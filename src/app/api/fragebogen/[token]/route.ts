@@ -169,7 +169,7 @@ export async function PUT(
     );
   }
 
-  const { currentStep, children, ...data } = body;
+  const { currentStep, children, ...data } = parsed.data;
 
   // Status auf IN_PROGRESS setzen falls noch INVITED
   if (onboarding.status === "INVITED") {

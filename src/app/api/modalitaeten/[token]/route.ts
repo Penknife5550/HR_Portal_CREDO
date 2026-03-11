@@ -139,7 +139,7 @@ export async function PUT(
     );
   }
 
-  const { currentStep, ...data } = body;
+  const { currentStep, ...data } = parsed.data;
 
   // Whitelist erlaubter Felder (Mass-Assignment-Schutz)
   const ALLOWED_FIELDS = new Set([

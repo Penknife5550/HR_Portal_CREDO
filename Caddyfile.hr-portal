@@ -1,0 +1,20 @@
+hr.fes-credo.de {
+    request_body {
+        max_size 50MB
+    }
+
+    header {
+        # Security Headers
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()"
+
+        # Server-Header entfernen
+        -Server
+    }
+
+    encode gzip
+
+    reverse_proxy credo-hr-app:3000
+}

@@ -90,8 +90,11 @@ export async function POST(request: NextRequest) {
     if (!lastName || typeof lastName !== "string" || !lastName.trim()) {
       errors.push("Nachname ist ein Pflichtfeld");
     }
-    if (!password || typeof password !== "string" || password.length < 6) {
-      errors.push("Passwort muss mindestens 6 Zeichen lang sein");
+    if (!password || typeof password !== "string" || password.length < 12) {
+      errors.push("Passwort muss mindestens 12 Zeichen lang sein");
+    }
+    if (password && (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password))) {
+      errors.push("Passwort muss Gross-/Kleinbuchstaben und Ziffern enthalten");
     }
     if (role && !["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"].includes(role)) {
       errors.push("Ungueltige Rolle");

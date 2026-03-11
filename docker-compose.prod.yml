@@ -1,0 +1,60 @@
+# =============================================================================
+# CREDO HR-Portal - Produktions-Konfiguration
+# =============================================================================
+# Deployment: docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+# Voraussetzung: Caddy Reverse Proxy mit externem Netzwerk "reverse_proxy"
+# Domain: hr.fes-credo.de
+# =============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: credo-hr-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: credo
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: hr_portal
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U credo -d hr_portal"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: credo-hr-app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://credo:${DB_PASSWORD}@db:5432/hr_portal?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      MAGIC_LINK_EXPIRY_HOURS: ${MAGIC_LINK_EXPIRY_HOURS:-720}
+      N8N_WEBHOOK_BASE_URL: ${N8N_WEBHOOK_BASE_URL}
+      APP_URL: ${APP_URL:-https://hr.fes-credo.de}
+      NODE_ENV: production
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - reverse_proxy
+      - internal
+
+volumes:
+  postgres_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  reverse_proxy:
+    external: true
+  internal:
+    internal: true

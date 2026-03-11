@@ -112,9 +112,15 @@ export async function PATCH(
     }
 
     if (password !== undefined) {
-      if (typeof password !== "string" || password.length < 6) {
+      if (typeof password !== "string" || password.length < 12) {
         return NextResponse.json(
-          { error: "Passwort muss mindestens 6 Zeichen lang sein" },
+          { error: "Passwort muss mindestens 12 Zeichen lang sein" },
+          { status: 400 }
+        );
+      }
+      if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+        return NextResponse.json(
+          { error: "Passwort muss Gross-/Kleinbuchstaben und Ziffern enthalten" },
           { status: 400 }
         );
       }

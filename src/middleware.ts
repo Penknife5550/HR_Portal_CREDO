@@ -2,13 +2,15 @@
  * Next.js Middleware
  *
  * Setzt Security-Headers fuer alle Responses und
- * schuetzt Portal-Routen mit Session-Check.
+ * schuetzt Portal-Routen mit kryptographischer JWT-Validierung.
+ * Verwendet 'jose' (Edge-Runtime-kompatibel) statt 'jsonwebtoken'.
  */
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { jwtVerify } from "jose";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const isDev = process.env.NODE_ENV !== "production";
 
@@ -67,6 +69,19 @@ export function middleware(request: NextRequest) {
     const sessionCookie = request.cookies.get("credo_session");
     if (!sessionCookie?.value) {
       return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    // Kryptographische JWT-Validierung (nicht nur Cookie-Existenz pruefen)
+    try {
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "");
+      await jwtVerify(sessionCookie.value, secret, {
+        algorithms: ["HS256"],
+      });
+    } catch {
+      // Ungueltiger oder abgelaufener Token → Cookie loeschen, Redirect zu Login
+      const redirectResponse = NextResponse.redirect(new URL("/login", request.url));
+      redirectResponse.cookies.delete("credo_session");
+      return redirectResponse;
     }
   }
 

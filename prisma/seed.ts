@@ -7,6 +7,7 @@
 
 import { PrismaClient, OrganizationType, UserRole, QuestionnaireType } from "@prisma/client";
 import { hashSync } from "bcryptjs";
+import crypto from "crypto";
 
 const prisma = new PrismaClient();
 
@@ -130,12 +131,15 @@ async function main() {
   // =============================================
   // 2. Admin-User (Dimitri)
   // =============================================
+  // Sicheres Zufallspasswort generieren (NICHT das schwache "admin2026"!)
+  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(16).toString("hex");
+
   const adminUser = await prisma.user.upsert({
     where: { email: "dimitri@credo-gruppe.de" },
     update: {},
     create: {
       email: "dimitri@credo-gruppe.de",
-      passwordHash: hashSync("admin2026", 12),
+      passwordHash: hashSync(initialPassword, 12),
       firstName: "Dimitri",
       lastName: "Riesen",
       role: UserRole.SUPER_ADMIN,
@@ -146,7 +150,10 @@ async function main() {
     `👤 Admin-User angelegt: ${adminUser.firstName} ${adminUser.lastName} (${adminUser.email})`
   );
   console.log(`   Rolle: ${adminUser.role}`);
-  console.log(`   Passwort: admin2026 (BITTE AENDERN!)\n`);
+  console.log(`\n   ╔══════════════════════════════════════════════╗`);
+  console.log(`   ║  INITIALES PASSWORT: ${initialPassword}`);
+  console.log(`   ║  BITTE SOFORT AENDERN!`);
+  console.log(`   ╚══════════════════════════════════════════════╝\n`);
 
   // =============================================
   // 3. Formularvorlagen (Default-Templates je QuestionnaireType)

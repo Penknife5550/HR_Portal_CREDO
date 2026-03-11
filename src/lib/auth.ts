@@ -66,12 +66,17 @@ interface SessionPayload {
 }
 
 export function createSessionToken(payload: SessionPayload): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: SESSION_EXPIRY });
+  return jwt.sign(payload, getJwtSecret(), {
+    expiresIn: SESSION_EXPIRY,
+    algorithm: "HS256",
+  });
 }
 
 export function verifySessionToken(token: string): SessionPayload | null {
   try {
-    return jwt.verify(token, getJwtSecret()) as SessionPayload;
+    return jwt.verify(token, getJwtSecret(), {
+      algorithms: ["HS256"],
+    }) as SessionPayload;
   } catch {
     return null;
   }

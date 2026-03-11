@@ -1,0 +1,13 @@
+# CREDO HR-Portal — Suchmaschinen-Ausschluss
+# Keine internen Seiten oder API-Endpunkte indizieren
+
+User-agent: *
+Disallow: /api/
+Disallow: /fragebogen/
+Disallow: /modalitaeten/
+Disallow: /dashboard/
+Disallow: /benutzerverwaltung/
+Disallow: /checklisten/
+Disallow: /vorlagen/
+Disallow: /mandanten/
+Disallow: /login
