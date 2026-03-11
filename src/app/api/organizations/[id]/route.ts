@@ -1,0 +1,144 @@
+/**
+ * API: Einzelner Mandant
+ *
+ * GET   /api/organizations/[id] → Mandant laden
+ * PATCH /api/organizations/[id] → Mandant bearbeiten (nur SUPER_ADMIN)
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+
+// Gueltige OrganizationType-Werte (aus Prisma Schema)
+const VALID_ORG_TYPES = [
+  "GYMNASIUM", "GESAMTSCHULE", "GRUNDSCHULE", "BERUFSKOLLEG",
+  "KITA", "VERWALTUNG", "GMBH", "VEREIN",
+];
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: "Nicht authentifiziert" },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+
+    const organization = await prisma.organization.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        mandantNumber: true,
+        name: true,
+        shortName: true,
+        type: true,
+        isActive: true,
+        createdAt: true,
+        _count: {
+          select: { onboardings: true },
+        },
+      },
+    });
+
+    if (!organization) {
+      return NextResponse.json(
+        { error: "Mandant nicht gefunden" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ data: organization });
+  } catch (error) {
+    console.error("Fehler beim Laden des Mandanten:", error);
+    return NextResponse.json(
+      { error: "Interner Serverfehler" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Auth-Check: Nur SUPER_ADMIN
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: "Nicht authentifiziert" },
+        { status: 401 }
+      );
+    }
+    if (session.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Keine Berechtigung" },
+        { status: 403 }
+      );
+    }
+
+    const { id } = await params;
+    const body = await request.json();
+
+    // Pruefen ob Mandant existiert
+    const existing = await prisma.organization.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Mandant nicht gefunden" },
+        { status: 404 }
+      );
+    }
+
+    // Nur erlaubte Felder aktualisieren (mandantNumber ist readonly)
+    const updateData: Record<string, unknown> = {};
+
+    if (body.name !== undefined) {
+      if (typeof body.name !== "string" || !body.name.trim()) {
+        return NextResponse.json(
+          { error: "Name darf nicht leer sein" },
+          { status: 400 }
+        );
+      }
+      updateData.name = body.name.trim();
+    }
+
+    if (body.shortName !== undefined) {
+      updateData.shortName = body.shortName?.trim() || null;
+    }
+
+    if (body.type !== undefined) {
+      if (!VALID_ORG_TYPES.includes(body.type)) {
+        return NextResponse.json(
+          { error: `Ungueltiger Organisationstyp. Erlaubt: ${VALID_ORG_TYPES.join(", ")}` },
+          { status: 400 }
+        );
+      }
+      updateData.type = body.type;
+    }
+
+    if (body.isActive !== undefined) {
+      updateData.isActive = Boolean(body.isActive);
+    }
+
+    const organization = await prisma.organization.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return NextResponse.json({ data: organization });
+  } catch (error) {
+    console.error("Fehler beim Aktualisieren des Mandanten:", error);
+    return NextResponse.json(
+      { error: "Interner Serverfehler" },
+      { status: 500 }
+    );
+  }
+}

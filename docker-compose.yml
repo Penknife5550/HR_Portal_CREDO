@@ -1,0 +1,49 @@
+services:
+  # =============================================
+  # PostgreSQL 16 - Datenbank
+  # =============================================
+  db:
+    image: postgres:16-alpine
+    container_name: credo-hr-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: credo
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-credo_dev_2026}
+      POSTGRES_DB: hr_portal
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U credo -d hr_portal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =============================================
+  # Next.js 15 - CREDO HR-Portal
+  # =============================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: credo-hr-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://credo:${DB_PASSWORD:-credo_dev_2026}@db:5432/hr_portal?schema=public
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_bitte_in_produktion_aendern}
+      MAGIC_LINK_EXPIRY_HOURS: ${MAGIC_LINK_EXPIRY_HOURS:-720}
+      N8N_WEBHOOK_BASE_URL: ${N8N_WEBHOOK_BASE_URL:-http://localhost:5678/webhook}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      NODE_ENV: ${NODE_ENV:-production}
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local

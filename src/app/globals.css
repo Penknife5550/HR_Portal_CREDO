@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/*
+ * =============================================
+ * CREDO Verwaltung – Offizielles Corporate Design
+ * =============================================
+ * Primaerfarbe Verwaltung: #DADADA (Hellgrau)
+ * Schulvereine/Text: #575756 (Dunkelgrau)
+ * Schrift: Montserrat (Fliesstext), Arial (Fallback)
+ * CREDO-Linie: Grau + Gelb/Gruen/Rot/Blau
+ * KEINE Farbverlaeufe erlaubt!
+ * =============================================
+ */
+
+@theme inline {
+  --color-background: #ffffff;
+  --color-foreground: #1a1a1a;
+
+  /* CREDO Verwaltung: Dunkelgrau als Primaer (Buttons, Links) */
+  --color-primary: #575756;
+  --color-primary-foreground: #ffffff;
+
+  /* Sekundaer: Verwaltungs-Hellgrau */
+  --color-secondary: #f5f5f5;
+  --color-secondary-foreground: #575756;
+
+  /* Muted / Hintergrund */
+  --color-muted: #fafafa;
+  --color-muted-foreground: #737373;
+
+  /* Accent: CREDO Verwaltungs-Hellgrau */
+  --color-accent: #DADADA;
+  --color-accent-foreground: #1a1a1a;
+
+  /* Fehler */
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+
+  /* Borders & Input */
+  --color-border: #e5e5e5;
+  --color-input: #e5e5e5;
+  --color-ring: #575756;
+
+  /* Cards */
+  --color-card: #ffffff;
+  --color-card-foreground: #1a1a1a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a1a1a;
+
+  /* =============================================
+   * CREDO-Linie Farbpalette
+   * ============================================= */
+  --color-credo-gelb: #FBC900;
+  --color-credo-gruen: #6BAA24;
+  --color-credo-rot: #E2001A;
+  --color-credo-blau: #009AC6;
+  --color-credo-grau: #DADADA;
+  --color-credo-dunkelgrau: #575756;
+
+  /* Einrichtungsfarben (Dashboard, Filter-Chips) */
+  --color-einrichtung-gymnasium: #FBC900;
+  --color-einrichtung-gesamtschule: #6BAA24;
+  --color-einrichtung-gs-minderheide: #E2001A;
+  --color-einrichtung-gs-haddenhausen: #009AC6;
+  --color-einrichtung-gs-stemwede: #AD1C28;
+  --color-einrichtung-berufskolleg: #5C82A5;
+  --color-einrichtung-kita-espelkamp: #03A2B1;
+  --color-einrichtung-kita-minderheide: #89B946;
+  --color-einrichtung-kita-herford: #FFDD00;
+  --color-einrichtung-kita-porta: #E4003A;
+
+  /* Status-Farben Onboarding-Dashboard */
+  --color-status-invited: #3b82f6;
+  --color-status-in-progress: #f59e0b;
+  --color-status-submitted: #8b5cf6;
+  --color-status-supervisor-pending: #ec4899;
+  --color-status-supervisor-submitted: #a855f7;
+  --color-status-reviewed: #10b981;
+  --color-status-completed: #059669;
+  --color-status-expired: #ef4444;
+
+  /* Radien */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+
+  /* Typografie: Montserrat (CREDO) + Arial (CI-Fallback) */
+  --font-sans: "Montserrat", "Arial", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-heading: "ITC Avant Garde Gothic", "Montserrat", "Arial", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  * {
+    @apply border-border;
+  }
+}
+
+/* =============================================
+ * CREDO-Linie (zentrales Gestaltungselement)
+ * Linke Haelfte: Grau | Rechte Haelfte: 4 Segmente
+ * ============================================= */
+.credo-linie {
+  display: flex;
+  height: 4px;
+  width: 100%;
+}
+
+.credo-linie--grau {
+  flex: 1;
+  background-color: #DADADA;
+}
+
+.credo-linie--gelb {
+  flex: 0.125;
+  background-color: #FBC900;
+}
+
+.credo-linie--gruen {
+  flex: 0.125;
+  background-color: #6BAA24;
+}
+
+.credo-linie--rot {
+  flex: 0.125;
+  background-color: #E2001A;
+}
+
+.credo-linie--blau {
+  flex: 0.125;
+  background-color: #009AC6;
+}
