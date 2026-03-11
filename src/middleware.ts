@@ -10,6 +10,7 @@ import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
+  const isDev = process.env.NODE_ENV !== "production";
 
   // =============================================
   // Security Headers
@@ -26,15 +27,24 @@ export function middleware(request: NextRequest) {
     "Strict-Transport-Security",
     "max-age=31536000; includeSubDomains"
   );
+
+  // CSP: In Dev-Modus unsafe-eval erlauben (Next.js HMR benoetigt es)
+  const scriptSrc = isDev
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline'";
+  const connectSrc = isDev
+    ? "connect-src 'self' ws://localhost:3000"
+    : "connect-src 'self'";
+
   response.headers.set(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
-      "connect-src 'self'",
+      connectSrc,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -49,7 +59,9 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPortalRoute = pathname.startsWith("/dashboard") ||
                         pathname.startsWith("/benutzerverwaltung") ||
-                        pathname.startsWith("/vorlagen");
+                        pathname.startsWith("/vorlagen") ||
+                        pathname.startsWith("/checklisten") ||
+                        pathname.startsWith("/mandanten");
 
   if (isPortalRoute) {
     const sessionCookie = request.cookies.get("credo_session");
