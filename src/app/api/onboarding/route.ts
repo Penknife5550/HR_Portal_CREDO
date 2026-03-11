@@ -225,6 +225,9 @@ export async function GET(request: NextRequest) {
           supervisorData: {
             select: { isComplete: true, currentStep: true },
           },
+          _count: {
+            select: { notes: true },
+          },
         },
         orderBy: { createdAt: "desc" },
         take: limit,

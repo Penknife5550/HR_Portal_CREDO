@@ -88,6 +88,7 @@ model OnboardingProcess {
   personalData            PersonalData?
   supervisorData          SupervisorData?
   documents               Document[]
+  notes                   OnboardingNote[]
   auditLogs               AuditLog[]
 
   createdAt               DateTime         @default(now())
@@ -383,6 +384,7 @@ model User {
   reviewedOnboardings     OnboardingProcess[] @relation("ReviewedBy")
   reviewedDocuments       Document[]
   completedChecklistItems ChecklistItem[]     @relation("CompletedChecklistItems")
+  onboardingNotes         OnboardingNote[]    @relation("NoteCreatedBy")
   auditLogs               AuditLog[]
 
   createdAt         DateTime           @default(now())
@@ -416,6 +418,25 @@ model AuditLog {
   @@index([onboardingId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// =============================================
+// Vorgang-Notizen (allgemeine Notizen pro Onboarding)
+// =============================================
+model OnboardingNote {
+  id            String            @id @default(uuid())
+  onboardingId  String
+  onboarding    OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+
+  content       String
+  createdById   String
+  createdBy     User              @relation("NoteCreatedBy", fields: [createdById], references: [id])
+
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([onboardingId])
+  @@map("onboarding_notes")
 }
 
 // =============================================

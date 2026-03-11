@@ -43,11 +43,22 @@ export async function GET(
           },
           orderBy: [{ category: "asc" }, { orderIndex: "asc" }],
         },
+        notes: {
+          include: {
+            createdBy: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
         invitedBy: {
           select: { firstName: true, lastName: true, email: true },
         },
         reviewedBy: {
           select: { firstName: true, lastName: true, email: true },
+        },
+        _count: {
+          select: { notes: true },
         },
       },
     });
