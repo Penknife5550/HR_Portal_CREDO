@@ -1,49 +1,60 @@
 services:
-  # =============================================
-  # PostgreSQL 16 - Datenbank
-  # =============================================
   db:
     image: postgres:16-alpine
     container_name: credo-hr-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: credo
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-credo_dev_2026}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: hr_portal
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U credo -d hr_portal"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 5
 
-  # =============================================
-  # Next.js 15 - CREDO HR-Portal
-  # =============================================
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: credo-hr-app
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://credo:${DB_PASSWORD:-credo_dev_2026}@db:5432/hr_portal?schema=public
-      JWT_SECRET: ${JWT_SECRET:-dev_secret_bitte_in_produktion_aendern}
+      DATABASE_URL: postgresql://credo:${DB_PASSWORD}@db:5432/hr_portal?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       MAGIC_LINK_EXPIRY_HOURS: ${MAGIC_LINK_EXPIRY_HOURS:-720}
-      N8N_WEBHOOK_BASE_URL: ${N8N_WEBHOOK_BASE_URL:-http://localhost:5678/webhook}
-      APP_URL: ${APP_URL:-http://localhost:3000}
-      NODE_ENV: ${NODE_ENV:-production}
+      N8N_WEBHOOK_BASE_URL: ${N8N_WEBHOOK_BASE_URL}
+      N8N_API_KEY: ${N8N_API_KEY}
+      APP_URL: ${APP_URL:-https://hr.fes-credo.de}
+      NODE_ENV: production
     volumes:
-      - ./uploads:/app/uploads
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - reverse_proxy
+      - internal
 
 volumes:
   postgres_data:
     driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  reverse_proxy:
+    external: true
+  internal:
+    internal: true
