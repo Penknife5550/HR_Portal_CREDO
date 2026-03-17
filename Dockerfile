@@ -43,9 +43,9 @@ COPY --from=deps --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/p
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
 
-# Entrypoint script
+# Entrypoint script (sed entfernt Windows CRLF-Zeilenumbrueche)
 COPY --chown=nextjs:nodejs entrypoint.sh ./
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
 USER nextjs
 
