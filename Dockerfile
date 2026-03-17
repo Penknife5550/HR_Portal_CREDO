@@ -39,8 +39,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
-# Prisma CLI global installieren (inkl. aller Abhaengigkeiten wie effect, @prisma/config)
-RUN npm install -g prisma
+# Prisma CLI global installieren - Version muss mit package-lock.json uebereinstimmen!
+RUN npm install -g prisma@6.19.2
 
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
