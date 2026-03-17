@@ -39,14 +39,20 @@ export function NeuerVorgangModal({
     onboardingId: string;
   } | null>(null);
 
+  // Escape-Taste zum Schliessen
+  useEffect(() => {
+    if (!open) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [open, onClose]);
+
   // Einrichtungen laden
   useEffect(() => {
     if (!open) return;
-    fetch("/api/onboarding?limit=0")
-      .then(() => {
-        // Einrichtungen separat laden
-        return fetch("/api/organizations");
-      })
+    fetch("/api/organizations")
       .then((res) => res.json())
       .then((data) => {
         if (data.data) setOrganizations(data.data);
@@ -171,8 +177,20 @@ export function NeuerVorgangModal({
                     className="flex-1 rounded-lg border border-input bg-muted px-3 py-2 font-mono text-xs"
                   />
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(result.fragebogenLink);
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(result.fragebogenLink);
+                      } catch {
+                        // Fallback fuer Nicht-HTTPS-Kontexte
+                        const textarea = document.createElement("textarea");
+                        textarea.value = result.fragebogenLink;
+                        textarea.style.position = "fixed";
+                        textarea.style.opacity = "0";
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand("copy");
+                        document.body.removeChild(textarea);
+                      }
                     }}
                     className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >

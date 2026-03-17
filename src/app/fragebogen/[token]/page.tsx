@@ -114,7 +114,7 @@ export default function FragebogenPage() {
   }
 
   // Fragebogen bereits eingereicht
-  if (data?.status === "SUBMITTED" || data?.status === "COMPLETED" || data?.status === "REVIEWED") {
+  if (data?.status === "SUBMITTED" || data?.status === "COMPLETED" || data?.status === "REVIEWED" || data?.status === "SUPERVISOR_PENDING" || data?.status === "SUPERVISOR_SUBMITTED") {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-4">
         <div className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-lg">

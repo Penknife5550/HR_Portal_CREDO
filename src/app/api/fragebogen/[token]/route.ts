@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { validateMagicToken } from "@/lib/auth";
+import { triggerN8nWebhook } from "@/lib/n8n";
+import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
 
@@ -124,6 +126,10 @@ export async function GET(
     personalData: personalData
       ? {
           ...personalData,
+          // Sensible Felder entschluesseln
+          iban: personalData.iban ? decrypt(personalData.iban) : "",
+          socialSecurityNumber: personalData.socialSecurityNumber ? decrypt(personalData.socialSecurityNumber) : "",
+          taxId: personalData.taxId ? decrypt(personalData.taxId) : "",
           // Dates als ISO strings
           birthDate: personalData.birthDate?.toISOString().split("T")[0] ?? "",
           dienstzeitBeginn:
@@ -147,6 +153,16 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  // Rate-Limiting
+  const clientIp = getClientIp(request);
+  const rlCheck = tokenRateLimiter.check(clientIp);
+  if (!rlCheck.allowed) {
+    return NextResponse.json(
+      { error: "Zu viele Anfragen. Bitte warten Sie." },
+      { status: 429 }
+    );
+  }
+
   const { token } = await params;
 
   const result = await validateMagicToken(token);
@@ -237,6 +253,16 @@ export async function PUT(
     updateData.currentStep = currentStep;
   }
 
+  // Sensible Felder verschluesseln (DSGVO Art. 32)
+  if (isEncryptionConfigured()) {
+    const ENCRYPTED_FIELDS = ["iban", "socialSecurityNumber", "taxId"];
+    for (const field of ENCRYPTED_FIELDS) {
+      if (typeof updateData[field] === "string" && updateData[field]) {
+        updateData[field] = encrypt(updateData[field] as string);
+      }
+    }
+  }
+
   const personalData = await prisma.personalData.upsert({
     where: { onboardingId: onboarding.id },
     create: {
@@ -299,6 +325,16 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  // Rate-Limiting
+  const clientIp = getClientIp(request);
+  const rlCheck = tokenRateLimiter.check(clientIp);
+  if (!rlCheck.allowed) {
+    return NextResponse.json(
+      { error: "Zu viele Anfragen. Bitte warten Sie." },
+      { status: 429 }
+    );
+  }
+
   const { token } = await params;
 
   const result = await validateMagicToken(token);
@@ -361,23 +397,11 @@ export async function POST(
   });
 
   // n8n Webhook aufrufen (falls konfiguriert)
-  const webhookUrl = process.env.N8N_WEBHOOK_URL;
-  if (webhookUrl) {
-    try {
-      await fetch(`${webhookUrl}/questionnaire-completed`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          onboardingId: onboarding.id,
-          email: onboarding.email,
-          organization: onboarding.organization.name,
-        }),
-      });
-    } catch (error) {
-      console.error("n8n Webhook fehlgeschlagen:", error);
-      // Nicht blockierend – Fragebogen wird trotzdem als eingereicht markiert
-    }
-  }
+  await triggerN8nWebhook("questionnaire-completed", {
+    onboardingId: onboarding.id,
+    email: onboarding.email,
+    organization: onboarding.organization.name,
+  });
 
   return NextResponse.json({
     success: true,

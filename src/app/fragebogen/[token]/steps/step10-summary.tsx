@@ -449,7 +449,7 @@ export function Step10Summary({
           />
           <div>
             <span className="text-sm font-medium text-foreground">
-              Ich bestaaetige die vorstehende Erklaerung.{" "}
+              Ich bestaetige die vorstehende Erklaerung.{" "}
               <span className="text-destructive">*</span>
             </span>
             <p className="text-xs text-muted-foreground">

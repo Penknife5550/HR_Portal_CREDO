@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { decrypt } from "@/lib/encryption";
 
 export async function GET(
   request: NextRequest,
@@ -121,13 +122,13 @@ export async function GET(
         pd?.phone || "",
         pd?.mobile || "",
         onboarding.email,
-        pd?.iban || "",
+        pd?.iban ? decrypt(pd.iban) : "",
         pd?.bic || "",
         pd?.accountHolder || "",
-        pd?.socialSecurityNumber || "",
+        pd?.socialSecurityNumber ? decrypt(pd.socialSecurityNumber) : "",
         pd?.healthInsuranceName || "",
         pd?.healthInsuranceType || "",
-        pd?.taxId || "",
+        pd?.taxId ? decrypt(pd.taxId) : "",
         pd?.taxClass || "",
         pd?.childAllowance?.toString() || "",
         pd?.parentStatus ? "Ja" : "Nein",
@@ -169,7 +170,16 @@ export async function GET(
       });
     }
 
-    // JSON-Export (Standard)
+    // JSON-Export (Standard) – sensible Felder entschluesseln
+    const decryptedPersonalData = onboarding.personalData
+      ? {
+          ...onboarding.personalData,
+          iban: onboarding.personalData.iban ? decrypt(onboarding.personalData.iban) : null,
+          socialSecurityNumber: onboarding.personalData.socialSecurityNumber ? decrypt(onboarding.personalData.socialSecurityNumber) : null,
+          taxId: onboarding.personalData.taxId ? decrypt(onboarding.personalData.taxId) : null,
+        }
+      : null;
+
     return NextResponse.json({
       onboarding: {
         id: onboarding.id,
@@ -178,7 +188,7 @@ export async function GET(
         organization: onboarding.organization,
         createdAt: onboarding.createdAt,
       },
-      personalData: onboarding.personalData,
+      personalData: decryptedPersonalData,
       supervisorData: onboarding.supervisorData,
     });
   } catch (error) {

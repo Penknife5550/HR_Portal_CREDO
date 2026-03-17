@@ -87,6 +87,14 @@ export function DocumentUpload({ token }: DocumentUploadProps) {
   const handleUpload = async (file: File) => {
     setError("");
     setSuccess("");
+
+    // Client-seitige Dateigroessen-Validierung (max. 10 MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`Datei "${file.name}" ist zu gross (max. 10 MB).`);
+      return;
+    }
+
     setUploading(true);
 
     const formData = new FormData();

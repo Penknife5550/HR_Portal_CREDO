@@ -70,7 +70,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(onboarding);
+    // Tokens aus der Antwort entfernen (Sicherheit: Magic-Links nicht exponieren)
+    const { token: _t, supervisorToken: _st, ...safeOnboarding } = onboarding;
+
+    return NextResponse.json(safeOnboarding);
   } catch (error) {
     console.error("Fehler beim Laden des Vorgangs:", error);
     return NextResponse.json(

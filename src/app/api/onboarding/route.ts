@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateToken, getTokenExpiryDate, getSession } from "@/lib/auth";
+import { triggerN8nWebhook } from "@/lib/n8n";
 
 // =============================================
 // POST /api/onboarding – Neuen Vorgang anlegen
@@ -52,23 +53,28 @@ export async function POST(request: NextRequest) {
     const tokenExpiresAt = getTokenExpiryDate();
 
     // Vorgangs-ID generieren: {Jahr}-{Org-Kuerzel}-{laufende Nummer}
+    // Retry-Logik gegen Race-Condition bei gleichzeitigen Requests
     const currentYear = new Date().getFullYear();
     const yearStart = new Date(currentYear, 0, 1);
     const yearEnd = new Date(currentYear + 1, 0, 1);
-
-    const countThisYear = await prisma.onboardingProcess.count({
-      where: {
-        createdAt: {
-          gte: yearStart,
-          lt: yearEnd,
-        },
-      },
-    });
-    const sequentialNumber = countThisYear + 1;
     const shortName = org.shortName || org.mandantNumber;
-    const displayId = `${currentYear}-${shortName}-${sequentialNumber
-      .toString()
-      .padStart(3, "0")}`;
+
+    let displayId = "";
+    let sequentialNumber = 0;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const countThisYear = await prisma.onboardingProcess.count({
+        where: { createdAt: { gte: yearStart, lt: yearEnd } },
+      });
+      sequentialNumber = countThisYear + 1 + attempt;
+      displayId = `${currentYear}-${shortName}-${sequentialNumber
+        .toString()
+        .padStart(3, "0")}`;
+      const exists = await prisma.onboardingProcess.findUnique({
+        where: { displayId },
+        select: { id: true },
+      });
+      if (!exists) break;
+    }
 
     // Onboarding-Vorgang anlegen
     const onboarding = await prisma.onboardingProcess.create({
@@ -110,22 +116,18 @@ export async function POST(request: NextRequest) {
     });
 
     if (checklistTemplate && checklistTemplate.items.length > 0) {
-      // ChecklistItems aus den TemplateItems erstellen
-      for (const templateItem of checklistTemplate.items) {
-        // dueDate berechnen: Wenn supervisorData.vertragsbeginn bekannt, sonst null
-        // Beim Erstellen des Onboardings ist vertragsbeginn noch nicht bekannt → null
-        await prisma.checklistItem.create({
-          data: {
-            onboardingId: onboarding.id,
-            templateItemId: templateItem.id,
-            title: templateItem.title,
-            category: templateItem.category,
-            orderIndex: templateItem.orderIndex,
-            dueDate: null, // Wird spaeter berechnet wenn vertragsbeginn bekannt
-            assignee: templateItem.defaultAssignee,
-          },
-        });
-      }
+      // ChecklistItems aus den TemplateItems erstellen (Batch-Insert)
+      await prisma.checklistItem.createMany({
+        data: checklistTemplate.items.map((templateItem) => ({
+          onboardingId: onboarding.id,
+          templateItemId: templateItem.id,
+          title: templateItem.title,
+          category: templateItem.category,
+          orderIndex: templateItem.orderIndex,
+          dueDate: null,
+          assignee: templateItem.defaultAssignee,
+        })),
+      });
 
       // checklistTemplateId auf dem OnboardingProcess setzen
       await prisma.onboardingProcess.update({
@@ -151,6 +153,17 @@ export async function POST(request: NextRequest) {
     // Link zusammenbauen
     const appUrl = process.env.APP_URL || "http://localhost:3000";
     const fragebogenLink = `${appUrl}/fragebogen/${token}`;
+
+    // n8n Webhook: Onboarding erstellt (damit n8n die Magic-Link-E-Mail senden kann)
+    await triggerN8nWebhook("onboarding-created", {
+      onboardingId: onboarding.id,
+      displayId: onboarding.displayId,
+      email: onboarding.email,
+      fragebogenLink,
+      organization: org.name,
+      mandantNumber: org.mandantNumber,
+      tokenExpiresAt: onboarding.tokenExpiresAt.toISOString(),
+    });
 
     return NextResponse.json(
       {

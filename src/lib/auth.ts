@@ -8,7 +8,8 @@
 
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
+import crypto from "crypto";
+import { cookies, headers } from "next/headers";
 import { prisma } from "./db";
 
 /**
@@ -83,6 +84,27 @@ export function verifySessionToken(token: string): SessionPayload | null {
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
+  // 1. API-Key-Auth fuer n8n Service-Calls (X-API-Key Header)
+  const configuredKey = process.env.N8N_API_KEY;
+  if (configuredKey) {
+    const headerStore = await headers();
+    const apiKey = headerStore.get("x-api-key");
+    if (
+      apiKey &&
+      apiKey.length === configuredKey.length &&
+      crypto.timingSafeEqual(Buffer.from(apiKey), Buffer.from(configuredKey))
+    ) {
+      return {
+        userId: "n8n-service",
+        email: "n8n@credo-gruppe.de",
+        role: "SERVICE",
+        firstName: "n8n",
+        lastName: "Service",
+      };
+    }
+  }
+
+  // 2. Standard Cookie-Session
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;

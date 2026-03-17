@@ -103,6 +103,13 @@ export function MandantenContent({ user }: { user: User }) {
 
   // Mandant aktivieren/deaktivieren
   async function handleToggleActive(org: Organization) {
+    if (org.isActive) {
+      const confirmed = confirm(
+        `Moechten Sie "${org.name}" wirklich deaktivieren?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
       const res = await fetch(`/api/organizations/${org.id}`, {
         method: "PATCH",

@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { validateSupervisorToken } from "@/lib/auth";
+import { triggerN8nWebhook } from "@/lib/n8n";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
 
@@ -117,6 +118,16 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  // Rate-Limiting
+  const clientIp = getClientIp(request);
+  const rlCheck = tokenRateLimiter.check(clientIp);
+  if (!rlCheck.allowed) {
+    return NextResponse.json(
+      { error: "Zu viele Anfragen. Bitte warten Sie." },
+      { status: 429 }
+    );
+  }
+
   const { token } = await params;
 
   const result = await validateSupervisorToken(token);
@@ -179,7 +190,7 @@ export async function PUT(
     "befristet", "vollzeit", "svPflichtig", "minijob", "ehrenamt",
     "probezeit", "jahressonderzahlung", "sachbezuege", "zulage",
     "masernschutzErforderlich", "masernschutzVorArbeitsbeginn", "zeiterfassung",
-  ];
+  ] as const;
   for (const field of boolFields) {
     if (typeof data[field] === "boolean") {
       updateData[field] = data[field];
@@ -206,9 +217,19 @@ export async function PUT(
 // POST – Modalitaeten endgueltig absenden
 // =============================================
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  // Rate-Limiting
+  const clientIp = getClientIp(request);
+  const rlCheck = tokenRateLimiter.check(clientIp);
+  if (!rlCheck.allowed) {
+    return NextResponse.json(
+      { error: "Zu viele Anfragen. Bitte warten Sie." },
+      { status: 429 }
+    );
+  }
+
   const { token } = await params;
 
   const result = await validateSupervisorToken(token);
@@ -251,23 +272,12 @@ export async function POST(
   });
 
   // n8n Webhook
-  const webhookUrl = process.env.N8N_WEBHOOK_URL;
-  if (webhookUrl) {
-    try {
-      await fetch(`${webhookUrl}/supervisor-completed`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          onboardingId: onboarding.id,
-          email: onboarding.email,
-          supervisorEmail: onboarding.supervisorEmail,
-          organization: onboarding.organization.name,
-        }),
-      });
-    } catch (error) {
-      console.error("n8n Webhook fehlgeschlagen:", error);
-    }
-  }
+  await triggerN8nWebhook("supervisor-completed", {
+    onboardingId: onboarding.id,
+    email: onboarding.email,
+    supervisorEmail: onboarding.supervisorEmail,
+    organization: onboarding.organization.name,
+  });
 
   return NextResponse.json({
     success: true,

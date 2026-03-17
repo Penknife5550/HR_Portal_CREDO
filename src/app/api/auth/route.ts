@@ -45,6 +45,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // HashDoS-Schutz: Laengenbegrenzung vor bcrypt-Verarbeitung
+    if (typeof password !== "string" || password.length > 256) {
+      return NextResponse.json(
+        { error: "Ungueltige Anmeldedaten" },
+        { status: 400 }
+      );
+    }
+    if (typeof email !== "string" || email.length > 254) {
+      return NextResponse.json(
+        { error: "Ungueltige Anmeldedaten" },
+        { status: 400 }
+      );
+    }
+
     // Rate Limiting per E-Mail (schuetzt gegen Brute-Force auf einzelnen Account)
     const normalizedEmail = String(email).trim().toLowerCase();
     const emailCheck = loginEmailRateLimiter.check(normalizedEmail);

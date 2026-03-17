@@ -109,6 +109,13 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
   async function handleToggleActive(targetUser: PortalUser) {
     if (targetUser.id === user.userId) return;
 
+    if (targetUser.isActive) {
+      const confirmed = confirm(
+        `Moechten Sie ${targetUser.firstName} ${targetUser.lastName} wirklich deaktivieren?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
       if (targetUser.isActive) {
         // Deaktivieren via DELETE

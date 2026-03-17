@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateToken, getTokenExpiryDate, getSession } from "@/lib/auth";
+import { triggerN8nWebhook } from "@/lib/n8n";
 
 export async function POST(
   request: NextRequest,
@@ -79,6 +80,7 @@ export async function POST(
     await prisma.auditLog.create({
       data: {
         onboardingId: id,
+        userId: session.userId,
         action: "SUPERVISOR_LINK_CREATED",
         details: {
           supervisorEmail,
@@ -91,6 +93,20 @@ export async function POST(
     const appUrl = process.env.APP_URL || "http://localhost:3000";
     const modalitaetenLink = `${appUrl}/modalitaeten/${supervisorToken}`;
 
+    // n8n Webhook: Vorgesetzten-Link erstellt (damit n8n die E-Mail an den Vorgesetzten senden kann)
+    const employeeName = onboarding.firstName
+      ? `${onboarding.firstName} ${onboarding.lastName}`
+      : onboarding.email;
+    await triggerN8nWebhook("supervisor-link-created", {
+      onboardingId: id,
+      supervisorEmail,
+      modalitaetenLink,
+      employeeName,
+      organization: onboarding.organization.name,
+      mandantNumber: onboarding.organization.mandantNumber,
+      supervisorTokenExpiresAt: supervisorTokenExpiresAt.toISOString(),
+    });
+
     return NextResponse.json(
       {
         id: updated.id,
@@ -102,9 +118,7 @@ export async function POST(
           name: onboarding.organization.name,
           mandantNumber: onboarding.organization.mandantNumber,
         },
-        employeeName: onboarding.firstName
-          ? `${onboarding.firstName} ${onboarding.lastName}`
-          : onboarding.email,
+        employeeName,
         supervisorTokenExpiresAt,
       },
       { status: 201 }

@@ -124,6 +124,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
         return;
       }
 
+      setSubmissionTime(new Date());
       setSubmitted(true);
     } catch {
       setSaveMessage("Verbindungsfehler. Bitte versuchen Sie es erneut.");
@@ -139,14 +140,14 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     return `CREDO-PF-${year}-${shortId}`;
   };
 
-  const submissionTime = new Date();
+  const [submissionTime, setSubmissionTime] = useState<Date | null>(null);
   const fullName = formData.firstName && formData.lastName
     ? `${formData.firstName} ${formData.lastName}`
     : initialData.email;
   const verificationCode = `${token.substring(0, 4)}-${token.substring(token.length - 4)}`.toUpperCase();
 
   // Erfolgsmeldung nach Absenden – mit digitaler Signatur
-  if (submitted) {
+  if (submitted && submissionTime) {
     const signatureId = generateSignatureId();
 
     return (

@@ -178,7 +178,7 @@ export default function ModalitaetenPage() {
   }
 
   // Already submitted
-  if (submitted || pageData?.status === "SUPERVISOR_SUBMITTED") {
+  if (submitted || pageData?.status === "SUPERVISOR_SUBMITTED" || pageData?.status === "REVIEWED" || pageData?.status === "COMPLETED") {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-4">
         <div className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-lg">

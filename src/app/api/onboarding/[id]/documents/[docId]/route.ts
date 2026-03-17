@@ -89,7 +89,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": document.mimeType || "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${document.fileName.replace(/[^a-zA-Z0-9._\- \u00C0-\u024F]/g, "_")}"`,
+        "Content-Disposition": `attachment; filename="${document.fileName.replace(/[^a-zA-Z0-9._\- \u00C0-\u024F]/g, "_").replace(/"/g, "")}"`,
         "Content-Length": fileBuffer.length.toString(),
       },
     });

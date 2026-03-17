@@ -73,7 +73,11 @@ export async function middleware(request: NextRequest) {
 
     // Kryptographische JWT-Validierung (nicht nur Cookie-Existenz pruefen)
     try {
-      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "");
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+      const secret = new TextEncoder().encode(jwtSecret);
       await jwtVerify(sessionCookie.value, secret, {
         algorithms: ["HS256"],
       });
