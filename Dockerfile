@@ -18,6 +18,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
+# Seed-Script von TypeScript zu JavaScript kompilieren
+RUN npx tsc --esModuleInterop --module commonjs --target es2020 \
+    --resolveJsonModule --skipLibCheck \
+    --outDir prisma/compiled prisma/seed.ts
 
 # Stage 3: Production
 FROM node:20-alpine AS runner
@@ -36,8 +40,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Prisma: Schema fuer Migrationen + generierter Client fuer Runtime
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# Kompiliertes Seed-Script (JS) fuer Produktion
+COPY --from=builder --chown=nextjs:nodejs /app/prisma/compiled/seed.js ./prisma/seed.js
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+# bcryptjs wird vom Seed benoetigt
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/bcryptjs ./node_modules/bcryptjs
 
 # Prisma CLI global installieren - Version muss mit package-lock.json uebereinstimmen!
 RUN npm install -g prisma@6.19.2
