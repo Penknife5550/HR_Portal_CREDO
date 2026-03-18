@@ -30,6 +30,7 @@ services:
       MAGIC_LINK_EXPIRY_HOURS: ${MAGIC_LINK_EXPIRY_HOURS:-720}
       N8N_WEBHOOK_BASE_URL: ${N8N_WEBHOOK_BASE_URL}
       N8N_API_KEY: ${N8N_API_KEY}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD}
       APP_URL: ${APP_URL:-https://hr.fes-credo.de}
       NODE_ENV: production
     volumes:
