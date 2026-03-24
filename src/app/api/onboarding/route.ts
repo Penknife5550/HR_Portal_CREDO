@@ -101,6 +101,21 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Fragebogen-Versionierung: Template-Snapshot zum Zeitpunkt der Erstellung speichern
+    const effectiveTypeForTemplate = questionnaireType || "STANDARD";
+    const formTemplate = await prisma.formTemplate.findUnique({
+      where: { questionnaireType: effectiveTypeForTemplate },
+    });
+    if (formTemplate) {
+      await prisma.onboardingProcess.update({
+        where: { id: onboarding.id },
+        data: {
+          formTemplateVersion: formTemplate.version ?? 1,
+          formTemplateSnapshot: formTemplate.stepsConfig as object,
+        },
+      });
+    }
+
     // Checkliste zuweisen: Suche aktive ChecklistTemplate passend zum questionnaireType
     const effectiveType = questionnaireType || "STANDARD";
     const checklistTemplate = await prisma.checklistTemplate.findFirst({
@@ -170,7 +185,6 @@ export async function POST(request: NextRequest) {
         id: onboarding.id,
         displayId: onboarding.displayId,
         email: onboarding.email,
-        token: onboarding.token,
         fragebogenLink,
         organization: {
           id: org.id,

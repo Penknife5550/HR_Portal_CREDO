@@ -8,15 +8,18 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { step6Schema, type Step6Data } from "@/lib/validations/personal-data";
+import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
   data: Record<string, unknown>;
   onNext: (data: Record<string, unknown>) => void;
   onBack: () => void;
   saving: boolean;
+  fieldConfig?: FieldConfigHelper;
 }
 
-export function Step6Employment({ data, onNext, onBack, saving }: StepProps) {
+export function Step6Employment({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
+  const fc = fieldConfig ?? new FieldConfigHelper(6);
   const {
     register,
     handleSubmit,
@@ -51,122 +54,132 @@ export function Step6Employment({ data, onNext, onBack, saving }: StepProps) {
       </div>
 
       {/* Hauptfrage */}
-      <div className="rounded-lg border border-border bg-muted/50 p-4">
-        <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            {...register("hasOtherEmployment")}
-            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-          />
-          <div>
-            <span className="text-sm font-medium text-foreground">
-              Ja, ich bin noch bei einem anderen Arbeitgeber beschaeftigt
-            </span>
-            <p className="text-xs text-muted-foreground">
-              Oder ich ueble eine selbststaendige / freiberufliche Taetigkeit
-              aus.
-            </p>
-          </div>
-        </label>
-      </div>
+      {fc.isVisible("hasOtherEmployment") && (
+        <div className="rounded-lg border border-border bg-muted/50 p-4">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              {...register("hasOtherEmployment")}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <div>
+              <span className="text-sm font-medium text-foreground">
+                {fc.getLabel("hasOtherEmployment")}
+              </span>
+              <p className="text-xs text-muted-foreground">
+                Oder ich ueble eine selbststaendige / freiberufliche Taetigkeit
+                aus.
+              </p>
+            </div>
+          </label>
+        </div>
+      )}
 
       {/* Bedingte Felder */}
       {hasOther && (
         <div className="space-y-4 rounded-lg border border-border p-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Name des anderen Arbeitgebers
-            </label>
-            <input
-              type="text"
-              {...register("otherEmployerName")}
-              placeholder="z.B. Firma XY GmbH"
-              className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Woechentliche Arbeitsstunden dort
-            </label>
-            <input
-              type="number"
-              {...register("otherWeeklyHours", { valueAsNumber: true })}
-              min={0}
-              max={60}
-              step={0.5}
-              placeholder="z.B. 10"
-              className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-            />
-            {errors.otherWeeklyHours && (
-              <p className="text-xs text-destructive">
-                {errors.otherWeeklyHours.message}
-              </p>
-            )}
-          </div>
+          {fc.isVisible("otherEmployerName") && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                {fc.getLabel("otherEmployerName")} {fc.isRequired("otherEmployerName") && <span className="text-destructive">*</span>}
+              </label>
+              <input
+                type="text"
+                {...register("otherEmployerName")}
+                placeholder="z.B. Firma XY GmbH"
+                className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              />
+            </div>
+          )}
+          {fc.isVisible("otherWeeklyHours") && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                {fc.getLabel("otherWeeklyHours")} {fc.isRequired("otherWeeklyHours") && <span className="text-destructive">*</span>}
+              </label>
+              <input
+                type="number"
+                {...register("otherWeeklyHours", { valueAsNumber: true })}
+                min={0}
+                max={60}
+                step={0.5}
+                placeholder="z.B. 10"
+                className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              />
+              {errors.otherWeeklyHours && (
+                <p className="text-xs text-destructive">
+                  {errors.otherWeeklyHours.message}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {/* Haupt- oder Nebenarbeitgeber */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">
-          Ist der Arbeitgeber kuenftig Haupt- oder Nebenarbeitgeber?{" "}
-          <span className="text-destructive">*</span>
-        </label>
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              value="hauptarbeitgeber"
-              {...register("employerType")}
-              className="h-4 w-4 border-border text-primary focus:ring-primary"
-            />
-            Ja, Hauptarbeitgeber
+      {fc.isVisible("employerType") && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">
+            {fc.getLabel("employerType")}{" "}
+            {fc.isRequired("employerType") && <span className="text-destructive">*</span>}
           </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              value="nebenarbeitgeber"
-              {...register("employerType")}
-              className="h-4 w-4 border-border text-primary focus:ring-primary"
-            />
-            Ja, Nebenarbeitgeber
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              value="nein"
-              {...register("employerType")}
-              className="h-4 w-4 border-border text-primary focus:ring-primary"
-            />
-            Nein
-          </label>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                value="hauptarbeitgeber"
+                {...register("employerType")}
+                className="h-4 w-4 border-border text-primary focus:ring-primary"
+              />
+              Ja, Hauptarbeitgeber
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                value="nebenarbeitgeber"
+                {...register("employerType")}
+                className="h-4 w-4 border-border text-primary focus:ring-primary"
+              />
+              Ja, Nebenarbeitgeber
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                value="nein"
+                {...register("employerType")}
+                className="h-4 w-4 border-border text-primary focus:ring-primary"
+              />
+              Nein
+            </label>
+          </div>
+          {errors.employerType && (
+            <p className="text-xs text-destructive">
+              {errors.employerType.message}
+            </p>
+          )}
         </div>
-        {errors.employerType && (
-          <p className="text-xs text-destructive">
-            {errors.employerType.message}
-          </p>
-        )}
-      </div>
+      )}
 
       {/* Weitere geringfuegige Beschaeftigung (Minijob) */}
-      <div className="rounded-lg border border-border bg-muted/50 p-4">
-        <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            {...register("hasMinijob")}
-            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-          />
-          <div>
-            <span className="text-sm font-medium text-foreground">
-              Ich uebe eine weitere geringfuegige Beschaeftigung (Minijob) aus
-            </span>
-            <p className="text-xs text-muted-foreground">
-              Bitte angeben, falls Sie neben dieser Taetigkeit einen Minijob
-              ausueben.
-            </p>
-          </div>
-        </label>
-      </div>
+      {fc.isVisible("hasMinijob") && (
+        <div className="rounded-lg border border-border bg-muted/50 p-4">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              {...register("hasMinijob")}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <div>
+              <span className="text-sm font-medium text-foreground">
+                {fc.getLabel("hasMinijob")}
+              </span>
+              <p className="text-xs text-muted-foreground">
+                Bitte angeben, falls Sie neben dieser Taetigkeit einen Minijob
+                ausueben.
+              </p>
+            </div>
+          </label>
+        </div>
+      )}
 
       {/* Navigation */}
       <div className="flex justify-between pt-4">

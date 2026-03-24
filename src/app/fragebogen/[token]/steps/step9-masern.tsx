@@ -9,6 +9,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { step9Schema, type Step9Data } from "@/lib/validations/personal-data";
+import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
   data: Record<string, unknown>;
@@ -16,6 +17,7 @@ interface StepProps {
   onBack: () => void;
   saving: boolean;
   organization: { name: string; type: string };
+  fieldConfig?: FieldConfigHelper;
 }
 
 export function Step9Masern({
@@ -24,7 +26,9 @@ export function Step9Masern({
   onBack,
   saving,
   organization,
+  fieldConfig,
 }: StepProps) {
+  const fc = fieldConfig ?? new FieldConfigHelper(9);
   const {
     register,
     handleSubmit,
@@ -86,27 +90,29 @@ export function Step9Masern({
       </div>
 
       {/* Geburtsjahr */}
-      <div className="rounded-lg border border-border bg-muted/50 p-4">
-        <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            {...register("bornAfter1971")}
-            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-          />
-          <div>
-            <span className="text-sm font-medium text-foreground">
-              Ich bin nach dem 31.12.1970 geboren
-            </span>
-            <p className="text-xs text-muted-foreground">
-              Personen, die vor 1971 geboren sind, gelten als immun und
-              benoetigen keinen Nachweis.
-            </p>
-          </div>
-        </label>
-      </div>
+      {fc.isVisible("bornAfter1971") && (
+        <div className="rounded-lg border border-border bg-muted/50 p-4">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              {...register("bornAfter1971")}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <div>
+              <span className="text-sm font-medium text-foreground">
+                {fc.getLabel("bornAfter1971")}
+              </span>
+              <p className="text-xs text-muted-foreground">
+                Personen, die vor 1971 geboren sind, gelten als immun und
+                benoetigen keinen Nachweis.
+              </p>
+            </div>
+          </label>
+        </div>
+      )}
 
       {/* Masernschutz vorhanden */}
-      {bornAfter1971 && (
+      {bornAfter1971 && fc.isVisible("masernschutzProvided") && (
         <div className="space-y-4 rounded-lg border border-border p-4">
           <label className="flex items-center gap-3">
             <input
@@ -116,7 +122,7 @@ export function Step9Masern({
             />
             <div>
               <span className="text-sm font-medium text-foreground">
-                Masernschutz liegt vor
+                {fc.getLabel("masernschutzProvided")}
               </span>
               <p className="text-xs text-muted-foreground">
                 Ich kann einen der folgenden Nachweise erbringen: Impfausweis

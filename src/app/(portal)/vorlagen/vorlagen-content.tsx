@@ -9,7 +9,9 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
+import { FIELD_REGISTRY, getDefaultFieldConfig, type FieldConfig } from "@/lib/field-definitions";
 
 // =============================================
 // Types
@@ -26,6 +28,7 @@ interface StepConfig {
   step: number;
   title: string;
   enabled: boolean;
+  fields?: FieldConfig[];
 }
 
 interface FormTemplate {
@@ -35,6 +38,8 @@ interface FormTemplate {
   description: string | null;
   stepsConfig: StepConfig[];
   isActive: boolean;
+  version?: number;
+  publishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +69,7 @@ const TYPE_COLORS: Record<string, string> = {
 // Component
 // =============================================
 export function VorlagenContent({ user }: { user: User }) {
+  const router = useRouter();
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +78,9 @@ export function VorlagenContent({ user }: { user: User }) {
   const [editedConfigs, setEditedConfigs] = useState<
     Record<string, StepConfig[]>
   >({});
+
+  // Welcher Schritt ist fuer Feld-Konfiguration aufgeklappt? "templateId:stepNumber"
+  const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
   // Tracking welche Templates gerade gespeichert werden
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
@@ -140,6 +149,47 @@ export function VorlagenContent({ user }: { user: User }) {
   }
 
   // =============================================
+  // Feld-Toggle (sichtbar/pflicht)
+  // =============================================
+  function handleFieldToggle(
+    templateId: string,
+    stepNumber: number,
+    fieldName: string,
+    property: "visible" | "required"
+  ) {
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+
+    const currentConfig = editedConfigs[templateId] || template.stepsConfig.map((s) => ({ ...s }));
+    const stepConfig = currentConfig.find((s) => s.step === stepNumber);
+    if (!stepConfig) return;
+
+    // Felder initialisieren falls noch nicht vorhanden
+    if (!stepConfig.fields) {
+      stepConfig.fields = getDefaultFieldConfig(stepNumber);
+    }
+
+    // Feld-Definition pruefen (alwaysVisible/alwaysRequired)
+    const definition = FIELD_REGISTRY[stepNumber]?.find((d) => d.name === fieldName);
+    if (property === "visible" && definition?.alwaysVisible) return;
+    if (property === "required" && definition?.alwaysRequired) return;
+
+    const field = stepConfig.fields.find((f) => f.name === fieldName);
+    if (!field) return;
+
+    if (property === "visible") {
+      field.visible = !field.visible;
+      // Wenn ausgeblendet, auch required deaktivieren
+      if (!field.visible) field.required = false;
+    } else {
+      field.required = !field.required;
+    }
+
+    setEditedConfigs((prev) => ({ ...prev, [templateId]: [...currentConfig] }));
+    setSuccessIds((prev) => { const next = new Set(prev); next.delete(templateId); return next; });
+  }
+
+  // =============================================
   // Pruefen ob Aenderungen vorliegen
   // =============================================
   function hasChanges(templateId: string): boolean {
@@ -149,9 +199,22 @@ export function VorlagenContent({ user }: { user: User }) {
     const template = templates.find((t) => t.id === templateId);
     if (!template) return false;
 
-    return edited.some((editedStep, index) => {
+    // Step-Level pruefen (enabled)
+    const stepChanged = edited.some((editedStep, index) => {
       const originalStep = template.stepsConfig[index];
       return originalStep && editedStep.enabled !== originalStep.enabled;
+    });
+    if (stepChanged) return true;
+
+    // Feld-Level pruefen
+    return edited.some((editedStep) => {
+      if (!editedStep.fields) return false;
+      const originalStep = template.stepsConfig.find((s) => s.step === editedStep.step);
+      const originalFields = originalStep?.fields ?? getDefaultFieldConfig(editedStep.step);
+      return editedStep.fields.some((ef) => {
+        const of = originalFields.find((f) => f.name === ef.name);
+        return of && (ef.visible !== of.visible || ef.required !== of.required);
+      });
     });
   }
 
@@ -339,9 +402,24 @@ export function VorlagenContent({ user }: { user: User }) {
                         </span>
                       )}
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                      {activeCount} von {steps.length} Schritten aktiv
-                    </span>
+                    <div className="flex items-center gap-3">
+                      {template.version && (
+                        <span className="text-xs text-muted-foreground">
+                          v{template.version}
+                        </span>
+                      )}
+                      <span className="text-sm text-muted-foreground">
+                        {activeCount} von {steps.length} Schritten
+                      </span>
+                      {canEdit && (
+                        <button
+                          onClick={() => router.push(`/vorlagen/vorschau/${template.id}`)}
+                          className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent"
+                        >
+                          Vorschau
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Beschreibung */}
@@ -357,96 +435,142 @@ export function VorlagenContent({ user }: { user: User }) {
                   <div className="px-6 py-4">
                     <div className="space-y-2">
                       {steps.map((step) => {
-                        const isMandatory = MANDATORY_STEPS.includes(
-                          step.step
-                        );
+                        const isMandatory = MANDATORY_STEPS.includes(step.step);
+                        const expandKey = `${template.id}:${step.step}`;
+                        const isExpanded = expandedStep === expandKey;
+                        const definitions = FIELD_REGISTRY[step.step] ?? [];
+                        const fields = step.fields ?? getDefaultFieldConfig(step.step);
 
                         return (
-                          <div
-                            key={step.step}
-                            className={`flex items-center justify-between rounded-lg px-4 py-3 transition-colors ${
-                              step.enabled
-                                ? "bg-white border border-border"
-                                : "bg-muted/50 border border-transparent"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              {/* Step-Nummer */}
-                              <span
-                                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                                  step.enabled
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted-foreground/20 text-muted-foreground"
-                                }`}
-                              >
-                                {step.step}
-                              </span>
-
-                              {/* Step-Titel */}
-                              <span
-                                className={`text-sm font-medium ${
-                                  step.enabled
-                                    ? "text-foreground"
-                                    : "text-muted-foreground line-through"
-                                }`}
-                              >
-                                {step.title}
-                              </span>
-
-                              {/* Pflichtschritt-Hinweis */}
-                              {isMandatory && (
-                                <span className="text-xs text-muted-foreground">
-                                  (Pflichtschritt)
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Toggle */}
-                            <div className="flex items-center gap-2">
-                              {isMandatory ? (
-                                <span className="text-xs text-muted-foreground">
-                                  Immer aktiv
-                                </span>
-                              ) : canEdit ? (
-                                <button
-                                  type="button"
-                                  role="switch"
-                                  aria-checked={step.enabled}
-                                  aria-label={`${step.title} ${step.enabled ? "deaktivieren" : "aktivieren"}`}
-                                  onClick={() =>
-                                    handleStepToggle(
-                                      template.id,
-                                      step.step
-                                    )
-                                  }
-                                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                                    step.enabled
-                                      ? "bg-primary"
-                                      : "bg-muted-foreground/30"
-                                  }`}
-                                >
-                                  <span
-                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out ${
-                                      step.enabled
-                                        ? "translate-x-5"
-                                        : "translate-x-0"
-                                    }`}
-                                  />
-                                </button>
-                              ) : (
+                          <div key={step.step}>
+                            {/* Step-Zeile */}
+                            <div
+                              className={`flex items-center justify-between rounded-lg px-4 py-3 transition-colors ${
+                                step.enabled
+                                  ? "bg-white border border-border"
+                                  : "bg-muted/50 border border-transparent"
+                              } ${isExpanded ? "rounded-b-none" : ""}`}
+                            >
+                              <div className="flex items-center gap-3">
                                 <span
-                                  className={`text-xs font-medium ${
+                                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
                                     step.enabled
-                                      ? "text-emerald-600"
-                                      : "text-muted-foreground"
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-muted-foreground/20 text-muted-foreground"
                                   }`}
                                 >
-                                  {step.enabled
-                                    ? "Aktiviert"
-                                    : "Deaktiviert"}
+                                  {step.step}
                                 </span>
-                              )}
+                                <span
+                                  className={`text-sm font-medium ${
+                                    step.enabled ? "text-foreground" : "text-muted-foreground line-through"
+                                  }`}
+                                >
+                                  {step.title}
+                                </span>
+                                {isMandatory && (
+                                  <span className="text-xs text-muted-foreground">(Pflichtschritt)</span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {/* Feld-Konfiguration aufklappen (nur fuer aktive Steps mit Feldern) */}
+                                {step.enabled && definitions.length > 0 && canEdit && (
+                                  <button
+                                    onClick={() => setExpandedStep(isExpanded ? null : expandKey)}
+                                    className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent"
+                                  >
+                                    {isExpanded ? "▲ Felder" : "▼ Felder"}
+                                  </button>
+                                )}
+
+                                {/* Step-Toggle */}
+                                {isMandatory ? (
+                                  <span className="text-xs text-muted-foreground">Immer aktiv</span>
+                                ) : canEdit ? (
+                                  <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={step.enabled}
+                                    onClick={() => handleStepToggle(template.id, step.step)}
+                                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                                      step.enabled ? "bg-primary" : "bg-muted-foreground/30"
+                                    }`}
+                                  >
+                                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform ${
+                                      step.enabled ? "translate-x-5" : "translate-x-0"
+                                    }`} />
+                                  </button>
+                                ) : (
+                                  <span className={`text-xs font-medium ${step.enabled ? "text-emerald-600" : "text-muted-foreground"}`}>
+                                    {step.enabled ? "Aktiviert" : "Deaktiviert"}
+                                  </span>
+                                )}
+                              </div>
                             </div>
+
+                            {/* Aufklappbare Feld-Konfiguration */}
+                            {isExpanded && step.enabled && (
+                              <div className="border border-t-0 border-border rounded-b-lg bg-muted/30 px-4 py-3">
+                                <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                  Felder in diesem Schritt
+                                </p>
+                                <div className="space-y-1.5">
+                                  {definitions.map((def) => {
+                                    const field = fields.find((f) => f.name === def.name);
+                                    const isVisible = field?.visible ?? def.defaultVisible;
+                                    const isRequired = field?.required ?? def.defaultRequired;
+
+                                    return (
+                                      <div
+                                        key={def.name}
+                                        className={`flex items-center justify-between rounded-md px-3 py-2 text-sm ${
+                                          isVisible ? "bg-white border border-border/50" : "bg-muted/50 opacity-60"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span className={`font-medium ${isVisible ? "text-foreground" : "text-muted-foreground line-through"}`}>
+                                            {def.label}
+                                          </span>
+                                          {def.alwaysVisible && (
+                                            <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-600">Pflichtfeld</span>
+                                          )}
+                                          {isRequired && isVisible && !def.alwaysRequired && (
+                                            <span className="text-destructive text-xs">*</span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          {/* Sichtbarkeit */}
+                                          {!def.alwaysVisible && (
+                                            <label className="flex items-center gap-1.5 cursor-pointer">
+                                              <input
+                                                type="checkbox"
+                                                checked={isVisible}
+                                                onChange={() => handleFieldToggle(template.id, step.step, def.name, "visible")}
+                                                className="h-3.5 w-3.5 rounded border-gray-300"
+                                              />
+                                              <span className="text-xs text-muted-foreground">Sichtbar</span>
+                                            </label>
+                                          )}
+                                          {/* Pflichtfeld */}
+                                          {isVisible && !def.alwaysRequired && (
+                                            <label className="flex items-center gap-1.5 cursor-pointer">
+                                              <input
+                                                type="checkbox"
+                                                checked={isRequired}
+                                                onChange={() => handleFieldToggle(template.id, step.step, def.name, "required")}
+                                                className="h-3.5 w-3.5 rounded border-gray-300"
+                                              />
+                                              <span className="text-xs text-muted-foreground">Pflicht</span>
+                                            </label>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { href: "/vorlagen", label: "Vorlagen", roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"] },
   { href: "/checklisten", label: "Checklisten", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },
   { href: "/mandanten", label: "Mandanten", roles: ["SUPER_ADMIN"] },
+  { href: "/einstellungen", label: "Einstellungen", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },
 ];
 
 export function PortalHeader({ user }: { user: User }) {
@@ -63,7 +64,7 @@ export function PortalHeader({ user }: { user: User }) {
           <nav className="hidden md:flex items-center gap-1">
             {NAV_ITEMS.filter((item) => item.roles.includes(user.role)).map(
               (item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname.startsWith(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -97,6 +98,7 @@ export function PortalHeader({ user }: { user: User }) {
           </div>
           <button
             onClick={handleLogout}
+            aria-label="Abmelden"
             className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
           >
             Abmelden
@@ -105,10 +107,10 @@ export function PortalHeader({ user }: { user: User }) {
       </div>
 
       {/* Mobile Navigation */}
-      <div className="flex md:hidden items-center gap-1 px-4 pb-2">
+      <div className="flex md:hidden overflow-x-auto items-center gap-1 px-4 pb-2">
         {NAV_ITEMS.filter((item) => item.roles.includes(user.role)).map(
           (item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

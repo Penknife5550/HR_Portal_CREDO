@@ -7,10 +7,11 @@
  * und CREDO Corporate Design.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
 import { STEP_CONFIG } from "@/lib/validations/personal-data";
+import { FieldConfigHelper, type StepFieldConfig } from "@/lib/field-definitions";
 
 // Step-Komponenten
 import { Step1Personal } from "./steps/step1-personal";
@@ -34,6 +35,7 @@ interface OnboardingData {
   };
   questionnaireType: string;
   status: string;
+  stepsConfig?: StepFieldConfig[] | null;
   personalData: Record<string, unknown> | null;
 }
 
@@ -52,6 +54,25 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+
+  // Aktive Steps berechnen (deaktivierte Steps ueberspringen)
+  const activeSteps = useMemo(() => {
+    if (!initialData.stepsConfig) return STEP_CONFIG.map((_, i) => i);
+    return initialData.stepsConfig
+      .filter((s) => s.enabled)
+      .map((s) => s.step - 1); // 0-basierter Index
+  }, [initialData.stepsConfig]);
+
+  // FieldConfig-Helper fuer jeden Step erstellen
+  const getFieldConfig = useCallback(
+    (stepNumber: number): FieldConfigHelper => {
+      const stepConfig = initialData.stepsConfig?.find(
+        (s) => s.step === stepNumber
+      );
+      return new FieldConfigHelper(stepNumber, stepConfig?.fields ?? undefined);
+    },
+    [initialData.stepsConfig]
+  );
 
   // Auto-Save: Step-Daten an API senden
   const saveStepData = useCallback(
@@ -334,18 +355,19 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
   };
 
   const stepComponents = [
-    <Step1Personal key="s1" {...stepProps} />,
-    <Step2Address key="s2" {...stepProps} />,
-    <Step3Bank key="s3" {...stepProps} />,
-    <Step4SocialSecurity key="s4" {...stepProps} />,
-    <Step5Tax key="s5" {...stepProps} />,
-    <Step6Employment key="s6" {...stepProps} />,
-    <Step7Children key="s7" {...stepProps} />,
-    <Step8Education key="s8" {...stepProps} />,
-    <Step9Masern key="s9" {...stepProps} />,
+    <Step1Personal key="s1" {...stepProps} fieldConfig={getFieldConfig(1)} />,
+    <Step2Address key="s2" {...stepProps} fieldConfig={getFieldConfig(2)} />,
+    <Step3Bank key="s3" {...stepProps} fieldConfig={getFieldConfig(3)} />,
+    <Step4SocialSecurity key="s4" {...stepProps} fieldConfig={getFieldConfig(4)} />,
+    <Step5Tax key="s5" {...stepProps} fieldConfig={getFieldConfig(5)} />,
+    <Step6Employment key="s6" {...stepProps} fieldConfig={getFieldConfig(6)} />,
+    <Step7Children key="s7" {...stepProps} fieldConfig={getFieldConfig(7)} />,
+    <Step8Education key="s8" {...stepProps} fieldConfig={getFieldConfig(8)} />,
+    <Step9Masern key="s9" {...stepProps} fieldConfig={getFieldConfig(9)} />,
     <Step10Summary
       key="s10"
       {...stepProps}
+      fieldConfig={getFieldConfig(10)}
       allData={formData}
       onSubmit={handleSubmit}
       token={token}

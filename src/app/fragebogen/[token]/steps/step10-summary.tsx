@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import { DocumentUpload } from "./document-upload";
+import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface ChildEntry {
   firstName: string;
@@ -26,6 +27,7 @@ interface StepProps {
   onSubmit: () => void;
   organization: { name: string; mandantNumber: string; type: string };
   token?: string;
+  fieldConfig?: FieldConfigHelper;
 }
 
 // Hilfs-Labels

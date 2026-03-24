@@ -113,6 +113,16 @@ export async function GET(
     include: { children: { orderBy: { orderIndex: "asc" } } },
   });
 
+  // Feld-Konfiguration laden: Snapshot vom Onboarding-Zeitpunkt (oder aktuelles Template)
+  let stepsConfig = onboarding.formTemplateSnapshot;
+  if (!stepsConfig) {
+    const formTemplate = await prisma.formTemplate.findUnique({
+      where: { questionnaireType: onboarding.questionnaireType },
+      select: { stepsConfig: true },
+    });
+    stepsConfig = formTemplate?.stepsConfig ?? null;
+  }
+
   return NextResponse.json({
     onboardingId: onboarding.id,
     email: onboarding.email,
@@ -123,6 +133,7 @@ export async function GET(
     },
     questionnaireType: onboarding.questionnaireType,
     status: onboarding.status,
+    stepsConfig, // Feld-Konfiguration fuer den Fragebogen
     personalData: personalData
       ? {
           ...personalData,

@@ -6,6 +6,7 @@
  */
 
 import { useState } from "react";
+import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface ChildEntry {
   firstName: string;
@@ -19,9 +20,10 @@ interface StepProps {
   onNext: (data: Record<string, unknown>) => void;
   onBack: () => void;
   saving: boolean;
+  fieldConfig?: FieldConfigHelper;
 }
 
-export function Step7Children({ data, onNext, onBack, saving }: StepProps) {
+export function Step7Children({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
   const existing = (data.children as ChildEntry[]) || [];
   const [children, setChildren] = useState<ChildEntry[]>(existing);
   const [errors, setErrors] = useState<Record<string, string>>({});

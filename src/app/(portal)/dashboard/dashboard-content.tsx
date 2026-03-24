@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { NeuerVorgangModal } from "@/components/neuer-vorgang-modal";
+import { STATUS_LABELS } from "@/lib/constants";
 
 interface User {
   userId: string;
@@ -55,26 +56,6 @@ interface Onboarding {
   } | null;
   _count?: { notes: number };
 }
-
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  INVITED: { label: "Eingeladen", color: "bg-[var(--color-status-invited)]/15 text-[var(--color-status-invited)]" },
-  IN_PROGRESS: {
-    label: "In Bearbeitung",
-    color: "bg-[var(--color-status-in-progress)]/15 text-[var(--color-status-in-progress)]",
-  },
-  SUBMITTED: { label: "Eingereicht", color: "bg-[var(--color-status-submitted)]/15 text-[var(--color-status-submitted)]" },
-  SUPERVISOR_PENDING: {
-    label: "Vorgesetzter offen",
-    color: "bg-[var(--color-status-supervisor-pending)]/15 text-[var(--color-status-supervisor-pending)]",
-  },
-  SUPERVISOR_SUBMITTED: {
-    label: "Vorgesetzter fertig",
-    color: "bg-[var(--color-status-supervisor-submitted)]/15 text-[var(--color-status-supervisor-submitted)]",
-  },
-  REVIEWED: { label: "Geprueft", color: "bg-[var(--color-status-reviewed)]/15 text-[var(--color-status-reviewed)]" },
-  COMPLETED: { label: "Abgeschlossen", color: "bg-[var(--color-status-completed)]/15 text-[var(--color-status-completed)]" },
-  EXPIRED: { label: "Abgelaufen", color: "bg-[var(--color-status-expired)]/15 text-[var(--color-status-expired)]" },
-};
 
 export function DashboardContent({ user }: { user: User }) {
   const [onboardings, setOnboardings] = useState<Onboarding[]>([]);
@@ -221,7 +202,7 @@ export function DashboardContent({ user }: { user: User }) {
         </div>
 
         {/* Tabelle */}
-        <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-lg border bg-card">
           {loading ? (
             <div className="p-8 text-center text-muted-foreground">
               Lade Vorgaenge...
@@ -309,7 +290,7 @@ export function DashboardContent({ user }: { user: User }) {
                         {ob.personalData?.isComplete
                           ? "Vollstaendig"
                           : ob.personalData
-                            ? `Step ${ob.personalData.currentStep}/10`
+                            ? `Schritt ${ob.personalData.currentStep}/10`
                             : "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">

@@ -94,6 +94,12 @@ export async function PATCH(
     if (description !== undefined) updateData.description = description;
     if (isActive !== undefined) updateData.isActive = isActive;
 
+    // Versionierung: Bei stepsConfig-Aenderung Version hochzaehlen
+    if (stepsConfig !== undefined) {
+      updateData.version = (existing.version ?? 0) + 1;
+      updateData.publishedAt = new Date();
+    }
+
     const updated = await prisma.formTemplate.update({
       where: { id },
       data: updateData,

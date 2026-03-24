@@ -2,18 +2,18 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen items-center justify-center bg-muted">
       <div className="text-center">
-        <h1 className="text-6xl font-bold text-gray-300 mb-4">404</h1>
-        <h2 className="text-2xl font-semibold text-gray-700 mb-2">
+        <h1 className="mb-4 text-6xl font-bold text-muted-foreground/30">404</h1>
+        <h2 className="mb-2 text-2xl font-semibold text-foreground">
           Seite nicht gefunden
         </h2>
-        <p className="text-gray-500 mb-8">
+        <p className="mb-8 text-muted-foreground">
           Die angeforderte Seite existiert nicht oder wurde verschoben.
         </p>
         <Link
           href="/"
-          className="inline-flex items-center px-6 py-3 bg-[#005d6a] text-white rounded-lg hover:bg-[#004a55] transition-colors"
+          className="inline-flex items-center rounded-lg bg-primary px-6 py-3 text-primary-foreground transition-colors hover:bg-primary/90"
         >
           Zur Startseite
         </Link>

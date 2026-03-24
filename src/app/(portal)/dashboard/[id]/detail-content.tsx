@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
+import { STATUS_LABELS } from "@/lib/constants";
 
 // =============================================
 // Types
@@ -123,17 +124,6 @@ interface DetailData {
 // =============================================
 // Constants
 // =============================================
-
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  INVITED: { label: "Eingeladen", color: "bg-blue-100 text-blue-700" },
-  IN_PROGRESS: { label: "In Bearbeitung", color: "bg-yellow-100 text-yellow-700" },
-  SUBMITTED: { label: "Eingereicht", color: "bg-orange-100 text-orange-700" },
-  SUPERVISOR_PENDING: { label: "Vorgesetzter offen", color: "bg-purple-100 text-purple-700" },
-  SUPERVISOR_SUBMITTED: { label: "Vorgesetzter fertig", color: "bg-indigo-100 text-indigo-700" },
-  REVIEWED: { label: "Geprueft", color: "bg-teal-100 text-teal-700" },
-  COMPLETED: { label: "Abgeschlossen", color: "bg-green-100 text-green-700" },
-  EXPIRED: { label: "Abgelaufen", color: "bg-red-100 text-red-700" },
-};
 
 const TABS = [
   { id: "overview", label: "Uebersicht" },
@@ -284,8 +274,8 @@ function CopyButton({ text, label = "Kopieren" }: { text: string; label?: string
     >
       {copied ? (
         <>
-          <CheckIcon className="h-3.5 w-3.5 text-[#6BAA24]" />
-          <span className="text-[#6BAA24]">Kopiert!</span>
+          <CheckIcon className="h-3.5 w-3.5 text-credo-gruen" />
+          <span className="text-credo-gruen">Kopiert!</span>
         </>
       ) : (
         <>
@@ -461,7 +451,7 @@ export function DetailContent({
         <PortalHeader user={user} />
         <div className="flex min-h-[60vh] items-center justify-center">
           <div className="text-center">
-            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-border border-t-[#6BAA24]" />
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-border border-t-credo-gruen" />
             <p className="text-sm text-muted-foreground">Lade Vorgangsdaten...</p>
           </div>
         </div>
@@ -558,7 +548,7 @@ export function DetailContent({
                   onClick={() => setActiveTab(tab.id)}
                   className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
                     isActive
-                      ? "border-[#6BAA24] text-[#6BAA24]"
+                      ? "border-credo-gruen text-credo-gruen"
                       : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
                   }`}
                 >
@@ -754,20 +744,20 @@ function TabOverview({
                     value={supervisorEmail}
                     onChange={(e) => setSupervisorEmail(e.target.value)}
                     placeholder="vorgesetzter@einrichtung.de"
-                    className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-[#009AC6] focus:ring-1 focus:ring-[#009AC6]"
+                    className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-credo-blau focus:ring-1 focus:ring-credo-blau"
                     onKeyDown={(e) => e.key === "Enter" && generateSupervisorLink()}
                   />
                   <button
                     onClick={generateSupervisorLink}
                     disabled={generatingLink || !supervisorEmail.trim()}
-                    className="shrink-0 rounded-md bg-[#6BAA24] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
+                    className="shrink-0 rounded-md bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
                   >
                     {generatingLink ? "..." : "Generieren"}
                   </button>
                 </div>
                 {linkResult && (
-                  <div className="rounded-md border border-[#6BAA24]/30 bg-[#6BAA24]/5 p-3">
-                    <p className="mb-2 text-xs font-medium text-[#6BAA24]">Link erstellt!</p>
+                  <div className="rounded-md border border-credo-gruen/30 bg-credo-gruen/5 p-3">
+                    <p className="mb-2 text-xs font-medium text-credo-gruen">Link erstellt!</p>
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
@@ -840,7 +830,7 @@ function TabOverview({
               onChange={(e) => setNewNote(e.target.value)}
               placeholder="Neue Notiz hinzufuegen..."
               rows={2}
-              className="min-w-0 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-[#009AC6] focus:ring-1 focus:ring-[#009AC6]"
+              className="min-w-0 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-credo-blau focus:ring-1 focus:ring-credo-blau"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) addNote();
               }}
@@ -848,7 +838,7 @@ function TabOverview({
             <button
               onClick={addNote}
               disabled={savingNote || !newNote.trim()}
-              className="shrink-0 self-end rounded-md bg-[#6BAA24] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
+              className="shrink-0 self-end rounded-md bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
             >
               {savingNote ? "..." : "Speichern"}
             </button>
@@ -914,7 +904,7 @@ function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: 
 
   const DOC_TYPE_COLORS: Record<string, string> = {
     PERSONALAUSWEIS: "bg-[#009AC6]/10 text-[#009AC6]",
-    LOHNSTEUERBESCHEINIGUNG: "bg-[#6BAA24]/10 text-[#6BAA24]",
+    LOHNSTEUERBESCHEINIGUNG: "bg-credo-gruen/10 text-credo-gruen",
     SOZIALVERSICHERUNGSAUSWEIS: "bg-purple-100 text-purple-700",
     MASERNSCHUTZ: "bg-orange-100 text-orange-700",
     FUEHRUNGSZEUGNIS: "bg-red-100 text-red-700",
@@ -953,7 +943,7 @@ function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: 
         </p>
         <button
           onClick={downloadAll}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#6BAA24] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
+          className="inline-flex items-center gap-2 rounded-lg bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
         >
           <DownloadIcon className="h-4 w-4" />
           Alle herunterladen
@@ -1000,7 +990,7 @@ function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: 
                 <a
                   href={`/api/onboarding/${onboardingId}/documents/${doc.id}`}
                   download={doc.fileName}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-[#6BAA24]/10 hover:text-[#6BAA24]"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-credo-gruen/10 hover:text-credo-gruen"
                   title="Herunterladen"
                 >
                   <DownloadIcon className="h-4 w-4" />
@@ -1075,7 +1065,7 @@ function TabChecklist({
           </div>
           <span
             className={`text-2xl font-bold ${
-              pct === 100 ? "text-[#6BAA24]" : pct > 50 ? "text-foreground" : "text-muted-foreground"
+              pct === 100 ? "text-credo-gruen" : pct > 50 ? "text-foreground" : "text-muted-foreground"
             }`}
           >
             {pct}%
@@ -1083,7 +1073,7 @@ function TabChecklist({
         </div>
         <div className="h-3 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-[#6BAA24] transition-all duration-500 ease-out"
+            className="h-full rounded-full bg-credo-gruen transition-all duration-500 ease-out"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -1109,8 +1099,8 @@ function TabChecklist({
                       disabled={togglingItems.has(item.id)}
                       className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
                         item.isCompleted
-                          ? "border-[#6BAA24] bg-[#6BAA24]"
-                          : "border-border hover:border-[#6BAA24]/50"
+                          ? "border-credo-gruen bg-credo-gruen"
+                          : "border-border hover:border-credo-gruen/50"
                       } ${togglingItems.has(item.id) ? "opacity-50" : ""}`}
                     >
                       {item.isCompleted && <CheckIcon className="h-3.5 w-3.5 text-white" />}
@@ -1195,7 +1185,7 @@ function TabChecklist({
                         onChange={(e) => setChecklistNoteText(e.target.value)}
                         placeholder="Notiz eingeben..."
                         rows={2}
-                        className="mb-2 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-[#009AC6] focus:ring-1 focus:ring-[#009AC6]"
+                        className="mb-2 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-credo-blau focus:ring-1 focus:ring-credo-blau"
                         autoFocus
                       />
                       <div className="flex items-center justify-end gap-2">
@@ -1211,7 +1201,7 @@ function TabChecklist({
                         <button
                           onClick={() => saveChecklistNote(item.id)}
                           disabled={savingChecklistNote}
-                          className="rounded-md bg-[#6BAA24] px-4 py-1.5 text-xs font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
+                          className="rounded-md bg-credo-gruen px-4 py-1.5 text-xs font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
                         >
                           {savingChecklistNote ? "..." : "Speichern"}
                         </button>
@@ -1352,7 +1342,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   return (
     <div className="rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-sm">
       <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-        <span className="h-1 w-1 rounded-full bg-[#6BAA24]" />
+        <span className="h-1 w-1 rounded-full bg-credo-gruen" />
         {title}
       </h3>
       {children}
@@ -1371,9 +1361,9 @@ function FieldRow({ label, value }: { label: string; value: string | null | unde
 
 function StatusMiniCard({ label, value, done }: { label: string; value: string; done: boolean }) {
   return (
-    <div className={`rounded-lg border p-3 transition-colors ${done ? "border-[#6BAA24]/30 bg-[#6BAA24]/5" : "border-border bg-muted/30"}`}>
+    <div className={`rounded-lg border p-3 transition-colors ${done ? "border-credo-gruen/30 bg-credo-gruen/5" : "border-border bg-muted/30"}`}>
       <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className={`text-sm font-bold ${done ? "text-[#6BAA24]" : "text-foreground"}`}>{value}</p>
+      <p className={`text-sm font-bold ${done ? "text-credo-gruen" : "text-foreground"}`}>{value}</p>
     </div>
   );
 }

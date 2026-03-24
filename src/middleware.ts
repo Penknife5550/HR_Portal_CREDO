@@ -63,7 +63,8 @@ export async function middleware(request: NextRequest) {
                         pathname.startsWith("/benutzerverwaltung") ||
                         pathname.startsWith("/vorlagen") ||
                         pathname.startsWith("/checklisten") ||
-                        pathname.startsWith("/mandanten");
+                        pathname.startsWith("/mandanten") ||
+                        pathname.startsWith("/einstellungen");
 
   if (isPortalRoute) {
     const sessionCookie = request.cookies.get("credo_session");

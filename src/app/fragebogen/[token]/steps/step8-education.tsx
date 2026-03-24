@@ -8,15 +8,18 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { step8Schema, type Step8Data } from "@/lib/validations/personal-data";
+import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
   data: Record<string, unknown>;
   onNext: (data: Record<string, unknown>) => void;
   onBack: () => void;
   saving: boolean;
+  fieldConfig?: FieldConfigHelper;
 }
 
-export function Step8Education({ data, onNext, onBack, saving }: StepProps) {
+export function Step8Education({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
+  const fc = fieldConfig ?? new FieldConfigHelper(8);
   const {
     register,
     handleSubmit,
@@ -49,63 +52,67 @@ export function Step8Education({ data, onNext, onBack, saving }: StepProps) {
       </div>
 
       {/* Hoechster Schulabschluss */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">
-          Hoechster Schulabschluss <span className="text-destructive">*</span>
-        </label>
-        <select
-          {...register("highestSchoolDegree")}
-          className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-        >
-          <option value="">Bitte waehlen...</option>
-          <option value="ohne_schulabschluss">Ohne Schulabschluss</option>
-          <option value="hauptschulabschluss">
-            Haupt-/Volksschulabschluss
-          </option>
-          <option value="mittlere_reife">
-            Mittlere Reife / gleichwertiger Abschluss
-          </option>
-          <option value="abitur_fachabitur">Abitur / Fachabitur</option>
-          <option value="sonstiges">Sonstiges / nicht bekannt</option>
-        </select>
-        {errors.highestSchoolDegree && (
-          <p className="text-xs text-destructive">
-            {errors.highestSchoolDegree.message}
-          </p>
-        )}
-      </div>
+      {fc.isVisible("highestSchoolDegree") && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">
+            {fc.getLabel("highestSchoolDegree")} {fc.isRequired("highestSchoolDegree") && <span className="text-destructive">*</span>}
+          </label>
+          <select
+            {...register("highestSchoolDegree")}
+            className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+          >
+            <option value="">Bitte waehlen...</option>
+            <option value="ohne_schulabschluss">Ohne Schulabschluss</option>
+            <option value="hauptschulabschluss">
+              Haupt-/Volksschulabschluss
+            </option>
+            <option value="mittlere_reife">
+              Mittlere Reife / gleichwertiger Abschluss
+            </option>
+            <option value="abitur_fachabitur">Abitur / Fachabitur</option>
+            <option value="sonstiges">Sonstiges / nicht bekannt</option>
+          </select>
+          {errors.highestSchoolDegree && (
+            <p className="text-xs text-destructive">
+              {errors.highestSchoolDegree.message}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Hoechste Berufsausbildung */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">
-          Hoechste Berufsausbildung <span className="text-destructive">*</span>
-        </label>
-        <select
-          {...register("highestProfessionalDegree")}
-          className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-        >
-          <option value="">Bitte waehlen...</option>
-          <option value="ohne_berufsausbildung">
-            Ohne berufliche Ausbildung
-          </option>
-          <option value="anerkannte_berufsausbildung">
-            Abschluss einer anerkannten Berufsausbildung
-          </option>
-          <option value="meister_techniker_fachschule">
-            Meister-/Techniker- oder gleichwertige Fachschulausbildung
-          </option>
-          <option value="bachelor">Bachelor</option>
-          <option value="diplom_magister_master_staatsexamen">
-            Diplom/Magister/Master/Staatsexamen
-          </option>
-          <option value="promotion">Promotion</option>
-        </select>
-        {errors.highestProfessionalDegree && (
-          <p className="text-xs text-destructive">
-            {errors.highestProfessionalDegree.message}
-          </p>
-        )}
-      </div>
+      {fc.isVisible("highestProfessionalDegree") && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">
+            {fc.getLabel("highestProfessionalDegree")} {fc.isRequired("highestProfessionalDegree") && <span className="text-destructive">*</span>}
+          </label>
+          <select
+            {...register("highestProfessionalDegree")}
+            className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+          >
+            <option value="">Bitte waehlen...</option>
+            <option value="ohne_berufsausbildung">
+              Ohne berufliche Ausbildung
+            </option>
+            <option value="anerkannte_berufsausbildung">
+              Abschluss einer anerkannten Berufsausbildung
+            </option>
+            <option value="meister_techniker_fachschule">
+              Meister-/Techniker- oder gleichwertige Fachschulausbildung
+            </option>
+            <option value="bachelor">Bachelor</option>
+            <option value="diplom_magister_master_staatsexamen">
+              Diplom/Magister/Master/Staatsexamen
+            </option>
+            <option value="promotion">Promotion</option>
+          </select>
+          {errors.highestProfessionalDegree && (
+            <p className="text-xs text-destructive">
+              {errors.highestProfessionalDegree.message}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Navigation */}
       <div className="flex justify-between pt-4">

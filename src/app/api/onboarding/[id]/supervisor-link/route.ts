@@ -111,7 +111,6 @@ export async function POST(
       {
         id: updated.id,
         supervisorEmail,
-        supervisorToken,
         modalitaetenLink,
         organization: {
           id: onboarding.organization.id,

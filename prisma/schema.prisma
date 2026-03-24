@@ -73,6 +73,10 @@ model OnboardingProcess {
   checklistTemplate       ChecklistTemplate? @relation(fields: [checklistTemplateId], references: [id])
   checklistItems          ChecklistItem[]
 
+  // Fragebogen-Versionierung (Vorschlag 5: Snapshot bei Erstellung)
+  formTemplateVersion     Int?              // Welche Template-Version war aktiv
+  formTemplateSnapshot    Json?             // Kompletter stepsConfig-Snapshot
+
   // Tracking
   invitedById             String?
   invitedBy               User?            @relation("InvitedBy", fields: [invitedById], references: [id])
@@ -506,6 +510,65 @@ model ChecklistItem {
 }
 
 // =============================================
+// Webhook-Konfigurationen (Admin-konfigurierbar, pro Event)
+// =============================================
+model WebhookConfig {
+  id          String   @id @default(uuid())
+  event       String   // z.B. "onboarding-created", "questionnaire-completed"
+  name        String   // Anzeigename, z.B. "n8n Onboarding Workflow"
+  url         String   // Ziel-URL des Webhooks
+  authType    String   @default("none") // "none" | "api_key" | "bearer" | "basic"
+  authHeader  String?  // Header-Name fuer API-Key (z.B. "X-API-Key")
+  authValue   String?  // Token / Passwort (sensibel – nicht im Frontend anzeigen)
+  isActive    Boolean  @default(true)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([event])
+  @@map("webhook_configs")
+}
+
+// =============================================
+// SMTP-Konfiguration (Singleton, ID = "default")
+// Fallback fuer E-Mail-Versand wenn n8n nicht erreichbar
+// =============================================
+model SmtpConfig {
+  id        String   @id @default("default")
+  host      String   @default("")
+  port      Int      @default(587)
+  secure    Boolean  @default(false)  // true = Port 465 (SSL), false = STARTTLS
+  username  String   @default("")
+  password  String   @default("")     // Passwort – nur maskiert im Frontend anzeigen
+  fromEmail String   @default("")
+  fromName  String   @default("CREDO HR-Portal")
+  isActive  Boolean  @default(false)  // n8n ist primaer; SMTP nur als Fallback
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("smtp_config")
+}
+
+// =============================================
+// E-Mail-Vorlagen (editierbar im Admin-Portal)
+// Werden fuer SMTP-Fallback genutzt
+// =============================================
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  event     String   @unique   // korrespondiert mit WebhookEvent
+  name      String              // Anzeigename
+  subject   String              // E-Mail-Betreff (kann Variablen enthalten)
+  bodyHtml  String              // HTML-Body mit {{variablen}}
+  bodyText  String?             // Plaintext-Fallback
+  variables Json                // [{key: "{{vorname}}", description: "..."}]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("email_templates")
+}
+
+// =============================================
 // Formularvorlagen (konfigurierbare Fragebogen-Templates)
 // =============================================
 model FormTemplate {
@@ -515,6 +578,10 @@ model FormTemplate {
   description       String?
   stepsConfig       Json              // Array: [{ step: 1, title: "...", enabled: true, fields: [...] }]
   isActive          Boolean           @default(true)
+
+  // Versionierung (Vorschlag 5)
+  version           Int               @default(1)       // Wird bei jeder Aenderung hochgezaehlt
+  publishedAt       DateTime?                            // Wann zuletzt veroeffentlicht
 
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt

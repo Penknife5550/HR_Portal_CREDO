@@ -9,15 +9,18 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { step3Schema, type Step3Data } from "@/lib/validations/personal-data";
 import { formatIBAN } from "@/lib/utils/iban-validator";
+import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
   data: Record<string, unknown>;
   onNext: (data: Record<string, unknown>) => void;
   onBack: () => void;
   saving: boolean;
+  fieldConfig?: FieldConfigHelper;
 }
 
-export function Step3Bank({ data, onNext, onBack, saving }: StepProps) {
+export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
+  const fc = fieldConfig ?? new FieldConfigHelper(3);
   const {
     register,
     handleSubmit,
@@ -54,63 +57,71 @@ export function Step3Bank({ data, onNext, onBack, saving }: StepProps) {
       </div>
 
       {/* IBAN */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">
-          IBAN <span className="text-destructive">*</span>
-        </label>
-        <input
-          type="text"
-          {...register("iban", { onChange: handleIbanChange })}
-          placeholder="DE89 3704 0044 0532 0130 00"
-          className="w-full rounded-lg border border-input bg-background px-4 py-2.5 font-mono text-sm tracking-wider outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-        />
-        {errors.iban && (
-          <p className="text-xs text-destructive">{errors.iban.message}</p>
-        )}
-      </div>
+      {fc.isVisible("iban") && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">
+            {fc.getLabel("iban")} {fc.isRequired("iban") && <span className="text-destructive">*</span>}
+          </label>
+          <input
+            type="text"
+            {...register("iban", { onChange: handleIbanChange })}
+            placeholder="DE89 3704 0044 0532 0130 00"
+            className="w-full rounded-lg border border-input bg-background px-4 py-2.5 font-mono text-sm tracking-wider outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+          />
+          {errors.iban && (
+            <p className="text-xs text-destructive">{errors.iban.message}</p>
+          )}
+        </div>
+      )}
 
       {/* BIC */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">
-          BIC (optional)
-        </label>
-        <input
-          type="text"
-          {...register("bic")}
-          placeholder="COBADEFFXXX"
-          className="w-full rounded-lg border border-input bg-background px-4 py-2.5 font-mono text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-        />
-        <p className="text-xs text-muted-foreground">
-          Fuer innerdeutsche Ueberweisungen ist der BIC nicht zwingend
-          erforderlich.
-        </p>
-      </div>
+      {fc.isVisible("bic") && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">
+            {fc.getLabel("bic")} {!fc.isRequired("bic") && "(optional)"}
+          </label>
+          <input
+            type="text"
+            {...register("bic")}
+            placeholder="COBADEFFXXX"
+            className="w-full rounded-lg border border-input bg-background px-4 py-2.5 font-mono text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+          />
+          <p className="text-xs text-muted-foreground">
+            Fuer innerdeutsche Ueberweisungen ist der BIC nicht zwingend
+            erforderlich.
+          </p>
+        </div>
+      )}
 
       {/* Bankname */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">
-          Name der Bank (optional)
-        </label>
-        <input
-          type="text"
-          {...register("bankName")}
-          placeholder="z.B. Sparkasse Minden-Luebbecke"
-          className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-        />
-      </div>
+      {fc.isVisible("bankName") && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">
+            {fc.getLabel("bankName")} {!fc.isRequired("bankName") && "(optional)"}
+          </label>
+          <input
+            type="text"
+            {...register("bankName")}
+            placeholder="z.B. Sparkasse Minden-Luebbecke"
+            className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+          />
+        </div>
+      )}
 
       {/* Kontoinhaber */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">
-          Kontoinhaber (falls abweichend)
-        </label>
-        <input
-          type="text"
-          {...register("accountHolder")}
-          placeholder="Nur angeben, wenn Konto auf anderen Namen laeuft"
-          className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-        />
-      </div>
+      {fc.isVisible("accountHolder") && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">
+            {fc.getLabel("accountHolder")} {fc.isRequired("accountHolder") && <span className="text-destructive">*</span>}
+          </label>
+          <input
+            type="text"
+            {...register("accountHolder")}
+            placeholder="Nur angeben, wenn Konto auf anderen Namen laeuft"
+            className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+          />
+        </div>
+      )}
 
       {/* Navigation */}
       <div className="flex justify-between pt-4">
