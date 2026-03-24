@@ -21,6 +21,8 @@ export type WebhookEvent =
   | "questionnaire-completed"
   | "supervisor-link-created"
   | "supervisor-completed"
+  | "employee-reminder"
+  | "supervisor-reminder"
   | (string & Record<never, never>); // erlaubt zukuenftige Events als Strings
 
 const MAX_RETRIES = 3;

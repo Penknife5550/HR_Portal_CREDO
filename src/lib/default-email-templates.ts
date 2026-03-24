@@ -314,4 +314,154 @@ CREDO HR-Portal`,
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
     ],
   },
+
+  // =============================================
+  // Erinnerung Mitarbeiter (Fragebogen nicht ausgefuellt)
+  // =============================================
+  {
+    event: "employee-reminder",
+    name: "Erinnerung Mitarbeiter (Fragebogen ausstehend)",
+    subject: "Erinnerung: Ihr Personalfragebogen ist noch offen – {{einrichtung}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#92400e;font-weight:bold;font-size:14px;">⏰ Erinnerung</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Ihr Personalfragebogen wartet auf Sie</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Hallo {{vorname}}, wir haben festgestellt, dass Ihr Personalfragebogen seit <strong>{{tage_offen}} Tagen</strong> noch nicht vollstaendig ausgefuellt wurde.
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
+            Bitte fuellen Sie den Fragebogen zeitnah aus, damit wir Ihre Einstellung reibungslos vorbereiten koennen.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#f59e0b;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Jetzt Fragebogen ausfuellen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 8px;">
+            Falls der Button nicht funktioniert:
+          </p>
+          <p style="color:#2563eb;font-size:12px;word-break:break-all;margin:0 0 24px;">{{link}}</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Bei Fragen wenden Sie sich bitte an Ihre HR-Ansprechperson.<br>
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
+            © CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Erinnerung: Ihr Personalfragebogen wartet auf Sie
+
+Hallo {{vorname}}, Ihr Personalfragebogen ist seit {{tage_offen}} Tagen offen.
+
+Bitte fuellen Sie ihn zeitnah aus:
+{{link}}
+
+Bei Fragen wenden Sie sich bitte an Ihre HR-Ansprechperson.
+
+CREDO Gruppe – {{einrichtung}}`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
+      { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
+      { key: "{{email}}", description: "E-Mail des Mitarbeiters" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{link}}", description: "Link zum Personalfragebogen" },
+      { key: "{{tage_offen}}", description: "Anzahl Tage seit Einladung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+    ],
+  },
+
+  // =============================================
+  // Erinnerung Vorgesetzter (Einstellungsmodalitaeten ausstehend)
+  // =============================================
+  {
+    event: "supervisor-reminder",
+    name: "Erinnerung Vorgesetzter (Modalitaeten ausstehend)",
+    subject: "Erinnerung: Einstellungsmodalitaeten fuer {{mitarbeiter_name}} offen",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#92400e;font-weight:bold;font-size:14px;">⏰ Erinnerung</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Einstellungsmodalitaeten ausstehend</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Die Einstellungsmodalitaeten fuer <strong>{{mitarbeiter_name}}</strong> sind seit <strong>{{tage_offen}} Tagen</strong> offen.
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
+            Bitte fuellen Sie das Formular zeitnah aus, damit die Personalabteilung den Arbeitsvertrag vorbereiten kann.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#f59e0b;border-radius:8px;">
+              <a href="{{supervisor_link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Einstellungsmodalitaeten ausfuellen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 8px;">
+            Falls der Button nicht funktioniert:
+          </p>
+          <p style="color:#2563eb;font-size:12px;word-break:break-all;margin:0 0 24px;">{{supervisor_link}}</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
+            © CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Erinnerung: Einstellungsmodalitaeten ausstehend
+
+Die Einstellungsmodalitaeten fuer {{mitarbeiter_name}} sind seit {{tage_offen}} Tagen offen.
+
+Bitte fuellen Sie das Formular aus:
+{{supervisor_link}}
+
+CREDO Gruppe – {{einrichtung}}`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Vollstaendiger Name des neuen Mitarbeiters" },
+      { key: "{{email}}", description: "E-Mail des Vorgesetzten" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{supervisor_link}}", description: "Link zum Vorgesetzten-Formular" },
+      { key: "{{tage_offen}}", description: "Anzahl Tage seit Einreichung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+    ],
+  },
 ];

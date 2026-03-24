@@ -1,0 +1,131 @@
+{
+  "name": "CREDO HR-Portal – Tägliche Erinnerungen",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Täglich 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HR_PORTAL_URL || 'https://hr.credo-schulen.de' }}/api/cron/reminders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.CRON_SECRET }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "http-request",
+      "name": "Erinnerungen senden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-success",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-status",
+      "name": "Erfolgreich?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "content": "=✅ Erinnerungen versendet\n\nMitarbeiter: {{ $json.body.employeeReminders }}\nVorgesetzte: {{ $json.body.supervisorReminders }}\nGesamt: {{ $json.body.total }}\nFehler: {{ $json.body.errors }}\nZeit: {{ $json.body.timestamp }}",
+        "options": {}
+      },
+      "id": "log-success",
+      "name": "Erfolg loggen",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [920, 200]
+    },
+    {
+      "parameters": {
+        "content": "=❌ Fehler beim Senden der Erinnerungen\n\nStatus: {{ $json.statusCode }}\nBody: {{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "log-error",
+      "name": "Fehler loggen",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [920, 400]
+    }
+  ],
+  "connections": {
+    "Täglich 08:00": {
+      "main": [
+        [{ "node": "Erinnerungen senden", "type": "main", "index": 0 }]
+      ]
+    },
+    "Erinnerungen senden": {
+      "main": [
+        [{ "node": "Erfolgreich?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Erfolgreich?": {
+      "main": [
+        [{ "node": "Erfolg loggen", "type": "main", "index": 0 }],
+        [{ "node": "Fehler loggen", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    { "name": "CREDO HR-Portal" },
+    { "name": "Erinnerungen" },
+    { "name": "Cron" }
+  ]
+}

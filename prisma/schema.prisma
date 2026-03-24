@@ -88,6 +88,10 @@ model OnboardingProcess {
   reviewedBy              User?            @relation("ReviewedBy", fields: [reviewedById], references: [id])
   completedAt             DateTime?
 
+  // Erinnerungen
+  lastEmployeeReminderAt  DateTime?  // Letzte Erinnerung an Mitarbeiter
+  lastSupervisorReminderAt DateTime? // Letzte Erinnerung an Vorgesetzten
+
   // Relationen
   personalData            PersonalData?
   supervisorData          SupervisorData?

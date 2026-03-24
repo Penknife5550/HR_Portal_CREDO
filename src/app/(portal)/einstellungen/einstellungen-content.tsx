@@ -65,6 +65,8 @@ const WEBHOOK_EVENTS = [
   { value: "questionnaire-completed", label: "Fragebogen eingereicht" },
   { value: "supervisor-link-created", label: "Vorgesetzten-Link erstellt" },
   { value: "supervisor-completed", label: "Einstellungsmodalitäten eingereicht" },
+  { value: "employee-reminder", label: "Erinnerung Mitarbeiter (Fragebogen ausstehend)" },
+  { value: "supervisor-reminder", label: "Erinnerung Vorgesetzter (Modalitäten ausstehend)" },
 ];
 
 const AUTH_TYPES = [

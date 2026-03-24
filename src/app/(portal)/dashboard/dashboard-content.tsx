@@ -12,6 +12,13 @@ import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { NeuerVorgangModal } from "@/components/neuer-vorgang-modal";
 import { STATUS_LABELS } from "@/lib/constants";
+import {
+  StatusPieChart,
+  MonthlyTrendChart,
+  OverdueBanner,
+  DurationKPI,
+  OverdueBadge,
+} from "@/components/dashboard-charts";
 
 interface User {
   userId: string;
@@ -66,7 +73,22 @@ export function DashboardContent({ user }: { user: User }) {
   const [displayIdSearch, setDisplayIdSearch] = useState<string>("");
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
+  const [stats, setStats] = useState<{
+    statusDistribution: { status: string; count: number }[];
+    monthlyTrend: { month: string; created: number; completed: number }[];
+    averageDuration: { days: number; processCount: number };
+    overdue: { count: number; criticalCount: number; items: { id: string }[] };
+  } | null>(null);
   const router = useRouter();
+
+  // Dashboard-Statistiken laden
+  useEffect(() => {
+    fetch("/api/dashboard/stats")
+      .then((res) => res.json())
+      .then((data) => { if (!data.error) setStats(data); })
+      .catch(() => {});
+  }, []);
 
   // Einrichtungen laden
   useEffect(() => {
@@ -150,6 +172,58 @@ export function DashboardContent({ user }: { user: User }) {
           ))}
         </div>
 
+        {/* Ueberfaellig-Banner */}
+        {stats && stats.overdue.count > 0 && (
+          <OverdueBanner
+            count={stats.overdue.count}
+            criticalCount={stats.overdue.criticalCount}
+            onFilter={() => setShowOverdueOnly(!showOverdueOnly)}
+          />
+        )}
+
+        {/* Charts & KPIs */}
+        {stats && (
+          <div className="mb-6 grid gap-4 lg:grid-cols-3">
+            {/* Tortendiagramm: Status-Verteilung */}
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="mb-2 text-sm font-semibold text-foreground">
+                Status-Verteilung
+              </h3>
+              <StatusPieChart data={stats.statusDistribution} />
+            </div>
+            {/* Balkendiagramm: Monatlicher Trend */}
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="mb-2 text-sm font-semibold text-foreground">
+                Monatlicher Trend (6 Monate)
+              </h3>
+              <MonthlyTrendChart data={stats.monthlyTrend} />
+            </div>
+            {/* KPIs */}
+            <div className="flex flex-col gap-4">
+              <DurationKPI
+                days={stats.averageDuration.days}
+                processCount={stats.averageDuration.processCount}
+              />
+              <div className="rounded-lg border bg-card p-4">
+                <p className="text-2xl font-bold text-foreground">
+                  {stats.overdue.count}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Ueberfaellige Vorgaenge (&gt;7 Tage)
+                </p>
+              </div>
+              <div className="rounded-lg border bg-card p-4">
+                <p className="text-2xl font-bold text-foreground">
+                  {stats.statusDistribution.reduce((sum, s) => sum + s.count, 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Vorgaenge insgesamt
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-foreground">
@@ -232,6 +306,11 @@ export function DashboardContent({ user }: { user: User }) {
               <tbody className="divide-y">
                 {onboardings
                   .filter((ob) => {
+                    if (showOverdueOnly) {
+                      const openStatuses = ["INVITED", "IN_PROGRESS", "SUBMITTED", "SUPERVISOR_PENDING"];
+                      const daysOpen = Math.floor((Date.now() - new Date(ob.invitedAt).getTime()) / 86400000);
+                      if (!openStatuses.includes(ob.status) || daysOpen < 7) return false;
+                    }
                     if (!displayIdSearch) return true;
                     const search = displayIdSearch.toLowerCase();
                     return (
@@ -324,6 +403,7 @@ export function DashboardContent({ user }: { user: User }) {
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
                         {new Date(ob.invitedAt).toLocaleDateString("de-DE")}
+                        <OverdueBadge invitedAt={ob.invitedAt} status={ob.status} />
                       </td>
                     </tr>
                   );
