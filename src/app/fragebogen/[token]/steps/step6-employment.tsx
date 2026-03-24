@@ -28,7 +28,7 @@ export function Step6Employment({ data, onNext, onBack, saving, fieldConfig }: S
     watch,
     formState: { errors },
   } = useForm<Step6Data>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       hasOtherEmployment: (data.hasOtherEmployment as boolean) || false,
       otherEmployerName: (data.otherEmployerName as string) || "",

@@ -28,7 +28,7 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
     watch,
     formState: { errors },
   } = useForm<Step1Data>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       salutation: (data.salutation as Step1Data["salutation"]) || undefined,
       title: (data.title as string) || "",

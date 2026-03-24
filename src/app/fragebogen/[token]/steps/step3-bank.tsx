@@ -29,7 +29,7 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
     setValue,
     formState: { errors },
   } = useForm<Step3Data>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       iban: formatIBAN((data.iban as string) || ""),
       bic: (data.bic as string) || "",

@@ -27,7 +27,7 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
     handleSubmit,
     formState: { errors },
   } = useForm<Step5Data>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       taxId: (data.taxId as string) || "",
       taxClass: (data.taxClass as Step5Data["taxClass"]) || undefined,

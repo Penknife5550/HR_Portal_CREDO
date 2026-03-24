@@ -27,7 +27,7 @@ export function Step8Education({ data, onNext, onBack, saving, fieldConfig }: St
     handleSubmit,
     formState: { errors },
   } = useForm<Step8Data>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       highestSchoolDegree:
         (data.highestSchoolDegree as Step8Data["highestSchoolDegree"]) ||

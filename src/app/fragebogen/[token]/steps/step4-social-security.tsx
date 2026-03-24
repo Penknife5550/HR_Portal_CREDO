@@ -33,7 +33,7 @@ export function Step4SocialSecurity({
     handleSubmit,
     formState: { errors },
   } = useForm<Step4Data>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       socialSecurityNumber: (data.socialSecurityNumber as string) || "",
       healthInsuranceName: (data.healthInsuranceName as string) || "",

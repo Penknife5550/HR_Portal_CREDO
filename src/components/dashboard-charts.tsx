@@ -105,7 +105,7 @@ export function StatusPieChart({ data }: { data: StatusData[] }) {
           outerRadius={100}
           paddingAngle={2}
           dataKey="value"
-          label={({ value, percent }) => percent > 0.05 ? `${value}` : ""}
+          label={({ value, percent }) => (percent ?? 0) > 0.05 ? `${value}` : ""}
           labelLine={true}
         >
           {chartData.map((entry, index) => (
