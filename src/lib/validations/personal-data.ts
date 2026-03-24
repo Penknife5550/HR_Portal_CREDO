@@ -24,6 +24,7 @@ function reqStr(fc: FieldConfigHelper, name: string, msg: string) {
 }
 
 // Helper: Enum-Feld das nur required ist wenn FieldConfig es verlangt
+// Bei optionalen Enums: leerer String "" (aus <select>) wird zu undefined konvertiert
 function reqEnum<T extends [string, ...string[]]>(
   fc: FieldConfigHelper,
   name: string,
@@ -32,7 +33,10 @@ function reqEnum<T extends [string, ...string[]]>(
 ) {
   return fc.isRequired(name)
     ? z.enum(values, { required_error: msg })
-    : z.enum(values).optional();
+    : z.preprocess(
+        (val) => (val === "" ? undefined : val),
+        z.enum(values).optional()
+      );
 }
 
 // =============================================
