@@ -67,7 +67,7 @@ export function Step6Employment({ data, onNext, onBack, saving, fieldConfig }: S
                 {fc.getLabel("hasOtherEmployment")}
               </span>
               <p className="text-xs text-muted-foreground">
-                Oder ich ueble eine selbststaendige / freiberufliche Taetigkeit
+                Oder ich uebe eine selbststaendige / freiberufliche Taetigkeit
                 aus.
               </p>
             </div>

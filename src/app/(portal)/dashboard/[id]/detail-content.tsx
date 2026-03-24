@@ -73,6 +73,66 @@ interface DetailData {
     lastName: string | null;
     isComplete: boolean;
     currentStep: number;
+    // Persoenliche Angaben
+    salutation: string | null;
+    title: string | null;
+    birthName: string | null;
+    birthDate: string | null;
+    birthPlace: string | null;
+    birthCountry: string | null;
+    nationality: string | null;
+    maritalStatus: string | null;
+    severelyDisabled: boolean | null;
+    disabilityDegree: number | null;
+    // Adresse
+    street: string | null;
+    houseNumber: string | null;
+    zipCode: string | null;
+    city: string | null;
+    country: string | null;
+    phone: string | null;
+    mobile: string | null;
+    emailPrivate: string | null;
+    // Bankverbindung
+    iban: string | null;
+    bic: string | null;
+    bankName: string | null;
+    accountHolder: string | null;
+    // Sozialversicherung
+    socialSecurityNumber: string | null;
+    healthInsuranceName: string | null;
+    healthInsuranceType: string | null;
+    parentStatus: boolean | null;
+    // Steuer
+    taxId: string | null;
+    taxClass: string | null;
+    taxAllowance: number | null;
+    childAllowance: number | null;
+    religion: string | null;
+    // Bildung
+    highestSchoolDegree: string | null;
+    highestProfessionalDegree: string | null;
+    // Sonstiges
+    hasOtherEmployment: boolean | null;
+    otherEmployerName: string | null;
+    otherWeeklyHours: number | null;
+    employerType: string | null;
+    hasMinijob: boolean | null;
+    minijobRvBefreiung: boolean | null;
+    // Masernschutz
+    bornAfter1971: boolean | null;
+    masernschutzProvided: boolean | null;
+    // DSGVO
+    dsgvoAccepted: boolean | null;
+    dsgvoAcceptedAt: string | null;
+    // Kinder
+    children: {
+      id: string;
+      firstName: string;
+      lastName: string | null;
+      birthDate: string;
+      taxAllowance: boolean;
+    }[];
   } | null;
   supervisorData: {
     isComplete: boolean;
@@ -127,6 +187,7 @@ interface DetailData {
 
 const TABS = [
   { id: "overview", label: "Uebersicht" },
+  { id: "questionnaire", label: "Fragebogen-Daten" },
   { id: "documents", label: "Dokumente" },
   { id: "checklist", label: "Checkliste" },
   { id: "supervisor", label: "Vorgesetzter" },
@@ -553,6 +614,15 @@ export function DetailContent({
                   }`}
                 >
                   {tab.label}
+                  {tab.id === "questionnaire" && data.personalData && (
+                    <span className={`ml-1.5 inline-flex h-5 w-auto min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
+                      data.personalData.isComplete
+                        ? "bg-green-100 text-green-800"
+                        : "bg-amber-100 text-amber-800"
+                    }`}>
+                      {data.personalData.isComplete ? "Komplett" : `${data.personalData.currentStep}/10`}
+                    </span>
+                  )}
                   {tab.id === "documents" && data.documents.length > 0 && (
                     <span className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
                       {data.documents.length}
@@ -591,6 +661,7 @@ export function DetailContent({
             onboardingId={onboardingId}
           />
         )}
+        {activeTab === "questionnaire" && <TabFragebogenDaten data={data} />}
         {activeTab === "documents" && <TabDocuments data={data} onboardingId={onboardingId} />}
         {activeTab === "checklist" && (
           <TabChecklist
@@ -886,6 +957,262 @@ function TabOverview({
           JSON Export
         </a>
       </div>
+    </div>
+  );
+}
+
+// =============================================
+// Tab: Fragebogen-Daten (alle Antworten)
+// =============================================
+
+const MARITAL_STATUS_LABELS: Record<string, string> = {
+  ledig: "Ledig",
+  verheiratet: "Verheiratet",
+  geschieden: "Geschieden",
+  verwitwet: "Verwitwet",
+  eingetragene_lebenspartnerschaft: "Eingetragene Lebenspartnerschaft",
+};
+
+const TAX_CLASS_LABELS: Record<string, string> = {
+  I: "Steuerklasse I",
+  II: "Steuerklasse II",
+  III: "Steuerklasse III",
+  IV: "Steuerklasse IV",
+  V: "Steuerklasse V",
+  VI: "Steuerklasse VI",
+};
+
+const INSURANCE_TYPE_LABELS: Record<string, string> = {
+  gesetzlich: "Gesetzlich",
+  privat: "Privat",
+};
+
+const SCHOOL_DEGREE_LABELS: Record<string, string> = {
+  ohne_schulabschluss: "Ohne Schulabschluss",
+  hauptschulabschluss: "Hauptschulabschluss",
+  mittlere_reife: "Mittlere Reife / Realschulabschluss",
+  abitur_fachabitur: "Abitur / Fachabitur",
+  sonstiges: "Sonstiges",
+};
+
+const PROF_DEGREE_LABELS: Record<string, string> = {
+  ohne_berufsausbildung: "Ohne Berufsausbildung",
+  anerkannte_berufsausbildung: "Anerkannte Berufsausbildung",
+  meister_techniker: "Meister / Techniker / Fachwirt",
+  bachelor: "Bachelor",
+  master_diplom: "Master / Diplom / Magister",
+  promotion: "Promotion",
+  sonstiges: "Sonstiges",
+};
+
+const RELIGION_LABELS: Record<string, string> = {
+  ev: "Evangelisch",
+  rk: "Roemisch-Katholisch",
+  keine: "Keine / Konfessionslos",
+  sonstige: "Sonstige",
+};
+
+function TabFragebogenDaten({ data }: { data: DetailData }) {
+  const pd = data.personalData;
+
+  if (!pd) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-12 text-center">
+        <p className="text-lg font-semibold text-foreground">Noch keine Daten vorhanden</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Der Mitarbeiter hat den Fragebogen noch nicht begonnen.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Fortschrittsanzeige */}
+      <div className="rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Fragebogen-Status: {pd.isComplete ? "Vollstaendig ausgefuellt" : `Schritt ${pd.currentStep} von 10`}
+            </p>
+            {pd.dsgvoAccepted && pd.dsgvoAcceptedAt && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                DSGVO-Einwilligung erteilt am {formatDate(pd.dsgvoAcceptedAt)}
+              </p>
+            )}
+          </div>
+          <div className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            pd.isComplete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+          }`}>
+            {pd.isComplete ? "Komplett" : "In Bearbeitung"}
+          </div>
+        </div>
+        {/* Progress Bar */}
+        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-credo-gruen transition-all"
+            style={{ width: `${pd.isComplete ? 100 : (pd.currentStep / 10) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Schritt 1: Persoenliche Daten */}
+      <SectionCard title="1. Persoenliche Daten" icon="&#128100;">
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+          <FieldRow label="Anrede" value={pd.salutation || "\u2014"} />
+          <FieldRow label="Titel" value={pd.title || "\u2014"} />
+          <FieldRow label="Vorname" value={pd.firstName || "\u2014"} />
+          <FieldRow label="Nachname" value={pd.lastName || "\u2014"} />
+          <FieldRow label="Geburtsname" value={pd.birthName || "\u2014"} />
+          <FieldRow label="Geburtsdatum" value={formatDate(pd.birthDate)} />
+          <FieldRow label="Geburtsort" value={pd.birthPlace || "\u2014"} />
+          <FieldRow label="Geburtsland" value={pd.birthCountry || "\u2014"} />
+          <FieldRow label="Staatsangehoerigkeit" value={pd.nationality || "\u2014"} />
+          <FieldRow label="Familienstand" value={pd.maritalStatus ? (MARITAL_STATUS_LABELS[pd.maritalStatus] || pd.maritalStatus) : "\u2014"} />
+          <FieldRow label="Schwerbehindert" value={formatBoolean(pd.severelyDisabled)} />
+          {pd.severelyDisabled && <FieldRow label="Grad der Behinderung" value={formatNumber(pd.disabilityDegree, "%")} />}
+        </div>
+      </SectionCard>
+
+      {/* Schritt 2: Adresse */}
+      <SectionCard title="2. Adresse &amp; Kontakt" icon="&#127968;">
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+          <FieldRow label="Strasse" value={pd.street || "\u2014"} />
+          <FieldRow label="Hausnummer" value={pd.houseNumber || "\u2014"} />
+          <FieldRow label="PLZ" value={pd.zipCode || "\u2014"} />
+          <FieldRow label="Ort" value={pd.city || "\u2014"} />
+          <FieldRow label="Land" value={pd.country || "\u2014"} />
+          <FieldRow label="Telefon (Festnetz)" value={pd.phone || "\u2014"} />
+          <FieldRow label="Mobilnummer" value={pd.mobile || "\u2014"} />
+          <FieldRow label="Private E-Mail" value={pd.emailPrivate || "\u2014"} />
+        </div>
+      </SectionCard>
+
+      {/* Schritt 3: Bankverbindung */}
+      <SectionCard title="3. Bankverbindung" icon="&#127974;">
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+          <FieldRow label="Kontoinhaber" value={pd.accountHolder || "\u2014"} />
+          <FieldRow label="IBAN" value={pd.iban ? maskSensitive(pd.iban) : "\u2014"} />
+          <FieldRow label="BIC" value={pd.bic || "\u2014"} />
+          <FieldRow label="Bankname" value={pd.bankName || "\u2014"} />
+        </div>
+      </SectionCard>
+
+      {/* Schritt 4: Sozialversicherung */}
+      <SectionCard title="4. Sozialversicherung" icon="&#128737;">
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+          <FieldRow label="SV-Nummer" value={pd.socialSecurityNumber ? maskSensitive(pd.socialSecurityNumber) : "\u2014"} />
+          <FieldRow label="Krankenkasse" value={pd.healthInsuranceName || "\u2014"} />
+          <FieldRow label="Versicherungsart" value={pd.healthInsuranceType ? (INSURANCE_TYPE_LABELS[pd.healthInsuranceType] || pd.healthInsuranceType) : "\u2014"} />
+          <FieldRow label="Elterneigenschaft (PV)" value={formatBoolean(pd.parentStatus)} />
+        </div>
+      </SectionCard>
+
+      {/* Schritt 5: Steuer */}
+      <SectionCard title="5. Steuerliche Angaben" icon="&#128196;">
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+          <FieldRow label="Steuer-ID" value={pd.taxId ? maskSensitive(pd.taxId) : "\u2014"} />
+          <FieldRow label="Steuerklasse" value={pd.taxClass ? (TAX_CLASS_LABELS[pd.taxClass] || pd.taxClass) : "\u2014"} />
+          <FieldRow label="Jaehrlicher Freibetrag" value={pd.taxAllowance != null ? formatCurrency(pd.taxAllowance) : "\u2014"} />
+          <FieldRow label="Kinderfreibetrag" value={pd.childAllowance != null ? formatCurrency(pd.childAllowance) : "\u2014"} />
+          <FieldRow label="Konfession" value={pd.religion ? (RELIGION_LABELS[pd.religion] || pd.religion) : "\u2014"} />
+        </div>
+      </SectionCard>
+
+      {/* Schritt 6: Beschaeftigung */}
+      <SectionCard title="6. Weitere Beschaeftigung" icon="&#128188;">
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+          <FieldRow label="Arbeitgebertyp" value={pd.employerType || "\u2014"} />
+          <FieldRow label="Weitere Beschaeftigung" value={formatBoolean(pd.hasOtherEmployment)} />
+          {pd.hasOtherEmployment && (
+            <>
+              <FieldRow label="Anderer Arbeitgeber" value={pd.otherEmployerName || "\u2014"} />
+              <FieldRow label="Wochenstunden (anderer AG)" value={formatNumber(pd.otherWeeklyHours, "Std.")} />
+            </>
+          )}
+          <FieldRow label="Minijob" value={formatBoolean(pd.hasMinijob)} />
+          {pd.hasMinijob && (
+            <FieldRow label="RV-Befreiung Minijob" value={formatBoolean(pd.minijobRvBefreiung)} />
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Schritt 7: Kinder */}
+      <SectionCard title="7. Kinder" icon="&#128118;">
+        {pd.children && pd.children.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left">
+                  <th className="pb-2 pr-4 text-xs font-semibold text-muted-foreground">Nr.</th>
+                  <th className="pb-2 pr-4 text-xs font-semibold text-muted-foreground">Vorname</th>
+                  <th className="pb-2 pr-4 text-xs font-semibold text-muted-foreground">Nachname</th>
+                  <th className="pb-2 pr-4 text-xs font-semibold text-muted-foreground">Geburtsdatum</th>
+                  <th className="pb-2 text-xs font-semibold text-muted-foreground">Kinderfreibetrag</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pd.children.map((child, idx) => (
+                  <tr key={child.id} className="border-b border-border/50">
+                    <td className="py-2 pr-4 text-muted-foreground">{idx + 1}</td>
+                    <td className="py-2 pr-4 font-medium text-foreground">{child.firstName}</td>
+                    <td className="py-2 pr-4 text-foreground">{child.lastName || "\u2014"}</td>
+                    <td className="py-2 pr-4 text-foreground">{formatDate(child.birthDate)}</td>
+                    <td className="py-2 text-foreground">{child.taxAllowance ? "Ja" : "Nein"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Keine Kinder angegeben.</p>
+        )}
+      </SectionCard>
+
+      {/* Schritt 8: Bildung */}
+      <SectionCard title="8. Bildungsabschluss" icon="&#127891;">
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+          <FieldRow label="Hoechster Schulabschluss" value={pd.highestSchoolDegree ? (SCHOOL_DEGREE_LABELS[pd.highestSchoolDegree] || pd.highestSchoolDegree) : "\u2014"} />
+          <FieldRow label="Hoechster Berufsabschluss" value={pd.highestProfessionalDegree ? (PROF_DEGREE_LABELS[pd.highestProfessionalDegree] || pd.highestProfessionalDegree) : "\u2014"} />
+        </div>
+      </SectionCard>
+
+      {/* Schritt 9: Masernschutz */}
+      <SectionCard title="9. Masernschutz" icon="&#128137;">
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+          <FieldRow label="Nach 1971 geboren" value={formatBoolean(pd.bornAfter1971)} />
+          <FieldRow label="Masernschutz nachgewiesen" value={formatBoolean(pd.masernschutzProvided)} />
+        </div>
+      </SectionCard>
+
+      {/* Schritt 10: DSGVO */}
+      <SectionCard title="10. Datenschutz &amp; Einwilligung" icon="&#128274;">
+        <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+          <FieldRow label="DSGVO-Einwilligung" value={formatBoolean(pd.dsgvoAccepted)} />
+          <FieldRow label="Einwilligung erteilt am" value={formatDate(pd.dsgvoAcceptedAt)} />
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+// Helper: Sensible Daten maskieren (IBAN, SV-Nr, Steuer-ID)
+function maskSensitive(value: string): string {
+  if (value.length <= 4) return "****";
+  return value.slice(0, 2) + "*".repeat(value.length - 4) + value.slice(-2);
+}
+
+// Helper: Section Card mit Icon und Titel
+function SectionCard({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border bg-card">
+      <div className="border-b border-border px-6 py-4">
+        <h3 className="flex items-center gap-2 text-sm font-bold text-foreground">
+          <span dangerouslySetInnerHTML={{ __html: icon }} />
+          {title}
+        </h3>
+      </div>
+      <div className="px-6 py-4">{children}</div>
     </div>
   );
 }
