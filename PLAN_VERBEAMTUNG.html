@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CREDO HR-Portal – Verbeamtungsprozess Implementierungsplan</title>
+<style>
+  :root {
+    --primary: #1a1a2e;
+    --accent: #005d6a;
+    --text: #2d2d2d;
+    --text-light: #6b7280;
+    --text-muted: #9ca3af;
+    --bg: #f4f4f5;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --gelb: #FBC900;
+    --gruen: #6BAA24;
+    --rot: #E2001A;
+    --blau: #009AC6;
+    --grau: #DADADA;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* Header */
+  .header {
+    background: var(--primary);
+    padding: 48px 0 40px;
+    text-align: center;
+  }
+  .header h1 {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 36px;
+    color: #fff;
+    letter-spacing: 6px;
+    margin-bottom: 8px;
+  }
+  .header-line {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .header-line span {
+    width: 32px;
+    height: 2px;
+    display: block;
+  }
+  .header .subtitle {
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+  .header .doc-title {
+    font-size: 22px;
+    color: #fff;
+    margin-top: 24px;
+    font-weight: 600;
+  }
+  .header .doc-date {
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 8px;
+  }
+
+  /* CREDO Linie */
+  .credo-line {
+    display: flex;
+    height: 4px;
+  }
+  .credo-line .l-grau { flex: 4; background: var(--grau); }
+  .credo-line .l-gelb { flex: 1; background: var(--gelb); }
+  .credo-line .l-gruen { flex: 1; background: var(--gruen); }
+  .credo-line .l-rot { flex: 1; background: var(--rot); }
+  .credo-line .l-blau { flex: 1; background: var(--blau); }
+
+  /* Container */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    border-radius: 50%;
+    margin-right: 12px;
+  }
+  .section-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+  }
+  .section-desc {
+    font-size: 16px;
+    color: var(--text-light);
+    margin-bottom: 24px;
+    max-width: 720px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-flex;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-green { background: #f0fdf4; color: #166534; }
+  .badge-blue { background: #eff6ff; color: #1e40af; }
+  .badge-amber { background: #fffbeb; color: #92400e; }
+  .badge-red { background: #fef2f2; color: #991b1b; }
+  .badge-gray { background: #f3f4f6; color: #4b5563; }
+
+  /* Process Flow */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+  }
+  .flow-step {
+    display: flex;
+    gap: 20px;
+    position: relative;
+  }
+  .flow-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 40px;
+    flex-shrink: 0;
+  }
+  .flow-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px var(--accent);
+    z-index: 1;
+    flex-shrink: 0;
+  }
+  .flow-dot.green { background: var(--gruen); box-shadow: 0 0 0 2px var(--gruen); }
+  .flow-dot.blue { background: var(--blau); box-shadow: 0 0 0 2px var(--blau); }
+  .flow-dot.amber { background: var(--gelb); box-shadow: 0 0 0 2px var(--gelb); }
+  .flow-dot.red { background: var(--rot); box-shadow: 0 0 0 2px var(--rot); }
+  .flow-connector {
+    width: 2px;
+    flex: 1;
+    min-height: 20px;
+    background: var(--border);
+  }
+  .flow-content {
+    flex: 1;
+    padding-bottom: 32px;
+  }
+  .flow-content h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .flow-content p {
+    font-size: 14px;
+    color: var(--text-light);
+    margin-bottom: 8px;
+  }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    background: #f9fafb;
+    border-bottom: 2px solid var(--border);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    color: var(--text);
+  }
+  tr:hover td { background: #f9fafb; }
+
+  /* Comparison Grid */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .comparison .card { height: 100%; }
+  .comparison .card-title .icon {
+    font-size: 20px;
+  }
+
+  /* Architecture Diagram */
+  .arch-diagram {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 32px;
+    text-align: center;
+  }
+  .arch-box {
+    display: inline-block;
+    padding: 12px 24px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    background: #fff;
+    margin: 4px;
+  }
+  .arch-box.highlight {
+    background: var(--accent);
+    color: #fff;
+  }
+  .arch-box.new {
+    border-color: var(--gruen);
+    background: #f0fdf4;
+    color: #166534;
+  }
+  .arch-arrow {
+    display: block;
+    color: var(--text-muted);
+    font-size: 20px;
+    margin: 8px 0;
+  }
+  .arch-row {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+
+  /* Mockup */
+  .mockup {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .mockup-header {
+    background: #f9fafb;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mockup-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .mockup-url {
+    flex: 1;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--text-light);
+    font-family: monospace;
+  }
+  .mockup-body { padding: 24px; }
+  .mockup-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .mockup-tab {
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+  }
+  .mockup-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .mockup-checklist {
+    list-style: none;
+  }
+  .mockup-checklist li {
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .mockup-checkbox {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .mockup-checkbox.checked {
+    background: var(--gruen);
+    border-color: var(--gruen);
+  }
+
+  /* Highlight Box */
+  .highlight-box {
+    border-left: 4px solid;
+    padding: 16px 20px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 16px;
+  }
+  .highlight-box.info { border-color: var(--blau); background: #eff6ff; }
+  .highlight-box.success { border-color: var(--gruen); background: #f0fdf4; }
+  .highlight-box.warning { border-color: var(--gelb); background: #fffbeb; }
+  .highlight-box.danger { border-color: var(--rot); background: #fef2f2; }
+  .highlight-box strong { display: block; margin-bottom: 4px; }
+
+  /* Effort Table */
+  .effort-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .effort-card {
+    text-align: center;
+    padding: 20px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .effort-card .number {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .effort-card .label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Footer */
+  .footer {
+    background: #fafafa;
+    padding: 32px 0;
+    text-align: center;
+    border-top: 1px solid var(--border);
+  }
+  .footer p {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.8;
+  }
+  .footer .credo-text {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  @media (max-width: 768px) {
+    .comparison { grid-template-columns: 1fr; }
+    .effort-grid { grid-template-columns: repeat(2, 1fr); }
+    .arch-row { flex-direction: column; align-items: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<div class="header">
+  <h1>CREDO</h1>
+  <div class="header-line">
+    <span style="background:var(--gelb)"></span>
+    <span style="background:var(--gruen)"></span>
+    <span style="background:var(--rot)"></span>
+    <span style="background:var(--blau)"></span>
+  </div>
+  <div class="subtitle">HR-Portal Erweiterungsplan</div>
+  <div class="doc-title">Verbeamtungsprozess (PSI) im HR-Portal</div>
+  <div class="doc-date">Erstellt: 24. M&auml;rz 2026 &middot; Version 1.0</div>
+</div>
+<div class="credo-line">
+  <div class="l-grau"></div>
+  <div class="l-gelb"></div>
+  <div class="l-gruen"></div>
+  <div class="l-rot"></div>
+  <div class="l-blau"></div>
+</div>
+
+<div class="container">
+
+<!-- ========== 1. VISION ========== -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-number">1</span>
+    Vision: Multi-Prozess HR-Portal
+  </div>
+  <div class="section-desc">
+    Das HR-Portal wird von einer reinen Onboarding-L&ouml;sung zu einer Multi-Prozess-Plattform erweitert. Jeder HR-Prozess (Onboarding, Verbeamtung, sp&auml;ter: Offboarding, Versetzung, etc.) wird als eigener Prozesstyp abgebildet &ndash; mit eigenen Phasen, Checklisten und Formularen.
+  </div>
+
+  <div class="comparison">
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128196;</span> Heute: Nur Onboarding</div>
+      <ul style="padding-left:20px; font-size:14px; color:var(--text-light);">
+        <li>1 Prozesstyp (STANDARD/BEAMTER)</li>
+        <li>Fragebogen f&uuml;r neuen Mitarbeiter</li>
+        <li>Vorgesetzten-Modalit&auml;ten</li>
+        <li>Statische Checkliste</li>
+        <li>CSV/JSON Export</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:var(--gruen);">
+      <div class="card-title"><span class="icon">&#127775;</span> Zukunft: Multi-Prozess</div>
+      <ul style="padding-left:20px; font-size:14px; color:var(--text);">
+        <li><strong>Onboarding</strong> (wie bisher)</li>
+        <li style="color:var(--gruen); font-weight:600;">Verbeamtung (PSI) &ndash; NEU</li>
+        <li style="color:var(--text-muted);">Offboarding (sp&auml;ter)</li>
+        <li style="color:var(--text-muted);">Versetzung (sp&auml;ter)</li>
+        <li style="color:var(--text-muted);">Vertragsverl&auml;ngerung (sp&auml;ter)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 2. ARCHITEKTUR ========== -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-number">2</span>
+    Technische Architektur
+  </div>
+  <div class="section-desc">
+    Statt den bestehenden Code zu duplizieren, wird eine generische Prozess-Engine eingef&uuml;hrt. Jeder Prozesstyp hat eigene Phasen, Checklisten-Vorlagen und Formulare.
+  </div>
+
+  <div class="arch-diagram">
+    <div style="margin-bottom:24px;">
+      <div class="arch-box highlight">HR-Portal Dashboard</div>
+    </div>
+    <div class="arch-arrow">&darr;</div>
+    <div class="arch-row">
+      <div class="arch-box">Onboarding-Prozess</div>
+      <div class="arch-box new">Verbeamtungs-Prozess (NEU)</div>
+      <div class="arch-box" style="border-style:dashed; color:var(--text-muted);">Weitere Prozesse...</div>
+    </div>
+    <div class="arch-arrow">&darr;</div>
+    <div style="margin:16px 0;">
+      <span class="badge badge-gray" style="margin:4px;">Phasen-Engine</span>
+      <span class="badge badge-gray" style="margin:4px;">Checklisten-System</span>
+      <span class="badge badge-gray" style="margin:4px;">Formulare</span>
+      <span class="badge badge-gray" style="margin:4px;">Dokumente</span>
+      <span class="badge badge-gray" style="margin:4px;">Webhooks / E-Mail</span>
+    </div>
+    <div class="arch-arrow">&darr;</div>
+    <div class="arch-row">
+      <div class="arch-box">PostgreSQL</div>
+      <div class="arch-box">n8n Workflows</div>
+      <div class="arch-box">LOGA Export</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 3. DATENMODELL ========== -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-number">3</span>
+    Neues Datenmodell: Verbeamtung
+  </div>
+
+  <div class="card">
+    <div class="card-title">&#128451; Neue Datenbank-Tabellen</div>
+    <table>
+      <thead>
+        <tr><th>Tabelle</th><th>Zweck</th><th>Wichtige Felder</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>CivilServiceProcess</strong></td>
+          <td>Haupttabelle je Verbeamtungsvorgang</td>
+          <td>teacherId, phase (1-5), status, schoolId, psiStartDate, probationEndDate</td>
+        </tr>
+        <tr>
+          <td><strong>CivilServicePhase</strong></td>
+          <td>Status jeder der 5 Phasen</td>
+          <td>processId, phaseNumber, status, startedAt, completedAt, approvedBy</td>
+        </tr>
+        <tr>
+          <td><strong>CivilServiceChecklist</strong></td>
+          <td>Checklisten-Eintr&auml;ge pro Phase</td>
+          <td>phaseId, title, category, isCompleted, dueDate, completedBy, notes</td>
+        </tr>
+        <tr>
+          <td><strong>CivilServiceAssessment</strong></td>
+          <td>Beurteilungen (3 Pflichtbeurteilungen)</td>
+          <td>processId, assessmentNumber, date, result, assessorName, document</td>
+        </tr>
+        <tr>
+          <td><strong>CivilServiceDocument</strong></td>
+          <td>Dokumente (Amtsarztzeugnis, Vertrag, etc.)</td>
+          <td>processId, type, fileName, uploadedAt, validUntil</td>
+        </tr>
+        <tr>
+          <td><strong>BoardDecision</strong></td>
+          <td>Beiratsentscheidungen</td>
+          <td>processId, date, result (POSITIV/NEGATIV/AUFGESCHOBEN), notes</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ========== 4. DER PROZESS IM TOOL ========== -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-number">4</span>
+    Der Verbeamtungsprozess im HR-Portal
+  </div>
+  <div class="section-desc">
+    So w&uuml;rde der komplette PSI-Prozess (5 Phasen) im HR-Portal ablaufen &ndash; von der Antragstellung bis zur &Uuml;bernahme auf Lebenszeit.
+  </div>
+
+  <div class="flow">
+
+    <!-- Phase 1 -->
+    <div class="flow-step">
+      <div class="flow-line">
+        <div class="flow-dot green"></div>
+        <div class="flow-connector"></div>
+      </div>
+      <div class="flow-content">
+        <h4>Phase 1: Antrag &amp; Beurteilung <span class="badge badge-green">T-6 Monate</span></h4>
+        <p>Schulleitung startet den Prozess im HR-Portal. Die Lehrkraft wird zugeordnet.</p>
+        <div class="card" style="margin-top:12px;">
+          <div class="card-subtitle">Was passiert im Tool:</div>
+          <ul style="padding-left:20px; font-size:14px; color:var(--text-light); line-height:2;">
+            <li><strong>HR/SL erstellt neuen Verbeamtungsvorgang</strong> (wie bei Onboarding: Lehrkraft ausw&auml;hlen, Schule zuordnen)</li>
+            <li>Checkliste Phase 1 wird automatisch generiert (Antrag, Unterrichtsbesuch, Beurteilung, Beiratsentscheidung)</li>
+            <li><strong>Supervisor-Link</strong> wird an Schulleitung gesendet &rarr; SL f&uuml;llt die Beurteilung digital aus</li>
+            <li>Beurteilungsbogen (Kriterien: Andachten, Engagement, Belastbarkeit, etc.) als Formular</li>
+            <li>Beiratsentscheidung wird dokumentiert (Positiv / Negativ / Aufgeschoben)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="flow-step">
+      <div class="flow-line">
+        <div class="flow-dot blue"></div>
+        <div class="flow-connector"></div>
+      </div>
+      <div class="flow-content">
+        <h4>Phase 2: Verwaltungsvorgang starten <span class="badge badge-blue">T-3 Monate</span></h4>
+        <p>Nach positiver Beiratsentscheidung startet die Personalverwaltung.</p>
+        <div class="card" style="margin-top:12px;">
+          <div class="card-subtitle">Was passiert im Tool:</div>
+          <ul style="padding-left:20px; font-size:14px; color:var(--text-light); line-height:2;">
+            <li>Automatischer <strong>Webhook/E-Mail</strong> an Personalabteilung: &bdquo;Verbeamtung genehmigt &ndash; Verwaltungsvorgang starten&ldquo;</li>
+            <li>Checkliste Phase 2 wird freigeschaltet (Info an PA, Beurteilung einreichen)</li>
+            <li>Dokument-Upload: Unterschriebene Beurteilung der SL</li>
+            <li>Status wechselt automatisch bei Abschluss aller Punkte</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="flow-step">
+      <div class="flow-line">
+        <div class="flow-dot amber"></div>
+        <div class="flow-connector"></div>
+      </div>
+      <div class="flow-content">
+        <h4>Phase 3: Personaladministration <span class="badge badge-amber">Die umfangreichste Phase</span></h4>
+        <p>Alle Verwaltungsschritte: Vertrag, BR, Versicherung, RV-Befreiung, LOGA.</p>
+        <div class="card" style="margin-top:12px;">
+          <div class="card-subtitle">Was passiert im Tool (8 Kategorien):</div>
+          <table style="font-size:13px;">
+            <thead>
+              <tr><th>Kategorie</th><th>Checklisten-Punkte im Tool</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>3.1 Vertragsunterlagen</strong></td><td>Amts&auml;rztl. Zeugnis anfordern, Vertrag auf Probe erstellen, Stufenberechnung</td></tr>
+              <tr><td><strong>3.2 Betriebsrat</strong></td><td>Unterlagen an BR senden, Antwort dokumentieren (mit Frist-Warnung)</td></tr>
+              <tr><td><strong>3.3 Versicherung</strong></td><td>KK-Privatversicherung Info, Beihilfe-Antrag, Meldung Beihilfestelle</td></tr>
+              <tr><td><strong>3.4 Rentenversicherung</strong></td><td>RV-Befreiungsantrag + Gew&auml;hrleistungsentscheidung MSB beilegen</td></tr>
+              <tr><td><strong>3.5 Abrechnung</strong></td><td>Vertragsende Angestelltenverh&auml;ltnis, Mehrarbeit, Personalbogen Beamte</td></tr>
+              <tr><td><strong>3.6 LOGA-Umstellung</strong></td><td>Transfer, neue Pers.-Nr., Kostenstelle, Pensionsr&uuml;ckstellungen</td></tr>
+              <tr><td><strong>3.7 Kommunikation</strong></td><td>Info Sekretariat, Info UNTIS</td></tr>
+              <tr><td><strong>3.8 F&ouml;rderverein</strong></td><td>Mitgliedschaft pr&uuml;fen/beantragen</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="highlight-box warning" style="margin-top:12px;">
+          <strong>&#9888; Automatische Fristen-Warnungen</strong>
+          Das Tool warnt automatisch wenn: Amtsarztzeugnis &auml;lter als 3 Monate wird, BR-Frist abl&auml;uft, oder Gew&auml;hrleistungsentscheidung fehlt.
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="flow-step">
+      <div class="flow-line">
+        <div class="flow-dot"></div>
+        <div class="flow-connector"></div>
+      </div>
+      <div class="flow-content">
+        <h4>Phase 4: Probezeit <span class="badge badge-gray">3 Jahre</span></h4>
+        <p>Begleitende Beurteilungen und Unterrichtsbesuche w&auml;hrend der Probezeit.</p>
+        <div class="card" style="margin-top:12px;">
+          <div class="card-subtitle">Was passiert im Tool:</div>
+          <ul style="padding-left:20px; font-size:14px; color:var(--text-light); line-height:2;">
+            <li><strong>Automatische Erinnerungen</strong> f&uuml;r die 3 Pflichtbeurteilungen (via n8n Webhook)</li>
+            <li>2. Unterrichtsbesuch nach 1 Jahr &rarr; SL-Link f&uuml;r Beurteilung</li>
+            <li>3. Unterrichtsbesuch zum Probezeit-Ende &rarr; SL-Link f&uuml;r Beurteilung + Geistliche Stellungnahme</li>
+            <li>Alle Beurteilungen als Dokument hochladbar</li>
+            <li>Fortschrittsanzeige: 3 von 3 Beurteilungen abgeschlossen</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div class="flow-step">
+      <div class="flow-line">
+        <div class="flow-dot red"></div>
+      </div>
+      <div class="flow-content">
+        <h4>Phase 5: &Uuml;bernahme auf Lebenszeit <span class="badge badge-red">T-3 Monate vor Probezeit-Ende</span></h4>
+        <p>Finale Phase: Beiratsentscheidung, neues Zeugnis, Vertrag auf Lebenszeit.</p>
+        <div class="card" style="margin-top:12px;">
+          <div class="card-subtitle">Was passiert im Tool:</div>
+          <ul style="padding-left:20px; font-size:14px; color:var(--text-light); line-height:2;">
+            <li>Tool berechnet automatisch: Probezeit endet am [Datum] &rarr; Phase 5 muss starten am [Datum-3 Monate]</li>
+            <li>Beiratsentscheidung dokumentieren (Positiv / Negativ / Verl&auml;ngerung)</li>
+            <li>Neues Amtsarztzeugnis anfordern (&#9888; altes reicht nicht!)</li>
+            <li>Gespr&auml;ch Vorstand &#8596; PSI dokumentieren</li>
+            <li>Vertrag auf Lebenszeit + BR-Anh&ouml;rung</li>
+            <li><strong>Vorgang abgeschlossen</strong> &rarr; Export m&ouml;glich</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ========== 5. UI MOCKUP ========== -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-number">5</span>
+    So sieht es im Portal aus (Mockup)
+  </div>
+
+  <!-- Mockup: Dashboard -->
+  <div class="mockup" style="margin-bottom:24px;">
+    <div class="mockup-header">
+      <div class="mockup-dot" style="background:#ff5f57;"></div>
+      <div class="mockup-dot" style="background:#febc2e;"></div>
+      <div class="mockup-dot" style="background:#28c840;"></div>
+      <div class="mockup-url">hr.fes-credo.de/dashboard</div>
+    </div>
+    <div class="mockup-body">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h3 style="font-size:18px;">Dashboard</h3>
+        <div>
+          <span class="badge badge-green" style="margin-right:8px;">+ Neues Onboarding</span>
+          <span class="badge badge-blue">+ Neue Verbeamtung</span>
+        </div>
+      </div>
+      <div class="mockup-tabs">
+        <div class="mockup-tab active">Alle Vorg&auml;nge</div>
+        <div class="mockup-tab">Onboarding (3)</div>
+        <div class="mockup-tab" style="color:var(--accent); font-weight:700;">Verbeamtung (2)</div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Typ</th><th>Name</th><th>Phase</th><th>Status</th><th>Schule</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-family:monospace; font-weight:600;">2026-GYM-V01</td>
+            <td><span class="badge badge-blue">PSI</span></td>
+            <td>Maria Schmidt</td>
+            <td>Phase 3 &ndash; Personaladmin</td>
+            <td><span class="badge badge-amber">BR-Anh&ouml;rung</span></td>
+            <td>Gymnasium</td>
+          </tr>
+          <tr>
+            <td style="font-family:monospace; font-weight:600;">2026-GES-V01</td>
+            <td><span class="badge badge-blue">PSI</span></td>
+            <td>Thomas M&uuml;ller</td>
+            <td>Phase 1 &ndash; Beurteilung</td>
+            <td><span class="badge badge-green">SL-Beurteilung l&auml;uft</span></td>
+            <td>Gesamtschule</td>
+          </tr>
+          <tr style="color:var(--text-muted);">
+            <td style="font-family:monospace;">2026-GYM-001</td>
+            <td><span class="badge badge-gray">Onboarding</span></td>
+            <td>Danny Bergen</td>
+            <td>&ndash;</td>
+            <td><span class="badge badge-green">Abgeschlossen</span></td>
+            <td>helex.it GmbH</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Mockup: Verbeamtungs-Detail -->
+  <div class="mockup">
+    <div class="mockup-header">
+      <div class="mockup-dot" style="background:#ff5f57;"></div>
+      <div class="mockup-dot" style="background:#febc2e;"></div>
+      <div class="mockup-dot" style="background:#28c840;"></div>
+      <div class="mockup-url">hr.fes-credo.de/dashboard/2026-GYM-V01</div>
+    </div>
+    <div class="mockup-body">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+        <span style="color:var(--text-muted); cursor:pointer;">&larr; Zur&uuml;ck</span>
+        <span style="font-family:monospace; font-weight:700; background:#f3f4f6; padding:4px 12px; border-radius:4px;">2026-GYM-V01</span>
+        <span class="badge badge-blue">PSI-Verbeamtung</span>
+        <span class="badge badge-amber">Phase 3</span>
+      </div>
+      <div style="font-size:14px; color:var(--text-light); margin-bottom:20px;">
+        <strong style="color:var(--text);">Maria Schmidt</strong> &middot; m.schmidt@fes-minden.de &middot; Gymnasium (737) &middot; PSI-Start: 01.08.2026
+      </div>
+      <div class="mockup-tabs">
+        <div class="mockup-tab">&Uuml;bersicht</div>
+        <div class="mockup-tab">Phasen-&Uuml;bersicht</div>
+        <div class="mockup-tab active">Checkliste Phase 3</div>
+        <div class="mockup-tab">Beurteilungen</div>
+        <div class="mockup-tab">Dokumente</div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <p style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; font-weight:600;">3.1 Vertragsunterlagen</p>
+        <ul class="mockup-checklist">
+          <li><div class="mockup-checkbox checked"></div> <span>Amts&auml;rztliches Zeugnis angefordert</span> <span class="badge badge-green" style="margin-left:auto; font-size:11px;">12.03.2026</span></li>
+          <li><div class="mockup-checkbox checked"></div> <span>Anstellungsvertrag auf Probe erstellt</span> <span class="badge badge-green" style="margin-left:auto; font-size:11px;">15.03.2026</span></li>
+          <li><div class="mockup-checkbox"></div> <span>Stufenberechnung (TV-L) erstellt</span></li>
+        </ul>
+      </div>
+      <div style="margin-bottom:16px;">
+        <p style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; font-weight:600;">3.2 Betriebsrat</p>
+        <ul class="mockup-checklist">
+          <li><div class="mockup-checkbox"></div> <span>Unterlagen an BR versandt</span> <span class="badge badge-red" style="margin-left:auto; font-size:11px;">&#9888; F&auml;llig in 5 Tagen</span></li>
+          <li><div class="mockup-checkbox"></div> <span>Antwort BR erhalten</span></li>
+        </ul>
+      </div>
+      <div>
+        <p style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; font-weight:600;">3.3 Versicherung &amp; Beihilfe</p>
+        <ul class="mockup-checklist">
+          <li><div class="mockup-checkbox"></div> <span>Anschreiben KK-Privatversicherung</span></li>
+          <li><div class="mockup-checkbox"></div> <span>Info Beihilfe + Erstantrag an LK</span></li>
+          <li><div class="mockup-checkbox"></div> <span>Meldung PSI an Beihilfestelle</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 6. SUPERVISOR LINK ========== -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-number">6</span>
+    Vorgesetzten-Link f&uuml;r Beurteilungen
+  </div>
+  <div class="section-desc">
+    Genau wie beim Onboarding erh&auml;lt die Schulleitung einen Magic-Link per E-Mail. Darauf&uuml;ber f&uuml;llt die SL die Beurteilung digital aus.
+  </div>
+
+  <div class="comparison">
+    <div class="card">
+      <div class="card-title">&#128231; E-Mail an Schulleitung</div>
+      <div style="background:#f8fafc; padding:16px; border-radius:4px; font-size:13px; line-height:1.8;">
+        <strong>Betreff:</strong> Beurteilung angefordert &ndash; Maria Schmidt (PSI)<br><br>
+        Sehr geehrte Schulleitung,<br><br>
+        f&uuml;r die Verbeamtung von <strong>Maria Schmidt</strong> wird Ihre dienstliche Beurteilung ben&ouml;tigt. Bitte f&uuml;llen Sie das Beurteilungsformular &uuml;ber folgenden Link aus:<br><br>
+        <span style="color:var(--accent);">[Button: Beurteilung ausf&uuml;llen &rarr;]</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">&#128203; Beurteilungsformular (SL)</div>
+      <div style="font-size:13px; line-height:2;">
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f3f4f6;">
+          <span>Regelm&auml;&szlig;iger Besuch der Andachten</span>
+          <span class="badge badge-green">&#9733; &#9733; &#9733; &#9733; &#9734;</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f3f4f6;">
+          <span>Belastbarkeit</span>
+          <span class="badge badge-green">&#9733; &#9733; &#9733; &#9733; &#9733;</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f3f4f6;">
+          <span>Miteinander Kollegium</span>
+          <span class="badge badge-green">&#9733; &#9733; &#9733; &#9733; &#9734;</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f3f4f6;">
+          <span>Engagement f&uuml;r die Schule</span>
+          <span class="badge badge-green">&#9733; &#9733; &#9733; &#9733; &#9733;</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0;">
+          <span>Identifikation mit FES-Grundsaetzen</span>
+          <span class="badge badge-green">&#9733; &#9733; &#9733; &#9733; &#9733;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 7. WEBHOOKS ========== -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-number">7</span>
+    Neue Webhooks &amp; E-Mails
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>Event</th><th>Ausl&ouml;ser</th><th>Empf&auml;nger</th><th>Inhalt</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>psi-created</code></td>
+          <td>Neuer PSI-Vorgang angelegt</td>
+          <td>HR + SL</td>
+          <td>Info + Link zur Beurteilung</td>
+        </tr>
+        <tr>
+          <td><code>psi-assessment-requested</code></td>
+          <td>Beurteilung angefordert</td>
+          <td>Schulleitung</td>
+          <td>Magic-Link zum Beurteilungsformular</td>
+        </tr>
+        <tr>
+          <td><code>psi-assessment-completed</code></td>
+          <td>Beurteilung eingegangen</td>
+          <td>HR</td>
+          <td>Benachrichtigung + n&auml;chste Schritte</td>
+        </tr>
+        <tr>
+          <td><code>psi-phase-completed</code></td>
+          <td>Phase abgeschlossen</td>
+          <td>HR</td>
+          <td>N&auml;chste Phase beginnen</td>
+        </tr>
+        <tr>
+          <td><code>psi-deadline-warning</code></td>
+          <td>Frist l&auml;uft ab</td>
+          <td>HR</td>
+          <td>Warnung: Amtsarztzeugnis, BR-Frist, etc.</td>
+        </tr>
+        <tr>
+          <td><code>psi-completed</code></td>
+          <td>Verbeamtung abgeschlossen</td>
+          <td>HR + SL</td>
+          <td>&Uuml;bernahme auf Lebenszeit best&auml;tigt</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ========== 8. AUFWAND ========== -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-number">8</span>
+    Gesch&auml;tzter Aufwand
+  </div>
+
+  <div class="effort-grid">
+    <div class="effort-card">
+      <div class="number">6</div>
+      <div class="label">Neue DB-Tabellen</div>
+    </div>
+    <div class="effort-card">
+      <div class="number">8</div>
+      <div class="label">Neue API-Routen</div>
+    </div>
+    <div class="effort-card">
+      <div class="number">5</div>
+      <div class="label">Neue Seiten/Tabs</div>
+    </div>
+    <div class="effort-card">
+      <div class="number">6</div>
+      <div class="label">Neue Webhooks</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:24px;">
+    <div class="card-title">&#128197; Umsetzungsplan</div>
+    <table>
+      <thead>
+        <tr><th>Phase</th><th>Inhalt</th><th>Aufwand</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Sprint 1</strong></td>
+          <td>Datenmodell + API + Prozess-Engine (Phasen-System)</td>
+          <td><span class="badge badge-amber">Mittel</span></td>
+        </tr>
+        <tr>
+          <td><strong>Sprint 2</strong></td>
+          <td>Dashboard-Erweiterung (Filter, PSI-Spalten) + Detailseite mit Phasen-Tabs</td>
+          <td><span class="badge badge-amber">Mittel</span></td>
+        </tr>
+        <tr>
+          <td><strong>Sprint 3</strong></td>
+          <td>Checklisten-Vorlagen (40+ Punkte) + Beurteilungsformular (SL-Link)</td>
+          <td><span class="badge badge-red">Hoch</span></td>
+        </tr>
+        <tr>
+          <td><strong>Sprint 4</strong></td>
+          <td>Webhooks + E-Mail-Templates + Fristen-Warnungen + n8n Workflows</td>
+          <td><span class="badge badge-amber">Mittel</span></td>
+        </tr>
+        <tr>
+          <td><strong>Sprint 5</strong></td>
+          <td>Test + Feinschliff + Go-Live</td>
+          <td><span class="badge badge-green">Gering</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ========== 9. ZUSAMMENFASSUNG ========== -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-number">9</span>
+    Zusammenfassung
+  </div>
+
+  <div class="highlight-box success">
+    <strong>Das HR-Portal wird zur zentralen Plattform f&uuml;r alle Personal-Prozesse.</strong>
+    Der Verbeamtungsprozess nutzt die gleiche Infrastruktur wie das Onboarding (Webhooks, E-Mail-Vorlagen, Checklisten, Dokumente, Magic-Links), erweitert sie aber um Phasen-Management, Beurteilungsformulare und automatische Fristen-Warnungen.
+  </div>
+
+  <div class="highlight-box info">
+    <strong>Vorgesetzten-Link funktioniert genau wie beim Onboarding.</strong>
+    Die Schulleitung erh&auml;lt einen Magic-Link, f&uuml;llt die Beurteilung digital aus, und HR wird automatisch benachrichtigt. Alle 3 Pflichtbeurteilungen laufen &uuml;ber diesen Mechanismus.
+  </div>
+
+  <div class="highlight-box warning">
+    <strong>Fristen sind kritisch beim PSI-Prozess.</strong>
+    Das Tool berechnet automatisch alle relevanten Termine (T-6, T-3, Probezeit-Ende, Amtsarztzeugnis-Ablauf) und warnt per E-Mail, bevor Fristen ablaufen.
+  </div>
+
+  <div class="card" style="margin-top:24px; text-align:center; padding:32px;">
+    <p style="font-size:18px; font-weight:700; color:var(--accent); margin-bottom:8px;">Bereit zur Umsetzung?</p>
+    <p style="font-size:14px; color:var(--text-light);">
+      Alle bestehenden Systeme (Webhooks, SMTP, E-Mail-Vorlagen, Mandanten) k&ouml;nnen wiederverwendet werden.<br>
+      Der Verbeamtungsprozess ist die erste Erweiterung &ndash; weitere Prozesse folgen dem gleichen Muster.
+    </p>
+  </div>
+</div>
+
+</div>
+
+<!-- Footer -->
+<div class="credo-line">
+  <div class="l-grau"></div>
+  <div class="l-gelb"></div>
+  <div class="l-gruen"></div>
+  <div class="l-rot"></div>
+  <div class="l-blau"></div>
+</div>
+<div class="footer">
+  <div class="credo-text">CREDO</div>
+  <p>Glauben &middot; Leben &middot; Gemeinsam</p>
+  <p style="margin-top:12px;">Christlicher Schulverein Minden e.V. &middot; Kingsleyallee 6 &middot; 32425 Minden</p>
+  <p style="margin-top:16px; color:#c0c0c0;">&copy; 2026 CREDO Gruppe &middot; Freie Evangelische Schulen Minden</p>
+</div>
+
+</body>
+</html>
