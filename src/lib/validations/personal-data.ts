@@ -16,6 +16,24 @@
 
 import { z } from "zod";
 import { validateIBAN } from "@/lib/utils/iban-validator";
+import { FieldConfigHelper } from "@/lib/field-definitions";
+
+// Helper: String-Feld das nur required ist wenn FieldConfig es verlangt
+function reqStr(fc: FieldConfigHelper, name: string, msg: string) {
+  return fc.isRequired(name) ? z.string().min(1, msg) : z.string();
+}
+
+// Helper: Enum-Feld das nur required ist wenn FieldConfig es verlangt
+function reqEnum<T extends [string, ...string[]]>(
+  fc: FieldConfigHelper,
+  name: string,
+  values: T,
+  msg: string
+) {
+  return fc.isRequired(name)
+    ? z.enum(values, { required_error: msg })
+    : z.enum(values).optional();
+}
 
 // =============================================
 // Step 1: Persoenliche Angaben
@@ -201,6 +219,119 @@ export const step10Schema = z.object({
 });
 
 export type Step10Data = z.infer<typeof step10Schema>;
+
+// =============================================
+// Dynamische Schema-Factories (FieldConfig-aware)
+// Verwenden FieldConfigHelper um Pflichtfelder dynamisch zu steuern
+// =============================================
+
+export function createStep1Schema(fc: FieldConfigHelper) {
+  return z.object({
+    salutation: z.enum(["Herr", "Frau"], {
+      required_error: "Bitte waehlen Sie eine Anrede.",
+    }),
+    title: z.string(),
+    firstName: z.string().min(1, "Vorname ist erforderlich.").max(100),
+    lastName: z.string().min(1, "Nachname ist erforderlich.").max(100),
+    birthName: z.string(),
+    birthDate: z.string().min(1, "Geburtsdatum ist erforderlich."),
+    birthPlace: reqStr(fc, "birthPlace", "Geburtsort ist erforderlich."),
+    birthCountry: z.string(),
+    nationality: z.string(),
+    maritalStatus: reqEnum(
+      fc, "maritalStatus",
+      ["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt_lebend", "eingetragene_partnerschaft"],
+      "Bitte waehlen Sie den Familienstand."
+    ),
+    severelyDisabled: z.boolean(),
+    disabilityDegree: z.number().min(0).max(100).nullable(),
+  });
+}
+
+export function createStep3Schema(fc: FieldConfigHelper) {
+  const ibanRequired = fc.isRequired("iban");
+  return z.object({
+    iban: ibanRequired
+      ? z.string().min(1, "IBAN ist erforderlich.").refine(
+          (val) => { if (!val) return true; return validateIBAN(val); },
+          { message: "Bitte geben Sie eine gueltige IBAN ein." }
+        )
+      : z.string().refine(
+          (val) => { if (!val || val.trim() === "") return true; return validateIBAN(val); },
+          { message: "Bitte geben Sie eine gueltige IBAN ein." }
+        ),
+    bic: z.string(),
+    bankName: z.string(),
+    accountHolder: z.string(),
+  });
+}
+
+export function createStep4Schema(fc: FieldConfigHelper) {
+  return z.object({
+    socialSecurityNumber: z.string(),
+    healthInsuranceName: reqStr(fc, "healthInsuranceName", "Krankenkasse ist erforderlich."),
+    healthInsuranceType: reqEnum(
+      fc, "healthInsuranceType",
+      ["gesetzlich", "privat"],
+      "Bitte waehlen Sie die Versicherungsart."
+    ),
+    parentStatus: z.boolean(),
+    minijobRvBefreiung: z.boolean(),
+  });
+}
+
+export function createStep5Schema(fc: FieldConfigHelper) {
+  const taxIdRequired = fc.isRequired("taxId");
+  return z.object({
+    taxId: taxIdRequired
+      ? z.string().min(1, "Steuer-ID ist erforderlich.").regex(/^\d{10,11}$/, "Steuer-ID muss 10 oder 11 Ziffern enthalten.")
+      : z.string().refine(
+          (val) => !val || val.trim() === "" || /^\d{10,11}$/.test(val),
+          { message: "Steuer-ID muss 10 oder 11 Ziffern enthalten." }
+        ),
+    taxClass: reqEnum(
+      fc, "taxClass",
+      ["I", "II", "III", "IV", "V", "VI"],
+      "Bitte waehlen Sie die Steuerklasse."
+    ),
+    taxAllowance: z.number().min(0).nullable(),
+    childAllowance: z.number().min(0).nullable(),
+    religion: reqEnum(
+      fc, "religion",
+      ["ev", "rk", "ak", "lt", "rf", "fr", "fg", "keine", "sonstige"],
+      "Bitte waehlen Sie die Religionszugehoerigkeit."
+    ),
+  });
+}
+
+export function createStep6Schema(fc: FieldConfigHelper) {
+  return z.object({
+    hasOtherEmployment: z.boolean(),
+    otherEmployerName: z.string(),
+    otherWeeklyHours: z.number().min(0).max(60).nullable(),
+    employerType: reqEnum(
+      fc, "employerType",
+      ["hauptarbeitgeber", "nebenarbeitgeber", "nein"],
+      "Bitte waehlen Sie eine Option."
+    ),
+    hasMinijob: z.boolean(),
+  });
+}
+
+export function createStep8Schema(fc: FieldConfigHelper) {
+  return z.object({
+    highestSchoolDegree: reqEnum(
+      fc, "highestSchoolDegree",
+      ["ohne_schulabschluss", "hauptschulabschluss", "mittlere_reife", "abitur_fachabitur", "sonstiges"],
+      "Bitte waehlen Sie den hoechsten Schulabschluss."
+    ),
+    highestProfessionalDegree: reqEnum(
+      fc, "highestProfessionalDegree",
+      ["ohne_berufsausbildung", "anerkannte_berufsausbildung", "meister_techniker_fachschule", "bachelor", "diplom_magister_master_staatsexamen", "promotion"],
+      "Bitte waehlen Sie die hoechste Berufsausbildung."
+    ),
+  });
+}
 
 // =============================================
 // Step-Konfiguration

@@ -5,9 +5,10 @@
  * SV-Nummer, Krankenkasse, Elterneigenschaft
  */
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { step4Schema, type Step4Data } from "@/lib/validations/personal-data";
+import { createStep4Schema, type Step4Data } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
@@ -26,12 +27,13 @@ export function Step4SocialSecurity({
   fieldConfig,
 }: StepProps) {
   const fc = fieldConfig ?? new FieldConfigHelper(4);
+  const schema = useMemo(() => createStep4Schema(fc), [fc]);
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<Step4Data>({
-    resolver: zodResolver(step4Schema),
+    resolver: zodResolver(schema),
     defaultValues: {
       socialSecurityNumber: (data.socialSecurityNumber as string) || "",
       healthInsuranceName: (data.healthInsuranceName as string) || "",
@@ -123,7 +125,7 @@ export function Step4SocialSecurity({
         </div>
       )}
 
-      {/* Elterneigenschaft */}
+      {/* Elterneigenschaft (Pflegeversicherung) */}
       {fc.isVisible("parentStatus") && (
         <div className="rounded-lg border border-border bg-muted/50 p-4">
           <label className="flex items-center gap-3">
@@ -137,8 +139,12 @@ export function Step4SocialSecurity({
                 {fc.getLabel("parentStatus")}
               </span>
               <p className="text-xs text-muted-foreground">
-                Relevant fuer den Zuschlag in der Pflegeversicherung. Kinderlose
-                Mitglieder ab 23 Jahren zahlen einen Zuschlag von 0,6%.
+                Bitte ankreuzen, wenn Sie leibliche, adoptierte oder
+                Stiefkinder haben. Diese Angabe ist wichtig fuer die
+                Pflegeversicherung: Arbeitnehmer ohne Kinder zahlen ab
+                23 Jahren einen Beitragszuschlag von 0,6%. Bei mehreren
+                Kindern unter 25 Jahren reduziert sich Ihr Beitrag
+                zusaetzlich.
               </p>
             </div>
           </label>

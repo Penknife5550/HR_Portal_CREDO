@@ -5,9 +5,10 @@
  * IBAN, BIC, Bankname, Kontoinhaber
  */
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { step3Schema, type Step3Data } from "@/lib/validations/personal-data";
+import { createStep3Schema, type Step3Data } from "@/lib/validations/personal-data";
 import { formatIBAN } from "@/lib/utils/iban-validator";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 
@@ -21,13 +22,14 @@ interface StepProps {
 
 export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
   const fc = fieldConfig ?? new FieldConfigHelper(3);
+  const schema = useMemo(() => createStep3Schema(fc), [fc]);
   const {
     register,
     handleSubmit,
     setValue,
     formState: { errors },
   } = useForm<Step3Data>({
-    resolver: zodResolver(step3Schema),
+    resolver: zodResolver(schema),
     defaultValues: {
       iban: formatIBAN((data.iban as string) || ""),
       bic: (data.bic as string) || "",

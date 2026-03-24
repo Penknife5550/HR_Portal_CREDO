@@ -5,9 +5,10 @@
  * Hoechster Schulabschluss und hoechste Berufsausbildung (Haufe HI13214732)
  */
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { step8Schema, type Step8Data } from "@/lib/validations/personal-data";
+import { createStep8Schema, type Step8Data } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
@@ -20,12 +21,13 @@ interface StepProps {
 
 export function Step8Education({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
   const fc = fieldConfig ?? new FieldConfigHelper(8);
+  const schema = useMemo(() => createStep8Schema(fc), [fc]);
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<Step8Data>({
-    resolver: zodResolver(step8Schema),
+    resolver: zodResolver(schema),
     defaultValues: {
       highestSchoolDegree:
         (data.highestSchoolDegree as Step8Data["highestSchoolDegree"]) ||

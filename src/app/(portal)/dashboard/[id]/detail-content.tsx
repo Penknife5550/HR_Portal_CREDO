@@ -1104,7 +1104,7 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
           <FieldRow label="SV-Nummer" value={pd.socialSecurityNumber || "\u2014"} />
           <FieldRow label="Krankenkasse" value={pd.healthInsuranceName || "\u2014"} />
           <FieldRow label="Versicherungsart" value={pd.healthInsuranceType ? (INSURANCE_TYPE_LABELS[pd.healthInsuranceType] || pd.healthInsuranceType) : "\u2014"} />
-          <FieldRow label="Elterneigenschaft (PV)" value={formatBoolean(pd.parentStatus)} />
+          <FieldRow label="Kinder vorhanden" value={formatBoolean(pd.parentStatus)} />
         </div>
       </SectionCard>
 

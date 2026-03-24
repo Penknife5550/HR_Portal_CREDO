@@ -5,9 +5,10 @@
  * Name, Geburtsdatum, Familienstand, Schwerbehinderung
  */
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { step1Schema, type Step1Data } from "@/lib/validations/personal-data";
+import { createStep1Schema, type Step1Data } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
@@ -20,13 +21,14 @@ interface StepProps {
 
 export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) {
   const fc = fieldConfig ?? new FieldConfigHelper(1);
+  const schema = useMemo(() => createStep1Schema(fc), [fc]);
   const {
     register,
     handleSubmit,
     watch,
     formState: { errors },
   } = useForm<Step1Data>({
-    resolver: zodResolver(step1Schema),
+    resolver: zodResolver(schema),
     defaultValues: {
       salutation: (data.salutation as Step1Data["salutation"]) || undefined,
       title: (data.title as string) || "",

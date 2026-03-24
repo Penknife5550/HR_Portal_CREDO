@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { decrypt } from "@/lib/encryption";
 
 // =============================================
 // GET /api/onboarding/:id
@@ -72,6 +73,17 @@ export async function GET(
 
     // Tokens aus der Antwort entfernen (Sicherheit: Magic-Links nicht exponieren)
     const { token: _t, supervisorToken: _st, ...safeOnboarding } = onboarding;
+
+    // Sensible Felder entschluesseln (IBAN, SV-Nummer, Steuer-ID)
+    if (safeOnboarding.personalData) {
+      const pd = safeOnboarding.personalData;
+      safeOnboarding.personalData = {
+        ...pd,
+        iban: pd.iban ? decrypt(pd.iban) : pd.iban,
+        socialSecurityNumber: pd.socialSecurityNumber ? decrypt(pd.socialSecurityNumber) : pd.socialSecurityNumber,
+        taxId: pd.taxId ? decrypt(pd.taxId) : pd.taxId,
+      };
+    }
 
     return NextResponse.json(safeOnboarding);
   } catch (error) {

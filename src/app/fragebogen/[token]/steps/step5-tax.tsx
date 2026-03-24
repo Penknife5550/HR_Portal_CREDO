@@ -5,9 +5,10 @@
  * Steuer-ID, Steuerklasse, Freibetraege, Religion
  */
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { step5Schema, type Step5Data } from "@/lib/validations/personal-data";
+import { createStep5Schema, type Step5Data } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
@@ -20,12 +21,13 @@ interface StepProps {
 
 export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
   const fc = fieldConfig ?? new FieldConfigHelper(5);
+  const schema = useMemo(() => createStep5Schema(fc), [fc]);
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<Step5Data>({
-    resolver: zodResolver(step5Schema),
+    resolver: zodResolver(schema),
     defaultValues: {
       taxId: (data.taxId as string) || "",
       taxClass: (data.taxClass as Step5Data["taxClass"]) || undefined,

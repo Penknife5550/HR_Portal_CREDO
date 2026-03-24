@@ -83,7 +83,7 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
     { name: "socialSecurityNumber", label: "SV-Nummer",              defaultVisible: true, defaultRequired: false },
     { name: "healthInsuranceName",  label: "Krankenkasse",           defaultVisible: true, defaultRequired: true },
     { name: "healthInsuranceType",  label: "Versicherungsart",       defaultVisible: true, defaultRequired: true },
-    { name: "parentStatus",         label: "Elterneigenschaft (PV)", defaultVisible: true, defaultRequired: false },
+    { name: "parentStatus",         label: "Haben Sie Kinder?", defaultVisible: true, defaultRequired: false },
     { name: "minijobRvBefreiung",   label: "RV-Befreiung Minijob",  defaultVisible: true, defaultRequired: false },
   ],
 

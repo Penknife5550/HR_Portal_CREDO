@@ -5,9 +5,10 @@
  * Angaben zu anderen Arbeitgebern
  */
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { step6Schema, type Step6Data } from "@/lib/validations/personal-data";
+import { createStep6Schema, type Step6Data } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
@@ -20,13 +21,14 @@ interface StepProps {
 
 export function Step6Employment({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
   const fc = fieldConfig ?? new FieldConfigHelper(6);
+  const schema = useMemo(() => createStep6Schema(fc), [fc]);
   const {
     register,
     handleSubmit,
     watch,
     formState: { errors },
   } = useForm<Step6Data>({
-    resolver: zodResolver(step6Schema),
+    resolver: zodResolver(schema),
     defaultValues: {
       hasOtherEmployment: (data.hasOtherEmployment as boolean) || false,
       otherEmployerName: (data.otherEmployerName as string) || "",
