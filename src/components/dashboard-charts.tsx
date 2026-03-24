@@ -112,7 +112,7 @@ export function StatusPieChart({ data }: { data: StatusData[] }) {
           ))}
         </Pie>
         <Tooltip
-          formatter={(value: number) => [value, "Vorgaenge"]}
+          formatter={(value) => [value, "Vorgaenge"]}
           contentStyle={{
             borderRadius: "8px",
             border: "1px solid #e5e7eb",

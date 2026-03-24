@@ -56,10 +56,8 @@ export async function GET() {
     for (let i = 0; i < TREND_MONTHS; i++) {
       const date = new Date(now.getFullYear(), now.getMonth() - TREND_MONTHS + 1 + i, 1);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      const monthLabel = date.toLocaleDateString("de-DE", {
-        month: "short",
-        year: "2-digit",
-      });
+      const MONTH_NAMES = ["Jan", "Feb", "Mrz", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+      const monthLabel = `${MONTH_NAMES[date.getMonth()]} ${String(date.getFullYear()).slice(-2)}`;
 
       const created = allProcesses.filter((p) => {
         const d = new Date(p.createdAt);

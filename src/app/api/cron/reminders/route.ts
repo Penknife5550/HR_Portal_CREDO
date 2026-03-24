@@ -127,6 +127,11 @@ export async function POST(request: NextRequest) {
     });
 
     for (const process of supervisorOverdue) {
+      // Ohne Supervisor-E-Mail koennen wir keine Erinnerung senden
+      if (!process.supervisorEmail) {
+        continue;
+      }
+
       try {
         const daysOpen = Math.floor(
           (now.getTime() - new Date(process.submittedAt!).getTime()) / MS_PER_DAY
