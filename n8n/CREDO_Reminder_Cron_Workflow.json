@@ -1,5 +1,5 @@
 {
-  "name": "CREDO HR-Portal – Tägliche Erinnerungen",
+  "name": "CREDO HR-Portal — Tägliche Erinnerungen",
   "nodes": [
     {
       "parameters": {
@@ -12,16 +12,16 @@
           ]
         }
       },
-      "id": "cron-trigger",
+      "id": "a1b2c3d4-cron-trigger",
       "name": "Täglich 08:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [250, 300]
+      "position": [100, 300]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.HR_PORTAL_URL || 'https://hr.credo-schulen.de' }}/api/cron/reminders",
+        "url": "https://hr.credo-schulen.de/api/cron/reminders",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -29,7 +29,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer {{ $env.CRON_SECRET }}"
+              "value": "Bearer HIER_CRON_SECRET_EINTRAGEN"
             }
           ]
         },
@@ -42,11 +42,21 @@
           }
         }
       },
-      "id": "http-request",
-      "name": "Erinnerungen senden",
+      "id": "b2c3d4e5-http-reminders",
+      "name": "Erinnerungen abrufen",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300]
+      "position": [340, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — Erinnerungs-Ergebnis auswerten\n// Loggt das Ergebnis und gibt eine Zusammenfassung aus\n// ============================================================\n\ntry {\n  const response = $input.first().json;\n  const body = response.body || response;\n\n  const summary = {\n    success: body.success || false,\n    timestamp: body.timestamp || new Date().toISOString(),\n    employeeReminders: body.employeeReminders || 0,\n    supervisorReminders: body.supervisorReminders || 0,\n    total: body.total || 0,\n    errors: body.errors || 0,\n    statusCode: response.statusCode || 200\n  };\n\n  // Nur E-Mail senden wenn Erinnerungen verschickt wurden\n  if (summary.total > 0 || summary.errors > 0) {\n    const lines = [\n      `Erinnerungs-Bericht vom ${new Date().toLocaleDateString('de-DE')}`,\n      '',\n      `Mitarbeiter-Erinnerungen: ${summary.employeeReminders}`,\n      `Vorgesetzten-Erinnerungen: ${summary.supervisorReminders}`,\n      `Gesamt versendet: ${summary.total}`,\n      summary.errors > 0 ? `Fehler: ${summary.errors}` : '',\n      '',\n      'CREDO HR-Portal — Automatischer Bericht'\n    ].filter(Boolean).join('\\n');\n\n    return [{\n      json: {\n        sendReport: true,\n        to: 'personalbuchhaltung@fes-minden.de',\n        subject: `HR-Portal: ${summary.total} Erinnerung(en) versendet${summary.errors > 0 ? ' (' + summary.errors + ' Fehler)' : ''}`,\n        html: `<div style=\"font-family:Calibri,Arial,sans-serif;font-size:14px;color:#2d2d2d;line-height:1.6;\"><pre>${lines}</pre></div>`,\n        ...summary\n      }\n    }];\n  }\n\n  // Keine Erinnerungen noetig → nichts senden\n  return [{ json: { sendReport: false, ...summary } }];\n\n} catch (error) {\n  return [{\n    json: {\n      sendReport: true,\n      to: 'personalbuchhaltung@fes-minden.de',\n      subject: 'HR-Portal: Fehler beim Erinnerungsversand',\n      html: `<div style=\"font-family:Calibri,Arial,sans-serif;font-size:14px;color:#c00;\">Fehler: ${error.message}</div>`,\n      error: error.message\n    }\n  }];\n}\n"
+      },
+      "id": "c3d4e5f6-code-evaluate",
+      "name": "Ergebnis auswerten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [580, 300]
     },
     {
       "parameters": {
@@ -58,11 +68,11 @@
           },
           "conditions": [
             {
-              "id": "check-success",
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200,
+              "id": "check-send",
+              "leftValue": "={{ $json.sendReport }}",
+              "rightValue": true,
               "operator": {
-                "type": "number",
+                "type": "boolean",
                 "operation": "equals"
               }
             }
@@ -70,62 +80,67 @@
           "combinator": "and"
         }
       },
-      "id": "check-status",
-      "name": "Erfolgreich?",
+      "id": "d4e5f6g7-if-send",
+      "name": "Bericht senden?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [700, 300]
+      "position": [820, 300]
     },
     {
       "parameters": {
-        "content": "=✅ Erinnerungen versendet\n\nMitarbeiter: {{ $json.body.employeeReminders }}\nVorgesetzte: {{ $json.body.supervisorReminders }}\nGesamt: {{ $json.body.total }}\nFehler: {{ $json.body.errors }}\nZeit: {{ $json.body.timestamp }}",
-        "options": {}
+        "toRecipients": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "bodyContent": "={{ $json.html }}",
+        "additionalFields": {
+          "from": "CREDO-HR",
+          "bodyContentType": "html",
+          "replyTo": "personalbuchhaltung@fes-minden.de"
+        }
       },
-      "id": "log-success",
-      "name": "Erfolg loggen",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [920, 200]
-    },
-    {
-      "parameters": {
-        "content": "=❌ Fehler beim Senden der Erinnerungen\n\nStatus: {{ $json.statusCode }}\nBody: {{ JSON.stringify($json.body) }}",
-        "options": {}
-      },
-      "id": "log-error",
-      "name": "Fehler loggen",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [920, 400]
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [1060, 220],
+      "id": "e5f6g7h8-outlook-report",
+      "name": "Bericht per Outlook senden",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "FCU8Wm3Is8PCPAHT",
+          "name": "n8n@fes-minden.de"
+        }
+      }
     }
   ],
+  "pinData": {},
   "connections": {
     "Täglich 08:00": {
       "main": [
-        [{ "node": "Erinnerungen senden", "type": "main", "index": 0 }]
+        [{ "node": "Erinnerungen abrufen", "type": "main", "index": 0 }]
       ]
     },
-    "Erinnerungen senden": {
+    "Erinnerungen abrufen": {
       "main": [
-        [{ "node": "Erfolgreich?", "type": "main", "index": 0 }]
+        [{ "node": "Ergebnis auswerten", "type": "main", "index": 0 }]
       ]
     },
-    "Erfolgreich?": {
+    "Ergebnis auswerten": {
       "main": [
-        [{ "node": "Erfolg loggen", "type": "main", "index": 0 }],
-        [{ "node": "Fehler loggen", "type": "main", "index": 0 }]
+        [{ "node": "Bericht senden?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Bericht senden?": {
+      "main": [
+        [{ "node": "Bericht per Outlook senden", "type": "main", "index": 0 }],
+        []
       ]
     }
   },
   "settings": {
     "executionOrder": "v1"
   },
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
   "tags": [
-    { "name": "CREDO HR-Portal" },
-    { "name": "Erinnerungen" },
-    { "name": "Cron" }
+    { "name": "Onboarding" },
+    { "name": "HR-Portal" },
+    { "name": "CREDO" },
+    { "name": "Erinnerungen" }
   ]
 }
