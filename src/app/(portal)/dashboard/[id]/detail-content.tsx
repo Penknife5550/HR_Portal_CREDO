@@ -1092,7 +1092,7 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
       <SectionCard title="3. Bankverbindung" icon="&#127974;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
           <FieldRow label="Kontoinhaber" value={pd.accountHolder || "\u2014"} />
-          <FieldRow label="IBAN" value={pd.iban ? maskSensitive(pd.iban) : "\u2014"} />
+          <FieldRow label="IBAN" value={pd.iban || "\u2014"} />
           <FieldRow label="BIC" value={pd.bic || "\u2014"} />
           <FieldRow label="Bankname" value={pd.bankName || "\u2014"} />
         </div>
@@ -1101,7 +1101,7 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
       {/* Schritt 4: Sozialversicherung */}
       <SectionCard title="4. Sozialversicherung" icon="&#128737;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-          <FieldRow label="SV-Nummer" value={pd.socialSecurityNumber ? maskSensitive(pd.socialSecurityNumber) : "\u2014"} />
+          <FieldRow label="SV-Nummer" value={pd.socialSecurityNumber || "\u2014"} />
           <FieldRow label="Krankenkasse" value={pd.healthInsuranceName || "\u2014"} />
           <FieldRow label="Versicherungsart" value={pd.healthInsuranceType ? (INSURANCE_TYPE_LABELS[pd.healthInsuranceType] || pd.healthInsuranceType) : "\u2014"} />
           <FieldRow label="Elterneigenschaft (PV)" value={formatBoolean(pd.parentStatus)} />
@@ -1111,7 +1111,7 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
       {/* Schritt 5: Steuer */}
       <SectionCard title="5. Steuerliche Angaben" icon="&#128196;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-          <FieldRow label="Steuer-ID" value={pd.taxId ? maskSensitive(pd.taxId) : "\u2014"} />
+          <FieldRow label="Steuer-ID" value={pd.taxId || "\u2014"} />
           <FieldRow label="Steuerklasse" value={pd.taxClass ? (TAX_CLASS_LABELS[pd.taxClass] || pd.taxClass) : "\u2014"} />
           <FieldRow label="Jaehrlicher Freibetrag" value={pd.taxAllowance != null ? formatCurrency(pd.taxAllowance) : "\u2014"} />
           <FieldRow label="Kinderfreibetrag" value={pd.childAllowance != null ? formatCurrency(pd.childAllowance) : "\u2014"} />
