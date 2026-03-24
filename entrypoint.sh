@@ -29,9 +29,9 @@ fi
 
 echo "Umgebungsvariablen geprueft: OK"
 
-echo "Datenbank-Migrationen werden ausgefuehrt..."
-prisma migrate deploy 2>&1
-echo "Migrationen erfolgreich."
+echo "Datenbank-Schema wird synchronisiert..."
+npx prisma db push --skip-generate 2>&1
+echo "Datenbank-Schema synchronisiert."
 
 # Seed ausfuehren wenn noch kein Admin-User existiert
 echo "Pruefe ob Seed notwendig..."
