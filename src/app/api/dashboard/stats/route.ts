@@ -52,11 +52,11 @@ export async function GET() {
       select: { createdAt: true, completedAt: true },
     });
 
+    const MONTH_NAMES = ["Jan", "Feb", "Mrz", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
     const monthlyTrend: { month: string; created: number; completed: number }[] = [];
     for (let i = 0; i < TREND_MONTHS; i++) {
       const date = new Date(now.getFullYear(), now.getMonth() - TREND_MONTHS + 1 + i, 1);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      const MONTH_NAMES = ["Jan", "Feb", "Mrz", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
       const monthLabel = `${MONTH_NAMES[date.getMonth()]} ${String(date.getFullYear()).slice(-2)}`;
 
       const created = allProcesses.filter((p) => {

@@ -185,23 +185,26 @@ function extractVariables(
 
   const base: Record<string, string> = {
     email: str(payload.email),
-    vorname: str(payload.firstName),
-    nachname: str(payload.lastName),
-    einrichtung: str(payload.organization),
+    vorname: str(payload.vorname || payload.firstName),
+    nachname: str(payload.nachname || payload.lastName),
+    einrichtung: str(payload.organization || payload.einrichtung),
     vorgangsnummer: str(payload.displayId),
-    mitarbeiter_name: [str(payload.firstName), str(payload.lastName)].filter(Boolean).join(" ") || str(payload.email),
+    mitarbeiter_name: str(payload.mitarbeiter_name) ||
+      [str(payload.vorname || payload.firstName), str(payload.nachname || payload.lastName)].filter(Boolean).join(" ") ||
+      str(payload.email),
     link: str(payload.fragebogenLink || payload.modalitaetenLink || payload.link),
     ablaufdatum: payload.tokenExpiresAt
       ? new Date(str(payload.tokenExpiresAt)).toLocaleDateString("de-DE")
       : "",
     supervisor_email: str(payload.supervisorEmail),
-    supervisor_link: str(payload.modalitaetenLink),
+    supervisor_link: str(payload.supervisor_link || payload.modalitaetenLink),
+    tage_offen: str(payload.tage_offen || ""),
   };
 
   // Event-spezifische Ergaenzungen
-  if (event === "supervisor-link-created") {
-    base.email = str(payload.supervisorEmail);
-    base.link = str(payload.modalitaetenLink);
+  if (event === "supervisor-link-created" || event === "supervisor-reminder") {
+    base.email = str(payload.supervisorEmail || payload.email);
+    base.link = str(payload.modalitaetenLink || payload.supervisor_link);
   }
 
   return base;

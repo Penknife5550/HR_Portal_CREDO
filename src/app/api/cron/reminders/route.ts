@@ -14,15 +14,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 
 const REMINDER_INTERVAL_DAYS = 7;
 const MS_PER_DAY = 86400000;
 
+/** Timing-Safe String-Vergleich (verhindert Timing-Attacken auf CRON_SECRET) */
+function timingSafeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 export async function POST(request: NextRequest) {
-  // Auth-Check: CRON_SECRET
-  const authHeader = request.headers.get("authorization");
+  // Auth-Check: CRON_SECRET (Timing-Safe)
+  const authHeader = request.headers.get("authorization") || "";
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
@@ -32,7 +39,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  const expected = `Bearer ${cronSecret}`;
+  if (!timingSafeCompare(authHeader, expected)) {
     return NextResponse.json(
       { error: "Nicht autorisiert" },
       { status: 401 }
@@ -78,8 +86,12 @@ export async function POST(request: NextRequest) {
           email: process.email,
           vorname,
           nachname,
+          firstName: vorname,
+          lastName: nachname,
           einrichtung: process.organization.name,
+          organization: process.organization.name,
           tage_offen: daysOpen,
+          fragebogenLink: `${getBaseUrl()}/fragebogen/${process.token}`,
           link: `${getBaseUrl()}/fragebogen/${process.token}`,
           displayId: process.displayId || process.id.substring(0, 8),
         });
@@ -114,7 +126,7 @@ export async function POST(request: NextRequest) {
       where: {
         status: "SUPERVISOR_PENDING",
         supervisorToken: { not: null },
-        submittedAt: { lt: reminderThreshold },
+        invitedAt: { lt: reminderThreshold },
         OR: [
           { lastSupervisorReminderAt: null },
           { lastSupervisorReminderAt: { lt: reminderThreshold } },
@@ -134,7 +146,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const daysOpen = Math.floor(
-          (now.getTime() - new Date(process.submittedAt!).getTime()) / MS_PER_DAY
+          (now.getTime() - new Date(process.invitedAt).getTime()) / MS_PER_DAY
         );
 
         const mitarbeiterName =
@@ -144,10 +156,13 @@ export async function POST(request: NextRequest) {
 
         await triggerWebhooks("supervisor-reminder", {
           onboardingId: process.id,
-          email: process.supervisorEmail || "",
+          email: process.supervisorEmail,
+          supervisorEmail: process.supervisorEmail,
           mitarbeiter_name: mitarbeiterName,
           einrichtung: process.organization.name,
+          organization: process.organization.name,
           tage_offen: daysOpen,
+          modalitaetenLink: `${getBaseUrl()}/vorgesetzter/${process.supervisorToken}`,
           supervisor_link: `${getBaseUrl()}/vorgesetzter/${process.supervisorToken}`,
           displayId: process.displayId || process.id.substring(0, 8),
         });

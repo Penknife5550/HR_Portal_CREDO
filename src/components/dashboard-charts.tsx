@@ -27,15 +27,16 @@ import {
 // =============================================
 // Status-Farben (konsistent mit CSS-Variablen)
 // =============================================
+// Farben konsistent mit globals.css --color-status-* Variablen
 const STATUS_COLORS: Record<string, string> = {
-  INVITED: "#3B82F6",            // Blau
-  IN_PROGRESS: "#F59E0B",       // Gelb/Orange
-  SUBMITTED: "#8B5CF6",          // Violett
-  SUPERVISOR_PENDING: "#EC4899", // Pink
-  SUPERVISOR_SUBMITTED: "#06B6D4", // Cyan
-  REVIEWED: "#10B981",           // Gruen
-  COMPLETED: "#22C55E",          // Gruen dunkel
-  EXPIRED: "#EF4444",            // Rot
+  INVITED: "#3b82f6",
+  IN_PROGRESS: "#f59e0b",
+  SUBMITTED: "#8b5cf6",
+  SUPERVISOR_PENDING: "#ec4899",
+  SUPERVISOR_SUBMITTED: "#a855f7",
+  REVIEWED: "#10b981",
+  COMPLETED: "#059669",
+  EXPIRED: "#ef4444",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -104,8 +105,8 @@ export function StatusPieChart({ data }: { data: StatusData[] }) {
           outerRadius={100}
           paddingAngle={2}
           dataKey="value"
-          label={({ name, value }) => `${name}: ${value}`}
-          labelLine={false}
+          label={({ value, percent }) => percent > 0.05 ? `${value}` : ""}
+          labelLine={true}
         >
           {chartData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={entry.color} />
@@ -151,7 +152,7 @@ export function MonthlyTrendChart({ data }: { data: TrendData[] }) {
         />
         <Legend wrapperStyle={{ fontSize: "13px" }} />
         <Bar dataKey="created" name="Erstellt" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="completed" name="Abgeschlossen" fill="#22C55E" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="completed" name="Abgeschlossen" fill="#059669" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -248,7 +249,7 @@ export function OverdueBadge({ invitedAt, status }: { invitedAt: string; status:
 
   return (
     <span
-      className={`ml-2 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+      className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
         isCritical
           ? "bg-red-100 text-red-700"
           : "bg-amber-100 text-amber-700"

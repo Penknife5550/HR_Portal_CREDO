@@ -80,7 +80,7 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
       {fc.isVisible("bic") && (
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">
-            {fc.getLabel("bic")} {!fc.isRequired("bic") && "(optional)"}
+            {fc.getLabel("bic")} {fc.isRequired("bic") && <span className="text-destructive">*</span>}
           </label>
           <input
             type="text"
@@ -99,7 +99,7 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
       {fc.isVisible("bankName") && (
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">
-            {fc.getLabel("bankName")} {!fc.isRequired("bankName") && "(optional)"}
+            {fc.getLabel("bankName")} {fc.isRequired("bankName") && <span className="text-destructive">*</span>}
           </label>
           <input
             type="text"

@@ -97,7 +97,7 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
           {fc.isVisible("taxAllowance") && (
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                {fc.getLabel("taxAllowance")} {!fc.isRequired("taxAllowance") && "(optional)"}
+                {fc.getLabel("taxAllowance")} {fc.isRequired("taxAllowance") && <span className="text-destructive">*</span>}
               </label>
               <div className="relative">
                 <input
@@ -117,7 +117,7 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
           {fc.isVisible("childAllowance") && (
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                {fc.getLabel("childAllowance")} {!fc.isRequired("childAllowance") && "(optional)"}
+                {fc.getLabel("childAllowance")} {fc.isRequired("childAllowance") && <span className="text-destructive">*</span>}
               </label>
               <div className="relative">
                 <input
