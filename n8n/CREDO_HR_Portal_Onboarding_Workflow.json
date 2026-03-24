@@ -1,0 +1,293 @@
+{
+  "name": "CREDO HR-Portal — Onboarding Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "onboarding-created",
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "wh-onboarding-created",
+      "name": "Webhook: Onboarding Created",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 160],
+      "webhookId": "onboarding-created",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HEADER_AUTH_CREDENTIAL_ID",
+          "name": "HR-Portal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "questionnaire-completed",
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "wh-questionnaire-completed",
+      "name": "Webhook: Questionnaire Completed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 460],
+      "webhookId": "questionnaire-completed",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HEADER_AUTH_CREDENTIAL_ID",
+          "name": "HR-Portal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "supervisor-link-created",
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "wh-supervisor-link",
+      "name": "Webhook: Supervisor Link Created",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 760],
+      "webhookId": "supervisor-link-created",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HEADER_AUTH_CREDENTIAL_ID",
+          "name": "HR-Portal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "supervisor-completed",
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "wh-supervisor-completed",
+      "name": "Webhook: Supervisor Completed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 1060],
+      "webhookId": "supervisor-completed",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HEADER_AUTH_CREDENTIAL_ID",
+          "name": "HR-Portal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — E-Mail an neuen Mitarbeiter\n// Personalfragebogen-Link zusenden\n// ============================================================\n\nconst CONFIG = {\n  debugMode: false,\n  senderName: 'CREDO Personalverwaltung',\n  senderEmail: 'personal@credo-gruppe.de'\n};\n\ntry {\n  const item = $input.first().json;\n  const { fragebogenLink, displayId, email, organization, mandantNumber, tokenExpiresAt } = item.body || item;\n\n  if (!fragebogenLink || !email) {\n    throw new Error(`Pflichtfelder fehlen: fragebogenLink=${!!fragebogenLink}, email=${!!email}`);\n  }\n\n  const expiryDate = tokenExpiresAt\n    ? new Date(tokenExpiresAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })\n    : '30 Tage nach Erstellung';\n\n  const orgName = organization || 'CREDO';\n\n  const htmlBody = `<!DOCTYPE html>\n<html lang=\"de\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:Calibri,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n  <!-- Header -->\n  <tr><td style=\"background-color:#005d6a;padding:30px 40px;text-align:center;\">\n    <h1 style=\"color:#ffffff;font-family:'ITC Avant Garde Gothic',Arial Black,Arial,sans-serif;font-size:28px;margin:0;letter-spacing:2px;\">CREDO</h1>\n    <p style=\"color:#ffffff;font-size:12px;margin:5px 0 0;letter-spacing:3px;\">Glauben &bull; Leben &bull; Gemeinsam</p>\n  </td></tr>\n  <!-- Body -->\n  <tr><td style=\"padding:40px;\">\n    <h2 style=\"color:#005d6a;font-size:20px;margin:0 0 20px;\">Willkommen bei ${orgName}!</h2>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 15px;\">Sehr geehrte/r neue/r Mitarbeiter/in,</p>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 15px;\">wir freuen uns, Sie bald in unserem Team begruessen zu duerfen! Im Rahmen Ihres Einstellungsprozesses bitten wir Sie, den digitalen Personalfragebogen auszufuellen.</p>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 5px;\"><strong>Vorgang:</strong> ${displayId || 'k.A.'}</p>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 5px;\"><strong>Einrichtung:</strong> ${orgName}</p>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 25px;\"><strong>Gueltig bis:</strong> ${expiryDate}</p>\n    <!-- CTA Button -->\n    <table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto 25px;\">\n    <tr><td align=\"center\" style=\"background-color:#005d6a;border-radius:6px;\">\n      <a href=\"${fragebogenLink}\" target=\"_blank\" style=\"display:inline-block;padding:14px 40px;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;\">Fragebogen oeffnen</a>\n    </td></tr>\n    </table>\n    <p style=\"color:#666666;font-size:13px;line-height:1.5;margin:0 0 10px;\">Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:</p>\n    <p style=\"color:#005d6a;font-size:13px;line-height:1.5;word-break:break-all;margin:0 0 25px;\">${fragebogenLink}</p>\n    <hr style=\"border:none;border-top:1px solid #eeeeee;margin:25px 0;\">\n    <p style=\"color:#666666;font-size:13px;line-height:1.5;margin:0;\">Ihre Daten werden verschluesselt uebertragen und gemaess DSGVO verarbeitet. Bei Fragen wenden Sie sich an <a href=\"mailto:personal@credo-gruppe.de\" style=\"color:#005d6a;\">personal@credo-gruppe.de</a>.</p>\n  </td></tr>\n  <!-- CREDO-Linie -->\n  <tr><td style=\"padding:0;\">\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n      <td width=\"50%\" style=\"height:4px;background-color:#DADADA;\"></td>\n      <td width=\"12.5%\" style=\"height:4px;background-color:#FBC900;\"></td>\n      <td width=\"12.5%\" style=\"height:4px;background-color:#6BAA24;\"></td>\n      <td width=\"12.5%\" style=\"height:4px;background-color:#E2001A;\"></td>\n      <td width=\"12.5%\" style=\"height:4px;background-color:#009AC6;\"></td>\n    </tr></table>\n  </td></tr>\n  <!-- Footer -->\n  <tr><td style=\"background-color:#f9f9f9;padding:20px 40px;text-align:center;\">\n    <p style=\"color:#999999;font-size:11px;line-height:1.5;margin:0;\">Christlicher Schulverein Minden e.V. &middot; Kingsleyallee 6 &middot; 32425 Minden<br>Tel. 0571 388 60-148 &middot; <a href=\"https://fes-minden.de\" style=\"color:#005d6a;text-decoration:none;\">fes-minden.de</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body></html>`;\n\n  if (CONFIG.debugMode) {\n    console.log(`[onboarding-created] E-Mail an ${email}, Vorgang ${displayId}`);\n  }\n\n  return [{\n    json: {\n      to: email,\n      subject: `Ihr Personalfragebogen — ${orgName} (${displayId || ''})`,\n      html: htmlBody\n    }\n  }];\n\n} catch (error) {\n  console.error('[onboarding-created] Fehler:', error.message);\n  return [{ json: { error: error.message, event: 'onboarding-created' } }];\n}"
+      },
+      "id": "code-email-mitarbeiter",
+      "name": "E-Mail vorbereiten: Mitarbeiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — Benachrichtigung an HR\n// Fragebogen wurde ausgefuellt\n// ============================================================\n\nconst CONFIG = {\n  debugMode: false,\n  hrEmail: 'personal@credo-gruppe.de'\n};\n\ntry {\n  const item = $input.first().json;\n  const { displayId, email, firstName, lastName, organization, mandantNumber } = item.body || item;\n\n  const fullName = [firstName, lastName].filter(Boolean).join(' ') || email || 'Unbekannt';\n  const orgName = organization || 'CREDO';\n\n  const htmlBody = `<!DOCTYPE html>\n<html lang=\"de\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:Calibri,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n  <tr><td style=\"background-color:#005d6a;padding:25px 40px;\">\n    <h1 style=\"color:#ffffff;font-family:'ITC Avant Garde Gothic',Arial Black,Arial,sans-serif;font-size:22px;margin:0;\">HR-Portal Benachrichtigung</h1>\n  </td></tr>\n  <tr><td style=\"padding:35px 40px;\">\n    <div style=\"background-color:#e8f5e9;border-left:4px solid #6BAA24;padding:15px 20px;border-radius:4px;margin:0 0 25px;\">\n      <p style=\"color:#2e7d32;font-size:15px;font-weight:bold;margin:0;\">Fragebogen eingegangen</p>\n    </div>\n    <table cellpadding=\"8\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin:0 0 25px;\">\n      <tr style=\"border-bottom:1px solid #eeeeee;\">\n        <td style=\"color:#666666;font-size:14px;width:140px;\">Vorgang</td>\n        <td style=\"color:#333333;font-size:14px;font-weight:bold;\">${displayId || 'k.A.'}</td>\n      </tr>\n      <tr style=\"border-bottom:1px solid #eeeeee;\">\n        <td style=\"color:#666666;font-size:14px;\">Mitarbeiter/in</td>\n        <td style=\"color:#333333;font-size:14px;font-weight:bold;\">${fullName}</td>\n      </tr>\n      <tr style=\"border-bottom:1px solid #eeeeee;\">\n        <td style=\"color:#666666;font-size:14px;\">E-Mail</td>\n        <td style=\"color:#333333;font-size:14px;\">${email || 'k.A.'}</td>\n      </tr>\n      <tr style=\"border-bottom:1px solid #eeeeee;\">\n        <td style=\"color:#666666;font-size:14px;\">Einrichtung</td>\n        <td style=\"color:#333333;font-size:14px;\">${orgName}</td>\n      </tr>\n      <tr>\n        <td style=\"color:#666666;font-size:14px;\">Mandant</td>\n        <td style=\"color:#333333;font-size:14px;\">${mandantNumber || 'k.A.'}</td>\n      </tr>\n    </table>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 15px;\">Der/die neue Mitarbeiter/in hat den Personalfragebogen vollstaendig ausgefuellt. Bitte erstellen Sie nun den Vorgesetzten-Link im HR-Portal.</p>\n    <p style=\"color:#666666;font-size:13px;margin:0;\"><strong>Naechster Schritt:</strong> HR-Portal &rarr; Dashboard &rarr; Vorgang oeffnen &rarr; Vorgesetzten-Link erstellen</p>\n  </td></tr>\n  <tr><td style=\"padding:0;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n    <td width=\"50%\" style=\"height:4px;background-color:#DADADA;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#FBC900;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#6BAA24;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#E2001A;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#009AC6;\"></td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#f9f9f9;padding:15px 40px;text-align:center;\">\n    <p style=\"color:#999999;font-size:11px;margin:0;\">Automatische Benachrichtigung des CREDO HR-Portals</p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body></html>`;\n\n  return [{\n    json: {\n      to: CONFIG.hrEmail,\n      subject: `[HR-Portal] Fragebogen eingegangen — ${fullName} (${displayId || ''}) — ${orgName}`,\n      html: htmlBody\n    }\n  }];\n\n} catch (error) {\n  console.error('[questionnaire-completed] Fehler:', error.message);\n  return [{ json: { error: error.message, event: 'questionnaire-completed' } }];\n}"
+      },
+      "id": "code-email-hr-fragebogen",
+      "name": "E-Mail vorbereiten: HR (Fragebogen)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — E-Mail an Vorgesetzten\n// Modalitaeten-Link zusenden\n// ============================================================\n\nconst CONFIG = {\n  debugMode: false\n};\n\ntry {\n  const item = $input.first().json;\n  const { modalitaetenLink, supervisorEmail, employeeName, organization, mandantNumber, tokenExpiresAt } = item.body || item;\n\n  if (!modalitaetenLink || !supervisorEmail) {\n    throw new Error(`Pflichtfelder fehlen: modalitaetenLink=${!!modalitaetenLink}, supervisorEmail=${!!supervisorEmail}`);\n  }\n\n  const expiryDate = tokenExpiresAt\n    ? new Date(tokenExpiresAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })\n    : '30 Tage nach Erstellung';\n\n  const orgName = organization || 'CREDO';\n  const empName = employeeName || 'neue/r Mitarbeiter/in';\n\n  const htmlBody = `<!DOCTYPE html>\n<html lang=\"de\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:Calibri,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n  <tr><td style=\"background-color:#005d6a;padding:30px 40px;text-align:center;\">\n    <h1 style=\"color:#ffffff;font-family:'ITC Avant Garde Gothic',Arial Black,Arial,sans-serif;font-size:28px;margin:0;letter-spacing:2px;\">CREDO</h1>\n    <p style=\"color:#ffffff;font-size:12px;margin:5px 0 0;letter-spacing:3px;\">Glauben &bull; Leben &bull; Gemeinsam</p>\n  </td></tr>\n  <tr><td style=\"padding:40px;\">\n    <h2 style=\"color:#005d6a;font-size:20px;margin:0 0 20px;\">Einstellungsmodalitaeten festlegen</h2>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 15px;\">Sehr geehrte Vorgesetzte/r,</p>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 15px;\">fuer die Einstellung von <strong>${empName}</strong> bei <strong>${orgName}</strong> bitten wir Sie, die Einstellungsmodalitaeten (Arbeitszeit, Verguetung, etc.) festzulegen.</p>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 25px;\"><strong>Gueltig bis:</strong> ${expiryDate}</p>\n    <table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto 25px;\">\n    <tr><td align=\"center\" style=\"background-color:#005d6a;border-radius:6px;\">\n      <a href=\"${modalitaetenLink}\" target=\"_blank\" style=\"display:inline-block;padding:14px 40px;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;\">Modalitaeten oeffnen</a>\n    </td></tr>\n    </table>\n    <p style=\"color:#666666;font-size:13px;line-height:1.5;margin:0 0 10px;\">Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:</p>\n    <p style=\"color:#005d6a;font-size:13px;line-height:1.5;word-break:break-all;margin:0 0 25px;\">${modalitaetenLink}</p>\n    <hr style=\"border:none;border-top:1px solid #eeeeee;margin:25px 0;\">\n    <p style=\"color:#666666;font-size:13px;line-height:1.5;margin:0;\">Bei Fragen wenden Sie sich an <a href=\"mailto:personal@credo-gruppe.de\" style=\"color:#005d6a;\">personal@credo-gruppe.de</a>.</p>\n  </td></tr>\n  <tr><td style=\"padding:0;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n    <td width=\"50%\" style=\"height:4px;background-color:#DADADA;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#FBC900;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#6BAA24;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#E2001A;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#009AC6;\"></td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#f9f9f9;padding:20px 40px;text-align:center;\">\n    <p style=\"color:#999999;font-size:11px;line-height:1.5;margin:0;\">Christlicher Schulverein Minden e.V. &middot; Kingsleyallee 6 &middot; 32425 Minden<br>Tel. 0571 388 60-148 &middot; <a href=\"https://fes-minden.de\" style=\"color:#005d6a;text-decoration:none;\">fes-minden.de</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body></html>`;\n\n  return [{\n    json: {\n      to: supervisorEmail,\n      subject: `Einstellungsmodalitaeten — ${empName} (${orgName})`,\n      html: htmlBody\n    }\n  }];\n\n} catch (error) {\n  console.error('[supervisor-link-created] Fehler:', error.message);\n  return [{ json: { error: error.message, event: 'supervisor-link-created' } }];\n}"
+      },
+      "id": "code-email-vorgesetzter",
+      "name": "E-Mail vorbereiten: Vorgesetzter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — Benachrichtigung an HR\n// Vorgesetzter hat Modalitaeten ausgefuellt — Vorgang komplett\n// ============================================================\n\nconst CONFIG = {\n  debugMode: false,\n  hrEmail: 'personal@credo-gruppe.de',\n  portalUrl: 'https://hr.fes-credo.de'\n};\n\ntry {\n  const item = $input.first().json;\n  const { displayId, employeeName, supervisorEmail, organization, mandantNumber } = item.body || item;\n\n  const orgName = organization || 'CREDO';\n  const empName = employeeName || 'Unbekannt';\n\n  const htmlBody = `<!DOCTYPE html>\n<html lang=\"de\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:Calibri,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n  <tr><td style=\"background-color:#005d6a;padding:25px 40px;\">\n    <h1 style=\"color:#ffffff;font-family:'ITC Avant Garde Gothic',Arial Black,Arial,sans-serif;font-size:22px;margin:0;\">HR-Portal Benachrichtigung</h1>\n  </td></tr>\n  <tr><td style=\"padding:35px 40px;\">\n    <div style=\"background-color:#e3f2fd;border-left:4px solid #009AC6;padding:15px 20px;border-radius:4px;margin:0 0 25px;\">\n      <p style=\"color:#0277bd;font-size:15px;font-weight:bold;margin:0;\">Vorgang abgeschlossen — Export moeglich</p>\n    </div>\n    <table cellpadding=\"8\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin:0 0 25px;\">\n      <tr style=\"border-bottom:1px solid #eeeeee;\">\n        <td style=\"color:#666666;font-size:14px;width:140px;\">Vorgang</td>\n        <td style=\"color:#333333;font-size:14px;font-weight:bold;\">${displayId || 'k.A.'}</td>\n      </tr>\n      <tr style=\"border-bottom:1px solid #eeeeee;\">\n        <td style=\"color:#666666;font-size:14px;\">Mitarbeiter/in</td>\n        <td style=\"color:#333333;font-size:14px;font-weight:bold;\">${empName}</td>\n      </tr>\n      <tr style=\"border-bottom:1px solid #eeeeee;\">\n        <td style=\"color:#666666;font-size:14px;\">Vorgesetzte/r</td>\n        <td style=\"color:#333333;font-size:14px;\">${supervisorEmail || 'k.A.'}</td>\n      </tr>\n      <tr style=\"border-bottom:1px solid #eeeeee;\">\n        <td style=\"color:#666666;font-size:14px;\">Einrichtung</td>\n        <td style=\"color:#333333;font-size:14px;\">${orgName}</td>\n      </tr>\n      <tr>\n        <td style=\"color:#666666;font-size:14px;\">Mandant</td>\n        <td style=\"color:#333333;font-size:14px;\">${mandantNumber || 'k.A.'}</td>\n      </tr>\n    </table>\n    <p style=\"color:#333333;font-size:15px;line-height:1.6;margin:0 0 20px;\">Der Vorgesetzte hat die Einstellungsmodalitaeten festgelegt. Der Vorgang ist nun vollstaendig und kann fuer den LOGA-Import exportiert werden.</p>\n    <table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto 20px;\">\n    <tr><td align=\"center\" style=\"background-color:#005d6a;border-radius:6px;\">\n      <a href=\"${CONFIG.portalUrl}/dashboard\" target=\"_blank\" style=\"display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;\">Im HR-Portal oeffnen</a>\n    </td></tr>\n    </table>\n  </td></tr>\n  <tr><td style=\"padding:0;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n    <td width=\"50%\" style=\"height:4px;background-color:#DADADA;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#FBC900;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#6BAA24;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#E2001A;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#009AC6;\"></td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#f9f9f9;padding:15px 40px;text-align:center;\">\n    <p style=\"color:#999999;font-size:11px;margin:0;\">Automatische Benachrichtigung des CREDO HR-Portals</p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body></html>`;\n\n  return [{\n    json: {\n      to: CONFIG.hrEmail,\n      subject: `[HR-Portal] Vorgang komplett — ${empName} (${displayId || ''}) — ${orgName} — Export moeglich`,\n      html: htmlBody\n    }\n  }];\n\n} catch (error) {\n  console.error('[supervisor-completed] Fehler:', error.message);\n  return [{ json: { error: error.message, event: 'supervisor-completed' } }];\n}"
+      },
+      "id": "code-email-hr-komplett",
+      "name": "E-Mail vorbereiten: HR (Komplett)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 1060]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "senderName": "CREDO Personalverwaltung"
+        }
+      },
+      "id": "smtp-mitarbeiter",
+      "name": "SMTP: An Mitarbeiter",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 160],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "CREDO Exchange SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "senderName": "CREDO HR-Portal"
+        }
+      },
+      "id": "smtp-hr-fragebogen",
+      "name": "SMTP: An HR (Fragebogen)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 460],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "CREDO Exchange SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "senderName": "CREDO Personalverwaltung"
+        }
+      },
+      "id": "smtp-vorgesetzter",
+      "name": "SMTP: An Vorgesetzten",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 760],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "CREDO Exchange SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "senderName": "CREDO HR-Portal"
+        }
+      },
+      "id": "smtp-hr-komplett",
+      "name": "SMTP: An HR (Komplett)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 1060],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "CREDO Exchange SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## CREDO HR-Portal — Onboarding Workflow\n\n### 4 Webhook-Events:\n1. **onboarding-created** → E-Mail an neuen MA mit Fragebogen-Link\n2. **questionnaire-completed** → E-Mail an HR: Fragebogen eingegangen\n3. **supervisor-link-created** → E-Mail an Vorgesetzten mit Modalitaeten-Link\n4. **supervisor-completed** → E-Mail an HR: Vorgang komplett, Export moeglich\n\n### Setup-Checkliste:\n- [ ] SMTP-Credential \"CREDO Exchange SMTP\" anlegen (Exchange-Server)\n- [ ] Header Auth Credential anlegen: Name=X-API-Key, Value=<N8N_API_KEY aus .env>\n- [ ] Credential-IDs in allen Nodes eintragen\n- [ ] Workflow aktivieren\n- [ ] Test: Neuen Vorgang im HR-Portal erstellen\n\n### Webhook-URLs (nach Aktivierung):\n- https://n8n.credo-intern.de/webhook/onboarding-created\n- https://n8n.credo-intern.de/webhook/questionnaire-completed\n- https://n8n.credo-intern.de/webhook/supervisor-link-created\n- https://n8n.credo-intern.de/webhook/supervisor-completed",
+        "height": 480,
+        "width": 400
+      },
+      "id": "sticky-doku",
+      "name": "Dokumentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-160, 120]
+    }
+  ],
+  "connections": {
+    "Webhook: Onboarding Created": {
+      "main": [
+        [{ "node": "E-Mail vorbereiten: Mitarbeiter", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook: Questionnaire Completed": {
+      "main": [
+        [{ "node": "E-Mail vorbereiten: HR (Fragebogen)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook: Supervisor Link Created": {
+      "main": [
+        [{ "node": "E-Mail vorbereiten: Vorgesetzter", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook: Supervisor Completed": {
+      "main": [
+        [{ "node": "E-Mail vorbereiten: HR (Komplett)", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-Mail vorbereiten: Mitarbeiter": {
+      "main": [
+        [{ "node": "SMTP: An Mitarbeiter", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-Mail vorbereiten: HR (Fragebogen)": {
+      "main": [
+        [{ "node": "SMTP: An HR (Fragebogen)", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-Mail vorbereiten: Vorgesetzter": {
+      "main": [
+        [{ "node": "SMTP: An Vorgesetzten", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-Mail vorbereiten: HR (Komplett)": {
+      "main": [
+        [{ "node": "SMTP: An HR (Komplett)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "HR-Portal" },
+    { "name": "Onboarding" },
+    { "name": "CREDO" },
+    { "name": "Produktion" }
+  ]
+}
