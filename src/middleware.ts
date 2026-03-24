@@ -25,10 +25,13 @@ export async function middleware(request: NextRequest) {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=(), payment=()"
   );
-  response.headers.set(
-    "Strict-Transport-Security",
-    "max-age=31536000; includeSubDomains"
-  );
+  // HSTS nur bei echtem HTTPS-Betrieb (nicht auf localhost HTTP)
+  if (!process.env.APP_URL?.startsWith("http://")) {
+    response.headers.set(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains"
+    );
+  }
 
   // CSP: In Dev-Modus unsafe-eval erlauben (Next.js HMR benoetigt es)
   const scriptSrc = isDev
@@ -51,7 +54,10 @@ export async function middleware(request: NextRequest) {
       "base-uri 'self'",
       "form-action 'self'",
       "object-src 'none'",
-      "upgrade-insecure-requests",
+      // upgrade-insecure-requests nur in Produktion (blockiert localhost HTTP)
+      ...(process.env.NODE_ENV === "production" && !process.env.APP_URL?.startsWith("http://")
+        ? ["upgrade-insecure-requests"]
+        : []),
     ].join("; ")
   );
 
