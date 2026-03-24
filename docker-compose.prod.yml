@@ -36,8 +36,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       MAGIC_LINK_EXPIRY_HOURS: ${MAGIC_LINK_EXPIRY_HOURS:-720}
-      N8N_WEBHOOK_BASE_URL: ${N8N_WEBHOOK_BASE_URL}
-      N8N_API_KEY: ${N8N_API_KEY}
+      # Webhooks werden ueber das Admin-Portal konfiguriert (Einstellungen → Webhooks)
+      # N8N_API_KEY ist optional fuer Service-API-Aufrufe
+      N8N_API_KEY: ${N8N_API_KEY:-}
       ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD}
       APP_URL: ${APP_URL:-https://hr.fes-credo.de}
       NODE_ENV: production
