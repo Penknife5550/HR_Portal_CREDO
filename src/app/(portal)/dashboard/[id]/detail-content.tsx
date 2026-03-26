@@ -382,13 +382,41 @@ export function DetailContent({
   const [checklistNoteText, setChecklistNoteText] = useState("");
   const [savingChecklistNote, setSavingChecklistNote] = useState(false);
   const [completingProcess, setCompletingProcess] = useState(false);
+  const [reviewingProcess, setReviewingProcess] = useState(false);
 
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  // ---- Vorgang abschliessen ----
+  // ---- Status-Aktionen ----
+  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
+
+  // "Als geprueft markieren" – wenn Vorgesetzter fertig ist
+  const canReview = data &&
+    ["SUBMITTED", "SUPERVISOR_SUBMITTED"].includes(data.status) &&
+    isAdmin;
+
+  // "Vorgang abschliessen" – wenn geprueft
   const canComplete = data &&
     data.status === "REVIEWED" &&
-    (user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG");
+    isAdmin;
+
+  const handleReviewProcess = async () => {
+    if (!data || !canReview) return;
+    setReviewingProcess(true);
+    try {
+      const res = await fetch(`/api/onboarding/${data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "REVIEWED" }),
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } catch {
+      // silent
+    } finally {
+      setReviewingProcess(false);
+    }
+  };
 
   const handleCompleteProcess = async () => {
     if (!data || !canComplete) return;
@@ -601,12 +629,22 @@ export function DetailContent({
               {data.questionnaireType}
             </span>
 
-            {/* Abschliessen-Button: Nur fuer SUPER_ADMIN / HR_LEITUNG bei Status REVIEWED */}
+            {/* Status-Aktionen: Nur fuer SUPER_ADMIN / HR_LEITUNG */}
+            {canReview && (
+              <button
+                onClick={handleReviewProcess}
+                disabled={reviewingProcess}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+              >
+                <CheckIcon className="h-3.5 w-3.5" />
+                {reviewingProcess ? "Wird markiert..." : "Als geprueft markieren"}
+              </button>
+            )}
             {canComplete && (
               <button
                 onClick={handleCompleteProcess}
                 disabled={completingProcess}
-                className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                className={`${canReview ? "" : "ml-auto "}inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50`}
               >
                 <CheckIcon className="h-3.5 w-3.5" />
                 {completingProcess ? "Wird abgeschlossen..." : "Vorgang abschliessen"}

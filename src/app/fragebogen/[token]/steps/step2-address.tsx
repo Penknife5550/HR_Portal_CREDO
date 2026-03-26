@@ -46,7 +46,7 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {/* Strasse + Hausnummer */}
       {fc.isVisible("street") && (
-        <div className="grid gap-4 sm:grid-cols-[1fr_6rem]">
+        <div className="grid grid-cols-[1fr_8rem] gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">
               {fc.getLabel("street")} {fc.isRequired("street") && <span className="text-destructive">*</span>}
