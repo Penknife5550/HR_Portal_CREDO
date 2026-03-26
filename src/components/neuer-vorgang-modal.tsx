@@ -31,6 +31,7 @@ export function NeuerVorgangModal({
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [email, setEmail] = useState("");
   const [organizationId, setOrganizationId] = useState("");
+  const [processType, setProcessType] = useState("EINSTELLUNG");
   const [questionnaireType, setQuestionnaireType] = useState("STANDARD");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -72,6 +73,7 @@ export function NeuerVorgangModal({
         body: JSON.stringify({
           email,
           organizationId,
+          processType,
           questionnaireType,
         }),
       });
@@ -98,6 +100,7 @@ export function NeuerVorgangModal({
   const handleClose = () => {
     setEmail("");
     setOrganizationId("");
+    setProcessType("EINSTELLUNG");
     setQuestionnaireType("STANDARD");
     setError("");
     setResult(null);
@@ -245,6 +248,22 @@ export function NeuerVorgangModal({
                       {org.name} ({org.mandantNumber})
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Vorgangsart
+                </label>
+                <select
+                  value={processType}
+                  onChange={(e) => setProcessType(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                >
+                  <option value="EINSTELLUNG">Einstellung (Neueinstellung)</option>
+                  <option value="VERBEAMTUNG" disabled>Verbeamtung (in Vorbereitung)</option>
+                  <option value="VERTRAGSAENDERUNG" disabled>Vertragsaenderung (in Vorbereitung)</option>
+                  <option value="KUENDIGUNG" disabled>Kuendigung / Austritt (in Vorbereitung)</option>
                 </select>
               </div>
 

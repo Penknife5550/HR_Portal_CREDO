@@ -64,7 +64,8 @@ model OnboardingProcess {
   supervisorToken         String?          @unique
   supervisorTokenExpiresAt DateTime?
 
-  // Status
+  // Prozesstyp & Status
+  processType             ProcessType      @default(EINSTELLUNG)
   status                  OnboardingStatus @default(INVITED)
   questionnaireType       QuestionnaireType @default(STANDARD)
 
@@ -118,6 +119,16 @@ enum OnboardingStatus {
   REVIEWED             // HR hat geprueft
   COMPLETED            // Alles erledigt, Daten exportiert
   EXPIRED              // Link abgelaufen
+}
+
+// =============================================
+// Prozesstyp (zukunftssicher fuer weitere HR-Vorgaenge)
+// =============================================
+enum ProcessType {
+  EINSTELLUNG          // Neueinstellung (bisheriges Onboarding)
+  VERBEAMTUNG          // Verbeamtungsprozess
+  VERTRAGSAENDERUNG    // Vertragsaenderung (Stunden, Entgeltgruppe etc.)
+  KUENDIGUNG           // Austritt / Kuendigung
 }
 
 enum QuestionnaireType {
@@ -354,6 +365,7 @@ enum DocumentType {
   ARBEITSVERTRAG
   FUEHRUNGSZEUGNIS
   KK_BESCHEINIGUNG
+  GEBURTSURKUNDE_EIGEN
   GEBURTSURKUNDE_KIND
   SV_AUSWEIS
   ZEUGNIS

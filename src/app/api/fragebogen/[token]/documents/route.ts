@@ -48,6 +48,7 @@ const DOCUMENT_TYPE_MAP: Record<string, string> = {
   arbeitsvertrag: "ARBEITSVERTRAG",
   fuehrungszeugnis: "FUEHRUNGSZEUGNIS",
   kk_bescheinigung: "KK_BESCHEINIGUNG",
+  geburtsurkunde_eigen: "GEBURTSURKUNDE_EIGEN",
   geburtsurkunde_kind: "GEBURTSURKUNDE_KIND",
   sv_ausweis: "SV_AUSWEIS",
   zeugnis: "ZEUGNIS",

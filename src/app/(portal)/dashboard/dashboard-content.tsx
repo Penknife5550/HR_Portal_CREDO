@@ -133,28 +133,39 @@ export function DashboardContent({ user }: { user: User }) {
           {[
             {
               label: "Gesamt",
-              value: total,
+              value: stats
+                ? stats.statusDistribution.reduce((sum, s) => sum + s.count, 0)
+                : total,
               filter: "",
               color: "bg-card",
             },
             {
-              label: "Eingeladen",
-              value: onboardings.filter((o) => o.status === "INVITED").length,
-              filter: "INVITED",
-              color: "bg-blue-50",
-            },
-            {
-              label: "In Bearbeitung",
-              value: onboardings.filter(
-                (o) =>
-                  o.status === "IN_PROGRESS" || o.status === "SUBMITTED"
-              ).length,
+              label: "Offen",
+              value: stats
+                ? stats.statusDistribution
+                    .filter((s) => ["INVITED", "IN_PROGRESS", "SUBMITTED", "SUPERVISOR_PENDING", "SUPERVISOR_SUBMITTED"].includes(s.status))
+                    .reduce((sum, s) => sum + s.count, 0)
+                : onboardings.filter((o) => !["COMPLETED", "EXPIRED", "REVIEWED"].includes(o.status)).length,
               filter: "IN_PROGRESS",
               color: "bg-yellow-50",
             },
             {
+              label: "In Pruefung",
+              value: stats
+                ? stats.statusDistribution
+                    .filter((s) => s.status === "REVIEWED")
+                    .reduce((sum, s) => sum + s.count, 0)
+                : onboardings.filter((o) => o.status === "REVIEWED").length,
+              filter: "REVIEWED",
+              color: "bg-blue-50",
+            },
+            {
               label: "Abgeschlossen",
-              value: onboardings.filter((o) => o.status === "COMPLETED").length,
+              value: stats
+                ? stats.statusDistribution
+                    .filter((s) => s.status === "COMPLETED")
+                    .reduce((sum, s) => sum + s.count, 0)
+                : onboardings.filter((o) => o.status === "COMPLETED").length,
               filter: "COMPLETED",
               color: "bg-green-50",
             },
@@ -210,14 +221,6 @@ export function DashboardContent({ user }: { user: User }) {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Ueberfaellige Vorgaenge (&gt;7 Tage)
-                </p>
-              </div>
-              <div className="rounded-lg border bg-card p-4">
-                <p className="text-2xl font-bold text-foreground">
-                  {stats.statusDistribution.reduce((sum, s) => sum + s.count, 0)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Vorgaenge insgesamt
                 </p>
               </div>
             </div>

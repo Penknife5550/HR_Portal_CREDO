@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { validateMagicToken } from "@/lib/auth";
 import { triggerN8nWebhook } from "@/lib/n8n";
+import { sendEmail } from "@/lib/mailer";
+import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -407,12 +409,66 @@ export async function POST(
     },
   });
 
-  // n8n Webhook aufrufen (falls konfiguriert)
+  // n8n Webhook aufrufen (falls konfiguriert) – HR-Benachrichtigung
   await triggerN8nWebhook("questionnaire-completed", {
     onboardingId: onboarding.id,
     email: onboarding.email,
     organization: onboarding.organization.name,
   });
+
+  // Bestaetigungs-E-Mail direkt an den Mitarbeiter senden
+  try {
+    // Personaldata fuer Vorname laden
+    const personalData = await prisma.personalData.findUnique({
+      where: { onboardingId: onboarding.id },
+      select: { firstName: true, lastName: true },
+    });
+
+    const vorname = personalData?.firstName || onboarding.firstName || "";
+    const nachname = personalData?.lastName || onboarding.lastName || "";
+    const displayId = onboarding.displayId || onboarding.id.substring(0, 8).toUpperCase();
+
+    // Template aus DB laden oder Default verwenden
+    const dbTemplate = await prisma.emailTemplate.findUnique({
+      where: { event: "questionnaire-confirmation-employee" },
+    });
+
+    const defaultTpl = DEFAULT_EMAIL_TEMPLATES.find(
+      (t) => t.event === "questionnaire-confirmation-employee"
+    );
+
+    const template = dbTemplate || defaultTpl;
+
+    if (template) {
+      const vars: Record<string, string> = {
+        "{{vorname}}": vorname,
+        "{{nachname}}": nachname,
+        "{{email}}": onboarding.email,
+        "{{einrichtung}}": onboarding.organization.name,
+        "{{vorgangsnummer}}": displayId,
+      };
+
+      let subject = dbTemplate ? dbTemplate.subject : defaultTpl!.subject;
+      let html = dbTemplate ? dbTemplate.bodyHtml : defaultTpl!.bodyHtml;
+      let text = dbTemplate ? (dbTemplate.bodyText || undefined) : defaultTpl!.bodyText;
+
+      for (const [key, value] of Object.entries(vars)) {
+        subject = subject.replaceAll(key, value);
+        html = html.replaceAll(key, value);
+        if (text) text = text.replaceAll(key, value);
+      }
+
+      await sendEmail({
+        to: onboarding.email,
+        subject,
+        html,
+        text,
+      });
+    }
+  } catch (emailError) {
+    // Bestaetigungs-E-Mail ist nicht kritisch – Fehler loggen, aber nicht abbrechen
+    console.error("[Fragebogen] Bestaetigungs-E-Mail an Mitarbeiter fehlgeschlagen:", emailError);
+  }
 
   return NextResponse.json({
     success: true,

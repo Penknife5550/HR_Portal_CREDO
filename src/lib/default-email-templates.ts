@@ -184,6 +184,95 @@ CREDO Gruppe – {{einrichtung}}`,
   },
 
   // =============================================
+  // Bestaetigungs-E-Mail an Mitarbeiter (nach Fragebogen-Einreichung)
+  // =============================================
+  {
+    event: "questionnaire-confirmation-employee",
+    name: "Eingangsbestaetigung Mitarbeiter (Fragebogen eingereicht)",
+    subject: "Ihre Unterlagen sind bei uns eingegangen – {{einrichtung}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#065f46;font-weight:bold;font-size:14px;">Erfolgreich eingegangen</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Vielen Dank, {{vorname}}!</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Wir bestaetigen hiermit den Eingang Ihres Personalfragebogens. Ihre Unterlagen wurden erfolgreich an unsere Personalabteilung uebermittelt.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Ihre Bestaetigungs-ID</p>
+              <p style="margin:0;color:#1a1a2e;font-size:15px;font-weight:bold;">{{vorgangsnummer}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Einrichtung</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{einrichtung}}</p>
+            </td></tr>
+          </table>
+
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            <strong>Wie geht es weiter?</strong><br>
+            Unsere Personalabteilung prueft Ihre Angaben und wird sich bei Rueckfragen direkt bei Ihnen melden. Sie muessen nichts weiter tun.
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Bitte bewahren Sie diese E-Mail als Nachweis auf.<br>
+            Bei Fragen wenden Sie sich bitte an Ihre HR-Ansprechperson.<br>
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
+            &copy; CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Vielen Dank, {{vorname}}!
+
+Wir bestaetigen den Eingang Ihres Personalfragebogens.
+
+Bestaetigungs-ID: {{vorgangsnummer}}
+Einrichtung: {{einrichtung}}
+
+Wie geht es weiter?
+Unsere Personalabteilung prueft Ihre Angaben und meldet sich bei Rueckfragen.
+
+Bitte bewahren Sie diese E-Mail als Nachweis auf.
+
+CREDO Gruppe – {{einrichtung}}`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
+      { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
+      { key: "{{email}}", description: "E-Mail des Mitarbeiters" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer / Bestaetigungs-ID" },
+    ],
+  },
+
+  // =============================================
   // Fragebogen eingereicht (HR-Benachrichtigung)
   // =============================================
   {

@@ -386,7 +386,7 @@ export function Step10Summary({
       {/* ============================================= */}
       {/* Dokumenten-Upload */}
       {/* ============================================= */}
-      {token && <DocumentUpload token={token} />}
+      {token && <DocumentUpload token={token} hasChildren={children.length > 0} />}
 
       {/* ============================================= */}
       {/* Erklaerung des Arbeitnehmers */}

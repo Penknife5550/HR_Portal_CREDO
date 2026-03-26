@@ -444,7 +444,7 @@ function SupStep2({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Wochenstunden</label>
-            <input type="number" {...register("wochenstunden", { valueAsNumber: true })} step={0.5} min={0} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            <input type="number" {...register("wochenstunden", { valueAsNumber: true })} step={0.01} min={0} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Tage pro Woche</label>
@@ -474,7 +474,7 @@ function SupStep2({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Stunden beim Hauptarbeitgeber</label>
-        <input type="number" {...register("hauptarbeitgeberStunden", { valueAsNumber: true })} step={0.5} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <input type="number" {...register("hauptarbeitgeberStunden", { valueAsNumber: true })} step={0.01} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
       </div>
 
       <div className="space-y-2">
@@ -491,7 +491,7 @@ function SupStep2({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Stunden beim Nebenarbeitgeber</label>
-        <input type="number" {...register("nebenarbeitgeberStunden", { valueAsNumber: true })} step={0.5} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <input type="number" {...register("nebenarbeitgeberStunden", { valueAsNumber: true })} step={0.01} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
       </div>
 
       <div className="space-y-3 rounded-lg border border-border p-4">

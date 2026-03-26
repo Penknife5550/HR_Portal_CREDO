@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const { email, organizationId, questionnaireType } = body;
+    const { email, organizationId, questionnaireType, processType } = body;
     const invitedById = session.userId;
 
     // Validierung
@@ -77,10 +77,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Onboarding-Vorgang anlegen
+    // ProcessType validieren
+    const VALID_PROCESS_TYPES = ["EINSTELLUNG", "VERBEAMTUNG", "VERTRAGSAENDERUNG", "KUENDIGUNG"];
+    const resolvedProcessType = processType && VALID_PROCESS_TYPES.includes(processType)
+      ? processType
+      : "EINSTELLUNG";
+
     const onboarding = await prisma.onboardingProcess.create({
       data: {
         email,
         organizationId,
+        processType: resolvedProcessType,
         questionnaireType: questionnaireType || "STANDARD",
         token,
         tokenExpiresAt,

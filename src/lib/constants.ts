@@ -29,6 +29,16 @@ export const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 // =============================================
+// Prozesstyp-Labels (zukunftssicher fuer weitere HR-Vorgaenge)
+// =============================================
+export const PROCESS_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+  EINSTELLUNG: { label: "Einstellung", color: "bg-blue-100 text-blue-800" },
+  VERBEAMTUNG: { label: "Verbeamtung", color: "bg-purple-100 text-purple-800" },
+  VERTRAGSAENDERUNG: { label: "Vertragsaenderung", color: "bg-orange-100 text-orange-800" },
+  KUENDIGUNG: { label: "Kuendigung", color: "bg-red-100 text-red-800" },
+};
+
+// =============================================
 // Berechtigungsrollen
 // =============================================
 export const ADMIN_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"] as const;

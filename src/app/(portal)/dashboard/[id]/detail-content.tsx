@@ -381,8 +381,34 @@ export function DetailContent({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [checklistNoteText, setChecklistNoteText] = useState("");
   const [savingChecklistNote, setSavingChecklistNote] = useState(false);
+  const [completingProcess, setCompletingProcess] = useState(false);
 
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  // ---- Vorgang abschliessen ----
+  const canComplete = data &&
+    data.status === "REVIEWED" &&
+    (user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG");
+
+  const handleCompleteProcess = async () => {
+    if (!data || !canComplete) return;
+    if (!window.confirm("Moechten Sie diesen Vorgang wirklich als abgeschlossen markieren? Diese Aktion kann nicht rueckgaengig gemacht werden.")) return;
+    setCompletingProcess(true);
+    try {
+      const res = await fetch(`/api/onboarding/${data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "COMPLETED" }),
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } catch {
+      // silent
+    } finally {
+      setCompletingProcess(false);
+    }
+  };
 
   // ---- Data Loading ----
   const loadData = useCallback(async () => {
@@ -574,6 +600,18 @@ export function DetailContent({
             <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
               {data.questionnaireType}
             </span>
+
+            {/* Abschliessen-Button: Nur fuer SUPER_ADMIN / HR_LEITUNG bei Status REVIEWED */}
+            {canComplete && (
+              <button
+                onClick={handleCompleteProcess}
+                disabled={completingProcess}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+              >
+                <CheckIcon className="h-3.5 w-3.5" />
+                {completingProcess ? "Wird abgeschlossen..." : "Vorgang abschliessen"}
+              </button>
+            )}
           </div>
 
           {/* Row 2: Person info */}
