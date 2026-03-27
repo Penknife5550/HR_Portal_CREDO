@@ -1,8 +1,9 @@
 /**
  * API: /api/auth
  *
- * POST – HR-Login (E-Mail + Passwort)
- * DELETE – Logout
+ * GET    – Session-Refresh (erneuert Cookie bei gültiger Session)
+ * POST   – HR-Login (E-Mail + Passwort)
+ * DELETE  – Logout
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -11,12 +12,35 @@ import {
   createSessionToken,
   setSessionCookie,
   clearSessionCookie,
+  getSession,
 } from "@/lib/auth";
 import {
   loginRateLimiter,
   loginEmailRateLimiter,
   getClientIp,
 } from "@/lib/rate-limit";
+
+// GET /api/auth – Session-Refresh (erneuert Cookie wenn Session gültig)
+export async function GET() {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json(
+        { error: "Nicht authentifiziert" },
+        { status: 401 }
+      );
+    }
+    // Neuen Token erstellen und Cookie erneuern
+    const token = createSessionToken(session);
+    await setSessionCookie(token);
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json(
+      { error: "Interner Serverfehler" },
+      { status: 500 }
+    );
+  }
+}
 
 // POST /api/auth – Login
 export async function POST(request: NextRequest) {

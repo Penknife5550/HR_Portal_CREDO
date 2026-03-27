@@ -65,7 +65,7 @@ const RELIGION_LABELS: Record<string, string> = {
   ak: "Altkatholisch",
   lt: "Evangelisch-Lutherisch",
   rf: "Evangelisch-Reformiert",
-  fr: "Franzoesisch-Reformiert",
+  fr: "Französisch-Reformiert",
   fg: "Freie Religionsgemeinschaft",
   keine: "Keine",
   sonstige: "Sonstige",
@@ -141,6 +141,7 @@ export function Step10Summary({
   const [dsgvoAccepted, setDsgvoAccepted] = useState(false);
   const [erklaerungAccepted, setErklaerungAccepted] = useState(false);
   const [dsgvoError, setDsgvoError] = useState("");
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const d = allData;
   const children = (d.children as ChildEntry[]) || [];
@@ -148,17 +149,17 @@ export function Step10Summary({
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!erklaerungAccepted) {
-      setDsgvoError("Bitte bestaetigen Sie die Erklaerung des Arbeitnehmers.");
+      setDsgvoError("Bitte bestätigen Sie die Erklärung des Arbeitnehmers.");
       return;
     }
     if (!dsgvoAccepted) {
       setDsgvoError(
-        "Bitte stimmen Sie der Datenschutzerklaerung zu, um den Fragebogen abzuschicken."
+        "Bitte stimmen Sie der Datenschutzerklärung zu, um den Fragebogen abzuschicken."
       );
       return;
     }
     setDsgvoError("");
-    onSubmit();
+    setShowConfirmDialog(true);
   };
 
   const formatDate = (dateStr: unknown): string => {
@@ -179,8 +180,8 @@ export function Step10Summary({
     <form onSubmit={handleFinalSubmit} className="space-y-5">
       <div className="rounded-lg border border-green-200 bg-green-50 p-4">
         <p className="text-sm text-green-800">
-          Bitte pruefen Sie alle Angaben sorgfaeltig. Nach dem Absenden koennen
-          Aenderungen nur noch ueber die Personalabteilung vorgenommen werden.
+          Bitte prüfen Sie alle Angaben sorgfältig. Nach dem Absenden können
+          Änderungen nur noch über die Personalabteilung vorgenommen werden.
         </p>
       </div>
 
@@ -190,8 +191,8 @@ export function Step10Summary({
         <SummaryRow label="Mandantennummer" value={organization.mandantNumber} />
       </SummarySection>
 
-      {/* Step 1: Persoenliche Angaben */}
-      <SummarySection title="1. Persoenliche Angaben">
+      {/* Step 1: Persönliche Angaben */}
+      <SummarySection title="1. Persönliche Angaben">
         <SummaryRow
           label="Anrede"
           value={SALUTATION_LABELS[str(d.salutation)] || str(d.salutation)}
@@ -206,7 +207,7 @@ export function Step10Summary({
         <SummaryRow label="Geburtsort" value={str(d.birthPlace)} />
         <SummaryRow label="Geburtsland" value={str(d.birthCountry)} />
         <SummaryRow
-          label="Staatsangehoerigkeit"
+          label="Staatsangehörigkeit"
           value={str(d.nationality)}
         />
         <SummaryRow
@@ -302,8 +303,8 @@ export function Step10Summary({
         />
       </SummarySection>
 
-      {/* Step 6: Weitere Beschaeftigung */}
-      <SummarySection title="6. Weitere Beschaeftigung">
+      {/* Step 6: Weitere Beschäftigung */}
+      <SummarySection title="6. Weitere Beschäftigung">
         <SummaryRow
           label="Weiterer Arbeitgeber"
           value={d.hasOtherEmployment ? "Ja" : "Nein"}
@@ -329,7 +330,7 @@ export function Step10Summary({
           }
         />
         <SummaryRow
-          label="Weitere geringfuegige Beschaeftigung (Minijob)"
+          label="Weitere geringfügige Beschäftigung (Minijob)"
           value={d.hasMinijob ? "Ja" : "Nein"}
         />
       </SummarySection>
@@ -354,14 +355,14 @@ export function Step10Summary({
       {/* Step 8: Bildung & Beruf */}
       <SummarySection title="8. Bildung & Beruf">
         <SummaryRow
-          label="Hoechster Schulabschluss"
+          label="Höchster Schulabschluss"
           value={
             SCHOOL_DEGREE_LABELS[str(d.highestSchoolDegree)] ||
             str(d.highestSchoolDegree)
           }
         />
         <SummaryRow
-          label="Hoechste Berufsausbildung"
+          label="Höchste Berufsausbildung"
           value={
             PROFESSIONAL_DEGREE_LABELS[str(d.highestProfessionalDegree)] ||
             str(d.highestProfessionalDegree)
@@ -389,7 +390,7 @@ export function Step10Summary({
       {token && <DocumentUpload token={token} hasChildren={children.length > 0} />}
 
       {/* ============================================= */}
-      {/* Erklaerung des Arbeitnehmers */}
+      {/* Erklärung des Arbeitnehmers */}
       {/* ============================================= */}
       <div className="rounded-lg border-2 border-primary/30 bg-muted p-5">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
@@ -406,7 +407,7 @@ export function Step10Summary({
               d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
             />
           </svg>
-          Erklaerung des Arbeitnehmers
+          Erklärung des Arbeitnehmers
         </h3>
         <div className="mb-4 rounded-lg bg-card p-4 text-xs leading-relaxed text-foreground">
           <p className="mb-3">
@@ -518,7 +519,7 @@ export function Step10Summary({
               <span className="text-destructive">*</span>
             </span>
             <p className="text-xs text-muted-foreground">
-              Mit dem Absenden bestaetigen Sie die Richtigkeit Ihrer Angaben.
+              Mit dem Absenden bestätigen Sie die Richtigkeit Ihrer Angaben.
             </p>
           </div>
         </label>
@@ -534,7 +535,7 @@ export function Step10Summary({
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"
@@ -546,6 +547,45 @@ export function Step10Summary({
             : "Fragebogen verbindlich absenden"}
         </button>
       </div>
+
+      {/* Bestätigungs-Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-foreground">Fragebogen absenden?</h3>
+            </div>
+            <p className="mb-2 text-sm text-muted-foreground">
+              Sie sind dabei, Ihren Personalfragebogen verbindlich einzureichen.
+            </p>
+            <p className="mb-5 text-sm text-muted-foreground">
+              Nach dem Absenden können Änderungen <strong>nur noch über die Personalabteilung</strong> vorgenommen werden. Bitte stellen Sie sicher, dass alle Angaben korrekt sind.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirmDialog(false)}
+                className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
+              >
+                Noch einmal prüfen
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowConfirmDialog(false); onSubmit(); }}
+                disabled={saving}
+                className="flex-1 rounded-lg bg-[#6BAA24] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#5a9420] disabled:opacity-50"
+              >
+                {saving ? "Wird gesendet..." : "Ja, jetzt absenden"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

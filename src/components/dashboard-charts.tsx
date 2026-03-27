@@ -45,7 +45,7 @@ const STATUS_LABELS: Record<string, string> = {
   SUBMITTED: "Eingereicht",
   SUPERVISOR_PENDING: "Vorges. offen",
   SUPERVISOR_SUBMITTED: "Vorges. fertig",
-  REVIEWED: "Geprueft",
+  REVIEWED: "Geprüft",
   COMPLETED: "Abgeschlossen",
   EXPIRED: "Abgelaufen",
 };
@@ -113,7 +113,7 @@ export function StatusPieChart({ data }: { data: StatusData[] }) {
           ))}
         </Pie>
         <Tooltip
-          formatter={(value) => [value, "Vorgaenge"]}
+          formatter={(value) => [value, "Vorgänge"]}
           contentStyle={{
             borderRadius: "8px",
             border: "1px solid #e5e7eb",
@@ -192,7 +192,7 @@ export function OverdueBanner({
       </svg>
       <div>
         <p className={`text-sm font-semibold ${textColor}`}>
-          {count} {count === 1 ? "Vorgang" : "Vorgaenge"} ueberfaellig
+          {count} {count === 1 ? "Vorgang" : "Vorgänge"} überfällig
           {criticalCount > 0 && (
             <span className="ml-1 text-red-600">
               ({criticalCount} kritisch, &gt;14 Tage)
@@ -200,7 +200,7 @@ export function OverdueBanner({
           )}
         </p>
         <p className={`text-xs ${textColor} opacity-75`}>
-          Klicken Sie hier, um die ueberfaelligen Vorgaenge anzuzeigen
+          Klicken Sie hier, um die überfälligen Vorgänge anzuzeigen
         </p>
       </div>
     </button>

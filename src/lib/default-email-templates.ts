@@ -545,7 +545,7 @@ Bitte fuellen Sie das Formular aus:
 
 CREDO Gruppe – {{einrichtung}}`,
     variables: [
-      { key: "{{mitarbeiter_name}}", description: "Vollstaendiger Name des neuen Mitarbeiters" },
+      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des neuen Mitarbeiters" },
       { key: "{{email}}", description: "E-Mail des Vorgesetzten" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{supervisor_link}}", description: "Link zum Vorgesetzten-Formular" },

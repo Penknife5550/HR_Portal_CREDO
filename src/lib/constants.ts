@@ -23,7 +23,7 @@ export const STATUS_LABELS: Record<string, { label: string; color: string }> = {
     label: "Vorgesetzter fertig",
     color: "bg-[var(--color-status-supervisor-submitted)]/15 text-[var(--color-status-supervisor-submitted)]",
   },
-  REVIEWED: { label: "Geprueft", color: "bg-[var(--color-status-reviewed)]/15 text-[var(--color-status-reviewed)]" },
+  REVIEWED: { label: "Geprüft", color: "bg-[var(--color-status-reviewed)]/15 text-[var(--color-status-reviewed)]" },
   COMPLETED: { label: "Abgeschlossen", color: "bg-[var(--color-status-completed)]/15 text-[var(--color-status-completed)]" },
   EXPIRED: { label: "Abgelaufen", color: "bg-[var(--color-status-expired)]/15 text-[var(--color-status-expired)]" },
 };
@@ -34,8 +34,8 @@ export const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 export const PROCESS_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   EINSTELLUNG: { label: "Einstellung", color: "bg-blue-100 text-blue-800" },
   VERBEAMTUNG: { label: "Verbeamtung", color: "bg-purple-100 text-purple-800" },
-  VERTRAGSAENDERUNG: { label: "Vertragsaenderung", color: "bg-orange-100 text-orange-800" },
-  KUENDIGUNG: { label: "Kuendigung", color: "bg-red-100 text-red-800" },
+  VERTRAGSAENDERUNG: { label: "Vertragsänderung", color: "bg-orange-100 text-orange-800" },
+  KUENDIGUNG: { label: "Kündigung", color: "bg-red-100 text-red-800" },
 };
 
 // =============================================

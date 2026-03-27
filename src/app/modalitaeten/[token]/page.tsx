@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Einstellungsmodalitaeten – Vorgesetzten-Formular
+ * Einstellungsmodalitäten – Vorgesetzten-Formular
  *
- * Der Vorgesetzte fuellt hier die Vertragsdaten, Verguetung
- * und Arbeitgeber-Zuordnung fuer den neuen Mitarbeiter aus.
+ * Der Vorgesetzte füllt hier die Vertragsdaten, Vergütung
+ * und Arbeitgeber-Zuordnung für den neuen Mitarbeiter aus.
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -55,6 +55,7 @@ export default function ModalitaetenPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -168,7 +169,7 @@ export default function ModalitaetenPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <h1 className="text-lg font-bold text-foreground">Link nicht gueltig</h1>
+            <h1 className="text-lg font-bold text-foreground">Link nicht gültig</h1>
             <p className="mt-2 text-sm text-muted-foreground">{error}</p>
           </div>
           <CredoLinie />
@@ -191,7 +192,7 @@ export default function ModalitaetenPage() {
             </div>
             <h1 className="text-lg font-bold text-foreground">Vielen Dank!</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Die Einstellungsmodalitaeten wurden erfolgreich eingereicht.
+              Die Einstellungsmodalitäten wurden erfolgreich eingereicht.
             </p>
           </div>
           <CredoLinie />
@@ -220,9 +221,9 @@ export default function ModalitaetenPage() {
           <div className="flex items-center gap-3">
             <Image src="/credo_logo.svg" alt="CREDO" width={100} height={33} priority />
             <div className="hidden sm:block">
-              <h1 className="text-sm font-bold text-foreground">Einstellungsmodalitaeten</h1>
+              <h1 className="text-sm font-bold text-foreground">Einstellungsmodalitäten</h1>
               <p className="text-xs text-muted-foreground">
-                fuer {pageData.employeeName} &middot; {pageData.organization.name}
+                für{pageData.employeeName} &middot; {pageData.organization.name}
               </p>
             </div>
           </div>
@@ -296,7 +297,7 @@ export default function ModalitaetenPage() {
                 data={formData}
                 onBack={handleBack}
                 saving={saving}
-                onSubmit={handleSubmit}
+                onSubmit={() => setShowConfirmDialog(true)}
                 organizations={pageData.organizations}
                 employeeName={pageData.employeeName}
               />
@@ -304,6 +305,43 @@ export default function ModalitaetenPage() {
           </div>
         </div>
       </main>
+
+      {/* Bestätigungs-Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-foreground">Verbindlich absenden?</h3>
+            </div>
+            <p className="mb-2 text-sm text-muted-foreground">
+              Sie sind dabei, die Einstellungsmodalitäten für <strong>{pageData.employeeName}</strong> verbindlich einzureichen.
+            </p>
+            <p className="mb-5 text-sm text-muted-foreground">
+              Nach dem Absenden können die Daten <strong>nicht mehr geändert</strong> werden. Bitte stellen Sie sicher, dass alle Angaben korrekt sind.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
+              >
+                Zurück zur Prüfung
+              </button>
+              <button
+                onClick={() => { setShowConfirmDialog(false); handleSubmit(); }}
+                disabled={saving}
+                className="flex-1 rounded-lg bg-[#6BAA24] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#5a9420] disabled:opacity-50"
+              >
+                {saving ? "Wird gesendet..." : "Ja, verbindlich absenden"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer className="mt-auto border-t bg-card py-4 text-center">
         <p className="text-xs text-muted-foreground">
@@ -345,14 +383,14 @@ function SupStep1({
   return (
     <form onSubmit={handleSubmit((v) => onNext(v as unknown as Record<string, unknown>))} className="space-y-5">
       <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">Betriebsstaette <span className="text-destructive">*</span></label>
+        <label className="text-sm font-medium text-foreground">Betriebsstätte <span className="text-destructive">*</span></label>
         <input type="text" {...register("betriebsstaette")} placeholder="z.B. Gymnasium Minden" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
         {errors.betriebsstaette && <p className="text-xs text-destructive">{errors.betriebsstaette.message}</p>}
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">Stellenbeschreibung (wird in Arbeitsvertrag uebernommen!) <span className="text-destructive">*</span></label>
-        <textarea {...register("stellenbeschreibung")} rows={3} placeholder="z.B. Lehrkraft fuer Mathematik und Physik" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <label className="text-sm font-medium text-foreground">Stellenbeschreibung (wird in Arbeitsvertrag übernommen!) <span className="text-destructive">*</span></label>
+        <textarea {...register("stellenbeschreibung")} rows={3} placeholder="z.B. Lehrkraft fürMathematik und Physik" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
         {errors.stellenbeschreibung && <p className="text-xs text-destructive">{errors.stellenbeschreibung.message}</p>}
       </div>
 
@@ -462,7 +500,7 @@ function SupStep2({
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Hauptarbeitgeber <span className="text-destructive">*</span></label>
         <select {...register("hauptarbeitgeberId")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring">
-          <option value="">Bitte waehlen...</option>
+          <option value="">Bitte wählen...</option>
           {organizations.map((org) => (
             <option key={org.mandantNumber} value={org.mandantNumber}>
               {org.name} ({org.mandantNumber})
@@ -502,7 +540,7 @@ function SupStep2({
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" {...register("minijob")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
-          Minijob (geringfuegig beschaeftigt)
+          Minijob (geringfügig beschäftigt)
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" {...register("ehrenamt")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
@@ -511,7 +549,7 @@ function SupStep2({
       </div>
 
       <div className="flex justify-between pt-4">
-        <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurueck</button>
+        <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurück</button>
         <button type="submit" disabled={saving} className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
           {saving ? "Speichern..." : "Weiter"}
         </button>
@@ -521,7 +559,7 @@ function SupStep2({
 }
 
 // =============================================
-// Step 3: Verguetung
+// Step 3: Vergütung
 // =============================================
 function SupStep3({
   data,
@@ -543,7 +581,7 @@ function SupStep3({
       stufe: (data.stufe as string) || "",
       festgehalt: (data.festgehalt as number) || null,
       stundenlohn: (data.stundenlohn as number) || null,
-      bemerkungVerguetung: (data.bemerkungVerguetung as string) || "",
+      bemerkungVergütung: (data.bemerkungVergütung as string) || "",
       jahressonderzahlung: (data.jahressonderzahlung as boolean) ?? true,
       sonderzahlungProzent: (data.sonderzahlungProzent as number) || null,
       sachbezuege: (data.sachbezuege as boolean) || false,
@@ -560,10 +598,10 @@ function SupStep3({
   return (
     <form onSubmit={handleSubmit((v) => onNext(v as unknown as Record<string, unknown>))} className="space-y-5">
       <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">Verguetungsmodell <span className="text-destructive">*</span></label>
+        <label className="text-sm font-medium text-foreground">Vergütungsmodell <span className="text-destructive">*</span></label>
         <select {...register("verguetungsmodell")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring">
-          <option value="">Bitte waehlen...</option>
-          <option value="TV_L">TV-L (Tarifvertrag der Laender)</option>
+          <option value="">Bitte wählen...</option>
+          <option value="TV_L">TV-L (Tarifvertrag der Länder)</option>
           <option value="TV_L_S">TV-L S (Sozial- und Erziehungsdienst)</option>
           <option value="HAUSTARIF">Haustarif</option>
           <option value="SONSTIGES">Sonstiges</option>
@@ -576,7 +614,7 @@ function SupStep3({
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Entgeltgruppe</label>
             <select {...register("entgeltgruppe")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring">
-              <option value="">Bitte waehlen...</option>
+              <option value="">Bitte wählen...</option>
               {model === "TV_L" ? (
                 <>
                   <option value="E1">E 1</option><option value="E2">E 2</option>
@@ -605,7 +643,7 @@ function SupStep3({
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Stufe</label>
             <select {...register("stufe")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring">
-              <option value="">Bitte waehlen...</option>
+              <option value="">Bitte wählen...</option>
               <option value="1">Stufe 1</option><option value="2">Stufe 2</option>
               <option value="3">Stufe 3</option><option value="4">Stufe 4</option>
               <option value="5">Stufe 5</option><option value="6">Stufe 6</option>
@@ -634,8 +672,8 @@ function SupStep3({
       )}
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">Bemerkung zur Verguetung</label>
-        <textarea {...register("bemerkungVerguetung")} rows={2} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <label className="text-sm font-medium text-foreground">Bemerkung zur Vergütung</label>
+        <textarea {...register("bemerkungVergütung")} rows={2} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
       </div>
 
       <div className="space-y-3 rounded-lg border border-border p-4">
@@ -645,7 +683,7 @@ function SupStep3({
         </label>
         <label className="flex items-center gap-3">
           <input type="checkbox" {...register("sachbezuege")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
-          <span className="text-sm font-medium text-foreground">Sachbezuege</span>
+          <span className="text-sm font-medium text-foreground">Sachbezüge</span>
         </label>
         {sachbez && (
           <div className="ml-7">
@@ -664,7 +702,7 @@ function SupStep3({
       </div>
 
       <div className="flex justify-between pt-4">
-        <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurueck</button>
+        <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurück</button>
         <button type="submit" disabled={saving} className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
           {saving ? "Speichern..." : "Weiter"}
         </button>
@@ -674,7 +712,7 @@ function SupStep3({
 }
 
 // =============================================
-// Step 4: Zusaetzliche Angaben
+// Step 4: Zusätzliche Angaben
 // =============================================
 function SupStep4({
   data,
@@ -758,12 +796,12 @@ function SupStep4({
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">Zusaetzliche Vereinbarungen / Bemerkungen</label>
+        <label className="text-sm font-medium text-foreground">Zusätzliche Vereinbarungen / Bemerkungen</label>
         <textarea {...register("zusatzvereinbarungen")} rows={4} placeholder="z.B. besondere Regelungen, Dienstwagen, etc." className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
       </div>
 
       <div className="flex justify-between pt-4">
-        <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurueck</button>
+        <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurück</button>
         <button type="submit" disabled={saving} className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
           {saving ? "Speichern..." : "Weiter"}
         </button>
@@ -807,7 +845,7 @@ function SupStep5Summary({
     <div className="space-y-5">
       <div className="rounded-lg border border-green-200 bg-green-50 p-4">
         <p className="text-sm text-green-800">
-          Bitte pruefen Sie alle Angaben fuer <strong>{employeeName}</strong> sorgfaeltig.
+          Bitte prüfen Sie alle Angaben für<strong>{employeeName}</strong> sorgfältig.
         </p>
       </div>
 
@@ -815,7 +853,7 @@ function SupStep5Summary({
       <div className="rounded-lg border border-border">
         <div className="border-b bg-muted/50 px-4 py-2"><h3 className="text-sm font-semibold">1. Stelle & Vertrag</h3></div>
         <div className="px-4 py-3 text-xs space-y-1">
-          <div className="flex justify-between"><span className="text-muted-foreground">Betriebsstaette</span><span className="font-medium">{str(data.betriebsstaette)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Betriebsstätte</span><span className="font-medium">{str(data.betriebsstaette)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Stelle</span><span className="font-medium">{str(data.stellenbeschreibung)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Vertragsbeginn</span><span className="font-medium">{str(data.vertragsbeginn)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Befristet</span><span className="font-medium">{data.befristet ? "Ja" : "Nein"}</span></div>
@@ -834,9 +872,9 @@ function SupStep5Summary({
         </div>
       </div>
 
-      {/* Verguetung */}
+      {/* Vergütung */}
       <div className="rounded-lg border border-border">
-        <div className="border-b bg-muted/50 px-4 py-2"><h3 className="text-sm font-semibold">3. Verguetung</h3></div>
+        <div className="border-b bg-muted/50 px-4 py-2"><h3 className="text-sm font-semibold">3. Vergütung</h3></div>
         <div className="px-4 py-3 text-xs space-y-1">
           <div className="flex justify-between"><span className="text-muted-foreground">Modell</span><span className="font-medium">{MODELL_LABELS[str(data.verguetungsmodell)] || str(data.verguetungsmodell)}</span></div>
           {!!data.entgeltgruppe && <div className="flex justify-between"><span className="text-muted-foreground">Entgeltgruppe</span><span className="font-medium">{str(data.entgeltgruppe)}</span></div>}
@@ -845,9 +883,9 @@ function SupStep5Summary({
         </div>
       </div>
 
-      {/* Zusaetzliches */}
+      {/* Zusätzliches */}
       <div className="rounded-lg border border-border">
-        <div className="border-b bg-muted/50 px-4 py-2"><h3 className="text-sm font-semibold">4. Zusaetzliche Angaben</h3></div>
+        <div className="border-b bg-muted/50 px-4 py-2"><h3 className="text-sm font-semibold">4. Zusätzliche Angaben</h3></div>
         <div className="px-4 py-3 text-xs space-y-1">
           {!!data.kostenstelle && <div className="flex justify-between"><span className="text-muted-foreground">Kostenstelle</span><span className="font-medium">{str(data.kostenstelle)}</span></div>}
           <div className="flex justify-between"><span className="text-muted-foreground">Probezeit</span><span className="font-medium">{data.probezeit ? `${str(data.probezeitMonate)} Monate` : "Nein"}</span></div>
@@ -858,7 +896,7 @@ function SupStep5Summary({
       </div>
 
       <div className="flex justify-between pt-4">
-        <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurueck</button>
+        <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurück</button>
         <button
           type="button"
           onClick={onSubmit}

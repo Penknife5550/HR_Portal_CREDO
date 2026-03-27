@@ -230,6 +230,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const organizationId = searchParams.get("organizationId");
+    const search = searchParams.get("search")?.trim();
+    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
     const rawLimit = parseInt(searchParams.get("limit") || "50");
     const rawOffset = parseInt(searchParams.get("offset") || "0");
     // Validierung: NaN/negative Werte abfangen, Maximum begrenzen
@@ -237,9 +240,28 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(isNaN(rawOffset) ? 0 : rawOffset, 0);
 
     // Filter zusammenbauen
-    const where: Record<string, unknown> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: Record<string, any> = {};
     if (status) where.status = status;
     if (organizationId) where.organizationId = organizationId;
+    if (search) {
+      where.OR = [
+        { displayId: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { personalData: { firstName: { contains: search, mode: "insensitive" } } },
+        { personalData: { lastName: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    // Sortierung validieren
+    const VALID_SORT_FIELDS: Record<string, string> = {
+      createdAt: "createdAt",
+      displayId: "displayId",
+      email: "email",
+      status: "status",
+      invitedAt: "invitedAt",
+    };
+    const resolvedSort = VALID_SORT_FIELDS[sortBy] || "createdAt";
 
     const [onboardings, total] = await Promise.all([
       prisma.onboardingProcess.findMany({
@@ -263,7 +285,7 @@ export async function GET(request: NextRequest) {
             select: { notes: true },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { [resolvedSort]: sortOrder },
         take: limit,
         skip: offset,
       }),

@@ -709,7 +709,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                   {template._count.onboardings > 0 && (
                     <div className="border-t px-6 py-3">
                       <p className="text-xs text-muted-foreground">
-                        Verwendet in {template._count.onboardings} Onboarding-Vorgang/Vorgaengen
+                        Verwendet in {template._count.onboardings} Onboarding-Vorgang/Vorgängen
                       </p>
                     </div>
                   )}

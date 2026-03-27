@@ -13,6 +13,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { CredoLinie } from "@/components/credo-linie";
+import { SessionTimeoutWarning } from "@/components/session-timeout-warning";
 
 interface User {
   userId: string;
@@ -41,6 +42,8 @@ export function PortalHeader({ user }: { user: User }) {
   }
 
   return (
+    <>
+    <SessionTimeoutWarning />
     <header className="border-b bg-card shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-6">
@@ -130,5 +133,6 @@ export function PortalHeader({ user }: { user: User }) {
 
       <CredoLinie height={3} />
     </header>
+    </>
   );
 }

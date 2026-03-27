@@ -96,7 +96,7 @@ export async function GET() {
 
     const overdueProcesses = await prisma.onboardingProcess.findMany({
       where: {
-        status: { in: ["INVITED", "IN_PROGRESS", "SUBMITTED", "SUPERVISOR_PENDING"] },
+        status: { in: ["INVITED", "IN_PROGRESS", "SUBMITTED", "SUPERVISOR_PENDING", "SUPERVISOR_SUBMITTED"] },
         invitedAt: { lt: overdueThreshold },
       },
       select: {

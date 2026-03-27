@@ -829,7 +829,7 @@ function TabOverview({
               label="Status"
               value={
                 data.personalData?.isComplete
-                  ? "Vollstaendig"
+                  ? "Vollständig"
                   : data.personalData
                     ? `Schritt ${data.personalData.currentStep} von 10`
                     : "Nicht begonnen"
@@ -860,7 +860,7 @@ function TabOverview({
                   label="Status"
                   value={
                     data.supervisorData?.isComplete
-                      ? "Vollstaendig"
+                      ? "Vollständig"
                       : data.supervisorData
                         ? `Schritt ${data.supervisorData.currentStep} von 5`
                         : "Nicht begonnen"
@@ -1109,7 +1109,7 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">
-              Fragebogen-Status: {pd.isComplete ? "Vollstaendig ausgefuellt" : `Schritt ${pd.currentStep} von 10`}
+              Fragebogen-Status: {pd.isComplete ? "Vollständig ausgefüllt" : `Schritt ${pd.currentStep} von 10`}
             </p>
             {pd.dsgvoAccepted && pd.dsgvoAcceptedAt && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1300,7 +1300,7 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
 function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: string }) {
   const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
     UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
-    REVIEWED: { label: "Geprueft", color: "bg-blue-100 text-blue-700" },
+    REVIEWED: { label: "Geprüft", color: "bg-blue-100 text-blue-700" },
     APPROVED: { label: "Genehmigt", color: "bg-green-100 text-green-700" },
     REJECTED: { label: "Abgelehnt", color: "bg-red-100 text-red-700" },
   };

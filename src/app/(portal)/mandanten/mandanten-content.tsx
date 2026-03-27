@@ -188,10 +188,10 @@ export function MandantenContent({ user }: { user: User }) {
                   <tr className="border-b bg-muted text-left text-xs font-medium uppercase text-muted-foreground">
                     <th className="px-4 py-3">Mandantennr.</th>
                     <th className="px-4 py-3">Name</th>
-                    <th className="px-4 py-3">Kuerzel</th>
+                    <th className="px-4 py-3">Kürzel</th>
                     <th className="px-4 py-3">Typ</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Vorgaenge</th>
+                    <th className="px-4 py-3">Vorgänge</th>
                     <th className="px-4 py-3">Aktionen</th>
                   </tr>
                 </thead>
