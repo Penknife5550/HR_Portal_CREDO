@@ -223,7 +223,7 @@ export default function ModalitaetenPage() {
             <div className="hidden sm:block">
               <h1 className="text-sm font-bold text-foreground">Einstellungsmodalitäten</h1>
               <p className="text-xs text-muted-foreground">
-                für{pageData.employeeName} &middot; {pageData.organization.name}
+                für {pageData.employeeName} &middot; {pageData.organization.name}
               </p>
             </div>
           </div>
@@ -390,7 +390,7 @@ function SupStep1({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Stellenbeschreibung (wird in Arbeitsvertrag übernommen!) <span className="text-destructive">*</span></label>
-        <textarea {...register("stellenbeschreibung")} rows={3} placeholder="z.B. Lehrkraft fürMathematik und Physik" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <textarea {...register("stellenbeschreibung")} rows={3} placeholder="z.B. Lehrkraft für Mathematik und Physik" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
         {errors.stellenbeschreibung && <p className="text-xs text-destructive">{errors.stellenbeschreibung.message}</p>}
       </div>
 
@@ -581,7 +581,7 @@ function SupStep3({
       stufe: (data.stufe as string) || "",
       festgehalt: (data.festgehalt as number) || null,
       stundenlohn: (data.stundenlohn as number) || null,
-      bemerkungVergütung: (data.bemerkungVergütung as string) || "",
+      bemerkungVerguetung: (data.bemerkungVerguetung as string) || "",
       jahressonderzahlung: (data.jahressonderzahlung as boolean) ?? true,
       sonderzahlungProzent: (data.sonderzahlungProzent as number) || null,
       sachbezuege: (data.sachbezuege as boolean) || false,
@@ -673,7 +673,7 @@ function SupStep3({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Bemerkung zur Vergütung</label>
-        <textarea {...register("bemerkungVergütung")} rows={2} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <textarea {...register("bemerkungVerguetung")} rows={2} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
       </div>
 
       <div className="space-y-3 rounded-lg border border-border p-4">
@@ -845,7 +845,7 @@ function SupStep5Summary({
     <div className="space-y-5">
       <div className="rounded-lg border border-green-200 bg-green-50 p-4">
         <p className="text-sm text-green-800">
-          Bitte prüfen Sie alle Angaben für<strong>{employeeName}</strong> sorgfältig.
+          Bitte prüfen Sie alle Angaben für <strong>{employeeName}</strong> sorgfältig.
         </p>
       </div>
 
