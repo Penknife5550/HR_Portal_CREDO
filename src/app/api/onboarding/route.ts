@@ -240,8 +240,7 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(isNaN(rawOffset) ? 0 : rawOffset, 0);
 
     // Filter zusammenbauen
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: Record<string, any> = {};
+    const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (organizationId) where.organizationId = organizationId;
     if (search) {
