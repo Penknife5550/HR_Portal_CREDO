@@ -1,0 +1,359 @@
+{
+  "name": "CREDO HR-Portal \u2014 Offboarding Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "offboarding-created",
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "wh-offboarding-created",
+      "name": "Webhook: Offboarding Created",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 160],
+      "webhookId": "offboarding-created",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HEADER_AUTH_CREDENTIAL_ID",
+          "name": "HR-Portal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "offboarding-department-assigned",
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "wh-offboarding-dept-assigned",
+      "name": "Webhook: Department Assigned",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 460],
+      "webhookId": "offboarding-department-assigned",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HEADER_AUTH_CREDENTIAL_ID",
+          "name": "HR-Portal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "offboarding-task-completed",
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "wh-offboarding-task-completed",
+      "name": "Webhook: Task Completed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 760],
+      "webhookId": "offboarding-task-completed",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HEADER_AUTH_CREDENTIAL_ID",
+          "name": "HR-Portal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "offboarding-department-completed",
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "wh-offboarding-dept-completed",
+      "name": "Webhook: Department Completed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 1060],
+      "webhookId": "offboarding-department-completed",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HEADER_AUTH_CREDENTIAL_ID",
+          "name": "HR-Portal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "offboarding-completed",
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 200
+      },
+      "id": "wh-offboarding-completed",
+      "name": "Webhook: Offboarding Completed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 1360],
+      "webhookId": "offboarding-completed",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HEADER_AUTH_CREDENTIAL_ID",
+          "name": "HR-Portal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — Offboarding angelegt\n// Benachrichtigung an HR: Neuer Offboarding-Vorgang\n// ============================================================\n\nconst CONFIG = {\n  hrEmail: 'personal@credo-gruppe.de',\n  portalUrl: 'https://hr.fes-credo.de'\n};\n\ntry {\n  const item = $input.first().json;\n  const data = item.body || item;\n  const { displayId, employeeName, employeeFirstName, employeeLastName, organization, exitType, lastWorkingDay } = data;\n\n  const name = employeeName || [employeeFirstName, employeeLastName].filter(Boolean).join(' ') || 'Unbekannt';\n  const orgName = organization || 'CREDO';\n  const lwdFormatted = lastWorkingDay ? new Date(lastWorkingDay).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'k.A.';\n\n  const exitTypeLabels = {\n    'KUENDIGUNG_ARBEITNEHMER': 'K\\u00fcndigung (Arbeitnehmer)',\n    'KUENDIGUNG_ARBEITGEBER': 'K\\u00fcndigung (Arbeitgeber)',\n    'AUFHEBUNGSVERTRAG': 'Aufhebungsvertrag',\n    'BEFRISTUNGSENDE': 'Befristungsende',\n    'RENTE_PENSION': 'Rente/Pension',\n    'ERWERBSMINDERUNG': 'Erwerbsminderung',\n    'ENTLASSUNG_BEAMTER': 'Entlassung (Beamter)',\n    'VERSETZUNG': 'Versetzung',\n    'TOD': 'Tod',\n    'SONSTIGES': 'Sonstiges'\n  };\n  const exitLabel = exitTypeLabels[exitType] || exitType || 'k.A.';\n\n  const htmlBody = `<!DOCTYPE html>\n<html lang=\"de\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:Calibri,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n  <tr><td style=\"background-color:#005d6a;padding:25px 40px;\">\n    <h1 style=\"color:#ffffff;font-family:'ITC Avant Garde Gothic',Arial Black,Arial,sans-serif;font-size:22px;margin:0;\">Offboarding-Benachrichtigung</h1>\n  </td></tr>\n  <tr><td style=\"padding:35px 40px;\">\n    <div style=\"background-color:#fff3e0;border-left:4px solid #FBC900;padding:15px 20px;border-radius:4px;margin:0 0 25px;\">\n      <p style=\"color:#e65100;font-size:15px;font-weight:bold;margin:0;\">Neuer Offboarding-Vorgang angelegt</p>\n    </div>\n    <table cellpadding=\"8\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin:0 0 25px;\">\n      <tr style=\"border-bottom:1px solid #eeeeee;\"><td style=\"color:#666;font-size:14px;width:160px;\">Vorgang</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${displayId || 'k.A.'}</td></tr>\n      <tr style=\"border-bottom:1px solid #eeeeee;\"><td style=\"color:#666;font-size:14px;\">Mitarbeiter/in</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${name}</td></tr>\n      <tr style=\"border-bottom:1px solid #eeeeee;\"><td style=\"color:#666;font-size:14px;\">Einrichtung</td><td style=\"color:#333;font-size:14px;\">${orgName}</td></tr>\n      <tr style=\"border-bottom:1px solid #eeeeee;\"><td style=\"color:#666;font-size:14px;\">Austrittsgrund</td><td style=\"color:#333;font-size:14px;\">${exitLabel}</td></tr>\n      <tr><td style=\"color:#666;font-size:14px;\">Letzter Arbeitstag</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${lwdFormatted}</td></tr>\n    </table>\n    <table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto 20px;\"><tr><td align=\"center\" style=\"background-color:#005d6a;border-radius:6px;\">\n      <a href=\"${CONFIG.portalUrl}/offboarding\" target=\"_blank\" style=\"display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;\">Im HR-Portal oeffnen</a>\n    </td></tr></table>\n  </td></tr>\n  <tr><td style=\"padding:0;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n    <td width=\"50%\" style=\"height:4px;background-color:#DADADA;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#FBC900;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#6BAA24;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#E2001A;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#009AC6;\"></td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#f9f9f9;padding:15px 40px;text-align:center;\">\n    <p style=\"color:#999;font-size:11px;margin:0;\">Automatische Benachrichtigung des CREDO HR-Portals</p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body></html>`;\n\n  return [{ json: { to: CONFIG.hrEmail, subject: `[HR-Portal] Neuer Offboarding-Vorgang angelegt: ${name} (${orgName})`, html: htmlBody } }];\n} catch (error) {\n  console.error('[offboarding-created] Fehler:', error.message);\n  return [{ json: { error: error.message, event: 'offboarding-created' } }];\n}"
+      },
+      "id": "code-offboarding-created",
+      "name": "E-Mail: Offboarding angelegt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — Abteilung zugewiesen\n// E-Mail an Abteilung mit Magic-Link\n// ============================================================\n\ntry {\n  const item = $input.first().json;\n  const data = item.body || item;\n  const { displayId, employeeName, employeeFirstName, employeeLastName, organization, departmentName, departmentKey, email, magicLink, lastWorkingDay, taskCount } = data;\n\n  const name = employeeName || [employeeFirstName, employeeLastName].filter(Boolean).join(' ') || 'Unbekannt';\n  const orgName = organization || 'CREDO';\n  const lwdFormatted = lastWorkingDay ? new Date(lastWorkingDay).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'k.A.';\n  const deptName = departmentName || departmentKey || 'Abteilung';\n\n  const htmlBody = `<!DOCTYPE html>\n<html lang=\"de\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:Calibri,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n  <tr><td style=\"background-color:#005d6a;padding:30px 40px;text-align:center;\">\n    <h1 style=\"color:#ffffff;font-family:'ITC Avant Garde Gothic',Arial Black,Arial,sans-serif;font-size:28px;margin:0;letter-spacing:2px;\">CREDO</h1>\n    <p style=\"color:#ffffff;font-size:12px;margin:5px 0 0;letter-spacing:3px;\">Glauben &bull; Leben &bull; Gemeinsam</p>\n  </td></tr>\n  <tr><td style=\"padding:40px;\">\n    <h2 style=\"color:#005d6a;font-size:20px;margin:0 0 20px;\">Offboarding-Aufgaben f\\u00fcr ${deptName}</h2>\n    <p style=\"color:#333;font-size:15px;line-height:1.6;margin:0 0 15px;\">Sehr geehrtes Team ${deptName},</p>\n    <p style=\"color:#333;font-size:15px;line-height:1.6;margin:0 0 15px;\">im Rahmen des Offboarding-Vorgangs f\\u00fcr <strong>${name}</strong> (${orgName}) wurden Ihnen Aufgaben zugewiesen. Bitte bearbeiten Sie diese zeitnah.</p>\n    <table cellpadding=\"8\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin:0 0 25px;\">\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;width:160px;\">Vorgang</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${displayId || 'k.A.'}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Mitarbeiter/in</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${name}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Letzter Arbeitstag</td><td style=\"color:#333;font-size:14px;\">${lwdFormatted}</td></tr>\n      <tr><td style=\"color:#666;font-size:14px;\">Offene Aufgaben</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${taskCount || 'k.A.'}</td></tr>\n    </table>\n    <table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto 25px;\"><tr><td align=\"center\" style=\"background-color:#005d6a;border-radius:6px;\">\n      <a href=\"${magicLink}\" target=\"_blank\" style=\"display:inline-block;padding:14px 40px;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;\">Aufgaben oeffnen</a>\n    </td></tr></table>\n    <p style=\"color:#666;font-size:13px;line-height:1.5;margin:0 0 10px;\">Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:</p>\n    <p style=\"color:#005d6a;font-size:13px;line-height:1.5;word-break:break-all;margin:0 0 25px;\">${magicLink}</p>\n    <hr style=\"border:none;border-top:1px solid #eee;margin:25px 0;\">\n    <p style=\"color:#666;font-size:13px;line-height:1.5;margin:0;\">Bei Fragen wenden Sie sich an <a href=\"mailto:personal@credo-gruppe.de\" style=\"color:#005d6a;\">personal@credo-gruppe.de</a>.</p>\n  </td></tr>\n  <tr><td style=\"padding:0;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n    <td width=\"50%\" style=\"height:4px;background-color:#DADADA;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#FBC900;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#6BAA24;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#E2001A;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#009AC6;\"></td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#f9f9f9;padding:20px 40px;text-align:center;\">\n    <p style=\"color:#999;font-size:11px;line-height:1.5;margin:0;\">Christlicher Schulverein Minden e.V. &middot; Kingsleyallee 6 &middot; 32425 Minden<br>Tel. 0571 388 60-148 &middot; <a href=\"https://fes-minden.de\" style=\"color:#005d6a;text-decoration:none;\">fes-minden.de</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body></html>`;\n\n  return [{ json: { to: email, subject: `Offboarding-Aufgaben f\\u00fcr ${deptName}: ${name} (${orgName})`, html: htmlBody } }];\n} catch (error) {\n  console.error('[offboarding-department-assigned] Fehler:', error.message);\n  return [{ json: { error: error.message, event: 'offboarding-department-assigned' } }];\n}"
+      },
+      "id": "code-offboarding-dept-assigned",
+      "name": "E-Mail: Abteilung zugewiesen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — Aufgabe erledigt\n// Benachrichtigung an HR ueber Fortschritt\n// ============================================================\n\nconst CONFIG = {\n  hrEmail: 'personal@credo-gruppe.de'\n};\n\ntry {\n  const item = $input.first().json;\n  const data = item.body || item;\n  const { displayId, employeeName, employeeFirstName, employeeLastName, organization, departmentName, departmentKey, taskTitle, completedCount, totalCount } = data;\n\n  const name = employeeName || [employeeFirstName, employeeLastName].filter(Boolean).join(' ') || 'Unbekannt';\n  const orgName = organization || 'CREDO';\n  const deptName = departmentName || departmentKey || 'Abteilung';\n  const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;\n\n  // Fortschrittsbalken-Farbe\n  const progressColor = progress >= 100 ? '#6BAA24' : progress >= 50 ? '#009AC6' : '#FBC900';\n\n  const htmlBody = `<!DOCTYPE html>\n<html lang=\"de\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:Calibri,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n  <tr><td style=\"background-color:#005d6a;padding:25px 40px;\">\n    <h1 style=\"color:#ffffff;font-family:'ITC Avant Garde Gothic',Arial Black,Arial,sans-serif;font-size:22px;margin:0;\">Offboarding-Fortschritt</h1>\n  </td></tr>\n  <tr><td style=\"padding:35px 40px;\">\n    <div style=\"background-color:#e8f5e9;border-left:4px solid #6BAA24;padding:15px 20px;border-radius:4px;margin:0 0 25px;\">\n      <p style=\"color:#2e7d32;font-size:15px;font-weight:bold;margin:0;\">${deptName} hat Aufgabe erledigt</p>\n    </div>\n    <table cellpadding=\"8\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin:0 0 20px;\">\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;width:160px;\">Vorgang</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${displayId || 'k.A.'}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Mitarbeiter/in</td><td style=\"color:#333;font-size:14px;\">${name}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Abteilung</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${deptName}</td></tr>\n      <tr><td style=\"color:#666;font-size:14px;\">Erledigte Aufgabe</td><td style=\"color:#333;font-size:14px;\">${taskTitle || 'k.A.'}</td></tr>\n    </table>\n    <p style=\"color:#333;font-size:14px;margin:0 0 8px;\"><strong>Fortschritt: ${progress}%</strong> (${completedCount || 0} von ${totalCount || 0})</p>\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 0 25px;\"><tr>\n      <td style=\"background-color:#eeeeee;border-radius:4px;height:12px;padding:0;\">\n        <div style=\"background-color:${progressColor};width:${progress}%;height:12px;border-radius:4px;min-width:${progress > 0 ? '12px' : '0'};\"></div>\n      </td>\n    </tr></table>\n  </td></tr>\n  <tr><td style=\"padding:0;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n    <td width=\"50%\" style=\"height:4px;background-color:#DADADA;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#FBC900;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#6BAA24;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#E2001A;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#009AC6;\"></td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#f9f9f9;padding:15px 40px;text-align:center;\">\n    <p style=\"color:#999;font-size:11px;margin:0;\">Automatische Benachrichtigung des CREDO HR-Portals</p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body></html>`;\n\n  return [{ json: { to: CONFIG.hrEmail, subject: `[HR-Portal] ${deptName} hat Aufgabe erledigt: ${taskTitle || 'Aufgabe'} (Fortschritt: ${progress}%)`, html: htmlBody } }];\n} catch (error) {\n  console.error('[offboarding-task-completed] Fehler:', error.message);\n  return [{ json: { error: error.message, event: 'offboarding-task-completed' } }];\n}"
+      },
+      "id": "code-offboarding-task-completed",
+      "name": "E-Mail: Aufgabe erledigt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — Abteilung komplett\n// Benachrichtigung an HR: Alle Aufgaben einer Abteilung erledigt\n// ============================================================\n\nconst CONFIG = {\n  hrEmail: 'personal@credo-gruppe.de'\n};\n\ntry {\n  const item = $input.first().json;\n  const data = item.body || item;\n  const { displayId, employeeName, employeeFirstName, employeeLastName, organization, departmentName, departmentKey, remainingDepartments } = data;\n\n  const name = employeeName || [employeeFirstName, employeeLastName].filter(Boolean).join(' ') || 'Unbekannt';\n  const orgName = organization || 'CREDO';\n  const deptName = departmentName || departmentKey || 'Abteilung';\n  const remaining = remainingDepartments !== undefined ? remainingDepartments : 'k.A.';\n\n  const htmlBody = `<!DOCTYPE html>\n<html lang=\"de\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:Calibri,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n  <tr><td style=\"background-color:#005d6a;padding:25px 40px;\">\n    <h1 style=\"color:#ffffff;font-family:'ITC Avant Garde Gothic',Arial Black,Arial,sans-serif;font-size:22px;margin:0;\">Offboarding-Fortschritt</h1>\n  </td></tr>\n  <tr><td style=\"padding:35px 40px;\">\n    <div style=\"background-color:#e3f2fd;border-left:4px solid #009AC6;padding:15px 20px;border-radius:4px;margin:0 0 25px;\">\n      <p style=\"color:#0277bd;font-size:15px;font-weight:bold;margin:0;\">${deptName} hat alle Offboarding-Aufgaben erledigt</p>\n    </div>\n    <table cellpadding=\"8\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin:0 0 25px;\">\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;width:160px;\">Vorgang</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${displayId || 'k.A.'}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Mitarbeiter/in</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${name}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Einrichtung</td><td style=\"color:#333;font-size:14px;\">${orgName}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Abteilung</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${deptName}</td></tr>\n      <tr><td style=\"color:#666;font-size:14px;\">Verbleibende Abt.</td><td style=\"color:#333;font-size:14px;\">${remaining}</td></tr>\n    </table>\n    <p style=\"color:#333;font-size:15px;line-height:1.6;margin:0;\">${remaining === 0 ? 'Alle Abteilungen haben ihre Aufgaben erledigt. Der Offboarding-Vorgang kann abgeschlossen werden.' : 'Es warten noch ' + remaining + ' Abteilung(en) auf Erledigung.'}</p>\n  </td></tr>\n  <tr><td style=\"padding:0;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n    <td width=\"50%\" style=\"height:4px;background-color:#DADADA;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#FBC900;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#6BAA24;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#E2001A;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#009AC6;\"></td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#f9f9f9;padding:15px 40px;text-align:center;\">\n    <p style=\"color:#999;font-size:11px;margin:0;\">Automatische Benachrichtigung des CREDO HR-Portals</p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body></html>`;\n\n  return [{ json: { to: CONFIG.hrEmail, subject: `[HR-Portal] ${deptName} hat alle Offboarding-Aufgaben erledigt — ${name} (${displayId || ''})`, html: htmlBody } }];\n} catch (error) {\n  console.error('[offboarding-department-completed] Fehler:', error.message);\n  return [{ json: { error: error.message, event: 'offboarding-department-completed' } }];\n}"
+      },
+      "id": "code-offboarding-dept-completed",
+      "name": "E-Mail: Abteilung komplett",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 1060]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal — Offboarding abgeschlossen\n// Benachrichtigung an HR: Gesamter Vorgang komplett\n// ============================================================\n\nconst CONFIG = {\n  hrEmail: 'personal@credo-gruppe.de',\n  portalUrl: 'https://hr.fes-credo.de'\n};\n\ntry {\n  const item = $input.first().json;\n  const data = item.body || item;\n  const { displayId, employeeName, employeeFirstName, employeeLastName, organization, lastWorkingDay, exitType, completedAt } = data;\n\n  const name = employeeName || [employeeFirstName, employeeLastName].filter(Boolean).join(' ') || 'Unbekannt';\n  const orgName = organization || 'CREDO';\n  const lwdFormatted = lastWorkingDay ? new Date(lastWorkingDay).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'k.A.';\n  const completedFormatted = completedAt ? new Date(completedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleDateString('de-DE');\n\n  const htmlBody = `<!DOCTYPE html>\n<html lang=\"de\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:Calibri,Arial,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n  <tr><td style=\"background-color:#005d6a;padding:25px 40px;\">\n    <h1 style=\"color:#ffffff;font-family:'ITC Avant Garde Gothic',Arial Black,Arial,sans-serif;font-size:22px;margin:0;\">Offboarding abgeschlossen</h1>\n  </td></tr>\n  <tr><td style=\"padding:35px 40px;\">\n    <div style=\"background-color:#e8f5e9;border-left:4px solid #6BAA24;padding:15px 20px;border-radius:4px;margin:0 0 25px;\">\n      <p style=\"color:#2e7d32;font-size:15px;font-weight:bold;margin:0;\">Offboarding-Vorgang vollst\\u00e4ndig abgeschlossen</p>\n    </div>\n    <table cellpadding=\"8\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;margin:0 0 25px;\">\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;width:160px;\">Vorgang</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${displayId || 'k.A.'}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Mitarbeiter/in</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${name}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Einrichtung</td><td style=\"color:#333;font-size:14px;\">${orgName}</td></tr>\n      <tr style=\"border-bottom:1px solid #eee;\"><td style=\"color:#666;font-size:14px;\">Letzter Arbeitstag</td><td style=\"color:#333;font-size:14px;\">${lwdFormatted}</td></tr>\n      <tr><td style=\"color:#666;font-size:14px;\">Abgeschlossen am</td><td style=\"color:#333;font-size:14px;font-weight:bold;\">${completedFormatted}</td></tr>\n    </table>\n    <p style=\"color:#333;font-size:15px;line-height:1.6;margin:0 0 20px;\">Alle Abteilungen haben ihre Offboarding-Aufgaben erledigt. Der Vorgang wurde als abgeschlossen markiert.</p>\n    <table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto 20px;\"><tr><td align=\"center\" style=\"background-color:#005d6a;border-radius:6px;\">\n      <a href=\"${CONFIG.portalUrl}/offboarding\" target=\"_blank\" style=\"display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;\">Im HR-Portal oeffnen</a>\n    </td></tr></table>\n  </td></tr>\n  <tr><td style=\"padding:0;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n    <td width=\"50%\" style=\"height:4px;background-color:#DADADA;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#FBC900;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#6BAA24;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#E2001A;\"></td>\n    <td width=\"12.5%\" style=\"height:4px;background-color:#009AC6;\"></td>\n  </tr></table></td></tr>\n  <tr><td style=\"background-color:#f9f9f9;padding:15px 40px;text-align:center;\">\n    <p style=\"color:#999;font-size:11px;margin:0;\">Automatische Benachrichtigung des CREDO HR-Portals</p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body></html>`;\n\n  return [{ json: { to: CONFIG.hrEmail, subject: `[HR-Portal] Offboarding abgeschlossen: ${name} (${orgName}) — ${displayId || ''}`, html: htmlBody } }];\n} catch (error) {\n  console.error('[offboarding-completed] Fehler:', error.message);\n  return [{ json: { error: error.message, event: 'offboarding-completed' } }];\n}"
+      },
+      "id": "code-offboarding-completed",
+      "name": "E-Mail: Offboarding abgeschlossen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 1360]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "senderName": "CREDO HR-Portal"
+        }
+      },
+      "id": "smtp-offboarding-created",
+      "name": "SMTP: Offboarding angelegt",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 160],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "CREDO Exchange SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "senderName": "CREDO Personalverwaltung"
+        }
+      },
+      "id": "smtp-offboarding-dept-assigned",
+      "name": "SMTP: An Abteilung",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 460],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "CREDO Exchange SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "senderName": "CREDO HR-Portal"
+        }
+      },
+      "id": "smtp-offboarding-task-completed",
+      "name": "SMTP: Aufgabe erledigt",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 760],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "CREDO Exchange SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "senderName": "CREDO HR-Portal"
+        }
+      },
+      "id": "smtp-offboarding-dept-completed",
+      "name": "SMTP: Abteilung komplett",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 1060],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "CREDO Exchange SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "senderName": "CREDO HR-Portal"
+        }
+      },
+      "id": "smtp-offboarding-completed",
+      "name": "SMTP: Offboarding komplett",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [780, 1360],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_ID",
+          "name": "CREDO Exchange SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## CREDO HR-Portal \u2014 Offboarding Workflow\n\n### 5 Webhook-Events:\n1. **offboarding-created** \u2192 E-Mail an HR: Neuer Offboarding-Vorgang\n2. **offboarding-department-assigned** \u2192 E-Mail an Abteilung mit Magic-Link\n3. **offboarding-task-completed** \u2192 E-Mail an HR: Aufgabe erledigt + Fortschritt\n4. **offboarding-department-completed** \u2192 E-Mail an HR: Abteilung fertig\n5. **offboarding-completed** \u2192 E-Mail an HR: Gesamter Vorgang abgeschlossen\n\n### Setup-Checkliste:\n- [ ] SMTP-Credential \"CREDO Exchange SMTP\" anlegen (Exchange-Server)\n- [ ] Header Auth Credential anlegen: Name=X-API-Key, Value=<N8N_API_KEY aus .env>\n- [ ] Credential-IDs in allen Nodes eintragen\n- [ ] Workflow aktivieren\n- [ ] Test: Neuen Offboarding-Vorgang im HR-Portal erstellen\n\n### Webhook-URLs (nach Aktivierung):\n- https://n8n.credo-intern.de/webhook/offboarding-created\n- https://n8n.credo-intern.de/webhook/offboarding-department-assigned\n- https://n8n.credo-intern.de/webhook/offboarding-task-completed\n- https://n8n.credo-intern.de/webhook/offboarding-department-completed\n- https://n8n.credo-intern.de/webhook/offboarding-completed",
+        "height": 520,
+        "width": 420
+      },
+      "id": "sticky-offboarding-doku",
+      "name": "Dokumentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-180, 120]
+    }
+  ],
+  "connections": {
+    "Webhook: Offboarding Created": {
+      "main": [
+        [{ "node": "E-Mail: Offboarding angelegt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook: Department Assigned": {
+      "main": [
+        [{ "node": "E-Mail: Abteilung zugewiesen", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook: Task Completed": {
+      "main": [
+        [{ "node": "E-Mail: Aufgabe erledigt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook: Department Completed": {
+      "main": [
+        [{ "node": "E-Mail: Abteilung komplett", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook: Offboarding Completed": {
+      "main": [
+        [{ "node": "E-Mail: Offboarding abgeschlossen", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-Mail: Offboarding angelegt": {
+      "main": [
+        [{ "node": "SMTP: Offboarding angelegt", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-Mail: Abteilung zugewiesen": {
+      "main": [
+        [{ "node": "SMTP: An Abteilung", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-Mail: Aufgabe erledigt": {
+      "main": [
+        [{ "node": "SMTP: Aufgabe erledigt", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-Mail: Abteilung komplett": {
+      "main": [
+        [{ "node": "SMTP: Abteilung komplett", "type": "main", "index": 0 }]
+      ]
+    },
+    "E-Mail: Offboarding abgeschlossen": {
+      "main": [
+        [{ "node": "SMTP: Offboarding komplett", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "HR-Portal" },
+    { "name": "Offboarding" },
+    { "name": "CREDO" },
+    { "name": "Produktion" }
+  ]
+}

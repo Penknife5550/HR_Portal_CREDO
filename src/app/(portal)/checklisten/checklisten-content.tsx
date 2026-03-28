@@ -79,7 +79,7 @@ const TYPE_COLORS: Record<string, string> = {
   EHRENAMT: "bg-rose-100 text-rose-800",
 };
 
-// Kategorie-Vorschlaege
+// Kategorie-Vorschlaege (Onboarding)
 const CATEGORY_SUGGESTIONS = [
   "Vor Arbeitsbeginn",
   "Erster Arbeitstag",
@@ -88,6 +88,51 @@ const CATEGORY_SUGGESTIONS = [
   "IT-Einrichtung",
   "Verwaltung",
 ];
+
+// Kategorie-Vorschlaege (Offboarding – 6 Phasen)
+const OFFBOARDING_CATEGORY_SUGGESTIONS = [
+  "Phase 1: Sofort",
+  "Phase 2: Erste Woche",
+  "Phase 3: Uebergabe",
+  "Phase 4: Letzte Woche",
+  "Phase 5: Letzter Tag",
+  "Phase 6: Nach Austritt",
+];
+
+// Abteilungs-Optionen fuer Offboarding-Items
+const DEPARTMENT_OPTIONS: { key: string; label: string }[] = [
+  { key: "HR", label: "Personalabteilung" },
+  { key: "IT", label: "IT-Abteilung" },
+  { key: "FACILITY", label: "Facility Management" },
+  { key: "BUCHHALTUNG", label: "Buchhaltung" },
+  { key: "VORGESETZTER", label: "Vorgesetzter" },
+  { key: "MITARBEITER", label: "Mitarbeiter" },
+  { key: "DSB", label: "Datenschutzbeauftragter" },
+];
+
+// Farben pro Abteilung fuer Badges
+const DEPARTMENT_BADGE_COLORS: Record<string, string> = {
+  HR: "bg-blue-100 text-blue-800",
+  IT: "bg-purple-100 text-purple-800",
+  FACILITY: "bg-orange-100 text-orange-800",
+  BUCHHALTUNG: "bg-yellow-100 text-yellow-800",
+  VORGESETZTER: "bg-green-100 text-green-800",
+  MITARBEITER: "bg-gray-100 text-gray-800",
+  DSB: "bg-red-100 text-red-800",
+};
+
+// Abteilungs-Label nachschlagen
+function getDepartmentLabel(key: string): string {
+  const dept = DEPARTMENT_OPTIONS.find((d) => d.key === key);
+  return dept ? dept.label : key;
+}
+
+// Pruefen ob ein Template ein Offboarding-Template ist
+function isOffboardingTemplate(template: { name: string; questionnaireType?: string | null }): boolean {
+  return template.name.startsWith("Offboarding:") || template.name.startsWith("Offboarding: ");
+}
+
+type TabType = "onboarding" | "offboarding";
 
 // Leeres Item
 function createEmptyItem(orderIndex: number): NewItem {
@@ -108,6 +153,7 @@ export function ChecklistenContent({ user }: { user: User }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("onboarding");
 
   // Aufklapp-State fuer Kategorien (templateId -> Set<category>)
   const [expandedCategories, setExpandedCategories] = useState<
@@ -127,6 +173,18 @@ export function ChecklistenContent({ user }: { user: User }) {
 
   const canEdit =
     user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
+
+  // Gefilterte Templates nach aktivem Tab
+  const filteredTemplates = templates.filter((t) =>
+    activeTab === "offboarding"
+      ? isOffboardingTemplate(t)
+      : !isOffboardingTemplate(t)
+  );
+
+  // Helfer: Ist das Modal gerade im Offboarding-Modus?
+  const isModalOffboarding =
+    activeTab === "offboarding" ||
+    (modalData.id != null && isOffboardingTemplate(modalData));
 
   // =============================================
   // Vorlagen laden
@@ -205,9 +263,9 @@ export function ChecklistenContent({ user }: { user: User }) {
   // =============================================
   function handleCreate() {
     setModalData({
-      name: "",
+      name: activeTab === "offboarding" ? "Offboarding: " : "",
       description: "",
-      questionnaireType: "",
+      questionnaireType: activeTab === "offboarding" ? "" : "",
       items: [createEmptyItem(0)],
     });
     setShowModal(true);
@@ -288,6 +346,16 @@ export function ChecklistenContent({ user }: { user: User }) {
       return;
     }
 
+    // Offboarding-spezifisch: Name-Prefix sicherstellen, questionnaireType = null
+    let finalName = modalData.name.trim();
+    let finalQuestionnaireType: string | null = modalData.questionnaireType || null;
+    if (isModalOffboarding) {
+      if (!finalName.startsWith("Offboarding:")) {
+        finalName = "Offboarding: " + finalName;
+      }
+      finalQuestionnaireType = null;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -299,9 +367,9 @@ export function ChecklistenContent({ user }: { user: User }) {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: modalData.name.trim(),
+            name: finalName,
             description: modalData.description.trim() || null,
-            questionnaireType: modalData.questionnaireType || null,
+            questionnaireType: finalQuestionnaireType,
           }),
         });
         if (!templateRes.ok) {
@@ -342,9 +410,9 @@ export function ChecklistenContent({ user }: { user: User }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: modalData.name.trim(),
+            name: finalName,
             description: modalData.description.trim() || null,
-            questionnaireType: modalData.questionnaireType || null,
+            questionnaireType: finalQuestionnaireType,
             items: validItems.map((item) => ({
               title: item.title.trim(),
               category: item.category.trim(),
@@ -460,7 +528,8 @@ export function ChecklistenContent({ user }: { user: User }) {
               Checklisten-Vorlagen
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Erstellen und verwalten Sie Checklisten fuer den Onboarding-Prozess
+              Erstellen und verwalten Sie Checklisten fuer{" "}
+              {activeTab === "offboarding" ? "den Offboarding-Prozess" : "den Onboarding-Prozess"}
             </p>
           </div>
           {canEdit && (
@@ -471,6 +540,30 @@ export function ChecklistenContent({ user }: { user: User }) {
               + Neue Checkliste
             </button>
           )}
+        </div>
+
+        {/* Tabs: Onboarding | Offboarding */}
+        <div className="mb-6 flex border-b border-border">
+          <button
+            onClick={() => setActiveTab("onboarding")}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === "onboarding"
+                ? "border-b-2 border-[#6BAA24] text-[#6BAA24]"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Onboarding
+          </button>
+          <button
+            onClick={() => setActiveTab("offboarding")}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === "offboarding"
+                ? "border-b-2 border-[#6BAA24] text-[#6BAA24]"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Offboarding
+          </button>
         </div>
 
         {/* Erfolgsmeldung */}
@@ -516,26 +609,26 @@ export function ChecklistenContent({ user }: { user: User }) {
         )}
 
         {/* Keine Vorlagen */}
-        {!loading && templates.length === 0 && !error && (
+        {!loading && filteredTemplates.length === 0 && !error && (
           <div className="rounded-xl border bg-card p-8 text-center shadow-sm">
             <p className="text-muted-foreground">
-              Keine Checklisten-Vorlagen gefunden.
+              Keine {activeTab === "offboarding" ? "Offboarding" : "Onboarding"}-Checklisten-Vorlagen gefunden.
             </p>
             {canEdit && (
               <button
                 onClick={handleCreate}
                 className="mt-4 rounded-lg bg-[#6BAA24] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#5a9120]"
               >
-                Erste Checkliste erstellen
+                Erste {activeTab === "offboarding" ? "Offboarding" : "Onboarding"}-Checkliste erstellen
               </button>
             )}
           </div>
         )}
 
         {/* Template-Karten */}
-        {!loading && templates.length > 0 && (
+        {!loading && filteredTemplates.length > 0 && (
           <div className="space-y-6">
-            {templates.map((template) => {
+            {filteredTemplates.map((template) => {
               const groups = groupByCategory(template.items);
               const categories = getUniqueCategories(template.items);
               const categoryCount = categories.length;
@@ -686,8 +779,13 @@ export function ChecklistenContent({ user }: { user: User }) {
                                       </span>
                                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                         {item.defaultAssignee && (
-                                          <span className="rounded-full bg-[#009AC6]/10 px-2 py-0.5 text-[#009AC6]">
-                                            {item.defaultAssignee}
+                                          <span
+                                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                              DEPARTMENT_BADGE_COLORS[item.defaultAssignee] ||
+                                              "bg-[#009AC6]/10 text-[#009AC6]"
+                                            }`}
+                                          >
+                                            {getDepartmentLabel(item.defaultAssignee)}
                                           </span>
                                         )}
                                         <span>
@@ -790,29 +888,41 @@ export function ChecklistenContent({ user }: { user: User }) {
                 />
               </div>
 
-              {/* Fragebogentyp */}
-              <div className="mb-6">
-                <label className="mb-1 block text-sm font-medium text-foreground">
-                  Fragebogentyp-Zuordnung
-                </label>
-                <select
-                  value={modalData.questionnaireType}
-                  onChange={(e) =>
-                    setModalData((prev) => ({
-                      ...prev,
-                      questionnaireType: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="">Keine Zuordnung</option>
-                  <option value="STANDARD">Standard</option>
-                  <option value="BEAMTE">Beamte</option>
-                  <option value="ERZIEHER">Erzieher</option>
-                  <option value="MINIJOB">Minijob</option>
-                  <option value="EHRENAMT">Ehrenamt</option>
-                </select>
-              </div>
+              {/* Fragebogentyp – nur bei Onboarding sichtbar */}
+              {!isModalOffboarding && (
+                <div className="mb-6">
+                  <label className="mb-1 block text-sm font-medium text-foreground">
+                    Fragebogentyp-Zuordnung
+                  </label>
+                  <select
+                    value={modalData.questionnaireType}
+                    onChange={(e) =>
+                      setModalData((prev) => ({
+                        ...prev,
+                        questionnaireType: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="">Keine Zuordnung</option>
+                    <option value="STANDARD">Standard</option>
+                    <option value="BEAMTE">Beamte</option>
+                    <option value="ERZIEHER">Erzieher</option>
+                    <option value="MINIJOB">Minijob</option>
+                    <option value="EHRENAMT">Ehrenamt</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Offboarding-Hinweis */}
+              {isModalOffboarding && (
+                <div className="mb-6 rounded-lg border border-orange-200 bg-orange-50 p-3">
+                  <p className="text-xs text-orange-800">
+                    Offboarding-Vorlage: Der Name wird automatisch mit &quot;Offboarding: &quot; prefixed.
+                    Weisen Sie jedem Checklisten-Punkt eine zustaendige Abteilung zu.
+                  </p>
+                </div>
+              )}
 
               {/* Info-Box */}
               <div className="mb-4 rounded-lg border border-[#009AC6]/20 bg-[#009AC6]/5 p-3">
@@ -888,7 +998,10 @@ export function ChecklistenContent({ user }: { user: User }) {
                             className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                           />
                           <datalist id={`category-suggestions-${index}`}>
-                            {CATEGORY_SUGGESTIONS.map((cat) => (
+                            {(isModalOffboarding
+                              ? OFFBOARDING_CATEGORY_SUGGESTIONS
+                              : CATEGORY_SUGGESTIONS
+                            ).map((cat) => (
                               <option key={cat} value={cat} />
                             ))}
                           </datalist>
@@ -918,21 +1031,42 @@ export function ChecklistenContent({ user }: { user: User }) {
                           />
                         </div>
 
-                        {/* Verantwortlicher */}
+                        {/* Verantwortlicher / Abteilung */}
                         <div>
-                          <input
-                            type="text"
-                            value={item.defaultAssignee}
-                            onChange={(e) =>
-                              handleItemChange(
-                                index,
-                                "defaultAssignee",
-                                e.target.value
-                              )
-                            }
-                            placeholder="Verantwortlicher (z.B. HR, IT)"
-                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
+                          {isModalOffboarding ? (
+                            <select
+                              value={item.defaultAssignee}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "defaultAssignee",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            >
+                              <option value="">Abteilung waehlen...</option>
+                              {DEPARTMENT_OPTIONS.map((dept) => (
+                                <option key={dept.key} value={dept.key}>
+                                  {dept.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={item.defaultAssignee}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "defaultAssignee",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Verantwortlicher (z.B. HR, IT)"
+                              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          )}
                         </div>
                       </div>
                     </div>

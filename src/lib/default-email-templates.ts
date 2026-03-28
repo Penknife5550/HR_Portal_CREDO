@@ -553,4 +553,349 @@ CREDO Gruppe – {{einrichtung}}`,
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
     ],
   },
+
+  // =============================================
+  // Offboarding: Neuer Vorgang erstellt
+  // =============================================
+  {
+    event: "offboarding-created",
+    name: "Neuer Offboarding-Vorgang erstellt",
+    subject: "Neuer Offboarding-Vorgang: {{vorname}} {{nachname}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fee2e2;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#991b1b;font-weight:bold;font-size:14px;">Offboarding gestartet</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Neuer Offboarding-Vorgang</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Fuer <strong>{{vorname}} {{nachname}}</strong> wurde ein Offboarding-Vorgang angelegt.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Mitarbeiter</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{vorname}} {{nachname}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Austrittsdatum</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{austrittsdatum}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Einrichtung</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{einrichtung}}</p>
+            </td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Neuer Offboarding-Vorgang: {{vorname}} {{nachname}}
+
+Austrittsdatum: {{austrittsdatum}}
+Einrichtung: {{einrichtung}}
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
+      { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
+      { key: "{{email}}", description: "E-Mail des Mitarbeiters" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{austrittsdatum}}", description: "Geplantes Austrittsdatum" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+    ],
+  },
+
+  // =============================================
+  // Offboarding: Abteilung zugewiesen
+  // =============================================
+  {
+    event: "offboarding-department-assigned",
+    name: "Offboarding-Aufgaben fuer Abteilung zugewiesen",
+    subject: "Offboarding-Aufgaben fuer {{abteilung}}: {{vorname}} {{nachname}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#dbeafe;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#1e40af;font-weight:bold;font-size:14px;">Aufgaben zugewiesen</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offboarding-Aufgaben fuer {{abteilung}}</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Im Rahmen des Offboardings von <strong>{{vorname}} {{nachname}}</strong> wurden Ihrer Abteilung Aufgaben zugewiesen. Bitte bearbeiten Sie diese bis zum Austrittsdatum.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Mitarbeiter</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{vorname}} {{nachname}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Abteilung</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{abteilung}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Austrittsdatum</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{austrittsdatum}}</p>
+            </td></tr>
+          </table>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#2563eb;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Aufgaben ansehen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Offboarding-Aufgaben fuer {{abteilung}}: {{vorname}} {{nachname}}
+
+Im Rahmen des Offboardings wurden Ihrer Abteilung Aufgaben zugewiesen.
+Austrittsdatum: {{austrittsdatum}}
+
+Aufgaben ansehen: {{link}}
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
+      { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
+      { key: "{{abteilung}}", description: "Name der zugewiesenen Abteilung" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{austrittsdatum}}", description: "Geplantes Austrittsdatum" },
+      { key: "{{link}}", description: "Link zu den Offboarding-Aufgaben" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+    ],
+  },
+
+  // =============================================
+  // Offboarding: Aufgabe erledigt
+  // =============================================
+  {
+    event: "offboarding-task-completed",
+    name: "Offboarding-Aufgabe erledigt",
+    subject: "Aufgabe erledigt: {{aufgabe}} ({{vorname}} {{nachname}})",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#065f46;font-weight:bold;font-size:14px;">Aufgabe erledigt</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">{{aufgabe}}</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Die Offboarding-Aufgabe <strong>{{aufgabe}}</strong> fuer <strong>{{vorname}} {{nachname}}</strong> wurde als erledigt markiert.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Abteilung</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{abteilung}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Offene Aufgaben</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{offene_aufgaben}}</p>
+            </td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Aufgabe erledigt: {{aufgabe}} ({{vorname}} {{nachname}})
+
+Abteilung: {{abteilung}}
+Offene Aufgaben: {{offene_aufgaben}}
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
+      { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
+      { key: "{{aufgabe}}", description: "Name der erledigten Aufgabe" },
+      { key: "{{abteilung}}", description: "Abteilung der Aufgabe" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{offene_aufgaben}}", description: "Anzahl verbleibender offener Aufgaben" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+    ],
+  },
+
+  // =============================================
+  // Offboarding: Erinnerung offene Aufgaben
+  // =============================================
+  {
+    event: "offboarding-reminder",
+    name: "Erinnerung: Offene Offboarding-Aufgaben",
+    subject: "Erinnerung: Offene Aufgaben fuer {{vorname}} {{nachname}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#92400e;font-weight:bold;font-size:14px;">Erinnerung</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offene Offboarding-Aufgaben</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Fuer das Offboarding von <strong>{{vorname}} {{nachname}}</strong> sind noch <strong>{{offene_aufgaben}} Aufgaben</strong> offen. Das Austrittsdatum ist der <strong>{{austrittsdatum}}</strong>.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#f59e0b;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Aufgaben ansehen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Erinnerung: Offene Aufgaben fuer {{vorname}} {{nachname}}
+
+Offene Aufgaben: {{offene_aufgaben}}
+Austrittsdatum: {{austrittsdatum}}
+
+Aufgaben ansehen: {{link}}
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
+      { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{austrittsdatum}}", description: "Geplantes Austrittsdatum" },
+      { key: "{{offene_aufgaben}}", description: "Anzahl offener Aufgaben" },
+      { key: "{{link}}", description: "Link zu den Offboarding-Aufgaben" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+    ],
+  },
+
+  // =============================================
+  // Offboarding: Vorgang abgeschlossen
+  // =============================================
+  {
+    event: "offboarding-completed",
+    name: "Offboarding abgeschlossen",
+    subject: "Offboarding abgeschlossen: {{vorname}} {{nachname}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#065f46;font-weight:bold;font-size:14px;">Abgeschlossen</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offboarding abgeschlossen</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Das Offboarding von <strong>{{vorname}} {{nachname}}</strong> wurde erfolgreich abgeschlossen. Alle Aufgaben sind erledigt.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Mitarbeiter</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{vorname}} {{nachname}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Austrittsdatum</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{austrittsdatum}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Einrichtung</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{einrichtung}}</p>
+            </td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Offboarding abgeschlossen: {{vorname}} {{nachname}}
+
+Austrittsdatum: {{austrittsdatum}}
+Einrichtung: {{einrichtung}}
+
+Alle Aufgaben wurden erledigt.
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
+      { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
+      { key: "{{email}}", description: "E-Mail des Mitarbeiters" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{austrittsdatum}}", description: "Austrittsdatum" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+    ],
+  },
 ];

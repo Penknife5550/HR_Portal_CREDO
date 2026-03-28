@@ -42,7 +42,31 @@ export const PROCESS_TYPE_LABELS: Record<string, { label: string; color: string 
 // Berechtigungsrollen
 // =============================================
 export const ADMIN_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"] as const;
-export const ALL_PORTAL_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"] as const;
+export const ALL_PORTAL_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER"] as const;
+export const HR_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"] as const;
+
+// =============================================
+// Rollen-Labels
+// =============================================
+export const USER_ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "Administrator",
+  HR_LEITUNG: "HR-Leitung",
+  HR_SACHBEARBEITER: "Sachbearbeiter",
+  EINRICHTUNGSLEITUNG: "Einrichtungsleitung",
+  VORGESETZTER: "Vorgesetzter",
+};
+
+// =============================================
+// Vertragsarten
+// =============================================
+export const CONTRACT_TYPE_LABELS: Record<string, string> = {
+  UNBEFRISTET: "Unbefristet",
+  BEFRISTET: "Befristet",
+  BEAMTER: "Beamtenverhältnis",
+  MINIJOB: "Minijob",
+  EHRENAMT: "Ehrenamt",
+  PRAKTIKUM: "Praktikum",
+};
 
 // =============================================
 // Validierungsfunktionen
@@ -59,3 +83,152 @@ export function isValidUrl(url: string): boolean {
 export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
+
+// =============================================
+// Offboarding Status-Labels
+// =============================================
+export const OFFBOARDING_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  INITIATED: { label: "Erfasst", color: "bg-blue-100 text-blue-800" },
+  NOTICE_PERIOD: { label: "Kündigungsfrist", color: "bg-yellow-100 text-yellow-800" },
+  HANDOVER_PHASE: { label: "Übergabe", color: "bg-orange-100 text-orange-800" },
+  FINAL_SETTLEMENT: { label: "Endabrechnung", color: "bg-purple-100 text-purple-800" },
+  COMPLETED: { label: "Abgeschlossen", color: "bg-green-100 text-green-800" },
+  CANCELLED: { label: "Abgebrochen", color: "bg-gray-100 text-gray-800" },
+};
+
+// =============================================
+// Austrittsart-Labels
+// =============================================
+export const EXIT_TYPE_LABELS: Record<string, string> = {
+  KUENDIGUNG_ARBEITNEHMER: "Kündigung Arbeitnehmer",
+  KUENDIGUNG_ARBEITGEBER: "Kündigung Arbeitgeber",
+  AUFHEBUNGSVERTRAG: "Aufhebungsvertrag",
+  BEFRISTUNGSENDE: "Befristungsende",
+  RENTE_PENSION: "Rente / Pension",
+  ERWERBSMINDERUNG: "Erwerbsminderung",
+  ENTLASSUNG_BEAMTER: "Entlassung (Beamter)",
+  VERSETZUNG: "Versetzung",
+  TOD: "Todesfall",
+  SONSTIGES: "Sonstiges",
+};
+
+// =============================================
+// Rueckgabe-Kategorie-Labels
+// =============================================
+export const RETURN_CATEGORY_LABELS: Record<string, string> = {
+  IT_HARDWARE: "IT-Hardware",
+  SCHLUESSEL: "Schlüssel & Zugangskarten",
+  FAHRZEUG: "Fahrzeug & Parkausweis",
+  DOKUMENTE: "Dokumente & Unterlagen",
+  KLEIDUNG: "Firmenkleidung",
+  SPEICHERMEDIEN: "Speichermedien",
+  SONSTIGES: "Sonstiges",
+};
+
+// =============================================
+// Offboarding Dokument-Typ-Labels
+// =============================================
+export const OFFBOARDING_DOC_TYPE_LABELS: Record<string, string> = {
+  KUENDIGUNGSSCHREIBEN: "Kündigungsschreiben",
+  AUFHEBUNGSVERTRAG: "Aufhebungsvertrag",
+  ZEUGNIS_EINFACH: "Einfaches Arbeitszeugnis",
+  ZEUGNIS_QUALIFIZIERT: "Qualifiziertes Arbeitszeugnis",
+  ARBEITSBESCHEINIGUNG: "Arbeitsbescheinigung",
+  ABFINDUNGSVEREINBARUNG: "Abfindungsvereinbarung",
+  WETTBEWERBSVERBOT: "Wettbewerbsverbot",
+  RUECKGABEPROTOKOLL: "Rückgabeprotokoll",
+  SV_ABMELDUNG: "SV-Abmeldung",
+  SONSTIGES: "Sonstiges",
+};
+
+// =============================================
+// Abteilungs-Schluessel
+// =============================================
+export const DEPARTMENT_KEYS = {
+  HR: "HR",
+  IT: "IT",
+  FACILITY: "FACILITY",
+  BUCHHALTUNG: "BUCHHALTUNG",
+  VORGESETZTER: "VORGESETZTER",
+  MITARBEITER: "MITARBEITER",
+  DSB: "DSB",
+} as const;
+
+export const DEPARTMENT_LABELS: Record<string, string> = {
+  HR: "Personalabteilung",
+  IT: "IT-Abteilung",
+  FACILITY: "Facility Management",
+  BUCHHALTUNG: "Buchhaltung",
+  VORGESETZTER: "Vorgesetzter",
+  MITARBEITER: "Mitarbeiter",
+  DSB: "Datenschutzbeauftragter",
+};
+
+// =============================================
+// Exit-Interview Status-Labels
+// =============================================
+export const EXIT_INTERVIEW_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  SCHEDULED: { label: "Geplant", color: "bg-gray-100 text-gray-800" },
+  INVITED: { label: "Eingeladen", color: "bg-blue-100 text-blue-800" },
+  IN_PROGRESS: { label: "In Bearbeitung", color: "bg-yellow-100 text-yellow-800" },
+  SUBMITTED: { label: "Abgeschlossen", color: "bg-green-100 text-green-800" },
+  EXPIRED: { label: "Abgelaufen", color: "bg-red-100 text-red-800" },
+};
+
+// =============================================
+// Zeugnis-Bewertung Status-Labels
+// =============================================
+export const ZEUGNIS_BEWERTUNG_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  INVITED: { label: "Eingeladen", color: "bg-blue-100 text-blue-800" },
+  IN_PROGRESS: { label: "In Bearbeitung", color: "bg-yellow-100 text-yellow-800" },
+  SUBMITTED: { label: "Eingereicht", color: "bg-purple-100 text-purple-800" },
+  HR_REVIEW: { label: "HR-Prüfung", color: "bg-orange-100 text-orange-800" },
+  FINALIZED: { label: "Finalisiert", color: "bg-green-100 text-green-800" },
+  EXPIRED: { label: "Abgelaufen", color: "bg-red-100 text-red-800" },
+};
+
+// =============================================
+// Zeugnis Berufsgruppen-Labels
+// =============================================
+export const ZEUGNIS_JOB_GROUP_LABELS: Record<string, string> = {
+  LEHRKRAFT: "Lehrkraft",
+  ERZIEHER: "Erzieher/in",
+  VERWALTUNG: "Verwaltung",
+  SCHULLEITUNG: "Schulleitung",
+  SONSTIGES: "Sonstiges Personal",
+};
+
+// =============================================
+// Schulnoten-Labels
+// =============================================
+export const SCHOOL_GRADE_LABELS: Record<number, { label: string; description: string }> = {
+  1: { label: "Sehr gut", description: "Herausragende Leistung" },
+  2: { label: "Gut", description: "Überdurchschnittliche Leistung" },
+  3: { label: "Befriedigend", description: "Durchschnittliche Leistung" },
+  4: { label: "Ausreichend", description: "Unterdurchschnittliche Leistung" },
+  5: { label: "Mangelhaft", description: "Erhebliche Mängel" },
+  6: { label: "Ungenügend", description: "Nicht verwertbare Leistung" },
+};
+
+// =============================================
+// Exit-Interview Fragetyp-Labels
+// =============================================
+export const EXIT_INTERVIEW_QUESTION_TYPE_LABELS: Record<string, string> = {
+  RATING_5_STAR: "5-Sterne-Bewertung",
+  FREE_TEXT: "Freitext",
+  MULTIPLE_CHOICE: "Mehrfachauswahl",
+  SINGLE_CHOICE: "Einfachauswahl",
+  ENPS: "eNPS (0-10)",
+};
+
+// =============================================
+// Gesamtnoten-Formulierungen (Arbeitszeugnis)
+// =============================================
+export const OVERALL_GRADE_FORMULATIONS: Record<number, string> = {
+  1: "stets zu unserer vollsten Zufriedenheit",
+  2: "stets zu unserer vollen Zufriedenheit",
+  3: "zu unserer vollen Zufriedenheit",
+  4: "zu unserer Zufriedenheit",
+  5: "im Großen und Ganzen zu unserer Zufriedenheit",
+  6: "hat sich bemüht, den Anforderungen gerecht zu werden",
+};

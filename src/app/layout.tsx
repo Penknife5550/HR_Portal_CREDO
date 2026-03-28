@@ -24,8 +24,29 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de">
-      <body className={`${montserrat.variable} font-sans`}>{children}</body>
+    <html lang="de" suppressHydrationWarning>
+      <head>
+        <meta name="format-detection" content="telephone=no" />
+        <script dangerouslySetInnerHTML={{ __html: `
+          // Safari Autofill Bug unterdrücken (webkit-masked-url Fehler)
+          if (typeof window !== 'undefined') {
+            window.addEventListener('error', function(e) {
+              if (e.message && e.message.includes('autoCompleteType')) {
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+              }
+            }, true);
+            window.addEventListener('unhandledrejection', function(e) {
+              if (e.reason && e.reason.message && e.reason.message.includes('autoCompleteType')) {
+                e.preventDefault();
+                return true;
+              }
+            });
+          }
+        `}} />
+      </head>
+      <body className={`${montserrat.variable} font-sans`} data-form-type="other">{children}</body>
     </html>
   );
 }

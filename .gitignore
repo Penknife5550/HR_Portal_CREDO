@@ -60,3 +60,5 @@ nul
 # Claude Code
 .claude/
 prisma/compiled/
+backups/*.dump
+.DS_Store

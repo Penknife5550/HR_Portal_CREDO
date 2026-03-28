@@ -9,7 +9,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { PortalHeader } from "@/components/portal-header";
 import { NeuerVorgangModal } from "@/components/neuer-vorgang-modal";
 import { STATUS_LABELS } from "@/lib/constants";
 import {
@@ -177,8 +176,6 @@ export function DashboardContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
-
       {/* Dashboard Content */}
       <main className="mx-auto max-w-7xl px-4 py-6">
         {/* Status-Zusammenfassung */}

@@ -1,0 +1,146 @@
+{
+  "name": "CREDO HR-Portal \u2014 Offboarding-Erinnerungen",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "f1a2b3c4-offb-cron-trigger",
+      "name": "T\u00e4glich 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hr.credo-schulen.de/api/cron/offboarding-reminders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer HIER_CRON_SECRET_EINTRAGEN"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "g2b3c4d5-http-offb-reminders",
+      "name": "Offboarding-Erinnerungen abrufen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CREDO HR-Portal \u2014 Offboarding-Erinnerungs-Ergebnis auswerten\n// 3-Stufen-Logik: INFO, WARNING, ESCALATION\n// ============================================================\n\ntry {\n  const response = $input.first().json;\n  const body = response.body || response;\n\n  const summary = {\n    success: body.success || false,\n    timestamp: body.timestamp || new Date().toISOString(),\n    remindersProcessed: body.remindersProcessed || 0,\n    errors: body.errors || 0,\n    details: body.details || [],\n    statusCode: response.statusCode || 200\n  };\n\n  // Nur E-Mail senden wenn Erinnerungen verschickt wurden oder Fehler auftraten\n  if (summary.remindersProcessed > 0 || summary.errors > 0) {\n    // Details nach Level gruppieren\n    const byLevel = { INFO: [], WARNING: [], ESCALATION: [] };\n    for (const d of summary.details) {\n      if (byLevel[d.level]) byLevel[d.level].push(d);\n    }\n\n    const levelLabels = { INFO: 'Vorab-Info (3 Tage vor F\\u00e4lligkeit)', WARNING: 'Warnung (1 Tag \\u00fcberf\\u00e4llig)', ESCALATION: 'Eskalation (3+ Tage \\u00fcberf\\u00e4llig)' };\n    const levelColors = { INFO: '#009AC6', WARNING: '#FBC900', ESCALATION: '#E2001A' };\n\n    let detailRows = '';\n    for (const [level, items] of Object.entries(byLevel)) {\n      for (const item of items) {\n        detailRows += `<tr style=\"border-bottom:1px solid #eee;\">`;\n        detailRows += `<td style=\"padding:8px;font-size:13px;\">${item.displayId}</td>`;\n        detailRows += `<td style=\"padding:8px;font-size:13px;\">${item.departmentName}</td>`;\n        detailRows += `<td style=\"padding:8px;font-size:13px;\"><span style=\"background-color:${levelColors[level]};color:#fff;padding:2px 8px;border-radius:3px;font-size:11px;\">${level}</span></td>`;\n        detailRows += `<td style=\"padding:8px;font-size:13px;\">${item.overdueItems} \\u00fcberf. / ${item.upcomingItems} bevorstehend</td>`;\n        detailRows += `</tr>`;\n      }\n    }\n\n    const htmlBody = `<div style=\"font-family:Calibri,Arial,sans-serif;font-size:14px;color:#2d2d2d;line-height:1.6;\">\n      <h2 style=\"color:#005d6a;\">Offboarding-Erinnerungsbericht</h2>\n      <p>Datum: ${new Date().toLocaleDateString('de-DE')}</p>\n      <p><strong>${summary.remindersProcessed}</strong> Erinnerung(en) versendet${summary.errors > 0 ? ', <strong style=\"color:#E2001A;\">' + summary.errors + ' Fehler</strong>' : ''}</p>\n      <table style=\"width:100%;border-collapse:collapse;margin:15px 0;\">\n        <tr style=\"background-color:#005d6a;color:#fff;\"><th style=\"padding:8px;text-align:left;\">Vorgang</th><th style=\"padding:8px;text-align:left;\">Abteilung</th><th style=\"padding:8px;text-align:left;\">Level</th><th style=\"padding:8px;text-align:left;\">Status</th></tr>\n        ${detailRows}\n      </table>\n      <hr style=\"border:none;border-top:1px solid #ddd;margin:20px 0;\">\n      <p style=\"color:#999;font-size:12px;\">CREDO HR-Portal \\u2014 Automatischer Bericht</p>\n    </div>`;\n\n    return [{\n      json: {\n        sendReport: true,\n        to: 'personalbuchhaltung@fes-minden.de',\n        subject: `HR-Portal Offboarding: ${summary.remindersProcessed} Erinnerung(en) versendet${summary.errors > 0 ? ' (' + summary.errors + ' Fehler)' : ''}`,\n        html: htmlBody,\n        ...summary\n      }\n    }];\n  }\n\n  // Keine Erinnerungen noetig\n  return [{ json: { sendReport: false, ...summary } }];\n\n} catch (error) {\n  return [{\n    json: {\n      sendReport: true,\n      to: 'personalbuchhaltung@fes-minden.de',\n      subject: 'HR-Portal: Fehler beim Offboarding-Erinnerungsversand',\n      html: `<div style=\"font-family:Calibri,Arial,sans-serif;font-size:14px;color:#c00;\">Fehler: ${error.message}</div>`,\n      error: error.message\n    }\n  }];\n}\n"
+      },
+      "id": "h3c4d5e6-code-offb-evaluate",
+      "name": "Ergebnis auswerten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [580, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-send-offb",
+              "leftValue": "={{ $json.sendReport }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "i4d5e6f7-if-send-offb",
+      "name": "Bericht senden?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [820, 300]
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "bodyContent": "={{ $json.html }}",
+        "additionalFields": {
+          "from": "CREDO-HR",
+          "bodyContentType": "html",
+          "replyTo": "personalbuchhaltung@fes-minden.de"
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [1060, 220],
+      "id": "j5e6f7g8-outlook-offb-report",
+      "name": "Bericht per Outlook senden",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "FCU8Wm3Is8PCPAHT",
+          "name": "n8n@fes-minden.de"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "T\u00e4glich 08:00": {
+      "main": [
+        [{ "node": "Offboarding-Erinnerungen abrufen", "type": "main", "index": 0 }]
+      ]
+    },
+    "Offboarding-Erinnerungen abrufen": {
+      "main": [
+        [{ "node": "Ergebnis auswerten", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ergebnis auswerten": {
+      "main": [
+        [{ "node": "Bericht senden?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Bericht senden?": {
+      "main": [
+        [{ "node": "Bericht per Outlook senden", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "Offboarding" },
+    { "name": "HR-Portal" },
+    { "name": "CREDO" },
+    { "name": "Erinnerungen" }
+  ]
+}

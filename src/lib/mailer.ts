@@ -207,5 +207,16 @@ function extractVariables(
     base.link = str(payload.modalitaetenLink || payload.supervisor_link);
   }
 
+  // Offboarding-spezifische Variablen
+  if (event.startsWith("offboarding-")) {
+    base.abteilung = str(payload.abteilung || payload.department);
+    base.aufgabe = str(payload.aufgabe || payload.task);
+    base.austrittsdatum = payload.austrittsdatum
+      ? new Date(str(payload.austrittsdatum)).toLocaleDateString("de-DE")
+      : str(payload.austrittsdatum || "");
+    base.offene_aufgaben = str(payload.offene_aufgaben || payload.openTasks || "");
+    base.link = str(payload.link || payload.offboardingLink || "");
+  }
+
   return base;
 }

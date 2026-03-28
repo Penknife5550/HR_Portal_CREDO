@@ -128,6 +128,48 @@ export async function GET() {
       };
     });
 
+    // =============================================
+    // 5. Offboarding-Statistiken
+    // =============================================
+    const offboardingStatusGroups = await prisma.offboardingProcess.groupBy({
+      by: ["status"],
+      _count: { id: true },
+    });
+
+    const byStatus: Record<string, number> = {
+      INITIATED: 0,
+      NOTICE_PERIOD: 0,
+      HANDOVER_PHASE: 0,
+      FINAL_SETTLEMENT: 0,
+      COMPLETED: 0,
+      CANCELLED: 0,
+    };
+    let offboardingTotal = 0;
+    for (const g of offboardingStatusGroups) {
+      byStatus[g.status] = g._count.id;
+      offboardingTotal += g._count.id;
+    }
+
+    // Ueberfaellige Checklisten-Items (dueDate < now, nicht erledigt)
+    const overdueChecklistCount = await prisma.offboardingChecklistItem.count({
+      where: {
+        isCompleted: false,
+        dueDate: { lt: now },
+        offboarding: {
+          status: { notIn: ["COMPLETED", "CANCELLED"] },
+        },
+      },
+    });
+
+    // Kuerzlich abgeschlossene Offboardings (letzte 30 Tage)
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+    const recentCompletedCount = await prisma.offboardingProcess.count({
+      where: {
+        status: "COMPLETED",
+        completedAt: { gte: thirtyDaysAgo },
+      },
+    });
+
     return NextResponse.json({
       statusDistribution,
       monthlyTrend,
@@ -139,6 +181,12 @@ export async function GET() {
         count: overdueItems.length,
         criticalCount: overdueItems.filter((i) => i.critical).length,
         items: overdueItems,
+      },
+      offboardingStats: {
+        total: offboardingTotal,
+        byStatus,
+        overdueCount: overdueChecklistCount,
+        recentCompleted: recentCompletedCount,
       },
     });
   } catch (error) {

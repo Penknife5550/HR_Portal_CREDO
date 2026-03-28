@@ -23,6 +23,13 @@ export type WebhookEvent =
   | "supervisor-completed"
   | "employee-reminder"
   | "supervisor-reminder"
+  | "offboarding-created"
+  | "offboarding-completed"
+  | "offboarding-department-assigned"
+  | "offboarding-department-completed"
+  | "offboarding-task-completed"
+  | "offboarding-task-overdue"
+  | "offboarding-reminder"
   | (string & Record<never, never>); // erlaubt zukuenftige Events als Strings
 
 const MAX_RETRIES = 3;

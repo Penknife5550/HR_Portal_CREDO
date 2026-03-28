@@ -15,7 +15,9 @@
     "db:generate": "prisma generate",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:build": "docker compose up -d --build"
+    "docker:build": "docker compose up -d --build",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -53,17 +55,24 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@tailwindcss/postcss": "^4.1.7",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/bcryptjs": "^3.0.0",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.15.18",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
     "@types/uuid": "^10.0.0",
+    "caniuse-lite": "^1.0.30001781",
     "eslint": "^9.27.0",
     "eslint-config-next": "^15.3.2",
+    "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0",
     "postcss": "^8.5.3",
     "prisma": "^6.9.0",
     "tailwindcss": "^4.1.7",
+    "ts-jest": "^29.4.6",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
