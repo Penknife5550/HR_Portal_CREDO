@@ -1417,6 +1417,12 @@ model CivilServiceProcess {
   erfahrungsstufe     Int?                // 1-12
   vordienszeitenJson  Json?               // Berechnungsgrundlage
 
+  // LK-Antrag Magic Link
+  applicationToken          String?         @unique
+  applicationTokenExpiresAt DateTime?
+  applicationSubmittedAt    DateTime?
+  applicationData           Json?           // Antworten der Lehrkraft
+
   // Relationen
   phases              CivilServicePhase[]
   assessments         CivilServiceAssessment[]
