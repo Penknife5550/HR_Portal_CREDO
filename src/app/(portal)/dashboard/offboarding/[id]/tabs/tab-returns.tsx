@@ -30,8 +30,8 @@ export function TabReturns({
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {returnItems.length > 0
-            ? `${returnItems.filter((i) => i.isReturned).length} von ${returnItems.length} Gegenstaenden zurueckgegeben`
-            : "Noch keine Rueckgaben erfasst"
+            ? `${returnItems.filter((i) => i.isReturned).length} von ${returnItems.length} Gegenständen zurückgegeben`
+            : "Noch keine Rückgaben erfasst"
           }
         </p>
         <button
@@ -39,7 +39,7 @@ export function TabReturns({
           className="inline-flex items-center gap-1.5 rounded-lg bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
         >
           <PlusIcon className="h-4 w-4" />
-          Gegenstand hinzufuegen
+          Gegenstand hinzufügen
         </button>
       </div>
 
@@ -103,7 +103,7 @@ export function TabReturns({
               disabled={savingReturn || !newReturn.itemName.trim()}
               className="rounded-md bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
             >
-              {savingReturn ? "Wird gespeichert..." : "Hinzufuegen"}
+              {savingReturn ? "Wird gespeichert..." : "Hinzufügen"}
             </button>
           </div>
         </div>
@@ -136,14 +136,14 @@ export function TabReturns({
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{item.serialNumber || "\u2014"}</td>
                   <td className="px-4 py-3">
                     {item.isReturned ? (
-                      <span className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                        Zurueckgegeben
+                      <span className="inline-flex rounded-full bg-credo-gruen/10 px-2.5 py-0.5 text-xs font-medium text-credo-gruen">
+                        Zurückgegeben
                         {item.returnedAt && (
-                          <span className="ml-1 text-[10px] text-green-600">({formatDate(item.returnedAt)})</span>
+                          <span className="ml-1 text-[10px] text-credo-gruen">({formatDate(item.returnedAt)})</span>
                         )}
                       </span>
                     ) : (
-                      <span className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+                      <span className="inline-flex rounded-full bg-credo-rot/10 px-2.5 py-0.5 text-xs font-medium text-credo-rot">
                         Ausstehend
                       </span>
                     )}
@@ -159,7 +159,7 @@ export function TabReturns({
                         className="inline-flex items-center gap-1 rounded-md bg-credo-gruen px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
                       >
                         <CheckIcon className="h-3 w-3" />
-                        Rueckgabe
+                        Rückgabe
                       </button>
                     )}
                   </td>
@@ -173,9 +173,9 @@ export function TabReturns({
           <svg className="mb-4 h-16 w-16 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
           </svg>
-          <p className="mb-1 text-base font-medium text-foreground">Keine Rueckgaben</p>
+          <p className="mb-1 text-base font-medium text-foreground">Keine Rückgaben</p>
           <p className="text-sm text-muted-foreground">
-            Es wurden noch keine Gegenstaende zur Rueckgabe erfasst.
+            Es wurden noch keine Gegenstände zur Rückgabe erfasst.
           </p>
         </div>
       ) : null}

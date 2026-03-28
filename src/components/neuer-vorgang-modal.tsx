@@ -202,7 +202,7 @@ export function NeuerVorgangModal({
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Senden Sie diesen Link an den neuen Mitarbeiter (z.B. per
-                  E-Mail ueber n8n). Der Link ist 30 Tage gueltig.
+                  E-Mail über n8n). Der Link ist 30 Tage gültig.
                 </p>
               </div>
             </div>

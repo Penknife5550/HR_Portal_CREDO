@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Zeugnis-Bewertungsboegen – Admin-Verwaltung (Client Component)
+ * Zeugnis-Bewertungsbögen – Admin-Verwaltung (Client Component)
  *
  * Zeigt alle Zeugnis-Bewertungsvorlagen nach Berufsgruppe (Job Group).
  * SUPER_ADMIN und HR_LEITUNG koennen Kategorien, Kriterien und
@@ -81,7 +81,7 @@ const GRADE_LABELS: Record<number, string> = {
   3: "Befriedigend",
   4: "Ausreichend",
   5: "Mangelhaft",
-  6: "Ungenuegend",
+  6: "Ungenügend",
 };
 
 // =============================================
@@ -104,7 +104,7 @@ function getWeightWarning(categories: Category[]): string | null {
   const max = Math.max(...percentages);
   const min = Math.min(...percentages);
   if (max - min > 60) {
-    return "Hinweis: Die Gewichtungen sind stark unausgewogen. Bitte pruefen Sie die Verteilung.";
+    return "Hinweis: Die Gewichtungen sind stark unausgewogen. Bitte prüfen Sie die Verteilung.";
   }
   return null;
 }
@@ -475,10 +475,10 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
         {/* Seitentitel */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-foreground">
-            Zeugnis-Bewertungsboegen
+            Zeugnis-Bewertungsbögen
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Verwalten Sie die Bewertungsvorlagen fuer Dienstzeugnisse nach Berufsgruppe
+            Verwalten Sie die Bewertungsvorlagen für Dienstzeugnisse nach Berufsgruppe
           </p>
         </div>
 
@@ -522,10 +522,10 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
         {!loading && !currentTemplate && (
           <div className="rounded-lg border border-border bg-card p-8 text-center">
             <p className="text-muted-foreground">
-              Keine Bewertungsvorlage fuer &quot;{JOB_GROUP_TABS.find((t) => t.key === activeTab)?.label}&quot; vorhanden.
+              Keine Bewertungsvorlage für &quot;{JOB_GROUP_TABS.find((t) => t.key === activeTab)?.label}&quot; vorhanden.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Erstellen Sie eine Vorlage ueber die API (POST /api/zeugnis-templates).
+              Erstellen Sie eine Vorlage über die API (POST /api/zeugnis-templates).
             </p>
           </div>
         )}
@@ -683,7 +683,7 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
                           <button
                             onClick={() => handleDeleteCategory(currentTemplate.id, catIndex)}
                             className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                            title="Kategorie loeschen"
+                            title="Kategorie löschen"
                           >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -709,7 +709,7 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
 
                           {category.criteria.length === 0 && (
                             <p className="text-xs text-muted-foreground py-2 text-center">
-                              Noch keine Kriterien. Fuegen Sie das erste Kriterium hinzu.
+                              Noch keine Kriterien. Fügen Sie das erste Kriterium hinzu.
                             </p>
                           )}
 
@@ -776,7 +776,7 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
                                     <button
                                       onClick={() => handleDeleteCriterion(currentTemplate.id, catIndex, critIndex)}
                                       className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                                      title="Kriterium loeschen"
+                                      title="Kriterium löschen"
                                     >
                                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -825,8 +825,8 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
               {formulierungenExpanded[currentTemplate.id] && (
                 <div className="border-t border-border p-5">
                   <p className="mb-4 text-sm text-muted-foreground">
-                    Standard-Zufriedenheitsformulierungen fuer die Gesamtnote im Dienstzeugnis.
-                    Diese Texte werden automatisch in das generierte Zeugnis eingefuegt.
+                    Standard-Zufriedenheitsformulierungen für die Gesamtnote im Dienstzeugnis.
+                    Diese Texte werden automatisch in das generierte Zeugnis eingefügt.
                   </p>
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-sm">
@@ -871,7 +871,7 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
                                   handleFormulierungChange(currentTemplate.id, "GESAMT", grade, e.target.value)
                                 }
                                 rows={2}
-                                placeholder={`Formulierung fuer Note ${grade}...`}
+                                placeholder={`Formulierung für Note ${grade}...`}
                                 className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground focus:border-[#6BAA24] focus:outline-none focus:ring-1 focus:ring-[#6BAA24]"
                               />
                             </td>
@@ -889,7 +889,7 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
               <div>
                 {currentEdit.dirty && (
                   <span className="text-sm text-amber-600">
-                    Ungespeicherte Aenderungen vorhanden
+                    Ungespeicherte Änderungen vorhanden
                   </span>
                 )}
               </div>
@@ -898,7 +898,7 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
                 disabled={saving || !currentEdit.dirty}
                 className="rounded-lg bg-[#6BAA24] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#5a9120] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {saving ? "Speichern..." : "Aenderungen speichern"}
+                {saving ? "Speichern..." : "Änderungen speichern"}
               </button>
             </div>
           </div>

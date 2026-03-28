@@ -186,7 +186,7 @@ interface DetailData {
 // =============================================
 
 const TABS = [
-  { id: "overview", label: "Uebersicht" },
+  { id: "overview", label: "Übersicht" },
   { id: "questionnaire", label: "Fragebogen-Daten" },
   { id: "documents", label: "Dokumente" },
   { id: "checklist", label: "Checkliste" },
@@ -389,12 +389,12 @@ export function DetailContent({
   // ---- Status-Aktionen ----
   const isAdmin = user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
 
-  // "Als geprueft markieren" – wenn Vorgesetzter fertig ist
+  // "Als geprüft markieren" – wenn Vorgesetzter fertig ist
   const canReview = data &&
     ["SUBMITTED", "SUPERVISOR_SUBMITTED"].includes(data.status) &&
     isAdmin;
 
-  // "Vorgang abschliessen" – wenn geprueft
+  // "Vorgang abschließen" – wenn geprueft
   const canComplete = data &&
     data.status === "REVIEWED" &&
     isAdmin;
@@ -420,7 +420,7 @@ export function DetailContent({
 
   const handleCompleteProcess = async () => {
     if (!data || !canComplete) return;
-    if (!window.confirm("Moechten Sie diesen Vorgang wirklich als abgeschlossen markieren? Diese Aktion kann nicht rueckgaengig gemacht werden.")) return;
+    if (!window.confirm("Möchten Sie diesen Vorgang wirklich als abgeschlossen markieren? Diese Aktion kann nicht rückgängig gemacht werden.")) return;
     setCompletingProcess(true);
     try {
       const res = await fetch(`/api/onboarding/${data.id}`, {
@@ -586,7 +586,7 @@ export function DetailContent({
               onClick={() => router.push("/dashboard")}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Zurueck zum Dashboard
+              Zurück zum Dashboard
             </button>
           </div>
         </div>
@@ -610,7 +610,7 @@ export function DetailContent({
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <ArrowLeftIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Zurueck</span>
+              <span className="hidden sm:inline">Zurück</span>
             </button>
 
             <div className="h-5 w-px bg-border" />
@@ -637,7 +637,7 @@ export function DetailContent({
                 className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
               >
                 <CheckIcon className="h-3.5 w-3.5" />
-                {reviewingProcess ? "Wird markiert..." : "Als geprueft markieren"}
+                {reviewingProcess ? "Wird markiert..." : "Als geprüft markieren"}
               </button>
             )}
             {canComplete && (
@@ -647,7 +647,7 @@ export function DetailContent({
                 className={`${canReview ? "" : "ml-auto "}inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50`}
               >
                 <CheckIcon className="h-3.5 w-3.5" />
-                {completingProcess ? "Wird abgeschlossen..." : "Vorgang abschliessen"}
+                {completingProcess ? "Wird abgeschlossen..." : "Vorgang abschließen"}
               </button>
             )}
           </div>
@@ -921,7 +921,7 @@ function TabOverview({
           </Card>
 
           {/* Quick Status Card */}
-          <Card title="Status-Uebersicht">
+          <Card title="Status-Übersicht">
             <div className="grid grid-cols-2 gap-3">
               <StatusMiniCard
                 label="Fragebogen"
@@ -975,7 +975,7 @@ function TabOverview({
             <textarea
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Neue Notiz hinzufuegen..."
+              placeholder="Neue Notiz hinzufügen..."
               rows={2}
               className="min-w-0 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-credo-blau focus:ring-1 focus:ring-credo-blau"
               onKeyDown={(e) => {
@@ -1195,11 +1195,11 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
         </div>
       </SectionCard>
 
-      {/* Schritt 6: Beschaeftigung */}
-      <SectionCard title="6. Weitere Beschaeftigung" icon="&#128188;">
+      {/* Schritt 6: Beschäftigung */}
+      <SectionCard title="6. Weitere Beschäftigung" icon="&#128188;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
           <FieldRow label="Arbeitgebertyp" value={pd.employerType || "\u2014"} />
-          <FieldRow label="Weitere Beschaeftigung" value={formatBoolean(pd.hasOtherEmployment)} />
+          <FieldRow label="Weitere Beschäftigung" value={formatBoolean(pd.hasOtherEmployment)} />
           {pd.hasOtherEmployment && (
             <>
               <FieldRow label="Anderer Arbeitgeber" value={pd.otherEmployerName || "\u2014"} />
@@ -1556,7 +1556,7 @@ function TabChecklist({
                         )}
                         {item.dueDate && (
                           <span className="text-[11px] text-muted-foreground">
-                            Faellig: {formatDate(item.dueDate)}
+                            Fällig: {formatDate(item.dueDate)}
                           </span>
                         )}
                         {item.isCompleted && item.completedBy && (

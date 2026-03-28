@@ -40,7 +40,7 @@ export function TabNotes({
           <textarea autoComplete="off"
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Neue Notiz hinzufuegen..."
+            placeholder="Neue Notiz hinzufügen..."
             rows={3}
             className="min-w-0 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-credo-blau focus:ring-1 focus:ring-credo-blau"
             onKeyDown={(e) => {
@@ -122,7 +122,7 @@ export function TabNotes({
                           <button
                             onClick={() => deleteNote(note.id)}
                             className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
-                            title="Loeschen"
+                            title="Löschen"
                           >
                             <TrashIcon className="h-3.5 w-3.5" />
                           </button>

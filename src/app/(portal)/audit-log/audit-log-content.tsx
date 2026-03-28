@@ -46,10 +46,10 @@ interface PaginationInfo {
 
 const ACTION_LABELS: Record<string, string> = {
   CREATED: "Vorgang erstellt",
-  STATUS_CHANGED: "Status geaendert",
+  STATUS_CHANGED: "Status geändert",
   NOTE_CREATED: "Notiz erstellt",
   NOTE_UPDATED: "Notiz bearbeitet",
-  NOTE_DELETED: "Notiz geloescht",
+  NOTE_DELETED: "Notiz gelöscht",
   DOCUMENT_UPLOADED: "Dokument hochgeladen",
   CHECKLIST_TOGGLED: "Checkliste aktualisiert",
   DEPARTMENT_LINKS_GENERATED: "Abteilungs-Links erstellt",
@@ -61,7 +61,7 @@ const ACTION_LABELS: Record<string, string> = {
   ONBOARDING_CREATED: "Onboarding erstellt",
   OFFBOARDING_CREATED: "Offboarding erstellt",
   QUESTIONNAIRE_SUBMITTED: "Fragebogen eingereicht",
-  RETURN_ITEM_UPDATED: "Rueckgabe aktualisiert",
+  RETURN_ITEM_UPDATED: "Rückgabe aktualisiert",
   DEPARTMENT_FEEDBACK_SUBMITTED: "Abteilungs-Feedback eingereicht",
 };
 
@@ -210,7 +210,7 @@ export function AuditLogContent({ user }: { user: User }) {
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-foreground">Audit-Log</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Protokoll aller Systemaktivitaeten
+            Protokoll aller Systemaktivitäten
           </p>
         </div>
 
@@ -284,7 +284,7 @@ export function AuditLogContent({ user }: { user: User }) {
                 onClick={handleReset}
                 className="rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
               >
-                Zuruecksetzen
+                Zurücksetzen
               </button>
             </div>
           </div>
@@ -293,7 +293,7 @@ export function AuditLogContent({ user }: { user: User }) {
         {/* Ergebnis-Info */}
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {pagination.total} {pagination.total === 1 ? "Eintrag" : "Eintraege"} gefunden
+            {pagination.total} {pagination.total === 1 ? "Eintrag" : "Einträge"} gefunden
           </p>
         </div>
 
@@ -336,7 +336,7 @@ export function AuditLogContent({ user }: { user: User }) {
                 ) : logs.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                      Keine Eintraege gefunden
+                      Keine Einträge gefunden
                     </td>
                   </tr>
                 ) : (
@@ -381,7 +381,7 @@ export function AuditLogContent({ user }: { user: User }) {
                 disabled={currentPage <= 1}
                 className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Zurueck
+                Zurück
               </button>
 
               {/* Seitenzahlen */}

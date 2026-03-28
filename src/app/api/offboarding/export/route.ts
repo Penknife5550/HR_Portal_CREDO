@@ -12,8 +12,8 @@ import { getSession } from "@/lib/auth";
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"];
 
 const EXIT_TYPE_LABELS: Record<string, string> = {
-  KUENDIGUNG_ARBEITNEHMER: "Kuendigung Arbeitnehmer",
-  KUENDIGUNG_ARBEITGEBER: "Kuendigung Arbeitgeber",
+  KUENDIGUNG_ARBEITNEHMER: "Kündigung Arbeitnehmer",
+  KUENDIGUNG_ARBEITGEBER: "Kündigung Arbeitgeber",
   AUFHEBUNGSVERTRAG: "Aufhebungsvertrag",
   BEFRISTUNGSENDE: "Befristungsende",
   RENTE_PENSION: "Rente / Pension",
@@ -26,8 +26,8 @@ const EXIT_TYPE_LABELS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   INITIATED: "Erfasst",
-  NOTICE_PERIOD: "Kuendigungsfrist",
-  HANDOVER_PHASE: "Uebergabe",
+  NOTICE_PERIOD: "Kündigungsfrist",
+  HANDOVER_PHASE: "Übergabe",
   FINAL_SETTLEMENT: "Endabrechnung",
   COMPLETED: "Abgeschlossen",
   CANCELLED: "Abgebrochen",
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
       "Erfasst am",
       "Abgeschlossen am",
       "Checkliste",
-      "Rueckgaben",
+      "Rückgaben",
     ];
 
     const rows = offboardings.map((o) => {

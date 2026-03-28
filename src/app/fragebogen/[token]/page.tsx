@@ -45,7 +45,7 @@ export default function FragebogenPage() {
       const result = await res.json();
       setData(result);
     } catch {
-      setError("Verbindungsfehler. Bitte versuchen Sie es spaeter erneut.");
+      setError("Verbindungsfehler. Bitte versuchen Sie es später erneut.");
     } finally {
       setLoading(false);
     }
@@ -99,12 +99,12 @@ export default function FragebogenPage() {
               </svg>
             </div>
             <h1 className="text-lg font-bold text-foreground">
-              Link nicht gueltig
+              Link nicht gültig
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">{error}</p>
             <p className="mt-4 text-xs text-muted-foreground">
               Bitte wenden Sie sich an die Personalabteilung,
-              falls Sie einen neuen Link benoetigen.
+              falls Sie einen neuen Link benötigen.
             </p>
           </div>
           <CredoLinie />
@@ -147,7 +147,7 @@ export default function FragebogenPage() {
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Vielen Dank! Ihr Personalfragebogen wurde bereits erfolgreich
-              eingereicht. Sie koennen dieses Fenster schliessen.
+              eingereicht. Sie können dieses Fenster schließen.
             </p>
           </div>
           <CredoLinie />

@@ -184,7 +184,7 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

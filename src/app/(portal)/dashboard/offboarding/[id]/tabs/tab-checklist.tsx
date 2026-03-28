@@ -131,15 +131,15 @@ export function TabChecklist({
                     <div className="flex items-center gap-2">
                       {/* Status */}
                       {link.allTasksComplete ? (
-                        <span className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-800">
+                        <span className="inline-flex rounded-full bg-credo-gruen/10 px-2.5 py-0.5 text-[10px] font-semibold text-credo-gruen">
                           Fertig
                         </span>
                       ) : link.firstOpenedAt ? (
-                        <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-semibold text-blue-800">
+                        <span className="inline-flex rounded-full bg-credo-blau/10 px-2.5 py-0.5 text-[10px] font-semibold text-credo-blau">
                           Geöffnet ({link.openCount}x)
                         </span>
                       ) : link.sentAt ? (
-                        <span className="inline-flex rounded-full bg-yellow-100 px-2.5 py-0.5 text-[10px] font-semibold text-yellow-800">
+                        <span className="inline-flex rounded-full bg-credo-gelb/10 px-2.5 py-0.5 text-[10px] font-semibold text-credo-gelb">
                           Gesendet
                         </span>
                       ) : (
@@ -169,7 +169,7 @@ export function TabChecklist({
                         title={magicUrl}
                       >
                         {copiedLinkId === link.id ? (
-                          <span className="text-green-600">Kopiert!</span>
+                          <span className="text-credo-gruen">Kopiert!</span>
                         ) : (
                           <span className="inline-flex items-center gap-1">
                             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -290,7 +290,7 @@ export function TabChecklist({
                           )}
                           {item.dueDate && (
                             <span className="text-[11px] text-muted-foreground">
-                              Faellig: {formatDate(item.dueDate)}
+                              Fällig: {formatDate(item.dueDate)}
                             </span>
                           )}
                           {item.isCompleted && item.completedAt && (

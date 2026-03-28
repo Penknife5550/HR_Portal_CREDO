@@ -211,12 +211,12 @@ CREDO Gruppe – {{einrichtung}}`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Vielen Dank, {{vorname}}!</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Wir bestaetigen hiermit den Eingang Ihres Personalfragebogens. Ihre Unterlagen wurden erfolgreich an unsere Personalabteilung uebermittelt.
+            Wir bestätigen hiermit den Eingang Ihres Personalfragebogens. Ihre Unterlagen wurden erfolgreich an unsere Personalabteilung übermittelt.
           </p>
 
           <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
             <tr><td style="padding:16px;">
-              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Ihre Bestaetigungs-ID</p>
+              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Ihre Bestätigungs-ID</p>
               <p style="margin:0;color:#1a1a2e;font-size:15px;font-weight:bold;">{{vorgangsnummer}}</p>
             </td></tr>
             <tr><td style="padding:0 16px 16px;">
@@ -227,7 +227,7 @@ CREDO Gruppe – {{einrichtung}}`,
 
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
             <strong>Wie geht es weiter?</strong><br>
-            Unsere Personalabteilung prueft Ihre Angaben und wird sich bei Rueckfragen direkt bei Ihnen melden. Sie muessen nichts weiter tun.
+            Unsere Personalabteilung prüft Ihre Angaben und wird sich bei Rückfragen direkt bei Ihnen melden. Sie müssen nichts weiter tun.
           </p>
 
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
@@ -252,13 +252,13 @@ CREDO Gruppe – {{einrichtung}}`,
 </html>`,
     bodyText: `Vielen Dank, {{vorname}}!
 
-Wir bestaetigen den Eingang Ihres Personalfragebogens.
+Wir bestätigen den Eingang Ihres Personalfragebogens.
 
-Bestaetigungs-ID: {{vorgangsnummer}}
+Bestätigungs-ID: {{vorgangsnummer}}
 Einrichtung: {{einrichtung}}
 
 Wie geht es weiter?
-Unsere Personalabteilung prueft Ihre Angaben und meldet sich bei Rueckfragen.
+Unsere Personalabteilung prüft Ihre Angaben und meldet sich bei Rückfragen.
 
 Bitte bewahren Sie diese E-Mail als Nachweis auf.
 
@@ -428,15 +428,15 @@ CREDO HR-Portal`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Ihr Personalfragebogen wartet auf Sie</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Hallo {{vorname}}, wir haben festgestellt, dass Ihr Personalfragebogen seit <strong>{{tage_offen}} Tagen</strong> noch nicht vollstaendig ausgefuellt wurde.
+            Hallo {{vorname}}, wir haben festgestellt, dass Ihr Personalfragebogen seit <strong>{{tage_offen}} Tagen</strong> noch nicht vollständig ausgefüllt wurde.
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
-            Bitte fuellen Sie den Fragebogen zeitnah aus, damit wir Ihre Einstellung reibungslos vorbereiten koennen.
+            Bitte füllen Sie den Fragebogen zeitnah aus, damit wir Ihre Einstellung reibungslos vorbereiten können.
           </p>
           <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
             <tr><td style="background-color:#f59e0b;border-radius:8px;">
               <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
-                Jetzt Fragebogen ausfuellen →
+                Jetzt Fragebogen ausfüllen →
               </a>
             </td></tr>
           </table>

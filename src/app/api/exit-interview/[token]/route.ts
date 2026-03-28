@@ -49,7 +49,7 @@ export async function GET(
     });
 
     if (!exitInterview) {
-      return NextResponse.json({ error: "Ungueltiger Link" }, { status: 404 });
+      return NextResponse.json({ error: "Ungültiger Link" }, { status: 404 });
     }
 
     if (exitInterview.tokenExpiresAt < new Date()) {
@@ -63,7 +63,7 @@ export async function GET(
       if (exitInterview.status === "SCHEDULED") {
         return NextResponse.json({ error: "Exit-Interview wurde noch nicht freigeschaltet" }, { status: 403 });
       }
-      return NextResponse.json({ error: "Exit-Interview ist nicht verfuegbar" }, { status: 400 });
+      return NextResponse.json({ error: "Exit-Interview ist nicht verfügbar" }, { status: 400 });
     }
 
     // Tracking: firstOpenedAt, lastOpenedAt, openCount
@@ -120,7 +120,7 @@ export async function PUT(
     });
 
     if (!exitInterview) {
-      return NextResponse.json({ error: "Ungueltiger Link" }, { status: 404 });
+      return NextResponse.json({ error: "Ungültiger Link" }, { status: 404 });
     }
 
     if (exitInterview.tokenExpiresAt < new Date()) {
@@ -133,7 +133,7 @@ export async function PUT(
 
     const body = await request.json().catch(() => null);
     if (!body) {
-      return NextResponse.json({ error: "Ungueltiger Request-Body" }, { status: 400 });
+      return NextResponse.json({ error: "Ungültiger Request-Body" }, { status: 400 });
     }
 
     const { responses, dsgvoAccepted } = body as {

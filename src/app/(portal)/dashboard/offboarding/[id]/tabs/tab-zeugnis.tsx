@@ -95,12 +95,12 @@ export function TabZeugnis({
   const magicUrl = typeof window !== "undefined" ? `${window.location.origin}/zeugnis-bewertung/${zeugnisBewertung.token}` : "";
 
   const statusLabels: Record<string, { label: string; color: string }> = {
-    INVITED: { label: "Eingeladen", color: "bg-blue-100 text-blue-800" },
-    IN_PROGRESS: { label: "In Bearbeitung", color: "bg-yellow-100 text-yellow-800" },
-    SUBMITTED: { label: "Eingereicht", color: "bg-purple-100 text-purple-800" },
-    HR_REVIEW: { label: "HR-Prüfung", color: "bg-orange-100 text-orange-800" },
-    FINALIZED: { label: "Finalisiert", color: "bg-green-100 text-green-800" },
-    EXPIRED: { label: "Abgelaufen", color: "bg-red-100 text-red-800" },
+    INVITED: { label: "Eingeladen", color: "bg-credo-blau/10 text-credo-blau" },
+    IN_PROGRESS: { label: "In Bearbeitung", color: "bg-credo-gelb/10 text-credo-gelb" },
+    SUBMITTED: { label: "Eingereicht", color: "bg-credo-blau/10 text-credo-blau" },
+    HR_REVIEW: { label: "HR-Prüfung", color: "bg-credo-gelb/10 text-credo-gelb" },
+    FINALIZED: { label: "Finalisiert", color: "bg-credo-gruen/10 text-credo-gruen" },
+    EXPIRED: { label: "Abgelaufen", color: "bg-credo-rot/10 text-credo-rot" },
   };
   const statusInfo = statusLabels[zeugnisBewertung.status] || statusLabels.INVITED;
 
@@ -191,7 +191,7 @@ export function TabZeugnis({
         title={magicUrl}
       >
         {copiedZB ? (
-          <span className="inline-flex items-center gap-1 text-green-600">
+          <span className="inline-flex items-center gap-1 text-credo-gruen">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
             Kopiert!
           </span>

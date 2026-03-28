@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     if (!departmentKey?.trim()) errors.push("departmentKey ist ein Pflichtfeld");
     if (!departmentName?.trim()) errors.push("departmentName ist ein Pflichtfeld");
     if (!email?.trim()) errors.push("E-Mail ist ein Pflichtfeld");
-    if (email && !isValidEmail(email.trim())) errors.push("E-Mail-Adresse ist nicht gueltig");
+    if (email && !isValidEmail(email.trim())) errors.push("E-Mail-Adresse ist nicht gültig");
 
     if (errors.length > 0) {
       return NextResponse.json({ error: errors.join(", ") }, { status: 400 });

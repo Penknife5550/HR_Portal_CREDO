@@ -3,9 +3,9 @@ import { z } from "zod";
 export const createOffboardingSchema = z.object({
   employeeFirstName: z.string().min(1, "Vorname ist erforderlich").max(100),
   employeeLastName: z.string().min(1, "Nachname ist erforderlich").max(100),
-  employeeEmail: z.string().email("Ungueltige E-Mail-Adresse"),
-  employeePrivateEmail: z.string().email("Ungueltige private E-Mail").optional().or(z.literal("")),
-  organizationId: z.string().uuid("Ungueltige Einrichtungs-ID"),
+  employeeEmail: z.string().email("Ungültige E-Mail-Adresse"),
+  employeePrivateEmail: z.string().email("Ungültige private E-Mail").optional().or(z.literal("")),
+  organizationId: z.string().uuid("Ungültige Einrichtungs-ID"),
   exitType: z.enum([
     "KUENDIGUNG_ARBEITNEHMER",
     "KUENDIGUNG_ARBEITGEBER",

@@ -111,7 +111,7 @@ export async function GET(
     });
 
     if (!bewertung) {
-      return NextResponse.json({ error: "Ungueltiger Link" }, { status: 404 });
+      return NextResponse.json({ error: "Ungültiger Link" }, { status: 404 });
     }
 
     if (bewertung.tokenExpiresAt < new Date()) {
@@ -194,7 +194,7 @@ export async function PUT(
     });
 
     if (!bewertung) {
-      return NextResponse.json({ error: "Ungueltiger Link" }, { status: 404 });
+      return NextResponse.json({ error: "Ungültiger Link" }, { status: 404 });
     }
 
     if (bewertung.tokenExpiresAt < new Date()) {

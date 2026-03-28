@@ -86,7 +86,7 @@ export default function OffboardingTasksPage() {
       };
       setData(mapped);
     } catch {
-      setError("Verbindungsfehler. Bitte versuchen Sie es spaeter erneut.");
+      setError("Verbindungsfehler. Bitte versuchen Sie es später erneut.");
     } finally {
       setLoading(false);
     }
@@ -140,12 +140,12 @@ export default function OffboardingTasksPage() {
               </svg>
             </div>
             <h1 className="text-lg font-bold text-foreground">
-              Link nicht gueltig
+              Link nicht gültig
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">{error}</p>
             <p className="mt-4 text-xs text-muted-foreground">
               Bitte wenden Sie sich an die Personalabteilung,
-              falls Sie einen neuen Link benoetigen.
+              falls Sie einen neuen Link benötigen.
             </p>
           </div>
           <CredoLinie />

@@ -37,7 +37,7 @@ export async function POST(
     });
 
     if (!exitInterview) {
-      return NextResponse.json({ error: "Ungueltiger Link" }, { status: 404 });
+      return NextResponse.json({ error: "Ungültiger Link" }, { status: 404 });
     }
 
     if (exitInterview.tokenExpiresAt < new Date()) {

@@ -72,9 +72,9 @@ export async function POST(request: NextRequest) {
     if (!event?.trim()) errors.push("Event ist ein Pflichtfeld");
     if (!name?.trim()) errors.push("Name ist ein Pflichtfeld");
     if (!url?.trim()) errors.push("URL ist ein Pflichtfeld");
-    if (url && !isValidUrl(url)) errors.push("URL ist nicht gueltig (muss mit http:// oder https:// beginnen)");
+    if (url && !isValidUrl(url)) errors.push("URL ist nicht gültig (muss mit http:// oder https:// beginnen)");
     if (authType && !["none", "api_key", "bearer", "basic"].includes(authType)) {
-      errors.push("Ungueltiger Auth-Typ");
+      errors.push("Ungültiger Auth-Typ");
     }
     if (authType === "api_key" && !authHeader?.trim()) {
       errors.push("API-Key: Header-Name ist ein Pflichtfeld");

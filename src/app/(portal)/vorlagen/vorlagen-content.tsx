@@ -315,12 +315,12 @@ export function VorlagenContent({ user }: { user: User }) {
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Konfigurieren Sie, welche Fragebogen-Schritte fuer jeden
-            Beschaeftigungstyp aktiviert sind.
+            Beschäftigungstyp aktiviert sind.
           </p>
           {!canEdit && (
             <p className="mt-2 text-xs text-amber-600">
               Sie haben nur Leserechte. Wenden Sie sich an einen
-              Administrator, um Aenderungen vorzunehmen.
+              Administrator, um Änderungen vorzunehmen.
             </p>
           )}
         </div>
@@ -583,12 +583,12 @@ export function VorlagenContent({ user }: { user: User }) {
                       <div>
                         {saved && (
                           <span className="text-sm font-medium text-emerald-600">
-                            Aenderungen gespeichert
+                            Änderungen gespeichert
                           </span>
                         )}
                         {changed && !saved && (
                           <span className="text-sm text-amber-600">
-                            Nicht gespeicherte Aenderungen
+                            Nicht gespeicherte Änderungen
                           </span>
                         )}
                       </div>

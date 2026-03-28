@@ -141,7 +141,7 @@ export async function POST(
     const upperDocType = docType.toUpperCase();
     if (!VALID_OFFBOARDING_DOC_TYPES.includes(upperDocType)) {
       return NextResponse.json(
-        { error: `Ungueltiger Dokumenttyp. Erlaubt: ${VALID_OFFBOARDING_DOC_TYPES.join(", ")}` },
+        { error: `Ungültiger Dokumenttyp. Erlaubt: ${VALID_OFFBOARDING_DOC_TYPES.join(", ")}` },
         { status: 400 }
       );
     }
@@ -166,7 +166,7 @@ export async function POST(
     const buffer = Buffer.from(await file.arrayBuffer());
     if (!validateMagicBytes(buffer, file.type)) {
       return NextResponse.json(
-        { error: "Dateiinhalt stimmt nicht mit dem angegebenen Dateityp ueberein." },
+        { error: "Dateiinhalt stimmt nicht mit dem angegebenen Dateityp überein." },
         { status: 400 }
       );
     }
@@ -186,7 +186,7 @@ export async function POST(
     const resolvedPath = path.resolve(filePath);
     if (!resolvedPath.startsWith(uploadBaseDir)) {
       return NextResponse.json(
-        { error: "Ungueltiger Dateiname." },
+        { error: "Ungültiger Dateiname." },
         { status: 400 }
       );
     }

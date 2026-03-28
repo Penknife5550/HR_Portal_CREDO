@@ -33,31 +33,31 @@ const VALID_CONTRACT_TYPES = [
 ] as const;
 
 const updateEmploymentSchema = z.object({
-  organizationId: z.string().uuid("Ungueltige Einrichtungs-ID").optional(),
+  organizationId: z.string().uuid("Ungültige Einrichtungs-ID").optional(),
   position: z.string().trim().optional().nullable(),
   department: z.string().trim().optional().nullable(),
   contractType: z
     .enum(VALID_CONTRACT_TYPES, {
       errorMap: () => ({
-        message: `Ungueltiger Vertragstyp. Erlaubt: ${VALID_CONTRACT_TYPES.join(", ")}`,
+        message: `Ungültiger Vertragstyp. Erlaubt: ${VALID_CONTRACT_TYPES.join(", ")}`,
       }),
     })
     .optional()
     .nullable(),
   workingHoursWeek: z
     .number()
-    .min(0, "Wochenstunden muessen >= 0 sein")
-    .max(168, "Wochenstunden muessen <= 168 sein")
+    .min(0, "Wochenstunden müssen >= 0 sein")
+    .max(168, "Wochenstunden müssen <= 168 sein")
     .optional()
     .nullable(),
   startDate: z
     .string()
-    .datetime({ message: "Ungueltiges Datumsformat (ISO 8601 erwartet)" })
+    .datetime({ message: "Ungültiges Datumsformat (ISO 8601 erwartet)" })
     .optional()
     .nullable(),
   endDate: z
     .string()
-    .datetime({ message: "Ungueltiges Datumsformat (ISO 8601 erwartet)" })
+    .datetime({ message: "Ungültiges Datumsformat (ISO 8601 erwartet)" })
     .optional()
     .nullable(),
   mandantNumber: z.string().trim().optional().nullable(),
@@ -161,6 +161,6 @@ export const DELETE = apiHandler(
       where: { id: employmentId },
     });
 
-    return NextResponse.json({ message: "Anstellung geloescht" });
+    return NextResponse.json({ message: "Anstellung gelöscht" });
   }
 );

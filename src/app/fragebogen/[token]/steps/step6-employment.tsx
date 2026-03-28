@@ -161,7 +161,7 @@ export function Step6Employment({ data, onNext, onBack, saving, fieldConfig }: S
         </div>
       )}
 
-      {/* Weitere geringfuegige Beschaeftigung (Minijob) */}
+      {/* Weitere geringfügige Beschäftigung (Minijob) */}
       {fc.isVisible("hasMinijob") && (
         <div className="rounded-lg border border-border bg-muted/50 p-4">
           <label className="flex items-center gap-3">
@@ -190,7 +190,7 @@ export function Step6Employment({ data, onNext, onBack, saving, fieldConfig }: S
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

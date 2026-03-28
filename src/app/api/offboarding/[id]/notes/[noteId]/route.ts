@@ -146,7 +146,7 @@ export async function DELETE(
     // Nur der Ersteller darf die Notiz loeschen
     if (existingNote.createdById !== session.userId) {
       return NextResponse.json(
-        { error: "Nur der Ersteller kann diese Notiz loeschen" },
+        { error: "Nur der Ersteller kann diese Notiz löschen" },
         { status: 403 }
       );
     }

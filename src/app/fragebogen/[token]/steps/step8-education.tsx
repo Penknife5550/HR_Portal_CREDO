@@ -48,7 +48,7 @@ export function Step8Education({ data, onNext, onBack, saving, fieldConfig }: St
       <div className="rounded-lg border border-[#009AC6]/20 bg-[#009AC6]/5 p-4">
         <p className="text-sm text-[#009AC6]">
           Diese Angaben werden fuer die Meldung zur Sozialversicherung
-          benoetigt. Bitte geben Sie Ihren hoechsten Schul- und
+          benötigt. Bitte geben Sie Ihren höchsten Schul- und
           Berufsausbildungsabschluss an.
         </p>
       </div>
@@ -123,7 +123,7 @@ export function Step8Education({ data, onNext, onBack, saving, fieldConfig }: St
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

@@ -93,7 +93,7 @@ const CATEGORY_SUGGESTIONS = [
 const OFFBOARDING_CATEGORY_SUGGESTIONS = [
   "Phase 1: Sofort",
   "Phase 2: Erste Woche",
-  "Phase 3: Uebergabe",
+  "Phase 3: Übergabe",
   "Phase 4: Letzte Woche",
   "Phase 5: Letzter Tag",
   "Phase 6: Nach Austritt",
@@ -476,7 +476,7 @@ export function ChecklistenContent({ user }: { user: User }) {
   // Vorlage loeschen
   // =============================================
   async function handleDelete(template: ChecklistTemplate) {
-    if (!confirm(`Checkliste "${template.name}" wirklich loeschen?`)) {
+    if (!confirm(`Checkliste "${template.name}" wirklich löschen?`)) {
       return;
     }
 
@@ -488,15 +488,15 @@ export function ChecklistenContent({ user }: { user: User }) {
 
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error || "Fehler beim Loeschen");
+        throw new Error(json.error || "Fehler beim Löschen");
       }
 
       await loadTemplates();
-      setSuccessMessage(`Checkliste "${template.name}" geloescht`);
+      setSuccessMessage(`Checkliste "${template.name}" gelöscht`);
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Fehler beim Loeschen"
+        err instanceof Error ? err.message : "Fehler beim Löschen"
       );
     } finally {
       setDeleting(null);
@@ -702,7 +702,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                             disabled={deleting === template.id}
                             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
                           >
-                            {deleting === template.id ? "..." : "Loeschen"}
+                            {deleting === template.id ? "..." : "Löschen"}
                           </button>
                         </div>
                       )}
@@ -927,8 +927,8 @@ export function ChecklistenContent({ user }: { user: User }) {
               {/* Info-Box */}
               <div className="mb-4 rounded-lg border border-[#009AC6]/20 bg-[#009AC6]/5 p-3">
                 <p className="text-xs text-[#009AC6]">
-                  Fuegen Sie Checklisten-Punkte hinzu. Jeder Punkt benoetigt einen
-                  Titel und eine Kategorie. Optional koennen Sie Faelligkeitstage
+                  Fügen Sie Checklisten-Punkte hinzu. Jeder Punkt benötigt einen
+                  Titel und eine Kategorie. Optional können Sie Fälligkeitstage
                   (relativ zum Vertragsbeginn) und einen Verantwortlichen festlegen.
                 </p>
               </div>
@@ -943,7 +943,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                     onClick={handleAddItem}
                     className="rounded-md bg-[#6BAA24] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[#5a9120]"
                   >
-                    + Punkt hinzufuegen
+                    + Punkt hinzufügen
                   </button>
                 </div>
 
@@ -1026,7 +1026,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                                   : null
                               )
                             }
-                            placeholder="Faelligkeitstage (z.B. -7)"
+                            placeholder="Fälligkeitstage (z.B. -7)"
                             className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                           />
                         </div>

@@ -38,7 +38,7 @@ export async function PATCH(
     });
 
     if (!link) {
-      return NextResponse.json({ error: "Ungueltiger Link" }, { status: 404 });
+      return NextResponse.json({ error: "Ungültiger Link" }, { status: 404 });
     }
 
     if (link.expiresAt < new Date()) {

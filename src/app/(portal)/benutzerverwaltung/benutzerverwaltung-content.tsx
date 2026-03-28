@@ -199,7 +199,7 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
             <div className="p-8 text-center text-muted-foreground">
               <p className="text-lg">Keine Benutzer vorhanden</p>
               <p className="mt-1 text-sm">
-                Erstellen Sie einen neuen Benutzer ueber den Button oben.
+                Erstellen Sie einen neuen Benutzer über den Button oben.
               </p>
             </div>
           ) : (

@@ -74,7 +74,7 @@ export function Step9Masern({
           {isGemeinschaftseinrichtung ? (
             <>
               <strong>Wichtig:</strong> Als Mitarbeiter/in einer
-              Gemeinschaftseinrichtung ({organization.name}) sind Sie gemaess
+              Gemeinschaftseinrichtung ({organization.name}) sind Sie gemäß
               Masernschutzgesetz (IfSG §20 Abs. 8) verpflichtet, einen
               Masernschutz nachzuweisen, sofern Sie nach dem 31.12.1970 geboren
               wurden.
@@ -104,7 +104,7 @@ export function Step9Masern({
               </span>
               <p className="text-xs text-muted-foreground">
                 Personen, die vor 1971 geboren sind, gelten als immun und
-                benoetigen keinen Nachweis.
+                benötigen keinen Nachweis.
               </p>
             </div>
           </label>
@@ -126,7 +126,7 @@ export function Step9Masern({
               </span>
               <p className="text-xs text-muted-foreground">
                 Ich kann einen der folgenden Nachweise erbringen: Impfausweis
-                mit 2 Masern-Impfungen, aerztliches Attest ueber Immunitaet,
+                mit 2 Masern-Impfungen, ärztliches Attest über Immunität,
                 oder eine Kontraindikation.
               </p>
             </div>
@@ -134,18 +134,18 @@ export function Step9Masern({
 
           <div className="ml-7 rounded-lg bg-muted p-3">
             <p className="text-xs text-muted-foreground">
-              <strong>Moegliche Nachweise:</strong>
+              <strong>Mögliche Nachweise:</strong>
             </p>
             <ul className="mt-1 list-inside list-disc text-xs text-muted-foreground">
               <li>Impfausweis (2 Impfungen gegen Masern)</li>
-              <li>Aerztliches Zeugnis ueber ausreichenden Impfschutz</li>
-              <li>Aerztliches Zeugnis ueber Immunitaet</li>
+              <li>Ärztliches Zeugnis über ausreichenden Impfschutz</li>
+              <li>Ärztliches Zeugnis über Immunität</li>
               <li>
-                Aerztliches Zeugnis ueber medizinische Kontraindikation
+                Ärztliches Zeugnis über medizinische Kontraindikation
               </li>
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">
-              Den Nachweis reichen Sie bitte spaeter als Dokument ein oder
+              Den Nachweis reichen Sie bitte später als Dokument ein oder
               legen ihn bei der Personalabteilung vor.
             </p>
           </div>
@@ -159,7 +159,7 @@ export function Step9Masern({
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

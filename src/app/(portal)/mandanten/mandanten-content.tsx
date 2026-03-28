@@ -118,7 +118,7 @@ export function MandantenContent({ user }: { user: User }) {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Fehler beim Aendern des Status");
+        throw new Error(data.error || "Fehler beim Ändern des Status");
       }
       setSuccessMessage(
         `${org.name} wurde ${org.isActive ? "deaktiviert" : "reaktiviert"}`
@@ -178,7 +178,7 @@ export function MandantenContent({ user }: { user: User }) {
             <div className="p-8 text-center text-muted-foreground">
               <p className="text-lg">Keine Mandanten vorhanden</p>
               <p className="mt-1 text-sm">
-                Erstellen Sie einen neuen Mandanten ueber den Button oben.
+                Erstellen Sie einen neuen Mandanten über den Button oben.
               </p>
             </div>
           ) : (
@@ -431,7 +431,7 @@ function MandantModal({
             />
             {!isNew && (
               <p className="mt-1 text-xs text-muted-foreground">
-                Die Mandantennummer kann nach der Erstellung nicht geaendert werden.
+                Die Mandantennummer kann nach der Erstellung nicht geändert werden.
               </p>
             )}
           </div>

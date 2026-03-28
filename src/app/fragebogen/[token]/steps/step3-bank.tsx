@@ -52,7 +52,7 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       <div className="rounded-lg border border-[#009AC6]/20 bg-[#009AC6]/5 p-4">
         <p className="text-sm text-[#009AC6]">
-          Bitte geben Sie die Bankverbindung an, auf die Ihr Gehalt ueberwiesen
+          Bitte geben Sie die Bankverbindung an, auf die Ihr Gehalt überwiesen
           werden soll. Die IBAN finden Sie auf Ihrer Bankkarte oder im
           Online-Banking.
         </p>
@@ -89,7 +89,7 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 font-mono text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
           <p className="text-xs text-muted-foreground">
-            Fuer innerdeutsche Ueberweisungen ist der BIC nicht zwingend
+            Für innerdeutsche Überweisungen ist der BIC nicht zwingend
             erforderlich.
           </p>
         </div>
@@ -132,7 +132,7 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

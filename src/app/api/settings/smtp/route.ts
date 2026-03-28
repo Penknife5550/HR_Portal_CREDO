@@ -87,7 +87,7 @@ export async function PUT(request: NextRequest) {
       if (!host?.trim()) errors.push("SMTP-Host ist ein Pflichtfeld");
       if (!username?.trim()) errors.push("Benutzername ist ein Pflichtfeld");
       if (!fromEmail?.trim()) errors.push("Absender-E-Mail ist ein Pflichtfeld");
-      if (fromEmail && !isValidEmail(fromEmail)) errors.push("Absender-E-Mail ist ungueltig");
+      if (fromEmail && !isValidEmail(fromEmail)) errors.push("Absender-E-Mail ist ungültig");
       if (errors.length > 0) return NextResponse.json({ error: errors.join(", ") }, { status: 400 });
     }
 

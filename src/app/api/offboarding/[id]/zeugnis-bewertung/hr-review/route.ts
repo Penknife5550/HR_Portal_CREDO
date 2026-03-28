@@ -92,7 +92,7 @@ export async function PUT(
     // Body validieren
     const body = await request.json().catch(() => null);
     if (!body) {
-      return NextResponse.json({ error: "Ungueltiger Request-Body" }, { status: 400 });
+      return NextResponse.json({ error: "Ungültiger Request-Body" }, { status: 400 });
     }
 
     const { ratings, hrNotes, finalize } = body;

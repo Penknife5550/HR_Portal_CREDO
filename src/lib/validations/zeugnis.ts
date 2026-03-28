@@ -24,7 +24,7 @@ export const createZeugnisTemplateSchema = z.object({
 });
 
 export const createZeugnisBewertungSchema = z.object({
-  supervisorEmail: z.string().email("Ungueltige E-Mail-Adresse"),
+  supervisorEmail: z.string().email("Ungültige E-Mail-Adresse"),
   supervisorName: z.string().max(200).optional(),
   jobGroup: z.enum(["LEHRKRAFT", "ERZIEHER", "VERWALTUNG", "SCHULLEITUNG", "SONSTIGES"]),
 });

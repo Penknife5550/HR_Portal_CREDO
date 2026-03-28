@@ -167,7 +167,7 @@ export async function PATCH(
 
     if (!existing) {
       return NextResponse.json(
-        { error: "Rueckgabe-Item nicht gefunden" },
+        { error: "Rückgabe-Item nicht gefunden" },
         { status: 404 }
       );
     }
@@ -265,7 +265,7 @@ export async function DELETE(
 
     if (!existing) {
       return NextResponse.json(
-        { error: "Rueckgabe-Item nicht gefunden" },
+        { error: "Rückgabe-Item nicht gefunden" },
         { status: 404 }
       );
     }

@@ -269,7 +269,7 @@ export function OffboardingDetailContent({
   };
 
   const deleteNote = async (noteId: string) => {
-    if (!window.confirm("Notiz wirklich loeschen?")) return;
+    if (!window.confirm("Notiz wirklich löschen?")) return;
     try {
       const res = await fetch(`/api/offboarding/${offboardingId}/notes/${noteId}`, {
         method: "DELETE",
@@ -530,7 +530,7 @@ export function OffboardingDetailContent({
               onClick={() => router.push("/dashboard?tab=offboarding")}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Zurueck zum Dashboard
+              Zurück zum Dashboard
             </button>
           </div>
         </div>
@@ -556,7 +556,7 @@ export function OffboardingDetailContent({
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <ArrowLeftIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Zurueck</span>
+              <span className="hidden sm:inline">Zurück</span>
             </button>
 
             <div className="h-5 w-px bg-border" />
@@ -581,7 +581,7 @@ export function OffboardingDetailContent({
                   disabled={changingStatus}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-credo-gruen px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#5a9420] disabled:opacity-50"
                 >
-                  {changingStatus ? "Wird geaendert..." : "Status aendern"}
+                  {changingStatus ? "Wird geändert..." : "Status ändern"}
                   <ChevronDownIcon className="h-3.5 w-3.5" />
                 </button>
                 {showStatusDropdown && (

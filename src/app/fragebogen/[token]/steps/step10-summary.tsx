@@ -415,27 +415,27 @@ export function Step10Summary({
             entsprechen und ich keine Angaben wissentlich verschwiegen habe.
           </p>
           <p className="mb-3">
-            Mir ist bekannt, dass unwahre oder unvollstaendige Angaben
-            einen wichtigen Grund fuer eine ausserordentliche Kuendigung des
-            Arbeitsverhaeltnisses darstellen koennen.
+            Mir ist bekannt, dass unwahre oder unvollständige Angaben
+            einen wichtigen Grund für eine außerordentliche Kündigung des
+            Arbeitsverhältnisses darstellen können.
           </p>
           <p className="mb-3">
             Ich verpflichte mich, meinem Arbeitgeber{" "}
-            <strong>unverzueglich</strong> mitzuteilen, wenn sich
-            Aenderungen bei den vorstehenden Angaben ergeben, insbesondere bei:
+            <strong>unverzüglich</strong> mitzuteilen, wenn sich
+            Änderungen bei den vorstehenden Angaben ergeben, insbesondere bei:
           </p>
           <ul className="mb-3 ml-4 list-disc space-y-1 text-muted-foreground">
-            <li>Aenderung des Familienstandes oder der Anschrift</li>
-            <li>Aenderung der Bankverbindung</li>
-            <li>Aenderung der Krankenkasse</li>
-            <li>Aenderung der Steuerklasse</li>
+            <li>Änderung des Familienstandes oder der Anschrift</li>
+            <li>Änderung der Bankverbindung</li>
+            <li>Änderung der Krankenkasse</li>
+            <li>Änderung der Steuerklasse</li>
             <li>Geburt eines Kindes</li>
-            <li>Aufnahme oder Beendigung einer weiteren Beschaeftigung</li>
-            <li>Aenderung bei der Schwerbehinderung</li>
+            <li>Aufnahme oder Beendigung einer weiteren Beschäftigung</li>
+            <li>Änderung bei der Schwerbehinderung</li>
           </ul>
           <p className="text-muted-foreground">
             Mir ist bekannt, dass die Mitteilungspflicht auch nach Beendigung des
-            Arbeitsverhaeltnisses fuer laufende Abrechnungszeitraeume fortbesteht.
+            Arbeitsverhältnisses für laufende Abrechnungszeiträume fortbesteht.
           </p>
         </div>
 
@@ -487,7 +487,7 @@ export function Step10Summary({
           <p className="mb-2">
             Die Rechtsgrundlage fuer die Verarbeitung ist Art. 6 Abs. 1 lit. b
             DSGVO (Vertragserfuellung) sowie Art. 88 DSGVO i.V.m. §26 BDSG
-            (Beschaeftigtendatenschutz).
+            (Beschäftigtendatenschutz).
           </p>
           <p className="mb-2">
             Verantwortliche Stelle: Christlicher Schulverein Minden e.V.,
@@ -496,7 +496,7 @@ export function Step10Summary({
           </p>
           <p>
             Sie haben das Recht auf Auskunft, Berichtigung, Loeschung und
-            Einschraenkung der Verarbeitung Ihrer Daten gemaess Art. 15-18
+            Einschränkung der Verarbeitung Ihrer Daten gemäß Art. 15-18
             DSGVO.
           </p>
         </div>

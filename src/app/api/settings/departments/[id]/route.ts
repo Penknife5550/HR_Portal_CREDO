@@ -40,7 +40,7 @@ export async function PATCH(
 
     // Validierung
     if (email !== undefined && !isValidEmail(email.trim())) {
-      return NextResponse.json({ error: "E-Mail-Adresse ist nicht gueltig" }, { status: 400 });
+      return NextResponse.json({ error: "E-Mail-Adresse ist nicht gültig" }, { status: 400 });
     }
 
     const updated = await prisma.departmentConfig.update({

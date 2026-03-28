@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       errors.push("Passwort muss Gross-/Kleinbuchstaben und Ziffern enthalten");
     }
     if (role && !["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"].includes(role)) {
-      errors.push("Ungueltige Rolle");
+      errors.push("Ungültige Rolle");
     }
 
     if (errors.length > 0) {

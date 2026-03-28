@@ -1102,11 +1102,11 @@ function DepartmentsTab() {
   }
 
   async function handleDelete(dept: DepartmentConfig) {
-    if (!confirm(`Abteilung "${dept.name}" wirklich loeschen?`)) return;
+    if (!confirm(`Abteilung "${dept.name}" wirklich löschen?`)) return;
     try {
       const res = await fetch(`/api/settings/departments/${dept.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error((await res.json()).error);
-      setSuccess(`"${dept.name}" geloescht`);
+      setSuccess(`"${dept.name}" gelöscht`);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler");
@@ -1128,7 +1128,7 @@ function DepartmentsTab() {
           onClick={() => setShowForm(!showForm)}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
-          {showForm ? "Abbrechen" : "+ Abteilung hinzufuegen"}
+          {showForm ? "Abbrechen" : "+ Abteilung hinzufügen"}
         </button>
       </div>
 
@@ -1332,7 +1332,7 @@ function DepartmentsTab() {
                           onClick={() => handleDelete(dept)}
                           className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50"
                         >
-                          Loeschen
+                          Löschen
                         </button>
                       </div>
                     </td>
@@ -1346,8 +1346,8 @@ function DepartmentsTab() {
 
       {/* Hinweis */}
       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        <strong>Hinweis:</strong> Zentrale Abteilungen gelten fuer alle Einrichtungen.
-        Einrichtungsspezifische Abteilungen ueberschreiben die zentrale Konfiguration fuer die jeweilige Einrichtung.
+        <strong>Hinweis:</strong> Zentrale Abteilungen gelten für alle Einrichtungen.
+        Einrichtungsspezifische Abteilungen überschreiben die zentrale Konfiguration für die jeweilige Einrichtung.
       </div>
     </div>
   );

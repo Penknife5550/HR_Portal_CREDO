@@ -124,7 +124,7 @@ export async function PATCH(
     ];
     if (status && !VALID_STATUSES.includes(status)) {
       return NextResponse.json(
-        { error: "Ungueltiger Status-Wert" },
+        { error: "Ungültiger Status-Wert" },
         { status: 400 }
       );
     }

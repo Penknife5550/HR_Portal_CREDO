@@ -98,7 +98,7 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
 
   // Step 6: Weitere Beschaeftigung
   6: [
-    { name: "hasOtherEmployment", label: "Weitere Beschaeftigung?",  defaultVisible: true, defaultRequired: false },
+    { name: "hasOtherEmployment", label: "Weitere Beschäftigung?",  defaultVisible: true, defaultRequired: false },
     { name: "otherEmployerName",  label: "Arbeitgeber-Name",        defaultVisible: true, defaultRequired: false },
     { name: "otherWeeklyHours",   label: "Wochenstunden (Nebenjob)", defaultVisible: true, defaultRequired: false },
     { name: "employerType",       label: "Arbeitgeber-Typ",         defaultVisible: true, defaultRequired: true },
@@ -201,7 +201,7 @@ function getStepTitle(step: number): string {
     3: "Bankverbindung",
     4: "Sozialversicherung",
     5: "Steuer",
-    6: "Weitere Beschaeftigung",
+    6: "Weitere Beschäftigung",
     7: "Kinder",
     8: "Bildung & Beruf",
     9: "Masernschutz",

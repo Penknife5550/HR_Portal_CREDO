@@ -189,9 +189,9 @@ export function NeuerAustrittModal({
           {result ? (
             /* Erfolg */
             <div className="space-y-4">
-              <div className="flex items-center gap-3 rounded-lg bg-green-50 p-4">
+              <div className="flex items-center gap-3 rounded-lg bg-credo-gruen/5 p-4">
                 <svg
-                  className="h-6 w-6 shrink-0 text-green-600"
+                  className="h-6 w-6 shrink-0 text-credo-gruen"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -203,7 +203,7 @@ export function NeuerAustrittModal({
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <div className="text-sm text-green-800">
+                <div className="text-sm text-credo-gruen">
                   <p className="font-medium">
                     Offboarding-Vorgang wurde erfolgreich angelegt!
                   </p>

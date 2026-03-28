@@ -66,7 +66,7 @@ export function Step4SocialSecurity({
           <p className="text-xs text-muted-foreground">
             Die SV-Nummer finden Sie auf Ihrem Sozialversicherungsausweis oder in
             Schreiben Ihres Rentenversicherungstraegers. Falls Sie Ihre Nummer
-            nicht kennen, kann sie ueber die Krankenkasse ermittelt werden.
+            nicht kennen, kann sie über die Krankenkasse ermittelt werden.
           </p>
         </div>
       )}
@@ -165,7 +165,7 @@ export function Step4SocialSecurity({
                 {fc.getLabel("minijobRvBefreiung")}
               </span>
               <p className="text-xs text-muted-foreground">
-                Nur relevant bei geringfuegiger Beschaeftigung (Minijob): Ich
+                Nur relevant bei geringfügiger Beschäftigung (Minijob): Ich
                 moechte mich von der Rentenversicherungspflicht befreien lassen.
               </p>
             </div>
@@ -180,7 +180,7 @@ export function Step4SocialSecurity({
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

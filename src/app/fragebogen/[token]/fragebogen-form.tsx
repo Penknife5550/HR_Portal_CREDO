@@ -200,7 +200,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
               Erfolgreich eingereicht!
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Ihr Personalfragebogen wurde sicher uebermittelt.
+              Ihr Personalfragebogen wurde sicher übermittelt.
             </p>
           </div>
 
@@ -270,13 +270,13 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  Personalfragebogen vollstaendig
+                  Personalfragebogen vollständig
                 </div>
                 <div className="flex items-center gap-2 text-xs text-green-700">
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  Erklaerung des Arbeitnehmers akzeptiert
+                  Erklärung des Arbeitnehmers akzeptiert
                 </div>
                 <div className="flex items-center gap-2 text-xs text-green-700">
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -322,12 +322,12 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
           <div className="px-8 pb-6">
             <div className="rounded-lg bg-muted p-4 text-center">
               <p className="text-xs text-muted-foreground">
-                Bitte bewahren Sie die Bestaetigungs-ID{" "}
+                Bitte bewahren Sie die Bestätigungs-ID{" "}
                 <strong className="text-foreground">{signatureId}</strong>{" "}
-                fuer Ihre Unterlagen auf.
+                für Ihre Unterlagen auf.
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Sie koennen dieses Fenster jetzt schliessen.
+                Sie können dieses Fenster jetzt schließen.
               </p>
             </div>
           </div>
@@ -505,7 +505,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
       <footer className="mt-auto border-t bg-card py-4 text-center">
         <p className="text-xs text-muted-foreground">
           &copy; {new Date().getFullYear()} Christlicher Schulverein Minden e.V.
-          &middot; Ihre Daten werden verschluesselt uebertragen.
+          &middot; Ihre Daten werden verschlüsselt übertragen.
         </p>
       </footer>
     </div>

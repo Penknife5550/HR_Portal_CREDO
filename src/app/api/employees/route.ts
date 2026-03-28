@@ -38,15 +38,15 @@ const createEmployeeSchema = z.object({
     .string()
     .trim()
     .min(1, "Nachname ist erforderlich"),
-  email: z.string().email("Ungueltige E-Mail-Adresse").optional().nullable(),
+  email: z.string().email("Ungültige E-Mail-Adresse").optional().nullable(),
   privateEmail: z
     .string()
-    .email("Ungueltige private E-Mail-Adresse")
+    .email("Ungültige private E-Mail-Adresse")
     .optional()
     .nullable(),
   dateOfBirth: z
     .string()
-    .datetime({ message: "Ungueltiges Datumsformat (ISO 8601 erwartet)" })
+    .datetime({ message: "Ungültiges Datumsformat (ISO 8601 erwartet)" })
     .optional()
     .nullable(),
   phone: z.string().trim().optional().nullable(),

@@ -38,7 +38,7 @@ export async function PUT(
     // Validierung
     if (url && !isValidUrl(url)) {
       return NextResponse.json(
-        { error: "URL ist nicht gueltig (muss mit http:// oder https:// beginnen)" },
+        { error: "URL ist nicht gültig (muss mit http:// oder https:// beginnen)" },
         { status: 400 }
       );
     }

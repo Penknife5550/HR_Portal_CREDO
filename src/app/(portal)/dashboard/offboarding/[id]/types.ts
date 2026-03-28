@@ -192,9 +192,9 @@ export interface OffboardingData {
 // =============================================
 
 export const TABS = [
-  { id: "overview", label: "Uebersicht" },
+  { id: "overview", label: "Übersicht" },
   { id: "checklist", label: "Checkliste" },
-  { id: "returns", label: "Rueckgaben" },
+  { id: "returns", label: "Rückgaben" },
   { id: "documents", label: "Dokumente" },
   { id: "notes", label: "Notizen" },
   { id: "exit-interview", label: "Exit-Interview" },

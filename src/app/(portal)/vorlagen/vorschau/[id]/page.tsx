@@ -49,7 +49,7 @@ export default function VorschauPage() {
   useEffect(() => {
     fetch(`/api/vorlagen/${templateId}/preview`)
       .then((r) => {
-        if (!r.ok) throw new Error("Vorschau nicht verfuegbar");
+        if (!r.ok) throw new Error("Vorschau nicht verfügbar");
         return r.json();
       })
       .then(setPreview)
@@ -106,12 +106,12 @@ export default function VorschauPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted">
         <div className="rounded-lg border bg-card p-8 text-center">
-          <p className="text-destructive">{error || "Vorschau nicht verfuegbar"}</p>
+          <p className="text-destructive">{error || "Vorschau nicht verfügbar"}</p>
           <button
             onClick={() => router.push("/vorlagen")}
             className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground"
           >
-            Zurueck zu Vorlagen
+            Zurück zu Vorlagen
           </button>
         </div>
       </div>
@@ -240,7 +240,7 @@ export default function VorschauPage() {
           </div>
           <div className="p-6">
             {stepComponents[currentStep] ?? (
-              <p className="text-muted-foreground">Schritt nicht in der Vorschau verfuegbar.</p>
+              <p className="text-muted-foreground">Schritt nicht in der Vorschau verfügbar.</p>
             )}
           </div>
         </div>

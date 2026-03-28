@@ -62,7 +62,7 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
           )}
           <p className="text-xs text-muted-foreground">
             Die 11-stellige Steuer-ID finden Sie auf Ihrem Steuerbescheid oder in
-            Schreiben des Finanzamtes. Sie ist lebenslang gueltig.
+            Schreiben des Finanzamtes. Sie ist lebenslang gültig.
           </p>
         </div>
       )}
@@ -172,7 +172,7 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

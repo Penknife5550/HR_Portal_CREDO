@@ -53,7 +53,7 @@ export async function GET(
     if (document.filePath.includes("../") || document.filePath.includes("..\\")) {
       console.error("Path-Traversal-Versuch erkannt:", document.filePath);
       return NextResponse.json(
-        { error: "Ungueltiger Dateipfad" },
+        { error: "Ungültiger Dateipfad" },
         { status: 400 }
       );
     }
@@ -67,7 +67,7 @@ export async function GET(
     if (!absolutePath.startsWith(uploadsDir)) {
       console.error("Dateizugriff ausserhalb des Upload-Verzeichnisses:", absolutePath);
       return NextResponse.json(
-        { error: "Ungueltiger Dateipfad" },
+        { error: "Ungültiger Dateipfad" },
         { status: 400 }
       );
     }

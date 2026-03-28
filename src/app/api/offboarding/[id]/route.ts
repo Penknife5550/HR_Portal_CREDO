@@ -145,7 +145,7 @@ export async function PATCH(
       if (!allowedTransitions) {
         return NextResponse.json(
           {
-            error: `Status "${existing.status}" kann nicht geaendert werden`,
+            error: `Status "${existing.status}" kann nicht geändert werden`,
           },
           { status: 400 }
         );
@@ -153,7 +153,7 @@ export async function PATCH(
       if (!allowedTransitions.includes(status)) {
         return NextResponse.json(
           {
-            error: `Ungueltiger Status-Uebergang: "${existing.status}" -> "${status}". Erlaubt: ${allowedTransitions.join(", ") || "keine"}`,
+            error: `Ungültiger Status-Übergang: "${existing.status}" -> "${status}". Erlaubt: ${allowedTransitions.join(", ") || "keine"}`,
           },
           { status: 400 }
         );

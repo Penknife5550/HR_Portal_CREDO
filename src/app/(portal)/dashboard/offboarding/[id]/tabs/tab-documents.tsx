@@ -31,9 +31,9 @@ export function TabDocuments({
 }) {
   const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
     UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
-    REVIEWED: { label: "Geprueft", color: "bg-blue-100 text-blue-700" },
-    APPROVED: { label: "Genehmigt", color: "bg-green-100 text-green-700" },
-    REJECTED: { label: "Abgelehnt", color: "bg-red-100 text-red-700" },
+    REVIEWED: { label: "Geprüft", color: "bg-credo-blau/10 text-credo-blau" },
+    APPROVED: { label: "Genehmigt", color: "bg-credo-gruen/10 text-credo-gruen" },
+    REJECTED: { label: "Abgelehnt", color: "bg-credo-rot/10 text-credo-rot" },
   };
 
   return (
@@ -51,7 +51,7 @@ export function TabDocuments({
       >
         <UploadCloudIcon className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
         <p className="mb-2 text-sm font-medium text-foreground">
-          {uploadingDoc ? "Wird hochgeladen..." : "Datei hier ablegen oder auswaehlen"}
+          {uploadingDoc ? "Wird hochgeladen..." : "Datei hier ablegen oder auswählen"}
         </p>
         <div className="flex items-center justify-center gap-3">
           <select autoComplete="off"
@@ -68,7 +68,7 @@ export function TabDocuments({
             disabled={uploadingDoc}
             className="rounded-md bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
           >
-            Datei auswaehlen
+            Datei auswählen
           </button>
           <input autoComplete="off"
             ref={fileInputRef}
@@ -142,7 +142,7 @@ export function TabDocuments({
           <DocumentIcon className="mb-3 h-12 w-12 text-border" />
           <p className="mb-1 text-base font-medium text-foreground">Keine Dokumente</p>
           <p className="text-sm text-muted-foreground">
-            Laden Sie Dokumente ueber den Upload-Bereich oben hoch.
+            Laden Sie Dokumente über den Upload-Bereich oben hoch.
           </p>
         </div>
       )}

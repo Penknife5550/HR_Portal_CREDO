@@ -85,9 +85,9 @@ export function Step7Children({ data, onNext, onBack, saving, fieldConfig }: Ste
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="rounded-lg border border-[#009AC6]/20 bg-[#009AC6]/5 p-4">
         <p className="text-sm text-[#009AC6]">
-          Bitte geben Sie Ihre Kinder an. Diese Angaben werden fuer die
-          Berechnung des Kinderfreibetrages und der Pflegeversicherung benoetigt.
-          Wenn Sie keine Kinder haben, koennen Sie diesen Schritt ueberspringen.
+          Bitte geben Sie Ihre Kinder an. Diese Angaben werden für die
+          Berechnung des Kinderfreibetrages und der Pflegeversicherung benötigt.
+          Wenn Sie keine Kinder haben, können Sie diesen Schritt überspringen.
         </p>
       </div>
 
@@ -102,7 +102,7 @@ export function Step7Children({ data, onNext, onBack, saving, fieldConfig }: Ste
             onClick={addChild}
             className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            + Kind hinzufuegen
+            + Kind hinzufügen
           </button>
         </div>
       ) : (
@@ -204,7 +204,7 @@ export function Step7Children({ data, onNext, onBack, saving, fieldConfig }: Ste
             onClick={addChild}
             className="w-full rounded-lg border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
           >
-            + Weiteres Kind hinzufuegen
+            + Weiteres Kind hinzufügen
           </button>
         </div>
       )}
@@ -216,7 +216,7 @@ export function Step7Children({ data, onNext, onBack, saving, fieldConfig }: Ste
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

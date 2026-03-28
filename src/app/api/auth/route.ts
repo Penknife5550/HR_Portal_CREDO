@@ -72,13 +72,13 @@ export async function POST(request: NextRequest) {
     // HashDoS-Schutz: Laengenbegrenzung vor bcrypt-Verarbeitung
     if (typeof password !== "string" || password.length > 256) {
       return NextResponse.json(
-        { error: "Ungueltige Anmeldedaten" },
+        { error: "Ungültige Anmeldedaten" },
         { status: 400 }
       );
     }
     if (typeof email !== "string" || email.length > 254) {
       return NextResponse.json(
-        { error: "Ungueltige Anmeldedaten" },
+        { error: "Ungültige Anmeldedaten" },
         { status: 400 }
       );
     }
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     const emailCheck = loginEmailRateLimiter.check(normalizedEmail);
     if (!emailCheck.allowed) {
       return NextResponse.json(
-        { error: "Zu viele Anmeldeversuche fuer dieses Konto. Bitte warten Sie." },
+        { error: "Zu viele Anmeldeversuche für dieses Konto. Bitte warten Sie." },
         {
           status: 429,
           headers: {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     const session = await authenticateUser(normalizedEmail, password);
     if (!session) {
       return NextResponse.json(
-        { error: "Ungueltige Anmeldedaten" },
+        { error: "Ungültige Anmeldedaten" },
         { status: 401 }
       );
     }

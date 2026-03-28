@@ -3,7 +3,7 @@
 /**
  * Analytics Dashboard – KPI-Sektion fuer Prozess-Dashboards
  *
- * Zeigt KPI-Karten, Austrittsgruende, monatliche Trends,
+ * Zeigt KPI-Karten, Austrittsgründe, monatliche Trends,
  * Exit-Interview-Insights und Abteilungs-Performance.
  * Rein CSS/Tailwind-basiert, keine externen Chart-Libraries.
  */
@@ -308,7 +308,7 @@ export function AnalyticsDashboard({
     return (
       <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          {error || "Keine Analysedaten verfuegbar."}
+          {error || "Keine Analysedaten verfügbar."}
         </p>
         <button
           onClick={loadAnalytics}
@@ -335,10 +335,10 @@ export function AnalyticsDashboard({
           Row 1: KPI Cards
           ================================================ */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Aktive Vorgaenge */}
+        {/* Aktive Vorgänge */}
         <div className="rounded-2xl border bg-card p-6 transition-shadow hover:shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Aktive Vorgaenge
+            Aktive Vorgänge
           </p>
           <p className="mt-2 text-3xl font-bold text-foreground">{kpi.activeCount}</p>
           <p className="mt-1 text-xs text-muted-foreground">In Bearbeitung</p>
@@ -366,7 +366,7 @@ export function AnalyticsDashboard({
           </p>
         </div>
 
-        {/* Ueberfaellig */}
+        {/* Überfällig */}
         <div
           className={`rounded-2xl border p-6 transition-shadow hover:shadow-sm ${
             kpi.overdueCount > 0
@@ -375,7 +375,7 @@ export function AnalyticsDashboard({
           }`}
         >
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Ueberfaellig
+            Überfällig
           </p>
           <p
             className={`mt-2 text-3xl font-bold ${
@@ -385,7 +385,7 @@ export function AnalyticsDashboard({
             {kpi.overdueCount}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {kpi.overdueCount > 0 ? "Sofortige Aufmerksamkeit noetig" : "Alles im Zeitplan"}
+            {kpi.overdueCount > 0 ? "Sofortige Aufmerksamkeit nötig" : "Alles im Zeitplan"}
           </p>
         </div>
       </div>
@@ -393,12 +393,12 @@ export function AnalyticsDashboard({
       {/* ================================================
           Row 2: Charts (collapsible)
           ================================================ */}
-      <CollapsibleSection title="Austrittsgruende & Trends" defaultOpen>
+      <CollapsibleSection title="Austrittsgründe & Trends" defaultOpen>
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          {/* Left: Austrittsgruende */}
+          {/* Left: Austrittsgründe */}
           <div>
             <h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Austrittsgruende
+              Austrittsgründe
             </h4>
             {exitReasons.length === 0 ? (
               <p className="text-xs text-muted-foreground">Noch keine Daten vorhanden.</p>
@@ -516,7 +516,7 @@ export function AnalyticsDashboard({
                 </p>
                 <p className="mt-0.5 text-[10px] text-muted-foreground">
                   {exitInterviewInsights.submittedCount} von{" "}
-                  {exitInterviewInsights.totalInterviews} ausgefuellt
+                  {exitInterviewInsights.totalInterviews} ausgefüllt
                 </p>
               </div>
 
@@ -584,7 +584,7 @@ export function AnalyticsDashboard({
                   {exitInterviewInsights.totalInterviews}
                 </p>
                 <p className="mt-0.5 text-[10px] text-muted-foreground">
-                  Durchgefuehrt
+                  Durchgeführt
                 </p>
               </div>
             </div>

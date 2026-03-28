@@ -114,13 +114,13 @@ export async function PUT(
     for (const cat of categories) {
       if (!cat.name || typeof cat.name !== "string") {
         return NextResponse.json(
-          { error: "Jede Kategorie benoetigt einen Namen" },
+          { error: "Jede Kategorie benötigt einen Namen" },
           { status: 400 }
         );
       }
       if (!cat.questions || !Array.isArray(cat.questions) || cat.questions.length === 0) {
         return NextResponse.json(
-          { error: `Kategorie "${cat.name}" benoetigt mindestens eine Frage` },
+          { error: `Kategorie "${cat.name}" benötigt mindestens eine Frage` },
           { status: 400 }
         );
       }

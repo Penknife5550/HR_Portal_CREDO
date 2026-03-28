@@ -44,7 +44,7 @@ export function OffboardingTasksForm({ token, initialData }: OffboardingTasksFor
     today.setHours(0, 0, 0, 0);
     lastDay.setHours(0, 0, 0, 0);
     const diff = Math.ceil((lastDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    if (diff < 0) return { text: `${Math.abs(diff)} Tage ueberfaellig`, overdue: true };
+    if (diff < 0) return { text: `${Math.abs(diff)} Tage überfällig`, overdue: true };
     if (diff === 0) return { text: "Heute", overdue: false };
     if (diff === 1) return { text: "Morgen", overdue: false };
     return { text: `Noch ${diff} Tage`, overdue: false };
@@ -224,7 +224,7 @@ export function OffboardingTasksForm({ token, initialData }: OffboardingTasksFor
                         : "bg-blue-100 text-blue-700"
                   }`}
                 >
-                  {item.isCompleted ? "Erledigt" : overdue ? "Ueberfaellig" : ""}{" "}
+                  {item.isCompleted ? "Erledigt" : overdue ? "Überfällig" : ""}{" "}
                   {formatDate(item.dueDate)}
                 </span>
               )}
@@ -262,7 +262,7 @@ export function OffboardingTasksForm({ token, initialData }: OffboardingTasksFor
                 onClick={() => toggleExpand(item.id)}
                 className="mt-2 text-xs text-primary hover:underline"
               >
-                {expanded ? "Kommentar ausblenden" : "Kommentar hinzufuegen"}
+                {expanded ? "Kommentar ausblenden" : "Kommentar hinzufügen"}
               </button>
             )}
 
@@ -440,7 +440,7 @@ export function OffboardingTasksForm({ token, initialData }: OffboardingTasksFor
           Bei Fragen wenden Sie sich an die Personalabteilung.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Ihre Eingaben werden verschluesselt uebertragen und gemaess DSGVO verarbeitet.
+          Ihre Eingaben werden verschlüsselt übertragen und gemäß DSGVO verarbeitet.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           &copy; {new Date().getFullYear()} Christlicher Schulverein Minden e.V.

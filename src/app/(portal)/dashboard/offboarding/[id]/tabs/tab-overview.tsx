@@ -68,10 +68,10 @@ export function TabOverview({
           {/* Austrittsdaten */}
           <Card title="Austrittsdaten">
             <FieldRow label="Austrittsart" value={EXIT_TYPE_LABELS[data.exitType] || data.exitType} />
-            <FieldRow label="Kuendigungsdatum" value={formatDate(data.noticeDate)} />
+            <FieldRow label="Kündigungsdatum" value={formatDate(data.noticeDate)} />
             <FieldRow label="Letzter Arbeitstag" value={formatDate(data.lastWorkingDay)} />
             <FieldRow label="Vertragsende" value={formatDate(data.contractEndDate)} />
-            <FieldRow label="Kuendigungsfrist-Ende" value={formatDate(data.noticePeriodEnd)} />
+            <FieldRow label="Kündigungsfrist-Ende" value={formatDate(data.noticePeriodEnd)} />
             {data.exitReason && <FieldRow label="Austrittsgrund" value={data.exitReason} />}
             <FieldRow label="Erfasst am" value={formatDate(data.initiatedAt)} />
             {data.completedAt && <FieldRow label="Abgeschlossen am" value={formatDate(data.completedAt)} />}
@@ -86,8 +86,8 @@ export function TabOverview({
               <>
                 <FieldRow label="Resturlaub" value={formatNumber(ed.remainingVacationDays, "Tage")} />
                 {ed.vacationPayout !== null && <FieldRow label="Urlaubsauszahlung" value={formatCurrency(ed.vacationPayout)} />}
-                <FieldRow label="Ueberstunden" value={formatNumber(ed.overtimeHours, "Std.")} />
-                {ed.overtimePayout !== null && <FieldRow label="Ueberstundenauszahlung" value={formatCurrency(ed.overtimePayout)} />}
+                <FieldRow label="Überstunden" value={formatNumber(ed.overtimeHours, "Std.")} />
+                {ed.overtimePayout !== null && <FieldRow label="Überstundenauszahlung" value={formatCurrency(ed.overtimePayout)} />}
                 {ed.severancePay && <FieldRow label="Abfindung" value={formatCurrency(ed.severancePay)} />}
               </>
             ) : (
@@ -111,7 +111,7 @@ export function TabOverview({
                 <div className="flex items-baseline justify-between gap-3 py-1.5">
                   <span className="shrink-0 text-xs text-muted-foreground">SV-Abmeldung</span>
                   <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    ed.svDeregistrationDone ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                    ed.svDeregistrationDone ? "bg-credo-gruen/10 text-credo-gruen" : "bg-credo-gelb/10 text-credo-gelb"
                   }`}>
                     {ed.svDeregistrationDone ? "Erledigt" : "Ausstehend"}
                   </span>
@@ -120,7 +120,7 @@ export function TabOverview({
                 <div className="flex items-baseline justify-between gap-3 py-1.5">
                   <span className="shrink-0 text-xs text-muted-foreground">Arbeitsbescheinigung</span>
                   <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    ed.employmentCertDone ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                    ed.employmentCertDone ? "bg-credo-gruen/10 text-credo-gruen" : "bg-credo-gelb/10 text-credo-gelb"
                   }`}>
                     {ed.employmentCertDone ? "Erstellt" : "Ausstehend"}
                   </span>
@@ -135,9 +135,9 @@ export function TabOverview({
           <Card title="Wissenstransfer">
             {ed ? (
               <>
-                <FieldRow label="Uebergabeplan" value={formatBoolean(ed.knowledgeTransferPlan)} />
+                <FieldRow label="Übergabeplan" value={formatBoolean(ed.knowledgeTransferPlan)} />
                 <FieldRow label="Nachfolger" value={ed.successorName} />
-                <FieldRow label="Dokumentation vollstaendig" value={formatBoolean(ed.handoverDocComplete)} />
+                <FieldRow label="Dokumentation vollständig" value={formatBoolean(ed.handoverDocComplete)} />
                 <FieldRow label="Wettbewerbsverbot" value={formatBoolean(ed.nonCompeteClause)} />
               </>
             ) : (
@@ -147,8 +147,8 @@ export function TabOverview({
         </div>
       </div>
 
-      {/* Status-Uebersicht */}
-      <Card title="Status-Uebersicht">
+      {/* Status-Übersicht */}
+      <Card title="Status-Übersicht">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatusMiniCard
             label="Checkliste"
@@ -160,7 +160,7 @@ export function TabOverview({
             done={data.checklistItems.length > 0 && data.checklistItems.every((i) => i.isCompleted)}
           />
           <StatusMiniCard
-            label="Rueckgaben"
+            label="Rückgaben"
             value={
               data.returnItems.length > 0
                 ? `${data.returnItems.filter((i) => i.isReturned).length}/${data.returnItems.length}`
@@ -200,18 +200,18 @@ export function TabOverview({
                       <span className="text-xs text-muted-foreground">{link.openCount}x geöffnet</span>
                     )}
                     {link.allTasksComplete ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-credo-gruen/10 px-3 py-1 text-xs font-semibold text-credo-gruen">
                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                         Abgeschlossen
                       </span>
                     ) : link.firstOpenedAt ? (
-                      <span className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
+                      <span className="inline-flex rounded-full bg-credo-blau/10 px-3 py-1 text-xs font-semibold text-credo-blau">
                         In Bearbeitung
                       </span>
                     ) : link.sentAt ? (
-                      <span className="inline-flex rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800">
+                      <span className="inline-flex rounded-full bg-credo-gelb/10 px-3 py-1 text-xs font-semibold text-credo-gelb">
                         Gesendet
                       </span>
                     ) : (

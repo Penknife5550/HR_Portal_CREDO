@@ -82,7 +82,7 @@ export const step2Schema = z.object({
     .string()
     .refine(
       (val) => val === "" || z.string().email().safeParse(val).success,
-      { message: "Bitte geben Sie eine gueltige E-Mail-Adresse ein." }
+      { message: "Bitte geben Sie eine gültige E-Mail-Adresse ein." }
     ),
 });
 
@@ -100,7 +100,7 @@ export const step3Schema = z.object({
         if (!val) return true; // min(1) handles the required check
         return validateIBAN(val);
       },
-      { message: "Bitte geben Sie eine gueltige IBAN ein." }
+      { message: "Bitte geben Sie eine gültige IBAN ein." }
     ),
   bic: z.string(),
   bankName: z.string(),
@@ -217,7 +217,7 @@ export const step10Schema = z.object({
   dsgvoAccepted: z.literal(true, {
     errorMap: () => ({
       message:
-        "Sie muessen der Datenschutzerklaerung zustimmen, um den Fragebogen abzuschicken.",
+        "Sie müssen der Datenschutzerklärung zustimmen, um den Fragebogen abzuschicken.",
     }),
   }),
 });
@@ -258,11 +258,11 @@ export function createStep3Schema(fc: FieldConfigHelper) {
     iban: ibanRequired
       ? z.string().min(1, "IBAN ist erforderlich.").refine(
           (val) => { if (!val) return true; return validateIBAN(val); },
-          { message: "Bitte geben Sie eine gueltige IBAN ein." }
+          { message: "Bitte geben Sie eine gültige IBAN ein." }
         )
       : z.string().refine(
           (val) => { if (!val || val.trim() === "") return true; return validateIBAN(val); },
-          { message: "Bitte geben Sie eine gueltige IBAN ein." }
+          { message: "Bitte geben Sie eine gültige IBAN ein." }
         ),
     bic: z.string(),
     bankName: z.string(),
@@ -373,7 +373,7 @@ export const STEP_CONFIG = [
   },
   {
     number: 6,
-    title: "Weitere Beschaeftigung",
+    title: "Weitere Beschäftigung",
     description: "Angaben zu weiteren Arbeitgebern",
     icon: "briefcase",
   },

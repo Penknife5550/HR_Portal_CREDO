@@ -14,9 +14,9 @@ export const STATUS_TRANSITIONS: Record<string, string[]> = {
 
 export const CHECKLIST_PHASE_LABELS: Record<string, string> = {
   "Phase 1: Erfassung & Planung": "Phase 1: Erfassung & Planung",
-  "Phase 2: Kuendigungsfrist": "Phase 2: Kuendigungsfrist",
-  "Phase 3: Uebergabe": "Phase 3: Uebergabe",
-  "Phase 4: IT & Zugaenge": "Phase 4: IT & Zugaenge",
+  "Phase 2: Kuendigungsfrist": "Phase 2: Kündigungsfrist",
+  "Phase 3: Uebergabe": "Phase 3: Übergabe",
+  "Phase 4: IT & Zugaenge": "Phase 4: IT & Zugänge",
   "Phase 5: Endabrechnung": "Phase 5: Endabrechnung",
   "Phase 6: Abschluss": "Phase 6: Abschluss",
 };

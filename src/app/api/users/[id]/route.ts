@@ -100,7 +100,7 @@ export async function PATCH(
     if (role !== undefined) {
       if (!["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"].includes(role)) {
         return NextResponse.json(
-          { error: "Ungueltige Rolle" },
+          { error: "Ungültige Rolle" },
           { status: 400 }
         );
       }
@@ -190,7 +190,7 @@ export async function DELETE(
     // Sich selbst darf man nicht deaktivieren
     if (id === session.userId) {
       return NextResponse.json(
-        { error: "Sie koennen sich nicht selbst deaktivieren" },
+        { error: "Sie können sich nicht selbst deaktivieren" },
         { status: 400 }
       );
     }

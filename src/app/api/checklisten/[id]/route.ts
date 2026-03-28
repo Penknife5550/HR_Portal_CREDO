@@ -145,7 +145,7 @@ export async function DELETE(
     // Rollencheck
     if (session.role !== "SUPER_ADMIN" && session.role !== "HR_LEITUNG") {
       return NextResponse.json(
-        { error: "Keine Berechtigung. Nur SUPER_ADMIN und HR_LEITUNG duerfen Checklisten loeschen." },
+        { error: "Keine Berechtigung. Nur SUPER_ADMIN und HR_LEITUNG dürfen Checklisten löschen." },
         { status: 403 }
       );
     }
@@ -173,7 +173,7 @@ export async function DELETE(
     if (existing._count.onboardings > 0) {
       return NextResponse.json(
         {
-          error: `Diese Vorlage wird von ${existing._count.onboardings} Onboarding-Vorgang/Vorgaengen verwendet und kann nicht geloescht werden.`,
+          error: `Diese Vorlage wird von ${existing._count.onboardings} Onboarding-Vorgang/Vorgängen verwendet und kann nicht gelöscht werden.`,
         },
         { status: 409 }
       );

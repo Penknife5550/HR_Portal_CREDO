@@ -128,7 +128,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Dateiinhalt stimmt nicht mit dem angegebenen Dateityp ueberein. Bitte laden Sie eine gueltige Datei hoch.",
+            "Dateiinhalt stimmt nicht mit dem angegebenen Dateityp überein. Bitte laden Sie eine gültige Datei hoch.",
         },
         { status: 400 }
       );
@@ -150,7 +150,7 @@ export async function POST(
     const resolvedPath = path.resolve(filePath);
     if (!resolvedPath.startsWith(uploadBaseDir)) {
       return NextResponse.json(
-        { error: "Ungueltiger Dateiname." },
+        { error: "Ungültiger Dateiname." },
         { status: 400 }
       );
     }

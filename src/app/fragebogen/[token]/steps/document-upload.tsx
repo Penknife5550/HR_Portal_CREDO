@@ -152,7 +152,7 @@ export function DocumentUpload({ token, hasChildren = false }: DocumentUploadPro
         await loadDocuments();
       }
     } catch {
-      setError("Fehler beim Loeschen.");
+      setError("Fehler beim Löschen.");
     }
   };
 
@@ -199,7 +199,7 @@ export function DocumentUpload({ token, hasChildren = false }: DocumentUploadPro
           Pflichtdokumente
         </h3>
         <p className="mb-4 text-xs text-amber-800">
-          Die folgenden Unterlagen werden zwingend benoetigt. Bitte laden Sie diese hoch (PDF, JPG, PNG, Word). Max. 10 MB pro Datei.
+          Die folgenden Unterlagen werden zwingend benötigt. Bitte laden Sie diese hoch (PDF, JPG, PNG, Word). Max. 10 MB pro Datei.
         </p>
 
         <div className="space-y-3">
@@ -256,7 +256,7 @@ export function DocumentUpload({ token, hasChildren = false }: DocumentUploadPro
                       if (doc) handleDelete(doc.id);
                     }}
                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    title="Loeschen"
+                    title="Löschen"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -291,7 +291,7 @@ export function DocumentUpload({ token, hasChildren = false }: DocumentUploadPro
           Weitere Unterlagen (optional)
         </h3>
         <p className="mb-3 text-xs text-muted-foreground">
-          Falls vorhanden, koennen Sie hier weitere Dokumente hochladen. Max. 10 MB pro Datei.
+          Falls vorhanden, können Sie hier weitere Dokumente hochladen. Max. 10 MB pro Datei.
         </p>
 
         {/* Kategorie waehlen */}
@@ -409,7 +409,7 @@ export function DocumentUpload({ token, hasChildren = false }: DocumentUploadPro
                 <button
                   onClick={() => handleDelete(doc.id)}
                   className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  title="Loeschen"
+                  title="Löschen"
                 >
                   <svg
                     className="h-4 w-4"
