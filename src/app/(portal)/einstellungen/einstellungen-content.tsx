@@ -78,12 +78,32 @@ interface OrganizationOption {
 // Konstanten
 // =============================================
 const WEBHOOK_EVENTS = [
-  { value: "onboarding-created", label: "Onboarding erstellt (Einladung Mitarbeiter)" },
-  { value: "questionnaire-completed", label: "Fragebogen eingereicht" },
-  { value: "supervisor-link-created", label: "Vorgesetzten-Link erstellt" },
-  { value: "supervisor-completed", label: "Einstellungsmodalitäten eingereicht" },
-  { value: "employee-reminder", label: "Erinnerung Mitarbeiter (Fragebogen ausstehend)" },
-  { value: "supervisor-reminder", label: "Erinnerung Vorgesetzter (Modalitäten ausstehend)" },
+  // Onboarding
+  { value: "onboarding-created", label: "Onboarding erstellt", group: "Onboarding" },
+  { value: "questionnaire-completed", label: "Fragebogen eingereicht", group: "Onboarding" },
+  { value: "supervisor-link-created", label: "Vorgesetzten-Link erstellt", group: "Onboarding" },
+  { value: "supervisor-completed", label: "Modalitäten eingereicht", group: "Onboarding" },
+  { value: "employee-reminder", label: "Erinnerung Mitarbeiter", group: "Onboarding" },
+  { value: "supervisor-reminder", label: "Erinnerung Vorgesetzter", group: "Onboarding" },
+  // Offboarding
+  { value: "offboarding-created", label: "Offboarding erstellt", group: "Offboarding" },
+  { value: "offboarding-department-assigned", label: "Abteilung zugewiesen", group: "Offboarding" },
+  { value: "offboarding-task-completed", label: "Aufgabe erledigt", group: "Offboarding" },
+  { value: "offboarding-department-completed", label: "Abteilung fertig", group: "Offboarding" },
+  { value: "offboarding-task-overdue", label: "Aufgabe überfällig", group: "Offboarding" },
+  { value: "offboarding-reminder", label: "Reminder gesendet", group: "Offboarding" },
+  { value: "offboarding-completed", label: "Offboarding abgeschlossen", group: "Offboarding" },
+  { value: "exit-interview-invited", label: "Exit-Interview versendet", group: "Offboarding" },
+  { value: "exit-interview-submitted", label: "Exit-Interview ausgefüllt", group: "Offboarding" },
+  { value: "zeugnis-bewertung-invited", label: "Zeugnis-Bewertung versendet", group: "Offboarding" },
+  { value: "zeugnis-bewertung-submitted", label: "Zeugnis-Bewertung eingereicht", group: "Offboarding" },
+  // Verbeamtung
+  { value: "psi-created", label: "Verbeamtung angelegt", group: "Verbeamtung" },
+  { value: "psi-assessment-requested", label: "Beurteilung angefordert", group: "Verbeamtung" },
+  { value: "psi-assessment-completed", label: "Beurteilung eingegangen", group: "Verbeamtung" },
+  { value: "psi-phase-completed", label: "Phase abgeschlossen", group: "Verbeamtung" },
+  { value: "psi-deadline-warning", label: "Frist-Warnung", group: "Verbeamtung" },
+  { value: "psi-completed", label: "Verbeamtung abgeschlossen", group: "Verbeamtung" },
 ];
 
 const AUTH_TYPES = [
@@ -228,11 +248,21 @@ function WebhooksTab() {
     }
   }
 
-  // Webhooks nach Event gruppieren
-  const grouped = WEBHOOK_EVENTS.map((ev) => ({
-    event: ev.value,
-    label: ev.label,
-    webhooks: webhooks.filter((w) => w.event === ev.value),
+  // Webhooks nach Prozess-Gruppe und dann Event gruppieren
+  const groups = ["Onboarding", "Offboarding", "Verbeamtung"] as const;
+  const groupColors: Record<string, string> = {
+    Onboarding: "bg-credo-blau/10 text-credo-blau",
+    Offboarding: "bg-credo-gruen/10 text-credo-gruen",
+    Verbeamtung: "bg-purple-100 text-purple-800",
+  };
+  const grouped = groups.map((group) => ({
+    group,
+    color: groupColors[group],
+    events: WEBHOOK_EVENTS.filter((ev) => ev.group === group).map((ev) => ({
+      event: ev.value,
+      label: ev.label,
+      webhooks: webhooks.filter((w) => w.event === ev.value),
+    })),
   }));
 
   return (
@@ -257,13 +287,25 @@ function WebhooksTab() {
       {loading ? (
         <LoadingCard text="Lade Webhooks..." />
       ) : (
-        grouped.map((group) => (
+        grouped.map((section) => (
+          <div key={section.group} className="space-y-3">
+            {/* Gruppen-Überschrift */}
+            <div className="flex items-center gap-2 pt-2">
+              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${section.color}`}>
+                {section.group}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {section.events.reduce((sum, ev) => sum + ev.webhooks.length, 0)} Webhook{section.events.reduce((sum, ev) => sum + ev.webhooks.length, 0) !== 1 ? "s" : ""} konfiguriert
+              </span>
+            </div>
+
+            {section.events.map((group) => (
           <div key={group.event} className="overflow-hidden rounded-lg border bg-card">
             {/* Event-Header */}
             <div className="border-b bg-muted/50 px-4 py-3 flex items-center justify-between">
               <div>
                 <span className="text-sm font-semibold text-foreground">{group.label}</span>
-                <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-mono text-blue-700">
+                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
                   {group.event}
                 </span>
               </div>
@@ -272,7 +314,7 @@ function WebhooksTab() {
               </span>
             </div>
 
-            {/* Webhook-Eintraege */}
+            {/* Webhook-Einträge */}
             {group.webhooks.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">
                 Kein Webhook konfiguriert – Event wird nicht ausgelöst.
@@ -342,6 +384,8 @@ function WebhooksTab() {
                 ))}
               </div>
             )}
+          </div>
+            ))}
           </div>
         ))
       )}

@@ -5,6 +5,7 @@
  */
 
 import { ProcessDashboard } from "@/components/process-dashboard";
+import { NeueVerbeamtungModal } from "@/components/neue-verbeamtung-modal";
 import { civilServiceDashboardConfig } from "./civil-service-config";
 
 interface User {
@@ -19,6 +20,9 @@ export function CivilServiceDashboardContent({ }: { user: User }) {
   return (
     <ProcessDashboard
       config={civilServiceDashboardConfig}
+      renderCreateModal={({ open, onClose, onCreated }) => (
+        <NeueVerbeamtungModal open={open} onClose={onClose} onCreated={onCreated} />
+      )}
     />
   );
 }

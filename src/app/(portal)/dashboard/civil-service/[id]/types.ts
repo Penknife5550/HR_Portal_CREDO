@@ -38,11 +38,18 @@ export interface PhaseData {
 export interface AssessmentData {
   id: string;
   assessmentNumber: number;
+  assessmentType: string; // "BEURTEILUNG" | "REFERENZ"
   status: string;
   supervisorEmail: string;
+  recipientEmail: string;
   supervisorName: string | null;
+  recipientName: string | null;
   grade: number | null;
   token: string | null;
+  sentAt: string | null;
+  firstOpenedAt: string | null;
+  lastOpenedAt: string | null;
+  openCount: number;
   submittedAt: string | null;
 }
 
@@ -99,6 +106,8 @@ export interface CivilServiceData {
   auditLog: AuditLogEntry[];
   boardDecisions: BoardDecision[];
   prerequisites: PrerequisiteData[];
+  applicationToken: string | null;
+  applicationSubmittedAt: string | null;
 }
 
 // =============================================

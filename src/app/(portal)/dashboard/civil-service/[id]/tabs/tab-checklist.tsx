@@ -1,10 +1,20 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { CIVIL_SERVICE_PHASE_LABELS, CIVIL_SERVICE_ASSIGNEE_LABELS } from "@/lib/constants";
 import type { ChecklistItem } from "../types";
 import { PHASE_ORDER, ASSIGNEE_COLORS } from "../types";
 import { formatDate } from "../helpers";
 import { ChevronIcon } from "../icons";
+
+const ASSIGNEE_FILTER_OPTIONS = [
+  { key: "ALL", label: "Alle" },
+  { key: "HR", label: "HR" },
+  { key: "SL", label: "SL" },
+  { key: "LK", label: "LK" },
+  { key: "EXTERN", label: "Extern" },
+  { key: "BEIRAT", label: "Beirat" },
+] as const;
 
 export function TabChecklist({
   checklistByPhase,
@@ -22,10 +32,70 @@ export function TabChecklist({
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("ALL");
+
+  // Count items per assignee across all phases
+  const assigneeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    let total = 0;
+    for (const items of Object.values(checklistByPhase)) {
+      for (const item of items) {
+        counts[item.assignee] = (counts[item.assignee] || 0) + 1;
+        total++;
+      }
+    }
+    counts["ALL"] = total;
+    return counts;
+  }, [checklistByPhase]);
+
+  // Filter items by assignee
+  const filteredByPhase = useMemo(() => {
+    if (assigneeFilter === "ALL") return checklistByPhase;
+    const filtered: Record<string, ChecklistItem[]> = {};
+    for (const [phase, items] of Object.entries(checklistByPhase)) {
+      const matching = items.filter((i) => i.assignee === assigneeFilter);
+      if (matching.length > 0) {
+        filtered[phase] = matching;
+      }
+    }
+    return filtered;
+  }, [checklistByPhase, assigneeFilter]);
+
   return (
     <div className="space-y-3">
+      {/* Assignee Filter Bar */}
+      <div className="flex items-center gap-2 flex-wrap rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+        {ASSIGNEE_FILTER_OPTIONS.map((opt) => {
+          const count = assigneeCounts[opt.key] || 0;
+          const isActive = assigneeFilter === opt.key;
+          return (
+            <button
+              key={opt.key}
+              onClick={() => setAssigneeFilter(opt.key)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                isActive
+                  ? "bg-credo-gruen text-white shadow-sm"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {opt.label}
+              <span
+                className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
+                  isActive
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-200 text-gray-500"
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Phases */}
       {PHASE_ORDER.map((phaseKey) => {
-        const items = checklistByPhase[phaseKey];
+        const items = filteredByPhase[phaseKey];
         if (!items || items.length === 0) return null;
 
         const completedCount = items.filter((i) => i.isCompleted).length;

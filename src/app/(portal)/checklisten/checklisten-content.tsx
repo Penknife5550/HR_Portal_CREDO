@@ -564,7 +564,67 @@ export function ChecklistenContent({ user }: { user: User }) {
           >
             Offboarding
           </button>
+          <button
+            onClick={() => setActiveTab("verbeamtung")}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === "verbeamtung"
+                ? "border-b-2 border-[#6BAA24] text-[#6BAA24]"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Verbeamtung
+          </button>
         </div>
+
+        {/* Verbeamtung Tab — Info */}
+        {activeTab === "verbeamtung" && (
+          <div className="rounded-xl border bg-card p-8">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-credo-blau/10">
+                <svg className="h-6 w-6 text-credo-blau" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Verbeamtung (PSI) — 62 Checklisten-Punkte</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Die Verbeamtungs-Checkliste wird automatisch beim Anlegen eines neuen Vorgangs erstellt.
+                  Sie umfasst 62 Punkte über alle 11 Schritte und 4 Phasen des PSI-Prozesses.
+                </p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-lg bg-muted p-3">
+                    <p className="text-xs text-muted-foreground">Phase I</p>
+                    <p className="text-sm font-semibold text-foreground">Antrag & Beurteilung</p>
+                    <p className="text-xs text-muted-foreground">11 Punkte</p>
+                  </div>
+                  <div className="rounded-lg bg-muted p-3">
+                    <p className="text-xs text-muted-foreground">Phase II</p>
+                    <p className="text-sm font-semibold text-foreground">Verwaltung (A-H)</p>
+                    <p className="text-xs text-muted-foreground">30 Punkte</p>
+                  </div>
+                  <div className="rounded-lg bg-muted p-3">
+                    <p className="text-xs text-muted-foreground">Phase III</p>
+                    <p className="text-sm font-semibold text-foreground">Probezeit</p>
+                    <p className="text-xs text-muted-foreground">16 Punkte</p>
+                  </div>
+                  <div className="rounded-lg bg-muted p-3">
+                    <p className="text-xs text-muted-foreground">Phase IV</p>
+                    <p className="text-sm font-semibold text-foreground">Übernahme Lebenszeit</p>
+                    <p className="text-xs text-muted-foreground">5 Punkte</p>
+                  </div>
+                </div>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Die Punkte können in der Detail-Ansicht jedes Verbeamtungsvorgangs bearbeitet werden.
+                  Gatekeeper-Punkte (🔒) müssen erledigt sein bevor die nächste Phase beginnt.
+                </p>
+                <a href="/dashboard?tab=civil-service"
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+                  Zum Verbeamtungs-Dashboard →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Erfolgsmeldung */}
         {successMessage && (
