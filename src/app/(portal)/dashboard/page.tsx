@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { PortalHeader } from "@/components/portal-header";
 import { DashboardContent } from "./dashboard-content";
 import { OffboardingDashboardContent } from "./offboarding-dashboard-new";
+import { CivilServiceDashboardContent } from "./civil-service-dashboard";
 
 /**
  * HR-Dashboard (Server Component)
@@ -22,7 +23,12 @@ export default async function DashboardPage({
   }
 
   const { tab } = await searchParams;
-  const activeTab = tab === "offboarding" ? "offboarding" : "onboarding";
+  const activeTab =
+    tab === "offboarding"
+      ? "offboarding"
+      : tab === "civil-service"
+        ? "civil-service"
+        : "onboarding";
 
   return (
     <div>
@@ -53,6 +59,16 @@ export default async function DashboardPage({
             >
               Offboarding
             </Link>
+            <Link
+              href="/dashboard?tab=civil-service"
+              className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === "civil-service"
+                  ? "border-credo-gruen text-credo-gruen"
+                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+              }`}
+            >
+              Verbeamtung
+            </Link>
           </nav>
         </div>
       </div>
@@ -60,8 +76,10 @@ export default async function DashboardPage({
       {/* Tab Content */}
       {activeTab === "onboarding" ? (
         <DashboardContent user={session} />
-      ) : (
+      ) : activeTab === "offboarding" ? (
         <OffboardingDashboardContent user={session} />
+      ) : (
+        <CivilServiceDashboardContent user={session} />
       )}
     </div>
   );

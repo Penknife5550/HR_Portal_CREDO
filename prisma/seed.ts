@@ -1129,6 +1129,14 @@ async function main() {
 
   console.log(`\n📋 Phase 2: ${zeugnisTemplates.length} Zeugnis-Bewertungsbogen Templates angelegt/aktualisiert.\n`);
 
+  // =============================================
+  // Section 9: Verbeamtung Checklisten-Template
+  // =============================================
+  console.log("\n📋 Phase 5: Verbeamtung Checklisten-Vorlage anlegen...\n");
+  console.log("  ℹ️  Verbeamtung (PSI) Checklisten-Template ist als Konstante in src/lib/civil-service-checklist-template.ts definiert.");
+  console.log("  ℹ️  62 Checklistenpunkte werden beim Start eines neuen CivilServiceProcess aus dem Template erzeugt.");
+  console.log("  ✅ Verbeamtung Konstanten bereit (Status, Schritte, Phasen, Zuständige, Dokumenttypen).\n");
+
   console.log("✨ Seeding abgeschlossen!\n");
 }
 

@@ -232,3 +232,92 @@ export const OVERALL_GRADE_FORMULATIONS: Record<number, string> = {
   5: "im Großen und Ganzen zu unserer Zufriedenheit",
   6: "hat sich bemüht, den Anforderungen gerecht zu werden",
 };
+
+// =============================================
+// Verbeamtung (PSI) Status-Labels
+// =============================================
+export const CIVIL_SERVICE_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  DRAFT: { label: "Entwurf", color: "bg-gray-100 text-gray-800" },
+  PREREQUISITES_CHECK: { label: "Voraussetzungsprüfung", color: "bg-credo-blau/10 text-credo-blau" },
+  ASSESSMENT_PENDING: { label: "Beurteilung ausstehend", color: "bg-credo-gelb/10 text-credo-gelb" },
+  REFERENCE_PENDING: { label: "Referenz ausstehend", color: "bg-credo-gelb/10 text-credo-gelb" },
+  BOARD_PENDING: { label: "Beirat ausstehend", color: "bg-purple-100 text-purple-800" },
+  BOARD_POSTPONED: { label: "Beirat: Aufgeschoben", color: "bg-orange-100 text-orange-800" },
+  ADMINISTRATION: { label: "Verwaltung", color: "bg-credo-blau/10 text-credo-blau" },
+  PROBATION: { label: "Probezeit", color: "bg-credo-gruen/10 text-credo-gruen" },
+  LIFETIME_PENDING: { label: "Übernahme Lebenszeit", color: "bg-purple-100 text-purple-800" },
+  COMPLETED: { label: "Abgeschlossen", color: "bg-credo-gruen/10 text-credo-gruen" },
+  REJECTED: { label: "Abgelehnt", color: "bg-credo-rot/10 text-credo-rot" },
+  CANCELLED: { label: "Abgebrochen", color: "bg-gray-100 text-gray-800" },
+};
+
+export const CIVIL_SERVICE_STEP_LABELS: Record<number, string> = {
+  1: "Formloser Antrag",
+  2: "Erste Information Beirat",
+  3: "1. Unterrichtsbesuch + Beurteilung",
+  4: "Gespräch + Referenz",
+  5: "Entscheidung Beirat",
+  6: "Verwaltungsvorgang",
+  7: "Übernahme PSI auf Probe",
+  8: "2. Unterrichtsbesuch",
+  9: "3. Unterrichtsbesuch + Referenz",
+  10: "Amtsarzt Lebenszeit",
+  11: "Übernahme Lebenszeit",
+};
+
+export const CIVIL_SERVICE_PHASE_LABELS: Record<string, string> = {
+  I: "Antrag & Beurteilung",
+  II_A: "Amtsarzt",
+  II_B: "Besoldung",
+  II_C: "Vertrag & BR",
+  II_D: "Krankenversicherung",
+  II_E: "Beihilfe",
+  II_F: "RV-Befreiung",
+  II_G: "Kündigung & LOGA",
+  II_H: "Riester, Förderverein, Info",
+  III: "Probezeit",
+  IV: "Übernahme Lebenszeit",
+};
+
+export const CIVIL_SERVICE_ASSIGNEE_LABELS: Record<string, string> = {
+  HR: "Personalverwaltung",
+  SL: "Schulleitung",
+  LK: "Lehrkraft",
+  EXTERN: "Extern",
+  BEIRAT: "Beirat",
+};
+
+export const CIVIL_SERVICE_DOC_TYPES: Record<string, string> = {
+  ANTRAG: "Formloser Antrag",
+  EINGANGSBESTAETIGUNG: "Eingangsbestätigung",
+  AMTSARZT_PROBE: "Amtsärztliches Zeugnis (Probe)",
+  AMTSARZT_LEBENSZEIT: "Amtsärztliches Zeugnis (Lebenszeit)",
+  BEURTEILUNG_1: "1. Dienstliche Beurteilung",
+  BEURTEILUNG_2: "2. Dienstliche Beurteilung",
+  BEURTEILUNG_3: "3. Dienstliche Beurteilung",
+  REFERENZ_1: "1. Schriftliche Referenz SL",
+  REFERENZ_2: "2. Schriftliche Referenz SL",
+  GEMEINDE_REFERENZ: "Gemeinde-Referenz",
+  VEBS_NACHWEIS: "VEBS-Seminar-Nachweis",
+  STUFENBERECHNUNG: "Erfahrungsstufen-Berechnung",
+  VORDIENSZEITENBERECHNUNG: "Vordienstzeiten-Berechnung",
+  VERTRAG_PROBE: "PSI-Vertrag auf Probe",
+  VERTRAG_LEBENSZEIT: "PSI-Vertrag auf Lebenszeit",
+  VERTRAG_UNTERSCHRIEBEN: "Unterschriebener Vertrag",
+  BR_ANTRAG_PROBE: "Antrag an BR Dez. 48 (Probe)",
+  BR_GENEHMIGUNG_PROBE: "BR-Genehmigung (Probe)",
+  BR_ANTRAG_LEBENSZEIT: "Antrag an BR Dez. 48 (Lebenszeit)",
+  BR_GENEHMIGUNG_LEBENSZEIT: "BR-Genehmigung (Lebenszeit)",
+  KK_BESCHEINIGUNG: "KK-Bescheinigung PKV",
+  BEIHILFE_ERSTANTRAG: "Beihilfe-Erstantrag",
+  BEIHILFE_DATENSCHUTZ: "Datenschutz-Einwilligung Beihilfe",
+  BEIHILFE_STAMMBLATT: "Stammblatt Beihilfeakte",
+  BEIHILFE_MITTEILUNG: "Mitteilung an Beihilfestelle",
+  RV_BEFREIUNGSANTRAG: "RV-Befreiungsantrag",
+  KUENDIGUNG_ANGESTELLT: "Kündigungsbestätigung Angestelltenverhältnis",
+  FAMILIENZUSCHLAEGE: "Erklärung Familienzuschläge",
+  RIESTER_EINVERSTAENDNIS: "Einverständnis Riester-Rente",
+  FOERDERVEREIN_ANTRAG: "Mitgliedsantrag Förderverein",
+  BEIRAT_PROTOKOLL_PROBE: "Beiratsprotokoll (Probe)",
+  BEIRAT_PROTOKOLL_LEBENSZEIT: "Beiratsprotokoll (Lebenszeit)",
+};

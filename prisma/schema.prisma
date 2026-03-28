@@ -29,6 +29,7 @@ model Organization {
   departmentConfigs DepartmentConfig[]
   employments      Employment[]
   userAssignments  UserOrgAssignment[]
+  civilServiceProcesses CivilServiceProcess[]
 
   @@map("organizations")
 }
@@ -61,6 +62,7 @@ model Employee {
   employments       Employment[]
   onboardings       OnboardingProcess[]  @relation("EmployeeOnboardings")
   offboardings      OffboardingProcess[] @relation("EmployeeOffboardings")
+  civilServiceProcesses CivilServiceProcess[] @relation("EmployeeCivilService")
 
   @@index([personalNumber])
   @@index([lastName, firstName])
@@ -516,6 +518,9 @@ model User {
   reviewedZeugnisse       ZeugnisBewertung[]   @relation("ZeugnisReviewer")
   finalizedZeugnisse      ZeugnisBewertung[]   @relation("ZeugnisFinalizier")
 
+  // Verbeamtung
+  initiatedCivilService   CivilServiceProcess[] @relation("CivilServiceInitiator")
+
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -541,7 +546,9 @@ model AuditLog {
   onboarding      OnboardingProcess? @relation(fields: [onboardingId], references: [id])
   offboardingId   String?
   offboarding     OffboardingProcess? @relation("OffboardingAuditLogs", fields: [offboardingId], references: [id])
-  processType     String?           // "ONBOARDING" oder "OFFBOARDING"
+  civilServiceId  String?
+  civilService    CivilServiceProcess? @relation("CivilServiceAuditLogs", fields: [civilServiceId], references: [id])
+  processType     String?           // "ONBOARDING", "OFFBOARDING" oder "CIVIL_SERVICE"
 
   action          String            // z.B. "ONBOARDING_CREATED", "QUESTIONNAIRE_SUBMITTED"
   details         Json?             // Zusaetzliche Infos
@@ -551,6 +558,7 @@ model AuditLog {
 
   @@index([onboardingId])
   @@index([offboardingId])
+  @@index([civilServiceId])
   @@index([createdAt])
   @@map("audit_logs")
 }
@@ -1327,4 +1335,271 @@ model ZeugnisBewertungRating {
   @@unique([zeugnisBewertungId, snapshotCriterionId])
   @@index([zeugnisBewertungId])
   @@map("zeugnis_bewertung_ratings")
+}
+
+// =============================================
+// VERBEAMTUNG (PSI) — Sprint 5
+// 11-Schritte-Prozess, 4 Phasen, 8 Gatekeeper
+// =============================================
+
+enum CivilServiceType {
+  PROBE       // PSI auf Probe (3 Jahre)
+  LIFETIME    // PSI auf Lebenszeit
+}
+
+enum CivilServiceStatus {
+  DRAFT                 // Antrag in Vorbereitung
+  PREREQUISITES_CHECK   // Voraussetzungen werden geprüft
+  ASSESSMENT_PENDING    // Beurteilung durch SL ausstehend
+  REFERENCE_PENDING     // Referenz durch SL ausstehend
+  BOARD_PENDING         // Beiratsentscheidung ausstehend
+  BOARD_POSTPONED       // Beirat hat aufgeschoben
+  ADMINISTRATION        // Verwaltungsvorgang läuft (Phase II)
+  PROBATION             // Probezeit (Phase III)
+  LIFETIME_PENDING      // Übernahme Lebenszeit läuft (Phase IV)
+  COMPLETED             // Abgeschlossen
+  REJECTED              // Abgelehnt
+  CANCELLED             // Abgebrochen
+}
+
+enum CivilServicePhaseStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+  SKIPPED
+}
+
+enum BoardDecisionResult {
+  POSITIVE
+  NEGATIVE
+  POSTPONED
+}
+
+// =============================================
+// Verbeamtungsvorgang (Haupttabelle)
+// =============================================
+model CivilServiceProcess {
+  id                  String              @id @default(uuid())
+  displayId           String              @unique // z.B. "PSI-2026-GYM-001"
+  sequentialNumber    Int
+
+  // Verknüpfungen
+  employeeId          String?
+  employee            Employee?           @relation("EmployeeCivilService", fields: [employeeId], references: [id])
+  organizationId      String
+  organization        Organization        @relation(fields: [organizationId], references: [id])
+  initiatedById       String
+  initiatedBy         User                @relation("CivilServiceInitiator", fields: [initiatedById], references: [id])
+
+  // Mitarbeiter-Daten (inline für Abwärtskompatibilität)
+  employeeFirstName   String
+  employeeLastName    String
+  employeeEmail       String
+  employeePersonalNr  String?
+
+  // Typ und Status
+  type                CivilServiceType    @default(PROBE)
+  status              CivilServiceStatus  @default(DRAFT)
+  currentStep         Int                 @default(1) // 1-11
+
+  // Voraussetzungen (JSON: 12 Kriterien aus 3.1)
+  prerequisites       Json?
+
+  // Termine
+  targetStartDate     DateTime?           // Geplanter Vertragsbeginn
+  probationStartDate  DateTime?           // Tatsächlicher Probezeit-Beginn
+  probationEndDate    DateTime?           // Probezeit-Ende (berechnet: +3 Jahre)
+  completedAt         DateTime?
+
+  // Besoldung
+  besoldungsgruppe    String?             // z.B. "A13"
+  erfahrungsstufe     Int?                // 1-12
+  vordienszeitenJson  Json?               // Berechnungsgrundlage
+
+  // Relationen
+  phases              CivilServicePhase[]
+  assessments         CivilServiceAssessment[]
+  boardDecisions      CivilServiceBoardDecision[]
+  documents           CivilServiceDocument[]
+  checklistItems      CivilServiceChecklistItem[]
+  auditLogs           AuditLog[]          @relation("CivilServiceAuditLogs")
+
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([status])
+  @@index([organizationId])
+  @@index([employeeId])
+  @@map("civil_service_processes")
+}
+
+// =============================================
+// Phasen-Status (A-H + Hauptphasen)
+// =============================================
+model CivilServicePhase {
+  id                String                @id @default(uuid())
+  processId         String
+  process           CivilServiceProcess   @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  phaseKey          String                // "I", "II_A", "II_B", ..., "II_H", "III", "IV"
+  phaseName         String                // "Amtsarzt", "Besoldung", etc.
+  orderIndex        Int                   @default(0)
+
+  status            CivilServicePhaseStatus @default(PENDING)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  blockedReason     String?
+
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([processId, phaseKey])
+  @@index([processId])
+  @@map("civil_service_phases")
+}
+
+// =============================================
+// Beurteilungen (3 Pflichtbeurteilungen via Magic Link)
+// =============================================
+model CivilServiceAssessment {
+  id                  String              @id @default(uuid())
+  processId           String
+  process             CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  assessmentNumber    Int                 // 1, 2 oder 3
+  assessmentType      String              // "BEURTEILUNG" oder "REFERENZ"
+
+  // Magic Link für SL
+  token               String              @unique
+  tokenExpiresAt      DateTime
+  recipientEmail      String              // SL E-Mail
+  recipientName       String?
+
+  // Tracking
+  sentAt              DateTime?
+  firstOpenedAt       DateTime?
+  lastOpenedAt        DateTime?
+  openCount           Int                 @default(0)
+  submittedAt         DateTime?
+
+  // Bewertung (JSON: Noten pro Kriterium)
+  templateSnapshot    Json?               // Beurteilungsvorlage (eingefroren)
+  ratingsData         Json?               // Noten pro Kriterium
+  overallGrade        Float?              // Gesamtschnitt
+  meetsRequirements   Boolean?            // < 3,0 und keine Kategorie > 3,0
+
+  // Referenz-Daten (nur bei assessmentNumber 1 + 3)
+  referenceData       Json?               // 12 Prüfpunkte (Ja/Nein/Teilweise)
+  gemeindeReferenz    String?             // Freitext Gemeinde-Referenz
+
+  // Reminder
+  lastReminderAt      DateTime?
+  reminderCount       Int                 @default(0)
+
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@unique([processId, assessmentNumber, assessmentType])
+  @@index([processId])
+  @@map("civil_service_assessments")
+}
+
+// =============================================
+// Beiratsentscheidungen
+// =============================================
+model CivilServiceBoardDecision {
+  id                String              @id @default(uuid())
+  processId         String
+  process           CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  decisionType      String              // "PROBE" oder "LIFETIME"
+  result            BoardDecisionResult
+  decisionDate      DateTime
+  notes             String?
+  protocolUploadId  String?             // Verweis auf Dokument
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([processId])
+  @@map("civil_service_board_decisions")
+}
+
+// =============================================
+// Dokumente (33+ Dokumenttypen)
+// =============================================
+model CivilServiceDocument {
+  id                String              @id @default(uuid())
+  processId         String
+  process           CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  documentType      String              // "AMTSARZT", "VERTRAG_PROBE", "BR_GENEHMIGUNG", etc.
+  documentName      String              // Anzeigename
+  step              String?             // Zuordnung zum Schritt (z.B. "6.A", "6.C")
+
+  // Datei
+  fileName          String?
+  filePath          String?
+  fileSize          Int?
+  mimeType          String?
+
+  // Status
+  status            String              @default("PENDING") // PENDING, UPLOADED, APPROVED, EXPIRED, GENERATED
+  uploadedAt        DateTime?
+  approvedAt        DateTime?
+  expiresAt         DateTime?           // z.B. Amtsarzt: 3 Monate Gültigkeit
+
+  // Auto-Generierung
+  isGenerated       Boolean             @default(false) // Vom System generiert?
+  generatedAt       DateTime?
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([processId])
+  @@index([documentType])
+  @@map("civil_service_documents")
+}
+
+// =============================================
+// Checkliste (40+ Aufgaben, phasenweise)
+// =============================================
+model CivilServiceChecklistItem {
+  id                String              @id @default(uuid())
+  processId         String
+  process           CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  step              String              // "1", "2", "3", ..., "6.A.1", "6.C.4", "7.3", etc.
+  phase             String              // "I", "II_A", "II_B", ..., "III", "IV"
+  category          String              // "Antrag", "Amtsarzt", "Vertrag", etc.
+  title             String
+  description       String?
+
+  // Zuständigkeit
+  assignee          String              // "HR", "SL", "LK", "EXTERN", "BEIRAT"
+  assigneeName      String?             // Konkreter Name falls bekannt
+
+  // Status
+  isCompleted       Boolean             @default(false)
+  completedAt       DateTime?
+  completedById     String?
+
+  // Fristen
+  dueDate           DateTime?
+  isGatekeeper      Boolean             @default(false) // Blockiert nächsten Schritt?
+  isOverdue         Boolean             @default(false)
+
+  // Verknüpfung zu Dokument
+  linkedDocumentType String?            // z.B. "AMTSARZT" — wenn Dokument hochgeladen, Item automatisch erledigt
+
+  orderIndex        Int                 @default(0)
+  notes             String?
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([processId])
+  @@index([phase])
+  @@map("civil_service_checklist_items")
 }
