@@ -127,10 +127,14 @@ export function ZeugnisBewertungForm({
     [sortedCategories]
   );
 
-  // Bewertete Kriterien
+  // Bewertete Kriterien (nur die im Template vorhandenen zaehlen)
+  const validCriterionIds = useMemo(
+    () => new Set(sortedCategories.flatMap((cat) => cat.criteria.map((c) => c.id))),
+    [sortedCategories]
+  );
   const ratedCriteria = useMemo(
-    () => Object.keys(grades).length,
-    [grades]
+    () => Object.keys(grades).filter((id) => validCriterionIds.has(id)).length,
+    [grades, validCriterionIds]
   );
 
   // Fortschritt in Prozent

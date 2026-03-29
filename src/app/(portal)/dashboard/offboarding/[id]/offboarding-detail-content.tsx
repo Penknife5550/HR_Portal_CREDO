@@ -704,6 +704,7 @@ export function OffboardingDetailContent({
             setEditingValue={setEditingValue}
             handleFieldSave={handleFieldSave}
             departmentLinks={data.departmentLinks || []}
+            onNavigateTab={(tab) => setActiveTab(tab as TabId)}
           />
         )}
 

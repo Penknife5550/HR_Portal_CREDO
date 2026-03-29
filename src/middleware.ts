@@ -85,9 +85,20 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL("/login", request.url));
       }
       const secret = new TextEncoder().encode(jwtSecret);
-      await jwtVerify(sessionCookie.value, secret, {
+      const { payload } = await jwtVerify(sessionCookie.value, secret, {
         algorithms: ["HS256"],
       });
+
+      // Admin-Routen nur fuer SUPER_ADMIN und HR_LEITUNG
+      const adminRoutes = ["/benutzerverwaltung", "/vorlagen", "/checklisten", "/mandanten", "/einstellungen"];
+      const isAdminRoute = adminRoutes.some((r) => pathname.startsWith(r));
+      if (isAdminRoute) {
+        const role = payload.role as string;
+        const adminRoles = ["SUPER_ADMIN", "HR_LEITUNG"];
+        if (!adminRoles.includes(role)) {
+          return NextResponse.redirect(new URL("/dashboard", request.url));
+        }
+      }
     } catch {
       // Ungueltiger oder abgelaufener Token → Cookie loeschen, Redirect zu Login
       const redirectResponse = NextResponse.redirect(new URL("/login", request.url));

@@ -29,6 +29,7 @@ export function TabOverview({
   setEditingValue,
   handleFieldSave,
   departmentLinks,
+  onNavigateTab,
 }: {
   data: OffboardingData;
   editingField: string | null;
@@ -38,6 +39,7 @@ export function TabOverview({
   setEditingValue: (v: string) => void;
   handleFieldSave: (field: string, value: string) => void;
   departmentLinks: DepartmentLinkData[];
+  onNavigateTab?: (tab: string) => void;
 }) {
   const ed = data.exitData;
 
@@ -129,6 +131,9 @@ export function TabOverview({
         note: i.notes,
       })) : undefined,
       info: deptTotal === 0 && checklistTotal === 0 ? "Keine Abteilungs-Links oder Checkliste vorhanden — erstelle sie im Checkliste-Tab" : undefined,
+      actions: !step2Done && onNavigateTab ? [
+        { label: "Zum Checkliste-Tab", onClick: () => onNavigateTab("checklist"), variant: "secondary" as const },
+      ] : undefined,
     },
     {
       key: "rueckgaben",
@@ -144,6 +149,9 @@ export function TabOverview({
         assigneeColor: "bg-orange-100 text-orange-700",
       })) : undefined,
       info: returnTotal === 0 ? "Keine Rueckgaben erfasst — erfasse sie im Rueckgaben-Tab" : undefined,
+      actions: !step3Done && onNavigateTab ? [
+        { label: "Zum Rueckgaben-Tab", onClick: () => onNavigateTab("returns"), variant: "secondary" as const },
+      ] : undefined,
     },
     {
       key: "exit-interview",
@@ -153,6 +161,9 @@ export function TabOverview({
       info: hasExitInterview
         ? (exitInterviewDone ? undefined : "Exit-Interview wurde erstellt — wartet auf Einreichung")
         : "Kein Exit-Interview erstellt — kann im Exit-Interview-Tab angelegt werden",
+      actions: !step4Done && onNavigateTab ? [
+        { label: "Zum Exit-Interview-Tab", onClick: () => onNavigateTab("exit-interview"), variant: "secondary" as const },
+      ] : undefined,
     },
     {
       key: "zeugnis",
@@ -162,6 +173,9 @@ export function TabOverview({
       info: zeugnisDone ? undefined
         : zeugnisStatus === "IN_PROGRESS" ? "Zeugnis in Bearbeitung"
         : "Zeugnis-Bewertung noch ausstehend — kann im Zeugnis-Tab gestartet werden",
+      actions: !step5Done && onNavigateTab ? [
+        { label: "Zum Zeugnis-Tab", onClick: () => onNavigateTab("zeugnis"), variant: "secondary" as const },
+      ] : undefined,
     },
     {
       key: "dokumente",
@@ -172,6 +186,9 @@ export function TabOverview({
         { id: "sv", title: "SV-Abmeldung", isCompleted: svDone, assignee: "HR", assigneeColor: "bg-credo-blau/10 text-credo-blau" },
         { id: "cert", title: "Arbeitsbescheinigung", isCompleted: certDone, assignee: "HR", assigneeColor: "bg-credo-blau/10 text-credo-blau" },
       ],
+      actions: !step6Done && onNavigateTab ? [
+        { label: "Zum Dokumente-Tab", onClick: () => onNavigateTab("documents"), variant: "secondary" as const },
+      ] : undefined,
     },
     {
       key: "abschluss",

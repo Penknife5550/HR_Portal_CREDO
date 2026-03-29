@@ -34,6 +34,6 @@ export const saveZeugnisRatingsSchema = z.object({
     snapshotCriterionId: z.string().min(1, "snapshotCriterionId ist erforderlich"),
     snapshotCategoryId: z.string().min(1, "snapshotCategoryId ist erforderlich"),
     grade: z.number().int().min(1, "grade muss mindestens 1 sein").max(6, "grade darf maximal 6 sein"),
-    comment: z.string().max(1000).optional(),
+    comment: z.string().max(1000).optional().nullable(),
   })).min(1, "Mindestens eine Bewertung erforderlich"),
 });

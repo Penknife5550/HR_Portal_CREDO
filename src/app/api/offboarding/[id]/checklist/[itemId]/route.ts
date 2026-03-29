@@ -98,6 +98,24 @@ export async function PATCH(
       });
     }
 
+    // Department-Link Status aktualisieren (wenn Item einer Abteilung zugewiesen ist)
+    const dept = updated.assigneeDepartment;
+    if (dept) {
+      const deptItems = await prisma.offboardingChecklistItem.findMany({
+        where: { offboardingId: id, assigneeDepartment: dept },
+        select: { isCompleted: true },
+      });
+      const deptAllComplete = deptItems.every((i) => i.isCompleted);
+
+      await prisma.offboardingDepartmentLink.updateMany({
+        where: { offboardingId: id, departmentKey: dept },
+        data: {
+          allTasksComplete: deptAllComplete,
+          completedAt: deptAllComplete ? new Date() : null,
+        },
+      });
+    }
+
     // Pruefen ob alle Items erledigt sind
     const totalItems = await prisma.offboardingChecklistItem.count({
       where: { offboardingId: id },
