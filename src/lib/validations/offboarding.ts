@@ -24,6 +24,10 @@ export const createOffboardingSchema = z.object({
 
 export const updateOffboardingSchema = z.object({
   status: z.string().optional(),
+  employeeFirstName: z.string().min(1).max(100).optional(),
+  employeeLastName: z.string().min(1).max(100).optional(),
+  employeePrivateEmail: z.string().email("Ungueltige private E-Mail").optional().or(z.literal("")),
+  employeePersonalNr: z.string().max(50).optional().or(z.literal("")),
   exitType: z.enum([
     "KUENDIGUNG_ARBEITNEHMER",
     "KUENDIGUNG_ARBEITGEBER",

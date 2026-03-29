@@ -134,6 +134,10 @@ export async function PATCH(
       contractEndDate,
       noticePeriodEnd,
       noticeDate,
+      employeeFirstName,
+      employeeLastName,
+      employeePrivateEmail,
+      employeePersonalNr,
       exitData: exitDataFromBody,
     } = parsed.data;
 
@@ -178,6 +182,10 @@ export async function PATCH(
     if (exitType) updateData.exitType = exitType;
     if (lastWorkingDay) updateData.lastWorkingDay = new Date(lastWorkingDay);
     if (exitReason !== undefined) updateData.exitReason = exitReason;
+    if (employeeFirstName !== undefined) updateData.employeeFirstName = employeeFirstName;
+    if (employeeLastName !== undefined) updateData.employeeLastName = employeeLastName;
+    if (employeePrivateEmail !== undefined) updateData.employeePrivateEmail = employeePrivateEmail || null;
+    if (employeePersonalNr !== undefined) updateData.employeePersonalNr = employeePersonalNr || null;
     if (contractEndDate)
       updateData.contractEndDate = new Date(contractEndDate);
     if (noticePeriodEnd)
