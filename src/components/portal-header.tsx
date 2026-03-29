@@ -41,7 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Dashboard",
     href: "/dashboard",
-    roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"],
+    roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER"],
   },
   {
     label: "Vorlagen",

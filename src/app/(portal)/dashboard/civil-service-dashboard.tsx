@@ -16,13 +16,16 @@ interface User {
   lastName: string;
 }
 
-export function CivilServiceDashboardContent({ }: { user: User }) {
+const CREATE_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG"];
+
+export function CivilServiceDashboardContent({ user }: { user: User }) {
+  const canCreate = CREATE_ROLES.includes(user.role);
   return (
     <ProcessDashboard
       config={civilServiceDashboardConfig}
-      renderCreateModal={({ open, onClose, onCreated }) => (
+      renderCreateModal={canCreate ? ({ open, onClose, onCreated }) => (
         <NeueVerbeamtungModal open={open} onClose={onClose} onCreated={onCreated} />
-      )}
+      ) : undefined}
     />
   );
 }

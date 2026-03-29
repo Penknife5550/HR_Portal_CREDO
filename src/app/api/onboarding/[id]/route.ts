@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
+import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
 
 // =============================================
 // GET /api/onboarding/:id
@@ -18,13 +19,16 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Auth-Check
+    // Auth + Rollen-Check
     const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { error: "Nicht authentifiziert" },
         { status: 401 }
       );
+    }
+    if (!PORTAL_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -71,6 +75,11 @@ export async function GET(
       );
     }
 
+    // Org-Zugriffspruefung
+    if (!(await canAccessProcess(session, onboarding.organizationId))) {
+      return NextResponse.json({ error: "Keine Berechtigung fuer diesen Vorgang" }, { status: 403 });
+    }
+
     // Tokens aus der Antwort entfernen (Sicherheit: Magic-Links nicht exponieren)
     const { token: _t, supervisorToken: _st, ...safeOnboarding } = onboarding;
 
@@ -103,13 +112,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Auth-Check
     const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { error: "Nicht authentifiziert" },
         { status: 401 }
       );
+    }
+    if (!HR_EDIT_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
     const { id } = await params;

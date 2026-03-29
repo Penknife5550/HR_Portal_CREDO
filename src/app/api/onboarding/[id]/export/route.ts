@@ -13,19 +13,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
+import { EXPORT_ROLES } from "@/lib/permissions";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Auth-Check: Export enthaelt sensible Personaldaten
+    // Auth + Rollen-Check: Export enthaelt sensible Personaldaten
     const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { error: "Nicht authentifiziert" },
         { status: 401 }
       );
+    }
+    if (!EXPORT_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung fuer Export" }, { status: 403 });
     }
 
     const { id } = await params;

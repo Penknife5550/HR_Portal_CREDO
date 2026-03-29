@@ -9,19 +9,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateToken, getTokenExpiryDate, getSession } from "@/lib/auth";
 import { triggerN8nWebhook } from "@/lib/n8n";
+import { orgFilter, PORTAL_ROLES, PROCESS_CREATE_ROLES } from "@/lib/permissions";
 
 // =============================================
 // POST /api/onboarding – Neuen Vorgang anlegen
 // =============================================
 export async function POST(request: NextRequest) {
   try {
-    // Auth-Check: Nur authentifizierte HR-Benutzer duerfen Vorgaenge anlegen
+    // Auth + Rollen-Check
     const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { error: "Nicht authentifiziert" },
         { status: 401 }
       );
+    }
+    if (!PROCESS_CREATE_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -218,13 +222,16 @@ export async function POST(request: NextRequest) {
 // =============================================
 export async function GET(request: NextRequest) {
   try {
-    // Auth-Check: Nur authentifizierte HR-Benutzer duerfen Vorgaenge sehen
+    // Auth + Rollen-Check
     const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { error: "Nicht authentifiziert" },
         { status: 401 }
       );
+    }
+    if (!PORTAL_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -239,8 +246,10 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(isNaN(rawLimit) ? 50 : rawLimit, 1), 200);
     const offset = Math.max(isNaN(rawOffset) ? 0 : rawOffset, 0);
 
-    // Filter zusammenbauen
-    const where: Record<string, unknown> = {};
+    // Filter zusammenbauen (inkl. Org-Einschraenkung)
+    const where: Record<string, unknown> = {
+      ...(await orgFilter(session)),
+    };
     if (status) where.status = status;
     if (organizationId) where.organizationId = organizationId;
     if (search) {

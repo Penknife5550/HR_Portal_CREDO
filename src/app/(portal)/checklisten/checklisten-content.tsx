@@ -132,7 +132,7 @@ function isOffboardingTemplate(template: { name: string; questionnaireType?: str
   return template.name.startsWith("Offboarding:") || template.name.startsWith("Offboarding: ");
 }
 
-type TabType = "onboarding" | "offboarding";
+type TabType = "onboarding" | "offboarding" | "verbeamtung";
 
 // Leeres Item
 function createEmptyItem(orderIndex: number): NewItem {

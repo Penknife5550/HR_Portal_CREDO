@@ -20,7 +20,6 @@ import { Step3Bank } from "./steps/step3-bank";
 import { Step4SocialSecurity } from "./steps/step4-social-security";
 import { Step5Tax } from "./steps/step5-tax";
 import { Step6Employment } from "./steps/step6-employment";
-import { Step7Children } from "./steps/step7-children";
 import { Step8Education } from "./steps/step8-education";
 import { Step9Masern } from "./steps/step9-masern";
 import { Step10Summary } from "./steps/step10-summary";
@@ -358,14 +357,13 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     <Step1Personal key="s1" {...stepProps} fieldConfig={getFieldConfig(1)} />,
     <Step2Address key="s2" {...stepProps} fieldConfig={getFieldConfig(2)} />,
     <Step3Bank key="s3" {...stepProps} fieldConfig={getFieldConfig(3)} />,
-    <Step4SocialSecurity key="s4" {...stepProps} fieldConfig={getFieldConfig(4)} />,
+    <Step4SocialSecurity key="s4" {...stepProps} fieldConfig={getFieldConfig(4)} token={token} />,
     <Step5Tax key="s5" {...stepProps} fieldConfig={getFieldConfig(5)} />,
     <Step6Employment key="s6" {...stepProps} fieldConfig={getFieldConfig(6)} />,
-    <Step7Children key="s7" {...stepProps} fieldConfig={getFieldConfig(7)} />,
-    <Step8Education key="s8" {...stepProps} fieldConfig={getFieldConfig(8)} />,
-    <Step9Masern key="s9" {...stepProps} fieldConfig={getFieldConfig(9)} />,
+    <Step8Education key="s7" {...stepProps} fieldConfig={getFieldConfig(8)} />,
+    <Step9Masern key="s8" {...stepProps} fieldConfig={getFieldConfig(9)} token={token} />,
     <Step10Summary
-      key="s10"
+      key="s9"
       {...stepProps}
       fieldConfig={getFieldConfig(10)}
       allData={formData}

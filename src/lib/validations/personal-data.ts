@@ -379,24 +379,18 @@ export const STEP_CONFIG = [
   },
   {
     number: 7,
-    title: "Kinder",
-    description: "Angaben zu Kindern (optional)",
-    icon: "users",
-  },
-  {
-    number: 8,
     title: "Bildung & Beruf",
     description: "Schulabschluss, Berufsausbildung",
     icon: "graduation-cap",
   },
   {
-    number: 9,
+    number: 8,
     title: "Masernschutz",
     description: "Impfnachweis fuer Gemeinschaftseinrichtungen",
     icon: "heart",
   },
   {
-    number: 10,
+    number: 9,
     title: "Zusammenfassung",
     description: "Pruefen und Absenden",
     icon: "check-circle",

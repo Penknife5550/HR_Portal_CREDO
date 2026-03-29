@@ -161,6 +161,9 @@ export function CivilServiceDetailContent({
   // Checklist
   const [togglingItems, setTogglingItems] = useState<Set<string>>(new Set());
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set());
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   // Documents
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -208,10 +211,10 @@ export function CivilServiceDetailContent({
     if (!data) return;
     setTogglingItems((prev) => new Set(prev).add(itemId));
     try {
-      const res = await fetch(`/api/civil-service/${processId}`, {
+      const res = await fetch(`/api/civil-service/${processId}/checklist/${itemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ checklistItemId: itemId, isCompleted: !currentValue }),
+        body: JSON.stringify({ isCompleted: !currentValue }),
       });
       if (res.ok) {
         await loadData();
@@ -226,6 +229,29 @@ export function CivilServiceDetailContent({
         next.delete(itemId);
         return next;
       });
+    }
+  };
+
+  // ---- Checklist Note Save ----
+  const handleSaveNote = async (itemId: string) => {
+    setSavingNote(true);
+    try {
+      const res = await fetch(`/api/civil-service/${processId}/checklist/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: noteText, isCompleted: data?.checklistItems.find(i => i.id === itemId)?.isCompleted ?? false }),
+      });
+      if (res.ok) {
+        await loadData();
+        setEditingNoteId(null);
+        setNoteText("");
+      } else {
+        setActionError("Notiz konnte nicht gespeichert werden.");
+      }
+    } catch {
+      setActionError("Verbindungsfehler.");
+    } finally {
+      setSavingNote(false);
     }
   };
 
@@ -356,13 +382,13 @@ export function CivilServiceDetailContent({
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {/* ---- Top Bar ---- */}
         <div className="mb-6">
-          <button
-            onClick={() => router.push("/dashboard?tab=civil-service")}
+          <a
+            href="/dashboard?tab=civil-service"
             className="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
           >
             <ArrowLeftIcon className="h-4 w-4" />
             Zurück
-          </button>
+          </a>
 
           <div className="flex flex-wrap items-start gap-3 sm:items-center">
             <span className="rounded-lg bg-credo-blau/10 px-3 py-1 text-sm font-bold text-credo-blau tracking-wide">
@@ -418,6 +444,16 @@ export function CivilServiceDetailContent({
             data={data}
             openGatekeepers={openGatekeepers}
             overdueItems={overdueItems}
+            onChecklistToggle={handleChecklistToggle}
+            togglingItems={togglingItems}
+            onReload={loadData}
+            editingNoteId={editingNoteId}
+            noteText={noteText}
+            savingNote={savingNote}
+            onEditNote={(id, currentNotes) => { setEditingNoteId(id); setNoteText(currentNotes || ""); }}
+            onCancelNote={() => { setEditingNoteId(null); setNoteText(""); }}
+            onNoteTextChange={setNoteText}
+            onSaveNote={handleSaveNote}
           />
         )}
 
@@ -428,6 +464,13 @@ export function CivilServiceDetailContent({
             togglePhaseCollapse={togglePhaseCollapse}
             togglingItems={togglingItems}
             onToggle={handleChecklistToggle}
+            editingNoteId={editingNoteId}
+            noteText={noteText}
+            savingNote={savingNote}
+            onEditNote={(id, currentNotes) => { setEditingNoteId(id); setNoteText(currentNotes || ""); }}
+            onCancelNote={() => { setEditingNoteId(null); setNoteText(""); }}
+            onNoteTextChange={setNoteText}
+            onSaveNote={handleSaveNote}
           />
         )}
 
@@ -452,10 +495,11 @@ export function CivilServiceDetailContent({
             fileInputRef={fileInputRef}
             onUpload={handleDocUpload}
             processId={processId}
+            assessments={data.assessments}
           />
         )}
 
-        {activeTab === "protocol" && <TabProtocol auditLog={data.auditLog} />}
+        {activeTab === "protocol" && <TabProtocol auditLog={data.auditLog || data.auditLogs || []} />}
       </main>
     </div>
   );

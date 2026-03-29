@@ -86,6 +86,17 @@ export interface PrerequisiteData {
   met: boolean;
 }
 
+export interface StakeholderContact {
+  name?: string;
+  email: string;
+}
+
+export interface Stakeholders {
+  schulleitung?: StakeholderContact;
+  amtsarzt?: { email: string };
+  beirat?: { email: string };
+}
+
 export interface CivilServiceData {
   id: string;
   displayId: string;
@@ -104,10 +115,12 @@ export interface CivilServiceData {
   assessments: AssessmentData[];
   documents: DocumentData[];
   auditLog: AuditLogEntry[];
+  auditLogs: AuditLogEntry[];
   boardDecisions: BoardDecision[];
   prerequisites: PrerequisiteData[];
   applicationToken: string | null;
   applicationSubmittedAt: string | null;
+  stakeholders: Stakeholders | null;
 }
 
 // =============================================

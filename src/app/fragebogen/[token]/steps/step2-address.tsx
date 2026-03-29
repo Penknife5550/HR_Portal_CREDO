@@ -53,6 +53,7 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
             </label>
             <input
               type="text"
+              autoComplete="off"
               {...register("street")}
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
             />
@@ -66,6 +67,7 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
             </label>
             <input
               type="text"
+              autoComplete="off"
               {...register("houseNumber")}
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
             />

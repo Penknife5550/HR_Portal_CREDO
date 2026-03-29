@@ -227,5 +227,5 @@ export async function POST(request: NextRequest) {
 }
 
 function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://hr.credo-schulen.de";
+  return process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://hr.fes-credo.de";
 }

@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { STATUS_LABELS } from "@/lib/constants";
+import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 
 // =============================================
 // Types
@@ -796,8 +797,111 @@ function TabOverview({
     ? `${appUrl}/modalitaeten/${data.supervisorToken}`
     : null;
 
+  // ---- Workflow-Steps berechnen ----
+  const fragebogenDone = data.personalData?.isComplete ?? false;
+  const fragebogenStarted = !!data.personalData;
+  const supervisorLinkExists = !!data.supervisorToken;
+  const supervisorDone = data.supervisorData?.isComplete ?? false;
+  const supervisorStarted = !!data.supervisorData;
+  const checklistTotal = data.checklistItems.length;
+  const checklistDone = data.checklistItems.filter((i) => i.isCompleted).length;
+  const checklistAllDone = checklistTotal > 0 && checklistDone === checklistTotal;
+  const isCompleted = data.status === "COMPLETED";
+
+  const workflowSteps: import("@/components/process-workflow-stepper").WorkflowStep[] = [
+    {
+      key: "einladung",
+      title: "Einladung versenden",
+      description: "Magic Link an den neuen Mitarbeiter senden",
+      status: data.token ? "completed" : "active",
+      completedAt: data.token ? formatDate(data.invitedAt) : undefined,
+      info: data.token ? undefined : "Fragebogen-Link wird beim Anlegen automatisch erstellt.",
+    },
+    {
+      key: "fragebogen",
+      title: "Personalfragebogen",
+      description: "Mitarbeiter fuellt den Personalfragebogen aus",
+      status: fragebogenDone ? "completed" : !data.token ? "upcoming" : "active",
+      completedAt: fragebogenDone && data.submittedAt ? formatDate(data.submittedAt) : undefined,
+      info: !fragebogenDone && fragebogenStarted
+        ? `Fragebogen in Bearbeitung (Schritt ${data.personalData?.currentStep || 1} von 9)`
+        : !fragebogenDone && data.token
+        ? "Wartet auf Einreichung durch den Mitarbeiter"
+        : undefined,
+      actions: !fragebogenDone && data.token ? [
+        { label: "Fragebogen-Link kopieren", onClick: () => { navigator.clipboard.writeText(fragebogenLink); }, variant: "secondary" },
+      ] : undefined,
+    },
+    {
+      key: "modalitaeten",
+      title: "Einstellungsmodalitaeten",
+      description: "Vorgesetzter fuellt Vertragsdetails aus",
+      status: supervisorDone ? "completed" : !fragebogenDone ? "upcoming" : "active",
+      info: supervisorDone ? undefined
+        : supervisorLinkExists && supervisorStarted
+        ? `Modalitaeten in Bearbeitung (Schritt ${data.supervisorData?.currentStep || 1} von 5)`
+        : supervisorLinkExists
+        ? "Link gesendet — wartet auf Bearbeitung durch den Vorgesetzten"
+        : fragebogenDone
+        ? "Vorgesetzten-Link muss noch erstellt werden"
+        : undefined,
+      actions: !supervisorDone && fragebogenDone ? (
+        supervisorLinkExists && modalitaetenLink
+          ? [{ label: "Modalitaeten-Link kopieren", onClick: () => { navigator.clipboard.writeText(modalitaetenLink); }, variant: "secondary" as const }]
+          : [{ label: "Vorgesetzten-Link erstellen", onClick: generateSupervisorLink, variant: "primary" as const, disabled: !supervisorEmail.trim(), loading: generatingLink }]
+      ) : undefined,
+    },
+    {
+      key: "pruefen",
+      title: "Daten pruefen",
+      description: "HR prueft Fragebogen-Daten und Dokumente",
+      status: data.status === "REVIEWED" || isCompleted ? "completed"
+        : !(fragebogenDone && supervisorDone) ? "upcoming"
+        : "active",
+      info: fragebogenDone && supervisorDone && data.status !== "REVIEWED" && !isCompleted
+        ? `${data.documents.length} Dokument${data.documents.length !== 1 ? "e" : ""} hochgeladen`
+        : undefined,
+      items: fragebogenDone && supervisorDone ? [
+        { id: "fb", title: "Personalfragebogen vollstaendig", isCompleted: true, assignee: "Mitarbeiter", assigneeColor: "bg-credo-gruen/10 text-credo-gruen" },
+        { id: "sv", title: "Modalitaeten vollstaendig", isCompleted: true, assignee: "Vorgesetzter", assigneeColor: "bg-purple-100 text-purple-700" },
+        { id: "docs", title: `${data.documents.length} Dokument${data.documents.length !== 1 ? "e" : ""} hochgeladen`, isCompleted: data.documents.length > 0, assignee: "Mitarbeiter", assigneeColor: "bg-credo-gruen/10 text-credo-gruen" },
+      ] : undefined,
+    },
+    {
+      key: "checkliste",
+      title: "Checkliste abarbeiten",
+      description: "Interne Onboarding-Aufgaben erledigen",
+      status: checklistAllDone || isCompleted ? "completed"
+        : data.status !== "REVIEWED" && !(fragebogenDone && supervisorDone) ? "upcoming"
+        : "active",
+      progress: checklistTotal > 0 ? { done: checklistDone, total: checklistTotal } : undefined,
+      items: checklistTotal > 0 && !checklistAllDone && (fragebogenDone && supervisorDone) ? data.checklistItems.filter((i) => !i.isCompleted).slice(0, 5).map((i) => ({
+        id: i.id,
+        title: i.title,
+        isCompleted: false,
+        assignee: i.assignee || undefined,
+        assigneeColor: "bg-credo-blau/10 text-credo-blau",
+        note: i.notes,
+      })) : undefined,
+      info: checklistTotal === 0 ? "Keine Checkliste zugewiesen" : undefined,
+    },
+    {
+      key: "abschluss",
+      title: "Abschluss",
+      description: "Vorgang abschliessen und Daten exportieren",
+      status: isCompleted ? "completed" : !checklistAllDone ? "upcoming" : "active",
+      completedAt: isCompleted && data.submittedAt ? formatDate(data.submittedAt) : undefined,
+      actions: !isCompleted && checklistAllDone ? [
+        { label: "CSV Export (LOGA)", onClick: () => { window.location.href = `/api/onboarding/${onboardingId}/export?format=csv`; }, variant: "secondary" as const },
+      ] : undefined,
+    },
+  ];
+
   return (
     <div className="space-y-6">
+      {/* ===== WORKFLOW STEPPER ===== */}
+      <ProcessWorkflowStepper steps={workflowSteps} />
+
       {/* 2-Column Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left Column */}
@@ -831,7 +935,7 @@ function TabOverview({
                 data.personalData?.isComplete
                   ? "Vollständig"
                   : data.personalData
-                    ? `Schritt ${data.personalData.currentStep} von 10`
+                    ? `Schritt ${data.personalData.currentStep} von 9`
                     : "Nicht begonnen"
               }
             />
@@ -1109,7 +1213,7 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">
-              Fragebogen-Status: {pd.isComplete ? "Vollständig ausgefüllt" : `Schritt ${pd.currentStep} von 10`}
+              Fragebogen-Status: {pd.isComplete ? "Vollständig ausgefüllt" : `Schritt ${pd.currentStep} von 9`}
             </p>
             {pd.dsgvoAccepted && pd.dsgvoAcceptedAt && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1297,6 +1401,93 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
 // Tab 2: Dokumente
 // =============================================
 
+function OnboardingExportSection({ onboardingId }: { onboardingId: string }) {
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const handleDownload = async (type: string) => {
+    setDownloading(type);
+    try {
+      const res = await fetch(`/api/onboarding/${onboardingId}/pdf-export?type=${type}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Export fehlgeschlagen" }));
+        alert(err.error || "Export fehlgeschlagen");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || `${type}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Verbindungsfehler beim Export.");
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const exports = [
+    { key: "gesamtakte", title: "Gesamtakte", desc: "Alle Dokumente in einem PDF", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
+    { key: "fragebogen", title: "Fragebogen", desc: "Personalfragebogen-Daten", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
+    { key: "modalitaeten", title: "Modalitaeten", desc: "Einstellungsmodalitaeten", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    { key: "dokumente", title: "Dokumente", desc: "Dokumentenuebersicht", icon: "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" },
+    { key: "checkliste", title: "Checkliste", desc: "Checkliste mit Notizen", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
+  ];
+
+  return (
+    <div className="rounded-2xl border-2 border-[#009AC6]/20 bg-[#009AC6]/5 p-5 mb-6">
+      <h3 className="text-sm font-bold text-foreground mb-1 flex items-center gap-2">
+        <svg className="h-5 w-5 text-[#009AC6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        PDF-Export fuer DMS
+      </h3>
+      <p className="text-xs text-muted-foreground mb-4">
+        Jedes Dokument erhaelt einen QR-Code auf der Deckseite zur automatischen DMS-Zuordnung.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {exports.map((e) => (
+          <div key={e.key} className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#009AC6]/10">
+                <svg className="h-5 w-5 text-[#009AC6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={e.icon} />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">{e.title}</p>
+                <p className="text-[11px] text-muted-foreground">{e.desc}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleDownload(e.key)}
+              disabled={downloading === e.key}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
+              {downloading === e.key ? (
+                <>
+                  <div className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />
+                  Wird erstellt...
+                </>
+              ) : (
+                <>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  PDF herunterladen
+                </>
+              )}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: string }) {
   const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
     UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
@@ -1316,12 +1507,15 @@ function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: 
 
   if (data.documents.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card py-16">
-        <UploadCloudIcon className="mb-4 h-16 w-16 text-border" />
-        <p className="mb-1 text-base font-medium text-foreground">Keine Dokumente</p>
-        <p className="text-sm text-muted-foreground">
-          Es wurden noch keine Dokumente zu diesem Vorgang hochgeladen.
-        </p>
+      <div>
+        <OnboardingExportSection onboardingId={onboardingId} />
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card py-16">
+          <UploadCloudIcon className="mb-4 h-16 w-16 text-border" />
+          <p className="mb-1 text-base font-medium text-foreground">Keine Dokumente</p>
+          <p className="text-sm text-muted-foreground">
+            Es wurden noch keine Dokumente zu diesem Vorgang hochgeladen.
+          </p>
+        </div>
       </div>
     );
   }
@@ -1339,6 +1533,9 @@ function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: 
 
   return (
     <div className="space-y-4">
+      {/* PDF Export */}
+      <OnboardingExportSection onboardingId={onboardingId} />
+
       {/* Header with download all */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">

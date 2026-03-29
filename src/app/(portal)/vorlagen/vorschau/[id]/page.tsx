@@ -24,7 +24,6 @@ import { Step3Bank } from "@/app/fragebogen/[token]/steps/step3-bank";
 import { Step4SocialSecurity } from "@/app/fragebogen/[token]/steps/step4-social-security";
 import { Step5Tax } from "@/app/fragebogen/[token]/steps/step5-tax";
 import { Step6Employment } from "@/app/fragebogen/[token]/steps/step6-employment";
-import { Step7Children } from "@/app/fragebogen/[token]/steps/step7-children";
 import { Step8Education } from "@/app/fragebogen/[token]/steps/step8-education";
 import { Step9Masern } from "@/app/fragebogen/[token]/steps/step9-masern";
 
@@ -135,9 +134,8 @@ export default function VorschauPage() {
     3: <Step4SocialSecurity {...stepProps} fieldConfig={getFieldConfig(4)} />,
     4: <Step5Tax {...stepProps} fieldConfig={getFieldConfig(5)} />,
     5: <Step6Employment {...stepProps} fieldConfig={getFieldConfig(6)} />,
-    6: <Step7Children {...stepProps} fieldConfig={getFieldConfig(7)} />,
-    7: <Step8Education {...stepProps} fieldConfig={getFieldConfig(8)} />,
-    8: <Step9Masern {...stepProps} fieldConfig={getFieldConfig(9)} />,
+    6: <Step8Education {...stepProps} fieldConfig={getFieldConfig(8)} />,
+    7: <Step9Masern {...stepProps} fieldConfig={getFieldConfig(9)} />,
   };
 
   const currentActiveIndex = activeStepIndices.indexOf(currentStep);

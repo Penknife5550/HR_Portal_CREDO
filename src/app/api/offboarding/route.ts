@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { createOffboardingSchema } from "@/lib/validations/offboarding";
+import { orgFilter, PORTAL_ROLES, PROCESS_CREATE_ROLES, HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 
 // Template-Name anhand OrganizationType bestimmen
 function getTemplateNameForOrgType(orgType: string): string {
@@ -41,6 +42,9 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
+    if (!PORTAL_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
@@ -62,8 +66,10 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    // Filter zusammenbauen
-    const where: Record<string, unknown> = {};
+    // Filter zusammenbauen (inkl. Org-Einschraenkung)
+    const where: Record<string, unknown> = {
+      ...(await orgFilter(session)),
+    };
     if (status) where.status = status;
     if (organizationId) where.organizationId = organizationId;
     if (from) {
@@ -162,6 +168,9 @@ export async function POST(request: NextRequest) {
         { error: "Nicht authentifiziert" },
         { status: 401 }
       );
+    }
+    if (!PROCESS_CREATE_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
     const body = await request.json().catch(() => null);

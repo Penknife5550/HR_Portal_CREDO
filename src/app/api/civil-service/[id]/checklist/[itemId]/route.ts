@@ -27,12 +27,29 @@ export async function PATCH(
       );
     }
 
+    // Rollencheck: HR-Rollen + SERVICE (n8n)
+    const allowedRoles = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "SERVICE"];
+    if (!allowedRoles.includes(session.role)) {
+      return NextResponse.json(
+        { error: "Keine Berechtigung" },
+        { status: 403 }
+      );
+    }
+
     const { id, itemId } = await params;
 
     // Body parsen und validieren
     let body: { isCompleted?: boolean; notes?: string };
     try {
-      body = await request.json();
+      const raw = await request.json();
+      // Validierung: isCompleted muss boolean sein, notes max 2000 Zeichen
+      if (raw.notes !== undefined && typeof raw.notes === "string" && raw.notes.length > 2000) {
+        return NextResponse.json({ error: "Notiz darf maximal 2000 Zeichen lang sein." }, { status: 400 });
+      }
+      if (raw.notes !== undefined && typeof raw.notes !== "string") {
+        return NextResponse.json({ error: "Notiz muss ein Text sein." }, { status: 400 });
+      }
+      body = raw;
     } catch {
       return NextResponse.json(
         { error: "Ungültiger Request-Body" },

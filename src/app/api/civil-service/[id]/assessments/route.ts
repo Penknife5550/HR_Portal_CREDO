@@ -168,7 +168,7 @@ export async function POST(
         tokenExpiresAt,
         recipientEmail: recipientEmail.trim().toLowerCase(),
         recipientName: recipientName?.trim() || null,
-        templateSnapshot,
+        templateSnapshot: templateSnapshot ?? undefined,
         sentAt: new Date(),
       },
     });

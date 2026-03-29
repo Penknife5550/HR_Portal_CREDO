@@ -11,6 +11,7 @@ import { getSession } from "@/lib/auth";
 import { decrypt, encrypt } from "@/lib/encryption";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { updateOffboardingSchema } from "@/lib/validations/offboarding";
+import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
 
 // Gueltige Status-Uebergaenge
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -36,6 +37,9 @@ export async function GET(
         { error: "Nicht authentifiziert" },
         { status: 401 }
       );
+    }
+    if (!PORTAL_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -73,6 +77,11 @@ export async function GET(
       );
     }
 
+    // Org-Zugriffspruefung
+    if (!(await canAccessProcess(session, offboarding.organizationId))) {
+      return NextResponse.json({ error: "Keine Berechtigung fuer diesen Vorgang" }, { status: 403 });
+    }
+
     // Sensible Felder entschluesseln
     if (offboarding.exitData?.severancePay) {
       offboarding.exitData.severancePay = decrypt(
@@ -104,6 +113,9 @@ export async function PATCH(
         { error: "Nicht authentifiziert" },
         { status: 401 }
       );
+    }
+    if (!HR_EDIT_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
     const { id } = await params;

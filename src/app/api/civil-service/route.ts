@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { createCivilServiceSchema } from "@/lib/validations/civil-service";
+import { orgFilter, PORTAL_ROLES } from "@/lib/permissions";
 import {
   CIVIL_SERVICE_CHECKLIST_TEMPLATE,
   CIVIL_SERVICE_PHASES,
@@ -27,14 +28,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Rollencheck: HR-Rollen + EINRICHTUNGSLEITUNG
-    const allowedRoles = [
-      "SUPER_ADMIN",
-      "HR_LEITUNG",
-      "HR_SACHBEARBEITER",
-      "EINRICHTUNGSLEITUNG",
-    ];
-    if (!allowedRoles.includes(session.role)) {
+    // Rollencheck: Portal-Rollen (inkl. VORGESETZTER)
+    if (!PORTAL_ROLES.includes(session.role)) {
       return NextResponse.json(
         { error: "Keine Berechtigung" },
         { status: 403 }
@@ -68,8 +63,10 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    // Filter zusammenbauen
-    const where: Record<string, unknown> = {};
+    // Filter zusammenbauen (inkl. Org-Einschraenkung)
+    const where: Record<string, unknown> = {
+      ...(await orgFilter(session)),
+    };
     if (status) where.status = status;
     if (organizationId) where.organizationId = organizationId;
     if (from) {
@@ -93,36 +90,6 @@ export async function GET(request: NextRequest) {
         { employeeFirstName: { contains: search, mode: "insensitive" } },
         { employeeLastName: { contains: search, mode: "insensitive" } },
       ];
-    }
-
-    // EINRICHTUNGSLEITUNG: nur eigene Einrichtungen sehen
-    if (session.role === "EINRICHTUNGSLEITUNG") {
-      // Berechtigungen aus User-Org-Zuweisungen laden
-      const userWithOrgs = await prisma.user.findUnique({
-        where: { id: session.userId },
-        select: {
-          orgAssignments: {
-            select: { organizationId: true },
-          },
-        },
-      });
-      const allowedOrgIds =
-        userWithOrgs?.orgAssignments?.map(
-          (p: { organizationId: string }) => p.organizationId
-        ) || [];
-      if (allowedOrgIds.length > 0) {
-        where.organizationId = { in: allowedOrgIds };
-      } else {
-        // Keine Einrichtungen zugewiesen → keine Ergebnisse
-        return NextResponse.json({
-          data: [],
-          total: 0,
-          page,
-          limit,
-          statusCounts: {},
-          totalPages: 0,
-        });
-      }
     }
 
     const [processes, total, statusCounts] = await Promise.all([
@@ -227,6 +194,7 @@ export async function POST(request: NextRequest) {
       organizationId,
       targetStartDate,
       employeeId,
+      stakeholders,
     } = parsed.data;
 
     // Organisation pruefen
@@ -284,6 +252,8 @@ export async function POST(request: NextRequest) {
           status: "DRAFT",
           currentStep: 1,
           initiatedById: session.userId,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          stakeholders: stakeholders ? (stakeholders as any) : undefined,
         },
         include: {
           organization: true,

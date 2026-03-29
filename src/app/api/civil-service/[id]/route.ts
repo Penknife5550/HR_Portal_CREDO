@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { updateCivilServiceSchema } from "@/lib/validations/civil-service";
+import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
+// PORTAL_ROLES wird fuer GET verwendet, HR_EDIT_ROLES fuer PATCH
 
 // Gueltige Status-Uebergaenge
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -39,6 +41,14 @@ export async function GET(
       return NextResponse.json(
         { error: "Nicht authentifiziert" },
         { status: 401 }
+      );
+    }
+
+    // Rollencheck: Portal-Rollen (inkl. VORGESETZTER)
+    if (!PORTAL_ROLES.includes(session.role)) {
+      return NextResponse.json(
+        { error: "Keine Berechtigung" },
+        { status: 403 }
       );
     }
 
@@ -77,6 +87,11 @@ export async function GET(
       );
     }
 
+    // Org-Zugriffspruefung
+    if (!(await canAccessProcess(session, process.organizationId))) {
+      return NextResponse.json({ error: "Keine Berechtigung fuer diesen Vorgang" }, { status: 403 });
+    }
+
     return NextResponse.json(process);
   } catch (error) {
     console.error("Fehler beim Laden des Verbeamtungsvorgangs:", error);
@@ -103,9 +118,8 @@ export async function PATCH(
       );
     }
 
-    // Rollencheck: nur HR-Rollen
-    const hrRoles = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"];
-    if (!hrRoles.includes(session.role)) {
+    // Rollencheck: nur HR-Rollen duerfen editieren
+    if (!HR_EDIT_ROLES.includes(session.role)) {
       return NextResponse.json(
         { error: "Keine Berechtigung" },
         { status: 403 }
@@ -128,6 +142,7 @@ export async function PATCH(
       besoldungsgruppe,
       erfahrungsstufe,
       prerequisites,
+      stakeholders,
     } = parsed.data;
 
     // Vorgang pruefen
@@ -185,6 +200,7 @@ export async function PATCH(
     if (besoldungsgruppe !== undefined) updateData.besoldungsgruppe = besoldungsgruppe;
     if (erfahrungsstufe !== undefined) updateData.erfahrungsstufe = erfahrungsstufe;
     if (prerequisites !== undefined) updateData.prerequisites = prerequisites;
+    if (stakeholders !== undefined) updateData.stakeholders = stakeholders;
 
     // Bei COMPLETED: completedAt setzen
     if (status === "COMPLETED") {

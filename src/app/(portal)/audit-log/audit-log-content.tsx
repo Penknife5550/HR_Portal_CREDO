@@ -221,7 +221,7 @@ export function AuditLogContent({ user }: { user: User }) {
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 Von
               </label>
-              <input autoComplete="off"
+              <input
                 type="date"
                 value={filterFrom}
                 onChange={(e) => setFilterFrom(e.target.value)}
@@ -233,7 +233,7 @@ export function AuditLogContent({ user }: { user: User }) {
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 Bis
               </label>
-              <input autoComplete="off"
+              <input
                 type="date"
                 value={filterTo}
                 onChange={(e) => setFilterTo(e.target.value)}
@@ -245,7 +245,7 @@ export function AuditLogContent({ user }: { user: User }) {
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 Aktion
               </label>
-              <select autoComplete="off"
+              <select
                 value={filterAction}
                 onChange={(e) => setFilterAction(e.target.value)}
                 autoComplete="off"
@@ -263,7 +263,7 @@ export function AuditLogContent({ user }: { user: User }) {
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 Benutzer
               </label>
-              <input autoComplete="off"
+              <input
                 type="text"
                 value={filterSearch}
                 onChange={(e) => setFilterSearch(e.target.value)}

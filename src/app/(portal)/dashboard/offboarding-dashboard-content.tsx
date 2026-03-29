@@ -299,12 +299,14 @@ export function OffboardingDashboardContent({ user }: { user: User }) {
               </button>
             )}
 
-            <button
-              onClick={() => setShowNewModal(true)}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              + Neuer Austritt
-            </button>
+            {["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG"].includes(user.role) && (
+              <button
+                onClick={() => setShowNewModal(true)}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                + Neuer Austritt
+              </button>
+            )}
           </div>
         </div>
 

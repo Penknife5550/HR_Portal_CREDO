@@ -4,6 +4,18 @@
 
 import { z } from "zod";
 
+// Stakeholder-Schema fuer Beteiligte am Verbeamtungsprozess
+const stakeholderContactSchema = z.object({
+  name: z.string().max(200).optional(),
+  email: z.string().email("Ungueltige E-Mail-Adresse"),
+});
+
+export const stakeholdersSchema = z.object({
+  schulleitung: stakeholderContactSchema.optional(),
+  amtsarzt: z.object({ email: z.string().email("Ungueltige E-Mail-Adresse") }).optional(),
+  beirat: z.object({ email: z.string().email("Ungueltige E-Mail-Adresse") }).optional(),
+}).optional();
+
 export const createCivilServiceSchema = z.object({
   employeeFirstName: z.string().min(1, "Vorname ist erforderlich").max(100),
   employeeLastName: z.string().min(1, "Nachname ist erforderlich").max(100),
@@ -12,6 +24,7 @@ export const createCivilServiceSchema = z.object({
   organizationId: z.string().uuid("Ungueltige Einrichtungs-ID"),
   targetStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Datum im Format YYYY-MM-DD erforderlich").optional(),
   employeeId: z.string().uuid("Ungueltige Mitarbeiter-ID").optional(),
+  stakeholders: stakeholdersSchema,
 });
 
 export const updateCivilServiceSchema = z.object({
@@ -22,6 +35,7 @@ export const updateCivilServiceSchema = z.object({
   besoldungsgruppe: z.string().max(10).optional().nullable(),
   erfahrungsstufe: z.number().int().min(1).max(12).optional().nullable(),
   prerequisites: z.record(z.unknown()).optional().nullable(),
+  stakeholders: stakeholdersSchema.nullable(),
 }).refine(data => Object.keys(data).length > 0, "Mindestens ein Feld erforderlich");
 
 export const updatePhaseSchema = z.object({

@@ -32,6 +32,8 @@ services:
       N8N_API_KEY: ${N8N_API_KEY}
       ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD}
       APP_URL: ${APP_URL:-https://hr.fes-credo.de}
+      NEXT_PUBLIC_APP_URL: ${APP_URL:-https://hr.fes-credo.de}
+      CRON_SECRET: ${CRON_SECRET}
       NODE_ENV: production
     volumes:
       - uploads_data:/app/uploads

@@ -1423,6 +1423,9 @@ model CivilServiceProcess {
   applicationSubmittedAt    DateTime?
   applicationData           Json?           // Antworten der Lehrkraft
 
+  // Beteiligte Personen (Schulleitung, Amtsarzt, Beirat etc.)
+  stakeholders              Json?           // { schulleitung: {name, email}, amtsarzt: {email}, beirat: {email} }
+
   // Relationen
   phases              CivilServicePhase[]
   assessments         CivilServiceAssessment[]
