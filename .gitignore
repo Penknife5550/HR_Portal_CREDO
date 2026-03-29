@@ -54,6 +54,9 @@ cookies.txt
 *.cookie
 *.cookies
 
+# Interne Dokumentation (Prozesse, Reviews, Plaene)
+/_docs/
+
 # Temporaere/Test-Dateien
 nul
 
