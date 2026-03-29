@@ -404,13 +404,50 @@ export function CivilServiceDetailContent({
             </span>
           </div>
 
-          <div className="mt-2">
-            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
-              {data.employeeFirstName} {data.employeeLastName}
-            </h1>
-            <p className="text-sm text-gray-500">
-              {data.employeeEmail} &middot; {data.organizationName}
-            </p>
+          <div className="mt-2 flex items-start justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
+                {data.employeeFirstName} {data.employeeLastName}
+              </h1>
+              <p className="text-sm text-gray-500">
+                {data.employeeEmail} &middot; {data.organizationName}
+              </p>
+            </div>
+            {/* Status-Aktionen fuer Admin/HR */}
+            {["SUPER_ADMIN", "HR_LEITUNG"].includes(user.role) && !["COMPLETED", "REJECTED", "CANCELLED"].includes(data.status) && (
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={async () => {
+                    if (!confirm("Vorgang als abgeschlossen markieren?")) return;
+                    const res = await fetch(`/api/civil-service/${processId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ status: "COMPLETED" }),
+                    });
+                    if (res.ok) loadData();
+                    else alert("Status konnte nicht geaendert werden.");
+                  }}
+                  className="rounded-lg bg-credo-gruen px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-credo-gruen/85"
+                >
+                  Abschliessen
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!confirm("Vorgang wirklich abbrechen?")) return;
+                    const res = await fetch(`/api/civil-service/${processId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ status: "CANCELLED" }),
+                    });
+                    if (res.ok) loadData();
+                    else alert("Status konnte nicht geaendert werden.");
+                  }}
+                  className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

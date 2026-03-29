@@ -79,6 +79,7 @@ export function DashboardContent({ user }: { user: User }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [showNewModal, setShowNewModal] = useState(false);
   const [showOverdueOnly, setShowOverdueOnly] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -133,14 +134,17 @@ export function DashboardContent({ user }: { user: User }) {
 
       const res = await fetch(`/api/onboarding?${params.toString()}`);
       const data = await res.json();
-      setOnboardings(data.data || []);
-      setTotal(data.total || 0);
+      const allItems = data.data || [];
+      const ARCHIVED_STATUSES = ["COMPLETED", "EXPIRED"];
+      const filtered = showArchived ? allItems : allItems.filter((o: Onboarding) => !ARCHIVED_STATUSES.includes(o.status));
+      setOnboardings(filtered);
+      setTotal(showArchived ? (data.total || 0) : filtered.length);
     } catch (error) {
       console.error("Fehler beim Laden:", error);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, organizationFilter, searchQuery, sortBy, sortOrder, page]);
+  }, [statusFilter, organizationFilter, searchQuery, sortBy, sortOrder, page, showArchived]);
 
   useEffect(() => {
     loadOnboardings();
@@ -365,6 +369,14 @@ export function DashboardContent({ user }: { user: User }) {
                 Filter zurücksetzen
               </button>
             )}
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                showArchived ? "border-credo-blau bg-credo-blau/10 text-credo-blau" : "border-border text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {showArchived ? "Archiv ausblenden" : "Archiv anzeigen"}
+            </button>
             {["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG"].includes(user.role) && (
               <button
                 onClick={() => setShowNewModal(true)}

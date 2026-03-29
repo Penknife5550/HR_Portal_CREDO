@@ -60,6 +60,7 @@ export function ProcessDashboard({ config, renderCreateModal }: ProcessDashboard
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [page, setPage] = useState(0);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -108,8 +109,11 @@ export function ProcessDashboard({ config, renderCreateModal }: ProcessDashboard
 
       const res = await fetch(`${apiEndpoint}?${params.toString()}`);
       const result = await res.json();
-      setData(result.data || []);
-      setTotal(result.total || 0);
+      const allItems = result.data || [];
+      const ARCHIVED_STATUSES = ["COMPLETED", "CANCELLED", "REJECTED"];
+      const filtered = showArchived ? allItems : allItems.filter((o: ProcessRow) => !ARCHIVED_STATUSES.includes(String(o.status)));
+      setData(filtered);
+      setTotal(showArchived ? (result.total || 0) : filtered.length);
       if (result.statusCounts) {
         setStatusCounts(result.statusCounts);
       }
@@ -118,7 +122,7 @@ export function ProcessDashboard({ config, renderCreateModal }: ProcessDashboard
     } finally {
       setLoading(false);
     }
-  }, [apiEndpoint, statusFilter, organizationFilter, searchQuery, dateFrom, dateTo, sortBy, sortOrder, page, pageSize]);
+  }, [apiEndpoint, statusFilter, organizationFilter, searchQuery, dateFrom, dateTo, sortBy, sortOrder, page, pageSize, showArchived]);
 
   useEffect(() => {
     loadData();
@@ -389,6 +393,14 @@ export function ProcessDashboard({ config, renderCreateModal }: ProcessDashboard
             )}
 
             {/* Erstellen-Button */}
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={`min-h-[44px] rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                showArchived ? "border-credo-blau bg-credo-blau/10 text-credo-blau" : "border-border text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {showArchived ? "Archiv ausblenden" : "Archiv anzeigen"}
+            </button>
             {renderCreateModal && (
               <button
                 onClick={() => setShowNewModal(true)}

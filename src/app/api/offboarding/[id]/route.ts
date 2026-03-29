@@ -156,12 +156,17 @@ export async function PATCH(
     }
 
     // Status-Uebergang validieren
-    if (status) {
+    // SUPER_ADMIN + HR_LEITUNG duerfen COMPLETED/CANCELLED direkt setzen
+    const ADMIN_OVERRIDE_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
+    const isAdminOverride = ADMIN_OVERRIDE_ROLES.includes(session.role) &&
+      (status === "COMPLETED" || status === "CANCELLED");
+
+    if (status && !isAdminOverride) {
       const allowedTransitions = VALID_TRANSITIONS[existing.status];
       if (!allowedTransitions) {
         return NextResponse.json(
           {
-            error: `Status "${existing.status}" kann nicht geändert werden`,
+            error: `Status "${existing.status}" kann nicht geaendert werden`,
           },
           { status: 400 }
         );
@@ -169,7 +174,7 @@ export async function PATCH(
       if (!allowedTransitions.includes(status)) {
         return NextResponse.json(
           {
-            error: `Ungültiger Status-Übergang: "${existing.status}" -> "${status}". Erlaubt: ${allowedTransitions.join(", ") || "keine"}`,
+            error: `Ungueltiger Status-Uebergang: "${existing.status}" -> "${status}". Erlaubt: ${allowedTransitions.join(", ") || "keine"}`,
           },
           { status: 400 }
         );

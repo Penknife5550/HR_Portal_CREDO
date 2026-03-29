@@ -78,6 +78,7 @@ export function OffboardingDashboardContent({ user }: { user: User }) {
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  const [showArchived, setShowArchived] = useState(false);
   const router = useRouter();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -117,8 +118,11 @@ export function OffboardingDashboardContent({ user }: { user: User }) {
 
       const res = await fetch(`/api/offboarding?${params.toString()}`);
       const data = await res.json();
-      setOffboardings(data.data || []);
-      setTotal(data.total || 0);
+      const allItems = data.data || [];
+      const ARCHIVED_STATUSES = ["COMPLETED", "CANCELLED"];
+      const filtered = showArchived ? allItems : allItems.filter((o: Offboarding) => !ARCHIVED_STATUSES.includes(o.status));
+      setOffboardings(filtered);
+      setTotal(showArchived ? (data.total || 0) : filtered.length);
       if (data.statusCounts) {
         setStatusCounts(data.statusCounts);
       }
@@ -127,7 +131,7 @@ export function OffboardingDashboardContent({ user }: { user: User }) {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, organizationFilter, searchQuery, sortBy, sortOrder, page]);
+  }, [statusFilter, organizationFilter, searchQuery, sortBy, sortOrder, page, showArchived]);
 
   useEffect(() => {
     loadOffboardings();
@@ -299,6 +303,14 @@ export function OffboardingDashboardContent({ user }: { user: User }) {
               </button>
             )}
 
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                showArchived ? "border-credo-blau bg-credo-blau/10 text-credo-blau" : "border-border text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {showArchived ? "Archiv ausblenden" : "Archiv anzeigen"}
+            </button>
             {["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG"].includes(user.role) && (
               <button
                 onClick={() => setShowNewModal(true)}

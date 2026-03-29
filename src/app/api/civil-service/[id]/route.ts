@@ -157,7 +157,12 @@ export async function PATCH(
     }
 
     // Status-Uebergang validieren
-    if (status) {
+    // SUPER_ADMIN + HR_LEITUNG duerfen COMPLETED/CANCELLED direkt setzen (Vorgang abschliessen/abbrechen)
+    const ADMIN_OVERRIDE_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
+    const isAdminOverride = ADMIN_OVERRIDE_ROLES.includes(session.role) &&
+      (status === "COMPLETED" || status === "CANCELLED");
+
+    if (status && !isAdminOverride) {
       const allowedTransitions = VALID_TRANSITIONS[existing.status];
       if (!allowedTransitions) {
         return NextResponse.json(
