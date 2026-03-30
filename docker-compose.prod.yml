@@ -1,9 +1,10 @@
 # =============================================================================
-# CREDO HR-Portal - Produktions-Konfiguration
+# CREDO HR-Portal - Produktions-Konfiguration (eigenstaendig, Port 3000)
 # =============================================================================
-# Deployment: docker compose -f docker-compose.prod.yml up -d
-# Voraussetzung: .env.production mit allen Secrets
-# Domain: hr.fes-credo.de (Reverse Proxy mit SSL erforderlich)
+# Deployment: docker compose -f docker-compose.prod.yml up -d --build
+# Voraussetzung: .env mit allen Secrets
+# Container: hr-portal-app, hr-portal-db
+# DB-User: hrportal
 # =============================================================================
 
 services:
@@ -16,10 +17,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
+#      - NODE_ENV=production
       - DATABASE_URL=postgresql://hrportal:${DB_PASSWORD}@db:5432/hr_portal?schema=public
     env_file:
-      - .env.production
+      - .env
     depends_on:
       db:
         condition: service_healthy

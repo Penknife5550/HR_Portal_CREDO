@@ -1,3 +1,13 @@
+# =============================================================================
+# CREDO HR-Portal - Produktion mit Caddy Reverse Proxy
+# =============================================================================
+# Deployment: docker compose up -d --build
+# Voraussetzung: .env mit allen Secrets
+# Container: credo-hr-app, credo-hr-db
+# DB-User: credo
+# Netzwerk: reverse_proxy (extern, fuer Caddy)
+# =============================================================================
+
 services:
   db:
     image: postgres:16-alpine
