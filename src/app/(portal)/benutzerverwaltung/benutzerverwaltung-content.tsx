@@ -51,6 +51,14 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
     label: "Sachbearbeiter",
     color: "bg-gray-100 text-gray-800",
   },
+  EINRICHTUNGSLEITUNG: {
+    label: "Einrichtungsleitung",
+    color: "bg-amber-100 text-amber-800",
+  },
+  VORGESETZTER: {
+    label: "Vorgesetzter",
+    color: "bg-green-100 text-green-800",
+  },
 };
 
 const EMPTY_FORM: UserFormData = {
@@ -552,6 +560,8 @@ function UserModal({
             >
               <option value="HR_SACHBEARBEITER">Sachbearbeiter</option>
               <option value="HR_LEITUNG">HR-Leitung</option>
+              <option value="EINRICHTUNGSLEITUNG">Einrichtungsleitung</option>
+              <option value="VORGESETZTER">Vorgesetzter</option>
               <option value="SUPER_ADMIN">Super Admin</option>
             </select>
           </div>
