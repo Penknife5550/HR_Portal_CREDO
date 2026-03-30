@@ -1,70 +1,61 @@
 # =============================================================================
-# CREDO HR-Portal - Produktion mit Caddy Reverse Proxy
+# CREDO HR-Portal - Docker Compose (Produktion)
 # =============================================================================
-# Deployment: docker compose up -d --build
-# Voraussetzung: .env mit allen Secrets
-# Container: credo-hr-app, credo-hr-db
-# DB-User: credo
-# Netzwerk: reverse_proxy (extern, fuer Caddy)
+# Start: sudo docker compose up -d --build
+# Container: hr-portal-app, hr-portal-db
+# Reverse Proxy: Caddy (externes Netzwerk reverse_proxy)
 # =============================================================================
 
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: credo-hr-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: credo
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: hr_portal
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - internal
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U credo -d hr_portal"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: credo-hr-app
+    container_name: hr-portal-app
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://credo:${DB_PASSWORD}@db:5432/hr_portal?schema=public
-      JWT_SECRET: ${JWT_SECRET}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      MAGIC_LINK_EXPIRY_HOURS: ${MAGIC_LINK_EXPIRY_HOURS:-720}
-      N8N_WEBHOOK_BASE_URL: ${N8N_WEBHOOK_BASE_URL}
-      N8N_API_KEY: ${N8N_API_KEY}
-      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD}
-      APP_URL: ${APP_URL:-https://hr.fes-credo.de}
-      NEXT_PUBLIC_APP_URL: ${APP_URL:-https://hr.fes-credo.de}
-      CRON_SECRET: ${CRON_SECRET}
-      NODE_ENV: production
-    volumes:
-      - uploads_data:/app/uploads
+#      - NODE_ENV=production
+      - DATABASE_URL=postgresql://hrportal:${DB_PASSWORD}@db:5432/hr_portal?schema=public
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - uploads_data:/app/uploads
     networks:
       - reverse_proxy
       - internal
 
+  db:
+    image: postgres:16-alpine
+    container_name: hr-portal-db
+    restart: unless-stopped
+    volumes:
+      - hr_portal_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    environment:
+      POSTGRES_DB: hr_portal
+      POSTGRES_USER: hrportal
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hrportal -d hr_portal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+    # Kein Port-Exposure — nur aus dem app-Container erreichbar
+
 volumes:
-  postgres_data:
-    driver: local
+  hr_portal_data:
   uploads_data:
-    driver: local
 
 networks:
   reverse_proxy:

@@ -33,28 +33,16 @@ npm run db:generate  # Prisma Client generieren
 
 ## Docker / Deployment
 
-### Drei Compose-Dateien
+### Eine einzige Compose-Datei: `docker-compose.yml`
 
-| Datei | Zweck | DB-User | Container-Namen | Netzwerk |
-|---|---|---|---|---|
-| `docker-compose.yml` | **Produktion mit Caddy Reverse Proxy** | `credo` | `credo-hr-app`, `credo-hr-db` | `reverse_proxy` (extern) + `internal` |
-| `docker-compose.prod.yml` | **Produktion eigenstaendig** (Port 3000 exposed) | `hrportal` | `hr-portal-app`, `hr-portal-db` | `internal` only |
-| `docker-compose.dev.yml` | Lokales Dev/Test (Port 3000 + DB 5433) | `credo` | `credo-hr-app-dev`, `credo-hr-db-dev` | default |
-
-### Wichtige Unterschiede
-
-- **`docker-compose.yml`** (Caddy): Kein Port-Expose, Env-Variablen direkt in `environment:`, Caddy routet ueber das externe `reverse_proxy`-Netzwerk
-- **`docker-compose.prod.yml`** (eigenstaendig): Port `3000:3000` exposed, liest Secrets aus `env_file: .env`, NODE_ENV ist auskommentiert (wird in .env gesetzt)
-- **`docker-compose.dev.yml`**: DB-Port `5433:5432` fuer lokalen Zugriff, APP_URL=`http://localhost:3000`
-
-### Welche Datei auf dem Server?
+- **DB-User:** `hrportal`
+- **Container:** `hr-portal-app`, `hr-portal-db`
+- **Env-Datei:** `.env` (alle Secrets)
+- **Netzwerk:** `reverse_proxy` (extern, fuer Caddy) + `internal` (DB nur intern erreichbar)
+- **Kein Port-Expose:** Caddy routet ueber das `reverse_proxy`-Netzwerk
 
 ```bash
-# MIT Caddy Reverse Proxy (hr.fes-credo.de):
 sudo docker compose up -d --build
-
-# OHNE Reverse Proxy (direkt Port 3000):
-sudo docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 ### Produktions-Server (fes-vm-ubuntudocker)
