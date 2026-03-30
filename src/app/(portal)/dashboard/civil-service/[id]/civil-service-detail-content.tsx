@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import {
   CIVIL_SERVICE_STATUS_LABELS,
@@ -382,13 +383,13 @@ export function CivilServiceDetailContent({
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {/* ---- Top Bar ---- */}
         <div className="mb-6">
-          <a
+          <Link
             href="/dashboard?tab=civil-service"
             className="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
           >
             <ArrowLeftIcon className="h-4 w-4" />
             Zurück
-          </a>
+          </Link>
 
           <div className="flex flex-wrap items-start gap-3 sm:items-center">
             <span className="rounded-lg bg-credo-blau/10 px-3 py-1 text-sm font-bold text-credo-blau tracking-wide">

@@ -252,7 +252,6 @@ export async function POST(request: NextRequest) {
           status: "DRAFT",
           currentStep: 1,
           initiatedById: session.userId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           stakeholders: stakeholders ? (stakeholders as any) : undefined,
         },
         include: {

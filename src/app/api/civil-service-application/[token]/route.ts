@@ -149,7 +149,6 @@ export async function PUT(
     }
 
     // Daten speichern (JSON-Felder via Prisma)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const applicationData: any = {
       prerequisites,
       employeeStatement: employeeStatement || null,
@@ -160,7 +159,7 @@ export async function PUT(
       where: { id: process.id },
       data: {
         applicationData,
-        prerequisites: prerequisites as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        prerequisites: prerequisites as any,
       },
     });
 

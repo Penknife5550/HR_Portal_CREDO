@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 
 // =============================================
@@ -617,10 +618,10 @@ export function ChecklistenContent({ user }: { user: User }) {
                   Die Punkte können in der Detail-Ansicht jedes Verbeamtungsvorgangs bearbeitet werden.
                   Gatekeeper-Punkte (🔒) müssen erledigt sein bevor die nächste Phase beginnt.
                 </p>
-                <a href="/dashboard?tab=civil-service"
+                <Link href="/dashboard?tab=civil-service"
                   className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
                   Zum Verbeamtungs-Dashboard →
-                </a>
+                </Link>
               </div>
             </div>
           </div>

@@ -74,7 +74,6 @@ export const GET = apiHandler(
     const skip = (page - 1) * limit;
 
     // Filter aufbauen
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {};
 
     // isActive-Filter (Standard: nur aktive)

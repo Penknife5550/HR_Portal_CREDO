@@ -31,7 +31,6 @@ export const GET = adminHandler(async ({ request }) => {
   const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "50")));
 
   // Prisma where-Clause aufbauen
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {};
 
   if (offboardingId) where.offboardingId = offboardingId;
