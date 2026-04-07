@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { getBaseUrl } from "@/lib/url";
 
 const REMINDER_INTERVAL_DAYS = 7;
 const MS_PER_DAY = 86400000;
@@ -200,8 +201,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://hr.fes-credo.de";
 }

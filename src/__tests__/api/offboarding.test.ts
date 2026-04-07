@@ -76,7 +76,7 @@ const validBody = {
 describe("API /api/offboarding", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetSession.mockResolvedValue({ userId: "test-user-id" });
+    mockGetSession.mockResolvedValue({ userId: "test-user-id", role: "HR_LEITUNG" });
   });
 
   describe("POST – Validierung", () => {

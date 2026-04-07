@@ -9,6 +9,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { updatePhaseSchema } from "@/lib/validations/civil-service";
+import { triggerWebhooks } from "@/lib/webhooks";
+import { formatEmployeeName } from "@/lib/format";
+import { CivilServicePhaseStatus } from "@prisma/client";
 
 // =============================================
 // GET /api/civil-service/:id/phases
@@ -90,10 +93,16 @@ export async function PATCH(
 
     const { phaseKey, status, blockedReason } = parsed.data;
 
-    // Vorgang pruefen
+    // Vorgang pruefen (mit Feldern fuer Webhook-Payload)
     const process = await prisma.civilServiceProcess.findUnique({
       where: { id },
-      select: { id: true },
+      select: {
+        id: true,
+        displayId: true,
+        employeeFirstName: true,
+        employeeLastName: true,
+        organization: { select: { name: true, mandantNumber: true } },
+      },
     });
     if (!process) {
       return NextResponse.json(
@@ -113,15 +122,21 @@ export async function PATCH(
       );
     }
 
+    // Idempotenz: war die Phase bereits abgeschlossen?
+    // Wenn ja, NICHT ueberschreiben + KEINEN Webhook nochmal feuern.
+    const wasAlreadyCompleted =
+      phase.status === CivilServicePhaseStatus.COMPLETED;
+
     // Update-Daten
     const updateData: Record<string, unknown> = { status };
-    if (status === "IN_PROGRESS" && !phase.startedAt) {
+    if (status === CivilServicePhaseStatus.IN_PROGRESS && !phase.startedAt) {
       updateData.startedAt = new Date();
     }
-    if (status === "COMPLETED") {
+    // completedAt nur setzen wenn es noch NICHT gesetzt war (Idempotenz)
+    if (status === CivilServicePhaseStatus.COMPLETED && !phase.completedAt) {
       updateData.completedAt = new Date();
     }
-    if (status === "BLOCKED") {
+    if (status === CivilServicePhaseStatus.BLOCKED) {
       updateData.blockedReason = blockedReason || null;
     } else {
       updateData.blockedReason = null;
@@ -147,6 +162,28 @@ export async function PATCH(
         } as Record<string, string | null>,
       },
     });
+
+    // Webhook nur bei Phasen-Abschluss UND nur beim **ersten** Abschluss
+    // (Idempotenz: ein wiederholtes PATCH mit COMPLETED feuert nicht erneut).
+    // Fire-and-forget: triggerWebhooks wirft nie, blockiert Response nicht.
+    if (
+      status === CivilServicePhaseStatus.COMPLETED &&
+      !wasAlreadyCompleted &&
+      updated.completedAt
+    ) {
+      triggerWebhooks("psi-phase-completed", {
+        civilServiceId: id,
+        displayId: process.displayId,
+        employeeName: formatEmployeeName(process),
+        organization: process.organization.name,
+        mandantNumber: process.organization.mandantNumber,
+        phaseKey: phase.phaseKey,
+        phaseName: phase.phaseName,
+        completedAt: updated.completedAt.toISOString(),
+      }).catch((err) =>
+        console.error("[psi-phase-completed] Webhook-Fehler:", err instanceof Error ? err.message : err)
+      );
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

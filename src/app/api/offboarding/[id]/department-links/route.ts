@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { getBaseUrl } from "@/lib/url";
+import { formatEmployeeName } from "@/lib/format";
 import crypto from "crypto";
 
 // Abteilungen die direkt im Portal arbeiten (keine Magic Links)
@@ -183,10 +185,12 @@ async function handleGenerateLinks(offboardingId: string, session: { userId: str
       departmentName: config.departmentName,
       email: config.email,
       expiresAt: expiresAt.toISOString(),
-      employeeName: `${offboarding.employeeFirstName} ${offboarding.employeeLastName}`,
+      employeeName: formatEmployeeName(offboarding),
       organizationName: offboarding.organization.name,
       lastWorkingDay: offboarding.lastWorkingDay.toISOString(),
       taskCount: items.length,
+      token: link.token,
+      magicLink: `${getBaseUrl()}/offboarding/abteilung/${link.token}`,
     });
   }
 
@@ -263,9 +267,11 @@ async function handleReminder(
     departmentName: link.departmentName,
     email: link.email,
     reminderCount: updated.reminderCount,
-    employeeName: `${offboarding.employeeFirstName} ${offboarding.employeeLastName}`,
+    employeeName: formatEmployeeName(offboarding),
     organizationName: offboarding.organization.name,
     lastWorkingDay: offboarding.lastWorkingDay.toISOString(),
+    magicLink: `${getBaseUrl()}/offboarding/abteilung/${link.token}`,
+    level: "INFO",
   });
 
   // AuditLog schreiben

@@ -10,6 +10,8 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { createCivilServiceSchema } from "@/lib/validations/civil-service";
 import { orgFilter, PORTAL_ROLES } from "@/lib/permissions";
+import { triggerWebhooks } from "@/lib/webhooks";
+import { formatEmployeeName } from "@/lib/format";
 import {
   CIVIL_SERVICE_CHECKLIST_TEMPLATE,
   CIVIL_SERVICE_PHASES,
@@ -314,6 +316,21 @@ export async function POST(request: NextRequest) {
         checklistItems: { orderBy: { orderIndex: "asc" } },
       },
     });
+
+    // Webhook fire-and-forget (triggerWebhooks wirft nie, blockiert Response nicht).
+    // .catch() als doppelte Sicherheit fuer den theoretischen Fall, dass die
+    // "wirft nie"-Garantie verletzt wird (z. B. durch Test-Mocks).
+    triggerWebhooks("psi-created", {
+      civilServiceId: civilService.id,
+      displayId: civilService.displayId,
+      employeeEmail: civilService.employeeEmail,
+      employeeName: formatEmployeeName(civilService),
+      organization: org.name,
+      mandantNumber: org.mandantNumber,
+      targetStartDate: civilService.targetStartDate?.toISOString() ?? null,
+    }).catch((err) =>
+      console.error("[psi-created] Webhook-Fehler:", err instanceof Error ? err.message : err)
+    );
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

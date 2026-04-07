@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { createBoardDecisionSchema } from "@/lib/validations/civil-service";
+import { triggerWebhooks } from "@/lib/webhooks";
+import { formatEmployeeName } from "@/lib/format";
+import { CivilServiceStatus, type Prisma } from "@prisma/client";
 
 // =============================================
 // POST /api/civil-service/:id/board-decision
@@ -44,9 +47,18 @@ export async function POST(
 
     const { decisionType, result, decisionDate, notes } = parsed.data;
 
-    // Vorgang pruefen
+    // Vorgang pruefen (nur die fuer Status-Check + Webhook-Payload benoetigten Felder)
     const process = await prisma.civilServiceProcess.findUnique({
       where: { id },
+      select: {
+        id: true,
+        status: true,
+        displayId: true,
+        employeeEmail: true,
+        employeeFirstName: true,
+        employeeLastName: true,
+        organization: { select: { name: true, mandantNumber: true } },
+      },
     });
     if (!process) {
       return NextResponse.json(
@@ -75,6 +87,22 @@ export async function POST(
       );
     }
 
+    // Status-Aenderung und completedAt VOR der Transaktion ableiten —
+    // beide haengen nicht von DB-State ab, also keine Race-Condition.
+    let newStatus: CivilServiceStatus | null = null;
+    if (result === "POSITIVE") {
+      newStatus =
+        decisionType === "PROBE"
+          ? CivilServiceStatus.ADMINISTRATION
+          : CivilServiceStatus.COMPLETED;
+    } else if (result === "NEGATIVE") {
+      newStatus = CivilServiceStatus.REJECTED;
+    } else if (result === "POSTPONED") {
+      newStatus = CivilServiceStatus.BOARD_POSTPONED;
+    }
+    const isLifetimeCompleted = newStatus === CivilServiceStatus.COMPLETED;
+    const completedAt = isLifetimeCompleted ? new Date() : null;
+
     // Transaktion: Entscheidung + Status-Aenderung
     const boardDecision = await prisma.$transaction(async (tx) => {
       // Beiratsentscheidung anlegen
@@ -88,26 +116,12 @@ export async function POST(
         },
       });
 
-      // Status-Aenderung basierend auf Ergebnis
-      let newStatus: string | null = null;
-
-      if (result === "POSITIVE") {
-        if (decisionType === "PROBE") {
-          newStatus = "ADMINISTRATION";
-        } else {
-          // LIFETIME → COMPLETED
-          newStatus = "COMPLETED";
-        }
-      } else if (result === "NEGATIVE") {
-        newStatus = "REJECTED";
-      } else if (result === "POSTPONED") {
-        newStatus = "BOARD_POSTPONED";
-      }
-
       if (newStatus) {
-        const updateData: Record<string, unknown> = { status: newStatus };
-        if (newStatus === "COMPLETED") {
-          updateData.completedAt = new Date();
+        const updateData: Prisma.CivilServiceProcessUpdateInput = {
+          status: newStatus,
+        };
+        if (completedAt) {
+          updateData.completedAt = completedAt;
         }
         await tx.civilServiceProcess.update({
           where: { id },
@@ -135,6 +149,24 @@ export async function POST(
 
       return decision;
     });
+
+    // Webhook fire-and-forget — nur bei finaler LIFETIME-Verbeamtung.
+    // triggerWebhooks wirft nie, blockiert Response nicht.
+    if (isLifetimeCompleted && completedAt) {
+      triggerWebhooks("psi-completed", {
+        civilServiceId: id,
+        displayId: process.displayId,
+        employeeEmail: process.employeeEmail,
+        employeeName: formatEmployeeName(process),
+        organization: process.organization.name,
+        mandantNumber: process.organization.mandantNumber,
+        decisionType,
+        decisionDate,
+        completedAt: completedAt.toISOString(),
+      }).catch((err) =>
+        console.error("[psi-completed] Webhook-Fehler:", err instanceof Error ? err.message : err)
+      );
+    }
 
     return NextResponse.json(boardDecision, { status: 201 });
   } catch (error) {

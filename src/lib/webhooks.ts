@@ -8,21 +8,28 @@
  * 1. Aktive DB-Webhooks fuer das Event laden und ausfuehren
  * 2. SMTP-Fallback falls kein Webhook erfolgreich war
  *
- * Keine Umgebungsvariablen fuer Webhooks – alles laeuft ueber die DB.
+ * Wichtige Eigenschaften:
+ * - **Wirft NIEMALS** nach aussen (Vertrag: alle Aufrufer duerfen ohne try/catch arbeiten)
+ * - Webhooks werden parallel via Promise.allSettled ausgefuehrt
+ * - SSRF-Schutz: Hostnamen werden vor dem Versand auf private/loopback IPs geprueft
+ * - URL-Logs sind redacted (keine Query-Parameter mit Tokens)
  */
 
 import { prisma } from "@/lib/db";
 import { sendEmailFallback } from "@/lib/mailer";
 import { decrypt } from "@/lib/encryption";
+import { isPublicHostname, redactUrlForLog } from "@/lib/url";
 
 // Bekannte Event-Typen (erweiterbar)
 export type WebhookEvent =
+  // Onboarding
   | "onboarding-created"
   | "questionnaire-completed"
   | "supervisor-link-created"
   | "supervisor-completed"
   | "employee-reminder"
   | "supervisor-reminder"
+  // Offboarding
   | "offboarding-created"
   | "offboarding-completed"
   | "offboarding-department-assigned"
@@ -30,50 +37,89 @@ export type WebhookEvent =
   | "offboarding-task-completed"
   | "offboarding-task-overdue"
   | "offboarding-reminder"
-  | (string & Record<never, never>); // erlaubt zukuenftige Events als Strings
+  // Verbeamtung (Phase A)
+  | "psi-created"
+  | "psi-phase-completed"
+  | "psi-completed"
+  | "psi-deadline-warning"
+  // Erweiterbar (z. B. fuer Phase B/C oder zukuenftige Events)
+  | (string & Record<never, never>);
 
 const MAX_RETRIES = 3;
 const TIMEOUT_MS = 10_000;
 
 // =============================================
 // Haupt-Funktion: Alle Kanaele ausloesen
+// VERTRAG: Wirft NIEMALS — alle Fehler werden geloggt und geschluckt.
 // =============================================
 export async function triggerWebhooks(
   event: WebhookEvent,
   payload: Record<string, unknown>
 ): Promise<void> {
-  const results: boolean[] = [];
-
-  // DB-konfigurierte Webhooks laden und ausfuehren
   try {
-    const dbWebhooks = await prisma.webhookConfig.findMany({
-      where: { event, isActive: true },
-    });
+    const results: boolean[] = [];
 
-    if (dbWebhooks.length === 0) {
-      console.warn(`[Webhooks] Keine aktiven Webhooks fuer "${event}" konfiguriert`);
+    // DB-konfigurierte Webhooks laden und ausfuehren
+    try {
+      const dbWebhooks = await prisma.webhookConfig.findMany({
+        where: { event, isActive: true },
+      });
+
+      if (dbWebhooks.length === 0) {
+        console.warn(`[Webhooks] Keine aktiven Webhooks fuer "${event}" konfiguriert`);
+      } else {
+        // Parallele Ausfuehrung via Promise.allSettled
+        // Vorteil: ein langsamer Webhook blockiert die anderen nicht
+        const settled = await Promise.allSettled(
+          dbWebhooks.map((webhook) =>
+            sendToWebhook(webhook.url, buildHeaders(webhook), payload)
+          )
+        );
+        for (const s of settled) {
+          if (s.status === "fulfilled") {
+            results.push(s.value);
+          } else {
+            console.error(
+              `[Webhooks] Unerwartete Exception bei "${event}":`,
+              s.reason instanceof Error ? s.reason.message : s.reason
+            );
+            results.push(false);
+          }
+        }
+      }
+    } catch (dbError) {
+      console.error(
+        `[Webhooks] DB-Webhooks fuer "${event}" konnten nicht geladen werden:`,
+        dbError instanceof Error ? dbError.message : dbError
+      );
     }
 
-    for (const webhook of dbWebhooks) {
-      const success = await sendToWebhook(webhook.url, buildHeaders(webhook), payload);
-      results.push(success);
+    // SMTP-Fallback: nur wenn kein Kanal erfolgreich war
+    const anySuccess = results.some(Boolean);
+    if (!anySuccess) {
+      console.warn(`[Webhooks] Kein Webhook fuer "${event}" erfolgreich – versuche SMTP-Fallback`);
+      try {
+        await sendEmailFallback(event, payload);
+      } catch (mailErr) {
+        console.error(
+          "[Webhooks] SMTP-Fallback fehlgeschlagen:",
+          mailErr instanceof Error ? mailErr.message : mailErr
+        );
+      }
     }
-  } catch (dbError) {
-    console.error(`[Webhooks] DB-Webhooks fuer "${event}" konnten nicht geladen werden:`, dbError);
-  }
-
-  // SMTP-Fallback: nur wenn kein Kanal erfolgreich war
-  const anySuccess = results.some(Boolean);
-  if (!anySuccess) {
-    console.warn(`[Webhooks] Kein Webhook fuer "${event}" erfolgreich – versuche SMTP-Fallback`);
-    await sendEmailFallback(event, payload).catch((err) =>
-      console.error("[Webhooks] SMTP-Fallback fehlgeschlagen:", err)
+  } catch (unexpected) {
+    // Letzte Sicherung — sollte nie greifen, aber garantiert "wirft niemals"
+    console.error(
+      `[Webhooks] Unerwarteter Fehler in triggerWebhooks fuer "${event}":`,
+      unexpected instanceof Error ? unexpected.message : unexpected
     );
   }
 }
 
 // =============================================
 // Auth-Header fuer DB-Webhooks aufbauen
+// Wirft niemals — bei Decrypt-Fehler wird der Webhook ohne Auth-Header gesendet
+// und der Empfaenger wird ihn (idealerweise) ablehnen.
 // =============================================
 function buildHeaders(webhook: {
   authType: string;
@@ -81,7 +127,19 @@ function buildHeaders(webhook: {
   authValue: string | null;
 }): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const decryptedValue = webhook.authValue ? decrypt(webhook.authValue) : null;
+
+  let decryptedValue: string | null = null;
+  if (webhook.authValue) {
+    try {
+      decryptedValue = decrypt(webhook.authValue);
+    } catch (err) {
+      console.error(
+        "[Webhooks] Konnte Auth-Wert nicht entschluesseln (Schluessel rotiert oder Ciphertext korrupt):",
+        err instanceof Error ? err.message : err
+      );
+      decryptedValue = null;
+    }
+  }
 
   switch (webhook.authType) {
     case "api_key":
@@ -108,30 +166,68 @@ function buildHeaders(webhook: {
 }
 
 // =============================================
-// HTTP-Versand mit Retry und Timeout
+// HTTP-Versand mit Retry, Timeout und SSRF-Schutz
 // =============================================
 async function sendToWebhook(
   url: string,
   headers: Record<string, string>,
   payload: Record<string, unknown>
 ): Promise<boolean> {
+  const safeUrl = redactUrlForLog(url);
+
+  // SSRF-Schutz: Hostname pruefen, bevor wir tatsaechlich anfragen
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    console.error(`[Webhooks] Ungueltige URL: ${safeUrl}`);
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    console.error(`[Webhooks] Unerlaubtes Protokoll bei ${safeUrl}`);
+    return false;
+  }
+  // In Entwicklung erlauben wir explizit localhost-Endpunkte
+  const allowPrivate = process.env.WEBHOOK_ALLOW_PRIVATE === "1";
+  if (!allowPrivate) {
+    const isPublic = await isPublicHostname(parsed.hostname);
+    if (!isPublic) {
+      console.error(
+        `[Webhooks] SSRF-Schutz: Webhook-URL ${safeUrl} zeigt auf eine private/loopback Adresse — wird abgelehnt.`
+      );
+      return false;
+    }
+  }
+
+  // Body einmal aufbauen — bei zirkulaeren Strukturen werfen, aber Fehler fangen
+  let body: string;
+  try {
+    body = JSON.stringify(payload);
+  } catch (err) {
+    console.error(
+      `[Webhooks] Payload-Serialisierung fehlgeschlagen fuer ${safeUrl}:`,
+      err instanceof Error ? err.message : err
+    );
+    return false;
+  }
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const response = await fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify(payload),
+        body,
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
 
       if (response.ok) return true;
 
       console.warn(
-        `[Webhooks] ${url} Versuch ${attempt}/${MAX_RETRIES}: HTTP ${response.status}`
+        `[Webhooks] ${safeUrl} Versuch ${attempt}/${MAX_RETRIES}: HTTP ${response.status}`
       );
     } catch (error) {
       console.warn(
-        `[Webhooks] ${url} Versuch ${attempt}/${MAX_RETRIES}:`,
+        `[Webhooks] ${safeUrl} Versuch ${attempt}/${MAX_RETRIES}:`,
         error instanceof Error ? error.message : error
       );
     }
@@ -141,7 +237,7 @@ async function sendToWebhook(
     }
   }
 
-  console.error(`[Webhooks] ${url} endgueltig fehlgeschlagen nach ${MAX_RETRIES} Versuchen.`);
+  console.error(`[Webhooks] ${safeUrl} endgueltig fehlgeschlagen nach ${MAX_RETRIES} Versuchen.`);
   return false;
 }
 

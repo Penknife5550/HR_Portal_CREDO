@@ -16,6 +16,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
+import { triggerWebhooks } from "@/lib/webhooks";
+import { formatEmployeeName } from "@/lib/format";
 
 const MS_PER_DAY = 86400000;
 
@@ -98,7 +100,7 @@ export async function POST(request: NextRequest) {
     for (const doc of amtsarztDocs) {
       processed++;
       const expiresAt = doc.expiresAt!;
-      const employeeName = `${doc.process.employeeFirstName} ${doc.process.employeeLastName}`;
+      const employeeName = formatEmployeeName(doc.process);
       const daysUntilExpiry = (expiresAt.getTime() - now.getTime()) / MS_PER_DAY;
 
       if (daysUntilExpiry < 0) {
@@ -160,7 +162,7 @@ export async function POST(request: NextRequest) {
     for (const proc of probationProcesses) {
       processed++;
       const startDate = proc.probationStartDate!;
-      const employeeName = `${proc.employeeFirstName} ${proc.employeeLastName}`;
+      const employeeName = formatEmployeeName(proc);
 
       // 2. Beurteilung (T+9 bis T+12)
       const hasSecondAssessment = proc.assessments.some(
@@ -263,7 +265,7 @@ export async function POST(request: NextRequest) {
 
       if (now > deadline && proc.documents.length === 0) {
         processed++;
-        const employeeName = `${proc.employeeFirstName} ${proc.employeeLastName}`;
+        const employeeName = formatEmployeeName(proc);
         warnings.push({
           processId: proc.id,
           displayId: proc.displayId,
@@ -313,7 +315,7 @@ export async function POST(request: NextRequest) {
 
       if (now > deadline) {
         processed++;
-        const employeeName = `${antrag.process.employeeFirstName} ${antrag.process.employeeLastName}`;
+        const employeeName = formatEmployeeName(antrag.process);
         warnings.push({
           processId: antrag.process.id,
           displayId: antrag.process.displayId,
@@ -337,6 +339,45 @@ export async function POST(request: NextRequest) {
       },
       data: { isOverdue: true },
     });
+
+    // ══════════════════════════════════════════
+    // Webhook: Sammelmail an HR (eine Mail pro Lauf)
+    // ══════════════════════════════════════════
+    if (warnings.length > 0) {
+      // Severities in einem einzigen Pass aggregieren (statt 3x .filter().length)
+      const bySeverity = warnings.reduce(
+        (acc, w) => {
+          acc[w.severity] += 1;
+          return acc;
+        },
+        { OVERDUE: 0, URGENT: 0, WARNING: 0 } as Record<Severity, number>
+      );
+      // Hoechste Severity bestimmen (fuer Banner-Farbe in der Mail)
+      const topSeverity: Severity =
+        bySeverity.OVERDUE > 0
+          ? "OVERDUE"
+          : bySeverity.URGENT > 0
+            ? "URGENT"
+            : "WARNING";
+
+      const MAX_WARNINGS_PER_MAIL = 50;
+      const includedWarnings = warnings.slice(0, MAX_WARNINGS_PER_MAIL);
+      const omittedCount = Math.max(0, warnings.length - MAX_WARNINGS_PER_MAIL);
+
+      // Fire-and-forget: triggerWebhooks wirft nie, blockiert Cron-Response nicht.
+      triggerWebhooks("psi-deadline-warning", {
+        timestamp: now.toISOString(),
+        totalWarnings: warnings.length,
+        shownWarnings: includedWarnings.length,
+        truncated: omittedCount > 0,
+        omittedCount,
+        bySeverity,
+        topSeverity,
+        warnings: includedWarnings,
+      }).catch((err) =>
+        console.error("[psi-deadline-warning] Webhook-Fehler:", err instanceof Error ? err.message : err)
+      );
+    }
 
     return NextResponse.json({
       warnings,
