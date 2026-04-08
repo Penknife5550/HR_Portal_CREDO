@@ -23,6 +23,7 @@ import {
   BRL_SCALE_LABELS,
   SCHULNOTEN_SCALE_LABELS,
 } from "@/lib/beurteilung-defaults";
+import { REFERENZ_LABELS } from "@/lib/referenz-labels";
 import type { AssessmentData } from "../types";
 
 interface Props {
@@ -30,21 +31,6 @@ interface Props {
   employeeName: string;
   onClose: () => void;
 }
-
-const REFERENZ_LABELS: Record<string, string> = {
-  andachtsbesuch: "Regelmäßiger Andachtsbesuch",
-  "vollzeit-perspektive": "Perspektive Vollzeit / mind. 75%",
-  belastbarkeit: "Belastbarkeit",
-  "gutes-miteinander": "Gutes Miteinander (Kollegium, Schüler, Eltern)",
-  "besondere-aufgaben": "Bereitschaft besondere Aufgaben zu übernehmen",
-  klassenleitung: "Klassenleitung übernommen",
-  "engagement-schule": "Engagement für Schule sichtbar",
-  "identifikation-fes": "Identifikation mit Grundsätzen FES Minden",
-  "grundsaetze-gelebt": "Grundsätze der FES werden gelebt",
-  zielvereinbarungen: "Zielvereinbarungen vereinbart",
-  gemeindemitgliedschaft: "Aktive Gemeindemitgliedschaft",
-  "mitarbeit-gemeinde": "Mitarbeit in der Gemeinde",
-};
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";

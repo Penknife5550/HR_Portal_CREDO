@@ -9,31 +9,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { AssessmentData } from "./page";
-
-interface ReferenzQuestion {
-  id: string;
-  label: string;
-  hasTextField?: boolean;
-}
-
-const REFERENZ_QUESTIONS: ReferenzQuestion[] = [
-  { id: "andachtsbesuch", label: "Regelmäßiger Andachtsbesuch" },
-  { id: "vollzeit-perspektive", label: "Perspektive Vollzeit / mind. 75%" },
-  { id: "belastbarkeit", label: "Belastbarkeit" },
-  { id: "gutes-miteinander", label: "Gutes Miteinander (Kollegium, Schüler, Eltern)" },
-  { id: "besondere-aufgaben", label: "Bereitschaft besondere Aufgaben zu übernehmen" },
-  { id: "klassenleitung", label: "Klassenleitung übernommen" },
-  { id: "engagement-schule", label: "Engagement für Schule sichtbar" },
-  { id: "identifikation-fes", label: "Identifikation mit Grundsätzen FES Minden" },
-  { id: "grundsaetze-gelebt", label: "Grundsätze der FES werden gelebt" },
-  { id: "zielvereinbarungen", label: "Zielvereinbarungen vereinbart" },
-  { id: "gemeindemitgliedschaft", label: "Aktive Gemeindemitgliedschaft" },
-  {
-    id: "mitarbeit-gemeinde",
-    label: "Mitarbeit in der Gemeinde — welcher Bereich?",
-    hasTextField: true,
-  },
-];
+import { REFERENZ_QUESTIONS } from "@/lib/referenz-labels";
 
 const REFERENZ_OPTIONS = ["Ja", "Nein", "Teilweise"] as const;
 const SAVE_DEBOUNCE_MS = 800;

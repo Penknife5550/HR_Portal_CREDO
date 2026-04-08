@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
+import { autosaveAssessmentSchema } from "@/lib/validations/beurteilung";
 
 // =============================================
 // Typen fuer Template-Snapshot
@@ -235,65 +236,53 @@ export async function PUT(
       );
     }
 
-    // Body parsen
+    // Body parsen + Zod-validieren (single source of truth: validations/beurteilung.ts)
     const body = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: "Ungueltiger Request-Body" }, { status: 400 });
     }
 
-    const {
-      ratingsData,
-      referenceData,
-      gemeindeReferenz,
-      // Workflow-Felder Phase 3
-      scheduledDate,
-      fach,
-      klasse,
-      vertrauenslehrkraft,
-      unbiasedConfirmed,
-      postReviewAt,
-      postReviewNotes,
-      beurteilungsgespraechAt,
-      beurteilungsgespraechNotes,
-      meetsRequirementsManual,
-      overallReasoning,
-    } = body;
+    const parsed = autosaveAssessmentSchema.safeParse(body);
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0];
+      return NextResponse.json(
+        {
+          error: firstError.message,
+          field: firstError.path.join("."),
+        },
+        { status: 400 },
+      );
+    }
+    const data = parsed.data;
 
-    // Daten je nach Typ validieren und speichern
+    // Skala-spezifischer Range-Check zusaetzlich zur Zod-Validierung
+    // (Schema erlaubt 1-6, BRL erlaubt nur 1-5)
+    const maxGrade = assessment.scaleType === "BRL_1_5" ? 5 : 6;
+    if (data.ratingsData) {
+      for (const [key, value] of Object.entries(data.ratingsData)) {
+        if (value > maxGrade) {
+          return NextResponse.json(
+            {
+              error: `Ungueltige Note fuer ${key}: Wert muss zwischen 1 und ${maxGrade} liegen`,
+            },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
+    // Daten je nach Typ in Update-Objekt mappen
     const updateData: Record<string, unknown> = {};
 
-    // Skala dynamisch ermitteln (BRL_1_5 → 5, sonst 6)
-    const maxGrade = assessment.scaleType === "BRL_1_5" ? 5 : 6;
-
     if (assessment.assessmentType === "BEURTEILUNG") {
-      // Noten validieren
-      if (ratingsData && typeof ratingsData === "object") {
-        for (const [key, value] of Object.entries(ratingsData)) {
-          if (
-            typeof value !== "number" ||
-            value < 1 ||
-            value > maxGrade ||
-            !Number.isInteger(value)
-          ) {
-            return NextResponse.json(
-              {
-                error: `Ungueltige Note fuer ${key}: Wert muss zwischen 1 und ${maxGrade} liegen`,
-              },
-              { status: 400 },
-            );
-          }
-        }
-
-        updateData.ratingsData = ratingsData;
+      if (data.ratingsData) {
+        updateData.ratingsData = data.ratingsData;
 
         // Gesamtschnitt berechnen — NUR Visualisierung, KEIN Gesamturteil!
         // BRL Nr. 7.5: Das Gesamturteil ist KEIN arithmetisches Mittel.
         const snapshot = assessment.templateSnapshot as unknown as TemplateSnapshot;
         if (snapshot) {
-          const gradeResult = calculateOverallGrade(
-            snapshot,
-            ratingsData as Record<string, number>,
-          );
+          const gradeResult = calculateOverallGrade(snapshot, data.ratingsData);
           if (gradeResult) {
             updateData.overallGrade = gradeResult.overallGrade;
             // meetsRequirements nur als Legacy-Feld, nicht mehr als Entscheidung
@@ -306,55 +295,48 @@ export async function PUT(
       }
 
       // Workflow-Felder
-      if (scheduledDate !== undefined) {
+      if (data.scheduledDate !== undefined) {
         updateData.scheduledDate =
-          scheduledDate === null ? null : new Date(scheduledDate);
+          data.scheduledDate === null ? null : new Date(data.scheduledDate);
       }
-      if (fach !== undefined) updateData.fach = fach || null;
-      if (klasse !== undefined) updateData.klasse = klasse || null;
-      if (vertrauenslehrkraft !== undefined) {
-        updateData.vertrauenslehrkraft = vertrauenslehrkraft || null;
+      if (data.fach !== undefined) updateData.fach = data.fach || null;
+      if (data.klasse !== undefined) updateData.klasse = data.klasse || null;
+      if (data.vertrauenslehrkraft !== undefined) {
+        updateData.vertrauenslehrkraft = data.vertrauenslehrkraft || null;
       }
-      if (unbiasedConfirmed !== undefined) {
-        updateData.unbiasedConfirmed = Boolean(unbiasedConfirmed);
-        if (unbiasedConfirmed) {
-          updateData.unbiasedConfirmedAt = new Date();
-        } else {
-          updateData.unbiasedConfirmedAt = null;
-        }
+      if (data.unbiasedConfirmed !== undefined) {
+        updateData.unbiasedConfirmed = data.unbiasedConfirmed;
+        updateData.unbiasedConfirmedAt = data.unbiasedConfirmed ? new Date() : null;
       }
-      if (postReviewAt !== undefined) {
+      if (data.postReviewAt !== undefined) {
         updateData.postReviewAt =
-          postReviewAt === null ? null : new Date(postReviewAt);
+          data.postReviewAt === null ? null : new Date(data.postReviewAt);
       }
-      if (postReviewNotes !== undefined) {
-        updateData.postReviewNotes = postReviewNotes || null;
+      if (data.postReviewNotes !== undefined) {
+        updateData.postReviewNotes = data.postReviewNotes || null;
       }
-      if (beurteilungsgespraechAt !== undefined) {
+      if (data.beurteilungsgespraechAt !== undefined) {
         updateData.beurteilungsgespraechAt =
-          beurteilungsgespraechAt === null
+          data.beurteilungsgespraechAt === null
             ? null
-            : new Date(beurteilungsgespraechAt);
+            : new Date(data.beurteilungsgespraechAt);
       }
-      if (beurteilungsgespraechNotes !== undefined) {
-        updateData.beurteilungsgespraechNotes = beurteilungsgespraechNotes || null;
+      if (data.beurteilungsgespraechNotes !== undefined) {
+        updateData.beurteilungsgespraechNotes =
+          data.beurteilungsgespraechNotes || null;
       }
-      if (meetsRequirementsManual !== undefined) {
-        updateData.meetsRequirementsManual =
-          meetsRequirementsManual === null
-            ? null
-            : Boolean(meetsRequirementsManual);
+      if (data.meetsRequirementsManual !== undefined) {
+        updateData.meetsRequirementsManual = data.meetsRequirementsManual;
       }
-      if (overallReasoning !== undefined) {
-        updateData.overallReasoning = overallReasoning || null;
+      if (data.overallReasoning !== undefined) {
+        updateData.overallReasoning = data.overallReasoning || null;
       }
     } else if (assessment.assessmentType === "REFERENZ") {
-      // Referenz-Daten speichern
-      if (referenceData && typeof referenceData === "object") {
-        updateData.referenceData = referenceData;
+      if (data.referenceData) {
+        updateData.referenceData = data.referenceData;
       }
-      if (typeof gemeindeReferenz === "string") {
-        updateData.gemeindeReferenz = gemeindeReferenz;
+      if (data.gemeindeReferenz !== undefined) {
+        updateData.gemeindeReferenz = data.gemeindeReferenz || null;
       }
     }
 

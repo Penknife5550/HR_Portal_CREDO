@@ -14,6 +14,7 @@ import {
   AUDIT_ACTION_LABELS,
   buildVerifyHash,
 } from "@/lib/verify-assessment";
+import { REFERENZ_LABELS_ASCII as REFERENZ_LABELS } from "@/lib/referenz-labels";
 
 // =============================================
 // Typen
@@ -204,20 +205,8 @@ const PREREQUISITE_LABELS: Record<string, string> = {
   amtsaerztlicheUntersuchung: "Amtsaerztliche Gesundheitsuntersuchung",
 };
 
-const REFERENZ_LABELS: Record<string, string> = {
-  andachtsbesuch: "Regelmaessiger Andachtsbesuch",
-  "vollzeit-perspektive": "Perspektive Vollzeit / mind. 75%",
-  belastbarkeit: "Belastbarkeit",
-  "gutes-miteinander": "Gutes Miteinander (Kollegium, Schueler, Eltern)",
-  "besondere-aufgaben": "Bereitschaft besondere Aufgaben zu uebernehmen",
-  klassenleitung: "Klassenleitung uebernommen",
-  "engagement-schule": "Engagement fuer Schule sichtbar",
-  "identifikation-fes": "Identifikation mit Grundsaetzen FES Minden",
-  "grundsaetze-gelebt": "Grundsaetze der FES werden gelebt",
-  zielvereinbarungen: "Zielvereinbarungen vereinbart",
-  gemeindemitgliedschaft: "Aktive Gemeindemitgliedschaft",
-  "mitarbeit-gemeinde": "Mitarbeit in der Gemeinde",
-};
+// REFERENZ_LABELS sind in lib/referenz-labels.ts zentralisiert (single source
+// of truth fuer Verify-Page, HR-Detail-Modal, PDF-Export, Lehrkraft-Form).
 
 // =============================================
 // QR Code generieren
