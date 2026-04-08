@@ -42,7 +42,7 @@ export const CIVIL_SERVICE_CHECKLIST_TEMPLATE: CivilServiceChecklistTemplate[] =
   // Phase II_B: Besoldung
   { step: "6.B.1", phase: "II_B", category: "Besoldung", title: "Vordienstzeiten berechnet", assignee: "HR", isGatekeeper: false, linkedDocumentType: "VORDIENSZEITENBERECHNUNG" },
   { step: "6.B.2", phase: "II_B", category: "Besoldung", title: "Erfahrungsstufe festgesetzt", assignee: "HR", isGatekeeper: false, linkedDocumentType: "STUFENBERECHNUNG" },
-  { step: "6.B.3", phase: "II_B", category: "Besoldung", title: "Bescheid an LK versendet", assignee: "HR", isGatekeeper: false },
+  { step: "6.B.3", phase: "II_B", category: "Besoldung", title: "Bescheid an LK versendet", assignee: "HR", isGatekeeper: true },
 
   // Phase II_C: Vertrag & BR
   { step: "6.C.1", phase: "II_C", category: "Vertrag", title: "PSI-Vertrag auf Probe erstellt", assignee: "HR", isGatekeeper: false, linkedDocumentType: "VERTRAG_PROBE" },
@@ -61,7 +61,7 @@ export const CIVIL_SERVICE_CHECKLIST_TEMPLATE: CivilServiceChecklistTemplate[] =
   { step: "6.E.2", phase: "II_E", category: "Beihilfe", title: "Beihilfe-Erstantrag mitgegeben", assignee: "HR", isGatekeeper: false, linkedDocumentType: "BEIHILFE_ERSTANTRAG" },
   { step: "6.E.3", phase: "II_E", category: "Beihilfe", title: "Datenschutz-Einwilligung Beihilfe", assignee: "LK", isGatekeeper: false, linkedDocumentType: "BEIHILFE_DATENSCHUTZ" },
   { step: "6.E.4", phase: "II_E", category: "Beihilfe", title: "Stammblatt Beihilfeakte erstellt", assignee: "HR", isGatekeeper: false, linkedDocumentType: "BEIHILFE_STAMMBLATT" },
-  { step: "6.E.5", phase: "II_E", category: "Beihilfe", title: "Mitteilung an BR Dez. 23 (Beihilfestelle)", assignee: "HR", isGatekeeper: false, linkedDocumentType: "BEIHILFE_MITTEILUNG" },
+  { step: "6.E.5", phase: "II_E", category: "Beihilfe", title: "Mitteilung an BR Dez. 23 (Beihilfestelle)", assignee: "HR", isGatekeeper: true, linkedDocumentType: "BEIHILFE_MITTEILUNG" },
 
   // Phase II_F: RV-Befreiung
   { step: "6.F.1", phase: "II_F", category: "RV-Befreiung", title: "RV-Befreiungsantrag vorbereitet", assignee: "HR", isGatekeeper: false },

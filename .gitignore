@@ -65,3 +65,6 @@ nul
 prisma/compiled/
 backups/*.dump
 .DS_Store
+
+# n8n Workflows (interner Stand, nie ins Repo)
+/n8n/

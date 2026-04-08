@@ -9,6 +9,11 @@
 
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
+import { getBaseUrl } from "@/lib/url";
+import {
+  AUDIT_ACTION_LABELS,
+  buildVerifyHash,
+} from "@/lib/verify-assessment";
 
 // =============================================
 // Typen
@@ -59,14 +64,46 @@ interface AssessmentExport {
   recipientName: string | null;
   overallGrade: number | null;
   meetsRequirements: boolean | null;
+  meetsRequirementsManual: boolean | null;
+  overallReasoning: string | null;
   ratingsData: Record<string, number> | null;
   referenceData: Record<string, string> | null;
   gemeindeReferenz: string | null;
   templateSnapshot: TemplateSnapshot | null;
   submittedAt: string | null;
+
+  // Phase 3-5 Workflow-Felder
+  scheduledDate: string | null;
+  fach: string | null;
+  klasse: string | null;
+  vertrauenslehrkraft: string | null;
+  unbiasedConfirmed: boolean | null;
+  unbiasedConfirmedAt: string | null;
+  postReviewAt: string | null;
+  postReviewNotes: string | null;
+  beurteilungsgespraechAt: string | null;
+  beurteilungsgespraechNotes: string | null;
+  releasedToEmployeeAt: string | null;
+  acknowledgedByEmployeeAt: string | null;
+  acknowledgedByEmployeeIp: string | null;
+  rebuttalText: string | null;
+  rebuttalAt: string | null;
+  archivedAt: string | null;
+
+  // Phase 6 — Verifikation
+  verifyToken: string | null;
+  auditTrail: AssessmentAuditEntry[];
+}
+
+interface AssessmentAuditEntry {
+  action: string;
+  createdAt: string;
+  actorName: string | null;
 }
 
 interface TemplateSnapshot {
+  scaleType?: string | null;
+  scaleLabels?: Record<string, string> | null;
   categories: {
     id: string;
     name: string;
@@ -197,6 +234,26 @@ async function generateQRDataUri(content: string): Promise<string> {
       light: COLORS.white,
     },
   });
+}
+
+/**
+ * Erzeugt den Verifikations-QR (Phase 6) — verweist auf die oeffentliche
+ * Audit-Page der Beurteilung. Wird zusaetzlich zum Swiss-DMS-QR auf jeder
+ * Beurteilungs-Sektion platziert.
+ */
+async function generateVerifyQR(verifyToken: string): Promise<Buffer> {
+  const url = `${getBaseUrl()}/verify/civil-service-assessment/${verifyToken}`;
+  const dataUri = await QRCode.toDataURL(url, {
+    errorCorrectionLevel: "M",
+    type: "image/png",
+    width: 200,
+    margin: 1,
+    color: {
+      dark: COLORS.gruen,
+      light: COLORS.white,
+    },
+  });
+  return Buffer.from(dataUri.split(",")[1], "base64");
 }
 
 function buildQRContent(
@@ -446,8 +503,9 @@ async function addBeurteilungPages(doc: PDFKit.PDFDocument, ctx: ExportContext, 
   await addCoverPage(doc, ctx, `BEURTEILUNG_${assessment.assessmentNumber}`,
     `${assessment.assessmentNumber}. Dienstliche Beurteilung`);
 
+  const sectionTitleStr = `${assessment.assessmentNumber}. Beurteilung`;
   doc.addPage();
-  addPageHeader(doc, ctx, `${assessment.assessmentNumber}. Beurteilung`);
+  addPageHeader(doc, ctx, sectionTitleStr);
 
   let y = sectionTitle(doc, "Beurteilungsergebnis", 55);
 
@@ -462,28 +520,84 @@ async function addBeurteilungPages(doc: PDFKit.PDFDocument, ctx: ExportContext, 
     .text(formatDate(assessment.submittedAt), 140, y);
   y += 16;
 
-  // Gesamtnote
-  if (assessment.overallGrade !== null) {
-    doc.font("Helvetica").fontSize(9).fillColor(COLORS.gray).text("Gesamtnote:", 50, y);
-    const gradeColor = assessment.overallGrade < 3.0 ? COLORS.gruen : COLORS.rot;
-    doc.font("Helvetica-Bold").fontSize(14).fillColor(gradeColor)
-      .text(assessment.overallGrade.toFixed(2), 140, y - 2);
-    y += 20;
+  // Skala-Snapshot (BRL Nr. 7.3 / Schulnoten)
+  const template = assessment.templateSnapshot;
+  const scaleType = template?.scaleType || "BRL_1_5";
+  const scaleLabel = scaleType === "BRL_1_5"
+    ? "BRL 1–5 (5 = Übertrifft besonders, 1 = Entspricht nicht)"
+    : "Schulnoten 1–6 (1 = sehr gut, 6 = ungenügend)";
+  doc.font("Helvetica").fontSize(9).fillColor(COLORS.gray).text("Skala:", 50, y);
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(COLORS.black)
+    .text(scaleLabel, 140, y, { width: 420 });
+  y += 20;
 
-    const reqLabel = assessment.meetsRequirements ? "Ja" : "Nein";
-    const reqColor = assessment.meetsRequirements ? COLORS.gruen : COLORS.rot;
-    doc.font("Helvetica").fontSize(9).fillColor(COLORS.gray).text("Anforderungen erfuellt:", 50, y);
-    doc.font("Helvetica-Bold").fontSize(10).fillColor(reqColor).text(reqLabel, 170, y);
-    y += 25;
+  // Stammdaten Unterrichtsbesuch (BRL Nr. 8.3, 4.10)
+  if (assessment.scheduledDate || assessment.fach || assessment.klasse || assessment.unbiasedConfirmed) {
+    doc.y = y;
+    checkPageBreak(doc, 80, ctx, sectionTitleStr);
+    y = sectionTitle(doc, "Vorbereitung — BRL Nr. 4.10 / 8.3");
+
+    const stammRows: Array<[string, string]> = [
+      ["Termin", formatDate(assessment.scheduledDate)],
+      ["Fach", assessment.fach || "—"],
+      ["Klasse", assessment.klasse || "—"],
+      ["Vertrauenslehrkraft", assessment.vertrauenslehrkraft || "—"],
+      [
+        "Befangenheit",
+        assessment.unbiasedConfirmed
+          ? `Keine Befangenheit bestätigt (${formatDate(assessment.unbiasedConfirmedAt)})`
+          : "Nicht bestätigt",
+      ],
+    ];
+    for (const [label, value] of stammRows) {
+      doc.font("Helvetica").fontSize(9).fillColor(COLORS.gray).text(label, 50, y);
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(COLORS.black).text(value, 170, y, { width: 390 });
+      y += 14;
+    }
+    y += 6;
+    doc.y = y;
+  }
+
+  // Manuelles Gesamturteil (BRL Nr. 7.5)
+  if (assessment.meetsRequirementsManual !== null || assessment.overallReasoning) {
+    checkPageBreak(doc, 100, ctx, sectionTitleStr);
+    y = sectionTitle(doc, "Gesamturteil — BRL Nr. 7.5");
+
+    if (assessment.meetsRequirementsManual !== null) {
+      const reqLabel = assessment.meetsRequirementsManual ? "Ja, erfüllt" : "Nein, erfüllt nicht";
+      const reqColor = assessment.meetsRequirementsManual ? COLORS.gruen : COLORS.rot;
+      doc.font("Helvetica").fontSize(9).fillColor(COLORS.gray).text("Erfüllt die Anforderungen?", 50, y);
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(reqColor).text(reqLabel, 220, y);
+      y += 18;
+    }
+
+    if (assessment.overallGrade !== null) {
+      const gradeColor = assessment.overallGrade < 3.0 ? COLORS.gruen : COLORS.rot;
+      doc.font("Helvetica").fontSize(9).fillColor(COLORS.gray).text("Hilfsvisualisierung Ø:", 50, y);
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(gradeColor)
+        .text(assessment.overallGrade.toFixed(2), 220, y);
+      y += 18;
+    }
+
+    if (assessment.overallReasoning) {
+      doc.font("Helvetica").fontSize(9).fillColor(COLORS.gray).text("Begründung:", 50, y);
+      y += 14;
+      doc.font("Helvetica").fontSize(9).fillColor(COLORS.black)
+        .text(assessment.overallReasoning, 50, y, { width: 515 });
+      y = doc.y + 8;
+    }
+    doc.y = y;
   }
 
   // Kategorien + Kriterien
-  const template = assessment.templateSnapshot;
   const ratings = assessment.ratingsData || {};
 
   if (template?.categories) {
+    checkPageBreak(doc, 60, ctx, sectionTitleStr);
+    y = sectionTitle(doc, "Bewertungen pro Merkmal");
+
     for (const cat of template.categories.sort((a, b) => a.orderIndex - b.orderIndex)) {
-      checkPageBreak(doc, 80, ctx, `${assessment.assessmentNumber}. Beurteilung`);
+      checkPageBreak(doc, 80, ctx, sectionTitleStr);
       y = doc.y;
 
       // Kategorie-Header
@@ -503,7 +617,7 @@ async function addBeurteilungPages(doc: PDFKit.PDFDocument, ctx: ExportContext, 
       y += 28;
 
       for (const crit of cat.criteria.sort((a, b) => a.orderIndex - b.orderIndex)) {
-        checkPageBreak(doc, 20, ctx, `${assessment.assessmentNumber}. Beurteilung`);
+        checkPageBreak(doc, 20, ctx, sectionTitleStr);
         y = doc.y;
 
         const rating = ratings[crit.id];
@@ -525,6 +639,128 @@ async function addBeurteilungPages(doc: PDFKit.PDFDocument, ctx: ExportContext, 
         doc.y = y;
       }
     }
+  }
+
+  // Gespraeche (BRL Nr. 9.1 + 10.1)
+  if (assessment.postReviewAt || assessment.beurteilungsgespraechAt) {
+    checkPageBreak(doc, 100, ctx, sectionTitleStr);
+    y = sectionTitle(doc, "Gespräche — BRL Nr. 9.1 / 10.1");
+
+    if (assessment.postReviewAt) {
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(COLORS.primary)
+        .text(`Nachbesprechung — ${formatDate(assessment.postReviewAt)}`, 50, y);
+      y += 14;
+      if (assessment.postReviewNotes) {
+        doc.font("Helvetica").fontSize(9).fillColor(COLORS.black)
+          .text(assessment.postReviewNotes, 50, y, { width: 515 });
+        y = doc.y + 8;
+      }
+    }
+
+    if (assessment.beurteilungsgespraechAt) {
+      checkPageBreak(doc, 50, ctx, sectionTitleStr);
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(COLORS.primary)
+        .text(`Beurteilungsgespräch — ${formatDate(assessment.beurteilungsgespraechAt)}`, 50, y);
+      y += 14;
+      if (assessment.beurteilungsgespraechNotes) {
+        doc.font("Helvetica").fontSize(9).fillColor(COLORS.black)
+          .text(assessment.beurteilungsgespraechNotes, 50, y, { width: 515 });
+        y = doc.y + 8;
+      }
+    }
+    doc.y = y;
+  }
+
+  // Bekanntgabe + Gegenaeusserung (§ 92 LBG NRW)
+  if (
+    assessment.releasedToEmployeeAt ||
+    assessment.acknowledgedByEmployeeAt ||
+    assessment.rebuttalText
+  ) {
+    checkPageBreak(doc, 100, ctx, sectionTitleStr);
+    y = sectionTitle(doc, "Bekanntgabe — § 92 Abs. 1 LBG NRW");
+
+    const bekRows: Array<[string, string]> = [
+      ["Bekanntgabe-Link erstellt", formatDate(assessment.releasedToEmployeeAt)],
+      ["Quittiert durch Lehrkraft", formatDate(assessment.acknowledgedByEmployeeAt)],
+    ];
+    if (assessment.acknowledgedByEmployeeIp) {
+      bekRows.push(["Quittierungs-IP", assessment.acknowledgedByEmployeeIp]);
+    }
+    for (const [label, value] of bekRows) {
+      doc.font("Helvetica").fontSize(9).fillColor(COLORS.gray).text(label, 50, y);
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(COLORS.black).text(value, 220, y);
+      y += 14;
+    }
+
+    if (assessment.rebuttalText) {
+      y += 6;
+      checkPageBreak(doc, 60, ctx, sectionTitleStr);
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(COLORS.gelb)
+        .text(`Gegenäußerung der Lehrkraft (${formatDate(assessment.rebuttalAt)}) — § 92 Abs. 1 S. 6 LBG NRW`, 50, y, { width: 515 });
+      y = doc.y + 6;
+      doc.font("Helvetica").fontSize(9).fillColor(COLORS.black)
+        .text(assessment.rebuttalText, 50, y, { width: 515 });
+      y = doc.y + 8;
+    }
+    doc.y = y;
+  }
+
+  // Audit-Trail
+  if (assessment.auditTrail && assessment.auditTrail.length > 0) {
+    checkPageBreak(doc, 80, ctx, sectionTitleStr);
+    y = sectionTitle(doc, "Audit-Trail");
+
+    for (const entry of assessment.auditTrail) {
+      checkPageBreak(doc, 18, ctx, sectionTitleStr);
+      const label = AUDIT_ACTION_LABELS[entry.action] ?? entry.action;
+      doc.font("Helvetica").fontSize(8).fillColor(COLORS.gray)
+        .text(formatDate(entry.createdAt), 50, y, { width: 90 });
+      doc.font("Helvetica").fontSize(9).fillColor(COLORS.black)
+        .text(label, 145, y, { width: 290 });
+      if (entry.actorName) {
+        doc.font("Helvetica").fontSize(8).fillColor(COLORS.gray)
+          .text(entry.actorName, 440, y, { width: 120, align: "right" });
+      }
+      y += 14;
+      doc.y = y;
+    }
+  }
+
+  // Verifikations-QR (Phase 6) — neue Seite, falls eng
+  if (assessment.verifyToken) {
+    checkPageBreak(doc, 200, ctx, sectionTitleStr);
+    y = sectionTitle(doc, "Verifikation");
+
+    const verifyHash = buildVerifyHash(assessment.verifyToken);
+    const qrBuffer = await generateVerifyQR(assessment.verifyToken);
+
+    // Linker Block: Erklaerung + Hash
+    doc.font("Helvetica").fontSize(9).fillColor(COLORS.black)
+      .text(
+        "Diese Beurteilung kann unabhängig durch die Bezirksregierung oder andere Auditoren über die Audit-Page des CREDO HR-Portals verifiziert werden. Scan mit der Smartphone-Kamera öffnet die Read-Only-Sicht.",
+        50, y, { width: 360 },
+      );
+    let leftY = doc.y + 10;
+
+    if (verifyHash) {
+      doc.font("Helvetica").fontSize(8).fillColor(COLORS.gray).text("Verifikations-Code:", 50, leftY);
+      leftY += 12;
+      doc.font("Helvetica-Bold").fontSize(14).fillColor(COLORS.gruen).text(verifyHash, 50, leftY);
+      leftY += 20;
+    }
+
+    doc.font("Helvetica").fontSize(7).fillColor(COLORS.gray).text(
+      `${getBaseUrl()}/verify/civil-service-assessment/${assessment.verifyToken}`,
+      50, leftY, { width: 360 },
+    );
+
+    // Rechter Block: QR
+    doc.image(qrBuffer, 430, y, { width: 130, height: 130 });
+    doc.font("Helvetica").fontSize(7).fillColor(COLORS.gray)
+      .text("Echtheit prüfen", 430, y + 135, { width: 130, align: "center" });
+
+    doc.y = Math.max(leftY + 20, y + 160);
   }
 }
 

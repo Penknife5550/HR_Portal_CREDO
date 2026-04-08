@@ -10,17 +10,27 @@ import { promises as dns } from "dns";
 import { isIP } from "net";
 
 /**
- * Base-URL der App. Reihenfolge: NEXT_PUBLIC_APP_URL > APP_URL > Production-Default.
+ * Base-URL der App.
+ *
+ * Reihenfolge:
+ *   1. NEXT_PUBLIC_APP_URL
+ *   2. APP_URL
+ *   3. Im Dev-Modus (NODE_ENV !== "production"): http://localhost:3000
+ *      → verhindert, dass lokale Dev-Tests Magic-Links mit der Prod-Domain
+ *        erzeugen.
+ *   4. Production-Default: https://hr.fes-credo.de
  *
  * Der Production-Default ist bewusst hardcoded, damit nicht durch eine fehlende
  * Env-Variable ein Mail-Magic-Link auf eine falsche/leere Domain zeigen kann.
  */
 export function getBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL ||
-    "https://hr.fes-credo.de"
-  );
+  const fromEnv =
+    process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  if (fromEnv) return fromEnv;
+  if (process.env.NODE_ENV !== "production") {
+    return "http://localhost:3000";
+  }
+  return "https://hr.fes-credo.de";
 }
 
 /**

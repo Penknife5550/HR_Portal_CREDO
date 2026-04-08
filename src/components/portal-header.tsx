@@ -51,6 +51,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/checklisten", label: "Checklisten", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },
       { href: "/exit-interview-vorlagen", label: "Exit-Interview", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },
       { href: "/zeugnis-vorlagen", label: "Zeugnis-Bewertung", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },
+      { href: "/beurteilungs-vorlagen", label: "Beurteilungs-Vorlagen", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },
     ],
   },
   {

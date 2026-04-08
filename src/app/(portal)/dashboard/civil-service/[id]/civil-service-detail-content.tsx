@@ -284,7 +284,7 @@ export function CivilServiceDetailContent({
 
   // ---- Copy Assessment Link ----
   const handleCopyLink = (token: string, id: string) => {
-    const url = `${window.location.origin}/assessment/${token}`;
+    const url = `${window.location.origin}/civil-service-assessment/${token}`;
     navigator.clipboard.writeText(url);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -515,6 +515,7 @@ export function CivilServiceDetailContent({
         {activeTab === "assessments" && (
           <TabAssessments
             assessments={data.assessments}
+            employeeName={`${data.employeeFirstName} ${data.employeeLastName}`}
             copiedId={copiedId}
             onCopyLink={handleCopyLink}
             processId={processId}

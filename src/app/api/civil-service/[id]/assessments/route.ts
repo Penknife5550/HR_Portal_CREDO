@@ -8,81 +8,27 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { randomUUID } from "crypto";
+import { BRL_DEFAULT_TEMPLATE, BRL_SCALE_LABELS } from "@/lib/beurteilung-defaults";
+import { triggerWebhooks } from "@/lib/webhooks";
+import { formatEmployeeName } from "@/lib/format";
+import { getBaseUrl } from "@/lib/url";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
+
+/** BRL Nr. 8.3 — Mindest-Ankündigungsfrist in Tagen */
+const MIN_NOTICE_DAYS = 14;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 // =============================================
-// Default Beurteilungs-Template (eingefroren als Snapshot)
-// =============================================
-const DEFAULT_BEURTEILUNG_TEMPLATE = {
-  categories: [
-    {
-      id: "fachliche-kompetenz",
-      name: "Fachliche Kompetenz",
-      weight: 1,
-      orderIndex: 0,
-      criteria: [
-        { id: "fachwissen", name: "Fachwissen", description: "Fundierte Kenntnisse im Fachgebiet", weight: 1, orderIndex: 0 },
-        { id: "didaktik", name: "Didaktik", description: "Methodisch-didaktische Kompetenz im Unterricht", weight: 1, orderIndex: 1 },
-        { id: "fortbildung", name: "Fortbildung", description: "Bereitschaft zur fachlichen Weiterentwicklung", weight: 1, orderIndex: 2 },
-      ],
-    },
-    {
-      id: "paedagogische-kompetenz",
-      name: "Paedagogische Kompetenz",
-      weight: 1,
-      orderIndex: 1,
-      criteria: [
-        { id: "unterricht", name: "Unterricht", description: "Qualitaet der Unterrichtsgestaltung", weight: 1, orderIndex: 0 },
-        { id: "differenzierung", name: "Differenzierung", description: "Individualisierung und Differenzierung im Unterricht", weight: 1, orderIndex: 1 },
-        { id: "classroom-management", name: "Classroom Management", description: "Klassenfuehrung und Unterrichtsorganisation", weight: 1, orderIndex: 2 },
-      ],
-    },
-    {
-      id: "arbeitsverhalten",
-      name: "Arbeitsverhalten",
-      weight: 1,
-      orderIndex: 2,
-      criteria: [
-        { id: "motivation", name: "Motivation", description: "Engagement und Einsatzbereitschaft", weight: 1, orderIndex: 0 },
-        { id: "zuverlaessigkeit", name: "Zuverlaessigkeit", description: "Termingerechte und gewissenhafte Erledigung von Aufgaben", weight: 1, orderIndex: 1 },
-        { id: "belastbarkeit", name: "Belastbarkeit", description: "Umgang mit Arbeitsbelastung und Stresssituationen", weight: 1, orderIndex: 2 },
-      ],
-    },
-    {
-      id: "sozialverhalten",
-      name: "Sozialverhalten",
-      weight: 1,
-      orderIndex: 3,
-      criteria: [
-        { id: "vorgesetzte", name: "Vorgesetzte", description: "Zusammenarbeit mit Vorgesetzten", weight: 1, orderIndex: 0 },
-        { id: "kollegen", name: "Kollegen", description: "Zusammenarbeit im Kollegium", weight: 1, orderIndex: 1 },
-        { id: "schueler", name: "Schueler", description: "Umgang mit Schuelern", weight: 1, orderIndex: 2 },
-        { id: "eltern", name: "Eltern", description: "Elternkommunikation und -zusammenarbeit", weight: 1, orderIndex: 3 },
-      ],
-    },
-    {
-      id: "christliches-profil",
-      name: "Christliches Profil",
-      weight: 1,
-      orderIndex: 4,
-      criteria: [
-        { id: "andachten", name: "Andachten", description: "Vorbereitung und Durchfuehrung von Andachten", weight: 1, orderIndex: 0 },
-        { id: "biblische-integration", name: "Biblische Integration", description: "Integration biblischer Inhalte in den Unterricht", weight: 1, orderIndex: 1 },
-        { id: "gemeindeleben", name: "Gemeindeleben", description: "Aktive Teilnahme am Gemeindeleben", weight: 1, orderIndex: 2 },
-        { id: "fes-grundsaetze", name: "FES-Grundsaetze", description: "Identifikation mit und Umsetzung der FES-Grundsaetze", weight: 1, orderIndex: 3 },
-      ],
-    },
-  ],
-};
-
-// =============================================
 // POST /api/civil-service/[id]/assessments
+// Snapshot-Quelle: BeurteilungTemplate (DB) → Mandanten-Default → Globaler Default
+//                  → Hardcoded BRL_DEFAULT_TEMPLATE aus beurteilung-defaults.ts (Fallback)
 // =============================================
 export async function POST(
   request: NextRequest,
@@ -99,10 +45,18 @@ export async function POST(
 
     const { id } = await context.params;
 
-    // Prozess pruefen
+    // Prozess pruefen — inkl. Organization-Daten fuer Webhook + Mandanten-Default
     const process = await prisma.civilServiceProcess.findUnique({
       where: { id },
-      select: { id: true, status: true, employeeFirstName: true, employeeLastName: true },
+      select: {
+        id: true,
+        status: true,
+        displayId: true,
+        employeeFirstName: true,
+        employeeLastName: true,
+        organizationId: true,
+        organization: { select: { name: true, mandantNumber: true } },
+      },
     });
 
     if (!process) {
@@ -115,7 +69,17 @@ export async function POST(
       return NextResponse.json({ error: "Ungueltiger Request-Body" }, { status: 400 });
     }
 
-    const { assessmentNumber, assessmentType, recipientEmail, recipientName } = body;
+    const {
+      assessmentNumber,
+      assessmentType,
+      recipientEmail,
+      recipientName,
+      templateId,
+      scheduledDate,
+      fach,
+      klasse,
+      acknowledgeShortNotice,
+    } = body;
 
     // Validierung
     if (![1, 2, 3].includes(assessmentNumber)) {
@@ -128,6 +92,34 @@ export async function POST(
 
     if (!recipientEmail || typeof recipientEmail !== "string") {
       return NextResponse.json({ error: "recipientEmail ist erforderlich" }, { status: 400 });
+    }
+
+    // BRL Nr. 8.3 — 14-Tage-Frist pruefen (nur fuer BEURTEILUNG mit Termin)
+    let scheduledDateParsed: Date | null = null;
+    if (scheduledDate && typeof scheduledDate === "string") {
+      const parsed = new Date(scheduledDate);
+      if (!Number.isNaN(parsed.getTime())) scheduledDateParsed = parsed;
+    }
+
+    if (
+      assessmentType === "BEURTEILUNG" &&
+      scheduledDateParsed &&
+      !acknowledgeShortNotice
+    ) {
+      const daysUntil = Math.floor(
+        (scheduledDateParsed.getTime() - Date.now()) / MS_PER_DAY,
+      );
+      if (daysUntil < MIN_NOTICE_DAYS) {
+        return NextResponse.json(
+          {
+            error: `Termin liegt nur ${daysUntil} Tage in der Zukunft. BRL Nr. 8.3 fordert mindestens ${MIN_NOTICE_DAYS} Tage Ankuendigungsfrist. Bitte mit "acknowledgeShortNotice: true" bestaetigen, falls Sie die Frist bewusst unterschreiten.`,
+            shortNotice: true,
+            daysUntil,
+            minDays: MIN_NOTICE_DAYS,
+          },
+          { status: 400 },
+        );
+      }
     }
 
     // Pruefen ob bereits vorhanden
@@ -148,15 +140,130 @@ export async function POST(
       );
     }
 
+    // =============================================
+    // Template-Snapshot fuer BEURTEILUNG
+    // Aufloesungs-Reihenfolge:
+    //   1. body.templateId (explizit gewaehlt)
+    //   2. Mandanten-Default (organizationId == process.organizationId, isDefault: true)
+    //   3. Globaler Default (organizationId: null, isDefault: true)
+    //   4. Fallback: BRL_DEFAULT_TEMPLATE aus beurteilung-defaults.ts
+    // =============================================
+    let chosenTemplateId: string | null = null;
+    let chosenScaleType: string = "BRL_1_5";
+    let templateSnapshot: Prisma.InputJsonValue | null = null;
+
+    if (assessmentType === "BEURTEILUNG") {
+      let dbTemplate = null;
+
+      if (templateId && typeof templateId === "string") {
+        dbTemplate = await prisma.beurteilungTemplate.findFirst({
+          where: { id: templateId, isActive: true },
+          include: {
+            categories: {
+              orderBy: { orderIndex: "asc" },
+              include: { criteria: { orderBy: { orderIndex: "asc" } } },
+            },
+          },
+        });
+        if (!dbTemplate) {
+          return NextResponse.json(
+            { error: "Gewaehlte Vorlage nicht gefunden oder deaktiviert" },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Mandanten-Default
+      if (!dbTemplate) {
+        dbTemplate = await prisma.beurteilungTemplate.findFirst({
+          where: {
+            organizationId: process.organizationId,
+            isDefault: true,
+            isActive: true,
+          },
+          include: {
+            categories: {
+              orderBy: { orderIndex: "asc" },
+              include: { criteria: { orderBy: { orderIndex: "asc" } } },
+            },
+          },
+        });
+      }
+
+      // Globaler Default
+      if (!dbTemplate) {
+        dbTemplate = await prisma.beurteilungTemplate.findFirst({
+          where: { organizationId: null, isDefault: true, isActive: true },
+          include: {
+            categories: {
+              orderBy: { orderIndex: "asc" },
+              include: { criteria: { orderBy: { orderIndex: "asc" } } },
+            },
+          },
+        });
+      }
+
+      if (dbTemplate) {
+        chosenTemplateId = dbTemplate.id;
+        chosenScaleType = dbTemplate.scaleType;
+        templateSnapshot = {
+          templateId: dbTemplate.id,
+          name: dbTemplate.name,
+          version: dbTemplate.version,
+          scaleType: dbTemplate.scaleType,
+          scaleLabels: dbTemplate.scaleLabels,
+          categories: dbTemplate.categories.map((cat) => ({
+            id: cat.id,
+            name: cat.name,
+            description: cat.description,
+            weight: cat.weight,
+            orderIndex: cat.orderIndex,
+            isMandatory: cat.isMandatory,
+            legalReference: cat.legalReference,
+            criteria: cat.criteria.map((crit) => ({
+              id: crit.id,
+              name: crit.name,
+              description: crit.description,
+              weight: crit.weight,
+              orderIndex: crit.orderIndex,
+            })),
+          })),
+        };
+      } else {
+        // Fallback auf hardcoded BRL-Default
+        templateSnapshot = {
+          templateId: null,
+          name: BRL_DEFAULT_TEMPLATE.name,
+          version: 0,
+          scaleType: BRL_DEFAULT_TEMPLATE.scaleType,
+          scaleLabels: BRL_SCALE_LABELS,
+          categories: BRL_DEFAULT_TEMPLATE.categories.map((cat, ci) => ({
+            id: `fallback-cat-${ci}`,
+            name: cat.name,
+            description: cat.description ?? null,
+            weight: cat.weight ?? 1.0,
+            orderIndex: cat.orderIndex,
+            isMandatory: cat.isMandatory ?? false,
+            legalReference: cat.legalReference ?? null,
+            criteria: cat.criteria.map((crit, cri) => ({
+              id: `fallback-crit-${ci}-${cri}`,
+              name: crit.name,
+              description: crit.description ?? null,
+              weight: crit.weight ?? 1.0,
+              orderIndex: crit.orderIndex,
+            })),
+          })),
+        };
+      }
+    }
+
     // Token generieren
     const token = randomUUID();
     const tokenExpiresAt = new Date();
     tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 90);
 
-    // Template-Snapshot: Bei BEURTEILUNG die Standardvorlage, bei REFERENZ null
-    const templateSnapshot = assessmentType === "BEURTEILUNG"
-      ? DEFAULT_BEURTEILUNG_TEMPLATE
-      : null;
+    // Verify-Token (Phase 6 — Audit-Page)
+    const verifyToken = randomUUID();
 
     // Assessment erstellen
     const assessment = await prisma.civilServiceAssessment.create({
@@ -168,10 +275,75 @@ export async function POST(
         tokenExpiresAt,
         recipientEmail: recipientEmail.trim().toLowerCase(),
         recipientName: recipientName?.trim() || null,
+        templateId: chosenTemplateId,
+        scaleType: assessmentType === "BEURTEILUNG" ? chosenScaleType : null,
         templateSnapshot: templateSnapshot ?? undefined,
+        scheduledDate: scheduledDateParsed,
+        fach: fach?.trim() || null,
+        klasse: klasse?.trim() || null,
+        announcedAt: new Date(),
+        verifyToken,
         sentAt: new Date(),
       },
     });
+
+    // =============================================
+    // Audit-Log + Webhook (fire-and-forget)
+    // =============================================
+    const magicLink = `${getBaseUrl()}/civil-service-assessment/${assessment.token}`;
+
+    // Audit-Log (HR-Aktion, mit User)
+    await prisma.auditLog
+      .create({
+        data: {
+          userId: session.userId,
+          civilServiceId: id,
+          processType: "CIVIL_SERVICE",
+          action: "ASSESSMENT_REQUESTED",
+          details: {
+            assessmentId: assessment.id,
+            assessmentNumber: assessment.assessmentNumber,
+            assessmentType: assessment.assessmentType,
+            recipientEmail: assessment.recipientEmail,
+            recipientName: assessment.recipientName,
+            templateId: assessment.templateId,
+            scheduledDate: assessment.scheduledDate?.toISOString() ?? null,
+            fach: assessment.fach,
+            klasse: assessment.klasse,
+            shortNoticeOverride: Boolean(acknowledgeShortNotice),
+          },
+        },
+      })
+      .catch((err) =>
+        console.error(
+          "[ASSESSMENT_REQUESTED] Audit-Log-Fehler:",
+          err instanceof Error ? err.message : err,
+        ),
+      );
+
+    // Webhook fire-and-forget
+    triggerWebhooks("psi-assessment-requested", {
+      civilServiceId: id,
+      assessmentId: assessment.id,
+      displayId: process.displayId,
+      employeeName: formatEmployeeName(process),
+      organization: process.organization.name,
+      mandantNumber: process.organization.mandantNumber,
+      assessmentNumber: assessment.assessmentNumber,
+      assessmentType: assessment.assessmentType,
+      recipientEmail: assessment.recipientEmail,
+      recipientName: assessment.recipientName,
+      magicLink,
+      tokenExpiresAt: assessment.tokenExpiresAt.toISOString(),
+      scheduledDate: assessment.scheduledDate?.toISOString() ?? null,
+      fach: assessment.fach,
+      klasse: assessment.klasse,
+    }).catch((err) =>
+      console.error(
+        "[psi-assessment-requested] Webhook-Fehler:",
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     return NextResponse.json({
       data: {
@@ -183,6 +355,10 @@ export async function POST(
         recipientName: assessment.recipientName,
         tokenExpiresAt: assessment.tokenExpiresAt,
         createdAt: assessment.createdAt,
+        templateId: assessment.templateId,
+        scaleType: assessment.scaleType,
+        scheduledDate: assessment.scheduledDate,
+        verifyToken: assessment.verifyToken,
       },
     }, { status: 201 });
   } catch (error) {

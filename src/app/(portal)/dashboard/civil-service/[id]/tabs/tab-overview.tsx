@@ -101,7 +101,7 @@ function buildMagicLinkRows(data: CivilServiceData): MagicLinkRow[] {
         key: `${slot.type}-${slot.number}`,
         typeLabel: getAssessmentTypeLabel(found),
         recipientLabel: "Schulleitung",
-        recipientEmail: found.recipientEmail || found.supervisorEmail || null,
+        recipientEmail: found.recipientEmail || null,
         status: getAssessmentLinkStatus(found),
         token: found.token,
         assessment: found,

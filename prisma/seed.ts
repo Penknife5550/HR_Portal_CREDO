@@ -8,6 +8,7 @@
 import { PrismaClient, OrganizationType, UserRole, QuestionnaireType, ExitInterviewQuestionType, ZeugnisJobGroup } from "@prisma/client";
 import { hashSync } from "bcryptjs";
 import crypto from "crypto";
+import { ALL_DEFAULT_BEURTEILUNG_TEMPLATES } from "../src/lib/beurteilung-defaults";
 
 const prisma = new PrismaClient();
 
@@ -1128,6 +1129,76 @@ async function main() {
   }
 
   console.log(`\n📋 Phase 2: ${zeugnisTemplates.length} Zeugnis-Bewertungsbogen Templates angelegt/aktualisiert.\n`);
+
+  // =============================================
+  // Section 8b: Beurteilungs-Vorlagen (BRL NRW + CREDO Legacy)
+  //
+  // Globale Defaults — pro Mandant kann später ein Override über die
+  // Einstellungen-UI angelegt werden.
+  // =============================================
+  console.log("\n📋 Phase 4: Beurteilungs-Vorlagen anlegen...\n");
+
+  for (const tmpl of ALL_DEFAULT_BEURTEILUNG_TEMPLATES) {
+    try {
+      // Existierende globale Vorlage mit demselben Namen löschen (idempotent)
+      const existing = await prisma.beurteilungTemplate.findFirst({
+        where: { name: tmpl.name, organizationId: null },
+      });
+
+      if (existing) {
+        await prisma.beurteilungTemplate.delete({ where: { id: existing.id } });
+      }
+
+      const created = await prisma.beurteilungTemplate.create({
+        data: {
+          name: tmpl.name,
+          description: tmpl.description ?? null,
+          scaleType: tmpl.scaleType,
+          scaleLabels: tmpl.scaleLabels,
+          organizationId: null, // global
+          isActive: true,
+          isDefault: tmpl.isDefault,
+          version: 1,
+          categories: {
+            create: tmpl.categories.map((cat) => ({
+              name: cat.name,
+              description: cat.description ?? null,
+              weight: cat.weight ?? 1.0,
+              orderIndex: cat.orderIndex,
+              isMandatory: cat.isMandatory ?? false,
+              legalReference: cat.legalReference ?? null,
+              criteria: {
+                create: cat.criteria.map((crit) => ({
+                  name: crit.name,
+                  description: crit.description ?? null,
+                  weight: crit.weight ?? 1.0,
+                  orderIndex: crit.orderIndex,
+                })),
+              },
+            })),
+          },
+        },
+      });
+
+      const criteriaCount = tmpl.categories.reduce(
+        (sum, cat) => sum + cat.criteria.length,
+        0,
+      );
+      const defaultBadge = tmpl.isDefault ? " [DEFAULT]" : "";
+      console.log(
+        `  ✅ Beurteilungs-Vorlage: ${created.name}${defaultBadge} (${tmpl.scaleType}, ${tmpl.categories.length} Kategorien, ${criteriaCount} Kriterien)`,
+      );
+    } catch (error) {
+      console.error(
+        `  ⚠️ Beurteilungs-Vorlage ${tmpl.name} konnte nicht angelegt werden:`,
+        error,
+      );
+    }
+  }
+
+  console.log(
+    `\n📋 Phase 4: ${ALL_DEFAULT_BEURTEILUNG_TEMPLATES.length} Beurteilungs-Vorlagen angelegt/aktualisiert.\n`,
+  );
 
   // =============================================
   // Section 9: Verbeamtung Checklisten-Template

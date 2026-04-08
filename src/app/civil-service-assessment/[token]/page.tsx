@@ -28,12 +28,20 @@ export interface SnapshotCriterion {
 export interface SnapshotCategory {
   id: string;
   name: string;
+  description?: string | null;
   weight: number;
   orderIndex: number;
+  isMandatory?: boolean;
+  legalReference?: string | null;
   criteria: SnapshotCriterion[];
 }
 
 export interface TemplateSnapshot {
+  templateId?: string | null;
+  name?: string;
+  version?: number;
+  scaleType?: "BRL_1_5" | "SCHULNOTEN_1_6";
+  scaleLabels?: Record<string, string>;
   categories: SnapshotCategory[];
 }
 
@@ -44,11 +52,27 @@ export interface AssessmentData {
   recipientName: string | null;
   recipientEmail: string;
   templateSnapshot: TemplateSnapshot | null;
+  scaleType: "BRL_1_5" | "SCHULNOTEN_1_6" | null;
   ratingsData: Record<string, number> | null;
   referenceData: Record<string, string> | null;
   gemeindeReferenz: string | null;
   overallGrade: number | null;
   meetsRequirements: boolean | null;
+  meetsRequirementsManual: boolean | null;
+  overallReasoning: string | null;
+  // Workflow-Felder Phase 3
+  scheduledDate: string | null;
+  announcedAt: string | null;
+  fach: string | null;
+  klasse: string | null;
+  vertrauenslehrkraft: string | null;
+  unbiasedConfirmed: boolean | null;
+  unbiasedConfirmedAt: string | null;
+  postReviewAt: string | null;
+  postReviewNotes: string | null;
+  beurteilungsgespraechAt: string | null;
+  beurteilungsgespraechNotes: string | null;
+  verifyToken: string | null;
   employee: {
     name: string;
     organizationName: string;

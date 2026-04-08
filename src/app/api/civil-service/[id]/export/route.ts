@@ -69,6 +69,46 @@ export async function GET(
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 
+    // Audit-Trail fuer alle Beurteilungen vorab laden (Phase 6)
+    const ASSESSMENT_AUDIT_ACTIONS = [
+      "ASSESSMENT_REQUESTED",
+      "ASSESSMENT_SUBMITTED",
+      "ASSESSMENT_RELEASED_TO_EMPLOYEE",
+      "ASSESSMENT_ACKNOWLEDGED",
+      "ASSESSMENT_REBUTTAL_FILED",
+      "ASSESSMENT_ARCHIVED",
+    ];
+    const allAuditLogs = await prisma.auditLog.findMany({
+      where: {
+        civilServiceId: id,
+        action: { in: ASSESSMENT_AUDIT_ACTIONS },
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        action: true,
+        details: true,
+        createdAt: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+    });
+    function auditTrailFor(assessmentId: string) {
+      return allAuditLogs
+        .filter((log) => {
+          if (!log.details || typeof log.details !== "object") return true;
+          const d = log.details as Record<string, unknown>;
+          if (!d.assessmentId) return true;
+          return d.assessmentId === assessmentId;
+        })
+        .map((log) => ({
+          action: log.action,
+          createdAt: log.createdAt.toISOString(),
+          actorName: log.user
+            ? `${log.user.firstName} ${log.user.lastName}`.trim()
+            : null,
+        }));
+    }
+
     // ExportContext zusammenbauen
     const ctx: ExportContext = {
       firstName: process.employeeFirstName,
@@ -94,11 +134,35 @@ export async function GET(
         recipientName: a.recipientName,
         overallGrade: a.overallGrade ? Number(a.overallGrade) : null,
         meetsRequirements: a.meetsRequirements,
+        meetsRequirementsManual: a.meetsRequirementsManual,
+        overallReasoning: a.overallReasoning,
         ratingsData: a.ratingsData as Record<string, number> | null,
         referenceData: a.referenceData as Record<string, string> | null,
         gemeindeReferenz: a.gemeindeReferenz,
         templateSnapshot: a.templateSnapshot as ExportContext["assessments"][0]["templateSnapshot"],
         submittedAt: a.submittedAt?.toISOString() || null,
+
+        // Phase 3-5 Workflow-Felder
+        scheduledDate: a.scheduledDate?.toISOString() ?? null,
+        fach: a.fach,
+        klasse: a.klasse,
+        vertrauenslehrkraft: a.vertrauenslehrkraft,
+        unbiasedConfirmed: a.unbiasedConfirmed,
+        unbiasedConfirmedAt: a.unbiasedConfirmedAt?.toISOString() ?? null,
+        postReviewAt: a.postReviewAt?.toISOString() ?? null,
+        postReviewNotes: a.postReviewNotes,
+        beurteilungsgespraechAt: a.beurteilungsgespraechAt?.toISOString() ?? null,
+        beurteilungsgespraechNotes: a.beurteilungsgespraechNotes,
+        releasedToEmployeeAt: a.releasedToEmployeeAt?.toISOString() ?? null,
+        acknowledgedByEmployeeAt: a.acknowledgedByEmployeeAt?.toISOString() ?? null,
+        acknowledgedByEmployeeIp: a.acknowledgedByEmployeeIp,
+        rebuttalText: a.rebuttalText,
+        rebuttalAt: a.rebuttalAt?.toISOString() ?? null,
+        archivedAt: a.archivedAt?.toISOString() ?? null,
+
+        // Phase 6 — Verifikation
+        verifyToken: a.verifyToken,
+        auditTrail: auditTrailFor(a.id),
       })),
       checklistItems: process.checklistItems.map((c) => ({
         step: c.step,

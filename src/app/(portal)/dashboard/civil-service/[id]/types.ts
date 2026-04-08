@@ -35,17 +35,82 @@ export interface PhaseData {
   orderIndex: number;
 }
 
+export interface AssessmentSnapshotCriterion {
+  id: string;
+  name: string;
+  description?: string | null;
+  weight?: number;
+  orderIndex?: number;
+}
+
+export interface AssessmentSnapshotCategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  weight?: number;
+  orderIndex?: number;
+  isMandatory?: boolean;
+  legalReference?: string | null;
+  criteria: AssessmentSnapshotCriterion[];
+}
+
+export interface AssessmentTemplateSnapshot {
+  templateId?: string | null;
+  name?: string;
+  version?: number;
+  scaleType?: "BRL_1_5" | "SCHULNOTEN_1_6";
+  scaleLabels?: Record<string, string>;
+  categories: AssessmentSnapshotCategory[];
+}
+
 export interface AssessmentData {
   id: string;
   assessmentNumber: number;
   assessmentType: string; // "BEURTEILUNG" | "REFERENZ"
-  status: string;
-  supervisorEmail: string;
+  status?: string;
+  // Reale Prisma-Felder:
   recipientEmail: string;
-  supervisorName: string | null;
   recipientName: string | null;
-  grade: number | null;
+  overallGrade: number | null;
+  overallReasoning: string | null;
+  meetsRequirements: boolean | null;
+  meetsRequirementsManual: boolean | null;
+  scaleType: string | null;
+  templateSnapshot: AssessmentTemplateSnapshot | null;
+  ratingsData: Record<string, number> | null;
+  referenceData: Record<string, string> | null;
+  gemeindeReferenz: string | null;
+
+  // Workflow Phase 3
+  scheduledDate: string | null;
+  announcedAt: string | null;
+  fach: string | null;
+  klasse: string | null;
+  vertrauenslehrkraft: string | null;
+  unbiasedConfirmed: boolean | null;
+  unbiasedConfirmedAt: string | null;
+  postReviewAt: string | null;
+  postReviewNotes: string | null;
+  beurteilungsgespraechAt: string | null;
+  beurteilungsgespraechNotes: string | null;
+
+  // Bekanntgabe Phase 5
+  employeeAckToken: string | null;
+  employeeAckExpiresAt: string | null;
+  releasedToEmployeeAt: string | null;
+  acknowledgedByEmployeeAt: string | null;
+  rebuttalText: string | null;
+  rebuttalAt: string | null;
+
+  // Archivierung — Schritt 9 (COMPLETED)
+  archivedAt: string | null;
+  archivedById: string | null;
+
+  // Verify Phase 6
+  verifyToken: string | null;
+
   token: string | null;
+  tokenExpiresAt: string | null;
   sentAt: string | null;
   firstOpenedAt: string | null;
   lastOpenedAt: string | null;
@@ -67,7 +132,8 @@ export interface DocumentData {
 export interface AuditLogEntry {
   id: string;
   action: string;
-  details: string | null;
+  // Prisma liefert hier ein JSON-Objekt; kann historisch auch String oder null sein.
+  details: Record<string, unknown> | string | null;
   createdAt: string;
   createdBy: { firstName: string; lastName: string } | null;
 }

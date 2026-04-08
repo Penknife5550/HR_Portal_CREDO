@@ -42,7 +42,13 @@ export type WebhookEvent =
   | "psi-phase-completed"
   | "psi-completed"
   | "psi-deadline-warning"
-  // Erweiterbar (z. B. fuer Phase B/C oder zukuenftige Events)
+  // Verbeamtung — Beurteilungs-Workflow (Phase 4 + 5)
+  | "psi-assessment-requested"
+  | "psi-assessment-completed"
+  | "psi-assessment-released"
+  | "psi-assessment-acknowledged"
+  | "psi-assessment-archived"
+  // Erweiterbar
   | (string & Record<never, never>);
 
 const MAX_RETRIES = 3;

@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { recalculatePhaseStatus } from "@/lib/civil-service-phases";
 
 // =============================================
 // PATCH /api/civil-service/:id/checklist/:itemId
@@ -93,48 +94,12 @@ export async function PATCH(
       },
     });
 
-    // Gatekeeper-Logik: Phase automatisch auf COMPLETED setzen
-    let phaseAdvanced = false;
-    if (body.isCompleted && item.isGatekeeper) {
-      // Alle Gatekeeper-Items dieser Phase laden
-      const gatekeeperItems = await prisma.civilServiceChecklistItem.findMany({
-        where: {
-          processId: id,
-          phase: item.phase,
-          isGatekeeper: true,
-        },
-        select: { id: true, isCompleted: true },
-      });
-
-      const allGatekeepersComplete = gatekeeperItems.every((g) => g.isCompleted);
-
-      if (allGatekeepersComplete) {
-        await prisma.civilServicePhase.updateMany({
-          where: {
-            processId: id,
-            phaseKey: item.phase,
-            status: { not: "COMPLETED" },
-          },
-          data: {
-            status: "COMPLETED",
-            completedAt: now,
-          },
-        });
-        phaseAdvanced = true;
-      }
-    }
-
-    // Phase-Fortschritt berechnen
-    const phaseItems = await prisma.civilServiceChecklistItem.findMany({
-      where: {
-        processId: id,
-        phase: item.phase,
-      },
-      select: { id: true, isCompleted: true },
-    });
-
-    const totalItems = phaseItems.length;
-    const completedItems = phaseItems.filter((i) => i.isCompleted).length;
+    // Phasen-Status zentral neu berechnen (siehe src/lib/civil-service-phases.ts)
+    const phaseResult = await recalculatePhaseStatus(id, item.phase);
+    const totalItems = phaseResult.totalItems;
+    const completedItems = phaseResult.completedItems;
+    const phaseAdvanced =
+      phaseResult.changed && phaseResult.status === "COMPLETED";
 
     // Audit-Log
     await prisma.auditLog.create({

@@ -10,4 +10,5 @@ Disallow: /benutzerverwaltung/
 Disallow: /checklisten/
 Disallow: /vorlagen/
 Disallow: /mandanten/
+Disallow: /verify/
 Disallow: /login

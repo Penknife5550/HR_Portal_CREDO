@@ -162,11 +162,27 @@ export async function GET(
         recipientName: assessment.recipientName,
         recipientEmail: assessment.recipientEmail,
         templateSnapshot: assessment.templateSnapshot,
+        scaleType: assessment.scaleType,
         ratingsData: assessment.ratingsData,
         referenceData: assessment.referenceData,
         gemeindeReferenz: assessment.gemeindeReferenz,
         overallGrade: assessment.overallGrade,
         meetsRequirements: assessment.meetsRequirements,
+        meetsRequirementsManual: assessment.meetsRequirementsManual,
+        overallReasoning: assessment.overallReasoning,
+        // Workflow-Felder Phase 3
+        scheduledDate: assessment.scheduledDate,
+        announcedAt: assessment.announcedAt,
+        fach: assessment.fach,
+        klasse: assessment.klasse,
+        vertrauenslehrkraft: assessment.vertrauenslehrkraft,
+        unbiasedConfirmed: assessment.unbiasedConfirmed,
+        unbiasedConfirmedAt: assessment.unbiasedConfirmedAt,
+        postReviewAt: assessment.postReviewAt,
+        postReviewNotes: assessment.postReviewNotes,
+        beurteilungsgespraechAt: assessment.beurteilungsgespraechAt,
+        beurteilungsgespraechNotes: assessment.beurteilungsgespraechNotes,
+        verifyToken: assessment.verifyToken,
         employee: {
           name: `${assessment.process.employeeFirstName} ${assessment.process.employeeLastName}`,
           organizationName: assessment.process.organization.name,
@@ -225,37 +241,112 @@ export async function PUT(
       return NextResponse.json({ error: "Ungueltiger Request-Body" }, { status: 400 });
     }
 
-    const { ratingsData, referenceData, gemeindeReferenz } = body;
+    const {
+      ratingsData,
+      referenceData,
+      gemeindeReferenz,
+      // Workflow-Felder Phase 3
+      scheduledDate,
+      fach,
+      klasse,
+      vertrauenslehrkraft,
+      unbiasedConfirmed,
+      postReviewAt,
+      postReviewNotes,
+      beurteilungsgespraechAt,
+      beurteilungsgespraechNotes,
+      meetsRequirementsManual,
+      overallReasoning,
+    } = body;
 
     // Daten je nach Typ validieren und speichern
     const updateData: Record<string, unknown> = {};
 
+    // Skala dynamisch ermitteln (BRL_1_5 → 5, sonst 6)
+    const maxGrade = assessment.scaleType === "BRL_1_5" ? 5 : 6;
+
     if (assessment.assessmentType === "BEURTEILUNG") {
-      // Noten validieren: Record<string, number> mit Werten 1-6
+      // Noten validieren
       if (ratingsData && typeof ratingsData === "object") {
         for (const [key, value] of Object.entries(ratingsData)) {
-          if (typeof value !== "number" || value < 1 || value > 6 || !Number.isInteger(value)) {
+          if (
+            typeof value !== "number" ||
+            value < 1 ||
+            value > maxGrade ||
+            !Number.isInteger(value)
+          ) {
             return NextResponse.json(
-              { error: `Ungueltige Note fuer ${key}: Wert muss zwischen 1 und 6 liegen` },
-              { status: 400 }
+              {
+                error: `Ungueltige Note fuer ${key}: Wert muss zwischen 1 und ${maxGrade} liegen`,
+              },
+              { status: 400 },
             );
           }
         }
 
         updateData.ratingsData = ratingsData;
 
-        // Gesamtnote berechnen
+        // Gesamtschnitt berechnen — NUR Visualisierung, KEIN Gesamturteil!
+        // BRL Nr. 7.5: Das Gesamturteil ist KEIN arithmetisches Mittel.
         const snapshot = assessment.templateSnapshot as unknown as TemplateSnapshot;
         if (snapshot) {
-          const gradeResult = calculateOverallGrade(snapshot, ratingsData as Record<string, number>);
+          const gradeResult = calculateOverallGrade(
+            snapshot,
+            ratingsData as Record<string, number>,
+          );
           if (gradeResult) {
             updateData.overallGrade = gradeResult.overallGrade;
+            // meetsRequirements nur als Legacy-Feld, nicht mehr als Entscheidung
             updateData.meetsRequirements = checkMeetsRequirements(
               gradeResult.overallGrade,
-              gradeResult.categoryAverages
+              gradeResult.categoryAverages,
             );
           }
         }
+      }
+
+      // Workflow-Felder
+      if (scheduledDate !== undefined) {
+        updateData.scheduledDate =
+          scheduledDate === null ? null : new Date(scheduledDate);
+      }
+      if (fach !== undefined) updateData.fach = fach || null;
+      if (klasse !== undefined) updateData.klasse = klasse || null;
+      if (vertrauenslehrkraft !== undefined) {
+        updateData.vertrauenslehrkraft = vertrauenslehrkraft || null;
+      }
+      if (unbiasedConfirmed !== undefined) {
+        updateData.unbiasedConfirmed = Boolean(unbiasedConfirmed);
+        if (unbiasedConfirmed) {
+          updateData.unbiasedConfirmedAt = new Date();
+        } else {
+          updateData.unbiasedConfirmedAt = null;
+        }
+      }
+      if (postReviewAt !== undefined) {
+        updateData.postReviewAt =
+          postReviewAt === null ? null : new Date(postReviewAt);
+      }
+      if (postReviewNotes !== undefined) {
+        updateData.postReviewNotes = postReviewNotes || null;
+      }
+      if (beurteilungsgespraechAt !== undefined) {
+        updateData.beurteilungsgespraechAt =
+          beurteilungsgespraechAt === null
+            ? null
+            : new Date(beurteilungsgespraechAt);
+      }
+      if (beurteilungsgespraechNotes !== undefined) {
+        updateData.beurteilungsgespraechNotes = beurteilungsgespraechNotes || null;
+      }
+      if (meetsRequirementsManual !== undefined) {
+        updateData.meetsRequirementsManual =
+          meetsRequirementsManual === null
+            ? null
+            : Boolean(meetsRequirementsManual);
+      }
+      if (overallReasoning !== undefined) {
+        updateData.overallReasoning = overallReasoning || null;
       }
     } else if (assessment.assessmentType === "REFERENZ") {
       // Referenz-Daten speichern
@@ -282,6 +373,7 @@ export async function PUT(
         success: true,
         overallGrade: updated.overallGrade,
         meetsRequirements: updated.meetsRequirements,
+        meetsRequirementsManual: updated.meetsRequirementsManual,
       },
     });
   } catch (error) {

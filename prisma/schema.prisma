@@ -16,20 +16,21 @@ datasource db {
 // Einrichtung / Mandant (16 Mandanten bei CREDO)
 // =============================================
 model Organization {
-  id             String             @id @default(uuid())
-  mandantNumber  String             @unique // z.B. "712", "737", "742"
-  name           String // z.B. "Gymnasium", "Kita Minden"
-  shortName      String? // z.B. "GYM", "GSM"
-  type           OrganizationType
-  isActive       Boolean            @default(true)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  onboardings      OnboardingProcess[]
-  offboardings     OffboardingProcess[]
-  departmentConfigs DepartmentConfig[]
-  employments      Employment[]
-  userAssignments  UserOrgAssignment[]
+  id                    String                @id @default(uuid())
+  mandantNumber         String                @unique // z.B. "712", "737", "742"
+  name                  String // z.B. "Gymnasium", "Kita Minden"
+  shortName             String? // z.B. "GYM", "GSM"
+  type                  OrganizationType
+  isActive              Boolean               @default(true)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  onboardings           OnboardingProcess[]
+  offboardings          OffboardingProcess[]
+  departmentConfigs     DepartmentConfig[]
+  employments           Employment[]
+  userAssignments       UserOrgAssignment[]
   civilServiceProcesses CivilServiceProcess[]
+  beurteilungTemplates  BeurteilungTemplate[]
 
   @@map("organizations")
 }
@@ -40,28 +41,28 @@ model Organization {
 // Stammdaten koennen via n8n aus LOGA importiert werden.
 // =============================================
 model Employee {
-  id                String         @id @default(uuid())
-  personalNumber    String?        @unique // Personalnummer aus LOGA
-  firstName         String
-  lastName          String
-  email             String?        // Dienst-E-Mail
-  privateEmail      String?        // Private E-Mail (fuer Exit-Interview)
-  dateOfBirth       DateTime?
-  phone             String?
+  id             String    @id @default(uuid())
+  personalNumber String?   @unique // Personalnummer aus LOGA
+  firstName      String
+  lastName       String
+  email          String? // Dienst-E-Mail
+  privateEmail   String? // Private E-Mail (fuer Exit-Interview)
+  dateOfBirth    DateTime?
+  phone          String?
 
   // Import-Tracking
-  importSource      String?        // z.B. "LOGA", "MANUELL"
-  importedAt        DateTime?
-  lastSyncAt        DateTime?
+  importSource String? // z.B. "LOGA", "MANUELL"
+  importedAt   DateTime?
+  lastSyncAt   DateTime?
 
-  isActive          Boolean        @default(true)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relationen
-  employments       Employment[]
-  onboardings       OnboardingProcess[]  @relation("EmployeeOnboardings")
-  offboardings      OffboardingProcess[] @relation("EmployeeOffboardings")
+  employments           Employment[]
+  onboardings           OnboardingProcess[]   @relation("EmployeeOnboardings")
+  offboardings          OffboardingProcess[]  @relation("EmployeeOffboardings")
   civilServiceProcesses CivilServiceProcess[] @relation("EmployeeCivilService")
 
   @@index([personalNumber])
@@ -74,23 +75,23 @@ model Employee {
 // z.B. Lehrkraft am Gymnasium + Nachmittagsbetreuung an der Kita
 // =============================================
 model Employment {
-  id                String         @id @default(uuid())
-  employeeId        String
-  employee          Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  organizationId    String
-  organization      Organization   @relation(fields: [organizationId], references: [id])
+  id             String       @id @default(uuid())
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
-  position          String?        // z.B. "Lehrkraft", "Erzieher/in"
-  department        String?        // z.B. "Grundschule", "Verwaltung"
-  contractType      ContractType?
-  workingHoursWeek  Float?         // z.B. 39.0, 20.0
-  startDate         DateTime?
-  endDate           DateTime?      // null = unbefristet
-  mandantNumber     String?        // LOGA Mandantennummer
+  position         String? // z.B. "Lehrkraft", "Erzieher/in"
+  department       String? // z.B. "Grundschule", "Verwaltung"
+  contractType     ContractType?
+  workingHoursWeek Float? // z.B. 39.0, 20.0
+  startDate        DateTime?
+  endDate          DateTime? // null = unbefristet
+  mandantNumber    String? // LOGA Mandantennummer
 
-  isActive          Boolean        @default(true)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([employeeId])
   @@index([organizationId])
@@ -111,13 +112,13 @@ enum ContractType {
 // Einrichtungsleitung sieht nur zugewiesene Mandanten
 // =============================================
 model UserOrgAssignment {
-  id              String       @id @default(uuid())
-  userId          String
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id])
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
-  createdAt       DateTime     @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([userId, organizationId])
   @@index([userId])
@@ -139,68 +140,68 @@ enum OrganizationType {
 // Onboarding-Vorgang (ein Vorgang pro Einstellung)
 // =============================================
 model OnboardingProcess {
-  id                      String           @id @default(uuid())
-  displayId               String?          @unique // z.B. "2026-GYM-001"
-  sequentialNumber        Int?             // Laufende Nummer fuer displayId
-  organizationId          String
-  organization            Organization     @relation(fields: [organizationId], references: [id])
+  id               String       @id @default(uuid())
+  displayId        String?      @unique // z.B. "2026-GYM-001"
+  sequentialNumber Int? // Laufende Nummer fuer displayId
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
 
   // Neuer Mitarbeiter
-  email                   String
-  firstName               String?
-  lastName                String?
+  email     String
+  firstName String?
+  lastName  String?
 
   // Verknüpfung zur zentralen Personalakte (optional)
-  employeeId              String?
-  employee                Employee?        @relation("EmployeeOnboardings", fields: [employeeId], references: [id])
+  employeeId String?
+  employee   Employee? @relation("EmployeeOnboardings", fields: [employeeId], references: [id])
 
   // Magic Link fuer MA (Personalfragebogen)
-  token                   String           @unique @default(uuid())
-  tokenExpiresAt          DateTime
+  token          String   @unique @default(uuid())
+  tokenExpiresAt DateTime
 
   // Magic Link fuer Vorgesetzten (Einstellungsmodalitaeten)
-  supervisorEmail         String?
-  supervisorToken         String?          @unique
+  supervisorEmail          String?
+  supervisorToken          String?   @unique
   supervisorTokenExpiresAt DateTime?
 
   // Prozesstyp & Status
-  processType             ProcessType      @default(EINSTELLUNG)
-  status                  OnboardingStatus @default(INVITED)
-  questionnaireType       QuestionnaireType @default(STANDARD)
+  processType       ProcessType       @default(EINSTELLUNG)
+  status            OnboardingStatus  @default(INVITED)
+  questionnaireType QuestionnaireType @default(STANDARD)
 
   // Checkliste
-  checklistTemplateId     String?
-  checklistTemplate       ChecklistTemplate? @relation(fields: [checklistTemplateId], references: [id])
-  checklistItems          ChecklistItem[]
+  checklistTemplateId String?
+  checklistTemplate   ChecklistTemplate? @relation(fields: [checklistTemplateId], references: [id])
+  checklistItems      ChecklistItem[]
 
   // Fragebogen-Versionierung (Vorschlag 5: Snapshot bei Erstellung)
-  formTemplateVersion     Int?              // Welche Template-Version war aktiv
-  formTemplateSnapshot    Json?             // Kompletter stepsConfig-Snapshot
+  formTemplateVersion  Int? // Welche Template-Version war aktiv
+  formTemplateSnapshot Json? // Kompletter stepsConfig-Snapshot
 
   // Tracking
-  invitedById             String?
-  invitedBy               User?            @relation("InvitedBy", fields: [invitedById], references: [id])
-  invitedAt               DateTime         @default(now())
-  submittedAt             DateTime?
-  supervisorSubmittedAt   DateTime?
-  reviewedAt              DateTime?
-  reviewedById            String?
-  reviewedBy              User?            @relation("ReviewedBy", fields: [reviewedById], references: [id])
-  completedAt             DateTime?
+  invitedById           String?
+  invitedBy             User?     @relation("InvitedBy", fields: [invitedById], references: [id])
+  invitedAt             DateTime  @default(now())
+  submittedAt           DateTime?
+  supervisorSubmittedAt DateTime?
+  reviewedAt            DateTime?
+  reviewedById          String?
+  reviewedBy            User?     @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  completedAt           DateTime?
 
   // Erinnerungen
-  lastEmployeeReminderAt  DateTime?  // Letzte Erinnerung an Mitarbeiter
+  lastEmployeeReminderAt   DateTime? // Letzte Erinnerung an Mitarbeiter
   lastSupervisorReminderAt DateTime? // Letzte Erinnerung an Vorgesetzten
 
   // Relationen
-  personalData            PersonalData?
-  supervisorData          SupervisorData?
-  documents               Document[]
-  notes                   OnboardingNote[]
-  auditLogs               AuditLog[]
+  personalData   PersonalData?
+  supervisorData SupervisorData?
+  documents      Document[]
+  notes          OnboardingNote[]
+  auditLogs      AuditLog[]
 
-  createdAt               DateTime         @default(now())
-  updatedAt               DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([organizationId])
@@ -210,120 +211,120 @@ model OnboardingProcess {
 }
 
 enum OnboardingStatus {
-  INVITED              // Link versendet, noch nicht geoeffnet
-  IN_PROGRESS          // MA hat angefangen auszufuellen
-  SUBMITTED            // MA hat Fragebogen abgeschickt
-  SUPERVISOR_PENDING   // Warte auf Vorgesetzten-Eingabe
+  INVITED // Link versendet, noch nicht geoeffnet
+  IN_PROGRESS // MA hat angefangen auszufuellen
+  SUBMITTED // MA hat Fragebogen abgeschickt
+  SUPERVISOR_PENDING // Warte auf Vorgesetzten-Eingabe
   SUPERVISOR_SUBMITTED // Vorgesetzter hat ausgefuellt
-  REVIEWED             // HR hat geprueft
-  COMPLETED            // Alles erledigt, Daten exportiert
-  EXPIRED              // Link abgelaufen
+  REVIEWED // HR hat geprueft
+  COMPLETED // Alles erledigt, Daten exportiert
+  EXPIRED // Link abgelaufen
 }
 
 // =============================================
 // Prozesstyp (zukunftssicher fuer weitere HR-Vorgaenge)
 // =============================================
 enum ProcessType {
-  EINSTELLUNG          // Neueinstellung (bisheriges Onboarding)
-  VERBEAMTUNG          // Verbeamtungsprozess
-  VERTRAGSAENDERUNG    // Vertragsaenderung (Stunden, Entgeltgruppe etc.)
-  KUENDIGUNG           // Austritt / Kuendigung
+  EINSTELLUNG // Neueinstellung (bisheriges Onboarding)
+  VERBEAMTUNG // Verbeamtungsprozess
+  VERTRAGSAENDERUNG // Vertragsaenderung (Stunden, Entgeltgruppe etc.)
+  KUENDIGUNG // Austritt / Kuendigung
 }
 
 enum QuestionnaireType {
-  STANDARD  // Angestellte (TV-L)
-  BEAMTE    // Planstelleninhaber
-  ERZIEHER  // Kita-Personal (TV-L S)
-  MINIJOB   // Geringfuegig Beschaeftigte
-  EHRENAMT  // Ehrenamtliche
+  STANDARD // Angestellte (TV-L)
+  BEAMTE // Planstelleninhaber
+  ERZIEHER // Kita-Personal (TV-L S)
+  MINIJOB // Geringfuegig Beschaeftigte
+  EHRENAMT // Ehrenamtliche
 }
 
 // =============================================
 // Personalfragebogen-Daten (vom neuen Mitarbeiter ausgefuellt)
 // =============================================
 model PersonalData {
-  id                String            @id @default(uuid())
-  onboardingId      String            @unique
-  onboarding        OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  id           String            @id @default(uuid())
+  onboardingId String            @unique
+  onboarding   OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
 
   // -- Persoenliche Angaben --
-  salutation        String?   // "Herr", "Frau", "Divers"
-  title             String?   // "Dr.", "Prof." etc.
-  firstName         String?
-  lastName          String?
-  birthName         String?   // Geburtsname
-  birthDate         DateTime?
-  birthPlace        String?
-  birthCountry      String?   @default("Deutschland")
-  nationality       String?   @default("deutsch")
-  maritalStatus     String?   // "ledig", "verheiratet", "geschieden", "verwitwet"
-  severelyDisabled  Boolean?  @default(false)
-  disabilityDegree  Int?
+  salutation       String? // "Herr", "Frau", "Divers"
+  title            String? // "Dr.", "Prof." etc.
+  firstName        String?
+  lastName         String?
+  birthName        String? // Geburtsname
+  birthDate        DateTime?
+  birthPlace       String?
+  birthCountry     String?   @default("Deutschland")
+  nationality      String?   @default("deutsch")
+  maritalStatus    String? // "ledig", "verheiratet", "geschieden", "verwitwet"
+  severelyDisabled Boolean?  @default(false)
+  disabilityDegree Int?
 
   // -- Adresse --
-  street            String?
-  houseNumber       String?
-  zipCode           String?
-  city              String?
-  country           String?   @default("Deutschland")
-  phone             String?
-  mobile            String?
-  emailPrivate      String?
+  street       String?
+  houseNumber  String?
+  zipCode      String?
+  city         String?
+  country      String? @default("Deutschland")
+  phone        String?
+  mobile       String?
+  emailPrivate String?
 
   // -- Bankverbindung --
-  iban              String?
-  bic               String?
-  bankName          String?
-  accountHolder     String?
+  iban          String?
+  bic           String?
+  bankName      String?
+  accountHolder String?
 
   // -- Sozialversicherung --
-  socialSecurityNumber    String?
-  healthInsuranceName     String?
-  healthInsuranceType     String?   // "gesetzlich", "privat"
-  parentStatus            Boolean?  // Elterneigenschaft fuer PV-Zuschlag
+  socialSecurityNumber String?
+  healthInsuranceName  String?
+  healthInsuranceType  String? // "gesetzlich", "privat"
+  parentStatus         Boolean? // Elterneigenschaft fuer PV-Zuschlag
 
   // -- Steuer --
-  taxId             String?
-  taxClass          String?   // "I", "II", "III", "IV", "V", "VI"
-  taxAllowance      Float?    // Jaehrlicher Freibetrag
-  childAllowance    Float?    // Kinderfreibetrag
-  religion          String?   // Fuer Kirchensteuer: "ev", "rk", "keine" etc.
+  taxId          String?
+  taxClass       String? // "I", "II", "III", "IV", "V", "VI"
+  taxAllowance   Float? // Jaehrlicher Freibetrag
+  childAllowance Float? // Kinderfreibetrag
+  religion       String? // Fuer Kirchensteuer: "ev", "rk", "keine" etc.
 
   // -- Bildung & Beruf --
-  highestSchoolDegree       String?   // "ohne_schulabschluss", "hauptschulabschluss", "mittlere_reife", "abitur_fachabitur", "sonstiges"
-  highestProfessionalDegree String?   // "ohne_berufsausbildung", "anerkannte_berufsausbildung", etc.
+  highestSchoolDegree       String? // "ohne_schulabschluss", "hauptschulabschluss", "mittlere_reife", "abitur_fachabitur", "sonstiges"
+  highestProfessionalDegree String? // "ohne_berufsausbildung", "anerkannte_berufsausbildung", etc.
 
   // -- Beamten-Zusatzfelder (Legacy) --
-  isBeamter               Boolean   @default(false)
-  besoldungsgruppe        String?
-  laufbahngruppe          String?
-  dienstzeitBeginn        DateTime?
-  amtsbezeichnung         String?
+  isBeamter                Boolean   @default(false)
+  besoldungsgruppe         String?
+  laufbahngruppe           String?
+  dienstzeitBeginn         DateTime?
+  amtsbezeichnung          String?
   verfassungstreuePruefung Boolean?
 
   // -- Sonstiges --
-  hasOtherEmployment      Boolean?  @default(false)
-  otherEmployerName       String?
-  otherWeeklyHours        Float?
-  employerType            String?   // "hauptarbeitgeber", "nebenarbeitgeber", "nein"
-  hasMinijob              Boolean?  @default(false)
-  minijobRvBefreiung      Boolean?  @default(false)
+  hasOtherEmployment Boolean? @default(false)
+  otherEmployerName  String?
+  otherWeeklyHours   Float?
+  employerType       String? // "hauptarbeitgeber", "nebenarbeitgeber", "nein"
+  hasMinijob         Boolean? @default(false)
+  minijobRvBefreiung Boolean? @default(false)
 
   // -- Masernschutz --
-  bornAfter1971           Boolean?
-  masernschutzProvided    Boolean?
+  bornAfter1971        Boolean?
+  masernschutzProvided Boolean?
 
   // -- Formular-Meta --
-  currentStep       Int       @default(0)
-  isComplete        Boolean   @default(false)
-  dsgvoAccepted     Boolean   @default(false)
-  dsgvoAcceptedAt   DateTime?
+  currentStep     Int       @default(0)
+  isComplete      Boolean   @default(false)
+  dsgvoAccepted   Boolean   @default(false)
+  dsgvoAcceptedAt DateTime?
 
   // Kinder
-  children          Child[]
+  children Child[]
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("personal_data")
 }
@@ -332,18 +333,18 @@ model PersonalData {
 // Kinder des Mitarbeiters
 // =============================================
 model Child {
-  id              String       @id @default(uuid())
-  personalDataId  String
-  personalData    PersonalData @relation(fields: [personalDataId], references: [id], onDelete: Cascade)
+  id             String       @id @default(uuid())
+  personalDataId String
+  personalData   PersonalData @relation(fields: [personalDataId], references: [id], onDelete: Cascade)
 
-  firstName       String
-  lastName        String?
-  birthDate       DateTime
-  taxAllowance    Boolean      @default(false) // Kinderfreibetrag
-  orderIndex      Int          @default(0)
+  firstName    String
+  lastName     String?
+  birthDate    DateTime
+  taxAllowance Boolean  @default(false) // Kinderfreibetrag
+  orderIndex   Int      @default(0)
 
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("children")
 }
@@ -352,12 +353,12 @@ model Child {
 // Einstellungsmodalitaeten (vom Vorgesetzten ausgefuellt)
 // =============================================
 model SupervisorData {
-  id                  String            @id @default(uuid())
-  onboardingId        String            @unique
-  onboarding          OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  id           String            @id @default(uuid())
+  onboardingId String            @unique
+  onboarding   OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
 
   // -- Betriebsstaette --
-  betriebsstaette     String?
+  betriebsstaette String?
 
   // -- Stellenbeschreibung (wird in Arbeitsvertrag uebernommen!) --
   stellenbeschreibung String?
@@ -369,66 +370,66 @@ model SupervisorData {
   befristungSachgrund String?
 
   // -- Vertragsumfang --
-  vollzeit            Boolean?   @default(true)
-  wochenstunden       Float?
-  tageProWoche        Int?
+  vollzeit      Boolean? @default(true)
+  wochenstunden Float?
+  tageProWoche  Int?
 
   // -- Arbeitgeber-Zuordnung (CREDO-Besonderheit: Haupt-/Nebenarbeitgeber) --
-  hauptarbeitgeberId  String?    // Mandantennummer des Hauptarbeitgebers
+  hauptarbeitgeberId      String? // Mandantennummer des Hauptarbeitgebers
   hauptarbeitgeberStunden Float?
-  nebenarbeitgeberId  String?    // Mandantennummer des Nebenarbeitgebers (optional)
+  nebenarbeitgeberId      String? // Mandantennummer des Nebenarbeitgebers (optional)
   nebenarbeitgeberStunden Float?
 
   // -- Vertragsart --
-  svPflichtig         Boolean?   @default(true)
-  minijob             Boolean?   @default(false)
-  ehrenamt            Boolean?   @default(false)
+  svPflichtig Boolean? @default(true)
+  minijob     Boolean? @default(false)
+  ehrenamt    Boolean? @default(false)
 
   // -- Kostenstelle --
-  kostenstelle        String?
-  kostenstelleAnteil  Float?     // Prozentuale Aufteilung
+  kostenstelle       String?
+  kostenstelleAnteil Float? // Prozentuale Aufteilung
 
   // -- Probezeit --
-  probezeit           Boolean?   @default(true)
-  probezeitMonate     Int?       @default(6)
+  probezeit       Boolean? @default(true)
+  probezeitMonate Int?     @default(6)
 
   // -- Verguetung --
-  verguetungsmodell   String?    // "TV_L", "TV_L_S", "HAUSTARIF", "SONSTIGES"
-  entgeltgruppe       String?    // z.B. "E11", "S8a"
-  stufe               String?    // z.B. "3"
+  verguetungsmodell   String? // "TV_L", "TV_L_S", "HAUSTARIF", "SONSTIGES"
+  entgeltgruppe       String? // z.B. "E11", "S8a"
+  stufe               String? // z.B. "3"
   festgehalt          Float?
   stundenlohn         Float?
   bemerkungVerguetung String?
 
   // -- Jahressonderzahlung --
-  jahressonderzahlung Boolean?   @default(true)
+  jahressonderzahlung  Boolean? @default(true)
   sonderzahlungProzent Float?
 
   // -- Sachbezuege & Zulagen --
-  sachbezuege         Boolean?   @default(false)
-  sachbezuegeBetrag   Float?
-  zulage              Boolean?   @default(false)
-  zulageBetrag        Float?
+  sachbezuege       Boolean? @default(false)
+  sachbezuegeBetrag Float?
+  zulage            Boolean? @default(false)
+  zulageBetrag      Float?
 
   // -- Urlaubsanspruch --
-  urlaubstageProJahr  Int?       @default(30)
+  urlaubstageProJahr Int? @default(30)
 
   // -- Masernschutz (fuer MA mit Kinderkontakt) --
-  masernschutzErforderlich Boolean? @default(false)
+  masernschutzErforderlich     Boolean? @default(false)
   masernschutzVorArbeitsbeginn Boolean?
 
   // -- Zeiterfassung --
-  zeiterfassung       Boolean?   @default(true)
+  zeiterfassung Boolean? @default(true)
 
   // -- Zusaetzliche Vereinbarungen --
   zusatzvereinbarungen String?
 
   // -- Meta --
-  currentStep         Int        @default(0)
-  isComplete          Boolean    @default(false)
+  currentStep Int     @default(0)
+  isComplete  Boolean @default(false)
 
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("supervisor_data")
 }
@@ -437,24 +438,24 @@ model SupervisorData {
 // Hochgeladene Dokumente
 // =============================================
 model Document {
-  id              String            @id @default(uuid())
-  onboardingId    String
-  onboarding      OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  id           String            @id @default(uuid())
+  onboardingId String
+  onboarding   OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
 
   type            DocumentType
   fileName        String
   filePath        String
-  fileSize        Int               // in Bytes
+  fileSize        Int // in Bytes
   mimeType        String
-  status          DocumentStatus    @default(UPLOADED)
+  status          DocumentStatus @default(UPLOADED)
   rejectionReason String?
 
-  uploadedAt      DateTime          @default(now())
-  reviewedAt      DateTime?
-  reviewedById    String?
-  reviewedBy      User?             @relation(fields: [reviewedById], references: [id])
+  uploadedAt   DateTime  @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?     @relation(fields: [reviewedById], references: [id])
 
-  createdAt       DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@index([onboardingId])
   @@map("documents")
@@ -489,18 +490,18 @@ enum DocumentStatus {
 // Portal-Benutzer (HR-Team)
 // =============================================
 model User {
-  id                String             @id @default(uuid())
-  email             String             @unique
-  passwordHash      String
-  firstName         String
-  lastName          String
-  role              UserRole           @default(HR_SACHBEARBEITER)
-  isActive          Boolean            @default(true)
-  lastLoginAt       DateTime?
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         UserRole  @default(HR_SACHBEARBEITER)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
 
   // Org-Zuweisungen (welche Mandanten darf dieser User sehen?)
   // SUPER_ADMIN + HR_LEITUNG sehen alles, bei anderen gelten die Zuweisungen
-  orgAssignments    UserOrgAssignment[]
+  orgAssignments UserOrgAssignment[]
 
   // Relationen
   invitedOnboardings      OnboardingProcess[] @relation("InvitedBy")
@@ -511,18 +512,18 @@ model User {
   auditLogs               AuditLog[]
 
   // Offboarding-Relationen
-  initiatedOffboardings   OffboardingProcess[] @relation("OffboardingInitiator")
-  offboardingNotes        OffboardingNote[]    @relation("OffboardingNoteAuthor")
+  initiatedOffboardings OffboardingProcess[] @relation("OffboardingInitiator")
+  offboardingNotes      OffboardingNote[]    @relation("OffboardingNoteAuthor")
 
   // Phase 2: Zeugnis-Review
-  reviewedZeugnisse       ZeugnisBewertung[]   @relation("ZeugnisReviewer")
-  finalizedZeugnisse      ZeugnisBewertung[]   @relation("ZeugnisFinalizier")
+  reviewedZeugnisse  ZeugnisBewertung[] @relation("ZeugnisReviewer")
+  finalizedZeugnisse ZeugnisBewertung[] @relation("ZeugnisFinalizier")
 
   // Verbeamtung
-  initiatedCivilService   CivilServiceProcess[] @relation("CivilServiceInitiator")
+  initiatedCivilService CivilServiceProcess[] @relation("CivilServiceInitiator")
 
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
 }
@@ -539,22 +540,22 @@ enum UserRole {
 // Audit-Log (wer hat wann was geaendert)
 // =============================================
 model AuditLog {
-  id              String            @id @default(uuid())
-  userId          String?
-  user            User?             @relation(fields: [userId], references: [id])
-  onboardingId    String?
-  onboarding      OnboardingProcess? @relation(fields: [onboardingId], references: [id])
-  offboardingId   String?
-  offboarding     OffboardingProcess? @relation("OffboardingAuditLogs", fields: [offboardingId], references: [id])
-  civilServiceId  String?
-  civilService    CivilServiceProcess? @relation("CivilServiceAuditLogs", fields: [civilServiceId], references: [id])
-  processType     String?           // "ONBOARDING", "OFFBOARDING" oder "CIVIL_SERVICE"
+  id             String               @id @default(uuid())
+  userId         String?
+  user           User?                @relation(fields: [userId], references: [id])
+  onboardingId   String?
+  onboarding     OnboardingProcess?   @relation(fields: [onboardingId], references: [id])
+  offboardingId  String?
+  offboarding    OffboardingProcess?  @relation("OffboardingAuditLogs", fields: [offboardingId], references: [id])
+  civilServiceId String?
+  civilService   CivilServiceProcess? @relation("CivilServiceAuditLogs", fields: [civilServiceId], references: [id])
+  processType    String? // "ONBOARDING", "OFFBOARDING" oder "CIVIL_SERVICE"
 
-  action          String            // z.B. "ONBOARDING_CREATED", "QUESTIONNAIRE_SUBMITTED"
-  details         Json?             // Zusaetzliche Infos
-  ipAddress       String?
+  action    String // z.B. "ONBOARDING_CREATED", "QUESTIONNAIRE_SUBMITTED"
+  details   Json? // Zusaetzliche Infos
+  ipAddress String?
 
-  createdAt       DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@index([onboardingId])
   @@index([offboardingId])
@@ -567,16 +568,16 @@ model AuditLog {
 // Vorgang-Notizen (allgemeine Notizen pro Onboarding)
 // =============================================
 model OnboardingNote {
-  id            String            @id @default(uuid())
-  onboardingId  String
-  onboarding    OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  id           String            @id @default(uuid())
+  onboardingId String
+  onboarding   OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
 
-  content       String
-  createdById   String
-  createdBy     User              @relation("NoteCreatedBy", fields: [createdById], references: [id])
+  content     String
+  createdById String
+  createdBy   User   @relation("NoteCreatedBy", fields: [createdById], references: [id])
 
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([onboardingId])
   @@map("onboarding_notes")
@@ -586,17 +587,17 @@ model OnboardingNote {
 // Checklisten-Vorlagen (Admin erstellt Templates)
 // =============================================
 model ChecklistTemplate {
-  id                String                 @id @default(uuid())
-  name              String                 // z.B. "Standard-Einstellung (TV-L)"
+  id                String             @id @default(uuid())
+  name              String // z.B. "Standard-Einstellung (TV-L)"
   description       String?
-  questionnaireType QuestionnaireType?     // Default-Zuordnung pro Typ (null = keine Auto-Zuordnung)
-  isActive          Boolean                @default(true)
+  questionnaireType QuestionnaireType? // Default-Zuordnung pro Typ (null = keine Auto-Zuordnung)
+  isActive          Boolean            @default(true)
 
-  items             ChecklistTemplateItem[]
-  onboardings       OnboardingProcess[]
+  items       ChecklistTemplateItem[]
+  onboardings OnboardingProcess[]
 
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("checklist_templates")
 }
@@ -605,17 +606,17 @@ model ChecklistTemplate {
 // Checklisten-Vorlagen-Punkte (Items einer Vorlage)
 // =============================================
 model ChecklistTemplateItem {
-  id              String            @id @default(uuid())
-  templateId      String
-  template        ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id         String            @id @default(uuid())
+  templateId String
+  template   ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
-  title           String            // z.B. "Arbeitsvertrag unterschrieben"
-  category        String            // z.B. "Dokumente", "IT-Einrichtung", "Vor Arbeitsbeginn"
-  orderIndex      Int               @default(0)
-  defaultDueDays  Int?              // Tage nach Vertragsbeginn (z.B. -7 = 7 Tage vorher)
-  defaultAssignee String?           // Standard-Verantwortlicher (z.B. "HR", "IT", "Vorgesetzter")
+  title           String // z.B. "Arbeitsvertrag unterschrieben"
+  category        String // z.B. "Dokumente", "IT-Einrichtung", "Vor Arbeitsbeginn"
+  orderIndex      Int     @default(0)
+  defaultDueDays  Int? // Tage nach Vertragsbeginn (z.B. -7 = 7 Tage vorher)
+  defaultAssignee String? // Standard-Verantwortlicher (z.B. "HR", "IT", "Vorgesetzter")
 
-  createdAt       DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@index([templateId])
   @@map("checklist_template_items")
@@ -625,24 +626,24 @@ model ChecklistTemplateItem {
 // Checklisten-Eintraege (Instanzen pro Onboarding)
 // =============================================
 model ChecklistItem {
-  id              String            @id @default(uuid())
-  onboardingId    String
-  onboarding      OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
-  templateItemId  String?           // Referenz zum Original-Template-Item
+  id             String            @id @default(uuid())
+  onboardingId   String
+  onboarding     OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  templateItemId String? // Referenz zum Original-Template-Item
 
-  title           String
-  category        String
-  orderIndex      Int               @default(0)
-  isCompleted     Boolean           @default(false)
-  completedAt     DateTime?
-  completedById   String?
-  completedBy     User?             @relation("CompletedChecklistItems", fields: [completedById], references: [id])
-  dueDate         DateTime?
-  assignee        String?           // Verantwortlicher
-  notes           String?           // Optionale Notizen
+  title         String
+  category      String
+  orderIndex    Int       @default(0)
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  completedById String?
+  completedBy   User?     @relation("CompletedChecklistItems", fields: [completedById], references: [id])
+  dueDate       DateTime?
+  assignee      String? // Verantwortlicher
+  notes         String? // Optionale Notizen
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([onboardingId])
   @@map("checklist_items")
@@ -653,12 +654,12 @@ model ChecklistItem {
 // =============================================
 model WebhookConfig {
   id          String   @id @default(uuid())
-  event       String   // z.B. "onboarding-created", "questionnaire-completed"
-  name        String   // Anzeigename, z.B. "n8n Onboarding Workflow"
-  url         String   // Ziel-URL des Webhooks
+  event       String // z.B. "onboarding-created", "questionnaire-completed"
+  name        String // Anzeigename, z.B. "n8n Onboarding Workflow"
+  url         String // Ziel-URL des Webhooks
   authType    String   @default("none") // "none" | "api_key" | "bearer" | "basic"
-  authHeader  String?  // Header-Name fuer API-Key (z.B. "X-API-Key")
-  authValue   String?  // Token / Passwort (sensibel – nicht im Frontend anzeigen)
+  authHeader  String? // Header-Name fuer API-Key (z.B. "X-API-Key")
+  authValue   String? // Token / Passwort (sensibel – nicht im Frontend anzeigen)
   isActive    Boolean  @default(true)
   description String?
   createdAt   DateTime @default(now())
@@ -676,12 +677,12 @@ model SmtpConfig {
   id        String   @id @default("default")
   host      String   @default("")
   port      Int      @default(587)
-  secure    Boolean  @default(false)  // true = Port 465 (SSL), false = STARTTLS
+  secure    Boolean  @default(false) // true = Port 465 (SSL), false = STARTTLS
   username  String   @default("")
-  password  String   @default("")     // Passwort – nur maskiert im Frontend anzeigen
+  password  String   @default("") // Passwort – nur maskiert im Frontend anzeigen
   fromEmail String   @default("")
   fromName  String   @default("CREDO HR-Portal")
-  isActive  Boolean  @default(false)  // n8n ist primaer; SMTP nur als Fallback
+  isActive  Boolean  @default(false) // n8n ist primaer; SMTP nur als Fallback
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -694,12 +695,12 @@ model SmtpConfig {
 // =============================================
 model EmailTemplate {
   id        String   @id @default(uuid())
-  event     String   @unique   // korrespondiert mit WebhookEvent
-  name      String              // Anzeigename
-  subject   String              // E-Mail-Betreff (kann Variablen enthalten)
-  bodyHtml  String              // HTML-Body mit {{variablen}}
-  bodyText  String?             // Plaintext-Fallback
-  variables Json                // [{key: "{{vorname}}", description: "..."}]
+  event     String   @unique // korrespondiert mit WebhookEvent
+  name      String // Anzeigename
+  subject   String // E-Mail-Betreff (kann Variablen enthalten)
+  bodyHtml  String // HTML-Body mit {{variablen}}
+  bodyText  String? // Plaintext-Fallback
+  variables Json // [{key: "{{vorname}}", description: "..."}]
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -713,17 +714,17 @@ model EmailTemplate {
 model FormTemplate {
   id                String            @id @default(uuid())
   questionnaireType QuestionnaireType @unique
-  name              String            // z.B. "Standard (TV-L)"
+  name              String // z.B. "Standard (TV-L)"
   description       String?
-  stepsConfig       Json              // Array: [{ step: 1, title: "...", enabled: true, fields: [...] }]
+  stepsConfig       Json // Array: [{ step: 1, title: "...", enabled: true, fields: [...] }]
   isActive          Boolean           @default(true)
 
   // Versionierung (Vorschlag 5)
-  version           Int               @default(1)       // Wird bei jeder Aenderung hochgezaehlt
-  publishedAt       DateTime?                            // Wann zuletzt veroeffentlicht
+  version     Int       @default(1) // Wird bei jeder Aenderung hochgezaehlt
+  publishedAt DateTime? // Wann zuletzt veroeffentlicht
 
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("form_templates")
 }
@@ -781,64 +782,64 @@ enum OffboardingDocType {
 // Offboarding-Vorgang (ein Vorgang pro Austritt)
 // =============================================
 model OffboardingProcess {
-  id                  String             @id @default(uuid())
-  displayId           String             @unique // z.B. "OFF-2026-GYM-001"
-  sequentialNumber    Int                // Laufende Nummer fuer displayId
+  id               String @id @default(uuid())
+  displayId        String @unique // z.B. "OFF-2026-GYM-001"
+  sequentialNumber Int // Laufende Nummer fuer displayId
 
-  organizationId      String
-  organization        Organization       @relation(fields: [organizationId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
   // Mitarbeiter-Daten (inline, für Abwärtskompatibilität)
-  employeeEmail       String
-  employeeFirstName   String
-  employeeLastName    String
-  employeePersonalNr  String?
+  employeeEmail        String
+  employeeFirstName    String
+  employeeLastName     String
+  employeePersonalNr   String?
   employeePrivateEmail String?
 
   // Verknüpfung zur zentralen Personalakte (optional, wird schrittweise befüllt)
-  employeeId          String?
-  employee            Employee?          @relation("EmployeeOffboardings", fields: [employeeId], references: [id])
+  employeeId String?
+  employee   Employee? @relation("EmployeeOffboardings", fields: [employeeId], references: [id])
 
   // Link zum Onboarding (optional)
-  onboardingId        String?
+  onboardingId String?
 
   // Austrittsgrund
-  exitType            ExitType
-  exitReason          String?
+  exitType   ExitType
+  exitReason String?
 
   // Termine
-  noticeDate          DateTime?
-  lastWorkingDay      DateTime
-  contractEndDate     DateTime?
-  noticePeriodEnd     DateTime?
+  noticeDate      DateTime?
+  lastWorkingDay  DateTime
+  contractEndDate DateTime?
+  noticePeriodEnd DateTime?
 
   // Status
-  status              OffboardingStatus  @default(INITIATED)
+  status OffboardingStatus @default(INITIATED)
 
   // Initiierung
-  initiatedById       String
-  initiatedBy         User               @relation("OffboardingInitiator", fields: [initiatedById], references: [id])
-  initiatedAt         DateTime           @default(now())
-  completedAt         DateTime?
+  initiatedById String
+  initiatedBy   User      @relation("OffboardingInitiator", fields: [initiatedById], references: [id])
+  initiatedAt   DateTime  @default(now())
+  completedAt   DateTime?
 
   // DSGVO
-  dataRetentionDate   DateTime?
+  dataRetentionDate DateTime?
 
   // Relationen
-  exitData            OffboardingExitData?
-  returnItems         ReturnItem[]
-  documents           OffboardingDocument[]
-  checklistItems      OffboardingChecklistItem[]
-  notes               OffboardingNote[]
-  departmentLinks     OffboardingDepartmentLink[]
-  auditLogs           AuditLog[]         @relation("OffboardingAuditLogs")
+  exitData        OffboardingExitData?
+  returnItems     ReturnItem[]
+  documents       OffboardingDocument[]
+  checklistItems  OffboardingChecklistItem[]
+  notes           OffboardingNote[]
+  departmentLinks OffboardingDepartmentLink[]
+  auditLogs       AuditLog[]                  @relation("OffboardingAuditLogs")
 
   // Phase 2
-  exitInterview       ExitInterview?
-  zeugnisBewertung    ZeugnisBewertung?
+  exitInterview    ExitInterview?
+  zeugnisBewertung ZeugnisBewertung?
 
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([organizationId])
@@ -850,15 +851,15 @@ model OffboardingProcess {
 // Austrittsdaten (1:1 zum Offboarding)
 // =============================================
 model OffboardingExitData {
-  id                    String             @id @default(uuid())
-  offboardingId         String             @unique
-  offboarding           OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  offboardingId String             @unique
+  offboarding   OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
 
   // Beschaeftigungsart
-  employmentType        String?            // z.B. "ANGESTELLT", "BEAMTET", "MINIJOB"
-  tarifvertrag          String?
-  entgeltgruppe         String?
-  isBefristet           Boolean            @default(false)
+  employmentType String? // z.B. "ANGESTELLT", "BEAMTET", "MINIJOB"
+  tarifvertrag   String?
+  entgeltgruppe  String?
+  isBefristet    Boolean @default(false)
 
   // Urlaub & Ueberstunden
   remainingVacationDays Float?
@@ -867,30 +868,30 @@ model OffboardingExitData {
   overtimePayout        Float?
 
   // Abfindung (verschluesselt)
-  severancePay          String?
+  severancePay String?
 
   // Zeugnis
-  certificateType       String?
-  certificateStatus     String             @default("PENDING")
+  certificateType   String?
+  certificateStatus String  @default("PENDING")
 
   // Sozialversicherung
-  svDeregistrationDone  Boolean            @default(false)
-  svDeregistrationDate  DateTime?
+  svDeregistrationDone Boolean   @default(false)
+  svDeregistrationDate DateTime?
 
   // Arbeitsbescheinigung
-  employmentCertDone    Boolean            @default(false)
-  employmentCertDate    DateTime?
+  employmentCertDone Boolean   @default(false)
+  employmentCertDate DateTime?
 
   // Wettbewerbsverbot
-  nonCompeteClause      Boolean            @default(false)
+  nonCompeteClause Boolean @default(false)
 
   // Wissenstransfer
-  knowledgeTransferPlan Boolean            @default(false)
+  knowledgeTransferPlan Boolean @default(false)
   successorName         String?
-  handoverDocComplete   Boolean            @default(false)
+  handoverDocComplete   Boolean @default(false)
 
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("offboarding_exit_data")
 }
@@ -899,24 +900,24 @@ model OffboardingExitData {
 // Offboarding-Checklisten-Eintraege
 // =============================================
 model OffboardingChecklistItem {
-  id                  String             @id @default(uuid())
-  offboardingId       String
-  offboarding         OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  offboardingId String
+  offboarding   OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
 
-  title               String
-  category            String
-  orderIndex          Int                @default(0)
-  description         String?
-  assigneeDepartment  String?            // "HR", "IT", "FACILITY", "BUCHHALTUNG", "VORGESETZTER", "MITARBEITER"
+  title              String
+  category           String
+  orderIndex         Int     @default(0)
+  description        String?
+  assigneeDepartment String? // "HR", "IT", "FACILITY", "BUCHHALTUNG", "VORGESETZTER", "MITARBEITER"
 
-  isCompleted         Boolean            @default(false)
-  completedAt         DateTime?
-  completedById       String?
-  dueDate             DateTime?
-  notes               String?
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  completedById String?
+  dueDate       DateTime?
+  notes         String?
 
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([offboardingId])
   @@map("offboarding_checklist_items")
@@ -926,22 +927,22 @@ model OffboardingChecklistItem {
 // Rueckgabe-Inventar
 // =============================================
 model ReturnItem {
-  id              String             @id @default(uuid())
-  offboardingId   String
-  offboarding     OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  offboardingId String
+  offboarding   OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
 
-  category        ReturnCategory
-  itemName        String
-  serialNumber    String?
+  category     ReturnCategory
+  itemName     String
+  serialNumber String?
 
-  isReturned      Boolean            @default(false)
-  returnedAt      DateTime?
-  returnedToId    String?            // User-ID, keine direkte Relation
-  condition       String?
-  notes           String?
+  isReturned   Boolean   @default(false)
+  returnedAt   DateTime?
+  returnedToId String? // User-ID, keine direkte Relation
+  condition    String?
+  notes        String?
 
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("return_items")
 }
@@ -950,21 +951,21 @@ model ReturnItem {
 // Offboarding-Dokumente
 // =============================================
 model OffboardingDocument {
-  id              String             @id @default(uuid())
-  offboardingId   String
-  offboarding     OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  offboardingId String
+  offboarding   OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
 
-  type            OffboardingDocType
-  fileName        String
-  filePath        String
-  fileSize        Int                // in Bytes
-  mimeType        String?
-  status          DocumentStatus     @default(UPLOADED)
+  type     OffboardingDocType
+  fileName String
+  filePath String
+  fileSize Int // in Bytes
+  mimeType String?
+  status   DocumentStatus     @default(UPLOADED)
 
-  uploadedAt      DateTime           @default(now())
-  uploadedById    String?
-  reviewedAt      DateTime?
-  reviewedById    String?
+  uploadedAt   DateTime  @default(now())
+  uploadedById String?
+  reviewedAt   DateTime?
+  reviewedById String?
 
   @@map("offboarding_documents")
 }
@@ -973,16 +974,16 @@ model OffboardingDocument {
 // Offboarding-Notizen
 // =============================================
 model OffboardingNote {
-  id              String             @id @default(uuid())
-  offboardingId   String
-  offboarding     OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  offboardingId String
+  offboarding   OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
 
-  content         String
-  createdById     String
-  createdBy       User               @relation("OffboardingNoteAuthor", fields: [createdById], references: [id])
+  content     String
+  createdById String
+  createdBy   User   @relation("OffboardingNoteAuthor", fields: [createdById], references: [id])
 
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([offboardingId])
   @@map("offboarding_notes")
@@ -992,18 +993,18 @@ model OffboardingNote {
 // Abteilungs-Konfiguration (Funktions-E-Mails)
 // =============================================
 model DepartmentConfig {
-  id              String        @id @default(uuid())
-  departmentKey   String
-  departmentName  String
-  email           String
+  id             String @id @default(uuid())
+  departmentKey  String
+  departmentName String
+  email          String
 
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
-  isActive        Boolean       @default(true)
+  isActive Boolean @default(true)
 
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([departmentKey, organizationId])
   @@map("department_configs")
@@ -1013,29 +1014,29 @@ model DepartmentConfig {
 // Magic Links pro Abteilung pro Offboarding
 // =============================================
 model OffboardingDepartmentLink {
-  id                String             @id @default(uuid())
-  offboardingId     String
-  offboarding       OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  offboardingId String
+  offboarding   OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
 
-  departmentKey     String
-  departmentName    String
-  email             String
-  token             String             @unique
-  expiresAt         DateTime
+  departmentKey  String
+  departmentName String
+  email          String
+  token          String   @unique
+  expiresAt      DateTime
 
-  sentAt            DateTime?
-  firstOpenedAt     DateTime?
-  lastOpenedAt      DateTime?
-  openCount         Int                @default(0)
+  sentAt        DateTime?
+  firstOpenedAt DateTime?
+  lastOpenedAt  DateTime?
+  openCount     Int       @default(0)
 
-  lastReminderAt    DateTime?
-  reminderCount     Int                @default(0)
+  lastReminderAt DateTime?
+  reminderCount  Int       @default(0)
 
-  allTasksComplete  Boolean            @default(false)
-  completedAt       DateTime?
+  allTasksComplete Boolean   @default(false)
+  completedAt      DateTime?
 
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([offboardingId, departmentKey])
   @@map("offboarding_department_links")
@@ -1084,54 +1085,54 @@ enum ZeugnisBewertungStatus {
 // Exit-Interview Template (Admin-konfigurierbar)
 // =============================================
 model ExitInterviewTemplate {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
   description String?
-  isActive    Boolean   @default(true)
-  isDefault   Boolean   @default(false)
-  version     Int       @default(1)
+  isActive    Boolean @default(true)
+  isDefault   Boolean @default(false)
+  version     Int     @default(1)
 
-  introText   String?
-  dsgvoText   String?
+  introText String?
+  dsgvoText String?
 
-  categories  ExitInterviewTemplateCategory[]
+  categories ExitInterviewTemplateCategory[]
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("exit_interview_templates")
 }
 
 model ExitInterviewTemplateCategory {
-  id          String    @id @default(uuid())
-  templateId  String
-  template    ExitInterviewTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id         String                @id @default(uuid())
+  templateId String
+  template   ExitInterviewTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   name        String
   description String?
-  orderIndex  Int       @default(0)
+  orderIndex  Int     @default(0)
 
-  questions   ExitInterviewTemplateQuestion[]
+  questions ExitInterviewTemplateQuestion[]
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([templateId])
   @@map("exit_interview_template_categories")
 }
 
 model ExitInterviewTemplateQuestion {
-  id            String                    @id @default(uuid())
-  categoryId    String
-  category      ExitInterviewTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  id         String                        @id @default(uuid())
+  categoryId String
+  category   ExitInterviewTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  questionText  String
-  questionType  ExitInterviewQuestionType
-  isRequired    Boolean   @default(true)
-  orderIndex    Int       @default(0)
-  options       Json?
-  roleFilter    String?
+  questionText String
+  questionType ExitInterviewQuestionType
+  isRequired   Boolean                   @default(true)
+  orderIndex   Int                       @default(0)
+  options      Json?
+  roleFilter   String?
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([categoryId])
   @@map("exit_interview_template_questions")
@@ -1141,36 +1142,36 @@ model ExitInterviewTemplateQuestion {
 // Exit-Interview (1:1 zum Offboarding)
 // =============================================
 model ExitInterview {
-  id                  String              @id @default(uuid())
-  offboardingId       String              @unique
-  offboarding         OffboardingProcess  @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  offboardingId String             @unique
+  offboarding   OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
 
-  token               String              @unique
-  tokenExpiresAt      DateTime
-  sendAfterDate       DateTime
+  token          String   @unique
+  tokenExpiresAt DateTime
+  sendAfterDate  DateTime
 
-  recipientEmail      String
+  recipientEmail String
 
-  status              ExitInterviewStatus @default(SCHEDULED)
-  sentAt              DateTime?
-  firstOpenedAt       DateTime?
-  lastOpenedAt        DateTime?
-  openCount           Int                 @default(0)
-  submittedAt         DateTime?
+  status        ExitInterviewStatus @default(SCHEDULED)
+  sentAt        DateTime?
+  firstOpenedAt DateTime?
+  lastOpenedAt  DateTime?
+  openCount     Int                 @default(0)
+  submittedAt   DateTime?
 
-  dsgvoAccepted       Boolean             @default(false)
-  dsgvoAcceptedAt     DateTime?
+  dsgvoAccepted   Boolean   @default(false)
+  dsgvoAcceptedAt DateTime?
 
-  templateSnapshot    Json
-  employeeRole        String?
+  templateSnapshot Json
+  employeeRole     String?
 
-  responses           ExitInterviewResponse[]
+  responses ExitInterviewResponse[]
 
-  lastReminderAt      DateTime?
-  reminderCount       Int                 @default(0)
+  lastReminderAt DateTime?
+  reminderCount  Int       @default(0)
 
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([sendAfterDate])
@@ -1178,9 +1179,9 @@ model ExitInterview {
 }
 
 model ExitInterviewResponse {
-  id                String          @id @default(uuid())
-  exitInterviewId   String
-  exitInterview     ExitInterview   @relation(fields: [exitInterviewId], references: [id], onDelete: Cascade)
+  id              String        @id @default(uuid())
+  exitInterviewId String
+  exitInterview   ExitInterview @relation(fields: [exitInterviewId], references: [id], onDelete: Cascade)
 
   snapshotQuestionId String
 
@@ -1189,8 +1190,8 @@ model ExitInterviewResponse {
   choiceValues      Json?
   singleChoiceValue String?
 
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([exitInterviewId, snapshotQuestionId])
   @@index([exitInterviewId])
@@ -1208,60 +1209,60 @@ model ZeugnisBewertungTemplate {
   isActive    Boolean         @default(true)
   version     Int             @default(1)
 
-  categories  ZeugnisBewertungTemplateCategory[]
+  categories     ZeugnisBewertungTemplateCategory[]
   formulierungen ZeugnisFormulierung[]
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("zeugnis_bewertung_templates")
 }
 
 model ZeugnisBewertungTemplateCategory {
-  id          String    @id @default(uuid())
-  templateId  String
-  template    ZeugnisBewertungTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id         String                   @id @default(uuid())
+  templateId String
+  template   ZeugnisBewertungTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   name        String
   description String?
-  weight      Float     @default(1.0)
-  orderIndex  Int       @default(0)
+  weight      Float   @default(1.0)
+  orderIndex  Int     @default(0)
 
-  criteria    ZeugnisBewertungTemplateCriterion[]
+  criteria ZeugnisBewertungTemplateCriterion[]
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([templateId])
   @@map("zeugnis_bewertung_template_categories")
 }
 
 model ZeugnisBewertungTemplateCriterion {
-  id          String    @id @default(uuid())
-  categoryId  String
-  category    ZeugnisBewertungTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  id         String                           @id @default(uuid())
+  categoryId String
+  category   ZeugnisBewertungTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   name        String
   description String?
-  weight      Float     @default(1.0)
-  orderIndex  Int       @default(0)
+  weight      Float   @default(1.0)
+  orderIndex  Int     @default(0)
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([categoryId])
   @@map("zeugnis_bewertung_template_criteria")
 }
 
 model ZeugnisFormulierung {
-  id          String    @id @default(uuid())
-  templateId  String
-  template    ZeugnisBewertungTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id         String                   @id @default(uuid())
+  templateId String
+  template   ZeugnisBewertungTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   criterionKey String
-  grade       Int
-  formulation String
+  grade        Int
+  formulation  String
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([templateId, criterionKey, grade])
   @@index([templateId])
@@ -1272,65 +1273,65 @@ model ZeugnisFormulierung {
 // Zeugnis-Bewertung (1:1 zum Offboarding)
 // =============================================
 model ZeugnisBewertung {
-  id                    String                  @id @default(uuid())
-  offboardingId         String                  @unique
-  offboarding           OffboardingProcess      @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  offboardingId String             @unique
+  offboarding   OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
 
-  supervisorEmail       String
-  supervisorName        String?
-  token                 String                  @unique
-  tokenExpiresAt        DateTime
+  supervisorEmail String
+  supervisorName  String?
+  token           String   @unique
+  tokenExpiresAt  DateTime
 
-  status                ZeugnisBewertungStatus  @default(INVITED)
+  status                ZeugnisBewertungStatus @default(INVITED)
   sentAt                DateTime?
   firstOpenedAt         DateTime?
   lastOpenedAt          DateTime?
-  openCount             Int                     @default(0)
+  openCount             Int                    @default(0)
   supervisorSubmittedAt DateTime?
 
-  hrReviewedAt          DateTime?
-  hrReviewedById        String?
-  hrReviewedBy          User?                   @relation("ZeugnisReviewer", fields: [hrReviewedById], references: [id], onDelete: SetNull)
-  finalizedAt           DateTime?
-  finalizedById         String?
-  finalizedBy           User?                   @relation("ZeugnisFinalizier", fields: [finalizedById], references: [id], onDelete: SetNull)
+  hrReviewedAt   DateTime?
+  hrReviewedById String?
+  hrReviewedBy   User?     @relation("ZeugnisReviewer", fields: [hrReviewedById], references: [id], onDelete: SetNull)
+  finalizedAt    DateTime?
+  finalizedById  String?
+  finalizedBy    User?     @relation("ZeugnisFinalizier", fields: [finalizedById], references: [id], onDelete: SetNull)
 
-  jobGroup              ZeugnisJobGroup
-  templateSnapshot      Json
+  jobGroup         ZeugnisJobGroup
+  templateSnapshot Json
 
-  overallGrade          Float?
-  overallGradeRounded   Int?
+  overallGrade        Float?
+  overallGradeRounded Int?
 
-  ratings               ZeugnisBewertungRating[]
+  ratings ZeugnisBewertungRating[]
 
-  hrNotes               String?
+  hrNotes String?
 
-  lastReminderAt        DateTime?
-  reminderCount         Int                     @default(0)
+  lastReminderAt DateTime?
+  reminderCount  Int       @default(0)
 
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@map("zeugnis_bewertungen")
 }
 
 model ZeugnisBewertungRating {
-  id                    String            @id @default(uuid())
-  zeugnisBewertungId    String
-  zeugnisBewertung      ZeugnisBewertung  @relation(fields: [zeugnisBewertungId], references: [id], onDelete: Cascade)
+  id                 String           @id @default(uuid())
+  zeugnisBewertungId String
+  zeugnisBewertung   ZeugnisBewertung @relation(fields: [zeugnisBewertungId], references: [id], onDelete: Cascade)
 
-  snapshotCriterionId   String
-  snapshotCategoryId    String
+  snapshotCriterionId String
+  snapshotCategoryId  String
 
-  grade                 Int
-  comment               String?
+  grade   Int
+  comment String?
 
-  hrOverrideGrade       Int?
-  hrOverrideReason      String?
+  hrOverrideGrade  Int?
+  hrOverrideReason String?
 
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([zeugnisBewertungId, snapshotCriterionId])
   @@index([zeugnisBewertungId])
@@ -1343,23 +1344,23 @@ model ZeugnisBewertungRating {
 // =============================================
 
 enum CivilServiceType {
-  PROBE       // PSI auf Probe (3 Jahre)
-  LIFETIME    // PSI auf Lebenszeit
+  PROBE // PSI auf Probe (3 Jahre)
+  LIFETIME // PSI auf Lebenszeit
 }
 
 enum CivilServiceStatus {
-  DRAFT                 // Antrag in Vorbereitung
-  PREREQUISITES_CHECK   // Voraussetzungen werden geprüft
-  ASSESSMENT_PENDING    // Beurteilung durch SL ausstehend
-  REFERENCE_PENDING     // Referenz durch SL ausstehend
-  BOARD_PENDING         // Beiratsentscheidung ausstehend
-  BOARD_POSTPONED       // Beirat hat aufgeschoben
-  ADMINISTRATION        // Verwaltungsvorgang läuft (Phase II)
-  PROBATION             // Probezeit (Phase III)
-  LIFETIME_PENDING      // Übernahme Lebenszeit läuft (Phase IV)
-  COMPLETED             // Abgeschlossen
-  REJECTED              // Abgelehnt
-  CANCELLED             // Abgebrochen
+  DRAFT // Antrag in Vorbereitung
+  PREREQUISITES_CHECK // Voraussetzungen werden geprüft
+  ASSESSMENT_PENDING // Beurteilung durch SL ausstehend
+  REFERENCE_PENDING // Referenz durch SL ausstehend
+  BOARD_PENDING // Beiratsentscheidung ausstehend
+  BOARD_POSTPONED // Beirat hat aufgeschoben
+  ADMINISTRATION // Verwaltungsvorgang läuft (Phase II)
+  PROBATION // Probezeit (Phase III)
+  LIFETIME_PENDING // Übernahme Lebenszeit läuft (Phase IV)
+  COMPLETED // Abgeschlossen
+  REJECTED // Abgelehnt
+  CANCELLED // Abgebrochen
 }
 
 enum CivilServicePhaseStatus {
@@ -1380,62 +1381,62 @@ enum BoardDecisionResult {
 // Verbeamtungsvorgang (Haupttabelle)
 // =============================================
 model CivilServiceProcess {
-  id                  String              @id @default(uuid())
-  displayId           String              @unique // z.B. "PSI-2026-GYM-001"
-  sequentialNumber    Int
+  id               String @id @default(uuid())
+  displayId        String @unique // z.B. "PSI-2026-GYM-001"
+  sequentialNumber Int
 
   // Verknüpfungen
-  employeeId          String?
-  employee            Employee?           @relation("EmployeeCivilService", fields: [employeeId], references: [id])
-  organizationId      String
-  organization        Organization        @relation(fields: [organizationId], references: [id])
-  initiatedById       String
-  initiatedBy         User                @relation("CivilServiceInitiator", fields: [initiatedById], references: [id])
+  employeeId     String?
+  employee       Employee?    @relation("EmployeeCivilService", fields: [employeeId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  initiatedById  String
+  initiatedBy    User         @relation("CivilServiceInitiator", fields: [initiatedById], references: [id])
 
   // Mitarbeiter-Daten (inline für Abwärtskompatibilität)
-  employeeFirstName   String
-  employeeLastName    String
-  employeeEmail       String
-  employeePersonalNr  String?
+  employeeFirstName  String
+  employeeLastName   String
+  employeeEmail      String
+  employeePersonalNr String?
 
   // Typ und Status
-  type                CivilServiceType    @default(PROBE)
-  status              CivilServiceStatus  @default(DRAFT)
-  currentStep         Int                 @default(1) // 1-11
+  type        CivilServiceType   @default(PROBE)
+  status      CivilServiceStatus @default(DRAFT)
+  currentStep Int                @default(1) // 1-11
 
   // Voraussetzungen (JSON: 12 Kriterien aus 3.1)
-  prerequisites       Json?
+  prerequisites Json?
 
   // Termine
-  targetStartDate     DateTime?           // Geplanter Vertragsbeginn
-  probationStartDate  DateTime?           // Tatsächlicher Probezeit-Beginn
-  probationEndDate    DateTime?           // Probezeit-Ende (berechnet: +3 Jahre)
-  completedAt         DateTime?
+  targetStartDate    DateTime? // Geplanter Vertragsbeginn
+  probationStartDate DateTime? // Tatsächlicher Probezeit-Beginn
+  probationEndDate   DateTime? // Probezeit-Ende (berechnet: +3 Jahre)
+  completedAt        DateTime?
 
   // Besoldung
-  besoldungsgruppe    String?             // z.B. "A13"
-  erfahrungsstufe     Int?                // 1-12
-  vordienszeitenJson  Json?               // Berechnungsgrundlage
+  besoldungsgruppe   String? // z.B. "A13"
+  erfahrungsstufe    Int? // 1-12
+  vordienszeitenJson Json? // Berechnungsgrundlage
 
   // LK-Antrag Magic Link
-  applicationToken          String?         @unique
+  applicationToken          String?   @unique
   applicationTokenExpiresAt DateTime?
   applicationSubmittedAt    DateTime?
-  applicationData           Json?           // Antworten der Lehrkraft
+  applicationData           Json? // Antworten der Lehrkraft
 
   // Beteiligte Personen (Schulleitung, Amtsarzt, Beirat etc.)
-  stakeholders              Json?           // { schulleitung: {name, email}, amtsarzt: {email}, beirat: {email} }
+  stakeholders Json? // { schulleitung: {name, email}, amtsarzt: {email}, beirat: {email} }
 
   // Relationen
-  phases              CivilServicePhase[]
-  assessments         CivilServiceAssessment[]
-  boardDecisions      CivilServiceBoardDecision[]
-  documents           CivilServiceDocument[]
-  checklistItems      CivilServiceChecklistItem[]
-  auditLogs           AuditLog[]          @relation("CivilServiceAuditLogs")
+  phases         CivilServicePhase[]
+  assessments    CivilServiceAssessment[]
+  boardDecisions CivilServiceBoardDecision[]
+  documents      CivilServiceDocument[]
+  checklistItems CivilServiceChecklistItem[]
+  auditLogs      AuditLog[]                  @relation("CivilServiceAuditLogs")
 
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([organizationId])
@@ -1447,21 +1448,21 @@ model CivilServiceProcess {
 // Phasen-Status (A-H + Hauptphasen)
 // =============================================
 model CivilServicePhase {
-  id                String                @id @default(uuid())
-  processId         String
-  process           CivilServiceProcess   @relation(fields: [processId], references: [id], onDelete: Cascade)
+  id        String              @id @default(uuid())
+  processId String
+  process   CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
 
-  phaseKey          String                // "I", "II_A", "II_B", ..., "II_H", "III", "IV"
-  phaseName         String                // "Amtsarzt", "Besoldung", etc.
-  orderIndex        Int                   @default(0)
+  phaseKey   String // "I", "II_A", "II_B", ..., "II_H", "III", "IV"
+  phaseName  String // "Amtsarzt", "Besoldung", etc.
+  orderIndex Int    @default(0)
 
-  status            CivilServicePhaseStatus @default(PENDING)
-  startedAt         DateTime?
-  completedAt       DateTime?
-  blockedReason     String?
+  status        CivilServicePhaseStatus @default(PENDING)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  blockedReason String?
 
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([processId, phaseKey])
   @@index([processId])
@@ -1472,42 +1473,79 @@ model CivilServicePhase {
 // Beurteilungen (3 Pflichtbeurteilungen via Magic Link)
 // =============================================
 model CivilServiceAssessment {
-  id                  String              @id @default(uuid())
-  processId           String
-  process             CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+  id        String              @id @default(uuid())
+  processId String
+  process   CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
 
-  assessmentNumber    Int                 // 1, 2 oder 3
-  assessmentType      String              // "BEURTEILUNG" oder "REFERENZ"
+  assessmentNumber Int // 1, 2 oder 3
+  assessmentType   String // "BEURTEILUNG" oder "REFERENZ"
 
   // Magic Link für SL
-  token               String              @unique
-  tokenExpiresAt      DateTime
-  recipientEmail      String              // SL E-Mail
-  recipientName       String?
+  token          String   @unique
+  tokenExpiresAt DateTime
+  recipientEmail String // SL E-Mail
+  recipientName  String?
 
   // Tracking
-  sentAt              DateTime?
-  firstOpenedAt       DateTime?
-  lastOpenedAt        DateTime?
-  openCount           Int                 @default(0)
-  submittedAt         DateTime?
+  sentAt        DateTime?
+  firstOpenedAt DateTime?
+  lastOpenedAt  DateTime?
+  openCount     Int       @default(0)
+  submittedAt   DateTime?
 
   // Bewertung (JSON: Noten pro Kriterium)
-  templateSnapshot    Json?               // Beurteilungsvorlage (eingefroren)
-  ratingsData         Json?               // Noten pro Kriterium
-  overallGrade        Float?              // Gesamtschnitt
-  meetsRequirements   Boolean?            // < 3,0 und keine Kategorie > 3,0
+  templateId              String? // Verweis auf BeurteilungTemplate (Audit/Versionierung)
+  scaleType               String?  @default("BRL_1_5") // BRL_1_5 oder SCHULNOTEN_1_6
+  templateSnapshot        Json? // Beurteilungsvorlage (eingefroren, inkl. scaleType + scaleLabels)
+  ratingsData             Json? // Noten pro Kriterium
+  overallGrade            Float? // Visualisierung — Gesamtschnitt (KEIN Gesamturteil!)
+  meetsRequirements       Boolean? // Legacy: automatische Berechnung
+  meetsRequirementsManual Boolean? // BRL Nr. 7.5 — manuelles Gesamturteil der SL
+  overallReasoning        String? // Pflichtbegründung Gesamturteil (min. 200 Zeichen)
 
   // Referenz-Daten (nur bei assessmentNumber 1 + 3)
-  referenceData       Json?               // 12 Prüfpunkte (Ja/Nein/Teilweise)
-  gemeindeReferenz    String?             // Freitext Gemeinde-Referenz
+  referenceData    Json? // 12 Prüfpunkte (Ja/Nein/Teilweise)
+  gemeindeReferenz String? // Freitext Gemeinde-Referenz
+
+  // Workflow — Vorbereitung
+  scheduledDate       DateTime? // Termin Unterrichtsbesuch
+  announcedAt         DateTime? // Ankündigungs-Zeitpunkt (BRL Nr. 8.3 — min. 14 Tage vorher)
+  fach                String? // Unterrichtsfach
+  klasse              String? // Klasse / Lerngruppe
+  vertrauenslehrkraft String? // BRL Nr. 8.3 — Optionaler Name der Vertrauenslehrkraft
+  unbiasedConfirmed   Boolean? // BRL Nr. 4.10 — Befangenheitserklärung der SL
+  unbiasedConfirmedAt DateTime?
+
+  // Workflow — Nachbesprechung & Beurteilungsgespräch
+  postReviewAt               DateTime? // BRL Nr. 9.1 — Nachbesprechung (zeitnah)
+  postReviewNotes            String?
+  beurteilungsgespraechAt    DateTime? // BRL Nr. 10.1 — Beurteilungsgespräch (zwingend vor Abfassung)
+  beurteilungsgespraechNotes String?
+
+  // Workflow — Bekanntgabe + Gegenäußerung (§ 92 Abs. 1 Satz 6 LBG NRW)
+  employeeAckToken         String?   @unique
+  employeeAckExpiresAt     DateTime?
+  releasedToEmployeeAt     DateTime? // Wann hat HR den Bekanntgabe-Link generiert
+  acknowledgedByEmployeeAt DateTime?
+  acknowledgedByEmployeeIp String? // IP für Beweisbarkeit
+  rebuttalText             String? // Gegenäußerung der Lehrkraft
+  rebuttalAt               DateTime?
+
+  // Workflow — Archivierung (BRL Nr. 14 + § 92 LBG NRW)
+  // Final in Personalakte aufgenommen — Schritt 9 (COMPLETED).
+  // Erst nach acknowledgedByEmployeeAt erlaubt.
+  archivedAt   DateTime?
+  archivedById String?
+
+  // Public Verify (Phase 6 — Audit-Page für Bezirksregierung)
+  verifyToken String? @unique // separate UUID, nie identisch mit token
 
   // Reminder
-  lastReminderAt      DateTime?
-  reminderCount       Int                 @default(0)
+  lastReminderAt DateTime?
+  reminderCount  Int       @default(0)
 
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([processId, assessmentNumber, assessmentType])
   @@index([processId])
@@ -1515,21 +1553,95 @@ model CivilServiceAssessment {
 }
 
 // =============================================
+// Beurteilungs-Vorlagen (konfigurierbar wie ZeugnisBewertungTemplate)
+//
+// Pro CREDO-Mandant kann ein Override angelegt werden (organizationId).
+// Wenn organizationId == null → globaler Default für alle Schulen.
+// Genau ein Eintrag pro Scope sollte isDefault: true tragen.
+//
+// scaleType:
+//   - "BRL_1_5"        → 5-Punkte-Skala BRL Nr. 7.3 (5 = Übertrifft besonders)
+//   - "SCHULNOTEN_1_6" → klassische Schulnoten (1 = sehr gut)
+//
+// scaleLabels: JSON mit den Labels pro Punkt, z.B.
+//   {"5":"Übertrifft die Anforderungen in besonderem Maße", "4":"...", ...}
+//
+// legalReference (pro Kategorie): freier Verweis wie "BRL Nr. 6.1 Merkmal 1".
+// =============================================
+model BeurteilungTemplate {
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  scaleType      String // "BRL_1_5" | "SCHULNOTEN_1_6"
+  scaleLabels    Json // {"5":"...", "4":"...", ...}
+  organizationId String? // null = global, sonst Mandanten-Override
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  isActive       Boolean       @default(true)
+  isDefault      Boolean       @default(false)
+  version        Int           @default(1)
+
+  categories BeurteilungTemplateCategory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([isActive])
+  @@map("beurteilung_templates")
+}
+
+model BeurteilungTemplateCategory {
+  id         String              @id @default(uuid())
+  templateId String
+  template   BeurteilungTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  name           String
+  description    String?
+  weight         Float   @default(1.0)
+  orderIndex     Int     @default(0)
+  isMandatory    Boolean @default(false) // BRL-Pflichtmerkmal?
+  legalReference String? // z.B. "BRL Nr. 6.1 Merkmal 1"
+
+  criteria BeurteilungTemplateCriterion[]
+
+  createdAt DateTime @default(now())
+
+  @@index([templateId])
+  @@map("beurteilung_template_categories")
+}
+
+model BeurteilungTemplateCriterion {
+  id         String                      @id @default(uuid())
+  categoryId String
+  category   BeurteilungTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  weight      Float   @default(1.0)
+  orderIndex  Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([categoryId])
+  @@map("beurteilung_template_criteria")
+}
+
+// =============================================
 // Beiratsentscheidungen
 // =============================================
 model CivilServiceBoardDecision {
-  id                String              @id @default(uuid())
-  processId         String
-  process           CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+  id        String              @id @default(uuid())
+  processId String
+  process   CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
 
-  decisionType      String              // "PROBE" oder "LIFETIME"
-  result            BoardDecisionResult
-  decisionDate      DateTime
-  notes             String?
-  protocolUploadId  String?             // Verweis auf Dokument
+  decisionType     String // "PROBE" oder "LIFETIME"
+  result           BoardDecisionResult
+  decisionDate     DateTime
+  notes            String?
+  protocolUploadId String? // Verweis auf Dokument
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([processId])
   @@map("civil_service_board_decisions")
@@ -1539,32 +1651,32 @@ model CivilServiceBoardDecision {
 // Dokumente (33+ Dokumenttypen)
 // =============================================
 model CivilServiceDocument {
-  id                String              @id @default(uuid())
-  processId         String
-  process           CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+  id        String              @id @default(uuid())
+  processId String
+  process   CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
 
-  documentType      String              // "AMTSARZT", "VERTRAG_PROBE", "BR_GENEHMIGUNG", etc.
-  documentName      String              // Anzeigename
-  step              String?             // Zuordnung zum Schritt (z.B. "6.A", "6.C")
+  documentType String // "AMTSARZT", "VERTRAG_PROBE", "BR_GENEHMIGUNG", etc.
+  documentName String // Anzeigename
+  step         String? // Zuordnung zum Schritt (z.B. "6.A", "6.C")
 
   // Datei
-  fileName          String?
-  filePath          String?
-  fileSize          Int?
-  mimeType          String?
+  fileName String?
+  filePath String?
+  fileSize Int?
+  mimeType String?
 
   // Status
-  status            String              @default("PENDING") // PENDING, UPLOADED, APPROVED, EXPIRED, GENERATED
-  uploadedAt        DateTime?
-  approvedAt        DateTime?
-  expiresAt         DateTime?           // z.B. Amtsarzt: 3 Monate Gültigkeit
+  status     String    @default("PENDING") // PENDING, UPLOADED, APPROVED, EXPIRED, GENERATED
+  uploadedAt DateTime?
+  approvedAt DateTime?
+  expiresAt  DateTime? // z.B. Amtsarzt: 3 Monate Gültigkeit
 
   // Auto-Generierung
-  isGenerated       Boolean             @default(false) // Vom System generiert?
-  generatedAt       DateTime?
+  isGenerated Boolean   @default(false) // Vom System generiert?
+  generatedAt DateTime?
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([processId])
   @@index([documentType])
@@ -1575,38 +1687,38 @@ model CivilServiceDocument {
 // Checkliste (40+ Aufgaben, phasenweise)
 // =============================================
 model CivilServiceChecklistItem {
-  id                String              @id @default(uuid())
-  processId         String
-  process           CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+  id        String              @id @default(uuid())
+  processId String
+  process   CivilServiceProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
 
-  step              String              // "1", "2", "3", ..., "6.A.1", "6.C.4", "7.3", etc.
-  phase             String              // "I", "II_A", "II_B", ..., "III", "IV"
-  category          String              // "Antrag", "Amtsarzt", "Vertrag", etc.
-  title             String
-  description       String?
+  step        String // "1", "2", "3", ..., "6.A.1", "6.C.4", "7.3", etc.
+  phase       String // "I", "II_A", "II_B", ..., "III", "IV"
+  category    String // "Antrag", "Amtsarzt", "Vertrag", etc.
+  title       String
+  description String?
 
   // Zuständigkeit
-  assignee          String              // "HR", "SL", "LK", "EXTERN", "BEIRAT"
-  assigneeName      String?             // Konkreter Name falls bekannt
+  assignee     String // "HR", "SL", "LK", "EXTERN", "BEIRAT"
+  assigneeName String? // Konkreter Name falls bekannt
 
   // Status
-  isCompleted       Boolean             @default(false)
-  completedAt       DateTime?
-  completedById     String?
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  completedById String?
 
   // Fristen
-  dueDate           DateTime?
-  isGatekeeper      Boolean             @default(false) // Blockiert nächsten Schritt?
-  isOverdue         Boolean             @default(false)
+  dueDate      DateTime?
+  isGatekeeper Boolean   @default(false) // Blockiert nächsten Schritt?
+  isOverdue    Boolean   @default(false)
 
   // Verknüpfung zu Dokument
-  linkedDocumentType String?            // z.B. "AMTSARZT" — wenn Dokument hochgeladen, Item automatisch erledigt
+  linkedDocumentType String? // z.B. "AMTSARZT" — wenn Dokument hochgeladen, Item automatisch erledigt
 
-  orderIndex        Int                 @default(0)
-  notes             String?
+  orderIndex Int     @default(0)
+  notes      String?
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([processId])
   @@index([phase])
