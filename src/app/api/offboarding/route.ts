@@ -202,6 +202,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Entlassungsschutz-Cross-Check: § 18 BEEG
+    // Pruefen ob aktive/genehmigte Elternzeit vorliegt — Override mit confirmElternzeit Flag.
+    const aktiveElternzeit = await prisma.elternzeitProzess.findFirst({
+      where: {
+        employeeEmail,
+        status: {
+          in: [
+            "ANTRAG_VORL_EINGEREICHT",
+            "VORLAEUFIG_GENEHMIGT",
+            "ANTRAG_ENDG_EINGEREICHT",
+            "GENEHMIGT",
+            "AKTIV",
+            "RUECKKEHR_GEPLANT",
+          ],
+        },
+      },
+      select: { id: true, displayId: true, status: true },
+    });
+    const confirmElternzeit =
+      typeof body === "object" && body !== null && "confirmElternzeit" in body
+        ? Boolean((body as Record<string, unknown>).confirmElternzeit)
+        : false;
+    if (aktiveElternzeit && !confirmElternzeit) {
+      return NextResponse.json(
+        {
+          error:
+            `Achtung: ${employeeFirstName} ${employeeLastName} hat eine aktive/genehmigte Elternzeit ` +
+            `(${aktiveElternzeit.displayId}). Eine Kuendigung waehrend der Elternzeit ist nur mit ` +
+            `Zustimmung der zustaendigen Behoerde zulaessig (§ 18 BEEG). Bitte zur Bestaetigung ` +
+            `mit confirmElternzeit=true erneut absenden.`,
+          warning: {
+            type: "ELTERNZEIT_AKTIV",
+            elternzeitId: aktiveElternzeit.id,
+            elternzeitDisplayId: aktiveElternzeit.displayId,
+            elternzeitStatus: aktiveElternzeit.status,
+          },
+        },
+        { status: 409 }
+      );
+    }
+
     const parsedLastWorkingDay = new Date(lastWorkingDay);
 
     // displayId generieren: "OFF-{year}-{orgShortName}-{sequential}"

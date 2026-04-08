@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 
 interface User {
@@ -243,6 +244,12 @@ export function MandantenContent({ user }: { user: User }) {
                           >
                             Bearbeiten
                           </button>
+                          <Link
+                            href={`/mandanten/${org.id}/elternzeit-config`}
+                            className="rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                          >
+                            Elternzeit-Konfig
+                          </Link>
                           <button
                             onClick={() => handleToggleActive(org)}
                             className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${

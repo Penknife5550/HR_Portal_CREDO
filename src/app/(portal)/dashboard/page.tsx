@@ -5,11 +5,14 @@ import { PortalHeader } from "@/components/portal-header";
 import { DashboardContent } from "./dashboard-content";
 import { OffboardingDashboardContent } from "./offboarding-dashboard-new";
 import { CivilServiceDashboardContent } from "./civil-service-dashboard";
+import { MutterschutzDashboardContent } from "./mutterschutz-dashboard";
+import { ElternzeitDashboardContent } from "./elternzeit-dashboard";
 
 /**
  * HR-Dashboard (Server Component)
  * Prueft die Session und leitet zum Login um wenn nicht angemeldet.
- * Unterstuetzt Tab-Umschaltung zwischen Onboarding und Offboarding via Query Parameter.
+ * Unterstuetzt Tab-Umschaltung zwischen Onboarding, Offboarding, Verbeamtung,
+ * Mutterschutz und Elternzeit via Query Parameter.
  */
 export default async function DashboardPage({
   searchParams,
@@ -28,7 +31,11 @@ export default async function DashboardPage({
       ? "offboarding"
       : tab === "civil-service"
         ? "civil-service"
-        : "onboarding";
+        : tab === "mutterschutz"
+          ? "mutterschutz"
+          : tab === "elternzeit"
+            ? "elternzeit"
+            : "onboarding";
 
   return (
     <div>
@@ -69,6 +76,26 @@ export default async function DashboardPage({
             >
               Verbeamtung
             </Link>
+            <Link
+              href="/dashboard?tab=mutterschutz"
+              className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === "mutterschutz"
+                  ? "border-credo-gruen text-credo-gruen"
+                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+              }`}
+            >
+              Mutterschutz
+            </Link>
+            <Link
+              href="/dashboard?tab=elternzeit"
+              className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === "elternzeit"
+                  ? "border-credo-gruen text-credo-gruen"
+                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+              }`}
+            >
+              Elternzeit
+            </Link>
           </nav>
         </div>
       </div>
@@ -78,8 +105,12 @@ export default async function DashboardPage({
         <DashboardContent user={session} />
       ) : activeTab === "offboarding" ? (
         <OffboardingDashboardContent user={session} />
-      ) : (
+      ) : activeTab === "civil-service" ? (
         <CivilServiceDashboardContent user={session} />
+      ) : activeTab === "mutterschutz" ? (
+        <MutterschutzDashboardContent user={session} />
+      ) : (
+        <ElternzeitDashboardContent user={session} />
       )}
     </div>
   );

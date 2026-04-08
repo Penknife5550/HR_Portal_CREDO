@@ -16,12 +16,37 @@ datasource db {
 // Einrichtung / Mandant (16 Mandanten bei CREDO)
 // =============================================
 model Organization {
-  id                    String                @id @default(uuid())
-  mandantNumber         String                @unique // z.B. "712", "737", "742"
-  name                  String // z.B. "Gymnasium", "Kita Minden"
-  shortName             String? // z.B. "GYM", "GSM"
-  type                  OrganizationType
-  isActive              Boolean               @default(true)
+  id            String           @id @default(uuid())
+  mandantNumber String           @unique // z.B. "712", "737", "742"
+  name          String // z.B. "Gymnasium", "Kita Minden"
+  shortName     String? // z.B. "GYM", "GSM"
+  type          OrganizationType
+  isActive      Boolean          @default(true)
+
+  // =============================================
+  // Elternzeit / Mutterschutz — Mandanten-Konfiguration (Phase 2)
+  // Pro Mandant konfigurierbar fuer Briefvorlagen und Standard-Workflows.
+  // =============================================
+  // Geschaeftsfuehrung / Unterschrift fuer endg. Genehmigungen
+  ezGfFirstName     String? // Vorname Geschaeftsfuehrer/in
+  ezGfLastName      String? // Nachname Geschaeftsfuehrer/in
+  ezGfTitle         String? // z.B. "Geschaeftsfuehrer", "Schulleiter/in"
+  ezSignaturePath   String? // optional: Pfad zu Unterschrifts-PNG (uploads/signatures/...)
+
+  // Standard-Einrichtungsleiter (Phase-2-Workflow)
+  ezDefaultLeiterFirstName String?
+  ezDefaultLeiterLastName  String?
+  ezDefaultLeiterEmail     String?
+
+  // Bezirksregierung Detmold Kontakt (PSI/Beamte)
+  ezBrDetmoldName        String?
+  ezBrDetmoldEmail       String?
+  ezBrDetmoldPhone       String?
+  ezBrDetmoldAktenPrefix String? // optional: Aktenzeichen-Prefix
+
+  // Token-Konfiguration
+  ezTokenValidityDays Int @default(30)
+
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
   onboardings           OnboardingProcess[]
@@ -31,6 +56,8 @@ model Organization {
   userAssignments       UserOrgAssignment[]
   civilServiceProcesses CivilServiceProcess[]
   beurteilungTemplates  BeurteilungTemplate[]
+  mutterschutzProzesse  MutterschutzProzess[]
+  elternzeitProzesse    ElternzeitProzess[]
 
   @@map("organizations")
 }
@@ -64,6 +91,8 @@ model Employee {
   onboardings           OnboardingProcess[]   @relation("EmployeeOnboardings")
   offboardings          OffboardingProcess[]  @relation("EmployeeOffboardings")
   civilServiceProcesses CivilServiceProcess[] @relation("EmployeeCivilService")
+  mutterschutzProzesse  MutterschutzProzess[] @relation("EmployeeMutterschutz")
+  elternzeitProzesse    ElternzeitProzess[]   @relation("EmployeeElternzeit")
 
   @@index([personalNumber])
   @@index([lastName, firstName])
@@ -522,6 +551,10 @@ model User {
   // Verbeamtung
   initiatedCivilService CivilServiceProcess[] @relation("CivilServiceInitiator")
 
+  // Mutterschutz & Elternzeit
+  initiatedMutterschutz MutterschutzProzess[] @relation("MutterschutzInitiator")
+  initiatedElternzeit   ElternzeitProzess[]   @relation("ElternzeitInitiator")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -549,7 +582,11 @@ model AuditLog {
   offboarding    OffboardingProcess?  @relation("OffboardingAuditLogs", fields: [offboardingId], references: [id])
   civilServiceId String?
   civilService   CivilServiceProcess? @relation("CivilServiceAuditLogs", fields: [civilServiceId], references: [id])
-  processType    String? // "ONBOARDING", "OFFBOARDING" oder "CIVIL_SERVICE"
+  mutterschutzId String?
+  mutterschutz   MutterschutzProzess? @relation("MutterschutzAuditLogs", fields: [mutterschutzId], references: [id])
+  elternzeitId   String?
+  elternzeit     ElternzeitProzess?   @relation("ElternzeitAuditLogs", fields: [elternzeitId], references: [id])
+  processType    String? // "ONBOARDING", "OFFBOARDING", "CIVIL_SERVICE", "MUTTERSCHUTZ", "ELTERNZEIT"
 
   action    String // z.B. "ONBOARDING_CREATED", "QUESTIONNAIRE_SUBMITTED"
   details   Json? // Zusaetzliche Infos
@@ -560,6 +597,8 @@ model AuditLog {
   @@index([onboardingId])
   @@index([offboardingId])
   @@index([civilServiceId])
+  @@index([mutterschutzId])
+  @@index([elternzeitId])
   @@index([createdAt])
   @@map("audit_logs")
 }
@@ -1723,4 +1762,463 @@ model CivilServiceChecklistItem {
   @@index([processId])
   @@index([phase])
   @@map("civil_service_checklist_items")
+}
+
+// =============================================
+// MUTTERSCHUTZ & ELTERNZEIT — Phase 1 MVP
+// Rechtsgrundlagen: BEEG, MuSchG, FrUrlV NRW, TV-L
+// =============================================
+
+// =============================================
+// Mutterschutz-Vorgang (eigenständiger Prozess, MuSchG)
+// Wird i. d. R. mit ElternzeitProzess verknuepft, kann aber alleinstehen.
+// Vaeter haben KEINEN Mutterschutz.
+// =============================================
+model MutterschutzProzess {
+  id               String @id @default(uuid())
+  displayId        String @unique // z.B. "MU-2026-GYM-001"
+  sequentialNumber Int
+
+  // Verknuepfungen
+  employeeId     String?
+  employee       Employee?    @relation("EmployeeMutterschutz", fields: [employeeId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  initiatedById  String
+  initiatedBy    User         @relation("MutterschutzInitiator", fields: [initiatedById], references: [id])
+
+  // Mitarbeiterin-Daten (inline, wie bei CivilService)
+  employeeFirstName  String
+  employeeLastName   String
+  employeeEmail      String
+  employeePersonalNr String?
+
+  // Schwangerschaftsdaten
+  voraussGeburt      DateTime
+  tatsGeburt         DateTime?
+  mutterschutzBeginn DateTime // berechnet: voraussGeburt - 42 Tage (6 Wochen)
+  mutterschutzEnde   DateTime? // berechnet: tatsGeburt + 56 oder 84 Tage
+  fruehgeburt        Boolean   @default(false)
+  mehrlinge          Boolean   @default(false)
+
+  // BAD (Betriebsaerztlicher Dienst) — nur Kita / Schulen mit Kinderkontakt
+  einrichtungstyp       MutterschutzEinrichtungstyp @default(SCHULE)
+  badErforderlich       Boolean                     @default(false)
+  badBeauftragtAm       DateTime?
+  badAbgeschlossenAm    DateTime?
+  badErgebnis           String? // Freitext
+  beschaeftigungsverbot Boolean                     @default(false)
+  alternativeTaetigkeit String?
+
+  // Lohnbescheinigung
+  lohnbeschKkErstelltAm DateTime?
+
+  // Status
+  status MutterschutzStatus @default(GEMELDET)
+
+  // Verknuepfte Elternzeit-Vorgaenge (1 Mutterschutz → N Elternzeiten)
+  elternzeitProzesse ElternzeitProzess[] @relation("MutterschutzZuElternzeit")
+
+  // Sub-Modelle
+  dokumente      MutterschutzDokument[]
+  notizen        MutterschutzNotiz[]
+  checklistItems MutterschutzChecklistItem[]
+  auditLogs      AuditLog[]                  @relation("MutterschutzAuditLogs")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([organizationId])
+  @@index([employeeId])
+  @@map("mutterschutz_prozesse")
+}
+
+enum MutterschutzStatus {
+  GEMELDET
+  BAD_BEAUFTRAGT
+  BAD_ABGESCHLOSSEN
+  AKTIV
+  BEENDET
+}
+
+enum MutterschutzEinrichtungstyp {
+  SCHULE // ohne BAD-Pflicht (außer expliziter Kinderkontakt)
+  KITA // immer BAD-Pflicht
+  VERWALTUNG // ohne BAD
+}
+
+model MutterschutzDokument {
+  id             String                  @id @default(uuid())
+  mutterschutzId String
+  mutterschutz   MutterschutzProzess     @relation(fields: [mutterschutzId], references: [id], onDelete: Cascade)
+  dokumentTyp    MutterschutzDokumentTyp
+  dateiname      String
+  dateipfad      String
+  mimeType       String?
+  fileSize       Int?
+  generiert      Boolean                 @default(false) // true = vom System erzeugt
+  hochgeladenAm  DateTime                @default(now())
+  hochgeladenVon String?
+
+  @@index([mutterschutzId])
+  @@map("mutterschutz_dokumente")
+}
+
+enum MutterschutzDokumentTyp {
+  BAD_AUFFORDERUNG
+  BAD_BESCHEINIGUNG
+  GEFAEHRDUNGSBEURTEILUNG
+  LOHNBESCHEINIGUNG_KK
+  AERZTLICHES_ZEUGNIS
+  SONSTIGES
+}
+
+model MutterschutzNotiz {
+  id             String              @id @default(uuid())
+  mutterschutzId String
+  mutterschutz   MutterschutzProzess @relation(fields: [mutterschutzId], references: [id], onDelete: Cascade)
+  text           String
+  erstelltVon    String
+  createdAt      DateTime            @default(now())
+
+  @@index([mutterschutzId])
+  @@map("mutterschutz_notizen")
+}
+
+model MutterschutzChecklistItem {
+  id             String              @id @default(uuid())
+  mutterschutzId String
+  mutterschutz   MutterschutzProzess @relation(fields: [mutterschutzId], references: [id], onDelete: Cascade)
+  titel          String
+  beschreibung   String?
+  logaHinweis    String? // ausfuehrlicher LOGA-Klickpfad
+  erledigtAm     DateTime?
+  erledigtVon    String?
+  personalgruppe Personalgruppe? // null = alle Gruppen
+  orderIndex     Int                 @default(0)
+
+  @@index([mutterschutzId])
+  @@map("mutterschutz_checkliste")
+}
+
+// =============================================
+// Elternzeit-Vorgang (eigenstaendig, BEEG / FrUrlV NRW)
+// =============================================
+model ElternzeitProzess {
+  id               String @id @default(uuid())
+  displayId        String @unique // z.B. "EZ-2026-GYM-001"
+  sequentialNumber Int
+
+  // Verknuepfungen
+  employeeId     String?
+  employee       Employee?    @relation("EmployeeElternzeit", fields: [employeeId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  initiatedById  String
+  initiatedBy    User         @relation("ElternzeitInitiator", fields: [initiatedById], references: [id])
+
+  // Mitarbeiter-Daten (inline)
+  employeeFirstName  String
+  employeeLastName   String
+  employeeEmail      String
+  employeePersonalNr String?
+
+  // Verknuepfung zu Mutterschutz (optional, nur bei Mutter)
+  mutterschutzId String?
+  mutterschutz   MutterschutzProzess? @relation("MutterschutzZuElternzeit", fields: [mutterschutzId], references: [id])
+
+  // Personalgruppe & Geschlecht (bestimmt Workflow + Briefvorlagen)
+  personalgruppe Personalgruppe
+  geschlecht     Geschlecht
+  kvTyp          KVTyp
+
+  // Kind-Daten
+  kindName           String?
+  kindGeburtsdatum   DateTime?
+  kindNummer         Int // 1, 2, 3 ... (HR waehlt manuell)
+  kindGeschlecht     KindGeschlecht?
+  geburtsurkunde     Boolean         @default(false)
+  geburtsurkundePfad String?
+  fruehgeburt        Boolean         @default(false)
+  mehrlinge          Boolean         @default(false)
+
+  // Status
+  status ElternzeitStatus @default(ANGELEGT)
+
+  // Magic-Link Tokens (Phase 1: nur Token 1 aktiv genutzt)
+  antragTokenVorl       String?   @unique
+  antragTokenVorlExpiry DateTime?
+  antragTokenVorlUsedAt DateTime? // Single-Use Schutz
+  antragTokenEndg       String?   @unique
+  antragTokenEndgExpiry DateTime?
+  antragTokenEndgUsedAt DateTime?
+
+  // Antragsdaten
+  antragVorlAm   DateTime?
+  antragEndgAm   DateTime?
+  genehmigungAm  DateTime?
+  genehmigungVon String?
+  ablehnungAm    DateTime?
+  ablehnungGrund String?
+
+  // Einrichtungsleiter (dynamisch, wie Verbeamtung)
+  einrichtungsleiterName  String?
+  einrichtungsleiterEmail String?
+
+  // Einrichtungsleiter-Magic-Link (Phase 2 — Genehmigung via Token)
+  leiterTokenEndg        String?   @unique
+  leiterTokenEndgExpiry  DateTime?
+  leiterTokenEndgUsedAt  DateTime?
+  leiterGenehmigungAm    DateTime?
+  leiterAblehnungGrund   String?
+
+  // Bezirksregierung Detmold Tracking (Phase 2 — hier nur Felder)
+  brSchreibenGeneriertAm DateTime?
+  brSchreibenVersandtAm  DateTime?
+  brAktenzeichen         String?
+  brGenehmigungEingegAm  DateTime?
+
+  // Mitarbeiter-Adresse (aus Formular, fuer Briefkopf)
+  adresseStrasse String?
+  adressePlz     String?
+  adresseOrt     String?
+
+  // Dienst-/Tarifbezeichnung (aus Formular)
+  dienstbezeichnung String?
+  schulnummer       String?
+
+  // Gleichzeitige EZ beider Eltern
+  gleichzeitigeEZ   Boolean @default(false)
+  betreuungsabsicht String? // Freitext-Erklaerung
+
+  // Sub-Modelle
+  abschnitte     ElternzeitAbschnitt[]
+  dokumente      ElternzeitDokument[]
+  checklistItems ElternzeitChecklistItem[]
+  notizen        ElternzeitNotiz[]
+  fristen        ElternzeitFrist[]
+  auditLogs      AuditLog[]                @relation("ElternzeitAuditLogs")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([organizationId])
+  @@index([employeeId])
+  @@index([mutterschutzId])
+  @@map("elternzeit_prozesse")
+}
+
+enum ElternzeitStatus {
+  ANGELEGT
+  ANTRAG_VORL_VERSANDT
+  ANTRAG_VORL_EINGEREICHT
+  VORLAEUFIG_GENEHMIGT
+  VORLAEUFIG_ABGELEHNT
+  ANTRAG_ENDG_VERSANDT
+  ANTRAG_ENDG_EINGEREICHT
+  GENEHMIGT
+  AKTIV
+  UNTERBROCHEN
+  RUECKKEHR_GEPLANT
+  BEENDET
+  ABGELEHNT
+}
+
+enum Personalgruppe {
+  TARIF_TV_L
+  BEAMTER
+  PLANSTELLENINHABER
+}
+
+enum Geschlecht {
+  MUTTER
+  VATER
+}
+
+enum KVTyp {
+  GKV_PFLICHT
+  GKV_FREIWILLIG
+  PKV
+}
+
+enum KindGeschlecht {
+  TOCHTER
+  SOHN
+}
+
+model ElternzeitAbschnitt {
+  id           String            @id @default(uuid())
+  elternzeitId String
+  elternzeit   ElternzeitProzess @relation(fields: [elternzeitId], references: [id], onDelete: Cascade)
+
+  abschnittNr Int // 1, 2 oder 3
+  von         DateTime
+  bis         DateTime
+
+  // Uebertragung auf 3.–8. Lebensjahr (§ 15 Abs. 2 BEEG)
+  uebertragung3bis8 Boolean  @default(false)
+  agZustimmung      Boolean? // null = noch offen, true = erteilt, false = abgelehnt
+
+  // Teilzeit waehrend EZ
+  teilzeit        Boolean @default(false)
+  teilzeitStunden Float? // max. 32h
+
+  // Feriensperrfrist (§ 11 FrUrlV NRW)
+  ferienSperrfristWarnung Boolean @default(false)
+  ferienBegruendung       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([elternzeitId])
+  @@map("elternzeit_abschnitte")
+}
+
+model ElternzeitDokument {
+  id           String                @id @default(uuid())
+  elternzeitId String
+  elternzeit   ElternzeitProzess     @relation(fields: [elternzeitId], references: [id], onDelete: Cascade)
+  dokumentTyp  ElternzeitDokumentTyp
+  dateiname    String
+  dateipfad    String
+  mimeType     String?
+  fileSize     Int?
+  generiert    Boolean               @default(false) // true = vom System erzeugt
+
+  hochgeladenAm  DateTime @default(now())
+  hochgeladenVon String?
+
+  @@index([elternzeitId])
+  @@map("elternzeit_dokumente")
+}
+
+enum ElternzeitDokumentTyp {
+  ANTRAG_VORLAEUFIG
+  GENEHMIGUNG_VORLAEUFIG
+  ANTRAG_ENDGUELTIG
+  GEBURTSURKUNDE
+  GENEHMIGUNG_ENDGUELTIG
+  BR_DETMOLD_SCHREIBEN
+  VBL_INFORMATIONSBRIEF
+  AG_BESCHEINIGUNG_ELTERNGELD
+  BEIHILFE_AENDERUNGSFORMULAR
+  UNTERBRECHUNGSGENEHMIGUNG
+  LOHNBESCHEINIGUNG_KK
+  ABLEHNUNGSSCHREIBEN
+  SONSTIGES
+}
+
+model ElternzeitChecklistItem {
+  id           String            @id @default(uuid())
+  elternzeitId String
+  elternzeit   ElternzeitProzess @relation(fields: [elternzeitId], references: [id], onDelete: Cascade)
+
+  titel          String
+  beschreibung   String?
+  logaHinweis    String? // ausfuehrlicher LOGA-Klickpfad
+  erledigtAm     DateTime?
+  erledigtVon    String?
+  personalgruppe Personalgruppe? // null = alle Gruppen
+  phase          ElternzeitPhase
+  orderIndex     Int             @default(0)
+
+  @@index([elternzeitId])
+  @@map("elternzeit_checkliste")
+}
+
+enum ElternzeitPhase {
+  ANTRAG
+  GENEHMIGUNG
+  EZ_AKTIV
+  RUECKKEHR
+}
+
+model ElternzeitNotiz {
+  id           String            @id @default(uuid())
+  elternzeitId String
+  elternzeit   ElternzeitProzess @relation(fields: [elternzeitId], references: [id], onDelete: Cascade)
+  text         String
+  erstelltVon  String
+  createdAt    DateTime          @default(now())
+
+  @@index([elternzeitId])
+  @@map("elternzeit_notizen")
+}
+
+// =============================================
+// NRW Schulferienkalender (pflegbar in Einstellungen, Phase 2)
+// In Phase 1 nur Schema + Seed-Daten, kein UI
+// =============================================
+model SchulferienNRW {
+  id          String    @id @default(uuid())
+  bezeichnung String // "Sommerferien 2026"
+  von         DateTime
+  bis         DateTime
+  ferienTyp   FerienTyp
+  schuljahr   String // "2025/2026"
+  aktiv       Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([von, bis])
+  @@map("schulferien_nrw")
+}
+
+enum FerienTyp {
+  SOMMER // Sperrzone: 6 Wochen vor/nach
+  SONSTIGE // Sperrzone: 2 Wochen vor/nach
+}
+
+// =============================================
+// Fristen-System Elternzeit (Phase 2)
+// Pro EZ-Vorgang werden bei Anlage / Zeitabschnitts-Erfassung
+// alle relevanten Fristen automatisch generiert. Ein Cron-Job
+// prueft taeglich Faelligkeit und triggert Webhooks.
+// =============================================
+model ElternzeitFrist {
+  id           String            @id @default(uuid())
+  elternzeitId String
+  elternzeit   ElternzeitProzess @relation(fields: [elternzeitId], references: [id], onDelete: Cascade)
+
+  fristTyp    ElternzeitFristTyp
+  bezeichnung String // anzeigbarer Titel
+  beschreibung String? // optionaler Hinweistext (z.B. Paragraf)
+  faelligAm   DateTime // Stichtag
+
+  // Erledigung
+  erledigtAm  DateTime?
+  erledigtVon String?
+  erledigung  String? // Freitext (z.B. "BR-Genehmigung eingegangen am ...")
+
+  // Cron-Tracking — verhindert Mehrfach-Webhooks pro Tag/Stufe
+  letzteSeverity     ElternzeitFristSeverity?
+  letzteWarnungAm    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([elternzeitId])
+  @@index([faelligAm])
+  @@index([erledigtAm])
+  @@map("elternzeit_fristen")
+}
+
+enum ElternzeitFristTyp {
+  ANTRAGSFRIST_VORL // 7 Wochen vor Beginn (§ 16 Abs. 1 BEEG)
+  TOKEN_VORL_EXPIRY // Magic Link Token 1 laeuft ab
+  TOKEN_ENDG_EXPIRY // Magic Link Token 2 laeuft ab
+  GEBURTSURKUNDE_NACHREICHUNG // 4 Wochen nach Geburt
+  BR_GENEHMIGUNG // 8 Wochen nach BR-Schreiben (PSI/Beamte)
+  BEIHILFE_AENDERUNG // 1 Monat nach EZ-Beginn (Beamte/PSI)
+  RUECKKEHR_GESPRAECH // 6 Wochen vor Ende
+  TEILZEIT_ANTRAG_PRUEFUNG // 4 Wochen Antwortfrist AG
+  SONSTIGE
+}
+
+enum ElternzeitFristSeverity {
+  INFO // mehr als 14 Tage bis Faelligkeit
+  WARNING // 14-7 Tage
+  URGENT // 6-0 Tage
+  OVERDUE // ueberfaellig
 }
