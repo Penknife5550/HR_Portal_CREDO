@@ -25,8 +25,10 @@ export async function middleware(request: NextRequest) {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=(), payment=()"
   );
-  // HSTS nur bei echtem HTTPS-Betrieb (nicht auf localhost HTTP)
-  if (!process.env.APP_URL?.startsWith("http://")) {
+  // HSTS nur in Production und nur wenn APP_URL HTTPS ist.
+  // In Dev (oder wenn APP_URL nicht gesetzt) NIEMALS senden, sonst pinnt
+  // der Browser localhost auf HTTPS und die Login-Seite ist nicht erreichbar.
+  if (!isDev && process.env.APP_URL?.startsWith("https://")) {
     response.headers.set(
       "Strict-Transport-Security",
       "max-age=31536000; includeSubDomains"
