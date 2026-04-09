@@ -107,12 +107,16 @@ interface ElternzeitData {
 
 const STATUS_LABELS: Record<string, string> = {
   ANGELEGT: "Angelegt",
-  ANTRAG_VORL_VERSANDT: "Antrag versandt",
-  ANTRAG_VORL_EINGEREICHT: "Antrag eingereicht",
+  ANTRAG_VORL_VERSANDT: "Vorl. Antrag versandt",
+  ANTRAG_VORL_EINGEREICHT: "Vorl. Antrag eingereicht",
   VORLAEUFIG_GENEHMIGT: "Vorlaeufig genehmigt",
   VORLAEUFIG_ABGELEHNT: "Vorlaeufig abgelehnt",
+  ANTRAG_ENDG_VERSANDT: "Endg. Antrag versandt",
+  ANTRAG_ENDG_EINGEREICHT: "Endg. Antrag eingereicht",
   GENEHMIGT: "Genehmigt",
   AKTIV: "Aktiv",
+  UNTERBROCHEN: "Unterbrochen",
+  RUECKKEHR_GEPLANT: "Rueckkehr geplant",
   BEENDET: "Beendet",
   ABGELEHNT: "Abgelehnt",
 };

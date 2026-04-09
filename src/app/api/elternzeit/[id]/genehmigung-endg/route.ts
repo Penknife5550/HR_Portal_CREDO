@@ -13,7 +13,7 @@ import { EXPORT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { generateEndgueltigeGenehmigungPdf } from "@/lib/elternzeit-pdf";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -73,6 +73,11 @@ export async function GET(
       );
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const pdfBuffer = await generateEndgueltigeGenehmigungPdf({
       firstName: ez.employeeFirstName,
       lastName: ez.employeeLastName,
@@ -116,6 +121,7 @@ export async function GET(
         processType: "ELTERNZEIT",
         action: "GENEHMIGUNG_ENDG_GENERATED",
         details: { displayId: ez.displayId },
+        ipAddress,
       },
     });
 

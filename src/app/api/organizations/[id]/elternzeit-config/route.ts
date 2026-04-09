@@ -134,12 +134,18 @@ export async function PATCH(
       select: SELECT_FIELDS,
     });
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     await prisma.auditLog.create({
       data: {
         userId: session.userId,
         action: "ORGANIZATION_ELTERNZEIT_CONFIG_UPDATED",
         processType: "ORGANIZATION",
         details: { organizationId: id, fields: Object.keys(updateData) },
+        ipAddress,
       },
     }).catch(() => {
       // AuditLog-Fehler nicht weiterwerfen — Config-Speicherung ist kritischer

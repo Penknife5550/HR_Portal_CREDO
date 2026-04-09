@@ -82,6 +82,11 @@ export async function POST(
       );
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const validityDays = ez.organization?.ezTokenValidityDays ?? 30;
     const token = randomUUID();
     const expiresAt = new Date();
@@ -108,10 +113,16 @@ export async function POST(
           expiresAt: expiresAt.toISOString(),
           validityDays,
         },
+        ipAddress,
       },
     });
 
-    await syncElternzeitFristen(id);
+    await syncElternzeitFristen(id).catch((err) =>
+      console.error(
+        `[syncElternzeitFristen] Fehler nach antrag-link-endg ${id}:`,
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
     const magicUrl = `${baseUrl}/elternzeit-antrag-endg/${token}`;

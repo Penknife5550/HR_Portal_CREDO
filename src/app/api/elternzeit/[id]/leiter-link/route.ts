@@ -81,6 +81,11 @@ export async function POST(
       );
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const validityDays = ez.organization?.ezTokenValidityDays ?? 14;
     const token = randomUUID();
     const expiresAt = new Date();
@@ -107,6 +112,7 @@ export async function POST(
           recipientName: parsed.data.recipientName || null,
           expiresAt: expiresAt.toISOString(),
         },
+        ipAddress,
       },
     });
 
@@ -123,7 +129,12 @@ export async function POST(
       organizationName: ez.organization.name,
       magicUrl,
       expiresAt: expiresAt.toISOString(),
-    }).catch(() => undefined);
+    }).catch((err) =>
+      console.error(
+        "[elternzeit-leiter-link-versandt] Webhook-Fehler:",
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     return NextResponse.json({
       data: { token, magicUrl, expiresAt: expiresAt.toISOString() },

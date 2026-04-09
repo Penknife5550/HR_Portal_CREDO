@@ -12,7 +12,7 @@ import { EXPORT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { generateBADAufforderungsbrief } from "@/lib/elternzeit-pdf";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -47,6 +47,11 @@ export async function GET(
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const pdfBuffer = await generateBADAufforderungsbrief({
       firstName: ez.employeeFirstName,
       lastName: ez.employeeLastName,
@@ -69,6 +74,7 @@ export async function GET(
         processType: "ELTERNZEIT",
         action: "BAD_AUFFORDERUNG_GENERATED",
         details: { displayId: ez.displayId },
+        ipAddress,
       },
     });
 

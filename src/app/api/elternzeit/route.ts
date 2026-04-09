@@ -168,6 +168,11 @@ export async function POST(request: NextRequest) {
 
     const checklistTemplate = getElternzeitCheckliste(personalgruppe);
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const created = await prisma.$transaction(async (tx) => {
       const ez = await tx.elternzeitProzess.create({
         data: {
@@ -217,13 +222,19 @@ export async function POST(request: NextRequest) {
             geschlecht,
             kindNummer,
           },
+          ipAddress,
         },
       });
 
       return ez;
     });
 
-    await syncElternzeitFristen(created.id);
+    await syncElternzeitFristen(created.id).catch((err) =>
+      console.error(
+        `[syncElternzeitFristen] Fehler nach Anlage ${created.id}:`,
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     triggerWebhooks("elternzeit-angelegt", {
       elternzeitId: created.id,

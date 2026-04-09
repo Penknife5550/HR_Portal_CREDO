@@ -102,6 +102,11 @@ export async function POST(
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const formData = await request.formData();
     const file = formData.get("file");
     const dokumentTyp = formData.get("dokumentTyp");
@@ -156,6 +161,7 @@ export async function POST(
           processType: "ELTERNZEIT",
           action: "DOCUMENT_UPLOADED",
           details: { dokumentTyp, dateiname: file.name, fileSize: file.size },
+          ipAddress,
         },
       });
     } catch (dbError) {

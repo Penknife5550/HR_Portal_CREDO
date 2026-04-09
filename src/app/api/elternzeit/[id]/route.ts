@@ -107,6 +107,11 @@ export async function PATCH(
         : null;
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const updated = await prisma.elternzeitProzess.update({
       where: { id },
       data,
@@ -124,6 +129,7 @@ export async function PATCH(
         processType: "ELTERNZEIT",
         action: "ELTERNZEIT_UPDATED",
         details: { fields: Object.keys(parsed.data) },
+        ipAddress,
       },
     });
 

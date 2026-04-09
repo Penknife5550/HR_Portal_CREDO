@@ -81,6 +81,11 @@ export async function PATCH(
         : null;
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const updated = await prisma.elternzeitProzess.update({
       where: { id },
       data,
@@ -93,10 +98,16 @@ export async function PATCH(
         processType: "ELTERNZEIT",
         action: "BR_TRACKING_UPDATED",
         details: { fields: Object.keys(data) },
+        ipAddress,
       },
     });
 
-    await syncElternzeitFristen(id);
+    await syncElternzeitFristen(id).catch((err) =>
+      console.error(
+        `[syncElternzeitFristen] Fehler nach br-tracking ${id}:`,
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     if (parsed.data.brGenehmigungEingegAm) {
       triggerWebhooks("elternzeit-br-genehmigung-eingegangen", {
@@ -104,7 +115,12 @@ export async function PATCH(
         displayId: updated.displayId,
         eingegangenAm: parsed.data.brGenehmigungEingegAm,
         aktenzeichen: parsed.data.brAktenzeichen ?? updated.brAktenzeichen,
-      }).catch(() => undefined);
+      }).catch((err) =>
+        console.error(
+          "[elternzeit-br-genehmigung-eingegangen] Webhook-Fehler:",
+          err instanceof Error ? err.message : err,
+        ),
+      );
     }
 
     return NextResponse.json({ data: updated });

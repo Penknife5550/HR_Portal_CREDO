@@ -14,7 +14,7 @@ import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -57,6 +57,11 @@ export async function POST(
       );
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const updated = await prisma.elternzeitProzess.update({
       where: { id },
       data: {
@@ -73,10 +78,16 @@ export async function POST(
         processType: "ELTERNZEIT",
         action: "VORL_GENEHMIGT",
         details: { genehmigungVon: `${session.firstName} ${session.lastName}` },
+        ipAddress,
       },
     });
 
-    await syncElternzeitFristen(id);
+    await syncElternzeitFristen(id).catch((err) =>
+      console.error(
+        `[syncElternzeitFristen] Fehler nach genehmigen-vorl ${id}:`,
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     triggerWebhooks("elternzeit-vorl-genehmigt", {
       elternzeitId: id,

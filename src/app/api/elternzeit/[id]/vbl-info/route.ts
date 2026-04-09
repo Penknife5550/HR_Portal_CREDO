@@ -13,7 +13,7 @@ import { generateVBLInfoBrief } from "@/lib/elternzeit-pdf";
 import { triggerWebhooks } from "@/lib/webhooks";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -61,6 +61,11 @@ export async function GET(
       );
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const pdfBuffer = await generateVBLInfoBrief({
       firstName: ez.employeeFirstName,
       lastName: ez.employeeLastName,
@@ -89,13 +94,19 @@ export async function GET(
         processType: "ELTERNZEIT",
         action: "VBL_INFO_GENERATED",
         details: { displayId: ez.displayId },
+        ipAddress,
       },
     });
 
     triggerWebhooks("elternzeit-vbl-generiert", {
       elternzeitId: id,
       displayId: ez.displayId,
-    }).catch(() => undefined);
+    }).catch((err) =>
+      console.error(
+        "[elternzeit-vbl-generiert] Webhook-Fehler:",
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,

@@ -52,7 +52,12 @@ export async function GET(
     }
 
     // Aktuell halten — Mandanten-bezogene Aenderungen werden hier sichtbar
-    await syncElternzeitFristen(id).catch(() => undefined);
+    await syncElternzeitFristen(id).catch((err) =>
+      console.error(
+        `[syncElternzeitFristen] Fehler beim Lesen der Fristen ${id}:`,
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     const fristen = await prisma.elternzeitFrist.findMany({
       where: { elternzeitId: id },

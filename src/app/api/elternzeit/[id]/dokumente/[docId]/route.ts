@@ -71,7 +71,7 @@ export async function GET(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string; docId: string }> },
 ) {
   try {
@@ -95,6 +95,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Dokument nicht gefunden" }, { status: 404 });
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     // Datei vom Disk loeschen (best effort)
     const uploadsRoot = path.resolve(process.cwd(), "uploads");
     const expectedDir = path.resolve(uploadsRoot, "elternzeit", id);
@@ -114,6 +119,7 @@ export async function DELETE(
         processType: "ELTERNZEIT",
         action: "DOCUMENT_DELETED",
         details: { docId, dokumentTyp: doc.dokumentTyp, dateiname: doc.dateiname },
+        ipAddress,
       },
     });
 

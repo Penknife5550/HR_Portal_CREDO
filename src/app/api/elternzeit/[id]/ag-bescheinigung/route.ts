@@ -87,6 +87,11 @@ export async function POST(
       );
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const pdfBuffer = await generateAGBescheinigungElterngeld({
       firstName: ez.employeeFirstName,
       lastName: ez.employeeLastName,
@@ -119,13 +124,19 @@ export async function POST(
         processType: "ELTERNZEIT",
         action: "AG_BESCHEINIGUNG_GENERATED",
         details: { displayId: ez.displayId, brutto12Monate: data.brutto12Monate },
+        ipAddress,
       },
     });
 
     triggerWebhooks("elternzeit-ag-bescheinigung-generiert", {
       elternzeitId: id,
       displayId: ez.displayId,
-    }).catch(() => undefined);
+    }).catch((err) =>
+      console.error(
+        "[elternzeit-ag-bescheinigung-generiert] Webhook-Fehler:",
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,

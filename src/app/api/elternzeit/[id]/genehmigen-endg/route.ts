@@ -67,6 +67,11 @@ export async function POST(
       );
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const updated = await prisma.elternzeitProzess.update({
       where: { id },
       data: {
@@ -83,10 +88,16 @@ export async function POST(
         processType: "ELTERNZEIT",
         action: "ENDG_GENEHMIGT",
         details: { genehmigungVon: parsed.data.genehmigungVon },
+        ipAddress,
       },
     });
 
-    await syncElternzeitFristen(id);
+    await syncElternzeitFristen(id).catch((err) =>
+      console.error(
+        `[syncElternzeitFristen] Fehler nach genehmigen-endg ${id}:`,
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     triggerWebhooks("elternzeit-endg-genehmigt", {
       elternzeitId: id,

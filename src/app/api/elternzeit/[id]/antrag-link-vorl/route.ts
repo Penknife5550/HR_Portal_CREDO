@@ -64,6 +64,11 @@ export async function POST(
       );
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     // Token (UUID, 30 Tage gueltig)
     const token = randomUUID();
     const expiresAt = new Date();
@@ -89,10 +94,16 @@ export async function POST(
           recipientName: parsed.data.recipientName || null,
           expiresAt: expiresAt.toISOString(),
         },
+        ipAddress,
       },
     });
 
-    await syncElternzeitFristen(id);
+    await syncElternzeitFristen(id).catch((err) =>
+      console.error(
+        `[syncElternzeitFristen] Fehler nach antrag-link-vorl ${id}:`,
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
     const magicUrl = `${baseUrl}/elternzeit-antrag/${token}`;

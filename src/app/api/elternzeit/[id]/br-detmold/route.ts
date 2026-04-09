@@ -15,7 +15,7 @@ import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -68,6 +68,11 @@ export async function GET(
       );
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      null;
+
     const generiertAm = new Date();
     const pdfBuffer = await generateBRDetmoldSchreiben({
       firstName: ez.employeeFirstName,
@@ -105,10 +110,16 @@ export async function GET(
         processType: "ELTERNZEIT",
         action: "BR_DETMOLD_GENERATED",
         details: { displayId: ez.displayId },
+        ipAddress,
       },
     });
 
-    await syncElternzeitFristen(id);
+    await syncElternzeitFristen(id).catch((err) =>
+      console.error(
+        `[syncElternzeitFristen] Fehler nach br-detmold ${id}:`,
+        err instanceof Error ? err.message : err,
+      ),
+    );
 
     triggerWebhooks("elternzeit-br-detmold-generiert", {
       elternzeitId: id,
