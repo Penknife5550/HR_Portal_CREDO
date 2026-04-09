@@ -30,7 +30,12 @@ fi
 echo "Umgebungsvariablen geprueft: OK"
 
 echo "Datenbank-Schema wird synchronisiert..."
-npx prisma db push --skip-generate 2>&1
+# --accept-data-loss: Prisma bricht sonst bei jeder neuen Unique-Constraint
+# oder Spalten-Aenderung mit Daten-Loss-Warnung ab (Exit != 0) und der
+# Container startet nicht. Im Produktionsbetrieb wollen wir Schema-Drift
+# automatisch ausrollen; destruktive Aenderungen werden ueber Review/PR
+# kontrolliert, nicht ueber das Entrypoint-Script.
+npx prisma db push --skip-generate --accept-data-loss 2>&1
 echo "Datenbank-Schema synchronisiert."
 
 # Seed ausfuehren wenn noch kein Admin-User existiert
