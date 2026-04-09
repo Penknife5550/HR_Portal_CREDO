@@ -301,6 +301,135 @@ Logik-Checks (`BEAMTER || PLANSTELLENINHABER`) bleiben unveraendert.
 
 ---
 
+## GoLive-Haertung (April 2026, Commit `4cc1358`)
+
+Nach dem Code-Review wurden weitere Haertungen umgesetzt — Phase 2 ist
+damit GoLive-tauglich.
+
+### Sicherheit
+
+- **R11 Token-Hashing:** Magic-Link-UUIDs werden via SHA-256 in der DB
+  abgelegt, der Klartext existiert nur in der Magic-URL und im Empfaenger-
+  Posteingang. `lib/token-hash.ts`. Alle 3 Generations- und 4 Validation-
+  Routes umgestellt. `tokenExpiry` ist defense-in-depth zusaetzlich im
+  atomaren `updateMany.where`.
+  - **⚠️ Breaking Change:** Bestehende Klartext-Magic-Links in alten DB-
+    Records werden nach dem Update ungueltig (Lookup hasht den eingehenden
+    Token, in der DB steht aber noch Klartext aus alten Vorgaengen).
+    Vor dem Update DB-Check auf offene Tokens machen, ggf. neue Links
+    nach dem Update versenden.
+
+- **IDOR-Schliessung Mutterschutz:** Alle 4 Bestands-Routes (`[id]` GET/
+  PATCH/DELETE, `notizen` GET/POST, `checkliste/[itemId]` PATCH) und
+  `POST /api/mutterschutz` pruefen jetzt `canAccessProcess`/`canAccessOrg`.
+  404 statt 403 — verhindert Existenz-Leak.
+
+- **Pre-existing Elternzeit-IDOR-Symmetrie:** `POST /api/elternzeit`
+  prueft jetzt ebenfalls `canAccessOrg` fuer `organizationId` UND fuer
+  `mutterschutzId`-Verknuepfung.
+
+- **Atomarer Mutterschutz-State-Wechsel:** `mutterschutz-transitions.ts`
+  refactored — `updateMany` mit `getErlaubteVorgaenger()` im WHERE plus
+  `prisma.$transaction` fuer Update + AuditLog. Race-frei, keine
+  Compliance-Luecke (Status-Wechsel ohne Audit unmoeglich).
+
+- **Public-Magic-Link AuditLogs erweitert:** Eigene Action-Suffixe
+  `*_VIA_MAGIC_LINK` mit `ipAddress` + `tokenHash` (NICHT Klartext).
+  Forensik bei Missbrauch jetzt moeglich.
+
+### UI/UX
+
+- **Stepper-Accessibility:** `<nav aria-label="Prozessfortschritt">`,
+  `aria-current="step"` am aktuellen Schritt, `aria-label` pro `<li>`
+  mit "Schritt X von Y: Label — Status", `aria-hidden` auf alle
+  dekorativen Elemente, `motion-safe:animate-pulse` (respektiert
+  prefers-reduced-motion).
+
+- **`confirm()` durch `ConfirmDeleteModal` ersetzt:** Beim Loeschen
+  von Dokumenten in beiden Detail-Components wird jetzt das Modal
+  aus `components/elternzeit/elternzeit-modals.tsx` verwendet, mit
+  Anzeige des Dateinamens und konsistentem CREDO-Styling.
+
+- **`type="button"`** auf allen Modal-Buttons ergaenzt — verhindert
+  versehentliche Form-Submits.
+
+- **Error-Handling-Polish:** Alle bisher silent failenden Fetch-Aufrufe
+  in den Detail-Components (`dokumentLoeschen`, `fristToggle`, `toggleItem`,
+  `notizSpeichern`) setzen jetzt `actionError` mit deutscher Meldung.
+
+### Tests
+
+- `src/__tests__/lib/mutterschutz-workflow.test.ts` — 43 Tests fuer die
+  State-Maschine, inkl. Konsistenz-Check zwischen `erlaubteFolgestatus`
+  und `getErlaubteVorgaenger`.
+- `src/__tests__/lib/token-hash.test.ts` — 7 Tests Idempotenz, Hex-Format,
+  leerer String, UUID, sehr lange Strings.
+- Test-Suite: 110 → 160 Tests (von 161 gesamt, 1 pre-existing Offboarding).
+
+### Hot-Spot-Refactor (Code-Review)
+
+- **Hot-Spot #1:** `mutterschutz-transitions.ts` macht jetzt Auth +
+  IDOR-Check selbst. Die 4 Status-Transition-Routes sind dadurch je
+  nur ~45 Zeilen (statt ~70). −33% DB-Roundtrips pro Transition.
+- **Hot-Spot #2:** Alte Status-Buttons in `elternzeit-detail-content`
+  entfernt — der `NaechsterSchrittBanner` ist jetzt Single-Source-of-
+  Truth fuer den primaeren HR-Schritt. Sekundaere Aktionen (Ablehnen,
+  Leiter-Link, PDF-Downloads) sind in einer eigenen Section.
+- **Hot-Spot #3:** `tokenExpiry: { gt: new Date() }` zusaetzlich im
+  atomaren `updateMany.where` der 3 Public-Token-Routes.
+
+---
+
+## Webhook-Verdrahtung (April 2026, Commit `54481cb`)
+
+### Webhook-Admin-UI
+
+- 18 neue Webhook-Events in `WEBHOOK_EVENTS` (13 Elternzeit + 5
+  Mutterschutz)
+- **Filter-Leiste** oben (Volltext-Suche + Gruppen-Dropdown)
+- **Quick-Add-Button "+ Webhook"** in jedem Event-Header → Modal
+  kommt mit prefilltem Event auf, kein Scrollen mehr durch die Liste
+- `WebhookModal` Prop `defaultEvent` fuer Prefill
+- Gruppen-Farben CREDO-CD-konform: EZ=gelb, MS=rot
+
+### n8n-Generator-Scripts
+
+Versioniert in `scripts/n8n/`, Output bleibt lokal in `n8n/` (gitignored).
+
+- `generator-lib.js`: geteilte Renderer-Library + `buildFlow()` Helper
+- `generate-elternzeit-flow.js`: 13 Events → `n8n/CREDO-Elternzeit-v3.json`
+  (39 Nodes, 26 Connections). Frist-Eskalations-Mail mit Severity-Farb-
+  Mapping (rot/gelb/blau).
+- `generate-mutterschutz-flow.js`: 5 Events → `n8n/CREDO-Mutterschutz-v3.json`
+  (15 Nodes, 10 Connections).
+
+```bash
+# Aufruf:
+node scripts/n8n/generate-elternzeit-flow.js > n8n/CREDO-Elternzeit-v3.json
+node scripts/n8n/generate-mutterschutz-flow.js > n8n/CREDO-Mutterschutz-v3.json
+```
+
+Dann in n8n ueber **Workflows → Import from File** importieren.
+Outlook-Credential muss bereits existieren (gleiche ID wie Onboarding-Flow).
+
+### Seed-Skript
+
+`scripts/seed-elternzeit-mutterschutz-webhooks.ts` legt alle 18 Webhooks
+**idempotent** in der DB an. Aufruf:
+
+```bash
+N8N_BASE_URL=https://n8n.fes-credo.de tsx scripts/seed-elternzeit-mutterschutz-webhooks.ts
+```
+
+Alle Webhooks werden **inaktiv** angelegt — Admin aktiviert manuell nach
+Test (verhindert Mailflut beim ersten Vorgang).
+
+**Hinweis Prod:** Im Container ist `tsx` NICHT verfuegbar. Auf prod
+stattdessen ein Direct-SQL-INSERT-Snippet (siehe Deployment-Runbook der
+Session) oder die UI-Quick-Add-Buttons nutzen.
+
+---
+
 ## Was bewusst NICHT in Phase 2 ist (→ Phase 3)
 
 - `ElternzeitUnterbrechung` Sub-Prozess + PDF
