@@ -107,6 +107,26 @@ const WEBHOOK_EVENTS = [
   { value: "psi-phase-completed", label: "Phase abgeschlossen", group: "Verbeamtung" },
   { value: "psi-deadline-warning", label: "Frist-Warnung", group: "Verbeamtung" },
   { value: "psi-completed", label: "Verbeamtung abgeschlossen", group: "Verbeamtung" },
+  // Elternzeit
+  { value: "elternzeit-angelegt", label: "Elternzeit angelegt", group: "Elternzeit" },
+  { value: "elternzeit-antrag-link-versandt", label: "Vorl. Magic-Link versandt", group: "Elternzeit" },
+  { value: "elternzeit-antrag-eingereicht", label: "Vorl. Antrag eingereicht", group: "Elternzeit" },
+  { value: "elternzeit-vorl-genehmigt", label: "Vorl. genehmigt", group: "Elternzeit" },
+  { value: "elternzeit-vorl-abgelehnt", label: "Vorl. abgelehnt", group: "Elternzeit" },
+  { value: "elternzeit-leiter-link-versandt", label: "Leiter-Magic-Link versandt", group: "Elternzeit" },
+  { value: "elternzeit-endg-genehmigt", label: "Endg. genehmigt", group: "Elternzeit" },
+  { value: "elternzeit-endg-abgelehnt", label: "Endg. abgelehnt", group: "Elternzeit" },
+  { value: "elternzeit-br-detmold-generiert", label: "BR-Detmold-Brief generiert", group: "Elternzeit" },
+  { value: "elternzeit-vbl-generiert", label: "VBL-Info-Brief generiert", group: "Elternzeit" },
+  { value: "elternzeit-ag-bescheinigung-generiert", label: "AG-Bescheinigung generiert", group: "Elternzeit" },
+  { value: "elternzeit-br-genehmigung-eingegangen", label: "BR-Genehmigung eingegangen", group: "Elternzeit" },
+  { value: "elternzeit-frist-eskaliert", label: "Frist eskaliert (Cron)", group: "Elternzeit" },
+  // Mutterschutz
+  { value: "mutterschutz-angelegt", label: "Mutterschutz angelegt", group: "Mutterschutz" },
+  { value: "mutterschutz-bad-beauftragt", label: "BAD beauftragt", group: "Mutterschutz" },
+  { value: "mutterschutz-bad-abgeschlossen", label: "BAD abgeschlossen", group: "Mutterschutz" },
+  { value: "mutterschutz-aktiviert", label: "Mutterschutz aktiviert", group: "Mutterschutz" },
+  { value: "mutterschutz-beendet", label: "Mutterschutz beendet", group: "Mutterschutz" },
 ];
 
 const AUTH_TYPES = [
@@ -181,9 +201,13 @@ function WebhooksTab() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editWebhook, setEditWebhook] = useState<WebhookConfig | null>(null);
+  const [prefillEvent, setPrefillEvent] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
+  // Filter
+  const [filterText, setFilterText] = useState("");
+  const [filterGroup, setFilterGroup] = useState<string>("ALLE");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -252,39 +276,100 @@ function WebhooksTab() {
   }
 
   // Webhooks nach Prozess-Gruppe und dann Event gruppieren
-  const groups = ["Onboarding", "Offboarding", "Verbeamtung"] as const;
+  const groups = [
+    "Onboarding",
+    "Offboarding",
+    "Verbeamtung",
+    "Elternzeit",
+    "Mutterschutz",
+  ] as const;
   const groupColors: Record<string, string> = {
     Onboarding: "bg-credo-blau/10 text-credo-blau",
     Offboarding: "bg-credo-gruen/10 text-credo-gruen",
     Verbeamtung: "bg-purple-100 text-purple-800",
+    Elternzeit: "bg-credo-gelb/20 text-foreground",
+    Mutterschutz: "bg-credo-rot/10 text-credo-rot",
   };
-  const grouped = groups.map((group) => ({
-    group,
-    color: groupColors[group],
-    events: WEBHOOK_EVENTS.filter((ev) => ev.group === group).map((ev) => ({
-      event: ev.value,
-      label: ev.label,
-      webhooks: webhooks.filter((w) => w.event === ev.value),
-    })),
-  }));
+
+  // Filter anwenden: filterGroup + Suchtext (Label oder Event-Name)
+  const filterTextLower = filterText.trim().toLowerCase();
+  const grouped = groups
+    .filter((g) => filterGroup === "ALLE" || filterGroup === g)
+    .map((group) => ({
+      group,
+      color: groupColors[group],
+      events: WEBHOOK_EVENTS.filter((ev) => ev.group === group)
+        .filter((ev) =>
+          filterTextLower
+            ? ev.label.toLowerCase().includes(filterTextLower) ||
+              ev.value.toLowerCase().includes(filterTextLower)
+            : true,
+        )
+        .map((ev) => ({
+          event: ev.value,
+          label: ev.label,
+          webhooks: webhooks.filter((w) => w.event === ev.value),
+        })),
+    }))
+    // leere Gruppen nach Filter ausblenden
+    .filter((section) => section.events.length > 0);
 
   return (
     <div className="space-y-4">
       {success && <Alert type="success">{success}</Alert>}
       {error && <Alert type="error">{error}</Alert>}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Pro Event können mehrere Webhooks konfiguriert werden. Alle Webhooks werden hier verwaltet.
-          </p>
-        </div>
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          Pro Event können mehrere Webhooks konfiguriert werden. Alle
+          Webhooks werden hier verwaltet.
+        </p>
         <button
-          onClick={() => { setEditWebhook(null); setShowModal(true); }}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          type="button"
+          onClick={() => {
+            setEditWebhook(null);
+            setPrefillEvent(null);
+            setShowModal(true);
+          }}
+          className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           + Neuer Webhook
         </button>
+      </div>
+
+      {/* Filter-Leiste */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
+        <input
+          type="text"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          placeholder="Event durchsuchen (z.B. magic-link)"
+          className="min-w-[220px] flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+        />
+        <select
+          value={filterGroup}
+          onChange={(e) => setFilterGroup(e.target.value)}
+          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+        >
+          <option value="ALLE">Alle Gruppen</option>
+          {groups.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+        {(filterText || filterGroup !== "ALLE") && (
+          <button
+            type="button"
+            onClick={() => {
+              setFilterText("");
+              setFilterGroup("ALLE");
+            }}
+            className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+          >
+            Filter zuruecksetzen
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -305,16 +390,30 @@ function WebhooksTab() {
             {section.events.map((group) => (
           <div key={group.event} className="overflow-hidden rounded-lg border bg-card">
             {/* Event-Header */}
-            <div className="border-b bg-muted/50 px-4 py-3 flex items-center justify-between">
-              <div>
+            <div className="border-b bg-muted/50 px-4 py-3 flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
                 <span className="text-sm font-semibold text-foreground">{group.label}</span>
                 <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
                   {group.event}
                 </span>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {group.webhooks.length} Webhook{group.webhooks.length !== 1 ? "s" : ""}
-              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {group.webhooks.length} Webhook{group.webhooks.length !== 1 ? "s" : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditWebhook(null);
+                    setPrefillEvent(group.event);
+                    setShowModal(true);
+                  }}
+                  className="rounded-md border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                  title={`Neuen Webhook fuer Event '${group.event}' anlegen`}
+                >
+                  + Webhook
+                </button>
+              </div>
             </div>
 
             {/* Webhook-Einträge */}
@@ -403,7 +502,12 @@ function WebhooksTab() {
       {showModal && (
         <WebhookModal
           initial={editWebhook}
-          onClose={() => { setShowModal(false); setEditWebhook(null); }}
+          defaultEvent={prefillEvent}
+          onClose={() => {
+            setShowModal(false);
+            setEditWebhook(null);
+            setPrefillEvent(null);
+          }}
           onSave={async (data) => {
             const isEdit = Boolean(editWebhook);
             const url = isEdit
@@ -833,15 +937,21 @@ function VorlagenTab() {
 // =============================================
 function WebhookModal({
   initial,
+  defaultEvent,
   onClose,
   onSave,
 }: {
   initial: WebhookConfig | null;
+  defaultEvent?: string | null;
   onClose: () => void;
   onSave: (data: Partial<WebhookConfig>) => Promise<void>;
 }) {
   const [form, setForm] = useState<Partial<WebhookConfig>>(
-    initial ?? { event: "onboarding-created", authType: "none", isActive: true }
+    initial ?? {
+      event: defaultEvent ?? "onboarding-created",
+      authType: "none",
+      isActive: true,
+    },
   );
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
