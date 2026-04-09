@@ -18,10 +18,21 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
-# Seed-Script von TypeScript zu JavaScript kompilieren
-RUN npx tsc --esModuleInterop --module commonjs --target es2020 \
-    --resolveJsonModule --skipLibCheck \
-    --outDir prisma/compiled prisma/seed.ts
+# Seed-Script bundeln (inkl. Imports aus src/lib/**) zu einem einzelnen JS-File.
+# tsc scheidet aus, weil seed.ts aus ../src/lib importiert und damit der
+# rootDir auf den Projekt-Root waechst — die Ausgabe wuerde in
+# prisma/compiled/prisma/seed.js landen, nicht in prisma/compiled/seed.js.
+# esbuild bundelt alle TS-Imports in eine Datei, @prisma/client und bcryptjs
+# bleiben als externe require()-Aufrufe erhalten (sind im Runner verfuegbar).
+RUN npx --yes esbuild@0.24 prisma/seed.ts \
+    --bundle \
+    --platform=node \
+    --target=node20 \
+    --format=cjs \
+    --external:@prisma/client \
+    --external:bcryptjs \
+    --outfile=prisma/compiled/seed.js \
+ && test -f prisma/compiled/seed.js
 
 # Stage 3: Production
 FROM node:20-alpine AS runner
