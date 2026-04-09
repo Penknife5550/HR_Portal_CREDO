@@ -40,7 +40,7 @@ export function NeuerMutterschutzModal({ open, onClose, onCreated }: Props) {
     "SCHULE" | "KITA" | "VERWALTUNG"
   >("SCHULE");
   const [personalgruppe, setPersonalgruppe] = useState<
-    "TARIF_TV_L" | "BEAMTER" | "PLANSTELLENINHABER"
+    "TARIF_TV_L" | "BEAMTER"
   >("TARIF_TV_L");
   const [badErforderlich, setBadErforderlich] = useState(false);
 
@@ -201,17 +201,13 @@ export function NeuerMutterschutzModal({ open, onClose, onCreated }: Props) {
                 value={personalgruppe}
                 onChange={(e) =>
                   setPersonalgruppe(
-                    e.target.value as
-                      | "TARIF_TV_L"
-                      | "BEAMTER"
-                      | "PLANSTELLENINHABER",
+                    e.target.value as "TARIF_TV_L" | "BEAMTER",
                   )
                 }
                 className={inp}
               >
                 <option value="TARIF_TV_L">Tarifangestellte (TV-L)</option>
                 <option value="BEAMTER">Beamtin</option>
-                <option value="PLANSTELLENINHABER">Planstelleninhaberin</option>
               </select>
             </Field>
           </div>

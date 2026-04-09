@@ -16,6 +16,7 @@ import {
 } from "@/lib/elternzeit-helpers";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
+import { hashToken } from "@/lib/token-hash";
 
 // =============================================
 // GET – Token validieren + Daten laden
@@ -26,9 +27,10 @@ export async function GET(
 ) {
   try {
     const { token } = await params;
+    const tokenHash = hashToken(token);
 
     const ez = await prisma.elternzeitProzess.findUnique({
-      where: { antragTokenVorl: token },
+      where: { antragTokenVorl: tokenHash },
       include: {
         organization: { select: { name: true, mandantNumber: true } },
       },
@@ -98,9 +100,10 @@ export async function POST(
 ) {
   try {
     const { token } = await params;
+    const tokenHash = hashToken(token);
 
     const ez = await prisma.elternzeitProzess.findUnique({
-      where: { antragTokenVorl: token },
+      where: { antragTokenVorl: tokenHash },
     });
     if (!ez) {
       return NextResponse.json(
@@ -174,8 +177,11 @@ export async function POST(
       const result = await tx.elternzeitProzess.updateMany({
         where: {
           id: ez.id,
-          antragTokenVorl: token,
+          antragTokenVorl: tokenHash,
           antragTokenVorlUsedAt: null,
+          // Defense in depth: Expiry auch im atomaren Update pruefen,
+          // damit ein zwischenzeitlich abgelaufener Token nicht durchrutscht.
+          antragTokenVorlExpiry: { gt: new Date() },
         },
         data: {
           adresseStrasse: data.adresseStrasse,
@@ -220,10 +226,13 @@ export async function POST(
         data: {
           elternzeitId: ez.id,
           processType: "ELTERNZEIT",
-          action: "ANTRAG_VORL_SUBMITTED",
+          // Public-Magic-Link-Submission — kein userId vorhanden,
+          // Forensik via ipAddress + tokenHash + Action-Suffix moeglich.
+          action: "ANTRAG_VORL_SUBMITTED_VIA_MAGIC_LINK",
           details: {
             abschnitte: data.abschnitte.length,
             ferienWarnungen: warnungen.length,
+            tokenHash,
           },
           ipAddress,
         },

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { hashToken } from "@/lib/token-hash";
 
 const submitSchema = z.object({
   entscheidung: z.enum(["GENEHMIGT", "ABGELEHNT"]),
@@ -24,9 +25,10 @@ export async function GET(
 ) {
   try {
     const { token } = await params;
+    const tokenHash = hashToken(token);
 
     const ez = await prisma.elternzeitProzess.findUnique({
-      where: { leiterTokenEndg: token },
+      where: { leiterTokenEndg: tokenHash },
       include: {
         organization: { select: { name: true } },
         abschnitte: { orderBy: { abschnittNr: "asc" } },
@@ -80,8 +82,9 @@ export async function POST(
 ) {
   try {
     const { token } = await params;
+    const tokenHash = hashToken(token);
     const ez = await prisma.elternzeitProzess.findUnique({
-      where: { leiterTokenEndg: token },
+      where: { leiterTokenEndg: tokenHash },
     });
     if (!ez) {
       return NextResponse.json({ error: "Token ungueltig" }, { status: 404 });
@@ -122,8 +125,10 @@ export async function POST(
       const result = await tx.elternzeitProzess.updateMany({
         where: {
           id: ez.id,
-          leiterTokenEndg: token,
+          leiterTokenEndg: tokenHash,
           leiterTokenEndgUsedAt: null,
+          // Defense in depth: Expiry im atomaren Update pruefen
+          leiterTokenEndgExpiry: { gt: new Date() },
         },
         data: {
           leiterTokenEndgUsedAt: new Date(),
@@ -142,12 +147,14 @@ export async function POST(
         data: {
           elternzeitId: ez.id,
           processType: "ELTERNZEIT",
+          // Public-Magic-Link-Entscheidung des Einrichtungsleiters
           action:
             parsed.data.entscheidung === "GENEHMIGT"
-              ? "LEITER_GENEHMIGT"
-              : "LEITER_ABGELEHNT",
+              ? "LEITER_GENEHMIGT_VIA_MAGIC_LINK"
+              : "LEITER_ABGELEHNT_VIA_MAGIC_LINK",
           details: {
             ablehnungGrund: parsed.data.ablehnungGrund || null,
+            tokenHash,
           },
           ipAddress,
         },

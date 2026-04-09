@@ -15,8 +15,21 @@ import {
   MagicLinkModal,
   GenehmigungEndgModal,
   AGBescheinigungModal,
+  ConfirmDeleteModal,
   type AGBescheinigungData,
 } from "@/components/elternzeit/elternzeit-modals";
+import {
+  ProzessStepper,
+  NaechsterSchrittBanner,
+} from "@/components/prozess-stepper";
+import {
+  ELTERNZEIT_STEPS,
+  ELTERNZEIT_ABBRUCH_STATES,
+  ELTERNZEIT_PAUSE_STATES,
+  getStepIndex as getEzStepIndex,
+  getNaechsterSchritt as getEzNaechsterSchritt,
+  type ElternzeitStatus,
+} from "@/lib/elternzeit-workflow";
 
 interface User {
   userId: string;
@@ -54,6 +67,17 @@ interface Notiz {
   text: string;
   erstelltVon: string;
   createdAt: string;
+}
+
+interface DokumentEintrag {
+  id: string;
+  dokumentTyp: string;
+  dateiname: string;
+  mimeType: string | null;
+  fileSize: number | null;
+  generiert: boolean;
+  hochgeladenAm: string;
+  hochgeladenVon: string | null;
 }
 
 interface FristEintrag {
@@ -137,9 +161,21 @@ export function ElternzeitDetailContent({
 }) {
   const [data, setData] = useState<ElternzeitData | null>(null);
   const [fristen, setFristen] = useState<FristEintrag[] | null>(null);
+  const [dokumente, setDokumente] = useState<DokumentEintrag[] | null>(null);
+  const [uploadTyp, setUploadTyp] = useState<string>("SONSTIGES");
+  const [uploading, setUploading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<DokumentEintrag | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<
-    "uebersicht" | "abschnitte" | "checkliste" | "notizen" | "briefe" | "fristen"
+    | "uebersicht"
+    | "abschnitte"
+    | "checkliste"
+    | "notizen"
+    | "briefe"
+    | "fristen"
+    | "dokumente"
   >("uebersicht");
   const [neueNotiz, setNeueNotiz] = useState("");
   const [magicLinkResult, setMagicLinkResult] = useState<string | null>(null);
@@ -178,7 +214,54 @@ export function ElternzeitDetailContent({
     }
   }, [prozessId]);
 
+  const loadDokumente = useCallback(async () => {
+    const res = await fetch(`/api/elternzeit/${prozessId}/dokumente`);
+    if (res.ok) {
+      const j = await res.json();
+      setDokumente(j.data);
+    }
+  }, [prozessId]);
+
+  async function dokumentUpload(file: File) {
+    setActionError(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("dokumentTyp", uploadTyp);
+      const res = await fetch(`/api/elternzeit/${prozessId}/dokumente`, {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setActionError(j.error || "Upload fehlgeschlagen.");
+        return;
+      }
+      loadDokumente();
+      load();
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function dokumentLoeschen(docId: string) {
+    setActionError(null);
+    const res = await fetch(
+      `/api/elternzeit/${prozessId}/dokumente/${docId}`,
+      { method: "DELETE" },
+    );
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error || "Dokument konnte nicht geloescht werden.");
+      return;
+    }
+    loadDokumente();
+    load();
+  }
+
   async function fristToggle(f: FristEintrag) {
+    setActionError(null);
     const res = await fetch(
       `/api/elternzeit/${prozessId}/fristen/${f.id}`,
       {
@@ -187,12 +270,23 @@ export function ElternzeitDetailContent({
         body: JSON.stringify({ erledigt: !f.erledigtAm }),
       },
     );
-    if (res.ok) loadFristen();
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error || "Frist konnte nicht aktualisiert werden.");
+      return;
+    }
+    loadFristen();
   }
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Dokumente werden direkt mitgeladen, damit der Uebersichts-Hinweis
+  // (z.B. "Geburtsurkunde liegt vor") sofort funktioniert.
+  useEffect(() => {
+    loadDokumente();
+  }, [loadDokumente]);
 
   useEffect(() => {
     if (tab === "fristen") {
@@ -364,21 +458,36 @@ export function ElternzeitDetailContent({
   }
 
   async function toggleItem(item: ChecklistItem) {
-    await fetch(`/api/elternzeit/${prozessId}/checkliste/${item.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ erledigt: !item.erledigtAm }),
-    });
+    setActionError(null);
+    const res = await fetch(
+      `/api/elternzeit/${prozessId}/checkliste/${item.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ erledigt: !item.erledigtAm }),
+      },
+    );
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error || "Item konnte nicht aktualisiert werden.");
+      return;
+    }
     load();
   }
 
   async function notizSpeichern() {
     if (neueNotiz.trim().length === 0) return;
-    await fetch(`/api/elternzeit/${prozessId}/notizen`, {
+    setActionError(null);
+    const res = await fetch(`/api/elternzeit/${prozessId}/notizen`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: neueNotiz }),
     });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error || "Notiz konnte nicht gespeichert werden.");
+      return;
+    }
     setNeueNotiz("");
     load();
   }
@@ -394,18 +503,12 @@ export function ElternzeitDetailContent({
     );
   }
 
-  // Aktions-Buttons abhaengig vom Status
-  const canSendLink = data.status === "ANGELEGT";
-  const canGenehmigen = data.status === "ANTRAG_VORL_EINGEREICHT";
+  // Sekundaer-Aktionen — Primaer-Schritte uebernimmt der NaechsterSchrittBanner.
+  // Hier nur Sichtbarkeits-Flags fuer Aktionen, die der Banner NICHT abdeckt:
+  // Ablehnungen, Leiter-Magic-Link, PDF-Downloads.
   const canAblehnen = data.status === "ANTRAG_VORL_EINGEREICHT";
   const canDownloadPdf = !!data.genehmigungAm;
-  // Phase 2 — Einrichtungsleiter-Genehmigung via Magic Link
   const canSendLeiterLink = data.status === "ANTRAG_VORL_EINGEREICHT";
-  // Phase 2 — endgueltiger Antrag
-  const canSendLinkEndg =
-    data.status === "VORLAEUFIG_GENEHMIGT" ||
-    data.status === "ANTRAG_ENDG_VERSANDT";
-  const canGenehmigenEndg = data.status === "ANTRAG_ENDG_EINGEREICHT";
   const canAblehnenEndg = data.status === "ANTRAG_ENDG_EINGEREICHT";
   const canDownloadEndgPdf =
     data.status === "GENEHMIGT" ||
@@ -455,81 +558,111 @@ export function ElternzeitDetailContent({
           </p>
         </div>
 
-        {/* Aktionen */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          {canSendLink && (
-            <button
-              onClick={() => setShowSendLinkModal(true)}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
-              Magic Link senden
-            </button>
-          )}
-          {canGenehmigen && (
-            <button
-              onClick={genehmigen}
-              className="rounded-lg bg-credo-gruen px-4 py-2 text-sm font-medium text-white"
-            >
-              Vorlaeufig genehmigen
-            </button>
-          )}
-          {canAblehnen && (
-            <button
-              onClick={() => setModal({ type: "ablehnung-vorl" })}
-              className="rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive"
-            >
-              Ablehnen
-            </button>
-          )}
-          {canDownloadPdf && (
-            <a
-              href={`/api/elternzeit/${prozessId}/genehmigung-vorl`}
-              className="rounded-lg border px-4 py-2 text-sm font-medium"
-            >
-              Vorl. Genehmigung (PDF)
-            </a>
-          )}
-          {canSendLeiterLink && (
-            <button
-              onClick={() => setModal({ type: "magic-link-leiter" })}
-              className="rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary"
-            >
-              Leiter-Magic-Link
-            </button>
-          )}
-          {canSendLinkEndg && (
-            <button
-              onClick={() => setModal({ type: "magic-link-endg" })}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
-              Magic Link endg. Antrag
-            </button>
-          )}
-          {canGenehmigenEndg && (
-            <button
-              onClick={() => setModal({ type: "genehmigung-endg" })}
-              className="rounded-lg bg-credo-gruen px-4 py-2 text-sm font-medium text-white"
-            >
-              Endgueltig genehmigen
-            </button>
-          )}
-          {canAblehnenEndg && (
-            <button
-              onClick={() => setModal({ type: "ablehnung-endg" })}
-              className="rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive"
-            >
-              Endgueltig ablehnen
-            </button>
-          )}
-          {canDownloadEndgPdf && (
-            <a
-              href={`/api/elternzeit/${prozessId}/genehmigung-endg`}
-              className="rounded-lg border px-4 py-2 text-sm font-medium"
-            >
-              Endg. Genehmigung (PDF)
-            </a>
-          )}
-        </div>
+        {/* Prozess-Stepper + Naechster-Schritt-Banner */}
+        {(() => {
+          const ezStatus = data.status as ElternzeitStatus;
+          const abgebrochen = ELTERNZEIT_ABBRUCH_STATES.includes(ezStatus);
+          const pausiert = ELTERNZEIT_PAUSE_STATES.includes(ezStatus);
+          const stepIndex = getEzStepIndex(ezStatus);
+          const naechster = getEzNaechsterSchritt(ezStatus);
+
+          // Mapping: Action-Identifier → Handler
+          const handler: (() => void) | undefined = (() => {
+            switch (naechster.action) {
+              case "MAGIC_LINK_VORL":
+                return () => setShowSendLinkModal(true);
+              case "GENEHMIGEN_VORL":
+                return () => genehmigen();
+              case "MAGIC_LINK_ENDG":
+                return () => setModal({ type: "magic-link-endg" });
+              case "GENEHMIGEN_ENDG":
+                return () => setModal({ type: "genehmigung-endg" });
+              default:
+                return undefined;
+            }
+          })();
+
+          return (
+            <div className="mb-4 space-y-3">
+              <ProzessStepper
+                steps={ELTERNZEIT_STEPS.map((s) => ({
+                  id: s.id,
+                  label: s.label,
+                  beschreibung: s.beschreibung,
+                }))}
+                currentStepIndex={stepIndex}
+                abgebrochen={abgebrochen}
+                pausiert={pausiert}
+              />
+              {!abgebrochen && !pausiert && (
+                <NaechsterSchrittBanner
+                  titel={naechster.titel}
+                  beschreibung={naechster.beschreibung}
+                  hrAktion={naechster.hrAktion}
+                  actionLabel={naechster.actionLabel}
+                  onAction={handler}
+                />
+              )}
+            </div>
+          );
+        })()}
+
+        {/*
+          Sekundaer-Aktionen — der primaere "naechste Schritt" wird vom
+          NaechsterSchrittBanner oben gerendert. Hier nur Aktionen, die
+          der Banner NICHT abdeckt: Ablehnungen, Leiter-Link, PDF-Downloads.
+        */}
+        {(canAblehnen ||
+          canAblehnenEndg ||
+          canSendLeiterLink ||
+          canDownloadPdf ||
+          canDownloadEndgPdf) && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {canAblehnen && (
+              <button
+                type="button"
+                onClick={() => setModal({ type: "ablehnung-vorl" })}
+                className="rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive"
+              >
+                Ablehnen
+              </button>
+            )}
+            {canSendLeiterLink && (
+              <button
+                type="button"
+                onClick={() => setModal({ type: "magic-link-leiter" })}
+                className="rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary"
+              >
+                Leiter-Magic-Link
+              </button>
+            )}
+            {canAblehnenEndg && (
+              <button
+                type="button"
+                onClick={() => setModal({ type: "ablehnung-endg" })}
+                className="rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive"
+              >
+                Endgueltig ablehnen
+              </button>
+            )}
+            {canDownloadPdf && (
+              <a
+                href={`/api/elternzeit/${prozessId}/genehmigung-vorl`}
+                className="rounded-lg border px-4 py-2 text-sm font-medium"
+              >
+                Vorl. Genehmigung (PDF)
+              </a>
+            )}
+            {canDownloadEndgPdf && (
+              <a
+                href={`/api/elternzeit/${prozessId}/genehmigung-endg`}
+                className="rounded-lg border px-4 py-2 text-sm font-medium"
+              >
+                Endg. Genehmigung (PDF)
+              </a>
+            )}
+          </div>
+        )}
 
         {actionError && (
           <div className="mb-4 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
@@ -559,6 +692,7 @@ export function ElternzeitDetailContent({
               "uebersicht",
               "abschnitte",
               "checkliste",
+              "dokumente",
               "notizen",
               "briefe",
               "fristen",
@@ -579,11 +713,13 @@ export function ElternzeitDetailContent({
                   ? `Abschnitte (${data.abschnitte.length})`
                   : t === "checkliste"
                     ? `Checkliste (${data.checklistItems.filter((i) => i.erledigtAm).length}/${data.checklistItems.length})`
-                    : t === "notizen"
-                      ? `Notizen (${data.notizen.length})`
-                      : t === "briefe"
-                        ? "Briefe"
-                        : "Fristen"}
+                    : t === "dokumente"
+                      ? `Dokumente (${dokumente?.length ?? 0})`
+                      : t === "notizen"
+                        ? `Notizen (${data.notizen.length})`
+                        : t === "briefe"
+                          ? "Briefe"
+                          : "Fristen"}
             </button>
           ))}
         </div>
@@ -635,6 +771,49 @@ export function ElternzeitDetailContent({
                 </p>
               </Section>
             )}
+
+            {/* Dokumente-Quick-Glance: Geburtsurkunde + Gesamt-Anzahl */}
+            <Section title="Dokumente">
+              {(() => {
+                const geburtsurkunde = dokumente?.find(
+                  (d) => d.dokumentTyp === "GEBURTSURKUNDE",
+                );
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        Geburtsurkunde
+                      </span>
+                      {geburtsurkunde ? (
+                        <a
+                          href={`/api/elternzeit/${prozessId}/dokumente/${geburtsurkunde.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm font-medium text-credo-gruen hover:underline"
+                        >
+                          ✓ liegt vor — {geburtsurkunde.dateiname}
+                        </a>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          noch nicht vorhanden
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        Insgesamt
+                      </span>
+                      <button
+                        onClick={() => setTab("dokumente")}
+                        className="text-sm font-medium text-primary hover:underline"
+                      >
+                        {dokumente?.length ?? 0} Dokument(e) anzeigen →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </Section>
 
             {data.mutterschutz && (
               <Section title="Verknuepfter Mutterschutz">
@@ -745,6 +924,126 @@ export function ElternzeitDetailContent({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {tab === "dokumente" && (
+          <div className="space-y-4">
+            {/* Upload-Bereich */}
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="text-sm font-semibold text-primary">
+                Dokument hochladen
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Manueller Upload (max. 10 MB, PDF / JPG / PNG / WebP).
+                Geburtsurkunden werden i.d.R. vom Mitarbeiter ueber den
+                Magic-Link hochgeladen.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <select
+                  value={uploadTyp}
+                  onChange={(e) => setUploadTyp(e.target.value)}
+                  className="rounded-lg border bg-background px-3 py-2 text-sm"
+                >
+                  <option value="GEBURTSURKUNDE">Geburtsurkunde</option>
+                  <option value="ANTRAG_VORLAEUFIG">Antrag (vorlaeufig)</option>
+                  <option value="ANTRAG_ENDGUELTIG">
+                    Antrag (endgueltig)
+                  </option>
+                  <option value="LOHNBESCHEINIGUNG_KK">
+                    Lohnbescheinigung KK
+                  </option>
+                  <option value="ABLEHNUNGSSCHREIBEN">Ablehnungsschreiben</option>
+                  <option value="SONSTIGES">Sonstiges</option>
+                </select>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) dokumentUpload(f);
+                    e.target.value = "";
+                  }}
+                  className="text-sm"
+                />
+                {uploading && (
+                  <span className="text-xs text-muted-foreground">
+                    Lade hoch…
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Liste */}
+            {dokumente && dokumente.length === 0 && (
+              <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+                Keine Dokumente vorhanden.
+              </p>
+            )}
+            {dokumente && dokumente.length > 0 && (
+              <div className="overflow-hidden rounded-lg border bg-card">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Typ</th>
+                      <th className="px-3 py-2 text-left">Dateiname</th>
+                      <th className="px-3 py-2 text-left">Hochgeladen</th>
+                      <th className="px-3 py-2 text-right">Aktion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dokumente.map((d) => (
+                      <tr
+                        key={d.id}
+                        className="border-t border-border/50 hover:bg-muted/20"
+                      >
+                        <td className="px-3 py-2">
+                          <span className="rounded bg-muted px-2 py-0.5 text-xs">
+                            {d.dokumentTyp}
+                          </span>
+                          {d.generiert && (
+                            <span className="ml-1 text-[10px] text-muted-foreground">
+                              (generiert)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <a
+                            href={`/api/elternzeit/${prozessId}/dokumente/${d.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-credo-gruen hover:underline"
+                          >
+                            {d.dateiname}
+                          </a>
+                          {d.fileSize && (
+                            <span className="ml-2 text-[10px] text-muted-foreground">
+                              {(d.fileSize / 1024).toFixed(0)} KB
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                          {new Date(d.hochgeladenAm).toLocaleDateString(
+                            "de-DE",
+                          )}
+                          {d.hochgeladenVon && ` · ${d.hochgeladenVon}`}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(d)}
+                            className="text-xs text-destructive hover:underline"
+                          >
+                            Loeschen
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -1037,6 +1336,18 @@ export function ElternzeitDetailContent({
         <AGBescheinigungModal
           onClose={() => setModal(null)}
           onSubmit={generiereAGBescheinigung}
+        />
+      )}
+      {confirmDelete && (
+        <ConfirmDeleteModal
+          titel="Dokument loeschen?"
+          beschreibung={`'${confirmDelete.dateiname}' wird endgueltig entfernt.`}
+          onClose={() => setConfirmDelete(null)}
+          onConfirm={async () => {
+            const docId = confirmDelete.id;
+            setConfirmDelete(null);
+            await dokumentLoeschen(docId);
+          }}
         />
       )}
     </div>

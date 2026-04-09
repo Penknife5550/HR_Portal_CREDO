@@ -488,6 +488,7 @@ export function ConfirmDeleteModal({
       )}
       <div className="mt-6 flex justify-end gap-2">
         <button
+          type="button"
           onClick={onClose}
           className="rounded-lg border px-4 py-2 text-sm font-medium"
           disabled={submitting}
@@ -495,6 +496,7 @@ export function ConfirmDeleteModal({
           Abbrechen
         </button>
         <button
+          type="button"
           onClick={handleConfirm}
           disabled={submitting}
           className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground disabled:opacity-50"

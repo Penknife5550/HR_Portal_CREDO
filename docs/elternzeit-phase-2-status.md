@@ -202,6 +202,105 @@ Idempotent — bestehende Eintraege werden uebersprungen.
 
 ---
 
+## Phase 2 Nachschlag (April 2026) — Mutterschutz-Vervollstaendigung & Prozess-Steuerung
+
+Nach dem ersten End-to-End-Test wurden drei Luecken sichtbar, die zur Phase 2
+gehoeren und nachgezogen wurden:
+
+### Mutterschutz auf Doku-Niveau
+
+Die Doku (`elternzeit-implementierungsplan.md` § 7) listet Endpunkte fuer
+Mutterschutz-Dokumente, BAD-Brief und Status-Transitions, die in der ersten
+Phase-2-Welle nicht umgesetzt waren. Jetzt vorhanden:
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| GET/POST | `/api/mutterschutz/[id]/dokumente` | Liste / Upload (HR_EDIT_ROLES) |
+| GET/DELETE | `/api/mutterschutz/[id]/dokumente/[docId]` | Download / Loeschen |
+| GET | `/api/mutterschutz/[id]/bad-aufforderung` | BAD-Brief generieren + persistieren |
+| POST | `/api/mutterschutz/[id]/bad-beauftragen` | Status GEMELDET → BAD_BEAUFTRAGT |
+| POST | `/api/mutterschutz/[id]/bad-abschliessen` | Status BAD_BEAUFTRAGT → BAD_ABGESCHLOSSEN |
+| POST | `/api/mutterschutz/[id]/aktivieren` | Status → AKTIV |
+| POST | `/api/mutterschutz/[id]/beenden` | Status → BEENDET |
+
+State-Validierung in `src/lib/mutterschutz-workflow.ts` (`erlaubteFolgestatus`),
+Transition-Helper in `src/lib/mutterschutz-transitions.ts` (zentrales Pattern
+fuer Audit-Log + Webhook). Webhook-Events:
+`mutterschutz-bad-beauftragt|abgeschlossen|aktiviert|beendet` und
+`mutterschutz-bad-aufforderung-generiert` (via Audit-Action).
+
+Wichtig: Mutterschutz hat **kein** `dienstbezeichnung`-Feld. Der BAD-Brief-
+Generator wird mit `dienstbezeichnung: null` aufgerufen, der Brief stellt
+das via "—" dar.
+
+### Dokumente sichtbar im Vorgang
+
+Vorher: Geburtsurkunden wurden via Magic-Link-Token-Upload korrekt als
+`ElternzeitDokument` gespeichert, die Detail-UI hatte aber keinen
+Dokumente-Tab — sie waren also unsichtbar. Jetzt:
+
+- **Neuer Tab "Dokumente"** in `elternzeit-detail-content.tsx` und
+  `mutterschutz-detail-content.tsx` mit Liste, Download, Upload, Loeschen.
+- **Quick-Glance "Dokumente"-Sektion** in der Elternzeit-Uebersicht zeigt
+  Geburtsurkunde-Status (gruener Haken + Direktlink) und Gesamtzahl, mit
+  Link in den Tab.
+- **Mutterschutz-Dokumente-Tab** enthaelt zusaetzlich den Button "BAD-Brief
+  erzeugen" (sichtbar nur wenn `badErforderlich = true`).
+
+### Prozess-Steuerung sichtbar (Stepper + Naechster-Schritt-Banner)
+
+Damit ein Dritter sofort sieht "wo stehe ich, was ist erster/letzter Schritt":
+
+- **`src/lib/elternzeit-workflow.ts`** und **`src/lib/mutterschutz-workflow.ts`**
+  — deklarative State-Maschinen mit `STEPS`, `getStepIndex`, `getNaechsterSchritt`,
+  `isErsterSchritt`, `isLetzterSchritt`. Endzustaende (Ablehnung, Pause)
+  separat.
+- **`src/components/prozess-stepper.tsx`** — generische `<ProzessStepper>` und
+  `<NaechsterSchrittBanner>`. Horizontale Kreise mit Verbindungslinien
+  (Desktop), vertikale Liste (Mobile), gruene Haken fuer abgeschlossene
+  Schritte, kraeftige Umrandung fuer den aktuellen Schritt, "Start"/"Ende"
+  an den Enden.
+- **Banner** unten am Stepper zeigt: "Naechster Schritt — HR" (gruen,
+  blinkender Punkt) oder "Naechster Schritt" (grau) plus passenden
+  Action-Button, der direkt den richtigen Handler aufruft (Magic-Link senden,
+  Genehmigen, BAD beauftragen, Aktivieren, Beenden, …).
+
+In beiden Detail-Seiten (`elternzeit-detail-content.tsx`,
+`mutterschutz-detail-content.tsx`) direkt unter dem Header eingebaut.
+
+### Geaenderte Files (Nachschlag)
+
+```
+src/lib/
+├── elternzeit-workflow.ts                    # NEW
+├── mutterschutz-workflow.ts                  # NEW
+└── mutterschutz-transitions.ts               # NEW
+
+src/components/
+└── prozess-stepper.tsx                       # NEW
+
+src/app/api/mutterschutz/[id]/
+├── dokumente/route.ts                        # NEW
+├── dokumente/[docId]/route.ts                # NEW
+├── bad-aufforderung/route.ts                 # NEW
+├── bad-beauftragen/route.ts                  # NEW
+├── bad-abschliessen/route.ts                 # NEW
+├── aktivieren/route.ts                       # NEW
+└── beenden/route.ts                          # NEW
+
+src/app/(portal)/dashboard/
+├── elternzeit/[id]/elternzeit-detail-content.tsx     # MODIFIED (Stepper + Banner + Dokumente-Tab)
+└── mutterschutz/[id]/mutterschutz-detail-content.tsx # MODIFIED (Stepper + Banner + Dokumente-Tab)
+```
+
+### Personalgruppe-Cleanup (Nebenbei)
+
+`PLANSTELLENINHABER` aus den Anlage-Modals (Mutterschutz, Elternzeit) entfernt
+— in unserem Kontext synonym mit `BEAMTER`. Enum bleibt fuer Bestandsdaten.
+Logik-Checks (`BEAMTER || PLANSTELLENINHABER`) bleiben unveraendert.
+
+---
+
 ## Was bewusst NICHT in Phase 2 ist (→ Phase 3)
 
 - `ElternzeitUnterbrechung` Sub-Prozess + PDF

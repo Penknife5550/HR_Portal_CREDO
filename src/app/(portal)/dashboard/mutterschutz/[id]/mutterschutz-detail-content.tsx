@@ -9,6 +9,17 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
+import {
+  ProzessStepper,
+  NaechsterSchrittBanner,
+} from "@/components/prozess-stepper";
+import { ConfirmDeleteModal } from "@/components/elternzeit/elternzeit-modals";
+import {
+  getRelevantSteps,
+  getStepIndex as getMsStepIndex,
+  getNaechsterSchritt as getMsNaechsterSchritt,
+  type MutterschutzStatus,
+} from "@/lib/mutterschutz-workflow";
 
 interface User {
   userId: string;
@@ -36,6 +47,17 @@ interface Notiz {
   createdAt: string;
 }
 
+interface DokumentEintrag {
+  id: string;
+  dokumentTyp: string;
+  dateiname: string;
+  mimeType: string | null;
+  fileSize: number | null;
+  generiert: boolean;
+  hochgeladenAm: string;
+  hochgeladenVon: string | null;
+}
+
 interface MutterschutzData {
   id: string;
   displayId: string;
@@ -58,6 +80,7 @@ interface MutterschutzData {
   organization: { id: string; name: string; mandantNumber: string };
   checklistItems: ChecklistItem[];
   notizen: Notiz[];
+  dokumente: DokumentEintrag[];
   elternzeitProzesse: {
     id: string;
     displayId: string;
@@ -83,10 +106,52 @@ export function MutterschutzDetailContent({
 }) {
   const [data, setData] = useState<MutterschutzData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"uebersicht" | "checkliste" | "notizen">(
-    "uebersicht",
-  );
+  const [tab, setTab] = useState<
+    "uebersicht" | "checkliste" | "dokumente" | "notizen"
+  >("uebersicht");
   const [neueNotiz, setNeueNotiz] = useState("");
+  const [uploadTyp, setUploadTyp] = useState<string>("SONSTIGES");
+  const [uploading, setUploading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<DokumentEintrag | null>(
+    null,
+  );
+
+  async function dokumentUpload(file: File) {
+    setActionError(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("dokumentTyp", uploadTyp);
+      const res = await fetch(`/api/mutterschutz/${prozessId}/dokumente`, {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setActionError(j.error || "Upload fehlgeschlagen.");
+        return;
+      }
+      load();
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function dokumentLoeschen(docId: string) {
+    setActionError(null);
+    const res = await fetch(
+      `/api/mutterschutz/${prozessId}/dokumente/${docId}`,
+      { method: "DELETE" },
+    );
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error || "Dokument konnte nicht geloescht werden.");
+      return;
+    }
+    load();
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,7 +168,8 @@ export function MutterschutzDetailContent({
   }, [load]);
 
   async function toggleItem(item: ChecklistItem) {
-    await fetch(
+    setActionError(null);
+    const res = await fetch(
       `/api/mutterschutz/${prozessId}/checkliste/${item.id}`,
       {
         method: "PATCH",
@@ -111,16 +177,42 @@ export function MutterschutzDetailContent({
         body: JSON.stringify({ erledigt: !item.erledigtAm }),
       },
     );
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error || "Item konnte nicht aktualisiert werden.");
+      return;
+    }
+    load();
+  }
+
+  async function statusTransition(
+    aktion: "bad-beauftragen" | "bad-abschliessen" | "aktivieren" | "beenden",
+  ) {
+    setActionError(null);
+    const res = await fetch(`/api/mutterschutz/${prozessId}/${aktion}`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error || `Fehler bei Aktion '${aktion}'.`);
+      return;
+    }
     load();
   }
 
   async function notizSpeichern() {
     if (neueNotiz.trim().length === 0) return;
-    await fetch(`/api/mutterschutz/${prozessId}/notizen`, {
+    setActionError(null);
+    const res = await fetch(`/api/mutterschutz/${prozessId}/notizen`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: neueNotiz }),
     });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error || "Notiz konnte nicht gespeichert werden.");
+      return;
+    }
     setNeueNotiz("");
     load();
   }
@@ -163,13 +255,62 @@ export function MutterschutzDetailContent({
           </p>
         </div>
 
+        {actionError && (
+          <div className="mb-3 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+            {actionError}
+          </div>
+        )}
+
+        {/* Prozess-Stepper + Naechster-Schritt-Banner */}
+        {(() => {
+          const msStatus = data.status as MutterschutzStatus;
+          const steps = getRelevantSteps(data.badErforderlich);
+          const stepIndex = getMsStepIndex(msStatus, data.badErforderlich);
+          const naechster = getMsNaechsterSchritt(
+            msStatus,
+            data.badErforderlich,
+          );
+
+          return (
+            <div className="mb-4 space-y-3">
+              <ProzessStepper
+                steps={steps.map((s) => ({
+                  id: s.id,
+                  label: s.label,
+                  beschreibung: s.beschreibung,
+                }))}
+                currentStepIndex={stepIndex}
+              />
+              <NaechsterSchrittBanner
+                titel={naechster.titel}
+                beschreibung={naechster.beschreibung}
+                hrAktion={naechster.hrAktion}
+                actionLabel={naechster.actionLabel}
+                onAction={
+                  naechster.action === "BAD_BEAUFTRAGEN"
+                    ? () => statusTransition("bad-beauftragen")
+                    : naechster.action === "BAD_ABSCHLIESSEN"
+                      ? () => statusTransition("bad-abschliessen")
+                      : naechster.action === "AKTIVIEREN"
+                        ? () => statusTransition("aktivieren")
+                        : naechster.action === "BEENDEN"
+                          ? () => statusTransition("beenden")
+                          : undefined
+                }
+              />
+            </div>
+          );
+        })()}
+
         {/* Tabs */}
-        <div className="mb-4 flex gap-1 border-b">
-          {(["uebersicht", "checkliste", "notizen"] as const).map((t) => (
+        <div className="mb-4 flex gap-1 border-b overflow-x-auto">
+          {(
+            ["uebersicht", "checkliste", "dokumente", "notizen"] as const
+          ).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`border-b-2 px-4 py-2 text-sm font-medium ${
+              className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${
                 tab === t
                   ? "border-credo-gruen text-credo-gruen"
                   : "border-transparent text-muted-foreground"
@@ -179,7 +320,9 @@ export function MutterschutzDetailContent({
                 ? "Uebersicht"
                 : t === "checkliste"
                   ? `Checkliste (${data.checklistItems.filter((i) => i.erledigtAm).length}/${data.checklistItems.length})`
-                  : `Notizen (${data.notizen.length})`}
+                  : t === "dokumente"
+                    ? `Dokumente (${data.dokumente?.length ?? 0})`
+                    : `Notizen (${data.notizen.length})`}
             </button>
           ))}
         </div>
@@ -288,6 +431,146 @@ export function MutterschutzDetailContent({
           </div>
         )}
 
+        {tab === "dokumente" && (
+          <div className="space-y-4">
+            {/* BAD-Brief generieren */}
+            {data.badErforderlich && (
+              <div className="rounded-lg border bg-card p-4">
+                <h3 className="text-sm font-semibold text-primary">
+                  BAD-Aufforderungsbrief
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Generiert den Brief an den Betriebsaerztlichen Dienst
+                  und legt ihn als Dokument ab.
+                </p>
+                <a
+                  href={`/api/mutterschutz/${prozessId}/bad-aufforderung`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-block rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted"
+                >
+                  BAD-Brief erzeugen (PDF)
+                </a>
+              </div>
+            )}
+
+            {/* Upload-Bereich */}
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="text-sm font-semibold text-primary">
+                Dokument hochladen
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Manueller Upload (max. 10 MB, PDF / JPG / PNG / WebP).
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <select
+                  value={uploadTyp}
+                  onChange={(e) => setUploadTyp(e.target.value)}
+                  className="rounded-lg border bg-background px-3 py-2 text-sm"
+                >
+                  <option value="BAD_BESCHEINIGUNG">BAD-Bescheinigung</option>
+                  <option value="GEFAEHRDUNGSBEURTEILUNG">
+                    Gefaehrdungsbeurteilung
+                  </option>
+                  <option value="LOHNBESCHEINIGUNG_KK">
+                    Lohnbescheinigung KK
+                  </option>
+                  <option value="AERZTLICHES_ZEUGNIS">
+                    Aerztliches Zeugnis
+                  </option>
+                  <option value="SONSTIGES">Sonstiges</option>
+                </select>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) dokumentUpload(f);
+                    e.target.value = "";
+                  }}
+                  className="text-sm"
+                />
+                {uploading && (
+                  <span className="text-xs text-muted-foreground">
+                    Lade hoch…
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Liste */}
+            {(!data.dokumente || data.dokumente.length === 0) && (
+              <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+                Keine Dokumente vorhanden.
+              </p>
+            )}
+            {data.dokumente && data.dokumente.length > 0 && (
+              <div className="overflow-hidden rounded-lg border bg-card">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Typ</th>
+                      <th className="px-3 py-2 text-left">Dateiname</th>
+                      <th className="px-3 py-2 text-left">Hochgeladen</th>
+                      <th className="px-3 py-2 text-right">Aktion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.dokumente.map((d) => (
+                      <tr
+                        key={d.id}
+                        className="border-t border-border/50 hover:bg-muted/20"
+                      >
+                        <td className="px-3 py-2">
+                          <span className="rounded bg-muted px-2 py-0.5 text-xs">
+                            {d.dokumentTyp}
+                          </span>
+                          {d.generiert && (
+                            <span className="ml-1 text-[10px] text-muted-foreground">
+                              (generiert)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <a
+                            href={`/api/mutterschutz/${prozessId}/dokumente/${d.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-credo-gruen hover:underline"
+                          >
+                            {d.dateiname}
+                          </a>
+                          {d.fileSize && (
+                            <span className="ml-2 text-[10px] text-muted-foreground">
+                              {(d.fileSize / 1024).toFixed(0)} KB
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                          {new Date(d.hochgeladenAm).toLocaleDateString(
+                            "de-DE",
+                          )}
+                          {d.hochgeladenVon && ` · ${d.hochgeladenVon}`}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(d)}
+                            className="text-xs text-destructive hover:underline"
+                          >
+                            Loeschen
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {tab === "notizen" && (
           <div className="space-y-4">
             <div className="rounded-lg border bg-card p-4">
@@ -318,6 +601,18 @@ export function MutterschutzDetailContent({
           </div>
         )}
       </div>
+      {confirmDelete && (
+        <ConfirmDeleteModal
+          titel="Dokument loeschen?"
+          beschreibung={`'${confirmDelete.dateiname}' wird endgueltig entfernt.`}
+          onClose={() => setConfirmDelete(null)}
+          onConfirm={async () => {
+            const docId = confirmDelete.id;
+            setConfirmDelete(null);
+            await dokumentLoeschen(docId);
+          }}
+        />
+      )}
     </div>
   );
 }

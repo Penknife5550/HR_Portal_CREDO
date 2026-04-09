@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { PORTAL_ROLES } from "@/lib/permissions";
+import { PORTAL_ROLES, canAccessProcess } from "@/lib/permissions";
 import { noteSchema } from "@/lib/validations/elternzeit";
 
 export async function GET(
@@ -24,6 +24,17 @@ export async function GET(
   }
 
   const { id } = await params;
+  const ms = await prisma.mutterschutzProzess.findUnique({
+    where: { id },
+    select: { organizationId: true },
+  });
+  if (!ms) {
+    return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+  }
+  if (!(await canAccessProcess(session, ms.organizationId))) {
+    return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+  }
+
   const notizen = await prisma.mutterschutzNotiz.findMany({
     where: { mutterschutzId: id },
     orderBy: { createdAt: "desc" },
@@ -54,8 +65,14 @@ export async function POST(
       );
     }
 
-    const ms = await prisma.mutterschutzProzess.findUnique({ where: { id } });
+    const ms = await prisma.mutterschutzProzess.findUnique({
+      where: { id },
+      select: { organizationId: true },
+    });
     if (!ms) {
+      return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+    }
+    if (!(await canAccessProcess(session, ms.organizationId))) {
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 

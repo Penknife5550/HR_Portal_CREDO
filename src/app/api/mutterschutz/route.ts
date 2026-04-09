@@ -14,6 +14,7 @@ import {
   orgFilter,
   PORTAL_ROLES,
   PROCESS_CREATE_ROLES,
+  canAccessOrg,
 } from "@/lib/permissions";
 import { createMutterschutzSchema } from "@/lib/validations/elternzeit";
 import {
@@ -46,21 +47,24 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(isNaN(rawLimit) ? 50 : rawLimit, 1), 200);
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {
+    // Basis-Where ohne Status — wird fuer KPI-Counts verwendet,
+    // damit die Kacheln nicht vom aktuell aktiven Status-Filter abhaengen.
+    const baseWhere: Record<string, unknown> = {
       ...(await orgFilter(session)),
     };
-    if (status) where.status = status;
-    if (organizationId) where.organizationId = organizationId;
+    if (organizationId) baseWhere.organizationId = organizationId;
     if (search) {
-      where.OR = [
+      baseWhere.OR = [
         { displayId: { contains: search, mode: "insensitive" } },
         { employeeFirstName: { contains: search, mode: "insensitive" } },
         { employeeLastName: { contains: search, mode: "insensitive" } },
         { employeeEmail: { contains: search, mode: "insensitive" } },
       ];
     }
+    const where: Record<string, unknown> = { ...baseWhere };
+    if (status) where.status = status;
 
-    const [items, total] = await Promise.all([
+    const [items, total, statusCountsRaw] = await Promise.all([
       prisma.mutterschutzProzess.findMany({
         where,
         include: {
@@ -76,13 +80,24 @@ export async function GET(request: NextRequest) {
         take: limit,
       }),
       prisma.mutterschutzProzess.count({ where }),
+      prisma.mutterschutzProzess.groupBy({
+        by: ["status"],
+        where: baseWhere,
+        _count: { status: true },
+      }),
     ]);
+
+    const statusCounts: Record<string, number> = {};
+    for (const sc of statusCountsRaw) {
+      statusCounts[sc.status] = sc._count.status;
+    }
 
     return NextResponse.json({
       data: items,
       total,
       page,
       limit,
+      statusCounts,
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
@@ -130,6 +145,12 @@ export async function POST(request: NextRequest) {
       where: { id: organizationId },
     });
     if (!org) {
+      return NextResponse.json(
+        { error: "Organisation nicht gefunden" },
+        { status: 404 },
+      );
+    }
+    if (!(await canAccessOrg(session, organizationId))) {
       return NextResponse.json(
         { error: "Organisation nicht gefunden" },
         { status: 404 },

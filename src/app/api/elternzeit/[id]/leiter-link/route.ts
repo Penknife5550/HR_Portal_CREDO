@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { hashToken } from "@/lib/token-hash";
 
 const schema = z.object({
   recipientEmail: z.string().email(),
@@ -88,13 +89,14 @@ export async function POST(
 
     const validityDays = ez.organization?.ezTokenValidityDays ?? 14;
     const token = randomUUID();
+    const tokenHash = hashToken(token);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + validityDays);
 
     await prisma.elternzeitProzess.update({
       where: { id },
       data: {
-        leiterTokenEndg: token,
+        leiterTokenEndg: tokenHash,
         leiterTokenEndgExpiry: expiresAt,
         einrichtungsleiterEmail: parsed.data.recipientEmail,
         einrichtungsleiterName: parsed.data.recipientName || null,

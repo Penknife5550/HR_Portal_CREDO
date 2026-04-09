@@ -48,7 +48,7 @@ export function NeueElternzeitModal({ open, onClose, onCreated }: Props) {
   const [personalNr, setPersonalNr] = useState("");
   const [organizationId, setOrganizationId] = useState("");
   const [personalgruppe, setPersonalgruppe] = useState<
-    "TARIF_TV_L" | "BEAMTER" | "PLANSTELLENINHABER"
+    "TARIF_TV_L" | "BEAMTER"
   >("TARIF_TV_L");
   const [geschlecht, setGeschlecht] = useState<"MUTTER" | "VATER">("MUTTER");
   const [kvTyp, setKvTyp] = useState<"GKV_PFLICHT" | "GKV_FREIWILLIG" | "PKV">(
@@ -218,17 +218,13 @@ export function NeueElternzeitModal({ open, onClose, onCreated }: Props) {
                 value={personalgruppe}
                 onChange={(e) =>
                   setPersonalgruppe(
-                    e.target.value as
-                      | "TARIF_TV_L"
-                      | "BEAMTER"
-                      | "PLANSTELLENINHABER",
+                    e.target.value as "TARIF_TV_L" | "BEAMTER",
                   )
                 }
                 className={inp}
               >
                 <option value="TARIF_TV_L">Tarifangestellte (TV-L)</option>
                 <option value="BEAMTER">Beamter/Beamtin</option>
-                <option value="PLANSTELLENINHABER">Planstelleninhaber/in</option>
               </select>
             </Field>
             <Field label="KV-Typ *">

@@ -13,6 +13,7 @@ import { unlink } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
 import { sanitizeFilename, saveUploadedFile, validateUpload } from "@/lib/file-upload";
+import { hashToken } from "@/lib/token-hash";
 
 export async function POST(
   request: NextRequest,
@@ -20,9 +21,10 @@ export async function POST(
 ) {
   try {
     const { token } = await params;
+    const tokenHash = hashToken(token);
 
     const ez = await prisma.elternzeitProzess.findUnique({
-      where: { antragTokenEndg: token },
+      where: { antragTokenEndg: tokenHash },
       select: {
         id: true,
         antragTokenEndgExpiry: true,

@@ -13,6 +13,7 @@ import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { generateAntragLinkSchema } from "@/lib/validations/elternzeit";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
+import { hashToken } from "@/lib/token-hash";
 
 export async function POST(
   request: NextRequest,
@@ -69,15 +70,17 @@ export async function POST(
       request.headers.get("x-real-ip") ||
       null;
 
-    // Token (UUID, 30 Tage gueltig)
+    // Token (UUID, 30 Tage gueltig). Klartext nur in der Magic-URL,
+    // in der DB liegt nur der SHA-256-Hash (siehe lib/token-hash.ts).
     const token = randomUUID();
+    const tokenHash = hashToken(token);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
     await prisma.elternzeitProzess.update({
       where: { id },
       data: {
-        antragTokenVorl: token,
+        antragTokenVorl: tokenHash,
         antragTokenVorlExpiry: expiresAt,
         status: "ANTRAG_VORL_VERSANDT",
       },

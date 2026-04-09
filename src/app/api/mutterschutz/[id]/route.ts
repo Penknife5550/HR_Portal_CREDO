@@ -13,6 +13,7 @@ import {
   ADMIN_ROLES,
   HR_EDIT_ROLES,
   PORTAL_ROLES,
+  canAccessProcess,
 } from "@/lib/permissions";
 import { updateMutterschutzSchema } from "@/lib/validations/elternzeit";
 import { berechneMutterschutzEnde } from "@/lib/elternzeit-helpers";
@@ -53,6 +54,9 @@ export async function GET(
     if (!ms) {
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
+    if (!(await canAccessProcess(session, ms.organizationId))) {
+      return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+    }
     return NextResponse.json({ data: ms });
   } catch (error) {
     console.error("[API] Mutterschutz GET[id] fehlgeschlagen:", error);
@@ -76,6 +80,9 @@ export async function PATCH(
     const { id } = await params;
     const ms = await prisma.mutterschutzProzess.findUnique({ where: { id } });
     if (!ms) {
+      return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+    }
+    if (!(await canAccessProcess(session, ms.organizationId))) {
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 
@@ -165,6 +172,9 @@ export async function DELETE(
     const { id } = await params;
     const ms = await prisma.mutterschutzProzess.findUnique({ where: { id } });
     if (!ms) {
+      return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+    }
+    if (!(await canAccessProcess(session, ms.organizationId))) {
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
     if (ms.status !== "GEMELDET") {

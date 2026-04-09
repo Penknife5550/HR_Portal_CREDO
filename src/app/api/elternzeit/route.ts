@@ -14,6 +14,7 @@ import {
   orgFilter,
   PORTAL_ROLES,
   PROCESS_CREATE_ROLES,
+  canAccessOrg,
 } from "@/lib/permissions";
 import { createElternzeitSchema } from "@/lib/validations/elternzeit";
 import { generateElternzeitDisplayId } from "@/lib/elternzeit-helpers";
@@ -45,22 +46,25 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(isNaN(rawLimit) ? 50 : rawLimit, 1), 200);
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {
+    // Basis-Where ohne Status — wird fuer KPI-Counts verwendet,
+    // damit die Kacheln nicht vom aktiven Status-Filter abhaengen.
+    const baseWhere: Record<string, unknown> = {
       ...(await orgFilter(session)),
     };
-    if (status) where.status = status;
-    if (organizationId) where.organizationId = organizationId;
-    if (personalgruppe) where.personalgruppe = personalgruppe;
+    if (organizationId) baseWhere.organizationId = organizationId;
+    if (personalgruppe) baseWhere.personalgruppe = personalgruppe;
     if (search) {
-      where.OR = [
+      baseWhere.OR = [
         { displayId: { contains: search, mode: "insensitive" } },
         { employeeFirstName: { contains: search, mode: "insensitive" } },
         { employeeLastName: { contains: search, mode: "insensitive" } },
         { employeeEmail: { contains: search, mode: "insensitive" } },
       ];
     }
+    const where: Record<string, unknown> = { ...baseWhere };
+    if (status) where.status = status;
 
-    const [items, total] = await Promise.all([
+    const [items, total, statusCountsRaw] = await Promise.all([
       prisma.elternzeitProzess.findMany({
         where,
         include: {
@@ -77,13 +81,24 @@ export async function GET(request: NextRequest) {
         take: limit,
       }),
       prisma.elternzeitProzess.count({ where }),
+      prisma.elternzeitProzess.groupBy({
+        by: ["status"],
+        where: baseWhere,
+        _count: { status: true },
+      }),
     ]);
+
+    const statusCounts: Record<string, number> = {};
+    for (const sc of statusCountsRaw) {
+      statusCounts[sc.status] = sc._count.status;
+    }
 
     return NextResponse.json({
       data: items,
       total,
       page,
       limit,
+      statusCounts,
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
@@ -139,6 +154,14 @@ export async function POST(request: NextRequest) {
         { status: 404 },
       );
     }
+    // IDOR-Schutz: User darf nur Vorgaenge in eigenen Mandanten anlegen.
+    // 404 statt 403, um Existenz nicht zu leaken.
+    if (!(await canAccessOrg(session, organizationId))) {
+      return NextResponse.json(
+        { error: "Organisation nicht gefunden" },
+        { status: 404 },
+      );
+    }
 
     // Validierung Mutterschutz-Verknuepfung: nur bei Mutter zulaessig
     if (mutterschutzId && geschlecht !== "MUTTER") {
@@ -150,9 +173,9 @@ export async function POST(request: NextRequest) {
     if (mutterschutzId) {
       const ms = await prisma.mutterschutzProzess.findUnique({
         where: { id: mutterschutzId },
-        select: { id: true },
+        select: { id: true, organizationId: true },
       });
-      if (!ms) {
+      if (!ms || !(await canAccessOrg(session, ms.organizationId))) {
         return NextResponse.json(
           { error: "Verknuepfter Mutterschutz-Vorgang nicht gefunden" },
           { status: 404 },

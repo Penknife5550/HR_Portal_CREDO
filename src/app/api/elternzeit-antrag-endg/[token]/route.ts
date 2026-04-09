@@ -14,6 +14,7 @@ import { prisma } from "@/lib/db";
 import { publicAntragEndgSchema } from "@/lib/validations/elternzeit";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
+import { hashToken } from "@/lib/token-hash";
 
 // =============================================
 // GET – Token validieren + Daten laden
@@ -24,9 +25,10 @@ export async function GET(
 ) {
   try {
     const { token } = await params;
+    const tokenHash = hashToken(token);
 
     const ez = await prisma.elternzeitProzess.findUnique({
-      where: { antragTokenEndg: token },
+      where: { antragTokenEndg: tokenHash },
       include: {
         organization: { select: { name: true, mandantNumber: true } },
         abschnitte: {
@@ -94,6 +96,7 @@ export async function POST(
 ) {
   try {
     const { token } = await params;
+    const tokenHash = hashToken(token);
 
     const body = await request.json().catch(() => null);
     const parsed = publicAntragEndgSchema.safeParse(body);
@@ -107,7 +110,7 @@ export async function POST(
 
     // Vorgang laden — fuer ID, Geburtsurkunden-Check und spaetere Webhook-Daten
     const ez = await prisma.elternzeitProzess.findUnique({
-      where: { antragTokenEndg: token },
+      where: { antragTokenEndg: tokenHash },
       select: {
         id: true,
         displayId: true,
@@ -150,8 +153,10 @@ export async function POST(
       const result = await tx.elternzeitProzess.updateMany({
         where: {
           id: ez.id,
-          antragTokenEndg: token,
+          antragTokenEndg: tokenHash,
           antragTokenEndgUsedAt: null,
+          // Defense in depth: Expiry im atomaren Update pruefen
+          antragTokenEndgExpiry: { gt: new Date() },
         },
         data: {
           kindName: data.kindName,
@@ -174,10 +179,12 @@ export async function POST(
         data: {
           elternzeitId: ez.id,
           processType: "ELTERNZEIT",
-          action: "ANTRAG_ENDG_SUBMITTED",
+          // Public-Magic-Link-Submission — kein userId vorhanden
+          action: "ANTRAG_ENDG_SUBMITTED_VIA_MAGIC_LINK",
           details: {
             kindName: data.kindName,
             kindGeburtsdatum: data.kindGeburtsdatum,
+            tokenHash,
           },
           ipAddress,
         },

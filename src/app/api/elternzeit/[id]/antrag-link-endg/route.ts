@@ -16,6 +16,7 @@ import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { generateAntragLinkEndgSchema } from "@/lib/validations/elternzeit";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
+import { hashToken } from "@/lib/token-hash";
 
 const ALLOWED_STATUSES = [
   "VORLAEUFIG_GENEHMIGT",
@@ -89,13 +90,14 @@ export async function POST(
 
     const validityDays = ez.organization?.ezTokenValidityDays ?? 30;
     const token = randomUUID();
+    const tokenHash = hashToken(token);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + validityDays);
 
     await prisma.elternzeitProzess.update({
       where: { id },
       data: {
-        antragTokenEndg: token,
+        antragTokenEndg: tokenHash,
         antragTokenEndgExpiry: expiresAt,
         status: "ANTRAG_ENDG_VERSANDT",
       },

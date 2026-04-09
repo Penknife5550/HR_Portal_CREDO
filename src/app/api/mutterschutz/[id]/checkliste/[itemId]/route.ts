@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { CHECKLIST_ROLES } from "@/lib/permissions";
+import { CHECKLIST_ROLES, canAccessProcess } from "@/lib/permissions";
 import { checklistUpdateSchema } from "@/lib/validations/elternzeit";
 
 export async function PATCH(
@@ -35,8 +35,12 @@ export async function PATCH(
 
     const item = await prisma.mutterschutzChecklistItem.findFirst({
       where: { id: itemId, mutterschutzId: id },
+      include: { mutterschutz: { select: { organizationId: true } } },
     });
     if (!item) {
+      return NextResponse.json({ error: "Item nicht gefunden" }, { status: 404 });
+    }
+    if (!(await canAccessProcess(session, item.mutterschutz.organizationId))) {
       return NextResponse.json({ error: "Item nicht gefunden" }, { status: 404 });
     }
 
