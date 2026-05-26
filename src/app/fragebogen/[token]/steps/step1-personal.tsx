@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Step 1: Persoenliche Angaben
+ * Step 1: Persönliche Angaben
  * Name, Geburtsdatum, Familienstand, Schwerbehinderung
  */
 
@@ -173,7 +173,7 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
         )}
       </div>
 
-      {/* Geburtsland + Staatsangehoerigkeit */}
+      {/* Geburtsland + Staatsangehörigkeit */}
       {(fc.isVisible("birthCountry") || fc.isVisible("nationality")) && (
         <div className="grid gap-4 sm:grid-cols-2">
           {fc.isVisible("birthCountry") && (

@@ -4,7 +4,7 @@
  * Offboarding-Aufgaben – Magic-Link Einstiegsseite
  *
  * Validiert den Token und zeigt entweder die Aufgabenliste
- * fuer die jeweilige Abteilung oder eine Fehlermeldung an.
+ * für die jeweilige Abteilung oder eine Fehlermeldung an.
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -57,7 +57,7 @@ export default function OffboardingTasksPage() {
         return;
       }
       const result = await res.json();
-      // API gibt { data: { department, offboarding, items, progress } } zurueck
+      // API gibt { data: { department, offboarding, items, progress } } zurück
       // Mapping auf OffboardingTaskData Format
       const apiData = result.data || result;
       const mapped: OffboardingTaskData = {
@@ -110,7 +110,7 @@ export default function OffboardingTasksPage() {
     );
   }
 
-  // Fehler (Token ungueltig, abgelaufen, etc.)
+  // Fehler (Token ungültig, abgelaufen, etc.)
   if (error) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-4">

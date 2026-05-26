@@ -5,7 +5,7 @@ import { EinstellungenContent } from "./einstellungen-content";
 /**
  * Einstellungen-Seite (Server Component)
  *
- * Zugaenglich fuer SUPER_ADMIN und HR_LEITUNG.
+ * Zugaenglich für SUPER_ADMIN und HR_LEITUNG.
  * Verwaltet: Webhooks, SMTP-Fallback, E-Mail-Vorlagen
  */
 export default async function EinstellungenPage() {

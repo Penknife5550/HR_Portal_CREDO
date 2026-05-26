@@ -3,7 +3,7 @@
  *
  * GET    – Einzelne Vorlage mit allen Items abrufen
  * PATCH  – Vorlage bearbeiten (name, description, questionnaireType, isActive)
- * DELETE – Vorlage loeschen (nur wenn nicht in Verwendung)
+ * DELETE – Vorlage löschen (nur wenn nicht in Verwendung)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -127,7 +127,7 @@ export async function PATCH(
 }
 
 // =============================================
-// DELETE /api/checklisten/:id – Vorlage loeschen
+// DELETE /api/checklisten/:id – Vorlage löschen
 // =============================================
 export async function DELETE(
   _request: NextRequest,
@@ -179,14 +179,14 @@ export async function DELETE(
       );
     }
 
-    // Vorlage loeschen (Cascade loescht auch die Template-Items)
+    // Vorlage löschen (Cascade loescht auch die Template-Items)
     await prisma.checklistTemplate.delete({
       where: { id },
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Fehler beim Loeschen der Checklisten-Vorlage:", error);
+    console.error("Fehler beim Löschen der Checklisten-Vorlage:", error);
     return NextResponse.json(
       { error: "Interner Serverfehler" },
       { status: 500 }

@@ -148,7 +148,7 @@ export function NeueElternzeitModal({ open, onClose, onCreated }: Props) {
         <div className="border-b p-4">
           <h2 className="text-lg font-semibold">Neue Elternzeit anlegen</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Phase 1: vorlaeufiger Antrag via Magic Link
+            Phase 1: vorläufiger Antrag via Magic Link
           </p>
         </div>
 

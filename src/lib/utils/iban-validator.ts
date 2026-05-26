@@ -27,7 +27,7 @@ export function validateIBAN(iban: string): boolean {
     return false;
   }
 
-  // Spezifische Pruefung fuer deutsche IBAN: DE + 2 Pruefziffern + 18 Ziffern = 22 Zeichen
+  // Spezifische Pruefung für deutsche IBAN: DE + 2 Pruefziffern + 18 Ziffern = 22 Zeichen
   if (cleaned.startsWith("DE")) {
     if (cleaned.length !== 22) {
       return false;
@@ -52,7 +52,7 @@ export function validateIBAN(iban: string): boolean {
     }
   }
 
-  // 3. Modulo 97 berechnen (mit schrittweiser Berechnung fuer grosse Zahlen)
+  // 3. Modulo 97 berechnen (mit schrittweiser Berechnung für grosse Zahlen)
   let remainder = 0;
   for (const digit of numericString) {
     remainder = (remainder * 10 + parseInt(digit, 10)) % 97;
@@ -62,7 +62,7 @@ export function validateIBAN(iban: string): boolean {
 }
 
 /**
- * Formatiert eine IBAN fuer die Anzeige (Grossbuchstaben, Leerzeichen alle 4 Zeichen).
+ * Formatiert eine IBAN für die Anzeige (Grossbuchstaben, Leerzeichen alle 4 Zeichen).
  *
  * @param iban - Die zu formatierende IBAN
  * @returns Formatierte IBAN (z.B. "DE89 3704 0044 0532 0130 00")

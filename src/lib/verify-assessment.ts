@@ -1,5 +1,5 @@
 /**
- * Shared loader fuer die oeffentliche Verify-/Audit-Page (Phase 6).
+ * Shared loader für die oeffentliche Verify-/Audit-Page (Phase 6).
  *
  * Wird sowohl von der SSR-Page (`/verify/civil-service-assessment/[token]/page.tsx`)
  * als auch von der API-Route (`/api/verify/civil-service-assessment/[token]`)
@@ -215,7 +215,7 @@ export async function loadVerifyAssessment(
 
 /**
  * Erzeugt aus dem verifyToken (UUID) einen 8-stelligen menschenlesbaren
- * Code im Format `CRD-XXXX-YYYY` fuer Telefonate / Aktenvermerke.
+ * Code im Format `CRD-XXXX-YYYY` für Telefonate / Aktenvermerke.
  */
 export function buildVerifyHash(verifyToken: string | null | undefined): string | null {
   if (!verifyToken) return null;
@@ -224,7 +224,7 @@ export function buildVerifyHash(verifyToken: string | null | undefined): string 
 }
 
 /**
- * Action -> deutsches Label fuer das Audit-Log auf der Verify-Page.
+ * Action -> deutsches Label für das Audit-Log auf der Verify-Page.
  */
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
   ASSESSMENT_REQUESTED: "Angefordert durch HR",

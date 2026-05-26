@@ -4,7 +4,7 @@ import type { AuditLogEntry } from "../types";
 import { formatDateTime } from "../helpers";
 import { AUDIT_ACTION_LABELS } from "@/lib/verify-assessment";
 
-// Zusaetzliche Action-Labels fuer Aktionen, die nicht in AUDIT_ACTION_LABELS
+// Zusaetzliche Action-Labels für Aktionen, die nicht in AUDIT_ACTION_LABELS
 // stehen (welche bewusst auf die Verify-Page beschraenkt ist).
 const EXTRA_ACTION_LABELS: Record<string, string> = {
   CIVIL_SERVICE_CREATED: "Verbeamtungsvorgang angelegt",

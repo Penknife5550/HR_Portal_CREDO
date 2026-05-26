@@ -3,10 +3,10 @@
 /**
  * Dashboard-Charts und KPI-Komponenten
  *
- * Verwendet Recharts fuer interaktive Visualisierungen:
+ * Verwendet Recharts für interaktive Visualisierungen:
  * - StatusPieChart: Tortendiagramm der Status-Verteilung
  * - MonthlyTrendChart: Balkendiagramm erstellt vs. abgeschlossen
- * - OverdueBanner: Warnbanner fuer ueberfaellige Vorgaenge
+ * - OverdueBanner: Warnbanner für ueberfaellige Vorgaenge
  * - DurationKPI: Durchschnittliche Bearbeitungsdauer
  */
 
@@ -95,14 +95,14 @@ export function StatusPieChart({ data }: { data: StatusData[] }) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={320}>
       <PieChart>
         <Pie
           data={chartData}
           cx="50%"
-          cy="50%"
-          innerRadius={60}
-          outerRadius={100}
+          cy="45%"
+          innerRadius={55}
+          outerRadius={90}
           paddingAngle={2}
           dataKey="value"
           label={({ value, percent }) => (percent ?? 0) > 0.05 ? `${value}` : ""}
@@ -118,6 +118,22 @@ export function StatusPieChart({ data }: { data: StatusData[] }) {
             borderRadius: "8px",
             border: "1px solid #e5e7eb",
             fontSize: "13px",
+          }}
+        />
+        <Legend
+          verticalAlign="bottom"
+          align="center"
+          iconType="circle"
+          iconSize={10}
+          wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }}
+          formatter={(value, entry) => {
+            const count = (entry?.payload as { value?: number } | undefined)?.value;
+            return (
+              <span className="text-foreground">
+                {value}
+                {typeof count === "number" ? ` (${count})` : ""}
+              </span>
+            );
           }}
         />
       </PieChart>
@@ -233,7 +249,7 @@ export function DurationKPI({
 }
 
 // =============================================
-// Ueberfaellig-Badge fuer Tabellenzeilen
+// Ueberfaellig-Badge für Tabellenzeilen
 // =============================================
 export function OverdueBadge({ invitedAt, status }: { invitedAt: string; status: string }) {
   const openStatuses = ["INVITED", "IN_PROGRESS", "SUBMITTED", "SUPERVISOR_PENDING"];

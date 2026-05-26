@@ -38,7 +38,7 @@ export async function GET(
 
     if (!ez) {
       return NextResponse.json(
-        { error: "Token ungueltig oder abgelaufen" },
+        { error: "Token ungültig oder abgelaufen" },
         { status: 404 },
       );
     }
@@ -57,7 +57,7 @@ export async function GET(
       );
     }
 
-    // Aktive Schulferien fuer Anzeige im Formular
+    // Aktive Schulferien für Anzeige im Formular
     const ferien = await prisma.schulferienNRW.findMany({
       where: { aktiv: true, bis: { gte: new Date() } },
       orderBy: { von: "asc" },
@@ -107,7 +107,7 @@ export async function POST(
     });
     if (!ez) {
       return NextResponse.json(
-        { error: "Token ungueltig" },
+        { error: "Token ungültig" },
         { status: 404 },
       );
     }
@@ -134,7 +134,7 @@ export async function POST(
     }
     const data = parsed.data;
 
-    // Feriensperrfrist-Check (Hinweis fuer alle, Pflichtbegruendung nur Beamte/PSI)
+    // Feriensperrfrist-Check (Hinweis für alle, Pflichtbegruendung nur Beamte/PSI)
     const ferien = await prisma.schulferienNRW.findMany({
       where: { aktiv: true },
     });
@@ -201,7 +201,7 @@ export async function POST(
         return { status: "ALREADY_USED" as const };
       }
 
-      // Bestehende Abschnitte loeschen + neue anlegen
+      // Bestehende Abschnitte löschen + neue anlegen
       await tx.elternzeitAbschnitt.deleteMany({
         where: { elternzeitId: ez.id },
       });
@@ -258,7 +258,7 @@ export async function POST(
     triggerWebhooks("elternzeit-antrag-eingereicht", {
       elternzeitId: ez.id,
       displayId: ez.displayId,
-      antragTyp: "vorlaeufig",
+      antragTyp: "vorläufig",
       submittedAt: new Date().toISOString(),
       employeeName: `${ez.employeeFirstName} ${ez.employeeLastName}`,
       employeeEmail: ez.employeeEmail,

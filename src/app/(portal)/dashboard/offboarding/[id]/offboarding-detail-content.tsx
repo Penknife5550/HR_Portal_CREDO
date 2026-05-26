@@ -110,7 +110,7 @@ export function OffboardingDetailContent({
     return () => clearTimeout(timer);
   }, [actionError]);
 
-  // Click-Outside fuer Status-Dropdown
+  // Click-Outside für Status-Dropdown
   useEffect(() => {
     if (!showStatusDropdown) return;
     const handleClickOutside = (e: MouseEvent) => {

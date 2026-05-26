@@ -5,7 +5,7 @@
  *
  * Zeigt die eingereichte Beurteilung als Read-Only und erlaubt der Lehrkraft:
  * 1. Die Beurteilung zur Kenntnis zu nehmen (Pflicht-Checkbox)
- * 2. Optional eine Gegenaeusserung gemaess § 92 Abs. 1 Satz 6 LBG NRW
+ * 2. Optional eine Gegenaeusserung gemäß § 92 Abs. 1 Satz 6 LBG NRW
  *    abzugeben (mehrzeilig, max. 10.000 Zeichen)
  * 3. Final zu bestaetigen
  *

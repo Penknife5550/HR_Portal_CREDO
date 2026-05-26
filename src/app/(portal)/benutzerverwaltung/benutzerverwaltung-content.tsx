@@ -375,7 +375,7 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
 }
 
 // =============================================
-// Wiederverwendbares Modal fuer Neuer/Bearbeiten
+// Wiederverwendbares Modal für Neuer/Bearbeiten
 // =============================================
 function UserModal({
   title,

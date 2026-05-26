@@ -29,7 +29,7 @@ export async function GET(
       );
     }
     if (!EXPORT_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: "Keine Berechtigung fuer Export" }, { status: 403 });
+      return NextResponse.json({ error: "Keine Berechtigung für Export" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -56,7 +56,7 @@ export async function GET(
       const pd = onboarding.personalData;
       const sd = onboarding.supervisorData;
 
-      // CSV-Header und -Zeile fuer LOGA-Import
+      // CSV-Header und -Zeile für LOGA-Import
       const headers = [
         "Mandantennummer",
         "Einrichtung",
@@ -68,7 +68,7 @@ export async function GET(
         "Geburtsdatum",
         "Geburtsort",
         "Geburtsland",
-        "Staatsangehoerigkeit",
+        "Staatsangehörigkeit",
         "Familienstand",
         "Konfession",
         "Strasse",
@@ -96,7 +96,7 @@ export async function GET(
         "Vertragsende",
         "Vollzeit",
         "Wochenstunden",
-        "Verguetungsmodell",
+        "Vergütungsmodell",
         "Entgeltgruppe",
         "Stufe",
         "Hauptarbeitgeber",
@@ -155,7 +155,7 @@ export async function GET(
         sd?.kostenstelle || "",
       ];
 
-      // CSV-String bauen (mit Semikolon als Trennzeichen fuer deutsche Excel-Versionen)
+      // CSV-String bauen (mit Semikolon als Trennzeichen für deutsche Excel-Versionen)
       const csvContent = [
         headers.join(";"),
         values.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";"),

@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json(
-        { error: "Diese Abteilung existiert bereits fuer diese Einrichtung" },
+        { error: "Diese Abteilung existiert bereits für diese Einrichtung" },
         { status: 409 }
       );
     }

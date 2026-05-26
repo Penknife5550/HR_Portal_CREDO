@@ -31,10 +31,15 @@ interface OnboardingData {
     name: string;
     mandantNumber: string;
     type: string;
+    dsgvoVerantwortlicheName?: string | null;
+    dsgvoVerantwortlicheStrasse?: string | null;
+    dsgvoVerantwortlichePlz?: string | null;
+    dsgvoVerantwortlicheOrt?: string | null;
   };
   questionnaireType: string;
   status: string;
   stepsConfig?: StepFieldConfig[] | null;
+  requiredDocuments?: string[] | null;
   personalData: Record<string, unknown> | null;
 }
 
@@ -62,7 +67,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
       .map((s) => s.step - 1); // 0-basierter Index
   }, [initialData.stepsConfig]);
 
-  // FieldConfig-Helper fuer jeden Step erstellen
+  // FieldConfig-Helper für jeden Step erstellen
   const getFieldConfig = useCallback(
     (stepNumber: number): FieldConfigHelper => {
       const stepConfig = initialData.stepsConfig?.find(
@@ -120,7 +125,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     }
   };
 
-  // Zurueck zum vorherigen Step
+  // Zurück zum vorherigen Step
   const handleBack = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
@@ -128,7 +133,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     }
   };
 
-  // Fragebogen endgueltig absenden
+  // Fragebogen endgültig absenden
   const handleSubmit = async () => {
     setSaving(true);
     try {
@@ -369,6 +374,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
       allData={formData}
       onSubmit={handleSubmit}
       token={token}
+      requiredDocuments={initialData.requiredDocuments ?? undefined}
     />,
   ];
 

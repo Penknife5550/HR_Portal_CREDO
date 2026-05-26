@@ -50,7 +50,7 @@ export async function POST(_request: NextRequest, context: RouteContext) {
 
     const { token } = await context.params;
 
-    // Beurteilung laden inkl. Process + Organization fuer Webhook
+    // Beurteilung laden inkl. Process + Organization für Webhook
     const assessment = await prisma.civilServiceAssessment.findUnique({
       where: { token },
       include: {

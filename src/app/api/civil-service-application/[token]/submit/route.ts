@@ -4,7 +4,7 @@
  * POST - LK reicht den Antrag auf Verbeamtung final ein
  *
  * OEFFENTLICH - kein Auth erforderlich!
- * Zugang ausschliesslich ueber gueltigen Magic-Link-Token.
+ * Zugang ausschliesslich über gueltigen Magic-Link-Token.
  *
  * Prueft alle 12 Voraussetzungen. Kriterien die von der SL/Beirat/Amtsarzt
  * abhaengen werden als "wird spaeter geprueft" markiert und blockieren

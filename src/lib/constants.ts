@@ -1,7 +1,7 @@
 /**
  * CREDO HR-Portal – Zentrale Konstanten
  *
- * Einheitliche Definitionen fuer Status-Labels, Rollen,
+ * Einheitliche Definitionen für Status-Labels, Rollen,
  * Validierungsfunktionen und andere wiederverwendbare Werte.
  */
 
@@ -29,7 +29,7 @@ export const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 // =============================================
-// Prozesstyp-Labels (zukunftssicher fuer weitere HR-Vorgaenge)
+// Prozesstyp-Labels (zukunftssicher für weitere HR-Vorgaenge)
 // =============================================
 export const PROCESS_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   EINSTELLUNG: { label: "Einstellung", color: "bg-blue-100 text-blue-800" },
@@ -142,7 +142,7 @@ export const OFFBOARDING_DOC_TYPE_LABELS: Record<string, string> = {
 };
 
 // =============================================
-// Abteilungs-Schluessel
+// Abteilungs-Schlüssel
 // =============================================
 export const DEPARTMENT_KEYS = {
   HR: "HR",

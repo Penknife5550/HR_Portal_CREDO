@@ -3,7 +3,7 @@
  *
  * GET    – Detail eines Elternzeit-Vorgangs
  * PATCH  – Status / Felder aktualisieren
- * DELETE – Loeschen (nur Status ANGELEGT, nur Admin)
+ * DELETE – Löschen (nur Status ANGELEGT, nur Admin)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -167,7 +167,7 @@ export async function DELETE(
     }
     if (ez.status !== "ANGELEGT") {
       return NextResponse.json(
-        { error: "Loeschen nur im Status ANGELEGT moeglich" },
+        { error: "Löschen nur im Status ANGELEGT moeglich" },
         { status: 409 },
       );
     }

@@ -1,12 +1,12 @@
 /**
  * CREDO HR-Portal – Verschluesselung sensibler Personaldaten
  *
- * AES-256-GCM Verschluesselung fuer:
+ * AES-256-GCM Verschluesselung für:
  * - IBAN (Bankverbindung)
  * - Sozialversicherungsnummer
  * - Steuer-Identifikationsnummer
  *
- * DSGVO Art. 32: Angemessene technische Massnahmen zum Schutz
+ * DSGVO Art. 32: Angemessene technische Maßnahmen zum Schutz
  * personenbezogener Daten (Application-Level Encryption).
  *
  * Schluesselgenerierung: openssl rand -hex 32
@@ -37,7 +37,7 @@ function getEncryptionKey(): Buffer {
 
 /**
  * Verschluesselt einen Klartext-String mit AES-256-GCM.
- * Gibt einen String im Format "iv:authTag:ciphertext" (Base64) zurueck.
+ * Gibt einen String im Format "iv:authTag:ciphertext" (Base64) zurück.
  */
 export function encrypt(plaintext: string): string {
   if (!plaintext) return plaintext;
@@ -56,7 +56,7 @@ export function encrypt(plaintext: string): string {
 
 /**
  * Entschluesselt einen verschluesselten String (Format: "iv:authTag:ciphertext").
- * Gibt den Klartext zurueck.
+ * Gibt den Klartext zurück.
  */
 export function decrypt(encryptedText: string): string {
   if (!encryptedText) return encryptedText;

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Fragebogen-Vorschau fuer Admins (Vorschlag 6)
+ * Fragebogen-Vorschau für Admins (Vorschlag 6)
  *
  * Zeigt den Personalfragebogen so an, wie ihn ein Mitarbeiter sehen wuerde,
  * basierend auf der aktuellen Vorlagen-Konfiguration.

@@ -2,7 +2,7 @@
  * API: /api/civil-service/[id]/assessments
  *
  * POST - Beurteilung erstellen (SL zur Bewertung auffordern)
- * GET  - Alle Beurteilungen fuer diesen Prozess auflisten
+ * GET  - Alle Beurteilungen für diesen Prozess auflisten
  *
  * Auth erforderlich (HR_LEITUNG, SUPER_ADMIN)
  */
@@ -45,7 +45,7 @@ export async function POST(
 
     const { id } = await context.params;
 
-    // Prozess pruefen — inkl. Organization-Daten fuer Webhook + Mandanten-Default
+    // Prozess pruefen — inkl. Organization-Daten für Webhook + Mandanten-Default
     const process = await prisma.civilServiceProcess.findUnique({
       where: { id },
       select: {
@@ -94,7 +94,7 @@ export async function POST(
       return NextResponse.json({ error: "recipientEmail ist erforderlich" }, { status: 400 });
     }
 
-    // BRL Nr. 8.3 — 14-Tage-Frist pruefen (nur fuer BEURTEILUNG mit Termin)
+    // BRL Nr. 8.3 — 14-Tage-Frist pruefen (nur für BEURTEILUNG mit Termin)
     let scheduledDateParsed: Date | null = null;
     if (scheduledDate && typeof scheduledDate === "string") {
       const parsed = new Date(scheduledDate);
@@ -141,7 +141,7 @@ export async function POST(
     }
 
     // =============================================
-    // Template-Snapshot fuer BEURTEILUNG
+    // Template-Snapshot für BEURTEILUNG
     // Aufloesungs-Reihenfolge:
     //   1. body.templateId (explizit gewaehlt)
     //   2. Mandanten-Default (organizationId == process.organizationId, isDefault: true)

@@ -1,8 +1,8 @@
 /**
  * API: /api/onboarding
  *
- * POST – Neuen Onboarding-Vorgang anlegen (fuer n8n oder Dashboard)
- * GET  – Alle Vorgaenge auflisten (fuer Dashboard)
+ * POST – Neuen Onboarding-Vorgang anlegen (für n8n oder Dashboard)
+ * GET  – Alle Vorgaenge auflisten (für Dashboard)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Pruefen ob Organisation existiert (inkl. shortName fuer displayId)
+    // Pruefen ob Organisation existiert (inkl. shortName für displayId)
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
     });

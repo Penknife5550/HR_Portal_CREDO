@@ -79,7 +79,7 @@ export async function GET(
 
     // Org-Zugriffspruefung
     if (!(await canAccessProcess(session, offboarding.organizationId))) {
-      return NextResponse.json({ error: "Keine Berechtigung fuer diesen Vorgang" }, { status: 403 });
+      return NextResponse.json({ error: "Keine Berechtigung für diesen Vorgang" }, { status: 403 });
     }
 
     // Sensible Felder entschluesseln

@@ -69,7 +69,7 @@ export default function FragebogenPage() {
     );
   }
 
-  // Fehler (Token ungueltig, abgelaufen, etc.)
+  // Fehler (Token ungültig, abgelaufen, etc.)
   if (error) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-4">

@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * Modale Komponenten fuer Elternzeit-Aktionen (Phase 2 — Block 5)
+ * Modale Komponenten für Elternzeit-Aktionen (Phase 2 — Block 5)
  *
  * Ersetzt 8 native prompt()/confirm()-Aufrufe durch CREDO-konforme Modals
  * mit Validierung, Live-Feedback und Abbruch ohne Datenverlust.
  *
  * Enthaltene Modals:
  *  - AblehnungModal       — Textarea mit Live-Counter (>=10 Zeichen)
- *  - MagicLinkModal       — E-Mail-Eingabe fuer Magic-Link-Versand
+ *  - MagicLinkModal       — E-Mail-Eingabe für Magic-Link-Versand
  *  - GenehmigungEndgModal — Unterzeichner waehlen (GF-Dropdown + Freitext)
  *  - AGBescheinigungModal — 4 strukturierte Felder (LOGA-Daten)
- *  - ConfirmDeleteModal   — Generische Loeschen-Bestaetigung
+ *  - ConfirmDeleteModal   — Generische Löschen-Bestaetigung
  *
  * Pattern angelehnt an `showSendLinkModal` aus Phase 1.
  */
@@ -252,7 +252,7 @@ export function GenehmigungEndgModal({
     try {
       await onSubmit(unterzeichner.trim());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Fehler bei endgueltiger Genehmigung");
+      setError(e instanceof Error ? e.message : "Fehler bei endgültiger Genehmigung");
     } finally {
       setSubmitting(false);
     }
@@ -260,7 +260,7 @@ export function GenehmigungEndgModal({
 
   return (
     <Modal
-      titel="Endgueltige Genehmigung"
+      titel="Endgültige Genehmigung"
       beschreibung="Der Unterzeichner erscheint im PDF-Bescheid als unterschreibende Person der Geschaeftsfuehrung."
       onClose={onClose}
     >
@@ -300,7 +300,7 @@ export function GenehmigungEndgModal({
           disabled={!valid || submitting}
           className="rounded-lg bg-credo-gruen px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {submitting ? "Sende..." : "Endgueltig genehmigen"}
+          {submitting ? "Sende..." : "Endgültig genehmigen"}
         </button>
       </div>
     </Modal>
@@ -443,13 +443,13 @@ export function AGBescheinigungModal({
 }
 
 // =============================================
-// ConfirmDeleteModal — Generische Loeschen-Bestaetigung
+// ConfirmDeleteModal — Generische Löschen-Bestaetigung
 // =============================================
 
 export function ConfirmDeleteModal({
-  titel = "Wirklich loeschen?",
+  titel = "Wirklich löschen?",
   beschreibung,
-  bestaetigungsText = "Loeschen",
+  bestaetigungsText = "Löschen",
   onClose,
   onConfirm,
 }: {
@@ -469,7 +469,7 @@ export function ConfirmDeleteModal({
     try {
       await onConfirm();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Loeschen fehlgeschlagen");
+      setError(e instanceof Error ? e.message : "Löschen fehlgeschlagen");
     } finally {
       setSubmitting(false);
     }

@@ -159,7 +159,7 @@ export function Step4SocialSecurity({
           <p className="text-xs text-muted-foreground">
             Die SV-Nummer finden Sie auf Ihrem Sozialversicherungsausweis oder in
             Schreiben Ihres Rentenversicherungstraegers. Falls Sie Ihre Nummer
-            nicht kennen, kann sie ueber die Krankenkasse ermittelt werden.
+            nicht kennen, kann sie über die Krankenkasse ermittelt werden.
           </p>
         </div>
       )}
@@ -234,7 +234,7 @@ export function Step4SocialSecurity({
               </span>
               <p className="text-xs text-muted-foreground">
                 Bitte ankreuzen, wenn Sie leibliche, adoptierte oder
-                Stiefkinder haben. Diese Angabe ist wichtig fuer die
+                Stiefkinder haben. Diese Angabe ist wichtig für die
                 Pflegeversicherung: Arbeitnehmer ohne Kinder zahlen ab
                 23 Jahren einen Beitragszuschlag von 0,6%. Bei mehreren
                 Kindern unter 25 Jahren reduziert sich Ihr Beitrag
@@ -251,7 +251,7 @@ export function Step4SocialSecurity({
           <div>
             <h3 className="text-sm font-bold text-foreground">Angaben zu Ihren Kindern</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Diese Angaben werden fuer die Berechnung des Kinderfreibetrages und der Pflegeversicherung benoetigt.
+              Diese Angaben werden für die Berechnung des Kinderfreibetrages und der Pflegeversicherung benoetigt.
             </p>
           </div>
 
@@ -424,7 +424,7 @@ export function Step4SocialSecurity({
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

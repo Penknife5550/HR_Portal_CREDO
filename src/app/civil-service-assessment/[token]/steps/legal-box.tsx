@@ -8,9 +8,9 @@
 import { getLegalReferences } from "@/lib/legal-references";
 
 interface Props {
-  /** Schluessel-Liste aus LEGAL_REFERENCES (z.B. ["BRL_8_3", "BRL_4_10"]). */
+  /** Schlüssel-Liste aus LEGAL_REFERENCES (z.B. ["BRL_8_3", "BRL_4_10"]). */
   references: string[];
-  /** Optionale Einleitung ueber den Verweisen. */
+  /** Optionale Einleitung über den Verweisen. */
   intro?: string;
 }
 

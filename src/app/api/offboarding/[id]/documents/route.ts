@@ -21,7 +21,7 @@ const ALLOWED_MIME_TYPES = [
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
-// Magic Bytes fuer Content-Type-Validierung
+// Magic Bytes für Content-Type-Validierung
 const MAGIC_BYTES: Record<string, number[][]> = {
   "application/pdf": [[0x25, 0x50, 0x44, 0x46]], // %PDF
   "image/jpeg": [[0xFF, 0xD8, 0xFF]],

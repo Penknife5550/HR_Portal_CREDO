@@ -1,7 +1,7 @@
 /**
  * API: /api/offboarding/[id]/zeugnis-bewertung
  *
- * POST - Zeugnis-Bewertung fuer ein Offboarding erstellen (Magic Link generieren)
+ * POST - Zeugnis-Bewertung für ein Offboarding erstellen (Magic Link generieren)
  * GET  - Zeugnis-Bewertung eines Offboardings abrufen
  *
  * Berechtigung: Authentifizierter Benutzer
@@ -40,7 +40,7 @@ export async function GET(
     });
 
     if (!bewertung) {
-      return NextResponse.json({ error: "Keine Zeugnis-Bewertung fuer dieses Offboarding gefunden" }, { status: 404 });
+      return NextResponse.json({ error: "Keine Zeugnis-Bewertung für dieses Offboarding gefunden" }, { status: 404 });
     }
 
     return NextResponse.json({ data: bewertung });
@@ -95,7 +95,7 @@ export async function POST(
       );
     }
 
-    // Template fuer die jobGroup laden
+    // Template für die jobGroup laden
     const template = await prisma.zeugnisBewertungTemplate.findFirst({
       where: {
         jobGroup: jobGroup as JobGroup,
@@ -116,7 +116,7 @@ export async function POST(
 
     if (!template) {
       return NextResponse.json(
-        { error: `Kein aktives Template fuer die Berufsgruppe "${jobGroup}" gefunden` },
+        { error: `Kein aktives Template für die Berufsgruppe "${jobGroup}" gefunden` },
         { status: 404 }
       );
     }

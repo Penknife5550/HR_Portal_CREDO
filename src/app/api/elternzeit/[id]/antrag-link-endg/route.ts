@@ -1,7 +1,7 @@
 /**
  * API: /api/elternzeit/[id]/antrag-link-endg
  *
- * POST – Magic Link Token 2 generieren (endgueltiger Antrag).
+ * POST – Magic Link Token 2 generieren (endgültiger Antrag).
  *        Token gueltig nach Mandanten-Konfiguration (default 30 Tage),
  *        Single-Use (antragTokenEndgUsedAt).
  *
@@ -71,14 +71,14 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Endgueltiger Antrag erst nach vorlaeufiger Genehmigung moeglich",
+            "Endgültiger Antrag erst nach vorläufiger Genehmigung moeglich",
         },
         { status: 409 },
       );
     }
     if (ez.antragEndgAm || ez.antragTokenEndgUsedAt) {
       return NextResponse.json(
-        { error: "Der endgueltige Antrag wurde bereits eingereicht" },
+        { error: "Der endgültige Antrag wurde bereits eingereicht" },
         { status: 400 },
       );
     }
@@ -132,7 +132,7 @@ export async function POST(
     triggerWebhooks("elternzeit-antrag-link-versandt", {
       elternzeitId: id,
       displayId: ez.displayId,
-      antragTyp: "endgueltig",
+      antragTyp: "endgültig",
       recipientEmail: parsed.data.recipientEmail,
       recipientName:
         parsed.data.recipientName ||

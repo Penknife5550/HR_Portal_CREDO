@@ -147,7 +147,7 @@ export async function PUT(
     }
 
     const template = await prisma.$transaction(async (tx) => {
-      // Alte Kategorien loeschen (Cascade loescht auch Fragen)
+      // Alte Kategorien löschen (Cascade loescht auch Fragen)
       await tx.exitInterviewTemplateCategory.deleteMany({
         where: { templateId: id },
       });
@@ -257,7 +257,7 @@ export async function DELETE(
 
     return NextResponse.json({ data: { success: true } });
   } catch (error) {
-    console.error("Fehler beim Loeschen des Exit-Interview-Templates:", error);
+    console.error("Fehler beim Löschen des Exit-Interview-Templates:", error);
     return NextResponse.json(
       { error: "Interner Serverfehler" },
       { status: 500 }

@@ -4,14 +4,14 @@
  * POST - Vorgesetzter reicht die Bewertung final ein
  *
  * OEFFENTLICH - kein Auth erforderlich!
- * Zugang ausschliesslich ueber gueltigen Magic-Link-Token.
+ * Zugang ausschliesslich über gueltigen Magic-Link-Token.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 
-// Typ fuer den Template-Snapshot
+// Typ für den Template-Snapshot
 interface SnapshotCriterion {
   id: string;
 }
@@ -85,7 +85,7 @@ export async function POST(
     if (missingCriteria.length > 0) {
       return NextResponse.json(
         {
-          error: `Es fehlen noch Bewertungen fuer ${missingCriteria.length} Kriterium(en). Bitte bewerten Sie alle Kriterien vor dem Einreichen.`,
+          error: `Es fehlen noch Bewertungen für ${missingCriteria.length} Kriterium(en). Bitte bewerten Sie alle Kriterien vor dem Einreichen.`,
           missingCriterionIds: missingCriteria,
         },
         { status: 400 }

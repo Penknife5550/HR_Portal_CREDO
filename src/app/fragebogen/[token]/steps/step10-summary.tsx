@@ -1,16 +1,17 @@
 "use client";
 
 /**
- * Step 10: Zusammenfassung + Dokumenten-Upload + Erklaerung + DSGVO + Signatur
+ * Step 10: Zusammenfassung + Dokumenten-Upload + Erklärung + DSGVO + Signatur
  *
  * Zeigt alle eingegebenen Daten zur Pruefung,
- * ermoeglicht Dokumenten-Upload, fordert Erklaerung
+ * ermoeglicht Dokumenten-Upload, fordert Erklärung
  * des Arbeitnehmers und DSGVO-Zustimmung.
  */
 
 import { useState } from "react";
 import { DocumentUpload } from "./document-upload";
 import { FieldConfigHelper } from "@/lib/field-definitions";
+import { formatVerantwortlicheStelle } from "@/lib/dsgvo";
 
 interface ChildEntry {
   firstName: string;
@@ -25,9 +26,18 @@ interface StepProps {
   onBack: () => void;
   saving: boolean;
   onSubmit: () => void;
-  organization: { name: string; mandantNumber: string; type: string };
+  organization: {
+    name: string;
+    mandantNumber: string;
+    type: string;
+    dsgvoVerantwortlicheName?: string | null;
+    dsgvoVerantwortlicheStrasse?: string | null;
+    dsgvoVerantwortlichePlz?: string | null;
+    dsgvoVerantwortlicheOrt?: string | null;
+  };
   token?: string;
   fieldConfig?: FieldConfigHelper;
+  requiredDocuments?: string[];
 }
 
 // Hilfs-Labels
@@ -137,6 +147,7 @@ export function Step10Summary({
   onSubmit,
   organization,
   token,
+  requiredDocuments,
 }: StepProps) {
   const [dsgvoAccepted, setDsgvoAccepted] = useState(false);
   const [erklaerungAccepted, setErklaerungAccepted] = useState(false);
@@ -387,7 +398,13 @@ export function Step10Summary({
       {/* ============================================= */}
       {/* Dokumenten-Upload */}
       {/* ============================================= */}
-      {token && <DocumentUpload token={token} hasChildren={children.length > 0} />}
+      {token && (
+        <DocumentUpload
+          token={token}
+          hasChildren={children.length > 0}
+          requiredDocuments={requiredDocuments}
+        />
+      )}
 
       {/* ============================================= */}
       {/* Erklärung des Arbeitnehmers */}
@@ -445,18 +462,18 @@ export function Step10Summary({
             checked={erklaerungAccepted}
             onChange={(e) => {
               setErklaerungAccepted(e.target.checked);
-              if (e.target.checked && dsgvoError.includes("Erklaerung"))
+              if (e.target.checked && dsgvoError.includes("Erklärung"))
                 setDsgvoError("");
             }}
             className="mt-0.5 h-5 w-5 rounded border-border text-primary focus:ring-primary"
           />
           <div>
             <span className="text-sm font-medium text-foreground">
-              Ich bestaetige die vorstehende Erklaerung.{" "}
+              Ich bestaetige die vorstehende Erklärung.{" "}
               <span className="text-destructive">*</span>
             </span>
             <p className="text-xs text-muted-foreground">
-              Diese Erklaerung ersetzt Ihre handschriftliche Unterschrift
+              Diese Erklärung ersetzt Ihre handschriftliche Unterschrift
               auf dem Personalfragebogen.
             </p>
           </div>
@@ -478,21 +495,21 @@ export function Step10Summary({
             verarbeitet werden.
           </p>
           <p className="mb-2">
-            Die Daten werden ausschliesslich fuer personalverwaltungsrelevante
+            Die Daten werden ausschliesslich für personalverwaltungsrelevante
             Zwecke verwendet und an die zustaendigen Stellen (Lohnbuchhaltung,
             Sozialversicherungstraeger, Finanzamt) weitergeleitet, soweit dies
-            gesetzlich vorgeschrieben oder fuer die Durchfuehrung des
+            gesetzlich vorgeschrieben oder für die Durchfuehrung des
             Arbeitsverhaeltnisses erforderlich ist.
           </p>
           <p className="mb-2">
-            Die Rechtsgrundlage fuer die Verarbeitung ist Art. 6 Abs. 1 lit. b
+            Die Rechtsgrundlage für die Verarbeitung ist Art. 6 Abs. 1 lit. b
             DSGVO (Vertragserfuellung) sowie Art. 88 DSGVO i.V.m. §26 BDSG
             (Beschäftigtendatenschutz).
           </p>
           <p className="mb-2">
-            Verantwortliche Stelle: Christlicher Schulverein Minden e.V.,
-            Kingsleyallee 6, 32425 Minden. Bei Fragen zum Datenschutz wenden
-            Sie sich bitte an die Personalabteilung.
+            Verantwortliche Stelle: {formatVerantwortlicheStelle(organization)}.
+            Bei Fragen zum Datenschutz wenden Sie sich bitte an die
+            Personalabteilung.
           </p>
           <p>
             Sie haben das Recht auf Auskunft, Berichtigung, Loeschung und

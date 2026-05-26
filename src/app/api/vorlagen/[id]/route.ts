@@ -8,6 +8,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { DOCUMENT_TYPE_LABELS } from "@/lib/required-documents";
+
+const VALID_DOCUMENT_TYPES = new Set(Object.keys(DOCUMENT_TYPE_LABELS));
 
 // =============================================
 // GET /api/vorlagen/:id
@@ -74,7 +77,22 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { stepsConfig, name, description, isActive } = body;
+    const { stepsConfig, name, description, isActive, requiredDocuments } = body;
+
+    // requiredDocuments validieren (Array gueltiger DocumentType-Werte)
+    if (requiredDocuments !== undefined) {
+      if (
+        !Array.isArray(requiredDocuments) ||
+        !requiredDocuments.every(
+          (t) => typeof t === "string" && VALID_DOCUMENT_TYPES.has(t),
+        )
+      ) {
+        return NextResponse.json(
+          { error: "Ungueltige Pflicht-Dokumenttypen." },
+          { status: 400 },
+        );
+      }
+    }
 
     // Vorlage pruefen
     const existing = await prisma.formTemplate.findUnique({
@@ -93,6 +111,7 @@ export async function PATCH(
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (requiredDocuments !== undefined) updateData.requiredDocuments = requiredDocuments;
 
     // Versionierung: Bei stepsConfig-Aenderung Version hochzaehlen
     if (stepsConfig !== undefined) {

@@ -3,7 +3,7 @@
  *
  * GET  /api/modalitaeten/:token  → Lade Vorgesetzten-Daten + MA-Info
  * PUT  /api/modalitaeten/:token  → Speichere/Aktualisiere Daten (Auto-Save)
- * POST /api/modalitaeten/:token  → Modalitaeten endgueltig absenden
+ * POST /api/modalitaeten/:token  → Modalitaeten endgültig absenden
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,7 +14,7 @@ import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
 
 // =============================================
-// Zod-Schema fuer Modalitaeten-Validierung (serverseitig)
+// Zod-Schema für Modalitaeten-Validierung (serverseitig)
 // =============================================
 const modalitaetenFieldsSchema = z.object({
   betriebsstaette: z.string().max(500).optional(),
@@ -87,7 +87,7 @@ export async function GET(
 
   const onboarding = result.onboarding!;
 
-  // Alle Einrichtungen laden (fuer Haupt-/Nebenarbeitgeber Dropdown)
+  // Alle Einrichtungen laden (für Haupt-/Nebenarbeitgeber Dropdown)
   const organizations = await prisma.organization.findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
@@ -214,7 +214,7 @@ export async function PUT(
 }
 
 // =============================================
-// POST – Modalitaeten endgueltig absenden
+// POST – Modalitaeten endgültig absenden
 // =============================================
 export async function POST(
   request: NextRequest,

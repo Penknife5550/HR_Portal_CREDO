@@ -1,6 +1,6 @@
 /**
  * API: /api/health
- * Health-Check Endpoint fuer Docker Healthcheck und Monitoring
+ * Health-Check Endpoint für Docker Healthcheck und Monitoring
  */
 
 import { NextResponse } from "next/server";

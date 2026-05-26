@@ -69,12 +69,12 @@ interface FristTemplate {
 }
 
 /**
- * Bestimmt alle relevanten Fristen fuer einen Elternzeit-Vorgang
+ * Bestimmt alle relevanten Fristen für einen Elternzeit-Vorgang
  * anhand seines aktuellen Zustands. Wird sowohl beim Anlegen
  * als auch beim Aktualisieren aufgerufen.
  *
- * Liefert nur Fristen, die fuer den jeweiligen Vorgang sinnvoll sind
- * (z.B. BR-Genehmigung nur fuer Beamte/PSI).
+ * Liefert nur Fristen, die für den jeweiligen Vorgang sinnvoll sind
+ * (z.B. BR-Genehmigung nur für Beamte/PSI).
  */
 export function berechneFristTemplates(
   ez: ElternzeitProzess & { abschnitte: ElternzeitAbschnitt[] },
@@ -84,13 +84,13 @@ export function berechneFristTemplates(
     (a, b) => a.von.getTime() - b.von.getTime(),
   )[0];
 
-  // 1. Antragsfrist vorlaeufig (§ 16 Abs. 1 BEEG, 7 Wochen vor Beginn)
+  // 1. Antragsfrist vorläufig (§ 16 Abs. 1 BEEG, 7 Wochen vor Beginn)
   if (ersterAbschnitt && !ez.antragVorlAm) {
     templates.push({
       fristTyp: "ANTRAGSFRIST_VORL",
-      bezeichnung: "Antrag vorlaeufig einreichen (§ 16 BEEG)",
+      bezeichnung: "Antrag vorläufig einreichen (§ 16 BEEG)",
       beschreibung:
-        "7 Wochen vor Beginn der Elternzeit muss der vorlaeufige Antrag eingereicht sein.",
+        "7 Wochen vor Beginn der Elternzeit muss der vorläufige Antrag eingereicht sein.",
       faelligAm: subDays(ersterAbschnitt.von, 49),
     });
   }
@@ -186,7 +186,7 @@ export function berechneFristTemplates(
       fristTyp: "TEILZEIT_ANTRAG_PRUEFUNG",
       bezeichnung: "Teilzeit-Antrag bearbeiten (§ 17 BEEG)",
       beschreibung:
-        "Der Arbeitgeber muss innerhalb 4 Wochen ueber den Teilzeit-Antrag entscheiden.",
+        "Der Arbeitgeber muss innerhalb 4 Wochen über den Teilzeit-Antrag entscheiden.",
       faelligAm: addWeeks(offenerTeilzeit.createdAt, 4),
     });
   }
@@ -199,11 +199,11 @@ export function berechneFristTemplates(
 // =============================================
 
 /**
- * Synchronisiert die Fristen-Tabelle fuer einen Vorgang:
+ * Synchronisiert die Fristen-Tabelle für einen Vorgang:
  * - Neue Fristen anlegen
  * - Existierende mit gleichem Typ aktualisieren (faelligAm kann sich
  *   aendern, z.B. wenn Mitarbeiter Termin verschiebt)
- * - Fristen, die nicht mehr anwendbar sind, NICHT loeschen
+ * - Fristen, die nicht mehr anwendbar sind, NICHT löschen
  *   (Audit-Trail bleibt erhalten — sie werden nur als erledigt
  *   markiert, falls noch nicht erledigt).
  */
@@ -268,7 +268,7 @@ export async function syncElternzeitFristen(elternzeitId: string): Promise<void>
 }
 
 // =============================================
-// Bequeme Helper fuer Personalgruppen-Workflow
+// Bequeme Helper für Personalgruppen-Workflow
 // =============================================
 
 export function gehoertZuBeamtenWorkflow(personalgruppe: Personalgruppe): boolean {

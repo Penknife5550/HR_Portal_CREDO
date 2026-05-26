@@ -174,7 +174,7 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
   }, [loadTemplates]);
 
   // =============================================
-  // Aktuelles Template fuer den aktiven Tab
+  // Aktuelles Template für den aktiven Tab
   // =============================================
   const currentTemplate = templates.find((t) => t.jobGroup === activeTab);
   const currentEdit = currentTemplate ? editState[currentTemplate.id] : null;
@@ -455,7 +455,7 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
       }
 
       setSuccessMessage("Vorlage erfolgreich gespeichert.");
-      // Erneut laden fuer sauberen State
+      // Erneut laden für sauberen State
       await loadTemplates();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -518,7 +518,7 @@ export function ZeugnisVorlagenContent({ user }: { user: User }) {
           </div>
         )}
 
-        {/* Kein Template fuer diese Berufsgruppe */}
+        {/* Kein Template für diese Berufsgruppe */}
         {!loading && !currentTemplate && (
           <div className="rounded-lg border border-border bg-card p-8 text-center">
             <p className="text-muted-foreground">

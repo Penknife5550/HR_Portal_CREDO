@@ -51,7 +51,7 @@ export function Step6Employment({ data, onNext, onBack, saving, fieldConfig }: S
         <p className="text-sm text-[#009AC6]">
           Bitte teilen Sie uns mit, ob Sie neben Ihrer Taetigkeit bei uns noch
           bei einem anderen Arbeitgeber beschaeftigt sind. Diese Angabe ist
-          wichtig fuer die korrekte Berechnung Ihrer Sozialversicherungsbeitraege.
+          wichtig für die korrekte Berechnung Ihrer Sozialversicherungsbeitraege.
         </p>
       </div>
 

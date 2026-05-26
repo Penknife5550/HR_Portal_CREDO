@@ -1,10 +1,10 @@
 /**
  * API: /api/cron/elternzeit-fristen
  *
- * POST – Taegliche Fristenpruefung fuer Elternzeit-Vorgaenge.
+ * POST – Taegliche Fristenpruefung für Elternzeit-Vorgaenge.
  *
  * Wird taeglich (z.B. von n8n) per Cron-Workflow aufgerufen.
- * Sicherheit: Authentifizierung ueber CRON_SECRET Bearer-Token.
+ * Sicherheit: Authentifizierung über CRON_SECRET Bearer-Token.
  *
  * Logik:
  * 1. Fristen aller offenen Vorgaenge per syncElternzeitFristen() aktualisieren
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         await syncElternzeitFristen(v.id);
       } catch (error) {
         console.error(
-          `[cron] syncElternzeitFristen fehlgeschlagen fuer ${v.displayId}:`,
+          `[cron] syncElternzeitFristen fehlgeschlagen für ${v.displayId}:`,
           error instanceof Error ? error.message : error,
         );
         syncFehler++;
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
         }
       } catch (err) {
         console.error(
-          `[cron] Eskalation fuer Frist ${frist.id} fehlgeschlagen:`,
+          `[cron] Eskalation für Frist ${frist.id} fehlgeschlagen:`,
           err instanceof Error ? err.message : err,
         );
         eskalationsFehler++;

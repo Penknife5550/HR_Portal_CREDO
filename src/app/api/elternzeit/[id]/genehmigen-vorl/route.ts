@@ -1,7 +1,7 @@
 /**
  * API: /api/elternzeit/[id]/genehmigen-vorl
  *
- * POST – Vorlaeufige Genehmigung durch HR.
+ * POST – Vorläufige Genehmigung durch HR.
  *        In Phase 1: HR genehmigt selbst (Phase 2 → Einrichtungsleiter via Magic Link).
  *        Setzt Status auf VORLAEUFIG_GENEHMIGT.
  */
@@ -51,7 +51,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Genehmigung nur moeglich wenn der vorlaeufige Antrag eingereicht wurde",
+            "Genehmigung nur moeglich wenn der vorläufige Antrag eingereicht wurde",
         },
         { status: 409 },
       );

@@ -1,8 +1,8 @@
 /**
  * Offboarding Dashboard – Konfiguration
  *
- * Prozessspezifische Einstellungen fuer das generische
- * Process-Dashboard, angepasst fuer Offboarding-Vorgaenge.
+ * Prozessspezifische Einstellungen für das generische
+ * Process-Dashboard, angepasst für Offboarding-Vorgaenge.
  */
 
 import type { ProcessDashboardConfig, ProcessRow } from "@/components/process-dashboard/types";

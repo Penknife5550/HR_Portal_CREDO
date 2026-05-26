@@ -5,7 +5,7 @@
  * PUT - Antworten speichern (Zwischenspeichern moeglich)
  *
  * OEFFENTLICH - kein Auth erforderlich!
- * Zugang ausschliesslich ueber gueltigen Magic-Link-Token.
+ * Zugang ausschliesslich über gueltigen Magic-Link-Token.
  */
 
 import { NextRequest, NextResponse } from "next/server";

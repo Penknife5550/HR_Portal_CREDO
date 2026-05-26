@@ -4,7 +4,7 @@
  * Mandanten-Verwaltung – Client Component
  *
  * Ermoeglicht das Anlegen, Bearbeiten und Aktivieren/Deaktivieren
- * von Mandanten (Einrichtungen). Nur fuer SUPER_ADMIN.
+ * von Mandanten (Einrichtungen). Nur für SUPER_ADMIN.
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -250,6 +250,12 @@ export function MandantenContent({ user }: { user: User }) {
                           >
                             Elternzeit-Konfig
                           </Link>
+                          <Link
+                            href={`/mandanten/${org.id}/dsgvo-config`}
+                            className="rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                          >
+                            DSGVO-Konfig
+                          </Link>
                           <button
                             onClick={() => handleToggleActive(org)}
                             className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
@@ -330,7 +336,7 @@ export function MandantenContent({ user }: { user: User }) {
 }
 
 // =============================================
-// Wiederverwendbares Modal fuer Neuer/Bearbeiten
+// Wiederverwendbares Modal für Neuer/Bearbeiten
 // =============================================
 function MandantModal({
   title,

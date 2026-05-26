@@ -91,7 +91,7 @@ export async function PUT(request: NextRequest) {
       if (errors.length > 0) return NextResponse.json({ error: errors.join(", ") }, { status: 400 });
     }
 
-    // Bestehende Konfiguration laden (fuer Passwort-Handling)
+    // Bestehende Konfiguration laden (für Passwort-Handling)
     const existing = await prisma.smtpConfig.findUnique({ where: { id: "default" } });
 
     // Passwort: "••••••••" = nicht aendern (bestehenden verschluesselten Wert behalten)

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Beurteilungs-Magic-Link – Einstiegsseite fuer Schulleitungen
+ * Beurteilungs-Magic-Link – Einstiegsseite für Schulleitungen
  *
  * Validiert den Token und zeigt entweder den Bewertungsbogen
  * (BEURTEILUNG oder REFERENZ) oder eine Fehlermeldung an.
@@ -122,7 +122,7 @@ export default function CivilServiceAssessmentPage() {
     );
   }
 
-  // Fehler (Token ungueltig, abgelaufen, bereits eingereicht)
+  // Fehler (Token ungültig, abgelaufen, bereits eingereicht)
   if (error) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-4">

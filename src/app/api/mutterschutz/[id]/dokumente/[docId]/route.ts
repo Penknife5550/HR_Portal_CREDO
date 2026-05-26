@@ -2,7 +2,7 @@
  * API: /api/mutterschutz/[id]/dokumente/[docId]
  *
  * GET    – Datei-Download (mit Path-Traversal-Schutz)
- * DELETE – Dokument loeschen (HR_EDIT_ROLES)
+ * DELETE – Dokument löschen (HR_EDIT_ROLES)
  */
 
 import { NextRequest, NextResponse } from "next/server";

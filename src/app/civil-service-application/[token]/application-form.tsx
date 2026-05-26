@@ -21,15 +21,15 @@ interface CriterionDefinition {
   title: string;
   description: string;
   type: "checkbox" | "number" | "checkbox-textarea" | "checkbox-date" | "text" | "info";
-  /** Label fuer Checkbox-Input */
+  /** Label für Checkbox-Input */
   checkboxLabel?: string;
-  /** Placeholder fuer Text-/Textarea-Input */
+  /** Placeholder für Text-/Textarea-Input */
   placeholder?: string;
-  /** Info-Text fuer Kriterien die nicht von LK geprueft werden */
+  /** Info-Text für Kriterien die nicht von LK geprueft werden */
   infoText?: string;
   /** Validierungsfunktion */
   validate?: (value: unknown) => boolean;
-  /** Minimum fuer number-Felder */
+  /** Minimum für number-Felder */
   min?: number;
 }
 
@@ -82,7 +82,7 @@ const CRITERIA: CriterionDefinition[] = [
   {
     key: "vebsSeminarCompleted",
     title: "VEBS-Grundlagenseminar",
-    description: "Die Teilnahme am VEBS-Grundlagenseminar ist Voraussetzung fuer die Verbeamtung.",
+    description: "Die Teilnahme am VEBS-Grundlagenseminar ist Voraussetzung für die Verbeamtung.",
     type: "checkbox-date",
     checkboxLabel: "Ich habe am VEBS-Grundlagenseminar teilgenommen",
     placeholder: "Datum der Teilnahme",
@@ -112,7 +112,7 @@ const CRITERIA: CriterionDefinition[] = [
   {
     key: "empfehlungSchulleitung",
     title: "Empfehlung Schulleitung",
-    description: "Die Schulleitung muss eine Empfehlung fuer Ihre Verbeamtung aussprechen.",
+    description: "Die Schulleitung muss eine Empfehlung für Ihre Verbeamtung aussprechen.",
     type: "info",
     infoText: "Wird von der Schulleitung erteilt.",
   },
@@ -130,7 +130,7 @@ const SELF_CHECKABLE_KEYS = new Set(
   CRITERIA.filter((c) => c.type !== "info").map((c) => c.key)
 );
 
-/** Debounce-Timeout fuer Auto-Save in ms */
+/** Debounce-Timeout für Auto-Save in ms */
 const SAVE_DEBOUNCE_MS = 1200;
 
 // =============================================
@@ -146,7 +146,7 @@ interface ApplicationFormProps {
 // Hilfsfunktionen
 // =============================================
 
-/** Statusfarbe fuer ein Kriterium */
+/** Statusfarbe für ein Kriterium */
 function getStatusIndicator(
   criterion: CriterionDefinition,
   values: Record<string, unknown>
@@ -401,7 +401,7 @@ export function ApplicationForm({ token, initialData }: ApplicationFormProps) {
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
               Ihr Antrag auf Uebernahme ins Planstelleninhaberverhaeltnis wurde
               erfolgreich eingereicht. Die Schulleitung und der Beirat werden
-              ueber Ihren Antrag informiert.
+              über Ihren Antrag informiert.
             </p>
             <div className="mt-6 rounded-lg bg-muted/50 p-4 text-left">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
@@ -414,7 +414,7 @@ export function ApplicationForm({ token, initialData }: ApplicationFormProps) {
                 </li>
                 <li className="flex gap-2">
                   <span className="shrink-0 text-blue-500">2.</span>
-                  Der Beirat entscheidet ueber Ihren Antrag
+                  Der Beirat entscheidet über Ihren Antrag
                 </li>
                 <li className="flex gap-2">
                   <span className="shrink-0 text-blue-500">3.</span>
@@ -489,7 +489,7 @@ export function ApplicationForm({ token, initialData }: ApplicationFormProps) {
 
       {/* Content */}
       <main className="mx-auto max-w-2xl px-4 py-6 pb-32">
-        {/* Begruessung */}
+        {/* Begrüßung */}
         <div className="mb-8">
           <h1 className="text-xl font-bold text-foreground leading-tight">
             Antrag auf Uebernahme ins Planstelleninhaberverhaeltnis
@@ -706,18 +706,18 @@ export function ApplicationForm({ token, initialData }: ApplicationFormProps) {
           })}
         </div>
 
-        {/* Persoenliche Erklaerung (optional) */}
+        {/* Persönliche Erklärung (optional) */}
         <div className="mt-8 rounded-xl border border-border bg-card p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-foreground">
-            Persoenliche Erklaerung (optional)
+            Persönliche Erklärung (optional)
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Hier koennen Sie eine persoenliche Erklaerung oder Anmerkungen zu Ihrem Antrag hinzufuegen.
+            Hier koennen Sie eine persönliche Erklärung oder Anmerkungen zu Ihrem Antrag hinzufuegen.
           </p>
           <textarea
             value={employeeStatement}
             onChange={(e) => handleStatementChange(e.target.value)}
-            placeholder="Ihre persoenliche Erklaerung..."
+            placeholder="Ihre persönliche Erklärung..."
             rows={4}
             className="mt-3 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             autoComplete="off"
@@ -767,7 +767,7 @@ export function ApplicationForm({ token, initialData }: ApplicationFormProps) {
         {/* DSGVO Footer */}
         <div className="border-t border-border/50 bg-muted/30 px-4 py-2">
           <p className="mx-auto max-w-2xl text-center text-[10px] text-muted-foreground leading-relaxed">
-            Ihre Daten werden gemaess der DSGVO verarbeitet und ausschliesslich fuer
+            Ihre Daten werden gemäß der DSGVO verarbeitet und ausschliesslich für
             den Verbeamtungsvorgang verwendet. Die Speicherung erfolgt verschluesselt
             auf Servern der CREDO-Gruppe.
           </p>

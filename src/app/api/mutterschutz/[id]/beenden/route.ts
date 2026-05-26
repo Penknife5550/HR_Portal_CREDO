@@ -3,7 +3,7 @@
  *
  * Wechselt den Status auf BEENDET. Optional: Body { tatsGeburt?: string }
  * Wenn tatsGeburt mitgegeben wird, wird sie gesetzt — mutterschutzEnde
- * sollte ueber das normale PATCH-Update aktualisiert werden.
+ * sollte über das normale PATCH-Update aktualisiert werden.
  */
 
 import { NextRequest, NextResponse } from "next/server";

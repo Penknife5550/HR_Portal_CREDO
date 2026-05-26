@@ -2,7 +2,7 @@
  * API: /api/elternzeit/[id]/beihilfe-aenderung
  *
  * GET – Beihilfe-Aenderungsformular als PDF generieren + ausliefern.
- *       Nur fuer BEAMTER / PLANSTELLENINHABER zulaessig.
+ *       Nur für BEAMTER / PLANSTELLENINHABER zulaessig.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -52,7 +52,7 @@ export async function GET(
       ez.personalgruppe !== "PLANSTELLENINHABER"
     ) {
       return NextResponse.json(
-        { error: "Beihilfe-Brief nur fuer Beamte / PSI zulaessig" },
+        { error: "Beihilfe-Brief nur für Beamte / PSI zulaessig" },
         { status: 409 },
       );
     }

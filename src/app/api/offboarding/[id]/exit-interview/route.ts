@@ -1,7 +1,7 @@
 /**
  * API: /api/offboarding/[id]/exit-interview
  *
- * POST - Exit-Interview fuer ein Offboarding erstellen
+ * POST - Exit-Interview für ein Offboarding erstellen
  * GET  - Exit-Interview eines Offboardings abrufen
  *
  * Berechtigung: Authentifizierter Benutzer
@@ -58,7 +58,7 @@ export async function POST(
 
     if (existing) {
       return NextResponse.json(
-        { error: "Es existiert bereits ein Exit-Interview fuer dieses Offboarding" },
+        { error: "Es existiert bereits ein Exit-Interview für dieses Offboarding" },
         { status: 409 }
       );
     }
@@ -80,7 +80,7 @@ export async function POST(
 
     if (!template) {
       return NextResponse.json(
-        { error: "Kein aktives Standard-Template fuer Exit-Interviews gefunden" },
+        { error: "Kein aktives Standard-Template für Exit-Interviews gefunden" },
         { status: 404 }
       );
     }

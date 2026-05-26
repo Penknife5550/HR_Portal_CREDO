@@ -24,7 +24,7 @@ export const createMutterschutzSchema = z.object({
   einrichtungstyp: z.enum(["SCHULE", "KITA", "VERWALTUNG"]),
   badErforderlich: z.boolean().optional(),
 
-  // Personalgruppe noetig fuer Checklisten-Filterung
+  // Personalgruppe noetig für Checklisten-Filterung
   personalgruppe: z.enum(["TARIF_TV_L", "BEAMTER", "PLANSTELLENINHABER"]),
 });
 
@@ -109,7 +109,7 @@ export const checklistUpdateSchema = z.object({
 });
 
 // =============================================
-// Magic Link Token 1 (vorlaeufiger Antrag)
+// Magic Link Token 1 (vorläufiger Antrag)
 // =============================================
 
 export const generateAntragLinkSchema = z.object({
@@ -118,7 +118,7 @@ export const generateAntragLinkSchema = z.object({
 });
 
 // =============================================
-// Public Form — Vorlaeufiger Antrag (Magic Link)
+// Public Form — Vorläufiger Antrag (Magic Link)
 // =============================================
 
 const abschnittSchema = z
@@ -170,7 +170,7 @@ export const publicAntragVorlSchema = z.object({
 export type PublicAntragVorlInput = z.infer<typeof publicAntragVorlSchema>;
 
 // =============================================
-// Magic Link Token 2 (endgueltiger Antrag) — Phase 2
+// Magic Link Token 2 (endgültiger Antrag) — Phase 2
 // =============================================
 
 export const generateAntragLinkEndgSchema = z.object({

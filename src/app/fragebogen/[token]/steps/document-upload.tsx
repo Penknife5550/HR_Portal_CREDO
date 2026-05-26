@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { DOCUMENT_TYPE_LABELS } from "@/lib/required-documents";
 
 interface UploadedDoc {
   id: string;
@@ -20,13 +21,12 @@ interface UploadedDoc {
 interface DocumentUploadProps {
   token: string;
   hasChildren?: boolean;
+  /** Pflicht-Dokumenttypen aus der Vorlagen-Konfiguration (DocumentType-Werte). */
+  requiredDocuments?: string[];
 }
 
-// Pflichtdokumente (werden separat angezeigt)
-const REQUIRED_DOCUMENTS = [
-  { value: "geburtsurkunde_eigen", label: "Kopie Ihrer Geburtsurkunde", dbType: "GEBURTSURKUNDE_EIGEN" },
-  { value: "geburtsurkunde_kind", label: "Geburtsurkunde(n) der Kinder", dbType: "GEBURTSURKUNDE_KIND" },
-];
+// Fallback-Pflichtdokumente, falls die Vorlage keine Konfiguration liefert.
+const FALLBACK_REQUIRED_TYPES = ["GEBURTSURKUNDE_EIGEN", "GEBURTSURKUNDE_KIND"];
 
 // Optionale Dokumente (Dropdown)
 const OPTIONAL_DOCUMENT_CATEGORIES = [
@@ -65,7 +65,11 @@ const TYPE_LABELS: Record<string, string> = {
   INFEKTIONSSCHUTZ: "Infektionsschutz",
 };
 
-export function DocumentUpload({ token, hasChildren = false }: DocumentUploadProps) {
+export function DocumentUpload({
+  token,
+  hasChildren = false,
+  requiredDocuments,
+}: DocumentUploadProps) {
   const [documents, setDocuments] = useState<UploadedDoc[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
@@ -98,7 +102,7 @@ export function DocumentUpload({ token, hasChildren = false }: DocumentUploadPro
     loadDocuments();
   }, [loadDocuments]);
 
-  // Upload-Funktion (optionaler Typ-Override fuer Pflichtdokumente)
+  // Upload-Funktion (optionaler Typ-Override für Pflichtdokumente)
   const handleUpload = async (file: File, typeOverride?: string) => {
     setError("");
     setSuccess("");
@@ -141,7 +145,7 @@ export function DocumentUpload({ token, hasChildren = false }: DocumentUploadPro
     }
   };
 
-  // Dokument loeschen
+  // Dokument löschen
   const handleDelete = async (docId: string) => {
     try {
       const res = await fetch(
@@ -180,11 +184,19 @@ export function DocumentUpload({ token, hasChildren = false }: DocumentUploadPro
     [selectedCategory, token]
   );
 
-  // Pflichtdokumente filtern (Geburtsurkunde Kinder nur wenn Kinder vorhanden)
-  const activeRequiredDocs = REQUIRED_DOCUMENTS.filter((doc) => {
-    if (doc.value === "geburtsurkunde_kind") return hasChildren;
-    return true;
-  });
+  // Pflichtdokumente aus der Vorlagen-Konfiguration ableiten (Fallback: Geburtsurkunden).
+  // Geburtsurkunde der Kinder nur, wenn Kinder vorhanden sind.
+  const requiredTypes =
+    requiredDocuments && requiredDocuments.length > 0
+      ? requiredDocuments
+      : FALLBACK_REQUIRED_TYPES;
+  const activeRequiredDocs = requiredTypes
+    .filter((t) => t !== "GEBURTSURKUNDE_KIND" || hasChildren)
+    .map((t) => ({
+      value: t.toLowerCase(),
+      dbType: t,
+      label: DOCUMENT_TYPE_LABELS[t] ?? t,
+    }));
 
   return (
     <div className="space-y-4">

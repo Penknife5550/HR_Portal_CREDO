@@ -25,9 +25,9 @@ interface HandlerOptions {
   roles?: string[];
   /** Wenn true, kein Auth erforderlich (z.B. Magic-Links) */
   public?: boolean;
-  /** Zod-Schema fuer Request-Body-Validierung */
+  /** Zod-Schema für Request-Body-Validierung */
   bodySchema?: ZodSchema;
-  /** Label fuer Error-Logs */
+  /** Label für Error-Logs */
   logLabel?: string;
 }
 
@@ -69,7 +69,7 @@ export function apiHandler<T = unknown>(
       // Params aufloesen (Next.js 15 async params)
       const params = context.params ? await context.params : {};
 
-      // Auth-Check (uebersprungen fuer public Endpoints)
+      // Auth-Check (uebersprungen für public Endpoints)
       let session: SessionPayload | null = null;
       if (!options.public) {
         session = await getSession();
@@ -128,7 +128,7 @@ export function apiHandler<T = unknown>(
   };
 }
 
-/** Shortcut: Authentifizierter Handler fuer Admin-Rollen (SUPER_ADMIN, HR_LEITUNG) */
+/** Shortcut: Authentifizierter Handler für Admin-Rollen (SUPER_ADMIN, HR_LEITUNG) */
 export function adminHandler<T = unknown>(
   handler: HandlerFn<T>,
   options?: Partial<HandlerOptions>
@@ -142,7 +142,7 @@ export function adminHandler<T = unknown>(
   );
 }
 
-/** Shortcut: Authentifizierter Handler fuer alle HR-Rollen */
+/** Shortcut: Authentifizierter Handler für alle HR-Rollen */
 export function authHandler<T = unknown>(
   handler: HandlerFn<T>,
   options?: Partial<HandlerOptions>

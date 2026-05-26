@@ -5,7 +5,7 @@
  *  - STEPS: Reihenfolge aller Schritte vom Anlegen bis zum Abschluss
  *  - getStepIndex(status): Position des aktuellen Status in STEPS
  *  - getNaechsterSchritt(data): naechster faelliger Schritt + zugehoerige HR-Aktion
- *  - isErsterSchritt / isLetzterSchritt: Helfer fuer den Stepper-UI
+ *  - isErsterSchritt / isLetzterSchritt: Helfer für den Stepper-UI
  *
  * Ziel: Ein Dritter sieht im UI sofort, wo der Vorgang gerade steht,
  * was getan wurde und was als naechstes passieren muss.
@@ -29,11 +29,11 @@ export type ElternzeitStatus =
 export type WorkflowStep = {
   /** Status-Wert, dem der Schritt entspricht */
   id: ElternzeitStatus;
-  /** Kurzlabel fuer den Stepper */
+  /** Kurzlabel für den Stepper */
   label: string;
-  /** Ausfuehrlichere Beschreibung fuer Tooltip / Banner */
+  /** Ausfuehrlichere Beschreibung für Tooltip / Banner */
   beschreibung: string;
-  /** Phase (1-4) — fuer Gruppenfarben im Stepper */
+  /** Phase (1-4) — für Gruppenfarben im Stepper */
   phase: 1 | 2 | 3 | 4;
 };
 
@@ -53,42 +53,42 @@ export const ELTERNZEIT_STEPS: WorkflowStep[] = [
     id: "ANTRAG_VORL_VERSANDT",
     label: "Vorl. Magic-Link versandt",
     beschreibung:
-      "Magic-Link fuer den vorlaeufigen Antrag wurde an den Mitarbeiter verschickt.",
+      "Magic-Link für den vorläufigen Antrag wurde an den Mitarbeiter verschickt.",
     phase: 1,
   },
   {
     id: "ANTRAG_VORL_EINGEREICHT",
     label: "Vorl. Antrag eingegangen",
     beschreibung:
-      "Mitarbeiter hat den vorlaeufigen Antrag (Formular 1) abgesendet.",
+      "Mitarbeiter hat den vorläufigen Antrag (Formular 1) abgesendet.",
     phase: 1,
   },
   {
     id: "VORLAEUFIG_GENEHMIGT",
-    label: "Vorlaeufig genehmigt",
+    label: "Vorläufig genehmigt",
     beschreibung:
-      "HR hat den vorlaeufigen Antrag genehmigt. Briefe an BR Detmold / VBL koennen erstellt werden.",
+      "HR hat den vorläufigen Antrag genehmigt. Briefe an BR Detmold / VBL koennen erstellt werden.",
     phase: 2,
   },
   {
     id: "ANTRAG_ENDG_VERSANDT",
     label: "Endg. Magic-Link versandt",
     beschreibung:
-      "Nach Geburt: Magic-Link fuer den endgueltigen Antrag inkl. Geburtsurkunde wurde versendet.",
+      "Nach Geburt: Magic-Link für den endgültigen Antrag inkl. Geburtsurkunde wurde versendet.",
     phase: 2,
   },
   {
     id: "ANTRAG_ENDG_EINGEREICHT",
     label: "Endg. Antrag eingegangen",
     beschreibung:
-      "Mitarbeiter hat den endgueltigen Antrag inkl. Geburtsurkunde eingereicht.",
+      "Mitarbeiter hat den endgültigen Antrag inkl. Geburtsurkunde eingereicht.",
     phase: 2,
   },
   {
     id: "GENEHMIGT",
     label: "Endg. genehmigt",
     beschreibung:
-      "HR hat den endgueltigen Antrag genehmigt. Endgueltige Genehmigung als PDF verfuegbar.",
+      "HR hat den endgültigen Antrag genehmigt. Endgültige Genehmigung als PDF verfuegbar.",
     phase: 2,
   },
   {
@@ -123,7 +123,7 @@ export const ELTERNZEIT_PAUSE_STATES: ElternzeitStatus[] = ["UNTERBROCHEN"];
 
 /**
  * Liefert den Index des aktuellen Status in der Hauptsequenz.
- * Gibt -1 zurueck, wenn der Status ein Abbruch- oder Pausenzustand ist.
+ * Gibt -1 zurück, wenn der Status ein Abbruch- oder Pausenzustand ist.
  */
 export function getStepIndex(status: ElternzeitStatus): number {
   return ELTERNZEIT_STEPS.findIndex((s) => s.id === status);
@@ -138,7 +138,7 @@ export function isLetzterSchritt(status: ElternzeitStatus): boolean {
 }
 
 /**
- * Action-Typen fuer den "Naechster Schritt"-Banner.
+ * Action-Typen für den "Naechster Schritt"-Banner.
  * Das UI mappt diese auf konkrete Buttons / Modal-Aufrufe.
  */
 export type ElternzeitNaechsterSchrittAction =
@@ -155,22 +155,22 @@ export type ElternzeitNaechsterSchrittAction =
   | "PAUSIERT";
 
 export type NaechsterSchritt = {
-  /** Kurzer Titel fuer den Banner */
+  /** Kurzer Titel für den Banner */
   titel: string;
   /** Detail-Beschreibung */
   beschreibung: string;
   /** Action-Identifier — das UI entscheidet, ob daraus ein Button wird */
   action: ElternzeitNaechsterSchrittAction;
-  /** Beschriftung fuer den Action-Button (falls anwendbar) */
+  /** Beschriftung für den Action-Button (falls anwendbar) */
   actionLabel?: string;
   /** Ist der naechste Schritt eine HR-Aktion (true) oder warten wir auf den Mitarbeiter (false)? */
   hrAktion: boolean;
 };
 
 /**
- * Liefert den naechsten faelligen Schritt fuer den aktuellen Vorgang.
+ * Liefert den naechsten faelligen Schritt für den aktuellen Vorgang.
  * Verwendet ausschliesslich den Status — Daten-Felder sind aktuell nicht
- * noetig, koennen aber spaeter ergaenzt werden (z.B. fuer Rueckkehr-Logik).
+ * noetig, koennen aber spaeter ergaenzt werden (z.B. für Rueckkehr-Logik).
  */
 export function getNaechsterSchritt(
   status: ElternzeitStatus,
@@ -178,9 +178,9 @@ export function getNaechsterSchritt(
   switch (status) {
     case "ANGELEGT":
       return {
-        titel: "Magic-Link fuer vorlaeufigen Antrag versenden",
+        titel: "Magic-Link für vorläufigen Antrag versenden",
         beschreibung:
-          "Erzeuge den Magic-Link und sende ihn an den Mitarbeiter, damit er den vorlaeufigen Antrag (Formular 1) ausfuellen kann.",
+          "Erzeuge den Magic-Link und sende ihn an den Mitarbeiter, damit er den vorläufigen Antrag (Formular 1) ausfüllen kann.",
         action: "MAGIC_LINK_VORL",
         actionLabel: "Magic-Link senden",
         hrAktion: true,
@@ -189,24 +189,24 @@ export function getNaechsterSchritt(
       return {
         titel: "Warten auf den Mitarbeiter",
         beschreibung:
-          "Der Mitarbeiter hat den Magic-Link erhalten. Sobald der vorlaeufige Antrag abgesendet wurde, kann HR ihn pruefen und genehmigen.",
+          "Der Mitarbeiter hat den Magic-Link erhalten. Sobald der vorläufige Antrag abgesendet wurde, kann HR ihn pruefen und genehmigen.",
         action: "WARTEN_AUF_MITARBEITER",
         hrAktion: false,
       };
     case "ANTRAG_VORL_EINGEREICHT":
       return {
-        titel: "Vorlaeufigen Antrag pruefen und genehmigen",
+        titel: "Vorläufigen Antrag pruefen und genehmigen",
         beschreibung:
           "Der Mitarbeiter hat den Antrag eingereicht. Pruefe die Angaben und genehmige (oder lehne ab).",
         action: "GENEHMIGEN_VORL",
-        actionLabel: "Vorlaeufig genehmigen",
+        actionLabel: "Vorläufig genehmigen",
         hrAktion: true,
       };
     case "VORLAEUFIG_GENEHMIGT":
       return {
         titel: "Auf Geburt warten — danach endg. Magic-Link senden",
         beschreibung:
-          "Der vorlaeufige Antrag ist genehmigt. Sobald die Geburt erfolgt ist, kann der Magic-Link fuer den endgueltigen Antrag (mit Geburtsurkunde) versendet werden.",
+          "Der vorläufige Antrag ist genehmigt. Sobald die Geburt erfolgt ist, kann der Magic-Link für den endgültigen Antrag (mit Geburtsurkunde) versendet werden.",
         action: "MAGIC_LINK_ENDG",
         actionLabel: "Endg. Magic-Link senden",
         hrAktion: true,
@@ -215,24 +215,24 @@ export function getNaechsterSchritt(
       return {
         titel: "Warten auf endg. Antrag + Geburtsurkunde",
         beschreibung:
-          "Der Mitarbeiter hat den Magic-Link fuer den endgueltigen Antrag erhalten. Sobald Antrag + Geburtsurkunde eingereicht sind, kann HR endgueltig genehmigen.",
+          "Der Mitarbeiter hat den Magic-Link für den endgültigen Antrag erhalten. Sobald Antrag + Geburtsurkunde eingereicht sind, kann HR endgültig genehmigen.",
         action: "WARTEN_AUF_MITARBEITER",
         hrAktion: false,
       };
     case "ANTRAG_ENDG_EINGEREICHT":
       return {
-        titel: "Endgueltigen Antrag genehmigen",
+        titel: "Endgültigen Antrag genehmigen",
         beschreibung:
-          "Der endgueltige Antrag inkl. Geburtsurkunde liegt vor. Pruefe und genehmige endgueltig.",
+          "Der endgültige Antrag inkl. Geburtsurkunde liegt vor. Pruefe und genehmige endgültig.",
         action: "GENEHMIGEN_ENDG",
-        actionLabel: "Endgueltig genehmigen",
+        actionLabel: "Endgültig genehmigen",
         hrAktion: true,
       };
     case "GENEHMIGT":
       return {
         titel: "Warten auf Beginn der Elternzeit",
         beschreibung:
-          "Der Vorgang ist endgueltig genehmigt. Mit Erreichen des EZ-Beginns wechselt der Status automatisch auf 'Aktiv'.",
+          "Der Vorgang ist endgültig genehmigt. Mit Erreichen des EZ-Beginns wechselt der Status automatisch auf 'Aktiv'.",
         action: "WARTEN_AUF_MITARBEITER",
         hrAktion: false,
       };
@@ -249,7 +249,7 @@ export function getNaechsterSchritt(
       return {
         titel: "Vorgang abschliessen",
         beschreibung:
-          "Die Rueckkehr ist abgestimmt. Sobald der Mitarbeiter zurueck ist, kann der Vorgang beendet werden.",
+          "Die Rueckkehr ist abgestimmt. Sobald der Mitarbeiter zurück ist, kann der Vorgang beendet werden.",
         action: "BEENDEN",
         actionLabel: "Abschliessen",
         hrAktion: true,

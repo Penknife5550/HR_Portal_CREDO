@@ -12,7 +12,7 @@ import { getSession } from "@/lib/auth";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 
-// Typ fuer den Template-Snapshot
+// Typ für den Template-Snapshot
 interface SnapshotCriterion {
   id: string;
   weight: number;
@@ -104,7 +104,7 @@ export async function PUT(
     });
 
     if (!bewertung) {
-      return NextResponse.json({ error: "Keine Zeugnis-Bewertung fuer dieses Offboarding gefunden" }, { status: 404 });
+      return NextResponse.json({ error: "Keine Zeugnis-Bewertung für dieses Offboarding gefunden" }, { status: 404 });
     }
 
     if (bewertung.status === "FINALIZED") {
@@ -123,7 +123,7 @@ export async function PUT(
 
         if (!existingRating) {
           return NextResponse.json(
-            { error: `Kein Rating fuer Kriterium "${r.snapshotCriterionId}" gefunden` },
+            { error: `Kein Rating für Kriterium "${r.snapshotCriterionId}" gefunden` },
             { status: 404 }
           );
         }
@@ -147,7 +147,7 @@ export async function PUT(
       }
     }
 
-    // Alle Ratings neu laden fuer Neuberechnung
+    // Alle Ratings neu laden für Neuberechnung
     const updatedRatings = await prisma.zeugnisBewertungRating.findMany({
       where: { zeugnisBewertungId: bewertung.id },
     });

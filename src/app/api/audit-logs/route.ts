@@ -80,7 +80,7 @@ export const GET = adminHandler(async ({ request }) => {
     prisma.auditLog.count({ where }),
   ]);
 
-  // Alle eindeutigen Aktionen fuer Filter-Dropdown
+  // Alle eindeutigen Aktionen für Filter-Dropdown
   const actions = await prisma.auditLog.findMany({
     select: { action: true },
     distinct: ["action"],

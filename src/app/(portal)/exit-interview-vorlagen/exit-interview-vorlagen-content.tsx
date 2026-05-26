@@ -58,7 +58,7 @@ interface ExitInterviewTemplate {
   updatedAt: string;
 }
 
-// Lokale Editier-Typen (ohne IDs, fuer den Editor-State)
+// Lokale Editier-Typen (ohne IDs, für den Editor-State)
 interface EditQuestion {
   questionText: string;
   questionType: string;
@@ -427,7 +427,7 @@ export function ExitInterviewVorlagenContent({ user }: { user: User }) {
   }
 
   // =============================================
-  // Optionen verwalten (fuer MULTIPLE_CHOICE / SINGLE_CHOICE)
+  // Optionen verwalten (für MULTIPLE_CHOICE / SINGLE_CHOICE)
   // =============================================
   function handleAddOption(catIdx: number, qIdx: number) {
     if (!editData) return;
@@ -483,7 +483,7 @@ export function ExitInterviewVorlagenContent({ user }: { user: User }) {
       return;
     }
 
-    // Optionen-Validierung fuer Choice-Fragen
+    // Optionen-Validierung für Choice-Fragen
     for (const cat of validCategories) {
       for (const q of cat.questions) {
         if (

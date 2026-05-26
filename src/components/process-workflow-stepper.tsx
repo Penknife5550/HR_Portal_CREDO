@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Generischer Workflow-Stepper fuer alle Prozesse (Onboarding, Offboarding, Verbeamtung)
+ * Generischer Workflow-Stepper für alle Prozesse (Onboarding, Offboarding, Verbeamtung)
  *
  * Zeigt einen gefuehrten Prozess:
  * - Aktiver Schritt: prominent, blau hervorgehoben, mit Aktions-Buttons
@@ -41,7 +41,7 @@ export interface WorkflowStep {
   description: string;
   status: "completed" | "active" | "upcoming" | "blocked";
   completedAt?: string;
-  /** Haupt-Aktionen fuer den aktiven Schritt */
+  /** Haupt-Aktionen für den aktiven Schritt */
   actions?: WorkflowAction[];
   /** Sub-Items (z.B. Checklist-Items, Abteilungen, Rueckgaben) */
   items?: WorkflowSubItem[];
@@ -55,7 +55,7 @@ export interface WorkflowStep {
 
 interface ProcessWorkflowStepperProps {
   steps: WorkflowStep[];
-  /** Optionaler Titel ueber dem Stepper */
+  /** Optionaler Titel über dem Stepper */
   title?: string;
 }
 

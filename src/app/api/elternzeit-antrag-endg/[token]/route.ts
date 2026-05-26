@@ -2,7 +2,7 @@
  * API: /api/elternzeit-antrag-endg/[token]
  *
  * GET  – Public: Token 2 validieren + Daten zurueckliefern
- * POST – Public: Endgueltigen Antrag einreichen (3-Schritt-Form, Single-Use)
+ * POST – Public: Endgültigen Antrag einreichen (3-Schritt-Form, Single-Use)
  *
  * KEINE Authentifizierung — Magic-Link-basiert. Geburtsurkunde wird
  * separat per /api/elternzeit-antrag-endg/[token]/upload hochgeladen
@@ -39,7 +39,7 @@ export async function GET(
 
     if (!ez) {
       return NextResponse.json(
-        { error: "Token ungueltig oder abgelaufen" },
+        { error: "Token ungültig oder abgelaufen" },
         { status: 404 },
       );
     }
@@ -88,7 +88,7 @@ export async function GET(
 }
 
 // =============================================
-// POST – Endgueltigen Antrag absenden
+// POST – Endgültigen Antrag absenden
 // =============================================
 export async function POST(
   request: NextRequest,
@@ -108,7 +108,7 @@ export async function POST(
     }
     const data = parsed.data;
 
-    // Vorgang laden — fuer ID, Geburtsurkunden-Check und spaetere Webhook-Daten
+    // Vorgang laden — für ID, Geburtsurkunden-Check und spaetere Webhook-Daten
     const ez = await prisma.elternzeitProzess.findUnique({
       where: { antragTokenEndg: tokenHash },
       select: {
@@ -122,7 +122,7 @@ export async function POST(
       },
     });
     if (!ez) {
-      return NextResponse.json({ error: "Token ungueltig" }, { status: 404 });
+      return NextResponse.json({ error: "Token ungültig" }, { status: 404 });
     }
     if (ez.antragTokenEndgExpiry && new Date() > ez.antragTokenEndgExpiry) {
       return NextResponse.json({ error: "Token abgelaufen" }, { status: 403 });
@@ -219,7 +219,7 @@ export async function POST(
     triggerWebhooks("elternzeit-antrag-eingereicht", {
       elternzeitId: ez.id,
       displayId: ez.displayId,
-      antragTyp: "endgueltig",
+      antragTyp: "endgültig",
       submittedAt: new Date().toISOString(),
       employeeName: `${ez.employeeFirstName} ${ez.employeeLastName}`,
       employeeEmail: ez.employeeEmail,

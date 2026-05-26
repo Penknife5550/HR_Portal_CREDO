@@ -283,7 +283,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Fehler beim Loeschen des Rueckgabe-Items:", error);
+    console.error("Fehler beim Löschen des Rueckgabe-Items:", error);
     return NextResponse.json(
       { error: "Interner Serverfehler" },
       { status: 500 }

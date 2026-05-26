@@ -1,10 +1,10 @@
 /**
- * CREDO HR-Portal – PDF-Export fuer Verbeamtungsvorgaenge
+ * CREDO HR-Portal – PDF-Export für Verbeamtungsvorgaenge
  *
  * Erzeugt PDF-Dokumente mit Swiss QR Code auf jeder Deckblatt-Seite.
  * QR-Code Inhalt: Mandantennummer | Nachname, Vorname | Personalnummer | Dokumenttyp
  *
- * Nutzt PDFKit fuer serverseitige PDF-Generierung.
+ * Nutzt PDFKit für serverseitige PDF-Generierung.
  */
 
 import PDFDocument from "pdfkit";
@@ -206,7 +206,7 @@ const PREREQUISITE_LABELS: Record<string, string> = {
 };
 
 // REFERENZ_LABELS sind in lib/referenz-labels.ts zentralisiert (single source
-// of truth fuer Verify-Page, HR-Detail-Modal, PDF-Export, Lehrkraft-Form).
+// of truth für Verify-Page, HR-Detail-Modal, PDF-Export, Lehrkraft-Form).
 
 // =============================================
 // QR Code generieren
@@ -397,7 +397,7 @@ async function addCoverPage(
 }
 
 // =============================================
-// Seitenheader (fuer Folgeseiten)
+// Seitenheader (für Folgeseiten)
 // =============================================
 
 function addPageHeader(doc: PDFKit.PDFDocument, ctx: ExportContext, docTitle: string): void {
@@ -474,10 +474,10 @@ async function addAntragPages(doc: PDFKit.PDFDocument, ctx: ExportContext, isFir
     doc.y = y + 2;
   }
 
-  // Persoenliche Erklaerung
+  // Persönliche Erklärung
   if (ctx.applicationData?.employeeStatement) {
     checkPageBreak(doc, 60, ctx, "Antrag");
-    const sy = sectionTitle(doc, "Persoenliche Erklaerung");
+    const sy = sectionTitle(doc, "Persönliche Erklärung");
     doc.font("Helvetica").fontSize(10).fillColor(COLORS.black)
       .text(String(ctx.applicationData.employeeStatement), 50, sy, { width: 515 });
   }
@@ -724,7 +724,7 @@ async function addBeurteilungPages(doc: PDFKit.PDFDocument, ctx: ExportContext, 
     const verifyHash = buildVerifyHash(assessment.verifyToken);
     const qrBuffer = await generateVerifyQR(assessment.verifyToken);
 
-    // Linker Block: Erklaerung + Hash
+    // Linker Block: Erklärung + Hash
     doc.font("Helvetica").fontSize(9).fillColor(COLORS.black)
       .text(
         "Diese Beurteilung kann unabhängig durch die Bezirksregierung oder andere Auditoren über die Audit-Page des CREDO HR-Portals verifiziert werden. Scan mit der Smartphone-Kamera öffnet die Read-Only-Sicht.",

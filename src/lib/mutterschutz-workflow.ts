@@ -4,7 +4,7 @@
  * Analog zu elternzeit-workflow.ts. Definiert den Mutterschutz-Prozess
  * von der Schwangerschaftsmeldung bis zum Abschluss als geordnete Schritte.
  *
- * Pfad-Variante: BAD ist nur fuer KITA bzw. einrichtungstyp-abhaengige
+ * Pfad-Variante: BAD ist nur für KITA bzw. einrichtungstyp-abhaengige
  * Faelle relevant. Wenn `badErforderlich = false`, ueberspringt der
  * naechste-Schritt-Helper die BAD-Schritte und geht direkt nach AKTIV.
  */
@@ -35,7 +35,7 @@ export const MUTTERSCHUTZ_STEPS: MutterschutzWorkflowStep[] = [
     id: "BAD_BEAUFTRAGT",
     label: "BAD beauftragt",
     beschreibung:
-      "Der Betriebsaerztliche Dienst (BAD) wurde beauftragt — relevant fuer Kita / Einrichtungen mit Kinderkontakt.",
+      "Der Betriebsaerztliche Dienst (BAD) wurde beauftragt — relevant für Kita / Einrichtungen mit Kinderkontakt.",
     optional: true,
   },
   {
@@ -170,7 +170,7 @@ export function getNaechsterSchritt(
 }
 
 /**
- * Liefert die zulaessigen Vorgaenger-Status fuer einen Ziel-Status.
+ * Liefert die zulaessigen Vorgaenger-Status für einen Ziel-Status.
  * Umkehrung von `erlaubteFolgestatus` — wird im atomaren updateMany-WHERE
  * der Transition-Routes verwendet, damit der Statuswechsel race-frei ist.
  */
@@ -191,7 +191,7 @@ export function getErlaubteVorgaenger(
 }
 
 /**
- * Liefert die zulaessigen Folgestatus fuer einen gegebenen Status.
+ * Liefert die zulaessigen Folgestatus für einen gegebenen Status.
  * Wird in den Status-Transition-API-Routes zur Validierung verwendet.
  */
 export function erlaubteFolgestatus(

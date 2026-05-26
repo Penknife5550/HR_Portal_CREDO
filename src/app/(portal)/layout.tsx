@@ -1,6 +1,6 @@
 /**
- * Portal-Layout (fuer HR-Dashboard und Login)
- * Dieses Layout wird fuer alle Seiten unter /(portal)/ verwendet.
+ * Portal-Layout (für HR-Dashboard und Login)
+ * Dieses Layout wird für alle Seiten unter /(portal)/ verwendet.
  */
 
 export default function PortalLayout({

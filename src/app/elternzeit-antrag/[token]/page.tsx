@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Elternzeit-Antrag (vorlaeufig) — Magic-Link Einstiegsseite
+ * Elternzeit-Antrag (vorläufig) — Magic-Link Einstiegsseite
  *
  * Validiert den Token und zeigt entweder das 5-Schritt-Antragsformular
  * oder eine Fehlermeldung an. Single-Use Schutz im Backend.

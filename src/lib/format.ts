@@ -1,7 +1,7 @@
 /**
- * Format-Helper fuer das CREDO HR-Portal
+ * Format-Helper für das CREDO HR-Portal
  *
- * Zentrale Stelle fuer wiederkehrende String-Formatierungen, die bisher
+ * Zentrale Stelle für wiederkehrende String-Formatierungen, die bisher
  * inline an mehreren Stellen gebaut wurden.
  */
 

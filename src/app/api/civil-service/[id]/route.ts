@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { updateCivilServiceSchema } from "@/lib/validations/civil-service";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
-// PORTAL_ROLES wird fuer GET verwendet, HR_EDIT_ROLES fuer PATCH
+// PORTAL_ROLES wird für GET verwendet, HR_EDIT_ROLES für PATCH
 
 // Gueltige Status-Uebergaenge
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -89,7 +89,7 @@ export async function GET(
 
     // Org-Zugriffspruefung
     if (!(await canAccessProcess(session, process.organizationId))) {
-      return NextResponse.json({ error: "Keine Berechtigung fuer diesen Vorgang" }, { status: 403 });
+      return NextResponse.json({ error: "Keine Berechtigung für diesen Vorgang" }, { status: 403 });
     }
 
     return NextResponse.json(process);

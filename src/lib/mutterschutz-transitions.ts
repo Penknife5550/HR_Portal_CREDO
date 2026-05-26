@@ -50,7 +50,7 @@ export async function mutterschutzTransition(
     return { ok: false, error: "Keine Berechtigung", status: 403 };
   }
 
-  // 2) Vorgang laden — minimal, nur fuer Org-Scope + badErforderlich + Audit-Daten
+  // 2) Vorgang laden — minimal, nur für Org-Scope + badErforderlich + Audit-Daten
   const ms = await prisma.mutterschutzProzess.findUnique({
     where: { id: input.prozessId },
     select: {

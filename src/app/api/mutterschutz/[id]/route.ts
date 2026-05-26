@@ -3,7 +3,7 @@
  *
  * GET    – Detail eines Mutterschutz-Vorgangs
  * PATCH  – Status / Felder aktualisieren
- * DELETE – Loeschen (nur Status GEMELDET, nur HR_LEITUNG/SUPER_ADMIN)
+ * DELETE – Löschen (nur Status GEMELDET, nur HR_LEITUNG/SUPER_ADMIN)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -179,7 +179,7 @@ export async function DELETE(
     }
     if (ms.status !== "GEMELDET") {
       return NextResponse.json(
-        { error: "Loeschen nur im Status GEMELDET moeglich" },
+        { error: "Löschen nur im Status GEMELDET moeglich" },
         { status: 409 },
       );
     }

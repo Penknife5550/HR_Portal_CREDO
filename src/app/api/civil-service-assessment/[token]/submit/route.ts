@@ -4,7 +4,7 @@
  * POST - Schulleitung reicht die Beurteilung final ein
  *
  * OEFFENTLICH - kein Auth erforderlich!
- * Zugang ausschliesslich ueber gueltigen Magic-Link-Token.
+ * Zugang ausschliesslich über gueltigen Magic-Link-Token.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,7 +14,7 @@ import { triggerWebhooks } from "@/lib/webhooks";
 import { formatEmployeeName } from "@/lib/format";
 import { autoCheckAssessmentChecklistItems } from "@/lib/civil-service-phases";
 
-// Typen fuer den Template-Snapshot
+// Typen für den Template-Snapshot
 interface SnapshotCriterion {
   id: string;
   weight: number;
@@ -50,7 +50,7 @@ export async function POST(
 
     const { token } = await params;
 
-    // Token validieren — inkl. Process+Organization fuer Webhook
+    // Token validieren — inkl. Process+Organization für Webhook
     const assessment = await prisma.civilServiceAssessment.findUnique({
       where: { token },
       include: {
@@ -104,7 +104,7 @@ export async function POST(
       if (missingCriteria.length > 0) {
         return NextResponse.json(
           {
-            error: `Es fehlen noch Bewertungen fuer ${missingCriteria.length} Kriterium(en). Bitte bewerten Sie alle Kriterien vor dem Einreichen.`,
+            error: `Es fehlen noch Bewertungen für ${missingCriteria.length} Kriterium(en). Bitte bewerten Sie alle Kriterien vor dem Einreichen.`,
             missingCriterionIds: missingCriteria,
           },
           { status: 400 }

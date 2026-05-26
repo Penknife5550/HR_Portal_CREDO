@@ -137,7 +137,7 @@ export function OffboardingDashboardContent({ user }: { user: User }) {
     loadOffboardings();
   }, [loadOffboardings]);
 
-  // Bei Filterwechsel immer auf Seite 0 zurueck
+  // Bei Filterwechsel immer auf Seite 0 zurück
   const handleStatusFilter = (filter: string) => {
     setStatusFilter((prev) => (prev === filter ? "" : filter));
     setPage(0);

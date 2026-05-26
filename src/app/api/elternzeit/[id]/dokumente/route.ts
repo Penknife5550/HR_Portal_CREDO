@@ -5,7 +5,7 @@
  * POST – Dokument hochladen (HR, multipart/form-data)
  *
  * Magic-Bytes-Validierung, max 10 MB, sichere Dateinamen.
- * Public Geburtsurkunden-Upload laeuft ueber separate Token-Route.
+ * Public Geburtsurkunden-Upload laeuft über separate Token-Route.
  */
 
 import { NextRequest, NextResponse } from "next/server";

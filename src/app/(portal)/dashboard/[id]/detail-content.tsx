@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { STATUS_LABELS } from "@/lib/constants";
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { EditPersonalDataModal } from "./edit-personal-data-modal";
 
 // =============================================
 // Types
@@ -74,7 +76,7 @@ interface DetailData {
     lastName: string | null;
     isComplete: boolean;
     currentStep: number;
-    // Persoenliche Angaben
+    // Persönliche Angaben
     salutation: string | null;
     title: string | null;
     birthName: string | null;
@@ -630,7 +632,7 @@ export function DetailContent({
               {data.questionnaireType}
             </span>
 
-            {/* Status-Aktionen: Nur fuer SUPER_ADMIN / HR_LEITUNG */}
+            {/* Status-Aktionen: Nur für SUPER_ADMIN / HR_LEITUNG */}
             {canReview && (
               <button
                 onClick={handleReviewProcess}
@@ -738,7 +740,14 @@ export function DetailContent({
             onboardingId={onboardingId}
           />
         )}
-        {activeTab === "questionnaire" && <TabFragebogenDaten data={data} />}
+        {activeTab === "questionnaire" && (
+          <TabFragebogenDaten
+            data={data}
+            onboardingId={onboardingId}
+            canEdit={HR_EDIT_ROLES.includes(user.role)}
+            onSaved={() => loadData()}
+          />
+        )}
         {activeTab === "documents" && <TabDocuments data={data} onboardingId={onboardingId} />}
         {activeTab === "checklist" && (
           <TabChecklist
@@ -1192,8 +1201,19 @@ const RELIGION_LABELS: Record<string, string> = {
   sonstige: "Sonstige",
 };
 
-function TabFragebogenDaten({ data }: { data: DetailData }) {
+function TabFragebogenDaten({
+  data,
+  onboardingId,
+  canEdit,
+  onSaved,
+}: {
+  data: DetailData;
+  onboardingId: string;
+  canEdit: boolean;
+  onSaved: () => void;
+}) {
   const pd = data.personalData;
+  const [showEdit, setShowEdit] = useState(false);
 
   if (!pd) {
     return (
@@ -1208,6 +1228,14 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
 
   return (
     <div className="space-y-6">
+      {showEdit && (
+        <EditPersonalDataModal
+          onboardingId={onboardingId}
+          personalData={pd as unknown as Record<string, unknown>}
+          onClose={() => setShowEdit(false)}
+          onSaved={onSaved}
+        />
+      )}
       {/* Fortschrittsanzeige */}
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex items-center justify-between">
@@ -1221,10 +1249,39 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
               </p>
             )}
           </div>
-          <div className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            pd.isComplete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
-          }`}>
-            {pd.isComplete ? "Komplett" : "In Bearbeitung"}
+          <div className="flex items-center gap-3">
+            {canEdit && (
+              <a
+                href={`/api/onboarding/${onboardingId}/fuehrungszeugnis-antrag`}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                title="Aufforderung erweitertes Führungszeugnis als Word-Dokument"
+              >
+                Führungszeugnis-Antrag (Word)
+              </a>
+            )}
+            {canEdit && (
+              <a
+                href={`/api/onboarding/${onboardingId}/masernschutz-bescheinigung`}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                title="Masernschutz Nachweis-Bescheinigung (Arzt) als Word-Dokument"
+              >
+                Masernschutz-Formular (Word)
+              </a>
+            )}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => setShowEdit(true)}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+              >
+                Daten bearbeiten
+              </button>
+            )}
+            <div className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              pd.isComplete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+            }`}>
+              {pd.isComplete ? "Komplett" : "In Bearbeitung"}
+            </div>
           </div>
         </div>
         {/* Progress Bar */}
@@ -1236,8 +1293,8 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
         </div>
       </div>
 
-      {/* Schritt 1: Persoenliche Daten */}
-      <SectionCard title="1. Persoenliche Daten" icon="&#128100;">
+      {/* Schritt 1: Persönliche Daten */}
+      <SectionCard title="1. Persönliche Daten" icon="&#128100;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
           <FieldRow label="Anrede" value={pd.salutation || "\u2014"} />
           <FieldRow label="Titel" value={pd.title || "\u2014"} />
@@ -1247,7 +1304,7 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
           <FieldRow label="Geburtsdatum" value={formatDate(pd.birthDate)} />
           <FieldRow label="Geburtsort" value={pd.birthPlace || "\u2014"} />
           <FieldRow label="Geburtsland" value={pd.birthCountry || "\u2014"} />
-          <FieldRow label="Staatsangehoerigkeit" value={pd.nationality || "\u2014"} />
+          <FieldRow label="Staatsangeh\u00f6rigkeit" value={pd.nationality || "\u2014"} />
           <FieldRow label="Familienstand" value={pd.maritalStatus ? (MARITAL_STATUS_LABELS[pd.maritalStatus] || pd.maritalStatus) : "\u2014"} />
           <FieldRow label="Schwerbehindert" value={formatBoolean(pd.severelyDisabled)} />
           {pd.severelyDisabled && <FieldRow label="Grad der Behinderung" value={formatNumber(pd.disabilityDegree, "%")} />}
@@ -1293,7 +1350,7 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
           <FieldRow label="Steuer-ID" value={pd.taxId || "\u2014"} />
           <FieldRow label="Steuerklasse" value={pd.taxClass ? (TAX_CLASS_LABELS[pd.taxClass] || pd.taxClass) : "\u2014"} />
-          <FieldRow label="Jaehrlicher Freibetrag" value={pd.taxAllowance != null ? formatCurrency(pd.taxAllowance) : "\u2014"} />
+          <FieldRow label="J\u00e4hrlicher Freibetrag" value={pd.taxAllowance != null ? formatCurrency(pd.taxAllowance) : "\u2014"} />
           <FieldRow label="Kinderfreibetrag" value={pd.childAllowance != null ? formatCurrency(pd.childAllowance) : "\u2014"} />
           <FieldRow label="Konfession" value={pd.religion ? (RELIGION_LABELS[pd.religion] || pd.religion) : "\u2014"} />
         </div>
@@ -1352,8 +1409,8 @@ function TabFragebogenDaten({ data }: { data: DetailData }) {
       {/* Schritt 8: Bildung */}
       <SectionCard title="8. Bildungsabschluss" icon="&#127891;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-          <FieldRow label="Hoechster Schulabschluss" value={pd.highestSchoolDegree ? (SCHOOL_DEGREE_LABELS[pd.highestSchoolDegree] || pd.highestSchoolDegree) : "\u2014"} />
-          <FieldRow label="Hoechster Berufsabschluss" value={pd.highestProfessionalDegree ? (PROF_DEGREE_LABELS[pd.highestProfessionalDegree] || pd.highestProfessionalDegree) : "\u2014"} />
+          <FieldRow label="H\u00f6chster Schulabschluss" value={pd.highestSchoolDegree ? (SCHOOL_DEGREE_LABELS[pd.highestSchoolDegree] || pd.highestSchoolDegree) : "\u2014"} />
+          <FieldRow label="H\u00f6chster Berufsabschluss" value={pd.highestProfessionalDegree ? (PROF_DEGREE_LABELS[pd.highestProfessionalDegree] || pd.highestProfessionalDegree) : "\u2014"} />
         </div>
       </SectionCard>
 
@@ -1443,10 +1500,10 @@ function OnboardingExportSection({ onboardingId }: { onboardingId: string }) {
         <svg className="h-5 w-5 text-[#009AC6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        PDF-Export fuer DMS
+        PDF-Export für DMS
       </h3>
       <p className="text-xs text-muted-foreground mb-4">
-        Jedes Dokument erhaelt einen QR-Code auf der Deckseite zur automatischen DMS-Zuordnung.
+        Jedes Dokument erhält einen QR-Code auf der Deckseite zur automatischen DMS-Zuordnung.
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {exports.map((e) => (
@@ -1893,15 +1950,15 @@ function TabSupervisor({ data, appUrl }: { data: DetailData; appUrl: string }) {
         </div>
       </Card>
 
-      {/* Sektion 3: Verguetung */}
-      <Card title="Verguetung">
+      {/* Sektion 3: Vergütung */}
+      <Card title="Vergütung">
         <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
-          <FieldRow label="Verguetungsmodell" value={sd.verguetungsmodell} />
+          <FieldRow label="Vergütungsmodell" value={sd.verguetungsmodell} />
           <FieldRow label="Entgeltgruppe" value={sd.entgeltgruppe} />
           <FieldRow label="Stufe" value={sd.stufe} />
           <FieldRow label="Festgehalt" value={formatCurrency(sd.festgehalt)} />
           <FieldRow label="Stundenlohn" value={formatCurrency(sd.stundenlohn)} />
-          <FieldRow label="Bemerkung Verguetung" value={sd.bemerkungVerguetung} />
+          <FieldRow label="Bemerkung Vergütung" value={sd.bemerkungVerguetung} />
           <FieldRow label="Jahressonderzahlung" value={formatBoolean(sd.jahressonderzahlung)} />
           <FieldRow label="Sonderzahlung %" value={formatNumber(sd.sonderzahlungProzent, "%")} />
           <FieldRow label="Sachbezuege" value={formatBoolean(sd.sachbezuege)} />

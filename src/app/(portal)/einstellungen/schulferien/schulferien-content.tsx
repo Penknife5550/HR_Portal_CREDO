@@ -3,8 +3,8 @@
 /**
  * Schulferien NRW — CRUD-Verwaltung
  *
- * Anlegen, Bearbeiten, Aktiv-Toggle, Loeschen.
- * Wird fuer Feriensperrfrist-Check (§ 11 FrUrlV NRW) im Elternzeit-Antrag genutzt.
+ * Anlegen, Bearbeiten, Aktiv-Toggle, Löschen.
+ * Wird für Feriensperrfrist-Check (§ 11 FrUrlV NRW) im Elternzeit-Antrag genutzt.
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -144,7 +144,7 @@ export function SchulferienContent({ user }: { user: User }) {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Zurueck zu Einstellungen
+            Zurück zu Einstellungen
           </Link>
         </div>
 
@@ -152,7 +152,7 @@ export function SchulferienContent({ user }: { user: User }) {
           <div>
             <h1 className="text-2xl font-bold">Schulferien NRW</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Pflege des Ferienkalenders fuer Feriensperrfrist-Check
+              Pflege des Ferienkalenders für Feriensperrfrist-Check
               (§ 11 FrUrlV NRW) im Elternzeit-Antrag.
             </p>
           </div>
@@ -341,9 +341,9 @@ export function SchulferienContent({ user }: { user: User }) {
 
       {deleteId && (
         <ConfirmDeleteModal
-          titel="Ferien-Eintrag loeschen?"
-          beschreibung="Der Eintrag wird unwiderruflich entfernt. Verwende stattdessen 'Aktiv' deaktivieren, um den Eintrag fuer Berechnungen auszublenden."
-          bestaetigungsText="Endgueltig loeschen"
+          titel="Ferien-Eintrag löschen?"
+          beschreibung="Der Eintrag wird unwiderruflich entfernt. Verwende stattdessen 'Aktiv' deaktivieren, um den Eintrag für Berechnungen auszublenden."
+          bestaetigungsText="Endgültig löschen"
           onClose={() => setDeleteId(null)}
           onConfirm={remove}
         />

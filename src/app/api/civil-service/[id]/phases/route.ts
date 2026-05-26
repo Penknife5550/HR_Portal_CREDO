@@ -93,7 +93,7 @@ export async function PATCH(
 
     const { phaseKey, status, blockedReason } = parsed.data;
 
-    // Vorgang pruefen (mit Feldern fuer Webhook-Payload)
+    // Vorgang pruefen (mit Feldern für Webhook-Payload)
     const process = await prisma.civilServiceProcess.findUnique({
       where: { id },
       select: {

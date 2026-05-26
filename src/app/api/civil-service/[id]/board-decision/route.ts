@@ -47,7 +47,7 @@ export async function POST(
 
     const { decisionType, result, decisionDate, notes } = parsed.data;
 
-    // Vorgang pruefen (nur die fuer Status-Check + Webhook-Payload benoetigten Felder)
+    // Vorgang pruefen (nur die für Status-Check + Webhook-Payload benoetigten Felder)
     const process = await prisma.civilServiceProcess.findUnique({
       where: { id },
       select: {

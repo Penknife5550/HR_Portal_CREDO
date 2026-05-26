@@ -2,7 +2,7 @@
  * API: /api/schulferien/[id]
  *
  * PATCH  – Eintrag bearbeiten (ADMIN_ROLES)
- * DELETE – Eintrag loeschen (ADMIN_ROLES)
+ * DELETE – Eintrag löschen (ADMIN_ROLES)
  */
 
 import { NextRequest, NextResponse } from "next/server";

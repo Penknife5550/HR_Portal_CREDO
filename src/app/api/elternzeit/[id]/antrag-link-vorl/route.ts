@@ -1,7 +1,7 @@
 /**
  * API: /api/elternzeit/[id]/antrag-link-vorl
  *
- * POST – Magic Link Token 1 generieren (vorlaeufiger Antrag).
+ * POST – Magic Link Token 1 generieren (vorläufiger Antrag).
  *        Token gueltig 30 Tage, Single-Use (antragTokenVorlUsedAt).
  */
 
@@ -60,7 +60,7 @@ export async function POST(
     }
     if (ez.antragVorlAm || ez.antragTokenVorlUsedAt) {
       return NextResponse.json(
-        { error: "Der vorlaeufige Antrag wurde bereits eingereicht" },
+        { error: "Der vorläufige Antrag wurde bereits eingereicht" },
         { status: 400 },
       );
     }
@@ -114,7 +114,7 @@ export async function POST(
     triggerWebhooks("elternzeit-antrag-link-versandt", {
       elternzeitId: id,
       displayId: ez.displayId,
-      antragTyp: "vorlaeufig",
+      antragTyp: "vorläufig",
       recipientEmail: parsed.data.recipientEmail,
       recipientName:
         parsed.data.recipientName || `${ez.employeeFirstName} ${ez.employeeLastName}`,

@@ -5,7 +5,7 @@ import { MandantenContent } from "./mandanten-content";
 /**
  * Mandanten-Verwaltung (Server Component)
  *
- * Nur fuer SUPER_ADMIN zugaenglich.
+ * Nur für SUPER_ADMIN zugaenglich.
  * Prueft die Session und leitet um wenn nicht berechtigt.
  */
 export default async function MandantenPage() {

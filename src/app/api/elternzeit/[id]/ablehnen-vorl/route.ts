@@ -1,7 +1,7 @@
 /**
  * API: /api/elternzeit/[id]/ablehnen-vorl
  *
- * POST – Vorlaeufigen Antrag ablehnen mit Begruendung.
+ * POST – Vorläufigen Antrag ablehnen mit Begruendung.
  */
 
 import { NextRequest, NextResponse } from "next/server";

@@ -5,7 +5,7 @@
  *        Elternzeit-Antrag zu bestaetigen / abzulehnen (Phase-2-Workflow).
  *
  * Voraussetzung: ANTRAG_VORL_EINGEREICHT (Mitarbeiter hat Antrag eingereicht).
- * Mandanten-Default fuer Empfaenger wird vorgeschlagen.
+ * Mandanten-Default für Empfaenger wird vorgeschlagen.
  */
 
 import { NextRequest, NextResponse } from "next/server";

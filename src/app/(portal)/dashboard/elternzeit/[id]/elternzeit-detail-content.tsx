@@ -133,8 +133,8 @@ const STATUS_LABELS: Record<string, string> = {
   ANGELEGT: "Angelegt",
   ANTRAG_VORL_VERSANDT: "Vorl. Antrag versandt",
   ANTRAG_VORL_EINGEREICHT: "Vorl. Antrag eingereicht",
-  VORLAEUFIG_GENEHMIGT: "Vorlaeufig genehmigt",
-  VORLAEUFIG_ABGELEHNT: "Vorlaeufig abgelehnt",
+  VORLAEUFIG_GENEHMIGT: "Vorläufig genehmigt",
+  VORLAEUFIG_ABGELEHNT: "Vorläufig abgelehnt",
   ANTRAG_ENDG_VERSANDT: "Endg. Antrag versandt",
   ANTRAG_ENDG_EINGEREICHT: "Endg. Antrag eingereicht",
   GENEHMIGT: "Genehmigt",
@@ -193,8 +193,10 @@ export function ElternzeitDetailContent({
     | null
   >(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    // silent=true: Hintergrund-Refresh nach Aktionen — kein loading-State,
+    // damit die Detailansicht nicht unmountet und die Scroll-Position bleibt.
+    if (!silent) setLoading(true);
     const res = await fetch(`/api/elternzeit/${prozessId}`);
     if (res.ok) {
       const j = await res.json();
@@ -203,7 +205,7 @@ export function ElternzeitDetailContent({
         setLinkRecipient(j.data.employeeEmail);
       }
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [prozessId, linkRecipient]);
 
   const loadFristen = useCallback(async () => {
@@ -239,7 +241,7 @@ export function ElternzeitDetailContent({
         return;
       }
       loadDokumente();
-      load();
+      load(true);
     } finally {
       setUploading(false);
     }
@@ -257,7 +259,7 @@ export function ElternzeitDetailContent({
       return;
     }
     loadDokumente();
-    load();
+    load(true);
   }
 
   async function fristToggle(f: FristEintrag) {
@@ -279,7 +281,7 @@ export function ElternzeitDetailContent({
   }
 
   useEffect(() => {
-    load();
+    load(false);
   }, [load]);
 
   // Dokumente werden direkt mitgeladen, damit der Uebersichts-Hinweis
@@ -312,7 +314,7 @@ export function ElternzeitDetailContent({
     const j = await res.json();
     setMagicLinkResult(j.data.magicUrl);
     setShowSendLinkModal(false);
-    load();
+    load(true);
   }
 
   async function genehmigen() {
@@ -326,7 +328,7 @@ export function ElternzeitDetailContent({
       setActionError(j.error || "Fehler bei Genehmigung.");
       return;
     }
-    load();
+    load(true);
   }
 
   async function ablehnen(grund: string) {
@@ -345,10 +347,10 @@ export function ElternzeitDetailContent({
       throw new Error(j.error);
     }
     setModal(null);
-    load();
+    load(true);
   }
 
-  // ── Phase-2-Aktionen: Endgueltiger Antrag ──
+  // ── Phase-2-Aktionen: Endgültiger Antrag ──
 
   async function sendeAntragsLinkEndg(empfaenger: string) {
     setActionError(null);
@@ -362,13 +364,13 @@ export function ElternzeitDetailContent({
     );
     if (!res.ok) {
       const j = await res.json();
-      setActionError(j.error || "Fehler beim Senden des endgueltigen Links.");
+      setActionError(j.error || "Fehler beim Senden des endgültigen Links.");
       throw new Error(j.error);
     }
     const j = await res.json();
     setMagicLinkResult(j.data.magicUrl);
     setModal(null);
-    load();
+    load(true);
   }
 
   async function genehmigenEndg(unterzeichner: string) {
@@ -383,11 +385,11 @@ export function ElternzeitDetailContent({
     );
     if (!res.ok) {
       const j = await res.json();
-      setActionError(j.error || "Fehler bei endgueltiger Genehmigung.");
+      setActionError(j.error || "Fehler bei endgültiger Genehmigung.");
       throw new Error(j.error);
     }
     setModal(null);
-    load();
+    load(true);
   }
 
   async function ablehnenEndg(grund: string) {
@@ -402,11 +404,11 @@ export function ElternzeitDetailContent({
     );
     if (!res.ok) {
       const j = await res.json();
-      setActionError(j.error || "Fehler bei endgueltiger Ablehnung.");
+      setActionError(j.error || "Fehler bei endgültiger Ablehnung.");
       throw new Error(j.error);
     }
     setModal(null);
-    load();
+    load(true);
   }
 
   // Leiter-Magic-Link senden (ersetzt inline-prompt im Button)
@@ -428,7 +430,7 @@ export function ElternzeitDetailContent({
     const j = await res.json();
     setMagicLinkResult(j.data.magicUrl);
     setModal(null);
-    load();
+    load(true);
   }
 
   // AG-Bescheinigung generieren (ersetzt 4 prompts)
@@ -472,7 +474,7 @@ export function ElternzeitDetailContent({
       setActionError(j.error || "Item konnte nicht aktualisiert werden.");
       return;
     }
-    load();
+    load(true);
   }
 
   async function notizSpeichern() {
@@ -489,7 +491,7 @@ export function ElternzeitDetailContent({
       return;
     }
     setNeueNotiz("");
-    load();
+    load(true);
   }
 
   if (loading || !data) {
@@ -504,7 +506,7 @@ export function ElternzeitDetailContent({
   }
 
   // Sekundaer-Aktionen — Primaer-Schritte uebernimmt der NaechsterSchrittBanner.
-  // Hier nur Sichtbarkeits-Flags fuer Aktionen, die der Banner NICHT abdeckt:
+  // Hier nur Sichtbarkeits-Flags für Aktionen, die der Banner NICHT abdeckt:
   // Ablehnungen, Leiter-Magic-Link, PDF-Downloads.
   const canAblehnen = data.status === "ANTRAG_VORL_EINGEREICHT";
   const canDownloadPdf = !!data.genehmigungAm;
@@ -533,7 +535,7 @@ export function ElternzeitDetailContent({
             href="/dashboard?tab=elternzeit"
             className="text-xs text-muted-foreground hover:text-foreground"
           >
-            ← Zurueck zum Dashboard
+            ← Zurück zum Dashboard
           </Link>
           <div className="mt-2 flex items-center gap-3 flex-wrap">
             <h1 className="text-xl font-bold">
@@ -642,7 +644,7 @@ export function ElternzeitDetailContent({
                 onClick={() => setModal({ type: "ablehnung-endg" })}
                 className="rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive"
               >
-                Endgueltig ablehnen
+                Endgültig ablehnen
               </button>
             )}
             {canDownloadPdf && (
@@ -936,7 +938,7 @@ export function ElternzeitDetailContent({
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 Manueller Upload (max. 10 MB, PDF / JPG / PNG / WebP).
-                Geburtsurkunden werden i.d.R. vom Mitarbeiter ueber den
+                Geburtsurkunden werden i.d.R. vom Mitarbeiter über den
                 Magic-Link hochgeladen.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -946,9 +948,9 @@ export function ElternzeitDetailContent({
                   className="rounded-lg border bg-background px-3 py-2 text-sm"
                 >
                   <option value="GEBURTSURKUNDE">Geburtsurkunde</option>
-                  <option value="ANTRAG_VORLAEUFIG">Antrag (vorlaeufig)</option>
+                  <option value="ANTRAG_VORLAEUFIG">Antrag (vorläufig)</option>
                   <option value="ANTRAG_ENDGUELTIG">
-                    Antrag (endgueltig)
+                    Antrag (endgültig)
                   </option>
                   <option value="LOHNBESCHEINIGUNG_KK">
                     Lohnbescheinigung KK
@@ -1035,7 +1037,7 @@ export function ElternzeitDetailContent({
                             onClick={() => setConfirmDelete(d)}
                             className="text-xs text-destructive hover:underline"
                           >
-                            Loeschen
+                            Löschen
                           </button>
                         </td>
                       </tr>
@@ -1084,7 +1086,7 @@ export function ElternzeitDetailContent({
                 Genehmigungen
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Vorlaeufige + endgueltige Genehmigung als PDF.
+                Vorläufige + endgültige Genehmigung als PDF.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <a
@@ -1109,7 +1111,7 @@ export function ElternzeitDetailContent({
                   Beamte / PSI
                 </h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Pflicht-Briefe fuer Beamte und Planstelleninhaber.
+                  Pflicht-Briefe für Beamte und Planstelleninhaber.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <a
@@ -1260,8 +1262,8 @@ export function ElternzeitDetailContent({
           <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-xl">
             <h2 className="text-lg font-semibold">Magic Link senden</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Der Mitarbeiter erhaelt einen Link, um den vorlaeufigen Antrag
-              auszufuellen.
+              Der Mitarbeiter erhält einen Link, um den vorläufigen Antrag
+              auszufüllen.
             </p>
             <label className="mt-4 block">
               <span className="mb-1 block text-xs font-medium">
@@ -1296,22 +1298,22 @@ export function ElternzeitDetailContent({
       {/* Phase-2 Modale (ersetzen prompt()/confirm()) */}
       {modal?.type === "ablehnung-vorl" && (
         <AblehnungModal
-          titel="Vorlaeufige Ablehnung"
+          titel="Vorläufige Ablehnung"
           onClose={() => setModal(null)}
           onSubmit={ablehnen}
         />
       )}
       {modal?.type === "ablehnung-endg" && (
         <AblehnungModal
-          titel="Endgueltige Ablehnung"
+          titel="Endgültige Ablehnung"
           onClose={() => setModal(null)}
           onSubmit={ablehnenEndg}
         />
       )}
       {modal?.type === "magic-link-endg" && (
         <MagicLinkModal
-          titel="Magic Link endgueltiger Antrag"
-          beschreibung="Der Mitarbeiter erhaelt einen Link, um den endgueltigen Antrag auszufuellen und die Geburtsurkunde hochzuladen."
+          titel="Magic Link endgültiger Antrag"
+          beschreibung="Der Mitarbeiter erhält einen Link, um den endgültigen Antrag auszufüllen und die Geburtsurkunde hochzuladen."
           defaultEmail={linkRecipient || data.employeeEmail}
           onClose={() => setModal(null)}
           onSubmit={sendeAntragsLinkEndg}
@@ -1320,7 +1322,7 @@ export function ElternzeitDetailContent({
       {modal?.type === "magic-link-leiter" && (
         <MagicLinkModal
           titel="Leiter-Magic-Link senden"
-          beschreibung="Die Einrichtungsleitung erhaelt einen Link fuer eine Stellungnahme zum Antrag."
+          beschreibung="Die Einrichtungsleitung erhält einen Link für eine Stellungnahme zum Antrag."
           defaultEmail={data.einrichtungsleiterEmail ?? ""}
           onClose={() => setModal(null)}
           onSubmit={sendeLeiterLink}
@@ -1340,8 +1342,8 @@ export function ElternzeitDetailContent({
       )}
       {confirmDelete && (
         <ConfirmDeleteModal
-          titel="Dokument loeschen?"
-          beschreibung={`'${confirmDelete.dateiname}' wird endgueltig entfernt.`}
+          titel="Dokument löschen?"
+          beschreibung={`'${confirmDelete.dateiname}' wird endgültig entfernt.`}
           onClose={() => setConfirmDelete(null)}
           onConfirm={async () => {
             const docId = confirmDelete.id;

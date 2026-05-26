@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Elternzeit-Antrag (endgueltig) — Magic-Link Einstiegsseite (Phase 2)
+ * Elternzeit-Antrag (endgültig) — Magic-Link Einstiegsseite (Phase 2)
  *
  * Validiert Token 2 und zeigt entweder das 3-Schritt-Antragsformular
  * (Kind-Daten, Geburtsurkunde-Upload, Bestaetigung) oder eine Fehlermeldung.

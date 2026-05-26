@@ -1,7 +1,7 @@
 /**
- * URL-Helper fuer das CREDO HR-Portal
+ * URL-Helper für das CREDO HR-Portal
  *
- * Zentrale Stelle fuer Base-URL-Aufloesung und SSRF-Prevention.
+ * Zentrale Stelle für Base-URL-Auflösung und SSRF-Prevention.
  * Wurde extrahiert aus drei Stellen, an denen `getBaseUrl()` byte-identisch
  * dupliziert war (cron/reminders, cron/offboarding-reminders, offboarding/department-links).
  */
@@ -35,7 +35,7 @@ export function getBaseUrl(): string {
 
 /**
  * Prueft, ob eine IP-Adresse (v4 oder v6) in einem privaten/loopback/link-local
- * Bereich liegt. Wird fuer SSRF-Prevention von ausgehenden Webhook-Calls genutzt.
+ * Bereich liegt. Wird für SSRF-Prevention von ausgehenden Webhook-Calls genutzt.
  */
 export function isPrivateAddress(addr: string): boolean {
   const family = isIP(addr);
@@ -82,10 +82,10 @@ function isPrivateIpv6(addr: string): boolean {
 
 /**
  * Prueft per DNS-Lookup, ob ein Hostname auf eine private/loopback/link-local
- * Adresse aufloest. Wird fuer Webhook-URL-Validierung genutzt (SSRF-Schutz).
+ * Adresse aufloest. Wird für Webhook-URL-Validierung genutzt (SSRF-Schutz).
  *
  * Liefert true, wenn der Host **sicher** zu sein scheint (kein privater Block).
- * Liefert false, wenn er privat aufloest oder die Aufloesung fehlschlaegt.
+ * Liefert false, wenn er privat aufloest oder die Auflösung fehlschlaegt.
  */
 export async function isPublicHostname(hostname: string): Promise<boolean> {
   // Wenn der Hostname selbst schon eine IP ist, direkt pruefen
@@ -115,7 +115,7 @@ export async function isPublicHostname(hostname: string): Promise<boolean> {
 }
 
 /**
- * Maskiert sensible URL-Bestandteile fuer das Logging.
+ * Maskiert sensible URL-Bestandteile für das Logging.
  * Entfernt Query-Parameter (koennen Tokens enthalten) und User-Info.
  *
  * Beispiel: "https://api.example.com/hook?token=secret" -> "https://api.example.com/hook"

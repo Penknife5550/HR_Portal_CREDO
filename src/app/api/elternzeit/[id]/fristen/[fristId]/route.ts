@@ -2,7 +2,7 @@
  * API: /api/elternzeit/[id]/fristen/[fristId]
  *
  * PATCH  – Frist als erledigt markieren / Erledigung-Text setzen.
- * DELETE – Frist loeschen (HR_EDIT_ROLES).
+ * DELETE – Frist löschen (HR_EDIT_ROLES).
  */
 
 import { NextRequest, NextResponse } from "next/server";

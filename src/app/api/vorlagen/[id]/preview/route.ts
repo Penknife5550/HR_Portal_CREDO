@@ -1,7 +1,7 @@
 /**
  * API: /api/vorlagen/:id/preview
  *
- * GET – Vorschau-Daten fuer den Personalfragebogen
+ * GET – Vorschau-Daten für den Personalfragebogen
  *       Liefert ein Mock-OnboardingData-Objekt ohne echten Vorgang
  *
  * Berechtigung: SUPER_ADMIN, HR_LEITUNG
@@ -34,7 +34,7 @@ export async function GET(
       return NextResponse.json({ error: "Vorlage nicht gefunden" }, { status: 404 });
     }
 
-    // Mock-Daten fuer die Vorschau (kein echter Onboarding-Vorgang noetig)
+    // Mock-Daten für die Vorschau (kein echter Onboarding-Vorgang noetig)
     return NextResponse.json({
       onboardingId: "preview",
       email: "vorschau@credo-gruppe.de",

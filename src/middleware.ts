@@ -1,7 +1,7 @@
 /**
  * Next.js Middleware
  *
- * Setzt Security-Headers fuer alle Responses und
+ * Setzt Security-Headers für alle Responses und
  * schuetzt Portal-Routen mit kryptographischer JWT-Validierung.
  * Verwendet 'jose' (Edge-Runtime-kompatibel) statt 'jsonwebtoken'.
  */
@@ -91,7 +91,7 @@ export async function middleware(request: NextRequest) {
         algorithms: ["HS256"],
       });
 
-      // Admin-Routen nur fuer SUPER_ADMIN und HR_LEITUNG
+      // Admin-Routen nur für SUPER_ADMIN und HR_LEITUNG
       const adminRoutes = ["/benutzerverwaltung", "/vorlagen", "/checklisten", "/mandanten", "/einstellungen"];
       const isAdminRoute = adminRoutes.some((r) => pathname.startsWith(r));
       if (isAdminRoute) {
@@ -102,7 +102,7 @@ export async function middleware(request: NextRequest) {
         }
       }
     } catch {
-      // Ungueltiger oder abgelaufener Token → Cookie loeschen, Redirect zu Login
+      // Ungueltiger oder abgelaufener Token → Cookie löschen, Redirect zu Login
       const redirectResponse = NextResponse.redirect(new URL("/login", request.url));
       redirectResponse.cookies.delete("credo_session");
       return redirectResponse;

@@ -3,7 +3,7 @@
 /**
  * Offboarding-Aufgaben – Abteilungs-Ansicht (Magic Link)
  *
- * Zeigt die Checkliste fuer eine Abteilung an.
+ * Zeigt die Checkliste für eine Abteilung an.
  * Aufgaben koennen abgehakt und mit Kommentar versehen werden.
  * Optimistic Updates mit Fehler-Rollback.
  */
@@ -256,7 +256,7 @@ export function OffboardingTasksForm({ token, initialData }: OffboardingTasksFor
               </p>
             )}
 
-            {/* Kommentar-Button (nur fuer offene Aufgaben) */}
+            {/* Kommentar-Button (nur für offene Aufgaben) */}
             {!item.isCompleted && (
               <button
                 onClick={() => toggleExpand(item.id)}
@@ -419,7 +419,7 @@ export function OffboardingTasksForm({ token, initialData }: OffboardingTasksFor
             </div>
             <h3 className="text-lg font-bold text-green-800">Alle Aufgaben erledigt!</h3>
             <p className="mt-1 text-sm text-green-700">
-              Vielen Dank. Alle Offboarding-Aufgaben fuer Ihre Abteilung sind abgeschlossen.
+              Vielen Dank. Alle Offboarding-Aufgaben für Ihre Abteilung sind abgeschlossen.
             </p>
           </div>
         )}
@@ -428,7 +428,7 @@ export function OffboardingTasksForm({ token, initialData }: OffboardingTasksFor
         {items.length === 0 && (
           <div className="mt-6 rounded-xl border bg-card p-8 text-center">
             <p className="text-muted-foreground">
-              Keine Aufgaben fuer diese Abteilung vorhanden.
+              Keine Aufgaben für diese Abteilung vorhanden.
             </p>
           </div>
         )}

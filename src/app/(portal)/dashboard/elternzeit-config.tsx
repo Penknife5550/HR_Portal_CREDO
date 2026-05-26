@@ -1,5 +1,5 @@
 /**
- * Elternzeit Dashboard – Konfiguration fuer ProcessDashboard
+ * Elternzeit Dashboard – Konfiguration für ProcessDashboard
  */
 
 import type { ProcessDashboardConfig } from "@/components/process-dashboard/types";
@@ -162,5 +162,5 @@ export const elternzeitDashboardConfig: ProcessDashboardConfig = {
 
   emptyStateText: "Keine Elternzeit-Vorgaenge vorhanden",
   emptyStateHint: "Erstellen Sie einen neuen Elternzeit-Vorgang.",
-  emptyFilterText: "Keine Vorgaenge fuer diese Filter gefunden",
+  emptyFilterText: "Keine Vorgaenge für diese Filter gefunden",
 };

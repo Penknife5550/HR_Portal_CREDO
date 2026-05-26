@@ -1,7 +1,7 @@
 /**
  * CREDO HR-Portal – Verbeamtung (PSI) Checklisten-Template
  *
- * 62 Checklistenpunkte fuer den kompletten PSI-Prozess.
+ * 62 Checklistenpunkte für den kompletten PSI-Prozess.
  * Wird beim Start eines neuen CivilServiceProcess als Vorlage
  * genutzt, um die individuellen Checklist-Items zu erzeugen.
  *
@@ -114,7 +114,7 @@ export const CIVIL_SERVICE_CHECKLIST_TEMPLATE: CivilServiceChecklistTemplate[] =
 ];
 
 /**
- * Phasen-Definitionen fuer die automatische Erstellung
+ * Phasen-Definitionen für die automatische Erstellung
  */
 export const CIVIL_SERVICE_PHASES = [
   { phaseKey: "I", phaseName: "Antrag & Beurteilung", orderIndex: 1 },

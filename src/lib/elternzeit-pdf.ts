@@ -1,7 +1,7 @@
 /**
  * CREDO HR-Portal — PDF-Generator Elternzeit
  *
- * Phase 1 MVP: Vorlaeufige Genehmigung (Mutter- und Vater-Version).
+ * Phase 1 MVP: Vorläufige Genehmigung (Mutter- und Vater-Version).
  * Verwendet Helvetica (PDFKit-Standard) — Montserrat in Phase 2 als TTF.
  *
  * QR-Code wie bei Verbeamtung (Swiss-DMS-Format):
@@ -95,7 +95,7 @@ async function generateQRBuffer(content: string): Promise<Buffer> {
 }
 
 /**
- * Erzeugt das PDF "Vorlaeufige Genehmigung Elternzeit" als Buffer.
+ * Erzeugt das PDF "Vorläufige Genehmigung Elternzeit" als Buffer.
  *
  * Mutter-Version: Bezug auf Mutterschutz, weibliche Anrede.
  * Vater-Version: kein Mutterschutz, maennliche Anrede.
@@ -112,9 +112,9 @@ export async function generateVorlaeufigeGenehmigungPdf(
     margin: 50,
     bufferPages: true,
     info: {
-      Title: `Vorlaeufige Genehmigung Elternzeit — ${ctx.displayId}`,
+      Title: `Vorläufige Genehmigung Elternzeit — ${ctx.displayId}`,
       Author: "CREDO HR-Portal",
-      Subject: "Elternzeit-Antrag (vorlaeufig)",
+      Subject: "Elternzeit-Antrag (vorläufig)",
     },
   });
 
@@ -189,7 +189,7 @@ export async function generateVorlaeufigeGenehmigungPdf(
     .font("Helvetica-Bold")
     .fontSize(13)
     .fillColor(COLORS.primary)
-    .text("Vorlaeufige Genehmigung Ihres Elternzeit-Antrags", 50, y, {
+    .text("Vorläufige Genehmigung Ihres Elternzeit-Antrags", 50, y, {
       width: 515,
     });
   y = doc.y + 20;
@@ -204,17 +204,17 @@ export async function generateVorlaeufigeGenehmigungPdf(
 
   // Einleitungstext
   const intro = isMutter
-    ? `wir bestaetigen Ihnen den Eingang Ihres vorlaeufigen Antrags auf Elternzeit ` +
-      `fuer Ihr ${ctx.kindNummer}. Kind. Ihre Angaben haben wir wie folgt erfasst:`
-    : `wir bestaetigen Ihnen den Eingang Ihres vorlaeufigen Antrags auf Elternzeit ` +
-      `fuer Ihr ${ctx.kindNummer}. Kind. Da Sie als Vater keinen Mutterschutz in Anspruch nehmen, ` +
+    ? `wir bestaetigen Ihnen den Eingang Ihres vorläufigen Antrags auf Elternzeit ` +
+      `für Ihr ${ctx.kindNummer}. Kind. Ihre Angaben haben wir wie folgt erfasst:`
+    : `wir bestaetigen Ihnen den Eingang Ihres vorläufigen Antrags auf Elternzeit ` +
+      `für Ihr ${ctx.kindNummer}. Kind. Da Sie als Vater keinen Mutterschutz in Anspruch nehmen, ` +
       `richtet sich Ihre Elternzeit nach § 15 BEEG. Ihre Angaben haben wir wie folgt erfasst:`;
   doc.text(intro, 50, y, { width: 515, align: "justify" });
   y = doc.y + 18;
 
   // Daten-Block
   doc.font("Helvetica-Bold").fontSize(10).fillColor(COLORS.primary);
-  doc.text("Persoenliche Daten", 50, y);
+  doc.text("Persönliche Daten", 50, y);
   y = doc.y + 8;
   doc.font("Helvetica").fontSize(10).fillColor(COLORS.black);
 
@@ -304,7 +304,7 @@ export async function generateVorlaeufigeGenehmigungPdf(
     .fontSize(11)
     .fillColor(COLORS.black)
     .text(
-      `Hiermit genehmigen wir Ihren Antrag vorlaeufig. Die endgueltige Genehmigung ` +
+      `Hiermit genehmigen wir Ihren Antrag vorläufig. Die endgültige Genehmigung ` +
         `erfolgt nach Vorlage der Geburtsurkunde. Sie werden hierzu separat einen ` +
         `Magic-Link erhalten.`,
       50,
@@ -316,7 +316,7 @@ export async function generateVorlaeufigeGenehmigungPdf(
   doc.text(
     `Wir wuenschen Ihnen ${
       isMutter ? "und Ihrem Kind" : "Ihrer Familie"
-    } alles Gute und Gottes Segen fuer die kommende Zeit.`,
+    } alles Gute und Gottes Segen für die kommende Zeit.`,
     50,
     y,
     { width: 515, align: "justify" },
@@ -343,7 +343,7 @@ export async function generateVorlaeufigeGenehmigungPdf(
     .fontSize(7)
     .fillColor(COLORS.gray)
     .text(
-      `CREDO HR-Portal | ${ctx.displayId} | Vorlaeufige Genehmigung Elternzeit | ${personenform}`,
+      `CREDO HR-Portal | ${ctx.displayId} | Vorläufige Genehmigung Elternzeit | ${personenform}`,
       50,
       778,
       { width: 515, align: "center" },
@@ -357,7 +357,7 @@ export async function generateVorlaeufigeGenehmigungPdf(
 }
 
 // =============================================
-// Phase 2: Endgueltige Genehmigung
+// Phase 2: Endgültige Genehmigung
 // =============================================
 
 export interface ElternzeitEndgPdfContext extends ElternzeitPdfContext {
@@ -386,7 +386,7 @@ function buildEndgQRContent(ctx: ElternzeitEndgPdfContext): string {
 }
 
 /**
- * Erzeugt das PDF "Endgueltige Genehmigung Elternzeit" als Buffer.
+ * Erzeugt das PDF "Endgültige Genehmigung Elternzeit" als Buffer.
  *
  * Wird nach Eingang der Geburtsurkunde + Validierung durch HR ausgestellt.
  * Unterzeichner: Geschaeftsfuehrung des Mandanten (aus Organization-Config),
@@ -405,9 +405,9 @@ export async function generateEndgueltigeGenehmigungPdf(
     margin: 50,
     bufferPages: true,
     info: {
-      Title: `Endgueltige Genehmigung Elternzeit — ${ctx.displayId}`,
+      Title: `Endgültige Genehmigung Elternzeit — ${ctx.displayId}`,
       Author: "CREDO HR-Portal",
-      Subject: "Elternzeit-Antrag (endgueltig)",
+      Subject: "Elternzeit-Antrag (endgültig)",
     },
   });
 
@@ -472,7 +472,7 @@ export async function generateEndgueltigeGenehmigungPdf(
     .font("Helvetica-Bold")
     .fontSize(13)
     .fillColor(COLORS.primary)
-    .text("Endgueltige Genehmigung Ihres Elternzeit-Antrags", 50, y, { width: 515 });
+    .text("Endgültige Genehmigung Ihres Elternzeit-Antrags", 50, y, { width: 515 });
   y = doc.y + 20;
 
   // Anrede
@@ -487,7 +487,7 @@ export async function generateEndgueltigeGenehmigungPdf(
   doc.text(
     `wir gratulieren Ihnen herzlich zur Geburt ${kindArtikel} ${ctx.kindName} ` +
       `am ${formatDate(ctx.kindGeburtsdatum)}. Mit der Vorlage der Geburtsurkunde ` +
-      `koennen wir Ihren Antrag auf Elternzeit fuer Ihr ${ctx.kindNummer}. Kind nun endgueltig genehmigen.`,
+      `koennen wir Ihren Antrag auf Elternzeit für Ihr ${ctx.kindNummer}. Kind nun endgültig genehmigen.`,
     50,
     y,
     { width: 515, align: "justify" },
@@ -496,7 +496,7 @@ export async function generateEndgueltigeGenehmigungPdf(
 
   // Daten-Block
   doc.font("Helvetica-Bold").fontSize(10).fillColor(COLORS.primary);
-  doc.text("Persoenliche Daten", 50, y);
+  doc.text("Persönliche Daten", 50, y);
   y = doc.y + 8;
 
   const rows: [string, string][] = [
@@ -561,7 +561,7 @@ export async function generateEndgueltigeGenehmigungPdf(
     .fontSize(11)
     .fillColor(COLORS.black)
     .text(
-      `Hiermit bestaetigen wir die endgueltige Genehmigung Ihres Elternzeit-Antrags. ` +
+      `Hiermit bestaetigen wir die endgültige Genehmigung Ihres Elternzeit-Antrags. ` +
         `Die genannten Zeitraeume gelten als verbindlich. Ihre Personalakte wird entsprechend gepflegt.`,
       50,
       y,
@@ -602,7 +602,7 @@ export async function generateEndgueltigeGenehmigungPdf(
     .fontSize(7)
     .fillColor(COLORS.gray)
     .text(
-      `CREDO HR-Portal | ${ctx.displayId} | Endgueltige Genehmigung Elternzeit | ${personenform}`,
+      `CREDO HR-Portal | ${ctx.displayId} | Endgültige Genehmigung Elternzeit | ${personenform}`,
       50,
       778,
       { width: 515, align: "center" },
@@ -778,7 +778,7 @@ function renderAbsatz(
 }
 
 // =============================================
-// Brief 1: BR Detmold (Bezirksregierung) — fuer Beamte/PSI
+// Brief 1: BR Detmold (Bezirksregierung) — für Beamte/PSI
 // =============================================
 
 export interface BRDetmoldPdfContext {
@@ -858,7 +858,7 @@ export async function generateBRDetmoldSchreiben(
     .font("Helvetica-Bold")
     .fontSize(10)
     .fillColor(COLORS.primary)
-    .text("Persoenliche Daten", 50, y);
+    .text("Persönliche Daten", 50, y);
   y = brief.doc.y + 8;
 
   const rows: [string, string][] = [
@@ -960,14 +960,14 @@ export async function generateVBLInfoBrief(ctx: VBLPdfContext): Promise<Buffer> 
     brief.doc,
     y,
     `Bitte nehmen Sie zur Kenntnis, dass Anspruchszeiten aus der Elternzeit ` +
-      `fuer Renten- und Versorgungsansprueche relevant sein koennen. Eine ` +
+      `für Renten- und Versorgungsansprueche relevant sein koennen. Eine ` +
       `Beratung erhalten Sie direkt bei der VBL: www.vbl.de`,
   );
   y = renderAbsatz(
     brief.doc,
     y,
     `Eine separate Meldung an die VBL durch Sie ist nicht erforderlich — wir ` +
-      `uebernehmen die DEUEV-Meldung fuer Sie.`,
+      `uebernehmen die DEUEV-Meldung für Sie.`,
   );
 
   y += 6;
@@ -1040,7 +1040,7 @@ export async function generateAGBescheinigungElterngeld(
   y = renderAbsatz(
     brief.doc,
     y,
-    `Hiermit bestaetigen wir folgende Angaben fuer den Elterngeld-Antrag der ` +
+    `Hiermit bestaetigen wir folgende Angaben für den Elterngeld-Antrag der ` +
       `unten genannten Mitarbeiterin / des Mitarbeiters:`,
   );
 
@@ -1092,7 +1092,7 @@ export async function generateAGBescheinigungElterngeld(
     brief.doc,
     y,
     `Diese Angaben dienen ausschliesslich dem Elterngeld-Antrag. Eine ` +
-      `Verwendung fuer andere Zwecke ist nicht zulaessig.`,
+      `Verwendung für andere Zwecke ist nicht zulaessig.`,
   );
 
   y += 16;
@@ -1141,9 +1141,9 @@ export async function generateBADAufforderungsbrief(
     brief.doc,
     y,
     `wir bitten um Durchfuehrung einer arbeitsmedizinischen Untersuchung ` +
-      `nach MuSchG / ArbMedVV fuer die nachstehend genannte schwangere ` +
+      `nach MuSchG / ArbMedVV für die nachstehend genannte schwangere ` +
       `Mitarbeiterin. Der Einsatzort ist eine Kindertageseinrichtung — die ` +
-      `Pruefung der Beschaeftigungsfaehigkeit ist gemaess § 10 MuSchG erforderlich.`,
+      `Pruefung der Beschaeftigungsfaehigkeit ist gemäß § 10 MuSchG erforderlich.`,
   );
 
   const rows: [string, string][] = [
@@ -1161,7 +1161,7 @@ export async function generateBADAufforderungsbrief(
     brief.doc,
     y,
     `Wir bitten um zeitnahen Termin und Rueckmeldung des Ergebnisses. Vielen ` +
-      `Dank fuer Ihre Unterstuetzung.`,
+      `Dank für Ihre Unterstuetzung.`,
   );
 
   y += 16;

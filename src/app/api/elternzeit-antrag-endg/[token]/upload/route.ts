@@ -32,7 +32,7 @@ export async function POST(
       },
     });
     if (!ez) {
-      return NextResponse.json({ error: "Token ungueltig" }, { status: 404 });
+      return NextResponse.json({ error: "Token ungültig" }, { status: 404 });
     }
     if (ez.antragTokenEndgExpiry && new Date() > ez.antragTokenEndgExpiry) {
       return NextResponse.json({ error: "Token abgelaufen" }, { status: 403 });
@@ -60,7 +60,7 @@ export async function POST(
 
     // Bestehende Geburtsurkunde ersetzen (Mitarbeiter darf korrigieren).
     // Wichtig: NEUE Datei zuerst speichern, dann in Transaktion DB-Eintraege
-    // tauschen, ALTE Dateien erst nach erfolgreichem Commit loeschen.
+    // tauschen, ALTE Dateien erst nach erfolgreichem Commit löschen.
     // Verhindert Datenverlust falls zwischen Delete und Save ein Crash passiert.
     const newFilename = sanitizeFilename(file.name);
     const newPath = await saveUploadedFile(
@@ -115,7 +115,7 @@ export async function POST(
       throw txError;
     }
 
-    // Erst NACH erfolgreicher TX die alten Dateien physisch loeschen
+    // Erst NACH erfolgreicher TX die alten Dateien physisch löschen
     const uploadsRoot = path.resolve(process.cwd(), "uploads");
     const expectedDir = path.resolve(uploadsRoot, "elternzeit", ez.id);
     for (const oldPath of filesToCleanup) {

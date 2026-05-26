@@ -188,8 +188,11 @@ export function CivilServiceDetailContent({
   }, [actionError, actionSuccess]);
 
   // ---- Data Loading ----
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    // silent=true: Hintergrund-Refresh nach Aktionen (z.B. Checklisten-Toggle,
+    // das serverseitig Phasen neu berechnet) — kein loading-State, damit die
+    // Ansicht nicht unmountet und die Scroll-Position erhalten bleibt.
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/civil-service/${processId}`);
@@ -199,12 +202,12 @@ export function CivilServiceDetailContent({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [processId]);
 
   useEffect(() => {
-    loadData();
+    loadData(false);
   }, [loadData]);
 
   // ---- Checklist Toggle ----
@@ -218,7 +221,7 @@ export function CivilServiceDetailContent({
         body: JSON.stringify({ isCompleted: !currentValue }),
       });
       if (res.ok) {
-        await loadData();
+        await loadData(true);
       } else {
         setActionError("Checkliste konnte nicht aktualisiert werden.");
       }
@@ -243,7 +246,7 @@ export function CivilServiceDetailContent({
         body: JSON.stringify({ notes: noteText, isCompleted: data?.checklistItems.find(i => i.id === itemId)?.isCompleted ?? false }),
       });
       if (res.ok) {
-        await loadData();
+        await loadData(true);
         setEditingNoteId(null);
         setNoteText("");
       } else {
@@ -270,7 +273,7 @@ export function CivilServiceDetailContent({
       });
       if (res.ok) {
         setActionSuccess("Dokument hochgeladen.");
-        await loadData();
+        await loadData(true);
       } else {
         setActionError("Upload fehlgeschlagen.");
       }
@@ -414,7 +417,7 @@ export function CivilServiceDetailContent({
                 {data.employeeEmail} &middot; {data.organizationName}
               </p>
             </div>
-            {/* Status-Aktionen fuer Admin/HR */}
+            {/* Status-Aktionen für Admin/HR */}
             {["SUPER_ADMIN", "HR_LEITUNG"].includes(user.role) && !["COMPLETED", "REJECTED", "CANCELLED"].includes(data.status) && (
               <div className="flex gap-2 shrink-0">
                 <button
@@ -425,7 +428,7 @@ export function CivilServiceDetailContent({
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ status: "COMPLETED" }),
                     });
-                    if (res.ok) loadData();
+                    if (res.ok) loadData(true);
                     else alert("Status konnte nicht geaendert werden.");
                   }}
                   className="rounded-lg bg-credo-gruen px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-credo-gruen/85"
@@ -440,7 +443,7 @@ export function CivilServiceDetailContent({
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ status: "CANCELLED" }),
                     });
-                    if (res.ok) loadData();
+                    if (res.ok) loadData(true);
                     else alert("Status konnte nicht geaendert werden.");
                   }}
                   className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"

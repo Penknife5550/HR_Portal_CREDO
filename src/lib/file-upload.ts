@@ -60,7 +60,7 @@ export function sanitizeFilename(originalName: string): string {
 
 /**
  * Speichert eine Datei im uploads-Verzeichnis. Erstellt das Zielverzeichnis
- * automatisch. Liefert den vollstaendigen Dateipfad zurueck.
+ * automatisch. Liefert den vollstaendigen Dateipfad zurück.
  *
  * @param subdir Unterverzeichnis unter `uploads/` (z.B. "elternzeit/<id>")
  */

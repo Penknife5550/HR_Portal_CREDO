@@ -82,7 +82,7 @@ export async function DELETE(
     await prisma.departmentConfig.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[API] Abteilung loeschen fehlgeschlagen:", error);
+    console.error("[API] Abteilung löschen fehlgeschlagen:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
 }

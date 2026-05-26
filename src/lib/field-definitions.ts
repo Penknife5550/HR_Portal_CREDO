@@ -1,8 +1,8 @@
 /**
- * CREDO HR-Portal – Feld-Registry fuer Personalfragebogen
+ * CREDO HR-Portal – Feld-Registry für Personalfragebogen
  *
  * Zentrale Definition aller Felder pro Schritt.
- * Wird verwendet fuer:
+ * Wird verwendet für:
  * - Admin-Vorlagen: welche Felder ein-/ausblendbar sind
  * - Fragebogen: dynamische Sichtbarkeit und Pflichtfeld-Status
  * - Validierung: dynamische Zod-Schemas
@@ -42,7 +42,7 @@ export interface StepFieldConfig {
 // Feld-Registry: Alle Felder pro Schritt
 // =============================================
 export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
-  // Step 1: Persoenliche Angaben
+  // Step 1: Persönliche Angaben
   1: [
     { name: "salutation",       label: "Anrede",                defaultVisible: true,  defaultRequired: true,  alwaysVisible: true, alwaysRequired: true },
     { name: "title",            label: "Titel (Dr., Prof.)",    defaultVisible: true,  defaultRequired: false },
@@ -52,7 +52,7 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
     { name: "birthDate",        label: "Geburtsdatum",          defaultVisible: true,  defaultRequired: true,  alwaysVisible: true, alwaysRequired: true },
     { name: "birthPlace",       label: "Geburtsort",            defaultVisible: true,  defaultRequired: true },
     { name: "birthCountry",     label: "Geburtsland",           defaultVisible: true,  defaultRequired: false },
-    { name: "nationality",      label: "Staatsangehoerigkeit",  defaultVisible: true,  defaultRequired: false },
+    { name: "nationality",      label: "Staatsangehörigkeit",   defaultVisible: true,  defaultRequired: false },
     { name: "maritalStatus",    label: "Familienstand",         defaultVisible: true,  defaultRequired: true },
     { name: "severelyDisabled",  label: "Schwerbehinderung",    defaultVisible: true,  defaultRequired: false },
     { name: "disabilityDegree", label: "Behinderungsgrad (GdB)", defaultVisible: true, defaultRequired: false },
@@ -60,7 +60,7 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
 
   // Step 2: Adresse & Kontakt
   2: [
-    { name: "street",       label: "Strasse",           defaultVisible: true,  defaultRequired: true,  alwaysVisible: true },
+    { name: "street",       label: "Straße",            defaultVisible: true,  defaultRequired: true,  alwaysVisible: true },
     { name: "houseNumber",  label: "Hausnummer",        defaultVisible: true,  defaultRequired: true,  alwaysVisible: true },
     { name: "zipCode",      label: "Postleitzahl",      defaultVisible: true,  defaultRequired: true,  alwaysVisible: true },
     { name: "city",         label: "Ort",               defaultVisible: true,  defaultRequired: true,  alwaysVisible: true },
@@ -91,9 +91,9 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
   5: [
     { name: "taxId",          label: "Steuer-ID",                defaultVisible: true, defaultRequired: true },
     { name: "taxClass",       label: "Steuerklasse",             defaultVisible: true, defaultRequired: true },
-    { name: "taxAllowance",   label: "Jaehrlicher Freibetrag",   defaultVisible: true, defaultRequired: false },
+    { name: "taxAllowance",   label: "Jährlicher Freibetrag",    defaultVisible: true, defaultRequired: false },
     { name: "childAllowance", label: "Kinderfreibetrag",         defaultVisible: true, defaultRequired: false },
-    { name: "religion",       label: "Religionszugehoerigkeit",  defaultVisible: true, defaultRequired: true },
+    { name: "religion",       label: "Religionszugehörigkeit",   defaultVisible: true, defaultRequired: true },
   ],
 
   // Step 6: Weitere Beschaeftigung
@@ -112,8 +112,8 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
 
   // Step 8: Bildung & Beruf
   8: [
-    { name: "highestSchoolDegree",       label: "Hoechster Schulabschluss",    defaultVisible: true, defaultRequired: true },
-    { name: "highestProfessionalDegree", label: "Hoechste Berufsausbildung",   defaultVisible: true, defaultRequired: true },
+    { name: "highestSchoolDegree",       label: "Höchster Schulabschluss",     defaultVisible: true, defaultRequired: true },
+    { name: "highestProfessionalDegree", label: "Höchste Berufsausbildung",    defaultVisible: true, defaultRequired: true },
   ],
 
   // Step 9: Masernschutz
@@ -180,7 +180,7 @@ export class FieldConfigHelper {
 
 // =============================================
 // Vollstaendige stepsConfig mit Feld-Defaults generieren
-// Wird fuer den Seed und fuer neue Templates verwendet
+// Wird für den Seed und für neue Templates verwendet
 // =============================================
 export function generateFullStepsConfig(): StepFieldConfig[] {
   return Array.from({ length: 10 }, (_, i) => {
@@ -196,7 +196,7 @@ export function generateFullStepsConfig(): StepFieldConfig[] {
 
 function getStepTitle(step: number): string {
   const titles: Record<number, string> = {
-    1: "Persoenliche Angaben",
+    1: "Persönliche Angaben",
     2: "Adresse & Kontakt",
     3: "Bankverbindung",
     4: "Sozialversicherung",

@@ -64,7 +64,7 @@ export function berechneMutterschutzEnde(
 // =============================================
 
 /**
- * Generiert eine eindeutige displayId fuer einen Mutterschutz- oder
+ * Generiert eine eindeutige displayId für einen Mutterschutz- oder
  * Elternzeit-Vorgang im Format `{prefix}-{year}-{shortName}-{nr3}`.
  *
  * Beispiel: "MU-2026-GYM-001", "EZ-2026-GYM-001"
@@ -151,7 +151,7 @@ export interface FerienWarnung {
 }
 
 /**
- * Berechnet die Sperrzone fuer einen Ferientermin.
+ * Berechnet die Sperrzone für einen Ferientermin.
  *
  * Sommerferien: 6 Wochen vor und nach den Ferien.
  * Sonstige Ferien: 2 Wochen vor und nach den Ferien.
@@ -171,7 +171,7 @@ function isInRange(date: Date, von: Date, bis: Date): boolean {
 
 /**
  * Prueft alle Elternzeit-Abschnitte gegen die NRW-Schulferien.
- * Empfehlung des Workspace: Hinweis fuer alle, Pflichtbegruendung nur Beamte/PSI.
+ * Empfehlung des Workspace: Hinweis für alle, Pflichtbegruendung nur Beamte/PSI.
  *
  * @returns Liste aller Warnungen (leer = keine Konflikte)
  */
@@ -234,7 +234,7 @@ export function pruefeFeriensperrfrist(
 }
 
 /**
- * Pflicht-Begruendung nur fuer Beamte/PSI (§ 11 FrUrlV NRW).
+ * Pflicht-Begruendung nur für Beamte/PSI (§ 11 FrUrlV NRW).
  * Fuer TV-L = nur Hinweis, keine Pflicht.
  */
 export function ferienBegruendungPflicht(personalgruppe: Personalgruppe): boolean {
@@ -272,7 +272,7 @@ export function pruefeAntragsfrist(
 // =============================================
 
 /**
- * Vater haben keinen Mutterschutz (§ 3 MuSchG gilt nur fuer schwangere/stillende Frauen).
+ * Vater haben keinen Mutterschutz (§ 3 MuSchG gilt nur für schwangere/stillende Frauen).
  */
 export function hatMutterschutz(geschlecht: Geschlecht): boolean {
   return geschlecht === "MUTTER";
@@ -286,7 +286,7 @@ export function deuevPflicht(personalgruppe: Personalgruppe, kvTyp: KVTyp): bool
 }
 
 /**
- * KV-Zuschuss (31 EUR/Monat) nur fuer Beamte/PSI (§ 13 FrUrlV NRW).
+ * KV-Zuschuss (31 EUR/Monat) nur für Beamte/PSI (§ 13 FrUrlV NRW).
  */
 export function hatKvZuschussAnspruch(personalgruppe: Personalgruppe): boolean {
   return personalgruppe === "BEAMTER" || personalgruppe === "PLANSTELLENINHABER";

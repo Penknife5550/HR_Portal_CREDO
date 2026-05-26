@@ -63,7 +63,7 @@ interface Onboarding {
   _count?: { notes: number };
 }
 
-// Konsistente Definition: offene Status (fuer Ueberfaellig-Filter)
+// Konsistente Definition: offene Status (für Ueberfaellig-Filter)
 const OPEN_STATUSES = ["INVITED", "IN_PROGRESS", "SUBMITTED", "SUPERVISOR_PENDING", "SUPERVISOR_SUBMITTED"];
 
 const PAGE_SIZE = 25;
@@ -150,7 +150,7 @@ export function DashboardContent({ user }: { user: User }) {
     loadOnboardings();
   }, [loadOnboardings]);
 
-  // Bei Filterwechsel immer auf Seite 0 zurueck
+  // Bei Filterwechsel immer auf Seite 0 zurück
   const handleStatusFilter = (filter: string) => {
     setStatusFilter(filter);
     setPage(0);

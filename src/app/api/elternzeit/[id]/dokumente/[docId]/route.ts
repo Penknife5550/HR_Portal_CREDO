@@ -2,7 +2,7 @@
  * API: /api/elternzeit/[id]/dokumente/[docId]
  *
  * GET    – Datei-Download (mit Path-Traversal-Schutz)
- * DELETE – Dokument loeschen (HR_EDIT_ROLES)
+ * DELETE – Dokument löschen (HR_EDIT_ROLES)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -100,7 +100,7 @@ export async function DELETE(
       request.headers.get("x-real-ip") ||
       null;
 
-    // Datei vom Disk loeschen (best effort)
+    // Datei vom Disk löschen (best effort)
     const uploadsRoot = path.resolve(process.cwd(), "uploads");
     const expectedDir = path.resolve(uploadsRoot, "elternzeit", id);
     const resolved = path.resolve(doc.dateipfad);

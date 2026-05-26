@@ -197,7 +197,7 @@ export function TabAssessments({
         const isArchived = Boolean(assessment.archivedAt);
         const isAcknowledged = Boolean(assessment.acknowledgedByEmployeeAt);
 
-        // Legacy-Badge fuer "ist angekommen?"
+        // Legacy-Badge für "ist angekommen?"
         const sb = assessment.submittedAt
           ? statusBadge("SUBMITTED")
           : assessment.firstOpenedAt
@@ -351,7 +351,7 @@ export function TabAssessments({
                 </button>
               )}
 
-              {/* Bekanntgabe-Buttons (nur fuer eingereichte BEURTEILUNG, vor Quittung) */}
+              {/* Bekanntgabe-Buttons (nur für eingereichte BEURTEILUNG, vor Quittung) */}
               {isSubmitted &&
                 assessment.assessmentType === "BEURTEILUNG" &&
                 assessment.token &&
@@ -397,7 +397,7 @@ export function TabAssessments({
                 </button>
               )}
 
-              {/* Audit-Link (Phase 6) — sichtbar fuer eingereichte Beurteilungen,
+              {/* Audit-Link (Phase 6) — sichtbar für eingereichte Beurteilungen,
                   damit HR den Read-Only-Link an die Bezirksregierung weitergeben kann. */}
               {isSubmitted &&
                 assessment.assessmentType === "BEURTEILUNG" &&
@@ -496,8 +496,8 @@ function BekanntgabeLinkBox({ ackToken }: { ackToken: string }) {
 
 // =============================================
 // AuditLinkButton (Phase 6)
-// Read-Only-Audit-Link fuer Bezirksregierung — kein Login noetig.
-// Wird ueber den verifyToken konstruiert (separate UUID, nie identisch mit
+// Read-Only-Audit-Link für Bezirksregierung — kein Login noetig.
+// Wird über den verifyToken konstruiert (separate UUID, nie identisch mit
 // dem SL- oder Lehrkraft-Token).
 // =============================================
 function AuditLinkButton({ verifyToken }: { verifyToken: string }) {
@@ -525,7 +525,7 @@ function AuditLinkButton({ verifyToken }: { verifyToken: string }) {
           ? "border-credo-gruen bg-credo-gruen/10 text-credo-gruen"
           : "border-credo-gruen/40 bg-white text-credo-gruen hover:bg-credo-gruen/5"
       }`}
-      title="Read-Only-Audit-Link fuer Bezirksregierung (kein Login noetig)"
+      title="Read-Only-Audit-Link für Bezirksregierung (kein Login noetig)"
     >
       <CopyIcon className="h-3.5 w-3.5" />
       {copied ? "Audit-Link kopiert!" : "Audit-Link kopieren"}
@@ -577,7 +577,7 @@ function RequestAssessmentModal({
     daysUntil !== null &&
     daysUntil < 14;
 
-  // Vorlagen laden — nur fuer BEURTEILUNG noetig
+  // Vorlagen laden — nur für BEURTEILUNG noetig
   useEffect(() => {
     if (assessmentType !== "BEURTEILUNG") return;
     fetch("/api/beurteilung-templates?includeInactive=false")

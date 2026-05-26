@@ -2,7 +2,7 @@
  * API: /api/elternzeit/[id]/vbl-info
  *
  * GET – VBL-Informationsbrief als PDF generieren + ausliefern.
- *       Nur fuer TARIF_TV_L (VBL-Pflichtversicherung).
+ *       Nur für TARIF_TV_L (VBL-Pflichtversicherung).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -50,7 +50,7 @@ export async function GET(
     }
     if (ez.personalgruppe !== "TARIF_TV_L") {
       return NextResponse.json(
-        { error: "VBL-Brief nur fuer TV-L zulaessig" },
+        { error: "VBL-Brief nur für TV-L zulaessig" },
         { status: 409 },
       );
     }

@@ -5,7 +5,7 @@
  * PUT - Bewertungen speichern (Zwischenspeichern)
  *
  * OEFFENTLICH - kein Auth erforderlich!
- * Zugang ausschliesslich ueber gueltigen Magic-Link-Token.
+ * Zugang ausschliesslich über gueltigen Magic-Link-Token.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,7 +14,7 @@ import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { autosaveAssessmentSchema } from "@/lib/validations/beurteilung";
 
 // =============================================
-// Typen fuer Template-Snapshot
+// Typen für Template-Snapshot
 // =============================================
 
 interface SnapshotCriterion {
@@ -34,7 +34,7 @@ interface TemplateSnapshot {
 }
 
 /**
- * Gesamtnote berechnen (gewichteter Durchschnitt ueber Kategorien)
+ * Gesamtnote berechnen (gewichteter Durchschnitt über Kategorien)
  */
 function calculateOverallGrade(
   snapshot: TemplateSnapshot,
@@ -263,7 +263,7 @@ export async function PUT(
         if (value > maxGrade) {
           return NextResponse.json(
             {
-              error: `Ungueltige Note fuer ${key}: Wert muss zwischen 1 und ${maxGrade} liegen`,
+              error: `Ungueltige Note für ${key}: Wert muss zwischen 1 und ${maxGrade} liegen`,
             },
             { status: 400 },
           );

@@ -1,7 +1,7 @@
 /**
  * Civil-Service Phasen-Helper
  *
- * Zentrale Logik fuer:
+ * Zentrale Logik für:
  * - Phasen-Status-Neuberechnung (PENDING / IN_PROGRESS / COMPLETED)
  * - Mapping von Beurteilungen → zugehoerige Checklisten-Items
  *

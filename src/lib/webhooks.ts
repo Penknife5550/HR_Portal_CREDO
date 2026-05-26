@@ -1,11 +1,11 @@
 /**
  * CREDO HR-Portal – Einheitlicher Webhook-Dispatcher
  *
- * Alle Webhooks werden ausschliesslich ueber die Datenbank konfiguriert
+ * Alle Webhooks werden ausschliesslich über die Datenbank konfiguriert
  * und im Admin-Portal (Einstellungen → Webhooks) verwaltet.
  *
  * Ablauf:
- * 1. Aktive DB-Webhooks fuer das Event laden und ausfuehren
+ * 1. Aktive DB-Webhooks für das Event laden und ausfuehren
  * 2. SMTP-Fallback falls kein Webhook erfolgreich war
  *
  * Wichtige Eigenschaften:
@@ -72,7 +72,7 @@ export async function triggerWebhooks(
       });
 
       if (dbWebhooks.length === 0) {
-        console.warn(`[Webhooks] Keine aktiven Webhooks fuer "${event}" konfiguriert`);
+        console.warn(`[Webhooks] Keine aktiven Webhooks für "${event}" konfiguriert`);
       } else {
         // Parallele Ausfuehrung via Promise.allSettled
         // Vorteil: ein langsamer Webhook blockiert die anderen nicht
@@ -95,7 +95,7 @@ export async function triggerWebhooks(
       }
     } catch (dbError) {
       console.error(
-        `[Webhooks] DB-Webhooks fuer "${event}" konnten nicht geladen werden:`,
+        `[Webhooks] DB-Webhooks für "${event}" konnten nicht geladen werden:`,
         dbError instanceof Error ? dbError.message : dbError
       );
     }
@@ -103,7 +103,7 @@ export async function triggerWebhooks(
     // SMTP-Fallback: nur wenn kein Kanal erfolgreich war
     const anySuccess = results.some(Boolean);
     if (!anySuccess) {
-      console.warn(`[Webhooks] Kein Webhook fuer "${event}" erfolgreich – versuche SMTP-Fallback`);
+      console.warn(`[Webhooks] Kein Webhook für "${event}" erfolgreich – versuche SMTP-Fallback`);
       try {
         await sendEmailFallback(event, payload);
       } catch (mailErr) {
@@ -116,14 +116,14 @@ export async function triggerWebhooks(
   } catch (unexpected) {
     // Letzte Sicherung — sollte nie greifen, aber garantiert "wirft niemals"
     console.error(
-      `[Webhooks] Unerwarteter Fehler in triggerWebhooks fuer "${event}":`,
+      `[Webhooks] Unerwarteter Fehler in triggerWebhooks für "${event}":`,
       unexpected instanceof Error ? unexpected.message : unexpected
     );
   }
 }
 
 // =============================================
-// Auth-Header fuer DB-Webhooks aufbauen
+// Auth-Header für DB-Webhooks aufbauen
 // Wirft niemals — bei Decrypt-Fehler wird der Webhook ohne Auth-Header gesendet
 // und der Empfaenger wird ihn (idealerweise) ablehnen.
 // =============================================
@@ -140,7 +140,7 @@ function buildHeaders(webhook: {
       decryptedValue = decrypt(webhook.authValue);
     } catch (err) {
       console.error(
-        "[Webhooks] Konnte Auth-Wert nicht entschluesseln (Schluessel rotiert oder Ciphertext korrupt):",
+        "[Webhooks] Konnte Auth-Wert nicht entschluesseln (Schlüssel rotiert oder Ciphertext korrupt):",
         err instanceof Error ? err.message : err
       );
       decryptedValue = null;
@@ -211,7 +211,7 @@ async function sendToWebhook(
     body = JSON.stringify(payload);
   } catch (err) {
     console.error(
-      `[Webhooks] Payload-Serialisierung fehlgeschlagen fuer ${safeUrl}:`,
+      `[Webhooks] Payload-Serialisierung fehlgeschlagen für ${safeUrl}:`,
       err instanceof Error ? err.message : err
     );
     return false;
@@ -243,12 +243,12 @@ async function sendToWebhook(
     }
   }
 
-  console.error(`[Webhooks] ${safeUrl} endgueltig fehlgeschlagen nach ${MAX_RETRIES} Versuchen.`);
+  console.error(`[Webhooks] ${safeUrl} endgültig fehlgeschlagen nach ${MAX_RETRIES} Versuchen.`);
   return false;
 }
 
 // =============================================
-// Test-Funktion fuer einen einzelnen Webhook (Admin-Portal)
+// Test-Funktion für einen einzelnen Webhook (Admin-Portal)
 // =============================================
 export async function testWebhook(webhookId: string): Promise<{
   success: boolean;

@@ -1,5 +1,5 @@
 /**
- * Single source of truth fuer die Labels der 12 Referenz-Pruefpunkte
+ * Single source of truth für die Labels der 12 Referenz-Pruefpunkte
  * (REFERENZ-Beurteilung Schritt 1 + 3).
  *
  * Diese Liste war historisch in vier Files dupliziert (PDF-Export, Verify-
@@ -11,7 +11,7 @@
 
 export interface ReferenzQuestion {
   id: string;
-  /** Label mit Umlauten — fuer UI-Kontexte (React, HTML) */
+  /** Label mit Umlauten — für UI-Kontexte (React, HTML) */
   label: string;
   /** Optional ein Freitextfeld zusaetzlich zur Ja/Nein/Teilweise-Antwort */
   hasTextField?: boolean;
@@ -37,16 +37,16 @@ export const REFERENZ_QUESTIONS: ReferenzQuestion[] = [
 ];
 
 /**
- * Lookup-Map id → Label fuer Komponenten, die nur ein Mapping brauchen.
+ * Lookup-Map id → Label für Komponenten, die nur ein Mapping brauchen.
  */
 export const REFERENZ_LABELS: Record<string, string> = Object.fromEntries(
   REFERENZ_QUESTIONS.map((q) => [q.id, q.label]),
 );
 
 /**
- * ASCII-Variante ohne Umlaute fuer den PDFKit-Export. PDFKit Helvetica
+ * ASCII-Variante ohne Umlaute für den PDFKit-Export. PDFKit Helvetica
  * unterstuetzt zwar Umlaute, aber die historische PDF-Variante hat ASCII —
- * wir behalten diese fuer die DMS-Kompatibilitaet bei.
+ * wir behalten diese für die DMS-Kompatibilitaet bei.
  */
 export const REFERENZ_LABELS_ASCII: Record<string, string> = {
   andachtsbesuch: "Regelmaessiger Andachtsbesuch",
@@ -55,7 +55,7 @@ export const REFERENZ_LABELS_ASCII: Record<string, string> = {
   "gutes-miteinander": "Gutes Miteinander (Kollegium, Schueler, Eltern)",
   "besondere-aufgaben": "Bereitschaft besondere Aufgaben zu uebernehmen",
   klassenleitung: "Klassenleitung uebernommen",
-  "engagement-schule": "Engagement fuer Schule sichtbar",
+  "engagement-schule": "Engagement für Schule sichtbar",
   "identifikation-fes": "Identifikation mit Grundsaetzen FES Minden",
   "grundsaetze-gelebt": "Grundsaetze der FES werden gelebt",
   zielvereinbarungen: "Zielvereinbarungen vereinbart",

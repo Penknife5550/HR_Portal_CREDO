@@ -2,7 +2,7 @@
  * CREDO HR-Portal – Datenbank Seed Script
  *
  * Erstellt die 16 Mandanten der CREDO Gruppe und
- * einen initialen Admin-User fuer Dimitri.
+ * einen initialen Admin-User für Dimitri.
  */
 
 import { PrismaClient, OrganizationType, UserRole, QuestionnaireType, ExitInterviewQuestionType, ZeugnisJobGroup } from "@prisma/client";
@@ -82,7 +82,7 @@ async function main() {
     },
     {
       mandantNumber: "747",
-      name: "helex.it GmbH",
+      name: "HELEX.IT GmbH",
       shortName: "HLX",
       type: OrganizationType.GMBH,
     },
@@ -162,7 +162,7 @@ async function main() {
   console.log("📋 Formularvorlagen anlegen...\n");
 
   const allStepsEnabled = [
-    { step: 1, title: "Persoenliche Angaben", enabled: true },
+    { step: 1, title: "Persönliche Angaben", enabled: true },
     { step: 2, title: "Adresse & Kontakt", enabled: true },
     { step: 3, title: "Bankverbindung", enabled: true },
     { step: 4, title: "Sozialversicherung", enabled: true },
@@ -175,7 +175,7 @@ async function main() {
   ];
 
   const minijobSteps = [
-    { step: 1, title: "Persoenliche Angaben", enabled: true },
+    { step: 1, title: "Persönliche Angaben", enabled: true },
     { step: 2, title: "Adresse & Kontakt", enabled: true },
     { step: 3, title: "Bankverbindung", enabled: true },
     { step: 4, title: "Sozialversicherung", enabled: true },
@@ -188,7 +188,7 @@ async function main() {
   ];
 
   const ehrenamtSteps = [
-    { step: 1, title: "Persoenliche Angaben", enabled: true },
+    { step: 1, title: "Persönliche Angaben", enabled: true },
     { step: 2, title: "Adresse & Kontakt", enabled: true },
     { step: 3, title: "Bankverbindung", enabled: false },
     { step: 4, title: "Sozialversicherung", enabled: false },
@@ -204,31 +204,31 @@ async function main() {
     {
       questionnaireType: QuestionnaireType.STANDARD,
       name: "Standard (TV-L)",
-      description: "Standardfragebogen fuer Angestellte nach TV-L",
+      description: "Standardfragebogen für Angestellte nach TV-L",
       stepsConfig: allStepsEnabled,
     },
     {
       questionnaireType: QuestionnaireType.BEAMTE,
       name: "Beamte (Planstellen)",
-      description: "Fragebogen fuer Planstelleninhaber / Beamte",
+      description: "Fragebogen für Planstelleninhaber / Beamte",
       stepsConfig: allStepsEnabled,
     },
     {
       questionnaireType: QuestionnaireType.ERZIEHER,
       name: "Erzieher (TV-L S)",
-      description: "Fragebogen fuer Kita-Personal nach TV-L S (inkl. Masernschutz)",
+      description: "Fragebogen für Kita-Personal nach TV-L S (inkl. Masernschutz)",
       stepsConfig: allStepsEnabled,
     },
     {
       questionnaireType: QuestionnaireType.MINIJOB,
       name: "Minijob",
-      description: "Vereinfachter Fragebogen fuer geringfuegig Beschaeftigte",
+      description: "Vereinfachter Fragebogen für geringfuegig Beschaeftigte",
       stepsConfig: minijobSteps,
     },
     {
       questionnaireType: QuestionnaireType.EHRENAMT,
       name: "Ehrenamt",
-      description: "Minimaler Fragebogen fuer ehrenamtliche Mitarbeiter",
+      description: "Minimaler Fragebogen für ehrenamtliche Mitarbeiter",
       stepsConfig: ehrenamtSteps,
     },
   ];
@@ -249,7 +249,7 @@ async function main() {
   console.log(`\n📋 ${formTemplates.length} Formularvorlagen angelegt/aktualisiert.\n`);
 
   // =============================================
-  // 4. Checklisten-Vorlagen (Standard-Checklisten fuer Onboarding)
+  // 4. Checklisten-Vorlagen (Standard-Checklisten für Onboarding)
   // =============================================
   console.log("📋 Checklisten-Vorlagen anlegen...\n");
 
@@ -258,20 +258,20 @@ async function main() {
     where: { id: "seed-checklist-standard" },
     update: {
       name: "Standard-Einstellung (TV-L)",
-      description: "Standard-Checkliste fuer Einstellungen nach TV-L",
+      description: "Standard-Checkliste für Einstellungen nach TV-L",
       questionnaireType: QuestionnaireType.STANDARD,
       isActive: true,
     },
     create: {
       id: "seed-checklist-standard",
       name: "Standard-Einstellung (TV-L)",
-      description: "Standard-Checkliste fuer Einstellungen nach TV-L",
+      description: "Standard-Checkliste für Einstellungen nach TV-L",
       questionnaireType: QuestionnaireType.STANDARD,
       isActive: true,
     },
   });
 
-  // Items fuer Standard-Checkliste loeschen und neu anlegen
+  // Items für Standard-Checkliste löschen und neu anlegen
   await prisma.checklistTemplateItem.deleteMany({
     where: { templateId: standardChecklist.id },
   });
@@ -281,9 +281,9 @@ async function main() {
     { title: "Arbeitsvertrag erstellt und versendet", category: "Vor Arbeitsbeginn", orderIndex: 0, defaultDueDays: -14, defaultAssignee: "HR" },
     { title: "Arbeitsvertrag unterschrieben retour", category: "Vor Arbeitsbeginn", orderIndex: 1, defaultDueDays: -7, defaultAssignee: "HR" },
     { title: "IT-Zugaenge beantragt", category: "Vor Arbeitsbeginn", orderIndex: 2, defaultDueDays: -7, defaultAssignee: "IT" },
-    { title: "Schluessel/Ausweis bestellt", category: "Vor Arbeitsbeginn", orderIndex: 3, defaultDueDays: -3, defaultAssignee: "Verwaltung" },
+    { title: "Schlüssel/Ausweis bestellt", category: "Vor Arbeitsbeginn", orderIndex: 3, defaultDueDays: -3, defaultAssignee: "Verwaltung" },
     // Kategorie: Erster Arbeitstag
-    { title: "Begruessung und Vorstellung im Team", category: "Erster Arbeitstag", orderIndex: 4, defaultDueDays: 0, defaultAssignee: "Vorgesetzter" },
+    { title: "Begrüßung und Vorstellung im Team", category: "Erster Arbeitstag", orderIndex: 4, defaultDueDays: 0, defaultAssignee: "Vorgesetzter" },
     { title: "Arbeitsplatz eingerichtet", category: "Erster Arbeitstag", orderIndex: 5, defaultDueDays: 0, defaultAssignee: "IT" },
     { title: "Einweisung Arbeitssicherheit", category: "Erster Arbeitstag", orderIndex: 6, defaultDueDays: 0, defaultAssignee: "HR" },
     // Kategorie: Erste Woche
@@ -312,20 +312,20 @@ async function main() {
     where: { id: "seed-checklist-minijob" },
     update: {
       name: "Minijob-Einstellung",
-      description: "Vereinfachte Checkliste fuer Minijob-Einstellungen",
+      description: "Vereinfachte Checkliste für Minijob-Einstellungen",
       questionnaireType: QuestionnaireType.MINIJOB,
       isActive: true,
     },
     create: {
       id: "seed-checklist-minijob",
       name: "Minijob-Einstellung",
-      description: "Vereinfachte Checkliste fuer Minijob-Einstellungen",
+      description: "Vereinfachte Checkliste für Minijob-Einstellungen",
       questionnaireType: QuestionnaireType.MINIJOB,
       isActive: true,
     },
   });
 
-  // Items fuer Minijob-Checkliste loeschen und neu anlegen
+  // Items für Minijob-Checkliste löschen und neu anlegen
   await prisma.checklistTemplateItem.deleteMany({
     where: { templateId: minijobChecklist.id },
   });
@@ -362,14 +362,14 @@ async function main() {
     where: { id: "seed-offboarding-standard" },
     update: {
       name: "Offboarding: Standard-Offboarding",
-      description: "Standard-Checkliste fuer alle Offboarding-Prozesse",
+      description: "Standard-Checkliste für alle Offboarding-Prozesse",
       questionnaireType: null,
       isActive: true,
     },
     create: {
       id: "seed-offboarding-standard",
       name: "Offboarding: Standard-Offboarding",
-      description: "Standard-Checkliste fuer alle Offboarding-Prozesse",
+      description: "Standard-Checkliste für alle Offboarding-Prozesse",
       questionnaireType: null,
       isActive: true,
     },
@@ -384,8 +384,8 @@ async function main() {
     { title: "Kuendigungsbestaetigung erstellen", category: "Phase 1: Sofort", orderIndex: 0, defaultDueDays: -30, defaultAssignee: "HR" },
     { title: "Kuendigungsfrist berechnen und pruefen", category: "Phase 1: Sofort", orderIndex: 1, defaultDueDays: -30, defaultAssignee: "HR" },
     { title: "Resturlaub berechnen und abstimmen", category: "Phase 1: Sofort", orderIndex: 2, defaultDueDays: -28, defaultAssignee: "HR" },
-    { title: "IT-Abteilung ueber Austritt informieren", category: "Phase 1: Sofort", orderIndex: 3, defaultDueDays: -28, defaultAssignee: "HR" },
-    { title: "Team ueber bevorstehenden Austritt informieren", category: "Phase 1: Sofort", orderIndex: 4, defaultDueDays: -28, defaultAssignee: "VORGESETZTER" },
+    { title: "IT-Abteilung über Austritt informieren", category: "Phase 1: Sofort", orderIndex: 3, defaultDueDays: -28, defaultAssignee: "HR" },
+    { title: "Team über bevorstehenden Austritt informieren", category: "Phase 1: Sofort", orderIndex: 4, defaultDueDays: -28, defaultAssignee: "VORGESETZTER" },
     // Phase 2: Erste Woche
     { title: "Nachfolgeplanung einleiten", category: "Phase 2: Erste Woche", orderIndex: 5, defaultDueDays: -21, defaultAssignee: "VORGESETZTER" },
     { title: "Uebergabeplan erstellen", category: "Phase 2: Erste Woche", orderIndex: 6, defaultDueDays: -21, defaultAssignee: "MITARBEITER" },
@@ -400,9 +400,9 @@ async function main() {
     { title: "IT-Zugaenge zur Sperrung vorbereiten", category: "Phase 4: Letzte Woche", orderIndex: 13, defaultDueDays: -2, defaultAssignee: "IT" },
     // Phase 5: Letzter Tag
     { title: "IT-Zugaenge und E-Mail-Konto sperren", category: "Phase 5: Letzter Tag", orderIndex: 14, defaultDueDays: 0, defaultAssignee: "IT" },
-    { title: "Physische Zugaenge entziehen (Schluessel, Karten)", category: "Phase 5: Letzter Tag", orderIndex: 15, defaultDueDays: 0, defaultAssignee: "FACILITY" },
+    { title: "Physische Zugaenge entziehen (Schlüssel, Karten)", category: "Phase 5: Letzter Tag", orderIndex: 15, defaultDueDays: 0, defaultAssignee: "FACILITY" },
     // Phase 6: Nach Austritt
-    { title: "Arbeitsbescheinigung an Agentur fuer Arbeit", category: "Phase 6: Nach Austritt", orderIndex: 16, defaultDueDays: 3, defaultAssignee: "HR" },
+    { title: "Arbeitsbescheinigung an Agentur für Arbeit", category: "Phase 6: Nach Austritt", orderIndex: 16, defaultDueDays: 3, defaultAssignee: "HR" },
     { title: "SV-Abmeldung durchfuehren", category: "Phase 6: Nach Austritt", orderIndex: 17, defaultDueDays: 42, defaultAssignee: "HR" },
   ];
 
@@ -419,14 +419,14 @@ async function main() {
     where: { id: "seed-offboarding-bildung" },
     update: {
       name: "Offboarding: Bildungseinrichtung",
-      description: "Erweiterte Checkliste fuer Bildungseinrichtungen (Schulen, KiTas)",
+      description: "Erweiterte Checkliste für Bildungseinrichtungen (Schulen, KiTas)",
       questionnaireType: null,
       isActive: true,
     },
     create: {
       id: "seed-offboarding-bildung",
       name: "Offboarding: Bildungseinrichtung",
-      description: "Erweiterte Checkliste fuer Bildungseinrichtungen (Schulen, KiTas)",
+      description: "Erweiterte Checkliste für Bildungseinrichtungen (Schulen, KiTas)",
       questionnaireType: null,
       isActive: true,
     },
@@ -440,10 +440,10 @@ async function main() {
     // Alle Standard-Items uebernehmen
     ...offboardingStandardItems,
     // Zusaetzliche Bildungseinrichtungs-Items
-    { title: "Eltern ueber Personalwechsel informieren", category: "Phase 2: Erste Woche", orderIndex: 18, defaultDueDays: -14, defaultAssignee: "VORGESETZTER" },
+    { title: "Eltern über Personalwechsel informieren", category: "Phase 2: Erste Woche", orderIndex: 18, defaultDueDays: -14, defaultAssignee: "VORGESETZTER" },
     { title: "Entwicklungsdokumentationen uebergeben", category: "Phase 3: Uebergabe", orderIndex: 19, defaultDueDays: -7, defaultAssignee: "MITARBEITER" },
     { title: "Fortbildungsnachweise archivieren", category: "Phase 3: Uebergabe", orderIndex: 20, defaultDueDays: -7, defaultAssignee: "HR" },
-    { title: "Vertretungsregelung fuer Betreuungsgruppen sicherstellen", category: "Phase 2: Erste Woche", orderIndex: 21, defaultDueDays: -21, defaultAssignee: "VORGESETZTER" },
+    { title: "Vertretungsregelung für Betreuungsgruppen sicherstellen", category: "Phase 2: Erste Woche", orderIndex: 21, defaultDueDays: -21, defaultAssignee: "VORGESETZTER" },
   ];
 
   for (const item of offboardingBildungItems) {
@@ -459,14 +459,14 @@ async function main() {
     where: { id: "seed-offboarding-beamte" },
     update: {
       name: "Offboarding: Beamte",
-      description: "Checkliste fuer Beamten-Entlassung / Versetzung",
+      description: "Checkliste für Beamten-Entlassung / Versetzung",
       questionnaireType: null,
       isActive: true,
     },
     create: {
       id: "seed-offboarding-beamte",
       name: "Offboarding: Beamte",
-      description: "Checkliste fuer Beamten-Entlassung / Versetzung",
+      description: "Checkliste für Beamten-Entlassung / Versetzung",
       questionnaireType: null,
       isActive: true,
     },
@@ -479,7 +479,7 @@ async function main() {
   const offboardingBeamteItems = [
     // Phase 1: Sofort
     { title: "Entlassungsantrag / Versetzungsverfuegung pruefen", category: "Phase 1: Sofort", orderIndex: 0, defaultDueDays: -30, defaultAssignee: "HR" },
-    { title: "Dienstherr ueber Entlassung informieren", category: "Phase 1: Sofort", orderIndex: 1, defaultDueDays: -30, defaultAssignee: "HR" },
+    { title: "Dienstherr über Entlassung informieren", category: "Phase 1: Sofort", orderIndex: 1, defaultDueDays: -30, defaultAssignee: "HR" },
     { title: "Personalrat beteiligen", category: "Phase 1: Sofort", orderIndex: 2, defaultDueDays: -28, defaultAssignee: "HR" },
     // Phase 2: Erste Woche
     { title: "Nachfolgeplanung einleiten", category: "Phase 2: Erste Woche", orderIndex: 3, defaultDueDays: -21, defaultAssignee: "VORGESETZTER" },
@@ -513,14 +513,14 @@ async function main() {
     where: { id: "seed-offboarding-minijob" },
     update: {
       name: "Offboarding: Minijob",
-      description: "Vereinfachte Checkliste fuer Minijob-Austritte",
+      description: "Vereinfachte Checkliste für Minijob-Austritte",
       questionnaireType: null,
       isActive: true,
     },
     create: {
       id: "seed-offboarding-minijob",
       name: "Offboarding: Minijob",
-      description: "Vereinfachte Checkliste fuer Minijob-Austritte",
+      description: "Vereinfachte Checkliste für Minijob-Austritte",
       questionnaireType: null,
       isActive: true,
     },
@@ -540,7 +540,7 @@ async function main() {
     { title: "Arbeitsmittel zurueckgeben", category: "Phase 2: Uebergabe", orderIndex: 4, defaultDueDays: -2, defaultAssignee: "MITARBEITER" },
     // Phase 3: Letzter Tag
     { title: "IT-Zugaenge sperren (falls vorhanden)", category: "Phase 3: Letzter Tag", orderIndex: 5, defaultDueDays: 0, defaultAssignee: "IT" },
-    { title: "Schluessel / Zugangskarten einziehen", category: "Phase 3: Letzter Tag", orderIndex: 6, defaultDueDays: 0, defaultAssignee: "FACILITY" },
+    { title: "Schlüssel / Zugangskarten einziehen", category: "Phase 3: Letzter Tag", orderIndex: 6, defaultDueDays: 0, defaultAssignee: "FACILITY" },
     // Phase 4: Nach Austritt
     { title: "Endabrechnung erstellen", category: "Phase 4: Nach Austritt", orderIndex: 7, defaultDueDays: 3, defaultAssignee: "HR" },
     { title: "Arbeitsbescheinigung ausstellen", category: "Phase 4: Nach Austritt", orderIndex: 8, defaultDueDays: 3, defaultAssignee: "HR" },

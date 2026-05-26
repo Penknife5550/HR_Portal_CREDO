@@ -3,8 +3,8 @@
  *
  * POST – Vorgesetzten-Link generieren
  *
- * n8n ruft diesen Endpunkt auf, um fuer einen bestehenden
- * Onboarding-Vorgang einen zweiten Link fuer den Vorgesetzten
+ * n8n ruft diesen Endpunkt auf, um für einen bestehenden
+ * Onboarding-Vorgang einen zweiten Link für den Vorgesetzten
  * zu erstellen (Einstellungsmodalitaeten).
  */
 

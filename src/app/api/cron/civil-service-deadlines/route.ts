@@ -352,7 +352,7 @@ export async function POST(request: NextRequest) {
         },
         { OVERDUE: 0, URGENT: 0, WARNING: 0 } as Record<Severity, number>
       );
-      // Hoechste Severity bestimmen (fuer Banner-Farbe in der Mail)
+      // Höchste Severity bestimmen (für Banner-Farbe in der Mail)
       const topSeverity: Severity =
         bySeverity.OVERDUE > 0
           ? "OVERDUE"

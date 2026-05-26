@@ -60,7 +60,7 @@ export function ProzessStepper({
     );
   }
 
-  // a11y-Helfer: liefert das Status-Wort fuer Screenreader
+  // a11y-Helfer: liefert das Status-Wort für Screenreader
   const statusWort = (
     istErledigt: boolean,
     istAktuell: boolean,
@@ -122,7 +122,7 @@ export function ProzessStepper({
                   )}
                 </div>
 
-                {/* Label (visuell, fuer SR ist aria-label am <li> die Quelle) */}
+                {/* Label (visuell, für SR ist aria-label am <li> die Quelle) */}
                 <div
                   className={`mt-2 text-center text-[10px] leading-tight ${
                     istAktuell

@@ -54,7 +54,7 @@ export const ORG_RESTRICTED_ROLES = ["EINRICHTUNGSLEITUNG", "VORGESETZTER"];
 // =============================================
 
 /**
- * Gibt die Org-IDs zurueck die dieser User sehen darf.
+ * Gibt die Org-IDs zurück die dieser User sehen darf.
  * Fuer globale Rollen: null (= alle).
  * Fuer eingeschraenkte Rollen: Array der zugewiesenen Org-IDs.
  */
@@ -153,19 +153,19 @@ export function isOrgRestricted(session: SessionPayload): boolean {
 }
 
 // =============================================
-// Rollen-Check Helper fuer API-Routes
+// Rollen-Check Helper für API-Routes
 // =============================================
 
 /**
  * Prueft ob die Session-Rolle in der erlaubten Liste ist.
- * Gibt ein NextResponse-Objekt zurueck wenn nicht erlaubt, sonst null.
+ * Gibt ein NextResponse-Objekt zurück wenn nicht erlaubt, sonst null.
  */
 export function checkRole(session: SessionPayload, allowedRoles: string[]): boolean {
   return allowedRoles.includes(session.role);
 }
 
 /**
- * Prueft Org-Zugriff fuer einen spezifischen Vorgang.
+ * Prueft Org-Zugriff für einen spezifischen Vorgang.
  * Fuer globale Rollen: immer true.
  * Fuer eingeschraenkte Rollen: prueft ob die Org zugewiesen ist.
  */

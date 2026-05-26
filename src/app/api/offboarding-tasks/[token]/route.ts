@@ -1,10 +1,10 @@
 /**
  * API: /api/offboarding-tasks/[token]
  *
- * GET - Aufgaben fuer eine Abteilung laden (via Magic Link)
+ * GET - Aufgaben für eine Abteilung laden (via Magic Link)
  *
  * OEFFENTLICH - kein Auth erforderlich!
- * Zugang ausschliesslich ueber gueltigen Magic-Link-Token.
+ * Zugang ausschliesslich über gueltigen Magic-Link-Token.
  */
 
 import { NextRequest, NextResponse } from "next/server";

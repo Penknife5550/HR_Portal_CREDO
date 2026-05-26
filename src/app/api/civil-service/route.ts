@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Webhook fire-and-forget (triggerWebhooks wirft nie, blockiert Response nicht).
-    // .catch() als doppelte Sicherheit fuer den theoretischen Fall, dass die
+    // .catch() als doppelte Sicherheit für den theoretischen Fall, dass die
     // "wirft nie"-Garantie verletzt wird (z. B. durch Test-Mocks).
     triggerWebhooks("psi-created", {
       civilServiceId: civilService.id,

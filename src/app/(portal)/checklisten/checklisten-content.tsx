@@ -4,7 +4,7 @@
  * Checklisten-Vorlagen – Client Component
  *
  * Zeigt alle Checklisten-Vorlagen als Karten an.
- * SUPER_ADMIN und HR_LEITUNG koennen Vorlagen erstellen, bearbeiten und loeschen.
+ * SUPER_ADMIN und HR_LEITUNG koennen Vorlagen erstellen, bearbeiten und löschen.
  * Items werden nach Kategorie gruppiert und sind aufklappbar.
  */
 
@@ -62,7 +62,7 @@ interface ModalData {
   items: NewItem[];
 }
 
-// Lesbare Labels fuer QuestionnaireType
+// Lesbare Labels für QuestionnaireType
 const TYPE_LABELS: Record<string, string> = {
   STANDARD: "Standard",
   BEAMTE: "Beamte",
@@ -71,7 +71,7 @@ const TYPE_LABELS: Record<string, string> = {
   EHRENAMT: "Ehrenamt",
 };
 
-// Farben fuer QuestionnaireType-Badges
+// Farben für QuestionnaireType-Badges
 const TYPE_COLORS: Record<string, string> = {
   STANDARD: "bg-blue-100 text-blue-800",
   BEAMTE: "bg-purple-100 text-purple-800",
@@ -100,7 +100,7 @@ const OFFBOARDING_CATEGORY_SUGGESTIONS = [
   "Phase 6: Nach Austritt",
 ];
 
-// Abteilungs-Optionen fuer Offboarding-Items
+// Abteilungs-Optionen für Offboarding-Items
 const DEPARTMENT_OPTIONS: { key: string; label: string }[] = [
   { key: "HR", label: "Personalabteilung" },
   { key: "IT", label: "IT-Abteilung" },
@@ -111,7 +111,7 @@ const DEPARTMENT_OPTIONS: { key: string; label: string }[] = [
   { key: "DSB", label: "Datenschutzbeauftragter" },
 ];
 
-// Farben pro Abteilung fuer Badges
+// Farben pro Abteilung für Badges
 const DEPARTMENT_BADGE_COLORS: Record<string, string> = {
   HR: "bg-blue-100 text-blue-800",
   IT: "bg-purple-100 text-purple-800",
@@ -156,7 +156,7 @@ export function ChecklistenContent({ user }: { user: User }) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("onboarding");
 
-  // Aufklapp-State fuer Kategorien (templateId -> Set<category>)
+  // Aufklapp-State für Kategorien (templateId -> Set<category>)
   const [expandedCategories, setExpandedCategories] = useState<
     Record<string, Set<string>>
   >({});
@@ -378,7 +378,7 @@ export function ChecklistenContent({ user }: { user: User }) {
           throw new Error(json.error || "Fehler beim Speichern");
         }
 
-        // 2. Bestehende Items loeschen
+        // 2. Bestehende Items löschen
         const existingTemplate = templates.find((t) => t.id === modalData.id);
         if (existingTemplate) {
           for (const item of existingTemplate.items) {
@@ -474,7 +474,7 @@ export function ChecklistenContent({ user }: { user: User }) {
   }
 
   // =============================================
-  // Vorlage loeschen
+  // Vorlage löschen
   // =============================================
   async function handleDelete(template: ChecklistTemplate) {
     if (!confirm(`Checkliste "${template.name}" wirklich löschen?`)) {
@@ -529,7 +529,7 @@ export function ChecklistenContent({ user }: { user: User }) {
               Checklisten-Vorlagen
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Erstellen und verwalten Sie Checklisten fuer{" "}
+              Erstellen und verwalten Sie Checklisten für{" "}
               {activeTab === "offboarding" ? "den Offboarding-Prozess" : "den Onboarding-Prozess"}
             </p>
           </div>

@@ -1,7 +1,7 @@
 /**
  * API: /api/elternzeit/[id]/genehmigung-vorl
  *
- * GET – PDF "Vorlaeufige Genehmigung Elternzeit" generieren + ausliefern.
+ * GET – PDF "Vorläufige Genehmigung Elternzeit" generieren + ausliefern.
  *       Mutter- oder Vater-Version automatisch nach Geschlecht.
  */
 

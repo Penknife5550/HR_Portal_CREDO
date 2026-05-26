@@ -30,7 +30,7 @@ export async function PUT(
     if (!subject?.trim()) return NextResponse.json({ error: "Betreff ist ein Pflichtfeld" }, { status: 400 });
     if (!bodyHtml?.trim()) return NextResponse.json({ error: "HTML-Body ist ein Pflichtfeld" }, { status: 400 });
 
-    // Variablen fuer dieses Event aus Default-Template holen
+    // Variablen für dieses Event aus Default-Template holen
     const defaultTemplate = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event);
     const variables = defaultTemplate?.variables ?? [];
 

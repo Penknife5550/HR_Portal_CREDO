@@ -29,7 +29,7 @@ export async function POST(
     });
 
     if (!exitInterview) {
-      return NextResponse.json({ error: "Kein Exit-Interview fuer dieses Offboarding gefunden" }, { status: 404 });
+      return NextResponse.json({ error: "Kein Exit-Interview für dieses Offboarding gefunden" }, { status: 404 });
     }
 
     if (exitInterview.status === "SUBMITTED") {
@@ -51,7 +51,7 @@ export async function POST(
 
     // TODO: Webhook "exit-interview-invited" triggern
     // await triggerWebhooks("exit-interview-invited", { ... });
-    console.log(`[Exit-Interview] Einladung gesendet fuer Interview ${exitInterview.id}, Offboarding ${id}`);
+    console.log(`[Exit-Interview] Einladung gesendet für Interview ${exitInterview.id}, Offboarding ${id}`);
 
     // AuditLog schreiben
     await prisma.auditLog.create({

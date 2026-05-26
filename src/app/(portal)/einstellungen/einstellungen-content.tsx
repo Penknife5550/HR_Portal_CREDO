@@ -6,7 +6,7 @@
  * Vier Tabs:
  * 1. Webhooks  – Pro-Event Webhooks anlegen, testen, aktivieren
  * 2. SMTP      – Fallback-Mail-Server konfigurieren und testen
- * 3. E-Mail-Vorlagen – HTML-Vorlagen fuer SMTP-Fallback bearbeiten
+ * 3. E-Mail-Vorlagen – HTML-Vorlagen für SMTP-Fallback bearbeiten
  * 4. Abteilungen – Offboarding-Abteilungen mit E-Mail verwalten
  */
 
@@ -409,7 +409,7 @@ function WebhooksTab() {
                     setShowModal(true);
                   }}
                   className="rounded-md border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/5"
-                  title={`Neuen Webhook fuer Event '${group.event}' anlegen`}
+                  title={`Neuen Webhook für Event '${group.event}' anlegen`}
                 >
                   + Webhook
                 </button>
@@ -1193,7 +1193,7 @@ function DepartmentsTab() {
     e.preventDefault();
     const finalKey = newKey === "__custom__" ? newCustomKey : newKey;
     if (!newName || !finalKey || !newEmail) {
-      setError("Bitte alle Pflichtfelder ausfuellen");
+      setError("Bitte alle Pflichtfelder ausfüllen");
       return;
     }
     setFormSaving(true);
@@ -1249,7 +1249,7 @@ function DepartmentsTab() {
         body: JSON.stringify({ email: editEmail }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      setSuccess(`E-Mail fuer "${dept.name}" aktualisiert`);
+      setSuccess(`E-Mail für "${dept.name}" aktualisiert`);
       setEditingId(null);
       setEditEmail("");
       load();
@@ -1305,7 +1305,7 @@ function DepartmentsTab() {
               />
             </FormField>
 
-            <FormField label="Abteilungs-Schluessel" required>
+            <FormField label="Abteilungs-Schlüssel" required>
               <select
                 value={newKey}
                 onChange={(e) => setNewKey(e.target.value)}
@@ -1317,13 +1317,13 @@ function DepartmentsTab() {
                     {opt.label} ({opt.value})
                   </option>
                 ))}
-                <option value="__custom__">Eigener Schluessel...</option>
+                <option value="__custom__">Eigener Schlüssel...</option>
               </select>
             </FormField>
           </div>
 
           {newKey === "__custom__" && (
-            <FormField label="Eigener Schluessel" required>
+            <FormField label="Eigener Schlüssel" required>
               <input
                 type="text"
                 value={newCustomKey}

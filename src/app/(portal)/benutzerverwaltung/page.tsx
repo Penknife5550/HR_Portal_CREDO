@@ -5,7 +5,7 @@ import { BenutzerverwaltungContent } from "./benutzerverwaltung-content";
 /**
  * Benutzerverwaltung (Server Component)
  *
- * Nur fuer SUPER_ADMIN und HR_LEITUNG zugaenglich.
+ * Nur für SUPER_ADMIN und HR_LEITUNG zugaenglich.
  * Prueft die Session und leitet um wenn nicht berechtigt.
  */
 export default async function BenutzerverwaltungPage() {

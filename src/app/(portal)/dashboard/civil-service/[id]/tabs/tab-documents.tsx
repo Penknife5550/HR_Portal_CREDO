@@ -50,10 +50,10 @@ function ExportSection({ processId, assessments }: { processId: string; assessme
         <svg className="h-5 w-5 text-credo-blau" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        PDF-Export fuer DMS
+        PDF-Export für DMS
       </h3>
       <p className="text-xs text-muted-foreground mb-4">
-        Jedes Dokument erhaelt einen QR-Code auf der Deckseite zur automatischen DMS-Zuordnung.
+        Jedes Dokument erhält einen QR-Code auf der Deckseite zur automatischen DMS-Zuordnung.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -69,7 +69,7 @@ function ExportSection({ processId, assessments }: { processId: string; assessme
         {/* Antrag */}
         <ExportCard
           title="Antrag"
-          description="Voraussetzungen + Erklaerung"
+          description="Voraussetzungen + Erklärung"
           icon="doc"
           isDownloading={downloading === "antrag"}
           onDownload={() => handleDownload("antrag")}

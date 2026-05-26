@@ -9,6 +9,10 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import {
+  SELECTABLE_DOCUMENT_TYPES,
+  DOCUMENT_TYPE_LABELS,
+} from "@/lib/required-documents";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { FIELD_REGISTRY, getDefaultFieldConfig, type FieldConfig } from "@/lib/field-definitions";
@@ -37,6 +41,7 @@ interface FormTemplate {
   name: string;
   description: string | null;
   stepsConfig: StepConfig[];
+  requiredDocuments?: string[];
   isActive: boolean;
   version?: number;
   publishedAt?: string | null;
@@ -47,7 +52,7 @@ interface FormTemplate {
 // Steps 1 und 10 sind Pflichtschritte (immer aktiviert)
 const MANDATORY_STEPS = [1, 10];
 
-// Lesbare Labels fuer QuestionnaireType
+// Lesbare Labels für QuestionnaireType
 const TYPE_LABELS: Record<string, string> = {
   STANDARD: "Standard",
   BEAMTE: "Beamte",
@@ -56,7 +61,7 @@ const TYPE_LABELS: Record<string, string> = {
   EHRENAMT: "Ehrenamt",
 };
 
-// Farben fuer QuestionnaireType-Badges
+// Farben für QuestionnaireType-Badges
 const TYPE_COLORS: Record<string, string> = {
   STANDARD: "bg-blue-100 text-blue-800",
   BEAMTE: "bg-purple-100 text-purple-800",
@@ -74,12 +79,12 @@ export function VorlagenContent({ user }: { user: User }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Lokaler State fuer bearbeitete StepConfigs (pro Template-ID)
+  // Lokaler State für bearbeitete StepConfigs (pro Template-ID)
   const [editedConfigs, setEditedConfigs] = useState<
     Record<string, StepConfig[]>
   >({});
 
-  // Welcher Schritt ist fuer Feld-Konfiguration aufgeklappt? "templateId:stepNumber"
+  // Welcher Schritt ist für Feld-Konfiguration aufgeklappt? "templateId:stepNumber"
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
   // Tracking welche Templates gerade gespeichert werden
@@ -87,6 +92,81 @@ export function VorlagenContent({ user }: { user: User }) {
 
   // Erfolgsmeldungen pro Template
   const [successIds, setSuccessIds] = useState<Set<string>>(new Set());
+
+  // Pflicht-Dokumente: editierter Zustand + Save-Tracking (pro Template-ID)
+  const [editedRequiredDocs, setEditedRequiredDocs] = useState<
+    Record<string, string[]>
+  >({});
+  const [savingDocsIds, setSavingDocsIds] = useState<Set<string>>(new Set());
+  const [successDocsIds, setSuccessDocsIds] = useState<Set<string>>(new Set());
+
+  function getCurrentRequiredDocs(template: FormTemplate): string[] {
+    return (
+      editedRequiredDocs[template.id] ??
+      template.requiredDocuments ?? ["GEBURTSURKUNDE_EIGEN", "GEBURTSURKUNDE_KIND"]
+    );
+  }
+
+  function toggleRequiredDoc(template: FormTemplate, type: string) {
+    const current = getCurrentRequiredDocs(template);
+    const next = current.includes(type)
+      ? current.filter((t) => t !== type)
+      : [...current, type];
+    setEditedRequiredDocs((prev) => ({ ...prev, [template.id]: next }));
+  }
+
+  function requiredDocsChanged(template: FormTemplate): boolean {
+    const edited = editedRequiredDocs[template.id];
+    if (!edited) return false;
+    const orig = template.requiredDocuments ?? [
+      "GEBURTSURKUNDE_EIGEN",
+      "GEBURTSURKUNDE_KIND",
+    ];
+    if (edited.length !== orig.length) return true;
+    const a = [...edited].sort();
+    const b = [...orig].sort();
+    return a.some((t, i) => t !== b[i]);
+  }
+
+  async function handleSaveRequiredDocs(templateId: string) {
+    const docs = editedRequiredDocs[templateId];
+    if (!docs) return;
+    setSavingDocsIds((prev) => new Set(prev).add(templateId));
+    try {
+      const res = await fetch(`/api/vorlagen/${templateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requiredDocuments: docs }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Fehler beim Speichern");
+      }
+      const updated = await res.json();
+      setTemplates((prev) => prev.map((t) => (t.id === templateId ? updated : t)));
+      setEditedRequiredDocs((prev) => {
+        const next = { ...prev };
+        delete next[templateId];
+        return next;
+      });
+      setSuccessDocsIds((prev) => new Set(prev).add(templateId));
+      setTimeout(() => {
+        setSuccessDocsIds((prev) => {
+          const next = new Set(prev);
+          next.delete(templateId);
+          return next;
+        });
+      }, 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setSavingDocsIds((prev) => {
+        const next = new Set(prev);
+        next.delete(templateId);
+        return next;
+      });
+    }
+  }
 
   const canEdit =
     user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
@@ -287,7 +367,7 @@ export function VorlagenContent({ user }: { user: User }) {
   }
 
   // =============================================
-  // Aktuelle Steps fuer ein Template
+  // Aktuelle Steps für ein Template
   // =============================================
   function getCurrentSteps(template: FormTemplate): StepConfig[] {
     return editedConfigs[template.id] || template.stepsConfig;
@@ -314,7 +394,7 @@ export function VorlagenContent({ user }: { user: User }) {
             Formularvorlagen
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Konfigurieren Sie, welche Fragebogen-Schritte fuer jeden
+            Konfigurieren Sie, welche Fragebogen-Schritte für jeden
             Beschäftigungstyp aktiviert sind.
           </p>
           {!canEdit && (
@@ -371,6 +451,10 @@ export function VorlagenContent({ user }: { user: User }) {
               const saving = savingIds.has(template.id);
               const saved = successIds.has(template.id);
               const activeCount = getActiveStepCount(steps);
+              const requiredDocs = getCurrentRequiredDocs(template);
+              const docsChanged = requiredDocsChanged(template);
+              const docsSaving = savingDocsIds.has(template.id);
+              const docsSaved = successDocsIds.has(template.id);
 
               return (
                 <div
@@ -474,7 +558,7 @@ export function VorlagenContent({ user }: { user: User }) {
                               </div>
 
                               <div className="flex items-center gap-2">
-                                {/* Feld-Konfiguration aufklappen (nur fuer aktive Steps mit Feldern) */}
+                                {/* Feld-Konfiguration aufklappen (nur für aktive Steps mit Feldern) */}
                                 {step.enabled && definitions.length > 0 && canEdit && (
                                   <button
                                     onClick={() => setExpandedStep(isExpanded ? null : expandKey)}
@@ -575,6 +659,74 @@ export function VorlagenContent({ user }: { user: User }) {
                         );
                       })}
                     </div>
+                  </div>
+
+                  {/* Pflicht-Dokumente (pro Vorlage konfigurierbar) */}
+                  <div className="border-t px-6 py-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">
+                          Pflicht-Dokumente
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          Diese Dokumente müssen vor dem Absenden hochgeladen
+                          werden. Die Geburtsurkunde(n) der Kinder wird nur
+                          verlangt, wenn Kinder angegeben sind.
+                        </p>
+                      </div>
+                      {docsSaved && (
+                        <span className="text-xs font-medium text-emerald-600">
+                          Gespeichert
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {SELECTABLE_DOCUMENT_TYPES.map((type) => {
+                        const active = requiredDocs.includes(type);
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() => toggleRequiredDoc(template, type)}
+                            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-60 ${
+                              active
+                                ? "border-credo-blau bg-credo-blau/10 text-credo-blau"
+                                : "border-border text-muted-foreground hover:bg-accent"
+                            }`}
+                          >
+                            {active ? "✓ " : ""}
+                            {DOCUMENT_TYPE_LABELS[type] ?? type}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {canEdit && docsChanged && (
+                      <div className="mt-3 flex items-center justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditedRequiredDocs((prev) => {
+                              const next = { ...prev };
+                              delete next[template.id];
+                              return next;
+                            })
+                          }
+                          disabled={docsSaving}
+                          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                        >
+                          Verwerfen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveRequiredDocs(template.id)}
+                          disabled={docsSaving}
+                          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          {docsSaving ? "Speichern..." : "Pflicht-Dokumente speichern"}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Card Footer (nur bei Aenderungen) */}

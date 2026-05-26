@@ -1,8 +1,8 @@
 /**
  * Verbeamtung (PSI) Dashboard – Konfiguration
  *
- * Prozessspezifische Einstellungen fuer das generische
- * Process-Dashboard, angepasst fuer Verbeamtungsvorgaenge.
+ * Prozessspezifische Einstellungen für das generische
+ * Process-Dashboard, angepasst für Verbeamtungsvorgaenge.
  */
 
 import type { ProcessDashboardConfig, ProcessRow } from "@/components/process-dashboard/types";
@@ -167,6 +167,6 @@ export const civilServiceDashboardConfig: ProcessDashboardConfig = {
 
   emptyStateText: "Keine Verbeamtungsvorgaenge vorhanden",
   emptyStateHint: "Erstellen Sie einen neuen Verbeamtungsvorgang.",
-  emptyFilterText: "Keine Vorgaenge fuer diese Filter gefunden",
-  emptyFilterHint: "Versuchen Sie andere Filterkriterien oder setzen Sie die Filter zurueck.",
+  emptyFilterText: "Keine Vorgaenge für diese Filter gefunden",
+  emptyFilterHint: "Versuchen Sie andere Filterkriterien oder setzen Sie die Filter zurück.",
 };

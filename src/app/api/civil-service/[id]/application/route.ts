@@ -1,7 +1,7 @@
 /**
  * API: /api/civil-service/[id]/application
  *
- * POST - Magic Link fuer LK-Antrag auf Verbeamtung generieren
+ * POST - Magic Link für LK-Antrag auf Verbeamtung generieren
  *
  * Auth erforderlich (HR).
  */

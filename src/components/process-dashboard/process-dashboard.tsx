@@ -3,7 +3,7 @@
 /**
  * Process Dashboard – Generische, wiederverwendbare Komponente
  *
- * Kann fuer Onboarding, Offboarding, Verbeamtung und alle
+ * Kann für Onboarding, Offboarding, Verbeamtung und alle
  * zukuenftigen HR-Prozesse verwendet werden.
  */
 
@@ -22,7 +22,7 @@ interface Organization {
 
 export interface ProcessDashboardProps {
   config: ProcessDashboardConfig;
-  /** Optionale Render-Funktion fuer das Erstellen-Modal */
+  /** Optionale Render-Funktion für das Erstellen-Modal */
   renderCreateModal?: (props: {
     open: boolean;
     onClose: () => void;

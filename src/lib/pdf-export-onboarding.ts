@@ -1,5 +1,5 @@
 /**
- * CREDO HR-Portal – PDF-Export fuer Onboarding-Vorgaenge
+ * CREDO HR-Portal – PDF-Export für Onboarding-Vorgaenge
  *
  * Erzeugt PDF-Dokumente mit Swiss QR Code auf jeder Deckblatt-Seite.
  * Exporttypen: Fragebogen (PersonalData), Dokumente-Liste, Checkliste, Gesamtakte
@@ -257,10 +257,10 @@ async function addFragebogenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
     return;
   }
 
-  // Persoenliche Daten
+  // Persönliche Daten
   doc.addPage();
   pageHeader(doc, ctx, "Fragebogen");
-  let y = section(doc, "Persoenliche Angaben", 55);
+  let y = section(doc, "Persönliche Angaben", 55);
   y = dataRow(doc, "Anrede", str(pd.salutation), y);
   y = dataRow(doc, "Titel", str(pd.title), y);
   y = dataRow(doc, "Vorname", str(pd.firstName), y);
@@ -269,7 +269,7 @@ async function addFragebogenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
   y = dataRow(doc, "Geburtsdatum", fmt(pd.birthDate), y);
   y = dataRow(doc, "Geburtsort", str(pd.birthPlace), y);
   y = dataRow(doc, "Geburtsland", str(pd.birthCountry), y);
-  y = dataRow(doc, "Staatsangehoerigkeit", str(pd.nationality), y);
+  y = dataRow(doc, "Staatsangehörigkeit", str(pd.nationality), y);
   y = dataRow(doc, "Familienstand", str(pd.maritalStatus), y);
   y = dataRow(doc, "Schwerbehindert", yn(pd.severelyDisabled), y);
   if (pd.severelyDisabled) y = dataRow(doc, "Grad der Behinderung", str(pd.disabilityDegree), y);
@@ -389,7 +389,7 @@ async function addModalitaetenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExpo
   y = dataRow(doc, "Ehrenamt", yn(sd.ehrenamt), y);
 
   checkBreak(doc, 100, ctx, "Modalitaeten");
-  y = section(doc, "Verguetung");
+  y = section(doc, "Vergütung");
   y = dataRow(doc, "Modell", str(sd.verguetungsmodell), y);
   y = dataRow(doc, "Entgeltgruppe", str(sd.entgeltgruppe), y);
   y = dataRow(doc, "Stufe", str(sd.stufe), y);

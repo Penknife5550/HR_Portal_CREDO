@@ -2,7 +2,7 @@
  * API: /api/offboarding/:id/notes/:noteId
  *
  * PATCH  – Notiz bearbeiten
- * DELETE – Notiz loeschen
+ * DELETE – Notiz löschen
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -103,7 +103,7 @@ export async function PATCH(
 }
 
 // =============================================
-// DELETE /api/offboarding/:id/notes/:noteId – Notiz loeschen
+// DELETE /api/offboarding/:id/notes/:noteId – Notiz löschen
 // =============================================
 export async function DELETE(
   _request: NextRequest,
@@ -143,7 +143,7 @@ export async function DELETE(
       );
     }
 
-    // Nur der Ersteller darf die Notiz loeschen
+    // Nur der Ersteller darf die Notiz löschen
     if (existingNote.createdById !== session.userId) {
       return NextResponse.json(
         { error: "Nur der Ersteller kann diese Notiz löschen" },
@@ -171,7 +171,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Fehler beim Loeschen der Offboarding-Notiz:", error);
+    console.error("Fehler beim Löschen der Offboarding-Notiz:", error);
     return NextResponse.json(
       { error: "Interner Serverfehler" },
       { status: 500 }

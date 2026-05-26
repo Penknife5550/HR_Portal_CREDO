@@ -1,5 +1,5 @@
 /**
- * Mutterschutz Dashboard – Konfiguration fuer ProcessDashboard
+ * Mutterschutz Dashboard – Konfiguration für ProcessDashboard
  */
 
 import type { ProcessDashboardConfig } from "@/components/process-dashboard/types";
@@ -129,5 +129,5 @@ export const mutterschutzDashboardConfig: ProcessDashboardConfig = {
 
   emptyStateText: "Keine Mutterschutz-Vorgaenge vorhanden",
   emptyStateHint: "Erstellen Sie einen neuen Mutterschutz-Vorgang.",
-  emptyFilterText: "Keine Vorgaenge fuer diese Filter gefunden",
+  emptyFilterText: "Keine Vorgaenge für diese Filter gefunden",
 };

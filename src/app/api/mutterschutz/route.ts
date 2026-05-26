@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(isNaN(rawLimit) ? 50 : rawLimit, 1), 200);
     const skip = (page - 1) * limit;
 
-    // Basis-Where ohne Status — wird fuer KPI-Counts verwendet,
+    // Basis-Where ohne Status — wird für KPI-Counts verwendet,
     // damit die Kacheln nicht vom aktuell aktiven Status-Filter abhaengen.
     const baseWhere: Record<string, unknown> = {
       ...(await orgFilter(session)),

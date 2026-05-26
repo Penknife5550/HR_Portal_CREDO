@@ -75,7 +75,7 @@ export default function CivilServiceApplicationPage() {
     );
   }
 
-  // Fehler (Token ungueltig, abgelaufen, bereits eingereicht)
+  // Fehler (Token ungültig, abgelaufen, bereits eingereicht)
   if (error) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-4">

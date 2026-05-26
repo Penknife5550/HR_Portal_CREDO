@@ -1,8 +1,8 @@
 /**
  * API: /api/elternzeit/[id]/genehmigung-endg
  *
- * GET – PDF "Endgueltige Genehmigung Elternzeit" generieren + ausliefern.
- *       Voraussetzung: Vorgang ist GENEHMIGT (= endgueltig genehmigt durch HR).
+ * GET – PDF "Endgültige Genehmigung Elternzeit" generieren + ausliefern.
+ *       Voraussetzung: Vorgang ist GENEHMIGT (= endgültig genehmigt durch HR).
  *       Unterzeichner = Geschaeftsfuehrung aus Mandanten-Konfiguration.
  */
 
@@ -52,7 +52,7 @@ export async function GET(
       return NextResponse.json(
         {
           error:
-            "Endgueltige Genehmigung kann erst nach abgeschlossener HR-Pruefung erstellt werden",
+            "Endgültige Genehmigung kann erst nach abgeschlossener HR-Pruefung erstellt werden",
         },
         { status: 409 },
       );

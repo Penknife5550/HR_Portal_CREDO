@@ -2,7 +2,7 @@
  * API: /api/elternzeit/[id]/bad-aufforderung
  *
  * GET – BAD-Aufforderungsbrief als PDF generieren + ausliefern.
- *       Sinnvoll fuer Mutterschutz-Bezug bei Kita-Mitarbeiterinnen.
+ *       Sinnvoll für Mutterschutz-Bezug bei Kita-Mitarbeiterinnen.
  */
 
 import { NextRequest, NextResponse } from "next/server";

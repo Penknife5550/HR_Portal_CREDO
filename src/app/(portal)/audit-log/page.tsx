@@ -5,7 +5,7 @@ import { AuditLogContent } from "./audit-log-content";
 /**
  * Audit-Log Seite (Server Component)
  *
- * Nur fuer SUPER_ADMIN und HR_LEITUNG zugaenglich.
+ * Nur für SUPER_ADMIN und HR_LEITUNG zugaenglich.
  */
 export default async function AuditLogPage() {
   const session = await getSession();

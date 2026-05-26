@@ -95,7 +95,7 @@ export const GET = apiHandler(
       ];
     }
 
-    // Einrichtungs-Filter (ueber Employment)
+    // Einrichtungs-Filter (über Employment)
     if (organizationId) {
       where.employments = {
         some: { organizationId },

@@ -3,7 +3,7 @@
  *
  * GET – BR Detmold-Schreiben als PDF generieren + ausliefern.
  *       Setzt brSchreibenGeneriertAm im Vorgang.
- *       Nur fuer BEAMTER / PLANSTELLENINHABER zulaessig.
+ *       Nur für BEAMTER / PLANSTELLENINHABER zulaessig.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -57,7 +57,7 @@ export async function GET(
       ez.personalgruppe !== "PLANSTELLENINHABER"
     ) {
       return NextResponse.json(
-        { error: "BR Detmold-Schreiben nur fuer Beamte / PSI zulaessig" },
+        { error: "BR Detmold-Schreiben nur für Beamte / PSI zulaessig" },
         { status: 409 },
       );
     }

@@ -47,6 +47,16 @@ model Organization {
   // Token-Konfiguration
   ezTokenValidityDays Int @default(30)
 
+  // =============================================
+  // Datenschutz — Verantwortliche Stelle (DSGVO, pro Mandant konfigurierbar)
+  // Wird im Personalfragebogen (DSGVO-Text) und als Brief-Platzhalter genutzt.
+  // Faellt auf den globalen Default zurueck, wenn nicht gesetzt.
+  // =============================================
+  dsgvoVerantwortlicheName    String? // z.B. "Christlicher Schulverein Minden e.V."
+  dsgvoVerantwortlicheStrasse String? // z.B. "Kingsleyallee 6"
+  dsgvoVerantwortlichePlz     String? // z.B. "32425"
+  dsgvoVerantwortlicheOrt     String? // z.B. "Minden"
+
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
   onboardings           OnboardingProcess[]
@@ -757,6 +767,10 @@ model FormTemplate {
   description       String?
   stepsConfig       Json // Array: [{ step: 1, title: "...", enabled: true, fields: [...] }]
   isActive          Boolean           @default(true)
+
+  // Pflicht-Dokumente fuer den Abschluss des Fragebogens (pro Vorlage konfigurierbar).
+  // GEBURTSURKUNDE_KIND wird nur verlangt, wenn der Mitarbeiter Kinder angegeben hat.
+  requiredDocuments DocumentType[]    @default([GEBURTSURKUNDE_EIGEN, GEBURTSURKUNDE_KIND])
 
   // Versionierung (Vorschlag 5)
   version     Int       @default(1) // Wird bei jeder Aenderung hochgezaehlt

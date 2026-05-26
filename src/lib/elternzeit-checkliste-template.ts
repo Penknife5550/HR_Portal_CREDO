@@ -48,7 +48,7 @@ export const MUTTERSCHUTZ_CHECKLISTE: MutterschutzChecklistTemplate[] = [
     nurBeiBad: true,
   },
   {
-    titel: "Lohnbescheinigung fuer Krankenkasse erstellen",
+    titel: "Lohnbescheinigung für Krankenkasse erstellen",
     beschreibung:
       "1 Woche vor Mutterschutz-Beginn an die zustaendige Krankenkasse senden (taegl. KK-Zuschuss 13,00 EUR)",
     logaHinweis:
@@ -118,21 +118,21 @@ export interface ElternzeitChecklistTemplate {
 export const ELTERNZEIT_CHECKLISTE: ElternzeitChecklistTemplate[] = [
   // ─── Phase ANTRAG ───
   {
-    titel: "Vorlaeufiger Antrag via Magic Link versendet",
+    titel: "Vorläufiger Antrag via Magic Link versendet",
     beschreibung: "Magic Link an Mitarbeiter/in per E-Mail",
     personalgruppe: null,
     phase: "ANTRAG",
     orderIndex: 10,
   },
   {
-    titel: "Vorlaeufige Genehmigung durch Einrichtungsleitung",
+    titel: "Vorläufige Genehmigung durch Einrichtungsleitung",
     beschreibung: "Einrichtungsleiter/in bestaetigt Antrag (Phase 2: per Magic Link, Phase 1: HR im Portal)",
     personalgruppe: null,
     phase: "ANTRAG",
     orderIndex: 20,
   },
   {
-    titel: "Vorlaeufige Genehmigung als PDF generiert + versendet",
+    titel: "Vorläufige Genehmigung als PDF generiert + versendet",
     beschreibung: "Mutter- oder Vater-Version automatisch gewaehlt",
     personalgruppe: null,
     phase: "ANTRAG",
@@ -141,7 +141,7 @@ export const ELTERNZEIT_CHECKLISTE: ElternzeitChecklistTemplate[] = [
 
   // ─── Phase GENEHMIGUNG (nach Geburt) ───
   {
-    titel: "Endgueltiger Antrag via Magic Link versendet",
+    titel: "Endgültiger Antrag via Magic Link versendet",
     beschreibung: "Nach Geburt: 2. Magic Link mit Geburtsurkunden-Upload (Phase 2)",
     personalgruppe: null,
     phase: "GENEHMIGUNG",
@@ -154,7 +154,7 @@ export const ELTERNZEIT_CHECKLISTE: ElternzeitChecklistTemplate[] = [
     orderIndex: 20,
   },
   {
-    titel: "Endgueltige Genehmigung versandt",
+    titel: "Endgültige Genehmigung versandt",
     personalgruppe: null,
     phase: "GENEHMIGUNG",
     orderIndex: 30,
@@ -174,7 +174,7 @@ export const ELTERNZEIT_CHECKLISTE: ElternzeitChecklistTemplate[] = [
     orderIndex: 50,
   },
   {
-    titel: "AG-Bescheinigung fuer Elterngeld ausgestellt",
+    titel: "AG-Bescheinigung für Elterngeld ausgestellt",
     beschreibung: "Bruttogehalt der letzten 12 Monate vor Mutterschutzbeginn aus LOGA ziehen",
     logaHinweis:
       "LOGA → Auswertungen → Bescheinigungen → Arbeitgeberbescheinigung Elterngeld → Mitarbeiter/in waehlen → Zeitraum: 12 Monate vor Mutterschutz/EZ-Beginn → PDF erstellen",
@@ -184,7 +184,7 @@ export const ELTERNZEIT_CHECKLISTE: ElternzeitChecklistTemplate[] = [
   },
   {
     titel: "KV-Zuschuss-Antrag an LBV NRW gestellt",
-    beschreibung: "Sofort bei Genehmigung — 31 EUR/Monat fuer Beamte/PSI",
+    beschreibung: "Sofort bei Genehmigung — 31 EUR/Monat für Beamte/PSI",
     personalgruppe: "BEAMTER",
     phase: "GENEHMIGUNG",
     orderIndex: 70,

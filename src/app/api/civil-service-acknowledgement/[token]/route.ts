@@ -1,15 +1,15 @@
 /**
  * API: /api/civil-service-acknowledgement/[token]
  *
- * GET  — Beurteilung als Read-Only fuer die Lehrkraft laden (oeffentlich, kein Auth)
+ * GET  — Beurteilung als Read-Only für die Lehrkraft laden (oeffentlich, kein Auth)
  * POST — Lehrkraft bestaetigt die Bekanntgabe und gibt optional eine
  *        Gegenaeusserung ab (§ 92 Abs. 1 Satz 6 LBG NRW).
  *
- * OEFFENTLICH — Zugang ueber Magic-Link-Token (employeeAckToken).
+ * OEFFENTLICH — Zugang über Magic-Link-Token (employeeAckToken).
  * Rate-Limit auf den Token, damit Token-Enumeration ausgeschlossen ist.
  *
  * Vertraulichkeit: Es werden nur die Beurteilungs-Felder zurueckgegeben,
- * die fuer die Lehrkraft bestimmt sind. Sensible Stamm-Daten wie IBAN,
+ * die für die Lehrkraft bestimmt sind. Sensible Stamm-Daten wie IBAN,
  * Steuer-ID etc. liegen ohnehin in einer anderen Tabelle.
  */
 
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         meetsRequirementsManual: assessment.meetsRequirementsManual,
         overallReasoning: assessment.overallReasoning,
 
-        // Workflow-Felder (Read-Only fuer LK)
+        // Workflow-Felder (Read-Only für LK)
         scheduledDate: assessment.scheduledDate?.toISOString() ?? null,
         announcedAt: assessment.announcedAt?.toISOString() ?? null,
         fach: assessment.fach,

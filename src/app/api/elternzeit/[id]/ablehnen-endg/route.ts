@@ -1,7 +1,7 @@
 /**
  * API: /api/elternzeit/[id]/ablehnen-endg
  *
- * POST – Endgueltige Ablehnung durch HR.
+ * POST – Endgültige Ablehnung durch HR.
  *        Voraussetzung: ANTRAG_ENDG_EINGEREICHT.
  *        Setzt Status auf ABGELEHNT (Endzustand).
  */
@@ -60,7 +60,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Endgueltige Ablehnung nur moeglich, wenn der endgueltige Antrag eingereicht wurde",
+            "Endgültige Ablehnung nur moeglich, wenn der endgültige Antrag eingereicht wurde",
         },
         { status: 409 },
       );

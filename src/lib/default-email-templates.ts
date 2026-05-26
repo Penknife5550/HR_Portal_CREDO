@@ -3,7 +3,7 @@
  *
  * Diese Vorlagen werden verwendet wenn:
  * 1. Noch keine DB-Vorlage gespeichert wurde
- * 2. Als Ausgangsbasis fuer den Admin
+ * 2. Als Ausgangsbasis für den Admin
  *
  * Variablen: {{schluessel}} werden beim Versand ersetzt.
  */
@@ -487,7 +487,7 @@ CREDO Gruppe – {{einrichtung}}`,
   {
     event: "supervisor-reminder",
     name: "Erinnerung Vorgesetzter (Modalitaeten ausstehend)",
-    subject: "Erinnerung: Einstellungsmodalitaeten fuer {{mitarbeiter_name}} offen",
+    subject: "Erinnerung: Einstellungsmodalitaeten für {{mitarbeiter_name}} offen",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -505,7 +505,7 @@ CREDO Gruppe – {{einrichtung}}`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Einstellungsmodalitaeten ausstehend</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Die Einstellungsmodalitaeten fuer <strong>{{mitarbeiter_name}}</strong> sind seit <strong>{{tage_offen}} Tagen</strong> offen.
+            Die Einstellungsmodalitaeten für <strong>{{mitarbeiter_name}}</strong> sind seit <strong>{{tage_offen}} Tagen</strong> offen.
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
             Bitte fuellen Sie das Formular zeitnah aus, damit die Personalabteilung den Arbeitsvertrag vorbereiten kann.
@@ -513,7 +513,7 @@ CREDO Gruppe – {{einrichtung}}`,
           <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
             <tr><td style="background-color:#f59e0b;border-radius:8px;">
               <a href="{{supervisor_link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
-                Einstellungsmodalitaeten ausfuellen →
+                Einstellungsmodalitaeten ausfüllen →
               </a>
             </td></tr>
           </table>
@@ -538,7 +538,7 @@ CREDO Gruppe – {{einrichtung}}`,
 </html>`,
     bodyText: `Erinnerung: Einstellungsmodalitaeten ausstehend
 
-Die Einstellungsmodalitaeten fuer {{mitarbeiter_name}} sind seit {{tage_offen}} Tagen offen.
+Die Einstellungsmodalitaeten für {{mitarbeiter_name}} sind seit {{tage_offen}} Tagen offen.
 
 Bitte fuellen Sie das Formular aus:
 {{supervisor_link}}
@@ -627,8 +627,8 @@ CREDO HR-Portal`,
   // =============================================
   {
     event: "offboarding-department-assigned",
-    name: "Offboarding-Aufgaben fuer Abteilung zugewiesen",
-    subject: "Offboarding-Aufgaben fuer {{abteilung}}: {{vorname}} {{nachname}}",
+    name: "Offboarding-Aufgaben für Abteilung zugewiesen",
+    subject: "Offboarding-Aufgaben für {{abteilung}}: {{vorname}} {{nachname}}",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -644,7 +644,7 @@ CREDO HR-Portal`,
           <div style="display:inline-block;background-color:#dbeafe;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
             <span style="color:#1e40af;font-weight:bold;font-size:14px;">Aufgaben zugewiesen</span>
           </div>
-          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offboarding-Aufgaben fuer {{abteilung}}</h2>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offboarding-Aufgaben für {{abteilung}}</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
             Im Rahmen des Offboardings von <strong>{{vorname}} {{nachname}}</strong> wurden Ihrer Abteilung Aufgaben zugewiesen. Bitte bearbeiten Sie diese bis zum Austrittsdatum.
           </p>
@@ -681,7 +681,7 @@ CREDO HR-Portal`,
   </table>
 </body>
 </html>`,
-    bodyText: `Offboarding-Aufgaben fuer {{abteilung}}: {{vorname}} {{nachname}}
+    bodyText: `Offboarding-Aufgaben für {{abteilung}}: {{vorname}} {{nachname}}
 
 Im Rahmen des Offboardings wurden Ihrer Abteilung Aufgaben zugewiesen.
 Austrittsdatum: {{austrittsdatum}}
@@ -724,7 +724,7 @@ CREDO HR-Portal`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">{{aufgabe}}</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Die Offboarding-Aufgabe <strong>{{aufgabe}}</strong> fuer <strong>{{vorname}} {{nachname}}</strong> wurde als erledigt markiert.
+            Die Offboarding-Aufgabe <strong>{{aufgabe}}</strong> für <strong>{{vorname}} {{nachname}}</strong> wurde als erledigt markiert.
           </p>
           <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
             <tr><td style="padding:16px;">
@@ -771,7 +771,7 @@ CREDO HR-Portal`,
   {
     event: "offboarding-reminder",
     name: "Erinnerung: Offene Offboarding-Aufgaben",
-    subject: "Erinnerung: Offene Aufgaben fuer {{vorname}} {{nachname}}",
+    subject: "Erinnerung: Offene Aufgaben für {{vorname}} {{nachname}}",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -810,7 +810,7 @@ CREDO HR-Portal`,
   </table>
 </body>
 </html>`,
-    bodyText: `Erinnerung: Offene Aufgaben fuer {{vorname}} {{nachname}}
+    bodyText: `Erinnerung: Offene Aufgaben für {{vorname}} {{nachname}}
 
 Offene Aufgaben: {{offene_aufgaben}}
 Austrittsdatum: {{austrittsdatum}}

@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 
-// Stakeholder-Schema fuer Beteiligte am Verbeamtungsprozess
+// Stakeholder-Schema für Beteiligte am Verbeamtungsprozess
 const stakeholderContactSchema = z.object({
   name: z.string().max(200).optional(),
   email: z.string().email("Ungueltige E-Mail-Adresse"),

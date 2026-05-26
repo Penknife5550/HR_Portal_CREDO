@@ -1,10 +1,10 @@
 /**
  * API: /api/cron/offboarding-reminders
  *
- * POST – Erinnerungen fuer offene Offboarding-Aufgaben senden
+ * POST – Erinnerungen für offene Offboarding-Aufgaben senden
  *
  * Wird taeglich von n8n per Cron-Workflow aufgerufen.
- * Sicherheit: Authentifizierung ueber CRON_SECRET Bearer-Token.
+ * Sicherheit: Authentifizierung über CRON_SECRET Bearer-Token.
  *
  * 3-Stufen-Logik:
  * - INFO: Item faellig in 3 Tagen, kein Reminder in letzten 3 Tagen
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       for (const deptLink of offboarding.departmentLinks) {
         if (deptLink.allTasksComplete) continue;
 
-        // Offene Items fuer diese Abteilung finden
+        // Offene Items für diese Abteilung finden
         const deptItems = offboarding.checklistItems.filter(
           (item) => item.assigneeDepartment === deptLink.departmentKey
         );

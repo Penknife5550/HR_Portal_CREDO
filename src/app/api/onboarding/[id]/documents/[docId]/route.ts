@@ -84,7 +84,7 @@ export async function GET(
     }
 
     // Response mit korrekten Headers zurueckgeben
-    // Buffer muss in Uint8Array umgewandelt werden fuer NextResponse-Kompatibilitaet
+    // Buffer muss in Uint8Array umgewandelt werden für NextResponse-Kompatibilitaet
     return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {

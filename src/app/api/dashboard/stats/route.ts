@@ -1,7 +1,7 @@
 /**
  * API: /api/dashboard/stats
  *
- * GET – Aggregierte Dashboard-Statistiken fuer Charts und KPIs
+ * GET – Aggregierte Dashboard-Statistiken für Charts und KPIs
  *
  * Liefert:
  * - Status-Verteilung (Tortendiagramm)

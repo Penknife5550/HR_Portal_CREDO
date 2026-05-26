@@ -1,13 +1,13 @@
 /**
  * API: /api/verify/civil-service-assessment/:verifyToken
  *
- * GET — Public, kein Login. Liefert die Daten fuer die oeffentliche
+ * GET — Public, kein Login. Liefert die Daten für die oeffentliche
  * Audit-Page (Phase 6). Wird sowohl von der Page direkt im SSR aufgerufen
- * als auch fuer programmatische Verifikation z. B. durch die Bezirks-
+ * als auch für programmatische Verifikation z. B. durch die Bezirks-
  * regierung verwendet.
  *
  * Sicherheit:
- * - Nur Lookup ueber `verifyToken` (UUID v4, schwer ratbar)
+ * - Nur Lookup über `verifyToken` (UUID v4, schwer ratbar)
  * - Rate-Limit pro IP (30/min) gegen Token-Enumeration
  * - Audit-Log bei jedem erfolgreichen + jedem fehlgeschlagenen Aufruf
  * - Cache-Control: no-store

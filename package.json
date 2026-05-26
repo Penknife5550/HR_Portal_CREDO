@@ -38,6 +38,7 @@
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "docx": "^9.7.0",
     "jose": "^6.2.1",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.511.0",

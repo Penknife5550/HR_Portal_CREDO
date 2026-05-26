@@ -1,7 +1,7 @@
 /**
  * Schulferien-Verwaltung (Server Component)
  *
- * NRW Schulferien-Kalender pflegen — wird fuer Feriensperrfrist-Check
+ * NRW Schulferien-Kalender pflegen — wird für Feriensperrfrist-Check
  * (§ 11 FrUrlV NRW) bei Elternzeit-Antraegen genutzt.
  *
  * Zugang: SUPER_ADMIN, HR_LEITUNG.

@@ -1,5 +1,5 @@
 /**
- * CREDO HR-Portal – SMTP-Mailversand (Fallback fuer n8n)
+ * CREDO HR-Portal – SMTP-Mailversand (Fallback für n8n)
  *
  * Wird nur verwendet wenn n8n nicht erreichbar ist.
  * Konfiguration wird aus der Datenbank (SmtpConfig) geladen.
@@ -154,7 +154,7 @@ export async function sendEmailFallback(
   });
 
   if (!template || !template.isActive) {
-    console.warn(`[Mailer] Keine aktive E-Mail-Vorlage fuer Event "${event}" – Fallback abgebrochen`);
+    console.warn(`[Mailer] Keine aktive E-Mail-Vorlage für Event "${event}" – Fallback abgebrochen`);
     return;
   }
 
@@ -163,7 +163,7 @@ export async function sendEmailFallback(
   const toEmail = vars.email || vars.supervisorEmail;
 
   if (!toEmail) {
-    console.warn(`[Mailer] Kein Empfaenger im Payload fuer Event "${event}" gefunden`);
+    console.warn(`[Mailer] Kein Empfaenger im Payload für Event "${event}" gefunden`);
     return;
   }
 

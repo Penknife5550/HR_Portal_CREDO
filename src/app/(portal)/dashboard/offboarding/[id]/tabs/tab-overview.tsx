@@ -138,7 +138,7 @@ export function TabOverview({
     {
       key: "rueckgaben",
       title: "Rueckgaben einsammeln",
-      description: "Hardware, Schluessel, Fahrzeuge und Dokumente zurueckfordern",
+      description: "Hardware, Schlüssel, Fahrzeuge und Dokumente zurückfordern",
       status: calcStatus(step3Done, step1Done),
       progress: returnTotal > 0 ? { done: returnDone, total: returnTotal } : undefined,
       items: returnTotal > 0 ? data.returnItems.filter((i) => !i.isReturned).slice(0, 5).map((i) => ({

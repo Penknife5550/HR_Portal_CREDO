@@ -1,10 +1,10 @@
 /**
  * API: /api/exit-interview/[token]/submit
  *
- * POST - Exit-Interview endgueltig einreichen
+ * POST - Exit-Interview endgültig einreichen
  *
  * OEFFENTLICH - kein Auth erforderlich!
- * Zugang ausschliesslich ueber gueltigen Magic-Link-Token.
+ * Zugang ausschliesslich über gueltigen Magic-Link-Token.
  */
 
 import { NextRequest, NextResponse } from "next/server";

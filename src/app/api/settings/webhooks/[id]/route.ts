@@ -2,7 +2,7 @@
  * API: /api/settings/webhooks/[id]
  *
  * PUT    – Webhook aktualisieren
- * DELETE – Webhook loeschen
+ * DELETE – Webhook löschen
  *
  * Berechtigung: SUPER_ADMIN, HR_LEITUNG
  */
@@ -95,7 +95,7 @@ export async function DELETE(
     await prisma.webhookConfig.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[API] Webhook loeschen fehlgeschlagen:", error);
+    console.error("[API] Webhook löschen fehlgeschlagen:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
 }

@@ -146,7 +146,7 @@ export function ElternzeitConfigContent({
             className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Zurueck zu Mandanten
+            Zurück zu Mandanten
           </Link>
         </div>
 
@@ -179,7 +179,7 @@ export function ElternzeitConfigContent({
           <section className="rounded-lg border bg-card p-6">
             <h2 className="text-lg font-semibold">Geschaeftsfuehrung / Unterschrift</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Wird auf endgueltigen Genehmigungen und Briefen als Unterzeichner
+              Wird auf endgültigen Genehmigungen und Briefen als Unterzeichner
               aufgefuehrt.
             </p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -275,7 +275,7 @@ export function ElternzeitConfigContent({
           <section className="rounded-lg border bg-card p-6">
             <h2 className="text-lg font-semibold">Bezirksregierung Detmold</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Kontaktdaten Dezernat 41 fuer BR-Schreiben (PSI / Beamte).
+              Kontaktdaten Dezernat 41 für BR-Schreiben (PSI / Beamte).
             </p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>

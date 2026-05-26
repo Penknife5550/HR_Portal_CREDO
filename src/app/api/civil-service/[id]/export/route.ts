@@ -69,7 +69,7 @@ export async function GET(
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 
-    // Audit-Trail fuer alle Beurteilungen vorab laden (Phase 6)
+    // Audit-Trail für alle Beurteilungen vorab laden (Phase 6)
     const ASSESSMENT_AUDIT_ACTIONS = [
       "ASSESSMENT_REQUESTED",
       "ASSESSMENT_SUBMITTED",

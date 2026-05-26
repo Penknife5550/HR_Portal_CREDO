@@ -1,10 +1,10 @@
 /**
- * Zod-Validierungsschemas fuer die Einstellungsmodalitaeten (Vorgesetzter)
+ * Zod-Validierungsschemas für die Einstellungsmodalitaeten (Vorgesetzter)
  *
  * 5 Abschnitte basierend auf dem Einstellungsmodalitaeten-Formular:
  * 1. Stelle & Vertrag
  * 2. Arbeitszeit & Arbeitgeber
- * 3. Verguetung
+ * 3. Vergütung
  * 4. Zusaetzliche Angaben
  * 5. Zusammenfassung
  */
@@ -44,11 +44,11 @@ export const supStep2Schema = z.object({
 export type SupStep2Data = z.infer<typeof supStep2Schema>;
 
 // =============================================
-// Step 3: Verguetung
+// Step 3: Vergütung
 // =============================================
 export const supStep3Schema = z.object({
   verguetungsmodell: z.enum(["TV_L", "TV_L_S", "HAUSTARIF", "SONSTIGES"], {
-    required_error: "Bitte waehlen Sie ein Verguetungsmodell.",
+    required_error: "Bitte waehlen Sie ein Vergütungsmodell.",
   }),
   entgeltgruppe: z.string(),
   stufe: z.string(),
@@ -98,7 +98,7 @@ export const SUP_STEP_CONFIG = [
   },
   {
     number: 3,
-    title: "Verguetung",
+    title: "Vergütung",
     description: "Entgeltgruppe, Zulagen, Sonderzahlungen",
   },
   {

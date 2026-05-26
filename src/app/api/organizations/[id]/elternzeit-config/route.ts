@@ -1,5 +1,5 @@
 /**
- * API: Mandanten-Konfiguration fuer Elternzeit & Mutterschutz (Phase 2)
+ * API: Mandanten-Konfiguration für Elternzeit & Mutterschutz (Phase 2)
  *
  * GET   /api/organizations/[id]/elternzeit-config → Config laden
  * PATCH /api/organizations/[id]/elternzeit-config → Config speichern (SUPER_ADMIN, HR_LEITUNG)

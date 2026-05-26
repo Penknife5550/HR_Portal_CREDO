@@ -3,7 +3,7 @@
  *
  * GET  /api/fragebogen/:token  → Lade gespeicherte Fragebogen-Daten
  * PUT  /api/fragebogen/:token  → Speichere/Aktualisiere Step-Daten (Auto-Save)
- * POST /api/fragebogen/:token  → Fragebogen endgueltig absenden
+ * POST /api/fragebogen/:token  → Fragebogen endgültig absenden
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,10 +14,14 @@ import { sendEmail } from "@/lib/mailer";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
+import {
+  computeMissingRequiredDocuments,
+  documentTypeLabel,
+} from "@/lib/required-documents";
 import { z } from "zod";
 
 // =============================================
-// Serverseitige Validierung: Zod-Schema fuer alle erlaubten Felder
+// Serverseitige Validierung: Zod-Schema für alle erlaubten Felder
 // Alle Felder sind optional (.optional()), da Auto-Save nur Teilmengen sendet
 // =============================================
 const fragebogenFieldsSchema = z.object({
@@ -115,15 +119,18 @@ export async function GET(
     include: { children: { orderBy: { orderIndex: "asc" } } },
   });
 
-  // Feld-Konfiguration laden: Snapshot vom Onboarding-Zeitpunkt (oder aktuelles Template)
-  let stepsConfig = onboarding.formTemplateSnapshot;
-  if (!stepsConfig) {
-    const formTemplate = await prisma.formTemplate.findUnique({
-      where: { questionnaireType: onboarding.questionnaireType },
-      select: { stepsConfig: true },
-    });
-    stepsConfig = formTemplate?.stepsConfig ?? null;
-  }
+  // Feld-Konfiguration + Pflicht-Dokumente laden.
+  // stepsConfig: Snapshot vom Onboarding-Zeitpunkt (oder aktuelles Template).
+  // requiredDocuments: immer aus dem aktuellen Template (nicht im Snapshot).
+  const formTemplate = await prisma.formTemplate.findUnique({
+    where: { questionnaireType: onboarding.questionnaireType },
+    select: { stepsConfig: true, requiredDocuments: true },
+  });
+  const stepsConfig = onboarding.formTemplateSnapshot ?? formTemplate?.stepsConfig ?? null;
+  const requiredDocuments = formTemplate?.requiredDocuments ?? [
+    "GEBURTSURKUNDE_EIGEN",
+    "GEBURTSURKUNDE_KIND",
+  ];
 
   return NextResponse.json({
     onboardingId: onboarding.id,
@@ -132,10 +139,16 @@ export async function GET(
       name: onboarding.organization.name,
       mandantNumber: onboarding.organization.mandantNumber,
       type: onboarding.organization.type,
+      // DSGVO: verantwortliche Stelle (pro Mandant konfigurierbar, sonst Default)
+      dsgvoVerantwortlicheName: onboarding.organization.dsgvoVerantwortlicheName,
+      dsgvoVerantwortlicheStrasse: onboarding.organization.dsgvoVerantwortlicheStrasse,
+      dsgvoVerantwortlichePlz: onboarding.organization.dsgvoVerantwortlichePlz,
+      dsgvoVerantwortlicheOrt: onboarding.organization.dsgvoVerantwortlicheOrt,
     },
     questionnaireType: onboarding.questionnaireType,
     status: onboarding.status,
-    stepsConfig, // Feld-Konfiguration fuer den Fragebogen
+    stepsConfig, // Feld-Konfiguration für den Fragebogen
+    requiredDocuments, // Pflicht-Dokumente (pro Vorlage konfigurierbar)
     personalData: personalData
       ? {
           ...personalData,
@@ -287,7 +300,7 @@ export async function PUT(
 
   // Kinder separat behandeln (replace-Strategie)
   if (Array.isArray(children)) {
-    // Alte Kinder loeschen
+    // Alte Kinder löschen
     await prisma.child.deleteMany({
       where: { personalDataId: personalData.id },
     });
@@ -332,7 +345,7 @@ export async function PUT(
 }
 
 // =============================================
-// POST – Fragebogen endgueltig absenden
+// POST – Fragebogen endgültig absenden
 // =============================================
 export async function POST(
   request: NextRequest,
@@ -377,6 +390,48 @@ export async function POST(
     );
   }
 
+  // =============================================
+  // Pflicht-Dokumente erzwingen (pro Vorlage konfigurierbar)
+  // =============================================
+  const template = await prisma.formTemplate.findUnique({
+    where: { questionnaireType: onboarding.questionnaireType },
+    select: { requiredDocuments: true },
+  });
+  // Fallback auf Geburtsurkunden, falls (noch) keine Vorlage existiert.
+  const requiredDocs = template?.requiredDocuments ?? [
+    "GEBURTSURKUNDE_EIGEN",
+    "GEBURTSURKUNDE_KIND",
+  ];
+
+  if (requiredDocs.length > 0) {
+    const [uploaded, childCount] = await Promise.all([
+      prisma.document.findMany({
+        where: { onboardingId: onboarding.id },
+        select: { type: true },
+      }),
+      prisma.child.count({
+        where: { personalData: { onboardingId: onboarding.id } },
+      }),
+    ]);
+
+    const missing = computeMissingRequiredDocuments({
+      required: requiredDocs,
+      uploadedTypes: uploaded.map((d) => d.type),
+      hasChildren: childCount > 0,
+    });
+
+    if (missing.length > 0) {
+      const labels = missing.map((t) => documentTypeLabel(t)).join(", ");
+      return NextResponse.json(
+        {
+          error: `Bitte laden Sie folgende Pflichtdokumente hoch, bevor Sie absenden: ${labels}.`,
+          missingDocuments: missing,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   // PersonalData als vollstaendig markieren
   await prisma.personalData.update({
     where: { onboardingId: onboarding.id },
@@ -418,7 +473,7 @@ export async function POST(
 
   // Bestaetigungs-E-Mail direkt an den Mitarbeiter senden
   try {
-    // Personaldata fuer Vorname laden
+    // Personaldata für Vorname laden
     const personalData = await prisma.personalData.findUnique({
       where: { onboardingId: onboarding.id },
       select: { firstName: true, lastName: true },

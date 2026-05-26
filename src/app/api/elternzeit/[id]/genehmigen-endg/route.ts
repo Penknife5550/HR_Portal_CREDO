@@ -1,9 +1,9 @@
 /**
  * API: /api/elternzeit/[id]/genehmigen-endg
  *
- * POST – Endgueltige Genehmigung durch HR.
+ * POST – Endgültige Genehmigung durch HR.
  *        Voraussetzung: ANTRAG_ENDG_EINGEREICHT (= Mitarbeiter hat
- *        Geburtsurkunde + endgueltige Daten via Magic Link Token 2 abgesendet).
+ *        Geburtsurkunde + endgültige Daten via Magic Link Token 2 abgesendet).
  *        Setzt Status auf GENEHMIGT.
  */
 
@@ -61,7 +61,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Endgueltige Genehmigung nur moeglich, wenn der endgueltige Antrag eingereicht wurde",
+            "Endgültige Genehmigung nur moeglich, wenn der endgültige Antrag eingereicht wurde",
         },
         { status: 409 },
       );

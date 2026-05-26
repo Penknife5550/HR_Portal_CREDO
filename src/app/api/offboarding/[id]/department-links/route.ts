@@ -120,7 +120,7 @@ async function handleGenerateLinks(offboardingId: string, session: { userId: str
     departmentMap.set(item.assigneeDepartment, existing);
   }
 
-  // Alle DepartmentConfigs laden (fuer E-Mail-Lookup)
+  // Alle DepartmentConfigs laden (für E-Mail-Lookup)
   const departmentConfigs = await prisma.departmentConfig.findMany({
     where: { isActive: true },
   });
@@ -141,7 +141,7 @@ async function handleGenerateLinks(offboardingId: string, session: { userId: str
 
     if (!config) {
       console.warn(
-        `[Department-Links] Keine E-Mail-Konfiguration fuer Abteilung "${departmentKey}" gefunden, ueberspringe`
+        `[Department-Links] Keine E-Mail-Konfiguration für Abteilung "${departmentKey}" gefunden, ueberspringe`
       );
       continue;
     }
@@ -245,7 +245,7 @@ async function handleReminder(
 
   if (!link) {
     return NextResponse.json(
-      { error: "Kein Department-Link fuer diese Abteilung gefunden" },
+      { error: "Kein Department-Link für diese Abteilung gefunden" },
       { status: 404 }
     );
   }

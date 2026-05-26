@@ -1,9 +1,9 @@
 /**
- * API: Dokumenten-Upload fuer den Personalfragebogen
+ * API: Dokumenten-Upload für den Personalfragebogen
  *
  * POST /api/fragebogen/:token/documents – Dokument hochladen
  * GET  /api/fragebogen/:token/documents – Hochgeladene Dokumente auflisten
- * DELETE via query param ?documentId=... – Einzelnes Dokument loeschen
+ * DELETE via query param ?documentId=... – Einzelnes Dokument löschen
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -25,7 +25,7 @@ const ALLOWED_MIME_TYPES = [
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
-// Magic Bytes fuer Content-Type-Validierung (MIME-Type vom Client ist nicht vertrauenswuerdig)
+// Magic Bytes für Content-Type-Validierung (MIME-Type vom Client ist nicht vertrauenswuerdig)
 const MAGIC_BYTES: Record<string, number[][]> = {
   "application/pdf": [[0x25, 0x50, 0x44, 0x46]], // %PDF
   "image/jpeg": [[0xFF, 0xD8, 0xFF]],
@@ -230,7 +230,7 @@ export async function GET(
 }
 
 // =============================================
-// DELETE – Dokument loeschen
+// DELETE – Dokument löschen
 // =============================================
 export async function DELETE(
   request: NextRequest,
@@ -269,15 +269,15 @@ export async function DELETE(
     );
   }
 
-  // Datei vom Filesystem loeschen
+  // Datei vom Filesystem löschen
   try {
     const filePath = path.join(process.cwd(), document.filePath);
     await unlink(filePath);
   } catch {
-    // Datei existiert nicht mehr - trotzdem DB-Eintrag loeschen
+    // Datei existiert nicht mehr - trotzdem DB-Eintrag löschen
   }
 
-  // DB-Eintrag loeschen
+  // DB-Eintrag löschen
   await prisma.document.delete({ where: { id: documentId } });
 
   return NextResponse.json({ success: true });

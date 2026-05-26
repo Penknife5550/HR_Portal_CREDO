@@ -3,9 +3,9 @@
 /**
  * Step 9 (ehem. 9): Masernschutz
  * Fuer Gemeinschaftseinrichtungen (Schulen, Kitas) ab 01.03.2020 Pflicht
- * gemaess Masernschutzgesetz (IfSG §20 Abs. 8)
+ * gemäß Masernschutzgesetz (IfSG §20 Abs. 8)
  *
- * Wenn Nachweis vorhanden: Inline-Upload fuer Impfausweis/Attest
+ * Wenn Nachweis vorhanden: Inline-Upload für Impfausweis/Attest
  */
 
 import { useState, useRef } from "react";
@@ -98,7 +98,7 @@ export function Step9Masern({
           {isGemeinschaftseinrichtung ? (
             <>
               <strong>Wichtig:</strong> Als Mitarbeiter/in einer
-              Gemeinschaftseinrichtung ({organization.name}) sind Sie gemaess
+              Gemeinschaftseinrichtung ({organization.name}) sind Sie gemäß
               Masernschutzgesetz (IfSG §20 Abs. 8) verpflichtet, einen
               Masernschutz nachzuweisen, sofern Sie nach dem 31.12.1970 geboren
               wurden.
@@ -106,7 +106,7 @@ export function Step9Masern({
           ) : (
             <>
               Bitte geben Sie an, ob Sie nach 1970 geboren wurden und ob ein
-              Masernschutznachweis vorliegt. Diese Angabe ist fuer die
+              Masernschutznachweis vorliegt. Diese Angabe ist für die
               Personalakte relevant.
             </>
           )}
@@ -150,7 +150,7 @@ export function Step9Masern({
               </span>
               <p className="text-xs text-muted-foreground">
                 Ich kann einen der folgenden Nachweise erbringen: Impfausweis
-                mit 2 Masern-Impfungen, aerztliches Attest ueber Immunitaet,
+                mit 2 Masern-Impfungen, aerztliches Attest über Immunitaet,
                 oder eine Kontraindikation.
               </p>
             </div>
@@ -162,13 +162,13 @@ export function Step9Masern({
             </p>
             <ul className="mt-1 list-inside list-disc text-xs text-muted-foreground">
               <li>Impfausweis (2 Impfungen gegen Masern)</li>
-              <li>Aerztliches Zeugnis ueber ausreichenden Impfschutz</li>
-              <li>Aerztliches Zeugnis ueber Immunitaet</li>
-              <li>Aerztliches Zeugnis ueber medizinische Kontraindikation</li>
+              <li>Aerztliches Zeugnis über ausreichenden Impfschutz</li>
+              <li>Aerztliches Zeugnis über Immunitaet</li>
+              <li>Aerztliches Zeugnis über medizinische Kontraindikation</li>
             </ul>
           </div>
 
-          {/* Inline Upload fuer Masernschutz-Nachweis */}
+          {/* Inline Upload für Masernschutz-Nachweis */}
           {masernschutzProvided && token && (
             <div className="ml-7 rounded-lg border border-dashed border-border bg-muted/30 p-3 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-center justify-between gap-3">
@@ -223,7 +223,7 @@ export function Step9Masern({
           onClick={onBack}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
         >
-          Zurueck
+          Zurück
         </button>
         <button
           type="submit"

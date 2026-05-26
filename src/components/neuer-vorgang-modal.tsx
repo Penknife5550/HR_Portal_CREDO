@@ -170,7 +170,7 @@ export function NeuerVorgangModal({
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
-                  Fragebogen-Link (fuer den neuen Mitarbeiter):
+                  Fragebogen-Link (für den neuen Mitarbeiter):
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -184,7 +184,7 @@ export function NeuerVorgangModal({
                       try {
                         await navigator.clipboard.writeText(result.fragebogenLink);
                       } catch {
-                        // Fallback fuer Nicht-HTTPS-Kontexte
+                        // Fallback für Nicht-HTTPS-Kontexte
                         const textarea = document.createElement("textarea");
                         textarea.value = result.fragebogenLink;
                         textarea.style.position = "fixed";

@@ -4,7 +4,7 @@
  * PATCH - Aufgabe abhaken (via Magic Link)
  *
  * OEFFENTLICH - kein Auth erforderlich!
- * Zugang ausschliesslich ueber gueltigen Magic-Link-Token.
+ * Zugang ausschliesslich über gueltigen Magic-Link-Token.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -80,7 +80,7 @@ export async function PATCH(
       },
     });
 
-    // Offboarding-Daten fuer Webhook laden
+    // Offboarding-Daten für Webhook laden
     const offboarding = await prisma.offboardingProcess.findUnique({
       where: { id: link.offboardingId },
       include: { organization: true },

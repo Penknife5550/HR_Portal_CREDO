@@ -2,7 +2,7 @@
 
 /**
  * Step 8: Bildung & Beruf
- * Hoechster Schulabschluss und hoechste Berufsausbildung (Haufe HI13214732)
+ * Höchster Schulabschluss und hoechste Berufsausbildung (Haufe HI13214732)
  */
 
 import { useMemo } from "react";
@@ -47,13 +47,13 @@ export function Step8Education({ data, onNext, onBack, saving, fieldConfig }: St
       {/* Info-Box */}
       <div className="rounded-lg border border-[#009AC6]/20 bg-[#009AC6]/5 p-4">
         <p className="text-sm text-[#009AC6]">
-          Diese Angaben werden fuer die Meldung zur Sozialversicherung
+          Diese Angaben werden für die Meldung zur Sozialversicherung
           benötigt. Bitte geben Sie Ihren höchsten Schul- und
           Berufsausbildungsabschluss an.
         </p>
       </div>
 
-      {/* Hoechster Schulabschluss */}
+      {/* Höchster Schulabschluss */}
       {fc.isVisible("highestSchoolDegree") && (
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">
@@ -82,7 +82,7 @@ export function Step8Education({ data, onNext, onBack, saving, fieldConfig }: St
         </div>
       )}
 
-      {/* Hoechste Berufsausbildung */}
+      {/* Höchste Berufsausbildung */}
       {fc.isVisible("highestProfessionalDegree") && (
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">

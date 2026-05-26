@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Elternzeit-Antrag (vorlaeufig) — 5-Schritt-Formular
+ * Elternzeit-Antrag (vorläufig) — 5-Schritt-Formular
  *
- * Schritt 1: Persoenliche Daten / Adresse
+ * Schritt 1: Persönliche Daten / Adresse
  * Schritt 2: Kind & Betreuungsabsicht
  * Schritt 3: Elternzeit-Zeitraeume (1-3 Abschnitte)
  * Schritt 4: Teilzeit waehrend Elternzeit
@@ -44,7 +44,7 @@ interface FormState {
 }
 
 const STEP_LABELS = [
-  "Persoenliche Daten",
+  "Persönliche Daten",
   "Kind & Betreuung",
   "Elternzeit-Zeitraeume",
   "Teilzeit",
@@ -85,7 +85,7 @@ export function ElternzeitAntragForm({
     dsgvoEinwilligung: false,
   });
 
-  // Feriensperrfrist-Check (lokal, fuer Vorschau-Warnung)
+  // Feriensperrfrist-Check (lokal, für Vorschau-Warnung)
   const ferienWarnungen = useMemo(() => {
     const warnungen: { abschnittNr: number; bezeichnung: string; hinweis: string }[] =
       [];
@@ -248,9 +248,9 @@ export function ElternzeitAntragForm({
             </div>
             <h1 className="text-lg font-bold">Antrag eingereicht</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Vielen Dank! Ihr vorlaeufiger Elternzeit-Antrag wurde an die
+              Vielen Dank! Ihr vorläufiger Elternzeit-Antrag wurde an die
               Personalabteilung uebermittelt. Sie erhalten in Kuerze die
-              vorlaeufige Genehmigung.
+              vorläufige Genehmigung.
             </p>
           </div>
           <CredoLinie />
@@ -281,7 +281,7 @@ export function ElternzeitAntragForm({
               </div>
             </div>
             <h1 className="mt-4 text-xl font-bold">
-              Antrag auf Elternzeit (vorlaeufig)
+              Antrag auf Elternzeit (vorläufig)
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {initialData.employeeName} —{" "}
@@ -397,7 +397,7 @@ export function ElternzeitAntragForm({
             {/* Schritt 2 */}
             {step === 2 && (
               <div className="space-y-4">
-                <Field label="Erklaerung zur Betreuungsabsicht *">
+                <Field label="Erklärung zur Betreuungsabsicht *">
                   <textarea
                     value={form.betreuungsabsicht}
                     onChange={(e) =>
@@ -611,9 +611,9 @@ export function ElternzeitAntragForm({
                   />
                   <span className="text-muted-foreground">
                     Ich willige in die Verarbeitung meiner personenbezogenen
-                    Daten gemaess DSGVO durch die CREDO-Schultraegergruppe zur
+                    Daten gemäß DSGVO durch die CREDO-Schultraegergruppe zur
                     Bearbeitung meines Elternzeit-Antrags ein. Die Daten werden
-                    ausschliesslich fuer den genannten Zweck verwendet und nach
+                    ausschliesslich für den genannten Zweck verwendet und nach
                     Ablauf der gesetzlichen Aufbewahrungsfristen geloescht.
                   </span>
                 </label>
@@ -635,7 +635,7 @@ export function ElternzeitAntragForm({
               onClick={() => setStep(step - 1)}
               className="rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
-              Zurueck
+              Zurück
             </button>
             {step < 5 ? (
               <button

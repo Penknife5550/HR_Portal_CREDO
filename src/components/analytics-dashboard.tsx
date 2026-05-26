@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Analytics Dashboard – KPI-Sektion fuer Prozess-Dashboards
+ * Analytics Dashboard – KPI-Sektion für Prozess-Dashboards
  *
  * Zeigt KPI-Karten, Austrittsgründe, monatliche Trends,
  * Exit-Interview-Insights und Abteilungs-Performance.

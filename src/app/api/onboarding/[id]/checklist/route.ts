@@ -1,7 +1,7 @@
 /**
  * API: /api/onboarding/:id/checklist
  *
- * GET  – Alle ChecklistItems fuer diesen Onboarding-Vorgang (gruppiert nach category)
+ * GET  – Alle ChecklistItems für diesen Onboarding-Vorgang (gruppiert nach category)
  * POST – Neue Checklist-Items aus Template erstellen
  */
 
@@ -117,7 +117,7 @@ export async function POST(
       );
     }
 
-    // Template-Items als ChecklistItems fuer diesen Vorgang erstellen
+    // Template-Items als ChecklistItems für diesen Vorgang erstellen
     const createdItems = await Promise.all(
       template.items.map((templateItem) =>
         prisma.checklistItem.create({

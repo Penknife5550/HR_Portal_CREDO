@@ -196,7 +196,7 @@ export function NeueVerbeamtungModal({ open, onClose, onCreated }: NeueVerbeamtu
               {/* Magic Link Vorschau */}
               {(slEmail || email) && (
                 <div className="rounded-lg border border-border p-4 space-y-2">
-                  <p className="text-sm font-medium text-foreground">Magic Links werden vorbereitet fuer:</p>
+                  <p className="text-sm font-medium text-foreground">Magic Links werden vorbereitet für:</p>
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[10px] font-bold text-green-700">LK</span>
@@ -374,12 +374,12 @@ export function NeueVerbeamtungModal({ open, onClose, onCreated }: NeueVerbeamtu
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                    <span className="font-medium">{firstName} {lastName}</span> erhaelt Antragsformular (12 Voraussetzungen)
+                    <span className="font-medium">{firstName} {lastName}</span> erhält Antragsformular (12 Voraussetzungen)
                   </div>
                   {slEmail ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                      <span className="font-medium">{slName || "Schulleitung"}</span> erhaelt Beurteilungs- und Referenz-Links
+                      <span className="font-medium">{slName || "Schulleitung"}</span> erhält Beurteilungs- und Referenz-Links
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-xs text-orange-500">
@@ -393,7 +393,7 @@ export function NeueVerbeamtungModal({ open, onClose, onCreated }: NeueVerbeamtu
               <div className="flex justify-between gap-3 pt-2">
                 <button type="button" onClick={handleBack}
                   className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">
-                  Zurueck
+                  Zurück
                 </button>
                 <div className="flex gap-3">
                   <button type="button" onClick={handleClose}

@@ -5,7 +5,7 @@
  * PUT - Bewertungen speichern (Zwischenspeichern moeglich)
  *
  * OEFFENTLICH - kein Auth erforderlich!
- * Zugang ausschliesslich ueber gueltigen Magic-Link-Token.
+ * Zugang ausschliesslich über gueltigen Magic-Link-Token.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,7 +13,7 @@ import { prisma } from "@/lib/db";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { saveZeugnisRatingsSchema } from "@/lib/validations/zeugnis";
 
-// Typ fuer den Template-Snapshot
+// Typ für den Template-Snapshot
 interface SnapshotCriterion {
   id: string;
   weight: number;

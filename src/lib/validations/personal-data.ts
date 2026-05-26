@@ -1,8 +1,8 @@
 /**
- * Zod-Validierungsschemas fuer den Personalfragebogen
+ * Zod-Validierungsschemas für den Personalfragebogen
  *
  * 10 Steps, angelehnt an Haufe HI13214732:
- * 1. Persoenliche Angaben
+ * 1. Persönliche Angaben
  * 2. Adresse & Kontakt
  * 3. Bankverbindung
  * 4. Sozialversicherung
@@ -40,7 +40,7 @@ function reqEnum<T extends [string, ...string[]]>(
 }
 
 // =============================================
-// Step 1: Persoenliche Angaben
+// Step 1: Persönliche Angaben
 // =============================================
 export const step1Schema = z.object({
   salutation: z.enum(["Herr", "Frau"], {
@@ -139,7 +139,7 @@ export const step5Schema = z.object({
   childAllowance: z.number().min(0).nullable(),
   religion: z.enum(
     ["ev", "rk", "ak", "lt", "rf", "fr", "fg", "keine", "sonstige"],
-    { required_error: "Bitte waehlen Sie die Religionszugehoerigkeit." }
+    { required_error: "Bitte waehlen Sie die Religionszugehörigkeit." }
   ),
 });
 
@@ -303,7 +303,7 @@ export function createStep5Schema(fc: FieldConfigHelper) {
     religion: reqEnum(
       fc, "religion",
       ["ev", "rk", "ak", "lt", "rf", "fr", "fg", "keine", "sonstige"],
-      "Bitte waehlen Sie die Religionszugehoerigkeit."
+      "Bitte waehlen Sie die Religionszugehörigkeit."
     ),
   });
 }
@@ -343,7 +343,7 @@ export function createStep8Schema(fc: FieldConfigHelper) {
 export const STEP_CONFIG = [
   {
     number: 1,
-    title: "Persoenliche Angaben",
+    title: "Persönliche Angaben",
     description: "Name, Geburtsdatum, Familienstand",
     icon: "user",
   },
@@ -386,7 +386,7 @@ export const STEP_CONFIG = [
   {
     number: 8,
     title: "Masernschutz",
-    description: "Impfnachweis fuer Gemeinschaftseinrichtungen",
+    description: "Impfnachweis für Gemeinschaftseinrichtungen",
     icon: "heart",
   },
   {

@@ -2,7 +2,7 @@
 
 /**
  * HR-Login-Seite
- * E-Mail + Passwort Authentifizierung fuer das HR-Team
+ * E-Mail + Passwort Authentifizierung für das HR-Team
  */
 
 import { useState } from "react";

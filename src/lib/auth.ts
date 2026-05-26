@@ -3,7 +3,7 @@
  *
  * Zwei Auth-Mechanismen:
  * 1. HR-Login: E-Mail + Passwort → JWT Session Cookie
- * 2. Magic-Link: Unique Token per E-Mail (fuer neue MA + Vorgesetzte)
+ * 2. Magic-Link: Unique Token per E-Mail (für neue MA + Vorgesetzte)
  */
 
 import jwt from "jsonwebtoken";
@@ -84,7 +84,7 @@ export function verifySessionToken(token: string): SessionPayload | null {
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
-  // 1. API-Key-Auth fuer n8n Service-Calls (X-API-Key Header)
+  // 1. API-Key-Auth für n8n Service-Calls (X-API-Key Header)
   const configuredKey = process.env.N8N_API_KEY;
   if (configuredKey) {
     const headerStore = await headers();

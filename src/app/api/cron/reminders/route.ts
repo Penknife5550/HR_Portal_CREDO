@@ -4,7 +4,7 @@
  * POST – Erinnerungs-E-Mails an ueberfaellige Vorgaenge senden
  *
  * Wird taeglich von n8n per Cron-Workflow aufgerufen.
- * Sicherheit: Authentifizierung ueber CRON_SECRET Bearer-Token.
+ * Sicherheit: Authentifizierung über CRON_SECRET Bearer-Token.
  *
  * Logik:
  * - Mitarbeiter-Erinnerung: Status INVITED/IN_PROGRESS, >7 Tage offen

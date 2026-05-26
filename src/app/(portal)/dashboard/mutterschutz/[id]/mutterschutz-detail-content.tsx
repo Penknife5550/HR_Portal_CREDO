@@ -133,7 +133,7 @@ export function MutterschutzDetailContent({
         setActionError(j.error || "Upload fehlgeschlagen.");
         return;
       }
-      load();
+      load(true);
     } finally {
       setUploading(false);
     }
@@ -150,17 +150,19 @@ export function MutterschutzDetailContent({
       setActionError(j.error || "Dokument konnte nicht geloescht werden.");
       return;
     }
-    load();
+    load(true);
   }
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    // silent=true: Hintergrund-Refresh nach Aktionen — KEIN loading-State,
+    // damit die Detailansicht nicht unmountet und die Scroll-Position erhalten bleibt.
+    if (!silent) setLoading(true);
     const res = await fetch(`/api/mutterschutz/${prozessId}`);
     if (res.ok) {
       const j = await res.json();
       setData(j.data);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [prozessId]);
 
   useEffect(() => {
@@ -169,20 +171,38 @@ export function MutterschutzDetailContent({
 
   async function toggleItem(item: ChecklistItem) {
     setActionError(null);
+    const wirdErledigt = !item.erledigtAm;
+    // Optimistisches Update: Checkbox reagiert sofort, ohne Unmount/Scroll-Sprung
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            checklistItems: prev.checklistItems.map((ci) =>
+              ci.id === item.id
+                ? {
+                    ...ci,
+                    erledigtAm: wirdErledigt ? new Date().toISOString() : null,
+                  }
+                : ci,
+            ),
+          }
+        : prev,
+    );
     const res = await fetch(
       `/api/mutterschutz/${prozessId}/checkliste/${item.id}`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ erledigt: !item.erledigtAm }),
+        body: JSON.stringify({ erledigt: wirdErledigt }),
       },
     );
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       setActionError(j.error || "Item konnte nicht aktualisiert werden.");
+      load(true); // Rollback auf den tatsaechlichen Serverstand
       return;
     }
-    load();
+    load(true); // stiller Refresh (fuellt erledigtVon etc.)
   }
 
   async function statusTransition(
@@ -197,7 +217,7 @@ export function MutterschutzDetailContent({
       setActionError(j.error || `Fehler bei Aktion '${aktion}'.`);
       return;
     }
-    load();
+    load(true);
   }
 
   async function notizSpeichern() {
@@ -214,7 +234,7 @@ export function MutterschutzDetailContent({
       return;
     }
     setNeueNotiz("");
-    load();
+    load(true);
   }
 
   if (loading || !data) {
@@ -237,7 +257,7 @@ export function MutterschutzDetailContent({
             href="/dashboard?tab=mutterschutz"
             className="text-xs text-muted-foreground hover:text-foreground"
           >
-            ← Zurueck zum Dashboard
+            ← Zurück zum Dashboard
           </Link>
           <div className="mt-2 flex items-center gap-3">
             <h1 className="text-xl font-bold">
@@ -559,7 +579,7 @@ export function MutterschutzDetailContent({
                             onClick={() => setConfirmDelete(d)}
                             className="text-xs text-destructive hover:underline"
                           >
-                            Loeschen
+                            Löschen
                           </button>
                         </td>
                       </tr>
@@ -603,8 +623,8 @@ export function MutterschutzDetailContent({
       </div>
       {confirmDelete && (
         <ConfirmDeleteModal
-          titel="Dokument loeschen?"
-          beschreibung={`'${confirmDelete.dateiname}' wird endgueltig entfernt.`}
+          titel="Dokument löschen?"
+          beschreibung={`'${confirmDelete.dateiname}' wird endgültig entfernt.`}
           onClose={() => setConfirmDelete(null)}
           onConfirm={async () => {
             const docId = confirmDelete.id;

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Elternzeit-Antrag (endgueltig) — 3-Schritt-Formular (Phase 2)
+ * Elternzeit-Antrag (endgültig) — 3-Schritt-Formular (Phase 2)
  *
  * Schritt 1: Kind-Daten (Name, Geburtsdatum, Geschlecht, Fruehgeburt, Mehrlinge)
  * Schritt 2: Geburtsurkunde-Upload (PDF/JPG/PNG, max 10 MB)
@@ -163,7 +163,7 @@ export function ElternzeitAntragEndgForm({
               Antrag erfolgreich abgesendet
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Vielen Dank! Wir haben Ihren endgueltigen Elternzeit-Antrag und
+              Vielen Dank! Wir haben Ihren endgültigen Elternzeit-Antrag und
               die Geburtsurkunde erhalten. Sie erhalten in Kuerze eine
               Bestaetigung der Personalabteilung.
             </p>
@@ -198,7 +198,7 @@ export function ElternzeitAntragEndgForm({
       <main className="mx-auto max-w-3xl px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">
-            Endgueltiger Elternzeit-Antrag
+            Endgültiger Elternzeit-Antrag
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {initialData.employeeName} · {initialData.organizationName}
@@ -249,7 +249,7 @@ export function ElternzeitAntragEndgForm({
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Angaben zum Kind</h2>
               <p className="text-sm text-muted-foreground">
-                Bitte geben Sie die endgueltigen Daten Ihres Kindes ein.
+                Bitte geben Sie die endgültigen Daten Ihres Kindes ein.
                 Falls die Personalabteilung bereits Daten hinterlegt hat,
                 koennen Sie diese hier korrigieren.
               </p>
@@ -434,7 +434,7 @@ export function ElternzeitAntragEndgForm({
                 />
                 <span>
                   Ich willige in die Verarbeitung meiner personenbezogenen
-                  Daten gemaess DSGVO zur Bearbeitung des Elternzeit-Antrags ein.
+                  Daten gemäß DSGVO zur Bearbeitung des Elternzeit-Antrags ein.
                 </span>
               </label>
             </div>
@@ -448,7 +448,7 @@ export function ElternzeitAntragEndgForm({
             disabled={step === 1}
             className="rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
-            Zurueck
+            Zurück
           </button>
           {step < 3 ? (
             <button

@@ -1,9 +1,9 @@
 /**
  * Public Verify-/Audit-Page (Phase 6).
  *
- * SSR, kein Login, keine Indizierung. Wird ueber einen kryptografisch starken
+ * SSR, kein Login, keine Indizierung. Wird über einen kryptografisch starken
  * `verifyToken` (UUID) erreicht und zeigt eine Read-Only-Sicht auf die
- * dienstliche Beurteilung — fuer Bezirksregierung und unabhaengige Auditoren.
+ * dienstliche Beurteilung — für Bezirksregierung und unabhaengige Auditoren.
  *
  * Liefert KEINE sensitiven Felder (IBAN, SV-Nr, Steuer-ID).
  */

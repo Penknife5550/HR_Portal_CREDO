@@ -1,7 +1,7 @@
 /**
  * In-Memory Rate Limiter
  *
- * Einfaches Token-Bucket-basiertes Rate Limiting fuer API-Routen.
+ * Einfaches Token-Bucket-basiertes Rate Limiting für API-Routen.
  * Fuer Produktion mit mehreren Instanzen sollte Redis verwendet werden.
  *
  * Schuetzt vor:
@@ -50,7 +50,7 @@ export function createRateLimiter(name: string, config: RateLimiterConfig) {
 
   return {
     /**
-     * Prueft ob ein Request fuer den gegebenen Key erlaubt ist.
+     * Prueft ob ein Request für den gegebenen Key erlaubt ist.
      *
      * @param key - Identifikator (z.B. IP-Adresse, E-Mail)
      * @returns { allowed: boolean, remaining: number, retryAfterMs?: number }

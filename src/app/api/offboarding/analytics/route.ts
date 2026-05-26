@@ -1,7 +1,7 @@
 /**
  * API: /api/offboarding/analytics
  *
- * GET – Umfassende Analytics fuer Offboarding-Prozesse
+ * GET – Umfassende Analytics für Offboarding-Prozesse
  *
  * Auth: Session-Cookie (alle HR-Rollen) ODER X-API-Key (n8n/Power BI)
  * Query-Parameter: from, to, organizationId
@@ -36,7 +36,7 @@ function getLast12Months(): string[] {
   return months;
 }
 
-// Typ fuer die templateSnapshot-Struktur im ExitInterview
+// Typ für die templateSnapshot-Struktur im ExitInterview
 interface SnapshotCategory {
   id: string;
   name: string;

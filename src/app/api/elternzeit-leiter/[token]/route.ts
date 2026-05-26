@@ -37,7 +37,7 @@ export async function GET(
 
     if (!ez) {
       return NextResponse.json(
-        { error: "Token ungueltig oder abgelaufen" },
+        { error: "Token ungültig oder abgelaufen" },
         { status: 404 },
       );
     }
@@ -87,7 +87,7 @@ export async function POST(
       where: { leiterTokenEndg: tokenHash },
     });
     if (!ez) {
-      return NextResponse.json({ error: "Token ungueltig" }, { status: 404 });
+      return NextResponse.json({ error: "Token ungültig" }, { status: 404 });
     }
     if (ez.leiterTokenEndgExpiry && new Date() > ez.leiterTokenEndgExpiry) {
       return NextResponse.json({ error: "Token abgelaufen" }, { status: 403 });
