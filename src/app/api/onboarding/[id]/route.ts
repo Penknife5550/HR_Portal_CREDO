@@ -80,8 +80,11 @@ export async function GET(
       return NextResponse.json({ error: "Keine Berechtigung für diesen Vorgang" }, { status: 403 });
     }
 
-    // Tokens aus der Antwort entfernen (Sicherheit: Magic-Links nicht exponieren)
-    const { token: _t, supervisorToken: _st, ...safeOnboarding } = onboarding;
+    // Tokens BLEIBEN enthalten: Diese Detail-Ansicht ist auth- + org-geschuetzt
+    // (canAccessProcess) und HR benoetigt die Tokens, um die teilbaren Magic-Links
+    // (Fragebogen-/Modalitaeten-Link) anzuzeigen und zu versenden. Ohne sie wuerde
+    // die UI ".../fragebogen/undefined" bauen.
+    const safeOnboarding = { ...onboarding };
 
     // Sensible Felder entschluesseln (IBAN, SV-Nummer, Steuer-ID)
     if (safeOnboarding.personalData) {

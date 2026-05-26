@@ -175,7 +175,7 @@ export function DashboardContent({ user }: { user: User }) {
 
   const SortIcon = ({ field }: { field: string }) => {
     if (sortBy !== field) return <span className="ml-1 text-muted-foreground/40">&#8597;</span>;
-    return <span className="ml-1">{sortOrder === "asc" ? "&#9650;" : "&#9660;"}</span>;
+    return <span className="ml-1">{sortOrder === "asc" ? "▲" : "▼"}</span>;
   };
 
   return (
@@ -226,16 +226,9 @@ export function DashboardContent({ user }: { user: User }) {
           ].map((stat) => (
             <button
               key={stat.label}
-              onClick={() => handleStatusFilter(stat.filter === "OPEN" ? "" : stat.filter)}
+              onClick={() => handleStatusFilter(stat.filter)}
               className={`rounded-lg ${stat.color} border p-4 text-left transition-shadow hover:shadow-md ${
-                statusFilter === stat.filter || (stat.filter === "OPEN" && statusFilter === "" && stat.label === "Offen")
-                  ? ""
-                  : ""
-              } ${
-                (stat.filter === "" && statusFilter === "" && stat.label === "Gesamt") ||
-                (stat.filter !== "" && stat.filter !== "OPEN" && statusFilter === stat.filter)
-                  ? "ring-2 ring-primary"
-                  : ""
+                statusFilter === stat.filter ? "ring-2 ring-primary" : ""
               }`}
             >
               <p className="text-2xl font-bold text-foreground">{stat.value}</p>

@@ -250,7 +250,14 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = {
       ...(await orgFilter(session)),
     };
-    if (status) where.status = status;
+    // "OPEN" ist kein echter Status, sondern die Gruppe der offenen Vorgaenge.
+    if (status === "OPEN") {
+      where.status = {
+        in: ["INVITED", "IN_PROGRESS", "SUBMITTED", "SUPERVISOR_PENDING", "SUPERVISOR_SUBMITTED"],
+      };
+    } else if (status) {
+      where.status = status;
+    }
     if (organizationId) where.organizationId = organizationId;
     if (search) {
       where.OR = [
