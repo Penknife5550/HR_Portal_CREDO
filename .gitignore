@@ -68,3 +68,6 @@ backups/*.dump
 
 # n8n Workflows (interner Stand, nie ins Repo)
 /n8n/
+
+# Lokale Arbeits-/Materialordner (nie ins Repo)
+/BEM/
