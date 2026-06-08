@@ -68,7 +68,7 @@ korrigieren, `sudo docker compose up -d` erneut.
 
 ```bash
 # DB-Schema enthaelt die BEM-Tabellen?
-sudo docker exec hr-portal-db psql -U hrportal -d hrportal -c "\dt bem_*"
+sudo docker exec hr-portal-db psql -U hrportal -d hr_portal -c "\dt bem_*"
 # erwartet: bem_faelle, bem_zugriffe, bem_gespraeche, bem_massnahmen,
 #           bem_einwilligungen, bem_dokumente, bem_fristen, bem_kommunikation
 
@@ -111,7 +111,7 @@ Test ggf. einen Nutzer als BEM-Beauftragte:n markieren.
 
 ### Verschluesselung stichprobenartig pruefen (Notiz liegt NICHT im Klartext)
 ```bash
-sudo docker exec hr-portal-db psql -U hrportal -d hrportal \
+sudo docker exec hr-portal-db psql -U hrportal -d hr_portal \
   -c "SELECT left(notizen,40) FROM bem_gespraeche ORDER BY \"createdAt\" DESC LIMIT 1;"
 # erwartet: ein Wert im Format iv:authTag:ciphertext (Base64), KEIN Klartext
 ```
