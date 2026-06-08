@@ -20,6 +20,7 @@ import {
 } from "@/lib/bem-workflow";
 import { type SessionPayload, canAccessBemContent } from "@/lib/permissions";
 import { BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
+import { syncBemFristen } from "@/lib/bem-fristen";
 
 export type BemTransitionResult =
   | { ok: true; data: { status: BemStatus } }
@@ -34,6 +35,20 @@ interface BemTransitionInput {
 }
 
 /** Berechnet Zusatzfelder, die mit dem Statuswechsel gesetzt werden. */
+/**
+ * Addiert Jahre datumssicher. setFullYear auf dem 29.02. wuerde sonst in
+ * Nicht-Schaltjahren auf den 01.03. rutschen — wir klemmen auf den letzten
+ * gueltigen Tag des Zielmonats (28.02.), damit die Aufbewahrungsfrist exakt
+ * stimmt (relevant fuer die automatische Loeschung).
+ */
+function addYearsSafe(date: Date, years: number): Date {
+  const d = new Date(date);
+  const tag = d.getDate();
+  d.setFullYear(d.getFullYear() + years);
+  if (d.getDate() !== tag) d.setDate(0); // auf letzten Tag des Vormonats zurueck
+  return d;
+}
+
 function buildExtraData(
   zielStatus: BemStatus,
   beendigungsgrund: string | null | undefined,
@@ -49,12 +64,10 @@ function buildExtraData(
       return { erstgespraechAm: now };
     case "ABGESCHLOSSEN":
     case "ABGEBROCHEN": {
-      const aufbewahrungBis = new Date(now);
-      aufbewahrungBis.setFullYear(aufbewahrungBis.getFullYear() + aufbewahrungJahre);
       return {
         beendetAm: now,
         beendigungsgrund: beendigungsgrund ?? null,
-        aufbewahrungBis,
+        aufbewahrungBis: addYearsSafe(now, aufbewahrungJahre),
       };
     }
     case "GELOESCHT":
@@ -137,6 +150,10 @@ export async function bemTransition(
     });
 
     if (!result.ok) return result;
+
+    // Fristen an den neuen Status anpassen (z.B. Erstgespraech-/Aufbewahrungsfrist).
+    await syncBemFristen(input.bemFallId);
+
     return { ok: true, data: { status: input.zielStatus } };
   } catch (error) {
     console.error(

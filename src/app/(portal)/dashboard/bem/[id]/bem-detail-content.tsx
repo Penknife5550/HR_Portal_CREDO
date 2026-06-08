@@ -109,6 +109,14 @@ interface Vorlage {
   platzhalter: string[];
 }
 
+interface Frist {
+  id: string;
+  typ: string;
+  bezeichnung: string;
+  beschreibung: string | null;
+  faelligAm: string;
+}
+
 interface BemFall {
   id: string;
   displayId: string;
@@ -132,6 +140,7 @@ interface BemFall {
   massnahmen: Massnahme[];
   einwilligungen: Einwilligung[];
   dokumente: Dokument[];
+  fristen: Frist[];
   kommunikation: Kommunikation[];
   auditLogs: AuditEntry[];
   _count: {
@@ -171,7 +180,27 @@ const ACTION_LABELS: Record<string, string> = {
   BEM_MASSNAHME_ERFASST: "Massnahme erfasst",
   BEM_MASSNAHME_AKTUALISIERT: "Massnahme aktualisiert",
   BEM_MASSNAHME_GELOESCHT: "Massnahme geloescht",
+  BEM_EINWILLIGUNG_ERTEILT: "Einwilligung erteilt",
+  BEM_EINWILLIGUNG_ABGELEHNT: "Einwilligung abgelehnt",
+  BEM_EINWILLIGUNG_WIDERRUFEN: "Einwilligung widerrufen",
+  BEM_EXPORT_ERSTELLT: "Gesamtexport erstellt",
+  BEM_FRIST_ERINNERUNG: "Frist-Erinnerung versendet",
+  BEM_GELOESCHT: "Akte geloescht (Aufbewahrung abgelaufen)",
 };
+
+// Severity einer Frist anhand verbleibender Tage (gespiegelt zu bem-fristen.ts).
+function fristSeverity(faelligAm: string): {
+  label: string;
+  cls: string;
+} {
+  const tage = Math.floor(
+    (new Date(faelligAm).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+  );
+  if (tage < 0) return { label: "Ueberfaellig", cls: "text-credo-rot" };
+  if (tage <= 7) return { label: "Dringend", cls: "text-credo-rot" };
+  if (tage <= 14) return { label: "Bald faellig", cls: "text-amber-600" };
+  return { label: "Im Plan", cls: "text-muted-foreground" };
+}
 
 const ROLLE_LABELS: Record<string, string> = {
   BEAUFTRAGTE: "BEM-Beauftragte:r",
@@ -658,6 +687,49 @@ export function BemDetailContent({
 
         {tab === "uebersicht" && (
           <div className="grid gap-6 md:grid-cols-2">
+            {/* Offene Fristen (volle Breite) */}
+            {fall.fristen.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-5 md:col-span-2">
+                <h2 className="mb-3 text-sm font-semibold text-foreground">
+                  Offene Fristen ({fall.fristen.length})
+                </h2>
+                <ul className="space-y-2 text-sm">
+                  {fall.fristen.map((f) => {
+                    const sev = fristSeverity(f.faelligAm);
+                    return (
+                      <li
+                        key={f.id}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
+                      >
+                        <div>
+                          <div className="font-medium text-foreground">
+                            {f.bezeichnung}
+                          </div>
+                          {f.beschreibung && (
+                            <div className="text-xs text-muted-foreground">
+                              {f.beschreibung}
+                            </div>
+                          )}
+                        </div>
+                        <div className="whitespace-nowrap text-right">
+                          <div className="text-xs text-muted-foreground">
+                            faellig {formatDate(f.faelligAm)}
+                          </div>
+                          <div className={`text-xs font-semibold ${sev.cls}`}>
+                            {sev.label}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Fristen werden automatisch berechnet; bei Eskalation erhalten die
+                  freigegebenen Beauftragten eine Erinnerung per E-Mail.
+                </p>
+              </div>
+            )}
+
             {/* Stammdaten */}
             <div className="rounded-xl border border-border bg-card p-5">
               <h2 className="mb-3 text-sm font-semibold text-foreground">

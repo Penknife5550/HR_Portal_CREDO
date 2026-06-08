@@ -13,6 +13,7 @@ import { getSession } from "@/lib/auth";
 import { canAccessBemContent } from "@/lib/permissions";
 import { validateUpload, saveUploadedFile, sanitizeFilename } from "@/lib/file-upload";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
+import { syncBemFristen } from "@/lib/bem-fristen";
 
 function clientIp(req: NextRequest): string | null {
   return (
@@ -110,6 +111,9 @@ export async function POST(
       },
       ipAddress,
     });
+
+    // Fristen anpassen (Erstgespraech-Frist nach erteilter Einwilligung).
+    await syncBemFristen(id);
 
     return NextResponse.json({ data: { ok: true, ...result } }, { status: 201 });
   } catch (error) {

@@ -21,6 +21,7 @@ import {
 import { createBemSchema } from "@/lib/validations/bem";
 import { generateBemDisplayId } from "@/lib/bem-helpers";
 import { BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
+import { syncBemFristen } from "@/lib/bem-fristen";
 
 function clientIp(req: NextRequest): string | null {
   return (
@@ -202,6 +203,9 @@ export async function POST(request: NextRequest) {
 
       return fall;
     });
+
+    // Initiale Fristen (z.B. "Einladung versenden") anlegen.
+    await syncBemFristen(created.id);
 
     return NextResponse.json(
       { id: created.id, displayId: created.displayId },

@@ -76,6 +76,10 @@ const ACTION_LABELS: Record<string, string> = {
   BEM_MASSNAHME_GELOESCHT: "Massnahme geloescht",
   BEM_DOKUMENT_GENERIERT: "Dokument generiert",
   BEM_EXPORT_ERSTELLT: "Gesamtexport erstellt",
+  BEM_ZUGRIFF_GEWAEHRT: "Freigabe erteilt",
+  BEM_ZUGRIFF_ENTZOGEN: "Freigabe entzogen",
+  BEM_FRIST_ERINNERUNG: "Frist-Erinnerung versendet",
+  BEM_GELOESCHT: "Akte geloescht (Aufbewahrung abgelaufen)",
 };
 
 interface TeilnehmerJson {

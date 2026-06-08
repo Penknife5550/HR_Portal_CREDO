@@ -123,6 +123,32 @@ Platzhalter im Word-Dokument z.B. `{name}`, `{mandant}`, `{datum}`, `{fall_numme
 
 ---
 
+## 3a. Automatische BEM-Crons in n8n einplanen (E6)
+
+Zwei neue BEM-Crons müssen — wie die bestehenden Crons — **täglich von n8n** per
+HTTP aufgerufen werden (es gibt keinen Scheduler im Container). Auth: `Authorization: Bearer <CRON_SECRET>` (derselbe `CRON_SECRET` wie für die übrigen Crons).
+
+| Endpoint | Methode | Zweck | Empfehlung |
+|---|---|---|---|
+| `/api/cron/bem-fristen` | POST | Fristen prüfen + Erinnerungs-Mails bei Eskalation | täglich, z.B. 07:00 |
+| `/api/cron/bem-aufbewahrung` | POST | abgelaufene Akten löschen (Crypto-Shredding) | täglich, z.B. 03:00 |
+
+n8n-Workflow je Cron: **Schedule Trigger (täglich)** → **HTTP Request**:
+```
+POST https://hr.fes-credo.de/api/cron/bem-fristen
+Header: Authorization: Bearer <CRON_SECRET>
+```
+Test von Hand (sollte JSON mit Zählern liefern, nicht 401):
+```bash
+curl -s -X POST https://hr.fes-credo.de/api/cron/bem-fristen \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+> Ohne n8n-Schedule laufen die Crons **nicht** automatisch — Fristen-Erinnerungen
+> und die Aufbewahrungs-Löschung bleiben dann aus. Die Erinnerungs-Mails nutzen
+> denselben SMTP-Weg wie die Einladung (müssen also bei funktionierendem SMTP).
+
+---
+
 ## 4. Rollback
 
 ```bash

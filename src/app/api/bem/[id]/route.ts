@@ -80,6 +80,18 @@ export async function GET(
           },
           orderBy: { createdAt: "desc" },
         },
+        // Offene Fristen (fuer das Fristen-/Naechster-Schritt-Panel).
+        fristen: {
+          where: { erledigtAm: null },
+          select: {
+            id: true,
+            typ: true,
+            bezeichnung: true,
+            beschreibung: true,
+            faelligAm: true,
+          },
+          orderBy: { faelligAm: "asc" },
+        },
         kommunikation: {
           orderBy: { gesendetAm: "desc" },
           include: {

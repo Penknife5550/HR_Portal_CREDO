@@ -7,7 +7,7 @@
  */
 
 import path from "path";
-import { mkdir, writeFile, readFile } from "fs/promises";
+import { mkdir, writeFile, readFile, unlink } from "fs/promises";
 import { randomUUID } from "crypto";
 
 export const ALLOWED_UPLOAD_MIME = [
@@ -102,6 +102,25 @@ export async function readUploadedFile(absPath: string): Promise<Buffer> {
     throw new Error("Pfad ausserhalb des erlaubten Bereichs");
   }
   return readFile(resolved);
+}
+
+/**
+ * Loescht eine gespeicherte Datei (best-effort) — nur innerhalb des uploads-
+ * Verzeichnisses. Gibt true zurueck, wenn geloescht; false bei ungueltigem Pfad
+ * oder Fehler (wirft nicht). Fuer das BEM-Aufbewahrungs-/Loesch-Cron.
+ */
+export async function deleteUploadedFile(absPath: string): Promise<boolean> {
+  try {
+    const uploadsRoot = path.resolve(path.join(process.cwd(), "uploads"));
+    const resolved = path.resolve(absPath);
+    if (resolved !== uploadsRoot && !resolved.startsWith(uploadsRoot + path.sep)) {
+      return false;
+    }
+    await unlink(resolved);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

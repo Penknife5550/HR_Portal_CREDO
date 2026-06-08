@@ -17,6 +17,7 @@ import { hashToken } from "@/lib/token-hash";
 import { sendEmailDetailed } from "@/lib/mailer";
 import { renderCredoEmail, paragraphsToHtml } from "@/lib/email-layout";
 import { logBemAudit, logBemKommunikation, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
+import { syncBemFristen } from "@/lib/bem-fristen";
 import { einladungSchema } from "@/lib/validations/bem";
 
 function clientIp(req: NextRequest): string | null {
@@ -197,6 +198,9 @@ export async function POST(
       where: { id, status: "ANGELEGT" },
       data: { status: "EINLADUNG_VERSENDET", einladungAm: now },
     });
+
+    // Fristen anpassen (Einwilligungs-Frist statt Einladungs-Frist).
+    await syncBemFristen(id);
 
     // magicUrl (Klartext-Token) wird NICHT zurueckgegeben — er ist bereits per
     // Mail zugestellt. Nur im SMTP-Fehlerfall (oben) wird er fuer die manuelle

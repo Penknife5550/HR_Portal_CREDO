@@ -15,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { hashToken } from "@/lib/token-hash";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
+import { syncBemFristen } from "@/lib/bem-fristen";
 import { einwilligungPublicSchema } from "@/lib/validations/bem";
 
 const ART_LABELS: Record<string, string> = {
@@ -177,6 +178,9 @@ export async function POST(
         },
       });
     });
+
+    // Fristen anpassen (Erstgespraech-Frist nach erteilter Einwilligung).
+    await syncBemFristen(e.bemFall.id);
 
     return NextResponse.json({
       data: { status: neuerStatus },
