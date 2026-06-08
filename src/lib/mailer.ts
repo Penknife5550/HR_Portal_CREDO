@@ -29,6 +29,15 @@ interface MailOptions {
   attachments?: MailAttachment[];
 }
 
+/**
+ * Ergebnis eines erfolgreichen Versands — dient als Zustellnachweis
+ * (z.B. fuer das BEM-Kommunikationsprotokoll, NFR 0a).
+ */
+export interface SendEmailResult {
+  messageId?: string;
+  accepted: string[];
+}
+
 interface SmtpTestResult {
   success: boolean;
   error?: string;
@@ -67,15 +76,17 @@ async function createTransporter() {
 // =============================================
 // E-Mail versenden
 // =============================================
-export async function sendEmail(options: MailOptions): Promise<boolean> {
+export async function sendEmail(
+  options: MailOptions
+): Promise<SendEmailResult | null> {
   try {
     const result = await createTransporter();
     if (!result) {
       console.warn("[Mailer] SMTP nicht konfiguriert oder deaktiviert – E-Mail uebersprungen");
-      return false;
+      return null;
     }
 
-    await result.transporter.sendMail({
+    const info = await result.transporter.sendMail({
       from: result.from,
       to: options.to,
       subject: options.subject,
@@ -89,13 +100,18 @@ export async function sendEmail(options: MailOptions): Promise<boolean> {
     });
 
     console.log(`[Mailer] E-Mail erfolgreich gesendet an: ${options.to.replace(/(.{2}).*(@.*)/, '$1***$2')}`);
-    return true;
+    return {
+      messageId: info.messageId,
+      accepted: (info.accepted ?? []).map((a) =>
+        typeof a === "string" ? a : a.address
+      ),
+    };
   } catch (error) {
     console.error(
       "[Mailer] E-Mail-Versand fehlgeschlagen:",
       error instanceof Error ? error.message : error
     );
-    return false;
+    return null;
   }
 }
 

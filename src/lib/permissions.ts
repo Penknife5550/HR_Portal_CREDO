@@ -176,3 +176,65 @@ export async function canAccessProcess(
   if (GLOBAL_ROLES.includes(session.role)) return true;
   return canAccessOrg(session, processOrgId);
 }
+
+// =============================================
+// BEM — "versiegelte Akte" (invertiertes Zugriffsmodell, § 167 SGB IX)
+// =============================================
+// WICHTIG: Anders als beim restlichen Portal gibt es hier KEINEN globalen
+// Bypass. Auch SUPER_ADMIN/HR_LEITUNG sehen BEM-INHALTE nur mit einer aktiven
+// BemZugriff-Freigabe. Sie duerfen Freigaben *verwalten* (canManageBemAccess),
+// aber nicht automatisch lesen. Inhalts-Routen MUESSEN canAccessBemContent
+// pruefen; Listen MUESSEN bemFilter verwenden.
+
+/**
+ * Prisma-WHERE-Filter fuer BEM-Faelle: nur Faelle, fuer die der User eine
+ * aktive (nicht widerrufene) BemZugriff-Freigabe hat. Kein Eintrag = kein
+ * Zugriff (auch fuer globale Rollen).
+ */
+export async function bemFilter(
+  session: SessionPayload
+): Promise<{ id: { in: string[] } }> {
+  const zugriffe = await prisma.bemZugriff.findMany({
+    where: { userId: session.userId, revokedAt: null },
+    select: { bemFallId: true },
+  });
+  return { id: { in: zugriffe.map((z) => z.bemFallId) } };
+}
+
+/**
+ * Prueft, ob der User die INHALTE eines konkreten BEM-Falls sehen darf.
+ * Nur true bei aktiver BemZugriff-Freigabe — ohne globalen Rollen-Bypass.
+ */
+export async function canAccessBemContent(
+  session: SessionPayload,
+  bemFallId: string
+): Promise<boolean> {
+  const zugriff = await prisma.bemZugriff.findFirst({
+    where: { bemFallId, userId: session.userId, revokedAt: null },
+    select: { id: true },
+  });
+  return !!zugriff;
+}
+
+/**
+ * Prueft, ob der User Freigaben (BemZugriff) verwalten darf.
+ * Das berechtigt NICHT zum Lesen der Inhalte (siehe canAccessBemContent).
+ */
+export function canManageBemAccess(session: SessionPayload): boolean {
+  return ADMIN_ROLES.includes(session.role);
+}
+
+/**
+ * Prueft, ob der User einen BEM-Fall anlegen darf:
+ * nur SUPER_ADMIN oder als BEM-Beauftragte:r gekennzeichnete Nutzer.
+ */
+export async function canCreateBemFall(
+  session: SessionPayload
+): Promise<boolean> {
+  if (session.role === "SUPER_ADMIN") return true;
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { isBemBeauftragte: true },
+  });
+  return !!user?.isBemBeauftragte;
+}

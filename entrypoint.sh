@@ -22,6 +22,12 @@ if [ -z "$ENCRYPTION_KEY" ] || [ ${#ENCRYPTION_KEY} -lt 64 ]; then
   exit 1
 fi
 
+if [ -z "$BEM_ENCRYPTION_KEY" ] || [ ${#BEM_ENCRYPTION_KEY} -lt 64 ]; then
+  echo "FATAL: BEM_ENCRYPTION_KEY fehlt oder ist zu kurz (min. 64 Hex-Zeichen). BEM-Gesundheitsdaten koennen nicht verschluesselt werden!"
+  echo "Generieren mit: openssl rand -hex 32"
+  exit 1
+fi
+
 if [ -z "$DATABASE_URL" ]; then
   echo "FATAL: DATABASE_URL ist nicht gesetzt!"
   exit 1

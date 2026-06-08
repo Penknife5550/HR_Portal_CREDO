@@ -3,7 +3,7 @@
 > **Single Source of Truth** für den Bau des BEM-Moduls (Betriebliches Eingliederungs­management, § 167 Abs. 2 SGB IX).
 > Diese Datei ist so geschrieben, dass jede Session genau weiß, was als Nächstes zu tun ist.
 
-- **Status:** **E0 (Vorlagenbibliothek-Fundament) umgesetzt** (2026-06-03) — Code build/lint/typecheck gruen, adversariell reviewt (8 Findings gefixt). `prisma db push` + Gotenberg-Container stehen auf dem Server noch aus (lokal keine DB/Docker). Naechster Schritt: **E1** (versiegelte Akte). Plan freigegeben 2026-06-03.
+- **Status:** **E0 + E1 umgesetzt.** E0 (Vorlagenbibliothek) 2026-06-03, E1 (versiegelte Akte) 2026-06-08 — beide build/lint/test gruen. Auf Server ausstehend: `BEM_ENCRYPTION_KEY` setzen, `db push` (via entrypoint), Gotenberg-Container. Naechster Schritt: **E2** (Workflow, Dashboard, Detailseite). Zusätzliche Entscheidungen 2026-06-08: BEM-Mails immer SMTP-direkt (#9), prüfungssichere Nachvollziehbarkeit `BemKommunikation` (NFR 0a), CREDO-CI-HTML-Mails (E4).
 - **Plan-Dokument (Übersicht + Mockups):** `BEM/BEM_Modul_Plan.html`
 - **Quell-Unterlagen + 7 Word-Vorlagen:** `BEM/` (`0_Gedaechnisprotokoll…` … `4_Datenschutzvereinbarung…`, `Allg. Info Credo.pdf`)
 - **Verwandter (pausierter) Epic:** „Zentrale Vorlagenverwaltung" → wird hier als **E0** gebaut. Siehe `docs/FEHLER_PDF_FIXES.md` (Abschnitt Gotenberg) und Memory `vorlagenverwaltung-epic`.
@@ -16,6 +16,14 @@ Das heutige Portal gilt: **„globale Rollen sehen alles"** (`orgFilter`, `GLOBA
 BEM **invertiert** das: **niemand** sieht BEM-Inhalte — außer Personen, die für **genau diesen Fall** freigegeben sind (Tabelle `BemZugriff` = Allowlist). Selbst SUPER_ADMIN/HR_LEITUNG dürfen Freigaben *verwalten*, aber Inhalte **nicht lesen**. Strikt getrennt von der Personalakte (gesetzlich vorgeschrieben).
 
 > ⚠️ Das größte Risiko ist **nicht** fehlende Funktion, sondern ein **versehentliches Datenleck**. Jede BEM-Inhalts-Antwort braucht eigene Queries/DTOs. **403-Tests sind Teil der Definition-of-Done.**
+
+### 0a. Prüfungssichere Nachvollziehbarkeit (verbindliche NFR, 2026-06-08)
+Bei einer Prüfung muss CREDO **lückenlos nachweisen** können: *„Die Einladung/der Brief ging am X an Y raus."* (DSGVO Art. 5 Abs. 2 Rechenschaftspflicht; § 167 SGB IX Dokumentationspflicht). Umsetzung:
+- **`BemKommunikation`** (neues Modell) = Versand-/Kommunikationsprotokoll. **Jede** ausgehende Mail und **jeder** generierte Brief erzeugt einen strukturierten, beweissicheren Eintrag: Kanal (E-MAIL/BRIEF), Empfänger, Betreff, Dokument-**SHA256-Hash**, Zeitstempel, auslösende:r Nutzer:in, Status (GESENDET/FEHLGESCHLAGEN/GENERIERT), **SMTP-Message-ID** (Zustellnachweis), Fehlertext, IP.
+- Eintrag wird **erst nach erfolgreichem Versand** als `GESENDET` geschrieben (Fehlversuche als `FEHLGESCHLAGEN`) — Protokoll bleibt wahrheitsgemäß.
+- **`AuditLog.bemFallId`** + `BEM_*`-Actions = technische Lückenlosigkeit (Lesezugriffe `BEM_AKTE_GEOEFFNET`, Statuswechsel, Freigabe/Entzug).
+- **Menschenlesbare Übersicht:** pro Fall ein Tab „Protokoll" (Tabelle: Datum · Vorgang · Empfänger · Status · Hash) + **PDF-Export** des kompletten Protokolls (Versand + Zugriffe). Ausbau in E6, Datenmodell in E1.
+- `sendEmail()` wird so erweitert, dass es die **Message-ID/akzeptierten Empfänger** von nodemailer zurückgibt (statt nur `boolean`), damit der Zustellnachweis echt ist.
 
 ---
 
@@ -31,6 +39,7 @@ BEM **invertiert** das: **niemand** sieht BEM-Inhalte — außer Personen, die f
 | 6 | Wer legt an? | **Nur SUPER_ADMIN + BEM-Beauftragte.** |
 | 7 | Sprache | Nur Deutsch (keine englische Datenschutzvereinbarung). |
 | 8 | Reihenfolge | **E0 vor E5** (Vorlagen-Basis zuerst). |
+| 9 | Mailversand (2026-06-08) | **Alle BEM-Mails immer SMTP-direkt** (`sendEmail()`), **kein n8n**. Begründung: „versiegelte Akte" — BEM-Daten/Links sollen nicht durch den externen n8n-Automationsserver fließen. Event-Mails (E4 Einladung/Einwilligung, E6 Erinnerungen) NICHT über `triggerWebhooks`, sondern direkt `sendEmail`. |
 
 **Aktentrennungs-Nuance (automatisch umsetzen):**
 - Datenschutzvereinbarung, Gespräche (Erst/Folge/Gedächtnis) → **nur BEM-Akte**.
@@ -58,6 +67,7 @@ BEM **invertiert** das: **niemand** sieht BEM-Inhalte — außer Personen, die f
 - `BemEinwilligung` — id, bemFallId, art (`DATENSCHUTZ|DURCHFUEHRUNG|BR|SBV`), status (`OFFEN|ERTEILT|ABGELEHNT|WIDERRUFEN`), token, tokenExpiry, signedAt, signedIp, signedName, dokumentHash.
 - `BemDokument` — id, bemFallId, typ (`BemDokumentTyp`), ablage (`NUR_BEM|KOPIE_PERSONALAKTE`), quelle (`GENERIERT|UPLOAD`), pfad, hash, createdBy.
 - `BemFrist` — id, bemFallId, typ, faelligAm, severity, letzteSeverity, erledigt.
+- `BemKommunikation` — id, bemFallId, kanal (`EMAIL|BRIEF`), empfaenger, betreff, dokumentId?, dokumentHash, status (`GESENDET|FEHLGESCHLAGEN|GENERIERT`), messageId (SMTP-Zustellnachweis), fehlertext, gesendetAm, gesendetById, ipAddress. **= prüfungssicherer Versandnachweis (NFR 0a).**
 
 **Enums:** `BemStatus` (`ANGELEGT, EINLADUNG_VERSENDET, EINWILLIGUNG_ERTEILT, EINWILLIGUNG_ABGELEHNT, ERSTGESPRAECH, MASSNAHMEN_LAUFEN, ABGESCHLOSSEN, ABGEBROCHEN, AUFBEWAHRUNG, GELOESCHT`), `BemGespraechTyp`, `BemMassnahmeKategorie`, `BemDokumentTyp`, `BemEinwilligungArt`, `BemZugriffRolle`.
 
@@ -122,15 +132,16 @@ Neuer ENV `BEM_ENCRYPTION_KEY` (64 Hex). `src/lib/encryption.ts` um optionalen K
 - [x] Ausgabe-Aktionen: Word-Download, PDF-Download (Gotenberg + DMS-QR-Deckblatt via `pdf-deckblatt.ts`), „Per Mail senden" (Mail erst nach erfolgreichem Versand persistiert; `mailer.ts` um Attachments erweitert).
 - **DoD:** ✅ Build/Lint/Typecheck grün; Render-Pipeline (docx-Befüllung + Extraktion) lokal end-to-end verifiziert; fehlende Platzhalter werden markiert; Rollen-Gating greift. ⏳ **Offline nicht testbar (braucht laufende DB + Gotenberg-Container):** tatsächliche `.docx→PDF`-Konvertierung, Mail-Versand, `db push`. Auf dem Server nach `docker compose up -d --build` verifizieren.
 
-### E1 — Versiegelte Akte, Datenmodell & Beauftragten-Kennzeichnung  ·  ~3–4 Tage  ·  **Fundament, zuerst**
+### E1 — Versiegelte Akte, Datenmodell & Beauftragten-Kennzeichnung  ·  ~3–4 Tage  ·  **Fundament, zuerst**  ·  ✅ UMGESETZT (2026-06-08)
 **Ziel:** Sichere Basis — niemand sieht Inhalte ohne Freigabe.
-- [ ] Prisma: `BemFall`, `BemZugriff`, `BemGespraech`, `BemMassnahme`, `BemEinwilligung`, `BemDokument`, `BemFrist` + Enums; `AuditLog.bemFallId`; `Organization.bem…`; `User.isBemBeauftragte`. → `db push`.
-- [ ] `bemFilter`, `canAccessBemContent`, `canManageBemAccess`, `canCreateBemFall` in `permissions.ts`.
-- [ ] Middleware-Schutz für `/dashboard/bem/*` + `/api/bem/*`.
-- [ ] Lese-Audit: jeder GET einer Inhalts-Route schreibt `AuditLog` (`BEM_AKTE_GEOEFFNET`).
-- [ ] `encryption.ts` um optionalen Key erweitern; `BEM_ENCRYPTION_KEY` in `.env` + `.env.production.example` + `entrypoint.sh`-Pflichtprüfung.
-- [ ] **403-Tests** (Jest): HR_LEITUNG/HR_SACHBEARBEITER/SUPER_ADMIN ohne Freigabe → 403 auf BEM-Inhalte; mit `BemZugriff` → 200.
-- **DoD:** 403-Tests grün; `npm run build` + `npm run lint` grün; ein BemFall lässt sich nur durch SUPER_ADMIN/BEM-Beauftragte anlegen.
+- [x] Prisma: `BemFall`, `BemZugriff`, `BemGespraech`, `BemMassnahme`, `BemEinwilligung`, `BemDokument`, `BemFrist`, **`BemKommunikation`** (NFR 0a) + Enums; `AuditLog.bemFallId`; `Organization.bem…`; `User.isBemBeauftragte`. (`prisma validate` + `generate` grün; **`db push` läuft auf dem Server via `entrypoint.sh`** — lokal keine DB.)
+- [x] `bemFilter`, `canAccessBemContent`, `canManageBemAccess`, `canCreateBemFall` in `permissions.ts` (KEIN globaler Bypass — auch SUPER_ADMIN/HR_LEITUNG brauchen `BemZugriff`).
+- [x] Middleware-Schutz: `/dashboard/bem/*` ist durch das bestehende `/dashboard`-Login-Gate abgedeckt; `/api/bem/*` läuft über `apiHandler` (Session+Rollen). Per-Fall-„Versiegelung" passiert in den Routen (Edge-Runtime hat kein Prisma) — kein redundanter Middleware-Code.
+- [x] Lese-Audit-Helfer `src/lib/bem-audit.ts` (Action-Konstanten `BEM_*` + `logBemAudit` für AuditLog **und** `logBemKommunikation` für das Versandprotokoll). Anwendung an konkreten GET-Routen folgt mit E2.
+- [x] `encryption.ts` um optionalen Key erweitert (+ `encryptBem`/`decryptBem`/`isBemEncryptionConfigured`); `BEM_ENCRYPTION_KEY` in `.env(.production).example` + `entrypoint.sh`-Pflichtprüfung.
+- [x] `mailer.ts`: `sendEmail()` gibt `SendEmailResult|null` (Message-ID + akzeptierte Empfänger) zurück — Zustellnachweis. Rückwärtskompatibel (Aufrufer prüfen truthy).
+- [x] **403-Tests** (Jest, `src/__tests__/lib/bem-permissions.test.ts`): globale Rollen ohne Freigabe → kein Zugriff; mit `BemZugriff` → Zugriff. 27 Tests grün.
+- **DoD:** ✅ 403-Tests grün; `npm run build` + `npm run lint` grün; `canCreateBemFall` lässt nur SUPER_ADMIN/BEM-Beauftragte zu. ⏳ **Auf Server:** `BEM_ENCRYPTION_KEY` setzen, `db push` (automatisch via entrypoint).
 
 ### E2 — Workflow, Dashboard & Detailseite  ·  ~3–4 Tage
 - [ ] `src/lib/bem-workflow.ts` (Status-Enum, Schritte, `getNaechsterSchritt`, erlaubte Übergänge) + `bem-transitions.ts` (atomar, AuditLog, Webhook nach Commit).
@@ -148,7 +159,8 @@ Neuer ENV `BEM_ENCRYPTION_KEY` (64 Hex). `src/lib/encryption.ts` um optionalen K
 ### E4 — Einladung & Einwilligung (digital + Papier)  ·  ~2–3 Tage
 - [ ] Magic-Link-Formular `src/app/bem/einwilligung/[token]/` (öffentlich, Rate-Limit, Zeitstempel+IP+Hash) — Muster: `fragebogen`/`exit-interview`.
 - [ ] Alternativ: Papier-Scan-Upload (`file-upload.ts`).
-- [ ] Widerruf jederzeit; `BemEinwilligung`-Status pflegen; Mail via E0/`mailer`.
+- [ ] Widerruf jederzeit; `BemEinwilligung`-Status pflegen; Mail **direkt via `sendEmail()` (SMTP, kein n8n)** — siehe Entscheidung #9.
+- [ ] **CREDO-CI-HTML-Mail-Layout** (User-Wunsch 2026-06-08): wiederverwendbarer Helfer `src/lib/email-layout.ts` (`renderCredoEmail({titel, bodyHtml, button?})`), Tabellen-Layout + Inline-Styles (Mail-Client-kompatibel), CI-Farben (Primär `#575756`, CREDO-Linie `#FBC900`/`#6BAA24`/`#E2001A`/`#009AC6`, Montserrat→Arial-Fallback, **keine Verläufe**), CREDO-Logo (`public/credo_logo*.svg`) per absoluter `APP_URL` oder CID-Embed. BEM-Mails rendern darüber; modulübergreifend nutzbar. Bestehende dunkelblaue Vorlagen (`default-email-templates.ts`) bleiben unberührt.
 - **DoD:** Beide Wege erzeugen gültige, nachweisbare Einwilligung; Widerruf setzt Status + Audit.
 
 ### E5 — BEM-Vorlagen, Aktentrennung & Mitarbeiter-Export  ·  ~3 Tage  ·  **nach E0**

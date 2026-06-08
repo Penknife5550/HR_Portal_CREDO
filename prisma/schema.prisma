@@ -57,6 +57,17 @@ model Organization {
   dsgvoVerantwortlichePlz     String? // z.B. "32425"
   dsgvoVerantwortlicheOrt     String? // z.B. "Minden"
 
+  // =============================================
+  // BEM (Betriebliches Eingliederungsmanagement, § 167 SGB IX)
+  // Standard-Beauftragte pro Mandant (ueberschreibt globalen Default).
+  // Bei CREDO i.d.R. fuer alle 16 Mandanten dieselben (Elena/Danny Bergen).
+  // =============================================
+  bemBeauftragte1Name  String?
+  bemBeauftragte1Email String?
+  bemBeauftragte2Name  String?
+  bemBeauftragte2Email String?
+  bemAufbewahrungJahre Int     @default(4) // Aufbewahrungsfrist nach Beendigung
+
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
   onboardings           OnboardingProcess[]
@@ -70,6 +81,7 @@ model Organization {
   elternzeitProzesse    ElternzeitProzess[]
   documentTemplates     DocumentTemplate[]
   generatedDocuments    GeneratedDocument[]
+  bemFaelle             BemFall[]
 
   @@map("organizations")
 }
@@ -105,6 +117,7 @@ model Employee {
   civilServiceProcesses CivilServiceProcess[] @relation("EmployeeCivilService")
   mutterschutzProzesse  MutterschutzProzess[] @relation("EmployeeMutterschutz")
   elternzeitProzesse    ElternzeitProzess[]   @relation("EmployeeElternzeit")
+  bemFaelle             BemFall[]             @relation("EmployeeBem")
 
   @@index([personalNumber])
   @@index([lastName, firstName])
@@ -540,6 +553,11 @@ model User {
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
 
+  // BEM (Phase 1): Kennzeichnung als BEM-Beauftragte:r.
+  // Darf BEM-Faelle anlegen und erhaelt bei Anlage Auto-Freigabe (BemZugriff).
+  // Volle externe Rolle (BEM_BEAUFTRAGTER) folgt in Phase 2 / E7.
+  isBemBeauftragte Boolean @default(false)
+
   // Org-Zuweisungen (welche Mandanten darf dieser User sehen?)
   // SUPER_ADMIN + HR_LEITUNG sehen alles, bei anderen gelten die Zuweisungen
   orgAssignments UserOrgAssignment[]
@@ -570,6 +588,12 @@ model User {
   // Vorlagenbibliothek (E0)
   createdDocumentTemplates  DocumentTemplate[]
   createdGeneratedDocuments GeneratedDocument[]
+
+  // BEM (E1)
+  createdBemFaelle      BemFall[]          @relation("BemFallCreatedBy")
+  bemZugriffe           BemZugriff[]       @relation("BemZugriffUser")
+  grantedBemZugriffe    BemZugriff[]       @relation("BemZugriffGrantedBy")
+  bemKommunikationen    BemKommunikation[] @relation("BemKommunikationSentBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -602,7 +626,9 @@ model AuditLog {
   mutterschutz   MutterschutzProzess? @relation("MutterschutzAuditLogs", fields: [mutterschutzId], references: [id])
   elternzeitId   String?
   elternzeit     ElternzeitProzess?   @relation("ElternzeitAuditLogs", fields: [elternzeitId], references: [id])
-  processType    String? // "ONBOARDING", "OFFBOARDING", "CIVIL_SERVICE", "MUTTERSCHUTZ", "ELTERNZEIT"
+  bemFallId      String?
+  bemFall        BemFall?             @relation("BemAuditLogs", fields: [bemFallId], references: [id])
+  processType    String? // "ONBOARDING", "OFFBOARDING", "CIVIL_SERVICE", "MUTTERSCHUTZ", "ELTERNZEIT", "BEM"
 
   action    String // z.B. "ONBOARDING_CREATED", "QUESTIONNAIRE_SUBMITTED"
   details   Json? // Zusaetzliche Infos
@@ -615,6 +641,7 @@ model AuditLog {
   @@index([civilServiceId])
   @@index([mutterschutzId])
   @@index([elternzeitId])
+  @@index([bemFallId])
   @@index([createdAt])
   @@map("audit_logs")
 }
@@ -2308,4 +2335,344 @@ enum ElternzeitFristSeverity {
   WARNING // 14-7 Tage
   URGENT // 6-0 Tage
   OVERDUE // ueberfaellig
+}
+
+// =============================================================================
+// BEM — Betriebliches Eingliederungsmanagement (§ 167 Abs. 2 SGB IX)
+// =============================================================================
+// KERNPRINZIP "versiegelte Akte": invertiertes Zugriffsmodell. Niemand sieht
+// BEM-Inhalte ausser explizit pro Fall freigegebene Personen (BemZugriff =
+// Allowlist). Selbst SUPER_ADMIN/HR_LEITUNG duerfen Freigaben verwalten, aber
+// Inhalte NICHT lesen. Strikt getrennt von der Personalakte (gesetzlich).
+// Gesundheitsbezogene Freitexte werden mit BEM_ENCRYPTION_KEY verschluesselt.
+// =============================================================================
+
+model BemFall {
+  id               String @id @default(uuid())
+  displayId        String @unique // z.B. "BEM-2026-GYM-001"
+  sequentialNumber Int
+
+  // Verknuepfungen
+  employeeId     String?
+  employee       Employee?    @relation("EmployeeBem", fields: [employeeId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdById    String
+  createdBy      User         @relation("BemFallCreatedBy", fields: [createdById], references: [id])
+
+  // Mitarbeiter-Daten (inline, fuer Briefkopf/Anzeige ohne Personalakten-Join)
+  employeeFirstName  String
+  employeeLastName   String
+  employeeEmail      String?
+  employeePersonalNr String?
+
+  // Prozess
+  status      BemStatus     @default(ANGELEGT)
+  eingangsweg BemEingangsweg @default(DIGITAL)
+
+  // Zeitstempel des Verfahrens
+  anlassFehlzeitenAb DateTime? // Beginn der relevanten Fehlzeiten
+  einladungAm        DateTime?
+  datenschutzAm      DateTime?
+  erstgespraechAm    DateTime?
+  beendetAm          DateTime?
+  beendigungsgrund   String?
+
+  // Aufbewahrung / Loeschung (Crypto-Shredding)
+  aufbewahrungBis DateTime? // beendetAm + bemAufbewahrungJahre
+  geloeschtAm     DateTime?
+
+  // Sub-Modelle
+  zugriffe      BemZugriff[]
+  gespraeche    BemGespraech[]
+  massnahmen    BemMassnahme[]
+  einwilligungen BemEinwilligung[]
+  dokumente     BemDokument[]
+  fristen       BemFrist[]
+  kommunikation BemKommunikation[]
+  auditLogs     AuditLog[]         @relation("BemAuditLogs")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([organizationId])
+  @@index([employeeId])
+  @@map("bem_faelle")
+}
+
+enum BemStatus {
+  ANGELEGT
+  EINLADUNG_VERSENDET
+  EINWILLIGUNG_ERTEILT
+  EINWILLIGUNG_ABGELEHNT
+  ERSTGESPRAECH
+  MASSNAHMEN_LAUFEN
+  ABGESCHLOSSEN
+  ABGEBROCHEN
+  AUFBEWAHRUNG
+  GELOESCHT
+}
+
+enum BemEingangsweg {
+  DIGITAL // Magic-Link-Formular
+  PAPIER // ausgedruckt + Scan-Upload
+}
+
+// Die "Versiegelung": Allowlist, wer diesen Fall sehen/bearbeiten darf.
+model BemZugriff {
+  id        String          @id @default(uuid())
+  bemFallId String
+  bemFall   BemFall         @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User            @relation("BemZugriffUser", fields: [userId], references: [id])
+  rolle     BemZugriffRolle @default(BEAUFTRAGTE)
+
+  grantedById String?
+  grantedBy   User?    @relation("BemZugriffGrantedBy", fields: [grantedById], references: [id])
+  grantedAt   DateTime @default(now())
+  revokedAt   DateTime? // null = aktiv
+
+  @@index([bemFallId])
+  @@index([userId])
+  @@index([revokedAt])
+  @@map("bem_zugriffe")
+}
+
+enum BemZugriffRolle {
+  BEAUFTRAGTE // BEM-Beauftragte:r (fuehrt das Verfahren)
+  VERTRETUNG
+  BR // Betriebsrat
+  SBV // Schwerbehindertenvertretung
+}
+
+model BemGespraech {
+  id        String          @id @default(uuid())
+  bemFallId String
+  bemFall   BemFall         @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  typ       BemGespraechTyp
+  datum     DateTime?
+  ort       String?
+  teilnehmer Json? // Liste { name, rolle }
+  notizen   String? // VERSCHLUESSELT (BEM_ENCRYPTION_KEY)
+  checkliste Json? // abgehakte Punkte aus CREDO-Vorlage
+  naechsterTermin DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([bemFallId])
+  @@map("bem_gespraeche")
+}
+
+enum BemGespraechTyp {
+  ERSTGESPRAECH
+  FOLGEGESPRAECH
+  GEDAECHTNISPROTOKOLL
+}
+
+model BemMassnahme {
+  id        String               @id @default(uuid())
+  bemFallId String
+  bemFall   BemFall              @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  kategorie BemMassnahmeKategorie
+  beschreibung String // VERSCHLUESSELT (BEM_ENCRYPTION_KEY)
+  zustaendig   String?
+  frist        DateTime?
+  status       BemMassnahmeStatus @default(OFFEN)
+  evaluationAm DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([bemFallId])
+  @@map("bem_massnahmen")
+}
+
+enum BemMassnahmeKategorie {
+  TECHNISCH
+  ORGANISATORISCH
+  PERSONENBEZOGEN
+}
+
+enum BemMassnahmeStatus {
+  OFFEN
+  LAEUFT
+  UMGESETZT
+  VERWORFEN
+}
+
+model BemEinwilligung {
+  id        String                @id @default(uuid())
+  bemFallId String
+  bemFall   BemFall               @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  art       BemEinwilligungArt
+  status    BemEinwilligungStatus @default(OFFEN)
+
+  // Magic-Link (digitaler Weg)
+  token       String?   @unique
+  tokenExpiry DateTime?
+  tokenUsedAt DateTime?
+
+  // Nachweis der Erteilung/Ablehnung/Widerruf
+  signedAt    DateTime?
+  signedIp    String?
+  signedName  String?
+  widerrufAm  DateTime?
+  dokumentHash String? // Hash der unterschriebenen Erklaerung
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bemFallId])
+  @@map("bem_einwilligungen")
+}
+
+enum BemEinwilligungArt {
+  DATENSCHUTZ
+  DURCHFUEHRUNG
+  BR
+  SBV
+}
+
+enum BemEinwilligungStatus {
+  OFFEN
+  ERTEILT
+  ABGELEHNT
+  WIDERRUFEN
+}
+
+model BemDokument {
+  id        String          @id @default(uuid())
+  bemFallId String
+  bemFall   BemFall         @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  typ       BemDokumentTyp
+  ablage    BemDokumentAblage @default(NUR_BEM)
+  quelle    BemDokumentQuelle @default(GENERIERT)
+
+  dateiname String
+  dateipfad String
+  mimeType  String?
+  fileSize  Int?
+  hash      String? // SHA256
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([bemFallId])
+  @@map("bem_dokumente")
+}
+
+enum BemDokumentTyp {
+  EINLADUNG
+  DATENSCHUTZVEREINBARUNG
+  ERSTGESPRAECH_PROTOKOLL
+  FOLGEGESPRAECH_PROTOKOLL
+  GEDAECHTNISPROTOKOLL
+  MASSNAHMENPLAN
+  ABSCHLUSSERKLAERUNG
+  ABBRUCHERKLAERUNG
+  BEENDIGUNGSERKLAERUNG
+  GESAMT_EXPORT // Mitarbeiter-Gesamtexport (DSGVO Art. 15)
+  SONSTIGES
+}
+
+// Aktentrennung (gesetzlich vorgeschrieben):
+// - NUR_BEM: bleibt ausschliesslich in der BEM-Akte
+// - KOPIE_PERSONALAKTE: bereinigte Kopie (ohne med. Details) -> Personalakte
+// - ORIGINAL_PERSONALAKTE: Original in Personalakte (Kuendigungsschutz) + Kopie BEM
+enum BemDokumentAblage {
+  NUR_BEM
+  KOPIE_PERSONALAKTE
+  ORIGINAL_PERSONALAKTE
+}
+
+enum BemDokumentQuelle {
+  GENERIERT // aus Vorlagenbibliothek (E0)
+  UPLOAD // Papier-Scan
+}
+
+model BemFrist {
+  id        String      @id @default(uuid())
+  bemFallId String
+  bemFall   BemFall     @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  typ       BemFristTyp
+  bezeichnung String
+  beschreibung String?
+  faelligAm  DateTime
+
+  erledigtAm  DateTime?
+  erledigtVon String?
+
+  // Cron-Tracking — verhindert Mehrfach-Webhooks pro Tag/Stufe
+  letzteSeverity  BemFristSeverity?
+  letzteWarnungAm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bemFallId])
+  @@index([faelligAm])
+  @@index([erledigtAm])
+  @@map("bem_fristen")
+}
+
+enum BemFristTyp {
+  EINLADUNG
+  EINWILLIGUNG
+  ERSTGESPRAECH
+  FOLGEGESPRAECH
+  EVALUATION
+  AUFBEWAHRUNGSENDE
+  SONSTIGE
+}
+
+enum BemFristSeverity {
+  INFO
+  WARNING
+  URGENT
+  OVERDUE
+}
+
+// =============================================
+// Versand-/Kommunikationsprotokoll (NFR 0a)
+// Prüfungssicherer Nachweis: jede ausgehende Mail + jeder generierte Brief.
+// Eintrag wird ERST nach erfolgreichem Versand als GESENDET geschrieben
+// (Fehlversuche als FEHLGESCHLAGEN), damit das Protokoll wahrheitsgemaess bleibt.
+// =============================================
+model BemKommunikation {
+  id        String                 @id @default(uuid())
+  bemFallId String
+  bemFall   BemFall                @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  kanal     BemKommunikationKanal
+  status    BemKommunikationStatus @default(GESENDET)
+
+  empfaenger String // E-Mail-Adresse oder Name (bei BRIEF)
+  betreff    String?
+  dokumentId String? // optionaler Bezug zu BemDokument
+  dokumentHash String? // SHA256 des versendeten/erzeugten Dokuments
+  messageId  String? // SMTP-Message-ID = Zustellnachweis
+  fehlertext String? // bei FEHLGESCHLAGEN
+  ipAddress  String?
+
+  gesendetById String?
+  gesendetBy   User?   @relation("BemKommunikationSentBy", fields: [gesendetById], references: [id])
+  gesendetAm   DateTime @default(now())
+
+  @@index([bemFallId])
+  @@index([gesendetAm])
+  @@map("bem_kommunikation")
+}
+
+enum BemKommunikationKanal {
+  EMAIL
+  BRIEF // generierter/ausgedruckter Brief (Word/PDF)
+}
+
+enum BemKommunikationStatus {
+  GESENDET
+  FEHLGESCHLAGEN
+  GENERIERT // Brief erzeugt, aber (noch) nicht versendet
 }
