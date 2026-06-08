@@ -82,6 +82,17 @@ interface Massnahme {
   evaluationAm: string | null;
 }
 
+interface Einwilligung {
+  id: string;
+  art: string;
+  status: string;
+  signedAt: string | null;
+  signedName: string | null;
+  widerrufAm: string | null;
+  tokenExpiry: string | null;
+  createdAt: string;
+}
+
 interface BemFall {
   id: string;
   displayId: string;
@@ -103,6 +114,7 @@ interface BemFall {
   zugriffe: Zugriff[];
   gespraeche: Gespraech[];
   massnahmen: Massnahme[];
+  einwilligungen: Einwilligung[];
   kommunikation: Kommunikation[];
   auditLogs: AuditEntry[];
   _count: {
@@ -170,6 +182,20 @@ const MASSNAHME_STATUS_LABELS: Record<string, string> = {
   VERWORFEN: "Verworfen",
 };
 
+const EINWILLIGUNG_ART_LABELS: Record<string, string> = {
+  DATENSCHUTZ: "Datenschutz",
+  DURCHFUEHRUNG: "Durchfuehrung",
+  BR: "Betriebsrat",
+  SBV: "Schwerbehindertenvertretung",
+};
+
+const EINWILLIGUNG_STATUS_LABELS: Record<string, string> = {
+  OFFEN: "Offen (ausstehend)",
+  ERTEILT: "Erteilt",
+  ABGELEHNT: "Abgelehnt",
+  WIDERRUFEN: "Widerrufen",
+};
+
 const INPUT_CLASS =
   "mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring";
 
@@ -213,7 +239,7 @@ export function BemDetailContent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<
-    "uebersicht" | "gespraeche" | "massnahmen" | "protokoll"
+    "uebersicht" | "gespraeche" | "massnahmen" | "einwilligung" | "protokoll"
   >("uebersicht");
   const [busy, setBusy] = useState(false);
   const [gespraechModal, setGespraechModal] = useState<Gespraech | "new" | null>(
@@ -222,6 +248,8 @@ export function BemDetailContent({
   const [massnahmeModal, setMassnahmeModal] = useState<Massnahme | "new" | null>(
     null,
   );
+  const [einladungOpen, setEinladungOpen] = useState(false);
+  const [papierOpen, setPapierOpen] = useState(false);
 
   // Stiller Refetch (kein Spinner) — verhindert Scroll-Sprung nach Aktionen.
   const load = useCallback(
@@ -297,6 +325,27 @@ export function BemDetailContent({
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         setError(j.error || "Loeschen fehlgeschlagen.");
+        return;
+      }
+      await load(true);
+    } catch {
+      setError("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function widerrufen(einwId: string) {
+    if (!window.confirm("Diese Einwilligung wirklich widerrufen?")) return;
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `/api/bem/${bemFallId}/einwilligung/${einwId}/widerruf`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error || "Widerruf fehlgeschlagen.");
         return;
       }
       await load(true);
@@ -454,6 +503,7 @@ export function BemDetailContent({
               ["uebersicht", "Uebersicht", null],
               ["gespraeche", "Gespraeche", fall.gespraeche.length],
               ["massnahmen", "Massnahmen", fall.massnahmen.length],
+              ["einwilligung", "Einwilligung", fall.einwilligungen.length],
               ["protokoll", "Protokoll", fall.kommunikation.length + fall.auditLogs.length],
             ] as const
           ).map(([val, label, count]) => (
@@ -564,8 +614,41 @@ export function BemDetailContent({
           />
         )}
 
+        {tab === "einwilligung" && (
+          <EinwilligungTab
+            fall={fall}
+            busy={busy}
+            onEinladung={() => setEinladungOpen(true)}
+            onPapier={() => setPapierOpen(true)}
+            onWiderruf={widerrufen}
+          />
+        )}
+
         {tab === "protokoll" && <ProtokollTab fall={fall} />}
       </main>
+
+      {einladungOpen && (
+        <EinladungModal
+          bemFallId={bemFallId}
+          defaultEmail={fall.employeeEmail || ""}
+          onClose={() => setEinladungOpen(false)}
+          onSent={async () => {
+            setEinladungOpen(false);
+            await load(true);
+          }}
+        />
+      )}
+
+      {papierOpen && (
+        <PapierModal
+          bemFallId={bemFallId}
+          onClose={() => setPapierOpen(false)}
+          onSaved={async () => {
+            setPapierOpen(false);
+            await load(true);
+          }}
+        />
+      )}
 
       {gespraechModal && (
         <GespraechModal
@@ -1391,6 +1474,351 @@ function MassnahmeModal({
         onConfirm={handleSubmit}
         confirmLabel={saving ? "Speichern…" : "Speichern"}
         disabled={saving}
+      />
+    </ModalShell>
+  );
+}
+
+// =============================================
+// Tab: Einwilligung
+// =============================================
+function EinwilligungTab({
+  fall,
+  busy,
+  onEinladung,
+  onPapier,
+  onWiderruf,
+}: {
+  fall: BemFall;
+  busy: boolean;
+  onEinladung: () => void;
+  onPapier: () => void;
+  onWiderruf: (einwId: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          onClick={onEinladung}
+          className="rounded-lg bg-credo-blau px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
+        >
+          Einladung digital versenden
+        </button>
+        <button
+          type="button"
+          onClick={onPapier}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
+        >
+          Papier-Einwilligung erfassen
+        </button>
+      </div>
+
+      {fall.einwilligungen.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          Noch keine Einwilligung erfasst. Versenden Sie eine digitale Einladung
+          oder erfassen Sie eine auf Papier erteilte Einwilligung.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-border bg-muted/50 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">Art</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Beantwortet</th>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {fall.einwilligungen.map((e) => (
+                <tr key={e.id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3">
+                    {EINWILLIGUNG_ART_LABELS[e.art] || e.art}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={
+                        e.status === "ERTEILT"
+                          ? "text-credo-gruen"
+                          : e.status === "ABGELEHNT" || e.status === "WIDERRUFEN"
+                            ? "text-credo-rot"
+                            : "text-credo-blau"
+                      }
+                    >
+                      {EINWILLIGUNG_STATUS_LABELS[e.status] || e.status}
+                    </span>
+                    {e.widerrufAm && (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        (am {formatDate(e.widerrufAm)})
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {formatDate(e.signedAt)}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {e.signedName || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {e.status === "ERTEILT" && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onWiderruf(e.id)}
+                        className="rounded-md border border-credo-rot/40 px-3 py-1 text-xs font-medium text-credo-rot hover:bg-credo-rot/10 disabled:opacity-50"
+                      >
+                        Widerrufen
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mt-3 text-xs text-muted-foreground">
+        Das BEM ist freiwillig. Eine erteilte Einwilligung kann jederzeit
+        widerrufen werden (§ 167 SGB IX / DSGVO).
+      </p>
+    </div>
+  );
+}
+
+// =============================================
+// Einladungs-Modal (digital)
+// =============================================
+function EinladungModal({
+  bemFallId,
+  defaultEmail,
+  onClose,
+  onSent,
+}: {
+  bemFallId: string;
+  defaultEmail: string;
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const [email, setEmail] = useState(defaultEmail);
+  const [art, setArt] = useState<"DATENSCHUTZ" | "DURCHFUEHRUNG">("DATENSCHUTZ");
+  const [nachricht, setNachricht] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [fallbackLink, setFallbackLink] = useState("");
+  const [done, setDone] = useState(false);
+
+  async function handleSubmit() {
+    setErr("");
+    setFallbackLink("");
+    if (!email.trim()) {
+      setErr("Bitte eine Empfaenger-E-Mail angeben.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/bem/${bemFallId}/einladung`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          art,
+          nachricht: nachricht.trim() || undefined,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(j.error || "Versand fehlgeschlagen.");
+        // Bei SMTP-Fehler liefert die API den Link zur manuellen Zustellung.
+        if (j.magicUrl) setFallbackLink(j.magicUrl);
+        return;
+      }
+      setDone(true);
+    } catch {
+      setErr("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ModalShell title="Einladung digital versenden" onClose={onClose}>
+      {done ? (
+        <div>
+          <div className="rounded-lg border border-credo-gruen/30 bg-credo-gruen/10 px-4 py-3 text-sm text-credo-gruen">
+            Einladung versendet. Der Versand ist im Protokoll-Tab als Nachweis
+            dokumentiert.
+          </div>
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              onClick={onSent}
+              className="rounded-lg bg-credo-blau px-5 py-2 text-sm font-semibold text-white hover:bg-credo-blau/90"
+            >
+              Schliessen
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {err && (
+            <div className="mb-4 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-2 text-sm text-credo-rot">
+              {err}
+            </div>
+          )}
+          {fallbackLink && (
+            <div className="mb-4 break-all rounded-lg border border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+              Link zur manuellen Zustellung:
+              <br />
+              <code>{fallbackLink}</code>
+            </div>
+          )}
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Empfaenger-E-Mail</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={INPUT_CLASS}
+                placeholder="beschaeftigte:r@example.de"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Art</label>
+              <select
+                value={art}
+                onChange={(e) => setArt(e.target.value as "DATENSCHUTZ" | "DURCHFUEHRUNG")}
+                className={INPUT_CLASS}
+              >
+                <option value="DATENSCHUTZ">Datenschutz-Einwilligung</option>
+                <option value="DURCHFUEHRUNG">Durchfuehrung des BEM</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">
+                Zusaetzliche Nachricht (optional)
+              </label>
+              <textarea
+                value={nachricht}
+                onChange={(e) => setNachricht(e.target.value)}
+                rows={3}
+                className={INPUT_CLASS}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Die Mail wird im CREDO-Design direkt per SMTP versendet (kein
+              externer Dienst) und im Protokoll als Versandnachweis erfasst.
+            </p>
+          </div>
+          <ModalActions
+            onClose={onClose}
+            onConfirm={handleSubmit}
+            confirmLabel={busy ? "Sende…" : "Senden"}
+            disabled={busy}
+          />
+        </>
+      )}
+    </ModalShell>
+  );
+}
+
+// =============================================
+// Papier-Einwilligung-Modal (Scan-Upload)
+// =============================================
+function PapierModal({
+  bemFallId,
+  onClose,
+  onSaved,
+}: {
+  bemFallId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [art, setArt] = useState<"DATENSCHUTZ" | "DURCHFUEHRUNG">("DATENSCHUTZ");
+  const [signedName, setSignedName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleSubmit() {
+    setErr("");
+    if (!file) {
+      setErr("Bitte einen Scan (PDF/Bild) auswaehlen.");
+      return;
+    }
+    setBusy(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("art", art);
+    if (signedName.trim()) fd.append("signedName", signedName.trim());
+    try {
+      const res = await fetch(`/api/bem/${bemFallId}/einwilligung/papier`, {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error || "Upload fehlgeschlagen.");
+        return;
+      }
+      onSaved();
+    } catch {
+      setErr("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ModalShell title="Papier-Einwilligung erfassen" onClose={onClose}>
+      {err && (
+        <div className="mb-4 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-2 text-sm text-credo-rot">
+          {err}
+        </div>
+      )}
+      <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Scan (PDF, JPG, PNG)</label>
+          <input
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Art</label>
+          <select
+            value={art}
+            onChange={(e) => setArt(e.target.value as "DATENSCHUTZ" | "DURCHFUEHRUNG")}
+            className={INPUT_CLASS}
+          >
+            <option value="DATENSCHUTZ">Datenschutz-Einwilligung</option>
+            <option value="DURCHFUEHRUNG">Durchfuehrung des BEM</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-sm font-medium">
+            Name der/des Unterzeichnenden (optional)
+          </label>
+          <input
+            value={signedName}
+            onChange={(e) => setSignedName(e.target.value)}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Der Scan wird ausschliesslich in der BEM-Akte abgelegt (nicht in der
+          Personalakte) und mit Pruefsumme dokumentiert.
+        </p>
+      </div>
+      <ModalActions
+        onClose={onClose}
+        onConfirm={handleSubmit}
+        confirmLabel={busy ? "Lade hoch…" : "Erfassen"}
+        disabled={busy}
       />
     </ModalShell>
   );

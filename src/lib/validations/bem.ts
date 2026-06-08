@@ -106,8 +106,29 @@ export const updateMassnahmeSchema = z.object({
   evaluationAm: dateLike.optional().nullable(),
 });
 
+// =============================================
+// Einladung & Einwilligung (E4)
+// =============================================
+export const einladungSchema = z.object({
+  // Phase 1 versendet nur DATENSCHUTZ/DURCHFUEHRUNG. BR/SBV-Einwilligungen
+  // (im Prisma-Enum BemEinwilligungArt vorhanden) folgen in Phase 2 (E9) mit
+  // eigenem Beteiligungs-Flow — bewusst hier NICHT zugelassen.
+  art: z.enum(["DATENSCHUTZ", "DURCHFUEHRUNG"]).default("DATENSCHUTZ"),
+  email: z.string().trim().email("Ungueltige E-Mail-Adresse").optional(),
+  nachricht: z.string().trim().max(3000).optional(),
+  gueltigkeitstage: z.number().int().min(1).max(90).optional(),
+});
+
+// Oeffentliches Einwilligungs-Formular (Magic-Link).
+export const einwilligungPublicSchema = z.object({
+  entscheidung: z.enum(["ERTEILT", "ABGELEHNT"]),
+  name: z.string().trim().min(2, "Bitte Namen angeben").max(150),
+});
+
 export type CreateBemInput = z.infer<typeof createBemSchema>;
 export type BemStatusInput = z.infer<typeof bemStatusSchema>;
+export type EinladungInput = z.infer<typeof einladungSchema>;
+export type EinwilligungPublicInput = z.infer<typeof einwilligungPublicSchema>;
 export type CreateGespraechInput = z.infer<typeof createGespraechSchema>;
 export type UpdateGespraechInput = z.infer<typeof updateGespraechSchema>;
 export type CreateMassnahmeInput = z.infer<typeof createMassnahmeSchema>;

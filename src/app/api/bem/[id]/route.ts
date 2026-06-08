@@ -53,6 +53,20 @@ export async function GET(
         },
         gespraeche: { orderBy: [{ datum: "asc" }, { createdAt: "asc" }] },
         massnahmen: { orderBy: { createdAt: "asc" } },
+        // Einwilligungen OHNE token/dokumentHash (kein Geheimnis-Leak).
+        einwilligungen: {
+          select: {
+            id: true,
+            art: true,
+            status: true,
+            signedAt: true,
+            signedName: true,
+            widerrufAm: true,
+            tokenExpiry: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
         kommunikation: {
           orderBy: { gesendetAm: "desc" },
           include: {

@@ -3,7 +3,7 @@
 > **Single Source of Truth** für den Bau des BEM-Moduls (Betriebliches Eingliederungs­management, § 167 Abs. 2 SGB IX).
 > Diese Datei ist so geschrieben, dass jede Session genau weiß, was als Nächstes zu tun ist.
 
-- **Status:** **E0 + E1 + E2 + E3 umgesetzt.** E0 (Vorlagenbibliothek) 2026-06-03; E1 (versiegelte Akte) + E2 (Workflow/Dashboard/Detailseite) + E3 (Gespräche/Checklisten/Maßnahmen) 2026-06-08 — alle build/lint/test gruen, E3 adversariell reviewt (3 Findings gefixt). Auf Server ausstehend: `BEM_ENCRYPTION_KEY` setzen, `db push` (via entrypoint), Gotenberg-Container. Naechster Schritt: **E4** (Einladung & Einwilligung digital + Papier, inkl. CREDO-CI-Mail-Layout). Entscheidungen 2026-06-08: BEM-Mails immer SMTP-direkt (#9), prüfungssichere Nachvollziehbarkeit `BemKommunikation` (NFR 0a), CREDO-CI-HTML-Mails (E4), Auto-Freigabe für Anlegende:n (E2).
+- **Status:** **E0–E4 umgesetzt.** E0 (Vorlagenbibliothek) 2026-06-03; E1 (versiegelte Akte) + E2 (Workflow/Dashboard) + E3 (Gespräche/Maßnahmen) + E4 (Einladung/Einwilligung + CREDO-CI-Mail) 2026-06-08 — alle build/lint/test gruen, E3+E4 adversariell reviewt (3 bzw. 8 Findings gefixt). Auf Server ausstehend: `BEM_ENCRYPTION_KEY` setzen, `db push` (via entrypoint), Gotenberg + SMTP. Naechster Schritt: **E5** (BEM-Vorlagen in Bibliothek, Aktentrennung, Mitarbeiter-Gesamt-Export). Entscheidungen 2026-06-08: BEM-Mails immer SMTP-direkt (#9), prüfungssichere Nachvollziehbarkeit `BemKommunikation` (NFR 0a), CREDO-CI-HTML-Mails (umgesetzt), Auto-Freigabe für Anlegende:n (E2).
 - **Plan-Dokument (Übersicht + Mockups):** `BEM/BEM_Modul_Plan.html`
 - **Quell-Unterlagen + 7 Word-Vorlagen:** `BEM/` (`0_Gedaechnisprotokoll…` … `4_Datenschutzvereinbarung…`, `Allg. Info Credo.pdf`)
 - **Verwandter (pausierter) Epic:** „Zentrale Vorlagenverwaltung" → wird hier als **E0** gebaut. Siehe `docs/FEHLER_PDF_FIXES.md` (Abschnitt Gotenberg) und Memory `vorlagenverwaltung-epic`.
@@ -164,12 +164,15 @@ Neuer ENV `BEM_ENCRYPTION_KEY` (64 Hex). `src/lib/encryption.ts` um optionalen K
 - **Bekannte Einschränkung (akzeptiert):** PATCH ist Last-Write-Wins (gesamtes Formular, inkl. Checkliste) — konsistent mit Elternzeit/Mutterschutz (kein Optimistic-Locking im Portal). Jede Änderung wird auditiert; Datenverlust nur bei echt gleichzeitigem Editieren zweier Freigegebener. Optimistic-Locking ggf. portalweit später.
 - **Hinweis Checklisten-Inhalt:** Default-Texte praxisnah abgeleitet; können 1:1 an die finalen CREDO-Word-Vorlagen (`BEM/`, lokal) angeglichen werden.
 
-### E4 — Einladung & Einwilligung (digital + Papier)  ·  ~2–3 Tage
-- [ ] Magic-Link-Formular `src/app/bem/einwilligung/[token]/` (öffentlich, Rate-Limit, Zeitstempel+IP+Hash) — Muster: `fragebogen`/`exit-interview`.
-- [ ] Alternativ: Papier-Scan-Upload (`file-upload.ts`).
-- [ ] Widerruf jederzeit; `BemEinwilligung`-Status pflegen; Mail **direkt via `sendEmail()` (SMTP, kein n8n)** — siehe Entscheidung #9.
-- [ ] **CREDO-CI-HTML-Mail-Layout** (User-Wunsch 2026-06-08): wiederverwendbarer Helfer `src/lib/email-layout.ts` (`renderCredoEmail({titel, bodyHtml, button?})`), Tabellen-Layout + Inline-Styles (Mail-Client-kompatibel), CI-Farben (Primär `#575756`, CREDO-Linie `#FBC900`/`#6BAA24`/`#E2001A`/`#009AC6`, Montserrat→Arial-Fallback, **keine Verläufe**), CREDO-Logo (`public/credo_logo*.svg`) per absoluter `APP_URL` oder CID-Embed. BEM-Mails rendern darüber; modulübergreifend nutzbar. Bestehende dunkelblaue Vorlagen (`default-email-templates.ts`) bleiben unberührt.
-- **DoD:** Beide Wege erzeugen gültige, nachweisbare Einwilligung; Widerruf setzt Status + Audit.
+### E4 — Einladung & Einwilligung (digital + Papier)  ·  ~2–3 Tage  ·  ✅ UMGESETZT (2026-06-08)
+- [x] **CREDO-CI-HTML-Mail-Layout** `src/lib/email-layout.ts` (`renderCredoEmail({titel, intro?, bodyHtml, button?, fussnote?})` + `paragraphsToHtml`): Tabellen-Layout, Inline-Styles, CI-Farben + CREDO-Linie, Logo per `APP_URL`, escaping, nur http(s)-Buttons. Modulübergreifend nutzbar.
+- [x] Einladung `POST /api/bem/[id]/einladung`: Magic-Link (nur Hash in DB), Mail **SMTP-direkt** im CI-Layout, Versandnachweis `BemKommunikation` (+Message-ID); Status→`EINLADUNG_VERSENDET` (race-frei aus ANGELEGT); SMTP-Fehler → 502 + Link zur manuellen Zustellung + `FEHLGESCHLAGEN`-Protokoll. Neuversand entwertet alte offene Tokens.
+- [x] Öffentliches Formular `src/app/bem/einwilligung/[token]/` + API `GET/POST /api/bem/einwilligung/[token]` (außerhalb `(portal)`-Auth): Rate-Limit, **Single-Use race-frei**, Zeitstempel/IP/Name, **HMAC-Integritäts-Hash** (Server-Secret), kein Inhalts-Leak. Status- + Fall-Fortschreibung + Audit **atomar in einer Transaktion**.
+- [x] Papier-Scan-Upload `POST /api/bem/[id]/einwilligung/papier` (`validateUpload` Magic-Bytes, Ablage `NUR_BEM`, SHA256-Prüfsumme, `BemDokument` + `BemEinwilligung`).
+- [x] Widerruf `POST /api/bem/[id]/einwilligung/[einwilligungId]/widerruf` (race-frei, Audit `EINWILLIGUNG_WIDERRUFEN`).
+- [x] UI: Detailseite-Tab **Einwilligung** (Einladung-/Papier-Modal, Status-Liste, Widerruf).
+- [x] Adversariell reviewt (Workflow, 8 Findings; behoben: Token-Leak in Response, Audit-Atomarität, HMAC-Hash, Token-Entwertung, URL-Guard).
+- **DoD:** ✅ Beide Wege erzeugen gültige, nachweisbare Einwilligung (signedAt/Ip/Name + HMAC-Hash); Widerruf setzt Status + Audit; Versand ist prüfungssicher protokolliert. ⏳ Runtime-Verifikation auf Server (DB + SMTP + `BEM_ENCRYPTION_KEY`).
 
 ### E5 — BEM-Vorlagen, Aktentrennung & Mitarbeiter-Export  ·  ~3 Tage  ·  **nach E0**
 - [ ] Die 7 CREDO-Vorlagen als `DocumentTemplate` hinterlegen + Platzhalter mappen (Resolver für Modul „BEM").
