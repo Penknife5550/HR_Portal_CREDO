@@ -12,6 +12,7 @@ import {
   statusLabel,
   type BemStatus,
 } from "@/lib/bem-workflow";
+import { getBemCheckliste } from "@/lib/bem-checkliste-template";
 
 interface User {
   userId: string;
@@ -50,6 +51,37 @@ interface AuditEntry {
   user: { firstName: string; lastName: string } | null;
 }
 
+interface Teilnehmer {
+  name: string;
+  rolle?: string | null;
+}
+
+interface ChecklistItem {
+  titel: string;
+  erledigt: boolean;
+}
+
+interface Gespraech {
+  id: string;
+  typ: string;
+  datum: string | null;
+  ort: string | null;
+  teilnehmer: Teilnehmer[] | null;
+  notizen: string | null;
+  checkliste: ChecklistItem[] | null;
+  naechsterTermin: string | null;
+}
+
+interface Massnahme {
+  id: string;
+  kategorie: string;
+  beschreibung: string;
+  zustaendig: string | null;
+  frist: string | null;
+  status: string;
+  evaluationAm: string | null;
+}
+
 interface BemFall {
   id: string;
   displayId: string;
@@ -69,6 +101,8 @@ interface BemFall {
   createdAt: string;
   organization: { id: string; name: string; mandantNumber: string } | null;
   zugriffe: Zugriff[];
+  gespraeche: Gespraech[];
+  massnahmen: Massnahme[];
   kommunikation: Kommunikation[];
   auditLogs: AuditEntry[];
   _count: {
@@ -102,6 +136,12 @@ const ACTION_LABELS: Record<string, string> = {
   BEM_EINLADUNG_VERSENDET: "Einladung versendet",
   BEM_MAIL_VERSENDET: "Mail versendet",
   BEM_DOKUMENT_GENERIERT: "Dokument generiert",
+  BEM_GESPRAECH_ERFASST: "Gespraech erfasst",
+  BEM_GESPRAECH_AKTUALISIERT: "Gespraech aktualisiert",
+  BEM_GESPRAECH_GELOESCHT: "Gespraech geloescht",
+  BEM_MASSNAHME_ERFASST: "Massnahme erfasst",
+  BEM_MASSNAHME_AKTUALISIERT: "Massnahme aktualisiert",
+  BEM_MASSNAHME_GELOESCHT: "Massnahme geloescht",
 };
 
 const ROLLE_LABELS: Record<string, string> = {
@@ -110,6 +150,33 @@ const ROLLE_LABELS: Record<string, string> = {
   BR: "Betriebsrat",
   SBV: "Schwerbehindertenvertretung",
 };
+
+const GESPRAECH_TYP_LABELS: Record<string, string> = {
+  ERSTGESPRAECH: "Erstgespraech",
+  FOLGEGESPRAECH: "Folgegespraech",
+  GEDAECHTNISPROTOKOLL: "Gedaechtnisprotokoll",
+};
+
+const KATEGORIE_LABELS: Record<string, string> = {
+  TECHNISCH: "Technisch",
+  ORGANISATORISCH: "Organisatorisch",
+  PERSONENBEZOGEN: "Personenbezogen",
+};
+
+const MASSNAHME_STATUS_LABELS: Record<string, string> = {
+  OFFEN: "Offen",
+  LAEUFT: "Laeuft",
+  UMGESETZT: "Umgesetzt",
+  VERWORFEN: "Verworfen",
+};
+
+const INPUT_CLASS =
+  "mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring";
+
+function dateInputValue(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toISOString().slice(0, 10);
+}
 
 const TERMINAL_TARGETS: BemStatus[] = [
   "ABGEBROCHEN",
@@ -145,8 +212,16 @@ export function BemDetailContent({
   const [fall, setFall] = useState<BemFall | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"uebersicht" | "protokoll">("uebersicht");
+  const [tab, setTab] = useState<
+    "uebersicht" | "gespraeche" | "massnahmen" | "protokoll"
+  >("uebersicht");
   const [busy, setBusy] = useState(false);
+  const [gespraechModal, setGespraechModal] = useState<Gespraech | "new" | null>(
+    null,
+  );
+  const [massnahmeModal, setMassnahmeModal] = useState<Massnahme | "new" | null>(
+    null,
+  );
 
   // Stiller Refetch (kein Spinner) — verhindert Scroll-Sprung nach Aktionen.
   const load = useCallback(
@@ -201,6 +276,27 @@ export function BemDetailContent({
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         setError(j.error || "Statuswechsel fehlgeschlagen.");
+        return;
+      }
+      await load(true);
+    } catch {
+      setError("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(kind: "gespraeche" | "massnahmen", entityId: string) {
+    const label = kind === "gespraeche" ? "Gespraech" : "Massnahme";
+    if (!window.confirm(`${label} wirklich loeschen?`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/bem/${bemFallId}/${kind}/${entityId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error || "Loeschen fehlgeschlagen.");
         return;
       }
       await load(true);
@@ -352,13 +448,15 @@ export function BemDetailContent({
         </div>
 
         {/* Tabs */}
-        <div className="mb-4 flex gap-2 border-b border-border">
+        <div className="mb-4 flex flex-wrap gap-2 border-b border-border">
           {(
             [
-              ["uebersicht", "Uebersicht"],
-              ["protokoll", "Protokoll"],
+              ["uebersicht", "Uebersicht", null],
+              ["gespraeche", "Gespraeche", fall.gespraeche.length],
+              ["massnahmen", "Massnahmen", fall.massnahmen.length],
+              ["protokoll", "Protokoll", fall.kommunikation.length + fall.auditLogs.length],
             ] as const
-          ).map(([val, label]) => (
+          ).map(([val, label, count]) => (
             <button
               key={val}
               type="button"
@@ -370,16 +468,14 @@ export function BemDetailContent({
               }`}
             >
               {label}
-              {val === "protokoll" && (
-                <span className="ml-1 text-xs text-muted-foreground">
-                  ({fall.kommunikation.length + fall.auditLogs.length})
-                </span>
+              {count !== null && (
+                <span className="ml-1 text-xs text-muted-foreground">({count})</span>
               )}
             </button>
           ))}
         </div>
 
-        {tab === "uebersicht" ? (
+        {tab === "uebersicht" && (
           <div className="grid gap-6 md:grid-cols-2">
             {/* Stammdaten */}
             <div className="rounded-xl border border-border bg-card p-5">
@@ -411,8 +507,8 @@ export function BemDetailContent({
                 <span>{fall._count.dokumente} Dokumente</span>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Gespraeche, Massnahmen, Einwilligung &amp; Dokumente folgen in den
-                naechsten Ausbaustufen (E3–E5).
+                Einwilligung &amp; Dokumente folgen in den naechsten Ausbaustufen
+                (E4–E5).
               </p>
             </div>
 
@@ -446,10 +542,54 @@ export function BemDetailContent({
               </p>
             </div>
           </div>
-        ) : (
-          <ProtokollTab fall={fall} />
         )}
+
+        {tab === "gespraeche" && (
+          <GespraecheTab
+            fall={fall}
+            busy={busy}
+            onNew={() => setGespraechModal("new")}
+            onEdit={(g) => setGespraechModal(g)}
+            onDelete={(gid) => remove("gespraeche", gid)}
+          />
+        )}
+
+        {tab === "massnahmen" && (
+          <MassnahmenTab
+            fall={fall}
+            busy={busy}
+            onNew={() => setMassnahmeModal("new")}
+            onEdit={(m) => setMassnahmeModal(m)}
+            onDelete={(mid) => remove("massnahmen", mid)}
+          />
+        )}
+
+        {tab === "protokoll" && <ProtokollTab fall={fall} />}
       </main>
+
+      {gespraechModal && (
+        <GespraechModal
+          bemFallId={bemFallId}
+          gespraech={gespraechModal === "new" ? null : gespraechModal}
+          onClose={() => setGespraechModal(null)}
+          onSaved={async () => {
+            setGespraechModal(null);
+            await load(true);
+          }}
+        />
+      )}
+
+      {massnahmeModal && (
+        <MassnahmeModal
+          bemFallId={bemFallId}
+          massnahme={massnahmeModal === "new" ? null : massnahmeModal}
+          onClose={() => setMassnahmeModal(null)}
+          onSaved={async () => {
+            setMassnahmeModal(null);
+            await load(true);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -572,5 +712,686 @@ function ProtokollTab({ fall }: { fall: BemFall }) {
         </table>
       </div>
     </div>
+  );
+}
+
+// =============================================
+// Tab: Gespraeche
+// =============================================
+function GespraecheTab({
+  fall,
+  busy,
+  onNew,
+  onEdit,
+  onDelete,
+}: {
+  fall: BemFall;
+  busy: boolean;
+  onNew: () => void;
+  onEdit: (g: Gespraech) => void;
+  onDelete: (gid: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={onNew}
+          className="rounded-lg bg-credo-blau px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
+        >
+          + Gespraech
+        </button>
+      </div>
+      {fall.gespraeche.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          Noch keine Gespraeche dokumentiert.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {fall.gespraeche.map((g) => {
+            const ckTotal = g.checkliste?.length || 0;
+            const ckDone = g.checkliste?.filter((c) => c.erledigt).length || 0;
+            return (
+              <div key={g.id} className="rounded-xl border border-border bg-card p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-foreground">
+                      {GESPRAECH_TYP_LABELS[g.typ] || g.typ}
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {formatDate(g.datum)}
+                      {g.ort ? ` · ${g.ort}` : ""}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(g)}
+                      className="rounded-md border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
+                    >
+                      Bearbeiten
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onDelete(g.id)}
+                      className="rounded-md border border-credo-rot/40 px-3 py-1 text-xs font-medium text-credo-rot hover:bg-credo-rot/10 disabled:opacity-50"
+                    >
+                      Loeschen
+                    </button>
+                  </div>
+                </div>
+
+                {g.teilnehmer && g.teilnehmer.length > 0 && (
+                  <div className="mt-3 text-sm">
+                    <span className="text-muted-foreground">Teilnehmende: </span>
+                    {g.teilnehmer
+                      .map((t) => (t.rolle ? `${t.name} (${t.rolle})` : t.name))
+                      .join(", ")}
+                  </div>
+                )}
+
+                {g.notizen && (
+                  <div className="mt-3 whitespace-pre-wrap rounded-lg bg-muted/40 p-3 text-sm text-foreground">
+                    {g.notizen}
+                  </div>
+                )}
+
+                {ckTotal > 0 && (
+                  <div className="mt-3">
+                    <div className="mb-1 text-xs text-muted-foreground">
+                      Checkliste: {ckDone}/{ckTotal} erledigt
+                    </div>
+                    <ul className="space-y-1 text-sm">
+                      {g.checkliste!.map((c, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <span
+                            className={
+                              c.erledigt ? "text-credo-gruen" : "text-muted-foreground"
+                            }
+                          >
+                            {c.erledigt ? "✓" : "○"}
+                          </span>
+                          <span
+                            className={
+                              c.erledigt ? "text-foreground" : "text-muted-foreground"
+                            }
+                          >
+                            {c.titel}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {g.naechsterTermin && (
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    Naechster Termin: {formatDate(g.naechsterTermin)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================
+// Tab: Massnahmen
+// =============================================
+function MassnahmenTab({
+  fall,
+  busy,
+  onNew,
+  onEdit,
+  onDelete,
+}: {
+  fall: BemFall;
+  busy: boolean;
+  onNew: () => void;
+  onEdit: (m: Massnahme) => void;
+  onDelete: (mid: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={onNew}
+          className="rounded-lg bg-credo-blau px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
+        >
+          + Massnahme
+        </button>
+      </div>
+      {fall.massnahmen.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          Noch keine Massnahmen erfasst.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-border bg-muted/50 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">Kategorie</th>
+                <th className="px-4 py-3 font-medium">Beschreibung</th>
+                <th className="px-4 py-3 font-medium">Zustaendig</th>
+                <th className="px-4 py-3 font-medium">Frist</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {fall.massnahmen.map((m) => (
+                <tr key={m.id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                      {KATEGORIE_LABELS[m.kategorie] || m.kategorie}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-foreground">{m.beschreibung}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {m.zustaendig || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {formatDate(m.frist)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={
+                        m.status === "UMGESETZT"
+                          ? "text-credo-gruen"
+                          : m.status === "VERWORFEN"
+                            ? "text-muted-foreground"
+                            : "text-credo-blau"
+                      }
+                    >
+                      {MASSNAHME_STATUS_LABELS[m.status] || m.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(m)}
+                        className="rounded-md border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
+                      >
+                        Bearbeiten
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onDelete(m.id)}
+                        className="rounded-md border border-credo-rot/40 px-3 py-1 text-xs font-medium text-credo-rot hover:bg-credo-rot/10 disabled:opacity-50"
+                      >
+                        Loeschen
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================
+// Modal-Bausteine
+// =============================================
+function ModalShell({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card p-6 shadow-xl"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Schliessen"
+          >
+            ✕
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ModalActions({
+  onClose,
+  onConfirm,
+  confirmLabel,
+  disabled,
+}: {
+  onClose: () => void;
+  onConfirm: () => void;
+  confirmLabel: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="mt-6 flex justify-end gap-3">
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
+      >
+        Abbrechen
+      </button>
+      <button
+        type="button"
+        onClick={onConfirm}
+        disabled={disabled}
+        className="rounded-lg bg-credo-blau px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90 disabled:opacity-50"
+      >
+        {confirmLabel}
+      </button>
+    </div>
+  );
+}
+
+// =============================================
+// Gespraech-Modal (anlegen / bearbeiten)
+// =============================================
+function GespraechModal({
+  bemFallId,
+  gespraech,
+  onClose,
+  onSaved,
+}: {
+  bemFallId: string;
+  gespraech: Gespraech | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = !!gespraech;
+  const [typ, setTyp] = useState<string>(gespraech?.typ || "ERSTGESPRAECH");
+  const [datum, setDatum] = useState(dateInputValue(gespraech?.datum ?? null));
+  const [ort, setOrt] = useState(gespraech?.ort || "");
+  const [naechsterTermin, setNaechsterTermin] = useState(
+    dateInputValue(gespraech?.naechsterTermin ?? null),
+  );
+  const [notizen, setNotizen] = useState(gespraech?.notizen || "");
+  const [teilnehmer, setTeilnehmer] = useState<Teilnehmer[]>(
+    gespraech?.teilnehmer && gespraech.teilnehmer.length > 0
+      ? gespraech.teilnehmer
+      : [{ name: "", rolle: "" }],
+  );
+  const [checkliste, setCheckliste] = useState<ChecklistItem[]>(
+    gespraech?.checkliste && gespraech.checkliste.length > 0
+      ? gespraech.checkliste
+      : getBemCheckliste((gespraech?.typ as never) || "ERSTGESPRAECH"),
+  );
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  function changeTyp(newTyp: string) {
+    setTyp(newTyp);
+    // Beim Anlegen: Checkliste an neuen Typ anpassen (nur wenn unveraendert/leer).
+    if (!isEdit) {
+      setCheckliste(getBemCheckliste(newTyp as never));
+    }
+  }
+
+  async function handleSubmit() {
+    setErr("");
+    setSaving(true);
+    const cleanTeilnehmer = teilnehmer
+      .filter((t) => t.name.trim() !== "")
+      .map((t) => ({ name: t.name.trim(), rolle: t.rolle?.trim() || null }));
+    const payload = {
+      ...(isEdit ? {} : { typ }),
+      datum: datum || null,
+      ort: ort.trim() || null,
+      teilnehmer: cleanTeilnehmer,
+      notizen: notizen.trim() || null,
+      checkliste,
+      naechsterTermin: naechsterTermin || null,
+    };
+    try {
+      const url = isEdit
+        ? `/api/bem/${bemFallId}/gespraeche/${gespraech!.id}`
+        : `/api/bem/${bemFallId}/gespraeche`;
+      const res = await fetch(url, {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error || "Speichern fehlgeschlagen.");
+        return;
+      }
+      onSaved();
+    } catch {
+      setErr("Verbindungsfehler.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ModalShell
+      title={isEdit ? "Gespraech bearbeiten" : "Neues Gespraech"}
+      onClose={onClose}
+    >
+      {err && (
+        <div className="mb-4 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-2 text-sm text-credo-rot">
+          {err}
+        </div>
+      )}
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium">Typ</label>
+            <select
+              value={typ}
+              onChange={(e) => changeTyp(e.target.value)}
+              disabled={isEdit}
+              className={INPUT_CLASS}
+            >
+              {Object.entries(GESPRAECH_TYP_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Datum</label>
+            <input
+              type="date"
+              value={datum}
+              onChange={(e) => setDatum(e.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium">Ort</label>
+          <input
+            value={ort}
+            onChange={(e) => setOrt(e.target.value)}
+            className={INPUT_CLASS}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">Teilnehmende</label>
+          <div className="mt-1 space-y-2">
+            {teilnehmer.map((t, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  value={t.name}
+                  onChange={(e) =>
+                    setTeilnehmer((prev) =>
+                      prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)),
+                    )
+                  }
+                  placeholder="Name"
+                  className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+                <input
+                  value={t.rolle || ""}
+                  onChange={(e) =>
+                    setTeilnehmer((prev) =>
+                      prev.map((x, j) => (j === i ? { ...x, rolle: e.target.value } : x)),
+                    )
+                  }
+                  placeholder="Rolle (optional)"
+                  className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTeilnehmer((prev) =>
+                      prev.length > 1 ? prev.filter((_, j) => j !== i) : prev,
+                    )
+                  }
+                  className="rounded-md border border-border px-2 text-muted-foreground hover:bg-accent"
+                  aria-label="Entfernen"
+                >
+                  −
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setTeilnehmer((prev) => [...prev, { name: "", rolle: "" }])}
+              className="text-xs text-credo-blau hover:underline"
+            >
+              + Teilnehmende:n hinzufuegen
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">
+            Notizen (vertraulich, verschluesselt)
+          </label>
+          <textarea
+            value={notizen}
+            onChange={(e) => setNotizen(e.target.value)}
+            rows={4}
+            className={INPUT_CLASS}
+          />
+        </div>
+
+        {checkliste.length > 0 && (
+          <div>
+            <label className="text-sm font-medium">Checkliste</label>
+            <ul className="mt-1 space-y-1">
+              {checkliste.map((c, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={c.erledigt}
+                    onChange={(e) =>
+                      setCheckliste((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, erledigt: e.target.checked } : x,
+                        ),
+                      )
+                    }
+                    className="mt-0.5"
+                  />
+                  <span>{c.titel}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div>
+          <label className="text-sm font-medium">Naechster Termin (optional)</label>
+          <input
+            type="date"
+            value={naechsterTermin}
+            onChange={(e) => setNaechsterTermin(e.target.value)}
+            className={INPUT_CLASS}
+          />
+        </div>
+      </div>
+
+      <ModalActions
+        onClose={onClose}
+        onConfirm={handleSubmit}
+        confirmLabel={saving ? "Speichern…" : "Speichern"}
+        disabled={saving}
+      />
+    </ModalShell>
+  );
+}
+
+// =============================================
+// Massnahme-Modal (anlegen / bearbeiten)
+// =============================================
+function MassnahmeModal({
+  bemFallId,
+  massnahme,
+  onClose,
+  onSaved,
+}: {
+  bemFallId: string;
+  massnahme: Massnahme | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = !!massnahme;
+  const [kategorie, setKategorie] = useState(massnahme?.kategorie || "TECHNISCH");
+  const [beschreibung, setBeschreibung] = useState(massnahme?.beschreibung || "");
+  const [zustaendig, setZustaendig] = useState(massnahme?.zustaendig || "");
+  const [frist, setFrist] = useState(dateInputValue(massnahme?.frist ?? null));
+  const [evaluationAm, setEvaluationAm] = useState(
+    dateInputValue(massnahme?.evaluationAm ?? null),
+  );
+  const [status, setStatus] = useState(massnahme?.status || "OFFEN");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleSubmit() {
+    setErr("");
+    if (!beschreibung.trim()) {
+      setErr("Beschreibung ist erforderlich.");
+      return;
+    }
+    setSaving(true);
+    const payload: Record<string, unknown> = {
+      kategorie,
+      beschreibung: beschreibung.trim(),
+      zustaendig: zustaendig.trim() || null,
+      frist: frist || null,
+      evaluationAm: evaluationAm || null,
+    };
+    if (isEdit) payload.status = status;
+    try {
+      const url = isEdit
+        ? `/api/bem/${bemFallId}/massnahmen/${massnahme!.id}`
+        : `/api/bem/${bemFallId}/massnahmen`;
+      const res = await fetch(url, {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error || "Speichern fehlgeschlagen.");
+        return;
+      }
+      onSaved();
+    } catch {
+      setErr("Verbindungsfehler.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ModalShell
+      title={isEdit ? "Massnahme bearbeiten" : "Neue Massnahme"}
+      onClose={onClose}
+    >
+      {err && (
+        <div className="mb-4 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-2 text-sm text-credo-rot">
+          {err}
+        </div>
+      )}
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium">Kategorie</label>
+            <select
+              value={kategorie}
+              onChange={(e) => setKategorie(e.target.value)}
+              className={INPUT_CLASS}
+            >
+              {Object.entries(KATEGORIE_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {isEdit && (
+            <div>
+              <label className="text-sm font-medium">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className={INPUT_CLASS}
+              >
+                {Object.entries(MASSNAHME_STATUS_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className="text-sm font-medium">Beschreibung (verschluesselt)</label>
+          <textarea
+            value={beschreibung}
+            onChange={(e) => setBeschreibung(e.target.value)}
+            rows={3}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="text-sm font-medium">Zustaendig</label>
+            <input
+              value={zustaendig}
+              onChange={(e) => setZustaendig(e.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Frist</label>
+            <input
+              type="date"
+              value={frist}
+              onChange={(e) => setFrist(e.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Evaluation am</label>
+            <input
+              type="date"
+              value={evaluationAm}
+              onChange={(e) => setEvaluationAm(e.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+        </div>
+      </div>
+
+      <ModalActions
+        onClose={onClose}
+        onConfirm={handleSubmit}
+        confirmLabel={saving ? "Speichern…" : "Speichern"}
+        disabled={saving}
+      />
+    </ModalShell>
   );
 }

@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canAccessBemContent } from "@/lib/permissions";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
+import { decryptBem } from "@/lib/encryption";
 
 function clientIp(req: NextRequest): string | null {
   return (
@@ -50,6 +51,8 @@ export async function GET(
           },
           orderBy: { grantedAt: "asc" },
         },
+        gespraeche: { orderBy: [{ datum: "asc" }, { createdAt: "asc" }] },
+        massnahmen: { orderBy: { createdAt: "asc" } },
         kommunikation: {
           orderBy: { gesendetAm: "desc" },
           include: {
@@ -76,6 +79,20 @@ export async function GET(
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
 
+    // Verschluesselte Freitexte (BEM_ENCRYPTION_KEY) fuer die Anzeige
+    // entschluesseln. decryptBem gibt Legacy-/Leerwerte unveraendert zurueck.
+    const decrypted = {
+      ...fall,
+      gespraeche: fall.gespraeche.map((g) => ({
+        ...g,
+        notizen: g.notizen ? decryptBem(g.notizen) : g.notizen,
+      })),
+      massnahmen: fall.massnahmen.map((m) => ({
+        ...m,
+        beschreibung: m.beschreibung ? decryptBem(m.beschreibung) : m.beschreibung,
+      })),
+    };
+
     // Lese-Audit (Compliance): jeder Zugriff wird protokolliert.
     await logBemAudit({
       bemFallId: id,
@@ -84,7 +101,7 @@ export async function GET(
       ipAddress: clientIp(request),
     });
 
-    return NextResponse.json({ data: fall });
+    return NextResponse.json({ data: decrypted });
   } catch (error) {
     console.error("[API] BEM [id] GET fehlgeschlagen:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });

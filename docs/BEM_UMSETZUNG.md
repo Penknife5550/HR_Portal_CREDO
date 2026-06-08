@@ -3,7 +3,7 @@
 > **Single Source of Truth** für den Bau des BEM-Moduls (Betriebliches Eingliederungs­management, § 167 Abs. 2 SGB IX).
 > Diese Datei ist so geschrieben, dass jede Session genau weiß, was als Nächstes zu tun ist.
 
-- **Status:** **E0 + E1 + E2 umgesetzt.** E0 (Vorlagenbibliothek) 2026-06-03, E1 (versiegelte Akte) + E2 (Workflow/Dashboard/Detailseite) 2026-06-08 — alle build/lint/test gruen. Auf Server ausstehend: `BEM_ENCRYPTION_KEY` setzen, `db push` (via entrypoint), Gotenberg-Container. Naechster Schritt: **E3** (Gespräche, Checklisten & Maßnahmen). Entscheidungen 2026-06-08: BEM-Mails immer SMTP-direkt (#9), prüfungssichere Nachvollziehbarkeit `BemKommunikation` (NFR 0a), CREDO-CI-HTML-Mails (E4), Auto-Freigabe für Anlegende:n (E2).
+- **Status:** **E0 + E1 + E2 + E3 umgesetzt.** E0 (Vorlagenbibliothek) 2026-06-03; E1 (versiegelte Akte) + E2 (Workflow/Dashboard/Detailseite) + E3 (Gespräche/Checklisten/Maßnahmen) 2026-06-08 — alle build/lint/test gruen, E3 adversariell reviewt (3 Findings gefixt). Auf Server ausstehend: `BEM_ENCRYPTION_KEY` setzen, `db push` (via entrypoint), Gotenberg-Container. Naechster Schritt: **E4** (Einladung & Einwilligung digital + Papier, inkl. CREDO-CI-Mail-Layout). Entscheidungen 2026-06-08: BEM-Mails immer SMTP-direkt (#9), prüfungssichere Nachvollziehbarkeit `BemKommunikation` (NFR 0a), CREDO-CI-HTML-Mails (E4), Auto-Freigabe für Anlegende:n (E2).
 - **Plan-Dokument (Übersicht + Mockups):** `BEM/BEM_Modul_Plan.html`
 - **Quell-Unterlagen + 7 Word-Vorlagen:** `BEM/` (`0_Gedaechnisprotokoll…` … `4_Datenschutzvereinbarung…`, `Allg. Info Credo.pdf`)
 - **Verwandter (pausierter) Epic:** „Zentrale Vorlagenverwaltung" → wird hier als **E0** gebaut. Siehe `docs/FEHLER_PDF_FIXES.md` (Abschnitt Gotenberg) und Memory `vorlagenverwaltung-epic`.
@@ -153,11 +153,16 @@ Neuer ENV `BEM_ENCRYPTION_KEY` (64 Hex). `src/lib/encryption.ts` um optionalen K
 
 **Design-Entscheidung E2 (2026-06-08):** Beim Anlegen erhält der/die Anlegende automatisch eine `BemZugriff(BEAUFTRAGTE)`-Freigabe (sonst wäre der eigene Fall unsichtbar) — explizit auditiert, **kein** globaler Bypass.
 
-### E3 — Gespräche, Checklisten & Maßnahmen  ·  ~3 Tage
-- [ ] `BemGespraech`-CRUD (Erst/Folge/Gedächtnis) mit Pflicht-Checklisten aus den CREDO-Vorlagen; Freitext **verschlüsselt** (`BEM_ENCRYPTION_KEY`).
-- [ ] `BemMassnahme`-CRUD (Kategorien TECH/ORG/PERSON), Status, Evaluationstermin.
-- [ ] Modals analog `elternzeit-modals.tsx`.
-- **DoD:** Erstgespräch mit Checkliste anlegen; Notizen liegen verschlüsselt in DB; Maßnahmen verwalten.
+### E3 — Gespräche, Checklisten & Maßnahmen  ·  ~3 Tage  ·  ✅ UMGESETZT (2026-06-08)
+- [x] `BemGespraech`-CRUD (Erst/Folge/Gedächtnis) mit Pflicht-Checklisten (`bem-checkliste-template.ts`, vorbefüllt je Typ); Freitext `notizen` **verschlüsselt** (`encryptBem`). API: `POST /api/bem/[id]/gespraeche`, `PATCH/DELETE /api/bem/[id]/gespraeche/[gespraechId]` (alle via `canAccessBemContent` + IDOR-Check).
+- [x] `BemMassnahme`-CRUD (TECH/ORG/PERSON), Status, Frist, Evaluationstermin; `beschreibung` **verschlüsselt**. API: `POST /api/bem/[id]/massnahmen`, `PATCH/DELETE .../[massnahmeId]`.
+- [x] Entschlüsselung NUR in der zugriffsgeschützten Detail-Route (`GET /api/bem/[id]`), NIE in der Liste, NIE im Audit (Audit-Details enthalten nur IDs/Typen).
+- [x] UI: Detailseite um Tabs **Gespräche** (Modal: Typ, Datum, Ort, Teilnehmer-Zeilen, verschlüsselte Notizen, vorbefüllte Checkliste) + **Maßnahmen** (Tabelle + Modal mit Status) erweitert.
+- [x] Eigene Audit-Actions für create/update/delete (`*_ERFASST`/`*_AKTUALISIERT`/`*_GELOESCHT`) — aus adversarialer Review (NFR 0a, prüfungssichere Unterscheidung).
+- [x] Tests: `bem-e3.test.ts` (Checkliste + Validierung, 11 Tests). Build/Lint grün, 48 BEM-Tests grün.
+- **DoD:** ✅ Gespräch mit Checkliste anlegen/bearbeiten/löschen; Notizen/Maßnahmen-Beschreibung verschlüsselt in DB; Maßnahmen mit Status verwalten. ⏳ Runtime-Verifikation auf Server (DB + `BEM_ENCRYPTION_KEY`).
+- **Bekannte Einschränkung (akzeptiert):** PATCH ist Last-Write-Wins (gesamtes Formular, inkl. Checkliste) — konsistent mit Elternzeit/Mutterschutz (kein Optimistic-Locking im Portal). Jede Änderung wird auditiert; Datenverlust nur bei echt gleichzeitigem Editieren zweier Freigegebener. Optimistic-Locking ggf. portalweit später.
+- **Hinweis Checklisten-Inhalt:** Default-Texte praxisnah abgeleitet; können 1:1 an die finalen CREDO-Word-Vorlagen (`BEM/`, lokal) angeglichen werden.
 
 ### E4 — Einladung & Einwilligung (digital + Papier)  ·  ~2–3 Tage
 - [ ] Magic-Link-Formular `src/app/bem/einwilligung/[token]/` (öffentlich, Rate-Limit, Zeitstempel+IP+Hash) — Muster: `fragebogen`/`exit-interview`.
