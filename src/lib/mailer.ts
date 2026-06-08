@@ -76,16 +76,28 @@ async function createTransporter() {
 // =============================================
 // E-Mail versenden
 // =============================================
-export async function sendEmail(
-  options: MailOptions
-): Promise<SendEmailResult | null> {
-  try {
-    const result = await createTransporter();
-    if (!result) {
-      console.warn("[Mailer] SMTP nicht konfiguriert oder deaktiviert – E-Mail uebersprungen");
-      return null;
-    }
+/**
+ * Detaillierte Variante: liefert bei Fehlschlag den konkreten Grund zurueck
+ * (statt nur null). Wird z.B. vom BEM-Einladungs-Endpunkt genutzt, um die echte
+ * SMTP-Fehlermeldung anzuzeigen und im Versandprotokoll zu hinterlegen.
+ */
+export type SendEmailDetailed =
+  | { ok: true; messageId?: string; accepted: string[] }
+  | { ok: false; error: string };
 
+export async function sendEmailDetailed(
+  options: MailOptions
+): Promise<SendEmailDetailed> {
+  const result = await createTransporter();
+  if (!result) {
+    console.warn("[Mailer] SMTP nicht konfiguriert oder deaktiviert – E-Mail uebersprungen");
+    return {
+      ok: false,
+      error:
+        "SMTP ist nicht konfiguriert oder nicht aktiviert. Bitte unter Einstellungen → SMTP Host/Benutzer/Absender eintragen, 'aktiv' setzen und 'Verbindung testen'.",
+    };
+  }
+  try {
     const info = await result.transporter.sendMail({
       from: result.from,
       to: options.to,
@@ -101,18 +113,24 @@ export async function sendEmail(
 
     console.log(`[Mailer] E-Mail erfolgreich gesendet an: ${options.to.replace(/(.{2}).*(@.*)/, '$1***$2')}`);
     return {
+      ok: true,
       messageId: info.messageId,
       accepted: (info.accepted ?? []).map((a) =>
         typeof a === "string" ? a : a.address
       ),
     };
   } catch (error) {
-    console.error(
-      "[Mailer] E-Mail-Versand fehlgeschlagen:",
-      error instanceof Error ? error.message : error
-    );
-    return null;
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("[Mailer] E-Mail-Versand fehlgeschlagen:", msg);
+    return { ok: false, error: msg };
   }
+}
+
+export async function sendEmail(
+  options: MailOptions
+): Promise<SendEmailResult | null> {
+  const r = await sendEmailDetailed(options);
+  return r.ok ? { messageId: r.messageId, accepted: r.accepted } : null;
 }
 
 // =============================================

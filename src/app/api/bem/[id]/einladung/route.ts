@@ -14,7 +14,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canAccessBemContent } from "@/lib/permissions";
 import { hashToken } from "@/lib/token-hash";
-import { sendEmail } from "@/lib/mailer";
+import { sendEmailDetailed } from "@/lib/mailer";
 import { renderCredoEmail, paragraphsToHtml } from "@/lib/email-layout";
 import { logBemAudit, logBemKommunikation, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { einladungSchema } from "@/lib/validations/bem";
@@ -130,21 +130,22 @@ export async function POST(
       appUrl: baseUrl,
     });
 
-    const sent = await sendEmail({
+    const sent = await sendEmailDetailed({
       to: recipient,
       subject,
       html,
       text: `${textBody}\n\nAntwort-Link: ${magicUrl}`,
     });
 
-    if (!sent) {
+    if (!sent.ok) {
+      // Echten SMTP-Fehler ins Protokoll schreiben (prueffaehig + debugbar).
       await logBemKommunikation({
         bemFallId: id,
         kanal: "EMAIL",
         status: "FEHLGESCHLAGEN",
         empfaenger: recipient,
         betreff: subject,
-        fehlertext: "SMTP nicht konfiguriert oder Versand fehlgeschlagen",
+        fehlertext: sent.error.slice(0, 500),
         ipAddress,
         gesendetById: session.userId,
       });
@@ -152,15 +153,19 @@ export async function POST(
         bemFallId: id,
         userId: session.userId,
         action: BEM_AUDIT_ACTIONS.EINLADUNG_FEHLGESCHLAGEN,
-        details: { einwilligungId: einwilligung.id, art: d.art, empfaenger: recipient },
+        details: {
+          einwilligungId: einwilligung.id,
+          art: d.art,
+          empfaenger: recipient,
+          fehler: sent.error.slice(0, 500),
+        },
         ipAddress,
       });
       // Token bleibt gueltig — HR kann den Link manuell zustellen.
       return NextResponse.json(
         {
-          error:
-            "E-Mail konnte nicht versendet werden (SMTP nicht konfiguriert oder Fehler). " +
-            "Der Einladungs-Link kann manuell zugestellt werden.",
+          error: `E-Mail konnte nicht versendet werden: ${sent.error}`,
+          detail: sent.error,
           magicUrl,
         },
         { status: 502 },
