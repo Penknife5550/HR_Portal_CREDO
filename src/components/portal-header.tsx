@@ -44,6 +44,13 @@ const NAV_GROUPS: NavGroup[] = [
     roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER"],
   },
   {
+    // BEM = "versiegelte Akte". Nav fuer alle Portal-Rollen sichtbar; die Liste
+    // zeigt aber nur Faelle mit aktiver Freigabe (bemFilter) — sonst leer.
+    label: "🔒 BEM",
+    href: "/dashboard/bem",
+    roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER"],
+  },
+  {
     label: "Vorlagen",
     roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"],
     children: [

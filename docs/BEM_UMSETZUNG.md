@@ -3,7 +3,7 @@
 > **Single Source of Truth** für den Bau des BEM-Moduls (Betriebliches Eingliederungs­management, § 167 Abs. 2 SGB IX).
 > Diese Datei ist so geschrieben, dass jede Session genau weiß, was als Nächstes zu tun ist.
 
-- **Status:** **E0 + E1 umgesetzt.** E0 (Vorlagenbibliothek) 2026-06-03, E1 (versiegelte Akte) 2026-06-08 — beide build/lint/test gruen. Auf Server ausstehend: `BEM_ENCRYPTION_KEY` setzen, `db push` (via entrypoint), Gotenberg-Container. Naechster Schritt: **E2** (Workflow, Dashboard, Detailseite). Zusätzliche Entscheidungen 2026-06-08: BEM-Mails immer SMTP-direkt (#9), prüfungssichere Nachvollziehbarkeit `BemKommunikation` (NFR 0a), CREDO-CI-HTML-Mails (E4).
+- **Status:** **E0 + E1 + E2 umgesetzt.** E0 (Vorlagenbibliothek) 2026-06-03, E1 (versiegelte Akte) + E2 (Workflow/Dashboard/Detailseite) 2026-06-08 — alle build/lint/test gruen. Auf Server ausstehend: `BEM_ENCRYPTION_KEY` setzen, `db push` (via entrypoint), Gotenberg-Container. Naechster Schritt: **E3** (Gespräche, Checklisten & Maßnahmen). Entscheidungen 2026-06-08: BEM-Mails immer SMTP-direkt (#9), prüfungssichere Nachvollziehbarkeit `BemKommunikation` (NFR 0a), CREDO-CI-HTML-Mails (E4), Auto-Freigabe für Anlegende:n (E2).
 - **Plan-Dokument (Übersicht + Mockups):** `BEM/BEM_Modul_Plan.html`
 - **Quell-Unterlagen + 7 Word-Vorlagen:** `BEM/` (`0_Gedaechnisprotokoll…` … `4_Datenschutzvereinbarung…`, `Allg. Info Credo.pdf`)
 - **Verwandter (pausierter) Epic:** „Zentrale Vorlagenverwaltung" → wird hier als **E0** gebaut. Siehe `docs/FEHLER_PDF_FIXES.md` (Abschnitt Gotenberg) und Memory `vorlagenverwaltung-epic`.
@@ -143,12 +143,15 @@ Neuer ENV `BEM_ENCRYPTION_KEY` (64 Hex). `src/lib/encryption.ts` um optionalen K
 - [x] **403-Tests** (Jest, `src/__tests__/lib/bem-permissions.test.ts`): globale Rollen ohne Freigabe → kein Zugriff; mit `BemZugriff` → Zugriff. 27 Tests grün.
 - **DoD:** ✅ 403-Tests grün; `npm run build` + `npm run lint` grün; `canCreateBemFall` lässt nur SUPER_ADMIN/BEM-Beauftragte zu. ⏳ **Auf Server:** `BEM_ENCRYPTION_KEY` setzen, `db push` (automatisch via entrypoint).
 
-### E2 — Workflow, Dashboard & Detailseite  ·  ~3–4 Tage
-- [ ] `src/lib/bem-workflow.ts` (Status-Enum, Schritte, `getNaechsterSchritt`, erlaubte Übergänge) + `bem-transitions.ts` (atomar, AuditLog, Webhook nach Commit).
-- [ ] `src/lib/bem-helpers.ts`: `generateBemDisplayId(org)` (`BEM-{YYYY}-{KÜRZEL}-{NR}`, Retry bei Race).
-- [ ] API: `GET/POST /api/bem`, `GET /api/bem/[id]`, Status-Transition-Route.
-- [ ] UI: `/dashboard/bem` (Übersicht, KPIs, Filter, „+ Neuer Fall"), `/dashboard/bem/[id]` (Stepper, Nächster-Schritt-Banner, Tabs). Nav-Eintrag „🔒 BEM" nur für Freigegebene.
-- **DoD:** Fall anlegen → erscheint in Liste; Detailseite zeigt Stepper/Status; Status-Übergang funktioniert + Audit.
+### E2 — Workflow, Dashboard & Detailseite  ·  ~3–4 Tage  ·  ✅ UMGESETZT (2026-06-08)
+- [x] `src/lib/bem-workflow.ts` (BemStatus, BEM_STEPS, `getNaechsterSchritt`, `erlaubteFolgestatus`, `getErlaubteVorgaenger`, `statusLabel`) + `bem-transitions.ts` (atomar via `updateMany` + AuditLog in `$transaction`; **kein Webhook** — BEM ist SMTP-direkt). Zugriff via `canAccessBemContent` (nicht Rolle).
+- [x] `src/lib/bem-helpers.ts`: `generateBemDisplayId(org)` (`BEM-{YYYY}-{KÜRZEL}-{NR}`, Retry bei Race).
+- [x] API: `GET/POST /api/bem` (Liste via `bemFilter`, Anlegen nur SUPER_ADMIN/Beauftragte + **Auto-Freigabe für Anlegende:n**, auditiert), `GET /api/bem/[id]` (Inhalt + Lese-Audit `BEM_AKTE_GEOEFFNET`), `POST /api/bem/[id]/status`.
+- [x] UI: `/dashboard/bem` (KPIs, Filter, Suche, „+ Neuer Fall"-Modal), `/dashboard/bem/[id]` (Stepper, Nächster-Schritt-Banner mit Status-Buttons, Tabs **Übersicht** + **Protokoll** = Versandnachweis & Zugriffs-/Änderungsprotokoll). Nav-Eintrag „🔒 BEM" für alle Portal-Rollen (Liste filtert via `bemFilter`).
+- [x] Tests: `bem-workflow.test.ts` (State-Machine, Vorgänger/Folge-Konsistenz). Build/Lint/Test grün.
+- **DoD:** ✅ Fall anlegen → erscheint in Liste (Anlegende:r auto-freigegeben); Detailseite zeigt Stepper/Status + Nächster-Schritt-Banner; Status-Übergang race-frei + Audit; Protokoll-Tab zeigt Versand-/Zugriffsnachweis. ⏳ Runtime-Verifikation auf Server (DB).
+
+**Design-Entscheidung E2 (2026-06-08):** Beim Anlegen erhält der/die Anlegende automatisch eine `BemZugriff(BEAUFTRAGTE)`-Freigabe (sonst wäre der eigene Fall unsichtbar) — explizit auditiert, **kein** globaler Bypass.
 
 ### E3 — Gespräche, Checklisten & Maßnahmen  ·  ~3 Tage
 - [ ] `BemGespraech`-CRUD (Erst/Folge/Gedächtnis) mit Pflicht-Checklisten aus den CREDO-Vorlagen; Freitext **verschlüsselt** (`BEM_ENCRYPTION_KEY`).
