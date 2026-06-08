@@ -1,0 +1,185 @@
+# BEM-Modul — Umsetzungsdokumentation
+
+> **Single Source of Truth** für den Bau des BEM-Moduls (Betriebliches Eingliederungs­management, § 167 Abs. 2 SGB IX).
+> Diese Datei ist so geschrieben, dass jede Session genau weiß, was als Nächstes zu tun ist.
+
+- **Status:** **E0 (Vorlagenbibliothek-Fundament) umgesetzt** (2026-06-03) — Code build/lint/typecheck gruen, adversariell reviewt (8 Findings gefixt). `prisma db push` + Gotenberg-Container stehen auf dem Server noch aus (lokal keine DB/Docker). Naechster Schritt: **E1** (versiegelte Akte). Plan freigegeben 2026-06-03.
+- **Plan-Dokument (Übersicht + Mockups):** `BEM/BEM_Modul_Plan.html`
+- **Quell-Unterlagen + 7 Word-Vorlagen:** `BEM/` (`0_Gedaechnisprotokoll…` … `4_Datenschutzvereinbarung…`, `Allg. Info Credo.pdf`)
+- **Verwandter (pausierter) Epic:** „Zentrale Vorlagenverwaltung" → wird hier als **E0** gebaut. Siehe `docs/FEHLER_PDF_FIXES.md` (Abschnitt Gotenberg) und Memory `vorlagenverwaltung-epic`.
+
+---
+
+## 0. Kernprinzip (nie vergessen)
+
+Das heutige Portal gilt: **„globale Rollen sehen alles"** (`orgFilter`, `GLOBAL_ROLES` in `src/lib/permissions.ts`).
+BEM **invertiert** das: **niemand** sieht BEM-Inhalte — außer Personen, die für **genau diesen Fall** freigegeben sind (Tabelle `BemZugriff` = Allowlist). Selbst SUPER_ADMIN/HR_LEITUNG dürfen Freigaben *verwalten*, aber Inhalte **nicht lesen**. Strikt getrennt von der Personalakte (gesetzlich vorgeschrieben).
+
+> ⚠️ Das größte Risiko ist **nicht** fehlende Funktion, sondern ein **versehentliches Datenleck**. Jede BEM-Inhalts-Antwort braucht eigene Queries/DTOs. **403-Tests sind Teil der Definition-of-Done.**
+
+---
+
+## 1. Abgestimmte Entscheidungen (2026-06-03)
+
+| # | Thema | Entscheidung |
+|---|-------|--------------|
+| 1 | Zugriffsmodell | **MVP intern** (versiegelte Akte, Auto-Freigabe für gekennzeichnete BEM-Beauftragte). Externe Logins erst **Phase 2 (E7)**. |
+| 2 | Fall-Auslösung | **Manuell** (Phase 1). Fehlzeiten-Automatik erst **Phase 2 (E8)**. |
+| 3 | Mitarbeiter-Einbindung | **Beide Wege:** digital (Magic-Link-Formular) **und** Papier + Scan-Upload. |
+| 4 | Dokumente | **Zentrale Vorlagenbibliothek** (Word-Upload + Variablen, docxtemplater). Ausgabe **Word + PDF (Ausdruck)** und **Mail (online)**. |
+| 5 | Mitarbeiter-Einsicht | **Gesamt-Export** der kompletten Akte als zusammengefasstes PDF (DSGVO Art. 15). |
+| 6 | Wer legt an? | **Nur SUPER_ADMIN + BEM-Beauftragte.** |
+| 7 | Sprache | Nur Deutsch (keine englische Datenschutzvereinbarung). |
+| 8 | Reihenfolge | **E0 vor E5** (Vorlagen-Basis zuerst). |
+
+**Aktentrennungs-Nuance (automatisch umsetzen):**
+- Datenschutzvereinbarung, Gespräche (Erst/Folge/Gedächtnis) → **nur BEM-Akte**.
+- Maßnahmenplan → BEM-Original **+ bereinigte Kopie (ohne med. Details)** in Personalakte.
+- Abbruch- & Beendigungserklärung → **Original Personalakte** (Kündigungsschutz-Nachweis) + Kopie BEM.
+
+**BEM-Beauftragte bei CREDO:** Elena Bergen (elena.bergen@cfh-minden.de) / Danny Bergen (danny.bergen@mvs-minden.de) — extern, für alle 16 Mandanten dieselben (pro Mandant überschreibbar).
+
+---
+
+## 2. Echte Rollen im Portal (Stand verifiziert)
+
+`src/lib/permissions.ts`: `SUPER_ADMIN`, `HR_LEITUNG`, `HR_SACHBEARBEITER` (= `GLOBAL_ROLES`, sehen alles), `EINRICHTUNGSLEITUNG`, `VORGESETZTER` (= `ORG_RESTRICTED_ROLES`), `SERVICE` (n8n).
+> Die in der alten CLAUDE.md genannten Rollen (`ADMIN`, `HR_STAFF`, `VIEWER`) sind **veraltet** — nicht verwenden.
+
+---
+
+## 3. Architektur-Überblick
+
+### 3.1 Neue Prisma-Modelle (BEM)
+- `BemFall` — id, displayId (`BEM-2026-GYM-001`), organizationId→Organization, employeeId→Employee, status (`BemStatus`), eingangsweg (`DIGITAL|PAPIER`), anlassFehlzeitenAb, einladungAm, datenschutzAm, beendetAm, beendigungsgrund, aufbewahrungBis, geloeschtAm, createdBy.
+- `BemZugriff` — id, bemFallId, userId, rolle (`BEAUFTRAGTE|VERTRETUNG|BR|SBV`), grantedBy, grantedAt, revokedAt. **= die „Versiegelung".**
+- `BemGespraech` — id, bemFallId, typ (`ERSTGESPRAECH|FOLGEGESPRAECH|GEDAECHTNISPROTOKOLL`), datum, ort, teilnehmer (Json), **notizen (Text, verschlüsselt)**, checkliste (Json), naechsterTermin, createdBy.
+- `BemMassnahme` — id, bemFallId, kategorie (`TECHNISCH|ORGANISATORISCH|PERSONENBEZOGEN`), **beschreibung (verschlüsselt)**, zustaendig, frist, status, evaluationAm.
+- `BemEinwilligung` — id, bemFallId, art (`DATENSCHUTZ|DURCHFUEHRUNG|BR|SBV`), status (`OFFEN|ERTEILT|ABGELEHNT|WIDERRUFEN`), token, tokenExpiry, signedAt, signedIp, signedName, dokumentHash.
+- `BemDokument` — id, bemFallId, typ (`BemDokumentTyp`), ablage (`NUR_BEM|KOPIE_PERSONALAKTE`), quelle (`GENERIERT|UPLOAD`), pfad, hash, createdBy.
+- `BemFrist` — id, bemFallId, typ, faelligAm, severity, letzteSeverity, erledigt.
+
+**Enums:** `BemStatus` (`ANGELEGT, EINLADUNG_VERSENDET, EINWILLIGUNG_ERTEILT, EINWILLIGUNG_ABGELEHNT, ERSTGESPRAECH, MASSNAHMEN_LAUFEN, ABGESCHLOSSEN, ABGEBROCHEN, AUFBEWAHRUNG, GELOESCHT`), `BemGespraechTyp`, `BemMassnahmeKategorie`, `BemDokumentTyp`, `BemEinwilligungArt`, `BemZugriffRolle`.
+
+**Erweiterungen bestehender Modelle:**
+- `AuditLog` (~`prisma/schema.prisma:585`): Feld `bemFallId String?` + neue Actions (`BEM_*`, inkl. `BEM_AKTE_GEOEFFNET` für Lese-Zugriffe).
+- `Organization`: `bemDefaultBeauftragte` (Namen/E-Mails analog zu `ez…`-Feldern), `bemAufbewahrungJahre Int @default(4)`.
+- `User`: `isBemBeauftragte Boolean @default(false)` (Phase-1-Kennzeichnung; volle Rolle in E7).
+
+### 3.2 Gemeinsame Vorlagenbibliothek (E0, modulübergreifend)
+- `DocumentTemplate` — id, name, modul, dateipfad (.docx), platzhalter (Json), scope (global/Mandant), createdBy.
+- `GeneratedDocument` — id, templateId, modul, refId (z.B. bemFallId), pfadDocx, pfadPdf, createdBy, audit.
+- Rendering: **docxtemplater** (angular-parser für Wenn/Dann). `.docx → PDF` via **Gotenberg-Container** (docker-compose, `internal`-Netz).
+- Upload-UI unter **`/brief-vorlagen`** (NICHT `/vorlagen` — das sind die Fragebogen-Formularvorlagen!).
+
+### 3.3 Zugriffsmodell (neuer Kern-Baustein)
+Neue Helfer in `src/lib/permissions.ts` (analog zu `orgFilter`/`canAccessProcess`):
+- `bemFilter(session)` → `{ id: { in: <aktive BemZugriff-FallIDs> } }`. Kein Eintrag = kein Zugriff.
+- `canAccessBemContent(session, bemFallId)` → für jede Inhalts-Route.
+- `canManageBemAccess(session)` → SUPER_ADMIN/HR_LEITUNG dürfen Freigaben verwalten, **nicht** Inhalte lesen.
+- `canCreateBemFall(session)` → nur `SUPER_ADMIN` oder `user.isBemBeauftragte`.
+Middleware (`src/middleware.ts`): `/dashboard/bem/*` und `/api/bem/*` schützen.
+
+### 3.4 Verschlüsselung
+Neuer ENV `BEM_ENCRYPTION_KEY` (64 Hex). `src/lib/encryption.ts` um optionalen Key-Parameter erweitern (`encrypt(text, key?)`, `decrypt(text, key?)`), damit BEM-Gesundheits-Felder mit eigenem Schlüssel ver-/entschlüsselt werden (Rotation unabhängig von Personalakte).
+
+---
+
+## 4. Wiederverwendbare Bausteine (Code-Referenzen)
+
+| Zweck | Vorlage im Code |
+|------|------------------|
+| Status-Maschine + atomare Transitions (+ AuditLog, Race-Schutz via `updateMany`) | `src/lib/mutterschutz-workflow.ts`, `src/lib/mutterschutz-transitions.ts` |
+| Workflow-Schritte, displayId-Generierung, Checklisten | `src/lib/elternzeit-workflow.ts`, `elternzeit-helpers.ts`, `elternzeit-checkliste-template.ts` |
+| Fristen + Severity + Cron-Sync | `src/lib/elternzeit-fristen.ts`, `src/app/api/cron/elternzeit-fristen/route.ts` |
+| Cron-Sicherheit (CRON_SECRET + timingSafeCompare) | `src/app/api/cron/reminders/route.ts` |
+| Auth/Tenant/Rollen-Wrapper | `src/lib/api-handler.ts`, `src/lib/permissions.ts`, `src/lib/auth.ts` |
+| Verschlüsselung (AES-256-GCM, `iv:authTag:ciphertext`) | `src/lib/encryption.ts` |
+| Magic-Link (Token-Hash, Validierung, Rate-Limit) | `src/lib/token-hash.ts`, `auth.ts` (`validateMagicToken`), `rate-limit.ts` (`tokenRateLimiter`) |
+| Öffentliches Formular (Muster Einwilligung) | `src/app/fragebogen/[token]/`, `src/app/exit-interview/[token]/` |
+| Mail / n8n / Webhooks | `src/lib/mailer.ts`, `default-email-templates.ts`, `n8n.ts`, `webhooks.ts` (`triggerWebhooks`) |
+| Word-Generierung (Muster) / PDF + DMS-QR | `src/lib/docx-fuehrungszeugnis.ts`, `docx-masernschutz.ts`, `pdf-export.ts` (`buildQRContent`) |
+| File-Upload (Magic-Bytes, Pfad-Schutz) | `src/lib/file-upload.ts` (`validateUpload`, `saveUploadedFile`) |
+| Verantwortliche Stelle (DSGVO) | `src/lib/dsgvo.ts` (`resolveVerantwortlicheStelle`) |
+| UI: Stepper, Nächster-Schritt-Banner | `src/components/prozess-stepper.tsx`, `process-workflow-stepper.tsx` |
+| UI: CREDO-Linie, Header/Nav, Modals, Detailseite | `credo-linie.tsx`, `portal-header.tsx` (`NAV_GROUPS`), `elternzeit/elternzeit-modals.tsx`, `dashboard/elternzeit/[id]/elternzeit-detail-content.tsx` |
+| CI-Farben/Theme | `src/app/globals.css` (Primär `#575756`, Akzent `#DADADA`, CREDO-Linie Gelb `#FBC900`/Grün `#6BAA24`/Rot `#E2001A`/Blau `#009AC6`, Montserrat, **keine Verläufe**) |
+
+---
+
+## 5. Umsetzungsreihenfolge & Tasks
+
+> Konvention: jede Box hat **Ziel**, **Schritte**, **Dateien**, **DoD** (Definition of Done). `[ ]` = offen.
+
+### E0 — Vorlagenbibliothek-Fundament  ·  ~4–6 Tage  ·  **Voraussetzung, vor E5**  ·  ✅ UMGESETZT (2026-06-03)
+**Ziel:** Word-Vorlagen hochladen, Platzhalter befüllen, Ausgabe Word/PDF/Mail. Modulübergreifend.
+- [x] Gotenberg-Service in `docker-compose.yml` (nur `internal`-Netz), Health-Check. (+ `GOTENBERG_URL` in `.env(.production).example`)
+- [x] `docxtemplater` + `pizzip` (+ `angular-expressions` Peer für Wenn/Dann, `@types/pizzip`) als Dependencies; Render-Lib `src/lib/doc-templates.ts` (Platzhalter füllen, angular-parser, fehlende → „___" + Warnung; Extraktion via `getFullText`, String-Literale in Ausdrücken werden ignoriert). `next.config.ts`: `serverExternalPackages` ergänzt.
+- [x] `.docx → PDF`-Helfer gegen Gotenberg (`src/lib/gotenberg.ts`: `convertDocxToPdf` + `mergePdfs` für Deckblatt).
+- [x] Prisma: `DocumentTemplate`, `GeneratedDocument` (+ Back-Relations Organization/User). **`db push` läuft auf dem Server automatisch via `entrypoint.sh`** (lokal keine DB).
+- [x] Platzhalter-Resolver pro Modul (`src/lib/doc-template-resolvers.ts`, Registry + `ALLGEMEIN`-Resolver auf `dsgvo.ts`; `sensitiveFields`-Hook für Audit → Modul-Resolver wie BEM kommen in E5).
+- [x] Admin-Upload-UI unter `/brief-vorlagen` (Anlegen/Bearbeiten/Deaktivieren: SUPER_ADMIN+HR_LEITUNG; Liste+Erzeugen: HR_EDIT_ROLES, Mandanten-Scope via `orgFilter`). Nav-Eintrag + Middleware-Schutz ergänzt.
+- [x] Ausgabe-Aktionen: Word-Download, PDF-Download (Gotenberg + DMS-QR-Deckblatt via `pdf-deckblatt.ts`), „Per Mail senden" (Mail erst nach erfolgreichem Versand persistiert; `mailer.ts` um Attachments erweitert).
+- **DoD:** ✅ Build/Lint/Typecheck grün; Render-Pipeline (docx-Befüllung + Extraktion) lokal end-to-end verifiziert; fehlende Platzhalter werden markiert; Rollen-Gating greift. ⏳ **Offline nicht testbar (braucht laufende DB + Gotenberg-Container):** tatsächliche `.docx→PDF`-Konvertierung, Mail-Versand, `db push`. Auf dem Server nach `docker compose up -d --build` verifizieren.
+
+### E1 — Versiegelte Akte, Datenmodell & Beauftragten-Kennzeichnung  ·  ~3–4 Tage  ·  **Fundament, zuerst**
+**Ziel:** Sichere Basis — niemand sieht Inhalte ohne Freigabe.
+- [ ] Prisma: `BemFall`, `BemZugriff`, `BemGespraech`, `BemMassnahme`, `BemEinwilligung`, `BemDokument`, `BemFrist` + Enums; `AuditLog.bemFallId`; `Organization.bem…`; `User.isBemBeauftragte`. → `db push`.
+- [ ] `bemFilter`, `canAccessBemContent`, `canManageBemAccess`, `canCreateBemFall` in `permissions.ts`.
+- [ ] Middleware-Schutz für `/dashboard/bem/*` + `/api/bem/*`.
+- [ ] Lese-Audit: jeder GET einer Inhalts-Route schreibt `AuditLog` (`BEM_AKTE_GEOEFFNET`).
+- [ ] `encryption.ts` um optionalen Key erweitern; `BEM_ENCRYPTION_KEY` in `.env` + `.env.production.example` + `entrypoint.sh`-Pflichtprüfung.
+- [ ] **403-Tests** (Jest): HR_LEITUNG/HR_SACHBEARBEITER/SUPER_ADMIN ohne Freigabe → 403 auf BEM-Inhalte; mit `BemZugriff` → 200.
+- **DoD:** 403-Tests grün; `npm run build` + `npm run lint` grün; ein BemFall lässt sich nur durch SUPER_ADMIN/BEM-Beauftragte anlegen.
+
+### E2 — Workflow, Dashboard & Detailseite  ·  ~3–4 Tage
+- [ ] `src/lib/bem-workflow.ts` (Status-Enum, Schritte, `getNaechsterSchritt`, erlaubte Übergänge) + `bem-transitions.ts` (atomar, AuditLog, Webhook nach Commit).
+- [ ] `src/lib/bem-helpers.ts`: `generateBemDisplayId(org)` (`BEM-{YYYY}-{KÜRZEL}-{NR}`, Retry bei Race).
+- [ ] API: `GET/POST /api/bem`, `GET /api/bem/[id]`, Status-Transition-Route.
+- [ ] UI: `/dashboard/bem` (Übersicht, KPIs, Filter, „+ Neuer Fall"), `/dashboard/bem/[id]` (Stepper, Nächster-Schritt-Banner, Tabs). Nav-Eintrag „🔒 BEM" nur für Freigegebene.
+- **DoD:** Fall anlegen → erscheint in Liste; Detailseite zeigt Stepper/Status; Status-Übergang funktioniert + Audit.
+
+### E3 — Gespräche, Checklisten & Maßnahmen  ·  ~3 Tage
+- [ ] `BemGespraech`-CRUD (Erst/Folge/Gedächtnis) mit Pflicht-Checklisten aus den CREDO-Vorlagen; Freitext **verschlüsselt** (`BEM_ENCRYPTION_KEY`).
+- [ ] `BemMassnahme`-CRUD (Kategorien TECH/ORG/PERSON), Status, Evaluationstermin.
+- [ ] Modals analog `elternzeit-modals.tsx`.
+- **DoD:** Erstgespräch mit Checkliste anlegen; Notizen liegen verschlüsselt in DB; Maßnahmen verwalten.
+
+### E4 — Einladung & Einwilligung (digital + Papier)  ·  ~2–3 Tage
+- [ ] Magic-Link-Formular `src/app/bem/einwilligung/[token]/` (öffentlich, Rate-Limit, Zeitstempel+IP+Hash) — Muster: `fragebogen`/`exit-interview`.
+- [ ] Alternativ: Papier-Scan-Upload (`file-upload.ts`).
+- [ ] Widerruf jederzeit; `BemEinwilligung`-Status pflegen; Mail via E0/`mailer`.
+- **DoD:** Beide Wege erzeugen gültige, nachweisbare Einwilligung; Widerruf setzt Status + Audit.
+
+### E5 — BEM-Vorlagen, Aktentrennung & Mitarbeiter-Export  ·  ~3 Tage  ·  **nach E0**
+- [ ] Die 7 CREDO-Vorlagen als `DocumentTemplate` hinterlegen + Platzhalter mappen (Resolver für Modul „BEM").
+- [ ] Aktentrennung automatisieren: Maßnahmenplan → bereinigte Kopie (ohne med. Details) als normales Personalakte-Dokument; Abbruch/Beendigung → Original Personalakte + Kopie BEM (`BemDokument.ablage`).
+- [ ] Mitarbeiter-Gesamt-Export: ein PDF der kompletten Akte (Gespräche, Maßnahmen, Dokumente) + Audit.
+- **DoD:** Alle 7 Vorlagen erzeugen Word+PDF korrekt befüllt; bereinigte Kopie enthält keine med. Details; Gesamt-Export vollständig.
+
+### E6 — Fristen, Aufbewahrung & Löschung  ·  ~2–3 Tage
+- [ ] `src/lib/bem-fristen.ts` (Einladung, Einwilligung, Erstgespräch, Folgegespräch, Evaluation, Aufbewahrungsende) + `GET /api/cron/bem-fristen` (CRON_SECRET).
+- [ ] `GET /api/cron/bem-aufbewahrung`: `aufbewahrungBis <= heute` → Crypto-Shredding (verschlüsselte Inhalte + Dokumente löschen), `status=GELOESCHT`, Audit bleibt. Vorab-Warnung.
+- [ ] Tab „Zugriffe/Protokoll" + Zugriffs-Report.
+- **DoD:** Fristen erscheinen mit Severity; Lösch-Cron entfernt abgelaufene Inhalte, behält Audit; Aufbewahrungsdatum wird bei Beendigung korrekt gesetzt (`beendetAm + bemAufbewahrungJahre`).
+
+### Phase 2 (später)
+- **E7** Externe Logins: Rolle `BEM_BEAUFTRAGTER` (Magic-Link/Passwort), sehen ausschließlich BEM. ~3 Tage.
+- **E8** Automatische Auslösung aus Fehlzeiten (LOGA/n8n, Schwelle >6 Wo/12 Mon). ~3–5 Tage.
+- **E9** BR/SBV-Einwilligungen + optionaler Diagnose-Schutz. ~2 Tage.
+
+---
+
+## 6. Umgebungs-Voraussetzungen für den Bau
+- Laufende **DB + Docker** (für `db push` und Gotenberg). E0 ist **offline nicht testbar** (`.docx→PDF` braucht Gotenberg).
+- Neuer ENV: `BEM_ENCRYPTION_KEY` (`openssl rand -hex 32`).
+- Befehle: `npm run db:push`, `npm run db:generate`, `npm run build`, `npm run lint`, `npm run test`.
+- CREDO-Konventionen: keine Umlaute in Bezeichnern; `<Link>` statt `<a>`; zentrale Zod-Schemas (`src/lib/validations/`); `apiHandler`-Wrapper. Vor Push: Skills `credo-check`, `edge-cases`, `simpler`.
+
+---
+
+## 7. Wenn du hier neu startest (Resume)
+1. Diese Datei lesen + Memory `bem-modul-plan` / `vorlagenverwaltung-epic`.
+2. Aktuellen Stand prüfen: existieren schon `BemFall` etc. in `prisma/schema.prisma`? Welche Tasks oben sind `[x]`?
+3. Mit dem ersten offenen Task in **E0** beginnen (oder, falls E0 fertig, E1).
+4. Pro abgeschlossenem Task hier `[ ]`→`[x]` setzen und den Status oben aktualisieren.

@@ -129,3 +129,55 @@ export async function validateUpload(
   }
   return { ok: true, buffer };
 }
+
+// =============================================
+// Word-Vorlagen (.docx) — eigener Validierungspfad
+// (separat von ALLOWED_UPLOAD_MIME, das nur PDF/Bilder erlaubt)
+// =============================================
+export const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+export const MAX_DOCX_SIZE = 15 * 1024 * 1024; // 15 MB
+
+const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04]; // "PK\x03\x04" — .docx ist ein ZIP
+
+/**
+ * Validiert eine hochgeladene Word-Vorlage (.docx).
+ * - Endung .docx
+ * - Groesse innerhalb Limits
+ * - ZIP/OOXML-Magic-Bytes (Browser melden den MIME oft unzuverlaessig, daher
+ *   pruefen wir Endung + Magic Bytes statt nur file.type).
+ */
+export async function validateDocxUpload(
+  file: File,
+): Promise<
+  | { ok: true; buffer: Buffer }
+  | { ok: false; status: number; error: string }
+> {
+  if (!file.name.toLowerCase().endsWith(".docx")) {
+    return {
+      ok: false,
+      status: 415,
+      error: "Nur Word-Dateien (.docx) sind als Vorlage erlaubt.",
+    };
+  }
+  if (file.size > MAX_DOCX_SIZE) {
+    return {
+      ok: false,
+      status: 413,
+      error: `Datei zu gross (max ${MAX_DOCX_SIZE / (1024 * 1024)} MB)`,
+    };
+  }
+  if (file.size === 0) {
+    return { ok: false, status: 400, error: "Die Datei ist leer." };
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  if (buffer.length < 4 || !ZIP_MAGIC.every((b, i) => buffer[i] === b)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Datei ist keine gueltige .docx-Datei (ungueltiges Format).",
+    };
+  }
+  return { ok: true, buffer };
+}

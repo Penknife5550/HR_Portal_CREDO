@@ -33,6 +33,25 @@ services:
       - reverse_proxy
       - internal
 
+  gotenberg:
+    # Konvertiert .docx -> PDF (LibreOffice). Nur im internen Netz erreichbar,
+    # NICHT am reverse_proxy (kein oeffentlicher Zugriff). Die App spricht den
+    # Dienst ueber http://gotenberg:3000 an (siehe GOTENBERG_URL).
+    image: gotenberg/gotenberg:8
+    container_name: hr-portal-gotenberg
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--api-timeout=120s"
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - internal
+
   db:
     image: postgres:16-alpine
     container_name: hr-portal-db

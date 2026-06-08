@@ -68,6 +68,8 @@ model Organization {
   beurteilungTemplates  BeurteilungTemplate[]
   mutterschutzProzesse  MutterschutzProzess[]
   elternzeitProzesse    ElternzeitProzess[]
+  documentTemplates     DocumentTemplate[]
+  generatedDocuments    GeneratedDocument[]
 
   @@map("organizations")
 }
@@ -565,6 +567,10 @@ model User {
   initiatedMutterschutz MutterschutzProzess[] @relation("MutterschutzInitiator")
   initiatedElternzeit   ElternzeitProzess[]   @relation("ElternzeitInitiator")
 
+  // Vorlagenbibliothek (E0)
+  createdDocumentTemplates  DocumentTemplate[]
+  createdGeneratedDocuments GeneratedDocument[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -611,6 +617,73 @@ model AuditLog {
   @@index([elternzeitId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// =============================================
+// Zentrale Vorlagenbibliothek (E0, moduluebergreifend)
+// Word-Vorlagen (.docx) mit Platzhaltern -> Ausgabe Word / PDF / Mail.
+// scope: GLOBAL (organizationId == null) oder MANDANT (organizationId gesetzt).
+// Wird moduluebergreifend genutzt (BEM, Onboarding, ...).
+// =============================================
+model DocumentTemplate {
+  id           String  @id @default(uuid())
+  name         String // Anzeigename, z.B. "BEM-Einladung"
+  description  String?
+  modul        String  @default("ALLGEMEIN") // "ALLGEMEIN" | "BEM" | "ONBOARDING" | ...
+  dateipfad    String // Pfad zur gespeicherten .docx (uploads/brief-vorlagen/...)
+  originalName String // urspruenglicher Dateiname beim Upload
+  fileSize     Int // Bytes
+  hash         String // SHA-256 der .docx
+  platzhalter  Json    @default("[]") // ["vorname","nachname", ...] aus der Datei extrahiert
+
+  // Scope: null = global, sonst Mandanten-spezifischer Override
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  isActive Boolean @default(true)
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  generatedDocuments GeneratedDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([modul])
+  @@index([organizationId])
+  @@index([isActive])
+  @@map("document_templates")
+}
+
+// Protokoll erzeugter Dokumente (Audit + Wiederfinden in DMS).
+model GeneratedDocument {
+  id         String            @id @default(uuid())
+  templateId String?
+  template   DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  name  String // Anzeigename des erzeugten Dokuments
+  modul String  @default("ALLGEMEIN")
+  refId String? // Bezug, z.B. bemFallId / onboardingId / employeeId
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  pfadDocx            String?
+  pfadPdf             String?
+  hash                String?
+  missingPlaceholders String[] @default([]) // nicht befuellte Platzhalter (Warnung)
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([templateId])
+  @@index([modul])
+  @@index([refId])
+  @@index([organizationId])
+  @@map("generated_documents")
 }
 
 // =============================================

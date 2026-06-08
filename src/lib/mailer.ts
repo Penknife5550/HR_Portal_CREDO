@@ -15,11 +15,18 @@ import { decrypt, isEncryptionConfigured } from "@/lib/encryption";
 // =============================================
 // Typen
 // =============================================
+interface MailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 interface MailOptions {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: MailAttachment[];
 }
 
 interface SmtpTestResult {
@@ -74,6 +81,11 @@ export async function sendEmail(options: MailOptions): Promise<boolean> {
       subject: options.subject,
       html: options.html,
       text: options.text,
+      attachments: options.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     });
 
     console.log(`[Mailer] E-Mail erfolgreich gesendet an: ${options.to.replace(/(.{2}).*(@.*)/, '$1***$2')}`);

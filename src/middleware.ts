@@ -70,6 +70,7 @@ export async function middleware(request: NextRequest) {
   const isPortalRoute = pathname.startsWith("/dashboard") ||
                         pathname.startsWith("/benutzerverwaltung") ||
                         pathname.startsWith("/vorlagen") ||
+                        pathname.startsWith("/brief-vorlagen") ||
                         pathname.startsWith("/checklisten") ||
                         pathname.startsWith("/mandanten") ||
                         pathname.startsWith("/einstellungen");
