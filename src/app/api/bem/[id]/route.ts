@@ -67,6 +67,19 @@ export async function GET(
           },
           orderBy: { createdAt: "desc" },
         },
+        // Dokumentenliste (Metadaten; Datei-Download via eigener Route).
+        dokumente: {
+          select: {
+            id: true,
+            typ: true,
+            ablage: true,
+            quelle: true,
+            dateiname: true,
+            fileSize: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
         kommunikation: {
           orderBy: { gesendetAm: "desc" },
           include: {

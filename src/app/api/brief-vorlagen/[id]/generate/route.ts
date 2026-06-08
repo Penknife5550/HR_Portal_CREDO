@@ -101,6 +101,21 @@ export const POST = apiHandler<GenerateInput>(
       );
     }
 
+    // Versiegelte Akte: BEM-Vorlagen duerfen NICHT ueber den generischen
+    // (nur rollengeschuetzten) E0-Endpunkt erzeugt werden — sonst koennte ein
+    // HR-Account ohne Fall-Freigabe BEM-Bezuege erzeugen. BEM-Dokumente werden
+    // ausschliesslich ueber /api/bem/[id]/dokumente/generieren erstellt
+    // (canAccessBemContent).
+    if (template.modul === "BEM") {
+      return NextResponse.json(
+        {
+          error:
+            "BEM-Vorlagen werden ausschliesslich im BEM-Modul (versiegelte Akte) erzeugt.",
+        },
+        { status: 403 },
+      );
+    }
+
     // Mandant der Vorlage pruefen (falls vorlagen-gebunden)
     if (
       template.organizationId &&

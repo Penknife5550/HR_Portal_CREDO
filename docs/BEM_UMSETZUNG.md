@@ -3,7 +3,7 @@
 > **Single Source of Truth** für den Bau des BEM-Moduls (Betriebliches Eingliederungs­management, § 167 Abs. 2 SGB IX).
 > Diese Datei ist so geschrieben, dass jede Session genau weiß, was als Nächstes zu tun ist.
 
-- **Status:** **E0–E4 umgesetzt.** E0 (Vorlagenbibliothek) 2026-06-03; E1 (versiegelte Akte) + E2 (Workflow/Dashboard) + E3 (Gespräche/Maßnahmen) + E4 (Einladung/Einwilligung + CREDO-CI-Mail) 2026-06-08 — alle build/lint/test gruen, E3+E4 adversariell reviewt (3 bzw. 8 Findings gefixt). Auf Server ausstehend: `BEM_ENCRYPTION_KEY` setzen, `db push` (via entrypoint), Gotenberg + SMTP. Naechster Schritt: **E5** (BEM-Vorlagen in Bibliothek, Aktentrennung, Mitarbeiter-Gesamt-Export). Entscheidungen 2026-06-08: BEM-Mails immer SMTP-direkt (#9), prüfungssichere Nachvollziehbarkeit `BemKommunikation` (NFR 0a), CREDO-CI-HTML-Mails (umgesetzt), Auto-Freigabe für Anlegende:n (E2).
+- **Status:** **E0–E5 umgesetzt (Phase 1 weitgehend komplett).** E0 (Vorlagenbibliothek) 2026-06-03; E1–E5 (versiegelte Akte / Workflow+Dashboard / Gespräche+Maßnahmen / Einladung+Einwilligung+CI-Mail / BEM-Vorlagen+Aktentrennung+Gesamtexport) 2026-06-08 — alle build/lint/test gruen, E3/E4/E5 adversariell reviewt (3/8/10 Findings gefixt). **Ausstehend: Server-Deploy + Verifikation** (siehe `docs/BEM_DEPLOY.md`): `BEM_ENCRYPTION_KEY` setzen, `db push` (via entrypoint), Gotenberg + SMTP, echte 7 .docx hochladen. Danach **E6** (Fristen, Aufbewahrung/Löschung-Cron). Entscheidungen 2026-06-08: BEM-Mails SMTP-direkt (#9), prüfungssichere Nachvollziehbarkeit (NFR 0a), CREDO-CI-Mails, Auto-Freigabe Anlegende:r (E2).
 - **Plan-Dokument (Übersicht + Mockups):** `BEM/BEM_Modul_Plan.html`
 - **Quell-Unterlagen + 7 Word-Vorlagen:** `BEM/` (`0_Gedaechnisprotokoll…` … `4_Datenschutzvereinbarung…`, `Allg. Info Credo.pdf`)
 - **Verwandter (pausierter) Epic:** „Zentrale Vorlagenverwaltung" → wird hier als **E0** gebaut. Siehe `docs/FEHLER_PDF_FIXES.md` (Abschnitt Gotenberg) und Memory `vorlagenverwaltung-epic`.
@@ -174,11 +174,13 @@ Neuer ENV `BEM_ENCRYPTION_KEY` (64 Hex). `src/lib/encryption.ts` um optionalen K
 - [x] Adversariell reviewt (Workflow, 8 Findings; behoben: Token-Leak in Response, Audit-Atomarität, HMAC-Hash, Token-Entwertung, URL-Guard).
 - **DoD:** ✅ Beide Wege erzeugen gültige, nachweisbare Einwilligung (signedAt/Ip/Name + HMAC-Hash); Widerruf setzt Status + Audit; Versand ist prüfungssicher protokolliert. ⏳ Runtime-Verifikation auf Server (DB + SMTP + `BEM_ENCRYPTION_KEY`).
 
-### E5 — BEM-Vorlagen, Aktentrennung & Mitarbeiter-Export  ·  ~3 Tage  ·  **nach E0**
-- [ ] Die 7 CREDO-Vorlagen als `DocumentTemplate` hinterlegen + Platzhalter mappen (Resolver für Modul „BEM").
-- [ ] Aktentrennung automatisieren: Maßnahmenplan → bereinigte Kopie (ohne med. Details) als normales Personalakte-Dokument; Abbruch/Beendigung → Original Personalakte + Kopie BEM (`BemDokument.ablage`).
-- [ ] Mitarbeiter-Gesamt-Export: ein PDF der kompletten Akte (Gespräche, Maßnahmen, Dokumente) + Audit.
-- **DoD:** Alle 7 Vorlagen erzeugen Word+PDF korrekt befüllt; bereinigte Kopie enthält keine med. Details; Gesamt-Export vollständig.
+### E5 — BEM-Vorlagen, Aktentrennung & Mitarbeiter-Export  ·  ~3 Tage  ·  **nach E0**  ·  ✅ UMGESETZT (2026-06-08)
+- [x] BEM-Platzhalter-Resolver `src/lib/bem-doc.ts` (`resolveBemPlaceholders`, NUR nicht-sensible Felder — keine Gesundheitsdaten in generierten Schriftstuecken). Vorlagen werden im Library-UI (Modul „BEM") hochgeladen; Generierung **versiegelt** über `POST /api/bem/[id]/dokumente/generieren` (`canAccessBemContent`, Template-Org-Abgleich). **E0-Generate gegen `modul=BEM` gesperrt** (sonst Leak über Rollen-Endpunkt).
+- [x] Aktentrennung `src/lib/bem-aktentrennung.ts` (typ→ablage: Gespraeche/Datenschutz NUR_BEM; Maßnahmenplan KOPIE_PERSONALAKTE; Abbruch/Beendigung ORIGINAL_PERSONALAKTE) — Ablage wird pro `BemDokument` gesetzt + im UI angezeigt. **Hinweis:** tatsächliche Übernahme der bereinigten Kopie in die Personalakte ist bewusst manuell (Sichtprüfung) — Personalakten-Integration offen.
+- [x] Mitarbeiter-Gesamt-Export `src/lib/bem-export.ts` (pdfkit) + `GET /api/bem/[id]/export`: vollständiges Akten-PDF (Stammdaten, Einwilligungen, Gespräche inkl. entschlüsselter Notizen + Checkliste, Maßnahmen, Dokumente, Versandnachweis, Zugriffsprotokoll) + Audit `EXPORT_ERSTELLT`.
+- [x] Dokumente-Tab (Liste + Ablage-Anzeige + Download via pfad-sicherer Route + „aus Vorlage erzeugen"-Modal); „Gesamt-Export (PDF)"-Button.
+- [x] Adversariell reviewt (Workflow, 10 Findings; behoben: Template-Org-Abgleich (Multi-Tenant), pfad-sicheres Datei-Lesen, null-sichere Export-Daten). Build/Lint grün, 54 BEM-Tests grün.
+- **DoD:** ✅ BEM-Vorlagen erzeugen Word (+PDF via Gotenberg) befüllt; Ablage je Typ korrekt + sichtbar; Gesamt-Export vollständig. ⏳ Runtime auf Server: echte 7 .docx hochladen, PDF-Konvertierung (Gotenberg), bereinigte Personalakten-Kopie (manuell).
 
 ### E6 — Fristen, Aufbewahrung & Löschung  ·  ~2–3 Tage
 - [ ] `src/lib/bem-fristen.ts` (Einladung, Einwilligung, Erstgespräch, Folgegespräch, Evaluation, Aufbewahrungsende) + `GET /api/cron/bem-fristen` (CRON_SECRET).

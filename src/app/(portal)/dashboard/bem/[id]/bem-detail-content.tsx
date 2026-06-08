@@ -93,6 +93,22 @@ interface Einwilligung {
   createdAt: string;
 }
 
+interface Dokument {
+  id: string;
+  typ: string;
+  ablage: string;
+  quelle: string;
+  dateiname: string;
+  fileSize: number | null;
+  createdAt: string;
+}
+
+interface Vorlage {
+  id: string;
+  name: string;
+  platzhalter: string[];
+}
+
 interface BemFall {
   id: string;
   displayId: string;
@@ -115,6 +131,7 @@ interface BemFall {
   gespraeche: Gespraech[];
   massnahmen: Massnahme[];
   einwilligungen: Einwilligung[];
+  dokumente: Dokument[];
   kommunikation: Kommunikation[];
   auditLogs: AuditEntry[];
   _count: {
@@ -196,6 +213,40 @@ const EINWILLIGUNG_STATUS_LABELS: Record<string, string> = {
   WIDERRUFEN: "Widerrufen",
 };
 
+const DOKUMENT_TYP_LABELS: Record<string, string> = {
+  EINLADUNG: "Einladung",
+  DATENSCHUTZVEREINBARUNG: "Datenschutzvereinbarung",
+  ERSTGESPRAECH_PROTOKOLL: "Erstgespraech-Protokoll",
+  FOLGEGESPRAECH_PROTOKOLL: "Folgegespraech-Protokoll",
+  GEDAECHTNISPROTOKOLL: "Gedaechtnisprotokoll",
+  MASSNAHMENPLAN: "Massnahmenplan",
+  ABSCHLUSSERKLAERUNG: "Abschlusserklaerung",
+  ABBRUCHERKLAERUNG: "Abbrucherklaerung",
+  BEENDIGUNGSERKLAERUNG: "Beendigungserklaerung",
+  GESAMT_EXPORT: "Gesamtexport",
+  SONSTIGES: "Sonstiges",
+};
+
+const ABLAGE_LABELS: Record<string, string> = {
+  NUR_BEM: "Nur BEM-Akte",
+  KOPIE_PERSONALAKTE: "BEM + bereinigte Kopie Personalakte",
+  ORIGINAL_PERSONALAKTE: "Personalakte (Original) + Kopie BEM",
+};
+
+// Dokumenttypen, die im Generieren-Dialog auswaehlbar sind (ohne GESAMT_EXPORT).
+const DOKUMENT_TYP_OPTIONS = [
+  "EINLADUNG",
+  "DATENSCHUTZVEREINBARUNG",
+  "ERSTGESPRAECH_PROTOKOLL",
+  "FOLGEGESPRAECH_PROTOKOLL",
+  "GEDAECHTNISPROTOKOLL",
+  "MASSNAHMENPLAN",
+  "ABSCHLUSSERKLAERUNG",
+  "ABBRUCHERKLAERUNG",
+  "BEENDIGUNGSERKLAERUNG",
+  "SONSTIGES",
+] as const;
+
 const INPUT_CLASS =
   "mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring";
 
@@ -239,7 +290,12 @@ export function BemDetailContent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<
-    "uebersicht" | "gespraeche" | "massnahmen" | "einwilligung" | "protokoll"
+    | "uebersicht"
+    | "gespraeche"
+    | "massnahmen"
+    | "einwilligung"
+    | "dokumente"
+    | "protokoll"
   >("uebersicht");
   const [busy, setBusy] = useState(false);
   const [gespraechModal, setGespraechModal] = useState<Gespraech | "new" | null>(
@@ -250,6 +306,8 @@ export function BemDetailContent({
   );
   const [einladungOpen, setEinladungOpen] = useState(false);
   const [papierOpen, setPapierOpen] = useState(false);
+  const [dokumentOpen, setDokumentOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Stiller Refetch (kein Spinner) — verhindert Scroll-Sprung nach Aktionen.
   const load = useCallback(
@@ -356,6 +414,43 @@ export function BemDetailContent({
     }
   }
 
+  async function downloadFile(url: string, fallbackName: string) {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setError(j.error || "Download fehlgeschlagen.");
+      return false;
+    }
+    const cd = res.headers.get("Content-Disposition") || "";
+    const m = cd.match(/filename="?([^"]+)"?/);
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objUrl;
+    a.download = m?.[1] || fallbackName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objUrl);
+    return true;
+  }
+
+  async function gesamtExport() {
+    setExporting(true);
+    setError("");
+    try {
+      const ok = await downloadFile(
+        `/api/bem/${bemFallId}/export`,
+        `BEM-Gesamtexport.pdf`,
+      );
+      if (ok) await load(true); // neuer Audit-Eintrag sichtbar machen
+    } catch {
+      setError("Verbindungsfehler.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -415,9 +510,20 @@ export function BemDetailContent({
                 : ""}
             </p>
           </div>
-          <span className="inline-block rounded-full border border-credo-blau/30 bg-credo-blau/10 px-3 py-1 text-sm font-medium text-credo-blau">
-            {STATUS_LABELS[fall.status] || fall.status}
-          </span>
+          <div className="flex flex-col items-end gap-2">
+            <span className="inline-block rounded-full border border-credo-blau/30 bg-credo-blau/10 px-3 py-1 text-sm font-medium text-credo-blau">
+              {STATUS_LABELS[fall.status] || fall.status}
+            </span>
+            <button
+              type="button"
+              disabled={exporting}
+              onClick={gesamtExport}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent disabled:opacity-50"
+              title="Komplette Akte als PDF (DSGVO Art. 15)"
+            >
+              {exporting ? "Erstelle…" : "Gesamt-Export (PDF)"}
+            </button>
+          </div>
         </div>
 
         {/* Stepper (nur Haupt-Pfad) */}
@@ -504,6 +610,7 @@ export function BemDetailContent({
               ["gespraeche", "Gespraeche", fall.gespraeche.length],
               ["massnahmen", "Massnahmen", fall.massnahmen.length],
               ["einwilligung", "Einwilligung", fall.einwilligungen.length],
+              ["dokumente", "Dokumente", fall.dokumente.length],
               ["protokoll", "Protokoll", fall.kommunikation.length + fall.auditLogs.length],
             ] as const
           ).map(([val, label, count]) => (
@@ -624,8 +731,29 @@ export function BemDetailContent({
           />
         )}
 
+        {tab === "dokumente" && (
+          <DokumenteTab
+            fall={fall}
+            onGenerieren={() => setDokumentOpen(true)}
+            onDownload={(dokId, name) =>
+              downloadFile(`/api/bem/${bemFallId}/dokumente/${dokId}/download`, name)
+            }
+          />
+        )}
+
         {tab === "protokoll" && <ProtokollTab fall={fall} />}
       </main>
+
+      {dokumentOpen && (
+        <DokumentGenerierenModal
+          bemFallId={bemFallId}
+          onClose={() => setDokumentOpen(false)}
+          onSaved={async () => {
+            setDokumentOpen(false);
+            await load(true);
+          }}
+        />
+      )}
 
       {einladungOpen && (
         <EinladungModal
@@ -1822,4 +1950,274 @@ function PapierModal({
       />
     </ModalShell>
   );
+}
+
+// =============================================
+// Tab: Dokumente
+// =============================================
+function formatBytes(bytes: number | null): string {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function DokumenteTab({
+  fall,
+  onGenerieren,
+  onDownload,
+}: {
+  fall: BemFall;
+  onGenerieren: () => void;
+  onDownload: (dokId: string, name: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={onGenerieren}
+          className="rounded-lg bg-credo-blau px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
+        >
+          Dokument aus Vorlage erzeugen
+        </button>
+      </div>
+      {fall.dokumente.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          Noch keine Dokumente in der Akte.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-border bg-muted/50 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">Typ</th>
+                <th className="px-4 py-3 font-medium">Datei</th>
+                <th className="px-4 py-3 font-medium">Ablage</th>
+                <th className="px-4 py-3 font-medium">Quelle</th>
+                <th className="px-4 py-3 font-medium">Erstellt</th>
+                <th className="px-4 py-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {fall.dokumente.map((d) => (
+                <tr key={d.id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-3">{DOKUMENT_TYP_LABELS[d.typ] || d.typ}</td>
+                  <td className="px-4 py-3">
+                    <div className="text-foreground">{d.dateiname}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatBytes(d.fileSize)}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`text-xs ${d.ablage === "NUR_BEM" ? "text-muted-foreground" : "text-credo-rot"}`}
+                    >
+                      {ABLAGE_LABELS[d.ablage] || d.ablage}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {d.quelle === "GENERIERT" ? "Generiert" : "Upload"}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {formatDate(d.createdAt)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onDownload(d.id, d.dateiname)}
+                      className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                    >
+                      Download
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mt-3 text-xs text-muted-foreground">
+        Ablage gemaess Aktentrennung (§ 167 SGB IX): Massnahmenplan und
+        Beendigung/Abbruch erfordern eine (bereinigte) Kopie bzw. das Original in
+        der Personalakte — die Uebernahme erfolgt als bewusster manueller Schritt.
+      </p>
+    </div>
+  );
+}
+
+// =============================================
+// Dokument-aus-Vorlage-Modal
+// =============================================
+function DokumentGenerierenModal({
+  bemFallId,
+  onClose,
+  onSaved,
+}: {
+  bemFallId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [vorlagen, setVorlagen] = useState<Vorlage[]>([]);
+  const [templateId, setTemplateId] = useState("");
+  const [typ, setTyp] = useState<string>("EINLADUNG");
+  const [format, setFormat] = useState<"docx" | "pdf">("docx");
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    fetch(`/api/bem/${bemFallId}/dokumente/vorlagen`)
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((j) => setVorlagen(j.data || []))
+      .catch(() => setVorlagen([]))
+      .finally(() => setLoading(false));
+  }, [bemFallId]);
+
+  const selected = vorlagen.find((v) => v.id === templateId);
+
+  async function handleSubmit() {
+    setErr("");
+    if (!templateId) {
+      setErr("Bitte eine Vorlage waehlen.");
+      return;
+    }
+    setBusy(true);
+    const filled: Record<string, string> = {};
+    for (const [k, v] of Object.entries(values)) {
+      if (v.trim() !== "") filled[k] = v;
+    }
+    try {
+      const res = await fetch(`/api/bem/${bemFallId}/dokumente/generieren`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId, typ, format, values: filled }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(j.error || "Erzeugung fehlgeschlagen.");
+        return;
+      }
+      onSaved();
+    } catch {
+      setErr("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ModalShell title="Dokument aus BEM-Vorlage erzeugen" onClose={onClose}>
+      {err && (
+        <div className="mb-4 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-2 text-sm text-credo-rot">
+          {err}
+        </div>
+      )}
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Lade Vorlagen…</p>
+      ) : vorlagen.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Keine BEM-Vorlagen hinterlegt. Bitte zuerst unter „Brief-Vorlagen“ eine
+          Vorlage mit Modul „BEM“ hochladen.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Vorlage</label>
+            <select
+              value={templateId}
+              onChange={(e) => {
+                setTemplateId(e.target.value);
+                setValues({});
+              }}
+              className={INPUT_CLASS}
+            >
+              <option value="">Bitte waehlen…</option>
+              {vorlagen.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium">Dokumenttyp (Ablage)</label>
+              <select
+                value={typ}
+                onChange={(e) => setTyp(e.target.value)}
+                className={INPUT_CLASS}
+              >
+                {DOKUMENT_TYP_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {DOKUMENT_TYP_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {ABLAGE_LABELS_BY_TYP(typ)}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Format</label>
+              <select
+                value={format}
+                onChange={(e) => setFormat(e.target.value as "docx" | "pdf")}
+                className={INPUT_CLASS}
+              >
+                <option value="docx">Word (.docx)</option>
+                <option value="pdf">PDF</option>
+              </select>
+            </div>
+          </div>
+
+          {selected && selected.platzhalter.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Platzhalter befuellen
+              </label>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Leere Felder werden automatisch (Name, Mandant, Datum, …) ergaenzt
+                oder mit „___“ markiert.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {selected.platzhalter.map((p) => (
+                  <div key={p}>
+                    <label className="text-xs text-muted-foreground">{p}</label>
+                    <input
+                      value={values[p] || ""}
+                      onChange={(e) =>
+                        setValues((prev) => ({ ...prev, [p]: e.target.value }))
+                      }
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {vorlagen.length > 0 && (
+        <ModalActions
+          onClose={onClose}
+          onConfirm={handleSubmit}
+          confirmLabel={busy ? "Erzeuge…" : "Erzeugen & ablegen"}
+          disabled={busy}
+        />
+      )}
+    </ModalShell>
+  );
+}
+
+// Ablage-Hinweis je Dokumenttyp (gespiegelt zu bem-aktentrennung.ts).
+function ABLAGE_LABELS_BY_TYP(typ: string): string {
+  const ablage =
+    typ === "MASSNAHMENPLAN"
+      ? "KOPIE_PERSONALAKTE"
+      : typ === "ABBRUCHERKLAERUNG" || typ === "BEENDIGUNGSERKLAERUNG"
+        ? "ORIGINAL_PERSONALAKTE"
+        : "NUR_BEM";
+  return ABLAGE_LABELS[ablage];
 }

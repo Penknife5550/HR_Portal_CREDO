@@ -7,7 +7,7 @@
  */
 
 import path from "path";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, readFile } from "fs/promises";
 import { randomUUID } from "crypto";
 
 export const ALLOWED_UPLOAD_MIME = [
@@ -88,6 +88,20 @@ export async function saveUploadedFile(
   await mkdir(targetDir, { recursive: true });
   await writeFile(targetPath, buffer);
   return targetPath;
+}
+
+/**
+ * Liest eine zuvor gespeicherte Datei — aber NUR, wenn ihr Pfad unterhalb des
+ * uploads-Verzeichnisses liegt (Defense-in-Depth gegen Pfad-Injection ueber eine
+ * manipulierte DB-Referenz). Wirft sonst.
+ */
+export async function readUploadedFile(absPath: string): Promise<Buffer> {
+  const uploadsRoot = path.resolve(path.join(process.cwd(), "uploads"));
+  const resolved = path.resolve(absPath);
+  if (resolved !== uploadsRoot && !resolved.startsWith(uploadsRoot + path.sep)) {
+    throw new Error("Pfad ausserhalb des erlaubten Bereichs");
+  }
+  return readFile(resolved);
 }
 
 /**

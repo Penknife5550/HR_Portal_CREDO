@@ -125,10 +125,32 @@ export const einwilligungPublicSchema = z.object({
   name: z.string().trim().min(2, "Bitte Namen angeben").max(150),
 });
 
+// =============================================
+// Dokument aus BEM-Vorlage erzeugen (E5)
+// =============================================
+export const dokumentGenerierenSchema = z.object({
+  templateId: z.string().uuid("Ungueltige Vorlagen-ID"),
+  typ: z.enum([
+    "EINLADUNG",
+    "DATENSCHUTZVEREINBARUNG",
+    "ERSTGESPRAECH_PROTOKOLL",
+    "FOLGEGESPRAECH_PROTOKOLL",
+    "GEDAECHTNISPROTOKOLL",
+    "MASSNAHMENPLAN",
+    "ABSCHLUSSERKLAERUNG",
+    "ABBRUCHERKLAERUNG",
+    "BEENDIGUNGSERKLAERUNG",
+    "SONSTIGES",
+  ]),
+  format: z.enum(["docx", "pdf"]).default("docx"),
+  values: z.record(z.string(), z.string()).optional(),
+});
+
 export type CreateBemInput = z.infer<typeof createBemSchema>;
 export type BemStatusInput = z.infer<typeof bemStatusSchema>;
 export type EinladungInput = z.infer<typeof einladungSchema>;
 export type EinwilligungPublicInput = z.infer<typeof einwilligungPublicSchema>;
+export type DokumentGenerierenInput = z.infer<typeof dokumentGenerierenSchema>;
 export type CreateGespraechInput = z.infer<typeof createGespraechSchema>;
 export type UpdateGespraechInput = z.infer<typeof updateGespraechSchema>;
 export type CreateMassnahmeInput = z.infer<typeof createMassnahmeSchema>;
