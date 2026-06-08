@@ -146,8 +146,17 @@ export const dokumentGenerierenSchema = z.object({
   values: z.record(z.string(), z.string()).optional(),
 });
 
+// =============================================
+// Freigaben (BemZugriff) verwalten
+// =============================================
+export const bemZugriffSchema = z.object({
+  userId: z.string().uuid("Ungueltige Benutzer-ID"),
+  rolle: z.enum(["BEAUFTRAGTE", "VERTRETUNG", "BR", "SBV"]).default("BEAUFTRAGTE"),
+});
+
 export type CreateBemInput = z.infer<typeof createBemSchema>;
 export type BemStatusInput = z.infer<typeof bemStatusSchema>;
+export type BemZugriffInput = z.infer<typeof bemZugriffSchema>;
 export type EinladungInput = z.infer<typeof einladungSchema>;
 export type EinwilligungPublicInput = z.infer<typeof einwilligungPublicSchema>;
 export type DokumentGenerierenInput = z.infer<typeof dokumentGenerierenSchema>;

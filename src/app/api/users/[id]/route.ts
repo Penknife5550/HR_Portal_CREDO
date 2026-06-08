@@ -47,7 +47,8 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { firstName, lastName, email, role, isActive, password } = body;
+    const { firstName, lastName, email, role, isActive, password, isBemBeauftragte } =
+      body;
 
     // Update-Daten zusammenbauen
     const updateData: Record<string, unknown> = {};
@@ -111,6 +112,19 @@ export async function PATCH(
       updateData.isActive = Boolean(isActive);
     }
 
+    // BEM-Beauftragten-Kennzeichnung: sensibel — NUR SUPER_ADMIN darf sie setzen
+    // (berechtigt zum Anlegen von BEM-Faellen). HR_LEITUNG darf Benutzer sonst
+    // verwalten, aber dieses Flag NICHT vergeben.
+    if (isBemBeauftragte !== undefined) {
+      if (session.role !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "Nur SUPER_ADMIN darf BEM-Beauftragte kennzeichnen" },
+          { status: 403 },
+        );
+      }
+      updateData.isBemBeauftragte = Boolean(isBemBeauftragte);
+    }
+
     if (password !== undefined) {
       if (typeof password !== "string" || password.length < 12) {
         return NextResponse.json(
@@ -138,6 +152,7 @@ export async function PATCH(
         lastName: true,
         role: true,
         isActive: true,
+        isBemBeauftragte: true,
         lastLoginAt: true,
         createdAt: true,
       },

@@ -25,6 +25,7 @@ interface PortalUser {
   lastName: string;
   role: string;
   isActive: boolean;
+  isBemBeauftragte: boolean;
   lastLoginAt: string | null;
   createdAt: string;
 }
@@ -36,6 +37,7 @@ interface UserFormData {
   password: string;
   role: string;
   isActive: boolean;
+  isBemBeauftragte: boolean;
 }
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
@@ -68,6 +70,7 @@ const EMPTY_FORM: UserFormData = {
   password: "",
   role: "HR_SACHBEARBEITER",
   isActive: true,
+  isBemBeauftragte: false,
 };
 
 export function BenutzerverwaltungContent({ user }: { user: User }) {
@@ -248,6 +251,14 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
                           >
                             {roleInfo.label}
                           </span>
+                          {u.isBemBeauftragte && (
+                            <span
+                              className="ml-1 inline-flex rounded-full bg-[#009AC6]/10 px-2 py-0.5 text-xs font-medium text-[#009AC6]"
+                              title="BEM-Beauftragte:r (darf BEM-Faelle anlegen)"
+                            >
+                              🔒 BEM
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {u.isActive ? (
@@ -312,6 +323,7 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
           title="Neuer Benutzer"
           initialData={EMPTY_FORM}
           showPasswordRequired
+          canSetBem={user.role === "SUPER_ADMIN"}
           onClose={() => setShowNewModal(false)}
           onSave={async (data) => {
             const res = await fetch("/api/users", {
@@ -340,9 +352,11 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
             password: "",
             role: editUser.role,
             isActive: editUser.isActive,
+            isBemBeauftragte: editUser.isBemBeauftragte,
           }}
           showIsActive
           showPasswordRequired={false}
+          canSetBem={user.role === "SUPER_ADMIN"}
           onClose={() => setEditUser(null)}
           onSave={async (data) => {
             const payload: Record<string, unknown> = {
@@ -352,6 +366,11 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
               role: data.role,
               isActive: data.isActive,
             };
+            // BEM-Flag nur senden, wenn der aktuelle User SUPER_ADMIN ist
+            // (sonst lehnt die API mit 403 ab).
+            if (user.role === "SUPER_ADMIN") {
+              payload.isBemBeauftragte = data.isBemBeauftragte;
+            }
             // Passwort nur mitsenden wenn ausgefuellt
             if (data.password && data.password.length > 0) {
               payload.password = data.password;
@@ -382,6 +401,7 @@ function UserModal({
   initialData,
   showPasswordRequired = true,
   showIsActive = false,
+  canSetBem = false,
   onClose,
   onSave,
 }: {
@@ -389,6 +409,7 @@ function UserModal({
   initialData: UserFormData;
   showPasswordRequired?: boolean;
   showIsActive?: boolean;
+  canSetBem?: boolean;
   onClose: () => void;
   onSave: (data: UserFormData) => Promise<void>;
 }) {
@@ -585,6 +606,35 @@ function UserModal({
                   }`}
                 />
               </button>
+            </div>
+          )}
+
+          {/* BEM-Beauftragte:r (nur SUPER_ADMIN) */}
+          {canSetBem && (
+            <div className="rounded-lg border border-input px-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">
+                  🔒 BEM-Beauftragte:r
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleChange("isBemBeauftragte", !formData.isBemBeauftragte)
+                  }
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    formData.isBemBeauftragte ? "bg-[#009AC6]" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                      formData.isBemBeauftragte ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Darf BEM-Faelle anlegen und fuehren (§ 167 SGB IX).
+              </p>
             </div>
           )}
 

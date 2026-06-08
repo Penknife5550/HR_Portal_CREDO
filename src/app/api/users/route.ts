@@ -40,6 +40,7 @@ export async function GET() {
         lastName: true,
         role: true,
         isActive: true,
+        isBemBeauftragte: true,
         lastLoginAt: true,
         createdAt: true,
       },
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, firstName, lastName, password, role } = body;
+    const { email, firstName, lastName, password, role, isBemBeauftragte } = body;
 
     // Validierung
     const errors: string[] = [];
@@ -118,6 +119,9 @@ export async function POST(request: NextRequest) {
     // Passwort hashen
     const passwordHash = await bcrypt.hash(password, 12);
 
+    // BEM-Beauftragten-Kennzeichnung nur durch SUPER_ADMIN setzbar.
+    const setBem = isBemBeauftragte === true && session.role === "SUPER_ADMIN";
+
     // Benutzer anlegen
     const user = await prisma.user.create({
       data: {
@@ -126,6 +130,7 @@ export async function POST(request: NextRequest) {
         lastName: lastName.trim(),
         passwordHash,
         role: role || "HR_SACHBEARBEITER",
+        isBemBeauftragte: setBem,
       },
       select: {
         id: true,
@@ -134,6 +139,7 @@ export async function POST(request: NextRequest) {
         lastName: true,
         role: true,
         isActive: true,
+        isBemBeauftragte: true,
         lastLoginAt: true,
         createdAt: true,
       },

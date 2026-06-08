@@ -153,6 +153,10 @@ Neuer ENV `BEM_ENCRYPTION_KEY` (64 Hex). `src/lib/encryption.ts` um optionalen K
 
 **Design-Entscheidung E2 (2026-06-08):** Beim Anlegen erhält der/die Anlegende automatisch eine `BemZugriff(BEAUFTRAGTE)`-Freigabe (sonst wäre der eigene Fall unsichtbar) — explizit auditiert, **kein** globaler Bypass.
 
+**Nachgezogen 2026-06-08 (BEM-Verwaltung):**
+- **BEM-Beauftragte:r-Kennzeichnung in der Benutzerverwaltung:** Toggle `isBemBeauftragte` (anlegen + bearbeiten), **nur SUPER_ADMIN** darf es setzen (API gated); Liste zeigt „🔒 BEM"-Badge. So können Kolleg:innen als BEM-Beauftragte markiert werden (dürfen dann Fälle anlegen).
+- **Freigaben verwalten pro Fall:** `POST /api/bem/[id]/zugriffe` (erteilen/reaktivieren) + `DELETE .../[zugriffId]` (widerrufen), gated durch `canManageBemAccess` (SUPER_ADMIN/HR_LEITUNG, **Verwalten ≠ Inhalt lesen**), auditiert (`BEM_ZUGRIFF_GEWAEHRT`/`_ENTZOGEN`). UI: „+ Person freigeben"-Modal + „Entziehen" je Eintrag in der Übersicht. Damit lassen sich Kolleg:innen auf konkrete Fälle freigeben.
+
 ### E3 — Gespräche, Checklisten & Maßnahmen  ·  ~3 Tage  ·  ✅ UMGESETZT (2026-06-08)
 - [x] `BemGespraech`-CRUD (Erst/Folge/Gedächtnis) mit Pflicht-Checklisten (`bem-checkliste-template.ts`, vorbefüllt je Typ); Freitext `notizen` **verschlüsselt** (`encryptBem`). API: `POST /api/bem/[id]/gespraeche`, `PATCH/DELETE /api/bem/[id]/gespraeche/[gespraechId]` (alle via `canAccessBemContent` + IDOR-Check).
 - [x] `BemMassnahme`-CRUD (TECH/ORG/PERSON), Status, Frist, Evaluationstermin; `beschreibung` **verschlüsselt**. API: `POST /api/bem/[id]/massnahmen`, `PATCH/DELETE .../[massnahmeId]`.

@@ -307,7 +307,11 @@ export function BemDetailContent({
   const [einladungOpen, setEinladungOpen] = useState(false);
   const [papierOpen, setPapierOpen] = useState(false);
   const [dokumentOpen, setDokumentOpen] = useState(false);
+  const [zugriffOpen, setZugriffOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Freigaben verwalten duerfen SUPER_ADMIN/HR_LEITUNG (Verwalten != Inhalt lesen).
+  const canManageAccess = ["SUPER_ADMIN", "HR_LEITUNG"].includes(user.role);
 
   // Stiller Refetch (kein Spinner) — verhindert Scroll-Sprung nach Aktionen.
   const load = useCallback(
@@ -448,6 +452,26 @@ export function BemDetailContent({
       setError("Verbindungsfehler.");
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function revokeZugriff(zugriffId: string, name: string) {
+    if (!window.confirm(`Freigabe fuer ${name} wirklich entziehen?`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/bem/${bemFallId}/zugriffe/${zugriffId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error || "Entzug fehlgeschlagen.");
+        return;
+      }
+      await load(true);
+    } catch {
+      setError("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -671,9 +695,20 @@ export function BemDetailContent({
 
             {/* Zugriffe */}
             <div className="rounded-xl border border-border bg-card p-5">
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
-                Freigegebene Personen ({fall.zugriffe.length})
-              </h2>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-foreground">
+                  Freigegebene Personen ({fall.zugriffe.length})
+                </h2>
+                {canManageAccess && (
+                  <button
+                    type="button"
+                    onClick={() => setZugriffOpen(true)}
+                    className="rounded-md bg-credo-blau px-3 py-1 text-xs font-semibold text-white hover:bg-credo-blau/90"
+                  >
+                    + Person freigeben
+                  </button>
+                )}
+              </div>
               <ul className="space-y-2 text-sm">
                 {fall.zugriffe.map((z) => (
                   <li
@@ -688,14 +723,32 @@ export function BemDetailContent({
                         {z.user.email}
                       </div>
                     </div>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      {ROLLE_LABELS[z.rolle] || z.rolle}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        {ROLLE_LABELS[z.rolle] || z.rolle}
+                      </span>
+                      {canManageAccess && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            revokeZugriff(
+                              z.id,
+                              `${z.user.firstName} ${z.user.lastName}`,
+                            )
+                          }
+                          className="rounded-md border border-credo-rot/40 px-2 py-0.5 text-xs font-medium text-credo-rot hover:bg-credo-rot/10 disabled:opacity-50"
+                        >
+                          Entziehen
+                        </button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
               <p className="mt-3 text-xs text-muted-foreground">
-                Freigaben verwalten folgt in einer naechsten Ausbaustufe.
+                Versiegelte Akte: nur freigegebene Personen sehen Inhalte. Jeder
+                Zugriff und jede Freigabe wird protokolliert.
               </p>
             </div>
           </div>
@@ -750,6 +803,18 @@ export function BemDetailContent({
           onClose={() => setDokumentOpen(false)}
           onSaved={async () => {
             setDokumentOpen(false);
+            await load(true);
+          }}
+        />
+      )}
+
+      {zugriffOpen && (
+        <ZugriffModal
+          bemFallId={bemFallId}
+          bereitsFreigegeben={fall.zugriffe.map((z) => z.user.id)}
+          onClose={() => setZugriffOpen(false)}
+          onSaved={async () => {
+            setZugriffOpen(false);
             await load(true);
           }}
         />
@@ -2220,4 +2285,134 @@ function ABLAGE_LABELS_BY_TYP(typ: string): string {
         ? "ORIGINAL_PERSONALAKTE"
         : "NUR_BEM";
   return ABLAGE_LABELS[ablage];
+}
+
+// =============================================
+// Freigabe-Modal (Person fuer diesen Fall freigeben)
+// =============================================
+interface AuswaehlbarerUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  isActive: boolean;
+}
+
+function ZugriffModal({
+  bemFallId,
+  bereitsFreigegeben,
+  onClose,
+  onSaved,
+}: {
+  bemFallId: string;
+  bereitsFreigegeben: string[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [users, setUsers] = useState<AuswaehlbarerUser[]>([]);
+  const [userId, setUserId] = useState("");
+  const [rolle, setRolle] = useState("BEAUFTRAGTE");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    fetch("/api/users")
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((j) => setUsers(j.data || []))
+      .catch(() => setUsers([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const auswaehlbar = users.filter(
+    (u) => u.isActive && !bereitsFreigegeben.includes(u.id),
+  );
+
+  async function handleSubmit() {
+    setErr("");
+    if (!userId) {
+      setErr("Bitte eine Person waehlen.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/bem/${bemFallId}/zugriffe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, rolle }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error || "Freigabe fehlgeschlagen.");
+        return;
+      }
+      onSaved();
+    } catch {
+      setErr("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ModalShell title="Person fuer diesen Fall freigeben" onClose={onClose}>
+      {err && (
+        <div className="mb-4 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-2 text-sm text-credo-rot">
+          {err}
+        </div>
+      )}
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Lade Benutzer…</p>
+      ) : auswaehlbar.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Keine weiteren Benutzer verfuegbar. Lege ggf. unter „Benutzerverwaltung“
+          eine:n Kolleg:in an.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Person</label>
+            <select
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              className={INPUT_CLASS}
+            >
+              <option value="">Bitte waehlen…</option>
+              {auswaehlbar.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.firstName} {u.lastName} — {u.email}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Rolle im Fall</label>
+            <select
+              value={rolle}
+              onChange={(e) => setRolle(e.target.value)}
+              className={INPUT_CLASS}
+            >
+              {Object.entries(ROLLE_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Die Person erhaelt damit Zugriff auf die Inhalte dieses Falls. Die
+            Freigabe wird protokolliert und ist jederzeit widerrufbar.
+          </p>
+        </div>
+      )}
+      {auswaehlbar.length > 0 && (
+        <ModalActions
+          onClose={onClose}
+          onConfirm={handleSubmit}
+          confirmLabel={busy ? "Speichere…" : "Freigeben"}
+          disabled={busy}
+        />
+      )}
+    </ModalShell>
+  );
 }
