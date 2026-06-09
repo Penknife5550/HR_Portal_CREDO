@@ -1587,6 +1587,10 @@ function GespraechModal({
   const [pendingDraft, setPendingDraft] = useState<Record<string, unknown> | null>(null);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipFirstDraft = useRef(true);
+  // true sobald erfolgreich gespeichert wurde — verhindert, dass der Unmount-
+  // Cleanup oder ein nachlaufender Debounce den (bereits geleerten) Entwurf
+  // wieder anlegt.
+  const savedRef = useRef(false);
 
   function clearDraft() {
     try {
@@ -1615,6 +1619,7 @@ function GespraechModal({
     }
     if (draftTimer.current) clearTimeout(draftTimer.current);
     draftTimer.current = setTimeout(() => {
+      if (savedRef.current) return; // nach Speichern nicht erneut anlegen
       try {
         const savedAt = Date.now();
         sessionStorage.setItem(
@@ -1630,6 +1635,24 @@ function GespraechModal({
       if (draftTimer.current) clearTimeout(draftTimer.current);
     };
   }, [typ, datum, ort, naechsterTermin, notizen, teilnehmer, checkliste, draftKey]);
+
+  // Beim Schliessen/Verlassen des Modals (Abbrechen/X/Navigation) den Klartext-
+  // Entwurf aus der sessionStorage raeumen — vertrauliche BEM-Notizen sollen
+  // NICHT laenger als noetig vorgehalten werden (Datenminimierung, versiegelte
+  // Akte). Ausnahme: nach erfolgreichem Speichern (savedRef) ist er ohnehin weg.
+  // Bei einem echten Browser-Crash laeuft dieser Cleanup nicht — dann bleibt der
+  // Entwurf zur Wiederherstellung erhalten (genau der Zweck des Autosave).
+  useEffect(() => {
+    return () => {
+      if (!savedRef.current) {
+        try {
+          sessionStorage.removeItem(draftKey);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, [draftKey]);
 
   // Warnung vor Verlassen der Seite, solange ein ungesicherter Entwurf besteht.
   useEffect(() => {
@@ -1701,6 +1724,7 @@ function GespraechModal({
         setErr(j.error || "Speichern fehlgeschlagen.");
         return;
       }
+      savedRef.current = true;
       clearDraft();
       onSaved();
     } catch {

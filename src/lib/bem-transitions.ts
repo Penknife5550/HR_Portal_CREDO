@@ -91,7 +91,10 @@ function buildExtraData(
       };
     case "ANGELEGT":
       // Wieder-Einladen aus ABGEBROCHEN/EINWILLIGUNG_ABGELEHNT: Verfahren neu
-      // starten — Abschluss-/Prozess-Zeitstempel zuruecksetzen.
+      // starten — Abschluss-/Prozess-Zeitstempel zuruecksetzen. Auch die vom
+      // Beschaeftigten im alten Durchlauf geaeusserten Wuensche (Vertrauensperson)
+      // werden geleert, damit sie im neuen Durchlauf frisch erhoben werden
+      // (DSGVO Art. 5 Abs. 1 c/d — Datenminimierung/Richtigkeit).
       return {
         beendetAm: null,
         beendigungsgrund: null,
@@ -100,6 +103,8 @@ function buildExtraData(
         einladungAm: null,
         datenschutzAm: null,
         erstgespraechAm: null,
+        vertrauenspersonWunsch: false,
+        vertrauenspersonText: null,
       };
     case "GELOESCHT":
       return { geloeschtAm: now };
@@ -118,6 +123,12 @@ export async function bemTransition(
       id: true,
       status: true,
       displayId: true,
+      // Altwerte fuer die Audit-Spur beim Wieder-Oeffnen/-Einladen (sonst gehen
+      // sie beim Null-Setzen unwiederbringlich verloren).
+      ergebnis: true,
+      beendigungsgrund: true,
+      beendetAm: true,
+      aufbewahrungBis: true,
       organization: { select: { bemAufbewahrungJahre: true } },
     },
   });
@@ -144,6 +155,14 @@ export async function bemTransition(
     fall.organization.bemAufbewahrungJahre,
     now,
   );
+
+  // Rueckwaerts-Uebergaenge (Wieder-Oeffnen/-Einladen) leeren dokumentierte
+  // Abschlussfelder. Damit der vorherige Stand prueffaehig erhalten bleibt
+  // (DSGVO Art. 5 Abs. 2 / § 167 SGB IX), halten wir die Altwerte im Audit fest.
+  const istReopen =
+    (input.zielStatus === "MASSNAHMEN_LAUFEN" && fall.status === "ABGESCHLOSSEN") ||
+    (input.zielStatus === "ANGELEGT" &&
+      (fall.status === "ABGEBROCHEN" || fall.status === "EINWILLIGUNG_ABGELEHNT"));
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -174,7 +193,25 @@ export async function bemTransition(
           userId: input.session.userId,
           processType: "BEM",
           action: BEM_AUDIT_ACTIONS.STATUS_GEAENDERT,
-          details: { vorher: fall.status, nachher: input.zielStatus },
+          details: {
+            vorher: fall.status,
+            nachher: input.zielStatus,
+            ...(input.ergebnis ? { ergebnis: input.ergebnis } : {}),
+            ...(input.beendigungsgrund ? { beendigungsgrund: input.beendigungsgrund } : {}),
+            // Beim Wieder-Oeffnen/-Einladen: ueberschriebene Altwerte sichern.
+            ...(istReopen
+              ? {
+                  ueberschrieben: {
+                    ergebnis: fall.ergebnis ?? null,
+                    beendigungsgrund: fall.beendigungsgrund ?? null,
+                    beendetAm: fall.beendetAm ? fall.beendetAm.toISOString() : null,
+                    aufbewahrungBis: fall.aufbewahrungBis
+                      ? fall.aufbewahrungBis.toISOString()
+                      : null,
+                  },
+                }
+              : {}),
+          },
           ipAddress: input.ipAddress,
         },
       });

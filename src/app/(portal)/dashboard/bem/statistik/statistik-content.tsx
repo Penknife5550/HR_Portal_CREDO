@@ -45,6 +45,13 @@ function quote(zaehler: number, nenner: number): string {
   return `${Math.round((zaehler / nenner) * 100)} %`;
 }
 
+// Schutz vor CSV-Formel-Injection: Excel/LibreOffice werten Zellinhalte, die mit
+// = + - @ (oder Tab/CR) beginnen, beim Oeffnen als Formel aus. Reine Zahlen sind
+// unbetroffen; nur Freitext-Spalten (Mandantenname) sind der Vektor.
+function sanitizeCsvCell(v: string): string {
+  return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+}
+
 // Spalten-Definition (auch fuer CSV-Export wiederverwendet).
 const COLS: { key: keyof Agg; label: string; group: string }[] = [
   { key: "gesamt", label: "Gesamt", group: "" },
@@ -103,7 +110,9 @@ export function BemStatistikContent({ user }: { user: User }) {
     ];
     const csv = lines
       .map((cells) =>
-        cells.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(sep),
+        cells
+          .map((c) => `"${sanitizeCsvCell(String(c)).replace(/"/g, '""')}"`)
+          .join(sep),
       )
       .join("\r\n");
     // BOM (﻿), damit Excel UTF-8 (Umlaute) korrekt erkennt.

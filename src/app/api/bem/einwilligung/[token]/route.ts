@@ -19,6 +19,7 @@ import { syncBemFristen } from "@/lib/bem-fristen";
 import { sendEmailDetailed } from "@/lib/mailer";
 import { renderCredoEmail, paragraphsToHtml } from "@/lib/email-layout";
 import { einwilligungPublicSchema } from "@/lib/validations/bem";
+import { getBemKeyHex } from "@/lib/encryption";
 
 const ART_LABELS: Record<string, string> = {
   DATENSCHUTZ: "Datenschutz-Einwilligung",
@@ -157,8 +158,10 @@ export async function POST(
     // Schluessel (BEM_ENCRYPTION_KEY). Nur der Server kann einen passenden Hash
     // erzeugen — die Werte selbst (signedName/Ip/At) liegen zusaetzlich als
     // Spalten in der DB.
-    const hmacKey = process.env.BEM_ENCRYPTION_KEY || "";
-    const dokumentHash = createHmac("sha256", hmacKey)
+    // Pflicht-Key (getBemKeyHex wirft bei fehlendem/zu kurzem Schluessel) —
+    // kein stiller Fallback auf einen leeren Schluessel, der den Nachweis
+    // faelschungssicherheits-wertlos machen wuerde.
+    const dokumentHash = createHmac("sha256", getBemKeyHex())
       .update(`${e.id}|${e.bemFall.id}|${neuerStatus}|${name}|${now.getTime()}|${ip}`)
       .digest("hex");
 
@@ -185,7 +188,7 @@ export async function POST(
       // Fall-Status fortschreiben (nur aus EINLADUNG_VERSENDET).
       const zielFallStatus =
         neuerStatus === "ERTEILT" ? "EINWILLIGUNG_ERTEILT" : "EINWILLIGUNG_ABGELEHNT";
-      await tx.bemFall.updateMany({
+      const fallUpd = await tx.bemFall.updateMany({
         where: { id: e.bemFall.id, status: "EINLADUNG_VERSENDET" },
         data: {
           status: zielFallStatus,
@@ -199,6 +202,13 @@ export async function POST(
             : {}),
         },
       });
+      // Der Fall ist nicht mehr in EINLADUNG_VERSENDET (z.B. die Antwort kam
+      // bereits per Papier oder wurde manuell erfasst). Der digitale Link ist
+      // damit veraltet — Transaktion zuruckrollen, statt einen widerspruechlichen
+      // Aktenstand + irrefuehrende Benachrichtigungs-Mails zu erzeugen.
+      if (fallUpd.count === 0) {
+        throw new Error("ALREADY_HANDLED");
+      }
 
       await tx.auditLog.create({
         data: {

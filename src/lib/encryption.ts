@@ -132,7 +132,7 @@ export function isEncryptionConfigured(): boolean {
 // von der Personalakte moeglich ist (DSGVO Art. 32 / besonders sensible Daten).
 // =============================================
 
-function getBemKeyHex(): string {
+export function getBemKeyHex(): string {
   const key = process.env.BEM_ENCRYPTION_KEY;
   if (!key || key.length < 64) {
     throw new Error(

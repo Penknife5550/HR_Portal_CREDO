@@ -39,6 +39,10 @@ export const bemFallPatchSchema = z.object({
 // gegen bem-workflow.ts geprueft (race-frei via updateMany).
 export const bemStatusSchema = z.object({
   zielStatus: z.enum([
+    // ANGELEGT ist Ziel beim "BEM erneut anbieten" (Wieder-Einladen aus
+    // ABGEBROCHEN / EINWILLIGUNG_ABGELEHNT) — muss deckungsgleich mit
+    // erlaubteFolgestatus()/getErlaubteVorgaenger() in bem-workflow.ts sein.
+    "ANGELEGT",
     "EINLADUNG_VERSENDET",
     "EINWILLIGUNG_ERTEILT",
     "EINWILLIGUNG_ABGELEHNT",
@@ -96,10 +100,19 @@ export const updateGespraechSchema = z.object({
 });
 
 // =============================================
-// Massnahmen (technisch / organisatorisch / personenbezogen)
+// Massnahmen (technisch / organisatorisch / personenbezogen / Wiedereingliederung)
 // =============================================
+// Eine gemeinsame Quelle fuer Create- UND Update-Schema, damit beide nicht
+// auseinanderlaufen (muss zur Prisma-Enum BemMassnahmeKategorie passen).
+export const MASSNAHME_KATEGORIEN = [
+  "TECHNISCH",
+  "ORGANISATORISCH",
+  "PERSONENBEZOGEN",
+  "WIEDEREINGLIEDERUNG",
+] as const;
+
 export const createMassnahmeSchema = z.object({
-  kategorie: z.enum(["TECHNISCH", "ORGANISATORISCH", "PERSONENBEZOGEN", "WIEDEREINGLIEDERUNG"]),
+  kategorie: z.enum(MASSNAHME_KATEGORIEN),
   beschreibung: z.string().trim().min(1, "Beschreibung ist erforderlich").max(5000),
   zustaendig: z.string().trim().max(200).optional().nullable(),
   frist: dateLike.optional().nullable(),
@@ -107,9 +120,7 @@ export const createMassnahmeSchema = z.object({
 });
 
 export const updateMassnahmeSchema = z.object({
-  kategorie: z
-    .enum(["TECHNISCH", "ORGANISATORISCH", "PERSONENBEZOGEN"])
-    .optional(),
+  kategorie: z.enum(MASSNAHME_KATEGORIEN).optional(),
   beschreibung: z.string().trim().min(1).max(5000).optional(),
   zustaendig: z.string().trim().max(200).optional().nullable(),
   frist: dateLike.optional().nullable(),

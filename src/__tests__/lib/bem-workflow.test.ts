@@ -13,6 +13,20 @@ import {
   BEM_STEPS,
   type BemStatus,
 } from "@/lib/bem-workflow";
+import { bemStatusSchema } from "@/lib/validations/bem";
+
+const ALLE_STATUS: BemStatus[] = [
+  "ANGELEGT",
+  "EINLADUNG_VERSENDET",
+  "EINWILLIGUNG_ERTEILT",
+  "EINWILLIGUNG_ABGELEHNT",
+  "ERSTGESPRAECH",
+  "MASSNAHMEN_LAUFEN",
+  "ABGESCHLOSSEN",
+  "ABGEBROCHEN",
+  "AUFBEWAHRUNG",
+  "GELOESCHT",
+];
 
 describe("bem-workflow — erlaubteFolgestatus", () => {
   it("ANGELEGT fuehrt zu EINLADUNG_VERSENDET oder ABGEBROCHEN", () => {
@@ -37,19 +51,7 @@ describe("bem-workflow — erlaubteFolgestatus", () => {
 
 describe("bem-workflow — getErlaubteVorgaenger (Umkehrung)", () => {
   it("ist konsistent mit erlaubteFolgestatus", () => {
-    const alle: BemStatus[] = [
-      "ANGELEGT",
-      "EINLADUNG_VERSENDET",
-      "EINWILLIGUNG_ERTEILT",
-      "EINWILLIGUNG_ABGELEHNT",
-      "ERSTGESPRAECH",
-      "MASSNAHMEN_LAUFEN",
-      "ABGESCHLOSSEN",
-      "ABGEBROCHEN",
-      "AUFBEWAHRUNG",
-      "GELOESCHT",
-    ];
-    for (const ziel of alle) {
+    for (const ziel of ALLE_STATUS) {
       for (const vorg of getErlaubteVorgaenger(ziel)) {
         expect(erlaubteFolgestatus(vorg)).toContain(ziel);
       }
@@ -60,6 +62,21 @@ describe("bem-workflow — getErlaubteVorgaenger (Umkehrung)", () => {
     expect(getErlaubteVorgaenger("EINWILLIGUNG_ERTEILT")).toEqual([
       "EINLADUNG_VERSENDET",
     ]);
+  });
+});
+
+describe("bem-workflow — Zod-Schema deckt alle erreichbaren Zielstatus (Drift-Schutz)", () => {
+  // Verhindert Regressionen wie das tote 'Wieder-Einladen' (Ziel ANGELEGT war
+  // in erlaubteFolgestatus, fehlte aber im Zod-zielStatus-Enum -> 400).
+  it("jeder via erlaubteFolgestatus erreichbare Zielstatus ist im bemStatusSchema.zielStatus-Enum", () => {
+    const erreichbar = new Set<string>();
+    for (const s of ALLE_STATUS) {
+      for (const z of erlaubteFolgestatus(s)) erreichbar.add(z);
+    }
+    for (const ziel of erreichbar) {
+      const res = bemStatusSchema.safeParse({ zielStatus: ziel });
+      expect(res.success).toBe(true);
+    }
   });
 });
 
