@@ -72,7 +72,7 @@ export async function POST(
     const recipient = d.email || fall.employeeEmail;
     if (!recipient) {
       return NextResponse.json(
-        { error: "Keine Empfaenger-E-Mail hinterlegt. Bitte E-Mail angeben." },
+        { error: "Keine Empfänger-E-Mail hinterlegt. Bitte E-Mail angeben." },
         { status: 400 },
       );
     }
@@ -116,18 +116,18 @@ export async function POST(
     const name = `${fall.employeeFirstName} ${fall.employeeLastName}`.trim();
     const subject = "Einladung zum Betrieblichen Eingliederungsmanagement (BEM)";
     const textBody =
-      `Sie waren in den letzten zwoelf Monaten laenger oder wiederholt arbeitsunfaehig. ` +
+      `Sie waren in den letzten zwölf Monaten länger oder wiederholt arbeitsunfähig. ` +
       `Ihr Arbeitgeber bietet Ihnen daher ein Betriebliches Eingliederungsmanagement (BEM) an. ` +
-      `Ziel ist es, gemeinsam Moeglichkeiten zu finden, Ihre Arbeitsfaehigkeit zu erhalten.\n\n` +
-      `Die Teilnahme ist freiwillig. Bitte teilen Sie uns ueber den folgenden Link mit, ` +
+      `Ziel ist es, gemeinsam Möglichkeiten zu finden, Ihre Arbeitsfähigkeit zu erhalten.\n\n` +
+      `Die Teilnahme ist freiwillig. Bitte teilen Sie uns über den folgenden Link mit, ` +
       `ob Sie dem BEM zustimmen. Ihre Angaben werden streng vertraulich behandelt.` +
       (d.nachricht ? `\n\n${d.nachricht}` : "");
     const html = renderCredoEmail({
-      titel: "Einladung zum BEM-Gespraech",
+      titel: "Einladung zum BEM-Gespräch",
       intro: `Guten Tag ${name},`,
       bodyHtml: paragraphsToHtml(textBody),
       button: { label: "Jetzt online antworten", url: magicUrl },
-      fussnote: `Dieser Link ist bis zum ${tokenExpiry.toLocaleDateString("de-DE")} gueltig. Wenn Sie die Nachricht irrtuemlich erhalten haben, ignorieren Sie sie bitte.`,
+      fussnote: `Dieser Link ist bis zum ${tokenExpiry.toLocaleDateString("de-DE")} gültig. Wenn Sie die Nachricht irrtümlich erhalten haben, ignorieren Sie sie bitte.`,
       appUrl: baseUrl,
     });
 

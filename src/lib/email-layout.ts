@@ -132,7 +132,7 @@ export function renderCredoEmail(opts: CredoEmailOptions): string {
         <!-- Footer -->
         <tr><td style="padding:16px 32px 24px;border-top:1px solid #DADADA;">
           <p style="${font}margin:0;font-size:12px;color:#999999;">
-            CREDO Schultraegergruppe · Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+            CREDO Schulträgergruppe · Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
           </p>
         </td></tr>
 

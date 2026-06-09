@@ -2575,6 +2575,7 @@ enum BemDokumentTyp {
   ABSCHLUSSERKLAERUNG
   ABBRUCHERKLAERUNG
   BEENDIGUNGSERKLAERUNG
+  ATTEST // AU / aerztliches Attest / mitgebrachte Unterlagen (Upload)
   GESAMT_EXPORT // Mitarbeiter-Gesamtexport (DSGVO Art. 15)
   SONSTIGES
 }

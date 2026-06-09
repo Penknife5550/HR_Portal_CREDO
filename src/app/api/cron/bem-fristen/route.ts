@@ -41,7 +41,7 @@ const SEVERITY_LABEL: Record<BemFristSeverity, string> = {
   INFO: "Hinweis",
   WARNING: "Warnung",
   URGENT: "Dringend",
-  OVERDUE: "Ueberfaellig",
+  OVERDUE: "Überfällig",
 };
 
 interface EskItem {
@@ -128,19 +128,19 @@ export async function POST(request: NextRequest) {
       const zeilen = info.items
         .map(
           (i) =>
-            `- ${i.bezeichnung}: faellig am ${i.faelligAm.toLocaleDateString("de-DE")} (${SEVERITY_LABEL[i.severity]})`,
+            `- ${i.bezeichnung}: fällig am ${i.faelligAm.toLocaleDateString("de-DE")} (${SEVERITY_LABEL[i.severity]})`,
         )
         .join("\n");
-      const subject = `BEM ${info.displayId}: Frist(en) faellig`;
+      const subject = `BEM ${info.displayId}: Frist(en) fällig`;
       const text =
-        `Im BEM-Fall ${info.displayId} sind folgende Fristen faellig oder ruecken naeher:\n\n${zeilen}\n\n` +
-        `Bitte oeffnen Sie den Fall im HR-Portal, um die naechsten Schritte zu veranlassen.`;
+        `Im BEM-Fall ${info.displayId} sind folgende Fristen fällig oder rücken näher:\n\n${zeilen}\n\n` +
+        `Bitte öffnen Sie den Fall im HR-Portal, um die nächsten Schritte zu veranlassen.`;
       const html = renderCredoEmail({
         titel: `BEM-Fristen: ${info.displayId}`,
         bodyHtml: paragraphsToHtml(text),
-        button: { label: "Fall oeffnen", url: `${baseUrl}/dashboard/bem/${fallId}` },
+        button: { label: "Fall öffnen", url: `${baseUrl}/dashboard/bem/${fallId}` },
         fussnote:
-          "Automatische Erinnerung des CREDO HR-Portals (BEM). Diese Nachricht enthaelt keine Gesundheitsdaten.",
+          "Automatische Erinnerung des CREDO HR-Portals (BEM). Diese Nachricht enthält keine Gesundheitsdaten.",
         appUrl: baseUrl,
       });
 

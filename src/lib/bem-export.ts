@@ -161,7 +161,7 @@ export async function buildBemGesamtExportPdf(
 
   // === Stammdaten ===
   heading(`BEM-Fall ${input.displayId}`);
-  kv("Beschaeftigte:r", input.employee.name);
+  kv("Beschäftigte:r", input.employee.name);
   kv("E-Mail", input.employee.email);
   kv("Personalnummer", input.employee.personalNr);
   kv(
@@ -176,7 +176,7 @@ export async function buildBemGesamtExportPdf(
   kv("Fehlzeiten ab", input.dates.fehlzeitenAb);
   kv("Einladung am", input.dates.einladungAm);
   kv("Einwilligung am", input.dates.einwilligungAm);
-  kv("Erstgespraech am", input.dates.erstgespraechAm);
+  kv("Erstgespräch am", input.dates.erstgespraechAm);
   if (input.dates.beendetAm) kv("Beendet am", input.dates.beendetAm);
   if (input.dates.beendigungsgrund) kv("Beendigungsgrund", input.dates.beendigungsgrund);
   if (input.dates.aufbewahrungBis) kv("Aufbewahrung bis", input.dates.aufbewahrungBis);
@@ -197,9 +197,9 @@ export async function buildBemGesamtExportPdf(
   }
 
   // === Gespraeche ===
-  heading("Gespraeche");
+  heading("Gespräche");
   if (input.gespraeche.length === 0) {
-    small("Keine Gespraeche dokumentiert.");
+    small("Keine Gespräche dokumentiert.");
   } else {
     for (const g of input.gespraeche) {
       doc.moveDown(0.3);
@@ -217,9 +217,9 @@ export async function buildBemGesamtExportPdf(
   }
 
   // === Massnahmen ===
-  heading("Massnahmen");
+  heading("Maßnahmen");
   if (input.massnahmen.length === 0) {
-    small("Keine Massnahmen erfasst.");
+    small("Keine Maßnahmen erfasst.");
   } else {
     for (const m of input.massnahmen) {
       doc.moveDown(0.3);
@@ -230,7 +230,7 @@ export async function buildBemGesamtExportPdf(
         .text(`${m.kategorieLabel} — ${m.statusLabel}`, L, doc.y, { width: W });
       para(m.beschreibung);
       const meta = [
-        m.zustaendig ? `Zustaendig: ${m.zustaendig}` : null,
+        m.zustaendig ? `Zuständig: ${m.zustaendig}` : null,
         m.frist ? `Frist: ${m.frist}` : null,
         m.evaluationAm ? `Evaluation: ${m.evaluationAm}` : null,
       ]
@@ -265,9 +265,9 @@ export async function buildBemGesamtExportPdf(
   }
 
   // === Protokoll ===
-  heading("Zugriffs- & Aenderungsprotokoll");
+  heading("Zugriffs- & Änderungsprotokoll");
   if (input.protokoll.length === 0) {
-    small("Keine Eintraege.");
+    small("Keine Einträge.");
   } else {
     for (const p of input.protokoll) {
       para(`${p.zeitpunkt} · ${p.vorgang} · ${p.person}${p.ip ? ` · ${p.ip}` : ""}`);

@@ -50,7 +50,7 @@ export async function POST(
     });
     if (upd.count === 0) {
       return NextResponse.json(
-        { error: "Nur erteilte Einwilligungen koennen widerrufen werden." },
+        { error: "Nur erteilte Einwilligungen können widerrufen werden." },
         { status: 409 },
       );
     }

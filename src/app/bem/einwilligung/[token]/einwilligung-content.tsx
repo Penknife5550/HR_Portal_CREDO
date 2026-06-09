@@ -27,7 +27,7 @@ export function BemEinwilligungContent({ token }: { token: string }) {
       const res = await fetch(`/api/bem/einwilligung/${token}`);
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage(json.error || "Dieser Link ist ungueltig.");
+        setMessage(json.error || "Dieser Link ist ungültig.");
         setView("fehler");
         return;
       }
@@ -43,7 +43,7 @@ export function BemEinwilligungContent({ token }: { token: string }) {
         setView("formular");
       }
     } catch {
-      setMessage("Verbindungsfehler. Bitte spaeter erneut versuchen.");
+      setMessage("Verbindungsfehler. Bitte später erneut versuchen.");
       setView("fehler");
     }
   }, [token]);
@@ -73,7 +73,7 @@ export function BemEinwilligungContent({ token }: { token: string }) {
       setErgebnis(entscheidung);
       setView("fertig");
     } catch {
-      setMessage("Verbindungsfehler. Bitte spaeter erneut versuchen.");
+      setMessage("Verbindungsfehler. Bitte später erneut versuchen.");
     } finally {
       setBusy(false);
     }
@@ -118,13 +118,13 @@ export function BemEinwilligungContent({ token }: { token: string }) {
               <p className="mt-3 text-sm leading-relaxed text-gray-700">
                 Ihr Arbeitgeber{info.organizationName ? ` (${info.organizationName})` : ""}{" "}
                 bietet Ihnen ein Betriebliches Eingliederungsmanagement an. Ziel ist es,
-                gemeinsam Moeglichkeiten zu finden, Ihre Arbeitsfaehigkeit zu erhalten.
+                gemeinsam Möglichkeiten zu finden, Ihre Arbeitsfähigkeit zu erhalten.
                 Die Teilnahme ist <strong>freiwillig</strong> und Ihre Angaben werden
                 streng vertraulich behandelt. Eine Ablehnung hat keine arbeitsrechtlichen
                 Nachteile.
               </p>
               <p className="mt-3 text-sm text-gray-700">
-                Bitte bestaetigen Sie Ihre Entscheidung ({info.artLabel}):
+                Bitte bestätigen Sie Ihre Entscheidung ({info.artLabel}):
               </p>
 
               <label className="mt-4 block text-sm font-medium text-gray-700">

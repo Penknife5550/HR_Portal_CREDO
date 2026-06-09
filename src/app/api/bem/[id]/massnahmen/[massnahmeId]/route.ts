@@ -45,7 +45,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
     if (!(await loadOwned(id, massnahmeId))) {
-      return NextResponse.json({ error: "Massnahme nicht gefunden" }, { status: 404 });
+      return NextResponse.json({ error: "Maßnahme nicht gefunden" }, { status: 404 });
     }
 
     const body = await request.json().catch(() => null);
@@ -99,7 +99,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
     if (!(await loadOwned(id, massnahmeId))) {
-      return NextResponse.json({ error: "Massnahme nicht gefunden" }, { status: 404 });
+      return NextResponse.json({ error: "Maßnahme nicht gefunden" }, { status: 404 });
     }
 
     await prisma.bemMassnahme.delete({ where: { id: massnahmeId } });

@@ -254,7 +254,7 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
                           {u.isBemBeauftragte && (
                             <span
                               className="ml-1 inline-flex rounded-full bg-[#009AC6]/10 px-2 py-0.5 text-xs font-medium text-[#009AC6]"
-                              title="BEM-Beauftragte:r (darf BEM-Faelle anlegen)"
+                              title="BEM-Beauftragte:r (darf BEM-Fälle anlegen)"
                             >
                               🔒 BEM
                             </span>
@@ -633,7 +633,7 @@ function UserModal({
                 </button>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Darf BEM-Faelle anlegen und fuehren (§ 167 SGB IX).
+                Darf BEM-Fälle anlegen und führen (§ 167 SGB IX).
               </p>
             </div>
           )}

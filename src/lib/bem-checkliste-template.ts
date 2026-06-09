@@ -19,28 +19,28 @@ export interface BemChecklistItem {
 
 const ERSTGESPRAECH: string[] = [
   "Einwilligung zum BEM liegt vor und ist dokumentiert",
-  "Zweck und Freiwilligkeit des BEM erlaeutert",
-  "Datenschutz und Schweigepflicht erklaert",
-  "Aktuelle gesundheitliche Situation besprochen (soweit gewuenscht)",
+  "Zweck und Freiwilligkeit des BEM erläutert",
+  "Datenschutz und Schweigepflicht erklärt",
+  "Aktuelle gesundheitliche Situation besprochen (soweit gewünscht)",
   "Belastungen / Probleme am Arbeitsplatz erfasst",
-  "Wuensche und Vorschlaege der/des Beschaeftigten aufgenommen",
-  "Moegliche Massnahmen (technisch/organisatorisch/personenbezogen) identifiziert",
-  "Hinzuziehung Betriebsarzt / Reha-Traeger / Integrationsamt geprueft",
-  "Naechste Schritte und Folgetermin vereinbart",
+  "Wünsche und Vorschläge der/des Beschäftigten aufgenommen",
+  "Mögliche Maßnahmen (technisch/organisatorisch/personenbezogen) identifiziert",
+  "Hinzuziehung Betriebsarzt / Reha-Träger / Integrationsamt geprüft",
+  "Nächste Schritte und Folgetermin vereinbart",
 ];
 
 const FOLGEGESPRAECH: string[] = [
-  "Umsetzung der vereinbarten Massnahmen geprueft",
-  "Wirksamkeit der Massnahmen bewertet",
-  "Gesundheitliche Entwicklung besprochen (soweit gewuenscht)",
-  "Anpassung bestehender oder neue Massnahmen vereinbart",
+  "Umsetzung der vereinbarten Maßnahmen geprüft",
+  "Wirksamkeit der Maßnahmen bewertet",
+  "Gesundheitliche Entwicklung besprochen (soweit gewünscht)",
+  "Anpassung bestehender oder neue Maßnahmen vereinbart",
   "Weiteres Vorgehen / Folgetermin oder Abschluss festgelegt",
 ];
 
 const GEDAECHTNISPROTOKOLL: string[] = [
-  "Datum, Ort und Dauer des Gespraechs erfasst",
+  "Datum, Ort und Dauer des Gesprächs erfasst",
   "Teilnehmende dokumentiert",
-  "Wesentliche Gespraechsinhalte festgehalten",
+  "Wesentliche Gesprächsinhalte festgehalten",
   "Getroffene Vereinbarungen notiert",
 ];
 

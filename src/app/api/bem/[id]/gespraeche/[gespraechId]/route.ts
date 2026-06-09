@@ -45,7 +45,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
     if (!(await loadOwned(id, gespraechId))) {
-      return NextResponse.json({ error: "Gespraech nicht gefunden" }, { status: 404 });
+      return NextResponse.json({ error: "Gespräch nicht gefunden" }, { status: 404 });
     }
 
     const body = await request.json().catch(() => null);
@@ -106,7 +106,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
     if (!(await loadOwned(id, gespraechId))) {
-      return NextResponse.json({ error: "Gespraech nicht gefunden" }, { status: 404 });
+      return NextResponse.json({ error: "Gespräch nicht gefunden" }, { status: 404 });
     }
 
     await prisma.bemGespraech.delete({ where: { id: gespraechId } });

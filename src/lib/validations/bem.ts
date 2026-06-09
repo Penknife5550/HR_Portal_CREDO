@@ -14,17 +14,17 @@ export const createBemSchema = z.object({
   employeeEmail: z
     .string()
     .trim()
-    .email("Ungueltige E-Mail-Adresse")
+    .email("Ungültige E-Mail-Adresse")
     .optional()
     .or(z.literal("")),
   employeePersonalNr: z.string().trim().max(50).optional().nullable(),
-  employeeId: z.string().uuid("Ungueltige Mitarbeiter-ID").optional().nullable(),
-  organizationId: z.string().uuid("Ungueltige Mandanten-ID"),
+  employeeId: z.string().uuid("Ungültige Mitarbeiter-ID").optional().nullable(),
+  organizationId: z.string().uuid("Ungültige Mandanten-ID"),
   eingangsweg: z.enum(["DIGITAL", "PAPIER"]).default("DIGITAL"),
   anlassFehlzeitenAb: z
     .string()
     .datetime({ offset: true })
-    .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ungueltiges Datum"))
+    .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ungültiges Datum"))
     .optional()
     .nullable(),
 });
@@ -62,7 +62,7 @@ const teilnehmerSchema = z.object({
 const dateLike = z
   .string()
   .datetime({ offset: true })
-  .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ungueltiges Datum"));
+  .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ungültiges Datum"));
 
 export const createGespraechSchema = z.object({
   typ: z.enum(["ERSTGESPRAECH", "FOLGEGESPRAECH", "GEDAECHTNISPROTOKOLL"]),
@@ -114,7 +114,7 @@ export const einladungSchema = z.object({
   // (im Prisma-Enum BemEinwilligungArt vorhanden) folgen in Phase 2 (E9) mit
   // eigenem Beteiligungs-Flow — bewusst hier NICHT zugelassen.
   art: z.enum(["DATENSCHUTZ", "DURCHFUEHRUNG"]).default("DATENSCHUTZ"),
-  email: z.string().trim().email("Ungueltige E-Mail-Adresse").optional(),
+  email: z.string().trim().email("Ungültige E-Mail-Adresse").optional(),
   nachricht: z.string().trim().max(3000).optional(),
   gueltigkeitstage: z.number().int().min(1).max(90).optional(),
 });
@@ -129,7 +129,7 @@ export const einwilligungPublicSchema = z.object({
 // Dokument aus BEM-Vorlage erzeugen (E5)
 // =============================================
 export const dokumentGenerierenSchema = z.object({
-  templateId: z.string().uuid("Ungueltige Vorlagen-ID"),
+  templateId: z.string().uuid("Ungültige Vorlagen-ID"),
   typ: z.enum([
     "EINLADUNG",
     "DATENSCHUTZVEREINBARUNG",
@@ -150,7 +150,7 @@ export const dokumentGenerierenSchema = z.object({
 // Freigaben (BemZugriff) verwalten
 // =============================================
 export const bemZugriffSchema = z.object({
-  userId: z.string().uuid("Ungueltige Benutzer-ID"),
+  userId: z.string().uuid("Ungültige Benutzer-ID"),
   rolle: z.enum(["BEAUFTRAGTE", "VERTRETUNG", "BR", "SBV"]).default("BEAUFTRAGTE"),
 });
 

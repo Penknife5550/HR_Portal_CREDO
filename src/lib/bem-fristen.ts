@@ -73,7 +73,7 @@ export function berechneBemFristTemplates(fall: BemFristSnapshot): FristTemplate
       typ: "EINLADUNG",
       bezeichnung: "BEM-Einladung versenden",
       beschreibung:
-        "Die/der Beschaeftigte sollte zeitnah zum BEM eingeladen werden.",
+        "Die/der Beschäftigte sollte zeitnah zum BEM eingeladen werden.",
       faelligAm: addDays(base, 14),
     });
   }
@@ -83,7 +83,7 @@ export function berechneBemFristTemplates(fall: BemFristSnapshot): FristTemplate
       typ: "EINWILLIGUNG",
       bezeichnung: "Einwilligung steht aus",
       beschreibung:
-        "Auf die Rueckmeldung warten; ggf. erinnern oder erneut einladen.",
+        "Auf die Rückmeldung warten; ggf. erinnern oder erneut einladen.",
       faelligAm: addDays(fall.einladungAm, 21),
     });
   }
@@ -91,8 +91,8 @@ export function berechneBemFristTemplates(fall: BemFristSnapshot): FristTemplate
   if (fall.status === "EINWILLIGUNG_ERTEILT" && fall.datenschutzAm) {
     t.push({
       typ: "ERSTGESPRAECH",
-      bezeichnung: "Erstgespraech terminieren",
-      beschreibung: "Nach erteilter Einwilligung das Erstgespraech vereinbaren.",
+      bezeichnung: "Erstgespräch terminieren",
+      beschreibung: "Nach erteilter Einwilligung das Erstgespräch vereinbaren.",
       faelligAm: addDays(fall.datenschutzAm, 21),
     });
   }
@@ -121,8 +121,8 @@ export function berechneBemFristTemplates(fall: BemFristSnapshot): FristTemplate
   if (evals[0] && fall.status === "MASSNAHMEN_LAUFEN") {
     t.push({
       typ: "EVALUATION",
-      bezeichnung: "Massnahmen evaluieren",
-      beschreibung: "Wirksamkeit der vereinbarten Massnahmen pruefen.",
+      bezeichnung: "Maßnahmen evaluieren",
+      beschreibung: "Wirksamkeit der vereinbarten Maßnahmen prüfen.",
       faelligAm: evals[0],
     });
   }
@@ -130,9 +130,9 @@ export function berechneBemFristTemplates(fall: BemFristSnapshot): FristTemplate
   if (fall.aufbewahrungBis && fall.status !== "GELOESCHT") {
     t.push({
       typ: "AUFBEWAHRUNGSENDE",
-      bezeichnung: "Aufbewahrungsfrist endet — Loeschung steht an",
+      bezeichnung: "Aufbewahrungsfrist endet — Löschung steht an",
       beschreibung:
-        "Mit Ablauf der Aufbewahrungsfrist werden die Akteninhalte automatisch geloescht.",
+        "Mit Ablauf der Aufbewahrungsfrist werden die Akteninhalte automatisch gelöscht.",
       faelligAm: fall.aufbewahrungBis,
     });
   }

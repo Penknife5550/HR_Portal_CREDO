@@ -39,12 +39,12 @@ const STATUS_LABELS: Record<string, string> = {
   EINLADUNG_VERSENDET: "Einladung versendet",
   EINWILLIGUNG_ERTEILT: "Einwilligung erteilt",
   EINWILLIGUNG_ABGELEHNT: "Einwilligung abgelehnt",
-  ERSTGESPRAECH: "Erstgespraech",
-  MASSNAHMEN_LAUFEN: "Massnahmen laufen",
+  ERSTGESPRAECH: "Erstgespräch",
+  MASSNAHMEN_LAUFEN: "Maßnahmen laufen",
   ABGESCHLOSSEN: "Abgeschlossen",
   ABGEBROCHEN: "Abgebrochen",
   AUFBEWAHRUNG: "Aufbewahrung",
-  GELOESCHT: "Geloescht",
+  GELOESCHT: "Gelöscht",
 };
 
 function statusBadgeClass(status: string): string {
@@ -134,8 +134,8 @@ export function BemContent({ user }: { user: User }) {
           <div>
             <h1 className="text-2xl font-bold text-foreground">🔒 BEM — Betriebliches Eingliederungsmanagement</h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Versiegelte Akte (§ 167 SGB IX). Sichtbar sind ausschliesslich
-              Faelle, fuer die Sie freigegeben sind. Jeder Zugriff wird
+              Versiegelte Akte (§ 167 SGB IX). Sichtbar sind ausschließlich
+              Fälle, für die Sie freigegeben sind. Jeder Zugriff wird
               protokolliert.
             </p>
           </div>
@@ -163,7 +163,7 @@ export function BemContent({ user }: { user: User }) {
 
         {/* KPIs */}
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <KpiCard label="Faelle gesamt" value={total} />
+          <KpiCard label="Fälle gesamt" value={total} />
           <KpiCard label="Laufend" value={laufend} accent="blau" />
           <KpiCard label="Abgeschlossen" value={statusCounts.ABGESCHLOSSEN || 0} accent="gruen" />
           <KpiCard label="Abgebrochen" value={statusCounts.ABGEBROCHEN || 0} accent="rot" />
@@ -196,7 +196,7 @@ export function BemContent({ user }: { user: User }) {
             <thead className="border-b border-border bg-muted/50 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Fall-Nr.</th>
-                <th className="px-4 py-3 font-medium">Beschaeftigte:r</th>
+                <th className="px-4 py-3 font-medium">Beschäftigte:r</th>
                 <th className="px-4 py-3 font-medium">Mandant</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Angelegt</th>
@@ -207,13 +207,13 @@ export function BemContent({ user }: { user: User }) {
               {loading ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    Lade Faelle…
+                    Lade Fälle…
                   </td>
                 </tr>
               ) : faelle.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    Keine freigegebenen BEM-Faelle.
+                    Keine freigegebenen BEM-Fälle.
                   </td>
                 </tr>
               ) : (
@@ -245,7 +245,7 @@ export function BemContent({ user }: { user: User }) {
                         href={`/dashboard/bem/${f.id}`}
                         className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                       >
-                        Oeffnen
+                        Öffnen
                       </Link>
                     </td>
                   </tr>
@@ -325,7 +325,7 @@ function CreateModal({
       return;
     }
     if (!organizationId) {
-      setErr("Bitte einen Mandanten waehlen.");
+      setErr("Bitte einen Mandanten wählen.");
       return;
     }
     setSaving(true);
@@ -369,7 +369,7 @@ function CreateModal({
             type="button"
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground"
-            aria-label="Schliessen"
+            aria-label="Schließen"
           >
             ✕
           </button>
@@ -426,7 +426,7 @@ function CreateModal({
               onChange={(e) => setOrganizationId(e.target.value)}
               className={INPUT_CLASS}
             >
-              <option value="">Bitte waehlen…</option>
+              <option value="">Bitte wählen…</option>
               {organizations.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.mandantNumber} — {o.name}

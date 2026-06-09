@@ -157,35 +157,36 @@ const STATUS_LABELS: Record<string, string> = {
   EINLADUNG_VERSENDET: "Einladung versendet",
   EINWILLIGUNG_ERTEILT: "Einwilligung erteilt",
   EINWILLIGUNG_ABGELEHNT: "Einwilligung abgelehnt",
-  ERSTGESPRAECH: "Erstgespraech",
-  MASSNAHMEN_LAUFEN: "Massnahmen laufen",
+  ERSTGESPRAECH: "Erstgespräch",
+  MASSNAHMEN_LAUFEN: "Maßnahmen laufen",
   ABGESCHLOSSEN: "Abgeschlossen",
   ABGEBROCHEN: "Abgebrochen",
   AUFBEWAHRUNG: "Aufbewahrung",
-  GELOESCHT: "Geloescht",
+  GELOESCHT: "Gelöscht",
 };
 
 const ACTION_LABELS: Record<string, string> = {
   BEM_FALL_ANGELEGT: "Fall angelegt",
-  BEM_AKTE_GEOEFFNET: "Akte geoeffnet",
-  BEM_STATUS_GEAENDERT: "Status geaendert",
-  BEM_ZUGRIFF_GEWAEHRT: "Zugriff gewaehrt",
+  BEM_AKTE_GEOEFFNET: "Akte geöffnet",
+  BEM_STATUS_GEAENDERT: "Status geändert",
+  BEM_ZUGRIFF_GEWAEHRT: "Zugriff gewährt",
   BEM_ZUGRIFF_ENTZOGEN: "Zugriff entzogen",
   BEM_EINLADUNG_VERSENDET: "Einladung versendet",
   BEM_MAIL_VERSENDET: "Mail versendet",
   BEM_DOKUMENT_GENERIERT: "Dokument generiert",
-  BEM_GESPRAECH_ERFASST: "Gespraech erfasst",
-  BEM_GESPRAECH_AKTUALISIERT: "Gespraech aktualisiert",
-  BEM_GESPRAECH_GELOESCHT: "Gespraech geloescht",
-  BEM_MASSNAHME_ERFASST: "Massnahme erfasst",
-  BEM_MASSNAHME_AKTUALISIERT: "Massnahme aktualisiert",
-  BEM_MASSNAHME_GELOESCHT: "Massnahme geloescht",
+  BEM_DOKUMENT_HOCHGELADEN: "Dokument hochgeladen",
+  BEM_GESPRAECH_ERFASST: "Gespräch erfasst",
+  BEM_GESPRAECH_AKTUALISIERT: "Gespräch aktualisiert",
+  BEM_GESPRAECH_GELOESCHT: "Gespräch gelöscht",
+  BEM_MASSNAHME_ERFASST: "Maßnahme erfasst",
+  BEM_MASSNAHME_AKTUALISIERT: "Maßnahme aktualisiert",
+  BEM_MASSNAHME_GELOESCHT: "Maßnahme gelöscht",
   BEM_EINWILLIGUNG_ERTEILT: "Einwilligung erteilt",
   BEM_EINWILLIGUNG_ABGELEHNT: "Einwilligung abgelehnt",
   BEM_EINWILLIGUNG_WIDERRUFEN: "Einwilligung widerrufen",
   BEM_EXPORT_ERSTELLT: "Gesamtexport erstellt",
   BEM_FRIST_ERINNERUNG: "Frist-Erinnerung versendet",
-  BEM_GELOESCHT: "Akte geloescht (Aufbewahrung abgelaufen)",
+  BEM_GELOESCHT: "Akte gelöscht (Aufbewahrung abgelaufen)",
 };
 
 // Severity einer Frist anhand verbleibender Tage (gespiegelt zu bem-fristen.ts).
@@ -196,9 +197,9 @@ function fristSeverity(faelligAm: string): {
   const tage = Math.floor(
     (new Date(faelligAm).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
   );
-  if (tage < 0) return { label: "Ueberfaellig", cls: "text-credo-rot" };
+  if (tage < 0) return { label: "Überfällig", cls: "text-credo-rot" };
   if (tage <= 7) return { label: "Dringend", cls: "text-credo-rot" };
-  if (tage <= 14) return { label: "Bald faellig", cls: "text-amber-600" };
+  if (tage <= 14) return { label: "Bald fällig", cls: "text-amber-600" };
   return { label: "Im Plan", cls: "text-muted-foreground" };
 }
 
@@ -210,9 +211,9 @@ const ROLLE_LABELS: Record<string, string> = {
 };
 
 const GESPRAECH_TYP_LABELS: Record<string, string> = {
-  ERSTGESPRAECH: "Erstgespraech",
-  FOLGEGESPRAECH: "Folgegespraech",
-  GEDAECHTNISPROTOKOLL: "Gedaechtnisprotokoll",
+  ERSTGESPRAECH: "Erstgespräch",
+  FOLGEGESPRAECH: "Folgegespräch",
+  GEDAECHTNISPROTOKOLL: "Gedächtnisprotokoll",
 };
 
 const KATEGORIE_LABELS: Record<string, string> = {
@@ -223,14 +224,14 @@ const KATEGORIE_LABELS: Record<string, string> = {
 
 const MASSNAHME_STATUS_LABELS: Record<string, string> = {
   OFFEN: "Offen",
-  LAEUFT: "Laeuft",
+  LAEUFT: "Läuft",
   UMGESETZT: "Umgesetzt",
   VERWORFEN: "Verworfen",
 };
 
 const EINWILLIGUNG_ART_LABELS: Record<string, string> = {
   DATENSCHUTZ: "Datenschutz",
-  DURCHFUEHRUNG: "Durchfuehrung",
+  DURCHFUEHRUNG: "Durchführung",
   BR: "Betriebsrat",
   SBV: "Schwerbehindertenvertretung",
 };
@@ -245,16 +246,31 @@ const EINWILLIGUNG_STATUS_LABELS: Record<string, string> = {
 const DOKUMENT_TYP_LABELS: Record<string, string> = {
   EINLADUNG: "Einladung",
   DATENSCHUTZVEREINBARUNG: "Datenschutzvereinbarung",
-  ERSTGESPRAECH_PROTOKOLL: "Erstgespraech-Protokoll",
-  FOLGEGESPRAECH_PROTOKOLL: "Folgegespraech-Protokoll",
-  GEDAECHTNISPROTOKOLL: "Gedaechtnisprotokoll",
-  MASSNAHMENPLAN: "Massnahmenplan",
-  ABSCHLUSSERKLAERUNG: "Abschlusserklaerung",
-  ABBRUCHERKLAERUNG: "Abbrucherklaerung",
-  BEENDIGUNGSERKLAERUNG: "Beendigungserklaerung",
+  ERSTGESPRAECH_PROTOKOLL: "Erstgespräch-Protokoll",
+  FOLGEGESPRAECH_PROTOKOLL: "Folgegespräch-Protokoll",
+  GEDAECHTNISPROTOKOLL: "Gedächtnisprotokoll",
+  MASSNAHMENPLAN: "Maßnahmenplan",
+  ABSCHLUSSERKLAERUNG: "Abschlusserklärung",
+  ABBRUCHERKLAERUNG: "Abbrucherklärung",
+  BEENDIGUNGSERKLAERUNG: "Beendigungserklärung",
+  ATTEST: "Attest / AU / Unterlage",
   GESAMT_EXPORT: "Gesamtexport",
   SONSTIGES: "Sonstiges",
 };
+
+// Beim manuellen Upload auswählbare Typen (ohne EINLADUNG/GESAMT_EXPORT).
+const DOKUMENT_UPLOAD_TYP_OPTIONS = [
+  "ATTEST",
+  "DATENSCHUTZVEREINBARUNG",
+  "ERSTGESPRAECH_PROTOKOLL",
+  "FOLGEGESPRAECH_PROTOKOLL",
+  "GEDAECHTNISPROTOKOLL",
+  "MASSNAHMENPLAN",
+  "ABSCHLUSSERKLAERUNG",
+  "ABBRUCHERKLAERUNG",
+  "BEENDIGUNGSERKLAERUNG",
+  "SONSTIGES",
+] as const;
 
 const ABLAGE_LABELS: Record<string, string> = {
   NUR_BEM: "Nur BEM-Akte",
@@ -336,6 +352,7 @@ export function BemDetailContent({
   const [einladungOpen, setEinladungOpen] = useState(false);
   const [papierOpen, setPapierOpen] = useState(false);
   const [dokumentOpen, setDokumentOpen] = useState(false);
+  const [dokumentUploadOpen, setDokumentUploadOpen] = useState(false);
   const [zugriffOpen, setZugriffOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -375,7 +392,7 @@ export function BemDetailContent({
     if (zielStatus === "ABGEBROCHEN" || zielStatus === "ABGESCHLOSSEN") {
       const grund = window.prompt(
         zielStatus === "ABGEBROCHEN"
-          ? "Grund fuer den Abbruch (wird dokumentiert):"
+          ? "Grund für den Abbruch (wird dokumentiert):"
           : "Abschlussvermerk (optional):",
         "",
       );
@@ -406,8 +423,8 @@ export function BemDetailContent({
   }
 
   async function remove(kind: "gespraeche" | "massnahmen", entityId: string) {
-    const label = kind === "gespraeche" ? "Gespraech" : "Massnahme";
-    if (!window.confirm(`${label} wirklich loeschen?`)) return;
+    const label = kind === "gespraeche" ? "Gespräch" : "Maßnahme";
+    if (!window.confirm(`${label} wirklich löschen?`)) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/bem/${bemFallId}/${kind}/${entityId}`, {
@@ -415,7 +432,7 @@ export function BemDetailContent({
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setError(j.error || "Loeschen fehlgeschlagen.");
+        setError(j.error || "Löschen fehlgeschlagen.");
         return;
       }
       await load(true);
@@ -485,7 +502,7 @@ export function BemDetailContent({
   }
 
   async function revokeZugriff(zugriffId: string, name: string) {
-    if (!window.confirm(`Freigabe fuer ${name} wirklich entziehen?`)) return;
+    if (!window.confirm(`Freigabe für ${name} wirklich entziehen?`)) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/bem/${bemFallId}/zugriffe/${zugriffId}`, {
@@ -527,8 +544,8 @@ export function BemDetailContent({
             href="/dashboard/bem"
             className="mt-4 inline-block text-sm text-credo-blau hover:underline"
           >
-            ← Zurueck zur Uebersicht
-          </Link>
+            ← Zurück zur Übersicht
+</Link>
         </main>
       </div>
     );
@@ -547,7 +564,7 @@ export function BemDetailContent({
           href="/dashboard/bem"
           className="mb-4 inline-block text-sm text-credo-blau hover:underline"
         >
-          ← Zurueck zur Uebersicht
+          ← Zurück zur Übersicht
         </Link>
 
         {/* Kopf */}
@@ -619,7 +636,7 @@ export function BemDetailContent({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-foreground">
-                Naechster Schritt: {naechster.titel}
+                Nächster Schritt: {naechster.titel}
               </div>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                 {naechster.beschreibung}
@@ -659,9 +676,9 @@ export function BemDetailContent({
         <div className="mb-4 flex flex-wrap gap-2 border-b border-border">
           {(
             [
-              ["uebersicht", "Uebersicht", null],
-              ["gespraeche", "Gespraeche", fall.gespraeche.length],
-              ["massnahmen", "Massnahmen", fall.massnahmen.length],
+              ["uebersicht", "Übersicht", null],
+              ["gespraeche", "Gespräche", fall.gespraeche.length],
+              ["massnahmen", "Maßnahmen", fall.massnahmen.length],
               ["einwilligung", "Einwilligung", fall.einwilligungen.length],
               ["dokumente", "Dokumente", fall.dokumente.length],
               ["protokoll", "Protokoll", fall.kommunikation.length + fall.auditLogs.length],
@@ -713,7 +730,7 @@ export function BemDetailContent({
                         </div>
                         <div className="whitespace-nowrap text-right">
                           <div className="text-xs text-muted-foreground">
-                            faellig {formatDate(f.faelligAm)}
+                            fällig {formatDate(f.faelligAm)}
                           </div>
                           <div className={`text-xs font-semibold ${sev.cls}`}>
                             {sev.label}
@@ -736,14 +753,14 @@ export function BemDetailContent({
                 Stammdaten
               </h2>
               <dl className="space-y-2 text-sm">
-                <Row label="Beschaeftigte:r" value={`${fall.employeeFirstName} ${fall.employeeLastName}`} />
+                <Row label="Beschäftigte:r" value={`${fall.employeeFirstName} ${fall.employeeLastName}`} />
                 <Row label="E-Mail" value={fall.employeeEmail || "—"} />
                 <Row label="Personalnummer" value={fall.employeePersonalNr || "—"} />
                 <Row label="Eingangsweg" value={fall.eingangsweg === "DIGITAL" ? "Digital" : "Papier"} />
                 <Row label="Fehlzeiten ab" value={formatDate(fall.anlassFehlzeitenAb)} />
                 <Row label="Einladung am" value={formatDate(fall.einladungAm)} />
                 <Row label="Einwilligung am" value={formatDate(fall.datenschutzAm)} />
-                <Row label="Erstgespraech am" value={formatDate(fall.erstgespraechAm)} />
+                <Row label="Erstgespräch am" value={formatDate(fall.erstgespraechAm)} />
                 {fall.beendetAm && (
                   <Row label="Beendet am" value={formatDate(fall.beendetAm)} />
                 )}
@@ -755,12 +772,12 @@ export function BemDetailContent({
                 )}
               </dl>
               <div className="mt-4 flex gap-4 border-t border-border pt-3 text-xs text-muted-foreground">
-                <span>{fall._count.gespraeche} Gespraeche</span>
-                <span>{fall._count.massnahmen} Massnahmen</span>
+                <span>{fall._count.gespraeche} Gespräche</span>
+                <span>{fall._count.massnahmen} Maßnahmen</span>
                 <span>{fall._count.dokumente} Dokumente</span>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Einwilligung &amp; Dokumente folgen in den naechsten Ausbaustufen
+                Einwilligung &amp; Dokumente folgen in den nächsten Ausbaustufen
                 (E4–E5).
               </p>
             </div>
@@ -860,6 +877,7 @@ export function BemDetailContent({
           <DokumenteTab
             fall={fall}
             onGenerieren={() => setDokumentOpen(true)}
+            onUpload={() => setDokumentUploadOpen(true)}
             onDownload={(dokId, name) =>
               downloadFile(`/api/bem/${bemFallId}/dokumente/${dokId}/download`, name)
             }
@@ -875,6 +893,17 @@ export function BemDetailContent({
           onClose={() => setDokumentOpen(false)}
           onSaved={async () => {
             setDokumentOpen(false);
+            await load(true);
+          }}
+        />
+      )}
+
+      {dokumentUploadOpen && (
+        <DokumentUploadModal
+          bemFallId={bemFallId}
+          onClose={() => setDokumentUploadOpen(false)}
+          onSaved={async () => {
+            setDokumentUploadOpen(false);
             await load(true);
           }}
         />
@@ -964,7 +993,7 @@ function ProtokollTab({ fall }: { fall: BemFall }) {
             <tr>
               <th className="px-4 py-2 font-medium">Datum</th>
               <th className="px-4 py-2 font-medium">Kanal</th>
-              <th className="px-4 py-2 font-medium">Empfaenger</th>
+              <th className="px-4 py-2 font-medium">Empfänger</th>
               <th className="px-4 py-2 font-medium">Betreff</th>
               <th className="px-4 py-2 font-medium">Status</th>
               <th className="px-4 py-2 font-medium">Nachweis</th>
@@ -1022,7 +1051,7 @@ function ProtokollTab({ fall }: { fall: BemFall }) {
       {/* Zugriffs-/Aenderungsprotokoll */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="border-b border-border bg-muted/40 px-4 py-2 text-sm font-semibold">
-          Zugriffs- &amp; Aenderungsprotokoll
+          Zugriffs- &amp; Änderungsprotokoll
         </div>
         <table className="w-full text-left text-sm">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground">
@@ -1037,7 +1066,7 @@ function ProtokollTab({ fall }: { fall: BemFall }) {
             {fall.auditLogs.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                  Keine Eintraege.
+                  Keine Einträge.
                 </td>
               </tr>
             ) : (
@@ -1087,12 +1116,12 @@ function GespraecheTab({
           onClick={onNew}
           className="rounded-lg bg-credo-blau px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
         >
-          + Gespraech
+          + Gespräch
         </button>
       </div>
       {fall.gespraeche.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          Noch keine Gespraeche dokumentiert.
+          Noch keine Gespräche dokumentiert.
         </div>
       ) : (
         <div className="space-y-4">
@@ -1125,7 +1154,7 @@ function GespraecheTab({
                       onClick={() => onDelete(g.id)}
                       className="rounded-md border border-credo-rot/40 px-3 py-1 text-xs font-medium text-credo-rot hover:bg-credo-rot/10 disabled:opacity-50"
                     >
-                      Loeschen
+                      Löschen
                     </button>
                   </div>
                 </div>
@@ -1175,7 +1204,7 @@ function GespraecheTab({
 
                 {g.naechsterTermin && (
                   <div className="mt-3 text-xs text-muted-foreground">
-                    Naechster Termin: {formatDate(g.naechsterTermin)}
+                    Nächster Termin: {formatDate(g.naechsterTermin)}
                   </div>
                 )}
               </div>
@@ -1211,12 +1240,12 @@ function MassnahmenTab({
           onClick={onNew}
           className="rounded-lg bg-credo-blau px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
         >
-          + Massnahme
+          + Maßnahme
         </button>
       </div>
       {fall.massnahmen.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          Noch keine Massnahmen erfasst.
+          Noch keine Maßnahmen erfasst.
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -1225,7 +1254,7 @@ function MassnahmenTab({
               <tr>
                 <th className="px-4 py-3 font-medium">Kategorie</th>
                 <th className="px-4 py-3 font-medium">Beschreibung</th>
-                <th className="px-4 py-3 font-medium">Zustaendig</th>
+                <th className="px-4 py-3 font-medium">Zuständig</th>
                 <th className="px-4 py-3 font-medium">Frist</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium"></th>
@@ -1274,7 +1303,7 @@ function MassnahmenTab({
                         onClick={() => onDelete(m.id)}
                         className="rounded-md border border-credo-rot/40 px-3 py-1 text-xs font-medium text-credo-rot hover:bg-credo-rot/10 disabled:opacity-50"
                       >
-                        Loeschen
+                        Löschen
                       </button>
                     </div>
                   </td>
@@ -1313,7 +1342,7 @@ function ModalShell({
             type="button"
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground"
-            aria-label="Schliessen"
+            aria-label="Schließen"
           >
             ✕
           </button>
@@ -1438,7 +1467,7 @@ function GespraechModal({
 
   return (
     <ModalShell
-      title={isEdit ? "Gespraech bearbeiten" : "Neues Gespraech"}
+      title={isEdit ? "Gespräch bearbeiten" : "Neues Gespräch"}
       onClose={onClose}
     >
       {err && (
@@ -1526,14 +1555,14 @@ function GespraechModal({
               onClick={() => setTeilnehmer((prev) => [...prev, { name: "", rolle: "" }])}
               className="text-xs text-credo-blau hover:underline"
             >
-              + Teilnehmende:n hinzufuegen
+              + Teilnehmende:n hinzufügen
             </button>
           </div>
         </div>
 
         <div>
           <label className="text-sm font-medium">
-            Notizen (vertraulich, verschluesselt)
+            Notizen (vertraulich, verschlüsselt)
           </label>
           <textarea
             value={notizen}
@@ -1569,7 +1598,7 @@ function GespraechModal({
         )}
 
         <div>
-          <label className="text-sm font-medium">Naechster Termin (optional)</label>
+          <label className="text-sm font-medium">Nächster Termin (optional)</label>
           <input
             type="date"
             value={naechsterTermin}
@@ -1654,7 +1683,7 @@ function MassnahmeModal({
 
   return (
     <ModalShell
-      title={isEdit ? "Massnahme bearbeiten" : "Neue Massnahme"}
+      title={isEdit ? "Maßnahme bearbeiten" : "Neue Maßnahme"}
       onClose={onClose}
     >
       {err && (
@@ -1696,7 +1725,7 @@ function MassnahmeModal({
           )}
         </div>
         <div>
-          <label className="text-sm font-medium">Beschreibung (verschluesselt)</label>
+          <label className="text-sm font-medium">Beschreibung (verschlüsselt)</label>
           <textarea
             value={beschreibung}
             onChange={(e) => setBeschreibung(e.target.value)}
@@ -1706,7 +1735,7 @@ function MassnahmeModal({
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <label className="text-sm font-medium">Zustaendig</label>
+            <label className="text-sm font-medium">Zuständig</label>
             <input
               value={zustaendig}
               onChange={(e) => setZustaendig(e.target.value)}
@@ -1878,7 +1907,7 @@ function EinladungModal({
     setErr("");
     setFallbackLink("");
     if (!email.trim()) {
-      setErr("Bitte eine Empfaenger-E-Mail angeben.");
+      setErr("Bitte eine Empfänger-E-Mail angeben.");
       return;
     }
     setBusy(true);
@@ -1921,7 +1950,7 @@ function EinladungModal({
               onClick={onSent}
               className="rounded-lg bg-credo-blau px-5 py-2 text-sm font-semibold text-white hover:bg-credo-blau/90"
             >
-              Schliessen
+              Schließen
             </button>
           </div>
         </div>
@@ -1941,13 +1970,13 @@ function EinladungModal({
           )}
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Empfaenger-E-Mail</label>
+              <label className="text-sm font-medium">Empfänger-E-Mail</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={INPUT_CLASS}
-                placeholder="beschaeftigte:r@example.de"
+                placeholder="beschäftigte:r@example.de"
               />
             </div>
             <div>
@@ -1958,12 +1987,12 @@ function EinladungModal({
                 className={INPUT_CLASS}
               >
                 <option value="DATENSCHUTZ">Datenschutz-Einwilligung</option>
-                <option value="DURCHFUEHRUNG">Durchfuehrung des BEM</option>
+                <option value="DURCHFUEHRUNG">Durchführung des BEM</option>
               </select>
             </div>
             <div>
               <label className="text-sm font-medium">
-                Zusaetzliche Nachricht (optional)
+                Zusätzliche Nachricht (optional)
               </label>
               <textarea
                 value={nachricht}
@@ -2010,7 +2039,7 @@ function PapierModal({
   async function handleSubmit() {
     setErr("");
     if (!file) {
-      setErr("Bitte einen Scan (PDF/Bild) auswaehlen.");
+      setErr("Bitte einen Scan (PDF/Bild) auswählen.");
       return;
     }
     setBusy(true);
@@ -2061,7 +2090,7 @@ function PapierModal({
             className={INPUT_CLASS}
           >
             <option value="DATENSCHUTZ">Datenschutz-Einwilligung</option>
-            <option value="DURCHFUEHRUNG">Durchfuehrung des BEM</option>
+            <option value="DURCHFUEHRUNG">Durchführung des BEM</option>
           </select>
         </div>
         <div>
@@ -2075,8 +2104,8 @@ function PapierModal({
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Der Scan wird ausschliesslich in der BEM-Akte abgelegt (nicht in der
-          Personalakte) und mit Pruefsumme dokumentiert.
+          Der Scan wird ausschließlich in der BEM-Akte abgelegt (nicht in der
+          Personalakte) und mit Prüfsumme dokumentiert.
         </p>
       </div>
       <ModalActions
@@ -2102,15 +2131,24 @@ function formatBytes(bytes: number | null): string {
 function DokumenteTab({
   fall,
   onGenerieren,
+  onUpload,
   onDownload,
 }: {
   fall: BemFall;
   onGenerieren: () => void;
+  onUpload: () => void;
   onDownload: (dokId: string, name: string) => void;
 }) {
   return (
     <div>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          onClick={onUpload}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
+        >
+          Dokument hochladen
+        </button>
         <button
           type="button"
           onClick={onGenerieren}
@@ -2175,9 +2213,9 @@ function DokumenteTab({
         </div>
       )}
       <p className="mt-3 text-xs text-muted-foreground">
-        Ablage gemaess Aktentrennung (§ 167 SGB IX): Massnahmenplan und
+        Ablage gemäß Aktentrennung (§ 167 SGB IX): Maßnahmenplan und
         Beendigung/Abbruch erfordern eine (bereinigte) Kopie bzw. das Original in
-        der Personalakte — die Uebernahme erfolgt als bewusster manueller Schritt.
+        der Personalakte — die Übernahme erfolgt als bewusster manueller Schritt.
       </p>
     </div>
   );
@@ -2217,7 +2255,7 @@ function DokumentGenerierenModal({
   async function handleSubmit() {
     setErr("");
     if (!templateId) {
-      setErr("Bitte eine Vorlage waehlen.");
+      setErr("Bitte eine Vorlage wählen.");
       return;
     }
     setBusy(true);
@@ -2270,7 +2308,7 @@ function DokumentGenerierenModal({
               }}
               className={INPUT_CLASS}
             >
-              <option value="">Bitte waehlen…</option>
+              <option value="">Bitte wählen…</option>
               {vorlagen.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name}
@@ -2312,10 +2350,10 @@ function DokumentGenerierenModal({
           {selected && selected.platzhalter.length > 0 && (
             <div>
               <label className="mb-1 block text-sm font-medium">
-                Platzhalter befuellen
+                Platzhalter befüllen
               </label>
               <p className="mb-2 text-xs text-muted-foreground">
-                Leere Felder werden automatisch (Name, Mandant, Datum, …) ergaenzt
+                Leere Felder werden automatisch (Name, Mandant, Datum, …) ergänzt
                 oder mit „___“ markiert.
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -2403,7 +2441,7 @@ function ZugriffModal({
   async function handleSubmit() {
     setErr("");
     if (!userId) {
-      setErr("Bitte eine Person waehlen.");
+      setErr("Bitte eine Person wählen.");
       return;
     }
     setBusy(true);
@@ -2427,7 +2465,7 @@ function ZugriffModal({
   }
 
   return (
-    <ModalShell title="Person fuer diesen Fall freigeben" onClose={onClose}>
+    <ModalShell title="Person für diesen Fall freigeben" onClose={onClose}>
       {err && (
         <div className="mb-4 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-2 text-sm text-credo-rot">
           {err}
@@ -2437,7 +2475,7 @@ function ZugriffModal({
         <p className="text-sm text-muted-foreground">Lade Benutzer…</p>
       ) : auswaehlbar.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Keine weiteren Benutzer verfuegbar. Lege ggf. unter „Benutzerverwaltung“
+          Keine weiteren Benutzer verfügbar. Lege ggf. unter „Benutzerverwaltung“
           eine:n Kolleg:in an.
         </p>
       ) : (
@@ -2449,7 +2487,7 @@ function ZugriffModal({
               onChange={(e) => setUserId(e.target.value)}
               className={INPUT_CLASS}
             >
-              <option value="">Bitte waehlen…</option>
+              <option value="">Bitte wählen…</option>
               {auswaehlbar.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.firstName} {u.lastName} — {u.email}
@@ -2472,7 +2510,7 @@ function ZugriffModal({
             </select>
           </div>
           <p className="text-xs text-muted-foreground">
-            Die Person erhaelt damit Zugriff auf die Inhalte dieses Falls. Die
+            Die Person erhält damit Zugriff auf die Inhalte dieses Falls. Die
             Freigabe wird protokolliert und ist jederzeit widerrufbar.
           </p>
         </div>
@@ -2485,6 +2523,101 @@ function ZugriffModal({
           disabled={busy}
         />
       )}
+    </ModalShell>
+  );
+}
+
+// =============================================
+// Dokument-Upload-Modal (Attest / mitgebrachte Unterlage)
+// =============================================
+function DokumentUploadModal({
+  bemFallId,
+  onClose,
+  onSaved,
+}: {
+  bemFallId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [typ, setTyp] = useState<string>("ATTEST");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleSubmit() {
+    setErr("");
+    if (!file) {
+      setErr("Bitte eine Datei (PDF, JPG, PNG) auswählen.");
+      return;
+    }
+    setBusy(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("typ", typ);
+    try {
+      const res = await fetch(`/api/bem/${bemFallId}/dokumente/upload`, {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error || "Upload fehlgeschlagen.");
+        return;
+      }
+      onSaved();
+    } catch {
+      setErr("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ModalShell title="Dokument hochladen" onClose={onClose}>
+      {err && (
+        <div className="mb-4 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-2 text-sm text-credo-rot">
+          {err}
+        </div>
+      )}
+      <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Datei (PDF, JPG, PNG)</label>
+          <input
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Dokumenttyp</label>
+          <select
+            value={typ}
+            onChange={(e) => setTyp(e.target.value)}
+            className={INPUT_CLASS}
+          >
+            {DOKUMENT_UPLOAD_TYP_OPTIONS.map((t) => (
+              <option key={t} value={t}>
+                {DOKUMENT_TYP_LABELS[t] || t}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {ABLAGE_LABELS_BY_TYP(typ)}
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Z. B. ein vom Mitarbeiter mitgebrachtes Attest/AU oder eine intern
+          erstellte Unterlage. Die Datei wird in der BEM-Akte abgelegt und mit
+          Prüfsumme dokumentiert.
+        </p>
+      </div>
+      <ModalActions
+        onClose={onClose}
+        onConfirm={handleSubmit}
+        confirmLabel={busy ? "Lade hoch…" : "Hochladen"}
+        disabled={busy}
+      />
     </ModalShell>
   );
 }

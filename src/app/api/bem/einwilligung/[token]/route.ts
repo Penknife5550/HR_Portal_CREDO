@@ -20,7 +20,7 @@ import { einwilligungPublicSchema } from "@/lib/validations/bem";
 
 const ART_LABELS: Record<string, string> = {
   DATENSCHUTZ: "Datenschutz-Einwilligung",
-  DURCHFUEHRUNG: "Durchfuehrung des BEM",
+  DURCHFUEHRUNG: "Durchführung des BEM",
   BR: "Beteiligung Betriebsrat",
   SBV: "Beteiligung Schwerbehindertenvertretung",
 };
@@ -56,14 +56,14 @@ export async function GET(
     const ip = getClientIp(request);
     if (!tokenRateLimiter.check(ip).allowed) {
       return NextResponse.json(
-        { error: "Zu viele Anfragen. Bitte spaeter erneut versuchen." },
+        { error: "Zu viele Anfragen. Bitte später erneut versuchen." },
         { status: 429 },
       );
     }
     const { token } = await context.params;
     const e = await loadByToken(token);
     if (!e) {
-      return NextResponse.json({ error: "Ungueltiger Link" }, { status: 404 });
+      return NextResponse.json({ error: "Ungültiger Link" }, { status: 404 });
     }
     const expired = !!e.tokenExpiry && e.tokenExpiry.getTime() < Date.now();
     const erledigt = e.status !== "OFFEN" || !!e.tokenUsedAt;
@@ -93,7 +93,7 @@ export async function POST(
     const ip = getClientIp(request);
     if (!tokenRateLimiter.check(ip).allowed) {
       return NextResponse.json(
-        { error: "Zu viele Anfragen. Bitte spaeter erneut versuchen." },
+        { error: "Zu viele Anfragen. Bitte später erneut versuchen." },
         { status: 429 },
       );
     }
@@ -110,7 +110,7 @@ export async function POST(
 
     const e = await loadByToken(token);
     if (!e) {
-      return NextResponse.json({ error: "Ungueltiger Link" }, { status: 404 });
+      return NextResponse.json({ error: "Ungültiger Link" }, { status: 404 });
     }
     if (e.tokenExpiry && e.tokenExpiry.getTime() < Date.now()) {
       return NextResponse.json({ error: "Der Link ist abgelaufen." }, { status: 410 });

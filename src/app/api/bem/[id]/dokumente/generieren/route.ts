@@ -73,7 +73,7 @@ export async function POST(
     }
     if (template.modul !== "BEM") {
       return NextResponse.json(
-        { error: "Nur BEM-Vorlagen koennen hier erzeugt werden." },
+        { error: "Nur BEM-Vorlagen können hier erzeugt werden." },
         { status: 400 },
       );
     }
@@ -87,7 +87,7 @@ export async function POST(
     // Fall desselben Mandanten verwendet werden (globale Vorlagen sind frei).
     if (template.organizationId && template.organizationId !== resolved.organizationId) {
       return NextResponse.json(
-        { error: "Diese Vorlage gehoert zu einem anderen Mandanten." },
+        { error: "Diese Vorlage gehört zu einem anderen Mandanten." },
         { status: 403 },
       );
     }

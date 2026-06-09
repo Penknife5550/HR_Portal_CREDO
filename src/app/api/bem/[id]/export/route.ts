@@ -32,9 +32,9 @@ function deTime(d: Date): string {
 }
 
 const TYP_LABELS: Record<string, string> = {
-  ERSTGESPRAECH: "Erstgespraech",
-  FOLGEGESPRAECH: "Folgegespraech",
-  GEDAECHTNISPROTOKOLL: "Gedaechtnisprotokoll",
+  ERSTGESPRAECH: "Erstgespräch",
+  FOLGEGESPRAECH: "Folgegespräch",
+  GEDAECHTNISPROTOKOLL: "Gedächtnisprotokoll",
 };
 const KATEGORIE_LABELS: Record<string, string> = {
   TECHNISCH: "Technisch",
@@ -43,13 +43,13 @@ const KATEGORIE_LABELS: Record<string, string> = {
 };
 const MASSNAHME_STATUS_LABELS: Record<string, string> = {
   OFFEN: "Offen",
-  LAEUFT: "Laeuft",
+  LAEUFT: "Läuft",
   UMGESETZT: "Umgesetzt",
   VERWORFEN: "Verworfen",
 };
 const EINW_ART_LABELS: Record<string, string> = {
   DATENSCHUTZ: "Datenschutz",
-  DURCHFUEHRUNG: "Durchfuehrung",
+  DURCHFUEHRUNG: "Durchführung",
   BR: "Betriebsrat",
   SBV: "Schwerbehindertenvertretung",
 };
@@ -61,25 +61,26 @@ const EINW_STATUS_LABELS: Record<string, string> = {
 };
 const ACTION_LABELS: Record<string, string> = {
   BEM_FALL_ANGELEGT: "Fall angelegt",
-  BEM_AKTE_GEOEFFNET: "Akte geoeffnet",
-  BEM_STATUS_GEAENDERT: "Status geaendert",
+  BEM_AKTE_GEOEFFNET: "Akte geöffnet",
+  BEM_STATUS_GEAENDERT: "Status geändert",
   BEM_EINLADUNG_VERSENDET: "Einladung versendet",
   BEM_EINLADUNG_FEHLGESCHLAGEN: "Einladung fehlgeschlagen",
   BEM_EINWILLIGUNG_ERTEILT: "Einwilligung erteilt",
   BEM_EINWILLIGUNG_ABGELEHNT: "Einwilligung abgelehnt",
   BEM_EINWILLIGUNG_WIDERRUFEN: "Einwilligung widerrufen",
-  BEM_GESPRAECH_ERFASST: "Gespraech erfasst",
-  BEM_GESPRAECH_AKTUALISIERT: "Gespraech aktualisiert",
-  BEM_GESPRAECH_GELOESCHT: "Gespraech geloescht",
-  BEM_MASSNAHME_ERFASST: "Massnahme erfasst",
-  BEM_MASSNAHME_AKTUALISIERT: "Massnahme aktualisiert",
-  BEM_MASSNAHME_GELOESCHT: "Massnahme geloescht",
+  BEM_GESPRAECH_ERFASST: "Gespräch erfasst",
+  BEM_GESPRAECH_AKTUALISIERT: "Gespräch aktualisiert",
+  BEM_GESPRAECH_GELOESCHT: "Gespräch gelöscht",
+  BEM_MASSNAHME_ERFASST: "Maßnahme erfasst",
+  BEM_MASSNAHME_AKTUALISIERT: "Maßnahme aktualisiert",
+  BEM_MASSNAHME_GELOESCHT: "Maßnahme gelöscht",
   BEM_DOKUMENT_GENERIERT: "Dokument generiert",
+  BEM_DOKUMENT_HOCHGELADEN: "Dokument hochgeladen",
   BEM_EXPORT_ERSTELLT: "Gesamtexport erstellt",
   BEM_ZUGRIFF_GEWAEHRT: "Freigabe erteilt",
   BEM_ZUGRIFF_ENTZOGEN: "Freigabe entzogen",
   BEM_FRIST_ERINNERUNG: "Frist-Erinnerung versendet",
-  BEM_GELOESCHT: "Akte geloescht (Aufbewahrung abgelaufen)",
+  BEM_GELOESCHT: "Akte gelöscht (Aufbewahrung abgelaufen)",
 };
 
 interface TeilnehmerJson {

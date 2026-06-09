@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     }
     if (!(await canCreateBemFall(session))) {
       return NextResponse.json(
-        { error: "Nur SUPER_ADMIN oder BEM-Beauftragte duerfen Faelle anlegen" },
+        { error: "Nur SUPER_ADMIN oder BEM-Beauftragte dürfen Fälle anlegen" },
         { status: 403 },
       );
     }

@@ -41,16 +41,16 @@ export async function POST(
 
     const form = await request.formData().catch(() => null);
     if (!form) {
-      return NextResponse.json({ error: "Ungueltiger Upload" }, { status: 400 });
+      return NextResponse.json({ error: "Ungültiger Upload" }, { status: 400 });
     }
     const file = form.get("file");
     const art = String(form.get("art") || "DATENSCHUTZ");
     const signedName = String(form.get("signedName") || "").trim();
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "Keine Datei uebergeben" }, { status: 400 });
+      return NextResponse.json({ error: "Keine Datei übergeben" }, { status: 400 });
     }
     if (!ERLAUBTE_ARTEN.includes(art)) {
-      return NextResponse.json({ error: "Ungueltige Einwilligungsart" }, { status: 400 });
+      return NextResponse.json({ error: "Ungültige Einwilligungsart" }, { status: 400 });
     }
 
     const valid = await validateUpload(file);
