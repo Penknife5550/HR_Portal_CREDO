@@ -656,6 +656,15 @@ export function BemDetailContent({
                     {naechster.actionLabel || statusLabel(primaerStatus)}
                   </button>
                 )}
+                {fall.status === "EINLADUNG_VERSENDET" && (
+                  <button
+                    type="button"
+                    onClick={() => setEinladungOpen(true)}
+                    className="rounded-lg border border-credo-blau/40 px-4 py-2 text-sm font-medium text-credo-blau transition-colors hover:bg-credo-blau/10"
+                  >
+                    Einladung erneut senden
+                  </button>
+                )}
                 {folgeStatus
                   .filter((s) => TERMINAL_TARGETS.includes(s))
                   .map((s) => (

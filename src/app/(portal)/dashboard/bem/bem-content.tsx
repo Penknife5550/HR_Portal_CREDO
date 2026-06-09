@@ -70,6 +70,28 @@ function formatDate(iso: string): string {
   });
 }
 
+interface HandlungsbedarfItem {
+  fallId: string;
+  displayId: string;
+  employeeName: string;
+  bezeichnung: string;
+  faelligAm: string;
+  severity: string;
+}
+
+function severityChip(severity: string): { label: string; cls: string } {
+  switch (severity) {
+    case "OVERDUE":
+      return { label: "Überfällig", cls: "bg-credo-rot/10 text-credo-rot border-credo-rot/30" };
+    case "URGENT":
+      return { label: "Dringend", cls: "bg-credo-rot/10 text-credo-rot border-credo-rot/30" };
+    case "WARNING":
+      return { label: "Bald fällig", cls: "bg-amber-100 text-amber-700 border-amber-300" };
+    default:
+      return { label: "Im Plan", cls: "bg-muted text-muted-foreground border-border" };
+  }
+}
+
 export function BemContent({ user }: { user: User }) {
   const [faelle, setFaelle] = useState<BemFall[]>([]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
@@ -81,6 +103,7 @@ export function BemContent({ user }: { user: User }) {
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [handlungsbedarf, setHandlungsbedarf] = useState<HandlungsbedarfItem[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,6 +133,13 @@ export function BemContent({ user }: { user: User }) {
       .then((r) => (r.ok ? r.json() : { data: [] }))
       .then((j) => setOrganizations(j.data || []))
       .catch(() => setOrganizations([]));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/bem/handlungsbedarf")
+      .then((r) => (r.ok ? r.json() : { data: { items: [] } }))
+      .then((j) => setHandlungsbedarf(j.data?.items || []))
+      .catch(() => setHandlungsbedarf([]));
   }, []);
 
   function notify(msg: string) {
@@ -158,6 +188,52 @@ export function BemContent({ user }: { user: User }) {
         {success && (
           <div className="mb-4 rounded-lg border border-credo-gruen/30 bg-credo-gruen/10 px-4 py-2 text-sm text-credo-gruen">
             {success}
+          </div>
+        )}
+
+        {/* Handlungsbedarf — fallübergreifende offene/überfällige Fristen */}
+        {handlungsbedarf.length > 0 && (
+          <div className="mb-6 overflow-hidden rounded-xl border border-credo-rot/30 bg-credo-rot/5">
+            <div className="flex items-center justify-between border-b border-credo-rot/20 px-4 py-2">
+              <h2 className="text-sm font-semibold text-foreground">
+                ⚠️ Handlungsbedarf ({handlungsbedarf.length})
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                Fällige &amp; überfällige Fristen
+              </span>
+            </div>
+            <ul className="divide-y divide-border">
+              {handlungsbedarf.slice(0, 8).map((h, i) => {
+                const chip = severityChip(h.severity);
+                return (
+                  <li key={`${h.fallId}-${i}`}>
+                    <Link
+                      href={`/dashboard/bem/${h.fallId}`}
+                      className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-credo-rot/5"
+                    >
+                      <span>
+                        <span className="font-medium text-foreground">{h.displayId}</span>
+                        <span className="text-muted-foreground"> · {h.employeeName}</span>
+                        <span className="text-foreground"> — {h.bezeichnung}</span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          fällig {formatDate(h.faelligAm)}
+                        </span>
+                        <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${chip.cls}`}>
+                          {chip.label}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            {handlungsbedarf.length > 8 && (
+              <div className="px-4 py-2 text-xs text-muted-foreground">
+                … und {handlungsbedarf.length - 8} weitere.
+              </div>
+            )}
           </div>
         )}
 

@@ -153,6 +153,21 @@ export function PortalHeader({ user }: { user: User }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [bemCount, setBemCount] = useState(0);
+
+  // BEM-Handlungsbedarf-Zaehler fuers Nav-Badge (0 fuer Nicht-Freigegebene).
+  useEffect(() => {
+    let active = true;
+    fetch("/api/bem/handlungsbedarf?countOnly=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (active && j) setBemCount(j.data?.counts?.total || 0);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [pathname]);
 
   async function handleLogout() {
     await fetch("/api/auth", { method: "DELETE" });
@@ -216,6 +231,14 @@ export function PortalHeader({ user }: { user: User }) {
                       }`}
                     >
                       {group.label}
+                      {group.href === "/dashboard/bem" && bemCount > 0 && (
+                        <span
+                          className="ml-1.5 inline-block rounded-full bg-credo-rot px-1.5 py-0.5 text-xs font-bold leading-none text-white"
+                          title={`${bemCount} Fristen mit Handlungsbedarf`}
+                        >
+                          {bemCount}
+                        </span>
+                      )}
                     </Link>
                   );
                 }
