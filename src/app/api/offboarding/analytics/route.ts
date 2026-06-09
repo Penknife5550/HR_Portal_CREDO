@@ -60,6 +60,12 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
+    // Externe BEM-Beauftragte (E7) duerfen KEINE Offboarding-Daten sehen
+    // (Defense-in-Depth zum zentralen Middleware-API-Guard; SERVICE/X-API-Key
+    // und alle internen Rollen bleiben unveraendert zugelassen).
+    if (session.role === "BEM_BEAUFTRAGTER") {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    }
 
     // --- Query-Parameter ---
     const { searchParams } = new URL(request.url);

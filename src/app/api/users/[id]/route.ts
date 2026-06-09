@@ -99,13 +99,22 @@ export async function PATCH(
     }
 
     if (role !== undefined) {
-      if (!["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"].includes(role)) {
+      if (
+        !["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "BEM_BEAUFTRAGTER"].includes(role)
+      ) {
         return NextResponse.json(
           { error: "Ungültige Rolle" },
           { status: 400 }
         );
       }
       updateData.role = role;
+      // Rollenwechsel WEG von der externen BEM-Rolle: einen evtl. noch offenen
+      // Passwort-Setup-Token entwerten — sonst koennte ein ausstehender Link
+      // ein dann hoeher privilegiertes Konto uebernehmen.
+      if (role !== "BEM_BEAUFTRAGTER") {
+        updateData.passwortSetupTokenHash = null;
+        updateData.passwortSetupExpiresAt = null;
+      }
     }
 
     if (isActive !== undefined) {
@@ -210,10 +219,16 @@ export async function DELETE(
       );
     }
 
-    // Soft Delete: isActive = false
+    // Soft Delete: isActive = false. Zusaetzlich einen evtl. offenen Setup-Token
+    // entwerten, damit ein deaktiviertes Konto sich nicht ueber den oeffentlichen
+    // Setup-Endpunkt selbst wieder aktivieren kann.
     await prisma.user.update({
       where: { id },
-      data: { isActive: false },
+      data: {
+        isActive: false,
+        passwortSetupTokenHash: null,
+        passwortSetupExpiresAt: null,
+      },
     });
 
     return NextResponse.json({ success: true, message: "Benutzer deaktiviert" });

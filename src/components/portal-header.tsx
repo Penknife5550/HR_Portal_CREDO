@@ -46,9 +46,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     // BEM = "versiegelte Akte". Nav fuer alle Portal-Rollen sichtbar; die Liste
     // zeigt aber nur Faelle mit aktiver Freigabe (bemFilter) — sonst leer.
+    // BEM_BEAUFTRAGTER (E7) sieht NUR diesen Punkt (in keiner anderen Gruppe).
     label: "🔒 BEM",
     href: "/dashboard/bem",
-    roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER"],
+    roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER", "BEM_BEAUFTRAGTER"],
   },
   {
     label: "Vorlagen",
@@ -266,7 +267,9 @@ export function PortalHeader({ user }: { user: User }) {
                   ? "Administrator"
                   : user.role === "HR_LEITUNG"
                     ? "HR-Leitung"
-                    : "Sachbearbeiter"}
+                    : user.role === "BEM_BEAUFTRAGTER"
+                      ? "BEM-Beauftragte:r"
+                      : "Sachbearbeiter"}
               </p>
             </div>
 

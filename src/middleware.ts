@@ -67,6 +67,39 @@ export async function middleware(request: NextRequest) {
   // Portal-Routen: Redirect zu Login wenn keine Session
   // =============================================
   const { pathname } = request.nextUrl;
+
+  // =============================================
+  // API-Isolation fuer externe BEM-Beauftragte (E7, Defense-in-Depth)
+  // Die Middleware schuetzt sonst nur Seiten. Externe BEM-Beauftragte duerfen
+  // AUSSCHLIESSLICH BEM-APIs (und Auth) erreichen — sonst koennten sie ueber
+  // ungegatete Nicht-BEM-Endpunkte (z.B. /api/dashboard/stats) Daten lesen.
+  if (
+    pathname.startsWith("/api/") &&
+    !pathname.startsWith("/api/bem") &&
+    !pathname.startsWith("/api/auth")
+  ) {
+    const sessionCookie = request.cookies.get("credo_session");
+    if (sessionCookie?.value) {
+      try {
+        const jwtSecret = process.env.JWT_SECRET;
+        if (jwtSecret) {
+          const secret = new TextEncoder().encode(jwtSecret);
+          const { payload } = await jwtVerify(sessionCookie.value, secret, {
+            algorithms: ["HS256"],
+          });
+          if ((payload.role as string) === "BEM_BEAUFTRAGTER") {
+            return NextResponse.json(
+              { error: "Keine Berechtigung" },
+              { status: 403 },
+            );
+          }
+        }
+      } catch {
+        // Ungueltige/abgelaufene Session: der Route-Handler entscheidet (401).
+      }
+    }
+  }
+
   const isPortalRoute = pathname.startsWith("/dashboard") ||
                         pathname.startsWith("/benutzerverwaltung") ||
                         pathname.startsWith("/vorlagen") ||
@@ -91,6 +124,15 @@ export async function middleware(request: NextRequest) {
       const { payload } = await jwtVerify(sessionCookie.value, secret, {
         algorithms: ["HS256"],
       });
+
+      // Externe BEM-Beauftragte (E7) sehen AUSSCHLIESSLICH das BEM-Modul.
+      // Jeder andere Portal-Pfad wird auf /dashboard/bem umgeleitet.
+      if (
+        (payload.role as string) === "BEM_BEAUFTRAGTER" &&
+        !pathname.startsWith("/dashboard/bem")
+      ) {
+        return NextResponse.redirect(new URL("/dashboard/bem", request.url));
+      }
 
       // Admin-Routen nur für SUPER_ADMIN und HR_LEITUNG
       const adminRoutes = ["/benutzerverwaltung", "/vorlagen", "/checklisten", "/mandanten", "/einstellungen"];

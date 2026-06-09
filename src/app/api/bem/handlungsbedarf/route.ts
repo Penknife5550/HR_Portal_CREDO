@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { PORTAL_ROLES, bemFilter } from "@/lib/permissions";
+import { BEM_PORTAL_ROLES, bemFilter } from "@/lib/permissions";
 import { berechneSeverity } from "@/lib/bem-fristen";
 import type { BemFristSeverity } from "@prisma/client";
 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
-    if (!PORTAL_ROLES.includes(session.role)) {
+    if (!BEM_PORTAL_ROLES.includes(session.role)) {
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 

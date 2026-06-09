@@ -556,8 +556,15 @@ model User {
 
   // BEM (Phase 1): Kennzeichnung als BEM-Beauftragte:r.
   // Darf BEM-Faelle anlegen und erhaelt bei Anlage Auto-Freigabe (BemZugriff).
-  // Volle externe Rolle (BEM_BEAUFTRAGTER) folgt in Phase 2 / E7.
+  // Interne Nutzer behalten ihre Rolle + dieses Flag; EXTERNE Beauftragte
+  // bekommen die eigene Rolle BEM_BEAUFTRAGTER (E7).
   isBemBeauftragte Boolean @default(false)
+
+  // E7: Externe BEM-Beauftragte richten ihr Passwort ueber einen einmaligen,
+  // zeitlich begrenzten Setup-Link selbst ein (es wird nur der SHA-256-Hash
+  // des Tokens gespeichert — analog zu den Magic-Links).
+  passwortSetupTokenHash String?
+  passwortSetupExpiresAt DateTime?
 
   // Org-Zuweisungen (welche Mandanten darf dieser User sehen?)
   // SUPER_ADMIN + HR_LEITUNG sehen alles, bei anderen gelten die Zuweisungen
@@ -608,6 +615,7 @@ enum UserRole {
   HR_SACHBEARBEITER
   EINRICHTUNGSLEITUNG
   VORGESETZTER
+  BEM_BEAUFTRAGTER // E7: externe:r BEM-Beauftragte:r, sieht ausschliesslich BEM
 }
 
 // =============================================

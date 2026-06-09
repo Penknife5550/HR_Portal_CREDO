@@ -6,11 +6,21 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { generateSetupToken, buildSetupEmail } from "@/lib/passwort-setup";
+import { sendEmailDetailed } from "@/lib/mailer";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
+// Rollen, die ueber diese API angelegt werden duerfen.
+const CREATABLE_ROLES = [
+  "SUPER_ADMIN",
+  "HR_LEITUNG",
+  "HR_SACHBEARBEITER",
+  "BEM_BEAUFTRAGTER",
+];
 
 // =============================================
 // GET /api/users - Alle Benutzer auflisten
@@ -80,6 +90,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, firstName, lastName, password, role, isBemBeauftragte } = body;
 
+    // Externe BEM-Beauftragte (E7) werden OHNE Passwort angelegt und richten es
+    // ueber einen Setup-Link selbst ein.
+    const isExternalBem = role === "BEM_BEAUFTRAGTER";
+
     // Validierung
     const errors: string[] = [];
     if (!email || typeof email !== "string" || !email.trim()) {
@@ -91,14 +105,21 @@ export async function POST(request: NextRequest) {
     if (!lastName || typeof lastName !== "string" || !lastName.trim()) {
       errors.push("Nachname ist ein Pflichtfeld");
     }
-    if (!password || typeof password !== "string" || password.length < 12) {
-      errors.push("Passwort muss mindestens 12 Zeichen lang sein");
+    // Passwort nur fuer NICHT-externe Rollen verpflichtend.
+    if (!isExternalBem) {
+      if (!password || typeof password !== "string" || password.length < 12) {
+        errors.push("Passwort muss mindestens 12 Zeichen lang sein");
+      }
+      if (password && (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password))) {
+        errors.push("Passwort muss Gross-/Kleinbuchstaben und Ziffern enthalten");
+      }
     }
-    if (password && (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password))) {
-      errors.push("Passwort muss Gross-/Kleinbuchstaben und Ziffern enthalten");
-    }
-    if (role && !["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"].includes(role)) {
+    if (role && !CREATABLE_ROLES.includes(role)) {
       errors.push("Ungültige Rolle");
+    }
+    // Externe BEM-Beauftragte brauchen eine E-Mail-Adresse fuer den Setup-Link.
+    if (isExternalBem && !process.env.APP_URL) {
+      errors.push("APP_URL ist nicht konfiguriert (fuer den Setup-Link erforderlich)");
     }
 
     if (errors.length > 0) {
@@ -116,11 +137,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Passwort hashen
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    // BEM-Beauftragten-Kennzeichnung nur durch SUPER_ADMIN setzbar.
+    // BEM-Beauftragten-Kennzeichnung (Flag) nur durch SUPER_ADMIN setzbar.
+    // Die externe Rolle BEM_BEAUFTRAGTER braucht das Flag nicht (Rolle reicht).
     const setBem = isBemBeauftragte === true && session.role === "SUPER_ADMIN";
+
+    // Externe Beauftragte: kein Passwort, sondern Setup-Token. Der initiale
+    // passwordHash ist ein gueltiger bcrypt-Hash eines Zufallswerts -> Login per
+    // Passwort schlaegt zuverlaessig fehl, bis ueber den Setup-Link eines gesetzt wird.
+    const setup = isExternalBem ? generateSetupToken() : null;
+    const passwordHash = isExternalBem
+      ? await bcrypt.hash(randomUUID(), 12)
+      : await bcrypt.hash(password, 12);
 
     // Benutzer anlegen
     const user = await prisma.user.create({
@@ -131,6 +158,11 @@ export async function POST(request: NextRequest) {
         passwordHash,
         role: role || "HR_SACHBEARBEITER",
         isBemBeauftragte: setBem,
+        // Externe Konten erst nach erfolgreichem Setup loginfaehig (doppelte
+        // Sperre: kein gueltiges Passwort UND inaktiv). Setup-POST aktiviert.
+        isActive: isExternalBem ? false : true,
+        passwortSetupTokenHash: setup?.tokenHash ?? null,
+        passwortSetupExpiresAt: setup?.expiresAt ?? null,
       },
       select: {
         id: true,
@@ -145,7 +177,30 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(user, { status: 201 });
+    // Setup-Link versenden (nach erfolgreicher Anlage).
+    let setupMailOk: boolean | undefined;
+    if (isExternalBem && setup) {
+      const mail = buildSetupEmail({
+        firstName: user.firstName,
+        lastName: user.lastName,
+        token: setup.token,
+      });
+      const res = await sendEmailDetailed({
+        to: user.email,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
+      });
+      setupMailOk = res.ok;
+      if (!res.ok) {
+        console.error("[API] Setup-Mail fehlgeschlagen:", res.error);
+      }
+    }
+
+    return NextResponse.json(
+      { ...user, ...(isExternalBem ? { setupMailVersendet: !!setupMailOk } : {}) },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Fehler beim Anlegen des Benutzers:", error);
     return NextResponse.json(

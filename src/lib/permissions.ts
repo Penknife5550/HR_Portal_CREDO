@@ -46,6 +46,16 @@ export const FINANCIAL_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"
 /** Alle Portal-Rollen (duerfen sich einloggen und Dashboard sehen) */
 export const PORTAL_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER"];
 
+/**
+ * Rollen, die die BEM-Liste/Handlungsbedarf-Endpunkte aufrufen duerfen.
+ * Das ist NUR ein grober "Portal-Nutzer"-Gate — die eigentliche Sichtbarkeit
+ * je Fall regelt weiterhin bemFilter (Allowlist). Enthaelt zusaetzlich die
+ * externe Rolle BEM_BEAUFTRAGTER (E7), die ausschliesslich BEM nutzen darf.
+ * BEM_BEAUFTRAGTER darf bewusst NICHT in PORTAL_ROLES stehen, sonst wuerde sie
+ * die Onboarding-/Offboarding-/Mutterschutz-Endpunkte passieren.
+ */
+export const BEM_PORTAL_ROLES = [...PORTAL_ROLES, "BEM_BEAUFTRAGTER"];
+
 /** Rollen die nur ihre zugewiesenen Organisationen sehen */
 export const ORG_RESTRICTED_ROLES = ["EINRICHTUNGSLEITUNG", "VORGESETZTER"];
 
@@ -226,15 +236,29 @@ export function canManageBemAccess(session: SessionPayload): boolean {
 
 /**
  * Prueft, ob der User einen BEM-Fall anlegen darf:
- * nur SUPER_ADMIN oder als BEM-Beauftragte:r gekennzeichnete Nutzer.
+ * SUPER_ADMIN oder intern als BEM-Beauftragte:r gekennzeichnete Nutzer (Flag).
+ *
+ * HINWEIS (E7): Die EXTERNE Rolle BEM_BEAUFTRAGTER darf bewusst KEINE Faelle
+ * anlegen — externe Beauftragte bearbeiten ausschliesslich ihnen freigegebene
+ * Faelle (Datensparsamkeit / versiegelte Akte). Eine interne Stelle legt den
+ * Fall an und gibt sie frei.
  */
 export async function canCreateBemFall(
   session: SessionPayload
 ): Promise<boolean> {
   if (session.role === "SUPER_ADMIN") return true;
+  if (session.role === "BEM_BEAUFTRAGTER") return false;
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     select: { isBemBeauftragte: true },
   });
   return !!user?.isBemBeauftragte;
+}
+
+/**
+ * Externe:r BEM-Beauftragte:r (E7): darf ausschliesslich das BEM-Modul sehen.
+ * Wird fuer Navigation/Redirects verwendet (Middleware/Header).
+ */
+export function isExternalBemUser(session: SessionPayload): boolean {
+  return session.role === "BEM_BEAUFTRAGTER";
 }

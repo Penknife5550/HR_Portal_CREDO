@@ -61,6 +61,10 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
     label: "Vorgesetzter",
     color: "bg-green-100 text-green-800",
   },
+  BEM_BEAUFTRAGTER: {
+    label: "BEM-Beauftragte:r (extern)",
+    color: "bg-[#009AC6]/10 text-[#009AC6]",
+  },
 };
 
 const EMPTY_FORM: UserFormData = {
@@ -156,6 +160,24 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
         );
       }
       loadUsers();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Ein Fehler ist aufgetreten"
+      );
+    }
+  }
+
+  // Externe BEM-Beauftragte: Einrichtungs-/Setup-Link erneut versenden.
+  async function handleResendSetup(targetUser: PortalUser) {
+    try {
+      const res = await fetch(`/api/users/${targetUser.id}/setup-link`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Setup-Link konnte nicht gesendet werden");
+      }
+      setSuccessMessage(`Setup-Link an ${targetUser.email} gesendet`);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Ein Fehler ist aufgetreten"
@@ -293,6 +315,15 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
                             >
                               Bearbeiten
                             </button>
+                            {u.role === "BEM_BEAUFTRAGTER" && (
+                              <button
+                                onClick={() => handleResendSetup(u)}
+                                className="rounded-md border border-[#009AC6]/40 px-3 py-1 text-xs font-medium text-[#009AC6] transition-colors hover:bg-[#009AC6]/10"
+                                title="Einrichtungs-/Setup-Link erneut per E-Mail senden"
+                              >
+                                Setup-Link senden
+                              </button>
+                            )}
                             {!isSelf && (
                               <button
                                 onClick={() => handleToggleActive(u)}
@@ -417,6 +448,10 @@ function UserModal({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Externe BEM-Beauftragte richten ihr Passwort selbst per Setup-Link ein —
+  // im Formular daher kein Passwortfeld, sondern ein Hinweis.
+  const isExternalBemRole = formData.role === "BEM_BEAUFTRAGTER";
+
   function handleChange(
     field: keyof UserFormData,
     value: string | boolean
@@ -442,17 +477,19 @@ function UserModal({
       setFormError("E-Mail ist ein Pflichtfeld");
       return;
     }
-    if (showPasswordRequired && formData.password.length < 6) {
-      setFormError("Passwort muss mindestens 6 Zeichen lang sein");
-      return;
-    }
-    if (
-      !showPasswordRequired &&
-      formData.password.length > 0 &&
-      formData.password.length < 6
-    ) {
-      setFormError("Passwort muss mindestens 6 Zeichen lang sein");
-      return;
+    if (!isExternalBemRole) {
+      if (showPasswordRequired && formData.password.length < 6) {
+        setFormError("Passwort muss mindestens 6 Zeichen lang sein");
+        return;
+      }
+      if (
+        !showPasswordRequired &&
+        formData.password.length > 0 &&
+        formData.password.length < 6
+      ) {
+        setFormError("Passwort muss mindestens 6 Zeichen lang sein");
+        return;
+      }
     }
 
     setSaving(true);
@@ -548,26 +585,34 @@ function UserModal({
             />
           </div>
 
-          {/* Passwort */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">
-              Passwort{" "}
-              {showPasswordRequired ? (
-                <span className="text-red-500">*</span>
-              ) : (
-                <span className="text-xs text-muted-foreground">
-                  (leer lassen um beizubehalten)
-                </span>
-              )}
-            </label>
-            <input
-              type="password"
-              value={formData.password}
-              onChange={(e) => handleChange("password", e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-              placeholder={showPasswordRequired ? "Mindestens 6 Zeichen" : "Neues Passwort eingeben..."}
-            />
-          </div>
+          {/* Passwort — entfaellt fuer externe BEM-Beauftragte (Setup-Link) */}
+          {isExternalBemRole ? (
+            <div className="rounded-lg border border-[#009AC6]/30 bg-[#009AC6]/5 px-3 py-2 text-sm text-foreground">
+              Diese Person erhält per E-Mail einen einmaligen Einrichtungs-Link und
+              vergibt ihr Passwort selbst. Ein Setup-Link lässt sich später jederzeit
+              über „Setup-Link senden“ erneut verschicken.
+            </div>
+          ) : (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Passwort{" "}
+                {showPasswordRequired ? (
+                  <span className="text-red-500">*</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    (leer lassen um beizubehalten)
+                  </span>
+                )}
+              </label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => handleChange("password", e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                placeholder={showPasswordRequired ? "Mindestens 6 Zeichen" : "Neues Passwort eingeben..."}
+              />
+            </div>
+          )}
 
           {/* Rolle */}
           <div>
@@ -584,6 +629,7 @@ function UserModal({
               <option value="EINRICHTUNGSLEITUNG">Einrichtungsleitung</option>
               <option value="VORGESETZTER">Vorgesetzter</option>
               <option value="SUPER_ADMIN">Super Admin</option>
+              <option value="BEM_BEAUFTRAGTER">BEM-Beauftragte:r (extern, nur BEM)</option>
             </select>
           </div>
 

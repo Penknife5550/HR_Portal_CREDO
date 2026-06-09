@@ -25,6 +25,11 @@ export async function GET() {
         { status: 401 }
       );
     }
+    // Externe BEM-Beauftragte (E7) sehen keine Mandantenliste/Vorgangs-Zaehler
+    // (sie legen keine Faelle an). Defense-in-Depth zum Middleware-API-Guard.
+    if (session.role === "BEM_BEAUFTRAGTER") {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    }
 
     const organizations = await prisma.organization.findMany({
       orderBy: { name: "asc" },

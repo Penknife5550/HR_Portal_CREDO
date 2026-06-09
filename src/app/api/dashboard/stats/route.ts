@@ -27,6 +27,11 @@ export async function GET() {
         { status: 401 }
       );
     }
+    // Externe BEM-Beauftragte (E7) duerfen KEINE Nicht-BEM-Daten sehen
+    // (Defense-in-Depth zum zentralen Middleware-API-Guard).
+    if (session.role === "BEM_BEAUFTRAGTER") {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    }
 
     // 1. Status-Verteilung
     const statusGroups = await prisma.onboardingProcess.groupBy({
