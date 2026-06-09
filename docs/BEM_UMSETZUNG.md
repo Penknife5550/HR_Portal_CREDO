@@ -199,6 +199,15 @@ Neuer ENV `BEM_ENCRYPTION_KEY` (64 Hex). `src/lib/encryption.ts` um optionalen K
 - [ ] Tab „Zugriffe/Protokoll" + Zugriffs-Report.
 - **DoD:** Fristen erscheinen mit Severity; Lösch-Cron entfernt abgelaufene Inhalte, behält Audit; Aufbewahrungsdatum wird bei Beendigung korrekt gesetzt (`beendetAm + bemAufbewahrungJahre`).
 
+### Post-E6 — Verbesserungspakete aus UX-/Compliance-Review (2026-06-09)
+Nach Abschluss E1–E6 wurden im kritischen UI/UX-Review zusätzliche Pakete umgesetzt:
+- **Paket D — Dokument-Upload & Umlaut-Korrektur · ✅** Eigener Upload von Attesten/Unterlagen (MA bringt mit / HR lädt hoch), `ATTEST`-Dokumenttyp; durchgängige Umlaut-Korrektur im BEM-UI („Öffnen" statt „Oeffnen" etc.).
+- **Paket E — Ansprechpartner-Wahl · ✅** `BemAnsprechpartner` pro Mandant (CRUD unter `mandanten/[id]/bem-ansprechpartner`); Mitarbeiter kann im Einwilligungs-Formular eine:n Ansprechpartner:in wählen; gewählte Person + Beauftragte erhalten Info-Mail (SMTP-direkt, CREDO-CI). Diverse Webhook-Mailvorlagen ergänzt (`default-email-templates.ts`, 37 Vorlagen).
+- **Paket F — Prozesstiefe · ✅ (Commit 9b7de04)** `BemErgebnis` (erfolgreich/teilweise/kein Erfolg/keine Maßnahmen) via Abschluss-Dialog; Maßnahmen-Kategorie `WIEDEREINGLIEDERUNG`; Wieder-Öffnen abgeschlossener Fälle (→`MASSNAHMEN_LAUFEN`) und erneutes Anbieten (→`ANGELEGT`) mit sauberem Zurücksetzen der Prozessfelder; schaltjahr-sichere Aufbewahrungsfrist (`addYearsSafe`). Ergebnis im DSGVO-Export.
+- **Paket G — Notiz-Autosave · ✅ (Commit 732d290)** Debounced Entwurfs-Sicherung der Gesprächsprotokolle in `sessionStorage` (kein Server-Roundtrip, kein Audit-Rauschen, kein dauerhaftes Ablegen sensibler Inhalte); Wiederherstellungs-Banner, Auto-gesichert-Indikator, `beforeunload`-Warnung; Entwurf wird nach Speichern verworfen.
+- **Paket H — IKS-/Statistik-Report · ✅ (Commit 31fa528)** `GET /api/bem/statistik` + Seite `/dashboard/bem/statistik` (nur `canManageBemAccess`): anonyme Kennzahlen je Mandant (Status-Verteilung, Verfahrens-Funnel mit Annahmequote, Ergebnis-Aufschlüsselung), Jahresfilter, CSV-Export (Excel/UTF-8) + Drucken/PDF. Bewusst ohne per-Fall-Allowlist (reine Anzahlen = kein BEM-Inhalt), aber rollen-gegated + `orgFilter`.
+- **DoD:** ✅ Build/Lint grün, 219/220 Tests (1 vorbestehender Offboarding-Mock-Drift, BEM-unabhängig). ⏳ **Server-Deploy** der akkumulierten Schema-Änderungen (ATTEST, BemAnsprechpartner, ansprechpartnerId, schwerbehindert, vertrauensperson, ergebnis, WIEDEREINGLIEDERUNG) — läuft automatisch via `entrypoint.sh` (`prisma db push`).
+
 ### Phase 2 (später)
 - **E7** Externe Logins: Rolle `BEM_BEAUFTRAGTER` (Magic-Link/Passwort), sehen ausschließlich BEM. ~3 Tage.
 - **E8** Automatische Auslösung aus Fehlzeiten (LOGA/n8n, Schwelle >6 Wo/12 Mon). ~3–5 Tage.
