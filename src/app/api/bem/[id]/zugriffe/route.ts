@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { canManageBemAccess } from "@/lib/permissions";
+import { canManageBemAccess, GLOBAL_ROLES } from "@/lib/permissions";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { bemZugriffSchema } from "@/lib/validations/bem";
 
@@ -41,7 +41,7 @@ export async function POST(
 
     const fall = await prisma.bemFall.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, organizationId: true },
     });
     if (!fall) {
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
@@ -59,12 +59,42 @@ export async function POST(
 
     const target = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, isActive: true },
+      select: {
+        id: true,
+        isActive: true,
+        role: true,
+        isBemBeauftragte: true,
+        orgAssignments: {
+          where: { organizationId: fall.organizationId },
+          select: { id: true },
+        },
+      },
     });
     if (!target || !target.isActive) {
       return NextResponse.json(
         { error: "Benutzer nicht gefunden oder inaktiv" },
         { status: 404 },
+      );
+    }
+
+    // G4-Haerterung: Mandanten-Bindung. Freigeben darf man nur Personen mit
+    // legitimem Bezug zum Mandanten des Falls — sonst koennte (versehentlich)
+    // jemand aus Mandant A Zugriff auf einen Fall in Mandant B erhalten.
+    // Erlaubt: globale Rollen (sehen ohnehin alle Mandanten), interne BEM-
+    // Beauftragte (Flag), externe BEM-Beauftragte (fallbasiert, E7) sowie
+    // org-zugewiesene Nutzer:innen des Fall-Mandanten.
+    const hatMandantenBezug =
+      GLOBAL_ROLES.includes(target.role) ||
+      target.isBemBeauftragte ||
+      target.role === "BEM_BEAUFTRAGTER" ||
+      target.orgAssignments.length > 0;
+    if (!hatMandantenBezug) {
+      return NextResponse.json(
+        {
+          error:
+            "Diese Person hat keinen Bezug zum Mandanten dieses Falls und kann nicht freigegeben werden.",
+        },
+        { status: 422 },
       );
     }
 
