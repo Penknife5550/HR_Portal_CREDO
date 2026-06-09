@@ -11,10 +11,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { canAccessBemContent } from "@/lib/permissions";
+import { canMutateBemContent } from "@/lib/permissions";
 import { encryptBem } from "@/lib/encryption";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { updateGespraechSchema } from "@/lib/validations/bem";
+import { istVerarbeitungGesperrt } from "@/lib/bem-einwilligung";
 
 function clientIp(req: NextRequest): string | null {
   return (
@@ -41,11 +42,18 @@ export async function PATCH(
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
     const { id, gespraechId } = await context.params;
-    if (!(await canAccessBemContent(session, id))) {
+    if (!(await canMutateBemContent(session, id))) {
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
     if (!(await loadOwned(id, gespraechId))) {
       return NextResponse.json({ error: "Gespräch nicht gefunden" }, { status: 404 });
+    }
+    // Nach Widerruf der tragenden Einwilligung keine inhaltliche Bearbeitung mehr.
+    if (await istVerarbeitungGesperrt(id)) {
+      return NextResponse.json(
+        { error: "Einwilligung widerrufen — Gespräche können nicht mehr bearbeitet werden." },
+        { status: 409 },
+      );
     }
 
     const body = await request.json().catch(() => null);
@@ -102,7 +110,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
     const { id, gespraechId } = await context.params;
-    if (!(await canAccessBemContent(session, id))) {
+    if (!(await canMutateBemContent(session, id))) {
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
     if (!(await loadOwned(id, gespraechId))) {

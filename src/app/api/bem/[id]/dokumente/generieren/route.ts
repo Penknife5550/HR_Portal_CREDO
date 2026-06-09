@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { canAccessBemContent } from "@/lib/permissions";
+import { canMutateBemContent } from "@/lib/permissions";
 import { resolveBemPlaceholders } from "@/lib/bem-doc";
 import { generateFromTemplate } from "@/lib/doc-generation";
 import { saveUploadedFile, readUploadedFile, DOCX_MIME } from "@/lib/file-upload";
@@ -43,7 +43,7 @@ export async function POST(
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
     const { id } = await context.params;
-    if (!(await canAccessBemContent(session, id))) {
+    if (!(await canMutateBemContent(session, id))) {
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
 

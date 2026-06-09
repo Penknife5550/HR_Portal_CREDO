@@ -8,10 +8,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { canAccessBemContent } from "@/lib/permissions";
+import { canMutateBemContent } from "@/lib/permissions";
 import { encryptBem } from "@/lib/encryption";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { createMassnahmeSchema } from "@/lib/validations/bem";
+import { istVerarbeitungGesperrt } from "@/lib/bem-einwilligung";
 
 function clientIp(req: NextRequest): string | null {
   return (
@@ -31,8 +32,15 @@ export async function POST(
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
     const { id } = await context.params;
-    if (!(await canAccessBemContent(session, id))) {
+    if (!(await canMutateBemContent(session, id))) {
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
+    }
+    // Nach Widerruf der tragenden Einwilligung keine weitere Erfassung (DSGVO Art. 7 Abs. 3).
+    if (await istVerarbeitungGesperrt(id)) {
+      return NextResponse.json(
+        { error: "Einwilligung widerrufen — es dürfen keine neuen Maßnahmen erfasst werden." },
+        { status: 409 },
+      );
     }
 
     const body = await request.json().catch(() => null);

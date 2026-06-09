@@ -31,9 +31,16 @@ export const createBemSchema = z.object({
 });
 
 // Bearbeitbare Fall-Stammfelder (PATCH /api/bem/[id]).
-export const bemFallPatchSchema = z.object({
-  schwerbehindert: z.boolean(),
-});
+export const bemFallPatchSchema = z
+  .object({
+    schwerbehindert: z.boolean().optional(),
+    // E9: erhoehter Diagnose-/Datenschutz (blendet Freitexte fuer BR/SBV aus).
+    diagnoseSchutz: z.boolean().optional(),
+  })
+  .refine(
+    (d) => d.schwerbehindert !== undefined || d.diagnoseSchutz !== undefined,
+    { message: "Kein aktualisierbares Feld angegeben" },
+  );
 
 // Status-Uebergang. Die erlaubten Uebergaenge selbst werden serverseitig
 // gegen bem-workflow.ts geprueft (race-frei via updateMany).
@@ -150,6 +157,10 @@ export const einwilligungPublicSchema = z.object({
   // Optionaler Wunsch nach Begleitung durch eine Vertrauensperson (BR/SBV/sonst.).
   vertrauenspersonWunsch: z.boolean().optional(),
   vertrauenspersonText: z.string().trim().max(1000).optional().nullable(),
+  // E9: Zustimmung zur Beteiligung von Betriebsrat / Schwerbehindertenvertretung
+  // (nur bei ERTEILT relevant). Erzeugt eigene BemEinwilligung-Eintraege (BR/SBV).
+  brBeteiligung: z.boolean().optional(),
+  sbvBeteiligung: z.boolean().optional(),
 });
 
 // BEM-Ansprechpartner:in (pro Mandant) anlegen/bearbeiten.

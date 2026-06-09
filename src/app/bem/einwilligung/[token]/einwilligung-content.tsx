@@ -29,6 +29,8 @@ export function BemEinwilligungContent({ token }: { token: string }) {
   const [ansprechpartnerId, setAnsprechpartnerId] = useState("");
   const [vpWunsch, setVpWunsch] = useState(false);
   const [vpText, setVpText] = useState("");
+  const [brBet, setBrBet] = useState(false);
+  const [sbvBet, setSbvBet] = useState(false);
   const [ergebnis, setErgebnis] = useState<"ERTEILT" | "ABGELEHNT" | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -83,6 +85,8 @@ export function BemEinwilligungContent({ token }: { token: string }) {
           vertrauenspersonWunsch: entscheidung === "ERTEILT" ? vpWunsch : false,
           vertrauenspersonText:
             entscheidung === "ERTEILT" && vpWunsch ? vpText.trim() || null : null,
+          brBeteiligung: entscheidung === "ERTEILT" ? brBet : false,
+          sbvBeteiligung: entscheidung === "ERTEILT" ? sbvBet : false,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -202,6 +206,37 @@ export function BemEinwilligungContent({ token }: { token: string }) {
                     className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#009AC6]"
                   />
                 )}
+              </div>
+
+              {/* E9: Beteiligung von BR/SBV (optional, nur bei Zustimmung relevant) */}
+              <div className="mt-4">
+                <p className="text-sm font-medium text-gray-700">
+                  Beteiligung weiterer Stellen (optional)
+                </p>
+                <label className="mt-2 flex items-start gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={brBet}
+                    onChange={(e) => setBrBet(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Ich bin einverstanden, dass der <strong>Betriebsrat</strong>{" "}
+                    beteiligt wird.
+                  </span>
+                </label>
+                <label className="mt-2 flex items-start gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={sbvBet}
+                    onChange={(e) => setSbvBet(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Ich bin einverstanden, dass die{" "}
+                    <strong>Schwerbehindertenvertretung (SBV)</strong> beteiligt wird.
+                  </span>
+                </label>
               </div>
 
               {message && (

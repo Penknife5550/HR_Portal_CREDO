@@ -127,6 +127,8 @@ interface BemFall {
   employeeEmail: string | null;
   employeePersonalNr: string | null;
   schwerbehindert: boolean;
+  diagnoseSchutz: boolean;
+  sensitivAusgeblendet?: boolean;
   vertrauenspersonWunsch: boolean;
   vertrauenspersonText: string | null;
   anlassFehlzeitenAb: string | null;
@@ -553,13 +555,13 @@ export function BemDetailContent({
     }
   }
 
-  async function setSchwerbehindert(value: boolean) {
+  async function patchFall(body: Record<string, unknown>) {
     setBusy(true);
     try {
       const res = await fetch(`/api/bem/${bemFallId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schwerbehindert: value }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -572,6 +574,14 @@ export function BemDetailContent({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function setSchwerbehindert(value: boolean) {
+    await patchFall({ schwerbehindert: value });
+  }
+
+  async function setDiagnoseSchutz(value: boolean) {
+    await patchFall({ diagnoseSchutz: value });
   }
 
   if (loading) {
@@ -648,6 +658,30 @@ export function BemDetailContent({
             </button>
           </div>
         </div>
+
+        {/* Widerruf-Banner (E9): eine TRAGENDE Einwilligung (Datenschutz/
+            Durchfuehrung) wurde widerrufen -> Verarbeitung einstellen (DSGVO
+            Art. 7 Abs. 3 / § 167 SGB IX). BR/SBV-Widerruf loest dies NICHT aus. */}
+        {fall.einwilligungen.some(
+          (e) =>
+            e.status === "WIDERRUFEN" &&
+            (e.art === "DATENSCHUTZ" || e.art === "DURCHFUEHRUNG"),
+        ) && (
+          <div className="mb-6 rounded-xl border border-credo-rot/40 bg-credo-rot/10 p-4 text-sm text-credo-rot">
+            <strong>⛔ Einwilligung widerrufen:</strong> Die weitere Verarbeitung
+            ist einzustellen — es können keine neuen Gespräche oder Maßnahmen mehr
+            erfasst werden. Bitte prüfen Sie, ob das Verfahren zu beenden ist.
+          </div>
+        )}
+
+        {/* Diagnose-Schutz aktiv + Betrachter:in sieht ausgeblendete Inhalte (BR/SBV) */}
+        {fall.sensitivAusgeblendet && (
+          <div className="mb-6 rounded-xl border border-credo-blau/40 bg-credo-blau/10 p-4 text-sm text-credo-blau">
+            <strong>🔒 Erhöhter Diagnose-Schutz:</strong> Vertrauliche Freitexte
+            (Gesprächs-Notizen, Maßnahmen-Beschreibungen) sind für Ihre Rolle
+            ausgeblendet. Sichtbar sind sie nur für die BEM-Beauftragten.
+          </div>
+        )}
 
         {/* SBV-Pflichthinweis bei Schwerbehinderung (§ 167/§ 178 SGB IX) */}
         {fall.schwerbehindert && (
@@ -889,6 +923,24 @@ export function BemDetailContent({
                       title="Bei Schwerbehinderung ist die SBV zu beteiligen (§ 167 SGB IX)"
                     >
                       {fall.schwerbehindert ? "Ja — ändern" : "Nein — setzen"}
+                    </button>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted-foreground">Erhöhter Diagnose-Schutz</dt>
+                  <dd>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setDiagnoseSchutz(!fall.diagnoseSchutz)}
+                      className={`rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                        fall.diagnoseSchutz
+                          ? "border-credo-blau/40 bg-credo-blau/10 text-credo-blau"
+                          : "border-border text-muted-foreground hover:bg-accent"
+                      }`}
+                      title="Blendet vertrauliche Freitexte (Notizen/Maßnahmen) für freigegebene BR/SBV aus — sichtbar nur für Beauftragte."
+                    >
+                      {fall.diagnoseSchutz ? "Aktiv — ändern" : "Inaktiv — aktivieren"}
                     </button>
                   </dd>
                 </div>

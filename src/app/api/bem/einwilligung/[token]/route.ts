@@ -121,8 +121,15 @@ export async function POST(
         { status: 400 },
       );
     }
-    const { entscheidung, name, ansprechpartnerId, vertrauenspersonWunsch, vertrauenspersonText } =
-      parsed.data;
+    const {
+      entscheidung,
+      name,
+      ansprechpartnerId,
+      vertrauenspersonWunsch,
+      vertrauenspersonText,
+      brBeteiligung,
+      sbvBeteiligung,
+    } = parsed.data;
 
     const e = await loadByToken(token);
     if (!e) {
@@ -223,6 +230,62 @@ export async function POST(
           ipAddress: ip,
         },
       });
+
+      // E9: Zustimmung zur Beteiligung von BR/SBV. Die aktuelle Antwort ist
+      // massgeblich (Re-Einladung/Zweit-Submit ueberschreibt). Eine bei Fall-
+      // Anlage automatisch erzeugte offene SBV-Beteiligung wird mitgefuehrt.
+      if (neuerStatus === "ERTEILT") {
+        for (const [art, consented] of [
+          ["BR", !!brBeteiligung],
+          ["SBV", !!sbvBeteiligung],
+        ] as const) {
+          const vorhanden = await tx.bemEinwilligung.findFirst({
+            where: { bemFallId: e.bemFall.id, art },
+            orderBy: { createdAt: "desc" },
+            select: { id: true },
+          });
+          const zielStatus = consented ? "ERTEILT" : "ABGELEHNT";
+          // BR ohne Zustimmung und ohne vorhandenen Datensatz: nichts anlegen.
+          if (!consented && !vorhanden) continue;
+          if (vorhanden) {
+            await tx.bemEinwilligung.update({
+              where: { id: vorhanden.id },
+              data: { status: zielStatus, signedAt: now, signedIp: ip, signedName: name },
+            });
+          } else {
+            await tx.bemEinwilligung.create({
+              data: {
+                bemFallId: e.bemFall.id,
+                art,
+                status: zielStatus,
+                signedAt: now,
+                signedIp: ip,
+                signedName: name,
+              },
+            });
+          }
+          // Beteiligungs-Entscheidung gleichwertig auditieren (Nachweisbarkeit).
+          await tx.auditLog.create({
+            data: {
+              bemFallId: e.bemFall.id,
+              userId: null,
+              processType: "BEM",
+              action: consented
+                ? BEM_AUDIT_ACTIONS.EINWILLIGUNG_ERTEILT
+                : BEM_AUDIT_ACTIONS.EINWILLIGUNG_ABGELEHNT,
+              details: { art, signedName: name },
+              ipAddress: ip,
+            },
+          });
+        }
+      } else {
+        // BEM abgelehnt: offene (auto-angelegte) BR/SBV-Beteiligungen schliessen,
+        // damit kein Dauer-OFFEN haengen bleibt.
+        await tx.bemEinwilligung.updateMany({
+          where: { bemFallId: e.bemFall.id, art: { in: ["BR", "SBV"] }, status: "OFFEN" },
+          data: { status: "ABGELEHNT", signedAt: now, signedIp: ip, signedName: name },
+        });
+      }
     });
 
     // Fristen anpassen (Erstgespraech-Frist nach erteilter Einwilligung).

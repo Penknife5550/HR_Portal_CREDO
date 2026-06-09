@@ -235,6 +235,49 @@ export function canManageBemAccess(session: SessionPayload): boolean {
 }
 
 /**
+ * Prueft, ob der User INHALTE eines Falls VERAENDERN darf (Gespraeche/Massnahmen/
+ * Dokumente erfassen, Status/Stammfelder aendern, Einwilligung widerrufen).
+ *
+ * Anders als canAccessBemContent (rollenblind, jede aktive Freigabe darf lesen)
+ * sind beteiligte BR/SBV bewusst NUR lesend: schreibend duerfen nur die
+ * verfahrensfuehrenden Rollen BEAUFTRAGTE/VERTRETUNG. Verhindert u.a., dass
+ * BR/SBV den Diagnose-Schutz abschalten oder Inhalte erfassen (E9).
+ */
+export async function canMutateBemContent(
+  session: SessionPayload,
+  bemFallId: string
+): Promise<boolean> {
+  const zugriff = await prisma.bemZugriff.findFirst({
+    where: {
+      bemFallId,
+      userId: session.userId,
+      revokedAt: null,
+      rolle: { in: ["BEAUFTRAGTE", "VERTRETUNG"] },
+    },
+    select: { id: true },
+  });
+  return !!zugriff;
+}
+
+/**
+ * Soll fuer diese:n Betrachter:in der sensible Freitext ausgeblendet werden?
+ * true, wenn der Diagnose-Schutz aktiv ist UND die Person ausschliesslich als
+ * BR/SBV (ohne BEAUFTRAGTE/VERTRETUNG) freigegeben ist (least privilege).
+ * Erwartet die aktiven Zugriffe als {userId, rolle}[] (revokedAt:null vorgefiltert).
+ */
+export function bemFreitextAusblenden(
+  diagnoseSchutz: boolean,
+  zugriffe: { userId: string; rolle: string }[],
+  userId: string
+): boolean {
+  if (!diagnoseSchutz) return false;
+  const rollen = zugriffe.filter((z) => z.userId === userId).map((z) => z.rolle);
+  if (rollen.length === 0) return false;
+  const fuehrend = rollen.includes("BEAUFTRAGTE") || rollen.includes("VERTRETUNG");
+  return !fuehrend && rollen.some((r) => r === "BR" || r === "SBV");
+}
+
+/**
  * Prueft, ob der User einen BEM-Fall anlegen darf:
  * SUPER_ADMIN oder intern als BEM-Beauftragte:r gekennzeichnete Nutzer (Flag).
  *

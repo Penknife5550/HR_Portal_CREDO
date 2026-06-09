@@ -18,7 +18,7 @@ import {
   statusLabel,
   type BemStatus,
 } from "@/lib/bem-workflow";
-import { type SessionPayload, canAccessBemContent } from "@/lib/permissions";
+import { type SessionPayload, canMutateBemContent } from "@/lib/permissions";
 import { BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { syncBemFristen } from "@/lib/bem-fristen";
 
@@ -133,7 +133,7 @@ export async function bemTransition(
     },
   });
   // 2) Zugriff: ohne aktive BemZugriff-Freigabe -> 404 (Existenz nicht leaken).
-  if (!fall || !(await canAccessBemContent(input.session, input.bemFallId))) {
+  if (!fall || !(await canMutateBemContent(input.session, input.bemFallId))) {
     return { ok: false, error: "Fall nicht gefunden", status: 404 };
   }
 

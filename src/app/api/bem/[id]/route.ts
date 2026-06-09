@@ -10,7 +10,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { canAccessBemContent } from "@/lib/permissions";
+import {
+  canAccessBemContent,
+  canMutateBemContent,
+  bemFreitextAusblenden,
+} from "@/lib/permissions";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { decryptBem } from "@/lib/encryption";
 import { bemFallPatchSchema } from "@/lib/validations/bem";
@@ -120,17 +124,38 @@ export async function GET(
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
 
+    // E9 Diagnose-Schutz: ist er aktiv und ruft eine freigegebene BR/SBV-Person
+    // den Fall ab, werden die sensiblen Freitexte (Notizen/Massnahmen) NICHT
+    // entschluesselt/ausgeliefert — sichtbar nur fuer Beauftragte/Vertretung.
+    const sensitivAusgeblendet = bemFreitextAusblenden(
+      fall.diagnoseSchutz,
+      fall.zugriffe.map((z) => ({ userId: z.userId, rolle: z.rolle })),
+      session.userId,
+    );
+    const REDACTED = "🔒 Inhalt aufgrund des erhöhten Diagnose-Schutzes ausgeblendet.";
+
     // Verschluesselte Freitexte (BEM_ENCRYPTION_KEY) fuer die Anzeige
     // entschluesseln. decryptBem gibt Legacy-/Leerwerte unveraendert zurueck.
     const decrypted = {
       ...fall,
+      sensitivAusgeblendet,
       gespraeche: fall.gespraeche.map((g) => ({
         ...g,
-        notizen: g.notizen ? decryptBem(g.notizen) : g.notizen,
+        notizen: sensitivAusgeblendet
+          ? g.notizen
+            ? REDACTED
+            : g.notizen
+          : g.notizen
+            ? decryptBem(g.notizen)
+            : g.notizen,
       })),
       massnahmen: fall.massnahmen.map((m) => ({
         ...m,
-        beschreibung: m.beschreibung ? decryptBem(m.beschreibung) : m.beschreibung,
+        beschreibung: sensitivAusgeblendet
+          ? REDACTED
+          : m.beschreibung
+            ? decryptBem(m.beschreibung)
+            : m.beschreibung,
       })),
     };
 
@@ -163,7 +188,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
     const { id } = await context.params;
-    if (!(await canAccessBemContent(session, id))) {
+    // Stammfelder (Schwerbehinderung/Diagnose-Schutz) duerfen nur verfahrens-
+    // fuehrende Rollen aendern — NICHT beteiligte BR/SBV (sonst koennten sie den
+    // Diagnose-Schutz abschalten).
+    if (!(await canMutateBemContent(session, id))) {
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
 
@@ -176,18 +204,48 @@ export async function PATCH(
       );
     }
 
-    await prisma.bemFall.update({
-      where: { id },
-      data: { schwerbehindert: parsed.data.schwerbehindert },
-    });
+    const updateData: { schwerbehindert?: boolean; diagnoseSchutz?: boolean } = {};
+    if (parsed.data.schwerbehindert !== undefined) {
+      updateData.schwerbehindert = parsed.data.schwerbehindert;
+    }
+    if (parsed.data.diagnoseSchutz !== undefined) {
+      updateData.diagnoseSchutz = parsed.data.diagnoseSchutz;
+    }
 
-    await logBemAudit({
-      bemFallId: id,
-      userId: session.userId,
-      action: BEM_AUDIT_ACTIONS.SCHWERBEHINDERUNG_GEAENDERT,
-      details: { schwerbehindert: parsed.data.schwerbehindert },
-      ipAddress: clientIp(request),
-    });
+    await prisma.bemFall.update({ where: { id }, data: updateData });
+
+    // Wird die Schwerbehinderung nachtraeglich gesetzt, die offene SBV-Beteiligung
+    // idempotent nachziehen (Symmetrie zur Automatik bei der Fall-Anlage).
+    if (parsed.data.schwerbehindert === true) {
+      const sbv = await prisma.bemEinwilligung.findFirst({
+        where: { bemFallId: id, art: "SBV" },
+        select: { id: true },
+      });
+      if (!sbv) {
+        await prisma.bemEinwilligung.create({
+          data: { bemFallId: id, art: "SBV", status: "OFFEN" },
+        });
+      }
+    }
+
+    if (parsed.data.schwerbehindert !== undefined) {
+      await logBemAudit({
+        bemFallId: id,
+        userId: session.userId,
+        action: BEM_AUDIT_ACTIONS.SCHWERBEHINDERUNG_GEAENDERT,
+        details: { schwerbehindert: parsed.data.schwerbehindert },
+        ipAddress: clientIp(request),
+      });
+    }
+    if (parsed.data.diagnoseSchutz !== undefined) {
+      await logBemAudit({
+        bemFallId: id,
+        userId: session.userId,
+        action: BEM_AUDIT_ACTIONS.DIAGNOSE_SCHUTZ_GEAENDERT,
+        details: { diagnoseSchutz: parsed.data.diagnoseSchutz },
+        ipAddress: clientIp(request),
+      });
+    }
 
     return NextResponse.json({ data: { ok: true } });
   } catch (error) {

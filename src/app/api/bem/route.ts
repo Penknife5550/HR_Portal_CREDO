@@ -187,6 +187,15 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // E9: Bei Schwerbehinderung ist die SBV zu beteiligen (§ 167 i.V.m.
+      // § 178 SGB IX). Wir legen eine offene SBV-Beteiligung als Aufgabe an,
+      // damit sie nicht vergessen wird (Status OFFEN -> noch einzuholen).
+      if (d.schwerbehindert) {
+        await tx.bemEinwilligung.create({
+          data: { bemFallId: fall.id, art: "SBV", status: "OFFEN" },
+        });
+      }
+
       await tx.auditLog.create({
         data: {
           bemFallId: fall.id,

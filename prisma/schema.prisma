@@ -2387,6 +2387,11 @@ model BemFall {
   vertrauenspersonWunsch Boolean @default(false)
   vertrauenspersonText   String?
 
+  // E9: Erhoehter Diagnose-/Datenschutz. Wenn aktiv, werden die sensiblen
+  // Freitexte (Gespraechs-Notizen, Massnahmen-Beschreibung) fuer freigegebene
+  // BR/SBV ausgeblendet — sichtbar nur fuer Beauftragte/Vertretung.
+  diagnoseSchutz Boolean @default(false)
+
   // Prozess
   status      BemStatus     @default(ANGELEGT)
   eingangsweg BemEingangsweg @default(DIGITAL)

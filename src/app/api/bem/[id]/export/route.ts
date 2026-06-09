@@ -9,8 +9,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { canAccessBemContent } from "@/lib/permissions";
+import { canAccessBemContent, bemFreitextAusblenden } from "@/lib/permissions";
 import { decryptBem } from "@/lib/encryption";
+
+const REDACTED_EXPORT = "🔒 Inhalt aufgrund des erhöhten Diagnose-Schutzes ausgeblendet.";
 import { statusLabel } from "@/lib/bem-workflow";
 import { ABLAGE_LABELS } from "@/lib/bem-aktentrennung";
 import { buildBemGesamtExportPdf, type BemExportInput } from "@/lib/bem-export";
@@ -119,6 +121,7 @@ export async function GET(
       where: { id },
       include: {
         organization: { select: { name: true, mandantNumber: true } },
+        zugriffe: { where: { revokedAt: null }, select: { userId: true, rolle: true } },
         gespraeche: { orderBy: [{ datum: "asc" }, { createdAt: "asc" }] },
         massnahmen: { orderBy: { createdAt: "asc" } },
         einwilligungen: { orderBy: { createdAt: "desc" } },
@@ -134,6 +137,14 @@ export async function GET(
     if (!fall) {
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
+
+    // E9: Diagnose-Schutz auch im PDF-Export anwenden (sonst Klartext-Leak an
+    // freigegebene BR/SBV ueber diesen Pfad). Gleiche Logik wie GET /api/bem/[id].
+    const sensitivAusgeblendet = bemFreitextAusblenden(
+      fall.diagnoseSchutz,
+      fall.zugriffe,
+      session.userId,
+    );
 
     const input: BemExportInput = {
       displayId: fall.displayId,
@@ -190,13 +201,23 @@ export async function GET(
           datum: de(g.datum),
           ort: g.ort,
           teilnehmer,
-          notizen: g.notizen ? decryptBem(g.notizen) : null,
+          notizen: sensitivAusgeblendet
+            ? g.notizen
+              ? REDACTED_EXPORT
+              : null
+            : g.notizen
+              ? decryptBem(g.notizen)
+              : null,
           checkliste,
         };
       }),
       massnahmen: fall.massnahmen.map((m) => ({
         kategorieLabel: KATEGORIE_LABELS[m.kategorie] || m.kategorie,
-        beschreibung: m.beschreibung ? decryptBem(m.beschreibung) : "",
+        beschreibung: sensitivAusgeblendet
+          ? REDACTED_EXPORT
+          : m.beschreibung
+            ? decryptBem(m.beschreibung)
+            : "",
         statusLabel: MASSNAHME_STATUS_LABELS[m.status] || m.status,
         zustaendig: m.zustaendig,
         frist: de(m.frist),
