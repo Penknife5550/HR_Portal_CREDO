@@ -208,10 +208,11 @@ Nach Abschluss E1–E6 wurden im kritischen UI/UX-Review zusätzliche Pakete umg
 - **Paket H — IKS-/Statistik-Report · ✅ (Commit 31fa528)** `GET /api/bem/statistik` + Seite `/dashboard/bem/statistik` (nur `canManageBemAccess`): anonyme Kennzahlen je Mandant (Status-Verteilung, Verfahrens-Funnel mit Annahmequote, Ergebnis-Aufschlüsselung), Jahresfilter, CSV-Export (Excel/UTF-8) + Drucken/PDF. Bewusst ohne per-Fall-Allowlist (reine Anzahlen = kein BEM-Inhalt), aber rollen-gegated + `orgFilter`.
 - **DoD:** ✅ Build/Lint grün, 219/220 Tests (1 vorbestehender Offboarding-Mock-Drift, BEM-unabhängig). ⏳ **Server-Deploy** der akkumulierten Schema-Änderungen (ATTEST, BemAnsprechpartner, ansprechpartnerId, schwerbehindert, vertrauensperson, ergebnis, WIEDEREINGLIEDERUNG) — läuft automatisch via `entrypoint.sh` (`prisma db push`).
 
-### Phase 2 (später)
-- **E7** Externe Logins: Rolle `BEM_BEAUFTRAGTER` (Magic-Link/Passwort), sehen ausschließlich BEM. ~3 Tage.
-- **E8** Automatische Auslösung aus Fehlzeiten (LOGA/n8n, Schwelle >6 Wo/12 Mon). ~3–5 Tage.
-- **E9** BR/SBV-Einwilligungen + optionaler Diagnose-Schutz. ~2 Tage.
+### Phase 2
+- **E7 — Externe Logins · ✅ UMGESETZT (2026-06-09, Commit 59bb019)** Rolle `BEM_BEAUFTRAGTER` (Enum via `db push`), additiv nur über `BEM_PORTAL_ROLES` (NICHT in `PORTAL_ROLES` — sonst Leak). Middleware isoliert Seiten **und** `/api/*` (nur /api/bem + /api/auth). Setup-Link-Flow (`/konto-einrichten/[token]`, `/api/auth/setup`; Token nur SHA-256-Hash, single-use, rate-limited, Konto isActive=false bis Setup). Anlage durch SUPER_ADMIN+HR_LEITUNG. **Externe legen keine Fälle an / sehen keine Mandantenliste — nur freigegebene Fälle.** Adversariell reviewt (12 Findings, u.a. HIGH `/api/dashboard/stats` ohne Gate) — alle gefixt.
+- **E8** Automatische Auslösung aus Fehlzeiten (LOGA/n8n, Schwelle >6 Wo/12 Mon). ~3–5 Tage. **OFFEN.**
+- **E9 — BR/SBV + Diagnose-Schutz + Widerruf-Wirkung · ✅ UMGESETZT (2026-06-09, Commit 2b4f56b)** BR/SBV-Beteiligung via Checkboxen im MA-Einwilligungsformular (+ Freigabe Rolle BR/SBV); Diagnose-Schutz (`BemFall.diagnoseSchutz` blendet verschlüsselte Freitexte für NUR-BR/SBV-Freigegebene aus — in GET **und** PDF-Export); Widerruf-Wirkung G1 (`istVerarbeitungGesperrt` je Art → Sperre neue/Bearbeitung Gespräche+Massnahmen + Banner + Mail, kein Auto-Abbruch); SBV-Automatik bei Schwerbehinderung. **Härtung:** neuer `canMutateBemContent` (nur BEAUFTRAGTE/VERTRETUNG schreiben) auf allen Schreibpfaden; `bemFreitextAusblenden` (least-privilege) gemeinsam in GET+Export. Adversariell reviewt (15 Findings, 2 CRITICAL: Export-Leak, PATCH-Schutz-Abschaltung) — alle gefixt.
+- **Offen (Härtung, low):** G4 — `POST /api/bem/[id]/zugriffe` prüft keine Mandanten-Bindung der freigegebenen Person (Admin könnte mandantenübergreifend freigeben).
 
 ---
 
