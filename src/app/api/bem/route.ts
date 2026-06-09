@@ -168,6 +168,7 @@ export async function POST(request: NextRequest) {
           employeeEmail: d.employeeEmail || null,
           employeePersonalNr: d.employeePersonalNr || null,
           eingangsweg: d.eingangsweg,
+          schwerbehindert: d.schwerbehindert ?? false,
           anlassFehlzeitenAb: d.anlassFehlzeitenAb
             ? new Date(d.anlassFehlzeitenAb)
             : null,

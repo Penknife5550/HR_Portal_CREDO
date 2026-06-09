@@ -21,12 +21,18 @@ export const createBemSchema = z.object({
   employeeId: z.string().uuid("Ungültige Mitarbeiter-ID").optional().nullable(),
   organizationId: z.string().uuid("Ungültige Mandanten-ID"),
   eingangsweg: z.enum(["DIGITAL", "PAPIER"]).default("DIGITAL"),
+  schwerbehindert: z.boolean().optional(),
   anlassFehlzeitenAb: z
     .string()
     .datetime({ offset: true })
     .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ungültiges Datum"))
     .optional()
     .nullable(),
+});
+
+// Bearbeitbare Fall-Stammfelder (PATCH /api/bem/[id]).
+export const bemFallPatchSchema = z.object({
+  schwerbehindert: z.boolean(),
 });
 
 // Status-Uebergang. Die erlaubten Uebergaenge selbst werden serverseitig
@@ -125,6 +131,9 @@ export const einwilligungPublicSchema = z.object({
   name: z.string().trim().min(2, "Bitte Namen angeben").max(150),
   // Optionale Wahl einer/eines Ansprechpartner:in (nur bei Zustimmung sinnvoll).
   ansprechpartnerId: z.string().uuid().optional().nullable(),
+  // Optionaler Wunsch nach Begleitung durch eine Vertrauensperson (BR/SBV/sonst.).
+  vertrauenspersonWunsch: z.boolean().optional(),
+  vertrauenspersonText: z.string().trim().max(1000).optional().nullable(),
 });
 
 // BEM-Ansprechpartner:in (pro Mandant) anlegen/bearbeiten.

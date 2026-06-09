@@ -69,6 +69,7 @@ const ACTION_LABELS: Record<string, string> = {
   BEM_EINWILLIGUNG_ABGELEHNT: "Einwilligung abgelehnt",
   BEM_EINWILLIGUNG_WIDERRUFEN: "Einwilligung widerrufen",
   BEM_ANSPRECHPARTNER_GEWAEHLT: "Ansprechpartner:in gewählt",
+  BEM_SCHWERBEHINDERUNG_GEAENDERT: "Schwerbehinderung geändert",
   BEM_GESPRAECH_ERFASST: "Gespräch erfasst",
   BEM_GESPRAECH_AKTUALISIERT: "Gespräch aktualisiert",
   BEM_GESPRAECH_GELOESCHT: "Gespräch gelöscht",
@@ -137,6 +138,10 @@ export async function GET(
         email: fall.employeeEmail,
         personalNr: fall.employeePersonalNr,
       },
+      schwerbehindert: fall.schwerbehindert,
+      vertrauensperson: fall.vertrauenspersonWunsch
+        ? fall.vertrauenspersonText || "Ja"
+        : null,
       organization: fall.organization,
       dates: {
         angelegtAm: de(fall.createdAt),

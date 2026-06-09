@@ -13,6 +13,7 @@ import { getSession } from "@/lib/auth";
 import { canAccessBemContent } from "@/lib/permissions";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { decryptBem } from "@/lib/encryption";
+import { bemFallPatchSchema } from "@/lib/validations/bem";
 
 function clientIp(req: NextRequest): string | null {
   return (
@@ -144,6 +145,53 @@ export async function GET(
     return NextResponse.json({ data: decrypted });
   } catch (error) {
     console.error("[API] BEM [id] GET fehlgeschlagen:", error);
+    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH – bearbeitbare Fall-Stammfelder (aktuell: Schwerbehinderung/Gleichstellung).
+ * Versiegelte Akte: Zugriff via canAccessBemContent. Aenderung wird auditiert.
+ */
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+    }
+    const { id } = await context.params;
+    if (!(await canAccessBemContent(session, id))) {
+      return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const parsed = bemFallPatchSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.errors[0].message },
+        { status: 400 },
+      );
+    }
+
+    await prisma.bemFall.update({
+      where: { id },
+      data: { schwerbehindert: parsed.data.schwerbehindert },
+    });
+
+    await logBemAudit({
+      bemFallId: id,
+      userId: session.userId,
+      action: BEM_AUDIT_ACTIONS.SCHWERBEHINDERUNG_GEAENDERT,
+      details: { schwerbehindert: parsed.data.schwerbehindert },
+      ipAddress: clientIp(request),
+    });
+
+    return NextResponse.json({ data: { ok: true } });
+  } catch (error) {
+    console.error("[API] BEM [id] PATCH fehlgeschlagen:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
 }

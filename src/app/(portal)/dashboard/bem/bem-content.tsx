@@ -391,6 +391,7 @@ function CreateModal({
   const [organizationId, setOrganizationId] = useState("");
   const [eingangsweg, setEingangsweg] = useState<"DIGITAL" | "PAPIER">("DIGITAL");
   const [anlassFehlzeitenAb, setAnlass] = useState("");
+  const [schwerbehindert, setSchwerbehindert] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
@@ -416,6 +417,7 @@ function CreateModal({
           employeePersonalNr: employeePersonalNr.trim() || null,
           organizationId,
           eingangsweg,
+          schwerbehindert,
           anlassFehlzeitenAb: anlassFehlzeitenAb || null,
         }),
       });
@@ -532,6 +534,21 @@ function CreateModal({
               />
             </div>
           </div>
+          <label className="flex items-start gap-2 rounded-lg border border-input px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={schwerbehindert}
+              onChange={(e) => setSchwerbehindert(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Schwerbehindert / gleichgestellt
+              <span className="block text-xs text-muted-foreground">
+                Falls ja, ist die Schwerbehindertenvertretung (SBV) zu beteiligen
+                (§ 167 i.&nbsp;V.&nbsp;m. § 178 SGB IX).
+              </span>
+            </span>
+          </label>
         </div>
 
         <div className="mt-6 flex justify-end gap-3">

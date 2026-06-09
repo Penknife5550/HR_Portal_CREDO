@@ -26,6 +26,8 @@ export interface BemExportInput {
   statusLabel: string;
   eingangsweg: string;
   employee: { name: string; email?: string | null; personalNr?: string | null };
+  schwerbehindert?: boolean;
+  vertrauensperson?: string | null;
   organization?: { name: string; mandantNumber: string } | null;
   dates: {
     angelegtAm?: string | null;
@@ -172,6 +174,8 @@ export async function buildBemGesamtExportPdf(
   );
   kv("Status", input.statusLabel);
   kv("Eingangsweg", input.eingangsweg === "DIGITAL" ? "Digital" : "Papier");
+  kv("Schwerbehindert / gleichgestellt", input.schwerbehindert ? "Ja" : "Nein");
+  if (input.vertrauensperson) kv("Vertrauensperson gewünscht", input.vertrauensperson);
   kv("Angelegt am", input.dates.angelegtAm);
   kv("Fehlzeiten ab", input.dates.fehlzeitenAb);
   kv("Einladung am", input.dates.einladungAm);

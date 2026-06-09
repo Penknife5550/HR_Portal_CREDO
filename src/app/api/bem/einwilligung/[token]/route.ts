@@ -119,7 +119,8 @@ export async function POST(
         { status: 400 },
       );
     }
-    const { entscheidung, name, ansprechpartnerId } = parsed.data;
+    const { entscheidung, name, ansprechpartnerId, vertrauenspersonWunsch, vertrauenspersonText } =
+      parsed.data;
 
     const e = await loadByToken(token);
     if (!e) {
@@ -189,6 +190,12 @@ export async function POST(
           status: zielFallStatus,
           ...(neuerStatus === "ERTEILT" ? { datenschutzAm: now } : {}),
           ...(gewaehlt ? { ansprechpartnerId: gewaehlt.id } : {}),
+          ...(neuerStatus === "ERTEILT"
+            ? {
+                vertrauenspersonWunsch: !!vertrauenspersonWunsch,
+                vertrauenspersonText: vertrauenspersonText?.trim() || null,
+              }
+            : {}),
         },
       });
 

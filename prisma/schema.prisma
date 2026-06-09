@@ -2371,6 +2371,14 @@ model BemFall {
   employeeEmail      String?
   employeePersonalNr String?
 
+  // Schwerbehinderung/Gleichstellung -> SBV-Beteiligung Pflicht (§ 167 / § 178 SGB IX)
+  schwerbehindert Boolean @default(false)
+
+  // Vom Mitarbeiter im Einwilligungs-Formular geaeusserter Wunsch nach einer
+  // Vertrauensperson (BR/SBV/sonst.) zur Begleitung des BEM.
+  vertrauenspersonWunsch Boolean @default(false)
+  vertrauenspersonText   String?
+
   // Prozess
   status      BemStatus     @default(ANGELEGT)
   eingangsweg BemEingangsweg @default(DIGITAL)

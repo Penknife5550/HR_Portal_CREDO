@@ -27,6 +27,8 @@ export function BemEinwilligungContent({ token }: { token: string }) {
   const [message, setMessage] = useState("");
   const [name, setName] = useState("");
   const [ansprechpartnerId, setAnsprechpartnerId] = useState("");
+  const [vpWunsch, setVpWunsch] = useState(false);
+  const [vpText, setVpText] = useState("");
   const [ergebnis, setErgebnis] = useState<"ERTEILT" | "ABGELEHNT" | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -78,6 +80,9 @@ export function BemEinwilligungContent({ token }: { token: string }) {
             entscheidung === "ERTEILT" && ansprechpartnerId
               ? ansprechpartnerId
               : null,
+          vertrauenspersonWunsch: entscheidung === "ERTEILT" ? vpWunsch : false,
+          vertrauenspersonText:
+            entscheidung === "ERTEILT" && vpWunsch ? vpText.trim() || null : null,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -174,6 +179,30 @@ export function BemEinwilligungContent({ token }: { token: string }) {
                   </span>
                 </label>
               )}
+
+              <div className="mt-4">
+                <label className="flex items-start gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={vpWunsch}
+                    onChange={(e) => setVpWunsch(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Ich wünsche die Begleitung durch eine Vertrauensperson
+                    (z.&nbsp;B. Betriebsrat oder Schwerbehindertenvertretung).
+                  </span>
+                </label>
+                {vpWunsch && (
+                  <textarea
+                    value={vpText}
+                    onChange={(e) => setVpText(e.target.value)}
+                    rows={2}
+                    placeholder="Optional: Wen oder was wünschen Sie? (z. B. konkrete Person)"
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#009AC6]"
+                  />
+                )}
+              </div>
 
               {message && (
                 <p className="mt-3 text-sm text-[#E2001A]">{message}</p>

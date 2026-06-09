@@ -126,6 +126,9 @@ interface BemFall {
   employeeLastName: string;
   employeeEmail: string | null;
   employeePersonalNr: string | null;
+  schwerbehindert: boolean;
+  vertrauenspersonWunsch: boolean;
+  vertrauenspersonText: string | null;
   anlassFehlzeitenAb: string | null;
   einladungAm: string | null;
   datenschutzAm: string | null;
@@ -186,6 +189,7 @@ const ACTION_LABELS: Record<string, string> = {
   BEM_EINWILLIGUNG_ABGELEHNT: "Einwilligung abgelehnt",
   BEM_EINWILLIGUNG_WIDERRUFEN: "Einwilligung widerrufen",
   BEM_ANSPRECHPARTNER_GEWAEHLT: "Ansprechpartner:in gewählt",
+  BEM_SCHWERBEHINDERUNG_GEAENDERT: "Schwerbehinderung geändert",
   BEM_EXPORT_ERSTELLT: "Gesamtexport erstellt",
   BEM_FRIST_ERINNERUNG: "Frist-Erinnerung versendet",
   BEM_GELOESCHT: "Akte gelöscht (Aufbewahrung abgelaufen)",
@@ -523,6 +527,27 @@ export function BemDetailContent({
     }
   }
 
+  async function setSchwerbehindert(value: boolean) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/bem/${bemFallId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schwerbehindert: value }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error || "Änderung fehlgeschlagen.");
+        return;
+      }
+      await load(true);
+    } catch {
+      setError("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -597,6 +622,23 @@ export function BemDetailContent({
             </button>
           </div>
         </div>
+
+        {/* SBV-Pflichthinweis bei Schwerbehinderung (§ 167/§ 178 SGB IX) */}
+        {fall.schwerbehindert && (
+          <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <strong>♿ Schwerbehindert / gleichgestellt:</strong> Die
+            Schwerbehindertenvertretung (SBV) ist zu beteiligen (§ 167 i.&nbsp;V.&nbsp;m.
+            § 178 SGB IX).
+            {fall.zugriffe.some((z) => z.rolle === "SBV") ? (
+              <span className="ml-1 text-credo-gruen">SBV ist freigegeben.</span>
+            ) : (
+              <span className="ml-1 font-medium text-credo-rot">
+                Noch keine SBV freigegeben — bitte über „Person freigeben“
+                (Rolle SBV) hinzufügen.
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Stepper (nur Haupt-Pfad) */}
         {!isOffPath(fall.status) && (
@@ -776,6 +818,30 @@ export function BemDetailContent({
                         ? `${fall.ansprechpartner.name} (${fall.ansprechpartner.funktion})`
                         : fall.ansprechpartner.name
                     }
+                  />
+                )}
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted-foreground">Schwerbehindert / gleichgestellt</dt>
+                  <dd>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setSchwerbehindert(!fall.schwerbehindert)}
+                      className={`rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                        fall.schwerbehindert
+                          ? "border-amber-300 bg-amber-100 text-amber-800"
+                          : "border-border text-muted-foreground hover:bg-accent"
+                      }`}
+                      title="Bei Schwerbehinderung ist die SBV zu beteiligen (§ 167 SGB IX)"
+                    >
+                      {fall.schwerbehindert ? "Ja — ändern" : "Nein — setzen"}
+                    </button>
+                  </dd>
+                </div>
+                {fall.vertrauenspersonWunsch && (
+                  <Row
+                    label="Vertrauensperson gewünscht"
+                    value={fall.vertrauenspersonText || "Ja"}
                   />
                 )}
                 <Row label="Fehlzeiten ab" value={formatDate(fall.anlassFehlzeitenAb)} />
