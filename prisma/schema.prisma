@@ -82,6 +82,7 @@ model Organization {
   documentTemplates     DocumentTemplate[]
   generatedDocuments    GeneratedDocument[]
   bemFaelle             BemFall[]
+  bemAnsprechpartner    BemAnsprechpartner[]
 
   @@map("organizations")
 }
@@ -2360,6 +2361,10 @@ model BemFall {
   createdById    String
   createdBy      User         @relation("BemFallCreatedBy", fields: [createdById], references: [id])
 
+  // Vom Mitarbeiter gewaehlte:r Ansprechpartner:in (E4-Erweiterung)
+  ansprechpartnerId String?
+  ansprechpartner   BemAnsprechpartner? @relation(fields: [ansprechpartnerId], references: [id])
+
   // Mitarbeiter-Daten (inline, fuer Briefkopf/Anzeige ohne Personalakten-Join)
   employeeFirstName  String
   employeeLastName   String
@@ -2676,4 +2681,29 @@ enum BemKommunikationStatus {
   GESENDET
   FEHLGESCHLAGEN
   GENERIERT // Brief erzeugt, aber (noch) nicht versendet
+}
+
+// =============================================
+// BEM-Ansprechpartner:innen (pro Mandant pflegbar)
+// Die/der Beschaeftigte waehlt im Einwilligungs-Formular eine:n Ansprechpartner:in;
+// diese:r wird per Mail informiert. Konfiguration unter Mandanten-Einstellungen.
+// =============================================
+model BemAnsprechpartner {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name     String
+  email    String
+  funktion String? // z.B. "BEM-Beauftragte", "Betriebsarzt", "Schwerbehindertenvertretung"
+  isActive Boolean @default(true)
+  orderIndex Int   @default(0)
+
+  faelle BemFall[] // Faelle, in denen diese:r Ansprechpartner:in gewaehlt wurde
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("bem_ansprechpartner")
 }

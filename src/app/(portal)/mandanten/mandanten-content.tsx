@@ -256,6 +256,12 @@ export function MandantenContent({ user }: { user: User }) {
                           >
                             DSGVO-Konfig
                           </Link>
+                          <Link
+                            href={`/mandanten/${org.id}/bem-ansprechpartner`}
+                            className="rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                          >
+                            BEM-Ansprechpartner
+                          </Link>
                           <button
                             onClick={() => handleToggleActive(org)}
                             className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${

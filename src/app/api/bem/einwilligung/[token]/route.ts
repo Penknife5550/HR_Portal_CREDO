@@ -14,8 +14,10 @@ import { createHmac } from "crypto";
 import { prisma } from "@/lib/db";
 import { hashToken } from "@/lib/token-hash";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
-import { BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
+import { BEM_AUDIT_ACTIONS, logBemAudit, logBemKommunikation } from "@/lib/bem-audit";
 import { syncBemFristen } from "@/lib/bem-fristen";
+import { sendEmailDetailed } from "@/lib/mailer";
+import { renderCredoEmail, paragraphsToHtml } from "@/lib/email-layout";
 import { einwilligungPublicSchema } from "@/lib/validations/bem";
 
 const ART_LABELS: Record<string, string> = {
@@ -39,6 +41,8 @@ async function loadByToken(token: string) {
         select: {
           id: true,
           status: true,
+          displayId: true,
+          organizationId: true,
           employeeFirstName: true,
           employeeLastName: true,
           organization: { select: { name: true } },
@@ -68,6 +72,14 @@ export async function GET(
     const expired = !!e.tokenExpiry && e.tokenExpiry.getTime() < Date.now();
     const erledigt = e.status !== "OFFEN" || !!e.tokenUsedAt;
 
+    // Auswaehlbare Ansprechpartner:innen des Mandanten (nur Name/Funktion — keine
+    // E-Mail nach aussen geben).
+    const ansprechpartner = await prisma.bemAnsprechpartner.findMany({
+      where: { organizationId: e.bemFall.organizationId, isActive: true },
+      select: { id: true, name: true, funktion: true },
+      orderBy: [{ orderIndex: "asc" }, { name: "asc" }],
+    });
+
     return NextResponse.json({
       data: {
         employeeName: `${e.bemFall.employeeFirstName} ${e.bemFall.employeeLastName}`.trim(),
@@ -77,6 +89,7 @@ export async function GET(
         status: e.status,
         expired,
         erledigt,
+        ansprechpartner,
       },
     });
   } catch (error) {
@@ -106,7 +119,7 @@ export async function POST(
         { status: 400 },
       );
     }
-    const { entscheidung, name } = parsed.data;
+    const { entscheidung, name, ansprechpartnerId } = parsed.data;
 
     const e = await loadByToken(token);
     if (!e) {
@@ -124,6 +137,20 @@ export async function POST(
 
     const now = new Date();
     const neuerStatus = entscheidung === "ERTEILT" ? "ERTEILT" : "ABGELEHNT";
+
+    // Optional gewaehlte:r Ansprechpartner:in — nur uebernehmen, wenn er/sie zum
+    // Mandanten des Falls gehoert und aktiv ist (sonst ignorieren statt Fehler).
+    const gewaehlt =
+      ansprechpartnerId && neuerStatus === "ERTEILT"
+        ? await prisma.bemAnsprechpartner.findFirst({
+            where: {
+              id: ansprechpartnerId,
+              organizationId: e.bemFall.organizationId,
+              isActive: true,
+            },
+            select: { id: true, name: true, email: true, funktion: true },
+          })
+        : null;
     // Faelschungssicherer Integritaets-Nachweis: HMAC mit serverseitigem
     // Schluessel (BEM_ENCRYPTION_KEY). Nur der Server kann einen passenden Hash
     // erzeugen — die Werte selbst (signedName/Ip/At) liegen zusaetzlich als
@@ -161,6 +188,7 @@ export async function POST(
         data: {
           status: zielFallStatus,
           ...(neuerStatus === "ERTEILT" ? { datenschutzAm: now } : {}),
+          ...(gewaehlt ? { ansprechpartnerId: gewaehlt.id } : {}),
         },
       });
 
@@ -182,8 +210,47 @@ export async function POST(
     // Fristen anpassen (Erstgespraech-Frist nach erteilter Einwilligung).
     await syncBemFristen(e.bemFall.id);
 
+    // Gewaehlte:n Ansprechpartner:in informieren (SMTP-direkt, CREDO-CI).
+    if (gewaehlt) {
+      const maName =
+        `${e.bemFall.employeeFirstName} ${e.bemFall.employeeLastName}`.trim();
+      const subject = `BEM ${e.bemFall.displayId}: Sie wurden als Ansprechpartner:in gewählt`;
+      const text =
+        `Guten Tag ${gewaehlt.name},\n\n` +
+        `${maName} hat im Rahmen des Betrieblichen Eingliederungsmanagements (BEM) ` +
+        `Sie als Ansprechpartner:in ausgewählt und der Durchführung des BEM zugestimmt.\n\n` +
+        `Bitte stimmen Sie sich mit der BEM-Beauftragten/dem BEM-Beauftragten über die ` +
+        `nächsten Schritte ab.`;
+      const html = renderCredoEmail({
+        titel: "Sie wurden als BEM-Ansprechpartner:in gewählt",
+        intro: `Guten Tag ${gewaehlt.name},`,
+        bodyHtml: paragraphsToHtml(text),
+        fussnote:
+          "Automatische Nachricht des CREDO HR-Portals (BEM). Bitte behandeln Sie diese Information vertraulich.",
+      });
+      const sent = await sendEmailDetailed({ to: gewaehlt.email, subject, html, text });
+
+      await logBemKommunikation({
+        bemFallId: e.bemFall.id,
+        kanal: "EMAIL",
+        status: sent.ok ? "GESENDET" : "FEHLGESCHLAGEN",
+        empfaenger: gewaehlt.email,
+        betreff: subject,
+        messageId: sent.ok ? (sent.messageId ?? null) : null,
+        fehlertext: sent.ok ? null : sent.error.slice(0, 500),
+        gesendetById: null,
+      });
+      await logBemAudit({
+        bemFallId: e.bemFall.id,
+        userId: null,
+        action: BEM_AUDIT_ACTIONS.ANSPRECHPARTNER_GEWAEHLT,
+        details: { ansprechpartnerId: gewaehlt.id, name: gewaehlt.name, benachrichtigt: sent.ok },
+        ipAddress: ip,
+      });
+    }
+
     return NextResponse.json({
-      data: { status: neuerStatus },
+      data: { status: neuerStatus, ansprechpartnerGewaehlt: !!gewaehlt },
     });
   } catch (error) {
     if (error instanceof Error && error.message === "ALREADY_HANDLED") {

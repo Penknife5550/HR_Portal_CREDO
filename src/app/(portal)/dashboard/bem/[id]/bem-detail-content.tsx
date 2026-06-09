@@ -135,6 +135,7 @@ interface BemFall {
   aufbewahrungBis: string | null;
   createdAt: string;
   organization: { id: string; name: string; mandantNumber: string } | null;
+  ansprechpartner: { name: string; funktion: string | null } | null;
   zugriffe: Zugriff[];
   gespraeche: Gespraech[];
   massnahmen: Massnahme[];
@@ -184,6 +185,7 @@ const ACTION_LABELS: Record<string, string> = {
   BEM_EINWILLIGUNG_ERTEILT: "Einwilligung erteilt",
   BEM_EINWILLIGUNG_ABGELEHNT: "Einwilligung abgelehnt",
   BEM_EINWILLIGUNG_WIDERRUFEN: "Einwilligung widerrufen",
+  BEM_ANSPRECHPARTNER_GEWAEHLT: "Ansprechpartner:in gewählt",
   BEM_EXPORT_ERSTELLT: "Gesamtexport erstellt",
   BEM_FRIST_ERINNERUNG: "Frist-Erinnerung versendet",
   BEM_GELOESCHT: "Akte gelöscht (Aufbewahrung abgelaufen)",
@@ -757,6 +759,16 @@ export function BemDetailContent({
                 <Row label="E-Mail" value={fall.employeeEmail || "—"} />
                 <Row label="Personalnummer" value={fall.employeePersonalNr || "—"} />
                 <Row label="Eingangsweg" value={fall.eingangsweg === "DIGITAL" ? "Digital" : "Papier"} />
+                {fall.ansprechpartner && (
+                  <Row
+                    label="Ansprechpartner:in"
+                    value={
+                      fall.ansprechpartner.funktion
+                        ? `${fall.ansprechpartner.name} (${fall.ansprechpartner.funktion})`
+                        : fall.ansprechpartner.name
+                    }
+                  />
+                )}
                 <Row label="Fehlzeiten ab" value={formatDate(fall.anlassFehlzeitenAb)} />
                 <Row label="Einladung am" value={formatDate(fall.einladungAm)} />
                 <Row label="Einwilligung am" value={formatDate(fall.datenschutzAm)} />

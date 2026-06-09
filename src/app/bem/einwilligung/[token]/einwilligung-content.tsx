@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+interface Ansprechpartner {
+  id: string;
+  name: string;
+  funktion: string | null;
+}
+
 interface Info {
   employeeName: string;
   organizationName: string | null;
@@ -10,6 +16,7 @@ interface Info {
   status: string;
   expired: boolean;
   erledigt: boolean;
+  ansprechpartner: Ansprechpartner[];
 }
 
 type View = "laden" | "formular" | "fehler" | "fertig";
@@ -19,6 +26,7 @@ export function BemEinwilligungContent({ token }: { token: string }) {
   const [view, setView] = useState<View>("laden");
   const [message, setMessage] = useState("");
   const [name, setName] = useState("");
+  const [ansprechpartnerId, setAnsprechpartnerId] = useState("");
   const [ergebnis, setErgebnis] = useState<"ERTEILT" | "ABGELEHNT" | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -63,7 +71,14 @@ export function BemEinwilligungContent({ token }: { token: string }) {
       const res = await fetch(`/api/bem/einwilligung/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entscheidung, name: name.trim() }),
+        body: JSON.stringify({
+          entscheidung,
+          name: name.trim(),
+          ansprechpartnerId:
+            entscheidung === "ERTEILT" && ansprechpartnerId
+              ? ansprechpartnerId
+              : null,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -136,6 +151,29 @@ export function BemEinwilligungContent({ token }: { token: string }) {
                   placeholder="Vor- und Nachname"
                 />
               </label>
+
+              {info.ansprechpartner.length > 0 && (
+                <label className="mt-4 block text-sm font-medium text-gray-700">
+                  Wunsch-Ansprechpartner:in (optional)
+                  <select
+                    value={ansprechpartnerId}
+                    onChange={(e) => setAnsprechpartnerId(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#009AC6]"
+                  >
+                    <option value="">Keine Auswahl</option>
+                    {info.ansprechpartner.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                        {a.funktion ? ` — ${a.funktion}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block text-xs text-gray-500">
+                    Die ausgewählte Person wird informiert und kann sich mit Ihnen in
+                    Verbindung setzen.
+                  </span>
+                </label>
+              )}
 
               {message && (
                 <p className="mt-3 text-sm text-[#E2001A]">{message}</p>

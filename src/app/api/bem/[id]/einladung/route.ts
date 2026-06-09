@@ -58,6 +58,7 @@ export async function POST(
         id: true,
         status: true,
         displayId: true,
+        organizationId: true,
         employeeFirstName: true,
         employeeLastName: true,
         employeeEmail: true,
@@ -113,6 +114,21 @@ export async function POST(
       request.nextUrl.origin;
     const magicUrl = `${baseUrl}/bem/einwilligung/${token}`;
 
+    // Ansprechpartner:innen des Mandanten zur Info in der Mail auflisten.
+    const ansprechpartner = await prisma.bemAnsprechpartner.findMany({
+      where: { organizationId: fall.organizationId, isActive: true },
+      select: { name: true, funktion: true },
+      orderBy: [{ orderIndex: "asc" }, { name: "asc" }],
+    });
+    const ansprechpartnerText =
+      ansprechpartner.length > 0
+        ? `\n\nAls Ansprechpartner:innen stehen Ihnen zur Verfügung:\n` +
+          ansprechpartner
+            .map((a) => `- ${a.name}${a.funktion ? ` (${a.funktion})` : ""}`)
+            .join("\n") +
+          `\nIm Antwort-Formular können Sie eine:n Wunsch-Ansprechpartner:in auswählen.`
+        : "";
+
     const name = `${fall.employeeFirstName} ${fall.employeeLastName}`.trim();
     const subject = "Einladung zum Betrieblichen Eingliederungsmanagement (BEM)";
     const textBody =
@@ -121,6 +137,7 @@ export async function POST(
       `Ziel ist es, gemeinsam Möglichkeiten zu finden, Ihre Arbeitsfähigkeit zu erhalten.\n\n` +
       `Die Teilnahme ist freiwillig. Bitte teilen Sie uns über den folgenden Link mit, ` +
       `ob Sie dem BEM zustimmen. Ihre Angaben werden streng vertraulich behandelt.` +
+      ansprechpartnerText +
       (d.nachricht ? `\n\n${d.nachricht}` : "");
     const html = renderCredoEmail({
       titel: "Einladung zum BEM-Gespräch",

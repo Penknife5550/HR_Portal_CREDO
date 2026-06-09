@@ -44,6 +44,7 @@ export async function GET(
         organization: {
           select: { id: true, name: true, mandantNumber: true, type: true },
         },
+        ansprechpartner: { select: { name: true, funktion: true } },
         zugriffe: {
           where: { revokedAt: null },
           include: {

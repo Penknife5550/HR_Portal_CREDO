@@ -123,6 +123,15 @@ export const einladungSchema = z.object({
 export const einwilligungPublicSchema = z.object({
   entscheidung: z.enum(["ERTEILT", "ABGELEHNT"]),
   name: z.string().trim().min(2, "Bitte Namen angeben").max(150),
+  // Optionale Wahl einer/eines Ansprechpartner:in (nur bei Zustimmung sinnvoll).
+  ansprechpartnerId: z.string().uuid().optional().nullable(),
+});
+
+// BEM-Ansprechpartner:in (pro Mandant) anlegen/bearbeiten.
+export const bemAnsprechpartnerSchema = z.object({
+  name: z.string().trim().min(1, "Name ist erforderlich").max(150),
+  email: z.string().trim().email("Ungültige E-Mail-Adresse").max(200),
+  funktion: z.string().trim().max(150).optional().nullable(),
 });
 
 // =============================================
@@ -159,6 +168,7 @@ export type BemStatusInput = z.infer<typeof bemStatusSchema>;
 export type BemZugriffInput = z.infer<typeof bemZugriffSchema>;
 export type EinladungInput = z.infer<typeof einladungSchema>;
 export type EinwilligungPublicInput = z.infer<typeof einwilligungPublicSchema>;
+export type BemAnsprechpartnerInput = z.infer<typeof bemAnsprechpartnerSchema>;
 export type DokumentGenerierenInput = z.infer<typeof dokumentGenerierenSchema>;
 export type CreateGespraechInput = z.infer<typeof createGespraechSchema>;
 export type UpdateGespraechInput = z.infer<typeof updateGespraechSchema>;
