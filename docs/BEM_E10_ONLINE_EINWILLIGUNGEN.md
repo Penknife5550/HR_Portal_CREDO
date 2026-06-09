@@ -1,6 +1,22 @@
 # BEM E10 — Online-Einwilligungen (alle Arten) + editierbare Vorlagen
 
-Status: **geplant** (Spec, 2026-06-09). Umsetzung mit adversariellem Review vor Commit (wie E7/E9).
+Status: **✅ UMGESETZT** (2026-06-09, Commit 7ff1723, gepusht). Adversariell reviewt
+(Workflow, 17 Findings — alle wesentlichen behoben, u.a. HIGH: Einladungs-Modal sendete
+weiter DATENSCHUTZ → Auto-Flow startete nie; HIGH: Nachweis nur per Versionsnummer →
+unveraenderlicher Text-Snapshot am Einwilligungs-Datensatz). Build/Lint grün, 220/221 Tests.
+
+**Server-Deploy:** `prisma db push` (via entrypoint) zieht die neuen Felder
+(Organization.hatBetriebsrat/hatSchwerbehindertenvertretung; BemVorlage + BemVorlageTyp;
+BemEinwilligung.vorlageVersion/textSnapshot). Danach unter Verwaltung → „BEM-Vorlagen"
+ggf. Texte/Checklisten anpassen und je Mandant BR/SBV-Schalter setzen.
+
+**Bewusst offen (low):** partieller Unique-Index für globale Vorlagen (NULL-Distinct in
+Postgres) — durch deterministisches orderBy + Text-Snapshot entschärft; Duplikat-Race nur
+Admin-seitig/geringe Wahrscheinlichkeit. Spätere BR/SBV-Antwort löst keine separate
+Beauftragten-Mail aus (nur Audit).
+
+---
+
 
 ## 1. Ziel & abgestimmte Entscheidungen
 
