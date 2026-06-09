@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import {
@@ -1577,6 +1577,93 @@ function GespraechModal({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
+  // --- Notiz-Autosave (Paket G) -------------------------------------------
+  // Entwurf wird lokal in der sessionStorage gehalten (NICHT serverseitig, kein
+  // Audit-Rauschen, kein dauerhaftes Ablegen sensibler BEM-Inhalte auf der
+  // Platte: sessionStorage wird beim Schliessen des Browser-Tabs geleert).
+  // Schuetzt vor Datenverlust bei versehentlichem Schliessen langer Notizen.
+  const draftKey = `bem-gespr-draft:${bemFallId}:${gespraech?.id ?? "new"}`;
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<Record<string, unknown> | null>(null);
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipFirstDraft = useRef(true);
+
+  function clearDraft() {
+    try {
+      sessionStorage.removeItem(draftKey);
+    } catch {
+      /* sessionStorage nicht verfuegbar */
+    }
+    setDraftSavedAt(null);
+  }
+
+  // Beim Oeffnen: liegt ein nicht gespeicherter Entwurf vor? -> Banner anbieten.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(draftKey);
+      if (raw) setPendingDraft(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+  }, [draftKey]);
+
+  // Debounced: Formularstand alle ~800ms in die sessionStorage sichern.
+  useEffect(() => {
+    if (skipFirstDraft.current) {
+      skipFirstDraft.current = false;
+      return;
+    }
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => {
+      try {
+        const savedAt = Date.now();
+        sessionStorage.setItem(
+          draftKey,
+          JSON.stringify({ typ, datum, ort, naechsterTermin, notizen, teilnehmer, checkliste, savedAt }),
+        );
+        setDraftSavedAt(savedAt);
+      } catch {
+        /* ignore */
+      }
+    }, 800);
+    return () => {
+      if (draftTimer.current) clearTimeout(draftTimer.current);
+    };
+  }, [typ, datum, ort, naechsterTermin, notizen, teilnehmer, checkliste, draftKey]);
+
+  // Warnung vor Verlassen der Seite, solange ein ungesicherter Entwurf besteht.
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (draftSavedAt) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [draftSavedAt]);
+
+  function applyDraft() {
+    if (!pendingDraft) return;
+    const d = pendingDraft;
+    if (!isEdit && typeof d.typ === "string") changeTyp(d.typ);
+    if (typeof d.datum === "string") setDatum(d.datum);
+    if (typeof d.ort === "string") setOrt(d.ort);
+    if (typeof d.naechsterTermin === "string") setNaechsterTermin(d.naechsterTermin);
+    if (typeof d.notizen === "string") setNotizen(d.notizen);
+    if (Array.isArray(d.teilnehmer) && d.teilnehmer.length > 0)
+      setTeilnehmer(d.teilnehmer as Teilnehmer[]);
+    if (Array.isArray(d.checkliste) && d.checkliste.length > 0)
+      setCheckliste(d.checkliste as ChecklistItem[]);
+    setPendingDraft(null);
+  }
+
+  function discardDraft() {
+    clearDraft();
+    setPendingDraft(null);
+  }
+  // ------------------------------------------------------------------------
+
   function changeTyp(newTyp: string) {
     setTyp(newTyp);
     // Beim Anlegen: Checkliste an neuen Typ anpassen (nur wenn unveraendert/leer).
@@ -1614,6 +1701,7 @@ function GespraechModal({
         setErr(j.error || "Speichern fehlgeschlagen.");
         return;
       }
+      clearDraft();
       onSaved();
     } catch {
       setErr("Verbindungsfehler.");
@@ -1630,6 +1718,38 @@ function GespraechModal({
       {err && (
         <div className="mb-4 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-2 text-sm text-credo-rot">
           {err}
+        </div>
+      )}
+      {pendingDraft && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-credo-gelb/40 bg-credo-gelb/10 px-4 py-2 text-sm">
+          <span>
+            Ungespeicherter Entwurf
+            {typeof pendingDraft.savedAt === "number"
+              ? ` von ${new Date(pendingDraft.savedAt).toLocaleString("de-DE", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  day: "2-digit",
+                  month: "2-digit",
+                })} Uhr`
+              : ""}{" "}
+            gefunden.
+          </span>
+          <span className="flex gap-2">
+            <button
+              type="button"
+              onClick={applyDraft}
+              className="rounded-md bg-credo-gelb px-3 py-1 text-xs font-medium text-credo-dunkelgrau"
+            >
+              Wiederherstellen
+            </button>
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-accent"
+            >
+              Verwerfen
+            </button>
+          </span>
         </div>
       )}
       <div className="space-y-4">
@@ -1718,8 +1838,18 @@ function GespraechModal({
         </div>
 
         <div>
-          <label className="text-sm font-medium">
-            Notizen (vertraulich, verschlüsselt)
+          <label className="flex items-center justify-between text-sm font-medium">
+            <span>Notizen (vertraulich, verschlüsselt)</span>
+            {draftSavedAt && (
+              <span className="text-xs font-normal text-muted-foreground">
+                Entwurf automatisch gesichert ·{" "}
+                {new Date(draftSavedAt).toLocaleTimeString("de-DE", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                Uhr
+              </span>
+            )}
           </label>
           <textarea
             value={notizen}
