@@ -96,6 +96,7 @@ export function BemContent({ user }: { user: User }) {
   const [faelle, setFaelle] = useState<BemFall[]>([]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [canCreate, setCanCreate] = useState(false);
+  const [canViewStats, setCanViewStats] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -117,6 +118,7 @@ export function BemContent({ user }: { user: User }) {
       setFaelle(json.data || []);
       setStatusCounts(json.statusCounts || {});
       setCanCreate(!!json.canCreate);
+      setCanViewStats(!!json.canManageAccess);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fehler beim Laden");
     } finally {
@@ -169,15 +171,25 @@ export function BemContent({ user }: { user: User }) {
               protokolliert.
             </p>
           </div>
-          {canCreate && (
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="rounded-lg bg-credo-blau px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
-            >
-              + Neuer Fall
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {canViewStats && (
+              <Link
+                href="/dashboard/bem/statistik"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              >
+                📊 Statistik / IKS-Report
+              </Link>
+            )}
+            {canCreate && (
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="rounded-lg bg-credo-blau px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
+              >
+                + Neuer Fall
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (
