@@ -1,24 +1,20 @@
 /**
  * API: POST /api/bem/[id]/einladung
  *
- * Versendet die BEM-Einladung samt Datenschutzinformation an die/den
- * Beschaeftigte:n. Erzeugt eine BemEinwilligung (OFFEN) mit Magic-Link-Token
- * (nur Hash in DB), sendet die Mail **SMTP-direkt** (kein n8n, Entscheidung #9)
- * im CREDO-CI-Layout und schreibt einen prueffaehigen Versandnachweis
- * (BemKommunikation, NFR 0a). Status -> EINLADUNG_VERSENDET (nur aus ANGELEGT).
+ * Versendet die BEM-Einladung = DURCHFUEHRUNGS-Einwilligung ("Angebot annehmen").
+ * Nutzt den zentralen Versand-Helfer (Magic-Link, CREDO-CI, SMTP-direkt,
+ * BemKommunikation + Audit). Nach Annahme werden die weiteren erforderlichen
+ * Einwilligungs-Links automatisch nachgesendet (siehe einwilligung/[token]).
+ * Status -> EINLADUNG_VERSENDET (nur aus ANGELEGT).
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canMutateBemContent } from "@/lib/permissions";
-import { hashToken } from "@/lib/token-hash";
-import { sendEmailDetailed } from "@/lib/mailer";
-import { renderCredoEmail, paragraphsToHtml } from "@/lib/email-layout";
-import { logBemAudit, logBemKommunikation, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { syncBemFristen } from "@/lib/bem-fristen";
 import { einladungSchema } from "@/lib/validations/bem";
+import { sendBemEinwilligungLink } from "@/lib/bem-einladung";
 
 function clientIp(req: NextRequest): string | null {
   return (
@@ -62,8 +58,7 @@ export async function POST(
         employeeFirstName: true,
         employeeLastName: true,
         employeeEmail: true,
-        einladungAm: true,
-        organization: { select: { name: true, ezTokenValidityDays: true } },
+        organization: { select: { ezTokenValidityDays: true } },
       },
     });
     if (!fall) {
@@ -78,43 +73,7 @@ export async function POST(
       );
     }
 
-    const ipAddress = clientIp(request);
-    const now = new Date();
-
-    // Token (UUID); in der DB nur der SHA-256-Hash.
-    const token = randomUUID();
-    const tokenHash = hashToken(token);
-    const validityDays = d.gueltigkeitstage || fall.organization.ezTokenValidityDays || 30;
-    const tokenExpiry = new Date(now);
-    tokenExpiry.setDate(tokenExpiry.getDate() + validityDays);
-
-    // Beim (Neu-)Versand werden zuvor offene, noch nicht beantwortete
-    // Einladungen derselben Art entwertet (Ablauf in die Vergangenheit) —
-    // so bleibt nur der zuletzt versandte Link gueltig (Sicherheit + DB-Hygiene).
-    const einwilligung = await prisma.$transaction(async (tx) => {
-      await tx.bemEinwilligung.updateMany({
-        where: { bemFallId: id, art: d.art, status: "OFFEN" },
-        data: { tokenExpiry: new Date(0) },
-      });
-      return tx.bemEinwilligung.create({
-        data: {
-          bemFallId: id,
-          art: d.art,
-          status: "OFFEN",
-          token: tokenHash,
-          tokenExpiry,
-        },
-        select: { id: true },
-      });
-    });
-
-    const baseUrl =
-      process.env.APP_URL ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      request.nextUrl.origin;
-    const magicUrl = `${baseUrl}/bem/einwilligung/${token}`;
-
-    // Ansprechpartner:innen des Mandanten zur Info in der Mail auflisten.
+    // Ansprechpartner:innen des Mandanten zur Info in die Mail aufnehmen.
     const ansprechpartner = await prisma.bemAnsprechpartner.findMany({
       where: { organizationId: fall.organizationId, isActive: true },
       select: { name: true, funktion: true },
@@ -122,108 +81,64 @@ export async function POST(
     });
     const ansprechpartnerText =
       ansprechpartner.length > 0
-        ? `\n\nAls Ansprechpartner:innen stehen Ihnen zur Verfügung:\n` +
+        ? `Als Ansprechpartner:innen stehen Ihnen zur Verfügung:\n` +
           ansprechpartner
             .map((a) => `- ${a.name}${a.funktion ? ` (${a.funktion})` : ""}`)
             .join("\n") +
           `\nIm Antwort-Formular können Sie eine:n Wunsch-Ansprechpartner:in auswählen.`
         : "";
+    const zusatzText = [ansprechpartnerText, d.nachricht?.trim() || ""]
+      .filter(Boolean)
+      .join("\n\n") || null;
 
-    const name = `${fall.employeeFirstName} ${fall.employeeLastName}`.trim();
-    const subject = "Einladung zum Betrieblichen Eingliederungsmanagement (BEM)";
-    const textBody =
-      `Sie waren in den letzten zwölf Monaten länger oder wiederholt arbeitsunfähig. ` +
-      `Ihr Arbeitgeber bietet Ihnen daher ein Betriebliches Eingliederungsmanagement (BEM) an. ` +
-      `Ziel ist es, gemeinsam Möglichkeiten zu finden, Ihre Arbeitsfähigkeit zu erhalten.\n\n` +
-      `Die Teilnahme ist freiwillig. Bitte teilen Sie uns über den folgenden Link mit, ` +
-      `ob Sie dem BEM zustimmen. Ihre Angaben werden streng vertraulich behandelt.` +
-      ansprechpartnerText +
-      (d.nachricht ? `\n\n${d.nachricht}` : "");
-    const html = renderCredoEmail({
-      titel: "Einladung zum BEM-Gespräch",
-      intro: `Guten Tag ${name},`,
-      bodyHtml: paragraphsToHtml(textBody),
-      button: { label: "Jetzt online antworten", url: magicUrl },
-      fussnote: `Dieser Link ist bis zum ${tokenExpiry.toLocaleDateString("de-DE")} gültig. Wenn Sie die Nachricht irrtümlich erhalten haben, ignorieren Sie sie bitte.`,
-      appUrl: baseUrl,
+    const baseUrl =
+      process.env.APP_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      request.nextUrl.origin;
+    const validityDays = d.gueltigkeitstage || fall.organization.ezTokenValidityDays || 30;
+
+    const result = await sendBemEinwilligungLink({
+      fall: {
+        id: fall.id,
+        displayId: fall.displayId,
+        organizationId: fall.organizationId,
+        employeeFirstName: fall.employeeFirstName,
+        employeeLastName: fall.employeeLastName,
+      },
+      art: "DURCHFUEHRUNG",
+      recipient,
+      baseUrl,
+      gueltigkeitstage: validityDays,
+      gesendetById: session.userId,
+      ipAddress: clientIp(request),
+      zusatzText,
     });
 
-    const sent = await sendEmailDetailed({
-      to: recipient,
-      subject,
-      html,
-      text: `${textBody}\n\nAntwort-Link: ${magicUrl}`,
-    });
-
-    if (!sent.ok) {
-      // Echten SMTP-Fehler ins Protokoll schreiben (prueffaehig + debugbar).
-      await logBemKommunikation({
-        bemFallId: id,
-        kanal: "EMAIL",
-        status: "FEHLGESCHLAGEN",
-        empfaenger: recipient,
-        betreff: subject,
-        fehlertext: sent.error.slice(0, 500),
-        ipAddress,
-        gesendetById: session.userId,
-      });
-      await logBemAudit({
-        bemFallId: id,
-        userId: session.userId,
-        action: BEM_AUDIT_ACTIONS.EINLADUNG_FEHLGESCHLAGEN,
-        details: {
-          einwilligungId: einwilligung.id,
-          art: d.art,
-          empfaenger: recipient,
-          fehler: sent.error.slice(0, 500),
-        },
-        ipAddress,
-      });
-      // Token bleibt gueltig — HR kann den Link manuell zustellen.
+    if (!result.ok) {
       return NextResponse.json(
         {
-          error: `E-Mail konnte nicht versendet werden: ${sent.error}`,
-          detail: sent.error,
-          magicUrl,
+          error: `E-Mail konnte nicht versendet werden: ${result.error}`,
+          detail: result.error,
+          magicUrl: result.magicUrl, // fuer manuelle Zustellung
         },
         { status: 502 },
       );
     }
 
-    // Versandnachweis (prueffaehig)
-    await logBemKommunikation({
-      bemFallId: id,
-      kanal: "EMAIL",
-      status: "GESENDET",
-      empfaenger: recipient,
-      betreff: subject,
-      messageId: sent.messageId ?? null,
-      ipAddress,
-      gesendetById: session.userId,
-    });
-    await logBemAudit({
-      bemFallId: id,
-      userId: session.userId,
-      action: BEM_AUDIT_ACTIONS.EINLADUNG_VERSENDET,
-      details: { einwilligungId: einwilligung.id, art: d.art, empfaenger: recipient },
-      ipAddress,
-    });
-
-    // Status nur aus ANGELEGT auf EINLADUNG_VERSENDET heben (race-frei); bei
-    // erneutem Versand bleibt der Status/das erste Einladungsdatum erhalten.
+    // Status nur aus ANGELEGT auf EINLADUNG_VERSENDET heben (race-frei).
     await prisma.bemFall.updateMany({
       where: { id, status: "ANGELEGT" },
-      data: { status: "EINLADUNG_VERSENDET", einladungAm: now },
+      data: { status: "EINLADUNG_VERSENDET", einladungAm: new Date() },
     });
-
-    // Fristen anpassen (Einwilligungs-Frist statt Einladungs-Frist).
+    // Manuell eingegebene Empfaenger-Mail als employeeEmail sichern, damit der
+    // automatische Folge-Versand (Datenschutz/BR/SBV) nach Annahme funktioniert.
+    if (!fall.employeeEmail && d.email) {
+      await prisma.bemFall.update({ where: { id }, data: { employeeEmail: recipient } });
+    }
     await syncBemFristen(id);
 
-    // magicUrl (Klartext-Token) wird NICHT zurueckgegeben — er ist bereits per
-    // Mail zugestellt. Nur im SMTP-Fehlerfall (oben) wird er fuer die manuelle
-    // Zustellung geliefert.
     return NextResponse.json({
-      data: { sent: true, empfaenger: recipient, expiresAt: tokenExpiry.toISOString() },
+      data: { sent: true, empfaenger: recipient },
     });
   } catch (error) {
     console.error("[API] BEM Einladung POST fehlgeschlagen:", error);

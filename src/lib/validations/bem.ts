@@ -139,13 +139,19 @@ export const updateMassnahmeSchema = z.object({
 // Einladung & Einwilligung (E4)
 // =============================================
 export const einladungSchema = z.object({
-  // Phase 1 versendet nur DATENSCHUTZ/DURCHFUEHRUNG. BR/SBV-Einwilligungen
-  // (im Prisma-Enum BemEinwilligungArt vorhanden) folgen in Phase 2 (E9) mit
-  // eigenem Beteiligungs-Flow — bewusst hier NICHT zugelassen.
-  art: z.enum(["DATENSCHUTZ", "DURCHFUEHRUNG"]).default("DATENSCHUTZ"),
+  // E10: Die Einladung versendet IMMER die DURCHFUEHRUNGS-Einwilligung ("Angebot
+  // annehmen") — kein art-Parameter mehr, damit der Einstieg eindeutig ist.
+  // Nach Annahme werden Datenschutz + (BR/SBV je nach Betrieb) automatisch
+  // nachgesendet.
   email: z.string().trim().email("Ungültige E-Mail-Adresse").optional(),
   nachricht: z.string().trim().max(3000).optional(),
   gueltigkeitstage: z.number().int().min(1).max(90).optional(),
+});
+
+// Einzel-Resend eines Einwilligungs-Links je Art (HR-Aktion, E10).
+export const einwilligungResendSchema = z.object({
+  art: z.enum(["DATENSCHUTZ", "DURCHFUEHRUNG", "BR", "SBV"]),
+  email: z.string().trim().email("Ungültige E-Mail-Adresse").optional(),
 });
 
 // Oeffentliches Einwilligungs-Formular (Magic-Link).
@@ -157,10 +163,6 @@ export const einwilligungPublicSchema = z.object({
   // Optionaler Wunsch nach Begleitung durch eine Vertrauensperson (BR/SBV/sonst.).
   vertrauenspersonWunsch: z.boolean().optional(),
   vertrauenspersonText: z.string().trim().max(1000).optional().nullable(),
-  // E9: Zustimmung zur Beteiligung von Betriebsrat / Schwerbehindertenvertretung
-  // (nur bei ERTEILT relevant). Erzeugt eigene BemEinwilligung-Eintraege (BR/SBV).
-  brBeteiligung: z.boolean().optional(),
-  sbvBeteiligung: z.boolean().optional(),
 });
 
 // BEM-Ansprechpartner:in (pro Mandant) anlegen/bearbeiten.

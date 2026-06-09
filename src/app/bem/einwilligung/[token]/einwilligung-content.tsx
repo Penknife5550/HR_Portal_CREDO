@@ -13,6 +13,7 @@ interface Info {
   organizationName: string | null;
   art: string;
   artLabel: string;
+  text: { titel: string; koerper: string };
   status: string;
   expired: boolean;
   erledigt: boolean;
@@ -29,8 +30,6 @@ export function BemEinwilligungContent({ token }: { token: string }) {
   const [ansprechpartnerId, setAnsprechpartnerId] = useState("");
   const [vpWunsch, setVpWunsch] = useState(false);
   const [vpText, setVpText] = useState("");
-  const [brBet, setBrBet] = useState(false);
-  const [sbvBet, setSbvBet] = useState(false);
   const [ergebnis, setErgebnis] = useState<"ERTEILT" | "ABGELEHNT" | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -85,8 +84,6 @@ export function BemEinwilligungContent({ token }: { token: string }) {
           vertrauenspersonWunsch: entscheidung === "ERTEILT" ? vpWunsch : false,
           vertrauenspersonText:
             entscheidung === "ERTEILT" && vpWunsch ? vpText.trim() || null : null,
-          brBeteiligung: entscheidung === "ERTEILT" ? brBet : false,
-          sbvBeteiligung: entscheidung === "ERTEILT" ? sbvBet : false,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -134,21 +131,21 @@ export function BemEinwilligungContent({ token }: { token: string }) {
           {view === "formular" && info && (
             <div>
               <h1 className="mb-2 text-lg font-bold text-[#575756]">
-                Betriebliches Eingliederungsmanagement (BEM)
+                {info.text.titel}
               </h1>
               <p className="text-sm text-gray-700">
-                Guten Tag {info.employeeName},
+                Guten Tag {info.employeeName}
+                {info.organizationName ? ` (${info.organizationName})` : ""},
               </p>
-              <p className="mt-3 text-sm leading-relaxed text-gray-700">
-                Ihr Arbeitgeber{info.organizationName ? ` (${info.organizationName})` : ""}{" "}
-                bietet Ihnen ein Betriebliches Eingliederungsmanagement an. Ziel ist es,
-                gemeinsam Möglichkeiten zu finden, Ihre Arbeitsfähigkeit zu erhalten.
-                Die Teilnahme ist <strong>freiwillig</strong> und Ihre Angaben werden
-                streng vertraulich behandelt. Eine Ablehnung hat keine arbeitsrechtlichen
-                Nachteile.
-              </p>
+              {info.text.koerper.split("\n").map((abs, i) =>
+                abs.trim() === "" ? null : (
+                  <p key={i} className="mt-3 text-sm leading-relaxed text-gray-700">
+                    {abs}
+                  </p>
+                ),
+              )}
               <p className="mt-3 text-sm text-gray-700">
-                Bitte bestätigen Sie Ihre Entscheidung ({info.artLabel}):
+                Bitte bestätigen Sie Ihre Entscheidung:
               </p>
 
               <label className="mt-4 block text-sm font-medium text-gray-700">
@@ -161,7 +158,7 @@ export function BemEinwilligungContent({ token }: { token: string }) {
                 />
               </label>
 
-              {info.ansprechpartner.length > 0 && (
+              {info.art === "DURCHFUEHRUNG" && info.ansprechpartner.length > 0 && (
                 <label className="mt-4 block text-sm font-medium text-gray-700">
                   Wunsch-Ansprechpartner:in (optional)
                   <select
@@ -184,60 +181,39 @@ export function BemEinwilligungContent({ token }: { token: string }) {
                 </label>
               )}
 
-              <div className="mt-4">
-                <label className="flex items-start gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={vpWunsch}
-                    onChange={(e) => setVpWunsch(e.target.checked)}
-                    className="mt-0.5"
-                  />
-                  <span>
-                    Ich wünsche die Begleitung durch eine Vertrauensperson
-                    (z.&nbsp;B. Betriebsrat oder Schwerbehindertenvertretung).
-                  </span>
-                </label>
-                {vpWunsch && (
-                  <textarea
-                    value={vpText}
-                    onChange={(e) => setVpText(e.target.value)}
-                    rows={2}
-                    placeholder="Optional: Wen oder was wünschen Sie? (z. B. konkrete Person)"
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#009AC6]"
-                  />
-                )}
-              </div>
+              {info.art === "DURCHFUEHRUNG" && (
+                <div className="mt-4">
+                  <label className="flex items-start gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={vpWunsch}
+                      onChange={(e) => setVpWunsch(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Ich wünsche die Begleitung durch eine Vertrauensperson
+                      (z.&nbsp;B. Betriebsrat oder Schwerbehindertenvertretung).
+                    </span>
+                  </label>
+                  {vpWunsch && (
+                    <textarea
+                      value={vpText}
+                      onChange={(e) => setVpText(e.target.value)}
+                      rows={2}
+                      placeholder="Optional: Wen oder was wünschen Sie? (z. B. konkrete Person)"
+                      className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#009AC6]"
+                    />
+                  )}
+                </div>
+              )}
 
-              {/* E9: Beteiligung von BR/SBV (optional, nur bei Zustimmung relevant) */}
-              <div className="mt-4">
-                <p className="text-sm font-medium text-gray-700">
-                  Beteiligung weiterer Stellen (optional)
+              {info.art === "DURCHFUEHRUNG" && (
+                <p className="mt-4 rounded-lg bg-[#009AC6]/5 px-3 py-2 text-xs text-gray-600">
+                  Nach Ihrer Zustimmung erhalten Sie automatisch weitere kurze
+                  Online-Formulare (u.&nbsp;a. zum Datenschutz), die Sie bitte
+                  ebenfalls bestätigen.
                 </p>
-                <label className="mt-2 flex items-start gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={brBet}
-                    onChange={(e) => setBrBet(e.target.checked)}
-                    className="mt-0.5"
-                  />
-                  <span>
-                    Ich bin einverstanden, dass der <strong>Betriebsrat</strong>{" "}
-                    beteiligt wird.
-                  </span>
-                </label>
-                <label className="mt-2 flex items-start gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={sbvBet}
-                    onChange={(e) => setSbvBet(e.target.checked)}
-                    className="mt-0.5"
-                  />
-                  <span>
-                    Ich bin einverstanden, dass die{" "}
-                    <strong>Schwerbehindertenvertretung (SBV)</strong> beteiligt wird.
-                  </span>
-                </label>
-              </div>
+              )}
 
               {message && (
                 <p className="mt-3 text-sm text-[#E2001A]">{message}</p>

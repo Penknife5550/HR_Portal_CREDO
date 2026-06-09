@@ -68,6 +68,7 @@ const NAV_GROUPS: NavGroup[] = [
     roles: ["SUPER_ADMIN", "HR_LEITUNG"],
     children: [
       { href: "/benutzerverwaltung", label: "Benutzer", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },
+      { href: "/bem-vorlagen", label: "BEM-Vorlagen", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },
       { href: "/mandanten", label: "Mandanten", roles: ["SUPER_ADMIN"] },
       { href: "/einstellungen", label: "Einstellungen", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },
       { href: "/audit-log", label: "Audit-Log", roles: ["SUPER_ADMIN", "HR_LEITUNG"] },

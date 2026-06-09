@@ -150,6 +150,8 @@ interface BemFall {
   fristen: Frist[];
   kommunikation: Kommunikation[];
   auditLogs: AuditEntry[];
+  // E10: editierbare Checklisten-Vorlagen je Gespraechstyp (Vorbefuellung).
+  checklistenVorlagen?: Record<string, ChecklistItem[]>;
   _count: {
     gespraeche: number;
     massnahmen: number;
@@ -488,6 +490,27 @@ export function BemDetailContent({
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         setError(j.error || "Widerruf fehlgeschlagen.");
+        return;
+      }
+      await load(true);
+    } catch {
+      setError("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendEinwilligung(art: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/bem/${bemFallId}/einwilligung/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ art }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error || "Versand fehlgeschlagen.");
         return;
       }
       await load(true);
@@ -1069,6 +1092,7 @@ export function BemDetailContent({
             onEinladung={() => setEinladungOpen(true)}
             onPapier={() => setPapierOpen(true)}
             onWiderruf={widerrufen}
+            onResend={resendEinwilligung}
           />
         )}
 
@@ -1157,6 +1181,7 @@ export function BemDetailContent({
         <GespraechModal
           bemFallId={bemFallId}
           gespraech={gespraechModal === "new" ? null : gespraechModal}
+          checklisten={fall.checklistenVorlagen}
           onClose={() => setGespraechModal(null)}
           onSaved={async () => {
             setGespraechModal(null);
@@ -1600,15 +1625,20 @@ function ModalActions({
 function GespraechModal({
   bemFallId,
   gespraech,
+  checklisten,
   onClose,
   onSaved,
 }: {
   bemFallId: string;
   gespraech: Gespraech | null;
+  checklisten?: Record<string, ChecklistItem[]>;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const isEdit = !!gespraech;
+  // Editierbare Checkliste je Typ (E10): aus den Vorlagen, sonst Code-Default.
+  const checklisteFuerTyp = (t: string): ChecklistItem[] =>
+    (checklisten?.[t] ?? getBemCheckliste(t as never)).map((c) => ({ ...c }));
   const [typ, setTyp] = useState<string>(gespraech?.typ || "ERSTGESPRAECH");
   const [datum, setDatum] = useState(dateInputValue(gespraech?.datum ?? null));
   const [ort, setOrt] = useState(gespraech?.ort || "");
@@ -1624,7 +1654,7 @@ function GespraechModal({
   const [checkliste, setCheckliste] = useState<ChecklistItem[]>(
     gespraech?.checkliste && gespraech.checkliste.length > 0
       ? gespraech.checkliste
-      : getBemCheckliste((gespraech?.typ as never) || "ERSTGESPRAECH"),
+      : checklisteFuerTyp(gespraech?.typ || "ERSTGESPRAECH"),
   );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -1743,7 +1773,7 @@ function GespraechModal({
     setTyp(newTyp);
     // Beim Anlegen: Checkliste an neuen Typ anpassen (nur wenn unveraendert/leer).
     if (!isEdit) {
-      setCheckliste(getBemCheckliste(newTyp as never));
+      setCheckliste(checklisteFuerTyp(newTyp));
     }
   }
 
@@ -2145,12 +2175,14 @@ function EinwilligungTab({
   onEinladung,
   onPapier,
   onWiderruf,
+  onResend,
 }: {
   fall: BemFall;
   busy: boolean;
   onEinladung: () => void;
   onPapier: () => void;
   onWiderruf: (einwId: string) => void;
+  onResend: (art: string) => void;
 }) {
   return (
     <div>
@@ -2229,6 +2261,17 @@ function EinwilligungTab({
                         Widerrufen
                       </button>
                     )}
+                    {e.status === "OFFEN" && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onResend(e.art)}
+                        className="rounded-md border border-credo-blau/40 px-3 py-1 text-xs font-medium text-credo-blau hover:bg-credo-blau/10 disabled:opacity-50"
+                        title="Einwilligungs-Link für diese Art erneut per E-Mail senden"
+                      >
+                        Link erneut senden
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -2259,7 +2302,6 @@ function EinladungModal({
   onSent: () => void;
 }) {
   const [email, setEmail] = useState(defaultEmail);
-  const [art, setArt] = useState<"DATENSCHUTZ" | "DURCHFUEHRUNG">("DATENSCHUTZ");
   const [nachricht, setNachricht] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -2280,7 +2322,6 @@ function EinladungModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
-          art,
           nachricht: nachricht.trim() || undefined,
         }),
       });
@@ -2342,17 +2383,11 @@ function EinladungModal({
                 placeholder="beschäftigte:r@example.de"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">Art</label>
-              <select
-                value={art}
-                onChange={(e) => setArt(e.target.value as "DATENSCHUTZ" | "DURCHFUEHRUNG")}
-                className={INPUT_CLASS}
-              >
-                <option value="DATENSCHUTZ">Datenschutz-Einwilligung</option>
-                <option value="DURCHFUEHRUNG">Durchführung des BEM</option>
-              </select>
-            </div>
+            <p className="rounded-lg bg-credo-blau/5 px-3 py-2 text-xs text-muted-foreground">
+              Versendet wird die Einladung zur <strong>Durchführung des BEM</strong>.
+              Nach Zustimmung erhält die/der Beschäftigte automatisch die weiteren
+              Einwilligungs-Links (Datenschutz sowie ggf. Betriebsrat/SBV).
+            </p>
             <div>
               <label className="text-sm font-medium">
                 Zusätzliche Nachricht (optional)

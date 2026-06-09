@@ -18,6 +18,7 @@ import {
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { decryptBem } from "@/lib/encryption";
 import { bemFallPatchSchema } from "@/lib/validations/bem";
+import { getBemChecklisteItems } from "@/lib/bem-vorlagen";
 
 function clientIp(req: NextRequest): string | null {
   return (
@@ -159,6 +160,19 @@ export async function GET(
       })),
     };
 
+    // Editierbare Checklisten-Vorlagen je Gespraechstyp (E10) — fuer die
+    // Vorbefuellung neuer Gespraeche im Modal (Override -> global -> Default).
+    const [clErst, clFolge, clGed] = await Promise.all([
+      getBemChecklisteItems("ERSTGESPRAECH", fall.organizationId),
+      getBemChecklisteItems("FOLGEGESPRAECH", fall.organizationId),
+      getBemChecklisteItems("GEDAECHTNISPROTOKOLL", fall.organizationId),
+    ]);
+    const checklistenVorlagen = {
+      ERSTGESPRAECH: clErst,
+      FOLGEGESPRAECH: clFolge,
+      GEDAECHTNISPROTOKOLL: clGed,
+    };
+
     // Lese-Audit (Compliance): jeder Zugriff wird protokolliert.
     await logBemAudit({
       bemFallId: id,
@@ -167,7 +181,7 @@ export async function GET(
       ipAddress: clientIp(request),
     });
 
-    return NextResponse.json({ data: decrypted });
+    return NextResponse.json({ data: { ...decrypted, checklistenVorlagen } });
   } catch (error) {
     console.error("[API] BEM [id] GET fehlgeschlagen:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });

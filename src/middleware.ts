@@ -104,6 +104,7 @@ export async function middleware(request: NextRequest) {
                         pathname.startsWith("/benutzerverwaltung") ||
                         pathname.startsWith("/vorlagen") ||
                         pathname.startsWith("/brief-vorlagen") ||
+                        pathname.startsWith("/bem-vorlagen") ||
                         pathname.startsWith("/checklisten") ||
                         pathname.startsWith("/mandanten") ||
                         pathname.startsWith("/einstellungen");
@@ -135,7 +136,7 @@ export async function middleware(request: NextRequest) {
       }
 
       // Admin-Routen nur für SUPER_ADMIN und HR_LEITUNG
-      const adminRoutes = ["/benutzerverwaltung", "/vorlagen", "/checklisten", "/mandanten", "/einstellungen"];
+      const adminRoutes = ["/benutzerverwaltung", "/vorlagen", "/bem-vorlagen", "/checklisten", "/mandanten", "/einstellungen"];
       const isAdminRoute = adminRoutes.some((r) => pathname.startsWith(r));
       if (isAdminRoute) {
         const role = payload.role as string;

@@ -67,6 +67,10 @@ model Organization {
   bemBeauftragte2Name  String?
   bemBeauftragte2Email String?
   bemAufbewahrungJahre Int     @default(4) // Aufbewahrungsfrist nach Beendigung
+  // E10: Im Betrieb vorhandene Gremien -> steuern den Auto-Versand der
+  // BR-/SBV-Einwilligungs-Links.
+  hatBetriebsrat                 Boolean @default(false)
+  hatSchwerbehindertenvertretung Boolean @default(false)
 
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
@@ -83,6 +87,7 @@ model Organization {
   generatedDocuments    GeneratedDocument[]
   bemFaelle             BemFall[]
   bemAnsprechpartner    BemAnsprechpartner[]
+  bemVorlagen           BemVorlage[]
 
   @@map("organizations")
 }
@@ -602,6 +607,7 @@ model User {
   bemZugriffe           BemZugriff[]       @relation("BemZugriffUser")
   grantedBemZugriffe    BemZugriff[]       @relation("BemZugriffGrantedBy")
   bemKommunikationen    BemKommunikation[] @relation("BemKommunikationSentBy")
+  aktualisierteBemVorlagen BemVorlage[]    @relation("BemVorlageAktualisiertBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2557,6 +2563,11 @@ model BemEinwilligung {
   signedName  String?
   widerrufAm  DateTime?
   dokumentHash String? // Hash der unterschriebenen Erklaerung
+  // E10: Version + WORTLAUT des angezeigten Einwilligungs-/Datenschutztextes
+  // zum Zeitpunkt des Versands (geht in dokumentHash ein) -> auch nach spaeteren
+  // Vorlagen-Aenderungen beweisbar, WELCHER Textstand zugestimmt wurde.
+  vorlageVersion Int?
+  textSnapshot   Json? // { titel, koerper } — unveraenderlicher Wortlaut
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2577,6 +2588,40 @@ enum BemEinwilligungStatus {
   ERTEILT
   ABGELEHNT
   WIDERRUFEN
+}
+
+// E10: Editierbare BEM-Vorlagen (Checklisten + Datenschutz-/Einwilligungstexte).
+// Admin/HR-Leitung koennen sie bei Gesetzesaenderungen anpassen. Eine globale
+// Fassung je Typ (organizationId = null) + optional eine pro Mandant (Override).
+// Fehlt ein DB-Eintrag, greift der Code-Default (bem-vorlagen.ts).
+model BemVorlage {
+  id             String        @id @default(uuid())
+  typ            BemVorlageTyp
+  organizationId String? // null = global; gesetzt = Mandant-Override
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Checkliste: string[] (Items). Text: { titel?: string, koerper: string }.
+  inhalt         Json
+  version        Int           @default(1)
+
+  aktualisiertById String?
+  aktualisiertBy   User?   @relation("BemVorlageAktualisiertBy", fields: [aktualisiertById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([typ, organizationId])
+  @@index([organizationId])
+  @@map("bem_vorlagen")
+}
+
+enum BemVorlageTyp {
+  CHECKLISTE_ERSTGESPRAECH
+  CHECKLISTE_FOLGEGESPRAECH
+  CHECKLISTE_GEDAECHTNISPROTOKOLL
+  EINWILLIGUNGSTEXT_DATENSCHUTZ
+  EINWILLIGUNGSTEXT_DURCHFUEHRUNG
+  EINWILLIGUNGSTEXT_BR
+  EINWILLIGUNGSTEXT_SBV
 }
 
 model BemDokument {
