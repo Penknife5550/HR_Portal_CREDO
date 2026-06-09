@@ -226,6 +226,22 @@ export function BemEinwilligungContent({ token }: { token: string }) {
                   Ich lehne ab
                 </button>
               </div>
+
+              {/* Datenschutzhinweis + Kontakt */}
+              <div className="mt-6 border-t border-gray-200 pt-4 text-xs leading-relaxed text-gray-500">
+                <p className="font-medium text-gray-600">Datenschutzhinweis</p>
+                <p className="mt-1">
+                  Ihre Angaben werden ausschließlich zur Durchführung des BEM
+                  verarbeitet (§ 167 Abs. 2 SGB IX, Art. 9 DSGVO), streng vertraulich
+                  und getrennt von Ihrer Personalakte behandelt und nur den dafür
+                  freigegebenen Personen zugänglich gemacht. Die Teilnahme ist
+                  freiwillig; Sie können eine erteilte Einwilligung jederzeit ohne
+                  Nachteile widerrufen. Nach Ablauf der Aufbewahrungsfrist werden die
+                  BEM-Daten gelöscht. Bei Fragen wenden Sie sich bitte an Ihre
+                  Personalabteilung
+                  {info.organizationName ? ` (${info.organizationName})` : ""}.
+                </p>
+              </div>
             </div>
           )}
 

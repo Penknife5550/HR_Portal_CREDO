@@ -45,6 +45,7 @@ async function loadByToken(token: string) {
           organizationId: true,
           employeeFirstName: true,
           employeeLastName: true,
+          employeeEmail: true,
           organization: { select: { name: true } },
         },
       },
@@ -253,6 +254,76 @@ export async function POST(
         action: BEM_AUDIT_ACTIONS.ANSPRECHPARTNER_GEWAEHLT,
         details: { ansprechpartnerId: gewaehlt.id, name: gewaehlt.name, benachrichtigt: sent.ok },
         ipAddress: ip,
+      });
+    }
+
+    const maName = `${e.bemFall.employeeFirstName} ${e.bemFall.employeeLastName}`.trim();
+    const entscheidungText = neuerStatus === "ERTEILT" ? "zugestimmt" : "abgelehnt";
+
+    // 1) Regelkreis schliessen: freigegebene Beauftragte ueber die Antwort
+    //    informieren (SMTP-direkt, je Empfaenger einzeln, ohne Gesundheitsdaten).
+    const zugriffe = await prisma.bemZugriff.findMany({
+      where: { bemFallId: e.bemFall.id, revokedAt: null },
+      include: { user: { select: { email: true, isActive: true } } },
+    });
+    const beauftragte = zugriffe
+      .map((z) => z.user)
+      .filter((u) => u.isActive && u.email)
+      .map((u) => u.email);
+    if (beauftragte.length > 0) {
+      const subject = `BEM ${e.bemFall.displayId}: Beschäftigte:r hat ${entscheidungText}`;
+      const text =
+        `Im BEM-Fall ${e.bemFall.displayId} (${maName}) wurde die Einwilligung ` +
+        `${entscheidungText}.\n\nBitte öffnen Sie den Fall im HR-Portal für die nächsten Schritte.`;
+      const html = renderCredoEmail({
+        titel: `BEM-Antwort: ${e.bemFall.displayId}`,
+        bodyHtml: paragraphsToHtml(text),
+        fussnote:
+          "Automatische Benachrichtigung des CREDO HR-Portals (BEM). Keine Gesundheitsdaten.",
+      });
+      for (const adr of beauftragte) {
+        const r = await sendEmailDetailed({ to: adr, subject, html, text });
+        await logBemKommunikation({
+          bemFallId: e.bemFall.id,
+          kanal: "EMAIL",
+          status: r.ok ? "GESENDET" : "FEHLGESCHLAGEN",
+          empfaenger: adr,
+          betreff: subject,
+          messageId: r.ok ? (r.messageId ?? null) : null,
+          fehlertext: r.ok ? null : r.error.slice(0, 500),
+          gesendetById: null,
+        });
+      }
+    }
+
+    // 2) Bestaetigung an die/den Beschaeftigte:n (Eingangsbestaetigung).
+    if (e.bemFall.employeeEmail) {
+      const subject = "Ihre Rückmeldung zum BEM ist eingegangen";
+      const text =
+        neuerStatus === "ERTEILT"
+          ? `Guten Tag ${maName},\n\nvielen Dank — Ihre Zustimmung zum Betrieblichen ` +
+            `Eingliederungsmanagement wurde gespeichert. Die zuständige Stelle wird sich ` +
+            `mit Ihnen in Verbindung setzen.`
+          : `Guten Tag ${maName},\n\nIhre Rückmeldung wurde gespeichert: Sie haben das ` +
+            `Betriebliche Eingliederungsmanagement abgelehnt. Ihnen entstehen dadurch keine ` +
+            `Nachteile. Sie können sich jederzeit an Ihre Personalabteilung wenden.`;
+      const html = renderCredoEmail({
+        titel: "Eingangsbestätigung BEM",
+        intro: `Guten Tag ${maName},`,
+        bodyHtml: paragraphsToHtml(text),
+        fussnote:
+          "Automatische Eingangsbestätigung des CREDO HR-Portals. Bitte antworten Sie nicht auf diese E-Mail.",
+      });
+      const r = await sendEmailDetailed({ to: e.bemFall.employeeEmail, subject, html, text });
+      await logBemKommunikation({
+        bemFallId: e.bemFall.id,
+        kanal: "EMAIL",
+        status: r.ok ? "GESENDET" : "FEHLGESCHLAGEN",
+        empfaenger: e.bemFall.employeeEmail,
+        betreff: subject,
+        messageId: r.ok ? (r.messageId ?? null) : null,
+        fehlertext: r.ok ? null : r.error.slice(0, 500),
+        gesendetById: null,
       });
     }
 
