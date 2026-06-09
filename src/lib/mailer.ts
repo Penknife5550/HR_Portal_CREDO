@@ -229,19 +229,47 @@ function extractVariables(
 ): Record<string, string> {
   const str = (v: unknown) => (v != null ? String(v) : "");
 
+  // Generischer Durchreich: jedes skalare Payload-Feld wird unter seinem
+  // Originalnamen als Platzhalter verfuegbar (z.B. {{employeeName}}, {{displayId}},
+  // {{magicUrl}}). Die kuratierten Felder unten ueberschreiben diese gezielt.
+  const generic: Record<string, string> = {};
+  for (const [k, v] of Object.entries(payload)) {
+    if (v == null) continue;
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      generic[k] = String(v);
+    }
+  }
+
   const base: Record<string, string> = {
-    email: str(payload.email),
+    ...generic,
+    // Empfaenger: deckt die unterschiedlichen Feldnamen aller Module ab.
+    email: str(
+      payload.email ||
+        payload.employeeEmail ||
+        payload.recipientEmail ||
+        payload.privateEmail,
+    ),
     vorname: str(payload.vorname || payload.firstName),
     nachname: str(payload.nachname || payload.lastName),
     einrichtung: str(payload.organization || payload.einrichtung),
     vorgangsnummer: str(payload.displayId),
-    mitarbeiter_name: str(payload.mitarbeiter_name) ||
-      [str(payload.vorname || payload.firstName), str(payload.nachname || payload.lastName)].filter(Boolean).join(" ") ||
-      str(payload.email),
-    link: str(payload.fragebogenLink || payload.modalitaetenLink || payload.link),
+    mitarbeiter_name:
+      str(payload.mitarbeiter_name || payload.employeeName) ||
+      [str(payload.vorname || payload.firstName), str(payload.nachname || payload.lastName)]
+        .filter(Boolean)
+        .join(" ") ||
+      str(payload.email || payload.employeeEmail),
+    link: str(
+      payload.fragebogenLink ||
+        payload.modalitaetenLink ||
+        payload.magicUrl ||
+        payload.link,
+    ),
     ablaufdatum: payload.tokenExpiresAt
       ? new Date(str(payload.tokenExpiresAt)).toLocaleDateString("de-DE")
-      : "",
+      : payload.expiresAt
+        ? new Date(str(payload.expiresAt)).toLocaleDateString("de-DE")
+        : "",
     supervisor_email: str(payload.supervisorEmail),
     supervisor_link: str(payload.supervisor_link || payload.modalitaetenLink),
     tage_offen: str(payload.tage_offen || ""),
@@ -251,6 +279,20 @@ function extractVariables(
   if (event === "supervisor-link-created" || event === "supervisor-reminder") {
     base.email = str(payload.supervisorEmail || payload.email);
     base.link = str(payload.modalitaetenLink || payload.supervisor_link);
+  }
+
+  // PSI-Beurteilungs-Anfrage: Empfaenger ist der/die Gutachter:in (recipientEmail),
+  // der Link liegt unter `magicLink` (nicht magicUrl).
+  if (event === "psi-assessment-requested") {
+    base.email = str(payload.recipientEmail || payload.email);
+    base.link = str(payload.magicLink || payload.link);
+  }
+
+  // PSI-Beurteilung freigegeben: Empfaenger ist der/die Beschaeftigte,
+  // der Bestaetigungs-Link liegt unter `ackLink`.
+  if (event === "psi-assessment-released") {
+    base.email = str(payload.employeeEmail || payload.email);
+    base.link = str(payload.ackLink || payload.link);
   }
 
   // Offboarding-spezifische Variablen
