@@ -40,6 +40,13 @@ const KATEGORIE_LABELS: Record<string, string> = {
   TECHNISCH: "Technisch",
   ORGANISATORISCH: "Organisatorisch",
   PERSONENBEZOGEN: "Personenbezogen",
+  WIEDEREINGLIEDERUNG: "Stufenweise Wiedereingliederung",
+};
+const ERGEBNIS_LABELS: Record<string, string> = {
+  ERFOLGREICH: "Erfolgreich — Arbeitsfähigkeit wiederhergestellt/erhalten",
+  TEILWEISE: "Teilweise erfolgreich",
+  KEIN_ERFOLG: "Kein Erfolg",
+  KEINE_MASSNAHMEN_NOETIG: "Keine Maßnahmen erforderlich",
 };
 const MASSNAHME_STATUS_LABELS: Record<string, string> = {
   OFFEN: "Offen",
@@ -150,6 +157,7 @@ export async function GET(
         einwilligungAm: de(fall.datenschutzAm),
         erstgespraechAm: de(fall.erstgespraechAm),
         beendetAm: de(fall.beendetAm),
+        ergebnis: fall.ergebnis ? ERGEBNIS_LABELS[fall.ergebnis] || fall.ergebnis : null,
         beendigungsgrund: fall.beendigungsgrund,
         aufbewahrungBis: de(fall.aufbewahrungBis),
       },

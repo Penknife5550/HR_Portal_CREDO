@@ -44,6 +44,7 @@ export async function POST(
       bemFallId: id,
       zielStatus: parsed.data.zielStatus as BemStatus,
       beendigungsgrund: parsed.data.beendigungsgrund ?? null,
+      ergebnis: parsed.data.ergebnis ?? null,
       session,
       ipAddress: clientIp(request),
     });

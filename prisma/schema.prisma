@@ -2390,6 +2390,7 @@ model BemFall {
   erstgespraechAm    DateTime?
   beendetAm          DateTime?
   beendigungsgrund   String?
+  ergebnis           BemErgebnis? // Abschluss-Ergebnis (nur bei ABGESCHLOSSEN)
 
   // Aufbewahrung / Loeschung (Crypto-Shredding)
   aufbewahrungBis DateTime? // beendetAm + bemAufbewahrungJahre
@@ -2508,6 +2509,14 @@ enum BemMassnahmeKategorie {
   TECHNISCH
   ORGANISATORISCH
   PERSONENBEZOGEN
+  WIEDEREINGLIEDERUNG // stufenweise Wiedereingliederung (Hamburger Modell)
+}
+
+enum BemErgebnis {
+  ERFOLGREICH
+  TEILWEISE
+  KEIN_ERFOLG
+  KEINE_MASSNAHMEN_NOETIG
 }
 
 enum BemMassnahmeStatus {

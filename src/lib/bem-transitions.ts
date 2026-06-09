@@ -30,6 +30,7 @@ interface BemTransitionInput {
   bemFallId: string;
   zielStatus: BemStatus;
   beendigungsgrund?: string | null;
+  ergebnis?: string | null;
   session: SessionPayload;
   ipAddress: string | null;
 }
@@ -51,7 +52,9 @@ function addYearsSafe(date: Date, years: number): Date {
 
 function buildExtraData(
   zielStatus: BemStatus,
+  currentStatus: BemStatus,
   beendigungsgrund: string | null | undefined,
+  ergebnis: string | null | undefined,
   aufbewahrungJahre: number,
   now: Date,
 ): Record<string, unknown> {
@@ -62,14 +65,42 @@ function buildExtraData(
       return { datenschutzAm: now };
     case "ERSTGESPRAECH":
       return { erstgespraechAm: now };
+    case "MASSNAHMEN_LAUFEN":
+      // Wieder-Oeffnen aus ABGESCHLOSSEN: Abschluss-/Aufbewahrungsfelder leeren.
+      if (currentStatus === "ABGESCHLOSSEN") {
+        return {
+          beendetAm: null,
+          beendigungsgrund: null,
+          ergebnis: null,
+          aufbewahrungBis: null,
+        };
+      }
+      return {};
     case "ABGESCHLOSSEN":
-    case "ABGEBROCHEN": {
+      return {
+        beendetAm: now,
+        beendigungsgrund: beendigungsgrund ?? null,
+        ergebnis: ergebnis ?? null,
+        aufbewahrungBis: addYearsSafe(now, aufbewahrungJahre),
+      };
+    case "ABGEBROCHEN":
       return {
         beendetAm: now,
         beendigungsgrund: beendigungsgrund ?? null,
         aufbewahrungBis: addYearsSafe(now, aufbewahrungJahre),
       };
-    }
+    case "ANGELEGT":
+      // Wieder-Einladen aus ABGEBROCHEN/EINWILLIGUNG_ABGELEHNT: Verfahren neu
+      // starten — Abschluss-/Prozess-Zeitstempel zuruecksetzen.
+      return {
+        beendetAm: null,
+        beendigungsgrund: null,
+        ergebnis: null,
+        aufbewahrungBis: null,
+        einladungAm: null,
+        datenschutzAm: null,
+        erstgespraechAm: null,
+      };
     case "GELOESCHT":
       return { geloeschtAm: now };
     default:
@@ -107,7 +138,9 @@ export async function bemTransition(
   const now = new Date();
   const extraData = buildExtraData(
     input.zielStatus,
+    fall.status as BemStatus,
     input.beendigungsgrund,
+    input.ergebnis,
     fall.organization.bemAufbewahrungJahre,
     now,
   );

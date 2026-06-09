@@ -50,6 +50,11 @@ export const bemStatusSchema = z.object({
     "GELOESCHT",
   ]),
   beendigungsgrund: z.string().trim().max(2000).optional().nullable(),
+  // Abschluss-Ergebnis (nur bei Ziel ABGESCHLOSSEN relevant).
+  ergebnis: z
+    .enum(["ERFOLGREICH", "TEILWEISE", "KEIN_ERFOLG", "KEINE_MASSNAHMEN_NOETIG"])
+    .optional()
+    .nullable(),
 });
 
 // =============================================
@@ -94,7 +99,7 @@ export const updateGespraechSchema = z.object({
 // Massnahmen (technisch / organisatorisch / personenbezogen)
 // =============================================
 export const createMassnahmeSchema = z.object({
-  kategorie: z.enum(["TECHNISCH", "ORGANISATORISCH", "PERSONENBEZOGEN"]),
+  kategorie: z.enum(["TECHNISCH", "ORGANISATORISCH", "PERSONENBEZOGEN", "WIEDEREINGLIEDERUNG"]),
   beschreibung: z.string().trim().min(1, "Beschreibung ist erforderlich").max(5000),
   zustaendig: z.string().trim().max(200).optional().nullable(),
   frist: dateLike.optional().nullable(),

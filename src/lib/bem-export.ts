@@ -37,6 +37,7 @@ export interface BemExportInput {
     erstgespraechAm?: string | null;
     beendetAm?: string | null;
     beendigungsgrund?: string | null;
+    ergebnis?: string | null;
     aufbewahrungBis?: string | null;
   };
   einwilligungen: Array<{
@@ -182,6 +183,7 @@ export async function buildBemGesamtExportPdf(
   kv("Einwilligung am", input.dates.einwilligungAm);
   kv("Erstgespräch am", input.dates.erstgespraechAm);
   if (input.dates.beendetAm) kv("Beendet am", input.dates.beendetAm);
+  if (input.dates.ergebnis) kv("Ergebnis", input.dates.ergebnis);
   if (input.dates.beendigungsgrund) kv("Beendigungsgrund", input.dates.beendigungsgrund);
   if (input.dates.aufbewahrungBis) kv("Aufbewahrung bis", input.dates.aufbewahrungBis);
 

@@ -135,6 +135,7 @@ interface BemFall {
   erstgespraechAm: string | null;
   beendetAm: string | null;
   beendigungsgrund: string | null;
+  ergebnis: string | null;
   aufbewahrungBis: string | null;
   createdAt: string;
   organization: { id: string; name: string; mandantNumber: string } | null;
@@ -226,7 +227,22 @@ const KATEGORIE_LABELS: Record<string, string> = {
   TECHNISCH: "Technisch",
   ORGANISATORISCH: "Organisatorisch",
   PERSONENBEZOGEN: "Personenbezogen",
+  WIEDEREINGLIEDERUNG: "Stufenweise Wiedereingliederung",
 };
+
+const ERGEBNIS_LABELS: Record<string, string> = {
+  ERFOLGREICH: "Erfolgreich",
+  TEILWEISE: "Teilweise erfolgreich",
+  KEIN_ERFOLG: "Kein Erfolg",
+  KEINE_MASSNAHMEN_NOETIG: "Keine Maßnahmen nötig",
+};
+
+const ERGEBNIS_OPTIONS = [
+  "ERFOLGREICH",
+  "TEILWEISE",
+  "KEIN_ERFOLG",
+  "KEINE_MASSNAHMEN_NOETIG",
+] as const;
 
 const MASSNAHME_STATUS_LABELS: Record<string, string> = {
   OFFEN: "Offen",
@@ -360,6 +376,7 @@ export function BemDetailContent({
   const [dokumentOpen, setDokumentOpen] = useState(false);
   const [dokumentUploadOpen, setDokumentUploadOpen] = useState(false);
   const [zugriffOpen, setZugriffOpen] = useState(false);
+  const [abschlussOpen, setAbschlussOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   // Freigaben verwalten duerfen SUPER_ADMIN/HR_LEITUNG (Verwalten != Inhalt lesen).
@@ -393,27 +410,20 @@ export function BemDetailContent({
     load();
   }, [load]);
 
-  async function transition(zielStatus: BemStatus) {
-    let beendigungsgrund: string | null = null;
-    if (zielStatus === "ABGEBROCHEN" || zielStatus === "ABGESCHLOSSEN") {
-      const grund = window.prompt(
-        zielStatus === "ABGEBROCHEN"
-          ? "Grund für den Abbruch (wird dokumentiert):"
-          : "Abschlussvermerk (optional):",
-        "",
-      );
-      if (zielStatus === "ABGEBROCHEN" && grund === null) return; // Abbruch abgebrochen
-      beendigungsgrund = grund;
-    } else {
-      if (!window.confirm(`Status auf "${statusLabel(zielStatus)}" setzen?`)) return;
-    }
-
+  async function postStatus(
+    zielStatus: BemStatus,
+    opts?: { beendigungsgrund?: string | null; ergebnis?: string | null },
+  ) {
     setBusy(true);
     try {
       const res = await fetch(`/api/bem/${bemFallId}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zielStatus, beendigungsgrund }),
+        body: JSON.stringify({
+          zielStatus,
+          beendigungsgrund: opts?.beendigungsgrund ?? null,
+          ergebnis: opts?.ergebnis ?? null,
+        }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -426,6 +436,22 @@ export function BemDetailContent({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function transition(zielStatus: BemStatus) {
+    // Abschluss erfasst Ergebnis + Vermerk in einem eigenen Dialog.
+    if (zielStatus === "ABGESCHLOSSEN") {
+      setAbschlussOpen(true);
+      return;
+    }
+    if (zielStatus === "ABGEBROCHEN") {
+      const grund = window.prompt("Grund für den Abbruch (wird dokumentiert):", "");
+      if (grund === null) return;
+      await postStatus(zielStatus, { beendigungsgrund: grund });
+      return;
+    }
+    if (!window.confirm(`Status auf „${statusLabel(zielStatus)}“ setzen?`)) return;
+    await postStatus(zielStatus);
   }
 
   async function remove(kind: "gespraeche" | "massnahmen", entityId: string) {
@@ -722,6 +748,34 @@ export function BemDetailContent({
                   ))}
               </div>
             )}
+            {/* Rueckwaerts-Aktionen: Wieder-Oeffnen / erneut anbieten */}
+            {(fall.status === "ABGESCHLOSSEN" ||
+              fall.status === "ABGEBROCHEN" ||
+              fall.status === "EINWILLIGUNG_ABGELEHNT") && (
+              <div className="flex flex-wrap gap-2">
+                {fall.status === "ABGESCHLOSSEN" && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => transition("MASSNAHMEN_LAUFEN")}
+                    className="rounded-lg border border-credo-blau/40 px-4 py-2 text-sm font-medium text-credo-blau transition-colors hover:bg-credo-blau/10 disabled:opacity-50"
+                  >
+                    Fall wieder öffnen
+                  </button>
+                )}
+                {(fall.status === "ABGEBROCHEN" ||
+                  fall.status === "EINWILLIGUNG_ABGELEHNT") && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => transition("ANGELEGT")}
+                    className="rounded-lg border border-credo-blau/40 px-4 py-2 text-sm font-medium text-credo-blau transition-colors hover:bg-credo-blau/10 disabled:opacity-50"
+                  >
+                    BEM erneut anbieten
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -850,6 +904,12 @@ export function BemDetailContent({
                 <Row label="Erstgespräch am" value={formatDate(fall.erstgespraechAm)} />
                 {fall.beendetAm && (
                   <Row label="Beendet am" value={formatDate(fall.beendetAm)} />
+                )}
+                {fall.ergebnis && (
+                  <Row
+                    label="Ergebnis"
+                    value={ERGEBNIS_LABELS[fall.ergebnis] || fall.ergebnis}
+                  />
                 )}
                 {fall.beendigungsgrund && (
                   <Row label="Grund" value={fall.beendigungsgrund} />
@@ -1004,6 +1064,16 @@ export function BemDetailContent({
           onSaved={async () => {
             setZugriffOpen(false);
             await load(true);
+          }}
+        />
+      )}
+
+      {abschlussOpen && (
+        <AbschlussModal
+          onClose={() => setAbschlussOpen(false)}
+          onConfirm={async (ergebnis, vermerk) => {
+            setAbschlussOpen(false);
+            await postStatus("ABGESCHLOSSEN", { ergebnis, beendigungsgrund: vermerk });
           }}
         />
       )}
@@ -2704,6 +2774,58 @@ function DokumentUploadModal({
         onConfirm={handleSubmit}
         confirmLabel={busy ? "Lade hoch…" : "Hochladen"}
         disabled={busy}
+      />
+    </ModalShell>
+  );
+}
+
+// =============================================
+// Abschluss-Modal (Ergebnis + Vermerk beim Abschliessen)
+// =============================================
+function AbschlussModal({
+  onClose,
+  onConfirm,
+}: {
+  onClose: () => void;
+  onConfirm: (ergebnis: string, vermerk: string | null) => void;
+}) {
+  const [ergebnis, setErgebnis] = useState<string>("ERFOLGREICH");
+  const [vermerk, setVermerk] = useState("");
+
+  return (
+    <ModalShell title="BEM abschließen" onClose={onClose}>
+      <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Ergebnis</label>
+          <select
+            value={ergebnis}
+            onChange={(e) => setErgebnis(e.target.value)}
+            className={INPUT_CLASS}
+          >
+            {ERGEBNIS_OPTIONS.map((o) => (
+              <option key={o} value={o}>
+                {ERGEBNIS_LABELS[o]}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Das Ergebnis fließt in die BEM-Statistik (IKS) ein.
+          </p>
+        </div>
+        <div>
+          <label className="text-sm font-medium">Abschlussvermerk (optional)</label>
+          <textarea
+            value={vermerk}
+            onChange={(e) => setVermerk(e.target.value)}
+            rows={3}
+            className={INPUT_CLASS}
+          />
+        </div>
+      </div>
+      <ModalActions
+        onClose={onClose}
+        onConfirm={() => onConfirm(ergebnis, vermerk.trim() || null)}
+        confirmLabel="Abschließen"
       />
     </ModalShell>
   );

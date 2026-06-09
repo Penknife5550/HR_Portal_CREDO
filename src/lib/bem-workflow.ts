@@ -208,15 +208,18 @@ export function erlaubteFolgestatus(status: BemStatus): BemStatus[] {
     case "EINWILLIGUNG_ERTEILT":
       return ["ERSTGESPRAECH", "ABGEBROCHEN"];
     case "EINWILLIGUNG_ABGELEHNT":
-      return ["ABGEBROCHEN"];
+      // Abbruch ODER erneutes Anbieten des BEM (BEM darf erneut angeboten werden).
+      return ["ABGEBROCHEN", "ANGELEGT"];
     case "ERSTGESPRAECH":
       return ["MASSNAHMEN_LAUFEN", "ABGESCHLOSSEN", "ABGEBROCHEN"];
     case "MASSNAHMEN_LAUFEN":
       return ["ABGESCHLOSSEN", "ABGEBROCHEN"];
     case "ABGESCHLOSSEN":
-      return ["AUFBEWAHRUNG"];
+      // Aufbewahrung ODER Wieder-Oeffnen (versehentlich/zu frueh abgeschlossen).
+      return ["AUFBEWAHRUNG", "MASSNAHMEN_LAUFEN"];
     case "ABGEBROCHEN":
-      return ["AUFBEWAHRUNG"];
+      // Aufbewahrung ODER erneutes Anbieten (Wieder-Einladen).
+      return ["AUFBEWAHRUNG", "ANGELEGT"];
     case "AUFBEWAHRUNG":
       return ["GELOESCHT"];
     case "GELOESCHT":
