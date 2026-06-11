@@ -13,6 +13,20 @@ import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VARIABLE_PATTERN = /^\{\{\w+\}\}$/;
+
+/** Liefert den ersten ungueltigen Eintrag, sonst null */
+function validateRecipientField(value: unknown): string | null {
+  if (value == null || typeof value !== "string" || !value.trim()) return null;
+  for (const entry of value.split(",").map((e) => e.trim()).filter(Boolean)) {
+    if (!EMAIL_PATTERN.test(entry) && !VARIABLE_PATTERN.test(entry)) {
+      return entry;
+    }
+  }
+  return null;
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,34 +38,50 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { event, subject, bodyHtml, bodyText, isActive } = body;
+    const { event, subject, bodyHtml, bodyText, isActive, recipientTo, recipientCc, recipientBcc } = body;
 
     if (!event?.trim()) return NextResponse.json({ error: "Event ist ein Pflichtfeld" }, { status: 400 });
     if (!subject?.trim()) return NextResponse.json({ error: "Betreff ist ein Pflichtfeld" }, { status: 400 });
     if (!bodyHtml?.trim()) return NextResponse.json({ error: "HTML-Body ist ein Pflichtfeld" }, { status: 400 });
 
+    // Empfaenger-Felder pruefen: kommagetrennt, je Eintrag E-Mail oder {{variable}}
+    for (const [label, value] of [
+      ["An", recipientTo],
+      ["CC", recipientCc],
+      ["BCC", recipientBcc],
+    ] as const) {
+      const invalid = validateRecipientField(value);
+      if (invalid) {
+        return NextResponse.json(
+          { error: `Empfaenger-Feld "${label}": "${invalid}" ist weder eine gueltige E-Mail-Adresse noch eine {{variable}}` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Variablen für dieses Event aus Default-Template holen
     const defaultTemplate = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event);
     const variables = defaultTemplate?.variables ?? [];
 
+    const data = {
+      subject: subject.trim(),
+      bodyHtml: bodyHtml.trim(),
+      bodyText: bodyText?.trim() || null,
+      recipientTo: recipientTo?.trim() ?? "",
+      recipientCc: recipientCc?.trim() ?? "",
+      recipientBcc: recipientBcc?.trim() ?? "",
+      isActive: isActive !== false,
+      variables,
+    };
+
     // Upsert per Event (nicht per ID, da Default-IDs "default-..." sind)
     const template = await prisma.emailTemplate.upsert({
       where: { event: event.trim() },
-      update: {
-        subject: subject.trim(),
-        bodyHtml: bodyHtml.trim(),
-        bodyText: bodyText?.trim() || null,
-        isActive: isActive !== false,
-        variables,
-      },
+      update: data,
       create: {
         event: event.trim(),
         name: defaultTemplate?.name ?? event.trim(),
-        subject: subject.trim(),
-        bodyHtml: bodyHtml.trim(),
-        bodyText: bodyText?.trim() || null,
-        isActive: isActive !== false,
-        variables,
+        ...data,
       },
     });
 

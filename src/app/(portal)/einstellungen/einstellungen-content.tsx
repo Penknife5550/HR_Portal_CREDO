@@ -3,11 +3,14 @@
 /**
  * CREDO HR-Portal – Einstellungen (Client Component)
  *
- * Vier Tabs:
- * 1. Webhooks  – Pro-Event Webhooks anlegen, testen, aktivieren
- * 2. SMTP      – Fallback-Mail-Server konfigurieren und testen
- * 3. E-Mail-Vorlagen – HTML-Vorlagen für SMTP-Fallback bearbeiten
- * 4. Abteilungen – Offboarding-Abteilungen mit E-Mail verwalten
+ * Tabs:
+ * 1. Versand-Status   – Konfigurations-Ampel je Event + SMTP-Status
+ * 2. E-Mail-Vorlagen  – Vorlagen inkl. Empfaenger (To/CC/BCC) + Test-Versand
+ * 3. Versandprotokoll – EmailLog (SENT/FAILED/SKIPPED) mit Filtern
+ * 4. SMTP             – Primaerer Versandkanal konfigurieren und testen
+ * 5. Webhooks         – Optionaler Zusatzkanal (z.B. n8n), pro Event
+ * 6. Abteilungen      – Offboarding-Abteilungen mit E-Mail verwalten
+ * 7. API-Zugang       – API-Keys fuer die Reporting-API
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -55,8 +58,14 @@ interface EmailTemplate {
   subject: string;
   bodyHtml: string;
   bodyText: string | null;
+  recipientTo: string;
+  recipientCc: string;
+  recipientBcc: string;
   variables: { key: string; description: string }[];
   isActive: boolean;
+  group: string;
+  recipientHint: string;
+  wired: boolean;
 }
 
 interface DepartmentConfig {
@@ -144,13 +153,27 @@ const EVENT_LABELS: Record<string, string> = Object.fromEntries(
 // Haupt-Komponente
 // =============================================
 export function EinstellungenContent({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<"webhooks" | "smtp" | "vorlagen" | "departments">("webhooks");
+  const [activeTab, setActiveTab] = useState<
+    "status" | "vorlagen" | "protokoll" | "smtp" | "webhooks" | "departments" | "api"
+  >("status");
+  const [smtpActive, setSmtpActive] = useState<boolean | null>(null);
+
+  // SMTP-Status fuer das globale Warn-Banner laden
+  useEffect(() => {
+    fetch("/api/settings/email-status")
+      .then((r) => r.json())
+      .then((d) => setSmtpActive(Boolean(d.data?.smtp?.active)))
+      .catch(() => setSmtpActive(null));
+  }, [activeTab]);
 
   const tabs = [
-    { id: "webhooks" as const, label: "Webhooks" },
-    { id: "smtp" as const, label: "SMTP (E-Mail-Fallback)" },
+    { id: "status" as const, label: "Versand-Status" },
     { id: "vorlagen" as const, label: "E-Mail-Vorlagen" },
+    { id: "protokoll" as const, label: "Versandprotokoll" },
+    { id: "smtp" as const, label: "SMTP" },
+    { id: "webhooks" as const, label: "Webhooks" },
     { id: "departments" as const, label: "Abteilungen" },
+    { id: "api" as const, label: "API-Zugang" },
   ];
 
   return (
@@ -162,9 +185,21 @@ export function EinstellungenContent({ user }: { user: User }) {
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-foreground">Einstellungen</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Webhooks, SMTP-Fallback, E-Mail-Vorlagen und Abteilungen verwalten
+            E-Mail-Versand, Vorlagen, Webhooks und Abteilungen verwalten
           </p>
         </div>
+
+        {/* Globales Warn-Banner: ohne aktives SMTP wird KEINE E-Mail versendet */}
+        {smtpActive === false && (
+          <div className="mb-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3">
+            <p className="text-sm font-medium text-red-800">
+              SMTP ist nicht aktiv — es werden derzeit KEINE E-Mails versendet.{" "}
+              <button onClick={() => setActiveTab("smtp")} className="underline hover:no-underline">
+                Jetzt SMTP konfigurieren
+              </button>
+            </p>
+          </div>
+        )}
 
         {/* Tab-Navigation */}
         <div className="mb-6 flex gap-1 rounded-lg border bg-card p-1">
@@ -184,10 +219,13 @@ export function EinstellungenContent({ user }: { user: User }) {
         </div>
 
         {/* Tab-Inhalte */}
-        {activeTab === "webhooks" && <WebhooksTab />}
+        {activeTab === "status" && <StatusTab onConfigureSmtp={() => setActiveTab("smtp")} />}
+        {activeTab === "vorlagen" && <VorlagenTab userEmail={user.email} />}
+        {activeTab === "protokoll" && <ProtokollTab />}
         {activeTab === "smtp" && <SmtpTab />}
-        {activeTab === "vorlagen" && <VorlagenTab />}
+        {activeTab === "webhooks" && <WebhooksTab />}
         {activeTab === "departments" && <DepartmentsTab />}
+        {activeTab === "api" && <ApiKeysTab />}
       </main>
     </div>
   );
@@ -494,8 +532,8 @@ function WebhooksTab() {
 
       {/* Hinweis */}
       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        <strong>Hinweis:</strong> Alle Webhooks (inkl. n8n) werden ausschließlich hier konfiguriert.
-        Wenn kein aktiver Webhook für ein Event erreichbar ist, wird automatisch der SMTP-Fallback genutzt (sofern aktiviert).
+        <strong>Hinweis:</strong> Webhooks sind ein optionaler Zusatzkanal (z.B. für n8n-Automatisierungen)
+        und werden ausschließlich hier konfiguriert. Der E-Mail-Versand läuft unabhängig davon immer über SMTP.
       </div>
 
       {/* Modal */}
@@ -613,7 +651,7 @@ function SmtpTab() {
         <div className="border-b px-6 py-4">
           <h3 className="font-semibold text-foreground">SMTP-Konfiguration</h3>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Wird als Fallback verwendet wenn n8n nicht erreichbar ist.
+            Primärer Versandkanal — alle E-Mails des Portals werden über diesen Server versendet.
           </p>
         </div>
 
@@ -627,9 +665,9 @@ function SmtpTab() {
               className="h-4 w-4 rounded border-gray-300"
             />
             <div>
-              <span className="text-sm font-medium text-foreground">SMTP-Fallback aktivieren</span>
+              <span className="text-sm font-medium text-foreground">SMTP-Versand aktivieren</span>
               <p className="text-xs text-muted-foreground">
-                Wenn deaktiviert, werden keine E-Mails als Fallback gesendet.
+                Wenn deaktiviert, versendet das Portal KEINE E-Mails.
               </p>
             </div>
           </label>
@@ -771,9 +809,506 @@ function SmtpTab() {
 }
 
 // =============================================
+// TAB: Versand-Status (Konfigurations-Ampel je Event)
+// =============================================
+interface EmailEventStatus {
+  event: string;
+  name: string;
+  group: string;
+  recipientHint: string;
+  wired: boolean;
+  templateSource: "db" | "default" | null;
+  templateActive: boolean;
+  recipientConfigured: boolean;
+  webhookCount: number;
+  ok: boolean;
+  issues: string[];
+}
+
+function StatusTab({ onConfigureSmtp }: { onConfigureSmtp: () => void }) {
+  const [smtp, setSmtp] = useState<{ configured: boolean; active: boolean } | null>(null);
+  const [events, setEvents] = useState<EmailEventStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings/email-status")
+      .then((r) => r.json())
+      .then((d) => {
+        setSmtp(d.data?.smtp ?? null);
+        setEvents(d.data?.events ?? []);
+      })
+      .catch(() => setError("Versand-Status konnte nicht geladen werden"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <LoadingCard text="Lade Versand-Status..." />;
+  if (error) return <Alert type="error">{error}</Alert>;
+
+  const groups = TEMPLATE_GROUP_ORDER.map((group) => ({
+    group,
+    items: events.filter((e) => e.group === group),
+  })).filter((g) => g.items.length > 0);
+
+  const problemCount = events.filter((e) => !e.ok).length;
+
+  return (
+    <div className="space-y-4">
+      {/* SMTP-Status */}
+      <div
+        className={`rounded-lg border px-4 py-3 ${
+          smtp?.active ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <p className={`text-sm font-medium ${smtp?.active ? "text-green-800" : "text-red-800"}`}>
+            {smtp?.active
+              ? "SMTP ist aktiv — Ereignisse werden per E-Mail versendet."
+              : smtp?.configured
+                ? "SMTP ist konfiguriert, aber NICHT aktiv — es werden keine E-Mails versendet."
+                : "SMTP ist nicht konfiguriert — es werden keine E-Mails versendet."}
+          </p>
+          {!smtp?.active && (
+            <button
+              onClick={onConfigureSmtp}
+              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              SMTP einrichten
+            </button>
+          )}
+        </div>
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        {problemCount === 0
+          ? "Alle Ereignisse sind vollständig konfiguriert."
+          : `${problemCount} von ${events.length} Ereignissen ${problemCount === 1 ? "ist" : "sind"} nicht vollständig konfiguriert.`}
+      </p>
+
+      {groups.map(({ group, items }) => (
+        <div key={group} className="overflow-hidden rounded-lg border bg-card">
+          <div className="border-b bg-muted/40 px-5 py-3">
+            <h3 className="text-sm font-semibold text-foreground">{group}</h3>
+          </div>
+          <div className="divide-y">
+            {items.map((e) => (
+              <div key={e.event} className="flex items-start gap-3 px-5 py-3">
+                <span
+                  className={`mt-1 h-3 w-3 shrink-0 rounded-full ${
+                    e.ok ? "bg-green-500" : e.issues.length > 0 && !e.wired ? "bg-gray-400" : "bg-red-500"
+                  }`}
+                  title={e.ok ? "Konfiguriert" : e.issues.join(", ")}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">{e.name}</span>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-700">
+                      {e.event}
+                    </span>
+                    {e.templateSource === "default" && (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        Standard-Vorlage
+                      </span>
+                    )}
+                    {e.webhookCount > 0 && (
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
+                        +{e.webhookCount} Webhook{e.webhookCount > 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
+                  {e.issues.length > 0 && (
+                    <p className="mt-0.5 text-xs text-red-700">{e.issues.join(" · ")}</p>
+                  )}
+                  {e.issues.length === 0 && e.recipientHint && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{e.recipientHint}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// =============================================
+// TAB: API-Zugang (API-Keys fuer Reporting)
+// =============================================
+interface ApiKeyEntry {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  isActive: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+function ApiKeysTab() {
+  const [keys, setKeys] = useState<ApiKeyEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+
+  useAutoHide(success, setSuccess, 4000);
+  useAutoHide(error, setError, 6000);
+
+  const loadKeys = useCallback(() => {
+    fetch("/api/settings/api-keys")
+      .then((r) => r.json())
+      .then((d) => setKeys(d.data ?? []))
+      .catch(() => setError("API-Keys konnten nicht geladen werden"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadKeys();
+  }, [loadKeys]);
+
+  async function handleCreate() {
+    setCreating(true);
+    setError(null);
+    setCreatedKey(null);
+    try {
+      const res = await fetch("/api/settings/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      setCreatedKey(json.data.plaintextKey);
+      setNewName("");
+      loadKeys();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "API-Key konnte nicht erstellt werden");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleToggle(key: ApiKeyEntry) {
+    try {
+      const res = await fetch(`/api/settings/api-keys/${key.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !key.isActive }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setSuccess(`API-Key "${key.name}" ${key.isActive ? "deaktiviert" : "aktiviert"}`);
+      loadKeys();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Aktion fehlgeschlagen");
+    }
+  }
+
+  async function handleDelete(key: ApiKeyEntry) {
+    if (!confirm(`API-Key "${key.name}" endgültig löschen? Externe Auswertungen mit diesem Key funktionieren danach nicht mehr.`)) return;
+    try {
+      const res = await fetch(`/api/settings/api-keys/${key.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setSuccess(`API-Key "${key.name}" gelöscht`);
+      loadKeys();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+    }
+  }
+
+  if (loading) return <LoadingCard text="Lade API-Keys..." />;
+
+  return (
+    <div className="space-y-4">
+      {success && <Alert type="success">{success}</Alert>}
+      {error && <Alert type="error">{error}</Alert>}
+
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">Reporting-API</h3>
+        <p className="text-sm text-muted-foreground">
+          Mit einem API-Key können externe Tools lesend auf Auswertungen zugreifen
+          (z.B. aktuelle Kündigungen). Authentifizierung per Header{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">Authorization: Bearer &lt;Key&gt;</code> oder{" "}
+          <code className="rounded bg-muted px-1 font-mono text-xs">X-API-Key</code>.
+        </p>
+        <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-0.5">
+          <li><code className="font-mono text-xs">GET /api/reports/offboardings</code> — Kündigungen (Filter: status, from, to, organizationId)</li>
+          <li><code className="font-mono text-xs">GET /api/reports/onboardings</code> — Einstellungen (Filter: status, from, to, organizationId)</li>
+          <li><code className="font-mono text-xs">GET /api/reports/elternzeit</code> — Elternzeit-Vorgänge (Filter: status, organizationId)</li>
+        </ul>
+      </div>
+
+      {/* Neuer Key */}
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">Neuen API-Key erstellen</h3>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder='Name, z.B. "PowerBI Auswertung"'
+            className={`${inputClass} max-w-sm`}
+          />
+          <button
+            onClick={handleCreate}
+            disabled={creating || !newName.trim()}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {creating ? "Wird erstellt..." : "Key erstellen"}
+          </button>
+        </div>
+        {createdKey && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 space-y-2">
+            <p className="text-sm font-medium text-amber-900">
+              Key erstellt — JETZT kopieren, er wird nicht noch einmal angezeigt:
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="break-all rounded bg-white px-2 py-1 font-mono text-xs">{createdKey}</code>
+              <button
+                onClick={() => navigator.clipboard.writeText(createdKey)}
+                className="rounded-lg border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
+              >
+                Kopieren
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Key-Liste */}
+      {keys.length === 0 ? (
+        <div className="rounded-lg border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
+          Noch keine API-Keys vorhanden.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border bg-card divide-y">
+          {keys.map((key) => (
+            <div key={key.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">{key.name}</span>
+                  <code className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
+                    {key.prefix}…
+                  </code>
+                  {!key.isActive && (
+                    <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+                      Deaktiviert
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Erstellt: {new Date(key.createdAt).toLocaleDateString("de-DE")}
+                  {" · "}
+                  Zuletzt genutzt: {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString("de-DE") : "nie"}
+                </p>
+              </div>
+              <button
+                onClick={() => handleToggle(key)}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent"
+              >
+                {key.isActive ? "Deaktivieren" : "Aktivieren"}
+              </button>
+              <button
+                onClick={() => handleDelete(key)}
+                className="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
+              >
+                Löschen
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================
+// TAB: Versandprotokoll (EmailLog)
+// =============================================
+interface EmailLogEntry {
+  id: string;
+  event: string;
+  recipient: string;
+  cc: string | null;
+  bcc: string | null;
+  subject: string;
+  status: "SENT" | "FAILED" | "SKIPPED";
+  detail: string | null;
+  messageId: string | null;
+  isTest: boolean;
+  createdAt: string;
+}
+
+const LOG_STATUS_STYLE: Record<string, { label: string; className: string }> = {
+  SENT: { label: "Gesendet", className: "bg-green-100 text-green-800" },
+  FAILED: { label: "Fehlgeschlagen", className: "bg-red-100 text-red-800" },
+  SKIPPED: { label: "Übersprungen", className: "bg-amber-100 text-amber-800" },
+};
+
+function ProtokollTab() {
+  const [logs, setLogs] = useState<EmailLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [eventFilter, setEventFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [expandedLog, setExpandedLog] = useState<string | null>(null);
+
+  const loadLogs = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams({ page: String(page) });
+    if (statusFilter) params.set("status", statusFilter);
+    if (eventFilter) params.set("event", eventFilter);
+    fetch(`/api/settings/email-log?${params}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setLogs(d.data?.logs ?? []);
+        setTotalPages(d.data?.totalPages ?? 1);
+        setTotal(d.data?.total ?? 0);
+      })
+      .catch(() => setError("Versandprotokoll konnte nicht geladen werden"))
+      .finally(() => setLoading(false));
+  }, [page, statusFilter, eventFilter]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
+
+  if (error) return <Alert type="error">{error}</Alert>;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Jeder Versandversuch wird hier protokolliert (Aufbewahrung: 90 Tage). Übersprungene
+        Ereignisse zeigen den Grund — z.B. fehlende Empfänger oder deaktivierte Vorlagen.
+      </p>
+
+      {/* Filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          className={`${inputClass} w-auto`}
+        >
+          <option value="">Alle Status</option>
+          <option value="SENT">Gesendet</option>
+          <option value="FAILED">Fehlgeschlagen</option>
+          <option value="SKIPPED">Übersprungen</option>
+        </select>
+        <select
+          value={eventFilter}
+          onChange={(e) => { setEventFilter(e.target.value); setPage(1); }}
+          className={`${inputClass} w-auto max-w-xs`}
+        >
+          <option value="">Alle Events</option>
+          {WEBHOOK_EVENTS.map((ev) => (
+            <option key={ev.value} value={ev.value}>{ev.label}</option>
+          ))}
+        </select>
+        <button
+          onClick={loadLogs}
+          className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
+        >
+          Aktualisieren
+        </button>
+        <span className="ml-auto text-sm text-muted-foreground">{total} Einträge</span>
+      </div>
+
+      {/* Liste */}
+      {loading ? (
+        <LoadingCard text="Lade Versandprotokoll..." />
+      ) : logs.length === 0 ? (
+        <div className="rounded-lg border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
+          Keine Einträge gefunden.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border bg-card divide-y">
+          {logs.map((log) => {
+            const style = LOG_STATUS_STYLE[log.status] ?? LOG_STATUS_STYLE.SKIPPED;
+            const isOpen = expandedLog === log.id;
+            return (
+              <div key={log.id}>
+                <button
+                  onClick={() => setExpandedLog(isOpen ? null : log.id)}
+                  className="flex w-full flex-wrap items-center gap-2 px-4 py-3 text-left hover:bg-muted/30"
+                >
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style.className}`}>
+                    {style.label}
+                  </span>
+                  {log.isTest && (
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      Test
+                    </span>
+                  )}
+                  <span className="font-mono text-xs text-muted-foreground">{log.event}</span>
+                  <span className="text-sm text-foreground">{log.recipient || "—"}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {new Date(log.createdAt).toLocaleString("de-DE")}
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="space-y-1 border-t bg-muted/20 px-4 py-3 text-sm">
+                    {log.subject && <p><span className="text-muted-foreground">Betreff:</span> {log.subject}</p>}
+                    {log.cc && <p><span className="text-muted-foreground">CC:</span> {log.cc}</p>}
+                    {log.bcc && <p><span className="text-muted-foreground">BCC:</span> {log.bcc}</p>}
+                    {log.detail && (
+                      <p className={log.status === "SENT" ? "" : "text-red-700"}>
+                        <span className="text-muted-foreground">Detail:</span> {log.detail}
+                      </p>
+                    )}
+                    {log.messageId && (
+                      <p className="font-mono text-xs text-muted-foreground">Message-ID: {log.messageId}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent disabled:opacity-50"
+          >
+            ← Zurück
+          </button>
+          <span className="text-sm text-muted-foreground">Seite {page} von {totalPages}</span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent disabled:opacity-50"
+          >
+            Weiter →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================
 // TAB 3: E-Mail-Vorlagen
 // =============================================
-function VorlagenTab() {
+const TEMPLATE_GROUP_ORDER = [
+  "Onboarding",
+  "Offboarding",
+  "Exit-Interview",
+  "Verbeamtung",
+  "Elternzeit",
+  "Mutterschutz",
+  "Weitere",
+];
+
+function VorlagenTab({ userEmail }: { userEmail: string }) {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -781,6 +1316,9 @@ function VorlagenTab() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState(userEmail);
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/settings/email-templates")
@@ -794,12 +1332,45 @@ function VorlagenTab() {
   useAutoHide(error, setError, 6000);
 
   function handleExpand(template: EmailTemplate) {
+    setTestResult(null);
     if (expanded === template.id) {
       setExpanded(null);
       setEditData({});
     } else {
       setExpanded(template.id);
       setEditData({ ...template });
+    }
+  }
+
+  async function handleTestSend(template: EmailTemplate) {
+    setTestSending(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/settings/email-templates/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: template.event,
+          recipientEmail: testEmail,
+          // Aktuellen (ggf. ungespeicherten) Editor-Stand testen
+          subject: editData.subject,
+          bodyHtml: editData.bodyHtml,
+          bodyText: editData.bodyText,
+          recipientTo: editData.recipientTo,
+          recipientCc: editData.recipientCc,
+          recipientBcc: editData.recipientBcc,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      setTestResult({ ok: true, message: json.data?.message ?? "Test-E-Mail versendet" });
+    } catch (err) {
+      setTestResult({
+        ok: false,
+        message: err instanceof Error ? err.message : "Test-Versand fehlgeschlagen",
+      });
+    } finally {
+      setTestSending(false);
     }
   }
 
@@ -814,7 +1385,8 @@ function VorlagenTab() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const updated = (await res.json()).data;
-      setTemplates((prev) => prev.map((t) => (t.event === template.event ? updated : t)));
+      // Mergen statt ersetzen: PUT-Antwort enthaelt group/recipientHint/wired nicht
+      setTemplates((prev) => prev.map((t) => (t.event === template.event ? { ...t, ...updated } : t)));
       setExpanded(null);
       setSuccess(`Vorlage "${template.name}" gespeichert`);
     } catch (err) {
@@ -826,17 +1398,28 @@ function VorlagenTab() {
 
   if (loading) return <LoadingCard text="Lade E-Mail-Vorlagen..." />;
 
+  const groupedTemplates = TEMPLATE_GROUP_ORDER.map((group) => ({
+    group,
+    items: templates.filter((t) => (t.group || "Weitere") === group),
+  })).filter((g) => g.items.length > 0);
+
   return (
     <div className="space-y-4">
       {success && <Alert type="success">{success}</Alert>}
       {error && <Alert type="error">{error}</Alert>}
 
       <p className="text-sm text-muted-foreground">
-        Diese Vorlagen werden verwendet wenn n8n nicht erreichbar ist und der SMTP-Fallback aktiv ist.
-        Variablen im Format <code className="rounded bg-muted px-1 font-mono text-xs">{"{{variable}}"}</code> werden beim Versand ersetzt.
+        Jedes Ereignis wird über diese Vorlagen per SMTP versendet. Empfänger, Betreff und Inhalt sind
+        je Vorlage konfigurierbar. Variablen im Format <code className="rounded bg-muted px-1 font-mono text-xs">{"{{variable}}"}</code> werden
+        beim Versand ersetzt — auch in den Empfänger-Feldern.
       </p>
 
-      {templates.map((template) => {
+      {groupedTemplates.map(({ group, items }) => (
+        <div key={group} className="space-y-2">
+          <h3 className="pt-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {group}
+          </h3>
+          {items.map((template) => {
         const isOpen = expanded === template.id;
         return (
           <div key={template.id} className="overflow-hidden rounded-lg border bg-card">
@@ -845,11 +1428,21 @@ function VorlagenTab() {
               onClick={() => handleExpand(template)}
               className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/30 transition-colors"
             >
-              <div>
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-foreground">{template.name}</span>
-                <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-700">
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-700">
                   {template.event}
                 </span>
+                {!template.isActive && (
+                  <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+                    Deaktiviert
+                  </span>
+                )}
+                {!template.recipientTo && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                    Kein Empfänger
+                  </span>
+                )}
               </div>
               <span className="text-muted-foreground text-sm">{isOpen ? "▲ Schließen" : "▼ Bearbeiten"}</span>
             </button>
@@ -873,6 +1466,47 @@ function VorlagenTab() {
                       </span>
                     ))}
                   </div>
+                </div>
+
+                {/* Empfaenger */}
+                <div className="rounded-lg border border-border p-4 space-y-3">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">
+                    Empfänger
+                    {template.recipientHint && (
+                      <span className="ml-2 normal-case font-normal">({template.recipientHint})</span>
+                    )}
+                  </p>
+                  <FormField label="An" required>
+                    <input
+                      type="text"
+                      value={editData.recipientTo ?? ""}
+                      onChange={(e) => setEditData((prev) => ({ ...prev, recipientTo: e.target.value }))}
+                      placeholder='z.B. {{email}} oder personal@fes-minden.de'
+                      className={inputClass}
+                    />
+                  </FormField>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <FormField label="CC (optional)">
+                      <input
+                        type="text"
+                        value={editData.recipientCc ?? ""}
+                        onChange={(e) => setEditData((prev) => ({ ...prev, recipientCc: e.target.value }))}
+                        className={inputClass}
+                      />
+                    </FormField>
+                    <FormField label="BCC (optional)">
+                      <input
+                        type="text"
+                        value={editData.recipientBcc ?? ""}
+                        onChange={(e) => setEditData((prev) => ({ ...prev, recipientBcc: e.target.value }))}
+                        className={inputClass}
+                      />
+                    </FormField>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Mehrere Adressen mit Komma trennen. Variablen wie <code className="rounded bg-muted px-1 font-mono">{"{{email}}"}</code> und
+                    Festadressen sind kombinierbar. Ohne An-Adresse wird das Ereignis nicht versendet.
+                  </p>
                 </div>
 
                 {/* Betreff */}
@@ -907,6 +1541,48 @@ function VorlagenTab() {
                   />
                 </FormField>
 
+                {/* Aktiv-Schalter */}
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={editData.isActive !== false}
+                    onChange={(e) => setEditData((prev) => ({ ...prev, isActive: e.target.checked }))}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  Vorlage aktiv (deaktiviert = Ereignis wird nicht versendet)
+                </label>
+
+                {/* Test-Versand */}
+                <div className="rounded-lg bg-muted/50 p-4 space-y-3">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Test-Versand</p>
+                  <p className="text-xs text-muted-foreground">
+                    Sendet den aktuellen Editor-Stand mit Beispieldaten und Betreff-Präfix [TEST] an die
+                    angegebene Adresse (CC/BCC werden beim Test ignoriert).
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input
+                      type="email"
+                      value={testEmail}
+                      onChange={(e) => setTestEmail(e.target.value)}
+                      placeholder="empfaenger@beispiel.de"
+                      className={`${inputClass} max-w-xs`}
+                    />
+                    <button
+                      onClick={() => handleTestSend(template)}
+                      disabled={testSending || !testEmail}
+                      className="rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+                    >
+                      {testSending ? "Wird gesendet..." : "Test senden"}
+                    </button>
+                  </div>
+                  {testResult && (
+                    <p className={`text-sm ${testResult.ok ? "text-green-700" : "text-red-700"}`}>
+                      {testResult.ok ? "✓ " : "✗ "}
+                      {testResult.message}
+                    </p>
+                  )}
+                </div>
+
                 {/* Aktionen */}
                 <div className="flex gap-3 pt-1">
                   <button
@@ -927,7 +1603,9 @@ function VorlagenTab() {
             )}
           </div>
         );
-      })}
+          })}
+        </div>
+      ))}
     </div>
   );
 }

@@ -6,7 +6,8 @@ import { EinstellungenContent } from "./einstellungen-content";
  * Einstellungen-Seite (Server Component)
  *
  * Zugaenglich für SUPER_ADMIN und HR_LEITUNG.
- * Verwaltet: Webhooks, SMTP-Fallback, E-Mail-Vorlagen
+ * Verwaltet: E-Mail-Versand (SMTP, Vorlagen, Status, Protokoll),
+ * Webhooks, Abteilungen und API-Zugang
  */
 export default async function EinstellungenPage() {
   const session = await getSession();

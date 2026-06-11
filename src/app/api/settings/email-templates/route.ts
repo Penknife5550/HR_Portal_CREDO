@@ -2,7 +2,9 @@
  * API: /api/settings/email-templates
  *
  * GET – Alle E-Mail-Vorlagen laden
- *       Falls noch keine vorhanden: Standard-Vorlagen aus Code liefern
+ *       Falls noch keine vorhanden: Standard-Vorlagen aus Code liefern.
+ *       Empfaenger-Felder werden mit den Katalog-Defaults vorbelegt,
+ *       solange sie nicht explizit konfiguriert wurden.
  *
  * Berechtigung: SUPER_ADMIN, HR_LEITUNG
  */
@@ -11,6 +13,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
+import { getEventDefinition } from "@/lib/events";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 
@@ -24,10 +27,33 @@ export async function GET() {
       orderBy: { event: "asc" },
     });
 
-    // Fehlende Vorlagen durch Defaults ersetzen (ohne DB-Eintrag anzulegen)
+    // Fehlende Vorlagen durch Defaults ersetzen (ohne DB-Eintrag anzulegen);
+    // leere Empfaenger-Felder mit den Katalog-Defaults vorbelegen.
     const allTemplates = DEFAULT_EMAIL_TEMPLATES.map((def) => {
+      const catalog = getEventDefinition(def.event);
+      const defaults = catalog?.defaultRecipients;
       const found = dbTemplates.find((t) => t.event === def.event);
-      return found ?? { ...def, id: `default-${def.event}`, isActive: true, createdAt: new Date(), updatedAt: new Date() };
+      const base =
+        found ??
+        {
+          ...def,
+          id: `default-${def.event}`,
+          recipientTo: "",
+          recipientCc: "",
+          recipientBcc: "",
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      return {
+        ...base,
+        recipientTo: base.recipientTo || defaults?.to || "",
+        recipientCc: base.recipientCc || defaults?.cc || "",
+        recipientBcc: base.recipientBcc || defaults?.bcc || "",
+        group: catalog?.group ?? "Weitere",
+        recipientHint: catalog?.recipientHint ?? "",
+        wired: catalog?.wired ?? true,
+      };
     });
 
     return NextResponse.json({ data: allTemplates });
