@@ -1,9 +1,14 @@
 /**
- * CREDO HR-Portal – SMTP-Mailversand (Fallback für n8n)
+ * CREDO HR-Portal – SMTP-Mailversand (primaerer Versandkanal)
  *
- * Wird nur verwendet wenn n8n nicht erreichbar ist.
+ * Jedes Event wird per SMTP versendet, sofern eine aktive Vorlage existiert
+ * und ein Empfaenger aufloesbar ist. Webhooks sind nur noch ein optionaler
+ * Zusatzkanal (siehe lib/webhooks.ts).
+ *
  * Konfiguration wird aus der Datenbank (SmtpConfig) geladen.
- * E-Mail-Vorlagen werden aus der Datenbank (EmailTemplate) geladen.
+ * E-Mail-Vorlagen werden aus der Datenbank (EmailTemplate) geladen;
+ * fehlt eine DB-Vorlage, greifen die Code-Defaults (default-email-templates.ts).
+ * Jeder Versandversuch wird im EmailLog protokolliert (SENT/FAILED/SKIPPED).
  *
  * Sensible Felder (Passwort) werden im Frontend maskiert angezeigt.
  */
@@ -11,6 +16,8 @@
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/db";
 import { decrypt, isEncryptionConfigured } from "@/lib/encryption";
+import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
+import { getEventDefinition } from "@/lib/events";
 
 // =============================================
 // Typen
@@ -23,6 +30,8 @@ interface MailAttachment {
 
 interface MailOptions {
   to: string;
+  cc?: string;
+  bcc?: string;
   subject: string;
   html: string;
   text?: string;
@@ -101,6 +110,8 @@ export async function sendEmailDetailed(
     const info = await result.transporter.sendMail({
       from: result.from,
       to: options.to,
+      cc: options.cc,
+      bcc: options.bcc,
       subject: options.subject,
       html: options.html,
       text: options.text,
@@ -179,7 +190,7 @@ export async function testSmtpConnection(testEmail: string): Promise<SmtpTestRes
 // =============================================
 // Variablen in E-Mail-Vorlage ersetzen
 // =============================================
-function renderTemplate(template: string, variables: Record<string, string>): string {
+export function renderTemplate(template: string, variables: Record<string, string>): string {
   return Object.entries(variables).reduce(
     (result, [key, value]) => result.replaceAll(`{{${key}}}`, value ?? ""),
     template
@@ -187,37 +198,266 @@ function renderTemplate(template: string, variables: Record<string, string>): st
 }
 
 // =============================================
-// SMTP-Fallback: Event-basierter E-Mail-Versand
-// Wird aufgerufen wenn n8n und alle Webhooks fehlschlagen
+// Empfaenger-Felder rendern und validieren
+// Eingabe: kommagetrennte Liste aus Festadressen und {{variablen}}
 // =============================================
-export async function sendEmailFallback(
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function renderRecipientField(
+  field: string,
+  vars: Record<string, string>
+): string {
+  const addresses = renderTemplate(field, vars)
+    .split(",")
+    .map((addr) => addr.trim())
+    .filter((addr) => EMAIL_PATTERN.test(addr));
+  return [...new Set(addresses.map((a) => a.toLowerCase()))].join(", ");
+}
+
+// =============================================
+// Vorlage fuer ein Event aufloesen: DB-Eintrag vor Code-Default
+// =============================================
+interface ResolvedTemplate {
+  subject: string;
+  bodyHtml: string;
+  bodyText: string | null;
+  recipientTo: string;
+  recipientCc: string;
+  recipientBcc: string;
+  isActive: boolean;
+  source: "db" | "default";
+}
+
+export async function resolveEventTemplate(
+  event: string
+): Promise<ResolvedTemplate | null> {
+  const dbTemplate = await prisma.emailTemplate.findUnique({
+    where: { event },
+  });
+  if (dbTemplate) {
+    return {
+      subject: dbTemplate.subject,
+      bodyHtml: dbTemplate.bodyHtml,
+      bodyText: dbTemplate.bodyText,
+      recipientTo: dbTemplate.recipientTo,
+      recipientCc: dbTemplate.recipientCc,
+      recipientBcc: dbTemplate.recipientBcc,
+      isActive: dbTemplate.isActive,
+      source: "db",
+    };
+  }
+
+  const defaultTemplate = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event);
+  if (!defaultTemplate) return null;
+  return {
+    subject: defaultTemplate.subject,
+    bodyHtml: defaultTemplate.bodyHtml,
+    bodyText: defaultTemplate.bodyText,
+    recipientTo: "",
+    recipientCc: "",
+    recipientBcc: "",
+    isActive: true,
+    source: "default",
+  };
+}
+
+// =============================================
+// Gerenderte Event-E-Mail (auch fuer den Test-Versand nutzbar)
+// =============================================
+export interface RenderedEventEmail {
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  html: string;
+  text?: string;
+}
+
+export function renderEventEmail(
+  template: Pick<
+    ResolvedTemplate,
+    "subject" | "bodyHtml" | "bodyText" | "recipientTo" | "recipientCc" | "recipientBcc"
+  >,
   event: string,
   payload: Record<string, unknown>
-): Promise<void> {
-  // E-Mail-Vorlage aus DB laden
-  const template = await prisma.emailTemplate.findUnique({
-    where: { event: String(event) },
-  });
-
-  if (!template || !template.isActive) {
-    console.warn(`[Mailer] Keine aktive E-Mail-Vorlage für Event "${event}" – Fallback abgebrochen`);
-    return;
-  }
-
-  // Empfaenger und Variablen aus Payload extrahieren
+): { rendered: RenderedEventEmail | null; skipReason?: string } {
   const vars = extractVariables(event, payload);
-  const toEmail = vars.email || vars.supervisorEmail;
+  const catalogDefaults = getEventDefinition(event)?.defaultRecipients;
 
-  if (!toEmail) {
-    console.warn(`[Mailer] Kein Empfaenger im Payload für Event "${event}" gefunden`);
-    return;
+  // An-Adresse: Vorlagen-Feld > Katalog-Default > bisherige Payload-Aufloesung
+  const toField =
+    template.recipientTo.trim() ||
+    catalogDefaults?.to ||
+    vars.email ||
+    vars.supervisor_email;
+  const to = renderRecipientField(toField, vars);
+  if (!to) {
+    return {
+      rendered: null,
+      skipReason: template.recipientTo.trim()
+        ? `Empfaenger "${template.recipientTo}" ergab keine gueltige Adresse`
+        : "Kein Empfaenger konfiguriert und keiner im Payload aufloesbar",
+    };
   }
 
-  const subject = renderTemplate(template.subject, vars);
-  const html = renderTemplate(template.bodyHtml, vars);
-  const text = template.bodyText ? renderTemplate(template.bodyText, vars) : undefined;
+  const cc = renderRecipientField(template.recipientCc.trim() || catalogDefaults?.cc || "", vars);
+  const bcc = renderRecipientField(template.recipientBcc.trim() || catalogDefaults?.bcc || "", vars);
 
-  await sendEmail({ to: toEmail, subject, html, text });
+  return {
+    rendered: {
+      to,
+      cc: cc || undefined,
+      bcc: bcc || undefined,
+      subject: renderTemplate(template.subject, vars),
+      html: renderTemplate(template.bodyHtml, vars),
+      text: template.bodyText ? renderTemplate(template.bodyText, vars) : undefined,
+    },
+  };
+}
+
+// =============================================
+// Versandprotokoll schreiben — wirft niemals
+// =============================================
+export type EmailLogStatus = "SENT" | "FAILED" | "SKIPPED";
+
+async function writeEmailLog(entry: {
+  event: string;
+  status: EmailLogStatus;
+  recipient?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  detail?: string;
+  messageId?: string;
+  isTest?: boolean;
+}): Promise<void> {
+  try {
+    await prisma.emailLog.create({
+      data: {
+        event: entry.event,
+        status: entry.status,
+        recipient: entry.recipient ?? "",
+        cc: entry.cc,
+        bcc: entry.bcc,
+        subject: entry.subject ?? "",
+        detail: entry.detail,
+        messageId: entry.messageId,
+        isTest: entry.isTest ?? false,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "[Mailer] Versandprotokoll konnte nicht geschrieben werden:",
+      err instanceof Error ? err.message : err
+    );
+  }
+}
+
+// =============================================
+// Primaerer Event-basierter E-Mail-Versand
+// Wird vom Dispatcher (lib/webhooks.ts) fuer jedes Event aufgerufen.
+// Wirft niemals — jedes Ergebnis wird im EmailLog protokolliert.
+// =============================================
+export interface EventEmailResult {
+  status: EmailLogStatus;
+  detail?: string;
+}
+
+export async function sendEventEmail(
+  event: string,
+  payload: Record<string, unknown>,
+  options?: {
+    isTest?: boolean;
+    /** Test-Versand: alle Empfaenger durch diese Adresse ersetzen */
+    overrideTo?: string;
+    /** Test-Versand: ungespeicherte Editor-Felder statt der DB-Vorlage nutzen */
+    templateOverride?: Partial<
+      Pick<
+        ResolvedTemplate,
+        "subject" | "bodyHtml" | "bodyText" | "recipientTo" | "recipientCc" | "recipientBcc"
+      >
+    >;
+  }
+): Promise<EventEmailResult> {
+  const isTest = options?.isTest ?? false;
+  try {
+    let template = await resolveEventTemplate(event);
+    if (!template) {
+      const detail = "Keine E-Mail-Vorlage vorhanden";
+      await writeEmailLog({ event, status: "SKIPPED", detail, isTest });
+      return { status: "SKIPPED", detail };
+    }
+    if (options?.templateOverride) {
+      template = { ...template, ...options.templateOverride };
+    }
+    // Test-Versand ist auch bei deaktivierter Vorlage erlaubt
+    if (!template.isActive && !isTest) {
+      const detail = "E-Mail-Vorlage ist deaktiviert";
+      await writeEmailLog({ event, status: "SKIPPED", detail, isTest });
+      return { status: "SKIPPED", detail };
+    }
+
+    let { rendered, skipReason } = renderEventEmail(template, event, payload);
+    if (options?.overrideTo) {
+      // Test-Versand: Empfaenger ersetzen — auch wenn die Vorlage selbst
+      // keinen aufloesbaren Empfaenger hat (z.B. HR-interne Events)
+      if (!rendered) {
+        const vars = extractVariables(event, payload);
+        rendered = {
+          to: options.overrideTo,
+          subject: renderTemplate(template.subject, vars),
+          html: renderTemplate(template.bodyHtml, vars),
+          text: template.bodyText ? renderTemplate(template.bodyText, vars) : undefined,
+        };
+        skipReason = undefined;
+      } else {
+        rendered.to = options.overrideTo;
+        rendered.cc = undefined;
+        rendered.bcc = undefined;
+      }
+    }
+    if (!rendered) {
+      await writeEmailLog({ event, status: "SKIPPED", detail: skipReason, isTest });
+      console.warn(`[Mailer] Event "${event}" uebersprungen: ${skipReason}`);
+      return { status: "SKIPPED", detail: skipReason };
+    }
+
+    if (isTest) {
+      rendered.subject = `[TEST] ${rendered.subject}`;
+    }
+
+    const result = await sendEmailDetailed(rendered);
+    if (result.ok) {
+      await writeEmailLog({
+        event,
+        status: "SENT",
+        recipient: rendered.to,
+        cc: rendered.cc,
+        bcc: rendered.bcc,
+        subject: rendered.subject,
+        messageId: result.messageId,
+        isTest,
+      });
+      return { status: "SENT" };
+    }
+
+    await writeEmailLog({
+      event,
+      status: "FAILED",
+      recipient: rendered.to,
+      cc: rendered.cc,
+      bcc: rendered.bcc,
+      subject: rendered.subject,
+      detail: result.error,
+      isTest,
+    });
+    return { status: "FAILED", detail: result.error };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error(`[Mailer] Unerwarteter Fehler beim Versand fuer "${event}":`, detail);
+    await writeEmailLog({ event, status: "FAILED", detail, isTest });
+    return { status: "FAILED", detail };
+  }
 }
 
 // =============================================
@@ -263,6 +503,7 @@ function extractVariables(
       payload.fragebogenLink ||
         payload.modalitaetenLink ||
         payload.magicUrl ||
+        payload.magicLink ||
         payload.link,
     ),
     ablaufdatum: payload.tokenExpiresAt
@@ -303,7 +544,7 @@ function extractVariables(
       ? new Date(str(payload.austrittsdatum)).toLocaleDateString("de-DE")
       : str(payload.austrittsdatum || "");
     base.offene_aufgaben = str(payload.offene_aufgaben || payload.openTasks || "");
-    base.link = str(payload.link || payload.offboardingLink || "");
+    base.link = str(payload.link || payload.offboardingLink || payload.magicLink || "");
   }
 
   return base;

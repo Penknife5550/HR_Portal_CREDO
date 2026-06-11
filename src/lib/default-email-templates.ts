@@ -17,6 +17,75 @@ export interface EmailTemplateDefinition {
   variables: { key: string; description: string }[];
 }
 
+/**
+ * Factory fuer einfache HR-Status-Benachrichtigungen im CREDO-CI
+ * (Badge + Text + Vorgangs-Box). Fuer Vorlagen ohne Magic-Link/Button.
+ */
+function hrStatusNotification(opts: {
+  event: string;
+  name: string;
+  subject: string;
+  badge: string;
+  badgeBg: string;
+  badgeText: string;
+  heading: string;
+  text: string;
+  extraVariables?: { key: string; description: string }[];
+}): EmailTemplateDefinition {
+  return {
+    event: opts.event,
+    name: opts.name,
+    subject: opts.subject,
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:${opts.badgeBg};border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:${opts.badgeText};font-weight:bold;font-size:14px;">${opts.badge}</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">${opts.heading}</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            ${opts.text}
+          </p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vorgang</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{vorgangsnummer}}</p>
+            </td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `${opts.subject}
+
+${opts.text.replace(/<[^>]+>/g, "")}
+Vorgang: {{vorgangsnummer}}
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Name des Mitarbeiters" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
+      ...(opts.extraVariables ?? []),
+    ],
+  };
+}
+
 export const DEFAULT_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
   // =============================================
   // Mitarbeiter-Einladung (Magic Link Fragebogen)
@@ -2394,4 +2463,79 @@ CREDO HR-Portal`,
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
     ],
   },
+
+  // =============================================
+  // Mutterschutz: Statuswechsel (HR-Benachrichtigungen)
+  // =============================================
+  hrStatusNotification({
+    event: "mutterschutz-bad-beauftragt",
+    name: "Mutterschutz: BAD beauftragt",
+    subject: "Mutterschutz: BAD beauftragt – {{mitarbeiter_name}} ({{vorgangsnummer}})",
+    badge: "BAD beauftragt",
+    badgeBg: "#dbeafe",
+    badgeText: "#1e40af",
+    heading: "Gefaehrdungsbeurteilung beauftragt",
+    text: "Im Mutterschutz-Vorgang <strong>{{vorgangsnummer}}</strong> ({{mitarbeiter_name}}) wurde der Betriebsaerztliche Dienst (BAD) mit der Gefaehrdungsbeurteilung beauftragt.",
+  }),
+  hrStatusNotification({
+    event: "mutterschutz-bad-abgeschlossen",
+    name: "Mutterschutz: BAD abgeschlossen",
+    subject: "Mutterschutz: BAD abgeschlossen – {{mitarbeiter_name}} ({{vorgangsnummer}})",
+    badge: "BAD abgeschlossen",
+    badgeBg: "#d1fae5",
+    badgeText: "#065f46",
+    heading: "Gefaehrdungsbeurteilung abgeschlossen",
+    text: "Im Mutterschutz-Vorgang <strong>{{vorgangsnummer}}</strong> ({{mitarbeiter_name}}) wurde die Gefaehrdungsbeurteilung durch den BAD abgeschlossen.",
+  }),
+  hrStatusNotification({
+    event: "mutterschutz-aktiviert",
+    name: "Mutterschutz: Aktiviert",
+    subject: "Mutterschutz aktiv – {{mitarbeiter_name}} ({{vorgangsnummer}})",
+    badge: "Mutterschutz aktiv",
+    badgeBg: "#dbeafe",
+    badgeText: "#1e40af",
+    heading: "Mutterschutz hat begonnen",
+    text: "Der Mutterschutz im Vorgang <strong>{{vorgangsnummer}}</strong> ({{mitarbeiter_name}}) ist jetzt aktiv.",
+  }),
+  hrStatusNotification({
+    event: "mutterschutz-beendet",
+    name: "Mutterschutz: Beendet",
+    subject: "Mutterschutz beendet – {{mitarbeiter_name}} ({{vorgangsnummer}})",
+    badge: "Beendet",
+    badgeBg: "#e5e7eb",
+    badgeText: "#374151",
+    heading: "Mutterschutz-Vorgang beendet",
+    text: "Der Mutterschutz-Vorgang <strong>{{vorgangsnummer}}</strong> ({{mitarbeiter_name}}) wurde beendet.",
+  }),
+
+  // =============================================
+  // Elternzeit: Entscheidung der Einrichtungsleitung (HR-Benachrichtigungen)
+  // =============================================
+  hrStatusNotification({
+    event: "elternzeit-leiter-genehmigt",
+    name: "Elternzeit: Durch Leitung genehmigt",
+    subject: "Elternzeit durch Leitung genehmigt – {{mitarbeiter_name}} ({{vorgangsnummer}})",
+    badge: "Genehmigt",
+    badgeBg: "#d1fae5",
+    badgeText: "#065f46",
+    heading: "Genehmigung der Einrichtungsleitung",
+    text: "Die Einrichtungsleitung ({{leiterName}}) hat den Elternzeit-Antrag im Vorgang <strong>{{vorgangsnummer}}</strong> ({{mitarbeiter_name}}) genehmigt.",
+    extraVariables: [
+      { key: "{{leiterName}}", description: "Name der Einrichtungsleitung" },
+    ],
+  }),
+  hrStatusNotification({
+    event: "elternzeit-leiter-abgelehnt",
+    name: "Elternzeit: Durch Leitung abgelehnt",
+    subject: "Elternzeit durch Leitung abgelehnt – {{mitarbeiter_name}} ({{vorgangsnummer}})",
+    badge: "Abgelehnt",
+    badgeBg: "#fee2e2",
+    badgeText: "#991b1b",
+    heading: "Ablehnung der Einrichtungsleitung",
+    text: "Die Einrichtungsleitung ({{leiterName}}) hat den Elternzeit-Antrag im Vorgang <strong>{{vorgangsnummer}}</strong> ({{mitarbeiter_name}}) abgelehnt. Grund: {{ablehnungGrund}}",
+    extraVariables: [
+      { key: "{{leiterName}}", description: "Name der Einrichtungsleitung" },
+      { key: "{{ablehnungGrund}}", description: "Begruendung der Ablehnung" },
+    ],
+  }),
 ];

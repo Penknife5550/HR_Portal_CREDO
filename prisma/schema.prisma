@@ -835,7 +835,7 @@ model WebhookConfig {
 
 // =============================================
 // SMTP-Konfiguration (Singleton, ID = "default")
-// Fallback fuer E-Mail-Versand wenn n8n nicht erreichbar
+// Primaerer Versandkanal fuer alle E-Mails des Portals
 // =============================================
 model SmtpConfig {
   id        String   @id @default("default")
@@ -846,7 +846,7 @@ model SmtpConfig {
   password  String   @default("") // Passwort – nur maskiert im Frontend anzeigen
   fromEmail String   @default("")
   fromName  String   @default("CREDO HR-Portal")
-  isActive  Boolean  @default(false) // n8n ist primaer; SMTP nur als Fallback
+  isActive  Boolean  @default(false) // muss nach der Einrichtung aktiviert werden
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -855,21 +855,68 @@ model SmtpConfig {
 
 // =============================================
 // E-Mail-Vorlagen (editierbar im Admin-Portal)
-// Werden fuer SMTP-Fallback genutzt
+// Primaerer Versandweg: SMTP, je Event eine Vorlage
 // =============================================
 model EmailTemplate {
-  id        String   @id @default(uuid())
-  event     String   @unique // korrespondiert mit WebhookEvent
-  name      String // Anzeigename
-  subject   String // E-Mail-Betreff (kann Variablen enthalten)
-  bodyHtml  String // HTML-Body mit {{variablen}}
-  bodyText  String? // Plaintext-Fallback
-  variables Json // [{key: "{{vorname}}", description: "..."}]
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  event        String   @unique // korrespondiert mit WebhookEvent
+  name         String // Anzeigename
+  subject      String // E-Mail-Betreff (kann Variablen enthalten)
+  bodyHtml     String // HTML-Body mit {{variablen}}
+  bodyText     String? // Plaintext-Fallback
+  variables    Json // [{key: "{{vorname}}", description: "..."}]
+  // Empfaenger: kommagetrennt, variablen-faehig (z.B. "{{email}}, hr@credo-gruppe.de")
+  // Leer = Default aus dem Event-Katalog (src/lib/events.ts)
+  recipientTo  String   @default("")
+  recipientCc  String   @default("")
+  recipientBcc String   @default("")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@map("email_templates")
+}
+
+// =============================================
+// E-Mail-Versandprotokoll (jeder Versandversuch)
+// =============================================
+model EmailLog {
+  id        String   @id @default(uuid())
+  event     String // Event-Name aus dem Katalog
+  recipient String   @default("") // gerenderte An-Adresse(n)
+  cc        String?
+  bcc       String?
+  subject   String   @default("")
+  status    String // "SENT" | "FAILED" | "SKIPPED"
+  detail    String? // Fehlermeldung bzw. Grund fuer SKIPPED
+  messageId String? // SMTP-Message-ID als Zustellnachweis
+  isTest    Boolean  @default(false) // Test-Versand aus den Einstellungen
+  createdAt DateTime @default(now())
+
+  @@index([event])
+  @@index([status])
+  @@index([createdAt])
+  @@map("email_logs")
+}
+
+// =============================================
+// API-Keys fuer externe Auswertungen (Reporting-API)
+// Klartext-Key wird nur einmal bei Erstellung angezeigt;
+// in der DB liegt ausschliesslich der SHA-256-Hash.
+// =============================================
+model ApiKey {
+  id         String    @id @default(uuid())
+  name       String // Anzeigename, z.B. "PowerBI Auswertung"
+  keyHash    String    @unique // SHA-256 des Klartext-Keys
+  prefix     String // erste Zeichen des Keys zur Wiedererkennung
+  scopes     String[]  @default(["reports:read"])
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  createdBy  String? // User-ID des Erstellers
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("api_keys")
 }
 
 // =============================================

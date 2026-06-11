@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { triggerWebhooks } from "@/lib/webhooks";
 
 // =============================================
 // POST /api/offboarding/[id]/exit-interview/send
@@ -23,9 +24,12 @@ export async function POST(
 
     const { id } = await params;
 
-    // Exit-Interview laden
+    // Exit-Interview laden (inkl. Offboarding fuer E-Mail-Variablen)
     const exitInterview = await prisma.exitInterview.findUnique({
       where: { offboardingId: id },
+      include: {
+        offboarding: { include: { organization: true } },
+      },
     });
 
     if (!exitInterview) {
@@ -49,8 +53,17 @@ export async function POST(
       },
     });
 
-    // TODO: Webhook "exit-interview-invited" triggern
-    // await triggerWebhooks("exit-interview-invited", { ... });
+    // Einladung versenden (E-Mail primaer, Webhooks zusaetzlich)
+    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    await triggerWebhooks("exit-interview-invited", {
+      offboardingId: id,
+      displayId: exitInterview.offboarding.displayId,
+      recipientEmail: exitInterview.recipientEmail,
+      employeeName: `${exitInterview.offboarding.employeeFirstName} ${exitInterview.offboarding.employeeLastName}`,
+      organization: exitInterview.offboarding.organization.name,
+      magicLink: `${appUrl}/exit-interview/${exitInterview.token}`,
+      expiresAt: exitInterview.tokenExpiresAt.toISOString(),
+    });
     console.log(`[Exit-Interview] Einladung gesendet für Interview ${exitInterview.id}, Offboarding ${id}`);
 
     // AuditLog schreiben

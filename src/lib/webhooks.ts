@@ -1,12 +1,14 @@
 /**
- * CREDO HR-Portal – Einheitlicher Webhook-Dispatcher
- *
- * Alle Webhooks werden ausschliesslich über die Datenbank konfiguriert
- * und im Admin-Portal (Einstellungen → Webhooks) verwaltet.
+ * CREDO HR-Portal – Event-Dispatcher (E-Mail primaer, Webhooks optional)
  *
  * Ablauf:
- * 1. Aktive DB-Webhooks für das Event laden und ausfuehren
- * 2. SMTP-Fallback falls kein Webhook erfolgreich war
+ * 1. E-Mail-Versand per SMTP (primaerer Kanal) — Vorlage + Empfaenger aus
+ *    EmailTemplate/Event-Katalog, jeder Versuch wird im EmailLog protokolliert
+ * 2. Aktive DB-Webhooks fuer das Event ZUSAETZLICH ausfuehren (z.B. fuer
+ *    n8n-Automatisierungen) — sie sind kein Ersatz fuer den E-Mail-Versand
+ *
+ * Alle Webhooks werden ausschliesslich ueber die Datenbank konfiguriert
+ * und im Admin-Portal (Einstellungen → Webhooks) verwaltet.
  *
  * Wichtige Eigenschaften:
  * - **Wirft NIEMALS** nach aussen (Vertrag: alle Aufrufer duerfen ohne try/catch arbeiten)
@@ -16,7 +18,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { sendEmailFallback } from "@/lib/mailer";
+import { sendEventEmail } from "@/lib/mailer";
 import { decrypt } from "@/lib/encryption";
 import { isPublicHostname, redactUrlForLog } from "@/lib/url";
 
@@ -55,7 +57,7 @@ const MAX_RETRIES = 3;
 const TIMEOUT_MS = 10_000;
 
 // =============================================
-// Haupt-Funktion: Alle Kanaele ausloesen
+// Haupt-Funktion: E-Mail primaer, Webhooks zusaetzlich
 // VERTRAG: Wirft NIEMALS — alle Fehler werden geloggt und geschluckt.
 // =============================================
 export async function triggerWebhooks(
@@ -63,17 +65,17 @@ export async function triggerWebhooks(
   payload: Record<string, unknown>
 ): Promise<void> {
   try {
-    const results: boolean[] = [];
+    // 1. Primaerer Kanal: E-Mail per SMTP
+    //    sendEventEmail wirft nicht und protokolliert jedes Ergebnis im EmailLog
+    await sendEventEmail(event, payload);
 
-    // DB-konfigurierte Webhooks laden und ausfuehren
+    // 2. Zusatzkanal: DB-konfigurierte Webhooks (unabhaengig vom E-Mail-Ergebnis)
     try {
       const dbWebhooks = await prisma.webhookConfig.findMany({
         where: { event, isActive: true },
       });
 
-      if (dbWebhooks.length === 0) {
-        console.warn(`[Webhooks] Keine aktiven Webhooks für "${event}" konfiguriert`);
-      } else {
+      if (dbWebhooks.length > 0) {
         // Parallele Ausfuehrung via Promise.allSettled
         // Vorteil: ein langsamer Webhook blockiert die anderen nicht
         const settled = await Promise.allSettled(
@@ -82,14 +84,11 @@ export async function triggerWebhooks(
           )
         );
         for (const s of settled) {
-          if (s.status === "fulfilled") {
-            results.push(s.value);
-          } else {
+          if (s.status === "rejected") {
             console.error(
               `[Webhooks] Unerwartete Exception bei "${event}":`,
               s.reason instanceof Error ? s.reason.message : s.reason
             );
-            results.push(false);
           }
         }
       }
@@ -98,20 +97,6 @@ export async function triggerWebhooks(
         `[Webhooks] DB-Webhooks für "${event}" konnten nicht geladen werden:`,
         dbError instanceof Error ? dbError.message : dbError
       );
-    }
-
-    // SMTP-Fallback: nur wenn kein Kanal erfolgreich war
-    const anySuccess = results.some(Boolean);
-    if (!anySuccess) {
-      console.warn(`[Webhooks] Kein Webhook für "${event}" erfolgreich – versuche SMTP-Fallback`);
-      try {
-        await sendEmailFallback(event, payload);
-      } catch (mailErr) {
-        console.error(
-          "[Webhooks] SMTP-Fallback fehlgeschlagen:",
-          mailErr instanceof Error ? mailErr.message : mailErr
-        );
-      }
     }
   } catch (unexpected) {
     // Letzte Sicherung — sollte nie greifen, aber garantiert "wirft niemals"
