@@ -12,7 +12,7 @@ Digitales HR-Portal der CREDO Schultraegergruppe (16 Mandanten). Verwaltet Onboa
 - **Datenbank:** PostgreSQL 16 + Prisma 6 ORM
 - **Auth:** JWT (jose/jsonwebtoken) + bcryptjs, Magic Links
 - **Verschluesselung:** AES-256-GCM fuer IBAN, SV-Nr, Steuer-ID (`src/lib/encryption.ts`)
-- **E-Mail:** Nodemailer + optionale n8n-Integration
+- **E-Mail:** Nodemailer/SMTP (primaerer Kanal); Webhooks/n8n nur optionaler Zusatzkanal
 - **PDF:** pdfkit, QR-Codes via qrcode
 - **Tests:** Jest + ts-jest
 - **Linting:** ESLint 9 (next/core-web-vitals)
@@ -121,6 +121,14 @@ src/
 - **API-Handler:** Zentrale Wrapper in `src/lib/api-handler.ts` (mit Auth + Error-Handling)
 - **Validierung:** Zod-Schemas in `src/lib/validations/`
 - **Berechtigungen:** Rollen-System in `src/lib/permissions.ts` (SUPER_ADMIN, ADMIN, HR_STAFF, VIEWER)
+
+## E-Mail-Versand (SMTP primaer)
+
+- **Dispatcher:** `triggerWebhooks(event, payload)` in `src/lib/webhooks.ts` — sendet IMMER zuerst die E-Mail per SMTP (`sendEventEmail` in `src/lib/mailer.ts`), Webhooks feuern nur zusaetzlich
+- **Event-Katalog:** `src/lib/events.ts` — eine Definition je Event (Name, Gruppe, Empfaenger-Default, Beispiel-Payload). Neue Events MUESSEN hier eingetragen werden (Test erzwingt das)
+- **Vorlagen:** `EmailTemplate` (DB, Admin-UI) mit Empfaenger-Feldern `recipientTo/Cc/Bcc` (kommagetrennt, `{{variablen}}`-faehig); Code-Defaults in `src/lib/default-email-templates.ts`
+- **Protokoll:** Jeder Versandversuch landet im `EmailLog` (SENT/FAILED/SKIPPED, 90 Tage Aufbewahrung)
+- **Reporting-API:** Read-Only-Endpunkte unter `/api/reports/*`, Auth per API-Key (`ApiKey`-Modell, Verwaltung in Einstellungen → API-Zugang) oder Portal-Session. Keine sensiblen Felder (IBAN/SV-Nr/Steuer-ID) ausgeben!
 
 ## Admin-Zugang
 
