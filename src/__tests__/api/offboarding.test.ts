@@ -19,6 +19,9 @@ const mockPrisma = {
   checklistTemplate: {
     findFirst: jest.fn(),
   },
+  elternzeitProzess: {
+    findFirst: jest.fn(),
+  },
   offboardingExitData: {
     create: jest.fn(),
   },
