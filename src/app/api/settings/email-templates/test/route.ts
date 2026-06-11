@@ -15,11 +15,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { sendEventEmail } from "@/lib/mailer";
+import { sendEventEmail, EMAIL_PATTERN } from "@/lib/mailer";
 import { getEventDefinition } from "@/lib/events";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,9 +60,10 @@ export async function POST(request: NextRequest) {
         data: { success: true, message: `Test-E-Mail an ${recipientEmail} versendet` },
       });
     }
+    // SKIPPED = Konfigurationsproblem (400), FAILED = SMTP-Fehler (502)
     return NextResponse.json(
       { error: result.detail ?? "Test-Versand fehlgeschlagen" },
-      { status: 502 }
+      { status: result.status === "SKIPPED" ? 400 : 502 }
     );
   } catch (error) {
     console.error("[API] Test-E-Mail fehlgeschlagen:", error);

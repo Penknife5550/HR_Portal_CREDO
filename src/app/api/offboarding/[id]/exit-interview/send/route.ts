@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { getBaseUrl } from "@/lib/url";
 
 // =============================================
 // POST /api/offboarding/[id]/exit-interview/send
@@ -54,14 +55,13 @@ export async function POST(
     });
 
     // Einladung versenden (E-Mail primaer, Webhooks zusaetzlich)
-    const appUrl = process.env.APP_URL || "http://localhost:3000";
     await triggerWebhooks("exit-interview-invited", {
       offboardingId: id,
       displayId: exitInterview.offboarding.displayId,
       recipientEmail: exitInterview.recipientEmail,
       employeeName: `${exitInterview.offboarding.employeeFirstName} ${exitInterview.offboarding.employeeLastName}`,
       organization: exitInterview.offboarding.organization.name,
-      magicLink: `${appUrl}/exit-interview/${exitInterview.token}`,
+      magicLink: `${getBaseUrl()}/exit-interview/${exitInterview.token}`,
       expiresAt: exitInterview.tokenExpiresAt.toISOString(),
     });
     console.log(`[Exit-Interview] Einladung gesendet für Interview ${exitInterview.id}, Offboarding ${id}`);

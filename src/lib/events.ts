@@ -185,8 +185,10 @@ export const EVENT_CATALOG: EventDefinition[] = [
     event: "offboarding-created",
     name: "Neuer Offboarding-Vorgang erstellt",
     group: "Offboarding",
-    recipientHint: "HR intern — heute geht die Mail an {{employeeEmail}}; bei Bedarf umkonfigurieren",
-    defaultRecipients: { to: "{{employeeEmail}}" },
+    // BEWUSST kein Default: die Mail darf NICHT automatisch an die
+    // gekuendigte Person gehen (z.B. Anlage vor dem Kuendigungsgespraech)
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
     samplePayload: {
       offboardingId: "00000000-0000-0000-0000-000000000002",
       displayId: "OFF-2026-GYM-001",
@@ -334,8 +336,8 @@ export const EVENT_CATALOG: EventDefinition[] = [
     event: "psi-created",
     name: "Verbeamtung: Vorgang angelegt",
     group: "Verbeamtung",
-    recipientHint: "HR intern / Lehrkraft — heute geht die Mail an {{employeeEmail}}",
-    defaultRecipients: { to: "{{employeeEmail}}" },
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
     samplePayload: {
       civilServiceId: "00000000-0000-0000-0000-000000000003",
       displayId: "PSI-2026-GYM-001",
@@ -508,8 +510,8 @@ export const EVENT_CATALOG: EventDefinition[] = [
     event: "elternzeit-angelegt",
     name: "Elternzeit: Vorgang angelegt",
     group: "Elternzeit",
-    recipientHint: "HR intern / Mitarbeiter:in — heute geht die Mail an {{employeeEmail}}",
-    defaultRecipients: { to: "{{employeeEmail}}" },
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
     samplePayload: {
       elternzeitId: "00000000-0000-0000-0000-000000000005",
       displayId: "EZ-2026-001",
@@ -725,8 +727,8 @@ export const EVENT_CATALOG: EventDefinition[] = [
     event: "mutterschutz-angelegt",
     name: "Mutterschutz: Vorgang angelegt",
     group: "Mutterschutz",
-    recipientHint: "HR intern / Mitarbeiterin — heute geht die Mail an {{employeeEmail}}",
-    defaultRecipients: { to: "{{employeeEmail}}" },
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
     samplePayload: {
       mutterschutzId: "00000000-0000-0000-0000-000000000006",
       displayId: "MS-2026-001",

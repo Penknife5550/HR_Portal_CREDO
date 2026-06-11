@@ -81,7 +81,7 @@ const REPORT_SESSION_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "SERVICE"];
 
 export async function authenticateReportAccess(
   request: NextRequest
-): Promise<{ ok: boolean; via?: "api-key" | "session"; error?: string }> {
+): Promise<{ ok: boolean; via?: "api-key" | "session"; error?: string; status?: 401 | 403 }> {
   const keyResult = await authenticateApiKey(request, "reports:read");
   if (keyResult.ok) return { ok: true, via: "api-key" };
 
@@ -92,11 +92,14 @@ export async function authenticateReportAccess(
     return { ok: true, via: "session" };
   }
   if (session) {
-    return { ok: false, error: "Keine Berechtigung für Auswertungen" };
+    // Authentifiziert, aber nicht berechtigt → 403 (nicht 401, sonst
+    // werfen Clients mit Re-Login-Logik den Nutzer aus der Session)
+    return { ok: false, error: "Keine Berechtigung für Auswertungen", status: 403 };
   }
 
   return {
     ok: false,
     error: keyResult.error ?? "Nicht authentifiziert",
+    status: 401,
   };
 }

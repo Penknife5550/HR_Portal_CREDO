@@ -29,10 +29,11 @@ export async function GET() {
 
     // Fehlende Vorlagen durch Defaults ersetzen (ohne DB-Eintrag anzulegen);
     // leere Empfaenger-Felder mit den Katalog-Defaults vorbelegen.
+    const dbByEvent = new Map(dbTemplates.map((t) => [t.event, t]));
     const allTemplates = DEFAULT_EMAIL_TEMPLATES.map((def) => {
       const catalog = getEventDefinition(def.event);
       const defaults = catalog?.defaultRecipients;
-      const found = dbTemplates.find((t) => t.event === def.event);
+      const found = dbByEvent.get(def.event);
       const base =
         found ??
         {

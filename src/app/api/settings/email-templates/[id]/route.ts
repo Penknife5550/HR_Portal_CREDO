@@ -10,10 +10,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
+import { EMAIL_PATTERN } from "@/lib/mailer";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VARIABLE_PATTERN = /^\{\{\w+\}\}$/;
 
 /** Liefert den ersten ungueltigen Eintrag, sonst null */
@@ -63,15 +63,20 @@ export async function PUT(
     const defaultTemplate = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event);
     const variables = defaultTemplate?.variables ?? [];
 
+    // Empfaenger-Felder NUR aktualisieren wenn sie im Body vorhanden sind —
+    // sonst wischt ein Client ohne diese Felder konfigurierte Empfaenger weg
+    const recipientData = {
+      ...(typeof recipientTo === "string" ? { recipientTo: recipientTo.trim() } : {}),
+      ...(typeof recipientCc === "string" ? { recipientCc: recipientCc.trim() } : {}),
+      ...(typeof recipientBcc === "string" ? { recipientBcc: recipientBcc.trim() } : {}),
+    };
     const data = {
       subject: subject.trim(),
       bodyHtml: bodyHtml.trim(),
       bodyText: bodyText?.trim() || null,
-      recipientTo: recipientTo?.trim() ?? "",
-      recipientCc: recipientCc?.trim() ?? "",
-      recipientBcc: recipientBcc?.trim() ?? "",
       isActive: isActive !== false,
       variables,
+      ...recipientData,
     };
 
     // Upsert per Event (nicht per ID, da Default-IDs "default-..." sind)
@@ -82,6 +87,24 @@ export async function PUT(
         event: event.trim(),
         name: defaultTemplate?.name ?? event.trim(),
         ...data,
+      },
+    });
+
+    // Audit-Trail: insbesondere Empfaenger-Aenderungen (To/CC/BCC) muessen
+    // nachvollziehbar sein — darueber liessen sich sonst unbemerkt alle
+    // Prozess-Mails (inkl. Magic-Links) an externe Adressen umleiten
+    await prisma.auditLog.create({
+      data: {
+        userId: session.userId,
+        processType: "SYSTEM",
+        action: "EMAIL_TEMPLATE_UPDATED",
+        details: {
+          event: template.event,
+          isActive: template.isActive,
+          recipientTo: template.recipientTo,
+          recipientCc: template.recipientCc,
+          recipientBcc: template.recipientBcc,
+        },
       },
     });
 

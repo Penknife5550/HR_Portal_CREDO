@@ -15,6 +15,12 @@ import { getSession } from "@/lib/auth";
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 const PAGE_SIZE = 50;
 const RETENTION_DAYS = 90;
+const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+// Drosselung: Cleanup hoechstens 1x pro Tag und Instanz — nicht bei jedem
+// Seitenwechsel im Protokoll. Primaere Durchsetzung der Aufbewahrungsfrist
+// laeuft im taeglichen Cron (api/cron/reminders).
+let lastCleanupAt = 0;
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,9 +28,11 @@ export async function GET(request: NextRequest) {
     if (!session) return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     if (!ALLOWED_ROLES.includes(session.role)) return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
 
-    // Aufbewahrungsfrist durchsetzen (guenstig dank Index auf createdAt)
-    const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
-    await prisma.emailLog.deleteMany({ where: { createdAt: { lt: cutoff } } });
+    if (Date.now() - lastCleanupAt > CLEANUP_INTERVAL_MS) {
+      lastCleanupAt = Date.now();
+      const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+      await prisma.emailLog.deleteMany({ where: { createdAt: { lt: cutoff } } });
+    }
 
     const { searchParams } = request.nextUrl;
     const status = searchParams.get("status");

@@ -188,6 +188,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // EmailLog-Aufbewahrung (90 Tage, DSGVO): taeglich hier durchsetzen,
+    // unabhaengig davon ob jemand das Versandprotokoll in der UI oeffnet
+    try {
+      const cutoff = new Date(now.getTime() - 90 * MS_PER_DAY);
+      await prisma.emailLog.deleteMany({ where: { createdAt: { lt: cutoff } } });
+    } catch (err) {
+      console.error("[Reminders] EmailLog-Cleanup fehlgeschlagen:", err);
+    }
+
     return NextResponse.json({
       success: true,
       timestamp: now.toISOString(),

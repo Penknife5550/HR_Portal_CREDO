@@ -77,6 +77,11 @@ async function createTransporter() {
       tls: {
         rejectUnauthorized: process.env.NODE_ENV === "production",
       },
+      // Harte Timeouts: ein haengender SMTP-Server darf Request-Pfade
+      // (Onboarding-POST, Fragebogen-Submit, ...) nicht minutenlang blockieren
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
     }),
     from: `"${config.fromName}" <${config.fromEmail}>`,
   };
@@ -201,7 +206,7 @@ export function renderTemplate(template: string, variables: Record<string, strin
 // Empfaenger-Felder rendern und validieren
 // Eingabe: kommagetrennte Liste aus Festadressen und {{variablen}}
 // =============================================
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function renderRecipientField(
   field: string,
@@ -279,39 +284,51 @@ export function renderEventEmail(
     "subject" | "bodyHtml" | "bodyText" | "recipientTo" | "recipientCc" | "recipientBcc"
   >,
   event: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  options?: {
+    /** Test-Versand: Empfaenger-Aufloesung ueberspringen, alles an diese Adresse */
+    overrideTo?: string;
+  }
 ): { rendered: RenderedEventEmail | null; skipReason?: string } {
   const vars = extractVariables(event, payload);
-  const catalogDefaults = getEventDefinition(event)?.defaultRecipients;
 
-  // An-Adresse: Vorlagen-Feld > Katalog-Default > bisherige Payload-Aufloesung
+  const body = {
+    subject: renderTemplate(template.subject, vars),
+    html: renderTemplate(template.bodyHtml, vars),
+    text: template.bodyText ? renderTemplate(template.bodyText, vars) : undefined,
+  };
+
+  if (options?.overrideTo) {
+    return { rendered: { to: options.overrideTo, ...body } };
+  }
+
+  // An-Adresse: Vorlagen-Feld > Katalog-Default.
+  // WICHTIG: Ein leerer Katalog-Default (to: "") bedeutet "bewusst kein
+  // Empfaenger" (HR-intern) und faellt NICHT auf Payload-Felder zurueck —
+  // sonst gingen interne Benachrichtigungen an die betroffene Person selbst.
+  // Nur Events ausserhalb des Katalogs nutzen die alte Payload-Aufloesung.
+  const catalogDef = getEventDefinition(event);
   const toField =
     template.recipientTo.trim() ||
-    catalogDefaults?.to ||
-    vars.email ||
-    vars.supervisor_email;
+    (catalogDef
+      ? catalogDef.defaultRecipients.to
+      : vars.email || vars.supervisor_email);
   const to = renderRecipientField(toField, vars);
   if (!to) {
     return {
       rendered: null,
       skipReason: template.recipientTo.trim()
         ? `Empfaenger "${template.recipientTo}" ergab keine gueltige Adresse`
-        : "Kein Empfaenger konfiguriert und keiner im Payload aufloesbar",
+        : "Kein Empfaenger konfiguriert — bitte in der Vorlage ein An-Feld setzen",
     };
   }
 
+  const catalogDefaults = catalogDef?.defaultRecipients;
   const cc = renderRecipientField(template.recipientCc.trim() || catalogDefaults?.cc || "", vars);
   const bcc = renderRecipientField(template.recipientBcc.trim() || catalogDefaults?.bcc || "", vars);
 
   return {
-    rendered: {
-      to,
-      cc: cc || undefined,
-      bcc: bcc || undefined,
-      subject: renderTemplate(template.subject, vars),
-      html: renderTemplate(template.bodyHtml, vars),
-      text: template.bodyText ? renderTemplate(template.bodyText, vars) : undefined,
-    },
+    rendered: { to, cc: cc || undefined, bcc: bcc || undefined, ...body },
   };
 }
 
@@ -382,13 +399,25 @@ export async function sendEventEmail(
   const isTest = options?.isTest ?? false;
   try {
     let template = await resolveEventTemplate(event);
+    if (!template && options?.templateOverride?.subject && options.templateOverride.bodyHtml) {
+      // Test-Versand fuer Events ohne jede Vorlage: Editor-Entwurf nutzen
+      template = {
+        subject: options.templateOverride.subject,
+        bodyHtml: options.templateOverride.bodyHtml,
+        bodyText: options.templateOverride.bodyText ?? null,
+        recipientTo: options.templateOverride.recipientTo ?? "",
+        recipientCc: options.templateOverride.recipientCc ?? "",
+        recipientBcc: options.templateOverride.recipientBcc ?? "",
+        isActive: true,
+        source: "default",
+      };
+    } else if (template && options?.templateOverride) {
+      template = { ...template, ...options.templateOverride };
+    }
     if (!template) {
       const detail = "Keine E-Mail-Vorlage vorhanden";
       await writeEmailLog({ event, status: "SKIPPED", detail, isTest });
       return { status: "SKIPPED", detail };
-    }
-    if (options?.templateOverride) {
-      template = { ...template, ...options.templateOverride };
     }
     // Test-Versand ist auch bei deaktivierter Vorlage erlaubt
     if (!template.isActive && !isTest) {
@@ -397,25 +426,9 @@ export async function sendEventEmail(
       return { status: "SKIPPED", detail };
     }
 
-    let { rendered, skipReason } = renderEventEmail(template, event, payload);
-    if (options?.overrideTo) {
-      // Test-Versand: Empfaenger ersetzen — auch wenn die Vorlage selbst
-      // keinen aufloesbaren Empfaenger hat (z.B. HR-interne Events)
-      if (!rendered) {
-        const vars = extractVariables(event, payload);
-        rendered = {
-          to: options.overrideTo,
-          subject: renderTemplate(template.subject, vars),
-          html: renderTemplate(template.bodyHtml, vars),
-          text: template.bodyText ? renderTemplate(template.bodyText, vars) : undefined,
-        };
-        skipReason = undefined;
-      } else {
-        rendered.to = options.overrideTo;
-        rendered.cc = undefined;
-        rendered.bcc = undefined;
-      }
-    }
+    const { rendered, skipReason } = renderEventEmail(template, event, payload, {
+      overrideTo: options?.overrideTo,
+    });
     if (!rendered) {
       await writeEmailLog({ event, status: "SKIPPED", detail: skipReason, isTest });
       console.warn(`[Mailer] Event "${event}" uebersprungen: ${skipReason}`);

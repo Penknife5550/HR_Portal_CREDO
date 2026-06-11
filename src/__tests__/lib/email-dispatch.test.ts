@@ -137,6 +137,40 @@ describe("sendEventEmail", () => {
     });
   });
 
+  it("HR-interne Events (Katalog-Default to: \"\") gehen NICHT an die Person aus dem Payload", async () => {
+    // questionnaire-completed ist eine HR-Benachrichtigung; payload.email
+    // ist die Mitarbeiter-Adresse — sie darf NICHT als Empfaenger einspringen
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({
+      ...baseTemplate,
+      event: "questionnaire-completed",
+    });
+
+    const result = await sendEventEmail("questionnaire-completed", {
+      onboardingId: "o1",
+      email: "max.mustermann@example.org",
+      organization: "FES Minden",
+    });
+
+    expect(result.status).toBe("SKIPPED");
+    expect(mockSendMail).not.toHaveBeenCalled();
+  });
+
+  it("nutzt die alte Payload-Aufloesung nur fuer Events ausserhalb des Katalogs", async () => {
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({
+      ...baseTemplate,
+      event: "custom-event-nicht-im-katalog",
+    });
+
+    const result = await sendEventEmail("custom-event-nicht-im-katalog", {
+      email: "max.mustermann@example.org",
+    });
+
+    expect(result.status).toBe("SENT");
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "max.mustermann@example.org" })
+    );
+  });
+
   it("ueberspringt wenn die Vorlage deaktiviert ist", async () => {
     mockPrisma.emailTemplate.findUnique.mockResolvedValue({
       ...baseTemplate,

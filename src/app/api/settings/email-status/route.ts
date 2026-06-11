@@ -43,10 +43,12 @@ export async function GET() {
     for (const w of webhooks) {
       webhookCounts.set(w.event, (webhookCounts.get(w.event) ?? 0) + 1);
     }
+    const dbByEvent = new Map(dbTemplates.map((t) => [t.event, t]));
+    const defaultEvents = new Set(DEFAULT_EMAIL_TEMPLATES.map((t) => t.event));
 
     const events = EVENT_CATALOG.map((def) => {
-      const dbTemplate = dbTemplates.find((t) => t.event === def.event);
-      const hasDefault = DEFAULT_EMAIL_TEMPLATES.some((t) => t.event === def.event);
+      const dbTemplate = dbByEvent.get(def.event);
+      const hasDefault = defaultEvents.has(def.event);
       const templateSource = dbTemplate ? "db" : hasDefault ? "default" : null;
       const templateActive = dbTemplate ? dbTemplate.isActive : hasDefault;
       const recipientConfigured = Boolean(

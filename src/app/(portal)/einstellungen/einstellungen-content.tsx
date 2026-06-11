@@ -13,9 +13,10 @@
  * 7. API-Zugang       – API-Keys fuer die Reporting-API
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { PortalHeader } from "@/components/portal-header";
 import { DEPARTMENT_KEYS, DEPARTMENT_LABELS } from "@/lib/constants";
+import { EVENT_GROUP_ORDER } from "@/lib/events";
 
 // =============================================
 // Typen
@@ -123,6 +124,8 @@ const WEBHOOK_EVENTS = [
   { value: "elternzeit-vorl-genehmigt", label: "Vorl. genehmigt", group: "Elternzeit" },
   { value: "elternzeit-vorl-abgelehnt", label: "Vorl. abgelehnt", group: "Elternzeit" },
   { value: "elternzeit-leiter-link-versandt", label: "Leiter-Magic-Link versandt", group: "Elternzeit" },
+  { value: "elternzeit-leiter-genehmigt", label: "Durch Leitung genehmigt", group: "Elternzeit" },
+  { value: "elternzeit-leiter-abgelehnt", label: "Durch Leitung abgelehnt", group: "Elternzeit" },
   { value: "elternzeit-endg-genehmigt", label: "Endg. genehmigt", group: "Elternzeit" },
   { value: "elternzeit-endg-abgelehnt", label: "Endg. abgelehnt", group: "Elternzeit" },
   { value: "elternzeit-br-detmold-generiert", label: "BR-Detmold-Brief generiert", group: "Elternzeit" },
@@ -157,9 +160,14 @@ export function EinstellungenContent({ user }: { user: User }) {
     "status" | "vorlagen" | "protokoll" | "smtp" | "webhooks" | "departments" | "api"
   >("status");
   const [smtpActive, setSmtpActive] = useState<boolean | null>(null);
+  const lastTabRef = useRef<string>("");
 
-  // SMTP-Status fuer das globale Warn-Banner laden
+  // SMTP-Status fuer das globale Warn-Banner laden — nur beim Mount und
+  // nach Verlassen des SMTP-Tabs (nur dort kann sich der Status aendern)
   useEffect(() => {
+    const shouldFetch = lastTabRef.current === "" || lastTabRef.current === "smtp";
+    lastTabRef.current = activeTab;
+    if (!shouldFetch) return;
     fetch("/api/settings/email-status")
       .then((r) => r.json())
       .then((d) => setSmtpActive(Boolean(d.data?.smtp?.active)))
@@ -1298,15 +1306,7 @@ function ProtokollTab() {
 // =============================================
 // TAB 3: E-Mail-Vorlagen
 // =============================================
-const TEMPLATE_GROUP_ORDER = [
-  "Onboarding",
-  "Offboarding",
-  "Exit-Interview",
-  "Verbeamtung",
-  "Elternzeit",
-  "Mutterschutz",
-  "Weitere",
-];
+const TEMPLATE_GROUP_ORDER = [...EVENT_GROUP_ORDER, "Weitere"];
 
 function VorlagenTab({ userEmail }: { userEmail: string }) {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);

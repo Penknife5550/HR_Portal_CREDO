@@ -23,6 +23,16 @@ describe("Event-Katalog", () => {
     expect(missing).toEqual([]);
   });
 
+  it("Anzeigenamen stimmen mit den Standard-Vorlagen ueberein", () => {
+    for (const template of DEFAULT_EMAIL_TEMPLATES) {
+      const def = getEventDefinition(template.event);
+      expect({ event: template.event, name: def?.name }).toEqual({
+        event: template.event,
+        name: template.name,
+      });
+    }
+  });
+
   it("hat eindeutige Event-Namen", () => {
     const events = EVENT_CATALOG.map((d) => d.event);
     expect(new Set(events).size).toBe(events.length);

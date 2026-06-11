@@ -15,20 +15,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateReportAccess } from "@/lib/api-key";
-import type { Prisma, OffboardingStatus } from "@prisma/client";
+import { parseReportDate, reportRateLimit } from "@/lib/report-query";
+import { Prisma, OffboardingStatus } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
+    const limited = reportRateLimit(request);
+    if (limited) return limited;
+
     const auth = await authenticateReportAccess(request);
     if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: 401 });
+      return NextResponse.json({ error: auth.error }, { status: auth.status ?? 401 });
     }
 
     const { searchParams } = request.nextUrl;
     const status = searchParams.get("status");
-    const from = searchParams.get("from");
-    const to = searchParams.get("to");
     const organizationId = searchParams.get("organizationId");
+    const from = parseReportDate(searchParams.get("from"));
+    const to = parseReportDate(searchParams.get("to"));
+    if (from === "invalid" || to === "invalid") {
+      return NextResponse.json(
+        { error: "Ungueltiges Datum — erwartet ISO-Format (YYYY-MM-DD)" },
+        { status: 400 }
+      );
+    }
+    if (status && !Object.values(OffboardingStatus).includes(status as OffboardingStatus)) {
+      return NextResponse.json(
+        { error: `Ungueltiger Status. Erlaubt: ${Object.values(OffboardingStatus).join(", ")}` },
+        { status: 400 }
+      );
+    }
 
     const where: Prisma.OffboardingProcessWhereInput = {};
     if (status) {
@@ -40,8 +56,8 @@ export async function GET(request: NextRequest) {
     if (organizationId) where.organizationId = organizationId;
     if (from || to) {
       where.lastWorkingDay = {
-        ...(from ? { gte: new Date(from) } : {}),
-        ...(to ? { lte: new Date(to) } : {}),
+        ...(from ? { gte: from } : {}),
+        ...(to ? { lte: to } : {}),
       };
     }
 

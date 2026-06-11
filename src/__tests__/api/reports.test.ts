@@ -99,10 +99,18 @@ describe("GET /api/reports/offboardings", () => {
     expect(res.status).toBe(200);
   });
 
-  it("liefert 401 fuer Session-Rollen ohne Reporting-Berechtigung (z.B. VIEWER)", async () => {
+  it("liefert 403 fuer Session-Rollen ohne Reporting-Berechtigung (z.B. VIEWER)", async () => {
     mockGetSession.mockResolvedValue({ userId: "u2", role: "VIEWER" });
     const res = await GET(createRequest());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
+  });
+
+  it("liefert 400 bei ungueltigem Status oder Datum", async () => {
+    mockPrisma.apiKey.findUnique.mockResolvedValue(validKeyRecord);
+    const resStatus = await GET(createRequest({ "x-api-key": "crk_test123" }, "?status=FOO"));
+    expect(resStatus.status).toBe(400);
+    const resDate = await GET(createRequest({ "x-api-key": "crk_test123" }, "?from=31.12.2026"));
+    expect(resDate.status).toBe(400);
   });
 
   it("uebernimmt Zeitraum- und Status-Filter aus der Query", async () => {

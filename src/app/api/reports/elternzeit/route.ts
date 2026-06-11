@@ -11,18 +11,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateReportAccess } from "@/lib/api-key";
-import type { Prisma, ElternzeitStatus } from "@prisma/client";
+import { reportRateLimit } from "@/lib/report-query";
+import { Prisma, ElternzeitStatus } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
+    const limited = reportRateLimit(request);
+    if (limited) return limited;
+
     const auth = await authenticateReportAccess(request);
     if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: 401 });
+      return NextResponse.json({ error: auth.error }, { status: auth.status ?? 401 });
     }
 
     const { searchParams } = request.nextUrl;
     const status = searchParams.get("status");
     const organizationId = searchParams.get("organizationId");
+    if (status && !Object.values(ElternzeitStatus).includes(status as ElternzeitStatus)) {
+      return NextResponse.json(
+        { error: `Ungueltiger Status. Erlaubt: ${Object.values(ElternzeitStatus).join(", ")}` },
+        { status: 400 }
+      );
+    }
 
     const where: Prisma.ElternzeitProzessWhereInput = {};
     if (status) where.status = status as ElternzeitStatus;

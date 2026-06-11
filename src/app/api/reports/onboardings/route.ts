@@ -12,28 +12,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authenticateReportAccess } from "@/lib/api-key";
-import type { Prisma, OnboardingStatus } from "@prisma/client";
+import { parseReportDate, reportRateLimit } from "@/lib/report-query";
+import { Prisma, OnboardingStatus } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
+    const limited = reportRateLimit(request);
+    if (limited) return limited;
+
     const auth = await authenticateReportAccess(request);
     if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: 401 });
+      return NextResponse.json({ error: auth.error }, { status: auth.status ?? 401 });
     }
 
     const { searchParams } = request.nextUrl;
     const status = searchParams.get("status");
-    const from = searchParams.get("from");
-    const to = searchParams.get("to");
     const organizationId = searchParams.get("organizationId");
+    const from = parseReportDate(searchParams.get("from"));
+    const to = parseReportDate(searchParams.get("to"));
+    if (from === "invalid" || to === "invalid") {
+      return NextResponse.json(
+        { error: "Ungueltiges Datum — erwartet ISO-Format (YYYY-MM-DD)" },
+        { status: 400 }
+      );
+    }
+    if (status && !Object.values(OnboardingStatus).includes(status as OnboardingStatus)) {
+      return NextResponse.json(
+        { error: `Ungueltiger Status. Erlaubt: ${Object.values(OnboardingStatus).join(", ")}` },
+        { status: 400 }
+      );
+    }
 
     const where: Prisma.OnboardingProcessWhereInput = {};
     if (status) where.status = status as OnboardingStatus;
     if (organizationId) where.organizationId = organizationId;
     if (from || to) {
       where.createdAt = {
-        ...(from ? { gte: new Date(from) } : {}),
-        ...(to ? { lte: new Date(to) } : {}),
+        ...(from ? { gte: from } : {}),
+        ...(to ? { lte: to } : {}),
       };
     }
 
