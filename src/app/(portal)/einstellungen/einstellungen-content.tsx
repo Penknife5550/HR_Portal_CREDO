@@ -14,6 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import { DEPARTMENT_KEYS, DEPARTMENT_LABELS } from "@/lib/constants";
 import { EVENT_GROUP_ORDER } from "@/lib/events";
@@ -849,11 +850,20 @@ interface EmailEventStatus {
   issues: string[];
 }
 
+type StatusFilter =
+  | "alle"
+  | "probleme"
+  | "kein-empfaenger"
+  | "vorlage-inaktiv"
+  | "nicht-ausgeloest"
+  | "ok";
+
 function StatusTab({ onConfigureSmtp }: { onConfigureSmtp: () => void }) {
   const [smtp, setSmtp] = useState<{ configured: boolean; active: boolean } | null>(null);
   const [events, setEvents] = useState<EmailEventStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<StatusFilter>("alle");
 
   useEffect(() => {
     fetch("/api/settings/email-status")
@@ -869,9 +879,21 @@ function StatusTab({ onConfigureSmtp }: { onConfigureSmtp: () => void }) {
   if (loading) return <LoadingCard text="Lade Versand-Status..." />;
   if (error) return <Alert type="error">{error}</Alert>;
 
+  const matchesFilter = (e: EmailEventStatus): boolean => {
+    switch (filter) {
+      case "probleme": return !e.ok;
+      case "kein-empfaenger": return !e.recipientConfigured;
+      case "vorlage-inaktiv": return !e.templateActive || !e.templateSource;
+      case "nicht-ausgeloest": return !e.wired;
+      case "ok": return e.ok;
+      default: return true;
+    }
+  };
+  const filteredEvents = events.filter(matchesFilter);
+
   const groups = TEMPLATE_GROUP_ORDER.map((group) => ({
     group,
-    items: events.filter((e) => e.group === group),
+    items: filteredEvents.filter((e) => e.group === group),
   })).filter((g) => g.items.length > 0);
 
   const problemCount = events.filter((e) => !e.ok).length;
@@ -903,11 +925,32 @@ function StatusTab({ onConfigureSmtp }: { onConfigureSmtp: () => void }) {
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {problemCount === 0
-          ? "Alle Ereignisse sind vollständig konfiguriert."
-          : `${problemCount} von ${events.length} Ereignissen ${problemCount === 1 ? "ist" : "sind"} nicht vollständig konfiguriert.`}
-      </p>
+      {/* Filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as StatusFilter)}
+          className={`${inputClass} w-auto`}
+        >
+          <option value="alle">Alle Ereignisse ({events.length})</option>
+          <option value="probleme">Nur Probleme ({events.filter((e) => !e.ok).length})</option>
+          <option value="kein-empfaenger">Kein Empfänger ({events.filter((e) => !e.recipientConfigured).length})</option>
+          <option value="vorlage-inaktiv">Vorlage fehlt/deaktiviert ({events.filter((e) => !e.templateActive || !e.templateSource).length})</option>
+          <option value="nicht-ausgeloest">Wird nicht ausgelöst ({events.filter((e) => !e.wired).length})</option>
+          <option value="ok">Vollständig konfiguriert ({events.filter((e) => e.ok).length})</option>
+        </select>
+        <p className="text-sm text-muted-foreground">
+          {problemCount === 0
+            ? "Alle Ereignisse sind vollständig konfiguriert."
+            : `${problemCount} von ${events.length} Ereignissen ${problemCount === 1 ? "ist" : "sind"} nicht vollständig konfiguriert.`}
+        </p>
+      </div>
+
+      {filteredEvents.length === 0 && (
+        <div className="rounded-lg border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
+          Keine Ereignisse für diesen Filter.
+        </div>
+      )}
 
       {groups.map(({ group, items }) => (
         <div key={group} className="overflow-hidden rounded-lg border bg-card">
@@ -952,6 +995,37 @@ function StatusTab({ onConfigureSmtp }: { onConfigureSmtp: () => void }) {
           </div>
         </div>
       ))}
+
+      {/* BEM: bewusst getrennter Versandweg (versiegelte Akte) */}
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="border-b bg-muted/40 px-5 py-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">🔒 BEM (versiegelte Akte)</h3>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              smtp?.active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}
+          >
+            {smtp?.active ? "Versandbereit (SMTP aktiv)" : "Kein Versand (SMTP inaktiv)"}
+          </span>
+        </div>
+        <div className="space-y-2 px-5 py-4 text-sm text-muted-foreground">
+          <p>
+            BEM-Mails laufen aus Datenschutzgründen (§ 167 SGB IX, versiegelte Akte) NICHT über die
+            Event-Vorlagen, sondern werden direkt per SMTP versendet. Texte sind unter{" "}
+            <Link href="/bem-vorlagen" className="text-primary underline hover:no-underline">
+              BEM-Vorlagen
+            </Link>{" "}
+            editierbar (global und je Mandant); der Versandnachweis liegt je Fall im BEM-Modul
+            (Tab „Protokoll“), nicht im allgemeinen Versandprotokoll.
+          </p>
+          <ul className="list-disc pl-5 space-y-0.5">
+            <li>Einladung zum BEM (Magic-Link „Angebot annehmen“)</li>
+            <li>Einwilligungs-Links Datenschutz / Betriebsrat / SBV (automatisch nach Annahme)</li>
+            <li>Bestätigung an Beschäftigte + Benachrichtigung an BEM-Beauftragte</li>
+            <li>Fristen-Erinnerungen (täglicher Cron) und Widerruf-Bestätigung</li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1335,6 +1409,8 @@ function VorlagenTab({ userEmail }: { userEmail: string }) {
   const [testEmail, setTestEmail] = useState(userEmail);
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [filter, setFilter] = useState<"alle" | "kein-empfaenger" | "deaktiviert" | "aktiv">("alle");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetch("/api/settings/email-templates")
@@ -1415,9 +1491,20 @@ function VorlagenTab({ userEmail }: { userEmail: string }) {
 
   if (loading) return <LoadingCard text="Lade E-Mail-Vorlagen..." />;
 
+  const visibleTemplates = templates.filter((t) => {
+    if (filter === "kein-empfaenger" && t.recipientTo) return false;
+    if (filter === "deaktiviert" && t.isActive) return false;
+    if (filter === "aktiv" && !t.isActive) return false;
+    const query = search.trim().toLowerCase();
+    if (query && !t.name.toLowerCase().includes(query) && !t.event.toLowerCase().includes(query)) {
+      return false;
+    }
+    return true;
+  });
+
   const groupedTemplates = TEMPLATE_GROUP_ORDER.map((group) => ({
     group,
-    items: templates.filter((t) => (t.group || "Weitere") === group),
+    items: visibleTemplates.filter((t) => (t.group || "Weitere") === group),
   })).filter((g) => g.items.length > 0);
 
   return (
@@ -1428,8 +1515,42 @@ function VorlagenTab({ userEmail }: { userEmail: string }) {
       <p className="text-sm text-muted-foreground">
         Jedes Ereignis wird über diese Vorlagen per SMTP versendet. Empfänger, Betreff und Inhalt sind
         je Vorlage konfigurierbar. Variablen im Format <code className="rounded bg-muted px-1 font-mono text-xs">{"{{variable}}"}</code> werden
-        beim Versand ersetzt — auch in den Empfänger-Feldern.
+        beim Versand ersetzt — auch in den Empfänger-Feldern. BEM-Texte werden separat unter{" "}
+        <Link href="/bem-vorlagen" className="text-primary underline hover:no-underline">BEM-Vorlagen</Link>{" "}
+        gepflegt (versiegelte Akte).
       </p>
+
+      {/* Filter + Suche */}
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as typeof filter)}
+          className={`${inputClass} w-auto`}
+        >
+          <option value="alle">Alle Vorlagen ({templates.length})</option>
+          <option value="kein-empfaenger">Kein Empfänger ({templates.filter((t) => !t.recipientTo).length})</option>
+          <option value="deaktiviert">Deaktiviert ({templates.filter((t) => !t.isActive).length})</option>
+          <option value="aktiv">Aktiv ({templates.filter((t) => t.isActive).length})</option>
+        </select>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Suchen (Name oder Event)..."
+          className={`${inputClass} w-auto min-w-[220px]`}
+        />
+        {(filter !== "alle" || search) && (
+          <span className="text-sm text-muted-foreground">
+            {visibleTemplates.length} Treffer
+          </span>
+        )}
+      </div>
+
+      {visibleTemplates.length === 0 && (
+        <div className="rounded-lg border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
+          Keine Vorlagen für diesen Filter.
+        </div>
+      )}
 
       {groupedTemplates.map(({ group, items }) => (
         <div key={group} className="space-y-2">
