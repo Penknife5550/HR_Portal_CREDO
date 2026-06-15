@@ -32,6 +32,7 @@ interface MailOptions {
   to: string;
   cc?: string;
   bcc?: string;
+  replyTo?: string;
   subject: string;
   html: string;
   text?: string;
@@ -117,6 +118,7 @@ export async function sendEmailDetailed(
       to: options.to,
       cc: options.cc,
       bcc: options.bcc,
+      replyTo: options.replyTo,
       subject: options.subject,
       html: options.html,
       text: options.text,
@@ -229,6 +231,7 @@ interface ResolvedTemplate {
   recipientTo: string;
   recipientCc: string;
   recipientBcc: string;
+  recipientReplyTo: string;
   isActive: boolean;
   source: "db" | "default";
 }
@@ -247,6 +250,7 @@ export async function resolveEventTemplate(
       recipientTo: dbTemplate.recipientTo,
       recipientCc: dbTemplate.recipientCc,
       recipientBcc: dbTemplate.recipientBcc,
+      recipientReplyTo: dbTemplate.recipientReplyTo,
       isActive: dbTemplate.isActive,
       source: "db",
     };
@@ -261,6 +265,7 @@ export async function resolveEventTemplate(
     recipientTo: "",
     recipientCc: "",
     recipientBcc: "",
+    recipientReplyTo: "",
     isActive: true,
     source: "default",
   };
@@ -273,6 +278,7 @@ export interface RenderedEventEmail {
   to: string;
   cc?: string;
   bcc?: string;
+  replyTo?: string;
   subject: string;
   html: string;
   text?: string;
@@ -281,13 +287,15 @@ export interface RenderedEventEmail {
 export function renderEventEmail(
   template: Pick<
     ResolvedTemplate,
-    "subject" | "bodyHtml" | "bodyText" | "recipientTo" | "recipientCc" | "recipientBcc"
+    "subject" | "bodyHtml" | "bodyText" | "recipientTo" | "recipientCc" | "recipientBcc" | "recipientReplyTo"
   >,
   event: string,
   payload: Record<string, unknown>,
   options?: {
     /** Test-Versand: Empfaenger-Aufloesung ueberspringen, alles an diese Adresse */
     overrideTo?: string;
+    /** Globaler Reply-To-Default aus der SMTP-Konfiguration (Fallback) */
+    globalReplyTo?: string;
   }
 ): { rendered: RenderedEventEmail | null; skipReason?: string } {
   const vars = extractVariables(event, payload);
@@ -298,8 +306,12 @@ export function renderEventEmail(
     text: template.bodyText ? renderTemplate(template.bodyText, vars) : undefined,
   };
 
+  // Reply-To: Vorlagen-Override > globaler SMTP-Default; variablen-faehig + validiert
+  const replyToField = template.recipientReplyTo.trim() || (options?.globalReplyTo ?? "");
+  const replyTo = renderRecipientField(replyToField, vars) || undefined;
+
   if (options?.overrideTo) {
-    return { rendered: { to: options.overrideTo, ...body } };
+    return { rendered: { to: options.overrideTo, replyTo, ...body } };
   }
 
   // An-Adresse: Vorlagen-Feld > Katalog-Default.
@@ -328,7 +340,7 @@ export function renderEventEmail(
   const bcc = renderRecipientField(template.recipientBcc.trim() || catalogDefaults?.bcc || "", vars);
 
   return {
-    rendered: { to, cc: cc || undefined, bcc: bcc || undefined, ...body },
+    rendered: { to, cc: cc || undefined, bcc: bcc || undefined, replyTo, ...body },
   };
 }
 
@@ -391,7 +403,7 @@ export async function sendEventEmail(
     templateOverride?: Partial<
       Pick<
         ResolvedTemplate,
-        "subject" | "bodyHtml" | "bodyText" | "recipientTo" | "recipientCc" | "recipientBcc"
+        "subject" | "bodyHtml" | "bodyText" | "recipientTo" | "recipientCc" | "recipientBcc" | "recipientReplyTo"
       >
     >;
   }
@@ -408,6 +420,7 @@ export async function sendEventEmail(
         recipientTo: options.templateOverride.recipientTo ?? "",
         recipientCc: options.templateOverride.recipientCc ?? "",
         recipientBcc: options.templateOverride.recipientBcc ?? "",
+        recipientReplyTo: options.templateOverride.recipientReplyTo ?? "",
         isActive: true,
         source: "default",
       };
@@ -426,8 +439,10 @@ export async function sendEventEmail(
       return { status: "SKIPPED", detail };
     }
 
+    const smtpConfig = await prisma.smtpConfig.findUnique({ where: { id: "default" } });
     const { rendered, skipReason } = renderEventEmail(template, event, payload, {
       overrideTo: options?.overrideTo,
+      globalReplyTo: smtpConfig?.replyToEmail ?? "",
     });
     if (!rendered) {
       await writeEmailLog({ event, status: "SKIPPED", detail: skipReason, isTest });

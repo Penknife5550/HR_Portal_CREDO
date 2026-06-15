@@ -28,10 +28,10 @@ model Organization {
   // Pro Mandant konfigurierbar fuer Briefvorlagen und Standard-Workflows.
   // =============================================
   // Geschaeftsfuehrung / Unterschrift fuer endg. Genehmigungen
-  ezGfFirstName     String? // Vorname Geschaeftsfuehrer/in
-  ezGfLastName      String? // Nachname Geschaeftsfuehrer/in
-  ezGfTitle         String? // z.B. "Geschaeftsfuehrer", "Schulleiter/in"
-  ezSignaturePath   String? // optional: Pfad zu Unterschrifts-PNG (uploads/signatures/...)
+  ezGfFirstName   String? // Vorname Geschaeftsfuehrer/in
+  ezGfLastName    String? // Nachname Geschaeftsfuehrer/in
+  ezGfTitle       String? // z.B. "Geschaeftsfuehrer", "Schulleiter/in"
+  ezSignaturePath String? // optional: Pfad zu Unterschrifts-PNG (uploads/signatures/...)
 
   // Standard-Einrichtungsleiter (Phase-2-Workflow)
   ezDefaultLeiterFirstName String?
@@ -62,11 +62,11 @@ model Organization {
   // Standard-Beauftragte pro Mandant (ueberschreibt globalen Default).
   // Bei CREDO i.d.R. fuer alle 16 Mandanten dieselben (Elena/Danny Bergen).
   // =============================================
-  bemBeauftragte1Name  String?
-  bemBeauftragte1Email String?
-  bemBeauftragte2Name  String?
-  bemBeauftragte2Email String?
-  bemAufbewahrungJahre Int     @default(4) // Aufbewahrungsfrist nach Beendigung
+  bemBeauftragte1Name            String?
+  bemBeauftragte1Email           String?
+  bemBeauftragte2Name            String?
+  bemBeauftragte2Email           String?
+  bemAufbewahrungJahre           Int     @default(4) // Aufbewahrungsfrist nach Beendigung
   // E10: Im Betrieb vorhandene Gremien -> steuern den Auto-Versand der
   // BR-/SBV-Einwilligungs-Links.
   hatBetriebsrat                 Boolean @default(false)
@@ -603,11 +603,11 @@ model User {
   createdGeneratedDocuments GeneratedDocument[]
 
   // BEM (E1)
-  createdBemFaelle      BemFall[]          @relation("BemFallCreatedBy")
-  bemZugriffe           BemZugriff[]       @relation("BemZugriffUser")
-  grantedBemZugriffe    BemZugriff[]       @relation("BemZugriffGrantedBy")
-  bemKommunikationen    BemKommunikation[] @relation("BemKommunikationSentBy")
-  aktualisierteBemVorlagen BemVorlage[]    @relation("BemVorlageAktualisiertBy")
+  createdBemFaelle         BemFall[]          @relation("BemFallCreatedBy")
+  bemZugriffe              BemZugriff[]       @relation("BemZugriffUser")
+  grantedBemZugriffe       BemZugriff[]       @relation("BemZugriffGrantedBy")
+  bemKommunikationen       BemKommunikation[] @relation("BemKommunikationSentBy")
+  aktualisierteBemVorlagen BemVorlage[]       @relation("BemVorlageAktualisiertBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -838,17 +838,18 @@ model WebhookConfig {
 // Primaerer Versandkanal fuer alle E-Mails des Portals
 // =============================================
 model SmtpConfig {
-  id        String   @id @default("default")
-  host      String   @default("")
-  port      Int      @default(587)
-  secure    Boolean  @default(false) // true = Port 465 (SSL), false = STARTTLS
-  username  String   @default("")
-  password  String   @default("") // Passwort – nur maskiert im Frontend anzeigen
-  fromEmail String   @default("")
-  fromName  String   @default("CREDO HR-Portal")
-  isActive  Boolean  @default(false) // muss nach der Einrichtung aktiviert werden
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default("default")
+  host         String   @default("")
+  port         Int      @default(587)
+  secure       Boolean  @default(false) // true = Port 465 (SSL), false = STARTTLS
+  username     String   @default("")
+  password     String   @default("") // Passwort – nur maskiert im Frontend anzeigen
+  fromEmail    String   @default("")
+  fromName     String   @default("CREDO HR-Portal")
+  replyToEmail String   @default("") // Antworten gehen an diese Adresse (Reply-To); leer = kein Reply-To
+  isActive     Boolean  @default(false) // muss nach der Einrichtung aktiviert werden
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@map("smtp_config")
 }
@@ -858,21 +859,22 @@ model SmtpConfig {
 // Primaerer Versandweg: SMTP, je Event eine Vorlage
 // =============================================
 model EmailTemplate {
-  id           String   @id @default(uuid())
-  event        String   @unique // korrespondiert mit WebhookEvent
-  name         String // Anzeigename
-  subject      String // E-Mail-Betreff (kann Variablen enthalten)
-  bodyHtml     String // HTML-Body mit {{variablen}}
-  bodyText     String? // Plaintext-Fallback
-  variables    Json // [{key: "{{vorname}}", description: "..."}]
+  id               String   @id @default(uuid())
+  event            String   @unique // korrespondiert mit WebhookEvent
+  name             String // Anzeigename
+  subject          String // E-Mail-Betreff (kann Variablen enthalten)
+  bodyHtml         String // HTML-Body mit {{variablen}}
+  bodyText         String? // Plaintext-Fallback
+  variables        Json // [{key: "{{vorname}}", description: "..."}]
   // Empfaenger: kommagetrennt, variablen-faehig (z.B. "{{email}}, hr@credo-gruppe.de")
   // Leer = Default aus dem Event-Katalog (src/lib/events.ts)
-  recipientTo  String   @default("")
-  recipientCc  String   @default("")
-  recipientBcc String   @default("")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  recipientTo      String   @default("")
+  recipientCc      String   @default("")
+  recipientBcc     String   @default("")
+  recipientReplyTo String   @default("") // Reply-To-Override fuer diese Vorlage; leer = globaler SMTP-Default
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@map("email_templates")
 }
@@ -932,7 +934,7 @@ model FormTemplate {
 
   // Pflicht-Dokumente fuer den Abschluss des Fragebogens (pro Vorlage konfigurierbar).
   // GEBURTSURKUNDE_KIND wird nur verlangt, wenn der Mitarbeiter Kinder angegeben hat.
-  requiredDocuments DocumentType[]    @default([GEBURTSURKUNDE_EIGEN, GEBURTSURKUNDE_KIND])
+  requiredDocuments DocumentType[] @default([GEBURTSURKUNDE_EIGEN, GEBURTSURKUNDE_KIND])
 
   // Versionierung (Vorschlag 5)
   version     Int       @default(1) // Wird bei jeder Aenderung hochgezaehlt
@@ -2143,11 +2145,11 @@ model ElternzeitProzess {
   einrichtungsleiterEmail String?
 
   // Einrichtungsleiter-Magic-Link (Phase 2 — Genehmigung via Token)
-  leiterTokenEndg        String?   @unique
-  leiterTokenEndgExpiry  DateTime?
-  leiterTokenEndgUsedAt  DateTime?
-  leiterGenehmigungAm    DateTime?
-  leiterAblehnungGrund   String?
+  leiterTokenEndg       String?   @unique
+  leiterTokenEndgExpiry DateTime?
+  leiterTokenEndgUsedAt DateTime?
+  leiterGenehmigungAm   DateTime?
+  leiterAblehnungGrund  String?
 
   // Bezirksregierung Detmold Tracking (Phase 2 — hier nur Felder)
   brSchreibenGeneriertAm DateTime?
@@ -2357,10 +2359,10 @@ model ElternzeitFrist {
   elternzeitId String
   elternzeit   ElternzeitProzess @relation(fields: [elternzeitId], references: [id], onDelete: Cascade)
 
-  fristTyp    ElternzeitFristTyp
-  bezeichnung String // anzeigbarer Titel
+  fristTyp     ElternzeitFristTyp
+  bezeichnung  String // anzeigbarer Titel
   beschreibung String? // optionaler Hinweistext (z.B. Paragraf)
-  faelligAm   DateTime // Stichtag
+  faelligAm    DateTime // Stichtag
 
   // Erledigung
   erledigtAm  DateTime?
@@ -2368,8 +2370,8 @@ model ElternzeitFrist {
   erledigung  String? // Freitext (z.B. "BR-Genehmigung eingegangen am ...")
 
   // Cron-Tracking — verhindert Mehrfach-Webhooks pro Tag/Stufe
-  letzteSeverity     ElternzeitFristSeverity?
-  letzteWarnungAm    DateTime?
+  letzteSeverity  ElternzeitFristSeverity?
+  letzteWarnungAm DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2446,7 +2448,7 @@ model BemFall {
   diagnoseSchutz Boolean @default(false)
 
   // Prozess
-  status      BemStatus     @default(ANGELEGT)
+  status      BemStatus      @default(ANGELEGT)
   eingangsweg BemEingangsweg @default(DIGITAL)
 
   // Zeitstempel des Verfahrens
@@ -2463,14 +2465,14 @@ model BemFall {
   geloeschtAm     DateTime?
 
   // Sub-Modelle
-  zugriffe      BemZugriff[]
-  gespraeche    BemGespraech[]
-  massnahmen    BemMassnahme[]
+  zugriffe       BemZugriff[]
+  gespraeche     BemGespraech[]
+  massnahmen     BemMassnahme[]
   einwilligungen BemEinwilligung[]
-  dokumente     BemDokument[]
-  fristen       BemFrist[]
-  kommunikation BemKommunikation[]
-  auditLogs     AuditLog[]         @relation("BemAuditLogs")
+  dokumente      BemDokument[]
+  fristen        BemFrist[]
+  kommunikation  BemKommunikation[]
+  auditLogs      AuditLog[]         @relation("BemAuditLogs")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2509,8 +2511,8 @@ model BemZugriff {
   rolle     BemZugriffRolle @default(BEAUFTRAGTE)
 
   grantedById String?
-  grantedBy   User?    @relation("BemZugriffGrantedBy", fields: [grantedById], references: [id])
-  grantedAt   DateTime @default(now())
+  grantedBy   User?     @relation("BemZugriffGrantedBy", fields: [grantedById], references: [id])
+  grantedAt   DateTime  @default(now())
   revokedAt   DateTime? // null = aktiv
 
   @@index([bemFallId])
@@ -2527,15 +2529,15 @@ enum BemZugriffRolle {
 }
 
 model BemGespraech {
-  id        String          @id @default(uuid())
-  bemFallId String
-  bemFall   BemFall         @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
-  typ       BemGespraechTyp
-  datum     DateTime?
-  ort       String?
-  teilnehmer Json? // Liste { name, rolle }
-  notizen   String? // VERSCHLUESSELT (BEM_ENCRYPTION_KEY)
-  checkliste Json? // abgehakte Punkte aus CREDO-Vorlage
+  id              String          @id @default(uuid())
+  bemFallId       String
+  bemFall         BemFall         @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  typ             BemGespraechTyp
+  datum           DateTime?
+  ort             String?
+  teilnehmer      Json? // Liste { name, rolle }
+  notizen         String? // VERSCHLUESSELT (BEM_ENCRYPTION_KEY)
+  checkliste      Json? // abgehakte Punkte aus CREDO-Vorlage
   naechsterTermin DateTime?
 
   createdById String?
@@ -2553,14 +2555,14 @@ enum BemGespraechTyp {
 }
 
 model BemMassnahme {
-  id        String               @id @default(uuid())
-  bemFallId String
-  bemFall   BemFall              @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
-  kategorie BemMassnahmeKategorie
+  id           String                @id @default(uuid())
+  bemFallId    String
+  bemFall      BemFall               @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  kategorie    BemMassnahmeKategorie
   beschreibung String // VERSCHLUESSELT (BEM_ENCRYPTION_KEY)
   zustaendig   String?
   frist        DateTime?
-  status       BemMassnahmeStatus @default(OFFEN)
+  status       BemMassnahmeStatus    @default(OFFEN)
   evaluationAm DateTime?
 
   createdById String?
@@ -2605,11 +2607,11 @@ model BemEinwilligung {
   tokenUsedAt DateTime?
 
   // Nachweis der Erteilung/Ablehnung/Widerruf
-  signedAt    DateTime?
-  signedIp    String?
-  signedName  String?
-  widerrufAm  DateTime?
-  dokumentHash String? // Hash der unterschriebenen Erklaerung
+  signedAt       DateTime?
+  signedIp       String?
+  signedName     String?
+  widerrufAm     DateTime?
+  dokumentHash   String? // Hash der unterschriebenen Erklaerung
   // E10: Version + WORTLAUT des angezeigten Einwilligungs-/Datenschutztextes
   // zum Zeitpunkt des Versands (geht in dokumentHash ein) -> auch nach spaeteren
   // Vorlagen-Aenderungen beweisbar, WELCHER Textstand zugestimmt wurde.
@@ -2672,9 +2674,9 @@ enum BemVorlageTyp {
 }
 
 model BemDokument {
-  id        String          @id @default(uuid())
+  id        String            @id @default(uuid())
   bemFallId String
-  bemFall   BemFall         @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  bemFall   BemFall           @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
   typ       BemDokumentTyp
   ablage    BemDokumentAblage @default(NUR_BEM)
   quelle    BemDokumentQuelle @default(GENERIERT)
@@ -2723,13 +2725,13 @@ enum BemDokumentQuelle {
 }
 
 model BemFrist {
-  id        String      @id @default(uuid())
-  bemFallId String
-  bemFall   BemFall     @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
-  typ       BemFristTyp
-  bezeichnung String
+  id           String      @id @default(uuid())
+  bemFallId    String
+  bemFall      BemFall     @relation(fields: [bemFallId], references: [id], onDelete: Cascade)
+  typ          BemFristTyp
+  bezeichnung  String
   beschreibung String?
-  faelligAm  DateTime
+  faelligAm    DateTime
 
   erledigtAm  DateTime?
   erledigtVon String?
@@ -2777,16 +2779,16 @@ model BemKommunikation {
   kanal     BemKommunikationKanal
   status    BemKommunikationStatus @default(GESENDET)
 
-  empfaenger String // E-Mail-Adresse oder Name (bei BRIEF)
-  betreff    String?
-  dokumentId String? // optionaler Bezug zu BemDokument
+  empfaenger   String // E-Mail-Adresse oder Name (bei BRIEF)
+  betreff      String?
+  dokumentId   String? // optionaler Bezug zu BemDokument
   dokumentHash String? // SHA256 des versendeten/erzeugten Dokuments
-  messageId  String? // SMTP-Message-ID = Zustellnachweis
-  fehlertext String? // bei FEHLGESCHLAGEN
-  ipAddress  String?
+  messageId    String? // SMTP-Message-ID = Zustellnachweis
+  fehlertext   String? // bei FEHLGESCHLAGEN
+  ipAddress    String?
 
   gesendetById String?
-  gesendetBy   User?   @relation("BemKommunikationSentBy", fields: [gesendetById], references: [id])
+  gesendetBy   User?    @relation("BemKommunikationSentBy", fields: [gesendetById], references: [id])
   gesendetAm   DateTime @default(now())
 
   @@index([bemFallId])
@@ -2815,11 +2817,11 @@ model BemAnsprechpartner {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  name     String
-  email    String
-  funktion String? // z.B. "BEM-Beauftragte", "Betriebsarzt", "Schwerbehindertenvertretung"
-  isActive Boolean @default(true)
-  orderIndex Int   @default(0)
+  name       String
+  email      String
+  funktion   String? // z.B. "BEM-Beauftragte", "Betriebsarzt", "Schwerbehindertenvertretung"
+  isActive   Boolean @default(true)
+  orderIndex Int     @default(0)
 
   faelle BemFall[] // Faelle, in denen diese:r Ansprechpartner:in gewaehlt wurde
 

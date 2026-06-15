@@ -38,7 +38,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { event, subject, bodyHtml, bodyText, isActive, recipientTo, recipientCc, recipientBcc } = body;
+    const { event, subject, bodyHtml, bodyText, isActive, recipientTo, recipientCc, recipientBcc, recipientReplyTo } = body;
 
     if (!event?.trim()) return NextResponse.json({ error: "Event ist ein Pflichtfeld" }, { status: 400 });
     if (!subject?.trim()) return NextResponse.json({ error: "Betreff ist ein Pflichtfeld" }, { status: 400 });
@@ -49,6 +49,7 @@ export async function PUT(
       ["An", recipientTo],
       ["CC", recipientCc],
       ["BCC", recipientBcc],
+      ["Reply-To", recipientReplyTo],
     ] as const) {
       const invalid = validateRecipientField(value);
       if (invalid) {
@@ -69,6 +70,7 @@ export async function PUT(
       ...(typeof recipientTo === "string" ? { recipientTo: recipientTo.trim() } : {}),
       ...(typeof recipientCc === "string" ? { recipientCc: recipientCc.trim() } : {}),
       ...(typeof recipientBcc === "string" ? { recipientBcc: recipientBcc.trim() } : {}),
+      ...(typeof recipientReplyTo === "string" ? { recipientReplyTo: recipientReplyTo.trim() } : {}),
     };
     const data = {
       subject: subject.trim(),
@@ -104,6 +106,7 @@ export async function PUT(
           recipientTo: template.recipientTo,
           recipientCc: template.recipientCc,
           recipientBcc: template.recipientBcc,
+          recipientReplyTo: template.recipientReplyTo,
         },
       },
     });

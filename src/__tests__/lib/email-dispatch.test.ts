@@ -43,6 +43,7 @@ const activeSmtpConfig = {
   password: "geheim",
   fromEmail: "noreply@fes-credo.de",
   fromName: "CREDO HR-Portal",
+  replyToEmail: "",
   isActive: true,
 };
 
@@ -56,6 +57,7 @@ const baseTemplate = {
   recipientTo: "",
   recipientCc: "",
   recipientBcc: "",
+  recipientReplyTo: "",
   isActive: true,
 };
 
@@ -228,6 +230,77 @@ describe("sendEventEmail", () => {
     expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ isTest: true }),
     });
+  });
+});
+
+describe("Reply-To", () => {
+  it("nutzt das Reply-To-Feld der Vorlage (Override vor globalem Default)", async () => {
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({
+      ...baseTemplate,
+      recipientReplyTo: "antwort@fes-minden.de",
+    });
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      ...activeSmtpConfig,
+      replyToEmail: "global@fes-minden.de",
+    });
+
+    await sendEventEmail("onboarding-created", payload);
+
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ replyTo: "antwort@fes-minden.de" })
+    );
+  });
+
+  it("faellt auf die globale SMTP-Reply-To-Adresse zurueck, wenn die Vorlage keine hat", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      ...activeSmtpConfig,
+      replyToEmail: "global@fes-minden.de",
+    });
+
+    await sendEventEmail("onboarding-created", payload);
+
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ replyTo: "global@fes-minden.de" })
+    );
+  });
+
+  it("setzt kein Reply-To, wenn weder Vorlage noch SMTP-Config eine Adresse haben", async () => {
+    await sendEventEmail("onboarding-created", payload);
+
+    expect(mockSendMail).toHaveBeenCalled();
+    expect(mockSendMail.mock.calls[0][0].replyTo).toBeUndefined();
+  });
+
+  it("ersetzt Variablen im Reply-To-Feld der Vorlage", async () => {
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({
+      ...baseTemplate,
+      recipientReplyTo: "{{email}}",
+    });
+
+    await sendEventEmail("onboarding-created", payload);
+
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ replyTo: "max.mustermann@example.org" })
+    );
+  });
+
+  it("setzt das Reply-To auch beim Test-Versand (overrideTo)", async () => {
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({
+      ...baseTemplate,
+      recipientReplyTo: "antwort@fes-minden.de",
+    });
+
+    await sendEventEmail("onboarding-created", payload, {
+      isTest: true,
+      overrideTo: "tester@example.org",
+    });
+
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "tester@example.org",
+        replyTo: "antwort@fes-minden.de",
+      })
+    );
   });
 });
 

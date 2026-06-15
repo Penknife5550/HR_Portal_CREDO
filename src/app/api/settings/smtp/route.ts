@@ -24,6 +24,7 @@ function maskConfig(config: {
   password: string;
   fromEmail: string;
   fromName: string;
+  replyToEmail: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -57,6 +58,7 @@ export async function GET() {
           password: "",
           fromEmail: "",
           fromName: "CREDO HR-Portal",
+          replyToEmail: "",
           isActive: false,
         },
       });
@@ -79,7 +81,7 @@ export async function PUT(request: NextRequest) {
     if (!ALLOWED_ROLES.includes(session.role)) return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
 
     const body = await request.json();
-    const { host, port, secure, username, password, fromEmail, fromName, isActive } = body;
+    const { host, port, secure, username, password, fromEmail, fromName, replyToEmail, isActive } = body;
 
     // Pflichtfelder pruefen wenn aktiviert
     if (isActive) {
@@ -89,6 +91,11 @@ export async function PUT(request: NextRequest) {
       if (!fromEmail?.trim()) errors.push("Absender-E-Mail ist ein Pflichtfeld");
       if (fromEmail && !isValidEmail(fromEmail)) errors.push("Absender-E-Mail ist ungültig");
       if (errors.length > 0) return NextResponse.json({ error: errors.join(", ") }, { status: 400 });
+    }
+
+    // Reply-To ist optional, aber wenn gesetzt muss es eine gueltige Adresse sein
+    if (replyToEmail?.trim() && !isValidEmail(replyToEmail.trim())) {
+      return NextResponse.json({ error: "Reply-To-Adresse ist ungültig" }, { status: 400 });
     }
 
     // Bestehende Konfiguration laden (für Passwort-Handling)
@@ -114,6 +121,7 @@ export async function PUT(request: NextRequest) {
         password: newPassword,
         fromEmail: fromEmail?.trim() ?? "",
         fromName: fromName?.trim() || "CREDO HR-Portal",
+        replyToEmail: replyToEmail?.trim() ?? "",
         isActive: Boolean(isActive),
       },
       create: {
@@ -125,7 +133,24 @@ export async function PUT(request: NextRequest) {
         password: newPassword,
         fromEmail: fromEmail?.trim() ?? "",
         fromName: fromName?.trim() || "CREDO HR-Portal",
+        replyToEmail: replyToEmail?.trim() ?? "",
         isActive: Boolean(isActive),
+      },
+    });
+
+    // Audit-Trail: SMTP-/Absender-/Reply-To-Aenderungen sind sicherheitsrelevant —
+    // eine globale Reply-To leitet die Antworten aller Prozess-Mails um. Passwort nie loggen.
+    await prisma.auditLog.create({
+      data: {
+        userId: session.userId,
+        processType: "SYSTEM",
+        action: "SMTP_CONFIG_UPDATED",
+        details: {
+          host: config.host,
+          fromEmail: config.fromEmail,
+          replyToEmail: config.replyToEmail,
+          isActive: config.isActive,
+        },
       },
     });
 

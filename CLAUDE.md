@@ -127,6 +127,7 @@ src/
 - **Dispatcher:** `triggerWebhooks(event, payload)` in `src/lib/webhooks.ts` — sendet IMMER zuerst die E-Mail per SMTP (`sendEventEmail` in `src/lib/mailer.ts`), Webhooks feuern nur zusaetzlich
 - **Event-Katalog:** `src/lib/events.ts` — eine Definition je Event (Name, Gruppe, Empfaenger-Default, Beispiel-Payload). Neue Events MUESSEN hier eingetragen werden (Test erzwingt das)
 - **Vorlagen:** `EmailTemplate` (DB, Admin-UI) mit Empfaenger-Feldern `recipientTo/Cc/Bcc` (kommagetrennt, `{{variablen}}`-faehig); Code-Defaults in `src/lib/default-email-templates.ts`
+- **Antwort-Adresse (Reply-To):** global in `SmtpConfig.replyToEmail`, optional je Vorlage via `EmailTemplate.recipientReplyTo` (`{{variablen}}`-faehig) ueberschreibbar. Aufloesung: Vorlagen-Feld > globaler SMTP-Wert > kein Reply-To
 - **Protokoll:** Jeder Versandversuch landet im `EmailLog` (SENT/FAILED/SKIPPED, 90 Tage Aufbewahrung)
 - **Reporting-API:** Read-Only-Endpunkte unter `/api/reports/*`, Auth per API-Key (`ApiKey`-Modell, Verwaltung in Einstellungen → API-Zugang) oder Portal-Session. Keine sensiblen Felder (IBAN/SV-Nr/Steuer-ID) ausgeben!
 

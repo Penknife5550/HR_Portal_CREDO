@@ -49,6 +49,7 @@ interface SmtpConfig {
   password: string;
   fromEmail: string;
   fromName: string;
+  replyToEmail: string;
   isActive: boolean;
 }
 
@@ -62,6 +63,7 @@ interface EmailTemplate {
   recipientTo: string;
   recipientCc: string;
   recipientBcc: string;
+  recipientReplyTo: string;
   variables: { key: string; description: string }[];
   isActive: boolean;
   group: string;
@@ -580,7 +582,7 @@ function WebhooksTab() {
 function SmtpTab() {
   const [config, setConfig] = useState<SmtpConfig>({
     host: "", port: 587, secure: false, username: "",
-    password: "", fromEmail: "", fromName: "CREDO HR-Portal", isActive: false,
+    password: "", fromEmail: "", fromName: "CREDO HR-Portal", replyToEmail: "", isActive: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -770,6 +772,20 @@ function SmtpTab() {
               />
             </FormField>
           </div>
+
+          {/* Antwort-Adresse (Reply-To) */}
+          <FormField label="Antwort-Adresse (Reply-To)">
+            <input
+              type="email"
+              value={config.replyToEmail}
+              onChange={(e) => update("replyToEmail", e.target.value)}
+              placeholder="z.B. personalbuchhaltung@fes-minden.de"
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Antworten der Empfänger gehen an diese Adresse statt an den Absender. Nur eine Adresse möglich. Leer = keine Antwort-Adresse. Je Vorlage überschreibbar.
+            </p>
+          </FormField>
 
           {/* Speichern */}
           <div className="flex justify-end pt-2">
@@ -1359,6 +1375,7 @@ function VorlagenTab({ userEmail }: { userEmail: string }) {
           recipientTo: editData.recipientTo,
           recipientCc: editData.recipientCc,
           recipientBcc: editData.recipientBcc,
+          recipientReplyTo: editData.recipientReplyTo,
         }),
       });
       const json = await res.json();
@@ -1503,6 +1520,18 @@ function VorlagenTab({ userEmail }: { userEmail: string }) {
                       />
                     </FormField>
                   </div>
+                  <FormField label="Antwort-Adresse (Reply-To, optional)">
+                    <input
+                      type="text"
+                      value={editData.recipientReplyTo ?? ""}
+                      onChange={(e) => setEditData((prev) => ({ ...prev, recipientReplyTo: e.target.value }))}
+                      placeholder="z.B. {{email}} oder personal@fes-minden.de"
+                      className={inputClass}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Überschreibt die globale Antwort-Adresse (SMTP-Tab) nur für diese Vorlage. Variablen wie <code className="rounded bg-muted px-1 font-mono">{"{{email}}"}</code> und Festadressen sind erlaubt. Leer = globale Adresse; ist auch diese leer, gehen Antworten an den Absender.
+                    </p>
+                  </FormField>
                   <p className="text-xs text-muted-foreground">
                     Mehrere Adressen mit Komma trennen. Variablen wie <code className="rounded bg-muted px-1 font-mono">{"{{email}}"}</code> und
                     Festadressen sind kombinierbar. Ohne An-Adresse wird das Ereignis nicht versendet.

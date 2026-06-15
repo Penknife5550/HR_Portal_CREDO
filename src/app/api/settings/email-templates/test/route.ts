@@ -8,7 +8,7 @@
  *        werden, um den aktuellen Entwurf zu testen.
  *
  * Body: { event, recipientEmail, subject?, bodyHtml?, bodyText?,
- *         recipientTo?, recipientCc?, recipientBcc? }
+ *         recipientTo?, recipientCc?, recipientBcc?, recipientReplyTo? }
  *
  * Berechtigung: SUPER_ADMIN, HR_LEITUNG
  */
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     if (!ALLOWED_ROLES.includes(session.role)) return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
 
     const body = await request.json();
-    const { event, recipientEmail, subject, bodyHtml, bodyText, recipientTo, recipientCc, recipientBcc } = body;
+    const { event, recipientEmail, subject, bodyHtml, bodyText, recipientTo, recipientCc, recipientBcc, recipientReplyTo } = body;
 
     if (!event?.trim()) {
       return NextResponse.json({ error: "Event ist ein Pflichtfeld" }, { status: 400 });
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
     if (typeof recipientTo === "string") templateOverride.recipientTo = recipientTo;
     if (typeof recipientCc === "string") templateOverride.recipientCc = recipientCc;
     if (typeof recipientBcc === "string") templateOverride.recipientBcc = recipientBcc;
+    if (typeof recipientReplyTo === "string") templateOverride.recipientReplyTo = recipientReplyTo;
 
     const result = await sendEventEmail(definition.event, definition.samplePayload, {
       isTest: true,
