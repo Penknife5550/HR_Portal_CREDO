@@ -71,3 +71,4 @@ backups/*.dump
 
 # Lokale Arbeits-/Materialordner (nie ins Repo)
 /BEM/
+/email-vorschau/
