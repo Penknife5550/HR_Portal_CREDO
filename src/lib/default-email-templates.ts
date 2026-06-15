@@ -93,7 +93,7 @@ const BASE_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
   {
     event: "onboarding-created",
     name: "Einladung Mitarbeiter (Personalfragebogen)",
-    subject: "Einladung zum Personalfragebogen – {{einrichtung}}",
+    subject: "Willkommen bei {{einrichtung}} – Ihr Personalfragebogen (bis {{ablaufdatum}})",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -110,40 +110,61 @@ const BASE_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
 
         <!-- Body -->
         <tr><td style="background-color:#ffffff;padding:32px;">
-          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Herzlich willkommen, {{vorname}}!</h2>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Herzlich willkommen, {{vorname}}!</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Wir freuen uns, Sie bald in unserem Team begrüßen zu dürfen. Bitte füllen Sie vor Ihrem ersten Arbeitstag den nachfolgenden Personalfragebogen aus.
+            Schön, dass Sie zu <strong>{{einrichtung}}</strong> kommen. Damit zu Ihrem Start alles bereitliegt – vom Arbeitsvertrag bis zur pünktlichen Gehaltszahlung – benötigen wir einmalig einige Angaben von Ihnen.
           </p>
-          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
-            Der Fragebogen ist <strong>bis zum {{ablaufdatum}}</strong> gültig.
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
+            Bitte füllen Sie dazu den <strong>Personalfragebogen</strong> aus. Ihre Daten werden verschlüsselt übertragen und vertraulich behandelt.
           </p>
 
+          <!-- Frist & Dauer -->
+          <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
+            <tr><td style="background-color:#f9fafb;border-left:4px solid #575756;padding:13px 16px;">
+              <p style="margin:0;color:#2d2d2d;font-size:14px;line-height:1.6;"><strong>Bitte ausfüllen bis:</strong> {{ablaufdatum}}<br><span style="color:#6b7280;">Dauer: ca. 10 Minuten</span></p>
+            </td></tr>
+          </table>
+
           <!-- Button -->
-          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
-            <tr><td style="background-color:#2563eb;border-radius:8px;">
-              <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+            <tr><td style="background-color:#575756;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
                 Personalfragebogen ausfüllen →
               </a>
             </td></tr>
           </table>
 
-          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 8px;">
-            Falls der Button nicht funktioniert, kopieren Sie bitte diesen Link in Ihren Browser:
+          <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:0 0 6px;">
+            Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:
           </p>
-          <p style="color:#2563eb;font-size:12px;word-break:break-all;margin:0 0 24px;">{{link}}</p>
+          <p style="margin:0 0 24px;"><a href="{{link}}" style="color:#575756;font-size:12px;word-break:break-all;text-decoration:underline;">{{link}}</a></p>
 
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
-          <p style="color:#9ca3af;font-size:12px;margin:0;">
-            Bei Fragen wenden Sie sich bitte an Ihre HR-Ansprechperson.<br>
-            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          <!-- Das halten Sie bereit -->
+          <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">
+            <tr><td style="background-color:#f9fafb;border:1px solid #eceef1;border-radius:8px;padding:16px 20px;">
+              <p style="margin:0 0 10px;color:#2d2d2d;font-size:14px;font-weight:bold;">Das halten Sie am besten bereit</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.9;">› IBAN Ihrer Bankverbindung<br>› Steuer-Identifikationsnummer (Steuer-ID)<br>› Sozialversicherungsnummer<br>› Name Ihrer Krankenkasse<br>› Nachweis Ihres Masernschutzes (z.&nbsp;B. Impfausweis)</p>
+            </td></tr>
+          </table>
+
+          <!-- So geht es weiter -->
+          <p style="color:#2d2d2d;font-size:14px;font-weight:bold;margin:0 0 6px;">So geht es weiter</p>
+          <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            Nach dem Absenden müssen Sie nichts weiter tun. Wir prüfen Ihre Angaben und melden uns, falls noch etwas fehlt. Alles Weitere besprechen wir an Ihrem ersten Arbeitstag.
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Haben Sie Fragen? Schreiben Sie uns gern an <a href="mailto:personalbuchhaltung@fes-minden.de" style="color:#575756;text-decoration:underline;">personalbuchhaltung@fes-minden.de</a>
           </p>
         </td></tr>
 
         <!-- Footer -->
-        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
-          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
-            © CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;">
+            <strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich
           </p>
+          <p style="margin:0;color:#bbbbbb;font-size:11px;text-align:center;">{{einrichtung}}</p>
         </td></tr>
 
       </table>
@@ -153,14 +174,28 @@ const BASE_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
 </html>`,
     bodyText: `Herzlich willkommen, {{vorname}}!
 
-Wir freuen uns, Sie bald in unserem Team begrüßen zu dürfen.
+Schön, dass Sie zu {{einrichtung}} kommen. Damit zu Ihrem Start alles bereitliegt – vom Arbeitsvertrag bis zur pünktlichen Gehaltszahlung – benötigen wir einmalig einige Angaben von Ihnen.
 
-Bitte füllen Sie Ihren Personalfragebogen aus (gültig bis {{ablaufdatum}}):
+Bitte füllen Sie dazu den Personalfragebogen aus. Ihre Daten werden verschlüsselt übertragen und vertraulich behandelt.
+
+Bitte ausfüllen bis: {{ablaufdatum}} (Dauer: ca. 10 Minuten)
+
+Personalfragebogen öffnen:
 {{link}}
 
-Bei Fragen wenden Sie sich bitte an Ihre HR-Ansprechperson.
+Das halten Sie am besten bereit:
+- IBAN Ihrer Bankverbindung
+- Steuer-Identifikationsnummer (Steuer-ID)
+- Sozialversicherungsnummer
+- Name Ihrer Krankenkasse
+- Nachweis Ihres Masernschutzes (z. B. Impfausweis)
 
-CREDO Gruppe – {{einrichtung}}`,
+So geht es weiter: Nach dem Absenden müssen Sie nichts weiter tun. Wir prüfen Ihre Angaben und melden uns, falls noch etwas fehlt.
+
+Haben Sie Fragen? Schreiben Sie uns gern an personalbuchhaltung@fes-minden.de.
+
+CREDO Gruppe – Freie Evangelische Schulen
+{{einrichtung}}`,
     variables: [
       { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
       { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
@@ -178,7 +213,7 @@ CREDO Gruppe – {{einrichtung}}`,
   {
     event: "supervisor-link-created",
     name: "Einladung Vorgesetzter (Einstellungsmodalitäten)",
-    subject: "Bitte ausfüllen: Einstellungsmodalitäten für {{mitarbeiter_name}}",
+    subject: "Einstellungsmodalitäten für {{mitarbeiter_name}} – bitte ausfüllen",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -195,39 +230,54 @@ CREDO Gruppe – {{einrichtung}}`,
 
         <!-- Body -->
         <tr><td style="background-color:#ffffff;padding:32px;">
-          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Einstellungsmodalitäten erforderlich</h2>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Bitte ergänzen Sie die Einstellungsmodalitäten</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Für den neuen Mitarbeiter <strong>{{mitarbeiter_name}}</strong> werden die Einstellungsmodalitäten benötigt.
+            Für die Einstellung von <strong>{{mitarbeiter_name}}</strong> bei {{einrichtung}} fehlen noch die Einstellungsmodalitäten. Mit Ihren Angaben kann die Personalabteilung den Arbeitsvertrag erstellen.
           </p>
-          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
-            Bitte füllen Sie das Formular über den nachstehenden Link aus, damit die Personalabteilung alle erforderlichen Informationen für den Arbeitsvertrag erhält.
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
+            Das Ausfüllen dauert nur wenige Minuten.
           </p>
 
           <!-- Button -->
-          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
-            <tr><td style="background-color:#059669;border-radius:8px;">
-              <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+            <tr><td style="background-color:#575756;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
                 Einstellungsmodalitäten ausfüllen →
               </a>
             </td></tr>
           </table>
 
-          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 8px;">
-            Falls der Button nicht funktioniert, kopieren Sie bitte diesen Link:
+          <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:0 0 6px;">
+            Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:
           </p>
-          <p style="color:#2563eb;font-size:12px;word-break:break-all;margin:0 0 24px;">{{link}}</p>
+          <p style="margin:0 0 24px;"><a href="{{link}}" style="color:#575756;font-size:12px;word-break:break-all;text-decoration:underline;">{{link}}</a></p>
 
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
-          <p style="color:#9ca3af;font-size:12px;margin:0;">
-            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          <!-- Eckdaten -->
+          <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">
+            <tr><td style="background-color:#f9fafb;border:1px solid #eceef1;border-radius:8px;padding:16px 20px;">
+              <p style="margin:0 0 10px;color:#2d2d2d;font-size:14px;font-weight:bold;">Diese Eckdaten werden abgefragt</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.9;">› Stellenbeschreibung (wird in den Arbeitsvertrag übernommen)<br>› Vertragsbeginn, ggf. Befristung<br>› Arbeitszeit (Wochenstunden)<br>› Vergütung (Entgeltgruppe/Stufe oder Festgehalt)</p>
+            </td></tr>
+          </table>
+
+          <!-- So geht es weiter -->
+          <p style="color:#2d2d2d;font-size:14px;font-weight:bold;margin:0 0 6px;">So geht es weiter</p>
+          <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            Nach dem Absenden übernimmt die Personalabteilung alles Weitere – Sie müssen nichts ausdrucken oder zurücksenden.
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Bei Rückfragen erreichen Sie uns unter <a href="mailto:personalbuchhaltung@fes-minden.de" style="color:#575756;text-decoration:underline;">personalbuchhaltung@fes-minden.de</a>
           </p>
         </td></tr>
 
         <!-- Footer -->
-        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
-          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
-            © CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;">
+            <strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich
           </p>
+          <p style="margin:0;color:#bbbbbb;font-size:11px;text-align:center;">{{einrichtung}}</p>
         </td></tr>
 
       </table>
@@ -235,14 +285,25 @@ CREDO Gruppe – {{einrichtung}}`,
   </table>
 </body>
 </html>`,
-    bodyText: `Einstellungsmodalitäten erforderlich
+    bodyText: `Bitte ergänzen Sie die Einstellungsmodalitäten
 
-Für den neuen Mitarbeiter {{mitarbeiter_name}} werden die Einstellungsmodalitäten benötigt.
+Für die Einstellung von {{mitarbeiter_name}} bei {{einrichtung}} fehlen noch die Einstellungsmodalitäten. Mit Ihren Angaben kann die Personalabteilung den Arbeitsvertrag erstellen. Das dauert nur wenige Minuten.
 
-Bitte füllen Sie das Formular aus:
+Formular öffnen:
 {{link}}
 
-CREDO Gruppe – {{einrichtung}}`,
+Diese Eckdaten werden abgefragt:
+- Stellenbeschreibung (wird in den Arbeitsvertrag übernommen)
+- Vertragsbeginn, ggf. Befristung
+- Arbeitszeit (Wochenstunden)
+- Vergütung (Entgeltgruppe/Stufe oder Festgehalt)
+
+So geht es weiter: Nach dem Absenden übernimmt die Personalabteilung alles Weitere.
+
+Bei Rückfragen erreichen Sie uns unter personalbuchhaltung@fes-minden.de.
+
+CREDO Gruppe – Freie Evangelische Schulen
+{{einrichtung}}`,
     variables: [
       { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des neuen Mitarbeiters" },
       { key: "{{email}}", description: "E-Mail des Vorgesetzten" },
@@ -357,35 +418,40 @@ CREDO Gruppe – {{einrichtung}}`,
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
         <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
           <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
         </td></tr>
         <tr><td style="background-color:#ffffff;padding:32px;">
-          <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
-            <span style="color:#065f46;font-weight:bold;font-size:14px;">✓ Fragebogen eingereicht</span>
-          </div>
-          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Personalfragebogen vollständig</h2>
-          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+            <tr><td style="background-color:#eef6e3;border-radius:6px;padding:8px 16px;"><span style="color:#41671a;font-weight:bold;font-size:14px;">✓ Fragebogen eingereicht</span></td></tr>
+          </table>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Personalfragebogen vollständig</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
             Der Personalfragebogen von <strong>{{mitarbeiter_name}}</strong> wurde soeben ausgefüllt und eingereicht.
           </p>
-          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;padding:0;margin:0 0 24px;">
-            <tr><td style="padding:16px;">
-              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Vorgang</p>
-              <p style="margin:0;color:#1a1a2e;font-size:15px;font-weight:bold;">{{vorgangsnummer}}</p>
-            </td></tr>
-            <tr><td style="padding:0 16px 16px;">
-              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Mitarbeiter</p>
-              <p style="margin:0;color:#374151;font-size:14px;">{{mitarbeiter_name}} · {{email}}</p>
-            </td></tr>
-            <tr><td style="padding:0 16px 16px;">
-              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Einrichtung</p>
-              <p style="margin:0;color:#374151;font-size:14px;">{{einrichtung}}</p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
+            <tr><td style="background-color:#f9fafb;border:1px solid #eceef1;border-radius:8px;padding:4px 0;">
+              <table cellpadding="0" cellspacing="0" style="width:100%;">
+                <tr><td style="padding:13px 18px 6px;">
+                  <p style="margin:0 0 2px;color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:bold;">Vorgang</p>
+                  <p style="margin:0;color:#2d2d2d;font-size:15px;font-weight:bold;">{{vorgangsnummer}}</p>
+                </td></tr>
+                <tr><td style="padding:0 18px 6px;">
+                  <p style="margin:0 0 2px;color:#9ca3af;font-size:11px;">Mitarbeiter</p>
+                  <p style="margin:0;color:#374151;font-size:14px;">{{mitarbeiter_name}} · {{email}}</p>
+                </td></tr>
+                <tr><td style="padding:0 18px 13px;">
+                  <p style="margin:0 0 2px;color:#9ca3af;font-size:11px;">Einrichtung</p>
+                  <p style="margin:0;color:#374151;font-size:14px;">{{einrichtung}}</p>
+                </td></tr>
+              </table>
             </td></tr>
           </table>
-          <p style="color:#9ca3af;font-size:12px;margin:0;">
-            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Sie können den Vorgang jetzt im HR-Portal prüfen und weiterbearbeiten.
           </p>
         </td></tr>
-        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
-          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;"><strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich</p>
         </td></tr>
       </table>
     </td></tr>
@@ -394,10 +460,13 @@ CREDO Gruppe – {{einrichtung}}`,
 </html>`,
     bodyText: `Fragebogen eingereicht – {{vorgangsnummer}}
 
-{{mitarbeiter_name}} hat den Personalfragebogen ausgefüllt.
+Der Personalfragebogen von {{mitarbeiter_name}} wurde soeben ausgefüllt und eingereicht.
 
+Vorgang: {{vorgangsnummer}}
+Mitarbeiter: {{mitarbeiter_name}} · {{email}}
 Einrichtung: {{einrichtung}}
-E-Mail: {{email}}
+
+Sie können den Vorgang jetzt im HR-Portal prüfen und weiterbearbeiten.
 
 CREDO HR-Portal`,
     variables: [
@@ -424,35 +493,40 @@ CREDO HR-Portal`,
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
         <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
           <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
         </td></tr>
         <tr><td style="background-color:#ffffff;padding:32px;">
-          <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
-            <span style="color:#065f46;font-weight:bold;font-size:14px;">✓ Einstellungsmodalitäten vollständig</span>
-          </div>
-          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Alle Daten eingegangen</h2>
-          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+            <tr><td style="background-color:#eef6e3;border-radius:6px;padding:8px 16px;"><span style="color:#41671a;font-weight:bold;font-size:14px;">✓ Einstellungsmodalitäten vollständig</span></td></tr>
+          </table>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Alle Daten eingegangen</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
             Die Einstellungsmodalitäten für <strong>{{mitarbeiter_name}}</strong> wurden vom Vorgesetzten eingereicht. Der Vorgang kann jetzt abgeschlossen werden.
           </p>
-          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
-            <tr><td style="padding:16px;">
-              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Vorgang</p>
-              <p style="margin:0;color:#1a1a2e;font-size:15px;font-weight:bold;">{{vorgangsnummer}}</p>
-            </td></tr>
-            <tr><td style="padding:0 16px 16px;">
-              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Mitarbeiter</p>
-              <p style="margin:0;color:#374151;font-size:14px;">{{mitarbeiter_name}}</p>
-            </td></tr>
-            <tr><td style="padding:0 16px 16px;">
-              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Einrichtung</p>
-              <p style="margin:0;color:#374151;font-size:14px;">{{einrichtung}}</p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
+            <tr><td style="background-color:#f9fafb;border:1px solid #eceef1;border-radius:8px;padding:4px 0;">
+              <table cellpadding="0" cellspacing="0" style="width:100%;">
+                <tr><td style="padding:13px 18px 6px;">
+                  <p style="margin:0 0 2px;color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:bold;">Vorgang</p>
+                  <p style="margin:0;color:#2d2d2d;font-size:15px;font-weight:bold;">{{vorgangsnummer}}</p>
+                </td></tr>
+                <tr><td style="padding:0 18px 6px;">
+                  <p style="margin:0 0 2px;color:#9ca3af;font-size:11px;">Mitarbeiter</p>
+                  <p style="margin:0;color:#374151;font-size:14px;">{{mitarbeiter_name}}</p>
+                </td></tr>
+                <tr><td style="padding:0 18px 13px;">
+                  <p style="margin:0 0 2px;color:#9ca3af;font-size:11px;">Einrichtung</p>
+                  <p style="margin:0;color:#374151;font-size:14px;">{{einrichtung}}</p>
+                </td></tr>
+              </table>
             </td></tr>
           </table>
-          <p style="color:#9ca3af;font-size:12px;margin:0;">
-            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Bitte schließen Sie den Vorgang im HR-Portal ab.
           </p>
         </td></tr>
-        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
-          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;"><strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich</p>
         </td></tr>
       </table>
     </td></tr>
@@ -461,9 +535,13 @@ CREDO HR-Portal`,
 </html>`,
     bodyText: `Einstellungsmodalitäten vollständig – {{vorgangsnummer}}
 
-Die Einstellungsmodalitäten für {{mitarbeiter_name}} wurden eingereicht.
+Die Einstellungsmodalitäten für {{mitarbeiter_name}} wurden vom Vorgesetzten eingereicht. Der Vorgang kann jetzt abgeschlossen werden.
 
+Vorgang: {{vorgangsnummer}}
+Mitarbeiter: {{mitarbeiter_name}}
 Einrichtung: {{einrichtung}}
+
+Bitte schließen Sie den Vorgang im HR-Portal ab.
 
 CREDO HR-Portal`,
     variables: [
