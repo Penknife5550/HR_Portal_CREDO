@@ -86,7 +86,7 @@ CREDO HR-Portal`,
   };
 }
 
-export const DEFAULT_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
+const BASE_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
   // =============================================
   // Mitarbeiter-Einladung (Magic Link Fragebogen)
   // =============================================
@@ -2539,3 +2539,41 @@ CREDO HR-Portal`,
     ],
   }),
 ];
+
+// =============================================
+// CREDO-Verwaltung Corporate Design zentral anwenden
+//
+// Die Vorlagen oben sind im historischen Design (#1a1a2e) gehalten.
+// Diese Transformation bringt JEDE Vorlage einheitlich in das CI der
+// CREDO Verwaltung: grauer Markenkopf (#575756), CREDO-Linie (Grau +
+// Gelb/Gruen/Rot/Blau) direkt unter dem Kopf, graue Buttons/Links statt Blau.
+//
+// Ein zentraler Ort => gilt automatisch auch fuer kuenftige Vorlagen.
+// Idempotent: bereits im CI gehaltene Vorlagen bleiben unveraendert.
+// =============================================
+const CREDO_LINE_HTML =
+  '<tr><td style="font-size:0;line-height:0;mso-line-height-rule:exactly;">' +
+  '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>' +
+  '<td width="50%" height="6" bgcolor="#dadada" style="background-color:#dadada;height:6px;line-height:6px;font-size:0;">&nbsp;</td>' +
+  '<td width="12.5%" height="6" bgcolor="#FBC900" style="background-color:#FBC900;height:6px;line-height:6px;font-size:0;">&nbsp;</td>' +
+  '<td width="12.5%" height="6" bgcolor="#6BAA24" style="background-color:#6BAA24;height:6px;line-height:6px;font-size:0;">&nbsp;</td>' +
+  '<td width="12.5%" height="6" bgcolor="#E2001A" style="background-color:#E2001A;height:6px;line-height:6px;font-size:0;">&nbsp;</td>' +
+  '<td width="12.5%" height="6" bgcolor="#009AC6" style="background-color:#009AC6;height:6px;line-height:6px;font-size:0;">&nbsp;</td>' +
+  '</tr></table></td></tr>';
+
+function applyCredoCi(html: string): string {
+  return html
+    // CREDO-Linie direkt nach dem dunklen Markenkopf einsetzen
+    .replace(
+      /(<tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;[^"]*">[\s\S]*?<\/td><\/tr>)/,
+      `$1${CREDO_LINE_HTML}`
+    )
+    // Farbwelt auf Verwaltungs-CI umstellen
+    .replaceAll("background-color:#1a1a2e", "background-color:#575756") // Markenkopf
+    .replaceAll("color:#1a1a2e", "color:#2d2d2d") // Ueberschriften / Akzentschrift
+    .replaceAll("background-color:#2563eb", "background-color:#575756") // Buttons
+    .replaceAll("color:#2563eb", "color:#575756"); // Links
+}
+
+export const DEFAULT_EMAIL_TEMPLATES: EmailTemplateDefinition[] =
+  BASE_EMAIL_TEMPLATES.map((t) => ({ ...t, bodyHtml: applyCredoCi(t.bodyHtml) }));
