@@ -177,6 +177,24 @@ export const EVENT_CATALOG: EventDefinition[] = [
     },
     wired: true,
   },
+  {
+    event: "onboarding-starter-packet-sent",
+    name: "Starterpaket versandt (Onboarding-Abschluss)",
+    group: "Onboarding",
+    recipientHint: "Mitarbeiter:in (Starterpaket-Dokumente als PDF-Anhang)",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      onboardingId: "00000000-0000-0000-0000-000000000001",
+      displayId: "2026-GYM-001",
+      email: "max.mustermann@example.org",
+      vorname: "Max",
+      nachname: "Mustermann",
+      organization: "FES Minden",
+      mandantNumber: "01",
+      anzahlDokumente: 5,
+    },
+    wired: true,
+  },
 
   // =============================================
   // Offboarding

@@ -88,6 +88,8 @@ model Organization {
   bemFaelle             BemFall[]
   bemAnsprechpartner    BemAnsprechpartner[]
   bemVorlagen           BemVorlage[]
+  starterpaketDokumente StarterpaketDokument[]
+  starterpaketAuswahl   StarterpaketAuswahl[]
 
   @@map("organizations")
 }
@@ -252,6 +254,10 @@ model OnboardingProcess {
   // Erinnerungen
   lastEmployeeReminderAt   DateTime? // Letzte Erinnerung an Mitarbeiter
   lastSupervisorReminderAt DateTime? // Letzte Erinnerung an Vorgesetzten
+
+  // Starterpaket-Versand (Nachweis + Resend-Anzeige)
+  starterPacketSentAt    DateTime?
+  starterPacketSentCount Int       @default(0)
 
   // Relationen
   personalData   PersonalData?
@@ -683,6 +689,8 @@ model DocumentTemplate {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   isActive Boolean @default(true)
+  // System-Vorlage (z.B. konsolidiertes Fuehrungszeugnis/Masernschutz) — vor Loeschen geschuetzt
+  isSystem Boolean @default(false)
 
   createdById String?
   createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
@@ -696,6 +704,59 @@ model DocumentTemplate {
   @@index([organizationId])
   @@index([isActive])
   @@map("document_templates")
+}
+
+// =============================================
+// Starterpaket — pro Mandant konfigurierbares Dokumenten-Set, das dem neuen
+// Mitarbeiter im Onboarding-Abschluss als PDF-Anhaenge zugeschickt wird.
+// Zentraler Pool (GLOBAL/MANDANT) + Markierung je Mandant (Reihenfolge).
+// =============================================
+model StarterpaketDokument {
+  id           String  @id @default(uuid())
+  name         String
+  beschreibung String?
+
+  // Scope: null = global (gruppenweit), gesetzt = mandantenspezifisch
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  dateipfad    String // gespeichertes PDF (uploads/starterpaket/...)
+  originalName String
+  fileSize     Int
+  mimeType     String  @default("application/pdf")
+  hash         String // SHA-256 (Versand-Nachweis)
+
+  isActive   Boolean @default(true)
+  orderIndex Int     @default(0)
+
+  createdById String? // User-ID, keine direkte Relation
+
+  auswahl StarterpaketAuswahl[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([isActive])
+  @@map("starterpaket_dokumente")
+}
+
+// Markierung: welche Pool-Dokumente gehoeren ins Starterpaket eines Mandanten
+// (+ Reihenfolge je Mandant).
+model StarterpaketAuswahl {
+  id             String               @id @default(uuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dokumentId     String
+  dokument       StarterpaketDokument @relation(fields: [dokumentId], references: [id], onDelete: Cascade)
+
+  orderIndex Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, dokumentId])
+  @@index([organizationId])
+  @@map("starterpaket_auswahl")
 }
 
 // Protokoll erzeugter Dokumente (Audit + Wiederfinden in DMS).

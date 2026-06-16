@@ -131,6 +131,13 @@ src/
 - **Protokoll:** Jeder Versandversuch landet im `EmailLog` (SENT/FAILED/SKIPPED, 90 Tage Aufbewahrung)
 - **Reporting-API:** Read-Only-Endpunkte unter `/api/reports/*`, Auth per API-Key (`ApiKey`-Modell, Verwaltung in Einstellungen → API-Zugang) oder Portal-Session. Keine sensiblen Felder (IBAN/SV-Nr/Steuer-ID) ausgeben!
 
+## Dokumente & Starterpaket
+
+- **Dokumente-Hub pro Vorgang:** Tab „Dokumente" der Onboarding-Detailseite buendelt Erstellen (Vorlagen + System-Dokumente), Versenden (Starterpaket), Hochgeladenes und PDF-Exporte — mit Prozessschritt-Anzeige („Sie sind hier"). Uebergreifend fuer Offboarding/Verbeamtung vorgesehen (Phase 2).
+- **Platzhalter-Katalog/Resolver:** Verfuegbare `{variablen}` je Modul liegen client-sicher in `src/lib/placeholder-catalog.ts` (re-exportiert von `doc-template-resolvers.ts`). Der ONBOARDING-Resolver fuellt sie aus Personal-/Vorgesetzten-Daten; sensible Felder (IBAN/SV-Nr/Steuer-ID) werden NUR entschluesselt, wenn die Vorlage sie nutzt (Audit via `sensitiveFields`). Im Vorlagen-Editor zeigt `VariablenKatalog` die Variablen klickbar an.
+- **System-Vorlagen:** Editierbare Standard-Vorlagen (z.B. Fuehrungszeugnis-Antrag, `DocumentTemplate.isSystem=true`, Modul ONBOARDING) liegen als Asset unter `public/system-dokumente/` und werden vom Entrypoint (`prisma/seed-check.js`) idempotent geseeded. Das amtliche **Masernschutz-NRW-Formular** wird als statisches PDF (`public/system-dokumente/masernschutz-nrw.pdf`) bereitgestellt — bewusst nicht nachgebaut (Layout-Treue).
+- **Starterpaket:** Pro Mandant konfigurierbares Set — `StarterpaketDokument` (Pool, Scope GLOBAL/MANDANT) + `StarterpaketAuswahl` (Markierung + Reihenfolge), Konfig unter `/mandanten/[id]/starterpaket`. Versand im Abschluss-Schritt/Hub als **einzelne PDF-Anhaenge** ueber Event `onboarding-starter-packet-sent` (Mailer mit `attachments`). Nachweis: `OnboardingProcess.starterPacketSentAt` + AuditLog (Dokument-Hashes) + EmailLog.
+
 ## Admin-Zugang
 
 - **E-Mail:** `dimitri@credo-gruppe.de`

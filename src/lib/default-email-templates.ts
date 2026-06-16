@@ -2616,6 +2616,86 @@ CREDO HR-Portal`,
       { key: "{{ablehnungGrund}}", description: "Begruendung der Ablehnung" },
     ],
   }),
+
+  // =============================================
+  // Starterpaket versandt (Onboarding-Abschluss, mit PDF-Anhang an MA)
+  // =============================================
+  {
+    event: "onboarding-starter-packet-sent",
+    name: "Starterpaket versandt (Onboarding-Abschluss)",
+    subject: "Herzlich willkommen bei {{einrichtung}} – Ihr Starterpaket",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#065f46;font-weight:bold;font-size:14px;">Herzlich willkommen</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Willkommen im Team, {{vorname}}!</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            wir freuen uns sehr, Sie bei {{einrichtung}} begrüßen zu dürfen. Im Anhang dieser E-Mail finden Sie Ihr persönliches Starterpaket mit wichtigen Unterlagen rund um Ihren Start bei uns.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Im Anhang</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">Ihre Starterpaket-Dokumente als PDF – z. B. Leitbild, Datenschutzinformationen und weitere Anlagen.</p>
+            </td></tr>
+          </table>
+
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Bitte lesen Sie die Unterlagen in Ruhe durch und bewahren Sie sie auf. Bei Fragen ist Ihre HR-Ansprechperson gerne für Sie da.
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Vorgang: {{vorgangsnummer}}<br>
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
+            &copy; CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Willkommen im Team, {{vorname}}!
+
+wir freuen uns, Sie bei {{einrichtung}} begrüßen zu dürfen. Im Anhang dieser E-Mail finden Sie Ihr persönliches Starterpaket mit wichtigen Unterlagen (z. B. Leitbild, Datenschutzinformationen und weitere Anlagen).
+
+Bitte lesen Sie die Unterlagen in Ruhe durch und bewahren Sie sie auf.
+
+Vorgang: {{vorgangsnummer}}
+
+CREDO Gruppe – {{einrichtung}}`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
+      { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
+      { key: "{{email}}", description: "E-Mail des Mitarbeiters" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
+      { key: "{{anzahlDokumente}}", description: "Anzahl der angehaengten Dokumente" },
+    ],
+  },
 ];
 
 // =============================================

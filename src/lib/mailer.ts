@@ -22,7 +22,7 @@ import { getEventDefinition } from "@/lib/events";
 // =============================================
 // Typen
 // =============================================
-interface MailAttachment {
+export interface MailAttachment {
   filename: string;
   content: Buffer;
   contentType?: string;
@@ -397,6 +397,8 @@ export async function sendEventEmail(
   payload: Record<string, unknown>,
   options?: {
     isTest?: boolean;
+    /** Optionale Datei-Anhaenge (z.B. Starterpaket-PDFs) — werden an den SMTP-Versand durchgereicht */
+    attachments?: MailAttachment[];
     /** Test-Versand: alle Empfaenger durch diese Adresse ersetzen */
     overrideTo?: string;
     /** Test-Versand: ungespeicherte Editor-Felder statt der DB-Vorlage nutzen */
@@ -454,7 +456,17 @@ export async function sendEventEmail(
       rendered.subject = `[TEST] ${rendered.subject}`;
     }
 
-    const result = await sendEmailDetailed(rendered);
+    const attachmentNote =
+      options?.attachments && options.attachments.length > 0
+        ? `${options.attachments.length} Anhang/Anhaenge: ${options.attachments
+            .map((a) => a.filename)
+            .join(", ")}`
+        : undefined;
+
+    const result = await sendEmailDetailed({
+      ...rendered,
+      attachments: options?.attachments,
+    });
     if (result.ok) {
       await writeEmailLog({
         event,
@@ -463,6 +475,7 @@ export async function sendEventEmail(
         cc: rendered.cc,
         bcc: rendered.bcc,
         subject: rendered.subject,
+        detail: attachmentNote,
         messageId: result.messageId,
         isTest,
       });

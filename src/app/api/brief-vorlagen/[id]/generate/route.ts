@@ -86,6 +86,7 @@ export const POST = apiHandler<GenerateInput>(
         dateipfad: true,
         organizationId: true,
         isActive: true,
+        platzhalter: true,
       },
     });
     if (!template) {
@@ -164,6 +165,9 @@ export const POST = apiHandler<GenerateInput>(
     const { data: resolverData, sensitiveFields } = await resolver({
       organizationId: effectiveOrgId,
       refId: body.refId ?? null,
+      placeholders: Array.isArray(template.platzhalter)
+        ? (template.platzhalter as string[])
+        : undefined,
       session,
       ipAddress: clientIp(request.headers),
     });

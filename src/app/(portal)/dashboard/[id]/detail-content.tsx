@@ -7,7 +7,7 @@
  * Nutzt die bestehende PortalHeader-Komponente und CREDO Corporate Design.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { STATUS_LABELS } from "@/lib/constants";
@@ -70,6 +70,8 @@ interface DetailData {
   supervisorEmail: string | null;
   invitedAt: string;
   submittedAt: string | null;
+  starterPacketSentAt: string | null;
+  starterPacketSentCount: number;
   organization: { name: string; mandantNumber: string };
   personalData: {
     firstName: string | null;
@@ -387,6 +389,10 @@ export function DetailContent({
   const [completingProcess, setCompletingProcess] = useState(false);
   const [reviewingProcess, setReviewingProcess] = useState(false);
 
+  // Starterpaket-Versand
+  const [sendingStarterpaket, setSendingStarterpaket] = useState(false);
+  const [starterpaketMsg, setStarterpaketMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   // ---- Status-Aktionen ----
@@ -401,6 +407,29 @@ export function DetailContent({
   const canComplete = data &&
     data.status === "REVIEWED" &&
     isAdmin;
+
+  // Starterpaket an den Mitarbeiter versenden (manuell, im Abschluss/Dokumente-Hub)
+  const sendStarterpaket = async () => {
+    setSendingStarterpaket(true);
+    setStarterpaketMsg(null);
+    try {
+      const res = await fetch(`/api/onboarding/${onboardingId}/starterpaket`, { method: "POST" });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const n = j.data?.anzahl ?? 0;
+        setStarterpaketMsg({ ok: true, text: `Starterpaket versendet (${n} Dokument${n === 1 ? "" : "e"}).` });
+        loadData();
+      } else if (res.status === 409) {
+        setStarterpaketMsg({ ok: false, text: j.error || "Keine Starterpaket-Dokumente fuer diesen Mandanten konfiguriert." });
+      } else {
+        setStarterpaketMsg({ ok: false, text: j.error || "Starterpaket konnte nicht versendet werden." });
+      }
+    } catch {
+      setStarterpaketMsg({ ok: false, text: "Verbindungsfehler beim Versand." });
+    } finally {
+      setSendingStarterpaket(false);
+    }
+  };
 
   const handleReviewProcess = async () => {
     if (!data || !canReview) return;
@@ -737,6 +766,8 @@ export function DetailContent({
             setNewNote={setNewNote}
             savingNote={savingNote}
             addNote={addNote}
+            sendingStarterpaket={sendingStarterpaket}
+            sendStarterpaket={sendStarterpaket}
             onboardingId={onboardingId}
           />
         )}
@@ -748,7 +779,16 @@ export function DetailContent({
             onSaved={() => loadData()}
           />
         )}
-        {activeTab === "documents" && <TabDocuments data={data} onboardingId={onboardingId} />}
+        {activeTab === "documents" && (
+          <TabDocuments
+            data={data}
+            onboardingId={onboardingId}
+            canEdit={HR_EDIT_ROLES.includes(user.role)}
+            sendingStarterpaket={sendingStarterpaket}
+            sendStarterpaket={sendStarterpaket}
+            starterpaketMsg={starterpaketMsg}
+          />
+        )}
         {activeTab === "checklist" && (
           <TabChecklist
             checklistItems={checklistItems}
@@ -786,6 +826,8 @@ function TabOverview({
   savingNote,
   addNote,
   onboardingId,
+  sendingStarterpaket,
+  sendStarterpaket,
 }: {
   data: DetailData;
   appUrl: string;
@@ -800,6 +842,8 @@ function TabOverview({
   savingNote: boolean;
   addNote: () => void;
   onboardingId: string;
+  sendingStarterpaket: boolean;
+  sendStarterpaket: () => void;
 }) {
   const fragebogenLink = `${appUrl}/fragebogen/${data.token}`;
   const modalitaetenLink = data.supervisorToken
@@ -902,6 +946,7 @@ function TabOverview({
       completedAt: isCompleted && data.submittedAt ? formatDate(data.submittedAt) : undefined,
       actions: !isCompleted && checklistAllDone ? [
         { label: "CSV Export (LOGA)", onClick: () => { window.location.href = `/api/onboarding/${onboardingId}/export?format=csv`; }, variant: "secondary" as const },
+        { label: sendingStarterpaket ? "Sende…" : "Starterpaket versenden", onClick: sendStarterpaket, variant: "primary" as const, loading: sendingStarterpaket },
       ] : undefined,
     },
   ];
@@ -1250,24 +1295,7 @@ function TabFragebogenDaten({
             )}
           </div>
           <div className="flex items-center gap-3">
-            {canEdit && (
-              <a
-                href={`/api/onboarding/${onboardingId}/fuehrungszeugnis-antrag`}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
-                title="Aufforderung erweitertes Führungszeugnis als Word-Dokument"
-              >
-                Führungszeugnis-Antrag (Word)
-              </a>
-            )}
-            {canEdit && (
-              <a
-                href={`/api/onboarding/${onboardingId}/masernschutz-bescheinigung`}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
-                title="Masernschutz Nachweis-Bescheinigung (Arzt) als Word-Dokument"
-              >
-                Masernschutz-Formular (Word)
-              </a>
-            )}
+            {/* Dokument-Erzeugung (Fuehrungszeugnis/Masernschutz) ist in den Dokumente-Tab (Hub) umgezogen. */}
             {canEdit && (
               <button
                 type="button"
@@ -1545,7 +1573,263 @@ function OnboardingExportSection({ onboardingId }: { onboardingId: string }) {
   );
 }
 
-function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: string }) {
+// ---- Schritt-Anzeige im Dokumente-Hub ("Sie sind hier") ----
+function onboardingSteps(data: DetailData) {
+  const fragebogenDone = data.personalData?.isComplete ?? false;
+  const supervisorDone = data.supervisorData?.isComplete ?? false;
+  const checklistTotal = data.checklistItems.length;
+  const checklistAllDone = checklistTotal > 0 && data.checklistItems.every((i) => i.isCompleted);
+  const isCompleted = data.status === "COMPLETED";
+  const reviewed = data.status === "REVIEWED" || isCompleted;
+  const steps = [
+    { label: "Einladung", done: !!data.token },
+    { label: "Fragebogen", done: fragebogenDone },
+    { label: "Modalitäten", done: supervisorDone },
+    { label: "Prüfen", done: reviewed },
+    { label: "Checkliste", done: checklistAllDone || isCompleted },
+    { label: "Abschluss", done: isCompleted },
+  ];
+  const firstOpen = steps.findIndex((s) => !s.done);
+  return { steps, currentIdx: firstOpen === -1 ? steps.length - 1 : firstOpen };
+}
+
+function StepHinweis({ data }: { data: DetailData }) {
+  const { steps, currentIdx } = onboardingSteps(data);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-3">
+      <span className="mr-1 text-xs text-muted-foreground">Sie sind hier:</span>
+      {steps.map((s, i) => (
+        <span key={s.label} className="flex items-center gap-1.5">
+          {i > 0 && <span className="text-border">&rsaquo;</span>}
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+              i === currentIdx
+                ? "bg-credo-blau/10 text-credo-blau"
+                : s.done
+                  ? "text-credo-gruen"
+                  : "text-muted-foreground"
+            }`}
+          >
+            {s.done && i !== currentIdx && <CheckIcon className="h-3 w-3" />}
+            {s.label}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const ERZEUG_BTN =
+  "rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50";
+
+function DocErzeugZeile({ name, tag, children }: { name: string; tag: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{name}</p>
+        <p className="text-[11px] text-muted-foreground">{tag}</p>
+      </div>
+      <div className="flex items-center gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+interface OnbTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+function OnboardingErstellenSection({
+  onboardingId,
+  canEdit,
+}: {
+  onboardingId: string;
+  canEdit: boolean;
+}) {
+  const [templates, setTemplates] = useState<OnbTemplate[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/brief-vorlagen?modul=ONBOARDING")
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((j) =>
+        setTemplates(
+          (j.data || []).map((t: { id: string; name: string; description: string | null }) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description,
+          })),
+        ),
+      )
+      .catch(() => setTemplates([]));
+  }, []);
+
+  async function generate(templateId: string, format: "docx" | "pdf") {
+    setBusy(`${templateId}:${format}`);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/brief-vorlagen/${templateId}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format, refId: onboardingId }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error || "Erzeugung fehlgeschlagen.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download =
+        res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") ||
+        `dokument.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setErr("Verbindungsfehler bei der Erzeugung.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-foreground">
+        <DocumentIcon className="h-5 w-5 text-muted-foreground" />
+        Dokumente erstellen
+      </h3>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.
+      </p>
+      {err && (
+        <div className="mb-3 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-3 py-2 text-xs text-credo-rot">
+          {err}
+        </div>
+      )}
+      <div className="space-y-2">
+        {canEdit && (
+          <DocErzeugZeile
+            name="Masernschutz – Nachweis-Bescheinigung"
+            tag="Amtliches NRW-Formular (zum Ausfüllen beim Arzt)"
+          >
+            <a
+              href="/system-dokumente/masernschutz-nrw.pdf"
+              target="_blank"
+              rel="noopener"
+              className={ERZEUG_BTN}
+            >
+              PDF öffnen
+            </a>
+          </DocErzeugZeile>
+        )}
+        {templates.map((t) => (
+          <DocErzeugZeile key={t.id} name={t.name} tag={t.description || "Vorlage"}>
+            <button
+              type="button"
+              onClick={() => generate(t.id, "docx")}
+              disabled={busy === `${t.id}:docx`}
+              className={ERZEUG_BTN}
+            >
+              {busy === `${t.id}:docx` ? "…" : "Word"}
+            </button>
+            <button
+              type="button"
+              onClick={() => generate(t.id, "pdf")}
+              disabled={busy === `${t.id}:pdf`}
+              className={ERZEUG_BTN}
+            >
+              {busy === `${t.id}:pdf` ? "…" : "PDF"}
+            </button>
+          </DocErzeugZeile>
+        ))}
+        {templates.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Keine Onboarding-Vorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ an.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StarterpaketVersandSection({
+  canEdit,
+  sending,
+  onSend,
+  msg,
+  sentAt,
+  count,
+}: {
+  canEdit: boolean;
+  sending: boolean;
+  onSend: () => void;
+  msg: { ok: boolean; text: string } | null;
+  sentAt: string | null;
+  count: number;
+}) {
+  return (
+    <div className="rounded-2xl border-2 border-credo-blau/30 bg-credo-blau/5 p-5">
+      <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-foreground">
+        <DownloadIcon className="h-5 w-5 text-credo-blau" />
+        Starterpaket versenden
+      </h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Die für diesen Mandanten markierten Dokumente gehen als PDF-Anhänge an den neuen Mitarbeiter.
+        Konfiguration unter Mandanten → Einrichtung → Starterpaket.
+      </p>
+      {msg && (
+        <div
+          className={`mb-3 rounded-lg border px-3 py-2 text-xs ${
+            msg.ok
+              ? "border-credo-gruen/30 bg-credo-gruen/10 text-credo-gruen"
+              : "border-credo-rot/30 bg-credo-rot/10 text-credo-rot"
+          }`}
+        >
+          {msg.text}
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        {canEdit && (
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={sending}
+            className="inline-flex items-center gap-2 rounded-lg bg-credo-blau px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90 disabled:opacity-50"
+          >
+            {sending ? "Sende…" : sentAt ? "Erneut senden" : "Starterpaket versenden"}
+          </button>
+        )}
+        <span className="text-xs text-muted-foreground">
+          {sentAt
+            ? `Zuletzt gesendet am ${formatDateTime(sentAt)}${count > 1 ? ` (${count}×)` : ""}`
+            : "Noch nicht versendet"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function TabDocuments({
+  data,
+  onboardingId,
+  canEdit,
+  sendingStarterpaket,
+  sendStarterpaket,
+  starterpaketMsg,
+}: {
+  data: DetailData;
+  onboardingId: string;
+  canEdit: boolean;
+  sendingStarterpaket: boolean;
+  sendStarterpaket: () => void;
+  starterpaketMsg: { ok: boolean; text: string } | null;
+}) {
   const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
     UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
     REVIEWED: { label: "Geprüft", color: "bg-blue-100 text-blue-700" },
@@ -1562,21 +1846,6 @@ function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: 
     SONSTIGES: "bg-gray-100 text-gray-600",
   };
 
-  if (data.documents.length === 0) {
-    return (
-      <div>
-        <OnboardingExportSection onboardingId={onboardingId} />
-        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card py-16">
-          <UploadCloudIcon className="mb-4 h-16 w-16 text-border" />
-          <p className="mb-1 text-base font-medium text-foreground">Keine Dokumente</p>
-          <p className="text-sm text-muted-foreground">
-            Es wurden noch keine Dokumente zu diesem Vorgang hochgeladen.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const downloadAll = () => {
     data.documents.forEach((doc, index) => {
       setTimeout(() => {
@@ -1589,74 +1858,98 @@ function TabDocuments({ data, onboardingId }: { data: DetailData; onboardingId: 
   };
 
   return (
-    <div className="space-y-4">
-      {/* PDF Export */}
+    <div className="space-y-6">
+      {/* Prozessschritt-Anzeige */}
+      <StepHinweis data={data} />
+
+      {/* Dokumente erstellen */}
+      <OnboardingErstellenSection onboardingId={onboardingId} canEdit={canEdit} />
+
+      {/* Starterpaket versenden */}
+      <StarterpaketVersandSection
+        canEdit={canEdit}
+        sending={sendingStarterpaket}
+        onSend={sendStarterpaket}
+        msg={starterpaketMsg}
+        sentAt={data.starterPacketSentAt ?? null}
+        count={data.starterPacketSentCount ?? 0}
+      />
+
+      {/* PDF-Export (DMS) */}
       <OnboardingExportSection onboardingId={onboardingId} />
 
-      {/* Header with download all */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {data.documents.length} Dokument{data.documents.length !== 1 ? "e" : ""} hochgeladen
-        </p>
-        <button
-          onClick={downloadAll}
-          className="inline-flex items-center gap-2 rounded-lg bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
-        >
-          <DownloadIcon className="h-4 w-4" />
-          Alle herunterladen
-        </button>
-      </div>
-
-      {/* Document Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {data.documents.map((doc) => {
-          const statusLabel = DOC_STATUS_LABELS[doc.status] || DOC_STATUS_LABELS.UPLOADED;
-          const typeColor = DOC_TYPE_COLORS[doc.type] || DOC_TYPE_COLORS.SONSTIGES;
-
-          return (
-            <div
-              key={doc.id}
-              className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-[#009AC6]/30 hover:shadow-md"
+      {/* Hochgeladene Dokumente */}
+      {data.documents.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card py-12">
+          <UploadCloudIcon className="mb-4 h-14 w-14 text-border" />
+          <p className="mb-1 text-base font-medium text-foreground">Keine Dokumente hochgeladen</p>
+          <p className="text-sm text-muted-foreground">
+            Es wurden noch keine Dokumente zu diesem Vorgang hochgeladen.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {data.documents.length} Dokument{data.documents.length !== 1 ? "e" : ""} hochgeladen
+            </p>
+            <button
+              onClick={downloadAll}
+              className="inline-flex items-center gap-2 rounded-lg bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
             >
-              {/* Document Icon + Name */}
-              <div className="mb-3 flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                  <DocumentIcon className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-foreground" title={doc.fileName}>
-                    {doc.fileName}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
-                </div>
-              </div>
+              <DownloadIcon className="h-4 w-4" />
+              Alle herunterladen
+            </button>
+          </div>
 
-              {/* Badges */}
-              <div className="mb-3 flex flex-wrap gap-2">
-                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${typeColor}`}>
-                  {doc.type.replace(/_/g, " ")}
-                </span>
-                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusLabel.color}`}>
-                  {statusLabel.label}
-                </span>
-              </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {data.documents.map((doc) => {
+              const statusLabel = DOC_STATUS_LABELS[doc.status] || DOC_STATUS_LABELS.UPLOADED;
+              const typeColor = DOC_TYPE_COLORS[doc.type] || DOC_TYPE_COLORS.SONSTIGES;
 
-              {/* Date + Download */}
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-muted-foreground">{formatDate(doc.uploadedAt)}</span>
-                <a
-                  href={`/api/onboarding/${onboardingId}/documents/${doc.id}`}
-                  download={doc.fileName}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-credo-gruen/10 hover:text-credo-gruen"
-                  title="Herunterladen"
+              return (
+                <div
+                  key={doc.id}
+                  className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-[#009AC6]/30 hover:shadow-md"
                 >
-                  <DownloadIcon className="h-4 w-4" />
-                </a>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                  <div className="mb-3 flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <DocumentIcon className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-foreground" title={doc.fileName}>
+                        {doc.fileName}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
+                    </div>
+                  </div>
+
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${typeColor}`}>
+                      {doc.type.replace(/_/g, " ")}
+                    </span>
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusLabel.color}`}>
+                      {statusLabel.label}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-muted-foreground">{formatDate(doc.uploadedAt)}</span>
+                    <a
+                      href={`/api/onboarding/${onboardingId}/documents/${doc.id}`}
+                      download={doc.fileName}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-credo-gruen/10 hover:text-credo-gruen"
+                      title="Herunterladen"
+                    >
+                      <DownloadIcon className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

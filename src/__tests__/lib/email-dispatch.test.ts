@@ -231,6 +231,31 @@ describe("sendEventEmail", () => {
       data: expect.objectContaining({ isTest: true }),
     });
   });
+
+  it("reicht Anhaenge an den SMTP-Versand durch und vermerkt sie im Protokoll", async () => {
+    const attachments = [
+      { filename: "leitbild.pdf", content: Buffer.from("%PDF-1.4"), contentType: "application/pdf" },
+      { filename: "datenschutz.pdf", content: Buffer.from("%PDF-1.4"), contentType: "application/pdf" },
+    ];
+
+    const result = await sendEventEmail("onboarding-created", payload, { attachments });
+
+    expect(result.status).toBe("SENT");
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: expect.arrayContaining([
+          expect.objectContaining({ filename: "leitbild.pdf" }),
+          expect.objectContaining({ filename: "datenschutz.pdf" }),
+        ]),
+      })
+    );
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: "SENT",
+        detail: expect.stringContaining("leitbild.pdf"),
+      }),
+    });
+  });
 });
 
 describe("Reply-To", () => {

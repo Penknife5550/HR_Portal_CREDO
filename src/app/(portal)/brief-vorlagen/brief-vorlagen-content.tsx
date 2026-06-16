@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { PortalHeader } from "@/components/portal-header";
+import { VariablenKatalog } from "@/components/variablen-katalog";
 
 interface User {
   userId: string;
@@ -456,6 +457,7 @@ function UploadModal({
             </select>
           </div>
         </div>
+        <VariablenKatalog modul={modul} />
       </div>
       <ModalActions
         onClose={onClose}
@@ -573,8 +575,9 @@ function EditModal({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Platzhalter: {template.platzhalter.join(", ") || "—"}
+          Platzhalter im Dokument: {template.platzhalter.join(", ") || "—"}
         </p>
+        <VariablenKatalog modul={modul} />
       </div>
       <ModalActions
         onClose={onClose}

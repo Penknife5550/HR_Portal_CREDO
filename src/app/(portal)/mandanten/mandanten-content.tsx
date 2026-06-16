@@ -262,6 +262,12 @@ export function MandantenContent({ user }: { user: User }) {
                           >
                             BEM-Ansprechpartner
                           </Link>
+                          <Link
+                            href={`/mandanten/${org.id}/starterpaket`}
+                            className="rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                          >
+                            Starterpaket
+                          </Link>
                           <button
                             onClick={() => handleToggleActive(org)}
                             className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
