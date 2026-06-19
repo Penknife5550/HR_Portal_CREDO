@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CREDO HR-Portal – Konzept: Modul „Vertragsende"</title>
+<style>
+  :root {
+    --grau-hell: #DADADA;
+    --grau-dunkel: #575756;
+    --gelb: #FBC900;
+    --gruen: #6BAA24;
+    --rot: #E2001A;
+    --blau: #009AC6;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #e5e5e5;
+    --bg-soft: #f5f5f5;
+    --bg-softer: #fafafa;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Montserrat", "Arial", "Segoe UI", system-ui, sans-serif;
+    color: var(--text); line-height: 1.65; margin: 0;
+    background: #ffffff; font-size: 16px;
+  }
+  .seite { max-width: 1040px; margin: 0 auto; padding: 0 1.4rem 4rem; }
+
+  /* CREDO-Linie */
+  .credo-linie { display: flex; height: 6px; width: 100%; }
+  .credo-linie .l-grau  { flex: 1;      background-color: var(--grau-hell); }
+  .credo-linie .l-gelb  { flex: 0 0 8%; background-color: var(--gelb); }
+  .credo-linie .l-gruen { flex: 0 0 8%; background-color: var(--gruen); }
+  .credo-linie .l-rot   { flex: 0 0 8%; background-color: var(--rot); }
+  .credo-linie .l-blau  { flex: 0 0 8%; background-color: var(--blau); }
+
+  /* Titelblatt */
+  header.titel { padding: 3rem 1.4rem 1.2rem; max-width: 1040px; margin: 0 auto; }
+  .logo-wort { font-size: 2.6rem; font-weight: 800; letter-spacing: 0.18em; color: var(--grau-dunkel); margin: 0; }
+  .logo-sub { font-size: 1.2rem; color: var(--grau-dunkel); margin: 0.2rem 0 0; font-weight: 600; }
+  .claim { color: var(--muted); letter-spacing: 0.08em; font-size: 0.82rem; text-transform: uppercase; margin-top: 0.8rem; }
+  header.titel h1 { border: none; padding: 0; margin: 1.6rem 0 0.4rem; font-size: 2.1rem; }
+  .untertitel { color: var(--muted); font-size: 1.05rem; margin-top: 0; }
+
+  h1, h2, h3 { color: var(--grau-dunkel); line-height: 1.25; }
+  h2 { font-size: 1.5rem; border-left: 7px solid var(--grau-hell); padding-left: 0.7rem; margin-top: 3rem; padding-top: 0.2rem; }
+  h3 { font-size: 1.18rem; margin-top: 2rem; }
+  h4 { font-size: 1.0rem; margin: 1.4rem 0 0.3rem; color: var(--grau-dunkel); }
+  p { margin: 0.7rem 0; }
+  a { color: var(--blau); }
+  ol, ul { padding-left: 1.5rem; }
+  ol li, ul li { margin: 0.4rem 0; }
+
+  /* Boxen */
+  .hinweis, .ergebnis { padding: 0.85rem 1.1rem; margin: 1.1rem 0; border-radius: 0 6px 6px 0; border-left: 6px solid var(--gelb); background: #fffaeb; }
+  .hinweis .label, .ergebnis .label { display: block; font-weight: 700; margin-bottom: 0.2rem; color: var(--grau-dunkel); }
+  .hinweis.warnung { border-left-color: var(--rot); background: #fff4f4; }
+  .hinweis.info { border-left-color: var(--blau); background: #eef9ff; }
+  .ergebnis { border-left-color: var(--gruen); background: #f3faea; }
+  .hinweis p:last-child, .ergebnis p:last-child { margin-bottom: 0; }
+  .hinweis p:first-of-type, .ergebnis p:first-of-type { margin-top: 0; }
+
+  /* Status-Kasten oben */
+  .meta { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.3rem; margin: 1.5rem 0; font-size: 0.92rem; }
+  .meta b { color: var(--grau-dunkel); }
+  .meta div { margin: 0.2rem 0; }
+
+  nav.inhalt { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.5rem; margin: 2rem 0; }
+  nav.inhalt h2 { border: none; padding: 0; margin: 0 0 0.6rem; font-size: 1.2rem; }
+  nav.inhalt ol { padding-left: 1.4rem; }
+  nav.inhalt a { color: var(--grau-dunkel); text-decoration: none; }
+  nav.inhalt a:hover { text-decoration: underline; color: var(--blau); }
+
+  table { border-collapse: collapse; width: 100%; margin: 1.1rem 0; font-size: 0.92rem; }
+  th, td { border: 1px solid var(--border); padding: 0.55rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--grau-dunkel); color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: var(--bg-softer); }
+  code { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; font-family: "Consolas","Courier New",monospace; font-size: 0.88em; }
+
+  /* ============ MOCKUPS ============ */
+  .mock { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 1.2rem 0 0.4rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); background:#fff; }
+  .mock-cap { font-size: 0.82rem; color: var(--muted); margin: 0 0 1.6rem; font-style: italic; }
+  .mock-appbar { display: flex; align-items: center; gap: 1rem; padding: 0.7rem 1.1rem; background:#fff; border-bottom: 1px solid #eee; }
+  .mock-brand { font-size: 0.7rem; color: var(--muted); line-height: 1.1; }
+  .mock-brand b { font-size: 1.15rem; color: var(--grau-dunkel); letter-spacing: 0.12em; display:inline-block; }
+  .mock-brand span { color: var(--grau-dunkel); font-weight:600; }
+  .mock-brand small { display:block; }
+  .mock-nav { margin-left: 1.4rem; display:flex; gap:1.1rem; font-size:0.85rem; color: var(--grau-dunkel); }
+  .mock-nav .on { font-weight: 700; border-bottom: 2px solid var(--gelb); padding-bottom: 2px; }
+  .mock-user { margin-left:auto; font-size:0.8rem; color:var(--muted); text-align:right; }
+  .mock-user b { color: var(--grau-dunkel); display:block; font-size:0.85rem; }
+  .mock-body { padding: 1.2rem 1.4rem 1.5rem; background: #fff; }
+
+  .mb-top { display:flex; align-items:center; gap:0.8rem; flex-wrap:wrap; padding-bottom:0.6rem; border-bottom:1px solid #eee; margin-bottom:1rem; }
+  .mb-top .zurueck { color:var(--muted); font-size:0.85rem; }
+  .mb-top .vid { font-weight:700; color:var(--grau-dunkel); }
+  .mb-top .person { color:var(--muted); font-size:0.9rem; }
+
+  .badge { display:inline-block; border-radius:20px; padding:0.12rem 0.7rem; font-size:0.75rem; font-weight:600; }
+  .badge-grau { background:#ececec; color:#555; }
+  .badge-blau { background:#e0f3fb; color:#0a7ca6; }
+  .badge-gruen{ background:#ecf6dd; color:#4d7d18; }
+  .badge-rot  { background:#fde3e3; color:#b3121a; }
+  .badge-gelb { background:#fff3c9; color:#8a6d00; }
+
+  .tabs { display:flex; gap:1.3rem; border-bottom:1px solid #eee; margin-bottom:1.1rem; font-size:0.9rem; flex-wrap:wrap; }
+  .tabs span { padding:0.4rem 0.1rem; color:var(--muted); }
+  .tabs span.on { color:var(--grau-dunkel); font-weight:700; border-bottom:3px solid var(--gruen); }
+
+  .btn { display:inline-block; border:none; border-radius:7px; padding:0.5rem 1rem; font-size:0.88rem; font-weight:600; cursor:default; background: var(--grau-dunkel); color:#fff; }
+  .btn-gruen { background: var(--gruen); }
+  .btn-rot   { background: var(--rot); }
+  .btn-gelb  { background: var(--gelb); color:#3a3000; }
+  .btn-outline { background:#fff; color:var(--grau-dunkel); border:1px solid var(--grau-hell); }
+  .btn-sm { padding:0.32rem 0.7rem; font-size:0.8rem; }
+
+  .karte { border:1px solid var(--border); border-radius:9px; padding:1rem 1.1rem; margin:0.8rem 0; background:#fff; }
+  .karte .knr { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:var(--grau-dunkel); color:#fff; font-size:0.82rem; font-weight:700; margin-right:0.5rem; }
+  .karte.aktiv { border:2px solid var(--blau); background:#f7fcff; }
+  .karte.gruen { border:2px solid var(--gruen); }
+  .karte.rot   { border:2px solid var(--rot); }
+  .ktitel { font-weight:700; color:var(--grau-dunkel); }
+  .ksub { color:var(--muted); font-size:0.85rem; margin-top:0.15rem; }
+
+  .schrittleiste { display:flex; flex-wrap:wrap; gap:0.4rem; font-size:0.78rem; margin:0.2rem 0 1rem; }
+  .schrittleiste span { padding:0.2rem 0.6rem; border-radius:20px; background:#f0f0f0; color:#888; }
+  .schrittleiste span.done { background:#ecf6dd; color:#4d7d18; }
+  .schrittleiste span.here { background:var(--blau); color:#fff; font-weight:600; }
+
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  @media (max-width:720px){ .grid2{ grid-template-columns:1fr; } .mock-nav{ display:none; } }
+
+  /* Formular-Mock */
+  .feld { margin:0.7rem 0; }
+  .feld label { display:block; font-size:0.8rem; color:var(--grau-dunkel); font-weight:600; margin-bottom:0.2rem; }
+  .feld .input { border:1px solid var(--grau-hell); border-radius:6px; padding:0.45rem 0.6rem; font-size:0.88rem; color:#333; background:#fff; }
+  .feld .input.ph { color:#aaa; }
+  .public-head { text-align:center; padding:1.4rem 1rem 0.6rem; }
+  .public-head .logo-wort { font-size:1.7rem; }
+
+  /* Modal-Mock */
+  .modal-wrap { background: #f1f1f1; padding:1.6rem; }
+  .modal { max-width:440px; margin:0 auto; background:#fff; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.18); overflow:hidden; }
+  .modal .mhead { padding:1rem 1.2rem; font-weight:700; color:var(--grau-dunkel); border-bottom:1px solid #eee; }
+  .modal .mbody { padding:1.1rem 1.2rem; font-size:0.9rem; }
+  .modal .mfoot { padding:0.9rem 1.2rem; display:flex; gap:0.6rem; justify-content:flex-end; border-top:1px solid #eee; }
+
+  .legende { display:flex; gap:1.3rem; flex-wrap:wrap; font-size:0.83rem; margin:0.6rem 0 0; color:var(--muted); }
+  .legende b { display:inline-block; width:13px; height:13px; border-radius:3px; vertical-align:middle; margin-right:4px; }
+  .fuss { margin-top:3.5rem; padding-top:1.2rem; border-top:1px solid var(--border); color:var(--muted); font-size:0.85rem; }
+</style>
+</head>
+<body>
+
+<div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+
+<header class="titel">
+  <p class="logo-wort">CREDO</p>
+  <p class="logo-sub">HR-Portal &middot; Personalmanagement</p>
+  <p class="claim">Konzept &amp; Mockups zur Abstimmung</p>
+  <h1>Modul „Vertragsende"</h1>
+  <p class="untertitel">Ein neuer Vorgangstyp für auslaufende (befristete) Verträge — mit Verlängerung (Strang A) oder Nicht-Übernahme (Strang B).</p>
+</header>
+
+<div class="seite">
+
+  <div class="meta">
+    <div><b>Zweck dieses Dokuments:</b> Visuelle Bestätigung, dass wir dasselbe meinen — <i>bevor</i> eine Zeile Code entsteht.</div>
+    <div><b>Stand:</b> Entwurf zur Abstimmung &middot; <b>Quelle:</b> Klärung Dimitri Riesen ↔ Claude (Skill <code>/klaeren</code>)</div>
+    <div><b>Noch kein Code:</b> Dieses Dokument ist reine Planung. Umsetzung startet erst nach deinem „Go".</div>
+  </div>
+
+  <nav class="inhalt">
+    <h2>Inhalt</h2>
+    <ol>
+      <li><a href="#idee">Die Idee in einem Satz</a></li>
+      <li><a href="#entscheidungen">Unsere Entscheidungen</a></li>
+      <li><a href="#prozess">Der Prozess (Diagramm)</a></li>
+      <li><a href="#mockups">Wie es aussieht (Mockups)</a></li>
+      <li><a href="#daten">Datenmodell &amp; Dokumentenmodul</a></li>
+      <li><a href="#quelle">Datenquelle: n8n &amp; SQL-Server</a></li>
+      <li><a href="#phasen">Phasenplan</a></li>
+      <li><a href="#brauche">Was ich von dir brauche</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="idee">1 &middot; Die Idee in einem Satz</h2>
+  <p>
+    Läuft ein <b>befristeter Vertrag</b> aus, entsteht im Portal automatisch ein <b>Vertragsende-Vorgang</b>.
+    Die Personalabteilung steht dann an einer Weiche und trifft <b>eine von zwei Entscheidungen</b>:
+  </p>
+  <div class="grid2">
+    <div class="karte gruen">
+      <p class="ktitel">A &middot; Mitarbeiter behalten</p>
+      <p class="ksub">Der Vorgesetzte bekommt einen Magic-Link, füllt die Vertragsdaten aus (wie im Onboarding) — daraus wird der neue Vertrag aus einer Vorlage erzeugt.</p>
+    </div>
+    <div class="karte rot">
+      <p class="ktitel">B &middot; Mitarbeiter nicht übernehmen</p>
+      <p class="ksub">Ein Klick — und das Portal legt automatisch einen Offboarding-Vorgang an (Austrittsgrund „Befristungsende"), mit übernommenen Daten.</p>
+    </div>
+  </div>
+
+  <h2 id="entscheidungen">2 &middot; Unsere Entscheidungen</h2>
+  <p>Das haben wir in der Klärung gemeinsam festgelegt — bitte gegenlesen:</p>
+  <table>
+    <tr><th style="width:26%">Frage</th><th>Entscheidung</th></tr>
+    <tr><td>Woher kommt die Meldung „Vertrag läuft aus"?</td><td><b>Komplett über n8n.</b> n8n liest deinen SQL-Server (<code>DokuBit</code>) und meldet auslaufende Verträge ans Portal. Das Portal bleibt vom SQL-Server <b>entkoppelt</b> (kein Direktzugriff).</td></tr>
+    <tr><td>Ab wann &amp; wie dringend?</td><td><b>Fristen-Ampel aus deinem n8n-Flow:</b> Beobachtung ab 12 Monaten, Warnung ab 6, kritisch ab 2 Monaten vor Vertragsende — so wird rechtzeitig gehandelt.</td></tr>
+    <tr><td>Was passiert bei „behalten" (Strang A)?</td><td><b>HR löst den Vorgesetzten-Link manuell aus</b> (wie beim Onboarding). Der Vorgesetzte füllt die Vertragsdaten aus → daraus wird <b>nur das Vertragsdokument</b> erzeugt (kein Zurückschreiben, keine erneute Überwachung).</td></tr>
+    <tr><td>Was passiert bei „nicht übernehmen" (Strang B)?</td><td><b>Per HR-Klick</b> (halbautomatisch): ein Klick legt das Offboarding an. Die Kontrolle bleibt beim Menschen.</td></tr>
+    <tr><td>Wie liefern wir aus?</td><td><b>Phasenweise.</b> Erst der Prozess + beide Stränge manuell, dann die Automatik (n8n/Erinnerungen).</td></tr>
+    <tr><td>Dokumenten-Hub</td><td>Wird beim Bau <b>einmal generisch</b> gemacht (gemeinsame Komponente für Onboarding + Vertragsende + später Offboarding/Verbeamtung).</td></tr>
+  </table>
+
+  <h2 id="prozess">3 &middot; Der Prozess</h2>
+  <p>Von der Meldung bis zum Abschluss — die Verzweigung in der Mitte ist der Kern:</p>
+
+  <svg viewBox="0 0 960 760" width="100%" xmlns="http://www.w3.org/2000/svg" style="border:1px solid var(--border);border-radius:10px;background:#fff;margin-top:0.6rem;">
+    <defs>
+      <marker id="pf" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L8,3 L0,6 Z" fill="#888"/>
+      </marker>
+      <style>
+        .bx{fill:#fff;stroke:#bbb;stroke-width:1.5;rx:10;}
+        .t{font-family:Montserrat,Arial,sans-serif;fill:#3a3a3a;}
+        .tt{font-weight:700;fill:#575756;}
+        .lbl{font-family:Montserrat,Arial,sans-serif;font-size:13px;fill:#777;}
+      </style>
+    </defs>
+
+    <!-- Trigger -->
+    <rect x="320" y="20" width="320" height="64" rx="10" fill="#eef9ff" stroke="#009AC6" stroke-width="1.5"/>
+    <text x="480" y="46" text-anchor="middle" class="t tt" font-size="15">Befristeter Vertrag läuft bald aus</text>
+    <text x="480" y="66" text-anchor="middle" class="lbl">n8n liest den SQL-Server und meldet ans Portal</text>
+
+    <line x1="480" y1="84" x2="480" y2="116" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- Vorgang -->
+    <rect x="330" y="118" width="300" height="60" rx="10" class="bx"/>
+    <text x="480" y="143" text-anchor="middle" class="t tt" font-size="15">Vertragsende-Vorgang entsteht</text>
+    <text x="480" y="163" text-anchor="middle" class="lbl">Status: ANGELEGT · VE-2026-…</text>
+
+    <line x1="480" y1="178" x2="480" y2="210" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- Entscheidung (Raute) -->
+    <polygon points="480,210 610,265 480,320 350,265" fill="#fffaeb" stroke="#FBC900" stroke-width="2"/>
+    <text x="480" y="262" text-anchor="middle" class="t tt" font-size="14">Mitarbeiter</text>
+    <text x="480" y="280" text-anchor="middle" class="t tt" font-size="14">übernehmen?</text>
+
+    <!-- nach links: JA -->
+    <path d="M350,265 H190 V298" fill="none" stroke="#6BAA24" stroke-width="2.5" marker-end="url(#pf)"/>
+    <text x="262" y="252" text-anchor="middle" class="lbl" fill="#4d7d18" font-weight="700">JA · Strang A</text>
+    <!-- nach rechts: NEIN -->
+    <path d="M610,265 H770 V298" fill="none" stroke="#E2001A" stroke-width="2.5" marker-end="url(#pf)"/>
+    <text x="698" y="252" text-anchor="middle" class="lbl" fill="#b3121a" font-weight="700">NEIN · Strang B</text>
+
+    <!-- STRANG A (links, grün) -->
+    <rect x="40" y="300" width="300" height="58" rx="10" fill="#f3faea" stroke="#6BAA24" stroke-width="1.5"/>
+    <text x="190" y="324" text-anchor="middle" class="t tt" font-size="14">Vorgesetzter erhält Magic-Link</text>
+    <text x="190" y="343" text-anchor="middle" class="lbl">per E-Mail · kein Login nötig</text>
+    <line x1="190" y1="358" x2="190" y2="388" stroke="#6BAA24" stroke-width="2" marker-end="url(#pf)"/>
+
+    <rect x="40" y="390" width="300" height="58" rx="10" fill="#f3faea" stroke="#6BAA24" stroke-width="1.5"/>
+    <text x="190" y="414" text-anchor="middle" class="t tt" font-size="14">Füllt Vertragsdaten aus</text>
+    <text x="190" y="433" text-anchor="middle" class="lbl">Beginn, Befristung, Stunden, Entgelt …</text>
+    <line x1="190" y1="448" x2="190" y2="478" stroke="#6BAA24" stroke-width="2" marker-end="url(#pf)"/>
+
+    <rect x="40" y="480" width="300" height="58" rx="10" fill="#f3faea" stroke="#6BAA24" stroke-width="1.5"/>
+    <text x="190" y="504" text-anchor="middle" class="t tt" font-size="14">Vertrag aus Vorlage erzeugt</text>
+    <text x="190" y="523" text-anchor="middle" class="lbl">Dokumenten-Hub · Word/PDF</text>
+    <line x1="190" y1="538" x2="190" y2="568" stroke="#6BAA24" stroke-width="2" marker-end="url(#pf)"/>
+
+    <rect x="40" y="570" width="300" height="52" rx="10" fill="#ecf6dd" stroke="#6BAA24" stroke-width="2"/>
+    <text x="190" y="601" text-anchor="middle" class="t tt" font-size="14">Status: VERTRAG_ERSTELLT</text>
+
+    <!-- STRANG B (rechts, rot) -->
+    <rect x="620" y="300" width="300" height="58" rx="10" fill="#fff4f4" stroke="#E2001A" stroke-width="1.5"/>
+    <text x="770" y="324" text-anchor="middle" class="t tt" font-size="14">HR klickt „Nicht übernehmen"</text>
+    <text x="770" y="343" text-anchor="middle" class="lbl">mit Sicherheitsabfrage</text>
+    <line x1="770" y1="358" x2="770" y2="388" stroke="#E2001A" stroke-width="2" marker-end="url(#pf)"/>
+
+    <rect x="620" y="390" width="300" height="58" rx="10" fill="#fff4f4" stroke="#E2001A" stroke-width="1.5"/>
+    <text x="770" y="414" text-anchor="middle" class="t tt" font-size="14">Offboarding wird angelegt</text>
+    <text x="770" y="433" text-anchor="middle" class="lbl">Grund: BEFRISTUNGSENDE · Daten übernommen</text>
+    <line x1="770" y1="448" x2="770" y2="478" stroke="#E2001A" stroke-width="2" marker-end="url(#pf)"/>
+
+    <rect x="620" y="480" width="300" height="58" rx="10" fill="#fff4f4" stroke="#E2001A" stroke-width="1.5"/>
+    <text x="770" y="504" text-anchor="middle" class="t tt" font-size="14">Verknüpft &amp; übergeben</text>
+    <text x="770" y="523" text-anchor="middle" class="lbl">weiter im bestehenden Offboarding-Prozess</text>
+    <line x1="770" y1="538" x2="770" y2="568" stroke="#E2001A" stroke-width="2" marker-end="url(#pf)"/>
+
+    <rect x="620" y="570" width="300" height="52" rx="10" fill="#fde3e3" stroke="#E2001A" stroke-width="2"/>
+    <text x="770" y="601" text-anchor="middle" class="t tt" font-size="14">Status: KEINE_UEBERNAHME</text>
+
+    <text x="480" y="680" text-anchor="middle" class="lbl" font-style="italic">Beide Stränge sind nachvollziehbar protokolliert (Audit-Log + E-Mail-Protokoll).</text>
+  </svg>
+
+  <div class="legende">
+    <span><b style="background:#009AC6"></b>Auslösung</span>
+    <span><b style="background:#FBC900"></b>Entscheidung</span>
+    <span><b style="background:#6BAA24"></b>Strang A — behalten</span>
+    <span><b style="background:#E2001A"></b>Strang B — nicht übernehmen</span>
+  </div>
+
+  <h2 id="mockups">4 &middot; Wie es aussieht (Mockups)</h2>
+  <p class="hinweis info"><span class="label">Hinweis</span>Das sind <b>Skizzen zur Verständigung</b>, keine fertigen Screens — Texte, Felder und Anordnung schärfen wir bei der Umsetzung. Optik = CREDO-CI wie im echten Portal.</p>
+
+  <h3>4.1 &middot; Übersichtsliste „Vertragsende"</h3>
+  <div class="mock">
+    <div class="mock-appbar">
+      <div class="mock-brand"><b>CREDO</b> <span>HR-Portal</span><small>Personalmanagement</small></div>
+      <div class="mock-nav"><span>Dashboard</span><span class="on">Vertragsende</span><span>Vorlagen</span><span>Verwaltung</span></div>
+      <div class="mock-user"><b>Administrator</b>Abmelden</div>
+    </div>
+    <div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <h3 style="margin:0;">Vertragsende</h3>
+        <span class="badge badge-gelb">4 Entscheidung offen</span>
+        <button class="btn btn-sm" style="margin-left:auto;">+ Vorgang anlegen</button>
+      </div>
+      <table style="margin:0;">
+        <tr><th>Vorgang</th><th>Mitarbeiter</th><th>Einrichtung</th><th>Vertragsende</th><th>Frist</th><th>Status</th></tr>
+        <tr><td><code>VE-2026-GS-001</code></td><td>Petra Probe</td><td>Grundschule</td><td>31.07.2026</td><td><span class="badge badge-rot">Kritisch</span></td><td><span class="badge badge-rot">Keine Übernahme</span></td></tr>
+        <tr><td><code>VE-2026-GYM-002</code></td><td>Erika Beispiel</td><td>Gymnasium</td><td>31.08.2026</td><td><span class="badge badge-rot">Kritisch</span></td><td><span class="badge badge-gruen">Vertrag erstellt</span></td></tr>
+        <tr><td><code>VE-2026-BK-003</code></td><td>Max Mustermann</td><td>Berufskolleg</td><td>30.09.2026</td><td><span class="badge badge-gelb">Warnung</span></td><td><span class="badge badge-grau">Angelegt</span></td></tr>
+        <tr><td><code>VE-2026-BK-001</code></td><td>Tom Test</td><td>Berufskolleg</td><td>31.03.2027</td><td><span class="badge badge-blau">Beobachten</span></td><td><span class="badge badge-blau">Link versendet</span></td></tr>
+      </table>
+    </div>
+  </div>
+  <p class="mock-cap">Eigene Kachel/Liste analog Onboarding &amp; Offboarding — mit Status-Filter, Suche und Mandanten-Scope.</p>
+
+  <h3>4.2 &middot; Detailseite — die Weiche (A oder B)</h3>
+  <div class="mock">
+    <div class="mock-appbar">
+      <div class="mock-brand"><b>CREDO</b> <span>HR-Portal</span><small>Personalmanagement</small></div>
+      <div class="mock-nav"><span>Dashboard</span><span class="on">Vertragsende</span><span>Vorlagen</span><span>Verwaltung</span></div>
+      <div class="mock-user"><b>Administrator</b>Abmelden</div>
+    </div>
+    <div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div class="mb-top">
+        <span class="zurueck">&larr; Zurück</span>
+        <span class="vid">VE-2026-BK-003</span>
+        <span class="badge badge-grau">Angelegt</span>
+        <span class="person">Max Mustermann &middot; Berufskolleg &middot; Vertragsende 30.09.2026</span>
+      </div>
+      <div class="tabs"><span class="on">Übersicht</span><span>Vertragsdaten</span><span>Dokumente</span><span>Notizen</span></div>
+
+      <p style="font-weight:700;color:var(--grau-dunkel);margin-bottom:0.2rem;">Entscheidung treffen</p>
+      <p style="color:var(--muted);font-size:0.88rem;margin-top:0;">Wird der Mitarbeiter über das Vertragsende hinaus weiterbeschäftigt?</p>
+      <div class="grid2" style="margin-top:0.6rem;">
+        <div class="karte gruen">
+          <p class="ktitel">✓ Mitarbeiter übernehmen</p>
+          <p class="ksub">Der Vorgesetzte erhält einen Link, um die neuen Vertragsdaten auszufüllen. Anschließend kann der Vertrag erzeugt werden.</p>
+          <button class="btn btn-gruen btn-sm" style="margin-top:0.4rem;">Vorgesetzten-Link senden &rarr;</button>
+        </div>
+        <div class="karte rot">
+          <p class="ktitel">✕ Nicht übernehmen</p>
+          <p class="ksub">Das Vertragsende führt zum Austritt. Es wird automatisch ein Offboarding-Vorgang angelegt.</p>
+          <button class="btn btn-rot btn-sm" style="margin-top:0.4rem;">Offboarding anlegen &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="mock-cap">Die zwei Wege sind bewusst gleichwertig nebeneinander — eine klare, bewusste Entscheidung.</p>
+
+  <h3>4.3 &middot; Strang A — Magic-Link-Formular für den Vorgesetzten (öffentlich)</h3>
+  <div class="mock">
+    <div class="public-head">
+      <p class="logo-wort">CREDO</p>
+      <p class="logo-sub" style="font-size:0.95rem;">Vertragsdaten erfassen</p>
+    </div>
+    <div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body" style="max-width:620px;margin:0 auto;">
+      <p style="font-size:0.9rem;color:var(--muted);">Für: <b style="color:var(--grau-dunkel);">Max Mustermann</b> &middot; Berufskolleg &middot; bisheriges Vertragsende 30.09.2026</p>
+      <div class="grid2">
+        <div class="feld"><label>Vertragsbeginn (neu)</label><div class="input">01.10.2026</div></div>
+        <div class="feld"><label>Befristung</label><div class="input">befristet bis …</div></div>
+        <div class="feld"><label>Neues Vertragsende</label><div class="input">30.09.2027</div></div>
+        <div class="feld"><label>Wochenstunden</label><div class="input">25,5</div></div>
+        <div class="feld"><label>Entgeltgruppe</label><div class="input">E11</div></div>
+        <div class="feld"><label>Stufe</label><div class="input">3</div></div>
+        <div class="feld"><label>Urlaubstage / Jahr</label><div class="input">30</div></div>
+        <div class="feld"><label>Probezeit (Monate)</label><div class="input ph">entfällt</div></div>
+      </div>
+      <div class="feld"><label>Stellenbeschreibung</label><div class="input" style="min-height:38px;">Lehrkraft Sekundarstufe II …</div></div>
+      <div style="display:flex;gap:0.6rem;margin-top:1rem;">
+        <button class="btn btn-outline btn-sm">Zwischenspeichern</button>
+        <button class="btn btn-gruen btn-sm">Absenden &amp; abschließen</button>
+      </div>
+    </div>
+  </div>
+  <p class="mock-cap">Gleiche Felder wie die „Einstellungsmodalitäten" im Onboarding — token-geschützt, kein Login. Personenstammdaten kommen aus der Akte und müssen nicht erneut eingegeben werden.</p>
+
+  <h3>4.4 &middot; Strang A — Vertrag im Dokumenten-Hub erzeugen</h3>
+  <div class="mock">
+    <div class="mock-appbar">
+      <div class="mock-brand"><b>CREDO</b> <span>HR-Portal</span><small>Personalmanagement</small></div>
+      <div class="mock-nav"><span>Dashboard</span><span class="on">Vertragsende</span><span>Vorlagen</span><span>Verwaltung</span></div>
+      <div class="mock-user"><b>Administrator</b>Abmelden</div>
+    </div>
+    <div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div class="mb-top">
+        <span class="vid">VE-2026-BK-003</span>
+        <span class="badge badge-gruen">Vertrag erstellen</span>
+      </div>
+      <div class="tabs"><span>Übersicht</span><span>Vertragsdaten</span><span class="on">Dokumente</span><span>Notizen</span></div>
+      <div class="schrittleiste">
+        <span class="done">✓ Meldung</span><span class="done">✓ Entscheidung</span><span class="here">Sie sind hier: Vertrag</span><span>Abschluss</span>
+      </div>
+      <div class="karte">
+        <p class="ktitel">Dokumente erstellen</p>
+        <p class="ksub">Aus Vorlagen erzeugte Verträge werden automatisch mit den Vorgangsdaten befüllt.</p>
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.7rem;flex-wrap:wrap;">
+          <span style="flex:1;min-width:200px;"><b style="color:var(--grau-dunkel);">Befristungsverlängerung</b><br><small style="color:var(--muted);">Vorlage · Modul Vertragsverlängerung</small></span>
+          <button class="btn btn-outline btn-sm">Word</button>
+          <button class="btn btn-sm">PDF öffnen</button>
+        </div>
+        <hr style="border:none;border-top:1px solid #eee;margin:0.8rem 0;">
+        <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+          <span style="flex:1;min-width:200px;"><b style="color:var(--grau-dunkel);">Entfristung / unbefristeter Vertrag</b><br><small style="color:var(--muted);">Vorlage · Modul Vertragsverlängerung</small></span>
+          <button class="btn btn-outline btn-sm">Word</button>
+          <button class="btn btn-sm">PDF öffnen</button>
+        </div>
+      </div>
+      <p style="font-size:0.82rem;color:var(--muted);">Vorlagen pflegst du unter „Vorlagen" — mit klickbarem Variablen-Katalog (<code>{vorname}</code>, <code>{neues_vertragsende}</code>, <code>{entgeltgruppe}</code> …).</p>
+    </div>
+  </div>
+  <p class="mock-cap">Derselbe Hub wie im Onboarding — nur mit dem neuen Modul „Vertragsverlängerung". Genau hier bauen wir die gemeinsame Komponente (löst auch das offene #13 mit).</p>
+
+  <h3>4.5 &middot; Strang B — Sicherheitsabfrage &amp; Ergebnis</h3>
+  <div class="mock">
+    <div class="modal-wrap">
+      <div class="modal">
+        <div class="mhead">Mitarbeiter nicht übernehmen?</div>
+        <div class="mbody">
+          <p style="margin-top:0;">Für <b>Max Mustermann</b> wird automatisch ein <b>Offboarding-Vorgang</b> angelegt:</p>
+          <ul style="margin:0.4rem 0;">
+            <li>Austrittsgrund: <b>Befristungsende</b></li>
+            <li>Letzter Arbeitstag: <b>30.09.2026</b> (= Vertragsende)</li>
+            <li>Personendaten werden übernommen</li>
+          </ul>
+          <p style="margin-bottom:0;color:var(--muted);font-size:0.85rem;">Der Vertragsende-Vorgang wird mit dem Offboarding verknüpft.</p>
+        </div>
+        <div class="mfoot">
+          <button class="btn btn-outline btn-sm">Abbrechen</button>
+          <button class="btn btn-rot btn-sm">Ja, Offboarding anlegen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ergebnis"><span class="label">Nach der Bestätigung</span>
+    <p>Offboarding <code>OFF-2026-BK-004</code> wurde angelegt und verknüpft. Der Vertragsende-Vorgang erhält den Status <span class="badge badge-rot">Keine Übernahme</span> — ab hier läuft alles im bewährten Offboarding-Prozess weiter.</p>
+  </div>
+
+  <h2 id="daten">5 &middot; Datenmodell &amp; Dokumentenmodul</h2>
+  <p>Technisch (für die Nachvollziehbarkeit — kann beim Querlesen übersprungen werden):</p>
+  <h4>Neuer Vorgang</h4>
+  <ul>
+    <li><code>ContractEndProcess</code> — eigener Vorgangstyp (wie <code>OnboardingProcess</code> / <code>OffboardingProcess</code>): Vorgangs-ID <code>VE-2026-…</code>, Mitarbeiter-/Mandantenbezug, Vertragsende-Datum, Status, Entscheidung, Vorgesetzten-Magic-Link, Verknüpfung zum erzeugten Offboarding.</li>
+    <li><code>ContractRenewalData</code> — die vom Vorgesetzten ausgefüllten Vertragsdaten (Quelle für die Dokument-Erzeugung; <b>kein</b> Rückschreiben — so abgestimmt).</li>
+  </ul>
+  <h4>Dokumentenmodul (gestern gebaut) — wird erweitert</h4>
+  <ul>
+    <li>Neues Modul <b>„Vertragsverlängerung"</b> mit eigenem Variablen-Katalog (Person + neue Vertragsdaten wie <code>{altes_vertragsende}</code>, <code>{neues_vertragsende}</code>, <code>{entgeltgruppe}</code>).</li>
+    <li>Du hinterlegst beliebige Vertrags-Vorlagen (Word) und setzt die Variablen per Klick ein — exakt wie heute schon im Vorlagen-Editor.</li>
+  </ul>
+  <h4>Wiederverwendet (nichts Neues erfunden)</h4>
+  <p>Magic-Link-Mechanik, E-Mail-Versand (SMTP + Protokoll), Rollen/Mandanten-Scope, Audit-Log, der Offboarding-Anlegevorgang (wird in einen wiederverwendbaren Service gehoben) und der Dokumenten-Hub.</p>
+
+  <h2 id="quelle">6 &middot; Datenquelle: alles über n8n</h2>
+  <p>Abgestimmt: Die Anbindung an deinen SQL-Server läuft <b>dauerhaft über n8n</b> — nicht nur am Anfang. Das Portal greift <b>nie direkt</b> auf den SQL-Server zu.</p>
+  <table>
+    <tr><th style="width:42%">Schritt</th><th>Wer</th></tr>
+    <tr><td>SQL-Server lesen (auslaufende Verträge finden)</td><td><b>n8n</b> — du kennst die Umgebung, der Zugriff bleibt dort</td></tr>
+    <tr><td>Auslaufende Verträge ans Portal melden</td><td><b>n8n &rarr; Portal:</b> <code>POST /api/webhooks/contract-end</code> (per Secret abgesichert)</td></tr>
+    <tr><td>Vertragsende-Vorgang anlegen</td><td><b>Portal</b> — empfängt die Meldung und legt den Vorgang an</td></tr>
+  </table>
+  <p class="hinweis info"><span class="label">Vorteil dieser Trennung</span>Weil alles über n8n läuft, bleibt das Portal von deinem SQL-Server <b>entkoppelt</b>: kein zusätzlicher Datenbank-Treiber, keine Netzwerk-/Firewall-Kopplung, keine fremden Zugangsdaten im Portal. n8n ist die einzige Stelle, die deinen SQL-Server kennt — robust und wartungsarm.</p>
+  <p>Du hast den bestehenden n8n-Flow <b>„Email-Vertragsende-Personal 2.0"</b> geteilt — perfekt, denn er liefert genau diese Daten schon heute. Quelle ist die Datenbank <code>DokuBit</code> (MS&nbsp;SQL), Tabellen <code>dokubitmitarbeiter</code> + <code>personal_mandanten</code>; der Flow läuft <b>wöchentlich (Mo&nbsp;9&nbsp;Uhr)</b> und erfasst Verträge mit Ende in <b>1–12 Monaten</b>.</p>
+
+  <h3>6.1 &middot; Welche Felder n8n ans Portal meldet</h3>
+  <table>
+    <tr><th>DokuBit-Spalte</th><th>Bedeutung</th><th>Portal-Feld</th></tr>
+    <tr><td><code>MANR</code></td><td>Personalnummer</td><td>employeePersonalNr</td></tr>
+    <tr><td><code>MAVONAME</code></td><td>Vorname</td><td>employeeFirstName</td></tr>
+    <tr><td><code>MANANAME</code></td><td>Nachname</td><td>employeeLastName</td></tr>
+    <tr><td><code>MAEMAIL</code></td><td>E-Mail</td><td>employeeEmail</td></tr>
+    <tr><td><code>MANDANTENNUMMER</code></td><td>Einrichtung (Nummer)</td><td>&rarr; organizationId (Zuordnung)</td></tr>
+    <tr><td><code>VERTRAGSBEGINN</code></td><td>Vertragsbeginn</td><td>contractStartDate (Info)</td></tr>
+    <tr><td><code>VERTRAGSENDE</code></td><td>Vertragsende</td><td><b>contractEndDate</b> (Schlüssel)</td></tr>
+  </table>
+  <p style="font-size:0.88rem;color:var(--muted);">n8n schickt diese Felder als JSON an <code>POST /api/webhooks/contract-end</code>. Das Portal legt daraus den Vorgang an und ordnet ihn über die Mandantennummer dem richtigen CREDO-Mandanten zu.</p>
+
+  <h3>6.2 &middot; Fristen-Ampel — „rechtzeitig Bescheid"</h3>
+  <p>Damit nichts zu spät kommt, übernimmt das Portal <b>exakt die Staffelung deines Flows</b>. Die Stufe berechnet sich automatisch aus dem Vertragsende und „wandert" mit der Zeit nach oben:</p>
+  <table>
+    <tr><th>Stufe</th><th>Zeit bis Vertragsende</th><th>Bedeutung</th></tr>
+    <tr><td><span class="badge badge-blau">Beobachten</span></td><td>7–12 Monate</td><td>Vorgang entsteht, HR hat ihn im Blick</td></tr>
+    <tr><td><span class="badge badge-gelb">Warnung</span></td><td>3–6 Monate</td><td>Entscheidung vorbereiten, Gespräche führen</td></tr>
+    <tr><td><span class="badge badge-rot">Kritisch</span></td><td>1–2 Monate</td><td>Sofort handeln — Vertrag oder Offboarding</td></tr>
+  </table>
+  <p class="hinweis info"><span class="label">Vorlauf = 12 Monate</span>Damit ist auch geklärt, <i>ab wann</i> ein Vorgang entsteht: <b>ab 12 Monaten</b> vor Vertragsende (Beobachtungsstart). Die Ampel ist eine reine Live-Anzeige aus dem Datum — sie wird nicht gespeichert und ist deshalb immer aktuell.</p>
+  <p style="font-size:0.88rem;color:var(--muted);">Deine hübsche wöchentliche HR-Übersichtsmail aus dem Flow kann unverändert weiterlaufen — das Portal <b>ergänzt</b> sie um die Vorgangs-Steuerung (Entscheidung A/B, Vertragserstellung), ersetzt sie nicht.</p>
+
+  <h2 id="phasen">7 &middot; Phasenplan</h2>
+  <h4>Phase 1 — der Prozess steht (Kern dieses Konzepts)</h4>
+  <ul>
+    <li>Datenmodell + Vorgangsliste + Anlegen</li>
+    <li>Detailseite mit der Weiche A/B</li>
+    <li>Strang A: Vorgesetzten-Link + Formular + Vertragsdokument (Dokumenten-Hub generisch)</li>
+    <li>Strang B: Ein-Klick-Offboarding</li>
+    <li>E-Mail-Vorlagen, Tests, Qualitäts-Check</li>
+  </ul>
+  <h4>Phase 2 — Automatik (über n8n)</h4>
+  <ul>
+    <li>n8n-Webhook-Eingang: auslaufende Verträge werden automatisch zu Vorgängen</li>
+    <li>Erinnerungen für offene Entscheidungen</li>
+  </ul>
+  <p style="font-size:0.9rem;color:var(--muted);">Geschätzter Aufwand Phase 1: ca. 3,5–4,5 Tage.</p>
+
+  <h2 id="brauche">8 &middot; Was ich von dir brauche</h2>
+  <p>Damit Phase 1 reibungslos startet bzw. Phase 2 vorbereitet ist:</p>
+
+  <h4>Für Phase 1 — nur noch ein Punkt offen</h4>
+  <ol>
+    <li><b>Vertrags-Vorlagen:</b> Hast du Word-Muster für „Befristungsverlängerung" und „Entfristung", die ich als Vorlage hinterlegen kann? (Sonst starten wir mit Platzhalter-Vorlagen.)</li>
+  </ol>
+  <p style="font-size:0.9rem;color:var(--muted);">✓ <b>Vorlauf</b> (12 Monate, Beobachtungsstart) und <b>Vorgesetzten-Link</b> (HR löst manuell aus, wie Onboarding) sind durch deinen Flow bzw. deine Vorgabe bereits geklärt.</p>
+
+  <h4>Für die Automatik (Phase 2, über n8n)</h4>
+  <ol>
+    <li>✓ <b>Tabellenstruktur:</b> geklärt — <code>DokuBit</code> (<code>dokubitmitarbeiter</code> + <code>personal_mandanten</code>), siehe Abschnitt&nbsp;6.1.</li>
+    <li>✓ <b>n8n-Takt:</b> geklärt — wöchentlich Mo&nbsp;9&nbsp;Uhr (aus deinem Flow).</li>
+    <li>✓ <b>Mandanten-Zuordnung:</b> geklärt — <code>DokuBit.MANDANTENNUMMER</code> ist identisch mit der Portal-Mandantennummer, die Zuordnung erfolgt automatisch.</li>
+  </ol>
+
+  <div class="hinweis info"><span class="label">Mein Vorschlag</span>
+    <p>Wir starten <b>Phase 1</b> (der Prozess mit beiden Strängen, manuell auslösbar) — dafür brauche ich von oben nur die drei Punkte unter „Phase 1". Sobald die n8n-Anbindung dran ist, definieren wir das Meldungs-Format gemeinsam anhand deiner Tabellenstruktur.</p>
+  </div>
+
+  <p class="fuss">CREDO HR-Portal &middot; Konzeptdokument „Vertragsende" &middot; erstellt zur Abstimmung &middot; noch nicht in Umsetzung.</p>
+
+</div>
+
+<div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+</body>
+</html>
