@@ -14,6 +14,7 @@ import { STATUS_LABELS } from "@/lib/constants";
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
+import { TemplateGenerationSection } from "@/components/template-generation-section";
 
 // =============================================
 // Types
@@ -1619,27 +1620,6 @@ function StepHinweis({ data }: { data: DetailData }) {
   );
 }
 
-const ERZEUG_BTN =
-  "rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50";
-
-function DocErzeugZeile({ name, tag, children }: { name: string; tag: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{name}</p>
-        <p className="text-[11px] text-muted-foreground">{tag}</p>
-      </div>
-      <div className="flex items-center gap-1.5">{children}</div>
-    </div>
-  );
-}
-
-interface OnbTemplate {
-  id: string;
-  name: string;
-  description: string | null;
-}
-
 function OnboardingErstellenSection({
   onboardingId,
   canEdit,
@@ -1647,114 +1627,23 @@ function OnboardingErstellenSection({
   onboardingId: string;
   canEdit: boolean;
 }) {
-  const [templates, setTemplates] = useState<OnbTemplate[]>([]);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/brief-vorlagen?modul=ONBOARDING")
-      .then((r) => (r.ok ? r.json() : { data: [] }))
-      .then((j) =>
-        setTemplates(
-          (j.data || []).map((t: { id: string; name: string; description: string | null }) => ({
-            id: t.id,
-            name: t.name,
-            description: t.description,
-          })),
-        ),
-      )
-      .catch(() => setTemplates([]));
-  }, []);
-
-  async function generate(templateId: string, format: "docx" | "pdf") {
-    setBusy(`${templateId}:${format}`);
-    setErr(null);
-    try {
-      const res = await fetch(`/api/brief-vorlagen/${templateId}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format, refId: onboardingId }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setErr(j.error || "Erzeugung fehlgeschlagen.");
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download =
-        res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") ||
-        `dokument.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      setErr("Verbindungsfehler bei der Erzeugung.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
+  // Nutzt die generische Hub-Komponente; Onboarding-Spezifika (Modul + amtliches
+  // Masernschutz-PDF) bleiben hier gekapselt.
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-foreground">
-        <DocumentIcon className="h-5 w-5 text-muted-foreground" />
-        Dokumente erstellen
-      </h3>
-      <p className="mb-4 text-xs text-muted-foreground">
-        Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.
-      </p>
-      {err && (
-        <div className="mb-3 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-3 py-2 text-xs text-credo-rot">
-          {err}
-        </div>
-      )}
-      <div className="space-y-2">
-        {canEdit && (
-          <DocErzeugZeile
-            name="Masernschutz – Nachweis-Bescheinigung"
-            tag="Amtliches NRW-Formular (zum Ausfüllen beim Arzt)"
-          >
-            <a
-              href="/system-dokumente/masernschutz-nrw.pdf"
-              target="_blank"
-              rel="noopener"
-              className={ERZEUG_BTN}
-            >
-              PDF öffnen
-            </a>
-          </DocErzeugZeile>
-        )}
-        {templates.map((t) => (
-          <DocErzeugZeile key={t.id} name={t.name} tag={t.description || "Vorlage"}>
-            <button
-              type="button"
-              onClick={() => generate(t.id, "docx")}
-              disabled={busy === `${t.id}:docx`}
-              className={ERZEUG_BTN}
-            >
-              {busy === `${t.id}:docx` ? "…" : "Word"}
-            </button>
-            <button
-              type="button"
-              onClick={() => generate(t.id, "pdf")}
-              disabled={busy === `${t.id}:pdf`}
-              className={ERZEUG_BTN}
-            >
-              {busy === `${t.id}:pdf` ? "…" : "PDF"}
-            </button>
-          </DocErzeugZeile>
-        ))}
-        {templates.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            Keine Onboarding-Vorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ an.
-          </p>
-        )}
-      </div>
-    </div>
+    <TemplateGenerationSection
+      modul="ONBOARDING"
+      refId={onboardingId}
+      canEdit={canEdit}
+      staticDocuments={[
+        {
+          name: "Masernschutz – Nachweis-Bescheinigung",
+          tag: "Amtliches NRW-Formular (zum Ausfüllen beim Arzt)",
+          href: "/system-dokumente/masernschutz-nrw.pdf",
+          label: "PDF öffnen",
+        },
+      ]}
+      emptyHint="Keine Onboarding-Vorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ an."
+    />
   );
 }
 

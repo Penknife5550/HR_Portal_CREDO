@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { PortalHeader } from "@/components/portal-header";
 import { DashboardContent } from "./dashboard-content";
 import { OffboardingDashboardContent } from "./offboarding-dashboard-new";
+import { ContractEndDashboardContent } from "./contract-end-dashboard-new";
 import { CivilServiceDashboardContent } from "./civil-service-dashboard";
 import { MutterschutzDashboardContent } from "./mutterschutz-dashboard";
 import { ElternzeitDashboardContent } from "./elternzeit-dashboard";
@@ -29,13 +30,15 @@ export default async function DashboardPage({
   const activeTab =
     tab === "offboarding"
       ? "offboarding"
-      : tab === "civil-service"
-        ? "civil-service"
-        : tab === "mutterschutz"
-          ? "mutterschutz"
-          : tab === "elternzeit"
-            ? "elternzeit"
-            : "onboarding";
+      : tab === "contract-end"
+        ? "contract-end"
+        : tab === "civil-service"
+          ? "civil-service"
+          : tab === "mutterschutz"
+            ? "mutterschutz"
+            : tab === "elternzeit"
+              ? "elternzeit"
+              : "onboarding";
 
   return (
     <div>
@@ -65,6 +68,16 @@ export default async function DashboardPage({
               }`}
             >
               Offboarding
+            </Link>
+            <Link
+              href="/dashboard?tab=contract-end"
+              className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === "contract-end"
+                  ? "border-credo-gruen text-credo-gruen"
+                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+              }`}
+            >
+              Vertragsende
             </Link>
             <Link
               href="/dashboard?tab=civil-service"
@@ -105,6 +118,8 @@ export default async function DashboardPage({
         <DashboardContent user={session} />
       ) : activeTab === "offboarding" ? (
         <OffboardingDashboardContent user={session} />
+      ) : activeTab === "contract-end" ? (
+        <ContractEndDashboardContent user={session} />
       ) : activeTab === "civil-service" ? (
         <CivilServiceDashboardContent user={session} />
       ) : activeTab === "mutterschutz" ? (

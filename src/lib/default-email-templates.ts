@@ -2649,6 +2649,20 @@ CREDO HR-Portal`,
   },
 
   // =============================================
+  // Vertragsende: HR-Benachrichtigung (neuer Vorgang)
+  // =============================================
+  hrStatusNotification({
+    event: "contract-end-created",
+    name: "Neuer Vertragsende-Vorgang erstellt",
+    subject: "Neuer Vertragsende-Vorgang: {{mitarbeiter_name}} ({{vorgangsnummer}})",
+    badge: "Vertragsende",
+    badgeBg: "#e0f3fb",
+    badgeText: "#0a7ca6",
+    heading: "Neuer Vertragsende-Vorgang",
+    text: "Für <strong>{{mitarbeiter_name}}</strong> ({{einrichtung}}) wurde ein Vertragsende-Vorgang (<strong>{{vorgangsnummer}}</strong>) angelegt. Bitte entscheiden Sie im Portal über Übernahme (Vertragsverlängerung) oder Austritt (Offboarding).",
+  }),
+
+  // =============================================
   // Mutterschutz: Statuswechsel (HR-Benachrichtigungen)
   // =============================================
   hrStatusNotification({

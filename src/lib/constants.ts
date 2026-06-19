@@ -97,6 +97,24 @@ export const OFFBOARDING_STATUS_LABELS: Record<string, { label: string; color: s
 };
 
 // =============================================
+// Vertragsende Status-Labels
+// =============================================
+export const CONTRACT_END_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  ANGELEGT: { label: "Angelegt", color: "bg-blue-100 text-blue-800" },
+  ENTSCHEIDUNG_UEBERNAHME: { label: "Übernahme – Link offen", color: "bg-yellow-100 text-yellow-800" },
+  VERTRAG_ERSTELLT: { label: "Vertrag erstellt", color: "bg-green-100 text-green-800" },
+  ENTSCHEIDUNG_KEINE_UEBERNAHME: { label: "Keine Übernahme", color: "bg-red-100 text-red-800" },
+  ABGESCHLOSSEN: { label: "Abgeschlossen", color: "bg-purple-100 text-purple-800" },
+  STORNIERT: { label: "Storniert", color: "bg-gray-100 text-gray-800" },
+};
+
+export const CONTRACT_END_DECISION_LABELS: Record<string, string> = {
+  OFFEN: "Offen",
+  UEBERNAHME: "Übernahme",
+  KEINE_UEBERNAHME: "Keine Übernahme",
+};
+
+// =============================================
 // Austrittsart-Labels
 // =============================================
 export const EXIT_TYPE_LABELS: Record<string, string> = {
