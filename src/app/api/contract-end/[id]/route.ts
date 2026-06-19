@@ -16,9 +16,18 @@ import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions
 
 // Gueltige Status-Uebergaenge
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  ANGELEGT: ["ENTSCHEIDUNG_UEBERNAHME", "ENTSCHEIDUNG_KEINE_UEBERNAHME", "STORNIERT"],
+  ANGELEGT: ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_KEINE_UEBERNAHME", "STORNIERT"],
+  ANFRAGE_VORGESETZTER: [
+    "RUECKMELDUNG_UEBERNAHME",
+    "RUECKMELDUNG_KEINE_UEBERNAHME",
+    "ENTSCHEIDUNG_KEINE_UEBERNAHME",
+    "STORNIERT",
+  ],
+  RUECKMELDUNG_UEBERNAHME: ["VERTRAG_ERSTELLT", "VERTRAG_UNTERSCHRIEBEN", "ABGESCHLOSSEN", "STORNIERT"],
+  RUECKMELDUNG_KEINE_UEBERNAHME: ["ENTSCHEIDUNG_KEINE_UEBERNAHME", "STORNIERT"],
   ENTSCHEIDUNG_UEBERNAHME: ["VERTRAG_ERSTELLT", "ENTSCHEIDUNG_KEINE_UEBERNAHME", "STORNIERT"],
-  VERTRAG_ERSTELLT: ["ABGESCHLOSSEN", "STORNIERT"],
+  VERTRAG_ERSTELLT: ["VERTRAG_UNTERSCHRIEBEN", "ABGESCHLOSSEN", "STORNIERT"],
+  VERTRAG_UNTERSCHRIEBEN: ["ABGESCHLOSSEN", "STORNIERT"],
   ENTSCHEIDUNG_KEINE_UEBERNAHME: ["ABGESCHLOSSEN", "STORNIERT"],
   ABGESCHLOSSEN: [],
   STORNIERT: [],
@@ -91,7 +100,7 @@ export async function PATCH(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
-    const { status, decision, supervisorEmail, contractEndDate } = parsed.data;
+    const { status, decision, supervisorEmail, contractEndDate, mavStatus } = parsed.data;
 
     const existing = await prisma.contractEndProcess.findUnique({ where: { id } });
     if (!existing) {
@@ -131,6 +140,13 @@ export async function PATCH(
     if (supervisorEmail !== undefined) updateData.supervisorEmail = supervisorEmail || null;
     if (contractEndDate) updateData.contractEndDate = new Date(contractEndDate);
     if (status === "ABGESCHLOSSEN") updateData.completedAt = new Date();
+    // B1: unterschriebener Ruecklauf -> Zeitpunkt festhalten (Entfristungsschutz)
+    if (status === "VERTRAG_UNTERSCHRIEBEN") updateData.contractSignedReturnedAt = new Date();
+    // B3: MAV-Status setzen; Anhoerungszeitpunkt mitschreiben (ausser "ausstehend")
+    if (mavStatus !== undefined) {
+      updateData.mavStatus = mavStatus || null;
+      updateData.mavConsultedAt = mavStatus && mavStatus !== "AUSSTEHEND" ? new Date() : null;
+    }
 
     const updated = await prisma.contractEndProcess.update({
       where: { id },
@@ -146,6 +162,7 @@ export async function PATCH(
     }
     if (decision) auditDetails.decision = decision;
     if (contractEndDate) auditDetails.contractEndDate = contractEndDate;
+    if (mavStatus !== undefined) auditDetails.mavStatus = mavStatus;
 
     await prisma.auditLog.create({
       data: {

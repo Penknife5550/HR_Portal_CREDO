@@ -857,6 +857,29 @@ export const EVENT_CATALOG: EventDefinition[] = [
     },
     wired: true,
   },
+  {
+    event: "contract-end-supervisor-reminder",
+    name: "Erinnerung Vorgesetzter (Vertragsende-Anfrage offen)",
+    group: "Vertragsende",
+    recipientHint: "Vorgesetzte:r — Erinnerung bei unbeantworteter Uebernahme-Anfrage",
+    defaultRecipients: { to: "{{supervisorEmail}}" },
+    samplePayload: {
+      contractEndId: "00000000-0000-0000-0000-000000000007",
+      displayId: "VE-2026-GYM-001",
+      employeeName: "Max Mustermann",
+      mitarbeiter_name: "Max Mustermann",
+      supervisorEmail: "vorgesetzte@example.org",
+      einrichtung: "FES Minden",
+      organization: "FES Minden",
+      contractEndDate: "2026-12-31T00:00:00.000Z",
+      vertragsende: "31.12.2026",
+      formularLink: BEISPIEL_LINK,
+      link: BEISPIEL_LINK,
+      tage_offen: 7,
+      dringlichkeit: "Warnung",
+    },
+    wired: true,
+  },
 ];
 
 // =============================================

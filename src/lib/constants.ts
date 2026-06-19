@@ -101,8 +101,12 @@ export const OFFBOARDING_STATUS_LABELS: Record<string, { label: string; color: s
 // =============================================
 export const CONTRACT_END_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   ANGELEGT: { label: "Angelegt", color: "bg-blue-100 text-blue-800" },
-  ENTSCHEIDUNG_UEBERNAHME: { label: "Übernahme – Link offen", color: "bg-yellow-100 text-yellow-800" },
+  ANFRAGE_VORGESETZTER: { label: "Anfrage beim Vorgesetzten", color: "bg-yellow-100 text-yellow-800" },
+  RUECKMELDUNG_UEBERNAHME: { label: "Rückmeldung: Übernahme", color: "bg-green-100 text-green-800" },
+  RUECKMELDUNG_KEINE_UEBERNAHME: { label: "Rückmeldung: keine Übernahme", color: "bg-orange-100 text-orange-800" },
+  ENTSCHEIDUNG_UEBERNAHME: { label: "Übernahme – Anfrage offen", color: "bg-yellow-100 text-yellow-800" },
   VERTRAG_ERSTELLT: { label: "Vertrag erstellt", color: "bg-green-100 text-green-800" },
+  VERTRAG_UNTERSCHRIEBEN: { label: "Vertrag unterschrieben", color: "bg-emerald-100 text-emerald-800" },
   ENTSCHEIDUNG_KEINE_UEBERNAHME: { label: "Keine Übernahme", color: "bg-red-100 text-red-800" },
   ABGESCHLOSSEN: { label: "Abgeschlossen", color: "bg-purple-100 text-purple-800" },
   STORNIERT: { label: "Storniert", color: "bg-gray-100 text-gray-800" },

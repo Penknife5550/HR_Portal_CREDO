@@ -12,6 +12,7 @@ import { PortalHeader } from "@/components/portal-header";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { CONTRACT_END_STATUS_LABELS } from "@/lib/constants";
 import { getContractEndCategory, CONTRACT_END_CATEGORY_META } from "@/lib/contract-end-fristen";
+import { getSignatureWarning, getKettenbefristungWarning } from "@/lib/contract-end-warnings";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 
 interface User {
@@ -50,6 +51,14 @@ interface ContractEndData {
   contractEndDate: string;
   supervisorEmail: string | null;
   supervisorLinkSentAt: string | null;
+  supervisorRespondedAt: string | null;
+  supervisorDeclineReason: string | null;
+  contractSignedReturnedAt: string | null;
+  befristungsart: string | null;
+  bisherigeBefristungMonate: number | null;
+  bisherigeVerlaengerungen: number | null;
+  mavStatus: string | null;
+  mavConsultedAt: string | null;
   organization: { id: string; name: string; mandantNumber: string };
   renewalData: RenewalData | null;
   offboarding: { id: string; displayId: string; status: string } | null;
@@ -187,6 +196,53 @@ export function ContractEndDetailContent({
     }
   }
 
+  // B1: unterschriebenen Ruecklauf erfassen (Entfristungsschutz)
+  async function signatureReceived() {
+    if (!window.confirm("Bestätigen: Der unterschriebene Verlängerungsvertrag liegt vor?")) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/contract-end/${contractEndId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "VERTRAG_UNTERSCHRIEBEN" }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setActionError(j.error || "Status konnte nicht geändert werden.");
+        return;
+      }
+      await loadData();
+    } catch {
+      setActionError("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // B3: MAV-Beteiligungsstatus setzen
+  async function setMav(mavStatus: string) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/contract-end/${contractEndId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mavStatus }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setActionError(j.error || "MAV-Status konnte nicht gesetzt werden.");
+        return;
+      }
+      await loadData();
+    } catch {
+      setActionError("Verbindungsfehler.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <div>
@@ -218,6 +274,17 @@ export function ContractEndDetailContent({
   const statusInfo = CONTRACT_END_STATUS_LABELS[data.status] || CONTRACT_END_STATUS_LABELS.ANGELEGT;
   const cat = getContractEndCategory(new Date(data.contractEndDate));
   const catMeta = CONTRACT_END_CATEGORY_META[cat];
+  const signatureWarning = getSignatureWarning({
+    decision: data.decision,
+    status: data.status,
+    contractEndDate: new Date(data.contractEndDate),
+    contractSignedReturnedAt: data.contractSignedReturnedAt ? new Date(data.contractSignedReturnedAt) : null,
+  });
+  const kettenWarning = getKettenbefristungWarning({
+    befristungsart: data.befristungsart,
+    bisherigeBefristungMonate: data.bisherigeBefristungMonate,
+    bisherigeVerlaengerungen: data.bisherigeVerlaengerungen,
+  });
 
   return (
     <div>
@@ -265,19 +332,32 @@ export function ContractEndDetailContent({
       <div className="border-b bg-card">
         <div className="mx-auto flex max-w-5xl flex-wrap gap-2 px-4 py-2 text-xs sm:px-6">
           {(() => {
-            const entschieden = data.decision !== "OFFEN";
-            const fertig = ["VERTRAG_ERSTELLT", "ENTSCHEIDUNG_KEINE_UEBERNAHME", "ABGESCHLOSSEN"].includes(
-              data.status,
-            );
+            const st = data.status;
+            const anfrageGestellt = st !== "ANGELEGT";
+            const rueckmeldung =
+              data.decision !== "OFFEN" ||
+              ["RUECKMELDUNG_UEBERNAHME", "RUECKMELDUNG_KEINE_UEBERNAHME"].includes(st);
+            const vollzug = [
+              "VERTRAG_ERSTELLT",
+              "VERTRAG_UNTERSCHRIEBEN",
+              "ENTSCHEIDUNG_KEINE_UEBERNAHME",
+              "ABGESCHLOSSEN",
+            ].includes(st);
+            const istAblehnung = data.decision === "KEINE_UEBERNAHME";
             const steps = [
               { label: "Angelegt", done: true },
-              { label: "Entscheidung", done: entschieden, here: !entschieden },
+              { label: "Anfrage", done: anfrageGestellt, here: st === "ANGELEGT" },
               {
-                label: data.decision === "KEINE_UEBERNAHME" ? "Offboarding" : "Vertrag",
-                done: fertig,
-                here: entschieden && !fertig,
+                label: "Rückmeldung",
+                done: rueckmeldung,
+                here: ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"].includes(st),
               },
-              { label: "Abschluss", done: data.status === "ABGESCHLOSSEN" },
+              {
+                label: istAblehnung ? "Offboarding" : "Vertrag",
+                done: vollzug,
+                here: rueckmeldung && !vollzug,
+              },
+              { label: "Abschluss", done: st === "ABGESCHLOSSEN" },
             ];
             return steps.map((s) => (
               <span
@@ -325,6 +405,17 @@ export function ContractEndDetailContent({
         <div className="py-5">
           {activeTab === "overview" && (
             <div className="space-y-5">
+              {/* B1: Entfristungs-Warnung (§15 Abs.5 TzBfG) */}
+              {signatureWarning?.warn && (
+                <EntfristungsWarnung
+                  daysLeft={signatureWarning.daysLeft}
+                  overdue={signatureWarning.overdue}
+                  endDate={data.contractEndDate}
+                />
+              )}
+              {/* B2: Kettenbefristungs-Hinweis (§14 TzBfG) */}
+              {kettenWarning && <KettenHinweis reason={kettenWarning.reason} />}
+
               {/* Stammdaten */}
               <div className="rounded-2xl border border-border bg-card p-5">
                 <h3 className="mb-3 text-sm font-bold text-foreground">Stammdaten</h3>
@@ -347,8 +438,12 @@ export function ContractEndDetailContent({
                 onSendLink={sendSupervisorLink}
                 onNichtUebernehmen={nichtUebernehmen}
                 onAbschliessen={abschliessen}
+                onSignatureReceived={signatureReceived}
                 onGotoDocuments={() => setActiveTab("documents")}
               />}
+
+              {/* B3: MAV-Beteiligung */}
+              {canEdit && <MavKarte data={data} busy={busy} onSetMav={setMav} />}
             </div>
           )}
 
@@ -385,6 +480,7 @@ function Entscheidung({
   onSendLink,
   onNichtUebernehmen,
   onAbschliessen,
+  onSignatureReceived,
   onGotoDocuments,
 }: {
   data: ContractEndData;
@@ -394,6 +490,7 @@ function Entscheidung({
   onSendLink: () => void;
   onNichtUebernehmen: () => void;
   onAbschliessen: () => void;
+  onSignatureReceived: () => void;
   onGotoDocuments: () => void;
 }) {
   const INPUT =
@@ -406,29 +503,66 @@ function Entscheidung({
         <p className="mt-1 text-sm text-muted-foreground">
           Für diesen Vorgang wurde ein Offboarding (Befristungsende) angelegt.
         </p>
-        {data.offboarding && (
-          <Link
-            href={`/dashboard/offboarding/${data.offboarding.id}`}
-            className="mt-3 inline-flex rounded-lg bg-credo-rot px-4 py-2 text-sm font-semibold text-white hover:bg-credo-rot/90"
+        {/* B6: Auslaufmitteilung + Zeugnis */}
+        <div className="mt-3 rounded-lg border border-border bg-card/60 p-3 text-sm">
+          <p className="font-medium text-foreground">Nächste Schritte</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
+            <li>
+              <strong className="text-foreground">Auslaufmitteilung</strong> an die/den Mitarbeiter:in erstellen
+              (Tab „Dokumente“ → Modul Vertragsverlängerung).
+            </li>
+            <li>
+              <strong className="text-foreground">Arbeitszeugnis</strong> über das verknüpfte Offboarding ausstellen.
+            </li>
+          </ul>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={onGotoDocuments}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
           >
-            Zum Offboarding {data.offboarding.displayId} →
-          </Link>
-        )}
+            Auslaufmitteilung erstellen →
+          </button>
+          {data.offboarding && (
+            <Link
+              href={`/dashboard/offboarding/${data.offboarding.id}`}
+              className="inline-flex rounded-lg bg-credo-rot px-4 py-2 text-sm font-semibold text-white hover:bg-credo-rot/90"
+            >
+              Zum Offboarding {data.offboarding.displayId} (inkl. Zeugnis) →
+            </Link>
+          )}
+        </div>
       </div>
     );
   }
 
-  if (data.status === "VERTRAG_ERSTELLT") {
+  // Fuehrungskraft will uebernehmen -> HR vollzieht (Vertrag erzeugen)
+  if (
+    data.status === "RUECKMELDUNG_UEBERNAHME" ||
+    data.status === "VERTRAG_ERSTELLT" ||
+    data.status === "VERTRAG_UNTERSCHRIEBEN"
+  ) {
+    const unterschrieben = Boolean(data.contractSignedReturnedAt);
     return (
       <div className="rounded-2xl border-2 border-credo-gruen/40 bg-credo-gruen/5 p-5">
-        <p className="text-sm font-bold text-foreground">Vertragsdaten erfasst</p>
+        <p className="text-sm font-bold text-foreground">Die Führungskraft möchte weiterbeschäftigen</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Die/der Vorgesetzte hat die Vertragsdaten ausgefüllt. Erzeugen Sie den Verlängerungsvertrag im Tab „Dokumente“.
+          Die Vertragsdaten wurden erfasst. Erzeugen Sie den Verlängerungsvertrag im Tab „Dokumente“, lassen Sie ihn unterschreiben und schließen Sie den Vorgang ab.
         </p>
+        {unterschrieben && (
+          <p className="mt-2 text-sm font-medium text-credo-gruen">
+            ✓ Unterschriebener Vertrag erfasst am {formatDate(data.contractSignedReturnedAt)}.
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <button onClick={onGotoDocuments} className="rounded-lg bg-credo-gruen px-4 py-2 text-sm font-semibold text-white hover:bg-credo-gruen/90">
             Zu den Dokumenten →
           </button>
+          {!unterschrieben && (
+            <button onClick={onSignatureReceived} disabled={busy} className="rounded-lg border border-credo-gruen/50 px-4 py-2 text-sm font-medium text-credo-gruen hover:bg-credo-gruen/10 disabled:opacity-50">
+              {busy ? "…" : "Unterschriebenen Vertrag erfassen"}
+            </button>
+          )}
           <button onClick={onAbschliessen} disabled={busy} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent disabled:opacity-50">
             Vorgang abschließen
           </button>
@@ -441,57 +575,72 @@ function Entscheidung({
     return null;
   }
 
-  // ANGELEGT oder ENTSCHEIDUNG_UEBERNAHME: Weiche A/B
-  const linkVersendet = data.status === "ENTSCHEIDUNG_UEBERNAHME" && Boolean(data.supervisorEmail);
-  return (
-    <div>
-      <p className="mb-1 text-sm font-bold text-foreground">Entscheidung treffen</p>
-      <p className="mb-3 text-sm text-muted-foreground">
-        Wird der Mitarbeiter über das Vertragsende hinaus weiterbeschäftigt?
-      </p>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Strang A */}
-        <div className="rounded-2xl border-2 border-credo-gruen/40 bg-credo-gruen/5 p-5">
-          <p className="text-sm font-bold text-foreground">✓ Mitarbeiter übernehmen</p>
-          <p className="mt-1 mb-3 text-sm text-muted-foreground">
-            Die/der Vorgesetzte erhält einen Link, um die neuen Vertragsdaten auszufüllen.
+  // Fuehrungskraft lehnt ab -> HR bestaetigt das Offboarding
+  if (data.status === "RUECKMELDUNG_KEINE_UEBERNAHME") {
+    return (
+      <div className="rounded-2xl border-2 border-credo-rot/30 bg-credo-rot/5 p-5">
+        <p className="text-sm font-bold text-foreground">Die Führungskraft lehnt die Weiterbeschäftigung ab</p>
+        {data.supervisorDeclineReason && (
+          <p className="mt-2 rounded-lg bg-background/60 p-3 text-sm text-foreground">
+            <span className="font-medium text-muted-foreground">Begründung: </span>
+            {data.supervisorDeclineReason}
           </p>
-          {linkVersendet ? (
-            <div className="text-sm">
-              <p className="text-credo-gruen">
-                Link gesendet an <strong>{data.supervisorEmail}</strong>
-                {data.supervisorLinkSentAt ? ` am ${formatDate(data.supervisorLinkSentAt)}` : ""}.
-              </p>
-              <button onClick={onSendLink} disabled={busy} className="mt-2 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50">
-                Link erneut senden
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <input
-                type="email"
-                value={supervisorEmail}
-                onChange={(e) => setSupervisorEmail(e.target.value)}
-                placeholder="vorgesetzte@einrichtung.de"
-                className={INPUT}
-              />
-              <button onClick={onSendLink} disabled={busy} className="w-full rounded-lg bg-credo-gruen px-4 py-2 text-sm font-semibold text-white hover:bg-credo-gruen/90 disabled:opacity-50">
-                {busy ? "…" : "Vorgesetzten-Link senden →"}
-              </button>
-            </div>
-          )}
-        </div>
+        )}
+        <p className="mt-3 text-sm text-muted-foreground">
+          Bestätigen Sie die Nicht-Übernahme — es wird ein Offboarding-Vorgang (Befristungsende) angelegt.
+        </p>
+        <button onClick={onNichtUebernehmen} disabled={busy} className="mt-3 rounded-lg bg-credo-rot px-4 py-2 text-sm font-semibold text-white hover:bg-credo-rot/90 disabled:opacity-50">
+          {busy ? "…" : "Offboarding anlegen →"}
+        </button>
+      </div>
+    );
+  }
 
-        {/* Strang B */}
-        <div className="rounded-2xl border-2 border-credo-rot/30 bg-credo-rot/5 p-5">
-          <p className="text-sm font-bold text-foreground">✕ Nicht übernehmen</p>
-          <p className="mt-1 mb-3 text-sm text-muted-foreground">
-            Das Vertragsende führt zum Austritt. Es wird automatisch ein Offboarding-Vorgang angelegt.
-          </p>
-          <button onClick={onNichtUebernehmen} disabled={busy} className="w-full rounded-lg bg-credo-rot px-4 py-2 text-sm font-semibold text-white hover:bg-credo-rot/90 disabled:opacity-50">
-            {busy ? "…" : "Offboarding anlegen →"}
-          </button>
-        </div>
+  // ANGELEGT / ANFRAGE_VORGESETZTER (+ Alt ENTSCHEIDUNG_UEBERNAHME): Anfrage an die Fuehrungskraft
+  const anfrageGesendet =
+    ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"].includes(data.status) && Boolean(data.supervisorEmail);
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border-2 border-credo-gruen/40 bg-credo-gruen/5 p-5">
+        <p className="text-sm font-bold text-foreground">Anfrage an die Führungskraft</p>
+        <p className="mt-1 mb-3 text-sm text-muted-foreground">
+          Die Führungskraft entscheidet selbst über die Weiterbeschäftigung und erfasst bei Übernahme die neuen Vertragsdaten.
+        </p>
+        {anfrageGesendet ? (
+          <div className="text-sm">
+            <p className="text-credo-gruen">
+              Anfrage gesendet an <strong>{data.supervisorEmail}</strong>
+              {data.supervisorLinkSentAt ? ` am ${formatDate(data.supervisorLinkSentAt)}` : ""} — wartet auf Rückmeldung.
+            </p>
+            <button onClick={onSendLink} disabled={busy} className="mt-2 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50">
+              Anfrage erneut senden
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <input
+              type="email"
+              value={supervisorEmail}
+              onChange={(e) => setSupervisorEmail(e.target.value)}
+              placeholder="vorgesetzte@einrichtung.de"
+              className={INPUT}
+            />
+            <button onClick={onSendLink} disabled={busy} className="w-full rounded-lg bg-credo-gruen px-4 py-2 text-sm font-semibold text-white hover:bg-credo-gruen/90 disabled:opacity-50">
+              {busy ? "…" : "Anfrage an Vorgesetzten senden →"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* HR kann die Entscheidung direkt treffen, wenn sie bereits feststeht */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-sm font-medium text-foreground">Entscheidung steht bereits fest?</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Wenn klar ist, dass nicht weiterbeschäftigt wird (z.B. Stelle entfällt), können Sie direkt das Offboarding anlegen.
+        </p>
+        <button onClick={onNichtUebernehmen} disabled={busy} className="mt-2 rounded-lg border border-credo-rot/40 px-3 py-1.5 text-xs font-semibold text-credo-rot hover:bg-credo-rot/5 disabled:opacity-50">
+          {busy ? "…" : "Direkt Nicht-Übernahme (Offboarding) →"}
+        </button>
       </div>
     </div>
   );
@@ -538,6 +687,91 @@ function RenewalView({ data }: { data: ContractEndData }) {
           <p className="mt-1 text-foreground">{rd.zusatzvereinbarungen}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// B1: Entfristungs-Warnung (§ 15 Abs. 5 TzBfG)
+function EntfristungsWarnung({
+  daysLeft,
+  overdue,
+  endDate,
+}: {
+  daysLeft: number;
+  overdue: boolean;
+  endDate: string;
+}) {
+  return (
+    <div className="rounded-2xl border-2 border-credo-rot/40 bg-credo-rot/5 p-4">
+      <p className="text-sm font-bold text-credo-rot">⚠ Entfristungsrisiko (§ 15 Abs. 5 TzBfG)</p>
+      <p className="mt-1 text-sm text-foreground">
+        {overdue
+          ? `Das Vertragsende (${formatDate(endDate)}) ist überschritten und es liegt kein unterschriebener Vertrag vor. Arbeitet die Person weiter, gilt das Arbeitsverhältnis als UNBEFRISTET — bitte sofort klären.`
+          : `Bis zum Vertragsende (${formatDate(endDate)}, in ${daysLeft} Tagen) muss ein unterschriebener Verlängerungsvertrag vorliegen — sonst droht durch Weiterarbeit ein unbefristetes Arbeitsverhältnis.`}
+      </p>
+    </div>
+  );
+}
+
+// B2: Kettenbefristungs-Hinweis (§ 14 TzBfG)
+function KettenHinweis({ reason }: { reason: string }) {
+  return (
+    <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+      <p className="text-sm font-bold text-amber-800">Hinweis zur Befristung (§ 14 TzBfG)</p>
+      <p className="mt-1 text-sm text-amber-900">{reason}</p>
+    </div>
+  );
+}
+
+// B3: MAV-Beteiligung
+const MAV_OPTIONS: { value: string; label: string }[] = [
+  { value: "NICHT_ERFORDERLICH", label: "Nicht erforderlich" },
+  { value: "ANGEHOERT", label: "Angehört" },
+  { value: "ZUGESTIMMT", label: "Zugestimmt" },
+  { value: "WIDERSPRUCH", label: "Widerspruch" },
+];
+
+function MavKarte({
+  data,
+  busy,
+  onSetMav,
+}: {
+  data: ContractEndData;
+  busy: boolean;
+  onSetMav: (status: string) => void;
+}) {
+  // Erst relevant, sobald eine Entscheidung vorliegt.
+  if (data.decision === "OFFEN") return null;
+  const current = data.mavStatus;
+  const erledigt = Boolean(current && current !== "AUSSTEHEND");
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <h3 className="text-sm font-bold text-foreground">Mitarbeitervertretung (MAV)</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Beteiligung der MAV vor Vollzug (MVG-EKD/MAVO). Falls für diesen Mandanten nicht zutreffend, als „nicht erforderlich“ markieren.
+      </p>
+      {erledigt && (
+        <p className="mt-2 text-sm font-medium text-credo-gruen">
+          ✓ {MAV_OPTIONS.find((o) => o.value === current)?.label ?? current}
+          {data.mavConsultedAt ? ` — ${formatDate(data.mavConsultedAt)}` : ""}
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {MAV_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            onClick={() => onSetMav(o.value)}
+            disabled={busy}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
+              current === o.value
+                ? "border-credo-gruen bg-credo-gruen/10 text-credo-gruen"
+                : "border-border text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -3,6 +3,8 @@
 **Branch:** `feat/vertragsende` · **Stand:** Phase 1 komplett, getestet und live verifiziert
 **Konzept + Mockups:** [`docs/vertragsende-prozess.html`](./vertragsende-prozess.html)
 
+> ⚠ **Prozess ab 2026-06 überarbeitet** (jetzt entscheidet die **Führungskraft** über die Übernahme, nicht HR) + HR-Schutzbausteine + Phase-2-Automatik. Aktueller Prozess, Status-Flow und Fortschritt: **[`vertragsende-phase2-plan.md`](./vertragsende-phase2-plan.md)**. Dieses Dokument beschreibt den ursprünglichen Phase-1-Stand.
+
 ---
 
 ## 1. Idee

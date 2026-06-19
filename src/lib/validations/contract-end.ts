@@ -26,6 +26,8 @@ export const updateContractEndSchema = z
     decision: z.string().optional(),
     supervisorEmail: z.string().email("Ungültige E-Mail-Adresse").optional().or(z.literal("")),
     contractEndDate: z.string().regex(DATE_YMD).optional(),
+    // B3: MAV-Beteiligung ("NICHT_ERFORDERLICH" | "AUSSTEHEND" | "ANGEHOERT" | "ZUGESTIMMT" | "WIDERSPRUCH")
+    mavStatus: z.string().max(40).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, "Mindestens ein Feld erforderlich");
 
@@ -47,12 +49,32 @@ export const renewalDataSchema = z
     stufe: z.string().max(20).optional(),
     stellenbeschreibung: z.string().max(2000).optional(),
     betriebsstaette: z.string().max(200).optional(),
+    betriebsstaetteOrgId: z.string().uuid("Ungültige Betriebsstätte").optional().or(z.literal("")),
     probezeit: z.boolean().optional(),
     probezeitMonate: z.number().int().min(0).max(12).optional(),
     urlaubstageProJahr: z.number().int().min(0).max(60).optional(),
     zusatzvereinbarungen: z.string().max(2000).optional(),
   })
   .strip();
+
+/**
+ * Rueckmeldung der Fuehrungskraft im oeffentlichen Formular (Strang A, neuer
+ * Prozess): SIE entscheidet ueber die Uebernahme. Bei Ablehnung ist eine kurze
+ * Begruendung Pflicht. Die Vertragsdaten (bei Uebernahme) kommen zusaetzlich
+ * ueber renewalDataSchema im selben Request.
+ */
+export const supervisorDecisionSchema = z
+  .object({
+    decision: z.enum(["UEBERNAHME", "KEINE_UEBERNAHME"]),
+    declineReason: z.string().max(1000).optional(),
+  })
+  .refine(
+    (d) => d.decision !== "KEINE_UEBERNAHME" || Boolean(d.declineReason && d.declineReason.trim()),
+    {
+      message: "Bitte geben Sie eine kurze Begründung für die Nicht-Übernahme an.",
+      path: ["declineReason"],
+    },
+  );
 
 /**
  * Meldung von n8n (liest DokuBit). Feldnamen bewusst nah an den DokuBit-Spalten
@@ -70,4 +92,5 @@ export const contractEndWebhookSchema = z.object({
 
 export type CreateContractEndInput = z.infer<typeof createContractEndSchema>;
 export type RenewalDataInput = z.infer<typeof renewalDataSchema>;
+export type SupervisorDecisionInput = z.infer<typeof supervisorDecisionSchema>;
 export type ContractEndWebhookInput = z.infer<typeof contractEndWebhookSchema>;

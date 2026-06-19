@@ -48,6 +48,12 @@ model Organization {
   ezTokenValidityDays Int @default(30)
 
   // =============================================
+  // Vertragsende — Feld-Konfiguration des Vertragsdaten-Formulars (pro Mandant).
+  // JSON: ContractEndFieldConfig[] (siehe src/lib/contract-end-fields.ts). null = Defaults.
+  // =============================================
+  contractEndFieldConfig Json?
+
+  // =============================================
   // Datenschutz — Verantwortliche Stelle (DSGVO, pro Mandant konfigurierbar)
   // Wird im Personalfragebogen (DSGVO-Text) und als Brief-Platzhalter genutzt.
   // Faellt auf den globalen Default zurueck, wenn nicht gesetzt.
@@ -2917,9 +2923,13 @@ model BemAnsprechpartner {
 //   KRITISCH 1-2 Mon | WARNUNG 3-6 Mon | BEOBACHTEN 7-12 Mon (Vorlauf 12 Mon).
 // =============================================
 enum ContractEndStatus {
-  ANGELEGT // Vorgang entstanden, Entscheidung offen
-  ENTSCHEIDUNG_UEBERNAHME // "behalten" gewaehlt, Vorgesetzten-Link offen/versendet
-  VERTRAG_ERSTELLT // Vorgesetzter hat Daten ausgefuellt, Vertrag erzeugt
+  ANGELEGT // Vorgang entstanden, noch keine Anfrage
+  ANFRAGE_VORGESETZTER // Anfrage an die Fuehrungskraft gesendet, wartet auf Rueckmeldung
+  RUECKMELDUNG_UEBERNAHME // Fuehrungskraft WILL uebernehmen + Vertragsdaten erfasst -> HR vollzieht
+  RUECKMELDUNG_KEINE_UEBERNAHME // Fuehrungskraft lehnt ab (mit Begruendung) -> HR bestaetigt Offboarding
+  ENTSCHEIDUNG_UEBERNAHME // DEPRECATED (Alt-Flow: HR entschied); bleibt nur fuer Bestandsdaten
+  VERTRAG_ERSTELLT // Verlaengerungsvertrag (Dokument) erzeugt
+  VERTRAG_UNTERSCHRIEBEN // B1: unterschriebener Vertrag liegt rechtzeitig vor
   ENTSCHEIDUNG_KEINE_UEBERNAHME // Offboarding angelegt
   ABGESCHLOSSEN
   STORNIERT
@@ -2957,11 +2967,37 @@ model ContractEndProcess {
   status   ContractEndStatus   @default(ANGELEGT)
   decision ContractEndDecision @default(OFFEN)
 
-  // Strang A: Vorgesetzten-Magic-Link (HR loest manuell aus, wie Onboarding)
+  // Strang A: Vorgesetzten-Magic-Link (HR loest die ANFRAGE manuell aus, wie Onboarding)
   supervisorEmail          String?
   supervisorToken          String?   @unique
   supervisorTokenExpiresAt DateTime?
   supervisorLinkSentAt     DateTime?
+
+  // Rueckmeldung der Fuehrungskraft (neuer Prozess: SIE entscheidet ueber die Uebernahme)
+  supervisorRespondedAt   DateTime?
+  supervisorDeclineReason String? // Begruendung bei Nicht-Uebernahme
+
+  // Erinnerung an die Fuehrungskraft (Cron, gestaffelt nach Fristen-Ampel)
+  lastSupervisorReminderAt DateTime?
+  supervisorReminderCount  Int       @default(0)
+
+  // B1: rechtzeitiger unterschriebener Ruecklauf (Entfristungsschutz §15 Abs.5 TzBfG)
+  contractSignedReturnedAt DateTime?
+
+  // B3: MAV-Beteiligung (kirchlicher Traeger; je Mandant ggf. nicht erforderlich)
+  mavStatus      String? // "NICHT_ERFORDERLICH" | "AUSSTEHEND" | "ANGEHOERT" | "ZUGESTIMMT" | "WIDERSPRUCH"
+  mavConsultedAt DateTime?
+
+  // Aktueller (auslaufender) Vertrag — von n8n gemeldet, dient dem Vorausfuellen (#5)
+  currentPosition      String?
+  currentEntgeltgruppe String?
+  currentStufe         String?
+  currentWochenstunden Float?
+
+  // Befristungshistorie — von n8n gemeldet (Basis der §14-TzBfG-Warnung, B2)
+  befristungsart            String? // "SACHGRUNDLOS" | "MIT_SACHGRUND"
+  bisherigeBefristungMonate Int?
+  bisherigeVerlaengerungen  Int?
 
   // Strang B: Verknuepfung zum erzeugten Offboarding (1:1)
   offboardingId String?             @unique
@@ -3016,8 +3052,9 @@ model ContractRenewalData {
   stufe             String?
 
   // Stelle
-  stellenbeschreibung String?
-  betriebsstaette     String?
+  stellenbeschreibung  String?
+  betriebsstaette      String? // Freitext-Fallback (Altbestand)
+  betriebsstaetteOrgId String? // gewaehlte Betriebsstaette/Mandant (Organization.id); Auswahl-UI in #5
 
   // Probezeit (bei Verlaengerung i.d.R. keine)
   probezeit       Boolean? @default(false)

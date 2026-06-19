@@ -1,9 +1,9 @@
 /**
  * API: POST /api/contract-end/:id/supervisor-link
  *
- * Strang A des Vertragsende-Prozesses: HR entscheidet, den Mitarbeiter zu
- * uebernehmen, und loest MANUELL (wie im Onboarding) einen Magic-Link an die
- * Vorgesetzte:n aus. Ueber den Link fuellt der/die Vorgesetzte die neuen
+ * Strang A des Vertragsende-Prozesses: HR loest MANUELL (wie im Onboarding) eine
+ * Anfrage per Magic-Link an die Vorgesetzte:n aus. Ueber den Link ENTSCHEIDET die
+ * Fuehrungskraft selbst ueber die Uebernahme und fuellt bei Ja die neuen
  * Vertragsdaten aus (oeffentliches Formular /vertrag-formular/[token]).
  */
 
@@ -53,13 +53,17 @@ export async function POST(
       );
     }
     if (
-      ["ENTSCHEIDUNG_KEINE_UEBERNAHME", "ABGESCHLOSSEN", "STORNIERT"].includes(
-        contractEnd.status
-      )
+      [
+        "ENTSCHEIDUNG_KEINE_UEBERNAHME",
+        "VERTRAG_ERSTELLT",
+        "VERTRAG_UNTERSCHRIEBEN",
+        "ABGESCHLOSSEN",
+        "STORNIERT",
+      ].includes(contractEnd.status)
     ) {
       return NextResponse.json(
         {
-          error: `Vorgang im Status "${contractEnd.status}" — ein Vorgesetzten-Link ist nicht mehr moeglich.`,
+          error: `Vorgang im Status "${contractEnd.status}" — eine Vorgesetzten-Anfrage ist nicht mehr moeglich.`,
         },
         { status: 400 }
       );
@@ -75,11 +79,12 @@ export async function POST(
         supervisorToken,
         supervisorTokenExpiresAt,
         supervisorLinkSentAt: new Date(),
-        decision: "UEBERNAHME",
-        status:
-          contractEnd.status === "ANGELEGT"
-            ? "ENTSCHEIDUNG_UEBERNAHME"
-            : contractEnd.status,
+        // Neuer Prozess: die Fuehrungskraft entscheidet -> Anfrage ist offen.
+        // Rueckmeldung/Entscheidung zuruecksetzen (auch bei erneuter Anfrage).
+        status: "ANFRAGE_VORGESETZTER",
+        decision: "OFFEN",
+        supervisorRespondedAt: null,
+        supervisorDeclineReason: null,
       },
     });
 
@@ -98,7 +103,6 @@ export async function POST(
         action: "SUPERVISOR_LINK_CREATED",
         details: {
           supervisorEmail,
-          decision: "UEBERNAHME",
           organization: contractEnd.organization.name,
         },
       },

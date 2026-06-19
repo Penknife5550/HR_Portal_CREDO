@@ -420,6 +420,94 @@ CREDO Gruppe – Freie Evangelische Schulen
   },
 
   // =============================================
+  // Erinnerung an Vorgesetzten (Vertragsende-Anfrage offen)
+  // =============================================
+  {
+    event: "contract-end-supervisor-reminder",
+    name: "Erinnerung Vorgesetzter (Vertragsende-Anfrage offen)",
+    subject: "Erinnerung: Vertragsverlängerung für {{mitarbeiter_name}} – Rückmeldung erbeten",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fff3c9;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#8a6d00;font-weight:bold;font-size:14px;">Erinnerung · {{dringlichkeit}}</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Ihre Rückmeldung wird noch benötigt</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            der befristete Vertrag von <strong>{{mitarbeiter_name}}</strong> bei {{einrichtung}} endet am <strong>{{vertragsende}}</strong>. Ihre Anfrage zur Weiterbeschäftigung ist seit {{tage_offen}} Tagen offen.
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
+            Bitte entscheiden Sie über das Formular, ob der/die Mitarbeiter:in weiterbeschäftigt wird – und erfassen Sie bei Übernahme gleich die neuen Vertragsdaten.
+          </p>
+
+          <!-- Button -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+            <tr><td style="background-color:#575756;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Jetzt entscheiden →
+              </a>
+            </td></tr>
+          </table>
+
+          <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:0 0 6px;">
+            Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:
+          </p>
+          <p style="margin:0 0 24px;"><a href="{{link}}" style="color:#575756;font-size:12px;word-break:break-all;text-decoration:underline;">{{link}}</a></p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Bei Rückfragen erreichen Sie uns unter <a href="mailto:personalbuchhaltung@fes-minden.de" style="color:#575756;text-decoration:underline;">personalbuchhaltung@fes-minden.de</a>
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;">
+            <strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich
+          </p>
+          <p style="margin:0;color:#bbbbbb;font-size:11px;text-align:center;">{{einrichtung}}</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Erinnerung – Ihre Rückmeldung wird noch benötigt
+
+Der befristete Vertrag von {{mitarbeiter_name}} bei {{einrichtung}} endet am {{vertragsende}}. Ihre Anfrage zur Weiterbeschäftigung ist seit {{tage_offen}} Tagen offen.
+
+Bitte entscheiden Sie über das Formular, ob der/die Mitarbeiter:in weiterbeschäftigt wird – und erfassen Sie bei Übernahme gleich die neuen Vertragsdaten:
+{{link}}
+
+Bei Rückfragen erreichen Sie uns unter personalbuchhaltung@fes-minden.de.
+
+CREDO Gruppe – Freie Evangelische Schulen
+{{einrichtung}}`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des Mitarbeiters" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{link}}", description: "Link zum Entscheidungs-/Vertragsdaten-Formular" },
+      { key: "{{vertragsende}}", description: "Datum des Vertragsendes" },
+      { key: "{{tage_offen}}", description: "Tage seit Versand der Anfrage" },
+      { key: "{{dringlichkeit}}", description: "Ampel-Stufe (Kritisch/Warnung/Beobachten)" },
+    ],
+  },
+
+  // =============================================
   // Bestaetigungs-E-Mail an Mitarbeiter (nach Fragebogen-Einreichung)
   // =============================================
   {

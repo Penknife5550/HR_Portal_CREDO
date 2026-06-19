@@ -55,16 +55,30 @@ export async function POST(
       );
     }
 
-    // Atomar "claimen": nur fortfahren, wenn die Entscheidung noch offen ist und
-    // noch kein Offboarding verknuepft wurde. Schuetzt gegen Doppelklick.
+    // Atomar "claimen": nur fortfahren, wenn noch kein Offboarding verknuepft ist
+    // und der Status den Strang B zulaesst. Der Status-Wechsel im selben Update
+    // schuetzt gegen Doppelklick / parallele Requests. Erlaubt: HR loest direkt
+    // aus (ANGELEGT/ANFRAGE_VORGESETZTER) ODER bestaetigt die Ablehnung der
+    // Fuehrungskraft (RUECKMELDUNG_KEINE_UEBERNAHME). ENTSCHEIDUNG_UEBERNAHME =
+    // Alt-Bestandsdaten.
     const claim = await prisma.contractEndProcess.updateMany({
       where: {
         id,
         offboardingId: null,
-        decision: "OFFEN",
-        status: { in: ["ANGELEGT", "ENTSCHEIDUNG_UEBERNAHME"] },
+        status: {
+          in: [
+            "ANGELEGT",
+            "ANFRAGE_VORGESETZTER",
+            "ENTSCHEIDUNG_UEBERNAHME",
+            "RUECKMELDUNG_KEINE_UEBERNAHME",
+          ],
+        },
       },
-      data: { decision: "KEINE_UEBERNAHME", decidedAt: new Date() },
+      data: {
+        decision: "KEINE_UEBERNAHME",
+        status: "ENTSCHEIDUNG_KEINE_UEBERNAHME",
+        decidedAt: new Date(),
+      },
     });
     if (claim.count === 0) {
       return NextResponse.json(
@@ -94,9 +108,14 @@ export async function POST(
         },
       });
     } catch (err) {
+      // Claim auf den Zustand vor dem Klick zuruecksetzen
       await prisma.contractEndProcess.update({
         where: { id },
-        data: { decision: "OFFEN", decidedAt: null },
+        data: {
+          decision: contractEnd.decision,
+          status: contractEnd.status,
+          decidedAt: contractEnd.decidedAt,
+        },
       });
       throw err;
     }
