@@ -59,6 +59,7 @@ cookies.txt
 
 # Temporaere/Test-Dateien
 nul
+scripts/create-test-admin.ts
 
 # Claude Code
 .claude/
