@@ -545,6 +545,7 @@ function extractVariables(
         payload.modalitaetenLink ||
         payload.magicUrl ||
         payload.magicLink ||
+        payload.formularLink ||
         payload.link,
     ),
     ablaufdatum: payload.tokenExpiresAt

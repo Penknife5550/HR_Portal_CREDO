@@ -841,7 +841,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
   },
   {
     event: "contract-end-supervisor-link",
-    name: "Vertragsverlaengerung: Link an Vorgesetzte:n",
+    name: "Einladung Vorgesetzter (Vertragsverlängerung)",
     group: "Vertragsende",
     recipientHint: "Vorgesetzte:r (Magic-Link zum Vertragsdaten-Formular)",
     defaultRecipients: { to: "{{supervisorEmail}}" },
@@ -855,7 +855,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
       formularLink: BEISPIEL_LINK,
       tokenExpiresAt: "2026-07-15T12:00:00.000Z",
     },
-    wired: false,
+    wired: true,
   },
 ];
 
