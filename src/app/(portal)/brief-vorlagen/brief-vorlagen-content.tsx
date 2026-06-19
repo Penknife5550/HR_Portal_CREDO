@@ -43,6 +43,7 @@ const MODULE_OPTIONS = [
   { value: "ALLGEMEIN", label: "Allgemein" },
   { value: "BEM", label: "BEM" },
   { value: "ONBOARDING", label: "Onboarding" },
+  { value: "VERTRAGSVERLAENGERUNG", label: "Vertragsverlängerung" },
   { value: "OFFBOARDING", label: "Offboarding" },
   { value: "VERBEAMTUNG", label: "Verbeamtung" },
   { value: "MUTTERSCHUTZ", label: "Mutterschutz" },

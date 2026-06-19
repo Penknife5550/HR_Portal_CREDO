@@ -48,6 +48,7 @@ export const AVAILABLE_MODULES: ReadonlyArray<{ value: string; label: string }> 
   { value: "ALLGEMEIN", label: "Allgemein" },
   { value: "BEM", label: "BEM" },
   { value: "ONBOARDING", label: "Onboarding" },
+  { value: "VERTRAGSVERLAENGERUNG", label: "Vertragsverlängerung" },
   { value: "OFFBOARDING", label: "Offboarding" },
   { value: "VERBEAMTUNG", label: "Verbeamtung" },
   { value: "MUTTERSCHUTZ", label: "Mutterschutz" },
@@ -63,6 +64,7 @@ export {
   type PlaceholderDef,
   ALLGEMEIN_PLACEHOLDERS,
   ONBOARDING_PLACEHOLDERS,
+  VERTRAGSVERLAENGERUNG_PLACEHOLDERS,
   PLACEHOLDER_CATALOG,
   getPlaceholderCatalog,
 } from "@/lib/placeholder-catalog";
@@ -262,9 +264,76 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
   return { data, sensitiveFields };
 };
 
+/**
+ * VERTRAGSVERLAENGERUNG-Resolver: fuellt die Platzhalter aus dem Vertragsende-
+ * Vorgang (refId == contractEndId) + den vom Vorgesetzten erfassten
+ * Verlaengerungsdaten (ContractRenewalData). Keine sensiblen Felder.
+ */
+const vertragsverlaengerungResolver: PlaceholderResolver = async (ctx) => {
+  const sensitiveFields: string[] = [];
+  if (!ctx.refId) {
+    return { data: await commonPlaceholders(ctx.organizationId), sensitiveFields };
+  }
+
+  const ce = await prisma.contractEndProcess.findUnique({
+    where: { id: ctx.refId },
+    select: {
+      displayId: true,
+      employeeFirstName: true,
+      employeeLastName: true,
+      employeePersonalNr: true,
+      contractEndDate: true,
+      organizationId: true,
+      renewalData: {
+        select: {
+          vertragsbeginn: true, vertragsende: true, befristungSachgrund: true,
+          wochenstunden: true, entgeltgruppe: true, stufe: true,
+          urlaubstageProJahr: true, probezeitMonate: true,
+          stellenbeschreibung: true, betriebsstaette: true,
+        },
+      },
+    },
+  });
+  if (!ce) {
+    return { data: await commonPlaceholders(ctx.organizationId), sensitiveFields };
+  }
+
+  const data = await commonPlaceholders(ce.organizationId);
+  const rd = ce.renewalData;
+  const set = (key: string, value: unknown): void => {
+    if (value == null) return;
+    const s = typeof value === "string" ? value : String(value);
+    if (s.trim() === "") return;
+    data[key] = value;
+  };
+
+  const vorname = ce.employeeFirstName || "";
+  const nachname = ce.employeeLastName || "";
+  set("vorname", vorname);
+  set("nachname", nachname);
+  set("name", `${vorname} ${nachname}`.trim());
+  set("personalnummer", ce.employeePersonalNr);
+  set("vorgangsnummer", ce.displayId);
+  set("altes_vertragsende", deDateOnb(ce.contractEndDate));
+
+  set("neuer_vertragsbeginn", deDateOnb(rd?.vertragsbeginn));
+  set("neues_vertragsende", deDateOnb(rd?.vertragsende));
+  set("befristung_sachgrund", rd?.befristungSachgrund);
+  if (rd?.wochenstunden != null) set("wochenstunden", String(rd.wochenstunden).replace(".", ","));
+  set("entgeltgruppe", rd?.entgeltgruppe);
+  set("stufe", rd?.stufe);
+  if (rd?.urlaubstageProJahr != null) set("urlaubstage", rd.urlaubstageProJahr);
+  if (rd?.probezeitMonate != null) set("probezeit_monate", rd.probezeitMonate);
+  set("stellenbeschreibung", rd?.stellenbeschreibung);
+  set("betriebsstaette", rd?.betriebsstaette);
+
+  return { data, sensitiveFields };
+};
+
 const resolvers: Record<string, PlaceholderResolver> = {
   ALLGEMEIN: allgemeinResolver,
   ONBOARDING: onboardingResolver,
+  VERTRAGSVERLAENGERUNG: vertragsverlaengerungResolver,
 };
 
 /** Registriert einen Modul-Resolver (z.B. in E5 fuer BEM). */

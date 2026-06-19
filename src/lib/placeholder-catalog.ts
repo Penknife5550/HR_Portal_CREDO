@@ -78,6 +78,30 @@ export const ONBOARDING_PLACEHOLDERS: PlaceholderDef[] = [
 ];
 
 /**
+ * Vertragsverlaengerungs-Platzhalter (aus ContractEndProcess + ContractRenewalData).
+ * Person aus den Vorgangs-Stammdaten, Konditionen aus den vom Vorgesetzten
+ * erfassten Verlaengerungsdaten.
+ */
+export const VERTRAGSVERLAENGERUNG_PLACEHOLDERS: PlaceholderDef[] = [
+  { key: "vorname", label: "Vorname", example: "Erika", group: "Person" },
+  { key: "nachname", label: "Nachname", example: "Mustermann", group: "Person" },
+  { key: "name", label: "Voller Name", example: "Erika Mustermann", group: "Person" },
+  { key: "personalnummer", label: "Personalnummer", group: "Person" },
+  { key: "vorgangsnummer", label: "Vorgangsnummer", example: "VE-2026-GYM-001", group: "Vorgang" },
+  { key: "altes_vertragsende", label: "Bisheriges Vertragsende", example: "31.08.2026", group: "Bisheriger Vertrag" },
+  { key: "neuer_vertragsbeginn", label: "Neuer Vertragsbeginn", example: "01.09.2026", group: "Neuer Vertrag" },
+  { key: "neues_vertragsende", label: "Neues Vertragsende (bei Befristung)", example: "31.08.2027", group: "Neuer Vertrag" },
+  { key: "befristung_sachgrund", label: "Sachgrund der Befristung", group: "Neuer Vertrag" },
+  { key: "wochenstunden", label: "Wochenstunden", example: "39", group: "Neuer Vertrag" },
+  { key: "entgeltgruppe", label: "Entgeltgruppe", example: "E11", group: "Neuer Vertrag" },
+  { key: "stufe", label: "Stufe", group: "Neuer Vertrag" },
+  { key: "urlaubstage", label: "Urlaubstage pro Jahr", example: "30", group: "Neuer Vertrag" },
+  { key: "probezeit_monate", label: "Probezeit (Monate)", group: "Neuer Vertrag" },
+  { key: "stellenbeschreibung", label: "Stellenbeschreibung", group: "Neuer Vertrag" },
+  { key: "betriebsstaette", label: "Betriebsstaette", group: "Neuer Vertrag" },
+];
+
+/**
  * Verfuegbare Platzhalter je Modul. Module ohne eigenen Resolver erhalten die
  * allgemeinen Platzhalter (Fallback ALLGEMEIN-Resolver). Onboarding ergaenzt die
  * vorgangsspezifischen Felder.
@@ -85,6 +109,7 @@ export const ONBOARDING_PLACEHOLDERS: PlaceholderDef[] = [
 export const PLACEHOLDER_CATALOG: Record<string, PlaceholderDef[]> = {
   ALLGEMEIN: ALLGEMEIN_PLACEHOLDERS,
   ONBOARDING: [...ALLGEMEIN_PLACEHOLDERS, ...ONBOARDING_PLACEHOLDERS],
+  VERTRAGSVERLAENGERUNG: [...ALLGEMEIN_PLACEHOLDERS, ...VERTRAGSVERLAENGERUNG_PLACEHOLDERS],
   OFFBOARDING: ALLGEMEIN_PLACEHOLDERS,
   VERBEAMTUNG: ALLGEMEIN_PLACEHOLDERS,
   MUTTERSCHUTZ: ALLGEMEIN_PLACEHOLDERS,
