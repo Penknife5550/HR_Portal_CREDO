@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CREDO HR-Portal – Das Handbuch für Einsteiger</title>
+<style>
+  :root {
+    --grau-hell: #DADADA;
+    --grau-dunkel: #575756;
+    --gelb: #FBC900;
+    --gruen: #6BAA24;
+    --rot: #E2001A;
+    --blau: #009AC6;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #e5e5e5;
+    --bg-soft: #f5f5f5;
+    --bg-softer: #fafafa;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: "Montserrat", "Arial", "Segoe UI", system-ui, sans-serif;
+    color: var(--text);
+    line-height: 1.65;
+    margin: 0;
+    background: #ffffff;
+    font-size: 17px;
+  }
+
+  .seite {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 1.4rem 4rem;
+  }
+
+  /* ===== CREDO-Linie (zentrales Gestaltungselement) ===== */
+  .credo-linie {
+    display: flex;
+    height: 6px;
+    width: 100%;
+  }
+  .credo-linie .l-grau  { flex: 1;        background-color: var(--grau-hell); }
+  .credo-linie .l-gelb  { flex: 0 0 8%;   background-color: var(--gelb); }
+  .credo-linie .l-gruen { flex: 0 0 8%;   background-color: var(--gruen); }
+  .credo-linie .l-rot   { flex: 0 0 8%;   background-color: var(--rot); }
+  .credo-linie .l-blau  { flex: 0 0 8%;   background-color: var(--blau); }
+
+  /* ===== Titelblatt ===== */
+  header.titel {
+    padding: 3rem 1.4rem 1.5rem;
+    max-width: 920px;
+    margin: 0 auto;
+  }
+  .logo-wort {
+    font-size: 2.6rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    color: var(--grau-dunkel);
+    margin: 0;
+  }
+  .logo-sub {
+    font-size: 1.2rem;
+    color: var(--grau-dunkel);
+    margin: 0.2rem 0 0;
+    font-weight: 600;
+  }
+  .claim {
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+  }
+  header.titel h1 {
+    border: none;
+    padding: 0;
+    margin: 1.6rem 0 0.4rem;
+    font-size: 2.1rem;
+  }
+  .untertitel {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin-top: 0;
+  }
+
+  /* ===== Überschriften ===== */
+  h1, h2, h3 { color: var(--grau-dunkel); line-height: 1.25; }
+  h1 { font-size: 2rem; }
+  h2 {
+    font-size: 1.55rem;
+    border-left: 7px solid var(--grau-hell);
+    padding-left: 0.7rem;
+    margin-top: 3rem;
+    padding-top: 0.2rem;
+  }
+  h3 { font-size: 1.2rem; margin-top: 2rem; }
+  h4 { font-size: 1.02rem; margin-top: 1.4rem; color: var(--grau-dunkel); margin-bottom: 0.3rem; }
+
+  p { margin: 0.7rem 0; }
+
+  a { color: var(--blau); }
+  a:hover { color: var(--grau-dunkel); }
+
+  /* ===== Listen ===== */
+  ol, ul { padding-left: 1.5rem; }
+  ol li, ul li { margin: 0.45rem 0; }
+  ol { counter-reset: none; }
+
+  /* ===== Hinweis- und Ergebnis-Boxen ===== */
+  .hinweis, .ergebnis {
+    padding: 0.85rem 1.1rem;
+    margin: 1.1rem 0;
+    border-radius: 0 6px 6px 0;
+    border-left: 6px solid var(--gelb);
+    background: #fffaeb;
+  }
+  .hinweis .label, .ergebnis .label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+    color: var(--grau-dunkel);
+  }
+  .hinweis.warnung { border-left-color: var(--rot); background: #fff4f4; }
+  .hinweis.info    { border-left-color: var(--blau); background: #eef9ff; }
+  .ergebnis        { border-left-color: var(--gruen); background: #f3faea; }
+  .hinweis p:last-child, .ergebnis p:last-child { margin-bottom: 0; }
+  .hinweis p:first-of-type, .ergebnis p:first-of-type { margin-top: 0; }
+
+  /* ===== "Wer darf das?" Rollen-Hinweis ===== */
+  .rolle {
+    display: inline-block;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.85rem;
+    color: var(--grau-dunkel);
+    white-space: nowrap;
+  }
+
+  /* ===== Inhaltsverzeichnis ===== */
+  nav.inhalt {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem 1.5rem;
+    margin: 2rem 0;
+  }
+  nav.inhalt h2 {
+    border: none;
+    padding: 0;
+    margin: 0 0 0.6rem;
+    font-size: 1.3rem;
+  }
+  nav.inhalt ol { padding-left: 1.4rem; }
+  nav.inhalt > ol > li { margin: 0.5rem 0; font-weight: 600; }
+  nav.inhalt ol ol { padding-left: 1.2rem; margin-top: 0.2rem; }
+  nav.inhalt ol ol li { font-weight: 400; font-size: 0.95rem; }
+  nav.inhalt a { color: var(--grau-dunkel); text-decoration: none; }
+  nav.inhalt a:hover { text-decoration: underline; color: var(--blau); }
+
+  /* ===== Tabellen (nur für echte Daten) ===== */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1.1rem 0;
+    font-size: 0.95rem;
+  }
+  caption {
+    text-align: left;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    color: var(--grau-dunkel);
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.55rem 0.7rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  thead th { background: var(--grau-dunkel); color: #ffffff; font-weight: 600; }
+  tbody tr:nth-child(even) { background: var(--bg-softer); }
+
+  /* ===== Code / Platzhalter ===== */
+  code {
+    background: var(--grau-hell);
+    color: #333;
+    padding: 0.08rem 0.35rem;
+    border-radius: 4px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 0.88em;
+  }
+
+  /* ===== Screenshots ===== */
+  figure.screenshot { margin: 1.5rem 0; }
+  figure.screenshot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    background: #ffffff;
+  }
+  figcaption {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    font-style: italic;
+  }
+
+  /* ===== Kapitel-Trenner und Hoch-Links ===== */
+  .kapitel { padding-top: 0.5rem; }
+  .nach-oben {
+    display: inline-block;
+    margin-top: 1.2rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .nach-oben:hover { color: var(--blau); }
+
+  hr.trenner {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2.5rem 0 0;
+  }
+
+  /* ===== Tastenkürzel ===== */
+  kbd {
+    background: #ffffff;
+    border: 1px solid var(--grau-hell);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.85em;
+    font-family: inherit;
+    color: var(--grau-dunkel);
+  }
+
+  /* ===== Skip-Link (Barrierefreiheit) ===== */
+  .skip-link {
+    position: absolute;
+    left: -999px;
+    background: var(--grau-dunkel);
+    color: #fff;
+    padding: 0.6rem 1rem;
+    border-radius: 0 0 6px 0;
+    z-index: 10;
+  }
+  .skip-link:focus { left: 0; top: 0; }
+
+  /* ===== Fußbereich ===== */
+  footer.fuss {
+    max-width: 920px;
+    margin: 3rem auto 0;
+    padding: 1.4rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  footer.fuss address { font-style: normal; margin-top: 0.6rem; line-height: 1.5; }
+
+  /* ===== Druck-Ansicht ===== */
+  @media print {
+    body { font-size: 12pt; }
+    nav.inhalt { page-break-after: always; }
+    h2 { page-break-before: auto; page-break-after: avoid; }
+    .nach-oben, .skip-link { display: none; }
+    a { color: var(--text); text-decoration: none; }
+    figure.screenshot img { min-height: 60px; }
+  }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#inhalt">Direkt zum Inhaltsverzeichnis springen</a>
+
+<div class="credo-linie" aria-hidden="true">
+  <span class="l-grau"></span><span class="l-gelb"></span><span class="l-gruen"></span><span class="l-rot"></span><span class="l-blau"></span>
+</div>
+
+<header class="titel">
+  <p class="logo-wort">CREDO</p>
+  <p class="logo-sub">HR-Portal · Personalmanagement</p>
+  <p class="claim">lebensnah • wegweisend • christlich</p>
+  <h1>Das Handbuch für Einsteiger</h1>
+  <p class="untertitel">Eine verständliche Anleitung für alle Mitarbeitenden in der Personalverwaltung – Schritt für Schritt, ohne Vorkenntnisse.</p>
+</header>
+
+<div class="credo-linie" aria-hidden="true">
+  <span class="l-grau"></span><span class="l-gelb"></span><span class="l-gruen"></span><span class="l-rot"></span><span class="l-blau"></span>
+</div>
+
+<main class="seite">
+
+  <!-- ==================== WILLKOMMEN ==================== -->
+  <section id="willkommen" class="kapitel">
+    <h2>Willkommen</h2>
+
+    <p>Schön, dass Sie dabei sind. Dieses Handbuch begleitet Sie durch das CREDO&nbsp;HR-Portal. Das HR-Portal ist eine Internetseite, auf der die Personalverwaltung der CREDO&nbsp;Schulträgergruppe abläuft. „HR" ist die englische Abkürzung für „Human Resources" und bedeutet schlicht „Personalwesen".</p>
+
+    <p>Sie brauchen kein technisches Vorwissen. Sie brauchen keine zusätzliche Software. Sie brauchen nur einen Internet-Browser – das ist das Programm, mit dem Sie Internetseiten öffnen, zum Beispiel Microsoft&nbsp;Edge, Google&nbsp;Chrome oder Mozilla&nbsp;Firefox.</p>
+
+    <div class="hinweis info">
+      <span class="label">Gut zu wissen</span>
+      <p>Sie können im Portal nichts kaputt machen. Jede wichtige Aktion lässt sich nachvollziehen, und das Portal fragt vor heiklen Schritten immer nach. Probieren Sie ruhig aus.</p>
+    </div>
+
+    <h3>Was kann das Portal?</h3>
+    <p>Das Portal bündelt alle Personalvorgänge an einem Ort. Ein „Vorgang" ist ein einzelner Fall – zum Beispiel eine Neueinstellung oder ein Austritt. Diese Vorgänge gibt es:</p>
+    <ul>
+      <li><strong>Onboarding</strong> – die Einstellung neuer Mitarbeitender (englisch für „an Bord nehmen").</li>
+      <li><strong>Offboarding</strong> – das Ausscheiden von Mitarbeitenden (englisch für „von Bord gehen").</li>
+      <li><strong>Verbeamtung</strong> – die Übernahme in ein Beamtenverhältnis.</li>
+      <li><strong>Mutterschutz</strong> – die Begleitung werdender Mütter.</li>
+      <li><strong>Elternzeit</strong> – die Verwaltung von Elternzeit-Anträgen.</li>
+      <li><strong>BEM</strong> – das Betriebliche Eingliederungsmanagement (Unterstützung nach längerer Krankheit).</li>
+      <li><strong>Exit-Interview</strong> – die Abschluss-Befragung beim Austritt.</li>
+      <li><strong>Zeugnisse und Beurteilungen</strong> – die Bewertung von Mitarbeitenden.</li>
+    </ul>
+    <p>Jeder dieser Bereiche bekommt in diesem Handbuch ein eigenes Kapitel.</p>
+
+    <h3>So lesen Sie dieses Handbuch</h3>
+    <p>Damit Sie sich schnell zurechtfinden, wiederholen sich einige Bausteine im ganzen Handbuch:</p>
+    <ul>
+      <li>Jeder Abschnitt beginnt mit einem Satz, der erklärt, <strong>wozu</strong> der Schritt gut ist.</li>
+      <li>Anleitungen sind immer als <strong>nummerierte Liste</strong> aufgebaut: Schritt 1, Schritt 2, Schritt 3.</li>
+      <li>Am Ende eines Abschnitts steht ein grüner Kasten <strong>„Das Ergebnis ist"</strong>. Daran erkennen Sie, ob alles geklappt hat.</li>
+    </ul>
+
+    <p>Die farbigen Kästen haben feste Bedeutungen:</p>
+    <div class="hinweis">
+      <span class="label">Tipp (gelb)</span>
+      <p>Ein gelber Kasten gibt Ihnen einen hilfreichen Hinweis oder eine Abkürzung.</p>
+    </div>
+    <div class="hinweis warnung">
+      <span class="label">Achtung (rot)</span>
+      <p>Ein roter Kasten warnt Sie vor einem Fehler oder einer Sache, die Sie nicht rückgängig machen können.</p>
+    </div>
+    <div class="hinweis info">
+      <span class="label">Wer darf das? (blau)</span>
+      <p>Ein blauer Kasten sagt Ihnen, welche Berechtigung Sie für eine Funktion brauchen. Nicht jede Person sieht alle Bereiche.</p>
+    </div>
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist (grün)</span>
+      <p>Ein grüner Kasten beschreibt, was nach den Schritten auf Ihrem Bildschirm zu sehen ist.</p>
+    </div>
+
+    <div class="hinweis info">
+      <span class="label">Über die Bilder in diesem Handbuch</span>
+      <p>An vielen Stellen sehen Sie ein Bildschirmfoto („Screenshot") der jeweiligen Seite. So erkennen Sie sofort, wie der beschriebene Bereich bei Ihnen aussieht. Kleine Abweichungen sind möglich, je nachdem, welche Berechtigungen Sie haben.</p>
+    </div>
+  </section>
+
+  <!-- ==================== INHALTSVERZEICHNIS ==================== -->
+  <nav class="inhalt" id="inhalt" aria-label="Inhaltsverzeichnis">
+    <h2>Inhaltsverzeichnis</h2>
+    <ol>
+      <li><a href="#anmelden">Die ersten Schritte: Anmelden und Abmelden</a></li>
+      <li><a href="#dashboard">Sich zurechtfinden: Startseite und Menü</a>
+        <ol>
+          <li><a href="#dashboard-aufbau">Aufbau der Startseite</a></li>
+          <li><a href="#dashboard-suchen">Vorgänge suchen und filtern</a></li>
+          <li><a href="#menue-rollen">Das Menü und die Berechtigungen</a></li>
+        </ol>
+      </li>
+      <li><a href="#onboarding">Onboarding: Neue Mitarbeitende einstellen</a>
+        <ol>
+          <li><a href="#onboarding-anlegen">Einen Onboarding-Vorgang anlegen</a></li>
+          <li><a href="#onboarding-fragebogen">Der Personalfragebogen (aus Sicht des neuen Mitarbeitenden)</a></li>
+          <li><a href="#onboarding-bearbeiten">Einen Vorgang öffnen und prüfen</a></li>
+          <li><a href="#onboarding-dokumente">Dokumente erstellen und das Starterpaket versenden</a></li>
+          <li><a href="#onboarding-checkliste">Checkliste abarbeiten und Vorgang abschließen</a></li>
+        </ol>
+      </li>
+      <li><a href="#offboarding">Offboarding: Austritte verwalten</a></li>
+      <li><a href="#verbeamtung">Verbeamtung (PSI)</a></li>
+      <li><a href="#mutterschutz">Mutterschutz</a></li>
+      <li><a href="#elternzeit">Elternzeit</a></li>
+      <li><a href="#bem">BEM: Betriebliches Eingliederungsmanagement</a></li>
+      <li><a href="#exit">Exit-Interview: Die Abschluss-Befragung</a></li>
+      <li><a href="#vorlagen">Vorlagen verwalten</a>
+        <ol>
+          <li><a href="#vorlagen-formulare">Formulare (Personalfragebogen)</a></li>
+          <li><a href="#vorlagen-brief">Brief-Vorlagen und Platzhalter</a></li>
+          <li><a href="#vorlagen-weitere">Checklisten, Zeugnisse und weitere Vorlagen</a></li>
+        </ol>
+      </li>
+      <li><a href="#verwaltung">Verwaltung: Benutzer, Einrichtungen und Einstellungen</a>
+        <ol>
+          <li><a href="#verwaltung-benutzer">Benutzer verwalten</a></li>
+          <li><a href="#verwaltung-mandanten">Einrichtungen (Mandanten) verwalten</a></li>
+          <li><a href="#verwaltung-einstellungen">Einstellungen und E-Mail-Versand</a></li>
+          <li><a href="#verwaltung-audit">Das Protokoll (Audit-Log)</a></li>
+        </ol>
+      </li>
+      <li><a href="#hilfe">Hilfe bei Problemen und häufige Fragen</a></li>
+      <li><a href="#glossar">Glossar: Fachbegriffe einfach erklärt</a></li>
+    </ol>
+  </nav>
+
+  <hr class="trenner">
+
+  <!-- ==================== 1. ANMELDEN ==================== -->
+  <section id="anmelden" class="kapitel">
+    <h2>1. Die ersten Schritte: Anmelden und Abmelden</h2>
+
+    <p>Damit niemand Unbefugtes Ihre Personaldaten sieht, ist das Portal durch ein Passwort geschützt. Bevor Sie arbeiten können, melden Sie sich mit Ihrer E-Mail-Adresse und Ihrem Passwort an. Dieser Vorgang heißt „Anmelden" oder „Einloggen".</p>
+
+    <h3>So melden Sie sich an</h3>
+    <p>Mit den folgenden Schritten gelangen Sie auf Ihre persönliche Startseite.</p>
+    <ol>
+      <li>Öffnen Sie Ihren Internet-Browser (zum Beispiel Edge oder Chrome).</li>
+      <li>Geben Sie oben in der Adresszeile die Adresse des Portals ein und drücken Sie die <kbd>Eingabetaste</kbd>.</li>
+      <li>Geben Sie in das Feld <strong>E-Mail-Adresse</strong> Ihre dienstliche E-Mail ein.</li>
+      <li>Geben Sie in das Feld <strong>Passwort</strong> Ihr Passwort ein.</li>
+      <li>Klicken Sie auf die Schaltfläche <strong>Anmelden</strong>.</li>
+    </ol>
+
+    <figure class="screenshot">
+      <img src="screenshots/anmelden.png" alt="Die Anmeldeseite mit einem Feld für die E-Mail-Adresse, einem Feld für das Passwort und einer grauen Schaltfläche Anmelden darunter.">
+      <figcaption>Die Anmeldeseite des CREDO HR-Portals.</figcaption>
+    </figure>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Sie sehen die Startseite des Portals, das sogenannte „Dashboard". Oben rechts steht Ihr Name. Sie sind jetzt angemeldet.</p>
+    </div>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: Anmeldung klappt nicht?</span>
+      <p>Falls die Meldung „Anmeldung fehlgeschlagen" erscheint, ist das normal und meist harmlos. Prüfen Sie in Ruhe: Ist die E-Mail-Adresse richtig geschrieben? Ist vielleicht die Feststelltaste (<kbd>Caps Lock</kbd>) aktiv und schreibt Großbuchstaben? Versuchen Sie es danach erneut. Wenn es weiter nicht klappt, wenden Sie sich an Ihre Administratorin oder Ihren Administrator.</p>
+    </div>
+
+    <h3>Die automatische Abmeldung verstehen</h3>
+    <p>Aus Sicherheitsgründen meldet das Portal Sie nach längerer Pause selbst ab. So sieht niemand Ihre Daten, wenn Sie den Platz verlassen. Kurz bevor das passiert, werden Sie gewarnt.</p>
+    <p>Wenn das Fenster <strong>„Session läuft ab"</strong> erscheint, haben Sie zwei Möglichkeiten:</p>
+    <ul>
+      <li>Klicken Sie auf <strong>Sitzung verlängern</strong>, um weiterzuarbeiten.</li>
+      <li>Klicken Sie auf <strong>Abmelden</strong>, wenn Sie fertig sind.</li>
+    </ul>
+    <p>Eine „Session" (sprich: Sesch-n) ist einfach die Zeit, in der Sie angemeldet sind.</p>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Nach „Sitzung verlängern" arbeiten Sie normal weiter. Reagieren Sie nicht, werden Sie zur Sicherheit abgemeldet und sehen wieder die Anmeldeseite.</p>
+    </div>
+
+    <h3>So melden Sie sich ab</h3>
+    <p>Wenn Sie Ihre Arbeit beenden, melden Sie sich ab. Besonders an Computern, die mehrere Personen nutzen, ist das wichtig.</p>
+    <ol>
+      <li>Schauen Sie oben rechts in die Ecke des Fensters.</li>
+      <li>Klicken Sie dort auf die Schaltfläche <strong>Abmelden</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Das Portal zeigt wieder die Anmeldeseite. Ihre Daten sind nun für andere nicht mehr sichtbar.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 2. DASHBOARD & NAVIGATION ==================== -->
+  <section id="dashboard" class="kapitel">
+    <h2>2. Sich zurechtfinden: Startseite und Menü</h2>
+
+    <p>Die Startseite heißt im Portal „Dashboard" (sprich: Däsch-bord). Das ist Englisch für „Armaturenbrett" – also die Übersicht, von der aus Sie alles im Blick haben und alles erreichen.</p>
+
+    <h3 id="dashboard-aufbau">2.1 Aufbau der Startseite</h3>
+    <p>Damit Sie wissen, wo Sie was finden, hier die Bereiche der Startseite von oben nach unten. So müssen Sie nicht lange suchen.</p>
+    <ul>
+      <li><strong>Kopfzeile (ganz oben):</strong> Links das CREDO-Logo, in der Mitte das Menü, rechts Ihr Name und die Schaltfläche „Abmelden".</li>
+      <li><strong>Reiter (englisch „Tabs"):</strong> Eine Reihe von Karteikarten – <strong>Onboarding</strong>, <strong>Offboarding</strong>, <strong>Verbeamtung</strong>, <strong>Mutterschutz</strong>, <strong>Elternzeit</strong>. Ein Klick wechselt den Bereich.</li>
+      <li><strong>Kacheln mit Zahlen:</strong> Vier Kästchen zeigen, wie viele Vorgänge <strong>Gesamt</strong>, <strong>Offen</strong>, <strong>Geprüft</strong> und <strong>Abgeschlossen</strong> sind.</li>
+      <li><strong>Kleine Diagramme:</strong> Grafiken zeigen die Verteilung der Vorgänge und den Verlauf der letzten Monate.</li>
+      <li><strong>Die Tabelle:</strong> Die Liste aller Vorgänge mit Name, Einrichtung, Status und Datum.</li>
+    </ul>
+
+    <figure class="screenshot">
+      <img src="screenshots/dashboard.png" alt="Die Startseite mit dem Menü oben, den Reitern Onboarding bis Elternzeit, vier Zahlen-Kacheln (Gesamt, Offen, Geprüft, Abgeschlossen), zwei Diagrammen und der Werkzeugleiste mit Suchfeld und der Schaltfläche Neuer Vorgang.">
+      <figcaption>Die Startseite (Dashboard): Menü, Reiter, Kacheln, Diagramme und die Werkzeugleiste über der Vorgangsliste.</figcaption>
+    </figure>
+
+    <div class="hinweis">
+      <span class="label">Tipp</span>
+      <p>Ein „Vorgang" ist ein einzelner Fall – zum Beispiel die Einstellung von Frau Müller. Jede Zeile in der Tabelle ist ein solcher Vorgang. Ein Klick auf eine Zeile öffnet die Details.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Sie erkennen die fünf Reiter oben und die Tabelle mit den Vorgängen darunter. Sie wissen jetzt, wo Sie welche Information finden.</p>
+    </div>
+
+    <h3 id="dashboard-suchen">2.2 Vorgänge suchen und filtern</h3>
+    <p>In einer langen Liste finden Sie eine bestimmte Person am schnellsten über die Suche oder einen Filter. Ein „Filter" blendet alles aus, was Sie gerade nicht brauchen.</p>
+    <ol>
+      <li>Klicken Sie oben in das Suchfeld mit dem Text <em>„Name, E-Mail oder Vorgangs-ID …"</em>.</li>
+      <li>Tippen Sie einen Namen oder eine E-Mail-Adresse ein.</li>
+      <li>Warten Sie einen Moment – die Tabelle zeigt automatisch die passenden Treffer.</li>
+      <li>Möchten Sie nur eine bestimmte Schule sehen, wählen Sie diese im Klappmenü <strong>Einrichtung</strong> aus. Ein Klappmenü ist eine Auswahlliste, die sich beim Anklicken öffnet.</li>
+      <li>Um nur einen Bearbeitungsstand zu sehen, klicken Sie auf eine der Kacheln (zum Beispiel <strong>Offen</strong>).</li>
+    </ol>
+
+    <div class="hinweis">
+      <span class="label">Tipp</span>
+      <p>Möchten Sie wieder alle Vorgänge sehen, klicken Sie auf <strong>Filter zurücksetzen</strong>. Mit <strong>Archiv anzeigen</strong> blenden Sie zusätzlich die bereits abgeschlossenen Vorgänge ein.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die Tabelle zeigt nur noch die Vorgänge, die zu Ihrer Suche oder Ihrem Filter passen. Die Anzahl der Treffer steht unter der Tabelle.</p>
+    </div>
+
+    <h3 id="menue-rollen">2.3 Das Menü und die Berechtigungen</h3>
+    <p>Über das Menü in der Kopfzeile erreichen Sie alle weiteren Bereiche. Welche Menüpunkte Sie sehen, hängt von Ihrer „Rolle" ab. Die Rolle bestimmt, was Sie dürfen – so sieht jede Person nur das, was sie für ihre Arbeit braucht.</p>
+
+    <p>Das Menü ist in drei Gruppen aufgeteilt:</p>
+    <ul>
+      <li><strong>Dashboard</strong> – die Startseite mit allen Vorgängen.</li>
+      <li><strong>🔒 BEM</strong> – der besonders geschützte Bereich für das Eingliederungsmanagement.</li>
+      <li><strong>Vorlagen</strong> – hier öffnet sich ein Klappmenü mit Formularen, Brief-Vorlagen, Checklisten und mehr.</li>
+      <li><strong>Verwaltung</strong> – hier öffnet sich ein Klappmenü mit Benutzern, Einrichtungen, Einstellungen und dem Protokoll.</li>
+    </ul>
+
+    <p>Diese Rollen gibt es im Portal:</p>
+    <table>
+      <caption>Die Rollen und was sie dürfen</caption>
+      <thead>
+        <tr>
+          <th scope="col">Rolle</th>
+          <th scope="col">Was diese Person typischerweise darf</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Administrator</strong></td>
+          <td>Darf alles: alle Vorgänge, alle Einrichtungen, alle Einstellungen und die Benutzerverwaltung.</td>
+        </tr>
+        <tr>
+          <td><strong>HR-Leitung</strong></td>
+          <td>Darf fast alles wie der Administrator, nur die Verwaltung der Einrichtungen ist dem Administrator vorbehalten.</td>
+        </tr>
+        <tr>
+          <td><strong>Sachbearbeiter</strong></td>
+          <td>Darf Vorgänge anlegen und bearbeiten sowie Formulare und Briefe nutzen. Keine Administrator-Funktionen.</td>
+        </tr>
+        <tr>
+          <td><strong>Einrichtungsleitung</strong></td>
+          <td>Sieht nur die eigene Einrichtung. Darf Vorgänge anlegen und Checklisten abhaken.</td>
+        </tr>
+        <tr>
+          <td><strong>Vorgesetzter</strong></td>
+          <td>Sieht nur die eigene Einrichtung. Darf vor allem lesen, Checklisten abhaken und Notizen schreiben.</td>
+        </tr>
+        <tr>
+          <td><strong>BEM-Beauftragte:r</strong></td>
+          <td>Sieht ausschließlich den geschützten BEM-Bereich und dort nur die freigegebenen Fälle.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Sehen Sie einen Menüpunkt nicht, ist das kein Fehler. Ihre Rolle gibt diesen Bereich einfach nicht frei. Brauchen Sie den Zugang für Ihre Arbeit, sprechen Sie mit Ihrer Administratorin oder Ihrem Administrator.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Sie wissen, über welche Menügruppe Sie welchen Bereich erreichen. Und Sie verstehen, warum Sie eventuell andere Menüpunkte sehen als eine Kollegin.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 3. ONBOARDING ==================== -->
+  <section id="onboarding" class="kapitel">
+    <h2>3. Onboarding: Neue Mitarbeitende einstellen</h2>
+
+    <p>Im Onboarding begleiten Sie eine neue Person vom ersten Tag der Einstellung bis zur fertigen Personalakte. Das Portal nimmt Ihnen dabei viel Schreibarbeit ab. Die neue Person füllt ihre Daten selbst aus, und Sie prüfen sie anschließend.</p>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Einen neuen Vorgang anlegen dürfen: Administrator, HR-Leitung, Sachbearbeiter und Einrichtungsleitung.</p>
+    </div>
+
+    <h3 id="onboarding-anlegen">3.1 Einen Onboarding-Vorgang anlegen</h3>
+    <p>Mit dem ersten Schritt eröffnen Sie den Vorgang. Das Portal erstellt dabei automatisch einen persönlichen Einladungs-Link für die neue Person.</p>
+    <ol>
+      <li>Klicken Sie auf den Reiter <strong>Onboarding</strong>.</li>
+      <li>Klicken Sie oben rechts auf die Schaltfläche <strong>+ Neuer Vorgang</strong>.</li>
+      <li>Geben Sie in das Feld <strong>E-Mail des neuen Mitarbeiters</strong> die E-Mail-Adresse ein. Dieses Feld ist ein Pflichtfeld.</li>
+      <li>Wählen Sie im Klappmenü <strong>Einrichtung / Mandant</strong> die zuständige Schule oder Kita aus. Auch das ist ein Pflichtfeld.</li>
+      <li>Wählen Sie bei <strong>Fragebogentyp</strong> die passende Art aus (zum Beispiel „Standard – Angestellte" oder „Beamte").</li>
+      <li>Klicken Sie auf <strong>Vorgang anlegen</strong>.</li>
+    </ol>
+
+    <figure class="screenshot">
+      <img src="screenshots/neuer-vorgang.png" alt="Das Eingabefenster Neuer Onboarding-Vorgang mit den Feldern E-Mail des neuen Mitarbeiters (Pflichtfeld), Einrichtung/Mandant (Pflichtfeld), Vorgangsart und Fragebogentyp sowie den Schaltflächen Abbrechen und Vorgang anlegen.">
+      <figcaption>Das Fenster „Neuer Onboarding-Vorgang". Die mit einem roten Sternchen <code>*</code> markierten Felder sind Pflichtfelder.</figcaption>
+    </figure>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Was sind Pflichtfelder?</span>
+      <p>Pflichtfelder müssen Sie ausfüllen, sonst lässt sich der Vorgang nicht speichern. Im Portal sind sie meist mit einem Sternchen <code>*</code> markiert. Hier sind es die E-Mail-Adresse und die Einrichtung.</p>
+    </div>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Was ist ein „Mandant"?</span>
+      <p>„Mandant" ist im Portal ein anderes Wort für „Einrichtung". Gemeint ist eine der 16 Schulen, Kitas oder Vereine der CREDO-Gruppe. Jeder Vorgang gehört zu genau einer Einrichtung.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Eine grüne Bestätigung erscheint: „Onboarding-Vorgang wurde erfolgreich angelegt!". Darunter sehen Sie einen Einladungs-Link für den Personalfragebogen.</p>
+    </div>
+
+    <h4>Die Einladung an die neue Person senden</h4>
+    <p>Damit die neue Person ihren Fragebogen ausfüllen kann, braucht sie den Einladungs-Link. Das Portal verschickt die Einladung automatisch per E-Mail – über SMTP, den E-Mail-Versand des Portals. Sie können den Link aber auch selbst kopieren und versenden.</p>
+    <ol>
+      <li>Klicken Sie in der Bestätigung auf die Schaltfläche <strong>Kopieren</strong> neben dem Link.</li>
+      <li>Fügen Sie den Link bei Bedarf in eine eigene E-Mail ein (mit <kbd>Strg</kbd>+<kbd>V</kbd>).</li>
+      <li>Klicken Sie auf <strong>Schließen</strong>, um zum Dashboard zurückzukehren.</li>
+    </ol>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das? / Wie lange gilt der Link?</span>
+      <p>Der Einladungs-Link ist ein sogenannter „Magic Link" – ein besonderer Einmal-Zugang ganz ohne Passwort. Wer ihn hat, gelangt direkt zum Fragebogen. Behandeln Sie ihn deshalb vertraulich. Der Link ist <strong>30 Tage</strong> gültig.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der neue Vorgang steht jetzt in der Tabelle auf dem Dashboard. Sein Status lautet „Eingeladen". Die neue Person kann nun ihren Fragebogen ausfüllen.</p>
+    </div>
+
+    <h3 id="onboarding-fragebogen">3.2 Der Personalfragebogen (aus Sicht des neuen Mitarbeitenden)</h3>
+    <p>Diesen Teil füllt die neue Person selbst aus – nicht Sie. Trotzdem ist es gut, den Ablauf zu kennen. So können Sie Fragen am Telefon beantworten. Die Person braucht dafür keine Anmeldung, nur den Einladungs-Link.</p>
+
+    <p>Der Fragebogen führt in <strong>zehn Schritten</strong> durch alle nötigen Angaben. Nach jedem Schritt speichert das Portal automatisch. Die Person kann also jederzeit pausieren und später weitermachen. Diese Daten werden abgefragt:</p>
+    <ul>
+      <li><strong>Schritt 1 – Persönliche Angaben:</strong> Anrede, Name, Geburtsdatum, Familienstand.</li>
+      <li><strong>Schritt 2 – Adresse und Kontakt:</strong> Anschrift, Telefon, private E-Mail.</li>
+      <li><strong>Schritt 3 – Bankverbindung:</strong> IBAN (die Kontonummer), Bank.</li>
+      <li><strong>Schritt 4 – Sozialversicherung:</strong> Sozialversicherungsnummer, Krankenkasse.</li>
+      <li><strong>Schritt 5 – Steuer:</strong> Steuer-Identifikationsnummer, Steuerklasse, Konfession.</li>
+      <li><strong>Schritt 6 – Weitere Beschäftigung:</strong> Angaben zu Nebenjobs.</li>
+      <li><strong>Schritt 8 – Bildung und Beruf:</strong> Abschlüsse.</li>
+      <li><strong>Schritt 9 – Masernschutz:</strong> Nachweis der Masern-Impfung.</li>
+      <li><strong>Schritt 10 – Zusammenfassung und Datenschutz:</strong> Kontrolle aller Angaben und die Datenschutz-Einwilligung.</li>
+    </ul>
+
+    <div class="hinweis info">
+      <span class="label">Datenschutz: besonders sensible Daten</span>
+      <p>Die Bankverbindung (IBAN), die Sozialversicherungsnummer und die Steuer-ID sind besonders schützenswert. Das Portal verschlüsselt diese Angaben. Das heißt: Sie werden unlesbar gemacht und nur dann wieder lesbar, wenn sie wirklich gebraucht werden.</p>
+    </div>
+
+    <p>Am Ende bestätigt die Person den Datenschutz-Hinweis und klickt auf <strong>Fragebogen absenden</strong>.</p>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die Person sieht eine Dankesseite mit einer Bestätigungs-Nummer (zum Beispiel <code>CREDO-PF-2026-A1B2C3D4</code>). Im Portal wechselt der Vorgang auf den Status „Eingereicht". Jetzt sind Sie wieder an der Reihe.</p>
+    </div>
+
+    <h3 id="onboarding-bearbeiten">3.3 Einen Vorgang öffnen und prüfen</h3>
+    <p>Sobald die Daten eingereicht sind, prüfen Sie sie. Dazu öffnen Sie den Vorgang und schauen sich die Angaben an. So stellen Sie sicher, dass alles vollständig und richtig ist.</p>
+    <ol>
+      <li>Klicken Sie auf dem Dashboard in der Tabelle auf die Zeile der Person.</li>
+      <li>Die Detailseite öffnet sich. Oben sehen Sie Name, Status und Einrichtung.</li>
+      <li>Klicken Sie auf den Reiter <strong>Fragebogen-Daten</strong>.</li>
+      <li>Lesen Sie die Angaben in den einzelnen Abschnitten durch (Person, Adresse, Bank und so weiter).</li>
+    </ol>
+
+    <figure class="screenshot">
+      <img src="screenshots/onboarding-detail.png" alt="Die Detailseite eines Onboarding-Vorgangs mit Vorgangsnummer und Status oben, den Reitern Übersicht, Fragebogen-Daten, Dokumente, Checkliste und Vorgesetzter sowie dem Fortschritts-Überblick mit aktuellem Schritt, kommenden und erledigten Schritten.">
+      <figcaption>Die Detailseite im Reiter „Übersicht". Der Fortschritts-Überblick zeigt den aktuellen Schritt und was noch aussteht. (Beispieldaten)</figcaption>
+    </figure>
+
+    <p>Die Detailseite hat mehrere Reiter. So springen Sie schnell zwischen den Bereichen eines Vorgangs:</p>
+    <ul>
+      <li><strong>Übersicht</strong> – der Fortschritt des Vorgangs, Ihre Notizen und der Starterpaket-Versand.</li>
+      <li><strong>Fragebogen-Daten</strong> – alle Angaben der Person zum Nachlesen.</li>
+      <li><strong>Dokumente</strong> – Schreiben erstellen, versenden und Dateien ablegen.</li>
+      <li><strong>Checkliste</strong> – die Aufgabenliste rund um die Einstellung.</li>
+      <li><strong>Vorgesetzter</strong> – die Angaben der oder des Vorgesetzten zum Arbeitsvertrag.</li>
+    </ul>
+
+    <h4>Eine Angabe nachträglich korrigieren</h4>
+    <p>Hat sich ein Tippfehler eingeschlichen, können Sie die Daten anpassen. So bleibt die Akte korrekt.</p>
+    <ol>
+      <li>Klicken Sie im Reiter <strong>Fragebogen-Daten</strong> auf <strong>Daten bearbeiten</strong>.</li>
+      <li>Ändern Sie die gewünschten Felder.</li>
+      <li>Klicken Sie auf <strong>Speichern</strong>.</li>
+    </ol>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Daten bearbeiten dürfen Administrator, HR-Leitung und Sachbearbeiter.</p>
+    </div>
+
+    <h4>Den Vorgang als geprüft markieren</h4>
+    <p>Wenn alle Angaben stimmen, bestätigen Sie das mit einem Klick. Damit ist für alle sichtbar, dass die Prüfung erledigt ist.</p>
+    <ol>
+      <li>Klicken Sie oben rechts auf <strong>Als geprüft markieren</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Status des Vorgangs wechselt auf „Geprüft". In der Übersicht sehen Sie, dass dieser Schritt abgeschlossen ist.</p>
+    </div>
+
+    <h4>Notizen festhalten</h4>
+    <p>Im Reiter <strong>Übersicht</strong> können Sie jederzeit Notizen zum Vorgang hinterlassen – etwa Absprachen oder offene Punkte. So geht nichts verloren, und Kolleginnen sehen den Stand.</p>
+    <ol>
+      <li>Wechseln Sie auf den Reiter <strong>Übersicht</strong>.</li>
+      <li>Schreiben Sie Ihren Text in das Notizfeld.</li>
+      <li>Klicken Sie auf <strong>Notiz hinzufügen</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Ihre Notiz erscheint in der Liste – mit Datum und Ihrem Namen. Die Anzahl der Notizen sehen Sie auch auf dem Dashboard.</p>
+    </div>
+
+    <h3 id="onboarding-dokumente">3.4 Dokumente erstellen und das Starterpaket versenden</h3>
+    <p>Im Reiter <strong>Dokumente</strong> erledigen Sie alle Schreiben rund um die Einstellung an einem Ort. Das Portal füllt die Schreiben automatisch mit den Daten der Person aus. Oben auf der Seite zeigt Ihnen eine Leiste „Sie sind hier" Ihren Platz im Gesamtablauf.</p>
+
+    <figure class="screenshot">
+      <img src="screenshots/onboarding-dokumente.png" alt="Der Reiter Dokumente eines Onboarding-Vorgangs mit der Prozessleiste Sie sind hier, dem Bereich Dokumente erstellen, dem Bereich Starterpaket versenden und dem Bereich PDF-Export für DMS mit Kacheln für Gesamtakte, Fragebogen, Modalitäten, Dokumente und Checkliste.">
+      <figcaption>Der Dokumente-Hub bündelt Erstellen, Versenden und PDF-Export. Oben zeigt „Sie sind hier" Ihren Platz im Ablauf. (Beispieldaten)</figcaption>
+    </figure>
+
+    <h4>Ein Schreiben aus einer Vorlage erstellen</h4>
+    <p>So erzeugen Sie zum Beispiel ein Anschreiben, ohne Daten abzutippen.</p>
+    <ol>
+      <li>Öffnen Sie den Vorgang und klicken Sie auf den Reiter <strong>Dokumente</strong>.</li>
+      <li>Suchen Sie im Bereich <strong>Dokumente erstellen</strong> die gewünschte Vorlage.</li>
+      <li>Klicken Sie auf <strong>Word</strong> für eine bearbeitbare Datei oder auf <strong>PDF</strong> für ein fertiges Dokument.</li>
+      <li>Das Schreiben wird erzeugt und heruntergeladen. Sie finden es im Download-Ordner Ihres Computers.</li>
+    </ol>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Word oder PDF?</span>
+      <p>Eine Word-Datei können Sie noch verändern. Eine PDF-Datei ist fertig und sieht überall gleich aus. Zum Verschicken oder Archivieren nehmen Sie meist PDF.</p>
+    </div>
+
+    <div class="hinweis">
+      <span class="label">Tipp: das Masernschutz-Formular</span>
+      <p>Für den Masernschutz gibt es ein amtliches Formular des Landes NRW. Klicken Sie auf <strong>PDF öffnen</strong>, drucken Sie es aus und lassen Sie es beim Arzt ausfüllen.</p>
+    </div>
+
+    <h4>Das Starterpaket versenden</h4>
+    <p>Das „Starterpaket" ist eine Sammlung wichtiger Dokumente für den Start. Das Portal schickt sie der neuen Person gebündelt als E-Mail mit PDF-Anhängen. Welche Dokumente dabei sind, legt die Verwaltung pro Einrichtung fest.</p>
+    <ol>
+      <li>Klicken Sie im Reiter <strong>Dokumente</strong> auf <strong>Starterpaket versenden</strong>.</li>
+      <li>Warten Sie kurz, bis die Bestätigung erscheint.</li>
+    </ol>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: keine Dokumente konfiguriert?</span>
+      <p>Erscheint die Meldung „Keine Starterpaket-Dokumente für diesen Mandanten konfiguriert", ist das kein Fehler von Ihnen. Für diese Einrichtung wurde das Paket noch nicht zusammengestellt. Die Administratorin kann das unter „Einrichtungen → Starterpaket" nachholen (siehe Kapitel 11.2).</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Eine grüne Meldung bestätigt zum Beispiel „Starterpaket versendet (3 Dokumente)." Im Vorgang wird notiert, wann das Paket verschickt wurde.</p>
+    </div>
+
+    <h4>Eine PDF-Akte für die Ablage erstellen</h4>
+    <p>Für das digitale Archiv können Sie die gesamte Akte oder einzelne Teile als PDF herunterladen. Jedes dieser PDFs bekommt vorne einen QR-Code. Ein QR-Code ist ein quadratisches Strichbild, das die spätere Ablage automatisch der richtigen Akte zuordnet.</p>
+    <ol>
+      <li>Gehen Sie im Reiter <strong>Dokumente</strong> zum Bereich <strong>PDF-Export für DMS</strong>. „DMS" ist die digitale Aktenablage.</li>
+      <li>Wählen Sie, was Sie brauchen – zum Beispiel <strong>Gesamtakte</strong> oder nur den <strong>Fragebogen</strong>.</li>
+      <li>Klicken Sie auf <strong>PDF herunterladen</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Das PDF liegt in Ihrem Download-Ordner – fertig zur Ablage im Archiv, inklusive QR-Code auf der ersten Seite.</p>
+    </div>
+
+    <h3 id="onboarding-checkliste">3.5 Checkliste abarbeiten und Vorgang abschließen</h3>
+    <p>Die Checkliste sorgt dafür, dass keine Aufgabe vergessen wird – vom IT-Arbeitsplatz bis zum Schlüssel. Sie haken jede erledigte Aufgabe ab. Ein Fortschrittsbalken zeigt, wie weit Sie sind.</p>
+    <ol>
+      <li>Öffnen Sie den Vorgang und klicken Sie auf den Reiter <strong>Checkliste</strong>.</li>
+      <li>Lesen Sie die Aufgaben. Sie sind nach Themen geordnet.</li>
+      <li>Klicken Sie auf das Kästchen vor einer Aufgabe, sobald sie erledigt ist.</li>
+      <li>Bei Bedarf schreiben Sie über das Notiz-Symbol eine kurze Bemerkung dazu.</li>
+    </ol>
+
+    <figure class="screenshot">
+      <img src="screenshots/onboarding-checkliste.png" alt="Der Reiter Checkliste eines Onboarding-Vorgangs mit einem Fortschrittsbalken (0 von 13 Aufgaben erledigt) und nach Kategorien geordneten Aufgaben mit Kontrollkästchen und Zuständigkeits-Markierungen wie HR oder Verwaltung.">
+      <figcaption>Die Checkliste, nach Themen geordnet. Jede erledigte Aufgabe haken Sie über das Kästchen ab. (Beispieldaten)</figcaption>
+    </figure>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Das Kästchen wird grün und bekommt ein Häkchen. Der Fortschrittsbalken oben steigt. Bei „100 %" sind alle Aufgaben erledigt.</p>
+    </div>
+
+    <h4>Den Vorgang abschließen</h4>
+    <p>Ist alles geprüft und erledigt, schließen Sie den Vorgang ab. Damit gilt die Einstellung im Portal als vollständig bearbeitet.</p>
+    <ol>
+      <li>Wechseln Sie auf den Reiter <strong>Übersicht</strong>.</li>
+      <li>Klicken Sie auf <strong>Vorgang abschließen</strong>.</li>
+      <li>Bestätigen Sie die Nachfrage.</li>
+    </ol>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Einen Vorgang abschließen dürfen Administrator und HR-Leitung.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Status wechselt auf „Abgeschlossen". Der Vorgang wandert ins Archiv. Über <strong>Archiv anzeigen</strong> auf dem Dashboard finden Sie ihn jederzeit wieder.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 4. OFFBOARDING ==================== -->
+  <section id="offboarding" class="kapitel">
+    <h2>4. Offboarding: Austritte verwalten</h2>
+
+    <p>Im Offboarding begleiten Sie das Ausscheiden einer Person – etwa bei Kündigung oder Renteneintritt. Das Portal hilft Ihnen, an alles zu denken: Übergaben, Rückgaben von Gegenständen und die Abschluss-Befragung.</p>
+
+    <h3>Einen Austritt anlegen</h3>
+    <p>Mit diesen Schritten eröffnen Sie den Austrittsvorgang.</p>
+    <ol>
+      <li>Klicken Sie auf den Reiter <strong>Offboarding</strong>.</li>
+      <li>Klicken Sie auf <strong>Neuer Austritt</strong>.</li>
+      <li>Füllen Sie die Pflichtfelder aus: <strong>Vorname</strong>, <strong>Nachname</strong>, <strong>Dienst-E-Mail</strong> und <strong>Einrichtung</strong>.</li>
+      <li>Wählen Sie bei <strong>Austrittsart</strong> den Grund aus (zum Beispiel „Kündigung Arbeitnehmer" oder „Rente / Pension").</li>
+      <li>Tragen Sie bei <strong>Letzter Arbeitstag</strong> das Datum ein.</li>
+      <li>Geben Sie optional eine <strong>private E-Mail</strong> an – sie wird für die Abschluss-Befragung gebraucht.</li>
+      <li>Klicken Sie auf <strong>Austritt anlegen</strong>.</li>
+    </ol>
+
+    <div class="hinweis">
+      <span class="label">Tipp</span>
+      <p>Geben Sie die private E-Mail-Adresse gleich mit an. Nach dem letzten Arbeitstag ist die Dienst-Adresse oft schon abgeschaltet. Über die private Adresse erreichen Sie die Person für das Exit-Interview noch.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Austritt erscheint in der Liste mit dem Status „Erfasst". Über <strong>Vorgang öffnen</strong> gelangen Sie zur Detailseite.</p>
+    </div>
+
+    <h3>Den Austritt bearbeiten</h3>
+    <p>Auf der Detailseite begleiten Sie den Austritt bis zum Abschluss. Sie nutzen dazu die Reiter:</p>
+    <ul>
+      <li><strong>Übersicht</strong> – Stammdaten und der Bearbeitungsstand.</li>
+      <li><strong>Checkliste</strong> – alle Aufgaben zum Abhaken.</li>
+      <li><strong>Rückgaben</strong> – Gegenstände wie Schlüssel, Laptop oder Dienstwagen erfassen und als zurückgegeben markieren.</li>
+      <li><strong>Dokumente</strong> – Dateien hochladen und ablegen.</li>
+      <li><strong>Notizen</strong> – Bemerkungen festhalten.</li>
+      <li><strong>Exit-Interview</strong> – die Abschluss-Befragung starten (siehe Kapitel 9).</li>
+      <li><strong>Zeugnis</strong> – die Bewertung für das Arbeitszeugnis vorbereiten.</li>
+    </ul>
+
+    <p>Der Bearbeitungsstand durchläuft mehrere Stufen: <strong>Erfasst → Kündigungsfrist → Übergabe → Endabrechnung → Abgeschlossen</strong>. Den Stand stellen Sie über das Status-Klappmenü auf der Übersicht ein.</p>
+
+    <figure class="screenshot">
+      <img src="screenshots/offboarding-detail.png" alt="Die Detailseite eines Offboarding-Vorgangs mit Name, Austrittsart und letztem Arbeitstag oben, der Schaltfläche Status ändern, den Reitern Übersicht, Checkliste, Rückgaben, Dokumente, Notizen, Exit-Interview und Zeugnis sowie dem Fortschritts-Überblick.">
+      <figcaption>Die Offboarding-Detailseite. Über „Status ändern" stellen Sie den Bearbeitungsstand weiter; die Reiter führen durch alle Aufgaben. (Beispieldaten)</figcaption>
+    </figure>
+
+    <h4>Eine Rückgabe erfassen</h4>
+    <p>So behalten Sie den Überblick, welche Gegenstände noch ausstehen.</p>
+    <ol>
+      <li>Öffnen Sie den Reiter <strong>Rückgaben</strong>.</li>
+      <li>Klicken Sie auf <strong>+ Gegenstände</strong>.</li>
+      <li>Wählen Sie die Kategorie (zum Beispiel „IT-Hardware" oder „Schlüssel") und geben Sie eine Bezeichnung ein.</li>
+      <li>Sobald die Person den Gegenstand zurückgibt, klicken Sie auf <strong>Rückgabe bestätigen</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Gegenstand ist als zurückgegeben markiert. So sehen Sie auf einen Blick, was noch fehlt.</p>
+    </div>
+
+    <h4>Aufgaben an Abteilungen verteilen</h4>
+    <p>Beim Austritt müssen oft mehrere Abteilungen mithelfen – etwa die IT und die Hausverwaltung. Das Portal kann jeder Abteilung ihre eigene Aufgabenliste per Link zusenden. Die Abteilung braucht dafür keine Anmeldung.</p>
+    <ol>
+      <li>Suchen Sie auf der Detailseite den Bereich <strong>Abteilungs-Checklisten</strong>.</li>
+      <li>Klicken Sie auf <strong>Abteilungs-Links versenden</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die beteiligten Abteilungen erhalten je einen Link zu ihrer Aufgabenliste. Ihre Rückmeldungen laufen automatisch im Vorgang zusammen.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 5. VERBEAMTUNG ==================== -->
+  <section id="verbeamtung" class="kapitel">
+    <h2>5. Verbeamtung (PSI)</h2>
+
+    <p>Die Verbeamtung begleitet die Übernahme einer Lehrkraft ins Beamtenverhältnis. Dieser Prozess ist lang und hat viele Beteiligte. Das Portal legt deshalb beim Start automatisch alle nötigen Aufgaben und Phasen an.</p>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Was bedeutet „PSI"?</span>
+      <p>„PSI" ist die interne Abkürzung für diesen Verbeamtungs-Prozess. Sie taucht im Menü und auf Schaltflächen auf. Gemeint ist immer die Übernahme ins Beamtenverhältnis.</p>
+    </div>
+
+    <h3>Eine Verbeamtung anlegen</h3>
+    <p>Das Anlegen geschieht in zwei Schritten („Schritt 1 von 2"). Im ersten Schritt erfassen Sie die Lehrkraft, im zweiten die weiteren Beteiligten.</p>
+
+    <h4>Schritt 1: die Lehrkraft</h4>
+    <ol>
+      <li>Klicken Sie auf den Reiter <strong>Verbeamtung</strong> und dann auf <strong>Neue Verbeamtung</strong>.</li>
+      <li>Füllen Sie die Pflichtfelder aus: <strong>Vorname</strong>, <strong>Nachname</strong>, <strong>Dienst-E-Mail</strong> und <strong>Schule</strong>.</li>
+      <li>Tragen Sie bei Bedarf den geplanten Vertragsbeginn und die Personalnummer ein.</li>
+      <li>Klicken Sie auf <strong>Weiter</strong>.</li>
+    </ol>
+
+    <h4>Schritt 2: die Beteiligten</h4>
+    <p>Am Verfahren wirken weitere Personen mit. Sie erhalten später automatisch ihre eigenen Zugangs-Links.</p>
+    <ol>
+      <li>Geben Sie Name und E-Mail der <strong>Schulleitung</strong> ein (für Beurteilungen und Referenzen).</li>
+      <li>Geben Sie die E-Mail des <strong>Amtsarztes</strong> ein (für Erinnerungen an den Untersuchungstermin).</li>
+      <li>Geben Sie bei Bedarf die E-Mail des <strong>Beirats</strong> ein.</li>
+      <li>Klicken Sie auf <strong>Verbeamtung anlegen</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Eine grüne Bestätigung erscheint. Das Portal hat den Vorgang mit allen Phasen und Checklisten-Punkten angelegt. Sie können sofort mit der Bearbeitung beginnen.</p>
+    </div>
+
+    <h3>Eine Verbeamtung bearbeiten</h3>
+    <p>Auf der Detailseite sehen Sie oben eine Zeitleiste mit vier großen Phasen und einen Fortschrittsbalken. So erkennen Sie sofort, wo das Verfahren gerade steht:</p>
+    <ul>
+      <li><strong>Phase I</strong> – Antrag und Beurteilung.</li>
+      <li><strong>Phase II</strong> – Verwaltung (mit mehreren Unterschritten, etwa Amtsarzt und Besoldung).</li>
+      <li><strong>Phase III</strong> – Probezeit.</li>
+      <li><strong>Phase IV</strong> – Übernahme auf Lebenszeit.</li>
+    </ul>
+    <p>Die Reiter <strong>Übersicht</strong>, <strong>Checkliste</strong>, <strong>Beurteilungen</strong>, <strong>Dokumente</strong> und <strong>Protokoll</strong> führen Sie durch die einzelnen Aufgaben. Sie arbeiten die Checkliste ab wie beim Onboarding: Aufgabe anklicken, Häkchen setzen.</p>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Mit jeder erledigten Aufgabe füllt sich der Fortschrittsbalken. Die Zeitleiste zeigt, welche Phase abgeschlossen ist und welche gerade läuft.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 6. MUTTERSCHUTZ ==================== -->
+  <section id="mutterschutz" class="kapitel">
+    <h2>6. Mutterschutz</h2>
+
+    <p>Im Mutterschutz begleiten Sie eine werdende Mutter vor und nach der Geburt. Das Portal hilft Ihnen, Fristen und die nötigen Schritte im Blick zu behalten.</p>
+
+    <h3>Einen Mutterschutz anlegen</h3>
+    <p>So erfassen Sie einen neuen Mutterschutz-Vorgang.</p>
+    <ol>
+      <li>Klicken Sie auf den Reiter <strong>Mutterschutz</strong> und dann auf <strong>Neuer Mutterschutz</strong>.</li>
+      <li>Füllen Sie Name, E-Mail und Einrichtung aus.</li>
+      <li>Tragen Sie den voraussichtlichen Geburtstermin ein.</li>
+      <li>Wählen Sie den Einrichtungstyp und die Personalgruppe aus.</li>
+      <li>Klicken Sie auf <strong>Speichern</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Vorgang erscheint in der Liste mit dem Status „Gemeldet".</p>
+    </div>
+
+    <h3>Den Status weiterstellen</h3>
+    <p>Der Mutterschutz durchläuft feste Stufen. Sie stellen den Stand über die passenden Schaltflächen weiter. So ist immer klar, wo der Vorgang steht.</p>
+    <ul>
+      <li><strong>BAD beauftragen</strong> – stellt den Status auf „BAD beauftragt". „BAD" ist der Betriebsärztliche Dienst, also die Betriebsärztin oder der Betriebsarzt.</li>
+      <li><strong>BAD abschließen</strong> – die ärztliche Beurteilung liegt vor.</li>
+      <li><strong>Aktivieren</strong> – der Mutterschutz läuft.</li>
+      <li><strong>Beenden</strong> – der Mutterschutz ist vorbei.</li>
+    </ul>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Status wechselt mit jedem Schritt. Den Verlauf sehen Sie jederzeit in der Übersicht des Vorgangs.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 7. ELTERNZEIT ==================== -->
+  <section id="elternzeit" class="kapitel">
+    <h2>7. Elternzeit</h2>
+
+    <p>In diesem Bereich verwalten Sie Elternzeit-Anträge – von der ersten Meldung bis zur Rückkehr. Das Portal erstellt die nötigen Bescheinigungen und erinnert Sie an Fristen.</p>
+
+    <h3>Einen Elternzeit-Vorgang bearbeiten</h3>
+    <p>Auf der Detailseite führt Sie ein Ablauf-Balken durch die Schritte. Ein Banner „Nächster Schritt" sagt Ihnen jeweils, was als Nächstes ansteht. Diese Reiter stehen zur Verfügung:</p>
+    <ul>
+      <li><strong>Übersicht</strong> – Angaben zum Kind und zur Person.</li>
+      <li><strong>Abschnitte</strong> – die einzelnen Elternzeit-Zeiträume (von wann bis wann).</li>
+      <li><strong>Checkliste</strong> – die Aufgaben im Verfahren.</li>
+      <li><strong>Briefe</strong> – die erzeugten Bescheinigungen.</li>
+      <li><strong>Fristen</strong> – wichtige Termine, farblich nach Dringlichkeit.</li>
+      <li><strong>Dokumente</strong> und <strong>Notizen</strong> – Ablage und Bemerkungen.</li>
+    </ul>
+
+    <h3>Einen Antrag genehmigen</h3>
+    <p>Liegt ein Antrag vollständig vor, genehmigen Sie ihn. Das Portal erstellt dazu die Arbeitgeber-Bescheinigung.</p>
+    <ol>
+      <li>Öffnen Sie den Vorgang.</li>
+      <li>Klicken Sie auf <strong>Genehmigen</strong>.</li>
+      <li>Bestätigen Sie im folgenden Fenster.</li>
+    </ol>
+
+    <div class="hinweis">
+      <span class="label">Tipp: die Feriensperrfrist</span>
+      <p>Für Lehrkräfte gibt es bei der Elternzeit eine besondere Regel zu den Schulferien. Damit das Portal die Ferien kennt, müssen diese unter „Einstellungen → Schulferien" gepflegt sein (siehe Kapitel 11.3).</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Antrag ist genehmigt, und die Bescheinigung wird erstellt. Über <strong>Magic Link versenden</strong> können Sie der Person zuvor einen Zugang zum Antrag schicken; mit <strong>Ablehnen</strong> lehnen Sie einen Antrag mit Begründung ab.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 8. BEM ==================== -->
+  <section id="bem" class="kapitel">
+    <h2>8. BEM: Betriebliches Eingliederungsmanagement</h2>
+
+    <p>Das „Betriebliche Eingliederungsmanagement" – kurz BEM – ist ein gesetzlich vorgeschriebenes Angebot. Es unterstützt Mitarbeitende, die länger krank waren, bei der Rückkehr an den Arbeitsplatz. Weil es dabei um Gesundheitsdaten geht, ist dieser Bereich besonders streng geschützt.</p>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: besonders vertraulicher Bereich</span>
+      <p>Der BEM-Bereich ist eine „versiegelte Akte". Das bedeutet: Nur ausdrücklich freigegebene Personen sehen einen Fall. Außerdem wird <strong>jeder einzelne Zugriff protokolliert</strong> – also festgehalten, wer wann hineingeschaut hat. Öffnen Sie BEM-Fälle nur, wenn es Ihre Aufgabe ist.</p>
+    </div>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Den BEM-Bereich sehen nur freigegebene Personen, zum Beispiel BEM-Beauftragte. Sehen Sie den Menüpunkt „🔒 BEM" nicht oder ist die Liste leer, haben Sie für diese Fälle keine Freigabe. Das ist so gewollt.</p>
+    </div>
+
+    <h3>Den BEM-Bereich öffnen</h3>
+    <p>So gelangen Sie zur Übersicht der BEM-Fälle.</p>
+    <ol>
+      <li>Klicken Sie im Menü oben auf <strong>🔒 BEM</strong>.</li>
+      <li>Sie sehen oben Kennzahlen (laufende, abgeschlossene Fälle) und darunter die Liste der freigegebenen Fälle.</li>
+      <li>Über das Klappmenü und das Suchfeld grenzen Sie die Liste ein.</li>
+    </ol>
+
+    <div class="hinweis">
+      <span class="label">Tipp: das rote Zahlen-Symbol</span>
+      <p>Steht am Menüpunkt „🔒 BEM" eine rote Zahl, gibt es so viele Fristen, die Ihre Aufmerksamkeit brauchen. Ein roter Hinweis-Kasten in der Liste nennt die überfälligen und bald fälligen Termine.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Sie sehen die Übersicht aller für Sie freigegebenen BEM-Fälle und erkennen sofort, wo Handlungsbedarf besteht.</p>
+    </div>
+
+    <h3>Einen BEM-Fall bearbeiten</h3>
+    <p>Ein einzelner Fall hat mehrere Reiter. Damit dokumentieren Sie den gesamten Ablauf sauber und nachvollziehbar:</p>
+    <ul>
+      <li><strong>Übersicht</strong> – die Stammdaten und der zeitliche Verlauf.</li>
+      <li><strong>Gespräche</strong> – Erst- und Folgegespräche mit Datum, Ort und Teilnehmenden festhalten.</li>
+      <li><strong>Maßnahmen</strong> – vereinbarte Schritte zur Wiedereingliederung erfassen.</li>
+      <li><strong>Einwilligungen</strong> – die nötigen Zustimmungen der betroffenen Person einholen.</li>
+      <li><strong>Dokumente</strong> und <strong>Fristen</strong> – Ablage und Termine.</li>
+      <li><strong>Zugriffe</strong> – wer auf diesen Fall zugreifen darf.</li>
+      <li><strong>Protokoll</strong> – die lückenlose Aufzeichnung aller Zugriffe und Änderungen.</li>
+    </ul>
+
+    <div class="hinweis info">
+      <span class="label">Datenschutz: die Einwilligung steht am Anfang</span>
+      <p>Ein BEM darf nur mit Zustimmung der betroffenen Person stattfinden. Über den Reiter <strong>Einwilligungen</strong> fordern Sie diese Zustimmung an. Die Person erhält dafür einen geschützten Link.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Jeder Schritt – vom ersten Gespräch bis zur Maßnahme – ist dokumentiert. Das Portal hält den Status fest und erinnert an Fristen.</p>
+    </div>
+
+    <h3>Auswertungen ansehen</h3>
+    <p>Für Berichte gibt es eine Statistik-Seite. Sie zeigt nur anonyme Gesamtzahlen, niemals einzelne Personen. So bleiben die Auswertungen datenschutzkonform.</p>
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Sie sehen zusammengefasste Zahlen über alle Fälle – ohne Rückschluss auf einzelne Mitarbeitende.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 9. EXIT-INTERVIEW ==================== -->
+  <section id="exit" class="kapitel">
+    <h2>9. Exit-Interview: Die Abschluss-Befragung</h2>
+
+    <p>Das „Exit-Interview" ist eine freiwillige Befragung beim Austritt. „Exit" ist Englisch für „Ausgang". Die Rückmeldungen helfen der CREDO-Gruppe, sich zu verbessern. Diesen Fragebogen füllt die austretende Person selbst aus – ähnlich wie den Personalfragebogen.</p>
+
+    <h3>So läuft die Befragung für die austretende Person ab</h3>
+    <p>Es ist hilfreich, den Ablauf zu kennen, falls Fragen aufkommen. Die Person braucht nur den zugesandten Link, keine Anmeldung.</p>
+    <ol>
+      <li>Die Person öffnet den Link aus der E-Mail.</li>
+      <li>Sie bestätigt zuerst den Datenschutz-Hinweis.</li>
+      <li>Sie beantwortet die Fragen, die nach Themen geordnet sind.</li>
+      <li>Am Ende prüft sie die Zusammenfassung und klickt auf <strong>Absenden</strong>.</li>
+    </ol>
+
+    <div class="hinweis">
+      <span class="label">Tipp: verschiedene Fragetypen</span>
+      <p>Die Befragung nutzt mehrere Antwortformen: Sterne zum Bewerten, freie Textfelder, Auswahllisten und eine Skala von 0 bis 10. Die Person sieht oben immer, im wievielten Schritt sie gerade ist.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die Person sieht eine Dankesseite und kann das Fenster schließen. Die Antworten laufen vertraulich im Portal zusammen und stehen für Auswertungen bereit.</p>
+    </div>
+
+    <h3>Eine Befragung starten</h3>
+    <p>Sie selbst starten die Befragung aus dem Austrittsvorgang heraus. So bekommt die richtige Person den richtigen Link.</p>
+    <ol>
+      <li>Öffnen Sie den passenden Offboarding-Vorgang (siehe Kapitel 4).</li>
+      <li>Wechseln Sie auf den Reiter <strong>Exit-Interview</strong>.</li>
+      <li>Lösen Sie den Versand des Befragungs-Links aus.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die austretende Person erhält den Link zur Befragung – idealerweise an ihre private E-Mail-Adresse.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 10. VORLAGEN ==================== -->
+  <section id="vorlagen" class="kapitel">
+    <h2>10. Vorlagen verwalten</h2>
+
+    <p>Eine „Vorlage" ist ein Muster, das Sie immer wieder verwenden – zum Beispiel ein Standard-Anschreiben oder eine feste Checkliste. Vorlagen sparen viel Zeit, weil Sie nicht jedes Mal von vorne anfangen. Alle Vorlagen erreichen Sie über das Menü <strong>Vorlagen</strong>.</p>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Vorlagen verwalten dürfen vor allem Administrator und HR-Leitung. Sachbearbeiter können Formulare und Brief-Vorlagen nutzen.</p>
+    </div>
+
+    <h3 id="vorlagen-formulare">10.1 Formulare (Personalfragebogen)</h3>
+    <p>Hier legen Sie fest, welche Fragen der Personalfragebogen für welche Beschäftigungsart enthält. So sieht eine Aushilfe nur die für sie nötigen Felder, eine Beamtin dagegen andere. Das macht den Fragebogen für alle übersichtlicher.</p>
+    <ol>
+      <li>Öffnen Sie <strong>Vorlagen → Formulare</strong>.</li>
+      <li>Wählen Sie die Vorlage aus, die Sie anpassen möchten (zum Beispiel „Standard").</li>
+      <li>Schalten Sie einzelne Schritte mit dem Schiebeschalter an oder aus.</li>
+      <li>Klicken Sie auf <strong>Felder</strong>, um innerhalb eines Schritts einzelne Felder ein- oder auszublenden.</li>
+      <li>Klicken Sie auf <strong>Speichern</strong>.</li>
+    </ol>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Pflichtschritte</span>
+      <p>Schritt 1 (persönliche Daten) und Schritt 10 (Zusammenfassung) lassen sich nicht ausschalten. Sie sind als „Pflichtschritt" gekennzeichnet, weil der Fragebogen sie immer braucht.</p>
+    </div>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Vorschau nutzen</span>
+      <p>Über <strong>Vorschau</strong> sehen Sie den Fragebogen genau so, wie ihn die neue Person sieht. Dabei werden keine Daten gespeichert. So prüfen Sie Ihre Änderungen gefahrlos.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Eine Bestätigung „Änderungen gespeichert" erscheint. Neue Vorgänge dieses Typs verwenden ab sofort Ihre Einstellungen.</p>
+    </div>
+
+    <h3 id="vorlagen-brief">10.2 Brief-Vorlagen und Platzhalter</h3>
+    <p>Mit Brief-Vorlagen erzeugen Sie Schreiben, die sich automatisch mit den Daten einer Person füllen. Sie laden dazu eine Word-Datei hoch, in der Sie „Platzhalter" eingebaut haben. Ein Platzhalter ist ein Stellvertreter in geschweiften Klammern, zum Beispiel <code>{vorname}</code>. Beim Erzeugen ersetzt das Portal ihn durch den echten Wert.</p>
+
+    <h4>Eine neue Brief-Vorlage hochladen</h4>
+    <ol>
+      <li>Öffnen Sie <strong>Vorlagen → Brief-Vorlagen</strong>.</li>
+      <li>Klicken Sie auf <strong>+ Neue Vorlage</strong>.</li>
+      <li>Wählen Sie Ihre Word-Datei (Endung <code>.docx</code>) aus.</li>
+      <li>Geben Sie einen <strong>Namen</strong> ein und wählen Sie das <strong>Modul</strong> (zum Beispiel „Onboarding").</li>
+      <li>Wählen Sie, ob die Vorlage für alle Einrichtungen („Global") oder nur für eine gilt.</li>
+      <li>Klicken Sie auf <strong>Speichern</strong>.</li>
+    </ol>
+
+    <figure class="screenshot">
+      <img src="screenshots/brief-vorlagen.png" alt="Die Seite Brief-Vorlagen mit der Schaltfläche Neue Vorlage oben rechts und einer Tabelle mit den Spalten Name, Modul, Geltung, Platzhalter und Aktionen.">
+      <figcaption>Die Übersicht der Brief-Vorlagen. Über „+ Neue Vorlage" laden Sie eine neue Word-Datei hoch.</figcaption>
+    </figure>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Platzhalter in Word einfügen</span>
+      <p>Schreiben Sie die Platzhalter einfach mit geschweiften Klammern in Ihren Word-Text, etwa: „Sehr geehrte/r <code>{anrede} {nachname}</code>". Das Portal erkennt sie automatisch beim Hochladen.</p>
+    </div>
+
+    <p>Diese Platzhalter werden besonders häufig gebraucht:</p>
+    <table>
+      <caption>Beispiele für Platzhalter</caption>
+      <thead>
+        <tr>
+          <th scope="col">Platzhalter</th>
+          <th scope="col">Wird ersetzt durch</th>
+          <th scope="col">Beispiel</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>{vorname}</code></td><td>den Vornamen</td><td>Erika</td></tr>
+        <tr><td><code>{nachname}</code></td><td>den Nachnamen</td><td>Mustermann</td></tr>
+        <tr><td><code>{anrede}</code></td><td>die Anrede</td><td>Frau</td></tr>
+        <tr><td><code>{plz_ort}</code></td><td>Postleitzahl und Ort</td><td>32425 Minden</td></tr>
+        <tr><td><code>{eintrittsdatum}</code></td><td>den Vertragsbeginn</td><td>01.09.2026</td></tr>
+        <tr><td><code>{mandant_name}</code></td><td>die Einrichtung</td><td>Gymnasium</td></tr>
+        <tr><td><code>{datum}</code></td><td>das heutige Datum</td><td>17.06.2026</td></tr>
+      </tbody>
+    </table>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: besonders sensible Platzhalter</span>
+      <p>Manche Platzhalter stehen für sehr persönliche Daten wie die Kontonummer (<code>{iban}</code>), die Sozialversicherungsnummer (<code>{sv_nummer}</code>) oder die Steuer-ID (<code>{steuer_id}</code>). Im Variablen-Katalog sind sie mit einem roten Punkt markiert. Nutzen Sie sie nur, wenn das Schreiben sie wirklich braucht. Jede Verwendung wird protokolliert.</p>
+    </div>
+
+    <h4>Ein Schreiben aus einer Brief-Vorlage erzeugen</h4>
+    <p>Aus einer fertigen Vorlage erstellen Sie jederzeit ein konkretes Schreiben.</p>
+    <ol>
+      <li>Klicken Sie in der Liste bei der Vorlage auf <strong>Erzeugen</strong>.</li>
+      <li>Wählen Sie das Ausgabeformat: <strong>Word</strong>, <strong>PDF</strong> oder <strong>Per E-Mail</strong>.</li>
+      <li>Füllen Sie bei Bedarf einzelne Platzhalter von Hand aus. Leere Felder ergänzt das Portal automatisch oder markiert sie mit <code>___</code>.</li>
+      <li>Lösen Sie die Erzeugung aus.</li>
+    </ol>
+
+    <div class="hinweis">
+      <span class="label">Tipp: der Variablen-Katalog</span>
+      <p>Im Fenster sehen Sie einen „Variablen-Katalog" mit allen verfügbaren Platzhaltern. Ein Klick darauf kopiert den Platzhalter. Sie können ihn dann in Word einfügen.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Das fertige Schreiben wird heruntergeladen oder direkt per E-Mail verschickt – vollständig mit den echten Daten gefüllt.</p>
+    </div>
+
+    <h3 id="vorlagen-weitere">10.3 Checklisten, Zeugnisse und weitere Vorlagen</h3>
+    <p>Im Menü <strong>Vorlagen</strong> finden Sie weitere Vorlagen-Arten. Sie funktionieren nach demselben Muster: öffnen, anpassen, speichern. Hier eine Übersicht, wofür sie da sind:</p>
+    <table>
+      <caption>Die weiteren Vorlagen-Arten</caption>
+      <thead>
+        <tr>
+          <th scope="col">Vorlage</th>
+          <th scope="col">Wofür sie da ist</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Checklisten</strong></td>
+          <td>Feste Aufgabenlisten für Onboarding, Offboarding und Verbeamtung. Sie legen die Aufgaben, ihre Reihenfolge und Fristen fest.</td>
+        </tr>
+        <tr>
+          <td><strong>Exit-Interview</strong></td>
+          <td>Die Fragen der Abschluss-Befragung. Sie bestimmen Kategorien, Fragen und Antwortformen.</td>
+        </tr>
+        <tr>
+          <td><strong>Zeugnis-Bewertung</strong></td>
+          <td>Bewertungsbögen für Arbeitszeugnisse, getrennt nach Berufsgruppe. Mit Kriterien, Gewichtung und Noten von 1 bis 6.</td>
+        </tr>
+        <tr>
+          <td><strong>Beurteilungs-Vorlagen</strong></td>
+          <td>Bögen für die dienstliche Beurteilung im Rahmen der Verbeamtung – rechtssicher nach den Vorgaben für NRW.</td>
+        </tr>
+        <tr>
+          <td><strong>BEM-Vorlagen</strong></td>
+          <td>Checklisten und Datenschutz-Texte für das Eingliederungsmanagement. Anpassbar, falls sich Gesetze ändern.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="hinweis">
+      <span class="label">Tipp: „Global" und einrichtungseigene Vorlagen</span>
+      <p>Viele Vorlagen gibt es in einer gemeinsamen Fassung für alle („Global"). Einzelne Einrichtungen können bei Bedarf eine eigene Fassung hinterlegen. Diese eigene Fassung gilt dann nur für diese eine Einrichtung.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Sie wissen, welche Vorlagen-Art wofür gedacht ist, und finden sie sicher im Menü „Vorlagen".</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 11. VERWALTUNG ==================== -->
+  <section id="verwaltung" class="kapitel">
+    <h2>11. Verwaltung: Benutzer, Einrichtungen und Einstellungen</h2>
+
+    <p>Im Bereich <strong>Verwaltung</strong> richten Sie das Portal grundlegend ein. Hier legen Sie Benutzer und Einrichtungen an und stellen den E-Mail-Versand ein. Diese Aufgaben übernehmen meist wenige Personen.</p>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Die Verwaltung sehen nur Administrator und HR-Leitung. Die Einrichtungs-Verwaltung ist allein dem Administrator vorbehalten.</p>
+    </div>
+
+    <h3 id="verwaltung-benutzer">11.1 Benutzer verwalten</h3>
+    <p>Hier legen Sie fest, wer sich am Portal anmelden darf und was diese Person sehen kann. Jede Mitarbeiterin und jeder Mitarbeiter braucht ein eigenes Benutzerkonto.</p>
+
+    <h4>Einen neuen Benutzer anlegen</h4>
+    <ol>
+      <li>Öffnen Sie <strong>Verwaltung → Benutzer</strong>.</li>
+      <li>Klicken Sie auf <strong>+ Neuer Benutzer</strong>.</li>
+      <li>Füllen Sie <strong>Vorname</strong>, <strong>Nachname</strong> und <strong>E-Mail</strong> aus.</li>
+      <li>Vergeben Sie ein <strong>Passwort</strong> (mindestens sechs Zeichen).</li>
+      <li>Wählen Sie die <strong>Rolle</strong> aus (siehe die Tabelle in Kapitel 2.3).</li>
+      <li>Klicken Sie auf <strong>Speichern</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Eine grüne Meldung bestätigt: „Benutzer wurde erfolgreich erstellt". Die Person kann sich nun mit E-Mail und Passwort anmelden.</p>
+    </div>
+
+    <h4>Einen Benutzer bearbeiten oder deaktivieren</h4>
+    <p>Verlässt jemand die Gruppe, schalten Sie das Konto ab, statt es zu löschen. So bleibt das Protokoll vollständig.</p>
+    <ol>
+      <li>Klicken Sie in der Liste bei der Person auf <strong>Bearbeiten</strong>, um Daten oder Rolle zu ändern.</li>
+      <li>Um den Zugang zu sperren, klicken Sie auf <strong>Deaktivieren</strong> und bestätigen Sie.</li>
+    </ol>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Passwort ändern</span>
+      <p>Beim Bearbeiten können Sie ein neues Passwort vergeben. Lassen Sie das Feld leer, bleibt das bisherige Passwort bestehen.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Status der Person zeigt „Aktiv" oder „Inaktiv". Inaktive Personen können sich nicht mehr anmelden, bleiben aber im Protokoll erhalten.</p>
+    </div>
+
+    <h3 id="verwaltung-mandanten">11.2 Einrichtungen (Mandanten) verwalten</h3>
+    <p>Hier pflegen Sie die 16 Einrichtungen der CREDO-Gruppe – die Schulen, Kitas und Vereine. Im Portal heißen sie „Mandanten". Jeder Vorgang gehört zu einer dieser Einrichtungen.</p>
+
+    <figure class="screenshot">
+      <img src="screenshots/mandanten.png" alt="Die Mandanten-Verwaltung mit einer Tabelle der Einrichtungen: Mandantennummer, Name, Kürzel, Typ als farbige Markierung, Status und Aktionen wie Bearbeiten, Elternzeit-Konfig und DSGVO-Konfig.">
+      <figcaption>Die Mandanten-Verwaltung listet alle Einrichtungen. Rechts in jeder Zeile finden Sie die Schaltflächen für die Feineinstellungen.</figcaption>
+    </figure>
+
+    <h4>Eine neue Einrichtung anlegen</h4>
+    <ol>
+      <li>Öffnen Sie <strong>Verwaltung → Mandanten</strong>.</li>
+      <li>Klicken Sie auf <strong>+ Neuer Mandant</strong>.</li>
+      <li>Geben Sie die <strong>Mandantennummer</strong> und den <strong>Namen</strong> ein.</li>
+      <li>Wählen Sie den <strong>Typ</strong> aus (zum Beispiel „Gymnasium" oder „Kita").</li>
+      <li>Klicken Sie auf <strong>Speichern</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die neue Einrichtung erscheint in der Liste und steht beim Anlegen von Vorgängen zur Auswahl.</p>
+    </div>
+
+    <h4>Eine Einrichtung genauer einstellen</h4>
+    <p>Jede Einrichtung hat zusätzliche Einstellungen. Sie erreichen sie über die Links in der jeweiligen Zeile. Diese Feineinstellungen lohnen sich besonders bei einer neuen Einrichtung:</p>
+    <ul>
+      <li><strong>Starterpaket</strong> – die Dokumente festlegen, die neue Mitarbeitende automatisch erhalten.</li>
+      <li><strong>DSGVO-Konfiguration</strong> – die für den Datenschutz verantwortliche Stelle hinterlegen (Name und Anschrift).</li>
+      <li><strong>Elternzeit-Konfiguration</strong> – Geschäftsführung und Ansprechpartner für Elternzeit-Briefe eintragen.</li>
+      <li><strong>BEM-Ansprechpartner</strong> – die Personen festlegen, die im BEM angesprochen werden können.</li>
+    </ul>
+
+    <div class="hinweis">
+      <span class="label">Tipp: das Starterpaket zusammenstellen</span>
+      <p>Im Starterpaket wählen Sie aus verfügbaren Dokumenten aus und bringen sie mit den Pfeilen <kbd>↑</kbd> und <kbd>↓</kbd> in die richtige Reihenfolge. Vergessen Sie am Ende nicht, auf <strong>Speichern</strong> zu klicken.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die Einrichtung ist vollständig eingerichtet. Onboarding, Elternzeit und BEM funktionieren für sie nun mit den richtigen Angaben.</p>
+    </div>
+
+    <h3 id="verwaltung-einstellungen">11.3 Einstellungen und E-Mail-Versand</h3>
+    <p>Unter <strong>Verwaltung → Einstellungen</strong> steuern Sie, wie das Portal E-Mails verschickt. Die Seite ist in mehrere Reiter unterteilt. Diese sind die wichtigsten:</p>
+
+    <div class="hinweis info">
+      <span class="label">So verschickt das Portal E-Mails</span>
+      <p>Alle automatischen E-Mails – zum Beispiel Einladungen, Benachrichtigungen und das Starterpaket – versendet das Portal selbst über <strong>SMTP</strong>. Das ist der primäre und wichtigste Versandweg. „Webhooks" sind nur ein optionaler Zusatz, um andere Programme anzubinden; für den E-Mail-Versand brauchen Sie sie nicht.</p>
+    </div>
+
+    <table>
+      <caption>Die Reiter unter „Einstellungen"</caption>
+      <thead>
+        <tr>
+          <th scope="col">Reiter</th>
+          <th scope="col">Wofür er da ist</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Versand-Status</strong></td><td>Eine Ampel pro E-Mail-Art: Grün heißt „alles bereit", Rot heißt „hier fehlt noch etwas".</td></tr>
+        <tr><td><strong>E-Mail-Vorlagen</strong></td><td>Den Text der automatischen E-Mails anpassen – Betreff, Empfänger und Inhalt.</td></tr>
+        <tr><td><strong>Versandprotokoll</strong></td><td>Die Liste aller verschickten E-Mails mit Status (verschickt, fehlgeschlagen, übersprungen).</td></tr>
+        <tr><td><strong>SMTP</strong></td><td>Die technischen Zugangsdaten für den E-Mail-Versand. „SMTP" ist das Standardverfahren, mit dem Programme E-Mails versenden – und der <strong>primäre Versandweg</strong> des Portals.</td></tr>
+        <tr><td><strong>Webhooks</strong></td><td>Nur ein optionaler Zusatzkanal, um andere Programme anzubinden. Für den E-Mail-Versand nicht nötig – das übernimmt SMTP.</td></tr>
+        <tr><td><strong>Abteilungen</strong></td><td>Die Abteilungen mit E-Mail-Adressen, die beim Offboarding ihre Aufgabenlisten erhalten.</td></tr>
+        <tr><td><strong>API-Zugang</strong></td><td>Zugangsschlüssel für andere Programme, die Auswertungen abrufen dürfen.</td></tr>
+      </tbody>
+    </table>
+
+    <figure class="screenshot">
+      <img src="screenshots/einstellungen.png" alt="Die Seite Einstellungen mit der Reiterleiste Versand-Status, E-Mail-Vorlagen, Versandprotokoll, SMTP, Webhooks, Abteilungen und API-Zugang.">
+      <figcaption>Die Einstellungen sind in Reiter unterteilt. Den E-Mail-Versand richten Sie im Reiter „SMTP" ein.</figcaption>
+    </figure>
+
+    <h4>Den E-Mail-Versand einrichten und testen</h4>
+    <p>Damit das Portal überhaupt E-Mails senden kann, müssen einmalig die SMTP-Zugangsdaten eingetragen sein. Diese erhalten Sie von Ihrer IT.</p>
+    <ol>
+      <li>Öffnen Sie den Reiter <strong>SMTP</strong>.</li>
+      <li>Tragen Sie die Daten ein, die Ihnen die IT genannt hat (Server, Port, Absender).</li>
+      <li>Klicken Sie auf <strong>Speichern</strong>.</li>
+      <li>Klicken Sie auf <strong>Test-Versand</strong> und geben Sie Ihre eigene Adresse ein.</li>
+    </ol>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: ohne SMTP keine E-Mails</span>
+      <p>Sehen Sie oben ein rotes Banner „SMTP ist nicht aktiv", verschickt das Portal keine E-Mails. Richten Sie zuerst den SMTP-Reiter ein. Alle anderen Funktionen arbeiten trotzdem normal weiter.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die Test-E-Mail kommt in Ihrem Postfach an. Der SMTP-Status zeigt Grün. Das Portal kann nun automatische E-Mails versenden.</p>
+    </div>
+
+    <h4>Eine Ferienzeit für die Elternzeit hinterlegen</h4>
+    <p>Für die Feriensperrfrist bei der Elternzeit muss das Portal die Schulferien kennen (siehe Kapitel 7). Diese pflegen Sie auf einer eigenen Seite.</p>
+    <ol>
+      <li>Öffnen Sie <strong>Einstellungen → Schulferien</strong>.</li>
+      <li>Klicken Sie auf <strong>+ Neue Schulferien</strong>.</li>
+      <li>Geben Sie Schuljahr, Bezeichnung sowie Anfangs- und Enddatum ein.</li>
+      <li>Klicken Sie auf <strong>Speichern</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die Ferienzeit steht in der Liste. Das Portal berücksichtigt sie bei der Berechnung der Elternzeit-Fristen.</p>
+    </div>
+
+    <h3 id="verwaltung-audit">11.4 Das Protokoll (Audit-Log)</h3>
+    <p>Das Portal hält jede wichtige Aktion fest – etwa „Vorgang erstellt" oder „Status geändert". Diese lückenlose Aufzeichnung heißt „Audit-Log" (sprich: Odit-Logg) und dient der Nachvollziehbarkeit. So lässt sich jederzeit klären, wer was wann getan hat.</p>
+    <ol>
+      <li>Öffnen Sie <strong>Verwaltung → Audit-Log</strong>.</li>
+      <li>Grenzen Sie die Liste über den Zeitraum, die Aktion oder die Person ein.</li>
+      <li>Klicken Sie bei einem Eintrag auf <strong>Details</strong>, um mehr zu sehen.</li>
+    </ol>
+
+    <figure class="screenshot">
+      <img src="screenshots/audit-log.png" alt="Die Seite Audit-Log mit einer Filterleiste für Zeitraum von und bis, Aktion und Benutzer sowie einer Tabelle mit den Spalten Zeitpunkt, Benutzer, Aktion, Details und Vorgang.">
+      <figcaption>Das Audit-Log mit Filterleiste. So grenzen Sie das Protokoll nach Zeitraum, Aktion oder Person ein.</figcaption>
+    </figure>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Sie sehen eine nachvollziehbare Liste aller Aktionen mit Datum, Person und Art der Änderung.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 12. HILFE ==================== -->
+  <section id="hilfe" class="kapitel">
+    <h2>12. Hilfe bei Problemen und häufige Fragen</h2>
+
+    <p>Etwas klappt nicht wie erwartet? Das ist völlig normal und meistens schnell gelöst. Hier finden Sie die häufigsten Fragen mit ihrer Antwort.</p>
+
+    <h3>Ich kann mich nicht anmelden.</h3>
+    <p>Prüfen Sie ganz in Ruhe drei Dinge:</p>
+    <ol>
+      <li>Ist die E-Mail-Adresse richtig geschrieben?</li>
+      <li>Ist die Feststelltaste (<kbd>Caps Lock</kbd>) versehentlich aktiv?</li>
+      <li>Hilft beides nicht, bitten Sie Ihre Administratorin oder Ihren Administrator um ein neues Passwort.</li>
+    </ol>
+
+    <h3>Ein Menüpunkt fehlt bei mir.</h3>
+    <p>Das ist kein Fehler. Ihre Rolle gibt diesen Bereich nicht frei. Brauchen Sie ihn für Ihre Arbeit, sprechen Sie mit Ihrer Administratorin oder Ihrem Administrator (siehe Kapitel 2.3).</p>
+
+    <h3>Eine E-Mail wurde nicht verschickt.</h3>
+    <p>Schauen Sie unter <strong>Einstellungen → Versandprotokoll</strong> nach. Dort steht bei jeder E-Mail, ob sie verschickt wurde. Zeigt das Portal oben ein rotes Banner „SMTP ist nicht aktiv", muss zuerst der E-Mail-Versand eingerichtet werden (siehe Kapitel 11.3).</p>
+
+    <h3>Das Starterpaket lässt sich nicht versenden.</h3>
+    <p>Wahrscheinlich wurde für diese Einrichtung noch kein Starterpaket zusammengestellt. Eine Administratorin kann das unter <strong>Mandanten → Starterpaket</strong> nachholen (siehe Kapitel 11.2).</p>
+
+    <h3>Ich habe einen Vorgang nicht in der Liste gefunden.</h3>
+    <p>Vielleicht ist er schon abgeschlossen. Klicken Sie auf dem Dashboard auf <strong>Archiv anzeigen</strong>. Setzen Sie außerdem mit <strong>Filter zurücksetzen</strong> alle Filter zurück (siehe Kapitel 2.2).</p>
+
+    <h3>Ich habe versehentlich etwas geändert.</h3>
+    <p>Keine Sorge. Öffnen Sie den Vorgang erneut und korrigieren Sie den Wert über <strong>Daten bearbeiten</strong>. Jede Änderung wird zudem im Protokoll festgehalten, sodass nichts verloren geht.</p>
+
+    <div class="hinweis info">
+      <span class="label">Sie kommen nicht weiter?</span>
+      <p>Wenden Sie sich an die Personalverwaltung der CREDO-Gruppe. Schreiben Sie am besten kurz auf, was Sie tun wollten und welche Meldung erschienen ist. Das hilft bei der schnellen Lösung.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 13. GLOSSAR ==================== -->
+  <section id="glossar" class="kapitel">
+    <h2>13. Glossar: Fachbegriffe einfach erklärt</h2>
+
+    <p>Im Portal tauchen einige Fachwörter auf. Hier finden Sie sie in alphabetischer Reihenfolge mit einer einfachen Erklärung.</p>
+
+    <table>
+      <caption>Begriffe von A bis Z</caption>
+      <thead>
+        <tr>
+          <th scope="col">Begriff</th>
+          <th scope="col">Bedeutung</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Audit-Log</strong></td><td>Das Protokoll. Eine Liste, die festhält, wer wann was im Portal getan hat.</td></tr>
+        <tr><td><strong>BAD</strong></td><td>Betriebsärztlicher Dienst. Die Betriebsärztin oder der Betriebsarzt.</td></tr>
+        <tr><td><strong>BEM</strong></td><td>Betriebliches Eingliederungsmanagement. Unterstützung bei der Rückkehr nach längerer Krankheit.</td></tr>
+        <tr><td><strong>Browser</strong></td><td>Das Programm, mit dem Sie Internetseiten öffnen, zum Beispiel Edge oder Chrome.</td></tr>
+        <tr><td><strong>Dashboard</strong></td><td>Die Startseite des Portals mit der Übersicht aller Vorgänge.</td></tr>
+        <tr><td><strong>DMS</strong></td><td>Dokumentenmanagementsystem. Das digitale Archiv für Akten und Dokumente.</td></tr>
+        <tr><td><strong>DSGVO</strong></td><td>Datenschutz-Grundverordnung. Das Gesetz zum Schutz persönlicher Daten.</td></tr>
+        <tr><td><strong>Filter</strong></td><td>Eine Einstellung, die nur die gewünschten Einträge anzeigt und den Rest ausblendet.</td></tr>
+        <tr><td><strong>IBAN</strong></td><td>Die internationale Kontonummer für die Bankverbindung.</td></tr>
+        <tr><td><strong>Klappmenü (Dropdown)</strong></td><td>Eine Auswahlliste, die sich beim Anklicken nach unten öffnet.</td></tr>
+        <tr><td><strong>Magic Link</strong></td><td>Ein besonderer Einmal-Zugangslink ohne Passwort, zum Beispiel für den Personalfragebogen.</td></tr>
+        <tr><td><strong>Mandant</strong></td><td>Eine Einrichtung der CREDO-Gruppe – eine Schule, Kita oder ein Verein.</td></tr>
+        <tr><td><strong>Modul</strong></td><td>Ein Bereich des Portals, zum Beispiel Onboarding oder Elternzeit.</td></tr>
+        <tr><td><strong>Offboarding</strong></td><td>Das Ausscheiden von Mitarbeitenden.</td></tr>
+        <tr><td><strong>Onboarding</strong></td><td>Die Einstellung neuer Mitarbeitender.</td></tr>
+        <tr><td><strong>PDF</strong></td><td>Ein fertiges, unveränderbares Dokumentformat. Sieht überall gleich aus.</td></tr>
+        <tr><td><strong>Pflichtfeld</strong></td><td>Ein Feld, das ausgefüllt werden muss. Oft mit einem Sternchen <code>*</code> markiert.</td></tr>
+        <tr><td><strong>Platzhalter (Variable)</strong></td><td>Ein Stellvertreter in Klammern wie <code>{vorname}</code>, der durch den echten Wert ersetzt wird.</td></tr>
+        <tr><td><strong>PSI</strong></td><td>Die interne Bezeichnung für den Verbeamtungs-Prozess.</td></tr>
+        <tr><td><strong>QR-Code</strong></td><td>Ein quadratisches Strichbild, das ein Computer schnell einlesen kann.</td></tr>
+        <tr><td><strong>Reiter (Tab)</strong></td><td>Eine Karteikarte zum Wechseln zwischen Bereichen einer Seite.</td></tr>
+        <tr><td><strong>Rolle</strong></td><td>Die Berechtigung einer Person. Sie bestimmt, was man sehen und tun darf.</td></tr>
+        <tr><td><strong>Session</strong></td><td>Die Zeit, in der Sie angemeldet sind.</td></tr>
+        <tr><td><strong>SMTP</strong></td><td>Das Standardverfahren, mit dem Programme E-Mails versenden – im Portal der primäre Versandweg.</td></tr>
+        <tr><td><strong>Starterpaket</strong></td><td>Eine Sammlung wichtiger Dokumente für neue Mitarbeitende.</td></tr>
+        <tr><td><strong>Status</strong></td><td>Der Bearbeitungsstand eines Vorgangs, zum Beispiel „Offen" oder „Abgeschlossen".</td></tr>
+        <tr><td><strong>Vorgang</strong></td><td>Ein einzelner Fall, zum Beispiel eine Einstellung oder ein Austritt.</td></tr>
+        <tr><td><strong>Vorlage</strong></td><td>Ein wiederverwendbares Muster für Schreiben, Formulare oder Checklisten.</td></tr>
+        <tr><td><strong>Webhook</strong></td><td>Eine automatische Verbindung, über die das Portal andere Programme benachrichtigt.</td></tr>
+      </tbody>
+    </table>
+
+    <p>Damit endet das Handbuch. Wir wünschen Ihnen eine gute und sichere Arbeit mit dem CREDO&nbsp;HR-Portal.</p>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+</main>
+
+<div class="credo-linie" aria-hidden="true">
+  <span class="l-grau"></span><span class="l-gelb"></span><span class="l-gruen"></span><span class="l-rot"></span><span class="l-blau"></span>
+</div>
+
+<footer class="fuss">
+  <p><strong>CREDO HR-Portal – Handbuch für Einsteiger.</strong> Stand: Juni 2026. Dieses Handbuch beschreibt die Bedienung des Portals für Mitarbeitende der Personalverwaltung.</p>
+  <address>
+    <p>Christlicher Schulverein Minden e.V. · Kingsleyallee 6 · 32425 Minden</p>
+    <p>Telefon 0571 388 60 - 148 · presse@fes-minden.de · fes-minden.de</p>
+  </address>
+</footer>
+
+</body>
+</html>
