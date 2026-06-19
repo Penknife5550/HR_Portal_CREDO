@@ -12,7 +12,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { renewalDataSchema, type RenewalDataInput } from "@/lib/validations/contract-end";
+
+/** Rate-Limit-Schutz gegen Token-Enumeration (wie alle Public-Token-Routen). */
+function rateLimited(request: NextRequest): NextResponse | null {
+  if (!tokenRateLimiter.check(getClientIp(request)).allowed) {
+    return NextResponse.json(
+      { error: "Zu viele Anfragen. Bitte warten Sie einen Moment." },
+      { status: 429 },
+    );
+  }
+  return null;
+}
 
 type LoadedContractEnd = Prisma.ContractEndProcessGetPayload<{
   include: {
@@ -60,10 +72,12 @@ function mapRenewalData(input: RenewalDataInput): Record<string, unknown> {
 // GET – Formulardaten laden
 // =============================================
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
+    const limited = rateLimited(request);
+    if (limited) return limited;
     const { token } = await params;
     const ce = await loadByToken(token);
     const state = tokenState(ce);
@@ -95,6 +109,8 @@ export async function PUT(
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
+    const limited = rateLimited(request);
+    if (limited) return limited;
     const { token } = await params;
     const ce = await loadByToken(token);
     const state = tokenState(ce);
@@ -136,6 +152,8 @@ export async function POST(
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
+    const limited = rateLimited(request);
+    if (limited) return limited;
     const { token } = await params;
     const ce = await loadByToken(token);
     const state = tokenState(ce);
