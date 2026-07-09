@@ -85,6 +85,10 @@ export async function POST(
         decision: "OFFEN",
         supervisorRespondedAt: null,
         supervisorDeclineReason: null,
+        // Neue Anfrage = neuer Erinnerungs-/Eskalationszyklus
+        lastSupervisorReminderAt: null,
+        supervisorReminderCount: 0,
+        escalatedAt: null,
       },
     });
 

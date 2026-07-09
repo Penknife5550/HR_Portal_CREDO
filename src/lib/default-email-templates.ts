@@ -508,6 +508,171 @@ CREDO Gruppe – Freie Evangelische Schulen
   },
 
   // =============================================
+  // Eskalation an HR (Vorgesetzter reagiert trotz Erinnerungen nicht)
+  // =============================================
+  {
+    event: "contract-end-eskalation",
+    name: "Eskalation an HR (Vorgesetzter reagiert nicht)",
+    subject: "ESKALATION: Keine Rückmeldung zur Vertragsverlängerung {{mitarbeiter_name}} ({{dringlichkeit}})",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fde3e3;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#b3121a;font-weight:bold;font-size:14px;">Eskalation · {{dringlichkeit}}</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Führungskraft reagiert nicht — Vorgang wird kritisch</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            zur Übernahme-Anfrage für <strong>{{mitarbeiter_name}}</strong> ({{einrichtung}}, Vorgang {{displayId}}) liegt trotz <strong>{{anzahl_erinnerungen}} Erinnerungen</strong> keine Rückmeldung von <strong>{{supervisorEmail}}</strong> vor. Die Anfrage ist seit {{tage_offen}} Tagen offen, der Vertrag endet am <strong>{{vertragsende}}</strong>.
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
+            Bitte fassen Sie persönlich nach. Achtung Entfristungsrisiko (§15 Abs. 5 TzBfG): Bei Weiterarbeit ohne rechtzeitigen neuen Vertrag gilt das Arbeitsverhältnis als unbefristet verlängert.
+          </p>
+
+          <!-- Button -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#575756;border-radius:8px;">
+              <a href="{{portalLink}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Vorgang im Portal öffnen →
+              </a>
+            </td></tr>
+          </table>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Diese Eskalation wird je Anfrage nur einmal versendet.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;">
+            <strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich
+          </p>
+          <p style="margin:0;color:#bbbbbb;font-size:11px;text-align:center;">{{einrichtung}}</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `ESKALATION – Führungskraft reagiert nicht
+
+Zur Übernahme-Anfrage für {{mitarbeiter_name}} ({{einrichtung}}, Vorgang {{displayId}}) liegt trotz {{anzahl_erinnerungen}} Erinnerungen keine Rückmeldung von {{supervisorEmail}} vor. Die Anfrage ist seit {{tage_offen}} Tagen offen, der Vertrag endet am {{vertragsende}}.
+
+Bitte fassen Sie persönlich nach. Achtung Entfristungsrisiko (§15 Abs. 5 TzBfG): Bei Weiterarbeit ohne rechtzeitigen neuen Vertrag gilt das Arbeitsverhältnis als unbefristet verlängert.
+
+Vorgang im Portal: {{portalLink}}
+
+Diese Eskalation wird je Anfrage nur einmal versendet.
+
+CREDO Gruppe – Freie Evangelische Schulen
+{{einrichtung}}`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des Mitarbeiters" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{displayId}}", description: "Vorgangsnummer (VE-...)" },
+      { key: "{{supervisorEmail}}", description: "E-Mail der Führungskraft" },
+      { key: "{{anzahl_erinnerungen}}", description: "Anzahl der bisherigen Erinnerungen" },
+      { key: "{{tage_offen}}", description: "Tage seit Versand der Anfrage" },
+      { key: "{{vertragsende}}", description: "Datum des Vertragsendes" },
+      { key: "{{dringlichkeit}}", description: "Ampel-Stufe (Kritisch/Warnung/Beobachten)" },
+      { key: "{{portalLink}}", description: "Link zur Vorgangs-Detailseite im Portal" },
+    ],
+  },
+
+  // =============================================
+  // Woechentlicher HR-Hinweis: kritische Vorgaenge ohne versendete Anfrage
+  // =============================================
+  {
+    event: "contract-end-unbearbeitet",
+    name: "Woechentlicher HR-Hinweis (Vertragsende ohne Anfrage)",
+    subject: "Vertragsende: {{anzahl}} Vorgänge ohne Vorgesetzten-Anfrage",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">Vertragsende-Monitoring</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fff3c9;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#8a6d00;font-weight:bold;font-size:14px;">Wöchentlicher Hinweis</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">{{anzahl}} Vertragsende-Vorgänge warten auf die Vorgesetzten-Anfrage</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            für die folgenden Vorgänge in den Ampel-Stufen Kritisch/Warnung wurde noch keine Anfrage an die Führungskraft versendet:
+          </p>
+          <ul style="color:#374151;font-size:14px;line-height:1.8;margin:0 0 22px;padding-left:20px;">{{liste_html}}</ul>
+
+          <!-- Button -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#575756;border-radius:8px;">
+              <a href="{{portalLink}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Vorgänge im Portal öffnen →
+              </a>
+            </td></tr>
+          </table>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Dieser Hinweis kommt einmal wöchentlich, solange unbearbeitete kritische Vorgänge vorliegen.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;">
+            <strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Wöchentlicher Hinweis – {{anzahl}} Vertragsende-Vorgänge ohne Vorgesetzten-Anfrage
+
+Für die folgenden Vorgänge in den Ampel-Stufen Kritisch/Warnung wurde noch keine Anfrage an die Führungskraft versendet:
+
+{{liste_text}}
+
+Vorgänge im Portal: {{portalLink}}
+
+Dieser Hinweis kommt einmal wöchentlich, solange unbearbeitete kritische Vorgänge vorliegen.
+
+CREDO Gruppe – Freie Evangelische Schulen`,
+    variables: [
+      { key: "{{anzahl}}", description: "Anzahl der unbearbeiteten Vorgänge" },
+      { key: "{{liste_text}}", description: "Liste der Vorgänge (Text, eine Zeile je Vorgang)" },
+      { key: "{{liste_html}}", description: "Liste der Vorgänge (HTML-Listenpunkte)" },
+      { key: "{{portalLink}}", description: "Link zur Vertragsende-Übersicht im Portal" },
+    ],
+  },
+
+  // =============================================
   // Bestaetigungs-E-Mail an Mitarbeiter (nach Fragebogen-Einreichung)
   // =============================================
   {
