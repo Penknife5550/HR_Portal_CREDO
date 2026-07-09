@@ -453,6 +453,38 @@ export function ContractEndDetailContent({
               {/* B2: Kettenbefristungs-Hinweis (§14 TzBfG) */}
               {kettenWarning && <KettenHinweis reason={kettenWarning.reason} />}
 
+              {/* B9: DokuBit hat das Vertragsende auf einem weit fortgeschrittenen
+                  Vorgang geaendert — vermutlich wurde die Verlaengerung bereits
+                  vollzogen. Banner verschwindet mit Abschluss des Vorgangs. */}
+              {data.contractEndDateGeaendertAm &&
+                !["ABGESCHLOSSEN", "STORNIERT"].includes(data.status) && (
+                  <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+                    <p className="text-sm font-bold text-amber-800">
+                      Vertragsende von DokuBit geändert ({formatDate(data.contractEndDateGeaendertAm)})
+                    </p>
+                    <p className="mt-1 text-sm text-amber-800">
+                      Das gemeldete Vertragsende hat sich geändert, obwohl der Vorgang bereits weit
+                      fortgeschritten war — vermutlich wurde die Verlängerung schon vollzogen.
+                      Bitte prüfen und den Vorgang ggf. abschließen.
+                    </p>
+                  </div>
+                )}
+
+              {/* Mehrfachbeschaeftigung: relevant fuer die Vertragsgestaltung
+                  (Gesamtarbeitszeit ueber alle Einstellungen) */}
+              {data.weitereMandanten.length > 0 && (
+                <div className="rounded-2xl border border-credo-blau/40 bg-credo-blau/5 p-4">
+                  <p className="text-sm font-bold text-foreground">
+                    👥 Person hat weitere Einstellungen
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Laut DokuBit ist die Person zusätzlich bei folgenden Mandanten beschäftigt:{" "}
+                    <strong className="text-foreground">{data.weitereMandanten.join(", ")}</strong>.
+                    Bei der Vertragsgestaltung die Gesamtarbeitszeit beachten.
+                  </p>
+                </div>
+              )}
+
               {/* Stammdaten */}
               <div className="rounded-2xl border border-border bg-card p-5">
                 <h3 className="mb-3 text-sm font-bold text-foreground">Stammdaten</h3>
