@@ -79,16 +79,34 @@ export const supervisorDecisionSchema = z
 /**
  * Meldung von n8n (liest DokuBit). Feldnamen bewusst nah an den DokuBit-Spalten
  * gehalten, damit n8n moeglichst 1:1 durchreichen kann.
+ *
+ * Zusatzfelder (Phase 2, #10): aktueller Vertrag (Vorausfuellen des
+ * Vorgesetzten-Formulars), Befristungshistorie (Basis der §14-Warnung B2) und
+ * alle Mandanten-Zuordnungen der Person (Mehrfach-Erkennung). Alles optional —
+ * n8n liefert, was DokuBit hergibt. `.strip()` verwirft Unbekanntes.
  */
-export const contractEndWebhookSchema = z.object({
-  personalNr: z.string().max(50).optional(), // DokuBit MANR
-  vorname: z.string().min(1).max(100), // MAVONAME
-  nachname: z.string().min(1).max(100), // MANANAME
-  email: z.string().email("Ungültige E-Mail-Adresse").optional().or(z.literal("")), // MAEMAIL
-  mandantNummer: z.string().min(1).max(20), // MANDANTENNUMMER -> Organization.mandantNumber
-  vertragsende: z.string().regex(DATE_YMD, "vertragsende im Format YYYY-MM-DD erforderlich"), // VERTRAGSENDE
-  vertragsbeginn: z.string().regex(DATE_YMD).optional().or(z.literal("")), // VERTRAGSBEGINN
-});
+export const contractEndWebhookSchema = z
+  .object({
+    personalNr: z.string().max(50).optional(), // DokuBit MANR
+    vorname: z.string().min(1).max(100), // MAVONAME
+    nachname: z.string().min(1).max(100), // MANANAME
+    email: z.string().email("Ungültige E-Mail-Adresse").optional().or(z.literal("")), // MAEMAIL
+    mandantNummer: z.string().min(1).max(20), // MANDANTENNUMMER -> Organization.mandantNumber
+    vertragsende: z.string().regex(DATE_YMD, "vertragsende im Format YYYY-MM-DD erforderlich"), // VERTRAGSENDE
+    vertragsbeginn: z.string().regex(DATE_YMD).optional().or(z.literal("")), // VERTRAGSBEGINN
+    // Aktueller (auslaufender) Vertrag — Vorausfuellen (#5)
+    aktuellePosition: z.string().max(200).optional().or(z.literal("")),
+    aktuelleEntgeltgruppe: z.string().max(20).optional().or(z.literal("")),
+    aktuelleStufe: z.string().max(20).optional().or(z.literal("")),
+    aktuelleWochenstunden: z.number().min(0).max(60).optional(),
+    // Befristungshistorie — §14-TzBfG-Warnung (B2)
+    befristungsart: z.enum(["SACHGRUNDLOS", "MIT_SACHGRUND"]).optional(),
+    bisherigeBefristungMonate: z.number().int().min(0).max(600).optional(),
+    bisherigeVerlaengerungen: z.number().int().min(0).max(50).optional(),
+    // Alle Mandanten-Zuordnungen der Person (personal_mandanten) — Mehrfach-Erkennung
+    personalMandanten: z.array(z.string().min(1).max(20)).max(50).optional(),
+  })
+  .strip();
 
 export type CreateContractEndInput = z.infer<typeof createContractEndSchema>;
 export type RenewalDataInput = z.infer<typeof renewalDataSchema>;

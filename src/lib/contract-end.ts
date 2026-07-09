@@ -33,6 +33,15 @@ export interface CreateContractEndInput {
   /** "MANUAL" (HR-UI) oder "N8N" (Webhook). */
   source?: string;
   initiatedById?: string | null;
+  /** Aktueller (auslaufender) Vertrag — von n8n gemeldet, Vorausfuellen (#5). */
+  currentPosition?: string | null;
+  currentEntgeltgruppe?: string | null;
+  currentStufe?: string | null;
+  currentWochenstunden?: number | null;
+  /** Befristungshistorie — von n8n gemeldet, Basis der §14-Warnung (B2). */
+  befristungsart?: string | null;
+  bisherigeBefristungMonate?: number | null;
+  bisherigeVerlaengerungen?: number | null;
 }
 
 /**
@@ -85,6 +94,13 @@ export async function createContractEndProcess(input: CreateContractEndInput) {
         contractStartDate: input.contractStartDate || null,
         source: input.source || "MANUAL",
         initiatedById: input.initiatedById || null,
+        currentPosition: input.currentPosition || null,
+        currentEntgeltgruppe: input.currentEntgeltgruppe || null,
+        currentStufe: input.currentStufe || null,
+        currentWochenstunden: input.currentWochenstunden ?? null,
+        befristungsart: input.befristungsart || null,
+        bisherigeBefristungMonate: input.bisherigeBefristungMonate ?? null,
+        bisherigeVerlaengerungen: input.bisherigeVerlaengerungen ?? null,
       },
       include: { organization: true },
     });
