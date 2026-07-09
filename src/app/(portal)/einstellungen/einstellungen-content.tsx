@@ -1135,6 +1135,7 @@ function ApiKeysTab() {
           <li><code className="font-mono text-xs">GET /api/reports/offboardings</code> — Kündigungen (Filter: status, from, to, organizationId)</li>
           <li><code className="font-mono text-xs">GET /api/reports/onboardings</code> — Einstellungen (Filter: status, from, to, organizationId)</li>
           <li><code className="font-mono text-xs">GET /api/reports/elternzeit</code> — Elternzeit-Vorgänge (Filter: status, organizationId)</li>
+          <li><code className="font-mono text-xs">GET /api/reports/contract-end</code> — Vertragsende-Vorgänge inkl. Fristen-Ampel (Filter: status, from, to, organizationId)</li>
         </ul>
       </div>
 
