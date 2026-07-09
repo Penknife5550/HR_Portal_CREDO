@@ -215,6 +215,78 @@ describe("POST /api/webhooks/contract-end", () => {
     );
   });
 
+  // ---------- DokuBit-Stammdaten ----------
+
+  it("speichert stammdaten als dokubitDaten (Whitelist, leere Werte verworfen)", async () => {
+    await POST(
+      req({
+        ...EINTRAG,
+        stammdaten: {
+          anrede: "Herr",
+          strasse: "Musterweg 1",
+          geburtsdatum: "1990-05-01",
+          titel: "", // leer -> wird verworfen
+          unbekanntesFeld: "wird gestrippt",
+        },
+      }),
+    );
+    const arg = mockCreateContractEnd.mock.calls[0][0];
+    expect(arg.dokubitDaten).toEqual({
+      anrede: "Herr",
+      strasse: "Musterweg 1",
+      geburtsdatum: "1990-05-01",
+    });
+  });
+
+  it("frischt dokubitDaten beim idempotenten Treffer mit auf", async () => {
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue({
+      id: "ce-alt",
+      displayId: "VE-2026-GYM-007",
+      status: "ANGELEGT",
+      contractEndDate: new Date("2026-12-31"),
+    });
+    await POST(req({ ...EINTRAG, stammdaten: { tarif: "TV-L" } }));
+    expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ dokubitDaten: { tarif: "TV-L" } }),
+      }),
+    );
+  });
+
+  it("setzt weitereMandanten ohne den eigenen Mandanten", async () => {
+    await POST(req({ ...EINTRAG, personalMandanten: ["712", "737", "742"] }));
+    expect(mockCreateContractEnd.mock.calls[0][0].weitereMandanten).toEqual(["737", "742"]);
+  });
+
+  // ---------- B9-Aenderungsmarker ----------
+
+  it("markiert Datumsaenderung auf weit fortgeschrittenem Vorgang", async () => {
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue({
+      id: "ce-alt",
+      displayId: "VE-2026-GYM-007",
+      status: "VERTRAG_ERSTELLT",
+      contractEndDate: new Date("2026-08-31"),
+    });
+    await POST(req(EINTRAG)); // neues Ende: 2026-12-31
+    expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ contractEndDateGeaendertAm: expect.any(Date) }),
+      }),
+    );
+  });
+
+  it("KEIN Aenderungsmarker bei fruehem Status (ANGELEGT)", async () => {
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue({
+      id: "ce-alt",
+      displayId: "VE-2026-GYM-007",
+      status: "ANGELEGT",
+      contractEndDate: new Date("2026-08-31"),
+    });
+    await POST(req(EINTRAG));
+    const updateData = mockPrisma.contractEndProcess.update.mock.calls[0][0].data;
+    expect(updateData.contractEndDateGeaendertAm).toBeUndefined();
+  });
+
   // ---------- Mehrfach-Erkennung ----------
 
   it("markiert Mehrfacheinstellung und haelt sie im Audit fest", async () => {

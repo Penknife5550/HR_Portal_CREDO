@@ -724,7 +724,7 @@ function Entscheidung({
               {data.supervisorReminderCount > 0
                 ? `Zuletzt erinnert: ${formatDate(data.lastSupervisorReminderAt)} · ${data.supervisorReminderCount}× erinnert`
                 : "Noch keine Erinnerung versendet."}
-              {" "}„Erinnerung senden" nutzt den bestehenden Link; „Anfrage erneut senden" erzeugt einen NEUEN Link und setzt begonnene Eingaben zurück.
+              {" "}„Erinnerung senden“ nutzt den bestehenden Link; „Anfrage erneut senden“ erzeugt einen NEUEN Link und setzt begonnene Eingaben zurück.
             </p>
           </div>
         ) : (
