@@ -284,6 +284,11 @@ const vertragsverlaengerungResolver: PlaceholderResolver = async (ctx) => {
       employeePersonalNr: true,
       contractEndDate: true,
       organizationId: true,
+      currentPosition: true,
+      currentEntgeltgruppe: true,
+      currentStufe: true,
+      currentWochenstunden: true,
+      dokubitDaten: true,
       renewalData: {
         select: {
           vertragsbeginn: true, vertragsende: true, befristungSachgrund: true,
@@ -326,6 +331,45 @@ const vertragsverlaengerungResolver: PlaceholderResolver = async (ctx) => {
   if (rd?.probezeitMonate != null) set("probezeit_monate", rd.probezeitMonate);
   set("stellenbeschreibung", rd?.stellenbeschreibung);
   set("betriebsstaette", rd?.betriebsstaette);
+
+  // Aktueller (auslaufender) Vertrag — typisierte n8n-Felder
+  set("aktuelle_position", ce.currentPosition);
+  set("aktuelle_entgeltgruppe", ce.currentEntgeltgruppe);
+  set("aktuelle_stufe", ce.currentStufe);
+  if (ce.currentWochenstunden != null) {
+    set("aktuelle_wochenstunden", String(ce.currentWochenstunden).replace(".", ","));
+  }
+
+  // DokuBit-Stammdaten (dokubitDaten Json) — Datumsfelder de-DE formatieren.
+  // Keys der Whitelist (contractEndStammdatenSchema) -> Platzhalter-Namen.
+  const dokubit = (ce.dokubitDaten ?? {}) as Record<string, string>;
+  const setDokubitText = (placeholder: string, key: string) => set(placeholder, dokubit[key]);
+  const setDokubitDate = (placeholder: string, key: string) => {
+    const v = dokubit[key];
+    if (v) set(placeholder, deDateOnb(new Date(v)));
+  };
+  setDokubitText("anrede", "anrede");
+  setDokubitText("titel", "titel");
+  setDokubitText("grad", "grad");
+  setDokubitText("strasse", "strasse");
+  setDokubitText("plz", "plz");
+  setDokubitText("ort", "ort");
+  setDokubitDate("geburtsdatum", "geburtsdatum");
+  setDokubitText("geburtsort", "geburtsort");
+  setDokubitText("geschlecht", "geschlecht");
+  setDokubitText("qualifikation", "qualifikation");
+  setDokubitText("mitarbeiter_status", "mitarbeiterStatus");
+  setDokubitText("abrechnungskreis", "abrechnungskreis");
+  setDokubitText("tarif", "tarif");
+  setDokubitDate("konzerneintritt", "konzerneintritt");
+  setDokubitDate("regelaltersgrenze", "regelaltersgrenze");
+  setDokubitText("beschaeftigungsgruppe", "beschaeftigungsgruppe");
+  setDokubitText("vertragsart", "vertragsart");
+  setDokubitText("probezeit_einheit", "probezeitEinheit");
+  setDokubitText("probezeit_dauer", "probezeitDauer");
+  setDokubitDate("probezeit_von", "probezeitVon");
+  setDokubitDate("probezeit_bis", "probezeitBis");
+  setDokubitDate("evtl_lda", "evtlLda");
 
   return { data, sensitiveFields };
 };

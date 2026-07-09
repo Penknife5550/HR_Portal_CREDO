@@ -46,6 +46,15 @@ interface PageData {
   declineReason: string | null;
   alreadySubmitted: boolean;
   renewalData: Record<string, unknown> | null;
+  /** Vorbefuellung aus dem aktuellen Vertrag (n8n/DokuBit) — nur fuer leere Felder. */
+  vorbefuellung?: {
+    vertragsbeginn?: string | null;
+    wochenstunden?: number | null;
+    entgeltgruppe?: string | null;
+    stufe?: string | null;
+    stellenbeschreibung?: string | null;
+    probezeitMonate?: number | null;
+  } | null;
 }
 
 type FormState = {
@@ -152,6 +161,22 @@ export default function VertragFormularPage() {
           stellenbeschreibung: (rd.stellenbeschreibung as string) || "",
           betriebsstaetteOrgId: (rd.betriebsstaetteOrgId as string) || "",
           zusatzvereinbarungen: (rd.zusatzvereinbarungen as string) || "",
+        }));
+      }
+      // Vorbefuellung aus dem aktuellen Vertrag (n8n/DokuBit) — greift NUR fuer
+      // Felder, die weder gespeichert (renewalData) noch bereits gesetzt sind.
+      const vb = j.vorbefuellung;
+      if (vb && !j.alreadySubmitted) {
+        setForm((f) => ({
+          ...f,
+          vertragsbeginn: f.vertragsbeginn || dateInput(vb.vertragsbeginn),
+          wochenstunden:
+            f.wochenstunden || (vb.wochenstunden != null ? String(vb.wochenstunden) : ""),
+          entgeltgruppe: f.entgeltgruppe || vb.entgeltgruppe || "",
+          stufe: f.stufe || vb.stufe || "",
+          stellenbeschreibung: f.stellenbeschreibung || vb.stellenbeschreibung || "",
+          probezeitMonate:
+            f.probezeitMonate || (vb.probezeitMonate != null ? String(vb.probezeitMonate) : ""),
         }));
       }
     } catch {

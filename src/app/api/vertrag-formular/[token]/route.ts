@@ -104,6 +104,27 @@ export async function GET(
       orderBy: { name: "asc" },
     });
 
+    // Vorbefuellung aus den n8n-/DokuBit-Daten des AKTUELLEN Vertrags —
+    // Vorgesetzte aendern nur, was sich aendert. Bewusst KEINE Adress-/
+    // Geburtsdaten (im Formular nicht gebraucht, Datenminimierung).
+    const dokubit = (ce.dokubitDaten ?? {}) as Record<string, string>;
+    // Probezeit-Monate nur ableiten, wenn DokuBit in Monaten rechnet
+    const probezeitMonate =
+      dokubit.probezeitDauer && /^monat/i.test(dokubit.probezeitEinheit || "")
+        ? parseInt(dokubit.probezeitDauer, 10) || null
+        : null;
+    // Kandidat fuer den neuen Vertragsbeginn: Tag nach dem alten Vertragsende
+    const beginnKandidat = new Date(ce.contractEndDate);
+    beginnKandidat.setDate(beginnKandidat.getDate() + 1);
+    const vorbefuellung = {
+      vertragsbeginn: beginnKandidat.toISOString().slice(0, 10),
+      wochenstunden: ce.currentWochenstunden,
+      entgeltgruppe: ce.currentEntgeltgruppe,
+      stufe: ce.currentStufe,
+      stellenbeschreibung: ce.currentPosition,
+      ...(probezeitMonate ? { probezeitMonate } : {}),
+    };
+
     return NextResponse.json({
       displayId: ce.displayId,
       employeeName: `${ce.employeeFirstName} ${ce.employeeLastName}`,
@@ -123,6 +144,7 @@ export async function GET(
           ce.status,
         ),
       renewalData: ce.renewalData,
+      vorbefuellung,
     });
   } catch (error) {
     console.error("Fehler beim Laden des Vertrag-Formulars:", error);
