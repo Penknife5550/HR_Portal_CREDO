@@ -16,6 +16,7 @@ const MODULE_LABEL: Record<string, string> = {
   MUTTERSCHUTZ: "Mutterschutz",
   ELTERNZEIT: "Elternzeit",
   BEM: "BEM",
+  VERTRAGSVERLAENGERUNG: "Vertragsverlängerung",
 };
 
 export function VariablenKatalog({ modul }: { modul: string }) {

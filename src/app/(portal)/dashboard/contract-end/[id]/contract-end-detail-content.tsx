@@ -53,7 +53,13 @@ interface ContractEndData {
   supervisorLinkSentAt: string | null;
   supervisorRespondedAt: string | null;
   supervisorDeclineReason: string | null;
+  lastSupervisorReminderAt: string | null;
+  supervisorReminderCount: number;
   contractSignedReturnedAt: string | null;
+  vorstandAbgestimmt: boolean | null;
+  vorstandAbstimmungVermerk: string | null;
+  weitereMandanten: string[];
+  contractEndDateGeaendertAm: string | null;
   befristungsart: string | null;
   bisherigeBefristungMonate: number | null;
   bisherigeVerlaengerungen: number | null;
@@ -92,6 +98,7 @@ export function ContractEndDetailContent({
   const [supervisorEmail, setSupervisorEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionInfo, setActionInfo] = useState<string | null>(null);
 
   const canEdit = HR_EDIT_ROLES.includes(user.role);
 
@@ -123,6 +130,12 @@ export function ContractEndDetailContent({
     return () => clearTimeout(t);
   }, [actionError]);
 
+  useEffect(() => {
+    if (!actionInfo) return;
+    const t = setTimeout(() => setActionInfo(null), 6000);
+    return () => clearTimeout(t);
+  }, [actionInfo]);
+
   async function sendSupervisorLink() {
     if (!supervisorEmail) {
       setActionError("Bitte E-Mail der/des Vorgesetzten eingeben.");
@@ -141,6 +154,25 @@ export function ContractEndDetailContent({
         setActionError(j.error || "Link konnte nicht versendet werden.");
         return;
       }
+      await loadData();
+    } catch {
+      setActionError("Verbindungsfehler beim Versand.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendReminder() {
+    setBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/contract-end/${contractEndId}/reminder`, { method: "POST" });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setActionError(j.error || "Erinnerung konnte nicht versendet werden.");
+        return;
+      }
+      setActionInfo("Erinnerung an die Führungskraft versendet.");
       await loadData();
     } catch {
       setActionError("Verbindungsfehler beim Versand.");
@@ -384,6 +416,11 @@ export function ContractEndDetailContent({
             {actionError}
           </div>
         )}
+        {actionInfo && (
+          <div className="mb-4 rounded-lg border border-credo-gruen/30 bg-credo-gruen/10 px-4 py-2.5 text-sm text-credo-gruen">
+            {actionInfo}
+          </div>
+        )}
 
         {/* Tabs */}
         <nav className="-mb-px flex gap-1 border-b" aria-label="Tabs">
@@ -416,6 +453,38 @@ export function ContractEndDetailContent({
               {/* B2: Kettenbefristungs-Hinweis (§14 TzBfG) */}
               {kettenWarning && <KettenHinweis reason={kettenWarning.reason} />}
 
+              {/* B9: DokuBit hat das Vertragsende auf einem weit fortgeschrittenen
+                  Vorgang geaendert — vermutlich wurde die Verlaengerung bereits
+                  vollzogen. Banner verschwindet mit Abschluss des Vorgangs. */}
+              {data.contractEndDateGeaendertAm &&
+                !["ABGESCHLOSSEN", "STORNIERT"].includes(data.status) && (
+                  <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+                    <p className="text-sm font-bold text-amber-800">
+                      Vertragsende von DokuBit geändert ({formatDate(data.contractEndDateGeaendertAm)})
+                    </p>
+                    <p className="mt-1 text-sm text-amber-800">
+                      Das gemeldete Vertragsende hat sich geändert, obwohl der Vorgang bereits weit
+                      fortgeschritten war — vermutlich wurde die Verlängerung schon vollzogen.
+                      Bitte prüfen und den Vorgang ggf. abschließen.
+                    </p>
+                  </div>
+                )}
+
+              {/* Mehrfachbeschaeftigung: relevant fuer die Vertragsgestaltung
+                  (Gesamtarbeitszeit ueber alle Einstellungen) */}
+              {data.weitereMandanten.length > 0 && (
+                <div className="rounded-2xl border border-credo-blau/40 bg-credo-blau/5 p-4">
+                  <p className="text-sm font-bold text-foreground">
+                    👥 Person hat weitere Einstellungen
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Laut DokuBit ist die Person zusätzlich bei folgenden Mandanten beschäftigt:{" "}
+                    <strong className="text-foreground">{data.weitereMandanten.join(", ")}</strong>.
+                    Bei der Vertragsgestaltung die Gesamtarbeitszeit beachten.
+                  </p>
+                </div>
+              )}
+
               {/* Stammdaten */}
               <div className="rounded-2xl border border-border bg-card p-5">
                 <h3 className="mb-3 text-sm font-bold text-foreground">Stammdaten</h3>
@@ -436,6 +505,7 @@ export function ContractEndDetailContent({
                 setSupervisorEmail={setSupervisorEmail}
                 busy={busy}
                 onSendLink={sendSupervisorLink}
+                onSendReminder={sendReminder}
                 onNichtUebernehmen={nichtUebernehmen}
                 onAbschliessen={abschliessen}
                 onSignatureReceived={signatureReceived}
@@ -450,15 +520,36 @@ export function ContractEndDetailContent({
           {activeTab === "renewal" && <RenewalView data={data} />}
 
           {activeTab === "documents" && (
-            <TemplateGenerationSection
-              modul="VERTRAGSVERLAENGERUNG"
-              refId={data.id}
-              canEdit={canEdit}
-              emptyHint="Keine Vertragsvorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ (Modul Vertragsverlängerung) an."
-            />
+            <div className="space-y-4">
+              {data.vorstandAbgestimmt === false && <VorstandWarnung />}
+              <TemplateGenerationSection
+                modul="VERTRAGSVERLAENGERUNG"
+                refId={data.id}
+                canEdit={canEdit}
+                emptyHint="Keine Vertragsvorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ (Modul Vertragsverlängerung) an."
+              />
+            </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Warnbox: Die Fuehrungskraft hat die Uebernahme OHNE Vorstand-/GF-Abstimmung
+ * gemeldet. Bewusst keine Blockade — HR entscheidet, klaert aber vorher.
+ */
+function VorstandWarnung() {
+  return (
+    <div className="rounded-2xl border-2 border-credo-rot/40 bg-credo-rot/5 p-4">
+      <p className="text-sm font-bold text-credo-rot">
+        ⚠ NICHT mit Vorstand/Geschäftsführung abgestimmt
+      </p>
+      <p className="mt-1 text-sm text-foreground">
+        Die Führungskraft hat angegeben, dass die Übernahme-Entscheidung nicht mit
+        Vorstand/Geschäftsführung abgestimmt wurde. Bitte vor der Vertragserstellung klären.
+      </p>
     </div>
   );
 }
@@ -478,6 +569,7 @@ function Entscheidung({
   setSupervisorEmail,
   busy,
   onSendLink,
+  onSendReminder,
   onNichtUebernehmen,
   onAbschliessen,
   onSignatureReceived,
@@ -488,6 +580,7 @@ function Entscheidung({
   setSupervisorEmail: (v: string) => void;
   busy: boolean;
   onSendLink: () => void;
+  onSendReminder: () => void;
   onNichtUebernehmen: () => void;
   onAbschliessen: () => void;
   onSignatureReceived: () => void;
@@ -549,6 +642,13 @@ function Entscheidung({
         <p className="mt-1 text-sm text-muted-foreground">
           Die Vertragsdaten wurden erfasst. Erzeugen Sie den Verlängerungsvertrag im Tab „Dokumente“, lassen Sie ihn unterschreiben und schließen Sie den Vorgang ab.
         </p>
+        {data.vorstandAbgestimmt === true && (
+          <p className="mt-2 text-sm font-medium text-credo-gruen">
+            ✓ Mit Vorstand/GF abgestimmt
+            {data.vorstandAbstimmungVermerk ? ` — ${data.vorstandAbstimmungVermerk}` : ""}
+          </p>
+        )}
+        {data.vorstandAbgestimmt === false && <VorstandWarnung />}
         {unterschrieben && (
           <p className="mt-2 text-sm font-medium text-credo-gruen">
             ✓ Unterschriebener Vertrag erfasst am {formatDate(data.contractSignedReturnedAt)}.
@@ -612,9 +712,20 @@ function Entscheidung({
               Anfrage gesendet an <strong>{data.supervisorEmail}</strong>
               {data.supervisorLinkSentAt ? ` am ${formatDate(data.supervisorLinkSentAt)}` : ""} — wartet auf Rückmeldung.
             </p>
-            <button onClick={onSendLink} disabled={busy} className="mt-2 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50">
-              Anfrage erneut senden
-            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button onClick={onSendReminder} disabled={busy} className="rounded-lg border border-credo-gruen/50 px-3 py-1.5 text-xs font-semibold text-credo-gruen hover:bg-credo-gruen/10 disabled:opacity-50">
+                {busy ? "…" : "Erinnerung senden"}
+              </button>
+              <button onClick={onSendLink} disabled={busy} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50">
+                Anfrage erneut senden
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {data.supervisorReminderCount > 0
+                ? `Zuletzt erinnert: ${formatDate(data.lastSupervisorReminderAt)} · ${data.supervisorReminderCount}× erinnert`
+                : "Noch keine Erinnerung versendet."}
+              {" "}„Erinnerung senden“ nutzt den bestehenden Link; „Anfrage erneut senden“ erzeugt einen NEUEN Link und setzt begonnene Eingaben zurück.
+            </p>
           </div>
         ) : (
           <div className="space-y-2">

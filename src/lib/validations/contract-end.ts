@@ -67,6 +67,10 @@ export const supervisorDecisionSchema = z
   .object({
     decision: z.enum(["UEBERNAHME", "KEINE_UEBERNAHME"]),
     declineReason: z.string().max(1000).optional(),
+    // Vorstand-/GF-Abstimmung: Pflicht bei Uebernahme (sofern das Feld laut
+    // Mandanten-Config sichtbar ist — das prueft die Route zusaetzlich).
+    vorstandAbgestimmt: z.boolean().optional(),
+    vorstandAbstimmungVermerk: z.string().max(300).optional(),
   })
   .refine(
     (d) => d.decision !== "KEINE_UEBERNAHME" || Boolean(d.declineReason && d.declineReason.trim()),
@@ -74,7 +78,52 @@ export const supervisorDecisionSchema = z
       message: "Bitte geben Sie eine kurze Begründung für die Nicht-Übernahme an.",
       path: ["declineReason"],
     },
+  )
+  .refine(
+    (d) =>
+      d.vorstandAbgestimmt !== true ||
+      Boolean(d.vorstandAbstimmungVermerk && d.vorstandAbstimmungVermerk.trim()),
+    {
+      message: "Bitte geben Sie an, mit wem und wann die Abstimmung erfolgt ist.",
+      path: ["vorstandAbstimmungVermerk"],
+    },
   );
+
+/**
+ * DokuBit-Stammdaten (Whitelist) — landen als Json in
+ * ContractEndProcess.dokubitDaten und speisen Dokument-Platzhalter +
+ * Formular-Vorbefuellung. Bewusst NICHT uebernommen (technische Spalten):
+ * LFD_NR, MABENUTZER, MAKURZ, ARCHIVDATUM, ARCHIVIERTVON.
+ */
+const optionalText = (max: number) => z.string().max(max).optional().or(z.literal(""));
+const optionalDate = z.string().regex(DATE_YMD, "Datum im Format YYYY-MM-DD erwartet").optional().or(z.literal(""));
+
+export const contractEndStammdatenSchema = z
+  .object({
+    anrede: optionalText(20), // MAANREDE
+    grad: optionalText(50), // MAGRAD
+    titel: optionalText(50), // MATITEL
+    strasse: optionalText(50), // MASTRASSE
+    plz: optionalText(10), // MAPLZ
+    ort: optionalText(50), // MAORT
+    geburtsdatum: optionalDate, // MAGEBURTSTAG
+    geburtsort: optionalText(50), // MAGEBURTSORT
+    geschlecht: optionalText(50), // MAGESCHLECHT
+    qualifikation: optionalText(250), // MAQUALIFIKATION
+    mitarbeiterStatus: optionalText(50), // MASTATUS
+    abrechnungskreis: optionalText(50), // ABRECHNUNGSKREIS
+    tarif: optionalText(50), // TARIF
+    konzerneintritt: optionalDate, // KONZERNEINTRITT
+    regelaltersgrenze: optionalDate, // REGELSALTERSGRENZE
+    beschaeftigungsgruppe: optionalText(50), // BESCHAEFTIGUNGSGRUPPE
+    vertragsart: optionalText(50), // VERTRAGSART
+    probezeitEinheit: optionalText(50), // PROBEZEITEINHEIT
+    probezeitDauer: optionalText(50), // PROBEZEITDAUER
+    probezeitVon: optionalDate, // PROBEZEITVON
+    probezeitBis: optionalDate, // PROBEZEITBIS
+    evtlLda: optionalDate, // EVTLLDA
+  })
+  .strip();
 
 /**
  * Meldung von n8n (liest DokuBit). Feldnamen bewusst nah an den DokuBit-Spalten
@@ -105,10 +154,13 @@ export const contractEndWebhookSchema = z
     bisherigeVerlaengerungen: z.number().int().min(0).max(50).optional(),
     // Alle Mandanten-Zuordnungen der Person (personal_mandanten) — Mehrfach-Erkennung
     personalMandanten: z.array(z.string().min(1).max(20)).max(50).optional(),
+    // DokuBit-Stammdaten (Whitelist) — Platzhalter + Vorbefuellung
+    stammdaten: contractEndStammdatenSchema.optional(),
   })
   .strip();
 
 export type CreateContractEndInput = z.infer<typeof createContractEndSchema>;
+export type ContractEndStammdaten = z.infer<typeof contractEndStammdatenSchema>;
 export type RenewalDataInput = z.infer<typeof renewalDataSchema>;
 export type SupervisorDecisionInput = z.infer<typeof supervisorDecisionSchema>;
 export type ContractEndWebhookInput = z.infer<typeof contractEndWebhookSchema>;

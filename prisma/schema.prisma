@@ -2999,6 +2999,24 @@ model ContractEndProcess {
   bisherigeBefristungMonate Int?
   bisherigeVerlaengerungen  Int?
 
+  // DokuBit-Stammdaten (Whitelist, via n8n-Webhook) — fuer Dokument-Platzhalter
+  // und Formular-Vorbefuellung. Struktur validiert der Webhook (stammdaten-Schema).
+  dokubitDaten Json?
+
+  // Mehrfachbeschaeftigung: weitere Mandanten-Nummern der Person (ohne den eigenen)
+  weitereMandanten String[] @default([])
+
+  // Vertragsende wurde von DokuBit geaendert, waehrend der Vorgang schon weit
+  // fortgeschritten war (vermutlich Verlaengerung bereits vollzogen) — HR-Hinweis
+  contractEndDateGeaendertAm DateTime?
+
+  // Vorstand-/GF-Abstimmung (Pflichtangabe der Fuehrungskraft bei Uebernahme)
+  vorstandAbgestimmt        Boolean?
+  vorstandAbstimmungVermerk String? // "Abgestimmt mit (Name/Funktion), am (Datum)"
+
+  // Eskalation an HR nach erfolglosen Vorgesetzten-Erinnerungen (einmal je Anfrage)
+  escalatedAt DateTime?
+
   // Strang B: Verknuepfung zum erzeugten Offboarding (1:1)
   offboardingId String?             @unique
   offboarding   OffboardingProcess? @relation("ContractEndToOffboarding", fields: [offboardingId], references: [id])

@@ -12,12 +12,11 @@
 
 | | |
 |---|---|
-| **Stand** | ✅ **ALLE Etappen (1–4) fertig** — #10 Webhook, #11 Tests, #12 QA am 2026-07-09 abgeschlossen |
-| **➡ Nächster Schritt** | Merge nach `main` + Server-Deploy (`prisma db push` via Entrypoint) + **n8n-Flow auf den Webhook umstellen** (s.u.) |
-| **n8n-Konfiguration** | Flow „Email-Vertragsende-Personal 2.0": `POST {APP_URL}/api/webhooks/contract-end`, Header `Authorization: Bearer {CRON_SECRET}`, Body = Eintrag-Objekt ODER Array (max. 200). Zusätzlich täglich: `POST /api/cron/contract-end-reminders` (gleicher Bearer) |
-| **Branch** | `feat/vertragsende`, rebased auf `main` (c40f375, 2026-07-09) |
-| **Verifik.-Artefakte** | Test-Vorgänge VE-2026-GYM-003…007 (+ Demo-Offboardings) in lokaler DB 5433 — aufräumbar, **nicht** im Code |
-| **Qualität** | tsc/ESLint/Build grün · 320 Jest-Tests grün (35 neue) · credo-check 🟢 (1 MINOR gefixt: äußerer try/catch) · Browser-Verifikation Etappe 1+2 (2026-06-19) |
+| **Stand** | ✅ **ALLE Etappen (1–4) fertig + Erweiterungspaket 2026-07-09** (siehe [§8](#8-erweiterungspaket-2026-07-09)) |
+| **➡ Nächster Schritt** | Server-Deploy (`prisma db push` via Entrypoint — NEUE Felder!) + n8n-Flow 3.0 **re-importieren** (Stammdaten-Spalten) + **Empfänger für die 2 neuen HR-Events konfigurieren** (Einstellungen → E-Mail-Versand: Eskalation + Unbearbeitet-Digest, sonst SKIPPED) |
+| **n8n-Konfiguration** | Flow „Email-Vertragsende-Personal 3.0": `POST {APP_URL}/api/webhooks/contract-end`, Header `Authorization: Bearer {CRON_SECRET}`, Body = Eintrag-Objekt ODER Array (max. 200), inkl. `stammdaten`-Objekt. Zusätzlich täglich: `POST /api/cron/contract-end-reminders` (gleicher Bearer) |
+| **Qualität (Basis)** | tsc/ESLint/Build grün · 320 Jest-Tests grün (35 neue) · credo-check 🟢 · Browser-Verifikation Etappe 1+2 (2026-06-19) |
+| **Qualität (Erweiterung)** | 345 Jest-Tests grün (25 neue: Reminder-manuell, Webhook-Stammdaten/B9, Vorstand-Frage, Eskalation/Digest) · lint/build/tsc grün |
 
 Fortschritt: siehe Checkliste in [§4](#4-arbeitspakete--fortschritt). Tasks auch im Session-Tasksystem (#1–#12).
 
@@ -122,17 +121,55 @@ Legende: ⬜ offen · 🔵 in Arbeit · ✅ fertig
 ## 6. Später / optional (bewusst zurückgestellt)
 
 - **Vorgesetzten-Mail aus n8n** — DokuBit liefert sie nicht → Anfrage bleibt manuell; Teilautomatik später.
-- **B7 HR-/GF-Freigabe-Gate** — nicht beschlossen; ließe sich in #6 in den Status-Flow ergänzen.
-- **B5 Teil-Offboarding** — verworfen; reiner Info-Hinweis „Person hat weitere Einstellungen" wäre billig nachrüstbar.
+- **B7 HR-/GF-Freigabe-Gate** — teilweise erledigt: seit 2026-07-09 bestätigt die Führungskraft die Vorstand/GF-Abstimmung (Pflichtfrage + Nachweis, keine Blockade); ein hartes Freigabe-Gate bleibt optional.
+- ~~**B5 Teil-Offboarding** — Info-Hinweis~~ → **Hinweis umgesetzt 2026-07-09** („Person hat weitere Einstellungen“-Karte auf der Detailseite); Teil-Offboarding bleibt verworfen.
 - **Voller Form-Builder** — verworfen zugunsten des schlanken Feld-Schalters (#5).
 - **Word-Vorlagen** „Verlängerung"/„Entfristung"/„Auslaufmitteilung"/„MAV-Anhörung" — Inhalt liefert der Nutzer; bis dahin Platzhalter-Vorlagen.
+- ⚠ **DSGVO-Löschkonzept (bewusstes, dokumentiertes Restrisiko):** Abgeschlossene/stornierte Vorgänge behalten die DokuBit-Stammdaten (inkl. Adresse/Geburtsdatum in `dokubitDaten`) unbegrenzt. Entscheidung 2026-07-09: eigenes späteres Paket — Cron nach BEM-Aufbewahrungs-Muster, der X Jahre nach Abschluss die Personendaten im Vorgang leert.
+- **Vorgesetzten-Stammdaten je Mandant** statt Freitext-E-Mail (Schutz gegen Fehlversand des Magic-Links) — Backlog-Kandidat.
 
 ---
 
 ## 7. DokuBit / n8n (Referenz aus Phase-1-Klärung)
 
-- Flow **„Email-Vertragsende-Personal 2.0"** (wöchentlich Mo 9 Uhr). Quelle MS-SQL **`DokuBit`**, Tabellen
-  `dokubitmitarbeiter` + `personal_mandanten`. `MANDANTENNUMMER` == `Organization.mandantNumber` (Auto-Zuordnung).
-- Bekannte Spalten: `MANR`, `MAVONAME`, `MANANAME`, `MAEMAIL`, `MANDANTENNUMMER`, `VERTRAGSBEGINN`, `VERTRAGSENDE`.
-- **Künftig zusätzlich (#10):** aktuelle Vertragsdaten (Position/E-Gruppe/Stufe/Stunden), Befristungsart + bisherige
-  Dauer/Verlängerungen, alle Mandanten-Zuordnungen je Person.
+- Flow **„Email-Vertragsende-Personal 3.0 (Portal-Webhook)"** (wöchentlich Mo 9 Uhr; JSON lokal unter `n8n/`,
+  bewusst nicht im Repo). Quelle MS-SQL **`DokuBit`**, Tabellen `dokubitmitarbeiter` + `personal_mandanten`.
+  `MANDANTENNUMMER` == `Organization.mandantNumber` (Auto-Zuordnung).
+- Basis-Spalten: `MANR`, `MAVONAME`, `MANANAME`, `MAEMAIL`, `MANDANTENNUMMER`, `VERTRAGSBEGINN`, `VERTRAGSENDE`.
+- **Seit 2026-07-09 zusätzlich (Erweiterungspaket):** aktueller Vertrag (`MAPOSITION`, `TARIFGRUPPE`, `TARIFSTUFE`,
+  `TEILZEITSTUNDEN`) als typisierte Felder + `stammdaten`-Whitelist (`MAANREDE/MAGRAD/MATITEL`, Adresse, Geburtsdaten,
+  `MAGESCHLECHT/MAQUALIFIKATION/MASTATUS`, `ABRECHNUNGSKREIS/TARIF/BESCHAEFTIGUNGSGRUPPE/VERTRAGSART`,
+  `KONZERNEINTRITT/REGELSALTERSGRENZE`, `PROBEZEIT*`, `EVTLLDA`) → `ContractEndProcess.dokubitDaten`.
+  Mehrfach-Erkennung aus dem Abfragefenster (gleiche `MANR` bei mehreren Mandanten) → `weitereMandanten`.
+  Befristungsart/-historie liefert DokuBit weiterhin NICHT (Felder bleiben optional, §14-Warnung greift nur bei Lieferung).
+
+---
+
+## 8. Erweiterungspaket 2026-07-09
+
+Nach Prozess-Review (HR-Brille) umgesetzt, alle Punkte in einem Branch `feat/vertragsende-erweiterungen`:
+
+1. **DokuBit-Stammdaten komplett** (siehe §7): 26 neue Dokument-Platzhalter (Gruppen „Person (DokuBit)" +
+   „Aktueller Vertrag (DokuBit)" im `VariablenKatalog`), Resolver liest `dokubitDaten` + `current*`.
+2. **Formular-Vorbefüllung:** GET `/api/vertrag-formular/[token]` liefert `vorbefuellung` (Stunden/EG/Stufe/
+   Position/Probezeit-Monate + Vertragsbeginn-Kandidat = Tag nach Vertragsende); Formular füllt nur leere Felder,
+   gespeicherte Entwürfe haben Vorrang. Bewusst KEINE Adress-/Geburtsdaten im öffentlichen Formular.
+3. **Vorstand/GF-Frage (B7 light):** Pflichtblock im Übernahme-Zweig „Wurde das mit dem Vorstand/Geschäftsführung
+   abgestimmt?" (Ja/Nein, CREDO-Gelb hervorgehoben); bei Ja Pflicht-Nachweis „Abgestimmt mit …, am …".
+   Per Mandant abschaltbar (Feld `vorstandAbstimmung` in der Vertragsende-Konfiguration). Bei Nein: Rückmeldung
+   wird angenommen, Detailseite + Dokumente-Tab zeigen eine rote Warnbox (keine Blockade).
+4. **Manueller Erinnerungs-Button:** `POST /api/contract-end/[id]/reminder` + Button „Erinnerung senden"
+   (bestehender Link, kein Token-Reset — Unterschied zu „Anfrage erneut senden" wird im UI erklärt);
+   gemeinsamer Helfer `contract-end-reminder.ts` mit dem Cron.
+5. **Eskalation an HR:** Event `contract-end-eskalation` nach ≥3 erfolglosen Erinnerungen, genau einmal je
+   Anfrage (`escalatedAt`, Reset bei erneutem Anfrage-Versand). **Empfänger muss in Einstellungen → E-Mail-Versand
+   konfiguriert werden** (bewusst kein Default).
+6. **Montags-Digest:** Event `contract-end-unbearbeitet` — kritische/Warnung-Vorgänge im Status ANGELEGT ohne
+   versendete Anfrage, als Sammel-Mail. **Empfänger ebenfalls konfigurieren.**
+7. **Detailseite:** Mehrfachbeschäftigungs-Karte (`weitereMandanten`) + amber Banner bei B9-Datumsänderung auf
+   weit fortgeschrittenem Vorgang (`contractEndDateGeaendertAm` — vermutlich Verlängerung bereits in LOGA vollzogen).
+
+**Neue Schema-Felder** (via `db push` beim Deploy): `dokubitDaten Json?`, `weitereMandanten String[]`,
+`contractEndDateGeaendertAm`, `vorstandAbgestimmt`, `vorstandAbstimmungVermerk`, `escalatedAt`.
+**Tests:** 345 gesamt grün (25 neue). **Deploy-Checkliste:** main deployen → n8n-Flow 3.0 re-importieren →
+Empfänger für die 2 neuen HR-Events setzen.

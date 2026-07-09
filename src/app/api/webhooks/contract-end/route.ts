@@ -80,6 +80,17 @@ async function processEintrag(
   const personalNr = eintrag.personalNr?.trim() || null;
   const email = eintrag.email?.trim() || null;
   const mehrfach = (eintrag.personalMandanten?.length ?? 0) > 1;
+  // Weitere Mandanten der Person (ohne den eigenen) — Hinweis fuer HR (B5-light)
+  const weitereMandanten = (eintrag.personalMandanten ?? []).filter(
+    (m) => m !== eintrag.mandantNummer,
+  );
+
+  // DokuBit-Stammdaten: leere Strings verwerfen, nur belegte Werte speichern
+  const dokubitDaten: Record<string, string> = {};
+  for (const [key, value] of Object.entries(eintrag.stammdaten ?? {})) {
+    if (typeof value === "string" && value.trim() !== "") dokubitDaten[key] = value.trim();
+  }
+  const hatStammdaten = Object.keys(dokubitDaten).length > 0;
 
   // Personen-Schluessel fuer die Dedup-Suche: Personalnummer bevorzugt,
   // sonst E-Mail (DokuBit liefert nicht immer beides).
@@ -121,6 +132,8 @@ async function processEintrag(
     ...(eintrag.bisherigeVerlaengerungen != null
       ? { bisherigeVerlaengerungen: eintrag.bisherigeVerlaengerungen }
       : {}),
+    ...(hatStammdaten ? { dokubitDaten } : {}),
+    ...(weitereMandanten.length > 0 ? { weitereMandanten } : {}),
   };
 
   if (offenerVorgang) {
@@ -139,12 +152,20 @@ async function processEintrag(
     }
 
     // B9 Vertragsaenderung: Ende hat sich verschoben -> Update statt Neuanlage.
+    // Ist der Vorgang schon weit fortgeschritten (Uebernahme laeuft), wurde die
+    // Verlaengerung vermutlich bereits in LOGA vollzogen -> HR-Hinweis-Marker.
+    const weitFortgeschritten = [
+      "RUECKMELDUNG_UEBERNAHME",
+      "VERTRAG_ERSTELLT",
+      "VERTRAG_UNTERSCHRIEBEN",
+    ].includes(offenerVorgang.status);
     await prisma.$transaction([
       prisma.contractEndProcess.update({
         where: { id: offenerVorgang.id },
         data: {
           contractEndDate: vertragsende,
           ...(vertragsbeginn ? { contractStartDate: vertragsbeginn } : {}),
+          ...(weitFortgeschritten ? { contractEndDateGeaendertAm: new Date() } : {}),
           ...prefillData,
         },
       }),

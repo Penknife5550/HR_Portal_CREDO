@@ -880,6 +880,47 @@ export const EVENT_CATALOG: EventDefinition[] = [
     },
     wired: true,
   },
+  {
+    event: "contract-end-eskalation",
+    name: "Eskalation an HR (Vorgesetzter reagiert nicht)",
+    group: "Vertragsende",
+    // BEWUSST kein Default: HR-interne Benachrichtigung — Empfaenger wird in
+    // der Vorlage konfiguriert (Pflicht-Konfigurationsschritt, sonst SKIPPED).
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
+    samplePayload: {
+      contractEndId: "00000000-0000-0000-0000-000000000007",
+      displayId: "VE-2026-GYM-001",
+      mitarbeiter_name: "Max Mustermann",
+      supervisorEmail: "vorgesetzte@example.org",
+      einrichtung: "FES Minden",
+      organization: "FES Minden",
+      vertragsende: "31.12.2026",
+      contractEndDate: "2026-12-31T00:00:00.000Z",
+      anzahl_erinnerungen: 3,
+      tage_offen: 21,
+      dringlichkeit: "Kritisch",
+      portalLink: "https://hr.fes-credo.de/dashboard/contract-end/00000000-0000-0000-0000-000000000007",
+    },
+    wired: true,
+  },
+  {
+    event: "contract-end-unbearbeitet",
+    name: "Woechentlicher HR-Hinweis (Vertragsende ohne Anfrage)",
+    group: "Vertragsende",
+    // BEWUSST kein Default: HR-interne Sammel-Benachrichtigung.
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
+    samplePayload: {
+      anzahl: 2,
+      liste_text:
+        "VE-2026-GYM-001 · Max Mustermann · FES Minden · Vertragsende 31.12.2026 (Kritisch)\nVE-2026-GES-004 · Erika Musterfrau · Gesamtschule · Vertragsende 28.02.2027 (Warnung)",
+      liste_html:
+        "<li>VE-2026-GYM-001 · Max Mustermann · FES Minden · Vertragsende 31.12.2026 (Kritisch)</li><li>VE-2026-GES-004 · Erika Musterfrau · Gesamtschule · Vertragsende 28.02.2027 (Warnung)</li>",
+      portalLink: "https://hr.fes-credo.de/dashboard?tab=contract-end",
+    },
+    wired: true,
+  },
 ];
 
 // =============================================

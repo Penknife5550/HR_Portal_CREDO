@@ -46,6 +46,15 @@ interface PageData {
   declineReason: string | null;
   alreadySubmitted: boolean;
   renewalData: Record<string, unknown> | null;
+  /** Vorbefuellung aus dem aktuellen Vertrag (n8n/DokuBit) — nur fuer leere Felder. */
+  vorbefuellung?: {
+    vertragsbeginn?: string | null;
+    wochenstunden?: number | null;
+    entgeltgruppe?: string | null;
+    stufe?: string | null;
+    stellenbeschreibung?: string | null;
+    probezeitMonate?: number | null;
+  } | null;
 }
 
 type FormState = {
@@ -91,6 +100,9 @@ export default function VertragFormularPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [decision, setDecision] = useState<"" | "UEBERNAHME" | "KEINE_UEBERNAHME">("");
   const [declineReason, setDeclineReason] = useState("");
+  // Vorstand-/GF-Abstimmung (Pflicht bei Uebernahme, sofern Feld sichtbar)
+  const [vorstandAbgestimmt, setVorstandAbgestimmt] = useState<boolean | null>(null);
+  const [vorstandVermerk, setVorstandVermerk] = useState("");
 
   const [form, setForm] = useState<FormState>({
     vertragsbeginn: "",
@@ -154,6 +166,22 @@ export default function VertragFormularPage() {
           zusatzvereinbarungen: (rd.zusatzvereinbarungen as string) || "",
         }));
       }
+      // Vorbefuellung aus dem aktuellen Vertrag (n8n/DokuBit) — greift NUR fuer
+      // Felder, die weder gespeichert (renewalData) noch bereits gesetzt sind.
+      const vb = j.vorbefuellung;
+      if (vb && !j.alreadySubmitted) {
+        setForm((f) => ({
+          ...f,
+          vertragsbeginn: f.vertragsbeginn || dateInput(vb.vertragsbeginn),
+          wochenstunden:
+            f.wochenstunden || (vb.wochenstunden != null ? String(vb.wochenstunden) : ""),
+          entgeltgruppe: f.entgeltgruppe || vb.entgeltgruppe || "",
+          stufe: f.stufe || vb.stufe || "",
+          stellenbeschreibung: f.stellenbeschreibung || vb.stellenbeschreibung || "",
+          probezeitMonate:
+            f.probezeitMonate || (vb.probezeitMonate != null ? String(vb.probezeitMonate) : ""),
+        }));
+      }
     } catch {
       setError("Verbindungsfehler.");
     } finally {
@@ -170,6 +198,12 @@ export default function VertragFormularPage() {
     return {
       decision: decision || undefined,
       declineReason: decision === "KEINE_UEBERNAHME" ? declineReason || undefined : undefined,
+      vorstandAbgestimmt:
+        decision === "UEBERNAHME" && vorstandAbgestimmt !== null ? vorstandAbgestimmt : undefined,
+      vorstandAbstimmungVermerk:
+        decision === "UEBERNAHME" && vorstandAbgestimmt === true
+          ? vorstandVermerk || undefined
+          : undefined,
       vertragsbeginn: form.vertragsbeginn || undefined,
       befristet: form.befristet,
       vertragsende: form.befristet ? form.vertragsende || undefined : undefined,
@@ -246,6 +280,14 @@ export default function VertragFormularPage() {
       return;
     }
     if (decision === "UEBERNAHME") {
+      if (vis("vorstandAbstimmung") && vorstandAbgestimmt === null) {
+        setMsg("Bitte beantworten Sie die Frage zur Abstimmung mit Vorstand/Geschäftsführung.");
+        return;
+      }
+      if (vorstandAbgestimmt === true && !vorstandVermerk.trim()) {
+        setMsg("Bitte geben Sie an, mit wem und wann die Abstimmung erfolgt ist.");
+        return;
+      }
       const missing = missingRequired();
       if (missing) {
         setMsg(`Bitte füllen Sie das Pflichtfeld „${missing}" aus.`);
@@ -362,6 +404,58 @@ export default function VertragFormularPage() {
 
         {decision === "UEBERNAHME" && (
           <>
+            {vis("vorstandAbstimmung") && (
+              <div className="rounded-xl border-2 border-credo-gelb bg-credo-gelb/10 p-4">
+                <p className="text-sm font-bold text-foreground">
+                  Wurde das mit dem Vorstand/Geschäftsführung abgestimmt? *
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setVorstandAbgestimmt(true)}
+                    className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition ${
+                      vorstandAbgestimmt === true
+                        ? "border-credo-gruen bg-credo-gruen/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-credo-gruen/50"
+                    }`}
+                  >
+                    Ja
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVorstandAbgestimmt(false)}
+                    className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition ${
+                      vorstandAbgestimmt === false
+                        ? "border-credo-rot bg-credo-rot/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-credo-rot/50"
+                    }`}
+                  >
+                    Nein
+                  </button>
+                </div>
+                {vorstandAbgestimmt === true && (
+                  <div className="mt-3">
+                    <label className="text-sm font-medium">
+                      Abgestimmt mit (Name/Funktion), am (Datum) *
+                    </label>
+                    <input
+                      type="text"
+                      value={vorstandVermerk}
+                      onChange={(e) => setVorstandVermerk(e.target.value)}
+                      placeholder="z.B. Hr. Mustermann (Vorstand), 05.07.2026"
+                      maxLength={300}
+                      className={INPUT}
+                    />
+                  </div>
+                )}
+                {vorstandAbgestimmt === false && (
+                  <p className="mt-3 text-xs font-medium text-credo-rot">
+                    Hinweis: Die Personalabteilung wird auf die fehlende Abstimmung hingewiesen.
+                    Bitte holen Sie die Abstimmung zeitnah nach.
+                  </p>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {vis("vertragsbeginn") && (
                 <div>

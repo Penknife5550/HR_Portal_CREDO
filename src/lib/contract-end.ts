@@ -42,6 +42,10 @@ export interface CreateContractEndInput {
   befristungsart?: string | null;
   bisherigeBefristungMonate?: number | null;
   bisherigeVerlaengerungen?: number | null;
+  /** DokuBit-Stammdaten (Whitelist) — Platzhalter + Vorbefuellung. */
+  dokubitDaten?: Record<string, string> | null;
+  /** Weitere Mandanten-Nummern der Person (ohne den eigenen). */
+  weitereMandanten?: string[];
 }
 
 /**
@@ -101,6 +105,8 @@ export async function createContractEndProcess(input: CreateContractEndInput) {
         befristungsart: input.befristungsart || null,
         bisherigeBefristungMonate: input.bisherigeBefristungMonate ?? null,
         bisherigeVerlaengerungen: input.bisherigeVerlaengerungen ?? null,
+        dokubitDaten: input.dokubitDaten ?? undefined,
+        weitereMandanten: input.weitereMandanten ?? [],
       },
       include: { organization: true },
     });

@@ -104,6 +104,27 @@ export async function GET(
       orderBy: { name: "asc" },
     });
 
+    // Vorbefuellung aus den n8n-/DokuBit-Daten des AKTUELLEN Vertrags —
+    // Vorgesetzte aendern nur, was sich aendert. Bewusst KEINE Adress-/
+    // Geburtsdaten (im Formular nicht gebraucht, Datenminimierung).
+    const dokubit = (ce.dokubitDaten ?? {}) as Record<string, string>;
+    // Probezeit-Monate nur ableiten, wenn DokuBit in Monaten rechnet
+    const probezeitMonate =
+      dokubit.probezeitDauer && /^monat/i.test(dokubit.probezeitEinheit || "")
+        ? parseInt(dokubit.probezeitDauer, 10) || null
+        : null;
+    // Kandidat fuer den neuen Vertragsbeginn: Tag nach dem alten Vertragsende
+    const beginnKandidat = new Date(ce.contractEndDate);
+    beginnKandidat.setDate(beginnKandidat.getDate() + 1);
+    const vorbefuellung = {
+      vertragsbeginn: beginnKandidat.toISOString().slice(0, 10),
+      wochenstunden: ce.currentWochenstunden,
+      entgeltgruppe: ce.currentEntgeltgruppe,
+      stufe: ce.currentStufe,
+      stellenbeschreibung: ce.currentPosition,
+      ...(probezeitMonate ? { probezeitMonate } : {}),
+    };
+
     return NextResponse.json({
       displayId: ce.displayId,
       employeeName: `${ce.employeeFirstName} ${ce.employeeLastName}`,
@@ -123,6 +144,7 @@ export async function GET(
           ce.status,
         ),
       renewalData: ce.renewalData,
+      vorbefuellung,
     });
   } catch (error) {
     console.error("Fehler beim Laden des Vertrag-Formulars:", error);
@@ -204,10 +226,27 @@ export async function POST(
         { status: 400 }
       );
     }
-    const { decision, declineReason } = decisionParsed.data;
+    const { decision, declineReason, vorstandAbgestimmt, vorstandAbstimmungVermerk } =
+      decisionParsed.data;
     const now = new Date();
 
     if (decision === "UEBERNAHME") {
+      // Vorstand-/GF-Abstimmung: Pflichtangabe bei Uebernahme, sofern das Feld
+      // laut Mandanten-Config sichtbar ist (Mandanten ohne Vorstand koennen es
+      // in der Vertragsende-Konfiguration ausblenden).
+      const fieldConfig = resolveContractEndFieldConfig(ce.organization.contractEndFieldConfig);
+      const vorstandFeldSichtbar =
+        fieldConfig.find((f) => f.name === "vorstandAbstimmung")?.visible ?? true;
+      if (vorstandFeldSichtbar && typeof vorstandAbgestimmt !== "boolean") {
+        return NextResponse.json(
+          {
+            error:
+              "Bitte beantworten Sie die Frage zur Abstimmung mit Vorstand/Geschäftsführung.",
+          },
+          { status: 400 },
+        );
+      }
+
       // Ja -> Vertragsdaten erfassen, HR vollzieht anschliessend (Vertrag erzeugen)
       const parsed = renewalDataSchema.safeParse(body);
       if (!parsed.success) {
@@ -227,6 +266,10 @@ export async function POST(
             decision: "UEBERNAHME",
             supervisorRespondedAt: now,
             decidedAt: now,
+            vorstandAbgestimmt: vorstandAbgestimmt ?? null,
+            vorstandAbstimmungVermerk: vorstandAbgestimmt
+              ? vorstandAbstimmungVermerk?.trim() || null
+              : null,
           },
         });
         await tx.auditLog.create({
@@ -234,7 +277,13 @@ export async function POST(
             contractEndId: ce.id,
             processType: "CONTRACT_END",
             action: "SUPERVISOR_DECISION_UEBERNAHME",
-            details: { displayId: ce.displayId },
+            details: {
+              displayId: ce.displayId,
+              vorstandAbgestimmt: vorstandAbgestimmt ?? null,
+              ...(vorstandAbgestimmt && vorstandAbstimmungVermerk
+                ? { vorstandAbstimmungVermerk: vorstandAbstimmungVermerk.trim() }
+                : {}),
+            },
           },
         });
       });
