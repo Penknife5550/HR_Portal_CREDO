@@ -20,11 +20,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
-import { triggerWebhooks } from "@/lib/webhooks";
-import { getBaseUrl } from "@/lib/url";
+import { sendSupervisorReminder } from "@/lib/contract-end-reminder";
 import {
   getContractEndCategory,
-  CONTRACT_END_CATEGORY_META,
   type ContractEndCategory,
 } from "@/lib/contract-end-fristen";
 
@@ -86,49 +84,9 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const tageOffen = Math.floor(
-          (now.getTime() - new Date(ce.supervisorLinkSentAt!).getTime()) / MS_PER_DAY,
-        );
-        const meta = CONTRACT_END_CATEGORY_META[kategorie];
-        const link = `${getBaseUrl()}/vertrag-formular/${ce.supervisorToken}`;
-        const vertragsende = new Date(ce.contractEndDate).toLocaleDateString("de-DE");
-
-        // SMTP primaer (Event), Webhooks zusaetzlich — wirft nie
-        await triggerWebhooks("contract-end-supervisor-reminder", {
-          contractEndId: ce.id,
-          displayId: ce.displayId,
-          supervisorEmail: ce.supervisorEmail,
-          mitarbeiter_name: `${ce.employeeFirstName} ${ce.employeeLastName}`,
-          einrichtung: ce.organization.name,
-          organization: ce.organization.name,
-          link,
-          formularLink: link,
-          tage_offen: tageOffen,
-          dringlichkeit: meta.label,
-          vertragsende,
-          contractEndDate: new Date(ce.contractEndDate).toISOString(),
-        });
-
-        await prisma.contractEndProcess.update({
-          where: { id: ce.id },
-          data: {
-            lastSupervisorReminderAt: now,
-            supervisorReminderCount: { increment: 1 },
-          },
-        });
-
-        await prisma.auditLog.create({
-          data: {
-            contractEndId: ce.id,
-            processType: "CONTRACT_END",
-            action: "SUPERVISOR_REMINDER_SENT",
-            details: {
-              tageOffen,
-              kategorie,
-              email: ce.supervisorEmail || "",
-            },
-          },
-        });
+        // Versand + Zaehler + Audit im gemeinsamen Helfer (auch vom manuellen
+        // "Erinnerung senden"-Button genutzt)
+        await sendSupervisorReminder(ce, now);
 
         results.reminders++;
       } catch (err) {

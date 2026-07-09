@@ -98,6 +98,7 @@ export function ContractEndDetailContent({
   const [supervisorEmail, setSupervisorEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionInfo, setActionInfo] = useState<string | null>(null);
 
   const canEdit = HR_EDIT_ROLES.includes(user.role);
 
@@ -129,6 +130,12 @@ export function ContractEndDetailContent({
     return () => clearTimeout(t);
   }, [actionError]);
 
+  useEffect(() => {
+    if (!actionInfo) return;
+    const t = setTimeout(() => setActionInfo(null), 6000);
+    return () => clearTimeout(t);
+  }, [actionInfo]);
+
   async function sendSupervisorLink() {
     if (!supervisorEmail) {
       setActionError("Bitte E-Mail der/des Vorgesetzten eingeben.");
@@ -147,6 +154,25 @@ export function ContractEndDetailContent({
         setActionError(j.error || "Link konnte nicht versendet werden.");
         return;
       }
+      await loadData();
+    } catch {
+      setActionError("Verbindungsfehler beim Versand.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendReminder() {
+    setBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/contract-end/${contractEndId}/reminder`, { method: "POST" });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setActionError(j.error || "Erinnerung konnte nicht versendet werden.");
+        return;
+      }
+      setActionInfo("Erinnerung an die Führungskraft versendet.");
       await loadData();
     } catch {
       setActionError("Verbindungsfehler beim Versand.");
@@ -390,6 +416,11 @@ export function ContractEndDetailContent({
             {actionError}
           </div>
         )}
+        {actionInfo && (
+          <div className="mb-4 rounded-lg border border-credo-gruen/30 bg-credo-gruen/10 px-4 py-2.5 text-sm text-credo-gruen">
+            {actionInfo}
+          </div>
+        )}
 
         {/* Tabs */}
         <nav className="-mb-px flex gap-1 border-b" aria-label="Tabs">
@@ -442,6 +473,7 @@ export function ContractEndDetailContent({
                 setSupervisorEmail={setSupervisorEmail}
                 busy={busy}
                 onSendLink={sendSupervisorLink}
+                onSendReminder={sendReminder}
                 onNichtUebernehmen={nichtUebernehmen}
                 onAbschliessen={abschliessen}
                 onSignatureReceived={signatureReceived}
@@ -505,6 +537,7 @@ function Entscheidung({
   setSupervisorEmail,
   busy,
   onSendLink,
+  onSendReminder,
   onNichtUebernehmen,
   onAbschliessen,
   onSignatureReceived,
@@ -515,6 +548,7 @@ function Entscheidung({
   setSupervisorEmail: (v: string) => void;
   busy: boolean;
   onSendLink: () => void;
+  onSendReminder: () => void;
   onNichtUebernehmen: () => void;
   onAbschliessen: () => void;
   onSignatureReceived: () => void;
@@ -646,9 +680,20 @@ function Entscheidung({
               Anfrage gesendet an <strong>{data.supervisorEmail}</strong>
               {data.supervisorLinkSentAt ? ` am ${formatDate(data.supervisorLinkSentAt)}` : ""} — wartet auf Rückmeldung.
             </p>
-            <button onClick={onSendLink} disabled={busy} className="mt-2 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50">
-              Anfrage erneut senden
-            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button onClick={onSendReminder} disabled={busy} className="rounded-lg border border-credo-gruen/50 px-3 py-1.5 text-xs font-semibold text-credo-gruen hover:bg-credo-gruen/10 disabled:opacity-50">
+                {busy ? "…" : "Erinnerung senden"}
+              </button>
+              <button onClick={onSendLink} disabled={busy} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50">
+                Anfrage erneut senden
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {data.supervisorReminderCount > 0
+                ? `Zuletzt erinnert: ${formatDate(data.lastSupervisorReminderAt)} · ${data.supervisorReminderCount}× erinnert`
+                : "Noch keine Erinnerung versendet."}
+              {" "}„Erinnerung senden" nutzt den bestehenden Link; „Anfrage erneut senden" erzeugt einen NEUEN Link und setzt begonnene Eingaben zurück.
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
