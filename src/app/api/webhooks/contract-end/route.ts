@@ -207,6 +207,15 @@ async function processEintrag(
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    return await handlePost(request);
+  } catch (error) {
+    console.error("[ContractEndWebhook] Schwerer Fehler:", error);
+    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+  }
+}
+
+async function handlePost(request: NextRequest) {
   const authHeader = request.headers.get("authorization") || "";
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {

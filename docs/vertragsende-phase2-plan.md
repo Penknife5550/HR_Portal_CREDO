@@ -1,6 +1,6 @@
 # Modul „Vertragsende" — Prozess-Überarbeitung & Phase 2 (Arbeitsplan)
 
-**Branch:** `feat/vertragsende` · **Stand:** 2026-06-19 · **Status:** ▶ Etappe 1 läuft (Task #1)
+**Branch:** `feat/vertragsende` · **Stand:** 2026-07-09 · **Status:** ✅ ALLE Etappen fertig — bereit für Merge nach `main`
 **Vorgänger:** [`vertragsende-implementierung.md`](./vertragsende-implementierung.md) (Phase 1, fertig) · [`vertragsende-prozess.html`](./vertragsende-prozess.html) (Ur-Konzept)
 
 > **Lebendiges Dokument.** Wird nach jedem abgeschlossenen Task aktualisiert. Der Abschnitt
@@ -12,11 +12,12 @@
 
 | | |
 |---|---|
-| **Stand** | ✅ **Etappe 1 + 2 fertig & live verifiziert** — pausiert (Urlaub), Etappe 3 + 4 offen |
-| **➡ Wiedereinstieg** | **#10** n8n-Webhook-Eingang → **#11** Tests (Warnlogik/Cron/Webhook) → **#12** QA (credo-check/simpler/build) + Merge nach `main` |
-| **Branch** | `feat/vertragsende` nach **origin gepusht** (2026-06-19); noch **nicht** nach `main` gemergt |
+| **Stand** | ✅ **ALLE Etappen (1–4) fertig** — #10 Webhook, #11 Tests, #12 QA am 2026-07-09 abgeschlossen |
+| **➡ Nächster Schritt** | Merge nach `main` + Server-Deploy (`prisma db push` via Entrypoint) + **n8n-Flow auf den Webhook umstellen** (s.u.) |
+| **n8n-Konfiguration** | Flow „Email-Vertragsende-Personal 2.0": `POST {APP_URL}/api/webhooks/contract-end`, Header `Authorization: Bearer {CRON_SECRET}`, Body = Eintrag-Objekt ODER Array (max. 200). Zusätzlich täglich: `POST /api/cron/contract-end-reminders` (gleicher Bearer) |
+| **Branch** | `feat/vertragsende`, rebased auf `main` (c40f375, 2026-07-09) |
 | **Verifik.-Artefakte** | Test-Vorgänge VE-2026-GYM-003…007 (+ Demo-Offboardings) in lokaler DB 5433 — aufräumbar, **nicht** im Code |
-| **Qualität** | tsc grün · ESLint ohne neue Befunde · Browser-Verifikation beider Etappen ok |
+| **Qualität** | tsc/ESLint/Build grün · 320 Jest-Tests grün (35 neue) · credo-check 🟢 (1 MINOR gefixt: äußerer try/catch) · Browser-Verifikation Etappe 1+2 (2026-06-19) |
 
 Fortschritt: siehe Checkliste in [§4](#4-arbeitspakete--fortschritt). Tasks auch im Session-Tasksystem (#1–#12).
 
@@ -94,11 +95,11 @@ Legende: ⬜ offen · 🔵 in Arbeit · ✅ fertig
 > **Etappe 2 live verifiziert (2026-06-19):** Feld-Config — `stufe` per Mandanten-Config abgeschaltet → öffentl. Formular blendet es aus; Betriebsstätte-Dropdown listet 16 Mandanten. B3 MAV (`ANGEHOERT` + `mavConsultedAt`) und B1 Unterschrift (`VERTRAG_UNTERSCHRIEBEN` + `contractSignedReturnedAt`) gesetzt. **Bug gefunden+gefixt:** Übergang `RUECKMELDUNG_UEBERNAHME → VERTRAG_UNTERSCHRIEBEN` fehlte in `VALID_TRANSITIONS` (gab 400) → ergänzt. B1/B2-Warnlogik → Unit-Test in #11.
 
 ### Etappe 3 — Phase 2 (n8n)
-- [ ] ⬜ **#10 n8n-Webhook-Eingang** `POST /api/webhooks/contract-end` — Auth, erweitertes Schema, Idempotenz (B8), Update (B9), Mehrfach via `personal_mandanten`. *verify: API-Tests Anlage/Dedup/Update/Auth.*
+- [x] ✅ **#10 n8n-Webhook-Eingang** `POST /api/webhooks/contract-end` — Bearer CRON_SECRET (timing-safe), Einzel- oder Batch-Body (max. 200), Idempotenz B8 (offener Vorgang + gleiches Ende → `unveraendert`, Vorausfüll-Felder werden still aufgefrischt), Vertragsänderung B9 (Ende verschoben → Update + AuditLog `CONTRACT_END_UPDATED_BY_WEBHOOK`), Mehrfach-Erkennung via `personalMandanten` (AuditLog `CONTRACT_END_MEHRFACH_ERKANNT`, kein Teil-Offboarding, Entscheidung B5), Personalakte-Verknüpfung per Personalnummer, Eintrag-Fehler brechen den Batch nicht ab. Erweitertes Schema: `aktuellePosition/Entgeltgruppe/Stufe/Wochenstunden`, `befristungsart`, `bisherigeBefristungMonate/Verlaengerungen`, `personalMandanten`. *erledigt 2026-07-09.*
 
 ### Etappe 4 — Abschluss
-- [ ] ⬜ **#11 Tests** — alle neuen Bausteine; 285 Bestandstests bleiben grün. *verify: `npm run test` grün.*
-- [ ] ⬜ **#12 Qualität + Doku** — credo-check/simpler/lint/build; diese Doku + Konzept-HTML aktualisieren; push/PR klären. *verify: lint+build grün, credo-check sauber.*
+- [x] ✅ **#11 Tests** — 35 neue: Warnlogik B1/B2 (Unit), Erinnerungs-Cron (Staffelung/Skip/Fehlertoleranz), Webhook (Auth/Anlage/B8/B9/Mehrfach/Batch). Gesamtsuite 320 grün. *erledigt 2026-07-09.*
+- [x] ✅ **#12 Qualität + Doku** — lint+build grün, credo-check 🟢 (MINOR A8 gefixt), diese Doku aktualisiert, Merge nach `main`. *erledigt 2026-07-09.*
 
 ---
 

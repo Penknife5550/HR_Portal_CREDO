@@ -57,11 +57,13 @@ Portal-Direktzugriff. Fristen-Ampel **KRITISCH 1–2 / WARNUNG 3–6 / BEOBACHTE
 
 ## 4. Offene Punkte
 
-- **Phase 2:** n8n-Webhook-Eingang `POST /api/webhooks/contract-end` (#14) + Erinnerungs-Cron
-  gestaffelt nach Ampel (#15). DokuBit-Feld-Mapping siehe Plandokument Abschnitt 6.1.
+- ~~**Phase 2:** n8n-Webhook-Eingang + Erinnerungs-Cron~~ → **beide umgesetzt**
+  (Webhook 2026-07-09, Cron 2026-06-19), Details in [`vertragsende-phase2-plan.md`](./vertragsende-phase2-plan.md).
 - **Word-Vorlagen** für „Verlängerung"/„Entfristung" (Modul Vertragsverlängerung) vom Nutzer
   bereitstellen — dann erscheinen sie im Dokumente-Tab.
-- **Branch noch nicht** nach origin gepusht / nach main gemergt.
+- **n8n-Umstellung:** Flow „Email-Vertragsende-Personal 2.0" auf
+  `POST /api/webhooks/contract-end` zeigen lassen + täglicher Aufruf von
+  `/api/cron/contract-end-reminders` (beides Bearer `CRON_SECRET`).
 
 ## 5. Lokal verifizieren
 
