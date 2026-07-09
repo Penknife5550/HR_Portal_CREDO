@@ -53,6 +53,13 @@ export const CONTRACT_END_FIELD_REGISTRY: ContractEndFieldDefinition[] = [
   },
   { name: "probezeitMonate", label: "Probezeit (Monate)", defaultVisible: false, defaultRequired: false },
   { name: "zusatzvereinbarungen", label: "Zusätzliche Vereinbarungen", defaultVisible: true, defaultRequired: false },
+  {
+    name: "vorstandAbstimmung",
+    label: "Abstimmung mit Vorstand/Geschäftsführung",
+    defaultVisible: true,
+    defaultRequired: true,
+    hint: "Die Führungskraft bestätigt bei Übernahme, ob die Entscheidung mit Vorstand/Geschäftsführung abgestimmt wurde.",
+  },
 ];
 
 const REGISTRY_BY_NAME = new Map(CONTRACT_END_FIELD_REGISTRY.map((d) => [d.name, d]));

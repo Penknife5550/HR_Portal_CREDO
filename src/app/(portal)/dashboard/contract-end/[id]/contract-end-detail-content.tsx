@@ -53,7 +53,13 @@ interface ContractEndData {
   supervisorLinkSentAt: string | null;
   supervisorRespondedAt: string | null;
   supervisorDeclineReason: string | null;
+  lastSupervisorReminderAt: string | null;
+  supervisorReminderCount: number;
   contractSignedReturnedAt: string | null;
+  vorstandAbgestimmt: boolean | null;
+  vorstandAbstimmungVermerk: string | null;
+  weitereMandanten: string[];
+  contractEndDateGeaendertAm: string | null;
   befristungsart: string | null;
   bisherigeBefristungMonate: number | null;
   bisherigeVerlaengerungen: number | null;
@@ -450,15 +456,36 @@ export function ContractEndDetailContent({
           {activeTab === "renewal" && <RenewalView data={data} />}
 
           {activeTab === "documents" && (
-            <TemplateGenerationSection
-              modul="VERTRAGSVERLAENGERUNG"
-              refId={data.id}
-              canEdit={canEdit}
-              emptyHint="Keine Vertragsvorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ (Modul Vertragsverlängerung) an."
-            />
+            <div className="space-y-4">
+              {data.vorstandAbgestimmt === false && <VorstandWarnung />}
+              <TemplateGenerationSection
+                modul="VERTRAGSVERLAENGERUNG"
+                refId={data.id}
+                canEdit={canEdit}
+                emptyHint="Keine Vertragsvorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ (Modul Vertragsverlängerung) an."
+              />
+            </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Warnbox: Die Fuehrungskraft hat die Uebernahme OHNE Vorstand-/GF-Abstimmung
+ * gemeldet. Bewusst keine Blockade — HR entscheidet, klaert aber vorher.
+ */
+function VorstandWarnung() {
+  return (
+    <div className="rounded-2xl border-2 border-credo-rot/40 bg-credo-rot/5 p-4">
+      <p className="text-sm font-bold text-credo-rot">
+        ⚠ NICHT mit Vorstand/Geschäftsführung abgestimmt
+      </p>
+      <p className="mt-1 text-sm text-foreground">
+        Die Führungskraft hat angegeben, dass die Übernahme-Entscheidung nicht mit
+        Vorstand/Geschäftsführung abgestimmt wurde. Bitte vor der Vertragserstellung klären.
+      </p>
     </div>
   );
 }
@@ -549,6 +576,13 @@ function Entscheidung({
         <p className="mt-1 text-sm text-muted-foreground">
           Die Vertragsdaten wurden erfasst. Erzeugen Sie den Verlängerungsvertrag im Tab „Dokumente“, lassen Sie ihn unterschreiben und schließen Sie den Vorgang ab.
         </p>
+        {data.vorstandAbgestimmt === true && (
+          <p className="mt-2 text-sm font-medium text-credo-gruen">
+            ✓ Mit Vorstand/GF abgestimmt
+            {data.vorstandAbstimmungVermerk ? ` — ${data.vorstandAbstimmungVermerk}` : ""}
+          </p>
+        )}
+        {data.vorstandAbgestimmt === false && <VorstandWarnung />}
         {unterschrieben && (
           <p className="mt-2 text-sm font-medium text-credo-gruen">
             ✓ Unterschriebener Vertrag erfasst am {formatDate(data.contractSignedReturnedAt)}.

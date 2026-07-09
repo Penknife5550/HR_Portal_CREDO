@@ -226,10 +226,27 @@ export async function POST(
         { status: 400 }
       );
     }
-    const { decision, declineReason } = decisionParsed.data;
+    const { decision, declineReason, vorstandAbgestimmt, vorstandAbstimmungVermerk } =
+      decisionParsed.data;
     const now = new Date();
 
     if (decision === "UEBERNAHME") {
+      // Vorstand-/GF-Abstimmung: Pflichtangabe bei Uebernahme, sofern das Feld
+      // laut Mandanten-Config sichtbar ist (Mandanten ohne Vorstand koennen es
+      // in der Vertragsende-Konfiguration ausblenden).
+      const fieldConfig = resolveContractEndFieldConfig(ce.organization.contractEndFieldConfig);
+      const vorstandFeldSichtbar =
+        fieldConfig.find((f) => f.name === "vorstandAbstimmung")?.visible ?? true;
+      if (vorstandFeldSichtbar && typeof vorstandAbgestimmt !== "boolean") {
+        return NextResponse.json(
+          {
+            error:
+              "Bitte beantworten Sie die Frage zur Abstimmung mit Vorstand/Geschäftsführung.",
+          },
+          { status: 400 },
+        );
+      }
+
       // Ja -> Vertragsdaten erfassen, HR vollzieht anschliessend (Vertrag erzeugen)
       const parsed = renewalDataSchema.safeParse(body);
       if (!parsed.success) {
@@ -249,6 +266,10 @@ export async function POST(
             decision: "UEBERNAHME",
             supervisorRespondedAt: now,
             decidedAt: now,
+            vorstandAbgestimmt: vorstandAbgestimmt ?? null,
+            vorstandAbstimmungVermerk: vorstandAbgestimmt
+              ? vorstandAbstimmungVermerk?.trim() || null
+              : null,
           },
         });
         await tx.auditLog.create({
@@ -256,7 +277,13 @@ export async function POST(
             contractEndId: ce.id,
             processType: "CONTRACT_END",
             action: "SUPERVISOR_DECISION_UEBERNAHME",
-            details: { displayId: ce.displayId },
+            details: {
+              displayId: ce.displayId,
+              vorstandAbgestimmt: vorstandAbgestimmt ?? null,
+              ...(vorstandAbgestimmt && vorstandAbstimmungVermerk
+                ? { vorstandAbstimmungVermerk: vorstandAbstimmungVermerk.trim() }
+                : {}),
+            },
           },
         });
       });

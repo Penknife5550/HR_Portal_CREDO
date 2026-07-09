@@ -67,12 +67,25 @@ export const supervisorDecisionSchema = z
   .object({
     decision: z.enum(["UEBERNAHME", "KEINE_UEBERNAHME"]),
     declineReason: z.string().max(1000).optional(),
+    // Vorstand-/GF-Abstimmung: Pflicht bei Uebernahme (sofern das Feld laut
+    // Mandanten-Config sichtbar ist — das prueft die Route zusaetzlich).
+    vorstandAbgestimmt: z.boolean().optional(),
+    vorstandAbstimmungVermerk: z.string().max(300).optional(),
   })
   .refine(
     (d) => d.decision !== "KEINE_UEBERNAHME" || Boolean(d.declineReason && d.declineReason.trim()),
     {
       message: "Bitte geben Sie eine kurze Begründung für die Nicht-Übernahme an.",
       path: ["declineReason"],
+    },
+  )
+  .refine(
+    (d) =>
+      d.vorstandAbgestimmt !== true ||
+      Boolean(d.vorstandAbstimmungVermerk && d.vorstandAbstimmungVermerk.trim()),
+    {
+      message: "Bitte geben Sie an, mit wem und wann die Abstimmung erfolgt ist.",
+      path: ["vorstandAbstimmungVermerk"],
     },
   );
 
