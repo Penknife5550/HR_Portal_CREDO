@@ -48,6 +48,12 @@ model Organization {
   ezTokenValidityDays Int @default(30)
 
   // =============================================
+  // Vertragsende — Feld-Konfiguration des Vertragsdaten-Formulars (pro Mandant).
+  // JSON: ContractEndFieldConfig[] (siehe src/lib/contract-end-fields.ts). null = Defaults.
+  // =============================================
+  contractEndFieldConfig Json?
+
+  // =============================================
   // Datenschutz — Verantwortliche Stelle (DSGVO, pro Mandant konfigurierbar)
   // Wird im Personalfragebogen (DSGVO-Text) und als Brief-Platzhalter genutzt.
   // Faellt auf den globalen Default zurueck, wenn nicht gesetzt.
@@ -90,6 +96,7 @@ model Organization {
   bemVorlagen           BemVorlage[]
   starterpaketDokumente StarterpaketDokument[]
   starterpaketAuswahl   StarterpaketAuswahl[]
+  contractEndProcesses  ContractEndProcess[]
 
   @@map("organizations")
 }
@@ -126,6 +133,7 @@ model Employee {
   mutterschutzProzesse  MutterschutzProzess[] @relation("EmployeeMutterschutz")
   elternzeitProzesse    ElternzeitProzess[]   @relation("EmployeeElternzeit")
   bemFaelle             BemFall[]             @relation("EmployeeBem")
+  contractEndProcesses  ContractEndProcess[]  @relation("EmployeeContractEnds")
 
   @@index([personalNumber])
   @@index([lastName, firstName])
@@ -593,6 +601,9 @@ model User {
   initiatedOffboardings OffboardingProcess[] @relation("OffboardingInitiator")
   offboardingNotes      OffboardingNote[]    @relation("OffboardingNoteAuthor")
 
+  // Vertragsende-Relationen
+  initiatedContractEnds ContractEndProcess[] @relation("ContractEndInitiator")
+
   // Phase 2: Zeugnis-Review
   reviewedZeugnisse  ZeugnisBewertung[] @relation("ZeugnisReviewer")
   finalizedZeugnisse ZeugnisBewertung[] @relation("ZeugnisFinalizier")
@@ -649,7 +660,9 @@ model AuditLog {
   elternzeit     ElternzeitProzess?   @relation("ElternzeitAuditLogs", fields: [elternzeitId], references: [id])
   bemFallId      String?
   bemFall        BemFall?             @relation("BemAuditLogs", fields: [bemFallId], references: [id])
-  processType    String? // "ONBOARDING", "OFFBOARDING", "CIVIL_SERVICE", "MUTTERSCHUTZ", "ELTERNZEIT", "BEM"
+  contractEndId  String?
+  contractEnd    ContractEndProcess?  @relation("ContractEndAuditLogs", fields: [contractEndId], references: [id])
+  processType    String? // "ONBOARDING", "OFFBOARDING", "CIVIL_SERVICE", "MUTTERSCHUTZ", "ELTERNZEIT", "BEM", "CONTRACT_END"
 
   action    String // z.B. "ONBOARDING_CREATED", "QUESTIONNAIRE_SUBMITTED"
   details   Json? // Zusaetzliche Infos
@@ -663,6 +676,7 @@ model AuditLog {
   @@index([mutterschutzId])
   @@index([elternzeitId])
   @@index([bemFallId])
+  @@index([contractEndId])
   @@index([createdAt])
   @@map("audit_logs")
 }
@@ -1115,6 +1129,9 @@ model OffboardingProcess {
   // Phase 2
   exitInterview    ExitInterview?
   zeugnisBewertung ZeugnisBewertung?
+
+  // Verknuepfung: aus einem Vertragsende-Vorgang erzeugt (Strang B)
+  contractEnd ContractEndProcess? @relation("ContractEndToOffboarding")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2891,4 +2908,170 @@ model BemAnsprechpartner {
 
   @@index([organizationId])
   @@map("bem_ansprechpartner")
+}
+
+// =============================================
+// Vertragsende (Befristungsende) — eigener Vorgangstyp
+// Weiche fuer auslaufende befristete Vertraege:
+//   Strang A (Uebernahme): HR loest den Vorgesetzten-Magic-Link MANUELL aus
+//     (wie Onboarding). Der Vorgesetzte fuellt die Vertragsdaten aus, daraus
+//     wird NUR das Vertragsdokument erzeugt (kein Rueckschreiben).
+//   Strang B (keine Uebernahme): per HR-Klick wird ein Offboarding
+//     (ExitType.BEFRISTUNGSENDE) angelegt und verknuepft.
+// Meldung der Faelle: dauerhaft ueber n8n (DokuBit), kein Portal-Direktzugriff.
+// Fristen-Ampel wird LIVE aus contractEndDate abgeleitet (KEIN DB-Feld):
+//   KRITISCH 1-2 Mon | WARNUNG 3-6 Mon | BEOBACHTEN 7-12 Mon (Vorlauf 12 Mon).
+// =============================================
+enum ContractEndStatus {
+  ANGELEGT // Vorgang entstanden, noch keine Anfrage
+  ANFRAGE_VORGESETZTER // Anfrage an die Fuehrungskraft gesendet, wartet auf Rueckmeldung
+  RUECKMELDUNG_UEBERNAHME // Fuehrungskraft WILL uebernehmen + Vertragsdaten erfasst -> HR vollzieht
+  RUECKMELDUNG_KEINE_UEBERNAHME // Fuehrungskraft lehnt ab (mit Begruendung) -> HR bestaetigt Offboarding
+  ENTSCHEIDUNG_UEBERNAHME // DEPRECATED (Alt-Flow: HR entschied); bleibt nur fuer Bestandsdaten
+  VERTRAG_ERSTELLT // Verlaengerungsvertrag (Dokument) erzeugt
+  VERTRAG_UNTERSCHRIEBEN // B1: unterschriebener Vertrag liegt rechtzeitig vor
+  ENTSCHEIDUNG_KEINE_UEBERNAHME // Offboarding angelegt
+  ABGESCHLOSSEN
+  STORNIERT
+}
+
+enum ContractEndDecision {
+  OFFEN
+  UEBERNAHME
+  KEINE_UEBERNAHME
+}
+
+model ContractEndProcess {
+  id               String @id @default(uuid())
+  displayId        String @unique // z.B. "VE-2026-GYM-001"
+  sequentialNumber Int
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  // Mitarbeiter-Daten (inline; via n8n aus DokuBit gemeldet)
+  employeeEmail      String
+  employeeFirstName  String
+  employeeLastName   String
+  employeePersonalNr String? // DokuBit MANR
+
+  // Verknuepfung zur zentralen Personalakte (optional)
+  employeeId String?
+  employee   Employee? @relation("EmployeeContractEnds", fields: [employeeId], references: [id])
+
+  // Vertragsdaten (Quelle der Fristen-Ampel)
+  contractStartDate DateTime? // VERTRAGSBEGINN (Info)
+  contractEndDate   DateTime // VERTRAGSENDE — steuert die Frist-Kategorie
+
+  // Status & Entscheidung
+  status   ContractEndStatus   @default(ANGELEGT)
+  decision ContractEndDecision @default(OFFEN)
+
+  // Strang A: Vorgesetzten-Magic-Link (HR loest die ANFRAGE manuell aus, wie Onboarding)
+  supervisorEmail          String?
+  supervisorToken          String?   @unique
+  supervisorTokenExpiresAt DateTime?
+  supervisorLinkSentAt     DateTime?
+
+  // Rueckmeldung der Fuehrungskraft (neuer Prozess: SIE entscheidet ueber die Uebernahme)
+  supervisorRespondedAt   DateTime?
+  supervisorDeclineReason String? // Begruendung bei Nicht-Uebernahme
+
+  // Erinnerung an die Fuehrungskraft (Cron, gestaffelt nach Fristen-Ampel)
+  lastSupervisorReminderAt DateTime?
+  supervisorReminderCount  Int       @default(0)
+
+  // B1: rechtzeitiger unterschriebener Ruecklauf (Entfristungsschutz §15 Abs.5 TzBfG)
+  contractSignedReturnedAt DateTime?
+
+  // B3: MAV-Beteiligung (kirchlicher Traeger; je Mandant ggf. nicht erforderlich)
+  mavStatus      String? // "NICHT_ERFORDERLICH" | "AUSSTEHEND" | "ANGEHOERT" | "ZUGESTIMMT" | "WIDERSPRUCH"
+  mavConsultedAt DateTime?
+
+  // Aktueller (auslaufender) Vertrag — von n8n gemeldet, dient dem Vorausfuellen (#5)
+  currentPosition      String?
+  currentEntgeltgruppe String?
+  currentStufe         String?
+  currentWochenstunden Float?
+
+  // Befristungshistorie — von n8n gemeldet (Basis der §14-TzBfG-Warnung, B2)
+  befristungsart            String? // "SACHGRUNDLOS" | "MIT_SACHGRUND"
+  bisherigeBefristungMonate Int?
+  bisherigeVerlaengerungen  Int?
+
+  // Strang B: Verknuepfung zum erzeugten Offboarding (1:1)
+  offboardingId String?             @unique
+  offboarding   OffboardingProcess? @relation("ContractEndToOffboarding", fields: [offboardingId], references: [id])
+
+  // Herkunft der Meldung
+  source String @default("MANUAL") // "MANUAL" | "N8N"
+
+  // Tracking
+  initiatedById String?
+  initiatedBy   User?     @relation("ContractEndInitiator", fields: [initiatedById], references: [id])
+  initiatedAt   DateTime  @default(now())
+  decidedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationen
+  renewalData ContractRenewalData?
+  auditLogs   AuditLog[]           @relation("ContractEndAuditLogs")
+
+  @@index([status])
+  @@index([organizationId])
+  @@index([displayId])
+  @@index([contractEndDate])
+  @@map("contract_end_processes")
+}
+
+// Vom Vorgesetzten ausgefuellte Vertragsdaten (Strang A; 1:1 zum Vorgang).
+// Gespiegelt aus SupervisorData, reduziert auf die fuer den Verlaengerungs-
+// vertrag relevanten Felder. Dient NUR der Dokument-Erzeugung — es findet
+// KEIN Rueckschreiben in Employment/Personalakte statt (so abgestimmt).
+model ContractRenewalData {
+  id            String             @id @default(uuid())
+  contractEndId String             @unique
+  contractEnd   ContractEndProcess @relation(fields: [contractEndId], references: [id], onDelete: Cascade)
+
+  // Vertragsdaten
+  vertragsbeginn      DateTime?
+  befristet           Boolean?
+  vertragsende        DateTime? // neues Vertragsende
+  befristungSachgrund String?
+
+  // Umfang
+  vollzeit      Boolean? @default(true)
+  wochenstunden Float?
+  tageProWoche  Int?
+
+  // Verguetung
+  verguetungsmodell String? // "TV_L", "TV_L_S", "HAUSTARIF", "SONSTIGES"
+  entgeltgruppe     String?
+  stufe             String?
+
+  // Stelle
+  stellenbeschreibung  String?
+  betriebsstaette      String? // Freitext-Fallback (Altbestand)
+  betriebsstaetteOrgId String? // gewaehlte Betriebsstaette/Mandant (Organization.id); Auswahl-UI in #5
+
+  // Probezeit (bei Verlaengerung i.d.R. keine)
+  probezeit       Boolean? @default(false)
+  probezeitMonate Int?
+
+  // Urlaub
+  urlaubstageProJahr Int?
+
+  // Zusaetzliche Vereinbarungen
+  zusatzvereinbarungen String?
+
+  // Meta
+  currentStep Int     @default(0)
+  isComplete  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contract_renewal_data")
 }

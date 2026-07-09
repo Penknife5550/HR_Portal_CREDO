@@ -8,27 +8,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { triggerWebhooks } from "@/lib/webhooks";
 import { createOffboardingSchema } from "@/lib/validations/offboarding";
 import { orgFilter, PORTAL_ROLES, PROCESS_CREATE_ROLES, HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
-
-// Template-Name anhand OrganizationType bestimmen
-function getTemplateNameForOrgType(orgType: string): string {
-  switch (orgType) {
-    case "KITA":
-    case "GYMNASIUM":
-    case "GRUNDSCHULE":
-    case "GESAMTSCHULE":
-    case "BERUFSKOLLEG":
-      return "Offboarding: Bildungseinrichtung";
-    case "VERWALTUNG":
-    case "GMBH":
-    case "VEREIN":
-      return "Offboarding: Standard-Offboarding";
-    default:
-      return "Offboarding: Standard-Offboarding";
-  }
-}
+import { createOffboardingProcess } from "@/lib/offboarding";
 
 // =============================================
 // GET /api/offboarding – Alle Vorgaenge auflisten
@@ -245,126 +227,17 @@ export async function POST(request: NextRequest) {
 
     const parsedLastWorkingDay = new Date(lastWorkingDay);
 
-    // displayId generieren: "OFF-{year}-{orgShortName}-{sequential}"
-    const currentYear = new Date().getFullYear();
-    const yearStart = new Date(currentYear, 0, 1);
-    const yearEnd = new Date(currentYear + 1, 0, 1);
-    const shortName = org.shortName || org.mandantNumber;
-
-    let displayId = "";
-    let sequentialNumber = 0;
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const countThisYear = await prisma.offboardingProcess.count({
-        where: {
-          organizationId,
-          createdAt: { gte: yearStart, lt: yearEnd },
-        },
-      });
-      sequentialNumber = countThisYear + 1 + attempt;
-      displayId = `OFF-${currentYear}-${shortName}-${sequentialNumber
-        .toString()
-        .padStart(3, "0")}`;
-      const exists = await prisma.offboardingProcess.findUnique({
-        where: { displayId },
-        select: { id: true },
-      });
-      if (!exists) break;
-    }
-
-    // Passendes Checklisten-Template finden
-    const templateName = getTemplateNameForOrgType(org.type);
-    const checklistTemplate = await prisma.checklistTemplate.findFirst({
-      where: {
-        name: templateName,
-        isActive: true,
-      },
-      include: {
-        items: {
-          orderBy: { orderIndex: "asc" },
-        },
-      },
-    });
-
-    // Gesamte Erstellung in einer Transaktion
-    const offboarding = await prisma.$transaction(async (tx) => {
-      // Offboarding-Vorgang erstellen
-      const created = await tx.offboardingProcess.create({
-        data: {
-          displayId,
-          sequentialNumber,
-          organizationId,
-          employeeEmail,
-          employeeFirstName,
-          employeeLastName,
-          employeePersonalNr: employeePersonalNr || null,
-          employeePrivateEmail: employeePrivateEmail || null,
-          exitType,
-          lastWorkingDay: parsedLastWorkingDay,
-          status: "INITIATED",
-          initiatedById: session.userId,
-        },
-        include: {
-          organization: true,
-        },
-      });
-
-      // OffboardingExitData anlegen (leer)
-      await tx.offboardingExitData.create({
-        data: {
-          offboardingId: created.id,
-        },
-      });
-
-      // Checklisten-Items aus Template erstellen
-      if (checklistTemplate && checklistTemplate.items.length > 0) {
-        await tx.offboardingChecklistItem.createMany({
-          data: checklistTemplate.items.map((templateItem) => ({
-            offboardingId: created.id,
-            title: templateItem.title,
-            category: templateItem.category,
-            orderIndex: templateItem.orderIndex,
-            assigneeDepartment: templateItem.defaultAssignee || null,
-            dueDate: templateItem.defaultDueDays != null
-              ? new Date(
-                  parsedLastWorkingDay.getTime() +
-                    templateItem.defaultDueDays * 24 * 60 * 60 * 1000
-                )
-              : null,
-          })),
-        });
-      }
-
-      // Audit-Log
-      await tx.auditLog.create({
-        data: {
-          offboardingId: created.id,
-          userId: session.userId,
-          processType: "OFFBOARDING",
-          action: "OFFBOARDING_CREATED",
-          details: {
-            employeeEmail,
-            employeeName: `${employeeFirstName} ${employeeLastName}`,
-            organization: org.name,
-            exitType,
-            lastWorkingDay,
-          },
-        },
-      });
-
-      return created;
-    });
-
-    // Webhook ausserhalb der Transaktion triggern
-    await triggerWebhooks("offboarding-created", {
-      offboardingId: offboarding.id,
-      displayId: offboarding.displayId,
-      employeeEmail: offboarding.employeeEmail,
-      employeeName: `${offboarding.employeeFirstName} ${offboarding.employeeLastName}`,
-      organization: org.name,
-      mandantNumber: org.mandantNumber,
-      exitType: offboarding.exitType,
-      lastWorkingDay: offboarding.lastWorkingDay.toISOString(),
+    // Anlage (displayId, Checkliste, Transaktion, Event) im gemeinsamen Service
+    const offboarding = await createOffboardingProcess({
+      organization: org,
+      employeeEmail,
+      employeeFirstName,
+      employeeLastName,
+      employeePersonalNr,
+      employeePrivateEmail,
+      exitType,
+      lastWorkingDay: parsedLastWorkingDay,
+      initiatedById: session.userId,
     });
 
     // Vorgang mit allen Includes zurueckgeben

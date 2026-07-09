@@ -39,6 +39,10 @@ export type WebhookEvent =
   | "offboarding-task-completed"
   | "offboarding-task-overdue"
   | "offboarding-reminder"
+  // Vertragsende
+  | "contract-end-created"
+  | "contract-end-supervisor-link"
+  | "contract-end-reminder"
   // Verbeamtung (Phase A)
   | "psi-created"
   | "psi-phase-completed"

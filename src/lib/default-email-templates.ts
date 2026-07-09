@@ -314,6 +314,200 @@ CREDO Gruppe – Freie Evangelische Schulen
   },
 
   // =============================================
+  // Vertragsende – Einladung Vorgesetzter (Vertragsverlaengerung, Strang A)
+  // =============================================
+  {
+    event: "contract-end-supervisor-link",
+    name: "Einladung Vorgesetzter (Vertragsverlängerung)",
+    subject: "Vertragsverlängerung für {{mitarbeiter_name}} – bitte Vertragsdaten erfassen",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Bitte erfassen Sie die Vertragsdaten</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Der befristete Vertrag von <strong>{{mitarbeiter_name}}</strong> bei {{einrichtung}} läuft aus. Da der/die Mitarbeiter:in weiterbeschäftigt werden soll, bitten wir Sie um die Vertragsdaten für die Verlängerung. Mit Ihren Angaben erstellt die Personalabteilung den neuen Vertrag.
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
+            Das Ausfüllen dauert nur wenige Minuten.
+          </p>
+
+          <!-- Button -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+            <tr><td style="background-color:#575756;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Vertragsdaten erfassen →
+              </a>
+            </td></tr>
+          </table>
+
+          <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:0 0 6px;">
+            Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:
+          </p>
+          <p style="margin:0 0 24px;"><a href="{{link}}" style="color:#575756;font-size:12px;word-break:break-all;text-decoration:underline;">{{link}}</a></p>
+
+          <!-- Eckdaten -->
+          <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">
+            <tr><td style="background-color:#f9fafb;border:1px solid #eceef1;border-radius:8px;padding:16px 20px;">
+              <p style="margin:0 0 10px;color:#2d2d2d;font-size:14px;font-weight:bold;">Diese Eckdaten werden abgefragt</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.9;">› Neuer Vertragsbeginn, ggf. Befristung<br>› Arbeitszeit (Wochenstunden)<br>› Vergütung (Entgeltgruppe/Stufe)<br>› Stellenbeschreibung</p>
+            </td></tr>
+          </table>
+
+          <p style="color:#2d2d2d;font-size:14px;font-weight:bold;margin:0 0 6px;">So geht es weiter</p>
+          <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            Nach dem Absenden übernimmt die Personalabteilung alles Weitere – Sie müssen nichts ausdrucken oder zurücksenden. Der Link ist bis zum {{ablaufdatum}} gültig.
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Bei Rückfragen erreichen Sie uns unter <a href="mailto:personalbuchhaltung@fes-minden.de" style="color:#575756;text-decoration:underline;">personalbuchhaltung@fes-minden.de</a>
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;">
+            <strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich
+          </p>
+          <p style="margin:0;color:#bbbbbb;font-size:11px;text-align:center;">{{einrichtung}}</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Bitte erfassen Sie die Vertragsdaten
+
+Der befristete Vertrag von {{mitarbeiter_name}} bei {{einrichtung}} läuft aus. Da der/die Mitarbeiter:in weiterbeschäftigt werden soll, bitten wir Sie um die Vertragsdaten für die Verlängerung. Mit Ihren Angaben erstellt die Personalabteilung den neuen Vertrag. Das dauert nur wenige Minuten.
+
+Formular öffnen:
+{{link}}
+
+Diese Eckdaten werden abgefragt:
+- Neuer Vertragsbeginn, ggf. Befristung
+- Arbeitszeit (Wochenstunden)
+- Vergütung (Entgeltgruppe/Stufe)
+- Stellenbeschreibung
+
+So geht es weiter: Nach dem Absenden übernimmt die Personalabteilung alles Weitere. Der Link ist bis zum {{ablaufdatum}} gültig.
+
+Bei Rückfragen erreichen Sie uns unter personalbuchhaltung@fes-minden.de.
+
+CREDO Gruppe – Freie Evangelische Schulen
+{{einrichtung}}`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des Mitarbeiters" },
+      { key: "{{supervisorEmail}}", description: "E-Mail des Vorgesetzten" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{link}}", description: "Link zum Vertragsdaten-Formular" },
+      { key: "{{ablaufdatum}}", description: "Gültig-bis-Datum des Links" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (VE-...)" },
+    ],
+  },
+
+  // =============================================
+  // Erinnerung an Vorgesetzten (Vertragsende-Anfrage offen)
+  // =============================================
+  {
+    event: "contract-end-supervisor-reminder",
+    name: "Erinnerung Vorgesetzter (Vertragsende-Anfrage offen)",
+    subject: "Erinnerung: Vertragsverlängerung für {{mitarbeiter_name}} – Rückmeldung erbeten",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fff3c9;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#8a6d00;font-weight:bold;font-size:14px;">Erinnerung · {{dringlichkeit}}</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Ihre Rückmeldung wird noch benötigt</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            der befristete Vertrag von <strong>{{mitarbeiter_name}}</strong> bei {{einrichtung}} endet am <strong>{{vertragsende}}</strong>. Ihre Anfrage zur Weiterbeschäftigung ist seit {{tage_offen}} Tagen offen.
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
+            Bitte entscheiden Sie über das Formular, ob der/die Mitarbeiter:in weiterbeschäftigt wird – und erfassen Sie bei Übernahme gleich die neuen Vertragsdaten.
+          </p>
+
+          <!-- Button -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+            <tr><td style="background-color:#575756;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Jetzt entscheiden →
+              </a>
+            </td></tr>
+          </table>
+
+          <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:0 0 6px;">
+            Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:
+          </p>
+          <p style="margin:0 0 24px;"><a href="{{link}}" style="color:#575756;font-size:12px;word-break:break-all;text-decoration:underline;">{{link}}</a></p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Bei Rückfragen erreichen Sie uns unter <a href="mailto:personalbuchhaltung@fes-minden.de" style="color:#575756;text-decoration:underline;">personalbuchhaltung@fes-minden.de</a>
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;">
+            <strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich
+          </p>
+          <p style="margin:0;color:#bbbbbb;font-size:11px;text-align:center;">{{einrichtung}}</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Erinnerung – Ihre Rückmeldung wird noch benötigt
+
+Der befristete Vertrag von {{mitarbeiter_name}} bei {{einrichtung}} endet am {{vertragsende}}. Ihre Anfrage zur Weiterbeschäftigung ist seit {{tage_offen}} Tagen offen.
+
+Bitte entscheiden Sie über das Formular, ob der/die Mitarbeiter:in weiterbeschäftigt wird – und erfassen Sie bei Übernahme gleich die neuen Vertragsdaten:
+{{link}}
+
+Bei Rückfragen erreichen Sie uns unter personalbuchhaltung@fes-minden.de.
+
+CREDO Gruppe – Freie Evangelische Schulen
+{{einrichtung}}`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des Mitarbeiters" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{link}}", description: "Link zum Entscheidungs-/Vertragsdaten-Formular" },
+      { key: "{{vertragsende}}", description: "Datum des Vertragsendes" },
+      { key: "{{tage_offen}}", description: "Tage seit Versand der Anfrage" },
+      { key: "{{dringlichkeit}}", description: "Ampel-Stufe (Kritisch/Warnung/Beobachten)" },
+    ],
+  },
+
+  // =============================================
   // Bestaetigungs-E-Mail an Mitarbeiter (nach Fragebogen-Einreichung)
   // =============================================
   {
@@ -2541,6 +2735,20 @@ CREDO HR-Portal`,
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
     ],
   },
+
+  // =============================================
+  // Vertragsende: HR-Benachrichtigung (neuer Vorgang)
+  // =============================================
+  hrStatusNotification({
+    event: "contract-end-created",
+    name: "Neuer Vertragsende-Vorgang erstellt",
+    subject: "Neuer Vertragsende-Vorgang: {{mitarbeiter_name}} ({{vorgangsnummer}})",
+    badge: "Vertragsende",
+    badgeBg: "#e0f3fb",
+    badgeText: "#0a7ca6",
+    heading: "Neuer Vertragsende-Vorgang",
+    text: "Für <strong>{{mitarbeiter_name}}</strong> ({{einrichtung}}) wurde ein Vertragsende-Vorgang (<strong>{{vorgangsnummer}}</strong>) angelegt. Bitte entscheiden Sie im Portal über Übernahme (Vertragsverlängerung) oder Austritt (Offboarding).",
+  }),
 
   // =============================================
   // Mutterschutz: Statuswechsel (HR-Benachrichtigungen)

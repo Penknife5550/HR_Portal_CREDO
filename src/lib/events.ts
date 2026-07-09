@@ -20,6 +20,7 @@
 export type EventGroup =
   | "Onboarding"
   | "Offboarding"
+  | "Vertragsende"
   | "Exit-Interview"
   | "Verbeamtung"
   | "Elternzeit"
@@ -815,6 +816,70 @@ export const EVENT_CATALOG: EventDefinition[] = [
     },
     wired: true,
   },
+
+  // =============================================
+  // Vertragsende
+  // =============================================
+  {
+    event: "contract-end-created",
+    name: "Neuer Vertragsende-Vorgang erstellt",
+    group: "Vertragsende",
+    // BEWUSST kein Default: HR-interne Benachrichtigung, nicht an die
+    // betroffene Person — Empfaenger wird in der Vorlage konfiguriert.
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
+    samplePayload: {
+      contractEndId: "00000000-0000-0000-0000-000000000007",
+      displayId: "VE-2026-GYM-001",
+      employeeName: "Max Mustermann",
+      employeeEmail: "max.mustermann@example.org",
+      organization: "FES Minden",
+      mandantNummer: "01",
+      contractEndDate: "2026-12-31T00:00:00.000Z",
+    },
+    wired: true,
+  },
+  {
+    event: "contract-end-supervisor-link",
+    name: "Einladung Vorgesetzter (Vertragsverlängerung)",
+    group: "Vertragsende",
+    recipientHint: "Vorgesetzte:r (Magic-Link zum Vertragsdaten-Formular)",
+    defaultRecipients: { to: "{{supervisorEmail}}" },
+    samplePayload: {
+      contractEndId: "00000000-0000-0000-0000-000000000007",
+      displayId: "VE-2026-GYM-001",
+      employeeName: "Max Mustermann",
+      supervisorEmail: "vorgesetzte@example.org",
+      organization: "FES Minden",
+      contractEndDate: "2026-12-31T00:00:00.000Z",
+      formularLink: BEISPIEL_LINK,
+      tokenExpiresAt: "2026-07-15T12:00:00.000Z",
+    },
+    wired: true,
+  },
+  {
+    event: "contract-end-supervisor-reminder",
+    name: "Erinnerung Vorgesetzter (Vertragsende-Anfrage offen)",
+    group: "Vertragsende",
+    recipientHint: "Vorgesetzte:r — Erinnerung bei unbeantworteter Uebernahme-Anfrage",
+    defaultRecipients: { to: "{{supervisorEmail}}" },
+    samplePayload: {
+      contractEndId: "00000000-0000-0000-0000-000000000007",
+      displayId: "VE-2026-GYM-001",
+      employeeName: "Max Mustermann",
+      mitarbeiter_name: "Max Mustermann",
+      supervisorEmail: "vorgesetzte@example.org",
+      einrichtung: "FES Minden",
+      organization: "FES Minden",
+      contractEndDate: "2026-12-31T00:00:00.000Z",
+      vertragsende: "31.12.2026",
+      formularLink: BEISPIEL_LINK,
+      link: BEISPIEL_LINK,
+      tage_offen: 7,
+      dringlichkeit: "Warnung",
+    },
+    wired: true,
+  },
 ];
 
 // =============================================
@@ -830,6 +895,7 @@ export function getEventDefinition(event: string): EventDefinition | undefined {
 export const EVENT_GROUP_ORDER: EventGroup[] = [
   "Onboarding",
   "Offboarding",
+  "Vertragsende",
   "Exit-Interview",
   "Verbeamtung",
   "Elternzeit",
