@@ -1,0 +1,1948 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Benutzerhandbuch – CREDO HR-Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       CREDO CI – Verwaltung (Grau)
+       Primärfarbe: #DADADA | Akzent: #575756
+       Institutsfarben: Gelb #FBC900, Grün #6BAA24, Rot #E2001A, Blau #009AC6
+    ============================================================ */
+
+    :root {
+      --credo-grau-hell:  #DADADA;
+      --credo-grau-dunkel:#575756;
+      --credo-gelb:       #FBC900;
+      --credo-gruen:      #6BAA24;
+      --credo-rot:        #E2001A;
+      --credo-blau:       #009AC6;
+      --text-primary:     #1a1a1a;
+      --text-secondary:   #555555;
+      --bg-page:          #f7f7f7;
+      --bg-card:          #ffffff;
+      --border:           #e0e0e0;
+      --radius:           8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Montserrat', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-primary);
+      background: var(--bg-page);
+    }
+
+    /* ---- HEADER ---- */
+    .page-header {
+      background: var(--credo-grau-dunkel);
+      color: #fff;
+      padding: 36px 48px 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .page-header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(0,154,198,.18) 0%, transparent 60%);
+    }
+    .page-header .badge {
+      display: inline-block;
+      background: var(--credo-blau);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+    }
+    .page-header h1 {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      line-height: 1.2;
+    }
+    .page-header .subtitle {
+      font-size: 13px;
+      opacity: .75;
+      margin-top: 6px;
+      font-weight: 400;
+    }
+    .page-header .meta {
+      margin-top: 16px;
+      font-size: 11px;
+      opacity: .55;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    /* ---- CREDO COLOR BAR ---- */
+    .credo-bar {
+      display: flex;
+      height: 5px;
+    }
+    .credo-bar span { flex: 1; }
+    .credo-bar .c-gelb  { background: var(--credo-gelb); }
+    .credo-bar .c-gruen { background: var(--credo-gruen); }
+    .credo-bar .c-rot   { background: var(--credo-rot); }
+    .credo-bar .c-blau  { background: var(--credo-blau); }
+    .credo-bar .c-grau  { background: var(--credo-grau-dunkel); }
+
+    /* ---- LAYOUT ---- */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 32px 80px;
+    }
+
+    /* ---- NAVIGATION (TOC) ---- */
+    .toc {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--credo-blau);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin-bottom: 40px;
+    }
+    .toc h2 {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--credo-grau-dunkel);
+      margin-bottom: 14px;
+    }
+    .toc ol {
+      list-style: none;
+      counter-reset: toc;
+      columns: 2;
+      column-gap: 32px;
+    }
+    .toc ol li {
+      counter-increment: toc;
+      margin-bottom: 5px;
+      font-size: 13px;
+      break-inside: avoid;
+    }
+    .toc ol li::before {
+      content: counter(toc) ". ";
+      font-weight: 600;
+      color: var(--credo-blau);
+      margin-right: 4px;
+    }
+    .toc ol li a {
+      color: var(--text-primary);
+      text-decoration: none;
+      transition: color .2s;
+    }
+    .toc ol li a:hover { color: var(--credo-blau); text-decoration: underline; }
+
+    /* ---- SECTIONS ---- */
+    .section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 36px;
+      margin-bottom: 28px;
+      scroll-margin-top: 20px;
+    }
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--credo-grau-hell);
+    }
+    .section-number {
+      min-width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--credo-blau);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .section-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--credo-grau-dunkel);
+      line-height: 1.3;
+    }
+    .section-header p.lead {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 3px;
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--credo-grau-dunkel);
+      margin: 22px 0 10px;
+      padding-left: 10px;
+      border-left: 3px solid var(--credo-blau);
+    }
+    h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 16px 0 8px;
+    }
+
+    p { margin-bottom: 10px; }
+    p:last-child { margin-bottom: 0; }
+
+    /* ---- SCHRITTE (Numbered steps) ---- */
+    .schritt-liste { margin: 14px 0; }
+    .schritt {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 14px;
+      margin-bottom: 6px;
+      border-radius: 6px;
+      background: #fafafa;
+      border: 1px solid var(--border);
+      transition: background .15s;
+    }
+    .schritt:hover { background: #f3f7fb; }
+    .schritt-nr {
+      min-width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--credo-blau);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .schritt-text { font-size: 13px; line-height: 1.55; }
+    .schritt-text strong { color: var(--credo-grau-dunkel); }
+
+    /* ---- HINWEIS & WARNUNG ---- */
+    .hinweis, .warnung, .rechtlich, .tipp {
+      display: flex;
+      gap: 12px;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin: 14px 0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .hinweis-icon, .warnung-icon, .rechtlich-icon, .tipp-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .hinweis {
+      background: #e8f4fb;
+      border: 1px solid #bee3f8;
+      color: #1a5f7a;
+    }
+    .warnung {
+      background: #fff3cd;
+      border: 1px solid #f0c040;
+      color: #7d4f00;
+    }
+    .rechtlich {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      color: #14532d;
+    }
+    .tipp {
+      background: #fefce8;
+      border: 1px solid #fde047;
+      color: #713f12;
+    }
+
+    /* ---- STATUS BADGES ---- */
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-blau   { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .badge-gelb   { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+    .badge-gruen  { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .badge-rot    { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .badge-grau   { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+    .badge-lila   { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+    .badge-orange { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
+
+    /* ---- ROLLE TABLE ---- */
+    .rolle-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin: 14px 0;
+    }
+    .rolle-table th {
+      background: var(--credo-grau-dunkel);
+      color: #fff;
+      text-align: left;
+      padding: 9px 12px;
+      font-weight: 600;
+      font-size: 11px;
+    }
+    .rolle-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .rolle-table tr:last-child td { border-bottom: none; }
+    .rolle-table tr:nth-child(even) td { background: #fafafa; }
+    .check { color: var(--credo-gruen); font-weight: 700; }
+    .cross { color: var(--credo-rot); font-weight: 700; }
+    .partial { color: var(--credo-gelb); font-weight: 700; }
+
+    /* ---- WORKFLOW STEPPER ---- */
+    .stepper {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      margin: 18px 0;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .step-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 100px;
+      position: relative;
+      flex: 1;
+    }
+    .step-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 14px;
+      left: 60%;
+      right: -40%;
+      height: 2px;
+      background: var(--credo-grau-hell);
+      z-index: 0;
+    }
+    .step-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--credo-grau-hell);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      z-index: 1;
+      color: var(--credo-grau-dunkel);
+    }
+    .step-dot.active { background: var(--credo-blau); color: #fff; border-color: var(--credo-blau); }
+    .step-dot.done { background: var(--credo-gruen); color: #fff; border-color: var(--credo-gruen); }
+    .step-dot.warn { background: var(--credo-rot); color: #fff; border-color: var(--credo-rot); }
+    .step-label {
+      font-size: 10px;
+      text-align: center;
+      margin-top: 5px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    /* ---- CHECKLISTE ---- */
+    .checkliste {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin: 14px 0;
+    }
+    .checkliste-header {
+      background: var(--credo-grau-dunkel);
+      color: #fff;
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .checkliste ul {
+      list-style: none;
+      padding: 6px 0;
+    }
+    .checkliste ul li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .checkliste ul li:last-child { border-bottom: none; }
+    .checkliste ul li::before {
+      content: '☐';
+      font-size: 14px;
+      color: var(--credo-blau);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* ---- FAQ ---- */
+    .faq-item {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .faq-q {
+      background: #fafafa;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--credo-grau-dunkel);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .faq-q::after { content: '▼'; font-size: 10px; color: var(--credo-blau); transition: transform .2s; }
+    .faq-item.open .faq-q::after { transform: rotate(180deg); }
+    .faq-a {
+      padding: 0 16px;
+      font-size: 13px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .3s ease, padding .2s;
+      line-height: 1.6;
+    }
+    .faq-item.open .faq-a { max-height: 400px; padding: 12px 16px; }
+
+    /* ---- GLOSSAR ---- */
+    .glossar {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin: 14px 0;
+    }
+    .glossar-term {
+      background: var(--credo-grau-hell);
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--credo-grau-dunkel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+    }
+    .glossar-def {
+      background: #fff;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      line-height: 1.55;
+    }
+    .glossar-term:last-of-type, .glossar-def:last-of-type { border-bottom: none; }
+
+    /* ---- SCREENSHOT PLACEHOLDER ---- */
+    .screenshot {
+      border: 2px dashed var(--credo-grau-hell);
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 12px;
+      margin: 12px 0;
+      background: #fafafa;
+    }
+    .screenshot::before { content: '📷 '; }
+
+    /* ---- FOOTER ---- */
+    footer {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-secondary);
+      padding: 24px 32px;
+    }
+
+    /* ---- PRINT ---- */
+    @media print {
+      body { background: #fff; font-size: 12px; }
+      .container { padding: 20px; }
+      .toc { page-break-after: always; }
+      .section { border: 1px solid #ccc; box-shadow: none; margin-bottom: 16px; page-break-inside: avoid; }
+      .page-header { background: #575756 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .credo-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      a { color: inherit; text-decoration: none; }
+      .faq-a { max-height: none !important; padding: 12px 16px !important; }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 20px 16px; }
+      .section { padding: 20px 18px; }
+      .toc ol { columns: 1; }
+      .stepper { flex-direction: column; gap: 8px; }
+      .step-item::after { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<div class="credo-bar">
+  <span class="c-gelb"></span>
+  <span class="c-gruen"></span>
+  <span class="c-rot"></span>
+  <span class="c-blau"></span>
+  <span class="c-grau"></span>
+</div>
+<header class="page-header">
+  <span class="badge">CREDO Schulträgergruppe</span>
+  <h1>Benutzerhandbuch<br>CREDO HR-Portal</h1>
+  <p class="subtitle">Vollständige Bedienungsanleitung für die Personalabteilung</p>
+  <div class="meta">
+    <span>📅 Stand: Juni 2026</span>
+    <span>🌐 hr.fes-credo.de</span>
+    <span>👥 Zielgruppe: HR-Sachbearbeitung &amp; Einrichtungsleitungen</span>
+    <span>📖 Version 1.0</span>
+  </div>
+</header>
+<div class="credo-bar">
+  <span class="c-blau"></span>
+  <span class="c-rot"></span>
+  <span class="c-gruen"></span>
+  <span class="c-gelb"></span>
+  <span class="c-grau"></span>
+</div>
+
+<!-- ===== CONTAINER ===== -->
+<div class="container">
+
+  <!-- TOC -->
+  <nav class="toc" aria-label="Inhaltsverzeichnis">
+    <h2>📋 Inhaltsverzeichnis</h2>
+    <ol>
+      <li><a href="#s1">Einleitung &amp; Überblick</a></li>
+      <li><a href="#s2">Anmelden &amp; Benutzeroberfläche</a></li>
+      <li><a href="#s3">Benutzerrollen &amp; Berechtigungen</a></li>
+      <li><a href="#s4">Onboarding</a></li>
+      <li><a href="#s5">Offboarding</a></li>
+      <li><a href="#s6">Verbeamtung (PSI)</a></li>
+      <li><a href="#s7">Mutterschutz</a></li>
+      <li><a href="#s8">Elternzeit</a></li>
+      <li><a href="#s9">BEM – Betriebliches Eingliederungsmanagement</a></li>
+      <li><a href="#s10">Vorlagen verwalten</a></li>
+      <li><a href="#s11">Mandanten &amp; Einrichtungen</a></li>
+      <li><a href="#s12">Benutzerverwaltung</a></li>
+      <li><a href="#s13">Einstellungen</a></li>
+      <li><a href="#s14">Audit-Log</a></li>
+      <li><a href="#s15">Häufige Fragen &amp; Lösungen</a></li>
+      <li><a href="#s16">Schnell-Checklisten</a></li>
+      <li><a href="#s17">Glossar</a></li>
+    </ol>
+  </nav>
+
+
+  <!-- =========================================================
+       1. EINLEITUNG
+  ========================================================= -->
+  <section class="section" id="s1">
+    <div class="section-header">
+      <div class="section-number">1</div>
+      <div>
+        <h2>Einleitung &amp; Überblick</h2>
+        <p class="lead">Was ist das CREDO HR-Portal und warum nutzen wir es?</p>
+      </div>
+    </div>
+
+    <p>Das CREDO HR-Portal ist das zentrale Personalverwaltungssystem der CREDO Schulträgergruppe. Es unterstützt 16 Mandanten – also alle Schulen, Kitas und Einrichtungen der Gruppe – bei der täglichen Personalarbeit.</p>
+
+    <h3>Was kann das Portal?</h3>
+    <p>Das Portal deckt sieben Kernprozesse ab:</p>
+    <div class="badge-row">
+      <span class="badge badge-blau">📋 Onboarding</span>
+      <span class="badge badge-orange">🚪 Offboarding</span>
+      <span class="badge badge-lila">⭐ Verbeamtung</span>
+      <span class="badge badge-gruen">🌱 Mutterschutz</span>
+      <span class="badge badge-gruen">🍼 Elternzeit</span>
+      <span class="badge badge-rot">🔒 BEM</span>
+      <span class="badge badge-gelb">📄 Zeugnisse</span>
+    </div>
+
+    <h3>Warum ein digitales Portal?</h3>
+    <p>Papierbasierte HR-Prozesse sind fehleranfällig, schwer nachvollziehbar und verstoßen bei sensiblen Daten schnell gegen den Datenschutz. Das Portal löst diese Probleme:</p>
+    <ul style="list-style:disc;padding-left:22px;font-size:13px;line-height:2;">
+      <li>Alle Vorgänge an einem Ort – kein Suchen in E-Mail-Postfächern</li>
+      <li>Klare Statusanzeige: Sie sehen sofort, wo ein Prozess steht</li>
+      <li>Sensible Daten (IBAN, Sozialversicherungsnummer) werden verschlüsselt gespeichert</li>
+      <li>Alle Zugriffe werden protokolliert (Datenschutz-Compliance)</li>
+      <li>BEM-Akten sind gesetzlich vorgeschrieben versiegelt (§ 167 SGB IX)</li>
+    </ul>
+
+    <div class="hinweis">
+      <span class="hinweis-icon">ℹ️</span>
+      <div>Das Portal ist unter <strong>hr.fes-credo.de</strong> erreichbar. Sie benötigen einen aktuellen Webbrowser (Chrome, Firefox, Edge oder Safari). Internet Explorer wird nicht unterstützt.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       2. ANMELDEN
+  ========================================================= -->
+  <section class="section" id="s2">
+    <div class="section-header">
+      <div class="section-number">2</div>
+      <div>
+        <h2>Anmelden &amp; Benutzeroberfläche</h2>
+        <p class="lead">So melden Sie sich an und finden sich im Portal zurecht.</p>
+      </div>
+    </div>
+
+    <h3>Anmeldung mit Passwort</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Öffnen Sie Ihren Browser und rufen Sie <strong>hr.fes-credo.de</strong> auf.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Geben Sie Ihre <strong>E-Mail-Adresse</strong> und Ihr <strong>Passwort</strong> ein.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Anmelden"</strong>. Sie gelangen direkt zum Dashboard.</div>
+      </div>
+    </div>
+
+    <div class="warnung">
+      <span class="warnung-icon">⚠️</span>
+      <div>Teilen Sie Ihr Passwort niemals mit anderen Personen. Jeder Mitarbeitende hat sein eigenes Konto. Bei Verdacht auf Missbrauch wenden Sie sich sofort an den Administrator.</div>
+    </div>
+
+    <h3>Die Benutzeroberfläche im Überblick</h3>
+    <div class="screenshot">Kopfzeile des Portals mit Navigation, Benutzeranzeige oben rechts</div>
+
+    <p>Am oberen Rand der Seite sehen Sie die <strong>Hauptnavigation</strong> mit folgenden Bereichen:</p>
+    <table class="rolle-table">
+      <thead>
+        <tr>
+          <th>Bereich</th>
+          <th>Beschreibung</th>
+          <th>Erreichbar über</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Dashboard</strong></td>
+          <td>Übersicht aller laufenden Prozesse (Tabs: Onboarding, Offboarding, Verbeamtung, Mutterschutz, Elternzeit)</td>
+          <td>Menü → „Dashboard"</td>
+        </tr>
+        <tr>
+          <td><strong>BEM</strong></td>
+          <td>Betriebliches Eingliederungsmanagement (gesondert geschützt)</td>
+          <td>Menü → „BEM"</td>
+        </tr>
+        <tr>
+          <td><strong>Vorlagen</strong></td>
+          <td>Brief-, Zeugnis-, Exit-Interview- und BEM-Vorlagen</td>
+          <td>Menü → „Vorlagen"</td>
+        </tr>
+        <tr>
+          <td><strong>Mandanten</strong></td>
+          <td>Einrichtungen der CREDO Gruppe verwalten</td>
+          <td>Menü → „Mandanten"</td>
+        </tr>
+        <tr>
+          <td><strong>Benutzer</strong></td>
+          <td>Benutzerkonten anlegen und verwalten</td>
+          <td>Menü → „Benutzer"</td>
+        </tr>
+        <tr>
+          <td><strong>Einstellungen</strong></td>
+          <td>System-Konfiguration, E-Mail-Einstellungen</td>
+          <td>Menü → „Einstellungen"</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Abmelden</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie oben rechts auf Ihren <strong>Namen</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Wählen Sie <strong>„Abmelden"</strong> im Dropdown-Menü.</div>
+      </div>
+    </div>
+
+    <div class="tipp">
+      <span class="tipp-icon">💡</span>
+      <div>Melden Sie sich immer ab, wenn Sie Ihren Computer verlassen – besonders auf gemeinsam genutzten Arbeitsplätzen.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       3. BENUTZERROLLEN
+  ========================================================= -->
+  <section class="section" id="s3">
+    <div class="section-header">
+      <div class="section-number">3</div>
+      <div>
+        <h2>Benutzerrollen &amp; Berechtigungen</h2>
+        <p class="lead">Wer darf was im Portal tun?</p>
+      </div>
+    </div>
+
+    <p>Das Portal kennt sechs verschiedene Rollen. Was Sie sehen und tun können, hängt von Ihrer Rolle ab. Die folgende Tabelle zeigt die wichtigsten Unterschiede.</p>
+
+    <table class="rolle-table">
+      <thead>
+        <tr>
+          <th>Rolle</th>
+          <th>Angezeigter Name</th>
+          <th>Alle Mandanten</th>
+          <th>Vorgänge anlegen</th>
+          <th>Vorgänge bearbeiten</th>
+          <th>Admin-Funktionen</th>
+          <th>BEM-Zugriff</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>SUPER_ADMIN</strong></td>
+          <td>Administrator</td>
+          <td class="check">✔</td>
+          <td class="check">✔</td>
+          <td class="check">✔</td>
+          <td class="check">✔</td>
+          <td>Nur mit Freigabe</td>
+        </tr>
+        <tr>
+          <td><strong>HR_LEITUNG</strong></td>
+          <td>HR-Leitung</td>
+          <td class="check">✔</td>
+          <td class="check">✔</td>
+          <td class="check">✔</td>
+          <td class="check">✔</td>
+          <td>Nur mit Freigabe</td>
+        </tr>
+        <tr>
+          <td><strong>HR_SACHBEARBEITER</strong></td>
+          <td>Sachbearbeiter</td>
+          <td class="check">✔</td>
+          <td class="check">✔</td>
+          <td class="check">✔</td>
+          <td class="cross">✘</td>
+          <td>Nur mit Freigabe</td>
+        </tr>
+        <tr>
+          <td><strong>EINRICHTUNGSLEITUNG</strong></td>
+          <td>Einrichtungsleitung</td>
+          <td class="cross">✘ (nur eigene)</td>
+          <td class="check">✔</td>
+          <td class="partial">⚡ eingeschränkt</td>
+          <td class="cross">✘</td>
+          <td>Nur mit Freigabe</td>
+        </tr>
+        <tr>
+          <td><strong>VORGESETZTER</strong></td>
+          <td>Vorgesetzter</td>
+          <td class="cross">✘ (nur eigene)</td>
+          <td class="cross">✘</td>
+          <td class="partial">⚡ nur Checklisten</td>
+          <td class="cross">✘</td>
+          <td>Nur mit Freigabe</td>
+        </tr>
+        <tr>
+          <td><strong>BEM_BEAUFTRAGTER</strong></td>
+          <td>BEM-Beauftragter</td>
+          <td class="cross">✘</td>
+          <td class="cross">✘</td>
+          <td class="partial">⚡ nur BEM</td>
+          <td class="cross">✘</td>
+          <td>Nur zugeteilte Fälle</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="hinweis">
+      <span class="hinweis-icon">ℹ️</span>
+      <div><strong>BEM ist immer besonders geschützt:</strong> Auch Administrator:innen sehen BEM-Inhalte NUR, wenn sie explizit für einen Fall freigegeben wurden. Das ist gesetzlich vorgeschrieben (§ 167 SGB IX). Mehr dazu in Abschnitt 9.</div>
+    </div>
+
+    <div class="rechtlich">
+      <span class="rechtlich-icon">⚖️</span>
+      <div><strong>Rechtlicher Hintergrund:</strong> Das Rollen- und Berechtigungssystem erfüllt die Anforderungen des Bundesdatenschutzgesetzes (BDSG) zum Grundsatz der Datensparsamkeit und des Berechtigungsmanagements.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       4. ONBOARDING
+  ========================================================= -->
+  <section class="section" id="s4">
+    <div class="section-header">
+      <div class="section-number">4</div>
+      <div>
+        <h2>Onboarding</h2>
+        <p class="lead">Neue Mitarbeitende strukturiert ins Portal eingliedern.</p>
+      </div>
+    </div>
+
+    <p>Das Onboarding-Modul begleitet den gesamten Einstellungsprozess – von der Einladung der neuen Person bis zur Ablage der vollständigen Personalakte.</p>
+
+    <h3>Status-Übersicht</h3>
+    <div class="stepper">
+      <div class="step-item">
+        <div class="step-dot active">1</div>
+        <div class="step-label">Eingeladen</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">2</div>
+        <div class="step-label">In Bearbeitung</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">3</div>
+        <div class="step-label">Eingereicht</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">4</div>
+        <div class="step-label">Vorgesetzter offen</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">5</div>
+        <div class="step-label">Vorgesetzter fertig</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">6</div>
+        <div class="step-label">Geprüft</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot done">✔</div>
+        <div class="step-label">Abgeschlossen</div>
+      </div>
+    </div>
+
+    <h3>Neuen Onboarding-Vorgang anlegen</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie im Dashboard auf den Tab <strong>„Onboarding"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie oben rechts auf <strong>„+ Neuer Vorgang"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Geben Sie die <strong>E-Mail-Adresse</strong> der neuen Person ein.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Wählen Sie die <strong>Einrichtung</strong> (Mandant) aus der Liste.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">5</div>
+        <div class="schritt-text">Wählen Sie den <strong>Fragebogentyp</strong> (z. B. Einstellung, Vertragsänderung).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">6</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Vorgang anlegen &amp; Einladung senden"</strong>. Die neue Person erhält automatisch eine E-Mail mit einem persönlichen Link (Magic Link).</div>
+      </div>
+    </div>
+
+    <div class="tipp">
+      <span class="tipp-icon">💡</span>
+      <div>Der <strong>Magic Link</strong> ist 7 Tage gültig. Wenn die Person nicht reagiert, sehen Sie im Vorgang einen „Überfällig"-Hinweis. Sie können die Einladung jederzeit erneut versenden.</div>
+    </div>
+
+    <h3>Einen Vorgang öffnen und prüfen</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie in der Tabelle auf die Zeile des Vorgangs oder direkt auf den Namen.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Sie sehen alle eingegebenen Daten der Person (Stammdaten, Bankverbindung, Sozialversicherungsdaten etc.).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Prüfen Sie die Angaben. Fügen Sie bei Bedarf <strong>Notizen</strong> hinzu (für das HR-Team sichtbar).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Setzen Sie den Status auf <strong>„Geprüft"</strong>, wenn alle Daten korrekt sind.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">5</div>
+        <div class="schritt-text">Setzen Sie den Status auf <strong>„Abgeschlossen"</strong>, wenn der Vorgang vollständig abgeschlossen ist.</div>
+      </div>
+    </div>
+
+    <h3>Vorgänge filtern und suchen</h3>
+    <p>Über der Tabelle finden Sie drei Möglichkeiten, die Liste einzugrenzen:</p>
+    <ul style="list-style:disc;padding-left:22px;font-size:13px;line-height:2;">
+      <li><strong>Suchfeld:</strong> Suche nach Name, E-Mail oder Vorgangs-ID</li>
+      <li><strong>Einrichtungs-Filter:</strong> Nur Vorgänge einer bestimmten Schule/Kita anzeigen</li>
+      <li><strong>Status-Karten:</strong> Klicken Sie auf „Offen", „Geprüft" oder „Abgeschlossen" oben in der Statistikleiste</li>
+    </ul>
+
+    <div class="warnung">
+      <span class="warnung-icon">⚠️</span>
+      <div><strong>Archiv:</strong> Abgeschlossene und abgelaufene Vorgänge werden standardmäßig ausgeblendet. Klicken Sie auf <strong>„Archiv anzeigen"</strong>, um diese zu sehen.</div>
+    </div>
+
+    <h3>Dashboard-Statistiken verstehen</h3>
+    <p>Oben im Onboarding-Tab sehen Sie drei Diagramme:</p>
+    <ul style="list-style:disc;padding-left:22px;font-size:13px;line-height:2;">
+      <li><strong>Status-Verteilung:</strong> Tortendiagramm – wie viele Vorgänge in welchem Status</li>
+      <li><strong>Monatlicher Trend:</strong> Balkendiagramm der letzten 6 Monate (angelegte vs. abgeschlossene Vorgänge)</li>
+      <li><strong>Durchschnittliche Dauer:</strong> Wie lange dauern Onboardings im Durchschnitt?</li>
+    </ul>
+  </section>
+
+
+  <!-- =========================================================
+       5. OFFBOARDING
+  ========================================================= -->
+  <section class="section" id="s5">
+    <div class="section-header">
+      <div class="section-number">5</div>
+      <div>
+        <h2>Offboarding</h2>
+        <p class="lead">Austritte professionell begleiten – von der Kündigung bis zum letzten Arbeitstag.</p>
+      </div>
+    </div>
+
+    <h3>Offboarding-Phasen</h3>
+    <div class="stepper">
+      <div class="step-item">
+        <div class="step-dot active">1</div>
+        <div class="step-label">Erfasst</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">2</div>
+        <div class="step-label">Kündigungs&shy;frist</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">3</div>
+        <div class="step-label">Übergabe</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">4</div>
+        <div class="step-label">Endabrechnung</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot done">✔</div>
+        <div class="step-label">Abgeschlossen</div>
+      </div>
+    </div>
+
+    <h3>Neuen Austritt erfassen</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Wechseln Sie im Dashboard zum Tab <strong>„Offboarding"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„+ Neuer Austritt"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Geben Sie Name, E-Mail und Austrittsgrund der Person ein. Wählen Sie die <strong>Austrittsart</strong> (z. B. Eigenkündigung, Arbeitgeberkündigung, Befristungsende).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Tragen Sie das <strong>Austrittsdatum</strong> ein. Das System berechnet automatisch die Kündigungsfristen.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">5</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Vorgang anlegen"</strong>. Dem ausscheidenden Mitarbeitenden wird optional eine Einladung zum <strong>Exit-Interview</strong> gesendet.</div>
+      </div>
+    </div>
+
+    <h3>Exit-Interview</h3>
+    <p>Das Exit-Interview ist ein strukturiertes Gespräch, das ausscheidende Mitarbeitende freiwillig ausfüllen können.</p>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Öffnen Sie den Offboarding-Vorgang.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Exit-Interview einladen"</strong>. Die Person erhält einen persönlichen Link per E-Mail.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Sobald die Person das Interview ausgefüllt hat, ändert sich der Status auf <strong>„Abgeschlossen"</strong>. Sie können die Antworten im Vorgang einsehen.</div>
+      </div>
+    </div>
+
+    <h3>Rückgabe-Checkliste</h3>
+    <p>Im Offboarding-Vorgang gibt es eine Checkliste für zurückzugebende Gegenstände (IT-Hardware, Schlüssel, Fahrzeuge, Dokumente etc.). Haken Sie jeden Posten ab, sobald er zurückgegeben wurde.</p>
+
+    <h3>Arbeitszeugnis anfordern</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Öffnen Sie den Offboarding-Vorgang und wechseln Sie zum Bereich <strong>„Zeugnis"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Wählen Sie <strong>„Zeugnisbewertung einladen"</strong>. Der Vorgesetzte erhält einen Link zur Bewertungseingabe.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Sobald die Bewertung eingereicht ist, prüft HR die Formulierungen und gibt das Zeugnis frei (<strong>„Finalisiert"</strong>).</div>
+      </div>
+    </div>
+
+    <div class="hinweis">
+      <span class="hinweis-icon">ℹ️</span>
+      <div>Arbeitszeugnisse sind gesetzlich vorgeschrieben. Arbeitnehmer:innen haben nach § 109 GewO Anspruch auf ein qualifiziertes Zeugnis. Stellen Sie sicher, dass das Zeugnis spätestens am letzten Arbeitstag ausgehändigt wird.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       6. VERBEAMTUNG
+  ========================================================= -->
+  <section class="section" id="s6">
+    <div class="section-header">
+      <div class="section-number">6</div>
+      <div>
+        <h2>Verbeamtung (PSI)</h2>
+        <p class="lead">Den Weg zur Privatschulinspektion und ins Beamtenverhältnis begleiten.</p>
+      </div>
+    </div>
+
+    <p>Das Verbeamtungs-Modul (PSI = Privatschulinspektion) begleitet Lehrkräfte durch den mehrstufigen Prozess der Übernahme in ein Beamtenverhältnis bei freien evangelischen Schulen.</p>
+
+    <h3>Die 11 Verbeamtungsschritte</h3>
+    <table class="rolle-table">
+      <thead>
+        <tr><th>Schritt</th><th>Bezeichnung</th><th>Wer handelt</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>Formloser Antrag</td><td>Lehrkraft / HR</td></tr>
+        <tr><td>2</td><td>Erste Information Beirat</td><td>HR / Schulleitung</td></tr>
+        <tr><td>3</td><td>1. Unterrichtsbesuch + Beurteilung</td><td>Schulleitung</td></tr>
+        <tr><td>4</td><td>Gespräch + Referenz</td><td>Schulleitung / HR</td></tr>
+        <tr><td>5</td><td>Entscheidung Beirat</td><td>Beirat</td></tr>
+        <tr><td>6</td><td>Verwaltungsvorgang</td><td>HR Verwaltung</td></tr>
+        <tr><td>7</td><td>Übernahme PSI auf Probe</td><td>HR / Lehrkraft</td></tr>
+        <tr><td>8</td><td>2. Unterrichtsbesuch</td><td>Schulleitung</td></tr>
+        <tr><td>9</td><td>3. Unterrichtsbesuch + Referenz</td><td>Schulleitung</td></tr>
+        <tr><td>10</td><td>Amtsarzt Lebenszeit</td><td>Extern / HR</td></tr>
+        <tr><td>11</td><td>Übernahme Lebenszeit</td><td>HR Verwaltung</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Neuen Verbeamtungsvorgang anlegen</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Wechseln Sie im Dashboard zum Tab <strong>„Verbeamtung"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„+ Neue Verbeamtung"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Geben Sie die Daten der Lehrkraft ein und wählen Sie die Schule.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Vorgang anlegen"</strong>.</div>
+      </div>
+    </div>
+
+    <h3>Digitaler Personalfragebogen</h3>
+    <p>Die Lehrkraft erhält einen Magic Link zum digitalen Personalfragebogen. Dieser sammelt alle notwendigen Daten für Amtsarzt, Krankenversicherung, Beihilfe und Rentenversicherungsbefreiung.</p>
+
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Öffnen Sie den Verbeamtungsvorgang.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Personalfragebogen senden"</strong>. Die Lehrkraft erhält eine E-Mail.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Sobald der Fragebogen eingereicht ist, sehen Sie alle Daten im Vorgang. Prüfen und bestätigen Sie die Angaben.</div>
+      </div>
+    </div>
+
+    <h3>Dokumente hochladen</h3>
+    <p>Im Verbeamtungsvorgang gibt es einen <strong>Dokumentenbereich</strong>. Laden Sie hier alle relevanten Unterlagen hoch (amtsärztliche Zeugnisse, Beiratsprotokolle, Beurteilungen etc.).</p>
+
+    <div class="hinweis">
+      <span class="hinweis-icon">ℹ️</span>
+      <div>Der <strong>Beirat</strong> ist das zuständige Gremium für die Entscheidung über die Verbeamtung. Er kann die Übernahme bestätigen, aufschieben oder ablehnen. Tragen Sie das Ergebnis direkt im Vorgang ein.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       7. MUTTERSCHUTZ
+  ========================================================= -->
+  <section class="section" id="s7">
+    <div class="section-header">
+      <div class="section-number">7</div>
+      <div>
+        <h2>Mutterschutz</h2>
+        <p class="lead">Mutterschutzfristen und Meldepflichten gesetzeskonform verwalten.</p>
+      </div>
+    </div>
+
+    <p>Das Mutterschutz-Modul unterstützt Sie bei der Einhaltung der Fristen nach dem Mutterschutzgesetz (MuSchG).</p>
+
+    <h3>Neuen Mutterschutzvorgang anlegen</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Wechseln Sie im Dashboard zum Tab <strong>„Mutterschutz"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„+ Neuer Mutterschutz"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Geben Sie den <strong>voraussichtlichen Entbindungstermin (ET)</strong> ein. Das Portal berechnet automatisch den Beginn der Schutzfrist (6 Wochen vor ET) und das Ende (8 Wochen nach ET, 12 Wochen bei Früh-/Mehrlingsgeburt).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Vorgang anlegen"</strong>.</div>
+      </div>
+    </div>
+
+    <div class="rechtlich">
+      <span class="rechtlich-icon">⚖️</span>
+      <div><strong>Gesetzliche Pflicht:</strong> Sie müssen die zuständige Aufsichtsbehörde unverzüglich über die Schwangerschaft informieren (§ 27 MuSchG). Das Portal erinnert Sie an diese Meldepflicht. Beschäftigungsverbote und Gefährdungsbeurteilungen sind ebenfalls zu dokumentieren.</div>
+    </div>
+
+    <div class="warnung">
+      <span class="warnung-icon">⚠️</span>
+      <div>Während der Schutzfristen besteht ein absolutes <strong>Beschäftigungsverbot</strong>. Ein Verstoß ist eine Ordnungswidrigkeit und kann mit Bußgeld geahndet werden.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       8. ELTERNZEIT
+  ========================================================= -->
+  <section class="section" id="s8">
+    <div class="section-header">
+      <div class="section-number">8</div>
+      <div>
+        <h2>Elternzeit</h2>
+        <p class="lead">Elternzeitanträge und -phasen übersichtlich verwalten.</p>
+      </div>
+    </div>
+
+    <p>Das Elternzeit-Modul verwaltet Anträge und Genehmigungen nach dem Bundeselterngeld- und Elternzeitgesetz (BEEG).</p>
+
+    <h3>Elternzeit erfassen</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Wechseln Sie im Dashboard zum Tab <strong>„Elternzeit"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„+ Neue Elternzeit"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Geben Sie die Daten ein: Beginn, Ende und ggf. Teilzeit während der Elternzeit.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Senden Sie den digitalen Antrag an die Mitarbeiterin/den Mitarbeiter zur Bestätigung. Der Vorgesetzte erhält ebenfalls einen Link zur Genehmigung.</div>
+      </div>
+    </div>
+
+    <div class="rechtlich">
+      <span class="rechtlich-icon">⚖️</span>
+      <div><strong>Anmeldefrist:</strong> Elternzeit muss mindestens <strong>7 Wochen</strong> vor Beginn beim Arbeitgeber angemeldet werden. Für Elternzeit bis zum 3. Geburtstag müssen die ersten zwei Jahre gleichzeitig beantragt werden (§ 16 BEEG).</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       9. BEM
+  ========================================================= -->
+  <section class="section" id="s9">
+    <div class="section-header">
+      <div class="section-number">9</div>
+      <div>
+        <h2>🔒 BEM – Betriebliches Eingliederungsmanagement</h2>
+        <p class="lead">Gesetzlich vorgeschrieben, besonders vertraulich – der wichtigste Sonderbereich im Portal.</p>
+      </div>
+    </div>
+
+    <h3>Was ist BEM?</h3>
+    <p>Das Betriebliche Eingliederungsmanagement (BEM) ist ein gesetzlich vorgeschriebenes Verfahren. Es hilft Mitarbeitenden, die länger krank waren, wieder schrittweise in die Arbeit zurückzufinden.</p>
+
+    <div class="rechtlich">
+      <span class="rechtlich-icon">⚖️</span>
+      <div>
+        <strong>Gesetzliche Grundlage – § 167 Abs. 2 SGB IX:</strong><br>
+        Wenn eine Mitarbeiterin oder ein Mitarbeiter innerhalb eines Jahres mehr als <strong>6 Wochen ununterbrochen oder wiederholt arbeitsunfähig</strong> war, sind Sie als Arbeitgeber verpflichtet, ein BEM anzubieten.<br><br>
+        <strong>Wichtig:</strong> Das BEM ist <em>freiwillig</em> für die betroffene Person. Lehnt sie ab, müssen Sie die Ablehnung dokumentieren. Das Angebot selbst ist aber für Sie als Arbeitgeber <em>Pflicht</em> – besonders im Fall einer späteren Kündigung wegen Krankheit.
+      </div>
+    </div>
+
+    <h3>Datenschutz im BEM – die „versiegelte Akte"</h3>
+    <p>BEM-Akten unterliegen dem strengsten Datenschutz im Portal. Das Portal setzt dies technisch durch:</p>
+    <ul style="list-style:disc;padding-left:22px;font-size:13px;line-height:2;">
+      <li>Jede:r Nutzer:in sieht <strong>nur Fälle, für die sie/er explizit freigegeben</strong> wurde.</li>
+      <li>Selbst Administrator:innen haben <strong>keinen automatischen Zugriff</strong> auf BEM-Inhalte.</li>
+      <li>Jeder Zugriff auf eine BEM-Akte wird <strong>protokolliert</strong>.</li>
+      <li>Ein optionaler <strong>Diagnose-Schutz</strong> blendet medizinische Freitexte für Betriebsrat und SBV aus.</li>
+    </ul>
+
+    <div class="warnung">
+      <span class="warnung-icon">⚠️</span>
+      <div>BEM-Informationen dürfen <strong>nicht</strong> an die direkte Führungskraft weitergegeben werden, sofern diese nicht ausdrücklich als Beteiligte:r am BEM-Verfahren freigegeben wurde. Verstöße können zu einer Verletzung des Datenschutzes führen.</div>
+    </div>
+
+    <h3>BEM-Rollen</h3>
+    <table class="rolle-table">
+      <thead>
+        <tr><th>BEM-Rolle</th><th>Bedeutung</th><th>Darf schreiben?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>BEAUFTRAGTE</strong></td><td>Federführende:r BEM-Beauftragte:r</td><td class="check">✔ Ja</td></tr>
+        <tr><td><strong>VERTRETUNG</strong></td><td>Vertretung des/der Beauftragten</td><td class="check">✔ Ja</td></tr>
+        <tr><td><strong>BR</strong></td><td>Betriebsrat (Mitbestimmung nach § 87 BetrVG)</td><td class="cross">✘ Nur lesen</td></tr>
+        <tr><td><strong>SBV</strong></td><td>Schwerbehindertenvertretung (Beteiligung nach § 178 SGB IX)</td><td class="cross">✘ Nur lesen</td></tr>
+      </tbody>
+    </table>
+
+    <h3>BEM-Workflow: Schritt für Schritt</h3>
+    <div class="stepper">
+      <div class="step-item">
+        <div class="step-dot active">1</div>
+        <div class="step-label">Fall angelegt</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">2</div>
+        <div class="step-label">Einladung versendet</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">3</div>
+        <div class="step-label">Einwilligung erteilt</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">4</div>
+        <div class="step-label">Erstgespräch</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot">5</div>
+        <div class="step-label">Maßnahmen laufen</div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot done">✔</div>
+        <div class="step-label">Abgeschlossen</div>
+      </div>
+    </div>
+
+    <h4>Phase 1 – Fall anlegen</h4>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie im Menü auf <strong>„BEM"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„+ Neuer Fall"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Geben Sie Vor- und Nachname der betroffenen Person ein.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Wählen Sie den Mandanten (Einrichtung) aus.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">5</div>
+        <div class="schritt-text">Geben Sie optional die E-Mail-Adresse und das Datum der Fehlzeiten ein.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">6</div>
+        <div class="schritt-text">Aktivieren Sie bei Bedarf die Option <strong>„Schwerbehindert / gleichgestellt"</strong>. Dann ist die Schwerbehindertenvertretung (SBV) zu beteiligen.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">7</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Fall anlegen"</strong>.</div>
+      </div>
+    </div>
+
+    <h4>Phase 2 – Einladung versenden</h4>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Öffnen Sie den angelegten BEM-Fall.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Einladung versenden"</strong>. Wählen Sie <em>Digital (Magic-Link)</em> oder <em>Papier</em>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Bei digitalem Weg erhält die Person eine E-Mail mit dem Link zur Einwilligungserklärung. Die Datenschutzinformation wird automatisch mitgesendet.</div>
+      </div>
+    </div>
+
+    <div class="rechtlich">
+      <span class="rechtlich-icon">⚖️</span>
+      <div>Die Einladung muss die Datenschutzinformation enthalten (§ 167 Abs. 2 S. 3 SGB IX i. V. m. Art. 13 DSGVO). Das Portal fügt diese automatisch hinzu. Bitte prüfen Sie trotzdem, ob die Vorlage aktuell ist.</div>
+    </div>
+
+    <h4>Phase 3 – Einwilligung erfassen</h4>
+    <p>Die betroffene Person kann die Einwilligung digital erteilen (über den Magic Link) oder auf Papier. In beiden Fällen erfassen Sie das Ergebnis im Portal:</p>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie im BEM-Fall auf <strong>„Einwilligung erfassen"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Wählen Sie <strong>„Einwilligung erteilt"</strong> oder <strong>„Einwilligung abgelehnt"</strong>.</div>
+      </div>
+    </div>
+
+    <div class="hinweis">
+      <span class="hinweis-icon">ℹ️</span>
+      <div>Wenn die Person das BEM <strong>ablehnt</strong>, ist das Verfahren beendet. Die Ablehnung wird dokumentiert. Das ist für Sie wichtig: Bei einer späteren krankheitsbedingten Kündigung können Sie nachweisen, dass Sie das BEM angeboten haben.</div>
+    </div>
+
+    <h4>Phase 4 – Erstgespräch</h4>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Erstgespräch starten"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Geben Sie Datum, Ort und Teilnehmende des Gesprächs ein.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Dokumentieren Sie die Gesprächsinhalte im Freitext-Feld.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Haken Sie die Checkliste-Punkte (z. B. „Wiedereingliederungsplan besprochen") ab.</div>
+      </div>
+    </div>
+
+    <div class="warnung">
+      <span class="warnung-icon">⚠️</span>
+      <div>Gesprächsinhalte und Diagnosen sind <strong>streng vertraulich</strong>. Diese Informationen verlassen das BEM-Modul nicht. Sie dürfen nicht in Personalakten oder anderen Systemen gespeichert werden.</div>
+    </div>
+
+    <h4>Phase 5 – Maßnahmen vereinbaren und umsetzen</h4>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„+ Maßnahme hinzufügen"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Beschreiben Sie die Maßnahme, legen Sie eine <strong>Frist</strong> und eine zuständige Person fest.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Aktualisieren Sie den Status der Maßnahme, wenn sie umgesetzt wurde.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Führen Sie Folgegespräche durch und dokumentieren Sie diese ebenfalls.</div>
+      </div>
+    </div>
+
+    <h4>Phase 6 – Verfahren abschließen</h4>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Abschließen"</strong>, wenn alle Maßnahmen evaluiert wurden.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Die Akte wechselt automatisch in die <strong>Aufbewahrungsphase</strong>.</div>
+      </div>
+    </div>
+
+    <h3>Handlungsbedarf – Fristen im Blick behalten</h3>
+    <p>Oben im BEM-Bereich zeigt das Portal eine rote Warnbox, wenn Maßnahmen oder Fristen überfällig sind. Diese Box zeigt:</p>
+    <div class="badge-row">
+      <span class="badge badge-rot">Überfällig</span>
+      <span class="badge badge-rot">Dringend</span>
+      <span class="badge badge-gelb">Bald fällig</span>
+    </div>
+    <p>Klicken Sie auf einen Eintrag in der Warnbox, um direkt zum betreffenden Fall zu gelangen.</p>
+
+    <h3>Zugriff verwalten (nur für Admins)</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Öffnen Sie einen BEM-Fall.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Zugriff verwalten"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Fügen Sie Personen hinzu und weisen Sie ihnen eine BEM-Rolle zu (BEAUFTRAGTE, BR, SBV etc.).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Zum <strong>Widerrufen</strong> eines Zugriffs klicken Sie neben dem Namen auf „Zugriff entziehen".</div>
+      </div>
+    </div>
+
+    <h3>Aufbewahrung und Löschung</h3>
+    <div class="rechtlich">
+      <span class="rechtlich-icon">⚖️</span>
+      <div>BEM-Akten unterliegen einer gesetzlichen Aufbewahrungsfrist. Nach Ablauf der Frist wird die Akte automatisch in den Status <strong>„Gelöscht"</strong> überführt (Crypto-Shredding). Sie können diesen Vorgang nicht manuell auslösen – das schützt die betroffene Person vor frühzeitiger Löschung wichtiger Unterlagen.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       10. VORLAGEN
+  ========================================================= -->
+  <section class="section" id="s10">
+    <div class="section-header">
+      <div class="section-number">10</div>
+      <div>
+        <h2>Vorlagen verwalten</h2>
+        <p class="lead">Briefe, Zeugnisse, BEM-Schreiben und Exit-Interviews einheitlich gestalten.</p>
+      </div>
+    </div>
+
+    <p>Im Bereich <strong>Vorlagen</strong> können Sie Musterdokumente pflegen, die das Portal beim Versand automatisch mit den richtigen Daten befüllt (Platzhalter-System).</p>
+
+    <h3>Vorlagentypen</h3>
+    <div class="badge-row">
+      <span class="badge badge-blau">📝 Briefvorlagen</span>
+      <span class="badge badge-gruen">📋 Zeugnisvorlagen</span>
+      <span class="badge badge-lila">🔒 BEM-Vorlagen</span>
+      <span class="badge badge-orange">👋 Exit-Interview-Vorlagen</span>
+      <span class="badge badge-gelb">⭐ Beurteilungsvorlagen</span>
+    </div>
+
+    <h3>Neue Vorlage anlegen</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie im Menü auf <strong>„Vorlagen"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Wählen Sie den Vorlagentyp (z. B. Briefvorlagen, BEM-Vorlagen).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„+ Neue Vorlage"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Geben Sie einen Namen und den Inhalt der Vorlage ein. Verwenden Sie <strong>Platzhalter</strong> für variable Inhalte (z. B. <code>{{vorname}}</code>, <code>{{nachname}}</code>, <code>{{datum}}</code>).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">5</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Speichern"</strong>. Die Vorlage steht sofort in den jeweiligen Prozessen zur Auswahl.</div>
+      </div>
+    </div>
+
+    <div class="tipp">
+      <span class="tipp-icon">💡</span>
+      <div>Klicken Sie auf <strong>„Vorschau"</strong>, um zu sehen, wie das Dokument mit Beispieldaten aussieht – bevor Sie es speichern.</div>
+    </div>
+
+    <h3>Checklisten-Vorlagen</h3>
+    <p>Unter <strong>„Checklisten"</strong> können Sie Aufgabenlisten für Onboarding, Offboarding und BEM definieren. Diese Checklisten erscheinen automatisch in den jeweiligen Vorgängen.</p>
+  </section>
+
+
+  <!-- =========================================================
+       11. MANDANTEN
+  ========================================================= -->
+  <section class="section" id="s11">
+    <div class="section-header">
+      <div class="section-number">11</div>
+      <div>
+        <h2>Mandanten &amp; Einrichtungen</h2>
+        <p class="lead">Die 16 Einrichtungen der CREDO Gruppe verwalten.</p>
+      </div>
+    </div>
+
+    <p>Jede Schule, Kita und Einrichtung ist im Portal als eigener <strong>Mandant</strong> angelegt. Vorgänge werden immer einer Einrichtung zugeordnet.</p>
+
+    <h3>Einrichtung bearbeiten</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie im Menü auf <strong>„Mandanten"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf die gewünschte Einrichtung.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Bearbeiten Sie Name, Mandantennummer, Kurzbezeichnung und Typ (Schule, Kita etc.).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Speichern"</strong>.</div>
+      </div>
+    </div>
+
+    <h3>BEM-Ansprechpartner einer Einrichtung</h3>
+    <p>Im Mandanten-Bereich können Sie festlegen, wer bei einer Einrichtung der zuständige BEM-Ansprechpartner ist. Diese Information erscheint in BEM-Schreiben.</p>
+
+    <h3>DSGVO-Konfiguration</h3>
+    <p>Für jede Einrichtung können Sie die <strong>Datenschutz-Einstellungen</strong> individuell festlegen (z. B. Speicherfristen, Datenschutzbeauftragter).</p>
+
+    <div class="hinweis">
+      <span class="hinweis-icon">ℹ️</span>
+      <div>Das Anlegen neuer Mandanten ist ausschließlich Administrator:innen (SUPER_ADMIN) vorbehalten.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       12. BENUTZERVERWALTUNG
+  ========================================================= -->
+  <section class="section" id="s12">
+    <div class="section-header">
+      <div class="section-number">12</div>
+      <div>
+        <h2>Benutzerverwaltung</h2>
+        <p class="lead">Konten anlegen, Rollen vergeben und Zugänge verwalten.</p>
+      </div>
+    </div>
+
+    <div class="warnung">
+      <span class="warnung-icon">⚠️</span>
+      <div>Die Benutzerverwaltung ist nur für <strong>SUPER_ADMIN</strong> und <strong>HR_LEITUNG</strong> zugänglich.</div>
+    </div>
+
+    <h3>Neuen Benutzer anlegen</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie im Menü auf <strong>„Benutzer"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„+ Neuer Benutzer"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Geben Sie Vorname, Nachname und E-Mail-Adresse ein.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">4</div>
+        <div class="schritt-text">Wählen Sie die <strong>Rolle</strong> aus (siehe Abschnitt 3).</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">5</div>
+        <div class="schritt-text">Weisen Sie bei Rollen mit eingeschränktem Zugriff (Einrichtungsleitung, Vorgesetzter) die entsprechenden <strong>Mandanten</strong> zu.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">6</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Einladung senden"</strong>. Der neue Nutzer erhält eine E-Mail zum Einrichten seines Kontos.</div>
+      </div>
+    </div>
+
+    <h3>Benutzer als BEM-Beauftragte:n kennzeichnen</h3>
+    <p>Interne Mitarbeitende, die als BEM-Beauftragte tätig sind, müssen zusätzlich das Flag <strong>„BEM-Beauftragte:r"</strong> erhalten. Dies erlaubt ihnen, neue BEM-Fälle anzulegen. Setzen Sie dieses Flag in den Benutzer-Einstellungen.</p>
+
+    <h3>Konto deaktivieren</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Öffnen Sie das Benutzerkonto.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Klicken Sie auf <strong>„Konto deaktivieren"</strong>. Der Benutzer kann sich dann nicht mehr anmelden.</div>
+      </div>
+    </div>
+
+    <div class="hinweis">
+      <span class="hinweis-icon">ℹ️</span>
+      <div>Deaktivieren Sie Konten ausscheidender Mitarbeiter:innen <strong>umgehend</strong> – spätestens am letzten Arbeitstag. Das ist eine Datenschutzpflicht.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       13. EINSTELLUNGEN
+  ========================================================= -->
+  <section class="section" id="s13">
+    <div class="section-header">
+      <div class="section-number">13</div>
+      <div>
+        <h2>Einstellungen</h2>
+        <p class="lead">E-Mail, Webhooks und Schulferien konfigurieren.</p>
+      </div>
+    </div>
+
+    <div class="warnung">
+      <span class="warnung-icon">⚠️</span>
+      <div>Einstellungen sind nur für <strong>SUPER_ADMIN</strong> und <strong>HR_LEITUNG</strong> zugänglich. Falsche Konfigurationen können den E-Mail-Versand beeinträchtigen.</div>
+    </div>
+
+    <h3>E-Mail-Konfiguration</h3>
+    <p>Hier konfigurieren Sie den SMTP-Server für den E-Mail-Versand. Alle Einladungen und Benachrichtigungen des Portals werden darüber versendet.</p>
+
+    <h3>Webhook / n8n-Integration</h3>
+    <p>Das Portal kann Ereignisse (z. B. „Vorgang abgeschlossen") automatisch an ein externes System (z. B. n8n Automatisierungsplattform) melden. Tragen Sie die Webhook-URL ein, um diese Integration zu aktivieren.</p>
+
+    <h3>Schulferien</h3>
+    <p>Unter <strong>„Schulferien"</strong> hinterlegen Sie die Ferientermine. Diese fließen in Fristenberechnungen ein (z. B. Elternzeit-Anmeldefristen).</p>
+  </section>
+
+
+  <!-- =========================================================
+       14. AUDIT-LOG
+  ========================================================= -->
+  <section class="section" id="s14">
+    <div class="section-header">
+      <div class="section-number">14</div>
+      <div>
+        <h2>Audit-Log</h2>
+        <p class="lead">Alle Zugriffe und Änderungen nachvollziehen.</p>
+      </div>
+    </div>
+
+    <p>Das Audit-Log protokolliert automatisch alle relevanten Aktionen im Portal: Wer hat wann was geändert oder eingesehen? Dieses Protokoll ist unveränderlich.</p>
+
+    <h3>Audit-Log aufrufen</h3>
+    <div class="schritt-liste">
+      <div class="schritt">
+        <div class="schritt-nr">1</div>
+        <div class="schritt-text">Klicken Sie im Menü auf <strong>„Audit-Log"</strong>.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">2</div>
+        <div class="schritt-text">Filtern Sie nach Datum, Benutzer oder Aktion.</div>
+      </div>
+      <div class="schritt">
+        <div class="schritt-nr">3</div>
+        <div class="schritt-text">Klicken Sie auf einen Eintrag, um Details zu sehen (Vor-/Nachher-Werte bei Änderungen).</div>
+      </div>
+    </div>
+
+    <div class="rechtlich">
+      <span class="rechtlich-icon">⚖️</span>
+      <div>Das Audit-Log ist ein Kernelement der Datenschutz-Compliance nach DSGVO Art. 5 Abs. 2 (Rechenschaftspflicht). Besonders für BEM-Zugriffe ist die Protokollierung gesetzlich bedeutsam.</div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       15. FAQ
+  ========================================================= -->
+  <section class="section" id="s15">
+    <div class="section-header">
+      <div class="section-number">15</div>
+      <div>
+        <h2>Häufige Fragen &amp; Lösungen</h2>
+        <p class="lead">Antworten auf die häufigsten Probleme im Alltag.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Die neue Mitarbeiterin hat die Einladungs-E-Mail nicht erhalten. Was tun?</div>
+      <div class="faq-a">
+        Öffnen Sie den Onboarding-Vorgang und klicken Sie auf <strong>„Einladung erneut senden"</strong>. Prüfen Sie, ob die E-Mail-Adresse korrekt eingegeben wurde. Bitten Sie die Person außerdem, den Spam-Ordner zu kontrollieren. Falls weiterhin nichts ankommt, wenden Sie sich an den Administrator zur Prüfung des SMTP-Servers.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Ich sehe keinen BEM-Fall, obwohl ich zuständig bin.</div>
+      <div class="faq-a">
+        BEM-Fälle sind versiegelt. Auch wenn Sie allgemein zuständig sind, sehen Sie einen Fall nur, wenn ein Administrator Sie für diesen Fall explizit <strong>freigeschaltet</strong> hat. Wenden Sie sich an Ihren Vorgesetzten oder den SUPER_ADMIN, um eine Freigabe anzufordern.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Ein Vorgang steht seit Wochen auf „Eingeladen" – was soll ich tun?</div>
+      <div class="faq-a">
+        Senden Sie die Einladung erneut. Wenn auch das keine Reaktion bringt: Kontaktieren Sie die Person persönlich. Hält das Problem an, können Sie den Vorgang manuell auf „In Bearbeitung" setzen und die Daten per Papierformular erfassen. Der Status kann dann manuell weitergeschalten werden.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Ich habe mein Passwort vergessen. Was tun?</div>
+      <div class="faq-a">
+        Klicken Sie auf der Login-Seite auf <strong>„Passwort vergessen"</strong>. Sie erhalten eine E-Mail mit einem Link zum Zurücksetzen. Alternativ: Bitten Sie den Administrator, Ihr Passwort zurückzusetzen.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Kann ich einen abgeschlossenen Vorgang wieder öffnen?</div>
+      <div class="faq-a">
+        Ja. Öffnen Sie den Vorgang und setzen Sie den Status manuell auf einen früheren Stand zurück. Beachten Sie: Diese Aktion wird im Audit-Log protokolliert. Fügen Sie eine Begründung als Notiz hinzu.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Wie lange werden BEM-Akten aufbewahrt?</div>
+      <div class="faq-a">
+        Die Aufbewahrungsfrist richtet sich nach dem Beschäftigungsverhältnis und den gesetzlichen Vorgaben. Das Portal überführt Akten nach Ablauf automatisch in den Status „Gelöscht" (Crypto-Shredding). Eine manuelle frühzeitige Löschung ist bewusst nicht vorgesehen.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Die Seite lädt sehr langsam oder zeigt einen Fehler.</div>
+      <div class="faq-a">
+        Laden Sie die Seite neu (Strg + F5 oder Cmd + Shift + R). Falls das nicht hilft: Prüfen Sie Ihre Internetverbindung. Schließen und öffnen Sie den Browser neu. Besteht das Problem weiter, wenden Sie sich an den IT-Support oder Administrator.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Muss ich BEM für jede:n kranken Mitarbeitenden anbieten?</div>
+      <div class="faq-a">
+        Nein – nur bei <strong>mehr als 6 Wochen Krankheit innerhalb von 12 Monaten</strong> (§ 167 Abs. 2 SGB IX). Das können durchgehende oder wiederholte Fehlzeiten sein, die zusammen 6 Wochen überschreiten. Dokumentieren Sie die Fehlzeiten sorgfältig im Portal, damit der Auslöser klar erkennbar ist.
+      </div>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       16. CHECKLISTEN
+  ========================================================= -->
+  <section class="section" id="s16">
+    <div class="section-header">
+      <div class="section-number">16</div>
+      <div>
+        <h2>Schnell-Checklisten</h2>
+        <p class="lead">Zum Ausdrucken oder Abhaken in der täglichen Arbeit.</p>
+      </div>
+    </div>
+
+    <h3>Neuen Mitarbeitenden onboarden</h3>
+    <div class="checkliste">
+      <div class="checkliste-header">✅ Onboarding – Checkliste HR</div>
+      <ul>
+        <li>E-Mail-Adresse und Einrichtung sind korrekt erfasst</li>
+        <li>Onboarding-Vorgang im Portal angelegt</li>
+        <li>Einladungs-E-Mail wurde versendet (Bestätigung im Portal sichtbar)</li>
+        <li>Fragebogen von neuer Person ausgefüllt (Status: „Eingereicht")</li>
+        <li>Daten geprüft: Stammdaten, Bankverbindung, SV-Nummer, Steuer-ID</li>
+        <li>Checkliste für Vorgesetzten freigegeben</li>
+        <li>Vorgesetzter hat Checkliste ausgefüllt</li>
+        <li>Status auf „Geprüft" gesetzt</li>
+        <li>Status auf „Abgeschlossen" gesetzt</li>
+        <li>Personalabteilung hat Unterlagen in LOGA / Personalsystem übertragen</li>
+      </ul>
+    </div>
+
+    <h3>Mitarbeitenden offboarden</h3>
+    <div class="checkliste">
+      <div class="checkliste-header">✅ Offboarding – Checkliste HR</div>
+      <ul>
+        <li>Austrittsdatum und Austrittsgrund erfasst</li>
+        <li>Exit-Interview-Einladung versendet (freiwillig)</li>
+        <li>Rückgabe-Checkliste vollständig abgehakt (IT, Schlüssel, Fahrzeug etc.)</li>
+        <li>Zeugnis-Bewertung durch Vorgesetzten angefordert</li>
+        <li>Zeugnis geprüft und finalisiert</li>
+        <li>Benutzerkonto im Portal am letzten Arbeitstag deaktiviert</li>
+        <li>Offboarding-Vorgang auf „Abgeschlossen" gesetzt</li>
+        <li>Abmeldung SV-Träger veranlasst</li>
+      </ul>
+    </div>
+
+    <h3>BEM-Fall eröffnen</h3>
+    <div class="checkliste">
+      <div class="checkliste-header">✅ BEM – Checkliste Eröffnung</div>
+      <ul>
+        <li>Fehlzeiten geprüft: mehr als 42 Tage in 12 Monaten?</li>
+        <li>Schwerbehindertenstatus geprüft (SBV-Beteiligung erforderlich?)</li>
+        <li>BEM-Fall im Portal angelegt</li>
+        <li>Zugriffsberechtigungen vergeben (BEM-Beauftragte:r, ggf. BR/SBV)</li>
+        <li>Einladung mit Datenschutzinformation versendet</li>
+        <li>Einwilligung erfasst (erteilt oder abgelehnt)</li>
+        <li>Bei Ablehnung: Dokumentation im Portal abgeschlossen</li>
+        <li>Bei Zustimmung: Erstgespräch terminiert</li>
+      </ul>
+    </div>
+
+    <h3>Monatliche Routine – HR-Kontrolle</h3>
+    <div class="checkliste">
+      <div class="checkliste-header">✅ Monatliche Routine</div>
+      <ul>
+        <li>Dashboard: Überfällige Vorgänge (&gt; 7 Tage ohne Reaktion) bearbeiten</li>
+        <li>BEM Handlungsbedarf-Box: Fällige Fristen prüfen und nachverfolgen</li>
+        <li>Deaktivierte Benutzerkonten: Ausgeschiedene Mitarbeitende geprüft?</li>
+        <li>Neue Vorgänge im Archiv: Ältere Fälle vollständig abgeschlossen?</li>
+        <li>Audit-Log: Ungewöhnliche Zugriffe geprüft?</li>
+      </ul>
+    </div>
+  </section>
+
+
+  <!-- =========================================================
+       17. GLOSSAR
+  ========================================================= -->
+  <section class="section" id="s17">
+    <div class="section-header">
+      <div class="section-number">17</div>
+      <div>
+        <h2>Glossar</h2>
+        <p class="lead">Fachbegriffe einfach erklärt.</p>
+      </div>
+    </div>
+
+    <div class="glossar">
+      <div class="glossar-term">Audit-Log</div>
+      <div class="glossar-def">Unveränderliches Protokoll aller Aktionen im Portal. Wer hat wann was geändert oder eingesehen.</div>
+
+      <div class="glossar-term">BEM</div>
+      <div class="glossar-def">Betriebliches Eingliederungsmanagement. Gesetzlich vorgeschriebenes Angebot an Mitarbeitende nach mehr als 6 Wochen Krankheit innerhalb eines Jahres (§ 167 Abs. 2 SGB IX).</div>
+
+      <div class="glossar-term">BEM-Akte (versiegelt)</div>
+      <div class="glossar-def">BEM-Daten sind besonders geschützt. Nur explizit freigegebene Personen können sie einsehen – unabhängig von der Systemrolle.</div>
+
+      <div class="glossar-term">BEEG</div>
+      <div class="glossar-def">Bundeselterngeld- und Elternzeitgesetz. Regelt Ansprüche auf Elternzeit und Elterngeld.</div>
+
+      <div class="glossar-term">BetrVG</div>
+      <div class="glossar-def">Betriebsverfassungsgesetz. Regelt die Mitbestimmungsrechte des Betriebsrats, u. a. bei BEM (§ 87).</div>
+
+      <div class="glossar-term">BR</div>
+      <div class="glossar-def">Betriebsrat. Im BEM hat der BR ein Überwachungsrecht (§ 80 BetrVG). Er bekommt Lesezugriff auf BEM-Fälle, kann aber keine Inhalte ändern.</div>
+
+      <div class="glossar-term">BDSG</div>
+      <div class="glossar-def">Bundesdatenschutzgesetz. Regelt ergänzend zur DSGVO den Datenschutz in Deutschland, insbesondere für Beschäftigtendaten.</div>
+
+      <div class="glossar-term">DSGVO</div>
+      <div class="glossar-def">Datenschutz-Grundverordnung der EU. Gilt für alle personenbezogenen Daten, die im Portal gespeichert werden.</div>
+
+      <div class="glossar-term">Einrichtungsleitung</div>
+      <div class="glossar-def">Portalrolle für Schul- oder Kita-Leitungen. Sieht nur Vorgänge der eigenen Einrichtung.</div>
+
+      <div class="glossar-term">Elternzeit</div>
+      <div class="glossar-def">Unbezahlter, aber jobgesicherter Urlaub nach der Geburt oder Adoption eines Kindes (bis zum 3. Lebensjahr).</div>
+
+      <div class="glossar-term">Erstgespräch</div>
+      <div class="glossar-def">Erstes formelles Gespräch im BEM-Verfahren. Ziel: gemeinsam klären, welche Maßnahmen die Rückkehr an den Arbeitsplatz erleichtern.</div>
+
+      <div class="glossar-term">Fehlzeitenauslöser</div>
+      <div class="glossar-def">Das Datum oder der Zeitraum, ab dem die 6-Wochen-Grenze für das BEM-Angebot erreicht ist.</div>
+
+      <div class="glossar-term">Fragebogen (Magic Link)</div>
+      <div class="glossar-def">Personalisierter Link, den neue Mitarbeitende per E-Mail erhalten, um ihre Daten selbst einzugeben.</div>
+
+      <div class="glossar-term">HR_SACHBEARBEITER</div>
+      <div class="glossar-def">Portalrolle für die operative HR-Sachbearbeitung. Voller Lese- und Schreibzugriff, aber keine Admin-Funktionen.</div>
+
+      <div class="glossar-term">IKS-Report</div>
+      <div class="glossar-def">Internes Kontrollsystem-Report. Statistikbericht über BEM-Fälle zur Nachweisführung und internen Revision.</div>
+
+      <div class="glossar-term">Magic Link</div>
+      <div class="glossar-def">Einmal-Link in einer E-Mail, der direkt zum Formular führt – ohne separates Passwort. Gilt 7 Tage.</div>
+
+      <div class="glossar-term">Mandant</div>
+      <div class="glossar-def">Eine einzelne Einrichtung der CREDO Gruppe (z. B. FES Gymnasium, Kita Sonnenschein). Das Portal verwaltet 16 Mandanten.</div>
+
+      <div class="glossar-term">Maßnahmen</div>
+      <div class="glossar-def">Im BEM: konkrete Schritte, die vereinbart werden, um die Rückkehr zur Arbeit zu erleichtern (z. B. Arbeitsplatzanpassung, Stundenreduzierung).</div>
+
+      <div class="glossar-term">MuSchG</div>
+      <div class="glossar-def">Mutterschutzgesetz. Schützt schwangere und stillende Arbeitnehmerinnen vor Gesundheitsgefahren und garantiert Schutzfristen.</div>
+
+      <div class="glossar-term">Offboarding</div>
+      <div class="glossar-def">Strukturierter Prozess für das Ausscheiden eines Mitarbeitenden (Kündigung, Befristungsende etc.).</div>
+
+      <div class="glossar-term">Onboarding</div>
+      <div class="glossar-def">Strukturierter Prozess für das Eingliedern neuer Mitarbeitender, inkl. Datenerfassung und Checklisten.</div>
+
+      <div class="glossar-term">PSI</div>
+      <div class="glossar-def">Privatschulinspektion. Behörde, die für die Verbeamtung von Lehrkräften an privaten Schulen zuständig ist.</div>
+
+      <div class="glossar-term">SBV</div>
+      <div class="glossar-def">Schwerbehindertenvertretung. Muss bei BEM-Verfahren für schwerbehinderte oder gleichgestellte Personen beteiligt werden (§ 178 SGB IX).</div>
+
+      <div class="glossar-term">SGB IX</div>
+      <div class="glossar-def">Sozialgesetzbuch IX. Enthält in § 167 Abs. 2 die Pflicht zum BEM-Angebot.</div>
+
+      <div class="glossar-term">SUPER_ADMIN</div>
+      <div class="glossar-def">Höchste Portalrolle mit vollen Rechten inkl. Benutzerverwaltung, Systemeinstellungen und Mandantenverwaltung.</div>
+
+      <div class="glossar-term">Verbeamtung</div>
+      <div class="glossar-def">Übernahme einer Lehrkraft aus dem Angestelltenverhältnis in das Beamtenverhältnis. Mehrstufiger Prozess mit Probezeit und Übernahme auf Lebenszeit.</div>
+
+      <div class="glossar-term">Vorgang</div>
+      <div class="glossar-def">Ein einzelner HR-Prozess im Portal (z. B. Onboarding einer bestimmten Person). Identifiziert durch eine eindeutige Vorgangs-ID.</div>
+
+      <div class="glossar-term">Zeugnis</div>
+      <div class="glossar-def">Arbeitszeugnis. Gesetzlicher Anspruch nach § 109 GewO. Einfaches Zeugnis: Tätigkeitsbeschreibung. Qualifiziertes Zeugnis: zusätzlich Leistungs- und Verhaltensbewertung.</div>
+    </div>
+  </section>
+
+</div><!-- /container -->
+
+<!-- ===== FOOTER ===== -->
+<div class="credo-bar">
+  <span class="c-gelb"></span>
+  <span class="c-gruen"></span>
+  <span class="c-rot"></span>
+  <span class="c-blau"></span>
+  <span class="c-grau"></span>
+</div>
+<footer>
+  <p><strong>CREDO Schulträgergruppe</strong> · HR-Portal Benutzerhandbuch · Version 1.0 · Stand: Juni 2026</p>
+  <p style="margin-top:4px;opacity:.6">Dieses Dokument ist für den internen Gebrauch bestimmt. Fragen: <a href="mailto:dimitri.riesen@fes-minden.de" style="color:inherit">dimitri.riesen@fes-minden.de</a></p>
+</footer>
+
+</body>
+</html>

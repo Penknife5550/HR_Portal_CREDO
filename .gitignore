@@ -73,3 +73,6 @@ backups/*.dump
 # Lokale Arbeits-/Materialordner (nie ins Repo)
 /BEM/
 /email-vorschau/
+# Echte Word-Vertragsvorlagen + Fehler-Sammlung (interne Personaldokumente)
+/Vorlagen_Word/
+/Plan_Fixes/

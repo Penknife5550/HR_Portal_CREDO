@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Konzeptplan — Modul "Ruhestandsplanung" | CREDO HR-Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary-bg:   #DADADA;
+  --accent:       #575756;
+  --text:         #2b2b2b;
+  --text-light:   #666;
+  --gelb:         #FBC900;
+  --gruen:        #6BAA24;
+  --rot:          #E2001A;
+  --blau:         #009AC6;
+  --white:        #ffffff;
+  --border:       #c5c5c5;
+  --hinweis-bg:   #EBF5FB;
+  --hinweis-bd:   #009AC6;
+  --warnung-bg:   #FEF9E7;
+  --warnung-bd:   #FBC900;
+  --kritik-bg:    #FDEDEC;
+  --kritik-bd:    #E2001A;
+  --offen-bg:     #F4F6F7;
+  --offen-bd:     #9B59B6;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Montserrat', Arial, sans-serif; font-size: 14px; line-height: 1.7; color: var(--text); background: #f7f7f7; }
+.page-wrapper { max-width: 980px; margin: 0 auto; background: var(--white); box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.credo-bar { display: flex; height: 6px; }
+.credo-bar span { flex: 1; }
+.credo-bar .grau  { background: var(--accent); }
+.credo-bar .gelb  { background: var(--gelb); }
+.credo-bar .gruen { background: var(--gruen); }
+.credo-bar .rot   { background: var(--rot); }
+.credo-bar .blau  { background: var(--blau); }
+.doc-header { background: var(--accent); color: var(--white); padding: 40px 48px 32px; }
+.doc-header .badge { display: inline-block; background: var(--blau); color: var(--white); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; margin-bottom: 14px; }
+.doc-header .badge.entwurf { background: var(--rot); }
+.doc-header h1 { font-size: 28px; font-weight: 700; line-height: 1.25; }
+.doc-header .subtitle { margin-top: 8px; font-size: 13px; opacity: .8; }
+.doc-header .meta { margin-top: 20px; font-size: 11px; opacity: .65; border-top: 1px solid rgba(255,255,255,.2); padding-top: 14px; }
+.toc { background: var(--primary-bg); padding: 28px 48px; border-bottom: 1px solid var(--border); }
+.toc h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin-bottom: 14px; }
+.toc ol { list-style: decimal; padding-left: 18px; columns: 2; column-gap: 32px; }
+.toc li { font-size: 13px; margin-bottom: 5px; break-inside: avoid; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.content { padding: 0 48px 48px; }
+.section { margin-top: 44px; }
+.section-title { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); margin-bottom: 20px; }
+.section-title .num { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--accent); color: var(--white); border-radius: 50%; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.section-title h2 { font-size: 18px; font-weight: 700; color: var(--accent); }
+h3 { font-size: 14px; font-weight: 700; color: var(--accent); margin: 24px 0 10px; }
+p { margin-bottom: 12px; }
+strong { font-weight: 700; }
+.hinweis, .warnung, .kritik, .offen { display: flex; gap: 14px; border-radius: 6px; padding: 14px 18px; margin: 16px 0; font-size: 13px; }
+.hinweis { background: var(--hinweis-bg); border-left: 4px solid var(--hinweis-bd); }
+.warnung { background: var(--warnung-bg); border-left: 4px solid var(--warnung-bd); }
+.kritik { background: var(--kritik-bg); border-left: 4px solid var(--kritik-bd); }
+.offen { background: var(--offen-bg); border-left: 4px solid var(--offen-bd); }
+.hinweis .icon, .warnung .icon, .kritik .icon, .offen .icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+.hinweis strong, .warnung strong, .kritik strong, .offen strong { display: block; font-weight: 700; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 16px 0; }
+th { background: var(--accent); color: var(--white); text-align: left; padding: 9px 14px; font-weight: 600; font-size: 12px; }
+td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:nth-child(even) td { background: #f9f9f9; }
+.status-badge { display: inline-block; padding: 3px 11px; border-radius: 16px; font-size: 11px; font-weight: 700; border: 1px solid; white-space: nowrap; }
+.status-badge.blau   { background: #EBF5FB; color: #009AC6; border-color: #b3dff0; }
+.status-badge.gelb   { background: #FEFDE7; color: #9A7D0A; border-color: #f7dc6f; }
+.status-badge.rot    { background: #FDEDEC; color: #C0392B; border-color: #f1948a; }
+.status-badge.grau   { background: #F4F6F7; color: #717D7E; border-color: #ccc; }
+.status-badge.gruen  { background: #EAFAF1; color: #1E8449; border-color: #a9dfbf; }
+
+/* Farbband Prozesskette */
+.flow-band { display: flex; margin: 20px 0 6px; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+.flow-seg { flex: 1; padding: 14px 10px; color: #fff; font-size: 11px; font-weight: 700; text-align: center; text-transform: uppercase; letter-spacing: .03em; position: relative; }
+.flow-seg.blau  { background: var(--blau); }
+.flow-seg.gelb  { background: var(--gelb); color: #4a3b00; }
+.flow-seg.rot   { background: var(--rot); }
+.flow-seg.grau  { background: var(--accent); }
+.flow-seg.gruen { background: var(--gruen); }
+.flow-seg .jahre { display:block; font-size: 15px; font-weight: 700; margin-top: 4px; }
+.flow-labels { display: flex; margin-bottom: 24px; }
+.flow-labels div { flex: 1; text-align: center; font-size: 11px; color: var(--text-light); padding: 0 4px; }
+
+/* Timeline (Phasen-Stepper) */
+.timeline { display: flex; align-items: flex-start; margin: 20px 0; overflow-x: auto; padding-bottom: 6px; }
+.tl-step { flex: 1; min-width: 110px; text-align: center; position: relative; padding: 0 4px; }
+.tl-step .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--border); color: #fff; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 11px; font-weight: 700; position: relative; z-index: 1; }
+.tl-step.done .dot { background: var(--gruen); }
+.tl-step.active .dot { background: var(--blau); box-shadow: 0 0 0 4px #EBF5FB; }
+.tl-step::before { content: ""; position: absolute; top: 11px; left: -50%; width: 100%; height: 2px; background: var(--border); z-index: 0; }
+.tl-step:first-child::before { display: none; }
+.tl-step.done::before, .tl-step.active::before { background: var(--gruen); }
+.tl-step .lbl { font-size: 10.5px; color: var(--text-light); line-height: 1.3; }
+.tl-step.active .lbl { color: var(--accent); font-weight: 700; }
+
+/* Mockup-Fenster */
+.mockup { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 18px 0; box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+.mockup-bar { background: #e9e9eb; padding: 8px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border); }
+.mockup-bar .dot-win { width: 9px; height: 9px; border-radius: 50%; background: #d0d0d0; }
+.mockup-bar .title { margin-left: 8px; font-size: 11px; color: var(--text-light); font-weight: 600; }
+.mockup-body { padding: 16px; background: #fbfbfb; font-size: 12.5px; }
+.mockup-tag { position: absolute; margin-top: -34px; margin-left: 8px; background: var(--accent); color: #fff; font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 3px; letter-spacing: .04em; text-transform: uppercase; }
+.m-tabs { display: flex; gap: 2px; border-bottom: 2px solid var(--border); margin-bottom: 12px; }
+.m-tab { padding: 7px 12px; font-size: 11.5px; font-weight: 600; color: var(--text-light); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.m-tab.active { color: var(--blau); border-bottom-color: var(--blau); }
+.m-row { display: flex; align-items: center; gap: 10px; padding: 9px 6px; border-bottom: 1px solid #eee; }
+.m-row:last-child { border-bottom: none; }
+.m-name { flex: 1; font-weight: 600; }
+.m-sub { font-size: 11px; color: var(--text-light); }
+.m-btn { display: inline-block; background: var(--blau); color: #fff; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 4px; }
+.m-btn.grau { background: var(--accent); }
+.m-btn.outline { background: transparent; border: 1px solid var(--blau); color: var(--blau); }
+.m-field { background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
+.m-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+.m-check .box { width: 14px; height: 14px; border: 2px solid var(--accent); border-radius: 3px; flex-shrink: 0; }
+.m-check .box.on { background: var(--gruen); border-color: var(--gruen); }
+
+/* Datenmodell-Diagramm */
+.dm-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 20px 0; }
+.dm-box { border: 2px solid var(--accent); border-radius: 6px; padding: 10px 16px; font-size: 12px; font-weight: 700; color: var(--accent); background: #fff; text-align: center; }
+.dm-box.main { border-color: var(--blau); color: var(--blau); font-size: 13px; }
+.dm-box.end { border-color: var(--rot); color: var(--rot); }
+.dm-arrow { font-size: 16px; color: var(--text-light); line-height: 1; }
+.dm-children { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin: 6px 0; }
+.dm-children .dm-box { font-size: 11px; font-weight: 600; }
+
+/* Kritik-Liste */
+.kritik-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; background: var(--rot); color: #fff; border-radius: 50%; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-right: 8px; }
+.loesung { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #f1948a; }
+.loesung strong { color: var(--gruen); }
+
+.epic-list { list-style: none; }
+.epic-list li { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.epic-list li:last-child { border-bottom: none; }
+.epic-tag { flex-shrink: 0; width: 46px; height: 26px; border-radius: 4px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+.quelle-item { font-size: 12px; margin-bottom: 8px; padding-left: 14px; border-left: 2px solid var(--border); }
+.quelle-item .conf { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; margin-left: 6px; }
+.conf.high { background: #EAFAF1; color: #1E8449; }
+.conf.medium { background: #FEFDE7; color: #9A7D0A; }
+.verworfen { font-size: 12px; color: var(--text-light); margin-bottom: 6px; text-decoration: line-through; }
+
+.doc-footer { margin-top: 48px; padding: 24px 48px; background: var(--primary-bg); font-size: 11px; color: var(--text-light); border-top: 1px solid var(--border); }
+.doc-footer p { margin-bottom: 4px; }
+
+@media (max-width: 680px) {
+  .doc-header, .toc, .content, .doc-footer { padding-left: 20px; padding-right: 20px; }
+  .toc ol { columns: 1; }
+  .flow-band, .timeline { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <div class="credo-bar"><span class="grau"></span><span class="gelb"></span><span class="gruen"></span><span class="rot"></span><span class="blau"></span></div>
+
+  <header class="doc-header">
+    <div class="badge entwurf">Konzeptplan · Entwurf 0.1 · noch nicht beauftragt</div>
+    <h1>Modul "Ruhestandsplanung &amp; Wissenstransfer"</h1>
+    <p class="subtitle">Gestaffelte Vorbereitung auf den Ruhestand — mit strukturierter Wissenssicherung und sauberer Übergabe an das Offboarding</p>
+    <p class="meta">Stand: 01. Juli 2026 &nbsp;|&nbsp; Basis: bestehender n8n-Report "#212 Ruhestandsplanung v2" + Codebase-Analyse HR-Portal + Web-Recherche (9 verifizierte Kernaussagen) + kritische Gegenprüfung (12 Punkte) &nbsp;|&nbsp; Zielgruppe: Entscheidungsgrundlage für spätere Umsetzung</p>
+  </header>
+
+  <nav class="toc" aria-label="Inhaltsverzeichnis">
+    <h2>Inhaltsverzeichnis</h2>
+    <ol>
+      <li><a href="#ziel">Ziel &amp; Ausgangslage</a></li>
+      <li><a href="#ist">Ist-Zustand: Report #212 (n8n)</a></li>
+      <li><a href="#prozesskette">Gesamt-Prozesskette</a></li>
+      <li><a href="#phase-planung">Phase A — Planung (5–10 Jahre)</a></li>
+      <li><a href="#phase-dringend">Phase B — Dringend (2–5 Jahre)</a></li>
+      <li><a href="#phase-kritisch">Phase C — Kritisch (&lt; 2 Jahre)</a></li>
+      <li><a href="#wissenstransfer">Wissenstransfer im Detail</a></li>
+      <li><a href="#offboarding-uebergang">Übergang zum Offboarding</a></li>
+      <li><a href="#datenmodell">Datenmodell (Architektur-Skizze)</a></li>
+      <li><a href="#rollen">Rollen &amp; Verantwortlichkeiten</a></li>
+      <li><a href="#recht">Rechtlicher Rahmen</a></li>
+      <li><a href="#kritik">Kritische Prüfung (Advocatus Diaboli)</a></li>
+      <li><a href="#fragen">Offene Fragen an dich</a></li>
+      <li><a href="#roadmap">Empfohlene Umsetzungsreihenfolge</a></li>
+      <li><a href="#quellen">Quellen &amp; Recherche-Hinweise</a></li>
+    </ol>
+  </nav>
+
+  <main class="content">
+
+    <!-- 1 -->
+    <section class="section" id="ziel">
+      <div class="section-title"><div class="num">1</div><h2>Ziel &amp; Ausgangslage</h2></div>
+      <p>CREDO weiß heute schon, wer wann in Rente geht — der bestehende n8n-Report liefert monatlich eine gestaffelte Liste. Was fehlt, ist ein <strong>Vorgang</strong>: eine strukturierte, nachvollziehbare Begleitung vom ersten Frühwarnsignal bis zum letzten Arbeitstag, bei der</p>
+      <ul style="padding-left: 20px; margin-bottom: 12px;">
+        <li>Vorgesetzte rechtzeitig wissen, wann sie eine Nachfolge planen müssen,</li>
+        <li>das Wissen langjähriger Mitarbeiter <em>vor</em> dem Ausscheiden gesichert wird (nicht erst im Exit-Interview),</li>
+        <li>am Ende alles sauber ins bestehende Offboarding übergeht, ohne Doppelarbeit,</li>
+        <li>und der Mensch dabei nicht zur Zahl in einer Ampel-Liste wird.</li>
+      </ul>
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div><strong>Status dieses Dokuments</strong>Dies ist eine <strong>Idee zur späteren Umsetzung</strong>, keine beauftragte Implementierung. Es wurde bewusst mit Web-Recherche und einer kritischen Gegenprüfung erarbeitet, damit bei einer späteren Beauftragung keine grundlegenden Design-Fehler wiederholt werden müssen.</div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="section" id="ist">
+      <div class="section-title"><div class="num">2</div><h2>Ist-Zustand: Report #212 (n8n)</h2></div>
+      <p>Der bestehende n8n-Workflow <strong>"#212 Email-Altersstruktur &amp; Ruhestandsplanung"</strong> läuft monatlich, liest alle aktiven Mitarbeiter aus der DATEV/Dokubit-SQL-Quelle, dedupliziert nach Name+Geburtsdatum (mandantenübergreifend) und ordnet jeden nach Tagen bis zur Regelaltersgrenze einer Kategorie zu:</p>
+      <table>
+        <thead><tr><th>Kategorie</th><th>Zeitfenster</th><th>Farbe</th><th>Aktuelle Aktion</th></tr></thead>
+        <tbody>
+          <tr><td><span class="status-badge rot">Kritisch</span></td><td>&lt; 2 Jahre</td><td>Rot</td><td>Erscheint in E-Mail-Report, keine weitere Aktion im System</td></tr>
+          <tr><td><span class="status-badge gelb">Dringend</span></td><td>2–5 Jahre</td><td>Gelb</td><td>Erscheint in E-Mail-Report, keine weitere Aktion im System</td></tr>
+          <tr><td><span class="status-badge blau">Planung</span></td><td>5–10 Jahre</td><td>Blau</td><td>Erscheint in E-Mail-Report, keine weitere Aktion im System</td></tr>
+        </tbody>
+      </table>
+      <p>Der Report geht als HTML-Mail an <code>CREDO-Personal-intern@fes-credo.de</code>. Es gibt bewusst <strong>keine KI</strong> im Flow (personenbezogene Daten) und ein Quality-Gate, das bei Datenproblemen abbricht statt falsch zu entwarnen. Offen war in der n8n-Doku bereits notiert: <em>"DSGVO/MAV-Angemessenheit des Verteilers prüfen"</em> — dieser Punkt taucht in Abschnitt 11 wieder auf.</p>
+      <p>Das neue Modul soll genau hier andocken: aus einer <strong>reinen Informations-Mail</strong> wird ein <strong>begleiteter Vorgang</strong> — ohne die bewährte n8n-Datenbasis zu ersetzen.</p>
+    </section>
+
+    <!-- 3 -->
+    <section class="section" id="prozesskette">
+      <div class="section-title"><div class="num">3</div><h2>Gesamt-Prozesskette</h2></div>
+      <p>Die fünf CREDO-Farben markieren die fünf Abschnitte der Reise eines Mitarbeiters — von der ersten Vorausschau bis zur Würdigung nach dem Ausscheiden:</p>
+      <div class="flow-band">
+        <div class="flow-seg blau">Planung<span class="jahre">5–10 J.</span></div>
+        <div class="flow-seg gelb">Dringend<span class="jahre">2–5 J.</span></div>
+        <div class="flow-seg rot">Kritisch<span class="jahre">&lt; 2 J.</span></div>
+        <div class="flow-seg grau">Offboarding<span class="jahre">Letzte Monate</span></div>
+        <div class="flow-seg gruen">Würdigung<span class="jahre">Nach Austritt</span></div>
+      </div>
+      <div class="flow-labels">
+        <div>Altersteilzeit prüfen, grobe Nachfolge-Einschätzung</div>
+        <div>Vorschlag an HR, Mitarbeiter informieren, Nachfolge + Wissenstransfer starten</div>
+        <div>Übergabephase, Mentoring, Verabschiedung planen</div>
+        <div>Zugriffsentzug, Übergabeprotokoll, Zeugnis (bestehendes Modul)</div>
+        <div>Dankschreiben, Alumni-Kontakt, Rückblick</div>
+      </div>
+      <div class="warnung">
+        <span class="icon">⚠️</span>
+        <div><strong>Wichtigste Korrektur gegenüber der ursprünglichen Idee</strong>Ursprünglich war geplant, dass bei "Dringend" automatisch ein Vorgang eröffnet wird, ohne dass der Mitarbeiter davon weiß. Die kritische Prüfung (Abschnitt 12) hat das als Datenschutz- und Vertrauensrisiko eingestuft. Der Plan sieht daher jetzt vor: <strong>Automatik erzeugt nur einen Vorschlag für HR</strong>, und <strong>der Mitarbeiter wird informiert, bevor</strong> über Nachfolge gesprochen wird. Das ist in den folgenden Abschnitten so eingearbeitet.</div>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="section" id="phase-planung">
+      <div class="section-title"><div class="num">4</div><h2>Phase A — Planung (5–10 Jahre bis Regelaltersgrenze)</h2></div>
+      <p>In dieser Phase passiert bewusst noch <strong>kein individueller Vorgang</strong> — nur ein aggregierter Blick für die Personalplanung, damit z. B. Altersteilzeit-Anfragen (ab 55 Jahren, lange Vorlaufzeit nötig) nicht überraschen.</p>
+      <div class="mockup">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Dashboard → Ruhestandsplanung → Vorausschau (Mandantenebene)</span></div>
+        <div class="mockup-body">
+          <div class="m-row"><div class="m-name">GYM Minden</div><div class="m-sub">3 Planung · 2 Dringend · 1 Kritisch</div><span class="status-badge rot">1 kritisch</span></div>
+          <div class="m-row"><div class="m-name">Kita Sonnenschein</div><div class="m-sub">1 Planung · 0 Dringend · 0 Kritisch</div><span class="status-badge grau">unauffällig</span></div>
+          <div class="m-row"><div class="m-name">Realschule Petershagen</div><div class="m-sub">2 Planung · 4 Dringend · 2 Kritisch</div><span class="status-badge rot">Handlungsbedarf</span></div>
+        </div>
+      </div>
+      <p>Diese Übersicht ist die Weiterentwicklung des heutigen E-Mail-Reports — nur jetzt interaktiv im Portal, mit Drill-down. Für einzelne Mitarbeiter in "Planung" wird lediglich ein Hinweis-Badge am Mitarbeiterprofil angezeigt ("Regelaltersgrenze in ca. 7 Jahren — Altersteilzeit ab 55 möglich"), aber <strong>kein eigener Datensatz mit Nachfolgeplanung</strong> angelegt.</p>
+    </section>
+
+    <!-- 5 -->
+    <section class="section" id="phase-dringend">
+      <div class="section-title"><div class="num">5</div><h2>Phase B — Dringend (2–5 Jahre): Vorschlag statt Automatik</h2></div>
+      <p>Hier beginnt die eigentliche Vorgangslogik. Statt eines automatisch aktiven Prozesses (das hätte laut kritischer Prüfung zu Alarmflut und Alters-Profiling ohne Rechtsgrundlage geführt) erscheint ein <strong>Vorschlag</strong>, den HR aktiv bestätigen muss:</p>
+      <div class="mockup">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Ruhestandsplanung → Vorschläge (Inbox für HR)</span></div>
+        <div class="mockup-body">
+          <div class="m-row">
+            <div class="m-name">Elke Wagner <span class="m-sub">GYM Minden · TV-L · in 3,2 Jahren</span></div>
+            <span class="status-badge gelb">Dringend</span>
+            <span class="m-btn">Vorgang eröffnen</span>
+            <span class="m-btn outline">Später</span>
+          </div>
+          <div class="m-row">
+            <div class="m-name">Hans-Peter Krüger <span class="m-sub">Realschule Petershagen · Beamter · in 4,7 Jahren</span></div>
+            <span class="status-badge gelb">Dringend</span>
+            <span class="m-btn">Vorgang eröffnen</span>
+            <span class="m-btn outline">Später</span>
+          </div>
+        </div>
+      </div>
+      <p>Erst mit Klick auf <strong>"Vorgang eröffnen"</strong> entsteht ein <code>RetirementProcess</code>. Der erste automatische Schritt danach ist <strong>nicht</strong> die Nachfolgersuche, sondern die Information des Mitarbeiters selbst:</p>
+      <div class="mockup">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Magic-Link an Mitarbeiter (kein Login nötig, wie Exit-Interview)</span></div>
+        <div class="mockup-body">
+          <p style="margin-bottom:10px;"><strong>Ihr Ruhestand rückt näher — wir möchten Sie gut begleiten</strong></p>
+          <p style="margin-bottom:10px; color:var(--text-light);">Ihre Regelaltersgrenze liegt voraussichtlich am 14.03.2030. Ihre Schulleitung möchte frühzeitig mit der Nachfolgeplanung beginnen und Ihr Wissen sichern. Bevor das passiert, möchten wir Sie informieren und um Ihr Einverständnis bitten.</p>
+          <div class="m-btn">Einverstanden — Nachfolgeplanung starten</div>&nbsp;
+          <div class="m-btn outline">Ich möchte das jetzt noch nicht</div>
+        </div>
+      </div>
+      <p>Erst nach Zustimmung (oder nach einer definierten Frist mit Eskalation an HR bei Nicht-Reaktion) schaltet die Phase auf Nachfolgersuche und Wissenstransfer-Vorbereitung um.</p>
+    </section>
+
+    <!-- 6 -->
+    <section class="section" id="phase-kritisch">
+      <div class="section-title"><div class="num">6</div><h2>Phase C — Kritisch (&lt; 2 Jahre): Übergabephase</h2></div>
+      <p>Der Vorgang zeigt jetzt den vollen Fortschritt als Stepper, analog zum Verbeamtungs-Modul (PSI), das bereits eine mehrstufige <code>Phase</code>-Tabelle mit Fortschrittsanzeige nutzt:</p>
+      <div class="timeline">
+        <div class="tl-step done"><div class="dot">✓</div><div class="lbl">Vorgang eröffnet</div></div>
+        <div class="tl-step done"><div class="dot">✓</div><div class="lbl">Mitarbeiter informiert &amp; einverstanden</div></div>
+        <div class="tl-step done"><div class="dot">✓</div><div class="lbl">Nachfolge geklärt</div></div>
+        <div class="tl-step active"><div class="dot">4</div><div class="lbl">Wissenstransfer-Interview</div></div>
+        <div class="tl-step"><div class="dot">5</div><div class="lbl">Übergabephase / Mentoring</div></div>
+        <div class="tl-step"><div class="dot">6</div><div class="lbl">Würdigung geplant</div></div>
+        <div class="tl-step"><div class="dot">7</div><div class="lbl">Offboarding ausgelöst</div></div>
+      </div>
+      <div class="warnung">
+        <span class="icon">⚠️</span>
+        <div><strong>Freiwilligkeit bleibt bestehen</strong>Ein Mitarbeiter kann die Mitwirkung an Übergabephase/Mentoring ablehnen — das ist sein gutes Recht. Der Vorgang bekommt dafür einen eigenen Status <span class="status-badge grau">Ausgesetzt</span> mit Grundangabe, statt im linearen Pfad steckenzubleiben oder falsch als "abgeschlossen" markiert zu werden.</div>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="section" id="wissenstransfer">
+      <div class="section-title"><div class="num">7</div><h2>Wissenstransfer im Detail</h2></div>
+      <p>Die Recherche bestätigt: Wissenstransfer, der erst im klassischen Exit-Interview passiert, kommt zu spät — ein Großteil des impliziten Wissens (Kontakte, Entscheidungsgründe, informelle Abläufe) lässt sich nur durch <strong>frühzeitige, strukturierte Interviews plus bewusste Überlappungszeit</strong> sichern, nicht durch Dokumentation allein. Drei Bausteine, mit klarer Aufgabenteilung:</p>
+      <div class="mockup">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Vorgang Elke Wagner → Tab "Wissenstransfer"</span></div>
+        <div class="mockup-body">
+          <div class="m-tabs">
+            <div class="m-tab">Übersicht</div><div class="m-tab">Nachfolge</div><div class="m-tab active">Wissenstransfer</div><div class="m-tab">Checkliste</div><div class="m-tab">Würdigung</div>
+          </div>
+          <p style="font-weight:700; margin-bottom:6px;">Übergabe-Interview (Magic-Link, wie Exit-Interview — aber vorausschauend)</p>
+          <div class="m-check"><div class="box on"></div>Interview mit Elke Wagner versendet (12.04.2027)</div>
+          <div class="m-check"><div class="box on"></div>Interview mit Vorgesetzter (Schulleitung) versendet</div>
+          <div class="m-check"><div class="box"></div>Interview mit Schlüssel-Stakeholder (Kollegium) versendet</div>
+          <p style="font-weight:700; margin:14px 0 6px;">Wissensdatenbank-Eintrag (Freitext)</p>
+          <div class="m-field">Laufende Projekte, Schlüsselkontakte, "so machen wir das eigentlich immer" — wird während der Überlappungszeit laufend ergänzt, nicht erst am Ende.</div>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Baustein</th><th>Wann</th><th>Wer befüllt</th><th>Zweck</th></tr></thead>
+        <tbody>
+          <tr><td>Übergabe-Interview</td><td>Bei Start Phase Kritisch</td><td>Mitarbeiter + Vorgesetzter (getrennt befragt)</td><td>Entscheidungs­kontext, Stakeholder-Beziehungen — strukturiert statt zufällig</td></tr>
+          <tr><td>Checkliste</td><td>Laufend Kritisch-Phase</td><td>Vorgesetzter + Nachfolger gemeinsam</td><td>Konkrete Aufgaben: Zugänge dokumentieren, Ansprechpartner vorstellen, Job-Shadowing terminieren</td></tr>
+          <tr><td>Wissensdatenbank</td><td>Laufend, ab Nachfolge-Klärung</td><td>Ausscheidender Mitarbeiter selbst</td><td>Informelles Wissen, das in keine Stellenbeschreibung passt</td></tr>
+        </tbody>
+      </table>
+      <div class="kritik">
+        <span class="icon">🛑</span>
+        <div><strong>Eigentümerschaft klären, um Doppelpflege zu vermeiden</strong><code>OffboardingExitData</code> hat bereits die Felder <code>knowledgeTransferPlan</code>, <code>successorName</code>, <code>handoverDocComplete</code>. Diese drei Bausteine hier <strong>befüllen dieselben Inhalte, nur früher</strong> — sie sind keine Zusatzfelder, sondern die Vorstufe. Details dazu in Abschnitt 8.</div>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="section" id="offboarding-uebergang">
+      <div class="section-title"><div class="num">8</div><h2>Übergang zum Offboarding — ohne Redundanz</h2></div>
+      <p>Klare Regel: Das Ruhestandsmodul <strong>besitzt</strong> die Wissenstransfer-Daten, solange der Vorgang läuft. Sobald der Offboarding-Vorgang entsteht, werden die Felder <strong>kopiert (Snapshot), nicht parallel gepflegt</strong>:</p>
+      <div class="dm-wrap">
+        <div class="dm-box main">RetirementProcess<br><span style="font-weight:400;font-size:10px;">knowledgeTransferPlan, successorName, handoverDocComplete (Entwurf)</span></div>
+        <div class="dm-arrow">↓ bei Erreichen "Kritisch, kurz vor Regelaltersgrenze"</div>
+        <div class="dm-box">Vorschlag an HR: "Offboarding jetzt eröffnen?" <span style="font-weight:400;">(kein Auto-Start — analog zu Abschnitt 5)</span></div>
+        <div class="dm-arrow">↓ HR bestätigt (ein Klick, Felder vorausgefüllt)</div>
+        <div class="dm-box end">OffboardingProcess (exitType: RENTE_PENSION)<br><span style="font-weight:400;font-size:10px;">Felder aus RetirementProcess übernommen &amp; eingefroren</span></div>
+      </div>
+      <p>Damit gehört <strong>Zugriffsentzug, Übergabeprotokoll-Abschluss und Zeugnis</strong> weiterhin klar zum bestehenden Offboarding-Modul — das Ruhestandsmodul liefert nur die Vorarbeit, dupliziert sie aber nicht als eigenständige Wahrheit.</p>
+      <div class="offen">
+        <span class="icon">💬</span>
+        <div><strong>Menschlicher Aspekt nicht vergessen</strong>Ein rein technischer Datenübergang würdigt nicht, dass hier oft jemand nach Jahrzehnten geht. Baustein "Würdigung" (Dienstjubiläum, Verabschiedung, Dankschreiben) ist deshalb ein eigener, bewusst nicht-technischer Checklisten-Punkt, der unabhängig vom Datentransfer abgehakt wird.</div>
+      </div>
+    </section>
+
+    <!-- 9 -->
+    <section class="section" id="datenmodell">
+      <div class="section-title"><div class="num">9</div><h2>Datenmodell (Architektur-Skizze)</h2></div>
+      <p>Architektonisches Vorbild ist das Verbeamtungs-Modul (<code>CivilServiceProcess</code>): Hauptprozess + Phasen-Kindtabelle + eigenes Checklisten-Modell + flexibles JSON für Beteiligte. Wichtigste Korrektur aus der kritischen Prüfung: der Vorgang hängt <strong>nicht am Employee allein</strong>, sondern führt ein <em>führendes Employment</em>, weil ein Mitarbeiter an verschiedenen Mandanten unterschiedliche Vertragsarten (Beamter vs. TV-L) mit unterschiedlichen Ruhestandsregeln haben kann.</p>
+      <div class="dm-wrap">
+        <div class="dm-box">Employee</div>
+        <div class="dm-arrow">↓ 1:n (führendes Employment explizit markiert)</div>
+        <div class="dm-box">Employment <span style="font-weight:400;font-size:10px;">(ContractType: BEAMTER / TV-L / …, je Mandant)</span></div>
+        <div class="dm-arrow">↓ 1:1 pro relevantem Employment</div>
+        <div class="dm-box main">RetirementProcess<br><span style="font-weight:400;font-size:10px;">category (berechnet, konfigurierbar), status, leadEmploymentId, consentAt</span></div>
+        <div class="dm-children">
+          <div class="dm-box">RetirementPhase<br><span style="font-weight:400;font-size:10px;">Meilensteine + Zeitstempel</span></div>
+          <div class="dm-box">RetirementChecklistItem<br><span style="font-weight:400;font-size:10px;">Vorgesetzter / Nachfolger / HR</span></div>
+          <div class="dm-box">RetirementSuccessor<br><span style="font-weight:400;font-size:10px;">Freitext ODER Employee-Referenz, mehrfach möglich</span></div>
+          <div class="dm-box">HandoverInterview<br><span style="font-weight:400;font-size:10px;">Template-Kaskade wie ExitInterview</span></div>
+        </div>
+      </div>
+      <h3>Wichtige Korrekturen gegenüber dem ersten Entwurf</h3>
+      <ul style="padding-left:20px;">
+        <li><strong>Kategorie-Schwellwerte sind Einstellungen</strong>, nicht Code — Default = heutige n8n-Werte (Kritisch &lt;2J / Dringend 2–5J / Planung 5–10J), aber je Mandant/Vertragsart justierbar (CREDO-Prinzip "Konfigurierbarkeit statt Hardcoding").</li>
+        <li><strong>Kategorisierungslogik lebt im Portal</strong>, nicht in n8n — n8n liefert künftig nur noch Rohdaten (Geburtsdatum, Vertragsart, Regelaltersgrenze-Basis) an einen neuen, API-Key-gesicherten Import-Endpunkt (analog zur bestehenden Reporting-API). Das Portal berechnet die Kategorie live bei jedem Aufruf — sonst könnte der monatliche n8n-Takt zu veralteten Kategorien im Portal führen, während die E-Mail schon eine andere Stufe zeigt.</li>
+        <li><strong>Nachfolger ist keine einfache 1:1-Referenz</strong> — häufig ist der Nachfolger extern (noch kein Employee-Datensatz) oder die Rolle wird geteilt. Deshalb eigene <code>RetirementSuccessor</code>-Relation statt einzelnem Fremdschlüssel.</li>
+        <li><strong>Löschkonzept ergänzen</strong>: <code>RetirementProcess</code> braucht wie <code>OffboardingProcess</code> ein <code>dataRetentionDate</code>-Feld; die abgeleitete Regelaltersgrenze braucht ein manuelles Korrekturfeld (z. B. bei Schwerbehinderung, die die Altersgrenze vorzieht).</li>
+      </ul>
+    </section>
+
+    <!-- 10 -->
+    <section class="section" id="rollen">
+      <div class="section-title"><div class="num">10</div><h2>Rollen &amp; Verantwortlichkeiten</h2></div>
+      <p>Die Recherche fand keine belastbare fertige RACI-Vorlage speziell für Ruhestandsprozesse — die folgende Aufteilung ist daher aus den bestehenden CREDO-Mustern (Offboarding, PSI) abgeleitet und sollte vor Umsetzung mit HR-Leitung/MAV abgestimmt werden (siehe Abschnitt 13):</p>
+      <table>
+        <thead><tr><th>Schritt</th><th>Verantwortlich</th><th>Mitwirkend</th><th>Informiert</th></tr></thead>
+        <tbody>
+          <tr><td>Vorschlag prüfen &amp; Vorgang eröffnen</td><td>HR (HR_LEITUNG / HR_SACHBEARBEITER)</td><td>Einrichtungsleitung</td><td>—</td></tr>
+          <tr><td>Mitarbeiter informieren &amp; Einverständnis einholen</td><td>HR</td><td>Vorgesetzter</td><td>Mitarbeiter</td></tr>
+          <tr><td>Nachfolge identifizieren</td><td>Vorgesetzter / Einrichtungsleitung</td><td>HR</td><td>Mitarbeiter (auf Wunsch)</td></tr>
+          <tr><td>Wissenstransfer-Interviews durchführen</td><td>Vorgesetzter</td><td>Mitarbeiter, Nachfolger</td><td>HR</td></tr>
+          <tr><td>Checkliste/Übergabe abarbeiten</td><td>Vorgesetzter + Nachfolger gemeinsam</td><td>Mitarbeiter</td><td>HR</td></tr>
+          <tr><td>Würdigung/Verabschiedung planen</td><td>Einrichtungsleitung</td><td>Vorgesetzter</td><td>HR</td></tr>
+          <tr><td>Offboarding auslösen</td><td>HR</td><td>Vorgesetzter</td><td>Mitarbeiter</td></tr>
+        </tbody>
+      </table>
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div><strong>Sichtbarkeit einschränken</strong>"Wer geht wann"-Daten sind besonders sensibel. Empfehlung: ähnlich restriktive Sichtbarkeit wie beim BEM-Modul ("versiegelte Akte"-Prinzip) — nicht pauschal für alle <code>HR_STAFF</code> einsehbar, sondern auf die konkret zuständigen Rollen begrenzt.</div>
+      </div>
+    </section>
+
+    <!-- 11 -->
+    <section class="section" id="recht">
+      <div class="section-title"><div class="num">11</div><h2>Rechtlicher Rahmen (recherchiert &amp; verifiziert)</h2></div>
+      <table>
+        <thead><tr><th>Thema</th><th>Kernaussage</th><th>Konsequenz fürs Modul</th></tr></thead>
+        <tbody>
+          <tr><td>Altersteilzeit</td><td>Ab 55 Jahren, mind. 1.080 Tage sozialversicherungspflichtig in 5 Jahren; Block- oder Gleichverteilungsmodell, lange Vorlaufzeit nötig.</td><td>Info-Hinweis bereits in Phase "Planung" (5–10 Jahre), nicht erst bei "Dringend".</td></tr>
+          <tr><td>TV-L / Angestellte</td><td>§ 41 Satz 3 SGB VI erlaubt eine einfache (auch mehrfache) Vereinbarung, den Ruhestandseintritt hinauszuschieben — kein neuer Arbeitsvertrag nötig.</td><td>Modul zeigt bei ContractType ≠ BEAMTER die Option "Verlängerung per Vereinbarung möglich" an.</td></tr>
+          <tr><td>Beamte</td><td>Kein Rechtsanspruch auf Weiterbeschäftigung über die Regelaltersgrenze hinaus (VG Frankfurt, Az. 9 K 3147/13.F — Zwangspensionierung ist gerechtfertigte Altersdiskriminierung wegen Personalplanung).</td><td>Modul zeigt bei ContractType = BEAMTER "harte Altersgrenze, keine automatische Verlängerung" — abweichend von TV-L-Ansicht.</td></tr>
+        </tbody>
+      </table>
+      <div class="kritik">
+        <span class="icon">🛑</span>
+        <div><strong>Bewusst NICHT übernommene, weil widerlegte Behauptungen</strong>Im Rechercheprozess wurden mehrere zunächst plausible Detailregeln aktiv geprüft und verworfen: eine angebliche niedersächsische 3-Jahres-Verlängerungsfrist (§ 36 Abs. 3 NBG), eine angebliche Pflicht zu einem komplett neuen Arbeitsvertrag nach TVöD, sowie unbelegte Statistiken zu Succession-Planning-Verbreitung. Diese dürfen <strong>nicht</strong> als Grundlage für Rechtstexte im Modul verwendet werden.</div>
+      </div>
+      <div class="offen">
+        <span class="icon">💬</span>
+        <div><strong>DSGVO &amp; MAV — noch ungeklärt, braucht Klärung vor Umsetzung</strong>Die Recherche fand keine belastbare Quelle zu: Rechtsgrundlage für automatisierte "Zeit-bis-Rente"-Auswertung (Art. 88 DSGVO + kirchliches Datenschutzrecht), Löschfristen für Ruhestandsdaten, und ob/wie die MAV bei einem systematischen Alters-Screening zu beteiligen ist. Das ist der wichtigste offene Punkt vor jeder Umsetzung (siehe Abschnitt 13).</div>
+      </div>
+    </section>
+
+    <!-- 12 -->
+    <section class="section" id="kritik">
+      <div class="section-title"><div class="num">12</div><h2>Kritische Prüfung (Advocatus Diaboli)</h2></div>
+      <p>Ein separater Prüf-Agent hat den ersten Entwurf gezielt angegriffen, ohne an der Formulierung des Plans beteiligt gewesen zu sein. Alle 12 Punkte sind in den Plan oben bereits eingearbeitet — hier zur Nachvollziehbarkeit im Original mit Lösung:</p>
+
+      <div class="kritik"><span class="kritik-num">1</span><div><strong>Widerspruch Auto-Trigger vs. Sichtbarkeit/MAV:</strong> Ein automatisch ohne Wissen des Mitarbeiters angelegter Vorgang ist faktisch Alters-Profiling ohne dokumentierte Rechtsgrundlage.<div class="loesung"><strong>Gelöst in Abschnitt 5:</strong> Automatik erzeugt nur einen Vorschlag, HR bestätigt aktiv; Mitarbeiter wird vor Nachfolgersuche informiert und gefragt.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">2</span><div><strong>Doppelte Fachlogik n8n vs. Portal:</strong> n8n rechnet tagesaktuell, ein monatlich gecachtes Portal-Feld würde veraltet sein.<div class="loesung"><strong>Gelöst in Abschnitt 9:</strong> Kategorisierungslogik zieht ins Portal um, n8n liefert nur noch Rohdaten.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">3</span><div><strong>Multi-Mandant-Bruchstelle:</strong> Ein Employee mit Beamten- und TV-L-Stelle gleichzeitig hat zwei Regelwerke, aber nur einen Prozess.<div class="loesung"><strong>Gelöst in Abschnitt 9:</strong> <code>RetirementProcess</code> führt ein explizites <code>leadEmploymentId</code> statt pauschal am Employee zu hängen.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">4</span><div><strong>Nachfolger-Modell zu simpel:</strong> Eine einzelne Fremdschlüssel-Referenz bildet externe Neueinstellungen oder geteilte Nachfolge nicht ab.<div class="loesung"><strong>Gelöst in Abschnitt 9:</strong> Eigene <code>RetirementSuccessor</code>-Relation, Freitext oder Employee-Referenz, mehrfach möglich.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">5</span><div><strong>Redundanz zu OffboardingExitData:</strong> Parallel gepflegte Wissenstransfer-Felder erzeugen divergierende Wahrheiten.<div class="loesung"><strong>Gelöst in Abschnitt 8:</strong> Klare Eigentümerschaft — Retirement-Modul befüllt vor, Offboarding übernimmt per Snapshot.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">6</span><div><strong>Alarmflut durch pauschalen Dringend-Trigger:</strong> Dutzende gleichzeitige Vorgänge würden ignoriert werden.<div class="loesung"><strong>Gelöst in Abschnitt 5:</strong> Vorschlags-Inbox statt Sofort-Start, HR entscheidet pro Fall.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">7</span><div><strong>Fehlende Transparenz gegenüber dem Betroffenen:</strong> Nachfolgersuche vor Wissen des Mitarbeiters ist riskant für Datenschutz und Betriebsklima.<div class="loesung"><strong>Gelöst in Abschnitt 5:</strong> Pflicht-Gate "Mitarbeiter informiert &amp; einverstanden" vor jedem weiteren Schritt.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">8</span><div><strong>Hardcoding-Verstoß:</strong> Fixe Schwellwerte widersprechen dem CREDO-Prinzip Konfigurierbarkeit statt Hardcoding.<div class="loesung"><strong>Gelöst in Abschnitt 9:</strong> Schwellwerte werden Einstellungen mit den heutigen n8n-Werten als Default.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">9</span><div><strong>SPOF durch Doppel-Push von n8n:</strong> E-Mail und API-Push aus einem Lauf erhöhen die Fehlerfläche ohne Kontrolle.<div class="loesung"><strong>Adressiert in Roadmap (Abschnitt 14):</strong> Push wird geloggt, aktiver Health-Check warnt bei ausbleibendem monatlichem Import — E-Mail bleibt vorerst parallel bestehen, wird erst nach Bewährung der Portal-Ansicht abgelöst.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">10</span><div><strong>Datenqualität/Löschfristen ungeklärt:</strong> Regelaltersgrenze ist rechtlich variabel (z. B. Schwerbehinderung), Aufbewahrungsdauer war nicht definiert.<div class="loesung"><strong>Gelöst in Abschnitt 9:</strong> Manuelles Korrekturfeld plus <code>dataRetentionDate</code> analog zum Offboarding-Modul.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">11</span><div><strong>Fehlender menschlicher/kultureller Aspekt:</strong> Ein rein prozessualer Plan ignoriert Wertschätzung nach jahrzehntelanger Zugehörigkeit.<div class="loesung"><strong>Gelöst in Abschnitt 3 &amp; 8:</strong> Eigener Prozessabschnitt "Würdigung" (grüner Farbbereich), unabhängig vom technischen Datentransfer.</div></div></div>
+
+      <div class="kritik"><span class="kritik-num">12</span><div><strong>Statuspipeline kollidiert mit Freiwilligkeit:</strong> Kein Ausstiegspfad, falls Mitwirkung verweigert wird oder der Prozess abbricht (Krankheit, vorzeitiger Austritt).<div class="loesung"><strong>Gelöst in Abschnitt 6:</strong> Eigener Status "Ausgesetzt/Abgebrochen" mit Grundfeld statt rein linearem Pfad.</div></div></div>
+    </section>
+
+    <!-- 13 -->
+    <section class="section" id="fragen">
+      <div class="section-title"><div class="num">13</div><h2>Offene Fragen an dich</h2></div>
+      <p>Bevor dieser Plan in eine Umsetzung gehen kann, braucht es Antworten auf Punkte, die weder Codebase noch Recherche beantworten konnten:</p>
+      <div class="offen"><span class="icon">1.</span><div><strong>MAV-Beteiligung:</strong> Muss die Mitarbeitervertretung vor Einführung eines systematischen "Zeit-bis-Rente"-Screenings beteiligt werden (Dienstvereinbarung)? Das war schon beim bestehenden n8n-Report offen und sollte jetzt final geklärt werden, bevor daraus ein aktiver Vorgang wird.</div></div>
+      <div class="offen"><span class="icon">2.</span><div><strong>Datenschutz-Rechtsgrundlage:</strong> Soll das Modul auf Basis einer Betriebs-/Dienstvereinbarung (Art. 88 DSGVO) laufen, oder braucht es eine Einzel-Einwilligung je Mitarbeiter? Das entscheidet, ob der "Vorschlag" (Abschnitt 5) HR-intern bleiben darf oder der Mitarbeiter schon vorher informiert werden muss.</div></div>
+      <div class="offen"><span class="icon">3.</span><div><strong>Auslöse-Zeitpunkt fürs Offboarding:</strong> Wie viele Monate vor der Regelaltersgrenze soll der Offboarding-Vorschlag (Abschnitt 8) erscheinen — 3, 6, 12 Monate? Das hängt auch von Kündigungs-/Meldefristen ab, die je Vertragsart unterschiedlich sind.</div></div>
+      <div class="offen"><span class="icon">4.</span><div><strong>Beamtenrecht je Bundesland/Landeskirche:</strong> Die recherchierten Regeln sind bundesweit/generisch; CREDO-Mandanten könnten unter unterschiedlichem Landesbeamtenrecht oder kirchlichem Dienstrecht stehen. Welche Bundesländer/Träger sind konkret betroffen, damit die rechtlichen Hinweistexte im Modul stimmen?</div></div>
+      <div class="offen"><span class="icon">5.</span><div><strong>Reichweite der Wissensdatenbank:</strong> Soll der Freitext-Wissensdatenbank-Eintrag (Abschnitt 7) nur an den Nachfolger gehen, oder soll er organisationsweit durchsuchbar sein (z. B. für spätere, noch unbekannte Nachfolger)? Das beeinflusst Zugriffsschutz und Aufbewahrungsdauer erheblich.</div></div>
+    </section>
+
+    <!-- 14 -->
+    <section class="section" id="roadmap">
+      <div class="section-title"><div class="num">14</div><h2>Empfohlene Umsetzungsreihenfolge</h2></div>
+      <p>Nach demselben Muster wie das BEM-Modul (Epics E0–E9) — klein anfangen, Nutzen früh zeigen, riskante Automatik zuletzt:</p>
+      <ol class="epic-list">
+        <li><span class="epic-tag">E0</span><div><strong>Datenbasis &amp; Einstellungen</strong> — Kategorisierungslogik + konfigurierbare Schwellwerte im Portal nachbauen (heutige n8n-Werte als Default), neuer Import-Endpunkt für Rohdaten aus n8n, Portal-Dashboard als reiner Ersatz/Ergänzung für die heutige E-Mail (noch keine Vorgänge).</div></li>
+        <li><span class="epic-tag">E1</span><div><strong>MAV/DSGVO-Klärung</strong> — Abschnitt 13 beantworten, ggf. Dienstvereinbarung, bevor irgendein Vorgang am einzelnen Mitarbeiter entsteht.</div></li>
+        <li><span class="epic-tag">E2</span><div><strong>Vorschlags-Inbox + Mitarbeiter-Information</strong> — Vorschlag bei "Dringend", HR-Bestätigung, Magic-Link-Information mit Einverständnis-Gate (Abschnitt 5).</div></li>
+        <li><span class="epic-tag">E3</span><div><strong>Nachfolge &amp; Checkliste</strong> — <code>RetirementSuccessor</code>, <code>RetirementChecklistItem</code>, Rollen-Zuweisung Vorgesetzter/Nachfolger.</div></li>
+        <li><span class="epic-tag">E4</span><div><strong>Wissenstransfer-Interview</strong> — Neue Template-Kaskade nach Exit-Interview-Muster, plus Wissensdatenbank-Freitext.</div></li>
+        <li><span class="epic-tag">E5</span><div><strong>Übergang zum Offboarding</strong> — Vorschlags-Mechanismus + Snapshot-Übernahme in <code>OffboardingExitData</code> (Abschnitt 8), Würdigungs-Baustein.</div></li>
+        <li><span class="epic-tag">E6</span><div><strong>Health-Check &amp; Ablösung der n8n-E-Mail</strong> — erst wenn E0–E5 sich bewährt haben, Doppel-Pfad (Abschnitt 12, Punkt 9) auflösen.</div></li>
+      </ol>
+    </section>
+
+    <!-- 15 -->
+    <section class="section" id="quellen">
+      <div class="section-title"><div class="num">15</div><h2>Quellen &amp; Recherche-Hinweise</h2></div>
+      <p>Web-Recherche mit adversarieller Verifikation (3-fach-Abstimmung pro Aussage). 25 Aussagen geprüft, 19 bestätigt, 6 widerlegt und verworfen.</p>
+      <div class="quelle-item">Succession Planning als 12–36-Monats-Prozess mit Readiness-Stufen <span class="conf high">hoch</span><br><em>SHRM Toolkit "Modernize Succession Planning"; pin.com Succession Planning Guide</em></div>
+      <div class="quelle-item">Wissenstransfer muss vor dem Exit-Interview beginnen, strukturierte Interviews + Überlappungszeit <span class="conf high">hoch</span><br><em>Qooper "4 Stages of Succession Planning"; Enterprise Knowledge "Navigating the Retirement Cliff"; ProcedureFlow Knowledge Transfer Plan</em></div>
+      <div class="quelle-item">Tacit Knowledge erfordert Mentoring/Job-Shadowing, nicht nur Dokumentation <span class="conf high">hoch</span><br><em>myHub Intranet Knowledge Transfer; Coach Mentoring UK</em></div>
+      <div class="quelle-item">Altersteilzeit: ab 55 Jahren, 1.080 Tage in 5 Jahren, Block-/Gleichverteilungsmodell <span class="conf high">hoch</span><br><em>Bundesministerium für Arbeit und Soziales (Primärquelle)</em></div>
+      <div class="quelle-item">§ 41 SGB VI: einfache Hinausschiebensvereinbarung für Angestellte möglich <span class="conf high">hoch</span><br><em>Ditschler Seminare, gegengeprüft mit Gesetzestext + BAG-Pressemitteilung</em></div>
+      <div class="quelle-item">Beamte: kein Anspruch auf Weiterbeschäftigung über Regelaltersgrenze (VG Frankfurt) <span class="conf high">hoch</span><br><em>Haufe Öffentlicher Dienst, gegengeprüft mit Legal Tribune Online</em></div>
+      <p style="margin-top:16px;"><strong>Bewusst verworfen (widerlegt in der Gegenprüfung):</strong></p>
+      <div class="verworfen">Angebliche Statistik "nur 21% der HR-Profis haben einen formalen Nachfolgeplan"</div>
+      <div class="verworfen">Angebliche TVöD-Pflicht zu komplett neuem Arbeitsvertrag nach Regelaltersgrenze</div>
+      <div class="verworfen">Angebliche niedersächsische 3-Jahres-Antragsfrist nach § 36 Abs. 3 NBG</div>
+      <p style="margin-top:16px; font-size:12px; color:var(--text-light);">Nicht abschließend recherchierbar (siehe Abschnitt 13): Reifegradmodelle speziell für den Bildungssektor, fertige RACI-Vorlagen für Vorgesetzte-vs-HR, DSGVO-Spezifika für Alters-Auswertungen, länderspezifische Beamtenrechts-Details.</p>
+    </section>
+
+  </main>
+
+  <footer class="doc-footer">
+    <p><strong>CREDO HR-Portal</strong> — Konzeptplan, erstellt als Diskussionsgrundlage. Keine beauftragte Umsetzung.</p>
+    <p>Erstellt mit Web-Recherche (adversarielle Quellenverifikation) und unabhängiger kritischer Gegenprüfung (Advocatus Diaboli).</p>
+  </footer>
+
+</div>
+</body>
+</html>

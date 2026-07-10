@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bedienungsanleitung — BEM-Modul | CREDO HR-Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* === Reset & Basis === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary-bg:   #DADADA;
+      --accent:       #575756;
+      --text:         #2b2b2b;
+      --text-light:   #666;
+      --gelb:         #FBC900;
+      --gruen:        #6BAA24;
+      --rot:          #E2001A;
+      --blau:         #009AC6;
+      --white:        #ffffff;
+      --border:       #c5c5c5;
+      --hinweis-bg:   #EBF5FB;
+      --hinweis-bd:   #009AC6;
+      --warnung-bg:   #FEF9E7;
+      --warnung-bd:   #FBC900;
+      --recht-bg:     #F4F6F7;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Montserrat', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+      background: #f7f7f7;
+    }
+
+    /* === Layout === */
+    .page-wrapper {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--white);
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    }
+
+    /* === Header === */
+    .doc-header {
+      background: var(--accent);
+      color: var(--white);
+      padding: 40px 48px 32px;
+    }
+    .doc-header .badge {
+      display: inline-block;
+      background: var(--blau);
+      color: var(--white);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+    }
+    .doc-header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .doc-header .subtitle {
+      margin-top: 8px;
+      font-size: 13px;
+      opacity: .75;
+    }
+    .doc-header .meta {
+      margin-top: 20px;
+      font-size: 11px;
+      opacity: .6;
+      border-top: 1px solid rgba(255,255,255,.2);
+      padding-top: 14px;
+    }
+
+    /* === CREDO-Farbbalken === */
+    .credo-bar {
+      display: flex;
+      height: 6px;
+    }
+    .credo-bar span {
+      flex: 1;
+    }
+    .credo-bar .gelb  { background: var(--gelb); }
+    .credo-bar .gruen { background: var(--gruen); }
+    .credo-bar .rot   { background: var(--rot); }
+    .credo-bar .blau  { background: var(--blau); }
+
+    /* === Inhaltsverzeichnis === */
+    .toc {
+      background: var(--primary-bg);
+      padding: 28px 48px;
+      border-bottom: 1px solid var(--border);
+    }
+    .toc h2 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+    .toc ol {
+      list-style: decimal;
+      padding-left: 18px;
+      columns: 2;
+      column-gap: 32px;
+    }
+    .toc li {
+      font-size: 13px;
+      margin-bottom: 5px;
+      break-inside: avoid;
+    }
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .toc a:hover { text-decoration: underline; }
+
+    /* === Hauptinhalt === */
+    .content {
+      padding: 0 48px 48px;
+    }
+
+    /* === Abschnitte === */
+    .section {
+      margin-top: 44px;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--accent);
+      margin-bottom: 20px;
+    }
+    .section-title .num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      color: var(--white);
+      border-radius: 50%;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .section-title h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 24px 0 10px;
+    }
+
+    p { margin-bottom: 12px; }
+
+    /* === Hinweise & Warnungen === */
+    .hinweis, .warnung, .rechtspflicht {
+      display: flex;
+      gap: 14px;
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 13px;
+    }
+    .hinweis {
+      background: var(--hinweis-bg);
+      border-left: 4px solid var(--hinweis-bd);
+    }
+    .warnung {
+      background: var(--warnung-bg);
+      border-left: 4px solid var(--warnung-bd);
+    }
+    .rechtspflicht {
+      background: #FDF2F8;
+      border-left: 4px solid #9B59B6;
+    }
+    .hinweis .icon, .warnung .icon, .rechtspflicht .icon {
+      font-size: 18px;
+      flex-shrink: 0;
+      line-height: 1.4;
+    }
+    .hinweis strong, .warnung strong, .rechtspflicht strong {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    /* === Schritte === */
+    .schritt-liste {
+      counter-reset: schritt;
+      list-style: none;
+      padding: 0;
+      margin: 16px 0;
+    }
+    .schritt {
+      counter-increment: schritt;
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+    .schritt::before {
+      content: counter(schritt);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 28px;
+      background: var(--blau);
+      color: var(--white);
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .schritt-text { flex: 1; }
+    .schritt-text strong { font-weight: 600; }
+    .schritt-text .ui-label {
+      display: inline-block;
+      background: var(--primary-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* === Status-Badges === */
+    .status-flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin: 16px 0;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid;
+    }
+    .status-badge.blau   { background: #EBF5FB; color: #009AC6; border-color: #b3dff0; }
+    .status-badge.gruen  { background: #EAFAF1; color: #1E8449; border-color: #a9dfbf; }
+    .status-badge.rot    { background: #FDEDEC; color: #C0392B; border-color: #f1948a; }
+    .status-badge.grau   { background: #F4F6F7; color: #717D7E; border-color: #ccc; }
+    .status-badge.gelb   { background: #FEFDE7; color: #9A7D0A; border-color: #f7dc6f; }
+    .arrow { color: var(--accent); font-weight: 700; font-size: 16px; }
+
+    /* === Tabellen === */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin: 16px 0;
+    }
+    th {
+      background: var(--accent);
+      color: var(--white);
+      text-align: left;
+      padding: 9px 14px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    td {
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #f9f9f9; }
+
+    /* === Checkliste === */
+    .checkliste {
+      list-style: none;
+      padding: 0;
+      margin: 16px 0;
+    }
+    .checkliste li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .checkliste li:last-child { border-bottom: none; }
+    .checkliste .box {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--accent);
+      border-radius: 3px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .checkliste .pflicht .box { border-color: var(--rot); }
+    .checkliste .pflicht-label {
+      font-size: 10px;
+      background: var(--rot);
+      color: var(--white);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 700;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* === Glossar === */
+    .glossar {
+      list-style: none;
+      padding: 0;
+    }
+    .glossar li {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 16px;
+      font-size: 13px;
+    }
+    .glossar li:last-child { border-bottom: none; }
+    .glossar .term {
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    /* === FAQ === */
+    .faq-item {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .faq-q {
+      background: var(--primary-bg);
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--accent);
+      display: flex;
+      gap: 8px;
+    }
+    .faq-q::before { content: "?"; color: var(--blau); font-weight: 700; }
+    .faq-a {
+      padding: 12px 16px;
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* === Screenshot-Platzhalter === */
+    .screenshot {
+      border: 2px dashed var(--border);
+      border-radius: 6px;
+      background: var(--primary-bg);
+      text-align: center;
+      padding: 20px;
+      margin: 14px 0;
+      color: var(--text-light);
+      font-size: 12px;
+      font-style: italic;
+    }
+
+    /* === Footer === */
+    .doc-footer {
+      margin-top: 48px;
+      padding: 24px 48px;
+      background: var(--primary-bg);
+      font-size: 11px;
+      color: var(--text-light);
+      border-top: 1px solid var(--border);
+    }
+    .doc-footer p { margin-bottom: 4px; }
+
+    /* === Druck === */
+    @media print {
+      body { background: white; font-size: 12px; }
+      .page-wrapper { box-shadow: none; max-width: 100%; }
+      .doc-header { background: var(--accent) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .toc { background: var(--primary-bg) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .toc ol { columns: 1; }
+      .section { page-break-inside: avoid; }
+      .schritt { page-break-inside: avoid; }
+      .faq-item { page-break-inside: avoid; }
+      a { color: inherit; text-decoration: none; }
+      .credo-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .hinweis, .warnung, .rechtspflicht { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    @media (max-width: 680px) {
+      .doc-header, .toc, .content, .doc-footer { padding-left: 20px; padding-right: 20px; }
+      .toc ol { columns: 1; }
+      .glossar li { grid-template-columns: 1fr; gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- CREDO-Farbbalken oben -->
+  <div class="credo-bar">
+    <span class="gelb"></span>
+    <span class="gruen"></span>
+    <span class="rot"></span>
+    <span class="blau"></span>
+  </div>
+
+  <!-- Header -->
+  <header class="doc-header">
+    <div class="badge">CREDO HR-Portal · Bedienungsanleitung</div>
+    <h1>Betriebliches Eingliederungsmanagement (BEM)</h1>
+    <p class="subtitle">Schritt-für-Schritt-Anleitung für die Personalabteilung</p>
+    <p class="meta">Version 1.0 &nbsp;|&nbsp; Stand: Juni 2026 &nbsp;|&nbsp; Gilt für alle Mandanten der CREDO Schulträgergruppe &nbsp;|&nbsp; Rechtsgrundlage: § 167 Abs. 2 SGB IX</p>
+  </header>
+
+  <!-- Inhaltsverzeichnis -->
+  <nav class="toc" aria-label="Inhaltsverzeichnis">
+    <h2>Inhaltsverzeichnis</h2>
+    <ol>
+      <li><a href="#einleitung">Was ist BEM und warum ist es wichtig?</a></li>
+      <li><a href="#rechtlicher-hintergrund">Rechtlicher Hintergrund</a></li>
+      <li><a href="#rollen">Rollen &amp; Berechtigungen</a></li>
+      <li><a href="#uebersicht">Die BEM-Übersicht</a></li>
+      <li><a href="#fall-anlegen">Neuen BEM-Fall anlegen</a></li>
+      <li><a href="#einladung">Einladung versenden</a></li>
+      <li><a href="#einwilligung">Einwilligung erfassen</a></li>
+      <li><a href="#gespraeche">Gespräche dokumentieren</a></li>
+      <li><a href="#massnahmen">Maßnahmen verwalten</a></li>
+      <li><a href="#dokumente">Dokumente &amp; Vorlagen</a></li>
+      <li><a href="#fristen">Fristen im Blick behalten</a></li>
+      <li><a href="#zugriff">Zugriffssteuerung</a></li>
+      <li><a href="#abschluss">Fall abschließen oder abbrechen</a></li>
+      <li><a href="#statistik">Statistik &amp; IKS-Report</a></li>
+      <li><a href="#faq">Häufige Fragen &amp; Lösungen</a></li>
+      <li><a href="#checkliste">Checkliste</a></li>
+      <li><a href="#glossar">Glossar</a></li>
+    </ol>
+  </nav>
+
+  <!-- Hauptinhalt -->
+  <main class="content">
+
+    <!-- 1. Einleitung -->
+    <section class="section" id="einleitung">
+      <div class="section-title">
+        <div class="num">1</div>
+        <h2>Was ist BEM und warum ist es wichtig?</h2>
+      </div>
+
+      <p>Das Betriebliche Eingliederungsmanagement — kurz <strong>BEM</strong> — ist ein gesetzlich vorgeschriebenes Verfahren. Ziel ist es, Beschäftigte nach längerer Krankheit wieder in den Arbeitsalltag einzugliedern.</p>
+
+      <p>Als Arbeitgeber ist die CREDO Schulträgergruppe verpflichtet, BEM anzubieten, sobald eine Person innerhalb von 12 Monaten länger als 6 Wochen — am Stück oder mit Unterbrechungen — arbeitsunfähig war. Das BEM-Modul im HR-Portal unterstützt Sie dabei, diesen Prozess rechtssicher und strukturiert zu durchzuführen.</p>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Das bringt das BEM-Modul im HR-Portal</strong>
+          Das System führt Sie Schritt für Schritt durch den BEM-Prozess. Es erinnert Sie an Fristen, erstellt Dokumente auf Knopfdruck und speichert alle Vorgänge revisionssicher. Jeder Zugriff auf eine BEM-Akte wird automatisch protokolliert.
+        </div>
+      </div>
+
+      <div class="warnung">
+        <span class="icon">⚠️</span>
+        <div>
+          <strong>BEM ist keine Disziplinarmaßnahme</strong>
+          Das BEM ist ausdrücklich ein Angebot an die beschäftigte Person — keine Pflicht für sie. Die Teilnahme ist freiwillig. Lehnt jemand ab, ist das zu dokumentieren und zu respektieren.
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Rechtlicher Hintergrund -->
+    <section class="section" id="rechtlicher-hintergrund">
+      <div class="section-title">
+        <div class="num">2</div>
+        <h2>Rechtlicher Hintergrund</h2>
+      </div>
+
+      <div class="rechtspflicht">
+        <span class="icon">⚖️</span>
+        <div>
+          <strong>Gesetzliche Pflicht des Arbeitgebers (§ 167 Abs. 2 SGB IX)</strong>
+          Arbeitgeber sind verpflichtet, bei Beschäftigten, die innerhalb eines Jahres mehr als 6 Wochen arbeitsunfähig waren, ein BEM einzuleiten. Diese Pflicht gilt für <em>alle</em> Beschäftigten — unabhängig davon, ob eine Schwerbehinderung vorliegt.
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Rechtliche Anforderung</th>
+            <th>Was das bedeutet</th>
+            <th>Im System hinterlegt</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Freiwilligkeit</strong></td>
+            <td>Die beschäftigte Person entscheidet selbst, ob sie teilnimmt. Ablehnung ist kein Kündigungsgrund allein.</td>
+            <td>Einwilligung wird digital oder als Papier-Scan erfasst</td>
+          </tr>
+          <tr>
+            <td><strong>Datenschutz</strong></td>
+            <td>BEM-Daten sind streng vertraulich. Nur berechtigte Personen dürfen die Akte einsehen (§ 26 BDSG).</td>
+            <td>Jede Akte ist versiegelt — Zugriff nur mit expliziter Freigabe</td>
+          </tr>
+          <tr>
+            <td><strong>Betriebsrat</strong></td>
+            <td>Der Betriebsrat ist zu beteiligen, sofern die beschäftigte Person zustimmt (§ 80 Abs. 1 Nr. 1 BetrVG).</td>
+            <td>Einwilligung „Betriebsrat" separat erfassbar</td>
+          </tr>
+          <tr>
+            <td><strong>Schwerbehindertenvertretung</strong></td>
+            <td>Bei Schwerbehinderung oder Gleichstellung ist die SBV zwingend zu beteiligen (§ 178 SGB IX).</td>
+            <td>Wird beim Anlegen abgefragt; SBV-Einwilligung wird automatisch angelegt</td>
+          </tr>
+          <tr>
+            <td><strong>Aufbewahrung</strong></td>
+            <td>BEM-Akten sind nach Abschluss für eine gesetzlich vorgegebene Frist aufzubewahren.</td>
+            <td>Nach Abschluss automatisch in „Aufbewahrung" versetzt</td>
+          </tr>
+          <tr>
+            <td><strong>Angebotspflicht</strong></td>
+            <td>Das Angebot muss nachweislich schriftlich erfolgen — auch wenn die Person ablehnt.</td>
+            <td>Einladungsschreiben wird im System erzeugt und protokolliert</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Wichtige Rechtsprechung des BAG</strong>
+          Das Bundesarbeitsgericht (BAG) hat entschieden: Kündigt ein Arbeitgeber wegen häufiger Kurzerkrankungen, ohne zuvor ein BEM durchgeführt oder zumindest angeboten zu haben, ist die Kündigung in der Regel unverhältnismäßig und damit unwirksam (BAG, 20.11.2014, 2 AZR 755/13).
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Rollen & Berechtigungen -->
+    <section class="section" id="rollen">
+      <div class="section-title">
+        <div class="num">3</div>
+        <h2>Rollen &amp; Berechtigungen</h2>
+      </div>
+
+      <p>Das BEM-Modul arbeitet mit einem strikten Berechtigungssystem. Sie sehen im System ausschließlich die Fälle, für die Sie persönlich freigeschaltet wurden.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Rolle im System</th>
+            <th>Bezeichnung</th>
+            <th>Darf …</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="status-badge blau">BEM-Beauftragte:r</span></td>
+            <td>BEAUFTRAGTE</td>
+            <td>Fälle anlegen, bearbeiten, Einladungen versenden, Gespräche erfassen, Zugriffe vergeben</td>
+          </tr>
+          <tr>
+            <td><span class="status-badge blau">Vertretung</span></td>
+            <td>VERTRETUNG</td>
+            <td>Freigegebene Fälle lesen und bearbeiten — gleiche Rechte wie Beauftragte</td>
+          </tr>
+          <tr>
+            <td><span class="status-badge grau">Betriebsrat</span></td>
+            <td>BR</td>
+            <td>Nur lesen — sofern die beschäftigte Person der Betriebsratsbeteiligung zugestimmt hat</td>
+          </tr>
+          <tr>
+            <td><span class="status-badge grau">Schwerbehindertenvertretung</span></td>
+            <td>SBV</td>
+            <td>Nur lesen — bei Schwerbehinderung obligatorisch</td>
+          </tr>
+          <tr>
+            <td><span class="status-badge gruen">Super-Admin</span></td>
+            <td>SUPER_ADMIN</td>
+            <td>Alle Fälle verwalten, Zugriffe vergeben, Statistiken einsehen</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="warnung">
+        <span class="icon">⚠️</span>
+        <div>
+          <strong>Datenschutz-Grundsatz: Zugriff nur bei Freigabe</strong>
+          Jeder Zugriff auf eine BEM-Akte wird im Audit-Log des Systems protokolliert — mit Zeitstempel und Benutzername. Geben Sie Zugriff nur an Personen weiter, die den Fall bearbeiten müssen.
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Übersicht -->
+    <section class="section" id="uebersicht">
+      <div class="section-title">
+        <div class="num">4</div>
+        <h2>Die BEM-Übersicht</h2>
+      </div>
+
+      <p>Die BEM-Übersicht erreichen Sie über das Hauptmenü: <span class="ui-label">Dashboard → BEM</span>. Dort sehen Sie auf einen Blick alle Fälle, für die Sie freigeschaltet sind.</p>
+
+      <div class="screenshot">📸 Screenshot-Platzhalter: BEM-Übersichtsseite mit Kennzahlen-Kacheln und Fallliste</div>
+
+      <h3>Kennzahlen-Kacheln (KPIs)</h3>
+      <p>Am Seitenanfang zeigt das System vier Kacheln:</p>
+      <ul style="margin: 0 0 12px 18px; font-size: 13px; line-height: 2;">
+        <li><strong>Fälle gesamt</strong> — Alle Fälle, auf die Sie Zugriff haben</li>
+        <li><strong>Laufend</strong> — Aktive Fälle (blau)</li>
+        <li><strong>Abgeschlossen</strong> — Regulär beendete Fälle (grün)</li>
+        <li><strong>Abgebrochen</strong> — Fälle, bei denen das BEM nicht durchgeführt werden konnte (rot)</li>
+      </ul>
+
+      <h3>Handlungsbedarf — rote Hinweisbox</h3>
+      <p>Wenn Fristen überfällig oder dringend sind, erscheint über der Fallliste eine rote Box mit dem Titel „Handlungsbedarf". Klicken Sie auf einen Eintrag, um direkt zum betreffenden Fall zu springen.</p>
+
+      <div class="warnung">
+        <span class="icon">⚠️</span>
+        <div>
+          <strong>Fristen im Blick behalten</strong>
+          Überfällige Fristen werden mit dem Label „Überfällig" in Rot markiert. Reagieren Sie zeitnah — verspätete Einladungen können rechtliche Konsequenzen haben.
+        </div>
+      </div>
+
+      <h3>Fallliste filtern und suchen</h3>
+      <p>Nutzen Sie die Filtermöglichkeiten oberhalb der Liste:</p>
+      <ul style="margin: 0 0 12px 18px; font-size: 13px; line-height: 2;">
+        <li><strong>Status-Filter</strong> — Zeigt nur Fälle mit einem bestimmten Status (z.&nbsp;B. „Einwilligung erteilt")</li>
+        <li><strong>Suchfeld</strong> — Suche nach Fall-Nummer oder Name der beschäftigten Person</li>
+      </ul>
+
+      <p>Klicken Sie auf <span class="ui-label">Öffnen</span> in einer Tabellenzeile, um den vollständigen Fall aufzurufen.</p>
+
+      <h3>Status-Übersicht: Der BEM-Prozess im Überblick</h3>
+      <p>Jeder BEM-Fall durchläuft mehrere Stationen. Das System zeigt den aktuellen Status immer oben im Fall an:</p>
+
+      <div class="status-flow">
+        <span class="status-badge blau">Angelegt</span>
+        <span class="arrow">→</span>
+        <span class="status-badge blau">Einladung versendet</span>
+        <span class="arrow">→</span>
+        <span class="status-badge gruen">Einwilligung erteilt</span>
+        <span class="arrow">→</span>
+        <span class="status-badge blau">Erstgespräch</span>
+        <span class="arrow">→</span>
+        <span class="status-badge blau">Maßnahmen laufen</span>
+        <span class="arrow">→</span>
+        <span class="status-badge gruen">Abgeschlossen</span>
+      </div>
+
+      <p>Lehnt die beschäftigte Person ab, wechselt der Status auf <span class="status-badge rot">Einwilligung abgelehnt</span>. Bricht die Person das laufende BEM ab, wechselt er auf <span class="status-badge rot">Abgebrochen</span>. Nach Abschluss geht der Fall automatisch in <span class="status-badge grau">Aufbewahrung</span>.</p>
+    </section>
+
+    <!-- 5. Fall anlegen -->
+    <section class="section" id="fall-anlegen">
+      <div class="section-title">
+        <div class="num">5</div>
+        <h2>Neuen BEM-Fall anlegen</h2>
+      </div>
+
+      <div class="rechtspflicht">
+        <span class="icon">⚖️</span>
+        <div>
+          <strong>Wann müssen Sie einen Fall anlegen?</strong>
+          Sobald eine Beschäftigte oder ein Beschäftigter innerhalb von 12 Monaten mehr als 42 Arbeitstage (6 Wochen) arbeitsunfähig war — egal ob am Stück oder mit Unterbrechungen. Die Pflicht gilt unabhängig von der Art der Erkrankung.
+        </div>
+      </div>
+
+      <h3>Voraussetzungen</h3>
+      <p>Neue Fälle dürfen nur Personen mit der Rolle <strong>BEM-Beauftragte:r</strong> oder <strong>Super-Admin</strong> anlegen. Sehen Sie den Button <span class="ui-label">+ Neuer Fall</span> nicht, fehlt Ihnen diese Berechtigung — wenden Sie sich an Ihren Administrator.</p>
+
+      <h3>Schritt-für-Schritt</h3>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie oben rechts auf der BEM-Übersicht auf <span class="ui-label">+ Neuer Fall</span>. Ein Formular öffnet sich.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Tragen Sie <strong>Vorname</strong> und <strong>Nachname</strong> der betroffenen Person ein. Diese Felder sind Pflicht.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Geben Sie die <strong>E-Mail-Adresse</strong> ein, wenn Sie die Einladung später digital versenden möchten. Ohne E-Mail-Adresse ist nur der Papierweg möglich.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Tragen Sie die <strong>Personalnummer</strong> ein (optional, aber empfohlen für die Zuordnung).
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Wählen Sie den <strong>Mandanten</strong> aus der Dropdown-Liste. Wählen Sie die Einrichtung, bei der die Person beschäftigt ist.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Wählen Sie den <strong>Eingangsweg</strong>:
+            <ul style="margin: 6px 0 0 16px; font-size: 13px;">
+              <li><strong>Digital (Magic-Link)</strong> — Das System versendet einen persönlichen Link per E-Mail. Die Person unterzeichnet die Einwilligung online.</li>
+              <li><strong>Papier (Scan)</strong> — Sie drucken die Einladung aus, übergeben sie persönlich und laden den Scan später hoch.</li>
+            </ul>
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Geben Sie das Datum ein, ab dem die maßgeblichen <strong>Fehlzeiten</strong> begannen (optional).
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Aktivieren Sie das Häkchen <span class="ui-label">Schwerbehindert / gleichgestellt</span>, falls dies zutrifft. Das System legt dann automatisch eine offene SBV-Beteiligung an.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">Fall anlegen</span>. Das System erstellt den Fall und vergib Ihnen automatisch Zugriff als BEM-Beauftragte:r.
+          </div>
+        </li>
+      </ol>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Fall-Nummer wird automatisch vergeben</strong>
+          Das System erzeugt eine eindeutige Fall-Nummer (z.&nbsp;B. „GYM-2026-001"). Sie finden sie in der Übersicht und in allen Dokumenten.
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Einladung versenden -->
+    <section class="section" id="einladung">
+      <div class="section-title">
+        <div class="num">6</div>
+        <h2>Einladung versenden</h2>
+      </div>
+
+      <p>Sobald der Fall angelegt ist, ist der nächste Schritt die Einladung der beschäftigten Person. Das System öffnet den Fall automatisch in der Detailansicht.</p>
+
+      <div class="rechtspflicht">
+        <span class="icon">⚖️</span>
+        <div>
+          <strong>Schriftlichkeitsgebot (§ 167 Abs. 2 SGB IX)</strong>
+          Die Einladung muss schriftlich erfolgen und die wesentlichen Informationen enthalten: Zweck des BEM, Freiwilligkeit, Datenschutz und das Recht, eine Vertrauensperson hinzuziehen. Das System erzeugt ein rechtssicheres Einladungsschreiben für Sie.
+        </div>
+      </div>
+
+      <h3>Digitale Einladung versenden (Magic-Link)</h3>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Öffnen Sie den Fall. Im oberen Bereich sehen Sie den aktuellen Status <span class="status-badge blau">Angelegt</span> und einen Hinweis auf den nächsten Schritt.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">Einladung versenden</span> im Abschnitt „Nächster Schritt".
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Das System sendet automatisch eine E-Mail mit einem persönlichen Link an die hinterlegte Adresse. Die Person kann darüber ihre Einwilligung erteilen oder ablehnen.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Der Status wechselt zu <span class="status-badge blau">Einladung versendet</span>. Das System protokolliert Datum und Uhrzeit.
+          </div>
+        </li>
+      </ol>
+
+      <h3>Papier-Einladung (Druck &amp; Scan)</h3>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie im Abschnitt „Dokumente &amp; Vorlagen" auf <span class="ui-label">Einladungsschreiben generieren</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Laden Sie das erzeugte PDF herunter, drucken Sie es aus und übergeben Sie es persönlich oder per Post.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Ändern Sie den Status manuell auf <span class="status-badge blau">Einladung versendet</span>, um den Prozess fortzusetzen.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Laden Sie den unterschriebenen Einladungsnachweis unter „Dokumente" hoch (Typ: <span class="ui-label">Attest / AU / Unterlage</span> oder <span class="ui-label">Sonstiges</span>).
+          </div>
+        </li>
+      </ol>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Reaktionsfrist</strong>
+          Reagiert die Person nicht innerhalb einer angemessenen Zeit (ca. 2 Wochen), dürfen Sie das BEM nicht einfach als „gescheitert" abschließen. Senden Sie eine Erinnerung und dokumentieren Sie dies als Gesprächseintrag.
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Einwilligung -->
+    <section class="section" id="einwilligung">
+      <div class="section-title">
+        <div class="num">7</div>
+        <h2>Einwilligung erfassen</h2>
+      </div>
+
+      <p>Nach dem Versenden der Einladung wartet das System auf die Rückmeldung der beschäftigten Person. Reagiert sie über den digitalen Magic-Link, aktualisiert das System den Status automatisch. Bei Papier-Eingang tragen Sie die Rückmeldung manuell ein.</p>
+
+      <h3>Die vier Einwilligungsarten</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Art</th>
+            <th>Bedeutung</th>
+            <th>Pflicht?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Datenschutz</strong></td>
+            <td>Zustimmung zur Verarbeitung der BEM-Daten</td>
+            <td>Ja — immer erforderlich</td>
+          </tr>
+          <tr>
+            <td><strong>Durchführung</strong></td>
+            <td>Zustimmung zur Teilnahme am BEM-Verfahren</td>
+            <td>Ja — ohne diese kein BEM möglich</td>
+          </tr>
+          <tr>
+            <td><strong>Betriebsrat</strong></td>
+            <td>Zustimmung zur Einbeziehung des BR</td>
+            <td>Nein — Entscheidung der Person</td>
+          </tr>
+          <tr>
+            <td><strong>Schwerbehindertenvertretung (SBV)</strong></td>
+            <td>Zustimmung zur Einbeziehung der SBV</td>
+            <td>Bei Schwerbehinderung gesetzlich vorgegeben</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Einwilligung manuell (Papier) erfassen</h3>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Öffnen Sie den Fall und scrollen Sie zum Abschnitt <span class="ui-label">Einwilligungen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">+ Papier-Einwilligung erfassen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Wählen Sie die Art der Einwilligung (Datenschutz, Durchführung usw.).
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Tragen Sie das Datum der Unterschrift und den Namen der unterzeichnenden Person ein.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">Speichern</span>. Der Status wechselt — bei vollständiger Einwilligung — auf <span class="status-badge gruen">Einwilligung erteilt</span>.
+          </div>
+        </li>
+      </ol>
+
+      <h3>Wenn die Person ablehnt</h3>
+      <p>Lehnt die beschäftigte Person das BEM ab, wechselt der Status zu <span class="status-badge rot">Einwilligung abgelehnt</span>. Das Verfahren ist damit beendet. Das System dokumentiert die Ablehnung revisionssicher.</p>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Ablehnung ist kein Scheitern</strong>
+          Auch eine dokumentierte Ablehnung schützt den Arbeitgeber rechtlich — vorausgesetzt, das Angebot wurde nachweislich gemacht. Das System protokolliert dies automatisch.
+        </div>
+      </div>
+
+      <h3>Einwilligung widerrufen</h3>
+      <p>Die beschäftigte Person kann ihre Einwilligung jederzeit widerrufen. Klicken Sie in der Einwilligungsliste auf <span class="ui-label">Widerrufen</span> neben dem entsprechenden Eintrag. Das System speichert Datum und Uhrzeit des Widerrufs.</p>
+    </section>
+
+    <!-- 8. Gespräche -->
+    <section class="section" id="gespraeche">
+      <div class="section-title">
+        <div class="num">8</div>
+        <h2>Gespräche dokumentieren</h2>
+      </div>
+
+      <p>Alle BEM-Gespräche sind zu protokollieren — das ist gesetzlich vorgeschrieben und schützt beide Seiten. Das System bietet drei Gesprächstypen mit vorausgefüllten Checklisten.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Typ</th>
+            <th>Wann?</th>
+            <th>Inhalt</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Erstgespräch</strong></td>
+            <td>Nach Einwilligung — so früh wie möglich</td>
+            <td>Situation, Belastungen, Wünsche, erste Maßnahmen</td>
+          </tr>
+          <tr>
+            <td><strong>Folgegespräch</strong></td>
+            <td>Zur Evaluation laufender Maßnahmen</td>
+            <td>Wirksamkeit prüfen, anpassen oder neue Maßnahmen vereinbaren</td>
+          </tr>
+          <tr>
+            <td><strong>Gedächtnisprotokoll</strong></td>
+            <td>Nachträgliche Dokumentation eines Gesprächs</td>
+            <td>Datum, Teilnehmer, Inhalte, Vereinbarungen</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Schritt-für-Schritt: Gespräch erfassen</h3>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Öffnen Sie den Fall und scrollen Sie zum Abschnitt <span class="ui-label">Gespräche</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">+ Gespräch erfassen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Wählen Sie den <strong>Gesprächstyp</strong>. Das System lädt automatisch die passende Checkliste.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Tragen Sie <strong>Datum</strong>, <strong>Ort</strong> und alle <strong>Teilnehmenden</strong> (Name und Funktion) ein.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Haken Sie die erledigten Punkte der <strong>Pflicht-Checkliste</strong> ab. Tragen Sie Notizen in das Freitextfeld ein.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Geben Sie optional einen <strong>Nächsten Termin</strong> ein, wenn ein Folgegespräch geplant ist.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">Speichern</span>. Das System protokolliert den Eintrag und ändert bei Erstgesprächen den Status entsprechend.
+          </div>
+        </li>
+      </ol>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Diagnosen gehören nicht ins Protokoll</strong>
+          Notieren Sie im Gespräch keine medizinischen Diagnosen. Beschreiben Sie stattdessen funktionale Einschränkungen: „Kann keine schwere Last heben" statt „Bandscheibenvorfall L4/L5". Der Diagnose-Schutz ist im System standardmäßig aktiviert.
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. Maßnahmen -->
+    <section class="section" id="massnahmen">
+      <div class="section-title">
+        <div class="num">9</div>
+        <h2>Maßnahmen verwalten</h2>
+      </div>
+
+      <p>Im Erstgespräch und in Folgegesprächen werden Maßnahmen vereinbart, die die Rückkehr oder den Verbleib der Person am Arbeitsplatz ermöglichen sollen. Tragen Sie jede vereinbarte Maßnahme im System ein.</p>
+
+      <h3>Maßnahmenkategorien</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Kategorie</th>
+            <th>Beispiele</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Technisch</strong></td>
+            <td>Ergonomischer Stuhl, höhenverstellbarer Tisch, angepasste Arbeitsmittel</td>
+          </tr>
+          <tr>
+            <td><strong>Organisatorisch</strong></td>
+            <td>Versetzung, Arbeitszeitanpassung, Telearbeit, veränderte Aufgaben</td>
+          </tr>
+          <tr>
+            <td><strong>Personenbezogen</strong></td>
+            <td>Coaching, Schulung, Umschulung, Konfliktmediation</td>
+          </tr>
+          <tr>
+            <td><strong>Stufenweise Wiedereingliederung</strong></td>
+            <td>Hamburger Modell — schrittweise Rückkehr nach §&nbsp;74 SGB&nbsp;V</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Schritt-für-Schritt: Maßnahme erfassen</h3>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Scrollen Sie im Fall zum Abschnitt <span class="ui-label">Maßnahmen</span> und klicken Sie auf <span class="ui-label">+ Maßnahme erfassen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Wählen Sie die <strong>Kategorie</strong> und tragen Sie eine klare <strong>Beschreibung</strong> ein.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Tragen Sie die <strong>zuständige Person</strong> und eine <strong>Frist</strong> ein.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">Speichern</span>. Die Maßnahme hat den Status <span class="status-badge blau">Offen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Aktualisieren Sie den Status der Maßnahme, sobald sie begonnen wurde (<span class="status-badge blau">Läuft</span>) oder abgeschlossen ist (<span class="status-badge gruen">Umgesetzt</span>).
+          </div>
+        </li>
+      </ol>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Tipp: Evaluation nicht vergessen</strong>
+          Tragen Sie bei jeder Maßnahme ein <strong>Evaluationsdatum</strong> ein. An diesem Datum prüfen Sie im Folgegespräch, ob die Maßnahme gewirkt hat.
+        </div>
+      </div>
+    </section>
+
+    <!-- 10. Dokumente -->
+    <section class="section" id="dokumente">
+      <div class="section-title">
+        <div class="num">10</div>
+        <h2>Dokumente &amp; Vorlagen</h2>
+      </div>
+
+      <p>Das System erzeugt wichtige BEM-Dokumente automatisch auf Basis der eingetragenen Daten. Zusätzlich können Sie eigene Dokumente hochladen.</p>
+
+      <h3>Automatisch generierbare Dokumente</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Vorlage</th>
+            <th>Wann nutzen?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Einladungsschreiben</td>
+            <td>Zum Start des BEM — mit allen Pflichtinformationen</td>
+          </tr>
+          <tr>
+            <td>Datenschutzvereinbarung</td>
+            <td>Vor dem Erstgespräch</td>
+          </tr>
+          <tr>
+            <td>Erstgespräch-Protokoll</td>
+            <td>Nach dem Erstgespräch</td>
+          </tr>
+          <tr>
+            <td>Folgegespräch-Protokoll</td>
+            <td>Nach jedem Folgegespräch</td>
+          </tr>
+          <tr>
+            <td>Maßnahmenplan</td>
+            <td>Übersicht aller vereinbarten Maßnahmen</td>
+          </tr>
+          <tr>
+            <td>Abschlusserklärung</td>
+            <td>Bei regulärem Abschluss des BEM</td>
+          </tr>
+          <tr>
+            <td>Abbrucherklärung</td>
+            <td>Wenn das BEM vorzeitig beendet wird</td>
+          </tr>
+          <tr>
+            <td>Gesamtexport</td>
+            <td>Vollständige Fallakte als PDF (z.&nbsp;B. für Revisionen)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Dokument generieren</h3>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Scrollen Sie im Fall zum Abschnitt <span class="ui-label">Dokumente &amp; Vorlagen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie neben der gewünschten Vorlage auf <span class="ui-label">Generieren</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Das Dokument wird erzeugt und erscheint in der Dokumentenliste. Klicken Sie auf <span class="ui-label">Herunterladen</span>, um es zu speichern.
+          </div>
+        </li>
+      </ol>
+
+      <h3>Eigenes Dokument hochladen</h3>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie im Abschnitt „Dokumente" auf <span class="ui-label">Dokument hochladen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Wählen Sie den passenden Dokumenttyp aus der Liste (z.&nbsp;B. <span class="ui-label">Attest / AU / Unterlage</span>).
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Wählen Sie die Ablage: <strong>Nur BEM-Akte</strong> — Dokumente im BEM-Modul bleiben streng vertraulich und sind nur für BEM-Berechtigte sichtbar.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">Hochladen</span>. Das System speichert das Dokument und protokolliert den Upload.
+          </div>
+        </li>
+      </ol>
+
+      <div class="warnung">
+        <span class="icon">⚠️</span>
+        <div>
+          <strong>Keine medizinischen Befunde hochladen</strong>
+          Laden Sie keine ärztlichen Befunde oder Diagnosen hoch, es sei denn, dies ist ausdrücklich mit der beschäftigten Person vereinbart. Arbeitsunfähigkeitsbescheinigungen ohne Diagnose sind unproblematisch.
+        </div>
+      </div>
+    </section>
+
+    <!-- 11. Fristen -->
+    <section class="section" id="fristen">
+      <div class="section-title">
+        <div class="num">11</div>
+        <h2>Fristen im Blick behalten</h2>
+      </div>
+
+      <p>Das System legt beim Anlegen eines Falls automatisch wichtige Fristen an — zum Beispiel für das Versenden der Einladung. Diese Fristen erscheinen im Abschnitt <span class="ui-label">Fristen</span> innerhalb des Falls und in der Handlungsbedarf-Box auf der Übersichtsseite.</p>
+
+      <h3>Frist-Ampel</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Anzeige</th>
+            <th>Bedeutung</th>
+            <th>Was tun?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="status-badge grau">Im Plan</span></td>
+            <td>Mehr als 14 Tage verbleibend</td>
+            <td>Nichts — Frist ist komfortabel</td>
+          </tr>
+          <tr>
+            <td><span class="status-badge gelb">Bald fällig</span></td>
+            <td>7–14 Tage verbleibend</td>
+            <td>Nächsten Schritt einplanen</td>
+          </tr>
+          <tr>
+            <td><span class="status-badge rot">Dringend</span></td>
+            <td>Weniger als 7 Tage verbleibend</td>
+            <td>Sofort handeln</td>
+          </tr>
+          <tr>
+            <td><span class="status-badge rot">Überfällig</span></td>
+            <td>Frist bereits abgelaufen</td>
+            <td>Unverzüglich nacholen und im Fall dokumentieren</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Fristen sind keine starren Rechtsnormen</strong>
+          Die Fristen im System sind praxisorientierte Richtwerte. Das Gesetz schreibt keine genauen Tagesfristen vor — aber: Je länger Sie warten, desto schwieriger wird eine erfolgreiche Eingliederung. Handeln Sie zeitnah.
+        </div>
+      </div>
+    </section>
+
+    <!-- 12. Zugriffssteuerung -->
+    <section class="section" id="zugriff">
+      <div class="section-title">
+        <div class="num">12</div>
+        <h2>Zugriffssteuerung</h2>
+      </div>
+
+      <p>Jede BEM-Akte ist geschützt — vergleichbar mit einem verschlossenen Aktenschrank. Nur wer explizit freigeschaltet wird, kann die Akte einsehen. Diese Freigabe kann jederzeit entzogen werden.</p>
+
+      <h3>Zugriff gewähren</h3>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Öffnen Sie den Fall und scrollen Sie zum Abschnitt <span class="ui-label">Zugriffsberechtigungen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">+ Person hinzufügen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Suchen Sie die Person nach Name oder E-Mail.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Wählen Sie die <strong>Rolle</strong>: BEM-Beauftragte:r, Vertretung, Betriebsrat oder SBV.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">Zugriff gewähren</span>. Das System protokolliert die Freigabe.
+          </div>
+        </li>
+      </ol>
+
+      <h3>Zugriff entziehen</h3>
+      <p>Klicken Sie in der Zugriffsliste neben dem Namen auf <span class="ui-label">Entziehen</span>. Der Entzug wird ebenfalls im Audit-Log festgehalten.</p>
+
+      <div class="warnung">
+        <span class="icon">⚠️</span>
+        <div>
+          <strong>Betriebsrat nur mit Zustimmung</strong>
+          Geben Sie dem Betriebsrat nur dann Zugriff, wenn die beschäftigte Person die entsprechende Einwilligung erteilt hat. Prüfen Sie den Einwilligungsstatus, bevor Sie den Zugriff vergeben.
+        </div>
+      </div>
+    </section>
+
+    <!-- 13. Abschluss -->
+    <section class="section" id="abschluss">
+      <div class="section-title">
+        <div class="num">13</div>
+        <h2>Fall abschließen oder abbrechen</h2>
+      </div>
+
+      <h3>Regulärer Abschluss</h3>
+      <p>Wenn das BEM erfolgreich abgeschlossen wurde, wechseln Sie den Status auf <span class="status-badge gruen">Abgeschlossen</span>.</p>
+      <ol class="schritt-liste">
+        <li class="schritt">
+          <div class="schritt-text">
+            Öffnen Sie den Fall. Klicken Sie auf <span class="ui-label">Status ändern</span> und wählen Sie <span class="ui-label">Abgeschlossen</span>.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Wählen Sie das <strong>Ergebnis</strong>: Erfolgreich / Teilweise erfolgreich / Kein Erfolg / Keine Maßnahmen nötig.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Generieren Sie die <span class="ui-label">Abschlusserklärung</span> aus den Vorlagen.
+          </div>
+        </li>
+        <li class="schritt">
+          <div class="schritt-text">
+            Klicken Sie auf <span class="ui-label">Speichern</span>. Der Fall wechselt automatisch nach einer Aufbewahrungsfrist in den Status <span class="status-badge grau">Aufbewahrung</span>.
+          </div>
+        </li>
+      </ol>
+
+      <h3>Vorzeitiger Abbruch</h3>
+      <p>Bricht die beschäftigte Person das BEM ab oder ist eine Fortsetzung nicht mehr möglich, wählen Sie <span class="status-badge rot">Abgebrochen</span> und dokumentieren Sie den Grund im Freitextfeld.</p>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Aufbewahrungsphase</strong>
+          Nach Abschluss ist die Akte nicht gelöscht — sie befindet sich in der „Aufbewahrung". Erst nach Ablauf der gesetzlichen Aufbewahrungsfrist wird sie systemseitig gelöscht (Crypto-Shredding). In dieser Phase sind keine Änderungen möglich.
+        </div>
+      </div>
+    </section>
+
+    <!-- 14. Statistik -->
+    <section class="section" id="statistik">
+      <div class="section-title">
+        <div class="num">14</div>
+        <h2>Statistik &amp; IKS-Report</h2>
+      </div>
+
+      <p>Die Statistik-Seite erreichen Sie über <span class="ui-label">BEM-Übersicht → Statistik / IKS-Report</span>. Diese Ansicht ist ausschließlich für Personen mit der Rolle <strong>Super-Admin</strong> oder <strong>BEM-Beauftragte:r</strong> sichtbar.</p>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div>
+          <strong>Keine personenbezogenen Daten</strong>
+          Die Statistik zeigt ausschließlich aggregierte Zahlen je Mandant — keine Namen, keine Fall-Nummern. Sie ist so konzipiert, dass sie auch dem Betriebsrat vorgelegt werden kann (§ 80 Abs. 1 BetrVG).
+        </div>
+      </div>
+
+      <h3>Verfügbare Auswertungen</h3>
+      <ul style="margin: 0 0 12px 18px; font-size: 13px; line-height: 2;">
+        <li>Verfahren gesamt und nach Status je Mandant</li>
+        <li>Einladungsquote (wie viele Personen wurden eingeladen?)</li>
+        <li>Annahmequote (wie viele haben eingewilligt?)</li>
+        <li>Ergebnisse (erfolgreich / teilweise / kein Erfolg)</li>
+      </ul>
+
+      <h3>Export und Druck</h3>
+      <p>Klicken Sie auf <span class="ui-label">CSV exportieren</span>, um die Statistik in Excel zu öffnen. Klicken Sie auf <span class="ui-label">Drucken / PDF</span>, um einen druckoptimierten Report zu erstellen.</p>
+    </section>
+
+    <!-- 15. FAQ -->
+    <section class="section" id="faq">
+      <div class="section-title">
+        <div class="num">15</div>
+        <h2>Häufige Fragen &amp; Lösungen</h2>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Ich sehe den Fall einer Kollegin nicht — obwohl ich BEM-Beauftragte bin.</div>
+        <div class="faq-a">Das BEM-System zeigt ausschließlich Fälle, für die Sie persönlich freigeschaltet wurden. Wer den Fall angelegt hat, muss Ihnen erst Zugriff gewähren (Abschnitt „Zugriffssteuerung"). Bei Bedarf wenden Sie sich an Ihre:n Super-Admin.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Kann ich einen versehentlich angelegten Fall löschen?</div>
+        <div class="faq-a">Nein — aus Revisionsgründen können Fälle nicht einfach gelöscht werden. Wechseln Sie den Status auf „Abgebrochen" und tragen Sie als Grund „Fehleingabe" ein. Sprechen Sie Ihre:n Super-Admin an, falls eine technische Korrektur nötig ist.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Die beschäftigte Person hat keinen Internetzugang. Wie vorgehe ich?</div>
+        <div class="faq-a">Wählen Sie beim Anlegen des Falls den Eingangsweg „Papier (Scan)". Generieren Sie das Einladungsschreiben, drucken Sie es aus und übergeben Sie es persönlich. Die Einwilligung erfassen Sie anschließend manuell im System (Abschnitt 7).</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Der Magic-Link ist abgelaufen. Was jetzt?</div>
+        <div class="faq-a">Öffnen Sie den Fall und klicken Sie erneut auf „Einladung versenden". Das System erzeugt einen neuen, gültigen Link und versendet ihn an die hinterlegte E-Mail-Adresse. Der alte Link wird automatisch ungültig.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Die beschäftigte Person lehnt ab, hat aber nicht schriftlich reagiert.</div>
+        <div class="faq-a">Dokumentieren Sie die mündliche Ablehnung als Gesprächseintrag (Gedächtnisprotokoll). Erfassen Sie den Status als „Einwilligung abgelehnt". Eine mündliche Ablehnung reicht rechtlich, wenn sie dokumentiert ist — schützt Sie aber weniger als eine schriftliche. Bieten Sie der Person nochmals die schriftliche Ablehnung an.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Ich finde die Statistik-Seite nicht.</div>
+        <div class="faq-a">Die Statistik ist nur für Super-Admins und BEM-Beauftragte sichtbar. Wenn Sie keinen Zugriff haben, fehlt Ihnen die Berechtigung. Wenden Sie sich an Ihren Administrator.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Muss ich alle Checklisten-Punkte im Gespräch abhaken?</div>
+        <div class="faq-a">Nein — die Checkliste ist eine Arbeitshilfe, keine formale Pflicht. Haken Sie ab, was Sie besprochen haben. Nicht relevante Punkte können Sie offenlassen. Wichtig ist, dass Sie im Notizfeld dokumentieren, warum ein Punkt nicht relevant war.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Kann ich Dokumente aus dem BEM-Modul in die Personalakte übernehmen?</div>
+        <div class="faq-a">Das BEM-Modul speichert Dokumente in der versiegelten BEM-Akte — getrennt von der allgemeinen Personalakte. Eine Übernahme in die Personalakte ist nicht vorgesehen und aus Datenschutzgründen nicht empfehlenswert. Besprechen Sie Ausnahmen mit Ihrer Datenschutzbeauftragten.</div>
+      </div>
+    </section>
+
+    <!-- 16. Checkliste -->
+    <section class="section" id="checkliste">
+      <div class="section-title">
+        <div class="num">16</div>
+        <h2>Checkliste — BEM-Prozess von A bis Z</h2>
+      </div>
+
+      <p>Diese Checkliste begleitet Sie durch den gesamten BEM-Prozess. Nutzen Sie sie als Gedächtnisstütze.</p>
+
+      <h3>Phase 1: Fall eröffnen</h3>
+      <ul class="checkliste">
+        <li class="pflicht"><div class="box"></div><div>Fehlzeiten geprüft: mehr als 42 Arbeitstage in 12 Monaten <span class="pflicht-label">Pflicht</span></div></li>
+        <li class="pflicht"><div class="box"></div><div>BEM-Fall im HR-Portal angelegt (Name, Mandant, Eingangsweg) <span class="pflicht-label">Pflicht</span></div></li>
+        <li><div class="box"></div><div>Schwerbehinderung/Gleichstellung geprüft und im Fall vermerkt</div></li>
+        <li><div class="box"></div><div>Zugriff für weitere berechtigte Personen eingerichtet</div></li>
+      </ul>
+
+      <h3>Phase 2: Einladung &amp; Einwilligung</h3>
+      <ul class="checkliste">
+        <li class="pflicht"><div class="box"></div><div>Einladungsschreiben generiert und versendet (digital oder Papier) <span class="pflicht-label">Pflicht</span></div></li>
+        <li class="pflicht"><div class="box"></div><div>Einladung dokumentiert (Datum, Eingangsweg) <span class="pflicht-label">Pflicht</span></div></li>
+        <li class="pflicht"><div class="box"></div><div>Einwilligung (Datenschutz &amp; Durchführung) erfasst <span class="pflicht-label">Pflicht</span></div></li>
+        <li><div class="box"></div><div>Einwilligung Betriebsrat (sofern gewünscht) erfasst</div></li>
+        <li><div class="box"></div><div>Bei Schwerbehinderung: SBV-Beteiligung eingeholt</div></li>
+        <li><div class="box"></div><div>Bei Ablehnung: Ablehnung dokumentiert und Status gesetzt</div></li>
+      </ul>
+
+      <h3>Phase 3: Gespräche &amp; Maßnahmen</h3>
+      <ul class="checkliste">
+        <li class="pflicht"><div class="box"></div><div>Erstgespräch terminiert und durchgeführt <span class="pflicht-label">Pflicht</span></div></li>
+        <li class="pflicht"><div class="box"></div><div>Erstgespräch dokumentiert (Checkliste, Notizen, Teilnehmer) <span class="pflicht-label">Pflicht</span></div></li>
+        <li><div class="box"></div><div>Maßnahmen vereinbart und im System erfasst</div></li>
+        <li><div class="box"></div><div>Fristen für Maßnahmen gesetzt</div></li>
+        <li><div class="box"></div><div>Folgegespräche (falls nötig) dokumentiert</div></li>
+        <li><div class="box"></div><div>Wirksamkeit der Maßnahmen evaluiert</div></li>
+      </ul>
+
+      <h3>Phase 4: Abschluss</h3>
+      <ul class="checkliste">
+        <li class="pflicht"><div class="box"></div><div>Ergebnis des BEM festgelegt und dokumentiert <span class="pflicht-label">Pflicht</span></div></li>
+        <li class="pflicht"><div class="box"></div><div>Abschlussdokument generiert <span class="pflicht-label">Pflicht</span></div></li>
+        <li class="pflicht"><div class="box"></div><div>Status auf „Abgeschlossen" gesetzt <span class="pflicht-label">Pflicht</span></div></li>
+        <li><div class="box"></div><div>Alle Dokumente vollständig in der Akte vorhanden</div></li>
+      </ul>
+    </section>
+
+    <!-- 17. Glossar -->
+    <section class="section" id="glossar">
+      <div class="section-title">
+        <div class="num">17</div>
+        <h2>Glossar — Fachbegriffe einfach erklärt</h2>
+      </div>
+
+      <ul class="glossar">
+        <li>
+          <div class="term">Audit-Log</div>
+          <div>Eine unveränderliche Aufzeichnung aller Aktivitäten in einer BEM-Akte. Jeder Zugriff, jede Änderung und jeder Versand wird mit Datum, Uhrzeit und Benutzername gespeichert.</div>
+        </li>
+        <li>
+          <div class="term">BAG</div>
+          <div>Bundesarbeitsgericht — das oberste deutsche Gericht für Arbeitsrechtsfragen.</div>
+        </li>
+        <li>
+          <div class="term">BDSG</div>
+          <div>Bundesdatenschutzgesetz — regelt den Umgang mit personenbezogenen Daten im Beschäftigungsverhältnis (§ 26 BDSG).</div>
+        </li>
+        <li>
+          <div class="term">BetrVG</div>
+          <div>Betriebsverfassungsgesetz — regelt die Rechte und Pflichten des Betriebsrats.</div>
+        </li>
+        <li>
+          <div class="term">BEM</div>
+          <div>Betriebliches Eingliederungsmanagement — gesetzliches Verfahren zur Wiedereingliederung erkrankter Beschäftigter (§ 167 Abs. 2 SGB IX).</div>
+        </li>
+        <li>
+          <div class="term">BEM-Beauftragte:r</div>
+          <div>Die Person, die im Betrieb für die Durchführung und Koordination des BEM verantwortlich ist.</div>
+        </li>
+        <li>
+          <div class="term">Crypto-Shredding</div>
+          <div>Technisches Löschverfahren: Nach Ablauf der Aufbewahrungsfrist werden alle verschlüsselten BEM-Daten unwiederbringlich gelöscht.</div>
+        </li>
+        <li>
+          <div class="term">Diagnose-Schutz</div>
+          <div>Im BEM-Modul standardmäßig aktive Einstellung, die verhindert, dass medizinische Diagnosen in Protokollen erscheinen.</div>
+        </li>
+        <li>
+          <div class="term">Einwilligung</div>
+          <div>Freiwillige, informierte Zustimmung der beschäftigten Person zur Durchführung des BEM und zur Verarbeitung der Daten. Ohne Einwilligung kein BEM.</div>
+        </li>
+        <li>
+          <div class="term">Hamburger Modell</div>
+          <div>Verfahren der stufenweisen Wiedereingliederung nach § 74 SGB V — schrittweise Rückkehr ins Arbeitsleben nach längerer Erkrankung.</div>
+        </li>
+        <li>
+          <div class="term">IKS</div>
+          <div>Internes Kontrollsystem — strukturiertes Verfahren zur Überwachung und Steuerung von Prozessen. Der BEM-Statistik-Report dient als IKS-Nachweis.</div>
+        </li>
+        <li>
+          <div class="term">Magic-Link</div>
+          <div>Persönlicher, zeitlich begrenzter Link, der per E-Mail versandt wird. Die beschäftigte Person kann damit die Einwilligung direkt online erteilen oder ablehnen — ohne Passwort.</div>
+        </li>
+        <li>
+          <div class="term">SBV</div>
+          <div>Schwerbehindertenvertretung — vertritt die Interessen schwerbehinderter Beschäftigter. Bei Schwerbehinderung ist die SBV zwingend am BEM zu beteiligen (§ 178 SGB IX).</div>
+        </li>
+        <li>
+          <div class="term">SGB IX</div>
+          <div>Sozialgesetzbuch Neuntes Buch — enthält in § 167 die rechtliche Grundlage für das Betriebliche Eingliederungsmanagement.</div>
+        </li>
+        <li>
+          <div class="term">Versiegelte Akte</div>
+          <div>Bezeichnung für das Sicherheitskonzept des BEM-Moduls: Eine BEM-Akte ist nicht einfach offen zugänglich — sie kann nur von explizit freigeschalteten Personen eingesehen werden.</div>
+        </li>
+        <li>
+          <div class="term">Wiedereingliederung</div>
+          <div>Prozess der Rückkehr einer erkrankten Person in den Arbeitsalltag — Ziel des BEM.</div>
+        </li>
+      </ul>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="doc-footer">
+    <p><strong>CREDO Schulträgergruppe</strong> &nbsp;|&nbsp; HR-Portal — BEM-Modul</p>
+    <p>Dieses Dokument ist eine Bedienungsanleitung für interne Zwecke. Es ersetzt keine Rechtsberatung.</p>
+    <p>Bei rechtlichen Fragen wenden Sie sich an Ihre Datenschutzbeauftragte oder Ihren Anwalt.</p>
+    <p style="margin-top: 8px;">Stand: Juni 2026 &nbsp;|&nbsp; Verantwortlich: CREDO Verwaltung, Personalwesen</p>
+  </footer>
+
+  <!-- CREDO-Farbbalken unten -->
+  <div class="credo-bar">
+    <span class="gelb"></span>
+    <span class="gruen"></span>
+    <span class="rot"></span>
+    <span class="blau"></span>
+  </div>
+
+</div>
+</body>
+</html>
