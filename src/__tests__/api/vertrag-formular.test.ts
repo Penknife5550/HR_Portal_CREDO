@@ -9,7 +9,8 @@ const mockTx = {
   auditLog: { create: jest.fn() },
 };
 const mockPrisma = {
-  contractEndProcess: { findFirst: jest.fn() },
+  contractEndProcess: { findFirst: jest.fn(), update: jest.fn() },
+  contractRenewalData: { upsert: jest.fn() },
   organization: { findMany: jest.fn() },
   $transaction: jest.fn(async (fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx)),
 };
@@ -20,7 +21,7 @@ jest.mock("@/lib/rate-limit", () => ({
   getClientIp: () => "127.0.0.1",
 }));
 
-import { GET, POST } from "@/app/api/vertrag-formular/[token]/route";
+import { GET, POST, PUT } from "@/app/api/vertrag-formular/[token]/route";
 import { NextRequest } from "next/server";
 
 const TOKEN = "test-token-1234567890";
@@ -32,6 +33,13 @@ function getReq(): NextRequest {
 function postReq(body: Record<string, unknown>): NextRequest {
   return new NextRequest(`http://localhost:3000/api/vertrag-formular/${TOKEN}`, {
     method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+function putReq(body: Record<string, unknown>): NextRequest {
+  return new NextRequest(`http://localhost:3000/api/vertrag-formular/${TOKEN}`, {
+    method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -81,7 +89,7 @@ describe("GET /api/vertrag-formular/[token]", () => {
     mockPrisma.organization.findMany.mockResolvedValue([]);
   });
 
-  it("liefert die Vorbefuellung aus current*-Feldern + DokuBit-Probezeit", async () => {
+  it("liefert die Vorbefuellung aus current*-Feldern (sichtbare Felder, Default-Config)", async () => {
     const res = await GET(getReq(), { params: params() });
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -91,10 +99,28 @@ describe("GET /api/vertrag-formular/[token]", () => {
         entgeltgruppe: "E13",
         stufe: "3",
         stellenbeschreibung: "Lehrer",
-        probezeitMonate: 6,
         vertragsbeginn: "2027-01-01", // Tag nach dem Vertragsende
       }),
     );
+    // probezeitMonate ist per Default-Config UNSICHTBAR -> keine Vorbefuellung
+    expect(json.vorbefuellung.probezeitMonate).toBeUndefined();
+  });
+
+  it("befuellt die DokuBit-Probezeit, wenn der Mandant das Feld sichtbar geschaltet hat", async () => {
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue(
+      vorgang({
+        organization: {
+          id: "org1",
+          name: "Gymnasium",
+          mandantNumber: "712",
+          contractEndFieldConfig: [
+            { name: "probezeitMonate", visible: true, required: false, label: "Probezeit (Monate)" },
+          ],
+        },
+      }),
+    );
+    const json = await (await GET(getReq(), { params: params() })).json();
+    expect(json.vorbefuellung.probezeitMonate).toBe(6);
   });
 
   it("Vorbefuellung enthaelt KEINE Adress-/Geburtsdaten (Datenminimierung)", async () => {
@@ -106,6 +132,72 @@ describe("GET /api/vertrag-formular/[token]", () => {
     const json = await (await GET(getReq(), { params: params() })).json();
     expect(JSON.stringify(json.vorbefuellung)).not.toContain("Musterweg");
     expect(JSON.stringify(json.vorbefuellung)).not.toContain("1990");
+  });
+
+  it("Vorbefuellung laesst vom Mandanten AUSGEBLENDETE Felder weg", async () => {
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue(
+      vorgang({
+        organization: {
+          id: "org1",
+          name: "Gymnasium",
+          mandantNumber: "712",
+          contractEndFieldConfig: [
+            { name: "stellenbeschreibung", visible: false, required: false, label: "x" },
+            { name: "entgeltgruppe", visible: false, required: false, label: "x" },
+          ],
+        },
+      }),
+    );
+    const json = await (await GET(getReq(), { params: params() })).json();
+    expect(json.vorbefuellung.stellenbeschreibung).toBeUndefined();
+    expect(json.vorbefuellung.entgeltgruppe).toBeUndefined();
+    // sichtbare Felder bleiben vorbefuellt
+    expect(json.vorbefuellung.wochenstunden).toBe(25.5);
+  });
+
+  it("liefert die zwischengespeicherte Vorstand-Antwort zurueck", async () => {
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue(
+      vorgang({ vorstandAbgestimmt: true, vorstandAbstimmungVermerk: "Hr. M (Vorstand), 01.07." }),
+    );
+    const json = await (await GET(getReq(), { params: params() })).json();
+    expect(json.vorstandAbgestimmt).toBe(true);
+    expect(json.vorstandAbstimmungVermerk).toBe("Hr. M (Vorstand), 01.07.");
+  });
+});
+
+describe("PUT /api/vertrag-formular/[token] — Zwischenspeichern", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue(vorgang());
+    mockPrisma.contractEndProcess.update.mockResolvedValue({});
+    mockPrisma.contractRenewalData.upsert.mockResolvedValue({});
+  });
+
+  it("persistiert die Vorstand-Antwort beim Auto-Save", async () => {
+    const res = await PUT(
+      putReq({
+        wochenstunden: 20,
+        vorstandAbgestimmt: true,
+        vorstandAbstimmungVermerk: "Fr. Beispiel (GF), 08.07.2026",
+      }),
+      { params: params() },
+    );
+    expect(res.status).toBe(200);
+    expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ce1" },
+        data: {
+          vorstandAbgestimmt: true,
+          vorstandAbstimmungVermerk: "Fr. Beispiel (GF), 08.07.2026",
+        },
+      }),
+    );
+  });
+
+  it("laesst die Vorstand-Felder unangetastet, wenn sie nicht mitgesendet werden", async () => {
+    const res = await PUT(putReq({ wochenstunden: 20 }), { params: params() });
+    expect(res.status).toBe(200);
+    expect(mockPrisma.contractEndProcess.update).not.toHaveBeenCalled();
   });
 });
 
@@ -179,6 +271,23 @@ describe("POST /api/vertrag-formular/[token] — Vorstand-Frage", () => {
         }),
       }),
     );
+  });
+
+  it("keine Pflicht, wenn der Mandant das Feld auf optional gestellt hat (required=false)", async () => {
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue(
+      vorgang({
+        organization: {
+          id: "org1",
+          name: "Gymnasium",
+          mandantNumber: "712",
+          contractEndFieldConfig: [
+            { name: "vorstandAbstimmung", visible: true, required: false, label: "x" },
+          ],
+        },
+      }),
+    );
+    const res = await POST(postReq(UEBERNAHME_BODY), { params: params() });
+    expect(res.status).toBe(200);
   });
 
   it("keine Pflicht, wenn der Mandant das Feld ausgeblendet hat", async () => {

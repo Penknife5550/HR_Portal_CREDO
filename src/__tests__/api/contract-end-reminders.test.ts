@@ -7,6 +7,8 @@
 const mockPrisma = {
   contractEndProcess: { findMany: jest.fn(), update: jest.fn() },
   auditLog: { create: jest.fn() },
+  emailLog: { findFirst: jest.fn() },
+  $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
 };
 const mockTriggerWebhooks = jest.fn();
 
@@ -37,9 +39,11 @@ function vorgang(overrides: Record<string, unknown> = {}) {
     employeeLastName: "Mustermann",
     supervisorEmail: "leitung@example.org",
     supervisorToken: "token-abc",
+    supervisorTokenExpiresAt: new Date(now + 20 * MS_PER_DAY),
     supervisorLinkSentAt: new Date(now - 10 * MS_PER_DAY),
     lastSupervisorReminderAt: null,
     supervisorReminderCount: 0,
+    escalatedAt: null,
     contractEndDate: new Date(now + 45 * MS_PER_DAY), // ~2 Monate -> KRITISCH
     organization: { name: "Gymnasium" },
     ...overrides,
@@ -53,7 +57,8 @@ describe("POST /api/cron/contract-end-reminders", () => {
     mockPrisma.contractEndProcess.findMany.mockResolvedValue([]);
     mockPrisma.contractEndProcess.update.mockResolvedValue({});
     mockPrisma.auditLog.create.mockResolvedValue({});
-    mockTriggerWebhooks.mockResolvedValue(undefined);
+    mockPrisma.emailLog.findFirst.mockResolvedValue(null);
+    mockTriggerWebhooks.mockResolvedValue({ status: "SENT" });
   });
 
   it("401 ohne/mit falschem Secret", async () => {
@@ -152,7 +157,8 @@ describe("POST /api/cron/contract-end-reminders", () => {
     expect(mockTriggerWebhooks).toHaveBeenCalledWith(
       "contract-end-eskalation",
       expect.objectContaining({
-        anzahl_erinnerungen: 3,
+        // inkl. der soeben versendeten Erinnerung (DB-Zaehler ist bereits 4)
+        anzahl_erinnerungen: 4,
         supervisorEmail: "leitung@example.org",
         portalLink: expect.stringContaining("/dashboard/contract-end/ce1"),
       }),
@@ -187,6 +193,42 @@ describe("POST /api/cron/contract-end-reminders", () => {
     const json = await (await POST(req())).json();
     expect(json.eskalationen).toBe(0);
   });
+
+  it("verbrennt die Eskalation NICHT, wenn die Mail nur SKIPPED wurde (kein Empfaenger)", async () => {
+    mockPrisma.contractEndProcess.findMany.mockResolvedValue([
+      vorgang({ supervisorReminderCount: 3, escalatedAt: null }),
+    ]);
+    // Erinnerung an Vorgesetzte SENT, Eskalation SKIPPED (kein Empfaenger konfiguriert)
+    mockTriggerWebhooks.mockImplementation(async (event: string) =>
+      event === "contract-end-eskalation"
+        ? { status: "SKIPPED", detail: "Kein Empfaenger" }
+        : { status: "SENT" },
+    );
+    const json = await (await POST(req())).json();
+    expect(json.eskalationen).toBe(0);
+    // escalatedAt darf NICHT gesetzt worden sein -> naechster Lauf versucht es erneut
+    expect(mockPrisma.contractEndProcess.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ escalatedAt: expect.anything() }) }),
+    );
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: "ESKALATION_GESENDET" }) }),
+    );
+  });
+
+  it("ueberspringt Vorgaenge mit abgelaufenem Magic-Link (kein toter-Link-Versand, keine Eskalation)", async () => {
+    mockPrisma.contractEndProcess.findMany.mockResolvedValue([
+      vorgang({
+        supervisorTokenExpiresAt: new Date(Date.now() - 1 * MS_PER_DAY),
+        supervisorReminderCount: 5,
+        escalatedAt: null,
+      }),
+    ]);
+    const json = await (await POST(req())).json();
+    expect(json.reminders).toBe(0);
+    expect(json.eskalationen).toBe(0);
+    expect(json.skipped).toBe(1);
+    expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+  });
 });
 
 describe("Montags-Digest: unbearbeitete kritische Vorgaenge", () => {
@@ -203,7 +245,8 @@ describe("Montags-Digest: unbearbeitete kritische Vorgaenge", () => {
     process.env.CRON_SECRET = SECRET;
     mockPrisma.contractEndProcess.update.mockResolvedValue({});
     mockPrisma.auditLog.create.mockResolvedValue({});
-    mockTriggerWebhooks.mockResolvedValue(undefined);
+    mockPrisma.emailLog.findFirst.mockResolvedValue(null);
+    mockTriggerWebhooks.mockResolvedValue({ status: "SENT" });
   });
 
   afterEach(() => {
@@ -256,6 +299,46 @@ describe("Montags-Digest: unbearbeitete kritische Vorgaenge", () => {
     const json = await (await POST(req())).json();
     expect(json.unbearbeitetHinweis).toBe(0);
     expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+  });
+
+  it("kein zweiter Digest am selben Montag (EmailLog-Idempotenz gegen n8n-Retries)", async () => {
+    jest.useFakeTimers({ now: naechsterMontag(), doNotFake: ["performance"] });
+    mockPrisma.emailLog.findFirst.mockResolvedValue({ id: "log-1" }); // heute schon SENT
+    mockFindMany([
+      {
+        id: "ce-neu",
+        displayId: "VE-2026-GYM-009",
+        employeeFirstName: "Erika",
+        employeeLastName: "Musterfrau",
+        contractEndDate: new Date(Date.now() + 45 * 86400000),
+        organization: { name: "Gymnasium" },
+      },
+    ]);
+    const json = await (await POST(req())).json();
+    expect(json.unbearbeitetHinweis).toBe(0);
+    expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+  });
+
+  it("escaped Namen/Traeger im HTML-Teil des Digests", async () => {
+    jest.useFakeTimers({ now: naechsterMontag(), doNotFake: ["performance"] });
+    mockFindMany([
+      {
+        id: "ce-html",
+        displayId: "VE-2026-GYM-010",
+        employeeFirstName: "<b>Max</b>",
+        employeeLastName: "Mustermann",
+        contractEndDate: new Date(Date.now() + 45 * 86400000),
+        organization: { name: "Schule & Kita gGmbH" },
+      },
+    ]);
+    await POST(req());
+    const payload = mockTriggerWebhooks.mock.calls.find(
+      (c) => c[0] === "contract-end-unbearbeitet",
+    )![1];
+    expect(payload.liste_html).toContain("&lt;b&gt;Max&lt;/b&gt;");
+    expect(payload.liste_html).toContain("Schule &amp; Kita gGmbH");
+    // Text-Teil bleibt unescaped
+    expect(payload.liste_text).toContain("Schule & Kita gGmbH");
   });
 
   it("kein Digest an anderen Wochentagen", async () => {

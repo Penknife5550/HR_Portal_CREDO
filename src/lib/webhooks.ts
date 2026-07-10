@@ -18,7 +18,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { sendEventEmail } from "@/lib/mailer";
+import { sendEventEmail, type EventEmailResult } from "@/lib/mailer";
 import { decrypt } from "@/lib/encryption";
 import { isPublicHostname, redactUrlForLog } from "@/lib/url";
 
@@ -63,15 +63,18 @@ const TIMEOUT_MS = 10_000;
 // =============================================
 // Haupt-Funktion: E-Mail primaer, Webhooks zusaetzlich
 // VERTRAG: Wirft NIEMALS — alle Fehler werden geloggt und geschluckt.
+// Gibt das E-Mail-Ergebnis (SENT/FAILED/SKIPPED) zurueck, damit Aufrufer
+// Folgeaktionen (z.B. Einmal-Marker wie escalatedAt) davon abhaengig machen
+// koennen; null bei unerwartetem Fehler. Bestehende Aufrufer ignorieren es.
 // =============================================
 export async function triggerWebhooks(
   event: WebhookEvent,
   payload: Record<string, unknown>
-): Promise<void> {
+): Promise<EventEmailResult | null> {
   try {
     // 1. Primaerer Kanal: E-Mail per SMTP
     //    sendEventEmail wirft nicht und protokolliert jedes Ergebnis im EmailLog
-    await sendEventEmail(event, payload);
+    const emailResult = await sendEventEmail(event, payload);
 
     // 2. Zusatzkanal: DB-konfigurierte Webhooks (unabhaengig vom E-Mail-Ergebnis)
     try {
@@ -102,12 +105,15 @@ export async function triggerWebhooks(
         dbError instanceof Error ? dbError.message : dbError
       );
     }
+
+    return emailResult;
   } catch (unexpected) {
     // Letzte Sicherung — sollte nie greifen, aber garantiert "wirft niemals"
     console.error(
       `[Webhooks] Unerwarteter Fehler in triggerWebhooks für "${event}":`,
       unexpected instanceof Error ? unexpected.message : unexpected
     );
+    return null;
   }
 }
 

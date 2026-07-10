@@ -49,7 +49,8 @@ export function paragraphsToHtml(text: string): string {
     .join("");
 }
 
-function escapeHtml(s: string): string {
+/** HTML-Escaping fuer Nutzdaten, die in E-Mail-HTML interpoliert werden. */
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

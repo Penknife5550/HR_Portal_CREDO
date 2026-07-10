@@ -89,6 +89,10 @@ export async function POST(
         lastSupervisorReminderAt: null,
         supervisorReminderCount: 0,
         escalatedAt: null,
+        // Auch die Vorstand-/GF-Abstimmung gehoert zur ALTEN Antwort —
+        // sonst klebt ein veralteter Nachweis an der neuen Entscheidung.
+        vorstandAbgestimmt: null,
+        vorstandAbstimmungVermerk: null,
       },
     });
 

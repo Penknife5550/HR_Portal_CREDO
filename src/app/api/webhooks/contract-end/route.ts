@@ -133,7 +133,10 @@ async function processEintrag(
       ? { bisherigeVerlaengerungen: eintrag.bisherigeVerlaengerungen }
       : {}),
     ...(hatStammdaten ? { dokubitDaten } : {}),
-    ...(weitereMandanten.length > 0 ? { weitereMandanten } : {}),
+    // Sobald n8n personalMandanten mitliefert, ist die Liste autoritativ —
+    // auch eine LEERE Liste (Mehrfachbeschaeftigung beendet) muss den alten
+    // Wert ueberschreiben. Nur bei fehlendem Feld nicht anfassen.
+    ...(eintrag.personalMandanten !== undefined ? { weitereMandanten } : {}),
   };
 
   if (offenerVorgang) {

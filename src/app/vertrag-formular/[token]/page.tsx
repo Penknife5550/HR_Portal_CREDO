@@ -46,6 +46,9 @@ interface PageData {
   declineReason: string | null;
   alreadySubmitted: boolean;
   renewalData: Record<string, unknown> | null;
+  /** Zwischengespeicherte Vorstand-/GF-Antwort (PUT persistiert sie). */
+  vorstandAbgestimmt?: boolean | null;
+  vorstandAbstimmungVermerk?: string | null;
   /** Vorbefuellung aus dem aktuellen Vertrag (n8n/DokuBit) — nur fuer leere Felder. */
   vorbefuellung?: {
     vertragsbeginn?: string | null;
@@ -144,6 +147,9 @@ export default function VertragFormularPage() {
       if (j.alreadySubmitted) setSubmitted(true);
       if (j.decision === "UEBERNAHME" || j.decision === "KEINE_UEBERNAHME") setDecision(j.decision);
       if (j.declineReason) setDeclineReason(j.declineReason);
+      // Zwischengespeicherte Vorstand-/GF-Antwort wiederherstellen
+      if (typeof j.vorstandAbgestimmt === "boolean") setVorstandAbgestimmt(j.vorstandAbgestimmt);
+      if (j.vorstandAbstimmungVermerk) setVorstandVermerk(j.vorstandAbstimmungVermerk);
       const rd = j.renewalData;
       if (rd) {
         setForm((f) => ({
@@ -280,7 +286,11 @@ export default function VertragFormularPage() {
       return;
     }
     if (decision === "UEBERNAHME") {
-      if (vis("vorstandAbstimmung") && vorstandAbgestimmt === null) {
+      if (
+        vis("vorstandAbstimmung") &&
+        helper.isRequired("vorstandAbstimmung") &&
+        vorstandAbgestimmt === null
+      ) {
         setMsg("Bitte beantworten Sie die Frage zur Abstimmung mit Vorstand/Geschäftsführung.");
         return;
       }
@@ -406,9 +416,7 @@ export default function VertragFormularPage() {
           <>
             {vis("vorstandAbstimmung") && (
               <div className="rounded-xl border-2 border-credo-gelb bg-credo-gelb/10 p-4">
-                <p className="text-sm font-bold text-foreground">
-                  Wurde das mit dem Vorstand/Geschäftsführung abgestimmt? *
-                </p>
+                <p className="text-sm font-bold text-foreground">{lbl("vorstandAbstimmung")}</p>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <button
                     type="button"

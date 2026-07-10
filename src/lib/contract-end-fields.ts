@@ -54,8 +54,11 @@ export const CONTRACT_END_FIELD_REGISTRY: ContractEndFieldDefinition[] = [
   { name: "probezeitMonate", label: "Probezeit (Monate)", defaultVisible: false, defaultRequired: false },
   { name: "zusatzvereinbarungen", label: "Zusätzliche Vereinbarungen", defaultVisible: true, defaultRequired: false },
   {
+    // Kein ContractRenewalData-Feld: gehoert zur Entscheidung (ContractEndProcess).
+    // label = Fragetext im Formular; visible/required steuern Anzeige UND Pflicht
+    // (Server prueft beides in vertrag-formular POST).
     name: "vorstandAbstimmung",
-    label: "Abstimmung mit Vorstand/Geschäftsführung",
+    label: "Wurde das mit dem Vorstand/Geschäftsführung abgestimmt?",
     defaultVisible: true,
     defaultRequired: true,
     hint: "Die Führungskraft bestätigt bei Übernahme, ob die Entscheidung mit Vorstand/Geschäftsführung abgestimmt wurde.",

@@ -372,13 +372,16 @@ describe("triggerWebhooks (Dispatcher)", () => {
     expect(global.fetch).toHaveBeenCalled();
   });
 
-  it("wirft niemals — auch wenn alles fehlschlaegt", async () => {
+  it("wirft niemals — auch wenn alles fehlschlaegt (liefert das E-Mail-Ergebnis)", async () => {
     mockPrisma.emailTemplate.findUnique.mockRejectedValue(new Error("DB down"));
     mockPrisma.emailLog.create.mockRejectedValue(new Error("DB down"));
     mockPrisma.webhookConfig.findMany.mockRejectedValue(new Error("DB down"));
 
-    await expect(
-      triggerWebhooks("onboarding-created", payload)
-    ).resolves.toBeUndefined();
+    // Kein Reject; seit dem Eskalations-Fix gibt der Dispatcher das
+    // EventEmailResult zurueck, damit Aufrufer Folgeaktionen davon abhaengig
+    // machen koennen (z.B. escalatedAt nur bei SENT setzen).
+    await expect(triggerWebhooks("onboarding-created", payload)).resolves.toEqual(
+      expect.objectContaining({ status: "FAILED" }),
+    );
   });
 });

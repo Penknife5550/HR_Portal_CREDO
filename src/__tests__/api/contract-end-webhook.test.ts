@@ -258,6 +258,35 @@ describe("POST /api/webhooks/contract-end", () => {
     expect(mockCreateContractEnd.mock.calls[0][0].weitereMandanten).toEqual(["737", "742"]);
   });
 
+  it("leert weitereMandanten, wenn die Mehrfachbeschaeftigung endet", async () => {
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue({
+      id: "ce-alt",
+      displayId: "VE-2026-GYM-007",
+      status: "ANGELEGT",
+      contractEndDate: new Date("2026-12-31"),
+    });
+    // Person hat nur noch den eigenen Mandanten -> autoritative leere Liste
+    await POST(req({ ...EINTRAG, personalMandanten: ["712"] }));
+    expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ce-alt" },
+        data: expect.objectContaining({ weitereMandanten: [] }),
+      }),
+    );
+  });
+
+  it("laesst weitereMandanten unangetastet, wenn personalMandanten fehlt", async () => {
+    mockPrisma.contractEndProcess.findFirst.mockResolvedValue({
+      id: "ce-alt",
+      displayId: "VE-2026-GYM-007",
+      status: "ANGELEGT",
+      contractEndDate: new Date("2026-12-31"),
+    });
+    await POST(req({ ...EINTRAG, aktuelleStufe: "3" })); // ohne personalMandanten
+    const updateData = mockPrisma.contractEndProcess.update.mock.calls[0][0].data;
+    expect(updateData.weitereMandanten).toBeUndefined();
+  });
+
   // ---------- B9-Aenderungsmarker ----------
 
   it("markiert Datumsaenderung auf weit fortgeschrittenem Vorgang", async () => {

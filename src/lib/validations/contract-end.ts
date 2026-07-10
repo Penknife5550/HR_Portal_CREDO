@@ -58,6 +58,18 @@ export const renewalDataSchema = z
   .strip();
 
 /**
+ * Vorstand-/GF-Abstimmung als Entwurf (PUT/Zwischenspeichern): beide Felder
+ * optional, keine Pflicht-Logik — die greift erst beim verbindlichen POST
+ * (supervisorDecisionSchema). `.strip()` gegen Mass-Assignment.
+ */
+export const vorstandDraftSchema = z
+  .object({
+    vorstandAbgestimmt: z.boolean().optional(),
+    vorstandAbstimmungVermerk: z.string().max(300).optional(),
+  })
+  .strip();
+
+/**
  * Rueckmeldung der Fuehrungskraft im oeffentlichen Formular (Strang A, neuer
  * Prozess): SIE entscheidet ueber die Uebernahme. Bei Ablehnung ist eine kurze
  * Begruendung Pflicht. Die Vertragsdaten (bei Uebernahme) kommen zusaetzlich

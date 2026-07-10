@@ -19,6 +19,7 @@ import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import {
   renewalDataSchema,
   supervisorDecisionSchema,
+  vorstandDraftSchema,
   type RenewalDataInput,
 } from "@/lib/validations/contract-end";
 import { resolveContractEndFieldConfig } from "@/lib/contract-end-fields";
@@ -107,6 +108,11 @@ export async function GET(
     // Vorbefuellung aus den n8n-/DokuBit-Daten des AKTUELLEN Vertrags —
     // Vorgesetzte aendern nur, was sich aendert. Bewusst KEINE Adress-/
     // Geburtsdaten (im Formular nicht gebraucht, Datenminimierung).
+    // NUR fuer laut Mandanten-Config SICHTBARE Felder — ausgeblendete Felder
+    // duerfen nicht unsichtbar vorbefuellt, persistiert und ins Vertrags-
+    // dokument gedruckt werden.
+    const sichtbar = (name: string) =>
+      fieldConfig.find((f) => f.name === name)?.visible ?? true;
     const dokubit = (ce.dokubitDaten ?? {}) as Record<string, string>;
     // Probezeit-Monate nur ableiten, wenn DokuBit in Monaten rechnet
     const probezeitMonate =
@@ -117,12 +123,15 @@ export async function GET(
     const beginnKandidat = new Date(ce.contractEndDate);
     beginnKandidat.setDate(beginnKandidat.getDate() + 1);
     const vorbefuellung = {
+      // vertragsbeginn ist alwaysVisible
       vertragsbeginn: beginnKandidat.toISOString().slice(0, 10),
-      wochenstunden: ce.currentWochenstunden,
-      entgeltgruppe: ce.currentEntgeltgruppe,
-      stufe: ce.currentStufe,
-      stellenbeschreibung: ce.currentPosition,
-      ...(probezeitMonate ? { probezeitMonate } : {}),
+      ...(sichtbar("wochenstunden") ? { wochenstunden: ce.currentWochenstunden } : {}),
+      ...(sichtbar("entgeltgruppe") ? { entgeltgruppe: ce.currentEntgeltgruppe } : {}),
+      ...(sichtbar("stufe") ? { stufe: ce.currentStufe } : {}),
+      ...(sichtbar("stellenbeschreibung")
+        ? { stellenbeschreibung: ce.currentPosition }
+        : {}),
+      ...(probezeitMonate && sichtbar("probezeitMonate") ? { probezeitMonate } : {}),
     };
 
     return NextResponse.json({
@@ -145,6 +154,9 @@ export async function GET(
         ),
       renewalData: ce.renewalData,
       vorbefuellung,
+      // Zwischengespeicherte Vorstand-/GF-Antwort (PUT persistiert sie)
+      vorstandAbgestimmt: ce.vorstandAbgestimmt,
+      vorstandAbstimmungVermerk: ce.vorstandAbstimmungVermerk,
     });
   } catch (error) {
     console.error("Fehler beim Laden des Vertrag-Formulars:", error);
@@ -187,6 +199,21 @@ export async function PUT(
       update: data,
       create: { contractEndId: ce.id, ...data },
     });
+
+    // Vorstand-/GF-Antwort mit zwischenspeichern (liegt am Vorgang, nicht in
+    // renewalData) — sonst geht das Compliance-Feld beim Wiederoeffnen verloren.
+    const vorstandDraft = vorstandDraftSchema.safeParse(body);
+    if (vorstandDraft.success && vorstandDraft.data.vorstandAbgestimmt !== undefined) {
+      await prisma.contractEndProcess.update({
+        where: { id: ce.id },
+        data: {
+          vorstandAbgestimmt: vorstandDraft.data.vorstandAbgestimmt,
+          vorstandAbstimmungVermerk: vorstandDraft.data.vorstandAbgestimmt
+            ? vorstandDraft.data.vorstandAbstimmungVermerk?.trim() || null
+            : null,
+        },
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -232,12 +259,12 @@ export async function POST(
 
     if (decision === "UEBERNAHME") {
       // Vorstand-/GF-Abstimmung: Pflichtangabe bei Uebernahme, sofern das Feld
-      // laut Mandanten-Config sichtbar ist (Mandanten ohne Vorstand koennen es
-      // in der Vertragsende-Konfiguration ausblenden).
+      // laut Mandanten-Config sichtbar UND als Pflicht markiert ist (Mandanten
+      // ohne Vorstand koennen es ausblenden oder auf optional stellen).
       const fieldConfig = resolveContractEndFieldConfig(ce.organization.contractEndFieldConfig);
-      const vorstandFeldSichtbar =
-        fieldConfig.find((f) => f.name === "vorstandAbstimmung")?.visible ?? true;
-      if (vorstandFeldSichtbar && typeof vorstandAbgestimmt !== "boolean") {
+      const vorstandFeld = fieldConfig.find((f) => f.name === "vorstandAbstimmung");
+      const vorstandPflicht = (vorstandFeld?.visible ?? true) && (vorstandFeld?.required ?? true);
+      if (vorstandPflicht && typeof vorstandAbgestimmt !== "boolean") {
         return NextResponse.json(
           {
             error:

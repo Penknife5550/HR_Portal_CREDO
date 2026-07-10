@@ -30,6 +30,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { getBaseUrl } from "@/lib/url";
+import { escapeHtml } from "@/lib/email-layout";
 import { sendSupervisorReminder } from "@/lib/contract-end-reminder";
 import {
   getContractEndCategory,
@@ -49,6 +50,17 @@ const REMINDER_INTERVAL_DAYS: Record<ContractEndCategory, number | null> = {
 
 // Ab so vielen erfolglosen Erinnerungen wird an HR eskaliert.
 const ESKALATION_AB_ERINNERUNGEN = 3;
+
+/**
+ * Wochentag bewusst in Europe/Berlin bestimmen — der Docker-Container laeuft
+ * in UTC, der fachliche "Montag" ist aber der deutsche.
+ */
+function istMontagInBerlin(d: Date): boolean {
+  return (
+    new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Berlin", weekday: "short" }).format(d) ===
+    "Mon"
+  );
+}
 
 /** Timing-Safe String-Vergleich (verhindert Timing-Attacken auf CRON_SECRET). */
 function timingSafeCompare(a: string, b: string): boolean {
@@ -83,6 +95,13 @@ export async function POST(request: NextRequest) {
 
     for (const ce of offen) {
       try {
+        // Abgelaufener Magic-Link: Erinnerung waere ein toter Link (410) und
+        // eine Eskalation darauf unfair — HR muss "Anfrage erneut senden".
+        if (!ce.supervisorTokenExpiresAt || new Date(ce.supervisorTokenExpiresAt) < now) {
+          results.skipped++;
+          continue;
+        }
+
         const kategorie = getContractEndCategory(new Date(ce.contractEndDate), now);
         const intervall = REMINDER_INTERVAL_DAYS[kategorie];
         if (intervall == null) {
@@ -110,7 +129,10 @@ export async function POST(request: NextRequest) {
           const tageOffen = Math.floor(
             (now.getTime() - new Date(ce.supervisorLinkSentAt!).getTime()) / MS_PER_DAY,
           );
-          await triggerWebhooks("contract-end-eskalation", {
+          // sendSupervisorReminder hat den DB-Zaehler soeben erhoeht — das
+          // in-memory ce ist stale, daher +1 fuer Mail und Audit.
+          const anzahlErinnerungen = ce.supervisorReminderCount + 1;
+          const mailResult = await triggerWebhooks("contract-end-eskalation", {
             contractEndId: ce.id,
             displayId: ce.displayId,
             mitarbeiter_name: `${ce.employeeFirstName} ${ce.employeeLastName}`,
@@ -119,29 +141,42 @@ export async function POST(request: NextRequest) {
             organization: ce.organization.name,
             vertragsende: new Date(ce.contractEndDate).toLocaleDateString("de-DE"),
             contractEndDate: new Date(ce.contractEndDate).toISOString(),
-            anzahl_erinnerungen: ce.supervisorReminderCount,
+            anzahl_erinnerungen: anzahlErinnerungen,
             tage_offen: tageOffen,
             dringlichkeit: CONTRACT_END_CATEGORY_META[kategorie].label,
             portalLink: `${getBaseUrl()}/dashboard/contract-end/${ce.id}`,
           });
-          await prisma.contractEndProcess.update({
-            where: { id: ce.id },
-            data: { escalatedAt: now },
-          });
-          await prisma.auditLog.create({
-            data: {
-              contractEndId: ce.id,
-              processType: "CONTRACT_END",
-              action: "ESKALATION_GESENDET",
-              details: {
-                anzahlErinnerungen: ce.supervisorReminderCount,
-                tageOffen,
-                kategorie,
-                supervisorEmail: ce.supervisorEmail || "",
-              },
-            },
-          });
-          results.eskalationen++;
+
+          // Einmal-Marker NUR setzen, wenn die Mail wirklich raus ist —
+          // SKIPPED (kein Empfaenger konfiguriert) oder FAILED darf die
+          // einmalige Eskalation nicht verbrennen (naechster Lauf versucht
+          // es erneut, bis der Empfaenger konfiguriert ist).
+          if (mailResult?.status === "SENT") {
+            await prisma.$transaction([
+              prisma.contractEndProcess.update({
+                where: { id: ce.id },
+                data: { escalatedAt: now },
+              }),
+              prisma.auditLog.create({
+                data: {
+                  contractEndId: ce.id,
+                  processType: "CONTRACT_END",
+                  action: "ESKALATION_GESENDET",
+                  details: {
+                    anzahlErinnerungen,
+                    tageOffen,
+                    kategorie,
+                    supervisorEmail: ce.supervisorEmail || "",
+                  },
+                },
+              }),
+            ]);
+            results.eskalationen++;
+          } else {
+            console.warn(
+              `[ContractEndReminders] Eskalation fuer ${ce.displayId} nicht zugestellt (${mailResult?.status ?? "unbekannt"}) — wird beim naechsten Lauf erneut versucht. Empfaenger in Einstellungen -> E-Mail-Versand konfigurieren.`,
+            );
+          }
         }
       } catch (err) {
         console.error(`[ContractEndReminders] Fehler bei ${ce.id}:`, err);
@@ -151,31 +186,47 @@ export async function POST(request: NextRequest) {
 
     // MONTAGS-DIGEST: kritische/Warnung-Vorgaenge, fuer die noch gar keine
     // Anfrage versendet wurde (Status ANGELEGT). Cron laeuft taeglich —
-    // der Digest geht nur montags raus, und nur wenn die Liste nicht leer ist.
-    if (now.getDay() === 1) {
+    // der Digest geht nur montags (Europe/Berlin) raus, hoechstens einmal
+    // je Tag (EmailLog-Check gegen n8n-Retries), und nur bei nicht-leerer Liste.
+    if (istMontagInBerlin(now)) {
       try {
-        const unbearbeitet = await prisma.contractEndProcess.findMany({
-          where: { status: "ANGELEGT" },
-          include: { organization: { select: { name: true } } },
-          orderBy: { contractEndDate: "asc" },
+        const tagesStart = new Date(now);
+        tagesStart.setHours(0, 0, 0, 0);
+        const heuteSchonGesendet = await prisma.emailLog.findFirst({
+          where: {
+            event: "contract-end-unbearbeitet",
+            status: "SENT",
+            isTest: false,
+            createdAt: { gte: tagesStart },
+          },
+          select: { id: true },
         });
-        const kritische = unbearbeitet
-          .map((ce) => ({
-            ce,
-            kategorie: getContractEndCategory(new Date(ce.contractEndDate), now),
-          }))
-          .filter(({ kategorie }) => kategorie === "KRITISCH" || kategorie === "WARNUNG");
 
-        if (kritische.length > 0) {
-          const zeile = ({ ce, kategorie }: (typeof kritische)[number]) =>
-            `${ce.displayId} · ${ce.employeeFirstName} ${ce.employeeLastName} · ${ce.organization.name} · Vertragsende ${new Date(ce.contractEndDate).toLocaleDateString("de-DE")} (${CONTRACT_END_CATEGORY_META[kategorie].label})`;
-          await triggerWebhooks("contract-end-unbearbeitet", {
-            anzahl: kritische.length,
-            liste_text: kritische.map(zeile).join("\n"),
-            liste_html: kritische.map((k) => `<li>${zeile(k)}</li>`).join(""),
-            portalLink: `${getBaseUrl()}/dashboard`,
+        if (!heuteSchonGesendet) {
+          const unbearbeitet = await prisma.contractEndProcess.findMany({
+            where: { status: "ANGELEGT" },
+            include: { organization: { select: { name: true } } },
+            orderBy: { contractEndDate: "asc" },
           });
-          results.unbearbeitetHinweis = kritische.length;
+          const kritische = unbearbeitet
+            .map((ce) => ({
+              ce,
+              kategorie: getContractEndCategory(new Date(ce.contractEndDate), now),
+            }))
+            .filter(({ kategorie }) => kategorie === "KRITISCH" || kategorie === "WARNUNG");
+
+          if (kritische.length > 0) {
+            const zeile = ({ ce, kategorie }: (typeof kritische)[number]) =>
+              `${ce.displayId} · ${ce.employeeFirstName} ${ce.employeeLastName} · ${ce.organization.name} · Vertragsende ${new Date(ce.contractEndDate).toLocaleDateString("de-DE")} (${CONTRACT_END_CATEGORY_META[kategorie].label})`;
+            await triggerWebhooks("contract-end-unbearbeitet", {
+              anzahl: kritische.length,
+              liste_text: kritische.map(zeile).join("\n"),
+              // Namen/Traeger stammen aus DokuBit — fuer den HTML-Teil escapen
+              liste_html: kritische.map((k) => `<li>${escapeHtml(zeile(k))}</li>`).join(""),
+              portalLink: `${getBaseUrl()}/dashboard`,
+            });
+            results.unbearbeitetHinweis = kritische.length;
+          }
         }
       } catch (err) {
         console.error("[ContractEndReminders] Fehler beim Unbearbeitet-Digest:", err);
