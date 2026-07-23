@@ -214,7 +214,7 @@ tr:nth-child(even) td { background: #f9f9f9; }
   <div class="credo-bar"><span class="grau"></span><span class="gelb"></span><span class="gruen"></span><span class="rot"></span><span class="blau"></span></div>
 
   <header class="doc-header">
-    <div class="badge">Umsetzungsplan · zur Freigabe</div>
+    <div class="badge" style="background:var(--gruen);">Umgesetzt · 23. Juli 2026 · Commit 0c99779</div>
     <h1>Vorlagen-Filter, Benutzer-Telefon &amp; Sachbearbeiter-Variablen</h1>
     <p class="subtitle">Drei zusammenhängende Erweiterungen: Brief-Vorlagen nach Modul und Geltung filtern · Telefonnummer am Benutzerkonto · Ansprechpartner-Variablen in den Word-Vorlagen</p>
     <p class="meta">Stand: 22. Juli 2026 &nbsp;|&nbsp; Basis: Codebase-Analyse (Vorlagenbibliothek E0, Benutzerverwaltung, Platzhalter-Resolver) &nbsp;|&nbsp; Offene Fragen mit dem Auftraggeber geklärt &nbsp;|&nbsp; Zielgruppe: Freigabe vor Umsetzung</p>
@@ -235,6 +235,34 @@ tr:nth-child(even) td { background: #f9f9f9; }
   </nav>
 
   <main class="content">
+
+    <!-- ============================================================ -->
+    <section class="section" id="status" style="margin-top:32px;">
+      <div class="hinweis" style="background:#EAFAF1;border-left-color:var(--gruen);">
+        <span class="icon">✅</span>
+        <div><strong>Stand der Umsetzung</strong>
+          Pakete 1–3 vollständig · Paket 4 Schritte 1–7 · zusätzlich drei bei der Gegenprüfung gefundene Bestandsfehler behoben (Rechteausweitung in der Benutzerverwaltung, Rollen-Dropdown, BEM-Variablenkatalog).
+          <br><br>
+          <strong>Prüfstand:</strong> 423 Tests grün (63 neue) · <code>tsc --noEmit</code> sauber · ESLint ohne Befund · Produktions-Build durchgelaufen · Mutationstests: drei absichtlich eingebaute Fehler, alle drei gefangen.
+          <br><br>
+          <strong>Zurückgestellt:</strong> Suche und Kappung in der Vorlagenliste (Schritt 8) — nach der Messung bei rund fünf sichtbaren Zeilen ohne Wirkung, nachrüstbar wenn die Vorlagenzahl wächst.
+        </div>
+      </div>
+
+      <div class="warnung">
+        <span class="icon">📋</span>
+        <div><strong>Drei Schritte vor dem Deploy — die Reihenfolge ist wichtig</strong>
+          Der Mandantenfilter greift erst nach dem Deploy. Werden die Stammdaten <em>vorher</em> bereinigt, entsteht kein Zeitfenster, in dem Träger eine leere Vorlagenliste sehen.
+          <ol style="margin:8px 0 0 18px;">
+            <li><strong>Vertragsverlängerungs-Vorlagen gruppenweit stellen</strong> — „AV Nachtrag" und „Vertragsverlängerung für Lehrkraft (ohne Sachgrund)" sind beide mandantengebunden. Unter <em>Brief-Vorlagen → Bearbeiten → Mandant: Global (alle Mandanten)</em>. <strong>Ohne diesen Schritt</strong> sehen Träger ohne eigene Vorlage nach dem Deploy dort eine leere Liste.</li>
+            <li><strong>Doppelte Führungszeugnis-Vorlage deaktivieren</strong> — „Antrag auf ein erweitertes Führungszeugnis <em>- KiTa</em>" und „… <em>Kita</em>" unterscheiden sich nur in der Schreibweise.</li>
+            <li><strong>Deploy</strong> — <code>sudo docker compose up -d --build</code>. Der Entrypoint legt dabei <code>User.phone</code> selbst an (<code>prisma db push</code>).</li>
+          </ol>
+          <br>
+          Schritte 1 und 2 bewusst über die Oberfläche, nicht per SQL: Nur so entsteht ein Audit-Eintrag (<code>DOC_TEMPLATE_UPDATED</code> / <code>DOC_TEMPLATE_DELETED</code>).
+        </div>
+      </div>
+    </section>
 
     <!-- ============================================================ -->
     <section class="section" id="ueberblick">
