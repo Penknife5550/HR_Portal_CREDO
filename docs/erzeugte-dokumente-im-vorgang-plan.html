@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Umsetzungsplan — Erzeugte Dokumente im Vorgang sichtbar machen | CREDO HR-Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary-bg:   #DADADA;
+  --accent:       #575756;
+  --text:         #2b2b2b;
+  --text-light:   #666;
+  --gelb:         #FBC900;
+  --gruen:        #6BAA24;
+  --rot:          #E2001A;
+  --blau:         #009AC6;
+  --white:        #ffffff;
+  --border:       #c5c5c5;
+  --hinweis-bg:   #EBF5FB;
+  --hinweis-bd:   #009AC6;
+  --warnung-bg:   #FEF9E7;
+  --warnung-bd:   #FBC900;
+  --kritik-bg:    #FDEDEC;
+  --kritik-bd:    #E2001A;
+  --offen-bg:     #F4F6F7;
+  --offen-bd:     #9B59B6;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Montserrat', Arial, sans-serif; font-size: 14px; line-height: 1.7; color: var(--text); background: #f7f7f7; }
+.page-wrapper { max-width: 980px; margin: 0 auto; background: var(--white); box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.credo-bar { display: flex; height: 6px; }
+.credo-bar span { flex: 1; }
+.credo-bar .grau  { background: var(--accent); }
+.credo-bar .gelb  { background: var(--gelb); }
+.credo-bar .gruen { background: var(--gruen); }
+.credo-bar .rot   { background: var(--rot); }
+.credo-bar .blau  { background: var(--blau); }
+.doc-header { background: var(--accent); color: var(--white); padding: 40px 48px 32px; }
+.doc-header .badge { display: inline-block; background: var(--blau); color: var(--white); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; margin-bottom: 14px; }
+.doc-header h1 { font-size: 28px; font-weight: 700; line-height: 1.25; }
+.doc-header .subtitle { margin-top: 8px; font-size: 13px; opacity: .8; }
+.doc-header .meta { margin-top: 20px; font-size: 11px; opacity: .65; border-top: 1px solid rgba(255,255,255,.2); padding-top: 14px; }
+.toc { background: var(--primary-bg); padding: 28px 48px; border-bottom: 1px solid var(--border); }
+.toc h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin-bottom: 14px; }
+.toc ol { list-style: decimal; padding-left: 18px; columns: 2; column-gap: 32px; }
+.toc li { font-size: 13px; margin-bottom: 5px; break-inside: avoid; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.content { padding: 0 48px 48px; }
+.section { margin-top: 44px; }
+.section-title { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); margin-bottom: 20px; }
+.section-title .num { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--accent); color: var(--white); border-radius: 50%; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.section-title h2 { font-size: 18px; font-weight: 700; color: var(--accent); }
+h3 { font-size: 14px; font-weight: 700; color: var(--accent); margin: 24px 0 10px; }
+h4 { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; margin: 18px 0 8px; }
+p { margin-bottom: 12px; }
+ul, ol { margin: 0 0 12px 20px; }
+li { margin-bottom: 5px; }
+strong { font-weight: 700; }
+code { font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; background: #f0f0f2; padding: 1px 5px; border-radius: 3px; color: #244; }
+.hinweis, .warnung, .kritik, .offen { display: flex; gap: 14px; border-radius: 6px; padding: 14px 18px; margin: 16px 0; font-size: 13px; }
+.hinweis { background: var(--hinweis-bg); border-left: 4px solid var(--hinweis-bd); }
+.warnung { background: var(--warnung-bg); border-left: 4px solid var(--warnung-bd); }
+.kritik { background: var(--kritik-bg); border-left: 4px solid var(--kritik-bd); }
+.offen { background: var(--offen-bg); border-left: 4px solid var(--offen-bd); }
+.hinweis .icon, .warnung .icon, .kritik .icon, .offen .icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+.hinweis strong, .warnung strong, .kritik strong, .offen strong { display: block; font-weight: 700; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 16px 0; }
+th { background: var(--accent); color: var(--white); text-align: left; padding: 9px 14px; font-weight: 600; font-size: 12px; }
+td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:nth-child(even) td { background: #f9f9f9; }
+.table-scroll { overflow-x: auto; }
+.status-badge { display: inline-block; padding: 3px 11px; border-radius: 16px; font-size: 11px; font-weight: 700; border: 1px solid; white-space: nowrap; }
+.status-badge.blau   { background: #EBF5FB; color: #009AC6; border-color: #b3dff0; }
+.status-badge.gelb   { background: #FEFDE7; color: #9A7D0A; border-color: #f7dc6f; }
+.status-badge.rot    { background: #FDEDEC; color: #C0392B; border-color: #f1948a; }
+.status-badge.grau   { background: #F4F6F7; color: #717D7E; border-color: #ccc; }
+.status-badge.gruen  { background: #EAFAF1; color: #1E8449; border-color: #a9dfbf; }
+
+/* Mockup-Fenster */
+.mockup { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 18px 0; box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+.mockup-bar { background: #e9e9eb; padding: 8px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border); }
+.mockup-bar .dot-win { width: 9px; height: 9px; border-radius: 50%; background: #d0d0d0; }
+.mockup-bar .title { margin-left: 8px; font-size: 11px; color: var(--text-light); font-weight: 600; }
+.mockup-body { padding: 16px; background: #fbfbfb; font-size: 12.5px; }
+.mockup.heute .mockup-bar { background: #efe6e6; }
+.mockup.heute .mockup-bar .title::before { content: "HEUTE · "; color: var(--rot); font-weight: 700; }
+.mockup.neu .mockup-bar { background: #e4f0e2; }
+.mockup.neu .mockup-bar .title::before { content: "NEU · "; color: var(--gruen); font-weight: 700; }
+.m-karte { border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 12px; margin-bottom: 10px; }
+.m-karte:last-child { margin-bottom: 0; }
+.m-kartenkopf { font-size: 12.5px; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+.m-kartensub { font-size: 10.5px; color: var(--text-light); margin-bottom: 10px; }
+.m-zaehler { display: inline-block; background: #eceff1; color: var(--text-light); border-radius: 10px; padding: 1px 8px; font-size: 10px; font-weight: 700; }
+.m-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; background: #fff; }
+.m-row:last-child { margin-bottom: 0; }
+.m-name { flex: 1; font-weight: 600; min-width: 0; }
+.m-sub { font-size: 11px; color: var(--text-light); font-weight: 400; }
+.m-btn { display: inline-block; background: transparent; border: 1px solid var(--border); color: var(--text); font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; white-space: nowrap; }
+.m-geltung { display: inline-flex; border-radius: 10px; padding: 1px 7px; font-size: 9px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+.m-geltung.grau { background: #eceff1; color: var(--text-light); }
+.m-geltung.gruen { background: #EAFAF1; color: #3f6b16; }
+.m-meldung { border-radius: 4px; padding: 4px 9px; font-size: 11px; margin: -2px 0 6px; }
+.m-meldung.gelb { background: var(--warnung-bg); border-left: 3px solid var(--gelb); color: #8a6d00; }
+.m-luecke { border: 2px dashed var(--rot); border-radius: 8px; padding: 14px; text-align: center; font-size: 12px; color: var(--rot); background: #fdf3f2; }
+
+/* Datenfluss */
+.fluss { display: flex; flex-direction: column; align-items: center; gap: 3px; margin: 20px 0; }
+.fluss-box { border: 2px solid var(--accent); border-radius: 6px; padding: 9px 16px; font-size: 12px; font-weight: 700; color: var(--accent); background: #fff; text-align: center; max-width: 560px; }
+.fluss-box.start { border-color: var(--blau); color: var(--blau); }
+.fluss-box.liegt { border-color: var(--gruen); color: #3f6b16; background: #f6fcf3; }
+.fluss-box.ende-rot { border-color: var(--rot); color: var(--rot); background: #fdf3f2; }
+.fluss-box.ende-gruen { border-color: var(--gruen); color: #3f6b16; background: #EAFAF1; }
+.fluss-box .zusatz { display: block; font-weight: 400; font-size: 10.5px; margin-top: 3px; opacity: .85; }
+.fluss-pfeil { font-size: 15px; color: var(--text-light); line-height: 1.2; }
+.fluss-paar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* Aufwandstabelle */
+.aufwand td:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.aufwand tr.summe td { font-weight: 700; border-top: 2px solid var(--accent); background: #f2f2f4; }
+
+.doc-footer { margin-top: 48px; padding: 24px 48px; background: var(--primary-bg); font-size: 11px; color: var(--text-light); border-top: 1px solid var(--border); }
+.doc-footer p { margin-bottom: 4px; }
+
+@media (max-width: 680px) {
+  .doc-header, .toc, .content, .doc-footer { padding-left: 20px; padding-right: 20px; }
+  .toc ol { columns: 1; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <div class="credo-bar"><span class="grau"></span><span class="gelb"></span><span class="gruen"></span><span class="rot"></span><span class="blau"></span></div>
+
+  <header class="doc-header">
+    <div class="badge">Umsetzungsplan · zur Freigabe</div>
+    <h1>Erzeugte Dokumente im Vorgang sichtbar machen</h1>
+    <p class="subtitle">Der befüllte Vertrag soll im Vorgang auffindbar bleiben — Vertragsende und Onboarding</p>
+    <p class="meta">Stand: 23. Juli 2026 &nbsp;|&nbsp; Anlass: Wunsch aus dem Modul Vertragsende &nbsp;|&nbsp; Grundlage: Prüfung des vorhandenen Datenmodells und der Ablage &nbsp;|&nbsp; Entscheidungen zu Umfang, Ablagerolle und Reichweite bereits getroffen</p>
+  </header>
+
+  <nav class="toc" aria-label="Inhaltsverzeichnis">
+    <h2>Inhaltsverzeichnis</h2>
+    <ol>
+      <li><a href="#ausgangslage">Ausgangslage — was heute unsichtbar passiert</a></li>
+      <li><a href="#entscheidungen">Getroffene Entscheidungen</a></li>
+      <li><a href="#vorher-nachher">Vorher und Nachher</a></li>
+      <li><a href="#bausteine">Die vier Bausteine</a></li>
+      <li><a href="#aufbewahrung">Aufbewahrung: zwölf Monate</a></li>
+      <li><a href="#aufwand">Aufwand und Reihenfolge</a></li>
+      <li><a href="#verworfen">Bewusst weggelassen</a></li>
+      <li><a href="#offen">Risiken und offene Punkte</a></li>
+    </ol>
+  </nav>
+
+  <main class="content">
+
+    <!-- ============================================================ -->
+    <section class="section" id="ausgangslage">
+      <div class="section-title"><span class="num">1</span><h2>Ausgangslage — was heute unsichtbar passiert</h2></div>
+
+      <p>Der Wunsch lautet: Der Vertrag soll mit den Variablen befüllt und anschließend im Portal gespeichert werden. Die Prüfung des Codes hat ergeben, dass <strong>beides bereits geschieht</strong> — nur ohne jede Möglichkeit, wieder heranzukommen.</p>
+
+      <div class="fluss">
+        <div class="fluss-box start">Klick auf „Word" oder „PDF" im Vertragsende-Vorgang</div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-box">Vorlage wird befüllt<span class="zusatz">Personalnummer, Entgeltgruppe, Stufe, Wochenstunden, Sachgrund, Vertragsdaten, DokuBit-Stammdaten — seit dem letzten Update auch die Kontaktdaten der bearbeitenden Person</span></div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-paar">
+          <div class="fluss-box liegt">Datei wird abgelegt<span class="zusatz">im Docker-Volume, übersteht jeden Neubau</span></div>
+          <div class="fluss-box liegt">Datensatz wird angelegt<span class="zusatz">mit Bezug zum Vorgang, Zeitstempel, Ersteller, Prüfsumme und der Liste leer gebliebener Felder</span></div>
+        </div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-box ende-rot">Im Portal sichtbar? <strong>Nein.</strong><span class="zusatz">Auf das Modell greift im gesamten Projekt genau eine Stelle zu — die Erzeugung. Kein Lesezugriff, kein Download, keine Anzeige.</span></div>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">📦</span>
+        <div><strong>Alles bisher Erzeugte liegt bereits auf dem Server</strong>Jedes Dokument, das aus einem Vorgang heraus erzeugt wurde, ist gespeichert und dem Vorgang zugeordnet. Es fehlt ausschließlich der Weg zurück. Der Datenbank-Index für genau die Abfrage „alle Dokumente dieses Vorgangs" ist ebenfalls schon angelegt.</div>
+      </div>
+
+      <h3>1.1 · Was daraus folgt</h3>
+      <p>Der Wunsch ist damit <strong>kein neues Feature, sondern das Freilegen eines vorhandenen</strong>. Es braucht kein neues Datenmodell, keine Schema-Änderung und keine Migration. Zum Vergleich: Offboarding, Verbeamtung, Mutterschutz, Elternzeit und BEM haben je ein eigenes Dokumentenmodell — ein sechstes wäre der nächste Klon. Das vorhandene generische Modell trägt bereits Modul und Vorgangsbezug und genügt.</p>
+
+      <div class="hinweis">
+        <span class="icon">♻️</span>
+        <div><strong>Die entscheidende Eigenschaft: Die Dokumente sind reproduzierbar</strong>Vorlage und Vorgangsdaten bleiben erhalten — ein Klick erzeugt das Schreiben jederzeit neu. Der Verlust eines Portal-Exemplars ist damit kein Datenverlust. Das nimmt der ganzen Aufbewahrungsfrage die Schärfe: keine Versionierung, keine Unveränderbarkeit, keine Wiederherstellung nötig.
+        <br><br>
+        <em>Einschränkung, damit das nicht falsch verstanden wird:</em> Wird die Vorlage zwischenzeitlich geändert, ist das neu erzeugte Dokument nicht mehr identisch mit dem alten. Für einen Nachweis zählt deshalb weiterhin das Exemplar im DMS, nicht das im Portal.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="entscheidungen">
+      <div class="section-title"><span class="num">2</span><h2>Getroffene Entscheidungen</h2></div>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:24%">Frage</th><th style="width:28%">Entscheidung</th><th>Konsequenz</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Was wird abgelegt?</td>
+            <td><strong>Nur erzeugte Entwürfe</strong></td>
+            <td>Sichtbar wird, was das Portal selbst erzeugt hat. Der unterschriebene Vertrag bleibt außerhalb. Damit genügt das vorhandene Modell; es braucht keine Upload-Strecke und keine Statusfelder.</td>
+          </tr>
+          <tr>
+            <td>Welche Rolle hat das Portal?</td>
+            <td><strong>Zwischenlager, das DMS führt</strong></td>
+            <td>Für die Übergabe ins DMS gibt es bereits den PDF-Export mit QR-Deckblatt. Das Portal hält die Dokumente nur, bis sie dort sind — deshalb genügt eine schlichte Frist ohne Löschkonzept.</td>
+          </tr>
+          <tr>
+            <td>Welche Module?</td>
+            <td><strong>Vertragsende und Onboarding</strong></td>
+            <td>Beide nutzen dieselbe Komponente; der Abschnitt erscheint in beiden ohne Mehraufwand. Onboarding hat dasselbe Problem — Führungszeugnis-Aufforderungen und Arbeitsverträge verschwinden dort ebenso.</td>
+          </tr>
+          <tr>
+            <td>Aufbewahrungsfrist?</td>
+            <td><strong>Zwölf Monate</strong></td>
+            <td>Begründung in Abschnitt 5. Kurz: Ein Vertragsende-Vorgang beginnt bis zu zwölf Monate vor dem Vertragsende — eine kürzere Frist könnte einen Entwurf entfernen, während der Vorgang noch läuft.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="warnung">
+        <span class="icon">📌</span>
+        <div><strong>Zur Beschriftung: „Entwurf", nicht „Vertrag"</strong>Was das Portal erzeugt, ist ein befülltes Word-Dokument — nicht der unterschriebene Vertrag. Steht im Portal schlicht „Vertrag", entsteht leicht der Eindruck, das sei das gültige Exemplar. Der Abschnitt heißt deshalb <strong>„Für diesen Vorgang bereits erstellt"</strong> und nicht „Verträge". Das ist kein technisches, sondern ein Beschriftungsthema — aber eines, das besser vorher geklärt ist als hinterher.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="vorher-nachher">
+      <div class="section-title"><span class="num">3</span><h2>Vorher und Nachher</h2></div>
+
+      <h3>3.1 · Vertragsende — der Dokumente-Tab</h3>
+      <p>Dort besteht der Tab heute allein aus der Karte „Dokumente erstellen". Was einmal erzeugt wurde, hinterlässt keine Spur.</p>
+
+      <div class="mockup heute">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Vertragsende-Vorgang → Tab „Dokumente"</span></div>
+        <div class="mockup-body">
+          <div class="m-karte">
+            <div class="m-kartenkopf">📄 Dokumente erstellen <span class="m-zaehler">2</span></div>
+            <div class="m-kartensub">Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.</div>
+            <div class="m-row">
+              <div class="m-name">AV Nachtrag <span class="m-geltung grau">Gruppenweit</span></div>
+              <span class="m-btn">Word</span> <span class="m-btn">PDF</span>
+            </div>
+            <div class="m-row">
+              <div class="m-name">Vertragsverlängerung für Lehrkraft (ohne Sachgrund) <span class="m-geltung grau">Gruppenweit</span></div>
+              <span class="m-btn">Word</span> <span class="m-btn">PDF</span>
+            </div>
+          </div>
+          <div class="m-luecke">
+            Hier endet der Tab.<br>
+            <strong>Was gestern erzeugt wurde, ist nicht zu sehen — auch nicht, von wem oder ob Felder leer blieben.</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Vertragsende-Vorgang → Tab „Dokumente"</span></div>
+        <div class="mockup-body">
+          <div class="m-karte">
+            <div class="m-kartenkopf">📄 Dokumente erstellen <span class="m-zaehler">2</span></div>
+            <div class="m-kartensub">Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.</div>
+            <div class="m-row">
+              <div class="m-name">AV Nachtrag <span class="m-geltung grau">Gruppenweit</span></div>
+              <span class="m-btn">Word</span> <span class="m-btn">PDF</span>
+            </div>
+            <div class="m-row">
+              <div class="m-name">Vertragsverlängerung für Lehrkraft (ohne Sachgrund) <span class="m-geltung grau">Gruppenweit</span></div>
+              <span class="m-btn">Word</span> <span class="m-btn">PDF</span>
+            </div>
+          </div>
+
+          <div class="m-karte" style="border-color:var(--gruen);">
+            <div class="m-kartenkopf" style="color:#3f6b16;">🗂 Für diesen Vorgang bereits erstellt <span class="m-zaehler">3</span></div>
+            <div class="m-kartensub">Im Portal abgelegte Entwürfe. Aufbewahrung zwölf Monate — die führende Ablage ist das DMS.</div>
+            <div class="m-row">
+              <div class="m-name">Vertragsverlängerung für Lehrkraft (ohne Sachgrund)<br><span class="m-sub">23.07.2026, 09:14 · Dimitri Riesen</span></div>
+              <span class="m-btn">Word</span> <span class="m-btn">PDF</span>
+            </div>
+            <div class="m-row">
+              <div class="m-name">AV Nachtrag<br><span class="m-sub">19.07.2026, 15:02 · Sabine Meier</span></div>
+              <span class="m-btn">Word</span>
+            </div>
+            <div class="m-meldung gelb">⚠ 2 Felder blieben beim Erzeugen leer</div>
+            <div class="m-row">
+              <div class="m-name">Vertragsverlängerung für Lehrkraft (ohne Sachgrund)<br><span class="m-sub">12.07.2026, 11:47 · Dimitri Riesen</span></div>
+              <span class="m-btn">Word</span> <span class="m-btn">PDF</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">💡</span>
+        <div><strong>Der Warnhinweis ist der eigentliche Gewinn</strong>Dass beim Erzeugen Felder leer blieben, steht bereits im gespeicherten Datensatz — es wurde nur nie gezeigt. Künftig ist auch Wochen später noch erkennbar, welcher Entwurf unvollständig war. Beim Erzeugen selbst erscheint der Hinweis seit dem letzten Update ohnehin direkt an der Zeile; hier bleibt er dauerhaft sichtbar.</div>
+      </div>
+
+      <h3>3.2 · Onboarding — derselbe Abschnitt, andere Umgebung</h3>
+      <p>Im Onboarding-Vorgang reiht sich der Abschnitt direkt hinter „Dokumente erstellen" ein — vor Starterpaket, hochgeladenen Nachweisen und dem DMS-Export. Die Reihenfolge folgt dem Ablauf: erstellen, dann sehen was erstellt wurde, dann versenden.</p>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Onboarding-Vorgang → Tab „Dokumente" (Aufbau)</span></div>
+        <div class="mockup-body">
+          <div class="m-karte" style="padding:8px 12px;font-size:11px;color:var(--text-light);">Sie sind hier: ✓ Einladung › ✓ Fragebogen › <strong style="color:var(--blau);">Modalitäten</strong> › Prüfen › Checkliste › Abschluss</div>
+          <div class="m-karte" style="padding:9px 12px;"><div class="m-kartenkopf" style="margin:0;">📄 Dokumente erstellen</div></div>
+          <div class="m-karte" style="padding:9px 12px;border-color:var(--gruen);"><div class="m-kartenkopf" style="margin:0;color:#3f6b16;">🗂 Für diesen Vorgang bereits erstellt <span class="m-geltung gruen">NEU</span></div></div>
+          <div class="m-karte" style="padding:9px 12px;border:2px solid var(--blau);background:#f4fbfd;"><div class="m-kartenkopf" style="margin:0;color:var(--blau);">⬇ Starterpaket versenden</div></div>
+          <div class="m-karte" style="padding:9px 12px;"><div class="m-kartenkopf" style="margin:0;">📎 Hochgeladene Dokumente</div></div>
+          <div class="m-karte" style="padding:9px 12px;"><div class="m-kartenkopf" style="margin:0;">⬇ PDF-Export für DMS</div></div>
+        </div>
+      </div>
+
+      <div class="warnung">
+        <span class="icon">📏</span>
+        <div><strong>Der Tab wurde gerade erst entrümpelt</strong>Ein zusätzlicher Abschnitt darf das nicht zunichtemachen. Deshalb: Er erscheint <strong>nur, wenn es tatsächlich Dokumente gibt</strong>, die Zeilen sind kompakt (eine Zeile je Dokument, Datum und Ersteller als Unterzeile), und bei mehr als fünf Einträgen werden die restlichen hinter „Alle N anzeigen" eingeklappt.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="bausteine">
+      <div class="section-title"><span class="num">4</span><h2>Die vier Bausteine</h2></div>
+
+      <h3>4.1 · Lesezugriff</h3>
+      <p>Ein Endpunkt, der zu einem Vorgang die erzeugten Dokumente liefert. Drei Dinge muss er selbst erledigen — sonst wird er zum Sicherheitsloch:</p>
+      <ul>
+        <li><strong>Den Vorgang je Modul auflösen</strong>, um an den Mandanten zu kommen. Erst dadurch lässt sich prüfen, ob der Aufrufer den Vorgang überhaupt sehen darf.</li>
+        <li><strong>Die Mandanten-Berechtigung prüfen</strong> — dieselbe Prüfung wie beim Öffnen des Vorgangs selbst.</li>
+        <li><strong>BEM abweisen.</strong> Für BEM gibt es einen eigenen, zugriffsgeschützten Weg. Ein generischer Endpunkt darf die versiegelte Akte nach § 167 SGB IX nicht umgehen. Die Erzeugungsroute macht das bereits genauso vor.</li>
+      </ul>
+
+      <h3>4.2 · Download</h3>
+      <p>Nach dem Muster der vorhandenen Routen aus BEM, Elternzeit und Mutterschutz. Sicherheitsrelevant ist genau eine Stelle: Der gespeicherte Pfad muss <strong>vor dem Lesen erneut daraufhin geprüft werden, dass er unterhalb des Upload-Verzeichnisses liegt</strong>. Beim Schreiben gibt es diese Prüfung bereits — beim Lesen gehört sie ebenso hin.</p>
+
+      <h3>4.3 · Anzeige</h3>
+      <p>Der Abschnitt aus den Mockups, eingebaut in die gemeinsame Komponente. Dadurch erscheint er in Vertragsende und Onboarding gleichzeitig. Je Zeile: Name, Zeitpunkt, Ersteller, verfügbare Formate — und der Warnhinweis, falls beim Erzeugen Felder leer blieben.</p>
+
+      <h3>4.4 · Aufbewahrung</h3>
+      <p>Ein Cron-Lauf nach dem Vorbild der BEM-Aufbewahrung. Wichtig: <strong>Datensatz und Datei</strong> entfernen, nicht nur eines von beidem — sonst sammeln sich verwaiste Dateien im Volume.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="aufbewahrung">
+      <div class="section-title"><span class="num">5</span><h2>Aufbewahrung: zwölf Monate</h2></div>
+
+      <p>Heute gibt es für erzeugte Dokumente <strong>überhaupt keine Löschlogik</strong>. Solange sie unsichtbar sind, fällt das nicht auf. Sobald sie sichtbar werden, wird das Portal faktisch zu einer Sammlung personenbezogener Daten ohne Frist — und ein Arbeitsvertrag ist in dieser Hinsicht kein harmloses Dokument. Andere Bereiche haben längst Fristen: das E-Mail-Protokoll 90 Tage, BEM einen eigenen Aufbewahrungslauf.</p>
+
+      <h3>5.1 · Warum zwölf und nicht sechs</h3>
+      <p>Die Frist muss den längsten laufenden Vorgang überdauern. Der Vertragsende-Prozess ist hier der Maßstab, weil eure Fristen-Ampel früh anschlägt:</p>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:26%">Stufe der Ampel</th><th style="width:24%">Vorlauf zum Vertragsende</th><th>Bedeutung für die Frist</th></tr></thead>
+        <tbody>
+          <tr><td><span class="status-badge grau">Beobachten</span></td><td>7–12 Monate</td><td>Hier entstehen die ersten Vorgänge. Eine Frist von sechs Monaten könnte einen Entwurf löschen, während der Vorgang noch läuft.</td></tr>
+          <tr><td><span class="status-badge gelb">Warnung</span></td><td>3–6 Monate</td><td>Übliche Bearbeitungsphase.</td></tr>
+          <tr><td><span class="status-badge rot">Kritisch</span></td><td>1–2 Monate</td><td>Entscheidung und Vertragserstellung.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p>Zwölf Monate decken den gesamten Vorlauf ab. Und selbst wenn ein Vorgang doch einmal länger dauert, ist die Folge harmlos: Der Entwurf lässt sich mit einem Klick neu erzeugen.</p>
+
+      <div class="hinweis">
+        <span class="icon">⚙️</span>
+        <div><strong>Bewusst einfach gehalten</strong>Gelöscht wird nach Alter des Dokuments, nicht nach Status des Vorgangs. Eine Regel wie „löschen, sobald der Vorgang abgeschlossen ist" wäre zwar präziser, verlangt aber, dass der Lauf für jedes Dokument den zugehörigen Vorgang je Modul nachschlägt und dessen Status auswertet. Dieser Aufwand lohnt sich für Dokumente nicht, die ohnehin reproduzierbar sind und deren maßgebliches Exemplar im DMS liegt.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="aufwand">
+      <div class="section-title"><span class="num">6</span><h2>Aufwand und Reihenfolge</h2></div>
+
+      <div class="table-scroll">
+      <table class="aufwand">
+        <thead><tr><th style="width:8%">#</th><th style="width:46%">Schritt</th><th style="width:14%">Art</th><th>ca. Zeilen</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Lesezugriff inkl. Modul-Auflösung, Mandantenprüfung und BEM-Ausschluss</td><td><span class="status-badge blau">API</span></td><td>60</td></tr>
+          <tr><td>2</td><td>Download mit erneuter Pfadprüfung</td><td><span class="status-badge blau">API</span></td><td>50</td></tr>
+          <tr><td>3</td><td>Abschnitt „Für diesen Vorgang bereits erstellt" in der gemeinsamen Komponente</td><td><span class="status-badge blau">UI</span></td><td>80</td></tr>
+          <tr><td>4</td><td>Cron-Lauf Aufbewahrung (Datensatz <em>und</em> Datei)</td><td><span class="status-badge gelb">Cron</span></td><td>60</td></tr>
+          <tr><td>5</td><td>Tests: Berechtigung, BEM-Ausschluss, Pfadprüfung, Fristenberechnung, Anzeige-Logik</td><td><span class="status-badge grau">Test</span></td><td>120</td></tr>
+          <tr class="summe"><td></td><td>Ein Arbeitstag, keine Schema-Änderung, keine Migration</td><td></td><td>370</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">🪜</span>
+        <div><strong>In zwei Lieferungen möglich</strong>Schritte 1 bis 3 stellen die Sichtbarkeit her und sind für sich nutzbar. Schritt 4 kann kurz danach folgen — solange nicht viel Zeit dazwischen liegt, denn ohne Frist wächst der Bestand weiter. Wer beides zusammen ausrollt, spart sich diese Überlegung.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="verworfen">
+      <div class="section-title"><span class="num">7</span><h2>Bewusst weggelassen</h2></div>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:32%">Idee</th><th>Warum nicht</th></tr></thead>
+        <tbody>
+          <tr><td>Eigenes Dokumentenmodell für Vertragsende</td><td>Fünf Module haben bereits je ein eigenes — ein sechstes wäre der nächste Klon. Das vorhandene generische Modell trägt Modul und Vorgangsbezug und genügt vollständig. Nebeneffekt: Der Lesezugriff kommt sofort beiden Modulen zugute.</td></tr>
+          <tr><td>Upload unterschriebener Verträge im Vorgang</td><td>Wurde als Umfang ausgeschlossen. Es wäre ein eigenes Vorhaben — Upload-Strecke, Dateiprüfung, Statusfelder — und würde das Portal von der Arbeitsablage zur Vertragsakte machen. Das ist eine Entscheidung mit datenschutzrechtlichen Folgen, keine technische.</td></tr>
+          <tr><td>Versionierung erzeugter Dokumente</td><td>Überflüssig, solange das DMS führt und die Dokumente reproduzierbar sind. Die zeitliche Abfolge ergibt sich ohnehin aus der Liste.</td></tr>
+          <tr><td>Löschen abhängig vom Vorgangsstatus</td><td>Präziser, aber der Lauf müsste je Dokument den Vorgang nachschlagen und dessen Status auswerten. Siehe Abschnitt 5.</td></tr>
+          <tr><td>Erzeugen-Dialog im Vorgang (Platzhalter nachtragen, E-Mail-Versand)</td><td>Fachlich reizvoll — heute geht das nur über die zentrale Vorlagenseite. Aber ein eigenes Vorhaben von erheblichem Umfang, und es beantwortet die gestellte Frage nicht.</td></tr>
+          <tr><td>Offboarding und Verbeamtung mit anschließen</td><td>Beide erzeugen heute überhaupt keine Dokumente aus Vorlagen. Dort wäre zuerst die Erzeugung einzurichten — ein eigenes Paket obendrauf.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="offen">
+      <div class="section-title"><span class="num">8</span><h2>Risiken und offene Punkte</h2></div>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:26%">Punkt</th><th style="width:14%">Einschätzung</th><th>Erläuterung</th></tr></thead>
+        <tbody>
+          <tr><td>Bestand wird sofort sichtbar</td><td><span class="status-badge gelb">beachten</span></td><td>Am Tag des Ausrollens erscheint alles, was bisher erzeugt wurde — auch alte Entwürfe und Fehlversuche. Das kann zunächst unaufgeräumt wirken. Die Frist greift rückwirkend und räumt beim ersten Lauf auf.</td></tr>
+          <tr><td>Erster Aufbewahrungslauf löscht viel auf einmal</td><td><span class="status-badge gelb">beachten</span></td><td>Vor dem ersten scharfen Lauf sollte gezählt werden, wie viele Dokumente älter als zwölf Monate sind. Ein Trockenlauf mit reiner Ausgabe der Anzahl ist ratsam.</td></tr>
+          <tr><td>Verwaiste Dateien aus der Zeit davor</td><td><span class="status-badge grau">gering</span></td><td>Falls Dateien ohne zugehörigen Datensatz existieren, räumt der Lauf sie nicht ab, da er über die Datensätze geht. Einmalig prüfbar; bisher kein Anhaltspunkt dafür.</td></tr>
+          <tr><td>Pfadprüfung beim Download</td><td><span class="status-badge rot">Pflicht</span></td><td>Die einzige sicherheitsrelevante Stelle des Vorhabens. Gehört mit einem eigenen Test abgesichert.</td></tr>
+          <tr><td>Speicherplatz im Volume</td><td><span class="status-badge grau">gering</span></td><td>Word-Dokumente sind klein. Mit der Frist bleibt der Bestand beschränkt. Sollte dennoch beobachtet werden, sobald die Anzahl der Vorgänge steigt.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="offen">
+        <span class="icon">💬</span>
+        <div><strong>Vor der Umsetzung zu klären</strong>Soll die Frist im Portal konfigurierbar sein oder als feste Größe im Code stehen? Fest ist einfacher und genügt, solange sich zwölf Monate nicht als unpassend erweisen. · Soll der Aufbewahrungslauf melden, was er gelöscht hat — etwa als Eintrag im Prüfprotokoll? Bei BEM ist das so gelöst; hier wäre es zusätzlicher Aufwand für Dokumente, die reproduzierbar sind.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="doc-footer">
+    <p><strong>CREDO HR-Portal</strong> — Umsetzungsplan zum Wunsch aus dem Modul Vertragsende, erstellt am 23. Juli 2026.</p>
+    <p>Mockups sind Skizzen zur Abstimmung, keine pixelgenauen Entwürfe — die tatsächliche Darstellung folgt dem bestehenden Portal-Design. Vorlagennamen und Ampelstufen entsprechen dem realen Datenbestand.</p>
+  </footer>
+
+</div>
+</body>
+</html>
