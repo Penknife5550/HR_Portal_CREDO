@@ -7,7 +7,7 @@
  */
 
 import path from "path";
-import { mkdir, writeFile, readFile, unlink } from "fs/promises";
+import { mkdir, writeFile, readFile, unlink, rmdir } from "fs/promises";
 import { randomUUID } from "crypto";
 
 export const ALLOWED_UPLOAD_MIME = [
@@ -120,6 +120,25 @@ export async function deleteUploadedFile(absPath: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Entfernt ein Verzeichnis unterhalb von uploads/, wenn es leer ist
+ * (best-effort, wirft nicht). Erzeugte Dokumente liegen je Erzeugung in einem
+ * eigenen Unterverzeichnis — ohne diesen Schritt blieben nach dem
+ * Aufbewahrungslauf tausende leere Ordner zurueck.
+ */
+export async function deleteUploadedDirIfEmpty(absDir: string): Promise<boolean> {
+  try {
+    const uploadsRoot = path.resolve(path.join(process.cwd(), "uploads"));
+    const resolved = path.resolve(absDir);
+    // Nur ECHTE Unterverzeichnisse — niemals uploads/ selbst.
+    if (!resolved.startsWith(uploadsRoot + path.sep)) return false;
+    await rmdir(resolved);
+    return true;
+  } catch {
+    return false; // nicht leer oder nicht vorhanden — beides unkritisch
   }
 }
 

@@ -138,7 +138,7 @@ tr:nth-child(even) td { background: #f9f9f9; }
   <div class="credo-bar"><span class="grau"></span><span class="gelb"></span><span class="gruen"></span><span class="rot"></span><span class="blau"></span></div>
 
   <header class="doc-header">
-    <div class="badge">Umsetzungsplan · zur Freigabe</div>
+    <div class="badge" style="background:var(--gruen);">Umgesetzt · 23. Juli 2026</div>
     <h1>Erzeugte Dokumente im Vorgang sichtbar machen</h1>
     <p class="subtitle">Der befüllte Vertrag soll im Vorgang auffindbar bleiben — Vertragsende und Onboarding</p>
     <p class="meta">Stand: 23. Juli 2026 &nbsp;|&nbsp; Anlass: Wunsch aus dem Modul Vertragsende &nbsp;|&nbsp; Grundlage: Prüfung des vorhandenen Datenmodells und der Ablage &nbsp;|&nbsp; Entscheidungen zu Umfang, Ablagerolle und Reichweite bereits getroffen</p>
@@ -159,6 +159,22 @@ tr:nth-child(even) td { background: #f9f9f9; }
   </nav>
 
   <main class="content">
+
+    <section class="section" style="margin-top:32px;">
+      <div class="hinweis" style="background:#EAFAF1;border-left-color:var(--gruen);">
+        <span class="icon">✅</span>
+        <div><strong>Stand der Umsetzung</strong>
+          Alle vier Bausteine sind gebaut: Lesezugriff, Download, Anzeige im Dokumente-Tab und Aufbewahrungslauf.
+          450 Tests grün · TypeScript sauber · ESLint ohne Befund · Produktions-Build durchgelaufen.
+          Mutationstest: drei absichtlich entfernte Sicherheitsprüfungen, alle drei gefangen.
+          <br><br>
+          <strong>Noch einzurichten:</strong> Der Aufbewahrungslauf muss in n8n eingeplant werden —
+          täglich <code>POST /api/cron/dokumente-aufbewahrung</code> mit Bearer-<code>CRON_SECRET</code>,
+          wie die übrigen Läufe. <strong>Vorher einmal mit <code>?dryRun=1</code> aufrufen</strong>: Das löscht nichts,
+          sondern meldet nur, wie viele Dokumente älter als zwölf Monate sind.
+        </div>
+      </div>
+    </section>
 
     <!-- ============================================================ -->
     <section class="section" id="ausgangslage">

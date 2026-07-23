@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { AUFBEWAHRUNG_MONATE } from "@/lib/erzeugte-dokumente";
 
 const ERZEUG_BTN =
   "rounded-md border border-border px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50";
@@ -24,6 +25,14 @@ function DocumentIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 4H7a2 2 0 01-2-2V6a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z" />
+    </svg>
+  );
+}
+
+function ArchivIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 8h14M5 8a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 01-2 2M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
     </svg>
   );
 }
@@ -77,6 +86,29 @@ interface VorlageItem {
   organizationId: string | null;
 }
 
+/** Ein bereits fuer diesen Vorgang erzeugtes Dokument. */
+interface ErzeugtesDokument {
+  id: string;
+  name: string;
+  createdAt: string;
+  erstelltVon: string | null;
+  hatDocx: boolean;
+  hatPdf: boolean;
+  fehlendeFelder: number;
+}
+
+/** Ab dieser Anzahl wird die Liste der erzeugten Dokumente eingeklappt. */
+const ERZEUGT_SICHTBAR = 5;
+
+function formatZeitpunkt(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })}, ${d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
 /** Meldung, die an einer einzelnen Zeile haengt. */
 interface ZeilenMeldung {
   art: "fehler" | "luecke";
@@ -119,6 +151,8 @@ export function TemplateGenerationSection({
   const [status, setStatus] = useState<"laedt" | "bereit" | "fehler">("laedt");
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [meldungen, setMeldungen] = useState<Record<string, ZeilenMeldung>>({});
+  const [erzeugte, setErzeugte] = useState<ErzeugtesDokument[]>([]);
+  const [alleZeigen, setAlleZeigen] = useState(false);
 
   // Ohne Bearbeitungsrecht antwortet die Schnittstelle mit 403 — der Aufruf
   // unterbleibt dann ganz, statt die Ablehnung als "keine Vorlagen" zu deuten.
@@ -155,9 +189,21 @@ export function TemplateGenerationSection({
       .catch(() => setStatus("fehler"));
   }, [modul, organizationId, darfLaden]);
 
+  // Bereits erzeugte Dokumente dieses Vorgangs. Fehler bleiben hier still:
+  // Die Liste ist eine Ergaenzung — sie darf das Erstellen nicht stoeren.
+  const ladeErzeugte = useCallback(() => {
+    if (!darfLaden) return;
+    const query = new URLSearchParams({ modul, refId });
+    fetch(`/api/brief-vorlagen/erzeugt?${query.toString()}`)
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((j) => setErzeugte(j.data || []))
+      .catch(() => setErzeugte([]));
+  }, [modul, refId, darfLaden]);
+
   useEffect(() => {
     laden();
-  }, [laden]);
+    ladeErzeugte();
+  }, [laden, ladeErzeugte]);
 
   function setMeldung(templateId: string, meldung: ZeilenMeldung | null) {
     setMeldungen((prev) => {
@@ -209,6 +255,9 @@ export function TemplateGenerationSection({
           text: `${fehlend} ${fehlend === 1 ? "Feld blieb" : "Felder blieben"} leer — bitte im Dokument prüfen.`,
         });
       }
+
+      // Das soeben erzeugte Dokument taucht in der Ablage auf.
+      ladeErzeugte();
     } catch {
       setMeldung(templateId, { art: "fehler", text: "Verbindungsfehler bei der Erzeugung." });
     } finally {
@@ -223,7 +272,12 @@ export function TemplateGenerationSection({
   const zeigeLeer =
     status === "bereit" && templates.length === 0 && staticDocuments.length === 0;
 
+  const sichtbareErzeugte = alleZeigen
+    ? erzeugte
+    : erzeugte.slice(0, ERZEUGT_SICHTBAR);
+
   return (
+    <>
     <div className="rounded-2xl border border-border bg-card p-5">
       <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-foreground">
         <DocumentIcon className="h-5 w-5 text-muted-foreground" />
@@ -308,5 +362,73 @@ export function TemplateGenerationSection({
         </div>
       )}
     </div>
+
+    {/* Bereits erzeugte Dokumente — erscheint nur, wenn es welche gibt, damit
+        der Tab nicht unnoetig waechst. */}
+    {erzeugte.length > 0 && (
+      <div className="mt-6 rounded-2xl border border-credo-gruen/40 bg-card p-5">
+        <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-foreground">
+          <ArchivIcon className="h-5 w-5 text-credo-gruen" />
+          Für diesen Vorgang bereits erstellt
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+            {erzeugte.length}
+          </span>
+        </h3>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Im Portal abgelegte Entwürfe. Aufbewahrung {AUFBEWAHRUNG_MONATE} Monate — die
+          führende Ablage ist das DMS.
+        </p>
+        <div className="space-y-2">
+          {sichtbareErzeugte.map((d) => (
+            <div key={d.id}>
+              <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatZeitpunkt(d.createdAt)}
+                    {d.erstelltVon ? ` · ${d.erstelltVon}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {d.hatDocx && (
+                    <a
+                      href={`/api/brief-vorlagen/erzeugt/${d.id}/download?format=docx`}
+                      className={ERZEUG_BTN}
+                    >
+                      Word
+                    </a>
+                  )}
+                  {d.hatPdf && (
+                    <a
+                      href={`/api/brief-vorlagen/erzeugt/${d.id}/download?format=pdf`}
+                      className={ERZEUG_BTN}
+                    >
+                      PDF
+                    </a>
+                  )}
+                </div>
+              </div>
+              {d.fehlendeFelder > 0 && (
+                <p className="mt-1 rounded-md border-l-[3px] border-credo-gelb bg-credo-gelb/10 px-2.5 py-1 text-[11px] text-[#8a6d00]">
+                  {d.fehlendeFelder}{" "}
+                  {d.fehlendeFelder === 1 ? "Feld blieb" : "Felder blieben"} beim Erzeugen
+                  leer
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+        {erzeugte.length > ERZEUGT_SICHTBAR && (
+          <button
+            type="button"
+            onClick={() => setAlleZeigen((v) => !v)}
+            className="mt-3 w-full text-center text-xs text-credo-blau underline hover:no-underline"
+          >
+            {alleZeigen ? "Weniger anzeigen" : `Alle ${erzeugte.length} anzeigen`}
+          </button>
+        )}
+      </div>
+    )}
+    </>
   );
 }
