@@ -23,6 +23,7 @@ interface PortalUser {
   email: string;
   firstName: string;
   lastName: string;
+  phone: string | null;
   role: string;
   isActive: boolean;
   isBemBeauftragte: boolean;
@@ -34,6 +35,7 @@ interface UserFormData {
   firstName: string;
   lastName: string;
   email: string;
+  phone: string;
   password: string;
   role: string;
   isActive: boolean;
@@ -67,10 +69,27 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
   },
 };
 
+/**
+ * Rollen, die ueber diese Oberflaeche vergeben werden duerfen — spiegelt
+ * assignableRoles() in src/app/api/users/route.ts.
+ *
+ * EINRICHTUNGSLEITUNG und VORGESETZTER fehlen bewusst: Beide sind
+ * mandantenbeschraenkt, und es gibt keine Oberflaeche, um Benutzern Mandanten
+ * zuzuweisen — solche Konten saehen ein leeres Portal. Bestandskonten mit
+ * diesen Rollen bleiben bearbeitbar (siehe rollenOptionen).
+ */
+const VERGEBBARE_ROLLEN: { value: string; label: string; nurSuperAdmin?: boolean }[] = [
+  { value: "HR_SACHBEARBEITER", label: "Sachbearbeiter" },
+  { value: "HR_LEITUNG", label: "HR-Leitung" },
+  { value: "SUPER_ADMIN", label: "Super Admin", nurSuperAdmin: true },
+  { value: "BEM_BEAUFTRAGTER", label: "BEM-Beauftragte:r (extern, nur BEM)" },
+];
+
 const EMPTY_FORM: UserFormData = {
   firstName: "",
   lastName: "",
   email: "",
+  phone: "",
   password: "",
   role: "HR_SACHBEARBEITER",
   isActive: true,
@@ -266,6 +285,11 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">
                           {u.email}
+                          {u.phone && (
+                            <div className="text-xs text-muted-foreground">
+                              Tel. {u.phone}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -355,6 +379,7 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
           initialData={EMPTY_FORM}
           showPasswordRequired
           canSetBem={user.role === "SUPER_ADMIN"}
+          canSetSuperAdmin={user.role === "SUPER_ADMIN"}
           onClose={() => setShowNewModal(false)}
           onSave={async (data) => {
             const res = await fetch("/api/users", {
@@ -380,6 +405,7 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
             firstName: editUser.firstName,
             lastName: editUser.lastName,
             email: editUser.email,
+            phone: editUser.phone ?? "",
             password: "",
             role: editUser.role,
             isActive: editUser.isActive,
@@ -388,12 +414,16 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
           showIsActive
           showPasswordRequired={false}
           canSetBem={user.role === "SUPER_ADMIN"}
+          canSetSuperAdmin={user.role === "SUPER_ADMIN"}
+          istEigenesKonto={editUser.id === user.userId}
           onClose={() => setEditUser(null)}
           onSave={async (data) => {
             const payload: Record<string, unknown> = {
               firstName: data.firstName,
               lastName: data.lastName,
               email: data.email,
+              // Leerer String loescht die Nummer bewusst (API behandelt "" als null)
+              phone: data.phone,
               role: data.role,
               isActive: data.isActive,
             };
@@ -433,6 +463,8 @@ function UserModal({
   showPasswordRequired = true,
   showIsActive = false,
   canSetBem = false,
+  canSetSuperAdmin = false,
+  istEigenesKonto = false,
   onClose,
   onSave,
 }: {
@@ -441,6 +473,10 @@ function UserModal({
   showPasswordRequired?: boolean;
   showIsActive?: boolean;
   canSetBem?: boolean;
+  /** Nur Super-Admins duerfen die Rolle Super-Admin vergeben. */
+  canSetSuperAdmin?: boolean;
+  /** Beim eigenen Konto ist die Rollenauswahl gesperrt (Selbstschutz). */
+  istEigenesKonto?: boolean;
   onClose: () => void;
   onSave: (data: UserFormData) => Promise<void>;
 }) {
@@ -451,6 +487,19 @@ function UserModal({
   // Externe BEM-Beauftragte richten ihr Passwort selbst per Setup-Link ein —
   // im Formular daher kein Passwortfeld, sondern ein Hinweis.
   const isExternalBemRole = formData.role === "BEM_BEAUFTRAGTER";
+
+  // Auswahlliste der Rollen. Traegt das bearbeitete Konto eine Rolle, die heute
+  // nicht mehr vergeben wird (Bestand), bleibt sie als Option erhalten — sonst
+  // wuerde das Speichern sie stillschweigend auf die erste Option umstellen.
+  const rollenOptionen = VERGEBBARE_ROLLEN.filter(
+    (r) => !r.nurSuperAdmin || canSetSuperAdmin,
+  ).slice();
+  if (!rollenOptionen.some((r) => r.value === initialData.role)) {
+    rollenOptionen.unshift({
+      value: initialData.role,
+      label: `${ROLE_LABELS[initialData.role]?.label ?? initialData.role} (Bestand, nicht neu vergebbar)`,
+    });
+  }
 
   function handleChange(
     field: keyof UserFormData,
@@ -585,6 +634,25 @@ function UserModal({
             />
           </div>
 
+          {/* Telefon (optional) — u.a. Quelle fuer {sachbearbeiter_telefon} */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">
+              Telefon{" "}
+              <span className="text-xs text-muted-foreground">(optional)</span>
+            </label>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
+              maxLength={50}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              placeholder="0571 / 88 79 - 120"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Wird in Brief-Vorlagen als {"{sachbearbeiter_telefon}"} eingesetzt.
+            </p>
+          </div>
+
           {/* Passwort — entfaellt fuer externe BEM-Beauftragte (Setup-Link) */}
           {isExternalBemRole ? (
             <div className="rounded-lg border border-[#009AC6]/30 bg-[#009AC6]/5 px-3 py-2 text-sm text-foreground">
@@ -622,15 +690,20 @@ function UserModal({
             <select
               value={formData.role}
               onChange={(e) => handleChange("role", e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              disabled={istEigenesKonto}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:opacity-60"
             >
-              <option value="HR_SACHBEARBEITER">Sachbearbeiter</option>
-              <option value="HR_LEITUNG">HR-Leitung</option>
-              <option value="EINRICHTUNGSLEITUNG">Einrichtungsleitung</option>
-              <option value="VORGESETZTER">Vorgesetzter</option>
-              <option value="SUPER_ADMIN">Super Admin</option>
-              <option value="BEM_BEAUFTRAGTER">BEM-Beauftragte:r (extern, nur BEM)</option>
+              {rollenOptionen.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
             </select>
+            {istEigenesKonto && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Die eigene Rolle lässt sich nicht ändern.
+              </p>
+            )}
           </div>
 
           {/* Status Toggle (nur bei Bearbeiten) */}

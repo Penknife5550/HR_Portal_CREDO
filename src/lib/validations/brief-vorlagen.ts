@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { MODULE_VALUES } from "@/lib/doc-template-resolvers";
+import { MODULE_VALUES } from "@/lib/placeholder-catalog";
 
 const modulSchema = z
   .string()

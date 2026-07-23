@@ -37,6 +37,8 @@ export interface BemResolveResult {
  */
 export async function resolveBemPlaceholders(
   bemFallId: string,
+  /** Angemeldete Person — fuellt die {sachbearbeiter_*}-Platzhalter. */
+  userId?: string | null,
 ): Promise<BemResolveResult | null> {
   const fall = await prisma.bemFall.findUnique({
     where: { id: bemFallId },
@@ -56,7 +58,7 @@ export async function resolveBemPlaceholders(
   });
   if (!fall) return null;
 
-  const common = await commonPlaceholders(fall.organizationId);
+  const common = await commonPlaceholders(fall.organizationId, userId);
   const name = `${fall.employeeFirstName} ${fall.employeeLastName}`.trim();
 
   const data: Record<string, unknown> = {

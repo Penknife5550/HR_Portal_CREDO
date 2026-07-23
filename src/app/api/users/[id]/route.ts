@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { assignableRoles, darfKontoVerwalten } from "@/lib/permissions";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 
@@ -46,8 +47,17 @@ export async function PATCH(
       );
     }
 
+    // Super-Admin-Konten sind nur fuer Super-Admins bearbeitbar (sonst waere die
+    // Rollen-Sperre unten ueber "Passwort neu setzen" umgehbar).
+    if (!darfKontoVerwalten(session.role, existingUser.role)) {
+      return NextResponse.json(
+        { error: "Nur ein Super-Admin darf ein Super-Admin-Konto bearbeiten" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
-    const { firstName, lastName, email, role, isActive, password, isBemBeauftragte } =
+    const { firstName, lastName, email, phone, role, isActive, password, isBemBeauftragte } =
       body;
 
     // Update-Daten zusammenbauen
@@ -98,13 +108,43 @@ export async function PATCH(
       updateData.email = normalizedEmail;
     }
 
-    if (role !== undefined) {
-      if (
-        !["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "BEM_BEAUFTRAGTER"].includes(role)
-      ) {
+    // Telefon ist optional. Ein leerer String loescht die Nummer bewusst —
+    // sonst liesse sie sich nach dem einmaligen Setzen nie wieder entfernen.
+    if (phone !== undefined) {
+      if (phone === null || (typeof phone === "string" && phone.trim() === "")) {
+        updateData.phone = null;
+      } else if (typeof phone !== "string" || phone.trim().length > 50) {
         return NextResponse.json(
-          { error: "Ungültige Rolle" },
+          { error: "Telefonnummer darf höchstens 50 Zeichen lang sein" },
           { status: 400 }
+        );
+      } else {
+        updateData.phone = phone.trim();
+      }
+    }
+
+    // Ein UNVERAENDERT mitgesendetes role-Feld wird bewusst ignoriert: Die
+    // Oberflaeche schickt die Rolle bei jedem Speichern mit, und Bestandskonten
+    // koennen Rollen tragen, die heute nicht mehr vergeben werden duerfen
+    // (EINRICHTUNGSLEITUNG/VORGESETZTER). Sonst waeren sie nicht mehr editierbar.
+    if (role !== undefined && role !== existingUser.role) {
+      // Die eigene Rolle darf niemand aendern — analog zum Selbstschutz beim
+      // Deaktivieren weiter unten.
+      if (id === session.userId) {
+        return NextResponse.json(
+          { error: "Sie können Ihre eigene Rolle nicht ändern" },
+          { status: 403 }
+        );
+      }
+      if (!assignableRoles(session.role).includes(role)) {
+        return NextResponse.json(
+          {
+            error:
+              role === "SUPER_ADMIN"
+                ? "Nur ein Super-Admin darf die Rolle Super-Admin vergeben"
+                : "Ungültige Rolle",
+          },
+          { status: role === "SUPER_ADMIN" ? 403 : 400 }
         );
       }
       updateData.role = role;
@@ -159,6 +199,7 @@ export async function PATCH(
         email: true,
         firstName: true,
         lastName: true,
+        phone: true,
         role: true,
         isActive: true,
         isBemBeauftragte: true,
@@ -208,6 +249,15 @@ export async function DELETE(
       return NextResponse.json(
         { error: "Benutzer nicht gefunden" },
         { status: 404 }
+      );
+    }
+
+    // Super-Admin-Konten darf nur ein Super-Admin deaktivieren — sonst koennte
+    // eine HR-Leitung alle Super-Admins aussperren.
+    if (!darfKontoVerwalten(session.role, existingUser.role)) {
+      return NextResponse.json(
+        { error: "Nur ein Super-Admin darf ein Super-Admin-Konto deaktivieren" },
+        { status: 403 }
       );
     }
 

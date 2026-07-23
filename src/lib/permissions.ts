@@ -59,6 +59,37 @@ export const BEM_PORTAL_ROLES = [...PORTAL_ROLES, "BEM_BEAUFTRAGTER"];
 /** Rollen die nur ihre zugewiesenen Organisationen sehen */
 export const ORG_RESTRICTED_ROLES = ["EINRICHTUNGSLEITUNG", "VORGESETZTER"];
 
+/**
+ * Rollen, die der AUFRUFER ueber die Benutzerverwaltung vergeben darf.
+ *
+ * SUPER_ADMIN ist Super-Admins vorbehalten: Andernfalls koennte eine HR-Leitung
+ * sich (oder andere) hochstufen und damit die SUPER_ADMIN-only-Sperre fuer
+ * isBemBeauftragte aushebeln — also den Zugang zur versiegelten BEM-Akte.
+ *
+ * EINRICHTUNGSLEITUNG und VORGESETZTER fehlen bewusst: Beide Rollen sind
+ * mandantenbeschraenkt (ORG_RESTRICTED_ROLES), und es gibt keine Oberflaeche,
+ * um Benutzern Mandanten zuzuweisen — solche Konten saehen ein leeres Portal.
+ * Bestandskonten mit diesen Rollen bleiben bearbeitbar, solange die Rolle
+ * unveraendert bleibt.
+ */
+export function assignableRoles(callerRole: string): string[] {
+  const base = ["HR_LEITUNG", "HR_SACHBEARBEITER", "BEM_BEAUFTRAGTER"];
+  return callerRole === "SUPER_ADMIN" ? ["SUPER_ADMIN", ...base] : base;
+}
+
+/**
+ * Ein Super-Admin-Konto darf nur ein Super-Admin bearbeiten oder deaktivieren.
+ *
+ * Ohne diese Sperre bliebe die Rechteausweitung offen: Eine HR-Leitung koennte
+ * zwar keine SUPER_ADMIN-Rolle mehr vergeben, aber das PASSWORT oder die E-MAIL
+ * eines bestehenden Super-Admins setzen und sich anschliessend als dieser
+ * anmelden. Die Rollen-Beschraenkung allein waere damit wirkungslos.
+ */
+export function darfKontoVerwalten(callerRole: string, zielRole: string): boolean {
+  if (callerRole === "SUPER_ADMIN") return true;
+  return zielRole !== "SUPER_ADMIN";
+}
+
 // =============================================
 // Org-Zugriff
 // =============================================

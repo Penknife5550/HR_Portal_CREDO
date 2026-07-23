@@ -12,15 +12,9 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { generateSetupToken, buildSetupEmail } from "@/lib/passwort-setup";
 import { sendEmailDetailed } from "@/lib/mailer";
+import { assignableRoles } from "@/lib/permissions";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
-// Rollen, die ueber diese API angelegt werden duerfen.
-const CREATABLE_ROLES = [
-  "SUPER_ADMIN",
-  "HR_LEITUNG",
-  "HR_SACHBEARBEITER",
-  "BEM_BEAUFTRAGTER",
-];
 
 // =============================================
 // GET /api/users - Alle Benutzer auflisten
@@ -48,6 +42,7 @@ export async function GET() {
         email: true,
         firstName: true,
         lastName: true,
+        phone: true,
         role: true,
         isActive: true,
         isBemBeauftragte: true,
@@ -88,7 +83,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, firstName, lastName, password, role, isBemBeauftragte } = body;
+    const { email, firstName, lastName, phone, password, role, isBemBeauftragte } = body;
 
     // Externe BEM-Beauftragte (E7) werden OHNE Passwort angelegt und richten es
     // ueber einen Setup-Link selbst ein.
@@ -114,8 +109,18 @@ export async function POST(request: NextRequest) {
         errors.push("Passwort muss Gross-/Kleinbuchstaben und Ziffern enthalten");
       }
     }
-    if (role && !CREATABLE_ROLES.includes(role)) {
-      errors.push("Ungültige Rolle");
+    if (role && !assignableRoles(session.role).includes(role)) {
+      errors.push(
+        role === "SUPER_ADMIN"
+          ? "Nur ein Super-Admin darf die Rolle Super-Admin vergeben"
+          : "Ungültige Rolle"
+      );
+    }
+    // Telefon ist optional; wenn gesetzt, muss es ein String sinnvoller Laenge sein
+    if (phone !== undefined && phone !== null && phone !== "") {
+      if (typeof phone !== "string" || phone.trim().length > 50) {
+        errors.push("Telefonnummer darf höchstens 50 Zeichen lang sein");
+      }
     }
     // Externe BEM-Beauftragte brauchen eine E-Mail-Adresse fuer den Setup-Link.
     if (isExternalBem && !process.env.APP_URL) {
@@ -155,6 +160,7 @@ export async function POST(request: NextRequest) {
         email: email.trim().toLowerCase(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        phone: typeof phone === "string" && phone.trim() !== "" ? phone.trim() : null,
         passwordHash,
         role: role || "HR_SACHBEARBEITER",
         isBemBeauftragte: setBem,
@@ -169,6 +175,7 @@ export async function POST(request: NextRequest) {
         email: true,
         firstName: true,
         lastName: true,
+        phone: true,
         role: true,
         isActive: true,
         isBemBeauftragte: true,

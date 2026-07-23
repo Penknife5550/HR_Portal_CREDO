@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Umsetzungsplan — Vorlagen-Filter, Benutzer-Telefon, Sachbearbeiter-Variablen | CREDO HR-Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary-bg:   #DADADA;
+  --accent:       #575756;
+  --text:         #2b2b2b;
+  --text-light:   #666;
+  --gelb:         #FBC900;
+  --gruen:        #6BAA24;
+  --rot:          #E2001A;
+  --blau:         #009AC6;
+  --white:        #ffffff;
+  --border:       #c5c5c5;
+  --hinweis-bg:   #EBF5FB;
+  --hinweis-bd:   #009AC6;
+  --warnung-bg:   #FEF9E7;
+  --warnung-bd:   #FBC900;
+  --kritik-bg:    #FDEDEC;
+  --kritik-bd:    #E2001A;
+  --offen-bg:     #F4F6F7;
+  --offen-bd:     #9B59B6;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Montserrat', Arial, sans-serif; font-size: 14px; line-height: 1.7; color: var(--text); background: #f7f7f7; }
+.page-wrapper { max-width: 980px; margin: 0 auto; background: var(--white); box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.credo-bar { display: flex; height: 6px; }
+.credo-bar span { flex: 1; }
+.credo-bar .grau  { background: var(--accent); }
+.credo-bar .gelb  { background: var(--gelb); }
+.credo-bar .gruen { background: var(--gruen); }
+.credo-bar .rot   { background: var(--rot); }
+.credo-bar .blau  { background: var(--blau); }
+.doc-header { background: var(--accent); color: var(--white); padding: 40px 48px 32px; }
+.doc-header .badge { display: inline-block; background: var(--blau); color: var(--white); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; margin-bottom: 14px; }
+.doc-header h1 { font-size: 28px; font-weight: 700; line-height: 1.25; }
+.doc-header .subtitle { margin-top: 8px; font-size: 13px; opacity: .8; }
+.doc-header .meta { margin-top: 20px; font-size: 11px; opacity: .65; border-top: 1px solid rgba(255,255,255,.2); padding-top: 14px; }
+.toc { background: var(--primary-bg); padding: 28px 48px; border-bottom: 1px solid var(--border); }
+.toc h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin-bottom: 14px; }
+.toc ol { list-style: decimal; padding-left: 18px; columns: 2; column-gap: 32px; }
+.toc li { font-size: 13px; margin-bottom: 5px; break-inside: avoid; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.content { padding: 0 48px 48px; }
+.section { margin-top: 44px; }
+.section-title { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); margin-bottom: 20px; }
+.section-title .num { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--accent); color: var(--white); border-radius: 50%; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.section-title h2 { font-size: 18px; font-weight: 700; color: var(--accent); }
+h3 { font-size: 14px; font-weight: 700; color: var(--accent); margin: 24px 0 10px; }
+h4 { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; margin: 18px 0 8px; }
+p { margin-bottom: 12px; }
+ul, ol { margin: 0 0 12px 20px; }
+li { margin-bottom: 5px; }
+strong { font-weight: 700; }
+code { font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; background: #f0f0f2; padding: 1px 5px; border-radius: 3px; color: #244; }
+.hinweis, .warnung, .kritik, .offen { display: flex; gap: 14px; border-radius: 6px; padding: 14px 18px; margin: 16px 0; font-size: 13px; }
+.hinweis { background: var(--hinweis-bg); border-left: 4px solid var(--hinweis-bd); }
+.warnung { background: var(--warnung-bg); border-left: 4px solid var(--warnung-bd); }
+.kritik { background: var(--kritik-bg); border-left: 4px solid var(--kritik-bd); }
+.offen { background: var(--offen-bg); border-left: 4px solid var(--offen-bd); }
+.hinweis .icon, .warnung .icon, .kritik .icon, .offen .icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+.hinweis strong, .warnung strong, .kritik strong, .offen strong { display: block; font-weight: 700; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 16px 0; }
+th { background: var(--accent); color: var(--white); text-align: left; padding: 9px 14px; font-weight: 600; font-size: 12px; }
+td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:nth-child(even) td { background: #f9f9f9; }
+.table-scroll { overflow-x: auto; }
+.status-badge { display: inline-block; padding: 3px 11px; border-radius: 16px; font-size: 11px; font-weight: 700; border: 1px solid; white-space: nowrap; }
+.status-badge.blau   { background: #EBF5FB; color: #009AC6; border-color: #b3dff0; }
+.status-badge.gelb   { background: #FEFDE7; color: #9A7D0A; border-color: #f7dc6f; }
+.status-badge.rot    { background: #FDEDEC; color: #C0392B; border-color: #f1948a; }
+.status-badge.grau   { background: #F4F6F7; color: #717D7E; border-color: #ccc; }
+.status-badge.gruen  { background: #EAFAF1; color: #1E8449; border-color: #a9dfbf; }
+
+/* Mockup-Fenster */
+.mockup { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 18px 0; box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+.mockup-bar { background: #e9e9eb; padding: 8px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border); }
+.mockup-bar .dot-win { width: 9px; height: 9px; border-radius: 50%; background: #d0d0d0; }
+.mockup-bar .title { margin-left: 8px; font-size: 11px; color: var(--text-light); font-weight: 600; }
+.mockup-body { padding: 16px; background: #fbfbfb; font-size: 12.5px; }
+.mockup.heute .mockup-bar { background: #efe6e6; }
+.mockup.heute .mockup-bar .title::before { content: "HEUTE · "; color: var(--rot); font-weight: 700; }
+.mockup.neu .mockup-bar { background: #e4f0e2; }
+.mockup.neu .mockup-bar .title::before { content: "NEU · "; color: var(--gruen); font-weight: 700; }
+.m-row { display: flex; align-items: center; gap: 10px; padding: 9px 6px; border-bottom: 1px solid #eee; }
+.m-row:last-child { border-bottom: none; }
+.m-name { flex: 1; font-weight: 600; }
+.m-sub { font-size: 11px; color: var(--text-light); font-weight: 400; }
+.m-btn { display: inline-block; background: var(--blau); color: #fff; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 4px; white-space: nowrap; }
+.m-btn.grau { background: var(--accent); }
+.m-btn.outline { background: transparent; border: 1px solid var(--border); color: var(--text-light); font-weight: 600; }
+.m-btn.rot { background: transparent; border: 1px solid #f1948a; color: var(--rot); }
+.m-field { background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
+.m-field.filled { color: var(--text); }
+.m-label { font-size: 11px; font-weight: 700; color: var(--text); margin-bottom: 3px; display: block; }
+.m-label .req { color: var(--rot); }
+.m-label .opt { font-weight: 400; color: var(--text-light); }
+.m-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+.m-check .box { width: 14px; height: 14px; border: 2px solid var(--accent); border-radius: 3px; flex-shrink: 0; }
+.m-check .box.on { background: var(--gruen); border-color: var(--gruen); }
+.m-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 0; }
+.m-table th { background: #f2f2f4; color: var(--text-light); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.m-table td { padding: 8px 10px; border-bottom: 1px solid #eee; background: #fff; }
+.m-table tr:nth-child(even) td { background: #fff; }
+
+/* Filterleiste im Mockup */
+.m-filterbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; }
+.m-filterbar .grow { flex: 1; min-width: 40px; }
+.m-select { background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 6px 26px 6px 10px; font-size: 12px; color: var(--text); position: relative; display: inline-block; min-width: 150px; }
+.m-select::after { content: "▾"; position: absolute; right: 9px; top: 5px; color: var(--text-light); font-size: 11px; }
+.m-select.aktiv { border-color: var(--blau); box-shadow: 0 0 0 2px #EBF5FB; font-weight: 600; }
+.m-count { font-size: 11px; color: var(--text-light); white-space: nowrap; padding-bottom: 7px; }
+.m-count strong { color: var(--text); }
+.m-reset { font-size: 11px; color: var(--blau); text-decoration: underline; white-space: nowrap; padding-bottom: 7px; }
+
+/* Dropdown-Aufklappung als Erläuterung */
+.m-dropdown { border: 1px solid var(--blau); border-radius: 4px; background: #fff; font-size: 12px; overflow: hidden; margin-top: 4px; max-width: 320px; box-shadow: 0 3px 8px rgba(0,0,0,.1); }
+.m-dropdown div { padding: 5px 10px; border-bottom: 1px solid #f0f0f0; }
+.m-dropdown div:last-child { border-bottom: none; }
+.m-dropdown .sel { background: #EBF5FB; font-weight: 700; color: var(--blau); }
+.m-dropdown .grp { background: #f6f6f8; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-light); font-weight: 700; }
+
+/* Variablen-Chips */
+.var-group { margin-bottom: 10px; }
+.var-group .grp-title { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-light); margin-bottom: 4px; }
+.var-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.var-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: #fff; border-radius: 4px; padding: 2px 7px; font-size: 11px; color: var(--text-light); }
+.var-chip code { background: none; padding: 0; color: var(--text); font-size: 11px; }
+.var-chip.neu { border-color: var(--gruen); background: #f2faee; }
+.var-chip.neu code { color: #3f6b16; }
+
+/* Brief-Vorschau */
+.brief { background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 20px 22px; font-family: 'Georgia', 'Times New Roman', serif; font-size: 12.5px; line-height: 1.75; color: #222; }
+.brief .platz { background: #FEFDE7; border-bottom: 1px dashed var(--gelb); font-family: 'Consolas', monospace; font-size: 11.5px; }
+.brief .fehlt { background: #FDEDEC; border-bottom: 1px dashed var(--rot); font-family: 'Consolas', monospace; font-size: 11.5px; color: var(--rot); }
+.brief .eingesetzt { background: #EAFAF1; border-bottom: 1px dashed var(--gruen); }
+.zwei-spalten { display: flex; gap: 16px; flex-wrap: wrap; }
+.zwei-spalten > * { flex: 1; min-width: 260px; }
+
+/* Datenfluss */
+.dm-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 20px 0; }
+.dm-box { border: 2px solid var(--accent); border-radius: 6px; padding: 10px 16px; font-size: 12px; font-weight: 700; color: var(--accent); background: #fff; text-align: center; }
+.dm-box.main { border-color: var(--blau); color: var(--blau); font-size: 13px; }
+.dm-box.end { border-color: var(--gruen); color: #3f6b16; }
+.dm-arrow { font-size: 16px; color: var(--text-light); line-height: 1; }
+
+/* Paket-Liste */
+.epic-list { list-style: none; margin-left: 0; }
+.epic-list li { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.epic-list li:last-child { border-bottom: none; }
+.epic-tag { flex-shrink: 0; width: 46px; height: 26px; border-radius: 4px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+/* Seitenaufbau-Skizze (Blockhoehen im Vergleich) */
+.skizze-paar { display: flex; gap: 20px; flex-wrap: wrap; margin: 18px 0; }
+.skizze { flex: 1; min-width: 250px; }
+.skizze > .kopf { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+.skizze.vorher > .kopf { color: var(--rot); }
+.skizze.nachher > .kopf { color: var(--gruen); }
+.blk { border-radius: 4px; padding: 6px 10px; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 8px; overflow: hidden; }
+.blk .px { font-weight: 400; font-size: 10px; opacity: .85; white-space: nowrap; }
+.blk.schritt { background: #9e9e9d; }
+.blk.erstellen { background: var(--blau); }
+.blk.starter { background: #0f7fa0; }
+.blk.export { background: var(--accent); }
+.blk.uploads { background: var(--gruen); }
+.blk.gekappt { background: repeating-linear-gradient(45deg, var(--blau), var(--blau) 6px, #0088ad 6px, #0088ad 12px); }
+.skizze .summe { margin-top: 8px; font-size: 11px; font-weight: 700; padding-top: 6px; border-top: 1px solid var(--border); }
+.skizze.vorher .summe { color: var(--rot); }
+.skizze.nachher .summe { color: var(--gruen); }
+.falte { position: relative; margin: 6px 0; border-top: 2px dashed var(--rot); }
+.falte span { position: absolute; right: 0; top: -8px; background: var(--white); padding: 0 6px; font-size: 9px; font-weight: 700; color: var(--rot); text-transform: uppercase; letter-spacing: .05em; }
+
+/* Mockup-Bausteine fuer den Dokumente-Hub */
+.m-such { background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-size: 12px; color: #a0a0a0; margin-bottom: 8px; }
+.m-zaehler { display: inline-block; background: #eceff1; color: var(--text-light); border-radius: 10px; padding: 1px 8px; font-size: 10px; font-weight: 700; margin-left: 6px; }
+.m-meldung { border-radius: 4px; padding: 4px 9px; font-size: 11px; margin: -4px 0 6px; }
+.m-meldung.rot { background: var(--kritik-bg); border-left: 3px solid var(--rot); color: #a0201a; }
+.m-meldung.gelb { background: var(--warnung-bg); border-left: 3px solid var(--gelb); color: #8a6d00; }
+.m-mehr { text-align: center; font-size: 11px; color: var(--blau); padding: 6px 0 0; }
+.m-kartenkopf { font-size: 12.5px; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+.m-kartensub { font-size: 10.5px; color: var(--text-light); margin-bottom: 10px; }
+.m-karte { border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 12px; margin-bottom: 10px; }
+.m-karte.blau { border: 2px solid var(--blau); background: #f4fbfd; }
+.m-karte.grau-akzent { border-color: var(--border); }
+.m-btnzeile { display: flex; flex-wrap: wrap; gap: 6px; }
+.m-btnzeile .m-btn { background: transparent; border: 1px solid var(--border); color: var(--text); font-weight: 600; }
+.m-exportkarte { border: 1px solid var(--border); border-radius: 6px; padding: 10px; background: #fff; text-align: center; font-size: 11px; }
+.m-exportkarte .ic { width: 26px; height: 26px; border-radius: 5px; background: #e2f3f9; margin: 0 auto 6px; }
+.m-exportkarte .b { margin-top: 8px; background: var(--blau); color: #fff; border-radius: 4px; padding: 4px; font-size: 10px; font-weight: 700; }
+.m-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.m-lang { color: var(--text-light); font-style: italic; font-size: 11px; text-align: center; padding: 6px 0; }
+
+.doc-footer { margin-top: 48px; padding: 24px 48px; background: var(--primary-bg); font-size: 11px; color: var(--text-light); border-top: 1px solid var(--border); }
+.doc-footer p { margin-bottom: 4px; }
+
+@media (max-width: 680px) {
+  .doc-header, .toc, .content, .doc-footer { padding-left: 20px; padding-right: 20px; }
+  .toc ol { columns: 1; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <div class="credo-bar"><span class="grau"></span><span class="gelb"></span><span class="gruen"></span><span class="rot"></span><span class="blau"></span></div>
+
+  <header class="doc-header">
+    <div class="badge">Umsetzungsplan · zur Freigabe</div>
+    <h1>Vorlagen-Filter, Benutzer-Telefon &amp; Sachbearbeiter-Variablen</h1>
+    <p class="subtitle">Drei zusammenhängende Erweiterungen: Brief-Vorlagen nach Modul und Geltung filtern · Telefonnummer am Benutzerkonto · Ansprechpartner-Variablen in den Word-Vorlagen</p>
+    <p class="meta">Stand: 22. Juli 2026 &nbsp;|&nbsp; Basis: Codebase-Analyse (Vorlagenbibliothek E0, Benutzerverwaltung, Platzhalter-Resolver) &nbsp;|&nbsp; Offene Fragen mit dem Auftraggeber geklärt &nbsp;|&nbsp; Zielgruppe: Freigabe vor Umsetzung</p>
+  </header>
+
+  <nav class="toc" aria-label="Inhaltsverzeichnis">
+    <h2>Inhaltsverzeichnis</h2>
+    <ol>
+      <li><a href="#ueberblick">Überblick &amp; getroffene Entscheidungen</a></li>
+      <li><a href="#paket1">Paket 1 — Filter „Modul" und „Geltung"</a></li>
+      <li><a href="#paket2">Paket 2 — Telefonnummer am Benutzer</a></li>
+      <li><a href="#paket3">Paket 3 — Variablen <code>{sachbearbeiter_*}</code></a></li>
+      <li><a href="#dateien">Betroffene Dateien im Überblick</a></li>
+      <li><a href="#reihenfolge">Reihenfolge, Tests &amp; Deployment</a></li>
+      <li><a href="#nebenwirkungen">Nebenwirkungen &amp; Abgrenzung</a></li>
+      <li><a href="#paket4">Paket 4 — Dokumente-Bereich übersichtlicher</a></li>
+    </ol>
+  </nav>
+
+  <main class="content">
+
+    <!-- ============================================================ -->
+    <section class="section" id="ueberblick">
+      <div class="section-title"><span class="num">1</span><h2>Überblick &amp; getroffene Entscheidungen</h2></div>
+
+      <p>Drei Wünsche, die inhaltlich zusammenhängen: Die Brief-Vorlagen sollen sich schneller finden lassen, Benutzer bekommen eine Telefonnummer, und diese Kontaktdaten sollen in den erzeugten Briefen als Variablen zur Verfügung stehen — typischerweise für den Signatur- oder Rückfrage-Block.</p>
+
+      <ul class="epic-list">
+        <li><span class="epic-tag" style="background:var(--blau)">P1</span><div><strong>Filter „Modul" und „Geltung" in den Brief-Vorlagen</strong><br><span class="m-sub">Zwei Dropdowns über der Tabelle, client-seitig gefiltert. Betrifft eine einzige Datei.</span></div></li>
+        <li><span class="epic-tag" style="background:var(--gelb);color:#4a3b00">P2</span><div><strong>Optionales Feld „Telefon" am Benutzerkonto</strong><br><span class="m-sub">Neues Schema-Feld <code>User.phone</code>, gepflegt in der Benutzerverwaltung.</span></div></li>
+        <li><span class="epic-tag" style="background:var(--gruen)">P3</span><div><strong>Variablen <code>{sachbearbeiter_name}</code>, <code>{sachbearbeiter_email}</code>, <code>{sachbearbeiter_telefon}</code> u.&nbsp;a.</strong><br><span class="m-sub">Gefüllt aus dem angemeldeten Benutzer, verfügbar in allen Modulen.</span></div></li>
+      </ul>
+
+      <h3>1.1 · Vorab geklärte Entscheidungen</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:26%">Frage</th><th style="width:30%">Entscheidung</th><th>Begründung / Konsequenz</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Wessen Kontaktdaten liefern die neuen Variablen?</td>
+            <td><strong>Der angemeldete Benutzer</strong>, der das Dokument erzeugt</td>
+            <td>Passt zu Paket 2 und braucht keine zusätzlichen Stammdaten am Mandanten. Wer den Brief erstellt, steht als Ansprechpartner darunter.</td>
+          </tr>
+          <tr>
+            <td>Wie heißen die Variablen?</td>
+            <td>Präfix <code>sachbearbeiter_</code></td>
+            <td>Zwingend nötig: <code>{name}</code>, <code>{email}</code> und <code>{telefon}</code> sind in Onboarding und Vertragsverlängerung bereits durch die <em>Mitarbeiterdaten</em> belegt. Ohne Präfix gäbe es eine stille Kollision.</td>
+          </tr>
+          <tr>
+            <td>Wie viele Telefonfelder?</td>
+            <td><strong>Ein Feld</strong> „Telefon", optional</td>
+            <td>Deckt den Signatur-Anwendungsfall ab. Ein zweites Feld ließe sich später additiv ergänzen.</td>
+          </tr>
+          <tr>
+            <td>Wie granular ist der Geltungs-Filter?</td>
+            <td>Alle · Nur global · Nur mandantenspezifisch · <em>jeder einzelne Mandant</em></td>
+            <td>Deckt beide Bedürfnisse ab: „zeig mir alle Sonderlocken" und „zeig mir nur Gymnasium Minden".</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div><strong>Warum die drei Pakete zusammengehören</strong>Die Telefonnummer aus Paket 2 ist der einzige Wert, den Paket 3 noch nicht aus der bestehenden Session ziehen kann — Name und E-Mail stehen bereits im Benutzerkonto. Paket 2 ist damit die Voraussetzung für die Variable <code>{sachbearbeiter_telefon}</code>. Paket 1 ist davon unabhängig und kann jederzeit einzeln umgesetzt und getestet werden.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="paket1">
+      <div class="section-title"><span class="num">2</span><h2>Paket 1 — Filter „Modul" und „Geltung"</h2></div>
+
+      <h3>2.1 · Ausgangslage</h3>
+      <p>Die Vorlagenliste unter <em>Vorlagen → Brief-Vorlagen</em> zeigt heute alle Vorlagen ungefiltert und ohne Blätterung. Die Spalten „Modul" und „Geltung" sind bereits vorhanden — es fehlt nur die Möglichkeit, danach einzugrenzen. Als einzige Steuerung gibt es die Checkbox „Deaktivierte Vorlagen anzeigen".</p>
+
+      <div class="mockup heute">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Vorlagen → Brief-Vorlagen</span></div>
+        <div class="mockup-body">
+          <div class="m-check"><span class="box on"></span> Deaktivierte Vorlagen anzeigen</div>
+          <table class="m-table">
+            <thead><tr><th>Name</th><th>Modul</th><th>Geltung</th><th>Platzhalter</th><th>Aktionen</th></tr></thead>
+            <tbody>
+              <tr><td><strong>BEM-Einladung</strong><br><span class="m-sub">bem_einladung.docx · 42 KB</span></td><td>BEM</td><td>Global</td><td>12 Stk.</td><td><span class="m-btn">Erzeugen</span></td></tr>
+              <tr><td><strong>Führungszeugnis-Antrag</strong></td><td>Onboarding</td><td>Global</td><td>8 Stk.</td><td><span class="m-btn">Erzeugen</span></td></tr>
+              <tr><td><strong>Verlängerungsschreiben</strong></td><td>Vertragsverlängerung</td><td>712 — Gymnasium Minden</td><td>17 Stk.</td><td><span class="m-btn">Erzeugen</span></td></tr>
+              <tr><td><strong>Willkommensbrief</strong></td><td>Onboarding</td><td>715 — Grundschule Petershagen</td><td>9 Stk.</td><td><span class="m-btn">Erzeugen</span></td></tr>
+              <tr><td colspan="5" style="text-align:center;color:var(--text-light);font-style:italic;">… alle weiteren Vorlagen, ungefiltert und unpaginiert …</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3>2.2 · Zielbild</h3>
+      <p>Über der Tabelle entsteht eine schmale Filterleiste mit zwei Dropdowns, einem Trefferzähler und einem Rücksetz-Link. Die Checkbox bleibt, wo sie ist.</p>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Vorlagen → Brief-Vorlagen mit Filterleiste</span></div>
+        <div class="mockup-body">
+          <div class="m-filterbar">
+            <div>
+              <span class="m-label">Modul</span>
+              <span class="m-select aktiv">Onboarding</span>
+            </div>
+            <div>
+              <span class="m-label">Geltung</span>
+              <span class="m-select">Alle</span>
+            </div>
+            <div class="grow"></div>
+            <span class="m-count"><strong>2</strong> von 14 Vorlagen</span>
+            <span class="m-reset">Filter zurücksetzen</span>
+          </div>
+          <div class="m-check"><span class="box"></span> Deaktivierte Vorlagen anzeigen</div>
+          <table class="m-table">
+            <thead><tr><th>Name</th><th>Modul</th><th>Geltung</th><th>Platzhalter</th><th>Aktionen</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Führungszeugnis-Antrag</strong><br><span class="m-sub">fuehrungszeugnis.docx · 31 KB</span></td><td>Onboarding</td><td>Global</td><td>8 Stk.</td><td><span class="m-btn">Erzeugen</span> <span class="m-btn outline">Bearbeiten</span></td></tr>
+              <tr><td><strong>Willkommensbrief</strong><br><span class="m-sub">willkommen.docx · 28 KB</span></td><td>Onboarding</td><td>715 — Grundschule Petershagen</td><td>9 Stk.</td><td><span class="m-btn">Erzeugen</span> <span class="m-btn outline">Bearbeiten</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h4>Das Dropdown „Geltung" im Detail</h4>
+      <div class="mockup">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Aufgeklappte Auswahl „Geltung"</span></div>
+        <div class="mockup-body">
+          <span class="m-select aktiv">Alle</span>
+          <div class="m-dropdown">
+            <div class="sel">Alle</div>
+            <div>Nur globale Vorlagen</div>
+            <div>Nur mandantenspezifische</div>
+            <div class="grp">Einzelne Mandanten</div>
+            <div>712 — Gymnasium Minden</div>
+            <div>715 — Grundschule Petershagen</div>
+            <div>718 — Realschule Lübbecke</div>
+            <div style="color:var(--text-light);font-style:italic;">… alle weiteren Mandanten</div>
+          </div>
+          <p style="margin-top:10px;font-size:11.5px;color:var(--text-light);">Die Mandantenliste wird bereits heute für die Upload- und Bearbeiten-Dialoge geladen — es entsteht keine zusätzliche Abfrage.</p>
+        </div>
+      </div>
+
+      <h3>2.3 · Technischer Ansatz</h3>
+      <p><strong>Client-seitig gefiltert.</strong> Die Liste kommt vollständig und unpaginiert vom Server. Im Browser zu filtern wirkt ohne Ladezeit und spart pro Auswahl einen Server-Roundtrip. Der bereits vorhandene Server-Parameter <code>?modul=</code> bleibt unverändert erhalten.</p>
+      <ul>
+        <li>Zwei neue Zustände in der Komponente: <code>filterModul</code> und <code>filterGeltung</code>, beide mit Startwert „ALLE".</li>
+        <li>Eine abgeleitete Liste (<code>useMemo</code>) speist die Tabelle; die Rohdaten bleiben unverändert im Zustand.</li>
+        <li>Der Leerzustand wird unterschieden: <em>„Noch keine Vorlagen vorhanden."</em> gegenüber <em>„Keine Vorlage passt zu den Filtern."</em> — sonst wirkt ein zu enger Filter wie ein leeres System.</li>
+        <li>Der Rücksetz-Link erscheint nur, wenn tatsächlich gefiltert wird.</li>
+      </ul>
+
+      <div class="hinweis">
+        <span class="icon">🧹</span>
+        <div><strong>Kleine Aufräumung im selben Zug (empfohlen)</strong>Die Modul-Liste existiert doppelt: einmal client-seitig in der Vorlagenseite, einmal server-seitig als <code>AVAILABLE_MODULES</code>. Der Grund ist nachvollziehbar — die Server-Datei importiert Prisma und ist damit nicht client-tauglich. Sauberer wäre, die Liste in die bewusst server-freie Katalog-Datei zu verschieben und von dort zu re-exportieren, genau wie es mit dem Platzhalter-Katalog bereits gemacht wurde. Dann gibt es eine Quelle statt zweier, die auseinanderlaufen können. <em>Optional — sag Bescheid, wenn es getrennt bleiben soll.</em></div>
+      </div>
+
+      <div class="warnung">
+        <span class="icon">⚠️</span>
+        <div><strong>Grenze des Ansatzes</strong>Client-seitiges Filtern trägt so lange, wie die gesamte Liste geladen wird. Sollte die Vorlagenzahl irgendwann eine Blätterung nötig machen, müssen Filter und Blätterung gemeinsam auf den Server wandern. Bei der heutigen Größenordnung ist das kein Thema.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="paket2">
+      <div class="section-title"><span class="num">3</span><h2>Paket 2 — Telefonnummer am Benutzer</h2></div>
+
+      <h3>3.1 · Zielbild</h3>
+      <p>Ein optionales Freitextfeld direkt unter der E-Mail-Adresse — im selben Formular, das für „Neuen Benutzer anlegen" und „Benutzer bearbeiten" verwendet wird.</p>
+
+      <div class="zwei-spalten">
+        <div class="mockup neu" style="margin-top:0;">
+          <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Benutzer bearbeiten</span></div>
+          <div class="mockup-body">
+            <span class="m-label">Vorname <span class="req">*</span></span>
+            <div class="m-field filled">Dimitri</div>
+            <span class="m-label">Nachname <span class="req">*</span></span>
+            <div class="m-field filled">Riesen</div>
+            <span class="m-label">E-Mail <span class="req">*</span></span>
+            <div class="m-field filled">dimitri@credo-gruppe.de</div>
+            <span class="m-label" style="color:#3f6b16;">Telefon <span class="opt">(optional)</span></span>
+            <div class="m-field" style="border-color:var(--gruen);background:#f8fdf5;color:#999;">0571 / 88 79 - 120</div>
+            <span class="m-label">Passwort <span class="opt">(leer lassen um beizubehalten)</span></span>
+            <div class="m-field">Neues Passwort eingeben…</div>
+            <span class="m-label">Rolle</span>
+            <div class="m-field filled">Super Admin</div>
+            <div style="text-align:right;margin-top:12px;"><span class="m-btn outline">Abbrechen</span> <span class="m-btn">Speichern</span></div>
+          </div>
+        </div>
+
+        <div class="mockup neu" style="margin-top:0;">
+          <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Verwaltung → Benutzer</span></div>
+          <div class="mockup-body">
+            <div class="m-row">
+              <div class="m-name">Dimitri Riesen<br>
+                <span class="m-sub">dimitri@credo-gruppe.de</span><br>
+                <span class="m-sub" style="color:#3f6b16;">☎ 0571 / 88 79 - 120</span>
+              </div>
+              <span class="status-badge blau">Super Admin</span>
+              <span class="m-btn outline">Bearbeiten</span>
+            </div>
+            <div class="m-row">
+              <div class="m-name">Sabine Meier<br>
+                <span class="m-sub">s.meier@credo-gruppe.de</span><br>
+                <span class="m-sub" style="color:#3f6b16;">☎ 0571 / 88 79 - 134</span>
+              </div>
+              <span class="status-badge gruen">HR-Leitung</span>
+              <span class="m-btn outline">Bearbeiten</span>
+            </div>
+            <div class="m-row">
+              <div class="m-name">Thomas Krause<br>
+                <span class="m-sub">t.krause@credo-gruppe.de</span><br>
+                <span class="m-sub" style="color:var(--text-light);font-style:italic;">keine Telefonnummer hinterlegt</span>
+              </div>
+              <span class="status-badge grau">Sachbearbeiter</span>
+              <span class="m-btn outline">Bearbeiten</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>3.2 · Umsetzung</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:34%">Stelle</th><th>Änderung</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Datenbankschema</strong><br><span class="m-sub">prisma/schema.prisma</span></td><td>Feld <code>phone String?</code> am Modell <code>User</code>. Englischer Feldname passend zu <code>firstName</code> / <code>lastName</code> / <code>email</code>. Anschließend <code>db:push</code> und <code>db:generate</code>.</td></tr>
+          <tr><td><strong>Benutzer-Liste &amp; Anlage</strong><br><span class="m-sub">api/users/route.ts</span></td><td>Feld in die Auswahl der Liste aufnehmen; beim Anlegen aus dem Request übernehmen — getrimmt, leer wird zu „nicht gesetzt", Länge begrenzt.</td></tr>
+          <tr><td><strong>Benutzer ändern</strong><br><span class="m-sub">api/users/[id]/route.ts</span></td><td>Feld im Änderungs-Endpunkt behandeln. Wichtig: Ein geleertes Feld muss die Nummer <em>löschen</em>, nicht ignorieren.</td></tr>
+          <tr><td><strong>Oberfläche</strong><br><span class="m-sub">benutzerverwaltung-content.tsx</span></td><td>Feld im Formular ergänzen (wirkt automatisch in beiden Dialogen, da dieselbe Komponente) und in der Liste unter der E-Mail anzeigen.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">ℹ️</span>
+        <div><strong>Stil-Treue statt Vereinheitlichung</strong>Die Benutzer-API validiert bewusst von Hand statt über ein Zod-Schema — anders als etwa die Vertragsende-API. Das neue Feld folgt dem vorhandenen Stil dieser Datei; ein Umbau der gesamten Validierung wäre eine eigene Entscheidung und gehört nicht in dieses Paket.</div>
+      </div>
+
+      <div class="offen">
+        <span class="icon">💬</span>
+        <div><strong>Bewusst nicht enthalten: Selbstpflege</strong>Es gibt im Portal keine „Mein Profil"-Seite. Die Telefonnummer pflegen damit ausschließlich SUPER_ADMIN und HR-Leitung in der Benutzerverwaltung — niemand kann seine eigene Nummer selbst ändern. Falls das gewünscht ist, wäre es ein eigenes, kleines Paket (eine Profilseite plus ein auf den eigenen Datensatz beschränkter Endpunkt).</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="paket3">
+      <div class="section-title"><span class="num">4</span><h2>Paket 3 — Variablen <code>{sachbearbeiter_*}</code></h2></div>
+
+      <h3>4.1 · Die neuen Variablen</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:32%">Variable</th><th style="width:28%">Quelle</th><th>Beispielwert</th></tr></thead>
+        <tbody>
+          <tr><td><code>{sachbearbeiter_name}</code></td><td>Vor- und Nachname zusammengesetzt</td><td>Dimitri Riesen</td></tr>
+          <tr><td><code>{sachbearbeiter_vorname}</code></td><td>Vorname des Benutzerkontos</td><td>Dimitri</td></tr>
+          <tr><td><code>{sachbearbeiter_nachname}</code></td><td>Nachname des Benutzerkontos</td><td>Riesen</td></tr>
+          <tr><td><code>{sachbearbeiter_email}</code></td><td>E-Mail des Benutzerkontos</td><td>dimitri@credo-gruppe.de</td></tr>
+          <tr><td><code>{sachbearbeiter_telefon}</code></td><td>Telefonfeld aus Paket 2 <span class="status-badge gelb">setzt P2 voraus</span></td><td>0571 / 88 79 - 120</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="dm-wrap">
+        <div class="dm-box main">Angemeldeter Benutzer (Session)</div>
+        <div class="dm-arrow">↓ beim Klick auf „Erzeugen"</div>
+        <div class="dm-box">Platzhalter-Resolver lädt Name · E-Mail · Telefon</div>
+        <div class="dm-arrow">↓ zusammen mit Datum, Mandant, Vorgangsdaten</div>
+        <div class="dm-box end">Fertiges Word-/PDF-Dokument mit Signaturblock</div>
+      </div>
+
+      <h3>4.2 · So sieht es in der Vorlage aus</h3>
+      <p>Die Variablen werden wie alle anderen direkt in die Word-Datei geschrieben. Typischer Einsatz ist der Abschluss eines Anschreibens:</p>
+
+      <div class="zwei-spalten">
+        <div class="mockup" style="margin-top:0;">
+          <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Word-Vorlage (.docx)</span></div>
+          <div class="mockup-body" style="padding:0;">
+            <div class="brief">
+              … über Ihre Bewerbung haben wir uns sehr gefreut.<br><br>
+              Bei Rückfragen wenden Sie sich gern an:<br>
+              <span class="platz">{sachbearbeiter_name}</span><br>
+              Telefon <span class="platz">{sachbearbeiter_telefon}</span><br>
+              <span class="platz">{sachbearbeiter_email}</span><br><br>
+              Mit freundlichen Grüßen<br><br>
+              <span class="platz">{sachbearbeiter_name}</span><br>
+              Personalabteilung <span class="platz">{mandant_name}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mockup neu" style="margin-top:0;">
+          <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Erzeugtes Dokument</span></div>
+          <div class="mockup-body" style="padding:0;">
+            <div class="brief">
+              … über Ihre Bewerbung haben wir uns sehr gefreut.<br><br>
+              Bei Rückfragen wenden Sie sich gern an:<br>
+              <span class="eingesetzt">Dimitri Riesen</span><br>
+              Telefon <span class="eingesetzt">0571 / 88 79 - 120</span><br>
+              <span class="eingesetzt">dimitri@credo-gruppe.de</span><br><br>
+              Mit freundlichen Grüßen<br><br>
+              <span class="eingesetzt">Dimitri Riesen</span><br>
+              Personalabteilung <span class="eingesetzt">Gymnasium Minden</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h4>Was passiert, wenn keine Telefonnummer gepflegt ist</h4>
+      <p>Das System folgt der bestehenden Konvention: Fehlende Werte werden sichtbar als <code>___</code> markiert und in der Meldung „X Platzhalter ohne Wert" mitgezählt — sie verschwinden ausdrücklich <em>nicht</em> stillschweigend. So fällt eine Lücke beim Korrekturlesen auf, statt unbemerkt in den Briefkasten zu gehen.</p>
+      <div class="mockup" style="margin-top:0;">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Erzeugtes Dokument — Benutzer ohne hinterlegte Telefonnummer</span></div>
+        <div class="mockup-body" style="padding:0;">
+          <div class="brief">
+            Bei Rückfragen wenden Sie sich gern an:<br>
+            <span class="eingesetzt">Thomas Krause</span><br>
+            Telefon <span class="fehlt">___</span><br>
+            <span class="eingesetzt">t.krause@credo-gruppe.de</span>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--text-light);">Rückmeldung in der Oberfläche: <em>„Dokument erzeugt. 1 Platzhalter ohne Wert (mit ‚___' markiert)."</em></p>
+
+      <h3>4.3 · Im Variablen-Katalog</h3>
+      <p>Beim Anlegen und Bearbeiten einer Vorlage zeigt das Portal alle verfügbaren Variablen gruppiert und klickbar zum Kopieren an. Die neue Gruppe erscheint dort automatisch — <strong>in allen Modulen</strong>, weil die allgemeinen Variablen in jeden Modul-Katalog übernommen werden.</p>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Vorlage bearbeiten → Verfügbare Variablen — Onboarding</span></div>
+        <div class="mockup-body">
+          <div class="var-group">
+            <div class="grp-title">Allgemein</div>
+            <div class="var-chips">
+              <span class="var-chip"><code>{datum}</code> Aktuelles Datum</span>
+              <span class="var-chip"><code>{jahr}</code> Aktuelles Jahr</span>
+            </div>
+          </div>
+          <div class="var-group">
+            <div class="grp-title">Mandant</div>
+            <div class="var-chips">
+              <span class="var-chip"><code>{mandant_name}</code> Einrichtung</span>
+              <span class="var-chip"><code>{mandant_kuerzel}</code> Kürzel</span>
+              <span class="var-chip"><code>{mandant_nummer}</code> Mandantennummer</span>
+            </div>
+          </div>
+          <div class="var-group" style="border:1px dashed var(--gruen);border-radius:5px;padding:8px;background:#fbfefa;">
+            <div class="grp-title" style="color:#3f6b16;">Sachbearbeiter &nbsp;<span style="background:var(--gruen);color:#fff;border-radius:3px;padding:1px 5px;font-size:9px;">NEU</span></div>
+            <div class="var-chips">
+              <span class="var-chip neu"><code>{sachbearbeiter_name}</code> Voller Name</span>
+              <span class="var-chip neu"><code>{sachbearbeiter_vorname}</code> Vorname</span>
+              <span class="var-chip neu"><code>{sachbearbeiter_nachname}</code> Nachname</span>
+              <span class="var-chip neu"><code>{sachbearbeiter_email}</code> E-Mail</span>
+              <span class="var-chip neu"><code>{sachbearbeiter_telefon}</code> Telefon</span>
+            </div>
+          </div>
+          <div class="var-group">
+            <div class="grp-title">Person</div>
+            <div class="var-chips">
+              <span class="var-chip"><code>{vorname}</code> Vorname <span style="color:var(--text-light);font-style:italic;">(Mitarbeiter)</span></span>
+              <span class="var-chip"><code>{nachname}</code> Nachname</span>
+              <span class="var-chip"><code>{email}</code> E-Mail <span style="color:var(--text-light);font-style:italic;">(Mitarbeiter)</span></span>
+              <span class="var-chip"><code>{telefon}</code> Telefon <span style="color:var(--text-light);font-style:italic;">(Mitarbeiter)</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kritik">
+        <span class="icon">❗</span>
+        <div><strong>Genau deshalb das Präfix</strong>Im selben Katalog stehen <code>{email}</code> und <code>{telefon}</code> bereits für die <em>Mitarbeiterdaten</em>. Ohne das Präfix <code>sachbearbeiter_</code> würden die neuen Werte die bestehenden überschreiben — und der Brief trüge die Telefonnummer der Personalabteilung dort, wo die des Mitarbeiters stehen soll. Ein bereits vorhandener automatischer Test wacht darüber, dass Variablennamen je Modul eindeutig bleiben.</div>
+      </div>
+
+      <h3>4.4 · Umsetzung</h3>
+      <ol>
+        <li><strong>Katalog erweitern</strong> — die fünf Definitionen kommen in die Gruppe der allgemeinen Variablen. Damit sind sie in jedem Modul verfügbar, ohne dass acht Kataloge einzeln gepflegt werden müssen. Die Katalog-Datei bleibt bewusst frei von Server-Importen, damit die Oberfläche sie direkt nutzen kann.</li>
+        <li><strong>Resolver erweitern</strong> — die Funktion, die Datum, Mandant und verantwortliche Stelle auflöst, bekommt einen optionalen zweiten Parameter für den Benutzer. Ist er gesetzt, werden Name, E-Mail und Telefon geladen. Leere Werte werden <em>nicht</em> gesetzt, damit die <code>___</code>-Markierung greift.</li>
+        <li><strong>Benutzer durchreichen</strong> — die drei bestehenden Modul-Resolver (Allgemein, Onboarding, Vertragsverlängerung) geben den angemeldeten Benutzer weiter. Er liegt im Resolver-Kontext bereits vor; es ist keine neue Signatur nötig.</li>
+        <li><strong>BEM anschließen</strong> <span class="status-badge gelb">empfohlen</span> — der BEM-Bereich erzeugt Dokumente über einen eigenen, zugriffsgeschützten Weg. Ohne eine kleine Ergänzung dort blieben die neuen Variablen in BEM-Vorlagen leer. Fachlich unbedenklich: Es sind die Kontaktdaten der bearbeitenden Person, keine Falldaten — die versiegelte Akte bleibt unberührt.</li>
+        <li><strong>Tests ergänzen</strong> — bestehende Testdatei erweitern um: Werte werden gesetzt · fehlende Telefonnummer setzt die Variable <em>nicht</em> · die neuen Namen sind in jedem Modul-Katalog vorhanden.</li>
+      </ol>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="dateien">
+      <div class="section-title"><span class="num">5</span><h2>Betroffene Dateien im Überblick</h2></div>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:8%">Paket</th><th style="width:42%">Datei</th><th>Art der Änderung</th></tr></thead>
+        <tbody>
+          <tr><td><span class="status-badge blau">P1</span></td><td><code>src/app/(portal)/brief-vorlagen/brief-vorlagen-content.tsx</code></td><td>Filterleiste, zwei Zustände, abgeleitete Liste, Leerzustände</td></tr>
+          <tr><td><span class="status-badge blau">P1</span></td><td><code>src/lib/placeholder-catalog.ts</code> + <code>doc-template-resolvers.ts</code></td><td><em>optional:</em> Modul-Liste an eine Stelle zusammenführen</td></tr>
+          <tr><td><span class="status-badge gelb">P2</span></td><td><code>prisma/schema.prisma</code></td><td>Feld <code>phone String?</code> am Modell <code>User</code></td></tr>
+          <tr><td><span class="status-badge gelb">P2</span></td><td><code>src/app/api/users/route.ts</code></td><td>Liste und Anlage um das Feld erweitern</td></tr>
+          <tr><td><span class="status-badge gelb">P2</span></td><td><code>src/app/api/users/[id]/route.ts</code></td><td>Änderung inkl. Leeren des Feldes</td></tr>
+          <tr><td><span class="status-badge gelb">P2</span></td><td><code>src/app/(portal)/benutzerverwaltung/benutzerverwaltung-content.tsx</code></td><td>Formularfeld und Anzeige in der Liste</td></tr>
+          <tr><td><span class="status-badge gruen">P3</span></td><td><code>src/lib/placeholder-catalog.ts</code></td><td>fünf neue Variablen-Definitionen, Gruppe „Sachbearbeiter"</td></tr>
+          <tr><td><span class="status-badge gruen">P3</span></td><td><code>src/lib/doc-template-resolvers.ts</code></td><td>optionaler Benutzer-Parameter, an drei Resolvern durchgereicht</td></tr>
+          <tr><td><span class="status-badge gruen">P3</span></td><td><code>src/lib/bem-doc.ts</code> + <code>api/bem/[id]/dokumente/generieren/route.ts</code></td><td><em>empfohlen:</em> Benutzer auch im BEM-Weg durchreichen</td></tr>
+          <tr><td><span class="status-badge gruen">P3</span></td><td><code>src/__tests__/lib/doc-template-resolvers.test.ts</code></td><td>drei neue Testfälle</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="font-size:12px;color:var(--text-light);">Keine Datei wird neu angelegt; es entstehen keine neuen Endpunkte und keine neuen Berechtigungen.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="reihenfolge">
+      <div class="section-title"><span class="num">6</span><h2>Reihenfolge, Tests &amp; Deployment</h2></div>
+
+      <h3>6.1 · Reihenfolge</h3>
+      <div class="dm-wrap">
+        <div class="dm-box main">Paket 1 — Filter <span style="font-weight:400;font-size:10px;">(unabhängig, jederzeit einzeln möglich)</span></div>
+        <div class="dm-arrow">↓</div>
+        <div class="dm-box">Paket 2 — Telefonnummer <span style="font-weight:400;font-size:10px;">(Schema + API + Oberfläche)</span></div>
+        <div class="dm-arrow">↓ muss vorher fertig sein</div>
+        <div class="dm-box end">Paket 3 — Variablen <span style="font-weight:400;font-size:10px;">(braucht das Telefonfeld)</span></div>
+      </div>
+
+      <h3>6.2 · Prüfung vor der Freigabe</h3>
+      <ul>
+        <li><code>npm run lint</code> und <code>npm run test</code> müssen sauber durchlaufen.</li>
+        <li>Manuell: Vorlage nach Modul filtern · nach „Nur global" filtern · nach einem einzelnen Mandanten filtern · zurücksetzen.</li>
+        <li>Manuell: Telefonnummer setzen, ändern, <strong>leeren</strong> — und prüfen, dass das Leeren wirklich löscht.</li>
+        <li>Manuell: Ein Dokument mit und eines ohne hinterlegte Telefonnummer erzeugen und beide Ergebnisse vergleichen.</li>
+      </ul>
+
+      <h3>6.3 · Deployment</h3>
+      <p>Das neue Feld ist additiv und darf leer bleiben — es gibt keinen Datenverlust und keinen Migrationsschritt an Bestandsdaten. Der Container gleicht das Schema beim Start ohnehin selbst ab, daher ist beim Ausrollen kein zusätzlicher manueller Schritt nötig.</p>
+      <div class="warnung">
+        <span class="icon">📋</span>
+        <div><strong>Einmalige Nacharbeit fachlicher Art</strong>Nach dem Ausrollen sind alle Telefonnummern leer. Solange sie nicht gepflegt sind, erscheint <code>{sachbearbeiter_telefon}</code> in erzeugten Briefen als <code>___</code>. Die Nummern sollten also einmalig in der Benutzerverwaltung nachgetragen werden, bevor die Variable in produktive Vorlagen eingebaut wird.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="nebenwirkungen">
+      <div class="section-title"><span class="num">7</span><h2>Nebenwirkungen &amp; Abgrenzung</h2></div>
+
+      <h3>7.1 · Was sich für Bestehendes ändert</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:30%">Bereich</th><th style="width:16%">Auswirkung</th><th>Erläuterung</th></tr></thead>
+        <tbody>
+          <tr><td>Vorhandene Word-Vorlagen</td><td><span class="status-badge gruen">keine</span></td><td>Die neuen Variablen wirken erst, wenn sie in eine Vorlage eingebaut werden.</td></tr>
+          <tr><td>Namenskollisionen</td><td><span class="status-badge gruen">keine</span></td><td>Das Präfix <code>sachbearbeiter_</code> ist neu; ein bestehender Test sichert die Eindeutigkeit je Modul ab.</td></tr>
+          <tr><td>Bestehende Benutzerkonten</td><td><span class="status-badge gruen">keine</span></td><td>Das Feld ist optional und startet leer.</td></tr>
+          <tr><td>Server-Filter <code>?modul=</code></td><td><span class="status-badge gruen">keine</span></td><td>Bleibt unverändert nutzbar, etwa aus anderen Aufrufen heraus.</td></tr>
+          <tr><td>Erzeugte Dokumente</td><td><span class="status-badge gelb">bewusst</span></td><td>Dienstliche Kontaktdaten der Sachbearbeiter erscheinen künftig in Dokumenten und ggf. in Anhängen versendeter E-Mails. Genau das ist der Zweck — aber es ist eine bewusste Entscheidung.</td></tr>
+          <tr><td>BEM-Dokumente</td><td><span class="status-badge gelb">abhängig</span></td><td>Ohne den empfohlenen Zusatzschritt bleiben die Variablen dort leer.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h3>7.2 · Ausdrücklich nicht enthalten</h3>
+      <ul>
+        <li><strong>Keine Selbstpflege-Seite</strong> für die eigene Telefonnummer (siehe Abschnitt 3).</li>
+        <li><strong>Keine Ansprechpartner-Stammdaten am Mandanten</strong> — es wurde bewusst der angemeldete Benutzer als Quelle gewählt. Ein fester Ansprechpartner je Einrichtung wäre ein eigenes Paket mit zusätzlichen Feldern und Pflegeoberfläche.</li>
+        <li><strong>Keine server-seitige Filterung mit Blätterung</strong> — erst nötig, wenn die Vorlagenzahl das erfordert.</li>
+        <li><strong>Keine Freitextsuche</strong> in den Brief-Vorlagen; es wurde ausdrücklich nach Modul und Geltung gefragt. Lässt sich später additiv ergänzen.</li>
+        <li><strong>Kein zweites Telefonfeld</strong> (Mobil oder Durchwahl) — additiv nachrüstbar.</li>
+      </ul>
+
+      <h3>7.3 · Offene Punkte für die Freigabe</h3>
+      <div class="offen"><span class="icon">💬</span><div>Soll die optionale Zusammenführung der Modul-Liste (Abschnitt 2.3) mitgemacht werden? · Soll BEM angeschlossen werden (Abschnitt 4.4, Punkt 4)? · Soll die Telefonnummer auch in den Signaturen der automatischen System-E-Mails auftauchen, oder nur in den Word-Vorlagen? · Ist eine Selbstpflege-Seite später gewünscht, damit die Nummern nicht zentral gepflegt werden müssen?</div></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="paket4">
+      <div class="section-title"><span class="num">8</span><h2>Paket 4 — Dokumente-Bereich übersichtlicher</h2></div>
+
+      <p><em>Nachträglich beauftragt:</em> „Überall dort, z.&nbsp;B. im Bereich Onboarding ‚Dokumente‘, wo ich Dokumente erstellen kann, möchte ich eine bessere Darstellung. Die Seite kann schnell unübersichtlich werden, wenn viele Dokumente zur Verfügung stehen."</p>
+
+      <div class="hinweis">
+        <span class="icon">🔬</span>
+        <div><strong>Grundlage dieses Abschnitts</strong>Fünf Analysten haben den Ist-Zustand vermessen (71 Befunde), vier unabhängige Entwürfe wurden von je drei Jurys bewertet, die Synthese anschließend von drei Gegenprüfern zerlegt. Die Gegenprüfung hat den ursprünglichen Vorschlag in einem zentralen Punkt korrigiert — das steht in Abschnitt 8.2, weil es die Reihenfolge der Umsetzung verändert.</div>
+      </div>
+
+      <h3>8.1 · Was der Dokumente-Tab heute ist</h3>
+      <p>Fünf gleichrangige, immer offene Blöcke untereinander. Nichts lässt sich zuklappen, es gibt kein Sprungmenü, und die Vorlagenliste in der Mitte hat keine Obergrenze — sie wächst mit jeder Vorlage um rund 62&nbsp;Pixel.</p>
+
+      <div class="mockup heute">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Onboarding-Vorgang → Tab „Dokumente"</span></div>
+        <div class="mockup-body">
+          <div class="m-karte" style="padding:8px 12px;font-size:11px;color:var(--text-light);">Sie sind hier: <span style="color:var(--gruen);">✓ Einladung</span> › <span style="color:var(--gruen);">✓ Fragebogen</span> › <span style="background:#EBF5FB;color:var(--blau);border-radius:9px;padding:1px 7px;font-weight:700;">Modalitäten</span> › Prüfen › Checkliste › Abschluss</div>
+
+          <div class="m-karte">
+            <div class="m-kartenkopf">📄 Dokumente erstellen</div>
+            <div class="m-kartensub">Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.</div>
+            <div class="m-row" style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px;padding:7px 10px;">
+              <div class="m-name">Masernschutz – Nachweis-Bescheinigung<br><span class="m-sub">Amtliches NRW-Formular (zum Ausfüllen beim Arzt)</span></div>
+              <span class="m-btn outline">PDF öffnen</span>
+            </div>
+            <div class="m-row" style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px;padding:7px 10px;">
+              <div class="m-name">Antrag Führungszeugnis<br><span class="m-sub" style="font-style:italic;">Vorlage</span></div>
+              <span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span>
+            </div>
+            <div class="m-row" style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px;padding:7px 10px;">
+              <div class="m-name">Arbeitsvertrag Lehrkraft<br><span class="m-sub" style="font-style:italic;">Vorlage</span></div>
+              <span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span>
+            </div>
+            <div class="m-lang">… jede weitere Vorlage als zusätzliche Zeile, ohne Ende, ohne Suche, ohne Gruppierung …</div>
+          </div>
+
+          <div class="m-karte blau">
+            <div class="m-kartenkopf" style="color:var(--blau);">⬇ Starterpaket versenden</div>
+            <div class="m-kartensub">Die für diesen Mandanten markierten Dokumente gehen als PDF-Anhänge an den neuen Mitarbeiter.</div>
+            <span class="m-btn">Starterpaket versenden</span> <span class="m-sub">Noch nicht versendet</span>
+          </div>
+
+          <div class="m-karte blau">
+            <div class="m-kartenkopf" style="color:var(--blau);">⬇ PDF-Export für DMS</div>
+            <div class="m-kartensub">Jedes Dokument erhält einen QR-Code auf der Deckseite zur automatischen DMS-Zuordnung.</div>
+            <div class="m-grid3">
+              <div class="m-exportkarte"><div class="ic"></div>Gesamtakte<div class="b">PDF herunterladen</div></div>
+              <div class="m-exportkarte"><div class="ic"></div>Fragebogen<div class="b">PDF herunterladen</div></div>
+              <div class="m-exportkarte"><div class="ic"></div>Modalitaeten<div class="b">PDF herunterladen</div></div>
+            </div>
+            <div class="m-grid3" style="margin-top:8px;">
+              <div class="m-exportkarte"><div class="ic"></div>Dokumente<div class="b">PDF herunterladen</div></div>
+              <div class="m-exportkarte"><div class="ic"></div>Checkliste<div class="b">PDF herunterladen</div></div>
+              <div></div>
+            </div>
+          </div>
+
+          <div class="m-karte grau-akzent">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span class="m-sub">3 Dokumente hochgeladen</span>
+              <span class="m-btn" style="background:var(--gruen);">Alle herunterladen</span>
+            </div>
+            <div class="m-grid3">
+              <div class="m-exportkarte" style="text-align:left;"><strong>ausweis.pdf</strong><br><span class="m-sub">1,2 MB</span><br><span class="status-badge grau" style="font-size:9px;margin-top:5px;display:inline-block;">KK BESCHEINIGUNG</span></div>
+              <div class="m-exportkarte" style="text-align:left;"><strong>zeugnis.pdf</strong><br><span class="m-sub">0,8 MB</span><br><span class="status-badge grau" style="font-size:9px;margin-top:5px;display:inline-block;">SONSTIGES</span></div>
+              <div class="m-exportkarte" style="text-align:left;"><strong>masern.jpg</strong><br><span class="m-sub">2,1 MB</span><br><span class="status-badge grau" style="font-size:9px;margin-top:5px;display:inline-block;">MASERNSCHUTZ</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>8.2 · Die Messung in der Produktionsdatenbank</h3>
+      <p>Die Analyse hat eine schlüssige Ursache gefunden: Der Vorgang lädt seine Vorlagen ohne Mandantenbezug, und der Mandantenfilter in der Schnittstelle ist <strong>toter Code</strong> — die Rollenliste, die den Zugang regelt, ist zeichengleich mit der Liste jener Rollen, für die der Filter sich selbst abschaltet (<code>permissions.ts:26</code> gegenüber <code>:32</code>). Ein Vorgang des Gymnasiums Minden bekommt also auch die Vorlagen der anderen Träger.</p>
+      <p>Die Gegenprüfung hielt dagegen, im Repository sei nur <em>eine</em> gruppenweite Vorlage angelegt (<code>prisma/seed-check.js:37</code>) — der Filter wäre damit wirkungslos. Deshalb wurde vor der Umsetzung gezählt. Ergebnis vom 22.&nbsp;Juli 2026:</p>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:34%">Modul</th><th style="width:18%">Vorlagen</th><th style="width:24%">mandantengebunden</th><th>gruppenweit</th></tr></thead>
+        <tbody>
+          <tr><td><strong>ONBOARDING</strong></td><td>8</td><td>5</td><td>3</td></tr>
+          <tr><td>BEM</td><td>7</td><td>0</td><td>7</td></tr>
+          <tr><td><strong>VERTRAGSVERLAENGERUNG</strong></td><td>2</td><td>2</td><td>0</td></tr>
+          <tr><td style="color:var(--text-light);">ALLGEMEIN</td><td colspan="3" style="color:var(--text-light);">keine Einträge</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">✅</span>
+        <div><strong>Der Mandantenfilter wirkt doch — der Einwand der Gegenprüfung galt nur für das Repository</strong>5 von 8 Onboarding-Vorlagen sind einem einzelnen Träger zugeordnet. Ein Vorgang zeigt heute alle 8 plus das statische Masernschutz-PDF, also 9 Zeilen; nach dem Filter sind es die 3 gruppenweiten plus die eigenen des Trägers — bei gleichmäßiger Verteilung rund <strong>5 statt 9 Zeilen</strong>. Der Filter ist damit die wirksamste Einzelmaßnahme und rückt an die erste Stelle.</div>
+      </div>
+
+      <div class="kritik">
+        <span class="icon">❗</span>
+        <div><strong>Bei der Vertragsverlängerung ist es kein Darstellungsproblem mehr, sondern ein fachliches</strong>Beide vorhandenen Vorlagen sind mandantengebunden, <em>keine</em> ist gruppenweit. Ein Vertragsende-Vorgang eines Trägers, der keine eigene Vorlage besitzt, zeigt heute also ausschließlich die Vorlagen <strong>fremder Träger</strong> — und wer daraus ein Schreiben erzeugt, bekommt den falschen Briefkopf. Das ist keine Unübersichtlichkeit, das ist ein Fehler mit Außenwirkung.</div>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">🔍</span>
+        <div><strong>Eine Vermutung hat sich erledigt</strong>Im Modul „Allgemein" liegt <em>keine einzige</em> Vorlage. Die Sorge, beim Hochladen sei jemand in der Vorbelegung hängengeblieben und hätte damit unsichtbare Vorlagen erzeugt, ist damit gegenstandslos — alle Vorlagen wurden korrekt einem Fachmodul zugeordnet. Der Stolperstein bleibt für die Zukunft bestehen (siehe 8.3), ist aber kein akuter Befund und rechtfertigt für sich allein keine Änderung.</div>
+      </div>
+
+      <h3>8.2b · Was die Vorlagennamen verraten — das eigentliche Problem</h3>
+      <p>Die zweite Abfrage hat die Namen gezeigt, und sie erklären die Unübersichtlichkeit besser als jede Mengenangabe. Die acht Onboarding-Vorlagen sind keine acht verschiedenen Schreiben — es sind im Kern <strong>drei Familien mit Varianten</strong>:</p>
+
+      <div class="mockup heute">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Die Onboarding-Vorlagen, alphabetisch — so stehen sie heute untereinander</span></div>
+        <div class="mockup-body">
+          <table class="m-table">
+            <thead><tr><th>Name</th><th style="width:22%">Geltung</th><th style="width:26%">Auffälligkeit</th></tr></thead>
+            <tbody>
+              <tr><td>AV - FES Objektservice GmbH</td><td>Mandant</td><td rowspan="2" style="background:#FEF9E7;">Zwei Arbeitsverträge, an völlig verschiedenen Stellen der alphabetischen Liste</td></tr>
+              <tr><td>Antrag auf ein erweitertes Führungszeugnis - KiTa</td><td>Mandant</td></tr>
+              <tr><td style="background:#FDEDEC;">Antrag auf ein erweitertes Führungszeugnis Kita</td><td>Mandant</td><td style="background:#FDEDEC;color:var(--rot);font-weight:700;">↑ Doppelt angelegt — nur Schreibweise verschieden</td></tr>
+              <tr><td>Arbeitsvertrag für Erzieher</td><td>Mandant</td><td>zweiter Arbeitsvertrag</td></tr>
+              <tr><td style="background:#FEF9E7;">Aufforderung erweitertes Führungszeugnis</td><td>Gruppenweit</td><td rowspan="2" style="background:#FEF9E7;">System-Vorlage und mandantengebundene Variante stehen direkt untereinander</td></tr>
+              <tr><td style="background:#FEF9E7;">Aufforderung erweitertes Führungszeugnis - Lehrer</td><td>Mandant</td></tr>
+              <tr><td>Befragung über Vorstrafen</td><td>Gruppenweit</td><td>—</td></tr>
+              <tr><td>Verpflichtung auf die Vertraulichkeit</td><td>Gruppenweit</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p><strong>Vier der acht Vorlagen betreffen das Führungszeugnis</strong>, und ihre Namen beginnen alle mit „A". Alphabetisch sortiert stehen sie unmittelbar untereinander — vier Zeilen, die sich auf den ersten Blick kaum unterscheiden lassen. Dazu kommen zwei Arbeitsverträge, die durch die Sortierung („AV&nbsp;-&nbsp;…" und „Arbeitsvertrag&nbsp;für&nbsp;…") auseinandergerissen werden.</p>
+
+      <div class="kritik">
+        <span class="icon">❗</span>
+        <div><strong>Ein Duplikat, das keine Oberfläche reparieren kann</strong>„Antrag auf ein erweitertes Führungszeugnis <strong>- KiTa</strong>" und „Antrag auf ein erweitertes Führungszeugnis <strong>Kita</strong>" sind zwei getrennte Einträge, die sich nur in Bindestrich und Schreibweise unterscheiden. Das ist eine Aufräumaufgabe für Sie, kein Entwicklungsauftrag — eine der beiden deaktivieren, und die Liste ist um eine Zeile kürzer und um eine Verwechslungsgefahr ärmer.</div>
+      </div>
+
+      <div class="warnung">
+        <span class="icon">⚠️</span>
+        <div><strong>Der Mandantenfilter löst nur die halbe Sache</strong>„Aufforderung erweitertes Führungszeugnis" ist die gruppenweite System-Vorlage aus dem Seed (<code>seed-check.js:32</code>, mit gepflegter Beschreibung „Anschreiben an die Lehrkraft (§&nbsp;30a&nbsp;BZRG)"). Daneben liegt „Aufforderung erweitertes Führungszeugnis&nbsp;-&nbsp;Lehrer" als mandantengebundene Fassung. Nach dem Filter verschwinden fremde Träger — aber diese beiden bleiben <em>beide</em> stehen, direkt untereinander, mit fast identischem Namen. Was hier fehlt, ist kein Filter und keine Suche, sondern ein <strong>Unterscheidungsmerkmal an der Zeile</strong>.</div>
+      </div>
+
+      <p><strong>Konsequenz für die Umsetzung — die Messung hat die Empfehlung an drei Stellen geändert:</strong></p>
+      <ul>
+        <li><strong>Der Mandantenfilter rückt an die erste Stelle.</strong> Er halbiert die Liste (9 → rund 5 Zeilen) und verhindert bei der Vertragsverlängerung falsche Briefköpfe.</li>
+        <li><strong>Suche und Kappung werden zurückgestellt.</strong> Bei rund 5 Zeilen nach dem Filter würde die Grenze von 8 nie erreicht und das Suchfeld nie erscheinen — Mechanik ohne Wirkung. Lässt sich später in einem Nachmittag ergänzen, wenn die Vorlagenzahl wächst.</li>
+        <li><strong>Neu aufgenommen: Geltungs-Kennzeichnung an der Zeile.</strong> Ein kleines Etikett „Für Ihre Einrichtung" beziehungsweise „Gruppenweit" unterscheidet die Varianten auf einen Blick. Die Schnittstelle liefert die Angabe längst mit (<code>brief-vorlagen/route.ts:78</code>) — die Oberfläche wirft sie heute weg. Das kostet also nichts außer der Anzeige. In der ursprünglichen Fassung dieses Plans war das Etikett noch als überflüssiges Rauschen verworfen; die Namensliste widerlegt das.</li>
+      </ul>
+
+      <h3>8.3 · Ein Fehler, der schwerer wiegt als die Optik</h3>
+
+      <div class="warnung">
+        <span class="icon">🎯</span>
+        <div><strong>Das Portal verschweigt Lücken in erzeugten Schreiben</strong>Beim Erzeugen zählt der Server, wie viele Platzhalter leer geblieben sind, und schickt die Zahl im Antwort-Kopf mit (<code>generate/route.ts:355</code>). Der Vorgang liest sie nicht aus. Ein Schreiben mit <code>___</code> statt Eintrittsdatum geht damit unbemerkt hinaus. Auf der zentralen Vorlagenseite wird derselbe Wert sehr wohl angezeigt — im Vorgang fehlt er. Bei Arbeitsverträgen und Führungszeugnis-Aufforderungen, also genau den Schreiben, die bei Ihnen hinterlegt sind, geht so ein unvollständiges Dokument nach außen.</div>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">📎</span>
+        <div><strong>Ein latenter Stolperstein, heute ohne Befund</strong>Der Upload-Dialog belegt das Modul mit <code>ALLGEMEIN</code> vor — im Formular (<code>brief-vorlagen-content.tsx:348</code>) <em>und</em> in der Prüfregel (<code>validations/brief-vorlagen.ts:24</code>). Wer beim Hochladen nicht bewusst ein Fachmodul auswählt, erzeugt eine Vorlage, die in <strong>keinem</strong> Vorgang erscheint, weil der Tab gezielt nach seinem Modul fragt. Die Messung zeigt: Das ist bisher niemandem passiert, in „Allgemein" liegt keine einzige Vorlage. Die Falle bleibt aber bestehen. Empfehlung: Modul beim Hochladen zur bewussten Auswahl machen statt es vorzubelegen — ein Einzeiler, den wir bei Gelegenheit mitnehmen, aber kein Grund für ein eigenes Vorhaben.</div>
+      </div>
+
+      <p>Dazu kommen drei kleinere, ebenso belegte Mängel: Fehler beim Erzeugen erscheinen ganz <em>oben</em> in der Karte und sind bei langer Liste außerhalb des Blickfelds. Jeder Ladefehler wird als „keine Vorlagen vorhanden" ausgegeben — Einrichtungsleitung und Vorgesetzte bekommen von der Schnittstelle ein 403 und lesen daraufhin die Falschaussage „Keine Vorlagen hinterlegt. Vorlagen legst du unter Brief-Vorlagen an.", also eine Aufforderung, die sie gar nicht ausführen dürfen. Und die Farbtabelle der hochgeladenen Dokumente zeigt zur Hälfte auf Dokumentarten, die es im Datenmodell nicht gibt — deshalb sind fast alle Etiketten grau und tragen rohe Datenbankwerte wie <code>KK BESCHEINIGUNG</code>, obwohl saubere deutsche Bezeichnungen bereits im Projekt liegen (<code>required-documents.ts:11-27</code>).</p>
+
+      <h3>8.4 · Der Vorschlag im Seitenaufbau</h3>
+      <p>Zwei Eingriffe verändern die Seite am stärksten: Die Vorlagenliste bekommt eine Obergrenze, und der selten gebrauchte DMS-Export schrumpft von fünf großen Karten auf eine ruhige Schaltflächenzeile — die dann ans Ende rückt, hinter die hochgeladenen Nachweise, die man weit häufiger braucht.</p>
+
+      <div class="skizze-paar">
+        <div class="skizze vorher">
+          <div class="kopf">Vorher — Szenario mit 30 Vorlagen</div>
+          <div class="blk schritt" style="height:16px;"><span>Schrittleiste</span><span class="px">55</span></div>
+          <div class="blk gekappt" style="height:150px;"><span>Dokumente erstellen — wächst ungebremst</span><span class="px">≈1.950</span></div>
+          <div class="falte"><span>Bildschirmkante</span></div>
+          <div class="blk starter" style="height:26px;"><span>Starterpaket</span><span class="px">170</span></div>
+          <div class="blk export" style="height:58px;"><span>PDF-Export (5 Karten)</span><span class="px">405</span></div>
+          <div class="blk uploads" style="height:62px;"><span>Hochgeladene Dokumente</span><span class="px">≈450</span></div>
+          <div class="summe">Scrollweg bis zu den Nachweisen: ≈ 2.680 px</div>
+        </div>
+        <div class="skizze nachher">
+          <div class="kopf">Nachher — unabhängig von der Vorlagenzahl</div>
+          <div class="blk schritt" style="height:16px;"><span>Schrittleiste</span><span class="px">55</span></div>
+          <div class="blk erstellen" style="height:62px;"><span>Dokumente erstellen — gedeckelt</span><span class="px">≈430</span></div>
+          <div class="blk starter" style="height:26px;"><span>Starterpaket</span><span class="px">170</span></div>
+          <div class="blk uploads" style="height:62px;"><span>Hochgeladene Dokumente</span><span class="px">≈450</span></div>
+          <div class="falte"><span>Bildschirmkante</span></div>
+          <div class="blk export" style="height:20px;"><span>PDF-Export (Buttonzeile)</span><span class="px">110</span></div>
+          <div class="summe">Scrollweg bis zu den Nachweisen: ≈ 730 px</div>
+        </div>
+      </div>
+      <p style="font-size:11.5px;color:var(--text-light);">Höhenangaben sind aus den tatsächlichen Tailwind-Klassen abgeleitete Schätzungen, keine Messungen. Beim heutigen Bestand von zwei Zeilen beträgt der Scrollweg rund 940&nbsp;px — die Umsortierung allein bringt also auch ohne viele Vorlagen etwas.</p>
+
+      <h3>8.5 · „Dokumente erstellen" im Detail — mit Ihren echten Vorlagen</h3>
+      <p>Beide Skizzen zeigen denselben Vorgang einer Kindertagesstätte, links wie er heute aussieht, rechts nach dem Umbau.</p>
+
+      <div class="mockup heute">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Karte „Dokumente erstellen" — KiTa-Vorgang, Ist-Zustand: 9 Zeilen</span></div>
+        <div class="mockup-body">
+          <div class="m-karte">
+            <div class="m-kartenkopf">📄 Dokumente erstellen</div>
+            <div class="m-kartensub">Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.</div>
+            <table class="m-table">
+              <tbody>
+                <tr><td>Masernschutz – Nachweis-Bescheinigung<br><span class="m-sub">Amtliches NRW-Formular</span></td><td style="width:110px;text-align:right;"><span class="m-btn outline">PDF öffnen</span></td></tr>
+                <tr><td style="background:#FDEDEC;">AV - FES Objektservice GmbH<br><span class="m-sub" style="font-style:italic;">Vorlage</span></td><td style="width:110px;text-align:right;background:#FDEDEC;"><span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span></td></tr>
+                <tr><td>Antrag auf ein erweitertes Führungszeugnis - KiTa<br><span class="m-sub" style="font-style:italic;">Vorlage</span></td><td style="text-align:right;"><span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span></td></tr>
+                <tr><td>Antrag auf ein erweitertes Führungszeugnis Kita<br><span class="m-sub" style="font-style:italic;">Vorlage</span></td><td style="text-align:right;"><span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span></td></tr>
+                <tr><td style="background:#FDEDEC;">Arbeitsvertrag für Erzieher<br><span class="m-sub" style="font-style:italic;">Vorlage</span></td><td style="text-align:right;background:#FDEDEC;"><span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span></td></tr>
+                <tr><td>Aufforderung erweitertes Führungszeugnis<br><span class="m-sub" style="font-style:italic;">Anschreiben an die Lehrkraft (§ 30a BZRG)</span></td><td style="text-align:right;"><span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span></td></tr>
+                <tr><td style="background:#FDEDEC;">Aufforderung erweitertes Führungszeugnis - Lehrer<br><span class="m-sub" style="font-style:italic;">Vorlage</span></td><td style="text-align:right;background:#FDEDEC;"><span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span></td></tr>
+                <tr><td>Befragung über Vorstrafen<br><span class="m-sub" style="font-style:italic;">Vorlage</span></td><td style="text-align:right;"><span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span></td></tr>
+                <tr><td>Verpflichtung auf die Vertraulichkeit<br><span class="m-sub" style="font-style:italic;">Vorlage</span></td><td style="text-align:right;"><span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span></td></tr>
+              </tbody>
+            </table>
+            <p style="margin:8px 0 0;font-size:11px;color:var(--rot);">Rot hinterlegt: gehört einem anderen Träger — im KiTa-Vorgang fachlich falsch, aber erzeugbar. Vier Zeilen beginnen mit „A" und betreffen alle das Führungszeugnis.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Karte „Dokumente erstellen" — derselbe Vorgang nach dem Umbau: 5 Zeilen</span></div>
+        <div class="mockup-body">
+          <div class="m-karte">
+            <div class="m-kartenkopf">📄 Dokumente erstellen <span class="m-zaehler">4</span></div>
+            <div class="m-kartensub">Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.</div>
+
+            <div class="m-row" style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px;padding:7px 10px;">
+              <div class="m-name">Masernschutz – Nachweis-Bescheinigung<br><span class="m-sub">Amtliches NRW-Formular (zum Ausfüllen beim Arzt)</span></div>
+              <span class="m-btn outline">PDF öffnen</span>
+            </div>
+            <div class="m-row" style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px;padding:7px 10px;">
+              <div class="m-name">Antrag auf ein erweitertes Führungszeugnis - KiTa <span class="status-badge gruen" style="font-size:9px;padding:1px 7px;">Für Ihre Einrichtung</span></div>
+              <span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span>
+            </div>
+            <div class="m-meldung gelb">2 Felder blieben leer — bitte im Dokument prüfen.</div>
+            <div class="m-row" style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px;padding:7px 10px;">
+              <div class="m-name">Aufforderung erweitertes Führungszeugnis <span class="status-badge grau" style="font-size:9px;padding:1px 7px;">Gruppenweit</span><br><span class="m-sub">Anschreiben an die Lehrkraft (§ 30a BZRG)</span></div>
+              <span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span>
+            </div>
+            <div class="m-row" style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px;padding:7px 10px;">
+              <div class="m-name">Befragung über Vorstrafen <span class="status-badge grau" style="font-size:9px;padding:1px 7px;">Gruppenweit</span></div>
+              <span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span>
+            </div>
+            <div class="m-meldung rot">Erzeugung fehlgeschlagen. <span style="text-decoration:underline;">Erneut versuchen</span></div>
+            <div class="m-row" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;">
+              <div class="m-name">Verpflichtung auf die Vertraulichkeit <span class="status-badge grau" style="font-size:9px;padding:1px 7px;">Gruppenweit</span></div>
+              <span class="m-btn outline">Word</span> <span class="m-btn outline">PDF</span>
+            </div>
+          </div>
+          <p style="margin:0;font-size:11px;color:#3f6b16;">Vier fremde Träger-Vorlagen sind verschwunden. Das Füllwort „Vorlage" ist weg, die Zeilen ohne Beschreibung sind dadurch flacher. Die Geltung steht an der Zeile — die gruppenweite System-Vorlage ist von einer mandantengebundenen Fassung unterscheidbar.</p>
+        </div>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">📐</span>
+        <div><strong>Kein Suchfeld, keine Kappung — vorerst</strong>Beides war im ursprünglichen Entwurf enthalten und ist nach der Messung zurückgestellt: Bei fünf Zeilen wäre ein Suchfeld Zierrat und die Grenze von acht Zeilen würde nie greifen. Die Bausteine sind im Plan beschrieben und lassen sich nachrüsten, sobald die Vorlagenzahl steigt.</div>
+      </div>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:26%">Aspekt</th><th style="width:37%">Vorher</th><th>Nachher</th></tr></thead>
+        <tbody>
+          <tr><td>Angezeigte Vorlagen</td><td>Alle 8 — auch die von 5 fremden Trägern</td><td>Gruppenweite plus die des eigenen Trägers: gemessen rund 4 statt 8</td></tr>
+          <tr><td>Geltung erkennbar</td><td>Nein. Die Schnittstelle liefert sie mit, die Oberfläche verwirft sie</td><td>Etikett an der Zeile: „Für Ihre Einrichtung" / „Gruppenweit" — unterscheidet die System-Vorlage von der mandantengebundenen Fassung</td></tr>
+          <tr><td>Falscher Briefkopf möglich</td><td>Ja — bei der Vertragsverlängerung sind <em>beide</em> Vorlagen mandantengebunden, ein Träger ohne eigene sieht nur fremde</td><td>Ausgeschlossen: fremde Träger-Vorlagen erreichen den Vorgang nicht mehr</td></tr>
+          <tr><td>Fehlermeldung</td><td>Roter Balken ganz oben in der Karte</td><td>Direkt unter der Zeile, deren Schaltfläche gedrückt wurde, mit „Erneut versuchen"</td></tr>
+          <tr><td>Leere Platzhalter</td><td>Keine Rückmeldung</td><td>Gelber Hinweis an der Zeile: „2 Felder blieben leer — bitte im Dokument prüfen."</td></tr>
+          <tr><td>Zweite Textzeile</td><td>Füllwort „Vorlage" überall dort, wo keine Beschreibung gepflegt ist. Belegt ist nur, dass die System-Vorlage eine hat (aus dem Seed); für die übrigen sieben steht die Prüfung noch aus — siehe die Abfrage in 8.8</td><td>Entfällt ersatzlos — solche Zeilen schrumpfen von ca. 54 auf ca. 40 px. Wo eine Beschreibung gepflegt ist, steht sie weiterhin</td></tr>
+          <tr><td>Ohne Bearbeitungsrecht</td><td>„Keine Vorlagen hinterlegt…" — falsch, und der Serveraufruf läuft trotzdem</td><td>„Zum Erstellen von Dokumenten fehlt Ihnen die Berechtigung." — Aufruf unterbleibt</td></tr>
+          <tr><td>Ladefehler</td><td>Wird als „keine Vorlagen" ausgegeben</td><td>Eigener Zustand: „Vorlagen konnten nicht geladen werden." + „Erneut versuchen"</td></tr>
+          <tr><td>Sortierung</td><td>Alphabetisch</td><td>Bleibt alphabetisch — bewusst. Eine Sortierung nach Häufigkeit macht die Reihenfolge über die Wochen unvorhersehbar.</td></tr>
+          <tr><td>Suche und Kappung</td><td>—</td><td><span class="status-badge grau">zurückgestellt</span> Bei rund 5 Zeilen ohne Wirkung. Nachrüstbar, wenn die Vorlagenzahl wächst</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h3>8.6 · Umsetzung, nach gemessenem Nutzen sortiert</h3>
+      <p>Diese Reihenfolge steht nach der Messung fest. Jeder Schritt ist einzeln lieferbar; nach Schritt 3 ist der sichtbare Teil der Verbesserung bereits erledigt.</p>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:5%">#</th><th style="width:38%">Schritt</th><th style="width:12%">Art</th><th>Grundlage</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><strong>Mandantenfilter serverseitig</strong>, nach dem produktiven BEM-Muster; als UND-Bedingung ergänzt, nicht den bestehenden Bereichsfilter überschreibend</td><td><span class="status-badge blau">API</span></td><td><strong>Gemessen:</strong> entfernt 5 von 8 Onboarding-Vorlagen aus dem einzelnen Vorgang und schließt bei der Vertragsverlängerung falsche Briefköpfe aus. Drei Zeilen Code.</td></tr>
+          <tr><td>2</td><td><strong>Geltungs-Etikett an der Zeile</strong> („Für Ihre Einrichtung" / „Gruppenweit")</td><td><span class="status-badge blau">UI</span></td><td>Unterscheidet die gruppenweite System-Vorlage von der mandantengebundenen Fassung — bei Ihnen zweimal namensgleich vorhanden. Die Angabe wird von der Schnittstelle bereits geliefert.</td></tr>
+          <tr><td>3</td><td>DMS-Export zu einer Schaltflächenzeile verdichten, hochgeladene Dokumente davor ziehen, den zweiten blauen Rahmen entfernen</td><td><span class="status-badge blau">UI</span></td><td>Größter Platzgewinn im Tab (≈ 295 px), löscht mehr Code als es hinzufügt, wirkt bei jedem Bestand</td></tr>
+          <tr><td>4</td><td>Rückmeldung an die Zeile binden und den Hinweis auf leere Platzhalter auswerten</td><td><span class="status-badge rot">Fehler</span></td><td>Der Wert wird vom Server geliefert und verworfen — betrifft Arbeitsverträge und Führungszeugnis-Aufforderungen</td></tr>
+          <tr><td>5</td><td>Vier ehrliche Zustände: Laden · keine Berechtigung · Ladefehler mit „Erneut versuchen" · leer</td><td><span class="status-badge rot">Fehler</span></td><td>Heute wird jeder Fehler als leere Liste ausgegeben</td></tr>
+          <tr><td>6</td><td>Dokumentart-Etiketten reparieren: tote Farbschlüssel ersetzen, deutsche Bezeichnungen aus dem vorhandenen Katalog statt roher Datenbankwerte</td><td><span class="status-badge rot">Fehler</span></td><td>3 von 6 Schlüsseln existieren im Datenmodell nicht — nachgeprüft</td></tr>
+          <tr><td>7</td><td>Füllwort „Vorlage" entfernen; Mandant beim Erzeugen mitsenden, damit das DMS-Deckblatt samt QR-Code auch bei gruppenweiten Vorlagen zugeordnet ist</td><td><span class="status-badge blau">UI</span></td><td>7 von 8 Vorlagen tragen heute dieses Füllwort. Der Deckblatt-Fix kostet nichts.</td></tr>
+          <tr><td>8</td><td>Modul beim Hochladen zur bewussten Auswahl machen statt es mit „Allgemein" vorzubelegen</td><td><span class="status-badge gelb">Vorsorge</span></td><td>Heute ohne Befund (0 Vorlagen in „Allgemein"), aber eine Falle, die zu unsichtbaren Vorlagen führt. Einzeiler zum Mitnehmen.</td></tr>
+          <tr><td>—</td><td>Suche und Kappung ab 9 Einträgen</td><td><span class="status-badge grau">zurückgestellt</span></td><td>Nach der Messung ohne Wirkung: rund 5 Zeilen erreichen die Grenze nie. Bausteine sind beschrieben, nachrüstbar in einem Nachmittag.</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="font-size:12px;color:var(--text-light);">Vertragsende erbt die Schritte 1, 2, 4, 5 und 7 automatisch, weil es dieselbe Komponente nutzt — dort trägt sie sogar den gesamten Tab, und dort wirkt Schritt&nbsp;1 am stärksten, weil beide vorhandenen Vorlagen mandantengebunden sind. Offboarding, Elternzeit und Mutterschutz haben heute überhaupt keine Vorlagenerzeugung, sondern nur Uploads; BEM hat bewusst einen eigenen, geschützten Weg (versiegelte Akte), filtert bereits nach Mandant und hat ohnehin nur gruppenweite Vorlagen — dort ändert sich nichts.</p>
+
+      <div class="hinweis">
+        <span class="icon">🧹</span>
+        <div><strong>Zwei Dinge, die Sie ohne mich erledigen können</strong>Eine der beiden gleichnamigen Führungszeugnis-Vorlagen deaktivieren („- KiTa" / „Kita") — das spart sofort eine Zeile und eine Verwechslung. Und bei den sieben Vorlagen ohne Beschreibung je einen kurzen Satz nachtragen, der die Variante benennt („für Erzieherinnen und Erzieher", „für Lehrkräfte"). Beides wirkt sofort und ohne Programmierung — und macht die Liste spürbar klarer als jede Filtermechanik.</div>
+      </div>
+
+      <h4>Mögliche Ausbaustufen (nicht Teil des Kernumbaus)</h4>
+      <ul>
+        <li><strong>„Für diesen Vorgang bereits erstellt"</strong> — jedes erzeugte Schreiben wird vollständig gespeichert (mit Pfad, Datum, Ersteller und Index auf den Vorgang), aber in keinem Vorgang je angezeigt. Bei Vertretung im Team wird dasselbe Schreiben deshalb doppelt erzeugt. Braucht einen neuen Lesezugang, der den Vorgang je Modul selbst auflöst und BEM ausdrücklich ausschließt.</li>
+        <li><strong>„Pflichtnachweise: 4 von 5 vorhanden — es fehlt: Masernschutz-Nachweis"</strong> — von der Sachbearbeiter-Jury als nützlichste Einzelzeile aller vier Entwürfe bewertet. Die Rechenfunktion existiert bereits; die Vorgangs-Schnittstelle müsste die Pflichtliste zusätzlich liefern.</li>
+      </ul>
+
+      <h3>8.7 · Bewusst verworfen</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:34%">Idee</th><th>Warum nicht</th></tr></thead>
+        <tbody>
+          <tr><td>Prozessschritt-Etiketten an Vorlagen (neues Datenfeld) mit Bereich „Jetzt fällig"</td><td>Am Umstellungstag ist das Feld bei jeder bestehenden Vorlage leer. Alles landet in einer Sammelgruppe, die nie „der aktuelle Schritt" ist — der Sachbearbeiter sähe zunächst gar keine Vorlage und bräuchte einen Klick <em>mehr</em> als heute. Teuerste Maßnahme, unsicherster Nutzen, dazu eine Schema-Änderung auf der Produktion.</td></tr>
+          <tr><td>Auf-/zuklappbare Gruppen („Für diese Einrichtung" / „Gruppenweit" / „Andere Einrichtungen")</td><td>Existiert nur, um fremde Träger zu bändigen — die lässt der Mandantenfilter gar nicht erst herein. Ungelöst blieb außerdem, was bei aktiver Suche mit zugeklappten Gruppen passiert: Der Zähler meldet 12 Treffer, sichtbar ist nichts.</td></tr>
+          <tr><td>Untertabs „Erstellen | Abgelegt | Erzeugt"</td><td>Der Dokumente-Bereich ist bereits selbst ein Reiter. Eine zweite Reiterebene versteckt genau das, was am häufigsten gebraucht wird — die hochgeladenen Nachweise.</td></tr>
+          <tr><td>Sortierung nach Nutzungshäufigkeit, Bereich „Häufig genutzt"</td><td>Der Zähler läuft über alle Mandanten, alle Nutzer und die gesamte Historie. Er sagt, was das Haus im Schnitt oft erzeugt — nicht, was in <em>diesem</em> Vorgang fällig ist.</td></tr>
+          <tr><td>Scrollfenster mit fester Höhe in der Liste</td><td>Ein solches Innen-Scrollfeld gibt es im ganzen Projekt an keiner Stelle. Es wäre eine dritte Scroll-Ebene und mit Mausrad eine Falle.</td></tr>
+          <tr><td>Erzeugen-Dialog im Vorgang (E-Mail, Platzhalter nachtragen, Deckblatt abwählen)</td><td>Fachlich reizvoll, aber ein eigenes Vorhaben. Es beantwortet die gestellte Frage nicht und macht die Karte länger statt kürzer.</td></tr>
+          <tr><td>Radix-UI-Komponenten einführen</td><td>Die zehn installierten Radix-Pakete haben null Verwendungen im Quellcode. Sie ausgerechnet hier erstmals einzusetzen wäre der Fremdkörper.</td></tr>
+          <tr><td>„PDF-Export" per Voreinstellung zuklappen</td><td>Spart weitere ~80 px, kostet aber bei jedem Vorgangsabschluss einen Zusatzklick für eine Routineaufgabe. Die Verdichtung bringt fast denselben Gewinn, ohne etwas zu verstecken.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h3>8.8 · Was ich noch von Ihnen brauche</h3>
+      <p>Die Zählung ist erledigt und hat den Plan an drei Stellen geändert (siehe 8.2 und 8.2b). Offen sind noch:</p>
+      <div class="offen">
+        <span class="icon">💬</span>
+        <div><strong>Die Zuordnung der fünf mandantengebundenen Onboarding-Vorlagen</strong>Liegen sie bei fünf verschiedenen Trägern oder mehrere beim selben? Davon hängt ab, ob ein Vorgang nach dem Filter 4 oder 6 Zeilen zeigt. Die Antwort ändert nichts am Bauplan, aber sie schärft die Erwartung.<br><span style="font-family:Consolas,monospace;font-size:11px;display:block;margin-top:6px;background:#f0f0f2;padding:6px 8px;border-radius:4px;">sudo docker exec hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT t.modul, t.name, coalesce(o."mandantNumber",''gruppenweit'') AS traeger, coalesce(t.description,''—'') AS beschreibung FROM document_templates t LEFT JOIN organizations o ON o.id = t."organizationId" WHERE t."isActive" ORDER BY t.modul, t.name;'</span></div>
+      </div>
+      <div class="offen">
+        <span class="icon">💬</span>
+        <div><strong>Vertragsverlängerung: Sollen die beiden Vorlagen gruppenweit gestellt werden?</strong>Beide sind heute mandantengebunden. Nach dem Filter sähe ein Träger ohne eigene Vorlage in seinen Vertragsende-Vorgängen <em>gar keine</em> — heute sieht er fremde, was schlechter ist, aber immerhin etwas. „AV Nachtrag" und „Vertragsverlängerung für Lehrkraft (ohne Sachgrund)" klingen nach Schreiben, die für die ganze Gruppe taugen. Umstellen können Sie das selbst unter Brief-Vorlagen → Bearbeiten → Mandant auf „Global".</div>
+      </div>
+      <div class="offen">
+        <span class="icon">💬</span>
+        <div><strong>Weitere Entscheidungen</strong>Gibt es Vorlagen, die bewusst bei einem Verwaltungsmandanten liegen, aber in Vorgängen aller Träger gebraucht werden? Die müssten künftig gruppenweit gestellt werden — „AV&nbsp;-&nbsp;FES&nbsp;Objektservice&nbsp;GmbH" könnte so ein Fall sein. · Soll die Einrichtungsleitung Dokumente aus Vorlagen erstellen dürfen? Heute darf sie es nicht und bekommt dabei eine irreführende Meldung — der Vorschlag ersetzt die Meldung durch eine ehrliche, die Rechtefrage selbst müssen Sie entscheiden.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="doc-footer">
+    <p><strong>CREDO HR-Portal</strong> — Umsetzungsplan zu drei beauftragten Erweiterungen. Erstellt am 22. Juli 2026 auf Basis einer vollständigen Analyse der betroffenen Code-Stellen.</p>
+    <p>Mockups sind Skizzen zur Abstimmung, keine pixelgenauen Entwürfe — die tatsächliche Darstellung folgt dem bestehenden Portal-Design.</p>
+  </footer>
+
+</div>
+</body>
+</html>

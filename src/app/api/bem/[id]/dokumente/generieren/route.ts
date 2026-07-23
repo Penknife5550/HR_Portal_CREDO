@@ -78,7 +78,7 @@ export async function POST(
       );
     }
 
-    const resolved = await resolveBemPlaceholders(id);
+    const resolved = await resolveBemPlaceholders(id, session.userId);
     if (!resolved) {
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }

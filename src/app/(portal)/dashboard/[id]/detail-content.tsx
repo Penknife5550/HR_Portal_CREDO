@@ -15,6 +15,7 @@ import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
+import { documentTypeLabel } from "@/lib/required-documents";
 
 // =============================================
 // Types
@@ -73,7 +74,7 @@ interface DetailData {
   submittedAt: string | null;
   starterPacketSentAt: string | null;
   starterPacketSentCount: number;
-  organization: { name: string; mandantNumber: string };
+  organization: { id: string; name: string; mandantNumber: string };
   personalData: {
     firstName: string | null;
     lastName: string | null;
@@ -1489,14 +1490,17 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
 
 function OnboardingExportSection({ onboardingId }: { onboardingId: string }) {
   const [downloading, setDownloading] = useState<string | null>(null);
+  // Fehler erscheinen als Zeile in der Karte statt als Systemmeldung (alert).
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const handleDownload = async (type: string) => {
     setDownloading(type);
+    setExportError(null);
     try {
       const res = await fetch(`/api/onboarding/${onboardingId}/pdf-export?type=${type}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Export fehlgeschlagen" }));
-        alert(err.error || "Export fehlgeschlagen");
+        setExportError(err.error || "Export fehlgeschlagen.");
         return;
       }
       const blob = await res.blob();
@@ -1509,65 +1513,49 @@ function OnboardingExportSection({ onboardingId }: { onboardingId: string }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      alert("Verbindungsfehler beim Export.");
+      setExportError("Verbindungsfehler beim Export.");
     } finally {
       setDownloading(null);
     }
   };
 
+  // Verdichtet: aus fuenf gleich aussehenden Karten (ca. 400 px) wird eine
+  // Schaltflaechenzeile (ca. 110 px). "Dokumente" heisst jetzt
+  // "Dokumentenuebersicht", damit im Tab "Dokumente" kein Knopf "Dokumente" steht.
   const exports = [
-    { key: "gesamtakte", title: "Gesamtakte", desc: "Alle Dokumente in einem PDF", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
-    { key: "fragebogen", title: "Fragebogen", desc: "Personalfragebogen-Daten", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
-    { key: "modalitaeten", title: "Modalitaeten", desc: "Einstellungsmodalitaeten", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-    { key: "dokumente", title: "Dokumente", desc: "Dokumentenuebersicht", icon: "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" },
-    { key: "checkliste", title: "Checkliste", desc: "Checkliste mit Notizen", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
+    { key: "gesamtakte", title: "Gesamtakte" },
+    { key: "fragebogen", title: "Fragebogen" },
+    { key: "modalitaeten", title: "Modalitäten" },
+    { key: "dokumente", title: "Dokumentenübersicht" },
+    { key: "checkliste", title: "Checkliste" },
   ];
 
   return (
-    <div className="rounded-2xl border-2 border-[#009AC6]/20 bg-[#009AC6]/5 p-5 mb-6">
+    <div className="rounded-2xl border border-border bg-card p-5">
       <h3 className="text-sm font-bold text-foreground mb-1 flex items-center gap-2">
-        <svg className="h-5 w-5 text-[#009AC6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-5 w-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
         PDF-Export für DMS
       </h3>
-      <p className="text-xs text-muted-foreground mb-4">
+      <p className="text-xs text-muted-foreground mb-3">
         Jedes Dokument erhält einen QR-Code auf der Deckseite zur automatischen DMS-Zuordnung.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {exportError && (
+        <div className="mb-3 rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-3 py-2 text-xs text-credo-rot">
+          {exportError}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
         {exports.map((e) => (
-          <div key={e.key} className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#009AC6]/10">
-                <svg className="h-5 w-5 text-[#009AC6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={e.icon} />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">{e.title}</p>
-                <p className="text-[11px] text-muted-foreground">{e.desc}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => handleDownload(e.key)}
-              disabled={downloading === e.key}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-            >
-              {downloading === e.key ? (
-                <>
-                  <div className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />
-                  Wird erstellt...
-                </>
-              ) : (
-                <>
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  PDF herunterladen
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            key={e.key}
+            onClick={() => handleDownload(e.key)}
+            disabled={downloading === e.key}
+            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+          >
+            {downloading === e.key ? "…" : e.title}
+          </button>
         ))}
       </div>
     </div>
@@ -1622,9 +1610,11 @@ function StepHinweis({ data }: { data: DetailData }) {
 
 function OnboardingErstellenSection({
   onboardingId,
+  organizationId,
   canEdit,
 }: {
   onboardingId: string;
+  organizationId: string;
   canEdit: boolean;
 }) {
   // Nutzt die generische Hub-Komponente; Onboarding-Spezifika (Modul + amtliches
@@ -1633,6 +1623,7 @@ function OnboardingErstellenSection({
     <TemplateGenerationSection
       modul="ONBOARDING"
       refId={onboardingId}
+      organizationId={organizationId}
       canEdit={canEdit}
       staticDocuments={[
         {
@@ -1726,12 +1717,25 @@ function TabDocuments({
     REJECTED: { label: "Abgelehnt", color: "bg-red-100 text-red-700" },
   };
 
+  // Schluessel MUESSEN dem Enum DocumentType entsprechen (prisma/schema.prisma).
+  // Frueher standen hier PERSONALAUSWEIS, LOHNSTEUERBESCHEINIGUNG und
+  // SOZIALVERSICHERUNGSAUSWEIS — die es im Datenmodell gar nicht gibt; real
+  // vorkommende Arten fielen dadurch alle auf Grau zurueck.
   const DOC_TYPE_COLORS: Record<string, string> = {
-    PERSONALAUSWEIS: "bg-[#009AC6]/10 text-[#009AC6]",
-    LOHNSTEUERBESCHEINIGUNG: "bg-credo-gruen/10 text-credo-gruen",
-    SOZIALVERSICHERUNGSAUSWEIS: "bg-purple-100 text-purple-700",
-    MASERNSCHUTZ: "bg-orange-100 text-orange-700",
+    ARBEITSVERTRAG: "bg-[#009AC6]/10 text-[#009AC6]",
     FUEHRUNGSZEUGNIS: "bg-red-100 text-red-700",
+    KK_BESCHEINIGUNG: "bg-credo-gruen/10 text-credo-gruen",
+    GEBURTSURKUNDE_EIGEN: "bg-amber-100 text-amber-700",
+    GEBURTSURKUNDE_KIND: "bg-amber-100 text-amber-700",
+    SV_AUSWEIS: "bg-purple-100 text-purple-700",
+    ZEUGNIS: "bg-sky-100 text-sky-700",
+    ABSCHLUSSZEUGNIS: "bg-sky-100 text-sky-700",
+    MASERNSCHUTZ: "bg-orange-100 text-orange-700",
+    INFEKTIONSSCHUTZ: "bg-orange-100 text-orange-700",
+    RV_BEFREIUNG: "bg-teal-100 text-teal-700",
+    SB_AUSWEIS: "bg-indigo-100 text-indigo-700",
+    VL_VERTRAG: "bg-lime-100 text-lime-700",
+    BAV_VERTRAG: "bg-lime-100 text-lime-700",
     SONSTIGES: "bg-gray-100 text-gray-600",
   };
 
@@ -1752,7 +1756,11 @@ function TabDocuments({
       <StepHinweis data={data} />
 
       {/* Dokumente erstellen */}
-      <OnboardingErstellenSection onboardingId={onboardingId} canEdit={canEdit} />
+      <OnboardingErstellenSection
+        onboardingId={onboardingId}
+        organizationId={data.organization.id}
+        canEdit={canEdit}
+      />
 
       {/* Starterpaket versenden */}
       <StarterpaketVersandSection
@@ -1764,10 +1772,8 @@ function TabDocuments({
         count={data.starterPacketSentCount ?? 0}
       />
 
-      {/* PDF-Export (DMS) */}
-      <OnboardingExportSection onboardingId={onboardingId} />
-
-      {/* Hochgeladene Dokumente */}
+      {/* Hochgeladene Dokumente — vor den Export gezogen: der am haeufigsten
+          konsultierte Bereich, waehrend der Export der seltenste Vorgang ist. */}
       {data.documents.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card py-12">
           <UploadCloudIcon className="mb-4 h-14 w-14 text-border" />
@@ -1815,7 +1821,7 @@ function TabDocuments({
 
                   <div className="mb-3 flex flex-wrap gap-2">
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${typeColor}`}>
-                      {doc.type.replace(/_/g, " ")}
+                      {documentTypeLabel(doc.type)}
                     </span>
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusLabel.color}`}>
                       {statusLabel.label}
@@ -1839,6 +1845,10 @@ function TabDocuments({
           </div>
         </div>
       )}
+
+      {/* PDF-Export (DMS) — ans Ende gerueckt und zu einer Schaltflaechenzeile
+          verdichtet; der Gesamtakte-Export ist eine Routine am Vorgangsende. */}
+      <OnboardingExportSection onboardingId={onboardingId} />
     </div>
   );
 }

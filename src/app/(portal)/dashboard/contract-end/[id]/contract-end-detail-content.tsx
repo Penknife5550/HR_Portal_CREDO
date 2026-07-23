@@ -525,6 +525,7 @@ export function ContractEndDetailContent({
               <TemplateGenerationSection
                 modul="VERTRAGSVERLAENGERUNG"
                 refId={data.id}
+                organizationId={data.organization.id}
                 canEdit={canEdit}
                 emptyHint="Keine Vertragsvorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ (Modul Vertragsverlängerung) an."
               />

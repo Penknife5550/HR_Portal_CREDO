@@ -45,20 +45,45 @@ export const GET = apiHandler(
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get("includeInactive") === "1";
     const modul = searchParams.get("modul")?.trim() || undefined;
+    // Optional: Vorgangs-Mandant. Dann werden NUR gruppenweite Vorlagen und die
+    // dieses Traegers geliefert — nach dem Muster von
+    // /api/bem/[id]/dokumente/vorlagen. Ohne den Parameter bleibt das Verhalten
+    // unveraendert (die Vorlagenverwaltung soll weiterhin alles sehen).
+    const organizationId = searchParams.get("organizationId")?.trim() || undefined;
 
     const where: Record<string, unknown> = {};
     if (!includeInactive) where.isActive = true;
     if (modul) where.modul = modul;
 
+    // Beide Einschraenkungen werden UND-verknuepft. Wichtig: NICHT je ein
+    // where.OR setzen — das zweite wuerde das erste ueberschreiben und den
+    // Rollen-Scope stillschweigend aushebeln.
+    const undBedingungen: Record<string, unknown>[] = [];
+
     // Mandanten-Scope: globale Rollen sehen alles; eingeschraenkte Rollen nur
     // globale Vorlagen (organizationId = null) + ihnen zugewiesene Mandanten.
     const allowedOrgIds = await getAllowedOrgIds(session);
     if (allowedOrgIds !== null) {
-      where.OR = [
-        { organizationId: null },
-        { organizationId: { in: allowedOrgIds } },
-      ];
+      undBedingungen.push({
+        OR: [{ organizationId: null }, { organizationId: { in: allowedOrgIds } }],
+      });
     }
+
+    if (organizationId) {
+      // Der uebergebene Mandant wird zusaetzlich gegen die Berechtigung geprueft,
+      // damit der Parameter kein Schlupfloch fuer fremde Traeger oeffnet.
+      if (!(await canAccessOrg(session, organizationId))) {
+        return NextResponse.json(
+          { error: "Keine Berechtigung fuer diesen Mandanten" },
+          { status: 403 },
+        );
+      }
+      undBedingungen.push({
+        OR: [{ organizationId: null }, { organizationId }],
+      });
+    }
+
+    if (undBedingungen.length > 0) where.AND = undBedingungen;
 
     const templates = await prisma.documentTemplate.findMany({
       where,

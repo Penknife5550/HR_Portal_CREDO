@@ -43,28 +43,19 @@ export type PlaceholderResolver = (
   ctx: ResolverContext,
 ) => Promise<ResolvedPlaceholders>;
 
-/** Modul-Auswahl fuer die UI (Wert + Anzeige). */
-export const AVAILABLE_MODULES: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "ALLGEMEIN", label: "Allgemein" },
-  { value: "BEM", label: "BEM" },
-  { value: "ONBOARDING", label: "Onboarding" },
-  { value: "VERTRAGSVERLAENGERUNG", label: "Vertragsverlängerung" },
-  { value: "OFFBOARDING", label: "Offboarding" },
-  { value: "VERBEAMTUNG", label: "Verbeamtung" },
-  { value: "MUTTERSCHUTZ", label: "Mutterschutz" },
-  { value: "ELTERNZEIT", label: "Elternzeit" },
-];
-
-export const MODULE_VALUES = AVAILABLE_MODULES.map((m) => m.value);
-
-// Der Platzhalter-Katalog (PlaceholderDef, PLACEHOLDER_CATALOG,
-// getPlaceholderCatalog) liegt client-sicher in placeholder-catalog.ts und wird
-// hier re-exportiert, damit Server-Resolver und Client-UI dieselbe Quelle nutzen.
+// Modul-Liste und Platzhalter-Katalog (PlaceholderDef, PLACEHOLDER_CATALOG,
+// getPlaceholderCatalog) liegen client-sicher in placeholder-catalog.ts und
+// werden hier re-exportiert, damit Server-Resolver und Client-UI dieselbe
+// Quelle nutzen.
 export {
   type PlaceholderDef,
+  AVAILABLE_MODULES,
+  MODULE_VALUES,
+  moduleLabel,
   ALLGEMEIN_PLACEHOLDERS,
   ONBOARDING_PLACEHOLDERS,
   VERTRAGSVERLAENGERUNG_PLACEHOLDERS,
+  BEM_PLACEHOLDERS,
   PLACEHOLDER_CATALOG,
   getPlaceholderCatalog,
 } from "@/lib/placeholder-catalog";
@@ -79,11 +70,16 @@ function todayDe(): string {
 
 /**
  * Gemeinsame Platzhalter, die fuer alle Module gelten (Datum, Mandant,
- * verantwortliche Stelle nach DSGVO). Faellt auf den globalen Default zurueck,
- * wenn keine Organisation uebergeben wird.
+ * verantwortliche Stelle nach DSGVO, Sachbearbeiter). Faellt auf den globalen
+ * Default zurueck, wenn keine Organisation uebergeben wird.
+ *
+ * `userId` ist optional: Ist sie gesetzt, werden zusaetzlich die
+ * {sachbearbeiter_*}-Platzhalter aus dem Benutzerkonto der Person gefuellt,
+ * die das Dokument erzeugt.
  */
 export async function commonPlaceholders(
   organizationId?: string | null,
+  userId?: string | null,
 ): Promise<Record<string, unknown>> {
   const now = new Date();
   const base: Record<string, unknown> = {
@@ -131,11 +127,33 @@ export async function commonPlaceholders(
   base.verantwortliche_plz = vs.plz;
   base.verantwortliche_ort = vs.ort;
 
+  // Sachbearbeiter:in = angemeldete Person, die das Dokument erzeugt.
+  // Leere Werte werden NICHT gesetzt, damit docxtemplater sie als "___"
+  // markiert und meldet (statt einer unsichtbaren Luecke im Schreiben).
+  if (userId) {
+    const sb = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, email: true, phone: true },
+    });
+    if (sb) {
+      const setSb = (key: string, value: string | null | undefined): void => {
+        if (value && value.trim() !== "") base[key] = value.trim();
+      };
+      const vorname = sb.firstName?.trim() || "";
+      const nachname = sb.lastName?.trim() || "";
+      setSb("sachbearbeiter_vorname", vorname);
+      setSb("sachbearbeiter_nachname", nachname);
+      setSb("sachbearbeiter_name", `${vorname} ${nachname}`.trim());
+      setSb("sachbearbeiter_email", sb.email);
+      setSb("sachbearbeiter_telefon", sb.phone);
+    }
+  }
+
   return base;
 }
 
 const allgemeinResolver: PlaceholderResolver = async (ctx) => {
-  const data = await commonPlaceholders(ctx.organizationId);
+  const data = await commonPlaceholders(ctx.organizationId, ctx.session?.userId);
   return { data, sensitiveFields: [] };
 };
 
@@ -157,7 +175,10 @@ function deDateOnb(d: Date | null | undefined): string | undefined {
 const onboardingResolver: PlaceholderResolver = async (ctx) => {
   const sensitiveFields: string[] = [];
   if (!ctx.refId) {
-    return { data: await commonPlaceholders(ctx.organizationId), sensitiveFields };
+    return {
+      data: await commonPlaceholders(ctx.organizationId, ctx.session?.userId),
+      sensitiveFields,
+    };
   }
 
   const ob = await prisma.onboardingProcess.findUnique({
@@ -190,10 +211,13 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
     },
   });
   if (!ob) {
-    return { data: await commonPlaceholders(ctx.organizationId), sensitiveFields };
+    return {
+      data: await commonPlaceholders(ctx.organizationId, ctx.session?.userId),
+      sensitiveFields,
+    };
   }
 
-  const data = await commonPlaceholders(ob.organizationId);
+  const data = await commonPlaceholders(ob.organizationId, ctx.session?.userId);
   const pd = ob.personalData;
   const sd = ob.supervisorData;
 
@@ -272,7 +296,10 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
 const vertragsverlaengerungResolver: PlaceholderResolver = async (ctx) => {
   const sensitiveFields: string[] = [];
   if (!ctx.refId) {
-    return { data: await commonPlaceholders(ctx.organizationId), sensitiveFields };
+    return {
+      data: await commonPlaceholders(ctx.organizationId, ctx.session?.userId),
+      sensitiveFields,
+    };
   }
 
   const ce = await prisma.contractEndProcess.findUnique({
@@ -300,10 +327,13 @@ const vertragsverlaengerungResolver: PlaceholderResolver = async (ctx) => {
     },
   });
   if (!ce) {
-    return { data: await commonPlaceholders(ctx.organizationId), sensitiveFields };
+    return {
+      data: await commonPlaceholders(ctx.organizationId, ctx.session?.userId),
+      sensitiveFields,
+    };
   }
 
-  const data = await commonPlaceholders(ce.organizationId);
+  const data = await commonPlaceholders(ce.organizationId, ctx.session?.userId);
   const rd = ce.renewalData;
   const set = (key: string, value: unknown): void => {
     if (value == null) return;

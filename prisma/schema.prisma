@@ -569,6 +569,9 @@ model User {
   passwordHash String
   firstName    String
   lastName     String
+  // Dienstliche Telefonnummer (optional). Wird u.a. als Platzhalter
+  // {sachbearbeiter_telefon} in Brief-Vorlagen eingesetzt.
+  phone        String?
   role         UserRole  @default(HR_SACHBEARBEITER)
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?

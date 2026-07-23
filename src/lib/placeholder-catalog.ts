@@ -7,6 +7,29 @@
  * (src/lib/doc-template-resolvers.ts) gelieferten Platzhaltern.
  */
 
+/**
+ * Modul-Auswahl fuer die UI (Wert + Anzeige). Liegt hier statt in
+ * doc-template-resolvers.ts, damit Client-Komponenten sie ohne Server-Import
+ * (prisma) nutzen koennen; der Resolver re-exportiert sie.
+ */
+export const AVAILABLE_MODULES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "ALLGEMEIN", label: "Allgemein" },
+  { value: "BEM", label: "BEM" },
+  { value: "ONBOARDING", label: "Onboarding" },
+  { value: "VERTRAGSVERLAENGERUNG", label: "Vertragsverlängerung" },
+  { value: "OFFBOARDING", label: "Offboarding" },
+  { value: "VERBEAMTUNG", label: "Verbeamtung" },
+  { value: "MUTTERSCHUTZ", label: "Mutterschutz" },
+  { value: "ELTERNZEIT", label: "Elternzeit" },
+];
+
+export const MODULE_VALUES = AVAILABLE_MODULES.map((m) => m.value);
+
+/** Anzeigename eines Moduls; unbekannte Werte werden unveraendert zurueckgegeben. */
+export function moduleLabel(value: string): string {
+  return AVAILABLE_MODULES.find((m) => m.value === value)?.label || value;
+}
+
 export interface PlaceholderDef {
   /** Variablenname OHNE geschweifte Klammern, z.B. "vorname". */
   key: string;
@@ -32,6 +55,14 @@ export const ALLGEMEIN_PLACEHOLDERS: PlaceholderDef[] = [
   { key: "verantwortliche_strasse", label: "Strasse (verantw. Stelle)", group: "Verantwortliche Stelle" },
   { key: "verantwortliche_plz", label: "PLZ (verantw. Stelle)", group: "Verantwortliche Stelle" },
   { key: "verantwortliche_ort", label: "Ort (verantw. Stelle)", group: "Verantwortliche Stelle" },
+  // Kontaktdaten der Person, die das Dokument erzeugt (angemeldeter Benutzer).
+  // Bewusst mit Praefix: {name}/{email}/{telefon} sind in Onboarding und
+  // Vertragsverlaengerung bereits durch die MITARBEITER-Daten belegt.
+  { key: "sachbearbeiter_name", label: "Sachbearbeiter (voller Name)", example: "Dimitri Riesen", group: "Sachbearbeiter" },
+  { key: "sachbearbeiter_vorname", label: "Sachbearbeiter (Vorname)", example: "Dimitri", group: "Sachbearbeiter" },
+  { key: "sachbearbeiter_nachname", label: "Sachbearbeiter (Nachname)", example: "Riesen", group: "Sachbearbeiter" },
+  { key: "sachbearbeiter_email", label: "Sachbearbeiter (E-Mail)", example: "dimitri@credo-gruppe.de", group: "Sachbearbeiter" },
+  { key: "sachbearbeiter_telefon", label: "Sachbearbeiter (Telefon)", example: "0571 / 88 79 - 120", group: "Sachbearbeiter" },
 ];
 
 /** Onboarding-spezifische Platzhalter (aus Personal-/Vorgesetzten-Daten). */
@@ -130,6 +161,27 @@ export const VERTRAGSVERLAENGERUNG_PLACEHOLDERS: PlaceholderDef[] = [
 ];
 
 /**
+ * BEM-spezifische Platzhalter (aus src/lib/bem-doc.ts).
+ *
+ * Bewusst NUR nicht-sensible Felder — gesundheitsbezogene Freitexte werden vom
+ * BEM-Resolver nicht aufgeloest (Aktentrennung, § 167 SGB IX) und duerfen daher
+ * auch hier nicht als verfuegbar angeboten werden.
+ */
+export const BEM_PLACEHOLDERS: PlaceholderDef[] = [
+  { key: "fall_nummer", label: "Fall-Nummer", example: "BEM-2026-GYM-001", group: "Vorgang" },
+  { key: "vorname", label: "Vorname", example: "Erika", group: "Person" },
+  { key: "nachname", label: "Nachname", example: "Mustermann", group: "Person" },
+  { key: "name", label: "Voller Name", example: "Erika Mustermann", group: "Person" },
+  { key: "empfaenger", label: "Empfaenger (voller Name)", example: "Erika Mustermann", group: "Person" },
+  { key: "email", label: "E-Mail", group: "Person" },
+  { key: "personalnummer", label: "Personalnummer", group: "Person" },
+  { key: "fehlzeiten_ab", label: "Fehlzeiten ab", example: "15.01.2026", group: "Fristen" },
+  { key: "einladung_am", label: "Einladung am", example: "01.02.2026", group: "Fristen" },
+  { key: "einwilligung_am", label: "Einwilligung am", example: "10.02.2026", group: "Fristen" },
+  { key: "erstgespraech_am", label: "Erstgespraech am", example: "20.02.2026", group: "Fristen" },
+];
+
+/**
  * Verfuegbare Platzhalter je Modul. Module ohne eigenen Resolver erhalten die
  * allgemeinen Platzhalter (Fallback ALLGEMEIN-Resolver). Onboarding ergaenzt die
  * vorgangsspezifischen Felder.
@@ -142,7 +194,7 @@ export const PLACEHOLDER_CATALOG: Record<string, PlaceholderDef[]> = {
   VERBEAMTUNG: ALLGEMEIN_PLACEHOLDERS,
   MUTTERSCHUTZ: ALLGEMEIN_PLACEHOLDERS,
   ELTERNZEIT: ALLGEMEIN_PLACEHOLDERS,
-  BEM: ALLGEMEIN_PLACEHOLDERS,
+  BEM: [...ALLGEMEIN_PLACEHOLDERS, ...BEM_PLACEHOLDERS],
 };
 
 /** Liefert die verfuegbaren Platzhalter fuer ein Modul (Fallback: ALLGEMEIN). */

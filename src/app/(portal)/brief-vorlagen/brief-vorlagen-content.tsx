@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { PortalHeader } from "@/components/portal-header";
 import { VariablenKatalog } from "@/components/variablen-katalog";
+import { AVAILABLE_MODULES, moduleLabel } from "@/lib/placeholder-catalog";
+import {
+  filterVorlagen,
+  istFilterAktiv,
+  GELTUNG_ALLE,
+  GELTUNG_GLOBAL,
+  GELTUNG_MANDANT,
+  MODUL_ALLE,
+} from "@/lib/brief-vorlagen-filter";
 
 interface User {
   userId: string;
@@ -39,23 +48,11 @@ interface Template {
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 
-const MODULE_OPTIONS = [
-  { value: "ALLGEMEIN", label: "Allgemein" },
-  { value: "BEM", label: "BEM" },
-  { value: "ONBOARDING", label: "Onboarding" },
-  { value: "VERTRAGSVERLAENGERUNG", label: "Vertragsverlängerung" },
-  { value: "OFFBOARDING", label: "Offboarding" },
-  { value: "VERBEAMTUNG", label: "Verbeamtung" },
-  { value: "MUTTERSCHUTZ", label: "Mutterschutz" },
-  { value: "ELTERNZEIT", label: "Elternzeit" },
-];
-
 const INPUT_CLASS =
   "mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring";
 
-function moduleLabel(value: string): string {
-  return MODULE_OPTIONS.find((m) => m.value === value)?.label || value;
-}
+const FILTER_CLASS =
+  "rounded-lg border border-input bg-background px-3 py-1.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -82,6 +79,22 @@ export function BriefVorlagenContent({ user }: { user: User }) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Template | null>(null);
   const [generateTarget, setGenerateTarget] = useState<Template | null>(null);
+
+  // Filter (rein clientseitig — die Liste kommt vollstaendig und unpaginiert).
+  // Die Logik liegt in @/lib/brief-vorlagen-filter, damit sie testbar ist.
+  const [filterModul, setFilterModul] = useState(MODUL_ALLE);
+  const [filterGeltung, setFilterGeltung] = useState(GELTUNG_ALLE);
+  const filterAktiv = istFilterAktiv({ modul: filterModul, geltung: filterGeltung });
+
+  const visibleTemplates = useMemo(
+    () => filterVorlagen(templates, { modul: filterModul, geltung: filterGeltung }),
+    [templates, filterModul, filterGeltung],
+  );
+
+  function resetFilter() {
+    setFilterModul(MODUL_ALLE);
+    setFilterGeltung(GELTUNG_ALLE);
+  }
 
   const loadTemplates = useCallback(async () => {
     setLoading(true);
@@ -178,16 +191,87 @@ export function BriefVorlagenContent({ user }: { user: User }) {
           </div>
         )}
 
-        {canManage && (
-          <label className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={includeInactive}
-              onChange={(e) => setIncludeInactive(e.target.checked)}
-            />
-            Deaktivierte Vorlagen anzeigen
-          </label>
-        )}
+        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card px-4 py-3">
+          <div>
+            <label htmlFor="filter-modul" className="mb-1 block text-xs font-medium text-foreground">
+              Modul
+            </label>
+            <select
+              id="filter-modul"
+              value={filterModul}
+              onChange={(e) => setFilterModul(e.target.value)}
+              className={FILTER_CLASS}
+            >
+              <option value={MODUL_ALLE}>Alle Module</option>
+              {AVAILABLE_MODULES.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="filter-geltung" className="mb-1 block text-xs font-medium text-foreground">
+              Geltung
+            </label>
+            <select
+              id="filter-geltung"
+              value={filterGeltung}
+              onChange={(e) => setFilterGeltung(e.target.value)}
+              className={FILTER_CLASS}
+            >
+              <option value={GELTUNG_ALLE}>Alle</option>
+              <option value={GELTUNG_GLOBAL}>Nur globale Vorlagen</option>
+              <option value={GELTUNG_MANDANT}>Nur mandantenspezifische</option>
+              <optgroup label="Einzelne Mandanten">
+                {organizations.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.mandantNumber} — {o.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-3 pb-1.5">
+            <span className="text-xs text-muted-foreground">
+              {filterAktiv ? (
+                <>
+                  <span className="font-medium text-foreground">{visibleTemplates.length}</span> von{" "}
+                  {templates.length} Vorlagen
+                </>
+              ) : (
+                <>
+                  <span className="font-medium text-foreground">{templates.length}</span> Vorlage
+                  {templates.length === 1 ? "" : "n"}
+                </>
+              )}
+            </span>
+            {filterAktiv && (
+              <button
+                type="button"
+                onClick={resetFilter}
+                className="text-xs text-credo-blau underline hover:no-underline"
+              >
+                Filter zurücksetzen
+              </button>
+            )}
+          </div>
+
+          {canManage && (
+            <label className="flex w-full items-center gap-2 border-t border-border pt-3 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={includeInactive}
+                onChange={(e) => setIncludeInactive(e.target.checked)}
+              />
+              Deaktivierte Vorlagen anzeigen
+            </label>
+          )}
+        </div>
 
         <div className="overflow-hidden rounded-xl border border-border bg-card">
           <table className="w-full text-left text-sm">
@@ -213,8 +297,21 @@ export function BriefVorlagenContent({ user }: { user: User }) {
                     Noch keine Vorlagen vorhanden.
                   </td>
                 </tr>
+              ) : visibleTemplates.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                    Keine Vorlage passt zu den Filtern.{" "}
+                    <button
+                      type="button"
+                      onClick={resetFilter}
+                      className="text-credo-blau underline hover:no-underline"
+                    >
+                      Filter zurücksetzen
+                    </button>
+                  </td>
+                </tr>
               ) : (
-                templates.map((t) => (
+                visibleTemplates.map((t) => (
                   <tr
                     key={t.id}
                     className={`border-b border-border last:border-0 ${t.isActive ? "" : "opacity-50"}`}
@@ -435,7 +532,7 @@ function UploadModal({
               onChange={(e) => setModul(e.target.value)}
               className={INPUT_CLASS}
             >
-              {MODULE_OPTIONS.map((m) => (
+              {AVAILABLE_MODULES.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
                 </option>
@@ -552,7 +649,7 @@ function EditModal({
               onChange={(e) => setModul(e.target.value)}
               className={INPUT_CLASS}
             >
-              {MODULE_OPTIONS.map((m) => (
+              {AVAILABLE_MODULES.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
                 </option>
