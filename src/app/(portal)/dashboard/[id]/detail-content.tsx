@@ -1633,7 +1633,7 @@ function OnboardingErstellenSection({
           label: "PDF öffnen",
         },
       ]}
-      emptyHint="Keine Onboarding-Vorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ an."
+      emptyHint="Keine Onboarding-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ an."
     />
   );
 }

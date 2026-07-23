@@ -527,7 +527,7 @@ export function ContractEndDetailContent({
                 refId={data.id}
                 organizationId={data.organization.id}
                 canEdit={canEdit}
-                emptyHint="Keine Vertragsvorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ (Modul Vertragsverlängerung) an."
+                emptyHint="Keine Vertragsvorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ (Modul Vertragsverlängerung) an."
               />
             </div>
           )}

@@ -1277,7 +1277,7 @@ function CreateTemplateModal({
             Neue Beurteilungs-Vorlage
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Nach dem Anlegen kannst du Kategorien und Kriterien im Editor pflegen.
+            Nach dem Anlegen können Sie Kategorien und Kriterien im Editor pflegen.
           </p>
         </div>
         <div className="p-5 space-y-4">

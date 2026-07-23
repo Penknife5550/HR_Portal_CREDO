@@ -302,7 +302,7 @@ export function TemplateGenerationSection({
           })}
           {zeigeLeer && (
             <p className="text-xs text-muted-foreground">
-              {emptyHint || "Keine Vorlagen hinterlegt. Vorlagen legst du unter „Brief-Vorlagen“ an."}
+              {emptyHint || "Keine Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ an."}
             </p>
           )}
         </div>
