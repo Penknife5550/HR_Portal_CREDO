@@ -213,6 +213,19 @@
     margin-top: 0.5rem;
     font-style: italic;
   }
+  figure.screenshot .platzhalter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+    border: 2px dashed var(--grau-hell);
+    border-radius: 8px;
+    background: var(--bg-softer);
+    color: var(--muted);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 1.5rem;
+  }
 
   /* ===== Kapitel-Trenner und Hoch-Links ===== */
   .kapitel { padding-top: 0.5rem; }
@@ -316,6 +329,7 @@
     <ul>
       <li><strong>Onboarding</strong> – die Einstellung neuer Mitarbeitender (englisch für „an Bord nehmen").</li>
       <li><strong>Offboarding</strong> – das Ausscheiden von Mitarbeitenden (englisch für „von Bord gehen").</li>
+      <li><strong>Vertragsende</strong> – die rechtzeitige Klärung, ob ein befristeter Vertrag verlängert wird oder ausläuft.</li>
       <li><strong>Verbeamtung</strong> – die Übernahme in ein Beamtenverhältnis.</li>
       <li><strong>Mutterschutz</strong> – die Begleitung werdender Mütter.</li>
       <li><strong>Elternzeit</strong> – die Verwaltung von Elternzeit-Anträgen.</li>
@@ -379,6 +393,15 @@
         </ol>
       </li>
       <li><a href="#offboarding">Offboarding: Austritte verwalten</a></li>
+      <li><a href="#vertragsende">Vertragsende: befristete Verträge rechtzeitig klären</a>
+        <ol>
+          <li><a href="#vertragsende-liste">Die Übersicht und die Fristen-Ampel</a></li>
+          <li><a href="#vertragsende-anfrage">Die Anfrage an die Führungskraft stellen</a></li>
+          <li><a href="#vertragsende-uebernahme">Übernahme: den Vertrag erzeugen</a></li>
+          <li><a href="#vertragsende-keine-uebernahme">Keine Übernahme: das Offboarding anlegen</a></li>
+          <li><a href="#vertragsende-schutz">Die eingebauten Schutz-Hinweise</a></li>
+        </ol>
+      </li>
       <li><a href="#verbeamtung">Verbeamtung (PSI)</a></li>
       <li><a href="#mutterschutz">Mutterschutz</a></li>
       <li><a href="#elternzeit">Elternzeit</a></li>
@@ -478,7 +501,7 @@
     <p>Damit Sie wissen, wo Sie was finden, hier die Bereiche der Startseite von oben nach unten. So müssen Sie nicht lange suchen.</p>
     <ul>
       <li><strong>Kopfzeile (ganz oben):</strong> Links das CREDO-Logo, in der Mitte das Menü, rechts Ihr Name und die Schaltfläche „Abmelden".</li>
-      <li><strong>Reiter (englisch „Tabs"):</strong> Eine Reihe von Karteikarten – <strong>Onboarding</strong>, <strong>Offboarding</strong>, <strong>Verbeamtung</strong>, <strong>Mutterschutz</strong>, <strong>Elternzeit</strong>. Ein Klick wechselt den Bereich.</li>
+      <li><strong>Reiter (englisch „Tabs"):</strong> Eine Reihe von Karteikarten – <strong>Onboarding</strong>, <strong>Offboarding</strong>, <strong>Vertragsende</strong>, <strong>Verbeamtung</strong>, <strong>Mutterschutz</strong>, <strong>Elternzeit</strong>. Ein Klick wechselt den Bereich.</li>
       <li><strong>Kacheln mit Zahlen:</strong> Vier Kästchen zeigen, wie viele Vorgänge <strong>Gesamt</strong>, <strong>Offen</strong>, <strong>Geprüft</strong> und <strong>Abgeschlossen</strong> sind.</li>
       <li><strong>Kleine Diagramme:</strong> Grafiken zeigen die Verteilung der Vorgänge und den Verlauf der letzten Monate.</li>
       <li><strong>Die Tabelle:</strong> Die Liste aller Vorgänge mit Name, Einrichtung, Status und Datum.</li>
@@ -653,6 +676,7 @@
       <li><strong>Schritt 4 – Sozialversicherung:</strong> Sozialversicherungsnummer, Krankenkasse.</li>
       <li><strong>Schritt 5 – Steuer:</strong> Steuer-Identifikationsnummer, Steuerklasse, Konfession.</li>
       <li><strong>Schritt 6 – Weitere Beschäftigung:</strong> Angaben zu Nebenjobs.</li>
+      <li><strong>Schritt 7 – Kinder:</strong> Angaben zu Kindern, sofern die Person Kinder hat.</li>
       <li><strong>Schritt 8 – Bildung und Beruf:</strong> Abschlüsse.</li>
       <li><strong>Schritt 9 – Masernschutz:</strong> Nachweis der Masern-Impfung.</li>
       <li><strong>Schritt 10 – Zusammenfassung und Datenschutz:</strong> Kontrolle aller Angaben und die Datenschutz-Einwilligung.</li>
@@ -766,7 +790,7 @@
 
     <div class="hinweis warnung">
       <span class="label">Achtung: keine Dokumente konfiguriert?</span>
-      <p>Erscheint die Meldung „Keine Starterpaket-Dokumente für diesen Mandanten konfiguriert", ist das kein Fehler von Ihnen. Für diese Einrichtung wurde das Paket noch nicht zusammengestellt. Die Administratorin kann das unter „Einrichtungen → Starterpaket" nachholen (siehe Kapitel 11.2).</p>
+      <p>Erscheint die Meldung „Keine Starterpaket-Dokumente für diesen Mandanten konfiguriert", ist das kein Fehler von Ihnen. Für diese Einrichtung wurde das Paket noch nicht zusammengestellt. Die Administratorin kann das unter „Einrichtungen → Starterpaket" nachholen (siehe Kapitel 12.2).</p>
     </div>
 
     <div class="ergebnis">
@@ -907,9 +931,148 @@
 
   <hr class="trenner">
 
-  <!-- ==================== 5. VERBEAMTUNG ==================== -->
+  <!-- ==================== 5. VERTRAGSENDE ==================== -->
+  <section id="vertragsende" class="kapitel">
+    <h2>5. Vertragsende: befristete Verträge rechtzeitig klären</h2>
+
+    <p>Läuft ein <strong>befristeter Vertrag</strong> aus, brauchen Sie rechtzeitig eine Entscheidung: Wird die Person weiterbeschäftigt, oder endet die Zusammenarbeit? Genau dafür gibt es den Vorgangstyp <strong>Vertragsende</strong>. Er entsteht meist automatisch – das Portal erhält die Meldung über auslaufende Verträge wöchentlich aus Ihrem Personalsystem (DokuBit) über eine technische Anbindung (n8n). Sie können einen Vorgang aber auch von Hand anlegen.</p>
+
+    <div class="hinweis info">
+      <span class="label">Wichtig: Die Entscheidung trifft die Führungskraft</span>
+      <p>Ob eine befristet beschäftigte Person weiterarbeitet, ist eine fachliche Entscheidung der Schul- oder Fachbereichsleitung – nicht der Personalverwaltung. HR stößt deshalb eine <strong>Anfrage an die Führungskraft</strong> an. Die Führungskraft entscheidet „Ja" oder „Nein" und füllt bei „Ja" gleich die neuen Vertragsdaten aus. HR sorgt anschließend für die Umsetzung: den Vertrag erzeugen oder das Offboarding bestätigen.</p>
+    </div>
+
+    <h3 id="vertragsende-liste">5.1 Die Übersicht und die Fristen-Ampel</h3>
+    <p>Auf dem Reiter <strong>Vertragsende</strong> sehen Sie alle Vorgänge dieser Art in einer Tabelle – mit Vorgangs-Nummer (zum Beispiel <code>VE-2026-GYM-002</code>), Mitarbeiter, Einrichtung, Vertragsende-Datum, Frist und Status.</p>
+
+    <p>Damit nichts zu spät auffällt, zeigt jede Zeile eine farbige <strong>Fristen-Ampel</strong>. Sie berechnet sich automatisch aus dem verbleibenden Zeitraum bis zum Vertragsende und ist nicht gespeichert, sondern immer aktuell:</p>
+    <table>
+      <caption>Die Fristen-Ampel</caption>
+      <thead>
+        <tr><th scope="col">Farbe</th><th scope="col">Zeit bis Vertragsende</th><th scope="col">Was zu tun ist</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Blau – Beobachten</strong></td><td>7–12 Monate</td><td>Der Vorgang ist neu entstanden. Noch kein akuter Handlungsbedarf, aber im Blick behalten.</td></tr>
+        <tr><td><strong>Gelb – Warnung</strong></td><td>3–6 Monate</td><td>Die Entscheidung vorbereiten und das Gespräch mit der Führungskraft suchen.</td></tr>
+        <tr><td><strong>Rot – Kritisch</strong></td><td>1–2 Monate</td><td>Zügig handeln: Anfrage stellen oder nachfassen.</td></tr>
+      </tbody>
+    </table>
+
+    <figure class="screenshot">
+      <div class="platzhalter">Screenshot folgt: Übersichtsliste „Vertragsende" mit Vorgangs-Tabelle, Fristen-Ampel und der Schaltfläche „+ Vorgang anlegen".</div>
+      <figcaption>Wird nach Abstimmung mit dem Portal ergänzt.</figcaption>
+    </figure>
+
+    <div class="hinweis">
+      <span class="label">Tipp: einen Vorgang von Hand anlegen</span>
+      <p>Normalerweise entstehen Vertragsende-Vorgänge automatisch. Fehlt ausnahmsweise einer, klicken Sie auf <strong>+ Vorgang anlegen</strong> und tragen Sie Vorname, Nachname, Dienst-E-Mail, Einrichtung und das Vertragsende-Datum ein (Pflichtfelder). Vertragsbeginn und Personalnummer sind freiwillig.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Sie sehen auf einen Blick, welche befristeten Verträge wie dringend eine Entscheidung brauchen, sortiert nach Ampelfarbe und Status.</p>
+    </div>
+
+    <h3 id="vertragsende-anfrage">5.2 Die Anfrage an die Führungskraft stellen</h3>
+    <p>Öffnen Sie den Vorgang, um die Anfrage auf den Weg zu bringen. Die Detailseite hat die Reiter <strong>Übersicht</strong>, <strong>Vertragsdaten</strong> und <strong>Dokumente</strong>. Eine Schrittleiste oben zeigt „Sie sind hier": Angelegt → Anfrage → Rückmeldung → Vertrag/Offboarding → Abschluss.</p>
+    <ol>
+      <li>Klicken Sie auf <strong>Anfrage an Vorgesetzten senden →</strong>.</li>
+      <li>Die Führungskraft erhält per E-Mail einen Magic Link – einen Einmal-Zugang ohne eigenes Passwort.</li>
+      <li>Im Formular entscheidet die Führungskraft „Ja, übernehmen" oder „Nein, nicht übernehmen".</li>
+      <li>Bei „Ja" füllt sie zugleich die neuen Vertragsdaten aus: neuer Vertragsbeginn, Befristung/Vertragsende, Wochenstunden, Entgeltgruppe, Stufe, Urlaubstage, Betriebsstätte, Stellenbeschreibung und mehr. Bei „Nein" trägt sie eine kurze Begründung ein.</li>
+    </ol>
+
+    <figure class="screenshot">
+      <div class="platzhalter">Screenshot folgt: Detailseite eines Vertragsende-Vorgangs mit Schrittleiste „Sie sind hier" und der Schaltfläche „Anfrage an Vorgesetzten senden".</div>
+      <figcaption>Wird nach Abstimmung mit dem Portal ergänzt.</figcaption>
+    </figure>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Welche Felder die Führungskraft sieht, ist einstellbar</span>
+      <p>Eine Administratorin kann pro Einrichtung festlegen, welche Felder im Formular erscheinen und welche Pflicht sind – unter <strong>Mandanten → Vertragsende-Konfiguration</strong> (siehe Kapitel 12.2).</p>
+    </div>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: Erinnerung statt neuer Anfrage</span>
+      <p>Antwortet die Führungskraft nicht rechtzeitig, erinnert das Portal automatisch – gestaffelt nach Dringlichkeit (bei „Kritisch" häufiger als bei „Beobachten"). Sie können zusätzlich manuell auf <strong>Erinnerung senden</strong> klicken: Das nutzt den bestehenden Link erneut. Mit <strong>Anfrage erneut senden</strong> erzeugen Sie dagegen einen neuen Link. Reagiert die Führungskraft trotz dreier Erinnerungen nicht, meldet das Portal den Vorgang automatisch an die Personalverwaltung (Eskalation).</p>
+    </div>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Entscheidung steht schon fest?</span>
+      <p>Wissen Sie die Antwort der Führungskraft bereits aus einem Gespräch, können Sie auf der Detailseite auch direkt <strong>Direkt Nicht-Übernahme (Offboarding) →</strong> auslösen, ohne erst den Formular-Umweg abzuwarten.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Status wechselt auf „Anfrage beim Vorgesetzten". Sobald die Führungskraft geantwortet hat, sehen Sie auf der Detailseite entweder die Meldung „Die Führungskraft möchte weiterbeschäftigen" oder „Die Führungskraft lehnt die Weiterbeschäftigung ab" samt Begründung.</p>
+    </div>
+
+    <h3 id="vertragsende-uebernahme">5.3 Übernahme: den Vertrag erzeugen</h3>
+    <p>Hat die Führungskraft der Übernahme zugestimmt, vollziehen Sie das im Portal.</p>
+    <ol>
+      <li>Prüfen Sie auf der Detailseite die von der Führungskraft eingetragenen Vertragsdaten (Reiter <strong>Vertragsdaten</strong>).</li>
+      <li>Wechseln Sie auf den Reiter <strong>Dokumente</strong> und erzeugen Sie den Verlängerungs- oder Entfristungsvertrag aus einer Vorlage – genau wie im Onboarding (siehe Kapitel 3.4), nur mit dem Vorlagen-Modul <strong>Vertragsverlängerung</strong>.</li>
+      <li>Sobald der unterschriebene Vertrag zurück ist, klicken Sie auf <strong>Unterschriebenen Vertrag erfassen</strong>.</li>
+      <li>Klicken Sie abschließend auf <strong>Vorgang abschließen</strong>.</li>
+    </ol>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: die Entfristungsfalle</span>
+      <p>Arbeitet die Person über das alte Vertragsende hinaus weiter, ohne dass der neue Vertrag unterschrieben zurück ist, kann der Vertrag rechtlich automatisch unbefristet werden (§ 15 Abs. 5 TzBfG). Solange „Unterschriebenen Vertrag erfassen" noch nicht angeklickt ist, macht Sie das Portal mit einer Warnbox darauf aufmerksam.</p>
+    </div>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Der Status wandert über „Vertrag erstellt" zu „Vertrag unterschrieben" und schließlich zu „Abgeschlossen". Die Person ist weiterbeschäftigt, mit einem neuen, ordnungsgemäß erzeugten Vertrag.</p>
+    </div>
+
+    <h3 id="vertragsende-keine-uebernahme">5.4 Keine Übernahme: das Offboarding anlegen</h3>
+    <p>Lehnt die Führungskraft die Weiterbeschäftigung ab, übernimmt das Portal den größten Teil der Arbeit für Sie.</p>
+    <ol>
+      <li>Lesen Sie die Begründung der Führungskraft auf der Detailseite.</li>
+      <li>Klicken Sie auf <strong>Offboarding anlegen →</strong>.</li>
+      <li>Bestätigen Sie die Sicherheitsabfrage.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Das Portal legt automatisch einen Offboarding-Vorgang an (Austrittsgrund „Befristungsende") und übernimmt dabei die Personendaten sowie den letzten Arbeitstag (= das bisherige Vertragsende). Der Vertragsende-Vorgang zeigt danach den Status „Keine Übernahme" und ist mit dem neuen Offboarding verknüpft. Von dort an läuft alles im gewohnten Offboarding-Ablauf weiter (siehe Kapitel 4) – inklusive Auslaufmitteilung und Arbeitszeugnis.</p>
+    </div>
+
+    <h3 id="vertragsende-schutz">5.5 Die eingebauten Schutz-Hinweise</h3>
+    <p>Weil bei befristeten Verträgen leicht rechtliche Fristen übersehen werden, weist das Portal an mehreren Stellen automatisch auf typische Stolperfallen hin. Sie müssen diese Hinweise nicht auswendig kennen – das Portal zeigt sie zur richtigen Zeit an:</p>
+    <table>
+      <caption>Automatische Schutz-Hinweise beim Vertragsende</caption>
+      <thead>
+        <tr><th scope="col">Hinweis</th><th scope="col">Worum es geht</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Entfristungsfalle</strong></td><td>Warnt, solange nach „Vertrag erstellt" noch keine Unterschrift erfasst ist (siehe Kapitel 5.3).</td></tr>
+        <tr><td><strong>Kettenbefristung</strong></td><td>Weist hin, wenn eine sachgrundlose Befristung die gesetzlichen Grenzen erreicht (insgesamt über 24 Monate oder mehr als drei Verlängerungen).</td></tr>
+        <tr><td><strong>MAV-Beteiligung</strong></td><td>Auf der Detailseite tragen Sie den Stand der Mitarbeitervertretungs-Beteiligung ein: „Nicht erforderlich", „Angehört", „Zugestimmt" oder „Widerspruch".</td></tr>
+        <tr><td><strong>Vorstand/GF-Abstimmung</strong></td><td>Im Übernahme-Zweig bestätigt die Führungskraft, ob die Weiterbeschäftigung mit Vorstand oder Geschäftsführung abgestimmt ist, und trägt bei „Ja" einen kurzen Nachweis ein. Bei „Nein" erscheint eine Warnbox – der Vorgang wird dadurch nicht blockiert. Diese Frage lässt sich pro Einrichtung abschalten.</td></tr>
+        <tr><td><strong>Mehrfachbeschäftigung</strong></td><td>Ist dieselbe Person an mehreren Einrichtungen beschäftigt, zeigt eine eigene Karte die weiteren Mandanten an.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Vertragsende-Vorgänge anlegen und bearbeiten dürfen Administrator, HR-Leitung und Sachbearbeiter. Die Führungskraft selbst braucht kein Benutzerkonto – sie arbeitet ausschließlich über den Magic Link.</p>
+    </div>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Empfänger für Eskalation und Wochen-Digest festlegen</span>
+      <p>Damit die automatische Eskalation (siehe Kapitel 5.2) und die montägliche Sammel-Mail zu unbearbeiteten, dringenden Vertragsenden ankommen, muss eine Administratorin dafür einmalig Empfänger unter <strong>Einstellungen → E-Mail-Vorlagen</strong> hinterlegen (siehe Kapitel 12.3). Ohne hinterlegte Empfänger werden diese beiden E-Mails übersprungen.</p>
+    </div>
+
+    <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
+  </section>
+
+  <hr class="trenner">
+
+  <!-- ==================== 6. VERBEAMTUNG ==================== -->
   <section id="verbeamtung" class="kapitel">
-    <h2>5. Verbeamtung (PSI)</h2>
+    <h2>6. Verbeamtung (PSI)</h2>
 
     <p>Die Verbeamtung begleitet die Übernahme einer Lehrkraft ins Beamtenverhältnis. Dieser Prozess ist lang und hat viele Beteiligte. Das Portal legt deshalb beim Start automatisch alle nötigen Aufgaben und Phasen an.</p>
 
@@ -963,9 +1126,9 @@
 
   <hr class="trenner">
 
-  <!-- ==================== 6. MUTTERSCHUTZ ==================== -->
+  <!-- ==================== 7. MUTTERSCHUTZ ==================== -->
   <section id="mutterschutz" class="kapitel">
-    <h2>6. Mutterschutz</h2>
+    <h2>7. Mutterschutz</h2>
 
     <p>Im Mutterschutz begleiten Sie eine werdende Mutter vor und nach der Geburt. Das Portal hilft Ihnen, Fristen und die nötigen Schritte im Blick zu behalten.</p>
 
@@ -1003,9 +1166,9 @@
 
   <hr class="trenner">
 
-  <!-- ==================== 7. ELTERNZEIT ==================== -->
+  <!-- ==================== 8. ELTERNZEIT ==================== -->
   <section id="elternzeit" class="kapitel">
-    <h2>7. Elternzeit</h2>
+    <h2>8. Elternzeit</h2>
 
     <p>In diesem Bereich verwalten Sie Elternzeit-Anträge – von der ersten Meldung bis zur Rückkehr. Das Portal erstellt die nötigen Bescheinigungen und erinnert Sie an Fristen.</p>
 
@@ -1030,7 +1193,7 @@
 
     <div class="hinweis">
       <span class="label">Tipp: die Feriensperrfrist</span>
-      <p>Für Lehrkräfte gibt es bei der Elternzeit eine besondere Regel zu den Schulferien. Damit das Portal die Ferien kennt, müssen diese unter „Einstellungen → Schulferien" gepflegt sein (siehe Kapitel 11.3).</p>
+      <p>Für Lehrkräfte gibt es bei der Elternzeit eine besondere Regel zu den Schulferien. Damit das Portal die Ferien kennt, müssen diese unter „Einstellungen → Schulferien" gepflegt sein (siehe Kapitel 12.3).</p>
     </div>
 
     <div class="ergebnis">
@@ -1043,9 +1206,9 @@
 
   <hr class="trenner">
 
-  <!-- ==================== 8. BEM ==================== -->
+  <!-- ==================== 9. BEM ==================== -->
   <section id="bem" class="kapitel">
-    <h2>8. BEM: Betriebliches Eingliederungsmanagement</h2>
+    <h2>9. BEM: Betriebliches Eingliederungsmanagement</h2>
 
     <p>Das „Betriebliche Eingliederungsmanagement" – kurz BEM – ist ein gesetzlich vorgeschriebenes Angebot. Es unterstützt Mitarbeitende, die länger krank waren, bei der Rückkehr an den Arbeitsplatz. Weil es dabei um Gesundheitsdaten geht, ist dieser Bereich besonders streng geschützt.</p>
 
@@ -1111,9 +1274,9 @@
 
   <hr class="trenner">
 
-  <!-- ==================== 9. EXIT-INTERVIEW ==================== -->
+  <!-- ==================== 10. EXIT-INTERVIEW ==================== -->
   <section id="exit" class="kapitel">
-    <h2>9. Exit-Interview: Die Abschluss-Befragung</h2>
+    <h2>10. Exit-Interview: Die Abschluss-Befragung</h2>
 
     <p>Das „Exit-Interview" ist eine freiwillige Befragung beim Austritt. „Exit" ist Englisch für „Ausgang". Die Rückmeldungen helfen der CREDO-Gruppe, sich zu verbessern. Diesen Fragebogen füllt die austretende Person selbst aus – ähnlich wie den Personalfragebogen.</p>
 
@@ -1139,7 +1302,7 @@
     <h3>Eine Befragung starten</h3>
     <p>Sie selbst starten die Befragung aus dem Austrittsvorgang heraus. So bekommt die richtige Person den richtigen Link.</p>
     <ol>
-      <li>Öffnen Sie den passenden Offboarding-Vorgang (siehe Kapitel 4).</li>
+      <li>Öffnen Sie den passenden Offboarding-Vorgang (siehe Kapitel 4). Kam der Austritt aus einem Vertragsende, ist er dort bereits verknüpft (siehe Kapitel 5).</li>
       <li>Wechseln Sie auf den Reiter <strong>Exit-Interview</strong>.</li>
       <li>Lösen Sie den Versand des Befragungs-Links aus.</li>
     </ol>
@@ -1154,9 +1317,9 @@
 
   <hr class="trenner">
 
-  <!-- ==================== 10. VORLAGEN ==================== -->
+  <!-- ==================== 11. VORLAGEN ==================== -->
   <section id="vorlagen" class="kapitel">
-    <h2>10. Vorlagen verwalten</h2>
+    <h2>11. Vorlagen verwalten</h2>
 
     <p>Eine „Vorlage" ist ein Muster, das Sie immer wieder verwenden – zum Beispiel ein Standard-Anschreiben oder eine feste Checkliste. Vorlagen sparen viel Zeit, weil Sie nicht jedes Mal von vorne anfangen. Alle Vorlagen erreichen Sie über das Menü <strong>Vorlagen</strong>.</p>
 
@@ -1165,7 +1328,7 @@
       <p>Vorlagen verwalten dürfen vor allem Administrator und HR-Leitung. Sachbearbeiter können Formulare und Brief-Vorlagen nutzen.</p>
     </div>
 
-    <h3 id="vorlagen-formulare">10.1 Formulare (Personalfragebogen)</h3>
+    <h3 id="vorlagen-formulare">11.1 Formulare (Personalfragebogen)</h3>
     <p>Hier legen Sie fest, welche Fragen der Personalfragebogen für welche Beschäftigungsart enthält. So sieht eine Aushilfe nur die für sie nötigen Felder, eine Beamtin dagegen andere. Das macht den Fragebogen für alle übersichtlicher.</p>
     <ol>
       <li>Öffnen Sie <strong>Vorlagen → Formulare</strong>.</li>
@@ -1190,7 +1353,7 @@
       <p>Eine Bestätigung „Änderungen gespeichert" erscheint. Neue Vorgänge dieses Typs verwenden ab sofort Ihre Einstellungen.</p>
     </div>
 
-    <h3 id="vorlagen-brief">10.2 Brief-Vorlagen und Platzhalter</h3>
+    <h3 id="vorlagen-brief">11.2 Brief-Vorlagen und Platzhalter</h3>
     <p>Mit Brief-Vorlagen erzeugen Sie Schreiben, die sich automatisch mit den Daten einer Person füllen. Sie laden dazu eine Word-Datei hoch, in der Sie „Platzhalter" eingebaut haben. Ein Platzhalter ist ein Stellvertreter in geschweiften Klammern, zum Beispiel <code>{vorname}</code>. Beim Erzeugen ersetzt das Portal ihn durch den echten Wert.</p>
 
     <h4>Eine neue Brief-Vorlage hochladen</h4>
@@ -1258,7 +1421,7 @@
       <p>Das fertige Schreiben wird heruntergeladen oder direkt per E-Mail verschickt – vollständig mit den echten Daten gefüllt.</p>
     </div>
 
-    <h3 id="vorlagen-weitere">10.3 Checklisten, Zeugnisse und weitere Vorlagen</h3>
+    <h3 id="vorlagen-weitere">11.3 Checklisten, Zeugnisse und weitere Vorlagen</h3>
     <p>Im Menü <strong>Vorlagen</strong> finden Sie weitere Vorlagen-Arten. Sie funktionieren nach demselben Muster: öffnen, anpassen, speichern. Hier eine Übersicht, wofür sie da sind:</p>
     <table>
       <caption>Die weiteren Vorlagen-Arten</caption>
@@ -1289,6 +1452,10 @@
           <td><strong>BEM-Vorlagen</strong></td>
           <td>Checklisten und Datenschutz-Texte für das Eingliederungsmanagement. Anpassbar, falls sich Gesetze ändern.</td>
         </tr>
+        <tr>
+          <td><strong>Vertragsverlängerung</strong></td>
+          <td>Vertrags-Vorlagen für Verlängerung oder Entfristung, mit eigenem Platzhalter-Katalog (zum Beispiel <code>{neues_vertragsende}</code>, <code>{entgeltgruppe}</code>). Wird im Vertragsende-Vorgang genutzt (siehe Kapitel 5.3).</td>
+        </tr>
       </tbody>
     </table>
 
@@ -1307,9 +1474,9 @@
 
   <hr class="trenner">
 
-  <!-- ==================== 11. VERWALTUNG ==================== -->
+  <!-- ==================== 12. VERWALTUNG ==================== -->
   <section id="verwaltung" class="kapitel">
-    <h2>11. Verwaltung: Benutzer, Einrichtungen und Einstellungen</h2>
+    <h2>12. Verwaltung: Benutzer, Einrichtungen und Einstellungen</h2>
 
     <p>Im Bereich <strong>Verwaltung</strong> richten Sie das Portal grundlegend ein. Hier legen Sie Benutzer und Einrichtungen an und stellen den E-Mail-Versand ein. Diese Aufgaben übernehmen meist wenige Personen.</p>
 
@@ -1318,7 +1485,7 @@
       <p>Die Verwaltung sehen nur Administrator und HR-Leitung. Die Einrichtungs-Verwaltung ist allein dem Administrator vorbehalten.</p>
     </div>
 
-    <h3 id="verwaltung-benutzer">11.1 Benutzer verwalten</h3>
+    <h3 id="verwaltung-benutzer">12.1 Benutzer verwalten</h3>
     <p>Hier legen Sie fest, wer sich am Portal anmelden darf und was diese Person sehen kann. Jede Mitarbeiterin und jeder Mitarbeiter braucht ein eigenes Benutzerkonto.</p>
 
     <h4>Einen neuen Benutzer anlegen</h4>
@@ -1353,7 +1520,7 @@
       <p>Der Status der Person zeigt „Aktiv" oder „Inaktiv". Inaktive Personen können sich nicht mehr anmelden, bleiben aber im Protokoll erhalten.</p>
     </div>
 
-    <h3 id="verwaltung-mandanten">11.2 Einrichtungen (Mandanten) verwalten</h3>
+    <h3 id="verwaltung-mandanten">12.2 Einrichtungen (Mandanten) verwalten</h3>
     <p>Hier pflegen Sie die 16 Einrichtungen der CREDO-Gruppe – die Schulen, Kitas und Vereine. Im Portal heißen sie „Mandanten". Jeder Vorgang gehört zu einer dieser Einrichtungen.</p>
 
     <figure class="screenshot">
@@ -1382,6 +1549,7 @@
       <li><strong>DSGVO-Konfiguration</strong> – die für den Datenschutz verantwortliche Stelle hinterlegen (Name und Anschrift).</li>
       <li><strong>Elternzeit-Konfiguration</strong> – Geschäftsführung und Ansprechpartner für Elternzeit-Briefe eintragen.</li>
       <li><strong>BEM-Ansprechpartner</strong> – die Personen festlegen, die im BEM angesprochen werden können.</li>
+      <li><strong>Vertragsende-Konfiguration</strong> – festlegen, welche Felder die Führungskraft im Vertragsdaten-Formular sieht und ob die Vorstands-/Geschäftsführungs-Abstimmung abgefragt wird (siehe Kapitel 5.2).</li>
     </ul>
 
     <div class="hinweis">
@@ -1394,7 +1562,7 @@
       <p>Die Einrichtung ist vollständig eingerichtet. Onboarding, Elternzeit und BEM funktionieren für sie nun mit den richtigen Angaben.</p>
     </div>
 
-    <h3 id="verwaltung-einstellungen">11.3 Einstellungen und E-Mail-Versand</h3>
+    <h3 id="verwaltung-einstellungen">12.3 Einstellungen und E-Mail-Versand</h3>
     <p>Unter <strong>Verwaltung → Einstellungen</strong> steuern Sie, wie das Portal E-Mails verschickt. Die Seite ist in mehrere Reiter unterteilt. Diese sind die wichtigsten:</p>
 
     <div class="hinweis info">
@@ -1459,7 +1627,7 @@
       <p>Die Ferienzeit steht in der Liste. Das Portal berücksichtigt sie bei der Berechnung der Elternzeit-Fristen.</p>
     </div>
 
-    <h3 id="verwaltung-audit">11.4 Das Protokoll (Audit-Log)</h3>
+    <h3 id="verwaltung-audit">12.4 Das Protokoll (Audit-Log)</h3>
     <p>Das Portal hält jede wichtige Aktion fest – etwa „Vorgang erstellt" oder „Status geändert". Diese lückenlose Aufzeichnung heißt „Audit-Log" (sprich: Odit-Logg) und dient der Nachvollziehbarkeit. So lässt sich jederzeit klären, wer was wann getan hat.</p>
     <ol>
       <li>Öffnen Sie <strong>Verwaltung → Audit-Log</strong>.</li>
@@ -1482,9 +1650,9 @@
 
   <hr class="trenner">
 
-  <!-- ==================== 12. HILFE ==================== -->
+  <!-- ==================== 13. HILFE ==================== -->
   <section id="hilfe" class="kapitel">
-    <h2>12. Hilfe bei Problemen und häufige Fragen</h2>
+    <h2>13. Hilfe bei Problemen und häufige Fragen</h2>
 
     <p>Etwas klappt nicht wie erwartet? Das ist völlig normal und meistens schnell gelöst. Hier finden Sie die häufigsten Fragen mit ihrer Antwort.</p>
 
@@ -1500,10 +1668,10 @@
     <p>Das ist kein Fehler. Ihre Rolle gibt diesen Bereich nicht frei. Brauchen Sie ihn für Ihre Arbeit, sprechen Sie mit Ihrer Administratorin oder Ihrem Administrator (siehe Kapitel 2.3).</p>
 
     <h3>Eine E-Mail wurde nicht verschickt.</h3>
-    <p>Schauen Sie unter <strong>Einstellungen → Versandprotokoll</strong> nach. Dort steht bei jeder E-Mail, ob sie verschickt wurde. Zeigt das Portal oben ein rotes Banner „SMTP ist nicht aktiv", muss zuerst der E-Mail-Versand eingerichtet werden (siehe Kapitel 11.3).</p>
+    <p>Schauen Sie unter <strong>Einstellungen → Versandprotokoll</strong> nach. Dort steht bei jeder E-Mail, ob sie verschickt wurde. Zeigt das Portal oben ein rotes Banner „SMTP ist nicht aktiv", muss zuerst der E-Mail-Versand eingerichtet werden (siehe Kapitel 12.3).</p>
 
     <h3>Das Starterpaket lässt sich nicht versenden.</h3>
-    <p>Wahrscheinlich wurde für diese Einrichtung noch kein Starterpaket zusammengestellt. Eine Administratorin kann das unter <strong>Mandanten → Starterpaket</strong> nachholen (siehe Kapitel 11.2).</p>
+    <p>Wahrscheinlich wurde für diese Einrichtung noch kein Starterpaket zusammengestellt. Eine Administratorin kann das unter <strong>Mandanten → Starterpaket</strong> nachholen (siehe Kapitel 12.2).</p>
 
     <h3>Ich habe einen Vorgang nicht in der Liste gefunden.</h3>
     <p>Vielleicht ist er schon abgeschlossen. Klicken Sie auf dem Dashboard auf <strong>Archiv anzeigen</strong>. Setzen Sie außerdem mit <strong>Filter zurücksetzen</strong> alle Filter zurück (siehe Kapitel 2.2).</p>
@@ -1521,9 +1689,9 @@
 
   <hr class="trenner">
 
-  <!-- ==================== 13. GLOSSAR ==================== -->
+  <!-- ==================== 14. GLOSSAR ==================== -->
   <section id="glossar" class="kapitel">
-    <h2>13. Glossar: Fachbegriffe einfach erklärt</h2>
+    <h2>14. Glossar: Fachbegriffe einfach erklärt</h2>
 
     <p>Im Portal tauchen einige Fachwörter auf. Hier finden Sie sie in alphabetischer Reihenfolge mit einer einfachen Erklärung.</p>
 
@@ -1544,10 +1712,12 @@
         <tr><td><strong>DMS</strong></td><td>Dokumentenmanagementsystem. Das digitale Archiv für Akten und Dokumente.</td></tr>
         <tr><td><strong>DSGVO</strong></td><td>Datenschutz-Grundverordnung. Das Gesetz zum Schutz persönlicher Daten.</td></tr>
         <tr><td><strong>Filter</strong></td><td>Eine Einstellung, die nur die gewünschten Einträge anzeigt und den Rest ausblendet.</td></tr>
+        <tr><td><strong>Fristen-Ampel</strong></td><td>Die farbige Einstufung eines Vertragsendes nach verbleibender Zeit: Blau „Beobachten", Gelb „Warnung", Rot „Kritisch".</td></tr>
         <tr><td><strong>IBAN</strong></td><td>Die internationale Kontonummer für die Bankverbindung.</td></tr>
         <tr><td><strong>Klappmenü (Dropdown)</strong></td><td>Eine Auswahlliste, die sich beim Anklicken nach unten öffnet.</td></tr>
         <tr><td><strong>Magic Link</strong></td><td>Ein besonderer Einmal-Zugangslink ohne Passwort, zum Beispiel für den Personalfragebogen.</td></tr>
         <tr><td><strong>Mandant</strong></td><td>Eine Einrichtung der CREDO-Gruppe – eine Schule, Kita oder ein Verein.</td></tr>
+        <tr><td><strong>MAV</strong></td><td>Mitarbeitervertretung. Muss bei kirchlichen Trägern bei bestimmten Personalentscheidungen beteiligt werden, zum Beispiel beim Vertragsende.</td></tr>
         <tr><td><strong>Modul</strong></td><td>Ein Bereich des Portals, zum Beispiel Onboarding oder Elternzeit.</td></tr>
         <tr><td><strong>Offboarding</strong></td><td>Das Ausscheiden von Mitarbeitenden.</td></tr>
         <tr><td><strong>Onboarding</strong></td><td>Die Einstellung neuer Mitarbeitender.</td></tr>
@@ -1562,6 +1732,8 @@
         <tr><td><strong>SMTP</strong></td><td>Das Standardverfahren, mit dem Programme E-Mails versenden – im Portal der primäre Versandweg.</td></tr>
         <tr><td><strong>Starterpaket</strong></td><td>Eine Sammlung wichtiger Dokumente für neue Mitarbeitende.</td></tr>
         <tr><td><strong>Status</strong></td><td>Der Bearbeitungsstand eines Vorgangs, zum Beispiel „Offen" oder „Abgeschlossen".</td></tr>
+        <tr><td><strong>TzBfG</strong></td><td>Teilzeit- und Befristungsgesetz. Regelt unter anderem, wie oft und wie lange ein Vertrag befristet werden darf.</td></tr>
+        <tr><td><strong>Vertragsende</strong></td><td>Der Vorgangstyp, der einen auslaufenden befristeten Vertrag begleitet, bis er verlängert oder zum Austritt wird.</td></tr>
         <tr><td><strong>Vorgang</strong></td><td>Ein einzelner Fall, zum Beispiel eine Einstellung oder ein Austritt.</td></tr>
         <tr><td><strong>Vorlage</strong></td><td>Ein wiederverwendbares Muster für Schreiben, Formulare oder Checklisten.</td></tr>
         <tr><td><strong>Webhook</strong></td><td>Eine automatische Verbindung, über die das Portal andere Programme benachrichtigt.</td></tr>
@@ -1580,7 +1752,7 @@
 </div>
 
 <footer class="fuss">
-  <p><strong>CREDO HR-Portal – Handbuch für Einsteiger.</strong> Stand: Juni 2026. Dieses Handbuch beschreibt die Bedienung des Portals für Mitarbeitende der Personalverwaltung.</p>
+  <p><strong>CREDO HR-Portal – Handbuch für Einsteiger.</strong> Stand: Juli 2026 (mit dem neuen Kapitel „Vertragsende"). Dieses Handbuch beschreibt die Bedienung des Portals für Mitarbeitende der Personalverwaltung.</p>
   <address>
     <p>Christlicher Schulverein Minden e.V. · Kingsleyallee 6 · 32425 Minden</p>
     <p>Telefon 0571 388 60 - 148 · presse@fes-minden.de · fes-minden.de</p>
