@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CREDO HR-Portal – Minijob-Checkliste Stand 05/2026</title>
+<style>
+  :root {
+    --grau-hell: #DADADA;
+    --grau-dunkel: #575756;
+    --gelb: #FBC900;
+    --gruen: #6BAA24;
+    --rot: #E2001A;
+    --blau: #009AC6;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #e5e5e5;
+    --bg-soft: #f5f5f5;
+    --bg-softer: #fafafa;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Montserrat", "Arial", "Segoe UI", system-ui, sans-serif;
+    color: var(--text); line-height: 1.65; margin: 0;
+    background: #ffffff; font-size: 16px;
+  }
+  .seite { max-width: 1040px; margin: 0 auto; padding: 0 1.4rem 4rem; }
+
+  /* CREDO-Linie */
+  .credo-linie { display: flex; height: 6px; width: 100%; }
+  .credo-linie .l-grau  { flex: 1;      background-color: var(--grau-hell); }
+  .credo-linie .l-gelb  { flex: 0 0 8%; background-color: var(--gelb); }
+  .credo-linie .l-gruen { flex: 0 0 8%; background-color: var(--gruen); }
+  .credo-linie .l-rot   { flex: 0 0 8%; background-color: var(--rot); }
+  .credo-linie .l-blau  { flex: 0 0 8%; background-color: var(--blau); }
+
+  /* Titelblatt */
+  header.titel { padding: 3rem 1.4rem 1.2rem; max-width: 1040px; margin: 0 auto; }
+  .logo-wort { font-size: 2.6rem; font-weight: 800; letter-spacing: 0.18em; color: var(--grau-dunkel); margin: 0; }
+  .logo-sub { font-size: 1.2rem; color: var(--grau-dunkel); margin: 0.2rem 0 0; font-weight: 600; }
+  .claim { color: var(--muted); letter-spacing: 0.08em; font-size: 0.82rem; text-transform: uppercase; margin-top: 0.8rem; }
+  header.titel h1 { border: none; padding: 0; margin: 1.6rem 0 0.4rem; font-size: 2.1rem; }
+  .untertitel { color: var(--muted); font-size: 1.05rem; margin-top: 0; }
+
+  h1, h2, h3 { color: var(--grau-dunkel); line-height: 1.25; }
+  h2 { font-size: 1.5rem; border-left: 7px solid var(--grau-hell); padding-left: 0.7rem; margin-top: 3rem; padding-top: 0.2rem; }
+  h3 { font-size: 1.18rem; margin-top: 2rem; }
+  h4 { font-size: 1.0rem; margin: 1.4rem 0 0.3rem; color: var(--grau-dunkel); }
+  p { margin: 0.7rem 0; }
+  a { color: var(--blau); }
+  ol, ul { padding-left: 1.5rem; }
+  ol li, ul li { margin: 0.4rem 0; }
+
+  /* Boxen */
+  .hinweis, .ergebnis { padding: 0.85rem 1.1rem; margin: 1.1rem 0; border-radius: 0 6px 6px 0; border-left: 6px solid var(--gelb); background: #fffaeb; }
+  .hinweis .label, .ergebnis .label { display: block; font-weight: 700; margin-bottom: 0.2rem; color: var(--grau-dunkel); }
+  .hinweis.warnung { border-left-color: var(--rot); background: #fff4f4; }
+  .hinweis.info { border-left-color: var(--blau); background: #eef9ff; }
+  .ergebnis { border-left-color: var(--gruen); background: #f3faea; }
+  .hinweis p:last-child, .ergebnis p:last-child { margin-bottom: 0; }
+  .hinweis p:first-of-type, .ergebnis p:first-of-type { margin-top: 0; }
+
+  .meta { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.3rem; margin: 1.5rem 0; font-size: 0.92rem; }
+  .meta b { color: var(--grau-dunkel); }
+  .meta div { margin: 0.2rem 0; }
+
+  nav.inhalt { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.5rem; margin: 2rem 0; }
+  nav.inhalt h2 { border: none; padding: 0; margin: 0 0 0.6rem; font-size: 1.2rem; }
+  nav.inhalt ol { padding-left: 1.4rem; }
+  nav.inhalt a { color: var(--grau-dunkel); text-decoration: none; }
+  nav.inhalt a:hover { text-decoration: underline; color: var(--blau); }
+
+  .tabelle-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1.1rem 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--border); padding: 0.55rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--grau-dunkel); color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: var(--bg-softer); }
+  code { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; font-family: "Consolas","Courier New",monospace; font-size: 0.86em; }
+
+  .badge { display:inline-block; border-radius:20px; padding:0.12rem 0.7rem; font-size:0.75rem; font-weight:600; white-space:nowrap; }
+  .badge-grau { background:#ececec; color:#555; }
+  .badge-gruen{ background:#ecf6dd; color:#4d7d18; }
+  .badge-rot  { background:#fde3e3; color:#b3121a; }
+  .badge-gelb { background:#fff3c9; color:#8a6d00; }
+
+  /* Kennzahlen */
+  .zahlen { display:grid; grid-template-columns:repeat(4,1fr); gap:0.9rem; margin:1.4rem 0; }
+  .zahl { border:1px solid var(--border); border-radius:9px; padding:1rem; text-align:center; background:#fff; }
+  .zahl .n { font-size:2.1rem; font-weight:800; color:var(--grau-dunkel); line-height:1.1; }
+  .zahl .t { font-size:0.8rem; color:var(--muted); margin-top:0.25rem; }
+  .zahl.rot .n { color:var(--rot); }
+  .zahl.gelb .n { color:#b08a00; }
+  .zahl.gruen .n { color:var(--gruen); }
+  @media (max-width:720px){ .zahlen{ grid-template-columns:repeat(2,1fr); } }
+
+  .karte { border:1px solid var(--border); border-radius:9px; padding:1rem 1.1rem; margin:0.9rem 0; background:#fff; }
+  .karte.rot { border-left:6px solid var(--rot); }
+  .karte.blau { border-left:6px solid var(--blau); }
+  .karte .ktitel { font-weight:700; color:var(--grau-dunkel); margin-bottom:0.3rem; }
+
+  .ap { border:1px solid var(--border); border-radius:9px; padding:0.9rem 1.1rem; margin:0.8rem 0; background:#fff; }
+  .ap .apkopf { display:flex; align-items:baseline; gap:0.7rem; flex-wrap:wrap; }
+  .ap .apnr { display:inline-flex; align-items:center; justify-content:center; min-width:44px; height:26px; padding:0 0.5rem; border-radius:13px; background:var(--grau-dunkel); color:#fff; font-size:0.78rem; font-weight:700; }
+  .ap .aptitel { font-weight:700; color:var(--grau-dunkel); }
+  .ap .apstd { margin-left:auto; font-size:0.82rem; color:var(--muted); font-weight:600; }
+  .ap .apbody { font-size:0.9rem; margin-top:0.4rem; }
+  .ap .apdateien { font-size:0.82rem; color:var(--muted); margin-top:0.35rem; }
+
+  .fuss { margin-top:3.5rem; padding-top:1.2rem; border-top:1px solid var(--border); color:var(--muted); font-size:0.85rem; }
+  .quelle { font-size:0.82rem; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+
+<header class="titel">
+  <p class="logo-wort">CREDO</p>
+  <p class="logo-sub">HR-Portal &middot; Personalmanagement</p>
+  <p class="claim">Abgleich &amp; Umsetzungsplan zur Abstimmung</p>
+  <h1>Minijob-Checkliste Stand 26.05.2026</h1>
+  <p class="untertitel">Was die neue Checkliste der Minijob-Zentrale verlangt &mdash; und was unser Personalfragebogen davon heute abbildet.</p>
+</header>
+
+<div class="seite">
+
+  <div class="meta">
+    <div><b>Anlass:</b> Neue Fassung der &bdquo;Checkliste f&uuml;r geringf&uuml;gig entlohnte oder kurzfristig Besch&auml;ftigte&ldquo; der Minijob-Zentrale, Stand 26.&nbsp;Mai&nbsp;2026.</div>
+    <div><b>Verglichen mit:</b> Formularvorlage <code>MINIJOB</code> des Personalfragebogens (Bereich <i>Vorlagen</i>) &middot; Code-Stand Branch <code>feat/vertragsende</code>, Commit <code>a106cb8</code>.</div>
+    <div><b>Zweck:</b> Gemeinsam durchgehen, Entscheidungen treffen &mdash; <i>bevor</i> eine Zeile Code entsteht.</div>
+    <div><b>Stand:</b> Alle Entscheidungen getroffen (17.08.2026, Abschnitt&nbsp;9). Branch <code>feat/minijob-checkliste-2026</code> von <code>origin/main</code> angelegt. Umsetzung noch nicht begonnen.</div>
+  </div>
+
+  <nav class="inhalt">
+    <h2>Inhalt</h2>
+    <ol>
+      <li><a href="#ergebnis">Das Ergebnis in einem Blick</a></li>
+      <li><a href="#befunde">Zwei Befunde vorweg</a></li>
+      <li><a href="#luecken">Die L&uuml;cken im Detail</a></li>
+      <li><a href="#neu">Was Stand 05/2026 wirklich neu ist</a></li>
+      <li><a href="#loesung">L&ouml;sungsvorschlag</a></li>
+      <li><a href="#pakete">Arbeitspakete &amp; Phasen</a></li>
+      <li><a href="#aufwand">Aufwand &mdash; ehrlich gerechnet</a></li>
+      <li><a href="#tests">Wie wir es absichern</a></li>
+      <li><a href="#brauche">Getroffene Entscheidungen</a></li>
+      <li><a href="#methodik">Methodik &amp; Belastbarkeit</a></li>
+    </ol>
+  </nav>
+
+  <!-- ============================================================ -->
+  <h2 id="ergebnis">1 &middot; Das Ergebnis in einem Blick</h2>
+
+  <p>
+    Ich habe die Checkliste in <b>84 einzelne Anforderungen</b> zerlegt &mdash; jede Abfrage, jede Ankreuzoption,
+    jede Nachweispflicht, beide Anlagen und das Merkblatt &mdash; und jede davon gegen unseren Code gepr&uuml;ft.
+  </p>
+
+  <div class="zahlen">
+    <div class="zahl gruen"><div class="n">8</div><div class="t">erf&uuml;llt</div></div>
+    <div class="zahl gelb"><div class="n">24</div><div class="t">teilweise</div></div>
+    <div class="zahl rot"><div class="n">52</div><div class="t">fehlen ganz</div></div>
+    <div class="zahl rot"><div class="n">47</div><div class="t">davon hohes Risiko</div></div>
+  </div>
+
+  <p>
+    Erf&uuml;llt sind im Wesentlichen die Stammdaten: Name, Anschrift, Geburtsdatum und -ort, IBAN, Krankenkassenname &mdash;
+    also genau das, was jeder Personalfragebogen ohnehin abfragt. <b>Alles, was die Checkliste
+    minijob-spezifisch macht, fehlt:</b> der Besch&auml;ftigungsstatus, s&auml;mtliche Tabellen zu weiteren
+    Besch&auml;ftigungen, die Rentenversicherungs-Entscheidung in ihrer heutigen Form, beide Antragsanlagen,
+    das Merkblatt &mdash; und jede Form von Unterschrift.
+  </p>
+
+  <div class="hinweis warnung"><span class="label">Warum das mehr ist als eine Formalie</span>
+    <p>
+      Die Checkliste ist kein Service der Minijob-Zentrale, sondern unser <b>Entlastungsbeweis in der
+      Betriebspr&uuml;fung</b> (&sect;&nbsp;28p SGB&nbsp;IV). Sie belegt, dass wir den Sachverhalt aufgekl&auml;rt haben.
+      Fehlt sie oder ist sie unvollst&auml;ndig, greift die Ausnahme des &sect;&nbsp;8 Abs.&nbsp;2 S.&nbsp;4 SGB&nbsp;IV:
+      Beitr&auml;ge k&ouml;nnen dann <b>r&uuml;ckwirkend</b> nachgefordert werden, wenn die Aufkl&auml;rung
+      vors&auml;tzlich oder grob fahrl&auml;ssig vers&auml;umt wurde. Konkret betroffen: der Arbeitnehmeranteil zur
+      Rentenversicherung (3,6&nbsp;%) bei nicht sauber dokumentierter Befreiung, und die volle Beitragspflicht,
+      wenn eine Zusammenrechnung mit weiteren Minijobs nicht erkannt wurde.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="befunde">2 &middot; Zwei Befunde vorweg</h2>
+
+  <p>
+    Bevor wir &uuml;ber einzelne Felder reden: Beim Nachpr&uuml;fen sind zwei Dinge aufgefallen, die unabh&auml;ngig
+    von der Minijob-Checkliste gelten und die den Umbau als Erstes betreffen.
+  </p>
+
+  <div class="karte rot">
+    <div class="ktitel">Befund 1 &mdash; Die Vorlagen-Steuerung wirkt im Fragebogen gar nicht</div>
+    <p>
+      Im Seed ist f&uuml;r die Minijob-Vorlage sauber hinterlegt, dass Schritt&nbsp;5 (Steuer) und Schritt&nbsp;6
+      (Weitere Besch&auml;ftigung) deaktiviert sind. Der Fragebogen berechnet die aktiven Schritte auch korrekt
+      (<code>activeSteps</code>, <code>fragebogen-form.tsx:63</code>) &mdash; <b>verwendet das Ergebnis dann aber nie.</b>
+      Gerendert wird ein fest verdrahtetes Array (<code>stepComponents[currentStep]</code>, <code>:504</code>).
+    </p>
+    <p>
+      Folge heute: Ein Minijobber durchl&auml;uft denselben Fragebogen wie eine TV-L-Angestellte &mdash; inklusive
+      Pflichtangaben zu Steuerklasse und Religionszugeh&ouml;rigkeit, die f&uuml;r ihn nicht passen. Dasselbe gilt
+      f&uuml;r die Ehrenamt-Vorlage.
+    </p>
+    <p>
+      Folge f&uuml;r den Umbau: <b>Solange das nicht behoben ist, l&auml;sst sich f&uuml;r Minijob gar nichts gezielt
+      ein- oder ausschalten.</b> Das ist deshalb Arbeitspaket&nbsp;1 und Voraussetzung f&uuml;r fast alles andere.
+    </p>
+  </div>
+
+  <div class="karte rot">
+    <div class="ktitel">Befund 2 &mdash; Die Wahrheitsversicherung wird nicht gespeichert</div>
+    <p>
+      Der Fragebogen zeigt im letzten Schritt eine Erkl&auml;rung mit dem Satz
+      &bdquo;Diese Erkl&auml;rung ersetzt Ihre handschriftliche Unterschrift&ldquo; (<code>step10-summary.tsx:476</code>).
+      Die zugeh&ouml;rige Checkbox <code>erklaerungAccepted</code> ist jedoch reiner Browser-Zustand
+      (<code>:153</code>); beim Absenden geht nur <code>dsgvoAccepted</code> an den Server
+      (<code>fragebogen-form.tsx:141</code>).
+    </p>
+    <p>
+      Es existiert also weder eine Unterschrift noch ein nachweisbarer Ersatz &mdash; kein Zeitstempel, kein Ort,
+      keine IP, keine Textversion. Die Checkliste verlangt genau das ausdr&uuml;cklich
+      (&bdquo;Ich versichere, dass die vorstehenden Angaben der Wahrheit entsprechen&ldquo; + Unterschrift, bei
+      Minderj&auml;hrigen zus&auml;tzlich die des gesetzlichen Vertreters). Das ist unabh&auml;ngig vom Minijob-Thema
+      der gr&ouml;&szlig;te Einzelposten und betrifft <b>alle</b> Vorlagen.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="luecken">3 &middot; Die L&uuml;cken im Detail</h2>
+
+  <p class="quelle">
+    Gliederung folgt der Checkliste. <span class="badge badge-rot">FEHLT</span> = gar nicht vorhanden &middot;
+    <span class="badge badge-gelb">TEILWEISE</span> = vorhanden, aber nicht in der geforderten Tiefe &middot;
+    Risiko <b>HOCH</b> = unmittelbares Beitragsnachforderungsrisiko in der Betriebspr&uuml;fung.
+  </p>
+
+  <h3>Abschnitt 1 &mdash; Pers&ouml;nliche Angaben</h3>
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:22%">Anforderung</th><th>Was das Portal heute tut</th><th style="width:12%">Bewertung</th><th style="width:9%">Risiko</th></tr>
+    <tr><td>Steueridentifikationsnummer</td><td>Feld <code>taxId</code> existiert und ist Pflicht &mdash; liegt aber in Schritt&nbsp;5, und Schritt&nbsp;5 ist f&uuml;r Minijob abgeschaltet (<code>seed.ts:182</code>). Heute nur deshalb sichtbar, weil Befund&nbsp;1 die Abschaltung aush&auml;ngt. <b>Nach dem Renderer-Fix w&uuml;rde die Steuer-ID aus dem Minijob-Fragebogen verschwinden.</b></td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Rentenversicherungsnummer</td><td>vorhanden und AES-verschl&uuml;sselt, aber optional und ohne Formatpr&uuml;fung; der Pflicht-Schalter der Vorlage wirkt hier nicht (<code>personal-data.ts:275</code>)</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Ersatzangabe Geschlecht (weiblich / m&auml;nnlich / divers)</td><td>kein Feld; <code>salutation</code> l&auml;sst nur &bdquo;Herr&ldquo;/&bdquo;Frau&ldquo; zu (<code>personal-data.ts:46</code>) &mdash; &bdquo;divers&ldquo; ist nicht w&auml;hlbar</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Ersatzangaben-Kaskade bei fehlender RV-Nummer (Geburtsname, -datum/-ort, Geschlecht, Staatsangeh&ouml;rigkeit)</td><td>Felder existieren einzeln, aber ohne jede Kopplung: fehlt die RV-Nummer, wird nichts nachgefordert</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-gelb">MITTEL</span></td></tr>
+    <tr><td>Name der Bank</td><td>Feld vorhanden, aber optional &mdash; die Checkliste verlangt es</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-grau">NIEDRIG</span></td></tr>
+    <tr><td>Telefon</td><td>optional; Schritt&nbsp;2 hat gar kein dynamisches Schema, der Pflicht-Schalter ist dort wirkungslos</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-grau">NIEDRIG</span></td></tr>
+  </table>
+  </div>
+  <p class="quelle">Erf&uuml;llt: Name und Vorname, Anschrift, Geburtsdatum und -ort, IBAN.</p>
+
+  <h3>Abschnitt 2 &mdash; Status bei Beginn der Besch&auml;ftigung</h3>
+  <p>
+    Die Checkliste fragt hier <b>17 Statusauspr&auml;gungen</b> ab (Sch&uuml;ler, Student, Schulentlassene mit
+    Berufsausbildungs-, Studien- oder Freiwilligendienstabsicht, Besch&auml;ftigungslose, Praktikant, Beamter,
+    Selbstst&auml;ndiger, Arbeitnehmer mit sozialversicherungspflichtiger Hauptbesch&auml;ftigung, im unbezahlten
+    Urlaub, in Elternzeit, Altersvollrentner vor bzw. nach Regelaltersgrenze, Versorgungsempf&auml;nger, Sonstige)
+    plus die Zusatzabfrage zur Meldung bei der Agentur f&uuml;r Arbeit.
+  </p>
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:22%">Anforderung</th><th>Was das Portal heute tut</th><th style="width:12%">Bewertung</th><th style="width:9%">Risiko</th></tr>
+    <tr><td>Status (17 Auspr&auml;gungen) + Freitext &bdquo;Sonstige&ldquo;</td><td><b>Kein Statusfeld</b> &mdash; weder in der Datenbank noch in der Feld-Registry. Am n&auml;chsten kommt <code>employerType</code> mit drei Werten (haupt&nbsp;/&nbsp;neben&nbsp;/&nbsp;nein)</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Erl&auml;uterungstexte zu den Statusoptionen (Fu&szlig;noten der Checkliste)</td><td>Die Feld-Registry kennt kein Hilfetext-Feld; Erkl&auml;rungen sind im Code vergraben</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-gelb">MITTEL</span></td></tr>
+    <tr><td>Meldung als arbeit- oder ausbildungssuchend + zust&auml;ndige Agentur + Leistungsbezug</td><td>kein Feld</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Nachweis zum Status (z.&nbsp;B. Immatrikulationsbescheinigung)</td><td>kein passender Dokumenttyp; die bedingte Nachweispflicht kennt bisher nur &bdquo;hat Kinder&ldquo;</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+  </table>
+  </div>
+  <div class="hinweis info"><span class="label">Warum das hohes Risiko ist</span>
+    <p>Der Status entscheidet die sozialversicherungsrechtliche Beurteilung: Sch&uuml;ler sind in der Arbeitslosenversicherung
+    versicherungsfrei, bei Studenten gelten Besonderheiten in Kranken-, Pflege- und Arbeitslosenversicherung,
+    Selbstst&auml;ndige und Beamte werden wie Personen ohne versicherungspflichtige Hauptbesch&auml;ftigung behandelt.
+    Und bei kurzfristiger Besch&auml;ftigung h&auml;ngt die <i>Berufsm&auml;&szlig;igkeit</i> unmittelbar am Status.
+    Ohne diese Angabe k&ouml;nnen wir die Beurteilung schlicht nicht treffen.</p>
+  </div>
+
+  <h3>Abschnitt 3 &mdash; Gesetzliche Krankenversicherung</h3>
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:22%">Anforderung</th><th>Was das Portal heute tut</th><th style="width:12%">Bewertung</th><th style="width:9%">Risiko</th></tr>
+    <tr><td>Art der Versicherung: eigene Mitgliedschaft oder Familienversicherung</td><td>nicht vorhanden. <code>parentStatus</code> betrifft die Pflegeversicherung, nicht die Versicherungsart</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-gelb">MITTEL</span></td></tr>
+    <tr><td>Nachweis privater Krankenversicherung (zwingend zu den Entgeltunterlagen)</td><td>kein eigener Dokumenttyp, keine bedingte Pflicht bei &bdquo;privat&ldquo;</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Bestehen einer gesetzlichen Krankenversicherung (ja/nein)</td><td>&uuml;ber <code>healthInsuranceType</code> (gesetzlich&nbsp;/&nbsp;privat) abgedeckt; der Hinweis auf die Nachweispflicht bei privater Versicherung fehlt</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-gelb">MITTEL</span></td></tr>
+  </table>
+  </div>
+  <p class="quelle">Erf&uuml;llt: Name der Krankenkasse.</p>
+
+  <h3>Abschnitt 4 &mdash; Weitere Besch&auml;ftigungen (a, b und c)</h3>
+  <p>
+    Das ist der gr&ouml;&szlig;te Block der Checkliste und zugleich unsere gr&ouml;&szlig;te L&uuml;cke. Gefordert sind
+    <b>drei Tabellen mit mehreren Zeilen</b>. Wir haben daf&uuml;r zwei flache Textfelder &mdash; und die liegen in
+    Schritt&nbsp;6, der f&uuml;r Minijob eigentlich abgeschaltet sein soll.
+  </p>
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:22%">Anforderung</th><th>Was das Portal heute tut</th><th style="width:12%">Bewertung</th><th style="width:9%">Risiko</th></tr>
+    <tr><td><b>4a</b> &mdash; Tabelle weiterer Besch&auml;ftigungen: je Zeile Beginn, Arbeitgeber mit Adresse und die Art (geringf&uuml;gig <i>mit</i> RV-Eigenanteil&nbsp;/ <i>ohne</i> RV-Eigenanteil&nbsp;/ mehr als geringf&uuml;gig)</td><td>ein einzelnes Textfeld <code>otherEmployerName</code> plus <code>otherWeeklyHours</code>. Kein Datum, keine Adresse, keine Art, <b>keine Mehrzeiligkeit</b></td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td><b>4a</b> &mdash; Additionsfrage: &Uuml;bersteigt die Summe aller Minijob-Entgelte regelm&auml;&szlig;ig 603&nbsp;&euro; im Monat?</td><td>kein Entgeltfeld, keine Grenze, keine Additionslogik. Die Zahl 603 kommt im gesamten Code nicht vor</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td><b>4b</b> &mdash; Vorbesch&auml;ftigungen im laufenden Kalenderjahr: Beginn und Ende, Entgelt &uuml;ber 603&nbsp;&euro;, tats&auml;chliche Arbeitstage, Arbeitgeber bzw. Arbeitsagentur</td><td>Die Fallgruppe &bdquo;kurzfristige Besch&auml;ftigung&ldquo; existiert im Portal &uuml;berhaupt nicht &mdash; weder als Fragebogentyp noch als Vertragsart noch als Feld</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td><b>4c</b> &mdash; Besch&auml;ftigung oder selbstst&auml;ndige T&auml;tigkeit im Ausland + Bescheinigung&nbsp;A1</td><td>kein Auslandsmerkmal, kein Dokumenttyp f&uuml;r A1 (nur Ablage unter &bdquo;Sonstiges&ldquo; m&ouml;glich)</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Grundfrage &bdquo;weitere Besch&auml;ftigung ja/nein&ldquo;</td><td><code>hasOtherEmployment</code> vorhanden, aber optional &mdash; und der Schritt ist f&uuml;r Minijob als deaktiviert konfiguriert</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+  </table>
+  </div>
+
+  <h3>Abschnitte 5, 7, 8 und 9 &mdash; Rentenversicherung, Antr&auml;ge, Merkblatt</h3>
+  <p>
+    Die Checkliste verlangt hier eine <b>Vier-Wege-Entscheidung</b>, zwei ausf&uuml;llbare Antragsanlagen und die
+    Aush&auml;ndigung eines Merkblatts. Wir haben daf&uuml;r ein einzelnes H&auml;kchen.
+  </p>
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:22%">Anforderung</th><th>Was das Portal heute tut</th><th style="width:12%">Bewertung</th><th style="width:9%">Risiko</th></tr>
+    <tr><td>Vier-Wege-Entscheidung: keine Befreiung&nbsp;/ Befreiung beantragen&nbsp;/ rentenversicherungsfrei als Altersvollrentner&nbsp;/ <b>Aufhebung der Befreiung</b></td><td>ein Boolean <code>minijobRvBefreiung</code>. Die Optionen 3 und 4 fehlen vollst&auml;ndig</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Befreiungsantrag als Anlage (&sect;&nbsp;6 Abs.&nbsp;1b SGB&nbsp;VI) mit Name, Vorname, RV-Nummer, Verzichtserkl&auml;rung, Bindungswirkung, Ort/Datum/Unterschrift</td><td>existiert nicht. Es gibt einen Upload-Typ <code>RV_BEFREIUNG</code>, aber kein Antragsdokument und keine Pflicht, es zu nutzen</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Aufhebungsantrag als Anlage (&sect;&nbsp;6 Abs.&nbsp;6 SGB&nbsp;VI)</td><td>im gesamten Repository nicht vorhanden</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Arbeitgeberteil beider Antr&auml;ge: Name, <b>8-stellige Betriebsnummer</b>, Eingangsdatum beim Arbeitgeber, Wirkungsdatum, Ort/Datum/Unterschrift</td><td>Betriebsnummer existiert nicht (unsere <code>mandantNumber</code> ist die dreistellige LOGA-Nummer). Eingangs- und Wirkungsdatum werden nirgends erfasst</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>6-Wochen-Meldefrist an die Minijob-Zentrale</td><td>kein Hinweis, keine Frist&uuml;berwachung, keine Erinnerung</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Merkblatt &uuml;ber die Folgen der Befreiung + Best&auml;tigung der Kenntnisnahme</td><td>kein Merkblatt im Repository, keine Best&auml;tigung, kein Zeitstempel</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+  </table>
+  </div>
+  <div class="hinweis warnung"><span class="label">Zusatzfund im PDF-Export</span>
+    <p>Die Minijob-Angaben werden im PDF-Export nur innerhalb einer Bedingung <code>if (pd.hasMinijob)</code> ausgegeben
+    (<code>pdf-export-onboarding.ts:326</code>). <code>hasMinijob</code> bedeutet aber &bdquo;hat <i>zus&auml;tzlich</i> einen Minijob&ldquo; &mdash;
+    bei einem echten Minijob-Vorgang ist das typischerweise <i>nicht</i> gesetzt. Die RV-Befreiung erscheint dort also
+    ausgerechnet bei Minijobbern nicht im Ausdruck.</p>
+  </div>
+
+  <h3>Abschnitte 6 und 10 &mdash; Schlussbest&auml;tigung und Formalia</h3>
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:22%">Anforderung</th><th>Was das Portal heute tut</th><th style="width:12%">Bewertung</th><th style="width:9%">Risiko</th></tr>
+    <tr><td>Wahrheitsversicherung + Verpflichtung zur unverz&uuml;glichen Mitteilung von &Auml;nderungen</td><td>Der Wortlaut steht in der Oberfl&auml;che, wird aber nicht &uuml;bertragen und nicht gespeichert (siehe Befund&nbsp;2)</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Unterschrift des Arbeitnehmers bzw. nachweisbarer Ersatz</td><td>keine Unterschrift, kein persistierter Ersatz. Die &bdquo;digitale Signatur&ldquo; auf der Erfolgsseite wird im Browser erzeugt und nirgends abgelegt</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Bei Minderj&auml;hrigen zus&auml;tzlich die Unterschrift des gesetzlichen Vertreters</td><td>Minderj&auml;hrigkeit wird nirgends abgeleitet oder abgebildet &mdash; bei Sch&uuml;ler-Minijobs der Regelfall</td><td><span class="badge badge-rot">FEHLT</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Ort und Datum der Erkl&auml;rung</td><td>kein Ort; als Datum existiert nur der DSGVO-Zeitstempel, im PDF ohne Uhrzeit</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-gelb">MITTEL</span></td></tr>
+    <tr><td>Belegte Angaben + Aufnahme zu den Entgeltunterlagen (Beitragsverfahrensverordnung)</td><td>Upload-Infrastruktur ist da, aber f&uuml;r keine Vorlage sind Pflichtdokumente gesetzt. Zudem l&ouml;scht der Mitarbeiter Nachweise <b>hart</b> &mdash; Datei und Datensatz weg, ohne Protokolleintrag (<code>documents/route.ts:275-281</code>)</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-rot">HOCH</span></td></tr>
+    <tr><td>Formularstand &bdquo;Stand: 26. Mai 2026&ldquo; nachvollziehbar</td><td>Versionierung existiert technisch, wird aber nirgends ausgegeben und beim Seed nicht hochgez&auml;hlt</td><td><span class="badge badge-gelb">TEILWEISE</span></td><td><span class="badge badge-gelb">MITTEL</span></td></tr>
+  </table>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="neu">4 &middot; Was Stand 05/2026 wirklich neu ist</h2>
+
+  <p>Drei Punkte in dieser Fassung sind echte Rechts&auml;nderungen &mdash; sie w&auml;ren auch dann umzusetzen, wenn unser Formular sonst vollst&auml;ndig w&auml;re:</p>
+
+  <div class="karte blau">
+    <div class="ktitel">1 &middot; Aufhebung der RV-Befreiung &mdash; neu ab 01.07.2026 (&sect;&nbsp;6 Abs.&nbsp;6 SGB&nbsp;VI)</div>
+    <p>
+      Bisher war die Befreiung von der Rentenversicherungspflicht eine Einbahnstra&szlig;e. K&uuml;nftig kann der
+      Besch&auml;ftigte sie <b>einmalig aufheben</b> lassen &mdash; schriftlich <i>oder elektronisch</i> gegen&uuml;ber dem
+      Arbeitgeber. Die Aufhebung wirkt ab dem 01. des Folgemonats, gilt f&uuml;r alle zeitgleichen Minijobs, ist f&uuml;r
+      die Dauer der Besch&auml;ftigung bindend und kann nicht widerrufen werden. Wir m&uuml;ssen daf&uuml;r einen eigenen
+      Antrag bereitstellen, das Eingangsdatum erfassen und die Daten im DE&Uuml;V-Verfahren melden.
+    </p>
+  </div>
+
+  <div class="karte blau">
+    <div class="ktitel">2 &middot; Geringf&uuml;gigkeitsgrenze 603&nbsp;&euro;</div>
+    <p>
+      Die Grenze steht an f&uuml;nf Stellen der Checkliste und ist mindestlohngekoppelt, &auml;ndert sich also regelm&auml;&szlig;ig.
+      In unserem Code kommt sie derzeit &uuml;berhaupt nicht vor. Wichtig f&uuml;r die Betriebspr&uuml;fung ist nicht nur der
+      aktuelle Wert, sondern welcher Wert <b>zum Zeitpunkt der Abgabe</b> galt &mdash; deshalb der Vorschlag, sie versioniert
+      zu f&uuml;hren statt als Konstante (siehe Abschnitt&nbsp;5.4).
+    </p>
+  </div>
+
+  <div class="karte blau">
+    <div class="ktitel">3 &middot; Elektronische Form &mdash; aber differenziert</div>
+    <p>
+      Die Checkliste ist ausdr&uuml;cklich als am PC ausf&uuml;llbares Dokument vorgesehen, und Abschnitt&nbsp;5 nennt
+      &bdquo;schriftliche oder elektronische Erkl&auml;rung&ldquo;. Die Erl&auml;uterung &bdquo;zu&nbsp;5.&ldquo; nennt f&uuml;r den
+      <b>Befreiungs</b>antrag nach &sect;&nbsp;6 Abs.&nbsp;1b SGB&nbsp;VI allerdings weiterhin nur die <b>Schriftform</b>;
+      ausdr&uuml;cklich elektronisch zugelassen ist nur der <b>Aufhebungs</b>antrag. Dieser Unterschied hat direkte Folgen
+      f&uuml;r unseren Prozess &mdash; siehe offene Entscheidung&nbsp;2.
+    </p>
+  </div>
+
+  <p class="quelle">
+    Neu ist au&szlig;erdem die Statusoption &bdquo;Schulentlassener mit Freiwilligendienstabsicht&ldquo; &mdash; f&uuml;r uns relevant,
+    weil sie in der Berufsm&auml;&szlig;igkeitspr&uuml;fung anders behandelt wird als die &uuml;brigen Schulentlassenen.
+  </p>
+
+  <!-- ============================================================ -->
+  <h2 id="loesung">5 &middot; L&ouml;sungsvorschlag</h2>
+
+  <h3>5.1 &nbsp;Ein Modell f&uuml;r die drei Tabellen &mdash; nicht drei</h3>
+  <p>
+    Die Tabellen 4a, 4b und 4c teilen sich rund 70&nbsp;% ihrer Spalten (Zeitraum, Arbeitgeber, Adresse, Art) und
+    unterscheiden sich in je zwei bis drei. Drei getrennte Modelle hie&szlig;en drei Speicherpfade, drei Validierungen,
+    drei Listenkomponenten, drei PDF-Renderer. Vorschlag: <b>ein Modell mit Kategorie-Kennzeichen</b>
+    (weitere Besch&auml;ftigung&nbsp;/ Vorbesch&auml;ftigung&nbsp;/ Ausland), mit kategoriespezifischer Validierung.
+  </p>
+  <p>
+    Bewusst <b>kein</b> Betragsfeld f&uuml;r das Entgelt der Fremdbesch&auml;ftigung: Die Checkliste fragt nur das Merkmal
+    &bdquo;&uuml;ber der Grenze&ldquo; ab. Ein Betragsfeld w&uuml;rde zus&auml;tzliche personenbezogene Daten Dritter erheben,
+    ohne dass sie verlangt sind (Datenminimierung).
+  </p>
+
+  <h3>5.2 &nbsp;Schritt&nbsp;6 umbauen, Schritt&nbsp;11 neu &mdash; nach dem Renderer-Fix</h3>
+  <p>
+    Schritt&nbsp;6 wird zu &bdquo;Weitere Besch&auml;ftigungen &amp; Status&ldquo; und nimmt Abschnitt&nbsp;2 sowie 4a, 4b und 4c auf.
+    F&uuml;r Minijob wird er <b>aktiviert</b> &mdash; die heutige Abschaltung ist fachlich falsch, denn genau diese
+    Erkl&auml;rung verlangt die Beitragsverfahrensverordnung f&uuml;r geringf&uuml;gig Besch&auml;ftigte.
+    Die Rentenversicherung (Abschnitte&nbsp;5, 7, 8 und 9) bekommt einen <b>eigenen Schritt&nbsp;11</b>, der nur in der
+    Minijob-Vorlage aktiv ist.
+  </p>
+  <div class="hinweis warnung"><span class="label">Zwei Stolpersteine, die wir vorher kennen sollten</span>
+    <p>
+      <b>a)</b> <code>currentStep</code> wird als Schrittnummer in der Datenbank gespeichert und ist serverseitig auf
+      <code>min(1).max(10)</code> begrenzt (<code>api/fragebogen/[token]/route.ts:77</code>). Ein Schritt&nbsp;11 w&uuml;rde
+      heute von der API abgewiesen &mdash; und laufende Vorg&auml;nge w&uuml;rden nach einer Umnummerierung an der falschen
+      Stelle wieder einsteigen. Beides braucht eine Datenmigration.
+    </p>
+    <p>
+      <b>b)</b> Der Vorlagen-Editor erkennt &Auml;nderungen &uuml;ber die Array-Position, nicht &uuml;ber die Schrittnummer.
+      Ein zus&auml;tzlicher Schritt bricht dort die &Auml;nderungserkennung, wenn wir das nicht mitziehen.
+    </p>
+  </div>
+
+  <h3>5.3 &nbsp;Unterschrift und Pr&uuml;fungsfestigkeit</h3>
+  <p>Der Plan zieht die Trennung, die die Checkliste vorgibt, bewusst hart:</p>
+  <ul>
+    <li><b>Die Checkliste selbst</b> wird elektronisch best&auml;tigt &mdash; mit Zeitstempel inklusive Uhrzeit, Ort, IP,
+        Browserkennung, Version des Erkl&auml;rungstextes und einer Pr&uuml;fsumme &uuml;ber den abgesendeten Datenstand.
+        Der Wortlaut wandert aus dem Code in eine versionierte Textdatei, damit im Streitfall belegbar ist,
+        <i>was</i> best&auml;tigt wurde.</li>
+    <li><b>Der Befreiungsantrag</b> wird vom Portal vorausgef&uuml;llt erzeugt, vom Mitarbeiter ausgedruckt,
+        unterschrieben und hochgeladen &mdash; der Upload wird zum bedingten Pflichtdokument. Eine blo&szlig;e Checkbox
+        als &bdquo;Antrag&ldquo; halte ich nicht f&uuml;r vertretbar.</li>
+    <li><b>Der Aufhebungsantrag</b> darf elektronisch erfolgen, mit demselben Nachweis-Baustein.</li>
+    <li><b>Nachweise werden manipulationssicher:</b> Pr&uuml;fsumme beim Upload, L&ouml;schen nur noch als Markierung
+        mit Protokolleintrag, nach dem Absenden gar nicht mehr.</li>
+  </ul>
+
+  <h3>5.4 &nbsp;Die 603&nbsp;&euro; geh&ouml;ren an genau eine Stelle</h3>
+  <p>
+    Vorschlag: ein kleines Stammdaten-Modell f&uuml;r sozialversicherungsrechtliche Rechengr&ouml;&szlig;en mit
+    G&uuml;ltigkeitszeitraum &mdash; Geringf&uuml;gigkeitsgrenze, drei Monate bzw. 70 Arbeitstage,
+    Beitragss&auml;tze 15&nbsp;%&nbsp;/&nbsp;3,6&nbsp;%&nbsp;/&nbsp;18,6&nbsp;%, Mindestbemessungsgrundlage 175&nbsp;&euro;.
+    Alle Hilfetexte ziehen die Werte als Platzhalter, genau wie unsere E-Mail-Vorlagen. Beim Absenden wird der verwendete
+    Stand am Vorgang eingefroren und im PDF ausgegeben. Bei der n&auml;chsten Anpassung pflegt HR einen Datensatz &mdash;
+    niemand muss Code anfassen.
+  </p>
+
+  <!-- ============================================================ -->
+  <h2 id="pakete">6 &middot; Arbeitspakete &amp; Phasen</h2>
+  <p>Sortiert danach, was das Betriebspr&uuml;fungsrisiko am schnellsten senkt.</p>
+
+  <h4>Phase 1 &mdash; rechtlich zwingend</h4>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;1</span><span class="aptitel">Renderer entkoppeln (Blocker)</span><span class="apstd">30&ndash;40&nbsp;h</span></div>
+    <div class="apbody">Vorlagen-Steuerung wirksam machen, Schrittnummern an einer Stelle definieren, <code>currentStep</code>-Migration f&uuml;r laufende Vorg&auml;nge. Ohne dieses Paket l&auml;sst sich f&uuml;r Minijob nichts gezielt schalten.</div>
+    <div class="apdateien">neu <code>src/lib/fragebogen-steps.ts</code> &middot; <code>fragebogen-form.tsx</code> &middot; <code>validations/personal-data.ts</code> &middot; <code>field-definitions.ts</code> &middot; Vorlagen-Editor und -Vorschau</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;2</span><span class="aptitel">Wahrheitsversicherung pr&uuml;fungsfest speichern</span><span class="apstd">12&ndash;16&nbsp;h</span></div>
+    <div class="apbody">Zustimmung, Zeitstempel, Ort, IP, Textversion und Pr&uuml;fsumme persistieren; Absenden ohne Best&auml;tigung serverseitig ablehnen; eigener PDF-Abschnitt &bdquo;Erkl&auml;rung des Arbeitnehmers&ldquo;; Belehrung nach &sect;&nbsp;28o SGB&nbsp;IV erg&auml;nzen.</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;3</span><span class="aptitel">Dokumenten-H&auml;rtung</span><span class="apstd">12&ndash;16&nbsp;h</span></div>
+    <div class="apbody">Pr&uuml;fsumme beim Upload, L&ouml;schen als Markierung statt hart, Protokolleintrag, Sperre nach dem Absenden, Mandanten-Pr&uuml;fung beim Download.</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;4</span><span class="aptitel">Rechengr&ouml;&szlig;en zentralisieren</span><span class="apstd">14&ndash;18&nbsp;h</span></div>
+    <div class="apbody">Modell mit G&uuml;ltigkeitszeitraum, Zugriffsschicht, Seed, Pflegemaske unter Einstellungen, Platzhalter in allen Hilfetexten, Stand am Vorgang einfrieren.</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;5</span><span class="aptitel">Datenmodell f&uuml;r die drei Tabellen</span><span class="apstd">10&ndash;14&nbsp;h</span></div>
+    <div class="apbody">Ein Modell mit Kategorie-Kennzeichen, atomares Speichern im Auto-Save, kategoriespezifische Validierung.</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;6</span><span class="aptitel">Schritt&nbsp;6 neu: Status + alle drei Tabellen</span><span class="apstd">40&ndash;50&nbsp;h</span></div>
+    <div class="apbody">17 Statusoptionen mit Erl&auml;uterungstexten, Zeilen hinzuf&uuml;gen und entfernen, Additionsfrage, bedingte Nachweispflichten (A1, Immatrikulation), PDF-Tabellen mit Seitenumbruch. Der gr&ouml;&szlig;te fachliche Block.</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;7</span><span class="aptitel">Schritt&nbsp;11 &bdquo;Rentenversicherung&ldquo;</span><span class="apstd">16&ndash;20&nbsp;h</span></div>
+    <div class="apbody">Vier-Wege-Entscheidung mit den Originaltexten, Merkblatt-Kenntnisnahme als Voraussetzung, Bindungswirkungs- und Informationspflicht-Erkl&auml;rungen, vollst&auml;ndige PDF-Ausgabe.</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;8</span><span class="aptitel">Merkblatt und beide Antr&auml;ge als System-Dokumente</span><span class="apstd">16&ndash;24&nbsp;h</span></div>
+    <div class="apbody">Nach dem Muster des F&uuml;hrungszeugnis-Antrags: Asset ablegen, idempotent seeden, &uuml;ber den Platzhalter-Resolver vorausf&uuml;llen. Betriebsnummer am Mandanten erg&auml;nzen. <i>Der Aufwand h&auml;ngt an Entscheidung&nbsp;7.</i></div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;9&ndash;11</span><span class="aptitel">Ersatzangaben-Kaskade, Krankenversicherung, bedingte Pflichtdokumente</span><span class="apstd">24&ndash;30&nbsp;h</span></div>
+    <div class="apbody">RV-Nummer mit Formatpr&uuml;fung; fehlt sie, werden die vier Ersatzangaben zwingend. Geschlecht als eigenes Feld inklusive &bdquo;divers&ldquo;. Versicherungsart und PKV-Nachweis. Nachweispflichten situationsabh&auml;ngig erzwingen.</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;12</span><span class="aptitel">HR-Seite: Eingangsdatum, Wirkungsdatum, 6-Wochen-Frist</span><span class="apstd">12&ndash;16&nbsp;h</span></div>
+    <div class="apbody">HR erfasst das Eingangsdatum, das Wirkungsdatum wird vorberechnet (Befreiung: Monatsbeginn des Eingangs, fr&uuml;hestens Besch&auml;ftigungsbeginn; Aufhebung: 01. des Folgemonats, keine R&uuml;ckwirkung). Erinnerung nach 4 und 5 Wochen.</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;13&ndash;16</span><span class="aptitel">Minderj&auml;hrige, Server-Validierung, PDF-Export, HR-Nacherfassung</span><span class="apstd">40&ndash;50&nbsp;h</span></div>
+    <div class="apbody">Gesetzlicher Vertreter bei Sch&uuml;ler-Minijobs. Fachvalidierung vom Browser auf den Server ziehen. PDF vorlagenbewusst. HR kann alle Felder nachpflegen &mdash; heute fehlen dort unter anderem Kinder, Masernschutz und die Felder aus Schritt&nbsp;6.</div>
+  </div>
+
+  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;17</span><span class="aptitel">Tests</span><span class="apstd">20&ndash;26&nbsp;h</span></div>
+    <div class="apbody">Paketbegleitend, siehe Abschnitt&nbsp;8.</div>
+  </div>
+
+  <h4>Phase 2 &mdash; Automatisierung und Komfort</h4>
+  <ul>
+    <li><b>Aufbewahrungsfristen Entgeltunterlagen</b> (8&ndash;10&nbsp;h) &mdash; mit einem Vorzieh-Punkt: unser Cron l&ouml;scht E-Mail-Protokolle nach 90 Tagen. Der Versandnachweis der RV-Meldung w&auml;re damit vor Ablauf der gesetzlichen Frist weg. Das sollten wir schon in Phase&nbsp;1 mitnehmen.</li>
+    <li><b>Eigener Vorgangstyp &bdquo;kurzfristige Besch&auml;ftigung&ldquo;</b> (10&ndash;14&nbsp;h)</li>
+    <li><b>Mandantenspezifische Fragebogen-Vorlagen</b> (16&ndash;20&nbsp;h) &mdash; heute strukturell ausgeschlossen, weil der Fragebogentyp eindeutig ist</li>
+    <li><b>Eigener Magic Link f&uuml;r den gesetzlichen Vertreter</b> (12&ndash;16&nbsp;h) statt Upload einer Zustimmung</li>
+    <li><b>DE&Uuml;V-Meldevorbereitung / Export der Befreiungsdaten f&uuml;r LOGA</b> (12&ndash;16&nbsp;h)</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2 id="aufwand">7 &middot; Aufwand &mdash; ehrlich gerechnet</h2>
+
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th>Phase</th><th>Inhalt</th><th style="width:20%">Aufwand</th></tr>
+    <tr><td><b>Phase 1</b></td><td>AP&nbsp;1&ndash;17: alle rechtlich zwingenden Punkte</td><td><b>250&ndash;320&nbsp;h</b></td></tr>
+    <tr><td><b>Phase 2</b></td><td>Automatisierung, Aufbewahrung, Komfort</td><td>60&ndash;90&nbsp;h</td></tr>
+  </table>
+  </div>
+
+  <div class="hinweis"><span class="label">Zur Einordnung dieser Zahl</span>
+    <p>
+      Der erste Entwurf des Plans nannte 150&ndash;190&nbsp;Stunden. Die Gegenpr&uuml;fung hat das als zu optimistisch
+      entlarvt, und ich halte die Korrektur f&uuml;r berechtigt: Nicht eingepreist waren die
+      <code>currentStep</code>-Datenmigration, die Anpassung der Reporting-Schnittstelle und der Export-Routen,
+      die Pflegemaske f&uuml;r die Rechengr&ouml;&szlig;en sowie die redaktionelle Arbeit an den Rechtstexten
+      (Merkblatt und zwei Antr&auml;ge im amtlichen Wortlaut) &mdash; das ist keine Entwicklungszeit, muss aber jemand machen.
+    </p>
+    <p>
+      Realistisch sind das <b>rund 3&ndash;4 Monate</b> bei einer Person, weil die Kette AP&nbsp;1 &rarr; AP&nbsp;5 &rarr;
+      AP&nbsp;6 &rarr; AP&nbsp;11 streng seriell ist. <b>Ein schneller Fix mit f&uuml;nf neuen Feldern ist nicht m&ouml;glich</b> &mdash;
+      drei der vier Kernabschnitte verlangen wiederholbare Tabellenzeilen, die unser heutiges flaches Datenmodell nicht abbilden kann.
+    </p>
+  </div>
+
+  <div class="hinweis info"><span class="label">Wenn es schneller gehen muss</span>
+    <p>
+      Ein risikoorientierter Minimalschnitt w&auml;re AP&nbsp;1&ndash;2 plus AP&nbsp;5&ndash;7 (rund 110&ndash;140&nbsp;h).
+      Damit sind Unterschrift, Status, alle drei Tabellen und die RV-Entscheidung abgedeckt &mdash; also die Punkte, an
+      denen eine Betriebspr&uuml;fung tats&auml;chlich ansetzt. Nachweise, Frist&uuml;berwachung und Minderj&auml;hrige
+      k&auml;men dann in einem zweiten Schritt. Das ist ein bewusster Kompromiss, keine vollst&auml;ndige Erf&uuml;llung.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="tests">8 &middot; Wie wir es absichern</h2>
+  <p>Neben den fachlichen Tests je Paket zwei, die ich f&uuml;r besonders wichtig halte:</p>
+  <ul>
+    <li><b>Regressionsschutz f&uuml;r Pflicht-Schalter:</b> ein Test, der pr&uuml;ft, dass <i>jedes</i> Feld der Registry
+        tats&auml;chlich in einer Validierung verdrahtet ist. Genau das ist heute mehrfach nicht der Fall &mdash; ein
+        Pflicht-Haken im Vorlagen-Editor bleibt dann wirkungslos, ohne dass es jemand merkt.</li>
+    <li><b>Regressionstest f&uuml;r die anderen Vorlagen:</b> Standard und Erzieher m&uuml;ssen nach dem Renderer-Umbau
+        unver&auml;ndert funktionieren, Schritt&nbsp;11 darf dort nicht erscheinen.</li>
+  </ul>
+  <p>
+    Dazu zehn manuelle Durchstiche mit PDF-Kontrolle &mdash; darunter der Minijob-Standardfall, der Befreiungsantrag
+    mit Schriftform, der elektronische Aufhebungsantrag, der minderj&auml;hrige Sch&uuml;ler-Minijob, die
+    Ersatzangaben-Kaskade inklusive Umgehungsversuch per direktem API-Aufruf und ein frischer Container-Start.
+  </p>
+
+  <!-- ============================================================ -->
+  <h2 id="brauche">9 &middot; Getroffene Entscheidungen</h2>
+  <p class="quelle">Abgestimmt am 17.08.2026 (Dimitri Riesen). Damit ist der Zuschnitt fix &mdash; die Umsetzung braucht keine weiteren Vorkl&auml;rungen.</p>
+
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:26%">Frage</th><th style="width:26%">Entscheidung</th><th>Konsequenz f&uuml;r die Umsetzung</th></tr>
+    <tr><td>Zuschnitt des Formulars</td><td><b>Integriert</b></td><td>Schritt&nbsp;6 wird erweitert, Schritt&nbsp;11 kommt neu dazu &mdash; beide nur in der Vorlage MINIJOB. Ein Magic Link, eine Akte, ein PDF. Kein zweites Formular.</td></tr>
+    <tr><td>Befreiungsantrag &sect;&nbsp;6 Abs.&nbsp;1b SGB&nbsp;VI</td><td><b>Schriftform</b></td><td>Portal erzeugt den vorausgef&uuml;llten Antrag, Mitarbeiter druckt, unterschreibt, l&auml;dt hoch; der Upload wird zum Pflichtdokument. Keine Rechtsauskunft abzuwarten &mdash; AP&nbsp;7 und 8 sind ohne Vorbehalt planbar.</td></tr>
+    <tr><td>Kurzfristige Besch&auml;ftigung</td><td><b>Eigener Vorgangstyp</b></td><td>Die Felder aus Abschnitt&nbsp;4b entstehen in Phase&nbsp;1 im gemeinsamen Datenmodell; der eigene Fragebogen- und Vertragstyp KURZFRISTIG folgt in Phase&nbsp;2 (AP&nbsp;19).</td></tr>
+    <tr><td>Laufende Minijob-Vorg&auml;nge</td><td><b>Gibt es derzeit keine</b></td><td>Die komplette Migrationslogik f&uuml;r Bestandsvorg&auml;nge entf&auml;llt. Es braucht keine Neu-Einladung und keine Sonderregel im Renderer.</td></tr>
+    <tr><td>Fremder Arbeitgeber (Name, Adresse)</td><td><b>Anbieten, als freiwillig gekennzeichnet</b></td><td>Bildet das amtliche Formular 1:1 ab. Felder bleiben optional und tragen den Hinweis &bdquo;Angabe freiwillig&ldquo;. Beim Entgelt bleibt es beim reinen Merkmal &bdquo;&uuml;ber/unter der Grenze&ldquo; &mdash; keine Betr&auml;ge.</td></tr>
+    <tr><td>BA-Betriebsnummer</td><td><b>Genau eine je Mandant</b></td><td>Einfaches Feld <code>betriebsnummer</code> am Mandanten mit Format-Pr&uuml;fung, gepflegt unter <code>/mandanten/[id]</code>. Keine 1:n-Zuordnung n&ouml;tig. <b>Offen bleibt die Datenlieferung:</b> die 16 Nummern m&uuml;ssen noch beschafft werden.</td></tr>
+    <tr><td>Merkblatt RV-Befreiung</td><td><b>Amtliches Original</b></td><td>Wie beim Masernschutz-Formular. Merkblatt (S.&nbsp;7), Befreiungsantrag (S.&nbsp;8) und Aufhebungsantrag (S.&nbsp;9) werden als Einzelseiten aus der amtlichen Checkliste extrahiert &mdash; nichts nachzufordern.</td></tr>
+    <tr><td>Steuer-ID im Minijob-Fragebogen</td><td><b>Schritt&nbsp;5 aktivieren, Rest ausblenden</b></td><td>L&ouml;st die Falle aus Abschnitt&nbsp;3: Steuer-ID bleibt sichtbar und pflichtig, Steuerklasse, Freibetr&auml;ge und Religionszugeh&ouml;rigkeit werden per Feld-Konfiguration ausgeblendet. Nutzt die vorhandene Feld-Ebene, kein Sonderweg.</td></tr>
+    <tr><td>Reichweite des Renderer-Fix</td><td><b>Alle f&uuml;nf Vorlagen</b></td><td>Die Vorlagen-Konfiguration wirkt endlich &uuml;berall. Ehrenamt wird dadurch erstmals tats&auml;chlich kurz. <b>HR vor dem Rollout informieren</b> &mdash; die Formulare &auml;ndern sich sichtbar.</td></tr>
+    <tr><td>Wahrheitsversicherung bei Altvorg&auml;ngen</td><td><b>Leer lassen</b></td><td>Kein abgeleiteter Zeitstempel. Ort, IP, Textversion und Pr&uuml;fsumme gab es damals nicht &mdash; ein Nachweis wird nicht r&uuml;ckwirkend konstruiert. Ab Rollout sind neue Vorg&auml;nge vollst&auml;ndig.</td></tr>
+    <tr><td>Umfang des ersten Blocks</td><td><b>Volle Phase&nbsp;1</b></td><td>AP&nbsp;1&ndash;17 werden durchgezogen, 250&ndash;320&nbsp;h. Danach ist die Checkliste vollst&auml;ndig abgebildet, inklusive Fristen&uuml;berwachung und Minderj&auml;hrigen-Regelung.</td></tr>
+  </table>
+  </div>
+
+  <h3>Annahmen, die ich ohne R&uuml;ckfrage treffe</h3>
+  <p>Falls eine davon nicht passt, sag Bescheid &mdash; sonst setze ich sie so um:</p>
+  <ul>
+    <li><b>Keine Verschl&uuml;sselung f&uuml;r Fremdarbeitgeber-Angaben.</b> Name und Adresse eines anderen Arbeitgebers sind personenbezogene Daten Dritter, aber nicht auf dem Niveau von IBAN, SV-Nummer oder Steuer-ID. Sie werden im Klartext gespeichert und nicht in die Reporting-Schnittstelle aufgenommen.</li>
+    <li><b>Reporting-Schnittstelle bleibt unber&uuml;hrt.</b> Sie arbeitet mit einer expliziten Feld-Freigabeliste und fasst <code>PersonalData</code> gar nicht an &mdash; neue Felder k&ouml;nnen dort nicht versehentlich durchschlagen.</li>
+    <li><b>Der 90-Tage-Aufr&auml;umlauf f&uuml;r E-Mail-Protokolle wird in Phase&nbsp;1 korrigiert</b>, nicht erst in Phase&nbsp;2. Sonst l&ouml;scht er den Versandnachweis der RV-Meldung vor Ablauf der gesetzlichen Aufbewahrungsfrist &mdash; und dieser Nachweis entsteht bereits in Phase&nbsp;1.</li>
+    <li><b>Geschlecht wird ein eigenes Feld</b>, getrennt von der Anrede. Die Anrede bleibt &bdquo;Herr&ldquo;/&bdquo;Frau&ldquo;; das neue Feld kennt weiblich, m&auml;nnlich und divers, wie das amtliche Formular.</li>
+  </ul>
+
+  <div class="hinweis info"><span class="label">Was noch von au&szlig;en kommen muss</span>
+    <p>
+      Nur ein einziger Punkt: die <b>acht­stelligen BA-Betriebsnummern der 16 Mandanten</b>. Sie werden erst in AP&nbsp;8
+      gebraucht, blockieren den Start also nicht. Die Antragserzeugung wird so gebaut, dass sie ohne hinterlegte Nummer
+      <i>blockiert</i>, statt still mit leerer Pflichtangabe zu drucken.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="methodik">10 &middot; Methodik &amp; Belastbarkeit</h2>
+  <p>Damit klar ist, wie belastbar die Zahlen oben sind:</p>
+  <ul>
+    <li>Die Checkliste wurde vollst&auml;ndig in 84 Einzelanforderungen zerlegt &mdash; inklusive beider Anlagen,
+        des Merkblatts und der Erl&auml;uterungen.</li>
+    <li>Jede Anforderung wurde gegen den Code gepr&uuml;ft, mit Datei- und Zeilenbeleg.</li>
+    <li><b>Nicht alle Befunde sind gleich tief gepr&uuml;ft:</b> 14 der 78 zun&auml;chst gemeldeten L&uuml;cken wurden
+        gezielt gegengepr&uuml;ft (davon 2 widerlegt &mdash; Steuer-ID und Bankname existieren doch, mit der Einschr&auml;nkung
+        aus Abschnitt&nbsp;3). Die &uuml;brigen 62 sind einfach belegt. Die gro&szlig;en Posten &mdash; Renderer,
+        Wahrheitsversicherung, fehlende Tabellen, fehlender Status, fehlende Antr&auml;ge &mdash; habe ich zus&auml;tzlich
+        selbst im Code nachgesehen.</li>
+    <li>Die Aufwandszahlen sind Sch&auml;tzungen auf Basis vergleichbarer Pakete in diesem Projekt, keine Festpreise.</li>
+    <li><b>Keine Rechtsberatung:</b> Die rechtlichen Einordnungen folgen dem Wortlaut der Checkliste und ihrer
+        Erl&auml;uterungen. Insbesondere Entscheidung&nbsp;2 (Schriftform des Befreiungsantrags) geh&ouml;rt fachlich
+        abgesichert, bevor wir sie umsetzen.</li>
+  </ul>
+
+  <p class="fuss">
+    CREDO HR-Portal &middot; Abgleich &bdquo;Checkliste f&uuml;r geringf&uuml;gig entlohnte oder kurzfristig Besch&auml;ftigte&ldquo;,
+    Stand 26.05.2026 &middot; Entscheidungen abgestimmt am 17.08.2026 &middot; Umsetzung noch nicht begonnen.
+  </p>
+
+</div>
+
+<div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+</body>
+</html>

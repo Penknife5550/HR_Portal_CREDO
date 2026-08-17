@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CREDO HR-Portal – Minijob: Prozess &amp; Masken</title>
+<style>
+  :root {
+    --grau-hell: #DADADA;
+    --grau-dunkel: #575756;
+    --gelb: #FBC900;
+    --gruen: #6BAA24;
+    --rot: #E2001A;
+    --blau: #009AC6;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #e5e5e5;
+    --bg-soft: #f5f5f5;
+    --bg-softer: #fafafa;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Montserrat", "Arial", "Segoe UI", system-ui, sans-serif;
+    color: var(--text); line-height: 1.65; margin: 0;
+    background: #ffffff; font-size: 16px;
+  }
+  .seite { max-width: 1040px; margin: 0 auto; padding: 0 1.4rem 4rem; }
+
+  /* CREDO-Linie */
+  .credo-linie { display: flex; height: 6px; width: 100%; }
+  .credo-linie .l-grau  { flex: 1;      background-color: var(--grau-hell); }
+  .credo-linie .l-gelb  { flex: 0 0 8%; background-color: var(--gelb); }
+  .credo-linie .l-gruen { flex: 0 0 8%; background-color: var(--gruen); }
+  .credo-linie .l-rot   { flex: 0 0 8%; background-color: var(--rot); }
+  .credo-linie .l-blau  { flex: 0 0 8%; background-color: var(--blau); }
+
+  header.titel { padding: 3rem 1.4rem 1.2rem; max-width: 1040px; margin: 0 auto; }
+  .logo-wort { font-size: 2.6rem; font-weight: 800; letter-spacing: 0.18em; color: var(--grau-dunkel); margin: 0; }
+  .logo-sub { font-size: 1.2rem; color: var(--grau-dunkel); margin: 0.2rem 0 0; font-weight: 600; }
+  .claim { color: var(--muted); letter-spacing: 0.08em; font-size: 0.82rem; text-transform: uppercase; margin-top: 0.8rem; }
+  header.titel h1 { border: none; padding: 0; margin: 1.6rem 0 0.4rem; font-size: 2.1rem; }
+  .untertitel { color: var(--muted); font-size: 1.05rem; margin-top: 0; }
+
+  h1, h2, h3 { color: var(--grau-dunkel); line-height: 1.25; }
+  h2 { font-size: 1.5rem; border-left: 7px solid var(--grau-hell); padding-left: 0.7rem; margin-top: 3rem; padding-top: 0.2rem; }
+  h3 { font-size: 1.18rem; margin-top: 2.2rem; }
+  h4 { font-size: 1.0rem; margin: 1.4rem 0 0.3rem; color: var(--grau-dunkel); }
+  p { margin: 0.7rem 0; }
+  a { color: var(--blau); }
+  ol, ul { padding-left: 1.5rem; }
+  ol li, ul li { margin: 0.4rem 0; }
+
+  .hinweis, .ergebnis { padding: 0.85rem 1.1rem; margin: 1.1rem 0; border-radius: 0 6px 6px 0; border-left: 6px solid var(--gelb); background: #fffaeb; }
+  .hinweis .label, .ergebnis .label { display: block; font-weight: 700; margin-bottom: 0.2rem; color: var(--grau-dunkel); }
+  .hinweis.warnung { border-left-color: var(--rot); background: #fff4f4; }
+  .hinweis.info { border-left-color: var(--blau); background: #eef9ff; }
+  .ergebnis { border-left-color: var(--gruen); background: #f3faea; }
+  .hinweis p:last-child, .ergebnis p:last-child { margin-bottom: 0; }
+  .hinweis p:first-of-type, .ergebnis p:first-of-type { margin-top: 0; }
+
+  .meta { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.3rem; margin: 1.5rem 0; font-size: 0.92rem; }
+  .meta b { color: var(--grau-dunkel); }
+  .meta div { margin: 0.2rem 0; }
+
+  nav.inhalt { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.5rem; margin: 2rem 0; }
+  nav.inhalt h2 { border: none; padding: 0; margin: 0 0 0.6rem; font-size: 1.2rem; }
+  nav.inhalt ol { padding-left: 1.4rem; }
+  nav.inhalt a { color: var(--grau-dunkel); text-decoration: none; }
+  nav.inhalt a:hover { text-decoration: underline; color: var(--blau); }
+  nav.inhalt ol ol { margin: 0.2rem 0 0.5rem; }
+  nav.inhalt ol ol a { font-size: 0.92rem; color: var(--muted); }
+
+  .tabelle-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1.1rem 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--border); padding: 0.55rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--grau-dunkel); color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: var(--bg-softer); }
+  code { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; font-family: "Consolas","Courier New",monospace; font-size: 0.86em; }
+
+  .badge { display:inline-block; border-radius:20px; padding:0.12rem 0.7rem; font-size:0.75rem; font-weight:600; white-space:nowrap; }
+  .badge-grau { background:#ececec; color:#555; }
+  .badge-blau { background:#e0f3fb; color:#0a7ca6; }
+  .badge-gruen{ background:#ecf6dd; color:#4d7d18; }
+  .badge-rot  { background:#fde3e3; color:#b3121a; }
+  .badge-gelb { background:#fff3c9; color:#8a6d00; }
+
+  svg.diagramm { border:1px solid var(--border); border-radius:10px; background:#fff; margin-top:0.6rem; width:100%; height:auto; display:block; }
+
+  .legende { display:flex; gap:1.3rem; flex-wrap:wrap; font-size:0.83rem; margin:0.7rem 0 0; color:var(--muted); }
+  .legende b { display:inline-block; width:13px; height:13px; border-radius:3px; vertical-align:middle; margin-right:4px; }
+
+  /* ============ MOCKUPS ============ */
+  .mock { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 1.2rem 0 0.4rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); background:#fff; }
+  .mock-cap { font-size: 0.82rem; color: var(--muted); margin: 0 0 1.8rem; font-style: italic; }
+  .mock-appbar { display: flex; align-items: center; gap: 1rem; padding: 0.7rem 1.1rem; background:#fff; border-bottom: 1px solid #eee; flex-wrap:wrap; }
+  .mock-brand { font-size: 0.7rem; color: var(--muted); line-height: 1.1; }
+  .mock-brand b { font-size: 1.15rem; color: var(--grau-dunkel); letter-spacing: 0.12em; display:inline-block; }
+  .mock-brand span { color: var(--grau-dunkel); font-weight:600; }
+  .mock-brand small { display:block; }
+  .mock-nav { margin-left: 1.4rem; display:flex; gap:1.1rem; font-size:0.85rem; color: var(--grau-dunkel); flex-wrap:wrap; }
+  .mock-nav .on { font-weight: 700; border-bottom: 2px solid var(--gelb); padding-bottom: 2px; }
+  .mock-user { margin-left:auto; font-size:0.8rem; color:var(--muted); text-align:right; }
+  .mock-user b { color: var(--grau-dunkel); display:block; font-size:0.85rem; }
+  .mock-body { padding: 1.2rem 1.4rem 1.5rem; background: #fff; }
+
+  .mb-top { display:flex; align-items:center; gap:0.8rem; flex-wrap:wrap; padding-bottom:0.6rem; border-bottom:1px solid #eee; margin-bottom:1rem; }
+  .mb-top .vid { font-weight:700; color:var(--grau-dunkel); }
+  .mb-top .person { color:var(--muted); font-size:0.9rem; }
+
+  .tabs { display:flex; gap:1.3rem; border-bottom:1px solid #eee; margin-bottom:1.1rem; font-size:0.9rem; flex-wrap:wrap; }
+  .tabs span { padding:0.4rem 0.1rem; color:var(--muted); }
+  .tabs span.on { color:var(--grau-dunkel); font-weight:700; border-bottom:3px solid var(--gruen); }
+
+  .btn { display:inline-block; border:none; border-radius:7px; padding:0.5rem 1rem; font-size:0.88rem; font-weight:600; cursor:default; background: var(--grau-dunkel); color:#fff; }
+  .btn-gruen { background: var(--gruen); }
+  .btn-rot   { background: var(--rot); }
+  .btn-blau  { background: var(--blau); }
+  .btn-gelb  { background: var(--gelb); color:#3a3000; }
+  .btn-outline { background:#fff; color:var(--grau-dunkel); border:1px solid var(--grau-hell); }
+  .btn-sm { padding:0.32rem 0.7rem; font-size:0.8rem; }
+
+  .karte { border:1px solid var(--border); border-radius:9px; padding:1rem 1.1rem; margin:0.8rem 0; background:#fff; }
+  .karte.aktiv { border:2px solid var(--blau); background:#f7fcff; }
+  .karte.gruen { border:2px solid var(--gruen); }
+  .karte.rot   { border:2px solid var(--rot); }
+  .ktitel { font-weight:700; color:var(--grau-dunkel); }
+  .ksub { color:var(--muted); font-size:0.85rem; margin-top:0.15rem; }
+
+  .fortschritt { padding:0.7rem 1.1rem; border-bottom:1px solid #eee; background:#fff; }
+  .fortschritt .balken { height:7px; background:#eee; border-radius:4px; overflow:hidden; }
+  .fortschritt .balken i { display:block; height:100%; background:var(--blau); }
+  .fortschritt .schritte { display:flex; flex-wrap:wrap; gap:0.35rem; font-size:0.72rem; margin-top:0.5rem; }
+  .fortschritt .schritte span { padding:0.15rem 0.5rem; border-radius:20px; background:#f0f0f0; color:#999; white-space:nowrap; }
+  .fortschritt .schritte span.done { background:#ecf6dd; color:#4d7d18; }
+  .fortschritt .schritte span.here { background:var(--blau); color:#fff; font-weight:600; }
+  .fortschritt .schritte span.neu  { background:#fff3c9; color:#8a6d00; font-weight:600; }
+
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:0.8rem; }
+  @media (max-width:720px){ .grid2, .grid3 { grid-template-columns:1fr; } .mock-nav{ display:none; } }
+
+  /* Formular-Mock */
+  .feld { margin:0.7rem 0; }
+  .feld label { display:block; font-size:0.8rem; color:var(--grau-dunkel); font-weight:600; margin-bottom:0.2rem; }
+  .feld .input { border:1px solid var(--grau-hell); border-radius:6px; padding:0.45rem 0.6rem; font-size:0.88rem; color:#333; background:#fff; }
+  .feld .input.ph { color:#aaa; }
+  .feld .hilfe { font-size:0.76rem; color:var(--muted); margin-top:0.2rem; }
+  .pflicht { color:var(--rot); }
+  .public-head { text-align:center; padding:1.4rem 1rem 0.6rem; }
+  .public-head .logo-wort { font-size:1.7rem; }
+
+  .radio, .check { display:flex; align-items:flex-start; gap:0.5rem; font-size:0.86rem; margin:0.3rem 0; color:#333; }
+  .radio i, .check i { flex:0 0 auto; width:14px; height:14px; border:1.5px solid #bbb; display:inline-block; margin-top:3px; background:#fff; }
+  .radio i { border-radius:50%; }
+  .check i { border-radius:3px; }
+  .radio.an i { border-color:var(--blau); background:radial-gradient(circle, var(--blau) 0 45%, #fff 46%); }
+  .check.an i { border-color:var(--gruen); background:var(--gruen); }
+  .radio small, .check small { display:block; color:var(--muted); font-size:0.76rem; }
+
+  /* NEU-Markierung */
+  .neu { border-left:5px solid var(--gelb) !important; background:#fffdf4; padding-left:0.85rem; border-radius:0 6px 6px 0; }
+  .neu-tag { display:inline-block; background:var(--gelb); color:#3a3000; font-size:0.66rem; font-weight:700; padding:0.05rem 0.42rem; border-radius:20px; margin-left:0.4rem; vertical-align:middle; letter-spacing:0.04em; }
+  .weg { border-left:5px solid var(--rot) !important; background:#fff6f6; padding-left:0.85rem; border-radius:0 6px 6px 0; }
+  .weg-tag { display:inline-block; background:#fde3e3; color:#b3121a; font-size:0.66rem; font-weight:700; padding:0.05rem 0.42rem; border-radius:20px; margin-left:0.4rem; vertical-align:middle; }
+  .durchgestrichen { text-decoration:line-through; color:#b0b0b0; }
+
+  .zeilenblock { border:1px dashed var(--grau-hell); border-radius:7px; padding:0.7rem 0.8rem; margin:0.5rem 0; background:#fafafa; }
+  .zeilenblock .znr { font-size:0.72rem; font-weight:700; color:var(--muted); letter-spacing:0.05em; }
+
+  .fuss { margin-top:3.5rem; padding-top:1.2rem; border-top:1px solid var(--border); color:var(--muted); font-size:0.85rem; }
+  .quelle { font-size:0.82rem; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+
+<header class="titel">
+  <p class="logo-wort">CREDO</p>
+  <p class="logo-sub">HR-Portal &middot; Personalmanagement</p>
+  <p class="claim">Prozesskette &amp; Masken-Entw&uuml;rfe</p>
+  <h1>Minijob: So l&auml;uft der Prozess</h1>
+  <p class="untertitel">Der Weg vom angelegten Vorgang bis zur pr&uuml;fungsfesten Akte &mdash; und wie die neuen Angaben in die einzelnen Masken kommen.</p>
+</header>
+
+<div class="seite">
+
+  <div class="meta">
+    <div><b>Bezug:</b> Umsetzung der Minijob-Zentrale-Checkliste (Stand 26.05.2026), siehe <a href="minijob-checkliste-2026.html"><code>minijob-checkliste-2026.html</code></a> (im selben Ordner).</div>
+    <div><b>Grundlage:</b> Die elf am 17.08.2026 getroffenen Entscheidungen &mdash; integriert ins bestehende Formular, Befreiungsantrag in Schriftform, volle Phase&nbsp;1.</div>
+    <div><b>Was das hier ist:</b> Skizzen zur Verst&auml;ndigung, keine fertigen Screens. Farben und Rahmen entsprechen dem echten Portal, Feinheiten sch&auml;rfen wir bei der Umsetzung.</div>
+    <div><b>Noch kein Code:</b> Branch <code>feat/minijob-checkliste-2026</code> ist angelegt, die Umsetzung hat noch nicht begonnen.</div>
+  </div>
+
+  <div class="hinweis info"><span class="label">Lesehilfe</span>
+    <p>
+      In allen Masken-Skizzen ist <span class="neu-tag">NEU</span> gelb markiert, was hinzukommt, und
+      <span class="weg-tag">ENTF&Auml;LLT</span> rot, was verschwindet oder umzieht. Alles ohne Markierung
+      bleibt so, wie es heute ist.
+    </p>
+    <p>
+      <b>Zur Sprache:</b> Alle Beschriftungen stehen im <b>generischen Maskulinum</b>, entsprechend der internen
+      CREDO-Festlegung. Das amtliche Formular der Minijob-Zentrale verwendet bei den Statusoptionen Doppelformen
+      (&bdquo;Sch&uuml;ler(in)&ldquo;, &bdquo;Schulentlassene(r)&ldquo;). Inhaltlich sind die Optionen identisch &mdash;
+      nur die Schreibweise unserer Oberfl&auml;che weicht ab. Da die Checkliste eine interne Arbeitshilfe ist und
+      die Auswahl fachlich unver&auml;ndert bleibt, ist das unkritisch.
+    </p>
+  </div>
+
+  <nav class="inhalt">
+    <h2>Inhalt</h2>
+    <ol>
+      <li><a href="#kette">Die Prozesskette</a>
+        <ol>
+          <li><a href="#gesamt">Gesamtablauf</a></li>
+          <li><a href="#weiche">Die Weiche: Entscheidung zur Rentenversicherung</a></li>
+          <li><a href="#fristen">Die Fristenkette nach dem Antrag</a></li>
+          <li><a href="#wozu">Wozu die vielen Tabellen? Die Zusammenrechnung</a></li>
+          <li><a href="#rollen">Wer macht was</a></li>
+        </ol>
+      </li>
+      <li><a href="#masken">Die Masken</a></li>
+    </ol>
+  </nav>
+
+  <!-- ============================================================ -->
+  <h2 id="kette">1 &middot; Die Prozesskette</h2>
+
+  <h3 id="gesamt">1.1 &middot; Gesamtablauf</h3>
+  <p>
+    Von links oben nach unten gelesen: Wer etwas tut, steht in der Farbe der jeweiligen Rolle.
+    Die einzige echte Verzweigung sitzt im Rentenversicherungs-Schritt &mdash; sie ist im n&auml;chsten Diagramm aufgeklappt.
+  </p>
+
+  <svg class="diagramm" viewBox="0 0 960 1040" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="pf" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L8,3 L0,6 Z" fill="#888"/>
+      </marker>
+      <style>
+        .t{font-family:Montserrat,Arial,sans-serif;fill:#3a3a3a;}
+        .tt{font-weight:700;fill:#575756;}
+        .lbl{font-family:Montserrat,Arial,sans-serif;font-size:12.5px;fill:#777;}
+        .rolle{font-family:Montserrat,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.06em;}
+      </style>
+    </defs>
+
+    <!-- 1 HR -->
+    <rect x="270" y="18" width="420" height="66" rx="10" fill="#f5f5f5" stroke="#575756" stroke-width="1.5"/>
+    <text x="288" y="38" class="rolle" fill="#575756">HR</text>
+    <text x="480" y="52" text-anchor="middle" class="t tt" font-size="15">Vorgang anlegen</text>
+    <text x="480" y="71" text-anchor="middle" class="lbl">Typ Einstellung &#183; Vertragsart Minijob &#8594; Vorlage MINIJOB greift</text>
+    <line x1="480" y1="84" x2="480" y2="112" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- 2 System -->
+    <rect x="270" y="114" width="420" height="60" rx="10" fill="#fffaeb" stroke="#FBC900" stroke-width="1.5"/>
+    <text x="288" y="133" class="rolle" fill="#8a6d00">PORTAL</text>
+    <text x="480" y="147" text-anchor="middle" class="t tt" font-size="15">Magic Link per E-Mail</text>
+    <text x="480" y="165" text-anchor="middle" class="lbl">kein Login n&#246;tig &#183; Link ist befristet</text>
+    <line x1="480" y1="174" x2="480" y2="202" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- 3 Mitarbeiter -->
+    <rect x="180" y="204" width="600" height="176" rx="10" fill="#eef9ff" stroke="#009AC6" stroke-width="1.5"/>
+    <text x="198" y="224" class="rolle" fill="#0a7ca6">MITARBEITER</text>
+    <text x="480" y="240" text-anchor="middle" class="t tt" font-size="15">Fragebogen ausf&#252;llen</text>
+    <text x="210" y="266" class="lbl" font-size="12">1 &#183; Pers&#246;nliche Angaben</text>
+    <text x="210" y="286" class="lbl" font-size="12">2 &#183; Adresse &amp; Kontakt</text>
+    <text x="210" y="306" class="lbl" font-size="12">3 &#183; Bankverbindung</text>
+    <text x="210" y="326" class="lbl" font-size="12">4 &#183; Sozialversicherung</text>
+    <text x="510" y="266" class="lbl" font-size="12">5 &#183; Steuer &#8212; nur Steuer-ID</text>
+    <text x="510" y="286" class="lbl" font-size="12" font-weight="700" fill="#8a6d00">6 &#183; Weitere Besch&#228;ftigungen &amp; Status</text>
+    <text x="510" y="306" class="lbl" font-size="12" font-weight="700" fill="#8a6d00">7 &#183; Rentenversicherung</text>
+    <text x="510" y="326" class="lbl" font-size="12">8 &#183; Zusammenfassung</text>
+    <text x="480" y="358" text-anchor="middle" class="lbl" font-style="italic">Zwischenstand wird laufend gespeichert &#8212; Ausf&#252;llen in mehreren Sitzungen m&#246;glich</text>
+    <line x1="480" y1="380" x2="480" y2="406" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- 4 Weiche -->
+    <polygon points="480,408 700,470 480,532 260,470" fill="#fffaeb" stroke="#FBC900" stroke-width="2"/>
+    <text x="480" y="462" text-anchor="middle" class="t tt" font-size="14">Entscheidung zur Rentenversicherung</text>
+    <text x="480" y="482" text-anchor="middle" class="lbl">vier Wege &#8212; siehe Abschnitt 1.2</text>
+    <line x1="480" y1="532" x2="480" y2="558" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- 5 Nachweise -->
+    <rect x="220" y="560" width="520" height="74" rx="10" fill="#eef9ff" stroke="#009AC6" stroke-width="1.5"/>
+    <text x="238" y="580" class="rolle" fill="#0a7ca6">MITARBEITER</text>
+    <text x="480" y="596" text-anchor="middle" class="t tt" font-size="15">Nachweise hochladen</text>
+    <text x="480" y="616" text-anchor="middle" class="lbl">je nach Angabe: Immatrikulation &#183; PKV-Nachweis &#183; A1 &#183; Zustimmung d. gesetzl. Vertreters</text>
+    <line x1="480" y1="634" x2="480" y2="660" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- 6 Absenden -->
+    <rect x="220" y="662" width="520" height="74" rx="10" fill="#f3faea" stroke="#6BAA24" stroke-width="2"/>
+    <text x="238" y="682" class="rolle" fill="#4d7d18">MITARBEITER</text>
+    <text x="480" y="698" text-anchor="middle" class="t tt" font-size="15">Absenden mit Wahrheitsversicherung</text>
+    <text x="480" y="718" text-anchor="middle" class="lbl">Zeitstempel, Ort, IP, Textversion und Pr&#252;fsumme werden gespeichert</text>
+    <line x1="480" y1="736" x2="480" y2="762" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- 7 HR -->
+    <rect x="220" y="764" width="520" height="74" rx="10" fill="#f5f5f5" stroke="#575756" stroke-width="1.5"/>
+    <text x="238" y="784" class="rolle" fill="#575756">HR</text>
+    <text x="480" y="800" text-anchor="middle" class="t tt" font-size="15">Pr&#252;fen und Antragseingang erfassen</text>
+    <text x="480" y="820" text-anchor="middle" class="lbl">Eingangsdatum eintragen &#8594; Wirkungsdatum wird vorbelegt</text>
+    <line x1="480" y1="838" x2="480" y2="864" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- 8 Meldung -->
+    <rect x="220" y="866" width="520" height="74" rx="10" fill="#fff4f4" stroke="#E2001A" stroke-width="2"/>
+    <text x="238" y="886" class="rolle" fill="#b3121a">HR &#183; FRISTGEBUNDEN</text>
+    <text x="480" y="902" text-anchor="middle" class="t tt" font-size="15">Meldung an die Minijob-Zentrale</text>
+    <text x="480" y="922" text-anchor="middle" class="lbl">DE&#220;V-Verfahren &#183; Portal &#252;berwacht die 6-Wochen-Frist und erinnert</text>
+    <line x1="480" y1="940" x2="480" y2="966" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
+
+    <!-- 9 Ablage -->
+    <rect x="270" y="968" width="420" height="60" rx="10" fill="#ecf6dd" stroke="#6BAA24" stroke-width="2"/>
+    <text x="288" y="987" class="rolle" fill="#4d7d18">PORTAL</text>
+    <text x="480" y="1002" text-anchor="middle" class="t tt" font-size="15">Ablage zu den Entgeltunterlagen</text>
+    <text x="480" y="1020" text-anchor="middle" class="lbl">PDF der Checkliste + alle Nachweise mit Pr&#252;fsumme, nicht mehr l&#246;schbar</text>
+  </svg>
+
+  <div class="legende">
+    <span><b style="background:#575756"></b>HR handelt</span>
+    <span><b style="background:#009AC6"></b>Mitarbeiter handelt</span>
+    <span><b style="background:#FBC900"></b>Portal / Entscheidung</span>
+    <span><b style="background:#6BAA24"></b>Nachweis gesichert</span>
+    <span><b style="background:#E2001A"></b>Frist l&auml;uft</span>
+  </div>
+
+  <!-- ============================================================ -->
+  <h3 id="weiche">1.2 &middot; Die Weiche: Entscheidung zur Rentenversicherung</h3>
+  <p>
+    Das ist der Kern des neuen Rentenversicherungs-Schritts. Die Checkliste kennt hier vier sich ausschlie&szlig;ende Wege &mdash;
+    heute bildet das Portal davon nur einen einzigen Haken ab. Weg&nbsp;D gibt es erst seit dieser Fassung.
+  </p>
+
+  <svg class="diagramm" viewBox="0 0 980 700" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="pf2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L8,3 L0,6 Z" fill="#888"/>
+      </marker>
+      <style>
+        .t2{font-family:Montserrat,Arial,sans-serif;fill:#3a3a3a;}
+        .tt2{font-weight:700;fill:#575756;}
+        .l2{font-family:Montserrat,Arial,sans-serif;font-size:11.5px;fill:#777;}
+        .k2{font-family:Montserrat,Arial,sans-serif;font-size:12px;font-weight:700;}
+      </style>
+    </defs>
+
+    <rect x="240" y="14" width="500" height="58" rx="10" fill="#fffaeb" stroke="#FBC900" stroke-width="2"/>
+    <text x="490" y="38" text-anchor="middle" class="t2 tt2" font-size="15">Schritt 7 &#183; Befreiung von der Rentenversicherungspflicht</text>
+    <text x="490" y="58" text-anchor="middle" class="l2">Genau eine der vier Angaben ist zu w&#228;hlen</text>
+
+    <path d="M490,72 V96 H125 V120" fill="none" stroke="#888" stroke-width="1.6" marker-end="url(#pf2)"/>
+    <path d="M490,96 H367 V120" fill="none" stroke="#888" stroke-width="1.6" marker-end="url(#pf2)"/>
+    <path d="M490,96 H613 V120" fill="none" stroke="#888" stroke-width="1.6" marker-end="url(#pf2)"/>
+    <path d="M490,96 H855 V120" fill="none" stroke="#888" stroke-width="1.6" marker-end="url(#pf2)"/>
+
+    <!-- A -->
+    <rect x="20" y="122" width="210" height="72" rx="9" fill="#f5f5f5" stroke="#999" stroke-width="1.5"/>
+    <text x="125" y="143" text-anchor="middle" class="k2" fill="#575756">A &#183; Keine Befreiung</text>
+    <text x="125" y="162" text-anchor="middle" class="l2">&#8222;Nein, ich m&#246;chte mich nicht</text>
+    <text x="125" y="178" text-anchor="middle" class="l2">befreien lassen.&#8220;</text>
+    <line x1="125" y1="194" x2="125" y2="220" stroke="#999" stroke-width="1.6" marker-end="url(#pf2)"/>
+    <rect x="20" y="222" width="210" height="66" rx="9" fill="#fff" stroke="#ccc"/>
+    <text x="125" y="244" text-anchor="middle" class="t2" font-size="12.5">Rentenversicherungspflichtig</text>
+    <text x="125" y="264" text-anchor="middle" class="l2">Arbeitgeber 15 % pauschal</text>
+    <text x="125" y="280" text-anchor="middle" class="l2">Arbeitnehmer 3,6 % Eigenanteil</text>
+    <line x1="125" y1="288" x2="125" y2="314" stroke="#999" stroke-width="1.6" marker-end="url(#pf2)"/>
+    <rect x="20" y="316" width="210" height="46" rx="9" fill="#ecf6dd" stroke="#6BAA24" stroke-width="1.5"/>
+    <text x="125" y="344" text-anchor="middle" class="k2" fill="#4d7d18">Kein Antrag n&#246;tig</text>
+
+    <!-- B -->
+    <rect x="262" y="122" width="210" height="72" rx="9" fill="#eef9ff" stroke="#009AC6" stroke-width="1.5"/>
+    <text x="367" y="143" text-anchor="middle" class="k2" fill="#0a7ca6">B &#183; Befreiung beantragen</text>
+    <text x="367" y="162" text-anchor="middle" class="l2">&#167; 6 Abs. 1b SGB VI</text>
+    <text x="367" y="178" text-anchor="middle" class="l2">Schriftform erforderlich</text>
+    <line x1="367" y1="194" x2="367" y2="220" stroke="#009AC6" stroke-width="1.8" marker-end="url(#pf2)"/>
+    <rect x="262" y="222" width="210" height="52" rx="9" fill="#fff" stroke="#009AC6"/>
+    <text x="367" y="243" text-anchor="middle" class="t2" font-size="12.5">Merkblatt best&#228;tigen</text>
+    <text x="367" y="262" text-anchor="middle" class="l2">Pflicht &#8212; sonst nicht w&#228;hlbar</text>
+    <line x1="367" y1="274" x2="367" y2="300" stroke="#009AC6" stroke-width="1.8" marker-end="url(#pf2)"/>
+    <rect x="262" y="302" width="210" height="62" rx="9" fill="#fff" stroke="#009AC6"/>
+    <text x="367" y="323" text-anchor="middle" class="t2" font-size="12.5">Antrag drucken,</text>
+    <text x="367" y="341" text-anchor="middle" class="t2" font-size="12.5">unterschreiben, hochladen</text>
+    <text x="367" y="358" text-anchor="middle" class="l2">Pflicht-Upload vor dem Absenden</text>
+    <line x1="367" y1="364" x2="367" y2="390" stroke="#009AC6" stroke-width="1.8" marker-end="url(#pf2)"/>
+    <rect x="262" y="392" width="210" height="62" rx="9" fill="#f5f5f5" stroke="#575756"/>
+    <text x="367" y="413" text-anchor="middle" class="t2" font-size="12.5">HR erfasst Eingangsdatum</text>
+    <text x="367" y="432" text-anchor="middle" class="l2">Wirkung ab Monatsbeginn,</text>
+    <text x="367" y="448" text-anchor="middle" class="l2">fr&#252;hestens Besch&#228;ftigungsbeginn</text>
+    <line x1="367" y1="454" x2="367" y2="480" stroke="#E2001A" stroke-width="2" marker-end="url(#pf2)"/>
+    <rect x="262" y="482" width="210" height="52" rx="9" fill="#fff4f4" stroke="#E2001A" stroke-width="1.8"/>
+    <text x="367" y="503" text-anchor="middle" class="k2" fill="#b3121a">Meldung binnen 6 Wochen</text>
+    <text x="367" y="522" text-anchor="middle" class="l2">Portal erinnert &#8212; siehe 1.3</text>
+
+    <!-- C -->
+    <rect x="508" y="122" width="210" height="72" rx="9" fill="#f5f5f5" stroke="#999" stroke-width="1.5"/>
+    <text x="613" y="143" text-anchor="middle" class="k2" fill="#575756">C &#183; Altersvollrentner</text>
+    <text x="613" y="162" text-anchor="middle" class="l2">nach Regelaltersgrenze bzw.</text>
+    <text x="613" y="178" text-anchor="middle" class="l2">Versorgungsempf&#228;nger</text>
+    <line x1="613" y1="194" x2="613" y2="220" stroke="#999" stroke-width="1.6" marker-end="url(#pf2)"/>
+    <rect x="508" y="222" width="210" height="66" rx="9" fill="#fff" stroke="#ccc"/>
+    <text x="613" y="250" text-anchor="middle" class="t2" font-size="12.5">Rentenversicherungsfrei</text>
+    <text x="613" y="270" text-anchor="middle" class="l2">von Gesetzes wegen</text>
+    <line x1="613" y1="288" x2="613" y2="314" stroke="#999" stroke-width="1.6" marker-end="url(#pf2)"/>
+    <rect x="508" y="316" width="210" height="46" rx="9" fill="#ecf6dd" stroke="#6BAA24" stroke-width="1.5"/>
+    <text x="613" y="336" text-anchor="middle" class="k2" fill="#4d7d18">Befreiung nicht</text>
+    <text x="613" y="352" text-anchor="middle" class="k2" fill="#4d7d18">erforderlich</text>
+
+    <!-- D -->
+    <rect x="750" y="122" width="210" height="72" rx="9" fill="#fffaeb" stroke="#FBC900" stroke-width="2"/>
+    <text x="855" y="143" text-anchor="middle" class="k2" fill="#8a6d00">D &#183; Aufhebung beantragen</text>
+    <text x="855" y="162" text-anchor="middle" class="l2">&#167; 6 Abs. 6 SGB VI</text>
+    <text x="855" y="178" text-anchor="middle" class="l2" font-weight="700" fill="#8a6d00">NEU ab 01.07.2026</text>
+    <line x1="855" y1="194" x2="855" y2="220" stroke="#FBC900" stroke-width="2" marker-end="url(#pf2)"/>
+    <rect x="750" y="222" width="210" height="62" rx="9" fill="#fff" stroke="#FBC900"/>
+    <text x="855" y="243" text-anchor="middle" class="t2" font-size="12.5">Elektronische Erkl&#228;rung</text>
+    <text x="855" y="261" text-anchor="middle" class="t2" font-size="12.5">direkt im Portal</text>
+    <text x="855" y="278" text-anchor="middle" class="l2">kein Ausdruck n&#246;tig</text>
+    <line x1="855" y1="284" x2="855" y2="310" stroke="#FBC900" stroke-width="2" marker-end="url(#pf2)"/>
+    <rect x="750" y="312" width="210" height="62" rx="9" fill="#f5f5f5" stroke="#575756"/>
+    <text x="855" y="333" text-anchor="middle" class="t2" font-size="12.5">HR erfasst Eingangsdatum</text>
+    <text x="855" y="352" text-anchor="middle" class="l2">Wirkung ab 01. des Folgemonats</text>
+    <text x="855" y="368" text-anchor="middle" class="l2">keine R&#252;ckwirkung m&#246;glich</text>
+    <line x1="855" y1="374" x2="855" y2="400" stroke="#E2001A" stroke-width="2" marker-end="url(#pf2)"/>
+    <rect x="750" y="402" width="210" height="52" rx="9" fill="#fff4f4" stroke="#E2001A" stroke-width="1.8"/>
+    <text x="855" y="423" text-anchor="middle" class="k2" fill="#b3121a">Meldung binnen 6 Wochen</text>
+    <text x="855" y="442" text-anchor="middle" class="l2">bindend &#183; nicht widerrufbar</text>
+
+    <text x="490" y="600" text-anchor="middle" class="l2" font-style="italic" font-size="12.5">Wege B und D gelten zugleich f&#252;r alle weiteren Minijobs des Besch&#228;ftigten &#8212; er muss seine anderen Arbeitgeber selbst informieren.</text>
+    <text x="490" y="624" text-anchor="middle" class="l2" font-style="italic" font-size="12.5">Genau daf&#252;r fragt Abschnitt 4a der Checkliste die weiteren Besch&#228;ftigungen ab.</text>
+  </svg>
+
+  <div class="hinweis"><span class="label">Warum Weg B einen Ausdruck verlangt, Weg D aber nicht</span>
+    <p>
+      Die Erl&auml;uterung der Checkliste nennt f&uuml;r den <b>Befreiungs</b>antrag nach &sect;&nbsp;6 Abs.&nbsp;1b SGB&nbsp;VI
+      weiterhin die Schriftform, w&auml;hrend &sect;&nbsp;6 Abs.&nbsp;6 SGB&nbsp;VI f&uuml;r den <b>Aufhebungs</b>antrag
+      ausdr&uuml;cklich auch die elektronische Erkl&auml;rung zul&auml;sst. Wir folgen dieser Trennung &mdash; so wie am
+      17.08.2026 entschieden.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h3 id="fristen">1.3 &middot; Die Fristenkette nach dem Antrag</h3>
+  <p>
+    Diese Kette ist der Grund, warum das Portal ein <b>Eingangsdatum</b> braucht und nicht einfach den Upload-Zeitpunkt
+    nimmt: Ab dem Eingang beim Arbeitgeber l&auml;uft eine Frist, und ob wir sie halten, entscheidet dar&uuml;ber,
+    <b>ab wann</b> die Befreiung wirkt &mdash; und damit &uuml;ber bare Beitr&auml;ge.
+  </p>
+
+  <svg class="diagramm" viewBox="0 0 960 380" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="pf3" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L8,3 L0,6 Z" fill="#888"/>
+      </marker>
+      <style>
+        .t3{font-family:Montserrat,Arial,sans-serif;fill:#3a3a3a;}
+        .l3{font-family:Montserrat,Arial,sans-serif;font-size:11.5px;fill:#777;}
+        .k3{font-family:Montserrat,Arial,sans-serif;font-size:12.5px;font-weight:700;fill:#575756;}
+      </style>
+    </defs>
+
+    <!-- Zeitstrahl -->
+    <line x1="70" y1="96" x2="890" y2="96" stroke="#ddd" stroke-width="3"/>
+
+    <circle cx="90" cy="96" r="8" fill="#009AC6"/>
+    <text x="90" y="72" text-anchor="middle" class="k3">Tag 0</text>
+    <text x="90" y="126" text-anchor="middle" class="l3">Antrag geht bei</text>
+    <text x="90" y="142" text-anchor="middle" class="l3">HR ein</text>
+
+    <circle cx="330" cy="96" r="7" fill="#FBC900"/>
+    <text x="330" y="72" text-anchor="middle" class="k3">Woche 4</text>
+    <text x="330" y="126" text-anchor="middle" class="l3">Portal erinnert</text>
+
+    <circle cx="530" cy="96" r="7" fill="#FBC900"/>
+    <text x="530" y="72" text-anchor="middle" class="k3">Woche 5</text>
+    <text x="530" y="126" text-anchor="middle" class="l3">Portal warnt</text>
+
+    <circle cx="800" cy="96" r="9" fill="#E2001A"/>
+    <text x="800" y="72" text-anchor="middle" class="k3" fill="#b3121a">Woche 6</text>
+    <text x="800" y="126" text-anchor="middle" class="l3">sp&#228;tester Termin f&#252;r die</text>
+    <text x="800" y="142" text-anchor="middle" class="l3">Meldung an die Minijob-Zentrale</text>
+
+    <!-- Ausgang gut -->
+    <path d="M800,150 V186 H300 V212" fill="none" stroke="#6BAA24" stroke-width="2" marker-end="url(#pf3)"/>
+    <rect x="60" y="214" width="480" height="70" rx="9" fill="#f3faea" stroke="#6BAA24" stroke-width="1.8"/>
+    <text x="300" y="238" text-anchor="middle" class="t3" font-size="13.5" font-weight="700" fill="#4d7d18">Rechtzeitig gemeldet</text>
+    <text x="300" y="258" text-anchor="middle" class="l3">Die Befreiung wirkt ab Beginn des Kalendermonats,</text>
+    <text x="300" y="274" text-anchor="middle" class="l3">in dem der Antrag einging &#8212; fr&#252;hestens ab Besch&#228;ftigungsbeginn.</text>
+
+    <!-- Ausgang schlecht -->
+    <path d="M800,150 V186 H700 V212" fill="none" stroke="#E2001A" stroke-width="2" marker-end="url(#pf3)"/>
+    <rect x="560" y="214" width="380" height="70" rx="9" fill="#fff4f4" stroke="#E2001A" stroke-width="1.8"/>
+    <text x="750" y="238" text-anchor="middle" class="t3" font-size="13.5" font-weight="700" fill="#b3121a">Frist vers&#228;umt</text>
+    <text x="750" y="258" text-anchor="middle" class="l3">Die Befreiung wirkt erst nach Ablauf des Monats,</text>
+    <text x="750" y="274" text-anchor="middle" class="l3">der auf den Eingang der Meldung folgt.</text>
+
+    <text x="480" y="330" text-anchor="middle" class="l3" font-style="italic">Die Differenz tr&#228;gt der Arbeitgeber: F&#252;r die dazwischenliegenden Monate bleibt der Arbeitnehmeranteil von 3,6 % f&#228;llig,</text>
+    <text x="480" y="350" text-anchor="middle" class="l3" font-style="italic">obwohl der Besch&#228;ftigte die Befreiung rechtzeitig beantragt hatte.</text>
+  </svg>
+
+  <div class="hinweis warnung"><span class="label">Das ist der teuerste Punkt im ganzen Prozess</span>
+    <p>
+      Heute hat das Portal <b>weder ein Eingangsdatum noch eine Fristen&uuml;berwachung</b>. Ein verpasster Termin f&auml;llt
+      erst in der Betriebspr&uuml;fung auf &mdash; dann r&uuml;ckwirkend f&uuml;r alle betroffenen Minijobber.
+      Deshalb steht die Fristen-Ampel in Phase&nbsp;1 und nicht in Phase&nbsp;2.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h3 id="wozu">1.4 &middot; Wozu die vielen Tabellen? Die Zusammenrechnung</h3>
+  <p>
+    Schritt&nbsp;6 wirkt auf den ersten Blick &uuml;berladen. Der Grund ist eine einzige Rechtsfolge: Mehrere Minijobs
+    werden <b>zusammengerechnet</b>. Erst die Summe entscheidet, ob es &uuml;berhaupt noch ein Minijob ist.
+  </p>
+
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:34%">Konstellation</th><th>Folge f&uuml;r die Sozialversicherung</th><th style="width:22%">Wonach wir fragen</th></tr>
+    <tr>
+      <td>Nur dieser eine Minijob</td>
+      <td>Geringf&uuml;gig entlohnt. Kranken- und Pflegeversicherung frei, Rentenversicherung je nach Entscheidung aus Schritt&nbsp;11.</td>
+      <td>Abschnitt 4a, Grundfrage</td>
+    </tr>
+    <tr>
+      <td>Minijob <b>neben</b> einer sozialversicherungspflichtigen Hauptbesch&auml;ftigung</td>
+      <td>Der <i>erste</i> Minijob wird nicht mit der Hauptbesch&auml;ftigung zusammengerechnet &mdash; er bleibt versicherungsfrei in der Krankenversicherung.</td>
+      <td>Abschnitt 2, Status</td>
+    </tr>
+    <tr>
+      <td><b>Jeder weitere</b> Minijob neben einer Hauptbesch&auml;ftigung</td>
+      <td>Wird mit der Hauptbesch&auml;ftigung zusammengerechnet und ist voll versicherungs- und beitragspflichtig in Kranken-, Pflege- und Rentenversicherung.</td>
+      <td>Abschnitt 4a, Tabelle</td>
+    </tr>
+    <tr>
+      <td>Mehrere Minijobs, <b>Summe &uuml;ber</b> der Geringf&uuml;gigkeitsgrenze</td>
+      <td>Keine geringf&uuml;gige Besch&auml;ftigung mehr &mdash; es gelten die allgemeinen Regeln f&uuml;r versicherungspflichtige Arbeitnehmer.</td>
+      <td>Abschnitt 4a, Additionsfrage</td>
+    </tr>
+    <tr>
+      <td>Kurzfristige Besch&auml;ftigung mit Vorbesch&auml;ftigungen im selben Kalenderjahr</td>
+      <td>&Uuml;berschreiten die Zeiten zusammen drei Monate bzw. 70 Arbeitstage, entf&auml;llt die Abgabenfreiheit.</td>
+      <td>Abschnitt 4b, Tabelle</td>
+    </tr>
+    <tr>
+      <td>Zus&auml;tzliche T&auml;tigkeit im EU-Ausland</td>
+      <td>M&ouml;glicherweise gilt ausl&auml;ndisches Sozialversicherungsrecht &mdash; dann sind dort Beitr&auml;ge zu zahlen. Kl&auml;rung &uuml;ber die Bescheinigung&nbsp;A1.</td>
+      <td>Abschnitt 4c</td>
+    </tr>
+  </table>
+  </div>
+
+  <div class="ergebnis"><span class="label">Deshalb reicht ein Ja/Nein-H&auml;kchen nicht</span>
+    <p>
+      Jede Zeile oben braucht andere Angaben: mal ein Datum, mal die Art der anderen Besch&auml;ftigung, mal die Zahl
+      der Arbeitstage. Genau deshalb verlangt die Checkliste Tabellen mit mehreren Zeilen &mdash; und genau deshalb
+      kommt das Portal mit den heutigen zwei Textfeldern nicht aus.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <h3 id="rollen">1.5 &middot; Wer macht was</h3>
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:16%">Rolle</th><th style="width:42%">Aufgabe</th><th>Wo im Portal</th></tr>
+    <tr><td><b>HR</b></td><td>Vorgang anlegen, Magic Link ausl&ouml;sen</td><td>Dashboard &rarr; Neuer Vorgang</td></tr>
+    <tr><td><b>Mitarbeiter</b></td><td>Fragebogen ausf&uuml;llen, Nachweise hochladen, Wahrheitsversicherung best&auml;tigen</td><td>&Ouml;ffentliches Formular &uuml;ber den Magic Link</td></tr>
+    <tr><td><b>Mitarbeiter</b></td><td>Bei Weg&nbsp;B: Befreiungsantrag ausdrucken, unterschreiben, hochladen</td><td>Schritt&nbsp;7 <span class="badge badge-gelb">neu</span></td></tr>
+    <tr><td><b>Gesetzl. Vertreter</b></td><td>Bei Minderj&auml;hrigen: Zustimmung unterschreiben</td><td>Upload &uuml;ber den Mitarbeiter <span class="badge badge-gelb">neu</span></td></tr>
+    <tr><td><b>HR</b></td><td>Angaben pr&uuml;fen, Eingangsdatum des Antrags erfassen, Wirkungsdatum best&auml;tigen</td><td>Vorgangs-Detailseite <span class="badge badge-gelb">neu</span></td></tr>
+    <tr><td><b>Portal</b></td><td>Fristen &uuml;berwachen, nach 4 und 5 Wochen erinnern</td><td>Ampel auf der Detailseite + E-Mail <span class="badge badge-gelb">neu</span></td></tr>
+    <tr><td><b>HR</b></td><td>Meldung an die Minijob-Zentrale (DE&Uuml;V), anschlie&szlig;end im Portal abhaken</td><td>au&szlig;erhalb des Portals, Nachweis im Portal</td></tr>
+    <tr><td><b>Portal</b></td><td>Alles zu den Entgeltunterlagen ablegen, gegen L&ouml;schen sichern</td><td>Dokumente-Hub + PDF-Export</td></tr>
+    <tr><td><b>SUPER_ADMIN</b></td><td>Rechengr&ouml;&szlig;en pflegen, wenn sich die Grenze &auml;ndert</td><td>Einstellungen <span class="badge badge-gelb">neu</span></td></tr>
+  </table>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="masken">2 &middot; Die Masken</h2>
+
+  <p>
+    Alle Skizzen zeigen den Zustand <b>nach</b> der Umsetzung, im Rahmen der echten Oberfl&auml;che.
+    Gelb markiert ist, was neu dazukommt; rot, was verschwindet oder umzieht.
+  </p>
+
+  <div class="hinweis info"><span class="label">Die Schritt-Strecke wird k&uuml;rzer, nicht l&auml;nger</span>
+    <p>
+      Heute durchl&auml;uft ein Minijobber neun Schritte &mdash; auch Bildung&nbsp;&amp;&nbsp;Beruf und Masernschutz,
+      obwohl beide f&uuml;r ihn abgeschaltet sein sollten (der Fehler aus Befund&nbsp;1). Nach dem Umbau sind es
+      <b>acht</b>, und jeder davon ist f&uuml;r ihn relevant:
+    </p>
+    <div class="fortschritt" style="border:1px solid var(--border);border-radius:8px;margin-top:0.8rem;">
+      <div class="schritte">
+        <span>1 Pers&ouml;nliche Angaben</span><span>2 Adresse &amp; Kontakt</span><span>3 Bankverbindung</span>
+        <span>4 Sozialversicherung</span><span>5 Steuer</span>
+        <span class="neu">6 Weitere Besch&auml;ftigungen &amp; Status</span>
+        <span class="neu">7 Rentenversicherung</span><span>8 Zusammenfassung</span>
+      </div>
+    </div>
+    <p style="margin-top:0.7rem;font-size:0.88rem;">
+      Die Nummern im Umsetzungsplan (&bdquo;Schritt&nbsp;6&ldquo;, &bdquo;Schritt&nbsp;11&ldquo;) sind interne
+      Registry-Nummern. <b>Der Mitarbeiter sieht die Z&auml;hlung oben</b> &mdash; also &bdquo;Schritt&nbsp;7&nbsp;/&nbsp;8&ldquo;
+      f&uuml;r die Rentenversicherung. Im Vorlagen-Editor steht die Rentenversicherung dagegen als
+      &bdquo;11&ldquo; <i>unter</i> der Zusammenfassung &mdash; im Fragebogen erscheint sie <i>davor</i>. Beides ist gewollt.
+    </p>
+  </div>
+
+  <div class="hinweis warnung"><span class="label">Eine Frage, die dabei auff&auml;llt: Bildung &amp; Beruf</span>
+    <p>
+      In der Minijob-Vorlage sind &bdquo;Bildung &amp; Beruf&ldquo; und &bdquo;Masernschutz&ldquo; als deaktiviert
+      hinterlegt &mdash; heute werden sie dem Minijobber aber trotzdem gezeigt (Befund&nbsp;1). <b>Nach dem
+      Renderer-Fix verschwinden beide tats&auml;chlich.</b>
+    </p>
+    <p>
+      Beim Masernschutz ist das unproblematisch. Bei &bdquo;Bildung &amp; Beruf&ldquo; ist es eine echte Frage:
+      Der T&auml;tigkeitsschl&uuml;ssel der Meldung zur Sozialversicherung verlangt Schulabschluss und
+      Berufsausbildung <i>auch</i> f&uuml;r geringf&uuml;gig Besch&auml;ftigte. Wenn die Lohnbuchhaltung diese Angaben
+      heute aus dem Fragebogen zieht, w&uuml;rden sie ihr k&uuml;nftig fehlen.
+    </p>
+    <p>
+      Das ist dieselbe Art von Falle wie bei der Steuer-ID &mdash; deshalb steht es hier und nicht in einem
+      Nebensatz. <b>Zu kl&auml;ren:</b> Braucht die Lohnbuchhaltung diese beiden Angaben bei Minijobs? Wenn ja,
+      lassen wir Schritt&nbsp;&bdquo;Bildung &amp; Beruf&ldquo; f&uuml;r Minijob aktiv &mdash; dann sind es neun statt acht Schritte.
+    </p>
+  </div>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.1 &middot; Schritt 1 &mdash; Pers&ouml;nliche Angaben</h3>
+  <p>Eine einzige Erg&auml;nzung, aber eine mit Folgen: Die Checkliste verlangt das <b>Geschlecht</b> als Ersatzangabe, wenn keine Rentenversicherungsnummer vorliegt &mdash; und kennt dort ausdr&uuml;cklich &bdquo;divers&ldquo;.</p>
+
+  <div class="mock">
+    <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
+      <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
+      <div class="mock-user" style="display:flex;align-items:center;gap:0.6rem;">
+        <span style="color:var(--gruen);font-size:0.78rem;font-weight:600;">Gespeichert</span>
+        <span class="badge badge-grau">Schritt 1 / 8</span>
+      </div>
+    </div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:12.5%;background:#575756;"></div></div>
+    <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="fortschritt" style="border-bottom:1px solid #eee;">
+      <div class="schritte">
+        <span class="here">1 Pers&ouml;nliche Angaben</span><span>2 Adresse</span><span>3 Bank</span><span>4 Sozialversicherung</span><span>5 Steuer</span><span>6 Besch&auml;ftigungen</span><span>7 Rentenversicherung</span><span>8 Zusammenfassung</span>
+      </div>
+    </div>
+    <div class="mock-body">
+      <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
+        <div style="font-weight:700;color:var(--grau-dunkel);">Pers&ouml;nliche Angaben</div>
+        <div style="font-size:0.82rem;color:var(--muted);">Name, Geburtsdatum, Familienstand</div>
+      </div>
+      <div class="feld"><label>Anrede <span class="pflicht">*</span></label>
+        <div style="display:flex;gap:1.2rem;margin-top:0.2rem;">
+          <span class="radio an"><i></i>Herr</span><span class="radio"><i></i>Frau</span>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="feld"><label>Vorname <span class="pflicht">*</span></label><div class="input">Lena</div></div>
+        <div class="feld"><label>Nachname <span class="pflicht">*</span></label><div class="input">Bergmann</div></div>
+      </div>
+      <div class="grid2">
+        <div class="feld"><label>Geburtsdatum <span class="pflicht">*</span></label><div class="input">14.03.2008</div></div>
+        <div class="feld"><label>Geburtsort <span class="pflicht">*</span></label><div class="input">Minden</div></div>
+      </div>
+      <div class="feld neu"><label>Geschlecht <span class="neu-tag">NEU</span></label>
+        <div style="display:flex;gap:1.2rem;margin-top:0.2rem;">
+          <span class="radio an"><i></i>weiblich</span><span class="radio"><i></i>m&auml;nnlich</span><span class="radio"><i></i>divers</span>
+        </div>
+        <div class="hilfe">Wird f&uuml;r die Meldung zur Sozialversicherung ben&ouml;tigt, wenn keine Rentenversicherungsnummer vorliegt.</div>
+      </div>
+      <div class="grid2">
+        <div class="feld"><label>Geburtsname</label><div class="input ph">nur falls abweichend</div></div>
+        <div class="feld"><label>Staatsangeh&ouml;rigkeit</label><div class="input">deutsch</div></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:1rem;"><span class="btn btn-sm">Weiter</span></div>
+    </div>
+  </div>
+  <p class="mock-cap">Bisher gab es nur die Anrede mit &bdquo;Herr&ldquo; und &bdquo;Frau&ldquo;. Die Anrede bleibt unver&auml;ndert &mdash; das Geschlecht kommt als eigenes Feld daneben, weil die amtliche Meldung es getrennt f&uuml;hrt.</p>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.2 &middot; Schritt 4 &mdash; Sozialversicherung</h3>
+  <p>Hier passieren drei Dinge gleichzeitig: Die <b>Art der Versicherung</b> kommt dazu, der <b>PKV-Nachweis</b> wird bei &bdquo;privat&ldquo; zur Pflicht &mdash; und die alte Minijob-Checkbox <b>zieht um</b> in den eigenen Rentenversicherungs-Schritt.</p>
+
+  <div class="mock">
+    <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
+      <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 4 / 8</span></div>
+    </div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:50%;background:#575756;"></div></div>
+    <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
+        <div style="font-weight:700;color:var(--grau-dunkel);">Sozialversicherung</div>
+        <div style="font-size:0.82rem;color:var(--muted);">SV-Nummer, Krankenkasse</div>
+      </div>
+      <div class="feld"><label>SV-Nummer</label><div class="input ph">12 345678 A 123</div>
+        <div class="hilfe">Die SV-Nummer finden Sie auf Ihrem Sozialversicherungsausweis.</div>
+      </div>
+      <div class="hinweis info" style="margin:0.6rem 0;padding:0.6rem 0.9rem;font-size:0.84rem;">
+        <span class="label" style="font-size:0.84rem;">Wenn Sie keine SV-Nummer haben <span class="neu-tag">NEU</span></span>
+        <p style="margin:0;font-size:0.82rem;">Dann werden Geburtsname, Geburtsdatum, Geburtsort, Geschlecht und Staatsangeh&ouml;rigkeit zu Pflichtangaben &mdash; das Portal fordert sie automatisch nach.</p>
+      </div>
+      <div class="feld"><label>Versicherungsart <span class="pflicht">*</span></label>
+        <div style="display:flex;gap:1.2rem;margin-top:0.2rem;">
+          <span class="radio an"><i></i>Gesetzlich versichert</span><span class="radio"><i></i>Privat versichert</span>
+        </div>
+      </div>
+      <div class="feld neu"><label>Art der Versicherung <span class="pflicht">*</span> <span class="neu-tag">NEU</span></label>
+        <div style="margin-top:0.2rem;">
+          <span class="radio an"><i></i><span>Eigene Mitgliedschaft</span></span>
+          <span class="radio"><i></i><span>Familienversicherung</span></span>
+          <span class="radio"><i></i><span>Freiwillig gesetzlich versichert</span></span>
+        </div>
+        <div class="hilfe">Erscheint nur bei &bdquo;Gesetzlich versichert&ldquo;. Entscheidet mit dar&uuml;ber, ob der Arbeitgeber den Pauschalbeitrag zur Krankenversicherung zahlt.</div>
+      </div>
+      <div class="feld"><label>Krankenkasse <span class="pflicht">*</span></label><div class="input">AOK NordWest</div></div>
+      <div class="hinweis warnung neu" style="margin:0.8rem 0;padding:0.6rem 0.9rem;">
+        <span class="label" style="font-size:0.84rem;">Bei &bdquo;Privat versichert&ldquo; <span class="neu-tag">NEU</span></span>
+        <p style="margin:0;font-size:0.82rem;">Ein Nachweis &uuml;ber die private Krankenversicherung wird zum <b>Pflichtdokument</b> &mdash; ohne ihn kann der Fragebogen nicht abgesendet werden. Der Arbeitgeber muss ihn zu den Entgeltunterlagen nehmen.</p>
+      </div>
+      <div class="feld"><label>Haben Sie Kinder?</label>
+        <span class="check"><i></i><span>Bitte ankreuzen, wenn Sie leibliche, adoptierte oder Stiefkinder haben.</span></span>
+      </div>
+      <div class="weg" style="margin:0.9rem 0;padding:0.6rem 0.9rem;">
+        <div style="font-size:0.85rem;">
+          <span class="check" style="margin:0;"><i></i><span class="durchgestrichen">RV-Befreiung Minijob</span></span>
+          <span class="weg-tag">ZIEHT UM</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:0.3rem;">
+          Die einzelne Checkbox verschwindet hier. Die Rentenversicherung bekommt einen eigenen Schritt&nbsp;7 &mdash; die Checkliste verlangt dort eine Auswahl aus vier Wegen, nicht ein Ja/Nein.
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:1rem;"><span class="btn btn-outline btn-sm">Zur&uuml;ck</span><span class="btn btn-sm">Weiter</span></div>
+    </div>
+  </div>
+  <p class="mock-cap">Der Kinder-Block (blau umrandet) bleibt unver&auml;ndert und klappt weiterhin inline auf.</p>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.3 &middot; Schritt 5 &mdash; Steuer</h3>
+  <p>Der Schritt wird f&uuml;r Minijob <b>eingeschaltet</b>, aber auf ein einziges Feld reduziert. So bleibt die von der Checkliste geforderte Steuer-ID erhalten, ohne dass jemand nach Steuerklasse und Religionszugeh&ouml;rigkeit gefragt wird, die bei Pauschalbesteuerung keine Rolle spielen.</p>
+
+  <div class="mock">
+    <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
+      <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 5 / 8</span></div>
+    </div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:62.5%;background:#575756;"></div></div>
+    <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
+        <div style="font-weight:700;color:var(--grau-dunkel);">Steuer</div>
+        <div style="font-size:0.82rem;color:var(--muted);">Steuer-ID</div>
+      </div>
+      <div class="feld"><label>Steuer-ID <span class="pflicht">*</span></label><div class="input">12345678901</div>
+        <div class="hilfe">Die 11-stellige Steuer-ID finden Sie auf Ihrem Steuerbescheid oder in Schreiben des Finanzamtes. Sie ist lebenslang g&uuml;ltig.</div>
+      </div>
+      <div class="weg" style="margin:0.9rem 0;padding:0.6rem 0.9rem;font-size:0.85rem;">
+        <div><span class="durchgestrichen">Steuerklasse</span> &middot; <span class="durchgestrichen">J&auml;hrlicher Freibetrag</span> &middot; <span class="durchgestrichen">Kinderfreibetrag</span> &middot; <span class="durchgestrichen">Religionszugeh&ouml;rigkeit</span> <span class="weg-tag">AUSGEBLENDET</span></div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:0.3rem;">Nur in der Minijob-Vorlage ausgeblendet &mdash; per Feld-Konfiguration im Vorlagen-Editor, siehe 2.8. In allen anderen Vorlagen bleibt der Schritt vollst&auml;ndig.</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:1rem;"><span class="btn btn-outline btn-sm">Zur&uuml;ck</span><span class="btn btn-sm">Weiter</span></div>
+    </div>
+  </div>
+  <p class="mock-cap">Ohne diesen Eingriff w&uuml;rde die Steuer-ID beim Renderer-Fix aus dem Minijob-Fragebogen verschwinden &mdash; die Falle aus Abschnitt&nbsp;3 des Plandokuments.</p>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.4 &middot; Schritt 6 &mdash; Weitere Besch&auml;ftigungen &amp; Status</h3>
+  <p>
+    Der gr&ouml;&szlig;te Umbau. Aus zwei Textfeldern wird der fachliche Kern der Checkliste: Besch&auml;ftigungsstatus,
+    drei Tabellen und die Additionsfrage. Damit der Schritt nicht erschl&auml;gt, erscheinen die Tabellen
+    <b>nur, wenn die jeweilige Grundfrage mit Ja beantwortet ist</b>.
+  </p>
+
+  <div class="mock">
+    <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
+      <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 6 / 8</span></div>
+    </div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:75%;background:#575756;"></div></div>
+    <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
+        <div style="font-weight:700;color:var(--grau-dunkel);">Weitere Besch&auml;ftigungen &amp; Status <span class="neu-tag">UMGEBAUT</span></div>
+        <div style="font-size:0.82rem;color:var(--muted);">Ihre Situation bei Besch&auml;ftigungsbeginn und weitere Arbeitgeber</div>
+      </div>
+
+      <div class="hinweis info" style="margin:0 0 1rem;padding:0.6rem 0.9rem;font-size:0.83rem;">
+        <p style="margin:0;">Diese Angaben brauchen wir, um Ihre Besch&auml;ftigung sozialversicherungsrechtlich korrekt einzustufen. Sie sind gesetzlich verpflichtet, sie vollst&auml;ndig zu machen (&sect;&nbsp;28o SGB&nbsp;IV).</p>
+      </div>
+
+      <div class="neu" style="padding-top:0.5rem;padding-bottom:0.5rem;">
+        <div class="ktitel" style="font-size:0.92rem;">Ihr Status bei Beginn der Besch&auml;ftigung <span class="pflicht">*</span> <span class="neu-tag">NEU</span></div>
+        <div class="ksub" style="margin-bottom:0.5rem;">Bitte w&auml;hlen Sie die Angabe, die auf Sie zutrifft.</div>
+        <div class="grid2" style="gap:0.1rem 1.4rem;">
+          <div>
+            <span class="radio an"><i></i><span>Sch&uuml;ler<small>w&auml;hrend des Besuchs einer allgemeinbildenden Schule</small></span></span>
+            <span class="radio"><i></i><span>Student</span></span>
+            <span class="radio"><i></i><span>Schulentlassener mit Berufsausbildungsabsicht</span></span>
+            <span class="radio"><i></i><span>Schulentlassener mit Studienabsicht</span></span>
+            <span class="radio"><i></i><span>Schulentlassener mit Freiwilligendienstabsicht</span></span>
+            <span class="radio"><i></i><span>Besch&auml;ftigungsloser Arbeit- oder Ausbildungsuchender</span></span>
+            <span class="radio"><i></i><span>Freiwilligendienstleistender</span></span>
+            <span class="radio"><i></i><span>Praktikant</span></span>
+            <span class="radio"><i></i><span>Beamter</span></span>
+          </div>
+          <div>
+            <span class="radio"><i></i><span>Selbstst&auml;ndiger</span></span>
+            <span class="radio"><i></i><span>Arbeitnehmer mit sozialversicherungspflichtiger Hauptbesch&auml;ftigung</span></span>
+            <span class="radio"><i></i><span>Arbeitnehmer im unbezahlten Urlaub</span></span>
+            <span class="radio"><i></i><span>Arbeitnehmer in der Elternzeit</span></span>
+            <span class="radio"><i></i><span>Altersvollrentner vor Erreichen der Regelaltersgrenze</span></span>
+            <span class="radio"><i></i><span>Altersvollrentner nach Erreichen der Regelaltersgrenze</span></span>
+            <span class="radio"><i></i><span>Versorgungsempf&auml;nger nach Erreichen einer Altersgrenze</span></span>
+            <span class="radio"><i></i><span>Sonstige</span></span>
+            <div class="feld" style="margin:0.2rem 0 0 1.4rem;"><div class="input ph" style="font-size:0.8rem;">Bitte n&auml;her bezeichnen</div></div>
+          </div>
+        </div>
+        <div class="hinweis" style="margin:0.7rem 0 0;padding:0.5rem 0.8rem;font-size:0.8rem;">
+          <p style="margin:0;">Weil Sie <b>Sch&uuml;ler</b> gew&auml;hlt haben, ben&ouml;tigen wir sp&auml;ter eine <b>Schulbescheinigung</b> als Nachweis.</p>
+        </div>
+      </div>
+
+      <div class="neu" style="margin-top:1rem;padding-top:0.5rem;padding-bottom:0.5rem;">
+        <div class="ktitel" style="font-size:0.92rem;">Meldung bei der Agentur f&uuml;r Arbeit <span class="neu-tag">NEU</span></div>
+        <span class="check" style="margin-top:0.3rem;"><i></i><span>Ich bin als arbeitsuchend oder ausbildungsuchend gemeldet.<small>Bitte auch ankreuzen, wenn Sie derzeit keine Leistungen beziehen.</small></span></span>
+        <div class="grid2" style="margin-left:1.4rem;opacity:0.5;">
+          <div class="feld" style="margin:0.3rem 0;"><label>Zust&auml;ndige Agentur f&uuml;r Arbeit <span class="pflicht">*</span></label><div class="input ph">z.B. Agentur f&uuml;r Arbeit Minden</div></div>
+          <div class="feld" style="margin:0.3rem 0;"><label>Leistungsbezug <span class="pflicht">*</span></label>
+            <span class="radio"><i></i>Mit Leistungsbezug</span><span class="radio"><i></i>Ohne Leistungsbezug</span>
+          </div>
+        </div>
+        <div class="hilfe" style="margin-left:1.4rem;">Erscheint nur, wenn das H&auml;kchen gesetzt ist. Die Angabe entscheidet bei kurzfristiger Besch&auml;ftigung &uuml;ber die Berufsm&auml;&szlig;igkeit.</div>
+      </div>
+
+      <div class="neu" style="margin-top:1rem;padding-top:0.5rem;padding-bottom:0.5rem;">
+        <div class="ktitel" style="font-size:0.92rem;">Weitere Besch&auml;ftigungen bei anderen Arbeitgebern <span class="neu-tag">NEU</span></div>
+        <div class="ksub" style="margin-bottom:0.4rem;">Bestehen derzeit ein oder mehrere Besch&auml;ftigungsverh&auml;ltnisse bei anderen Arbeitgebern? <span class="pflicht">*</span></div>
+        <span class="radio"><i></i>Nein</span>
+        <span class="radio an"><i></i>Ja &mdash; bitte unten eintragen</span>
+
+        <div class="zeilenblock">
+          <div class="znr">BESCH&Auml;FTIGUNG 1</div>
+          <div class="grid3">
+            <div class="feld" style="margin:0.4rem 0;"><label>Besch&auml;ftigungsbeginn</label><div class="input">01.02.2026</div></div>
+            <div class="feld" style="margin:0.4rem 0;"><label>Arbeitgeber <span style="font-weight:400;color:var(--muted);">(freiwillig)</span></label><div class="input">B&auml;ckerei Lindemann</div></div>
+            <div class="feld" style="margin:0.4rem 0;"><label>Adresse <span style="font-weight:400;color:var(--muted);">(freiwillig)</span></label><div class="input ph">Stra&szlig;e, PLZ, Ort</div></div>
+          </div>
+          <div class="feld" style="margin:0.3rem 0 0;"><label>Diese Besch&auml;ftigung ist / war</label>
+            <span class="radio an"><i></i><span>geringf&uuml;gig entlohnt &ndash; <b>mit</b> Eigenanteil zur Rentenversicherung</span></span>
+            <span class="radio"><i></i><span>geringf&uuml;gig entlohnt &ndash; <b>ohne</b> Eigenanteil zur Rentenversicherung</span></span>
+            <span class="radio"><i></i><span>mehr als geringf&uuml;gig entlohnt</span></span>
+          </div>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-top:0.3rem;">
+          <span class="btn btn-outline btn-sm">+ Weitere Besch&auml;ftigung hinzuf&uuml;gen</span>
+        </div>
+
+        <div class="feld" style="margin-top:0.9rem;"><label>Ergibt die Summe aller geringf&uuml;gigen Besch&auml;ftigungen regelm&auml;&szlig;ig mehr als 603&nbsp;&euro; im Monat? <span class="pflicht">*</span></label>
+          <span class="radio an"><i></i>Nein</span><span class="radio"><i></i>Ja</span>
+          <div class="hilfe">Der Betrag wird aus den zentral gepflegten Rechengr&ouml;&szlig;en eingesetzt &mdash; bei einer Gesetzes&auml;nderung &auml;ndert er sich hier automatisch mit.</div>
+        </div>
+      </div>
+
+      <div class="neu" style="margin-top:1rem;padding-top:0.5rem;padding-bottom:0.5rem;">
+        <div class="ktitel" style="font-size:0.92rem;">Vorbesch&auml;ftigungen in diesem Kalenderjahr <span class="neu-tag">NEU</span></div>
+        <div class="ksub" style="margin-bottom:0.4rem;">Nur bei kurzfristiger Besch&auml;ftigung auszuf&uuml;llen. <span class="pflicht">*</span></div>
+        <span class="radio an"><i></i>Nein</span>
+        <span class="radio"><i></i>Ja &mdash; bitte unten eintragen</span>
+        <div class="zeilenblock" style="opacity:0.5;">
+          <div class="znr">VORBESCH&Auml;FTIGUNG 1 &mdash; erscheint erst bei &bdquo;Ja&ldquo;</div>
+          <div class="grid3">
+            <div class="feld" style="margin:0.4rem 0;"><label>Von &ndash; bis</label><div class="input ph">TT.MM.JJJJ &ndash; TT.MM.JJJJ</div></div>
+            <div class="feld" style="margin:0.4rem 0;"><label>Tats&auml;chliche Arbeitstage</label><div class="input ph">z.B. 18</div></div>
+            <div class="feld" style="margin:0.4rem 0;"><label>Entgelt &uuml;ber 603&nbsp;&euro;?</label><div class="input ph">Ja / Nein</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="neu" style="margin-top:1rem;padding-top:0.5rem;padding-bottom:0.5rem;">
+        <div class="ktitel" style="font-size:0.92rem;">Besch&auml;ftigung oder selbstst&auml;ndige T&auml;tigkeit im Ausland <span class="neu-tag">NEU</span></div>
+        <div class="ksub" style="margin-bottom:0.4rem;">Besteht derzeit im Ausland ein Besch&auml;ftigungsverh&auml;ltnis oder eine selbstst&auml;ndige T&auml;tigkeit? <span class="pflicht">*</span></div>
+        <span class="radio an"><i></i>Nein</span>
+        <span class="radio"><i></i>Ja &mdash; Bescheinigung A1 wird ben&ouml;tigt</span>
+        <div class="hilfe">Bei &bdquo;Ja&ldquo; wird die Bescheinigung&nbsp;A1 zum Pflichtdokument.</div>
+      </div>
+
+      <div class="weg" style="margin:1rem 0 0;padding:0.6rem 0.9rem;font-size:0.85rem;">
+        <div><span class="durchgestrichen">Arbeitgeber-Name</span> &middot; <span class="durchgestrichen">Wochenstunden (Nebenjob)</span> &middot; <span class="durchgestrichen">Minijob vorhanden?</span> <span class="weg-tag">ERSETZT</span></div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:0.3rem;">Die drei alten Felder gehen in der Tabelle auf. &bdquo;Arbeitgeber-Typ&ldquo; (Haupt-/Nebenarbeitgeber) bleibt und steht k&uuml;nftig beim Status.</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:1rem;"><span class="btn btn-outline btn-sm">Zur&uuml;ck</span><span class="btn btn-sm">Weiter</span></div>
+    </div>
+  </div>
+  <p class="mock-cap">Im Bild sind alle drei Bl&ouml;cke aufgeklappt, damit man den Umfang sieht. Real sieht ein Minijobber ohne Nebenjob nur die drei Grundfragen und den Status &mdash; also gut eine Bildschirmh&ouml;he.</p>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.5 &middot; Schritt 7 &mdash; Rentenversicherung</h3>
+  <p>Komplett neu und nur in der Minijob-Vorlage aktiv. Hier sitzt die Vierfach-Verzweigung aus Abschnitt&nbsp;1.2.</p>
+
+  <div class="mock">
+    <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
+      <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 7 / 8</span></div>
+    </div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:87.5%;background:#575756;"></div></div>
+    <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
+        <div style="font-weight:700;color:var(--grau-dunkel);">Rentenversicherung <span class="neu-tag">NEUER SCHRITT</span></div>
+        <div style="font-size:0.82rem;color:var(--muted);">Befreiung von der Versicherungspflicht</div>
+      </div>
+
+      <div class="hinweis info" style="margin:0 0 1rem;padding:0.7rem 0.9rem;font-size:0.83rem;">
+        <span class="label" style="font-size:0.85rem;">Bevor Sie w&auml;hlen</span>
+        <p style="margin:0.2rem 0 0.5rem;">Als geringf&uuml;gig Besch&auml;ftigter sind Sie grunds&auml;tzlich rentenversicherungspflichtig. Der Arbeitgeber tr&auml;gt 15&nbsp;%, Ihr Eigenanteil betr&auml;gt 3,6&nbsp;% des Arbeitsentgelts. Sie k&ouml;nnen sich davon befreien lassen &mdash; verzichten damit aber auf volle Rentenanspr&uuml;che.</p>
+        <span class="btn btn-outline btn-sm">Merkblatt &ouml;ffnen (PDF)</span>
+        <div style="margin-top:0.5rem;">
+          <span class="check an"><i></i><span><b>Ich habe das Merkblatt zur Kenntnis genommen.</b><small>Erforderlich, bevor Sie eine Befreiung beantragen k&ouml;nnen.</small></span></span>
+        </div>
+      </div>
+
+      <div class="feld"><label>Ihre Entscheidung <span class="pflicht">*</span></label></div>
+
+      <div class="karte" style="margin:0.4rem 0;">
+        <span class="radio"><i></i><span><b>Nein, ich m&ouml;chte mich nicht befreien lassen.</b><small>Sie bleiben rentenversicherungspflichtig und erwerben volle Pflichtbeitragszeiten. Vom Entgelt werden 3,6&nbsp;% einbehalten.</small></span></span>
+      </div>
+
+      <div class="karte aktiv" style="margin:0.4rem 0;">
+        <span class="radio an"><i></i><span><b>Ja, ich beantrage die Befreiung von der Versicherungspflicht.</b><small>Der Arbeitgeber zahlt nur den Pauschalbeitrag. Sie erwerben nur anteilig Wartezeiten. Die Befreiung gilt f&uuml;r alle Ihre Minijobs gleichzeitig und ist bindend.</small></span></span>
+        <div class="hinweis" style="margin:0.7rem 0 0;padding:0.6rem 0.8rem;font-size:0.82rem;">
+          <span class="label" style="font-size:0.82rem;">So geht es weiter</span>
+          <p style="margin:0.2rem 0 0.5rem;">Der Antrag muss <b>schriftlich</b> gestellt werden. Wir haben ihn f&uuml;r Sie ausgef&uuml;llt &mdash; bitte ausdrucken, unterschreiben und wieder hochladen.</p>
+          <span class="btn btn-blau btn-sm">Antrag herunterladen (PDF)</span>
+          <span class="btn btn-outline btn-sm">Unterschriebenen Antrag hochladen</span>
+          <p style="margin:0.5rem 0 0;font-size:0.8rem;color:var(--muted);">Ohne hochgeladenen Antrag k&ouml;nnen Sie den Fragebogen nicht absenden.</p>
+        </div>
+      </div>
+
+      <div class="karte" style="margin:0.4rem 0;">
+        <span class="radio"><i></i><span><b>Ich bin Altersvollrentner nach Erreichen der Regelaltersgrenze bzw. Versorgungsempf&auml;nger.</b><small>Sie sind bereits rentenversicherungsfrei &mdash; eine Befreiung ist nicht erforderlich.</small></span></span>
+      </div>
+
+      <div class="karte" style="margin:0.4rem 0;">
+        <span class="radio"><i></i><span><b>Ja, ich beantrage die Aufhebung einer bestehenden Befreiung.</b> <span class="neu-tag">AB 01.07.2026</span><small>Sie werden wieder rentenversicherungspflichtig. Die Aufhebung wirkt ab dem 01. des Folgemonats, gilt f&uuml;r alle Ihre Minijobs und kann nicht widerrufen werden. Diese Erkl&auml;rung k&ouml;nnen Sie direkt hier abgeben &mdash; ohne Ausdruck.</small></span></span>
+      </div>
+
+      <div class="hinweis warnung" style="margin-top:1rem;padding:0.6rem 0.9rem;font-size:0.82rem;">
+        <p style="margin:0;">Wenn Sie mehrere Minijobs aus&uuml;ben, gilt Ihre Entscheidung <b>einheitlich f&uuml;r alle</b>. Bitte informieren Sie Ihre &uuml;brigen Arbeitgeber selbst dar&uuml;ber.</p>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:1rem;"><span class="btn btn-outline btn-sm">Zur&uuml;ck</span><span class="btn btn-sm">Weiter</span></div>
+    </div>
+  </div>
+  <p class="mock-cap">Die vier Karten sind bewusst gleichwertig und ausgeschrieben &mdash; die Entscheidung hat sp&uuml;rbare Folgen f&uuml;r die sp&auml;tere Rente, und die Checkliste verlangt, dass der Beschäftigte sie informiert trifft.</p>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.6 &middot; Schritt 8 &mdash; Zusammenfassung</h3>
+  <p>Die Zusammenfassung bekommt zwei neue Bl&ouml;cke und &mdash; unsichtbar, aber entscheidend &mdash; wird die Best&auml;tigung endlich <b>gespeichert</b>.</p>
+
+  <div class="mock">
+    <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
+      <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 8 / 8</span></div>
+    </div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:100%;background:#575756;"></div></div>
+    <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
+        <div style="font-weight:700;color:var(--grau-dunkel);">Zusammenfassung</div>
+        <div style="font-size:0.82rem;color:var(--muted);">Pr&uuml;fen und Absenden</div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:8px;margin-bottom:0.6rem;">
+        <div style="background:var(--bg-soft);padding:0.4rem 0.8rem;font-size:0.8rem;font-weight:700;color:var(--grau-dunkel);">6. Weitere Besch&auml;ftigungen &amp; Status <span class="neu-tag">ERWEITERT</span></div>
+        <div style="padding:0.5rem 0.8rem;font-size:0.78rem;">
+          <div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid #f0f0f0;"><span style="color:var(--muted);">Status bei Beginn</span><span style="font-weight:500;">Sch&uuml;ler</span></div>
+          <div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid #f0f0f0;"><span style="color:var(--muted);">Weitere Besch&auml;ftigungen</span><span style="font-weight:500;">1 erfasst</span></div>
+          <div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid #f0f0f0;"><span style="color:var(--muted);">&nbsp;&nbsp;B&auml;ckerei Lindemann, ab 01.02.2026</span><span style="font-weight:500;">geringf&uuml;gig, mit RV-Eigenanteil</span></div>
+          <div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid #f0f0f0;"><span style="color:var(--muted);">Summe &uuml;ber 603&nbsp;&euro;</span><span style="font-weight:500;">Nein</span></div>
+          <div style="display:flex;justify-content:space-between;padding:0.2rem 0;"><span style="color:var(--muted);">T&auml;tigkeit im Ausland</span><span style="font-weight:500;">Nein</span></div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:8px;margin-bottom:0.6rem;">
+        <div style="background:var(--bg-soft);padding:0.4rem 0.8rem;font-size:0.8rem;font-weight:700;color:var(--grau-dunkel);">7. Rentenversicherung <span class="neu-tag">NEU</span></div>
+        <div style="padding:0.5rem 0.8rem;font-size:0.78rem;">
+          <div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid #f0f0f0;"><span style="color:var(--muted);">Entscheidung</span><span style="font-weight:500;">Befreiung beantragt</span></div>
+          <div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid #f0f0f0;"><span style="color:var(--muted);">Merkblatt zur Kenntnis genommen</span><span style="font-weight:500;">Ja, am 17.08.2026</span></div>
+          <div style="display:flex;justify-content:space-between;padding:0.2rem 0;"><span style="color:var(--muted);">Unterschriebener Antrag</span><span style="font-weight:500;color:var(--gruen);">hochgeladen</span></div>
+        </div>
+      </div>
+
+      <div class="karte neu" style="margin-top:0.9rem;">
+        <div class="ktitel">Zustimmung des gesetzlichen Vertreters <span class="neu-tag">NEU</span></div>
+        <div class="ksub" style="margin-bottom:0.5rem;">Sie sind zu Besch&auml;ftigungsbeginn noch nicht 18 Jahre alt. Die Checkliste verlangt daher zus&auml;tzlich die Unterschrift Ihres gesetzlichen Vertreters.</div>
+        <div class="grid2">
+          <div class="feld" style="margin:0.3rem 0;"><label>Name <span class="pflicht">*</span></label><div class="input">Martina Bergmann</div></div>
+          <div class="feld" style="margin:0.3rem 0;"><label>Verh&auml;ltnis <span class="pflicht">*</span></label><div class="input">Mutter</div></div>
+        </div>
+        <div class="feld" style="margin:0.3rem 0;"><label>Anschrift <span class="pflicht">*</span></label><div class="input">Weserstra&szlig;e 12, 32423 Minden</div></div>
+        <span class="btn btn-outline btn-sm">Unterschriebene Zustimmung hochladen</span>
+      </div>
+
+      <div class="karte" style="margin-top:0.9rem;">
+        <div class="ktitel">Erkl&auml;rung des Arbeitnehmers</div>
+        <div style="font-size:0.8rem;color:#444;margin-top:0.4rem;">
+          <p style="margin:0.3rem 0;">Ich versichere, dass die vorstehenden Angaben der Wahrheit entsprechen und ich keine Angaben wissentlich verschwiegen habe.</p>
+          <p style="margin:0.3rem 0;">Ich verpflichte mich, meinem Arbeitgeber <b>unverz&uuml;glich</b> mitzuteilen, wenn sich &Auml;nderungen ergeben, insbesondere bei der Aufnahme oder Beendigung einer weiteren Besch&auml;ftigung.</p>
+          <p style="margin:0.3rem 0;" class="neu">Mir ist bekannt, dass ich zu diesen Angaben gesetzlich verpflichtet bin und unrichtige, unvollst&auml;ndige oder versp&auml;tete Angaben eine Ordnungswidrigkeit darstellen k&ouml;nnen (&sect;&nbsp;28o und &sect;&nbsp;111 Abs.&nbsp;1 Nr.&nbsp;4 SGB&nbsp;IV). <span class="neu-tag">NEU</span></p>
+        </div>
+        <div class="grid2 neu" style="margin-top:0.6rem;padding-top:0.4rem;padding-bottom:0.4rem;">
+          <div class="feld" style="margin:0.2rem 0;"><label>Ort <span class="pflicht">*</span> <span class="neu-tag">NEU</span></label><div class="input">Minden</div></div>
+          <div class="feld" style="margin:0.2rem 0;"><label>Datum</label><div class="input" style="color:#888;">17.08.2026, 14:32 Uhr &mdash; wird automatisch gesetzt</div></div>
+        </div>
+        <div style="margin-top:0.5rem;">
+          <span class="check an"><i></i><span><b>Ich best&auml;tige die vorstehende Erkl&auml;rung.</b> <span class="pflicht">*</span><small>Diese Erkl&auml;rung ersetzt Ihre handschriftliche Unterschrift auf dem Personalfragebogen.</small></span></span>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:1rem;"><span class="btn btn-outline btn-sm">Zur&uuml;ck</span><span class="btn btn-gruen btn-sm">Fragebogen verbindlich absenden</span></div>
+    </div>
+  </div>
+  <div class="hinweis warnung"><span class="label">Der eigentliche Fortschritt ist unsichtbar</span>
+    <p>
+      Die Erkl&auml;rung sieht fast aus wie bisher. Der Unterschied: Heute ist der Haken reiner Browser-Zustand und
+      geht beim Absenden verloren. K&uuml;nftig werden <b>Zeitstempel mit Uhrzeit, Ort, IP-Adresse, Browserkennung,
+      die Version des Erkl&auml;rungstextes und eine Pr&uuml;fsumme &uuml;ber die abgesendeten Daten</b> gespeichert und
+      im PDF ausgewiesen. Erst das macht die Erkl&auml;rung zum Unterschriftsersatz.
+    </p>
+  </div>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.7 &middot; HR &mdash; Vorgangs-Detailseite</h3>
+  <p>
+    Auf der HR-Seite kommt genau eine neue Karte dazu, im Tab &bdquo;&Uuml;bersicht&ldquo;. Sie tr&auml;gt die
+    Fristen-Ampel &mdash; nach demselben Muster, das im Vertragsende-Modul schon l&auml;uft.
+  </p>
+
+  <div class="mock">
+    <div class="mock-appbar">
+      <div class="mock-brand"><b>CREDO</b> <span>HR-Portal</span><small>Personalmanagement</small></div>
+      <div class="mock-nav"><span>Dashboard</span><span>&#128274; BEM</span><span>Vorlagen &#9662;</span><span>Verwaltung &#9662;</span></div>
+      <div class="mock-user"><b>Dimitri Riesen</b>Administrator</div>
+    </div>
+    <div class="credo-linie" style="height:3px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div class="mb-top">
+        <span style="color:var(--muted);font-size:0.85rem;">&larr; Zur&uuml;ck</span>
+        <span class="vid">ONB-2026-0042</span>
+        <span class="badge" style="background:rgba(139,92,246,0.15);color:#8b5cf6;">Eingereicht</span>
+        <span class="badge badge-gelb">MINIJOB</span>
+        <span class="badge" style="background:#fff3c9;color:#8a6d00;">RV-Frist: Warnung</span>
+      </div>
+      <div style="font-size:0.85rem;color:var(--muted);margin:-0.5rem 0 0.9rem;">Lena Bergmann &middot; Berufskolleg (004) &middot; Eingeladen am 03.08.2026</div>
+      <div class="tabs"><span class="on">&Uuml;bersicht</span><span>Fragebogen-Daten</span><span>Dokumente</span><span>Checkliste</span><span>Vorgesetzter</span></div>
+
+      <div class="karte neu" style="border:2px solid var(--gelb);background:#fffdf4;">
+        <div class="ktitel">Rentenversicherung &mdash; Befreiungsantrag <span class="neu-tag">NEUE KARTE</span></div>
+        <div class="ksub" style="margin-bottom:0.7rem;">Antrag auf Befreiung nach &sect;&nbsp;6 Abs.&nbsp;1b SGB&nbsp;VI, unterschrieben eingegangen.</div>
+        <div class="grid2">
+          <div class="feld" style="margin:0.3rem 0;"><label>Eingang beim Arbeitgeber <span class="pflicht">*</span></label><div class="input">05.08.2026</div>
+            <div class="hilfe">Das Datum, an dem der unterschriebene Antrag bei uns eingegangen ist &mdash; nicht der Upload-Zeitpunkt.</div>
+          </div>
+          <div class="feld" style="margin:0.3rem 0;"><label>Befreiung wirkt ab</label><div class="input">01.08.2026</div>
+            <div class="hilfe">Vorbelegt: Monatsbeginn des Eingangs, fr&uuml;hestens Besch&auml;ftigungsbeginn. &Uuml;berschreibbar.</div>
+          </div>
+        </div>
+        <div class="hinweis warnung" style="margin:0.7rem 0 0.5rem;padding:0.6rem 0.9rem;font-size:0.83rem;">
+          <span class="label" style="font-size:0.84rem;">&#9888; Meldung an die Minijob-Zentrale offen</span>
+          <p style="margin:0.2rem 0 0;">Noch <b>9 Tage</b> bis zum Ablauf der 6-Wochen-Frist (16.09.2026). Wird sie vers&auml;umt, wirkt die Befreiung erst ab dem &uuml;bern&auml;chsten Monat &mdash; der Arbeitnehmeranteil von 3,6&nbsp;% bleibt bis dahin f&auml;llig.</p>
+        </div>
+        <span class="check"><i></i><span>An die Minijob-Zentrale gemeldet (DE&Uuml;V)</span></span>
+        <div style="margin-top:0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <span class="btn btn-outline btn-sm">Antrag ansehen</span>
+          <span class="btn btn-sm">Speichern</span>
+        </div>
+      </div>
+
+      <div class="karte" style="opacity:0.55;">
+        <div class="ktitel">Person</div>
+        <div class="ksub">Bestehende Karten bleiben unver&auml;ndert &mdash; Person, Personalfragebogen, Vorgesetzten-Link, Status-&Uuml;bersicht, Notizen.</div>
+      </div>
+    </div>
+  </div>
+  <p class="mock-cap">Die Ampel-Farben sind dieselben wie beim Vertragsende: Kritisch rot, Warnung bernstein, Beobachten blau. So bedeutet dieselbe Farbe im Portal &uuml;berall dasselbe.</p>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.8 &middot; Vorlagen-Editor &mdash; wo das alles geschaltet wird</h3>
+  <p>
+    Nichts davon ist fest verdrahtet. Die Minijob-Vorlage bekommt zwei zus&auml;tzliche Schritte und eine
+    Feld-Konfiguration f&uuml;r den Steuer-Schritt &mdash; alles &uuml;ber die vorhandene Oberfl&auml;che.
+  </p>
+
+  <div class="mock">
+    <div class="mock-appbar">
+      <div class="mock-brand"><b>CREDO</b> <span>HR-Portal</span><small>Personalmanagement</small></div>
+      <div class="mock-nav"><span>Dashboard</span><span>&#128274; BEM</span><span class="on">Vorlagen &#9662;</span><span>Verwaltung &#9662;</span></div>
+      <div class="mock-user"><b>Dimitri Riesen</b>Administrator</div>
+    </div>
+    <div class="credo-linie" style="height:3px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div style="font-size:1.15rem;font-weight:700;color:var(--grau-dunkel);">Formularvorlagen</div>
+      <div style="font-size:0.84rem;color:var(--muted);margin-bottom:0.9rem;">Konfigurieren Sie, welche Fragebogen-Schritte f&uuml;r jeden Besch&auml;ftigungstyp aktiviert sind.</div>
+
+      <div class="karte">
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <span class="ktitel">Minijob</span>
+          <span class="badge badge-gelb">Minijob</span>
+          <span class="badge badge-gruen">Aktiv</span>
+          <span class="badge badge-grau">v2</span>
+          <span style="margin-left:auto;font-size:0.8rem;color:var(--muted);">8 von 12 Schritten</span>
+          <span class="btn btn-outline btn-sm">Vorschau</span>
+        </div>
+        <div class="ksub" style="margin-bottom:0.7rem;">Vereinfachter Fragebogen f&uuml;r geringf&uuml;gig Besch&auml;ftigte</div>
+
+        <div style="font-size:0.84rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;border:1px solid var(--border);border-radius:7px;margin:0.25rem 0;">
+            <span style="width:22px;height:22px;border-radius:50%;background:var(--grau-dunkel);color:#fff;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;">1</span>
+            Pers&ouml;nliche Angaben <span class="badge badge-grau" style="font-size:0.68rem;">Pflichtschritt</span>
+            <span style="margin-left:auto;color:var(--muted);font-size:0.78rem;">&#9660; Felder &nbsp;&middot;&nbsp; Immer aktiv</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;border:1px solid var(--border);border-radius:7px;margin:0.25rem 0;">
+            <span style="width:22px;height:22px;border-radius:50%;background:var(--grau-dunkel);color:#fff;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;">5</span>
+            Steuer
+            <span style="margin-left:auto;color:var(--muted);font-size:0.78rem;">&#9650; Felder &nbsp;&middot;&nbsp; <b style="color:var(--gruen);">an</b></span>
+          </div>
+          <div class="neu" style="margin:0 0 0.4rem 1.6rem;padding:0.5rem 0.8rem;border:1px dashed var(--gelb);border-radius:7px;background:#fffdf4;">
+            <div style="font-size:0.78rem;font-weight:700;color:var(--grau-dunkel);margin-bottom:0.3rem;">Felder in diesem Schritt <span class="neu-tag">HIER WIRD DIE STEUER-ID GERETTET</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.15rem 0;"><span><b>Steuer-ID</b></span><span style="color:var(--muted);">&#9745; Sichtbar &nbsp; &#9745; Pflicht</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.15rem 0;opacity:0.55;"><span class="durchgestrichen">Steuerklasse</span><span style="color:var(--muted);">&#9744; Sichtbar</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.15rem 0;opacity:0.55;"><span class="durchgestrichen">J&auml;hrlicher Freibetrag</span><span style="color:var(--muted);">&#9744; Sichtbar</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.15rem 0;opacity:0.55;"><span class="durchgestrichen">Kinderfreibetrag</span><span style="color:var(--muted);">&#9744; Sichtbar</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.15rem 0;opacity:0.55;"><span class="durchgestrichen">Religionszugeh&ouml;rigkeit</span><span style="color:var(--muted);">&#9744; Sichtbar</span></div>
+          </div>
+          <div class="neu" style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.8rem;border:1px solid var(--gelb);border-radius:0 7px 7px 0;margin:0.25rem 0;background:#fffdf4;">
+            <span style="width:22px;height:22px;border-radius:50%;background:var(--grau-dunkel);color:#fff;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;">6</span>
+            Weitere Besch&auml;ftigungen &amp; Status <span class="neu-tag">UMBENANNT + AN</span>
+            <span style="margin-left:auto;color:var(--muted);font-size:0.78rem;">&#9660; Felder &nbsp;&middot;&nbsp; <b style="color:var(--gruen);">an</b></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;border-radius:7px;margin:0.25rem 0;background:var(--bg-soft);opacity:0.6;">
+            <span style="width:22px;height:22px;border-radius:50%;background:#ccc;color:#fff;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;">8</span>
+            <span class="durchgestrichen">Bildung &amp; Beruf</span>
+            <span style="margin-left:auto;color:var(--muted);font-size:0.78rem;">aus</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;border-radius:7px;margin:0.25rem 0;background:var(--bg-soft);opacity:0.6;">
+            <span style="width:22px;height:22px;border-radius:50%;background:#ccc;color:#fff;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;">9</span>
+            <span class="durchgestrichen">Masernschutz</span>
+            <span style="margin-left:auto;color:var(--muted);font-size:0.78rem;">aus</span>
+          </div>
+          <div class="neu" style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.8rem;border:1px solid var(--gelb);border-radius:0 7px 7px 0;margin:0.25rem 0;background:#fffdf4;">
+            <span style="width:22px;height:22px;border-radius:50%;background:var(--grau-dunkel);color:#fff;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;">11</span>
+            Rentenversicherung <span class="neu-tag">NEUER SCHRITT</span>
+            <span style="margin-left:auto;color:var(--muted);font-size:0.78rem;">&#9660; Felder &nbsp;&middot;&nbsp; <b style="color:var(--gruen);">an</b></span>
+          </div>
+        </div>
+
+        <div style="margin-top:0.9rem;">
+          <div style="font-size:0.85rem;font-weight:700;color:var(--grau-dunkel);">Pflicht-Dokumente</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.4rem;">Diese Dokumente m&uuml;ssen vor dem Absenden hochgeladen werden.</div>
+          <div style="display:flex;flex-wrap:wrap;gap:0.35rem;font-size:0.75rem;">
+            <span class="badge badge-gruen">&#10003; Antrag RV-Befreiung (Minijob)</span>
+            <span class="badge badge-gruen neu" style="border-left:none;">&#10003; Nachweis private Krankenversicherung <span class="neu-tag">NEU</span></span>
+            <span class="badge badge-gruen neu" style="border-left:none;">&#10003; Bescheinigung A1 <span class="neu-tag">NEU</span></span>
+            <span class="badge badge-gruen neu" style="border-left:none;">&#10003; Statusnachweis (z.B. Schulbescheinigung) <span class="neu-tag">NEU</span></span>
+            <span class="badge badge-grau">Kopie Ihrer Geburtsurkunde</span>
+            <span class="badge badge-grau">Sozialversicherungsausweis</span>
+          </div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:0.4rem;">Die neuen Nachweise werden nur verlangt, wenn die Angaben es ausl&ouml;sen &mdash; A1 nur bei Auslandst&auml;tigkeit, der PKV-Nachweis nur bei privater Versicherung.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="mock-cap">Die internen Schrittnummern 6 und 11 sieht nur HR im Editor. Der Mitarbeiter z&auml;hlt durchgehend 1 bis 8.</p>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.9 &middot; Mandant &mdash; Betriebsnummer</h3>
+  <p>Eine kleine, aber unverzichtbare Erg&auml;nzung: Ohne die achtstellige Betriebsnummer der Bundesagentur f&uuml;r Arbeit l&auml;sst sich kein Antrag erzeugen.</p>
+
+  <div class="mock">
+    <div class="mock-appbar">
+      <div class="mock-brand"><b>CREDO</b> <span>HR-Portal</span><small>Personalmanagement</small></div>
+      <div class="mock-nav"><span>Dashboard</span><span>&#128274; BEM</span><span>Vorlagen &#9662;</span><span class="on">Verwaltung &#9662;</span></div>
+      <div class="mock-user"><b>Dimitri Riesen</b>Administrator</div>
+    </div>
+    <div class="credo-linie" style="height:3px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div style="font-size:0.82rem;color:var(--muted);">&larr; Zur&uuml;ck zu Mandanten</div>
+      <div style="font-size:1.15rem;font-weight:700;color:var(--grau-dunkel);margin-top:0.5rem;">Sozialversicherung &amp; Meldewesen <span class="neu-tag">NEUE UNTERSEITE</span></div>
+      <div style="font-size:0.84rem;color:var(--muted);margin-bottom:0.9rem;">Berufskolleg &middot; Mandant 004 &middot; BK</div>
+
+      <div class="karte">
+        <div class="ktitel">Betriebsnummer</div>
+        <div class="ksub" style="margin-bottom:0.5rem;">Die achtstellige Betriebsnummer der Bundesagentur f&uuml;r Arbeit. Sie erscheint auf dem Befreiungs- und dem Aufhebungsantrag zur Rentenversicherung.</div>
+        <div class="feld" style="max-width:280px;"><label>Betriebsnummer <span class="pflicht">*</span></label><div class="input">12345678</div>
+          <div class="hilfe">Genau 8 Ziffern. Nicht zu verwechseln mit der Mandantennummer (004), die nur im Portal gilt.</div>
+        </div>
+        <div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:7px;padding:0.6rem 0.8rem;font-size:0.82rem;margin-top:0.6rem;">
+          <div style="color:var(--muted);font-size:0.76rem;margin-bottom:0.2rem;">Vorschau (so erscheint es auf dem Antrag):</div>
+          <div>Arbeitgeber: <b>Berufskolleg</b> &nbsp;&middot;&nbsp; Betriebsnummer: <b>12345678</b></div>
+        </div>
+        <div style="margin-top:0.7rem;"><span class="btn btn-sm">Speichern</span></div>
+      </div>
+
+      <div class="hinweis warnung" style="font-size:0.84rem;">
+        <span class="label" style="font-size:0.85rem;">Solange die Nummer fehlt</span>
+        <p style="margin:0;">wird die Antragserzeugung <b>blockiert</b> &mdash; mit einem Hinweis an HR statt eines Dokuments mit leerer Pflichtangabe.</p>
+      </div>
+    </div>
+  </div>
+  <p class="mock-cap">Aufbau &uuml;bernommen von der bestehenden Seite &bdquo;Verantwortliche Stelle (DSGVO)&ldquo; pro Mandant &mdash; inklusive der Live-Vorschau unter dem Feld.</p>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.10 &middot; Einstellungen &mdash; Rechengr&ouml;&szlig;en</h3>
+  <p>
+    Damit die 603&nbsp;&euro; bei der n&auml;chsten Gesetzes&auml;nderung nicht im Code gesucht werden m&uuml;ssen:
+    eine gepflegte Werte-Tabelle mit G&uuml;ltigkeitsdatum, nach dem Muster der Schulferien-Seite.
+  </p>
+
+  <div class="mock">
+    <div class="mock-appbar">
+      <div class="mock-brand"><b>CREDO</b> <span>HR-Portal</span><small>Personalmanagement</small></div>
+      <div class="mock-nav"><span>Dashboard</span><span>&#128274; BEM</span><span>Vorlagen &#9662;</span><span class="on">Verwaltung &#9662;</span></div>
+      <div class="mock-user"><b>Dimitri Riesen</b>Administrator</div>
+    </div>
+    <div class="credo-linie" style="height:3px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+    <div class="mock-body">
+      <div style="font-size:0.82rem;color:var(--muted);">&larr; Zur&uuml;ck zu Einstellungen</div>
+      <div style="display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-top:0.5rem;">
+        <div>
+          <div style="font-size:1.15rem;font-weight:700;color:var(--grau-dunkel);">Sozialversicherungs-Rechengr&ouml;&szlig;en <span class="neu-tag">NEUE SEITE</span></div>
+          <div style="font-size:0.84rem;color:var(--muted);">Geringf&uuml;gigkeitsgrenze und Beitragss&auml;tze f&uuml;r Minijob-Formulare und Hilfetexte.</div>
+        </div>
+        <span class="btn btn-sm" style="margin-left:auto;">Neuer Eintrag</span>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:0.9rem;">
+        <div style="background:var(--bg-soft);padding:0.45rem 0.8rem;font-size:0.7rem;font-weight:600;text-transform:uppercase;color:var(--muted);display:grid;grid-template-columns:1.1fr 0.9fr 0.8fr 0.8fr 0.8fr 0.8fr;gap:0.5rem;">
+          <span>G&uuml;ltig ab</span><span>Grenze</span><span>Kurzfristig</span><span>AG-Pauschale</span><span>AN-Anteil</span><span>Status</span>
+        </div>
+        <div style="padding:0.5rem 0.8rem;font-size:0.82rem;display:grid;grid-template-columns:1.1fr 0.9fr 0.8fr 0.8fr 0.8fr 0.8fr;gap:0.5rem;border-bottom:1px solid #f0f0f0;align-items:center;">
+          <span>01.01.2026<br><small style="color:var(--muted);">Stand 26.05.2026</small></span><span><b>603,00&nbsp;&euro;</b></span><span>3 Mon. / 70 Tage</span><span>15,0&nbsp;%</span><span>3,6&nbsp;%</span><span><span class="badge badge-gruen">Aktiv</span></span>
+        </div>
+        <div style="padding:0.5rem 0.8rem;font-size:0.82rem;display:grid;grid-template-columns:1.1fr 0.9fr 0.8fr 0.8fr 0.8fr 0.8fr;gap:0.5rem;opacity:0.5;align-items:center;">
+          <span>01.01.2025</span><span>556,00&nbsp;&euro;</span><span>3 Mon. / 70 Tage</span><span>15,0&nbsp;%</span><span>3,6&nbsp;%</span><span><span class="badge badge-grau">Abgel&ouml;st</span></span>
+        </div>
+      </div>
+
+      <div class="hinweis info" style="font-size:0.84rem;">
+        <span class="label" style="font-size:0.85rem;">Warum mit G&uuml;ltigkeitsdatum statt nur einem Wert</span>
+        <p style="margin:0;">Beim Absenden merkt sich das Portal, welcher Stand galt, und schreibt ihn ins PDF. In einer Betriebspr&uuml;fung ist damit belegbar, auf welcher Grundlage der Besch&auml;ftigte die Additionsfrage beantwortet hat.</p>
+      </div>
+    </div>
+  </div>
+  <p class="mock-cap">Schreibrecht nur f&uuml;r Administratoren. Der Wert 556&nbsp;&euro; ist hier nur als Beispiel f&uuml;r einen abgel&ouml;sten Eintrag gezeigt.</p>
+
+  <!-- ---------------------------------------------------------- -->
+  <h3>2.11 &middot; Was sich wo &auml;ndert &mdash; auf einen Blick</h3>
+  <div class="tabelle-wrap">
+  <table>
+    <tr><th style="width:26%">Maske</th><th>&Auml;nderung</th><th style="width:14%">Umfang</th></tr>
+    <tr><td>Schritt 1 &mdash; Pers&ouml;nliche Angaben</td><td>Feld &bdquo;Geschlecht&ldquo; kommt dazu; Ersatzangaben werden Pflicht, wenn die SV-Nummer fehlt</td><td><span class="badge badge-gruen">klein</span></td></tr>
+    <tr><td>Schritt 4 &mdash; Sozialversicherung</td><td>&bdquo;Art der Versicherung&ldquo; kommt dazu, PKV-Nachweis wird Pflicht, RV-Checkbox zieht nach Schritt 7 um</td><td><span class="badge badge-gelb">mittel</span></td></tr>
+    <tr><td>Schritt 5 &mdash; Steuer</td><td>Wird f&uuml;r Minijob eingeschaltet, aber auf die Steuer-ID reduziert &mdash; reine Konfiguration, kein Code</td><td><span class="badge badge-gruen">klein</span></td></tr>
+    <tr><td>Schritt 6 &mdash; Besch&auml;ftigungen &amp; Status</td><td>Kompletter Neubau: Status, drei Tabellen, Additionsfrage, bedingte Nachweise</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
+    <tr><td>Schritt 7 &mdash; Rentenversicherung</td><td>Neuer Schritt mit Vier-Wege-Entscheidung, Merkblatt und Antragserzeugung</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
+    <tr><td>Schritt 8 &mdash; Zusammenfassung</td><td>Zwei neue Bl&ouml;cke, Ort-Feld, Vertreterblock &mdash; und die Best&auml;tigung wird endlich gespeichert</td><td><span class="badge badge-gelb">mittel</span></td></tr>
+    <tr><td>HR &mdash; Vorgangs-Detailseite</td><td>Eine neue Karte im Tab &bdquo;&Uuml;bersicht&ldquo; mit Eingangsdatum, Wirkungsdatum und Fristen-Ampel</td><td><span class="badge badge-gelb">mittel</span></td></tr>
+    <tr><td>Vorlagen-Editor</td><td>Zwei zus&auml;tzliche Schritte in der Liste, neue Felder im Katalog, neue Dokument-Chips &mdash; die Oberfl&auml;che selbst bleibt</td><td><span class="badge badge-gruen">klein</span></td></tr>
+    <tr><td>Mandant</td><td>Neue Unterseite mit einem Feld: Betriebsnummer</td><td><span class="badge badge-gruen">klein</span></td></tr>
+    <tr><td>Einstellungen</td><td>Neue Seite &bdquo;Rechengr&ouml;&szlig;en&ldquo; als Werte-Tabelle</td><td><span class="badge badge-gelb">mittel</span></td></tr>
+  </table>
+  </div>
+
+  <div class="ergebnis"><span class="label">Was auff&auml;llt</span>
+    <p>
+      Der weitaus gr&ouml;&szlig;te Teil des Aufwands sitzt in zwei Masken &mdash; Schritt&nbsp;6 und Schritt&nbsp;7.
+      Alles &Uuml;brige sind &Uuml;bertragungen bestehender Muster: die Fristen-Ampel gibt es beim Vertragsende, die
+      Mandanten-Unterseite bei der DSGVO-Konfiguration, die Werte-Tabelle bei den Schulferien. Das ist der Grund,
+      warum die Sch&auml;tzung trotz des Umfangs tragf&auml;hig ist.
+    </p>
+  </div>
+
+
+  <p class="fuss">
+    CREDO HR-Portal &middot; Minijob: Prozesskette und Masken-Entw&uuml;rfe &middot; Stand 17.08.2026 &middot; Umsetzung noch nicht begonnen.
+  </p>
+
+</div>
+
+<div class="credo-linie"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
+</body>
+</html>
