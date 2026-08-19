@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Das Modalitaeten-Formular nach der Zweckbefristungs-Anpassung, Ansicht fuer Ansicht aus Sicht der Fuehrungskraft.">
+<meta name="color-scheme" content="light dark">
+<title>Zweckbefristung im Formular</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+
+<style>
+/* =========================================================
+   Tokens
+   Seiten-Rahmen: themefähig (hell/dunkel).
+   App-Nachbau: bewusst fest im CREDO-Hausstil des Portals,
+   weil er eine Ansicht der hellen Anwendung zeigt.
+   ========================================================= */
+:root {
+  --credo-dunkelgrau: #575756;
+  --credo-grau: #DADADA;
+  --credo-gelb: #FBC900;
+  --credo-gruen: #6BAA24;
+  --credo-rot: #E2001A;
+  --credo-blau: #009AC6;
+
+  --ground: #f1f1ef;
+  --ground-2: #ffffff;
+  --ink: #26262a;
+  --ink-2: #5f5f63;
+  --ink-3: #86868b;
+  --rule: #dedcd8;
+  --rule-strong: #c9c6c1;
+  --marker: #007fa3;
+  --neu: #4d7d1a;
+  --alt: #b30015;
+  --shadow: 0 1px 2px rgba(24,24,20,.06), 0 12px 32px -14px rgba(24,24,20,.28);
+
+  --measure: 34rem;
+  --step-0: .8125rem;
+  --step-1: .9375rem;
+  --step-2: 1.0625rem;
+  --step-3: 1.375rem;
+  --step-4: 2rem;
+  --step-5: 2.75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #1a1a19;
+    --ground-2: #232322;
+    --ink: #eae9e5;
+    --ink-2: #b0aea8;
+    --ink-3: #8b8983;
+    --rule: #35352f;
+    --rule-strong: #4a4a43;
+    --marker: #4cc4e8;
+    --neu: #9ed35f;
+    --alt: #ff8a80;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 16px 40px -16px rgba(0,0,0,.75);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #1a1a19;
+  --ground-2: #232322;
+  --ink: #eae9e5;
+  --ink-2: #b0aea8;
+  --ink-3: #8b8983;
+  --rule: #35352f;
+  --rule-strong: #4a4a43;
+  --marker: #4cc4e8;
+  --neu: #9ed35f;
+  --alt: #ff8a80;
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 16px 40px -16px rgba(0,0,0,.75);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "Montserrat", Arial, "Segoe UI", system-ui, sans-serif;
+  font-size: var(--step-1);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+:where(a):focus-visible,
+:where(button):focus-visible,
+:where(input):focus-visible,
+:where(textarea):focus-visible,
+:where(select):focus-visible {
+  outline: 2px solid var(--marker);
+  outline-offset: 2px;
+}
+
+.wrap { width: min(76rem, 100% - 2.5rem); margin-inline: auto; }
+
+/* ---------- Kopf ---------- */
+.masthead { padding: 4.5rem 0 2.5rem; }
+.eyebrow {
+  font-size: .6875rem; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-3); margin: 0 0 1rem;
+}
+.masthead h1 {
+  font-size: clamp(2rem, 1.3rem + 2.6vw, var(--step-5));
+  line-height: 1.08; font-weight: 700; letter-spacing: -.02em;
+  margin: 0 0 1rem; text-wrap: balance; max-width: 22ch;
+}
+.standfirst {
+  font-size: var(--step-2); color: var(--ink-2);
+  max-width: var(--measure); margin: 0 0 2rem; text-wrap: pretty;
+}
+.meta { display: flex; flex-wrap: wrap; gap: .5rem; }
+.chip {
+  font-size: .75rem; font-weight: 500; padding: .3rem .7rem;
+  border: 1px solid var(--rule-strong); border-radius: 999px; color: var(--ink-2);
+}
+.chip.neu { border-color: var(--neu); color: var(--neu); }
+
+/* ---------- Vorher / Nachher ---------- */
+.compare {
+  display: grid; gap: 1rem; margin: 0 0 4.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+}
+.compare > div {
+  background: var(--ground-2); border: 1px solid var(--rule);
+  border-radius: .75rem; padding: 1.375rem 1.5rem;
+}
+.compare h2 {
+  font-size: .6875rem; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; margin: 0 0 .625rem;
+}
+.compare .alt h2 { color: var(--alt); }
+.compare .neu h2 { color: var(--neu); }
+.compare p { margin: 0; font-size: var(--step-1); color: var(--ink-2); }
+.compare p + p { margin-top: .625rem; }
+.compare strong { color: var(--ink); font-weight: 600; }
+
+/* ---------- Ablauf ---------- */
+.stages { list-style: none; margin: 0; padding: 0; }
+.stage { padding-bottom: 4.5rem; }
+.stage-head {
+  display: flex; align-items: baseline; gap: .875rem;
+  padding-bottom: 1.25rem; margin-bottom: 1.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+.stage-num {
+  font-size: .75rem; font-weight: 700; letter-spacing: .06em;
+  color: var(--marker); font-variant-numeric: tabular-nums;
+  flex: none; padding-top: .2rem;
+}
+.stage-head h2 {
+  font-size: var(--step-3); font-weight: 700; letter-spacing: -.01em;
+  margin: 0; text-wrap: balance;
+}
+.stage-head .sub { display: block; font-size: var(--step-1); font-weight: 400; color: var(--ink-2); margin-top: .2rem; }
+
+.band { display: grid; gap: 2rem 2.5rem; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 60rem) { .band { grid-template-columns: minmax(0, 1fr); } }
+
+.notes { display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: 2rem; }
+@media (max-width: 60rem) { .notes { position: static; } }
+.note h3 {
+  font-size: .6875rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  margin: 0 0 .5rem; color: var(--ink-3);
+}
+.note.is-neu h3 { color: var(--neu); }
+.note.is-alt h3 { color: var(--alt); }
+.note p { margin: 0; font-size: var(--step-0); line-height: 1.62; color: var(--ink-2); }
+.note p + p { margin-top: .5rem; }
+.note strong { color: var(--ink); font-weight: 600; }
+code {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: .8em; background: color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: .1em .38em; border-radius: .25rem;
+}
+
+/* =========================================================
+   Nachbau der Anwendung — fester heller CREDO-Hausstil
+   ========================================================= */
+.app {
+  background: #ffffff;
+  border: 1px solid var(--rule-strong);
+  border-radius: .75rem;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  color: #1a1a1a;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.app-head { background: #fff; border-bottom: 1px solid #e5e5e5; }
+.app-head-in {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: .75rem 1.25rem;
+}
+.app-brand { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.app-brand .logo { width: 86px; height: 19px; flex: none; }
+.app-brand .t { font-size: 13px; font-weight: 700; color: #1a1a1a; line-height: 1.3; }
+.app-brand .s { font-size: 11px; color: #737373; line-height: 1.3; }
+.app-head-right { display: flex; align-items: center; gap: .625rem; flex: none; }
+.app-save { font-size: 11px; color: var(--credo-gruen); font-weight: 500; }
+.app-save.err { color: #dc2626; font-weight: 600; max-width: 15rem; text-align: right; line-height: 1.35; }
+.app-pill {
+  font-size: 11px; font-weight: 500; color: #737373;
+  background: #fafafa; border-radius: 999px; padding: .25rem .7rem; white-space: nowrap;
+}
+.app-progress { height: 3px; background: #fafafa; }
+.app-progress > i { display: block; height: 100%; background: var(--credo-dunkelgrau); }
+.linie { display: flex; width: 100%; height: 2px; }
+.linie i { display: block; height: 100%; }
+.linie .g { flex: 1; background: var(--credo-grau); }
+.linie .a { flex: .125; background: var(--credo-gelb); }
+.linie .b { flex: .125; background: var(--credo-gruen); }
+.linie .c { flex: .125; background: var(--credo-rot); }
+.linie .d { flex: .125; background: var(--credo-blau); }
+
+.app-nav { background: #fff; border-bottom: 1px solid #e5e5e5; padding: .5rem 1.25rem; }
+.app-nav-in { display: flex; gap: .25rem; overflow-x: auto; }
+.tab {
+  display: flex; align-items: center; gap: .375rem; white-space: nowrap;
+  border-radius: .375rem; padding: .375rem .625rem; font-size: 11px; font-weight: 500;
+  color: #737373; opacity: .5;
+}
+.tab .n {
+  display: grid; place-items: center; width: 18px; height: 18px; border-radius: 999px;
+  font-size: 9px; font-weight: 700; background: #fafafa; color: #737373;
+}
+.tab.is-active { background: var(--credo-dunkelgrau); color: #fff; opacity: 1; }
+.tab.is-active .n { background: #fff; color: var(--credo-dunkelgrau); }
+.tab.is-done { background: #dcfce7; color: #166534; opacity: 1; }
+.tab.is-done .n { background: var(--credo-gruen); color: #fff; }
+
+.app-main { background: #fafafa; padding: 1.5rem 1.25rem; }
+.app-card { background: #fff; border-radius: .75rem; box-shadow: 0 1px 2px rgba(0,0,0,.05); overflow: hidden; }
+.app-card-head { background: #fafafa; border-bottom: 1px solid #e5e5e5; padding: .875rem 1.5rem; }
+.app-card-head h4 { font-size: 17px; font-weight: 700; margin: 0; color: #1a1a1a; }
+.app-card-head p { font-size: 13px; color: #737373; margin: .125rem 0 0; }
+.app-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+.fld { display: flex; flex-direction: column; gap: .5rem; }
+.fld > label { font-size: 13px; font-weight: 500; color: #1a1a1a; }
+.req { color: #dc2626; }
+.inp {
+  width: 100%; border: 1px solid #e5e5e5; border-radius: .5rem;
+  background: #fff; padding: .625rem 1rem; font-size: 13px; color: #1a1a1a;
+  font-family: inherit; min-height: 2.5rem; display: flex; align-items: center;
+}
+.inp.ph { color: #a3a3a3; }
+.inp.ta { min-height: 4.25rem; align-items: flex-start; }
+/* Echte Bedienelemente im Live-Block */
+input.inp, textarea.inp, select.inp { display: block; line-height: 1.5; }
+textarea.inp { resize: vertical; padding-top: .5rem; }
+select.inp { appearance: none; background-image: none; }
+.inp.sel { justify-content: space-between; }
+.inp.sel::after { content: "⌄"; color: #737373; font-size: 15px; line-height: 1; margin-top: -.35em; }
+.inp.err { border-color: #dc2626; }
+.hint { font-size: 11px; color: #737373; }
+.msg-err { font-size: 11px; color: #dc2626; }
+
+.box {
+  border: 1px solid #e5e5e5; border-radius: .5rem; background: #fafafa; padding: 1rem;
+}
+.box.plain { background: #fff; display: flex; flex-direction: column; gap: 1rem; }
+.check { display: flex; align-items: center; gap: .75rem; font-size: 13px; font-weight: 500; }
+.check input { width: 16px; height: 16px; accent-color: var(--credo-dunkelgrau); margin: 0; }
+
+.radio-card {
+  display: flex; align-items: flex-start; gap: .75rem;
+  border: 1px solid #e5e5e5; border-radius: .5rem; padding: .75rem;
+}
+.radio-card input { width: 16px; height: 16px; margin: .15rem 0 0; accent-color: var(--credo-dunkelgrau); flex: none; }
+.radio-card .rt { font-size: 13px; font-weight: 500; color: #1a1a1a; display: block; }
+.radio-card .rd { font-size: 11px; color: #737373; display: block; margin-top: .125rem; }
+.radio-card.on { border-color: var(--credo-dunkelgrau); background: #fafafa; }
+
+.app-actions { display: flex; justify-content: flex-end; padding-top: .5rem; }
+.btn {
+  background: var(--credo-dunkelgrau); color: #fff; border: 0; border-radius: .5rem;
+  padding: .625rem 1.5rem; font-size: 13px; font-weight: 600; font-family: inherit;
+}
+.btn.ghost { background: #fff; color: #737373; border: 1px solid #e5e5e5; }
+.btn.gruen { background: var(--credo-gruen); }
+.app-foot { background: #fff; border-top: 1px solid #e5e5e5; padding: .875rem; text-align: center; font-size: 11px; color: #737373; }
+
+/* Zusammenfassung */
+.sum { border: 1px solid #e5e5e5; border-radius: .5rem; overflow: hidden; }
+.sum-head { background: #fafafa; border-bottom: 1px solid #e5e5e5; padding: .5rem 1rem; font-size: 13px; font-weight: 600; }
+.sum-body { padding: .75rem 1rem; display: flex; flex-direction: column; gap: .25rem; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 1.5rem; font-size: 12px; }
+.row span:first-child { color: #737373; flex: none; }
+.row span:last-child { font-weight: 500; text-align: right; }
+.row.mark span:last-child { color: #4d7d1a; }
+.banner { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: .5rem; padding: 1rem; font-size: 13px; color: #166534; }
+
+/* HR-Ansicht */
+.hr-card { border: 1px solid #e5e5e5; border-radius: .75rem; overflow: hidden; background: #fff; }
+.hr-card > h5 { margin: 0; padding: .875rem 1.25rem; border-bottom: 1px solid #e5e5e5; font-size: 14px; font-weight: 700; }
+.hr-grid { padding: .875rem 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0 2rem; }
+.hr-row { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: .375rem 0; border-bottom: 1px dashed #f0f0f0; }
+.hr-row span:first-child { font-size: 11px; color: #737373; flex: none; }
+.hr-row span:last-child { font-size: 13px; font-weight: 500; text-align: right; }
+
+.vars { display: flex; flex-wrap: wrap; gap: .375rem; padding: 0 1.25rem 1.125rem; }
+.var {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px; padding: .2rem .5rem; border-radius: .25rem;
+  background: #fafafa; border: 1px solid #e5e5e5; color: #575756;
+}
+.var.neu { border-color: var(--credo-gruen); color: #4d7d1a; background: #f7fdf2; }
+
+/* Live-Demo */
+.live-hint {
+  display: inline-flex; align-items: center; gap: .5rem; font-size: .75rem; font-weight: 600;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--marker); margin-bottom: 1rem;
+}
+.live .radio-card, .live .check { cursor: pointer; }
+.live .radio-card:hover { background: #f5f5f5; }
+.hidden { display: none !important; }
+
+/* Statische Nachbauten sind Abbildungen, keine Bedienelemente */
+.static input { pointer-events: none; }
+
+/* Abschluss */
+.outro {
+  border-top: 1px solid var(--rule); margin-top: 1rem; padding: 3rem 0 5rem;
+  display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+.outro h3 { font-size: var(--step-1); font-weight: 700; margin: 0 0 .5rem; }
+.outro p { margin: 0; font-size: var(--step-0); color: var(--ink-2); }
+.outro pre {
+  margin: .625rem 0 0; padding: .75rem .875rem; overflow-x: auto;
+  background: var(--ground-2); border: 1px solid var(--rule); border-radius: .5rem;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .75rem; color: var(--ink);
+}
+
+/* Schmale Displays: Kopfzeile des Nachbaus umbrechen, damit die
+   Schrittanzeige nicht aus der Karte geschnitten wird */
+@media (max-width: 34rem) {
+  .app-head-in { flex-wrap: wrap; }
+  .app-head-right { width: 100%; justify-content: flex-end; }
+  .app-brand .s { overflow-wrap: anywhere; }
+  .app-save.err { max-width: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="credo-logo" viewBox="0 0 1621.984 360.894">
+    <g fill="#575756"><path d="M810.185,576.206l-46.544-.234L673.879,426.131H609.856V385.538h79.769c11.431-.748,19.669-2.884,27.316-7.133,16.393-9.11,33.907-28.658,33.907-56.2,0-12.562-2.95-22.716-9.864-33.954-6.535-10.622-14.047-17.1-27.711-23.921-12.521-6.248-28.921-5.974-49.664-5.628-5.062.085-10.371.169-15.942.169H572.232V575.982H531.639V217.153H661.651c34.546,0,53.577,0,73.4,11.143,15.9,8.942,30,17.862,41.394,36.5,12.36,20.217,17.872,38.459,17.872,59.15,0,53.235-37.871,91.448-75.107,102.11Z" transform="translate(-147.205 -215.311)"/><path d="M1062.272,575.982H847.013V217.153h215.259v41.723H889.22l.037,119.689h172.266v40.593H889.22V535.465h173.052Z" transform="translate(-147.205 -215.311)"/><path d="M326.6,575.148c-98.917,0-179.394-80.474-179.394-179.394S227.681,216.36,326.6,216.36A179.176,179.176,0,0,1,491.813,325.745l2.056,4.849H448.548l-1-1.775A139.016,139.016,0,0,0,326.6,258.047c-76.485,0-138.708,62.224-138.708,138.709S250.114,535.465,326.6,535.465A139.129,139.129,0,0,0,447.13,465.442l1-1.757H492.76l-2.182,4.9A179.646,179.646,0,0,1,326.6,575.148Z" transform="translate(-147.205 -215.311)"/><path d="M1589.044,575.592c-99.33,0-180.141-80.81-180.141-180.139s80.811-180.142,180.141-180.142,180.145,80.811,180.145,180.142S1688.374,575.592,1589.044,575.592Zm0-319.6c-76.9,0-139.464,62.564-139.464,139.465s62.564,139.464,139.464,139.464,139.464-62.564,139.464-139.464-62.563-139.465-139.464-139.465Z" transform="translate(-147.205 -215.311)"/><path d="M1388.646,378.271a178.513,178.513,0,0,0-174.714-160.709v-.371l-114.438-.038V575.982h95.675c23.5,0,45.338-2.411,65.065-7.2a178.379,178.379,0,0,0,129.287-167.456l.024-2.586C1389.545,391.9,1389.243,385.035,1388.646,378.271Zm-85.913,124.614c-28.139,23-59.09,34.665-91.989,34.665h-69.709V258.791h70.6c26.838,0,57.012,9.572,78.755,24.988,17.907,12.627,29.186,25.7,44.7,51.81,9.691,16.309,15.03,38.406,15.03,62.22C1350.125,438.73,1331.965,478.99,1302.733,502.885Z" transform="translate(-147.205 -215.311)"/></g>
+  </symbol>
+</svg>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">CREDO HR-Portal · Onboarding · Einstellungsmodalitäten</p>
+    <h1>Befristung ohne festes Enddatum</h1>
+    <p class="standfirst">
+      Die Christliche Familienhilfe Minden meldete, dass sie im Modalitäten-Formular nicht weiterkam:
+      projektbezogene Sachgrundbefristung, Ende an eine Kostenzusage des Jugendamtes gekoppelt — also
+      kein Datum, das man eintragen könnte. So sieht das Formular nach der Anpassung aus, Ansicht für
+      Ansicht, aus Sicht der Führungskraft.
+    </p>
+    <div class="meta">
+      <span class="chip">Magic-Link-Formular, kein Login</span>
+      <span class="chip">5 Schritte</span>
+      <span class="chip neu">Neu: Art der Befristung</span>
+    </div>
+  </header>
+
+  <section class="compare">
+    <div class="alt">
+      <h2>Bisher</h2>
+      <p>
+        Haken bei „Befristeter Vertrag" setzen — und sofort stand dort ein Datumsfeld, ohne Alternative.
+        Wer kein Datum hatte, ließ es leer und klickte auf <strong>Weiter</strong>.
+      </p>
+      <p>
+        Dann passierte <strong>nichts</strong>. Kein Hinweis, keine Meldung, kein Fortschritt. Im Hintergrund
+        lehnte die Datenbank den leeren Wert ab; das Formular verschluckte den Fehler stillschweigend.
+      </p>
+    </div>
+    <div class="neu">
+      <h2>Jetzt</h2>
+      <p>
+        Nach dem Haken kommt zuerst eine Frage: <strong>festes Enddatum</strong> oder
+        <strong>Zweckbefristung</strong>. Wer keinen Kalendertag hat, beschreibt stattdessen, wodurch
+        der Vertrag endet.
+      </p>
+      <p>
+        Und falls doch einmal etwas fehlt, sagt das Formular es — sichtbar und in Klartext, statt
+        wirkungslos zu bleiben.
+      </p>
+    </div>
+  </section>
+
+  <ol class="stages">
+
+    <!-- ============ 1 ============ -->
+    <li class="stage">
+      <div class="stage-head">
+        <span class="stage-num">01</span>
+        <h2>Der Einstieg
+          <span class="sub">Schritt 1 von 5 — Stelle &amp; Vertrag, noch ohne Befristung</span>
+        </h2>
+      </div>
+      <div class="band">
+        <div class="app static">
+          <div class="app-head">
+            <div class="app-head-in">
+              <div class="app-brand">
+                <svg class="logo" viewBox="0 0 1621.984 360.894" role="img" aria-label="CREDO"><use href="#credo-logo"/></svg>
+                <div>
+                  <div class="t">Einstellungsmodalitäten</div>
+                  <div class="s">für Anna Beispiel · Christliche Familienhilfe Minden e. V.</div>
+                </div>
+              </div>
+              <div class="app-head-right">
+                <span class="app-pill">Schritt 1 / 5</span>
+              </div>
+            </div>
+            <div class="app-progress"><i style="width:20%"></i></div>
+            <div class="linie"><i class="g"></i><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>
+          </div>
+          <div class="app-nav">
+            <div class="app-nav-in">
+              <span class="tab is-active"><span class="n">1</span>Stelle &amp; Vertrag</span>
+              <span class="tab"><span class="n">2</span>Arbeitszeit &amp; Arbeitgeber</span>
+              <span class="tab"><span class="n">3</span>Vergütung</span>
+              <span class="tab"><span class="n">4</span>Zusätzliche Angaben</span>
+              <span class="tab"><span class="n">5</span>Zusammenfassung</span>
+            </div>
+          </div>
+          <div class="app-main">
+            <div class="app-card">
+              <div class="app-card-head">
+                <h4>Stelle &amp; Vertrag</h4>
+                <p>Betriebsstätte, Stellenbeschreibung, Vertragsdaten</p>
+              </div>
+              <div class="app-body">
+                <div class="fld">
+                  <label>Betriebsstätte <span class="req">*</span></label>
+                  <div class="inp">Kingsleyallee 6, Minden</div>
+                </div>
+                <div class="fld">
+                  <label>Stellenbeschreibung (wird in Arbeitsvertrag übernommen!) <span class="req">*</span></label>
+                  <div class="inp ta">Sozialpädagogische Familienhilfe</div>
+                </div>
+                <div class="fld">
+                  <label>Vertragsbeginn <span class="req">*</span></label>
+                  <div class="inp">01.09.2026</div>
+                </div>
+                <div class="box">
+                  <label class="check"><input type="checkbox" tabindex="-1"> Befristeter Vertrag</label>
+                </div>
+                <div class="app-actions"><span class="btn">Weiter</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="app-foot">© 2026 Christlicher Schulverein Minden e.V.</div>
+        </div>
+
+        <div class="notes">
+          <div class="note">
+            <h3>Unverändert</h3>
+            <p>Bis hierher ist alles wie bisher: drei Pflichtfelder, darunter der Haken für die Befristung.
+               Wer unbefristet einstellt, klickt einfach auf <strong>Weiter</strong>.</p>
+          </div>
+          <div class="note is-neu">
+            <h3>Still im Hintergrund repariert</h3>
+            <p>Genau dieser Klick — ohne Haken, ohne Datum — führte bisher schon in den Stillstand.
+               Das betraf also nicht nur befristete Verträge, sondern jeden, der kein Enddatum eintrug.</p>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <!-- ============ 2 ============ -->
+    <li class="stage">
+      <div class="stage-head">
+        <span class="stage-num">02</span>
+        <h2>Der Haken ist gesetzt
+          <span class="sub">Neu: erst die Art der Befristung, dann die Details</span>
+        </h2>
+      </div>
+      <div class="band">
+        <div class="app static">
+          <div class="app-main" style="padding-top:1.25rem">
+            <div class="app-card">
+              <div class="app-body">
+                <div class="box">
+                  <label class="check"><input type="checkbox" checked tabindex="-1"> Befristeter Vertrag</label>
+                </div>
+                <div class="box plain">
+                  <div class="fld">
+                    <label>Art der Befristung <span class="req">*</span></label>
+                    <label class="radio-card">
+                      <input type="radio" name="s2" tabindex="-1">
+                      <span>
+                        <span class="rt">Festes Enddatum</span>
+                        <span class="rd">Der Vertrag endet an einem konkreten Kalendertag.</span>
+                      </span>
+                    </label>
+                    <label class="radio-card">
+                      <input type="radio" name="s2" tabindex="-1">
+                      <span>
+                        <span class="rt">Zweckbefristung – kein festes Enddatum</span>
+                        <span class="rd">Der Vertrag endet, sobald der Zweck erreicht ist bzw. die Finanzierung ausläuft – z.B. projektbezogen bis zum Ende einer Kostenzusage.</span>
+                      </span>
+                    </label>
+                  </div>
+                  <div class="fld">
+                    <label>Sachgrund der Befristung</label>
+                    <div class="inp sel ph">Ohne Sachgrund</div>
+                  </div>
+                </div>
+                <div class="app-actions"><span class="btn">Weiter</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note is-alt">
+            <h3>Was hier vorher stand</h3>
+            <p>Ein einzelnes Feld „Vertragsende" mit Datumsauswahl. Keine Möglichkeit zu sagen,
+               dass es kein Datum gibt.</p>
+          </div>
+          <div class="note is-neu">
+            <h3>Die neue Weiche</h3>
+            <p>Die Führungskraft entscheidet zuerst, <strong>welche Art</strong> von Befristung vorliegt.
+               Erst danach erscheint das passende Feld — ein Datum oder eine Beschreibung.</p>
+            <p>Die Auswahl ist Pflicht. Beides gleichzeitig geht nicht: Ein Vertrag endet entweder an
+               einem Tag oder mit einem Ereignis.</p>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <!-- ============ 3 ============ -->
+    <li class="stage">
+      <div class="stage-head">
+        <span class="stage-num">03</span>
+        <h2>Weg A — festes Enddatum
+          <span class="sub">Der gewohnte Fall, jetzt als klares Pflichtfeld</span>
+        </h2>
+      </div>
+      <div class="band">
+        <div class="app static">
+          <div class="app-main" style="padding-top:1.25rem">
+            <div class="app-card">
+              <div class="app-body">
+                <div class="box">
+                  <label class="check"><input type="checkbox" checked tabindex="-1"> Befristeter Vertrag</label>
+                </div>
+                <div class="box plain">
+                  <div class="fld">
+                    <label>Art der Befristung <span class="req">*</span></label>
+                    <label class="radio-card on">
+                      <input type="radio" name="s3" checked tabindex="-1">
+                      <span>
+                        <span class="rt">Festes Enddatum</span>
+                        <span class="rd">Der Vertrag endet an einem konkreten Kalendertag.</span>
+                      </span>
+                    </label>
+                    <label class="radio-card">
+                      <input type="radio" name="s3" tabindex="-1">
+                      <span>
+                        <span class="rt">Zweckbefristung – kein festes Enddatum</span>
+                        <span class="rd">Der Vertrag endet, sobald der Zweck erreicht ist bzw. die Finanzierung ausläuft.</span>
+                      </span>
+                    </label>
+                  </div>
+                  <div class="fld">
+                    <label>Vertragsende <span class="req">*</span></label>
+                    <div class="inp">31.08.2027</div>
+                  </div>
+                  <div class="fld">
+                    <label>Sachgrund der Befristung</label>
+                    <div class="inp sel">Vertretung</div>
+                  </div>
+                </div>
+                <div class="app-actions"><span class="btn">Weiter</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note">
+            <h3>Für die meisten Fälle</h3>
+            <p>Vertretung, Erprobung, klassische Sachgrundbefristung mit Kalenderende — hier ändert sich
+               für die Führungskraft praktisch nichts.</p>
+          </div>
+          <div class="note is-neu">
+            <h3>Ein Detail ist neu</h3>
+            <p>Das Datum ist jetzt ausdrücklich Pflicht. Wer es leer lässt, bekommt einen Hinweis mit
+               dem Weg heraus: <em>„… oder wählen Sie die Zweckbefristung, wenn kein Datum feststeht."</em></p>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <!-- ============ 4 ============ -->
+    <li class="stage">
+      <div class="stage-head">
+        <span class="stage-num">04</span>
+        <h2>Weg B — Zweckbefristung
+          <span class="sub">Der gemeldete Fall: Projekt, finanziert über eine Kostenzusage</span>
+        </h2>
+      </div>
+      <div class="band">
+        <div class="app static">
+          <div class="app-main" style="padding-top:1.25rem">
+            <div class="app-card">
+              <div class="app-body">
+                <div class="box">
+                  <label class="check"><input type="checkbox" checked tabindex="-1"> Befristeter Vertrag</label>
+                </div>
+                <div class="box plain">
+                  <div class="fld">
+                    <label>Art der Befristung <span class="req">*</span></label>
+                    <label class="radio-card">
+                      <input type="radio" name="s4" tabindex="-1">
+                      <span>
+                        <span class="rt">Festes Enddatum</span>
+                        <span class="rd">Der Vertrag endet an einem konkreten Kalendertag.</span>
+                      </span>
+                    </label>
+                    <label class="radio-card on">
+                      <input type="radio" name="s4" checked tabindex="-1">
+                      <span>
+                        <span class="rt">Zweckbefristung – kein festes Enddatum</span>
+                        <span class="rd">Der Vertrag endet, sobald der Zweck erreicht ist bzw. die Finanzierung ausläuft – z.B. projektbezogen bis zum Ende einer Kostenzusage.</span>
+                      </span>
+                    </label>
+                  </div>
+                  <div class="fld">
+                    <label>Wodurch endet der Vertrag? <span class="req">*</span></label>
+                    <div class="inp ta">Ende der Kostenzusage des Jugendamtes für das Projekt „Begleitete Elternschaft"</div>
+                  </div>
+                  <div class="fld">
+                    <label>Voraussichtliches Ende (optional)</label>
+                    <div class="inp ph">TT.MM.JJJJ</div>
+                    <p class="hint">Unverbindlich – dient der Personalabteilung nur als Wiedervorlage.</p>
+                  </div>
+                  <div class="fld">
+                    <label>Sachgrund der Befristung</label>
+                    <div class="inp sel">Projektbezogen</div>
+                  </div>
+                </div>
+                <div class="app-actions"><span class="btn">Weiter</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note is-neu">
+            <h3>Kein Datum nötig</h3>
+            <p>Statt eines Kalendertags beschreibt die Führungskraft das Ereignis, das den Vertrag beendet.
+               Das ist die <strong>Zweckbefristung</strong> nach § 3 Abs. 1 S. 2 TzBfG — rechtlich ein
+               eigener Fall, kein Notbehelf.</p>
+          </div>
+          <div class="note">
+            <h3>Das optionale Datum</h3>
+            <p>Wer den Zeitraum der Kostenzusage kennt, kann ihn eintragen. Der Text darunter macht klar,
+               dass dieses Datum <strong>nicht</strong> das Vertragsende ist — die Personalabteilung
+               nutzt es nur als Wiedervorlage.</p>
+            <p>Bleibt es leer, geht es trotzdem weiter. Genau dieser Fall ließ das Formular vorher hängen.</p>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <!-- ============ 5 ============ -->
+    <li class="stage">
+      <div class="stage-head">
+        <span class="stage-num">05</span>
+        <h2>Wenn etwas fehlt
+          <span class="sub">Das Formular sagt jetzt, was los ist</span>
+        </h2>
+      </div>
+      <div class="band">
+        <div class="app static">
+          <div class="app-head">
+            <div class="app-head-in">
+              <div class="app-brand">
+                <svg class="logo" viewBox="0 0 1621.984 360.894" role="img" aria-label="CREDO"><use href="#credo-logo"/></svg>
+                <div>
+                  <div class="t">Einstellungsmodalitäten</div>
+                  <div class="s">für Anna Beispiel · Christliche Familienhilfe Minden e. V.</div>
+                </div>
+              </div>
+              <div class="app-head-right">
+                <span class="app-save err">Bitte beschreiben Sie, wodurch der befristete Vertrag endet.</span>
+                <span class="app-pill">Schritt 1 / 5</span>
+              </div>
+            </div>
+            <div class="app-progress"><i style="width:20%"></i></div>
+            <div class="linie"><i class="g"></i><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>
+          </div>
+          <div class="app-main">
+            <div class="app-card">
+              <div class="app-body">
+                <div class="box plain">
+                  <div class="fld">
+                    <label>Wodurch endet der Vertrag? <span class="req">*</span></label>
+                    <div class="inp ta err ph">z.B. Ende der Kostenzusage des Jugendamtes für das Projekt ...</div>
+                    <p class="msg-err">Bitte beschreiben Sie, wodurch der Vertrag endet (z.B. Ende der Kostenzusage).</p>
+                  </div>
+                  <div class="fld">
+                    <label>Voraussichtliches Ende (optional)</label>
+                    <div class="inp ph">TT.MM.JJJJ</div>
+                  </div>
+                </div>
+                <div class="app-actions"><span class="btn">Weiter</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note is-alt">
+            <h3>Der eigentliche Ärger</h3>
+            <p>Nicht das fehlende Feld war das Schlimmste, sondern die Stille: Der Klick auf
+               <strong>Weiter</strong> blieb ohne jede Reaktion. Man sucht dann den Fehler bei sich.</p>
+          </div>
+          <div class="note is-neu">
+            <h3>Zwei Meldungen</h3>
+            <p><strong>Rot am Feld</strong> — wenn eine Pflichtangabe fehlt, direkt dort, wo sie hingehört.</p>
+            <p><strong>Rot oben im Kopf</strong> — wenn das Speichern selbst scheitert, im Klartext statt
+               als toter Knopf.</p>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <!-- ============ 6 ============ -->
+    <li class="stage">
+      <div class="stage-head">
+        <span class="stage-num">06</span>
+        <h2>Die Zusammenfassung
+          <span class="sub">Schritt 5 von 5 — was verbindlich abgesendet wird</span>
+        </h2>
+      </div>
+      <div class="band">
+        <div class="app static">
+          <div class="app-head">
+            <div class="app-head-in">
+              <div class="app-brand">
+                <svg class="logo" viewBox="0 0 1621.984 360.894" role="img" aria-label="CREDO"><use href="#credo-logo"/></svg>
+                <div>
+                  <div class="t">Einstellungsmodalitäten</div>
+                  <div class="s">für Anna Beispiel · Christliche Familienhilfe Minden e. V.</div>
+                </div>
+              </div>
+              <div class="app-head-right">
+                <span class="app-save">Gespeichert</span>
+                <span class="app-pill">Schritt 5 / 5</span>
+              </div>
+            </div>
+            <div class="app-progress"><i style="width:100%"></i></div>
+            <div class="linie"><i class="g"></i><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>
+          </div>
+          <div class="app-nav">
+            <div class="app-nav-in">
+              <span class="tab is-done"><span class="n">✓</span>Stelle &amp; Vertrag</span>
+              <span class="tab is-done"><span class="n">✓</span>Arbeitszeit &amp; Arbeitgeber</span>
+              <span class="tab is-done"><span class="n">✓</span>Vergütung</span>
+              <span class="tab is-done"><span class="n">✓</span>Zusätzliche Angaben</span>
+              <span class="tab is-active"><span class="n">5</span>Zusammenfassung</span>
+            </div>
+          </div>
+          <div class="app-main">
+            <div class="app-card">
+              <div class="app-card-head">
+                <h4>Zusammenfassung</h4>
+                <p>Prüfen und Absenden</p>
+              </div>
+              <div class="app-body">
+                <div class="banner">Bitte prüfen Sie alle Angaben für <strong>Anna Beispiel</strong> sorgfältig.</div>
+                <div class="sum">
+                  <div class="sum-head">1. Stelle &amp; Vertrag</div>
+                  <div class="sum-body">
+                    <div class="row"><span>Betriebsstätte</span><span>Kingsleyallee 6, Minden</span></div>
+                    <div class="row"><span>Stelle</span><span>Sozialpädagogische Familienhilfe</span></div>
+                    <div class="row"><span>Vertragsbeginn</span><span>01.09.2026</span></div>
+                    <div class="row"><span>Befristet</span><span>Ja</span></div>
+                    <div class="row mark"><span>Art der Befristung</span><span>Zweckbefristung (Ende bei Zweckerreichung)</span></div>
+                    <div class="row mark"><span>Ende bei</span><span>Ende der Kostenzusage des Jugendamtes für das Projekt „Begleitete Elternschaft"</span></div>
+                    <div class="row mark"><span>Voraussichtliches Ende</span><span>—</span></div>
+                    <div class="row mark"><span>Sachgrund</span><span>Projektbezogen</span></div>
+                  </div>
+                </div>
+                <div class="app-actions" style="justify-content:space-between">
+                  <span class="btn ghost">Zurück</span>
+                  <span class="btn gruen">Verbindlich absenden</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note is-neu">
+            <h3>Grün markiert</h3>
+            <p>Die vier Zeilen zur Befristung sind neu. Vorher stand hier nur „Befristet: Ja" und ein
+               Vertragsende — bei einer Zweckbefristung also eine leere Zeile.</p>
+          </div>
+          <div class="note">
+            <h3>Vor dem Absenden</h3>
+            <p>Fehlt eine der Pflichtangaben, weist auch der Server das Absenden zurück — mit demselben
+               Klartext. Unvollständige Modalitäten erreichen die Personalabteilung nicht mehr.</p>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <!-- ============ 7 ============ -->
+    <li class="stage">
+      <div class="stage-head">
+        <span class="stage-num">07</span>
+        <h2>Was die Personalabteilung sieht
+          <span class="sub">Reiter „Vorgesetzter" im Onboarding-Vorgang</span>
+        </h2>
+      </div>
+      <div class="band">
+        <div class="hr-card">
+          <h5>Stelle &amp; Vertrag</h5>
+          <div class="hr-grid">
+            <div class="hr-row"><span>Betriebsstätte</span><span>Kingsleyallee 6, Minden</span></div>
+            <div class="hr-row"><span>Stellenbeschreibung</span><span>Sozialpädagogische Familienhilfe</span></div>
+            <div class="hr-row"><span>Vertragsbeginn</span><span>01.09.2026</span></div>
+            <div class="hr-row"><span>Befristet</span><span>Ja</span></div>
+            <div class="hr-row"><span>Art der Befristung</span><span>Zweckbefristung (Ende bei Zweckerreichung)</span></div>
+            <div class="hr-row"><span>Vertragsende</span><span>Zweckbefristung – kein festes Datum</span></div>
+            <div class="hr-row"><span>Ende bei</span><span>Ende der Kostenzusage des Jugendamtes</span></div>
+            <div class="hr-row"><span>Befristung Sachgrund</span><span>Projektbezogen</span></div>
+          </div>
+          <div class="vars">
+            <span class="var">{eintrittsdatum}</span>
+            <span class="var">{stellenbeschreibung}</span>
+            <span class="var">{vertragsende}</span>
+            <span class="var neu">{befristung_art}</span>
+            <span class="var neu">{befristung_zweck}</span>
+            <span class="var neu">{befristung_sachgrund}</span>
+            <span class="var neu">{vertragsende_voraussichtlich}</span>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note">
+            <h3>Kein Rätselraten mehr</h3>
+            <p>Statt eines leeren Vertragsendes steht dort, <em>warum</em> keins da ist und
+               <em>wodurch</em> der Vertrag endet. Die Sachbearbeitung kann den Arbeitsvertrag
+               ohne Rückfrage aufsetzen.</p>
+          </div>
+          <div class="note is-neu">
+            <h3>Für die Vertragsvorlagen</h3>
+            <p>Die vier grün markierten Platzhalter stehen ab sofort im Vorlagen-Editor bereit.
+               <code>{vertragsende}</code> bleibt bewusst dem Kalenderdatum vorbehalten und bleibt bei
+               einer Zweckbefristung leer — sonst stünde im Arbeitsvertrag ein Datum, das es rechtlich
+               nicht gibt.</p>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <!-- ============ 8 ============ -->
+    <li class="stage">
+      <div class="stage-head">
+        <span class="stage-num">08</span>
+        <h2>Selbst ausprobieren
+          <span class="sub">Dieser Block reagiert wie im echten Formular</span>
+        </h2>
+      </div>
+      <div class="band">
+        <div class="app live">
+          <div class="app-main" style="padding-top:1.25rem">
+            <div class="app-card">
+              <div class="app-body">
+                <p class="live-hint">Haken setzen, dann eine Art wählen</p>
+                <div class="box">
+                  <label class="check">
+                    <input type="checkbox" id="d-befristet"> Befristeter Vertrag
+                  </label>
+                </div>
+
+                <div class="box plain hidden" id="d-block">
+                  <div class="fld">
+                    <label>Art der Befristung <span class="req">*</span></label>
+                    <label class="radio-card" id="d-card-kal">
+                      <input type="radio" name="d-art" value="KALENDER">
+                      <span>
+                        <span class="rt">Festes Enddatum</span>
+                        <span class="rd">Der Vertrag endet an einem konkreten Kalendertag.</span>
+                      </span>
+                    </label>
+                    <label class="radio-card" id="d-card-zweck">
+                      <input type="radio" name="d-art" value="ZWECK">
+                      <span>
+                        <span class="rt">Zweckbefristung – kein festes Enddatum</span>
+                        <span class="rd">Der Vertrag endet, sobald der Zweck erreicht ist bzw. die Finanzierung ausläuft – z.B. projektbezogen bis zum Ende einer Kostenzusage.</span>
+                      </span>
+                    </label>
+                  </div>
+
+                  <div class="fld hidden" id="d-kalender">
+                    <label>Vertragsende <span class="req">*</span></label>
+                    <input class="inp" type="date" value="2027-08-31">
+                  </div>
+
+                  <div class="hidden" id="d-zweck" style="display:none">
+                    <div class="fld">
+                      <label>Wodurch endet der Vertrag? <span class="req">*</span></label>
+                      <textarea class="inp ta" rows="2" placeholder="z.B. Ende der Kostenzusage des Jugendamtes für das Projekt ..."></textarea>
+                    </div>
+                    <div class="fld" style="margin-top:1rem">
+                      <label>Voraussichtliches Ende (optional)</label>
+                      <input class="inp" type="date">
+                      <p class="hint">Unverbindlich – dient der Personalabteilung nur als Wiedervorlage.</p>
+                    </div>
+                  </div>
+
+                  <div class="fld">
+                    <label>Sachgrund der Befristung</label>
+                    <select class="inp">
+                      <option>Ohne Sachgrund</option>
+                      <option>Vertretung</option>
+                      <option selected>Projektbezogen</option>
+                      <option>Erprobung</option>
+                      <option>Sonstiger Sachgrund</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="app-actions"><button class="btn" type="button">Weiter</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notes">
+          <div class="note">
+            <h3>Was Sie hier sehen</h3>
+            <p>Die Ein- und Ausblendlogik ist dieselbe wie im Portal. Nur das Speichern fehlt —
+               dies ist eine Nachbildung, keine Verbindung zum echten Vorgang.</p>
+          </div>
+        </div>
+      </div>
+    </li>
+
+  </ol>
+
+  <section class="outro">
+    <div>
+      <h3>Was vor dem Einsatz passieren muss</h3>
+      <p>Die drei neuen Felder brauchen einen Schema-Abgleich in der Datenbank. Den erledigt der
+         Container-Start selbst — es reicht das übliche Deploy auf dem Server.</p>
+      <pre>sudo docker compose up -d --build</pre>
+    </div>
+    <div>
+      <h3>Für den gemeldeten Vorgang</h3>
+      <p>Der bestehende Link bleibt gültig. Die Angaben aus Schritt 1 wurden nie gespeichert — sie
+         müssen einmal neu erfasst werden. Danach führt der Weg über
+         <strong>Zweckbefristung</strong> durch bis zum Absenden.</p>
+    </div>
+    <div>
+      <h3>Bestehende Vorgänge</h3>
+      <p>Laufende Onboardings mit festem Enddatum bleiben unberührt: Sie erscheinen weiterhin als
+         befristet mit Datum, die neue Auswahl steht bei ihnen auf <strong>Festes Enddatum</strong>.</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var check = document.getElementById("d-befristet");
+  var block = document.getElementById("d-block");
+  var kalender = document.getElementById("d-kalender");
+  var zweck = document.getElementById("d-zweck");
+  var cardKal = document.getElementById("d-card-kal");
+  var cardZweck = document.getElementById("d-card-zweck");
+  var radios = document.querySelectorAll('input[name="d-art"]');
+
+  function show(el, on) {
+    el.classList.toggle("hidden", !on);
+    el.style.display = on ? "" : "none";
+  }
+
+  function render() {
+    show(block, check.checked);
+    var art = "";
+    radios.forEach(function (r) { if (r.checked) art = r.value; });
+    show(kalender, check.checked && art === "KALENDER");
+    show(zweck, check.checked && art === "ZWECK");
+    cardKal.classList.toggle("on", art === "KALENDER");
+    cardZweck.classList.toggle("on", art === "ZWECK");
+  }
+
+  check.addEventListener("change", render);
+  radios.forEach(function (r) { r.addEventListener("change", render); });
+  render();
+})();
+</script>
+</body>
+</html>
