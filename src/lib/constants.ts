@@ -69,6 +69,32 @@ export const CONTRACT_TYPE_LABELS: Record<string, string> = {
 };
 
 // =============================================
+// Befristung (Einstellungsmodalitaeten)
+// =============================================
+/** Art der Befristung: kalendermaessig (festes Enddatum) oder Zweckbefristung. */
+export const BEFRISTUNGSART_LABELS: Record<string, string> = {
+  KALENDER: "Festes Enddatum (kalendermäßig befristet)",
+  ZWECK: "Zweckbefristung (Ende bei Zweckerreichung)",
+};
+
+export const BEFRISTUNG_SACHGRUND_LABELS: Record<string, string> = {
+  vertretung: "Vertretung",
+  projektbezogen: "Projektbezogen",
+  erprobung: "Erprobung",
+  sonstig: "Sonstiger Sachgrund",
+};
+
+export function getBefristungsartLabel(value?: string | null): string | null {
+  if (!value) return null;
+  return BEFRISTUNGSART_LABELS[value] || value;
+}
+
+export function getBefristungSachgrundLabel(value?: string | null): string | null {
+  if (!value) return "Ohne Sachgrund";
+  return BEFRISTUNG_SACHGRUND_LABELS[value] || value;
+}
+
+// =============================================
 // Validierungsfunktionen
 // =============================================
 export function isValidUrl(url: string): boolean {

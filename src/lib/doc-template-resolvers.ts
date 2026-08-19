@@ -17,6 +17,7 @@ import { prisma } from "@/lib/db";
 import { resolveVerantwortlicheStelle } from "@/lib/dsgvo";
 import { decrypt } from "@/lib/encryption";
 import type { SessionPayload } from "@/lib/permissions";
+import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
 
 export interface ResolverContext {
   organizationId?: string | null;
@@ -204,6 +205,8 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
       supervisorData: {
         select: {
           vertragsbeginn: true, vertragsende: true, stellenbeschreibung: true,
+          befristet: true, befristungsart: true, befristungZweck: true,
+          vertragsendeVoraussichtlich: true, befristungSachgrund: true,
           betriebsstaette: true, entgeltgruppe: true, stufe: true,
           wochenstunden: true, probezeitMonate: true, urlaubstageProJahr: true,
         },
@@ -261,7 +264,17 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
   set("berufsausbildung", pd?.highestProfessionalDegree);
 
   set("eintrittsdatum", deDateOnb(sd?.vertragsbeginn));
-  set("vertragsende", deDateOnb(sd?.vertragsende));
+  if (sd?.befristet) {
+    set("befristung_art", getBefristungsartLabel(sd.befristungsart));
+    set("befristung_sachgrund", getBefristungSachgrundLabel(sd.befristungSachgrund));
+    // Bei Zweckbefristung gibt es bewusst KEIN kalendermaessiges Vertragsende
+    if (sd.befristungsart === "ZWECK") {
+      set("befristung_zweck", sd.befristungZweck);
+      set("vertragsende_voraussichtlich", deDateOnb(sd.vertragsendeVoraussichtlich));
+    } else {
+      set("vertragsende", deDateOnb(sd.vertragsende));
+    }
+  }
   set("stellenbeschreibung", sd?.stellenbeschreibung);
   set("betriebsstaette", sd?.betriebsstaette);
   set("entgeltgruppe", sd?.entgeltgruppe);

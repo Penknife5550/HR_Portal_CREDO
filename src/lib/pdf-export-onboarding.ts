@@ -7,6 +7,7 @@
 
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
+import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
 
 // =============================================
 // Typen
@@ -82,7 +83,10 @@ interface SupervisorDataExport {
   stellenbeschreibung: string | null;
   vertragsbeginn: string | null;
   befristet: boolean | null;
+  befristungsart: string | null;
   vertragsende: string | null;
+  befristungZweck: string | null;
+  vertragsendeVoraussichtlich: string | null;
   befristungSachgrund: string | null;
   vollzeit: boolean | null;
   wochenstunden: number | null;
@@ -372,8 +376,17 @@ async function addModalitaetenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExpo
   y = dataRow(doc, "Vertragsbeginn", fmt(sd.vertragsbeginn), y);
   y = dataRow(doc, "Befristet", yn(sd.befristet), y);
   if (sd.befristet) {
-    y = dataRow(doc, "Vertragsende", fmt(sd.vertragsende), y);
-    y = dataRow(doc, "Sachgrund", str(sd.befristungSachgrund), y);
+    y = dataRow(doc, "Art der Befristung", str(getBefristungsartLabel(sd.befristungsart)), y);
+    if (sd.befristungsart === "ZWECK") {
+      y = dataRow(doc, "Vertragsende", "Zweckbefristung - kein festes Datum", y);
+      y = dataRow(doc, "Ende bei", str(sd.befristungZweck), y);
+      if (sd.vertragsendeVoraussichtlich) {
+        y = dataRow(doc, "Vorauss. Ende", `${fmt(sd.vertragsendeVoraussichtlich)} (unverbindlich)`, y);
+      }
+    } else {
+      y = dataRow(doc, "Vertragsende", fmt(sd.vertragsende), y);
+    }
+    y = dataRow(doc, "Sachgrund", str(getBefristungSachgrundLabel(sd.befristungSachgrund)), y);
   }
 
   checkBreak(doc, 80, ctx, "Modalitaeten");

@@ -162,7 +162,11 @@ export async function GET(
         stellenbeschreibung: process.supervisorData.stellenbeschreibung,
         vertragsbeginn: process.supervisorData.vertragsbeginn?.toISOString() || null,
         befristet: process.supervisorData.befristet,
+        befristungsart: process.supervisorData.befristungsart,
         vertragsende: process.supervisorData.vertragsende?.toISOString() || null,
+        befristungZweck: process.supervisorData.befristungZweck,
+        vertragsendeVoraussichtlich:
+          process.supervisorData.vertragsendeVoraussichtlich?.toISOString() || null,
         befristungSachgrund: process.supervisorData.befristungSachgrund,
         vollzeit: process.supervisorData.vollzeit,
         wochenstunden: process.supervisorData.wochenstunden ? Number(process.supervisorData.wochenstunden) : null,
