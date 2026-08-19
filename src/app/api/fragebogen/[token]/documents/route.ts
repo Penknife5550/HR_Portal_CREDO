@@ -158,9 +158,12 @@ export async function POST(
     // buffer wurde bereits oben gelesen (Magic Bytes Validierung)
     await writeFile(filePath, buffer);
 
-    // Dokument-Typ mappen
+    // Dokument-Typ mappen.
+    // Aufrufer senden teils den Kategorie-Schluessel ("geburtsurkunde_kind"),
+    // teils die Enum-Schreibweise ("GEBURTSURKUNDE_KIND") — beides muss treffen,
+    // sonst landet das Dokument stillschweigend als SONSTIGES und gilt als fehlend.
     const documentType =
-      DOCUMENT_TYPE_MAP[docType] || "SONSTIGES";
+      DOCUMENT_TYPE_MAP[docType.toLowerCase()] || "SONSTIGES";
 
     // Dokument in DB speichern
     const document = await prisma.document.create({
