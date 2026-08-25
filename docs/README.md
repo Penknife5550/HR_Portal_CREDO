@@ -15,14 +15,19 @@ beim Verschieben müssen Handbuch und Bildordner zusammenbleiben.
 
 ## Module
 
-### Minijob-Checkliste 05/2026 — *geplant, noch nicht umgesetzt*
+### Minijob-Checkliste 2026 — *geplant, noch nicht umgesetzt*
 
 | Datei | Inhalt |
 |---|---|
-| [module/minijob/minijob-checkliste-2026.html](module/minijob/minijob-checkliste-2026.html) | Abgleich der amtlichen Checkliste (Stand 26.05.2026) mit dem Personalfragebogen, Lückenanalyse, Umsetzungsplan, Entscheidungsprotokoll |
+| [module/minijob/checkliste-minijobzentrale-2026-06-30.pdf](module/minijob/checkliste-minijobzentrale-2026-06-30.pdf) | **Amtliche Vorlage der Minijob-Zentrale, Stand 30.06.2026** — maßgeblich für die Umsetzung. Seiten 7–9 (Merkblatt, Befreiungsantrag, Aufhebungsantrag) werden in AP 8 als System-Dokumente extrahiert |
+| [module/minijob/minijob-checkliste-2026.html](module/minijob/minijob-checkliste-2026.html) | Abgleich der amtlichen Checkliste mit dem Personalfragebogen, Lückenanalyse, Umsetzungsplan, Entscheidungsprotokoll, Nachtrag 25.08.2026 |
 | [module/minijob/minijob-mockups-2026.html](module/minijob/minijob-mockups-2026.html) | Prozesskette und Masken-Entwürfe |
 
 Branch: `feat/minijob-checkliste-2026`.
+
+> **Achtung Formularstand:** Der Erstabgleich lief gegen die Fassung 26.05.2026, maßgeblich ist inzwischen
+> **30.06.2026**. Vor dem Extrahieren der Anlagen bitte prüfen, ob die Minijob-Zentrale erneut nachgelegt hat —
+> [Downloadseite](https://www.minijob-zentrale.de/SharedDocs/Downloads/DE/Formulare/gewerblich/Checkliste_BDA_Personalfragebogen.html).
 
 ### Vertragsende — *im Betrieb*
 
@@ -31,6 +36,7 @@ Branch: `feat/minijob-checkliste-2026`.
 | [module/vertragsende/vertragsende-prozess.html](module/vertragsende/vertragsende-prozess.html) | Konzept, Prozess und Mockups |
 | [module/vertragsende/vertragsende-implementierung.md](module/vertragsende/vertragsende-implementierung.md) | Implementierungs-Dokumentation |
 | [module/vertragsende/vertragsende-phase2-plan.md](module/vertragsende/vertragsende-phase2-plan.md) | Phase 2 (n8n-Anbindung) |
+| [module/vertragsende/zweckbefristung-formular-mockup.html](module/vertragsende/zweckbefristung-formular-mockup.html) | Mockup des Modalitäten-Formulars mit Zweckbefristung |
 
 ### Elternzeit
 
@@ -79,6 +85,7 @@ Branch: `feat/minijob-checkliste-2026`.
 | Datei | Inhalt |
 |---|---|
 | [historie/FEHLER_PDF_FIXES.md](historie/FEHLER_PDF_FIXES.md) | Behobene PDF-Fehler |
+| [historie/onboarding-fixes-2026-08.md](historie/onboarding-fixes-2026-08.md) | Onboarding-Fixes August 2026 (Zweckbefristung, Dokument-Typ-Mapping) |
 
 ---
 

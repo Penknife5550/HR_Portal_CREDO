@@ -187,10 +187,21 @@
 <div class="seite">
 
   <div class="meta">
-    <div><b>Bezug:</b> Umsetzung der Minijob-Zentrale-Checkliste (Stand 26.05.2026), siehe <a href="minijob-checkliste-2026.html"><code>minijob-checkliste-2026.html</code></a> (im selben Ordner).</div>
-    <div><b>Grundlage:</b> Die elf am 17.08.2026 getroffenen Entscheidungen &mdash; integriert ins bestehende Formular, Befreiungsantrag in Schriftform, volle Phase&nbsp;1.</div>
+    <div><b>Bezug:</b> Umsetzung der Minijob-Zentrale-Checkliste (<b>Stand 30.06.2026</b>), siehe <a href="minijob-checkliste-2026.html"><code>minijob-checkliste-2026.html</code></a> und die amtliche Vorlage <code>checkliste-minijobzentrale-2026-06-30.pdf</code> (im selben Ordner).</div>
+    <div><b>Grundlage:</b> Die elf am 17.08.2026 getroffenen Entscheidungen &mdash; integriert ins bestehende Formular, Befreiungsantrag in Schriftform, volle Phase&nbsp;1. Nachtrag vom 25.08.2026 eingearbeitet.</div>
     <div><b>Was das hier ist:</b> Skizzen zur Verst&auml;ndigung, keine fertigen Screens. Farben und Rahmen entsprechen dem echten Portal, Feinheiten sch&auml;rfen wir bei der Umsetzung.</div>
     <div><b>Noch kein Code:</b> Branch <code>feat/minijob-checkliste-2026</code> ist angelegt, die Umsetzung hat noch nicht begonnen.</div>
+  </div>
+
+  <div class="hinweis warnung"><span class="label">&Uuml;berarbeitet am 25.08.2026</span>
+    <p>
+      Nach dem vollst&auml;ndigen Abgleich mit dem amtlichen Muster wurden sechs Skizzen korrigiert. Betroffen sind
+      Schritt&nbsp;4 (Art der Versicherung hat <b>zwei</b> Optionen, nicht drei), Schritt&nbsp;6 (vierte Spalte in 4b,
+      vollst&auml;ndige Tabelle in 4c, Wortlaut der Additionsfrage), Schritt&nbsp;8 (Unterschriftsregel bei
+      Minderj&auml;hrigen) und die HR-Detailseite (zwei Fristen statt einer, Unterschrift des Arbeitgebers).
+      Die Kennungen <span class="badge badge-gelb">N-2</span> bis <span class="badge badge-gelb">N-11</span> verweisen
+      auf Abschnitt&nbsp;11 des Plandokuments.
+    </p>
   </div>
 
   <div class="hinweis info"><span class="label">Lesehilfe</span>
@@ -446,7 +457,7 @@
     <b>ab wann</b> die Befreiung wirkt &mdash; und damit &uuml;ber bare Beitr&auml;ge.
   </p>
 
-  <svg class="diagramm" viewBox="0 0 960 380" xmlns="http://www.w3.org/2000/svg">
+  <svg class="diagramm" viewBox="0 0 960 550" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <marker id="pf3" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
         <path d="M0,0 L8,3 L0,6 Z" fill="#888"/>
@@ -455,46 +466,77 @@
         .t3{font-family:Montserrat,Arial,sans-serif;fill:#3a3a3a;}
         .l3{font-family:Montserrat,Arial,sans-serif;font-size:11.5px;fill:#777;}
         .k3{font-family:Montserrat,Arial,sans-serif;font-size:12.5px;font-weight:700;fill:#575756;}
+        .ph3{font-family:Montserrat,Arial,sans-serif;font-size:11.5px;font-weight:700;fill:#999;letter-spacing:0.08em;}
       </style>
     </defs>
 
+    <text x="30" y="24" class="ph3">1 &#183; MELDEFRIST &#8212; MASSGEBLICH IST DER FR&#220;HERE DER BEIDEN ROTEN TERMINE</text>
+
     <!-- Zeitstrahl -->
-    <line x1="70" y1="96" x2="890" y2="96" stroke="#ddd" stroke-width="3"/>
+    <line x1="70" y1="112" x2="890" y2="112" stroke="#ddd" stroke-width="3"/>
 
-    <circle cx="90" cy="96" r="8" fill="#009AC6"/>
-    <text x="90" y="72" text-anchor="middle" class="k3">Tag 0</text>
-    <text x="90" y="126" text-anchor="middle" class="l3">Antrag geht bei</text>
-    <text x="90" y="142" text-anchor="middle" class="l3">HR ein</text>
+    <circle cx="90" cy="112" r="8" fill="#009AC6"/>
+    <text x="90" y="88" text-anchor="middle" class="k3">Tag 0</text>
+    <text x="90" y="142" text-anchor="middle" class="l3">Antrag geht bei</text>
+    <text x="90" y="158" text-anchor="middle" class="l3">HR ein</text>
 
-    <circle cx="330" cy="96" r="7" fill="#FBC900"/>
-    <text x="330" y="72" text-anchor="middle" class="k3">Woche 4</text>
-    <text x="330" y="126" text-anchor="middle" class="l3">Portal erinnert</text>
+    <circle cx="280" cy="112" r="7" fill="#FBC900"/>
+    <text x="280" y="88" text-anchor="middle" class="k3">Woche 4</text>
+    <text x="280" y="142" text-anchor="middle" class="l3">Portal erinnert</text>
 
-    <circle cx="530" cy="96" r="7" fill="#FBC900"/>
-    <text x="530" y="72" text-anchor="middle" class="k3">Woche 5</text>
-    <text x="530" y="126" text-anchor="middle" class="l3">Portal warnt</text>
+    <!-- NEU: Entgeltabrechnung, variabler Termin -->
+    <line x1="470" y1="62" x2="470" y2="170" stroke="#E2001A" stroke-width="2" stroke-dasharray="5 4"/>
+    <circle cx="470" cy="112" r="9" fill="#E2001A"/>
+    <text x="470" y="52" text-anchor="middle" class="k3" fill="#b3121a">n&#228;chste Entgeltabrechnung</text>
+    <text x="470" y="188" text-anchor="middle" class="l3">Termin variabel &#8212; kann auch</text>
+    <text x="470" y="204" text-anchor="middle" class="l3">vor Woche 4 liegen</text>
 
-    <circle cx="800" cy="96" r="9" fill="#E2001A"/>
-    <text x="800" y="72" text-anchor="middle" class="k3" fill="#b3121a">Woche 6</text>
-    <text x="800" y="126" text-anchor="middle" class="l3">sp&#228;tester Termin f&#252;r die</text>
-    <text x="800" y="142" text-anchor="middle" class="l3">Meldung an die Minijob-Zentrale</text>
+    <circle cx="650" cy="112" r="7" fill="#FBC900"/>
+    <text x="650" y="88" text-anchor="middle" class="k3">Woche 5</text>
+    <text x="650" y="142" text-anchor="middle" class="l3">Portal warnt</text>
 
-    <!-- Ausgang gut -->
-    <path d="M800,150 V186 H300 V212" fill="none" stroke="#6BAA24" stroke-width="2" marker-end="url(#pf3)"/>
-    <rect x="60" y="214" width="480" height="70" rx="9" fill="#f3faea" stroke="#6BAA24" stroke-width="1.8"/>
-    <text x="300" y="238" text-anchor="middle" class="t3" font-size="13.5" font-weight="700" fill="#4d7d18">Rechtzeitig gemeldet</text>
-    <text x="300" y="258" text-anchor="middle" class="l3">Die Befreiung wirkt ab Beginn des Kalendermonats,</text>
-    <text x="300" y="274" text-anchor="middle" class="l3">in dem der Antrag einging &#8212; fr&#252;hestens ab Besch&#228;ftigungsbeginn.</text>
+    <circle cx="840" cy="112" r="9" fill="#E2001A"/>
+    <text x="840" y="88" text-anchor="middle" class="k3" fill="#b3121a">sp&#228;testens Woche 6</text>
+    <text x="840" y="142" text-anchor="middle" class="l3">&#228;u&#223;ere Grenze f&#252;r die Meldung</text>
+    <text x="840" y="158" text-anchor="middle" class="l3">an die Minijob-Zentrale</text>
 
-    <!-- Ausgang schlecht -->
-    <path d="M800,150 V186 H700 V212" fill="none" stroke="#E2001A" stroke-width="2" marker-end="url(#pf3)"/>
-    <rect x="560" y="214" width="380" height="70" rx="9" fill="#fff4f4" stroke="#E2001A" stroke-width="1.8"/>
-    <text x="750" y="238" text-anchor="middle" class="t3" font-size="13.5" font-weight="700" fill="#b3121a">Frist vers&#228;umt</text>
-    <text x="750" y="258" text-anchor="middle" class="l3">Die Befreiung wirkt erst nach Ablauf des Monats,</text>
-    <text x="750" y="274" text-anchor="middle" class="l3">der auf den Eingang der Meldung folgt.</text>
+    <!-- Verzweigung -->
+    <text x="480" y="240" text-anchor="middle" class="l3" font-style="italic">Wurde bis zum fr&#252;heren der beiden roten Termine gemeldet?</text>
+    <path d="M480,248 H260 V278" fill="none" stroke="#6BAA24" stroke-width="2" marker-end="url(#pf3)"/>
+    <path d="M480,248 H720 V278" fill="none" stroke="#E2001A" stroke-width="2" marker-end="url(#pf3)"/>
 
-    <text x="480" y="330" text-anchor="middle" class="l3" font-style="italic">Die Differenz tr&#228;gt der Arbeitgeber: F&#252;r die dazwischenliegenden Monate bleibt der Arbeitnehmeranteil von 3,6 % f&#228;llig,</text>
-    <text x="480" y="350" text-anchor="middle" class="l3" font-style="italic">obwohl der Besch&#228;ftigte die Befreiung rechtzeitig beantragt hatte.</text>
+    <rect x="40" y="280" width="440" height="76" rx="9" fill="#f3faea" stroke="#6BAA24" stroke-width="1.8"/>
+    <text x="260" y="304" text-anchor="middle" class="t3" font-size="13.5" font-weight="700" fill="#4d7d18">Ja &#8212; rechtzeitig gemeldet</text>
+    <text x="260" y="324" text-anchor="middle" class="l3">Die Befreiung wirkt ab Beginn des Kalendermonats,</text>
+    <text x="260" y="340" text-anchor="middle" class="l3">in dem der Antrag einging &#8212; fr&#252;hestens ab Besch&#228;ftigungsbeginn.</text>
+
+    <rect x="500" y="280" width="440" height="76" rx="9" fill="#fff4f4" stroke="#E2001A" stroke-width="1.8"/>
+    <text x="720" y="304" text-anchor="middle" class="t3" font-size="13.5" font-weight="700" fill="#b3121a">Nein &#8212; Frist vers&#228;umt</text>
+    <text x="720" y="324" text-anchor="middle" class="l3">Die Befreiung wirkt erst nach Ablauf des Monats,</text>
+    <text x="720" y="340" text-anchor="middle" class="l3">der auf den Eingang der Meldung folgt.</text>
+
+    <text x="480" y="382" text-anchor="middle" class="l3" font-style="italic">Die Differenz tr&#228;gt der Arbeitgeber: F&#252;r die dazwischenliegenden Monate bleibt der Arbeitnehmeranteil von 3,6 % f&#228;llig,</text>
+    <text x="480" y="398" text-anchor="middle" class="l3" font-style="italic">obwohl der Besch&#228;ftigte die Befreiung rechtzeitig beantragt hatte.</text>
+
+    <!-- NEU: zweite Frist -->
+    <line x1="30" y1="422" x2="930" y2="422" stroke="#eee" stroke-width="1"/>
+    <text x="30" y="450" class="ph3">2 &#183; DANACH &#8212; WIDERSPRUCHSFRIST DER MINIJOB-ZENTRALE</text>
+
+    <rect x="40" y="468" width="270" height="64" rx="9" fill="#f5f5f5" stroke="#575756" stroke-width="1.5"/>
+    <text x="175" y="492" text-anchor="middle" class="t3" font-size="13" font-weight="700">Meldung abgesetzt</text>
+    <text x="175" y="512" text-anchor="middle" class="l3">DE&#220;V-Verfahren</text>
+
+    <path d="M310,500 H370" fill="none" stroke="#888" stroke-width="2" marker-end="url(#pf3)"/>
+
+    <rect x="378" y="468" width="270" height="64" rx="9" fill="#fffaeb" stroke="#FBC900" stroke-width="2"/>
+    <text x="513" y="492" text-anchor="middle" class="t3" font-size="13" font-weight="700">1 Monat Widerspruchsfrist</text>
+    <text x="513" y="512" text-anchor="middle" class="l3">Vorgang noch nicht abgeschlossen</text>
+
+    <path d="M648,500 H708" fill="none" stroke="#888" stroke-width="2" marker-end="url(#pf3)"/>
+
+    <rect x="716" y="468" width="224" height="64" rx="9" fill="#ecf6dd" stroke="#6BAA24" stroke-width="2"/>
+    <text x="828" y="492" text-anchor="middle" class="t3" font-size="13" font-weight="700" fill="#4d7d18">Kein Widerspruch</text>
+    <text x="828" y="512" text-anchor="middle" class="l3">Befreiung steht fest</text>
   </svg>
 
   <div class="hinweis warnung"><span class="label">Das ist der teuerste Punkt im ganzen Prozess</span>
@@ -502,6 +544,22 @@
       Heute hat das Portal <b>weder ein Eingangsdatum noch eine Fristen&uuml;berwachung</b>. Ein verpasster Termin f&auml;llt
       erst in der Betriebspr&uuml;fung auf &mdash; dann r&uuml;ckwirkend f&uuml;r alle betroffenen Minijobber.
       Deshalb steht die Fristen-Ampel in Phase&nbsp;1 und nicht in Phase&nbsp;2.
+    </p>
+  </div>
+
+  <div class="hinweis warnung"><span class="label">Zwei Korrekturen gegen&uuml;ber dem ersten Entwurf <span class="badge badge-gelb">N-4 &middot; N-5</span></span>
+    <p>
+      <b>Sechs Wochen sind nicht die Frist, sondern die &auml;u&szlig;ere Grenze.</b> Der Wortlaut der Erl&auml;uterung
+      lautet &bdquo;bis zur n&auml;chsten Entgeltabrechnung, <i>sp&auml;testens</i> innerhalb von 6&nbsp;Wochen&ldquo;.
+      Ma&szlig;geblich ist der <b>fr&uuml;here</b> der beiden Termine. Eine Ampel, die nur sechs Wochen z&auml;hlt, steht
+      bei einem Eingang zu Monatsbeginn noch auf Gr&uuml;n, obwohl die Frist &uuml;ber die Entgeltabrechnung l&auml;ngst
+      abgelaufen ist. Das Portal braucht dazu den Abrechnungstermin des Mandanten.
+    </p>
+    <p>
+      <b>Nach der Meldung ist der Vorgang noch nicht fertig.</b> Die Befreiung wirkt nur, &bdquo;sofern die
+      Minijob-Zentrale dem Befreiungsantrag nicht innerhalb <i>eines Monats</i> widerspricht&ldquo; &mdash; bei der
+      Aufhebung ausdr&uuml;cklich &uuml;ber &sect;&nbsp;28i Satz&nbsp;5 und &sect;&nbsp;28a SGB&nbsp;IV. Es braucht
+      also einen zweiten Zustand &bdquo;gemeldet, Widerspruchsfrist l&auml;uft&ldquo; und dessen Ende.
     </p>
   </div>
 
@@ -702,13 +760,13 @@
           <span class="radio an"><i></i>Gesetzlich versichert</span><span class="radio"><i></i>Privat versichert</span>
         </div>
       </div>
-      <div class="feld neu"><label>Art der Versicherung <span class="pflicht">*</span> <span class="neu-tag">NEU</span></label>
+      <div class="feld neu"><label>Art der Versicherung <span class="pflicht">*</span> <span class="neu-tag">NEU</span> <span class="neu-tag">KORRIGIERT N-8</span></label>
         <div style="margin-top:0.2rem;">
           <span class="radio an"><i></i><span>Eigene Mitgliedschaft</span></span>
           <span class="radio"><i></i><span>Familienversicherung</span></span>
-          <span class="radio"><i></i><span>Freiwillig gesetzlich versichert</span></span>
         </div>
         <div class="hilfe">Erscheint nur bei &bdquo;Gesetzlich versichert&ldquo;. Entscheidet mit dar&uuml;ber, ob der Arbeitgeber den Pauschalbeitrag zur Krankenversicherung zahlt.</div>
+        <div class="hilfe"><b>Genau zwei Optionen</b> &mdash; der erste Entwurf zeigte hier f&auml;lschlich eine dritte (&bdquo;Freiwillig gesetzlich versichert&ldquo;). Das Ankreuzfeld des amtlichen Musters kennt nur diese beiden; die freiwillige Versicherung taucht ausschlie&szlig;lich in der Erl&auml;uterung auf.</div>
       </div>
       <div class="feld"><label>Krankenkasse <span class="pflicht">*</span></label><div class="input">AOK NordWest</div></div>
       <div class="hinweis warnung neu" style="margin:0.8rem 0;padding:0.6rem 0.9rem;">
@@ -852,33 +910,45 @@
           <span class="btn btn-outline btn-sm">+ Weitere Besch&auml;ftigung hinzuf&uuml;gen</span>
         </div>
 
-        <div class="feld" style="margin-top:0.9rem;"><label>Ergibt die Summe aller geringf&uuml;gigen Besch&auml;ftigungen regelm&auml;&szlig;ig mehr als 603&nbsp;&euro; im Monat? <span class="pflicht">*</span></label>
+        <div class="feld" style="margin-top:0.9rem;"><label><b>Wenn keine mehr als geringf&uuml;gig entlohnte Hauptbesch&auml;ftigung vorliegt:</b> Ergibt die Addition der Bruttoarbeitsentgelte aus allen geringf&uuml;gigen Besch&auml;ftigungen einen Betrag, der regelm&auml;&szlig;ig 603&nbsp;&euro; im Monat &uuml;bersteigt? <span class="pflicht">*</span> <span class="neu-tag">WORTLAUT N-11</span></label>
           <span class="radio an"><i></i>Nein</span><span class="radio"><i></i>Ja</span>
           <div class="hilfe">Der Betrag wird aus den zentral gepflegten Rechengr&ouml;&szlig;en eingesetzt &mdash; bei einer Gesetzes&auml;nderung &auml;ndert er sich hier automatisch mit.</div>
+          <div class="hilfe">Die einleitende Bedingung geh&ouml;rt zur Frage und darf nicht wegfallen: Liegt eine sozialversicherungspflichtige Hauptbesch&auml;ftigung vor, wird der erste Minijob mit ihr <b>nicht</b> zusammengerechnet &mdash; die Addition greift dann gar nicht. Die Frage wird deshalb ausgeblendet, wenn im Status &bdquo;Arbeitnehmer mit sozialversicherungspflichtiger Hauptbesch&auml;ftigung&ldquo; gew&auml;hlt ist.</div>
+          <div class="hilfe">Wurde eine der eingetragenen Besch&auml;ftigungen <b>vor dem 01.01.2013</b> aufgenommen, gilt eine gesonderte versicherungsrechtliche Beurteilung (&Uuml;bergangsrecht der Minijob-Zentrale). Das Portal zeigt in diesem Fall einen Hinweis f&uuml;r HR, entscheidet aber nicht selbst. <span class="neu-tag">N-13</span></div>
         </div>
       </div>
 
       <div class="neu" style="margin-top:1rem;padding-top:0.5rem;padding-bottom:0.5rem;">
-        <div class="ktitel" style="font-size:0.92rem;">Vorbesch&auml;ftigungen in diesem Kalenderjahr <span class="neu-tag">NEU</span></div>
-        <div class="ksub" style="margin-bottom:0.4rem;">Nur bei kurzfristiger Besch&auml;ftigung auszuf&uuml;llen. <span class="pflicht">*</span></div>
+        <div class="ktitel" style="font-size:0.92rem;">Vorbesch&auml;ftigungen in diesem Kalenderjahr <span class="neu-tag">NEU</span> <span class="neu-tag">ERWEITERT N-2</span></div>
+        <div class="ksub" style="margin-bottom:0.4rem;">Im laufenden Kalenderjahr habe ich bereits eine oder mehrere Besch&auml;ftigungen ausge&uuml;bt <b>oder</b> war als Besch&auml;ftigungsloser arbeit- bzw. ausbildungsuchend gemeldet. <span class="pflicht">*</span></div>
         <span class="radio an"><i></i>Nein</span>
         <span class="radio"><i></i>Ja &mdash; bitte unten eintragen</span>
         <div class="zeilenblock" style="opacity:0.5;">
           <div class="znr">VORBESCH&Auml;FTIGUNG 1 &mdash; erscheint erst bei &bdquo;Ja&ldquo;</div>
-          <div class="grid3">
-            <div class="feld" style="margin:0.4rem 0;"><label>Von &ndash; bis</label><div class="input ph">TT.MM.JJJJ &ndash; TT.MM.JJJJ</div></div>
-            <div class="feld" style="margin:0.4rem 0;"><label>Tats&auml;chliche Arbeitstage</label><div class="input ph">z.B. 18</div></div>
-            <div class="feld" style="margin:0.4rem 0;"><label>Entgelt &uuml;ber 603&nbsp;&euro;?</label><div class="input ph">Ja / Nein</div></div>
+          <div class="grid2">
+            <div class="feld" style="margin:0.4rem 0;"><label>Beginn und Ende der Besch&auml;ftigung <b>bzw. der Meldung</b></label><div class="input ph">TT.MM.JJJJ &ndash; TT.MM.JJJJ</div></div>
+            <div class="feld" style="margin:0.4rem 0;"><label>Monatliches Arbeitsentgelt</label><div class="input ph">gr&ouml;&szlig;er als 603&nbsp;&euro;? Ja / Nein</div></div>
+            <div class="feld" style="margin:0.4rem 0;"><label>Tats&auml;chliche Arbeitstage in diesem Zeitraum</label><div class="input ph">z.B. 18</div></div>
+            <div class="feld" style="margin:0.4rem 0;"><label>Arbeitgeber mit Adresse <b>bzw. zust&auml;ndige Arbeitsagentur</b> <span style="font-weight:400;color:var(--muted);">(Adresse freiwillig)</span></label><div class="input ph">Arbeitgeber oder Agentur f&uuml;r Arbeit</div></div>
           </div>
         </div>
+        <div class="hilfe">Das amtliche Muster hat hier <b>vier</b> Spalten &mdash; der erste Entwurf zeigte nur drei. Eine Zeile kann auch eine <b>Meldung bei der Arbeitsagentur</b> statt einer Besch&auml;ftigung sein; deshalb tragen die erste und die vierte Spalte beide F&auml;lle. Aus diesen Zeilen wird sp&auml;ter die Drei-Monats-/70-Tage-Grenze berechnet.</div>
       </div>
 
       <div class="neu" style="margin-top:1rem;padding-top:0.5rem;padding-bottom:0.5rem;">
-        <div class="ktitel" style="font-size:0.92rem;">Besch&auml;ftigung oder selbstst&auml;ndige T&auml;tigkeit im Ausland <span class="neu-tag">NEU</span></div>
-        <div class="ksub" style="margin-bottom:0.4rem;">Besteht derzeit im Ausland ein Besch&auml;ftigungsverh&auml;ltnis oder eine selbstst&auml;ndige T&auml;tigkeit? <span class="pflicht">*</span></div>
+        <div class="ktitel" style="font-size:0.92rem;">Besch&auml;ftigung oder selbstst&auml;ndige T&auml;tigkeit im Ausland <span class="neu-tag">NEU</span> <span class="neu-tag">TABELLE ERG&Auml;NZT N-3</span></div>
+        <div class="ksub" style="margin-bottom:0.4rem;">Besteht derzeit im Ausland ein Besch&auml;ftigungsverh&auml;ltnis bei einem anderen Arbeitgeber oder eine selbstst&auml;ndige T&auml;tigkeit? <span class="pflicht">*</span></div>
         <span class="radio an"><i></i>Nein</span>
-        <span class="radio"><i></i>Ja &mdash; Bescheinigung A1 wird ben&ouml;tigt</span>
-        <div class="hilfe">Bei &bdquo;Ja&ldquo; wird die Bescheinigung&nbsp;A1 zum Pflichtdokument.</div>
+        <span class="radio"><i></i>Ja &mdash; bitte unten eintragen, Bescheinigung A1 beif&uuml;gen</span>
+        <div class="zeilenblock" style="opacity:0.5;">
+          <div class="znr">T&Auml;TIGKEIT IM AUSLAND 1 &mdash; erscheint erst bei &bdquo;Ja&ldquo;</div>
+          <div class="grid2">
+            <div class="feld" style="margin:0.4rem 0;"><label>Beginn und Ende der Besch&auml;ftigung bzw. T&auml;tigkeit</label><div class="input ph">TT.MM.JJJJ &ndash; TT.MM.JJJJ</div></div>
+            <div class="feld" style="margin:0.4rem 0;"><label>Arbeitgeber mit Adresse bzw. T&auml;tigkeitsort <span style="font-weight:400;color:var(--muted);">(Adresse freiwillig)</span></label><div class="input ph">Arbeitgeber oder Ort der T&auml;tigkeit</div></div>
+          </div>
+        </div>
+        <div class="hilfe">Bei &bdquo;Ja&ldquo; wird die Bescheinigung&nbsp;A1 zum Pflichtdokument. <b>4c ist keine reine Ja/Nein-Frage</b> &mdash; das Muster verlangt auch hier Zeitraum und Arbeitgeber bzw. T&auml;tigkeitsort; der erste Entwurf hatte die Tabelle &uuml;bersehen.</div>
+        <div class="hilfe">Liegt noch keine A1 vor, ist eine Kl&auml;rung herbeizuf&uuml;hren &mdash; zust&auml;ndig ist die Deutsche Verbindungsstelle Krankenversicherung&nbsp;&ndash;&nbsp;Ausland (DVKA) in Bonn, bei Wohnsitz au&szlig;erhalb Deutschlands die Beh&ouml;rde des Wohnstaats. <span class="neu-tag">N-12</span></div>
       </div>
 
       <div class="weg" style="margin:1rem 0 0;padding:0.6rem 0.9rem;font-size:0.85rem;">
@@ -931,6 +1001,11 @@
           <span class="btn btn-blau btn-sm">Antrag herunterladen (PDF)</span>
           <span class="btn btn-outline btn-sm">Unterschriebenen Antrag hochladen</span>
           <p style="margin:0.5rem 0 0;font-size:0.8rem;color:var(--muted);">Ohne hochgeladenen Antrag k&ouml;nnen Sie den Fragebogen nicht absenden.</p>
+        </div>
+        <div class="hinweis warnung" style="margin:0.6rem 0 0;padding:0.6rem 0.8rem;font-size:0.82rem;">
+          <span class="label" style="font-size:0.82rem;">Voraussetzungen f&uuml;r die Antragserzeugung <span class="neu-tag">N-7 &middot; N-10</span></span>
+          <p style="margin:0.2rem 0 0;">Der Antrag tr&auml;gt im Kopf <b>Name, Vorname und Rentenversicherungsnummer</b>. Die RV-Nummer wird deshalb hier zur <b>Pflichtangabe</b> &mdash; fehlt sie oder die Betriebsnummer des Mandanten, blockiert das Portal die Erzeugung, statt ein Dokument mit leerer Pflichtangabe zu drucken.</p>
+          <p style="margin:0.4rem 0 0;">Bei <b>Minderj&auml;hrigen</b> unterschreibt auf diesem Antrag der gesetzliche Vertreter <b>anstelle</b> des Besch&auml;ftigten &mdash; anders als auf der Checkliste selbst, wo er <i>zus&auml;tzlich</i> unterschreibt. Die Unterschriftszeile wird entsprechend beschriftet.</p>
         </div>
       </div>
 
@@ -997,6 +1072,7 @@
         </div>
         <div class="feld" style="margin:0.3rem 0;"><label>Anschrift <span class="pflicht">*</span></label><div class="input">Weserstra&szlig;e 12, 32423 Minden</div></div>
         <span class="btn btn-outline btn-sm">Unterschriebene Zustimmung hochladen</span>
+        <div class="hilfe" style="margin-top:0.4rem;"><b>Zwei verschiedene Regeln <span class="neu-tag">N-10</span></b> &mdash; auf der <b>Checkliste</b> unterschreibt der gesetzliche Vertreter <i>zus&auml;tzlich</i> zum Besch&auml;ftigten, auf dem <b>Befreiungs- und Aufhebungsantrag</b> dagegen <i>anstelle</i> des Besch&auml;ftigten. Das Portal f&uuml;hrt beide Nachweise getrennt.</div>
       </div>
 
       <div class="karte" style="margin-top:0.9rem;">
@@ -1063,11 +1139,39 @@
             <div class="hilfe">Vorbelegt: Monatsbeginn des Eingangs, fr&uuml;hestens Besch&auml;ftigungsbeginn. &Uuml;berschreibbar.</div>
           </div>
         </div>
+        <div class="grid2 neu" style="margin-top:0.5rem;padding-top:0.4rem;padding-bottom:0.4rem;">
+          <div class="feld" style="margin:0.3rem 0;"><label>Ort und Datum der Arbeitgeber-Unterschrift <span class="pflicht">*</span> <span class="neu-tag">N-6</span></label><div class="input">Minden, 05.08.2026</div>
+            <div class="hilfe">Erscheint im Arbeitgeberteil des Antrags. Das Muster verlangt dort Ort, Datum <b>und Unterschrift des Arbeitgebers</b> &mdash; der Antrag ist also von uns gegenzuzeichnen, bevor er zu den Entgeltunterlagen geht.</div>
+          </div>
+          <div class="feld" style="margin:0.3rem 0;"><label>Unterschrift Arbeitgeber</label>
+            <span class="check"><i></i><span>Antrag ausgedruckt, gegengezeichnet und abgelegt</span></span>
+            <div class="hilfe">Betriebsnummer <b>12345678</b> wird aus dem Mandanten gezogen.</div>
+          </div>
+        </div>
+
         <div class="hinweis warnung" style="margin:0.7rem 0 0.5rem;padding:0.6rem 0.9rem;font-size:0.83rem;">
-          <span class="label" style="font-size:0.84rem;">&#9888; Meldung an die Minijob-Zentrale offen</span>
-          <p style="margin:0.2rem 0 0;">Noch <b>9 Tage</b> bis zum Ablauf der 6-Wochen-Frist (16.09.2026). Wird sie vers&auml;umt, wirkt die Befreiung erst ab dem &uuml;bern&auml;chsten Monat &mdash; der Arbeitnehmeranteil von 3,6&nbsp;% bleibt bis dahin f&auml;llig.</p>
+          <span class="label" style="font-size:0.84rem;">&#9888; Schritt 1 von 2 &mdash; Meldung an die Minijob-Zentrale offen <span class="neu-tag">N-5</span></span>
+          <p style="margin:0.2rem 0 0.35rem;">Ma&szlig;geblich ist der <b>fr&uuml;here</b> der beiden Termine:</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.8rem;">
+            <div style="border:1px solid var(--rot);border-radius:6px;padding:0.35rem 0.6rem;background:#fff;">
+              <div style="font-weight:700;color:var(--rot);">25.08.2026 &mdash; n&auml;chste Entgeltabrechnung</div>
+              <div style="color:var(--muted);">noch <b>9 Tage</b> &middot; <b>dieser Termin z&auml;hlt</b></div>
+            </div>
+            <div style="border:1px solid var(--grau-hell);border-radius:6px;padding:0.35rem 0.6rem;background:#fff;opacity:0.7;">
+              <div style="font-weight:700;color:var(--grau-dunkel);">16.09.2026 &mdash; 6 Wochen nach Eingang</div>
+              <div style="color:var(--muted);">noch 32 Tage &middot; nur die &auml;u&szlig;ere Grenze</div>
+            </div>
+          </div>
+          <p style="margin:0.45rem 0 0;">Wird der ma&szlig;gebliche Termin vers&auml;umt, wirkt die Befreiung erst ab dem &uuml;bern&auml;chsten Monat &mdash; der Arbeitnehmeranteil von 3,6&nbsp;% bleibt bis dahin f&auml;llig.</p>
         </div>
         <span class="check"><i></i><span>An die Minijob-Zentrale gemeldet (DE&Uuml;V)</span></span>
+
+        <div class="hinweis info neu" style="margin:0.7rem 0 0.5rem;padding:0.6rem 0.9rem;font-size:0.83rem;opacity:0.6;">
+          <span class="label" style="font-size:0.84rem;">Schritt 2 von 2 &mdash; Widerspruchsfrist <span class="neu-tag">NEU N-4</span></span>
+          <p style="margin:0.2rem 0 0;">Wird erst aktiv, sobald die Meldung abgehakt ist. Die Minijob-Zentrale hat dann <b>einen Monat</b> Zeit zu widersprechen; erst danach steht die Befreiung endg&uuml;ltig fest. Bis dahin bleibt der Vorgang im Zustand &bdquo;gemeldet, Widerspruchsfrist l&auml;uft&ldquo;.</p>
+        </div>
+        <span class="check" style="opacity:0.6;"><i></i><span>Widerspruchsfrist abgelaufen, kein Widerspruch &mdash; Befreiung endg&uuml;ltig</span></span>
+
         <div style="margin-top:0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
           <span class="btn btn-outline btn-sm">Antrag ansehen</span>
           <span class="btn btn-sm">Speichern</span>
@@ -1080,7 +1184,7 @@
       </div>
     </div>
   </div>
-  <p class="mock-cap">Die Ampel-Farben sind dieselben wie beim Vertragsende: Kritisch rot, Warnung bernstein, Beobachten blau. So bedeutet dieselbe Farbe im Portal &uuml;berall dasselbe.</p>
+  <p class="mock-cap">Die Ampel-Farben sind dieselben wie beim Vertragsende: Kritisch rot, Warnung bernstein, Beobachten blau. So bedeutet dieselbe Farbe im Portal &uuml;berall dasselbe. &mdash; Die Karte f&uuml;hrt seit dem Nachtrag <b>zwei</b> Fristen hintereinander: erst die Meldefrist (fr&uuml;herer Termin aus Entgeltabrechnung und sechs Wochen), danach die einmonatige Widerspruchsfrist der Minijob-Zentrale. Der Vorgang gilt erst nach der zweiten als abgeschlossen.</p>
 
   <!-- ---------------------------------------------------------- -->
   <h3>2.8 &middot; Vorlagen-Editor &mdash; wo das alles geschaltet wird</h3>
@@ -1192,6 +1296,9 @@
         <div class="feld" style="max-width:280px;"><label>Betriebsnummer <span class="pflicht">*</span></label><div class="input">12345678</div>
           <div class="hilfe">Genau 8 Ziffern. Nicht zu verwechseln mit der Mandantennummer (004), die nur im Portal gilt.</div>
         </div>
+        <div class="feld neu" style="max-width:380px;"><label>Termin der Entgeltabrechnung <span class="pflicht">*</span> <span class="neu-tag">NEU N-5</span></label><div class="input">25. eines Monats</div>
+          <div class="hilfe">Wird f&uuml;r die Meldefrist der RV-Befreiung gebraucht: Gemeldet werden muss &bdquo;bis zur n&auml;chsten Entgeltabrechnung, sp&auml;testens innerhalb von 6&nbsp;Wochen&ldquo; &mdash; ma&szlig;geblich ist der <b>fr&uuml;here</b> der beiden Termine. Ohne diesen Wert kann das Portal nur die &auml;u&szlig;ere Grenze &uuml;berwachen und meldet zu sp&auml;t.</div>
+        </div>
         <div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:7px;padding:0.6rem 0.8rem;font-size:0.82rem;margin-top:0.6rem;">
           <div style="color:var(--muted);font-size:0.76rem;margin-bottom:0.2rem;">Vorschau (so erscheint es auf dem Antrag):</div>
           <div>Arbeitgeber: <b>Berufskolleg</b> &nbsp;&middot;&nbsp; Betriebsnummer: <b>12345678</b></div>
@@ -1236,7 +1343,7 @@
           <span>G&uuml;ltig ab</span><span>Grenze</span><span>Kurzfristig</span><span>AG-Pauschale</span><span>AN-Anteil</span><span>Status</span>
         </div>
         <div style="padding:0.5rem 0.8rem;font-size:0.82rem;display:grid;grid-template-columns:1.1fr 0.9fr 0.8fr 0.8fr 0.8fr 0.8fr;gap:0.5rem;border-bottom:1px solid #f0f0f0;align-items:center;">
-          <span>01.01.2026<br><small style="color:var(--muted);">Stand 26.05.2026</small></span><span><b>603,00&nbsp;&euro;</b></span><span>3 Mon. / 70 Tage</span><span>15,0&nbsp;%</span><span>3,6&nbsp;%</span><span><span class="badge badge-gruen">Aktiv</span></span>
+          <span>01.01.2026<br><small style="color:var(--muted);">Formularstand 30.06.2026</small></span><span><b>603,00&nbsp;&euro;</b></span><span>3 Mon. / 70 Tage</span><span>15,0&nbsp;%</span><span>3,6&nbsp;%</span><span><span class="badge badge-gruen">Aktiv</span></span>
         </div>
         <div style="padding:0.5rem 0.8rem;font-size:0.82rem;display:grid;grid-template-columns:1.1fr 0.9fr 0.8fr 0.8fr 0.8fr 0.8fr;gap:0.5rem;opacity:0.5;align-items:center;">
           <span>01.01.2025</span><span>556,00&nbsp;&euro;</span><span>3 Mon. / 70 Tage</span><span>15,0&nbsp;%</span><span>3,6&nbsp;%</span><span><span class="badge badge-grau">Abgel&ouml;st</span></span>
@@ -1246,6 +1353,7 @@
       <div class="hinweis info" style="font-size:0.84rem;">
         <span class="label" style="font-size:0.85rem;">Warum mit G&uuml;ltigkeitsdatum statt nur einem Wert</span>
         <p style="margin:0;">Beim Absenden merkt sich das Portal, welcher Stand galt, und schreibt ihn ins PDF. In einer Betriebspr&uuml;fung ist damit belegbar, auf welcher Grundlage der Besch&auml;ftigte die Additionsfrage beantwortet hat.</p>
+        <p style="margin:0.5rem 0 0;"><b>Nachtrag <span class="neu-tag">N-1 &middot; N-14</span>:</b> Neben den Rechengr&ouml;&szlig;en wird auch der <b>Formularstand</b> eingefroren &mdash; sonst l&auml;sst sich sp&auml;ter nicht belegen, welchen Erkl&auml;rungstext der Besch&auml;ftigte unterschrieben hat. Der Datensatz f&uuml;hrt zus&auml;tzlich den vollen Beitragssatz (18,6&nbsp;%), die Mindestbemessungsgrundlage (175&nbsp;&euro;) und die abweichenden S&auml;tze f&uuml;r <b>Privathaushalte</b> (AG&nbsp;5&nbsp;%, AN&nbsp;13,6&nbsp;%) &mdash; f&uuml;r einen Schultr&auml;ger ohne Bedeutung, aber das amtliche Merkblatt nennt sie, also darf unsere Tabelle ihnen nicht widersprechen.</p>
       </div>
     </div>
   </div>
@@ -1257,12 +1365,14 @@
   <table>
     <tr><th style="width:26%">Maske</th><th>&Auml;nderung</th><th style="width:14%">Umfang</th></tr>
     <tr><td>Schritt 1 &mdash; Pers&ouml;nliche Angaben</td><td>Feld &bdquo;Geschlecht&ldquo; kommt dazu; Ersatzangaben werden Pflicht, wenn die SV-Nummer fehlt</td><td><span class="badge badge-gruen">klein</span></td></tr>
-    <tr><td>Schritt 4 &mdash; Sozialversicherung</td><td>&bdquo;Art der Versicherung&ldquo; kommt dazu, PKV-Nachweis wird Pflicht, RV-Checkbox zieht nach Schritt 7 um</td><td><span class="badge badge-gelb">mittel</span></td></tr>
+    <tr><td>Schritt 4 &mdash; Sozialversicherung</td><td>&bdquo;Art der Versicherung&ldquo; kommt dazu (<b>zwei</b> Optionen, siehe N-8), PKV-Nachweis wird Pflicht, RV-Checkbox zieht nach Schritt 7 um</td><td><span class="badge badge-gelb">mittel</span></td></tr>
     <tr><td>Schritt 5 &mdash; Steuer</td><td>Wird f&uuml;r Minijob eingeschaltet, aber auf die Steuer-ID reduziert &mdash; reine Konfiguration, kein Code</td><td><span class="badge badge-gruen">klein</span></td></tr>
-    <tr><td>Schritt 6 &mdash; Besch&auml;ftigungen &amp; Status</td><td>Kompletter Neubau: Status, drei Tabellen, Additionsfrage, bedingte Nachweise</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
-    <tr><td>Schritt 7 &mdash; Rentenversicherung</td><td>Neuer Schritt mit Vier-Wege-Entscheidung, Merkblatt und Antragserzeugung</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
+    <tr><td>Schritt 6 &mdash; Besch&auml;ftigungen &amp; Status</td><td>Kompletter Neubau: Status, drei Tabellen (4b mit <b>vier</b> Spalten, 4c ebenfalls als Tabelle), Additionsfrage im Originalwortlaut, bedingte Nachweise</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
+    <tr><td>Schritt 7 &mdash; Rentenversicherung</td><td>Neuer Schritt mit Vier-Wege-Entscheidung, Merkblatt, Antragserzeugung und bedingter RV-Nummer-Pflicht</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
     <tr><td>Schritt 8 &mdash; Zusammenfassung</td><td>Zwei neue Bl&ouml;cke, Ort-Feld, Vertreterblock &mdash; und die Best&auml;tigung wird endlich gespeichert</td><td><span class="badge badge-gelb">mittel</span></td></tr>
-    <tr><td>HR &mdash; Vorgangs-Detailseite</td><td>Eine neue Karte im Tab &bdquo;&Uuml;bersicht&ldquo; mit Eingangsdatum, Wirkungsdatum und Fristen-Ampel</td><td><span class="badge badge-gelb">mittel</span></td></tr>
+    <tr><td>HR &mdash; Vorgangs-Detailseite</td><td>Eine neue Karte im Tab &bdquo;&Uuml;bersicht&ldquo; mit Eingangsdatum, Wirkungsdatum, Arbeitgeber-Unterschrift und <b>zwei</b> Fristen (Meldefrist, danach Widerspruchsfrist)</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
+    <tr><td>Mandant &mdash; Abrechnungstermin <span class="badge badge-gelb">neu</span></td><td>Termin der Entgeltabrechnung je Mandant &mdash; ohne ihn l&auml;sst sich die ma&szlig;gebliche Meldefrist nicht berechnen</td><td><span class="badge badge-gruen">klein</span></td></tr>
+    <tr><td>Berufsm&auml;&szlig;igkeit &mdash; Entscheidungshilfe <span class="badge badge-gelb">neu</span></td><td>Auswertung der 4b-Zeilen gegen die Kriterien der Erl&auml;uterung; Hinweis mit Begr&uuml;ndung f&uuml;r HR, keine automatische Einstufung</td><td><span class="badge badge-gelb">mittel</span></td></tr>
     <tr><td>Vorlagen-Editor</td><td>Zwei zus&auml;tzliche Schritte in der Liste, neue Felder im Katalog, neue Dokument-Chips &mdash; die Oberfl&auml;che selbst bleibt</td><td><span class="badge badge-gruen">klein</span></td></tr>
     <tr><td>Mandant</td><td>Neue Unterseite mit einem Feld: Betriebsnummer</td><td><span class="badge badge-gruen">klein</span></td></tr>
     <tr><td>Einstellungen</td><td>Neue Seite &bdquo;Rechengr&ouml;&szlig;en&ldquo; als Werte-Tabelle</td><td><span class="badge badge-gelb">mittel</span></td></tr>
@@ -1276,11 +1386,18 @@
       Mandanten-Unterseite bei der DSGVO-Konfiguration, die Werte-Tabelle bei den Schulferien. Das ist der Grund,
       warum die Sch&auml;tzung trotz des Umfangs tragf&auml;hig ist.
     </p>
+    <p>
+      <b>Nach dem Nachtrag vom 25.08.2026</b> ist eine dritte Maske dazugekommen, die kein reines &Uuml;bertragen mehr ist:
+      die <b>HR-Detailseite</b>. Aus einer Frist sind zwei geworden, und die erste h&auml;ngt an einem Termin, den das
+      Portal bisher gar nicht kennt &mdash; der Entgeltabrechnung des Mandanten. Das ist der einzige Punkt, an dem
+      die Vertragsende-Ampel nicht eins zu eins passt.
+    </p>
   </div>
 
 
   <p class="fuss">
-    CREDO HR-Portal &middot; Minijob: Prozesskette und Masken-Entw&uuml;rfe &middot; Stand 17.08.2026 &middot; Umsetzung noch nicht begonnen.
+    CREDO HR-Portal &middot; Minijob: Prozesskette und Masken-Entw&uuml;rfe &middot; Grundlage: amtliche Checkliste Stand 30.06.2026 &middot;
+    Entscheidungen 17.08.2026 &middot; Nachtrag 25.08.2026 &middot; Umsetzung noch nicht begonnen.
   </p>
 
 </div>
