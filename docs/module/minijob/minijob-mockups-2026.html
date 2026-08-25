@@ -275,14 +275,15 @@
     <rect x="180" y="204" width="600" height="176" rx="10" fill="#eef9ff" stroke="#009AC6" stroke-width="1.5"/>
     <text x="198" y="224" class="rolle" fill="#0a7ca6">MITARBEITER</text>
     <text x="480" y="240" text-anchor="middle" class="t tt" font-size="15">Fragebogen ausf&#252;llen</text>
-    <text x="210" y="266" class="lbl" font-size="12">1 &#183; Pers&#246;nliche Angaben</text>
-    <text x="210" y="286" class="lbl" font-size="12">2 &#183; Adresse &amp; Kontakt</text>
-    <text x="210" y="306" class="lbl" font-size="12">3 &#183; Bankverbindung</text>
-    <text x="210" y="326" class="lbl" font-size="12">4 &#183; Sozialversicherung</text>
-    <text x="510" y="266" class="lbl" font-size="12">5 &#183; Steuer &#8212; nur Steuer-ID</text>
-    <text x="510" y="286" class="lbl" font-size="12" font-weight="700" fill="#8a6d00">6 &#183; Weitere Besch&#228;ftigungen &amp; Status</text>
-    <text x="510" y="306" class="lbl" font-size="12" font-weight="700" fill="#8a6d00">7 &#183; Rentenversicherung</text>
-    <text x="510" y="326" class="lbl" font-size="12">8 &#183; Zusammenfassung</text>
+    <text x="210" y="262" class="lbl" font-size="12">1 &#183; Pers&#246;nliche Angaben</text>
+    <text x="210" y="280" class="lbl" font-size="12">2 &#183; Adresse &amp; Kontakt</text>
+    <text x="210" y="298" class="lbl" font-size="12">3 &#183; Bankverbindung</text>
+    <text x="210" y="316" class="lbl" font-size="12">4 &#183; Sozialversicherung</text>
+    <text x="210" y="334" class="lbl" font-size="12">5 &#183; Steuer &#8212; nur Steuer-ID</text>
+    <text x="510" y="262" class="lbl" font-size="12" font-weight="700" fill="#8a6d00">6 &#183; Weitere Besch&#228;ftigungen &amp; Status</text>
+    <text x="510" y="280" class="lbl" font-size="12">7 &#183; Bildung &amp; Beruf</text>
+    <text x="510" y="298" class="lbl" font-size="12" font-weight="700" fill="#8a6d00">8 &#183; Rentenversicherung</text>
+    <text x="510" y="316" class="lbl" font-size="12">9 &#183; Zusammenfassung</text>
     <text x="480" y="358" text-anchor="middle" class="lbl" font-style="italic">Zwischenstand wird laufend gespeichert &#8212; Ausf&#252;llen in mehreren Sitzungen m&#246;glich</text>
     <line x1="480" y1="380" x2="480" y2="406" stroke="#888" stroke-width="2" marker-end="url(#pf)"/>
 
@@ -356,7 +357,7 @@
     </defs>
 
     <rect x="240" y="14" width="500" height="58" rx="10" fill="#fffaeb" stroke="#FBC900" stroke-width="2"/>
-    <text x="490" y="38" text-anchor="middle" class="t2 tt2" font-size="15">Schritt 7 &#183; Befreiung von der Rentenversicherungspflicht</text>
+    <text x="490" y="38" text-anchor="middle" class="t2 tt2" font-size="15">Schritt 8 &#183; Befreiung von der Rentenversicherungspflicht</text>
     <text x="490" y="58" text-anchor="middle" class="l2">Genau eine der vier Angaben ist zu w&#228;hlen</text>
 
     <path d="M490,72 V96 H125 V120" fill="none" stroke="#888" stroke-width="1.6" marker-end="url(#pf2)"/>
@@ -621,7 +622,7 @@
     <tr><th style="width:16%">Rolle</th><th style="width:42%">Aufgabe</th><th>Wo im Portal</th></tr>
     <tr><td><b>HR</b></td><td>Vorgang anlegen, Magic Link ausl&ouml;sen</td><td>Dashboard &rarr; Neuer Vorgang</td></tr>
     <tr><td><b>Mitarbeiter</b></td><td>Fragebogen ausf&uuml;llen, Nachweise hochladen, Wahrheitsversicherung best&auml;tigen</td><td>&Ouml;ffentliches Formular &uuml;ber den Magic Link</td></tr>
-    <tr><td><b>Mitarbeiter</b></td><td>Bei Weg&nbsp;B: Befreiungsantrag ausdrucken, unterschreiben, hochladen</td><td>Schritt&nbsp;7 <span class="badge badge-gelb">neu</span></td></tr>
+    <tr><td><b>Mitarbeiter</b></td><td>Bei Weg&nbsp;B: Befreiungsantrag ausdrucken, unterschreiben, hochladen</td><td>Schritt&nbsp;8 <span class="badge badge-gelb">neu</span></td></tr>
     <tr><td><b>Gesetzl. Vertreter</b></td><td>Bei Minderj&auml;hrigen: Zustimmung unterschreiben</td><td>Upload &uuml;ber den Mitarbeiter <span class="badge badge-gelb">neu</span></td></tr>
     <tr><td><b>HR</b></td><td>Angaben pr&uuml;fen, Eingangsdatum des Antrags erfassen, Wirkungsdatum best&auml;tigen</td><td>Vorgangs-Detailseite <span class="badge badge-gelb">neu</span></td></tr>
     <tr><td><b>Portal</b></td><td>Fristen &uuml;berwachen, nach 4 und 5 Wochen erinnern</td><td>Ampel auf der Detailseite + E-Mail <span class="badge badge-gelb">neu</span></td></tr>
@@ -639,44 +640,49 @@
     Gelb markiert ist, was neu dazukommt; rot, was verschwindet oder umzieht.
   </p>
 
-  <div class="hinweis info"><span class="label">Die Schritt-Strecke wird k&uuml;rzer, nicht l&auml;nger</span>
+  <div class="hinweis info"><span class="label">Die Schritt-Strecke bleibt gleich lang &mdash; aber jeder Schritt passt</span>
     <p>
-      Heute durchl&auml;uft ein Minijobber neun Schritte &mdash; auch Bildung&nbsp;&amp;&nbsp;Beruf und Masernschutz,
-      obwohl beide f&uuml;r ihn abgeschaltet sein sollten (der Fehler aus Befund&nbsp;1). Nach dem Umbau sind es
-      <b>acht</b>, und jeder davon ist f&uuml;r ihn relevant:
+      Heute durchl&auml;uft ein Minijobber neun Schritte, darunter Masernschutz und volle Steuerangaben, die f&uuml;r
+      ihn nicht passen (der Fehler aus Befund&nbsp;1). Nach dem Umbau sind es <b>wieder neun</b> &mdash; aber es
+      sind andere, und jeder davon ist f&uuml;r ihn relevant:
     </p>
     <div class="fortschritt" style="border:1px solid var(--border);border-radius:8px;margin-top:0.8rem;">
       <div class="schritte">
         <span>1 Pers&ouml;nliche Angaben</span><span>2 Adresse &amp; Kontakt</span><span>3 Bankverbindung</span>
         <span>4 Sozialversicherung</span><span>5 Steuer</span>
         <span class="neu">6 Weitere Besch&auml;ftigungen &amp; Status</span>
-        <span class="neu">7 Rentenversicherung</span><span>8 Zusammenfassung</span>
+        <span>7 Bildung &amp; Beruf</span>
+        <span class="neu">8 Rentenversicherung</span><span>9 Zusammenfassung</span>
       </div>
     </div>
     <p style="margin-top:0.7rem;font-size:0.88rem;">
       Die Nummern im Umsetzungsplan (&bdquo;Schritt&nbsp;6&ldquo;, &bdquo;Schritt&nbsp;11&ldquo;) sind interne
-      Registry-Nummern. <b>Der Mitarbeiter sieht die Z&auml;hlung oben</b> &mdash; also &bdquo;Schritt&nbsp;7&nbsp;/&nbsp;8&ldquo;
+      Registry-Nummern. <b>Der Mitarbeiter sieht die Z&auml;hlung oben</b> &mdash; also &bdquo;Schritt&nbsp;8&nbsp;/&nbsp;9&ldquo;
       f&uuml;r die Rentenversicherung. Im Vorlagen-Editor steht die Rentenversicherung dagegen als
       &bdquo;11&ldquo; <i>unter</i> der Zusammenfassung &mdash; im Fragebogen erscheint sie <i>davor</i>. Beides ist gewollt.
     </p>
   </div>
 
-  <div class="hinweis warnung"><span class="label">Eine Frage, die dabei auff&auml;llt: Bildung &amp; Beruf</span>
+  <div class="ergebnis"><span class="label">Entschieden am 25.08.2026: Bildung &amp; Beruf bleibt aktiv</span>
     <p>
       In der Minijob-Vorlage sind &bdquo;Bildung &amp; Beruf&ldquo; und &bdquo;Masernschutz&ldquo; als deaktiviert
-      hinterlegt &mdash; heute werden sie dem Minijobber aber trotzdem gezeigt (Befund&nbsp;1). <b>Nach dem
-      Renderer-Fix verschwinden beide tats&auml;chlich.</b>
+      hinterlegt &mdash; heute werden sie dem Minijobber aber trotzdem gezeigt (Befund&nbsp;1). Nach dem
+      Renderer-Fix w&uuml;rden beide tats&auml;chlich verschwinden.
     </p>
     <p>
-      Beim Masernschutz ist das unproblematisch. Bei &bdquo;Bildung &amp; Beruf&ldquo; ist es eine echte Frage:
-      Der T&auml;tigkeitsschl&uuml;ssel der Meldung zur Sozialversicherung verlangt Schulabschluss und
-      Berufsausbildung <i>auch</i> f&uuml;r geringf&uuml;gig Besch&auml;ftigte. Wenn die Lohnbuchhaltung diese Angaben
-      heute aus dem Fragebogen zieht, w&uuml;rden sie ihr k&uuml;nftig fehlen.
+      Beim <b>Masernschutz</b> ist das gewollt: Er bleibt f&uuml;r Minijob aus.
     </p>
     <p>
-      Das ist dieselbe Art von Falle wie bei der Steuer-ID &mdash; deshalb steht es hier und nicht in einem
-      Nebensatz. <b>Zu kl&auml;ren:</b> Braucht die Lohnbuchhaltung diese beiden Angaben bei Minijobs? Wenn ja,
-      lassen wir Schritt&nbsp;&bdquo;Bildung &amp; Beruf&ldquo; f&uuml;r Minijob aktiv &mdash; dann sind es neun statt acht Schritte.
+      Bei <b>Bildung &amp; Beruf</b> war es eine echte Frage &mdash; der T&auml;tigkeitsschl&uuml;ssel der Meldung zur
+      Sozialversicherung verlangt Schulabschluss und Berufsausbildung <i>auch</i> f&uuml;r geringf&uuml;gig
+      Besch&auml;ftigte. <b>Entscheidung: Der Schritt bleibt f&uuml;r MINIJOB eingeschaltet.</b> Die Lohnbuchhaltung
+      bekommt die Angaben damit weiter aus dem Fragebogen und muss sie nicht separat erfragen. Der Fragebogen
+      hat dadurch neun statt acht Schritte; die Rentenversicherung r&uuml;ckt auf Position&nbsp;8, die
+      Zusammenfassung auf&nbsp;9.
+    </p>
+    <p style="font-size:0.88rem;">
+      Er sitzt an der Stelle, an der ihn der heutige Renderer ohnehin f&uuml;hrt: <b>nach</b> den weiteren
+      Besch&auml;ftigungen, <b>vor</b> der Rentenversicherung. Reine Vorlagen-Konfiguration &mdash; kein Code.
     </p>
   </div>
 
@@ -689,14 +695,14 @@
       <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
       <div class="mock-user" style="display:flex;align-items:center;gap:0.6rem;">
         <span style="color:var(--gruen);font-size:0.78rem;font-weight:600;">Gespeichert</span>
-        <span class="badge badge-grau">Schritt 1 / 8</span>
+        <span class="badge badge-grau">Schritt 1 / 9</span>
       </div>
     </div>
-    <div style="height:2px;background:#eee;"><div style="height:2px;width:12.5%;background:#575756;"></div></div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:11.1%;background:#575756;"></div></div>
     <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
     <div class="fortschritt" style="border-bottom:1px solid #eee;">
       <div class="schritte">
-        <span class="here">1 Pers&ouml;nliche Angaben</span><span>2 Adresse</span><span>3 Bank</span><span>4 Sozialversicherung</span><span>5 Steuer</span><span>6 Besch&auml;ftigungen</span><span>7 Rentenversicherung</span><span>8 Zusammenfassung</span>
+        <span class="here">1 Pers&ouml;nliche Angaben</span><span>2 Adresse</span><span>3 Bank</span><span>4 Sozialversicherung</span><span>5 Steuer</span><span>6 Besch&auml;ftigungen</span><span>7 Bildung &amp; Beruf</span><span>8 Rentenversicherung</span><span>9 Zusammenfassung</span>
       </div>
     </div>
     <div class="mock-body">
@@ -739,9 +745,9 @@
   <div class="mock">
     <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
       <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
-      <div class="mock-user"><span class="badge badge-grau">Schritt 4 / 8</span></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 4 / 9</span></div>
     </div>
-    <div style="height:2px;background:#eee;"><div style="height:2px;width:50%;background:#575756;"></div></div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:44.4%;background:#575756;"></div></div>
     <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
     <div class="mock-body">
       <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
@@ -782,7 +788,7 @@
           <span class="weg-tag">ZIEHT UM</span>
         </div>
         <div style="font-size:0.8rem;color:var(--muted);margin-top:0.3rem;">
-          Die einzelne Checkbox verschwindet hier. Die Rentenversicherung bekommt einen eigenen Schritt&nbsp;7 &mdash; die Checkliste verlangt dort eine Auswahl aus vier Wegen, nicht ein Ja/Nein.
+          Die einzelne Checkbox verschwindet hier. Die Rentenversicherung bekommt einen eigenen Schritt&nbsp;8 &mdash; die Checkliste verlangt dort eine Auswahl aus vier Wegen, nicht ein Ja/Nein.
         </div>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:1rem;"><span class="btn btn-outline btn-sm">Zur&uuml;ck</span><span class="btn btn-sm">Weiter</span></div>
@@ -797,9 +803,9 @@
   <div class="mock">
     <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
       <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
-      <div class="mock-user"><span class="badge badge-grau">Schritt 5 / 8</span></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 5 / 9</span></div>
     </div>
-    <div style="height:2px;background:#eee;"><div style="height:2px;width:62.5%;background:#575756;"></div></div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:55.6%;background:#575756;"></div></div>
     <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
     <div class="mock-body">
       <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
@@ -829,9 +835,9 @@
   <div class="mock">
     <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
       <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
-      <div class="mock-user"><span class="badge badge-grau">Schritt 6 / 8</span></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 6 / 9</span></div>
     </div>
-    <div style="height:2px;background:#eee;"><div style="height:2px;width:75%;background:#575756;"></div></div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:66.7%;background:#575756;"></div></div>
     <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
     <div class="mock-body">
       <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
@@ -962,15 +968,15 @@
   <p class="mock-cap">Im Bild sind alle drei Bl&ouml;cke aufgeklappt, damit man den Umfang sieht. Real sieht ein Minijobber ohne Nebenjob nur die drei Grundfragen und den Status &mdash; also gut eine Bildschirmh&ouml;he.</p>
 
   <!-- ---------------------------------------------------------- -->
-  <h3>2.5 &middot; Schritt 7 &mdash; Rentenversicherung</h3>
+  <h3>2.5 &middot; Schritt 8 &mdash; Rentenversicherung</h3>
   <p>Komplett neu und nur in der Minijob-Vorlage aktiv. Hier sitzt die Vierfach-Verzweigung aus Abschnitt&nbsp;1.2.</p>
 
   <div class="mock">
     <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
       <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
-      <div class="mock-user"><span class="badge badge-grau">Schritt 7 / 8</span></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 8 / 9</span></div>
     </div>
-    <div style="height:2px;background:#eee;"><div style="height:2px;width:87.5%;background:#575756;"></div></div>
+    <div style="height:2px;background:#eee;"><div style="height:2px;width:88.9%;background:#575756;"></div></div>
     <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
     <div class="mock-body">
       <div style="background:var(--bg-soft);margin:-1.2rem -1.4rem 1.1rem;padding:0.8rem 1.4rem;border-bottom:1px solid #eee;">
@@ -1027,13 +1033,13 @@
   <p class="mock-cap">Die vier Karten sind bewusst gleichwertig und ausgeschrieben &mdash; die Entscheidung hat sp&uuml;rbare Folgen f&uuml;r die sp&auml;tere Rente, und die Checkliste verlangt, dass der Beschäftigte sie informiert trifft.</p>
 
   <!-- ---------------------------------------------------------- -->
-  <h3>2.6 &middot; Schritt 8 &mdash; Zusammenfassung</h3>
+  <h3>2.6 &middot; Schritt 9 &mdash; Zusammenfassung</h3>
   <p>Die Zusammenfassung bekommt zwei neue Bl&ouml;cke und &mdash; unsichtbar, aber entscheidend &mdash; wird die Best&auml;tigung endlich <b>gespeichert</b>.</p>
 
   <div class="mock">
     <div class="mock-appbar" style="padding:0.6rem 1.1rem;">
       <div class="mock-brand"><b>CREDO</b><br><span style="font-size:0.8rem;">Personalfragebogen</span><small>Christlicher Schulverein Minden e.V.</small></div>
-      <div class="mock-user"><span class="badge badge-grau">Schritt 8 / 8</span></div>
+      <div class="mock-user"><span class="badge badge-grau">Schritt 9 / 9</span></div>
     </div>
     <div style="height:2px;background:#eee;"><div style="height:2px;width:100%;background:#575756;"></div></div>
     <div class="credo-linie" style="height:2px;"><div class="l-grau"></div><div class="l-gelb"></div><div class="l-gruen"></div><div class="l-rot"></div><div class="l-blau"></div></div>
@@ -1055,7 +1061,7 @@
       </div>
 
       <div style="border:1px solid var(--border);border-radius:8px;margin-bottom:0.6rem;">
-        <div style="background:var(--bg-soft);padding:0.4rem 0.8rem;font-size:0.8rem;font-weight:700;color:var(--grau-dunkel);">7. Rentenversicherung <span class="neu-tag">NEU</span></div>
+        <div style="background:var(--bg-soft);padding:0.4rem 0.8rem;font-size:0.8rem;font-weight:700;color:var(--grau-dunkel);">8. Rentenversicherung <span class="neu-tag">NEU</span></div>
         <div style="padding:0.5rem 0.8rem;font-size:0.78rem;">
           <div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid #f0f0f0;"><span style="color:var(--muted);">Entscheidung</span><span style="font-weight:500;">Befreiung beantragt</span></div>
           <div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid #f0f0f0;"><span style="color:var(--muted);">Merkblatt zur Kenntnis genommen</span><span style="font-weight:500;">Ja, am 17.08.2026</span></div>
@@ -1210,7 +1216,7 @@
           <span class="badge badge-gelb">Minijob</span>
           <span class="badge badge-gruen">Aktiv</span>
           <span class="badge badge-grau">v2</span>
-          <span style="margin-left:auto;font-size:0.8rem;color:var(--muted);">8 von 12 Schritten</span>
+          <span style="margin-left:auto;font-size:0.8rem;color:var(--muted);">9 von 11 Schritten</span>
           <span class="btn btn-outline btn-sm">Vorschau</span>
         </div>
         <div class="ksub" style="margin-bottom:0.7rem;">Vereinfachter Fragebogen f&uuml;r geringf&uuml;gig Besch&auml;ftigte</div>
@@ -1239,10 +1245,10 @@
             Weitere Besch&auml;ftigungen &amp; Status <span class="neu-tag">UMBENANNT + AN</span>
             <span style="margin-left:auto;color:var(--muted);font-size:0.78rem;">&#9660; Felder &nbsp;&middot;&nbsp; <b style="color:var(--gruen);">an</b></span>
           </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;border-radius:7px;margin:0.25rem 0;background:var(--bg-soft);opacity:0.6;">
-            <span style="width:22px;height:22px;border-radius:50%;background:#ccc;color:#fff;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;">8</span>
-            <span class="durchgestrichen">Bildung &amp; Beruf</span>
-            <span style="margin-left:auto;color:var(--muted);font-size:0.78rem;">aus</span>
+          <div class="neu" style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.8rem;border:1px solid var(--gelb);border-radius:0 7px 7px 0;margin:0.25rem 0;background:#fffdf4;">
+            <span style="width:22px;height:22px;border-radius:50%;background:var(--grau-dunkel);color:#fff;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;">8</span>
+            Bildung &amp; Beruf <span class="neu-tag">BLEIBT AN</span>
+            <span style="margin-left:auto;color:var(--muted);font-size:0.78rem;">&#9660; Felder &nbsp;&middot;&nbsp; <b style="color:var(--gruen);">an</b></span>
           </div>
           <div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;border-radius:7px;margin:0.25rem 0;background:var(--bg-soft);opacity:0.6;">
             <span style="width:22px;height:22px;border-radius:50%;background:#ccc;color:#fff;font-size:0.7rem;display:inline-flex;align-items:center;justify-content:center;">9</span>
@@ -1272,7 +1278,7 @@
       </div>
     </div>
   </div>
-  <p class="mock-cap">Die internen Schrittnummern 6 und 11 sieht nur HR im Editor. Der Mitarbeiter z&auml;hlt durchgehend 1 bis 8.</p>
+  <p class="mock-cap">Die internen Schrittnummern 6 und 11 sieht nur HR im Editor. Der Mitarbeiter z&auml;hlt durchgehend 1 bis 9.</p>
 
   <!-- ---------------------------------------------------------- -->
   <h3>2.9 &middot; Mandant &mdash; Betriebsnummer</h3>
@@ -1365,11 +1371,12 @@
   <table>
     <tr><th style="width:26%">Maske</th><th>&Auml;nderung</th><th style="width:14%">Umfang</th></tr>
     <tr><td>Schritt 1 &mdash; Pers&ouml;nliche Angaben</td><td>Feld &bdquo;Geschlecht&ldquo; kommt dazu; Ersatzangaben werden Pflicht, wenn die SV-Nummer fehlt</td><td><span class="badge badge-gruen">klein</span></td></tr>
-    <tr><td>Schritt 4 &mdash; Sozialversicherung</td><td>&bdquo;Art der Versicherung&ldquo; kommt dazu (<b>zwei</b> Optionen, siehe N-8), PKV-Nachweis wird Pflicht, RV-Checkbox zieht nach Schritt 7 um</td><td><span class="badge badge-gelb">mittel</span></td></tr>
+    <tr><td>Schritt 4 &mdash; Sozialversicherung</td><td>&bdquo;Art der Versicherung&ldquo; kommt dazu (<b>zwei</b> Optionen, siehe N-8), PKV-Nachweis wird Pflicht, RV-Checkbox zieht nach Schritt 8 um</td><td><span class="badge badge-gelb">mittel</span></td></tr>
     <tr><td>Schritt 5 &mdash; Steuer</td><td>Wird f&uuml;r Minijob eingeschaltet, aber auf die Steuer-ID reduziert &mdash; reine Konfiguration, kein Code</td><td><span class="badge badge-gruen">klein</span></td></tr>
     <tr><td>Schritt 6 &mdash; Besch&auml;ftigungen &amp; Status</td><td>Kompletter Neubau: Status, drei Tabellen (4b mit <b>vier</b> Spalten, 4c ebenfalls als Tabelle), Additionsfrage im Originalwortlaut, bedingte Nachweise</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
-    <tr><td>Schritt 7 &mdash; Rentenversicherung</td><td>Neuer Schritt mit Vier-Wege-Entscheidung, Merkblatt, Antragserzeugung und bedingter RV-Nummer-Pflicht</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
-    <tr><td>Schritt 8 &mdash; Zusammenfassung</td><td>Zwei neue Bl&ouml;cke, Ort-Feld, Vertreterblock &mdash; und die Best&auml;tigung wird endlich gespeichert</td><td><span class="badge badge-gelb">mittel</span></td></tr>
+    <tr><td>Schritt 7 &mdash; Bildung &amp; Beruf</td><td>Bleibt f&uuml;r Minijob eingeschaltet (Entscheidung 25.08.2026) &mdash; die Lohnbuchhaltung braucht Schulabschluss und Berufsausbildung f&uuml;r den T&auml;tigkeitsschl&uuml;ssel. Reine Konfiguration, kein Code</td><td><span class="badge badge-gruen">keiner</span></td></tr>
+    <tr><td>Schritt 8 &mdash; Rentenversicherung</td><td>Neuer Schritt mit Vier-Wege-Entscheidung, Merkblatt, Antragserzeugung und bedingter RV-Nummer-Pflicht</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
+    <tr><td>Schritt 9 &mdash; Zusammenfassung</td><td>Zwei neue Bl&ouml;cke, Ort-Feld, Vertreterblock &mdash; und die Best&auml;tigung wird endlich gespeichert</td><td><span class="badge badge-gelb">mittel</span></td></tr>
     <tr><td>HR &mdash; Vorgangs-Detailseite</td><td>Eine neue Karte im Tab &bdquo;&Uuml;bersicht&ldquo; mit Eingangsdatum, Wirkungsdatum, Arbeitgeber-Unterschrift und <b>zwei</b> Fristen (Meldefrist, danach Widerspruchsfrist)</td><td><span class="badge badge-rot">gro&szlig;</span></td></tr>
     <tr><td>Mandant &mdash; Abrechnungstermin <span class="badge badge-gelb">neu</span></td><td>Termin der Entgeltabrechnung je Mandant &mdash; ohne ihn l&auml;sst sich die ma&szlig;gebliche Meldefrist nicht berechnen</td><td><span class="badge badge-gruen">klein</span></td></tr>
     <tr><td>Berufsm&auml;&szlig;igkeit &mdash; Entscheidungshilfe <span class="badge badge-gelb">neu</span></td><td>Auswertung der 4b-Zeilen gegen die Kriterien der Erl&auml;uterung; Hinweis mit Begr&uuml;ndung f&uuml;r HR, keine automatische Einstufung</td><td><span class="badge badge-gelb">mittel</span></td></tr>
@@ -1381,7 +1388,7 @@
 
   <div class="ergebnis"><span class="label">Was auff&auml;llt</span>
     <p>
-      Der weitaus gr&ouml;&szlig;te Teil des Aufwands sitzt in zwei Masken &mdash; Schritt&nbsp;6 und Schritt&nbsp;7.
+      Der weitaus gr&ouml;&szlig;te Teil des Aufwands sitzt in zwei Masken &mdash; Schritt&nbsp;6 und Schritt&nbsp;8.
       Alles &Uuml;brige sind &Uuml;bertragungen bestehender Muster: die Fristen-Ampel gibt es beim Vertragsende, die
       Mandanten-Unterseite bei der DSGVO-Konfiguration, die Werte-Tabelle bei den Schulferien. Das ist der Grund,
       warum die Sch&auml;tzung trotz des Umfangs tragf&auml;hig ist.
