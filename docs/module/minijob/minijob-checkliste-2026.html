@@ -521,9 +521,15 @@
         <li><b>HR-Ansichten</b> zeigten &bdquo;Schritt X von 9&ldquo; bzw. &bdquo;X/10&ldquo;. Da die
             Streckenlaenge an der Vorlage haengt, waere jede feste Zahl geraten &mdash; sie zeigen
             jetzt den <i>Titel</i> des zuletzt erreichten Schritts und einen konservativen Prozentwert.</li>
+        <li><b>MINIJOB-Vorlage:</b> In der Datenbank stand bis hierher &bdquo;Steuer: aus&ldquo; &mdash; ein
+            Stand, der nie gewirkt hat. Sobald die Konfiguration greift, waere damit die <b>Steuer-ID</b>
+            verschwunden. Der Entrypoint korrigiert das einmalig und marker-gesichert auf den
+            Zielzustand (Steuer an, auf die Steuer-ID reduziert; Weitere Besch&auml;ftigung an;
+            Bildung &amp; Beruf an; Masernschutz unveraendert aus). Nur diese drei Schritte werden
+            angefasst &mdash; alles Uebrige und alle anderen Vorlagen bleiben, wie HR sie gepflegt hat.</li>
       </ul>
-      <div style="margin-top:0.5rem;"><b>Abgesichert:</b> 25 neue Tests
-      (<code>src/__tests__/lib/fragebogen-steps.test.ts</code>), Suite 500 gruen &middot;
+      <div style="margin-top:0.5rem;"><b>Abgesichert:</b> 28 neue Tests
+      (<code>src/__tests__/lib/fragebogen-steps.test.ts</code>), Suite 503 gruen &middot;
       <code>tsc --noEmit</code> sauber &middot; <code>npm run lint</code> ohne Errors &middot;
       <code>npm run build</code> erfolgreich. Ein Durchstich im Browser steht aus &mdash; dafuer
       fehlt eine laufende Datenbank.</div>

@@ -21,6 +21,8 @@ import {
   resolveResumeStep,
 } from "@/lib/fragebogen-steps";
 import { FIELD_REGISTRY, generateFullStepsConfig } from "@/lib/field-definitions";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 /** Vorlagen-Konfiguration bauen: alles an, ausser den genannten Schritten. */
 function configExcept(disabled: number[]) {
@@ -193,6 +195,39 @@ describe("legacyIndexToStepNumber – Migration der Alt-Daten", () => {
     for (let i = 0; i <= 10; i++) {
       expect(legacyIndexToStepNumber(i)).toBeGreaterThanOrEqual(i);
     }
+  });
+});
+
+describe("MINIJOB-Vorlagenkorrektur im Entrypoint", () => {
+  // prisma/seed-check.js laeuft im Container als reines JS ohne tsx und kann
+  // die Feld-Registry deshalb nicht importieren. Die Steuer-Felder sind dort
+  // dupliziert — dieser Test faengt ab, dass die Kopien auseinanderlaufen.
+  const seedCheck = readFileSync(
+    join(process.cwd(), "prisma", "seed-check.js"),
+    "utf-8"
+  );
+
+  it("kennt jedes Feld des Steuer-Schritts", () => {
+    const block = seedCheck.slice(
+      seedCheck.indexOf("const MINIJOB_TAX_FIELDS"),
+      seedCheck.indexOf("async function ensureMinijobTemplateSteps")
+    );
+    expect(block.length).toBeGreaterThan(0);
+    for (const feld of FIELD_REGISTRY[5]) {
+      expect(block).toContain(`name: "${feld.name}"`);
+    }
+  });
+
+  it("laesst genau die Steuer-ID sichtbar und pflichtig", () => {
+    expect(seedCheck).toContain(
+      '{ name: "taxId", label: "Steuer-ID", visible: true, required: true }'
+    );
+  });
+
+  it("dupliziert die alte Anzeigereihenfolge unveraendert", () => {
+    expect(seedCheck).toContain(
+      "const LEGACY_DISPLAY_ORDER = [" + LEGACY_DISPLAY_ORDER.join(", ") + "]"
+    );
   });
 });
 
