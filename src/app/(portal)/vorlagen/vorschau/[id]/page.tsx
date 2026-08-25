@@ -11,11 +11,11 @@
  * - Deutlicher "Vorschau"-Banner
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
-import { STEP_CONFIG } from "@/lib/validations/personal-data";
+import { getActiveSteps, type FragebogenStepKey } from "@/lib/fragebogen-steps";
 import { FieldConfigHelper, type StepFieldConfig } from "@/lib/field-definitions";
 
 import { Step1Personal } from "@/app/fragebogen/[token]/steps/step1-personal";
@@ -56,13 +56,12 @@ export default function VorschauPage() {
       .finally(() => setLoading(false));
   }, [templateId]);
 
-  // Aktive Steps (deaktivierte ueberspringen)
-  const activeStepIndices = useMemo(() => {
-    if (!preview?.stepsConfig) return STEP_CONFIG.map((_, i) => i);
-    return preview.stepsConfig
-      .filter((s) => s.enabled)
-      .map((s) => s.step - 1);
-  }, [preview?.stepsConfig]);
+  // Die Schritte dieser Vorlage in Anzeigereihenfolge. Die Zusammenfassung
+  // faellt raus — Pruefen und Absenden braucht die Vorschau nicht.
+  const previewSteps = useMemo(
+    () => getActiveSteps(preview?.stepsConfig).filter((s) => s.key !== "summary"),
+    [preview?.stepsConfig]
+  );
 
   const getFieldConfig = useCallback(
     (stepNumber: number): FieldConfigHelper => {
@@ -75,17 +74,15 @@ export default function VorschauPage() {
   // Vorschau: "Speichern" simuliert, keine echte API-Aufrufe
   const handleNext = (stepData: Record<string, unknown>) => {
     setFormData((prev) => ({ ...prev, ...stepData }));
-    const nextStepIndex = activeStepIndices.indexOf(currentStep) + 1;
-    if (nextStepIndex < activeStepIndices.length) {
-      setCurrentStep(activeStepIndices[nextStepIndex]);
+    if (currentStep + 1 < previewSteps.length) {
+      setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
   const handleBack = () => {
-    const prevStepIndex = activeStepIndices.indexOf(currentStep) - 1;
-    if (prevStepIndex >= 0) {
-      setCurrentStep(activeStepIndices[prevStepIndex]);
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -126,21 +123,21 @@ export default function VorschauPage() {
     organization: { name: "CREDO Vorschau", mandantNumber: "000", type: "VERWALTUNG" },
   };
 
-  // Nur Steps 1-9 als Vorschau (Step 10 = Zusammenfassung/Absenden brauchen wir nicht)
-  const stepComponents: Record<number, React.ReactNode> = {
-    0: <Step1Personal {...stepProps} fieldConfig={getFieldConfig(1)} />,
-    1: <Step2Address {...stepProps} fieldConfig={getFieldConfig(2)} />,
-    2: <Step3Bank {...stepProps} fieldConfig={getFieldConfig(3)} />,
-    3: <Step4SocialSecurity {...stepProps} fieldConfig={getFieldConfig(4)} />,
-    4: <Step5Tax {...stepProps} fieldConfig={getFieldConfig(5)} />,
-    5: <Step6Employment {...stepProps} fieldConfig={getFieldConfig(6)} />,
-    6: <Step8Education {...stepProps} fieldConfig={getFieldConfig(8)} />,
-    7: <Step9Masern {...stepProps} fieldConfig={getFieldConfig(9)} />,
+  // Masken je Schritt-Schluessel. Die Zusammenfassung fehlt bewusst: Pruefen und
+  // Absenden gehoert nicht in die Vorschau.
+  const stepComponents: Partial<Record<FragebogenStepKey, ReactNode>> = {
+    personal: <Step1Personal {...stepProps} fieldConfig={getFieldConfig(1)} />,
+    address: <Step2Address {...stepProps} fieldConfig={getFieldConfig(2)} />,
+    bank: <Step3Bank {...stepProps} fieldConfig={getFieldConfig(3)} />,
+    social: <Step4SocialSecurity {...stepProps} fieldConfig={getFieldConfig(4)} />,
+    tax: <Step5Tax {...stepProps} fieldConfig={getFieldConfig(5)} />,
+    employment: <Step6Employment {...stepProps} fieldConfig={getFieldConfig(6)} />,
+    education: <Step8Education {...stepProps} fieldConfig={getFieldConfig(8)} />,
+    masern: <Step9Masern {...stepProps} fieldConfig={getFieldConfig(9)} />,
   };
 
-  const currentActiveIndex = activeStepIndices.indexOf(currentStep);
-  const totalActive = activeStepIndices.filter((i) => i < 9).length; // Ohne Zusammenfassung
-  const progress = ((currentActiveIndex + 1) / Math.max(totalActive, 1)) * 100;
+  const activeStep = previewSteps[currentStep];
+  const progress = ((currentStep + 1) / Math.max(previewSteps.length, 1)) * 100;
 
   return (
     <div className="min-h-screen bg-muted">
@@ -181,7 +178,7 @@ export default function VorschauPage() {
             </div>
           </div>
           <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-            Schritt {currentActiveIndex + 1} / {totalActive}
+            Schritt {currentStep + 1} / {previewSteps.length}
           </span>
         </div>
 
@@ -195,13 +192,12 @@ export default function VorschauPage() {
       <nav className="border-b bg-card">
         <div className="mx-auto max-w-3xl overflow-x-auto px-4 py-2">
           <div className="flex gap-1">
-            {STEP_CONFIG.slice(0, 9).map((step, index) => {
-              if (!activeStepIndices.includes(index)) return null;
+            {previewSteps.map((step, index) => {
               const isActive = index === currentStep;
-              const isDone = activeStepIndices.indexOf(index) < currentActiveIndex;
+              const isDone = index < currentStep;
               return (
                 <button
-                  key={step.number}
+                  key={step.step}
                   onClick={() => { if (isDone) setCurrentStep(index); }}
                   disabled={!isDone && !isActive}
                   className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
@@ -215,7 +211,7 @@ export default function VorschauPage() {
                     : isDone ? "bg-green-600 text-white"
                     : "bg-muted text-muted-foreground"
                   }`}>
-                    {isDone ? "✓" : step.number}
+                    {isDone ? "✓" : index + 1}
                   </span>
                   <span className="hidden lg:inline">{step.title}</span>
                 </button>
@@ -230,14 +226,14 @@ export default function VorschauPage() {
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
           <div className="border-b bg-muted/50 px-6 py-4">
             <h2 className="text-lg font-bold text-foreground">
-              {STEP_CONFIG[currentStep]?.title ?? ""}
+              {activeStep?.title ?? ""}
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {STEP_CONFIG[currentStep]?.description ?? ""}
+              {activeStep?.description ?? ""}
             </p>
           </div>
           <div className="p-6">
-            {stepComponents[currentStep] ?? (
+            {(activeStep?.key ? stepComponents[activeStep.key] : null) ?? (
               <p className="text-muted-foreground">Schritt nicht in der Vorschau verfügbar.</p>
             )}
           </div>

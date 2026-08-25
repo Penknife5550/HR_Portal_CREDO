@@ -129,7 +129,7 @@
     <div><b>Ma&szlig;geblich:</b> &bdquo;Checkliste f&uuml;r geringf&uuml;gig entlohnte oder kurzfristig Besch&auml;ftigte&ldquo; der Minijob-Zentrale, <b>Stand 30.&nbsp;Juni&nbsp;2026</b> &mdash; im Repository abgelegt als <code>checkliste-minijobzentrale-2026-06-30.pdf</code>.</div>
     <div><b>Verglichen mit:</b> Formularvorlage <code>MINIJOB</code> des Personalfragebogens (Bereich <i>Vorlagen</i>) &middot; Erstabgleich gegen Branch <code>feat/vertragsende</code>, Commit <code>a106cb8</code>; Gegenpr&uuml;fung am 25.08.2026 gegen <code>main</code>, Commit <code>a740d9f</code> &mdash; alle Befunde reproduzieren unver&auml;ndert.</div>
     <div><b>Zweck:</b> Gemeinsam durchgehen, Entscheidungen treffen &mdash; <i>bevor</i> eine Zeile Code entsteht.</div>
-    <div><b>Stand:</b> Alle Entscheidungen getroffen (17.08.2026, Abschnitt&nbsp;9). Nachtrag vom 25.08.2026 eingearbeitet (Abschnitt&nbsp;11). Branch <code>feat/minijob-checkliste-2026</code>. Umsetzung noch nicht begonnen.</div>
+    <div><b>Stand:</b> Alle Entscheidungen getroffen (17.08.2026 und 25.08.2026, Abschnitt&nbsp;9). Nachtrag vom 25.08.2026 eingearbeitet (Abschnitt&nbsp;11). Branch <code>feat/minijob-checkliste-2026</code>. <b>AP&nbsp;1 ist umgesetzt</b> &mdash; siehe Abschnitt&nbsp;6.</div>
   </div>
 
   <div class="hinweis warnung"><span class="label">Formularstand gewechselt &mdash; 25.08.2026</span>
@@ -496,9 +496,38 @@
 
   <h4>Phase 1 &mdash; rechtlich zwingend</h4>
 
-  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;1</span><span class="aptitel">Renderer entkoppeln (Blocker)</span><span class="apstd">30&ndash;40&nbsp;h</span></div>
+  <div class="ap" style="border-left:6px solid var(--gruen);"><div class="apkopf"><span class="apnr" style="background:var(--gruen);">AP&nbsp;1</span><span class="aptitel">Renderer entkoppeln (Blocker)</span><span class="badge badge-gruen">umgesetzt 25.08.2026</span><span class="apstd">30&ndash;40&nbsp;h</span></div>
     <div class="apbody">Vorlagen-Steuerung wirksam machen, Schrittnummern an einer Stelle definieren, <code>currentStep</code>-Migration f&uuml;r laufende Vorg&auml;nge. Ohne dieses Paket l&auml;sst sich f&uuml;r Minijob nichts gezielt schalten.</div>
     <div class="apdateien">neu <code>src/lib/fragebogen-steps.ts</code> &middot; <code>fragebogen-form.tsx</code> &middot; <code>validations/personal-data.ts</code> &middot; <code>field-definitions.ts</code> &middot; Vorlagen-Editor und -Vorschau</div>
+    <div class="apbody" style="border-top:1px solid var(--border);margin-top:0.6rem;padding-top:0.6rem;">
+      <b>Umgesetzt am 25.08.2026.</b> Die Schritt-Definition liegt jetzt einmal in
+      <code>src/lib/fragebogen-steps.ts</code>: Die Array-Reihenfolge ist die Anzeigereihenfolge,
+      <code>step</code> die stabile Registry-Nummer. Vier auseinanderlaufende Kopien sind entfallen
+      (<code>STEP_CONFIG</code>, <code>getStepTitle()</code>, das Komponenten-Array im Renderer und
+      die Schritt-Bloecke im Seed).
+      <ul style="margin:0.5rem 0 0;">
+        <li><b>Fragebogen</b> rendert <code>activeSteps</code> statt eines festen Arrays &mdash; die
+            Vorlagen-Konfiguration wirkt damit erstmals.</li>
+        <li><b>Vorlagen-Vorschau</b> zeigte ab Registry-Schritt&nbsp;7 die <i>falsche</i> Maske
+            (Kinder hat keine eigene Maske, danach war alles um eins verschoben). Behoben.</li>
+        <li><b>Vorlagen-Editor:</b> &Auml;nderungserkennung laeuft ueber die Schrittnummer statt
+            ueber die Array-Position; Pflichtschritte kommen aus der zentralen Definition.</li>
+        <li><b>API:</b> <code>currentStep</code> ist an <code>MAX_STEP_NUMBER</code> gebunden &mdash;
+            ein neuer Schritt&nbsp;11 wird nicht mehr abgewiesen.</li>
+        <li><b>Datenmigration:</b> <code>PersonalData.currentStep</code> speicherte die
+            Anzeigeposition, jetzt die Registry-Nummer. Die Umstellung laeuft idempotent im
+            Entrypoint (<code>prisma/seed-check.js</code>), abgesichert ueber einen AuditLog-Marker
+            und in einer Transaktion mit den Updates.</li>
+        <li><b>HR-Ansichten</b> zeigten &bdquo;Schritt X von 9&ldquo; bzw. &bdquo;X/10&ldquo;. Da die
+            Streckenlaenge an der Vorlage haengt, waere jede feste Zahl geraten &mdash; sie zeigen
+            jetzt den <i>Titel</i> des zuletzt erreichten Schritts und einen konservativen Prozentwert.</li>
+      </ul>
+      <div style="margin-top:0.5rem;"><b>Abgesichert:</b> 25 neue Tests
+      (<code>src/__tests__/lib/fragebogen-steps.test.ts</code>), Suite 500 gruen &middot;
+      <code>tsc --noEmit</code> sauber &middot; <code>npm run lint</code> ohne Errors &middot;
+      <code>npm run build</code> erfolgreich. Ein Durchstich im Browser steht aus &mdash; dafuer
+      fehlt eine laufende Datenbank.</div>
+    </div>
   </div>
 
   <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;2</span><span class="aptitel">Wahrheitsversicherung pr&uuml;fungsfest speichern</span><span class="apstd">12&ndash;16&nbsp;h</span></div>
@@ -771,7 +800,7 @@
 
   <p class="fuss">
     CREDO HR-Portal &middot; Abgleich &bdquo;Checkliste f&uuml;r geringf&uuml;gig entlohnte oder kurzfristig Besch&auml;ftigte&ldquo;,
-    Stand 30.06.2026 &middot; Entscheidungen abgestimmt am 17.08.2026 &middot; Nachtrag 25.08.2026 &middot; Umsetzung noch nicht begonnen.
+    Stand 30.06.2026 &middot; Entscheidungen abgestimmt am 17.08.2026 &middot; Nachtrag 25.08.2026 &middot; AP&nbsp;1 umgesetzt am 25.08.2026.
   </p>
 
 </div>

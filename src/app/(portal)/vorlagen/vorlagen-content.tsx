@@ -16,6 +16,7 @@ import {
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { FIELD_REGISTRY, getDefaultFieldConfig, type FieldConfig } from "@/lib/field-definitions";
+import { MANDATORY_STEP_NUMBERS } from "@/lib/fragebogen-steps";
 
 // =============================================
 // Types
@@ -49,8 +50,8 @@ interface FormTemplate {
   updatedAt: string;
 }
 
-// Steps 1 und 10 sind Pflichtschritte (immer aktiviert)
-const MANDATORY_STEPS = [1, 10];
+// Pflichtschritte (immer aktiviert) kommen aus der zentralen Schritt-Definition.
+const MANDATORY_STEPS = MANDATORY_STEP_NUMBERS;
 
 // Lesbare Labels für QuestionnaireType
 const TYPE_LABELS: Record<string, string> = {
@@ -279,10 +280,16 @@ export function VorlagenContent({ user }: { user: User }) {
     const template = templates.find((t) => t.id === templateId);
     if (!template) return false;
 
-    // Step-Level pruefen (enabled)
-    const stepChanged = edited.some((editedStep, index) => {
-      const originalStep = template.stepsConfig[index];
-      return originalStep && editedStep.enabled !== originalStep.enabled;
+    // Step-Level pruefen (enabled) — ueber die Schrittnummer, nicht ueber die
+    // Array-Position. Sonst bricht die Aenderungserkennung, sobald ein Schritt
+    // dazukommt oder die Konfiguration in anderer Reihenfolge geladen wird.
+    const stepChanged = edited.some((editedStep) => {
+      const originalStep = template.stepsConfig.find(
+        (s) => s.step === editedStep.step
+      );
+      // Kein Original = neuer Schritt in der Konfiguration -> Aenderung.
+      if (!originalStep) return true;
+      return editedStep.enabled !== originalStep.enabled;
     });
     if (stepChanged) return true;
 

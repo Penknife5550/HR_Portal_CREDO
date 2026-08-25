@@ -18,6 +18,7 @@ import {
   DurationKPI,
   OverdueBadge,
 } from "@/components/dashboard-charts";
+import { describeCurrentStep } from "@/lib/fragebogen-steps";
 
 interface User {
   userId: string;
@@ -481,7 +482,7 @@ export function DashboardContent({ user }: { user: User }) {
                           {ob.personalData?.isComplete
                             ? "Vollständig"
                             : ob.personalData
-                              ? `Schritt ${ob.personalData.currentStep}/10`
+                              ? describeCurrentStep(ob.personalData.currentStep)
                               : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">

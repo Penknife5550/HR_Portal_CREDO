@@ -62,10 +62,100 @@ async function ensureSystemDocumentTemplates(prisma) {
   }
 }
 
+/**
+ * Einmalige Datenmigration: PersonalData.currentStep von der Anzeigeposition
+ * auf die Registry-Schrittnummer umstellen (AP 1, Renderer-Entkopplung).
+ *
+ * Vorher speicherte die Spalte die **0-basierte Anzeigeposition** in der fest
+ * verdrahteten Reihenfolge des alten Renderers. Weil dieser die Vorlagen-
+ * Konfiguration ignoriert hat, galt diese Reihenfolge fuer alle Vorlagen
+ * gleichermassen — die Abbildung ist deshalb eindeutig.
+ *
+ * Ohne die Migration wuerden laufende Vorgaenge an der falschen Stelle wieder
+ * einsteigen, sobald der Renderer die Registry-Nummer interpretiert.
+ *
+ * Muss mit LEGACY_DISPLAY_ORDER in src/lib/fragebogen-steps.ts uebereinstimmen.
+ * Hier als reines JS dupliziert, weil im Container kein tsx verfuegbar ist.
+ *
+ * Idempotenz: Ein AuditLog-Eintrag mit fester action dient als Marker. Er wird
+ * in derselben Transaktion geschrieben wie die Updates — entweder beides oder
+ * nichts. Ein zweiter Lauf ohne Marker wuerde die Werte erneut verschieben.
+ */
+const CURRENT_STEP_MIGRATION_MARKER = "MIGRATION_CURRENT_STEP_REGISTRY_V1";
+const LEGACY_DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 8, 9, 10];
+
+function legacyIndexToStepNumber(legacyIndex) {
+  const mapped = LEGACY_DISPLAY_ORDER[legacyIndex];
+  if (mapped !== undefined) return mapped;
+  return LEGACY_DISPLAY_ORDER[LEGACY_DISPLAY_ORDER.length - 1];
+}
+
+async function migrateCurrentStepToRegistryNumbers(prisma) {
+  try {
+    const alreadyRun = await prisma.auditLog.findFirst({
+      where: { action: CURRENT_STEP_MIGRATION_MARKER },
+      select: { id: true },
+    });
+    if (alreadyRun) return;
+
+    const rowCount = await prisma.personalData.count();
+    if (rowCount === 0) {
+      // Frische Datenbank: nichts zu migrieren, Marker trotzdem setzen.
+      await prisma.auditLog.create({
+        data: {
+          action: CURRENT_STEP_MIGRATION_MARKER,
+          details: { migrated: 0, reason: "keine PersonalData-Datensaetze" },
+        },
+      });
+      console.log("currentStep-Migration: keine Datensaetze, Marker gesetzt.");
+      return;
+    }
+
+    // Hoechste Quellwerte zuerst. Jedes Ziel liegt >= Quelle, deshalb ist beim
+    // Bearbeiten von Wert s garantiert noch nichts nach s hineingeschoben worden.
+    const sources = [];
+    for (let i = 10; i >= 0; i--) sources.push(i);
+
+    const updates = [];
+    for (const from of sources) {
+      const to = legacyIndexToStepNumber(from);
+      if (to === from) continue;
+      updates.push(
+        prisma.personalData.updateMany({
+          where: { currentStep: from },
+          data: { currentStep: to },
+        }),
+      );
+    }
+
+    const results = await prisma.$transaction([
+      ...updates,
+      prisma.auditLog.create({
+        data: {
+          action: CURRENT_STEP_MIGRATION_MARKER,
+          details: { rowCount, mapping: LEGACY_DISPLAY_ORDER },
+        },
+      }),
+    ]);
+
+    const changed = results
+      .slice(0, updates.length)
+      .reduce((sum, r) => sum + (r.count || 0), 0);
+    console.log(
+      "currentStep-Migration: " + changed + " von " + rowCount + " Datensaetzen umgestellt.",
+    );
+  } catch (error) {
+    // Nicht-kritisch fuer den Start, aber laut: ohne Migration steigen laufende
+    // Vorgaenge an der falschen Stelle ein.
+    console.error("currentStep-Migration fehlgeschlagen:", error.message);
+  }
+}
+
 async function main() {
   const prisma = new PrismaClient();
   try {
     await ensureSystemDocumentTemplates(prisma);
+    await migrateCurrentStepToRegistryNumbers(prisma);
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {

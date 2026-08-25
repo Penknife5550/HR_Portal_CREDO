@@ -9,6 +9,8 @@ import { PrismaClient, OrganizationType, UserRole, QuestionnaireType, ExitInterv
 import { hashSync } from "bcryptjs";
 import crypto from "crypto";
 import { ALL_DEFAULT_BEURTEILUNG_TEMPLATES } from "../src/lib/beurteilung-defaults";
+import { FRAGEBOGEN_STEPS } from "../src/lib/fragebogen-steps";
+import { getDefaultFieldConfig } from "../src/lib/field-definitions";
 
 const prisma = new PrismaClient();
 
@@ -161,44 +163,45 @@ async function main() {
   // =============================================
   console.log("📋 Formularvorlagen anlegen...\n");
 
-  const allStepsEnabled = [
-    { step: 1, title: "Persönliche Angaben", enabled: true },
-    { step: 2, title: "Adresse & Kontakt", enabled: true },
-    { step: 3, title: "Bankverbindung", enabled: true },
-    { step: 4, title: "Sozialversicherung", enabled: true },
-    { step: 5, title: "Steuer", enabled: true },
-    { step: 6, title: "Weitere Beschaeftigung", enabled: true },
-    { step: 7, title: "Kinder", enabled: true },
-    { step: 8, title: "Bildung & Beruf", enabled: true },
-    { step: 9, title: "Masernschutz", enabled: true },
-    { step: 10, title: "Zusammenfassung", enabled: true },
-  ];
+  // Schrittnummern und Titel kommen aus der zentralen Definition
+  // (src/lib/fragebogen-steps.ts). Hier wird nur noch entschieden, welche
+  // Schritte eine Vorlage abschaltet.
+  const stepsExcept = (disabled: number[]) =>
+    FRAGEBOGEN_STEPS.map((s) => ({
+      step: s.step,
+      title: s.title,
+      enabled: !disabled.includes(s.step),
+    }));
 
-  const minijobSteps = [
-    { step: 1, title: "Persönliche Angaben", enabled: true },
-    { step: 2, title: "Adresse & Kontakt", enabled: true },
-    { step: 3, title: "Bankverbindung", enabled: true },
-    { step: 4, title: "Sozialversicherung", enabled: true },
-    { step: 5, title: "Steuer", enabled: false },
-    { step: 6, title: "Weitere Beschaeftigung", enabled: false },
-    { step: 7, title: "Kinder", enabled: false },
-    { step: 8, title: "Bildung & Beruf", enabled: false },
-    { step: 9, title: "Masernschutz", enabled: false },
-    { step: 10, title: "Zusammenfassung", enabled: true },
-  ];
+  const allStepsEnabled = stepsExcept([]);
 
-  const ehrenamtSteps = [
-    { step: 1, title: "Persönliche Angaben", enabled: true },
-    { step: 2, title: "Adresse & Kontakt", enabled: true },
-    { step: 3, title: "Bankverbindung", enabled: false },
-    { step: 4, title: "Sozialversicherung", enabled: false },
-    { step: 5, title: "Steuer", enabled: false },
-    { step: 6, title: "Weitere Beschaeftigung", enabled: false },
-    { step: 7, title: "Kinder", enabled: false },
-    { step: 8, title: "Bildung & Beruf", enabled: false },
-    { step: 9, title: "Masernschutz", enabled: false },
-    { step: 10, title: "Zusammenfassung", enabled: true },
-  ];
+  /**
+   * Minijob: Der Steuer-Schritt bleibt aktiv, wird aber auf die Steuer-ID
+   * reduziert. Die Checkliste der Minijob-Zentrale verlangt die Steuer-ID;
+   * Steuerklasse, Freibetraege und Religionszugehoerigkeit spielen bei
+   * Pauschalbesteuerung keine Rolle und wuerden als Pflichtfelder stoeren.
+   */
+  const minijobTaxFields = getDefaultFieldConfig(5).map((f) =>
+    f.name === "taxId"
+      ? { ...f, visible: true, required: true }
+      : { ...f, visible: false, required: false },
+  );
+
+  /**
+   * Minijob: Nur der Masernschutz faellt weg — er ist fuer geringfuegig
+   * Beschaeftigte in Schulen und Kitas nicht einschlaegig.
+   *
+   * "Bildung & Beruf" bleibt bewusst aktiv: Der Taetigkeitsschluessel der
+   * Meldung zur Sozialversicherung verlangt Schulabschluss und
+   * Berufsausbildung auch bei geringfuegig Beschaeftigten (Entscheidung
+   * 25.08.2026). "Weitere Beschaeftigung" bleibt aktiv, weil die
+   * Beitragsverfahrensverordnung genau diese Erklaerung verlangt.
+   */
+  const minijobSteps = stepsExcept([9]).map((s) =>
+    s.step === 5 ? { ...s, fields: minijobTaxFields } : s,
+  );
+
+  const ehrenamtSteps = stepsExcept([3, 4, 5, 6, 7, 8, 9]);
 
   const formTemplates = [
     {

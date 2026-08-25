@@ -9,7 +9,12 @@
  *
  * WICHTIG: Neue Felder hier registrieren, damit sie im Admin-Portal
  * und im Fragebogen sichtbar werden.
+ *
+ * Die Schritte selbst (Nummer, Titel, Reihenfolge, Maske) stehen in
+ * `fragebogen-steps.ts` — hier stehen nur die Felder je Schritt.
  */
+
+import { FRAGEBOGEN_STEPS } from "./fragebogen-steps";
 
 // =============================================
 // Typen
@@ -183,29 +188,10 @@ export class FieldConfigHelper {
 // Wird für den Seed und für neue Templates verwendet
 // =============================================
 export function generateFullStepsConfig(): StepFieldConfig[] {
-  return Array.from({ length: 10 }, (_, i) => {
-    const step = i + 1;
-    return {
-      step,
-      title: getStepTitle(step),
-      enabled: true,
-      fields: getDefaultFieldConfig(step),
-    };
-  });
-}
-
-function getStepTitle(step: number): string {
-  const titles: Record<number, string> = {
-    1: "Persönliche Angaben",
-    2: "Adresse & Kontakt",
-    3: "Bankverbindung",
-    4: "Sozialversicherung",
-    5: "Steuer",
-    6: "Weitere Beschäftigung",
-    7: "Kinder",
-    8: "Bildung & Beruf",
-    9: "Masernschutz",
-    10: "Zusammenfassung",
-  };
-  return titles[step] ?? `Schritt ${step}`;
+  return FRAGEBOGEN_STEPS.map((s) => ({
+    step: s.step,
+    title: s.title,
+    enabled: true,
+    fields: getDefaultFieldConfig(s.step),
+  }));
 }

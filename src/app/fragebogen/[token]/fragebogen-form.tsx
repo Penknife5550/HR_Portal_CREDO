@@ -7,10 +7,14 @@
  * und CREDO Corporate Design.
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, type ReactNode } from "react";
 import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
-import { STEP_CONFIG } from "@/lib/validations/personal-data";
+import {
+  getActiveSteps,
+  resolveResumeStep,
+  type FragebogenStepKey,
+} from "@/lib/fragebogen-steps";
 import { FieldConfigHelper, type StepFieldConfig } from "@/lib/field-definitions";
 
 // Step-Komponenten
@@ -49,23 +53,28 @@ interface FragebogenFormProps {
 }
 
 export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
-  const savedStep =
-    (initialData.personalData?.currentStep as number) || 0;
-  const [currentStep, setCurrentStep] = useState(savedStep);
+  // Die Schritte, die dieser Mitarbeiter laut Vorlage durchlaeuft —
+  // in Anzeigereihenfolge, ohne die abgeschalteten.
+  const activeSteps = useMemo(
+    () => getActiveSteps(initialData.stepsConfig),
+    [initialData.stepsConfig]
+  );
+
+  // `currentStep` ist die Position in `activeSteps`, nicht die Registry-Nummer.
+  // Gespeichert wird die Registry-Nummer — sie bleibt gueltig, auch wenn sich
+  // die Vorlage aendert, waehrend der Vorgang laeuft.
+  const [currentStep, setCurrentStep] = useState(() =>
+    resolveResumeStep(
+      activeSteps,
+      initialData.personalData?.currentStep as number | null | undefined
+    )
+  );
   const [formData, setFormData] = useState<Record<string, unknown>>(
     initialData.personalData || {}
   );
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
-
-  // Aktive Steps berechnen (deaktivierte Steps ueberspringen)
-  const activeSteps = useMemo(() => {
-    if (!initialData.stepsConfig) return STEP_CONFIG.map((_, i) => i);
-    return initialData.stepsConfig
-      .filter((s) => s.enabled)
-      .map((s) => s.step - 1); // 0-basierter Index
-  }, [initialData.stepsConfig]);
 
   // FieldConfig-Helper für jeden Step erstellen
   const getFieldConfig = useCallback(
@@ -78,9 +87,9 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     [initialData.stepsConfig]
   );
 
-  // Auto-Save: Step-Daten an API senden
+  // Auto-Save: Step-Daten an API senden. `nextStepNumber` ist die Registry-Nummer.
   const saveStepData = useCallback(
-    async (stepData: Record<string, unknown>, nextStep: number) => {
+    async (stepData: Record<string, unknown>, nextStepNumber: number) => {
       setSaving(true);
       setSaveMessage("");
       try {
@@ -89,7 +98,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...stepData,
-            currentStep: nextStep,
+            currentStep: nextStepNumber,
           }),
         });
 
@@ -117,10 +126,12 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     const merged = { ...formData, ...stepData };
     setFormData(merged);
 
-    const nextStep = currentStep + 1;
-    const saved = await saveStepData(stepData, nextStep);
+    const nextIndex = currentStep + 1;
+    if (nextIndex >= activeSteps.length) return;
+
+    const saved = await saveStepData(stepData, activeSteps[nextIndex].step);
     if (saved) {
-      setCurrentStep(nextStep);
+      setCurrentStep(nextIndex);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -358,27 +369,33 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     organization: initialData.organization,
   };
 
-  const stepComponents = [
-    <Step1Personal key="s1" {...stepProps} fieldConfig={getFieldConfig(1)} />,
-    <Step2Address key="s2" {...stepProps} fieldConfig={getFieldConfig(2)} />,
-    <Step3Bank key="s3" {...stepProps} fieldConfig={getFieldConfig(3)} />,
-    <Step4SocialSecurity key="s4" {...stepProps} fieldConfig={getFieldConfig(4)} token={token} />,
-    <Step5Tax key="s5" {...stepProps} fieldConfig={getFieldConfig(5)} />,
-    <Step6Employment key="s6" {...stepProps} fieldConfig={getFieldConfig(6)} />,
-    <Step8Education key="s7" {...stepProps} fieldConfig={getFieldConfig(8)} />,
-    <Step9Masern key="s8" {...stepProps} fieldConfig={getFieldConfig(9)} token={token} />,
-    <Step10Summary
-      key="s9"
-      {...stepProps}
-      fieldConfig={getFieldConfig(10)}
-      allData={formData}
-      onSubmit={handleSubmit}
-      token={token}
-      requiredDocuments={initialData.requiredDocuments ?? undefined}
-    />,
-  ];
+  // Masken je Schritt-Schluessel. Welche davon der Mitarbeiter zu sehen bekommt
+  // und in welcher Reihenfolge, entscheidet allein `activeSteps`.
+  const stepComponents: Record<FragebogenStepKey, ReactNode> = {
+    personal: <Step1Personal {...stepProps} fieldConfig={getFieldConfig(1)} />,
+    address: <Step2Address {...stepProps} fieldConfig={getFieldConfig(2)} />,
+    bank: <Step3Bank {...stepProps} fieldConfig={getFieldConfig(3)} />,
+    social: (
+      <Step4SocialSecurity {...stepProps} fieldConfig={getFieldConfig(4)} token={token} />
+    ),
+    tax: <Step5Tax {...stepProps} fieldConfig={getFieldConfig(5)} />,
+    employment: <Step6Employment {...stepProps} fieldConfig={getFieldConfig(6)} />,
+    education: <Step8Education {...stepProps} fieldConfig={getFieldConfig(8)} />,
+    masern: <Step9Masern {...stepProps} fieldConfig={getFieldConfig(9)} token={token} />,
+    summary: (
+      <Step10Summary
+        {...stepProps}
+        fieldConfig={getFieldConfig(10)}
+        allData={formData}
+        onSubmit={handleSubmit}
+        token={token}
+        requiredDocuments={initialData.requiredDocuments ?? undefined}
+      />
+    ),
+  };
 
-  const progress = ((currentStep + 1) / STEP_CONFIG.length) * 100;
+  const activeStep = activeSteps[currentStep];
+  const progress = ((currentStep + 1) / activeSteps.length) * 100;
 
   return (
     <div className="min-h-screen bg-muted">
@@ -413,7 +430,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
               <span className="text-xs text-green-600">{saveMessage}</span>
             )}
             <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-              Schritt {currentStep + 1} / {STEP_CONFIG.length}
+              Schritt {currentStep + 1} / {activeSteps.length}
             </span>
           </div>
         </div>
@@ -432,14 +449,14 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
       <nav className="border-b bg-card">
         <div className="mx-auto max-w-3xl overflow-x-auto px-4 py-2">
           <div className="flex gap-1">
-            {STEP_CONFIG.map((step, index) => {
+            {activeSteps.map((step, index) => {
               const isActive = index === currentStep;
               const isDone = index < currentStep;
               const isFuture = index > currentStep;
 
               return (
                 <button
-                  key={step.number}
+                  key={step.step}
                   onClick={() => {
                     if (isDone) setCurrentStep(index);
                   }}
@@ -476,7 +493,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
                         />
                       </svg>
                     ) : (
-                      step.number
+                      index + 1
                     )}
                   </span>
                   <span className="hidden lg:inline">{step.title}</span>
@@ -493,15 +510,17 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
           {/* Step-Header */}
           <div className="border-b bg-muted/50 px-6 py-4">
             <h2 className="text-lg font-bold text-foreground">
-              {STEP_CONFIG[currentStep].title}
+              {activeStep?.title ?? ""}
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {STEP_CONFIG[currentStep].description}
+              {activeStep?.description ?? ""}
             </p>
           </div>
 
           {/* Step-Inhalt */}
-          <div className="p-6">{stepComponents[currentStep]}</div>
+          <div className="p-6">
+            {activeStep?.key ? stepComponents[activeStep.key] : null}
+          </div>
         </div>
       </main>
 

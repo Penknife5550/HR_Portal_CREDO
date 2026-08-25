@@ -18,6 +18,7 @@ import {
   computeMissingRequiredDocuments,
   documentTypeLabel,
 } from "@/lib/required-documents";
+import { MAX_STEP_NUMBER, SUMMARY_STEP_NUMBER } from "@/lib/fragebogen-steps";
 import { z } from "zod";
 
 // =============================================
@@ -74,7 +75,10 @@ const fragebogenFieldsSchema = z.object({
   minijobRvBefreiung: z.boolean().optional(),
   bornAfter1971: z.boolean().optional(),
   masernschutzProvided: z.boolean().optional(),
-  currentStep: z.number().min(1).max(10).optional(),
+  // Registry-Nummer des Schritts, auf dem der Vorgang steht — nicht die
+  // Anzeigeposition. Obergrenze kommt aus der zentralen Schritt-Definition,
+  // damit ein neuer Schritt hier nicht vergessen wird.
+  currentStep: z.number().int().min(1).max(MAX_STEP_NUMBER).optional(),
   children: z.array(z.object({
     firstName: z.string().min(1).max(100),
     lastName: z.string().max(100).optional(),
@@ -439,7 +443,7 @@ export async function POST(
       isComplete: true,
       dsgvoAccepted: true,
       dsgvoAcceptedAt: new Date(),
-      currentStep: 10,
+      currentStep: SUMMARY_STEP_NUMBER,
     },
   });
 

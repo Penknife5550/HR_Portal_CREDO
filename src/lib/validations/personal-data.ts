@@ -340,59 +340,6 @@ export function createStep8Schema(fc: FieldConfigHelper) {
 // =============================================
 // Step-Konfiguration
 // =============================================
-export const STEP_CONFIG = [
-  {
-    number: 1,
-    title: "Persönliche Angaben",
-    description: "Name, Geburtsdatum, Familienstand",
-    icon: "user",
-  },
-  {
-    number: 2,
-    title: "Adresse & Kontakt",
-    description: "Wohnanschrift, Telefon, E-Mail",
-    icon: "home",
-  },
-  {
-    number: 3,
-    title: "Bankverbindung",
-    description: "IBAN, BIC, Kontoinhaber",
-    icon: "credit-card",
-  },
-  {
-    number: 4,
-    title: "Sozialversicherung",
-    description: "SV-Nummer, Krankenkasse",
-    icon: "shield",
-  },
-  {
-    number: 5,
-    title: "Steuer",
-    description: "Steuer-ID, Steuerklasse, Kirchensteuer",
-    icon: "file-text",
-  },
-  {
-    number: 6,
-    title: "Weitere Beschäftigung",
-    description: "Angaben zu weiteren Arbeitgebern",
-    icon: "briefcase",
-  },
-  {
-    number: 7,
-    title: "Bildung & Beruf",
-    description: "Schulabschluss, Berufsausbildung",
-    icon: "graduation-cap",
-  },
-  {
-    number: 8,
-    title: "Masernschutz",
-    description: "Impfnachweis für Gemeinschaftseinrichtungen",
-    icon: "heart",
-  },
-  {
-    number: 9,
-    title: "Zusammenfassung",
-    description: "Pruefen und Absenden",
-    icon: "check-circle",
-  },
-] as const;
+// Die Schritt-Definition (Nummer, Titel, Reihenfolge, Maske) liegt zentral in
+// `@/lib/fragebogen-steps`. Das frueher hier gepflegte STEP_CONFIG war eine
+// vierte, abweichende Kopie derselben Liste und ist entfallen.
