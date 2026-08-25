@@ -10,7 +10,7 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
-import { STATUS_LABELS } from "@/lib/constants";
+import { STATUS_LABELS, getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
@@ -148,7 +148,10 @@ interface DetailData {
     stellenbeschreibung: string | null;
     vertragsbeginn: string | null;
     befristet: boolean | null;
+    befristungsart: string | null;
     vertragsende: string | null;
+    befristungZweck: string | null;
+    vertragsendeVoraussichtlich: string | null;
     befristungSachgrund: string | null;
     vollzeit: boolean | null;
     wochenstunden: number | null;
@@ -2121,8 +2124,24 @@ function TabSupervisor({ data, appUrl }: { data: DetailData; appUrl: string }) {
           <FieldRow label="Stellenbeschreibung" value={sd.stellenbeschreibung} />
           <FieldRow label="Vertragsbeginn" value={formatDate(sd.vertragsbeginn)} />
           <FieldRow label="Befristet" value={formatBoolean(sd.befristet)} />
-          <FieldRow label="Vertragsende" value={formatDate(sd.vertragsende)} />
-          <FieldRow label="Befristung Sachgrund" value={sd.befristungSachgrund} />
+          {sd.befristet && (
+            <>
+              <FieldRow label="Art der Befristung" value={getBefristungsartLabel(sd.befristungsart)} />
+              {sd.befristungsart === "ZWECK" ? (
+                <>
+                  <FieldRow label="Vertragsende" value="Zweckbefristung – kein festes Datum" />
+                  <FieldRow label="Ende bei" value={sd.befristungZweck} />
+                  <FieldRow
+                    label="Voraussichtliches Ende"
+                    value={sd.vertragsendeVoraussichtlich ? `${formatDate(sd.vertragsendeVoraussichtlich)} (unverbindlich)` : null}
+                  />
+                </>
+              ) : (
+                <FieldRow label="Vertragsende" value={formatDate(sd.vertragsende)} />
+              )}
+              <FieldRow label="Befristung Sachgrund" value={getBefristungSachgrundLabel(sd.befristungSachgrund)} />
+            </>
+          )}
         </div>
       </Card>
 

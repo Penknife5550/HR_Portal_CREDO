@@ -78,8 +78,8 @@ model Organization {
   hatBetriebsrat                 Boolean @default(false)
   hatSchwerbehindertenvertretung Boolean @default(false)
 
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
   onboardings           OnboardingProcess[]
   offboardings          OffboardingProcess[]
   departmentConfigs     DepartmentConfig[]
@@ -438,10 +438,17 @@ model SupervisorData {
   stellenbeschreibung String?
 
   // -- Vertragsdaten --
-  vertragsbeginn      DateTime?
-  befristet           Boolean?
-  vertragsende        DateTime?
-  befristungSachgrund String?
+  vertragsbeginn              DateTime?
+  befristet                   Boolean?
+  // Art der Befristung: "KALENDER" (festes Enddatum) | "ZWECK" (Ende bei Zweckerreichung, § 3 Abs. 1 S. 2 TzBfG)
+  befristungsart              String?
+  // Kalendermaessiges (bindendes) Vertragsende – nur bei befristungsart "KALENDER"
+  vertragsende                DateTime?
+  // Zweckbefristung: Beschreibung des Zwecks bzw. des Ereignisses, das den Vertrag beendet
+  befristungZweck             String?
+  // Unverbindliches voraussichtliches Ende (Wiedervorlage HR) – nur bei befristungsart "ZWECK"
+  vertragsendeVoraussichtlich DateTime?
+  befristungSachgrund         String?
 
   // -- Vertragsumfang --
   vollzeit      Boolean? @default(true)
@@ -740,7 +747,7 @@ model StarterpaketDokument {
   dateipfad    String // gespeichertes PDF (uploads/starterpaket/...)
   originalName String
   fileSize     Int
-  mimeType     String  @default("application/pdf")
+  mimeType     String @default("application/pdf")
   hash         String // SHA-256 (Versand-Nachweis)
 
   isActive   Boolean @default(true)

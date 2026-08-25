@@ -14,14 +14,57 @@ import { z } from "zod";
 // =============================================
 // Step 1: Stelle & Vertrag
 // =============================================
-export const supStep1Schema = z.object({
-  betriebsstaette: z.string().min(1, "Betriebsstaette ist erforderlich."),
-  stellenbeschreibung: z.string().min(1, "Stellenbeschreibung ist erforderlich."),
-  vertragsbeginn: z.string().min(1, "Vertragsbeginn ist erforderlich."),
-  befristet: z.boolean(),
-  vertragsende: z.string(),
-  befristungSachgrund: z.string(),
-});
+/**
+ * Art der Befristung:
+ * - KALENDER: kalendermaessig befristet, festes Enddatum (§ 3 Abs. 1 S. 2 Alt. 1 TzBfG)
+ * - ZWECK:    Zweckbefristung, Ende mit Zweckerreichung (§ 3 Abs. 1 S. 2 Alt. 2 TzBfG),
+ *             z.B. projektbezogen bis zum Auslaufen einer Kostenzusage – ohne festes Datum
+ */
+export const BEFRISTUNGSARTEN = ["KALENDER", "ZWECK"] as const;
+
+export const supStep1Schema = z
+  .object({
+    betriebsstaette: z.string().min(1, "Betriebsstaette ist erforderlich."),
+    stellenbeschreibung: z.string().min(1, "Stellenbeschreibung ist erforderlich."),
+    vertragsbeginn: z.string().min(1, "Vertragsbeginn ist erforderlich."),
+    befristet: z.boolean(),
+    befristungsart: z.enum(BEFRISTUNGSARTEN).or(z.literal("")),
+    vertragsende: z.string(),
+    befristungZweck: z.string().max(500, "Bitte maximal 500 Zeichen."),
+    vertragsendeVoraussichtlich: z.string(),
+    befristungSachgrund: z.string(),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.befristet) return;
+
+    if (!v.befristungsart) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["befristungsart"],
+        message: "Bitte wählen Sie die Art der Befristung.",
+      });
+      return;
+    }
+
+    // Kalendermaessige Befristung: festes Enddatum ist Pflicht
+    if (v.befristungsart === "KALENDER" && !v.vertragsende) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["vertragsende"],
+        message:
+          "Bitte geben Sie das Vertragsende an – oder wählen Sie die Zweckbefristung, wenn kein Datum feststeht.",
+      });
+    }
+
+    // Zweckbefristung: Beschreibung des Zwecks ist Pflicht (ersetzt das fehlende Datum)
+    if (v.befristungsart === "ZWECK" && v.befristungZweck.trim().length < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["befristungZweck"],
+        message: "Bitte beschreiben Sie, wodurch der Vertrag endet (z.B. Ende der Kostenzusage).",
+      });
+    }
+  });
 
 export type SupStep1Data = z.infer<typeof supStep1Schema>;
 

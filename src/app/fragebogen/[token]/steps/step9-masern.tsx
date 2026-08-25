@@ -66,7 +66,7 @@ export function Step9Masern({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("type", "MASERNSCHUTZ");
+      formData.append("type", "masernschutz");
       const res = await fetch(`/api/fragebogen/${token}/documents`, { method: "POST", body: formData });
       if (res.ok) {
         setUploadedFile(file.name);

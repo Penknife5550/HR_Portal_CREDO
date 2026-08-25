@@ -14,6 +14,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 import { EXPORT_ROLES } from "@/lib/permissions";
+import { getBefristungsartLabel } from "@/lib/constants";
 
 export async function GET(
   request: NextRequest,
@@ -102,6 +103,11 @@ export async function GET(
         "Hauptarbeitgeber",
         "Nebenarbeitgeber",
         "Kostenstelle",
+        // Neue Spalten bewusst am Ende: so verschiebt sich keine bestehende
+        // Spaltenposition fuer den LOGA-Import.
+        "Art der Befristung",
+        "Zweckbefristung: Ende bei",
+        "Vorauss. Ende",
       ];
 
       const values = [
@@ -153,6 +159,12 @@ export async function GET(
         sd?.hauptarbeitgeberId || "",
         sd?.nebenarbeitgeberId || "",
         sd?.kostenstelle || "",
+        // Reihenfolge muss zu den drei angehaengten Kopfzeilen passen
+        sd?.befristet ? getBefristungsartLabel(sd.befristungsart) || "" : "",
+        sd?.befristungZweck || "",
+        sd?.vertragsendeVoraussichtlich
+          ? new Date(sd.vertragsendeVoraussichtlich).toLocaleDateString("de-DE")
+          : "",
       ];
 
       // CSV-String bauen (mit Semikolon als Trennzeichen für deutsche Excel-Versionen)

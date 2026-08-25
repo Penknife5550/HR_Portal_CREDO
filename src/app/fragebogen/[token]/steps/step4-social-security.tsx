@@ -79,7 +79,7 @@ export function Step4SocialSecurity({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("type", "GEBURTSURKUNDE_KIND");
+      formData.append("type", "geburtsurkunde_kind");
       formData.append("notes", `Kind ${childIndex + 1}: ${children[childIndex]?.firstName || ""}`);
       const res = await fetch(`/api/fragebogen/${token}/documents`, { method: "POST", body: formData });
       if (res.ok) {

@@ -12,6 +12,7 @@ import { validateSupervisorToken } from "@/lib/auth";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
+import { BEFRISTUNGSARTEN } from "@/lib/validations/supervisor-data";
 
 // =============================================
 // Zod-Schema für Modalitaeten-Validierung (serverseitig)
@@ -21,7 +22,10 @@ const modalitaetenFieldsSchema = z.object({
   stellenbeschreibung: z.string().max(2000).optional(),
   vertragsbeginn: z.string().optional(),
   befristet: z.boolean().optional(),
+  befristungsart: z.enum(BEFRISTUNGSARTEN).or(z.literal("")).optional(),
   vertragsende: z.string().optional(),
+  befristungZweck: z.string().max(500).optional(),
+  vertragsendeVoraussichtlich: z.string().optional(),
   befristungSachgrund: z.string().max(500).optional(),
   vollzeit: z.boolean().optional(),
   wochenstunden: z.number().min(0).max(60).nullable().optional(),
@@ -155,7 +159,8 @@ export async function PUT(
   // Whitelist erlaubter Felder (Mass-Assignment-Schutz)
   const ALLOWED_FIELDS = new Set([
     "betriebsstaette", "stellenbeschreibung",
-    "vertragsbeginn", "befristet", "vertragsende", "befristungSachgrund",
+    "vertragsbeginn", "befristet", "befristungsart", "vertragsende",
+    "befristungZweck", "vertragsendeVoraussichtlich", "befristungSachgrund",
     "vollzeit", "wochenstunden", "tageProWoche",
     "hauptarbeitgeberId", "hauptarbeitgeberStunden",
     "nebenarbeitgeberId", "nebenarbeitgeberStunden",
@@ -181,9 +186,45 @@ export async function PUT(
     }
   }
 
-  // Datumsfelder konvertieren
-  if (data.vertragsbeginn) updateData.vertragsbeginn = new Date(data.vertragsbeginn);
-  if (data.vertragsende) updateData.vertragsende = new Date(data.vertragsende);
+  // Datumsfelder konvertieren – leere Strings MUESSEN zu null werden,
+  // sonst lehnt Prisma den Wert fuer die DateTime-Spalte ab (Formular blieb haengen).
+  const DATE_FIELDS = ["vertragsbeginn", "vertragsende", "vertragsendeVoraussichtlich"] as const;
+  for (const field of DATE_FIELDS) {
+    const value = data[field];
+    if (value === undefined) continue;
+    if (!value) {
+      updateData[field] = null;
+      continue;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return NextResponse.json(
+        { error: `Ungültiges Datum im Feld "${field}".` },
+        { status: 400 }
+      );
+    }
+    updateData[field] = parsed;
+  }
+
+  // Befristung konsistent halten: nur die Felder der gewaehlten Art speichern.
+  // Nur ausfuehren, wenn der Schritt "Stelle & Vertrag" gesendet wurde.
+  if (data.befristet !== undefined) {
+    if (!data.befristet) {
+      updateData.befristungsart = null;
+      updateData.vertragsende = null;
+      updateData.befristungZweck = null;
+      updateData.vertragsendeVoraussichtlich = null;
+      updateData.befristungSachgrund = null;
+    } else if (data.befristungsart === "ZWECK") {
+      // Zweckbefristung: kein bindendes Enddatum (§ 3 Abs. 1 S. 2 TzBfG)
+      updateData.vertragsende = null;
+    } else if (data.befristungsart === "KALENDER") {
+      updateData.befristungZweck = null;
+      updateData.vertragsendeVoraussichtlich = null;
+    }
+  }
+  // Leere Auswahl nicht als "" ablegen
+  if (updateData.befristungsart === "") updateData.befristungsart = null;
 
   // Booleans explizit setzen
   const boolFields = [
@@ -241,6 +282,33 @@ export async function POST(
   }
 
   const onboarding = result.onboarding!;
+
+  // Server-Enforcement: Befristungsangaben muessen zusammenpassen
+  const sd = onboarding.supervisorData;
+  if (!sd) {
+    return NextResponse.json(
+      { error: "Bitte füllen Sie das Formular zuerst aus." },
+      { status: 400 }
+    );
+  }
+  if (sd.befristet) {
+    if (sd.befristungsart === "ZWECK") {
+      if (!sd.befristungZweck?.trim()) {
+        return NextResponse.json(
+          { error: "Bitte beschreiben Sie, wodurch der befristete Vertrag endet." },
+          { status: 400 }
+        );
+      }
+    } else if (!sd.vertragsende) {
+      return NextResponse.json(
+        {
+          error:
+            "Bitte geben Sie das Vertragsende an – oder wählen Sie die Zweckbefristung, wenn kein Datum feststeht.",
+        },
+        { status: 400 }
+      );
+    }
+  }
 
   // SupervisorData als vollstaendig markieren
   await prisma.supervisorData.update({

@@ -13,6 +13,7 @@ import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
 import {
   supStep1Schema,
   supStep2Schema,
@@ -43,6 +44,12 @@ interface ModalitaetenData {
   status: string;
 }
 
+/** ISO-Datum aus der API ("2026-08-31T00:00:00.000Z") auf das Format von <input type="date"> kuerzen. */
+function dateInputValue(v: unknown): string {
+  if (!v || typeof v !== "string") return "";
+  return v.slice(0, 10);
+}
+
 export default function ModalitaetenPage() {
   const params = useParams();
   const token = params.token as string;
@@ -54,6 +61,7 @@ export default function ModalitaetenPage() {
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [saveError, setSaveError] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
@@ -88,17 +96,25 @@ export default function ModalitaetenPage() {
   ) => {
     setSaving(true);
     setSaveMsg("");
+    setSaveError(false);
     try {
       const res = await fetch(`/api/modalitaeten/${token}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...stepData, currentStep: nextStep }),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        // Ohne Meldung wirkt der "Weiter"-Button wie tot – Fehler immer sichtbar machen
+        const err = await res.json().catch(() => ({}));
+        setSaveError(true);
+        setSaveMsg(err.error || "Speichern fehlgeschlagen. Bitte erneut versuchen.");
+        return false;
+      }
       setSaveMsg("Gespeichert");
       setTimeout(() => setSaveMsg(""), 2000);
       return true;
     } catch {
+      setSaveError(true);
       setSaveMsg("Fehler beim Speichern.");
       return false;
     } finally {
@@ -133,12 +149,14 @@ export default function ModalitaetenPage() {
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
+        setSaveError(true);
         setSaveMsg(err.error || "Fehler beim Absenden.");
         return;
       }
       setSubmitted(true);
     } catch {
+      setSaveError(true);
       setSaveMsg("Verbindungsfehler.");
     } finally {
       setSaving(false);
@@ -234,7 +252,9 @@ export default function ModalitaetenPage() {
                 Speichern...
               </span>
             )}
-            {saveMsg && !saving && <span className="text-xs text-green-600">{saveMsg}</span>}
+            {saveMsg && !saving && (
+              <span className={`text-xs ${saveError ? "font-medium text-destructive" : "text-green-600"}`}>{saveMsg}</span>
+            )}
             <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
               Schritt {currentStep + 1} / {SUP_STEP_CONFIG.length}
             </span>
@@ -371,14 +391,21 @@ function SupStep1({
     defaultValues: {
       betriebsstaette: (data.betriebsstaette as string) || "",
       stellenbeschreibung: (data.stellenbeschreibung as string) || "",
-      vertragsbeginn: (data.vertragsbeginn as string) || "",
+      vertragsbeginn: dateInputValue(data.vertragsbeginn),
       befristet: (data.befristet as boolean) || false,
-      vertragsende: (data.vertragsende as string) || "",
+      // Altdaten kennen nur das kalendermaessige Enddatum -> als KALENDER vorbelegen
+      befristungsart:
+        (data.befristungsart as "KALENDER" | "ZWECK" | "") ||
+        (data.befristet ? "KALENDER" : ""),
+      vertragsende: dateInputValue(data.vertragsende),
+      befristungZweck: (data.befristungZweck as string) || "",
+      vertragsendeVoraussichtlich: dateInputValue(data.vertragsendeVoraussichtlich),
       befristungSachgrund: (data.befristungSachgrund as string) || "",
     },
   });
 
   const befristet = watch("befristet");
+  const befristungsart = watch("befristungsart");
 
   return (
     <form onSubmit={handleSubmit((v) => onNext(v as unknown as Record<string, unknown>))} className="space-y-5">
@@ -410,9 +437,56 @@ function SupStep1({
       {befristet && (
         <div className="space-y-4 rounded-lg border border-border p-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Vertragsende</label>
-            <input type="date" {...register("vertragsende")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            <label className="text-sm font-medium text-foreground">Art der Befristung <span className="text-destructive">*</span></label>
+            <div className="space-y-2">
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input p-3 transition-colors hover:bg-accent/50">
+                <input type="radio" value="KALENDER" {...register("befristungsart")} className="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary" />
+                <span>
+                  <span className="block text-sm font-medium text-foreground">Festes Enddatum</span>
+                  <span className="block text-xs text-muted-foreground">Der Vertrag endet an einem konkreten Kalendertag.</span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input p-3 transition-colors hover:bg-accent/50">
+                <input type="radio" value="ZWECK" {...register("befristungsart")} className="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary" />
+                <span>
+                  <span className="block text-sm font-medium text-foreground">Zweckbefristung &ndash; kein festes Enddatum</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Der Vertrag endet, sobald der Zweck erreicht ist bzw. die Finanzierung ausl&auml;uft &ndash; z.B. projektbezogen bis zum Ende einer Kostenzusage.
+                  </span>
+                </span>
+              </label>
+            </div>
+            {errors.befristungsart && <p className="text-xs text-destructive">{errors.befristungsart.message}</p>}
           </div>
+
+          {befristungsart === "KALENDER" && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Vertragsende <span className="text-destructive">*</span></label>
+              <input type="date" {...register("vertragsende")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+              {errors.vertragsende && <p className="text-xs text-destructive">{errors.vertragsende.message}</p>}
+            </div>
+          )}
+
+          {befristungsart === "ZWECK" && (
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Wodurch endet der Vertrag? <span className="text-destructive">*</span></label>
+                <textarea
+                  {...register("befristungZweck")}
+                  rows={2}
+                  placeholder="z.B. Ende der Kostenzusage des Jugendamtes für das Projekt ..."
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                />
+                {errors.befristungZweck && <p className="text-xs text-destructive">{errors.befristungZweck.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Voraussichtliches Ende (optional)</label>
+                <input type="date" {...register("vertragsendeVoraussichtlich")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+                <p className="text-xs text-muted-foreground">Unverbindlich &ndash; dient der Personalabteilung nur als Wiedervorlage.</p>
+              </div>
+            </>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Sachgrund der Befristung</label>
             <select {...register("befristungSachgrund")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring">
@@ -829,6 +903,12 @@ function SupStep5Summary({
   employeeName: string;
 }) {
   const str = (v: unknown): string => (v ? String(v) : "—");
+  const dateDe = (v: unknown): string => {
+    const iso = dateInputValue(v);
+    if (!iso) return "—";
+    const [y, m, d] = iso.split("-");
+    return `${d}.${m}.${y}`;
+  };
   const findOrg = (id: unknown): string => {
     const org = organizations.find((o) => o.mandantNumber === id);
     return org ? `${org.name} (${org.mandantNumber})` : str(id);
@@ -855,9 +935,22 @@ function SupStep5Summary({
         <div className="px-4 py-3 text-xs space-y-1">
           <div className="flex justify-between"><span className="text-muted-foreground">Betriebsstätte</span><span className="font-medium">{str(data.betriebsstaette)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Stelle</span><span className="font-medium">{str(data.stellenbeschreibung)}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Vertragsbeginn</span><span className="font-medium">{str(data.vertragsbeginn)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Vertragsbeginn</span><span className="font-medium">{dateDe(data.vertragsbeginn)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Befristet</span><span className="font-medium">{data.befristet ? "Ja" : "Nein"}</span></div>
-          {!!data.befristet && <div className="flex justify-between"><span className="text-muted-foreground">Vertragsende</span><span className="font-medium">{str(data.vertragsende)}</span></div>}
+          {!!data.befristet && (
+            <>
+              <div className="flex justify-between"><span className="text-muted-foreground">Art der Befristung</span><span className="font-medium">{getBefristungsartLabel(data.befristungsart as string) || "—"}</span></div>
+              {data.befristungsart === "ZWECK" ? (
+                <>
+                  <div className="flex justify-between gap-4"><span className="shrink-0 text-muted-foreground">Ende bei</span><span className="max-w-[60%] text-right font-medium">{str(data.befristungZweck)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Voraussichtliches Ende</span><span className="font-medium">{dateDe(data.vertragsendeVoraussichtlich)}</span></div>
+                </>
+              ) : (
+                <div className="flex justify-between"><span className="text-muted-foreground">Vertragsende</span><span className="font-medium">{dateDe(data.vertragsende)}</span></div>
+              )}
+              <div className="flex justify-between"><span className="text-muted-foreground">Sachgrund</span><span className="font-medium">{getBefristungSachgrundLabel(data.befristungSachgrund as string)}</span></div>
+            </>
+          )}
         </div>
       </div>
 
