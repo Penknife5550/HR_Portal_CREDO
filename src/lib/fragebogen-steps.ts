@@ -232,37 +232,59 @@ export function resolveResumeStep(
 // Anzeige des Bearbeitungsstands in der HR-Ansicht
 // =============================================
 
-/**
- * Wie weit ist der Fragebogen? Als Text fuer die HR-Ansicht.
- *
- * Bewusst **ohne** "Schritt X von Y": Wie viele Schritte ein Vorgang hat,
- * haengt an seiner Vorlage — ein Minijobber durchlaeuft eine andere Strecke als
- * eine TV-L-Angestellte. Die HR-Listen kennen die Vorlage nicht, deshalb waere
- * jede Zahl dort geraten. Der Titel des zuletzt erreichten Schritts ist
- * ehrlicher und fuer HR ohnehin aussagekraeftiger.
- */
-export function describeCurrentStep(
-  stepNumber: number | null | undefined
-): string {
-  if (typeof stepNumber !== "number" || stepNumber <= 0) return "noch nicht begonnen";
-  return getStepTitle(stepNumber);
+export interface FragebogenFortschritt {
+  /** 1-basierte Anzeigeposition. 0 = noch nicht begonnen. */
+  position: number;
+  /** Anzahl der Schritte, die *dieser* Vorgang durchlaeuft. */
+  total: number;
+  /** Titel des zuletzt erreichten Schritts, oder ein Ersatztext. */
+  titel: string;
+  /** Fortschritt in Prozent, gemessen an der Strecke dieses Vorgangs. */
+  prozent: number;
 }
 
 /**
- * Grober Fortschritt in Prozent fuer Balken und Ringe.
+ * Wie weit ist ein Fragebogen? Fuer Listen, Balken und Statuszeilen der
+ * HR-Ansicht.
  *
- * Gemessen an allen Schritten mit eigener Maske, nicht an der Strecke der
- * konkreten Vorlage. Fuer eine verkuerzte Vorlage ist der Wert deshalb
- * konservativ — er zeigt nie mehr an, als tatsaechlich erledigt ist.
+ * Wichtig ist der erste Parameter: Wie viele Schritte ein Vorgang hat, haengt
+ * an seiner Vorlage — ein Minijobber durchlaeuft eine andere Strecke als eine
+ * TV-L-Angestellte, und eine Ehrenamt-Vorlage kennt nur drei Schritte. Ohne
+ * die Konfiguration des Vorgangs waere jede Zahl geraten: Ein Ehrenamtlicher
+ * auf Schritt 2 von 3 saehe sonst 22 statt 67 Prozent.
+ *
+ * Steht der gespeicherte Schritt nicht (mehr) in der Strecke — etwa weil die
+ * Vorlage geaendert wurde —, wird der Fortschritt als unbekannt gemeldet, aber
+ * der Titel trotzdem aufgeloest.
  */
-export function progressPercent(
-  stepNumber: number | null | undefined
-): number {
-  if (typeof stepNumber !== "number" || stepNumber <= 0) return 0;
-  const renderable = FRAGEBOGEN_STEPS.filter((s) => s.key !== null);
-  const index = renderable.findIndex((s) => s.step === stepNumber);
-  if (index < 0) return 0;
-  return Math.round(((index + 1) / renderable.length) * 100);
+export function describeProgress(
+  stepsConfig: StepEnabledConfig[] | null | undefined,
+  currentStep: number | null | undefined
+): FragebogenFortschritt {
+  const aktiv = getActiveSteps(stepsConfig);
+  const total = aktiv.length;
+
+  if (typeof currentStep !== "number" || currentStep <= 0) {
+    return { position: 0, total, titel: "noch nicht begonnen", prozent: 0 };
+  }
+
+  const index = indexOfStep(aktiv, currentStep);
+  if (index < 0) {
+    return { position: 0, total, titel: getStepTitle(currentStep), prozent: 0 };
+  }
+
+  return {
+    position: index + 1,
+    total,
+    titel: aktiv[index].title,
+    prozent: total > 0 ? Math.round(((index + 1) / total) * 100) : 0,
+  };
+}
+
+/** Kurzform fuer Statuszeilen: "Schritt 3 von 8 · Bankverbindung". */
+export function formatProgress(f: FragebogenFortschritt): string {
+  if (f.position === 0) return f.titel;
+  return `Schritt ${f.position} von ${f.total} · ${f.titel}`;
 }
 
 // =============================================

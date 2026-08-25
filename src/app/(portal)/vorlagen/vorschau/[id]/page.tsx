@@ -16,6 +16,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
 import { getActiveSteps, type FragebogenStepKey } from "@/lib/fragebogen-steps";
+
 import { FieldConfigHelper, type StepFieldConfig } from "@/lib/field-definitions";
 
 import { Step1Personal } from "@/app/fragebogen/[token]/steps/step1-personal";
@@ -26,6 +27,9 @@ import { Step5Tax } from "@/app/fragebogen/[token]/steps/step5-tax";
 import { Step6Employment } from "@/app/fragebogen/[token]/steps/step6-employment";
 import { Step8Education } from "@/app/fragebogen/[token]/steps/step8-education";
 import { Step9Masern } from "@/app/fragebogen/[token]/steps/step9-masern";
+/** Alle Schritte, die die Vorschau zeigt — die Zusammenfassung gehoert nicht dazu. */
+type VorschauStepKey = Exclude<FragebogenStepKey, "summary">;
+
 
 interface PreviewData {
   questionnaireType: string;
@@ -123,9 +127,12 @@ export default function VorschauPage() {
     organization: { name: "CREDO Vorschau", mandantNumber: "000", type: "VERWALTUNG" },
   };
 
-  // Masken je Schritt-Schluessel. Die Zusammenfassung fehlt bewusst: Pruefen und
-  // Absenden gehoert nicht in die Vorschau.
-  const stepComponents: Partial<Record<FragebogenStepKey, ReactNode>> = {
+  // Masken je Schritt-Schluessel. Bewusst ein **vollstaendiger** Record ueber
+  // alle Schluessel ausser "summary": Kommt ein Schritt zur zentralen
+  // Definition dazu, bricht hier der Typecheck, statt dass die Vorschau ihn
+  // still zur Fallback-Meldung macht. Pruefen und Absenden gehoert nicht in die
+  // Vorschau, deshalb ist "summary" ausgenommen.
+  const stepComponents: Record<VorschauStepKey, ReactNode> = {
     personal: <Step1Personal {...stepProps} fieldConfig={getFieldConfig(1)} />,
     address: <Step2Address {...stepProps} fieldConfig={getFieldConfig(2)} />,
     bank: <Step3Bank {...stepProps} fieldConfig={getFieldConfig(3)} />,
@@ -137,6 +144,9 @@ export default function VorschauPage() {
   };
 
   const activeStep = previewSteps[currentStep];
+  // previewSteps filtert "summary" bereits heraus; die Pruefung engt den Typ ein.
+  const vorschauKey: VorschauStepKey | null =
+    activeStep?.key && activeStep.key !== "summary" ? activeStep.key : null;
   const progress = ((currentStep + 1) / Math.max(previewSteps.length, 1)) * 100;
 
   return (
@@ -233,7 +243,7 @@ export default function VorschauPage() {
             </p>
           </div>
           <div className="p-6">
-            {(activeStep?.key ? stepComponents[activeStep.key] : null) ?? (
+            {(vorschauKey ? stepComponents[vorschauKey] : null) ?? (
               <p className="text-muted-foreground">Schritt nicht in der Vorschau verfügbar.</p>
             )}
           </div>

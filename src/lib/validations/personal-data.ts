@@ -337,9 +337,6 @@ export function createStep8Schema(fc: FieldConfigHelper) {
   });
 }
 
-// =============================================
-// Step-Konfiguration
-// =============================================
 // Die Schritt-Definition (Nummer, Titel, Reihenfolge, Maske) liegt zentral in
 // `@/lib/fragebogen-steps`. Das frueher hier gepflegte STEP_CONFIG war eine
 // vierte, abweichende Kopie derselben Liste und ist entfallen.

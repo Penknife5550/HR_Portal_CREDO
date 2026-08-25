@@ -13,6 +13,8 @@ import {
   MAX_STEP_NUMBER,
   SUMMARY_STEP_NUMBER,
   LEGACY_DISPLAY_ORDER,
+  describeProgress,
+  formatProgress,
   getActiveSteps,
   getStep,
   getStepTitle,
@@ -25,8 +27,12 @@ import {
   generateFullStepsConfig,
   mergeStepsConfig,
 } from "@/lib/field-definitions";
-import { readFileSync } from "fs";
-import { join } from "path";
+// seed-check.js laeuft im Container als reines JS ohne tsx und kann die
+// Feld-Registry nicht importieren; die Werte sind dort dupliziert. Dank des
+// `require.main === module`-Guards laesst sich die Datei hier laden, ohne dass
+// der Entrypoint startet — so werden die Kopien echt geprueft statt per
+// Textsuche im Quelltext.
+const seedCheck = require("../../../prisma/seed-check.js");
 
 /** Vorlagen-Konfiguration bauen: alles an, ausser den genannten Schritten. */
 function configExcept(disabled: number[]) {
@@ -193,6 +199,72 @@ describe("indexOfStep / resolveResumeStep – Wiedereinstieg", () => {
   });
 });
 
+describe("describeProgress – Fortschritt fuer die HR-Ansicht", () => {
+  it("misst an der Strecke dieser Vorlage, nicht an allen Schritten", () => {
+    // Der eigentliche Punkt: Ein Ehrenamtlicher auf Schritt 2 von 3 ist bei
+    // 67 Prozent. Gemessen an allen neun Schritten waeren es 22.
+    const ehrenamt = configExcept([3, 4, 5, 6, 7, 8, 9]);
+    const f = describeProgress(ehrenamt, 2);
+    expect(f.position).toBe(2);
+    expect(f.total).toBe(3);
+    expect(f.prozent).toBe(67);
+    expect(f.titel).toBe("Adresse & Kontakt");
+  });
+
+  it("rechnet fuer die Minijob-Strecke gegen deren Laenge", () => {
+    const minijob = configExcept([9]);
+    const f = describeProgress(minijob, 8); // Bildung & Beruf
+    expect(f.position).toBe(7);
+    expect(f.total).toBe(8);
+    expect(f.prozent).toBe(88);
+  });
+
+  it("meldet einen nicht begonnenen Fragebogen", () => {
+    for (const wert of [0, null, undefined]) {
+      const f = describeProgress(configExcept([]), wert);
+      expect(f.position).toBe(0);
+      expect(f.prozent).toBe(0);
+      expect(f.titel).toBe("noch nicht begonnen");
+    }
+  });
+
+  it("loest den Titel auf, auch wenn der Schritt nicht zur Vorlage gehoert", () => {
+    // Die Vorlage wurde geaendert, waehrend der Vorgang lief.
+    const f = describeProgress(configExcept([9]), 9);
+    expect(f.position).toBe(0);
+    expect(f.prozent).toBe(0);
+    expect(f.titel).toBe("Masernschutz");
+  });
+
+  it("erreicht auf dem letzten Schritt genau 100 Prozent", () => {
+    for (const config of [configExcept([]), configExcept([9]), configExcept([3, 4, 5])]) {
+      const aktiv = getActiveSteps(config);
+      const letzter = aktiv[aktiv.length - 1];
+      expect(describeProgress(config, letzter.step).prozent).toBe(100);
+    }
+  });
+
+  it("meldet fuer einen virtuellen Schritt keinen Fortschritt", () => {
+    // Schritt 7 (Kinder) hat keine eigene Maske und kann nie erreicht werden.
+    const f = describeProgress(configExcept([]), 7);
+    expect(f.position).toBe(0);
+    expect(f.titel).toBe("Kinder");
+  });
+});
+
+describe("formatProgress – Text fuer Listen und Statuszeilen", () => {
+  it("nennt Position, Gesamtzahl und Titel", () => {
+    const f = describeProgress(configExcept([9]), 3);
+    expect(formatProgress(f)).toBe("Schritt 3 von 8 · Bankverbindung");
+  });
+
+  it("laesst die Zahlen weg, wenn es keine Position gibt", () => {
+    expect(formatProgress(describeProgress(configExcept([]), 0))).toBe(
+      "noch nicht begonnen"
+    );
+  });
+});
+
 describe("legacyIndexToStepNumber – Migration der Alt-Daten", () => {
   it("bildet die alte Anzeigereihenfolge ab", () => {
     // Alt: 0-basierte Position in [1,2,3,4,5,6,8,9,10].
@@ -290,35 +362,70 @@ describe("mergeStepsConfig – gespeicherte Konfiguration als Overlay", () => {
 });
 
 describe("MINIJOB-Vorlagenkorrektur im Entrypoint", () => {
-  // prisma/seed-check.js laeuft im Container als reines JS ohne tsx und kann
-  // die Feld-Registry deshalb nicht importieren. Die Steuer-Felder sind dort
-  // dupliziert — dieser Test faengt ab, dass die Kopien auseinanderlaufen.
-  const seedCheck = readFileSync(
-    join(process.cwd(), "prisma", "seed-check.js"),
-    "utf-8"
-  );
+  const { MINIJOB_TAX_FIELDS, korrigiereMinijobSchritte } = seedCheck;
 
   it("kennt jedes Feld des Steuer-Schritts", () => {
-    const block = seedCheck.slice(
-      seedCheck.indexOf("const MINIJOB_TAX_FIELDS"),
-      seedCheck.indexOf("async function ensureMinijobTemplateSteps")
-    );
-    expect(block.length).toBeGreaterThan(0);
-    for (const feld of FIELD_REGISTRY[5]) {
-      expect(block).toContain(`name: "${feld.name}"`);
-    }
+    const namen = MINIJOB_TAX_FIELDS.map((f: { name: string }) => f.name);
+    expect(namen.sort()).toEqual(FIELD_REGISTRY[5].map((f) => f.name).sort());
   });
 
   it("laesst genau die Steuer-ID sichtbar und pflichtig", () => {
-    expect(seedCheck).toContain(
-      '{ name: "taxId", label: "Steuer-ID", visible: true, required: true }'
-    );
+    for (const feld of MINIJOB_TAX_FIELDS) {
+      const erwartet = feld.name === "taxId";
+      expect(feld.visible).toBe(erwartet);
+      expect(feld.required).toBe(erwartet);
+    }
   });
 
   it("dupliziert die alte Anzeigereihenfolge unveraendert", () => {
-    expect(seedCheck).toContain(
-      "const LEGACY_DISPLAY_ORDER = [" + LEGACY_DISPLAY_ORDER.join(", ") + "]"
+    expect(seedCheck.LEGACY_DISPLAY_ORDER).toEqual([...LEGACY_DISPLAY_ORDER]);
+  });
+
+  it("bildet dieselbe Abbildung wie die TypeScript-Fassung", () => {
+    for (let i = -2; i <= 12; i++) {
+      expect(seedCheck.legacyIndexToStepNumber(i)).toBe(legacyIndexToStepNumber(i));
+    }
+  });
+
+  it("schaltet Steuer, Weitere Beschaeftigung und Bildung ein", () => {
+    const vorher = configExcept([5, 6, 8, 9]);
+    const { neu, geaendert } = korrigiereMinijobSchritte(vorher);
+
+    expect(geaendert).toHaveLength(3);
+    const nach = (n: number) => neu.find((s: { step: number }) => s.step === n);
+    expect(nach(5).enabled).toBe(true);
+    expect(nach(6).enabled).toBe(true);
+    expect(nach(8).enabled).toBe(true);
+    // Masernschutz bleibt bewusst aus.
+    expect(nach(9).enabled).toBe(false);
+  });
+
+  it("reduziert den Steuer-Schritt auf die Steuer-ID", () => {
+    const vorher = configExcept([]);
+    const { neu } = korrigiereMinijobSchritte(vorher);
+    const steuer = neu.find((s: { step: number }) => s.step === 5);
+    expect(steuer.fields).toEqual(MINIJOB_TAX_FIELDS);
+  });
+
+  it("korrigiert auch einen bereits aktiven Steuer-Schritt mit allen Feldern", () => {
+    // Das war die Luecke: Frueher galt der Schritt als in Ordnung, sobald
+    // taxId sichtbar und pflichtig war — Steuerklasse und Religion blieben
+    // dann als Pflichtfelder stehen.
+    const vorher = configExcept([]).map((s) =>
+      s.step === 5 ? { ...s, fields: generateFullStepsConfig()[4].fields } : s
     );
+    const { neu, geaendert } = korrigiereMinijobSchritte(vorher);
+    expect(geaendert.some((g: string) => g.startsWith("5"))).toBe(true);
+    const steuer = neu.find((s: { step: number }) => s.step === 5);
+    expect(steuer.fields.find((f: { name: string }) => f.name === "religion").visible).toBe(false);
+  });
+
+  it("laesst eine bereits korrekte Konfiguration unveraendert", () => {
+    const schon = configExcept([9]).map((s) =>
+      s.step === 5 ? { ...s, fields: MINIJOB_TAX_FIELDS } : s
+    );
+    const { geaendert } = korrigiereMinijobSchritte(schon);
+    expect(geaendert).toEqual([]);
   });
 });
 

@@ -62,6 +62,27 @@ async function ensureSystemDocumentTemplates(prisma) {
   }
 }
 
+// =============================================
+// Merker fuer einmalige Datenmigrationen
+//
+// Bewusst eine eigene Tabelle und kein AuditLog-Eintrag: Ein Log ist etwas,
+// das man aufraeumt. Laeuft eine nicht idempotente Migration ein zweites Mal,
+// verschiebt sie Daten erneut.
+// =============================================
+/** Ist diese Migration schon gelaufen? */
+async function migrationErledigt(prisma, name) {
+  const treffer = await prisma.systemMigration.findUnique({
+    where: { name },
+    select: { id: true },
+  });
+  return Boolean(treffer);
+}
+
+/** Schreiboperation, die eine Migration als erledigt markiert. */
+function markiereMigration(prisma, name, details) {
+  return prisma.systemMigration.create({ data: { name, details } });
+}
+
 /**
  * Einmalige Datenmigration: PersonalData.currentStep von der Anzeigeposition
  * auf die Registry-Schrittnummer umstellen (AP 1, Renderer-Entkopplung).
@@ -77,11 +98,14 @@ async function ensureSystemDocumentTemplates(prisma) {
  * Muss mit LEGACY_DISPLAY_ORDER in src/lib/fragebogen-steps.ts uebereinstimmen.
  * Hier als reines JS dupliziert, weil im Container kein tsx verfuegbar ist.
  *
- * Idempotenz: Ein AuditLog-Eintrag mit fester action dient als Marker. Er wird
- * in derselben Transaktion geschrieben wie die Updates — entweder beides oder
- * nichts. Ein zweiter Lauf ohne Marker wuerde die Werte erneut verschieben.
+ * Idempotenz: Ein Eintrag in `system_migrations` dient als Merker. Er wird in
+ * derselben Transaktion geschrieben wie die Updates — entweder beides oder
+ * nichts. Ein zweiter Lauf ohne Merker wuerde die Werte erneut verschieben
+ * (6 wird zu 8, dann zu 10), deshalb liegt der Merker in einer eigenen Tabelle
+ * und nicht im AuditLog: Logs werden aufgeraeumt, Migrationsmerker nicht.
  */
-const CURRENT_STEP_MIGRATION_MARKER = "MIGRATION_CURRENT_STEP_REGISTRY_V1";
+const CURRENT_STEP_MIGRATION_MARKER = "CURRENT_STEP_REGISTRY_V1";
+
 const LEGACY_DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 8, 9, 10];
 
 function legacyIndexToStepNumber(legacyIndex) {
@@ -95,22 +119,16 @@ function legacyIndexToStepNumber(legacyIndex) {
 
 async function migrateCurrentStepToRegistryNumbers(prisma) {
   try {
-    const alreadyRun = await prisma.auditLog.findFirst({
-      where: { action: CURRENT_STEP_MIGRATION_MARKER },
-      select: { id: true },
-    });
-    if (alreadyRun) return;
+    if (await migrationErledigt(prisma, CURRENT_STEP_MIGRATION_MARKER)) return;
 
     const rowCount = await prisma.personalData.count();
     if (rowCount === 0) {
-      // Frische Datenbank: nichts zu migrieren, Marker trotzdem setzen.
-      await prisma.auditLog.create({
-        data: {
-          action: CURRENT_STEP_MIGRATION_MARKER,
-          details: { migrated: 0, reason: "keine PersonalData-Datensaetze" },
-        },
+      // Frische Datenbank: nichts zu migrieren, Merker trotzdem setzen.
+      await markiereMigration(prisma, CURRENT_STEP_MIGRATION_MARKER, {
+        migrated: 0,
+        reason: "keine PersonalData-Datensaetze",
       });
-      console.log("currentStep-Migration: keine Datensaetze, Marker gesetzt.");
+      console.log("currentStep-Migration: keine Datensaetze, Merker gesetzt.");
       return;
     }
 
@@ -133,11 +151,9 @@ async function migrateCurrentStepToRegistryNumbers(prisma) {
 
     const results = await prisma.$transaction([
       ...updates,
-      prisma.auditLog.create({
-        data: {
-          action: CURRENT_STEP_MIGRATION_MARKER,
-          details: { rowCount, mapping: LEGACY_DISPLAY_ORDER },
-        },
+      markiereMigration(prisma, CURRENT_STEP_MIGRATION_MARKER, {
+        rowCount,
+        mapping: LEGACY_DISPLAY_ORDER,
       }),
     ]);
 
@@ -179,7 +195,7 @@ async function migrateCurrentStepToRegistryNumbers(prisma) {
  * wie HR sie gepflegt hat. Laeuft genau einmal (AuditLog-Marker) und nur, wenn
  * sich tatsaechlich etwas aendert.
  */
-const MINIJOB_TEMPLATE_MARKER = "MIGRATION_MINIJOB_TEMPLATE_STEPS_V1";
+const MINIJOB_TEMPLATE_MARKER = "MINIJOB_TEMPLATE_STEPS_V1";
 
 // Muss zu FIELD_REGISTRY[5] in src/lib/field-definitions.ts passen.
 // Der Test src/__tests__/lib/fragebogen-steps.test.ts prueft das.
@@ -231,11 +247,7 @@ function korrigiereMinijobSchritte(steps) {
 
 async function ensureMinijobTemplateSteps(prisma) {
   try {
-    const alreadyRun = await prisma.auditLog.findFirst({
-      where: { action: MINIJOB_TEMPLATE_MARKER },
-      select: { id: true },
-    });
-    if (alreadyRun) return;
+    if (await migrationErledigt(prisma, MINIJOB_TEMPLATE_MARKER)) return;
 
     const template = await prisma.formTemplate.findUnique({
       where: { questionnaireType: "MINIJOB" },
@@ -287,11 +299,9 @@ async function ensureMinijobTemplateSteps(prisma) {
     }
 
     if (geaendert.length === 0 && snapshotUpdates.length === 0) {
-      await prisma.auditLog.create({
-        data: {
-          action: MINIJOB_TEMPLATE_MARKER,
-          details: { changed: false, reason: "Vorlage bereits im Zielzustand" },
-        },
+      await markiereMigration(prisma, MINIJOB_TEMPLATE_MARKER, {
+        changed: false,
+        reason: "Vorlage bereits im Zielzustand",
       });
       return;
     }
@@ -307,15 +317,10 @@ async function ensureMinijobTemplateSteps(prisma) {
     }
     schreibvorgaenge.push(...snapshotUpdates);
     schreibvorgaenge.push(
-      prisma.auditLog.create({
-        data: {
-          action: MINIJOB_TEMPLATE_MARKER,
-          details: {
-            changed: true,
-            steps: geaendert,
-            snapshotsNachgezogen: snapshotUpdates.length,
-          },
-        },
+      markiereMigration(prisma, MINIJOB_TEMPLATE_MARKER, {
+        changed: true,
+        steps: geaendert,
+        snapshotsNachgezogen: snapshotUpdates.length,
       }),
     );
 
@@ -358,4 +363,16 @@ async function main() {
   }
 }
 
-main();
+// Nur ausfuehren, wenn direkt gestartet (`node prisma/seed-check.js` im
+// Entrypoint). Beim `require` aus einem Test bleibt der Modulrumpf wirkungslos —
+// so lassen sich die Migrationsregeln testen, ohne eine Datenbank zu brauchen.
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  LEGACY_DISPLAY_ORDER,
+  MINIJOB_TAX_FIELDS,
+  legacyIndexToStepNumber,
+  korrigiereMinijobSchritte,
+};

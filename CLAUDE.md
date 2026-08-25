@@ -78,8 +78,23 @@ sudo docker exec hr-portal-app curl -s http://localhost:3000/api/health
 Beim Container-Start passiert automatisch:
 1. Pflicht-Umgebungsvariablen pruefen (JWT_SECRET, ENCRYPTION_KEY, DATABASE_URL)
 2. `prisma db push --skip-generate` (Schema synchronisieren)
-3. Seed-Check (`prisma/seed-check.js`) — legt Admin-User an falls noch keiner existiert
+3. Seed-Check (`prisma/seed-check.js`) — System-Vorlagen sicherstellen, **einmalige Datenmigrationen** ausfuehren, Admin-User anlegen falls noch keiner existiert
 4. Next.js Server starten (`node server.js`)
+
+### Einmalige Datenmigrationen
+
+Migrationen, die genau einmal laufen duerfen, stehen in `prisma/seed-check.js` und
+merken sich ihren Lauf im Modell `SystemMigration` (Tabelle `system_migrations`).
+
+- **Nicht** das `AuditLog` als Merker verwenden: Logs werden aufgeraeumt, und eine
+  nicht idempotente Migration, die ein zweites Mal laeuft, verschiebt Daten erneut.
+- Merker und Datenaenderung gehoeren in **dieselbe Transaktion** — entweder beides
+  oder nichts.
+- Fehler werden geloggt, brechen den Start aber nicht ab. Ohne Merker laeuft die
+  Migration beim naechsten Start erneut.
+- `prisma/seed-check.js` exportiert seine reinen Funktionen und ruft `main()` nur
+  hinter `require.main === module` auf — so sind die Regeln ohne Datenbank testbar
+  (`src/__tests__/lib/fragebogen-steps.test.ts`).
 
 ### Umgebungsvariablen (Pflicht)
 

@@ -18,7 +18,7 @@ import {
   DurationKPI,
   OverdueBadge,
 } from "@/components/dashboard-charts";
-import { describeCurrentStep } from "@/lib/fragebogen-steps";
+import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 
 interface User {
   userId: string;
@@ -38,6 +38,8 @@ interface Organization {
 
 interface Onboarding {
   id: string;
+  /** Serverseitig gegen die Vorlage dieses Vorgangs berechnet. */
+  fragebogenFortschritt: FragebogenFortschritt;
   displayId: string | null;
   email: string;
   firstName: string | null;
@@ -482,7 +484,7 @@ export function DashboardContent({ user }: { user: User }) {
                           {ob.personalData?.isComplete
                             ? "Vollständig"
                             : ob.personalData
-                              ? describeCurrentStep(ob.personalData.currentStep)
+                              ? formatProgress(ob.fragebogenFortschritt)
                               : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">

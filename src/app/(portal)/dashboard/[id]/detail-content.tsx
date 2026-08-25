@@ -16,7 +16,7 @@ import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { documentTypeLabel } from "@/lib/required-documents";
-import { describeCurrentStep, progressPercent } from "@/lib/fragebogen-steps";
+import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 
 // =============================================
 // Types
@@ -62,6 +62,8 @@ interface NoteData {
 
 interface DetailData {
   id: string;
+  /** Serverseitig gegen die Vorlage dieses Vorgangs berechnet. */
+  fragebogenFortschritt: FragebogenFortschritt;
   displayId: string | null;
   email: string;
   firstName: string | null;
@@ -734,7 +736,7 @@ export function DetailContent({
                         ? "bg-green-100 text-green-800"
                         : "bg-amber-100 text-amber-800"
                     }`}>
-                      {data.personalData.isComplete ? "Komplett" : `${progressPercent(data.personalData.currentStep)}%`}
+                      {data.personalData.isComplete ? "Komplett" : `${data.fragebogenFortschritt.position}/${data.fragebogenFortschritt.total}`}
                     </span>
                   )}
                   {tab.id === "documents" && data.documents.length > 0 && (
@@ -883,7 +885,7 @@ function TabOverview({
       status: fragebogenDone ? "completed" : !data.token ? "upcoming" : "active",
       completedAt: fragebogenDone && data.submittedAt ? formatDate(data.submittedAt) : undefined,
       info: !fragebogenDone && fragebogenStarted
-        ? `Fragebogen in Bearbeitung — zuletzt: ${describeCurrentStep(data.personalData?.currentStep)}`
+        ? `Fragebogen in Bearbeitung — ${formatProgress(data.fragebogenFortschritt)}`
         : !fragebogenDone && data.token
         ? "Wartet auf Einreichung durch den Mitarbeiter"
         : undefined,
@@ -995,7 +997,7 @@ function TabOverview({
                 data.personalData?.isComplete
                   ? "Vollständig"
                   : data.personalData
-                    ? describeCurrentStep(data.personalData.currentStep)
+                    ? formatProgress(data.fragebogenFortschritt)
                     : "Nicht begonnen"
               }
             />
@@ -1093,7 +1095,7 @@ function TabOverview({
                   data.personalData?.isComplete
                     ? "Fertig"
                     : data.personalData
-                      ? `${progressPercent(data.personalData.currentStep)}%`
+                      ? `${data.fragebogenFortschritt.position}/${data.fragebogenFortschritt.total}`
                       : "Offen"
                 }
                 done={data.personalData?.isComplete ?? false}
@@ -1292,7 +1294,7 @@ function TabFragebogenDaten({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">
-              Fragebogen-Status: {pd.isComplete ? "Vollständig ausgefüllt" : `in Bearbeitung — zuletzt: ${describeCurrentStep(pd.currentStep)}`}
+              Fragebogen-Status: {pd.isComplete ? "Vollständig ausgefüllt" : `in Bearbeitung — ${formatProgress(data.fragebogenFortschritt)}`}
             </p>
             {pd.dsgvoAccepted && pd.dsgvoAcceptedAt && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1322,7 +1324,7 @@ function TabFragebogenDaten({
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-credo-gruen transition-all"
-            style={{ width: `${pd.isComplete ? 100 : progressPercent(pd.currentStep)}%` }}
+            style={{ width: `${pd.isComplete ? 100 : data.fragebogenFortschritt.prozent}%` }}
           />
         </div>
       </div>

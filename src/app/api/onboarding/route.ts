@@ -10,6 +10,10 @@ import { prisma } from "@/lib/db";
 import { generateToken, getTokenExpiryDate, getSession } from "@/lib/auth";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { orgFilter, PORTAL_ROLES, PROCESS_CREATE_ROLES } from "@/lib/permissions";
+import {
+  ladeVorlagenKonfigurationen,
+  fortschrittFuerVorgang,
+} from "@/lib/fragebogen-fortschritt";
 
 // =============================================
 // POST /api/onboarding – Neuen Vorgang anlegen
@@ -278,7 +282,7 @@ export async function GET(request: NextRequest) {
     };
     const resolvedSort = VALID_SORT_FIELDS[sortBy] || "createdAt";
 
-    const [onboardings, total] = await Promise.all([
+    const [onboardings, total, vorlagen] = await Promise.all([
       prisma.onboardingProcess.findMany({
         where,
         include: {
@@ -305,10 +309,18 @@ export async function GET(request: NextRequest) {
         skip: offset,
       }),
       prisma.onboardingProcess.count({ where }),
+      ladeVorlagenKonfigurationen(),
     ]);
 
+    // Der Fortschritt wird hier berechnet, nicht im Browser: Wie viele Schritte
+    // ein Vorgang hat, haengt an seiner Vorlage, und die kennt die Liste nicht.
+    const data = onboardings.map((ob) => ({
+      ...ob,
+      fragebogenFortschritt: fortschrittFuerVorgang(ob, vorlagen),
+    }));
+
     return NextResponse.json({
-      data: onboardings,
+      data,
       total,
       limit,
       offset,

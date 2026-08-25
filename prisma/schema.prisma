@@ -692,6 +692,27 @@ model AuditLog {
 }
 
 // =============================================
+// Einmalige Datenmigrationen
+//
+// Der Entrypoint fuehrt beim Start Migrationen aus, die genau einmal laufen
+// duerfen (prisma/seed-check.js). Der Merker liegt bewusst in einer eigenen
+// Tabelle und nicht im AuditLog: Ein Log ist etwas, das man aufraeumt, und
+// eine nicht idempotente Migration, die ein zweites Mal laeuft, verschiebt
+// Daten erneut. Diese Tabelle wird nie automatisch geleert.
+// =============================================
+model SystemMigration {
+  id      String @id @default(uuid())
+  /// Stabiler Name der Migration, z.B. "CURRENT_STEP_REGISTRY_V1".
+  name    String @unique
+  /// Was der Lauf getan hat — fuer die Nachvollziehbarkeit.
+  details Json?
+
+  appliedAt DateTime @default(now())
+
+  @@map("system_migrations")
+}
+
+// =============================================
 // Zentrale Vorlagenbibliothek (E0, moduluebergreifend)
 // Word-Vorlagen (.docx) mit Platzhaltern -> Ausgabe Word / PDF / Mail.
 // scope: GLOBAL (organizationId == null) oder MANDANT (organizationId gesetzt).

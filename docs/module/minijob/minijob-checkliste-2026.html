@@ -528,8 +528,18 @@
             Bildung &amp; Beruf an; Masernschutz unveraendert aus). Nur diese drei Schritte werden
             angefasst &mdash; alles Uebrige und alle anderen Vorlagen bleiben, wie HR sie gepflegt hat.</li>
       </ul>
-      <div style="margin-top:0.5rem;"><b>Abgesichert:</b> 28 neue Tests
-      (<code>src/__tests__/lib/fragebogen-steps.test.ts</code>), Suite 503 gruen &middot;
+      <div style="margin-top:0.5rem;"><b>Code-Review am 25.08.2026:</b> 14 Findings, davon alle
+      behoben. Die wichtigsten: Die Vorlagenkorrektur fasste nur das Template an, nicht die
+      eingefrorenen Snapshots der laufenden Vorgaenge — die haetten die Steuer-ID trotzdem
+      verloren. Ein Schritt, den eine gespeicherte Konfiguration nicht kennt, galt als
+      <i>aktiviert</i>; damit waere die Rentenversicherung in AP&nbsp;7 in allen f&uuml;nf Vorlagen
+      erschienen, auch bei TV-L. Und der Vorlagen-Editor rendert seine Liste jetzt aus der
+      zentralen Definition statt aus der Datenbank, sonst waere ein neuer Schritt dort
+      unsichtbar und nicht schaltbar. Die Merker der Datenmigrationen liegen seither im
+      Modell <code>SystemMigration</code> statt im AuditLog — Logs werden aufgeraeumt,
+      Migrationsmerker duerfen es nicht.</div>
+      <div style="margin-top:0.5rem;"><b>Abgesichert:</b> 50 neue Tests
+      (<code>src/__tests__/lib/fragebogen-steps.test.ts</code>), Suite 525 gruen &middot;
       <code>tsc --noEmit</code> sauber &middot; <code>npm run lint</code> ohne Errors &middot;
       <code>npm run build</code> erfolgreich. Ein Durchstich im Browser steht aus &mdash; dafuer
       fehlt eine laufende Datenbank.</div>

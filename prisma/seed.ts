@@ -9,8 +9,7 @@ import { PrismaClient, OrganizationType, UserRole, QuestionnaireType, ExitInterv
 import { hashSync } from "bcryptjs";
 import crypto from "crypto";
 import { ALL_DEFAULT_BEURTEILUNG_TEMPLATES } from "../src/lib/beurteilung-defaults";
-import { FRAGEBOGEN_STEPS } from "../src/lib/fragebogen-steps";
-import { getDefaultFieldConfig } from "../src/lib/field-definitions";
+import { generateFullStepsConfig } from "../src/lib/field-definitions";
 
 const prisma = new PrismaClient();
 
@@ -167,9 +166,8 @@ async function main() {
   // (src/lib/fragebogen-steps.ts). Hier wird nur noch entschieden, welche
   // Schritte eine Vorlage abschaltet.
   const stepsExcept = (disabled: number[]) =>
-    FRAGEBOGEN_STEPS.map((s) => ({
-      step: s.step,
-      title: s.title,
+    generateFullStepsConfig().map((s) => ({
+      ...s,
       enabled: !disabled.includes(s.step),
     }));
 
@@ -181,7 +179,9 @@ async function main() {
    * Steuerklasse, Freibetraege und Religionszugehoerigkeit spielen bei
    * Pauschalbesteuerung keine Rolle und wuerden als Pflichtfelder stoeren.
    */
-  const minijobTaxFields = getDefaultFieldConfig(5).map((f) =>
+  const minijobTaxFields = (
+    generateFullStepsConfig().find((s) => s.step === 5)?.fields ?? []
+  ).map((f) =>
     f.name === "taxId"
       ? { ...f, visible: true, required: true }
       : { ...f, visible: false, required: false },
@@ -237,14 +237,18 @@ async function main() {
   ];
 
   for (const tmpl of formTemplates) {
+    // stepsConfig ist eine Json-Spalte. StepFieldConfig ist ein Interface mit
+    // optionalem `fields` und damit fuer Prismas InputJsonValue nicht direkt
+    // zuweisbar — der Umweg ueber `object` ist hier der uebliche Weg.
+    const stepsConfig = tmpl.stepsConfig as unknown as object;
     await prisma.formTemplate.upsert({
       where: { questionnaireType: tmpl.questionnaireType },
       update: {
         name: tmpl.name,
         description: tmpl.description,
-        stepsConfig: tmpl.stepsConfig,
+        stepsConfig,
       },
-      create: tmpl,
+      create: { ...tmpl, stepsConfig },
     });
     console.log(`  ✅ Vorlage: ${tmpl.name} (${tmpl.questionnaireType})`);
   }
