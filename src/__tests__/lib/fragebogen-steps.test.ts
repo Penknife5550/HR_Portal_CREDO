@@ -20,7 +20,11 @@ import {
   legacyIndexToStepNumber,
   resolveResumeStep,
 } from "@/lib/fragebogen-steps";
-import { FIELD_REGISTRY, generateFullStepsConfig } from "@/lib/field-definitions";
+import {
+  FIELD_REGISTRY,
+  generateFullStepsConfig,
+  mergeStepsConfig,
+} from "@/lib/field-definitions";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -111,9 +115,34 @@ describe("getActiveSteps – die Vorlagen-Konfiguration wirkt", () => {
     expect(aktiv.map((s) => s.step)).toContain(SUMMARY_STEP_NUMBER);
   });
 
-  it("wertet einen in der Konfiguration fehlenden Schritt als aktiv", () => {
+  it("wertet einen in der Konfiguration fehlenden Schritt als abgeschaltet", () => {
+    // Eine gespeicherte Konfiguration stammt aus dem Moment des letzten
+    // Speicherns und kennt spaeter hinzugekommene Schritte nicht. Gaelten die
+    // als aktiv, erschiene jeder neue Schritt sofort in allen Vorlagen.
     const luecke = configExcept([]).filter((s) => s.step !== 6);
-    expect(getActiveSteps(luecke).map((s) => s.step)).toContain(6);
+    expect(getActiveSteps(luecke).map((s) => s.step)).not.toContain(6);
+  });
+
+  it("haelt Pflichtschritte auch dann, wenn sie in der Konfiguration fehlen", () => {
+    const ohnePflicht = configExcept([]).filter(
+      (s) => s.step !== 1 && s.step !== SUMMARY_STEP_NUMBER
+    );
+    const nummern = getActiveSteps(ohnePflicht).map((s) => s.step);
+    expect(nummern).toContain(1);
+    expect(nummern).toContain(SUMMARY_STEP_NUMBER);
+  });
+
+  it("laesst einen neu definierten Schritt nicht in fremde Vorlagen rutschen", () => {
+    // Szenario AP 7: Die Rentenversicherung kommt als Registry-Schritt 11 dazu.
+    // Die gespeicherten Konfigurationen der uebrigen Vorlagen kennen sie nicht.
+    const alsWaereEsVorAP7 = configExcept([]);
+    const kuenftig = [...alsWaereEsVorAP7]; // ohne Eintrag fuer 11
+    const aktiv = getActiveSteps(kuenftig).map((s) => s.step);
+    // Kein Schritt ausserhalb der gespeicherten Konfiguration darf auftauchen.
+    const bekannt = new Set(kuenftig.map((s) => s.step));
+    for (const nummer of aktiv) {
+      expect(bekannt.has(nummer)).toBe(true);
+    }
   });
 
   it("bildet die Minijob-Strecke ab: ohne Masernschutz, mit Bildung & Beruf", () => {
@@ -189,12 +218,74 @@ describe("legacyIndexToStepNumber – Migration der Alt-Daten", () => {
     );
   });
 
+  it("bildet einen negativen Index auf den ersten Schritt ab", () => {
+    // Ohne untere Grenze landete ein negativer Wert beim letzten Eintrag,
+    // also ausgerechnet auf der Zusammenfassung.
+    expect(legacyIndexToStepNumber(-1)).toBe(LEGACY_DISPLAY_ORDER[0]);
+    expect(legacyIndexToStepNumber(-99)).toBe(LEGACY_DISPLAY_ORDER[0]);
+  });
+
   it("verschiebt Werte nie nach unten – Voraussetzung der Migration", () => {
     // Die Migration arbeitet Quellwerte absteigend ab. Das ist nur kollisions-
     // frei, solange kein Zielwert kleiner als sein Quellwert ist.
     for (let i = 0; i <= 10; i++) {
       expect(legacyIndexToStepNumber(i)).toBeGreaterThanOrEqual(i);
     }
+  });
+});
+
+describe("mergeStepsConfig – gespeicherte Konfiguration als Overlay", () => {
+  it("ergaenzt Schritte, die die gespeicherte Konfiguration nicht kennt", () => {
+    // Ohne das Zusammenfuehren waere ein neu definierter Schritt im
+    // Vorlagen-Editor unsichtbar und damit nicht freischaltbar.
+    const alt = configExcept([]).filter((s) => s.step !== 8);
+    const merged = mergeStepsConfig(alt);
+    expect(merged.map((s) => s.step)).toEqual(FRAGEBOGEN_STEPS.map((s) => s.step));
+    expect(merged.find((s) => s.step === 8)?.enabled).toBe(false);
+  });
+
+  it("uebernimmt enabled und fields aus der gespeicherten Konfiguration", () => {
+    const gespeichert = configExcept([9]).map((s) =>
+      s.step === 5
+        ? { ...s, fields: [{ name: "taxId", visible: true, required: true, label: "Steuer-ID" }] }
+        : s
+    );
+    const merged = mergeStepsConfig(gespeichert);
+    expect(merged.find((s) => s.step === 9)?.enabled).toBe(false);
+    expect(merged.find((s) => s.step === 6)?.enabled).toBe(true);
+    expect(merged.find((s) => s.step === 5)?.fields).toHaveLength(1);
+  });
+
+  it("haelt Pflichtschritte an, auch wenn sie fehlen", () => {
+    const ohnePflicht = configExcept([]).filter(
+      (s) => s.step !== 1 && s.step !== SUMMARY_STEP_NUMBER
+    );
+    const merged = mergeStepsConfig(ohnePflicht);
+    expect(merged.find((s) => s.step === 1)?.enabled).toBe(true);
+    expect(merged.find((s) => s.step === SUMMARY_STEP_NUMBER)?.enabled).toBe(true);
+  });
+
+  it("liefert ohne gespeicherte Konfiguration die Vollausstattung", () => {
+    for (const stored of [null, undefined, []]) {
+      const merged = mergeStepsConfig(stored);
+      expect(merged).toHaveLength(FRAGEBOGEN_STEPS.length);
+      expect(merged.every((s) => s.enabled)).toBe(true);
+    }
+  });
+
+  it("bleibt mit getActiveSteps konsistent", () => {
+    const gespeichert = configExcept([9]);
+    const ausMerge = getActiveSteps(mergeStepsConfig(gespeichert)).map((s) => s.step);
+    const direkt = getActiveSteps(gespeichert).map((s) => s.step);
+    expect(ausMerge).toEqual(direkt);
+  });
+
+  it("nimmt immer Titel und Reihenfolge der zentralen Definition", () => {
+    const mitAltemTitel = configExcept([]).map((s) =>
+      s.step === 6 ? { ...s, title: "Weitere Beschaeftigung" } : s
+    );
+    const merged = mergeStepsConfig(mitAltemTitel);
+    expect(merged.find((s) => s.step === 6)?.title).toBe("Weitere Beschäftigung");
   });
 });
 

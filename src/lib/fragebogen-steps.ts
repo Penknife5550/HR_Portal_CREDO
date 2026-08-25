@@ -175,7 +175,16 @@ interface StepEnabledConfig {
  * Konfiguration sie faelschlich deaktiviert — sonst gaebe es einen Fragebogen
  * ohne Absende-Schritt.
  *
- * Ohne Konfiguration (neue Vorlage, fehlende Daten) gelten alle Schritte als aktiv.
+ * **Ohne Konfiguration** (neue Vorlage, fehlende Daten) gelten alle Schritte
+ * als aktiv. **Innerhalb** einer vorhandenen Konfiguration gilt dagegen ein
+ * fehlender Schritt als *abgeschaltet*: Die Konfiguration stammt aus dem
+ * Moment, in dem die Vorlage zuletzt gespeichert wurde, und kennt spaeter
+ * hinzugekommene Schritte nicht. Wuerde ein unbekannter Schritt als aktiv
+ * gelten, erschiene jeder neu definierte Schritt sofort in *allen* Vorlagen —
+ * die Rentenversicherung (AP 7) etwa auch im TV-L-Fragebogen. HR schaltet
+ * einen neuen Schritt bewusst frei; der Vorlagen-Editor zeigt ihn dafuer an,
+ * auch wenn er in der gespeicherten Konfiguration noch fehlt
+ * (`mergeStepsConfig` in field-definitions.ts).
  */
 export function getActiveSteps(
   stepsConfig?: StepEnabledConfig[] | null
@@ -187,8 +196,7 @@ export function getActiveSteps(
 
   return renderable.filter((s) => {
     if (s.mandatory) return true;
-    // Unbekannt in der Konfiguration = nicht abgeschaltet.
-    return enabledByStep.get(s.step) ?? true;
+    return enabledByStep.get(s.step) ?? false;
   });
 }
 
@@ -278,6 +286,9 @@ export const LEGACY_DISPLAY_ORDER: readonly number[] = [1, 2, 3, 4, 5, 6, 8, 9, 
  * werden auf die Zusammenfassung abgebildet: Der Fragebogen war dann fertig.
  */
 export function legacyIndexToStepNumber(legacyIndex: number): number {
+  // Unterhalb des Bereichs auf den ersten Schritt, oberhalb auf den letzten.
+  // Ohne die untere Grenze landete ein negativer Wert bei der Zusammenfassung.
+  if (legacyIndex < 0) return LEGACY_DISPLAY_ORDER[0];
   const mapped = LEGACY_DISPLAY_ORDER[legacyIndex];
   if (mapped !== undefined) return mapped;
   return LEGACY_DISPLAY_ORDER[LEGACY_DISPLAY_ORDER.length - 1];

@@ -195,3 +195,42 @@ export function generateFullStepsConfig(): StepFieldConfig[] {
     fields: getDefaultFieldConfig(s.step),
   }));
 }
+
+// =============================================
+// Gespeicherte Konfiguration auf die zentrale Definition legen
+// =============================================
+/**
+ * Fuehrt eine gespeicherte `stepsConfig` mit der zentralen Schritt-Definition
+ * zusammen.
+ *
+ * Die gespeicherte Konfiguration ist ein **Overlay, keine vollstaendige
+ * Liste**: Sie stammt aus dem Moment, in dem die Vorlage zuletzt gespeichert
+ * wurde, und kennt spaeter hinzugekommene Schritte nicht. Wer sie unbesehen
+ * rendert — so wie der Vorlagen-Editor es bisher tat — zeigt einen neu
+ * definierten Schritt gar nicht erst an, und HR kann ihn weder ein- noch
+ * ausschalten.
+ *
+ * Reihenfolge und Titel kommen deshalb immer aus der zentralen Definition,
+ * `enabled` und `fields` aus der gespeicherten Konfiguration, sofern
+ * vorhanden. Ein dort fehlender Schritt gilt als abgeschaltet — ausser er ist
+ * Pflichtschritt. Das deckt sich mit `getActiveSteps`.
+ *
+ * Ohne gespeicherte Konfiguration gilt die Vollausstattung.
+ */
+export function mergeStepsConfig(
+  stored?: StepFieldConfig[] | null
+): StepFieldConfig[] {
+  if (!stored || stored.length === 0) return generateFullStepsConfig();
+
+  const byStep = new Map(stored.map((s) => [s.step, s]));
+
+  return FRAGEBOGEN_STEPS.map((def) => {
+    const gespeichert = byStep.get(def.step);
+    return {
+      step: def.step,
+      title: def.title,
+      enabled: gespeichert?.enabled ?? def.mandatory ?? false,
+      fields: gespeichert?.fields ?? getDefaultFieldConfig(def.step),
+    };
+  });
+}

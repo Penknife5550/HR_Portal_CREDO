@@ -85,6 +85,9 @@ const CURRENT_STEP_MIGRATION_MARKER = "MIGRATION_CURRENT_STEP_REGISTRY_V1";
 const LEGACY_DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 8, 9, 10];
 
 function legacyIndexToStepNumber(legacyIndex) {
+  // Unterhalb des Bereichs auf den ersten Schritt, oberhalb auf den letzten.
+  // Ohne die untere Grenze landete ein negativer Wert bei der Zusammenfassung.
+  if (legacyIndex < 0) return LEGACY_DISPLAY_ORDER[0];
   const mapped = LEGACY_DISPLAY_ORDER[legacyIndex];
   if (mapped !== undefined) return mapped;
   return LEGACY_DISPLAY_ORDER[LEGACY_DISPLAY_ORDER.length - 1];
@@ -188,6 +191,44 @@ const MINIJOB_TAX_FIELDS = [
   { name: "religion", label: "Religionszugehörigkeit", visible: false, required: false },
 ];
 
+/**
+ * Wendet den Zielzustand auf eine stepsConfig an.
+ *
+ * Gibt die neue Liste zurueck plus die Beschreibung dessen, was sich geaendert
+ * hat. Ist die Liste leer, war schon alles im Zielzustand.
+ */
+function korrigiereMinijobSchritte(steps) {
+  const geaendert = [];
+
+  const neu = steps.map((s) => {
+    if (s.step === 5) {
+      // Vollstaendig gegen den Zielzustand pruefen, nicht nur gegen taxId:
+      // Ist der Schritt zwar an, aber Steuerklasse und Religion stehen noch
+      // als Pflichtfelder darin, muss er trotzdem korrigiert werden.
+      const felderPassen =
+        Array.isArray(s.fields) &&
+        MINIJOB_TAX_FIELDS.every((ziel) => {
+          const ist = s.fields.find((f) => f.name === ziel.name);
+          return (
+            ist && ist.visible === ziel.visible && ist.required === ziel.required
+          );
+        });
+      if (s.enabled !== true || !felderPassen) {
+        geaendert.push("5 (Steuer, auf Steuer-ID reduziert)");
+        return { ...s, enabled: true, fields: MINIJOB_TAX_FIELDS };
+      }
+      return s;
+    }
+    if ((s.step === 6 || s.step === 8) && s.enabled !== true) {
+      geaendert.push(String(s.step));
+      return { ...s, enabled: true };
+    }
+    return s;
+  });
+
+  return { neu, geaendert };
+}
+
 async function ensureMinijobTemplateSteps(prisma) {
   try {
     const alreadyRun = await prisma.auditLog.findFirst({
@@ -201,40 +242,51 @@ async function ensureMinijobTemplateSteps(prisma) {
       select: { id: true, stepsConfig: true },
     });
 
-    const steps = Array.isArray(template && template.stepsConfig)
-      ? template.stepsConfig
-      : null;
+    const steps =
+      template && Array.isArray(template.stepsConfig)
+        ? template.stepsConfig
+        : null;
 
-    if (!template || !steps || steps.length === 0) {
-      await prisma.auditLog.create({
-        data: {
-          action: MINIJOB_TEMPLATE_MARKER,
-          details: { changed: false, reason: "keine MINIJOB-Vorlage vorhanden" },
-        },
-      });
+    if (!steps || steps.length === 0) {
+      // **Kein Marker.** Auf einer frischen Datenbank laeuft diese Funktion vor
+      // dem Seed, die Vorlage existiert also noch gar nicht. Wuerden wir hier
+      // "erledigt" schreiben, liefe die Korrektur nie wieder — auch dann nicht,
+      // wenn die Vorlage spaeter mit altem Stand angelegt oder aus einem Backup
+      // zurueckgespielt wird. Stattdessen beim naechsten Start erneut versuchen.
+      console.log(
+        "MINIJOB-Vorlage noch nicht vorhanden — Korrektur wird beim naechsten Start erneut geprueft.",
+      );
       return;
     }
 
-    const geaendert = [];
-    const neu = steps.map((s) => {
-      if (s.step === 5) {
-        const brauchtFelder =
-          !Array.isArray(s.fields) ||
-          !s.fields.some((f) => f.name === "taxId" && f.visible && f.required);
-        if (s.enabled !== true || brauchtFelder) {
-          geaendert.push("5 (Steuer, auf Steuer-ID reduziert)");
-          return { ...s, enabled: true, fields: MINIJOB_TAX_FIELDS };
-        }
-        return s;
-      }
-      if ((s.step === 6 || s.step === 8) && s.enabled !== true) {
-        geaendert.push(String(s.step));
-        return { ...s, enabled: true };
-      }
-      return s;
+    const { neu, geaendert } = korrigiereMinijobSchritte(steps);
+
+    // Laufende Vorgaenge tragen eine eingefrorene Kopie der Konfiguration
+    // (OnboardingProcess.formTemplateSnapshot). Der Fragebogen liest bevorzugt
+    // diese Kopie — ohne Nachziehen verloere ein bereits eingeladener
+    // Minijobber die Steuer-ID trotz korrigierter Vorlage.
+    const laufende = await prisma.onboardingProcess.findMany({
+      where: {
+        questionnaireType: "MINIJOB",
+        status: { in: ["INVITED", "IN_PROGRESS"] },
+      },
+      select: { id: true, formTemplateSnapshot: true },
     });
 
-    if (geaendert.length === 0) {
+    const snapshotUpdates = [];
+    for (const vorgang of laufende) {
+      if (!Array.isArray(vorgang.formTemplateSnapshot)) continue;
+      const ergebnis = korrigiereMinijobSchritte(vorgang.formTemplateSnapshot);
+      if (ergebnis.geaendert.length === 0) continue;
+      snapshotUpdates.push(
+        prisma.onboardingProcess.update({
+          where: { id: vorgang.id },
+          data: { formTemplateSnapshot: ergebnis.neu },
+        }),
+      );
+    }
+
+    if (geaendert.length === 0 && snapshotUpdates.length === 0) {
       await prisma.auditLog.create({
         data: {
           action: MINIJOB_TEMPLATE_MARKER,
@@ -244,21 +296,36 @@ async function ensureMinijobTemplateSteps(prisma) {
       return;
     }
 
-    await prisma.$transaction([
-      prisma.formTemplate.update({
-        where: { id: template.id },
-        data: { stepsConfig: neu },
-      }),
+    const schreibvorgaenge = [];
+    if (geaendert.length > 0) {
+      schreibvorgaenge.push(
+        prisma.formTemplate.update({
+          where: { id: template.id },
+          data: { stepsConfig: neu },
+        }),
+      );
+    }
+    schreibvorgaenge.push(...snapshotUpdates);
+    schreibvorgaenge.push(
       prisma.auditLog.create({
         data: {
           action: MINIJOB_TEMPLATE_MARKER,
-          details: { changed: true, steps: geaendert },
+          details: {
+            changed: true,
+            steps: geaendert,
+            snapshotsNachgezogen: snapshotUpdates.length,
+          },
         },
       }),
-    ]);
+    );
+
+    await prisma.$transaction(schreibvorgaenge);
 
     console.log(
-      "MINIJOB-Vorlage korrigiert: Schritte " + geaendert.join(", ") + " aktiviert.",
+      "MINIJOB-Vorlage korrigiert: Schritte " +
+        (geaendert.join(", ") || "keine") +
+        "; laufende Vorgaenge nachgezogen: " +
+        snapshotUpdates.length,
     );
   } catch (error) {
     console.error("MINIJOB-Vorlagenkorrektur fehlgeschlagen:", error.message);
