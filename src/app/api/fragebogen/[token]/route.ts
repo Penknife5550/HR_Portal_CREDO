@@ -19,6 +19,8 @@ import {
   documentTypeLabel,
 } from "@/lib/required-documents";
 import { MAX_STEP_NUMBER, SUMMARY_STEP_NUMBER } from "@/lib/fragebogen-steps";
+import { istBekannteErklaerung } from "@/lib/erklaerung-arbeitnehmer";
+import { berechnePruefsumme } from "@/lib/fragebogen-pruefsumme";
 import { z } from "zod";
 
 // =============================================
@@ -387,10 +389,52 @@ export async function POST(
 
   const body = await request.json();
 
-  if (!body.dsgvoAccepted) {
+  const absendenSchema = z.object({
+    dsgvoAccepted: z.literal(true),
+    // Die Wahrheitsversicherung ersetzt die Unterschrift. Sie war bisher reiner
+    // Browser-Zustand und ging beim Absenden verloren — der Server hat sie nie
+    // gesehen und konnte sie folglich auch nicht erzwingen.
+    erklaerungAccepted: z.literal(true),
+    erklaerungOrt: z.string().trim().min(2).max(100),
+    erklaerungVersion: z.string().min(1).max(40),
+  });
+
+  const absenden = absendenSchema.safeParse(body);
+  if (!absenden.success) {
+    const fehlend = absenden.error.issues.map((i) => i.path.join("."));
+    if (fehlend.includes("dsgvoAccepted")) {
+      return NextResponse.json(
+        { error: "DSGVO-Einwilligung ist erforderlich." },
+        { status: 400 }
+      );
+    }
+    if (fehlend.includes("erklaerungAccepted")) {
+      return NextResponse.json(
+        { error: "Bitte bestätigen Sie die Erklärung des Arbeitnehmers." },
+        { status: 400 }
+      );
+    }
+    if (fehlend.includes("erklaerungOrt")) {
+      return NextResponse.json(
+        { error: "Bitte geben Sie den Ort an. Er gehört zur Unterschrift." },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: "DSGVO-Einwilligung ist erforderlich." },
+      { error: "Die Angaben zur Erklärung sind unvollständig." },
       { status: 400 }
+    );
+  }
+
+  // Eine Version, die wir nicht kennen, koennen wir spaeter nicht mehr
+  // nachweisen — dann waere die Erklaerung wertlos.
+  if (!istBekannteErklaerung(absenden.data.erklaerungVersion)) {
+    return NextResponse.json(
+      {
+        error:
+          "Der Erklärungstext ist nicht mehr aktuell. Bitte laden Sie die Seite neu.",
+      },
+      { status: 409 }
     );
   }
 
@@ -436,14 +480,53 @@ export async function POST(
     }
   }
 
+  // =============================================
+  // Wahrheitsversicherung pruefungsfest festhalten
+  // =============================================
+  // Die Pruefsumme wird ueber den Stand gebildet, den der Beschaeftigte in
+  // diesem Moment bestaetigt — im Klartext, damit sie sich spaeter nachrechnen
+  // laesst (verschluesselte Felder haben bei jedem Speichern ein anderes
+  // Chiffrat).
+  const bestand = await prisma.personalData.findUnique({
+    where: { onboardingId: onboarding.id },
+    include: { children: true },
+  });
+
+  if (!bestand) {
+    return NextResponse.json(
+      { error: "Es sind noch keine Angaben gespeichert." },
+      { status: 400 }
+    );
+  }
+
+  const angabenKlartext: Record<string, unknown> = {
+    ...bestand,
+    iban: bestand.iban ? decrypt(bestand.iban) : bestand.iban,
+    socialSecurityNumber: bestand.socialSecurityNumber
+      ? decrypt(bestand.socialSecurityNumber)
+      : bestand.socialSecurityNumber,
+    taxId: bestand.taxId ? decrypt(bestand.taxId) : bestand.taxId,
+  };
+
+  const pruefsumme = berechnePruefsumme(angabenKlartext, bestand.children);
+  const abgegebenAm = new Date();
+
   // PersonalData als vollstaendig markieren
   await prisma.personalData.update({
     where: { onboardingId: onboarding.id },
     data: {
       isComplete: true,
       dsgvoAccepted: true,
-      dsgvoAcceptedAt: new Date(),
+      dsgvoAcceptedAt: abgegebenAm,
       currentStep: SUMMARY_STEP_NUMBER,
+      erklaerungAccepted: true,
+      erklaerungAcceptedAt: abgegebenAm,
+      erklaerungOrt: absenden.data.erklaerungOrt,
+      erklaerungIp: clientIp,
+      erklaerungUserAgent:
+        request.headers.get("user-agent")?.slice(0, 500) ?? null,
+      erklaerungVersion: absenden.data.erklaerungVersion,
+      erklaerungPruefsumme: pruefsumme,
     },
   });
 
@@ -463,8 +546,12 @@ export async function POST(
       action: "QUESTIONNAIRE_SUBMITTED",
       details: {
         email: onboarding.email,
-        submittedAt: new Date().toISOString(),
+        submittedAt: abgegebenAm.toISOString(),
+        erklaerungOrt: absenden.data.erklaerungOrt,
+        erklaerungVersion: absenden.data.erklaerungVersion,
+        erklaerungPruefsumme: pruefsumme,
       },
+      ipAddress: clientIp,
     },
   });
 

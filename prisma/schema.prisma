@@ -389,10 +389,32 @@ model PersonalData {
   masernschutzProvided Boolean?
 
   // -- Formular-Meta --
+  /// Registry-Schrittnummer aus src/lib/fragebogen-steps.ts, nicht die
+  /// Anzeigeposition. 0 = noch nicht begonnen.
   currentStep     Int       @default(0)
   isComplete      Boolean   @default(false)
   dsgvoAccepted   Boolean   @default(false)
   dsgvoAcceptedAt DateTime?
+
+  // -- Wahrheitsversicherung (Unterschriftsersatz, AP 2) --
+  //
+  // Die Checkliste der Minijob-Zentrale verlangt eine Unterschrift oder einen
+  // nachweisbaren Ersatz. Ein Haken allein ist das nicht: Erst Zeitpunkt, Ort,
+  // Herkunft, der genaue Wortlaut und eine Pruefsumme ueber die abgesendeten
+  // Daten machen belegbar, *wer* *was* *wann* bestaetigt hat.
+  //
+  // Altvorgaenge bleiben leer — ein Nachweis wird nicht rueckwirkend
+  // konstruiert (Entscheidung vom 17.08.2026).
+  erklaerungAccepted   Boolean   @default(false)
+  erklaerungAcceptedAt DateTime?
+  /// Ort, den der Beschaeftigte angegeben hat (wie auf dem Papierformular).
+  erklaerungOrt        String?
+  erklaerungIp         String?
+  erklaerungUserAgent  String?
+  /// Fassung des Erklaerungstextes aus src/lib/erklaerung-arbeitnehmer.ts.
+  erklaerungVersion    String?
+  /// SHA-256 ueber die abgesendeten Angaben im Klartext.
+  erklaerungPruefsumme String?
 
   // Kinder
   children Child[]

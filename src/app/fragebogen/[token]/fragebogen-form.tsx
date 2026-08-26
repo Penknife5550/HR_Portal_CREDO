@@ -144,14 +144,23 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     }
   };
 
-  // Fragebogen endgültig absenden
-  const handleSubmit = async () => {
+  // Fragebogen endgültig absenden.
+  //
+  // Ort und Fassung der Erklaerung gehen mit an den Server: Sie sind Teil des
+  // Unterschriftsersatzes. Zeitpunkt, IP und Pruefsumme setzt der Server selbst
+  // — was der Browser behauptet, taugt als Nachweis nichts.
+  const handleSubmit = async (erklaerung: { ort: string; version: string }) => {
     setSaving(true);
     try {
       const res = await fetch(`/api/fragebogen/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dsgvoAccepted: true }),
+        body: JSON.stringify({
+          dsgvoAccepted: true,
+          erklaerungAccepted: true,
+          erklaerungOrt: erklaerung.ort,
+          erklaerungVersion: erklaerung.version,
+        }),
       });
 
       if (!res.ok) {

@@ -12,6 +12,7 @@ import { useState } from "react";
 import { DocumentUpload } from "./document-upload";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 import { formatVerantwortlicheStelle } from "@/lib/dsgvo";
+import { AKTUELLE_ERKLAERUNG } from "@/lib/erklaerung-arbeitnehmer";
 
 interface ChildEntry {
   firstName: string;
@@ -25,7 +26,7 @@ interface StepProps {
   allData: Record<string, unknown>;
   onBack: () => void;
   saving: boolean;
-  onSubmit: () => void;
+  onSubmit: (erklaerung: { ort: string; version: string }) => void;
   organization: {
     name: string;
     mandantNumber: string;
@@ -151,6 +152,7 @@ export function Step10Summary({
 }: StepProps) {
   const [dsgvoAccepted, setDsgvoAccepted] = useState(false);
   const [erklaerungAccepted, setErklaerungAccepted] = useState(false);
+  const [erklaerungOrt, setErklaerungOrt] = useState("");
   const [dsgvoError, setDsgvoError] = useState("");
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
@@ -159,6 +161,13 @@ export function Step10Summary({
 
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (erklaerungOrt.trim().length < 2) {
+      // Wortlaut bewusst ohne "Erklärung": Die Fehleranzeige wird ueber
+      // Teilzeichenketten zurueckgesetzt, sonst raeumte das Haken-Setzen diese
+      // Meldung mit weg.
+      setDsgvoError("Bitte geben Sie den Ort an. Er gehört zur Unterschrift.");
+      return;
+    }
     if (!erklaerungAccepted) {
       setDsgvoError("Bitte bestätigen Sie die Erklärung des Arbeitnehmers.");
       return;
@@ -427,33 +436,51 @@ export function Step10Summary({
           Erklärung des Arbeitnehmers
         </h3>
         <div className="mb-4 rounded-lg bg-card p-4 text-xs leading-relaxed text-foreground">
-          <p className="mb-3">
-            Ich versichere, dass die vorstehenden Angaben der Wahrheit
-            entsprechen und ich keine Angaben wissentlich verschwiegen habe.
-          </p>
-          <p className="mb-3">
-            Mir ist bekannt, dass unwahre oder unvollständige Angaben
-            einen wichtigen Grund für eine außerordentliche Kündigung des
-            Arbeitsverhältnisses darstellen können.
-          </p>
-          <p className="mb-3">
-            Ich verpflichte mich, meinem Arbeitgeber{" "}
-            <strong>unverzüglich</strong> mitzuteilen, wenn sich
-            Änderungen bei den vorstehenden Angaben ergeben, insbesondere bei:
-          </p>
-          <ul className="mb-3 ml-4 list-disc space-y-1 text-muted-foreground">
-            <li>Änderung des Familienstandes oder der Anschrift</li>
-            <li>Änderung der Bankverbindung</li>
-            <li>Änderung der Krankenkasse</li>
-            <li>Änderung der Steuerklasse</li>
-            <li>Geburt eines Kindes</li>
-            <li>Aufnahme oder Beendigung einer weiteren Beschäftigung</li>
-            <li>Änderung bei der Schwerbehinderung</li>
-          </ul>
-          <p className="text-muted-foreground">
-            Mir ist bekannt, dass die Mitteilungspflicht auch nach Beendigung des
-            Arbeitsverhältnisses für laufende Abrechnungszeiträume fortbesteht.
-          </p>
+          {AKTUELLE_ERKLAERUNG.abschnitte.map((abschnitt, i) => (
+            <div key={i} className="mb-3 last:mb-0">
+              <p>{abschnitt.text}</p>
+              {abschnitt.punkte && (
+                <ul className="ml-4 mt-1 list-disc space-y-1 text-muted-foreground">
+                  {abschnitt.punkte.map((punkt) => (
+                    <li key={punkt}>{punkt}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Ort — wie auf dem Papierformular "Ort, Datum". Das Datum setzt der
+            Server beim Absenden, damit es nicht manipulierbar ist. */}
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="erklaerungOrt"
+              className="mb-1 block text-xs font-semibold text-foreground"
+            >
+              Ort <span className="text-destructive">*</span>
+            </label>
+            <input
+              id="erklaerungOrt"
+              type="text"
+              value={erklaerungOrt}
+              onChange={(e) => {
+                setErklaerungOrt(e.target.value);
+                if (dsgvoError.includes("Ort")) setDsgvoError("");
+              }}
+              maxLength={100}
+              placeholder="z.B. Minden"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-foreground">
+              Datum
+            </span>
+            <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+              wird beim Absenden gesetzt
+            </p>
+          </div>
         </div>
 
         <label className="flex items-start gap-3">
@@ -469,12 +496,11 @@ export function Step10Summary({
           />
           <div>
             <span className="text-sm font-medium text-foreground">
-              Ich bestaetige die vorstehende Erklärung.{" "}
+              {AKTUELLE_ERKLAERUNG.bestaetigung}{" "}
               <span className="text-destructive">*</span>
             </span>
             <p className="text-xs text-muted-foreground">
-              Diese Erklärung ersetzt Ihre handschriftliche Unterschrift
-              auf dem Personalfragebogen.
+              {AKTUELLE_ERKLAERUNG.unterschriftsersatz}
             </p>
           </div>
         </label>
@@ -593,7 +619,13 @@ export function Step10Summary({
               </button>
               <button
                 type="button"
-                onClick={() => { setShowConfirmDialog(false); onSubmit(); }}
+                onClick={() => {
+                  setShowConfirmDialog(false);
+                  onSubmit({
+                    ort: erklaerungOrt.trim(),
+                    version: AKTUELLE_ERKLAERUNG.version,
+                  });
+                }}
                 disabled={saving}
                 className="flex-1 rounded-lg bg-[#6BAA24] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#5a9420] disabled:opacity-50"
               >

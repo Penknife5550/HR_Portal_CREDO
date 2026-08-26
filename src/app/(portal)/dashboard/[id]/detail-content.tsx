@@ -135,6 +135,14 @@ interface DetailData {
     // DSGVO
     dsgvoAccepted: boolean | null;
     dsgvoAcceptedAt: string | null;
+    // Wahrheitsversicherung (Unterschriftsersatz)
+    erklaerungAccepted: boolean | null;
+    erklaerungAcceptedAt: string | null;
+    erklaerungOrt: string | null;
+    erklaerungIp: string | null;
+    erklaerungUserAgent: string | null;
+    erklaerungVersion: string | null;
+    erklaerungPruefsumme: string | null;
     // Kinder
     children: {
       id: string;
@@ -1289,6 +1297,81 @@ function TabFragebogenDaten({
           onSaved={onSaved}
         />
       )}
+      {/* =============================================
+          Erklaerung des Arbeitnehmers (Unterschriftsersatz)
+          =============================================
+          Steht bewusst weit oben: In einer Betriebspruefung ist das der
+          Nachweis, dass der Beschaeftigte die Angaben bestaetigt hat. */}
+      {pd.isComplete && (
+        <div
+          className={`rounded-lg border p-4 ${
+            pd.erklaerungAccepted
+              ? "border-green-200 bg-green-50"
+              : "border-amber-200 bg-amber-50"
+          }`}
+        >
+          <p className="text-sm font-semibold text-foreground">
+            Erklärung des Arbeitnehmers
+          </p>
+          {pd.erklaerungAccepted ? (
+            <>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Bestätigt am{" "}
+                {pd.erklaerungAcceptedAt
+                  ? formatDateTime(pd.erklaerungAcceptedAt)
+                  : "—"}
+                {pd.erklaerungOrt ? ` in ${pd.erklaerungOrt}` : ""} — ersetzt die
+                handschriftliche Unterschrift.
+              </p>
+              <dl className="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Fassung des Wortlauts</dt>
+                  <dd className="font-medium text-foreground">
+                    {pd.erklaerungVersion ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">IP-Adresse</dt>
+                  <dd className="font-medium text-foreground">
+                    {pd.erklaerungIp ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3 sm:col-span-2">
+                  <dt className="text-muted-foreground">Prüfsumme (SHA-256)</dt>
+                  <dd
+                    className="break-all font-mono text-[11px] font-medium text-foreground"
+                    title={pd.erklaerungPruefsumme ?? undefined}
+                  >
+                    {pd.erklaerungPruefsumme ?? "—"}
+                  </dd>
+                </div>
+                {pd.erklaerungUserAgent && (
+                  <div className="flex justify-between gap-3 sm:col-span-2">
+                    <dt className="shrink-0 text-muted-foreground">Browserkennung</dt>
+                    <dd className="break-all text-right text-[11px] text-muted-foreground">
+                      {pd.erklaerungUserAgent}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Die Prüfsumme bezieht sich auf die Angaben zum Zeitpunkt des
+                Absendens. Wurden Felder danach über die Personalabteilung
+                geändert, stimmt sie mit dem heutigen Stand nicht mehr überein —
+                das ist gewollt und im Änderungsprotokoll nachvollziehbar.
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Für diesen Vorgang liegt keine gespeicherte Erklärung vor. Der
+              Fragebogen wurde eingereicht, bevor das Portal Zeitpunkt, Ort und
+              Prüfsumme festgehalten hat. Ein Nachweis wird nicht rückwirkend
+              erzeugt.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Fortschrittsanzeige */}
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex items-center justify-between">

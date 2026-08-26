@@ -150,6 +150,15 @@ export async function GET(
         masernschutzProvided: pd.masernschutzProvided,
         dsgvoAccepted: pd.dsgvoAccepted,
         dsgvoAcceptedAt: pd.dsgvoAcceptedAt?.toISOString() || null,
+        // Unterschriftsersatz — der PDF-Abschnitt "Erklärung des Arbeitnehmers"
+        // ist in der Betriebspruefung der eigentliche Nachweis.
+        erklaerungAccepted: pd.erklaerungAccepted,
+        erklaerungAcceptedAt: pd.erklaerungAcceptedAt?.toISOString() || null,
+        erklaerungOrt: pd.erklaerungOrt,
+        erklaerungIp: pd.erklaerungIp,
+        erklaerungUserAgent: pd.erklaerungUserAgent,
+        erklaerungVersion: pd.erklaerungVersion,
+        erklaerungPruefsumme: pd.erklaerungPruefsumme,
         children: pd.children.map((c) => ({
           firstName: c.firstName,
           lastName: c.lastName,

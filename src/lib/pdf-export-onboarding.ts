@@ -8,6 +8,7 @@
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
+import { getErklaerung } from "@/lib/erklaerung-arbeitnehmer";
 
 // =============================================
 // Typen
@@ -75,6 +76,13 @@ interface PersonalDataExport {
   masernschutzProvided: boolean | null;
   dsgvoAccepted: boolean | null;
   dsgvoAcceptedAt: string | null;
+  erklaerungAccepted?: boolean | null;
+  erklaerungAcceptedAt?: string | null;
+  erklaerungOrt?: string | null;
+  erklaerungIp?: string | null;
+  erklaerungUserAgent?: string | null;
+  erklaerungVersion?: string | null;
+  erklaerungPruefsumme?: string | null;
   children: { firstName: string; lastName: string | null; birthDate: string; taxAllowance: boolean }[];
 }
 
@@ -138,6 +146,21 @@ const C = {
 function fmt(d: string | null): string {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/**
+ * Datum **mit Uhrzeit**. Fuer die Erklaerung reicht das blosse Datum nicht: Der
+ * Zeitpunkt ist Teil des Unterschriftsersatzes.
+ */
+function fmtZeit(d: string | null | undefined): string {
+  if (!d) return "—";
+  const datum = new Date(d);
+  if (Number.isNaN(datum.getTime())) return "—";
+  return `${datum.toLocaleDateString("de-DE")}, ${datum.toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })} Uhr`;
 }
 
 function yn(v: boolean | null): string {
@@ -343,6 +366,69 @@ async function addFragebogenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
     for (const child of pd.children) {
       y = dataRow(doc, `${child.firstName} ${child.lastName || ""}`, `geb. ${fmt(child.birthDate)}, Kinderfreibetrag: ${yn(child.taxAllowance)}`, y);
     }
+  }
+
+  // =============================================
+  // Erklaerung des Arbeitnehmers (Unterschriftsersatz)
+  // =============================================
+  // Eigener Abschnitt, weil genau er in der Betriebspruefung die Unterschrift
+  // ersetzt: Wortlaut in der Fassung, die galt, plus Zeitpunkt, Ort, Herkunft
+  // und Pruefsumme.
+  checkBreak(doc, 200, ctx, "Fragebogen");
+  y = section(doc, "Erklärung des Arbeitnehmers");
+
+  if (!pd.erklaerungAccepted) {
+    // Altvorgaenge: Der Haken war frueher reiner Browser-Zustand und wurde nie
+    // uebertragen. Ein Nachweis wird nicht rueckwirkend konstruiert.
+    doc.font("Helvetica-Oblique").fontSize(9).fillColor(C.gray).text(
+      "Für diesen Vorgang liegt keine gespeicherte Erklärung vor. Der Fragebogen " +
+        "wurde eingereicht, bevor das Portal Zeitpunkt, Ort und Prüfsumme " +
+        "festgehalten hat.",
+      50,
+      y,
+      { width: 515 },
+    );
+    y = doc.y + 10;
+  } else {
+    const fassung = getErklaerung(pd.erklaerungVersion);
+
+    if (fassung) {
+      doc.font("Helvetica").fontSize(8.5).fillColor(C.black);
+      for (const abschnitt of fassung.abschnitte) {
+        checkBreak(doc, 40, ctx, "Fragebogen");
+        doc.font("Helvetica").fontSize(8.5).fillColor(C.black)
+          .text(abschnitt.text, 50, doc.y, { width: 515, align: "justify" });
+        if (abschnitt.punkte) {
+          for (const punkt of abschnitt.punkte) {
+            doc.font("Helvetica").fontSize(8.5).fillColor(C.gray)
+              .text(`•  ${punkt}`, 62, doc.y + 2, { width: 503 });
+          }
+        }
+        doc.moveDown(0.4);
+      }
+      checkBreak(doc, 30, ctx, "Fragebogen");
+      doc.font("Helvetica-Bold").fontSize(8.5).fillColor(C.black)
+        .text(fassung.bestaetigung, 50, doc.y + 4, { width: 515 });
+      y = doc.y + 12;
+    } else {
+      doc.font("Helvetica-Oblique").fontSize(9).fillColor(C.gray).text(
+        `Der Wortlaut der bestätigten Fassung (${str(pd.erklaerungVersion)}) liegt ` +
+          "im System nicht mehr vor.",
+        50,
+        y,
+        { width: 515 },
+      );
+      y = doc.y + 10;
+    }
+
+    checkBreak(doc, 90, ctx, "Fragebogen");
+    y = dataRow(doc, "Bestätigt", yn(pd.erklaerungAccepted), y);
+    y = dataRow(doc, "Ort", str(pd.erklaerungOrt), y);
+    y = dataRow(doc, "Zeitpunkt", fmtZeit(pd.erklaerungAcceptedAt), y);
+    y = dataRow(doc, "Fassung des Wortlauts", str(pd.erklaerungVersion), y);
+    y = dataRow(doc, "IP-Adresse", str(pd.erklaerungIp), y);
+    y = dataRow(doc, "Browserkennung", str(pd.erklaerungUserAgent), y);
+    y = dataRow(doc, "Prüfsumme (SHA-256)", str(pd.erklaerungPruefsumme), y);
   }
 
   // DSGVO
