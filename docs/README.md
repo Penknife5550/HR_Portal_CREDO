@@ -15,13 +15,14 @@ beim Verschieben müssen Handbuch und Bildordner zusammenbleiben.
 
 ## Module
 
-### Minijob-Checkliste 2026 — *geplant, noch nicht umgesetzt*
+### Minijob-Checkliste 2026 — *AP 1 und AP 2 umgesetzt, Phase 1 läuft*
 
 | Datei | Inhalt |
 |---|---|
+| [module/minijob/minijob-umsetzungsstand.md](module/minijob/minijob-umsetzungsstand.md) | **Übergabe-Dokument:** Was gebaut ist, welche Festlegungen gelten, womit es weitergeht. Hier anfangen |
 | [module/minijob/checkliste-minijobzentrale-2026-06-30.pdf](module/minijob/checkliste-minijobzentrale-2026-06-30.pdf) | **Amtliche Vorlage der Minijob-Zentrale, Stand 30.06.2026** — maßgeblich für die Umsetzung. Seiten 7–9 (Merkblatt, Befreiungsantrag, Aufhebungsantrag) werden in AP 8 als System-Dokumente extrahiert |
 | [module/minijob/minijob-checkliste-2026.html](module/minijob/minijob-checkliste-2026.html) | Abgleich der amtlichen Checkliste mit dem Personalfragebogen, Lückenanalyse, Umsetzungsplan, Entscheidungsprotokoll, Nachtrag 25.08.2026 |
-| [module/minijob/minijob-mockups-2026.html](module/minijob/minijob-mockups-2026.html) | Prozesskette und Masken-Entwürfe |
+| [module/minijob/minijob-mockups-2026.html](module/minijob/minijob-mockups-2026.html) | Prozesskette und Masken-Entwürfe (Zielzustand nach voller Phase 1) |
 
 Branch: `feat/minijob-checkliste-2026`.
 
