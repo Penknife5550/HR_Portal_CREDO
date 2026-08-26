@@ -129,7 +129,7 @@
     <div><b>Ma&szlig;geblich:</b> &bdquo;Checkliste f&uuml;r geringf&uuml;gig entlohnte oder kurzfristig Besch&auml;ftigte&ldquo; der Minijob-Zentrale, <b>Stand 30.&nbsp;Juni&nbsp;2026</b> &mdash; im Repository abgelegt als <code>checkliste-minijobzentrale-2026-06-30.pdf</code>.</div>
     <div><b>Verglichen mit:</b> Formularvorlage <code>MINIJOB</code> des Personalfragebogens (Bereich <i>Vorlagen</i>) &middot; Erstabgleich gegen Branch <code>feat/vertragsende</code>, Commit <code>a106cb8</code>; Gegenpr&uuml;fung am 25.08.2026 gegen <code>main</code>, Commit <code>a740d9f</code> &mdash; alle Befunde reproduzieren unver&auml;ndert.</div>
     <div><b>Zweck:</b> Gemeinsam durchgehen, Entscheidungen treffen &mdash; <i>bevor</i> eine Zeile Code entsteht.</div>
-    <div><b>Stand:</b> Alle Entscheidungen getroffen (17.08.2026 und 25.08.2026, Abschnitt&nbsp;9). Nachtrag vom 25.08.2026 eingearbeitet (Abschnitt&nbsp;11). Branch <code>feat/minijob-checkliste-2026</code>. <b>AP&nbsp;1 ist umgesetzt</b> &mdash; siehe Abschnitt&nbsp;6.</div>
+    <div><b>Stand:</b> Alle Entscheidungen getroffen (17.08.2026 und 25.08.2026, Abschnitt&nbsp;9). Nachtrag vom 25.08.2026 eingearbeitet (Abschnitt&nbsp;11). Branch <code>feat/minijob-checkliste-2026</code>. <b>AP&nbsp;1 und AP&nbsp;2 sind umgesetzt</b> &mdash; siehe Abschnitt&nbsp;6.</div>
   </div>
 
   <div class="hinweis warnung"><span class="label">Formularstand gewechselt &mdash; 25.08.2026</span>
@@ -546,8 +546,34 @@
     </div>
   </div>
 
-  <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;2</span><span class="aptitel">Wahrheitsversicherung pr&uuml;fungsfest speichern</span><span class="apstd">12&ndash;16&nbsp;h</span></div>
+  <div class="ap" style="border-left:6px solid var(--gruen);"><div class="apkopf"><span class="apnr" style="background:var(--gruen);">AP&nbsp;2</span><span class="aptitel">Wahrheitsversicherung pr&uuml;fungsfest speichern</span><span class="badge badge-gruen">umgesetzt 25.08.2026</span><span class="apstd">12&ndash;16&nbsp;h</span></div>
     <div class="apbody">Zustimmung, Zeitstempel, Ort, IP, Textversion und Pr&uuml;fsumme persistieren; Absenden ohne Best&auml;tigung serverseitig ablehnen; eigener PDF-Abschnitt &bdquo;Erkl&auml;rung des Arbeitnehmers&ldquo;; Belehrung nach &sect;&nbsp;28o SGB&nbsp;IV erg&auml;nzen.</div>
+    <div class="apbody" style="border-top:1px solid var(--border);margin-top:0.6rem;padding-top:0.6rem;">
+      <b>Umgesetzt am 25.08.2026.</b>
+      <ul style="margin:0.4rem 0 0;">
+        <li><b>Versionierter Wortlaut</b> in <code>src/lib/erklaerung-arbeitnehmer.ts</code>. Der Text lag
+            im Markup; eine sp&auml;tere &Auml;nderung h&auml;tte r&uuml;ckwirkend ver&auml;ndert, was
+            bereits abgegebene Erkl&auml;rungen ausweisen. Jetzt tr&auml;gt jede Fassung eine Version, am
+            Vorgang wird die gespeicherte gedruckt. <b>Neu im Wortlaut:</b> die Belehrung nach
+            &sect;&nbsp;28o und &sect;&nbsp;111 Abs.&nbsp;1 Nr.&nbsp;4 SGB&nbsp;IV.</li>
+        <li><b>Pr&uuml;fsumme</b> (<code>src/lib/fragebogen-pruefsumme.ts</code>): SHA-256 &uuml;ber die
+            kanonisch serialisierten Angaben, im <i>Klartext</i> &mdash; AES-GCM erzeugt bei jedem
+            Speichern ein anderes Chiffrat, dar&uuml;ber gebildet w&auml;re die Pr&uuml;fsumme schon nach
+            einem folgenlosen Neuspeichern verletzt.</li>
+        <li><b>Server erzwingt</b> Best&auml;tigung, Ort und eine bekannte Fassung. Zeitpunkt, IP,
+            Browserkennung und Pr&uuml;fsumme setzt er selbst &mdash; was der Browser behauptet, taugt
+            als Nachweis nichts.</li>
+        <li><b>Sichtbar</b> im eigenen PDF-Abschnitt und als Karte auf der HR-Detailseite.
+            Altvorg&auml;nge sagen ausdr&uuml;cklich, dass kein Nachweis vorliegt, statt eine
+            L&uuml;cke zu zeigen.</li>
+        <li><b>Schreibgesch&uuml;tzt:</b> Die HR-Nacherfassung arbeitet mit Feld-Freigabeliste und
+            <code>.strip()</code>; die Nachweisfelder stehen nicht darin. Die Reporting-Schnittstelle
+            exponiert sie nicht.</li>
+      </ul>
+      <div style="margin-top:0.5rem;"><b>Abgesichert:</b> 22 neue Tests
+      (<code>src/__tests__/lib/erklaerung-arbeitnehmer.test.ts</code>), Suite 547 gruen &middot;
+      <code>tsc</code> sauber &middot; lint ohne Errors &middot; Build erfolgreich.</div>
+    </div>
   </div>
 
   <div class="ap"><div class="apkopf"><span class="apnr">AP&nbsp;3</span><span class="aptitel">Dokumenten-H&auml;rtung</span><span class="apstd">12&ndash;16&nbsp;h</span></div>
@@ -816,7 +842,7 @@
 
   <p class="fuss">
     CREDO HR-Portal &middot; Abgleich &bdquo;Checkliste f&uuml;r geringf&uuml;gig entlohnte oder kurzfristig Besch&auml;ftigte&ldquo;,
-    Stand 30.06.2026 &middot; Entscheidungen abgestimmt am 17.08.2026 &middot; Nachtrag 25.08.2026 &middot; AP&nbsp;1 umgesetzt am 25.08.2026.
+    Stand 30.06.2026 &middot; Entscheidungen abgestimmt am 17.08.2026 &middot; Nachtrag 25.08.2026 &middot; AP&nbsp;1 und AP&nbsp;2 umgesetzt am 25.08.2026.
   </p>
 
 </div>
