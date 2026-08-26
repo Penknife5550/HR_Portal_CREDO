@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { validateMagicToken } from "@/lib/auth";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { sendEmail } from "@/lib/mailer";
@@ -21,6 +22,11 @@ import {
 import { MAX_STEP_NUMBER, SUMMARY_STEP_NUMBER } from "@/lib/fragebogen-steps";
 import { istBekannteErklaerung } from "@/lib/erklaerung-arbeitnehmer";
 import { berechnePruefsumme } from "@/lib/fragebogen-pruefsumme";
+import {
+  BESCHAEFTIGUNGS_KATEGORIEN,
+  beschaeftigungsAngabenListeSchema,
+  zuDatensatz,
+} from "@/lib/validations/beschaeftigungs-angaben";
 import { z } from "zod";
 
 // =============================================
@@ -77,6 +83,11 @@ const fragebogenFieldsSchema = z.object({
   minijobRvBefreiung: z.boolean().optional(),
   bornAfter1971: z.boolean().optional(),
   masernschutzProvided: z.boolean().optional(),
+  // Grundfragen zu Abschnitt 4 der Minijob-Checkliste. hasOtherEmployment
+  // (oben) ist die Grundfrage zu 4a.
+  vorbeschaeftigungenVorhanden: z.boolean().optional(),
+  auslandsbeschaeftigungVorhanden: z.boolean().optional(),
+  summeUeberGeringfuegigkeitsgrenze: z.boolean().optional(),
   // Registry-Nummer des Schritts, auf dem der Vorgang steht — nicht die
   // Anzeigeposition. Obergrenze kommt aus der zentralen Schritt-Definition,
   // damit ein neuer Schritt hier nicht vergessen wird.
@@ -87,6 +98,9 @@ const fragebogenFieldsSchema = z.object({
     birthDate: z.string().min(1),
     taxAllowance: z.boolean().optional(),
   })).optional(),
+  // Zeilen der drei Tabellen aus Abschnitt 4. Die Validierung je Kategorie
+  // steht in validations/beschaeftigungs-angaben.ts.
+  beschaeftigungsAngaben: beschaeftigungsAngabenListeSchema.optional(),
 }).strip(); // strip() entfernt unbekannte Felder serverseitig (Defense in Depth zusaetzlich zur Whitelist)
 
 // =============================================
@@ -122,7 +136,10 @@ export async function GET(
   // PersonalData mit Kindern laden
   const personalData = await prisma.personalData.findUnique({
     where: { onboardingId: onboarding.id },
-    include: { children: { orderBy: { orderIndex: "asc" } } },
+    include: {
+      children: { orderBy: { orderIndex: "asc" } },
+      beschaeftigungsAngaben: { orderBy: [{ kategorie: "asc" }, { orderIndex: "asc" }] },
+    },
   });
 
   // Feld-Konfiguration + Pflicht-Dokumente laden.
@@ -217,7 +234,7 @@ export async function PUT(
     );
   }
 
-  const { currentStep, children, ...data } = parsed.data;
+  const { currentStep, children, beschaeftigungsAngaben, ...data } = parsed.data;
 
   // Status auf IN_PROGRESS setzen falls noch INVITED
   if (onboarding.status === "INVITED") {
@@ -304,36 +321,66 @@ export async function PUT(
     update: updateData,
   });
 
-  // Kinder separat behandeln (replace-Strategie)
-  if (Array.isArray(children)) {
-    // Alte Kinder löschen
-    await prisma.child.deleteMany({
-      where: { personalDataId: personalData.id },
-    });
+  // =============================================
+  // Wiederholbare Zeilen: ersetzen statt zusammenfuehren
+  // =============================================
+  // Loeschen und Neuanlegen laufen in **einer** Transaktion. Vorher waren es
+  // zwei getrennte Aufrufe — schlug das Anlegen fehl, waren die alten Zeilen
+  // schon weg und der Zwischenstand des Beschaeftigten verloren.
+  const zeilenSchreiben: Prisma.PrismaPromise<unknown>[] = [];
 
-    // Neue Kinder anlegen
+  if (Array.isArray(children)) {
+    zeilenSchreiben.push(
+      prisma.child.deleteMany({ where: { personalDataId: personalData.id } }),
+    );
     if (children.length > 0) {
-      await prisma.child.createMany({
-        data: children.map(
-          (
-            child: {
-              firstName: string;
-              lastName?: string;
-              birthDate: string;
-              taxAllowance?: boolean;
-            },
-            index: number
-          ) => ({
+      zeilenSchreiben.push(
+        prisma.child.createMany({
+          data: children.map((child, index) => ({
             personalDataId: personalData.id,
             firstName: child.firstName,
             lastName: child.lastName || null,
             birthDate: new Date(child.birthDate),
             taxAllowance: child.taxAllowance || false,
             orderIndex: index,
-          })
-        ),
-      });
+          })),
+        }),
+      );
     }
+  }
+
+  if (Array.isArray(beschaeftigungsAngaben)) {
+    // Nur die Kategorien anfassen, die tatsaechlich mitgeschickt wurden.
+    // Sonst loeschte ein Schritt, der nur 4a sendet, auch die Zeilen zu 4b
+    // und 4c mit.
+    const gesendeteKategorien = new Set(
+      beschaeftigungsAngaben.map((a) => a.kategorie),
+    );
+
+    for (const kategorie of BESCHAEFTIGUNGS_KATEGORIEN) {
+      if (!gesendeteKategorien.has(kategorie)) continue;
+      zeilenSchreiben.push(
+        prisma.beschaeftigungsAngabe.deleteMany({
+          where: { personalDataId: personalData.id, kategorie },
+        }),
+      );
+    }
+
+    // orderIndex je Kategorie zaehlen, nicht ueber die gesamte Liste.
+    const zaehler: Record<string, number> = {};
+    for (const angabe of beschaeftigungsAngaben) {
+      const index = zaehler[angabe.kategorie] ?? 0;
+      zaehler[angabe.kategorie] = index + 1;
+      zeilenSchreiben.push(
+        prisma.beschaeftigungsAngabe.create({
+          data: zuDatensatz(angabe, personalData.id, index),
+        }),
+      );
+    }
+  }
+
+  if (zeilenSchreiben.length > 0) {
+    await prisma.$transaction(zeilenSchreiben);
   }
 
   // Name im Onboarding-Prozess aktualisieren
@@ -489,7 +536,7 @@ export async function POST(
   // Chiffrat).
   const bestand = await prisma.personalData.findUnique({
     where: { onboardingId: onboarding.id },
-    include: { children: true },
+    include: { children: true, beschaeftigungsAngaben: true },
   });
 
   if (!bestand) {
@@ -508,7 +555,11 @@ export async function POST(
     taxId: bestand.taxId ? decrypt(bestand.taxId) : bestand.taxId,
   };
 
-  const pruefsumme = berechnePruefsumme(angabenKlartext, bestand.children);
+  const pruefsumme = berechnePruefsumme(
+    angabenKlartext,
+    bestand.children,
+    bestand.beschaeftigungsAngaben,
+  );
   const abgegebenAm = new Date();
 
   // PersonalData als vollstaendig markieren

@@ -43,8 +43,9 @@ const NICHT_TEIL_DER_ANGABEN = new Set([
   "erklaerungUserAgent",
   "erklaerungVersion",
   "erklaerungPruefsumme",
-  // Wird separat und in fester Reihenfolge angehaengt.
+  // Werden separat und in fester Reihenfolge angehaengt.
   "children",
+  "beschaeftigungsAngaben",
 ]);
 
 export interface KindFuerPruefsumme {
@@ -52,6 +53,20 @@ export interface KindFuerPruefsumme {
   lastName?: string | null;
   birthDate?: Date | string | null;
   taxAllowance?: boolean | null;
+}
+
+/** Eine Zeile aus den drei Tabellen des Abschnitts 4 der Minijob-Checkliste. */
+export interface BeschaeftigungFuerPruefsumme {
+  kategorie?: string | null;
+  orderIndex?: number | null;
+  beginn?: Date | string | null;
+  ende?: Date | string | null;
+  arbeitgeberName?: string | null;
+  arbeitgeberAdresse?: string | null;
+  art?: string | null;
+  entgeltUeberGrenze?: boolean | null;
+  arbeitstage?: number | null;
+  beiArbeitsagentur?: boolean | null;
 }
 
 /** Ein Wert in der Form, in der er in die Pruefsumme eingeht. */
@@ -69,7 +84,8 @@ function normalisiere(wert: unknown): unknown {
  */
 export function kanonischeAngaben(
   angaben: Record<string, unknown>,
-  kinder: KindFuerPruefsumme[] = []
+  kinder: KindFuerPruefsumme[] = [],
+  beschaeftigungen: BeschaeftigungFuerPruefsumme[] = []
 ): string {
   const gefiltert: Record<string, unknown> = {};
   for (const schluessel of Object.keys(angaben).sort()) {
@@ -90,7 +106,38 @@ export function kanonischeAngaben(
       return String(a.firstName ?? "").localeCompare(String(b.firstName ?? ""));
     });
 
-  return JSON.stringify({ angaben: gefiltert, kinder: kinderKanonisch });
+  const inhalt: Record<string, unknown> = {
+    angaben: gefiltert,
+    kinder: kinderKanonisch,
+  };
+
+  // Der Schluessel kommt nur dazu, wenn es Zeilen gibt.
+  //
+  // Grund ist die Nachrechenbarkeit: Vorgaenge, die vor Einfuehrung dieses
+  // Modells abgesendet wurden, haben keine Zeilen. Wuerde hier immer ein
+  // (leeres) Feld stehen, aenderte sich ihre Pruefsumme rueckwirkend und liesse
+  // sich nicht mehr bestaetigen — genau das, was die Pruefsumme leisten soll.
+  if (beschaeftigungen.length > 0) {
+    inhalt.beschaeftigungen = beschaeftigungen
+      .map((b) => ({
+        arbeitgeberAdresse: b.arbeitgeberAdresse ?? null,
+        arbeitgeberName: b.arbeitgeberName ?? null,
+        arbeitstage: b.arbeitstage ?? null,
+        art: b.art ?? null,
+        beginn: normalisiere(b.beginn),
+        beiArbeitsagentur: b.beiArbeitsagentur ?? null,
+        ende: normalisiere(b.ende),
+        entgeltUeberGrenze: b.entgeltUeberGrenze ?? null,
+        kategorie: b.kategorie ?? null,
+      }))
+      .sort((a, b) => {
+        const kat = String(a.kategorie ?? "").localeCompare(String(b.kategorie ?? ""));
+        if (kat !== 0) return kat;
+        return String(a.beginn ?? "").localeCompare(String(b.beginn ?? ""));
+      });
+  }
+
+  return JSON.stringify(inhalt);
 }
 
 /**
@@ -101,11 +148,12 @@ export function kanonischeAngaben(
  */
 export function berechnePruefsumme(
   angaben: Record<string, unknown>,
-  kinder: KindFuerPruefsumme[] = []
+  kinder: KindFuerPruefsumme[] = [],
+  beschaeftigungen: BeschaeftigungFuerPruefsumme[] = []
 ): string {
   return crypto
     .createHash("sha256")
-    .update(kanonischeAngaben(angaben, kinder), "utf8")
+    .update(kanonischeAngaben(angaben, kinder, beschaeftigungen), "utf8")
     .digest("hex");
 }
 

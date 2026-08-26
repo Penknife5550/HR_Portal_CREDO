@@ -384,6 +384,23 @@ model PersonalData {
   hasMinijob         Boolean? @default(false)
   minijobRvBefreiung Boolean? @default(false)
 
+  // -- Weitere Beschaeftigungen nach der Minijob-Checkliste, Abschnitt 4 --
+  //
+  // Die Grundfragen stehen hier als eigene Felder, die Zeilen dazu im Modell
+  // BeschaeftigungsAngabe. Beides wird gebraucht: Eine leere Tabelle allein ist
+  // mehrdeutig — sie kann "nein, es gibt keine" oder "noch nicht beantwortet"
+  // heissen. Erst die Grundfrage macht daraus eine Aussage.
+  //
+  // hasOtherEmployment (oben) ist die Grundfrage zu 4a.
+  /// 4b — im laufenden Kalenderjahr bereits beschaeftigt oder arbeitsuchend gemeldet?
+  vorbeschaeftigungenVorhanden     Boolean?
+  /// 4c — derzeit Beschaeftigung oder selbstaendige Taetigkeit im Ausland?
+  auslandsbeschaeftigungVorhanden  Boolean?
+  /// 4a, Additionsfrage: Uebersteigt die Summe der Bruttoarbeitsentgelte aus
+  /// allen geringfuegigen Beschaeftigungen regelmaessig die Geringfuegigkeits-
+  /// grenze? Nur zu stellen, wenn keine Hauptbeschaeftigung vorliegt.
+  summeUeberGeringfuegigkeitsgrenze Boolean?
+
   // -- Masernschutz --
   bornAfter1971        Boolean?
   masernschutzProvided Boolean?
@@ -419,10 +436,84 @@ model PersonalData {
   // Kinder
   children Child[]
 
+  // Zeilen zu den drei Tabellen aus Abschnitt 4 der Minijob-Checkliste
+  beschaeftigungsAngaben BeschaeftigungsAngabe[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("personal_data")
+}
+
+// =============================================
+// Weitere Beschaeftigungen (Minijob-Checkliste, Abschnitt 4)
+//
+// Die Checkliste verlangt drei Tabellen: 4a weitere Beschaeftigungen bei
+// anderen Arbeitgebern, 4b Vorbeschaeftigungen im laufenden Kalenderjahr,
+// 4c Taetigkeiten im Ausland. Sie teilen sich rund 70 % ihrer Spalten
+// (Zeitraum, Arbeitgeber, Adresse) und unterscheiden sich in je zwei bis drei.
+//
+// Deshalb **ein** Modell mit Kategorie-Kennzeichen statt dreier: Drei getrennte
+// Modelle hiessen drei Speicherpfade, drei Validierungen, drei Listen-
+// komponenten und drei PDF-Renderer. Welche Felder je Kategorie gefuellt sein
+// muessen, entscheidet die Validierung in
+// src/lib/validations/beschaeftigungs-angaben.ts.
+//
+// Bewusst **kein Betragsfeld** fuer das Entgelt: Die Checkliste fragt nur das
+// Merkmal "ueber der Grenze" ab. Ein Betrag waere zusaetzliches
+// personenbezogenes Datum eines Dritten, ohne verlangt zu sein.
+// =============================================
+enum BeschaeftigungsKategorie {
+  WEITERE /// 4a — laeuft derzeit parallel bei einem anderen Arbeitgeber
+  VORBESCHAEFTIGUNG /// 4b — im laufenden Kalenderjahr bereits ausgeuebt
+  AUSLAND /// 4c — Beschaeftigung oder selbstaendige Taetigkeit im Ausland
+}
+
+/// Art der weiteren Beschaeftigung (nur Kategorie WEITERE).
+/// Entspricht den Ankreuzfeldern in Abschnitt 4a der Checkliste.
+enum BeschaeftigungsArt {
+  GERINGFUEGIG_MIT_EIGENANTEIL
+  GERINGFUEGIG_OHNE_EIGENANTEIL
+  MEHR_ALS_GERINGFUEGIG
+}
+
+model BeschaeftigungsAngabe {
+  id             String       @id @default(uuid())
+  personalDataId String
+  personalData   PersonalData @relation(fields: [personalDataId], references: [id], onDelete: Cascade)
+
+  kategorie  BeschaeftigungsKategorie
+  /// Reihenfolge der Zeilen, wie der Beschaeftigte sie eingetragen hat.
+  orderIndex Int                      @default(0)
+
+  /// 4a kennt nur den Beginn, 4b und 4c Beginn und Ende.
+  /// Bei 4b kann der Zeitraum auch eine Meldung bei der Arbeitsagentur sein.
+  beginn DateTime?
+  ende   DateTime?
+
+  /// Angabe freiwillig — so steht es im amtlichen Muster (Fussnote zu 4a/4b/4c).
+  /// Bei 4b steht hier wahlweise die zustaendige Arbeitsagentur, bei 4c
+  /// wahlweise der Taetigkeitsort.
+  arbeitgeberName    String?
+  arbeitgeberAdresse String?
+
+  /// Nur 4a.
+  art BeschaeftigungsArt?
+
+  /// Nur 4b: Lag das monatliche Arbeitsentgelt ueber der Geringfuegigkeitsgrenze?
+  entgeltUeberGrenze Boolean?
+  /// Nur 4b: tatsaechliche Arbeitstage in diesem Zeitraum.
+  arbeitstage        Int?
+  /// Nur 4b: Die Zeile beschreibt eine Meldung als arbeit- oder
+  /// ausbildungsuchend, keine Beschaeftigung. Beides zaehlt fuer die
+  /// Berufsmaessigkeitspruefung, muss aber unterscheidbar bleiben.
+  beiArbeitsagentur  Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personalDataId, kategorie])
+  @@map("beschaeftigungs_angaben")
 }
 
 // =============================================
