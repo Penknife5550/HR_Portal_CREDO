@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { STATUS_LABELS, getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
@@ -77,12 +78,19 @@ interface DetailData {
   submittedAt: string | null;
   starterPacketSentAt: string | null;
   starterPacketSentCount: number;
-  organization: { id: string; name: string; mandantNumber: string };
+  organization: {
+    id: string;
+    name: string;
+    mandantNumber: string;
+    betriebsnummer?: string | null;
+  };
   personalData: {
     firstName: string | null;
     lastName: string | null;
     isComplete: boolean;
     currentStep: number;
+    /** Entscheidung aus Schritt 11 — steuert, welcher Antrag erzeugt wird. */
+    rvEntscheidung?: string | null;
     // Persönliche Angaben
     salutation: string | null;
     title: string | null;
@@ -1701,29 +1709,81 @@ function OnboardingErstellenSection({
   onboardingId,
   organizationId,
   canEdit,
+  rvEntscheidung,
+  betriebsnummerFehlt,
 }: {
   onboardingId: string;
   organizationId: string;
   canEdit: boolean;
+  rvEntscheidung?: string | null;
+  betriebsnummerFehlt: boolean;
 }) {
-  // Nutzt die generische Hub-Komponente; Onboarding-Spezifika (Modul + amtliches
-  // Masernschutz-PDF) bleiben hier gekapselt.
+  // Nutzt die generische Hub-Komponente; Onboarding-Spezifika (Modul, amtliche
+  // Formulare der Minijob-Checkliste) bleiben hier gekapselt.
+  const statisch = [
+    {
+      name: "Masernschutz – Nachweis-Bescheinigung",
+      tag: "Amtliches NRW-Formular (zum Ausfüllen beim Arzt)",
+      href: "/system-dokumente/masernschutz-nrw.pdf",
+      label: "PDF öffnen",
+    },
+    {
+      name: "Merkblatt zur Befreiung von der Rentenversicherungspflicht",
+      tag: "Amtliche Anlage der Minijob-Zentrale, Stand 30.06.2026",
+      href: "/system-dokumente/merkblatt-rv-befreiung.pdf",
+      label: "PDF öffnen",
+    },
+  ];
+
+  // Der Antrag entsteht nur, wenn der Beschaeftigte sich dafuer entschieden hat
+  // — und nur, wenn die Betriebsnummer des Mandanten hinterlegt ist. Fehlt sie,
+  // erscheint statt eines Knopfes der Grund: Ein deaktivierter Knopf ohne
+  // Begruendung ist hier schlimmer als gar keiner.
+  const antragsArt =
+    rvEntscheidung === "BEFREIUNG_BEANTRAGT"
+      ? "BEFREIUNG"
+      : rvEntscheidung === "AUFHEBUNG_BEANTRAGT"
+        ? "AUFHEBUNG"
+        : null;
+
+  if (antragsArt && !betriebsnummerFehlt) {
+    statisch.push({
+      name:
+        antragsArt === "BEFREIUNG"
+          ? "Antrag auf Befreiung von der Rentenversicherungspflicht"
+          : "Antrag auf Aufhebung der Befreiung von der Rentenversicherungspflicht",
+      tag: "Vorausgefüllt · gehört nach § 8 Abs. 2 Nr. 4a BVV in die Entgeltunterlagen",
+      href: `/api/onboarding/${onboardingId}/rv-antrag?art=${antragsArt}`,
+      label: "PDF erzeugen",
+    });
+  }
+
   return (
-    <TemplateGenerationSection
-      modul="ONBOARDING"
-      refId={onboardingId}
-      organizationId={organizationId}
-      canEdit={canEdit}
-      staticDocuments={[
-        {
-          name: "Masernschutz – Nachweis-Bescheinigung",
-          tag: "Amtliches NRW-Formular (zum Ausfüllen beim Arzt)",
-          href: "/system-dokumente/masernschutz-nrw.pdf",
-          label: "PDF öffnen",
-        },
-      ]}
-      emptyHint="Keine Onboarding-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ an."
-    />
+    <>
+      {antragsArt && betriebsnummerFehlt && (
+        <div className="rounded-2xl border-2 border-[#FBC900]/50 bg-[#FBC900]/10 p-4">
+          <p className="text-sm font-semibold text-foreground">
+            Der Antrag zur Rentenversicherung kann nicht erzeugt werden
+          </p>
+          <p className="mt-1 text-xs text-foreground/80">
+            Für diesen Mandanten ist keine BA-Betriebsnummer hinterlegt. Der
+            amtliche Antrag verlangt sie im Arbeitgeberteil. Sie tragen sie unter{" "}
+            <Link href="/mandanten" className="font-medium underline">
+              Mandanten
+            </Link>{" "}
+            nach.
+          </p>
+        </div>
+      )}
+      <TemplateGenerationSection
+        modul="ONBOARDING"
+        refId={onboardingId}
+        organizationId={organizationId}
+        canEdit={canEdit}
+        staticDocuments={statisch}
+        emptyHint="Keine Onboarding-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ an."
+      />
+    </>
   );
 }
 
@@ -1849,6 +1909,8 @@ function TabDocuments({
         onboardingId={onboardingId}
         organizationId={data.organization.id}
         canEdit={canEdit}
+        rvEntscheidung={data.personalData?.rvEntscheidung ?? null}
+        betriebsnummerFehlt={!data.organization.betriebsnummer}
       />
 
       {/* Starterpaket versenden */}

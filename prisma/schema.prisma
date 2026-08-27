@@ -17,11 +17,25 @@ datasource db {
 // =============================================
 model Organization {
   id            String           @id @default(uuid())
-  mandantNumber String           @unique // z.B. "712", "737", "742"
+  mandantNumber String           @unique // LOGA-Mandantennummer, z.B. "712" — NICHT die BA-Betriebsnummer (siehe betriebsnummer)
   name          String // z.B. "Gymnasium", "Kita Minden"
   shortName     String? // z.B. "GYM", "GSM"
   type          OrganizationType
   isActive      Boolean          @default(true)
+
+  // =============================================
+  // Meldewesen (Sozialversicherung)
+  // =============================================
+  // Achtstellige Betriebsnummer der Bundesagentur fuer Arbeit. Der
+  // Arbeitgeberteil beider Antraege nach § 6 Abs. 1b und § 6 Abs. 6 SGB VI
+  // verlangt sie (Seiten 8 und 9 der Minijob-Checkliste).
+  //
+  // NICHT die dreistellige mandantNumber aus LOGA — beide bestehen nebeneinander
+  // und werden regelmaessig verwechselt.
+  //
+  // Bewusst optional: Die Nummern traegt der Kunde nach. Bewusst NICHT @unique —
+  // mehrere Mandanten koennen zum selben Betrieb im Sinne der BA gehoeren.
+  betriebsnummer String?
 
   // =============================================
   // Elternzeit / Mutterschutz — Mandanten-Konfiguration (Phase 2)

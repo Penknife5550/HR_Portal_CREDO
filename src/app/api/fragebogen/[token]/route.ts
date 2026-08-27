@@ -17,6 +17,7 @@ import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import {
   computeMissingRequiredDocuments,
+  RV_BEFREIUNG_HINWEIS,
   documentTypeLabel,
 } from "@/lib/required-documents";
 import { MAX_STEP_NUMBER, SUMMARY_STEP_NUMBER } from "@/lib/fragebogen-steps";
@@ -202,6 +203,10 @@ export async function GET(
       name: onboarding.organization.name,
       mandantNumber: onboarding.organization.mandantNumber,
       type: onboarding.organization.type,
+      // Nur die Tatsache, nicht die Nummer: Der Fragebogen muss den
+      // Antrags-Download sperren koennen, aber die Betriebsnummer ist ein
+      // Arbeitgeber-Stammdatum und gehoert nicht in ein oeffentliches Formular.
+      betriebsnummerVorhanden: Boolean(onboarding.organization.betriebsnummer),
       // DSGVO: verantwortliche Stelle (pro Mandant konfigurierbar, sonst Default)
       dsgvoVerantwortlicheName: onboarding.organization.dsgvoVerantwortlicheName,
       dsgvoVerantwortlicheStrasse: onboarding.organization.dsgvoVerantwortlicheStrasse,
@@ -551,7 +556,11 @@ export async function POST(
     "GEBURTSURKUNDE_KIND",
   ];
 
-  if (requiredDocs.length > 0) {
+  // Bewusst ohne `if (requiredDocs.length > 0)`: Die Pflicht zum
+  // Befreiungsantrag entsteht aus der Entscheidung des Beschaeftigten, nicht aus
+  // der Vorlage. Setzt HR die Pflichtdokumente einer Vorlage auf die leere
+  // Liste, verschwaende der alte Guard diese Sperre lautlos mit.
+  {
     const [uploaded, childCount] = await Promise.all([
       prisma.document.findMany({
         where: { onboardingId: onboarding.id },
@@ -562,17 +571,25 @@ export async function POST(
       }),
     ]);
 
+    // Verbindlich ist der Datenbankstand, nicht etwas Mitgeschicktes: In einem
+    // zweiten Tab kann ein Dokument geloescht worden sein, waehrend hier
+    // abgesendet wird.
     const missing = computeMissingRequiredDocuments({
       required: requiredDocs,
       uploadedTypes: uploaded.map((d) => d.type),
       hasChildren: childCount > 0,
+      // personalData ist ueber validateMagicToken bereits geladen.
+      rvEntscheidung: onboarding.personalData?.rvEntscheidung ?? null,
     });
 
     if (missing.length > 0) {
       const labels = missing.map((t) => documentTypeLabel(t)).join(", ");
+      const nurRv = missing.length === 1 && missing[0] === "RV_BEFREIUNG";
       return NextResponse.json(
         {
-          error: `Bitte laden Sie folgende Pflichtdokumente hoch, bevor Sie absenden: ${labels}.`,
+          error: nurRv
+            ? RV_BEFREIUNG_HINWEIS
+            : `Bitte laden Sie folgende Pflichtdokumente hoch, bevor Sie absenden: ${labels}.`,
           missingDocuments: missing,
         },
         { status: 400 }

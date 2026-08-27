@@ -8,6 +8,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import {
+  BETRIEBSNUMMER_FORMAT_FEHLER,
+  pruefeBetriebsnummerEingabe,
+} from "@/lib/betriebsnummer";
 
 // Gueltige OrganizationType-Werte (aus Prisma Schema)
 const VALID_ORG_TYPES = [
@@ -36,6 +40,7 @@ export async function GET() {
       select: {
         id: true,
         mandantNumber: true,
+        betriebsnummer: true,
         name: true,
         shortName: true,
         type: true,
@@ -103,6 +108,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Betriebsnummer ist optional — sie wird oft erst spaeter nachgetragen.
+    // Ist sie angegeben, muss sie stimmen: acht Ziffern, normalisiert gespeichert.
+    const betriebsnummer = pruefeBetriebsnummerEingabe(body.betriebsnummer);
+    if (!betriebsnummer.ok) {
+      return NextResponse.json(
+        { error: BETRIEBSNUMMER_FORMAT_FEHLER },
+        { status: 400 }
+      );
+    }
+
     // Pruefen ob Mandantennummer bereits existiert
     const existing = await prisma.organization.findUnique({
       where: { mandantNumber: mandantNumber.trim() },
@@ -117,6 +132,7 @@ export async function POST(request: NextRequest) {
     const organization = await prisma.organization.create({
       data: {
         mandantNumber: mandantNumber.trim(),
+        betriebsnummer: betriebsnummer.wert,
         name: name.trim(),
         shortName: shortName?.trim() || null,
         type,

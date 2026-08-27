@@ -1,10 +1,10 @@
 # Minijob-Checkliste — Umsetzungsstand
 
 > **Stand:** 2026-08-27 · Branch `feat/minijob-checkliste-2026` (auf `origin`)
-> **Fertig:** AP 1, AP 2, AP 5, AP 6, AP 7 · **Als Nächstes:** AP 8 → AP 12
-> **Verifiziert:** 641 Tests grün (48 Suites) · `tsc --noEmit` sauber · `npm run lint`
-> ohne Errors · `npm run build` erfolgreich · Schritt 11 im Browser gegen die
-> Dev-Datenbank durchgespielt (Auswahl, Sperren, Speichern, Zusammenfassung)
+> **Fertig:** AP 1, AP 2, AP 5, AP 6, AP 7, AP 8 · **Als Nächstes:** AP 12
+> **Verifiziert:** 706 Tests grün (52 Suites) · `tsc --noEmit` sauber · `npm run lint`
+> ohne Errors · `npm run build` erfolgreich · Antragserzeugung, Sperren und
+> Upload-Pflicht im Browser gegen die Dev-Datenbank durchgespielt
 
 Dieses Dokument ist die Übergabe: Was ist gebaut, was ist bewusst offen, und
 womit fängt man weiter an. Der fachliche Plan steht in
@@ -110,6 +110,64 @@ Leitgedanken, die ein Test absichert:
 Die MINIJOB-Vorlage schaltet Schritt 11 über die Entrypoint-Migration
 `ensureMinijobRenteSchritt` ein — samt der Snapshots laufender Vorgänge.
 
+### AP 8 — Merkblatt, beide Anträge, Betriebsnummer
+
+**Die Betriebsnummer.** `Organization.betriebsnummer` (achtstellig, BA) — bewusst
+neben `mandantNumber` (dreistellig, LOGA), weil beide regelmäßig verwechselt
+werden. Sie steht deshalb im selben Formular direkt untereinander und in der
+Mandantenliste in zwei Spalten nebeneinander; fehlt sie, zeigt die Liste ein
+Warn-Badge „fehlt". Regeln in
+[`src/lib/betriebsnummer.ts`](../../../src/lib/betriebsnummer.ts) — **ohne**
+Prüfziffernrechnung: Die gilt erst für neuere Vergaben, und eine ältere echte
+Nummer würde durchfallen und damit genau die Antragserzeugung blockieren, die die
+Prüfung schützen soll.
+
+**Das Merkblatt** (Seite 7) liegt als amtliches Original unter
+`public/system-dokumente/merkblatt-rv-befreiung.pdf` — dieselbe Entscheidung wie
+beim Masernschutz-Formular: nichts auszufüllen, also nicht nachbauen. Es ist über
+den Magic Link erreichbar, weil Schritt 11 die Kenntnisnahme verlangt; der Weg
+über die Brief-Vorlagen wäre für den Beschäftigten gesperrt.
+
+**Die beiden Anträge** (Seiten 8 und 9) werden dagegen **nachgebaut**
+([`pdf-rv-antrag.ts`](../../../src/lib/pdf-rv-antrag.ts)), weil sie die
+Betriebsnummer tragen, die nur das Portal kennt. Das Merkblatt verlangt den
+Vordruck nur „möglichst", eine zwingende Form gibt es also nicht. Abgesichert
+durch: versionierten Wortlaut in
+[`rv-antrag-wortlaut.ts`](../../../src/lib/rv-antrag-wortlaut.ts), eine
+Herkunftszeile auf jedem Blatt und einen Test, der jeden Satz zeichengenau gegen
+die abgelegte amtliche Textfassung
+(`docs/module/minijob/anlagen-wortlaut-2026-06-30.txt`) hält.
+
+**Was das Blatt NICHT ausfüllt — und warum.** Vorbelegt sind genau fünf Werte:
+Name, Vorname, Rentenversicherungsnummer, Arbeitgebername, Betriebsnummer. Die
+vier Arbeitgeberfelder bleiben leer:
+
+- „*ist am … bei mir eingegangen*" ist eine Feststellung des Arbeitgebers. Zum
+  Zeitpunkt des Drucks hat der Antrag ihn noch gar nicht erreicht — das Blatt
+  wird ja gerade erst zum Unterschreiben ausgegeben.
+- „*wirkt ab …*" hängt daran, ob rechtzeitig an die Minijob-Zentrale gemeldet
+  wird (nächste Entgeltabrechnung, **spätestens** sechs Wochen — maßgeblich ist
+  der frühere der beiden Termine). Das steht beim Druck noch nicht fest.
+- Beide Unterschriftszeilen sind der einzige Grund, warum überhaupt gedruckt wird.
+
+Diese Felder erfasst **AP 12**. Einzige Ausnahme: die zwei Kästchen „0" und „1"
+in der Wirkungszeile des Aufhebungsantrags — die sind Vordruck, nicht
+Vorbefüllung (die Aufhebung wirkt nur zum Monatsersten).
+
+**Die Upload-Pflicht.** `computeMissingRequiredDocuments` kennt jetzt die
+`rvEntscheidung`. Der unterschriebene Befreiungsantrag wird verlangt — **nur** bei
+`BEFREIUNG_BEANTRAGT`. Bei der **Aufhebung nicht**: § 6 Abs. 6 SGB VI lässt die
+elektronische Erklärung ausdrücklich zu, ein erzwungener Ausdruck wäre
+hinzuerfundene Förmlichkeit. Damit ist das Versprechen aus Schritt 11 eingelöst.
+
+**Zwei Ausgabekanäle, eine Sperre.** Der Beschäftigte holt das Blatt über
+`/api/fragebogen/[token]/rv-antrag`, HR über `/api/onboarding/[id]/rv-antrag`.
+Beide prüfen mit derselben Funktion
+([`minijob-antrag.ts`](../../../src/lib/minijob-antrag.ts)) und antworten mit 409
+und Klartext, wenn die Betriebsnummer fehlt. Der Beschäftigten-Kanal läuft
+bewusst **nicht** über die Brief-Vorlagen: Deren PDF-Ausgabe hängt an Gotenberg,
+ein Ausfall dieses Dienstes würde sonst den ganzen Fragebogen blockieren.
+
 ---
 
 ## 3. Festlegungen, die man kennen muss
@@ -155,7 +213,7 @@ daneben: Ehrenamt auf Schritt 2 von 3 zeigte 22 statt 67 Prozent.
 
 ---
 
-## 4. Zwei Fallen, die schon zugeschnappt sind
+## 4. Fallen, die schon zugeschnappt sind
 
 **Der Snapshot.** Der Fragebogen liest bevorzugt
 `OnboardingProcess.formTemplateSnapshot` — eine bei der Anlage eingefrorene Kopie
@@ -181,6 +239,21 @@ Absenden, und Abschnitt 6 zeigte noch die Altfelder aus der Zeit vor AP 5/6.
 Beides ist nachgezogen. Wer einen Schritt ergänzt, ergänzt auch die
 Zusammenfassung **und** den PDF-Export.
 
+**Blockieren statt leer drucken.** Der Weg über die Brief-Vorlagen ersetzt
+fehlende Platzhalter still durch „___" und meldet sie nur in einem Header. Bei
+einem amtlichen Antrag, der nach § 8 Abs. 2 Nr. 4a BVV in die Entgeltunterlagen
+und damit in die Betriebsprüfung geht, ist ein leeres Pflichtfeld schlimmer als
+kein Formular: Es sieht vollständig aus und ist es nicht. Deshalb die harte
+Vorprüfung vor dem ersten Byte.
+
+**Die Sackgasse.** Fehlt die Betriebsnummer, kann der Beschäftigte den Antrag
+nicht erzeugen, also nicht unterschreiben, also nicht hochladen — und den
+Fragebogen nicht absenden. Die Upload-Pflicht wird deshalb **nicht** automatisch
+ausgesetzt (das würde die Schriftform still unterlaufen), sondern das Fehlen wird
+früh sichtbar: Warn-Badge in der Mandantenliste, Hinweis im Dokumente-Hub des
+Vorgangs, Klartext in Schritt 11 mit dem Zusatz, dass die Eingaben gespeichert
+bleiben.
+
 **Block im Absatz.** `HilfeHinweis` rendert seinen aufgeklappten Kasten als
 `<span class="block">`, nicht als `<div>`. Ein `<div>` im `<p>` bricht der Browser
 beim Parsen auf; Server- und Client-Struktur laufen auseinander und React meldet
@@ -193,26 +266,45 @@ einen Hydration-Fehler. Als phrasing content passt der Kasten in `<p>`, `<label>
 
 | AP | Inhalt | Aufwand |
 |---|---|---|
-| **8** | Merkblatt und beide Anträge als System-Dokumente aus dem PDF vom 30.06.2026 (Seiten 7–9); Betriebsnummer am Mandanten | 16–20 h |
-| **12** | HR-Seite: Eingangsdatum, Wirkungsdatum, zwei Fristen (die frühere aus nächster Entgeltabrechnung / sechs Wochen, danach die Monatsfrist für den Widerspruch) | 12–16 h |
+| **12** | HR-Seite: Eingangsdatum und Wirkungsdatum erfassen, zwei Fristen überwachen (die frühere aus nächster Entgeltabrechnung / sechs Wochen, danach die Monatsfrist für den Widerspruch) | 12–16 h |
 
-**Was AP 8 einlösen muss:** Schritt 11 sagt dem Beschäftigten heute schon
-„Ohne den unterschriebenen Antrag können Sie den Fragebogen nicht absenden."
-Diese Sperre gibt es noch **nicht** — der Upload-Typ „Antrag RV-Befreiung
-(Minijob)" existiert, ist aber nicht als Pflicht verdrahtet. Bis AP 8 ist das ein
-Versprechen, das die Software nicht hält.
+**Was AP 12 aus der Rechtsprüfung mitnehmen muss** (Gegenprüfung vom 27.08.2026,
+drei unabhängige Blickwinkel je Regel):
 
-**Noch offen aus AP 6/7:** Die HR-Detailseite zeigt die Rentenentscheidung und
-die Beschäftigungstabellen noch nicht an — sie stehen bisher nur im Fragebogen,
-in der Zusammenfassung und im PDF-Export. Das gehört zu AP 12.
+- **Zwei Zweige, nicht einer.** Die Befreiung wirkt „grundsätzlich" ab Beginn des
+  Eingangsmonats, frühestens ab Beschäftigungsbeginn — aber nur, wenn fristgerecht
+  gemeldet wurde. Andernfalls beginnt sie erst am Ersten des übernächsten Monats
+  nach Eingang der Meldung bei der Minijob-Zentrale. Welcher Zweig gilt, steht
+  beim Erzeugen des Antrags noch nicht fest.
+- **Zwei konkurrierende Meldetermine.** Maßgeblich ist der **frühere** aus
+  nächster Entgeltabrechnung und Eingang + 6 Wochen. Eine Ampel, die nur sechs
+  Wochen zählt, steht bei Eingang zu Monatsbeginn noch auf Grün, während die
+  Frist über die Entgeltabrechnung längst abgelaufen ist.
+- **Nicht automatisierbar.** Der Eingang der DEUEV-Meldung bei der
+  Minijob-Zentrale entsteht außerhalb des Portals. Beide Widerspruchsfristen und
+  der Verspätungsfall hängen daran — sie brauchen ein manuelles Erfassungsfeld
+  und dürfen nicht geschätzt werden.
+- **Monate rechnen, nicht Tage.** 31.01. + 30 Tage ergibt den 02.03. statt korrekt
+  den 01.02.
+- **Europe/Berlin, nicht UTC.** Beide Wirkungsformeln setzen auf dem *Monat* auf.
+  Eine Absendung am 01.09. um 00:30 MESZ ist in UTC der 31.08. — das verschöbe das
+  Ergebnis um einen vollen Monat und damit die Beitragspflicht.
+- **Keine Analogie zur Aufhebung.** Für sie nennt der amtliche Text weder
+  „frühestens ab Beschäftigungsbeginn" noch eine Meldefrist noch die
+  Wirkungsverschiebung. Alle drei gelten nur für die Befreiung.
+- **Vorschlag statt Automatik.** Die berechneten Daten haben unmittelbare
+  Beitragsfolgen. Sie gehören HR als bestätigbarer Vorschlag vorgelegt, nicht als
+  unveränderliches Ergebnis.
 
 ---
 
 ## 6. Was noch von außen kommen muss
 
-1. Die **achtstelligen BA-Betriebsnummern** der 16 Mandanten (AP 8). Ohne sie
-   blockiert die Antragserzeugung — bewusst, statt still mit leerer Pflichtangabe
-   zu drucken.
+1. Die **achtstelligen BA-Betriebsnummern** der 16 Mandanten. Das Feld und die
+   Pflegemaske stehen (AP 8); solange eine Nummer fehlt, blockiert die
+   Antragserzeugung für diesen Mandanten — bewusst, statt still mit leerer
+   Pflichtangabe zu drucken. Die Mandantenliste zeigt mit einem Warn-Badge,
+   welche noch offen sind.
 2. Der **Termin der Entgeltabrechnung** je Mandant (AP 12). Ohne ihn überwacht das
    Portal nur die äußere Sechs-Wochen-Grenze und meldet zu spät.
 

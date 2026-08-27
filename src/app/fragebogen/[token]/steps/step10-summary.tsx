@@ -13,6 +13,10 @@ import { DocumentUpload } from "./document-upload";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 import { formatVerantwortlicheStelle } from "@/lib/dsgvo";
 import { AKTUELLE_ERKLAERUNG } from "@/lib/erklaerung-arbeitnehmer";
+import {
+  RV_BEFREIUNG_HINWEIS,
+  documentTypeLabel,
+} from "@/lib/required-documents";
 import { rvEntscheidungLabel } from "@/lib/minijob-rentenversicherung";
 import { statusLabel } from "@/lib/minijob-status";
 import {
@@ -58,6 +62,8 @@ interface StepProps {
   token?: string;
   fieldConfig?: FieldConfigHelper;
   requiredDocuments?: string[];
+  /** Ist beim Mandanten eine Betriebsnummer hinterlegt? */
+  antragErzeugbar?: boolean;
 }
 
 // Hilfs-Labels
@@ -168,11 +174,21 @@ export function Step10Summary({
   organization,
   token,
   requiredDocuments,
+  antragErzeugbar = true,
 }: StepProps) {
   const [dsgvoAccepted, setDsgvoAccepted] = useState(false);
   const [erklaerungAccepted, setErklaerungAccepted] = useState(false);
   const [erklaerungOrt, setErklaerungOrt] = useState("");
   const [dsgvoError, setDsgvoError] = useState("");
+  /**
+   * Eigener Zustand fuer fehlende Dokumente — bewusst nicht `dsgvoError`.
+   *
+   * Der wird ueber Teilzeichenketten zurueckgesetzt („Ort", „Erklärung",
+   * „Datenschutz"). Eine Dokumentenmeldung, die eines dieser Woerter enthaelt,
+   * verschwaende beim naechsten Haken lautlos.
+   */
+  const [fehlendeDokumente, setFehlendeDokumente] = useState<string[]>([]);
+  const [dokumenteFehler, setDokumenteFehler] = useState("");
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const d = allData;
@@ -199,6 +215,25 @@ export function Step10Summary({
       );
       return;
     }
+
+    // Nur Hoeflichkeit: Verbindlich prueft der Server gegen den Datenbankstand.
+    // In einem zweiten Tab kann ein Dokument geloescht worden sein, waehrend
+    // hier abgeschickt wird.
+    if (fehlendeDokumente.length > 0) {
+      const nurRv =
+        fehlendeDokumente.length === 1 && fehlendeDokumente[0] === "RV_BEFREIUNG";
+      setDokumenteFehler(
+        nurRv
+          ? RV_BEFREIUNG_HINWEIS
+          : "Bitte laden Sie zuerst die fehlenden Pflichtunterlagen hoch: " +
+              fehlendeDokumente.map((t) => documentTypeLabel(t)).join(", ") +
+              "."
+      );
+      setDsgvoError("");
+      return;
+    }
+
+    setDokumenteFehler("");
     setDsgvoError("");
     setShowConfirmDialog(true);
   };
@@ -540,6 +575,12 @@ export function Step10Summary({
           token={token}
           hasChildren={children.length > 0}
           requiredDocuments={requiredDocuments}
+          rvEntscheidung={(d.rvEntscheidung as string) ?? null}
+          antragErzeugbar={antragErzeugbar}
+          onMissingChange={(missing) => {
+            setFehlendeDokumente(missing);
+            if (missing.length === 0) setDokumenteFehler("");
+          }}
         />
       )}
 
@@ -694,6 +735,11 @@ export function Step10Summary({
             </p>
           </div>
         </label>
+        {dokumenteFehler && (
+          <p className="mt-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {dokumenteFehler}
+          </p>
+        )}
         {dsgvoError && (
           <p className="mt-2 text-xs text-destructive">{dsgvoError}</p>
         )}

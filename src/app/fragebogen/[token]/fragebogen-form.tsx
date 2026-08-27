@@ -36,6 +36,8 @@ interface OnboardingData {
     name: string;
     mandantNumber: string;
     type: string;
+    /** Ist beim Mandanten eine BA-Betriebsnummer hinterlegt? */
+    betriebsnummerVorhanden?: boolean;
     dsgvoVerantwortlicheName?: string | null;
     dsgvoVerantwortlicheStrasse?: string | null;
     dsgvoVerantwortlichePlz?: string | null;
@@ -392,7 +394,14 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     employment: <Step6Employment {...stepProps} fieldConfig={getFieldConfig(6)} />,
     education: <Step8Education {...stepProps} fieldConfig={getFieldConfig(8)} />,
     masern: <Step9Masern {...stepProps} fieldConfig={getFieldConfig(9)} token={token} />,
-    rente: <Step11Rente {...stepProps} fieldConfig={getFieldConfig(11)} />,
+    rente: (
+      <Step11Rente
+        {...stepProps}
+        fieldConfig={getFieldConfig(11)}
+        token={token}
+        antragErzeugbar={initialData.organization.betriebsnummerVorhanden !== false}
+      />
+    ),
     summary: (
       <Step10Summary
         {...stepProps}
@@ -401,6 +410,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
         onSubmit={handleSubmit}
         token={token}
         requiredDocuments={initialData.requiredDocuments ?? undefined}
+        antragErzeugbar={initialData.organization.betriebsnummerVorhanden !== false}
       />
     ),
   };

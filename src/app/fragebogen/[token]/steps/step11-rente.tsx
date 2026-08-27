@@ -30,9 +30,20 @@ interface StepProps {
   onBack: () => void;
   saving: boolean;
   fieldConfig?: FieldConfigHelper;
+  /** Magic-Link-Token — fuer den Download des vorausgefuellten Antrags. */
+  token?: string;
+  /** Ist beim Mandanten eine Betriebsnummer hinterlegt? */
+  antragErzeugbar?: boolean;
 }
 
-export function Step11Rente({ data, onNext, onBack, saving }: StepProps) {
+export function Step11Rente({
+  data,
+  onNext,
+  onBack,
+  saving,
+  token,
+  antragErzeugbar = true,
+}: StepProps) {
   const [entscheidung, setEntscheidung] = useState<string>(
     (data.rvEntscheidung as string) || ""
   );
@@ -52,6 +63,14 @@ export function Step11Rente({ data, onNext, onBack, saving }: StepProps) {
     () => RV_OPTIONEN.filter((o) => istWaehlbar(o, heute)),
     [heute]
   );
+
+  // Der Server erzeugt den Antrag aus dem GESPEICHERTEN Stand. Solange die
+  // Auswahl nur im Browser steht, liefe ein Download auf die alte Entscheidung
+  // — oder ins Leere. Deshalb haengt der Knopf am gespeicherten Wert, nicht am
+  // gerade angeklickten.
+  const gespeicherteEntscheidung = data.rvEntscheidung as string | undefined;
+  const antragSchonGespeichert =
+    gespeicherteEntscheidung === "BEFREIUNG_BEANTRAGT";
 
   const gewaehlt = getRvOption(entscheidung);
   const brauchtMerkblatt = gewaehlt?.brauchtMerkblatt === true;
@@ -138,6 +157,23 @@ export function Step11Rente({ data, onNext, onBack, saving }: StepProps) {
             <p className="rounded-lg bg-[#009AC6]/5 px-3 py-2">
               {MERKBLATT_KERN.beratung}
             </p>
+            {/* Der Befreiungsantrag bestaetigt die Kenntnisnahme des amtlichen
+                Merkblatts. Was oben steht, ist unsere Zusammenfassung — das
+                Original gehoert daneben, sichtbar getrennt, damit die
+                Bestaetigung sich auf den amtlichen Wortlaut beziehen kann. */}
+            <p className="border-t border-border pt-3">
+              <a
+                href="/system-dokumente/merkblatt-rv-befreiung.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-primary underline underline-offset-2"
+              >
+                Amtliches Merkblatt der Minijob-Zentrale öffnen (PDF)
+              </a>
+              <span className="mt-0.5 block text-muted-foreground">
+                Der Wortlaut im Original, Stand 30. Juni 2026.
+              </span>
+            </p>
           </div>
         )}
       </div>
@@ -210,6 +246,29 @@ export function Step11Rente({ data, onNext, onBack, saving }: StepProps) {
                         hoch. Ohne den unterschriebenen Antrag können Sie den
                         Fragebogen nicht absenden.
                       </p>
+                      {token && antragErzeugbar && antragSchonGespeichert && (
+                        <a
+                          href={`/api/fragebogen/${token}/rv-antrag?art=BEFREIUNG`}
+                          className="mt-2 inline-block rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/5"
+                        >
+                          Antrag herunterladen (PDF)
+                        </a>
+                      )}
+                      {antragErzeugbar && !antragSchonGespeichert && (
+                        <p className="mt-2 text-foreground/70">
+                          Den ausgefüllten Antrag finden Sie zum Herunterladen im
+                          letzten Schritt bei den Unterlagen — sobald Sie diese
+                          Auswahl mit „Weiter“ gespeichert haben.
+                        </p>
+                      )}
+                      {!antragErzeugbar && (
+                        <p className="mt-2 rounded-lg bg-white/60 px-3 py-2 text-foreground">
+                          Der Antrag kann derzeit nicht erstellt werden, weil
+                          beim Arbeitgeber eine Angabe fehlt. Bitte wenden Sie
+                          sich an die Personalabteilung. Ihre Eingaben bleiben
+                          gespeichert.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
