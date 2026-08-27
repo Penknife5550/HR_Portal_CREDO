@@ -23,6 +23,10 @@ import { MAX_STEP_NUMBER, SUMMARY_STEP_NUMBER } from "@/lib/fragebogen-steps";
 import { istBekannteErklaerung } from "@/lib/erklaerung-arbeitnehmer";
 import { berechnePruefsumme } from "@/lib/fragebogen-pruefsumme";
 import {
+  ERLAUBTE_FRAGEBOGEN_FELDER,
+  LEERBARE_FRAGEBOGEN_FELDER,
+} from "@/lib/fragebogen-felder";
+import {
   BESCHAEFTIGUNGS_KATEGORIEN,
   beschaeftigungsAngabenListeSchema,
   zuDatensatz,
@@ -83,11 +87,37 @@ const fragebogenFieldsSchema = z.object({
   minijobRvBefreiung: z.boolean().optional(),
   bornAfter1971: z.boolean().optional(),
   masernschutzProvided: z.boolean().optional(),
+  // Abschnitt 2 der Minijob-Checkliste: Status bei Beginn der Beschaeftigung
+  // und die Rueckfrage zur Agentur fuer Arbeit.
+  beschaeftigungsStatus: z.enum([
+    "SCHUELER",
+    "STUDENT",
+    "SCHULENTLASSEN_BERUFSAUSBILDUNG",
+    "SCHULENTLASSEN_STUDIUM",
+    "SCHULENTLASSEN_FREIWILLIGENDIENST",
+    "BESCHAEFTIGUNGSLOS_SUCHEND",
+    "FREIWILLIGENDIENSTLEISTENDER",
+    "PRAKTIKANT",
+    "BEAMTER",
+    "SELBSTSTAENDIGER",
+    "ARBEITNEHMER_HAUPTBESCHAEFTIGUNG",
+    "ARBEITNEHMER_UNBEZAHLTER_URLAUB",
+    "ARBEITNEHMER_ELTERNZEIT",
+    "ALTERSVOLLRENTNER_VOR_REGELALTERSGRENZE",
+    "ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE",
+    "VERSORGUNGSEMPFAENGER",
+    "SONSTIGE",
+  ]).optional(),
+  // nullable: Wird die Frage gegenstandslos, sendet das Formular null.
+  beschaeftigungsStatusSonstige: z.string().max(200).nullable().optional(),
+  alsArbeitsuchendGemeldet: z.boolean().optional(),
+  agenturFuerArbeit: z.string().max(200).nullable().optional(),
+  mitLeistungsbezug: z.boolean().nullable().optional(),
   // Grundfragen zu Abschnitt 4 der Minijob-Checkliste. hasOtherEmployment
   // (oben) ist die Grundfrage zu 4a.
   vorbeschaeftigungenVorhanden: z.boolean().optional(),
   auslandsbeschaeftigungVorhanden: z.boolean().optional(),
-  summeUeberGeringfuegigkeitsgrenze: z.boolean().optional(),
+  summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
   // Registry-Nummer des Schritts, auf dem der Vorgang steht — nicht die
   // Anzeigeposition. Obergrenze kommt aus der zentralen Schritt-Definition,
   // damit ein neuer Schritt hier nicht vergessen wird.
@@ -244,32 +274,22 @@ export async function PUT(
     });
   }
 
-  // Whitelist erlaubter Felder (Mass-Assignment-Schutz)
-  const ALLOWED_FIELDS = new Set([
-    "salutation", "title", "firstName", "lastName", "birthName",
-    "birthDate", "birthPlace", "birthCountry", "nationality",
-    "maritalStatus", "severelyDisabled", "disabilityDegree",
-    "street", "houseNumber", "zipCode", "city", "country",
-    "phone", "mobile", "emailPrivate",
-    "iban", "bic", "bankName", "accountHolder",
-    "socialSecurityNumber", "healthInsuranceName", "healthInsuranceType",
-    "parentStatus", "taxId", "taxClass", "taxAllowance", "childAllowance",
-    "religion", "highestSchoolDegree", "highestProfessionalDegree",
-    "isBeamter", "besoldungsgruppe", "laufbahngruppe", "dienstzeitBeginn",
-    "amtsbezeichnung", "verfassungstreuePruefung",
-    "hasOtherEmployment", "otherEmployerName", "otherWeeklyHours",
-    "employerType", "hasMinijob", "minijobRvBefreiung",
-    "bornAfter1971", "masernschutzProvided",
-  ]);
+  // Freigabeliste und leerbare Felder stehen in src/lib/fragebogen-felder.ts —
+  // dort halten Tests sie gegen die Schritt-Schemata.
+  const ALLOWED_FIELDS = ERLAUBTE_FRAGEBOGEN_FELDER;
+  const DARF_GELEERT_WERDEN = LEERBARE_FRAGEBOGEN_FELDER;
 
   // PersonalData upserten (erstellen oder aktualisieren)
   const updateData: Record<string, unknown> = {};
 
   // Nur gesetzte UND erlaubte Felder uebernehmen (kein Ueberschreiben mit null)
   for (const [key, value] of Object.entries(data)) {
-    if (ALLOWED_FIELDS.has(key) && value !== undefined && value !== null && value !== "") {
-      updateData[key] = value;
+    if (!ALLOWED_FIELDS.has(key) || value === undefined) continue;
+    if (value === null || value === "") {
+      if (DARF_GELEERT_WERDEN.has(key)) updateData[key] = null;
+      continue;
     }
+    updateData[key] = value;
   }
 
   // Speziell: Booleans und 0 erlauben
@@ -291,6 +311,16 @@ export async function PUT(
     updateData.hasMinijob = data.hasMinijob;
   if (typeof data.minijobRvBefreiung === "boolean")
     updateData.minijobRvBefreiung = data.minijobRvBefreiung;
+  if (typeof data.alsArbeitsuchendGemeldet === "boolean")
+    updateData.alsArbeitsuchendGemeldet = data.alsArbeitsuchendGemeldet;
+  if (typeof data.mitLeistungsbezug === "boolean")
+    updateData.mitLeistungsbezug = data.mitLeistungsbezug;
+  if (typeof data.vorbeschaeftigungenVorhanden === "boolean")
+    updateData.vorbeschaeftigungenVorhanden = data.vorbeschaeftigungenVorhanden;
+  if (typeof data.auslandsbeschaeftigungVorhanden === "boolean")
+    updateData.auslandsbeschaeftigungVorhanden = data.auslandsbeschaeftigungVorhanden;
+  if (typeof data.summeUeberGeringfuegigkeitsgrenze === "boolean")
+    updateData.summeUeberGeringfuegigkeitsgrenze = data.summeUeberGeringfuegigkeitsgrenze;
 
   // Datumsfelder konvertieren
   if (data.birthDate) updateData.birthDate = new Date(data.birthDate);

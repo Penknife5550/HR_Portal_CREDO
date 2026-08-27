@@ -149,13 +149,18 @@ export type Step5Data = z.infer<typeof step5Schema>;
 // Step 6: Weitere Beschaeftigung
 // =============================================
 export const step6Schema = z.object({
+  beschaeftigungsStatus: z.string(),
+  beschaeftigungsStatusSonstige: z.string().optional(),
+  alsArbeitsuchendGemeldet: z.boolean(),
+  agenturFuerArbeit: z.string().optional(),
+  mitLeistungsbezug: z.boolean().nullable().optional(),
   hasOtherEmployment: z.boolean(),
-  otherEmployerName: z.string(),
-  otherWeeklyHours: z.number().min(0).max(60).nullable(),
+  summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
+  vorbeschaeftigungenVorhanden: z.boolean(),
+  auslandsbeschaeftigungVorhanden: z.boolean(),
   employerType: z.enum(["hauptarbeitgeber", "nebenarbeitgeber", "nein"], {
     required_error: "Bitte waehlen Sie eine Option.",
   }),
-  hasMinijob: z.boolean(),
 });
 
 export type Step6Data = z.infer<typeof step6Schema>;
@@ -308,18 +313,91 @@ export function createStep5Schema(fc: FieldConfigHelper) {
   });
 }
 
+/**
+ * Schritt 6 — Weitere Beschaeftigungen und Status.
+ *
+ * Deckt Abschnitt 2 (Status, Meldung bei der Agentur fuer Arbeit) und die
+ * Grundfragen zu Abschnitt 4 der Minijob-Checkliste ab. Die Tabellenzeilen
+ * selbst werden getrennt geprueft — siehe validations/beschaeftigungs-angaben.ts.
+ *
+ * Die alten Felder `otherEmployerName`, `otherWeeklyHours` und `hasMinijob`
+ * werden hier nicht mehr abgefragt: Sie gehen in der Tabelle 4a auf. In der
+ * Datenbank bleiben sie, damit Altvorgaenge lesbar bleiben.
+ */
 export function createStep6Schema(fc: FieldConfigHelper) {
-  return z.object({
-    hasOtherEmployment: z.boolean(),
-    otherEmployerName: z.string(),
-    otherWeeklyHours: z.number().min(0).max(60).nullable(),
-    employerType: reqEnum(
-      fc, "employerType",
-      ["hauptarbeitgeber", "nebenarbeitgeber", "nein"],
-      "Bitte waehlen Sie eine Option."
-    ),
-    hasMinijob: z.boolean(),
-  });
+  return z
+    .object({
+      beschaeftigungsStatus: z
+        .string()
+        .min(1, "Bitte waehlen Sie aus, was auf Sie zutrifft."),
+      beschaeftigungsStatusSonstige: z.string().max(200).optional(),
+
+      alsArbeitsuchendGemeldet: z.boolean(),
+      agenturFuerArbeit: z.string().max(200).optional(),
+      mitLeistungsbezug: z.boolean().nullable().optional(),
+
+      hasOtherEmployment: z.boolean(),
+      summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
+      vorbeschaeftigungenVorhanden: z.boolean(),
+      auslandsbeschaeftigungVorhanden: z.boolean(),
+
+      employerType: reqEnum(
+        fc, "employerType",
+        ["hauptarbeitgeber", "nebenarbeitgeber", "nein"],
+        "Bitte waehlen Sie eine Option."
+      ),
+    })
+    .superRefine((werte, ctx) => {
+      // "Sonstige" ohne Erlaeuterung ist keine Angabe.
+      if (
+        werte.beschaeftigungsStatus === "SONSTIGE" &&
+        !werte.beschaeftigungsStatusSonstige?.trim()
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["beschaeftigungsStatusSonstige"],
+          message: "Bitte beschreiben Sie kurz, was auf Sie zutrifft.",
+        });
+      }
+
+      // Wer gemeldet ist, muss sagen wo — sonst laesst sich die
+      // Berufsmaessigkeit spaeter nicht pruefen.
+      if (werte.alsArbeitsuchendGemeldet) {
+        if (!werte.agenturFuerArbeit?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["agenturFuerArbeit"],
+            message: "Bitte geben Sie an, bei welcher Agentur Sie gemeldet sind.",
+          });
+        }
+        if (werte.mitLeistungsbezug === null || werte.mitLeistungsbezug === undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["mitLeistungsbezug"],
+            message: "Bitte geben Sie an, ob Sie Leistungen beziehen.",
+          });
+        }
+      }
+
+      // Additionsfrage — nur wenn keine Hauptbeschaeftigung vorliegt und es
+      // ueberhaupt etwas zu addieren gibt. Genau so steht die Bedingung im
+      // amtlichen Muster ("Wenn keine mehr als geringfuegig entlohnte
+      // (Haupt-)Beschaeftigung vorliegt ...").
+      const hatHauptbeschaeftigung =
+        werte.beschaeftigungsStatus === "ARBEITNEHMER_HAUPTBESCHAEFTIGUNG";
+      if (
+        werte.hasOtherEmployment &&
+        !hatHauptbeschaeftigung &&
+        (werte.summeUeberGeringfuegigkeitsgrenze === null ||
+          werte.summeUeberGeringfuegigkeitsgrenze === undefined)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["summeUeberGeringfuegigkeitsgrenze"],
+          message: "Bitte beantworten Sie diese Frage.",
+        });
+      }
+    });
 }
 
 export function createStep8Schema(fc: FieldConfigHelper) {

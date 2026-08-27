@@ -392,6 +392,20 @@ model PersonalData {
   // heissen. Erst die Grundfrage macht daraus eine Aussage.
   //
   // hasOtherEmployment (oben) ist die Grundfrage zu 4a.
+  /// Abschnitt 2 — Status bei Beginn der Beschaeftigung.
+  beschaeftigungsStatus         BeschaeftigungsStatus?
+  /// Freitext, nur bei Status SONSTIGE ("Sonstige: ___" im Muster).
+  beschaeftigungsStatusSonstige String?
+
+  // -- Abschnitt 2, Zusatzabfrage: Meldung bei der Agentur fuer Arbeit --
+  // Entscheidet bei kurzfristiger Beschaeftigung ueber die Berufsmaessigkeit.
+  /// Zu Beginn beschaeftigungslos und arbeit- oder ausbildungsuchend gemeldet?
+  alsArbeitsuchendGemeldet Boolean?
+  /// Zustaendige Agentur fuer Arbeit — nur wenn gemeldet.
+  agenturFuerArbeit        String?
+  /// Mit oder ohne Leistungsbezug — nur wenn gemeldet.
+  mitLeistungsbezug        Boolean?
+
   /// 4b — im laufenden Kalenderjahr bereits beschaeftigt oder arbeitsuchend gemeldet?
   vorbeschaeftigungenVorhanden     Boolean?
   /// 4c — derzeit Beschaeftigung oder selbstaendige Taetigkeit im Ausland?
@@ -463,6 +477,30 @@ model PersonalData {
 // Merkmal "ueber der Grenze" ab. Ein Betrag waere zusaetzliches
 // personenbezogenes Datum eines Dritten, ohne verlangt zu sein.
 // =============================================
+/// Status bei Beginn der Beschaeftigung (Minijob-Checkliste, Abschnitt 2).
+/// Die 17 Auspraegungen des amtlichen Musters, in dessen Reihenfolge.
+/// Der Status entscheidet die sozialversicherungsrechtliche Beurteilung —
+/// ohne ihn laesst sie sich nicht treffen.
+enum BeschaeftigungsStatus {
+  SCHUELER
+  STUDENT
+  SCHULENTLASSEN_BERUFSAUSBILDUNG
+  SCHULENTLASSEN_STUDIUM
+  SCHULENTLASSEN_FREIWILLIGENDIENST
+  BESCHAEFTIGUNGSLOS_SUCHEND
+  FREIWILLIGENDIENSTLEISTENDER
+  PRAKTIKANT
+  BEAMTER
+  SELBSTSTAENDIGER
+  ARBEITNEHMER_HAUPTBESCHAEFTIGUNG
+  ARBEITNEHMER_UNBEZAHLTER_URLAUB
+  ARBEITNEHMER_ELTERNZEIT
+  ALTERSVOLLRENTNER_VOR_REGELALTERSGRENZE
+  ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE
+  VERSORGUNGSEMPFAENGER
+  SONSTIGE
+}
+
 enum BeschaeftigungsKategorie {
   WEITERE /// 4a — laeuft derzeit parallel bei einem anderen Arbeitgeber
   VORBESCHAEFTIGUNG /// 4b — im laufenden Kalenderjahr bereits ausgeuebt
