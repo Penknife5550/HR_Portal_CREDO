@@ -382,7 +382,25 @@ model PersonalData {
   otherWeeklyHours   Float?
   employerType       String? // "hauptarbeitgeber", "nebenarbeitgeber", "nein"
   hasMinijob         Boolean? @default(false)
+  /// Altfeld. Ein einzelner Haken bildete die Vier-Wege-Entscheidung des
+  /// Abschnitts 5 nie ab; massgeblich ist `rvEntscheidung`. Bleibt fuer
+  /// Altvorgaenge lesbar.
   minijobRvBefreiung Boolean? @default(false)
+
+  // -- Rentenversicherung (Minijob-Checkliste, Abschnitt 5) --
+  /// Welchen der vier Wege der Beschaeftigte gewaehlt hat.
+  rvEntscheidung RvEntscheidung?
+  /// Wann die Entscheidung abgegeben wurde.
+  rvEntscheidungAm DateTime?
+  /// Das Merkblatt ueber die Folgen einer Befreiung wurde zur Kenntnis
+  /// genommen. Voraussetzung, bevor eine Befreiung beantragt werden kann —
+  /// so verlangt es die Checkliste.
+  rvMerkblattGelesen   Boolean   @default(false)
+  rvMerkblattGelesenAm DateTime?
+  /// Bestaetigung der Bindungswirkung: Die Entscheidung gilt einheitlich fuer
+  /// alle gleichzeitig ausgeuebten Minijobs, und der Beschaeftigte
+  /// verpflichtet sich, seine uebrigen Arbeitgeber zu informieren.
+  rvBindungBestaetigt Boolean @default(false)
 
   // -- Weitere Beschaeftigungen nach der Minijob-Checkliste, Abschnitt 4 --
   //
@@ -477,6 +495,23 @@ model PersonalData {
 // Merkmal "ueber der Grenze" ab. Ein Betrag waere zusaetzliches
 // personenbezogenes Datum eines Dritten, ohne verlangt zu sein.
 // =============================================
+/// Entscheidung zur Rentenversicherung (Minijob-Checkliste, Abschnitt 5).
+///
+/// Vier sich ausschliessende Wege. Bis AP 7 bildete das Portal davon nur einen
+/// einzigen Haken ab (`minijobRvBefreiung`) — die Wege C und D fehlten ganz.
+enum RvEntscheidung {
+  /// Keine Befreiung: bleibt versicherungspflichtig, zahlt den Eigenanteil.
+  KEINE_BEFREIUNG
+  /// Befreiung nach § 6 Abs. 1b SGB VI. Schriftform, Antrag ist beizufuegen.
+  BEFREIUNG_BEANTRAGT
+  /// Altersvollrentner nach Regelaltersgrenze oder Versorgungsempfaenger:
+  /// von Gesetzes wegen frei, eine Befreiung ist gar nicht erforderlich.
+  RENTENVERSICHERUNGSFREI
+  /// Aufhebung einer bestehenden Befreiung nach § 6 Abs. 6 SGB VI.
+  /// Erst ab 01.07.2026 moeglich; schriftlich **oder elektronisch**.
+  AUFHEBUNG_BEANTRAGT
+}
+
 /// Status bei Beginn der Beschaeftigung (Minijob-Checkliste, Abschnitt 2).
 /// Die 17 Auspraegungen des amtlichen Musters, in dessen Reihenfolge.
 /// Der Status entscheidet die sozialversicherungsrechtliche Beurteilung —

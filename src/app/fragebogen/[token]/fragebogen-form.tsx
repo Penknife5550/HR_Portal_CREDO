@@ -26,6 +26,7 @@ import { Step5Tax } from "./steps/step5-tax";
 import { Step6Employment } from "./steps/step6-employment";
 import { Step8Education } from "./steps/step8-education";
 import { Step9Masern } from "./steps/step9-masern";
+import { Step11Rente } from "./steps/step11-rente";
 import { Step10Summary } from "./steps/step10-summary";
 
 interface OnboardingData {
@@ -391,6 +392,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     employment: <Step6Employment {...stepProps} fieldConfig={getFieldConfig(6)} />,
     education: <Step8Education {...stepProps} fieldConfig={getFieldConfig(8)} />,
     masern: <Step9Masern {...stepProps} fieldConfig={getFieldConfig(9)} token={token} />,
+    rente: <Step11Rente {...stepProps} fieldConfig={getFieldConfig(11)} />,
     summary: (
       <Step10Summary
         {...stepProps}

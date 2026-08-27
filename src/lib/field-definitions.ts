@@ -129,6 +129,15 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
 
   // Step 10: Zusammenfassung (keine konfigurierbaren Felder)
   10: [],
+
+  // Step 11: Rentenversicherung (Minijob-Checkliste, Abschnitt 5)
+  // Die Entscheidung selbst ist nicht abschaltbar — ohne sie waere der Schritt
+  // sinnlos. Die beiden Zusagen haengen an der gewaehlten Option.
+  11: [
+    { name: "rvEntscheidung",      label: "Entscheidung zur Rentenversicherung", defaultVisible: true, defaultRequired: true, alwaysVisible: true, alwaysRequired: true },
+    { name: "rvMerkblattGelesen",  label: "Merkblatt zur Kenntnis genommen",     defaultVisible: true, defaultRequired: false },
+    { name: "rvBindungBestaetigt", label: "Bindungswirkung bestaetigt",          defaultVisible: true, defaultRequired: false },
+  ],
 };
 
 // =============================================

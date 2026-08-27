@@ -76,6 +76,11 @@ export const ERLAUBTE_FRAGEBOGEN_FELDER: ReadonlySet<string> = new Set([
   "hasMinijob",
   "minijobRvBefreiung",
 
+  // Schritt 11 — Rentenversicherung
+  "rvEntscheidung",
+  "rvMerkblattGelesen",
+  "rvBindungBestaetigt",
+
   // Schritt 8 — Bildung und Beruf
   "highestSchoolDegree",
   "highestProfessionalDegree",

@@ -109,9 +109,16 @@ describe("getActiveSteps – die Vorlagen-Konfiguration wirkt", () => {
   });
 
   it("behaelt die Anzeigereihenfolge der zentralen Definition bei", () => {
+    // Nicht aufsteigend nach Nummer: Die Registry-Nummer ist ein stabiler
+    // Schluessel, die Reihenfolge im Array ist die Anzeige. Schritt 11
+    // (Rentenversicherung) steht vor Schritt 10 (Zusammenfassung) — die
+    // Zusammenfassung bleibt der letzte Schritt, egal was noch dazukommt.
     const nummern = getActiveSteps(configExcept([5])).map((s) => s.step);
-    const sortiert = [...nummern].sort((a, b) => a - b);
-    expect(nummern).toEqual(sortiert);
+    const erwartet = FRAGEBOGEN_STEPS.filter(
+      (s) => s.key !== null && s.step !== 5
+    ).map((s) => s.step);
+    expect(nummern).toEqual(erwartet);
+    expect(nummern[nummern.length - 1]).toBe(SUMMARY_STEP_NUMBER);
   });
 
   it("behaelt Pflichtschritte, auch wenn eine Konfiguration sie abschaltet", () => {
@@ -153,21 +160,22 @@ describe("getActiveSteps – die Vorlagen-Konfiguration wirkt", () => {
 
   it("bildet die Minijob-Strecke ab: ohne Masernschutz, mit Bildung & Beruf", () => {
     // Entscheidung 25.08.2026: Bildung & Beruf bleibt an, Masernschutz faellt weg.
-    //
-    // Heute sind das acht Schritte. Neun werden es erst mit AP 7, wenn die
-    // Rentenversicherung als Registry-Schritt 11 vor der Zusammenfassung
-    // dazukommt — so wie die Masken-Entwuerfe den Endzustand zeigen.
+    // Seit AP 7 kommt die Rentenversicherung als Schritt 11 dazu — neun
+    // Schritte, genau der Endzustand aus den Masken-Entwuerfen.
     const aktiv = getActiveSteps(configExcept([9]));
-    expect(aktiv.map((s) => s.step)).toEqual([1, 2, 3, 4, 5, 6, 8, 10]);
+    expect(aktiv.map((s) => s.step)).toEqual([1, 2, 3, 4, 5, 6, 8, 11, 10]);
     expect(aktiv.map((s) => s.step)).toContain(8); // Bildung & Beruf
     expect(aktiv.map((s) => s.step)).not.toContain(9); // Masernschutz
     // Der Mitarbeiter zaehlt durchgehend, ohne Luecke bei der 7.
     expect(indexOfStep(aktiv, 8) + 1).toBe(7);
-    expect(indexOfStep(aktiv, SUMMARY_STEP_NUMBER) + 1).toBe(8);
+    expect(indexOfStep(aktiv, 11) + 1).toBe(8); // Rentenversicherung
+    expect(indexOfStep(aktiv, SUMMARY_STEP_NUMBER) + 1).toBe(9);
   });
 
   it("bildet die Ehrenamt-Strecke ab: nur Person, Adresse, Zusammenfassung", () => {
-    const aktiv = getActiveSteps(configExcept([3, 4, 5, 6, 7, 8, 9]));
+    // Ein Ehrenamtlicher wird nicht sozialversichert — die Rentenfrage
+    // (Schritt 11) stellt sich fuer ihn gar nicht.
+    const aktiv = getActiveSteps(configExcept([3, 4, 5, 6, 7, 8, 9, 11]));
     expect(aktiv.map((s) => s.step)).toEqual([1, 2, SUMMARY_STEP_NUMBER]);
   });
 });
@@ -203,7 +211,7 @@ describe("describeProgress – Fortschritt fuer die HR-Ansicht", () => {
   it("misst an der Strecke dieser Vorlage, nicht an allen Schritten", () => {
     // Der eigentliche Punkt: Ein Ehrenamtlicher auf Schritt 2 von 3 ist bei
     // 67 Prozent. Gemessen an allen neun Schritten waeren es 22.
-    const ehrenamt = configExcept([3, 4, 5, 6, 7, 8, 9]);
+    const ehrenamt = configExcept([3, 4, 5, 6, 7, 8, 9, 11]);
     const f = describeProgress(ehrenamt, 2);
     expect(f.position).toBe(2);
     expect(f.total).toBe(3);
@@ -215,8 +223,8 @@ describe("describeProgress – Fortschritt fuer die HR-Ansicht", () => {
     const minijob = configExcept([9]);
     const f = describeProgress(minijob, 8); // Bildung & Beruf
     expect(f.position).toBe(7);
-    expect(f.total).toBe(8);
-    expect(f.prozent).toBe(88);
+    expect(f.total).toBe(9);
+    expect(f.prozent).toBe(78);
   });
 
   it("meldet einen nicht begonnenen Fragebogen", () => {
@@ -255,7 +263,7 @@ describe("describeProgress – Fortschritt fuer die HR-Ansicht", () => {
 describe("formatProgress – Text fuer Listen und Statuszeilen", () => {
   it("nennt Position, Gesamtzahl und Titel", () => {
     const f = describeProgress(configExcept([9]), 3);
-    expect(formatProgress(f)).toBe("Schritt 3 von 8 · Bankverbindung");
+    expect(formatProgress(f)).toBe("Schritt 3 von 9 · Bankverbindung");
   });
 
   it("laesst die Zahlen weg, wenn es keine Position gibt", () => {
@@ -285,8 +293,22 @@ describe("legacyIndexToStepNumber – Migration der Alt-Daten", () => {
   it("laesst die alte Reihenfolge den virtuellen Schritt aus", () => {
     // Schritt 7 (Kinder) hatte nie eine eigene Maske.
     expect(LEGACY_DISPLAY_ORDER).not.toContain(7);
-    expect(LEGACY_DISPLAY_ORDER).toEqual(
-      FRAGEBOGEN_STEPS.filter((s) => s.key !== null).map((s) => s.step)
+  });
+
+  it("waechst nicht mit neuen Schritten mit", () => {
+    // Wichtig: Diese Liste beschreibt die Vergangenheit — die Reihenfolge, in
+    // der die alten Datensaetze gezaehlt wurden. Schritt 11 kam erst mit AP 7
+    // dazu; kein Altbestand kann je dort gestanden haben. Waechst die Liste
+    // mit, verschiebt die Migration bestehende Werte auf falsche Schritte.
+    expect(LEGACY_DISPLAY_ORDER).not.toContain(11);
+    // Was drinsteht, muss es aber weiterhin geben.
+    const bekannt = new Set(FRAGEBOGEN_STEPS.map((s) => s.step));
+    for (const nummer of LEGACY_DISPLAY_ORDER) {
+      expect(bekannt.has(nummer)).toBe(true);
+    }
+    // Und die Zusammenfassung bleibt das Ende der alten Zaehlung.
+    expect(LEGACY_DISPLAY_ORDER[LEGACY_DISPLAY_ORDER.length - 1]).toBe(
+      SUMMARY_STEP_NUMBER
     );
   });
 

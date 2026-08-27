@@ -10,6 +10,7 @@ import QRCode from "qrcode";
 import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
 import { getErklaerung } from "@/lib/erklaerung-arbeitnehmer";
 import { statusLabel } from "@/lib/minijob-status";
+import { rvEntscheidungLabel } from "@/lib/minijob-rentenversicherung";
 import { ART_LABELS, KATEGORIE_LABELS } from "@/lib/validations/beschaeftigungs-angaben";
 
 // =============================================
@@ -93,6 +94,11 @@ interface PersonalDataExport {
   otherWeeklyHours: number | null;
   hasMinijob: boolean | null;
   minijobRvBefreiung: boolean | null;
+  rvEntscheidung?: string | null;
+  rvEntscheidungAm?: string | null;
+  rvMerkblattGelesen?: boolean | null;
+  rvMerkblattGelesenAm?: string | null;
+  rvBindungBestaetigt?: boolean | null;
   bornAfter1971: boolean | null;
   masernschutzProvided: boolean | null;
   dsgvoAccepted: boolean | null;
@@ -448,6 +454,22 @@ async function addFragebogenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
   }
   y = dataRow(doc, "Minijob", yn(pd.hasMinijob), y);
   if (pd.hasMinijob) y = dataRow(doc, "RV-Befreiung Minijob", yn(pd.minijobRvBefreiung), y);
+
+  // =============================================
+  // Rentenversicherung (Checkliste, Abschnitt 5)
+  // =============================================
+  if (pd.rvEntscheidung) {
+    checkBreak(doc, 70, ctx, "Fragebogen");
+    y = section(doc, "Rentenversicherung");
+    y = dataRow(doc, "Entscheidung", rvEntscheidungLabel(pd.rvEntscheidung), y);
+    y = dataRow(doc, "Abgegeben am", fmtZeit(pd.rvEntscheidungAm), y);
+    if (pd.rvMerkblattGelesen) {
+      y = dataRow(doc, "Merkblatt gelesen", fmtZeit(pd.rvMerkblattGelesenAm), y);
+    }
+    if (pd.rvBindungBestaetigt) {
+      y = dataRow(doc, "Bindungswirkung bestätigt", "Ja", y);
+    }
+  }
 
   // Masernschutz
   checkBreak(doc, 40, ctx, "Fragebogen");

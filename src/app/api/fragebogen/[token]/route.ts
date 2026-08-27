@@ -118,6 +118,16 @@ const fragebogenFieldsSchema = z.object({
   vorbeschaeftigungenVorhanden: z.boolean().optional(),
   auslandsbeschaeftigungVorhanden: z.boolean().optional(),
   summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
+  // Abschnitt 5 der Minijob-Checkliste: Entscheidung zur Rentenversicherung.
+  // Zeitpunkte setzt der Server, nicht der Browser.
+  rvEntscheidung: z.enum([
+    "KEINE_BEFREIUNG",
+    "BEFREIUNG_BEANTRAGT",
+    "RENTENVERSICHERUNGSFREI",
+    "AUFHEBUNG_BEANTRAGT",
+  ]).optional(),
+  rvMerkblattGelesen: z.boolean().optional(),
+  rvBindungBestaetigt: z.boolean().optional(),
   // Registry-Nummer des Schritts, auf dem der Vorgang steht — nicht die
   // Anzeigeposition. Obergrenze kommt aus der zentralen Schritt-Definition,
   // damit ein neuer Schritt hier nicht vergessen wird.
@@ -321,6 +331,19 @@ export async function PUT(
     updateData.auslandsbeschaeftigungVorhanden = data.auslandsbeschaeftigungVorhanden;
   if (typeof data.summeUeberGeringfuegigkeitsgrenze === "boolean")
     updateData.summeUeberGeringfuegigkeitsgrenze = data.summeUeberGeringfuegigkeitsgrenze;
+  if (typeof data.rvMerkblattGelesen === "boolean")
+    updateData.rvMerkblattGelesen = data.rvMerkblattGelesen;
+  if (typeof data.rvBindungBestaetigt === "boolean")
+    updateData.rvBindungBestaetigt = data.rvBindungBestaetigt;
+
+  // Zeitpunkte gehoeren dem Server. Was der Browser behauptet, taugt als
+  // Nachweis nichts — genauso wie bei der Wahrheitsversicherung.
+  if (data.rvEntscheidung) {
+    updateData.rvEntscheidungAm = new Date();
+  }
+  if (data.rvMerkblattGelesen === true) {
+    updateData.rvMerkblattGelesenAm = new Date();
+  }
 
   // Datumsfelder konvertieren
   if (data.birthDate) updateData.birthDate = new Date(data.birthDate);
@@ -572,6 +595,28 @@ export async function POST(
   if (!bestand) {
     return NextResponse.json(
       { error: "Es sind noch keine Angaben gespeichert." },
+      { status: 400 }
+    );
+  }
+
+  // =============================================
+  // Rentenversicherung: Voraussetzungen fuer einen Antrag
+  // =============================================
+  // Beide Antragsanlagen tragen im Kopf Name, Vorname und
+  // Rentenversicherungsnummer. Ohne sie erzeugte das Portal ein Dokument mit
+  // leerer Pflichtangabe — deshalb blockiert es lieber und sagt, was fehlt.
+  const brauchtRvNummer =
+    bestand.rvEntscheidung === "BEFREIUNG_BEANTRAGT" ||
+    bestand.rvEntscheidung === "AUFHEBUNG_BEANTRAGT";
+
+  if (brauchtRvNummer && !bestand.socialSecurityNumber) {
+    return NextResponse.json(
+      {
+        error:
+          "Für Ihren Antrag zur Rentenversicherung brauchen wir Ihre " +
+          "Rentenversicherungsnummer. Bitte ergänzen Sie sie im Schritt " +
+          "„Sozialversicherung“.",
+      },
       { status: 400 }
     );
   }

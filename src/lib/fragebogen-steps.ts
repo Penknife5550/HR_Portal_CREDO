@@ -29,6 +29,7 @@ export type FragebogenStepKey =
   | "employment"
   | "education"
   | "masern"
+  | "rente"
   | "summary";
 
 export interface FragebogenStep {
@@ -121,6 +122,22 @@ export const FRAGEBOGEN_STEPS: readonly FragebogenStep[] = [
     title: "Masernschutz",
     description: "Impfnachweis für Gemeinschaftseinrichtungen",
     icon: "heart",
+  },
+  {
+    // Registry-Nummer 11, Anzeigeposition **vor** der Zusammenfassung.
+    //
+    // Genau dafuer gibt es die Trennung von Nummer und Reihenfolge: Im
+    // Vorlagen-Editor steht die Rentenversicherung als "11" unter der
+    // Zusammenfassung, im Fragebogen erscheint sie davor. Beides ist gewollt.
+    //
+    // Standardmaessig **aus**: Ein Schritt, den eine gespeicherte stepsConfig
+    // nicht kennt, gilt als abgeschaltet. Fuer MINIJOB wird er ausdruecklich
+    // eingeschaltet (Seed und Entrypoint-Korrektur).
+    step: 11,
+    key: "rente",
+    title: "Rentenversicherung",
+    description: "Befreiung von der Versicherungspflicht",
+    icon: "piggy-bank",
   },
   {
     step: 10,

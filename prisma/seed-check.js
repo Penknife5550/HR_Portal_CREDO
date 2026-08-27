@@ -197,6 +197,19 @@ async function migrateCurrentStepToRegistryNumbers(prisma) {
  */
 const MINIJOB_TEMPLATE_MARKER = "MINIJOB_TEMPLATE_STEPS_V1";
 
+/**
+ * Zweiter Lauf: Schritt 11 (Rentenversicherung) fuer MINIJOB freischalten.
+ *
+ * Eigener Merker, nicht V2 des ersten: Wer den ersten Lauf schon hinter sich
+ * hat, soll ihn nicht wiederholen — aber den neuen Schritt trotzdem bekommen.
+ *
+ * Der Schritt fehlt in allen gespeicherten Konfigurationen, weil es ihn beim
+ * letzten Speichern noch nicht gab. Ein fehlender Schritt gilt als
+ * abgeschaltet — fuer MINIJOB muss er also ausdruecklich hinein.
+ */
+const MINIJOB_RENTE_MARKER = "MINIJOB_TEMPLATE_RENTE_V1";
+const RENTE_SCHRITT = 11;
+
 // Muss zu FIELD_REGISTRY[5] in src/lib/field-definitions.ts passen.
 // Der Test src/__tests__/lib/fragebogen-steps.test.ts prueft das.
 const MINIJOB_TAX_FIELDS = [
@@ -337,12 +350,96 @@ async function ensureMinijobTemplateSteps(prisma) {
   }
 }
 
+async function ensureMinijobRenteSchritt(prisma) {
+  try {
+    if (await migrationErledigt(prisma, MINIJOB_RENTE_MARKER)) return;
+
+    const template = await prisma.formTemplate.findUnique({
+      where: { questionnaireType: "MINIJOB" },
+      select: { id: true, stepsConfig: true },
+    });
+    const steps =
+      template && Array.isArray(template.stepsConfig) ? template.stepsConfig : null;
+
+    if (!steps || steps.length === 0) {
+      // Wie beim ersten Lauf: ohne Vorlage kein Merker. Auf einer frischen
+      // Datenbank legt der Seed sie gleich richtig an.
+      console.log(
+        "MINIJOB-Vorlage noch nicht vorhanden — Rentenversicherungs-Schritt wird beim naechsten Start geprueft.",
+      );
+      return;
+    }
+
+    const vorhanden = steps.find((s) => s.step === RENTE_SCHRITT);
+    if (vorhanden && vorhanden.enabled === true) {
+      await markiereMigration(prisma, MINIJOB_RENTE_MARKER, {
+        changed: false,
+        reason: "Schritt 11 bereits aktiv",
+      });
+      return;
+    }
+
+    const neu = vorhanden
+      ? steps.map((s) => (s.step === RENTE_SCHRITT ? { ...s, enabled: true } : s))
+      : [...steps, { step: RENTE_SCHRITT, title: "Rentenversicherung", enabled: true }];
+
+    // Laufende Vorgaenge tragen eine eingefrorene Kopie — ohne Nachziehen saehe
+    // ein bereits eingeladener Minijobber den Schritt nicht.
+    const laufende = await prisma.onboardingProcess.findMany({
+      where: {
+        questionnaireType: "MINIJOB",
+        status: { in: ["INVITED", "IN_PROGRESS"] },
+      },
+      select: { id: true, formTemplateSnapshot: true },
+    });
+
+    const schreibvorgaenge = [
+      prisma.formTemplate.update({
+        where: { id: template.id },
+        data: { stepsConfig: neu },
+      }),
+    ];
+
+    for (const vorgang of laufende) {
+      if (!Array.isArray(vorgang.formTemplateSnapshot)) continue;
+      const snap = vorgang.formTemplateSnapshot;
+      const hatSchritt = snap.find((s) => s.step === RENTE_SCHRITT);
+      if (hatSchritt && hatSchritt.enabled === true) continue;
+      const snapNeu = hatSchritt
+        ? snap.map((s) => (s.step === RENTE_SCHRITT ? { ...s, enabled: true } : s))
+        : [...snap, { step: RENTE_SCHRITT, title: "Rentenversicherung", enabled: true }];
+      schreibvorgaenge.push(
+        prisma.onboardingProcess.update({
+          where: { id: vorgang.id },
+          data: { formTemplateSnapshot: snapNeu },
+        }),
+      );
+    }
+
+    schreibvorgaenge.push(
+      markiereMigration(prisma, MINIJOB_RENTE_MARKER, {
+        changed: true,
+        snapshotsNachgezogen: schreibvorgaenge.length - 1,
+      }),
+    );
+
+    await prisma.$transaction(schreibvorgaenge);
+    console.log(
+      "MINIJOB-Vorlage: Rentenversicherungs-Schritt aktiviert; laufende Vorgaenge nachgezogen: " +
+        (schreibvorgaenge.length - 2),
+    );
+  } catch (error) {
+    console.error("Rentenversicherungs-Schritt fehlgeschlagen:", error.message);
+  }
+}
+
 async function main() {
   const prisma = new PrismaClient();
   try {
     await ensureSystemDocumentTemplates(prisma);
     await migrateCurrentStepToRegistryNumbers(prisma);
     await ensureMinijobTemplateSteps(prisma);
+    await ensureMinijobRenteSchritt(prisma);
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {
@@ -371,6 +468,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  RENTE_SCHRITT,
   LEGACY_DISPLAY_ORDER,
   MINIJOB_TAX_FIELDS,
   legacyIndexToStepNumber,

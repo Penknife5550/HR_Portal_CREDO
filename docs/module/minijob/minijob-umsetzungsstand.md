@@ -1,9 +1,10 @@
 # Minijob-Checkliste — Umsetzungsstand
 
-> **Stand:** 2026-08-26 · Branch `feat/minijob-checkliste-2026` (auf `origin`)
-> **Fertig:** AP 1, AP 2 · **Als Nächstes:** AP 5 → 6 → 7
-> **Verifiziert:** 547 Tests grün (44 Suites) · `tsc --noEmit` sauber · `npm run lint`
-> ohne Errors · `npm run build` erfolgreich · Durchstich gegen die Dev-Datenbank gemacht
+> **Stand:** 2026-08-27 · Branch `feat/minijob-checkliste-2026` (auf `origin`)
+> **Fertig:** AP 1, AP 2, AP 5, AP 6, AP 7 · **Als Nächstes:** AP 8 → AP 12
+> **Verifiziert:** 641 Tests grün (48 Suites) · `tsc --noEmit` sauber · `npm run lint`
+> ohne Errors · `npm run build` erfolgreich · Schritt 11 im Browser gegen die
+> Dev-Datenbank durchgespielt (Auswahl, Sperren, Speichern, Zusammenfassung)
 
 Dieses Dokument ist die Übergabe: Was ist gebaut, was ist bewusst offen, und
 womit fängt man weiter an. Der fachliche Plan steht in
@@ -59,6 +60,55 @@ die Checkbox war aber reiner Browser-Zustand. Der Server hat sie nie gesehen.
 - Der Server **erzwingt** Bestätigung, Ort und eine bekannte Fassung; Zeitpunkt,
   IP, Browserkennung und Prüfsumme setzt er selbst.
 - Eigener **PDF-Abschnitt** und eine **Karte auf der HR-Detailseite**.
+
+### AP 5 — Datenmodell für die drei Tabellen
+
+`BeschaeftigungsAngabe` mit Kategorie-Kennzeichen (`WEITERE`,
+`VORBESCHAEFTIGUNG`, `AUSLAND`) statt drei getrennter Tabellen — die drei
+Abschnitte teilen sich die meisten Felder.
+
+Validierung in
+[`src/lib/validations/beschaeftigungs-angaben.ts`](../../../src/lib/validations/beschaeftigungs-angaben.ts)
+als `z.discriminatedUnion`. **Wichtig:** Die Datumsprüfung sitzt in einem
+`.superRefine()` **auf** der Vereinigung. Ein `.refine()` an einem Mitglied macht
+daraus `ZodEffects`, das Unterscheidungsmerkmal geht verloren und `kategorie`
+kommt als `unknown` heraus.
+
+### AP 6 — Schritt 6 neu: Status und Beschäftigungen
+
+17 Statusoptionen ([`src/lib/minijob-status.ts`](../../../src/lib/minijob-status.ts)),
+die drei Tabellen, die Additionsfrage und die bedingten Nachweise.
+
+**Neu für die Textführung:**
+[`src/components/hilfe-hinweis.tsx`](../../../src/components/hilfe-hinweis.tsx) —
+`HilfeHinweis` (ein Fragezeichen neben der Beschriftung, ein Klick klappt die
+Erklärung auf) und `ErklaerBox` (ein ruhiger Kasten für einen ganzen Abschnitt).
+Aufklappen statt Hover: Ein Tooltip am Mauszeiger ist auf dem Handy nicht
+erreichbar und für Screenreader schwer zu fassen.
+
+### AP 7 — Schritt 11: Rentenversicherung
+
+Die vier Wege aus Abschnitt 5 der Checkliste in
+[`src/lib/minijob-rentenversicherung.ts`](../../../src/lib/minijob-rentenversicherung.ts),
+die Maske in
+[`step11-rente.tsx`](../../../src/app/fragebogen/[token]/steps/step11-rente.tsx).
+
+Leitgedanken, die ein Test absichert:
+
+- **Kein Schubs in eine Richtung.** Versichert-bleiben und Befreiung stehen
+  gleich ausführlich nebeneinander; ein Test prüft, dass die Folgenlisten sich um
+  höchstens einen Punkt unterscheiden.
+- **Zahlen statt Prozente allein.** „3,6 %" sagt wenig, „rund 21,71 € im Monat"
+  sagt etwas. Formatiert über `prozent()` / `euro()` — deutsche Dezimalkommas.
+- **Das Merkblatt steht im Formular**, nicht nur als PDF zum Herunterladen.
+- Die **Aufhebung einer Befreiung** (§ 6 Abs. 6 SGB VI) ist erst ab dem
+  01.07.2026 wählbar; `istWaehlbar()` blendet sie vorher aus.
+- Zusagen hängen am jeweiligen Weg: Merkblatt-Kenntnis nur vor einer Befreiung,
+  Bindungswirkung bei Befreiung *und* Aufhebung, Schriftform nur bei der
+  Befreiung.
+
+Die MINIJOB-Vorlage schaltet Schritt 11 über die Entrypoint-Migration
+`ensureMinijobRenteSchritt` ein — samt der Snapshots laufender Vorgänge.
 
 ---
 
@@ -118,28 +168,43 @@ der nie gewirkt hat. In dem Moment, in dem AP 1 die Konfiguration wirksam macht,
 wäre die Steuer-ID aus dem Minijob-Fragebogen verschwunden. Der Entrypoint
 korrigiert das einmalig und marker-gesichert.
 
+**Die Freigabeliste.** `ERLAUBTE_FRAGEBOGEN_FELDER` in
+[`src/lib/fragebogen-felder.ts`](../../../src/lib/fragebogen-felder.ts) entscheidet,
+was der Auto-Save überhaupt schreiben darf. Wird ein neues Feld dort vergessen,
+kommt es fehlerfrei durch die Validierung, die API antwortet mit 200 — und der
+Wert landet nie in der Datenbank. Genau das ist bei AP 6 einmal passiert.
+
+**Die Zusammenfassung.** Schritt 10 zählt seine Abschnitte fest auf. Ein neuer
+Schritt erscheint dort **nicht** von selbst: Die Rentenentscheidung — die
+folgenreichste Angabe im ganzen Fragebogen — fehlte zunächst beim Prüfen vor dem
+Absenden, und Abschnitt 6 zeigte noch die Altfelder aus der Zeit vor AP 5/6.
+Beides ist nachgezogen. Wer einen Schritt ergänzt, ergänzt auch die
+Zusammenfassung **und** den PDF-Export.
+
+**Block im Absatz.** `HilfeHinweis` rendert seinen aufgeklappten Kasten als
+`<span class="block">`, nicht als `<div>`. Ein `<div>` im `<p>` bricht der Browser
+beim Parsen auf; Server- und Client-Struktur laufen auseinander und React meldet
+einen Hydration-Fehler. Als phrasing content passt der Kasten in `<p>`, `<label>`,
+`<legend>` und `<span>` gleichermaßen.
+
 ---
 
 ## 5. Was als Nächstes kommt
 
-**AP 5 → 6 → 7** ist die fachliche Kernkette und streng seriell.
-
 | AP | Inhalt | Aufwand |
 |---|---|---|
-| **5** | Ein Datenmodell mit Kategorie-Kennzeichen für die drei Tabellen (weitere Beschäftigung / Vorbeschäftigung / Ausland) | 12–16 h |
-| **6** | Schritt 6 neu: 17 Statusoptionen, drei Tabellen, Additionsfrage, bedingte Nachweise | 44–56 h |
-| **7** | Schritt 11 „Rentenversicherung": Vier-Wege-Entscheidung, Merkblatt, Antragserzeugung | 18–24 h |
+| **8** | Merkblatt und beide Anträge als System-Dokumente aus dem PDF vom 30.06.2026 (Seiten 7–9); Betriebsnummer am Mandanten | 16–20 h |
+| **12** | HR-Seite: Eingangsdatum, Wirkungsdatum, zwei Fristen (die frühere aus nächster Entgeltabrechnung / sechs Wochen, danach die Monatsfrist für den Widerspruch) | 12–16 h |
 
-**Beim Anlegen von Registry-Schritt 11 (AP 7) zu beachten:**
+**Was AP 8 einlösen muss:** Schritt 11 sagt dem Beschäftigten heute schon
+„Ohne den unterschriebenen Antrag können Sie den Fragebogen nicht absenden."
+Diese Sperre gibt es noch **nicht** — der Upload-Typ „Antrag RV-Befreiung
+(Minijob)" existiert, ist aber nicht als Pflicht verdrahtet. Bis AP 8 ist das ein
+Versprechen, das die Software nicht hält.
 
-- In `FRAGEBOGEN_STEPS` **vor** der Zusammenfassung einsortieren, Nummer 11.
-- `FragebogenStepKey` um `"rente"` erweitern — Fragebogen *und* Vorschau brechen
-  dann im Typecheck und erzwingen die Ergänzung. Das ist Absicht.
-- Ein Eintrag in `FIELD_REGISTRY[11]` ist Pflicht (ein Test prüft das).
-- Die bestehenden `stepsConfig` in der Datenbank kennen die 11 nicht → sie gilt
-  als abgeschaltet. Für MINIJOB muss sie **aktiv gesetzt** werden, entweder im
-  Vorlagen-Editor oder über eine `SystemMigration`.
-- Der Minijob-Fragebogen hat danach **neun** Schritte statt acht.
+**Noch offen aus AP 6/7:** Die HR-Detailseite zeigt die Rentenentscheidung und
+die Beschäftigungstabellen noch nicht an — sie stehen bisher nur im Fragebogen,
+in der Zusammenfassung und im PDF-Export. Das gehört zu AP 12.
 
 ---
 

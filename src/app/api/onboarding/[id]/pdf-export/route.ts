@@ -173,6 +173,11 @@ export async function GET(
         vorbeschaeftigungenVorhanden: pd.vorbeschaeftigungenVorhanden,
         auslandsbeschaeftigungVorhanden: pd.auslandsbeschaeftigungVorhanden,
         summeUeberGeringfuegigkeitsgrenze: pd.summeUeberGeringfuegigkeitsgrenze,
+        rvEntscheidung: pd.rvEntscheidung,
+        rvEntscheidungAm: pd.rvEntscheidungAm?.toISOString() ?? null,
+        rvMerkblattGelesen: pd.rvMerkblattGelesen,
+        rvMerkblattGelesenAm: pd.rvMerkblattGelesenAm?.toISOString() ?? null,
+        rvBindungBestaetigt: pd.rvBindungBestaetigt,
         beschaeftigungsAngaben: pd.beschaeftigungsAngaben.map((a) => ({
           kategorie: a.kategorie,
           beginn: a.beginn?.toISOString() ?? null,

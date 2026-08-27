@@ -27,6 +27,7 @@ import { Step5Tax } from "@/app/fragebogen/[token]/steps/step5-tax";
 import { Step6Employment } from "@/app/fragebogen/[token]/steps/step6-employment";
 import { Step8Education } from "@/app/fragebogen/[token]/steps/step8-education";
 import { Step9Masern } from "@/app/fragebogen/[token]/steps/step9-masern";
+import { Step11Rente } from "@/app/fragebogen/[token]/steps/step11-rente";
 /** Alle Schritte, die die Vorschau zeigt — die Zusammenfassung gehoert nicht dazu. */
 type VorschauStepKey = Exclude<FragebogenStepKey, "summary">;
 
@@ -141,6 +142,7 @@ export default function VorschauPage() {
     employment: <Step6Employment {...stepProps} fieldConfig={getFieldConfig(6)} />,
     education: <Step8Education {...stepProps} fieldConfig={getFieldConfig(8)} />,
     masern: <Step9Masern {...stepProps} fieldConfig={getFieldConfig(9)} />,
+    rente: <Step11Rente {...stepProps} fieldConfig={getFieldConfig(11)} />,
   };
 
   const activeStep = previewSteps[currentStep];

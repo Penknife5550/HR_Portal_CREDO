@@ -53,12 +53,18 @@ export function HilfeHinweis({ thema, children }: HilfeHinweisProps) {
         ?
       </button>
       {offen && (
-        <div
+        // `span` mit `block`, nicht `div`: Das Fragezeichen steht neben einer
+        // Beschriftung, und die kann ein <p>, <label>, <legend> oder <span>
+        // sein. Ein <div> im <p> bricht der Browser beim Parsen auf — der
+        // Server liefert dann eine andere Struktur als der Client aufbaut, und
+        // React meldet einen Hydration-Fehler. Als phrasing content passt der
+        // Kasten ueberall hinein; die Erklaerungen sind reiner Text.
+        <span
           id={id}
-          className="mt-1.5 rounded-lg border-l-4 border-[#009AC6] bg-[#009AC6]/5 px-3 py-2 text-xs leading-relaxed text-foreground"
+          className="mt-1.5 block rounded-lg border-l-4 border-[#009AC6] bg-[#009AC6]/5 px-3 py-2 text-xs leading-relaxed text-foreground"
         >
           {children}
-        </div>
+        </span>
       )}
     </>
   );

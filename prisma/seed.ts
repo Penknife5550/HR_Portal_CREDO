@@ -171,7 +171,9 @@ async function main() {
       enabled: !disabled.includes(s.step),
     }));
 
-  const allStepsEnabled = stepsExcept([]);
+  // Schritt 11 (Rentenversicherung) ist eine Minijob-Angelegenheit und bleibt
+  // in allen anderen Vorlagen aus.
+  const allStepsEnabled = stepsExcept([11]);
 
   /**
    * Minijob: Der Steuer-Schritt bleibt aktiv, wird aber auf die Steuer-ID
@@ -201,7 +203,7 @@ async function main() {
     s.step === 5 ? { ...s, fields: minijobTaxFields } : s,
   );
 
-  const ehrenamtSteps = stepsExcept([3, 4, 5, 6, 7, 8, 9]);
+  const ehrenamtSteps = stepsExcept([3, 4, 5, 6, 7, 8, 9, 11]);
 
   const formTemplates = [
     {
