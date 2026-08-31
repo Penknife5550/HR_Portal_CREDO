@@ -579,6 +579,7 @@ export function Step10Summary({
         <DocumentUpload
           token={token}
           hasChildren={children.length > 0}
+          anzahlKinder={children.length}
           requiredDocuments={requiredDocuments}
           rvEntscheidung={(d.rvEntscheidung as string) ?? null}
           antragErzeugbar={antragErzeugbar}

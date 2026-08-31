@@ -5,7 +5,7 @@
  * SV-Nummer, Krankenkasse, Elterneigenschaft + inline Kinder-Erfassung
  */
 
-import { useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createStep4Schema, type Step4Data } from "@/lib/validations/personal-data";
@@ -71,7 +71,41 @@ export function Step4SocialSecurity({
 
   // Geburtsurkunde-Upload pro Kind
   const [uploads, setUploads] = useState<Record<number, UploadState>>({});
+  /**
+   * Geburtsurkunden, die bereits in der Akte liegen.
+   *
+   * Bewusst als eine Liste und nicht je Kind: Ein Dokument haengt am Vorgang,
+   * nicht am einzelnen Kind — das Modell kennt keine Zuordnung. Sie hier
+   * vorzutaeuschen waere schlimmer als sie wegzulassen.
+   */
+  const [bereitsInDerAkte, setBereitsInDerAkte] = useState<string[]>([]);
   const fileRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  // Was schon in der Akte liegt, beim Oeffnen holen.
+  //
+  // Ohne das sah der Bereich bei jedem Wiedereinstieg leer aus — auch wenn die
+  // Urkunde laengst hochgeladen war. Wer ueber den Magic Link zurueckkommt oder
+  // im Fragebogen zurueckblaettert, laedt dieselbe Datei dann ein zweites Mal,
+  // und in der Akte liegen Dubletten.
+  const ladeUrkunden = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/fragebogen/${token}/documents`);
+      if (!res.ok) return;
+      const daten = await res.json();
+      setBereitsInDerAkte(
+        (daten.documents || [])
+          .filter((d: { type: string }) => d.type === "GEBURTSURKUNDE_KIND")
+          .map((d: { fileName: string }) => d.fileName)
+      );
+    } catch {
+      // Stumm: Der Bereich ist eine Hilfe, kein Blocker fuer den Schritt.
+    }
+  }, [token]);
+
+  useEffect(() => {
+    ladeUrkunden();
+  }, [ladeUrkunden]);
 
   const handleChildDocUpload = async (childIndex: number, file: File) => {
     if (!token) return;
@@ -80,10 +114,14 @@ export function Step4SocialSecurity({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("type", "geburtsurkunde_kind");
-      formData.append("notes", `Kind ${childIndex + 1}: ${children[childIndex]?.firstName || ""}`);
+      // Frueher ging hier eine Notiz „Kind N: Vorname" mit. Das Modell hat
+      // kein solches Feld — der Server hat sie stillschweigend verworfen. Ein
+      // Aufruf, der so tut, als wuerde er etwas speichern, ist schlimmer als
+      // keiner.
       const res = await fetch(`/api/fragebogen/${token}/documents`, { method: "POST", body: formData });
       if (res.ok) {
         setUploads((prev) => ({ ...prev, [childIndex]: { uploading: false, fileName: file.name, error: null } }));
+        ladeUrkunden();
       } else {
         setUploads((prev) => ({ ...prev, [childIndex]: { uploading: false, fileName: null, error: "Upload fehlgeschlagen" } }));
       }
@@ -382,6 +420,31 @@ export function Step4SocialSecurity({
                   </div>
                 </div>
               ))}
+
+              {/* Was schon da ist — damit beim Wiedereinstieg niemand denkt, der
+                  Upload sei verloren gegangen, und dieselbe Datei ein zweites
+                  Mal hochlaedt. Bewusst als eine Liste: Ein Dokument haengt am
+                  Vorgang, nicht am einzelnen Kind. */}
+              {bereitsInDerAkte.length > 0 && (
+                <div className="rounded-lg border border-credo-gruen/30 bg-credo-gruen/5 p-3">
+                  <p className="text-xs font-medium text-foreground">
+                    {bereitsInDerAkte.length === 1
+                      ? "Eine Geburtsurkunde liegt bereits vor"
+                      : `${bereitsInDerAkte.length} Geburtsurkunden liegen bereits vor`}
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {bereitsInDerAkte.map((name) => (
+                      <li key={name} className="truncate text-[11px] text-muted-foreground">
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Sie müssen diese nicht erneut hochladen — auch nicht am Ende
+                    des Fragebogens.
+                  </p>
+                </div>
+              )}
 
               <button
                 type="button"

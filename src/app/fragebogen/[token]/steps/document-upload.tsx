@@ -25,6 +25,8 @@ interface UploadedDoc {
 interface DocumentUploadProps {
   token: string;
   hasChildren?: boolean;
+  /** Wie viele Kinder eingetragen sind — fuer den Abgleich mit den Urkunden. */
+  anzahlKinder?: number;
   /** Pflicht-Dokumenttypen aus der Vorlagen-Konfiguration (DocumentType-Werte). */
   requiredDocuments?: string[];
   /** Entscheidung aus Schritt 11 — sie kann eine Pflicht erzeugen. */
@@ -78,6 +80,7 @@ const TYPE_LABELS: Record<string, string> = {
 export function DocumentUpload({
   token,
   hasChildren = false,
+  anzahlKinder = 0,
   requiredDocuments,
   rvEntscheidung,
   antragErzeugbar = true,
@@ -239,6 +242,17 @@ export function DocumentUpload({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fehlendSchluessel]);
 
+  // Die Pflicht ist erfuellt, sobald EIN Dokument dieses Typs vorliegt — auch
+  // bei mehreren Kindern. Das bleibt bewusst so: Ein Scan kann zwei Urkunden
+  // enthalten, und wer solche Faelle aussperrt, schafft mehr Aerger als er
+  // verhindert. Ein stiller Durchlauf waere aber auch falsch, deshalb der
+  // Hinweis — er blockiert nicht.
+  const urkundenKinder = documents.filter(
+    (d) => d.type === "GEBURTSURKUNDE_KIND"
+  ).length;
+  const urkundenFehlenMoeglicherweise =
+    anzahlKinder > 1 && urkundenKinder > 0 && urkundenKinder < anzahlKinder;
+
   return (
     <div className="space-y-4">
       {/* ============================================= */}
@@ -356,6 +370,23 @@ export function DocumentUpload({
           })}
         </div>
       </div>
+
+      {urkundenFehlenMoeglicherweise && (
+        <div className="rounded-lg border border-[#FBC900]/50 bg-[#FBC900]/10 px-4 py-3">
+          <p className="text-sm font-medium text-foreground">
+            {urkundenKinder} von {anzahlKinder} Geburtsurkunden hochgeladen
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-foreground/80">
+            Sie haben {anzahlKinder} Kinder eingetragen, aber{" "}
+            {urkundenKinder === 1
+              ? "nur eine Geburtsurkunde"
+              : `${urkundenKinder} Geburtsurkunden`}{" "}
+            hochgeladen. Falls eine Datei mehrere Urkunden enthält, ist alles in
+            Ordnung — Sie können absenden. Andernfalls ergänzen Sie die
+            fehlenden bitte oben.
+          </p>
+        </div>
+      )}
 
       {/* ============================================= */}
       {/* OPTIONALE DOKUMENTE */}
