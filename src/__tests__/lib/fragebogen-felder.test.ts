@@ -124,4 +124,34 @@ describe("Freigabeliste des Auto-Save", () => {
       expect(feld).toMatch(/^[a-z][A-Za-z0-9]*$/);
     }
   });
+
+  it("lässt den Beschäftigten die Arbeitgeberangaben nicht setzen", () => {
+    // Die Felder aus AP 12 stehen zwar in PersonalData, sind aber
+    // Feststellungen des ARBEITGEBERS. Stünden sie in der Freigabeliste,
+    // könnte der Beschäftigte sein eigenes Eingangsdatum setzen — und damit
+    // das Wirkungsdatum und seine Beitragspflicht verschieben. Das ist der
+    // Grund, warum diese Zeile hier steht und nicht wegoptimiert werden darf.
+    for (const feld of [
+      "rvAntragEingangAm",
+      "rvWirkungAb",
+      "rvMeldungAm",
+      "rvBearbeitetVonId",
+      "rvBearbeitetAm",
+    ]) {
+      expect(ERLAUBTE_FRAGEBOGEN_FELDER.has(feld)).toBe(false);
+      expect(LEERBARE_FRAGEBOGEN_FELDER.has(feld)).toBe(false);
+    }
+  });
+
+  it("lässt die selbst getroffene Rentenentscheidung dagegen zu", () => {
+    // Gegenprobe: Die Entscheidung selbst trifft der Beschäftigte — sie muss
+    // schreibbar bleiben, sonst speichert Schritt 11 stillschweigend nichts.
+    for (const feld of [
+      "rvEntscheidung",
+      "rvMerkblattGelesen",
+      "rvBindungBestaetigt",
+    ]) {
+      expect(ERLAUBTE_FRAGEBOGEN_FELDER.has(feld)).toBe(true);
+    }
+  });
 });

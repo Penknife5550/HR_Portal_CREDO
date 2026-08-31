@@ -15,8 +15,10 @@ import { STATUS_LABELS, getBefristungSachgrundLabel, getBefristungsartLabel } fr
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
+import { RvFristenCard } from "./rv-fristen-card";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { documentTypeLabel } from "@/lib/required-documents";
+import { statusLabel } from "@/lib/minijob-status";
 import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 
 // =============================================
@@ -91,6 +93,15 @@ interface DetailData {
     currentStep: number;
     /** Entscheidung aus Schritt 11 — steuert, welcher Antrag erzeugt wird. */
     rvEntscheidung?: string | null;
+    // Schritt 6 seit AP 5/6 — Status und Grundfragen zu weiteren Beschaeftigungen.
+    beschaeftigungsStatus?: string | null;
+    beschaeftigungsStatusSonstige?: string | null;
+    alsArbeitsuchendGemeldet?: boolean | null;
+    agenturFuerArbeit?: string | null;
+    mitLeistungsbezug?: boolean | null;
+    summeUeberGeringfuegigkeitsgrenze?: boolean | null;
+    vorbeschaeftigungenVorhanden?: boolean | null;
+    auslandsbeschaeftigungVorhanden?: boolean | null;
     // Persönliche Angaben
     salutation: string | null;
     title: string | null;
@@ -1486,17 +1497,29 @@ function TabFragebogenDaten({
       {/* Schritt 6: Beschäftigung */}
       <SectionCard title="6. Weitere Beschäftigung" icon="&#128188;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-          <FieldRow label="Arbeitgebertyp" value={pd.employerType || "\u2014"} />
-          <FieldRow label="Weitere Beschäftigung" value={formatBoolean(pd.hasOtherEmployment)} />
-          {pd.hasOtherEmployment && (
+          <FieldRow label="Status" value={pd.beschaeftigungsStatus ? statusLabel(pd.beschaeftigungsStatus) : "\u2014"} />
+          {pd.beschaeftigungsStatusSonstige && (
+            <FieldRow label="Und zwar" value={pd.beschaeftigungsStatusSonstige} />
+          )}
+          <FieldRow label="Bei der Agentur für Arbeit gemeldet" value={formatBoolean(pd.alsArbeitsuchendGemeldet ?? null)} />
+          {pd.alsArbeitsuchendGemeldet && (
             <>
-              <FieldRow label="Anderer Arbeitgeber" value={pd.otherEmployerName || "\u2014"} />
-              <FieldRow label="Wochenstunden (anderer AG)" value={formatNumber(pd.otherWeeklyHours, "Std.")} />
+              <FieldRow label="Agentur" value={pd.agenturFuerArbeit || "\u2014"} />
+              <FieldRow label="Mit Leistungsbezug" value={formatBoolean(pd.mitLeistungsbezug ?? null)} />
             </>
           )}
-          <FieldRow label="Minijob" value={formatBoolean(pd.hasMinijob)} />
-          {pd.hasMinijob && (
-            <FieldRow label="RV-Befreiung Minijob" value={formatBoolean(pd.minijobRvBefreiung)} />
+          <FieldRow label="Weitere Beschäftigungen" value={formatBoolean(pd.hasOtherEmployment)} />
+          <FieldRow label="Arbeitgebertyp" value={pd.employerType || "\u2014"} />
+          <FieldRow label="Summe über der Geringfügigkeitsgrenze" value={formatBoolean(pd.summeUeberGeringfuegigkeitsgrenze ?? null)} />
+          <FieldRow label="Vorbeschäftigungen in diesem Jahr" value={formatBoolean(pd.vorbeschaeftigungenVorhanden ?? null)} />
+          <FieldRow label="Tätigkeit im Ausland" value={formatBoolean(pd.auslandsbeschaeftigungVorhanden ?? null)} />
+          {/* Altfelder: seit AP 6 nicht mehr erhoben, erscheinen nur noch
+              bei alten Vorgängen. */}
+          {pd.otherEmployerName && (
+            <FieldRow label="Anderer Arbeitgeber (frühere Erfassung)" value={pd.otherEmployerName} />
+          )}
+          {pd.otherWeeklyHours != null && (
+            <FieldRow label="Wochenstunden (frühere Erfassung)" value={formatNumber(pd.otherWeeklyHours, "Std.")} />
           )}
         </div>
       </SectionCard>
@@ -1548,6 +1571,12 @@ function TabFragebogenDaten({
           <FieldRow label="Masernschutz nachgewiesen" value={formatBoolean(pd.masernschutzProvided)} />
         </div>
       </SectionCard>
+
+      {/* Rentenversicherung: Entscheidung des Beschäftigten plus der
+          Arbeitgeberteil des Antrags (Eingang, Wirkung, Fristen). Bewusst
+          ohne Ziffer — die Nummern oben stammen aus der alten festen
+          Schrittfolge, in der es diesen Schritt noch nicht gab. */}
+      <RvFristenCard onboardingId={onboardingId} canEdit={canEdit} />
 
       {/* Schritt 10: DSGVO */}
       <SectionCard title="10. Datenschutz &amp; Einwilligung" icon="&#128274;">

@@ -37,6 +37,15 @@ model Organization {
   // mehrere Mandanten koennen zum selben Betrieb im Sinne der BA gehoeren.
   betriebsnummer String?
 
+  // Tag im Monat, an dem die Entgeltabrechnung laeuft (1–31).
+  //
+  // Die Befreiung ist der Minijob-Zentrale „bis zur naechsten Entgeltabrechnung,
+  // spaetestens innerhalb von 6 Wochen" zu melden — massgeblich ist der
+  // FRUEHERE der beiden Termine. Ohne diesen Wert ueberwacht das Portal nur die
+  // aeussere Sechs-Wochen-Grenze und meldet damit unter Umstaenden zu spaet;
+  // die Oberflaeche weist das aus.
+  entgeltabrechnungTag Int?
+
   // =============================================
   // Elternzeit / Mutterschutz — Mandanten-Konfiguration (Phase 2)
   // Pro Mandant konfigurierbar fuer Briefvorlagen und Standard-Workflows.
@@ -415,6 +424,33 @@ model PersonalData {
   /// alle gleichzeitig ausgeuebten Minijobs, und der Beschaeftigte
   /// verpflichtet sich, seine uebrigen Arbeitgeber zu informieren.
   rvBindungBestaetigt Boolean @default(false)
+
+  // -- Arbeitgeberteil des Antrags (AP 12) --
+  //
+  // ACHTUNG: Das sind Feststellungen des ARBEITGEBERS, nicht Angaben des
+  // Beschaeftigten. Sie stehen hier, weil PersonalData die 1:1-Tabelle des
+  // Vorgangs ist — sie duerfen aber niemals in
+  // `ERLAUBTE_FRAGEBOGEN_FELDER` (src/lib/fragebogen-felder.ts) auftauchen.
+  // Sonst koennte der Beschaeftigte sein eigenes Eingangsdatum setzen und damit
+  // das Wirkungsdatum und die Beitragspflicht verschieben. Ein Test sichert das.
+  //
+  // Als reines Datum (@db.Date) gespeichert, nicht als Zeitstempel: Alle
+  // Fristenregeln setzen auf dem Kalendermonat auf, eine mitgefuehrte Uhrzeit
+  // koennte das Ergebnis ueber die Zeitzone um einen Monat verschieben.
+
+  /// Tag, an dem der unterschriebene Antrag beim Arbeitgeber eingegangen ist.
+  /// Speist das Formularfeld „ist am … bei mir eingegangen" und jede Frist.
+  rvAntragEingangAm DateTime? @db.Date
+  /// Das von HR bestaetigte Wirkungsdatum. Der Vorschlag wird berechnet
+  /// (src/lib/minijob-fristen.ts), bestaetigt wird er von Hand.
+  rvWirkungAb DateTime? @db.Date
+  /// Eingang der DEUEV-Meldung bei der Minijob-Zentrale. Entsteht ausserhalb
+  /// des Portals in der Lohnbuchhaltung und muss erfasst werden — daran haengen
+  /// die Widerspruchsfrist und der Verspaetungsfall.
+  rvMeldungAm DateTime? @db.Date
+  /// Wer die Arbeitgeberangaben zuletzt gesetzt hat, und wann.
+  rvBearbeitetVonId String?
+  rvBearbeitetAm    DateTime?
 
   // -- Weitere Beschaeftigungen nach der Minijob-Checkliste, Abschnitt 4 --
   //

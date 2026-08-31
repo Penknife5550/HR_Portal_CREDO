@@ -1,10 +1,9 @@
 # Minijob-Checkliste — Umsetzungsstand
 
-> **Stand:** 2026-08-27 · Branch `feat/minijob-checkliste-2026` (auf `origin`)
-> **Fertig:** AP 1, AP 2, AP 5, AP 6, AP 7, AP 8 · **Als Nächstes:** AP 12
-> **Verifiziert:** 706 Tests grün (52 Suites) · `tsc --noEmit` sauber · `npm run lint`
-> ohne Errors · `npm run build` erfolgreich · Antragserzeugung, Sperren und
-> Upload-Pflicht im Browser gegen die Dev-Datenbank durchgespielt
+> **Stand:** 2026-08-31 · Branch `feat/minijob-checkliste-2026` (auf `origin`)
+> **Fertig:** AP 1, AP 2, AP 5, AP 6, AP 7, AP 8, AP 12
+> **Verifiziert:** 781 Tests grün (54 Suites) · `tsc --noEmit` sauber · `npm run lint`
+> ohne Errors · `npm run build` erfolgreich
 
 Dieses Dokument ist die Übergabe: Was ist gebaut, was ist bewusst offen, und
 womit fängt man weiter an. Der fachliche Plan steht in
@@ -168,6 +167,54 @@ und Klartext, wenn die Betriebsnummer fehlt. Der Beschäftigten-Kanal läuft
 bewusst **nicht** über die Brief-Vorlagen: Deren PDF-Ausgabe hängt an Gotenberg,
 ein Ausfall dieses Dienstes würde sonst den ganzen Fragebogen blockieren.
 
+### AP 12 — Eingangsdatum, Wirkungsdatum, zwei Fristen
+
+Der Arbeitgeberteil des Antrags: was AP 8 bewusst leer gedruckt hat, wird hier
+erfasst — und hier laufen die Fristen.
+
+**Der Rechenkern**
+([`minijob-fristen.ts`](../../../src/lib/minijob-fristen.ts)) rechnet
+ausschließlich mit `YYYY-MM-DD`-**Zeichenketten** und eigener
+Kalenderarithmetik. Nicht aus Prinzipienreiterei: Alle Regeln setzen auf dem
+Kalendermonat auf, und ein `Date` trägt Uhrzeit und Zone mit sich. Eine
+Absendung am 01.09. um 00:30 Uhr MESZ ist in UTC der 31.08. — das verschöbe das
+Ergebnis um einen vollen Monat und damit die Beitragspflicht. Ebenso wird in
+Monaten gerechnet, nicht in Tagen: 31.01. plus 30 Tage ist der 02.03., richtig
+ist der 01.02.
+
+**Vorschlag, nicht Automatik.** Kein Datum wird still gesetzt. Die Oberfläche
+legt den berechneten Wert samt Begründung daneben; übernommen wird er per Klick,
+und eine Abweichung wird sichtbar gemacht. Die Daten wirken unmittelbar auf die
+Beitragspflicht und gehen nach § 8 Abs. 2 Nr. 4a BVV in die Entgeltunterlagen.
+
+**Die Regeln, wie sie umgesetzt sind:**
+
+| Feld | Regel |
+|---|---|
+| Wirkung der Befreiung (Regelfall) | `max(Erster des Eingangsmonats, Beschäftigungsbeginn)` |
+| Wirkung der Befreiung (Frist versäumt) | Erster des übernächsten Monats nach Eingang der Meldung — **ebenfalls nicht vor Beschäftigungsbeginn** |
+| Wirkung der Aufhebung | Erster des Folgemonats nach Antragstellung; immer der Monatserste (deshalb die vorgedruckte „01" im Vordruck) |
+| Meldefrist | **der frühere** aus nächster Entgeltabrechnung und Eingang + 6 Wochen |
+| Widerspruchsfrist | ein Monat nach Eingang der Meldung, mit Monatsende-Kappung (§ 188 Abs. 2 BGB) und Werktagsregel (§ 26 Abs. 3 SGB X) |
+
+Die Fallentscheidung Regelfall/Verspätung trifft `wirkungDerBefreiung()` — nicht
+die Oberfläche. Sonst hätten zwei Stellen dieselbe Regel auszulegen, und ein
+Aufrufer, der schlicht `wirkungBefreiung()` nimmt, druckte den ungeschobenen
+Termin.
+
+**Was das Portal nicht wissen kann**, und deshalb erfassen lässt statt zu raten:
+der Eingang des unterschriebenen Antrags beim Arbeitgeber und der Eingang der
+DEUEV-Meldung bei der Minijob-Zentrale. Letzterer entsteht in der
+Lohnbuchhaltung; an ihm hängen Widerspruchsfrist und Verspätungsfall. Neu am
+Mandanten: `entgeltabrechnungTag`. Fehlt er, überwacht das Portal nur die äußere
+Sechs-Wochen-Grenze — und sagt das auch.
+
+**Sicherheitszusicherung.** Die neuen Felder stehen zwar in `PersonalData`, sind
+aber Feststellungen des Arbeitgebers. Ein Test hält fest, dass sie **nicht** in
+`ERLAUBTE_FRAGEBOGEN_FELDER` stehen: Sonst könnte der Beschäftigte sein eigenes
+Eingangsdatum setzen und damit sein Wirkungsdatum und seine Beitragspflicht
+verschieben.
+
 ---
 
 ## 3. Festlegungen, die man kennen muss
@@ -239,6 +286,18 @@ Absenden, und Abschnitt 6 zeigte noch die Altfelder aus der Zeit vor AP 5/6.
 Beides ist nachgezogen. Wer einen Schritt ergänzt, ergänzt auch die
 Zusammenfassung **und** den PDF-Export.
 
+**Der Zeitzonenfehler kam durch die Hintertür zurück.** Der Rechenkern schließt
+ihn strukturell aus, indem er nur mit Zeichenketten rechnet. Die Route las
+`rvEntscheidungAm` aber mit `toISOString().slice(0, 10)` — und dieses Feld ist,
+anders als die drei neuen, ein echter Zeitstempel ohne `@db.Date`. Bei einer
+Absendung am Monatsersten kurz nach Mitternacht schlug die Aufhebung damit einen
+**um einen vollen Monat zu frühen** Wirkungsbeginn vor, und zwar auf dem
+Normalpfad: Für die elektronisch erklärte Aufhebung gibt es gar keinen
+Papiereingang, der Zeitstempel ist die einzige Quelle. Die Lehre: Eine
+strukturelle Zusicherung gilt nur so weit wie das Modul, das sie trägt. An der
+Systemgrenze braucht es eine benannte Funktion — hier `berlinerKalendertag()` —
+und einen Test, der genau diese Umrechnung prüft, nicht nur „heute".
+
 **Blockieren statt leer drucken.** Der Weg über die Brief-Vorlagen ersetzt
 fehlende Platzhalter still durch „___" und meldet sie nur in einem Header. Bei
 einem amtlichen Antrag, der nach § 8 Abs. 2 Nr. 4a BVV in die Entgeltunterlagen
@@ -264,37 +323,19 @@ einen Hydration-Fehler. Als phrasing content passt der Kasten in `<p>`, `<label>
 
 ## 5. Was als Nächstes kommt
 
-| AP | Inhalt | Aufwand |
-|---|---|---|
-| **12** | HR-Seite: Eingangsdatum und Wirkungsdatum erfassen, zwei Fristen überwachen (die frühere aus nächster Entgeltabrechnung / sechs Wochen, danach die Monatsfrist für den Widerspruch) | 12–16 h |
+Die rechtlich zwingende Kette ist abgeschlossen. Offen sind nur noch
+Zulieferungen und Komfort:
 
-**Was AP 12 aus der Rechtsprüfung mitnehmen muss** (Gegenprüfung vom 27.08.2026,
-drei unabhängige Blickwinkel je Regel):
+| Thema | Inhalt |
+|---|---|
+| **Zulieferung** | Die 16 BA-Betriebsnummern und die Termine der Entgeltabrechnung je Mandant (siehe Abschnitt 6) |
+| **Wiedervorlage** | Die Fristen werden heute nur auf der Vorgangsseite angezeigt. Eine aktive Erinnerung (Cron + E-Mail, Muster: `contract-end-reminders`) fehlt noch |
+| **Feiertage** | Die Werktagsregel des § 26 Abs. 3 SGB X berücksichtigt nur Sonnabend und Sonntag. Feiertage hängen am Ort der Einzugsstelle, den das Portal nicht kennt — das Fristende kann also noch etwas später liegen |
 
-- **Zwei Zweige, nicht einer.** Die Befreiung wirkt „grundsätzlich" ab Beginn des
-  Eingangsmonats, frühestens ab Beschäftigungsbeginn — aber nur, wenn fristgerecht
-  gemeldet wurde. Andernfalls beginnt sie erst am Ersten des übernächsten Monats
-  nach Eingang der Meldung bei der Minijob-Zentrale. Welcher Zweig gilt, steht
-  beim Erzeugen des Antrags noch nicht fest.
-- **Zwei konkurrierende Meldetermine.** Maßgeblich ist der **frühere** aus
-  nächster Entgeltabrechnung und Eingang + 6 Wochen. Eine Ampel, die nur sechs
-  Wochen zählt, steht bei Eingang zu Monatsbeginn noch auf Grün, während die
-  Frist über die Entgeltabrechnung längst abgelaufen ist.
-- **Nicht automatisierbar.** Der Eingang der DEUEV-Meldung bei der
-  Minijob-Zentrale entsteht außerhalb des Portals. Beide Widerspruchsfristen und
-  der Verspätungsfall hängen daran — sie brauchen ein manuelles Erfassungsfeld
-  und dürfen nicht geschätzt werden.
-- **Monate rechnen, nicht Tage.** 31.01. + 30 Tage ergibt den 02.03. statt korrekt
-  den 01.02.
-- **Europe/Berlin, nicht UTC.** Beide Wirkungsformeln setzen auf dem *Monat* auf.
-  Eine Absendung am 01.09. um 00:30 MESZ ist in UTC der 31.08. — das verschöbe das
-  Ergebnis um einen vollen Monat und damit die Beitragspflicht.
-- **Keine Analogie zur Aufhebung.** Für sie nennt der amtliche Text weder
-  „frühestens ab Beschäftigungsbeginn" noch eine Meldefrist noch die
-  Wirkungsverschiebung. Alle drei gelten nur für die Befreiung.
-- **Vorschlag statt Automatik.** Die berechneten Daten haben unmittelbare
-  Beitragsfolgen. Sie gehören HR als bestätigbarer Vorschlag vorgelegt, nicht als
-  unveränderliches Ergebnis.
+**Vor der Produktivsetzung** sollten die berechneten Wirkungsdaten an einigen
+Echtfällen mit der Lohnbuchhaltung abgeglichen werden. Die Ableitungen beruhen
+auf dem amtlichen Merkblatt- und Erläuterungstext; das ist eine Auslegung, kein
+Rechtsrat, und die Zahlen haben Beitragsfolgen.
 
 ---
 
@@ -305,8 +346,11 @@ drei unabhängige Blickwinkel je Regel):
    Antragserzeugung für diesen Mandanten — bewusst, statt still mit leerer
    Pflichtangabe zu drucken. Die Mandantenliste zeigt mit einem Warn-Badge,
    welche noch offen sind.
-2. Der **Termin der Entgeltabrechnung** je Mandant (AP 12). Ohne ihn überwacht das
-   Portal nur die äußere Sechs-Wochen-Grenze und meldet zu spät.
+2. Der **Termin der Entgeltabrechnung** je Mandant. Das Feld
+   (`Organization.entgeltabrechnungTag`) steht; ohne Wert überwacht das Portal
+   nur die äußere Sechs-Wochen-Grenze und weist das in der Maske aus. Da die
+   Meldefrist der **frühere** der beiden Termine ist, kann sie in Wirklichkeit
+   deutlich früher enden als angezeigt.
 
 ---
 

@@ -2,6 +2,13 @@
  * Tests fuer den Erinnerungs-Cron: POST /api/cron/contract-end-reminders
  * Kern: Auth, Intervall-Staffelung nach Fristen-Ampel, Skip ausserhalb
  * des Vorlaufs, Zaehler-/Zeitstempel-Fortschreibung.
+ *
+ * **Die Uhr steht.** Die Route verschickt montags zusaetzlich einen Digest an
+ * HR (`contract-end-unbearbeitet`). Ohne feste Systemzeit fiel dieser Zweig in
+ * die Tests hinein, die `not.toHaveBeenCalled()` erwarten — die Suite war
+ * damit an sechs von sieben Wochentagen gruen und montags rot. Deshalb wird
+ * die Zeit hier auf einen Dienstag gesetzt; der Montags-Digest hat einen
+ * eigenen Block, der bewusst auf einen Montag stellt.
  */
 
 const mockPrisma = {
@@ -21,6 +28,11 @@ import { NextRequest } from "next/server";
 
 const SECRET = "test-cron-secret";
 const MS_PER_DAY = 86400000;
+
+/** Ein Dienstag, 12 Uhr Berliner Zeit — bewusst kein Montag. */
+const DIENSTAG = new Date("2026-09-01T10:00:00Z");
+/** Ein Montag, 12 Uhr Berliner Zeit — fuer den Digest-Block. */
+const MONTAG = new Date("2026-08-31T10:00:00Z");
 
 function req(token: string | null = SECRET): NextRequest {
   return new NextRequest("http://localhost:3000/api/cron/contract-end-reminders", {
@@ -51,7 +63,16 @@ function vorgang(overrides: Record<string, unknown> = {}) {
 }
 
 describe("POST /api/cron/contract-end-reminders", () => {
+  beforeAll(() => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+    jest.setSystemTime(DIENSTAG);
+  });
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
+    jest.setSystemTime(DIENSTAG);
     jest.clearAllMocks();
     process.env.CRON_SECRET = SECRET;
     mockPrisma.contractEndProcess.findMany.mockResolvedValue([]);
@@ -359,5 +380,48 @@ describe("Montags-Digest: unbearbeitete kritische Vorgaenge", () => {
     expect(json.unbearbeitetHinweis).toBe(0);
     // findMany fuer ANGELEGT wird gar nicht erst aufgerufen
     expect(mockPrisma.contractEndProcess.findMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Montags-Digest an HR", () => {
+  beforeAll(() => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+  });
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.CRON_SECRET = SECRET;
+    mockPrisma.contractEndProcess.findMany.mockResolvedValue([]);
+    mockPrisma.contractEndProcess.update.mockResolvedValue({});
+    mockPrisma.auditLog.create.mockResolvedValue({});
+    mockPrisma.emailLog.findFirst.mockResolvedValue(null);
+    mockTriggerWebhooks.mockResolvedValue({ status: "SENT" });
+  });
+
+  /** Ein Vorgang im Status ANGELEGT: Anfrage nie versendet. */
+  function unbearbeitet() {
+    return vorgang({
+      supervisorLinkSentAt: null,
+      supervisorToken: null,
+      supervisorTokenExpiresAt: null,
+    });
+  }
+
+  it("geht montags raus", () => {
+    jest.setSystemTime(MONTAG);
+    expect(new Date().getDay()).toBe(1);
+  });
+
+  it("geht dienstags nicht raus", async () => {
+    jest.setSystemTime(DIENSTAG);
+    mockPrisma.contractEndProcess.findMany.mockResolvedValue([unbearbeitet()]);
+    await POST(req());
+    expect(mockTriggerWebhooks).not.toHaveBeenCalledWith(
+      "contract-end-unbearbeitet",
+      expect.anything(),
+    );
   });
 });
