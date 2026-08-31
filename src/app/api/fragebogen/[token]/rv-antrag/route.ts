@@ -34,7 +34,15 @@ export async function GET(
   const { token } = await params;
   const ip = getClientIp(request);
 
-  if (!tokenRateLimiter.check(ip)) {
+  // `check()` liefert ein Objekt, keinen Wahrheitswert — `!check(ip)` waere
+  // immer falsch und der 429-Zweig damit toter Code. Genau so stand es hier.
+  //
+  // Eigener Schluesselraum: Sonst zehrt jeder Antrags-Download am selben
+  // Kontingent wie das Auto-Speichern des Fragebogens. Wer den Antrag mehrfach
+  // holt, weil der Drucker klemmt, sperrt sich damit aus dem eigenen Formular
+  // aus — und sieht dort nur „Fehler beim Speichern".
+  const rlCheck = tokenRateLimiter.check(`rv-antrag:${ip}`);
+  if (!rlCheck.allowed) {
     return NextResponse.json(
       { error: "Zu viele Anfragen. Bitte versuchen Sie es später erneut." },
       { status: 429 }

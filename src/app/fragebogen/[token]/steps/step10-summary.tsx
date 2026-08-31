@@ -381,10 +381,15 @@ export function Step10Summary({
           label="Elterneigenschaft"
           value={d.parentStatus ? "Ja" : "Nein"}
         />
-        <SummaryRow
-          label="RV-Befreiung (Minijob)"
-          value={d.minijobRvBefreiung ? "Ja" : "Nein"}
-        />
+        {/* Nur noch fuer Altvorgaenge: Wer Schritt 11 durchlaufen hat, sieht
+            seine Entscheidung dort — zwei Antworten auf dieselbe Frage
+            waeren ein Widerspruch in der eigenen Akte. */}
+        {!d.rvEntscheidung && d.minijobRvBefreiung === true && (
+          <SummaryRow
+            label="RV-Befreiung (Minijob, frühere Erfassung)"
+            value="Ja"
+          />
+        )}
       </SummarySection>
 
       {/* Step 5: Steuer */}

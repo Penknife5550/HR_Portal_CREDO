@@ -395,27 +395,19 @@ export function Step4SocialSecurity({
         </div>
       )}
 
-      {/* Minijob RV-Befreiung */}
-      {fc.isVisible("minijobRvBefreiung") && (
-        <div className="rounded-lg border border-border bg-muted/50 p-4">
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              {...register("minijobRvBefreiung")}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-            />
-            <div>
-              <span className="text-sm font-medium text-foreground">
-                {fc.getLabel("minijobRvBefreiung")}
-              </span>
-              <p className="text-xs text-muted-foreground">
-                Nur relevant bei geringfuegiger Beschaeftigung (Minijob): Ich
-                moechte mich von der Rentenversicherungspflicht befreien lassen.
-              </p>
-            </div>
-          </label>
-        </div>
-      )}
+      {/* Die Frage nach der RV-Befreiung stand frueher hier als einzelner
+          Haken. Seit AP 7 ist sie ein eigener Schritt mit vier Wegen
+          (step11-rente.tsx) — der Haken bildete die Entscheidung nie ab.
+
+          Er wird deshalb nicht mehr gerendert, auch wenn eine gespeicherte
+          Vorlagen-Konfiguration ihn noch als sichtbar fuehrt. Sonst
+          beantwortete derselbe Mensch dieselbe Frage zweimal, mit
+          unterschiedlicher Aufloesung — und die Akte truege zur
+          folgenreichsten Angabe des Fragebogens zwei Antworten, beide unter
+          derselben Wahrheitsversicherung.
+
+          Das Feld selbst bleibt im Modell und lesbar: Altvorgaenge haben es
+          befuellt. */}
 
       {/* Navigation */}
       <div className="flex justify-between pt-4">

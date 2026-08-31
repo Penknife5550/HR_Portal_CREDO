@@ -403,6 +403,23 @@ describe("MINIJOB-Vorlagenkorrektur im Entrypoint", () => {
     expect(seedCheck.LEGACY_DISPLAY_ORDER).toEqual([...LEGACY_DISPLAY_ORDER]);
   });
 
+  it("bietet die 0 nicht als Migrationsquelle an", () => {
+    // Die 0 ist der Schema-Default „noch nicht begonnen", keine alte
+    // Anzeigeposition — die alte API liess nur min(1) zu. Wanderte sie mit auf
+    // 1, waere nach dem Deploy nicht mehr erkennbar, wer den Link nie geöffnet
+    // hat. Die Migration läuft genau einmal; danach hilft nur ein Backup.
+    const quellen: number[] = seedCheck.migrationsQuellen();
+    expect(quellen).not.toContain(0);
+    expect(quellen).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+  });
+
+  it("arbeitet die Quellen absteigend ab", () => {
+    // Voraussetzung der Kollisionsfreiheit: Jedes Ziel liegt >= Quelle.
+    const quellen: number[] = seedCheck.migrationsQuellen();
+    const absteigend = [...quellen].sort((a, b) => b - a);
+    expect(quellen).toEqual(absteigend);
+  });
+
   it("bildet dieselbe Abbildung wie die TypeScript-Fassung", () => {
     for (let i = -2; i <= 12; i++) {
       expect(seedCheck.legacyIndexToStepNumber(i)).toBe(legacyIndexToStepNumber(i));

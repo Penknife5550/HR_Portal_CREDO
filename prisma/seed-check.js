@@ -117,6 +117,18 @@ function legacyIndexToStepNumber(legacyIndex) {
   return LEGACY_DISPLAY_ORDER[LEGACY_DISPLAY_ORDER.length - 1];
 }
 
+/**
+ * Die Quellwerte der currentStep-Migration, hoechster zuerst.
+ *
+ * Eigene Funktion, damit ein Test sie halten kann: Der Ausschluss der 0 ist die
+ * ganze Regel, und sie ist nach einem Lauf nicht mehr korrigierbar.
+ */
+function migrationsQuellen() {
+  const quellen = [];
+  for (let i = 10; i >= 1; i--) quellen.push(i);
+  return quellen;
+}
+
 async function migrateCurrentStepToRegistryNumbers(prisma) {
   try {
     if (await migrationErledigt(prisma, CURRENT_STEP_MIGRATION_MARKER)) return;
@@ -134,8 +146,15 @@ async function migrateCurrentStepToRegistryNumbers(prisma) {
 
     // Hoechste Quellwerte zuerst. Jedes Ziel liegt >= Quelle, deshalb ist beim
     // Bearbeiten von Wert s garantiert noch nichts nach s hineingeschoben worden.
-    const sources = [];
-    for (let i = 10; i >= 0; i--) sources.push(i);
+    //
+    // Beginn bei 1, NICHT bei 0: Die 0 ist keine alte Anzeigeposition, sondern
+    // der Schema-Default „noch nicht begonnen". Die alte API liess nur min(1)
+    // zu, das alte Formular speicherte immer currentStep + 1. Wanderte die 0
+    // mit auf 1, koennte HR nach dem Deploy nicht mehr unterscheiden, wer den
+    // Link nie geoeffnet hat und wer auf Schritt 1 steht — und zwar in allen
+    // Fragebogentypen, nicht nur bei Minijob. Die Migration laeuft genau
+    // einmal; danach waere der Zustand nur noch aus einem Backup zu holen.
+    const sources = migrationsQuellen();
 
     const updates = [];
     for (const from of sources) {
@@ -468,6 +487,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  migrationsQuellen,
   RENTE_SCHRITT,
   LEGACY_DISPLAY_ORDER,
   MINIJOB_TAX_FIELDS,

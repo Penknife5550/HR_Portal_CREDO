@@ -29,6 +29,15 @@ interface StepProps {
   onNext: (data: Record<string, unknown>) => void;
   onBack: () => void;
   saving: boolean;
+  /**
+   * Wird entgegengenommen, aber nicht ausgewertet — und das mit Absicht.
+   *
+   * In diesem Schritt ist nichts abschaltbar: Die Entscheidung traegt den
+   * Schritt, und die beiden Zusagen sind die Voraussetzung, unter der eine
+   * Befreiung beantragt werden darf. Die Registry fuehrt sie deshalb als
+   * `alwaysVisible`/`alwaysRequired`, der Vorlagen-Editor zeigt dort ein
+   * Pflichtfeld-Kennzeichen statt eines Schalters.
+   */
   fieldConfig?: FieldConfigHelper;
   /** Magic-Link-Token — fuer den Download des vorausgefuellten Antrags. */
   token?: string;

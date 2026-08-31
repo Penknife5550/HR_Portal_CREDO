@@ -89,7 +89,10 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
     { name: "healthInsuranceName",  label: "Krankenkasse",           defaultVisible: true, defaultRequired: true },
     { name: "healthInsuranceType",  label: "Versicherungsart",       defaultVisible: true, defaultRequired: true },
     { name: "parentStatus",         label: "Haben Sie Kinder?", defaultVisible: true, defaultRequired: false },
-    { name: "minijobRvBefreiung",   label: "RV-Befreiung Minijob",  defaultVisible: true, defaultRequired: false },
+    // Altfeld. Ein einzelner Haken bildete die Vier-Wege-Entscheidung des
+    // Abschnitts 5 nie ab; seit AP 7 steht sie als eigener Schritt 11. Bleibt
+    // in der Registry, damit Altvorgaenge lesbar sind — aber aus.
+    { name: "minijobRvBefreiung",   label: "RV-Befreiung Minijob (Altfeld)",  defaultVisible: false, defaultRequired: false },
   ],
 
   // Step 5: Steuer
@@ -131,12 +134,21 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
   10: [],
 
   // Step 11: Rentenversicherung (Minijob-Checkliste, Abschnitt 5)
-  // Die Entscheidung selbst ist nicht abschaltbar — ohne sie waere der Schritt
-  // sinnlos. Die beiden Zusagen haengen an der gewaehlten Option.
+  //
+  // Hier ist NICHTS abschaltbar, und das ist Absicht: Die Entscheidung traegt
+  // den ganzen Schritt, und die beiden Zusagen sind die Voraussetzung, unter der
+  // eine Befreiung ueberhaupt beantragt werden darf — die Kenntnisnahme des
+  // Merkblatts verlangt das amtliche Muster ausdruecklich, die Bindungswirkung
+  // steht im Antragstext selbst.
+  //
+  // Sie stehen trotzdem in der Registry, damit der Vorlagen-Editor den Schritt
+  // vollstaendig anzeigt. `alwaysVisible`/`alwaysRequired` sorgen dafuer, dass
+  // er statt wirkungsloser Haken ein Pflichtfeld-Kennzeichen zeigt. Genau das
+  // fehlte: Die Schalter liessen sich umlegen und aenderten nichts.
   11: [
     { name: "rvEntscheidung",      label: "Entscheidung zur Rentenversicherung", defaultVisible: true, defaultRequired: true, alwaysVisible: true, alwaysRequired: true },
-    { name: "rvMerkblattGelesen",  label: "Merkblatt zur Kenntnis genommen",     defaultVisible: true, defaultRequired: false },
-    { name: "rvBindungBestaetigt", label: "Bindungswirkung bestaetigt",          defaultVisible: true, defaultRequired: false },
+    { name: "rvMerkblattGelesen",  label: "Merkblatt zur Kenntnis genommen",     defaultVisible: true, defaultRequired: true, alwaysVisible: true, alwaysRequired: true },
+    { name: "rvBindungBestaetigt", label: "Bindungswirkung bestaetigt",          defaultVisible: true, defaultRequired: true, alwaysVisible: true, alwaysRequired: true },
   ],
 };
 

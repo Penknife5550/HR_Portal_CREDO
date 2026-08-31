@@ -114,6 +114,76 @@ function Hinweise({ texte }: { texte: string[] }) {
   );
 }
 
+/**
+ * Ein Datumsfeld, das erst beim Verlassen speichert.
+ *
+ * Warum nicht bei `onChange`: Ein `<input type="date">` mit vorhandenem Wert ist
+ * waehrend der Eingabe kurz leer und feuert dabei ein Change mit "". Wer ein
+ * erfasstes Datum korrigieren wollte, loeschte es damit zuerst — und weil die
+ * Antwort das Feld neu montierte, war die halb getippte Eingabe gleich mit weg.
+ * Bei einem Feld, das unmittelbar auf die Beitragspflicht wirkt, ist das der
+ * falsche Zeitpunkt zum Speichern.
+ *
+ * Leeren ist deshalb auch kein Nebeneffekt mehr, sondern ein eigener Knopf: Ein
+ * leeres Datumsfeld ist meistens ein Zwischenzustand, kein Loeschwunsch.
+ */
+function DatumsFeld({
+  wert,
+  onSpeichern,
+  bearbeitbar,
+  laeuft,
+}: {
+  wert: string | null;
+  onSpeichern: (neu: string | null) => void;
+  bearbeitbar: boolean;
+  laeuft: boolean;
+}) {
+  const [entwurf, setEntwurf] = useState(wert ?? "");
+
+  // Wert von aussen uebernehmen — aber nur, wenn gerade nicht getippt wird.
+  useEffect(() => {
+    setEntwurf(wert ?? "");
+  }, [wert]);
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="date"
+        value={entwurf}
+        readOnly={!bearbeitbar}
+        onChange={(e) => setEntwurf(e.target.value)}
+        onBlur={() => {
+          if (!bearbeitbar) return;
+          const neu = entwurf === "" ? null : entwurf;
+          // Nichts geaendert, nichts speichern — sonst faellt bei jedem
+          // Durchtabben ein Audit-Eintrag an.
+          if (neu === (wert ?? null)) return;
+          // Leeren nur ueber den eigenen Knopf.
+          if (neu === null) {
+            setEntwurf(wert ?? "");
+            return;
+          }
+          onSpeichern(neu);
+        }}
+        className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring read-only:opacity-60"
+      />
+      {bearbeitbar && wert && (
+        <button
+          type="button"
+          onClick={() => onSpeichern(null)}
+          title="Datum entfernen"
+          className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent"
+        >
+          Entfernen
+        </button>
+      )}
+      {laeuft && (
+        <span className="text-xs text-muted-foreground">wird gespeichert …</span>
+      )}
+    </div>
+  );
+}
+
 export function RvFristenCard({
   onboardingId,
   canEdit,
@@ -228,26 +298,21 @@ export function RvFristenCard({
                   : "Der Tag, an dem der unterschriebene Antrag hier eingegangen ist. Nicht das Datum der Unterschrift und nicht das Absendedatum des Fragebogens. Er steuert Wirkung und Frist."
               }
             >
-              <input
-                type="date"
-                disabled={!canEdit || speichert}
-                defaultValue={daten.erfasst.antragEingangAm ?? ""}
-                onChange={(e) =>
-                  speichern("antragEingangAm", e.target.value || null)
-                }
-                className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:opacity-50"
+              <DatumsFeld
+                wert={daten.erfasst.antragEingangAm}
+                bearbeitbar={canEdit}
+                laeuft={speichert}
+                onSpeichern={(neu) => speichern("antragEingangAm", neu)}
               />
             </Zeile>
 
             {/* ---------- Wirkungsdatum ---------- */}
             <Zeile label="Die Befreiung wirkt ab">
-              <input
-                type="date"
-                disabled={!canEdit || speichert}
-                defaultValue={daten.erfasst.wirkungAb ?? ""}
-                key={daten.erfasst.wirkungAb ?? "leer"}
-                onChange={(e) => speichern("wirkungAb", e.target.value || null)}
-                className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:opacity-50"
+              <DatumsFeld
+                wert={daten.erfasst.wirkungAb}
+                bearbeitbar={canEdit}
+                laeuft={speichert}
+                onSpeichern={(neu) => speichern("wirkungAb", neu)}
               />
             </Zeile>
 
@@ -305,14 +370,11 @@ export function RvFristenCard({
                   <label className="text-xs text-muted-foreground">
                     Gemeldet am
                   </label>
-                  <input
-                    type="date"
-                    disabled={!canEdit || speichert}
-                    defaultValue={daten.erfasst.meldungAm ?? ""}
-                    onChange={(e) =>
-                      speichern("meldungAm", e.target.value || null)
-                    }
-                    className="rounded-lg border border-input bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:opacity-50"
+                  <DatumsFeld
+                    wert={daten.erfasst.meldungAm}
+                    bearbeitbar={canEdit}
+                    laeuft={speichert}
+                    onSpeichern={(neu) => speichern("meldungAm", neu)}
                   />
                 </div>
               </div>

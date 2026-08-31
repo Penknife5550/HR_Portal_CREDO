@@ -453,7 +453,11 @@ async function addFragebogenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
     y = dataRow(doc, "Wochenstunden (Altangabe)", str(pd.otherWeeklyHours), y);
   }
   y = dataRow(doc, "Minijob", yn(pd.hasMinijob), y);
-  if (pd.hasMinijob) y = dataRow(doc, "RV-Befreiung Minijob", yn(pd.minijobRvBefreiung), y);
+  // Altfeld: nur ausgeben, solange keine Entscheidung aus Schritt 11 vorliegt.
+  // Sonst stuenden in derselben Akte zwei Antworten auf dieselbe Frage.
+  if (!pd.rvEntscheidung && pd.minijobRvBefreiung) {
+    y = dataRow(doc, "RV-Befreiung Minijob (Altangabe)", yn(pd.minijobRvBefreiung), y);
+  }
 
   // =============================================
   // Rentenversicherung (Checkliste, Abschnitt 5)
