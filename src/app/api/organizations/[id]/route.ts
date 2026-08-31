@@ -9,7 +9,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import {
+  ABRECHNUNGSTAG_FORMAT_FEHLER,
   BETRIEBSNUMMER_FORMAT_FEHLER,
+  pruefeAbrechnungstagEingabe,
   pruefeBetriebsnummerEingabe,
 } from "@/lib/betriebsnummer";
 
@@ -40,6 +42,7 @@ export async function GET(
         id: true,
         mandantNumber: true,
         betriebsnummer: true,
+        entgeltabrechnungTag: true,
         name: true,
         shortName: true,
         type: true,
@@ -146,6 +149,17 @@ export async function PATCH(
       }
       neueBetriebsnummer = geprueft.wert;
       updateData.betriebsnummer = geprueft.wert;
+    }
+
+    if (body.entgeltabrechnungTag !== undefined) {
+      const geprueft = pruefeAbrechnungstagEingabe(body.entgeltabrechnungTag);
+      if (!geprueft.ok) {
+        return NextResponse.json(
+          { error: ABRECHNUNGSTAG_FORMAT_FEHLER },
+          { status: 400 }
+        );
+      }
+      updateData.entgeltabrechnungTag = geprueft.wert;
     }
 
     const vorher =

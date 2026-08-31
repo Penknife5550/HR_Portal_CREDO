@@ -8,7 +8,9 @@
  */
 
 import {
+  ABRECHNUNGSTAG_FORMAT_FEHLER,
   BETRIEBSNUMMER_FORMAT_FEHLER,
+  pruefeAbrechnungstagEingabe,
   BETRIEBSNUMMER_LAENGE,
   betriebsnummerFehltText,
   formatiereBetriebsnummer,
@@ -84,6 +86,31 @@ describe("Eingabepruefung", () => {
 
   it("weist Nicht-Zeichenketten ab", () => {
     expect(pruefeBetriebsnummerEingabe(12345678).ok).toBe(false);
+  });
+});
+
+describe("Termin der Entgeltabrechnung", () => {
+  it("nimmt einen Tag zwischen 1 und 31", () => {
+    expect(pruefeAbrechnungstagEingabe(25)).toEqual({ ok: true, wert: 25 });
+    expect(pruefeAbrechnungstagEingabe("25")).toEqual({ ok: true, wert: 25 });
+    expect(pruefeAbrechnungstagEingabe(1)).toEqual({ ok: true, wert: 1 });
+    expect(pruefeAbrechnungstagEingabe(31)).toEqual({ ok: true, wert: 31 });
+  });
+
+  it("macht aus leer ein null", () => {
+    for (const leer of ["", null, undefined]) {
+      expect(pruefeAbrechnungstagEingabe(leer)).toEqual({ ok: true, wert: null });
+    }
+  });
+
+  it("weist alles ab, was die Fristenrechnung sprengen würde", () => {
+    // Ein krummer oder zu grosser Wert erzeugte in meldefristEnde frueher ein
+    // kaputtes Datum. Hier ist die erste Verteidigungslinie.
+    for (const falsch of [0, 32, -3, 5.7, "abc", "25.5"]) {
+      const r = pruefeAbrechnungstagEingabe(falsch);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.fehler).toBe(ABRECHNUNGSTAG_FORMAT_FEHLER);
+    }
   });
 });
 

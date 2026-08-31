@@ -84,6 +84,33 @@ export function betriebsnummerFehltText(mandantName: string): string {
   );
 }
 
+/**
+ * Der Tag im Monat, an dem die Entgeltabrechnung laeuft.
+ *
+ * Steht hier neben der Betriebsnummer, weil beides Mandanten-Stammdaten sind,
+ * die dieselbe Maske pflegt — und weil beide fuer die Minijob-Antraege gebraucht
+ * werden: die Nummer auf dem Vordruck, der Termin fuer die Meldefrist.
+ *
+ * Die Meldefrist ist der FRUEHERE aus naechster Entgeltabrechnung und Eingang
+ * plus sechs Wochen. Ohne diesen Wert ueberwacht das Portal nur die aeussere
+ * Grenze und meldet damit unter Umstaenden zu spaet.
+ */
+export function pruefeAbrechnungstagEingabe(
+  eingabe: unknown
+): { ok: true; wert: number | null } | { ok: false; fehler: string } {
+  if (eingabe === null || eingabe === undefined || eingabe === "") {
+    return { ok: true, wert: null };
+  }
+  const zahl = typeof eingabe === "number" ? eingabe : Number(String(eingabe).trim());
+  if (!Number.isInteger(zahl) || zahl < 1 || zahl > 31) {
+    return { ok: false, fehler: ABRECHNUNGSTAG_FORMAT_FEHLER };
+  }
+  return { ok: true, wert: zahl };
+}
+
+export const ABRECHNUNGSTAG_FORMAT_FEHLER =
+  "Der Abrechnungstag ist eine ganze Zahl zwischen 1 und 31.";
+
 /** Anzeigeform mit Tausenderluecken? Nein — die BA schreibt sie am Stueck. */
 export function formatiereBetriebsnummer(wert: string | null | undefined): string {
   return wert && wert.trim() !== "" ? wert : "—";

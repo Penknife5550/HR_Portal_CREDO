@@ -9,7 +9,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import {
+  ABRECHNUNGSTAG_FORMAT_FEHLER,
   BETRIEBSNUMMER_FORMAT_FEHLER,
+  pruefeAbrechnungstagEingabe,
   pruefeBetriebsnummerEingabe,
 } from "@/lib/betriebsnummer";
 
@@ -41,6 +43,7 @@ export async function GET() {
         id: true,
         mandantNumber: true,
         betriebsnummer: true,
+        entgeltabrechnungTag: true,
         name: true,
         shortName: true,
         type: true,
@@ -118,6 +121,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const abrechnungstag = pruefeAbrechnungstagEingabe(body.entgeltabrechnungTag);
+    if (!abrechnungstag.ok) {
+      return NextResponse.json(
+        { error: ABRECHNUNGSTAG_FORMAT_FEHLER },
+        { status: 400 }
+      );
+    }
+
     // Pruefen ob Mandantennummer bereits existiert
     const existing = await prisma.organization.findUnique({
       where: { mandantNumber: mandantNumber.trim() },
@@ -133,6 +144,7 @@ export async function POST(request: NextRequest) {
       data: {
         mandantNumber: mandantNumber.trim(),
         betriebsnummer: betriebsnummer.wert,
+        entgeltabrechnungTag: abrechnungstag.wert,
         name: name.trim(),
         shortName: shortName?.trim() || null,
         type,
