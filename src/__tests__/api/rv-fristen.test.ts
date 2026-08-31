@@ -89,8 +89,11 @@ describe("Zugang", () => {
     expect((await PATCH(patchReq({}), ctx())).status).toBe(401);
   });
 
-  it("lässt VIEWER lesen, aber nicht schreiben", async () => {
-    mockGetSession.mockResolvedValue({ userId: "u2", role: "VIEWER" });
+  it("lässt eine reine Leserolle lesen, aber nicht schreiben", async () => {
+    // EINRICHTUNGSLEITUNG steht in PORTAL_ROLES, aber nicht in HR_EDIT_ROLES.
+    // (Die Route führte hier früher "VIEWER" — eine Rolle, die es im Schema
+    // gar nicht gibt.)
+    mockGetSession.mockResolvedValue({ userId: "u2", role: "EINRICHTUNGSLEITUNG" });
     mockPrisma.onboardingProcess.findUnique.mockResolvedValue(vorgang());
     expect((await GET(getReq(), ctx())).status).toBe(200);
     expect(

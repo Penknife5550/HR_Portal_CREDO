@@ -25,6 +25,7 @@ import {
   fristampel,
   heuteInBerlin,
 } from "@/lib/minijob-fristen";
+import { rvEntscheidungLabel } from "@/lib/minijob-rentenversicherung";
 
 interface Berechnung {
   datum: string | null;
@@ -67,13 +68,6 @@ const AMPEL_STIL: Record<Ampel, string> = {
   BALD: "border-[#FBC900]/50 bg-[#FBC900]/15 text-[#8a6d00]",
   UEBERFAELLIG: "border-destructive/40 bg-destructive/10 text-destructive",
   OFFEN: "border-border bg-muted text-muted-foreground",
-};
-
-const ENTSCHEIDUNG_LABEL: Record<string, string> = {
-  KEINE_BEFREIUNG: "Bleibt versicherungspflichtig",
-  BEFREIUNG_BEANTRAGT: "Befreiung beantragt",
-  RENTENVERSICHERUNGSFREI: "Rentenversicherungsfrei (kein Antrag nötig)",
-  AUFHEBUNG_BEANTRAGT: "Aufhebung einer früheren Befreiung beantragt",
 };
 
 function Zeile({
@@ -275,8 +269,11 @@ export function RvFristenCard({
       <div className="px-6 py-4">
         <Zeile label="Entscheidung des Beschäftigten">
           <span className="text-sm font-medium text-foreground">
+            {/* Aus der gemeinsamen Quelle: Eine zweite Liste hier war schon
+                auseinandergelaufen („kein Antrag nötig" gegen „keine
+                Befreiung nötig"). */}
             {daten.entscheidung
-              ? ENTSCHEIDUNG_LABEL[daten.entscheidung] ?? daten.entscheidung
+              ? rvEntscheidungLabel(daten.entscheidung)
               : "— noch nicht getroffen"}
           </span>
         </Zeile>

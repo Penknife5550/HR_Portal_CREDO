@@ -194,6 +194,39 @@ describe("Pruefsumme ueber die Angaben", () => {
   });
 });
 
+describe("Der Arbeitgeberteil zaehlt nicht zu den versicherten Angaben", () => {
+  const angaben = {
+    firstName: "Maria",
+    lastName: "Voth",
+    rvEntscheidung: "BEFREIUNG_BEANTRAGT",
+  };
+
+  it("laesst die Pruefsumme unveraendert, wenn HR die Fristen nachtraegt", () => {
+    // Der eigentliche Punkt: Die Wahrheitsversicherung deckt ab, was der
+    // Beschaeftigte erklaert hat. Eingangsdatum, Wirkungsdatum und Meldedatum
+    // traegt HR spaeter nach — stuenden sie in der Pruefsumme, waere sie mit
+    // dem ersten Eintrag ungueltig und liesse sich nie wieder nachrechnen.
+    // Genau dafuer gibt es sie aber.
+    const nachHrEingabe = {
+      ...angaben,
+      rvAntragEingangAm: "2026-08-10",
+      rvWirkungAb: "2026-08-01",
+      rvMeldungAm: "2026-08-20",
+      rvBearbeitetVonId: "user-1",
+      rvBearbeitetAm: "2026-08-20T09:00:00.000Z",
+    };
+    expect(berechnePruefsumme(nachHrEingabe)).toBe(berechnePruefsumme(angaben));
+  });
+
+  it("erfasst die Entscheidung des Beschaeftigten dagegen sehr wohl", () => {
+    // Gegenprobe: Was er selbst erklaert hat, muss die Pruefsumme abdecken.
+    const andereEntscheidung = { ...angaben, rvEntscheidung: "KEINE_BEFREIUNG" };
+    expect(berechnePruefsumme(andereEntscheidung)).not.toBe(
+      berechnePruefsumme(angaben)
+    );
+  });
+});
+
 describe("pruefsummeKurz", () => {
   it("kuerzt lange Pruefsummen fuer die Anzeige", () => {
     const voll = "a".repeat(8) + "b".repeat(48) + "c".repeat(8);

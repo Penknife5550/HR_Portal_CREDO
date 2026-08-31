@@ -43,6 +43,16 @@ const NICHT_TEIL_DER_ANGABEN = new Set([
   "erklaerungUserAgent",
   "erklaerungVersion",
   "erklaerungPruefsumme",
+  // Der Arbeitgeberteil des RV-Antrags (AP 12). Er gehoert NICHT zu den
+  // Angaben, die der Beschaeftigte versichert hat — HR traegt ihn spaeter
+  // nach. Stuende er in der Pruefsumme, waere sie mit dem ersten
+  // eingetragenen Eingangsdatum ungueltig, und die Wahrheitsversicherung
+  // liesse sich nicht mehr nachrechnen. Genau dafuer ist sie da.
+  "rvAntragEingangAm",
+  "rvWirkungAb",
+  "rvMeldungAm",
+  "rvBearbeitetVonId",
+  "rvBearbeitetAm",
   // Werden separat und in fester Reihenfolge angehaengt.
   "children",
   "beschaeftigungsAngaben",

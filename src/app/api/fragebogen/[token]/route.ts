@@ -220,6 +220,16 @@ export async function GET(
     personalData: personalData
       ? {
           ...personalData,
+          // Der Arbeitgeberteil bleibt drin: Das sind Feststellungen des
+          // Arbeitgebers und die Kennung des Sachbearbeiters — sie gehen den
+          // Beschaeftigten nichts an und haben in einem oeffentlichen,
+          // nur token-geschuetzten Formular nichts zu suchen. `...personalData`
+          // nimmt sonst jedes neue Feld des Modells stillschweigend mit.
+          rvAntragEingangAm: undefined,
+          rvWirkungAb: undefined,
+          rvMeldungAm: undefined,
+          rvBearbeitetVonId: undefined,
+          rvBearbeitetAm: undefined,
           // Sensible Felder entschluesseln
           iban: personalData.iban ? decrypt(personalData.iban) : "",
           socialSecurityNumber: personalData.socialSecurityNumber ? decrypt(personalData.socialSecurityNumber) : "",

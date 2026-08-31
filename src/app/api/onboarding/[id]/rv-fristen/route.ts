@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { HR_EDIT_ROLES, PORTAL_ROLES } from "@/lib/permissions";
 import {
   type Kalendertag,
   berlinerKalendertag,
@@ -30,8 +30,6 @@ import {
   wirkungAufhebung,
   wirkungDerBefreiung,
 } from "@/lib/minijob-fristen";
-
-const LESE_ROLLEN = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "VIEWER"];
 
 /**
  * Kalendertag aus einer **`@db.Date`-Spalte**.
@@ -167,7 +165,10 @@ export async function GET(
     if (!session) {
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
-    if (!LESE_ROLLEN.includes(session.role)) {
+    // Bewusst die gemeinsame Liste statt einer eigenen: Die frueher hier
+    // stehende Liste fuehrte "VIEWER" — eine Rolle, die es im Schema gar
+    // nicht gibt.
+    if (!PORTAL_ROLES.includes(session.role)) {
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
