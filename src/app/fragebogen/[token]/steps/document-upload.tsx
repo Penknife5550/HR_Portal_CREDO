@@ -514,7 +514,11 @@ export function DocumentUpload({
                     </p>
                   </div>
                 </div>
+                {/* type="button" ist Pflicht: ohne das Attribut ist der Knopf
+                    ein Submit-Knopf und loest zusaetzlich zum Loeschen den
+                    verbindlichen Absende-Dialog aus (Schritt 10). */}
                 <button
+                  type="button"
                   onClick={() => handleDelete(doc.id)}
                   className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   title="Löschen"
