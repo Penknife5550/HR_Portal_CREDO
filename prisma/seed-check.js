@@ -452,6 +452,158 @@ async function ensureMinijobRenteSchritt(prisma) {
   }
 }
 
+// =============================================
+// Einmalige Datenmigration: BA-Betriebsnummern der 16 Mandanten
+// =============================================
+const BETRIEBSNUMMERN_MARKER = "ORG_BETRIEBSNUMMERN_V1";
+
+/**
+ * Der Testwert, den die Dev-Datenbank vor der Erstbefuellung beim Berufskolleg
+ * trug. Er darf ueberschrieben werden — ein echter Wert nie.
+ */
+const BETRIEBSNUMMER_PLATZHALTER = "12345678";
+
+/**
+ * Die BA-Betriebsnummern je LOGA-Mandantennummer, geliefert vom Kunden
+ * am 01.09.2026.
+ *
+ * Schluessel ist die `mandantNumber`, nicht der Name: Namen weichen zwischen
+ * Liste und Datenbank ab („KiTa Porta" vs. „KiTa Porta Westfalica",
+ * „MVS Maranatha GmbH" vs. „Maranatha GmbH"), die Nummer ist eindeutig und
+ * @unique.
+ *
+ * Mehrfachnennungen sind korrekt und kein Tippfehler: Haddenhausen und
+ * Minderheide teilen sich 36844001, Gesamtschule/Gymnasium/Berufskolleg
+ * teilen sich 78071501. Im Sinne der BA ist das jeweils ein Betrieb — deshalb
+ * ist `Organization.betriebsnummer` bewusst nicht @unique.
+ */
+const BETRIEBSNUMMERN = [
+  { mandant: "742", name: "KiTa Minden", betriebsnummer: "93465718" },
+  { mandant: "743", name: "KiTa Espelkamp", betriebsnummer: "93483607" },
+  { mandant: "766", name: "KiTa Herford", betriebsnummer: "77232791" },
+  { mandant: "769", name: "KiTa Porta Westfalica", betriebsnummer: "74674044" },
+  { mandant: "712", name: "GS Haddenhausen", betriebsnummer: "36844001" },
+  { mandant: "728", name: "GS Minderheide", betriebsnummer: "36844001" },
+  { mandant: "719", name: "GS Stemwede", betriebsnummer: "36894251" },
+  { mandant: "721", name: "Gesamtschule", betriebsnummer: "78071501" },
+  { mandant: "737", name: "Gymnasium", betriebsnummer: "78071501" },
+  { mandant: "767", name: "Berufskolleg", betriebsnummer: "78071501" },
+  { mandant: "735", name: "Chr. Schulfoerderverein Minden e.V.", betriebsnummer: "18306871" },
+  { mandant: "734", name: "Chr. Schulfoerderverein FES Minden e.V.", betriebsnummer: "36907542" },
+  { mandant: "764", name: "FES Objekt Service GmbH", betriebsnummer: "18885833" },
+  { mandant: "736", name: "MVS Maranatha GmbH", betriebsnummer: "16391978" },
+  { mandant: "747", name: "HELEX.IT GmbH", betriebsnummer: "18837588" },
+  { mandant: "768", name: "Chr. Familienhilfe Minden e.V.", betriebsnummer: "75478766" },
+];
+
+/**
+ * Vergleichsform der Mandantennummer.
+ *
+ * Der Kunde notiert sie vierstellig mit fuehrender Null („0742"), die Datenbank
+ * haelt sie dreistellig („742"). Ohne Normalisierung fiele die Zuordnung
+ * lautlos aus und die Migration wuerde als erledigt markiert, ohne etwas
+ * getan zu haben.
+ */
+function normalisiereMandantNummer(wert) {
+  return String(wert ?? "").trim().replace(/^0+/, "");
+}
+
+/**
+ * Entscheidet je Mandant, ob geschrieben wird.
+ *
+ * Geschrieben wird nur, wenn das Feld leer ist oder den dokumentierten
+ * Testwert traegt. Eine abweichende, bereits gepflegte Nummer bleibt stehen und
+ * wird gemeldet — die Migration soll Stammdaten erstbefuellen, nicht die
+ * Pflege des Kunden ueberschreiben.
+ */
+function planeBetriebsnummern(organisationen, eintraege) {
+  const nachNummer = new Map(
+    organisationen.map((o) => [normalisiereMandantNummer(o.mandantNumber), o]),
+  );
+  const zuSchreiben = [];
+  const uebersprungen = [];
+  const fehlend = [];
+
+  for (const eintrag of eintraege) {
+    const org = nachNummer.get(normalisiereMandantNummer(eintrag.mandant));
+    if (!org) {
+      fehlend.push(eintrag);
+      continue;
+    }
+    const jetzt = org.betriebsnummer;
+    if (jetzt && jetzt !== BETRIEBSNUMMER_PLATZHALTER && jetzt !== eintrag.betriebsnummer) {
+      uebersprungen.push({ ...eintrag, vorhanden: jetzt, dbName: org.name });
+      continue;
+    }
+    if (jetzt === eintrag.betriebsnummer) continue;
+    zuSchreiben.push({ ...eintrag, id: org.id, dbName: org.name });
+  }
+  return { zuSchreiben, uebersprungen, fehlend };
+}
+
+/**
+ * Traegt die BA-Betriebsnummern nach.
+ *
+ * Ohne sie sperrt das Portal die Erzeugung beider Minijob-Antraege fuer den
+ * jeweiligen Mandanten (bewusst, siehe src/lib/betriebsnummer.ts) — der
+ * Beschaeftigte steht dann am Ende des Fragebogens vor einer Pflicht, die er
+ * selbst nicht erfuellen kann.
+ *
+ * Idempotenz: Merker in `system_migrations`, geschrieben in derselben
+ * Transaktion wie die Updates.
+ */
+async function ensureBetriebsnummern(prisma) {
+  try {
+    if (await migrationErledigt(prisma, BETRIEBSNUMMERN_MARKER)) return;
+
+    const organisationen = await prisma.organization.findMany({
+      select: { id: true, mandantNumber: true, name: true, betriebsnummer: true },
+    });
+    if (organisationen.length === 0) {
+      // Frische Datenbank: der Seed legt die Mandanten erst an. Ohne Merker
+      // laeuft die Migration beim naechsten Start erneut.
+      console.log("Noch keine Mandanten vorhanden — Betriebsnummern folgen beim naechsten Start.");
+      return;
+    }
+
+    const { zuSchreiben, uebersprungen, fehlend } = planeBetriebsnummern(
+      organisationen,
+      BETRIEBSNUMMERN,
+    );
+
+    for (const e of fehlend) {
+      console.warn(
+        "Betriebsnummer ohne Mandant: LOGA " + e.mandant + " (" + e.name + ") nicht gefunden.",
+      );
+    }
+    for (const e of uebersprungen) {
+      console.warn(
+        "Betriebsnummer uebersprungen: " + e.dbName + " (LOGA " + e.mandant + ") traegt bereits " +
+          e.vorhanden + ", erwartet war " + e.betriebsnummer + ".",
+      );
+    }
+
+    const schreibvorgaenge = zuSchreiben.map((e) =>
+      prisma.organization.update({
+        where: { id: e.id },
+        data: { betriebsnummer: e.betriebsnummer },
+      }),
+    );
+    schreibvorgaenge.push(
+      markiereMigration(prisma, BETRIEBSNUMMERN_MARKER, {
+        gesetzt: zuSchreiben.length,
+        uebersprungen: uebersprungen.map((e) => e.mandant),
+        fehlend: fehlend.map((e) => e.mandant),
+      }),
+    );
+
+    await prisma.$transaction(schreibvorgaenge);
+    console.log("BA-Betriebsnummern gesetzt: " + zuSchreiben.length + " von " + BETRIEBSNUMMERN.length + ".");
+  } catch (error) {
+    console.error("Betriebsnummern-Migration fehlgeschlagen:", error.message);
+  }
+}
+
 async function main() {
   const prisma = new PrismaClient();
   try {
@@ -459,6 +611,7 @@ async function main() {
     await migrateCurrentStepToRegistryNumbers(prisma);
     await ensureMinijobTemplateSteps(prisma);
     await ensureMinijobRenteSchritt(prisma);
+    await ensureBetriebsnummern(prisma);
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {
@@ -493,4 +646,8 @@ module.exports = {
   MINIJOB_TAX_FIELDS,
   legacyIndexToStepNumber,
   korrigiereMinijobSchritte,
+  BETRIEBSNUMMERN,
+  BETRIEBSNUMMER_PLATZHALTER,
+  normalisiereMandantNummer,
+  planeBetriebsnummern,
 };
