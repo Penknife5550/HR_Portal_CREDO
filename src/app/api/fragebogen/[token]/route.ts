@@ -468,6 +468,18 @@ export async function PUT(
 // =============================================
 // POST – Fragebogen endgültig absenden
 // =============================================
+/**
+ * Ein zweiter Absender war schneller.
+ *
+ * Eigene Klasse, weil das Beanspruchen des Vorgangs INNERHALB der Transaktion
+ * passiert: Der einzige Weg, eine begonnene Transaktion zurueckzurollen, ist
+ * eine Ausnahme. Sie traegt keine Nutzdaten — der Aufrufer antwortet 409.
+ */
+class BereitsEingereicht extends Error {}
+
+/** Aus diesen Staenden heraus darf abgesendet werden. */
+const ABSENDBAR = ["INVITED", "IN_PROGRESS"] as const;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -494,8 +506,14 @@ export async function POST(
 
   const onboarding = result.onboarding!;
 
-  // Doppelten Submit verhindern: Bereits eingereichte Fragebogen ablehnen
-  if (onboarding.status === "SUBMITTED" || onboarding.status === "SUPERVISOR_PENDING" || onboarding.status === "SUPERVISOR_SUBMITTED" || onboarding.status === "REVIEWED" || onboarding.status === "COMPLETED") {
+  // Schneller Weg fuer den Regelfall: Wer den Link nach dem Absenden erneut
+  // oeffnet, bekommt sofort eine klare Antwort, ohne dass Dokumente und
+  // Pruefsumme umsonst geladen werden.
+  //
+  // Verlassen darf man sich darauf NICHT — zwischen dieser Zeile und dem
+  // Schreiben liegen mehrere Datenbankabfragen. Die verbindliche Sperre ist das
+  // bedingte updateMany unten, das den Statuswechsel selbst als Sperre benutzt.
+  if (!ABSENDBAR.includes(onboarding.status as (typeof ABSENDBAR)[number])) {
     return NextResponse.json(
       { error: "Fragebogen wurde bereits eingereicht." },
       { status: 409 }
@@ -664,49 +682,88 @@ export async function POST(
   );
   const abgegebenAm = new Date();
 
-  // PersonalData als vollstaendig markieren
-  await prisma.personalData.update({
-    where: { onboardingId: onboarding.id },
-    data: {
-      isComplete: true,
-      dsgvoAccepted: true,
-      dsgvoAcceptedAt: abgegebenAm,
-      currentStep: SUMMARY_STEP_NUMBER,
-      erklaerungAccepted: true,
-      erklaerungAcceptedAt: abgegebenAm,
-      erklaerungOrt: absenden.data.erklaerungOrt,
-      erklaerungIp: clientIp,
-      erklaerungUserAgent:
-        request.headers.get("user-agent")?.slice(0, 500) ?? null,
-      erklaerungVersion: absenden.data.erklaerungVersion,
-      erklaerungPruefsumme: pruefsumme,
-    },
-  });
+  // =============================================
+  // Der eigentliche Abschluss — atomar und in einem Rutsch
+  // =============================================
+  // Alle drei Saetze gehoeren zusammen: die abgegebene Erklaerung, der
+  // Statuswechsel und der Protokolleintrag. Liefen sie einzeln, koennte ein
+  // Abbruch dazwischen eine bestaetigte Erklaerung hinterlassen, waehrend der
+  // Vorgang weiter IN_PROGRESS steht — HR saehe ihn als unerledigt, und der
+  // Beschaeftigte koennte erneut absenden und Ort, Zeitpunkt und Pruefsumme
+  // der ersten Erklaerung ueberschreiben.
+  //
+  // Das bedingte updateMany ist zugleich die Sperre gegen den Doppel-Submit:
+  // Es ist EIN atomares UPDATE ... WHERE status IN (...), also gewinnt genau
+  // ein Aufrufer. Die vorgelagerte Statuspruefung allein genuegt nicht — der
+  // Handler wartet danach auf mehrere Abfragen, und zwei offene Tabs oder ein
+  // Retry nach Proxy-Timeout kommen beide durch. Zwei QUESTIONNAIRE_SUBMITTED
+  // mit verschiedenen Pruefsummen zur selben Erklaerung machen den
+  // Unterschriftsersatz in der Betriebspruefung mehrdeutig.
+  //
+  // submittedAt traegt bewusst `abgegebenAm` — denselben Zeitpunkt wie die
+  // Erklaerung und das Protokoll. Ein eigenes `new Date()` ergaebe drei
+  // minimal verschiedene Zeitstempel fuer einen Vorgang, und submittedAt ist
+  // der Anker fuer das RV-Wirkungsdatum beim Aufhebungsantrag.
+  try {
+    await prisma.$transaction(async (tx) => {
+      const beansprucht = await tx.onboardingProcess.updateMany({
+        where: { id: onboarding.id, status: { in: [...ABSENDBAR] } },
+        data: { status: "SUBMITTED", submittedAt: abgegebenAm },
+      });
+      if (beansprucht.count === 0) throw new BereitsEingereicht();
 
-  // Onboarding-Status aktualisieren
-  await prisma.onboardingProcess.update({
-    where: { id: onboarding.id },
-    data: {
-      status: "SUBMITTED",
-      submittedAt: new Date(),
-    },
-  });
+      await tx.personalData.update({
+        where: { onboardingId: onboarding.id },
+        data: {
+          isComplete: true,
+          dsgvoAccepted: true,
+          dsgvoAcceptedAt: abgegebenAm,
+          currentStep: SUMMARY_STEP_NUMBER,
+          erklaerungAccepted: true,
+          erklaerungAcceptedAt: abgegebenAm,
+          erklaerungOrt: absenden.data.erklaerungOrt,
+          erklaerungIp: clientIp,
+          erklaerungUserAgent:
+            request.headers.get("user-agent")?.slice(0, 500) ?? null,
+          erklaerungVersion: absenden.data.erklaerungVersion,
+          erklaerungPruefsumme: pruefsumme,
+        },
+      });
 
-  // Audit-Log
-  await prisma.auditLog.create({
-    data: {
-      onboardingId: onboarding.id,
-      action: "QUESTIONNAIRE_SUBMITTED",
-      details: {
-        email: onboarding.email,
-        submittedAt: abgegebenAm.toISOString(),
-        erklaerungOrt: absenden.data.erklaerungOrt,
-        erklaerungVersion: absenden.data.erklaerungVersion,
-        erklaerungPruefsumme: pruefsumme,
+      // Der Protokolleintrag gehoert in denselben Commit: Er ist der Nachweis
+      // der Abgabe, nicht bloss ein Logeintrag daneben.
+      await tx.auditLog.create({
+        data: {
+          onboardingId: onboarding.id,
+          action: "QUESTIONNAIRE_SUBMITTED",
+          details: {
+            email: onboarding.email,
+            submittedAt: abgegebenAm.toISOString(),
+            erklaerungOrt: absenden.data.erklaerungOrt,
+            erklaerungVersion: absenden.data.erklaerungVersion,
+            erklaerungPruefsumme: pruefsumme,
+          },
+          ipAddress: clientIp,
+        },
+      });
+    });
+  } catch (error) {
+    if (error instanceof BereitsEingereicht) {
+      return NextResponse.json(
+        { error: "Fragebogen wurde bereits eingereicht." },
+        { status: 409 }
+      );
+    }
+    console.error("[Fragebogen] Absenden fehlgeschlagen:", error);
+    return NextResponse.json(
+      {
+        error:
+          "Der Fragebogen konnte nicht abgesendet werden. " +
+          "Bitte versuchen Sie es erneut.",
       },
-      ipAddress: clientIp,
-    },
-  });
+      { status: 500 }
+    );
+  }
 
   // n8n Webhook aufrufen (falls konfiguriert) – HR-Benachrichtigung
   await triggerN8nWebhook("questionnaire-completed", {
