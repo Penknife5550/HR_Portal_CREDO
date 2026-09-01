@@ -54,6 +54,7 @@ function vorgang(
   const { personalData, ...rest } = overrides;
   return {
     id: ID,
+    submittedAt: new Date("2026-09-03T08:00:00.000Z"),
     organization: {
       id: "org1",
       name: "Berufskolleg Minden",
@@ -160,6 +161,41 @@ describe("Vorschläge", () => {
 });
 
 describe("Die Systemgrenze zur Zeitzone", () => {
+  it("ankert die Aufhebung am Absenden, nicht am Zwischenspeichern", async () => {
+    // rvEntscheidungAm setzt die PUT-Route bei JEDEM Speichern von Schritt 11 —
+    // mitten im Ausfüllen, wo noch nichts erklärt ist. Wer am 31.08. speichert
+    // und am 03.09. absendet, bekäme sonst den 01.09. statt richtig den 01.10.:
+    // ein voller Monat falsch abgerechneter Beiträge.
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
+      vorgang({
+        submittedAt: new Date("2026-09-03T08:00:00.000Z"),
+        personalData: {
+          rvEntscheidung: "AUFHEBUNG_BEANTRAGT",
+          rvEntscheidungAm: new Date("2026-08-31T10:00:00.000Z"),
+          rvAntragEingangAm: null,
+        },
+      })
+    );
+    const j = await (await GET(getReq(), ctx())).json();
+    expect(j.data.vorschlag.wirkungAb.datum).toBe("2026-10-01");
+  });
+
+  it("schlägt nichts vor, solange der Fragebogen nicht abgesendet ist", async () => {
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
+      vorgang({
+        submittedAt: null,
+        personalData: {
+          rvEntscheidung: "AUFHEBUNG_BEANTRAGT",
+          rvEntscheidungAm: new Date("2026-08-31T10:00:00.000Z"),
+          rvAntragEingangAm: null,
+        },
+      })
+    );
+    const j = await (await GET(getReq(), ctx())).json();
+    expect(j.data.abgesendet).toBe(false);
+    expect(j.data.vorschlag.wirkungAb.datum).toBeNull();
+  });
+
   it("rechnet den Entscheidungs-Zeitstempel über Berlin um", async () => {
     // `rvEntscheidungAm` ist ein echter Zeitstempel, keine date-Spalte. Wird er
     // mit toISOString().slice(0,10) gelesen, liefert er bei einer Absendung am
@@ -167,9 +203,10 @@ describe("Die Systemgrenze zur Zeitzone", () => {
     // wirkte einen vollen Monat zu früh. Genau dieser Fall.
     mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
       vorgang({
+        // Absendung am 01.09.2026 um 00:30 Uhr Berliner Zeit
+        submittedAt: new Date("2026-08-31T22:30:00.000Z"),
         personalData: {
           rvEntscheidung: "AUFHEBUNG_BEANTRAGT",
-          // 01.09.2026, 00:30 Uhr Berliner Zeit
           rvEntscheidungAm: new Date("2026-08-31T22:30:00.000Z"),
           rvAntragEingangAm: null, // elektronisch erklärt, kein Papiereingang
         },

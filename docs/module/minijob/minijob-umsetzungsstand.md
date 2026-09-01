@@ -1,9 +1,13 @@
 # Minijob-Checkliste — Umsetzungsstand
 
-> **Stand:** 2026-08-31 · Branch `feat/minijob-checkliste-2026` (auf `origin`)
-> **Fertig:** AP 1, AP 2, AP 5, AP 6, AP 7, AP 8, AP 12
-> **Verifiziert:** 781 Tests grün (54 Suites) · `tsc --noEmit` sauber · `npm run lint`
-> ohne Errors · `npm run build` erfolgreich
+> **Stand:** 2026-09-01 · Branch `feat/minijob-checkliste-2026` (auf `origin`)
+> **Fertig:** AP 1, AP 2, AP 5, AP 6, AP 7, AP 8, AP 12 — danach eine
+> kritische Abschlussdurchsicht mit sechzehn behobenen Fehlern (Abschnitt 5)
+> **Offen:** 32 Punkte in [minijob-offene-punkte.md](minijob-offene-punkte.md),
+> davon elf vor dem Rollout
+> **Verifiziert:** 790 Tests grün (54 Suites) · `tsc --noEmit` sauber · `npm run lint`
+> ohne Errors · `npm run build` erfolgreich · Fragebogen und beide
+> Antragskanäle gegen die Dev-Datenbank durchgespielt
 
 Dieses Dokument ist die Übergabe: Was ist gebaut, was ist bewusst offen, und
 womit fängt man weiter an. Der fachliche Plan steht in
@@ -321,16 +325,86 @@ einen Hydration-Fehler. Als phrasing content passt der Kasten in `<p>`, `<label>
 
 ---
 
-## 5. Was als Nächstes kommt
+## 5. Die Abschlussdurchsicht
 
-Die rechtlich zwingende Kette ist abgeschlossen. Offen sind nur noch
-Zulieferungen und Komfort:
+Nach dem letzten Arbeitspaket lief eine kritische Gesamtdurchsicht: sechs
+unabhängige Blickwinkel (Vollständigkeit gegen die amtliche Checkliste, Brüche
+im Prozess, Sicherheit und Mandantentrennung, Deploy und Migration, innere
+Konsistenz, fachliche Sicht von HR und Betriebsprüfung). Jeder behauptete Fehler
+wurde einzeln nachgerechnet, bevor er anerkannt wurde — keine der Behauptungen
+wurde dabei verworfen.
 
-| Thema | Inhalt |
+**Sechzehn Fehler gefunden und behoben.** Drei davon hätte man beim
+Durchklicken nicht gesehen:
+
+**Die Prüfsumme der Wahrheitsversicherung war ausgehebelt.** Die AP-12-Felder
+waren Teil der Prüfsumme. Sobald HR ein Eingangsdatum einträgt, hätte sich die
+Erklärung nicht mehr nachrechnen lassen — genau die Zusicherung, für die AP 2
+gebaut wurde, wäre still verfallen.
+
+**Die Migration hätte beim ersten Serverstart Daten zerstört.**
+`currentStep = 0` bedeutet „noch nicht begonnen". Die Migration bot die 0 als
+Quellwert an und hätte alle nie geöffneten Fragebogen — über alle Typen und
+Mandanten — auf Schritt 1 gesetzt. Sie läuft genau einmal; danach wäre der
+Zustand nur noch aus einem Backup zu holen gewesen.
+
+**Die RV-Frage stand zweimal im Fragebogen.** Der alte Haken
+`minijobRvBefreiung` in Schritt 4 neben der Vier-Wege-Entscheidung in
+Schritt 11. Zusammenfassung und PDF-Export gaben beide aus — zwei womöglich
+widersprechende Antworten zur folgenreichsten Angabe, beide unter derselben
+Wahrheitsversicherung.
+
+Die übrigen dreizehn:
+
+| Fehler | Folge |
 |---|---|
-| **Zulieferung** | Die 16 BA-Betriebsnummern und die Termine der Entgeltabrechnung je Mandant (siehe Abschnitt 6) |
-| **Wiedervorlage** | Die Fristen werden heute nur auf der Vorgangsseite angezeigt. Eine aktive Erinnerung (Cron + E-Mail, Muster: `contract-end-reminders`) fehlt noch |
-| **Feiertage** | Die Werktagsregel des § 26 Abs. 3 SGB X berücksichtigt nur Sonnabend und Sonntag. Feiertage hängen am Ort der Einzugsstelle, den das Portal nicht kennt — das Fristende kann also noch etwas später liegen |
+| Rate-Limit der öffentlichen Antrags-Route war toter Code (`!check(ip)` auf einem Objekt) | Keine Begrenzung auf einer Route, die die Versicherungsnummer entschlüsselt — und der Download zehrte trotzdem am Kontingent des Auto-Speicherns, sperrte den Mitarbeiter also aus seinem eigenen Fragebogen aus |
+| Datumsfelder der HR-Karte speicherten bei `onChange` | Ein `<input type="date">` ist beim Bearbeiten kurz leer; das erfasste Wirkungsdatum wurde zuerst gelöscht und die Eingabe abgebrochen |
+| Arbeitgeber-interne Felder gingen über den Magic Link mit | `...personalData` nimmt jedes neue Modellfeld mit, hier auch die Kennung des Sachbearbeiters |
+| Feldkonfiguration von Schritt 11 wirkte nicht | Der Vorlagen-Editor bot Schalter an, die nichts taten |
+| Rollenliste mit dem Phantom `VIEWER` | Eine Rolle, die es im Schema nicht gibt — die Prüfung lief ins Leere |
+| Zweite Beschriftungsliste für die RV-Entscheidung | Bereits auseinandergelaufen („kein Antrag nötig" gegen „keine Befreiung nötig") |
+| `entgeltabrechnungTag` war nicht pflegbar | Das Feld wurde gelesen, hatte aber weder Maske noch API — die genauere Meldefrist blieb unbenutzbar |
+| Kinder-Upload zeigte beim Wiedereinstieg nichts an | Das Feld sah leer aus, obwohl die Urkunde vorlag — Dubletten in der Akte |
+| Zwei Tests des Vertragsende-Crons bestanden nur an sechs von sieben Wochentagen | Der Montags-Digest fiel in Tests, die keinen Versand erwarten (nicht Minijob, beim Durchlauf aufgefallen) |
+| Die Aufhebung rechnete ab dem Zwischenspeichern von Schritt 11 statt ab dem Absenden | `rvEntscheidungAm` setzt die PUT-Route bei **jedem** Speichern. Wer am 31.08. speichert und am 03.09. absendet, bekam den 01.09. statt richtig den 01.10. — ein voller Monat falsch abgerechneter Beiträge. Anker ist jetzt `submittedAt` |
+| Betriebsnummer und Abrechnungstermin aller 16 Mandanten waren für jede Portal-Rolle lesbar | Von mir mit AP 8/12 neu ausgeliefert, ohne den Mandanten-Scope zu prüfen. Jetzt nur noch für `ADMIN_ROLES` |
+| Der Feiertags-Vorbehalt wurde ausgerechnet bei der Widerspruchsfrist nicht angezeigt | Der Rechenkern erzeugt ihn, die Maske gab ihn dort nicht aus — bei der Frist, an deren Ablauf die Wirksamkeit hängt |
+| RV-Karte und Merkblatt erschienen in **jedem** Vorgang | Auch bei TV-L und Beamten, wo es den Schritt gar nicht gibt. Dort stand dauerhaft „noch nicht getroffen" — das liest sich wie eine offene Aufgabe, die es nicht gibt |
+
+**Was daraus zu lernen ist**, über den Einzelfall hinaus: Eine strukturelle
+Zusicherung gilt nur so weit wie das Modul, das sie trägt. Der Rechenkern
+schließt den Zeitzonenfehler aus, indem er nur mit Zeichenketten rechnet — an
+der Systemgrenze kam er trotzdem zurück, weil ein Zeitstempel aus der Datenbank
+mit `toISOString()` gelesen wurde. Dort gehört eine benannte Funktion hin
+(`berlinerKalendertag()`) und ein Test, der genau diese Umrechnung prüft, nicht
+nur „heute".
+
+---
+
+## 6. Was als Nächstes kommt
+
+Die rechtlich zwingende Kette ist gebaut und geprüft. Was noch offen ist, steht
+vollständig in **[minijob-offene-punkte.md](minijob-offene-punkte.md)** — 32
+Punkte, entdoppelt und nach Dringlichkeit geordnet, mit Fundstellen.
+
+**Elf davon vor dem Rollout.** Die wichtigsten:
+
+| Punkt | Worum es geht |
+|---|---|
+| **Minderjährige** | Die Checkliste verlangt bei ihnen die Zustimmung des gesetzlichen Vertreters. Das Portal kennt nur eine Bestätigung — die des Beschäftigten. „Schüler" ist die erste Statusoption; für einen Schulträger ist das kein Randfall. **Eine Entscheidung, keine Reparatur.** |
+| **Absenden ohne RV-Entscheidung** | Beim Absenden wird nicht geprüft, ob überhaupt eine Entscheidung getroffen wurde. Über den Wiedereinstieg erreichbar — betrifft besonders die bereits laufenden Vorgänge. |
+| **Keine Korrektur nach dem Absenden** | Verklickt sich jemand bei der folgenreichsten Frage, ist der Zustand endgültig. Es gibt keine HR-Maske dafür und kein Wiederöffnen. |
+| **Sackgasse ohne Betriebsnummer** | Der Beschäftigte steht vor einer Pflicht, die er selbst nicht erfüllen kann — und HR kann den Antrag nicht ersatzweise hinterlegen. |
+| **Kein HR-Upload** | Der Papierweg ist nicht abgebildet: Ein per Post eingegangener Antrag lässt sich nirgends ablegen. |
+| **Art der Krankenversicherung** | Abschnitt 3 der Checkliste will zusätzlich „eigene Mitgliedschaft oder Familienversicherung". Wird nirgends erhoben. |
+| **Nachweise** | Der Fragebogen kündigt sie an, fordert sie aber nie ein — und für die meisten Statusoptionen sind sie gar nicht benannt. |
+| **Abschnitt 4 unsichtbar für HR** | Die drei Beschäftigungstabellen stehen nur im PDF-Export, nicht auf der Detailseite. Genau daran entscheidet sich die Zusammenrechnung. |
+
+Zwei Punkte betreffen den **Deploy selbst** und stehen ebenfalls dort: Der in
+CLAUDE.md aufgeführte Seed-Befehl würde die Vorlagen-Anpassungen von HR
+zurücksetzen, und wieder geöffnete Altvorgänge bekommen den neuen Fragebogen
+nicht.
 
 **Vor der Produktivsetzung** sollten die berechneten Wirkungsdaten an einigen
 Echtfällen mit der Lohnbuchhaltung abgeglichen werden. Die Ableitungen beruhen
@@ -339,7 +413,7 @@ Rechtsrat, und die Zahlen haben Beitragsfolgen.
 
 ---
 
-## 6. Was noch von außen kommen muss
+## 7. Was noch von außen kommen muss
 
 1. Die **achtstelligen BA-Betriebsnummern** der 16 Mandanten. Das Feld und die
    Pflegemaske stehen (AP 8); solange eine Nummer fehlt, blockiert die
@@ -354,18 +428,20 @@ Rechtsrat, und die Zahlen haben Beitragsfolgen.
 
 ---
 
-## 7. Offene Handschritte
+## 8. Offene Handschritte
 
 - **Deploy** auf `fes-vm-ubuntudocker`. Der Entrypoint führt `prisma db push` vor
-  `seed-check.js` aus; die Schema-Erweiterungen (`SystemMigration`, sieben Spalten
-  auf `personal_data`) kommen also von selbst mit.
+  `seed-check.js` aus; alle Schema-Erweiterungen (`SystemMigration`, die
+  RV-Spalten auf `personal_data`, `betriebsnummer` und `entgeltabrechnungTag` auf
+  `organizations`, das Modell `BeschaeftigungsAngabe`) kommen also von selbst mit.
+  Eine Datenmigration ist nicht nötig — die neuen Spalten starten leer.
 - **HR vor dem Rollout informieren.** Der Renderer-Fix wirkt auf alle fünf
   Vorlagen; die Formulare ändern sich sichtbar, Ehrenamt schrumpft auf drei
   Schritte.
 
 ---
 
-## 8. Entwicklungsumgebung
+## 9. Entwicklungsumgebung
 
 Die Dev-Datenbank läuft im Container `credo-hr-db-dev` auf **Port 5433** — nicht
 5432. Die `.env` zeigt auf 5432, die richtige URL steht in **`.env.local`**.

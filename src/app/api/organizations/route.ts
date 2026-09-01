@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { ADMIN_ROLES } from "@/lib/permissions";
 import {
   ABRECHNUNGSTAG_FORMAT_FEHLER,
   BETRIEBSNUMMER_FORMAT_FEHLER,
@@ -37,13 +38,21 @@ export async function GET() {
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
+    // Betriebsnummer und Abrechnungstermin sind Arbeitgeber-Stammdaten: Die
+    // eine steht auf amtlichen Antraegen an die Minijob-Zentrale, der andere
+    // steuert eine beitragsrechtliche Frist. Sie gehen nur an die Rollen, die
+    // sie auch pflegen duerfen — eine Einrichtungsleitung braucht die Nummern
+    // der uebrigen fuenfzehn Traeger nicht. Der Fragebogen gibt sie ohnehin
+    // nicht heraus, dort geht nur ein Ja/Nein raus.
+    const darfStammdatenSehen = ADMIN_ROLES.includes(session.role);
+
     const organizations = await prisma.organization.findMany({
       orderBy: { name: "asc" },
       select: {
         id: true,
         mandantNumber: true,
-        betriebsnummer: true,
-        entgeltabrechnungTag: true,
+        betriebsnummer: darfStammdatenSehen,
+        entgeltabrechnungTag: darfStammdatenSehen,
         name: true,
         shortName: true,
         type: true,

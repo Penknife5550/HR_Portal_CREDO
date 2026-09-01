@@ -40,6 +40,8 @@ interface Meldefrist extends Berechnung {
 
 interface RvFristen {
   entscheidung: string | null;
+  /** Ist der Fragebogen abgesendet? Vorher ist alles vorläufig. */
+  abgesendet: boolean;
   entscheidungAm: string | null;
   vertragsbeginn: string | null;
   mandant: {
@@ -181,9 +183,12 @@ function DatumsFeld({
 export function RvFristenCard({
   onboardingId,
   canEdit,
+  istMinijob,
 }: {
   onboardingId: string;
   canEdit: boolean;
+  /** Nur der Minijob-Fragebogen kennt den Schritt Rentenversicherung. */
+  istMinijob: boolean;
 }) {
   const [daten, setDaten] = useState<RvFristen | null>(null);
   const [laedt, setLaedt] = useState(true);
@@ -236,6 +241,12 @@ export function RvFristenCard({
   if (laedt) return null;
   if (!daten) return null;
 
+  // In einem TV-L- oder Beamten-Vorgang gibt es diesen Schritt gar nicht. Dort
+  // stuende sonst dauerhaft „noch nicht getroffen" — das liest sich wie eine
+  // offene Aufgabe, die es nicht gibt, und laesst echte offene Punkte in der
+  // Masse untergehen.
+  if (!istMinijob && !daten.entscheidung) return null;
+
   // Für die übrigen beiden Wege gibt es keinen Antrag und damit keine Fristen.
   const relevant =
     daten.entscheidung === "BEFREIUNG_BEANTRAGT" ||
@@ -277,6 +288,14 @@ export function RvFristenCard({
               : "— noch nicht getroffen"}
           </span>
         </Zeile>
+
+        {!daten.abgesendet && (
+          <p className="mt-3 rounded-lg border border-[#FBC900]/50 bg-[#FBC900]/10 px-3 py-2 text-xs leading-relaxed text-foreground">
+            Der Fragebogen ist noch nicht abgesendet. Die Entscheidung kann sich
+            noch ändern — tragen Sie Daten erst ein, wenn der Vorgang eingegangen
+            ist.
+          </p>
+        )}
 
         {!relevant && (
           <p className="pt-3 text-xs text-muted-foreground">
@@ -410,6 +429,9 @@ export function RvFristenCard({
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 {widerspruch.begruendung}
               </p>
+              {/* Gerade hier zaehlt der Vorbehalt: Mit dem Ablauf dieser Frist
+                  gilt die Entscheidung als wirksam. */}
+              <Hinweise texte={widerspruch.hinweise} />
             </div>
 
             {!daten.mandant.entgeltabrechnungTag && (

@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { ADMIN_ROLES } from "@/lib/permissions";
 import {
   ABRECHNUNGSTAG_FORMAT_FEHLER,
   BETRIEBSNUMMER_FORMAT_FEHLER,
@@ -41,8 +42,9 @@ export async function GET(
       select: {
         id: true,
         mandantNumber: true,
-        betriebsnummer: true,
-        entgeltabrechnungTag: true,
+        // Siehe Kommentar in der Listen-Route: nur fuer Rollen, die sie pflegen.
+        betriebsnummer: ADMIN_ROLES.includes(session.role),
+        entgeltabrechnungTag: ADMIN_ROLES.includes(session.role),
         name: true,
         shortName: true,
         type: true,

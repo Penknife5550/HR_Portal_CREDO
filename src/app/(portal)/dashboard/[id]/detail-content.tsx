@@ -1576,7 +1576,11 @@ function TabFragebogenDaten({
           Arbeitgeberteil des Antrags (Eingang, Wirkung, Fristen). Bewusst
           ohne Ziffer — die Nummern oben stammen aus der alten festen
           Schrittfolge, in der es diesen Schritt noch nicht gab. */}
-      <RvFristenCard onboardingId={onboardingId} canEdit={canEdit} />
+      <RvFristenCard
+        onboardingId={onboardingId}
+        canEdit={canEdit}
+        istMinijob={data.questionnaireType === "MINIJOB"}
+      />
 
       {/* Schritt 10: DSGVO */}
       <SectionCard title="10. Datenschutz &amp; Einwilligung" icon="&#128274;">
@@ -1740,12 +1744,15 @@ function OnboardingErstellenSection({
   canEdit,
   rvEntscheidung,
   betriebsnummerFehlt,
+  istMinijob,
 }: {
   onboardingId: string;
   organizationId: string;
   canEdit: boolean;
   rvEntscheidung?: string | null;
   betriebsnummerFehlt: boolean;
+  /** Nur dort ist das RV-Merkblatt einschlaegig. */
+  istMinijob: boolean;
 }) {
   // Nutzt die generische Hub-Komponente; Onboarding-Spezifika (Modul, amtliche
   // Formulare der Minijob-Checkliste) bleiben hier gekapselt.
@@ -1756,13 +1763,18 @@ function OnboardingErstellenSection({
       href: "/system-dokumente/masernschutz-nrw.pdf",
       label: "PDF öffnen",
     },
-    {
+  ];
+
+  // Das Merkblatt gehoert zum Minijob-Verfahren. In einem TV-L- oder
+  // Beamten-Vorgang steht es nur im Weg.
+  if (istMinijob || rvEntscheidung) {
+    statisch.push({
       name: "Merkblatt zur Befreiung von der Rentenversicherungspflicht",
       tag: "Amtliche Anlage der Minijob-Zentrale, Stand 30.06.2026",
       href: "/system-dokumente/merkblatt-rv-befreiung.pdf",
       label: "PDF öffnen",
-    },
-  ];
+    });
+  }
 
   // Der Antrag entsteht nur, wenn der Beschaeftigte sich dafuer entschieden hat
   // — und nur, wenn die Betriebsnummer des Mandanten hinterlegt ist. Fehlt sie,
@@ -1940,6 +1952,7 @@ function TabDocuments({
         canEdit={canEdit}
         rvEntscheidung={data.personalData?.rvEntscheidung ?? null}
         betriebsnummerFehlt={!data.organization.betriebsnummer}
+        istMinijob={data.questionnaireType === "MINIJOB"}
       />
 
       {/* Starterpaket versenden */}

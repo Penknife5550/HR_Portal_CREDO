@@ -61,6 +61,8 @@ async function ladeVorgang(id: string) {
     where: { id },
     select: {
       id: true,
+      // Der Zeitpunkt, zu dem die Erklaerung den Arbeitgeber erreicht hat.
+      submittedAt: true,
       organization: {
         select: { id: true, name: true, betriebsnummer: true, entgeltabrechnungTag: true },
       },
@@ -99,15 +101,20 @@ function baueAntwort(v: Vorgang) {
   // Beim Aufhebungsantrag ist die Antragstellung die Erklaerung im Fragebogen;
   // sie darf elektronisch erfolgen. Liegt ein abweichender Papiereingang vor,
   // hat HR ihn erfasst — der geht dann vor.
-  // `rvEntscheidungAm` ist ein echter Zeitstempel (`new Date()` beim Absenden),
-  // keine date-Spalte. Ohne die Umrechnung ueber Berlin schlaegt eine Absendung
-  // am Monatsersten kurz nach Mitternacht einen um einen ganzen Monat zu
-  // fruehen Wirkungsbeginn vor — und fuer die elektronisch erklaerte Aufhebung
-  // ist dieser Rueckfall der Normalfall, weil es dort gar keinen Papiereingang
-  // gibt.
+  //
+  // Anker ist `submittedAt`, NICHT `rvEntscheidungAm`. Letzteres setzt die
+  // PUT-Route bei jedem Zwischenspeichern von Schritt 11 — also mitten im
+  // Ausfuellen, wo noch gar nichts erklaert ist und der Beschaeftigte seine
+  // Wahl jederzeit aendern kann. Wer am 31.08. speichert und am 03.09.
+  // absendet, bekaeme sonst den 01.09. statt richtig den 01.10.
+  // vorgeschlagen: ein voller Monat falsch abgerechneter Beitraege.
+  //
+  // Die Umrechnung ueber Berlin ist Pflicht: `submittedAt` ist ein echter
+  // Zeitstempel, keine date-Spalte, und alle Regeln setzen auf dem
+  // Kalendermonat auf.
+  const abgesendet = Boolean(v.submittedAt);
   const antragstellung = istAufhebung
-    ? eingang ??
-      (pd?.rvEntscheidungAm ? berlinerKalendertag(pd.rvEntscheidungAm) : null)
+    ? eingang ?? (v.submittedAt ? berlinerKalendertag(v.submittedAt) : null)
     : eingang;
 
   const frist = istBefreiung
@@ -129,8 +136,13 @@ function baueAntwort(v: Vorgang) {
 
   return {
     entscheidung,
+    // Solange der Fragebogen nicht abgesendet ist, sind alle Angaben vorlaeufig
+    // — der Beschaeftigte kann seine Entscheidung noch aendern.
+    abgesendet,
     // Zeitstempel der Entscheidung, damit die Oberflaeche einordnen kann,
     // wann der Beschaeftigte sich erklaert hat.
+    // Wann die Entscheidung zuletzt gespeichert wurde — zur Einordnung, nicht
+    // als Rechengroesse.
     entscheidungAm: pd?.rvEntscheidungAm
       ? berlinerKalendertag(pd.rvEntscheidungAm)
       : null,
