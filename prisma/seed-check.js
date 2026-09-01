@@ -453,6 +453,130 @@ async function ensureMinijobRenteSchritt(prisma) {
 }
 
 // =============================================
+// Einmalige Datenmigration: Schritt-6-Felder der MINIJOB-Vorlage
+// =============================================
+const MINIJOB_STEP6_MARKER = "MINIJOB_TEMPLATE_STEP6_FELDER_V1";
+const STEP6 = 6;
+
+/**
+ * Der Zielzustand von Schritt 6 fuer MINIJOB.
+ *
+ * Muss zu FIELD_REGISTRY[6] in src/lib/field-definitions.ts passen; der Test
+ * src/__tests__/lib/fragebogen-steps.test.ts prueft das.
+ *
+ * Hintergrund: Die fuenf Bloecke aus Abschnitt 4 der Checkliste stehen in der
+ * Registry auf defaultVisible: false, weil sie in einem TV-L- oder
+ * Beamten-Fragebogen nichts zu suchen haben. Fuer MINIJOB muessen sie
+ * ausdruecklich an — in gespeicherten Konfigurationen fehlen sie, weil es sie
+ * beim letzten Speichern noch nicht gab.
+ */
+const MINIJOB_STEP6_FIELDS = [
+  { name: "beschaeftigungsStatus", label: "Status bei Beschäftigungsbeginn", visible: true, required: true },
+  { name: "alsArbeitsuchendGemeldet", label: "Bei der Agentur für Arbeit gemeldet?", visible: true, required: true },
+  { name: "hasOtherEmployment", label: "Weitere Beschäftigung?", visible: true, required: false },
+  { name: "summeUeberGeringfuegigkeitsgrenze", label: "Summe über Geringfügigkeitsgrenze?", visible: true, required: false },
+  { name: "vorbeschaeftigungenVorhanden", label: "Vorbeschäftigungen im Kalenderjahr?", visible: true, required: true },
+  { name: "auslandsbeschaeftigungVorhanden", label: "Beschäftigung im Ausland?", visible: true, required: true },
+  { name: "employerType", label: "Arbeitgeber-Typ", visible: true, required: true },
+  // Altfelder: bleiben aus, werden nicht mehr erhoben.
+  { name: "otherEmployerName", label: "Arbeitgeber-Name (Altfeld)", visible: false, required: false },
+  { name: "otherWeeklyHours", label: "Wochenstunden Nebenjob (Altfeld)", visible: false, required: false },
+  { name: "hasMinijob", label: "Minijob vorhanden? (Altfeld)", visible: false, required: false },
+];
+
+/** Steht Schritt 6 der uebergebenen Konfiguration schon im Zielzustand? */
+function step6Passt(steps) {
+  const schritt = steps.find((s) => s.step === STEP6);
+  if (!schritt || schritt.enabled !== true || !Array.isArray(schritt.fields)) return false;
+  return MINIJOB_STEP6_FIELDS.every((ziel) => {
+    const ist = schritt.fields.find((f) => f.name === ziel.name);
+    return ist && ist.visible === ziel.visible && ist.required === ziel.required;
+  });
+}
+
+/** Setzt Schritt 6 auf den Zielzustand. */
+function setzeStep6(steps) {
+  const vorhanden = steps.some((s) => s.step === STEP6);
+  const ziel = {
+    step: STEP6,
+    title: "Weitere Beschäftigung",
+    enabled: true,
+    fields: MINIJOB_STEP6_FIELDS,
+  };
+  return vorhanden
+    ? steps.map((s) => (s.step === STEP6 ? { ...s, ...ziel } : s))
+    : [...steps, ziel];
+}
+
+/**
+ * Schaltet die Minijob-Fragen aus Abschnitt 4 fuer die MINIJOB-Vorgaenge frei.
+ *
+ * Zieht auch die eingefrorenen Kopien laufender Vorgaenge nach — ohne das saehe
+ * ein bereits eingeladener Minijobber die Fragen nicht, obwohl der Antrag sie
+ * verlangt.
+ */
+async function ensureMinijobStep6Felder(prisma) {
+  try {
+    if (await migrationErledigt(prisma, MINIJOB_STEP6_MARKER)) return;
+
+    const template = await prisma.formTemplate.findUnique({
+      where: { questionnaireType: "MINIJOB" },
+      select: { id: true, stepsConfig: true },
+    });
+    const steps =
+      template && Array.isArray(template.stepsConfig) ? template.stepsConfig : null;
+
+    if (!steps || steps.length === 0) {
+      // Kein Merker: Auf einer frischen Datenbank legt der Seed die Vorlage
+      // gleich richtig an; sonst beim naechsten Start erneut versuchen.
+      console.log("MINIJOB-Vorlage noch nicht vorhanden — Schritt-6-Felder folgen spaeter.");
+      return;
+    }
+
+    const schreibvorgaenge = [];
+    if (!step6Passt(steps)) {
+      schreibvorgaenge.push(
+        prisma.formTemplate.update({
+          where: { id: template.id },
+          data: { stepsConfig: setzeStep6(steps) },
+        }),
+      );
+    }
+
+    const laufende = await prisma.onboardingProcess.findMany({
+      where: { questionnaireType: "MINIJOB", status: { in: ["INVITED", "IN_PROGRESS"] } },
+      select: { id: true, formTemplateSnapshot: true },
+    });
+    let nachgezogen = 0;
+    for (const vorgang of laufende) {
+      if (!Array.isArray(vorgang.formTemplateSnapshot)) continue;
+      if (step6Passt(vorgang.formTemplateSnapshot)) continue;
+      nachgezogen++;
+      schreibvorgaenge.push(
+        prisma.onboardingProcess.update({
+          where: { id: vorgang.id },
+          data: { formTemplateSnapshot: setzeStep6(vorgang.formTemplateSnapshot) },
+        }),
+      );
+    }
+
+    schreibvorgaenge.push(
+      markiereMigration(prisma, MINIJOB_STEP6_MARKER, {
+        vorlageGeaendert: schreibvorgaenge.length > nachgezogen,
+        snapshotsNachgezogen: nachgezogen,
+      }),
+    );
+
+    await prisma.$transaction(schreibvorgaenge);
+    console.log(
+      "MINIJOB-Vorlage: Schritt-6-Felder gesetzt; laufende Vorgaenge nachgezogen: " + nachgezogen,
+    );
+  } catch (error) {
+    console.error("Schritt-6-Felder fehlgeschlagen:", error.message);
+  }
+}
+
+// =============================================
 // Einmalige Datenmigration: BA-Betriebsnummern der 16 Mandanten
 // =============================================
 const BETRIEBSNUMMERN_MARKER = "ORG_BETRIEBSNUMMERN_V1";
@@ -611,6 +735,7 @@ async function main() {
     await migrateCurrentStepToRegistryNumbers(prisma);
     await ensureMinijobTemplateSteps(prisma);
     await ensureMinijobRenteSchritt(prisma);
+    await ensureMinijobStep6Felder(prisma);
     await ensureBetriebsnummern(prisma);
 
     const userCount = await prisma.user.count();
@@ -644,6 +769,10 @@ module.exports = {
   RENTE_SCHRITT,
   LEGACY_DISPLAY_ORDER,
   MINIJOB_TAX_FIELDS,
+  MINIJOB_STEP6_FIELDS,
+  STEP6,
+  step6Passt,
+  setzeStep6,
   legacyIndexToStepNumber,
   korrigiereMinijobSchritte,
   BETRIEBSNUMMERN,

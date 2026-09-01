@@ -327,11 +327,28 @@ export function createStep5Schema(fc: FieldConfigHelper) {
 export function createStep6Schema(fc: FieldConfigHelper) {
   return z
     .object({
-      beschaeftigungsStatus: z
-        .string()
-        .min(1, "Bitte waehlen Sie aus, was auf Sie zutrifft."),
+      // Die Bloecke aus Abschnitt 4 der Minijob-Checkliste sind an die Vorlage
+      // gebunden. Ohne diese Gates verlangte Schritt 6 sie von JEDEM
+      // Fragebogentyp — auch von TV-L-Angestellten und Beamten, die die Fragen
+      // gar nicht angezeigt bekommen und den Schritt dann nicht verlassen
+      // koennen.
+      // Nur die Statusfrage braucht ein Sichtbarkeits-Gate. Sie ist die
+      // einzige Pflichtangabe dieses Schritts, die sich nicht von selbst
+      // erfuellt: `.min(1)` scheitert am leeren Vorgabewert, und wo der Block
+      // ausgeblendet ist, kann ihn niemand fuellen — Schritt 6 waere fuer
+      // TV-L-, Beamten- und Erzieher-Fragebogen unpassierbar.
+      //
+      // Beide Zweige liefern `string`. Ein `.optional()` oder `.default()`
+      // waere hier falsch: Es machte den Eingabetyp optional, und die Maske
+      // arbeitet mit konkreten Werten aus `defaultValues`.
+      beschaeftigungsStatus: fc.isVisible("beschaeftigungsStatus")
+        ? z.string().min(1, "Bitte waehlen Sie aus, was auf Sie zutrifft.")
+        : z.string(),
       beschaeftigungsStatusSonstige: z.string().max(200).optional(),
 
+      // Die vier Ja/Nein-Fragen brauchen keines: `z.boolean()` ist mit `false`
+      // erfuellt, und `defaultValues` setzt sie immer. Ausgeblendet bleiben sie
+      // schlicht auf "nein" stehen.
       alsArbeitsuchendGemeldet: z.boolean(),
       agenturFuerArbeit: z.string().max(200).optional(),
       mitLeistungsbezug: z.boolean().nullable().optional(),
@@ -383,9 +400,16 @@ export function createStep6Schema(fc: FieldConfigHelper) {
       // ueberhaupt etwas zu addieren gibt. Genau so steht die Bedingung im
       // amtlichen Muster ("Wenn keine mehr als geringfuegig entlohnte
       // (Haupt-)Beschaeftigung vorliegt ...").
+      //
+      // Das Sichtbarkeits-Gate ist hier nicht optional: Ohne es griffe die
+      // Bedingung auch dort, wo die Statusfrage ausgeblendet ist. Dann bliebe
+      // beschaeftigungsStatus leer, hatHauptbeschaeftigung waere false — und
+      // ein TV-L-Fragebogen verlangte eine Antwort auf eine Frage, die er
+      // nicht anzeigt.
       const hatHauptbeschaeftigung =
         werte.beschaeftigungsStatus === "ARBEITNEHMER_HAUPTBESCHAEFTIGUNG";
       if (
+        fc.isVisible("summeUeberGeringfuegigkeitsgrenze") &&
         werte.hasOtherEmployment &&
         !hatHauptbeschaeftigung &&
         (werte.summeUeberGeringfuegigkeitsgrenze === null ||

@@ -275,524 +275,534 @@ export function Step6Employment({
       {/* ============================================= */}
       {/* Status bei Beginn der Beschäftigung           */}
       {/* ============================================= */}
-      <fieldset className="rounded-lg border border-border p-4">
-        <legend className="px-1 text-sm font-semibold text-foreground">
-          Was trifft auf Sie zu, wenn Sie bei uns anfangen?{" "}
-          <span className="text-destructive">*</span>
-        </legend>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Bitte wählen Sie die eine Angabe, die am besten passt.
-        </p>
-
-        <div className="grid gap-1 sm:grid-cols-2">
-          {STATUS_OPTIONEN.map((option) => (
-            <div key={option.wert} className="sm:col-span-1">
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg p-2 hover:bg-muted/60">
-                <input
-                  type="radio"
-                  value={option.wert}
-                  {...register("beschaeftigungsStatus")}
-                  className="mt-0.5 h-4 w-4 shrink-0 border-border text-primary focus:ring-primary"
-                />
-                <span className="text-sm text-foreground">
-                  {option.label}
-                  {option.hilfe && (
-                    <HilfeHinweis thema={option.label}>
-                      {option.hilfe}
-                    </HilfeHinweis>
-                  )}
-                  {option.kurz && (
-                    <span className="block text-xs text-muted-foreground">
-                      {option.kurz}
-                    </span>
-                  )}
-                </span>
-              </label>
-            </div>
-          ))}
-        </div>
-
-        {errors.beschaeftigungsStatus && (
-          <p className="mt-2 text-xs text-destructive">
-            {String(errors.beschaeftigungsStatus.message)}
+      {fc.isVisible("beschaeftigungsStatus") && (
+        <fieldset className="rounded-lg border border-border p-4">
+          <legend className="px-1 text-sm font-semibold text-foreground">
+            Was trifft auf Sie zu, wenn Sie bei uns anfangen?{" "}
+            <span className="text-destructive">*</span>
+          </legend>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Bitte wählen Sie die eine Angabe, die am besten passt.
           </p>
-        )}
 
-        {gewaehlt?.fragtNachFreitext && (
-          <div className="mt-3">
-            <label htmlFor="statusSonstige" className={labelKlasse}>
-              Bitte kurz beschreiben <span className="text-destructive">*</span>
-            </label>
-            <input
-              id="statusSonstige"
-              type="text"
-              maxLength={200}
-              placeholder="z.B. Rentner wegen Erwerbsminderung"
-              {...register("beschaeftigungsStatusSonstige")}
-              className={feldKlasse}
-            />
-            {errors.beschaeftigungsStatusSonstige && (
-              <p className="mt-1 text-xs text-destructive">
-                {String(errors.beschaeftigungsStatusSonstige.message)}
-              </p>
-            )}
+          <div className="grid gap-1 sm:grid-cols-2">
+            {STATUS_OPTIONEN.map((option) => (
+              <div key={option.wert} className="sm:col-span-1">
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-lg p-2 hover:bg-muted/60">
+                  <input
+                    type="radio"
+                    value={option.wert}
+                    {...register("beschaeftigungsStatus")}
+                    className="mt-0.5 h-4 w-4 shrink-0 border-border text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm text-foreground">
+                    {option.label}
+                    {option.hilfe && (
+                      <HilfeHinweis thema={option.label}>
+                        {option.hilfe}
+                      </HilfeHinweis>
+                    )}
+                    {option.kurz && (
+                      <span className="block text-xs text-muted-foreground">
+                        {option.kurz}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </div>
+            ))}
           </div>
-        )}
 
-        {nachweis && (
-          <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-            Für diese Angabe brauchen wir später <strong>{nachweis}</strong>. Sie
-            können sie im letzten Schritt hochladen.
-          </p>
-        )}
-      </fieldset>
+          {errors.beschaeftigungsStatus && (
+            <p className="mt-2 text-xs text-destructive">
+              {String(errors.beschaeftigungsStatus.message)}
+            </p>
+          )}
+
+          {gewaehlt?.fragtNachFreitext && (
+            <div className="mt-3">
+              <label htmlFor="statusSonstige" className={labelKlasse}>
+                Bitte kurz beschreiben <span className="text-destructive">*</span>
+              </label>
+              <input
+                id="statusSonstige"
+                type="text"
+                maxLength={200}
+                placeholder="z.B. Rentner wegen Erwerbsminderung"
+                {...register("beschaeftigungsStatusSonstige")}
+                className={feldKlasse}
+              />
+              {errors.beschaeftigungsStatusSonstige && (
+                <p className="mt-1 text-xs text-destructive">
+                  {String(errors.beschaeftigungsStatusSonstige.message)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {nachweis && (
+            <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+              Für diese Angabe brauchen wir später <strong>{nachweis}</strong>. Sie
+              können sie im letzten Schritt hochladen.
+            </p>
+          )}
+        </fieldset>
+      )}
 
       {/* ============================================= */}
       {/* Meldung bei der Agentur für Arbeit            */}
       {/* ============================================= */}
-      <fieldset className="rounded-lg border border-border p-4">
-        <legend className="px-1 text-sm font-semibold text-foreground">
-          Sind Sie bei der Agentur für Arbeit gemeldet?
-          <HilfeHinweis thema="Meldung bei der Agentur für Arbeit">
-            Gemeint ist eine Meldung als arbeitsuchend oder ausbildungsuchend —
-            auch dann, wenn Sie kein Arbeitslosengeld beziehen. Die Angabe
-            brauchen wir, weil sie bei kurzfristigen Beschäftigungen darüber
-            mitentscheidet, ob Beiträge anfallen.
-          </HilfeHinweis>
-        </legend>
+      {fc.isVisible("alsArbeitsuchendGemeldet") && (
+        <fieldset className="rounded-lg border border-border p-4">
+          <legend className="px-1 text-sm font-semibold text-foreground">
+            Sind Sie bei der Agentur für Arbeit gemeldet?
+            <HilfeHinweis thema="Meldung bei der Agentur für Arbeit">
+              Gemeint ist eine Meldung als arbeitsuchend oder ausbildungsuchend —
+              auch dann, wenn Sie kein Arbeitslosengeld beziehen. Die Angabe
+              brauchen wir, weil sie bei kurzfristigen Beschäftigungen darüber
+              mitentscheidet, ob Beiträge anfallen.
+            </HilfeHinweis>
+          </legend>
 
-        <div className="mt-2">
-          <JaNein
-            name="Bei der Agentur für Arbeit gemeldet"
-            wert={gemeldet}
-            onChange={(v) => setValue("alsArbeitsuchendGemeldet", v)}
-          />
-        </div>
-
-        {gemeldet && (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="agentur" className={labelKlasse}>
-                Zuständige Agentur für Arbeit{" "}
-                <span className="text-destructive">*</span>
-              </label>
-              <input
-                id="agentur"
-                type="text"
-                maxLength={200}
-                placeholder="z.B. Agentur für Arbeit Minden"
-                {...register("agenturFuerArbeit")}
-                className={feldKlasse}
-              />
-              {errors.agenturFuerArbeit && (
-                <p className="mt-1 text-xs text-destructive">
-                  {String(errors.agenturFuerArbeit.message)}
-                </p>
-              )}
-            </div>
-            <div>
-              <span className={labelKlasse}>
-                Beziehen Sie Leistungen?{" "}
-                <span className="text-destructive">*</span>
-              </span>
-              <JaNein
-                name="Leistungsbezug"
-                wert={watch("mitLeistungsbezug") ?? null}
-                onChange={(v) => setValue("mitLeistungsbezug", v)}
-              />
-              {errors.mitLeistungsbezug && (
-                <p className="mt-1 text-xs text-destructive">
-                  {String(errors.mitLeistungsbezug.message)}
-                </p>
-              )}
-            </div>
+          <div className="mt-2">
+            <JaNein
+              name="Bei der Agentur für Arbeit gemeldet"
+              wert={gemeldet}
+              onChange={(v) => setValue("alsArbeitsuchendGemeldet", v)}
+            />
           </div>
-        )}
-      </fieldset>
+
+          {gemeldet && (
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="agentur" className={labelKlasse}>
+                  Zuständige Agentur für Arbeit{" "}
+                  <span className="text-destructive">*</span>
+                </label>
+                <input
+                  id="agentur"
+                  type="text"
+                  maxLength={200}
+                  placeholder="z.B. Agentur für Arbeit Minden"
+                  {...register("agenturFuerArbeit")}
+                  className={feldKlasse}
+                />
+                {errors.agenturFuerArbeit && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {String(errors.agenturFuerArbeit.message)}
+                  </p>
+                )}
+              </div>
+              <div>
+                <span className={labelKlasse}>
+                  Beziehen Sie Leistungen?{" "}
+                  <span className="text-destructive">*</span>
+                </span>
+                <JaNein
+                  name="Leistungsbezug"
+                  wert={watch("mitLeistungsbezug") ?? null}
+                  onChange={(v) => setValue("mitLeistungsbezug", v)}
+                />
+                {errors.mitLeistungsbezug && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {String(errors.mitLeistungsbezug.message)}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </fieldset>
+      )}
 
       {/* ============================================= */}
       {/* 4a — weitere Beschäftigungen                  */}
       {/* ============================================= */}
-      <fieldset className="rounded-lg border border-border p-4">
-        <legend className="px-1 text-sm font-semibold text-foreground">
-          Arbeiten Sie derzeit noch bei anderen Arbeitgebern?
-        </legend>
-        <div className="mt-2">
-          <JaNein
-            name="Weitere Beschäftigungen"
-            wert={hatWeitere}
-            onChange={(v) => {
-              setValue("hasOtherEmployment", v);
-              if (v && weitere.length === 0) setWeitere([leereZeile("WEITERE")]);
-            }}
-          />
-        </div>
+      {fc.isVisible("hasOtherEmployment") && (
+        <fieldset className="rounded-lg border border-border p-4">
+          <legend className="px-1 text-sm font-semibold text-foreground">
+            Arbeiten Sie derzeit noch bei anderen Arbeitgebern?
+          </legend>
+          <div className="mt-2">
+            <JaNein
+              name="Weitere Beschäftigungen"
+              wert={hatWeitere}
+              onChange={(v) => {
+                setValue("hasOtherEmployment", v);
+                if (v && weitere.length === 0) setWeitere([leereZeile("WEITERE")]);
+              }}
+            />
+          </div>
 
-        {hatWeitere && (
-          <div className="mt-4 space-y-3">
-            {weitere.map((zeile, i) => (
-              <div key={i} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                    Beschäftigung {i + 1}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setWeitere(weitere.filter((_, x) => x !== i))}
-                    className="text-xs text-destructive hover:underline"
-                  >
-                    Entfernen
-                  </button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <label className={labelKlasse}>
-                      Beginn <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={zeile.beginn}
-                      onChange={(e) =>
-                        setWeitere(weitere.map((z, x) => (x === i ? { ...z, beginn: e.target.value } : z)))
-                      }
-                      className={feldKlasse}
-                    />
+          {hatWeitere && (
+            <div className="mt-4 space-y-3">
+              {weitere.map((zeile, i) => (
+                <div key={i} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      Beschäftigung {i + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setWeitere(weitere.filter((_, x) => x !== i))}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Entfernen
+                    </button>
                   </div>
-                  <div>
-                    <label className={labelKlasse}>
-                      Arbeitgeber{" "}
-                      <span className="font-normal text-muted-foreground">(freiwillig)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={zeile.arbeitgeberName}
-                      onChange={(e) =>
-                        setWeitere(weitere.map((z, x) => (x === i ? { ...z, arbeitgeberName: e.target.value } : z)))
-                      }
-                      className={feldKlasse}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelKlasse}>
-                      Adresse{" "}
-                      <span className="font-normal text-muted-foreground">(freiwillig)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={zeile.arbeitgeberAdresse}
-                      onChange={(e) =>
-                        setWeitere(weitere.map((z, x) => (x === i ? { ...z, arbeitgeberAdresse: e.target.value } : z)))
-                      }
-                      className={feldKlasse}
-                    />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <span className={labelKlasse}>
-                    Diese Beschäftigung ist <span className="text-destructive">*</span>
-                    <HilfeHinweis thema="Eigenanteil zur Rentenversicherung">
-                      In einem Minijob zahlt Ihr Arbeitgeber einen Pauschalbeitrag
-                      zur Rentenversicherung. Sie selbst steuern normalerweise
-                      3,6 % Ihres Verdienstes bei — das ist der Eigenanteil. Wer
-                      sich davon hat befreien lassen, zahlt ihn nicht.{" "}
-                      <strong>
-                        Wenn Sie unsicher sind: Auf Ihrer Lohnabrechnung steht,
-                        ob ein Rentenversicherungsbeitrag abgezogen wird.
-                      </strong>
-                    </HilfeHinweis>
-                  </span>
-                  <div className="mt-1 space-y-1">
-                    {Object.entries(ART_LABELS).map(([wert, label]) => (
-                      <label key={wert} className="flex cursor-pointer items-start gap-2 text-sm">
-                        <input
-                          type="radio"
-                          checked={zeile.art === wert}
-                          onChange={() =>
-                            setWeitere(weitere.map((z, x) => (x === i ? { ...z, art: wert } : z)))
-                          }
-                          className="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary"
-                        />
-                        <span className="text-foreground">{label}</span>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className={labelKlasse}>
+                        Beginn <span className="text-destructive">*</span>
                       </label>
-                    ))}
+                      <input
+                        type="date"
+                        value={zeile.beginn}
+                        onChange={(e) =>
+                          setWeitere(weitere.map((z, x) => (x === i ? { ...z, beginn: e.target.value } : z)))
+                        }
+                        className={feldKlasse}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelKlasse}>
+                        Arbeitgeber{" "}
+                        <span className="font-normal text-muted-foreground">(freiwillig)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={zeile.arbeitgeberName}
+                        onChange={(e) =>
+                          setWeitere(weitere.map((z, x) => (x === i ? { ...z, arbeitgeberName: e.target.value } : z)))
+                        }
+                        className={feldKlasse}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelKlasse}>
+                        Adresse{" "}
+                        <span className="font-normal text-muted-foreground">(freiwillig)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={zeile.arbeitgeberAdresse}
+                        onChange={(e) =>
+                          setWeitere(weitere.map((z, x) => (x === i ? { ...z, arbeitgeberAdresse: e.target.value } : z)))
+                        }
+                        className={feldKlasse}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className={labelKlasse}>
+                      Diese Beschäftigung ist <span className="text-destructive">*</span>
+                      <HilfeHinweis thema="Eigenanteil zur Rentenversicherung">
+                        In einem Minijob zahlt Ihr Arbeitgeber einen Pauschalbeitrag
+                        zur Rentenversicherung. Sie selbst steuern normalerweise
+                        3,6 % Ihres Verdienstes bei — das ist der Eigenanteil. Wer
+                        sich davon hat befreien lassen, zahlt ihn nicht.{" "}
+                        <strong>
+                          Wenn Sie unsicher sind: Auf Ihrer Lohnabrechnung steht,
+                          ob ein Rentenversicherungsbeitrag abgezogen wird.
+                        </strong>
+                      </HilfeHinweis>
+                    </span>
+                    <div className="mt-1 space-y-1">
+                      {Object.entries(ART_LABELS).map(([wert, label]) => (
+                        <label key={wert} className="flex cursor-pointer items-start gap-2 text-sm">
+                          <input
+                            type="radio"
+                            checked={zeile.art === wert}
+                            onChange={() =>
+                              setWeitere(weitere.map((z, x) => (x === i ? { ...z, art: wert } : z)))
+                            }
+                            className="mt-0.5 h-4 w-4 border-border text-primary focus:ring-primary"
+                          />
+                          <span className="text-foreground">{label}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setWeitere([...weitere, leereZeile("WEITERE")])}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
-            >
-              + Weitere Beschäftigung hinzufügen
-            </button>
-          </div>
-        )}
-
-        {additionsfrageNoetig && (
-          <div className="mt-4 rounded-lg border-l-4 border-[#FBC900] bg-[#FBC900]/10 p-3">
-            <span className={labelKlasse}>
-              Verdienen Sie mit allen Minijobs zusammen regelmäßig mehr als
-              603 € im Monat? <span className="text-destructive">*</span>
-              <HilfeHinweis thema="Zusammenrechnung mehrerer Minijobs">
-                Gemeint ist die Summe aus allen Ihren Minijobs, diesen hier
-                eingerechnet. Liegt sie über 603 €, ist es kein Minijob mehr —
-                dann gelten die normalen Regeln zur Sozialversicherung und es
-                werden Beiträge fällig. Deshalb müssen wir das vorher wissen.
-              </HilfeHinweis>
-            </span>
-            <div className="mt-1">
-              <JaNein
-                name="Summe über der Geringfügigkeitsgrenze"
-                wert={watch("summeUeberGeringfuegigkeitsgrenze") ?? null}
-                onChange={(v) => setValue("summeUeberGeringfuegigkeitsgrenze", v)}
-              />
+              ))}
+              <button
+                type="button"
+                onClick={() => setWeitere([...weitere, leereZeile("WEITERE")])}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
+              >
+                + Weitere Beschäftigung hinzufügen
+              </button>
             </div>
-            {errors.summeUeberGeringfuegigkeitsgrenze && (
-              <p className="mt-1 text-xs text-destructive">
-                {String(errors.summeUeberGeringfuegigkeitsgrenze.message)}
-              </p>
-            )}
-          </div>
-        )}
-      </fieldset>
+          )}
+
+          {additionsfrageNoetig && (
+            <div className="mt-4 rounded-lg border-l-4 border-[#FBC900] bg-[#FBC900]/10 p-3">
+              <span className={labelKlasse}>
+                Verdienen Sie mit allen Minijobs zusammen regelmäßig mehr als
+                603 € im Monat? <span className="text-destructive">*</span>
+                <HilfeHinweis thema="Zusammenrechnung mehrerer Minijobs">
+                  Gemeint ist die Summe aus allen Ihren Minijobs, diesen hier
+                  eingerechnet. Liegt sie über 603 €, ist es kein Minijob mehr —
+                  dann gelten die normalen Regeln zur Sozialversicherung und es
+                  werden Beiträge fällig. Deshalb müssen wir das vorher wissen.
+                </HilfeHinweis>
+              </span>
+              <div className="mt-1">
+                <JaNein
+                  name="Summe über der Geringfügigkeitsgrenze"
+                  wert={watch("summeUeberGeringfuegigkeitsgrenze") ?? null}
+                  onChange={(v) => setValue("summeUeberGeringfuegigkeitsgrenze", v)}
+                />
+              </div>
+              {errors.summeUeberGeringfuegigkeitsgrenze && (
+                <p className="mt-1 text-xs text-destructive">
+                  {String(errors.summeUeberGeringfuegigkeitsgrenze.message)}
+                </p>
+              )}
+            </div>
+          )}
+        </fieldset>
+      )}
 
       {/* ============================================= */}
       {/* 4b — Vorbeschäftigungen                       */}
       {/* ============================================= */}
-      <fieldset className="rounded-lg border border-border p-4">
-        <legend className="px-1 text-sm font-semibold text-foreground">
-          Hatten Sie dieses Jahr schon andere Beschäftigungen?
-          <HilfeHinweis thema="Beschäftigungen in diesem Kalenderjahr">
-            Gemeint ist alles seit dem 1. Januar dieses Jahres — auch Zeiten, in
-            denen Sie bei der Agentur für Arbeit als arbeit- oder
-            ausbildungsuchend gemeldet waren. Diese Zeiten zählen zusammen; ab
-            drei Monaten beziehungsweise 70 Arbeitstagen ändert sich die
-            Beurteilung.
-          </HilfeHinweis>
-        </legend>
-        <div className="mt-2">
-          <JaNein
-            name="Vorbeschäftigungen"
-            wert={hatVor}
-            onChange={(v) => {
-              setValue("vorbeschaeftigungenVorhanden", v);
-              if (v && vor.length === 0) setVor([leereZeile("VORBESCHAEFTIGUNG")]);
-            }}
-          />
-        </div>
-
-        {hatVor && (
-          <div className="mt-4 space-y-3">
-            {vor.map((zeile, i) => (
-              <div key={i} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                    Zeitraum {i + 1}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setVor(vor.filter((_, x) => x !== i))}
-                    className="text-xs text-destructive hover:underline"
-                  >
-                    Entfernen
-                  </button>
-                </div>
-
-                <label className="mb-3 flex cursor-pointer items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={zeile.beiArbeitsagentur}
-                    onChange={(e) =>
-                      setVor(vor.map((z, x) => (x === i ? { ...z, beiArbeitsagentur: e.target.checked } : z)))
-                    }
-                    className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span className="text-foreground">
-                    In diesem Zeitraum war ich arbeit- oder ausbildungsuchend
-                    gemeldet, nicht beschäftigt.
-                  </span>
-                </label>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className={labelKlasse}>
-                      Von <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={zeile.beginn}
-                      onChange={(e) => setVor(vor.map((z, x) => (x === i ? { ...z, beginn: e.target.value } : z)))}
-                      className={feldKlasse}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelKlasse}>
-                      Bis <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={zeile.ende}
-                      onChange={(e) => setVor(vor.map((z, x) => (x === i ? { ...z, ende: e.target.value } : z)))}
-                      className={feldKlasse}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelKlasse}>
-                      Tatsächliche Arbeitstage{" "}
-                      <span className="text-destructive">*</span>
-                      <HilfeHinweis thema="Tatsächliche Arbeitstage">
-                        Gemeint sind die Tage, an denen Sie wirklich gearbeitet
-                        haben — nicht die Kalendertage des Zeitraums. Bei einer
-                        Meldung ohne Beschäftigung tragen Sie 0 ein.
-                      </HilfeHinweis>
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={366}
-                      value={zeile.arbeitstage}
-                      onChange={(e) => setVor(vor.map((z, x) => (x === i ? { ...z, arbeitstage: e.target.value } : z)))}
-                      className={feldKlasse}
-                    />
-                  </div>
-                  <div>
-                    <span className={labelKlasse}>
-                      Verdienst über 603 € im Monat?{" "}
-                      <span className="text-destructive">*</span>
-                    </span>
-                    <JaNein
-                      name="Entgelt über der Grenze"
-                      wert={zeile.entgeltUeberGrenze}
-                      onChange={(v) =>
-                        setVor(vor.map((z, x) => (x === i ? { ...z, entgeltUeberGrenze: v } : z)))
-                      }
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className={labelKlasse}>
-                      {zeile.beiArbeitsagentur ? "Zuständige Arbeitsagentur" : "Arbeitgeber"}{" "}
-                      <span className="font-normal text-muted-foreground">(freiwillig)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={zeile.arbeitgeberName}
-                      onChange={(e) => setVor(vor.map((z, x) => (x === i ? { ...z, arbeitgeberName: e.target.value } : z)))}
-                      className={feldKlasse}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setVor([...vor, leereZeile("VORBESCHAEFTIGUNG")])}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
-            >
-              + Weiteren Zeitraum hinzufügen
-            </button>
+      {fc.isVisible("vorbeschaeftigungenVorhanden") && (
+        <fieldset className="rounded-lg border border-border p-4">
+          <legend className="px-1 text-sm font-semibold text-foreground">
+            Hatten Sie dieses Jahr schon andere Beschäftigungen?
+            <HilfeHinweis thema="Beschäftigungen in diesem Kalenderjahr">
+              Gemeint ist alles seit dem 1. Januar dieses Jahres — auch Zeiten, in
+              denen Sie bei der Agentur für Arbeit als arbeit- oder
+              ausbildungsuchend gemeldet waren. Diese Zeiten zählen zusammen; ab
+              drei Monaten beziehungsweise 70 Arbeitstagen ändert sich die
+              Beurteilung.
+            </HilfeHinweis>
+          </legend>
+          <div className="mt-2">
+            <JaNein
+              name="Vorbeschäftigungen"
+              wert={hatVor}
+              onChange={(v) => {
+                setValue("vorbeschaeftigungenVorhanden", v);
+                if (v && vor.length === 0) setVor([leereZeile("VORBESCHAEFTIGUNG")]);
+              }}
+            />
           </div>
-        )}
-      </fieldset>
+
+          {hatVor && (
+            <div className="mt-4 space-y-3">
+              {vor.map((zeile, i) => (
+                <div key={i} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      Zeitraum {i + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setVor(vor.filter((_, x) => x !== i))}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Entfernen
+                    </button>
+                  </div>
+
+                  <label className="mb-3 flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={zeile.beiArbeitsagentur}
+                      onChange={(e) =>
+                        setVor(vor.map((z, x) => (x === i ? { ...z, beiArbeitsagentur: e.target.checked } : z)))
+                      }
+                      className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                    <span className="text-foreground">
+                      In diesem Zeitraum war ich arbeit- oder ausbildungsuchend
+                      gemeldet, nicht beschäftigt.
+                    </span>
+                  </label>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className={labelKlasse}>
+                        Von <span className="text-destructive">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={zeile.beginn}
+                        onChange={(e) => setVor(vor.map((z, x) => (x === i ? { ...z, beginn: e.target.value } : z)))}
+                        className={feldKlasse}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelKlasse}>
+                        Bis <span className="text-destructive">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={zeile.ende}
+                        onChange={(e) => setVor(vor.map((z, x) => (x === i ? { ...z, ende: e.target.value } : z)))}
+                        className={feldKlasse}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelKlasse}>
+                        Tatsächliche Arbeitstage{" "}
+                        <span className="text-destructive">*</span>
+                        <HilfeHinweis thema="Tatsächliche Arbeitstage">
+                          Gemeint sind die Tage, an denen Sie wirklich gearbeitet
+                          haben — nicht die Kalendertage des Zeitraums. Bei einer
+                          Meldung ohne Beschäftigung tragen Sie 0 ein.
+                        </HilfeHinweis>
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={366}
+                        value={zeile.arbeitstage}
+                        onChange={(e) => setVor(vor.map((z, x) => (x === i ? { ...z, arbeitstage: e.target.value } : z)))}
+                        className={feldKlasse}
+                      />
+                    </div>
+                    <div>
+                      <span className={labelKlasse}>
+                        Verdienst über 603 € im Monat?{" "}
+                        <span className="text-destructive">*</span>
+                      </span>
+                      <JaNein
+                        name="Entgelt über der Grenze"
+                        wert={zeile.entgeltUeberGrenze}
+                        onChange={(v) =>
+                          setVor(vor.map((z, x) => (x === i ? { ...z, entgeltUeberGrenze: v } : z)))
+                        }
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelKlasse}>
+                        {zeile.beiArbeitsagentur ? "Zuständige Arbeitsagentur" : "Arbeitgeber"}{" "}
+                        <span className="font-normal text-muted-foreground">(freiwillig)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={zeile.arbeitgeberName}
+                        onChange={(e) => setVor(vor.map((z, x) => (x === i ? { ...z, arbeitgeberName: e.target.value } : z)))}
+                        className={feldKlasse}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setVor([...vor, leereZeile("VORBESCHAEFTIGUNG")])}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
+              >
+                + Weiteren Zeitraum hinzufügen
+              </button>
+            </div>
+          )}
+        </fieldset>
+      )}
 
       {/* ============================================= */}
       {/* 4c — Ausland                                  */}
       {/* ============================================= */}
-      <fieldset className="rounded-lg border border-border p-4">
-        <legend className="px-1 text-sm font-semibold text-foreground">
-          Arbeiten Sie derzeit im Ausland oder sind Sie dort selbstständig?
-          <HilfeHinweis thema="Tätigkeit im Ausland">
-            Wenn Sie zugleich im Ausland arbeiten, gilt möglicherweise das
-            Sozialversicherungsrecht des anderen Landes. Das muss geklärt
-            werden, bevor abgerechnet wird — dafür gibt es die
-            <strong> Bescheinigung A1</strong>. Haben Sie noch keine, hilft die
-            Deutsche Verbindungsstelle Krankenversicherung – Ausland in Bonn
-            weiter.
-          </HilfeHinweis>
-        </legend>
-        <div className="mt-2">
-          <JaNein
-            name="Tätigkeit im Ausland"
-            wert={hatAusland}
-            onChange={(v) => {
-              setValue("auslandsbeschaeftigungVorhanden", v);
-              if (v && ausland.length === 0) setAusland([leereZeile("AUSLAND")]);
-            }}
-          />
-        </div>
-
-        {hatAusland && (
-          <div className="mt-4 space-y-3">
-            {ausland.map((zeile, i) => (
-              <div key={i} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                    Tätigkeit {i + 1}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setAusland(ausland.filter((_, x) => x !== i))}
-                    className="text-xs text-destructive hover:underline"
-                  >
-                    Entfernen
-                  </button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className={labelKlasse}>
-                      Von <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={zeile.beginn}
-                      onChange={(e) => setAusland(ausland.map((z, x) => (x === i ? { ...z, beginn: e.target.value } : z)))}
-                      className={feldKlasse}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelKlasse}>
-                      Bis{" "}
-                      <span className="font-normal text-muted-foreground">
-                        (leer lassen, wenn es noch läuft)
-                      </span>
-                    </label>
-                    <input
-                      type="date"
-                      value={zeile.ende}
-                      onChange={(e) => setAusland(ausland.map((z, x) => (x === i ? { ...z, ende: e.target.value } : z)))}
-                      className={feldKlasse}
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className={labelKlasse}>
-                      Arbeitgeber oder Tätigkeitsort{" "}
-                      <span className="font-normal text-muted-foreground">(freiwillig)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={zeile.arbeitgeberName}
-                      onChange={(e) => setAusland(ausland.map((z, x) => (x === i ? { ...z, arbeitgeberName: e.target.value } : z)))}
-                      className={feldKlasse}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setAusland([...ausland, leereZeile("AUSLAND")])}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
-            >
-              + Weitere Tätigkeit hinzufügen
-            </button>
-            <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-              Für diese Angabe brauchen wir später die{" "}
-              <strong>Bescheinigung A1</strong>, falls Sie eine haben. Sie können
-              sie im letzten Schritt hochladen.
-            </p>
+      {fc.isVisible("auslandsbeschaeftigungVorhanden") && (
+        <fieldset className="rounded-lg border border-border p-4">
+          <legend className="px-1 text-sm font-semibold text-foreground">
+            Arbeiten Sie derzeit im Ausland oder sind Sie dort selbstständig?
+            <HilfeHinweis thema="Tätigkeit im Ausland">
+              Wenn Sie zugleich im Ausland arbeiten, gilt möglicherweise das
+              Sozialversicherungsrecht des anderen Landes. Das muss geklärt
+              werden, bevor abgerechnet wird — dafür gibt es die
+              <strong> Bescheinigung A1</strong>. Haben Sie noch keine, hilft die
+              Deutsche Verbindungsstelle Krankenversicherung – Ausland in Bonn
+              weiter.
+            </HilfeHinweis>
+          </legend>
+          <div className="mt-2">
+            <JaNein
+              name="Tätigkeit im Ausland"
+              wert={hatAusland}
+              onChange={(v) => {
+                setValue("auslandsbeschaeftigungVorhanden", v);
+                if (v && ausland.length === 0) setAusland([leereZeile("AUSLAND")]);
+              }}
+            />
           </div>
-        )}
-      </fieldset>
+
+          {hatAusland && (
+            <div className="mt-4 space-y-3">
+              {ausland.map((zeile, i) => (
+                <div key={i} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      Tätigkeit {i + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAusland(ausland.filter((_, x) => x !== i))}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Entfernen
+                    </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className={labelKlasse}>
+                        Von <span className="text-destructive">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={zeile.beginn}
+                        onChange={(e) => setAusland(ausland.map((z, x) => (x === i ? { ...z, beginn: e.target.value } : z)))}
+                        className={feldKlasse}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelKlasse}>
+                        Bis{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (leer lassen, wenn es noch läuft)
+                        </span>
+                      </label>
+                      <input
+                        type="date"
+                        value={zeile.ende}
+                        onChange={(e) => setAusland(ausland.map((z, x) => (x === i ? { ...z, ende: e.target.value } : z)))}
+                        className={feldKlasse}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelKlasse}>
+                        Arbeitgeber oder Tätigkeitsort{" "}
+                        <span className="font-normal text-muted-foreground">(freiwillig)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={zeile.arbeitgeberName}
+                        onChange={(e) => setAusland(ausland.map((z, x) => (x === i ? { ...z, arbeitgeberName: e.target.value } : z)))}
+                        className={feldKlasse}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setAusland([...ausland, leereZeile("AUSLAND")])}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
+              >
+                + Weitere Tätigkeit hinzufügen
+              </button>
+              <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                Für diese Angabe brauchen wir später die{" "}
+                <strong>Bescheinigung A1</strong>, falls Sie eine haben. Sie können
+                sie im letzten Schritt hochladen.
+              </p>
+            </div>
+          )}
+        </fieldset>
+      )}
 
       {/* Arbeitgeber-Typ bleibt aus der bisherigen Fassung erhalten */}
       {fc.isVisible("employerType") && (

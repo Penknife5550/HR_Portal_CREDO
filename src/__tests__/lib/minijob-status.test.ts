@@ -19,9 +19,20 @@ import {
   statusLabel,
 } from "@/lib/minijob-status";
 import { createStep6Schema } from "@/lib/validations/personal-data";
-import { FieldConfigHelper } from "@/lib/field-definitions";
+import { FIELD_REGISTRY, FieldConfigHelper } from "@/lib/field-definitions";
 
-const schema = createStep6Schema(new FieldConfigHelper(6));
+// seed-check.js haelt den Zielzustand von Schritt 6 fuer MINIJOB. Ihn hier zu
+// verwenden statt einer handgeschriebenen Kopie heisst: Die Tests pruefen
+// genau die Konfiguration, die die Migration in die Vorlage schreibt.
+const seedCheck = require("../../../prisma/seed-check.js");
+
+/** Schritt 6 so, wie ihn ein MINIJOB-Vorgang sieht. */
+const schema = createStep6Schema(
+  new FieldConfigHelper(6, seedCheck.MINIJOB_STEP6_FIELDS)
+);
+
+/** Schritt 6 so, wie ihn ein TV-L-, Beamten- oder Erzieher-Vorgang sieht. */
+const schemaOhneMinijob = createStep6Schema(new FieldConfigHelper(6));
 
 function fehlerPfade(eingabe: Record<string, unknown>): string[] {
   const ergebnis = schema.safeParse(eingabe);
@@ -205,5 +216,115 @@ describe("Schritt 6 — Validierung", () => {
         summeUeberGeringfuegigkeitsgrenze: false,
       })
     ).toEqual([]);
+  });
+});
+
+describe("Schritt 6 — andere Fragebogentypen bleiben verschont", () => {
+  /**
+   * Die Regression, um die es geht: Die Minijob-Fragen aus Abschnitt 4 waren
+   * eine Zeit lang unbedingte Pflichtangaben. Weil prisma/seed.ts Schritt 6
+   * auch fuer STANDARD, BEAMTE und ERZIEHER aktiviert, bekam damit jede
+   * TV-L-Angestellte die siebzehn Statusoptionen vorgesetzt — und konnte den
+   * Schritt nicht verlassen, weil die Maske die Frage gar nicht anzeigte.
+   */
+  function fehlerOhneMinijob(eingabe: Record<string, unknown>): string[] {
+    const ergebnis = schemaOhneMinijob.safeParse(eingabe);
+    return ergebnis.success ? [] : ergebnis.error.issues.map((i) => i.path.join("."));
+  }
+
+  /** Was ein Nicht-Minijob-Fragebogen tatsaechlich liefert: keine Statusangabe. */
+  const OHNE_STATUS = { ...BASIS, beschaeftigungsStatus: "" };
+
+  it("verlangt keine Statusauswahl", () => {
+    expect(fehlerOhneMinijob(OHNE_STATUS)).toEqual([]);
+  });
+
+  it("verlangt die Additionsfrage nicht, auch wenn eine weitere Beschäftigung besteht", () => {
+    // Ohne das Sichtbarkeits-Gate griffe die Bedingung hier: Der Status ist
+    // leer, also gilt "keine Hauptbeschaeftigung" — und der Fragebogen
+    // verlangte eine Antwort auf eine Frage, die er nicht anzeigt.
+    expect(
+      fehlerOhneMinijob({
+        ...OHNE_STATUS,
+        hasOtherEmployment: true,
+        summeUeberGeringfuegigkeitsgrenze: null,
+      })
+    ).toEqual([]);
+  });
+
+  it("blendet die fünf Minijob-Blöcke aus, lässt Arbeitgeber-Typ aber stehen", () => {
+    const fc = new FieldConfigHelper(6);
+    for (const feld of [
+      "beschaeftigungsStatus",
+      "alsArbeitsuchendGemeldet",
+      "summeUeberGeringfuegigkeitsgrenze",
+      "vorbeschaeftigungenVorhanden",
+      "auslandsbeschaeftigungVorhanden",
+    ]) {
+      expect(fc.isVisible(feld)).toBe(false);
+    }
+    expect(fc.isVisible("employerType")).toBe(true);
+    expect(fc.isVisible("hasOtherEmployment")).toBe(true);
+  });
+
+  it("zeigt dieselben Blöcke für MINIJOB", () => {
+    const fc = new FieldConfigHelper(6, seedCheck.MINIJOB_STEP6_FIELDS);
+    for (const feld of [
+      "beschaeftigungsStatus",
+      "alsArbeitsuchendGemeldet",
+      "summeUeberGeringfuegigkeitsgrenze",
+      "vorbeschaeftigungenVorhanden",
+      "auslandsbeschaeftigungVorhanden",
+      "employerType",
+      "hasOtherEmployment",
+    ]) {
+      expect(fc.isVisible(feld)).toBe(true);
+    }
+  });
+
+  it("hält die Altfelder überall aus", () => {
+    // otherEmployerName, otherWeeklyHours und hasMinijob werden nicht mehr
+    // erhoben. Stuenden sie sichtbar in der Registry, zeigte der Vorlagen-
+    // Editor drei Schalter ohne Wirkung.
+    for (const fc of [
+      new FieldConfigHelper(6),
+      new FieldConfigHelper(6, seedCheck.MINIJOB_STEP6_FIELDS),
+    ]) {
+      expect(fc.isVisible("otherEmployerName")).toBe(false);
+      expect(fc.isVisible("otherWeeklyHours")).toBe(false);
+      expect(fc.isVisible("hasMinijob")).toBe(false);
+    }
+  });
+});
+
+describe("MINIJOB_STEP6_FIELDS — synchron zur Feld-Registry", () => {
+  // seed-check.js laeuft im Container als reines JS und kann die Registry
+  // nicht importieren; die Namen sind dort dupliziert. Laeuft die Kopie
+  // auseinander, schreibt die Migration Felder, die es nicht mehr gibt.
+  it("nennt genau die Felder aus FIELD_REGISTRY[6]", () => {
+    const ausRegistry = FIELD_REGISTRY[6].map((f) => f.name).sort();
+    const ausMigration = seedCheck.MINIJOB_STEP6_FIELDS.map(
+      (f: { name: string }) => f.name
+    ).sort();
+    expect(ausMigration).toEqual(ausRegistry);
+  });
+
+  it("setzt Schritt 6 in einer leeren Konfiguration auf den Zielzustand", () => {
+    const gesetzt = seedCheck.setzeStep6([{ step: 5, title: "Steuer", enabled: true }]);
+    expect(seedCheck.step6Passt(gesetzt)).toBe(true);
+    // Der bestehende Schritt 5 darf dabei nicht verloren gehen.
+    expect(gesetzt.find((s: { step: number }) => s.step === 5)).toBeDefined();
+  });
+
+  it("erkennt eine Konfiguration, der die neuen Felder fehlen", () => {
+    const alt = [
+      {
+        step: 6,
+        title: "Weitere Beschäftigung",
+        enabled: true,
+        fields: [{ name: "employerType", label: "Arbeitgeber-Typ", visible: true, required: true }],
+      },
+    ];
+    expect(seedCheck.step6Passt(alt)).toBe(false);
   });
 });

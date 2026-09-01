@@ -105,12 +105,28 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
   ],
 
   // Step 6: Weitere Beschaeftigung
+  //
+  // Die fuenf Bloecke aus Abschnitt 4 der Minijob-Checkliste stehen bewusst auf
+  // defaultVisible: false. Sie sind fachlich an den Minijob gebunden — die
+  // Statusabfrage mit ihren siebzehn Optionen, die Meldung bei der Agentur fuer
+  // Arbeit und die drei Tabellen haben in einem TV-L- oder Beamten-Fragebogen
+  // nichts zu suchen. Fuer MINIJOB schaltet sie die Migration
+  // MINIJOB_STEP6_FELDER_V1 in prisma/seed-check.js frei.
   6: [
-    { name: "hasOtherEmployment", label: "Weitere Beschäftigung?",  defaultVisible: true, defaultRequired: false },
-    { name: "otherEmployerName",  label: "Arbeitgeber-Name",        defaultVisible: true, defaultRequired: false },
-    { name: "otherWeeklyHours",   label: "Wochenstunden (Nebenjob)", defaultVisible: true, defaultRequired: false },
-    { name: "employerType",       label: "Arbeitgeber-Typ",         defaultVisible: true, defaultRequired: true },
-    { name: "hasMinijob",         label: "Minijob vorhanden?",      defaultVisible: true, defaultRequired: false },
+    { name: "beschaeftigungsStatus",              label: "Status bei Beschäftigungsbeginn",        defaultVisible: false, defaultRequired: true },
+    { name: "alsArbeitsuchendGemeldet",           label: "Bei der Agentur für Arbeit gemeldet?",   defaultVisible: false, defaultRequired: true },
+    { name: "hasOtherEmployment",                 label: "Weitere Beschäftigung?",                 defaultVisible: true,  defaultRequired: false },
+    { name: "summeUeberGeringfuegigkeitsgrenze",  label: "Summe über Geringfügigkeitsgrenze?",     defaultVisible: false, defaultRequired: false },
+    { name: "vorbeschaeftigungenVorhanden",       label: "Vorbeschäftigungen im Kalenderjahr?",    defaultVisible: false, defaultRequired: true },
+    { name: "auslandsbeschaeftigungVorhanden",    label: "Beschäftigung im Ausland?",              defaultVisible: false, defaultRequired: true },
+    { name: "employerType",                       label: "Arbeitgeber-Typ",                        defaultVisible: true,  defaultRequired: true },
+    // Altfelder: werden seit der Minijob-Fassung nicht mehr erhoben. Sie
+    // bleiben in der Registry, damit gespeicherte Vorlagen-Konfigurationen
+    // ihre Eintraege behalten und der Editor keinen Schalter ohne Bedeutung
+    // anzeigt.
+    { name: "otherEmployerName",  label: "Arbeitgeber-Name (Altfeld)",         defaultVisible: false, defaultRequired: false },
+    { name: "otherWeeklyHours",   label: "Wochenstunden Nebenjob (Altfeld)",   defaultVisible: false, defaultRequired: false },
+    { name: "hasMinijob",         label: "Minijob vorhanden? (Altfeld)",       defaultVisible: false, defaultRequired: false },
   ],
 
   // Step 7: Kinder (Sonderfall – dynamische Liste)
@@ -185,7 +201,13 @@ export class FieldConfigHelper {
     const def = this.definitionMap.get(fieldName);
     if (def?.alwaysVisible) return true;
     const config = this.configMap.get(fieldName);
-    return config?.visible ?? true;
+    // Faellt auf den Registry-Default zurueck, nicht auf `true` — genau wie
+    // isRequired es schon immer tat. Der Unterschied zaehlt fuer Felder, die
+    // NACH dem letzten Speichern einer Vorlage hinzugekommen sind: Sie fehlen
+    // in deren gespeicherter Konfiguration. Mit `?? true` waere jedes neue
+    // Feld sofort in JEDER Vorlage sichtbar — so bekamen TV-L-, Beamten- und
+    // Erzieher-Fragebogen die Minijob-Pflichtfragen aus Schritt 6 vorgesetzt.
+    return config?.visible ?? def?.defaultVisible ?? true;
   }
 
   isRequired(fieldName: string): boolean {
