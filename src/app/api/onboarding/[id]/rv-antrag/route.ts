@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { decrypt } from "@/lib/encryption";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { pruefeAntragMoeglich } from "@/lib/minijob-antrag";
@@ -40,8 +41,10 @@ export async function GET(
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
 
-    const allowedRoles = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"];
-    if (!allowedRoles.includes(session.role)) {
+    // Die gemeinsame Konstante statt einer eigenen Liste: Eine handgeschriebene
+    // Kopie waere die Stelle, an der spaeter eine mandantenbeschraenkte Rolle
+    // ergaenzt wird, ohne dass jemand an die Mandantenpruefung denkt.
+    if (!HR_EDIT_ROLES.includes(session.role)) {
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
@@ -64,7 +67,7 @@ export async function GET(
         id: true,
         firstName: true,
         lastName: true,
-        organization: { select: { name: true, betriebsnummer: true } },
+        organization: { select: { id: true, name: true, betriebsnummer: true } },
         personalData: {
           select: {
             firstName: true,
@@ -78,6 +81,18 @@ export async function GET(
 
     if (!vorgang) {
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+    }
+    // Zweite Schranke neben der Rollenliste: Der Antrag traegt die
+    // Sozialversicherungsnummer im Klartext (unten entschluesselt). Ein Vorgang
+    // ohne Mandanten waere ein Datenfehler — dann lieber sperren.
+    if (
+      !vorgang.organization ||
+      !(await canAccessProcess(session, vorgang.organization.id))
+    ) {
+      return NextResponse.json(
+        { error: "Keine Berechtigung für diesen Vorgang" },
+        { status: 403 }
+      );
     }
 
     const pruefung = pruefeAntragMoeglich(

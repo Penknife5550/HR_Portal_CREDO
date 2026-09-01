@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { HR_EDIT_ROLES, PORTAL_ROLES } from "@/lib/permissions";
+import { HR_EDIT_ROLES, PORTAL_ROLES, canAccessProcess } from "@/lib/permissions";
 import {
   type Kalendertag,
   berlinerKalendertag,
@@ -83,6 +83,21 @@ async function ladeVorgang(id: string) {
 }
 
 type Vorgang = NonNullable<Awaited<ReturnType<typeof ladeVorgang>>>;
+
+/**
+ * Darf diese Sitzung den Mandanten dieses Vorgangs sehen?
+ *
+ * Eigene Funktion, weil GET und PATCH dieselbe Antwort brauchen und
+ * `organization` im Select optional ist: Ein Vorgang ohne Mandanten waere ein
+ * Datenfehler — dann lieber sperren als durchlassen.
+ */
+async function mandantErlaubt(
+  session: Parameters<typeof canAccessProcess>[0],
+  vorgang: Vorgang
+): Promise<boolean> {
+  if (!vorgang.organization) return false;
+  return canAccessProcess(session, vorgang.organization.id);
+}
 
 /** Baut den Antwortkoerper: erfasste Werte plus Vorschlaege. */
 function baueAntwort(v: Vorgang) {
@@ -189,6 +204,16 @@ export async function GET(
     if (!vorgang) {
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
+    // Org-Zugriffspruefung — wie in der Schwester-Route /api/onboarding/[id].
+    // PORTAL_ROLES enthaelt die mandantenbeschraenkten Rollen
+    // EINRICHTUNGSLEITUNG und VORGESETZTER; ohne diese Pruefung saehen sie den
+    // RV-Stand fremder Traeger.
+    if (!(await mandantErlaubt(session, vorgang))) {
+      return NextResponse.json(
+        { error: "Keine Berechtigung für diesen Vorgang" },
+        { status: 403 }
+      );
+    }
 
     return NextResponse.json({ data: baueAntwort(vorgang) });
   } catch (error) {
@@ -226,6 +251,12 @@ export async function PATCH(
     const vorgang = await ladeVorgang(id);
     if (!vorgang) {
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+    }
+    if (!(await mandantErlaubt(session, vorgang))) {
+      return NextResponse.json(
+        { error: "Keine Berechtigung für diesen Vorgang" },
+        { status: 403 }
+      );
     }
     if (!vorgang.personalData) {
       return NextResponse.json(

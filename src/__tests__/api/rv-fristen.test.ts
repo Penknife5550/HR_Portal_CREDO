@@ -13,6 +13,8 @@ const mockPrisma = {
   onboardingProcess: { findUnique: jest.fn() },
   personalData: { update: jest.fn() },
   auditLog: { create: jest.fn() },
+  // canAccessProcess fragt fuer mandantenbeschraenkte Rollen die Zuweisung ab.
+  userOrgAssignment: { findUnique: jest.fn() },
 };
 const mockGetSession = jest.fn();
 
@@ -90,16 +92,44 @@ describe("Zugang", () => {
     expect((await PATCH(patchReq({}), ctx())).status).toBe(401);
   });
 
-  it("lässt eine reine Leserolle lesen, aber nicht schreiben", async () => {
+  it("lässt eine reine Leserolle im eigenen Mandanten lesen, aber nicht schreiben", async () => {
     // EINRICHTUNGSLEITUNG steht in PORTAL_ROLES, aber nicht in HR_EDIT_ROLES.
     // (Die Route führte hier früher "VIEWER" — eine Rolle, die es im Schema
     // gar nicht gibt.)
     mockGetSession.mockResolvedValue({ userId: "u2", role: "EINRICHTUNGSLEITUNG" });
     mockPrisma.onboardingProcess.findUnique.mockResolvedValue(vorgang());
+    mockPrisma.userOrgAssignment.findUnique.mockResolvedValue({ id: "z1" });
     expect((await GET(getReq(), ctx())).status).toBe(200);
     expect(
       (await PATCH(patchReq({ antragEingangAm: "2026-08-10" }), ctx())).status
     ).toBe(403);
+  });
+
+  it("sperrt eine Leserolle aus einem fremden Mandanten aus", async () => {
+    // Der eigentliche Zweck der Mandantenprüfung: EINRICHTUNGSLEITUNG und
+    // VORGESETZTER sind mandantenbeschränkt (ORG_RESTRICTED_ROLES). Ohne
+    // Zuweisung darf die Route nichts preisgeben — sonst läge der RV-Stand
+    // eines fremden Trägers offen, sobald solche Konten vergeben werden.
+    mockGetSession.mockResolvedValue({ userId: "u3", role: "EINRICHTUNGSLEITUNG" });
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(vorgang());
+    mockPrisma.userOrgAssignment.findUnique.mockResolvedValue(null);
+    expect((await GET(getReq(), ctx())).status).toBe(403);
+  });
+
+  it("fragt für globale Rollen gar nicht erst nach einer Zuweisung", async () => {
+    // GLOBAL_ROLES sehen alle Mandanten — ein Datenbank-Roundtrip je Aufruf
+    // wäre reine Last. Bricht diese Abkürzung weg, fällt es hier auf.
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(vorgang());
+    expect((await GET(getReq(), ctx())).status).toBe(200);
+    expect(mockPrisma.userOrgAssignment.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("sperrt einen Vorgang ohne Mandanten, statt ihn durchzulassen", async () => {
+    mockGetSession.mockResolvedValue({ userId: "u2", role: "EINRICHTUNGSLEITUNG" });
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
+      vorgang({ organization: null })
+    );
+    expect((await GET(getReq(), ctx())).status).toBe(403);
   });
 
   it("meldet einen unbekannten Vorgang", async () => {
