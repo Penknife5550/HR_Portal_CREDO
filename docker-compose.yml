@@ -29,6 +29,10 @@ services:
       start_period: 40s
     volumes:
       - uploads_data:/app/uploads
+      # Der Entrypoint legt hier vor jedem Schema-Abgleich einen pg_dump ab.
+      # Ohne diese Einhaengung startet der Container nicht, sobald sich das
+      # Schema geaendert hat -- bewusst: db push laeuft mit --accept-data-loss.
+      - ./backups:/backups
     networks:
       - reverse_proxy
       - internal
