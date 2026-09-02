@@ -5,6 +5,7 @@ import { CIVIL_SERVICE_DOC_TYPES } from "@/lib/constants";
 import type { DocumentData, AssessmentData } from "../types";
 import { formatDate, formatFileSize } from "../helpers";
 import { UploadIcon, DownloadIcon } from "../icons";
+import { TemplateGenerationSection } from "@/components/template-generation-section";
 
 // =============================================
 // PDF Export Sektion
@@ -192,6 +193,8 @@ export function TabDocuments({
   onUpload,
   processId,
   assessments,
+  organizationId,
+  canEdit,
 }: {
   documents: DocumentData[];
   uploadingDoc: boolean;
@@ -201,6 +204,9 @@ export function TabDocuments({
   onUpload: (file: File, type: string) => void;
   processId: string;
   assessments?: AssessmentData[];
+  organizationId: string;
+  /** Darf die angemeldete Person Dokumente erzeugen? */
+  canEdit: boolean;
 }) {
   const docTypeEntries = Object.entries(CIVIL_SERVICE_DOC_TYPES);
 
@@ -218,6 +224,18 @@ export function TabDocuments({
 
   return (
     <div>
+      {/* Dokumente aus Vorlagen erzeugen. Reihenfolge wie im Dokumente-Hub des
+          Onboardings: erst erstellen, dann exportieren, dann hochladen. */}
+      <div className="mb-6">
+        <TemplateGenerationSection
+          modul="VERBEAMTUNG"
+          refId={processId}
+          organizationId={organizationId}
+          canEdit={canEdit}
+          emptyHint="Keine Verbeamtungs-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ (Modul Verbeamtung) an."
+        />
+      </div>
+
       {/* PDF Export Sektion */}
       <ExportSection processId={processId} assessments={assessments || []} />
 

@@ -5,6 +5,7 @@ import { OFFBOARDING_DOC_TYPE_LABELS } from "@/lib/constants";
 import type { OffboardingData } from "../types";
 import { formatDate, formatFileSize } from "../helpers";
 import { DocumentIcon, UploadCloudIcon, DownloadIcon } from "../icons";
+import { TemplateGenerationSection } from "@/components/template-generation-section";
 
 export function TabDocuments({
   data,
@@ -17,6 +18,7 @@ export function TabDocuments({
   handleFileDrop,
   dragOver,
   setDragOver,
+  canEdit,
 }: {
   data: OffboardingData;
   offboardingId: string;
@@ -28,6 +30,8 @@ export function TabDocuments({
   handleFileDrop: (e: React.DragEvent) => void;
   dragOver: boolean;
   setDragOver: (v: boolean) => void;
+  /** Darf die angemeldete Person Dokumente erzeugen? */
+  canEdit: boolean;
 }) {
   const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
     UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
@@ -38,6 +42,19 @@ export function TabDocuments({
 
   return (
     <div className="space-y-6">
+      {/* Dokumente aus Vorlagen erzeugen. Steht bewusst VOR dem Hochladen —
+          dieselbe Reihenfolge wie im Onboarding und bei Vertragsende: erst
+          erstellen, dann Hochgeladenes. Die Sektion bringt ihre eigene
+          Liste bereits erzeugter Schreiben mit; sie ist unabhaengig von der
+          Upload-Liste darunter. */}
+      <TemplateGenerationSection
+        modul="OFFBOARDING"
+        refId={offboardingId}
+        organizationId={data.organization.id}
+        canEdit={canEdit}
+        emptyHint="Keine Offboarding-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ (Modul Offboarding) an."
+      />
+
       {/* Upload Area */}
       <div
         className={`rounded-xl border-2 border-dashed p-8 text-center transition-colors ${

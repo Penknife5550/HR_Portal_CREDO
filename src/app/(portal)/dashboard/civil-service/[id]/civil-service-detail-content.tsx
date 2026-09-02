@@ -21,6 +21,7 @@ import type { User, CivilServiceData, PhaseData, TabId } from "./types";
 import { TABS, MAIN_PHASES, SUB_PHASES_II, PHASE_ORDER } from "./types";
 import { getPhaseStatus, getMainPhaseStatus } from "./helpers";
 import { ArrowLeftIcon } from "./icons";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
 import {
   TabOverview,
   TabChecklist,
@@ -538,6 +539,8 @@ export function CivilServiceDetailContent({
             onUpload={handleDocUpload}
             processId={processId}
             assessments={data.assessments}
+            organizationId={data.organizationId}
+            canEdit={HR_EDIT_ROLES.includes(user.role)}
           />
         )}
 

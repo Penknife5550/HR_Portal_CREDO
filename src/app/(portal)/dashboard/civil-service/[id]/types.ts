@@ -171,6 +171,10 @@ export interface CivilServiceData {
   employeeFirstName: string;
   employeeLastName: string;
   employeeEmail: string;
+  // Die Schnittstelle gibt die rohe Prisma-Zeile zurueck, organizationId liegt
+  // also vor. Sie wird fuer die Vorlagen-Sektion gebraucht, damit nur die
+  // Vorlagen dieses Traegers geladen werden.
+  organizationId: string;
   organizationName: string;
   startDate: string | null;
   probationStartDate: string | null;
