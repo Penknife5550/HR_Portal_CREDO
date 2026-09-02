@@ -25,7 +25,7 @@ interface RateLimiterConfig {
 const stores = new Map<string, Map<string, RateLimitEntry>>();
 
 // Periodische Bereinigung alter Eintraege (alle 5 Minuten)
-setInterval(() => {
+const aufraeumUhr = setInterval(() => {
   const now = Date.now();
   for (const [, store] of stores) {
     for (const [key, entry] of store) {
@@ -36,6 +36,13 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+
+// Der Timer soll den Prozess nicht am Leben halten. Im Server faellt das nicht
+// auf — der laeuft ohnehin weiter. In Jest schon: Ohne unref() bleibt der
+// Event-Loop offen, der Testlauf haengt am Ende und Jest meldet
+// "A worker process has failed to exit gracefully".
+// Optional aufgerufen, weil unref() nur in der Node-Runtime existiert.
+(aufraeumUhr as unknown as { unref?: () => void }).unref?.();
 
 /**
  * Erstellt einen Rate Limiter mit der gegebenen Konfiguration.
@@ -122,13 +129,35 @@ export const apiRateLimiter = createRateLimiter("api", {
 });
 
 /**
- * Hilfsfunktion: IP-Adresse aus NextRequest extrahieren.
+ * Die IP des Aufrufers — so weit man ihr trauen kann.
+ *
+ * `X-Forwarded-For` ist eine Kette: Jeder Proxy haengt hinten an, wen er
+ * gesehen hat. Vertrauenswuerdig ist deshalb nur der **letzte** Eintrag — den
+ * hat der eigene Reverse Proxy geschrieben (Caddy, siehe Caddyfile.hr-portal).
+ * Alles davor stammt aus dem Header, den der Aufrufer selbst mitgeschickt hat.
+ *
+ * Vorher stand hier der ERSTE Eintrag. Damit war jede Begrenzung wirkungslos:
+ * Ein `X-Forwarded-For: <zufaellige IP>` pro Versuch, und jeder Aufruf bekam
+ * einen frischen Zaehler — Login-Bremse, Token-Bremse und die Bremse der
+ * Reporting-Endpunkte gleichermassen. Und weil dieselbe Funktion die IP fuer
+ * die Protokolle liefert (AuditLog, `erklaerungIp` der Wahrheitsversicherung),
+ * stand dort eine Adresse, die sich der Absender frei aussuchen konnte.
+ *
+ * Sind mehrere Proxys hintereinander geschaltet, muss diese Stelle mitwachsen:
+ * dann ist nicht der letzte Eintrag der richtige, sondern der letzte VOR den
+ * eigenen Proxys.
  */
 export function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    return forwarded.split(",")[0].trim();
+    const kette = forwarded
+      .split(",")
+      .map((eintrag) => eintrag.trim())
+      .filter((eintrag) => eintrag.length > 0);
+    if (kette.length > 0) return kette[kette.length - 1];
   }
-  // Fallback - im Prod hinter Reverse Proxy immer x-forwarded-for nutzen
+  // Ohne Proxy-Header laesst sich die IP hier nicht ermitteln. Alle solchen
+  // Aufrufe teilen sich dann einen Zaehler — das bremst zu viel, aber es
+  // oeffnet nichts. Im Betrieb setzt Caddy den Header immer.
   return "unknown";
 }
