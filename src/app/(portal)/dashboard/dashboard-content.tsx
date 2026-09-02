@@ -135,13 +135,19 @@ export function DashboardContent({ user }: { user: User }) {
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(page * PAGE_SIZE));
 
+      // Das Archiv filtert der Server, nicht der Browser.
+      //
+      // Vorher holte die Seite bis zu PAGE_SIZE Datensaetze, warf daraus die
+      // archivierten weg und setzte `total` auf die Laenge des Rests. Damit war
+      // total nie groesser als eine Seite, totalPages also immer 1 und die
+      // Blaetternavigation wurde nie gerendert: Ab dem 26. offenen Vorgang war
+      // jeder weitere im Dashboard unerreichbar.
+      if (!showArchived && !statusFilter) params.set("archiv", "aus");
+
       const res = await fetch(`/api/onboarding?${params.toString()}`);
       const data = await res.json();
-      const allItems = data.data || [];
-      const ARCHIVED_STATUSES = ["COMPLETED", "EXPIRED"];
-      const filtered = showArchived ? allItems : allItems.filter((o: Onboarding) => !ARCHIVED_STATUSES.includes(o.status));
-      setOnboardings(filtered);
-      setTotal(showArchived ? (data.total || 0) : filtered.length);
+      setOnboardings(data.data || []);
+      setTotal(data.total || 0);
     } catch (error) {
       console.error("Fehler beim Laden:", error);
     } finally {

@@ -261,6 +261,17 @@ export async function GET(request: NextRequest) {
       };
     } else if (status) {
       where.status = status;
+    } else if (searchParams.get("archiv") === "aus") {
+      // Die Voreinstellung der Liste: alles ausser dem Archiv.
+      //
+      // Bewusst NICHT ueber status=OPEN geloest — diese Gruppe laesst auch
+      // REVIEWED weg, das Archiv umfasst aber nur COMPLETED und EXPIRED.
+      // Geprüfte Vorgaenge wuerden sonst lautlos aus der Liste verschwinden.
+      //
+      // Und bewusst auf dem Server statt im Browser: Wer erst eine Seite holt
+      // und dann daraus wegfiltert, kennt die Gesamtzahl nicht mehr. Genau
+      // daran haing die Blaetternavigation.
+      where.status = { notIn: ["COMPLETED", "EXPIRED"] };
     }
     if (organizationId) where.organizationId = organizationId;
     if (search) {
