@@ -397,3 +397,17 @@ export const CIVIL_SERVICE_DOC_TYPES: Record<string, string> = {
   BEIRAT_PROTOKOLL_PROBE: "Beiratsprotokoll (Probe)",
   BEIRAT_PROTOKOLL_LEBENSZEIT: "Beiratsprotokoll (Lebenszeit)",
 };
+
+/**
+ * Dokumenttypen, die der Upload der Verbeamtung annimmt.
+ *
+ * Abgeleitet aus der Liste, die die Oberflaeche anbietet — plus SONSTIGES als
+ * Rueckfallwert. In der Upload-Route stand frueher eine eigene Aufzaehlung, die
+ * sich mit der Oberflaeche nur in neun von siebenundzwanzig Eintraegen deckte.
+ * Aufgefallen ist das nie, weil der Upload den Typ unter dem falschen
+ * Feldnamen schickte und deshalb ohnehin immer auf SONSTIGES fiel.
+ */
+export const CIVIL_SERVICE_UPLOAD_TYPES: string[] = [
+  ...Object.keys(CIVIL_SERVICE_DOC_TYPES),
+  "SONSTIGES",
+];

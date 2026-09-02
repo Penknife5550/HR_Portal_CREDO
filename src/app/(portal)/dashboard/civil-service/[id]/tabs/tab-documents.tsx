@@ -222,6 +222,14 @@ export function TabDocuments({
 
   const getDocFile = (type: string) => documents.find((d) => d.type === type);
 
+  // Alles, was zu keinem der bekannten Typen gehoert. Solange der Upload den
+  // Typ unter dem falschen Feldnamen schickte, landete JEDES Dokument als
+  // SONSTIGES — und war damit nirgends sichtbar, obwohl die Datei gespeichert
+  // war. Ohne diesen Griff blieben die Altbestaende unauffindbar.
+  const sonstigeDokumente = documents.filter(
+    (d) => !(d.type in CIVIL_SERVICE_DOC_TYPES),
+  );
+
   return (
     <div>
       {/* Dokumente aus Vorlagen erzeugen. Reihenfolge wie im Dokumente-Hub des
@@ -311,6 +319,43 @@ export function TabDocuments({
           );
         })}
       </div>
+
+      {/* Dokumente ohne bekannten Typ — holt die Altbestaende zurueck in die
+          Anzeige, die als SONSTIGES gespeichert wurden und im Raster darueber
+          nirgends auftauchen. */}
+      {sonstigeDokumente.length > 0 && (
+        <div className="mt-6">
+          <h3 className="mb-3 text-sm font-bold text-gray-800">
+            Weitere Dokumente
+            <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
+              {sonstigeDokumente.length}
+            </span>
+          </h3>
+          <div className="space-y-2">
+            {sonstigeDokumente.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-800">{doc.fileName}</p>
+                  <p className="text-[11px] text-gray-500">
+                    {formatDate(doc.uploadedAt)} &middot; {formatFileSize(doc.fileSize)}
+                  </p>
+                </div>
+                <a
+                  href={`/api/civil-service/${processId}/documents/${doc.id}`}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                  download
+                >
+                  <DownloadIcon className="h-3.5 w-3.5" />
+                  Laden
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

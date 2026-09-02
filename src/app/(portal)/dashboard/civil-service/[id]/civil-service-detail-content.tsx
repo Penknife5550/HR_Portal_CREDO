@@ -267,7 +267,10 @@ export function CivilServiceDetailContent({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("type", docType);
+      // Der Feldname muss "documentType" heissen — so liest ihn die Route und so
+      // heisst die Spalte. Unter "type" kam der Wert nie an und fiel auf
+      // SONSTIGES zurueck.
+      formData.append("documentType", docType);
       const res = await fetch(`/api/civil-service/${processId}/documents`, {
         method: "POST",
         body: formData,
