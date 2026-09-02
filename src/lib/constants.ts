@@ -161,6 +161,34 @@ export const EXIT_TYPE_LABELS: Record<string, string> = {
 };
 
 // =============================================
+// Beschaeftigungsart und Zeugnisart (Offboarding)
+//
+// Beide Felder speichert das Portal als Grosschreibungs-Code, ohne dass eine
+// Uebersetzung existierte. In einem Schreiben stuende sonst woertlich
+// "ANGESTELLT" bzw. "QUALIFIZIERT". Unbekannte Werte fallen bewusst auf den
+// Rohwert zurueck — die Felder sind nicht gegen ein Enum validiert.
+// =============================================
+export const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
+  ANGESTELLT: "Angestellt",
+  BEAMTET: "Beamtet",
+  MINIJOB: "Minijob",
+};
+
+export const CERTIFICATE_TYPE_LABELS: Record<string, string> = {
+  QUALIFIZIERT: "Qualifiziertes Arbeitszeugnis",
+  EINFACH: "Einfaches Arbeitszeugnis",
+};
+
+/** Uebersetzt einen Code ueber einen Katalog; unbekannt bleibt unveraendert. */
+export function labelOderRohwert(
+  katalog: Record<string, string>,
+  wert: string | null | undefined,
+): string | undefined {
+  if (!wert) return undefined;
+  return katalog[wert] ?? wert;
+}
+
+// =============================================
 // Rueckgabe-Kategorie-Labels
 // =============================================
 export const RETURN_CATEGORY_LABELS: Record<string, string> = {

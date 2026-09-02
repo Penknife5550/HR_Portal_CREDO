@@ -16,8 +16,18 @@
 import { prisma } from "@/lib/db";
 import { resolveVerantwortlicheStelle } from "@/lib/dsgvo";
 import { decrypt } from "@/lib/encryption";
-import type { SessionPayload } from "@/lib/permissions";
-import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
+import { canAccessProcess, type SessionPayload } from "@/lib/permissions";
+import {
+  getBefristungSachgrundLabel,
+  getBefristungsartLabel,
+  labelOderRohwert,
+  CERTIFICATE_TYPE_LABELS,
+  EMPLOYMENT_TYPE_LABELS,
+  EXIT_TYPE_LABELS,
+  OVERALL_GRADE_FORMULATIONS,
+  SCHOOL_GRADE_LABELS,
+  ZEUGNIS_JOB_GROUP_LABELS,
+} from "@/lib/constants";
 
 export interface ResolverContext {
   organizationId?: string | null;
@@ -419,10 +429,239 @@ const vertragsverlaengerungResolver: PlaceholderResolver = async (ctx) => {
   return { data, sensitiveFields };
 };
 
+/**
+ * Geldbetrag in deutscher Schreibweise, immer mit zwei Nachkommastellen.
+ *
+ * Betrifft nur die Betraege, die als Zahl gespeichert sind. Die Abfindung ist
+ * ein FREITEXT-Feld und laeuft bewusst NICHT hier durch: Aus "15.000,00" wuerde
+ * beim Parsen der Betrag fuenfzehn — und der stuende dann in einem
+ * Aufhebungsvertrag.
+ */
+function euroDe(wert: number | null | undefined): string | undefined {
+  if (wert == null || Number.isNaN(wert)) return undefined;
+  return wert.toLocaleString("de-DE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** Kommazahl in deutscher Schreibweise, ohne erzwungene Nachkommastellen. */
+function zahlDe(wert: number | null | undefined): string | undefined {
+  if (wert == null || Number.isNaN(wert)) return undefined;
+  return String(wert).replace(".", ",");
+}
+
+/**
+ * OFFBOARDING-Resolver: fuellt die Platzhalter aus einem Offboarding-Vorgang
+ * (refId == offboardingId).
+ *
+ * Anschrift, Anrede, Titel, Geburtsort, Position und Wochenstunden stammen aus
+ * dem vorgelagerten Vertragsende-Vorgang und gibt es deshalb nur bei Vorgaengen,
+ * die daraus entstanden sind. Bei von Hand angelegten Offboardings hat das
+ * Portal keine Postanschrift der Person — die betroffenen Platzhalter bleiben
+ * dann ungesetzt und rendern als "___".
+ */
+const offboardingResolver: PlaceholderResolver = async (ctx) => {
+  const sensitiveFields: string[] = [];
+  const nurAllgemein = async (): Promise<ResolvedPlaceholders> => ({
+    data: await commonPlaceholders(ctx.organizationId, ctx.session?.userId),
+    sensitiveFields,
+  });
+
+  if (!ctx.refId) return nurAllgemein();
+
+  const off = await prisma.offboardingProcess.findUnique({
+    where: { id: ctx.refId },
+    select: {
+      displayId: true,
+      organizationId: true,
+      employeeEmail: true,
+      employeeFirstName: true,
+      employeeLastName: true,
+      employeePersonalNr: true,
+      employeePrivateEmail: true,
+      exitType: true,
+      exitReason: true,
+      noticeDate: true,
+      noticePeriodEnd: true,
+      lastWorkingDay: true,
+      contractEndDate: true,
+      employee: {
+        select: { personalNumber: true, dateOfBirth: true, phone: true, privateEmail: true },
+      },
+      exitData: {
+        select: {
+          employmentType: true, tarifvertrag: true, entgeltgruppe: true,
+          remainingVacationDays: true, vacationPayout: true,
+          overtimeHours: true, overtimePayout: true, severancePay: true,
+          certificateType: true, nonCompeteClause: true, successorName: true,
+        },
+      },
+      contractEnd: {
+        select: {
+          contractStartDate: true, currentPosition: true,
+          currentEntgeltgruppe: true, currentStufe: true,
+          currentWochenstunden: true, dokubitDaten: true,
+        },
+      },
+      zeugnisBewertung: {
+        select: {
+          jobGroup: true, overallGradeRounded: true,
+          status: true, finalizedAt: true, supervisorName: true,
+        },
+      },
+      returnItems: {
+        select: { category: true, itemName: true, serialNumber: true, isReturned: true, returnedAt: true },
+      },
+    },
+  });
+  if (!off) return nurAllgemein();
+
+  // Mandantenpruefung. Der Erzeugen-Endpunkt prueft die Organisation der
+  // VORLAGE und eine mitgeschickte organizationId, aber nicht, ob der Vorgang
+  // hinter der refId zum eigenen Mandanten gehoert. Ohne diese Zeile koennte
+  // eine fremde Vorgangs-ID untergeschoben werden.
+  if (!(await canAccessProcess(ctx.session, off.organizationId))) {
+    return nurAllgemein();
+  }
+
+  // Mandant DES VORGANGS, nicht ctx.organizationId — sonst truege das Schreiben
+  // den Briefkopf eines fremden Traegers.
+  const data = await commonPlaceholders(off.organizationId, ctx.session?.userId);
+  const ed = off.exitData;
+  const ce = off.contractEnd;
+  const zb = off.zeugnisBewertung;
+
+  const set = (key: string, value: unknown): void => {
+    if (value == null) return;
+    const s = typeof value === "string" ? value : String(value);
+    if (s.trim() === "") return;
+    data[key] = value;
+  };
+
+  // dokubitDaten ist ein untypisiertes Json-Feld (Whitelist
+  // contractEndStammdatenSchema) — wie im Vertragsverlaengerungs-Resolver als
+  // Zeichenketten-Map lesen, Datumswerte liegen als YYYY-MM-DD vor.
+  const dokubit = (ce?.dokubitDaten ?? {}) as Record<string, string>;
+  const dk = (feld: string): string | undefined => {
+    const v = dokubit[feld];
+    return typeof v === "string" && v.trim() !== "" ? v : undefined;
+  };
+  const dkDatum = (feld: string): string | undefined => {
+    const v = dk(feld);
+    return v ? deDateOnb(new Date(v)) : undefined;
+  };
+
+  const vorname = off.employeeFirstName;
+  const nachname = off.employeeLastName;
+  set("vorname", vorname);
+  set("nachname", nachname);
+  set("name", `${vorname} ${nachname}`.trim());
+  set("anrede", dk("anrede"));
+  set("titel", dk("titel"));
+  set("geschlecht", dk("geschlecht"));
+  set("personalnummer", off.employeePersonalNr || off.employee?.personalNumber);
+  set("geburtsdatum", deDateOnb(off.employee?.dateOfBirth) ?? dkDatum("geburtsdatum"));
+  set("geburtsort", dk("geburtsort"));
+  set("email", off.employeeEmail);
+  set("email_privat", off.employeePrivateEmail || off.employee?.privateEmail);
+  set("telefon", off.employee?.phone);
+
+  set("strasse", dk("strasse"));
+  set("plz", dk("plz"));
+  set("ort", dk("ort"));
+  set("plz_ort", [dk("plz"), dk("ort")].filter(Boolean).join(" "));
+
+  set("vorgangsnummer", off.displayId);
+
+  set("austrittsart", EXIT_TYPE_LABELS[off.exitType] ?? off.exitType);
+  set("austrittsgrund", off.exitReason);
+  set("kuendigungsdatum", deDateOnb(off.noticeDate));
+  set("kuendigungsfrist_ende", deDateOnb(off.noticePeriodEnd));
+  set("letzter_arbeitstag", deDateOnb(off.lastWorkingDay));
+  // {vertragsende} meint hier das Ende des AUSLAUFENDEN Arbeitsverhaeltnisses.
+  set("vertragsende", deDateOnb(off.contractEndDate));
+  set("eintrittsdatum", deDateOnb(ce?.contractStartDate));
+  set("konzerneintritt", dkDatum("konzerneintritt"));
+
+  set("position", ce?.currentPosition);
+  set("beschaeftigungsart", labelOderRohwert(EMPLOYMENT_TYPE_LABELS, ed?.employmentType));
+  set("tarifvertrag", ed?.tarifvertrag);
+  set("entgeltgruppe", ed?.entgeltgruppe || ce?.currentEntgeltgruppe);
+  set("stufe", ce?.currentStufe);
+  set("wochenstunden", zahlDe(ce?.currentWochenstunden));
+  set("wettbewerbsverbot", ed?.nonCompeteClause ? "Ja" : "Nein");
+  set("nachfolger", ed?.successorName);
+
+  set("resturlaub_tage", zahlDe(ed?.remainingVacationDays));
+  set("urlaubsauszahlung", euroDe(ed?.vacationPayout));
+  set("ueberstunden", zahlDe(ed?.overtimeHours));
+  set("ueberstundenauszahlung", euroDe(ed?.overtimePayout));
+
+  set("zeugnisart", labelOderRohwert(CERTIFICATE_TYPE_LABELS, ed?.certificateType));
+  set("zeugnis_berufsgruppe", ZEUGNIS_JOB_GROUP_LABELS[zb?.jobGroup ?? ""] ?? zb?.jobGroup);
+  set("beurteiler_name", zb?.supervisorName);
+
+  // Note NUR aus einer abgeschlossenen Bewertung. Vorher ist es die
+  // vorlaeufige Einschaetzung der Fuehrungskraft ohne die HR-Korrektur — die
+  // gehoert nicht in ein rechtsverbindliches Arbeitszeugnis.
+  const noteFreigegeben = zb?.status === "FINALIZED" && zb?.overallGradeRounded != null;
+  if (noteFreigegeben) {
+    const note = zb.overallGradeRounded as number;
+    set("zeugnis_note", String(note));
+    set("zeugnis_note_text", SCHOOL_GRADE_LABELS[note]?.label);
+    set("zeugnis_gesamtformulierung", OVERALL_GRADE_FORMULATIONS[note]);
+  }
+
+  // Rueckgaben als mehrzeilige Zeichenkette: renderDocx laeuft mit
+  // linebreaks: true, Umbrueche kommen also im Word an. Ein Schleifen-Konstrukt
+  // kennen weder der Editor noch PlaceholderDef. ReturnItem hat kein
+  // orderIndex, deshalb explizit sortieren.
+  const sortiert = [...off.returnItems].sort(
+    (a, b) =>
+      String(a.category).localeCompare(String(b.category)) ||
+      a.itemName.localeCompare(b.itemName),
+  );
+  const bezeichnung = (i: (typeof sortiert)[number]): string =>
+    i.serialNumber ? `${i.itemName} (${i.serialNumber})` : i.itemName;
+  const zurueck = sortiert.filter((i) => i.isReturned);
+  const offen = sortiert.filter((i) => !i.isReturned);
+  if (zurueck.length > 0) {
+    set(
+      "rueckgaben_liste",
+      zurueck
+        .map((i) => {
+          const am = deDateOnb(i.returnedAt);
+          return am ? `${bezeichnung(i)} — zurueck am ${am}` : bezeichnung(i);
+        })
+        .join("\n"),
+    );
+  }
+  if (offen.length > 0) {
+    set("rueckgaben_offen_liste", offen.map(bezeichnung).join("\n"));
+    set("rueckgaben_offen_anzahl", String(offen.length));
+  }
+
+  // Sensibles Feld nur aufloesen und melden, wenn die Vorlage es nutzt.
+  // Die Abfindung ist ein Freitext und wird UNVERAENDERT uebernommen.
+  const wantsAbfindung =
+    !ctx.placeholders || ctx.placeholders.includes("abfindung");
+  if (ed?.severancePay && wantsAbfindung) {
+    const klar = decrypt(ed.severancePay);
+    if (klar && klar.trim() !== "") {
+      data.abfindung = klar;
+      sensitiveFields.push("abfindung");
+    }
+  }
+
+  return { data, sensitiveFields };
+};
+
 const resolvers: Record<string, PlaceholderResolver> = {
   ALLGEMEIN: allgemeinResolver,
   ONBOARDING: onboardingResolver,
   VERTRAGSVERLAENGERUNG: vertragsverlaengerungResolver,
+  OFFBOARDING: offboardingResolver,
 };
 
 /** Registriert einen Modul-Resolver (z.B. in E5 fuer BEM). */
