@@ -8,16 +8,46 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { NeuerVorgangModal } from "@/components/neuer-vorgang-modal";
 import { STATUS_LABELS } from "@/lib/constants";
 import {
-  StatusPieChart,
-  MonthlyTrendChart,
   OverdueBanner,
   DurationKPI,
   OverdueBadge,
-} from "@/components/dashboard-charts";
+} from "@/components/dashboard-kennzahlen";
+
+// Die beiden Diagramme kommen nach, statt im Einstiegs-Bundle mitzureisen.
+//
+// recharts wiegt rund 145 kB und war fest in die Seite gelinkt: /dashboard
+// lieferte 261 kB First-Load-JS -- den ersten Bildschirm nach dem Login.
+// Gebraucht werden die Diagramme aber erst, wenn die Kennzahlen geladen sind,
+// und sie stehen weit unten auf der Seite.
+//
+// ssr:false, weil recharts die Groesse seines Containers misst; serverseitig
+// gerendert kaeme ein leeres Diagramm heraus, das der Browser sofort ersetzt.
+const StatusPieChart = dynamic(
+  () => import("@/components/dashboard-charts").then((m) => m.StatusPieChart),
+  { ssr: false, loading: () => <ChartPlatzhalter /> }
+);
+const MonthlyTrendChart = dynamic(
+  () => import("@/components/dashboard-charts").then((m) => m.MonthlyTrendChart),
+  { ssr: false, loading: () => <ChartPlatzhalter /> }
+);
+
+/** Haelt die Hoehe frei, damit die Seite beim Nachladen nicht springt. */
+function ChartPlatzhalter() {
+  return (
+    <div
+      className="flex h-[300px] items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground"
+      role="status"
+      aria-label="Diagramm wird geladen"
+    >
+      Diagramm wird geladen …
+    </div>
+  );
+}
 import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 
 interface User {
