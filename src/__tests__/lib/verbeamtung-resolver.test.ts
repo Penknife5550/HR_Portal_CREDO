@@ -252,3 +252,43 @@ describe("Verbeamtungs-Resolver — Mandant und Fehlerfaelle", () => {
     expect(data.datum).toBeDefined();
   });
 });
+
+describe("Verbeamtungs-Resolver — Befunde aus dem Codereview", () => {
+  it("nimmt KEINE Beiratsentscheidung anderer Art", async () => {
+    // Ein Lebenszeit-Vorgang traegt in der Regel schon die Probe-Entscheidung
+    // von vor drei Jahren. Faellt der Resolver darauf zurueck, teilt ein
+    // Schreiben "Mitteilung Beiratsentscheidung (Lebenszeit)" eine Zustimmung
+    // mit, die der Beirat nie getroffen hat.
+    findCs.mockResolvedValue(
+      vorgang({
+        type: "LIFETIME",
+        boardDecisions: [
+          { decisionType: "PROBE", result: "POSITIVE", decisionDate: new Date("2026-06-20T00:00:00.000Z") },
+        ],
+      })
+    );
+    const { data } = await loese();
+    expect(data.beirat_entscheidung).toBeUndefined();
+    expect(data.beirat_entscheidung_am).toBeUndefined();
+    expect(data.beirat_entscheidung_art).toBeUndefined();
+  });
+
+  it("macht aus einem unmoeglichen Datum kein \"Invalid Date\"", async () => {
+    // vebsSeminarCompletedDate stammt aus dem oeffentlichen Antragsformular,
+    // dessen Route den Rumpf praktisch ungeprueft speichert.
+    for (const murks of ["noch offen", "2026-13-45", "31.02.2026", ""]) {
+      findCs.mockResolvedValue(
+        vorgang({ prerequisites: { vebsSeminarCompletedDate: murks } })
+      );
+      const { data } = await loese();
+      expect(data.vebs_seminar_am).toBeUndefined();
+    }
+  });
+
+  it("nimmt ein gueltiges Seminardatum weiterhin an", async () => {
+    findCs.mockResolvedValue(
+      vorgang({ prerequisites: { vebsSeminarCompletedDate: "2025-11-14" } })
+    );
+    expect((await loese()).data.vebs_seminar_am).toBe("14.11.2025");
+  });
+});

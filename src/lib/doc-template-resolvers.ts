@@ -173,7 +173,14 @@ const allgemeinResolver: PlaceholderResolver = async (ctx) => {
 
 function deDateOnb(d: Date | null | undefined): string | undefined {
   if (!d) return undefined;
-  return new Date(d).toLocaleDateString("de-DE", {
+  const datum = new Date(d);
+  // Ein Invalid-Date-Objekt ist truthy — ohne diese Pruefung liefert
+  // toLocaleDateString woertlich "Invalid Date", und genau das stuende dann im
+  // erzeugten Schreiben. Die Aufrufer geben teils Werte aus untypisierten
+  // Json-Feldern herein (dokubitDaten, prerequisites aus dem oeffentlichen
+  // Antragsformular), die kein gueltiges Datum sein muessen.
+  if (Number.isNaN(datum.getTime())) return undefined;
+  return datum.toLocaleDateString("de-DE", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -851,10 +858,15 @@ const verbeamtungResolver: PlaceholderResolver = async (ctx) => {
     if (r) set(`referenz_${nr}_am`, deDateOnb(r.submittedAt));
   }
 
-  // Beiratsentscheidung: die neueste, die zur Art des Vorgangs passt —
-  // sonst die neueste ueberhaupt.
-  const beirat =
-    cs.boardDecisions.find((b) => b.decisionType === cs.type) ?? cs.boardDecisions[0];
+  // Beiratsentscheidung: NUR die neueste, deren Art zum Vorgang passt.
+  //
+  // Bewusst ohne Rueckfall auf die neueste Entscheidung beliebiger Art: Ein
+  // Lebenszeit-Vorgang traegt in der Regel schon die Probe-Entscheidung von vor
+  // drei Jahren. Ein Schreiben "Mitteilung Beiratsentscheidung (Lebenszeit)",
+  // das nur {beirat_entscheidung} nutzt, teilte der Lehrkraft sonst eine
+  // Zustimmung mit, die der Beirat nie getroffen hat. Fehlt die passende
+  // Entscheidung, bleiben die Platzhalter ungesetzt und rendern "___".
+  const beirat = cs.boardDecisions.find((b) => b.decisionType === cs.type);
   if (beirat) {
     setGeschuetzt(
       "beirat_entscheidung",

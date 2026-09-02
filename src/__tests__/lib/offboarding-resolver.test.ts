@@ -300,3 +300,25 @@ describe("Offboarding-Resolver — Mandantenpruefung", () => {
     expect(findZuweisung).not.toHaveBeenCalled();
   });
 });
+
+describe("Offboarding-Resolver — Befunde aus dem Codereview", () => {
+  it("macht aus einem unmoeglichen Datum kein \"Invalid Date\"", async () => {
+    // Die Datumswerte in dokubitDaten werden beim Schreiben nur gegen eine
+    // Formatmaske geprueft (nicht am Ende verankert, ohne Kalenderpruefung):
+    // "2026-13-45" kommt durch.
+    findOff.mockResolvedValue(
+      vorgang({
+        contractEnd: {
+          ...vorgang().contractEnd,
+          dokubitDaten: { ...vorgang().contractEnd.dokubitDaten, konzerneintritt: "2026-13-45" },
+        },
+      })
+    );
+    const { data } = await loese();
+    expect(data.konzerneintritt).toBeUndefined();
+  });
+
+  it("nimmt ein gueltiges Konzerneintrittsdatum weiterhin an", async () => {
+    expect((await loese()).data.konzerneintritt).toBe("01.08.2010");
+  });
+});
