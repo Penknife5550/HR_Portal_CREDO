@@ -27,6 +27,7 @@ import {
   OVERALL_GRADE_FORMULATIONS,
   SCHOOL_GRADE_LABELS,
   ZEUGNIS_JOB_GROUP_LABELS,
+  CIVIL_SERVICE_STATUS_LABELS,
 } from "@/lib/constants";
 
 export interface ResolverContext {
@@ -657,11 +658,227 @@ const offboardingResolver: PlaceholderResolver = async (ctx) => {
   return { data, sensitiveFields };
 };
 
+/** PSI-Art als Klartext. */
+const PSI_ART_LABELS: Record<string, string> = {
+  PROBE: "Beamtenverhaeltnis auf Probe",
+  LIFETIME: "Beamtenverhaeltnis auf Lebenszeit",
+};
+
+/** Ergebnis einer Beiratsentscheidung als Klartext. */
+const BEIRAT_ERGEBNIS_LABELS: Record<string, string> = {
+  POSITIVE: "Zustimmung",
+  NEGATIVE: "Ablehnung",
+  POSTPONED: "Zurueckgestellt",
+};
+
+/**
+ * VERBEAMTUNG-Resolver: fuellt die Platzhalter aus einem PSI-Vorgang
+ * (refId == civilServiceProcessId).
+ *
+ * `prerequisites`, `applicationData` und `stakeholders` sind untypisierte
+ * Json-Felder, die zum Teil aus einem OEFFENTLICHEN Magic-Link-Formular
+ * stammen. Sie werden deshalb schluesselweise und mit Typpruefung gelesen,
+ * niemals blind uebernommen.
+ *
+ * Schutzwuerdige Angaben (Gemeindezugehoerigkeit, persoenliche Erklaerung,
+ * Beurteilungsergebnisse) sind NICHT verschluesselt, gehoeren aber ins
+ * Protokoll: Sie werden wie sensible Felder ueber `placeholders` gegated und
+ * in `sensitiveFields` gemeldet.
+ */
+const verbeamtungResolver: PlaceholderResolver = async (ctx) => {
+  const sensitiveFields: string[] = [];
+  const nurAllgemein = async (): Promise<ResolvedPlaceholders> => ({
+    data: await commonPlaceholders(ctx.organizationId, ctx.session?.userId),
+    sensitiveFields,
+  });
+
+  if (!ctx.refId) return nurAllgemein();
+
+  const cs = await prisma.civilServiceProcess.findUnique({
+    where: { id: ctx.refId },
+    select: {
+      displayId: true,
+      organizationId: true,
+      employeeFirstName: true,
+      employeeLastName: true,
+      employeeEmail: true,
+      employeePersonalNr: true,
+      type: true,
+      status: true,
+      targetStartDate: true,
+      probationStartDate: true,
+      probationEndDate: true,
+      completedAt: true,
+      besoldungsgruppe: true,
+      erfahrungsstufe: true,
+      applicationSubmittedAt: true,
+      prerequisites: true,
+      applicationData: true,
+      stakeholders: true,
+      employee: {
+        select: { personalNumber: true, dateOfBirth: true, phone: true, privateEmail: true },
+      },
+      organization: {
+        select: {
+          ezBrDetmoldName: true, ezBrDetmoldEmail: true, ezBrDetmoldPhone: true,
+          ezBrDetmoldAktenPrefix: true, ezGfFirstName: true, ezGfLastName: true,
+          ezGfTitle: true,
+        },
+      },
+      assessments: {
+        select: {
+          assessmentType: true, assessmentNumber: true, submittedAt: true,
+          meetsRequirements: true, meetsRequirementsManual: true,
+        },
+      },
+      boardDecisions: {
+        select: { decisionType: true, result: true, decisionDate: true },
+        orderBy: { decisionDate: "desc" },
+      },
+    },
+  });
+  if (!cs) return nurAllgemein();
+
+  // Mandantenpruefung — siehe offboardingResolver.
+  if (!(await canAccessProcess(ctx.session, cs.organizationId))) {
+    return nurAllgemein();
+  }
+
+  const data = await commonPlaceholders(cs.organizationId, ctx.session?.userId);
+
+  const set = (key: string, value: unknown): void => {
+    if (value == null) return;
+    const s = typeof value === "string" ? value : String(value);
+    if (s.trim() === "") return;
+    data[key] = value;
+  };
+
+  // Json-Felder schluesselweise und mit Typpruefung lesen.
+  const json = (feld: unknown): Record<string, unknown> =>
+    feld && typeof feld === "object" && !Array.isArray(feld)
+      ? (feld as Record<string, unknown>)
+      : {};
+  const vor = json(cs.prerequisites);
+  const antrag = json(cs.applicationData);
+  const beteiligte = json(cs.stakeholders);
+
+  const text = (quelle: Record<string, unknown>, key: string): string | undefined => {
+    const v = quelle[key];
+    return typeof v === "string" && v.trim() !== "" ? v : undefined;
+  };
+  const zahl = (quelle: Record<string, unknown>, key: string): string | undefined => {
+    const v = quelle[key];
+    return typeof v === "number" && Number.isFinite(v) ? String(v) : undefined;
+  };
+  /** Ein verschachtelter Beteiligter, z.B. stakeholders.schulleitung.email */
+  const beteiligter = (rolle: string, feld: string): string | undefined =>
+    text(json(beteiligte[rolle]), feld);
+
+  set("vorgangsnummer", cs.displayId);
+  set("verbeamtungsart", PSI_ART_LABELS[cs.type] ?? cs.type);
+  set("vorgang_status", CIVIL_SERVICE_STATUS_LABELS[cs.status]?.label ?? cs.status);
+  set("antrag_eingereicht_am", deDateOnb(cs.applicationSubmittedAt));
+
+  const vorname = cs.employeeFirstName;
+  const nachname = cs.employeeLastName;
+  set("vorname", vorname);
+  set("nachname", nachname);
+  set("name", `${vorname} ${nachname}`.trim());
+  set("email", cs.employeeEmail);
+  set("personalnummer", cs.employeePersonalNr || cs.employee?.personalNumber);
+  set("geburtsdatum", deDateOnb(cs.employee?.dateOfBirth));
+  set("telefon", cs.employee?.phone);
+  set("email_privat", cs.employee?.privateEmail);
+
+  set("geplanter_beginn", deDateOnb(cs.targetStartDate));
+  set("probezeit_beginn", deDateOnb(cs.probationStartDate));
+  set("probezeit_ende", deDateOnb(cs.probationEndDate));
+  set("abgeschlossen_am", deDateOnb(cs.completedAt));
+  set("besoldungsgruppe", cs.besoldungsgruppe);
+  if (cs.erfahrungsstufe != null) set("erfahrungsstufe", String(cs.erfahrungsstufe));
+
+  set("faecher", text(vor, "subjectCombination"));
+  set("stellenumfang_prozent", zahl(vor, "workloadPercent"));
+  const seminar = text(vor, "vebsSeminarCompletedDate");
+  if (seminar) set("vebs_seminar_am", deDateOnb(new Date(seminar)));
+
+  set("schulleitung_name", beteiligter("schulleitung", "name"));
+  set("schulleitung_email", beteiligter("schulleitung", "email"));
+  set("amtsarzt_email", beteiligter("amtsarzt", "email"));
+  set("beirat_email", beteiligter("beirat", "email"));
+
+  // Mandanten-Stammdaten. Heute bei keinem der 16 Mandanten gepflegt und in
+  // der Oberflaeche unter "Elternzeit-Konfiguration" zu finden, obwohl das
+  // Datenmodell sie fuer die Verbeamtung vorsieht.
+  const o = cs.organization;
+  set("br_kontakt", o?.ezBrDetmoldName);
+  set("br_email", o?.ezBrDetmoldEmail);
+  set("br_telefon", o?.ezBrDetmoldPhone);
+  set("br_aktenzeichen_prefix", o?.ezBrDetmoldAktenPrefix);
+  set("gf_name", [o?.ezGfFirstName, o?.ezGfLastName].filter(Boolean).join(" "));
+  set("gf_funktion", o?.ezGfTitle);
+
+  // Beurteilungen und Referenzen. Das Gesamturteil ist meetsRequirementsManual
+  // (BRL Nr. 7.5); meetsRequirements ist nur der Legacy-Fallback. Der
+  // Gesamtschnitt bleibt bewusst aussen vor — der Schema-Kommentar sagt
+  // woertlich "KEIN Gesamturteil".
+  const findeBeurteilung = (typ: string, nr: number) =>
+    cs.assessments.find((a) => a.assessmentType === typ && a.assessmentNumber === nr);
+
+  const wants = (key: string): boolean =>
+    !ctx.placeholders || ctx.placeholders.includes(key);
+  /** Schutzwuerdig: setzen und melden, aber nur wenn die Vorlage es nutzt. */
+  const setGeschuetzt = (key: string, value: string | undefined): void => {
+    if (!value || !wants(key)) return;
+    data[key] = value;
+    sensitiveFields.push(key);
+  };
+
+  for (const nr of [1, 2, 3]) {
+    const b = findeBeurteilung("BEURTEILUNG", nr);
+    if (!b) continue;
+    set(`beurteilung_${nr}_am`, deDateOnb(b.submittedAt));
+    const erfuellt = b.meetsRequirementsManual ?? b.meetsRequirements;
+    if (erfuellt != null) {
+      setGeschuetzt(
+        `beurteilung_${nr}_ergebnis`,
+        erfuellt ? "Anforderungen erfuellt" : "Anforderungen nicht erfuellt",
+      );
+    }
+  }
+  for (const nr of [1, 2]) {
+    const r = findeBeurteilung("REFERENZ", nr);
+    if (r) set(`referenz_${nr}_am`, deDateOnb(r.submittedAt));
+  }
+
+  // Beiratsentscheidung: die neueste, die zur Art des Vorgangs passt —
+  // sonst die neueste ueberhaupt.
+  const beirat =
+    cs.boardDecisions.find((b) => b.decisionType === cs.type) ?? cs.boardDecisions[0];
+  if (beirat) {
+    setGeschuetzt(
+      "beirat_entscheidung",
+      BEIRAT_ERGEBNIS_LABELS[beirat.result] ?? String(beirat.result),
+    );
+    set("beirat_entscheidung_am", deDateOnb(beirat.decisionDate));
+    set(
+      "beirat_entscheidung_art",
+      PSI_ART_LABELS[beirat.decisionType] ?? beirat.decisionType,
+    );
+  }
+
+  setGeschuetzt("gemeinde", text(vor, "activeCommunityMembershipDetail"));
+  setGeschuetzt("antrag_erklaerung", text(antrag, "employeeStatement"));
+
+  return { data, sensitiveFields };
+};
+
 const resolvers: Record<string, PlaceholderResolver> = {
   ALLGEMEIN: allgemeinResolver,
   ONBOARDING: onboardingResolver,
   VERTRAGSVERLAENGERUNG: vertragsverlaengerungResolver,
   OFFBOARDING: offboardingResolver,
+  VERBEAMTUNG: verbeamtungResolver,
 };
 
 /** Registriert einen Modul-Resolver (z.B. in E5 fuer BEM). */
