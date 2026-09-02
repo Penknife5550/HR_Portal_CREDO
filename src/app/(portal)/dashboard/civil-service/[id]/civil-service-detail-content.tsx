@@ -418,7 +418,7 @@ export function CivilServiceDetailContent({
                 {data.employeeFirstName} {data.employeeLastName}
               </h1>
               <p className="text-sm text-gray-500">
-                {data.employeeEmail} &middot; {data.organizationName}
+                {data.employeeEmail} &middot; {data.organization.name}
               </p>
             </div>
             {/* Status-Aktionen für Admin/HR */}

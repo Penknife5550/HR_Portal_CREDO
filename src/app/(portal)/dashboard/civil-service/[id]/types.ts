@@ -175,11 +175,15 @@ export interface CivilServiceData {
   // also vor. Sie wird fuer die Vorlagen-Sektion gebraucht, damit nur die
   // Vorlagen dieses Traegers geladen werden.
   organizationId: string;
-  organizationName: string;
-  startDate: string | null;
+  // Die Schnittstelle gibt die rohe Prisma-Zeile mit include organization
+  // zurueck. Hier standen frueher drei Felder, die sie nie geliefert hat:
+  // organizationName (heisst organization.name), startDate (heisst
+  // targetStartDate) und lifetimeDate (gibt es im Datenmodell gar nicht).
+  // TypeScript hat das nicht gemerkt, die Anzeige blieb leer.
+  organization: { name: string };
+  targetStartDate: string | null;
   probationStartDate: string | null;
   probationEndDate: string | null;
-  lifetimeDate: string | null;
   phases: PhaseData[];
   checklistItems: ChecklistItem[];
   assessments: AssessmentData[];
