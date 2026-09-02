@@ -9,6 +9,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { ORG_RESTRICTED_ROLES } from "@/lib/mandanten-gate";
 
 export interface SessionPayload {
   userId: string;
@@ -57,7 +58,11 @@ export const PORTAL_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "
 export const BEM_PORTAL_ROLES = [...PORTAL_ROLES, "BEM_BEAUFTRAGTER"];
 
 /** Rollen die nur ihre zugewiesenen Organisationen sehen */
-export const ORG_RESTRICTED_ROLES = ["EINRICHTUNGSLEITUNG", "VORGESETZTER"];
+// Definiert in mandanten-gate.ts, weil die Middleware sie in der Edge-Runtime
+// braucht und diese Datei Prisma importiert. Hier nur weitergereicht, damit
+// bestehende Importpfade gueltig bleiben — eine zweite Liste waere die Stelle,
+// die beim naechsten Rollenwechsel vergessen wird.
+export { ORG_RESTRICTED_ROLES };
 
 /**
  * Rollen, die der AUFRUFER ueber die Benutzerverwaltung vergeben darf.

@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { apiZugriffVerweigern } from "@/lib/mandanten-gate";
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
@@ -69,15 +70,23 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // =============================================
-  // API-Isolation fuer externe BEM-Beauftragte (E7, Defense-in-Depth)
-  // Die Middleware schuetzt sonst nur Seiten. Externe BEM-Beauftragte duerfen
-  // AUSSCHLIESSLICH BEM-APIs (und Auth) erreichen — sonst koennten sie ueber
-  // ungegatete Nicht-BEM-Endpunkte (z.B. /api/dashboard/stats) Daten lesen.
-  if (
-    pathname.startsWith("/api/") &&
-    !pathname.startsWith("/api/bem") &&
-    !pathname.startsWith("/api/auth")
-  ) {
+  // API-Isolation fuer Rollen mit eingeschraenktem Blick
+  //
+  // Zwei Faelle, eine Stelle — beide, weil die Route-Handler den Zugriff nicht
+  // durchgaengig selbst pruefen:
+  //
+  // 1. Externe BEM-Beauftragte (E7) duerfen AUSSCHLIESSLICH BEM-APIs (und
+  //    Auth) erreichen, sonst laesen sie ueber ungegatete Nicht-BEM-Endpunkte
+  //    (z.B. /api/dashboard/stats) Daten.
+  //
+  // 2. Mandantenbeschraenkte Rollen (EINRICHTUNGSLEITUNG, VORGESETZTER) duerfen
+  //    nur, was in MANDANTEN_API_ALLOWLIST steht. Von 193 Routen filtern nur
+  //    rund 50 nach Mandant; eine Sperrliste waere beim naechsten neuen
+  //    Endpunkt schon wieder unvollstaendig, also gilt hier Allowlist:
+  //    Unbekanntes bekommt 403. Details in src/lib/mandanten-gate.ts.
+  //
+  // Der Token wird fuer beide Faelle nur einmal geprueft.
+  if (pathname.startsWith("/api/")) {
     const sessionCookie = request.cookies.get("credo_session");
     if (sessionCookie?.value) {
       try {
@@ -87,7 +96,14 @@ export async function middleware(request: NextRequest) {
           const { payload } = await jwtVerify(sessionCookie.value, secret, {
             algorithms: ["HS256"],
           });
-          if ((payload.role as string) === "BEM_BEAUFTRAGTER") {
+          const role = payload.role as string;
+
+          const bemGesperrt =
+            role === "BEM_BEAUFTRAGTER" &&
+            !pathname.startsWith("/api/bem") &&
+            !pathname.startsWith("/api/auth");
+
+          if (bemGesperrt || apiZugriffVerweigern(role, pathname)) {
             return NextResponse.json(
               { error: "Keine Berechtigung" },
               { status: 403 },
