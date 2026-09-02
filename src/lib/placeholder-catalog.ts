@@ -186,6 +186,163 @@ export const BEM_PLACEHOLDERS: PlaceholderDef[] = [
 ];
 
 /**
+ * Platzhalter des Offboarding-Moduls (Resolver: offboardingResolver).
+ *
+ * Anschrift, Anrede, Titel, Geburtsort, Position und Wochenstunden gibt es NUR
+ * bei Vorgaengen, die aus einem Vertragsende entstanden sind — bei von Hand
+ * angelegten Offboardings hat das Portal keine Postanschrift der Person. Leere
+ * Werte setzt der Resolver bewusst nicht, dann rendert die Vorlage "___" und
+ * zaehlt das Feld als fehlend.
+ *
+ * BEWUSST NICHT enthalten: Antworten aus dem Exit-Interview und die Freitexte
+ * der Zeugnis-Bewertung. Das Exit-Interview ist eine Vertrauensbefragung; ein
+ * Platzhalter daraus truege sie in ein Schreiben an genau die Person, die sie
+ * im Vertrauen gegeben hat.
+ */
+export const OFFBOARDING_PLACEHOLDERS: PlaceholderDef[] = [
+  // Person
+  { key: "vorname", label: "Vorname", example: "Erika", group: "Person" },
+  { key: "nachname", label: "Nachname", example: "Mustermann", group: "Person" },
+  { key: "name", label: "Voller Name", example: "Erika Mustermann", group: "Person" },
+  { key: "anrede", label: "Anrede", example: "Frau", group: "Person" },
+  { key: "titel", label: "Titel", example: "Dr.", group: "Person" },
+  { key: "geschlecht", label: "Geschlecht (fuer Anrede-Wenn/Dann)", example: "weiblich", group: "Person" },
+  { key: "personalnummer", label: "Personalnummer", example: "100234", group: "Person" },
+  { key: "geburtsdatum", label: "Geburtsdatum", example: "01.01.1980", group: "Person" },
+  { key: "geburtsort", label: "Geburtsort", example: "Minden", group: "Person" },
+  { key: "email", label: "E-Mail (dienstlich)", example: "e.mustermann@fes-minden.de", group: "Person" },
+  { key: "email_privat", label: "E-Mail (privat)", group: "Person" },
+  { key: "telefon", label: "Telefon", group: "Person" },
+
+  // Adresse
+  { key: "strasse", label: "Strasse + Hausnummer", example: "Musterweg 1", group: "Adresse" },
+  { key: "plz", label: "PLZ", example: "32425", group: "Adresse" },
+  { key: "ort", label: "Ort", example: "Minden", group: "Adresse" },
+  { key: "plz_ort", label: "PLZ + Ort", example: "32425 Minden", group: "Adresse" },
+
+  // Vorgang
+  { key: "vorgangsnummer", label: "Vorgangsnummer", example: "OFF-2026-GYM-001", group: "Vorgang" },
+
+  // Austritt
+  { key: "austrittsart", label: "Austrittsart", example: "Aufhebungsvertrag", group: "Austritt" },
+  { key: "austrittsgrund", label: "Austrittsgrund (Freitext)", group: "Austritt" },
+  { key: "kuendigungsdatum", label: "Datum der Kuendigung", example: "31.03.2026", group: "Austritt" },
+  { key: "kuendigungsfrist_ende", label: "Ende der Kuendigungsfrist", example: "30.06.2026", group: "Austritt" },
+  { key: "letzter_arbeitstag", label: "Letzter Arbeitstag", example: "30.06.2026", group: "Austritt" },
+  { key: "vertragsende", label: "Vertragsende (rechtliches Ende des Arbeitsverhaeltnisses)", example: "30.06.2026", group: "Austritt" },
+  { key: "eintrittsdatum", label: "Vertragsbeginn (Beschaeftigung seit)", example: "01.08.2015", group: "Austritt" },
+  { key: "konzerneintritt", label: "Konzerneintritt", example: "01.08.2010", group: "Austritt" },
+
+  // Beschaeftigung
+  { key: "position", label: "Position / Taetigkeit", example: "Lehrkraft", group: "Beschaeftigung" },
+  { key: "beschaeftigungsart", label: "Beschaeftigungsart", example: "ANGESTELLT", group: "Beschaeftigung" },
+  { key: "tarifvertrag", label: "Tarifvertrag", example: "TV-L", group: "Beschaeftigung" },
+  { key: "entgeltgruppe", label: "Entgeltgruppe", example: "E11", group: "Beschaeftigung" },
+  { key: "stufe", label: "Stufe", example: "4", group: "Beschaeftigung" },
+  { key: "wochenstunden", label: "Wochenstunden", example: "25,5", group: "Beschaeftigung" },
+  { key: "wettbewerbsverbot", label: "Nachvertragliches Wettbewerbsverbot (Ja/Nein)", example: "Nein", group: "Beschaeftigung" },
+  { key: "nachfolger", label: "Nachfolger:in (Uebergabe)", group: "Beschaeftigung" },
+
+  // Abrechnung
+  { key: "resturlaub_tage", label: "Resturlaub (Tage)", example: "12,5", group: "Abrechnung" },
+  { key: "urlaubsauszahlung", label: "Urlaubsauszahlung (EUR)", example: "1.234,56", group: "Abrechnung" },
+  { key: "ueberstunden", label: "Ueberstunden", example: "37,5", group: "Abrechnung" },
+  { key: "ueberstundenauszahlung", label: "Ueberstundenauszahlung (EUR)", example: "890,00", group: "Abrechnung" },
+  { key: "abfindung", label: "Abfindung", example: "15.000,00 EUR", group: "Abrechnung", sensitive: true },
+
+  // Zeugnis
+  { key: "zeugnisart", label: "Zeugnisart", example: "Qualifiziertes Arbeitszeugnis", group: "Zeugnis" },
+  { key: "zeugnis_berufsgruppe", label: "Berufsgruppe der Zeugnis-Bewertung", example: "Lehrkraft", group: "Zeugnis" },
+  { key: "zeugnis_note", label: "Gesamtnote des Zeugnisses (1-6)", example: "2", group: "Zeugnis" },
+  { key: "zeugnis_note_text", label: "Gesamtnote in Worten", example: "Gut", group: "Zeugnis" },
+  { key: "zeugnis_gesamtformulierung", label: "Zufriedenheitsformel fuer das Zeugnis", example: "stets zu unserer vollen Zufriedenheit", group: "Zeugnis" },
+  { key: "beurteiler_name", label: "Bewertende Fuehrungskraft", example: "Thomas Schmidt", group: "Zeugnis" },
+
+  // Rueckgaben
+  { key: "rueckgaben_liste", label: "Zurueckgegebene Gegenstaende (eine Zeile je Eintrag)", example: "Laptop Dell Latitude (SN: ABC123), zurueck am 30.06.2026", group: "Rueckgaben" },
+  { key: "rueckgaben_offen_liste", label: "Noch offene Rueckgaben (eine Zeile je Eintrag)", example: "Schluessel Haupteingang", group: "Rueckgaben" },
+  { key: "rueckgaben_offen_anzahl", label: "Anzahl offener Rueckgaben", example: "2", group: "Rueckgaben" },
+];
+
+/**
+ * Platzhalter des Verbeamtungs-Moduls (Resolver: verbeamtungResolver).
+ *
+ * BEWUSST NICHT enthalten: der Gesamtschnitt der Beurteilungen. Der
+ * Schema-Kommentar sagt dazu woertlich "KEIN Gesamturteil" — die Zahl in einem
+ * Schreiben an die Bezirksregierung waere fachlich falsch. Das Gesamturteil ist
+ * das manuell gesetzte Feld nach BRL Nr. 7.5.
+ *
+ * Die br_*- und gf_*-Platzhalter lesen Mandanten-Stammdaten, die heute bei
+ * KEINEM der 16 Mandanten gepflegt sind (Stand 02.09.2026) und in der
+ * Oberflaeche unter "Elternzeit-Konfiguration" liegen, obwohl das Datenmodell
+ * sie fuer die Verbeamtung vorsieht. Sie bleiben also vorerst leer — sichtbar
+ * als "___", nicht als stille Luecke.
+ */
+export const VERBEAMTUNG_PLACEHOLDERS: PlaceholderDef[] = [
+  // Vorgang
+  { key: "vorgangsnummer", label: "Vorgangsnummer", example: "PSI-2026-GYM-001", group: "Vorgang" },
+  { key: "verbeamtungsart", label: "Art der Uebernahme", example: "PSI auf Probe", group: "Vorgang" },
+  { key: "vorgang_status", label: "Status des Vorgangs", example: "Verwaltung", group: "Vorgang" },
+  { key: "antrag_eingereicht_am", label: "Antrag eingereicht am", example: "14.03.2026", group: "Vorgang" },
+
+  // Person
+  { key: "vorname", label: "Vorname", example: "Erika", group: "Person" },
+  { key: "nachname", label: "Nachname", example: "Mustermann", group: "Person" },
+  { key: "name", label: "Voller Name", example: "Erika Mustermann", group: "Person" },
+  { key: "email", label: "E-Mail (dienstlich)", group: "Person" },
+  { key: "personalnummer", label: "Personalnummer", group: "Person" },
+  { key: "geburtsdatum", label: "Geburtsdatum", example: "01.01.1990", group: "Person" },
+  { key: "telefon", label: "Telefon", group: "Person" },
+  { key: "email_privat", label: "E-Mail (privat)", group: "Person" },
+
+  // Dienstverhaeltnis
+  { key: "geplanter_beginn", label: "Geplanter Beginn des Dienstverhaeltnisses", example: "01.08.2026", group: "Dienstverhaeltnis" },
+  { key: "probezeit_beginn", label: "Beginn der Probezeit", example: "01.08.2026", group: "Dienstverhaeltnis" },
+  { key: "probezeit_ende", label: "Ende der Probezeit", example: "31.07.2029", group: "Dienstverhaeltnis" },
+  { key: "abgeschlossen_am", label: "Vorgang abgeschlossen am", group: "Dienstverhaeltnis" },
+  { key: "besoldungsgruppe", label: "Besoldungsgruppe", example: "A13", group: "Dienstverhaeltnis" },
+  { key: "erfahrungsstufe", label: "Erfahrungsstufe", example: "5", group: "Dienstverhaeltnis" },
+
+  // Antrag der Lehrkraft
+  { key: "faecher", label: "Faecherkombination", example: "Deutsch, Mathematik", group: "Antrag der Lehrkraft" },
+  { key: "stellenumfang_prozent", label: "Stellenumfang in Prozent (Angabe der Lehrkraft)", example: "100", group: "Antrag der Lehrkraft" },
+  { key: "gemeinde", label: "Gemeinde und Dienstbereich", example: "FeG Minden, Jugendarbeit", group: "Antrag der Lehrkraft" },
+  { key: "vebs_seminar_am", label: "VEBS-Grundlagenseminar besucht am", example: "12.10.2025", group: "Antrag der Lehrkraft" },
+  { key: "antrag_erklaerung", label: "Erklaerung der Lehrkraft zum Antrag", group: "Antrag der Lehrkraft" },
+
+  // Beteiligte
+  { key: "schulleitung_name", label: "Schulleitung (Name)", group: "Beteiligte" },
+  { key: "schulleitung_email", label: "Schulleitung (E-Mail)", group: "Beteiligte" },
+  { key: "amtsarzt_email", label: "Amtsaerztlicher Dienst (E-Mail)", group: "Beteiligte" },
+  { key: "beirat_email", label: "Beirat (E-Mail)", group: "Beteiligte" },
+
+  // Bezirksregierung
+  { key: "br_kontakt", label: "Bezirksregierung Detmold — Ansprechpartner / Dezernat", example: "Dezernat 41", group: "Bezirksregierung" },
+  { key: "br_email", label: "Bezirksregierung Detmold — E-Mail", group: "Bezirksregierung" },
+  { key: "br_telefon", label: "Bezirksregierung Detmold — Telefon", example: "+49 5231 71-0", group: "Bezirksregierung" },
+  { key: "br_aktenzeichen_prefix", label: "Bezirksregierung Detmold — Aktenzeichen-Prefix", group: "Bezirksregierung" },
+
+  // Unterschrift
+  { key: "gf_name", label: "Geschaeftsfuehrung (Name, Unterschrift)", group: "Unterschrift" },
+  { key: "gf_funktion", label: "Geschaeftsfuehrung (Funktionsbezeichnung)", example: "Geschaeftsfuehrer", group: "Unterschrift" },
+
+  // Beurteilungen
+  { key: "beurteilung_1_am", label: "1. Dienstliche Beurteilung eingereicht am", example: "20.02.2026", group: "Beurteilungen" },
+  { key: "beurteilung_1_ergebnis", label: "1. Dienstliche Beurteilung — Gesamturteil", example: "Anforderungen erfuellt", group: "Beurteilungen" },
+  { key: "beurteilung_2_am", label: "2. Dienstliche Beurteilung eingereicht am", group: "Beurteilungen" },
+  { key: "beurteilung_2_ergebnis", label: "2. Dienstliche Beurteilung — Gesamturteil", group: "Beurteilungen" },
+  { key: "beurteilung_3_am", label: "3. Dienstliche Beurteilung eingereicht am", group: "Beurteilungen" },
+  { key: "beurteilung_3_ergebnis", label: "3. Dienstliche Beurteilung — Gesamturteil", group: "Beurteilungen" },
+  { key: "referenz_1_am", label: "1. Schriftliche Referenz eingereicht am", group: "Beurteilungen" },
+  { key: "referenz_2_am", label: "2. Schriftliche Referenz eingereicht am", group: "Beurteilungen" },
+
+  // Beirat
+  { key: "beirat_entscheidung", label: "Entscheidung des Beirats", example: "Zustimmung", group: "Beirat" },
+  { key: "beirat_entscheidung_am", label: "Entscheidung des Beirats am", example: "05.05.2026", group: "Beirat" },
+  { key: "beirat_entscheidung_art", label: "Entscheidung des Beirats — betrifft", example: "PSI auf Probe", group: "Beirat" },
+];
+
+/**
  * Verfuegbare Platzhalter je Modul. Module ohne eigenen Resolver erhalten die
  * allgemeinen Platzhalter (Fallback ALLGEMEIN-Resolver). Onboarding ergaenzt die
  * vorgangsspezifischen Felder.
@@ -194,8 +351,8 @@ export const PLACEHOLDER_CATALOG: Record<string, PlaceholderDef[]> = {
   ALLGEMEIN: ALLGEMEIN_PLACEHOLDERS,
   ONBOARDING: [...ALLGEMEIN_PLACEHOLDERS, ...ONBOARDING_PLACEHOLDERS],
   VERTRAGSVERLAENGERUNG: [...ALLGEMEIN_PLACEHOLDERS, ...VERTRAGSVERLAENGERUNG_PLACEHOLDERS],
-  OFFBOARDING: ALLGEMEIN_PLACEHOLDERS,
-  VERBEAMTUNG: ALLGEMEIN_PLACEHOLDERS,
+  OFFBOARDING: [...ALLGEMEIN_PLACEHOLDERS, ...OFFBOARDING_PLACEHOLDERS],
+  VERBEAMTUNG: [...ALLGEMEIN_PLACEHOLDERS, ...VERBEAMTUNG_PLACEHOLDERS],
   MUTTERSCHUTZ: ALLGEMEIN_PLACEHOLDERS,
   ELTERNZEIT: ALLGEMEIN_PLACEHOLDERS,
   BEM: [...ALLGEMEIN_PLACEHOLDERS, ...BEM_PLACEHOLDERS],
