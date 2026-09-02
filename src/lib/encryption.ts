@@ -31,13 +31,25 @@ function parseKey(keyHex: string, envName: string): Buffer {
   const cached = _keyCache.get(keyHex);
   if (cached) return cached;
 
-  if (!keyHex || keyHex.length < 64) {
+  // Genau 64 Hex-Zeichen — nicht nur "mindestens 64 Zeichen".
+  //
+  // Buffer.from(wert, "hex") ist nachsichtig: Es hoert beim ersten
+  // Nicht-Hex-Zeichen auf und liefert einen zu kurzen Puffer. Ein Schluessel
+  // mit einem Tippfehler an Stelle 10 kam damit durch die Startpruefung und
+  // scheiterte erst bei der ersten Verschluesselung — also mitten in einem
+  // Vorgang, wenn jemand seine Bankverbindung speichert, statt beim Hochfahren.
+  if (!/^[0-9a-fA-F]{64}$/.test(keyHex ?? "")) {
     throw new Error(
-      `FATAL: ${envName} muss als 64-stelliger Hex-String (32 Bytes) konfiguriert sein. ` +
+      `FATAL: ${envName} muss aus genau 64 Hex-Zeichen bestehen (32 Bytes). ` +
       "Generieren Sie einen mit: openssl rand -hex 32"
     );
   }
   const buf = Buffer.from(keyHex, "hex");
+  if (buf.length !== 32) {
+    throw new Error(
+      `FATAL: ${envName} ergibt ${buf.length} statt 32 Bytes.`
+    );
+  }
   _keyCache.set(keyHex, buf);
   return buf;
 }
@@ -76,39 +88,96 @@ export function encrypt(plaintext: string, keyHex?: string): string {
 }
 
 /**
- * Entschluesselt einen verschluesselten String (Format: "iv:authTag:ciphertext").
- * Gibt den Klartext zurück.
+ * Fehler beim Entschluesseln eines Werts, der unser Format hat.
+ *
+ * Eigene Klasse, damit ein Aufrufer, der es wirklich abfangen will, ihn von
+ * einem beliebigen anderen Fehler unterscheiden kann.
+ */
+export class EntschluesselungFehlgeschlagen extends Error {
+  constructor(ursache?: unknown) {
+    super(
+      "Ein verschluesselter Wert liess sich nicht entschluesseln. " +
+        "Das deutet auf einen falschen oder gewechselten Schluessel hin " +
+        "(ENCRYPTION_KEY bzw. BEM_ENCRYPTION_KEY) oder auf beschaedigte Daten. " +
+        "Ursache: " +
+        (ursache instanceof Error ? ursache.message : String(ursache)),
+    );
+    this.name = "EntschluesselungFehlgeschlagen";
+  }
+}
+
+/**
+ * Traegt dieser Wert unseren Umschlag "iv:authTag:ciphertext"?
+ *
+ * Das ist die Trennlinie zwischen den beiden Faellen, die frueher vermengt
+ * waren: unverschluesselte Altdaten einerseits, ein kaputter Schluessel
+ * andererseits. Geprueft werden genau drei Teile und die festen Laengen von IV
+ * und Auth-Tag — ein Klartextwert trifft das praktisch nie, die betroffenen
+ * Felder (IBAN, Sozialversicherungsnummer, Steuer-ID) enthalten ohnehin keine
+ * Doppelpunkte.
+ */
+function istUmschlag(text: string): boolean {
+  const teile = text.split(":");
+  if (teile.length !== 3) return false;
+  if (teile[2].length === 0) return false;
+  try {
+    return (
+      Buffer.from(teile[0], "base64").length === IV_LENGTH &&
+      Buffer.from(teile[1], "base64").length === AUTH_TAG_LENGTH
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Entschluesselt einen Wert im Format "iv:authTag:ciphertext".
+ *
+ * Werte ohne diesen Umschlag gelten als unverschluesselte Altdaten und werden
+ * unveraendert zurueckgegeben — dieses Verhalten bleibt.
+ *
+ * **Was sich geaendert hat:** Scheitert die Entschluesselung eines Werts, der
+ * den Umschlag TRAEGT, wirft die Funktion. Frueher gab sie in diesem Fall
+ * still das Chiffrat zurueck, als waere es Klartext. Das ist die
+ * gefaehrlichste Antwort, die hier moeglich ist:
+ *
+ * - Der GCM-Auth-Tag ist die Echtheitspruefung. Sein Fehlschlag bedeutet
+ *   falscher Schluessel oder veraenderte Daten — nie "das war schon immer
+ *   Klartext".
+ * - Die Zeichenkette `iv:authTag:ciphertext` waere in PDF-Export, E-Mail und
+ *   Akte gelandet, sichtbar als Buchstabensalat im Feld "IBAN".
+ * - Schlimmer: Speichert jemand das Formular danach, wird der Buchstabensalat
+ *   erneut verschluesselt. Der urspruengliche Wert ist dann endgueltig weg,
+ *   auch wenn der richtige Schluessel spaeter wieder auftaucht.
+ *
+ * Ein falscher Schluessel betrifft immer alle Datensaetze auf einmal, nie
+ * einen einzelnen. Laut zu scheitern macht daraus einen Betriebsfehler, den
+ * jemand bemerkt und behebt, statt eines stillen Datenverlusts.
  */
 export function decrypt(encryptedText: string, keyHex?: string): string {
   if (!encryptedText) return encryptedText;
 
-  // Unverschluesselte Altdaten erkennen (kein Base64-Format)
-  if (!encryptedText.includes(":")) {
-    return encryptedText; // Legacy-Klartext zurueckgeben
-  }
+  // Unverschluesselte Altdaten: unveraendert durchreichen.
+  if (!istUmschlag(encryptedText)) return encryptedText;
 
-  const parts = encryptedText.split(":");
-  if (parts.length !== 3) {
-    // Koennte ein unverschluesselter Wert sein (z.B. IBAN)
-    return encryptedText;
-  }
-
+  const [ivB64, tagB64, dataB64] = encryptedText.split(":");
   try {
-    const iv = Buffer.from(parts[0], "base64");
-    const authTag = Buffer.from(parts[1], "base64");
-    const encrypted = Buffer.from(parts[2], "base64");
-
-    if (iv.length !== IV_LENGTH || authTag.length !== AUTH_TAG_LENGTH) {
-      return encryptedText; // Kein gueltiges verschluesseltes Format
-    }
-
-    const decipher = crypto.createDecipheriv(ALGORITHM, resolveKey(keyHex), iv);
-    decipher.setAuthTag(authTag);
-    return decipher.update(encrypted).toString("utf8") + decipher.final("utf8");
-  } catch {
-    // Wenn Entschluesselung fehlschlaegt, Legacy-Klartext zurueckgeben
-    console.warn("Entschluesselung fehlgeschlagen — moeglicherweise Altdaten im Klartext");
-    return encryptedText;
+    const decipher = crypto.createDecipheriv(
+      ALGORITHM,
+      resolveKey(keyHex),
+      Buffer.from(ivB64, "base64"),
+    );
+    decipher.setAuthTag(Buffer.from(tagB64, "base64"));
+    return (
+      decipher.update(Buffer.from(dataB64, "base64")).toString("utf8") +
+      decipher.final("utf8")
+    );
+  } catch (fehler) {
+    // Bewusst ohne den Wert selbst im Log — er ist personenbezogen.
+    console.error(
+      "[encryption] Entschluesselung fehlgeschlagen. Schluessel pruefen (ENCRYPTION_KEY / BEM_ENCRYPTION_KEY).",
+    );
+    throw new EntschluesselungFehlgeschlagen(fehler);
   }
 }
 

@@ -470,12 +470,6 @@ export function TabOverview({
                 <span className="font-medium text-gray-800">{formatDate(data.probationEndDate)}</span>
               </div>
             )}
-            {data.lifetimeDate && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">Übernahme Lebenszeit</span>
-                <span className="font-medium text-gray-800">{formatDate(data.lifetimeDate)}</span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -553,7 +547,7 @@ export function TabOverview({
             </div>
             <div>
               <span className="text-gray-400">Schule</span>
-              <p className="font-medium text-gray-800">{data.organizationName}</p>
+              <p className="font-medium text-gray-800">{data.organization.name}</p>
             </div>
             <div>
               <span className="text-gray-400">Antrag-ID</span>
@@ -561,7 +555,7 @@ export function TabOverview({
             </div>
             <div>
               <span className="text-gray-400">Startdatum</span>
-              <p className="font-medium text-gray-800">{formatDate(data.startDate)}</p>
+              <p className="font-medium text-gray-800">{formatDate(data.targetStartDate)}</p>
             </div>
             <div>
               <span className="text-gray-400">Status</span>

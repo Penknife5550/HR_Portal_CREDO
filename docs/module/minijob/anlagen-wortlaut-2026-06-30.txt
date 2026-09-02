@@ -1,0 +1,189 @@
+Amtlicher Wortlaut der Anlagen zur Checkliste der Minijob-Zentrale.
+Fassung: Stand 30. Juni 2026. Unveraenderte Textextraktion aus
+checkliste-minijobzentrale-2026-06-30.pdf, Seiten 7 bis 9.
+
+Diese Datei ist die Pruefgrundlage fuer src/__tests__/lib/rv-antrag-wortlaut.test.ts.
+Nicht von Hand bearbeiten - bei einer neuen amtlichen Fassung neu erzeugen.
+
+
+########## SEITE 7 - Merkblatt ##########
+Anlage 
+Merkblatt über die möglichen Folgen einer Befreiung von der Rentenversicherungspflicht 
+Allgemeines 
+Arbeitnehmer/-innen, die eine geringfügig entlohnte Beschäftigung ausüben, unterliegen grundsätzlich der Versiche-
+rungs- und vollen Beitragspflicht in der gesetzlichen Rentenversicherung. Der von der Arbeitnehmerin/dem Arbeitnehmer 
+zu tragende Anteil am Rentenversicherungsbeitrag beläuft sich auf 3,6 Prozent (bzw. 13,6 Prozent bei geringfügig ent-
+lohnten Beschäftigungen in Privathaushalten) des Arbeitsentgelts. Er ergibt sich aus der Differenz zwischen dem Pau-
+schalbeitrag der Arbeitgeberin/des Arbeitgebers (15 Prozent bei geringfügig entlohnten Beschäftigungen im gewerbli-
+chen Bereich bzw. 5 Prozent bei solchen in Privathaushalten) und dem vollen Beitrag zur Rentenversicherung in Höhe 
+von 18,6 Prozent. Zu beachten ist, dass der volle Rentenversicherungsbeitrag mindestens von einem Arbeitsentgelt in 
+Höhe von 175 Euro zu zahlen ist. 
+Vorteile der vollen Beitragszahlung zur Rentenversicherung 
+Die Vorteile der Versicherungspflicht für den/die Arbeitnehmer/-in ergeben sich aus dem Erwerb von Pflichtbeitragszeiten 
+in der Rentenversicherung. Das bedeutet, dass die Beschäftigungszeit in vollem Umfang für die Erfüllung der verschie-
+denen Wartezeiten (Mindestversicherungszeiten) berücksichtigt wird. Pflichtbeitragszeiten sind beispielsweise Voraus-
+setzung für 
+
+einen früheren Rentenbeginn,
+
+Ansprüche auf Leistungen zur Rehabilitation (sowohl im medizinischen Bereich als auch im Arbeitsleben),
+
+den Anspruch auf Übergangsgeld bei Rehabilitationsmaßnahmen der gesetzlichen Rentenversicherung,
+
+die Begründung oder Aufrechterhaltung des Anspruchs auf eine Rente wegen Erwerbsminderung,
+
+den Rechtsanspruch auf Entgeltumwandlung für eine betriebliche Altersversorgung und
+
+die Erfüllung der Zugangsvoraussetzungen für eine private Altersvorsorge mit staatlicher Förderung (zum Bei-
+spiel die so genannte Riester-Rente) für den/die Arbeitnehmer/-in und gegebenenfalls sogar den/die Ehepart-
+ner/-in.
+Darüber hinaus wird das Arbeitsentgelt nicht nur anteilig, sondern in voller Höhe bei der Berechnung der Rente berück-
+sichtigt.  
+Antrag auf Befreiung von der Rentenversicherungspflicht 
+Ist die Versicherungspflicht nicht gewollt, kann sich der/die Arbeitnehmer/-in von ihr befreien lassen. Hierzu ist der Arbeit-
+geberin/dem Arbeitgeber - möglichst mit dem beiliegenden Formular - schriftlich mitzuteilen, dass die Befreiung von der 
+Versicherungspflicht in der Rentenversicherung gewünscht ist. Übt der/die Arbeitnehmer/-in mehrere geringfügig ent-
+lohnte Beschäftigungen aus, kann der Antrag auf Befreiung nur einheitlich für alle zeitgleich ausgeübten geringfügigen 
+Beschäftigungen gestellt werden. Über den Befreiungsantrag hat der/die Arbeitnehmer/-in alle weiteren - auch 
+zukünftige- Arbeitgeber zu informieren, bei denen er eine geringfügig entlohnte Beschäftigung ausübt. Die Befreiung von 
+der Versicherungspflicht ist grundsätzlich für die Dauer dieser Beschäftigung(en) bindend; sie kann jedoch einmalig für 
+die Zukunft aufgehoben werden. Das erfolgt mit dem "Antrag auf Aufhebung der Befreiung von der 
+Rentenversicherungspflicht bei einer geringfügig entlohnten Beschäftigung nach § 6 Abs.6 SGB VI" gegenüber dem 
+Arbeitgeber. Für die Vergangenheit ist kein Widerruf möglich.
+Die Befreiung wirkt grundsätzlich ab Beginn des Kalendermonats des Eingangs bei der Arbeitgeberin/dem Arbeit-geber, 
+frühestens ab Beschäftigungsbeginn. Voraussetzung ist, dass der/die Arbeitgeber/-in der Minijob-Zentrale die Befreiung 
+bis zur nächsten Entgeltabrechnung, spätestens innerhalb von 6 Wochen nach Eingang des Befreiungsantrages bei ihm 
+meldet. Anderenfalls beginnt die Befreiung erst nach Ablauf des Kalendermonats, der dem Kalendermonat des 
+Eingangs der Meldung bei der Minijob-Zentrale folgt
+Konsequenzen aus der Befreiung von der Rentenversicherungspflicht 
+Geringfügig entlohnte Beschäftigte, die die Befreiung von der Rentenversicherungspflicht beantragen, verzichten freiwil-
+lig auf die oben genannten Vorteile. Durch die Befreiung zahlt lediglich der/die Arbeitgeber/-in den Pauschalbeitrag in 
+Höhe von 15 Prozent (bzw. 5 Prozent bei Beschäftigungen in Privathaushalten) des Arbeitsentgelts. Die Zahlung eines 
+Eigenanteils durch den/die Arbeitnehmer/-in entfällt hierbei. Dies hat zur Folge, dass der/die Arbeitnehmer/-in nur 
+anteilig Monate für die Erfüllung der verschiedenen Wartezeiten erwirbt und auch das erzielte Arbeitsentgelt bei der 
+Berechnung der Rente nur anteilig berücksichtigt wird. 
+Hinweis: Bevor sich ein/-e Arbeitnehmer/-in für die Befreiung von der Rentenversicherungspflicht entscheidet, wird eine 
+individuelle Beratung bezüglich der rentenrechtlichen Auswirkungen der Befreiung bei einer Auskunfts- und Beratungs-
+stelle der Deutschen Rentenversicherung empfohlen. Das Servicetelefon der Deutschen Rentenversicherung ist kosten-
+los unter der 0800 10004800 zu erreichen. Bitte nach Möglichkeit beim Anruf die Versicherungsnummer der Rentenver-
+sicherung bereithalten. 
+
+
+########## SEITE 8 - Befreiungsantrag ##########
+Stand: 30. Juni 2026 
+Anlage 
+Antrag auf Befreiung von der Rentenversicherungspflicht bei einer geringfügig entlohnten 
+Beschäftigung nach § 6 Abs. 1b Sozialgesetzbuch Sechstes Buch (SGB VI) 
+Arbeitnehmer/-in: 
+Name: 
+__________________________________________________________________ 
+Vorname:    
+__________________________________________________________________ 
+Rentenversicherungsnummer: 
+Hiermit beantrage ich die Befreiung von der Versicherungspflicht in der Rentenversicherung im 
+Rahmen meiner geringfügig entlohnten Beschäftigung und verzichte damit auf den Erwerb von 
+Pflichtbeitragszeiten. Ich habe die Hinweise auf dem „Merkblatt über die möglichen Folgen einer 
+Befreiung von der Rentenversicherungspflicht“ zur Kenntnis genommen. 
+Mir ist bekannt, dass der Befreiungsantrag für alle von mir zeitgleich ausgeübten geringfügig ent-
+lohnten Beschäftigungen gilt und grundsätzlich für die Dauer der Beschäftigungen bindend ist. Ich 
+verpflichte mich, alle weiteren Arbeitgeber/-innen, bei denen ich eine geringfü-gig entlohnte 
+Beschäftigung ausübe, über diesen Befreiungsantrag zu informieren. 
+____________________________________________________ 
+_________________________________________________________________________________________________________ 
+(Ort, Datum) 
+ (Unterschrift der Arbeitnehmerin/des Arbeitnehmers bzw. bei Minderjährigen Unter-
+schrift der gesetzlichen Vertreterin/des gesetzlichen Vertreters) 
+Arbeitgeber/-in: 
+Name:    
+___________________________________________________________ 
+Betriebsnummer: 
+Der Befreiungsantrag ist am 
+bei mir eingegangen. 
+T 
+T 
+M 
+M 
+J 
+J 
+J 
+J 
+Die Befreiung wirkt ab 
+. 
+T 
+T 
+M 
+M 
+J 
+J 
+J 
+J 
+____________________________________________________ 
+_____________________________________________________ 
+(Ort, Datum) 
+(Unterschrift der Arbeitgeberin/des Arbeitgebers)
+Hinweis für den Arbeitgeber: 
+Der Befreiungsantrag ist nach § 8 Abs. 2 Nr. 4a Beitragsverfahrensverordnung (BVV) zu den 
+Entgeltunterlagen zu nehmen und nicht an die Minijob-Zentrale zu senden. 
+
+
+########## SEITE 9 - Aufhebungsantrag ##########
+Stand: 30. Juni 2026 
+Anlage 
+Antrag auf Aufhebung der Befreiung von der Rentenversicherungspflicht bei einer geringfü-
+gig entlohnten Beschäftigung nach § 6 Abs. 6 Sozialgesetzbuch Sechstes Buch (SGB VI) 
+Arbeitnehmer/-in: 
+Name: 
+__________________________________________________________________ 
+Vorname:    
+__________________________________________________________________ 
+Rentenversicherungsnummer: 
+Hiermit beantrage ich die Aufhebung der Befreiung von der Versicherungspflicht in der Rentenver-
+sicherung im Rahmen meiner geringfügig entlohnten Beschäftigung. Der Antrag auf Aufhebung der 
+Befreiung ist für die Dauer der Beschäftigungen bindend. 
+Die Befreiung gilt als aufgehoben, wenn die nach § 28i Satz 5 SGB IV zuständige Einzugsstelle 
+nicht innerhalb eines Monats nach Eingang der Meldung des Arbeitgebers nach § 28a SGB IV 
+dem Antrag auf Aufhebung des/r Beschäftigten widerspricht. 
+Mir ist bekannt, dass die einmalige Aufhebung der Befreiung von der Rentenversicherungspflicht 
+erst ab Beginn des Kalendermonats, der auf den Monat meiner Antragstellung folgt wirkt und für 
+alle von mir zeitgleich ausgeübten geringfügig entlohnten Beschäftigungen gilt und für die Dauer 
+der Beschäftigungen bindend ist; eine Rücknahme ist nicht möglich. Ich verpflichte mich, alle wei-
+teren Arbeitgeber/-innen, bei denen ich eine geringfügig entlohnte Beschäftigung ausübe, über 
+diese Aufhebung der Befreiung von der Rentenversicherungspflicht zu informieren.
+____________________________________________________ 
+_________________________________________________________________________________________________________ 
+(Ort, Datum) 
+ (Unterschrift der Arbeitnehmerin/des Arbeitnehmers bzw. bei Minderjährigen Unter-
+schrift der gesetzlichen Vertreterin/des gesetzlichen Vertreters) 
+Arbeitgeber/-in: 
+Name:    
+___________________________________________________________ 
+Betriebsnummer: 
+Der Aufhebungsantrag ist am 
+bei mir eingegangen. 
+T 
+T 
+M 
+M 
+J 
+J 
+J 
+J 
+Die Aufhebung der Befreiung wirkt ab 
+0 
+1 
+. 
+T 
+T 
+M 
+M 
+J 
+J 
+J 
+J 
+____________________________________________________ 
+_____________________________________________________ 
+(Ort, Datum) 
+(Unterschrift der Arbeitgeberin/des Arbeitgebers) 
+Hinweis für den Arbeitgeber: 
+Der Aufhebungsantrag ist nach § 8 Abs. 2 Nr. 4a Beitragsverfahrensverordnung (BVV) zu den 
+Entgeltunterlagen zu nehmen und nicht an die Minijob-Zentrale zu senden. 

@@ -21,6 +21,7 @@ import type { User, CivilServiceData, PhaseData, TabId } from "./types";
 import { TABS, MAIN_PHASES, SUB_PHASES_II, PHASE_ORDER } from "./types";
 import { getPhaseStatus, getMainPhaseStatus } from "./helpers";
 import { ArrowLeftIcon } from "./icons";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
 import {
   TabOverview,
   TabChecklist,
@@ -266,7 +267,10 @@ export function CivilServiceDetailContent({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("type", docType);
+      // Der Feldname muss "documentType" heissen — so liest ihn die Route und so
+      // heisst die Spalte. Unter "type" kam der Wert nie an und fiel auf
+      // SONSTIGES zurueck.
+      formData.append("documentType", docType);
       const res = await fetch(`/api/civil-service/${processId}/documents`, {
         method: "POST",
         body: formData,
@@ -414,7 +418,7 @@ export function CivilServiceDetailContent({
                 {data.employeeFirstName} {data.employeeLastName}
               </h1>
               <p className="text-sm text-gray-500">
-                {data.employeeEmail} &middot; {data.organizationName}
+                {data.employeeEmail} &middot; {data.organization.name}
               </p>
             </div>
             {/* Status-Aktionen für Admin/HR */}
@@ -538,6 +542,8 @@ export function CivilServiceDetailContent({
             onUpload={handleDocUpload}
             processId={processId}
             assessments={data.assessments}
+            organizationId={data.organizationId}
+            canEdit={HR_EDIT_ROLES.includes(user.role)}
           />
         )}
 

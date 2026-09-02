@@ -8,14 +8,18 @@
  */
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { STATUS_LABELS, getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
+import { RvFristenCard } from "./rv-fristen-card";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { documentTypeLabel } from "@/lib/required-documents";
+import { statusLabel } from "@/lib/minijob-status";
+import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 
 // =============================================
 // Types
@@ -61,6 +65,8 @@ interface NoteData {
 
 interface DetailData {
   id: string;
+  /** Serverseitig gegen die Vorlage dieses Vorgangs berechnet. */
+  fragebogenFortschritt: FragebogenFortschritt;
   displayId: string | null;
   email: string;
   firstName: string | null;
@@ -74,12 +80,28 @@ interface DetailData {
   submittedAt: string | null;
   starterPacketSentAt: string | null;
   starterPacketSentCount: number;
-  organization: { id: string; name: string; mandantNumber: string };
+  organization: {
+    id: string;
+    name: string;
+    mandantNumber: string;
+    betriebsnummer?: string | null;
+  };
   personalData: {
     firstName: string | null;
     lastName: string | null;
     isComplete: boolean;
     currentStep: number;
+    /** Entscheidung aus Schritt 11 — steuert, welcher Antrag erzeugt wird. */
+    rvEntscheidung?: string | null;
+    // Schritt 6 seit AP 5/6 — Status und Grundfragen zu weiteren Beschaeftigungen.
+    beschaeftigungsStatus?: string | null;
+    beschaeftigungsStatusSonstige?: string | null;
+    alsArbeitsuchendGemeldet?: boolean | null;
+    agenturFuerArbeit?: string | null;
+    mitLeistungsbezug?: boolean | null;
+    summeUeberGeringfuegigkeitsgrenze?: boolean | null;
+    vorbeschaeftigungenVorhanden?: boolean | null;
+    auslandsbeschaeftigungVorhanden?: boolean | null;
     // Persönliche Angaben
     salutation: string | null;
     title: string | null;
@@ -132,6 +154,14 @@ interface DetailData {
     // DSGVO
     dsgvoAccepted: boolean | null;
     dsgvoAcceptedAt: string | null;
+    // Wahrheitsversicherung (Unterschriftsersatz)
+    erklaerungAccepted: boolean | null;
+    erklaerungAcceptedAt: string | null;
+    erklaerungOrt: string | null;
+    erklaerungIp: string | null;
+    erklaerungUserAgent: string | null;
+    erklaerungVersion: string | null;
+    erklaerungPruefsumme: string | null;
     // Kinder
     children: {
       id: string;
@@ -733,7 +763,7 @@ export function DetailContent({
                         ? "bg-green-100 text-green-800"
                         : "bg-amber-100 text-amber-800"
                     }`}>
-                      {data.personalData.isComplete ? "Komplett" : `${data.personalData.currentStep}/10`}
+                      {data.personalData.isComplete ? "Komplett" : `${data.fragebogenFortschritt.position}/${data.fragebogenFortschritt.total}`}
                     </span>
                   )}
                   {tab.id === "documents" && data.documents.length > 0 && (
@@ -882,7 +912,7 @@ function TabOverview({
       status: fragebogenDone ? "completed" : !data.token ? "upcoming" : "active",
       completedAt: fragebogenDone && data.submittedAt ? formatDate(data.submittedAt) : undefined,
       info: !fragebogenDone && fragebogenStarted
-        ? `Fragebogen in Bearbeitung (Schritt ${data.personalData?.currentStep || 1} von 9)`
+        ? `Fragebogen in Bearbeitung — ${formatProgress(data.fragebogenFortschritt)}`
         : !fragebogenDone && data.token
         ? "Wartet auf Einreichung durch den Mitarbeiter"
         : undefined,
@@ -994,7 +1024,7 @@ function TabOverview({
                 data.personalData?.isComplete
                   ? "Vollständig"
                   : data.personalData
-                    ? `Schritt ${data.personalData.currentStep} von 9`
+                    ? formatProgress(data.fragebogenFortschritt)
                     : "Nicht begonnen"
               }
             />
@@ -1092,7 +1122,7 @@ function TabOverview({
                   data.personalData?.isComplete
                     ? "Fertig"
                     : data.personalData
-                      ? `${data.personalData.currentStep}/10`
+                      ? `${data.fragebogenFortschritt.position}/${data.fragebogenFortschritt.total}`
                       : "Offen"
                 }
                 done={data.personalData?.isComplete ?? false}
@@ -1286,12 +1316,87 @@ function TabFragebogenDaten({
           onSaved={onSaved}
         />
       )}
+      {/* =============================================
+          Erklaerung des Arbeitnehmers (Unterschriftsersatz)
+          =============================================
+          Steht bewusst weit oben: In einer Betriebspruefung ist das der
+          Nachweis, dass der Beschaeftigte die Angaben bestaetigt hat. */}
+      {pd.isComplete && (
+        <div
+          className={`rounded-lg border p-4 ${
+            pd.erklaerungAccepted
+              ? "border-green-200 bg-green-50"
+              : "border-amber-200 bg-amber-50"
+          }`}
+        >
+          <p className="text-sm font-semibold text-foreground">
+            Erklärung des Arbeitnehmers
+          </p>
+          {pd.erklaerungAccepted ? (
+            <>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Bestätigt am{" "}
+                {pd.erklaerungAcceptedAt
+                  ? formatDateTime(pd.erklaerungAcceptedAt)
+                  : "—"}
+                {pd.erklaerungOrt ? ` in ${pd.erklaerungOrt}` : ""} — ersetzt die
+                handschriftliche Unterschrift.
+              </p>
+              <dl className="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Fassung des Wortlauts</dt>
+                  <dd className="font-medium text-foreground">
+                    {pd.erklaerungVersion ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">IP-Adresse</dt>
+                  <dd className="font-medium text-foreground">
+                    {pd.erklaerungIp ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3 sm:col-span-2">
+                  <dt className="text-muted-foreground">Prüfsumme (SHA-256)</dt>
+                  <dd
+                    className="break-all font-mono text-[11px] font-medium text-foreground"
+                    title={pd.erklaerungPruefsumme ?? undefined}
+                  >
+                    {pd.erklaerungPruefsumme ?? "—"}
+                  </dd>
+                </div>
+                {pd.erklaerungUserAgent && (
+                  <div className="flex justify-between gap-3 sm:col-span-2">
+                    <dt className="shrink-0 text-muted-foreground">Browserkennung</dt>
+                    <dd className="break-all text-right text-[11px] text-muted-foreground">
+                      {pd.erklaerungUserAgent}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Die Prüfsumme bezieht sich auf die Angaben zum Zeitpunkt des
+                Absendens. Wurden Felder danach über die Personalabteilung
+                geändert, stimmt sie mit dem heutigen Stand nicht mehr überein —
+                das ist gewollt und im Änderungsprotokoll nachvollziehbar.
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Für diesen Vorgang liegt keine gespeicherte Erklärung vor. Der
+              Fragebogen wurde eingereicht, bevor das Portal Zeitpunkt, Ort und
+              Prüfsumme festgehalten hat. Ein Nachweis wird nicht rückwirkend
+              erzeugt.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Fortschrittsanzeige */}
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">
-              Fragebogen-Status: {pd.isComplete ? "Vollständig ausgefüllt" : `Schritt ${pd.currentStep} von 9`}
+              Fragebogen-Status: {pd.isComplete ? "Vollständig ausgefüllt" : `in Bearbeitung — ${formatProgress(data.fragebogenFortschritt)}`}
             </p>
             {pd.dsgvoAccepted && pd.dsgvoAcceptedAt && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1321,7 +1426,7 @@ function TabFragebogenDaten({
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-credo-gruen transition-all"
-            style={{ width: `${pd.isComplete ? 100 : (pd.currentStep / 10) * 100}%` }}
+            style={{ width: `${pd.isComplete ? 100 : data.fragebogenFortschritt.prozent}%` }}
           />
         </div>
       </div>
@@ -1392,17 +1497,29 @@ function TabFragebogenDaten({
       {/* Schritt 6: Beschäftigung */}
       <SectionCard title="6. Weitere Beschäftigung" icon="&#128188;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-          <FieldRow label="Arbeitgebertyp" value={pd.employerType || "\u2014"} />
-          <FieldRow label="Weitere Beschäftigung" value={formatBoolean(pd.hasOtherEmployment)} />
-          {pd.hasOtherEmployment && (
+          <FieldRow label="Status" value={pd.beschaeftigungsStatus ? statusLabel(pd.beschaeftigungsStatus) : "\u2014"} />
+          {pd.beschaeftigungsStatusSonstige && (
+            <FieldRow label="Und zwar" value={pd.beschaeftigungsStatusSonstige} />
+          )}
+          <FieldRow label="Bei der Agentur für Arbeit gemeldet" value={formatBoolean(pd.alsArbeitsuchendGemeldet ?? null)} />
+          {pd.alsArbeitsuchendGemeldet && (
             <>
-              <FieldRow label="Anderer Arbeitgeber" value={pd.otherEmployerName || "\u2014"} />
-              <FieldRow label="Wochenstunden (anderer AG)" value={formatNumber(pd.otherWeeklyHours, "Std.")} />
+              <FieldRow label="Agentur" value={pd.agenturFuerArbeit || "\u2014"} />
+              <FieldRow label="Mit Leistungsbezug" value={formatBoolean(pd.mitLeistungsbezug ?? null)} />
             </>
           )}
-          <FieldRow label="Minijob" value={formatBoolean(pd.hasMinijob)} />
-          {pd.hasMinijob && (
-            <FieldRow label="RV-Befreiung Minijob" value={formatBoolean(pd.minijobRvBefreiung)} />
+          <FieldRow label="Weitere Beschäftigungen" value={formatBoolean(pd.hasOtherEmployment)} />
+          <FieldRow label="Arbeitgebertyp" value={pd.employerType || "\u2014"} />
+          <FieldRow label="Summe über der Geringfügigkeitsgrenze" value={formatBoolean(pd.summeUeberGeringfuegigkeitsgrenze ?? null)} />
+          <FieldRow label="Vorbeschäftigungen in diesem Jahr" value={formatBoolean(pd.vorbeschaeftigungenVorhanden ?? null)} />
+          <FieldRow label="Tätigkeit im Ausland" value={formatBoolean(pd.auslandsbeschaeftigungVorhanden ?? null)} />
+          {/* Altfelder: seit AP 6 nicht mehr erhoben, erscheinen nur noch
+              bei alten Vorgängen. */}
+          {pd.otherEmployerName && (
+            <FieldRow label="Anderer Arbeitgeber (frühere Erfassung)" value={pd.otherEmployerName} />
+          )}
+          {pd.otherWeeklyHours != null && (
+            <FieldRow label="Wochenstunden (frühere Erfassung)" value={formatNumber(pd.otherWeeklyHours, "Std.")} />
           )}
         </div>
       </SectionCard>
@@ -1454,6 +1571,16 @@ function TabFragebogenDaten({
           <FieldRow label="Masernschutz nachgewiesen" value={formatBoolean(pd.masernschutzProvided)} />
         </div>
       </SectionCard>
+
+      {/* Rentenversicherung: Entscheidung des Beschäftigten plus der
+          Arbeitgeberteil des Antrags (Eingang, Wirkung, Fristen). Bewusst
+          ohne Ziffer — die Nummern oben stammen aus der alten festen
+          Schrittfolge, in der es diesen Schritt noch nicht gab. */}
+      <RvFristenCard
+        onboardingId={onboardingId}
+        canEdit={canEdit}
+        istMinijob={data.questionnaireType === "MINIJOB"}
+      />
 
       {/* Schritt 10: DSGVO */}
       <SectionCard title="10. Datenschutz &amp; Einwilligung" icon="&#128274;">
@@ -1615,29 +1742,89 @@ function OnboardingErstellenSection({
   onboardingId,
   organizationId,
   canEdit,
+  rvEntscheidung,
+  betriebsnummerFehlt,
+  istMinijob,
 }: {
   onboardingId: string;
   organizationId: string;
   canEdit: boolean;
+  rvEntscheidung?: string | null;
+  betriebsnummerFehlt: boolean;
+  /** Nur dort ist das RV-Merkblatt einschlaegig. */
+  istMinijob: boolean;
 }) {
-  // Nutzt die generische Hub-Komponente; Onboarding-Spezifika (Modul + amtliches
-  // Masernschutz-PDF) bleiben hier gekapselt.
+  // Nutzt die generische Hub-Komponente; Onboarding-Spezifika (Modul, amtliche
+  // Formulare der Minijob-Checkliste) bleiben hier gekapselt.
+  const statisch = [
+    {
+      name: "Masernschutz – Nachweis-Bescheinigung",
+      tag: "Amtliches NRW-Formular (zum Ausfüllen beim Arzt)",
+      href: "/system-dokumente/masernschutz-nrw.pdf",
+      label: "PDF öffnen",
+    },
+  ];
+
+  // Das Merkblatt gehoert zum Minijob-Verfahren. In einem TV-L- oder
+  // Beamten-Vorgang steht es nur im Weg.
+  if (istMinijob || rvEntscheidung) {
+    statisch.push({
+      name: "Merkblatt zur Befreiung von der Rentenversicherungspflicht",
+      tag: "Amtliche Anlage der Minijob-Zentrale, Stand 30.06.2026",
+      href: "/system-dokumente/merkblatt-rv-befreiung.pdf",
+      label: "PDF öffnen",
+    });
+  }
+
+  // Der Antrag entsteht nur, wenn der Beschaeftigte sich dafuer entschieden hat
+  // — und nur, wenn die Betriebsnummer des Mandanten hinterlegt ist. Fehlt sie,
+  // erscheint statt eines Knopfes der Grund: Ein deaktivierter Knopf ohne
+  // Begruendung ist hier schlimmer als gar keiner.
+  const antragsArt =
+    rvEntscheidung === "BEFREIUNG_BEANTRAGT"
+      ? "BEFREIUNG"
+      : rvEntscheidung === "AUFHEBUNG_BEANTRAGT"
+        ? "AUFHEBUNG"
+        : null;
+
+  if (antragsArt && !betriebsnummerFehlt) {
+    statisch.push({
+      name:
+        antragsArt === "BEFREIUNG"
+          ? "Antrag auf Befreiung von der Rentenversicherungspflicht"
+          : "Antrag auf Aufhebung der Befreiung von der Rentenversicherungspflicht",
+      tag: "Vorausgefüllt · gehört nach § 8 Abs. 2 Nr. 4a BVV in die Entgeltunterlagen",
+      href: `/api/onboarding/${onboardingId}/rv-antrag?art=${antragsArt}`,
+      label: "PDF erzeugen",
+    });
+  }
+
   return (
-    <TemplateGenerationSection
-      modul="ONBOARDING"
-      refId={onboardingId}
-      organizationId={organizationId}
-      canEdit={canEdit}
-      staticDocuments={[
-        {
-          name: "Masernschutz – Nachweis-Bescheinigung",
-          tag: "Amtliches NRW-Formular (zum Ausfüllen beim Arzt)",
-          href: "/system-dokumente/masernschutz-nrw.pdf",
-          label: "PDF öffnen",
-        },
-      ]}
-      emptyHint="Keine Onboarding-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ an."
-    />
+    <>
+      {antragsArt && betriebsnummerFehlt && (
+        <div className="rounded-2xl border-2 border-[#FBC900]/50 bg-[#FBC900]/10 p-4">
+          <p className="text-sm font-semibold text-foreground">
+            Der Antrag zur Rentenversicherung kann nicht erzeugt werden
+          </p>
+          <p className="mt-1 text-xs text-foreground/80">
+            Für diesen Mandanten ist keine BA-Betriebsnummer hinterlegt. Der
+            amtliche Antrag verlangt sie im Arbeitgeberteil. Sie tragen sie unter{" "}
+            <Link href="/mandanten" className="font-medium underline">
+              Mandanten
+            </Link>{" "}
+            nach.
+          </p>
+        </div>
+      )}
+      <TemplateGenerationSection
+        modul="ONBOARDING"
+        refId={onboardingId}
+        organizationId={organizationId}
+        canEdit={canEdit}
+        staticDocuments={statisch}
+        emptyHint="Keine Onboarding-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ an."
+      />
+    </>
   );
 }
 
@@ -1763,6 +1950,9 @@ function TabDocuments({
         onboardingId={onboardingId}
         organizationId={data.organization.id}
         canEdit={canEdit}
+        rvEntscheidung={data.personalData?.rvEntscheidung ?? null}
+        betriebsnummerFehlt={!data.organization.betriebsnummer}
+        istMinijob={data.questionnaireType === "MINIJOB"}
       />
 
       {/* Starterpaket versenden */}

@@ -4,7 +4,7 @@
 # =============================================
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --ignore-scripts
@@ -13,7 +13,7 @@ COPY prisma ./prisma
 RUN npx prisma generate
 
 # Stage 2: Build
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -27,7 +27,7 @@ RUN npm run build
 RUN npx --yes esbuild@0.24 prisma/seed.ts \
     --bundle \
     --platform=node \
-    --target=node20 \
+    --target=node22 \
     --format=cjs \
     --external:@prisma/client \
     --external:bcryptjs \
@@ -35,13 +35,15 @@ RUN npx --yes esbuild@0.24 prisma/seed.ts \
  && test -f prisma/compiled/seed.js
 
 # Stage 3: Production
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache curl
+# curl fuer den Healthcheck, postgresql-client fuer die Sicherung, die der
+# Entrypoint vor jedem Schema-Abgleich anlegt (pg_dump).
+RUN apk add --no-cache curl postgresql-client
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
@@ -59,8 +61,19 @@ COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/
 # bcryptjs wird vom Seed benoetigt
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/bcryptjs ./node_modules/bcryptjs
 
-# Prisma CLI global installieren - Version muss mit package-lock.json uebereinstimmen!
-RUN npm install -g prisma@6.19.2
+# Prisma CLI global installieren.
+#
+# Die Version MUSS zum generierten Client passen -- ein Versatz zwischen CLI und
+# Engine laesst `prisma db push` im Entrypoint scheitern oder, schlimmer, gegen
+# ein anders interpretiertes Schema laufen. Frueher stand hier eine feste
+# Nummer neben dem Hinweis, dass sie passen muss; sie tat es nicht (CLI 6.19.2
+# gegen Client 6.9.0). Deshalb jetzt aus dem Lockfile abgeleitet -- damit kann
+# sie gar nicht mehr auseinanderlaufen.
+COPY package-lock.json ./lock-fuer-prisma.json
+RUN PRISMA_VERSION="$(node -p "require('./lock-fuer-prisma.json').packages['node_modules/prisma'].version")" \
+ && echo "Prisma CLI: $PRISMA_VERSION (muss zum generierten Client passen)" \
+ && npm install -g "prisma@$PRISMA_VERSION" \
+ && rm lock-fuer-prisma.json
 
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads

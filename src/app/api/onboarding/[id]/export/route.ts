@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { csvZeile } from "@/lib/csv";
 import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 import { EXPORT_ROLES } from "@/lib/permissions";
@@ -168,10 +169,7 @@ export async function GET(
       ];
 
       // CSV-String bauen (mit Semikolon als Trennzeichen für deutsche Excel-Versionen)
-      const csvContent = [
-        headers.join(";"),
-        values.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";"),
-      ].join("\n");
+      const csvContent = [csvZeile(headers), csvZeile(values)].join("\n");
 
       // Dateiname sanitisieren (nur sichere Zeichen erlauben, Header-Injection verhindern)
       const safeMandant = (onboarding.organization.mandantNumber || "export").replace(/[^a-zA-Z0-9_-]/g, "_");

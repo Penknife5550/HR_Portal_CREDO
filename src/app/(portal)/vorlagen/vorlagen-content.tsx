@@ -15,7 +15,13 @@ import {
 } from "@/lib/required-documents";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
-import { FIELD_REGISTRY, getDefaultFieldConfig, type FieldConfig } from "@/lib/field-definitions";
+import {
+  FIELD_REGISTRY,
+  getDefaultFieldConfig,
+  mergeStepsConfig,
+  type FieldConfig,
+} from "@/lib/field-definitions";
+import { MANDATORY_STEP_NUMBERS } from "@/lib/fragebogen-steps";
 
 // =============================================
 // Types
@@ -49,8 +55,8 @@ interface FormTemplate {
   updatedAt: string;
 }
 
-// Steps 1 und 10 sind Pflichtschritte (immer aktiviert)
-const MANDATORY_STEPS = [1, 10];
+// Pflichtschritte (immer aktiviert) kommen aus der zentralen Schritt-Definition.
+const MANDATORY_STEPS = MANDATORY_STEP_NUMBERS;
 
 // Lesbare Labels für QuestionnaireType
 const TYPE_LABELS: Record<string, string> = {
@@ -207,9 +213,11 @@ export function VorlagenContent({ user }: { user: User }) {
     const template = templates.find((t) => t.id === templateId);
     if (!template) return;
 
-    // Aktuellen Config-Stand verwenden (editiert oder original)
+    // Aktuellen Config-Stand verwenden (editiert oder zusammengefuehrt).
+    // mergeStepsConfig ergaenzt Schritte, die es beim letzten Speichern der
+    // Vorlage noch nicht gab — sonst waeren sie hier nicht schaltbar.
     const currentConfig =
-      editedConfigs[templateId] || [...template.stepsConfig];
+      editedConfigs[templateId] || mergeStepsConfig(template.stepsConfig);
 
     const updatedConfig = currentConfig.map((s) =>
       s.step === stepNumber ? { ...s, enabled: !s.enabled } : { ...s }
@@ -240,7 +248,8 @@ export function VorlagenContent({ user }: { user: User }) {
     const template = templates.find((t) => t.id === templateId);
     if (!template) return;
 
-    const currentConfig = editedConfigs[templateId] || template.stepsConfig.map((s) => ({ ...s }));
+    const currentConfig =
+      editedConfigs[templateId] || mergeStepsConfig(template.stepsConfig);
     const stepConfig = currentConfig.find((s) => s.step === stepNumber);
     if (!stepConfig) return;
 
@@ -279,17 +288,24 @@ export function VorlagenContent({ user }: { user: User }) {
     const template = templates.find((t) => t.id === templateId);
     if (!template) return false;
 
-    // Step-Level pruefen (enabled)
-    const stepChanged = edited.some((editedStep, index) => {
-      const originalStep = template.stepsConfig[index];
-      return originalStep && editedStep.enabled !== originalStep.enabled;
+    // Step-Level pruefen (enabled) — ueber die Schrittnummer, nicht ueber die
+    // Array-Position. Sonst bricht die Aenderungserkennung, sobald ein Schritt
+    // dazukommt oder die Konfiguration in anderer Reihenfolge geladen wird.
+    // Verglichen wird gegen die zusammengefuehrte Fassung, nicht gegen die roh
+    // gespeicherte: Ein Schritt, den mergeStepsConfig erst ergaenzt hat, ist
+    // noch keine Aenderung des Anwenders.
+    const original = mergeStepsConfig(template.stepsConfig);
+    const stepChanged = edited.some((editedStep) => {
+      const originalStep = original.find((s) => s.step === editedStep.step);
+      if (!originalStep) return true;
+      return editedStep.enabled !== originalStep.enabled;
     });
     if (stepChanged) return true;
 
     // Feld-Level pruefen
     return edited.some((editedStep) => {
       if (!editedStep.fields) return false;
-      const originalStep = template.stepsConfig.find((s) => s.step === editedStep.step);
+      const originalStep = original.find((s) => s.step === editedStep.step);
       const originalFields = originalStep?.fields ?? getDefaultFieldConfig(editedStep.step);
       return editedStep.fields.some((ef) => {
         const of = originalFields.find((f) => f.name === ef.name);
@@ -370,7 +386,10 @@ export function VorlagenContent({ user }: { user: User }) {
   // Aktuelle Steps für ein Template
   // =============================================
   function getCurrentSteps(template: FormTemplate): StepConfig[] {
-    return editedConfigs[template.id] || template.stepsConfig;
+    // Zusammengefuehrt, nicht roh: Ein Schritt, den es beim letzten Speichern
+    // der Vorlage noch nicht gab, wuerde sonst fehlen und liesse sich hier
+    // nicht freischalten.
+    return editedConfigs[template.id] || mergeStepsConfig(template.stepsConfig);
   }
 
   // =============================================

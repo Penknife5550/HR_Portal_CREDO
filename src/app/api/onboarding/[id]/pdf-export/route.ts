@@ -57,7 +57,12 @@ export async function GET(
       include: {
         organization: true,
         personalData: {
-          include: { children: true },
+          include: {
+            children: true,
+            beschaeftigungsAngaben: {
+              orderBy: [{ kategorie: "asc" }, { orderIndex: "asc" }],
+            },
+          },
         },
         supervisorData: true,
         documents: {
@@ -150,6 +155,40 @@ export async function GET(
         masernschutzProvided: pd.masernschutzProvided,
         dsgvoAccepted: pd.dsgvoAccepted,
         dsgvoAcceptedAt: pd.dsgvoAcceptedAt?.toISOString() || null,
+        // Unterschriftsersatz — der PDF-Abschnitt "Erklärung des Arbeitnehmers"
+        // ist in der Betriebspruefung der eigentliche Nachweis.
+        erklaerungAccepted: pd.erklaerungAccepted,
+        erklaerungAcceptedAt: pd.erklaerungAcceptedAt?.toISOString() || null,
+        erklaerungOrt: pd.erklaerungOrt,
+        erklaerungIp: pd.erklaerungIp,
+        erklaerungUserAgent: pd.erklaerungUserAgent,
+        erklaerungVersion: pd.erklaerungVersion,
+        erklaerungPruefsumme: pd.erklaerungPruefsumme,
+        // Abschnitt 2 und 4 der Minijob-Checkliste
+        beschaeftigungsStatus: pd.beschaeftigungsStatus,
+        beschaeftigungsStatusSonstige: pd.beschaeftigungsStatusSonstige,
+        alsArbeitsuchendGemeldet: pd.alsArbeitsuchendGemeldet,
+        agenturFuerArbeit: pd.agenturFuerArbeit,
+        mitLeistungsbezug: pd.mitLeistungsbezug,
+        vorbeschaeftigungenVorhanden: pd.vorbeschaeftigungenVorhanden,
+        auslandsbeschaeftigungVorhanden: pd.auslandsbeschaeftigungVorhanden,
+        summeUeberGeringfuegigkeitsgrenze: pd.summeUeberGeringfuegigkeitsgrenze,
+        rvEntscheidung: pd.rvEntscheidung,
+        rvEntscheidungAm: pd.rvEntscheidungAm?.toISOString() ?? null,
+        rvMerkblattGelesen: pd.rvMerkblattGelesen,
+        rvMerkblattGelesenAm: pd.rvMerkblattGelesenAm?.toISOString() ?? null,
+        rvBindungBestaetigt: pd.rvBindungBestaetigt,
+        beschaeftigungsAngaben: pd.beschaeftigungsAngaben.map((a) => ({
+          kategorie: a.kategorie,
+          beginn: a.beginn?.toISOString() ?? null,
+          ende: a.ende?.toISOString() ?? null,
+          arbeitgeberName: a.arbeitgeberName,
+          arbeitgeberAdresse: a.arbeitgeberAdresse,
+          art: a.art,
+          entgeltUeberGrenze: a.entgeltUeberGrenze,
+          arbeitstage: a.arbeitstage,
+          beiArbeitsagentur: a.beiArbeitsagentur,
+        })),
         children: pd.children.map((c) => ({
           firstName: c.firstName,
           lastName: c.lastName,

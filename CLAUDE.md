@@ -76,10 +76,40 @@ sudo docker exec hr-portal-app curl -s http://localhost:3000/api/health
 ### Entrypoint (`entrypoint.sh`)
 
 Beim Container-Start passiert automatisch:
-1. Pflicht-Umgebungsvariablen pruefen (JWT_SECRET, ENCRYPTION_KEY, DATABASE_URL)
-2. `prisma db push --skip-generate` (Schema synchronisieren)
-3. Seed-Check (`prisma/seed-check.js`) — legt Admin-User an falls noch keiner existiert
-4. Next.js Server starten (`node server.js`)
+1. Pflicht-Umgebungsvariablen pruefen (JWT_SECRET, ENCRYPTION_KEY, BEM_ENCRYPTION_KEY, DATABASE_URL)
+2. **Schema-Vergleich** (`prisma migrate diff --exit-code`) — nur wenn es einen Unterschied gibt, geht es weiter mit 3.
+3. **Sicherung** (`pg_dump` nach `/backups/vor-schema-abgleich-<Zeitstempel>.sql`) — schlaegt sie fehl, **bricht der Start ab**
+4. `prisma db push --skip-generate --accept-data-loss` (Schema synchronisieren)
+5. Seed-Check (`prisma/seed-check.js`) — System-Vorlagen sicherstellen, **einmalige Datenmigrationen** ausfuehren, Admin-User anlegen falls noch keiner existiert
+6. Next.js Server starten (`node server.js`)
+
+**Warum die Sicherung den Start blockieren darf.** `db push` laeuft mit
+`--accept-data-loss`, sonst startet der Container bei jeder neuen
+Unique-Constraint nicht mehr. Das Flag heisst aber woertlich, was es tut: Eine in
+`schema.prisma` umbenannte Spalte wird als „alte loeschen, neue anlegen"
+ausgerollt — unbeaufsichtigt und ohne Rueckfrage. Ohne Migrationsordner gibt es
+kein Netz darunter, also ist der `pg_dump` das Netz. Kein Dump, kein Push.
+
+Voraussetzung dafuer: Der Dienst `app` muss `./backups:/backups` einhaengen
+(steht in `docker-compose.yml`). Fehlt die Einhaengung, nennt die Fehlermeldung
+beim Start genau diese Zeilen. Steuerbar ueber `DB_BACKUP_DIR` (Standard
+`/backups`) und `DB_BACKUP_KEEP` (Standard 10 — aeltere eigene Dumps werden
+aufgeraeumt, fremde Dateien im Verzeichnis bleiben unangetastet).
+
+### Einmalige Datenmigrationen
+
+Migrationen, die genau einmal laufen duerfen, stehen in `prisma/seed-check.js` und
+merken sich ihren Lauf im Modell `SystemMigration` (Tabelle `system_migrations`).
+
+- **Nicht** das `AuditLog` als Merker verwenden: Logs werden aufgeraeumt, und eine
+  nicht idempotente Migration, die ein zweites Mal laeuft, verschiebt Daten erneut.
+- Merker und Datenaenderung gehoeren in **dieselbe Transaktion** — entweder beides
+  oder nichts.
+- Fehler werden geloggt, brechen den Start aber nicht ab. Ohne Merker laeuft die
+  Migration beim naechsten Start erneut.
+- `prisma/seed-check.js` exportiert seine reinen Funktionen und ruft `main()` nur
+  hinter `require.main === module` auf — so sind die Regeln ohne Datenbank testbar
+  (`src/__tests__/lib/fragebogen-steps.test.ts`).
 
 ### Umgebungsvariablen (Pflicht)
 
@@ -88,9 +118,12 @@ Beim Container-Start passiert automatisch:
 | `DB_PASSWORD` | PostgreSQL-Passwort | frei waehlbar |
 | `JWT_SECRET` | JWT-Signierung (kein "dev_secret"!) | `openssl rand -base64 48` |
 | `ENCRYPTION_KEY` | 64 Hex-Zeichen fuer AES-256-GCM | `openssl rand -hex 32` |
+| `BEM_ENCRYPTION_KEY` | 64 Hex-Zeichen, eigener Schluessel fuer BEM-Gesundheitsdaten (Art. 9 DSGVO). Der Entrypoint bricht ohne ihn ab — **nicht** derselbe Wert wie `ENCRYPTION_KEY` | `openssl rand -hex 32` |
 | `CRON_SECRET` | Absicherung der Cron-Endpunkte | `openssl rand -base64 24` |
 | `APP_URL` | Basis-URL | `https://hr.fes-credo.de` |
 | `ADMIN_INITIAL_PASSWORD` | Initiales Admin-Passwort (optional, sonst zufaellig) | frei waehlbar |
+| `DB_BACKUP_DIR` | Ablage der Sicherung vor dem Schema-Abgleich (optional, Standard `/backups`) | — |
+| `DB_BACKUP_KEEP` | Wie viele eigene Sicherungen behalten werden (optional, Standard 10) | — |
 
 ## Projektstruktur
 

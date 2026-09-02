@@ -8,16 +8,47 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { NeuerVorgangModal } from "@/components/neuer-vorgang-modal";
 import { STATUS_LABELS } from "@/lib/constants";
 import {
-  StatusPieChart,
-  MonthlyTrendChart,
   OverdueBanner,
   DurationKPI,
   OverdueBadge,
-} from "@/components/dashboard-charts";
+} from "@/components/dashboard-kennzahlen";
+
+// Die beiden Diagramme kommen nach, statt im Einstiegs-Bundle mitzureisen.
+//
+// recharts wiegt rund 145 kB und war fest in die Seite gelinkt: /dashboard
+// lieferte 261 kB First-Load-JS -- den ersten Bildschirm nach dem Login.
+// Gebraucht werden die Diagramme aber erst, wenn die Kennzahlen geladen sind,
+// und sie stehen weit unten auf der Seite.
+//
+// ssr:false, weil recharts die Groesse seines Containers misst; serverseitig
+// gerendert kaeme ein leeres Diagramm heraus, das der Browser sofort ersetzt.
+const StatusPieChart = dynamic(
+  () => import("@/components/dashboard-charts").then((m) => m.StatusPieChart),
+  { ssr: false, loading: () => <ChartPlatzhalter /> }
+);
+const MonthlyTrendChart = dynamic(
+  () => import("@/components/dashboard-charts").then((m) => m.MonthlyTrendChart),
+  { ssr: false, loading: () => <ChartPlatzhalter /> }
+);
+
+/** Haelt die Hoehe frei, damit die Seite beim Nachladen nicht springt. */
+function ChartPlatzhalter() {
+  return (
+    <div
+      className="flex h-[300px] items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground"
+      role="status"
+      aria-label="Diagramm wird geladen"
+    >
+      Diagramm wird geladen …
+    </div>
+  );
+}
+import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 
 interface User {
   userId: string;
@@ -37,6 +68,8 @@ interface Organization {
 
 interface Onboarding {
   id: string;
+  /** Serverseitig gegen die Vorlage dieses Vorgangs berechnet. */
+  fragebogenFortschritt: FragebogenFortschritt;
   displayId: string | null;
   email: string;
   firstName: string | null;
@@ -132,13 +165,19 @@ export function DashboardContent({ user }: { user: User }) {
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(page * PAGE_SIZE));
 
+      // Das Archiv filtert der Server, nicht der Browser.
+      //
+      // Vorher holte die Seite bis zu PAGE_SIZE Datensaetze, warf daraus die
+      // archivierten weg und setzte `total` auf die Laenge des Rests. Damit war
+      // total nie groesser als eine Seite, totalPages also immer 1 und die
+      // Blaetternavigation wurde nie gerendert: Ab dem 26. offenen Vorgang war
+      // jeder weitere im Dashboard unerreichbar.
+      if (!showArchived && !statusFilter) params.set("archiv", "aus");
+
       const res = await fetch(`/api/onboarding?${params.toString()}`);
       const data = await res.json();
-      const allItems = data.data || [];
-      const ARCHIVED_STATUSES = ["COMPLETED", "EXPIRED"];
-      const filtered = showArchived ? allItems : allItems.filter((o: Onboarding) => !ARCHIVED_STATUSES.includes(o.status));
-      setOnboardings(filtered);
-      setTotal(showArchived ? (data.total || 0) : filtered.length);
+      setOnboardings(data.data || []);
+      setTotal(data.total || 0);
     } catch (error) {
       console.error("Fehler beim Laden:", error);
     } finally {
@@ -481,7 +520,7 @@ export function DashboardContent({ user }: { user: User }) {
                           {ob.personalData?.isComplete
                             ? "Vollständig"
                             : ob.personalData
-                              ? `Schritt ${ob.personalData.currentStep}/10`
+                              ? formatProgress(ob.fragebogenFortschritt)
                               : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">

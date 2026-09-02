@@ -10,6 +10,10 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
+import {
+  ladeVorlagenKonfigurationen,
+  fortschrittFuerVorgang,
+} from "@/lib/fragebogen-fortschritt";
 
 // =============================================
 // GET /api/onboarding/:id
@@ -97,7 +101,14 @@ export async function GET(
       };
     }
 
-    return NextResponse.json(safeOnboarding);
+    const vorlagen = await ladeVorlagenKonfigurationen();
+
+    return NextResponse.json({
+      ...safeOnboarding,
+      // Fortschritt gegen die Strecke *dieses* Vorgangs, nicht gegen alle
+      // moeglichen Schritte — siehe fragebogen-fortschritt.ts.
+      fragebogenFortschritt: fortschrittFuerVorgang(onboarding, vorlagen),
+    });
   } catch (error) {
     console.error("Fehler beim Laden des Vorgangs:", error);
     return NextResponse.json(

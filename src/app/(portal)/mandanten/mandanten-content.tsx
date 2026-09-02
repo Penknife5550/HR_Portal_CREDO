@@ -10,6 +10,10 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
+import {
+  pruefeAbrechnungstagEingabe,
+  pruefeBetriebsnummerEingabe,
+} from "@/lib/betriebsnummer";
 
 interface User {
   userId: string;
@@ -22,6 +26,8 @@ interface User {
 interface Organization {
   id: string;
   mandantNumber: string;
+  betriebsnummer: string | null;
+  entgeltabrechnungTag: number | null;
   name: string;
   shortName: string | null;
   type: string;
@@ -34,6 +40,8 @@ interface Organization {
 
 interface MandantFormData {
   mandantNumber: string;
+  betriebsnummer: string;
+  entgeltabrechnungTag: string;
   name: string;
   shortName: string;
   type: string;
@@ -54,6 +62,8 @@ const ORGANIZATION_TYPES = Object.keys(ORGANIZATION_TYPE_LABELS);
 
 const EMPTY_FORM: MandantFormData = {
   mandantNumber: "",
+  betriebsnummer: "",
+  entgeltabrechnungTag: "",
   name: "",
   shortName: "",
   type: "GYMNASIUM",
@@ -188,6 +198,7 @@ export function MandantenContent({ user }: { user: User }) {
                 <thead>
                   <tr className="border-b bg-muted text-left text-xs font-medium uppercase text-muted-foreground">
                     <th className="px-4 py-3">Mandantennr.</th>
+                    <th className="px-4 py-3">Betriebsnr.</th>
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Kürzel</th>
                     <th className="px-4 py-3">Typ</th>
@@ -208,6 +219,23 @@ export function MandantenContent({ user }: { user: User }) {
                         <span className="font-mono text-sm font-medium text-foreground">
                           {org.mandantNumber}
                         </span>
+                      </td>
+                      {/* Zwei Nummernspalten nebeneinander: dreistellig gegen
+                          achtstellig — die deutlichste Art, den Unterschied
+                          zwischen LOGA- und BA-Nummer zu zeigen. Und dies ist
+                          der einzige Ort, an dem alle Mandanten nebeneinander
+                          stehen; ohne die Spalte merkt niemand, welche Nummern
+                          noch fehlen. */}
+                      <td className="px-4 py-3">
+                        {org.betriebsnummer ? (
+                          <span className="font-mono text-sm text-foreground">
+                            {org.betriebsnummer}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-[#FBC900]/15 px-2 py-0.5 text-xs font-medium text-[#8a6d00]">
+                            fehlt
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-foreground">
@@ -324,6 +352,11 @@ export function MandantenContent({ user }: { user: User }) {
           title="Mandant bearbeiten"
           initialData={{
             mandantNumber: editOrg.mandantNumber,
+            betriebsnummer: editOrg.betriebsnummer ?? "",
+            entgeltabrechnungTag:
+              editOrg.entgeltabrechnungTag != null
+                ? String(editOrg.entgeltabrechnungTag)
+                : "",
             name: editOrg.name,
             shortName: editOrg.shortName || "",
             type: editOrg.type,
@@ -338,6 +371,8 @@ export function MandantenContent({ user }: { user: User }) {
                 name: data.name,
                 shortName: data.shortName,
                 type: data.type,
+                betriebsnummer: data.betriebsnummer,
+                entgeltabrechnungTag: data.entgeltabrechnungTag,
               }),
             });
             if (!res.ok) {
@@ -395,10 +430,25 @@ function MandantModal({
       setFormError("Typ ist ein Pflichtfeld");
       return;
     }
+    // Leer ist erlaubt — die Nummern werden nachgetragen. Was dasteht, muss aber stimmen.
+    const bn = pruefeBetriebsnummerEingabe(formData.betriebsnummer);
+    if (!bn.ok) {
+      setFormError(bn.fehler);
+      return;
+    }
+    const at = pruefeAbrechnungstagEingabe(formData.entgeltabrechnungTag);
+    if (!at.ok) {
+      setFormError(at.fehler);
+      return;
+    }
 
     setSaving(true);
     try {
-      await onSave(formData);
+      await onSave({
+        ...formData,
+        betriebsnummer: bn.wert ?? "",
+        entgeltabrechnungTag: at.wert != null ? String(at.wert) : "",
+      });
       onClose();
     } catch (error) {
       setFormError(
@@ -465,6 +515,50 @@ function MandantModal({
                 Die Mandantennummer kann nach der Erstellung nicht geändert werden.
               </p>
             )}
+          </div>
+
+          {/* BA-Betriebsnummer — bewusst direkt unter der Mandantennummer */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">
+              BA-Betriebsnummer (8-stellig)
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={formData.betriebsnummer}
+              onChange={(e) => handleChange("betriebsnummer", e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              placeholder="z.B. 12345678"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Betriebsnummer der Bundesagentur für Arbeit — acht Ziffern. Nicht
+              die dreistellige Mandantennummer aus LOGA. Wird für die Anträge zur
+              Rentenversicherungs-Befreiung (Minijob) gebraucht.
+            </p>
+          </div>
+
+          {/* Termin der Entgeltabrechnung */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">
+              Entgeltabrechnung am (Tag im Monat)
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              value={formData.entgeltabrechnungTag}
+              onChange={(e) =>
+                handleChange("entgeltabrechnungTag", e.target.value)
+              }
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              placeholder="z.B. 25"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Die Befreiung von der Rentenversicherung ist bis zur nächsten
+              Entgeltabrechnung zu melden, spätestens sechs Wochen nach Eingang
+              des Antrags — maßgeblich ist der frühere Termin. Ohne diesen Wert
+              überwacht das Portal nur die Sechs-Wochen-Grenze.
+            </p>
           </div>
 
           {/* Name */}

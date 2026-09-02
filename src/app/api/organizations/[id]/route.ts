@@ -8,6 +8,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { ADMIN_ROLES } from "@/lib/permissions";
+import {
+  ABRECHNUNGSTAG_FORMAT_FEHLER,
+  BETRIEBSNUMMER_FORMAT_FEHLER,
+  pruefeAbrechnungstagEingabe,
+  pruefeBetriebsnummerEingabe,
+} from "@/lib/betriebsnummer";
 
 // Gueltige OrganizationType-Werte (aus Prisma Schema)
 const VALID_ORG_TYPES = [
@@ -35,6 +42,9 @@ export async function GET(
       select: {
         id: true,
         mandantNumber: true,
+        // Siehe Kommentar in der Listen-Route: nur fuer Rollen, die sie pflegen.
+        betriebsnummer: ADMIN_ROLES.includes(session.role),
+        entgeltabrechnungTag: ADMIN_ROLES.includes(session.role),
         name: true,
         shortName: true,
         type: true,
@@ -128,10 +138,70 @@ export async function PATCH(
       updateData.isActive = Boolean(body.isActive);
     }
 
+    // Anders als die Mandantennummer bleibt die Betriebsnummer aenderbar — sie
+    // wird nachgetragen, sobald der BA-Bescheid vorliegt.
+    let neueBetriebsnummer: string | null | undefined;
+    if (body.betriebsnummer !== undefined) {
+      const geprueft = pruefeBetriebsnummerEingabe(body.betriebsnummer);
+      if (!geprueft.ok) {
+        return NextResponse.json(
+          { error: BETRIEBSNUMMER_FORMAT_FEHLER },
+          { status: 400 }
+        );
+      }
+      neueBetriebsnummer = geprueft.wert;
+      updateData.betriebsnummer = geprueft.wert;
+    }
+
+    if (body.entgeltabrechnungTag !== undefined) {
+      const geprueft = pruefeAbrechnungstagEingabe(body.entgeltabrechnungTag);
+      if (!geprueft.ok) {
+        return NextResponse.json(
+          { error: ABRECHNUNGSTAG_FORMAT_FEHLER },
+          { status: 400 }
+        );
+      }
+      updateData.entgeltabrechnungTag = geprueft.wert;
+    }
+
+    const vorher =
+      neueBetriebsnummer !== undefined
+        ? await prisma.organization.findUnique({
+            where: { id },
+            select: { betriebsnummer: true },
+          })
+        : null;
+
     const organization = await prisma.organization.update({
       where: { id },
       data: updateData,
     });
+
+    // Die Betriebsnummer landet auf amtlichen Antraegen, die in die
+    // Entgeltunterlagen gehen. Eine Aenderung muss nachvollziehbar sein — diese
+    // Route hat bisher ueberhaupt kein AuditLog geschrieben.
+    if (vorher && vorher.betriebsnummer !== neueBetriebsnummer) {
+      await prisma.auditLog
+        .create({
+          data: {
+            userId: session.userId,
+            action: "ORGANIZATION_BETRIEBSNUMMER_UPDATED",
+            processType: "ORGANIZATION",
+            details: {
+              organizationId: id,
+              alt: vorher.betriebsnummer,
+              neu: neueBetriebsnummer ?? null,
+            },
+            ipAddress:
+              request.headers.get("x-forwarded-for") ||
+              request.headers.get("x-real-ip") ||
+              null,
+          },
+        })
+        .catch(() => {
+          // Nicht weiterwerfen: Die Aenderung selbst ist wichtiger als ihr Protokoll.
+        });
+    }
 
     return NextResponse.json({ data: organization });
   } catch (error) {

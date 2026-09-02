@@ -149,13 +149,18 @@ export type Step5Data = z.infer<typeof step5Schema>;
 // Step 6: Weitere Beschaeftigung
 // =============================================
 export const step6Schema = z.object({
+  beschaeftigungsStatus: z.string(),
+  beschaeftigungsStatusSonstige: z.string().optional(),
+  alsArbeitsuchendGemeldet: z.boolean(),
+  agenturFuerArbeit: z.string().optional(),
+  mitLeistungsbezug: z.boolean().nullable().optional(),
   hasOtherEmployment: z.boolean(),
-  otherEmployerName: z.string(),
-  otherWeeklyHours: z.number().min(0).max(60).nullable(),
+  summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
+  vorbeschaeftigungenVorhanden: z.boolean(),
+  auslandsbeschaeftigungVorhanden: z.boolean(),
   employerType: z.enum(["hauptarbeitgeber", "nebenarbeitgeber", "nein"], {
     required_error: "Bitte waehlen Sie eine Option.",
   }),
-  hasMinijob: z.boolean(),
 });
 
 export type Step6Data = z.infer<typeof step6Schema>;
@@ -308,18 +313,115 @@ export function createStep5Schema(fc: FieldConfigHelper) {
   });
 }
 
+/**
+ * Schritt 6 — Weitere Beschaeftigungen und Status.
+ *
+ * Deckt Abschnitt 2 (Status, Meldung bei der Agentur fuer Arbeit) und die
+ * Grundfragen zu Abschnitt 4 der Minijob-Checkliste ab. Die Tabellenzeilen
+ * selbst werden getrennt geprueft — siehe validations/beschaeftigungs-angaben.ts.
+ *
+ * Die alten Felder `otherEmployerName`, `otherWeeklyHours` und `hasMinijob`
+ * werden hier nicht mehr abgefragt: Sie gehen in der Tabelle 4a auf. In der
+ * Datenbank bleiben sie, damit Altvorgaenge lesbar bleiben.
+ */
 export function createStep6Schema(fc: FieldConfigHelper) {
-  return z.object({
-    hasOtherEmployment: z.boolean(),
-    otherEmployerName: z.string(),
-    otherWeeklyHours: z.number().min(0).max(60).nullable(),
-    employerType: reqEnum(
-      fc, "employerType",
-      ["hauptarbeitgeber", "nebenarbeitgeber", "nein"],
-      "Bitte waehlen Sie eine Option."
-    ),
-    hasMinijob: z.boolean(),
-  });
+  return z
+    .object({
+      // Die Bloecke aus Abschnitt 4 der Minijob-Checkliste sind an die Vorlage
+      // gebunden. Ohne diese Gates verlangte Schritt 6 sie von JEDEM
+      // Fragebogentyp — auch von TV-L-Angestellten und Beamten, die die Fragen
+      // gar nicht angezeigt bekommen und den Schritt dann nicht verlassen
+      // koennen.
+      // Nur die Statusfrage braucht ein Sichtbarkeits-Gate. Sie ist die
+      // einzige Pflichtangabe dieses Schritts, die sich nicht von selbst
+      // erfuellt: `.min(1)` scheitert am leeren Vorgabewert, und wo der Block
+      // ausgeblendet ist, kann ihn niemand fuellen — Schritt 6 waere fuer
+      // TV-L-, Beamten- und Erzieher-Fragebogen unpassierbar.
+      //
+      // Beide Zweige liefern `string`. Ein `.optional()` oder `.default()`
+      // waere hier falsch: Es machte den Eingabetyp optional, und die Maske
+      // arbeitet mit konkreten Werten aus `defaultValues`.
+      beschaeftigungsStatus: fc.isVisible("beschaeftigungsStatus")
+        ? z.string().min(1, "Bitte waehlen Sie aus, was auf Sie zutrifft.")
+        : z.string(),
+      beschaeftigungsStatusSonstige: z.string().max(200).optional(),
+
+      // Die vier Ja/Nein-Fragen brauchen keines: `z.boolean()` ist mit `false`
+      // erfuellt, und `defaultValues` setzt sie immer. Ausgeblendet bleiben sie
+      // schlicht auf "nein" stehen.
+      alsArbeitsuchendGemeldet: z.boolean(),
+      agenturFuerArbeit: z.string().max(200).optional(),
+      mitLeistungsbezug: z.boolean().nullable().optional(),
+
+      hasOtherEmployment: z.boolean(),
+      summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
+      vorbeschaeftigungenVorhanden: z.boolean(),
+      auslandsbeschaeftigungVorhanden: z.boolean(),
+
+      employerType: reqEnum(
+        fc, "employerType",
+        ["hauptarbeitgeber", "nebenarbeitgeber", "nein"],
+        "Bitte waehlen Sie eine Option."
+      ),
+    })
+    .superRefine((werte, ctx) => {
+      // "Sonstige" ohne Erlaeuterung ist keine Angabe.
+      if (
+        werte.beschaeftigungsStatus === "SONSTIGE" &&
+        !werte.beschaeftigungsStatusSonstige?.trim()
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["beschaeftigungsStatusSonstige"],
+          message: "Bitte beschreiben Sie kurz, was auf Sie zutrifft.",
+        });
+      }
+
+      // Wer gemeldet ist, muss sagen wo — sonst laesst sich die
+      // Berufsmaessigkeit spaeter nicht pruefen.
+      if (werte.alsArbeitsuchendGemeldet) {
+        if (!werte.agenturFuerArbeit?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["agenturFuerArbeit"],
+            message: "Bitte geben Sie an, bei welcher Agentur Sie gemeldet sind.",
+          });
+        }
+        if (werte.mitLeistungsbezug === null || werte.mitLeistungsbezug === undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["mitLeistungsbezug"],
+            message: "Bitte geben Sie an, ob Sie Leistungen beziehen.",
+          });
+        }
+      }
+
+      // Additionsfrage — nur wenn keine Hauptbeschaeftigung vorliegt und es
+      // ueberhaupt etwas zu addieren gibt. Genau so steht die Bedingung im
+      // amtlichen Muster ("Wenn keine mehr als geringfuegig entlohnte
+      // (Haupt-)Beschaeftigung vorliegt ...").
+      //
+      // Das Sichtbarkeits-Gate ist hier nicht optional: Ohne es griffe die
+      // Bedingung auch dort, wo die Statusfrage ausgeblendet ist. Dann bliebe
+      // beschaeftigungsStatus leer, hatHauptbeschaeftigung waere false — und
+      // ein TV-L-Fragebogen verlangte eine Antwort auf eine Frage, die er
+      // nicht anzeigt.
+      const hatHauptbeschaeftigung =
+        werte.beschaeftigungsStatus === "ARBEITNEHMER_HAUPTBESCHAEFTIGUNG";
+      if (
+        fc.isVisible("summeUeberGeringfuegigkeitsgrenze") &&
+        werte.hasOtherEmployment &&
+        !hatHauptbeschaeftigung &&
+        (werte.summeUeberGeringfuegigkeitsgrenze === null ||
+          werte.summeUeberGeringfuegigkeitsgrenze === undefined)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["summeUeberGeringfuegigkeitsgrenze"],
+          message: "Bitte beantworten Sie diese Frage.",
+        });
+      }
+    });
 }
 
 export function createStep8Schema(fc: FieldConfigHelper) {
@@ -337,62 +439,6 @@ export function createStep8Schema(fc: FieldConfigHelper) {
   });
 }
 
-// =============================================
-// Step-Konfiguration
-// =============================================
-export const STEP_CONFIG = [
-  {
-    number: 1,
-    title: "Persönliche Angaben",
-    description: "Name, Geburtsdatum, Familienstand",
-    icon: "user",
-  },
-  {
-    number: 2,
-    title: "Adresse & Kontakt",
-    description: "Wohnanschrift, Telefon, E-Mail",
-    icon: "home",
-  },
-  {
-    number: 3,
-    title: "Bankverbindung",
-    description: "IBAN, BIC, Kontoinhaber",
-    icon: "credit-card",
-  },
-  {
-    number: 4,
-    title: "Sozialversicherung",
-    description: "SV-Nummer, Krankenkasse",
-    icon: "shield",
-  },
-  {
-    number: 5,
-    title: "Steuer",
-    description: "Steuer-ID, Steuerklasse, Kirchensteuer",
-    icon: "file-text",
-  },
-  {
-    number: 6,
-    title: "Weitere Beschäftigung",
-    description: "Angaben zu weiteren Arbeitgebern",
-    icon: "briefcase",
-  },
-  {
-    number: 7,
-    title: "Bildung & Beruf",
-    description: "Schulabschluss, Berufsausbildung",
-    icon: "graduation-cap",
-  },
-  {
-    number: 8,
-    title: "Masernschutz",
-    description: "Impfnachweis für Gemeinschaftseinrichtungen",
-    icon: "heart",
-  },
-  {
-    number: 9,
-    title: "Zusammenfassung",
-    description: "Pruefen und Absenden",
-    icon: "check-circle",
-  },
-] as const;
+// Die Schritt-Definition (Nummer, Titel, Reihenfolge, Maske) liegt zentral in
+// `@/lib/fragebogen-steps`. Das frueher hier gepflegte STEP_CONFIG war eine
+// vierte, abweichende Kopie derselben Liste und ist entfallen.

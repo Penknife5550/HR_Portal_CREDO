@@ -29,6 +29,7 @@ import type {
 import { TABS } from "./types";
 import { STATUS_TRANSITIONS, formatDate, daysUntilLabel } from "./helpers";
 import { ArrowLeftIcon, ChevronDownIcon } from "./icons";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
 import {
   TabOverview,
   TabChecklist,
@@ -124,6 +125,11 @@ export function OffboardingDetailContent({
   }, [showStatusDropdown]);
 
   const isAdmin = user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
+
+  // Fuer das Erzeugen von Dokumenten gilt die Rollenmenge der Erzeugungs-Route
+  // (HR_EDIT_ROLES). isAdmin waere hier zu eng und sperrte die
+  // Sachbearbeitung aus, obwohl der Endpunkt sie zulaesst.
+  const canEdit = HR_EDIT_ROLES.includes(user.role);
 
   // ---- Data Loading ----
   const loadData = useCallback(async () => {
@@ -757,6 +763,7 @@ export function OffboardingDetailContent({
             handleFileDrop={handleFileDrop}
             dragOver={dragOver}
             setDragOver={setDragOver}
+            canEdit={canEdit}
           />
         )}
 

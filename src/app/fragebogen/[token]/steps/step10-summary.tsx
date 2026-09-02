@@ -12,6 +12,30 @@ import { useState } from "react";
 import { DocumentUpload } from "./document-upload";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 import { formatVerantwortlicheStelle } from "@/lib/dsgvo";
+import { AKTUELLE_ERKLAERUNG } from "@/lib/erklaerung-arbeitnehmer";
+import {
+  RV_BEFREIUNG_HINWEIS,
+  documentTypeLabel,
+} from "@/lib/required-documents";
+import { rvEntscheidungLabel } from "@/lib/minijob-rentenversicherung";
+import { statusLabel } from "@/lib/minijob-status";
+import {
+  ART_LABELS,
+  BESCHAEFTIGUNGS_KATEGORIEN,
+  KATEGORIE_LABELS,
+} from "@/lib/validations/beschaeftigungs-angaben";
+
+/** Eine Zeile aus den drei Tabellen des Beschaeftigungs-Schritts. */
+interface BeschaeftigungEntry {
+  kategorie: string;
+  beginn?: string | null;
+  ende?: string | null;
+  art?: string | null;
+  arbeitgeberName?: string | null;
+  entgeltUeberGrenze?: boolean | null;
+  arbeitstage?: number | null;
+  beiArbeitsagentur?: boolean | null;
+}
 
 interface ChildEntry {
   firstName: string;
@@ -25,7 +49,7 @@ interface StepProps {
   allData: Record<string, unknown>;
   onBack: () => void;
   saving: boolean;
-  onSubmit: () => void;
+  onSubmit: (erklaerung: { ort: string; version: string }) => void;
   organization: {
     name: string;
     mandantNumber: string;
@@ -38,6 +62,8 @@ interface StepProps {
   token?: string;
   fieldConfig?: FieldConfigHelper;
   requiredDocuments?: string[];
+  /** Ist beim Mandanten eine Betriebsnummer hinterlegt? */
+  antragErzeugbar?: boolean;
 }
 
 // Hilfs-Labels
@@ -148,17 +174,37 @@ export function Step10Summary({
   organization,
   token,
   requiredDocuments,
+  antragErzeugbar = true,
 }: StepProps) {
   const [dsgvoAccepted, setDsgvoAccepted] = useState(false);
   const [erklaerungAccepted, setErklaerungAccepted] = useState(false);
+  const [erklaerungOrt, setErklaerungOrt] = useState("");
   const [dsgvoError, setDsgvoError] = useState("");
+  /**
+   * Eigener Zustand fuer fehlende Dokumente — bewusst nicht `dsgvoError`.
+   *
+   * Der wird ueber Teilzeichenketten zurueckgesetzt („Ort", „Erklärung",
+   * „Datenschutz"). Eine Dokumentenmeldung, die eines dieser Woerter enthaelt,
+   * verschwaende beim naechsten Haken lautlos.
+   */
+  const [fehlendeDokumente, setFehlendeDokumente] = useState<string[]>([]);
+  const [dokumenteFehler, setDokumenteFehler] = useState("");
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const d = allData;
   const children = (d.children as ChildEntry[]) || [];
+  const beschaeftigungen =
+    (d.beschaeftigungsAngaben as BeschaeftigungEntry[]) || [];
 
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (erklaerungOrt.trim().length < 2) {
+      // Wortlaut bewusst ohne "Erklärung": Die Fehleranzeige wird ueber
+      // Teilzeichenketten zurueckgesetzt, sonst raeumte das Haken-Setzen diese
+      // Meldung mit weg.
+      setDsgvoError("Bitte geben Sie den Ort an. Er gehört zur Unterschrift.");
+      return;
+    }
     if (!erklaerungAccepted) {
       setDsgvoError("Bitte bestätigen Sie die Erklärung des Arbeitnehmers.");
       return;
@@ -169,6 +215,25 @@ export function Step10Summary({
       );
       return;
     }
+
+    // Nur Hoeflichkeit: Verbindlich prueft der Server gegen den Datenbankstand.
+    // In einem zweiten Tab kann ein Dokument geloescht worden sein, waehrend
+    // hier abgeschickt wird.
+    if (fehlendeDokumente.length > 0) {
+      const nurRv =
+        fehlendeDokumente.length === 1 && fehlendeDokumente[0] === "RV_BEFREIUNG";
+      setDokumenteFehler(
+        nurRv
+          ? RV_BEFREIUNG_HINWEIS
+          : "Bitte laden Sie zuerst die fehlenden Pflichtunterlagen hoch: " +
+              fehlendeDokumente.map((t) => documentTypeLabel(t)).join(", ") +
+              "."
+      );
+      setDsgvoError("");
+      return;
+    }
+
+    setDokumenteFehler("");
     setDsgvoError("");
     setShowConfirmDialog(true);
   };
@@ -185,6 +250,39 @@ export function Step10Summary({
   const str = (val: unknown): string => {
     if (!val) return "—";
     return String(val);
+  };
+
+  /**
+   * Ja/Nein — aber "—", solange die Frage unbeantwortet ist.
+   *
+   * Nicht `wert ? "Ja" : "Nein"`: Die Fragen des Beschaeftigungs-Schritts sind
+   * dreiwertig. Ein noch nicht angeklicktes Feld als "Nein" auszuweisen, waere
+   * eine Angabe, die der Mitarbeiter nie gemacht hat — und genau die soll er
+   * hier ja pruefen.
+   */
+  const jaNein = (val: unknown): string => {
+    if (val === true) return "Ja";
+    if (val === false) return "Nein";
+    return "—";
+  };
+
+  /** Eine Beschaeftigungszeile als ein lesbarer Satzteil. */
+  const beschreibeZeile = (z: BeschaeftigungEntry): string => {
+    const teile: string[] = [];
+    if (z.ende) {
+      teile.push(`${formatDate(z.beginn)} – ${formatDate(z.ende)}`);
+    } else {
+      teile.push(`seit ${formatDate(z.beginn)}`);
+    }
+    if (z.art) teile.push(ART_LABELS[z.art] || z.art);
+    if (typeof z.arbeitstage === "number") {
+      teile.push(`${z.arbeitstage} Arbeitstage`);
+    }
+    if (z.entgeltUeberGrenze === true) teile.push("Entgelt über der Grenze");
+    if (z.entgeltUeberGrenze === false) teile.push("Entgelt unter der Grenze");
+    if (z.beiArbeitsagentur) teile.push("Meldung bei der Agentur für Arbeit");
+    if (z.arbeitgeberName) teile.push(z.arbeitgeberName);
+    return teile.join(" · ");
   };
 
   return (
@@ -283,10 +381,15 @@ export function Step10Summary({
           label="Elterneigenschaft"
           value={d.parentStatus ? "Ja" : "Nein"}
         />
-        <SummaryRow
-          label="RV-Befreiung (Minijob)"
-          value={d.minijobRvBefreiung ? "Ja" : "Nein"}
-        />
+        {/* Nur noch fuer Altvorgaenge: Wer Schritt 11 durchlaufen hat, sieht
+            seine Entscheidung dort — zwei Antworten auf dieselbe Frage
+            waeren ein Widerspruch in der eigenen Akte. */}
+        {!d.rvEntscheidung && d.minijobRvBefreiung === true && (
+          <SummaryRow
+            label="RV-Befreiung (Minijob, frühere Erfassung)"
+            value="Ja"
+          />
+        )}
       </SummarySection>
 
       {/* Step 5: Steuer */}
@@ -317,23 +420,30 @@ export function Step10Summary({
       {/* Step 6: Weitere Beschäftigung */}
       <SummarySection title="6. Weitere Beschäftigung">
         <SummaryRow
-          label="Weiterer Arbeitgeber"
-          value={d.hasOtherEmployment ? "Ja" : "Nein"}
+          label="Status"
+          value={
+            d.beschaeftigungsStatus
+              ? statusLabel(d.beschaeftigungsStatus as string)
+              : "—"
+          }
         />
-        {!!d.hasOtherEmployment && (
-          <>
-            <SummaryRow
-              label="Arbeitgeber"
-              value={str(d.otherEmployerName)}
-            />
-            <SummaryRow
-              label="Wochenstunden"
-              value={
-                d.otherWeeklyHours ? `${str(d.otherWeeklyHours)} Std.` : "—"
-              }
-            />
-          </>
-        )}
+        <SummaryRow
+          label="Und zwar"
+          value={str(d.beschaeftigungsStatusSonstige)}
+        />
+        <SummaryRow
+          label="Bei der Agentur für Arbeit gemeldet"
+          value={jaNein(d.alsArbeitsuchendGemeldet)}
+        />
+        <SummaryRow label="Agentur" value={str(d.agenturFuerArbeit)} />
+        <SummaryRow
+          label="Mit Leistungsbezug"
+          value={jaNein(d.mitLeistungsbezug)}
+        />
+        <SummaryRow
+          label="Weitere Beschäftigungen"
+          value={jaNein(d.hasOtherEmployment)}
+        />
         <SummaryRow
           label="Haupt-/Nebenarbeitgeber"
           value={
@@ -341,10 +451,59 @@ export function Step10Summary({
           }
         />
         <SummaryRow
-          label="Weitere geringfügige Beschäftigung (Minijob)"
-          value={d.hasMinijob ? "Ja" : "Nein"}
+          label="Summe über der Geringfügigkeitsgrenze"
+          value={jaNein(d.summeUeberGeringfuegigkeitsgrenze)}
+        />
+        <SummaryRow
+          label="Vorbeschäftigungen in diesem Jahr"
+          value={jaNein(d.vorbeschaeftigungenVorhanden)}
+        />
+        <SummaryRow
+          label="Tätigkeit im Ausland"
+          value={jaNein(d.auslandsbeschaeftigungVorhanden)}
+        />
+        {/* Altfelder: seit AP 6 nicht mehr erhoben — die Tabelle „Weitere
+            Beschäftigung“ hat sie abgeloest. Sie erscheinen nur noch, wenn ein
+            alter Vorgang sie mitbringt; sonst blendet SummaryRow sie aus. */}
+        <SummaryRow
+          label="Arbeitgeber (frühere Erfassung)"
+          value={str(d.otherEmployerName)}
+        />
+        <SummaryRow
+          label="Wochenstunden (frühere Erfassung)"
+          value={d.otherWeeklyHours ? `${str(d.otherWeeklyHours)} Std.` : "—"}
         />
       </SummarySection>
+
+      {/* Die drei Tabellen aus Abschnitt 4 der Checkliste. Nur zeigen, was
+          wirklich eingetragen wurde — ein leerer Block sagt nichts. */}
+      {beschaeftigungen.length > 0 && (
+        <SummarySection title="Angegebene Beschäftigungen">
+          {BESCHAEFTIGUNGS_KATEGORIEN.map((kategorie) => {
+            const zeilen = beschaeftigungen.filter(
+              (z) => z.kategorie === kategorie
+            );
+            if (zeilen.length === 0) return null;
+            return (
+              <div
+                key={kategorie}
+                className="border-b border-border/50 py-2 last:border-0"
+              >
+                <p className="mb-1 text-xs font-semibold text-foreground">
+                  {KATEGORIE_LABELS[kategorie]}
+                </p>
+                {zeilen.map((z, i) => (
+                  <SummaryRow
+                    key={i}
+                    label={`Eintrag ${i + 1}`}
+                    value={beschreibeZeile(z)}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </SummarySection>
+      )}
 
       {/* Step 7: Kinder */}
       <SummarySection title="7. Kinder">
@@ -395,6 +554,24 @@ export function Step10Summary({
         )}
       </SummarySection>
 
+      {/* Rentenversicherung — bewusst ohne Ziffer im Titel: Die Nummern oben
+          stammen aus der alten festen Schrittfolge, in der es diesen Schritt
+          noch nicht gab. Eine erfundene Nummer waere irrefuehrender als keine. */}
+      {!!d.rvEntscheidung && (
+        <SummarySection title="Rentenversicherung">
+          <SummaryRow
+            label="Entscheidung"
+            value={rvEntscheidungLabel(d.rvEntscheidung as string)}
+          />
+          {d.rvMerkblattGelesen === true && (
+            <SummaryRow label="Hinweise zur Rente gelesen" value="Ja" />
+          )}
+          {d.rvBindungBestaetigt === true && (
+            <SummaryRow label="Bindungswirkung bestätigt" value="Ja" />
+          )}
+        </SummarySection>
+      )}
+
       {/* ============================================= */}
       {/* Dokumenten-Upload */}
       {/* ============================================= */}
@@ -402,7 +579,14 @@ export function Step10Summary({
         <DocumentUpload
           token={token}
           hasChildren={children.length > 0}
+          anzahlKinder={children.length}
           requiredDocuments={requiredDocuments}
+          rvEntscheidung={(d.rvEntscheidung as string) ?? null}
+          antragErzeugbar={antragErzeugbar}
+          onMissingChange={(missing) => {
+            setFehlendeDokumente(missing);
+            if (missing.length === 0) setDokumenteFehler("");
+          }}
         />
       )}
 
@@ -427,33 +611,51 @@ export function Step10Summary({
           Erklärung des Arbeitnehmers
         </h3>
         <div className="mb-4 rounded-lg bg-card p-4 text-xs leading-relaxed text-foreground">
-          <p className="mb-3">
-            Ich versichere, dass die vorstehenden Angaben der Wahrheit
-            entsprechen und ich keine Angaben wissentlich verschwiegen habe.
-          </p>
-          <p className="mb-3">
-            Mir ist bekannt, dass unwahre oder unvollständige Angaben
-            einen wichtigen Grund für eine außerordentliche Kündigung des
-            Arbeitsverhältnisses darstellen können.
-          </p>
-          <p className="mb-3">
-            Ich verpflichte mich, meinem Arbeitgeber{" "}
-            <strong>unverzüglich</strong> mitzuteilen, wenn sich
-            Änderungen bei den vorstehenden Angaben ergeben, insbesondere bei:
-          </p>
-          <ul className="mb-3 ml-4 list-disc space-y-1 text-muted-foreground">
-            <li>Änderung des Familienstandes oder der Anschrift</li>
-            <li>Änderung der Bankverbindung</li>
-            <li>Änderung der Krankenkasse</li>
-            <li>Änderung der Steuerklasse</li>
-            <li>Geburt eines Kindes</li>
-            <li>Aufnahme oder Beendigung einer weiteren Beschäftigung</li>
-            <li>Änderung bei der Schwerbehinderung</li>
-          </ul>
-          <p className="text-muted-foreground">
-            Mir ist bekannt, dass die Mitteilungspflicht auch nach Beendigung des
-            Arbeitsverhältnisses für laufende Abrechnungszeiträume fortbesteht.
-          </p>
+          {AKTUELLE_ERKLAERUNG.abschnitte.map((abschnitt, i) => (
+            <div key={i} className="mb-3 last:mb-0">
+              <p>{abschnitt.text}</p>
+              {abschnitt.punkte && (
+                <ul className="ml-4 mt-1 list-disc space-y-1 text-muted-foreground">
+                  {abschnitt.punkte.map((punkt) => (
+                    <li key={punkt}>{punkt}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Ort — wie auf dem Papierformular "Ort, Datum". Das Datum setzt der
+            Server beim Absenden, damit es nicht manipulierbar ist. */}
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="erklaerungOrt"
+              className="mb-1 block text-xs font-semibold text-foreground"
+            >
+              Ort <span className="text-destructive">*</span>
+            </label>
+            <input
+              id="erklaerungOrt"
+              type="text"
+              value={erklaerungOrt}
+              onChange={(e) => {
+                setErklaerungOrt(e.target.value);
+                if (dsgvoError.includes("Ort")) setDsgvoError("");
+              }}
+              maxLength={100}
+              placeholder="z.B. Minden"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-foreground">
+              Datum
+            </span>
+            <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+              wird beim Absenden gesetzt
+            </p>
+          </div>
         </div>
 
         <label className="flex items-start gap-3">
@@ -469,12 +671,11 @@ export function Step10Summary({
           />
           <div>
             <span className="text-sm font-medium text-foreground">
-              Ich bestaetige die vorstehende Erklärung.{" "}
+              {AKTUELLE_ERKLAERUNG.bestaetigung}{" "}
               <span className="text-destructive">*</span>
             </span>
             <p className="text-xs text-muted-foreground">
-              Diese Erklärung ersetzt Ihre handschriftliche Unterschrift
-              auf dem Personalfragebogen.
+              {AKTUELLE_ERKLAERUNG.unterschriftsersatz}
             </p>
           </div>
         </label>
@@ -540,6 +741,11 @@ export function Step10Summary({
             </p>
           </div>
         </label>
+        {dokumenteFehler && (
+          <p className="mt-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {dokumenteFehler}
+          </p>
+        )}
         {dsgvoError && (
           <p className="mt-2 text-xs text-destructive">{dsgvoError}</p>
         )}
@@ -593,7 +799,13 @@ export function Step10Summary({
               </button>
               <button
                 type="button"
-                onClick={() => { setShowConfirmDialog(false); onSubmit(); }}
+                onClick={() => {
+                  setShowConfirmDialog(false);
+                  onSubmit({
+                    ort: erklaerungOrt.trim(),
+                    version: AKTUELLE_ERKLAERUNG.version,
+                  });
+                }}
                 disabled={saving}
                 className="flex-1 rounded-lg bg-[#6BAA24] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#5a9420] disabled:opacity-50"
               >

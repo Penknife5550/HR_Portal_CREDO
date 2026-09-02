@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { validateMagicToken } from "@/lib/auth";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { sendEmail } from "@/lib/mailer";
@@ -16,8 +17,21 @@ import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import {
   computeMissingRequiredDocuments,
+  RV_BEFREIUNG_HINWEIS,
   documentTypeLabel,
 } from "@/lib/required-documents";
+import { MAX_STEP_NUMBER, SUMMARY_STEP_NUMBER } from "@/lib/fragebogen-steps";
+import { istBekannteErklaerung } from "@/lib/erklaerung-arbeitnehmer";
+import { berechnePruefsumme } from "@/lib/fragebogen-pruefsumme";
+import {
+  ERLAUBTE_FRAGEBOGEN_FELDER,
+  LEERBARE_FRAGEBOGEN_FELDER,
+} from "@/lib/fragebogen-felder";
+import {
+  BESCHAEFTIGUNGS_KATEGORIEN,
+  beschaeftigungsAngabenListeSchema,
+  zuDatensatz,
+} from "@/lib/validations/beschaeftigungs-angaben";
 import { z } from "zod";
 
 // =============================================
@@ -74,13 +88,60 @@ const fragebogenFieldsSchema = z.object({
   minijobRvBefreiung: z.boolean().optional(),
   bornAfter1971: z.boolean().optional(),
   masernschutzProvided: z.boolean().optional(),
-  currentStep: z.number().min(1).max(10).optional(),
+  // Abschnitt 2 der Minijob-Checkliste: Status bei Beginn der Beschaeftigung
+  // und die Rueckfrage zur Agentur fuer Arbeit.
+  beschaeftigungsStatus: z.enum([
+    "SCHUELER",
+    "STUDENT",
+    "SCHULENTLASSEN_BERUFSAUSBILDUNG",
+    "SCHULENTLASSEN_STUDIUM",
+    "SCHULENTLASSEN_FREIWILLIGENDIENST",
+    "BESCHAEFTIGUNGSLOS_SUCHEND",
+    "FREIWILLIGENDIENSTLEISTENDER",
+    "PRAKTIKANT",
+    "BEAMTER",
+    "SELBSTSTAENDIGER",
+    "ARBEITNEHMER_HAUPTBESCHAEFTIGUNG",
+    "ARBEITNEHMER_UNBEZAHLTER_URLAUB",
+    "ARBEITNEHMER_ELTERNZEIT",
+    "ALTERSVOLLRENTNER_VOR_REGELALTERSGRENZE",
+    "ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE",
+    "VERSORGUNGSEMPFAENGER",
+    "SONSTIGE",
+  ]).optional(),
+  // nullable: Wird die Frage gegenstandslos, sendet das Formular null.
+  beschaeftigungsStatusSonstige: z.string().max(200).nullable().optional(),
+  alsArbeitsuchendGemeldet: z.boolean().optional(),
+  agenturFuerArbeit: z.string().max(200).nullable().optional(),
+  mitLeistungsbezug: z.boolean().nullable().optional(),
+  // Grundfragen zu Abschnitt 4 der Minijob-Checkliste. hasOtherEmployment
+  // (oben) ist die Grundfrage zu 4a.
+  vorbeschaeftigungenVorhanden: z.boolean().optional(),
+  auslandsbeschaeftigungVorhanden: z.boolean().optional(),
+  summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
+  // Abschnitt 5 der Minijob-Checkliste: Entscheidung zur Rentenversicherung.
+  // Zeitpunkte setzt der Server, nicht der Browser.
+  rvEntscheidung: z.enum([
+    "KEINE_BEFREIUNG",
+    "BEFREIUNG_BEANTRAGT",
+    "RENTENVERSICHERUNGSFREI",
+    "AUFHEBUNG_BEANTRAGT",
+  ]).optional(),
+  rvMerkblattGelesen: z.boolean().optional(),
+  rvBindungBestaetigt: z.boolean().optional(),
+  // Registry-Nummer des Schritts, auf dem der Vorgang steht — nicht die
+  // Anzeigeposition. Obergrenze kommt aus der zentralen Schritt-Definition,
+  // damit ein neuer Schritt hier nicht vergessen wird.
+  currentStep: z.number().int().min(1).max(MAX_STEP_NUMBER).optional(),
   children: z.array(z.object({
     firstName: z.string().min(1).max(100),
     lastName: z.string().max(100).optional(),
     birthDate: z.string().min(1),
     taxAllowance: z.boolean().optional(),
   })).optional(),
+  // Zeilen der drei Tabellen aus Abschnitt 4. Die Validierung je Kategorie
+  // steht in validations/beschaeftigungs-angaben.ts.
+  beschaeftigungsAngaben: beschaeftigungsAngabenListeSchema.optional(),
 }).strip(); // strip() entfernt unbekannte Felder serverseitig (Defense in Depth zusaetzlich zur Whitelist)
 
 // =============================================
@@ -116,7 +177,10 @@ export async function GET(
   // PersonalData mit Kindern laden
   const personalData = await prisma.personalData.findUnique({
     where: { onboardingId: onboarding.id },
-    include: { children: { orderBy: { orderIndex: "asc" } } },
+    include: {
+      children: { orderBy: { orderIndex: "asc" } },
+      beschaeftigungsAngaben: { orderBy: [{ kategorie: "asc" }, { orderIndex: "asc" }] },
+    },
   });
 
   // Feld-Konfiguration + Pflicht-Dokumente laden.
@@ -139,6 +203,10 @@ export async function GET(
       name: onboarding.organization.name,
       mandantNumber: onboarding.organization.mandantNumber,
       type: onboarding.organization.type,
+      // Nur die Tatsache, nicht die Nummer: Der Fragebogen muss den
+      // Antrags-Download sperren koennen, aber die Betriebsnummer ist ein
+      // Arbeitgeber-Stammdatum und gehoert nicht in ein oeffentliches Formular.
+      betriebsnummerVorhanden: Boolean(onboarding.organization.betriebsnummer),
       // DSGVO: verantwortliche Stelle (pro Mandant konfigurierbar, sonst Default)
       dsgvoVerantwortlicheName: onboarding.organization.dsgvoVerantwortlicheName,
       dsgvoVerantwortlicheStrasse: onboarding.organization.dsgvoVerantwortlicheStrasse,
@@ -152,6 +220,16 @@ export async function GET(
     personalData: personalData
       ? {
           ...personalData,
+          // Der Arbeitgeberteil bleibt drin: Das sind Feststellungen des
+          // Arbeitgebers und die Kennung des Sachbearbeiters — sie gehen den
+          // Beschaeftigten nichts an und haben in einem oeffentlichen,
+          // nur token-geschuetzten Formular nichts zu suchen. `...personalData`
+          // nimmt sonst jedes neue Feld des Modells stillschweigend mit.
+          rvAntragEingangAm: undefined,
+          rvWirkungAb: undefined,
+          rvMeldungAm: undefined,
+          rvBearbeitetVonId: undefined,
+          rvBearbeitetAm: undefined,
           // Sensible Felder entschluesseln
           iban: personalData.iban ? decrypt(personalData.iban) : "",
           socialSecurityNumber: personalData.socialSecurityNumber ? decrypt(personalData.socialSecurityNumber) : "",
@@ -211,7 +289,7 @@ export async function PUT(
     );
   }
 
-  const { currentStep, children, ...data } = parsed.data;
+  const { currentStep, children, beschaeftigungsAngaben, ...data } = parsed.data;
 
   // Status auf IN_PROGRESS setzen falls noch INVITED
   if (onboarding.status === "INVITED") {
@@ -221,32 +299,22 @@ export async function PUT(
     });
   }
 
-  // Whitelist erlaubter Felder (Mass-Assignment-Schutz)
-  const ALLOWED_FIELDS = new Set([
-    "salutation", "title", "firstName", "lastName", "birthName",
-    "birthDate", "birthPlace", "birthCountry", "nationality",
-    "maritalStatus", "severelyDisabled", "disabilityDegree",
-    "street", "houseNumber", "zipCode", "city", "country",
-    "phone", "mobile", "emailPrivate",
-    "iban", "bic", "bankName", "accountHolder",
-    "socialSecurityNumber", "healthInsuranceName", "healthInsuranceType",
-    "parentStatus", "taxId", "taxClass", "taxAllowance", "childAllowance",
-    "religion", "highestSchoolDegree", "highestProfessionalDegree",
-    "isBeamter", "besoldungsgruppe", "laufbahngruppe", "dienstzeitBeginn",
-    "amtsbezeichnung", "verfassungstreuePruefung",
-    "hasOtherEmployment", "otherEmployerName", "otherWeeklyHours",
-    "employerType", "hasMinijob", "minijobRvBefreiung",
-    "bornAfter1971", "masernschutzProvided",
-  ]);
+  // Freigabeliste und leerbare Felder stehen in src/lib/fragebogen-felder.ts —
+  // dort halten Tests sie gegen die Schritt-Schemata.
+  const ALLOWED_FIELDS = ERLAUBTE_FRAGEBOGEN_FELDER;
+  const DARF_GELEERT_WERDEN = LEERBARE_FRAGEBOGEN_FELDER;
 
   // PersonalData upserten (erstellen oder aktualisieren)
   const updateData: Record<string, unknown> = {};
 
   // Nur gesetzte UND erlaubte Felder uebernehmen (kein Ueberschreiben mit null)
   for (const [key, value] of Object.entries(data)) {
-    if (ALLOWED_FIELDS.has(key) && value !== undefined && value !== null && value !== "") {
-      updateData[key] = value;
+    if (!ALLOWED_FIELDS.has(key) || value === undefined) continue;
+    if (value === null || value === "") {
+      if (DARF_GELEERT_WERDEN.has(key)) updateData[key] = null;
+      continue;
     }
+    updateData[key] = value;
   }
 
   // Speziell: Booleans und 0 erlauben
@@ -268,6 +336,29 @@ export async function PUT(
     updateData.hasMinijob = data.hasMinijob;
   if (typeof data.minijobRvBefreiung === "boolean")
     updateData.minijobRvBefreiung = data.minijobRvBefreiung;
+  if (typeof data.alsArbeitsuchendGemeldet === "boolean")
+    updateData.alsArbeitsuchendGemeldet = data.alsArbeitsuchendGemeldet;
+  if (typeof data.mitLeistungsbezug === "boolean")
+    updateData.mitLeistungsbezug = data.mitLeistungsbezug;
+  if (typeof data.vorbeschaeftigungenVorhanden === "boolean")
+    updateData.vorbeschaeftigungenVorhanden = data.vorbeschaeftigungenVorhanden;
+  if (typeof data.auslandsbeschaeftigungVorhanden === "boolean")
+    updateData.auslandsbeschaeftigungVorhanden = data.auslandsbeschaeftigungVorhanden;
+  if (typeof data.summeUeberGeringfuegigkeitsgrenze === "boolean")
+    updateData.summeUeberGeringfuegigkeitsgrenze = data.summeUeberGeringfuegigkeitsgrenze;
+  if (typeof data.rvMerkblattGelesen === "boolean")
+    updateData.rvMerkblattGelesen = data.rvMerkblattGelesen;
+  if (typeof data.rvBindungBestaetigt === "boolean")
+    updateData.rvBindungBestaetigt = data.rvBindungBestaetigt;
+
+  // Zeitpunkte gehoeren dem Server. Was der Browser behauptet, taugt als
+  // Nachweis nichts — genauso wie bei der Wahrheitsversicherung.
+  if (data.rvEntscheidung) {
+    updateData.rvEntscheidungAm = new Date();
+  }
+  if (data.rvMerkblattGelesen === true) {
+    updateData.rvMerkblattGelesenAm = new Date();
+  }
 
   // Datumsfelder konvertieren
   if (data.birthDate) updateData.birthDate = new Date(data.birthDate);
@@ -298,36 +389,66 @@ export async function PUT(
     update: updateData,
   });
 
-  // Kinder separat behandeln (replace-Strategie)
-  if (Array.isArray(children)) {
-    // Alte Kinder löschen
-    await prisma.child.deleteMany({
-      where: { personalDataId: personalData.id },
-    });
+  // =============================================
+  // Wiederholbare Zeilen: ersetzen statt zusammenfuehren
+  // =============================================
+  // Loeschen und Neuanlegen laufen in **einer** Transaktion. Vorher waren es
+  // zwei getrennte Aufrufe — schlug das Anlegen fehl, waren die alten Zeilen
+  // schon weg und der Zwischenstand des Beschaeftigten verloren.
+  const zeilenSchreiben: Prisma.PrismaPromise<unknown>[] = [];
 
-    // Neue Kinder anlegen
+  if (Array.isArray(children)) {
+    zeilenSchreiben.push(
+      prisma.child.deleteMany({ where: { personalDataId: personalData.id } }),
+    );
     if (children.length > 0) {
-      await prisma.child.createMany({
-        data: children.map(
-          (
-            child: {
-              firstName: string;
-              lastName?: string;
-              birthDate: string;
-              taxAllowance?: boolean;
-            },
-            index: number
-          ) => ({
+      zeilenSchreiben.push(
+        prisma.child.createMany({
+          data: children.map((child, index) => ({
             personalDataId: personalData.id,
             firstName: child.firstName,
             lastName: child.lastName || null,
             birthDate: new Date(child.birthDate),
             taxAllowance: child.taxAllowance || false,
             orderIndex: index,
-          })
-        ),
-      });
+          })),
+        }),
+      );
     }
+  }
+
+  if (Array.isArray(beschaeftigungsAngaben)) {
+    // Nur die Kategorien anfassen, die tatsaechlich mitgeschickt wurden.
+    // Sonst loeschte ein Schritt, der nur 4a sendet, auch die Zeilen zu 4b
+    // und 4c mit.
+    const gesendeteKategorien = new Set(
+      beschaeftigungsAngaben.map((a) => a.kategorie),
+    );
+
+    for (const kategorie of BESCHAEFTIGUNGS_KATEGORIEN) {
+      if (!gesendeteKategorien.has(kategorie)) continue;
+      zeilenSchreiben.push(
+        prisma.beschaeftigungsAngabe.deleteMany({
+          where: { personalDataId: personalData.id, kategorie },
+        }),
+      );
+    }
+
+    // orderIndex je Kategorie zaehlen, nicht ueber die gesamte Liste.
+    const zaehler: Record<string, number> = {};
+    for (const angabe of beschaeftigungsAngaben) {
+      const index = zaehler[angabe.kategorie] ?? 0;
+      zaehler[angabe.kategorie] = index + 1;
+      zeilenSchreiben.push(
+        prisma.beschaeftigungsAngabe.create({
+          data: zuDatensatz(angabe, personalData.id, index),
+        }),
+      );
+    }
+  }
+
+  if (zeilenSchreiben.length > 0) {
+    await prisma.$transaction(zeilenSchreiben);
   }
 
   // Name im Onboarding-Prozess aktualisieren
@@ -347,6 +468,18 @@ export async function PUT(
 // =============================================
 // POST – Fragebogen endgültig absenden
 // =============================================
+/**
+ * Ein zweiter Absender war schneller.
+ *
+ * Eigene Klasse, weil das Beanspruchen des Vorgangs INNERHALB der Transaktion
+ * passiert: Der einzige Weg, eine begonnene Transaktion zurueckzurollen, ist
+ * eine Ausnahme. Sie traegt keine Nutzdaten — der Aufrufer antwortet 409.
+ */
+class BereitsEingereicht extends Error {}
+
+/** Aus diesen Staenden heraus darf abgesendet werden. */
+const ABSENDBAR = ["INVITED", "IN_PROGRESS"] as const;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -373,8 +506,14 @@ export async function POST(
 
   const onboarding = result.onboarding!;
 
-  // Doppelten Submit verhindern: Bereits eingereichte Fragebogen ablehnen
-  if (onboarding.status === "SUBMITTED" || onboarding.status === "SUPERVISOR_PENDING" || onboarding.status === "SUPERVISOR_SUBMITTED" || onboarding.status === "REVIEWED" || onboarding.status === "COMPLETED") {
+  // Schneller Weg fuer den Regelfall: Wer den Link nach dem Absenden erneut
+  // oeffnet, bekommt sofort eine klare Antwort, ohne dass Dokumente und
+  // Pruefsumme umsonst geladen werden.
+  //
+  // Verlassen darf man sich darauf NICHT — zwischen dieser Zeile und dem
+  // Schreiben liegen mehrere Datenbankabfragen. Die verbindliche Sperre ist das
+  // bedingte updateMany unten, das den Statuswechsel selbst als Sperre benutzt.
+  if (!ABSENDBAR.includes(onboarding.status as (typeof ABSENDBAR)[number])) {
     return NextResponse.json(
       { error: "Fragebogen wurde bereits eingereicht." },
       { status: 409 }
@@ -383,10 +522,52 @@ export async function POST(
 
   const body = await request.json();
 
-  if (!body.dsgvoAccepted) {
+  const absendenSchema = z.object({
+    dsgvoAccepted: z.literal(true),
+    // Die Wahrheitsversicherung ersetzt die Unterschrift. Sie war bisher reiner
+    // Browser-Zustand und ging beim Absenden verloren — der Server hat sie nie
+    // gesehen und konnte sie folglich auch nicht erzwingen.
+    erklaerungAccepted: z.literal(true),
+    erklaerungOrt: z.string().trim().min(2).max(100),
+    erklaerungVersion: z.string().min(1).max(40),
+  });
+
+  const absenden = absendenSchema.safeParse(body);
+  if (!absenden.success) {
+    const fehlend = absenden.error.issues.map((i) => i.path.join("."));
+    if (fehlend.includes("dsgvoAccepted")) {
+      return NextResponse.json(
+        { error: "DSGVO-Einwilligung ist erforderlich." },
+        { status: 400 }
+      );
+    }
+    if (fehlend.includes("erklaerungAccepted")) {
+      return NextResponse.json(
+        { error: "Bitte bestätigen Sie die Erklärung des Arbeitnehmers." },
+        { status: 400 }
+      );
+    }
+    if (fehlend.includes("erklaerungOrt")) {
+      return NextResponse.json(
+        { error: "Bitte geben Sie den Ort an. Er gehört zur Unterschrift." },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: "DSGVO-Einwilligung ist erforderlich." },
+      { error: "Die Angaben zur Erklärung sind unvollständig." },
       { status: 400 }
+    );
+  }
+
+  // Eine Version, die wir nicht kennen, koennen wir spaeter nicht mehr
+  // nachweisen — dann waere die Erklaerung wertlos.
+  if (!istBekannteErklaerung(absenden.data.erklaerungVersion)) {
+    return NextResponse.json(
+      {
+        error:
+          "Der Erklärungstext ist nicht mehr aktuell. Bitte laden Sie die Seite neu.",
+      },
+      { status: 409 }
     );
   }
 
@@ -403,7 +584,11 @@ export async function POST(
     "GEBURTSURKUNDE_KIND",
   ];
 
-  if (requiredDocs.length > 0) {
+  // Bewusst ohne `if (requiredDocs.length > 0)`: Die Pflicht zum
+  // Befreiungsantrag entsteht aus der Entscheidung des Beschaeftigten, nicht aus
+  // der Vorlage. Setzt HR die Pflichtdokumente einer Vorlage auf die leere
+  // Liste, verschwaende der alte Guard diese Sperre lautlos mit.
+  {
     const [uploaded, childCount] = await Promise.all([
       prisma.document.findMany({
         where: { onboardingId: onboarding.id },
@@ -414,17 +599,25 @@ export async function POST(
       }),
     ]);
 
+    // Verbindlich ist der Datenbankstand, nicht etwas Mitgeschicktes: In einem
+    // zweiten Tab kann ein Dokument geloescht worden sein, waehrend hier
+    // abgesendet wird.
     const missing = computeMissingRequiredDocuments({
       required: requiredDocs,
       uploadedTypes: uploaded.map((d) => d.type),
       hasChildren: childCount > 0,
+      // personalData ist ueber validateMagicToken bereits geladen.
+      rvEntscheidung: onboarding.personalData?.rvEntscheidung ?? null,
     });
 
     if (missing.length > 0) {
       const labels = missing.map((t) => documentTypeLabel(t)).join(", ");
+      const nurRv = missing.length === 1 && missing[0] === "RV_BEFREIUNG";
       return NextResponse.json(
         {
-          error: `Bitte laden Sie folgende Pflichtdokumente hoch, bevor Sie absenden: ${labels}.`,
+          error: nurRv
+            ? RV_BEFREIUNG_HINWEIS
+            : `Bitte laden Sie folgende Pflichtdokumente hoch, bevor Sie absenden: ${labels}.`,
           missingDocuments: missing,
         },
         { status: 400 }
@@ -432,37 +625,145 @@ export async function POST(
     }
   }
 
-  // PersonalData als vollstaendig markieren
-  await prisma.personalData.update({
+  // =============================================
+  // Wahrheitsversicherung pruefungsfest festhalten
+  // =============================================
+  // Die Pruefsumme wird ueber den Stand gebildet, den der Beschaeftigte in
+  // diesem Moment bestaetigt — im Klartext, damit sie sich spaeter nachrechnen
+  // laesst (verschluesselte Felder haben bei jedem Speichern ein anderes
+  // Chiffrat).
+  const bestand = await prisma.personalData.findUnique({
     where: { onboardingId: onboarding.id },
-    data: {
-      isComplete: true,
-      dsgvoAccepted: true,
-      dsgvoAcceptedAt: new Date(),
-      currentStep: 10,
-    },
+    include: { children: true, beschaeftigungsAngaben: true },
   });
 
-  // Onboarding-Status aktualisieren
-  await prisma.onboardingProcess.update({
-    where: { id: onboarding.id },
-    data: {
-      status: "SUBMITTED",
-      submittedAt: new Date(),
-    },
-  });
+  if (!bestand) {
+    return NextResponse.json(
+      { error: "Es sind noch keine Angaben gespeichert." },
+      { status: 400 }
+    );
+  }
 
-  // Audit-Log
-  await prisma.auditLog.create({
-    data: {
-      onboardingId: onboarding.id,
-      action: "QUESTIONNAIRE_SUBMITTED",
-      details: {
-        email: onboarding.email,
-        submittedAt: new Date().toISOString(),
+  // =============================================
+  // Rentenversicherung: Voraussetzungen fuer einen Antrag
+  // =============================================
+  // Beide Antragsanlagen tragen im Kopf Name, Vorname und
+  // Rentenversicherungsnummer. Ohne sie erzeugte das Portal ein Dokument mit
+  // leerer Pflichtangabe — deshalb blockiert es lieber und sagt, was fehlt.
+  const brauchtRvNummer =
+    bestand.rvEntscheidung === "BEFREIUNG_BEANTRAGT" ||
+    bestand.rvEntscheidung === "AUFHEBUNG_BEANTRAGT";
+
+  if (brauchtRvNummer && !bestand.socialSecurityNumber) {
+    return NextResponse.json(
+      {
+        error:
+          "Für Ihren Antrag zur Rentenversicherung brauchen wir Ihre " +
+          "Rentenversicherungsnummer. Bitte ergänzen Sie sie im Schritt " +
+          "„Sozialversicherung“.",
       },
-    },
-  });
+      { status: 400 }
+    );
+  }
+
+  const angabenKlartext: Record<string, unknown> = {
+    ...bestand,
+    iban: bestand.iban ? decrypt(bestand.iban) : bestand.iban,
+    socialSecurityNumber: bestand.socialSecurityNumber
+      ? decrypt(bestand.socialSecurityNumber)
+      : bestand.socialSecurityNumber,
+    taxId: bestand.taxId ? decrypt(bestand.taxId) : bestand.taxId,
+  };
+
+  const pruefsumme = berechnePruefsumme(
+    angabenKlartext,
+    bestand.children,
+    bestand.beschaeftigungsAngaben,
+  );
+  const abgegebenAm = new Date();
+
+  // =============================================
+  // Der eigentliche Abschluss — atomar und in einem Rutsch
+  // =============================================
+  // Alle drei Saetze gehoeren zusammen: die abgegebene Erklaerung, der
+  // Statuswechsel und der Protokolleintrag. Liefen sie einzeln, koennte ein
+  // Abbruch dazwischen eine bestaetigte Erklaerung hinterlassen, waehrend der
+  // Vorgang weiter IN_PROGRESS steht — HR saehe ihn als unerledigt, und der
+  // Beschaeftigte koennte erneut absenden und Ort, Zeitpunkt und Pruefsumme
+  // der ersten Erklaerung ueberschreiben.
+  //
+  // Das bedingte updateMany ist zugleich die Sperre gegen den Doppel-Submit:
+  // Es ist EIN atomares UPDATE ... WHERE status IN (...), also gewinnt genau
+  // ein Aufrufer. Die vorgelagerte Statuspruefung allein genuegt nicht — der
+  // Handler wartet danach auf mehrere Abfragen, und zwei offene Tabs oder ein
+  // Retry nach Proxy-Timeout kommen beide durch. Zwei QUESTIONNAIRE_SUBMITTED
+  // mit verschiedenen Pruefsummen zur selben Erklaerung machen den
+  // Unterschriftsersatz in der Betriebspruefung mehrdeutig.
+  //
+  // submittedAt traegt bewusst `abgegebenAm` — denselben Zeitpunkt wie die
+  // Erklaerung und das Protokoll. Ein eigenes `new Date()` ergaebe drei
+  // minimal verschiedene Zeitstempel fuer einen Vorgang, und submittedAt ist
+  // der Anker fuer das RV-Wirkungsdatum beim Aufhebungsantrag.
+  try {
+    await prisma.$transaction(async (tx) => {
+      const beansprucht = await tx.onboardingProcess.updateMany({
+        where: { id: onboarding.id, status: { in: [...ABSENDBAR] } },
+        data: { status: "SUBMITTED", submittedAt: abgegebenAm },
+      });
+      if (beansprucht.count === 0) throw new BereitsEingereicht();
+
+      await tx.personalData.update({
+        where: { onboardingId: onboarding.id },
+        data: {
+          isComplete: true,
+          dsgvoAccepted: true,
+          dsgvoAcceptedAt: abgegebenAm,
+          currentStep: SUMMARY_STEP_NUMBER,
+          erklaerungAccepted: true,
+          erklaerungAcceptedAt: abgegebenAm,
+          erklaerungOrt: absenden.data.erklaerungOrt,
+          erklaerungIp: clientIp,
+          erklaerungUserAgent:
+            request.headers.get("user-agent")?.slice(0, 500) ?? null,
+          erklaerungVersion: absenden.data.erklaerungVersion,
+          erklaerungPruefsumme: pruefsumme,
+        },
+      });
+
+      // Der Protokolleintrag gehoert in denselben Commit: Er ist der Nachweis
+      // der Abgabe, nicht bloss ein Logeintrag daneben.
+      await tx.auditLog.create({
+        data: {
+          onboardingId: onboarding.id,
+          action: "QUESTIONNAIRE_SUBMITTED",
+          details: {
+            email: onboarding.email,
+            submittedAt: abgegebenAm.toISOString(),
+            erklaerungOrt: absenden.data.erklaerungOrt,
+            erklaerungVersion: absenden.data.erklaerungVersion,
+            erklaerungPruefsumme: pruefsumme,
+          },
+          ipAddress: clientIp,
+        },
+      });
+    });
+  } catch (error) {
+    if (error instanceof BereitsEingereicht) {
+      return NextResponse.json(
+        { error: "Fragebogen wurde bereits eingereicht." },
+        { status: 409 }
+      );
+    }
+    console.error("[Fragebogen] Absenden fehlgeschlagen:", error);
+    return NextResponse.json(
+      {
+        error:
+          "Der Fragebogen konnte nicht abgesendet werden. " +
+          "Bitte versuchen Sie es erneut.",
+      },
+      { status: 500 }
+    );
+  }
 
   // n8n Webhook aufrufen (falls konfiguriert) – HR-Benachrichtigung
   await triggerN8nWebhook("questionnaire-completed", {

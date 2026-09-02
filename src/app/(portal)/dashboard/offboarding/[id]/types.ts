@@ -178,7 +178,10 @@ export interface OffboardingData {
   initiatedAt: string;
   completedAt: string | null;
   dataRetentionDate: string | null;
-  organization: { name: string; mandantNumber: string };
+  // id ist noetig, damit die Vorlagen-Sektion nur die Vorlagen dieses
+  // Traegers laedt. Die Schnittstelle liefert sie laengst mit (include:
+  // { organization: true }), der Typ kannte sie nur nicht.
+  organization: { id: string; name: string; mandantNumber: string };
   exitData: ExitData | null;
   returnItems: ReturnItemData[];
   documents: DocumentData[];

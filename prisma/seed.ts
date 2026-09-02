@@ -9,6 +9,7 @@ import { PrismaClient, OrganizationType, UserRole, QuestionnaireType, ExitInterv
 import { hashSync } from "bcryptjs";
 import crypto from "crypto";
 import { ALL_DEFAULT_BEURTEILUNG_TEMPLATES } from "../src/lib/beurteilung-defaults";
+import { generateFullStepsConfig } from "../src/lib/field-definitions";
 
 const prisma = new PrismaClient();
 
@@ -161,44 +162,48 @@ async function main() {
   // =============================================
   console.log("📋 Formularvorlagen anlegen...\n");
 
-  const allStepsEnabled = [
-    { step: 1, title: "Persönliche Angaben", enabled: true },
-    { step: 2, title: "Adresse & Kontakt", enabled: true },
-    { step: 3, title: "Bankverbindung", enabled: true },
-    { step: 4, title: "Sozialversicherung", enabled: true },
-    { step: 5, title: "Steuer", enabled: true },
-    { step: 6, title: "Weitere Beschaeftigung", enabled: true },
-    { step: 7, title: "Kinder", enabled: true },
-    { step: 8, title: "Bildung & Beruf", enabled: true },
-    { step: 9, title: "Masernschutz", enabled: true },
-    { step: 10, title: "Zusammenfassung", enabled: true },
-  ];
+  // Schrittnummern und Titel kommen aus der zentralen Definition
+  // (src/lib/fragebogen-steps.ts). Hier wird nur noch entschieden, welche
+  // Schritte eine Vorlage abschaltet.
+  const stepsExcept = (disabled: number[]) =>
+    generateFullStepsConfig().map((s) => ({
+      ...s,
+      enabled: !disabled.includes(s.step),
+    }));
 
-  const minijobSteps = [
-    { step: 1, title: "Persönliche Angaben", enabled: true },
-    { step: 2, title: "Adresse & Kontakt", enabled: true },
-    { step: 3, title: "Bankverbindung", enabled: true },
-    { step: 4, title: "Sozialversicherung", enabled: true },
-    { step: 5, title: "Steuer", enabled: false },
-    { step: 6, title: "Weitere Beschaeftigung", enabled: false },
-    { step: 7, title: "Kinder", enabled: false },
-    { step: 8, title: "Bildung & Beruf", enabled: false },
-    { step: 9, title: "Masernschutz", enabled: false },
-    { step: 10, title: "Zusammenfassung", enabled: true },
-  ];
+  // Schritt 11 (Rentenversicherung) ist eine Minijob-Angelegenheit und bleibt
+  // in allen anderen Vorlagen aus.
+  const allStepsEnabled = stepsExcept([11]);
 
-  const ehrenamtSteps = [
-    { step: 1, title: "Persönliche Angaben", enabled: true },
-    { step: 2, title: "Adresse & Kontakt", enabled: true },
-    { step: 3, title: "Bankverbindung", enabled: false },
-    { step: 4, title: "Sozialversicherung", enabled: false },
-    { step: 5, title: "Steuer", enabled: false },
-    { step: 6, title: "Weitere Beschaeftigung", enabled: false },
-    { step: 7, title: "Kinder", enabled: false },
-    { step: 8, title: "Bildung & Beruf", enabled: false },
-    { step: 9, title: "Masernschutz", enabled: false },
-    { step: 10, title: "Zusammenfassung", enabled: true },
-  ];
+  /**
+   * Minijob: Der Steuer-Schritt bleibt aktiv, wird aber auf die Steuer-ID
+   * reduziert. Die Checkliste der Minijob-Zentrale verlangt die Steuer-ID;
+   * Steuerklasse, Freibetraege und Religionszugehoerigkeit spielen bei
+   * Pauschalbesteuerung keine Rolle und wuerden als Pflichtfelder stoeren.
+   */
+  const minijobTaxFields = (
+    generateFullStepsConfig().find((s) => s.step === 5)?.fields ?? []
+  ).map((f) =>
+    f.name === "taxId"
+      ? { ...f, visible: true, required: true }
+      : { ...f, visible: false, required: false },
+  );
+
+  /**
+   * Minijob: Nur der Masernschutz faellt weg — er ist fuer geringfuegig
+   * Beschaeftigte in Schulen und Kitas nicht einschlaegig.
+   *
+   * "Bildung & Beruf" bleibt bewusst aktiv: Der Taetigkeitsschluessel der
+   * Meldung zur Sozialversicherung verlangt Schulabschluss und
+   * Berufsausbildung auch bei geringfuegig Beschaeftigten (Entscheidung
+   * 25.08.2026). "Weitere Beschaeftigung" bleibt aktiv, weil die
+   * Beitragsverfahrensverordnung genau diese Erklaerung verlangt.
+   */
+  const minijobSteps = stepsExcept([9]).map((s) =>
+    s.step === 5 ? { ...s, fields: minijobTaxFields } : s,
+  );
+
+  const ehrenamtSteps = stepsExcept([3, 4, 5, 6, 7, 8, 9, 11]);
 
   const formTemplates = [
     {
@@ -234,14 +239,18 @@ async function main() {
   ];
 
   for (const tmpl of formTemplates) {
+    // stepsConfig ist eine Json-Spalte. StepFieldConfig ist ein Interface mit
+    // optionalem `fields` und damit fuer Prismas InputJsonValue nicht direkt
+    // zuweisbar — der Umweg ueber `object` ist hier der uebliche Weg.
+    const stepsConfig = tmpl.stepsConfig as unknown as object;
     await prisma.formTemplate.upsert({
       where: { questionnaireType: tmpl.questionnaireType },
       update: {
         name: tmpl.name,
         description: tmpl.description,
-        stepsConfig: tmpl.stepsConfig,
+        stepsConfig,
       },
-      create: tmpl,
+      create: { ...tmpl, stepsConfig },
     });
     console.log(`  ✅ Vorlage: ${tmpl.name} (${tmpl.questionnaireType})`);
   }

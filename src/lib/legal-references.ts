@@ -9,8 +9,7 @@
  * - Public Verify-/Audit-Page
  * - PDF-Export
  *
- * Quelle: HR_Portal_CREDO/docs/Digitale Dokumentation von
- * Unterrichtsbesuchen – NRW Ersatzschulen (Verbeamtung).md
+ * Quelle: docs/module/verbeamtung/unterrichtsbesuche-nrw-ersatzschulen.md
  */
 
 export interface LegalReference {

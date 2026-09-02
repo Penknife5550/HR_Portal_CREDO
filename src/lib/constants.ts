@@ -161,6 +161,34 @@ export const EXIT_TYPE_LABELS: Record<string, string> = {
 };
 
 // =============================================
+// Beschaeftigungsart und Zeugnisart (Offboarding)
+//
+// Beide Felder speichert das Portal als Grosschreibungs-Code, ohne dass eine
+// Uebersetzung existierte. In einem Schreiben stuende sonst woertlich
+// "ANGESTELLT" bzw. "QUALIFIZIERT". Unbekannte Werte fallen bewusst auf den
+// Rohwert zurueck — die Felder sind nicht gegen ein Enum validiert.
+// =============================================
+export const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
+  ANGESTELLT: "Angestellt",
+  BEAMTET: "Beamtet",
+  MINIJOB: "Minijob",
+};
+
+export const CERTIFICATE_TYPE_LABELS: Record<string, string> = {
+  QUALIFIZIERT: "Qualifiziertes Arbeitszeugnis",
+  EINFACH: "Einfaches Arbeitszeugnis",
+};
+
+/** Uebersetzt einen Code ueber einen Katalog; unbekannt bleibt unveraendert. */
+export function labelOderRohwert(
+  katalog: Record<string, string>,
+  wert: string | null | undefined,
+): string | undefined {
+  if (!wert) return undefined;
+  return katalog[wert] ?? wert;
+}
+
+// =============================================
 // Rueckgabe-Kategorie-Labels
 // =============================================
 export const RETURN_CATEGORY_LABELS: Record<string, string> = {
@@ -369,3 +397,17 @@ export const CIVIL_SERVICE_DOC_TYPES: Record<string, string> = {
   BEIRAT_PROTOKOLL_PROBE: "Beiratsprotokoll (Probe)",
   BEIRAT_PROTOKOLL_LEBENSZEIT: "Beiratsprotokoll (Lebenszeit)",
 };
+
+/**
+ * Dokumenttypen, die der Upload der Verbeamtung annimmt.
+ *
+ * Abgeleitet aus der Liste, die die Oberflaeche anbietet — plus SONSTIGES als
+ * Rueckfallwert. In der Upload-Route stand frueher eine eigene Aufzaehlung, die
+ * sich mit der Oberflaeche nur in neun von siebenundzwanzig Eintraegen deckte.
+ * Aufgefallen ist das nie, weil der Upload den Typ unter dem falschen
+ * Feldnamen schickte und deshalb ohnehin immer auf SONSTIGES fiel.
+ */
+export const CIVIL_SERVICE_UPLOAD_TYPES: string[] = [
+  ...Object.keys(CIVIL_SERVICE_DOC_TYPES),
+  "SONSTIGES",
+];

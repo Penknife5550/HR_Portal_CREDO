@@ -8,6 +8,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { ADMIN_ROLES } from "@/lib/permissions";
+import {
+  ABRECHNUNGSTAG_FORMAT_FEHLER,
+  BETRIEBSNUMMER_FORMAT_FEHLER,
+  pruefeAbrechnungstagEingabe,
+  pruefeBetriebsnummerEingabe,
+} from "@/lib/betriebsnummer";
 
 // Gueltige OrganizationType-Werte (aus Prisma Schema)
 const VALID_ORG_TYPES = [
@@ -31,11 +38,21 @@ export async function GET() {
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
+    // Betriebsnummer und Abrechnungstermin sind Arbeitgeber-Stammdaten: Die
+    // eine steht auf amtlichen Antraegen an die Minijob-Zentrale, der andere
+    // steuert eine beitragsrechtliche Frist. Sie gehen nur an die Rollen, die
+    // sie auch pflegen duerfen — eine Einrichtungsleitung braucht die Nummern
+    // der uebrigen fuenfzehn Traeger nicht. Der Fragebogen gibt sie ohnehin
+    // nicht heraus, dort geht nur ein Ja/Nein raus.
+    const darfStammdatenSehen = ADMIN_ROLES.includes(session.role);
+
     const organizations = await prisma.organization.findMany({
       orderBy: { name: "asc" },
       select: {
         id: true,
         mandantNumber: true,
+        betriebsnummer: darfStammdatenSehen,
+        entgeltabrechnungTag: darfStammdatenSehen,
         name: true,
         shortName: true,
         type: true,
@@ -103,6 +120,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Betriebsnummer ist optional — sie wird oft erst spaeter nachgetragen.
+    // Ist sie angegeben, muss sie stimmen: acht Ziffern, normalisiert gespeichert.
+    const betriebsnummer = pruefeBetriebsnummerEingabe(body.betriebsnummer);
+    if (!betriebsnummer.ok) {
+      return NextResponse.json(
+        { error: BETRIEBSNUMMER_FORMAT_FEHLER },
+        { status: 400 }
+      );
+    }
+
+    const abrechnungstag = pruefeAbrechnungstagEingabe(body.entgeltabrechnungTag);
+    if (!abrechnungstag.ok) {
+      return NextResponse.json(
+        { error: ABRECHNUNGSTAG_FORMAT_FEHLER },
+        { status: 400 }
+      );
+    }
+
     // Pruefen ob Mandantennummer bereits existiert
     const existing = await prisma.organization.findUnique({
       where: { mandantNumber: mandantNumber.trim() },
@@ -117,6 +152,8 @@ export async function POST(request: NextRequest) {
     const organization = await prisma.organization.create({
       data: {
         mandantNumber: mandantNumber.trim(),
+        betriebsnummer: betriebsnummer.wert,
+        entgeltabrechnungTag: abrechnungstag.wert,
         name: name.trim(),
         shortName: shortName?.trim() || null,
         type,

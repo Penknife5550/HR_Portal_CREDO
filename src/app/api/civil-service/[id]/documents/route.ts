@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { CIVIL_SERVICE_UPLOAD_TYPES } from "@/lib/constants";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
@@ -40,44 +41,6 @@ function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
 
 // ── Gültige Dokumenttypen (33+ aus dem Verbeamtungsverfahren) ──
 
-const CIVIL_SERVICE_DOC_TYPES = [
-  // Phase I: Antrag & Voraussetzungen
-  "ANTRAG_PSI",
-  "LEBENSLAUF",
-  "FUEHRUNGSZEUGNIS",
-  "AMTSARZT_PROBE",
-  "AMTSARZT_LEBENSZEIT",
-  // Phase II: Verwaltung
-  "VERTRAG_PROBE",
-  "VERTRAG_LEBENSZEIT",
-  "ERNENNUNGSURKUNDE_PROBE",
-  "ERNENNUNGSURKUNDE_LEBENSZEIT",
-  "BESOLDUNGSBESCHEID",
-  "RV_BEFREIUNGSANTRAG",
-  "RV_BEFREIUNGSBESCHEID",
-  "BEIHILFE_ANTRAG",
-  "BEIHILFE_BESCHEID",
-  "BR_ANTRAG_PROBE",
-  "BR_ANTRAG_LEBENSZEIT",
-  "BR_GENEHMIGUNG_PROBE",
-  "BR_GENEHMIGUNG_LEBENSZEIT",
-  "DIENSTEID",
-  "BELEHRUNG_DATENSCHUTZ",
-  "BELEHRUNG_MASERNSCHUTZ",
-  // Phase III: Probezeit
-  "BEURTEILUNG_1",
-  "BEURTEILUNG_2",
-  "BEURTEILUNG_3",
-  "REFERENZ_GEMEINDE",
-  "UNTERRICHTSBESUCH_1",
-  "UNTERRICHTSBESUCH_2",
-  "UNTERRICHTSBESUCH_3",
-  // Phase IV: Übernahme
-  "BEIRAT_PROTOKOLL",
-  "ANTRAG_LEBENSZEIT",
-  // Allgemein
-  "SONSTIGES",
-];
 
 // Amtsarzt-Dokumenttypen die automatisch ein Ablaufdatum bekommen
 const AMTSARZT_TYPES = ["AMTSARZT_PROBE", "AMTSARZT_LEBENSZEIT"];
@@ -175,10 +138,10 @@ export async function POST(
 
     // Dokumenttyp validieren
     const upperDocType = documentType.toUpperCase();
-    if (!CIVIL_SERVICE_DOC_TYPES.includes(upperDocType)) {
+    if (!CIVIL_SERVICE_UPLOAD_TYPES.includes(upperDocType)) {
       return NextResponse.json(
         {
-          error: `Ungültiger Dokumenttyp. Erlaubt: ${CIVIL_SERVICE_DOC_TYPES.join(", ")}`,
+          error: `Ungültiger Dokumenttyp. Erlaubt: ${CIVIL_SERVICE_UPLOAD_TYPES.join(", ")}`,
         },
         { status: 400 }
       );

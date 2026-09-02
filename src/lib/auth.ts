@@ -75,9 +75,27 @@ export function createSessionToken(payload: SessionPayload): string {
 
 export function verifySessionToken(token: string): SessionPayload | null {
   try {
-    return jwt.verify(token, getJwtSecret(), {
+    const roh = jwt.verify(token, getJwtSecret(), {
       algorithms: ["HS256"],
-    }) as SessionPayload;
+    }) as SessionPayload & { iat?: number; exp?: number };
+
+    // NUR die eigenen Felder zurueckgeben. jwt.verify liefert zusaetzlich die
+    // Standardansprueche `iat` und `exp` mit; der Cast auf SessionPayload hat
+    // sie bisher nur vor TypeScript versteckt, zur Laufzeit waren sie da.
+    //
+    // Folge: GET /api/auth reichte dieses Objekt an createSessionToken weiter,
+    // also an jwt.sign(payload, secret, { expiresIn }) — und jsonwebtoken
+    // wirft dann "payload already has an 'exp' property". Die
+    // Sitzungsverlaengerung hat deshalb nie funktioniert: Der Endpunkt
+    // antwortete immer 500, die Sitzung lief unangekuendigt ab und riss
+    // laufende Formulareingaben mit.
+    return {
+      userId: roh.userId,
+      email: roh.email,
+      role: roh.role,
+      firstName: roh.firstName,
+      lastName: roh.lastName,
+    };
   } catch {
     return null;
   }

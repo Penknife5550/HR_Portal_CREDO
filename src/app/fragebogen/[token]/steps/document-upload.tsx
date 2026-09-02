@@ -8,7 +8,11 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { DOCUMENT_TYPE_LABELS } from "@/lib/required-documents";
+import {
+  DOCUMENT_TYPE_LABELS,
+  RV_BEFREIUNG_HINWEIS,
+  effektivePflichtDokumente,
+} from "@/lib/required-documents";
 
 interface UploadedDoc {
   id: string;
@@ -21,8 +25,16 @@ interface UploadedDoc {
 interface DocumentUploadProps {
   token: string;
   hasChildren?: boolean;
+  /** Wie viele Kinder eingetragen sind — fuer den Abgleich mit den Urkunden. */
+  anzahlKinder?: number;
   /** Pflicht-Dokumenttypen aus der Vorlagen-Konfiguration (DocumentType-Werte). */
   requiredDocuments?: string[];
+  /** Entscheidung aus Schritt 11 — sie kann eine Pflicht erzeugen. */
+  rvEntscheidung?: string | null;
+  /** Ist beim Mandanten eine Betriebsnummer hinterlegt? */
+  antragErzeugbar?: boolean;
+  /** Meldet nach oben, was noch fehlt — Schritt 10 sperrt damit das Absenden. */
+  onMissingChange?: (missing: string[]) => void;
 }
 
 // Fallback-Pflichtdokumente, falls die Vorlage keine Konfiguration liefert.
@@ -68,7 +80,11 @@ const TYPE_LABELS: Record<string, string> = {
 export function DocumentUpload({
   token,
   hasChildren = false,
+  anzahlKinder = 0,
   requiredDocuments,
+  rvEntscheidung,
+  antragErzeugbar = true,
+  onMissingChange,
 }: DocumentUploadProps) {
   const [documents, setDocuments] = useState<UploadedDoc[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -185,18 +201,57 @@ export function DocumentUpload({
   );
 
   // Pflichtdokumente aus der Vorlagen-Konfiguration ableiten (Fallback: Geburtsurkunden).
-  // Geburtsurkunde der Kinder nur, wenn Kinder vorhanden sind.
+  //
+  // Die Bedingungen stehen bewusst NICHT hier, sondern in required-documents.ts:
+  // Der Server prueft beim Absenden mit derselben Funktion. Zwei Nachbauten
+  // liefen frueher oder spaeter auseinander — und dann sperrt der Server etwas,
+  // wovon das Formular nichts weiss.
   const requiredTypes =
     requiredDocuments && requiredDocuments.length > 0
       ? requiredDocuments
       : FALLBACK_REQUIRED_TYPES;
-  const activeRequiredDocs = requiredTypes
-    .filter((t) => t !== "GEBURTSURKUNDE_KIND" || hasChildren)
-    .map((t) => ({
-      value: t.toLowerCase(),
-      dbType: t,
-      label: DOCUMENT_TYPE_LABELS[t] ?? t,
-    }));
+
+  const pflichtTypen = effektivePflichtDokumente({
+    required: requiredTypes,
+    hasChildren,
+    rvEntscheidung,
+  });
+
+  const activeRequiredDocs = pflichtTypen.map((t) => ({
+    value: t.toLowerCase(),
+    dbType: t,
+    label: DOCUMENT_TYPE_LABELS[t] ?? t,
+  }));
+
+  // Was hier Pflicht ist, gehoert nicht zusaetzlich ins Dropdown der freiwilligen
+  // Unterlagen — sonst stuende derselbe Typ zweimal auf der Seite.
+  const optionaleKategorien = OPTIONAL_DOCUMENT_CATEGORIES.filter(
+    (k) => !pflichtTypen.includes(k.value.toUpperCase())
+  );
+
+  // Der Absende-Knopf in Schritt 10 haengt an dieser Liste. Sie liegt nur hier
+  // vor, weil `documents` lokaler Zustand dieser Komponente ist.
+  const fehlend = pflichtTypen.filter(
+    (t) => !documents.some((d) => d.type === t)
+  );
+  const fehlendSchluessel = fehlend.join(",");
+  useEffect(() => {
+    onMissingChange?.(fehlendSchluessel ? fehlendSchluessel.split(",") : []);
+    // Bewusst am Schluessel haengen, nicht am Array: Ein neues Array bei jedem
+    // Rendern wuerde eine Endlosschleife ausloesen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fehlendSchluessel]);
+
+  // Die Pflicht ist erfuellt, sobald EIN Dokument dieses Typs vorliegt — auch
+  // bei mehreren Kindern. Das bleibt bewusst so: Ein Scan kann zwei Urkunden
+  // enthalten, und wer solche Faelle aussperrt, schafft mehr Aerger als er
+  // verhindert. Ein stiller Durchlauf waere aber auch falsch, deshalb der
+  // Hinweis — er blockiert nicht.
+  const urkundenKinder = documents.filter(
+    (d) => d.type === "GEBURTSURKUNDE_KIND"
+  ).length;
+  const urkundenFehlenMoeglicherweise =
+    anzahlKinder > 1 && urkundenKinder > 0 && urkundenKinder < anzahlKinder;
 
   return (
     <div className="space-y-4">
@@ -247,6 +302,30 @@ export function DocumentUpload({
                     <p className="text-[10px] text-muted-foreground">
                       {uploaded ? "Hochgeladen" : "Noch nicht hochgeladen – Pflicht"}
                     </p>
+                    {/* Beim Befreiungsantrag reicht der Hinweis „hochladen" nicht:
+                        Der Beschaeftigte muss wissen, woher das Blatt kommt und
+                        warum ein Haken hier nicht genuegt. */}
+                    {reqDoc.dbType === "RV_BEFREIUNG" && !uploaded && (
+                      <div className="mt-1.5 max-w-md">
+                        <p className="text-[11px] leading-relaxed text-amber-800">
+                          {RV_BEFREIUNG_HINWEIS}
+                        </p>
+                        {antragErzeugbar ? (
+                          <a
+                            href={`/api/fragebogen/${token}/rv-antrag?art=BEFREIUNG`}
+                            className="mt-1 inline-block text-[11px] font-semibold text-primary underline underline-offset-2"
+                          >
+                            Antrag ausgefüllt herunterladen (PDF)
+                          </a>
+                        ) : (
+                          <p className="mt-1 text-[11px] font-medium text-amber-900">
+                            Der Antrag kann derzeit nicht erstellt werden. Bitte
+                            wenden Sie sich an die Personalabteilung — Ihre
+                            Eingaben bleiben gespeichert.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -292,6 +371,23 @@ export function DocumentUpload({
         </div>
       </div>
 
+      {urkundenFehlenMoeglicherweise && (
+        <div className="rounded-lg border border-[#FBC900]/50 bg-[#FBC900]/10 px-4 py-3">
+          <p className="text-sm font-medium text-foreground">
+            {urkundenKinder} von {anzahlKinder} Geburtsurkunden hochgeladen
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-foreground/80">
+            Sie haben {anzahlKinder} Kinder eingetragen, aber{" "}
+            {urkundenKinder === 1
+              ? "nur eine Geburtsurkunde"
+              : `${urkundenKinder} Geburtsurkunden`}{" "}
+            hochgeladen. Falls eine Datei mehrere Urkunden enthält, ist alles in
+            Ordnung — Sie können absenden. Andernfalls ergänzen Sie die
+            fehlenden bitte oben.
+          </p>
+        </div>
+      )}
+
       {/* ============================================= */}
       {/* OPTIONALE DOKUMENTE */}
       {/* ============================================= */}
@@ -316,7 +412,7 @@ export function DocumentUpload({
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           >
-            {OPTIONAL_DOCUMENT_CATEGORIES.map((cat) => (
+            {optionaleKategorien.map((cat) => (
               <option key={cat.value} value={cat.value}>
                 {cat.label}
               </option>
@@ -418,7 +514,11 @@ export function DocumentUpload({
                     </p>
                   </div>
                 </div>
+                {/* type="button" ist Pflicht: ohne das Attribut ist der Knopf
+                    ein Submit-Knopf und loest zusaetzlich zum Loeschen den
+                    verbindlichen Absende-Dialog aus (Schritt 10). */}
                 <button
+                  type="button"
                   onClick={() => handleDelete(doc.id)}
                   className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   title="Löschen"

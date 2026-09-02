@@ -8,6 +8,10 @@
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
+import { getErklaerung } from "@/lib/erklaerung-arbeitnehmer";
+import { statusLabel } from "@/lib/minijob-status";
+import { rvEntscheidungLabel } from "@/lib/minijob-rentenversicherung";
+import { ART_LABELS, KATEGORIE_LABELS } from "@/lib/validations/beschaeftigungs-angaben";
 
 // =============================================
 // Typen
@@ -67,14 +71,45 @@ interface PersonalDataExport {
   highestSchoolDegree: string | null;
   highestProfessionalDegree: string | null;
   hasOtherEmployment: boolean | null;
+  beschaeftigungsStatus?: string | null;
+  beschaeftigungsStatusSonstige?: string | null;
+  alsArbeitsuchendGemeldet?: boolean | null;
+  agenturFuerArbeit?: string | null;
+  mitLeistungsbezug?: boolean | null;
+  vorbeschaeftigungenVorhanden?: boolean | null;
+  auslandsbeschaeftigungVorhanden?: boolean | null;
+  summeUeberGeringfuegigkeitsgrenze?: boolean | null;
+  beschaeftigungsAngaben?: {
+    kategorie: string;
+    beginn: string | null;
+    ende: string | null;
+    arbeitgeberName: string | null;
+    arbeitgeberAdresse: string | null;
+    art: string | null;
+    entgeltUeberGrenze: boolean | null;
+    arbeitstage: number | null;
+    beiArbeitsagentur: boolean | null;
+  }[];
   otherEmployerName: string | null;
   otherWeeklyHours: number | null;
   hasMinijob: boolean | null;
   minijobRvBefreiung: boolean | null;
+  rvEntscheidung?: string | null;
+  rvEntscheidungAm?: string | null;
+  rvMerkblattGelesen?: boolean | null;
+  rvMerkblattGelesenAm?: string | null;
+  rvBindungBestaetigt?: boolean | null;
   bornAfter1971: boolean | null;
   masernschutzProvided: boolean | null;
   dsgvoAccepted: boolean | null;
   dsgvoAcceptedAt: string | null;
+  erklaerungAccepted?: boolean | null;
+  erklaerungAcceptedAt?: string | null;
+  erklaerungOrt?: string | null;
+  erklaerungIp?: string | null;
+  erklaerungUserAgent?: string | null;
+  erklaerungVersion?: string | null;
+  erklaerungPruefsumme?: string | null;
   children: { firstName: string; lastName: string | null; birthDate: string; taxAllowance: boolean }[];
 }
 
@@ -138,6 +173,21 @@ const C = {
 function fmt(d: string | null): string {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/**
+ * Datum **mit Uhrzeit**. Fuer die Erklaerung reicht das blosse Datum nicht: Der
+ * Zeitpunkt ist Teil des Unterschriftsersatzes.
+ */
+function fmtZeit(d: string | null | undefined): string {
+  if (!d) return "—";
+  const datum = new Date(d);
+  if (Number.isNaN(datum.getTime())) return "—";
+  return `${datum.toLocaleDateString("de-DE")}, ${datum.toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })} Uhr`;
 }
 
 function yn(v: boolean | null): string {
@@ -241,8 +291,12 @@ function checkBreak(doc: PDFKit.PDFDocument, needed: number, ctx: OnboardingExpo
 
 function dataRow(doc: PDFKit.PDFDocument, label: string, value: string, y: number): number {
   doc.font("Helvetica").fontSize(9).fillColor(C.gray).text(label, 50, y, { width: 170 });
+  // Ende der Beschriftung merken, bevor der Wert gezeichnet wird: `doc.y` zeigt
+  // danach ans Ende des *Werts*. Bei einer Beschriftung, die auf zwei Zeilen
+  // umbricht, waere die naechste Zeile sonst in die zweite Zeile hineingerutscht.
+  const labelEnde = doc.y;
   doc.font("Helvetica").fontSize(9).fillColor(C.black).text(value, 225, y, { width: 340 });
-  return Math.max(doc.y, y + 14) + 4;
+  return Math.max(labelEnde, doc.y, y + 14) + 4;
 }
 
 // =============================================
@@ -319,16 +373,107 @@ async function addFragebogenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
   y = dataRow(doc, "Schulabschluss", str(pd.highestSchoolDegree), y);
   y = dataRow(doc, "Berufsabschluss", str(pd.highestProfessionalDegree), y);
 
-  // Weitere Beschaeftigung
+  // =============================================
+  // Status bei Beginn der Beschaeftigung (Checkliste, Abschnitt 2)
+  // =============================================
+  if (pd.beschaeftigungsStatus) {
+    checkBreak(doc, 60, ctx, "Fragebogen");
+    y = section(doc, "Status bei Beginn der Beschäftigung");
+    y = dataRow(doc, "Status", statusLabel(pd.beschaeftigungsStatus), y);
+    if (pd.beschaeftigungsStatusSonstige) {
+      y = dataRow(doc, "Erläuterung", str(pd.beschaeftigungsStatusSonstige), y);
+    }
+    y = dataRow(doc, "Bei der Agentur gemeldet", yn(pd.alsArbeitsuchendGemeldet ?? null), y);
+    if (pd.alsArbeitsuchendGemeldet) {
+      y = dataRow(doc, "Zuständige Agentur", str(pd.agenturFuerArbeit), y);
+      y = dataRow(doc, "Leistungsbezug", yn(pd.mitLeistungsbezug ?? null), y);
+    }
+  }
+
+  // =============================================
+  // Weitere Beschaeftigungen (Checkliste, Abschnitt 4)
+  // =============================================
   checkBreak(doc, 60, ctx, "Fragebogen");
-  y = section(doc, "Weitere Beschaeftigung");
-  y = dataRow(doc, "Weitere Beschaeftigung", yn(pd.hasOtherEmployment), y);
-  if (pd.hasOtherEmployment) {
-    y = dataRow(doc, "Arbeitgeber", str(pd.otherEmployerName), y);
-    y = dataRow(doc, "Wochenstunden", str(pd.otherWeeklyHours), y);
+  y = section(doc, "Weitere Beschäftigungen");
+  y = dataRow(doc, "Weitere Beschäftigungen", yn(pd.hasOtherEmployment), y);
+  if (pd.summeUeberGeringfuegigkeitsgrenze !== null && pd.summeUeberGeringfuegigkeitsgrenze !== undefined) {
+    y = dataRow(doc, "Summe über der Grenze", yn(pd.summeUeberGeringfuegigkeitsgrenze), y);
+  }
+  if (pd.vorbeschaeftigungenVorhanden !== null && pd.vorbeschaeftigungenVorhanden !== undefined) {
+    y = dataRow(doc, "Vorbeschäftigungen dieses Jahr", yn(pd.vorbeschaeftigungenVorhanden), y);
+  }
+  if (pd.auslandsbeschaeftigungVorhanden !== null && pd.auslandsbeschaeftigungVorhanden !== undefined) {
+    y = dataRow(doc, "Tätigkeit im Ausland", yn(pd.auslandsbeschaeftigungVorhanden), y);
+  }
+
+  // Die Zeilen der drei Tabellen, nach Kategorie gruppiert. Jede Zeile prueft
+  // vorher, ob sie noch auf die Seite passt — sonst reisst der Block mitten
+  // durch.
+  const angaben = pd.beschaeftigungsAngaben ?? [];
+  for (const kategorie of ["WEITERE", "VORBESCHAEFTIGUNG", "AUSLAND"] as const) {
+    const zeilen = angaben.filter((a) => a.kategorie === kategorie);
+    if (zeilen.length === 0) continue;
+
+    checkBreak(doc, 50, ctx, "Fragebogen");
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(C.primary)
+      .text(KATEGORIE_LABELS[kategorie], 50, y);
+    y = doc.y + 6;
+
+    zeilen.forEach((zeile, i) => {
+      checkBreak(doc, 55, ctx, "Fragebogen");
+      const zeitraum = zeile.ende
+        ? `${fmt(zeile.beginn)} – ${fmt(zeile.ende)}`
+        : `ab ${fmt(zeile.beginn)}`;
+      y = dataRow(doc, `${i + 1}. Zeitraum`, zeitraum, y);
+
+      if (zeile.art) {
+        y = dataRow(doc, "   Art", ART_LABELS[zeile.art] ?? zeile.art, y);
+      }
+      if (zeile.entgeltUeberGrenze !== null) {
+        y = dataRow(doc, "   Entgelt über Grenze", yn(zeile.entgeltUeberGrenze), y);
+      }
+      if (zeile.arbeitstage !== null) {
+        y = dataRow(doc, "   Arbeitstage", String(zeile.arbeitstage), y);
+      }
+      if (zeile.beiArbeitsagentur) {
+        y = dataRow(doc, "   Art", "Meldung bei der Agentur für Arbeit", y);
+      }
+      if (zeile.arbeitgeberName) {
+        y = dataRow(doc, "   Arbeitgeber", str(zeile.arbeitgeberName), y);
+      }
+      if (zeile.arbeitgeberAdresse) {
+        y = dataRow(doc, "   Adresse", str(zeile.arbeitgeberAdresse), y);
+      }
+    });
+  }
+
+  // Altfelder — nur noch, wenn ein Vorgang sie traegt.
+  if (pd.otherEmployerName || pd.otherWeeklyHours) {
+    y = dataRow(doc, "Arbeitgeber (Altangabe)", str(pd.otherEmployerName), y);
+    y = dataRow(doc, "Wochenstunden (Altangabe)", str(pd.otherWeeklyHours), y);
   }
   y = dataRow(doc, "Minijob", yn(pd.hasMinijob), y);
-  if (pd.hasMinijob) y = dataRow(doc, "RV-Befreiung Minijob", yn(pd.minijobRvBefreiung), y);
+  // Altfeld: nur ausgeben, solange keine Entscheidung aus Schritt 11 vorliegt.
+  // Sonst stuenden in derselben Akte zwei Antworten auf dieselbe Frage.
+  if (!pd.rvEntscheidung && pd.minijobRvBefreiung) {
+    y = dataRow(doc, "RV-Befreiung Minijob (Altangabe)", yn(pd.minijobRvBefreiung), y);
+  }
+
+  // =============================================
+  // Rentenversicherung (Checkliste, Abschnitt 5)
+  // =============================================
+  if (pd.rvEntscheidung) {
+    checkBreak(doc, 70, ctx, "Fragebogen");
+    y = section(doc, "Rentenversicherung");
+    y = dataRow(doc, "Entscheidung", rvEntscheidungLabel(pd.rvEntscheidung), y);
+    y = dataRow(doc, "Abgegeben am", fmtZeit(pd.rvEntscheidungAm), y);
+    if (pd.rvMerkblattGelesen) {
+      y = dataRow(doc, "Merkblatt gelesen", fmtZeit(pd.rvMerkblattGelesenAm), y);
+    }
+    if (pd.rvBindungBestaetigt) {
+      y = dataRow(doc, "Bindungswirkung bestätigt", "Ja", y);
+    }
+  }
 
   // Masernschutz
   checkBreak(doc, 40, ctx, "Fragebogen");
@@ -343,6 +488,69 @@ async function addFragebogenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
     for (const child of pd.children) {
       y = dataRow(doc, `${child.firstName} ${child.lastName || ""}`, `geb. ${fmt(child.birthDate)}, Kinderfreibetrag: ${yn(child.taxAllowance)}`, y);
     }
+  }
+
+  // =============================================
+  // Erklaerung des Arbeitnehmers (Unterschriftsersatz)
+  // =============================================
+  // Eigener Abschnitt, weil genau er in der Betriebspruefung die Unterschrift
+  // ersetzt: Wortlaut in der Fassung, die galt, plus Zeitpunkt, Ort, Herkunft
+  // und Pruefsumme.
+  checkBreak(doc, 200, ctx, "Fragebogen");
+  y = section(doc, "Erklärung des Arbeitnehmers");
+
+  if (!pd.erklaerungAccepted) {
+    // Altvorgaenge: Der Haken war frueher reiner Browser-Zustand und wurde nie
+    // uebertragen. Ein Nachweis wird nicht rueckwirkend konstruiert.
+    doc.font("Helvetica-Oblique").fontSize(9).fillColor(C.gray).text(
+      "Für diesen Vorgang liegt keine gespeicherte Erklärung vor. Der Fragebogen " +
+        "wurde eingereicht, bevor das Portal Zeitpunkt, Ort und Prüfsumme " +
+        "festgehalten hat.",
+      50,
+      y,
+      { width: 515 },
+    );
+    y = doc.y + 10;
+  } else {
+    const fassung = getErklaerung(pd.erklaerungVersion);
+
+    if (fassung) {
+      doc.font("Helvetica").fontSize(8.5).fillColor(C.black);
+      for (const abschnitt of fassung.abschnitte) {
+        checkBreak(doc, 40, ctx, "Fragebogen");
+        doc.font("Helvetica").fontSize(8.5).fillColor(C.black)
+          .text(abschnitt.text, 50, doc.y, { width: 515, align: "justify" });
+        if (abschnitt.punkte) {
+          for (const punkt of abschnitt.punkte) {
+            doc.font("Helvetica").fontSize(8.5).fillColor(C.gray)
+              .text(`•  ${punkt}`, 62, doc.y + 2, { width: 503 });
+          }
+        }
+        doc.moveDown(0.4);
+      }
+      checkBreak(doc, 30, ctx, "Fragebogen");
+      doc.font("Helvetica-Bold").fontSize(8.5).fillColor(C.black)
+        .text(fassung.bestaetigung, 50, doc.y + 4, { width: 515 });
+      y = doc.y + 12;
+    } else {
+      doc.font("Helvetica-Oblique").fontSize(9).fillColor(C.gray).text(
+        `Der Wortlaut der bestätigten Fassung (${str(pd.erklaerungVersion)}) liegt ` +
+          "im System nicht mehr vor.",
+        50,
+        y,
+        { width: 515 },
+      );
+      y = doc.y + 10;
+    }
+
+    checkBreak(doc, 90, ctx, "Fragebogen");
+    y = dataRow(doc, "Bestätigt", yn(pd.erklaerungAccepted), y);
+    y = dataRow(doc, "Ort", str(pd.erklaerungOrt), y);
+    y = dataRow(doc, "Zeitpunkt", fmtZeit(pd.erklaerungAcceptedAt), y);
+    y = dataRow(doc, "Fassung des Wortlauts", str(pd.erklaerungVersion), y);
+    y = dataRow(doc, "IP-Adresse", str(pd.erklaerungIp), y);
+    y = dataRow(doc, "Browserkennung", str(pd.erklaerungUserAgent), y);
+    y = dataRow(doc, "Prüfsumme (SHA-256)", str(pd.erklaerungPruefsumme), y);
   }
 
   // DSGVO

@@ -7,6 +7,7 @@
 
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
+import { csvZelle } from "@/lib/csv";
 import { getSession } from "@/lib/auth";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"];
@@ -33,18 +34,15 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Abgebrochen",
 };
 
-/** CSV-Feld escapen: Semikolons, Anfuehrungszeichen und Zeilenumbrueche */
-function escapeCsvField(value: string): string {
-  if (
-    value.includes(";") ||
-    value.includes('"') ||
-    value.includes("\n") ||
-    value.includes("\r")
-  ) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
+/**
+ * CSV-Feld escapen.
+ *
+ * Liegt jetzt in src/lib/csv.ts, gemeinsam mit dem Onboarding-Export: Die
+ * beiden frueheren Fassungen dachten nur an Trennzeichen und
+ * Anfuehrungszeichen — nicht an fuehrende Formelzeichen, die Excel und
+ * LibreOffice als Formel auswerten.
+ */
+const escapeCsvField = csvZelle;
 
 function formatDate(date: Date | null | undefined): string {
   if (!date) return "";

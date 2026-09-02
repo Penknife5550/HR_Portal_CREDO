@@ -1,0 +1,334 @@
+/**
+ * Zentrale Definition der Fragebogen-Schritte.
+ *
+ * Vorher lagen vier Wahrheiten nebeneinander: STEP_CONFIG (Anzeige, 9 Eintraege),
+ * FIELD_REGISTRY (Felder, 10 Eintraege), getStepTitle() (Titel, 10 Eintraege) und
+ * ein fest verdrahtetes Komponenten-Array im Renderer (9 Eintraege). Sobald ein
+ * Schritt fehlte, liefen die Nummern auseinander — deshalb hat die Vorlagen-
+ * Konfiguration im Fragebogen nie gewirkt und die Vorlagen-Vorschau ab Schritt 7
+ * die falsche Maske gezeigt.
+ *
+ * Ab hier gilt:
+ *  - Die **Reihenfolge dieses Arrays** ist die Anzeigereihenfolge.
+ *  - `step` ist die **stabile Registry-Nummer** — so wie sie in
+ *    FormTemplate.stepsConfig, in FIELD_REGISTRY und in PersonalData.currentStep
+ *    steht. Sie darf sich nie aendern, auch wenn ein Schritt umzieht.
+ *
+ * Neue Schritte werden an ihrer Anzeigeposition einsortiert und bekommen die
+ * naechste freie Registry-Nummer. Beispiel Rentenversicherung (AP 7): Nummer 11,
+ * einsortiert *vor* der Zusammenfassung.
+ */
+
+/** Komponenten-Schluessel der Schritte mit eigener Maske. */
+export type FragebogenStepKey =
+  | "personal"
+  | "address"
+  | "bank"
+  | "social"
+  | "tax"
+  | "employment"
+  | "education"
+  | "masern"
+  | "rente"
+  | "summary";
+
+export interface FragebogenStep {
+  /** Stabile Registry-Nummer. Schluessel in stepsConfig und FIELD_REGISTRY. */
+  step: number;
+  /**
+   * Komponenten-Schluessel, oder `null` fuer einen **virtuellen Schritt**:
+   * im Vorlagen-Editor konfigurierbar, im Fragebogen aber ohne eigene Maske,
+   * weil er innerhalb eines anderen Schritts erfasst wird.
+   */
+  key: FragebogenStepKey | null;
+  title: string;
+  description: string;
+  icon: string;
+  /** Kann im Vorlagen-Editor nicht abgeschaltet werden. */
+  mandatory?: boolean;
+  /** Nur bei virtuellen Schritten: wo die Felder tatsaechlich erfasst werden. */
+  renderedWithin?: number;
+}
+
+/**
+ * Alle Schritte in Anzeigereihenfolge.
+ *
+ * Schritt 7 (Kinder) ist virtuell: Die Kinder-Angaben werden inline im Schritt
+ * Sozialversicherung erfasst. Der Eintrag existiert trotzdem, damit die Felder
+ * im Vorlagen-Editor konfigurierbar bleiben.
+ */
+export const FRAGEBOGEN_STEPS: readonly FragebogenStep[] = [
+  {
+    step: 1,
+    key: "personal",
+    title: "Persönliche Angaben",
+    description: "Name, Geburtsdatum, Familienstand",
+    icon: "user",
+    mandatory: true,
+  },
+  {
+    step: 2,
+    key: "address",
+    title: "Adresse & Kontakt",
+    description: "Wohnanschrift, Telefon, E-Mail",
+    icon: "home",
+  },
+  {
+    step: 3,
+    key: "bank",
+    title: "Bankverbindung",
+    description: "IBAN, BIC, Kontoinhaber",
+    icon: "credit-card",
+  },
+  {
+    step: 4,
+    key: "social",
+    title: "Sozialversicherung",
+    description: "SV-Nummer, Krankenkasse",
+    icon: "shield",
+  },
+  {
+    step: 5,
+    key: "tax",
+    title: "Steuer",
+    description: "Steuer-ID, Steuerklasse, Kirchensteuer",
+    icon: "file-text",
+  },
+  {
+    step: 6,
+    key: "employment",
+    title: "Weitere Beschäftigung",
+    description: "Angaben zu weiteren Arbeitgebern",
+    icon: "briefcase",
+  },
+  {
+    step: 7,
+    key: null,
+    title: "Kinder",
+    description: "Wird in der Sozialversicherung miterfasst",
+    icon: "users",
+    renderedWithin: 4,
+  },
+  {
+    step: 8,
+    key: "education",
+    title: "Bildung & Beruf",
+    description: "Schulabschluss, Berufsausbildung",
+    icon: "graduation-cap",
+  },
+  {
+    step: 9,
+    key: "masern",
+    title: "Masernschutz",
+    description: "Impfnachweis für Gemeinschaftseinrichtungen",
+    icon: "heart",
+  },
+  {
+    // Registry-Nummer 11, Anzeigeposition **vor** der Zusammenfassung.
+    //
+    // Genau dafuer gibt es die Trennung von Nummer und Reihenfolge: Im
+    // Vorlagen-Editor steht die Rentenversicherung als "11" unter der
+    // Zusammenfassung, im Fragebogen erscheint sie davor. Beides ist gewollt.
+    //
+    // Standardmaessig **aus**: Ein Schritt, den eine gespeicherte stepsConfig
+    // nicht kennt, gilt als abgeschaltet. Fuer MINIJOB wird er ausdruecklich
+    // eingeschaltet (Seed und Entrypoint-Korrektur).
+    step: 11,
+    key: "rente",
+    title: "Rentenversicherung",
+    description: "Befreiung von der Versicherungspflicht",
+    icon: "piggy-bank",
+  },
+  {
+    step: 10,
+    key: "summary",
+    title: "Zusammenfassung",
+    description: "Pruefen und Absenden",
+    icon: "check-circle",
+    mandatory: true,
+  },
+];
+
+/** Registry-Nummern, die im Vorlagen-Editor nicht abschaltbar sind. */
+export const MANDATORY_STEP_NUMBERS: readonly number[] = FRAGEBOGEN_STEPS.filter(
+  (s) => s.mandatory
+).map((s) => s.step);
+
+/** Hoechste vergebene Registry-Nummer — Obergrenze fuer die API-Validierung. */
+export const MAX_STEP_NUMBER: number = FRAGEBOGEN_STEPS.reduce(
+  (max, s) => (s.step > max ? s.step : max),
+  0
+);
+
+/**
+ * Registry-Nummer der Zusammenfassung. Wird beim Absenden gesetzt und markiert
+ * einen abgeschlossenen Fragebogen.
+ */
+export const SUMMARY_STEP_NUMBER: number =
+  FRAGEBOGEN_STEPS.find((s) => s.key === "summary")?.step ?? MAX_STEP_NUMBER;
+
+/** Registry-Nummer -> Schritt. */
+export function getStep(stepNumber: number): FragebogenStep | undefined {
+  return FRAGEBOGEN_STEPS.find((s) => s.step === stepNumber);
+}
+
+/** Titel einer Registry-Nummer, mit Fallback fuer unbekannte Nummern. */
+export function getStepTitle(stepNumber: number): string {
+  return getStep(stepNumber)?.title ?? `Schritt ${stepNumber}`;
+}
+
+/** Minimale Form der Vorlagen-Konfiguration, die hier gebraucht wird. */
+interface StepEnabledConfig {
+  step: number;
+  enabled: boolean;
+}
+
+/**
+ * Die Schritte, die ein Mitarbeiter mit dieser Vorlagen-Konfiguration
+ * tatsaechlich durchlaeuft — in Anzeigereihenfolge.
+ *
+ * Es fallen raus: virtuelle Schritte (ohne eigene Maske) und alles, was die
+ * Vorlage abschaltet. Pflichtschritte bleiben immer drin, auch wenn eine
+ * Konfiguration sie faelschlich deaktiviert — sonst gaebe es einen Fragebogen
+ * ohne Absende-Schritt.
+ *
+ * **Ohne Konfiguration** (neue Vorlage, fehlende Daten) gelten alle Schritte
+ * als aktiv. **Innerhalb** einer vorhandenen Konfiguration gilt dagegen ein
+ * fehlender Schritt als *abgeschaltet*: Die Konfiguration stammt aus dem
+ * Moment, in dem die Vorlage zuletzt gespeichert wurde, und kennt spaeter
+ * hinzugekommene Schritte nicht. Wuerde ein unbekannter Schritt als aktiv
+ * gelten, erschiene jeder neu definierte Schritt sofort in *allen* Vorlagen —
+ * die Rentenversicherung (AP 7) etwa auch im TV-L-Fragebogen. HR schaltet
+ * einen neuen Schritt bewusst frei; der Vorlagen-Editor zeigt ihn dafuer an,
+ * auch wenn er in der gespeicherten Konfiguration noch fehlt
+ * (`mergeStepsConfig` in field-definitions.ts).
+ */
+export function getActiveSteps(
+  stepsConfig?: StepEnabledConfig[] | null
+): FragebogenStep[] {
+  const renderable = FRAGEBOGEN_STEPS.filter((s) => s.key !== null);
+  if (!stepsConfig || stepsConfig.length === 0) return renderable;
+
+  const enabledByStep = new Map(stepsConfig.map((s) => [s.step, s.enabled]));
+
+  return renderable.filter((s) => {
+    if (s.mandatory) return true;
+    return enabledByStep.get(s.step) ?? false;
+  });
+}
+
+/**
+ * Anzeigeposition (0-basiert) einer Registry-Nummer innerhalb der aktiven
+ * Strecke. `-1`, wenn der Schritt in dieser Vorlage nicht vorkommt.
+ */
+export function indexOfStep(
+  activeSteps: readonly FragebogenStep[],
+  stepNumber: number
+): number {
+  return activeSteps.findIndex((s) => s.step === stepNumber);
+}
+
+/**
+ * Registry-Nummer, bei der ein Vorgang wieder einsteigt.
+ *
+ * Faellt auf den ersten aktiven Schritt zurueck, wenn der gespeicherte Schritt
+ * in dieser Vorlage nicht (mehr) vorkommt — etwa weil die Konfiguration
+ * geaendert wurde, waehrend der Vorgang lief.
+ */
+export function resolveResumeStep(
+  activeSteps: readonly FragebogenStep[],
+  savedStepNumber: number | null | undefined
+): number {
+  if (activeSteps.length === 0) return 0;
+  if (typeof savedStepNumber !== "number") return 0;
+  const index = indexOfStep(activeSteps, savedStepNumber);
+  return index >= 0 ? index : 0;
+}
+
+// =============================================
+// Anzeige des Bearbeitungsstands in der HR-Ansicht
+// =============================================
+
+export interface FragebogenFortschritt {
+  /** 1-basierte Anzeigeposition. 0 = noch nicht begonnen. */
+  position: number;
+  /** Anzahl der Schritte, die *dieser* Vorgang durchlaeuft. */
+  total: number;
+  /** Titel des zuletzt erreichten Schritts, oder ein Ersatztext. */
+  titel: string;
+  /** Fortschritt in Prozent, gemessen an der Strecke dieses Vorgangs. */
+  prozent: number;
+}
+
+/**
+ * Wie weit ist ein Fragebogen? Fuer Listen, Balken und Statuszeilen der
+ * HR-Ansicht.
+ *
+ * Wichtig ist der erste Parameter: Wie viele Schritte ein Vorgang hat, haengt
+ * an seiner Vorlage — ein Minijobber durchlaeuft eine andere Strecke als eine
+ * TV-L-Angestellte, und eine Ehrenamt-Vorlage kennt nur drei Schritte. Ohne
+ * die Konfiguration des Vorgangs waere jede Zahl geraten: Ein Ehrenamtlicher
+ * auf Schritt 2 von 3 saehe sonst 22 statt 67 Prozent.
+ *
+ * Steht der gespeicherte Schritt nicht (mehr) in der Strecke — etwa weil die
+ * Vorlage geaendert wurde —, wird der Fortschritt als unbekannt gemeldet, aber
+ * der Titel trotzdem aufgeloest.
+ */
+export function describeProgress(
+  stepsConfig: StepEnabledConfig[] | null | undefined,
+  currentStep: number | null | undefined
+): FragebogenFortschritt {
+  const aktiv = getActiveSteps(stepsConfig);
+  const total = aktiv.length;
+
+  if (typeof currentStep !== "number" || currentStep <= 0) {
+    return { position: 0, total, titel: "noch nicht begonnen", prozent: 0 };
+  }
+
+  const index = indexOfStep(aktiv, currentStep);
+  if (index < 0) {
+    return { position: 0, total, titel: getStepTitle(currentStep), prozent: 0 };
+  }
+
+  return {
+    position: index + 1,
+    total,
+    titel: aktiv[index].title,
+    prozent: total > 0 ? Math.round(((index + 1) / total) * 100) : 0,
+  };
+}
+
+/** Kurzform fuer Statuszeilen: "Schritt 3 von 8 · Bankverbindung". */
+export function formatProgress(f: FragebogenFortschritt): string {
+  if (f.position === 0) return f.titel;
+  return `Schritt ${f.position} von ${f.total} · ${f.titel}`;
+}
+
+// =============================================
+// Migration der Alt-Daten
+// =============================================
+
+/**
+ * Anzeigereihenfolge, die der alte Renderer fest verdrahtet hatte.
+ *
+ * `PersonalData.currentStep` enthielt bis zur Entkopplung die **0-basierte
+ * Anzeigeposition** in genau dieser Liste — nicht die Registry-Nummer. Weil der
+ * Renderer die Vorlagen-Konfiguration ignoriert hat, galt sie fuer *alle*
+ * Vorlagen gleichermassen; die Abbildung ist deshalb eindeutig.
+ */
+export const LEGACY_DISPLAY_ORDER: readonly number[] = [1, 2, 3, 4, 5, 6, 8, 9, 10];
+
+/**
+ * Alte 0-basierte Anzeigeposition -> Registry-Nummer.
+ *
+ * Werte ausserhalb der Liste (z.B. die 10, die beim Absenden gesetzt wurde)
+ * werden auf die Zusammenfassung abgebildet: Der Fragebogen war dann fertig.
+ */
+export function legacyIndexToStepNumber(legacyIndex: number): number {
+  // Unterhalb des Bereichs auf den ersten Schritt, oberhalb auf den letzten.
+  // Ohne die untere Grenze landete ein negativer Wert bei der Zusammenfassung.
+  if (legacyIndex < 0) return LEGACY_DISPLAY_ORDER[0];
+  const mapped = LEGACY_DISPLAY_ORDER[legacyIndex];
+  if (mapped !== undefined) return mapped;
+  return LEGACY_DISPLAY_ORDER[LEGACY_DISPLAY_ORDER.length - 1];
+}

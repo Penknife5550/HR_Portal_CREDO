@@ -111,9 +111,25 @@ export function ProcessDashboard({ config, renderCreateModal }: ProcessDashboard
       const result = await res.json();
       const allItems = result.data || [];
       const ARCHIVED_STATUSES = ["COMPLETED", "CANCELLED", "REJECTED"];
-      const filtered = showArchived ? allItems : allItems.filter((o: ProcessRow) => !ARCHIVED_STATUSES.includes(String(o.status)));
+      const filtered = showArchived
+        ? allItems
+        : allItems.filter((o: ProcessRow) => !ARCHIVED_STATUSES.includes(String(o.status)));
       setData(filtered);
-      setTotal(showArchived ? (result.total || 0) : filtered.length);
+
+      // `total` kommt vom Server und beschreibt die ganze Ergebnismenge.
+      //
+      // Vorher stand hier die Laenge der gefilterten AKTUELLEN SEITE. Damit war
+      // total nie groesser als eine Seite, totalPages also immer 1 und die
+      // Blaetternavigation wurde nie gerendert -- ab dem 26. offenen Vorgang
+      // war jeder weitere unerreichbar. Das betraf Offboarding, Vertragsende,
+      // Verbeamtung, Mutterschutz und Elternzeit gleichermassen.
+      //
+      // Offen bleibt, dass hier weiterhin im Browser gefiltert wird: Eine Seite
+      // kann dadurch weniger als pageSize Zeilen zeigen. Das ist ein
+      // Schoenheitsfehler, kein Datenverlust. Sauber waere es serverseitig --
+      // dafuer muessten die fuenf Endpunkte hinter apiEndpoint einen
+      // Archiv-Parameter bekommen, so wie /api/onboarding ihn jetzt hat.
+      setTotal(result.total || 0);
       if (result.statusCounts) {
         setStatusCounts(result.statusCounts);
       }
