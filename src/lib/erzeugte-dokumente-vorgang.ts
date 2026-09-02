@@ -36,6 +36,22 @@ const VORGANG_MANDANT: Record<string, (refId: string) => Promise<string | null>>
         select: { organizationId: true },
       })
     )?.organizationId ?? null,
+
+  OFFBOARDING: async (refId) =>
+    (
+      await prisma.offboardingProcess.findUnique({
+        where: { id: refId },
+        select: { organizationId: true },
+      })
+    )?.organizationId ?? null,
+
+  VERBEAMTUNG: async (refId) =>
+    (
+      await prisma.civilServiceProcess.findUnique({
+        where: { id: refId },
+        select: { organizationId: true },
+      })
+    )?.organizationId ?? null,
 };
 
 /**

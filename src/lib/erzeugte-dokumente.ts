@@ -16,7 +16,12 @@ export const AUFBEWAHRUNG_MONATE = 12;
  * zugriffsgeschuetzten Weg. Ein generischer Endpunkt darf sie nicht umgehen —
  * die Erzeugungsroute lehnt BEM aus demselben Grund ab.
  */
-export const UNTERSTUETZTE_MODULE = ["ONBOARDING", "VERTRAGSVERLAENGERUNG"] as const;
+export const UNTERSTUETZTE_MODULE = [
+  "ONBOARDING",
+  "VERTRAGSVERLAENGERUNG",
+  "OFFBOARDING",
+  "VERBEAMTUNG",
+] as const;
 
 /** Ist die Anzeige fuer dieses Modul vorgesehen? */
 export function istModulUnterstuetzt(modul: string): boolean {

@@ -23,8 +23,20 @@ describe("Unterstuetzte Module", () => {
     expect(UNTERSTUETZTE_MODULE).not.toContain("BEM");
   });
 
-  it("schliesst Module ohne Vorgangs-Aufloesung aus", () => {
-    for (const modul of ["ALLGEMEIN", "OFFBOARDING", "VERBEAMTUNG", "MUTTERSCHUTZ", "ELTERNZEIT"]) {
+  it("unterstuetzt die Module mit Vorgangs-Aufloesung", () => {
+    // Ein Modul gehoert hierher, sobald VORGANG_MANDANT in
+    // erzeugte-dokumente-vorgang.ts den Mandanten seines Vorgangs aufloesen
+    // kann — sonst laesst sich die Berechtigung nicht pruefen.
+    for (const modul of ["ONBOARDING", "VERTRAGSVERLAENGERUNG", "OFFBOARDING", "VERBEAMTUNG"]) {
+      expect({ modul, unterstuetzt: istModulUnterstuetzt(modul) }).toEqual({
+        modul,
+        unterstuetzt: true,
+      });
+    }
+  });
+
+  it("schliesst Module ohne Vorgangs-Aufloesung weiterhin aus", () => {
+    for (const modul of ["ALLGEMEIN", "MUTTERSCHUTZ", "ELTERNZEIT"]) {
       expect({ modul, unterstuetzt: istModulUnterstuetzt(modul) }).toEqual({
         modul,
         unterstuetzt: false,
