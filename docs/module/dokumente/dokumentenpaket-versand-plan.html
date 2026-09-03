@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Umsetzungsplan — Starterpaket flexibel: Vorlagen auswählen, befüllen, versenden | CREDO HR-Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary-bg:   #DADADA;
+  --accent:       #575756;
+  --text:         #2b2b2b;
+  --text-light:   #666;
+  --gelb:         #FBC900;
+  --gruen:        #6BAA24;
+  --rot:          #E2001A;
+  --blau:         #009AC6;
+  --white:        #ffffff;
+  --border:       #c5c5c5;
+  --hinweis-bg:   #EBF5FB;
+  --hinweis-bd:   #009AC6;
+  --warnung-bg:   #FEF9E7;
+  --warnung-bd:   #FBC900;
+  --kritik-bg:    #FDEDEC;
+  --kritik-bd:    #E2001A;
+  --offen-bg:     #F4F6F7;
+  --offen-bd:     #9B59B6;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Montserrat', Arial, sans-serif; font-size: 14px; line-height: 1.7; color: var(--text); background: #f7f7f7; }
+.page-wrapper { max-width: 980px; margin: 0 auto; background: var(--white); box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.credo-bar { display: flex; height: 6px; }
+.credo-bar span { flex: 1; }
+.credo-bar .grau  { background: var(--accent); }
+.credo-bar .gelb  { background: var(--gelb); }
+.credo-bar .gruen { background: var(--gruen); }
+.credo-bar .rot   { background: var(--rot); }
+.credo-bar .blau  { background: var(--blau); }
+.doc-header { background: var(--accent); color: var(--white); padding: 40px 48px 32px; }
+.doc-header .badge { display: inline-block; background: var(--blau); color: var(--white); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; margin-bottom: 14px; }
+.doc-header h1 { font-size: 28px; font-weight: 700; line-height: 1.25; }
+.doc-header .subtitle { margin-top: 8px; font-size: 13px; opacity: .8; }
+.doc-header .meta { margin-top: 20px; font-size: 11px; opacity: .65; border-top: 1px solid rgba(255,255,255,.2); padding-top: 14px; }
+.toc { background: var(--primary-bg); padding: 28px 48px; border-bottom: 1px solid var(--border); }
+.toc h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin-bottom: 14px; }
+.toc ol { list-style: decimal; padding-left: 18px; columns: 2; column-gap: 32px; }
+.toc li { font-size: 13px; margin-bottom: 5px; break-inside: avoid; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.content { padding: 0 48px 48px; }
+.section { margin-top: 44px; }
+.section-title { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); margin-bottom: 20px; }
+.section-title .num { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--accent); color: var(--white); border-radius: 50%; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.section-title h2 { font-size: 18px; font-weight: 700; color: var(--accent); }
+h3 { font-size: 14px; font-weight: 700; color: var(--accent); margin: 24px 0 10px; }
+h4 { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; margin: 18px 0 8px; }
+p { margin-bottom: 12px; }
+ul, ol { margin: 0 0 12px 20px; }
+li { margin-bottom: 5px; }
+strong { font-weight: 700; }
+code { font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; background: #f0f0f2; padding: 1px 5px; border-radius: 3px; color: #244; }
+.hinweis, .warnung, .kritik, .offen { display: flex; gap: 14px; border-radius: 6px; padding: 14px 18px; margin: 16px 0; font-size: 13px; }
+.hinweis { background: var(--hinweis-bg); border-left: 4px solid var(--hinweis-bd); }
+.warnung { background: var(--warnung-bg); border-left: 4px solid var(--warnung-bd); }
+.kritik { background: var(--kritik-bg); border-left: 4px solid var(--kritik-bd); }
+.offen { background: var(--offen-bg); border-left: 4px solid var(--offen-bd); }
+.hinweis .icon, .warnung .icon, .kritik .icon, .offen .icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+.hinweis strong, .warnung strong, .kritik strong, .offen strong { display: block; font-weight: 700; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 16px 0; }
+th { background: var(--accent); color: var(--white); text-align: left; padding: 9px 14px; font-weight: 600; font-size: 12px; }
+td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:nth-child(even) td { background: #f9f9f9; }
+.table-scroll { overflow-x: auto; }
+.status-badge { display: inline-block; padding: 3px 11px; border-radius: 16px; font-size: 11px; font-weight: 700; border: 1px solid; white-space: nowrap; }
+.status-badge.blau   { background: #EBF5FB; color: #009AC6; border-color: #b3dff0; }
+.status-badge.gelb   { background: #FEFDE7; color: #9A7D0A; border-color: #f7dc6f; }
+.status-badge.rot    { background: #FDEDEC; color: #C0392B; border-color: #f1948a; }
+.status-badge.grau   { background: #F4F6F7; color: #717D7E; border-color: #ccc; }
+.status-badge.gruen  { background: #EAFAF1; color: #1E8449; border-color: #a9dfbf; }
+.status-badge.lila   { background: #F5EEF8; color: #7D3C98; border-color: #d7bde2; }
+
+/* Vergleich heute / neu */
+.vergleich { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+.vergleich > div { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; font-size: 12.5px; }
+.vergleich .heute { background: #fdf6f6; border-color: #e8bcbc; }
+.vergleich .neu { background: #f4faf0; border-color: #bfd9ad; }
+.vergleich h4 { margin-top: 0; }
+.vergleich .heute h4 { color: var(--rot); }
+.vergleich .neu h4 { color: #3f6b16; }
+.vergleich ul { margin-left: 16px; }
+
+/* Mockup-Fenster */
+.mockup { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 18px 0; box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+.mockup-bar { background: #e9e9eb; padding: 8px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border); }
+.mockup-bar .dot-win { width: 9px; height: 9px; border-radius: 50%; background: #d0d0d0; }
+.mockup-bar .title { margin-left: 8px; font-size: 11px; color: var(--text-light); font-weight: 600; }
+.mockup-body { padding: 16px; background: #fbfbfb; font-size: 12.5px; }
+.mockup.heute .mockup-bar { background: #efe6e6; }
+.mockup.heute .mockup-bar .title::before { content: "HEUTE · "; color: var(--rot); font-weight: 700; }
+.mockup.neu .mockup-bar { background: #e4f0e2; }
+.mockup.neu .mockup-bar .title::before { content: "NEU · "; color: var(--gruen); font-weight: 700; }
+.mockup.phase2 .mockup-bar { background: #ece4f3; }
+.mockup.phase2 .mockup-bar .title::before { content: "PHASE 2 · "; color: #7D3C98; font-weight: 700; }
+.m-karte { border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 12px; margin-bottom: 10px; }
+.m-karte:last-child { margin-bottom: 0; }
+.m-kartenkopf { font-size: 12.5px; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+.m-kartensub { font-size: 10.5px; color: var(--text-light); margin-bottom: 10px; }
+.m-zaehler { display: inline-block; background: #eceff1; color: var(--text-light); border-radius: 10px; padding: 1px 8px; font-size: 10px; font-weight: 700; }
+.m-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; background: #fff; }
+.m-row:last-child { margin-bottom: 0; }
+.m-row.aus { opacity: .62; }
+.m-row.gesperrt { background: #f6f6f6; border-style: dashed; }
+.m-name { flex: 1; font-weight: 600; min-width: 0; }
+.m-sub { font-size: 11px; color: var(--text-light); font-weight: 400; }
+.m-btn { display: inline-block; background: transparent; border: 1px solid var(--border); color: var(--text); font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; white-space: nowrap; }
+.m-btn.primaer { background: var(--blau); border-color: var(--blau); color: #fff; }
+.m-btn.gruen { background: var(--gruen); border-color: var(--gruen); color: #fff; }
+.m-btn.inaktiv { opacity: .45; }
+.m-geltung { display: inline-flex; border-radius: 10px; padding: 1px 7px; font-size: 9px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+.m-geltung.grau { background: #eceff1; color: var(--text-light); }
+.m-geltung.gruen { background: #EAFAF1; color: #3f6b16; }
+.m-geltung.blau { background: #EBF5FB; color: #0b7aa0; }
+.m-geltung.lila { background: #F5EEF8; color: #7D3C98; }
+.m-geltung.rot { background: #FDEDEC; color: #C0392B; }
+.m-meldung { border-radius: 4px; padding: 4px 9px; font-size: 11px; margin: -2px 0 6px; }
+.m-meldung.gelb { background: var(--warnung-bg); border-left: 3px solid var(--gelb); color: #8a6d00; }
+.m-meldung.gruen { background: #EAFAF1; border-left: 3px solid var(--gruen); color: #1E8449; }
+.m-meldung.rot { background: var(--kritik-bg); border-left: 3px solid var(--rot); color: #C0392B; }
+.m-luecke { border: 2px dashed var(--rot); border-radius: 8px; padding: 14px; text-align: center; font-size: 12px; color: var(--rot); background: #fdf3f2; }
+.m-check { width: 15px; height: 15px; border: 1.5px solid #8a8a8a; border-radius: 3px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; background: #fff; }
+.m-check.an { background: var(--blau); border-color: var(--blau); color: #fff; }
+.m-check.gesperrt { background: #e5e5e5; border-color: #bbb; color: #999; }
+.m-status { font-size: 10.5px; white-space: nowrap; }
+.m-status.ok { color: #1E8449; }
+.m-status.warn { color: #8a6d00; }
+.m-status.lock { color: #888; }
+.m-feld { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; background: #fff; font-size: 12px; }
+.m-feld .label { display: block; font-size: 10px; color: var(--text-light); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+.m-feld.textarea { min-height: 54px; color: #999; }
+.m-summe { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #f2f6f9; border-radius: 6px; font-size: 11.5px; margin-top: 10px; }
+.m-modal { border: 1px solid #9a9a9a; border-radius: 10px; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.18); overflow: hidden; }
+.m-modal-kopf { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.m-modal-kopf strong { font-size: 13.5px; }
+.m-modal-body { padding: 14px 16px; }
+.m-modal-fuss { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; background: #fafafa; }
+.m-abschnitt { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-light); margin: 12px 0 6px; }
+.m-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.m-tab { padding: 6px 12px; font-size: 11.5px; font-weight: 600; color: var(--text-light); border-bottom: 2px solid transparent; }
+.m-tab.aktiv { color: var(--blau); border-bottom-color: var(--blau); }
+.m-tab.bald { opacity: .5; }
+.m-mail { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #f4f4f5; padding: 14px; }
+.m-mail-inner { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; font-size: 12px; }
+.m-mail-kopf { background: #1a1a2e; color: #fff; padding: 12px 16px; }
+.m-mail-kopf .t { font-weight: 700; font-size: 13px; }
+.m-mail-kopf .s { color: #a0a0c0; font-size: 10.5px; }
+.m-mail-body { padding: 14px 16px; }
+.m-mail-body p { margin-bottom: 8px; font-size: 12px; }
+.m-mail-box { background: #f9fafb; border-radius: 6px; padding: 10px 12px; margin: 8px 0; }
+.m-mail-box .l { font-size: 9.5px; text-transform: uppercase; color: #6b7280; font-weight: 700; margin-bottom: 4px; }
+.m-mail-note { border-left: 3px solid var(--gelb); background: #fffbea; padding: 8px 12px; margin: 8px 0; font-style: italic; }
+.m-anhang { display: inline-block; border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 10.5px; background: #fff; margin: 2px 4px 2px 0; }
+.m-pfeil-btn { font-size: 10px; color: var(--text-light); padding: 0 3px; }
+
+/* Datenfluss */
+.fluss { display: flex; flex-direction: column; align-items: center; gap: 3px; margin: 20px 0; }
+.fluss-box { border: 2px solid var(--accent); border-radius: 6px; padding: 9px 16px; font-size: 12px; font-weight: 700; color: var(--accent); background: #fff; text-align: center; max-width: 600px; }
+.fluss-box.start { border-color: var(--blau); color: var(--blau); }
+.fluss-box.liegt { border-color: var(--gruen); color: #3f6b16; background: #f6fcf3; }
+.fluss-box.ende-rot { border-color: var(--rot); color: var(--rot); background: #fdf3f2; }
+.fluss-box.ende-gruen { border-color: var(--gruen); color: #3f6b16; background: #EAFAF1; }
+.fluss-box .zusatz { display: block; font-weight: 400; font-size: 10.5px; margin-top: 3px; opacity: .85; }
+.fluss-pfeil { font-size: 15px; color: var(--text-light); line-height: 1.2; }
+.fluss-paar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* Aufwandstabelle */
+.aufwand td:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.aufwand tr.summe td { font-weight: 700; border-top: 2px solid var(--accent); background: #f2f2f4; }
+.aufwand tr.phase td { background: #e9eef2; font-weight: 700; color: var(--accent); }
+
+.entscheidung td:nth-child(2) { font-weight: 600; }
+
+.doc-footer { margin-top: 48px; padding: 24px 48px; background: var(--primary-bg); font-size: 11px; color: var(--text-light); border-top: 1px solid var(--border); }
+.doc-footer p { margin-bottom: 4px; }
+
+@media (max-width: 680px) {
+  .doc-header, .toc, .content, .doc-footer { padding-left: 20px; padding-right: 20px; }
+  .toc ol { columns: 1; }
+  .vergleich { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <div class="credo-bar"><span class="grau"></span><span class="gelb"></span><span class="gruen"></span><span class="rot"></span><span class="blau"></span></div>
+
+  <header class="doc-header">
+    <div class="badge">Plan · abgestimmt am 2. September 2026</div>
+    <h1>Starterpaket flexibel: Vorlagen auswählen, befüllen, versenden</h1>
+    <p class="subtitle">Aus dem Vorgang heraus die passenden Vorlagen wählen, automatisch mit den Vorgangsdaten befüllen und zusammen mit den festen Unterlagen per E-Mail zustellen — Onboarding zuerst, danach Offboarding, Verbeamtung und Vertragsende</p>
+    <p class="meta">Stand: 2. September 2026 &nbsp;|&nbsp; Codestand: <code>main</code> 546161d &nbsp;|&nbsp; Anlass: Wunsch, das Starterpaket in Summe flexibler zu machen &nbsp;|&nbsp; Grundlage: Prüfung von Starterpaket, Vorlagenbibliothek, Resolvern und Mailversand &nbsp;|&nbsp; Status: drei Entscheidungen am 2. September getroffen, drei Fragen offen &nbsp;|&nbsp; Umsetzung nach dem Server-Deploy des Stands vom 2. September</p>
+  </header>
+
+  <nav class="toc" aria-label="Inhaltsverzeichnis">
+    <h2>Inhaltsverzeichnis</h2>
+    <ol>
+      <li><a href="#ausgangslage">Ausgangslage — was das Starterpaket heute kann</a></li>
+      <li><a href="#ziel">Ziel und Leitidee</a></li>
+      <li><a href="#entscheidungen">Empfohlene Entscheidungen</a></li>
+      <li><a href="#mockups">So sieht es aus — Mockups</a></li>
+      <li><a href="#ablauf">Was hinter dem Knopf passiert</a></li>
+      <li><a href="#datenmodell">Datenmodell und Schnittstellen</a></li>
+      <li><a href="#bausteine">Bausteine und betroffene Dateien</a></li>
+      <li><a href="#aufwand">Aufwand und Reihenfolge</a></li>
+      <li><a href="#phase2">Phase 2 — Offboarding, Verbeamtung, Vertragsende</a></li>
+      <li><a href="#verworfen">Bewusst weggelassen</a></li>
+      <li><a href="#risiken">Risiken</a></li>
+      <li><a href="#offen">Offene Fragen vor der Umsetzung</a></li>
+    </ol>
+  </nav>
+
+  <main class="content">
+
+    <section class="section" style="margin-top:32px;">
+      <div class="hinweis" style="background:#EAFAF1;border-left-color:var(--gruen);">
+        <span class="icon">✅</span>
+        <div><strong>Entscheidungen vom 2. September 2026</strong>
+          <strong style="display:inline;">Sensible Vorlagen</strong> (IBAN, SV-Nr, Steuer-ID) dürfen mit ausdrücklicher Bestätigung je Versand per E-Mail gehen — anders als empfohlen; eingearbeitet in Mockups, Datenfluss, Nachweis und Aufwand (rund 5 Stunden mehr). ·
+          <strong style="display:inline;">Empfängeradresse</strong> ist im Dialog änderbar; die Abweichung steht im Nachweis. ·
+          <strong style="display:inline;">Reihenfolge:</strong> Zuerst wird der Stand vom 2. September (546161d) auf den Server gebracht und geprüft, dann beginnt dieses Vorhaben.
+          <br><br><strong>Ergänzt am 3. September 2026:</strong> <strong style="display:inline;">Pflegerechte</strong> für das Standardpaket bleiben wie bisher bei SUPER_ADMIN und HR_LEITUNG. · <strong style="display:inline;">Dateinamen</strong> der befüllten Vorlagen tragen Vorlagenname, Nachname und Datum (<code>Willkommensschreiben_Mueller_2026-09-03.pdf</code>). Offen bleibt nur Frage 5 in Abschnitt 12 (Reihenfolge in Phase 2); sie wird erst nach Phase 1 entschieden. Der Server-Deploy des Stands 546161d stand am 3. September noch aus — der Ablauf steht in der Übergabe <code>docs/historie/codereview-und-vorlagen-2026-09.md</code>.
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="ausgangslage">
+      <div class="section-title"><span class="num">1</span><h2>Ausgangslage — was das Starterpaket heute kann</h2></div>
+
+      <p>Das Starterpaket ist seit Juni 2026 im Betrieb und funktioniert zuverlässig — aber es ist starr. Es besteht ausschließlich aus <strong>fertigen PDFs</strong>, die einmal hochgeladen und je Mandant angekreuzt werden. Im Vorgang gibt es genau einen Knopf: „Starterpaket versenden" schickt <em>alles</em>, was für den Mandanten markiert ist, ohne Rückfrage und ohne Auswahl.</p>
+
+      <p>Parallel dazu existiert die <strong>Vorlagenbibliothek</strong> („Brief-Vorlagen"): Word-Vorlagen mit Platzhaltern, die für Onboarding, Offboarding, Verbeamtung und Vertragsende automatisch aus den Vorgangsdaten befüllt werden — 203 Platzhalter im Katalog, je Modul ein Resolver. Aus dem Vorgang heraus lassen sich diese Vorlagen als Word oder PDF <em>herunterladen</em>. Per E-Mail verschicken kann man sie nur einzeln, nur von der zentralen Vorlagenseite aus, und nur mit von Hand eingetippter Empfängeradresse.</p>
+
+      <p>Die beiden Welten berühren sich nicht: Ein befülltes Willkommensschreiben kann heute nicht Teil des Starterpakets sein.</p>
+
+      <div class="vergleich">
+        <div class="heute">
+          <h4>Heute</h4>
+          <ul>
+            <li>Starterpaket = feste PDFs aus einem Pool, je Mandant markiert und sortiert</li>
+            <li>Versand nur im Onboarding: ein Knopf, alles oder nichts</li>
+            <li>Keine Auswahl im Vorgang, keine persönliche Nachricht</li>
+            <li>Vorlagen aus der Bibliothek: nur Word-/PDF-Download im Vorgang</li>
+            <li>E-Mail-Versand einer Vorlage: nur einzeln von der zentralen Seite, Empfänger von Hand</li>
+            <li>Offboarding, Verbeamtung, Vertragsende: gar kein Versand</li>
+            <li>Nachweis: Zeitstempel am Vorgang + Prüfprotokoll + E-Mail-Protokoll (90 Tage)</li>
+          </ul>
+        </div>
+        <div class="neu">
+          <h4>Neu</h4>
+          <ul>
+            <li>Paket = feste PDFs <strong>und</strong> befüllte Vorlagen, gemischt und sortiert</li>
+            <li>Im Vorgang: Standardpaket vorausgewählt, jede Position abwählbar, weitere hinzufügbar</li>
+            <li>Vorprüfung vor dem Senden: welche Felder bleiben leer, wie groß wird die Mail</li>
+            <li>Empfänger vorbelegt aus dem Vorgang, änderbar; optionale persönliche Nachricht</li>
+            <li>Eine E-Mail, alle Anhänge als PDF — ohne DMS-Deckblatt</li>
+            <li>Dieselbe Sektion in Offboarding, Verbeamtung und Vertragsende (Phase 2)</li>
+            <li>Dauerhafter Versandnachweis je Vorgang mit Dokumentliste und Hashes</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Was bereits da ist und wiederverwendet wird</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:34%">Baustein</th><th style="width:30%">Wo</th><th>Rolle im neuen Ablauf</th></tr></thead>
+        <tbody>
+          <tr><td>Pool der festen PDFs + Markierung je Mandant</td><td><code>StarterpaketDokument</code>, <code>StarterpaketAuswahl</code></td><td>Bleibt. Die Markierung wird um Vorlagen erweitert.</td></tr>
+          <tr><td>Vorlagenbibliothek mit Modul- und Mandantenbezug</td><td><code>DocumentTemplate</code>, <code>/api/brief-vorlagen</code></td><td>Liefert die wählbaren Vorlagen je Modul (gruppenweit + eigener Mandant).</td></tr>
+          <tr><td>Platzhalter-Resolver je Modul</td><td><code>doc-template-resolvers.ts</code></td><td>Befüllen die Vorlagen — unverändert. Wird einmal je Paket aufgerufen, nicht je Vorlage.</td></tr>
+          <tr><td>Rendering Word → PDF</td><td><code>doc-generation.ts</code>, Gotenberg</td><td>Erzeugt die PDF-Anhänge. Neu: ohne DMS-Deckblatt.</td></tr>
+          <tr><td>Event-Mail mit Anhängen</td><td><code>sendEventEmail</code>, Vorlage <code>onboarding-starter-packet-sent</code></td><td>Bleibt der Versandweg. Die Mailvorlage bekommt zwei neue Variablen.</td></tr>
+          <tr><td>Ablage erzeugter Dokumente im Vorgang</td><td><code>GeneratedDocument</code>, „Für diesen Vorgang bereits erstellt"</td><td>Die versendeten PDFs erscheinen dort — mit Kennzeichen „per E-Mail versendet".</td></tr>
+          <tr><td>Versandnachweis</td><td><code>starterPacketSentAt</code>, AuditLog, EmailLog</td><td>Bleibt, wird um eine dauerhafte Versandtabelle ergänzt (siehe Abschnitt 6).</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">🧩</span>
+        <div><strong>Es fehlt kein Fundament, sondern die Verbindung</strong>Alle Einzelteile — Pool, Vorlagen, Resolver, PDF-Erzeugung, Mail mit Anhängen, Ablage — existieren und sind getestet. Das Vorhaben verbindet sie zu einem Ablauf und gibt HR die Auswahl in die Hand. Deshalb ist es kein neues Modul, sondern ein Ausbau mit überschaubarem Risiko.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="ziel">
+      <div class="section-title"><span class="num">2</span><h2>Ziel und Leitidee</h2></div>
+
+      <p><strong>Der Wunsch in einem Satz:</strong> Im jeweiligen Modul aus den hinterlegten, dazu passenden Vorlagen auswählen, diese mit den Variablen des Vorgangs befüllen lassen und per E-Mail versenden.</p>
+
+      <p>Daraus ergeben sich drei Ebenen, die sauber getrennt bleiben sollten:</p>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:22%">Ebene</th><th style="width:30%">Wer entscheidet</th><th>Was</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Standardpaket</strong></td><td>HR-Leitung, einmal je Mandant und Modul</td><td>Welche festen PDFs und welche Vorlagen gehören <em>normalerweise</em> ins Paket, in welcher Reihenfolge. Das ist die heutige Starterpaket-Konfiguration, erweitert um Vorlagen.</td></tr>
+          <tr><td><strong>Auswahl im Vorgang</strong></td><td>Sachbearbeitung, je Vorgang</td><td>Das Standardpaket ist vorausgewählt. Einzelne Positionen lassen sich abwählen, weitere Vorlagen des Moduls oder Pool-PDFs hinzufügen. Empfänger und optionale Nachricht.</td></tr>
+          <tr><td><strong>Befüllung und Versand</strong></td><td>Das Portal, automatisch</td><td>Vorlagen werden mit dem Modul-Resolver befüllt, zu PDF gewandelt, zusammen mit den festen PDFs an eine Mail gehängt und mit Nachweis versendet.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <p>Der Name „Starterpaket" bleibt im Onboarding, weil er dort eingeführt ist. Technisch wird das Ganze zum <strong>Dokumentenpaket</strong>: ein modulneutraler Ablauf, der im Offboarding „Unterlagen zum Austritt", in der Verbeamtung „Unterlagen zur Verbeamtung" heißt und immer dieselbe Komponente nutzt.</p>
+
+      <div class="warnung">
+        <span class="icon">🎯</span>
+        <div><strong>Was das Vorhaben nicht ist</strong>Kein Serienbrief, keine Empfangsbestätigung durch die Beschäftigten, kein Bearbeiten der Dokumente im Portal und kein automatischer Versand bei Statuswechseln. Der Versand bleibt eine bewusste Handlung von HR — das war die Entscheidung vom Juni und sie gilt weiter. Details in Abschnitt 10.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="entscheidungen">
+      <div class="section-title"><span class="num">3</span><h2>Empfohlene Entscheidungen</h2></div>
+
+      <p>Elf Punkte, bei denen es mehr als einen Weg gibt. Zu jedem eine Empfehlung mit Begründung. <strong>Punkt 5 und 8 sind am 2. September entschieden</strong> — bei Punkt 5 anders als empfohlen; Mockups und Aufwand sind darauf angepasst. Die übrigen Punkte bleiben Empfehlungen; wer anders entscheidet, verschiebt einzelne Zahlen in Abschnitt 8.</p>
+
+      <div class="table-scroll">
+      <table class="entscheidung">
+        <thead><tr><th style="width:4%">#</th><th style="width:22%">Frage</th><th style="width:30%">Empfehlung</th><th>Warum — und was die Alternative kosten würde</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Auswahl je Vorgang oder nur feste Konfiguration?</td><td>Standardpaket vorausgewählt, jede Position abwählbar, weitere hinzufügbar</td><td>Das ist der Kern des Wunsches. Eine feste Konfiguration mit Vorlagen wäre nur „mehr vom Gleichen". Die Alternative — ganz ohne Standard, jedes Mal alles neu ankreuzen — kostet HR bei jedem Vorgang Zeit und produziert Vergessensfehler.</td></tr>
+          <tr><td>2</td><td>Wo wird das Standardpaket gepflegt?</td><td>Auf der bestehenden Mandantenseite „Starterpaket" — eine gemischte, sortierbare Liste aus PDFs und Vorlagen; Phase 2 ergänzt Reiter je Modul</td><td>Die Seite und ihre Rechte (SUPER_ADMIN, HR_LEITUNG) sind da. Eine neue Seite je Modul würde die Pflege zersplittern.</td></tr>
+          <tr><td>3</td><td>Format der befüllten Vorlagen in der Mail?</td><td>Nur PDF, <strong>ohne</strong> DMS-Deckblatt</td><td>Beschäftigte sollen ein fertiges Schreiben erhalten, keine Word-Datei zum Weiterbearbeiten. Das DMS-Deckblatt mit QR-Code ist ein internes Ablagehilfsmittel und hat in der Mail an neue Mitarbeitende nichts verloren — heute hängt es standardmäßig vorne dran.</td></tr>
+          <tr><td>4</td><td>PDF-Dienst (Gotenberg) nicht erreichbar?</td><td>Versand abbrechen, klare Meldung, nichts verschicken</td><td>Ein halbes Paket (PDFs ja, Vorlagen als Word) wäre schlimmer als keines. Die Vorprüfung zeigt den Dienststatus vor dem Klick, sodass der Fall selten überrascht. Pakete ohne Vorlagen brauchen den Dienst nicht und gehen weiterhin durch.</td></tr>
+          <tr><td>5</td><td>Vorlagen mit sensiblen Platzhaltern (IBAN, SV-Nr, Steuer-ID)?</td><td><span class="status-badge gruen">entschieden</span> <strong>Mit Bestätigung erlauben</strong> — je Versand und je Vorlage ein ausdrückliches Häkchen, serverseitig erzwungen</td><td>Entscheidung vom 2. September, anders als die Empfehlung „sperren". Anwendungsfall: Beschäftigte sollen ihre Abrechnungsdaten (Bankverbindung, Steuer-ID) schriftlich bestätigt bekommen. Damit das kein stilles Risiko wird: Die Vorlage ist im Dialog rot gekennzeichnet, das Häkchen nennt Felder und Empfängeradresse, und weicht die Adresse vom Vorgang ab, warnt der Dialog doppelt. Ohne Häkchen lehnt der Server ab (409). Die Bestätigung steht mit Person, Zeit und Feldern im Nachweis; die Entschlüsselung wird wie beim Download heute im Prüfprotokoll vermerkt. Mehraufwand gegenüber der Sperre: rund 5 Stunden, eingerechnet.</td></tr>
+          <tr><td>6</td><td>Wie wird der Versand dauerhaft nachgewiesen?</td><td>Neue Tabelle <code>DokumentenVersand</code> je Vorgang, zusätzlich zu Audit und EmailLog</td><td>Das E-Mail-Protokoll wird nach 90 Tagen gelöscht, das Prüfprotokoll wird ebenfalls aufgeräumt. Bei einer Nachfrage im Jahr darauf („Haben Sie mir die Datenschutzinformation zugeschickt?") braucht HR Empfänger, Datum, Dokumentliste und Hashes — dauerhaft und modulübergreifend.</td></tr>
+          <tr><td>7</td><td>Werden die befüllten PDFs im Vorgang abgelegt?</td><td>Ja, als erzeugte Dokumente mit Kennzeichen „per E-Mail versendet" — zwölf Monate wie heute</td><td>So lässt sich noch Monate später genau <em>das</em> Schreiben öffnen, das rausging. Der Hash im Nachweis zeigt auf diese Datei. Ohne Ablage bliebe nur der Name.</td></tr>
+          <tr><td>8</td><td>Empfängeradresse fest oder änderbar?</td><td><span class="status-badge gruen">entschieden</span> Vorbelegt aus dem Vorgang, änderbar; Abweichung wird im Nachweis vermerkt</td><td>Tippfehler in der Vorgangsadresse kommen vor, und beim Offboarding ist die Dienstadresse oft schon abgeschaltet. Fest wäre sicherer, aber praxisfern.</td></tr>
+          <tr><td>9</td><td>Persönliche Nachricht?</td><td>Optional, Freitext, erscheint über <code>{{nachricht}}</code> in der Mailvorlage</td><td>Geringer Aufwand, spürbarer Unterschied im Ton („Wir freuen uns auf Sie am 1. Oktober, Ihr Büro ist Raum 214"). Die Vorprüfung warnt, wenn eine in der Datenbank angepasste Mailvorlage die Variable noch nicht enthält.</td></tr>
+          <tr><td>10</td><td>Einzelanhänge oder ein Sammel-PDF?</td><td>Einzelanhänge; Sammel-PDF als Option in Phase 3</td><td>Einzelanhänge sind für Empfänger übersichtlicher und beim Speichern praktischer. Das Zusammenführen ist mit der vorhandenen Funktion billig nachrüstbar.</td></tr>
+          <tr><td>11</td><td>Reihenfolge der Module?</td><td>Phase 1 Onboarding, Phase 2 die drei anderen gemeinsam</td><td>Komponente, Versandlogik und Nachweis werden von Anfang an modulneutral gebaut. Phase 2 ist dann im Wesentlichen Einbinden, Mailvorlagen und Empfängerlogik.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="mockups">
+      <div class="section-title"><span class="num">4</span><h2>So sieht es aus — Mockups</h2></div>
+
+      <p>Alle Skizzen zeigen einen Onboarding-Vorgang bei der FES Minden. Namen und Dokumente sind Beispiele; die Vorlagennamen entsprechen dem, was HR realistisch hinterlegen würde.</p>
+
+      <h3>4.1 · Der Dokumente-Tab — heute</h3>
+      <p>Die Starterpaket-Karte hat genau einen Knopf. Was er verschickt, steht nirgends — nur der Hinweis, wo man die Konfiguration findet.</p>
+
+      <div class="mockup heute">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Onboarding 2026-GYM-014 · Max Mustermann → Tab „Dokumente"</span></div>
+        <div class="mockup-body">
+          <div class="m-karte" style="padding:8px 12px;font-size:11px;color:var(--text-light);">Sie sind hier: ✓ Einladung › ✓ Fragebogen › ✓ Modalitäten › ✓ Prüfen › ✓ Checkliste › <strong style="color:var(--blau);">Abschluss</strong></div>
+          <div class="m-karte">
+            <div class="m-kartenkopf">📄 Dokumente erstellen <span class="m-zaehler">3</span></div>
+            <div class="m-kartensub">Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.</div>
+            <div class="m-row"><div class="m-name">Masernschutz – Nachweis-Bescheinigung <span class="m-sub">Amtliches NRW-Formular</span></div><span class="m-btn">PDF öffnen</span></div>
+            <div class="m-row"><div class="m-name">Führungszeugnis-Antrag <span class="m-geltung grau">Gruppenweit</span></div><span class="m-btn">Word</span> <span class="m-btn">PDF</span></div>
+            <div class="m-row"><div class="m-name">Willkommensschreiben <span class="m-geltung grau">Gruppenweit</span></div><span class="m-btn">Word</span> <span class="m-btn">PDF</span></div>
+          </div>
+          <div class="m-karte" style="border:2px solid var(--blau);background:#f4fbfd;">
+            <div class="m-kartenkopf" style="color:var(--blau);">⬇ Starterpaket versenden</div>
+            <div class="m-kartensub">Die für diesen Mandanten markierten Dokumente gehen als PDF-Anhänge an den neuen Mitarbeiter. Konfiguration unter Mandanten → Einrichtung → Starterpaket.</div>
+            <div style="display:flex;align-items:center;gap:12px;"><span class="m-btn primaer">Starterpaket versenden</span><span class="m-sub">Noch nicht versendet</span></div>
+          </div>
+          <div class="m-luecke">
+            <strong>Was genau rausgeht, sieht man erst hinterher.</strong><br>
+            Das Willkommensschreiben von oben kann nicht mit ins Paket. Eine persönliche Zeile auch nicht.
+          </div>
+        </div>
+      </div>
+
+      <h3>4.2 · Der Dokumente-Tab — neu</h3>
+      <p>Die Karte zeigt das Standardpaket dieses Mandanten schon in der Übersicht. Der Knopf öffnet den Versand-Dialog statt sofort zu senden. Darunter der bisherige Verlauf.</p>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Onboarding 2026-GYM-014 · Max Mustermann → Tab „Dokumente"</span></div>
+        <div class="mockup-body">
+          <div class="m-karte" style="padding:8px 12px;font-size:11px;color:var(--text-light);">Sie sind hier: ✓ Einladung › ✓ Fragebogen › ✓ Modalitäten › ✓ Prüfen › ✓ Checkliste › <strong style="color:var(--blau);">Abschluss</strong></div>
+          <div class="m-karte" style="padding:9px 12px;"><div class="m-kartenkopf" style="margin:0;">📄 Dokumente erstellen <span class="m-zaehler">3</span></div></div>
+          <div class="m-karte" style="padding:9px 12px;border-color:var(--gruen);"><div class="m-kartenkopf" style="margin:0;color:#3f6b16;">🗂 Für diesen Vorgang bereits erstellt <span class="m-zaehler">1</span></div></div>
+
+          <div class="m-karte" style="border:2px solid var(--blau);background:#f4fbfd;">
+            <div class="m-kartenkopf" style="color:var(--blau);">✉ Starterpaket versenden</div>
+            <div class="m-kartensub">Standardpaket der FES Minden — im Dialog anpassbar. Vorlagen werden mit den Daten dieses Vorgangs befüllt.</div>
+            <div class="m-row" style="padding:5px 10px;"><div class="m-name" style="font-weight:500;">Leitbild der CREDO-Gruppe <span class="m-geltung blau">PDF</span></div><span class="m-sub">1,8 MB</span></div>
+            <div class="m-row" style="padding:5px 10px;"><div class="m-name" style="font-weight:500;">Datenschutzinformation für Beschäftigte <span class="m-geltung blau">PDF</span></div><span class="m-sub">320 KB</span></div>
+            <div class="m-row" style="padding:5px 10px;"><div class="m-name" style="font-weight:500;">Willkommensschreiben <span class="m-geltung lila">Vorlage · wird befüllt</span></div><span class="m-sub">9 Felder</span></div>
+            <div class="m-row" style="padding:5px 10px;"><div class="m-name" style="font-weight:500;">Verschwiegenheitserklärung <span class="m-geltung lila">Vorlage · wird befüllt</span></div><span class="m-sub">6 Felder</span></div>
+            <div class="m-row" style="padding:5px 10px;"><div class="m-name" style="font-weight:500;">Hausordnung Gymnasium <span class="m-geltung blau">PDF</span> <span class="m-geltung gruen">Für Ihre Einrichtung</span></div><span class="m-sub">640 KB</span></div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:10px;"><span class="m-btn primaer">Zusammenstellen und versenden …</span><span class="m-sub">Noch nicht versendet</span></div>
+          </div>
+
+          <div class="m-karte" style="padding:9px 12px;"><div class="m-kartenkopf" style="margin:0;">📎 Hochgeladene Dokumente <span class="m-zaehler">4</span></div></div>
+          <div class="m-karte" style="padding:9px 12px;"><div class="m-kartenkopf" style="margin:0;">⬇ PDF-Export für DMS</div></div>
+        </div>
+      </div>
+
+      <h3>4.3 · Der Versand-Dialog</h3>
+      <p>Das Herzstück. Drei Blöcke: Empfänger, Zusammenstellung, Nachricht. Die Vorprüfung läuft beim Öffnen automatisch und schreibt ihr Ergebnis direkt an die Zeilen — bevor irgendetwas verschickt wird.</p>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Dialog „Starterpaket zusammenstellen"</span></div>
+        <div class="mockup-body" style="background:#e9e9eb;">
+          <div class="m-modal">
+            <div class="m-modal-kopf"><strong>✉ Starterpaket an Max Mustermann</strong><span class="m-sub">Vorgang 2026-GYM-014 · FES Minden</span></div>
+            <div class="m-modal-body">
+
+              <div class="m-feld"><span class="label">Empfänger</span>max.mustermann@example.org <span class="m-sub">· aus dem Vorgang übernommen</span></div>
+
+              <div class="m-abschnitt">Standardpaket FES Minden · vorausgewählt</div>
+              <div class="m-row"><span class="m-check an">✓</span><div class="m-name">Leitbild der CREDO-Gruppe <span class="m-geltung blau">PDF</span></div><span class="m-status ok">1,8 MB</span></div>
+              <div class="m-row"><span class="m-check an">✓</span><div class="m-name">Datenschutzinformation für Beschäftigte (Art. 13 DSGVO) <span class="m-geltung blau">PDF</span></div><span class="m-status ok">320 KB</span></div>
+              <div class="m-row"><span class="m-check an">✓</span><div class="m-name">Willkommensschreiben <span class="m-geltung lila">Vorlage</span></div><span class="m-status ok">✓ alle 9 Felder befüllt</span></div>
+              <div class="m-row"><span class="m-check an">✓</span><div class="m-name">Verschwiegenheitserklärung <span class="m-geltung lila">Vorlage</span></div><span class="m-status warn">⚠ 1 Feld leer</span></div>
+              <div class="m-meldung gelb">Leer bleibt: <code>{vorgesetzter_telefon}</code> — im Vorgang sind keine Vorgesetzten-Daten hinterlegt. Das Dokument wird mit „___" an dieser Stelle verschickt, wenn Sie es nicht abwählen.</div>
+              <div class="m-row aus"><span class="m-check"></span><div class="m-name">Hausordnung Gymnasium <span class="m-geltung blau">PDF</span> <span class="m-geltung gruen">Für Ihre Einrichtung</span></div><span class="m-status">640 KB · abgewählt</span></div>
+
+              <div class="m-abschnitt">Weitere Vorlagen · Onboarding und Allgemein</div>
+              <div class="m-row aus"><span class="m-check"></span><div class="m-name">Führungszeugnis-Antrag <span class="m-geltung lila">Vorlage</span> <span class="m-geltung grau">System</span></div><span class="m-status">5 Felder</span></div>
+              <div class="m-row"><span class="m-check an">✓</span><div class="m-name">Bestätigung des Diensteintritts <span class="m-geltung lila">Vorlage</span></div><span class="m-status ok">✓ alle 7 Felder befüllt</span></div>
+              <div class="m-row" style="border-color:#e8bcbc;"><span class="m-check an">✓</span><div class="m-name">Bestätigung Ihrer Abrechnungsdaten <span class="m-geltung lila">Vorlage</span> <span class="m-geltung rot">enthält IBAN, Steuer-ID</span></div><span class="m-status ok">✓ alle 8 Felder befüllt</span></div>
+              <div class="m-meldung rot">Diese Unterlage enthält Bankverbindung und Steuer-ID und geht unverschlüsselt per E-Mail. <span class="m-check an" style="vertical-align:middle;">✓</span> Ich bestätige den Versand an <strong>max.mustermann@example.org</strong> — die Adresse, die die Person selbst im Fragebogen angegeben hat.</div>
+
+              <div class="m-abschnitt">Weitere PDFs aus dem Pool</div>
+              <div class="m-row aus"><span class="m-check"></span><div class="m-name">Merkblatt Dienstreisen <span class="m-geltung blau">PDF</span> <span class="m-geltung grau">Gruppenweit</span></div><span class="m-status">210 KB</span></div>
+
+              <div class="m-summe"><span><strong>6 Anhänge</strong> · 2,5 MB von höchstens 15 MB · 1 Hinweis · 1 Bestätigung erteilt</span><span class="m-status ok">✓ PDF-Dienst erreichbar</span></div>
+
+              <div class="m-abschnitt">Persönliche Nachricht · optional</div>
+              <div class="m-feld textarea">Erscheint in der E-Mail oberhalb der Anhangsliste, z. B. „Wir freuen uns auf Sie am 1. Oktober — Ihr Büro ist Raum 214."</div>
+
+            </div>
+            <div class="m-modal-fuss"><span class="m-btn">Abbrechen</span><span class="m-btn primaer">Senden · 6 Dokumente</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">🔍</span>
+        <div><strong>Die Vorprüfung ist der eigentliche Gewinn gegenüber heute</strong>Sie befüllt jede gewählte Vorlage probeweise (nur Word, ohne PDF-Dienst — das dauert Millisekunden), zählt die leer gebliebenen Felder und nennt sie beim Namen. Dazu die Gesamtgröße, der Status des PDF-Dienstes und ein Hinweis, falls die Mailvorlage die persönliche Nachricht noch nicht anzeigt. Nichts davon wird gespeichert oder verschickt. Heute erfährt HR von leeren Feldern erst nach dem Download — beim Mailversand gar nicht.</div>
+      </div>
+
+      <div class="kritik">
+        <span class="icon">🔒</span>
+        <div><strong>Bestätigung statt Sperre — so sieht sie aus</strong>Die Bestätigung Ihrer Abrechnungsdaten im Beispiel nutzt <code>{iban}</code> und <code>{steuer_id}</code>. Sie ist rot gekennzeichnet und lässt sich wie jede andere Vorlage anhaken — aber der Senden-Knopf bleibt gesperrt, bis das Häkchen unter der Zeile gesetzt ist. Das Häkchen nennt die Felder und die Empfängeradresse; wurde die Adresse im Dialog geändert, steht dort zusätzlich in Rot „abweichend von der Adresse im Vorgang". Die Vorprüfung entschlüsselt nichts — sensible Felder zählen dort als „wird beim Versand befüllt". Entschlüsselt wird erst beim Versand, und nur für bestätigte Vorlagen. Entscheidung 5.</div>
+      </div>
+
+      <h3>4.4 · Nach dem Versand</h3>
+      <p>Die Karte zeigt das Ergebnis und führt den Verlauf. Jeder Versand ist aufklappbar: Empfänger, Dokumente, Hashes, wer es ausgelöst hat. Das ist die Ansicht der neuen Tabelle <code>DokumentenVersand</code>.</p>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Karte „Starterpaket versenden" nach dem Versand</span></div>
+        <div class="mockup-body">
+          <div class="m-karte" style="border:2px solid var(--blau);background:#f4fbfd;">
+            <div class="m-kartenkopf" style="color:var(--blau);">✉ Starterpaket versenden</div>
+            <div class="m-meldung gruen" style="margin:6px 0 10px;">✓ Starterpaket versendet an max.mustermann@example.org — 6 Dokumente. Die Verschwiegenheitserklärung ging mit 1 leeren Feld hinaus; der Versand der Abrechnungsdaten wurde von Ihnen bestätigt.</div>
+            <div style="display:flex;align-items:center;gap:12px;"><span class="m-btn">Erneut zusammenstellen …</span><span class="m-sub">Zuletzt gesendet am 02.09.2026, 10:14 (1×)</span></div>
+
+            <div class="m-abschnitt" style="margin-top:14px;">Versandverlauf</div>
+            <div class="m-row" style="flex-wrap:wrap;">
+              <div class="m-name">02.09.2026, 10:14 · an max.mustermann@example.org · 6 Dokumente<br><span class="m-sub">ausgelöst von Dimitri Riesen · Zustellung angenommen (Message-ID vorhanden) · 1 Bestätigung sensibler Daten · Adresse wie im Vorgang</span></div>
+              <span class="m-btn">▾ Details</span>
+              <div style="flex-basis:100%;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-size:11px;color:var(--text-light);line-height:1.6;">
+                1. Leitbild der CREDO-Gruppe · PDF · <code>a91f…3c</code><br>
+                2. Datenschutzinformation für Beschäftigte · PDF · <code>77b0…e1</code><br>
+                3. Willkommensschreiben · befüllte Vorlage · <code>0d4e…9a</code> · <span style="color:#1E8449;">öffnen</span><br>
+                4. Verschwiegenheitserklärung · befüllte Vorlage · <code>c2a8…57</code> · ⚠ 1 Feld leer · <span style="color:#1E8449;">öffnen</span><br>
+                5. Bestätigung des Diensteintritts · befüllte Vorlage · <code>5be1…04</code> · <span style="color:#1E8449;">öffnen</span><br>
+                6. Bestätigung Ihrer Abrechnungsdaten · befüllte Vorlage · <code>e07c…b2</code> · <span style="color:#C0392B;">enthält IBAN, Steuer-ID · Versand bestätigt 10:13 von Dimitri Riesen</span> · <span style="color:#1E8449;">öffnen</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>4.5 · Die E-Mail beim Empfänger</h3>
+      <p>Die bestehende Mailvorlage „Starterpaket versandt" bleibt — sie ist in den Einstellungen editierbar. Neu sind zwei Variablen: <code>{{nachricht}}</code> für den Freitext und <code>{{dokumentenliste}}</code> für die Aufzählung der Anhänge. Beide sind optional; eine Vorlage ohne sie funktioniert wie bisher.</p>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Posteingang · „Herzlich willkommen bei FES Minden – Ihr Starterpaket"</span></div>
+        <div class="mockup-body">
+          <div class="m-mail">
+            <div class="m-mail-inner">
+              <div class="m-mail-kopf"><div class="t">CREDO HR-Portal</div><div class="s">FES Minden</div></div>
+              <div class="m-mail-body">
+                <p><strong>Willkommen im Team, Max!</strong></p>
+                <p>wir freuen uns sehr, Sie bei FES Minden begrüßen zu dürfen. Im Anhang dieser E-Mail finden Sie Ihr persönliches Starterpaket mit wichtigen Unterlagen rund um Ihren Start bei uns.</p>
+                <div class="m-mail-note">Wir freuen uns auf Sie am 1. Oktober — Ihr Büro ist Raum 214. Melden Sie sich bitte um 7:45 Uhr im Sekretariat.<br><span style="font-style:normal;font-size:10px;color:#8a6d00;">← {{nachricht}}</span></div>
+                <div class="m-mail-box">
+                  <div class="l">Im Anhang · 6 Dokumente</div>
+                  1. Leitbild der CREDO-Gruppe<br>2. Datenschutzinformation für Beschäftigte<br>3. Willkommensschreiben<br>4. Verschwiegenheitserklärung<br>5. Bestätigung des Diensteintritts<br>6. Bestätigung Ihrer Abrechnungsdaten<br>
+                  <span style="font-size:10px;color:#8a6d00;">← {{dokumentenliste}}</span>
+                </div>
+                <p style="font-size:11px;color:#6b7280;">Bei Fragen wenden Sie sich an die Personalabteilung.</p>
+              </div>
+              <div style="padding:8px 16px 12px;border-top:1px solid #eee;">
+                <span class="m-anhang">📎 Leitbild_CREDO.pdf</span><span class="m-anhang">📎 Datenschutzinformation.pdf</span><span class="m-anhang">📎 Willkommensschreiben_2026-09-02.pdf</span><span class="m-anhang">📎 Verschwiegenheitserklaerung_2026-09-02.pdf</span><span class="m-anhang">📎 Bestaetigung_Diensteintritt_2026-09-02.pdf</span><span class="m-anhang">📎 Bestaetigung_Abrechnungsdaten_2026-09-02.pdf</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>4.6 · Mandanten-Konfiguration — das Standardpaket</h3>
+      <p>Die bestehende Seite bekommt eine zweite Quelle. Statt nur PDFs aus dem Pool anzukreuzen, entsteht <strong>eine</strong> sortierte Liste, in die sich PDFs und Vorlagen einreihen. Die Vorlagen kommen aus der Bibliothek — Modul Onboarding oder Allgemein, gruppenweit oder für diesen Mandanten. Wer eine Vorlage ins Paket will, legt sie also wie bisher unter „Brief-Vorlagen" an und kreuzt sie hier an.</p>
+
+      <div class="mockup neu">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Mandanten → FES Minden → Starterpaket</span></div>
+        <div class="mockup-body">
+          <div class="m-tabs"><span class="m-tab aktiv">Onboarding · Starterpaket</span><span class="m-tab bald">Offboarding</span><span class="m-tab bald">Verbeamtung</span><span class="m-tab bald">Vertragsende</span><span class="m-sub" style="margin-left:auto;align-self:center;">Reiter ab Phase 2</span></div>
+
+          <div class="m-karte">
+            <div class="m-kartenkopf">Standardpaket · in dieser Reihenfolge <span class="m-zaehler">5</span></div>
+            <div class="m-kartensub">Wird im Vorgang vorausgewählt. Die Sachbearbeitung kann einzelne Positionen abwählen oder weitere hinzufügen.</div>
+            <div class="m-row"><span class="m-pfeil-btn">▲ ▼</span><div class="m-name">1 · Leitbild der CREDO-Gruppe <span class="m-geltung blau">PDF</span> <span class="m-geltung grau">Gruppenweit</span></div><span class="m-btn">Entfernen</span></div>
+            <div class="m-row"><span class="m-pfeil-btn">▲ ▼</span><div class="m-name">2 · Datenschutzinformation für Beschäftigte <span class="m-geltung blau">PDF</span> <span class="m-geltung grau">Gruppenweit</span></div><span class="m-btn">Entfernen</span></div>
+            <div class="m-row"><span class="m-pfeil-btn">▲ ▼</span><div class="m-name">3 · Willkommensschreiben <span class="m-geltung lila">Vorlage · Onboarding</span> <span class="m-geltung grau">Gruppenweit</span><br><span class="m-sub">9 Platzhalter · wird je Vorgang befüllt</span></div><span class="m-btn">Entfernen</span></div>
+            <div class="m-row"><span class="m-pfeil-btn">▲ ▼</span><div class="m-name">4 · Verschwiegenheitserklärung <span class="m-geltung lila">Vorlage · Allgemein</span> <span class="m-geltung grau">Gruppenweit</span><br><span class="m-sub">6 Platzhalter</span></div><span class="m-btn">Entfernen</span></div>
+            <div class="m-row"><span class="m-pfeil-btn">▲ ▼</span><div class="m-name">5 · Hausordnung Gymnasium <span class="m-geltung blau">PDF</span> <span class="m-geltung gruen">Nur dieser Mandant</span></div><span class="m-btn">Entfernen</span></div>
+            <div style="margin-top:10px;"><span class="m-btn gruen">Speichern</span></div>
+          </div>
+
+          <div class="m-karte">
+            <div class="m-kartenkopf">Verfügbare Vorlagen <span class="m-zaehler">3</span></div>
+            <div class="m-kartensub">Aus der Vorlagenbibliothek: Modul Onboarding und Allgemein, gruppenweit oder für diesen Mandanten. Vorlagen mit IBAN, SV-Nummer oder Steuer-ID sind rot gekennzeichnet — ihr Versand muss im Vorgang jedes Mal ausdrücklich bestätigt werden.</div>
+            <div class="m-row"><div class="m-name">Führungszeugnis-Antrag <span class="m-geltung grau">System</span><br><span class="m-sub">5 Platzhalter</span></div><span class="m-btn">Ins Paket</span></div>
+            <div class="m-row"><div class="m-name">Bestätigung des Diensteintritts<br><span class="m-sub">7 Platzhalter</span></div><span class="m-btn">Ins Paket</span></div>
+            <div class="m-row" style="border-color:#e8bcbc;"><div class="m-name">Bestätigung Ihrer Abrechnungsdaten <span class="m-geltung rot">enthält IBAN, Steuer-ID · Bestätigung je Versand</span><br><span class="m-sub">8 Platzhalter</span></div><span class="m-btn">Ins Paket</span></div>
+          </div>
+
+          <div class="m-karte">
+            <div class="m-kartenkopf">Pool-PDFs <span class="m-zaehler">1</span> <span class="m-sub" style="margin-left:auto;font-weight:400;">+ PDF hochladen</span></div>
+            <div class="m-kartensub">Feste Dokumente ohne Platzhalter — wie bisher.</div>
+            <div class="m-row"><div class="m-name">Merkblatt Dienstreisen <span class="m-geltung grau">Gruppenweit</span><br><span class="m-sub">210 KB</span></div><span class="m-btn">Ins Paket</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">↔</span>
+        <div><strong>Zwei Quellen, eine Liste</strong>Die Trennung „PDF" / „Vorlage" ist für die Pflege nebensächlich — was zählt, ist die Reihenfolge, in der die Beschäftigten die Anhänge sehen. Deshalb eine gemeinsame, sortierbare Liste. Die Etiketten sagen, was befüllt wird und was nicht.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="ablauf">
+      <div class="section-title"><span class="num">5</span><h2>Was hinter dem Knopf passiert</h2></div>
+
+      <p>Der Ablauf ist bewusst so gebaut, dass <strong>nichts persistiert wird, bevor die Mail angenommen wurde</strong> — dasselbe Prinzip wie heute beim Mailversand einer einzelnen Vorlage. Ein gescheiterter Versand hinterlässt keinen falschen Eintrag „versendet".</p>
+
+      <div class="fluss">
+        <div class="fluss-box start">HR klickt „Senden · 6 Dokumente"<span class="zusatz">Bestätigungen für sensible Vorlagen sind gesetzt · Dialog sperrt den Knopf, zeigt „Dokumente werden befüllt …"</span></div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-box">Zugriff prüfen<span class="zusatz">Rolle (HR_EDIT_ROLES) · Vorgang gehört zu einem erlaubten Mandanten (canAccessProcess) · Modul unterstützt, BEM ausgeschlossen</span></div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-box">Positionen validieren<span class="zusatz">Jede Vorlage: aktiv, Modul passt (Vorgangsmodul oder Allgemein), Geltung gruppenweit oder Vorgangs-Mandant, bei sensiblen Platzhaltern liegt die Bestätigung vor (sonst 409) · Jedes PDF: im Pool dieses Mandanten oder gruppenweit</span></div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-box">Resolver einmal aufrufen<span class="zusatz">Vereinigung aller Platzhalter der gewählten Vorlagen · liefert die Werte des Vorgangs · sensible Felder werden nur für bestätigte Vorlagen entschlüsselt und als sensitiveFields fürs Prüfprotokoll gemeldet</span></div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-box">Vorlagen befüllen und zu PDF wandeln<span class="zusatz">docx rendern → Gotenberg · ohne Deckblatt · Dateiname Vorlagenname_Nachname_Datum.pdf · leere Felder je Vorlage merken · Gesamtgröße prüfen (15 MB)</span></div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-paar">
+          <div class="fluss-box ende-rot">PDF-Dienst nicht erreichbar<span class="zusatz">Abbruch · nichts gespeichert, nichts verschickt · Meldung im Dialog</span></div>
+          <div class="fluss-box">Pool-PDFs laden<span class="zusatz">pfadsicher aus dem Upload-Verzeichnis</span></div>
+        </div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-box">Eine E-Mail über das Modul-Event<span class="zusatz">Anhänge in Paketreihenfolge · Payload: vorname, einrichtung, nachricht, dokumentenliste, anzahlDokumente · Mailvorlage aus den Einstellungen</span></div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-paar">
+          <div class="fluss-box ende-rot">SMTP lehnt ab<span class="zusatz">EmailLog FAILED (wie heute) · sonst nichts · HR sieht die Meldung</span></div>
+          <div class="fluss-box liegt">SMTP nimmt an (Message-ID)</div>
+        </div>
+        <div class="fluss-pfeil">↓</div>
+        <div class="fluss-box ende-gruen">Nachweis in einer Transaktion<span class="zusatz">befüllte PDFs als GeneratedDocument ablegen (Kennzeichen „versendet") · DokumentenVersand mit Empfänger (samt Vermerk bei Abweichung), Liste, Hashes, Message-ID, Bestätigungen · AuditLog mit sensitiveFields · Onboarding: starterPacketSentAt/Count wie heute</span></div>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">⏱</span>
+        <div><strong>Wie lange dauert das?</strong>Das Befüllen einer Word-Vorlage dauert Millisekunden; die PDF-Wandlung über Gotenberg ein bis drei Sekunden je Dokument. Bei vier Vorlagen sind das bis zu zwölf Sekunden — die Wandlungen laufen nacheinander, um den Dienst nicht zu überlasten (Zeitlimit des Dienstes: 120 Sekunden). Der Dialog zeigt währenddessen den Fortschritt je Dokument.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="datenmodell">
+      <div class="section-title"><span class="num">6</span><h2>Datenmodell und Schnittstellen</h2></div>
+
+      <h3>6.1 · Schema-Änderungen</h3>
+      <p>Zwei Eingriffe, beide rückwärtskompatibel: Bestehende Markierungen bleiben gültig, keine Datenmigration nötig.</p>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:26%">Modell</th><th style="width:34%">Änderung</th><th>Bemerkung</th></tr></thead>
+        <tbody>
+          <tr><td><code>StarterpaketAuswahl</code></td><td><code>dokumentId</code> wird optional, neu <code>templateId</code> (optional, → <code>DocumentTemplate</code>), neu <code>modul</code> (Standard <code>ONBOARDING</code>)</td><td>Eine Position ist entweder PDF <em>oder</em> Vorlage — genau eines von beiden gesetzt; das Zod-Schema erzwingt es, die Route prüft es. Eindeutigkeit: <code>[organizationId, modul, dokumentId]</code> und <code>[organizationId, modul, templateId]</code>. Das Feld <code>modul</code> ist der Anker für die Reiter in Phase 2.</td></tr>
+          <tr><td><code>DokumentenVersand</code> <span class="status-badge gruen">neu</span></td><td><code>id, modul, refId, organizationId, empfaenger, empfaengerVorgang, empfaengerAbweichend, betreff, nachricht, anzahl, positionen (Json), bestaetigungen (Json), messageId, fehlendeFelderGesamt, sentById, createdAt</code></td><td>Der dauerhafte Nachweis. <code>positionen</code> trägt je Anhang Name, Art, Hash und — bei Vorlagen — <code>templateId</code>, <code>generatedDocumentId</code> und die leeren Felder. <code>empfaengerVorgang</code> hält die Adresse fest, die zum Zeitpunkt des Versands im Vorgang stand; <code>empfaengerAbweichend</code> sagt, ob davon abgewichen wurde. <code>bestaetigungen</code> trägt je sensibler Vorlage die bestätigten Felder, die bestätigende Person und den Zeitpunkt. Index auf <code>[modul, refId]</code>. Wird nicht aufgeräumt.</td></tr>
+          <tr><td><code>GeneratedDocument</code></td><td>neu <code>versandId</code> (optional, → <code>DokumentenVersand</code>)</td><td>Damit die Liste „bereits erstellt" das Kennzeichen „per E-Mail versendet" zeigen kann und der Nachweis auf die Datei zeigt. Nach zwölf Monaten löscht der bestehende Aufbewahrungslauf die Datei; der Nachweis behält Name und Hash.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="warnung">
+        <span class="icon">🗄</span>
+        <div><strong>Deploy-Hinweis</strong>Schema-Änderung → der Entrypoint legt vor dem Abgleich eine Sicherung an und braucht dafür die Einhängung <code>./backups:/backups</code> (siehe Übergabe vom 2. September). Das Umbenennen von Spalten wird hier bewusst vermieden: <code>dokumentId</code> wird nur optional, nichts wird umbenannt — <code>db push</code> löscht also nichts.</div>
+      </div>
+
+      <h3>6.2 · Neue und geänderte Endpunkte</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:38%">Endpunkt</th><th style="width:16%">Rechte</th><th>Aufgabe</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET /api/dokumentenpaket?modul=&amp;refId=</code> <span class="status-badge gruen">neu</span></td><td>HR_EDIT_ROLES + Vorgangsmandant</td><td>Liefert alles, was der Dialog braucht: Empfängervorschlag, Standardpaket (vorausgewählt), weitere Vorlagen des Moduls, weitere Pool-PDFs, sensible Vorlagen mit Kennzeichen und betroffenen Feldern, Versandverlauf, Größenlimit.</td></tr>
+          <tr><td><code>POST /api/dokumentenpaket/pruefen</code> <span class="status-badge gruen">neu</span></td><td>wie oben</td><td>Vorprüfung: befüllt die gewählten Vorlagen probeweise (nur Word), meldet leere Felder je Vorlage, Gesamtgröße, Erreichbarkeit des PDF-Dienstes, ob die Mailvorlage <code>{{nachricht}}</code> enthält. Persistiert nichts. Entschlüsselt nichts: Sensible Platzhalter werden mit einem Marker gefüllt und zählen nicht als leer — entschlüsselt wird erst beim bestätigten Versand, mit Vermerk im Prüfprotokoll wie beim Download heute.</td></tr>
+          <tr><td><code>POST /api/dokumentenpaket/versenden</code> <span class="status-badge gruen">neu</span></td><td>wie oben</td><td>Der Versand aus Abschnitt 5. Body: <code>modul, refId, positionen[{art, id, bestaetigt?}], empfaenger, nachricht?</code>. Sensible Vorlage ohne <code>bestaetigt</code> → 409, auch bei direktem Aufruf ohne Oberfläche. Antwort: Versand-ID, Dokumentliste mit Hashes und leeren Feldern, Warnungen.</td></tr>
+          <tr><td><code>GET/PUT /api/organizations/[id]/starterpaket</code> <span class="status-badge gelb">erweitert</span></td><td>ADMIN_ROLES</td><td>Neuer Parameter <code>modul</code> (Standard ONBOARDING). GET liefert zusätzlich die verfügbaren Vorlagen samt Kennzeichen und sensiblen Feldern; PUT nimmt eine geordnete Liste aus <code>{art, id}</code> und prüft je Vorlage Modul, Geltung und Aktivität; sensible Vorlagen sind erlaubt und kommen gekennzeichnet zurück.</td></tr>
+          <tr><td><code>POST /api/onboarding/[id]/starterpaket</code> <span class="status-badge grau">wird ersetzt</span></td><td>—</td><td>Der bisherige Alles-oder-nichts-Versand. Wird zum dünnen Aufruf von <code>versenden</code> mit dem Standardpaket, bis der Abschluss-Schritt auf den Dialog umgestellt ist — dann entfällt er. Die sieben bestehenden Tests ziehen mit um.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <h3>6.3 · Was in die Mailvorlage kommt</h3>
+      <p>Die Payload des Events erhält drei Variablen zusätzlich zu den heutigen (<code>vorname</code>, <code>nachname</code>, <code>einrichtung</code>, <code>displayId</code>, <code>anzahlDokumente</code>):</p>
+      <ul>
+        <li><code>{{nachricht}}</code> — der Freitext aus dem Dialog, als HTML-sicher umgebrochene Absätze; leer, wenn keiner eingegeben wurde. Die Standardvorlage zeigt den Block nur, wenn er nicht leer ist.</li>
+        <li><code>{{dokumentenliste}}</code> — nummerierte Liste der Anhangsnamen in Paketreihenfolge.</li>
+        <li><code>{{sachbearbeiter_name}}</code> — wer versendet hat, für die Grußformel. Das Muster existiert bereits im Vorlagen-Katalog.</li>
+      </ul>
+      <p>Wer die Vorlage in der Datenbank bereits angepasst hat, muss die neuen Variablen von Hand einfügen — die Vorprüfung sagt das dann im Dialog, statt dass die Nachricht stillschweigend verschwindet.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="bausteine">
+      <div class="section-title"><span class="num">7</span><h2>Bausteine und betroffene Dateien</h2></div>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:5%">#</th><th style="width:30%">Baustein</th><th style="width:38%">Dateien</th><th>Kern</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Schema und Validierung</td><td><code>prisma/schema.prisma</code>, <code>src/lib/validations/starterpaket.ts</code>, neu <code>validations/dokumentenpaket.ts</code></td><td>Auswahl mit <code>templateId</code>/<code>modul</code>, Modell <code>DokumentenVersand</code>, Zod-Schemas für Positionen (genau eine Art), Versand-Body, Prüf-Body.</td></tr>
+          <tr><td>2</td><td>Kennzeichnung sensibler Vorlagen und Bestätigungspflicht</td><td><code>src/lib/placeholder-catalog.ts</code> (Kennzeichen <code>sensitive</code> je Platzhalter existiert: IBAN, SV-Nr, Steuer-ID, im Offboarding auch die Abfindung), neu Helfer <code>sensiblePlatzhalter(platzhalter[])</code></td><td>Eine Funktion, die Konfig-Route, Paket-Route und beide Oberflächen gemeinsam nutzen: gleicht die Platzhalter einer Vorlage mit dem Katalog ab und liefert die sensiblen. Die Versandroute verlangt für jede Vorlage mit Treffern die Bestätigung. Testbar ohne Datenbank.</td></tr>
+          <tr><td>3</td><td>Konfiguration Standardpaket (Server)</td><td><code>src/app/api/organizations/[id]/starterpaket/route.ts</code></td><td>Verfügbare Vorlagen je Modul ermitteln (Modul + ALLGEMEIN, gruppenweit + Mandant, aktiv, nicht gesperrt), gemischte Liste speichern.</td></tr>
+          <tr><td>4</td><td>Konfiguration Standardpaket (Oberfläche)</td><td><code>src/app/(portal)/mandanten/[id]/starterpaket/starterpaket-content.tsx</code></td><td>Eine sortierte Liste, zwei Quellen-Karten, Etiketten, rotes Kennzeichen mit den sensiblen Feldern. Modul-Reiter vorbereitet, in Phase 1 nur Onboarding sichtbar.</td></tr>
+          <tr><td>5</td><td>Versand-Bibliothek</td><td>neu <code>src/lib/dokumentenpaket.ts</code> (löst <code>starterpaket.ts</code> ab)</td><td>Zusammenstellung, Validierung inkl. Bestätigungspflicht, Resolver-Aufruf (Entschlüsselung nur für bestätigte Vorlagen, <code>sensitiveFields</code> ins Prüfprotokoll), Rendering ohne Deckblatt, Größenprüfung, Versand, Nachweis-Transaktion. Modulneutral über <code>ladeVorgangsMandant</code>. Mailvorlagen-Payload je Modul aus einer kleinen Tabelle.</td></tr>
+          <tr><td>6</td><td>Vorprüfung</td><td>neu <code>src/app/api/dokumentenpaket/pruefen/route.ts</code></td><td>Nutzt dieselbe Zusammenstellung wie der Versand, rendert nur Word, gibt leere Felder je Vorlage zurück. Prüft Gotenberg über <code>isGotenbergReachable</code> und die Mailvorlage über <code>resolveEventTemplate</code>.</td></tr>
+          <tr><td>7</td><td>Zusammenstellung und Versand (Routen)</td><td>neu <code>src/app/api/dokumentenpaket/route.ts</code>, <code>…/versenden/route.ts</code></td><td>Dünne Routen über der Bibliothek. Fehlerbilder: 403 fremder Mandant, 404 Vorgang, 409 leere Auswahl oder sensible Vorlage ohne Bestätigung, 413 zu groß, 502 PDF-Dienst oder SMTP.</td></tr>
+          <tr><td>8</td><td>Versand-Dialog</td><td>neu <code>src/components/dokumentenpaket-dialog.tsx</code>, neu <code>src/components/dokumentenpaket-section.tsx</code></td><td>Die Karte mit Standardpaket-Vorschau, Verlauf und Knopf; der Dialog mit Empfänger, drei Auswahlblöcken, Vorprüfung, Bestätigungsstufe je sensibler Vorlage (doppelte Warnung bei abweichender Adresse), Nachricht, Fortschritt, Ergebnis. Beides modulneutral (<code>modul</code>, <code>refId</code>, <code>organizationId</code>, <code>empfaengerVorschlag</code>, Beschriftungen).</td></tr>
+          <tr><td>9</td><td>Einbindung Onboarding</td><td><code>src/app/(portal)/dashboard/[id]/detail-content.tsx</code></td><td>Ersetzt <code>StarterpaketVersandSection</code>; der Knopf im Abschluss-Schritt öffnet den Dialog statt sofort zu senden.</td></tr>
+          <tr><td>10</td><td>Mailvorlage und Event</td><td><code>src/lib/default-email-templates.ts</code>, <code>src/lib/events.ts</code></td><td>Neue Variablen in Standardvorlage und Beispiel-Payload. Der Katalog-Test erzwingt den Eintrag.</td></tr>
+          <tr><td>11</td><td>Kennzeichen in „bereits erstellt"</td><td><code>src/components/template-generation-section.tsx</code>, <code>src/app/api/brief-vorlagen/erzeugt/route.ts</code></td><td>Etikett „per E-Mail versendet am …" an Dokumenten mit <code>versandId</code>.</td></tr>
+          <tr><td>12</td><td>Tests</td><td><code>src/__tests__/lib/dokumentenpaket.test.ts</code>, <code>src/__tests__/api/dokumentenpaket.test.ts</code>, bestehende Starterpaket-Tests anpassen</td><td>Siehe Abschnitt 8. Schwerpunkt: Mandantengrenzen, Bestätigungspflicht, Modul-Abgleich, Abbruchpfade ohne Nachweis, Nachweis-Inhalt.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">🧭</span>
+        <div><strong>Warum eine neue Bibliothek statt Ausbau von <code>starterpaket.ts</code></strong>Die heutige Datei kennt nur Onboarding, nur PDFs und nur den Alles-Fall — jede ihrer Funktionen müsste umgeschrieben werden. Eine neue, modulneutrale Datei mit klarem Namen ist ehrlicher; <code>starterpaket.ts</code> verschwindet mit Baustein 9. Die Pool-Verwaltung (<code>/api/starterpaket-dokumente</code>) bleibt unberührt.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="aufwand">
+      <div class="section-title"><span class="num">8</span><h2>Aufwand und Reihenfolge</h2></div>
+
+      <p>Geschätzt in Stunden je Baustein, wie in den früheren Plänen; ein Arbeitstag entspricht rund sieben produktiven Stunden. Die Reihenfolge innerhalb einer Phase ist die Baureihenfolge — jeder Schritt ist für sich testbar.</p>
+
+      <div class="table-scroll">
+      <table class="aufwand">
+        <thead><tr><th style="width:6%">#</th><th style="width:56%">Schritt</th><th style="width:16%">Art</th><th>Stunden</th></tr></thead>
+        <tbody>
+          <tr class="phase"><td colspan="4">Phase 1 — Onboarding: Auswahl, Befüllung, Versand, Nachweis</td></tr>
+          <tr><td>1</td><td>Schema (Auswahl mit Vorlagen und Modul, DokumentenVersand, versandId), Zod-Schemas, <code>db push</code> gegen die Dev-Datenbank</td><td><span class="status-badge lila">Schema</span></td><td>3</td></tr>
+          <tr><td>2</td><td>Kennzeichnung sensibler Vorlagen als reine Funktion + Test</td><td><span class="status-badge blau">Lib</span></td><td>1,5</td></tr>
+          <tr><td>3</td><td>Konfig-Route: verfügbare Vorlagen je Modul, gemischte Liste speichern, Prüfungen</td><td><span class="status-badge blau">API</span></td><td>3</td></tr>
+          <tr><td>4</td><td>Konfig-Oberfläche: eine sortierte Liste, zwei Quellen, Etiketten, Kennzeichen sensibler Vorlagen</td><td><span class="status-badge blau">UI</span></td><td>4</td></tr>
+          <tr><td>5</td><td>Versand-Bibliothek: Zusammenstellung, Validierung mit Bestätigungspflicht, Resolver mit Entschlüsselung nur für bestätigte Vorlagen und Prüfprotokoll, Rendering ohne Deckblatt, Größenprüfung, Versand, Nachweis-Transaktion</td><td><span class="status-badge blau">Lib</span></td><td>7,5</td></tr>
+          <tr><td>6</td><td>Vorprüfung (Route + Auswertung leerer Felder, Marker für sensible Felder ohne Entschlüsselung, Dienststatus, Mailvorlagen-Check)</td><td><span class="status-badge blau">API</span></td><td>3,5</td></tr>
+          <tr><td>7</td><td>Routen Zusammenstellung und Versand, alte Onboarding-Route umleiten</td><td><span class="status-badge blau">API</span></td><td>2</td></tr>
+          <tr><td>8</td><td>Dialog und Karte: Empfänger, drei Auswahlblöcke, Vorprüfung an den Zeilen, Bestätigungsstufe je sensibler Vorlage mit doppelter Warnung bei abweichender Adresse, Nachricht, Fortschritt, Ergebnis, Verlauf</td><td><span class="status-badge blau">UI</span></td><td>9,5</td></tr>
+          <tr><td>9</td><td>Einbindung Onboarding (Dokumente-Tab und Abschluss-Schritt), Kennzeichen in „bereits erstellt"</td><td><span class="status-badge blau">UI</span></td><td>2</td></tr>
+          <tr><td>10</td><td>Mailvorlage und Event: drei Variablen, Standardtext mit bedingtem Nachricht-Block</td><td><span class="status-badge gelb">Mail</span></td><td>1,5</td></tr>
+          <tr><td>11</td><td>Tests: Mandantengrenze (fremde Vorlage, fremdes PDF), sensible Vorlage ohne Bestätigung → 409, Prüfprotokoll mit sensitiveFields, Vorprüfung entschlüsselt nicht, Modul-Abgleich, BEM-Ausschluss, PDF-Dienst down ohne Nachweis, SMTP-Fehler ohne Nachweis, Größenlimit, Nachweis-Inhalt inkl. Adressabweichung, Konfig-Validierung, Anpassung der zehn Starterpaket-Tests</td><td><span class="status-badge grau">Test</span></td><td>6</td></tr>
+          <tr><td>12</td><td>Doku (dieses Dokument nachführen, README, CLAUDE.md-Abschnitt), <code>credo-check</code>, <code>edge-cases</code>, Verifikation am laufenden System mit echtem SMTP</td><td><span class="status-badge grau">Doku</span></td><td>2,5</td></tr>
+          <tr class="summe"><td></td><td>Phase 1 — rund 6,5 Arbeitstage</td><td></td><td>46</td></tr>
+
+          <tr class="phase"><td colspan="4">Phase 2 — Offboarding, Verbeamtung, Vertragsende</td></tr>
+          <tr><td>13</td><td>Drei Events und Mailvorlagen im CREDO-Layout (Unterlagen zum Austritt, zur Verbeamtung, zur Vertragsverlängerung)</td><td><span class="status-badge gelb">Mail</span></td><td>3</td></tr>
+          <tr><td>14</td><td>Konfig-Seite: Reiter je Modul, Beschriftung „Dokumentenpakete"</td><td><span class="status-badge blau">UI</span></td><td>2,5</td></tr>
+          <tr><td>15</td><td>Einbindung in drei Dokumente-Tabs; Empfängerlogik (Offboarding: private oder dienstliche Adresse wählbar)</td><td><span class="status-badge blau">UI</span></td><td>3</td></tr>
+          <tr><td>16</td><td>Resolver Onboarding und Vertragsverlängerung um <code>canAccessProcess</code> ergänzen (bekannter offener Punkt; die Paket-Route prüft ohnehin, aber der Resolver soll es selbst tun)</td><td><span class="status-badge blau">Lib</span></td><td>1,5</td></tr>
+          <tr><td>17</td><td>Tests je Modul (Empfänger, Mandantengrenze, Nachweis)</td><td><span class="status-badge grau">Test</span></td><td>3</td></tr>
+          <tr class="summe"><td></td><td>Phase 2 — rund 2 Arbeitstage</td><td></td><td>13</td></tr>
+
+          <tr class="phase"><td colspan="4">Phase 3 — optional, nach Erfahrung aus dem Betrieb</td></tr>
+          <tr><td>18</td><td>Option „als ein Sammel-PDF" im Dialog (<code>mergePdfs</code> existiert)</td><td><span class="status-badge blau">Lib/UI</span></td><td>2</td></tr>
+          <tr><td>19</td><td>Vorschau einer einzelnen befüllten Vorlage aus dem Dialog, ohne Ablage</td><td><span class="status-badge blau">API/UI</span></td><td>2,5</td></tr>
+          <tr><td>20</td><td>Übergreifende Versandübersicht in den Einstellungen (alle Module, Filter nach Mandant und Zeitraum, CSV)</td><td><span class="status-badge blau">UI</span></td><td>3</td></tr>
+          <tr class="summe"><td></td><td>Phase 3 — rund 1 Arbeitstag</td><td></td><td>7,5</td></tr>
+
+          <tr class="summe"><td></td><td>Phase 1 + 2 zusammen, zuzüglich 15 % für Review und Nacharbeit</td><td></td><td>≈ 68 h · 10 Tage</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="hinweis">
+        <span class="icon">🪜</span>
+        <div><strong>Lieferbar in drei Stücken</strong>Nach Schritt 4 ist die Konfiguration mit Vorlagen fertig — allerdings ohne Wirkung, solange der Versand die Vorlagen nicht kennt; das ist nur ein interner Meilenstein. Nach Schritt 9 ist Phase 1 nutzbar und kann ausgerollt werden. Phase 2 folgt unabhängig davon, sobald die Mailtexte für die drei Module abgestimmt sind — die brauchen fachliche Zuarbeit (was steht in einer Mail „Unterlagen zum Austritt"?), nicht nur Entwicklung.</div>
+      </div>
+
+      <div class="warnung">
+        <span class="icon">📐</span>
+        <div><strong>Wovon die Schätzung abhängt</strong>Die 46 Stunden für Phase 1 enthalten bereits die Entscheidung vom 2. September, sensible Vorlagen mit Bestätigung zuzulassen — rund 5 Stunden mehr als die ursprünglich empfohlene Sperre (Entschlüsselung mit Prüfprotokoll im Versandpfad, Marker in der Vorprüfung, Bestätigungsstufe im Dialog, zusätzliche Tests). Übrige Stellschraube: Entscheidung 4 in Richtung „Word-Fallback" kostet etwa 1,5 Stunden mehr.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="phase2">
+      <div class="section-title"><span class="num">9</span><h2>Phase 2 — Offboarding, Verbeamtung, Vertragsende</h2></div>
+
+      <p>Alle drei Module haben seit dem 2. September die Karte „Dokumente erstellen" mit ihren Vorlagen. Die neue Sektion reiht sich dort ein — dieselbe Komponente, andere Beschriftung, anderer Empfängervorschlag. Was je Modul anders ist:</p>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:18%">Modul</th><th style="width:24%">Beschriftung</th><th style="width:30%">Empfängervorschlag</th><th>Typische Inhalte des Standardpakets</th></tr></thead>
+        <tbody>
+          <tr><td>Offboarding</td><td>Unterlagen zum Austritt versenden</td><td><strong>Wahl</strong> zwischen privater und dienstlicher Adresse; Standard privat, weil die Dienstadresse zum Austritt meist abgeschaltet wird. Fehlt die private, Hinweis statt Vorschlag.</td><td>Bestätigung des Austritts, Hinweise zur Arbeitsbescheinigung, Rückgabeliste, Datenschutzhinweis nach Austritt</td></tr>
+          <tr><td>Verbeamtung</td><td>Unterlagen zur Verbeamtung versenden</td><td>Dienstadresse aus dem Vorgang</td><td>Mitteilung über die Ernennung auf Probe, Hinweise zur amtsärztlichen Untersuchung, Belehrung</td></tr>
+          <tr><td>Vertragsende</td><td>Unterlagen zur Vertragsverlängerung versenden</td><td>Dienstadresse aus dem Vorgang</td><td>Anschreiben zur Verlängerung, Nachtrag zum Arbeitsvertrag (zur Kenntnis, nicht zur Unterschrift per Mail)</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="mockup phase2">
+        <div class="mockup-bar"><span class="dot-win"></span><span class="dot-win"></span><span class="dot-win"></span><span class="title">Offboarding-Vorgang → Tab „Dokumente" → Dialog</span></div>
+        <div class="mockup-body" style="background:#e9e9eb;">
+          <div class="m-modal">
+            <div class="m-modal-kopf"><strong>✉ Unterlagen zum Austritt an Sabine Beispiel</strong><span class="m-sub">Offboarding 2026-GES-007 · FES Gesamtschule</span></div>
+            <div class="m-modal-body">
+              <div class="m-feld"><span class="label">Empfänger</span>
+                <span class="m-check an" style="border-radius:50%;">•</span> sabine.beispiel@gmx.de <span class="m-sub">· privat</span>&nbsp;&nbsp;&nbsp;
+                <span class="m-check" style="border-radius:50%;"></span> s.beispiel@fes-minden.de <span class="m-sub">· dienstlich, endet am 30.09.2026</span>
+              </div>
+              <div class="m-abschnitt">Standardpaket Offboarding · FES Gesamtschule</div>
+              <div class="m-row"><span class="m-check an">✓</span><div class="m-name">Bestätigung des Austritts <span class="m-geltung lila">Vorlage</span></div><span class="m-status ok">✓ alle 11 Felder befüllt</span></div>
+              <div class="m-row"><span class="m-check an">✓</span><div class="m-name">Hinweise zur Arbeitsbescheinigung und Rückgabe <span class="m-geltung blau">PDF</span></div><span class="m-status ok">180 KB</span></div>
+              <div class="m-row"><span class="m-check an">✓</span><div class="m-name">Datenschutzhinweis nach Austritt <span class="m-geltung blau">PDF</span> <span class="m-geltung grau">Gruppenweit</span></div><span class="m-status ok">95 KB</span></div>
+              <div class="m-summe"><span><strong>3 Anhänge</strong> · 0,4 MB</span><span class="m-status ok">✓ PDF-Dienst erreichbar</span></div>
+            </div>
+            <div class="m-modal-fuss"><span class="m-btn">Abbrechen</span><span class="m-btn primaer">Senden · 3 Dokumente</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kritik">
+        <span class="icon">⚠</span>
+        <div><strong>Zeugnis und Exit-Interview bleiben draußen</strong>Der Offboarding-Resolver kennt bewusst keine Exit-Interview-Antworten und keine Freitexte der Zeugnisbewertung (Vertrauensbefragung, Festlegung vom 2. September). Das Arbeitszeugnis selbst wird über den bestehenden Zeugnis-Weg erzeugt und gehört nicht in dieses Paket — es wird unterschrieben übergeben, nicht per Mail verschickt.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="verworfen">
+      <div class="section-title"><span class="num">10</span><h2>Bewusst weggelassen</h2></div>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:32%">Idee</th><th>Warum nicht — oder noch nicht</th></tr></thead>
+        <tbody>
+          <tr><td>Automatischer Versand bei Statuswechsel (z. B. bei Abschluss)</td><td>Widerspricht der Entscheidung vom Juni: HR-Kontrolle, Nachweis, bewusste Handlung. Mit Vorauswahl und Vorprüfung sind es zwei Klicks — der Zeitgewinn einer Automatik wäre minimal, das Risiko eines Versands mit leeren Feldern real.</td></tr>
+          <tr><td>Empfangs- oder Kenntnisnahme-Bestätigung durch die Beschäftigten</td><td>Anderes Vorhaben mit Magic-Link, öffentlichem Formular und Signaturblock — das Muster existiert im BEM-Modul (E10/E11). Der Versandnachweis deckt „zugestellt" ab, nicht „zugestimmt". Bei Bedarf als eigenes Paket obendrauf.</td></tr>
+          <tr><td>Word-Anhänge zusätzlich zum PDF</td><td>Beschäftigte sollen keine bearbeitbaren Fassungen erhalten. Word bleibt der Download-Weg für HR.</td></tr>
+          <tr><td>Platzhalter im Dialog von Hand nachtragen</td><td>Verführerisch bei „1 Feld leer" — aber der richtige Ort für den fehlenden Wert ist der Vorgang (dann stimmt auch das nächste Dokument), nicht ein Freitextfeld im Versand. Die Vorprüfung nennt das Feld, HR trägt es an der Quelle nach und öffnet den Dialog erneut.</td></tr>
+          <tr><td>Weitere Empfänger (CC an Vorgesetzte, Sekretariat)</td><td>Die Mailvorlage kann CC/BCC bereits global je Event. Ein Feld je Versand wäre schnell gebaut, öffnet aber die Frage, welche Anhänge Dritte sehen dürfen. Erst klären, dann bauen.</td></tr>
+          <tr><td>Versand an mehrere Vorgänge auf einmal (Serienbrief)</td><td>Das pausierte Serienbrief-Epic. Nicht Teil des Wunsches; die modulneutrale Bibliothek wäre aber die Grundlage dafür.</td></tr>
+          <tr><td>Vorlagen direkt aus dem Dialog hochladen</td><td>Die Bibliothek hat eine Pflegeseite mit Rechten, Platzhalter-Extraktion und Katalog. Ein zweiter Upload-Weg würde das umgehen.</td></tr>
+          <tr><td>Eigener Speicher für die versendeten PDFs</td><td>Die Ablage erzeugter Dokumente mit zwölf Monaten Frist existiert. Ein zweiter Ort mit eigener Frist wäre der nächste Klon. Der dauerhafte Teil des Nachweises (Name, Hash, Empfänger) liegt in <code>DokumentenVersand</code>.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="risiken">
+      <div class="section-title"><span class="num">11</span><h2>Risiken</h2></div>
+
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th style="width:28%">Punkt</th><th style="width:14%">Einschätzung</th><th>Erläuterung und Gegenmaßnahme</th></tr></thead>
+        <tbody>
+          <tr><td>Neue Abhängigkeit vom PDF-Dienst im Starterpaket</td><td><span class="status-badge gelb">beachten</span></td><td>Heute braucht das Starterpaket keinen Gotenberg. Mit Vorlagen im Paket schon. Ist der Dienst down, geht kein Paket mit Vorlagen raus. Gegenmaßnahme: Dienststatus in der Vorprüfung sichtbar; Pakete ohne Vorlagen funktionieren weiter; der Dienst hat einen Healthcheck im Compose.</td></tr>
+          <tr><td>Sensible Daten in der Mail</td><td><span class="status-badge rot">Pflicht</span></td><td>Mit der Entscheidung, sensible Vorlagen zuzulassen, trägt die Bestätigung die Verantwortung — sie muss deshalb serverseitig erzwungen sein und darf nicht nur in der Oberfläche sitzen. Eigener Test, der eine sensible Vorlage per direktem API-Aufruf ohne Bestätigung zu versenden versucht und 409 erwartet. Dazu: Die Bestätigung nennt Felder und Adresse; bei abweichender Adresse warnt der Dialog doppelt; Person, Zeitpunkt und Felder stehen dauerhaft im Nachweis, die Entschlüsselung im Prüfprotokoll. Organisatorisch bleibt: Eine unverschlüsselte Mail mit Steuer-ID ist nur an eine Adresse vertretbar, die die Person selbst angegeben hat — das gehört in die HR-Mitteilung zum Ausrollen.</td></tr>
+          <tr><td>Mandantengrenze bei Vorlagen und PDFs</td><td><span class="status-badge rot">Pflicht</span></td><td>Eine Vorlage der FES Gesamtschule darf nicht in ein Paket der FES Minden — sonst geht ein fremder Briefkopf raus. Die Konfig-Route prüft es beim Speichern, die Paket-Route erneut beim Versand (Konfiguration kann sich zwischenzeitlich geändert haben). Tests für beide.</td></tr>
+          <tr><td>Größe der Mail</td><td><span class="status-badge gelb">beachten</span></td><td>Fünf PDFs à 10 MB wären 50 MB — kein Mailserver nimmt das an. Limit 15 MB gesamt, in der Vorprüfung sichtbar, im Versand hart geprüft (413). Der Wert ist eine Konstante, keine Einstellung; bei Bedarf später konfigurierbar.</td></tr>
+          <tr><td>Leere Felder gehen raus</td><td><span class="status-badge gelb">beachten</span></td><td>Bewusst kein Blocker — manche Felder sind legitim leer (zweiter Vorname). Aber: sichtbar an der Zeile, im Ergebnis, im Nachweis. Wer trotzdem sendet, hat es gesehen.</td></tr>
+          <tr><td>Doppelversand durch Doppelklick</td><td><span class="status-badge grau">gering</span></td><td>Knopf sperrt sofort; die Route lehnt einen zweiten Versand desselben Pakets an denselben Empfänger innerhalb von 30 Sekunden ab (409 mit Hinweis). Ein bewusster erneuter Versand danach bleibt möglich.</td></tr>
+          <tr><td>Bestehende angepasste Mailvorlage ohne neue Variablen</td><td><span class="status-badge grau">gering</span></td><td>Die persönliche Nachricht erschiene nicht. Die Vorprüfung prüft die aufgelöste Vorlage auf <code>{{nachricht}}</code> und sagt es im Dialog, mit Link zu den Einstellungen.</td></tr>
+          <tr><td>Umstellung des Abschluss-Schritts</td><td><span class="status-badge grau">gering</span></td><td>Der Primärknopf „Starterpaket versenden" im Abschluss verhält sich anders als bisher (Dialog statt Sofortversand). Kurze Mitteilung ans HR-Team wie beim Vorlagen-Update im Juli.</td></tr>
+          <tr><td>Deploy mit Schema-Änderung</td><td><span class="status-badge gelb">beachten</span></td><td>Braucht die Backup-Einhängung aus der Übergabe vom 2. September. Der ohnehin anstehende Deploy sollte <em>vor</em> diesem Vorhaben erfolgen, damit nicht zwei Schema-Stände auf einmal auf den Server gehen.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="section" id="offen">
+      <div class="section-title"><span class="num">12</span><h2>Offene Fragen vor der Umsetzung</h2></div>
+
+      <p>Fünf der sechs Punkte sind entschieden — drei am 2., zwei am 3. September. Offen bleibt nur Frage 5; sie wird erst nach Abschluss von Phase 1 relevant.</p>
+
+      <div class="hinweis" style="background:#EAFAF1;border-left-color:var(--gruen);">
+        <span class="icon">✅</span>
+        <div><strong>1 · Sensible Vorlagen — entschieden: mit Bestätigung erlauben</strong>Entscheidung vom 2. September, gegen die Empfehlung „sperren". Umgesetzt als Häkchen je Vorlage und Versand, serverseitig erzwungen, mit Vermerk im Nachweis und im Prüfprotokoll. Mehraufwand rund 5 Stunden, in Abschnitt 8 eingerechnet.</div>
+      </div>
+      <div class="hinweis" style="background:#EAFAF1;border-left-color:var(--gruen);">
+        <span class="icon">✅</span>
+        <div><strong>2 · Empfängeradresse — entschieden: änderbar, mit Vermerk im Nachweis</strong>Entscheidung vom 2. September, wie empfohlen. Der Nachweis hält die Adresse des Vorgangs und die tatsächlich verwendete fest; bei sensiblen Vorlagen warnt der Dialog bei Abweichung doppelt.</div>
+      </div>
+      <div class="hinweis" style="background:#EAFAF1;border-left-color:var(--gruen);">
+        <span class="icon">✅</span>
+        <div><strong>3 · Pflegerechte — entschieden: wie bisher SUPER_ADMIN und HR_LEITUNG</strong>Entscheidung vom 3. September, wie empfohlen. Dieselben Rollen legen auch die Vorlagen an; die Konfig-Route (Baustein 3) bleibt bei <code>ADMIN_ROLES</code>, <code>permissions.ts</code> wird nicht angefasst.</div>
+      </div>
+      <div class="hinweis" style="background:#EAFAF1;border-left-color:var(--gruen);">
+        <span class="icon">✅</span>
+        <div><strong>4 · Dateinamen — entschieden: Vorlagenname, Nachname und Datum</strong>Entscheidung vom 3. September, anders als vorgeschlagen: <code>Willkommensschreiben_Mueller_2026-09-03.pdf</code>, damit Empfänger die Datei später wiederfinden. Vorlagenname und Nachname werden für den Dateinamen normalisiert (Umlaute umschreiben, Leer- und Sonderzeichen ersetzen) — mit demselben Verfahren wie heute beim Download erzeugter Dokumente (<code>asciiFilename</code>). Derselbe Name steht im Nachweis (<code>positionen</code>) und am abgelegten <code>GeneratedDocument</code>; Pool-PDFs behalten ihren Namen aus dem Pool.</div>
+      </div>
+      <div class="offen">
+        <span class="icon">💬</span>
+        <div><strong>5 · Phase 2: alle drei Module zusammen oder eines zuerst?</strong>Empfehlung: zusammen, weil die Entwicklung je Modul klein ist und die Mailtexte die eigentliche Arbeit sind. Falls eines dringend ist, geht auch das einzeln — Offboarding wäre der Kandidat, dort ist der Versandbedarf am größten.</div>
+      </div>
+      <div class="hinweis" style="background:#EAFAF1;border-left-color:var(--gruen);">
+        <span class="icon">✅</span>
+        <div><strong>6 · Reihenfolge — entschieden: erst der Deploy des Stands vom 2. September</strong>Entscheidung vom 2. September, wie empfohlen. Dieses Vorhaben beginnt, sobald der Stand 546161d auf dem Server läuft und geprüft ist (Backup-Einhängung, BA-Betriebsnummern, Einrichtungsname in der Verbeamtung — siehe Übergabe <code>docs/historie/codereview-und-vorlagen-2026-09.md</code>).</div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="doc-footer">
+    <p><strong>CREDO HR-Portal</strong> — Umsetzungsplan zum Wunsch, das Starterpaket flexibler zu machen, erstellt am 2. September 2026, Entscheidungen ergänzt am 3. September 2026.</p>
+    <p>Mockups sind Skizzen zur Abstimmung, keine pixelgenauen Entwürfe — die tatsächliche Darstellung folgt dem bestehenden Portal-Design. Vorlagen- und Personennamen sind Beispiele. Aufwände sind Schätzungen auf Grundlage des Codestands 546161d, der Entscheidungen vom 2. September und der übrigen Empfehlungen in Abschnitt 3.</p>
+  </footer>
+
+</div>
+</body>
+</html>

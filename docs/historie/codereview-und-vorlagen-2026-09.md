@@ -36,6 +36,58 @@ durchgespielt.
 (Mandanten-Übersicht) und ob in der Verbeamtungs-Detailseite der Einrichtungsname in
 der Kopfzeile erscheint.
 
+### Ablauf auf dem Server
+
+`main` und `origin/main` stehen auf `546161d` (Stand 03.09.2026; ein reiner
+Docs-Commit darüber ist unschädlich).
+
+```bash
+ssh fes-vm-ubuntudocker
+cd /vol/container/HR_Portal_CREDO
+
+# 1) Vorbedingungen — beides muss da sein, sonst startet der Container nicht
+grep -n "backups:/backups" docker-compose.yml   # erwartet: zwei Treffer (app UND db)
+grep -c "^BEM_ENCRYPTION_KEY=" .env             # erwartet: 1
+
+# 2) Code holen
+git fetch origin
+git checkout main
+git pull
+git log --oneline -1                            # erwartet: 546161d (oder Docs-Commit darüber)
+
+# 3) Bauen und starten
+sudo docker compose up -d --build
+
+# 4) Start verfolgen
+sudo docker compose logs -f app
+```
+
+Im Log der Reihe nach erwartet:
+
+| Zeile | Bedeutung |
+|---|---|
+| `Umgebungsvariablen geprueft: OK` | alle vier Pflichtwerte vorhanden |
+| `Schema-Unterschied erkannt — Sicherung wird angelegt...` | erster Start nach dem Merge |
+| `Sicherung abgelegt: /backups/vor-schema-abgleich-<Zeit>.sql (<n> Bytes)` | `pg_dump` hat funktioniert; die Datei liegt auf dem Host unter `./backups/` |
+| `Datenbank-Schema synchronisiert.` | `db push` ist durch |
+| `BA-Betriebsnummern gesetzt: <n> von 16.` | Betriebsnummern-Migration gelaufen |
+| `Next.js Server startet auf Port 3000...` | fertig |
+
+Beim **zweiten** Start (`sudo docker compose restart app`) muss stattdessen
+`Datenbank-Schema ist bereits deckungsgleich — kein Abgleich noetig.` erscheinen.
+
+Steht im Log `FATAL: Sicherungsverzeichnis /backups fehlt.`, fehlt die Einhängung beim
+Dienst `app`. Dann die Zeile aus der Compose-Datei nachtragen und `up -d` wiederholen —
+am Schema hat der Container in diesem Fall **nichts** geändert.
+
+Zum Schluss:
+
+```bash
+sudo docker exec hr-portal-app curl -s http://localhost:3000/api/health
+```
+
+→ `{"status":"ok",…}`, danach die zwei Prüfpunkte oben im Browser.
+
 ---
 
 ## Was sich geändert hat
