@@ -29,7 +29,7 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { readUploadedFile, saveUploadedFile } from "@/lib/file-upload";
-import { sendEventEmail, type MailAttachment } from "@/lib/mailer";
+import { sendEventEmail, resolveEventTemplate, type MailAttachment } from "@/lib/mailer";
 import { renderDocx, TemplateError } from "@/lib/doc-templates";
 import { convertDocxToPdf, isGotenbergReachable } from "@/lib/gotenberg";
 import { getResolver, hasModuleResolver } from "@/lib/doc-template-resolvers";
@@ -709,4 +709,250 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
   });
 
   return { status: "SENT", versandId, empfaenger, dokumente, warnungen };
+}
+
+// =============================================
+// Vorpruefung
+//
+// Sagt vor dem Versand, was hinausgehen wuerde: welche Felder leer bleiben,
+// wie gross das Paket wird, ob der PDF-Dienst antwortet und ob die Mailvorlage
+// die Nachricht ueberhaupt kennt.
+//
+// Sie persistiert nichts und ENTSCHLUESSELT NICHTS. Sensible Platzhalter
+// bekommen einen Marker und zaehlen dadurch nicht als leer — sie werden erst
+// beim bestaetigten Versand befuellt. Der Marker verlaesst den Server nie: Das
+// probeweise befuellte Dokument wird weder abgelegt noch verschickt.
+// =============================================
+
+/** Fuellwert fuer sensible Platzhalter waehrend der Vorpruefung. */
+export const SENSIBEL_MARKER = "(wird beim Versand eingesetzt)";
+
+export interface PruefPosition {
+  art: "PDF" | "VORLAGE";
+  id: string;
+  name: string;
+  groesse: number;
+  /**
+   * Bei Vorlagen ist die Groesse geschaetzt: Gemessen wird das befuellte
+   * Word-Dokument, versendet wird das daraus gewandelte PDF. Die Vorpruefung
+   * ruft den PDF-Dienst bewusst nicht — sie soll schnell und folgenlos sein.
+   */
+  geschaetzt: boolean;
+  fehlendeFelder: string[];
+  sensibleFelder: SensiblesFeld[];
+  bestaetigungNoetig: boolean;
+}
+
+export interface PaketPruefung {
+  empfaengerVorgang: string;
+  empfaengerAbweichend: boolean;
+  positionen: PruefPosition[];
+  gesamtGroesse: number;
+  gesamtGeschaetzt: boolean;
+  ueberGroessenGrenze: boolean;
+  pdfDienstErreichbar: boolean;
+  /**
+   * Kennt die Mailvorlage die Variable {{nachricht}}? Wer die Vorlage in der
+   * Datenbank angepasst hat, hat sie moeglicherweise nicht — dann verschwaende
+   * die eingegebene Nachricht stillschweigend.
+   */
+  mailvorlageKenntNachricht: boolean;
+  warnungen: string[];
+}
+
+export type PruefungErgebnis =
+  | { status: "OK"; pruefung: PaketPruefung }
+  | { status: "FEHLER"; fehler: PaketFehler; detail: string };
+
+export async function pruefePaket(opts: {
+  modul: string;
+  refId: string;
+  positionen: PaketPositionEingabe[];
+  empfaenger?: string;
+  session: SessionPayload;
+}): Promise<PruefungErgebnis> {
+  if (!modulVerdrahtet(opts.modul)) {
+    return {
+      status: "FEHLER",
+      fehler: "MODUL_NICHT_UNTERSTUETZT",
+      detail: `Fuer das Modul "${opts.modul}" ist kein Paketversand eingerichtet.`,
+    };
+  }
+  const eintrag = MODULE[opts.modul];
+
+  const vorgang = await eintrag.lade(opts.refId);
+  if (!vorgang) {
+    return {
+      status: "FEHLER",
+      fehler: "VORGANG_NICHT_GEFUNDEN",
+      detail: "Der Vorgang wurde nicht gefunden.",
+    };
+  }
+  if (!(await canAccessProcess(opts.session, vorgang.organizationId))) {
+    return {
+      status: "FEHLER",
+      fehler: "KEIN_ZUGRIFF",
+      detail: "Kein Zugriff auf den Mandanten dieses Vorgangs.",
+    };
+  }
+
+  // Eine leere Auswahl ist hier KEIN Fehler: Der Dialog prueft waehrend des
+  // Zusammenstellens, und eine Fehlermeldung auf dem Weg dorthin waere Laerm.
+  // Der Versand lehnt sie ab, das genuegt.
+  const zusammen = await stellePaketZusammen({
+    modul: opts.modul,
+    organizationId: vorgang.organizationId,
+    positionen: opts.positionen,
+  });
+  if (!zusammen.ok) {
+    return { status: "FEHLER", fehler: "POSITION_NICHT_VERFUEGBAR", detail: zusammen.detail };
+  }
+
+  const warnungen: string[] = [];
+  const positionen: PruefPosition[] = [];
+
+  const brauchtVorlagen = zusammen.positionen.some((p) => p.art === "VORLAGE");
+  const pdfDienstErreichbar = brauchtVorlagen ? await isGotenbergReachable() : true;
+  if (brauchtVorlagen && !pdfDienstErreichbar) {
+    warnungen.push(
+      "Der Dienst zur PDF-Erzeugung antwortet nicht. Vorlagen koennen derzeit nicht versendet werden.",
+    );
+  }
+
+  const vorlage = await resolveEventTemplate(eintrag.event);
+  const mailvorlageKenntNachricht = Boolean(
+    vorlage &&
+      [vorlage.subject, vorlage.bodyHtml, vorlage.bodyText ?? ""].some((t) =>
+        t.includes("{{nachricht}}"),
+      ),
+  );
+  if (!vorlage) {
+    warnungen.push("Fuer diesen Versand ist keine E-Mail-Vorlage hinterlegt.");
+  } else if (!mailvorlageKenntNachricht) {
+    warnungen.push(
+      "Die E-Mail-Vorlage enthaelt die Variable {{nachricht}} nicht — eine eingegebene Nachricht erschiene nicht in der Mail.",
+    );
+  }
+
+  for (const pos of zusammen.positionen) {
+    if (pos.art === "PDF") {
+      let groesse = 0;
+      try {
+        groesse = (await readUploadedFile(pos.dateipfad!)).length;
+      } catch {
+        warnungen.push(`Dokument "${pos.name}" fehlt im Speicher und wuerde den Versand abbrechen.`);
+      }
+      positionen.push({
+        art: "PDF",
+        id: pos.id,
+        name: pos.name,
+        groesse,
+        geschaetzt: false,
+        fehlendeFelder: [],
+        sensibleFelder: [],
+        bestaetigungNoetig: false,
+      });
+      continue;
+    }
+
+    // Sensible Schluessel gehen NICHT an den Resolver — er entschluesselt hier
+    // also nichts, unabhaengig davon, ob die Vorlage spaeter bestaetigt wird.
+    const gesperrt = new Set(pos.sensibleFelder.map((f) => f.key.toLowerCase()));
+    const alle = Array.isArray(pos.platzhalter)
+      ? pos.platzhalter.filter((x): x is string => typeof x === "string")
+      : [];
+    const ohneSensible = alle.filter((k) => !gesperrt.has(k.trim().toLowerCase()));
+
+    const aufgeloest = await getResolver(opts.modul)({
+      organizationId: vorgang.organizationId,
+      refId: opts.refId,
+      placeholders: ohneSensible,
+      session: opts.session,
+      ipAddress: null,
+    });
+
+    // Marker setzen, damit die sensiblen Felder nicht als "leer" erscheinen.
+    const daten = { ...aufgeloest.data };
+    for (const f of pos.sensibleFelder) daten[f.key] = SENSIBEL_MARKER;
+
+    let fehlendeFelder: string[] = [];
+    let groesse = 0;
+    try {
+      const quelle = await readUploadedFile(pos.dateipfad!);
+      const gerendert = renderDocx(quelle, daten);
+      groesse = gerendert.buffer.length;
+      fehlendeFelder = gerendert.missing.filter((k) => !gesperrt.has(k.trim().toLowerCase()));
+    } catch (e) {
+      warnungen.push(
+        `Vorlage "${pos.name}" konnte nicht probeweise befuellt werden: ${
+          e instanceof Error ? e.message : "Unbekannter Fehler"
+        }`,
+      );
+    }
+
+    positionen.push({
+      art: "VORLAGE",
+      id: pos.id,
+      name: pos.name,
+      groesse,
+      geschaetzt: true,
+      fehlendeFelder,
+      sensibleFelder: pos.sensibleFelder,
+      bestaetigungNoetig: pos.sensibleFelder.length > 0,
+    });
+  }
+
+  const gesamtGroesse = positionen.reduce((s, p) => s + p.groesse, 0);
+  const empfaenger = (opts.empfaenger || "").trim();
+
+  return {
+    status: "OK",
+    pruefung: {
+      empfaengerVorgang: vorgang.empfaenger,
+      empfaengerAbweichend:
+        empfaenger !== "" && empfaenger.toLowerCase() !== vorgang.empfaenger.toLowerCase(),
+      positionen,
+      gesamtGroesse,
+      gesamtGeschaetzt: positionen.some((p) => p.geschaetzt),
+      ueberGroessenGrenze: gesamtGroesse > MAX_PAKET_BYTES,
+      pdfDienstErreichbar,
+      mailvorlageKenntNachricht,
+      warnungen,
+    },
+  };
+}
+
+// =============================================
+// HTTP-Zuordnung
+// =============================================
+
+/**
+ * Ein Fehlerbild, ein Status — hier und nicht in den Routen, damit Vorpruefung
+ * und Versand nicht auseinanderlaufen.
+ *
+ * 409 sammelt die Faelle, in denen das Paket in seiner jetzigen
+ * Zusammenstellung nicht versendbar ist: Die aufrufende Person kann etwas
+ * daran aendern (Bestaetigung setzen, ein Dokument entfernen). 502 steht fuer
+ * die beiden fremden Dienste, an denen es liegen kann.
+ */
+export function statusFuerFehler(fehler: PaketFehler): number {
+  switch (fehler) {
+    case "KEIN_ZUGRIFF":
+      return 403;
+    case "VORGANG_NICHT_GEFUNDEN":
+      return 404;
+    case "LEERE_AUSWAHL":
+    case "BESTAETIGUNG_FEHLT":
+    case "DATEI_FEHLT":
+    case "VORLAGE_FEHLERHAFT":
+      return 409;
+    case "ZU_GROSS":
+      return 413;
+    case "PDF_DIENST":
+    case "VERSAND":
+      return 502;
+    case "MODUL_NICHT_UNTERSTUETZT":
+    case "POSITION_NICHT_VERFUEGBAR":
+      return 400;
+  }
 }

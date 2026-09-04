@@ -18,6 +18,7 @@ const mockPrisma = {
 };
 const mockCanAccessProcess = jest.fn();
 const mockSendEventEmail = jest.fn();
+const mockResolveEventTemplate = jest.fn();
 const mockRenderDocx = jest.fn();
 const mockConvertDocxToPdf = jest.fn();
 const mockGotenbergReachable = jest.fn();
@@ -30,7 +31,10 @@ jest.mock("@/lib/permissions", () => ({
   ...jest.requireActual("@/lib/permissions"),
   canAccessProcess: (...a: unknown[]) => mockCanAccessProcess(...a),
 }));
-jest.mock("@/lib/mailer", () => ({ sendEventEmail: (...a: unknown[]) => mockSendEventEmail(...a) }));
+jest.mock("@/lib/mailer", () => ({
+  sendEventEmail: (...a: unknown[]) => mockSendEventEmail(...a),
+  resolveEventTemplate: (...a: unknown[]) => mockResolveEventTemplate(...a),
+}));
 jest.mock("@/lib/gotenberg", () => ({
   convertDocxToPdf: (...a: unknown[]) => mockConvertDocxToPdf(...a),
   isGotenbergReachable: () => mockGotenbergReachable(),
@@ -51,6 +55,9 @@ jest.mock("@/lib/doc-template-resolvers", () => ({
 
 import {
   versendePaket,
+  pruefePaket,
+  SENSIBEL_MARKER,
+  statusFuerFehler,
   unbestaetigteSensible,
   erlaubtePlatzhalter,
   vorlagenDateiname,
@@ -110,6 +117,11 @@ beforeEach(() => {
     messageId: "<abc@fes>",
     recipient: "max@example.org",
     subject: "Herzlich willkommen",
+  });
+  mockResolveEventTemplate.mockResolvedValue({
+    subject: "Herzlich willkommen",
+    bodyHtml: "<p>Hallo {{vorname}}</p><p>{{nachricht}}</p>",
+    bodyText: null,
   });
   mockPrisma.dokumentenVersand.create.mockResolvedValue({});
   mockPrisma.generatedDocument.create.mockResolvedValue({ id: "gen-1" });
@@ -426,5 +438,177 @@ describe("Erfolgreicher Versand", () => {
     expect(log.action).toBe("DOKUMENTENPAKET_SENT");
     expect(log.details.sensitiveFields).toEqual(["iban"]);
     expect(log.details.empfaengerAbweichend).toBe(false);
+  });
+});
+
+// =============================================
+// Vorpruefung
+// =============================================
+
+const VORLAGE_SENSIBEL = {
+  id: VORLAGE_ID,
+  name: "Abrechnungsdaten",
+  dateipfad: "brief-vorlagen/a.docx",
+  platzhalter: ["vorname", "iban", "steuer_id"],
+  modul: "ONBOARDING",
+};
+
+describe("Vorpruefung", () => {
+  it("reicht sensible Platzhalter NICHT an den Resolver — auch nicht bei Bestaetigung", async () => {
+    // Der Kern: Die Vorpruefung entschluesselt nichts. Ob spaeter bestaetigt
+    // wird, spielt hier keine Rolle.
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_SENSIBEL]);
+
+    await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "VORLAGE", id: VORLAGE_ID, bestaetigt: true }],
+      session,
+    });
+
+    expect(mockResolver).toHaveBeenCalledWith(
+      expect.objectContaining({ placeholders: ["vorname"] }),
+    );
+  });
+
+  it("setzt fuer sensible Felder einen Marker, damit sie nicht als leer zaehlen", async () => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_SENSIBEL]);
+    mockRenderDocx.mockReturnValue({ buffer: Buffer.from("docx"), missing: ["ort"] });
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "VORLAGE", id: VORLAGE_ID }],
+      session,
+    });
+
+    // Marker landet in den Renderdaten ...
+    const daten = mockRenderDocx.mock.calls[0][1];
+    expect(daten.iban).toBe(SENSIBEL_MARKER);
+    expect(daten.steuer_id).toBe(SENSIBEL_MARKER);
+
+    // ... und die Position meldet nur das echte Loch, plus die Bestaetigungspflicht.
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.positionen[0]).toMatchObject({
+      fehlendeFelder: ["ort"],
+      bestaetigungNoetig: true,
+      geschaetzt: true,
+    });
+    expect(r.pruefung.positionen[0].sensibleFelder.map((f) => f.key)).toEqual([
+      "iban",
+      "steuer_id",
+    ]);
+  });
+
+  it("meldet Groessen: PDFs genau, Vorlagen geschaetzt", async () => {
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_SENSIBEL]);
+    mockReadUploadedFile.mockResolvedValue(Buffer.alloc(1000));
+    mockRenderDocx.mockReturnValue({ buffer: Buffer.alloc(2000), missing: [] });
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [
+        { art: "PDF", id: PDF_ID },
+        { art: "VORLAGE", id: VORLAGE_ID },
+      ],
+      session,
+    });
+
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.gesamtGroesse).toBe(3000);
+    expect(r.pruefung.gesamtGeschaetzt).toBe(true);
+    expect(r.pruefung.ueberGroessenGrenze).toBe(false);
+    expect(r.pruefung.positionen[0].geschaetzt).toBe(false);
+  });
+
+  it("warnt, wenn die Mailvorlage {{nachricht}} nicht kennt", async () => {
+    mockResolveEventTemplate.mockResolvedValue({
+      subject: "Willkommen",
+      bodyHtml: "<p>Hallo {{vorname}}</p>",
+      bodyText: null,
+    });
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.mailvorlageKenntNachricht).toBe(false);
+    expect(r.pruefung.warnungen.join(" ")).toContain("{{nachricht}}");
+  });
+
+  it("warnt beim nicht erreichbaren PDF-Dienst, bricht aber nicht ab", async () => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_SENSIBEL]);
+    mockGotenbergReachable.mockResolvedValue(false);
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "VORLAGE", id: VORLAGE_ID }],
+      session,
+    });
+
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.pdfDienstErreichbar).toBe(false);
+    expect(r.pruefung.warnungen.join(" ")).toContain("PDF");
+  });
+
+  it("nimmt eine leere Auswahl hin — der Dialog prueft waehrend des Zusammenstellens", async () => {
+    const r = await pruefePaket({ modul: "ONBOARDING", refId: REF, positionen: [], session });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.positionen).toEqual([]);
+    expect(r.pruefung.gesamtGroesse).toBe(0);
+  });
+
+  it("haelt eine abweichende Adresse fest", async () => {
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [],
+      empfaenger: "privat@example.org",
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.empfaengerVorgang).toBe("max@example.org");
+    expect(r.pruefung.empfaengerAbweichend).toBe(true);
+  });
+
+  it("lehnt fremde Mandanten ab und persistiert nie etwas", async () => {
+    mockCanAccessProcess.mockResolvedValue(false);
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+    expect(r).toMatchObject({ status: "FEHLER", fehler: "KEIN_ZUGRIFF" });
+    nichtsGeschrieben();
+    expect(mockSaveUploadedFile).not.toHaveBeenCalled();
+  });
+});
+
+describe("HTTP-Zuordnung", () => {
+  it("bildet jedes Fehlerbild auf einen Status ab", () => {
+    expect(statusFuerFehler("KEIN_ZUGRIFF")).toBe(403);
+    expect(statusFuerFehler("VORGANG_NICHT_GEFUNDEN")).toBe(404);
+    expect(statusFuerFehler("LEERE_AUSWAHL")).toBe(409);
+    expect(statusFuerFehler("BESTAETIGUNG_FEHLT")).toBe(409);
+    expect(statusFuerFehler("ZU_GROSS")).toBe(413);
+    expect(statusFuerFehler("PDF_DIENST")).toBe(502);
+    expect(statusFuerFehler("VERSAND")).toBe(502);
+    expect(statusFuerFehler("MODUL_NICHT_UNTERSTUETZT")).toBe(400);
   });
 });
