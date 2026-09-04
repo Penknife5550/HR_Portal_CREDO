@@ -204,6 +204,24 @@ async function leseVorlagenDatei(dateipfad: string): Promise<Buffer> {
   return readFile(ziel);
 }
 
+/**
+ * Macht Freitext HTML-sicher und behaelt seine Absaetze.
+ *
+ * Die Nachricht kommt aus einem Eingabefeld und landet unveraendert im
+ * HTML-Teil der Mail. Ohne Maskierung koennte ein < im Text die Mail
+ * zerlegen — und ein "<script>" waere im Postfach des Empfaengers.
+ * Zeilenumbrueche werden zu <br>, damit die Absaetze erhalten bleiben.
+ */
+export function alsHtmlAbsaetze(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/\r\n?/g, "\n")
+    .replace(/\n/g, "<br>");
+}
+
 function sha256(buffer: Buffer): string {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
@@ -592,7 +610,14 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
   }
 
   // --- 8. Versand ---
+  // Zwei Fassungen, weil dieselbe Payload den Text- UND den HTML-Teil der
+  // Mail speist: Was fuer HTML maskiert ist, sieht im Textteil falsch aus.
   const dokumentenliste = dokumente.map((d, i) => `${i + 1}. ${d.name}`).join("\n");
+  const dokumentenlisteHtml =
+    "<ol style=\"margin:0;padding-left:20px;\">" +
+    dokumente.map((d) => `<li>${alsHtmlAbsaetze(d.name)}</li>`).join("") +
+    "</ol>";
+  const nachricht = (opts.nachricht ?? "").trim();
   const ergebnis = await sendEventEmail(
     eintrag.event,
     {
@@ -608,8 +633,10 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
       organization: vorgang.organizationName,
       einrichtung: vorgang.organizationName,
       anzahlDokumente: dokumente.length,
-      nachricht: opts.nachricht ?? "",
+      nachricht,
+      nachricht_html: alsHtmlAbsaetze(nachricht),
       dokumentenliste,
+      dokumentenliste_html: dokumentenlisteHtml,
       sachbearbeiter_name: `${opts.session.firstName} ${opts.session.lastName}`.trim(),
     },
     { attachments: anhaenge },
@@ -668,7 +695,7 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
         // zurueckgemeldet. Ihn hier selbst zusammenzusetzen hiesse, im Nachweis
         // etwas zu behaupten, das so nie versendet wurde.
         betreff: ergebnis.subject ?? "",
-        nachricht: opts.nachricht || null,
+        nachricht: nachricht || null,
         anzahl: dokumente.length,
         positionen: dokumente as unknown as object,
         bestaetigungen: bestaetigungen as unknown as object,
@@ -847,10 +874,14 @@ export async function pruefePaket(opts: {
   }
 
   const vorlage = await resolveEventTemplate(eintrag.event);
+  // Erkennt {{nachricht}}, {{nachricht_html}} und den bedingten Block
+  // {{#nachricht}} — sonst meldete die Vorpruefung eine Luecke, die es in
+  // der Standardvorlage gar nicht gibt.
+  const nachrichtImText = /\{\{[#/]?nachricht(_html)?\}\}/;
   const mailvorlageKenntNachricht = Boolean(
     vorlage &&
       [vorlage.subject, vorlage.bodyHtml, vorlage.bodyText ?? ""].some((t) =>
-        t.includes("{{nachricht}}"),
+        nachrichtImText.test(t),
       ),
   );
   if (!vorlage) {

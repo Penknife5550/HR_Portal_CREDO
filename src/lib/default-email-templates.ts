@@ -3023,13 +3023,25 @@ CREDO HR-Portal`,
 
           <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
             <tr><td style="padding:16px;">
-              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Im Anhang</p>
-              <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">Ihre Starterpaket-Dokumente als PDF – z. B. Leitbild, Datenschutzinformationen und weitere Anlagen.</p>
+              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Im Anhang ({{anzahlDokumente}})</p>
+              <div style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{dokumentenliste_html}}</div>
             </td></tr>
           </table>
 
+{{#nachricht}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;border-left:3px solid #FBC900;background-color:#fffbea;border-radius:4px;margin:0 0 24px;">
+            <tr><td style="padding:14px 16px;">
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{nachricht_html}}</p>
+            </td></tr>
+          </table>
+{{/nachricht}}
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
             Bitte lesen Sie die Unterlagen in Ruhe durch und bewahren Sie sie auf. Bei Fragen ist Ihre HR-Ansprechperson gerne für Sie da.
+          </p>
+
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Mit freundlichen Grüßen<br>
+            {{sachbearbeiter_name}}
           </p>
 
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
@@ -3053,9 +3065,17 @@ CREDO HR-Portal`,
 </html>`,
     bodyText: `Willkommen im Team, {{vorname}}!
 
-wir freuen uns, Sie bei {{einrichtung}} begrüßen zu dürfen. Im Anhang dieser E-Mail finden Sie Ihr persönliches Starterpaket mit wichtigen Unterlagen (z. B. Leitbild, Datenschutzinformationen und weitere Anlagen).
+wir freuen uns, Sie bei {{einrichtung}} begrüßen zu dürfen. Im Anhang dieser E-Mail finden Sie Ihr persönliches Starterpaket.
 
+Im Anhang ({{anzahlDokumente}}):
+{{dokumentenliste}}
+{{#nachricht}}
+{{nachricht}}
+{{/nachricht}}
 Bitte lesen Sie die Unterlagen in Ruhe durch und bewahren Sie sie auf.
+
+Mit freundlichen Grüßen
+{{sachbearbeiter_name}}
 
 Vorgang: {{vorgangsnummer}}
 
@@ -3067,6 +3087,12 @@ CREDO Gruppe – {{einrichtung}}`,
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
       { key: "{{anzahlDokumente}}", description: "Anzahl der angehaengten Dokumente" },
+      { key: "{{dokumentenliste}}", description: "Nummerierte Liste der Anhaenge (Textteil)" },
+      { key: "{{dokumentenliste_html}}", description: "Liste der Anhaenge als <ol> (HTML-Teil)" },
+      { key: "{{nachricht}}", description: "Persoenliche Nachricht aus dem Versand-Dialog (Textteil)" },
+      { key: "{{nachricht_html}}", description: "Dieselbe Nachricht HTML-sicher, Umbrueche als <br>" },
+      { key: "{{#nachricht}}...{{/nachricht}}", description: "Block, der nur erscheint, wenn eine Nachricht eingegeben wurde" },
+      { key: "{{sachbearbeiter_name}}", description: "Wer versendet hat (Gruszformel)" },
     ],
   },
 ];

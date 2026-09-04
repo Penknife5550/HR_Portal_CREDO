@@ -55,8 +55,10 @@ jest.mock("@/lib/doc-template-resolvers", () => ({
   hasModuleResolver: () => true,
 }));
 
+import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import {
   versendePaket,
+  alsHtmlAbsaetze,
   pruefePaket,
   SENSIBEL_MARKER,
   statusFuerFehler,
@@ -689,5 +691,70 @@ describe("Vorlagendateien lesen", () => {
       expect(r).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
       expect(mockSendEventEmail).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe("Freitext im HTML-Teil", () => {
+  it("maskiert alles, was die Mail zerlegen koennte", () => {
+    // Die Nachricht kommt aus einem Eingabefeld und landet im HTML-Teil.
+    expect(alsHtmlAbsaetze('<script>alert("x")</script>')).toBe(
+      "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;",
+    );
+    expect(alsHtmlAbsaetze("Meier & Sohn")).toBe("Meier &amp; Sohn");
+  });
+
+  it("behaelt Absaetze als <br>", () => {
+    expect(alsHtmlAbsaetze("Zeile 1\nZeile 2")).toBe("Zeile 1<br>Zeile 2");
+    expect(alsHtmlAbsaetze("Zeile 1\r\nZeile 2")).toBe("Zeile 1<br>Zeile 2");
+  });
+
+  it("reicht die unmaskierte Fassung an den Textteil und die maskierte an HTML", async () => {
+    await versendePaket(basis({ nachricht: "Meier & Sohn\nBis Montag" }));
+    const payload = mockSendEventEmail.mock.calls[0][1];
+    expect(payload.nachricht).toBe("Meier & Sohn\nBis Montag");
+    expect(payload.nachricht_html).toBe("Meier &amp; Sohn<br>Bis Montag");
+  });
+
+  it("liefert die Anhangliste in beiden Fassungen", async () => {
+    await versendePaket(basis());
+    const payload = mockSendEventEmail.mock.calls[0][1];
+    expect(payload.dokumentenliste).toBe("1. Leitbild");
+    expect(payload.dokumentenliste_html).toContain("<li>Leitbild</li>");
+    expect(payload.sachbearbeiter_name).toBe("Erika Sachbearbeiter");
+  });
+});
+
+describe("Standardvorlage des Starterpakets", () => {
+  const vorlage = DEFAULT_EMAIL_TEMPLATES.find(
+    (t) => t.event === "onboarding-starter-packet-sent",
+  );
+
+  it("existiert", () => {
+    expect(vorlage).toBeDefined();
+  });
+
+  it("kennt die Nachricht als bedingten Block — sonst warnt die Vorpruefung zu Recht", () => {
+    expect(vorlage!.bodyHtml).toContain("{{#nachricht}}");
+    expect(vorlage!.bodyHtml).toContain("{{nachricht_html}}");
+    expect(vorlage!.bodyText).toContain("{{#nachricht}}");
+    expect(vorlage!.bodyText).toContain("{{nachricht}}");
+  });
+
+  it("nennt die Anhaenge und den Absender", () => {
+    expect(vorlage!.bodyHtml).toContain("{{dokumentenliste_html}}");
+    expect(vorlage!.bodyText).toContain("{{dokumentenliste}}");
+    expect(vorlage!.bodyHtml).toContain("{{sachbearbeiter_name}}");
+    expect(vorlage!.bodyText).toContain("{{sachbearbeiter_name}}");
+  });
+
+  it("maskiert den Freitext im HTML-Teil und nicht im Textteil", () => {
+    // Der HTML-Teil muss {{nachricht_html}} nehmen; {{nachricht}} dort waere
+    // eine offene Tuer fuer Markup aus dem Eingabefeld.
+    const htmlOhneBlockmarker = vorlage!.bodyHtml
+      .split("{{#nachricht}}")
+      .join("")
+      .split("{{/nachricht}}")
+      .join("");
+    expect(htmlOhneBlockmarker).not.toContain("{{nachricht}}");
   });
 });
