@@ -74,7 +74,8 @@ Branch: `feat/minijob-checkliste-2026`.
 | [module/dokumente/erzeugte-dokumente-im-vorgang-plan.html](module/dokumente/erzeugte-dokumente-im-vorgang-plan.html) | Erzeugte Dokumente im Vorgang sichtbar machen |
 | [module/dokumente/erweiterungen-vorlagen-benutzer-plan.html](module/dokumente/erweiterungen-vorlagen-benutzer-plan.html) | Erweiterungen Vorlagen und Benutzerverwaltung |
 | [module/dokumente/mitteilung-hr-team-vorlagen-update.md](module/dokumente/mitteilung-hr-team-vorlagen-update.md) | Mitteilung ans HR-Team zum Vorlagen-Update |
-| [module/dokumente/dokumentenpaket-versand-plan.html](module/dokumente/dokumentenpaket-versand-plan.html) | **Plan (Sept. 2026):** Starterpaket flexibel — Vorlagen im Vorgang auswählen, befüllen, per E-Mail versenden; Mockups, Datenmodell, Aufwand. **Phase 1 ist umgesetzt** (Zweig `feat/dokumentenpaket-versand`, 4. September); Phase 2 (Offboarding, Verbeamtung, Vertragsverlängerung) steht aus |
+| [module/dokumente/dokumentenpaket-versand-plan.html](module/dokumente/dokumentenpaket-versand-plan.html) | **Plan (Sept. 2026):** Starterpaket flexibel — Vorlagen im Vorgang auswählen, befüllen, per E-Mail versenden; Mockups, Datenmodell, Aufwand. **Vollständig umgesetzt** (Bausteine 1–15, Zweig `feat/dokumentenpaket-versand`, 4. September) |
+| [module/dokumente/dokumentenpaket-offene-punkte.md](module/dokumente/dokumentenpaket-offene-punkte.md) | **Offene Punkte** nach dem Code-Review: vier bewusst nicht behobene Befunde, die Verifikation mit echtem SMTP und die Deploy-Hinweise |
 
 ### Ruhestandsplanung — *geplant*
 
