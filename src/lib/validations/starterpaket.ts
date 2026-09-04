@@ -27,6 +27,11 @@ export type UpdateStarterpaketDokument = z.infer<
 /**
  * Markierung eines Mandanten setzen: die uebergebene (geordnete) Liste ersetzt
  * die komplette Auswahl. orderIndex = Position in der Liste.
+ *
+ * ABGELOEST von `setPaketAuswahlSchema` in validations/dokumentenpaket.ts, das
+ * gemischte Listen aus PDFs und Brief-Vorlagen je Modul entgegennimmt. Bleibt
+ * stehen, solange PUT /api/organizations/[id]/starterpaket noch die alte Form
+ * annimmt (Baustein 3); danach ersatzlos entfernen.
  */
 export const setStarterpaketAuswahlSchema = z.object({
   dokumentIds: z.array(z.string().uuid()).max(100),

@@ -33,7 +33,14 @@ export async function resolveStarterpaketDokumente(
   organizationId: string,
 ): Promise<PoolDoc[]> {
   const auswahl = await prisma.starterpaketAuswahl.findMany({
-    where: { organizationId, dokument: { isActive: true } },
+    where: {
+      organizationId,
+      // Seit Baustein 1 kann eine Position auch eine Brief-Vorlage sein
+      // (dokumentId = null) und zu einem anderen Modul gehoeren. Diese Funktion
+      // kennt nur Pool-PDFs im Onboarding — bis dokumentenpaket.ts sie abloest.
+      modul: "ONBOARDING",
+      dokument: { isActive: true },
+    },
     orderBy: { orderIndex: "asc" },
     select: {
       dokument: {
@@ -47,7 +54,11 @@ export async function resolveStarterpaketDokumente(
       },
     },
   });
-  return auswahl.map((a) => a.dokument);
+  // dokument ist seit Baustein 1 nullable. Der Filter oben schliesst die
+  // Vorlagen-Positionen bereits in der Abfrage aus — TypeScript sieht das nicht.
+  return auswahl
+    .map((a) => a.dokument)
+    .filter((d): d is PoolDoc => d !== null);
 }
 
 /** Erzeugt einen sauberen, fuer den Empfaenger lesbaren PDF-Dateinamen. */

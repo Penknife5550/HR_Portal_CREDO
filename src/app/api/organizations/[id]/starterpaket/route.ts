@@ -55,10 +55,16 @@ export const GET = apiHandler(
       },
     });
     const auswahl = await prisma.starterpaketAuswahl.findMany({
-      where: { organizationId: id },
+      // Baustein 1 hat die Auswahl um Modul und Vorlagen erweitert. Diese Route
+      // kennt weiterhin nur Pool-PDFs im Onboarding — bis Baustein 3 sie auf
+      // gemischte Listen je Modul umstellt. Bis dahin MUSS sie sich auf ihr
+      // Modul beschraenken, sonst raeumt sie fremde Pakete mit ab.
+      where: { organizationId: id, modul: "ONBOARDING", dokumentId: { not: null } },
       select: { dokumentId: true, orderIndex: true },
     });
-    const markMap = new Map(auswahl.map((a) => [a.dokumentId, a.orderIndex]));
+    const markMap = new Map(
+      auswahl.flatMap((a) => (a.dokumentId ? [[a.dokumentId, a.orderIndex] as const] : [])),
+    );
 
     const documents = docs
       .map((d) => ({
@@ -125,12 +131,18 @@ export const PUT = apiHandler<SetStarterpaketAuswahl>(
     }
 
     await prisma.$transaction([
-      prisma.starterpaketAuswahl.deleteMany({ where: { organizationId: id } }),
+      // Nur das eigene Modul leeren — siehe Hinweis oben. Ohne die Einschraenkung
+      // loescht das Speichern des Onboarding-Pakets ab Phase 2 die Pakete der
+      // anderen Module gleich mit.
+      prisma.starterpaketAuswahl.deleteMany({ where: { organizationId: id, modul: "ONBOARDING" } }),
       ...(ids.length > 0
         ? [
             prisma.starterpaketAuswahl.createMany({
               data: ids.map((dokumentId, index) => ({
                 organizationId: id,
+                // Ausdruecklich statt ueber den Schema-Default: die Zeile soll
+                // ihr Modul benennen, nicht davon abhaengen.
+                modul: "ONBOARDING",
                 dokumentId,
                 orderIndex: index,
               })),

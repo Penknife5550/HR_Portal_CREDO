@@ -105,13 +105,17 @@ describe("PUT /api/organizations/[id]/starterpaket", () => {
     const res = await PUT(putReq({ dokumentIds: [GLOBAL_DOC, MANDANT_DOC] }), ctx());
     expect(res.status).toBe(200);
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    // Beide Schreibvorgaenge sind auf ONBOARDING eingegrenzt. Ohne das raeumt
+    // das Speichern des Onboarding-Pakets ab Phase 2 die Pakete der anderen
+    // Module mit ab — deshalb steht das Modul hier ausdruecklich in der
+    // Erwartung und nicht nur im Schema-Default.
     expect(mockPrisma.starterpaketAuswahl.deleteMany).toHaveBeenCalledWith({
-      where: { organizationId: ORG_ID },
+      where: { organizationId: ORG_ID, modul: "ONBOARDING" },
     });
     expect(mockPrisma.starterpaketAuswahl.createMany).toHaveBeenCalledWith({
       data: [
-        { organizationId: ORG_ID, dokumentId: GLOBAL_DOC, orderIndex: 0 },
-        { organizationId: ORG_ID, dokumentId: MANDANT_DOC, orderIndex: 1 },
+        { organizationId: ORG_ID, modul: "ONBOARDING", dokumentId: GLOBAL_DOC, orderIndex: 0 },
+        { organizationId: ORG_ID, modul: "ONBOARDING", dokumentId: MANDANT_DOC, orderIndex: 1 },
       ],
     });
     expect(mockPrisma.auditLog.create).toHaveBeenCalled();
@@ -126,10 +130,13 @@ describe("PUT /api/organizations/[id]/starterpaket", () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it("leere Auswahl loescht nur (kein createMany)", async () => {
+  it("leere Auswahl loescht nur (kein createMany) — und nur im eigenen Modul", async () => {
     const res = await PUT(putReq({ dokumentIds: [] }), ctx());
     expect(res.status).toBe(200);
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.starterpaketAuswahl.deleteMany).toHaveBeenCalledWith({
+      where: { organizationId: ORG_ID, modul: "ONBOARDING" },
+    });
     expect(mockPrisma.starterpaketAuswahl.createMany).not.toHaveBeenCalled();
   });
 
