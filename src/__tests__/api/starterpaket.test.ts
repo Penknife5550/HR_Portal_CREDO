@@ -109,7 +109,7 @@ describe("PUT /api/organizations/[id]/starterpaket", () => {
   it("setzt die Auswahl atomar (deleteMany + createMany im $transaction)", async () => {
     mockPrisma.starterpaketDokument.count.mockResolvedValue(2);
 
-    const res = await PUT(putReq({ dokumentIds: [GLOBAL_DOC, MANDANT_DOC] }), ctx());
+    const res = await PUT(putReq({ modul: "ONBOARDING", positionen: [{ art: "PDF", id: GLOBAL_DOC }, { art: "PDF", id: MANDANT_DOC }] }), ctx());
     expect(res.status).toBe(200);
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
     // Beide Schreibvorgaenge sind auf ONBOARDING eingegrenzt. Ohne das raeumt
@@ -132,13 +132,13 @@ describe("PUT /api/organizations/[id]/starterpaket", () => {
     // 2 IDs angefragt, aber nur 1 ist verfuegbar (das fremde wird nicht gezaehlt)
     mockPrisma.starterpaketDokument.count.mockResolvedValue(1);
 
-    const res = await PUT(putReq({ dokumentIds: [GLOBAL_DOC, FREMD_DOC] }), ctx());
+    const res = await PUT(putReq({ modul: "ONBOARDING", positionen: [{ art: "PDF", id: GLOBAL_DOC }, { art: "PDF", id: FREMD_DOC }] }), ctx());
     expect(res.status).toBe(400);
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("leere Auswahl loescht nur (kein createMany) — und nur im eigenen Modul", async () => {
-    const res = await PUT(putReq({ dokumentIds: [] }), ctx());
+    const res = await PUT(putReq({ modul: "ONBOARDING", positionen: [] }), ctx());
     expect(res.status).toBe(200);
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
     expect(mockPrisma.starterpaketAuswahl.deleteMany).toHaveBeenCalledWith({
@@ -149,13 +149,13 @@ describe("PUT /api/organizations/[id]/starterpaket", () => {
 
   it("liefert 401 ohne Session", async () => {
     mockGetSession.mockResolvedValue(null);
-    const res = await PUT(putReq({ dokumentIds: [] }), ctx());
+    const res = await PUT(putReq({ modul: "ONBOARDING", positionen: [] }), ctx());
     expect(res.status).toBe(401);
   });
 
   it("liefert 403 fuer Nicht-Admin-Rolle", async () => {
     mockGetSession.mockResolvedValue({ ...adminSession, role: "HR_SACHBEARBEITER" });
-    const res = await PUT(putReq({ dokumentIds: [] }), ctx());
+    const res = await PUT(putReq({ modul: "ONBOARDING", positionen: [] }), ctx());
     expect(res.status).toBe(403);
   });
 });
@@ -347,22 +347,14 @@ describe("PUT — gemischte Positionen", () => {
     expect(res.status).toBe(200);
   });
 
-  it("nimmt uebergangsweise weiterhin die alte Form { dokumentIds } an", async () => {
-    // Sonst koennte die Konfigurationsseite bis Baustein 4 nichts mehr speichern.
+  it("weist die abgeloeste Form { dokumentIds } ab (400)", async () => {
+    // Seit Baustein 4 schickt die Oberflaeche { modul, positionen }. Die alte
+    // Form ist kein gueltiger Koerper mehr und darf nicht stillschweigend als
+    // leeres Paket durchgehen — das wuerde das Standardpaket loeschen.
     mockPrisma.starterpaketDokument.count.mockResolvedValue(1);
     const res = await PUT(putReq({ dokumentIds: [GLOBAL_DOC] }), ctx());
-    expect(res.status).toBe(200);
-    expect(mockPrisma.starterpaketAuswahl.createMany).toHaveBeenCalledWith({
-      data: [
-        {
-          organizationId: ORG_ID,
-          modul: "ONBOARDING",
-          dokumentId: GLOBAL_DOC,
-          templateId: null,
-          orderIndex: 0,
-        },
-      ],
-    });
+    expect(res.status).toBe(400);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("haelt Modul und Aufteilung im Pruefprotokoll fest", async () => {

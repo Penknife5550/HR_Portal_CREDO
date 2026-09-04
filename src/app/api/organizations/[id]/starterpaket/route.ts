@@ -12,7 +12,6 @@
  * unveraendert gegenueber dem reinen PDF-Paket).
  */
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { ADMIN_ROLES } from "@/lib/permissions";
@@ -20,22 +19,11 @@ import { sensiblePlatzhalter, type SensiblesFeld } from "@/lib/placeholder-catal
 import {
   setPaketAuswahlSchema,
   PAKET_MODULE,
+  type SetPaketAuswahl,
   type PaketPositionArt,
 } from "@/lib/validations/dokumentenpaket";
-import { setStarterpaketAuswahlSchema } from "@/lib/validations/starterpaket";
 
 const STANDARD_MODUL = "ONBOARDING";
-
-/**
- * Uebergangsweise werden beide Koerperformen angenommen.
- *
- * Die Konfigurationsseite schickt bis Baustein 4 noch `{ dokumentIds }`. Wuerde
- * die Route das ab sofort ablehnen, koennte zwischen diesem und dem naechsten
- * Schritt niemand mehr ein Starterpaket speichern — die Seite meldete einen
- * Fehler, den niemand erwartet. Mit Baustein 4 faellt die alte Form weg.
- */
-const putBodySchema = z.union([setPaketAuswahlSchema, setStarterpaketAuswahlSchema]);
-type PutBody = z.infer<typeof putBodySchema>;
 
 interface Position {
   art: PaketPositionArt;
@@ -50,17 +38,6 @@ interface PaketEintrag {
   orderIndex: number;
   /** Nur bei Vorlagen gesetzt; PDFs koennen keine Platzhalter befuellen. */
   sensibleFelder?: SensiblesFeld[];
-}
-
-/** Vereinheitlicht beide Koerperformen zu Modul + geordneter Positionsliste. */
-function normalisiere(body: PutBody): { modul: string; positionen: Position[] } {
-  if ("positionen" in body) {
-    return { modul: body.modul, positionen: body.positionen };
-  }
-  return {
-    modul: STANDARD_MODUL,
-    positionen: body.dokumentIds.map((id) => ({ art: "PDF" as const, id })),
-  };
 }
 
 /** Modul aus der Abfrage, auf die unterstuetzten Werte begrenzt. */
@@ -214,10 +191,10 @@ export const GET = apiHandler(
   },
 );
 
-export const PUT = apiHandler<PutBody>(
+export const PUT = apiHandler<SetPaketAuswahl>(
   {
     roles: ADMIN_ROLES,
-    bodySchema: putBodySchema,
+    bodySchema: setPaketAuswahlSchema,
     logLabel: "Starterpaket-Auswahl PUT",
   },
   async ({ request, params, body, session }) => {
@@ -225,7 +202,7 @@ export const PUT = apiHandler<PutBody>(
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
     const { id } = params;
-    const { modul, positionen } = normalisiere(body);
+    const { modul, positionen } = body;
 
     const org = await prisma.organization.findUnique({
       where: { id },
@@ -235,8 +212,9 @@ export const PUT = apiHandler<PutBody>(
       return NextResponse.json({ error: "Mandant nicht gefunden" }, { status: 404 });
     }
 
-    // Duplikate entfernen, Reihenfolge erhalten. Das Zod-Schema lehnt sie fuer
-    // die neue Koerperform bereits ab; die alte Form kannte die Pruefung nicht.
+    // Doppelte Positionen lehnt bereits das Zod-Schema ab. Der Filter bleibt
+    // als zweite Schranke stehen: Die Reihenfolge unten wird zum orderIndex,
+    // und ein Duplikat wuerde die Unique-Constraint der Tabelle verletzen.
     const gesehen = new Set<string>();
     const eindeutig = positionen.filter((p) => {
       const schluessel = p.art + ":" + p.id;
@@ -326,13 +304,7 @@ export const PUT = apiHandler<PutBody>(
     });
 
     return NextResponse.json({
-      data: {
-        organizationId: id,
-        modul,
-        positionen: eindeutig,
-        // Solange die alte Oberflaeche laeuft, erwartet sie dieses Feld.
-        dokumentIds: pdfIds,
-      },
+      data: { organizationId: id, modul, positionen: eindeutig },
     });
   },
 );
