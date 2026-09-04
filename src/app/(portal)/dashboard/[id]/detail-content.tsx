@@ -444,20 +444,72 @@ export function DetailContent({
     isAdmin;
 
   // Starterpaket an den Mitarbeiter versenden (manuell, im Abschluss/Dokumente-Hub)
+  /**
+   * UEBERGANG (Baustein 7 bis 9): Die alte Route ist weg, der Dialog noch nicht
+   * da. Bis dahin holt die Karte das Standardpaket des Mandanten und schickt es
+   * unveraendert los — dasselbe Ergebnis wie bisher, nur ueber den neuen Weg.
+   * Mit dem Dialog faellt diese Funktion samt Karte ersatzlos weg.
+   */
   const sendStarterpaket = async () => {
     setSendingStarterpaket(true);
     setStarterpaketMsg(null);
     try {
-      const res = await fetch(`/api/onboarding/${onboardingId}/starterpaket`, { method: "POST" });
+      const angebot = await fetch(
+        `/api/dokumentenpaket?modul=ONBOARDING&refId=${onboardingId}`,
+      );
+      const aj = await angebot.json().catch(() => ({}));
+      if (!angebot.ok) {
+        setStarterpaketMsg({ ok: false, text: aj.error || "Paket konnte nicht geladen werden." });
+        return;
+      }
+
+      const positionen: { art: string; id: string; bestaetigt?: boolean }[] =
+        aj.data?.standardpaket ?? [];
+      if (positionen.length === 0) {
+        setStarterpaketMsg({
+          ok: false,
+          text: "Fuer diesen Mandanten ist kein Standardpaket konfiguriert.",
+        });
+        return;
+      }
+
+      // Sensible Vorlagen brauchen eine Bestaetigung je Versand. Die kann diese
+      // Karte nicht einholen — das ist Aufgabe des Dialogs. Bis dahin lehnen
+      // wir hier ab, statt eine Bestaetigung vorzutaeuschen, die niemand gegeben
+      // hat.
+      const verfuegbar: { art: string; id: string; name: string; sensibleFelder: unknown[] }[] =
+        aj.data?.verfuegbar ?? [];
+      const sensibel = positionen
+        .map((p) => verfuegbar.find((v) => v.art === p.art && v.id === p.id))
+        .filter((v) => v && v.sensibleFelder.length > 0);
+      if (sensibel.length > 0) {
+        setStarterpaketMsg({
+          ok: false,
+          text: `Das Standardpaket enthaelt ${sensibel.length} Vorlage(n) mit sensiblen Daten. Der Versand mit Bestaetigung folgt mit dem neuen Dialog.`,
+        });
+        return;
+      }
+
+      const res = await fetch("/api/dokumentenpaket/versenden", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modul: "ONBOARDING",
+          refId: onboardingId,
+          positionen: positionen.map((p) => ({ art: p.art, id: p.id })),
+          empfaenger: aj.data?.empfaengerVorschlag,
+        }),
+      });
       const j = await res.json().catch(() => ({}));
       if (res.ok) {
-        const n = j.data?.anzahl ?? 0;
-        setStarterpaketMsg({ ok: true, text: `Starterpaket versendet (${n} Dokument${n === 1 ? "" : "e"}).` });
+        const n = j.data?.dokumente?.length ?? 0;
+        setStarterpaketMsg({
+          ok: true,
+          text: `Paket versendet (${n} Dokument${n === 1 ? "" : "e"}).`,
+        });
         loadData();
-      } else if (res.status === 409) {
-        setStarterpaketMsg({ ok: false, text: j.error || "Keine Starterpaket-Dokumente fuer diesen Mandanten konfiguriert." });
       } else {
-        setStarterpaketMsg({ ok: false, text: j.error || "Starterpaket konnte nicht versendet werden." });
+        setStarterpaketMsg({ ok: false, text: j.error || "Paket konnte nicht versendet werden." });
       }
     } catch {
       setStarterpaketMsg({ ok: false, text: "Verbindungsfehler beim Versand." });

@@ -351,6 +351,30 @@ describe("Erfolgreicher Versand", () => {
     });
   });
 
+  it("haengt Pool-PDFs mit Originalnamen und PDF-Typ an", async () => {
+    // Uebernommen aus dem Test der abgeloesten starterpaket.ts.
+    await versendePaket(basis());
+    expect(mockSendEventEmail).toHaveBeenCalledWith(
+      "onboarding-starter-packet-sent",
+      expect.objectContaining({ email: "max@example.org", anzahlDokumente: 1 }),
+      expect.objectContaining({
+        attachments: [
+          expect.objectContaining({ filename: "leitbild.pdf", contentType: "application/pdf" }),
+        ],
+      }),
+    );
+  });
+
+  it("nennt im Pruefprotokoll Name, Hash und Art jedes Dokuments", async () => {
+    // Ebenfalls aus dem alten Test — dort ohne die Art, die es jetzt braucht,
+    // weil ein Paket aus zwei Quellen bestehen kann.
+    const r = await versendePaket(basis());
+    const log = mockPrisma.auditLog.create.mock.calls[0][0].data;
+    expect(log.details.dokumente).toEqual([
+      { name: "Leitbild", hash: r.status === "SENT" ? r.dokumente[0].hash : "", art: "PDF" },
+    ]);
+  });
+
   it("haelt eine abweichende Empfaengeradresse fest", async () => {
     const r = await versendePaket(basis({ empfaenger: "privat@example.org" }));
     expect(r.status).toBe("SENT");

@@ -956,3 +956,179 @@ export function statusFuerFehler(fehler: PaketFehler): number {
       return 400;
   }
 }
+
+// =============================================
+// Zusammenstellung fuer den Dialog
+// =============================================
+
+export interface PaketAngebotPosition {
+  art: "PDF" | "VORLAGE";
+  id: string;
+  name: string;
+  beschreibung: string | null;
+  scope: "GLOBAL" | "MANDANT";
+  groesse: number;
+  sensibleFelder: SensiblesFeld[];
+}
+
+export interface PaketAngebot {
+  modul: string;
+  organizationId: string;
+  empfaengerVorschlag: string;
+  vorname: string;
+  nachname: string;
+  displayId: string | null;
+  /** Standardpaket des Mandanten, in Reihenfolge — im Dialog vorausgewaehlt. */
+  standardpaket: { art: "PDF" | "VORLAGE"; id: string }[];
+  /** Alles Waehlbare, Standardpaket eingeschlossen. */
+  verfuegbar: PaketAngebotPosition[];
+  verlauf: {
+    id: string;
+    createdAt: Date;
+    empfaenger: string;
+    anzahl: number;
+    empfaengerAbweichend: boolean;
+  }[];
+  maxBytes: number;
+}
+
+export type AngebotErgebnis =
+  | { status: "OK"; angebot: PaketAngebot }
+  | { status: "FEHLER"; fehler: PaketFehler; detail: string };
+
+/**
+ * Alles, was der Versand-Dialog braucht — in einem Aufruf.
+ *
+ * Bewusst hier und nicht in der Route: Der Dialog waehlt aus derselben Menge,
+ * die der Versand spaeter akzeptiert. Zwei getrennte Abfragen wuerden
+ * frueher oder spaeter auseinanderlaufen und Positionen anbieten, die der
+ * Versand dann mit 400 abweist.
+ */
+export async function ladePaketAngebot(opts: {
+  modul: string;
+  refId: string;
+  session: SessionPayload;
+}): Promise<AngebotErgebnis> {
+  if (!modulVerdrahtet(opts.modul)) {
+    return {
+      status: "FEHLER",
+      fehler: "MODUL_NICHT_UNTERSTUETZT",
+      detail: `Fuer das Modul "${opts.modul}" ist kein Paketversand eingerichtet.`,
+    };
+  }
+
+  const vorgang = await MODULE[opts.modul].lade(opts.refId);
+  if (!vorgang) {
+    return {
+      status: "FEHLER",
+      fehler: "VORGANG_NICHT_GEFUNDEN",
+      detail: "Der Vorgang wurde nicht gefunden.",
+    };
+  }
+  if (!(await canAccessProcess(opts.session, vorgang.organizationId))) {
+    return {
+      status: "FEHLER",
+      fehler: "KEIN_ZUGRIFF",
+      detail: "Kein Zugriff auf den Mandanten dieses Vorgangs.",
+    };
+  }
+
+  const org = vorgang.organizationId;
+  const [pdfs, vorlagen, auswahl, verlauf] = await Promise.all([
+    prisma.starterpaketDokument.findMany({
+      where: { isActive: true, OR: [{ organizationId: null }, { organizationId: org }] },
+      select: {
+        id: true,
+        name: true,
+        beschreibung: true,
+        organizationId: true,
+        fileSize: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.documentTemplate.findMany({
+      where: {
+        isActive: true,
+        modul: { in: [opts.modul, "ALLGEMEIN"] },
+        OR: [{ organizationId: null }, { organizationId: org }],
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        organizationId: true,
+        fileSize: true,
+        platzhalter: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.starterpaketAuswahl.findMany({
+      where: { organizationId: org, modul: opts.modul },
+      orderBy: { orderIndex: "asc" },
+      select: { dokumentId: true, templateId: true },
+    }),
+    prisma.dokumentenVersand.findMany({
+      where: { modul: opts.modul, refId: opts.refId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        createdAt: true,
+        empfaenger: true,
+        anzahl: true,
+        empfaengerAbweichend: true,
+      },
+    }),
+  ]);
+
+  const verfuegbar: PaketAngebotPosition[] = [
+    ...pdfs.map((d) => ({
+      art: "PDF" as const,
+      id: d.id,
+      name: d.name,
+      beschreibung: d.beschreibung,
+      scope: (d.organizationId ? "MANDANT" : "GLOBAL") as "GLOBAL" | "MANDANT",
+      groesse: d.fileSize,
+      sensibleFelder: [],
+    })),
+    ...vorlagen.map((t) => ({
+      art: "VORLAGE" as const,
+      id: t.id,
+      name: t.name,
+      beschreibung: t.description,
+      scope: (t.organizationId ? "MANDANT" : "GLOBAL") as "GLOBAL" | "MANDANT",
+      groesse: t.fileSize,
+      sensibleFelder: sensiblePlatzhalter(t.platzhalter),
+    })),
+  ];
+
+  // Nur, was es noch gibt: Eine geloeschte oder deaktivierte Position bliebe
+  // sonst als Vorauswahl stehen und der Versand wiese sie ab.
+  const vorhanden = new Set(verfuegbar.map((p) => `${p.art}:${p.id}`));
+  const standardpaket = auswahl
+    .map((a) =>
+      a.dokumentId
+        ? { art: "PDF" as const, id: a.dokumentId }
+        : a.templateId
+          ? { art: "VORLAGE" as const, id: a.templateId }
+          : null,
+    )
+    .filter((p): p is { art: "PDF" | "VORLAGE"; id: string } => p !== null)
+    .filter((p) => vorhanden.has(`${p.art}:${p.id}`));
+
+  return {
+    status: "OK",
+    angebot: {
+      modul: opts.modul,
+      organizationId: org,
+      empfaengerVorschlag: vorgang.empfaenger,
+      vorname: vorgang.vorname,
+      nachname: vorgang.nachname,
+      displayId: vorgang.displayId,
+      standardpaket,
+      verfuegbar,
+      verlauf,
+      maxBytes: MAX_PAKET_BYTES,
+    },
+  };
+}
