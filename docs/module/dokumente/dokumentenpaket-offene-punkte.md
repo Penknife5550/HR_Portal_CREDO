@@ -1,6 +1,6 @@
 # Dokumentenpaket-Versand — offene Punkte
 
-> **Stand:** 04.09.2026 · Zweig `feat/dokumentenpaket-versand`, 18 Commits — **nur lokal, nicht auf `origin`, nicht nach `main` gemergt**
+> **Stand:** 04.09.2026 · **auf `main` gemergt** (`53c484b`) und gepusht; noch nicht deployt
 > **Plan:** [dokumentenpaket-versand-plan.html](dokumentenpaket-versand-plan.html) — vollständig abgearbeitet (Bausteine 1–15)
 > **Nachweise:** `npx tsc --noEmit` fehlerfrei · `npm run lint` 0 Fehler · **1074 Tests in 66 Suites** grün · `npm run build` exit 0
 
@@ -13,14 +13,12 @@ liegengeblieben.
 
 ## 0 · Wo es weitergeht
 
-Der Code ist fertig und geprüft, aber er liegt noch auf keinem Server und in
-keinem entfernten Verzeichnis. In dieser Reihenfolge:
+Der Code liegt seit dem 4. September auf `main` (Merge-Commit `53c484b`,
+gepusht) — aber **auf keinem Server**. Was noch aussteht:
 
-1. **Zweig sichern** — `git push -u origin feat/dokumentenpaket-versand`.
-   Solange das nicht passiert ist, existieren die 18 Commits genau einmal, auf
-   diesem Rechner.
-2. **Nach `main` mergen** (oder als PR) — `main` steht auf `a4b8c60`, dem
-   Stand, der am 4. September ausgerollt wurde.
+1. ~~Zweig sichern~~ — erledigt, `feat/dokumentenpaket-versand` steht auf `origin`.
+2. ~~Nach `main` mergen~~ — erledigt am 4. September, ohne PR, mit Merge-Commit.
+   Gate davor: tsc sauber, Lint ohne Fehler, 1074 Tests in 66 Suites grün.
 3. **Deployen** nach dem Ablauf in
    [../../historie/codereview-und-vorlagen-2026-09.md](../../historie/codereview-und-vorlagen-2026-09.md).
    Neu gegenüber dem letzten Deploy: eine Tabelle (`dokumenten_versand`), zwei
