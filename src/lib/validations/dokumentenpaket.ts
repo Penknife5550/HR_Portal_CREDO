@@ -80,6 +80,9 @@ function ohneDoppelte<T extends { art: PaketPositionArt; id: string }>(
   });
 }
 
+/** Hoechstlaenge der persoenlichen Nachricht im Versand-Dialog. */
+export const MAX_NACHRICHT_ZEICHEN = 2000;
+
 /** Hoechstzahl Positionen je Versand — die Groessenpruefung sitzt in der Bibliothek. */
 export const MAX_POSITIONEN_VERSAND = 50;
 /** Hoechstzahl Positionen im Standardpaket eines Mandanten. */
@@ -137,6 +140,10 @@ export type PruefePaket = z.infer<typeof pruefePaketSchema>;
 export const versendePaketSchema = z.object({
   ...paketBasis,
   empfaenger: z.string().trim().email("Ungueltige E-Mail-Adresse").max(254),
-  nachricht: z.string().trim().max(2000, "Die Nachricht ist zu lang").optional(),
+  nachricht: z
+    .string()
+    .trim()
+    .max(MAX_NACHRICHT_ZEICHEN, "Die Nachricht ist zu lang")
+    .optional(),
 });
 export type VersendePaket = z.infer<typeof versendePaketSchema>;

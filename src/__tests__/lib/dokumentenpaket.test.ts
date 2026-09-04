@@ -26,8 +26,12 @@ const mockReadUploadedFile = jest.fn();
 const mockSaveUploadedFile = jest.fn();
 const mockResolver = jest.fn();
 const mockReadFile = jest.fn();
+const mockUnlink = jest.fn();
 
-jest.mock("fs/promises", () => ({ readFile: (...a: unknown[]) => mockReadFile(...a) }));
+jest.mock("fs/promises", () => ({
+  readFile: (...a: unknown[]) => mockReadFile(...a),
+  unlink: (...a: unknown[]) => mockUnlink(...a),
+}));
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/permissions", () => ({
   ...jest.requireActual("@/lib/permissions"),
@@ -58,6 +62,7 @@ jest.mock("@/lib/doc-template-resolvers", () => ({
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import {
   versendePaket,
+  deutschesDatum,
   alsHtmlAbsaetze,
   pruefePaket,
   SENSIBEL_MARKER,
@@ -119,6 +124,7 @@ beforeEach(() => {
   mockCanAccessProcess.mockResolvedValue(true);
   mockReadUploadedFile.mockResolvedValue(Buffer.from("%PDF-1.4 inhalt"));
   mockReadFile.mockResolvedValue(Buffer.from("PK docx-quelle"));
+  mockUnlink.mockResolvedValue(undefined);
   mockSaveUploadedFile.mockResolvedValue("uploads/irgendwo/datei");
   mockGotenbergReachable.mockResolvedValue(true);
   mockRenderDocx.mockReturnValue({ buffer: Buffer.from("docx"), missing: [] });
@@ -638,8 +644,9 @@ describe("Vorpruefung", () => {
 
 describe("HTTP-Zuordnung", () => {
   it("bildet jedes Fehlerbild auf einen Status ab", () => {
-    expect(statusFuerFehler("KEIN_ZUGRIFF")).toBe(403);
+    expect(statusFuerFehler("KEIN_ZUGRIFF")).toBe(404);
     expect(statusFuerFehler("VORGANG_NICHT_GEFUNDEN")).toBe(404);
+    expect(statusFuerFehler("VERSAND_LAEUFT")).toBe(409);
     expect(statusFuerFehler("LEERE_AUSWAHL")).toBe(409);
     expect(statusFuerFehler("BESTAETIGUNG_FEHLT")).toBe(409);
     expect(statusFuerFehler("ZU_GROSS")).toBe(413);
@@ -756,5 +763,105 @@ describe("Standardvorlage des Starterpakets", () => {
       .split("{{/nachricht}}")
       .join("");
     expect(htmlOhneBlockmarker).not.toContain("{{nachricht}}");
+  });
+});
+
+// =============================================
+// Haertung aus dem Audit (credo-check / edge-cases)
+// =============================================
+
+describe("Datum in deutscher Zeit", () => {
+  it("nimmt den deutschen Kalendertag, nicht den von UTC", () => {
+    // 00:30 deutscher Sommerzeit ist UTC noch der Vortag. Der Dateiname ist
+    // Teil des Nachweises — er soll den Tag nennen, an dem hier gearbeitet wurde.
+    expect(deutschesDatum(new Date("2026-09-04T22:30:00.000Z"))).toBe("2026-09-05");
+    // Und im Winter (UTC+1) genauso.
+    expect(deutschesDatum(new Date("2026-01-14T23:30:00.000Z"))).toBe("2026-01-15");
+    expect(deutschesDatum(new Date("2026-09-04T10:00:00.000Z"))).toBe("2026-09-04");
+  });
+
+  it("schlaegt bis in den Dateinamen durch", () => {
+    expect(
+      vorlagenDateiname("Anschreiben", "Meier", new Date("2026-09-04T22:30:00.000Z")),
+    ).toBe("Anschreiben_Meier_2026-09-05.pdf");
+  });
+});
+
+describe("Doppelversand", () => {
+  it("laesst nur einen Versand je Vorgang gleichzeitig zu", async () => {
+    // Der Dialog sperrt seinen Knopf — zwei parallele API-Aufrufe wuerden
+    // trotzdem zweimal verschicken. Eine Mail laesst sich nicht zurueckholen.
+    let freigeben: () => void = () => undefined;
+    mockSendEventEmail.mockImplementation(
+      () =>
+        new Promise((res) => {
+          freigeben = () =>
+            res({ status: "SENT", messageId: "<a>", recipient: "max@example.org", subject: "W" });
+        }),
+    );
+
+    const ersterLauf = versendePaket(basis());
+    // Kurz warten, damit der erste Aufruf die Sperre wirklich haelt.
+    await new Promise((r) => setImmediate(r));
+    const zweiterLauf = await versendePaket(basis());
+
+    expect(zweiterLauf).toMatchObject({ status: "FEHLER", fehler: "VERSAND_LAEUFT" });
+    expect(mockSendEventEmail).toHaveBeenCalledTimes(1);
+
+    freigeben();
+    expect((await ersterLauf).status).toBe("SENT");
+  });
+
+  it("gibt die Sperre auch nach einem Fehlschlag wieder frei", async () => {
+    // Sonst waere der Vorgang dauerhaft blockiert.
+    mockSendEventEmail.mockResolvedValue({ status: "FAILED", detail: "SMTP weg" });
+    expect((await versendePaket(basis())).status).toBe("FEHLER");
+
+    mockSendEventEmail.mockResolvedValue({
+      status: "SENT",
+      messageId: "<a>",
+      recipient: "max@example.org",
+      subject: "W",
+    });
+    expect((await versendePaket(basis())).status).toBe("SENT");
+  });
+});
+
+describe("Nachweis scheitert nach dem Versand", () => {
+  // Der Fehlschlag wird bewusst geloggt — im Testlauf ist das nur Laerm und
+  // koennte echte Fehler verdecken.
+  let konsole: jest.SpyInstance;
+  beforeAll(() => {
+    konsole = jest.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+  afterAll(() => konsole.mockRestore());
+
+  beforeEach(() => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([
+      {
+        id: VORLAGE_ID,
+        name: "Willkommensschreiben",
+        dateipfad: VORLAGE_PFAD,
+        platzhalter: ["vorname"],
+        modul: "ONBOARDING",
+      },
+    ]);
+    mockSaveUploadedFile
+      .mockResolvedValueOnce("uploads/x/a.docx")
+      .mockResolvedValueOnce("uploads/x/a.pdf");
+    mockPrisma.$transaction.mockRejectedValue(new Error("Datenbank weg"));
+  });
+
+  it("meldet trotzdem SENT — sonst verschickt jemand dasselbe Paket erneut", async () => {
+    const r = await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(r.status).toBe("SENT");
+    expect(r.status === "SENT" && r.warnungen.join(" ")).toContain("NICHT wiederholen");
+  });
+
+  it("raeumt die eben abgelegten, nun unreferenzierten Dateien weg", async () => {
+    await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(mockUnlink).toHaveBeenCalledWith("uploads/x/a.docx");
+    expect(mockUnlink).toHaveBeenCalledWith("uploads/x/a.pdf");
   });
 });

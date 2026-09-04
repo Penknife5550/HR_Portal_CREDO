@@ -193,9 +193,11 @@ describe("Berechtigungen", () => {
     ).toBe(403);
   });
 
-  it("weist einen fremden Mandanten ab (403) und schreibt nichts", async () => {
+  it("weist einen fremden Mandanten ab (404) und schreibt nichts", async () => {
+    // 404, nicht 403: Ueber den Statuscode soll niemand erfahren, dass ein
+    // fremder Vorgang ueberhaupt existiert (CREDO-Hausstandard A6).
     mockCanAccessProcess.mockResolvedValue(false);
-    expect((await GET(getReq(), ctx())).status).toBe(403);
+    expect((await GET(getReq(), ctx())).status).toBe(404);
     const res = await VERSENDEN(
       postReq("versenden", {
         modul: "ONBOARDING",
@@ -205,7 +207,7 @@ describe("Berechtigungen", () => {
       }),
       ctx(),
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(mockSendEventEmail).not.toHaveBeenCalled();
     nichtsGeschrieben();
   });

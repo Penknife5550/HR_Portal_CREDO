@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FileTextIcon } from "lucide-react";
 
 export interface SensiblesFeld {
   key: string;
@@ -90,6 +91,16 @@ function formatBytes(bytes: number): string {
 }
 
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+
+/**
+ * Wartezeit nach der letzten Aenderung, bevor die Vorpruefung laeuft.
+ *
+ * Sie rendert Vorlagen probeweise — bei jedem Tastendruck waere das zu viel.
+ * Eine halbe Sekunde fasst Tippen zusammen und ist kurz genug, dass die
+ * Rueckmeldung noch zur Aktion gehoert.
+ */
+const VORPRUEFUNG_VERZOEGERUNG_MS = 500;
 
 export function DokumentenpaketDialog({
   angebot,
@@ -174,7 +185,7 @@ export function DokumentenpaketDialog({
   useEffect(() => {
     if (ergebnis) return;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(pruefe, 500);
+    timer.current = setTimeout(pruefe, VORPRUEFUNG_VERZOEGERUNG_MS);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
@@ -306,7 +317,7 @@ export function DokumentenpaketDialog({
             <ul className="mt-4 space-y-1 text-sm text-foreground">
               {ergebnis.dokumente.map((d) => (
                 <li key={d.dateiname} className="flex items-center gap-2">
-                  <span className="text-muted-foreground">•</span>
+                  <FileTextIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   {d.name}
                   <span className="text-xs text-muted-foreground">({d.dateiname})</span>
                 </li>

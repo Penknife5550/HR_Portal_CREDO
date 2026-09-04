@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { FileTextIcon } from "lucide-react";
 import { DokumentenpaketDialog, type PaketAngebot } from "@/components/dokumentenpaket-dialog";
 
 export function DokumentenpaketSection({
@@ -101,7 +102,7 @@ export function DokumentenpaketSection({
             <ul className="mb-3 space-y-1 text-xs text-foreground">
               {standard.map((p) => (
                 <li key={`${p.art}:${p.id}`} className="flex flex-wrap items-center gap-2">
-                  <span className="text-muted-foreground">•</span>
+                  <FileTextIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   {p.name}
                   {p.art === "VORLAGE" && (
                     <span className="rounded-md bg-credo-gruen/10 px-1.5 py-0.5 text-[10px] font-medium text-credo-gruen">

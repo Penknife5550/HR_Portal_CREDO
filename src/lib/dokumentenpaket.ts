@@ -28,7 +28,7 @@
  */
 import crypto from "crypto";
 import path from "path";
-import { readFile } from "fs/promises";
+import { readFile, unlink } from "fs/promises";
 import { prisma } from "@/lib/db";
 import { readUploadedFile, saveUploadedFile } from "@/lib/file-upload";
 import { sendEventEmail, resolveEventTemplate, type MailAttachment } from "@/lib/mailer";
@@ -54,6 +54,14 @@ import { istModulUnterstuetzt } from "@/lib/erzeugte-dokumente";
  */
 export const MAX_PAKET_BYTES = 15 * 1024 * 1024;
 
+/**
+ * Ein Text fuer zwei Faelle: nicht vorhanden und nicht zugaenglich.
+ *
+ * Der Statuscode ist bei beiden 404 — waere der Text unterschiedlich,
+ * verriete er trotzdem, dass der Vorgang existiert.
+ */
+const NICHT_GEFUNDEN_TEXT = "Der Vorgang wurde nicht gefunden.";
+
 // =============================================
 // Fehlerbilder
 // =============================================
@@ -69,7 +77,8 @@ export type PaketFehler =
   | "VORLAGE_FEHLERHAFT"
   | "PDF_DIENST"
   | "ZU_GROSS"
-  | "VERSAND";
+  | "VERSAND"
+  | "VERSAND_LAEUFT";
 
 export interface PaketPositionEingabe {
   art: "PDF" | "VORLAGE";
@@ -222,6 +231,25 @@ export function alsHtmlAbsaetze(text: string): string {
     .replace(/\n/g, "<br>");
 }
 
+/**
+ * Datum in deutscher Zeit als JJJJ-MM-TT.
+ *
+ * toISOString() liefert UTC: Zwischen 00:00 und 02:00 deutscher Sommerzeit
+ * stuende im Dateinamen der Vortag — und der Dateiname ist Teil des
+ * Nachweises. Der bestehende Erzeugen-Weg hat denselben Fehler;
+ * Gleichfoermigkeit macht ihn nicht richtiger.
+ *
+ * "en-CA" liefert genau das ISO-Format JJJJ-MM-TT.
+ */
+export function deutschesDatum(zeitpunkt: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(zeitpunkt);
+}
+
 function sha256(buffer: Buffer): string {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
@@ -241,7 +269,7 @@ export function vorlagenDateiname(
   nachname: string,
   stichtag: Date,
 ): string {
-  const datum = stichtag.toISOString().slice(0, 10);
+  const datum = deutschesDatum(stichtag);
   const teile = [vorlagenName, nachname].filter((t) => t && t.trim() !== "");
   return ascii(`${teile.join("_")}_${datum}.pdf`).slice(0, 150);
 }
@@ -413,7 +441,39 @@ export interface VersandOptionen {
   jetzt?: Date;
 }
 
+/**
+ * Laufende Versendungen je Vorgang.
+ *
+ * Der Dialog sperrt seinen Knopf, aber zwei parallele API-Aufrufe wuerden
+ * zweimal verschicken und zwei Nachweise schreiben. Eine Mail laesst sich nicht
+ * zurueckholen, also greift die Sperre VOR dem Versand.
+ *
+ * BEWUSST prozesslokal: Das Portal laeuft als ein Container (hr-portal-app).
+ * Wird es je waagerecht skaliert, traegt diese Sperre nicht mehr und muss durch
+ * eine Datenbanksperre ersetzt werden. Der Hinweis steht hier, damit das beim
+ * Skalieren auffaellt und nicht erst im Postfach eines Beschaeftigten.
+ */
+const laufendeVersendungen = new Set<string>();
+
 export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebnis> {
+  const sperre = `${opts.modul}:${opts.refId}`;
+  if (laufendeVersendungen.has(sperre)) {
+    return fehler(
+      "VERSAND_LAEUFT",
+      "Fuer diesen Vorgang laeuft bereits ein Versand. Bitte das Ergebnis abwarten.",
+    );
+  }
+  laufendeVersendungen.add(sperre);
+  try {
+    return await versendeIntern(opts);
+  } finally {
+    // Genau eine Freigabestelle — kein Rueckgabepfad darf die Sperre stehen
+    // lassen, sonst waere der Vorgang dauerhaft blockiert.
+    laufendeVersendungen.delete(sperre);
+  }
+}
+
+async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
   const jetzt = opts.jetzt ?? new Date();
 
   // --- 1. Modul ---
@@ -428,7 +488,7 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
   // --- 2. Vorgang ---
   const vorgang = await eintrag.lade(opts.refId);
   if (!vorgang) {
-    return fehler("VORGANG_NICHT_GEFUNDEN", "Der Vorgang wurde nicht gefunden.");
+    return fehler("VORGANG_NICHT_GEFUNDEN", NICHT_GEFUNDEN_TEXT);
   }
 
   // --- 3. Mandant ---
@@ -436,7 +496,7 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
   // fehlendem Zugriff still auf die allgemeinen Platzhalter zurueck. Ohne diese
   // Zeile ginge ein leeres Schreiben an eine echte Adresse.
   if (!(await canAccessProcess(opts.session, vorgang.organizationId))) {
-    return fehler("KEIN_ZUGRIFF", "Kein Zugriff auf den Mandanten dieses Vorgangs.");
+    return fehler("KEIN_ZUGRIFF", NICHT_GEFUNDEN_TEXT);
   }
 
   // --- 4. Auswahl ---
@@ -681,7 +741,7 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
   }
 
   const versandId = crypto.randomUUID();
-  await prisma.$transaction(async (tx) => {
+  const nachweisGeschrieben = await prisma.$transaction(async (tx) => {
     await tx.dokumentenVersand.create({
       data: {
         id: versandId,
@@ -710,7 +770,7 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
       const erzeugt = await tx.generatedDocument.create({
         data: {
           templateId: a.templateId,
-          name: `${a.name} (${jetzt.toISOString().slice(0, 10)})`,
+          name: `${a.name} (${deutschesDatum(jetzt)})`,
           modul: opts.modul,
           refId: opts.refId,
           organizationId: vorgang.organizationId,
@@ -760,7 +820,29 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
         },
       });
     }
-  });
+  }).then(
+    () => true,
+    async (e) => {
+      // Die Mail ist raus — das ist die unumkehrbare Tatsache. Ein Fehler hier
+      // darf NICHT als Fehlschlag zurueckkommen: Sonst verschickt jemand
+      // dasselbe Paket ein zweites Mal, und das ist der schlimmere Ausgang.
+      // Die eben abgelegten Dateien referenziert nun nichts mehr — weg damit,
+      // statt sie als Muell im Speicher zu lassen.
+      for (const pfade of abgelegt.values()) {
+        await unlink(pfade.pfadDocx).catch(() => undefined);
+        await unlink(pfade.pfadPdf).catch(() => undefined);
+      }
+      console.error("[Dokumentenpaket] Nachweis konnte nicht geschrieben werden:", e);
+      return false;
+    },
+  );
+
+  if (!nachweisGeschrieben) {
+    warnungen.push(
+      "Das Paket wurde versendet, der Nachweis konnte aber nicht gespeichert werden. " +
+        "Bitte den Versand NICHT wiederholen und die Protokolle pruefen.",
+    );
+  }
 
   return { status: "SENT", versandId, empfaenger, dokumente, warnungen };
 }
@@ -839,14 +921,14 @@ export async function pruefePaket(opts: {
     return {
       status: "FEHLER",
       fehler: "VORGANG_NICHT_GEFUNDEN",
-      detail: "Der Vorgang wurde nicht gefunden.",
+      detail: NICHT_GEFUNDEN_TEXT,
     };
   }
   if (!(await canAccessProcess(opts.session, vorgang.organizationId))) {
     return {
       status: "FEHLER",
       fehler: "KEIN_ZUGRIFF",
-      detail: "Kein Zugriff auf den Mandanten dieses Vorgangs.",
+      detail: NICHT_GEFUNDEN_TEXT,
     };
   }
 
@@ -995,8 +1077,10 @@ export async function pruefePaket(opts: {
  */
 export function statusFuerFehler(fehler: PaketFehler): number {
   switch (fehler) {
+    // 404 auch bei fehlendem Zugriff — Hausstandard: Ueber den Statuscode
+    // soll niemand erfahren, dass ein fremder Vorgang existiert. Aus
+    // demselben Grund lautet der Text beider Faelle gleich.
     case "KEIN_ZUGRIFF":
-      return 403;
     case "VORGANG_NICHT_GEFUNDEN":
       return 404;
     case "LEERE_AUSWAHL":
@@ -1009,6 +1093,8 @@ export function statusFuerFehler(fehler: PaketFehler): number {
     case "PDF_DIENST":
     case "VERSAND":
       return 502;
+    case "VERSAND_LAEUFT":
+      return 409;
     case "MODUL_NICHT_UNTERSTUETZT":
     case "POSITION_NICHT_VERFUEGBAR":
       return 400;
@@ -1080,14 +1166,14 @@ export async function ladePaketAngebot(opts: {
     return {
       status: "FEHLER",
       fehler: "VORGANG_NICHT_GEFUNDEN",
-      detail: "Der Vorgang wurde nicht gefunden.",
+      detail: NICHT_GEFUNDEN_TEXT,
     };
   }
   if (!(await canAccessProcess(opts.session, vorgang.organizationId))) {
     return {
       status: "FEHLER",
       fehler: "KEIN_ZUGRIFF",
-      detail: "Kein Zugriff auf den Mandanten dieses Vorgangs.",
+      detail: NICHT_GEFUNDEN_TEXT,
     };
   }
 
