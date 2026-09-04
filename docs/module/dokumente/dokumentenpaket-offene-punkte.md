@@ -1,6 +1,6 @@
 # Dokumentenpaket-Versand — offene Punkte
 
-> **Stand:** 04.09.2026 · Zweig `feat/dokumentenpaket-versand`, 17 Commits
+> **Stand:** 04.09.2026 · Zweig `feat/dokumentenpaket-versand`, 18 Commits — **nur lokal, nicht auf `origin`, nicht nach `main` gemergt**
 > **Plan:** [dokumentenpaket-versand-plan.html](dokumentenpaket-versand-plan.html) — vollständig abgearbeitet (Bausteine 1–15)
 > **Nachweise:** `npx tsc --noEmit` fehlerfrei · `npm run lint` 0 Fehler · **1074 Tests in 66 Suites** grün · `npm run build` exit 0
 
@@ -8,6 +8,27 @@ Dieses Dokument hält fest, was **nicht** erledigt ist. Es entstand aus einem
 Code-Review über den ganzen Zweig (zehn Prüfwinkel plus Nachlauf). Elf
 Merge-Blocker wurden behoben (Commit `98d56df`); was hier steht, ist bewusst
 liegengeblieben.
+
+---
+
+## 0 · Wo es weitergeht
+
+Der Code ist fertig und geprüft, aber er liegt noch auf keinem Server und in
+keinem entfernten Verzeichnis. In dieser Reihenfolge:
+
+1. **Zweig sichern** — `git push -u origin feat/dokumentenpaket-versand`.
+   Solange das nicht passiert ist, existieren die 18 Commits genau einmal, auf
+   diesem Rechner.
+2. **Nach `main` mergen** (oder als PR) — `main` steht auf `a4b8c60`, dem
+   Stand, der am 4. September ausgerollt wurde.
+3. **Deployen** nach dem Ablauf in
+   [../../historie/codereview-und-vorlagen-2026-09.md](../../historie/codereview-und-vorlagen-2026-09.md).
+   Neu gegenüber dem letzten Deploy: eine Tabelle (`dokumenten_versand`), zwei
+   Spalten, zwei Unique-Constraints — siehe Abschnitt 4.
+4. **Erst danach Abschnitt 1** (Verifikation mit echtem SMTP). Vorher hat
+   niemand belegt, dass eine Mail mit Anhängen tatsächlich ankommt.
+
+Die vier Befunde aus Abschnitt 2 blockieren keinen dieser Schritte.
 
 ---
 
