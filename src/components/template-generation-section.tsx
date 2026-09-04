@@ -95,6 +95,9 @@ interface ErzeugtesDokument {
   hatDocx: boolean;
   hatPdf: boolean;
   fehlendeFelder: number;
+  /** Gesetzt, wenn das Dokument als Teil eines Pakets verschickt wurde. */
+  versendetAm: string | null;
+  versendetAn: string | null;
 }
 
 /** Ab dieser Anzahl wird die Liste der erzeugten Dokumente eingeklappt. */
@@ -383,10 +386,27 @@ export function TemplateGenerationSection({
             <div key={d.id}>
               <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
+                    {d.versendetAm && (
+                      <span
+                        className="rounded-md bg-credo-gruen/10 px-2 py-0.5 text-[10px] font-medium text-credo-gruen"
+                        title={
+                          d.versendetAn
+                            ? `An ${d.versendetAn} am ${formatZeitpunkt(d.versendetAm)}`
+                            : undefined
+                        }
+                      >
+                        per E-Mail versendet
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-muted-foreground">
                     {formatZeitpunkt(d.createdAt)}
                     {d.erstelltVon ? ` · ${d.erstelltVon}` : ""}
+                    {d.versendetAm
+                      ? ` · versendet am ${formatZeitpunkt(d.versendetAm)}`
+                      : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">

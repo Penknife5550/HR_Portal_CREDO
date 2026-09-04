@@ -71,6 +71,10 @@ export const GET = apiHandler(
         pfadDocx: true,
         pfadPdf: true,
         createdBy: { select: { firstName: true, lastName: true } },
+        // Wurde dieses Dokument als Teil eines Pakets verschickt? Die Liste
+        // zeigt dann "per E-Mail versendet" — sonst waere aus ihr nicht zu
+        // erkennen, was beim Empfaenger schon angekommen ist.
+        versand: { select: { createdAt: true, empfaenger: true } },
       },
     });
 
@@ -84,6 +88,8 @@ export const GET = apiHandler(
           : null,
         hatDocx: !!d.pfadDocx,
         hatPdf: !!d.pfadPdf,
+        versendetAm: d.versand?.createdAt ?? null,
+        versendetAn: d.versand?.empfaenger ?? null,
         fehlendeFelder: d.missingPlaceholders.length,
       })),
     });
