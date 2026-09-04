@@ -147,6 +147,13 @@ export interface VorgangsKontext {
    * Ein Nachweis, der das behauptet, waere schlimmer als keiner.
    */
   altversand?: { am: Date; anzahl: number } | null;
+  /**
+   * Zusaetzliche Platzhalter, die nur dieses Modul kennt — etwa das
+   * Austrittsdatum im Offboarding. Sie gehen unveraendert in die
+   * Mail-Payload; leere Werte lassen den bedingten Block der Vorlage
+   * entfallen, statt einen Satz ohne Datum zu hinterlassen.
+   */
+  zusatz?: Record<string, string>;
 }
 
 interface ModulEintrag {
@@ -158,10 +165,14 @@ interface ModulEintrag {
 /**
  * Je Modul ein Eintrag.
  *
- * Phase 1 verdrahtet nur Onboarding. Offboarding, Verbeamtung und
- * Vertragsverlaengerung brauchen je eine eigene Mailvorlage mit abgestimmtem
- * Text (Baustein 13) — sie hier ohne Vorlage einzutragen wuerde einen Versand
- * ermoeglichen, dessen Anschreiben niemand gelesen hat. Deshalb erst dann.
+ * Alle vier Vorgangsmodule sind verdrahtet; je Modul gehoert eine eigene
+ * Mailvorlage dazu (default-email-templates.ts) — ein Modul ohne Vorlage
+ * duerfte gar nicht erst versenden koennen, deshalb prueft modulVerdrahtet
+ * beides.
+ *
+ * Was je Modul verschieden ist: die Empfaengeradresse und das Datum, das im
+ * Anschreiben zaehlt. Beides liefert der Lader ueber `zusatz`, damit nicht
+ * jedes Modul dieselben Felder haben muss.
  */
 const MODULE: Record<string, ModulEintrag> = {
   ONBOARDING: {
@@ -179,6 +190,7 @@ const MODULE: Record<string, ModulEintrag> = {
           personalData: { select: { firstName: true, lastName: true } },
           starterPacketSentAt: true,
           starterPacketSentCount: true,
+          supervisorData: { select: { vertragsbeginn: true } },
         },
       });
       if (!ob) return null;
@@ -190,9 +202,108 @@ const MODULE: Record<string, ModulEintrag> = {
         vorname: ob.personalData?.firstName || ob.firstName || "",
         nachname: ob.personalData?.lastName || ob.lastName || "",
         empfaenger: ob.email,
+        zusatz: { eintrittsdatum: anzeigeDatum(ob.supervisorData?.vertragsbeginn) },
         altversand: ob.starterPacketSentAt
           ? { am: ob.starterPacketSentAt, anzahl: ob.starterPacketSentCount }
           : null,
+      };
+    },
+  },
+
+  OFFBOARDING: {
+    event: "offboarding-documents-sent",
+    lade: async (refId) => {
+      const off = await prisma.offboardingProcess.findUnique({
+        where: { id: refId },
+        select: {
+          employeeEmail: true,
+          employeePrivateEmail: true,
+          employeeFirstName: true,
+          employeeLastName: true,
+          displayId: true,
+          organizationId: true,
+          organization: { select: { name: true } },
+          contractEndDate: true,
+          lastWorkingDay: true,
+        },
+      });
+      if (!off) return null;
+      return {
+        organizationId: off.organizationId,
+        organizationName: off.organization?.name ?? "",
+        displayId: off.displayId,
+        vorname: off.employeeFirstName,
+        nachname: off.employeeLastName,
+        // Private Adresse zuerst (Entscheidung vom 4. September): Wer
+        // ausscheidet, verliert das dienstliche Postfach — und genau dort
+        // laegen dann Zeugnis und Bescheinigungen. Im Dialog aenderbar.
+        empfaenger: off.employeePrivateEmail || off.employeeEmail,
+        zusatz: {
+          austrittsdatum: anzeigeDatum(off.contractEndDate ?? off.lastWorkingDay),
+        },
+      };
+    },
+  },
+
+  VERBEAMTUNG: {
+    event: "civil-service-documents-sent",
+    lade: async (refId) => {
+      const cs = await prisma.civilServiceProcess.findUnique({
+        where: { id: refId },
+        select: {
+          employeeEmail: true,
+          employeeFirstName: true,
+          employeeLastName: true,
+          displayId: true,
+          organizationId: true,
+          organization: { select: { name: true } },
+          probationStartDate: true,
+          targetStartDate: true,
+        },
+      });
+      if (!cs) return null;
+      return {
+        organizationId: cs.organizationId,
+        organizationName: cs.organization?.name ?? "",
+        displayId: cs.displayId,
+        vorname: cs.employeeFirstName,
+        nachname: cs.employeeLastName,
+        empfaenger: cs.employeeEmail,
+        zusatz: {
+          // Der tatsaechliche Beginn schlaegt den geplanten; steht keiner
+          // fest, bleibt die Angabe leer und der Satz entfaellt.
+          probezeit_beginn: anzeigeDatum(cs.probationStartDate ?? cs.targetStartDate),
+        },
+      };
+    },
+  },
+
+  VERTRAGSVERLAENGERUNG: {
+    event: "contract-renewal-documents-sent",
+    lade: async (refId) => {
+      const ce = await prisma.contractEndProcess.findUnique({
+        where: { id: refId },
+        select: {
+          employeeEmail: true,
+          employeeFirstName: true,
+          employeeLastName: true,
+          displayId: true,
+          organizationId: true,
+          organization: { select: { name: true } },
+          renewalData: { select: { vertragsende: true } },
+        },
+      });
+      if (!ce) return null;
+      return {
+        organizationId: ce.organizationId,
+        organizationName: ce.organization?.name ?? "",
+        displayId: ce.displayId,
+        vorname: ce.employeeFirstName,
+        nachname: ce.employeeLastName,
+        empfaenger: ce.employeeEmail,
+        zusatz: {
+          vertragsende_neu: anzeigeDatum(ce.renewalData?.vertragsende),
+        },
       };
     },
   },
@@ -278,6 +389,22 @@ export function deutschesDatum(zeitpunkt: Date): string {
  */
 export function kodierteGroesse(rohBytes: number): number {
   return Math.ceil(rohBytes / 3) * 4;
+}
+
+/**
+ * Datum fuer die Anzeige in einer Mail: TT.MM.JJJJ in deutscher Zeit.
+ *
+ * Leer, wenn kein Datum vorliegt — die Vorlagen setzen solche Angaben in
+ * einen bedingten Block, damit kein angefangener Satz stehen bleibt.
+ */
+export function anzeigeDatum(zeitpunkt: Date | null | undefined): string {
+  if (!zeitpunkt) return "";
+  return new Intl.DateTimeFormat("de-DE", {
+    timeZone: "Europe/Berlin",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(zeitpunkt);
 }
 
 function sha256(buffer: Buffer): string {
@@ -738,6 +865,8 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
       dokumentenliste,
       dokumentenliste_html: dokumentenlisteHtml,
       sachbearbeiter_name: `${opts.session.firstName} ${opts.session.lastName}`.trim(),
+      // Modulspezifisches zuletzt: Es soll nichts Allgemeines ueberschreiben.
+      ...(vorgang.zusatz ?? {}),
     },
     {
       attachments: anhaenge,

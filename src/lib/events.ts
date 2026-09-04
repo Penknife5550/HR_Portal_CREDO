@@ -203,6 +203,90 @@ export const EVENT_CATALOG: EventDefinition[] = [
   },
 
   // =============================================
+  // Dokumentenpaket in Offboarding, Verbeamtung und Vertragsverlaengerung
+  //
+  // Gleicher Aufbau wie onboarding-starter-packet-sent; je Modul kommt eine
+  // eigene Datumsvariable dazu, die der Lader in dokumentenpaket.ts fuellt.
+  // =============================================
+  {
+    event: "offboarding-documents-sent",
+    name: "Unterlagen zum Austritt (Offboarding)",
+    group: "Offboarding",
+    recipientHint: "Ausscheidende:r (private Adresse bevorzugt, im Dialog aenderbar)",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      refId: "00000000-0000-0000-0000-000000000001",
+      offboardingId: "00000000-0000-0000-0000-000000000001",
+      displayId: "OFF-2026-GYM-001",
+      email: "max.mustermann@example.org",
+      vorname: "Max",
+      nachname: "Mustermann",
+      organization: "FES Minden",
+      einrichtung: "FES Minden",
+      anzahlDokumente: 3,
+      dokumentenliste: "1. Arbeitszeugnis\n2. Bescheinigung",
+      dokumentenliste_html: "<ol><li>Arbeitszeugnis</li><li>Bescheinigung</li></ol>",
+      nachricht: "",
+      nachricht_html: "",
+      sachbearbeiter_name: "Erika Sachbearbeiter",
+      austrittsdatum: "31.12.2026",
+    },
+    wired: true,
+  },
+
+  {
+    event: "civil-service-documents-sent",
+    name: "Unterlagen zur Verbeamtung",
+    group: "Verbeamtung",
+    recipientHint: "Lehrkraft im Verbeamtungsverfahren",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      refId: "00000000-0000-0000-0000-000000000001",
+      civilServiceId: "00000000-0000-0000-0000-000000000001",
+      displayId: "PSI-2026-GYM-001",
+      email: "max.mustermann@example.org",
+      vorname: "Max",
+      nachname: "Mustermann",
+      organization: "FES Minden",
+      einrichtung: "FES Minden",
+      anzahlDokumente: 3,
+      dokumentenliste: "1. Arbeitszeugnis\n2. Bescheinigung",
+      dokumentenliste_html: "<ol><li>Arbeitszeugnis</li><li>Bescheinigung</li></ol>",
+      nachricht: "",
+      nachricht_html: "",
+      sachbearbeiter_name: "Erika Sachbearbeiter",
+      probezeit_beginn: "01.08.2026",
+    },
+    wired: true,
+  },
+
+  {
+    event: "contract-renewal-documents-sent",
+    name: "Unterlagen zur Vertragsverlaengerung",
+    group: "Vertragsende",
+    recipientHint: "Beschaeftigte:r mit verlaengertem Vertrag",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      refId: "00000000-0000-0000-0000-000000000001",
+      contractEndId: "00000000-0000-0000-0000-000000000001",
+      displayId: "VE-2026-GYM-001",
+      email: "max.mustermann@example.org",
+      vorname: "Max",
+      nachname: "Mustermann",
+      organization: "FES Minden",
+      einrichtung: "FES Minden",
+      anzahlDokumente: 3,
+      dokumentenliste: "1. Arbeitszeugnis\n2. Bescheinigung",
+      dokumentenliste_html: "<ol><li>Arbeitszeugnis</li><li>Bescheinigung</li></ol>",
+      nachricht: "",
+      nachricht_html: "",
+      sachbearbeiter_name: "Erika Sachbearbeiter",
+      vertragsende_neu: "31.07.2028",
+    },
+    wired: true,
+  },
+
+  // =============================================
   // Offboarding
   // =============================================
   {

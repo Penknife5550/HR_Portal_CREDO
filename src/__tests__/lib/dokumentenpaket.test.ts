@@ -11,6 +11,9 @@ const mockPrisma = {
   onboardingProcess: { findUnique: jest.fn(), update: jest.fn() },
   starterpaketDokument: { findMany: jest.fn() },
   documentTemplate: { findMany: jest.fn() },
+  offboardingProcess: { findUnique: jest.fn() },
+  civilServiceProcess: { findUnique: jest.fn() },
+  contractEndProcess: { findUnique: jest.fn() },
   starterpaketAuswahl: { findMany: jest.fn() },
   dokumentenVersand: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
   generatedDocument: { create: jest.fn() },
@@ -60,6 +63,7 @@ jest.mock("@/lib/doc-template-resolvers", () => ({
   hasModuleResolver: () => true,
 }));
 
+import { EVENT_CATALOG } from "@/lib/events";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import {
   versendePaket,
@@ -232,11 +236,19 @@ describe("Verdrahtete Module", () => {
     expect(modulVerdrahtet("ONBOARDING")).toBe(true);
   });
 
-  it("kennt weder BEM noch Phantasiemodule noch die noch nicht verdrahteten", () => {
+  it("kennt alle vier Vorgangsmodule", () => {
+    // Jedes von ihnen hat eine eigene, abgestimmte Mailvorlage — ohne die
+    // duerfte es gar nicht erst versenden koennen.
+    for (const m of ["ONBOARDING", "OFFBOARDING", "VERBEAMTUNG", "VERTRAGSVERLAENGERUNG"]) {
+      expect(modulVerdrahtet(m)).toBe(true);
+    }
+  });
+
+  it("kennt weder BEM noch Phantasiemodule", () => {
+    // BEM bleibt aussen vor: Die versiegelte Akte nach § 167 SGB IX hat
+    // ihren eigenen, zugriffsgeschuetzten Weg.
     expect(modulVerdrahtet("BEM")).toBe(false);
     expect(modulVerdrahtet("PHANTASIE")).toBe(false);
-    // Phase 2 traegt sie nach — bis dahin gibt es keine abgestimmte Mailvorlage.
-    expect(modulVerdrahtet("OFFBOARDING")).toBe(false);
   });
 });
 
@@ -1027,5 +1039,150 @@ describe("Bestandsvorgaenge gelten nicht als unversendet", () => {
     mockPrisma.dokumentenVersand.findMany.mockResolvedValue([]);
     const r = await ladePaketAngebot({ modul: "ONBOARDING", refId: REF, session });
     expect(r.status === "OK" && r.angebot.altversand).toBeNull();
+  });
+});
+
+// =============================================
+// Phase 2: die drei weiteren Module
+// =============================================
+
+describe("Offboarding", () => {
+  const vorgang = (extra: Record<string, unknown> = {}) => ({
+    employeeEmail: "dienstlich@fes.de",
+    employeePrivateEmail: "privat@example.org",
+    employeeFirstName: "Lena",
+    employeeLastName: "Bergmann",
+    displayId: "OFF-2026-GYM-001",
+    organizationId: ORG,
+    organization: { name: "Gymnasium" },
+    contractEndDate: new Date("2026-12-31T00:00:00.000Z"),
+    lastWorkingDay: new Date("2026-12-20T00:00:00.000Z"),
+    ...extra,
+  });
+
+  beforeEach(() => {
+    mockPrisma.starterpaketAuswahl.findMany.mockResolvedValue([]);
+    mockPrisma.dokumentenVersand.findMany.mockResolvedValue([]);
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([]);
+  });
+
+  it("schlaegt die private Adresse vor — das dienstliche Postfach ist bald weg", async () => {
+    mockPrisma.offboardingProcess.findUnique.mockResolvedValue(vorgang());
+    const r = await ladePaketAngebot({ modul: "OFFBOARDING", refId: REF, session });
+    expect(r.status === "OK" && r.angebot.empfaengerVorschlag).toBe("privat@example.org");
+  });
+
+  it("faellt auf die dienstliche zurueck, wenn keine private hinterlegt ist", async () => {
+    mockPrisma.offboardingProcess.findUnique.mockResolvedValue(
+      vorgang({ employeePrivateEmail: null }),
+    );
+    const r = await ladePaketAngebot({ modul: "OFFBOARDING", refId: REF, session });
+    expect(r.status === "OK" && r.angebot.empfaengerVorschlag).toBe("dienstlich@fes.de");
+  });
+
+  it("nimmt das Vertragsende als Austrittsdatum", async () => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
+      { id: PDF_ID, name: "Leitbild", dateipfad: "starterpaket/leitbild.pdf", originalName: "leitbild.pdf", hash: "x".repeat(64) },
+    ]);
+    mockPrisma.offboardingProcess.findUnique.mockResolvedValue(vorgang());
+    await versendePaket(basis({ modul: "OFFBOARDING", positionen: [{ art: "PDF", id: PDF_ID }] }));
+    expect(mockSendEventEmail.mock.calls[0][1].austrittsdatum).toBe("31.12.2026");
+  });
+
+  it("faellt auf den letzten Arbeitstag zurueck", async () => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
+      { id: PDF_ID, name: "Leitbild", dateipfad: "starterpaket/leitbild.pdf", originalName: "leitbild.pdf", hash: "x".repeat(64) },
+    ]);
+    mockPrisma.offboardingProcess.findUnique.mockResolvedValue(vorgang({ contractEndDate: null }));
+    await versendePaket(basis({ modul: "OFFBOARDING", positionen: [{ art: "PDF", id: PDF_ID }] }));
+    expect(mockSendEventEmail.mock.calls[0][1].austrittsdatum).toBe("20.12.2026");
+  });
+});
+
+describe("Verbeamtung und Vertragsverlaengerung", () => {
+  beforeEach(() => {
+    mockPrisma.starterpaketAuswahl.findMany.mockResolvedValue([]);
+    mockPrisma.dokumentenVersand.findMany.mockResolvedValue([]);
+  });
+
+  it("nimmt den tatsaechlichen Probezeitbeginn vor dem geplanten", async () => {
+    mockPrisma.civilServiceProcess.findUnique.mockResolvedValue({
+      employeeEmail: "lehrkraft@fes.de",
+      employeeFirstName: "Jonas",
+      employeeLastName: "Keller",
+      displayId: "PSI-2026-GYM-001",
+      organizationId: ORG,
+      organization: { name: "Gymnasium" },
+      probationStartDate: new Date("2026-08-01T00:00:00.000Z"),
+      targetStartDate: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    await versendePaket(
+      basis({ modul: "VERBEAMTUNG", positionen: [{ art: "PDF", id: PDF_ID }] }),
+    );
+    expect(mockSendEventEmail.mock.calls[0][1].probezeit_beginn).toBe("01.08.2026");
+  });
+
+  it("laesst das Datum leer, wenn keines feststeht — der Satz entfaellt dann", async () => {
+    mockPrisma.contractEndProcess.findUnique.mockResolvedValue({
+      employeeEmail: "lena@fes.de",
+      employeeFirstName: "Lena",
+      employeeLastName: "Bergmann",
+      displayId: "VE-2026-GYM-001",
+      organizationId: ORG,
+      organization: { name: "Gymnasium" },
+      renewalData: null,
+    });
+    await versendePaket(
+      basis({ modul: "VERTRAGSVERLAENGERUNG", positionen: [{ art: "PDF", id: PDF_ID }] }),
+    );
+    expect(mockSendEventEmail.mock.calls[0][1].vertragsende_neu).toBe("");
+  });
+});
+
+describe("Die drei Vorlagen", () => {
+  const vorlagen = [
+    "offboarding-documents-sent",
+    "civil-service-documents-sent",
+    "contract-renewal-documents-sent",
+  ];
+
+  it("liegen als Standardvorlage vor und sind im Katalog eingetragen", () => {
+    for (const ereignis of vorlagen) {
+      const v = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === ereignis);
+      expect(v).toBeDefined();
+      const k = EVENT_CATALOG.find((e) => e.event === ereignis);
+      expect(k).toBeDefined();
+      // Der Katalog-Test erzwingt gleiche Namen — hier zusaetzlich der
+      // Empfaenger, damit keine Vorlage ohne An-Feld ausgeliefert wird.
+      expect(k!.defaultRecipients.to).toBe("{{email}}");
+    }
+  });
+
+  it("setzen Nachricht und Datum in bedingte Bloecke", () => {
+    const erwartet: Record<string, string> = {
+      "offboarding-documents-sent": "austrittsdatum",
+      "civil-service-documents-sent": "probezeit_beginn",
+      "contract-renewal-documents-sent": "vertragsende_neu",
+    };
+    for (const [ereignis, feld] of Object.entries(erwartet)) {
+      const v = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === ereignis)!;
+      for (const teil of [v.bodyHtml, v.bodyText ?? ""]) {
+        expect(teil).toContain("{{#nachricht}}");
+        expect(teil).toContain(`{{#${feld}}}`);
+        expect(teil).toContain(`{{${feld}}}`);
+      }
+      // HTML nimmt die maskierte Fassung, sonst landet Markup im Postfach.
+      expect(v.bodyHtml).toContain("{{nachricht_html}}");
+    }
+  });
+
+  it("bleibt beim Austritt im Ton neutral", () => {
+    // Entscheidung vom 4. September: kein Dank, kein Glueckwunsch — der Satz
+    // traegt nur bei einvernehmlicher Trennung und wirkt sonst zynisch.
+    const v = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === "offboarding-documents-sent")!;
+    for (const teil of [v.bodyHtml, v.bodyText ?? ""]) {
+      expect(teil).not.toMatch(/danken|alles Gute|Glück/i);
+    }
   });
 });

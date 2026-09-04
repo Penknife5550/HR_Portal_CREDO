@@ -3095,6 +3095,332 @@ CREDO Gruppe – {{einrichtung}}`,
       { key: "{{sachbearbeiter_name}}", description: "Wer versendet hat (Gruszformel)" },
     ],
   },
+
+  // =============================================
+  // Dokumentenpaket in den uebrigen drei Modulen (Phase 2)
+  //
+  // Aufbau bewusst gleich: dieselben Variablen, derselbe bedingte
+  // Nachrichtenblock, je Modul ein eigenes Datum in einem eigenen bedingten
+  // Block — fehlt das Datum im Vorgang, entfaellt der Satz, statt halb
+  // dazustehen.
+  // =============================================
+  {
+    event: "offboarding-documents-sent",
+    name: "Unterlagen zum Austritt (Offboarding)",
+    subject: "Ihre Unterlagen zum Austritt aus {{einrichtung}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#e5e7eb;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#374151;font-weight:bold;font-size:14px;">Unterlagen zum Austritt</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Guten Tag {{vorname}} {{nachname}},</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            im Anhang dieser E-Mail finden Sie die Unterlagen zu Ihrem Austritt aus {{einrichtung}}.{{#austrittsdatum}} Ihr Arbeitsverhältnis endet zum {{austrittsdatum}}.{{/austrittsdatum}}
+          </p>
+
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Im Anhang ({{anzahlDokumente}})</p>
+              <div style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{dokumentenliste_html}}</div>
+            </td></tr>
+          </table>
+{{#nachricht}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;border-left:3px solid #FBC900;background-color:#fffbea;border-radius:4px;margin:0 0 24px;">
+            <tr><td style="padding:14px 16px;">
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{nachricht_html}}</p>
+            </td></tr>
+          </table>
+{{/nachricht}}
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Bitte bewahren Sie diese Unterlagen sorgfältig auf — die Bescheinigungen zur Sozialversicherung und für die Agentur für Arbeit brauchen Sie unter Umständen kurzfristig. Bei Rückfragen zu den Unterlagen wenden Sie sich gerne an uns.
+          </p>
+
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Mit freundlichen Grüßen<br>
+            {{sachbearbeiter_name}}
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Vorgang: {{vorgangsnummer}}<br>
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
+            &copy; CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Guten Tag {{vorname}} {{nachname}},
+
+im Anhang dieser E-Mail finden Sie die Unterlagen zu Ihrem Austritt aus {{einrichtung}}.{{#austrittsdatum}} Ihr Arbeitsverhältnis endet zum {{austrittsdatum}}.{{/austrittsdatum}}
+
+Im Anhang ({{anzahlDokumente}}):
+{{dokumentenliste}}
+{{#nachricht}}
+{{nachricht}}
+{{/nachricht}}
+Bitte bewahren Sie diese Unterlagen sorgfältig auf — die Bescheinigungen zur Sozialversicherung und für die Agentur für Arbeit brauchen Sie unter Umständen kurzfristig.
+
+Bei Rückfragen zu den Unterlagen wenden Sie sich gerne an uns.
+
+Mit freundlichen Grüßen
+{{sachbearbeiter_name}}
+
+Vorgang: {{vorgangsnummer}}
+
+CREDO Gruppe – {{einrichtung}}`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname der Person" },
+      { key: "{{nachname}}", description: "Nachname der Person" },
+      { key: "{{email}}", description: "E-Mail der Person" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
+      { key: "{{anzahlDokumente}}", description: "Anzahl der angehaengten Dokumente" },
+      { key: "{{dokumentenliste}}", description: "Nummerierte Liste der Anhaenge (Textteil)" },
+      { key: "{{dokumentenliste_html}}", description: "Liste der Anhaenge als <ol> (HTML-Teil)" },
+      { key: "{{nachricht}}", description: "Persoenliche Nachricht aus dem Versand-Dialog (Textteil)" },
+      { key: "{{nachricht_html}}", description: "Dieselbe Nachricht HTML-sicher, Umbrueche als <br>" },
+      { key: "{{#nachricht}}...{{/nachricht}}", description: "Block, der nur bei eingegebener Nachricht erscheint" },
+      { key: "{{austrittsdatum}}", description: "Datum aus dem Vorgang; leer, wenn keines hinterlegt ist" },
+      { key: "{{#austrittsdatum}}...{{/austrittsdatum}}", description: "Block, der nur bei vorhandenem Datum erscheint" },
+      { key: "{{sachbearbeiter_name}}", description: "Wer versendet hat (Gruszformel)" },
+    ],
+  },
+
+  {
+    event: "civil-service-documents-sent",
+    name: "Unterlagen zur Verbeamtung",
+    subject: "Unterlagen zu Ihrer Verbeamtung – {{einrichtung}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#dbeafe;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#1e40af;font-weight:bold;font-size:14px;">Verbeamtungsverfahren</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Guten Tag {{vorname}} {{nachname}},</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            im Anhang dieser E-Mail finden Sie die Unterlagen zu Ihrem Verbeamtungsverfahren bei {{einrichtung}}.{{#probezeit_beginn}} Ihre Probezeit beginnt am {{probezeit_beginn}}.{{/probezeit_beginn}}
+          </p>
+
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Im Anhang ({{anzahlDokumente}})</p>
+              <div style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{dokumentenliste_html}}</div>
+            </td></tr>
+          </table>
+{{#nachricht}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;border-left:3px solid #FBC900;background-color:#fffbea;border-radius:4px;margin:0 0 24px;">
+            <tr><td style="padding:14px 16px;">
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{nachricht_html}}</p>
+            </td></tr>
+          </table>
+{{/nachricht}}
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Bitte prüfen Sie die Unterlagen. Sofern Vordrucke auszufüllen oder zu unterschreiben sind, senden Sie diese bitte fristgerecht zurück. Bei Rückfragen wenden Sie sich gerne an uns.
+          </p>
+
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Mit freundlichen Grüßen<br>
+            {{sachbearbeiter_name}}
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Vorgang: {{vorgangsnummer}}<br>
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
+            &copy; CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Guten Tag {{vorname}} {{nachname}},
+
+im Anhang dieser E-Mail finden Sie die Unterlagen zu Ihrem Verbeamtungsverfahren bei {{einrichtung}}.{{#probezeit_beginn}} Ihre Probezeit beginnt am {{probezeit_beginn}}.{{/probezeit_beginn}}
+
+Im Anhang ({{anzahlDokumente}}):
+{{dokumentenliste}}
+{{#nachricht}}
+{{nachricht}}
+{{/nachricht}}
+Bitte prüfen Sie die Unterlagen. Sofern Vordrucke auszufüllen oder zu unterschreiben sind, senden Sie diese bitte fristgerecht zurück.
+
+Bei Rückfragen wenden Sie sich gerne an uns.
+
+Mit freundlichen Grüßen
+{{sachbearbeiter_name}}
+
+Vorgang: {{vorgangsnummer}}
+
+CREDO Gruppe – {{einrichtung}}`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname der Person" },
+      { key: "{{nachname}}", description: "Nachname der Person" },
+      { key: "{{email}}", description: "E-Mail der Person" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
+      { key: "{{anzahlDokumente}}", description: "Anzahl der angehaengten Dokumente" },
+      { key: "{{dokumentenliste}}", description: "Nummerierte Liste der Anhaenge (Textteil)" },
+      { key: "{{dokumentenliste_html}}", description: "Liste der Anhaenge als <ol> (HTML-Teil)" },
+      { key: "{{nachricht}}", description: "Persoenliche Nachricht aus dem Versand-Dialog (Textteil)" },
+      { key: "{{nachricht_html}}", description: "Dieselbe Nachricht HTML-sicher, Umbrueche als <br>" },
+      { key: "{{#nachricht}}...{{/nachricht}}", description: "Block, der nur bei eingegebener Nachricht erscheint" },
+      { key: "{{probezeit_beginn}}", description: "Datum aus dem Vorgang; leer, wenn keines hinterlegt ist" },
+      { key: "{{#probezeit_beginn}}...{{/probezeit_beginn}}", description: "Block, der nur bei vorhandenem Datum erscheint" },
+      { key: "{{sachbearbeiter_name}}", description: "Wer versendet hat (Gruszformel)" },
+    ],
+  },
+
+  {
+    event: "contract-renewal-documents-sent",
+    name: "Unterlagen zur Vertragsverlaengerung",
+    subject: "Ihre Vertragsverlängerung bei {{einrichtung}} – Unterlagen",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#065f46;font-weight:bold;font-size:14px;">Vertragsverlängerung</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Guten Tag {{vorname}} {{nachname}},</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            wir freuen uns, dass Sie {{einrichtung}} erhalten bleiben. Im Anhang finden Sie die Unterlagen zu Ihrer Vertragsverlängerung.{{#vertragsende_neu}} Ihr Vertrag läuft nun bis zum {{vertragsende_neu}}.{{/vertragsende_neu}}
+          </p>
+
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Im Anhang ({{anzahlDokumente}})</p>
+              <div style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{dokumentenliste_html}}</div>
+            </td></tr>
+          </table>
+{{#nachricht}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;border-left:3px solid #FBC900;background-color:#fffbea;border-radius:4px;margin:0 0 24px;">
+            <tr><td style="padding:14px 16px;">
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{nachricht_html}}</p>
+            </td></tr>
+          </table>
+{{/nachricht}}
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Bitte prüfen Sie die Unterlagen. Falls eine Ausfertigung unterschrieben zurückzusenden ist, finden Sie den Hinweis im jeweiligen Dokument. Bei Rückfragen wenden Sie sich gerne an uns.
+          </p>
+
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Mit freundlichen Grüßen<br>
+            {{sachbearbeiter_name}}
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Vorgang: {{vorgangsnummer}}<br>
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
+            &copy; CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Guten Tag {{vorname}} {{nachname}},
+
+wir freuen uns, dass Sie {{einrichtung}} erhalten bleiben. Im Anhang finden Sie die Unterlagen zu Ihrer Vertragsverlängerung.{{#vertragsende_neu}} Ihr Vertrag läuft nun bis zum {{vertragsende_neu}}.{{/vertragsende_neu}}
+
+Im Anhang ({{anzahlDokumente}}):
+{{dokumentenliste}}
+{{#nachricht}}
+{{nachricht}}
+{{/nachricht}}
+Bitte prüfen Sie die Unterlagen. Falls eine Ausfertigung unterschrieben zurückzusenden ist, finden Sie den Hinweis im jeweiligen Dokument.
+
+Bei Rückfragen wenden Sie sich gerne an uns.
+
+Mit freundlichen Grüßen
+{{sachbearbeiter_name}}
+
+Vorgang: {{vorgangsnummer}}
+
+CREDO Gruppe – {{einrichtung}}`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname der Person" },
+      { key: "{{nachname}}", description: "Nachname der Person" },
+      { key: "{{email}}", description: "E-Mail der Person" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
+      { key: "{{anzahlDokumente}}", description: "Anzahl der angehaengten Dokumente" },
+      { key: "{{dokumentenliste}}", description: "Nummerierte Liste der Anhaenge (Textteil)" },
+      { key: "{{dokumentenliste_html}}", description: "Liste der Anhaenge als <ol> (HTML-Teil)" },
+      { key: "{{nachricht}}", description: "Persoenliche Nachricht aus dem Versand-Dialog (Textteil)" },
+      { key: "{{nachricht_html}}", description: "Dieselbe Nachricht HTML-sicher, Umbrueche als <br>" },
+      { key: "{{#nachricht}}...{{/nachricht}}", description: "Block, der nur bei eingegebener Nachricht erscheint" },
+      { key: "{{vertragsende_neu}}", description: "Datum aus dem Vorgang; leer, wenn keines hinterlegt ist" },
+      { key: "{{#vertragsende_neu}}...{{/vertragsende_neu}}", description: "Block, der nur bei vorhandenem Datum erscheint" },
+      { key: "{{sachbearbeiter_name}}", description: "Wer versendet hat (Gruszformel)" },
+    ],
+  },
 ];
 
 // =============================================
