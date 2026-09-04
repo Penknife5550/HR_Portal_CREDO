@@ -401,6 +401,12 @@ export interface EventEmailResult {
    */
   messageId?: string;
   /**
+   * Betreff, der tatsaechlich versendet wurde — nach Einsetzen der Variablen
+   * und (bei Testversand) dem [TEST]-Praefix. Der Nachweis soll festhalten,
+   * was hinausging, nicht was der Aufrufer vermutet hat.
+   */
+  subject?: string;
+  /**
    * Adresse, an die tatsaechlich zugestellt wurde — nach Aufloesung der
    * Vorlagen-Empfaengerfelder und dem Aussortieren ungueltiger Adressen. Nicht
    * zwingend das, was der Aufrufer erwartet hat; genau deshalb im Nachweis
@@ -496,7 +502,12 @@ export async function sendEventEmail(
         messageId: result.messageId,
         isTest,
       });
-      return { status: "SENT", messageId: result.messageId, recipient: rendered.to };
+      return {
+        status: "SENT",
+        messageId: result.messageId,
+        recipient: rendered.to,
+        subject: rendered.subject,
+      };
     }
 
     await writeEmailLog({
