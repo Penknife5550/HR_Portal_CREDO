@@ -96,6 +96,27 @@ beim Start genau diese Zeilen. Steuerbar ueber `DB_BACKUP_DIR` (Standard
 `/backups`) und `DB_BACKUP_KEEP` (Standard 10 — aeltere eigene Dumps werden
 aufgeraeumt, fremde Dateien im Verzeichnis bleiben unangetastet).
 
+Die Einhaengung allein genuegt aber nicht. Der Container laeuft als **uid 1001**
+(`nextjs`) mit der Primaergruppe **65533 (`nogroup`)** — das Dockerfile legt zwar
+`nodejs` mit gid 1001 an, weist sie dem Benutzer aber nie zu. Bei einem
+**Bind-Mount** uebernimmt Docker die Rechte des Host-Verzeichnisses unveraendert
+(anders als beim benannten Volume `uploads_data`). Gehoert `./backups` auf dem Host
+jemand anderem, scheitert schon das Anlegen der Dump-Datei, und der Start bricht mit
+`FATAL: Sicherung ... fehlgeschlagen` ab. Einmal je Server:
+
+```bash
+sudo chown 1001 backups
+```
+
+Zwei Irrwege: `sudo` beim Docker-Aufruf aendert daran nichts — es regelt den Zugriff
+auf den Daemon, nicht die Kennung des Prozesses im Container. Und `chgrp 1001`
+greift nicht, weil 1001 die Gruppe `nodejs` ist, die dem Benutzer nicht gehoert.
+Vorab pruefbar, ohne etwas zu veraendern:
+
+```bash
+sudo docker run --rm --user nextjs --entrypoint sh -v "$PWD/backups:/backups" <image> -c 'id; touch /backups/.schreibtest && rm /backups/.schreibtest && echo OK'
+```
+
 ### Einmalige Datenmigrationen
 
 Migrationen, die genau einmal laufen duerfen, stehen in `prisma/seed-check.js` und

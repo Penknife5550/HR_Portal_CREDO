@@ -24,6 +24,27 @@ Die Zeile steht in der gemergten Compose-Datei. Wird auf dem Server eine eigene 
 gepflegt, muss sie dort nachgetragen werden. Die Fehlermeldung beim Start nennt sie
 wörtlich.
 
+**Und die Einhängung allein genügt nicht.** Der Container läuft als **uid 1001**
+(`nextjs`) mit Primärgruppe **65533 (`nogroup`)**. Bei einem Bind-Mount übernimmt
+Docker die Rechte des Host-Verzeichnisses unverändert — gehört `./backups` dort
+jemand anderem, scheitert der `pg_dump` an der Dateianlage und der Start bricht ab.
+Beim Deploy am 4. September war genau das der Fall (`fes-linux-adm:root`, Modus
+`775`, also nur `r-x` für uid 1001). Abhilfe einmal je Server:
+
+```bash
+sudo chown 1001 backups
+```
+
+Zwei Irrwege, die dabei Zeit gekostet haben: `sudo docker …` ändert nichts daran —
+es regelt den Zugriff auf den Daemon, nicht die Kennung im Container. Und `chgrp
+1001` greift nicht, weil 1001 die Gruppe `nodejs` aus dem Dockerfile ist, die dem
+Benutzer `nextjs` nie zugewiesen wurde (`id` im Container: `gid=65533(nogroup)`).
+Vorab prüfbar, ohne etwas zu verändern:
+
+```bash
+sudo docker run --rm --user nextjs --entrypoint sh -v "$PWD/backups:/backups" $(sudo docker inspect -f '{{.Config.Image}}' hr-portal-app) -c 'id; touch /backups/.schreibtest && rm /backups/.schreibtest && echo SCHREIBEN-OK'
+```
+
 Ebenfalls neu in der Pflichttabelle: **`BEM_ENCRYPTION_KEY`**. Der Entrypoint bricht
 ohne den Wert ab; in `CLAUDE.md` fehlte er bisher.
 
