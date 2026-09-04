@@ -6,6 +6,14 @@
  *   aufgeloest + gemeldet, wenn die Vorlage sie nutzt (placeholders-Gating).
  */
 
+// canAccessProcess wird ueberschrieben, alles andere aus permissions bleibt echt.
+// Standard ist "erlaubt" — die Bestandstests laufen dadurch unveraendert weiter.
+const mockCanAccessProcess = jest.fn().mockResolvedValue(true);
+jest.mock("@/lib/permissions", () => ({
+  ...jest.requireActual("@/lib/permissions"),
+  canAccessProcess: (...args: unknown[]) => mockCanAccessProcess(...args),
+}));
+
 jest.mock("@/lib/db", () => ({
   prisma: {
     onboardingProcess: { findUnique: jest.fn() },
@@ -351,5 +359,109 @@ describe("Sachbearbeiter-Platzhalter", () => {
     const { data } = await getResolver("ALLGEMEIN")(ohneUser);
     expect(mockFindUser).not.toHaveBeenCalled();
     expect("sachbearbeiter_name" in data).toBe(false);
+  });
+});
+
+// =============================================
+// Mandantenpruefung in Onboarding und Vertragsverlaengerung
+//
+// Vorgezogen aus Baustein 16 des Dokumentenpaket-Plans: Beide Resolver hatten
+// keine Pruefung, weil der Erzeugen-Endpunkt nur die Organisation der VORLAGE
+// prueft. Solange alle vergebbaren Rollen global sind, faellt das nicht auf —
+// mit der ersten mandantenbeschraenkten Rolle waere es ein Leck.
+//
+// Der Rueckfall ist bewusst still (nur allgemeine Platzhalter), nicht laut:
+// So verhaelt sich bereits der Offboarding-Resolver. Fuer den Paketversand
+// heisst das, dass die aufrufende Route zusaetzlich selbst pruefen muss — ein
+// leeres Schreiben darf nicht als Erfolg durchgehen.
+// =============================================
+describe("Mandantenpruefung der Resolver", () => {
+  const vorgang = {
+    displayId: "2026-GYM-001",
+    email: "max@example.org",
+    firstName: "Max",
+    lastName: "Mustermann",
+    organizationId: "fremde-org",
+    personalData: { firstName: "Max", lastName: "Mustermann", iban: "DE111" },
+    supervisorData: null,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCanAccessProcess.mockResolvedValue(true);
+    mockFindOrg.mockResolvedValue({
+      name: "Gymnasium",
+      shortName: "GYM",
+      mandantNumber: "712",
+      dsgvoVerantwortlicheName: null,
+      dsgvoVerantwortlicheStrasse: null,
+      dsgvoVerantwortlichePlz: null,
+      dsgvoVerantwortlicheOrt: null,
+    });
+    mockFindUser.mockResolvedValue({
+      firstName: "Erika",
+      lastName: "Sachbearbeiter",
+      email: "erika@credo-gruppe.de",
+      phone: null,
+    });
+  });
+
+  it("Onboarding: fremder Mandant liefert nur allgemeine Platzhalter", async () => {
+    mockFindOnboarding.mockResolvedValue(vorgang);
+    mockCanAccessProcess.mockResolvedValue(false);
+
+    const res = await getResolver("ONBOARDING")(ctx({ placeholders: ["vorname", "iban"] }));
+
+    expect(mockCanAccessProcess).toHaveBeenCalledWith(session, "fremde-org");
+    expect(res.data.vorname).toBeUndefined();
+    expect(res.data.iban).toBeUndefined();
+    expect(res.sensitiveFields).toEqual([]);
+    // Allgemeines bleibt — das Schreiben traegt Datum und Mandant, sonst nichts.
+    expect(res.data.datum).toBeDefined();
+  });
+
+  it("Onboarding: eigener Mandant fuellt weiterhin", async () => {
+    mockFindOnboarding.mockResolvedValue(vorgang);
+
+    const res = await getResolver("ONBOARDING")(ctx({ placeholders: ["vorname"] }));
+
+    expect(res.data.vorname).toBe("Max");
+  });
+
+  it("Vertragsverlaengerung: fremder Mandant liefert nur allgemeine Platzhalter", async () => {
+    mockFindContractEnd.mockResolvedValue({
+      displayId: "2026-GYM-900",
+      employeeFirstName: "Lena",
+      employeeLastName: "Bergmann",
+      organizationId: "fremde-org",
+      contractEndDate: new Date("2026-12-31T00:00:00.000Z"),
+      renewalData: null,
+    });
+    mockCanAccessProcess.mockResolvedValue(false);
+
+    const res = await getResolver("VERTRAGSVERLAENGERUNG")(
+      ctx({ refId: "ce1", placeholders: ["vorname"] }),
+    );
+
+    expect(mockCanAccessProcess).toHaveBeenCalledWith(session, "fremde-org");
+    expect(res.data.vorname).toBeUndefined();
+    expect(res.data.datum).toBeDefined();
+  });
+
+  it("Vertragsverlaengerung: eigener Mandant fuellt weiterhin", async () => {
+    mockFindContractEnd.mockResolvedValue({
+      displayId: "2026-GYM-900",
+      employeeFirstName: "Lena",
+      employeeLastName: "Bergmann",
+      organizationId: "org1",
+      contractEndDate: new Date("2026-12-31T00:00:00.000Z"),
+      renewalData: null,
+    });
+
+    const res = await getResolver("VERTRAGSVERLAENGERUNG")(
+      ctx({ refId: "ce1", placeholders: ["vorname"] }),
+    );
+
+    expect(res.data.vorname).toBe("Lena");
   });
 });

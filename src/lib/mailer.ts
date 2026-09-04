@@ -390,6 +390,23 @@ async function writeEmailLog(entry: {
 export interface EventEmailResult {
   status: EmailLogStatus;
   detail?: string;
+  /**
+   * Message-ID des SMTP-Servers — nur bei status "SENT" gesetzt, und auch dann
+   * nur, wenn der Server eine geliefert hat.
+   *
+   * Der Wert stand hier schon immer zur Verfuegung (er wandert ins EmailLog),
+   * wurde aber nicht zurueckgegeben. Der Dokumentenpaket-Versand braucht ihn
+   * fuer seinen dauerhaften Nachweis: Das EmailLog wird nach 90 Tagen
+   * aufgeraeumt, der Nachweis bleibt.
+   */
+  messageId?: string;
+  /**
+   * Adresse, an die tatsaechlich zugestellt wurde — nach Aufloesung der
+   * Vorlagen-Empfaengerfelder und dem Aussortieren ungueltiger Adressen. Nicht
+   * zwingend das, was der Aufrufer erwartet hat; genau deshalb im Nachweis
+   * festgehalten.
+   */
+  recipient?: string;
 }
 
 export async function sendEventEmail(
@@ -479,7 +496,7 @@ export async function sendEventEmail(
         messageId: result.messageId,
         isTest,
       });
-      return { status: "SENT" };
+      return { status: "SENT", messageId: result.messageId, recipient: rendered.to };
     }
 
     await writeEmailLog({
