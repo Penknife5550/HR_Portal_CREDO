@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
+import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
 import { CONTRACT_END_STATUS_LABELS } from "@/lib/constants";
 import { getContractEndCategory, CONTRACT_END_CATEGORY_META } from "@/lib/contract-end-fristen";
 import { getSignatureWarning, getKettenbefristungWarning } from "@/lib/contract-end-warnings";
@@ -528,6 +529,13 @@ export function ContractEndDetailContent({
                 organizationId={data.organization.id}
                 canEdit={canEdit}
                 emptyHint="Keine Vertragsvorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ (Modul Vertragsverlängerung) an."
+              />
+              <DokumentenpaketSection
+                modul="VERTRAGSVERLAENGERUNG"
+                refId={data.id}
+                canEdit={canEdit}
+                titel="Unterlagen zur Vertragsverlängerung versenden"
+                beschreibung="Feste PDFs und befüllte Vorlagen gehen als Anhänge an die beschäftigte Person. Das Standardpaket wird unter Mandanten → Einrichtung → Dokumentenpakete gepflegt."
               />
             </div>
           )}

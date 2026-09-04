@@ -1,5 +1,9 @@
 /**
- * Zod-Schemas fuer das Starterpaket (Pool-Dokumente + Mandanten-Markierung).
+ * Zod-Schemas fuer den Pool der Starterpaket-Dokumente (Upload und Pflege).
+ *
+ * Die Markierung je Mandant liegt seit Baustein 3/4 in
+ * validations/dokumentenpaket.ts — sie kennt gemischte Listen aus PDFs und
+ * Brief-Vorlagen je Modul.
  */
 import { z } from "zod";
 
@@ -23,12 +27,3 @@ export const updateStarterpaketDokumentSchema = z.object({
 export type UpdateStarterpaketDokument = z.infer<
   typeof updateStarterpaketDokumentSchema
 >;
-
-/**
- * Markierung eines Mandanten setzen: die uebergebene (geordnete) Liste ersetzt
- * die komplette Auswahl. orderIndex = Position in der Liste.
- */
-export const setStarterpaketAuswahlSchema = z.object({
-  dokumentIds: z.array(z.string().uuid()).max(100),
-});
-export type SetStarterpaketAuswahl = z.infer<typeof setStarterpaketAuswahlSchema>;

@@ -1,22 +1,50 @@
 /**
- * Starterpaket-Markierung pro Mandant.
+ * Standardpaket pro Mandant und Modul.
  *
- * GET /api/organizations/[id]/starterpaket
- *   Verfuegbare Pool-Dokumente fuer diesen Mandanten (global + eigene) inkl.
- *   Markierungs-Status + Reihenfolge.
+ * GET /api/organizations/[id]/starterpaket?modul=ONBOARDING
+ *   Verfuegbare Pool-PDFs und Brief-Vorlagen fuer diesen Mandanten (global +
+ *   eigene) inkl. Markierung und Reihenfolge. `paket` ist die geordnete,
+ *   gemischte Liste — die Oberflaeche muss sie nicht selbst zusammensetzen.
  * PUT /api/organizations/[id]/starterpaket
- *   Setzt die komplette (geordnete) Auswahl des Mandanten neu (atomar).
+ *   Setzt die komplette (geordnete) Auswahl fuer ein Modul neu (atomar).
  *
- * Berechtigung: SUPER_ADMIN / HR_LEITUNG.
+ * Berechtigung: SUPER_ADMIN / HR_LEITUNG (Entscheidung vom 03.09.2026 —
+ * unveraendert gegenueber dem reinen PDF-Paket).
  */
 import { NextResponse } from "next/server";
 import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { ADMIN_ROLES } from "@/lib/permissions";
+import { sensiblePlatzhalter, type SensiblesFeld } from "@/lib/placeholder-catalog";
 import {
-  setStarterpaketAuswahlSchema,
-  type SetStarterpaketAuswahl,
-} from "@/lib/validations/starterpaket";
+  setPaketAuswahlSchema,
+  PAKET_MODULE,
+  type SetPaketAuswahl,
+  type PaketPositionArt,
+} from "@/lib/validations/dokumentenpaket";
+
+const STANDARD_MODUL = "ONBOARDING";
+
+interface Position {
+  art: PaketPositionArt;
+  id: string;
+}
+
+/** Ein Eintrag der geordneten Gesamtliste, die die Oberflaeche anzeigt. */
+interface PaketEintrag {
+  art: PaketPositionArt;
+  id: string;
+  name: string;
+  orderIndex: number;
+  /** Nur bei Vorlagen gesetzt; PDFs koennen keine Platzhalter befuellen. */
+  sensibleFelder?: SensiblesFeld[];
+}
+
+/** Modul aus der Abfrage, auf die unterstuetzten Werte begrenzt. */
+function modulAusAbfrage(url: string): string {
+  const roh = new URL(url).searchParams.get("modul")?.trim().toUpperCase();
+  return roh && (PAKET_MODULE as readonly string[]).includes(roh) ? roh : STANDARD_MODUL;
+}
 
 function clientIp(headers: Headers): string | null {
   return (
@@ -28,11 +56,12 @@ function clientIp(headers: Headers): string | null {
 
 export const GET = apiHandler(
   { roles: ADMIN_ROLES, logLabel: "Starterpaket-Auswahl GET" },
-  async ({ params, session }) => {
+  async ({ request, params, session }) => {
     if (!session) {
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
     const { id } = params;
+    const modul = modulAusAbfrage(request.url);
 
     const org = await prisma.organization.findUnique({
       where: { id },
@@ -54,11 +83,50 @@ export const GET = apiHandler(
         isActive: true,
       },
     });
-    const auswahl = await prisma.starterpaketAuswahl.findMany({
-      where: { organizationId: id },
-      select: { dokumentId: true, orderIndex: true },
+
+    // Vorlagen: das Modul des Pakets plus ALLGEMEIN (die passen ueberall),
+    // gruppenweit plus mandantenspezifisch, und nur aktive. BEM taucht hier
+    // nicht auf — das Modul steht nicht in PAKET_MODULE.
+    const templates = await prisma.documentTemplate.findMany({
+      where: {
+        isActive: true,
+        modul: { in: [modul, "ALLGEMEIN"] },
+        OR: [{ organizationId: null }, { organizationId: id }],
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        modul: true,
+        organizationId: true,
+        fileSize: true,
+        platzhalter: true,
+        isSystem: true,
+      },
     });
-    const markMap = new Map(auswahl.map((a) => [a.dokumentId, a.orderIndex]));
+
+    const auswahl = await prisma.starterpaketAuswahl.findMany({
+      where: { organizationId: id, modul },
+      orderBy: { orderIndex: "asc" },
+      select: { dokumentId: true, templateId: true, orderIndex: true },
+    });
+    const pdfMarken = new Map(
+      auswahl.flatMap((a) => (a.dokumentId ? [[a.dokumentId, a.orderIndex] as const] : [])),
+    );
+    const vorlagenMarken = new Map(
+      auswahl.flatMap((a) => (a.templateId ? [[a.templateId, a.orderIndex] as const] : [])),
+    );
+
+    // Markierte zuerst (in Paketreihenfolge), dann unmarkierte alphabetisch.
+    const sortiere = <T extends { marked: boolean; orderIndex: number | null; name: string }>(
+      a: T,
+      b: T,
+    ): number => {
+      if (a.marked && b.marked) return (a.orderIndex ?? 0) - (b.orderIndex ?? 0);
+      if (a.marked) return -1;
+      if (b.marked) return 1;
+      return a.name.localeCompare(b.name, "de");
+    };
 
     const documents = docs
       .map((d) => ({
@@ -68,25 +136,65 @@ export const GET = apiHandler(
         scope: d.organizationId ? ("MANDANT" as const) : ("GLOBAL" as const),
         fileSize: d.fileSize,
         isActive: d.isActive,
-        marked: markMap.has(d.id),
-        orderIndex: markMap.get(d.id) ?? null,
+        marked: pdfMarken.has(d.id),
+        orderIndex: pdfMarken.get(d.id) ?? null,
       }))
-      // markierte zuerst (in Reihenfolge), dann unmarkierte alphabetisch
-      .sort((a, b) => {
-        if (a.marked && b.marked) return (a.orderIndex ?? 0) - (b.orderIndex ?? 0);
-        if (a.marked) return -1;
-        if (b.marked) return 1;
-        return a.name.localeCompare(b.name, "de");
-      });
+      .sort(sortiere);
 
-    return NextResponse.json({ data: { organization: org, documents } });
+    const vorlagen = templates
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        beschreibung: t.description,
+        modul: t.modul,
+        scope: t.organizationId ? ("MANDANT" as const) : ("GLOBAL" as const),
+        fileSize: t.fileSize,
+        isSystem: t.isSystem,
+        // Rotes Kennzeichen in der Oberflaeche: welche sensiblen Felder wuerde
+        // diese Vorlage befuellen? Ohne Datenbankzugriff und ohne
+        // Entschluesselung — hier zaehlt nur, was in der Vorlage steht.
+        sensibleFelder: sensiblePlatzhalter(t.platzhalter),
+        marked: vorlagenMarken.has(t.id),
+        orderIndex: vorlagenMarken.get(t.id) ?? null,
+      }))
+      .sort(sortiere);
+
+    // Die geordnete Gesamtliste — eine Quelle fuer die Reihenfolge, damit
+    // Oberflaeche und Versand nicht getrennt sortieren muessen.
+    const paket: PaketEintrag[] = auswahl
+      .flatMap<PaketEintrag>((a) => {
+        if (a.dokumentId) {
+          const d = documents.find((x) => x.id === a.dokumentId);
+          return d ? [{ art: "PDF" as const, id: d.id, name: d.name, orderIndex: a.orderIndex }] : [];
+        }
+        if (a.templateId) {
+          const v = vorlagen.find((x) => x.id === a.templateId);
+          return v
+            ? [
+                {
+                  art: "VORLAGE" as const,
+                  id: v.id,
+                  name: v.name,
+                  orderIndex: a.orderIndex,
+                  sensibleFelder: v.sensibleFelder,
+                },
+              ]
+            : [];
+        }
+        return [];
+      })
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+
+    return NextResponse.json({
+      data: { organization: org, modul, documents, vorlagen, paket },
+    });
   },
 );
 
-export const PUT = apiHandler<SetStarterpaketAuswahl>(
+export const PUT = apiHandler<SetPaketAuswahl>(
   {
     roles: ADMIN_ROLES,
-    bodySchema: setStarterpaketAuswahlSchema,
+    bodySchema: setPaketAuswahlSchema,
     logLabel: "Starterpaket-Auswahl PUT",
   },
   async ({ request, params, body, session }) => {
@@ -94,6 +202,7 @@ export const PUT = apiHandler<SetStarterpaketAuswahl>(
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
     const { id } = params;
+    const { modul, positionen } = body;
 
     const org = await prisma.organization.findUnique({
       where: { id },
@@ -103,20 +212,31 @@ export const PUT = apiHandler<SetStarterpaketAuswahl>(
       return NextResponse.json({ error: "Mandant nicht gefunden" }, { status: 404 });
     }
 
-    // Duplikate entfernen, Reihenfolge erhalten
-    const ids = [...new Set(body.dokumentIds)];
+    // Doppelte Positionen lehnt bereits das Zod-Schema ab. Der Filter bleibt
+    // als zweite Schranke stehen: Die Reihenfolge unten wird zum orderIndex,
+    // und ein Duplikat wuerde die Unique-Constraint der Tabelle verletzen.
+    const gesehen = new Set<string>();
+    const eindeutig = positionen.filter((p) => {
+      const schluessel = p.art + ":" + p.id;
+      if (gesehen.has(schluessel)) return false;
+      gesehen.add(schluessel);
+      return true;
+    });
 
-    // Alle markierten Dokumente muessen fuer diesen Mandanten verfuegbar sein
-    // (global oder mandantenspezifisch) — sonst koennte ein fremdes Mandanten-PDF
-    // markiert werden.
-    if (ids.length > 0) {
+    const pdfIds = eindeutig.filter((p) => p.art === "PDF").map((p) => p.id);
+    const vorlagenIds = eindeutig.filter((p) => p.art === "VORLAGE").map((p) => p.id);
+
+    // Alle markierten PDFs muessen fuer diesen Mandanten verfuegbar sein
+    // (global oder mandantenspezifisch) — sonst koennte ein fremdes
+    // Mandanten-PDF markiert werden.
+    if (pdfIds.length > 0) {
       const verfuegbar = await prisma.starterpaketDokument.count({
         where: {
-          id: { in: ids },
+          id: { in: pdfIds },
           OR: [{ organizationId: null }, { organizationId: id }],
         },
       });
-      if (verfuegbar !== ids.length) {
+      if (verfuegbar !== pdfIds.length) {
         return NextResponse.json(
           { error: "Mindestens ein Dokument ist fuer diesen Mandanten nicht verfuegbar." },
           { status: 400 },
@@ -124,14 +244,42 @@ export const PUT = apiHandler<SetStarterpaketAuswahl>(
       }
     }
 
+    // Vorlagen zusaetzlich gegen Modul und Aktivitaet pruefen. Eine Vorlage aus
+    // einem anderen Modul wuerde der Resolver des Vorgangs nicht befuellen und
+    // ein halb leeres Schreiben verschicken; eine deaktivierte gehoert gar
+    // nicht mehr ins Paket.
+    if (vorlagenIds.length > 0) {
+      const verfuegbar = await prisma.documentTemplate.count({
+        where: {
+          id: { in: vorlagenIds },
+          isActive: true,
+          modul: { in: [modul, "ALLGEMEIN"] },
+          OR: [{ organizationId: null }, { organizationId: id }],
+        },
+      });
+      if (verfuegbar !== vorlagenIds.length) {
+        return NextResponse.json(
+          {
+            error:
+              "Mindestens eine Vorlage ist fuer diesen Mandanten oder dieses Modul nicht verfuegbar.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     await prisma.$transaction([
-      prisma.starterpaketAuswahl.deleteMany({ where: { organizationId: id } }),
-      ...(ids.length > 0
+      // Nur das eigene Modul leeren: Ohne die Einschraenkung loescht das
+      // Speichern des Onboarding-Pakets die Pakete der anderen Module mit ab.
+      prisma.starterpaketAuswahl.deleteMany({ where: { organizationId: id, modul } }),
+      ...(eindeutig.length > 0
         ? [
             prisma.starterpaketAuswahl.createMany({
-              data: ids.map((dokumentId, index) => ({
+              data: eindeutig.map((p, index) => ({
                 organizationId: id,
-                dokumentId,
+                modul,
+                dokumentId: p.art === "PDF" ? p.id : null,
+                templateId: p.art === "VORLAGE" ? p.id : null,
                 orderIndex: index,
               })),
             }),
@@ -144,11 +292,19 @@ export const PUT = apiHandler<SetStarterpaketAuswahl>(
         userId: session.userId,
         processType: "STARTERPAKET",
         action: "STARTERPAKET_SELECTION_UPDATED",
-        details: { organizationId: id, anzahl: ids.length },
+        details: {
+          organizationId: id,
+          modul,
+          anzahl: eindeutig.length,
+          anzahlPdf: pdfIds.length,
+          anzahlVorlagen: vorlagenIds.length,
+        },
         ipAddress: clientIp(request.headers),
       },
     });
 
-    return NextResponse.json({ data: { organizationId: id, dokumentIds: ids } });
+    return NextResponse.json({
+      data: { organizationId: id, modul, positionen: eindeutig },
+    });
   },
 );

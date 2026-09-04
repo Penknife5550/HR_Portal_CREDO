@@ -6,6 +6,7 @@ import type { OffboardingData } from "../types";
 import { formatDate, formatFileSize } from "../helpers";
 import { DocumentIcon, UploadCloudIcon, DownloadIcon } from "../icons";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
+import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
 
 export function TabDocuments({
   data,
@@ -53,6 +54,17 @@ export function TabDocuments({
         organizationId={data.organization.id}
         canEdit={canEdit}
         emptyHint="Keine Offboarding-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ (Modul Offboarding) an."
+      />
+
+      {/* Versand: erst erstellen, dann verschicken — dieselbe Reihenfolge wie
+          im Onboarding. Der Empfaengervorschlag ist hier die private Adresse,
+          falls hinterlegt: Wer ausscheidet, verliert das dienstliche Postfach. */}
+      <DokumentenpaketSection
+        modul="OFFBOARDING"
+        refId={offboardingId}
+        canEdit={canEdit}
+        titel="Unterlagen zum Austritt versenden"
+        beschreibung="Feste PDFs und befüllte Vorlagen gehen als Anhänge an die ausscheidende Person — vorgeschlagen wird die private Adresse, falls hinterlegt. Das Standardpaket wird unter Mandanten → Einrichtung → Dokumentenpakete gepflegt."
       />
 
       {/* Upload Area */}

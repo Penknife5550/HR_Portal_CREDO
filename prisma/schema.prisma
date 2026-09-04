@@ -119,6 +119,7 @@ model Organization {
   bemVorlagen           BemVorlage[]
   starterpaketDokumente StarterpaketDokument[]
   starterpaketAuswahl   StarterpaketAuswahl[]
+  dokumentenVersand     DokumentenVersand[]
   contractEndProcesses  ContractEndProcess[]
 
   @@map("organizations")
@@ -412,18 +413,18 @@ model PersonalData {
 
   // -- Rentenversicherung (Minijob-Checkliste, Abschnitt 5) --
   /// Welchen der vier Wege der Beschaeftigte gewaehlt hat.
-  rvEntscheidung RvEntscheidung?
+  rvEntscheidung       RvEntscheidung?
   /// Wann die Entscheidung abgegeben wurde.
-  rvEntscheidungAm DateTime?
+  rvEntscheidungAm     DateTime?
   /// Das Merkblatt ueber die Folgen einer Befreiung wurde zur Kenntnis
   /// genommen. Voraussetzung, bevor eine Befreiung beantragt werden kann —
   /// so verlangt es die Checkliste.
-  rvMerkblattGelesen   Boolean   @default(false)
+  rvMerkblattGelesen   Boolean         @default(false)
   rvMerkblattGelesenAm DateTime?
   /// Bestaetigung der Bindungswirkung: Die Entscheidung gilt einheitlich fuer
   /// alle gleichzeitig ausgeuebten Minijobs, und der Beschaeftigte
   /// verpflichtet sich, seine uebrigen Arbeitgeber zu informieren.
-  rvBindungBestaetigt Boolean @default(false)
+  rvBindungBestaetigt  Boolean         @default(false)
 
   // -- Arbeitgeberteil des Antrags (AP 12) --
   //
@@ -443,11 +444,11 @@ model PersonalData {
   rvAntragEingangAm DateTime? @db.Date
   /// Das von HR bestaetigte Wirkungsdatum. Der Vorschlag wird berechnet
   /// (src/lib/minijob-fristen.ts), bestaetigt wird er von Hand.
-  rvWirkungAb DateTime? @db.Date
+  rvWirkungAb       DateTime? @db.Date
   /// Eingang der DEUEV-Meldung bei der Minijob-Zentrale. Entsteht ausserhalb
   /// des Portals in der Lohnbuchhaltung und muss erfasst werden — daran haengen
   /// die Widerspruchsfrist und der Verspaetungsfall.
-  rvMeldungAm DateTime? @db.Date
+  rvMeldungAm       DateTime? @db.Date
   /// Wer die Arbeitgeberangaben zuletzt gesetzt hat, und wann.
   rvBearbeitetVonId String?
   rvBearbeitetAm    DateTime?
@@ -475,9 +476,9 @@ model PersonalData {
   mitLeistungsbezug        Boolean?
 
   /// 4b — im laufenden Kalenderjahr bereits beschaeftigt oder arbeitsuchend gemeldet?
-  vorbeschaeftigungenVorhanden     Boolean?
+  vorbeschaeftigungenVorhanden      Boolean?
   /// 4c — derzeit Beschaeftigung oder selbstaendige Taetigkeit im Ausland?
-  auslandsbeschaeftigungVorhanden  Boolean?
+  auslandsbeschaeftigungVorhanden   Boolean?
   /// 4a, Additionsfrage: Uebersteigt die Summe der Bruttoarbeitsentgelte aus
   /// allen geringfuegigen Beschaeftigungen regelmaessig die Geringfuegigkeits-
   /// grenze? Nur zu stellen, wenn keine Hauptbeschaeftigung vorliegt.
@@ -862,8 +863,9 @@ model User {
   initiatedElternzeit   ElternzeitProzess[]   @relation("ElternzeitInitiator")
 
   // Vorlagenbibliothek (E0)
-  createdDocumentTemplates  DocumentTemplate[]
-  createdGeneratedDocuments GeneratedDocument[]
+  createdDocumentTemplates   DocumentTemplate[]
+  createdGeneratedDocuments  GeneratedDocument[]
+  versendeteDokumentenpakete DokumentenVersand[]
 
   // BEM (E1)
   createdBemFaelle         BemFall[]          @relation("BemFallCreatedBy")
@@ -976,7 +978,8 @@ model DocumentTemplate {
   createdById String?
   createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
-  generatedDocuments GeneratedDocument[]
+  generatedDocuments  GeneratedDocument[]
+  starterpaketAuswahl StarterpaketAuswahl[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1025,19 +1028,93 @@ model StarterpaketDokument {
 // Markierung: welche Pool-Dokumente gehoeren ins Starterpaket eines Mandanten
 // (+ Reihenfolge je Mandant).
 model StarterpaketAuswahl {
-  id             String               @id @default(uuid())
+  id             String       @id @default(uuid())
   organizationId String
-  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  dokumentId     String
-  dokument       StarterpaketDokument @relation(fields: [dokumentId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Eine Position ist entweder ein Pool-PDF ODER eine Brief-Vorlage — genau
+  // eines von beiden ist gesetzt. Prisma kann das nicht erzwingen; das
+  // Zod-Schema (paketPositionSchema) und die Konfig-Route pruefen es.
+  //
+  // dokumentId wird optional, aber NICHT umbenannt: db push laeuft mit
+  // --accept-data-loss, und eine Umbenennung waere dort "alte Spalte loeschen,
+  // neue anlegen". So bleiben die Bestandszeilen unangetastet.
+  dokumentId String?
+  dokument   StarterpaketDokument? @relation(fields: [dokumentId], references: [id], onDelete: Cascade)
+
+  templateId String?
+  template   DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  // Anker fuer die Modul-Reiter (Phase 2). Bestandszeilen sind Onboarding —
+  // deshalb der Default, nicht null.
+  modul String @default("ONBOARDING")
 
   orderIndex Int @default(0)
 
   createdAt DateTime @default(now())
 
-  @@unique([organizationId, dokumentId])
-  @@index([organizationId])
+  // Je Mandant und Modul darf dieselbe Quelle nur einmal im Paket stehen.
+  // In PostgreSQL kollidieren mehrere NULL nicht — die PDF-Zeilen mit
+  // templateId = null stoeren sich also nicht gegenseitig, und umgekehrt.
+  @@unique([organizationId, modul, dokumentId])
+  @@unique([organizationId, modul, templateId])
+  @@index([organizationId, modul])
   @@map("starterpaket_auswahl")
+}
+
+// =============================================
+// Dokumentenpaket-Versand — dauerhafter Nachweis je verschicktem Paket.
+//
+// Bewusst eine eigene Tabelle statt AuditLog/EmailLog: beide werden aufgeraeumt
+// (EmailLog nach 90 Tagen), der Nachweis eines Versands an Beschaeftigte muss
+// aber bleiben. Wird NICHT aufgeraeumt.
+// =============================================
+model DokumentenVersand {
+  id String @id @default(uuid())
+
+  // Vorgangsbezug, modulneutral (ONBOARDING, OFFBOARDING, VERBEAMTUNG,
+  // VERTRAGSVERLAENGERUNG). BEM ist ausgeschlossen — die versiegelte Akte hat
+  // ihren eigenen Weg.
+  modul String
+  refId String
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  // Die tatsaechlich verwendete Adresse und die, die zum Zeitpunkt des Versands
+  // im Vorgang stand. Das Aendern ist erlaubt (Entscheidung vom 02.09.2026),
+  // die Abweichung aber nachweispflichtig.
+  empfaenger           String
+  empfaengerVorgang    String?
+  empfaengerAbweichend Boolean @default(false)
+
+  betreff   String
+  nachricht String?
+
+  anzahl Int
+
+  // positionen: je Anhang { name, art, hash, templateId?, generatedDocumentId?,
+  //   fehlendeFelder[] }
+  // bestaetigungen: je sensibler Vorlage { templateId, felder[], userId, at }
+  positionen     Json @default("[]")
+  bestaetigungen Json @default("[]")
+
+  fehlendeFelderGesamt Int @default(0)
+
+  // Message-ID des SMTP-Versands — verbindet den Nachweis mit dem EmailLog,
+  // solange der noch existiert.
+  messageId String?
+
+  sentById String?
+  sentBy   User?   @relation(fields: [sentById], references: [id], onDelete: SetNull)
+
+  generatedDocuments GeneratedDocument[]
+
+  createdAt DateTime @default(now())
+
+  @@index([modul, refId])
+  @@index([organizationId])
+  @@map("dokumenten_versand")
 }
 
 // Protokoll erzeugter Dokumente (Audit + Wiederfinden in DMS).
@@ -1058,6 +1135,13 @@ model GeneratedDocument {
   hash                String?
   missingPlaceholders String[] @default([]) // nicht befuellte Platzhalter (Warnung)
 
+  // Gesetzt, wenn dieses Dokument als Teil eines Pakets verschickt wurde. Traegt
+  // das Etikett "per E-Mail versendet am ..." in der Liste "bereits erstellt".
+  // Nach zwoelf Monaten raeumt der Aufbewahrungslauf die Datei weg — der
+  // Nachweis in DokumentenVersand behaelt Name und Hash.
+  versandId String?
+  versand   DokumentenVersand? @relation(fields: [versandId], references: [id], onDelete: SetNull)
+
   createdById String?
   createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -1067,6 +1151,7 @@ model GeneratedDocument {
   @@index([modul])
   @@index([refId])
   @@index([organizationId])
+  @@index([versandId])
   @@map("generated_documents")
 }
 

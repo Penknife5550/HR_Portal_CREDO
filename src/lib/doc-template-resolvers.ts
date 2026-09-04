@@ -240,6 +240,18 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
     };
   }
 
+  // Mandantenpruefung — siehe offboardingResolver. Bis zum Dokumentenpaket-
+  // Versand fehlte sie hier: Der Erzeugen-Endpunkt prueft die Organisation der
+  // VORLAGE, aber nicht, ob der Vorgang hinter der refId zum eigenen Mandanten
+  // gehoert. Solange alle vergebbaren Rollen global sind, faellt das nicht auf;
+  // mit der ersten mandantenbeschraenkten Rolle waere es ein Leck.
+  if (!(await canAccessProcess(ctx.session, ob.organizationId))) {
+    return {
+      data: await commonPlaceholders(ctx.organizationId, ctx.session?.userId),
+      sensitiveFields,
+    };
+  }
+
   const data = await commonPlaceholders(ob.organizationId, ctx.session?.userId);
   const pd = ob.personalData;
   const sd = ob.supervisorData;
@@ -360,6 +372,18 @@ const vertragsverlaengerungResolver: PlaceholderResolver = async (ctx) => {
     },
   });
   if (!ce) {
+    return {
+      data: await commonPlaceholders(ctx.organizationId, ctx.session?.userId),
+      sensitiveFields,
+    };
+  }
+
+  // Mandantenpruefung — siehe offboardingResolver. Bis zum Dokumentenpaket-
+  // Versand fehlte sie hier: Der Erzeugen-Endpunkt prueft die Organisation der
+  // VORLAGE, aber nicht, ob der Vorgang hinter der refId zum eigenen Mandanten
+  // gehoert. Solange alle vergebbaren Rollen global sind, faellt das nicht auf;
+  // mit der ersten mandantenbeschraenkten Rolle waere es ein Leck.
+  if (!(await canAccessProcess(ctx.session, ce.organizationId))) {
     return {
       data: await commonPlaceholders(ctx.organizationId, ctx.session?.userId),
       sensitiveFields,

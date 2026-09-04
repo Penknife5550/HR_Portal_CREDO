@@ -198,9 +198,23 @@ export async function testSmtpConnection(testEmail: string): Promise<SmtpTestRes
 // Variablen in E-Mail-Vorlage ersetzen
 // =============================================
 export function renderTemplate(template: string, variables: Record<string, string>): string {
+  // Bedingte Bloecke: {{#name}}...{{/name}} bleibt nur stehen, wenn die
+  // Variable einen nicht-leeren Wert hat.
+  //
+  // Gebraucht fuer optionale Abschnitte wie die persoenliche Nachricht beim
+  // Dokumentenpaket: Ohne Bedingung stuende dort ein leerer, gerahmter Kasten.
+  // Bewusst klein gehalten — keine Schleifen, keine Verschachtelung gleichen
+  // Namens, kein Negativ-Block. Wer mehr braucht, ergaenzt es hier bewusst und
+  // stoesst nicht auf eine halbe Implementierung.
+  const mitBloecken = template.replace(
+    /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+    (_treffer, name: string, inhalt: string) =>
+      (variables[name] ?? "").trim() === "" ? "" : inhalt,
+  );
+
   return Object.entries(variables).reduce(
     (result, [key, value]) => result.replaceAll(`{{${key}}}`, value ?? ""),
-    template
+    mitBloecken
   );
 }
 
@@ -390,6 +404,29 @@ async function writeEmailLog(entry: {
 export interface EventEmailResult {
   status: EmailLogStatus;
   detail?: string;
+  /**
+   * Message-ID des SMTP-Servers — nur bei status "SENT" gesetzt, und auch dann
+   * nur, wenn der Server eine geliefert hat.
+   *
+   * Der Wert stand hier schon immer zur Verfuegung (er wandert ins EmailLog),
+   * wurde aber nicht zurueckgegeben. Der Dokumentenpaket-Versand braucht ihn
+   * fuer seinen dauerhaften Nachweis: Das EmailLog wird nach 90 Tagen
+   * aufgeraeumt, der Nachweis bleibt.
+   */
+  messageId?: string;
+  /**
+   * Betreff, der tatsaechlich versendet wurde — nach Einsetzen der Variablen
+   * und (bei Testversand) dem [TEST]-Praefix. Der Nachweis soll festhalten,
+   * was hinausging, nicht was der Aufrufer vermutet hat.
+   */
+  subject?: string;
+  /**
+   * Adresse, an die tatsaechlich zugestellt wurde — nach Aufloesung der
+   * Vorlagen-Empfaengerfelder und dem Aussortieren ungueltiger Adressen. Nicht
+   * zwingend das, was der Aufrufer erwartet hat; genau deshalb im Nachweis
+   * festgehalten.
+   */
+  recipient?: string;
 }
 
 export async function sendEventEmail(
@@ -479,7 +516,12 @@ export async function sendEventEmail(
         messageId: result.messageId,
         isTest,
       });
-      return { status: "SENT" };
+      return {
+        status: "SENT",
+        messageId: result.messageId,
+        recipient: rendered.to,
+        subject: rendered.subject,
+      };
     }
 
     await writeEmailLog({

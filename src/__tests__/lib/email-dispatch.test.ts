@@ -31,7 +31,7 @@ jest.mock("@/lib/url", () => ({
   redactUrlForLog: (url: string) => url,
 }));
 
-import { sendEventEmail, renderEventEmail } from "@/lib/mailer";
+import { sendEventEmail, renderEventEmail, renderTemplate } from "@/lib/mailer";
 import { triggerWebhooks } from "@/lib/webhooks";
 
 const activeSmtpConfig = {
@@ -383,5 +383,35 @@ describe("triggerWebhooks (Dispatcher)", () => {
     await expect(triggerWebhooks("onboarding-created", payload)).resolves.toEqual(
       expect.objectContaining({ status: "FAILED" }),
     );
+  });
+});
+
+describe("renderTemplate — bedingte Bloecke", () => {
+  const vorlage = "Hallo{{#nachricht}}\n\n{{nachricht}}{{/nachricht}}\n\nGruss";
+
+  it("laesst den Block weg, wenn die Variable leer ist", () => {
+    expect(renderTemplate(vorlage, { nachricht: "" })).toBe("Hallo\n\nGruss");
+    // Auch reiner Leerraum zaehlt als leer — sonst stuende ein leerer Kasten da.
+    expect(renderTemplate(vorlage, { nachricht: "   " })).toBe("Hallo\n\nGruss");
+  });
+
+  it("laesst den Block weg, wenn die Variable gar nicht uebergeben wurde", () => {
+    expect(renderTemplate(vorlage, {})).toBe("Hallo\n\nGruss");
+  });
+
+  it("behaelt den Block samt Inhalt, wenn etwas drinsteht", () => {
+    expect(renderTemplate(vorlage, { nachricht: "Bis Montag!" })).toBe(
+      "Hallo\n\nBis Montag!\n\nGruss",
+    );
+  });
+
+  it("laesst gewoehnliche Variablen unberuehrt", () => {
+    expect(renderTemplate("Hallo {{name}}", { name: "Max" })).toBe("Hallo Max");
+  });
+
+  it("behandelt mehrere Bloecke unterschiedlichen Namens einzeln", () => {
+    const t = "{{#a}}A{{/a}}|{{#b}}B{{/b}}";
+    expect(renderTemplate(t, { a: "x", b: "" })).toBe("A|");
+    expect(renderTemplate(t, { a: "", b: "y" })).toBe("|B");
   });
 });
