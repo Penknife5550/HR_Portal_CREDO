@@ -362,3 +362,94 @@ export const PLACEHOLDER_CATALOG: Record<string, PlaceholderDef[]> = {
 export function getPlaceholderCatalog(modul: string): PlaceholderDef[] {
   return PLACEHOLDER_CATALOG[(modul ?? "").toUpperCase()] ?? ALLGEMEIN_PLACEHOLDERS;
 }
+
+// =============================================
+// Sensible Platzhalter — Grundlage der Bestaetigungspflicht beim Paketversand
+// =============================================
+
+/** Ein sensibles Feld, das eine Vorlage tatsaechlich verwendet. */
+export interface SensiblesFeld {
+  /** Platzhaltername ohne Klammern, z.B. "iban". */
+  key: string;
+  /** Deutsche Beschreibung fuer die Bestaetigung im Dialog. */
+  label: string;
+}
+
+/**
+ * Alle als `sensitive` markierten Platzhalter des gesamten Katalogs, nach Key.
+ *
+ * BEWUSST modul-uebergreifend und nicht je Modul: Eine Vorlage traegt ihr
+ * eigenes Modul (oft ALLGEMEIN), gefuellt wird sie aber vom Resolver des
+ * **Vorgangs**. Eine ALLGEMEIN-Vorlage mit {iban} bekommt in einem
+ * Onboarding-Paket die echte IBAN — eine Pruefung gegen den ALLGEMEIN-Katalog
+ * wuerde sie fuer harmlos halten und ohne Bestaetigung verschicken.
+ *
+ * Die Reihenfolge folgt dem Katalog, nicht der Vorlage: Der Nachweis soll bei
+ * gleicher Vorlage immer dieselbe Liste zeigen.
+ */
+const SENSIBLE_FELDER: readonly SensiblesFeld[] = (() => {
+  const gesehen = new Map<string, SensiblesFeld>();
+  for (const defs of Object.values(PLACEHOLDER_CATALOG)) {
+    for (const def of defs) {
+      if (def.sensitive && !gesehen.has(def.key)) {
+        gesehen.set(def.key, { key: def.key, label: def.label });
+      }
+    }
+  }
+  return Array.from(gesehen.values());
+})();
+
+/** Keys aller sensiblen Platzhalter (klein geschrieben) — fuer schnelle Pruefungen. */
+export const SENSIBLE_PLATZHALTER_KEYS: ReadonlySet<string> = new Set(
+  SENSIBLE_FELDER.map((f) => f.key.toLowerCase()),
+);
+
+/**
+ * Bringt einen Platzhalternamen auf die Form des Katalogs.
+ *
+ * Der Extraktor legt die Namen so ab, wie sie in der .docx stehen — inklusive
+ * Grossschreibung. Wir vergleichen deshalb ohne Ruecksicht auf Gross- und
+ * Kleinschreibung und entfernen vorsichtshalber Klammern und Punkt-Notation.
+ */
+function normalisiere(name: string): string {
+  return name
+    .trim()
+    .replace(/^\{+|\}+$/g, "")
+    .trim()
+    .split(".")[0]
+    .toLowerCase();
+}
+
+/**
+ * Welche sensiblen Felder verwendet diese Vorlage?
+ *
+ * Rein rechnerisch: kein Datenbankzugriff, keine Entschluesselung. Beantwortet
+ * allein aus den extrahierten Platzhaltern der Vorlage, ob beim Versand eine
+ * ausdrueckliche Bestaetigung noetig ist (Entscheidung vom 02.09.2026: sensible
+ * Vorlagen duerfen per E-Mail gehen, aber nur mit Bestaetigung je Versand).
+ *
+ * Im Zweifel wird gemeldet, nicht verschwiegen: Schreibt jemand `{IBAN}` statt
+ * `{iban}`, fuellt der Resolver das Feld zwar nicht, die Bestaetigung wird aber
+ * trotzdem verlangt. Ein Klick zu viel ist folgenlos, eine ungefragt
+ * verschickte Steuer-ID nicht.
+ *
+ * @param platzhalter Rohwert aus `DocumentTemplate.platzhalter` (Json) — alles,
+ *   was kein String ist, wird stillschweigend uebergangen.
+ */
+export function sensiblePlatzhalter(platzhalter: unknown): SensiblesFeld[] {
+  if (!Array.isArray(platzhalter)) return [];
+
+  const verwendet = new Set<string>();
+  for (const roh of platzhalter) {
+    if (typeof roh !== "string") continue;
+    const key = normalisiere(roh);
+    if (key) verwendet.add(key);
+  }
+
+  return SENSIBLE_FELDER.filter((f) => verwendet.has(f.key.toLowerCase()));
+}
+
+/** Kurzform: Braucht diese Vorlage beim Versand eine Bestaetigung? */
+export function brauchtBestaetigung(platzhalter: unknown): boolean {
+  return sensiblePlatzhalter(platzhalter).length > 0;
+}
