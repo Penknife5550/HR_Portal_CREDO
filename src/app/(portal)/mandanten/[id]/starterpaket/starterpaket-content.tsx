@@ -447,7 +447,9 @@ export function StarterpaketContent({
           </p>
           {freieDokumente.length === 0 ? (
             <p className="py-2 text-sm text-muted-foreground">
-              Alle verfügbaren Dokumente sind bereits ausgewählt.
+              {documents.length === 0
+                ? "Für diesen Mandanten ist noch kein PDF hinterlegt. Unten hochladen."
+                : "Alle verfügbaren Dokumente sind bereits ausgewählt."}
             </p>
           ) : (
             <ul className="space-y-2">
