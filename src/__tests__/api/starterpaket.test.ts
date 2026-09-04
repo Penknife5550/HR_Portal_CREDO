@@ -9,6 +9,7 @@
 const mockPrisma = {
   organization: { findUnique: jest.fn() },
   starterpaketDokument: { findMany: jest.fn(), count: jest.fn() },
+  documentTemplate: { findMany: jest.fn(), count: jest.fn() },
   starterpaketAuswahl: {
     findMany: jest.fn(),
     deleteMany: jest.fn(),
@@ -29,6 +30,8 @@ const ORG_ID = "11111111-1111-1111-1111-111111111111";
 const GLOBAL_DOC = "22222222-2222-2222-2222-222222222222";
 const MANDANT_DOC = "33333333-3333-3333-3333-333333333333";
 const FREMD_DOC = "44444444-4444-4444-4444-444444444444";
+const VORLAGE = "55555555-5555-4555-8555-555555555555";
+const VORLAGE_SENSIBEL = "66666666-6666-4666-8666-666666666666";
 
 function ctx(id: string = ORG_ID) {
   return { params: Promise.resolve({ id }) };
@@ -42,8 +45,9 @@ function putReq(body: unknown): NextRequest {
   });
 }
 
-function getReq(): NextRequest {
-  return new NextRequest(`http://localhost:3000/api/organizations/${ORG_ID}/starterpaket`);
+function getReq(modul?: string): NextRequest {
+  const basis = `http://localhost:3000/api/organizations/${ORG_ID}/starterpaket`;
+  return new NextRequest(modul ? `${basis}?modul=${modul}` : basis);
 }
 
 const adminSession = {
@@ -66,6 +70,9 @@ beforeEach(() => {
   mockPrisma.$transaction.mockResolvedValue([]);
   mockPrisma.starterpaketAuswahl.deleteMany.mockResolvedValue({ count: 0 });
   mockPrisma.starterpaketAuswahl.createMany.mockResolvedValue({ count: 0 });
+  mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+  mockPrisma.starterpaketAuswahl.findMany.mockResolvedValue([]);
+  mockPrisma.documentTemplate.findMany.mockResolvedValue([]);
 });
 
 describe("GET /api/organizations/[id]/starterpaket", () => {
@@ -114,8 +121,8 @@ describe("PUT /api/organizations/[id]/starterpaket", () => {
     });
     expect(mockPrisma.starterpaketAuswahl.createMany).toHaveBeenCalledWith({
       data: [
-        { organizationId: ORG_ID, modul: "ONBOARDING", dokumentId: GLOBAL_DOC, orderIndex: 0 },
-        { organizationId: ORG_ID, modul: "ONBOARDING", dokumentId: MANDANT_DOC, orderIndex: 1 },
+        { organizationId: ORG_ID, modul: "ONBOARDING", dokumentId: GLOBAL_DOC, templateId: null, orderIndex: 0 },
+        { organizationId: ORG_ID, modul: "ONBOARDING", dokumentId: MANDANT_DOC, templateId: null, orderIndex: 1 },
       ],
     });
     expect(mockPrisma.auditLog.create).toHaveBeenCalled();
@@ -150,5 +157,238 @@ describe("PUT /api/organizations/[id]/starterpaket", () => {
     mockGetSession.mockResolvedValue({ ...adminSession, role: "HR_SACHBEARBEITER" });
     const res = await PUT(putReq({ dokumentIds: [] }), ctx());
     expect(res.status).toBe(403);
+  });
+});
+
+// =============================================
+// Baustein 3: Vorlagen im Standardpaket, je Modul
+// =============================================
+
+const VORLAGE_ZEILE = {
+  id: VORLAGE,
+  name: "Willkommensschreiben",
+  description: null,
+  modul: "ONBOARDING",
+  organizationId: null,
+  fileSize: 1000,
+  platzhalter: ["vorname", "nachname"],
+  isSystem: false,
+};
+const VORLAGE_SENSIBEL_ZEILE = {
+  ...VORLAGE_ZEILE,
+  id: VORLAGE_SENSIBEL,
+  name: "Bestaetigung der Abrechnungsdaten",
+  platzhalter: ["vorname", "iban", "steuer_id"],
+};
+
+describe("GET — Vorlagen im Paket", () => {
+  it("kennzeichnet Vorlagen mit ihren sensiblen Feldern", async () => {
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([
+      VORLAGE_ZEILE,
+      VORLAGE_SENSIBEL_ZEILE,
+    ]);
+
+    const json = await (await GET(getReq(), ctx())).json();
+    const harmlos = json.data.vorlagen.find((v: { id: string }) => v.id === VORLAGE);
+    const sensibel = json.data.vorlagen.find((v: { id: string }) => v.id === VORLAGE_SENSIBEL);
+
+    expect(harmlos.sensibleFelder).toEqual([]);
+    expect(sensibel.sensibleFelder.map((f: { key: string }) => f.key)).toEqual([
+      "iban",
+      "steuer_id",
+    ]);
+  });
+
+  it("fragt nur Vorlagen des Moduls und ALLGEMEIN ab, aktiv und im Mandanten-Scope", async () => {
+    await GET(getReq("OFFBOARDING"), ctx());
+    expect(mockPrisma.documentTemplate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          isActive: true,
+          modul: { in: ["OFFBOARDING", "ALLGEMEIN"] },
+          OR: [{ organizationId: null }, { organizationId: ORG_ID }],
+        },
+      }),
+    );
+  });
+
+  it("liest die Auswahl des angefragten Moduls", async () => {
+    await GET(getReq("VERBEAMTUNG"), ctx());
+    expect(mockPrisma.starterpaketAuswahl.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organizationId: ORG_ID, modul: "VERBEAMTUNG" } }),
+    );
+  });
+
+  it("faellt bei unbekanntem oder ausgeschlossenem Modul auf ONBOARDING zurueck", async () => {
+    for (const modul of ["PHANTASIE", "BEM"]) {
+      const json = await (await GET(getReq(modul), ctx())).json();
+      expect(json.data.modul).toBe("ONBOARDING");
+    }
+  });
+
+  it("liefert die gemischte Liste in Paketreihenfolge", async () => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
+      {
+        id: GLOBAL_DOC,
+        name: "Leitbild",
+        beschreibung: null,
+        organizationId: null,
+        fileSize: 20,
+        isActive: true,
+      },
+    ]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_ZEILE]);
+    mockPrisma.starterpaketAuswahl.findMany.mockResolvedValue([
+      { dokumentId: null, templateId: VORLAGE, orderIndex: 0 },
+      { dokumentId: GLOBAL_DOC, templateId: null, orderIndex: 1 },
+    ]);
+
+    const json = await (await GET(getReq(), ctx())).json();
+    expect(json.data.paket).toEqual([
+      {
+        art: "VORLAGE",
+        id: VORLAGE,
+        name: "Willkommensschreiben",
+        orderIndex: 0,
+        sensibleFelder: [],
+      },
+      { art: "PDF", id: GLOBAL_DOC, name: "Leitbild", orderIndex: 1 },
+    ]);
+  });
+});
+
+describe("PUT — gemischte Positionen", () => {
+  it("speichert PDFs und Vorlagen in der uebergebenen Reihenfolge", async () => {
+    mockPrisma.starterpaketDokument.count.mockResolvedValue(1);
+    mockPrisma.documentTemplate.count.mockResolvedValue(1);
+
+    const res = await PUT(
+      putReq({
+        modul: "ONBOARDING",
+        positionen: [
+          { art: "VORLAGE", id: VORLAGE },
+          { art: "PDF", id: GLOBAL_DOC },
+        ],
+      }),
+      ctx(),
+    );
+    expect(res.status).toBe(200);
+    expect(mockPrisma.starterpaketAuswahl.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: ORG_ID,
+          modul: "ONBOARDING",
+          dokumentId: null,
+          templateId: VORLAGE,
+          orderIndex: 0,
+        },
+        {
+          organizationId: ORG_ID,
+          modul: "ONBOARDING",
+          dokumentId: GLOBAL_DOC,
+          templateId: null,
+          orderIndex: 1,
+        },
+      ],
+    });
+  });
+
+  it("leert nur das uebergebene Modul", async () => {
+    mockPrisma.documentTemplate.count.mockResolvedValue(1);
+    await PUT(
+      putReq({ modul: "OFFBOARDING", positionen: [{ art: "VORLAGE", id: VORLAGE }] }),
+      ctx(),
+    );
+    expect(mockPrisma.starterpaketAuswahl.deleteMany).toHaveBeenCalledWith({
+      where: { organizationId: ORG_ID, modul: "OFFBOARDING" },
+    });
+  });
+
+  it("weist eine Vorlage ab, die fuer Mandant oder Modul nicht verfuegbar ist (400)", async () => {
+    // Zwei angefragt, nur eine erfuellt Modul, Geltung und Aktivitaet.
+    mockPrisma.documentTemplate.count.mockResolvedValue(1);
+
+    const res = await PUT(
+      putReq({
+        modul: "ONBOARDING",
+        positionen: [
+          { art: "VORLAGE", id: VORLAGE },
+          { art: "VORLAGE", id: VORLAGE_SENSIBEL },
+        ],
+      }),
+      ctx(),
+    );
+    expect(res.status).toBe(400);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("prueft Vorlagen gegen Aktivitaet, Modul und Mandant", async () => {
+    mockPrisma.documentTemplate.count.mockResolvedValue(1);
+    await PUT(
+      putReq({ modul: "ONBOARDING", positionen: [{ art: "VORLAGE", id: VORLAGE }] }),
+      ctx(),
+    );
+    expect(mockPrisma.documentTemplate.count).toHaveBeenCalledWith({
+      where: {
+        id: { in: [VORLAGE] },
+        isActive: true,
+        modul: { in: ["ONBOARDING", "ALLGEMEIN"] },
+        OR: [{ organizationId: null }, { organizationId: ORG_ID }],
+      },
+    });
+  });
+
+  it("laesst sensible Vorlagen zu — die Bestaetigung sitzt beim Versand, nicht hier", async () => {
+    mockPrisma.documentTemplate.count.mockResolvedValue(1);
+    const res = await PUT(
+      putReq({ modul: "ONBOARDING", positionen: [{ art: "VORLAGE", id: VORLAGE_SENSIBEL }] }),
+      ctx(),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("nimmt uebergangsweise weiterhin die alte Form { dokumentIds } an", async () => {
+    // Sonst koennte die Konfigurationsseite bis Baustein 4 nichts mehr speichern.
+    mockPrisma.starterpaketDokument.count.mockResolvedValue(1);
+    const res = await PUT(putReq({ dokumentIds: [GLOBAL_DOC] }), ctx());
+    expect(res.status).toBe(200);
+    expect(mockPrisma.starterpaketAuswahl.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: ORG_ID,
+          modul: "ONBOARDING",
+          dokumentId: GLOBAL_DOC,
+          templateId: null,
+          orderIndex: 0,
+        },
+      ],
+    });
+  });
+
+  it("haelt Modul und Aufteilung im Pruefprotokoll fest", async () => {
+    mockPrisma.starterpaketDokument.count.mockResolvedValue(1);
+    mockPrisma.documentTemplate.count.mockResolvedValue(1);
+    await PUT(
+      putReq({
+        modul: "ONBOARDING",
+        positionen: [
+          { art: "PDF", id: GLOBAL_DOC },
+          { art: "VORLAGE", id: VORLAGE },
+        ],
+      }),
+      ctx(),
+    );
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          details: expect.objectContaining({
+            modul: "ONBOARDING",
+            anzahl: 2,
+            anzahlPdf: 1,
+            anzahlVorlagen: 1,
+          }),
+        }),
+      }),
+    );
   });
 });
