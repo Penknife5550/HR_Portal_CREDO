@@ -195,7 +195,21 @@ describe("Standardpaket", () => {
     expect(r.success && r.data.positionen[0]).toEqual({ art: "VORLAGE", id: UUID_A });
   });
 
-  it("laesst mehr Positionen zu als ein einzelner Versand", () => {
-    expect(MAX_POSITIONEN_KONFIG).toBeGreaterThan(MAX_POSITIONEN_VERSAND);
+  it("geht nie ueber die Versandgrenze hinaus", () => {
+    // Der Dialog waehlt das ganze Standardpaket vor. Waere die
+    // Konfigurationsgrenze groesser, liesse sich ein Paket zusammenstellen,
+    // das sich nie versenden laesst — Vorpruefung und Versand wiesen es ab,
+    // ohne dass jemand den Grund saehe.
+    expect(MAX_POSITIONEN_KONFIG).toBeLessThanOrEqual(MAX_POSITIONEN_VERSAND);
+  });
+
+  it("laesst die leere Auswahl in der Vorpruefung zu, im Versand nicht", () => {
+    // Die Vorpruefung laeuft waehrend des Zusammenstellens — eine
+    // Fehlermeldung beim Entfernen des letzten Hakens waere Laerm.
+    const leer = { modul: "ONBOARDING", refId: UUID_A, positionen: [] };
+    expect(pruefePaketSchema.safeParse(leer).success).toBe(true);
+    expect(
+      versendePaketSchema.safeParse({ ...leer, empfaenger: "max@example.org" }).success,
+    ).toBe(false);
   });
 });

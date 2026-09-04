@@ -85,8 +85,14 @@ export const MAX_NACHRICHT_ZEICHEN = 2000;
 
 /** Hoechstzahl Positionen je Versand — die Groessenpruefung sitzt in der Bibliothek. */
 export const MAX_POSITIONEN_VERSAND = 50;
-/** Hoechstzahl Positionen im Standardpaket eines Mandanten. */
-export const MAX_POSITIONEN_KONFIG = 100;
+/**
+ * Hoechstzahl Positionen im Standardpaket eines Mandanten.
+ *
+ * Darf NICHT groesser sein als MAX_POSITIONEN_VERSAND: Der Dialog waehlt das
+ * ganze Standardpaket vor, ein groesseres liesse sich also konfigurieren,
+ * aber nie versenden.
+ */
+export const MAX_POSITIONEN_KONFIG = MAX_POSITIONEN_VERSAND;
 
 /**
  * Standardpaket eines Mandanten setzen: Die uebergebene, geordnete Liste
@@ -105,15 +111,29 @@ export const setPaketAuswahlSchema = z.object({
 });
 export type SetPaketAuswahl = z.infer<typeof setPaketAuswahlSchema>;
 
-/** Gemeinsame Felder von Vorpruefung und Versand. */
+/**
+ * Die Positionsliste ohne Doppelten-Pruefung — als eigene Konstante, damit der
+ * Versand seine Mindestanzahl daraufsetzen kann. Nach superRefine ist das ein
+ * ZodEffects, auf dem .min() nicht mehr zur Verfuegung steht.
+ */
+const positionenListe = z
+  .array(paketPositionSchema)
+  .max(
+    MAX_POSITIONEN_VERSAND,
+    `Ein Paket fasst hoechstens ${MAX_POSITIONEN_VERSAND} Dokumente`,
+  );
+
+/**
+ * Gemeinsame Felder von Vorpruefung und Versand.
+ *
+ * OHNE Mindestanzahl: Die Vorpruefung laeuft waehrend des Zusammenstellens,
+ * und eine leere Auswahl ist dort ausdruecklich kein Fehler. Nur der Versand
+ * verlangt mindestens eine Position (siehe versendePaketSchema).
+ */
 const paketBasis = {
   modul: modulSchema,
   refId: z.string().uuid("Ungueltige Vorgangs-ID"),
-  positionen: z
-    .array(paketPositionSchema)
-    .min(1, "Es ist keine Position ausgewaehlt")
-    .max(MAX_POSITIONEN_VERSAND)
-    .superRefine(ohneDoppelte),
+  positionen: positionenListe.superRefine(ohneDoppelte),
 };
 
 /**
@@ -139,6 +159,11 @@ export type PruefePaket = z.infer<typeof pruefePaketSchema>;
  */
 export const versendePaketSchema = z.object({
   ...paketBasis,
+  // Erst hier: Ein Versand ohne Dokument ergibt keinen Sinn, eine
+  // Vorpruefung ohne Dokument schon.
+  positionen: positionenListe
+    .min(1, "Es ist keine Position ausgewaehlt")
+    .superRefine(ohneDoppelte),
   empfaenger: z.string().trim().email("Ungueltige E-Mail-Adresse").max(254),
   nachricht: z
     .string()

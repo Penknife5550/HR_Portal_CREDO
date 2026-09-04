@@ -107,3 +107,23 @@ describe("Stabile Reihenfolge", () => {
     expect(sensiblePlatzhalter(["iban", "iban", "{IBAN}"]).map((f) => f.key)).toEqual(["iban"]);
   });
 });
+
+describe("Besondere Kategorien nach Art. 9 DSGVO", () => {
+  it("verlangt auch fuer Religion, Krankenkasse und Gemeinde eine Bestaetigung", () => {
+    // Aus dem Review: Diese drei standen nicht als sensibel im Katalog und
+    // waeren damit ohne Bestaetigung und ohne rotes Kennzeichen per
+    // unverschluesselter E-Mail hinausgegangen. Religionszugehoerigkeit,
+    // Krankenkasse (Gesundheitsbezug) und Gemeindezugehoerigkeit sind
+    // besondere Kategorien.
+    expect(brauchtBestaetigung(["religion"])).toBe(true);
+    expect(brauchtBestaetigung(["krankenkasse"])).toBe(true);
+    expect(brauchtBestaetigung(["gemeinde"])).toBe(true);
+  });
+
+  it("nennt sie im Dialog beim Namen", () => {
+    expect(sensiblePlatzhalter(["religion", "krankenkasse"]).map((f) => f.label)).toEqual([
+      "Krankenkasse",
+      "Religion (Kirchensteuer)",
+    ]);
+  });
+});

@@ -133,6 +133,20 @@ export interface VorgangsKontext {
   nachname: string;
   /** Adressvorschlag aus dem Vorgang. Der Dialog darf ihn aendern. */
   empfaenger: string;
+  /**
+   * Versand aus der Zeit VOR dieser Tabelle.
+   *
+   * Das Onboarding hat sein Starterpaket frueher ueber
+   * OnboardingProcess.starterPacketSentAt vermerkt. Ohne diese Angabe stuende
+   * nach dem Deploy bei jedem Bestandsvorgang "Noch nicht versendet" — und
+   * jemand schickte die Unterlagen ein zweites Mal an Beschaeftigte, die sie
+   * laengst haben.
+   *
+   * Bewusst KEINE nachtraeglich erfundene DokumentenVersand-Zeile: Wir wissen
+   * nicht, welche Dokumente das damals waren und an welche Adresse sie gingen.
+   * Ein Nachweis, der das behauptet, waere schlimmer als keiner.
+   */
+  altversand?: { am: Date; anzahl: number } | null;
 }
 
 interface ModulEintrag {
@@ -163,6 +177,8 @@ const MODULE: Record<string, ModulEintrag> = {
           organizationId: true,
           organization: { select: { name: true } },
           personalData: { select: { firstName: true, lastName: true } },
+          starterPacketSentAt: true,
+          starterPacketSentCount: true,
         },
       });
       if (!ob) return null;
@@ -174,6 +190,9 @@ const MODULE: Record<string, ModulEintrag> = {
         vorname: ob.personalData?.firstName || ob.firstName || "",
         nachname: ob.personalData?.lastName || ob.lastName || "",
         empfaenger: ob.email,
+        altversand: ob.starterPacketSentAt
+          ? { am: ob.starterPacketSentAt, anzahl: ob.starterPacketSentCount }
+          : null,
       };
     },
   },
@@ -250,6 +269,17 @@ export function deutschesDatum(zeitpunkt: Date): string {
   }).format(zeitpunkt);
 }
 
+/**
+ * Groesse, die aus n Rohbytes als base64-kodierter Anhang wird.
+ *
+ * SMTP transportiert Anhaenge base64-kodiert: je drei Bytes werden zu vier
+ * Zeichen. Die Grenze der Gegenstelle gilt fuer die kodierte Nachricht, also
+ * muessen wir dagegen pruefen und nicht gegen die Rohdaten.
+ */
+export function kodierteGroesse(rohBytes: number): number {
+  return Math.ceil(rohBytes / 3) * 4;
+}
+
 function sha256(buffer: Buffer): string {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
@@ -271,7 +301,12 @@ export function vorlagenDateiname(
 ): string {
   const datum = deutschesDatum(stichtag);
   const teile = [vorlagenName, nachname].filter((t) => t && t.trim() !== "");
-  return ascii(`${teile.join("_")}_${datum}.pdf`).slice(0, 150);
+  // Erst kuerzen, DANN die Endung anhaengen. Andersherum schneidet ein langer
+  // Vorlagenname das ".pdf" ab — und dann trifft `replace(/\.pdf$/i, ".docx")`
+  // beim Ablegen nicht mehr, Word- und PDF-Fassung landen unter demselben Pfad
+  // und ueberschreiben sich.
+  const basis = ascii(`${teile.join("_")}_${datum}`).slice(0, 140);
+  return `${basis}.pdf`;
 }
 
 /** Dateiname eines Pool-PDFs — unveraendert aus starterpaket.ts uebernommen. */
@@ -657,7 +692,12 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
   }
 
   // --- 7. Groesse ---
-  const gesamt = anhaenge.reduce((s, a) => s + a.content.length, 0);
+  // Gemessen wird die Groesse der fertigen Nachricht, nicht die der Rohdaten:
+  // Anhaenge gehen base64-kodiert ueber SMTP und wachsen dabei um rund ein
+  // Drittel. Ein Paket mit 14,8 MB Rohbytes ergibt gut 20 MB Nachricht — und
+  // wird von jedem Posteingang mit 20-MB-Grenze abgewiesen. Genau das soll die
+  // Pruefung verhindern.
+  const gesamt = kodierteGroesse(anhaenge.reduce((s, a) => s + a.content.length, 0));
   if (gesamt > MAX_PAKET_BYTES) {
     return fehler(
       "ZU_GROSS",
@@ -699,7 +739,19 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
       dokumentenliste_html: dokumentenlisteHtml,
       sachbearbeiter_name: `${opts.session.firstName} ${opts.session.lastName}`.trim(),
     },
-    { attachments: anhaenge },
+    {
+      attachments: anhaenge,
+      // Die im Dialog gewaehlte Adresse MUSS gelten. Ohne overrideTo entscheidet
+      // renderEventEmail nach der Regel "Vorlagen-Feld vor Katalog-Default" —
+      // ein in der Vorlagenverwaltung gesetztes An-Feld schluege die Auswahl,
+      // und der Nachweis behauptete eine Zustellung, die nie stattfand.
+      //
+      // overrideTo verwirft zugleich Cc und Bcc der Vorlage. Das ist hier
+      // richtig: Die Bestaetigung fuer sensible Daten nennt genau eine Adresse.
+      // Ein stiller Verteiler im Cc bekaeme die IBAN mit, ohne dass ihn jemand
+      // bestaetigt oder der Nachweis ihn kennt.
+      overrideTo: empfaenger,
+    },
   );
 
   if (ergebnis.status !== "SENT") {
@@ -710,7 +762,12 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
   }
 
   // --- 9. Nachweis (erst jetzt, und in einer Transaktion) ---
-  const abweichend = empfaenger.toLowerCase() !== (vorgang.empfaenger || "").toLowerCase();
+  // Festgehalten wird, was der Mailer TATSAECHLICH adressiert hat — nicht, was
+  // wir angefordert haben. Beides sollte durch overrideTo uebereinstimmen; wenn
+  // nicht, ist die Wahrheit die des Mailers.
+  const zugestelltAn = ergebnis.recipient || empfaenger;
+  const abweichend =
+    zugestelltAn.toLowerCase() !== (vorgang.empfaenger || "").trim().toLowerCase();
   const bestaetigungen = zusammen.positionen
     .filter((p) => p.art === "VORLAGE" && p.sensibleFelder.length > 0)
     .map((p) => ({
@@ -748,7 +805,7 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
         modul: opts.modul,
         refId: opts.refId,
         organizationId: vorgang.organizationId,
-        empfaenger,
+        empfaenger: zugestelltAn,
         empfaengerVorgang: vorgang.empfaenger,
         empfaengerAbweichend: abweichend,
         // Der Betreff kommt aus der Mailvorlage und wird vom Mailer
@@ -786,6 +843,18 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
       dokumente[a.index].generatedDocumentId = erzeugt.id;
     }
 
+    // Nachziehen, weil der create oben `dokumente` in dem Zustand serialisiert
+    // hat, den es VOR dieser Schleife hatte. Ohne diese Zeilen bliebe die
+    // Verknuepfung Nachweis -> Datei dauerhaft leer, obwohl die HTTP-Antwort
+    // sie enthaelt — und nach der Zwoelf-Monats-Aufbewahrung waere sie
+    // endgueltig verloren.
+    if (abzulegen.length > 0) {
+      await tx.dokumentenVersand.update({
+        where: { id: versandId },
+        data: { positionen: dokumente as unknown as object },
+      });
+    }
+
     await tx.auditLog.create({
       data: {
         userId: opts.session.userId,
@@ -796,7 +865,7 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
           versandId,
           modul: opts.modul,
           refId: opts.refId,
-          empfaenger,
+          empfaenger: zugestelltAn,
           empfaengerAbweichend: abweichend,
           anzahl: dokumente.length,
           dokumente: dokumente.map((d) => ({ name: d.name, hash: d.hash, art: d.art })),
@@ -820,6 +889,12 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
         },
       });
     }
+  }, {
+    // Bis zu 50 erzeugte Dokumente plus Nachweis, Protokoll und Zeitstempel —
+    // das Standardbudget von 5 Sekunden reicht dafuer nicht verlaesslich, und
+    // ein Timeout hier kostet den kompletten Nachweis einer bereits
+    // zugestellten Mail.
+    timeout: 30_000,
   }).then(
     () => true,
     async (e) => {
@@ -833,6 +908,40 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
         await unlink(pfade.pfadPdf).catch(() => undefined);
       }
       console.error("[Dokumentenpaket] Nachweis konnte nicht geschrieben werden:", e);
+
+      // Der Nachweis UND das Pruefprotokoll lagen in derselben Transaktion —
+      // beide sind jetzt weg. Uebrig bliebe nur das EmailLog, das nach 90 Tagen
+      // aufgeraeumt wird und weder Hashes noch die entschluesselten Felder
+      // kennt. Fuer eine Mail, die Art.-9-Daten enthalten kann, ist das zu
+      // wenig: Ein Auskunftsersuchen waere danach nicht mehr zu beantworten.
+      // Deshalb ein eigenstaendiger Protokolleintrag ausserhalb jeder
+      // Transaktion. Schlaegt auch der fehl, bleibt nur noch die Konsole.
+      await prisma.auditLog
+        .create({
+          data: {
+            userId: opts.session.userId,
+            onboardingId: opts.modul === "ONBOARDING" ? opts.refId : null,
+            processType: "STARTERPAKET",
+            action: "DOKUMENTENPAKET_NACHWEIS_FEHLGESCHLAGEN",
+            details: {
+              versandId,
+              modul: opts.modul,
+              refId: opts.refId,
+              empfaenger: zugestelltAn,
+              anzahl: dokumente.length,
+              dokumente: dokumente.map((d) => ({ name: d.name, hash: d.hash, art: d.art })),
+              sensitiveFields: [...new Set(dokumente.flatMap((d) => d.sensibleFelder))],
+              grund: e instanceof Error ? e.message : String(e),
+            },
+            ipAddress: opts.ipAddress ?? null,
+          },
+        })
+        .catch((zweiterFehler) =>
+          console.error(
+            "[Dokumentenpaket] Auch der Ersatz-Protokolleintrag schlug fehl:",
+            zweiterFehler,
+          ),
+        );
       return false;
     },
   );
@@ -844,7 +953,7 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
     );
   }
 
-  return { status: "SENT", versandId, empfaenger, dokumente, warnungen };
+  return { status: "SENT", versandId, empfaenger: zugestelltAn, dokumente, warnungen };
 }
 
 // =============================================
@@ -1133,6 +1242,8 @@ export interface PaketAngebot {
     anzahl: number;
     empfaengerAbweichend: boolean;
   }[];
+  /** Versand aus der Zeit vor dieser Tabelle — siehe VorgangsKontext. */
+  altversand: { am: Date; anzahl: number } | null;
   maxBytes: number;
 }
 
@@ -1272,6 +1383,7 @@ export async function ladePaketAngebot(opts: {
       standardpaket,
       verfuegbar,
       verlauf,
+      altversand: vorgang.altversand ?? null,
       maxBytes: MAX_PAKET_BYTES,
     },
   };

@@ -11,7 +11,8 @@ const mockPrisma = {
   onboardingProcess: { findUnique: jest.fn(), update: jest.fn() },
   starterpaketDokument: { findMany: jest.fn() },
   documentTemplate: { findMany: jest.fn() },
-  dokumentenVersand: { create: jest.fn() },
+  starterpaketAuswahl: { findMany: jest.fn() },
+  dokumentenVersand: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
   generatedDocument: { create: jest.fn() },
   auditLog: { create: jest.fn() },
   $transaction: jest.fn(),
@@ -62,6 +63,8 @@ jest.mock("@/lib/doc-template-resolvers", () => ({
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import {
   versendePaket,
+  kodierteGroesse,
+  ladePaketAngebot,
   deutschesDatum,
   alsHtmlAbsaetze,
   pruefePaket,
@@ -130,18 +133,25 @@ beforeEach(() => {
   mockRenderDocx.mockReturnValue({ buffer: Buffer.from("docx"), missing: [] });
   mockConvertDocxToPdf.mockResolvedValue(Buffer.from("%PDF-1.4 gewandelt"));
   mockResolver.mockResolvedValue({ data: { vorname: "Max" }, sensitiveFields: [] });
-  mockSendEventEmail.mockResolvedValue({
-    status: "SENT",
-    messageId: "<abc@fes>",
-    recipient: "max@example.org",
-    subject: "Herzlich willkommen",
-  });
+  // Wie der echte Mailer: Er meldet zurueck, an wen er TATSAECHLICH
+  // adressiert hat — bei gesetztem overrideTo also genau diese Adresse.
+  mockSendEventEmail.mockImplementation(
+    async (_event: string, _payload: unknown, optionen?: { overrideTo?: string }) => ({
+      status: "SENT",
+      messageId: "<abc@fes>",
+      recipient: optionen?.overrideTo ?? "max@example.org",
+      subject: "Herzlich willkommen",
+    }),
+  );
   mockResolveEventTemplate.mockResolvedValue({
     subject: "Herzlich willkommen",
     bodyHtml: "<p>Hallo {{vorname}}</p><p>{{nachricht}}</p>",
     bodyText: null,
   });
   mockPrisma.dokumentenVersand.create.mockResolvedValue({});
+  mockPrisma.dokumentenVersand.update.mockResolvedValue({});
+  mockPrisma.dokumentenVersand.findMany.mockResolvedValue([]);
+  mockPrisma.starterpaketAuswahl.findMany.mockResolvedValue([]);
   mockPrisma.generatedDocument.create.mockResolvedValue({ id: "gen-1" });
   mockPrisma.auditLog.create.mockResolvedValue({});
   mockPrisma.onboardingProcess.update.mockResolvedValue({});
@@ -863,5 +873,159 @@ describe("Nachweis scheitert nach dem Versand", () => {
     await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
     expect(mockUnlink).toHaveBeenCalledWith("uploads/x/a.docx");
     expect(mockUnlink).toHaveBeenCalledWith("uploads/x/a.pdf");
+  });
+});
+
+// =============================================
+// Behobene Review-Befunde
+// =============================================
+
+describe("Dateiname behaelt seine Endung", () => {
+  it("kuerzt den Namen, nicht die Endung", () => {
+    // Vorher wurde erst ".pdf" angehaengt und dann auf 150 Zeichen gekuerzt —
+    // bei langen Vorlagennamen fiel die Endung weg. Danach traf
+    // replace(/\.pdf$/i, ".docx") beim Ablegen nicht mehr, und Word- und
+    // PDF-Fassung landeten unter demselben Pfad.
+    const name = vorlagenDateiname("V".repeat(200), "Mustermann", JETZT);
+    expect(name.endsWith(".pdf")).toBe(true);
+    expect(name.replace(/\.pdf$/i, ".docx")).not.toBe(name);
+    expect(name.length).toBeLessThanOrEqual(144);
+  });
+});
+
+describe("Groessengrenze misst die versendete Nachricht", () => {
+  it("rechnet die base64-Kodierung ein", () => {
+    expect(kodierteGroesse(3)).toBe(4);
+    expect(kodierteGroesse(MAX_PAKET_BYTES)).toBeGreaterThan(MAX_PAKET_BYTES);
+  });
+
+  it("weist ein Paket ab, das erst kodiert zu gross wird", async () => {
+    // Rohbytes unter der Grenze, base64 darueber: genau der Fall, den die alte
+    // Pruefung durchgelassen haette und den der Posteingang abweist.
+    const roh = Math.floor(MAX_PAKET_BYTES * 0.8);
+    expect(roh).toBeLessThan(MAX_PAKET_BYTES);
+    expect(kodierteGroesse(roh)).toBeGreaterThan(MAX_PAKET_BYTES);
+
+    mockReadUploadedFile.mockResolvedValue(Buffer.alloc(roh));
+    const r = await versendePaket(basis());
+    expect(r).toMatchObject({ status: "FEHLER", fehler: "ZU_GROSS" });
+    expect(mockSendEventEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("Empfaenger: Zusage des Dialogs gilt", () => {
+  it("erzwingt die gewaehlte Adresse per overrideTo", async () => {
+    // Ohne overrideTo entscheidet die Mailvorlage ("Vorlagen-Feld vor
+    // Katalog-Default") — ein dort gesetztes An-Feld schluege die Auswahl.
+    await versendePaket(basis({ empfaenger: "privat@example.org" }));
+    expect(mockSendEventEmail).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      expect.objectContaining({ overrideTo: "privat@example.org" }),
+    );
+  });
+
+  it("haelt im Nachweis fest, wohin tatsaechlich zugestellt wurde", async () => {
+    // Der Mailer meldet eine andere Adresse zurueck, als angefordert wurde.
+    // Der Nachweis muss seiner Meldung folgen, nicht unserer Absicht.
+    mockSendEventEmail.mockResolvedValue({
+      status: "SENT",
+      messageId: "<a>",
+      recipient: "verteiler@example.org",
+      subject: "W",
+    });
+    const r = await versendePaket(basis({ empfaenger: "privat@example.org" }));
+
+    const daten = mockPrisma.dokumentenVersand.create.mock.calls[0][0].data;
+    expect(daten.empfaenger).toBe("verteiler@example.org");
+    expect(daten.empfaengerAbweichend).toBe(true);
+    expect(r.status === "SENT" && r.empfaenger).toBe("verteiler@example.org");
+  });
+});
+
+describe("Nachweis kennt die erzeugten Dokumente", () => {
+  it("zieht die generatedDocumentId in positionen nach", async () => {
+    // Der create serialisiert positionen, BEVOR die IDs feststehen — ohne das
+    // Nachziehen bliebe die Verknuepfung Nachweis -> Datei dauerhaft leer.
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([
+      {
+        id: VORLAGE_ID,
+        name: "Willkommensschreiben",
+        dateipfad: VORLAGE_PFAD,
+        platzhalter: ["vorname"],
+        modul: "ONBOARDING",
+      },
+    ]);
+
+    await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+
+    expect(mockPrisma.dokumentenVersand.update).toHaveBeenCalledTimes(1);
+    const nachgezogen = mockPrisma.dokumentenVersand.update.mock.calls[0][0];
+    expect(nachgezogen.data.positionen[0].generatedDocumentId).toBe("gen-1");
+  });
+});
+
+describe("Nachweis scheitert: Ersatzprotokoll", () => {
+  let konsole: jest.SpyInstance;
+  beforeAll(() => {
+    konsole = jest.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+  afterAll(() => konsole.mockRestore());
+
+  it("schreibt ein eigenstaendiges Protokoll ausserhalb der Transaktion", async () => {
+    // Nachweis UND Pruefprotokoll lagen in derselben Transaktion. Faellt sie,
+    // bliebe nur das EmailLog — ohne Hashes, ohne entschluesselte Felder, und
+    // nach 90 Tagen weg. Fuer eine Mail mit Art.-9-Daten zu wenig.
+    mockPrisma.$transaction.mockRejectedValue(new Error("Datenbank weg"));
+
+    const r = await versendePaket(basis());
+    expect(r.status).toBe("SENT");
+
+    const eintraege = mockPrisma.auditLog.create.mock.calls.map((c) => c[0].data.action);
+    expect(eintraege).toContain("DOKUMENTENPAKET_NACHWEIS_FEHLGESCHLAGEN");
+
+    const ersatz = mockPrisma.auditLog.create.mock.calls.find(
+      (c) => c[0].data.action === "DOKUMENTENPAKET_NACHWEIS_FEHLGESCHLAGEN",
+    )[0].data;
+    expect(ersatz.details.empfaenger).toBe("max@example.org");
+    expect(ersatz.details.dokumente[0].name).toBe("Leitbild");
+    expect(ersatz.details.grund).toContain("Datenbank weg");
+  });
+});
+
+describe("Bestandsvorgaenge gelten nicht als unversendet", () => {
+  it("reicht den Altversand ins Angebot durch", async () => {
+    // Ohne das stuende nach dem Deploy bei jedem Bestandsvorgang "Noch nicht
+    // versendet" — und jemand schickte die Unterlagen ein zweites Mal.
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue({
+      email: "max@example.org",
+      firstName: "Max",
+      lastName: "Mustermann",
+      displayId: "2026-GYM-001",
+      organizationId: ORG,
+      organization: { name: "Gymnasium" },
+      personalData: null,
+      starterPacketSentAt: new Date("2026-06-01T09:00:00.000Z"),
+      starterPacketSentCount: 2,
+    });
+    mockPrisma.starterpaketAuswahl.findMany.mockResolvedValue([]);
+    mockPrisma.dokumentenVersand.findMany.mockResolvedValue([]);
+
+    const r = await ladePaketAngebot({ modul: "ONBOARDING", refId: REF, session });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.angebot.verlauf).toEqual([]);
+    expect(r.angebot.altversand).toEqual({
+      am: new Date("2026-06-01T09:00:00.000Z"),
+      anzahl: 2,
+    });
+  });
+
+  it("meldet null, wenn nie etwas versendet wurde", async () => {
+    mockPrisma.starterpaketAuswahl.findMany.mockResolvedValue([]);
+    mockPrisma.dokumentenVersand.findMany.mockResolvedValue([]);
+    const r = await ladePaketAngebot({ modul: "ONBOARDING", refId: REF, session });
+    expect(r.status === "OK" && r.angebot.altversand).toBeNull();
   });
 });

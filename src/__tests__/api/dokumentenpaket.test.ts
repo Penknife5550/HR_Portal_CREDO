@@ -18,7 +18,7 @@ const mockPrisma = {
   starterpaketDokument: { findMany: jest.fn() },
   documentTemplate: { findMany: jest.fn() },
   starterpaketAuswahl: { findMany: jest.fn() },
-  dokumentenVersand: { create: jest.fn(), findMany: jest.fn() },
+  dokumentenVersand: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
   generatedDocument: { create: jest.fn() },
   auditLog: { create: jest.fn() },
   $transaction: jest.fn(),
@@ -137,6 +137,7 @@ beforeEach(() => {
   mockPrisma.starterpaketAuswahl.findMany.mockResolvedValue([]);
   mockPrisma.dokumentenVersand.findMany.mockResolvedValue([]);
   mockPrisma.dokumentenVersand.create.mockResolvedValue({});
+  mockPrisma.dokumentenVersand.update.mockResolvedValue({});
   mockPrisma.generatedDocument.create.mockResolvedValue({ id: "gen-1" });
   mockPrisma.auditLog.create.mockResolvedValue({});
   mockPrisma.onboardingProcess.update.mockResolvedValue({});
@@ -155,12 +156,16 @@ beforeEach(() => {
     bodyHtml: "<p>{{#nachricht}}{{nachricht_html}}{{/nachricht}}</p>",
     bodyText: null,
   });
-  mockSendEventEmail.mockResolvedValue({
-    status: "SENT",
-    messageId: "<abc@fes>",
-    recipient: "max@example.org",
-    subject: "Willkommen",
-  });
+  // Wie der echte Mailer: Er meldet zurueck, an wen er TATSAECHLICH
+  // adressiert hat — bei gesetztem overrideTo also genau diese Adresse.
+  mockSendEventEmail.mockImplementation(
+    async (_event: string, _payload: unknown, optionen?: { overrideTo?: string }) => ({
+      status: "SENT",
+      messageId: "<abc@fes>",
+      recipient: optionen?.overrideTo ?? "max@example.org",
+      subject: "Willkommen",
+    }),
+  );
 });
 
 function nichtsGeschrieben() {

@@ -58,11 +58,13 @@ export function DokumentenpaketSection({
         setAngebot(j.data);
         setFehler("");
       } else {
-        setAngebot(null);
+        // Das bisherige Angebot BEHALTEN. Wird es hier verworfen,
+        // verschwindet der Dialog — und mit ihm die Ergebnisanzeige samt
+        // der Warnung "Bitte den Versand NICHT wiederholen". Wer die nicht
+        // mehr sieht, verschickt dasselbe Paket ein zweites Mal.
         setFehler(j.error || "Der Versand konnte nicht vorbereitet werden.");
       }
     } catch {
-      setAngebot(null);
       setFehler("Verbindungsfehler.");
     } finally {
       setLaden(false);
@@ -126,7 +128,7 @@ export function DokumentenpaketSection({
                 onClick={() => setOffen(true)}
                 className="inline-flex items-center gap-2 rounded-lg bg-credo-blau px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
               >
-                {letzter ? "Erneut versenden…" : "Dokumente versenden…"}
+                {letzter || angebot.altversand ? "Erneut versenden…" : "Dokumente versenden…"}
               </button>
             )}
             <span className="text-xs text-muted-foreground">
@@ -134,7 +136,15 @@ export function DokumentenpaketSection({
                 ? `Zuletzt am ${new Date(letzter.createdAt).toLocaleString("de-DE")} an ${letzter.empfaenger}${
                     angebot.verlauf.length > 1 ? ` (${angebot.verlauf.length}×)` : ""
                   }`
-                : "Noch nicht versendet"}
+                : angebot.altversand
+                  ? // Vorgang aus der Zeit vor dem Nachweis: Zeitpunkt und Anzahl
+                    // sind bekannt, Empfaenger und Dokumente nicht. Das steht so
+                    // da, statt "Noch nicht versendet" zu behaupten — sonst ginge
+                    // das Paket ein zweites Mal hinaus.
+                    `Bereits versendet am ${new Date(angebot.altversand.am).toLocaleString("de-DE")}${
+                      angebot.altversand.anzahl > 1 ? ` (${angebot.altversand.anzahl}×)` : ""
+                    } — vor Einführung des Nachweises, ohne Angabe der Dokumente`
+                  : "Noch nicht versendet"}
             </span>
           </div>
         </>

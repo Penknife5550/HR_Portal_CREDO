@@ -91,10 +91,14 @@ export const ONBOARDING_PLACEHOLDERS: PlaceholderDef[] = [
   { key: "bank", label: "Bank", group: "Bank" },
   { key: "kontoinhaber", label: "Kontoinhaber", group: "Bank" },
   { key: "sv_nummer", label: "Sozialversicherungsnummer", group: "SV & Steuer", sensitive: true },
-  { key: "krankenkasse", label: "Krankenkasse", group: "SV & Steuer" },
+  // Gesundheitsbezug: Die Krankenkasse laesst auf Versichertenstatus und
+  // teils auf Erkrankungen schliessen (Art. 9 DSGVO).
+  { key: "krankenkasse", label: "Krankenkasse", group: "SV & Steuer", sensitive: true },
   { key: "steuer_id", label: "Steuer-ID", group: "SV & Steuer", sensitive: true },
   { key: "steuerklasse", label: "Steuerklasse", group: "SV & Steuer" },
-  { key: "religion", label: "Religion (Kirchensteuer)", group: "SV & Steuer" },
+  // Religionszugehoerigkeit ist eine besondere Kategorie nach Art. 9 DSGVO —
+  // auch wenn sie hier aus steuerlichen Gruenden erhoben wird.
+  { key: "religion", label: "Religion (Kirchensteuer)", group: "SV & Steuer", sensitive: true },
   { key: "schulabschluss", label: "Hoechster Schulabschluss", group: "Bildung" },
   { key: "berufsausbildung", label: "Hoechste Berufsausbildung", group: "Bildung" },
   { key: "eintrittsdatum", label: "Eintrittsdatum / Vertragsbeginn", example: "01.09.2026", group: "Vertrag" },
@@ -306,7 +310,10 @@ export const VERBEAMTUNG_PLACEHOLDERS: PlaceholderDef[] = [
   // Antrag der Lehrkraft
   { key: "faecher", label: "Faecherkombination", example: "Deutsch, Mathematik", group: "Antrag der Lehrkraft" },
   { key: "stellenumfang_prozent", label: "Stellenumfang in Prozent (Angabe der Lehrkraft)", example: "100", group: "Antrag der Lehrkraft" },
-  { key: "gemeinde", label: "Gemeinde und Dienstbereich", example: "FeG Minden, Jugendarbeit", group: "Antrag der Lehrkraft" },
+  // Gemeindezugehoerigkeit — wie religion eine besondere Kategorie. Der
+  // Verbeamtungs-Resolver meldet sie ohnehin schon als sensitiveFields; ohne
+  // sensitive:true haette der Versand sie aber ohne Bestaetigung verschickt.
+  { key: "gemeinde", label: "Gemeinde und Dienstbereich", example: "FeG Minden, Jugendarbeit", group: "Antrag der Lehrkraft", sensitive: true },
   { key: "vebs_seminar_am", label: "VEBS-Grundlagenseminar besucht am", example: "12.10.2025", group: "Antrag der Lehrkraft" },
   { key: "antrag_erklaerung", label: "Erklaerung der Lehrkraft zum Antrag", group: "Antrag der Lehrkraft" },
 

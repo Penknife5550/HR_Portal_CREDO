@@ -47,6 +47,8 @@ export interface PaketAngebot {
     anzahl: number;
     empfaengerAbweichend: boolean;
   }[];
+  /** Versand aus der Zeit vor dem Nachweis — nur Zeitpunkt und Anzahl. */
+  altversand: { am: string; anzahl: number } | null;
   maxBytes: number;
 }
 
@@ -241,7 +243,13 @@ export function DokumentenpaketDialog({
           positionen: reihenfolge.map((p) => ({
             art: p.art,
             id: p.id,
-            ...(p.sensibleFelder.length > 0 ? { bestaetigt: true } : {}),
+            // Der TATSAECHLICHE Haekchenstand, nicht pauschal true. Sonst
+            // waere die Bestaetigung eine blosse Behauptung des Clients und
+            // die Schranke haenge allein am gesperrten Knopf — der 409 des
+            // Servers koennte gar nicht mehr greifen.
+            ...(p.sensibleFelder.length > 0
+              ? { bestaetigt: bestaetigt.has(schluessel(p)) }
+              : {}),
           })),
           empfaenger: empfaenger.trim(),
           ...(nachricht.trim() ? { nachricht: nachricht.trim() } : {}),
