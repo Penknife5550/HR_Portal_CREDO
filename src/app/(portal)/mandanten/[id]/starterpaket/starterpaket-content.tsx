@@ -56,14 +56,18 @@ interface Vorlage {
 }
 
 /**
- * Module mit eigenem Standardpaket.
+ * Module mit eigenem Standardpaket — je Modul ein Reiter.
  *
- * Phase 1 zeigt nur Onboarding. Die Reiter sind vorbereitet: Kommen in Phase 2
- * Offboarding, Verbeamtung und Vertragsverlaengerung dazu, reicht ein Eintrag
- * je Modul — Laden, Speichern und Anzeige haengen bereits am Modul.
+ * Die Reihenfolge folgt dem Lebenslauf eines Arbeitsverhaeltnisses. Wer hier
+ * ein Modul ergaenzt, braucht dafuer auch einen Eintrag in der Modul-Tabelle
+ * von src/lib/dokumentenpaket.ts und eine eigene Mailvorlage — sonst laesst
+ * sich zwar konfigurieren, aber nie versenden.
  */
 const MODULE: ReadonlyArray<{ value: string; label: string }> = [
   { value: "ONBOARDING", label: "Onboarding" },
+  { value: "VERTRAGSVERLAENGERUNG", label: "Vertragsverlängerung" },
+  { value: "VERBEAMTUNG", label: "Verbeamtung" },
+  { value: "OFFBOARDING", label: "Offboarding" },
 ];
 
 const INPUT_CLASS =
@@ -309,10 +313,11 @@ export function StarterpaketContent({
           ← Zurück zu Mandanten
         </Link>
 
-        <h1 className="text-2xl font-bold text-foreground">Standardpaket</h1>
+        <h1 className="text-2xl font-bold text-foreground">Dokumentenpakete</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {organization.mandantNumber} — {organization.name}. Diese Unterlagen sind im
-          Vorgang vorausgewählt, wenn ein Paket verschickt wird. Feste PDFs gehen so, wie
+          {organization.mandantNumber} — {organization.name}. Je Modul ein eigenes Paket:
+          Diese Unterlagen sind im jeweiligen Vorgang vorausgewählt, wenn etwas verschickt
+          wird. Feste PDFs gehen so, wie
           sie hochgeladen wurden; Brief-Vorlagen werden vorher automatisch mit den Daten
           des Vorgangs befüllt.
         </p>

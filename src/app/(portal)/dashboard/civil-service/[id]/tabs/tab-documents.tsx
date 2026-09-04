@@ -6,6 +6,7 @@ import type { DocumentData, AssessmentData } from "../types";
 import { formatDate, formatFileSize } from "../helpers";
 import { UploadIcon, DownloadIcon } from "../icons";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
+import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
 
 // =============================================
 // PDF Export Sektion
@@ -241,6 +242,16 @@ export function TabDocuments({
           organizationId={organizationId}
           canEdit={canEdit}
           emptyHint="Keine Verbeamtungs-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ (Modul Verbeamtung) an."
+        />
+      </div>
+
+      <div className="mb-6">
+        <DokumentenpaketSection
+          modul="VERBEAMTUNG"
+          refId={processId}
+          canEdit={canEdit}
+          titel="Unterlagen zur Verbeamtung versenden"
+          beschreibung="Feste PDFs und befüllte Vorlagen gehen als Anhänge an die Lehrkraft. Das Standardpaket wird unter Mandanten → Einrichtung → Dokumentenpakete gepflegt."
         />
       </div>
 
