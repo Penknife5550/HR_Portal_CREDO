@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useRef, type ReactNode } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
+import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
 import { STATUS_LABELS, getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
@@ -424,9 +425,9 @@ export function DetailContent({
   const [completingProcess, setCompletingProcess] = useState(false);
   const [reviewingProcess, setReviewingProcess] = useState(false);
 
-  // Starterpaket-Versand
-  const [sendingStarterpaket, setSendingStarterpaket] = useState(false);
-  const [starterpaketMsg, setStarterpaketMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Dokumentenpaket-Versand: Der Dialog gehoert der Karte im Dokumente-Tab,
+  // der Knopf im Abschluss-Schritt oeffnet denselben.
+  const [paketDialogOffen, setPaketDialogOffen] = useState(false);
 
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -444,80 +445,6 @@ export function DetailContent({
     isAdmin;
 
   // Starterpaket an den Mitarbeiter versenden (manuell, im Abschluss/Dokumente-Hub)
-  /**
-   * UEBERGANG (Baustein 7 bis 9): Die alte Route ist weg, der Dialog noch nicht
-   * da. Bis dahin holt die Karte das Standardpaket des Mandanten und schickt es
-   * unveraendert los — dasselbe Ergebnis wie bisher, nur ueber den neuen Weg.
-   * Mit dem Dialog faellt diese Funktion samt Karte ersatzlos weg.
-   */
-  const sendStarterpaket = async () => {
-    setSendingStarterpaket(true);
-    setStarterpaketMsg(null);
-    try {
-      const angebot = await fetch(
-        `/api/dokumentenpaket?modul=ONBOARDING&refId=${onboardingId}`,
-      );
-      const aj = await angebot.json().catch(() => ({}));
-      if (!angebot.ok) {
-        setStarterpaketMsg({ ok: false, text: aj.error || "Paket konnte nicht geladen werden." });
-        return;
-      }
-
-      const positionen: { art: string; id: string; bestaetigt?: boolean }[] =
-        aj.data?.standardpaket ?? [];
-      if (positionen.length === 0) {
-        setStarterpaketMsg({
-          ok: false,
-          text: "Fuer diesen Mandanten ist kein Standardpaket konfiguriert.",
-        });
-        return;
-      }
-
-      // Sensible Vorlagen brauchen eine Bestaetigung je Versand. Die kann diese
-      // Karte nicht einholen — das ist Aufgabe des Dialogs. Bis dahin lehnen
-      // wir hier ab, statt eine Bestaetigung vorzutaeuschen, die niemand gegeben
-      // hat.
-      const verfuegbar: { art: string; id: string; name: string; sensibleFelder: unknown[] }[] =
-        aj.data?.verfuegbar ?? [];
-      const sensibel = positionen
-        .map((p) => verfuegbar.find((v) => v.art === p.art && v.id === p.id))
-        .filter((v) => v && v.sensibleFelder.length > 0);
-      if (sensibel.length > 0) {
-        setStarterpaketMsg({
-          ok: false,
-          text: `Das Standardpaket enthaelt ${sensibel.length} Vorlage(n) mit sensiblen Daten. Der Versand mit Bestaetigung folgt mit dem neuen Dialog.`,
-        });
-        return;
-      }
-
-      const res = await fetch("/api/dokumentenpaket/versenden", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modul: "ONBOARDING",
-          refId: onboardingId,
-          positionen: positionen.map((p) => ({ art: p.art, id: p.id })),
-          empfaenger: aj.data?.empfaengerVorschlag,
-        }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (res.ok) {
-        const n = j.data?.dokumente?.length ?? 0;
-        setStarterpaketMsg({
-          ok: true,
-          text: `Paket versendet (${n} Dokument${n === 1 ? "" : "e"}).`,
-        });
-        loadData();
-      } else {
-        setStarterpaketMsg({ ok: false, text: j.error || "Paket konnte nicht versendet werden." });
-      }
-    } catch {
-      setStarterpaketMsg({ ok: false, text: "Verbindungsfehler beim Versand." });
-    } finally {
-      setSendingStarterpaket(false);
-    }
-  };
-
   const handleReviewProcess = async () => {
     if (!data || !canReview) return;
     setReviewingProcess(true);
@@ -853,8 +780,8 @@ export function DetailContent({
             setNewNote={setNewNote}
             savingNote={savingNote}
             addNote={addNote}
-            sendingStarterpaket={sendingStarterpaket}
-            sendStarterpaket={sendStarterpaket}
+            setActiveTab={setActiveTab}
+            oeffnePaketDialog={() => setPaketDialogOffen(true)}
             onboardingId={onboardingId}
           />
         )}
@@ -871,9 +798,8 @@ export function DetailContent({
             data={data}
             onboardingId={onboardingId}
             canEdit={HR_EDIT_ROLES.includes(user.role)}
-            sendingStarterpaket={sendingStarterpaket}
-            sendStarterpaket={sendStarterpaket}
-            starterpaketMsg={starterpaketMsg}
+            paketDialogOffen={paketDialogOffen}
+            setPaketDialogOffen={setPaketDialogOffen}
           />
         )}
         {activeTab === "checklist" && (
@@ -913,8 +839,8 @@ function TabOverview({
   savingNote,
   addNote,
   onboardingId,
-  sendingStarterpaket,
-  sendStarterpaket,
+  setActiveTab,
+  oeffnePaketDialog,
 }: {
   data: DetailData;
   appUrl: string;
@@ -929,8 +855,8 @@ function TabOverview({
   savingNote: boolean;
   addNote: () => void;
   onboardingId: string;
-  sendingStarterpaket: boolean;
-  sendStarterpaket: () => void;
+  setActiveTab: (tab: TabId) => void;
+  oeffnePaketDialog: () => void;
 }) {
   const fragebogenLink = `${appUrl}/fragebogen/${data.token}`;
   const modalitaetenLink = data.supervisorToken
@@ -1033,7 +959,16 @@ function TabOverview({
       completedAt: isCompleted && data.submittedAt ? formatDate(data.submittedAt) : undefined,
       actions: !isCompleted && checklistAllDone ? [
         { label: "CSV Export (LOGA)", onClick: () => { window.location.href = `/api/onboarding/${onboardingId}/export?format=csv`; }, variant: "secondary" as const },
-        { label: sendingStarterpaket ? "Sende…" : "Starterpaket versenden", onClick: sendStarterpaket, variant: "primary" as const, loading: sendingStarterpaket },
+        {
+          label: "Dokumente versenden…",
+          // Oeffnet denselben Dialog wie die Karte — und wechselt dorthin,
+          // damit sichtbar bleibt, wo der Versand zuhause ist.
+          onClick: () => {
+            setActiveTab("documents");
+            oeffnePaketDialog();
+          },
+          variant: "primary" as const,
+        },
       ] : undefined,
     },
   ];
@@ -1879,78 +1814,18 @@ function OnboardingErstellenSection({
     </>
   );
 }
-
-function StarterpaketVersandSection({
-  canEdit,
-  sending,
-  onSend,
-  msg,
-  sentAt,
-  count,
-}: {
-  canEdit: boolean;
-  sending: boolean;
-  onSend: () => void;
-  msg: { ok: boolean; text: string } | null;
-  sentAt: string | null;
-  count: number;
-}) {
-  return (
-    <div className="rounded-2xl border-2 border-credo-blau/30 bg-credo-blau/5 p-5">
-      <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-foreground">
-        <DownloadIcon className="h-5 w-5 text-credo-blau" />
-        Starterpaket versenden
-      </h3>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Die für diesen Mandanten markierten Dokumente gehen als PDF-Anhänge an den neuen Mitarbeiter.
-        Konfiguration unter Mandanten → Einrichtung → Starterpaket.
-      </p>
-      {msg && (
-        <div
-          className={`mb-3 rounded-lg border px-3 py-2 text-xs ${
-            msg.ok
-              ? "border-credo-gruen/30 bg-credo-gruen/10 text-credo-gruen"
-              : "border-credo-rot/30 bg-credo-rot/10 text-credo-rot"
-          }`}
-        >
-          {msg.text}
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-3">
-        {canEdit && (
-          <button
-            type="button"
-            onClick={onSend}
-            disabled={sending}
-            className="inline-flex items-center gap-2 rounded-lg bg-credo-blau px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90 disabled:opacity-50"
-          >
-            {sending ? "Sende…" : sentAt ? "Erneut senden" : "Starterpaket versenden"}
-          </button>
-        )}
-        <span className="text-xs text-muted-foreground">
-          {sentAt
-            ? `Zuletzt gesendet am ${formatDateTime(sentAt)}${count > 1 ? ` (${count}×)` : ""}`
-            : "Noch nicht versendet"}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 function TabDocuments({
   data,
   onboardingId,
   canEdit,
-  sendingStarterpaket,
-  sendStarterpaket,
-  starterpaketMsg,
+  paketDialogOffen,
+  setPaketDialogOffen,
 }: {
   data: DetailData;
   onboardingId: string;
   canEdit: boolean;
-  sendingStarterpaket: boolean;
-  sendStarterpaket: () => void;
-  starterpaketMsg: { ok: boolean; text: string } | null;
+  paketDialogOffen: boolean;
+  setPaketDialogOffen: (offen: boolean) => void;
 }) {
   const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
     UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
@@ -2007,14 +1882,13 @@ function TabDocuments({
         istMinijob={data.questionnaireType === "MINIJOB"}
       />
 
-      {/* Starterpaket versenden */}
-      <StarterpaketVersandSection
+      {/* Dokumentenpaket versenden */}
+      <DokumentenpaketSection
+        modul="ONBOARDING"
+        refId={onboardingId}
         canEdit={canEdit}
-        sending={sendingStarterpaket}
-        onSend={sendStarterpaket}
-        msg={starterpaketMsg}
-        sentAt={data.starterPacketSentAt ?? null}
-        count={data.starterPacketSentCount ?? 0}
+        offen={paketDialogOffen}
+        onOffenChange={setPaketDialogOffen}
       />
 
       {/* Hochgeladene Dokumente — vor den Export gezogen: der am haeufigsten

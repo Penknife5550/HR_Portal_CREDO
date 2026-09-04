@@ -21,17 +21,30 @@ export function DokumentenpaketSection({
   canEdit,
   titel = "Dokumente versenden",
   beschreibung = "Feste PDFs und befüllte Vorlagen gehen als Anhänge an die im Vorgang hinterlegte Adresse. Das Standardpaket wird unter Mandanten → Einrichtung → Standardpaket gepflegt.",
+  offen: offenExtern,
+  onOffenChange,
 }: {
   modul: string;
   refId: string;
   canEdit: boolean;
   titel?: string;
   beschreibung?: string;
+  /**
+   * Offen-Zustand von aussen steuern — der Knopf im Abschluss-Schritt oeffnet
+   * denselben Dialog. Ohne diese beiden Angaben verwaltet die Karte ihn selbst.
+   */
+  offen?: boolean;
+  onOffenChange?: (offen: boolean) => void;
 }) {
   const [angebot, setAngebot] = useState<PaketAngebot | null>(null);
   const [laden, setLaden] = useState(true);
   const [fehler, setFehler] = useState("");
-  const [offen, setOffen] = useState(false);
+  const [offenIntern, setOffenIntern] = useState(false);
+  const offen = offenExtern ?? offenIntern;
+  const setOffen = (wert: boolean) => {
+    setOffenIntern(wert);
+    onOffenChange?.(wert);
+  };
 
   const laedt = useCallback(async () => {
     setLaden(true);

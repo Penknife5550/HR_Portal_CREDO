@@ -27,6 +27,8 @@
  * SENT. Jeder Abbruchpfad davor laesst die Datenbank unberuehrt.
  */
 import crypto from "crypto";
+import path from "path";
+import { readFile } from "fs/promises";
 import { prisma } from "@/lib/db";
 import { readUploadedFile, saveUploadedFile } from "@/lib/file-upload";
 import { sendEventEmail, resolveEventTemplate, type MailAttachment } from "@/lib/mailer";
@@ -176,6 +178,31 @@ export function modulVerdrahtet(modul: string): boolean {
 // =============================================
 // Hilfen
 // =============================================
+
+/**
+ * Liest eine Vorlagendatei — aus den beiden Verzeichnissen, in denen Vorlagen
+ * legitim liegen, und aus keinem anderen.
+ *
+ * Hochgeladene Vorlagen liegen unter uploads/. System-Vorlagen liegen
+ * bewusst als Asset unter public/system-dokumente/ (sie werden beim Start
+ * geseedet, nicht hochgeladen) — readUploadedFile weist sie deshalb ab.
+ *
+ * Die bestehende Erzeugen-Route liest die Datei ohne jede Pruefung. Das wird
+ * hier nicht nachgemacht: dateipfad steht in der Datenbank, und eine
+ * manipulierte Zeile duerfte sonst jede Datei des Servers als Anhang
+ * verschicken.
+ */
+async function leseVorlagenDatei(dateipfad: string): Promise<Buffer> {
+  const wurzeln = [
+    path.resolve(path.join(process.cwd(), "uploads")),
+    path.resolve(path.join(process.cwd(), "public", "system-dokumente")),
+  ];
+  const ziel = path.resolve(dateipfad);
+  if (!wurzeln.some((w) => ziel === w || ziel.startsWith(w + path.sep))) {
+    throw new Error("Pfad ausserhalb der erlaubten Vorlagen-Verzeichnisse");
+  }
+  return readFile(ziel);
+}
 
 function sha256(buffer: Buffer): string {
   return crypto.createHash("sha256").update(buffer).digest("hex");
@@ -488,7 +515,7 @@ export async function versendePaket(opts: VersandOptionen): Promise<PaketErgebni
 
     let quelle: Buffer;
     try {
-      quelle = await readUploadedFile(pos.dateipfad!);
+      quelle = await leseVorlagenDatei(pos.dateipfad!);
     } catch {
       return fehler(
         "DATEI_FEHLT",
@@ -878,7 +905,7 @@ export async function pruefePaket(opts: {
     let fehlendeFelder: string[] = [];
     let groesse = 0;
     try {
-      const quelle = await readUploadedFile(pos.dateipfad!);
+      const quelle = await leseVorlagenDatei(pos.dateipfad!);
       const gerendert = renderDocx(quelle, daten);
       groesse = gerendert.buffer.length;
       fehlendeFelder = gerendert.missing.filter((k) => !gesperrt.has(k.trim().toLowerCase()));

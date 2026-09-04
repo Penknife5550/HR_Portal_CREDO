@@ -25,7 +25,9 @@ const mockGotenbergReachable = jest.fn();
 const mockReadUploadedFile = jest.fn();
 const mockSaveUploadedFile = jest.fn();
 const mockResolver = jest.fn();
+const mockReadFile = jest.fn();
 
+jest.mock("fs/promises", () => ({ readFile: (...a: unknown[]) => mockReadFile(...a) }));
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/permissions", () => ({
   ...jest.requireActual("@/lib/permissions"),
@@ -70,6 +72,13 @@ const REF = "onb-1";
 const PDF_ID = "11111111-1111-4111-8111-111111111111";
 const VORLAGE_ID = "22222222-2222-4222-8222-222222222222";
 const JETZT = new Date("2026-09-04T10:00:00.000Z");
+const VORLAGE_PFAD = require("path").join(process.cwd(), "uploads", "brief-vorlagen", "a.docx");
+const SYSTEM_PFAD = require("path").join(
+  process.cwd(),
+  "public",
+  "system-dokumente",
+  "fuehrungszeugnis-antrag.docx",
+);
 
 const session = {
   userId: "u1",
@@ -107,6 +116,7 @@ beforeEach(() => {
   mockPrisma.documentTemplate.findMany.mockResolvedValue([]);
   mockCanAccessProcess.mockResolvedValue(true);
   mockReadUploadedFile.mockResolvedValue(Buffer.from("%PDF-1.4 inhalt"));
+  mockReadFile.mockResolvedValue(Buffer.from("PK docx-quelle"));
   mockSaveUploadedFile.mockResolvedValue("uploads/irgendwo/datei");
   mockGotenbergReachable.mockResolvedValue(true);
   mockRenderDocx.mockReturnValue({ buffer: Buffer.from("docx"), missing: [] });
@@ -258,7 +268,7 @@ describe("Abbruch ohne Nachweis", () => {
       {
         id: VORLAGE_ID,
         name: "Abrechnungsdaten",
-        dateipfad: "brief-vorlagen/a.docx",
+        dateipfad: VORLAGE_PFAD,
         platzhalter: ["vorname", "iban"],
         modul: "ONBOARDING",
       },
@@ -291,7 +301,7 @@ describe("Abbruch ohne Nachweis", () => {
       {
         id: VORLAGE_ID,
         name: "Willkommensschreiben",
-        dateipfad: "brief-vorlagen/w.docx",
+        dateipfad: VORLAGE_PFAD,
         platzhalter: ["vorname"],
         modul: "ONBOARDING",
       },
@@ -403,7 +413,7 @@ describe("Erfolgreicher Versand", () => {
       {
         id: VORLAGE_ID,
         name: "Willkommensschreiben",
-        dateipfad: "brief-vorlagen/w.docx",
+        dateipfad: VORLAGE_PFAD,
         platzhalter: ["vorname"],
         modul: "ONBOARDING",
       },
@@ -447,7 +457,7 @@ describe("Erfolgreicher Versand", () => {
       {
         id: VORLAGE_ID,
         name: "Abrechnungsdaten",
-        dateipfad: "brief-vorlagen/a.docx",
+        dateipfad: VORLAGE_PFAD,
         platzhalter: ["vorname", "iban"],
         modul: "ONBOARDING",
       },
@@ -472,7 +482,7 @@ describe("Erfolgreicher Versand", () => {
 const VORLAGE_SENSIBEL = {
   id: VORLAGE_ID,
   name: "Abrechnungsdaten",
-  dateipfad: "brief-vorlagen/a.docx",
+  dateipfad: VORLAGE_PFAD,
   platzhalter: ["vorname", "iban", "steuer_id"],
   modul: "ONBOARDING",
 };
@@ -634,5 +644,50 @@ describe("HTTP-Zuordnung", () => {
     expect(statusFuerFehler("PDF_DIENST")).toBe(502);
     expect(statusFuerFehler("VERSAND")).toBe(502);
     expect(statusFuerFehler("MODUL_NICHT_UNTERSTUETZT")).toBe(400);
+  });
+});
+
+describe("Vorlagendateien lesen", () => {
+  const vorlage = (dateipfad: string) => ({
+    id: VORLAGE_ID,
+    name: "Willkommensschreiben",
+    dateipfad,
+    platzhalter: ["vorname"],
+    modul: "ONBOARDING",
+  });
+
+  beforeEach(() => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+  });
+
+  it("liest hochgeladene Vorlagen aus uploads/", async () => {
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([vorlage(VORLAGE_PFAD)]);
+    const r = await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(r.status).toBe("SENT");
+    expect(mockReadFile).toHaveBeenCalledWith(VORLAGE_PFAD);
+  });
+
+  it("liest System-Vorlagen aus public/system-dokumente/", async () => {
+    // Sie werden beim Start geseedet, nicht hochgeladen — readUploadedFile
+    // wuerde sie abweisen. An dieser Stelle ist der Versand einmal gescheitert.
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([vorlage(SYSTEM_PFAD)]);
+    const r = await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(r.status).toBe("SENT");
+    expect(mockReadFile).toHaveBeenCalledWith(SYSTEM_PFAD);
+  });
+
+  it("weist jeden anderen Pfad ab, auch wenn er in der Datenbank steht", async () => {
+    // Der Pfad kommt aus der Datenbank. Eine manipulierte Zeile darf nicht
+    // jede Datei des Servers als Anhang verschicken koennen.
+    for (const boesartig of [
+      "/etc/passwd",
+      require("path").join(process.cwd(), ".env"),
+      require("path").join(process.cwd(), "uploads", "..", ".env"),
+    ]) {
+      mockPrisma.documentTemplate.findMany.mockResolvedValue([vorlage(boesartig)]);
+      const r = await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+      expect(r).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
+      expect(mockSendEventEmail).not.toHaveBeenCalled();
+    }
   });
 });
