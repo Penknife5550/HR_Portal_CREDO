@@ -297,6 +297,44 @@ export async function PATCH(
     if (noticePeriodEnd) auditDetails.noticePeriodEnd = noticePeriodEnd;
     if (noticeDate) auditDetails.noticeDate = noticeDate;
 
+    // Adressaenderung MIT Vorher und Nachher — die Gegenprobe zur
+    // Empfaenger-Freigabe.
+    //
+    // Die Freigaberegel (src/lib/empfaenger-freigabe.ts) laesst die im Vorgang
+    // hinterlegte Adresse IMMER durch, auch wenn ihre Domain nicht auf der
+    // Liste steht. Das ist Absicht — der Regelfall beim Ausscheiden ist eine
+    // private Freemail-Adresse — und stuetzt sich ausdruecklich darauf, dass
+    // eine Aenderung dieser Adresse "eine eigene, protokollpflichtige Handlung
+    // an anderer Stelle" ist. Diese Stelle ist hier.
+    //
+    // Ohne den Eintrag waere die Liste mit zwei Aufrufen zu umgehen: private
+    // Adresse auf die eigene setzen -> Dokumentenpaket versenden (die Freigabe
+    // greift nicht, weil Ziel == Vorgangsadresse) -> Adresse zuruecksetzen.
+    // Der Versandnachweis vermerkt dabei sogar "empfaengerAbweichend: false".
+    //
+    // Das VORHER gehoert zwingend dazu: Wer die Adresse zuruecksetzt,
+    // hinterliesse sonst zwei Eintraege, die beide die richtige Adresse
+    // zeigen — und damit einen Nachweis, der genau das Gegenteil belegt.
+    //
+    // Die Adresse selbst ist ein Personendatum. Sie steht trotzdem im
+    // Protokoll, weil ein Eintrag ohne sie nichts belegen kann; das AuditLog
+    // fuehrt an anderer Stelle bereits Adressen (Cron-Erinnerungen,
+    // Vorgesetzten-Links). Es gilt dieselbe Aufbewahrung wie fuer den
+    // uebrigen Log-Bestand.
+    //
+    // Nur employeePrivateEmail ist hier aenderbar; employeeEmail nimmt
+    // updateOffboardingSchema gar nicht erst an (und keine andere Route
+    // schreibt es). Kaeme es dazu, gehoert es nach demselben Muster hierher.
+    if (employeePrivateEmail !== undefined) {
+      // Exakt so normalisiert wie oben in updateData: "" wird zu null. Sonst
+      // meldete das Protokoll ein "" -> null als Aenderung, das keine ist.
+      const neuePrivatadresse = employeePrivateEmail || null;
+      if (neuePrivatadresse !== existing.employeePrivateEmail) {
+        auditDetails.employeePrivateEmailFrom = existing.employeePrivateEmail;
+        auditDetails.employeePrivateEmailTo = neuePrivatadresse;
+      }
+    }
+
     await prisma.auditLog.create({
       data: {
         offboardingId: id,

@@ -14,6 +14,7 @@ import { getSession } from "@/lib/auth";
 import { EXPORT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { generateBADAufforderungsbrief } from "@/lib/elternzeit-pdf";
 import { saveUploadedFile, sanitizeFilename } from "@/lib/file-upload";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 import { unlink } from "fs/promises";
 
 export async function GET(
@@ -51,10 +52,7 @@ export async function GET(
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const generiertAm = new Date();
     const pdfBuffer = await generateBADAufforderungsbrief({

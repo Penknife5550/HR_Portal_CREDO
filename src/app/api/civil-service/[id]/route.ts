@@ -28,6 +28,33 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   CANCELLED: [],
 };
 
+/**
+ * Zieht die E-Mail-Adressen aus dem Beteiligten-Feld heraus — Rolle -> Adresse.
+ *
+ * `stakeholders` ist eine Json-Spalte ({ schulleitung: {name, email},
+ * amtsarzt: {email}, beirat: {email} }), also zur Laufzeit alles Moegliche.
+ * Deshalb wird hier nichts angenommen, sondern geprueft: Was keine Adresse
+ * traegt, taucht schlicht nicht auf. Die Rollen werden bewusst NICHT fest
+ * aufgezaehlt — kommt in stakeholdersSchema eine vierte hinzu, wandert sie
+ * ohne Aenderung hier mit ins Protokoll, statt still zu fehlen.
+ *
+ * Leere Adressen werden zu einem fehlenden Eintrag: "" und "nicht gesetzt"
+ * sind fuer den Vergleich dasselbe, sonst meldete das Protokoll Aenderungen,
+ * die keine sind.
+ */
+function stakeholderAdressen(wert: unknown): Record<string, string> {
+  const adressen: Record<string, string> = {};
+  if (!wert || typeof wert !== "object" || Array.isArray(wert)) return adressen;
+  for (const [rolle, eintrag] of Object.entries(wert as Record<string, unknown>)) {
+    if (!eintrag || typeof eintrag !== "object" || Array.isArray(eintrag)) continue;
+    const email = (eintrag as Record<string, unknown>).email;
+    if (typeof email !== "string") continue;
+    const getrimmt = email.trim();
+    if (getrimmt !== "") adressen[rolle] = getrimmt;
+  }
+  return adressen;
+}
+
 // =============================================
 // GET /api/civil-service/:id
 // =============================================
@@ -229,6 +256,46 @@ export async function PATCH(
     if (probationStartDate !== undefined) auditDetails.probationStartDate = probationStartDate;
     if (besoldungsgruppe !== undefined) auditDetails.besoldungsgruppe = besoldungsgruppe;
     if (erfahrungsstufe !== undefined) auditDetails.erfahrungsstufe = erfahrungsstufe;
+
+    // Adressaenderungen MIT Vorher und Nachher — die Gegenprobe zur
+    // Empfaenger-Freigabe.
+    //
+    // Die Freigaberegel (src/lib/empfaenger-freigabe.ts) laesst die im Vorgang
+    // hinterlegte Adresse IMMER durch, auch wenn ihre Domain nicht auf der
+    // Liste steht, und stuetzt sich ausdruecklich darauf, dass eine Aenderung
+    // dieser Adresse "eine eigene, protokollpflichtige Handlung an anderer
+    // Stelle" ist. Diese Stelle ist hier.
+    //
+    // Das VORHER gehoert zwingend dazu: Wer eine Adresse fuer einen Versand
+    // umbiegt und danach zuruecksetzt, hinterliesse sonst zwei Eintraege, die
+    // beide die richtige Adresse zeigen.
+    //
+    // Der Empfaenger des Dokumentenpakets ist in diesem Modul employeeEmail —
+    // die nimmt updateCivilServiceSchema nicht an, und keine andere Route
+    // schreibt sie; kaeme das dazu, gehoert es nach demselben Muster hierher.
+    // Aenderbar sind hier die Adressen der Beteiligten (Schulleitung,
+    // Amtsarzt, Beirat). Sie sind ebenfalls protokollpflichtig: Sie stehen in
+    // erzeugten Schreiben und im PDF-Export des Vorgangs, sind also der Weg,
+    // auf dem Angaben zur Person das Haus verlassen.
+    //
+    // Die Adressen selbst sind Personendaten. Sie stehen trotzdem im
+    // Protokoll, weil ein Eintrag ohne sie nichts belegen kann; das AuditLog
+    // fuehrt an anderer Stelle bereits Adressen (Gutachter-Anforderungen
+    // dieses Moduls, Cron-Erinnerungen).
+    if (stakeholders !== undefined) {
+      const alteAdressen = stakeholderAdressen(existing.stakeholders);
+      const neueAdressen = stakeholderAdressen(stakeholders);
+      // Vereinigung beider Seiten, damit auch eine ENTFERNTE Rolle auffaellt —
+      // eine geloeschte Adresse ist genauso eine Aenderung wie eine neue.
+      const rollen = new Set([...Object.keys(alteAdressen), ...Object.keys(neueAdressen)]);
+      for (const rolle of rollen) {
+        const alt = alteAdressen[rolle] ?? null;
+        const neu = neueAdressen[rolle] ?? null;
+        if (alt === neu) continue;
+        auditDetails[`${rolle}EmailFrom`] = alt;
+        auditDetails[`${rolle}EmailTo`] = neu;
+      }
+    }
 
     await prisma.auditLog.create({
       data: {

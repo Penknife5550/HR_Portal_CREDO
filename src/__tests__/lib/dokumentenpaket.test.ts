@@ -18,6 +18,13 @@ const mockPrisma = {
   dokumentenVersand: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
   generatedDocument: { create: jest.fn() },
   auditLog: { create: jest.fn() },
+  // Traegt die Freigabeliste fuer abweichende Empfaenger. Ohne diesen Eintrag
+  // liefe ladeErlaubteDomains in "Cannot read properties of undefined".
+  smtpConfig: { findUnique: jest.fn() },
+  // Nur fuer den einen Test, der den ECHTEN Verbeamtungs-Resolver laufen
+  // laesst (siehe "Was ctx.placeholders wirklich steuert").
+  organization: { findUnique: jest.fn() },
+  user: { findUnique: jest.fn() },
   $transaction: jest.fn(),
 };
 const mockCanAccessProcess = jest.fn();
@@ -26,14 +33,19 @@ const mockResolveEventTemplate = jest.fn();
 const mockRenderDocx = jest.fn();
 const mockConvertDocxToPdf = jest.fn();
 const mockGotenbergReachable = jest.fn();
-const mockReadUploadedFile = jest.fn();
 const mockSaveUploadedFile = jest.fn();
 const mockResolver = jest.fn();
 const mockReadFile = jest.fn();
+const mockRealpath = jest.fn();
 const mockUnlink = jest.fn();
 
 jest.mock("fs/promises", () => ({
   readFile: (...a: unknown[]) => mockReadFile(...a),
+  // Die Pfadschranke loest beide Seiten ueber realpath auf. Standardverhalten
+  // im Test ist die Identitaet — damit verhaelt sich die Schranke wie der
+  // reine Zeichenkettenvergleich von frueher, und die Faelle, die den
+  // Unterschied ausmachen, setzen den Mock gezielt anders.
+  realpath: (...a: unknown[]) => mockRealpath(...a),
   unlink: (...a: unknown[]) => mockUnlink(...a),
 }));
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
@@ -53,8 +65,12 @@ jest.mock("@/lib/doc-templates", () => ({
   ...jest.requireActual("@/lib/doc-templates"),
   renderDocx: (...a: unknown[]) => mockRenderDocx(...a),
 }));
+// requireActual-Spread und nicht nur die zwei Namen: dokumentenpaket.ts holt
+// sich hier auch asciiFilename und sha256Hex. Eine Fabrik, die nur
+// saveUploadedFile auflistet, machte beide zu undefined — und der Nachweis-Hash
+// waere still weg.
 jest.mock("@/lib/file-upload", () => ({
-  readUploadedFile: (...a: unknown[]) => mockReadUploadedFile(...a),
+  ...jest.requireActual("@/lib/file-upload"),
   saveUploadedFile: (...a: unknown[]) => mockSaveUploadedFile(...a),
 }));
 jest.mock("@/lib/doc-template-resolvers", () => ({
@@ -65,6 +81,7 @@ jest.mock("@/lib/doc-template-resolvers", () => ({
 
 import { EVENT_CATALOG } from "@/lib/events";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
+import { sensiblePlatzhalter } from "@/lib/placeholder-catalog";
 import {
   versendePaket,
   kodierteGroesse,
@@ -85,8 +102,13 @@ const ORG = "org-1";
 const REF = "onb-1";
 const PDF_ID = "11111111-1111-4111-8111-111111111111";
 const VORLAGE_ID = "22222222-2222-4222-8222-222222222222";
+const VORLAGE_ID_2 = "33333333-3333-4333-8333-333333333333";
 const JETZT = new Date("2026-09-04T10:00:00.000Z");
 const VORLAGE_PFAD = require("path").join(process.cwd(), "uploads", "brief-vorlagen", "a.docx");
+/** So sehen die Pfade der Pool-PDFs aus: uploads/starterpaket/<datei>. */
+const POOL_PFAD = require("path").join(process.cwd(), "uploads", "starterpaket", "leitbild.pdf");
+const POOL_INHALT = Buffer.from("%PDF-1.4 inhalt");
+const DOCX_INHALT = Buffer.from("PK docx-quelle");
 const SYSTEM_PFAD = require("path").join(
   process.cwd(),
   "public",
@@ -101,6 +123,19 @@ const session = {
   firstName: "Erika",
   lastName: "Sachbearbeiter",
 };
+
+/** Ein Pool-PDF, wie es aus der Datenbank kommt — inklusive fileSize. */
+function poolDokument(extra: Record<string, unknown> = {}) {
+  return {
+    id: PDF_ID,
+    name: "Leitbild",
+    dateipfad: POOL_PFAD,
+    originalName: "leitbild.pdf",
+    hash: "x".repeat(64),
+    fileSize: POOL_INHALT.length,
+    ...extra,
+  };
+}
 
 function basis(extra?: Record<string, unknown>) {
   return {
@@ -124,13 +159,18 @@ beforeEach(() => {
     organization: { name: "Gymnasium" },
     personalData: null,
   });
-  mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
-    { id: PDF_ID, name: "Leitbild", dateipfad: "starterpaket/leitbild.pdf", originalName: "leitbild.pdf", hash: "x".repeat(64) },
-  ]);
+  mockPrisma.starterpaketDokument.findMany.mockResolvedValue([poolDokument()]);
   mockPrisma.documentTemplate.findMany.mockResolvedValue([]);
+  mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "" });
+  mockPrisma.organization.findUnique.mockResolvedValue(null);
+  mockPrisma.user.findUnique.mockResolvedValue(null);
   mockCanAccessProcess.mockResolvedValue(true);
-  mockReadUploadedFile.mockResolvedValue(Buffer.from("%PDF-1.4 inhalt"));
-  mockReadFile.mockResolvedValue(Buffer.from("PK docx-quelle"));
+  // Pool-PDFs und Vorlagen laufen jetzt ueber denselben Leseweg (readFile hinter
+  // der Pfadschranke) — unterschieden wird an der Endung.
+  mockReadFile.mockImplementation(async (p: unknown) =>
+    String(p).toLowerCase().endsWith(".pdf") ? POOL_INHALT : DOCX_INHALT,
+  );
+  mockRealpath.mockImplementation(async (p: unknown) => p as string);
   mockUnlink.mockResolvedValue(undefined);
   mockSaveUploadedFile.mockResolvedValue("uploads/irgendwo/datei");
   mockGotenbergReachable.mockResolvedValue(true);
@@ -317,7 +357,7 @@ describe("Abbruch ohne Nachweis", () => {
   });
 
   it("fehlende Datei", async () => {
-    mockReadUploadedFile.mockRejectedValue(new Error("weg"));
+    mockReadFile.mockRejectedValue(new Error("weg"));
     const r = await versendePaket(basis());
     expect(r).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
     expect(mockSendEventEmail).not.toHaveBeenCalled();
@@ -352,7 +392,7 @@ describe("Abbruch ohne Nachweis", () => {
   });
 
   it("Paket zu gross", async () => {
-    mockReadUploadedFile.mockResolvedValue(Buffer.alloc(MAX_PAKET_BYTES + 1));
+    mockReadFile.mockResolvedValue(Buffer.alloc(MAX_PAKET_BYTES + 1));
     const r = await versendePaket(basis());
     expect(r).toMatchObject({ status: "FEHLER", fehler: "ZU_GROSS" });
     expect(mockSendEventEmail).not.toHaveBeenCalled();
@@ -569,7 +609,11 @@ describe("Vorpruefung", () => {
 
   it("meldet Groessen: PDFs genau, Vorlagen geschaetzt", async () => {
     mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_SENSIBEL]);
-    mockReadUploadedFile.mockResolvedValue(Buffer.alloc(1000));
+    // Die PDF-Groesse kommt jetzt aus der Datenbank (fileSize), nicht mehr aus
+    // dem eingelesenen Puffer. Die Erwartungen darunter bleiben gleich — genau
+    // das ist der Beleg, dass die Umstellung die gemeldete Groesse nicht
+    // verschiebt.
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([poolDokument({ fileSize: 1000 })]);
     mockRenderDocx.mockReturnValue({ buffer: Buffer.alloc(2000), missing: [] });
 
     const r = await pruefePaket({
@@ -588,6 +632,65 @@ describe("Vorpruefung", () => {
     expect(r.pruefung.gesamtGeschaetzt).toBe(true);
     expect(r.pruefung.ueberGroessenGrenze).toBe(false);
     expect(r.pruefung.positionen[0].geschaetzt).toBe(false);
+  });
+
+  it("liest fuer die Groesse eines Pool-PDFs kein einziges Byte", async () => {
+    // Der Dialog stoesst die Vorpruefung 500 ms verzoegert nach JEDER Aenderung
+    // an — bei jedem Haken und jedem Tastendruck im Adressfeld. Frueher wanderte
+    // dabei jedes Pool-PDF vollstaendig in den Speicher, nur um .length zu lesen.
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+    expect(r.status === "OK" && r.pruefung.positionen[0].groesse).toBe(POOL_INHALT.length);
+    expect(mockReadFile).not.toHaveBeenCalled();
+    // Die Existenz wird trotzdem geprueft — ueber den aufgeloesten Pfad.
+    expect(mockRealpath).toHaveBeenCalledWith(POOL_PFAD);
+  });
+
+  it("warnt weiterhin, wenn ein Pool-PDF fehlt", async () => {
+    // Die Zusage der Vorpruefung ("wuerde den Versand abbrechen") haette bei der
+    // Umstellung auf den Datenbankwert wegfallen koennen. realpath beantwortet
+    // beides auf einmal: erlaubter Bereich UND vorhanden.
+    mockRealpath.mockImplementation(async (p: unknown) => {
+      if (p === POOL_PFAD) throw new Error("ENOENT");
+      return p as string;
+    });
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.warnungen.join(" ")).toContain("fehlt im Speicher");
+  });
+
+  it("warnt auch, wenn das Pool-PDF ausserhalb seines Verzeichnisses liegt", async () => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
+      poolDokument({ dateipfad: require("path").join(process.cwd(), ".env") }),
+    ]);
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+    expect(r.status === "OK" && r.pruefung.warnungen.join(" ")).toContain("fehlt im Speicher");
+  });
+
+  it("der Versand misst dagegen die echten Bytes und nicht den Datenbankwert", async () => {
+    // Die 413-Grenze haengt am Versand. Ein falscher fileSize-Wert darf sie
+    // nicht aufweichen — deshalb bleibt dort das vollstaendige Lesen.
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
+      poolDokument({ fileSize: 1 }),
+    ]);
+    mockReadFile.mockResolvedValue(Buffer.alloc(MAX_PAKET_BYTES + 1));
+    const r = await versendePaket(basis());
+    expect(r).toMatchObject({ status: "FEHLER", fehler: "ZU_GROSS" });
   });
 
   it("warnt, wenn die Mailvorlage {{nachricht}} nicht kennt", async () => {
@@ -664,6 +767,231 @@ describe("Vorpruefung", () => {
   });
 });
 
+/**
+ * Das Kennzeichen `blockiert` je Position — die serverseitige Haelfte der
+ * Knopfsperre im Dialog.
+ *
+ * Die Zusage ist eng: gesetzt wird es NUR dort, wo der Versand tatsaechlich mit
+ * 409 abbraeche (DATEI_FEHLT, VORLAGE_FEHLERHAFT). Deshalb steht neben jedem
+ * Blockier-Fall die Gegenprobe mit versendePaket — nur so bleibt das Kennzeichen
+ * an die Wahrheit des Versands gebunden und wird nicht zur Meinung der
+ * Vorpruefung.
+ *
+ * Ebenso wichtig sind die Gegenproben nach unten: Eine Sperre, die auch im
+ * Normalfall oder bei bloss leeren Feldern zuschlaegt, macht den Knopf
+ * unbenutzbar und ist schlimmer als gar keine.
+ */
+describe("Vorpruefung: blockierte Positionen", () => {
+  // Eine nicht lesbare Vorlage wird bewusst mit ihrem vollen Pfad geloggt (der
+  // Browser bekommt nur den Dateinamen — siehe den Test dazu weiter unten). Im
+  // Testlauf ist dieses Logging nur Laerm und koennte echte Fehler verdecken.
+  // Der globale beforeEach ruft jest.clearAllMocks(), also sieht jeder Test nur
+  // seine eigenen Aufrufe.
+  let konsole: jest.SpyInstance;
+  beforeAll(() => {
+    konsole = jest.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+  afterAll(() => konsole.mockRestore());
+
+  /** Eine harmlose Vorlage ohne sensible Felder — fuer die Gegenproben. */
+  const VORLAGE_HARMLOS = {
+    id: VORLAGE_ID,
+    name: "Willkommensschreiben",
+    dateipfad: VORLAGE_PFAD,
+    platzhalter: ["vorname", "ort"],
+    modul: "ONBOARDING",
+  };
+
+  it("kennzeichnet ein fehlendes Pool-PDF — und der Versand bricht dort wirklich ab", async () => {
+    mockRealpath.mockImplementation(async (p: unknown) => {
+      if (p === POOL_PFAD) throw new Error("ENOENT");
+      return p as string;
+    });
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.positionen[0].blockiert).toBe(true);
+
+    // Die Zusage einloesen: Genau diese Position laeuft im Versand in den 409.
+    const v = await versendePaket(basis());
+    expect(v).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
+    expect(statusFuerFehler("DATEI_FEHLT")).toBe(409);
+  });
+
+  it("kennzeichnet ein Pool-PDF ausserhalb seines Verzeichnisses", async () => {
+    // Nicht dasselbe wie "Datei weg": Die Datei gibt es, sie liegt nur da, wo
+    // sie nicht liegen darf. Der Versand weist sie ueber dieselbe Schranke ab.
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
+      poolDokument({ dateipfad: require("path").join(process.cwd(), ".env") }),
+    ]);
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+    expect(r.status === "OK" && r.pruefung.positionen[0].blockiert).toBe(true);
+    expect(await versendePaket(basis())).toMatchObject({
+      status: "FEHLER",
+      fehler: "DATEI_FEHLT",
+    });
+  });
+
+  it("kennzeichnet eine Vorlage, die sich nicht befuellen laesst", async () => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_HARMLOS]);
+    mockRenderDocx.mockImplementation(() => {
+      throw new Error("Unopened tag: {vorname");
+    });
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "VORLAGE", id: VORLAGE_ID }],
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.positionen[0].blockiert).toBe(true);
+
+    const v = await versendePaket(
+      basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }),
+    );
+    expect(v).toMatchObject({ status: "FEHLER", fehler: "VORLAGE_FEHLERHAFT" });
+    expect(statusFuerFehler("VORLAGE_FEHLERHAFT")).toBe(409);
+  });
+
+  it("kennzeichnet eine Vorlagendatei, die gar nicht mehr da ist", async () => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_HARMLOS]);
+    mockRealpath.mockImplementation(async (p: unknown) => {
+      if (p === VORLAGE_PFAD) throw new Error("ENOENT");
+      return p as string;
+    });
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "VORLAGE", id: VORLAGE_ID }],
+      session,
+    });
+    expect(r.status === "OK" && r.pruefung.positionen[0].blockiert).toBe(true);
+    expect(
+      await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] })),
+    ).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
+  });
+
+  it("nennt dabei den Dateinamen und NICHT den Serverpfad", async () => {
+    // Die Warnung geht als JSON an den Browser. Frueher stand die Meldung des
+    // Dateisystems woertlich darin — samt "/app/uploads/brief-vorlagen/…", also
+    // der Verzeichnisstruktur des Servers. Der Dateiname genuegt zum
+    // Wiederfinden in der Vorlagenverwaltung.
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_HARMLOS]);
+    // So wirft Node tatsaechlich: mit dem vollstaendigen Pfad in der Meldung.
+    mockReadFile.mockRejectedValue(
+      new Error(`ENOENT: no such file or directory, open '${VORLAGE_PFAD}'`),
+    );
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "VORLAGE", id: VORLAGE_ID }],
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.positionen[0].blockiert).toBe(true);
+
+    const warnung = r.pruefung.warnungen.join(" ");
+    expect(warnung).toContain("Willkommensschreiben");
+    expect(warnung).toContain("a.docx");
+    expect(warnung).not.toContain(VORLAGE_PFAD);
+    expect(warnung).not.toContain("brief-vorlagen");
+    expect(warnung).not.toContain(process.cwd());
+
+    // Verloren gehen darf der Pfad deswegen nicht: Wer auf der Maschine sucht,
+    // findet ihn im Serverprotokoll.
+    const geloggt = konsole.mock.calls.map((c) => c.join(" ")).join(" ");
+    expect(geloggt).toContain(VORLAGE_PFAD);
+  });
+
+  it("Gegenprobe Normalfall: keine einzige Position ist blockiert", async () => {
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_HARMLOS]);
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [
+        { art: "PDF", id: PDF_ID },
+        { art: "VORLAGE", id: VORLAGE_ID },
+      ],
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.positionen).toHaveLength(2);
+    // Bewusst gegen `true` und nicht gegen `false` geprueft: Das Feld ist
+    // optional, und `undefined` heisst clientseitig ebenfalls "unauffaellig".
+    for (const p of r.pruefung.positionen) expect(p.blockiert).not.toBe(true);
+    expect(r.pruefung.warnungen).toEqual([]);
+  });
+
+  it("Gegenprobe leere Felder: eine Vorlage mit Luecken ist NICHT blockiert", async () => {
+    // Das Dokument geht hinaus, nur mit Luecken — der Versand kennt dafuer
+    // keinen Abbruch, sondern eine Warnung. Wuerde die Vorpruefung hier sperren,
+    // koennte niemand mehr ein Schreiben verschicken, dessen Ort noch fehlt.
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_HARMLOS]);
+    mockRenderDocx.mockReturnValue({ buffer: Buffer.from("docx"), missing: ["ort"] });
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "VORLAGE", id: VORLAGE_ID }],
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.positionen[0].fehlendeFelder).toEqual(["ort"]);
+    expect(r.pruefung.positionen[0].blockiert).not.toBe(true);
+
+    // Und der Beleg dafuer, dass das kein Versehen ist: Der Versand laesst
+    // dieselbe Vorlage anstandslos durch.
+    const v = await versendePaket(
+      basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }),
+    );
+    expect(v.status).toBe("SENT");
+  });
+
+  it("Gegenprobe unbestaetigte sensible Vorlage: nicht blockiert, nur bestaetigungspflichtig", async () => {
+    // Die fehlende Bestaetigung bricht den Versand zwar ebenfalls mit 409 ab,
+    // hat im Dialog aber ihr eigenes Feld (bestaetigungNoetig) und ihre eigene
+    // Sperre. Waere sie hier zusaetzlich blockiert, blieben Ankreuzfeld und
+    // Rotmeldung dauerhaft nebeneinander stehen — die Bestaetigung liesse sich
+    // setzen, ohne dass der Knopf je freigaebe.
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([VORLAGE_SENSIBEL]);
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "VORLAGE", id: VORLAGE_ID }],
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.positionen[0].bestaetigungNoetig).toBe(true);
+    expect(r.pruefung.positionen[0].blockiert).not.toBe(true);
+  });
+});
+
 describe("HTTP-Zuordnung", () => {
   it("bildet jedes Fehlerbild auf einen Status ab", () => {
     expect(statusFuerFehler("KEIN_ZUGRIFF")).toBe(404);
@@ -720,6 +1048,99 @@ describe("Vorlagendateien lesen", () => {
       expect(r).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
       expect(mockSendEventEmail).not.toHaveBeenCalled();
     }
+  });
+
+  it("weist eine Vorlage aus dem BEM-Baum ab", async () => {
+    // Der Kern der Verengung: Frueher war der ganze uploads-Baum Wurzel, und
+    // darunter liegen die BEM-Anlagen — Gesundheitsdaten nach Art. 9 DSGVO mit
+    // eigenem Schluessel. Die haben in einem Dokumentenpaket nichts zu suchen.
+    const bemPfad = require("path").join(
+      process.cwd(),
+      "uploads",
+      "bem",
+      "fall-1",
+      "dokumente",
+      "upload",
+      "attest.docx",
+    );
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([vorlage(bemPfad)]);
+    const r = await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(r).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
+    expect(mockSendEventEmail).not.toHaveBeenCalled();
+  });
+
+  it("weist ein Geschwisterverzeichnis mit gleichem Praefix ab", async () => {
+    // Der Grund, warum ueber path.relative und nicht ueber startsWith
+    // verglichen wird: "uploads/brief-vorlagen-fremd" faengt mit
+    // "uploads/brief-vorlagen" an, liegt aber nicht darunter.
+    const geschwister = require("path").join(
+      process.cwd(),
+      "uploads",
+      "brief-vorlagen-fremd",
+      "a.docx",
+    );
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([vorlage(geschwister)]);
+    const r = await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(r).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
+  });
+
+  it("prueft den aufgeloesten und nicht den geschriebenen Pfad", async () => {
+    // Das ist der Symlink-Fall in mockbarer Form: In der Datenbank steht ein
+    // Pfad, der brav unter uploads/brief-vorlagen liegt — er zeigt aber
+    // woandershin. Mit dem alten path.resolve+startsWith waere dieser Test
+    // gruen durchgelaufen UND haette die falsche Datei verschickt.
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([vorlage(VORLAGE_PFAD)]);
+    mockRealpath.mockImplementation(async (p: unknown) =>
+      p === VORLAGE_PFAD ? "/etc/passwd" : (p as string),
+    );
+    const r = await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(r).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
+    expect(mockReadFile).not.toHaveBeenCalledWith("/etc/passwd");
+    expect(mockSendEventEmail).not.toHaveBeenCalled();
+  });
+
+  it("laesst eine Wurzel aus, die es auf dieser Maschine nicht gibt", async () => {
+    // Ob public/system-dokumente existiert, darf nicht darueber entscheiden, ob
+    // eine hochgeladene Vorlage lesbar ist. realpath wirft dort — die Schranke
+    // muss die Wurzel ueberspringen statt aufzugeben.
+    const systemWurzel = require("path").join(process.cwd(), "public", "system-dokumente");
+    mockRealpath.mockImplementation(async (p: unknown) => {
+      if (p === systemWurzel) throw new Error("ENOENT");
+      return p as string;
+    });
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([vorlage(VORLAGE_PFAD)]);
+    const r = await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(r.status).toBe("SENT");
+  });
+});
+
+describe("Pool-PDFs nur aus uploads/starterpaket", () => {
+  it("liest ein Pool-PDF aus seinem Verzeichnis", async () => {
+    const r = await versendePaket(basis());
+    expect(r.status).toBe("SENT");
+    expect(mockReadFile).toHaveBeenCalledWith(POOL_PFAD);
+  });
+
+  it("weist ein Pool-PDF ausserhalb von uploads/starterpaket ab", async () => {
+    // So sehen die Fragebogen-Uploads real aus: uploads/<onboardingId>/....
+    // Sie liegen im uploads-Baum und waeren frueher als Anhang durchgegangen.
+    const fremd = require("path").join(process.cwd(), "uploads", REF, "1773221186031_Lebenslauf.pdf");
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
+      poolDokument({ dateipfad: fremd }),
+    ]);
+    const r = await versendePaket(basis());
+    expect(r).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
+    expect(mockSendEventEmail).not.toHaveBeenCalled();
+    nichtsGeschrieben();
+  });
+
+  it("weist auch ein Pool-PDF aus dem Vorlagen-Verzeichnis ab", async () => {
+    // Die beiden Wurzeln sind getrennt: Eine Brief-Vorlage ist kein Pool-PDF.
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
+      poolDokument({ dateipfad: VORLAGE_PFAD }),
+    ]);
+    const r = await versendePaket(basis());
+    expect(r).toMatchObject({ status: "FEHLER", fehler: "DATEI_FEHLT" });
   });
 });
 
@@ -918,10 +1339,61 @@ describe("Groessengrenze misst die versendete Nachricht", () => {
     expect(roh).toBeLessThan(MAX_PAKET_BYTES);
     expect(kodierteGroesse(roh)).toBeGreaterThan(MAX_PAKET_BYTES);
 
-    mockReadUploadedFile.mockResolvedValue(Buffer.alloc(roh));
+    mockReadFile.mockResolvedValue(Buffer.alloc(roh));
     const r = await versendePaket(basis());
     expect(r).toMatchObject({ status: "FEHLER", fehler: "ZU_GROSS" });
     expect(mockSendEventEmail).not.toHaveBeenCalled();
+  });
+
+  it("meldet dasselbe schon in der Vorpruefung — sonst gibt der Dialog den Knopf frei", async () => {
+    // Das Fenster zwischen den beiden Grenzen: roh unter 15 MB, kodiert
+    // darueber. Genau hier hat die Vorpruefung frueher "passt" gesagt, waehrend
+    // der Versand mit 413 abwies — die Knopfsperre des Dialogs haengt an
+    // ueberGroessenGrenze und war damit in diesem Fenster wirkungslos.
+    const roh = Math.floor(MAX_PAKET_BYTES * 0.8);
+    expect(roh).toBeLessThan(MAX_PAKET_BYTES);
+    expect(kodierteGroesse(roh)).toBeGreaterThan(MAX_PAKET_BYTES);
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([poolDokument({ fileSize: roh })]);
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.ueberGroessenGrenze).toBe(true);
+    // Der Anzeigewert bleibt roh: Der Dialog schreibt "x von 15 MB" und meint
+    // damit die Anhaenge, nicht ihre base64-Fassung.
+    expect(r.pruefung.gesamtGroesse).toBe(roh);
+
+    // Die Zusage einloesen — dieselbe Menge laeuft im Versand wirklich in den 413.
+    mockReadFile.mockResolvedValue(Buffer.alloc(roh));
+    expect(await versendePaket(basis())).toMatchObject({
+      status: "FEHLER",
+      fehler: "ZU_GROSS",
+    });
+    expect(statusFuerFehler("ZU_GROSS")).toBe(413);
+  });
+
+  it("Gegenprobe: knapp unter der kodierten Grenze bleibt der Weg frei", async () => {
+    // Die Vorpruefung darf nicht ins andere Extrem kippen und ein Paket sperren,
+    // das der Versand anstandslos annimmt.
+    const roh = Math.floor((MAX_PAKET_BYTES * 3) / 4) - 4096;
+    expect(kodierteGroesse(roh)).toBeLessThan(MAX_PAKET_BYTES);
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([poolDokument({ fileSize: roh })]);
+
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+    expect(r.status === "OK" && r.pruefung.ueberGroessenGrenze).toBe(false);
+
+    mockReadFile.mockResolvedValue(Buffer.alloc(roh));
+    expect(await versendePaket(basis())).toMatchObject({ status: "SENT" });
   });
 });
 
@@ -1083,7 +1555,7 @@ describe("Offboarding", () => {
 
   it("nimmt das Vertragsende als Austrittsdatum", async () => {
     mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
-      { id: PDF_ID, name: "Leitbild", dateipfad: "starterpaket/leitbild.pdf", originalName: "leitbild.pdf", hash: "x".repeat(64) },
+      poolDokument(),
     ]);
     mockPrisma.offboardingProcess.findUnique.mockResolvedValue(vorgang());
     await versendePaket(basis({ modul: "OFFBOARDING", positionen: [{ art: "PDF", id: PDF_ID }] }));
@@ -1092,7 +1564,7 @@ describe("Offboarding", () => {
 
   it("faellt auf den letzten Arbeitstag zurueck", async () => {
     mockPrisma.starterpaketDokument.findMany.mockResolvedValue([
-      { id: PDF_ID, name: "Leitbild", dateipfad: "starterpaket/leitbild.pdf", originalName: "leitbild.pdf", hash: "x".repeat(64) },
+      poolDokument(),
     ]);
     mockPrisma.offboardingProcess.findUnique.mockResolvedValue(vorgang({ contractEndDate: null }));
     await versendePaket(basis({ modul: "OFFBOARDING", positionen: [{ art: "PDF", id: PDF_ID }] }));
@@ -1184,5 +1656,315 @@ describe("Die drei Vorlagen", () => {
     for (const teil of [v.bodyHtml, v.bodyText ?? ""]) {
       expect(teil).not.toMatch(/danken|alles Gute|Glück/i);
     }
+  });
+});
+
+// =============================================
+// Freigabe abweichender Empfaengeradressen
+// =============================================
+
+describe("Freigabe abweichender Empfaengeradressen", () => {
+  it("bricht bei fremder Domain ab, BEVOR irgendetwas hinausgeht", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes-minden.de",
+    });
+    const r = await versendePaket(basis({ empfaenger: "dieb@gmail.com" }));
+
+    expect(r).toMatchObject({ status: "FEHLER", fehler: "EMPFAENGER_NICHT_ERLAUBT" });
+    // Der eigentliche Punkt: Die Schranke sitzt vor dem Versand und nicht
+    // dahinter. Hinter sendEventEmail waere sie nur noch ein Vermerk.
+    expect(mockSendEventEmail).not.toHaveBeenCalled();
+    expect(mockReadFile).not.toHaveBeenCalled();
+    expect(mockConvertDocxToPdf).not.toHaveBeenCalled();
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.dokumentenVersand.create).not.toHaveBeenCalled();
+    nichtsGeschrieben();
+  });
+
+  it("nennt in der Meldung, was erlaubt waere", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes-minden.de, credo-gruppe.de",
+    });
+    const r = await versendePaket(basis({ empfaenger: "dieb@gmail.com" }));
+    expect(r.status === "FEHLER" && r.detail).toContain("fes-minden.de");
+    expect(r.status === "FEHLER" && r.detail).toContain("credo-gruppe.de");
+  });
+
+  it("laesst die Adresse des Vorgangs immer durch — auch bei gepflegter Liste", async () => {
+    // Der Normalfall des Onboardings: Die neue Person hat noch kein
+    // dienstliches Postfach. Eine Liste, die genau das blockierte, waere
+    // unbrauchbar — und wuerde nach der ersten Woche wieder geleert.
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue({
+      email: "max@gmail.com",
+      firstName: "Max",
+      lastName: "Mustermann",
+      displayId: "2026-GYM-001",
+      organizationId: ORG,
+      organization: { name: "Gymnasium" },
+      personalData: null,
+    });
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes-minden.de",
+    });
+    const r = await versendePaket(basis({ empfaenger: "max@gmail.com" }));
+    expect(r.status).toBe("SENT");
+  });
+
+  it("laesst eine freigegebene Domain durch", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes-minden.de",
+    });
+    const r = await versendePaket(basis({ empfaenger: "vertretung@fes-minden.de" }));
+    expect(r.status).toBe("SENT");
+  });
+
+  it("blockiert nichts, solange die Liste leer ist — und vermerkt die Abweichung", async () => {
+    // Auslieferungszustand: Eine Liste, die niemand gepflegt hat, darf den
+    // Versand nicht lahmlegen. Der bisherige Vermerk im Nachweis bleibt.
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "" });
+    const r = await versendePaket(basis({ empfaenger: "privat@web.de" }));
+    expect(r.status).toBe("SENT");
+    const daten = mockPrisma.dokumentenVersand.create.mock.calls[0][0].data;
+    expect(daten.empfaengerAbweichend).toBe(true);
+  });
+
+  it("kommt ohne SmtpConfig-Zeile aus (frische Installation)", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue(null);
+    const r = await versendePaket(basis({ empfaenger: "privat@web.de" }));
+    expect(r.status).toBe("SENT");
+  });
+
+  it("liefert den Status 409 — die Person kann es selbst beheben", () => {
+    expect(statusFuerFehler("EMPFAENGER_NICHT_ERLAUBT")).toBe(409);
+  });
+
+  it("meldet dasselbe schon in der Vorpruefung", async () => {
+    // Damit der Dialog den Knopf sperren kann, statt die Person erst nach dem
+    // Zusammenstellen des ganzen Pakets in einen 409 laufen zu lassen.
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes-minden.de",
+    });
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      empfaenger: "dieb@gmail.com",
+      session,
+    });
+    expect(r.status).toBe("OK");
+    if (r.status !== "OK") return;
+    expect(r.pruefung.empfaengerErlaubt).toBe(false);
+    expect(r.pruefung.erlaubteDomains).toEqual(["fes-minden.de"]);
+  });
+
+  it("haelt die Vorpruefung ohne eingegebene Adresse offen", async () => {
+    // Der Dialog fragt auch, waehrend das Feld noch leer ist.
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes-minden.de",
+    });
+    const r = await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [{ art: "PDF", id: PDF_ID }],
+      session,
+    });
+    expect(r.status === "OK" && r.pruefung.empfaengerErlaubt).toBe(true);
+  });
+});
+
+// =============================================
+// Zwischenspeicher fuer den Resolver
+// =============================================
+
+describe("Resolver-Zwischenspeicher", () => {
+  const vorlage = (id: string, platzhalter: string[]) => ({
+    id,
+    name: `Vorlage ${id.slice(0, 4)}`,
+    dateipfad: VORLAGE_PFAD,
+    platzhalter,
+    modul: "ONBOARDING",
+  });
+
+  beforeEach(() => {
+    mockPrisma.starterpaketDokument.findMany.mockResolvedValue([]);
+  });
+
+  it("ruft den Resolver bei gleicher Platzhalterliste nur einmal", async () => {
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([
+      vorlage(VORLAGE_ID, ["vorname", "nachname"]),
+      vorlage(VORLAGE_ID_2, ["nachname", "vorname"]),
+    ]);
+    const r = await versendePaket(
+      basis({
+        positionen: [
+          { art: "VORLAGE", id: VORLAGE_ID },
+          { art: "VORLAGE", id: VORLAGE_ID_2 },
+        ],
+      }),
+    );
+    expect(r.status).toBe("SENT");
+    // Zwei Vorlagen, ein Resolver-Lauf — und die Reihenfolge der Platzhalter
+    // darf dabei keine Rolle spielen, deshalb wird der Schluessel sortiert.
+    expect(mockResolver).toHaveBeenCalledTimes(1);
+    expect(mockRenderDocx).toHaveBeenCalledTimes(2);
+  });
+
+  it("teilt ein Ergebnis NIE mit einer anderen Platzhalterliste", async () => {
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([
+      vorlage(VORLAGE_ID, ["vorname"]),
+      vorlage(VORLAGE_ID_2, ["vorname", "antrag_erklaerung"]),
+    ]);
+    await versendePaket(
+      basis({
+        positionen: [
+          { art: "VORLAGE", id: VORLAGE_ID },
+          { art: "VORLAGE", id: VORLAGE_ID_2 },
+        ],
+      }),
+    );
+    expect(mockResolver).toHaveBeenCalledTimes(2);
+    expect(mockResolver.mock.calls[0][0].placeholders).toEqual(["vorname"]);
+    expect(mockResolver.mock.calls[1][0].placeholders).toEqual([
+      "vorname",
+      "antrag_erklaerung",
+    ]);
+  });
+
+  it("gibt jeder Vorlage eine eigene Kopie der Daten", async () => {
+    // Die Resolver liefern heute nur Zeichenketten, und kein Aufrufer schreibt
+    // in das Ergebnis hinein. Wer das spaeter tut, soll trotzdem nicht der
+    // naechsten Vorlage in die Daten schreiben.
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([
+      vorlage(VORLAGE_ID, ["vorname"]),
+      vorlage(VORLAGE_ID_2, ["vorname"]),
+    ]);
+    await versendePaket(
+      basis({
+        positionen: [
+          { art: "VORLAGE", id: VORLAGE_ID },
+          { art: "VORLAGE", id: VORLAGE_ID_2 },
+        ],
+      }),
+    );
+    const ersteDaten = mockRenderDocx.mock.calls[0][1];
+    const zweiteDaten = mockRenderDocx.mock.calls[1][1];
+    expect(ersteDaten).toEqual(zweiteDaten);
+    expect(ersteDaten).not.toBe(zweiteDaten);
+  });
+
+  it("laesst einen Fehlschlag nicht am Speicher kleben", async () => {
+    // Ein Verbindungsabriss bei der ersten Vorlage darf nicht alle folgenden
+    // Aufrufe mitreissen — der Eintrag wird wieder ausgetragen.
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([vorlage(VORLAGE_ID, ["vorname"])]);
+    mockResolver
+      .mockRejectedValueOnce(new Error("Verbindung weg"))
+      .mockResolvedValue({ data: { vorname: "Max" }, sensitiveFields: [] });
+
+    await expect(
+      versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] })),
+    ).rejects.toThrow("Verbindung weg");
+
+    const r = await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(r.status).toBe("SENT");
+  });
+
+  it("lebt nur fuer einen Aufruf", async () => {
+    // Kein Modul-Speicher: Ein Eintrag mit entschluesselter IBAN darf weder
+    // eine zweite Anfrage noch eine zweite Person sehen.
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([vorlage(VORLAGE_ID, ["vorname"])]);
+    await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    await versendePaket(basis({ positionen: [{ art: "VORLAGE", id: VORLAGE_ID }] }));
+    expect(mockResolver).toHaveBeenCalledTimes(2);
+  });
+
+  it("spart die Wiederholung auch in der Vorpruefung", async () => {
+    mockPrisma.documentTemplate.findMany.mockResolvedValue([
+      vorlage(VORLAGE_ID, ["vorname"]),
+      vorlage(VORLAGE_ID_2, ["vorname"]),
+    ]);
+    await pruefePaket({
+      modul: "ONBOARDING",
+      refId: REF,
+      positionen: [
+        { art: "VORLAGE", id: VORLAGE_ID },
+        { art: "VORLAGE", id: VORLAGE_ID_2 },
+      ],
+      session,
+    });
+    expect(mockResolver).toHaveBeenCalledTimes(1);
+  });
+});
+
+// =============================================
+// Was ctx.placeholders wirklich steuert
+//
+// Der Zwischenspeicher oben nimmt die VOLLSTAENDIGE Platzhalterliste als
+// Schluessel. Naheliegend waere gewesen, nur den sensiblen Anteil zu nehmen —
+// dann teilten sich viel mehr Vorlagen ein Ergebnis. Das ruhte aber auf der
+// Annahme, die Resolver werteten ctx.placeholders NUR fuer sensible Felder aus.
+//
+// Diese Annahme ist falsch, und der folgende Test haelt genau das fest: Der
+// Verbeamtungs-Resolver gated ueber dieselbe Abfrage auch Felder, die im
+// Platzhalter-Katalog NICHT als sensitive markiert sind. Faellt dieser Test
+// eines Tages, weil jemand das im Resolver aufgeraeumt hat, darf der
+// Cache-Schluessel gekuerzt werden — vorher nicht.
+// =============================================
+
+describe("Was ctx.placeholders wirklich steuert", () => {
+  const echteResolver = jest.requireActual("@/lib/doc-template-resolvers");
+
+  const vorgang = {
+    displayId: "PSI-2026-GYM-001",
+    organizationId: ORG,
+    employeeFirstName: "Jonas",
+    employeeLastName: "Keller",
+    employeeEmail: "jonas@fes.de",
+    employeePersonalNr: "4711",
+    type: "PROBE",
+    status: "IN_PROGRESS",
+    targetStartDate: null,
+    probationStartDate: null,
+    probationEndDate: null,
+    completedAt: null,
+    besoldungsgruppe: null,
+    erfahrungsstufe: null,
+    applicationSubmittedAt: null,
+    prerequisites: {},
+    applicationData: { employeeStatement: "Ich bewerbe mich, weil ..." },
+    stakeholders: {},
+    employee: null,
+    organization: null,
+    assessments: [],
+    boardDecisions: [],
+  };
+
+  function ctx(placeholders?: string[]) {
+    return { organizationId: ORG, refId: REF, placeholders, session, ipAddress: null };
+  }
+
+  beforeEach(() => {
+    mockPrisma.civilServiceProcess.findUnique.mockResolvedValue(vorgang);
+  });
+
+  it("gated auch Felder, die NICHT als sensibel gelten", async () => {
+    const resolver = echteResolver.getResolver("VERBEAMTUNG");
+
+    // antrag_erklaerung steht nicht unter den sensiblen Platzhaltern ...
+    expect(sensiblePlatzhalter(["antrag_erklaerung"])).toEqual([]);
+
+    // ... wird vom Resolver aber trotzdem nur gesetzt, wenn die Vorlage es
+    // anfordert. Ein Cache-Schluessel aus den sensiblen Feldern allein wuerde
+    // beide Faelle fuer gleich halten.
+    const mit = await resolver(ctx(["antrag_erklaerung"]));
+    expect(mit.data.antrag_erklaerung).toBe("Ich bewerbe mich, weil ...");
+
+    const ohne = await resolver(ctx(["vorname"]));
+    expect(ohne.data.antrag_erklaerung).toBeUndefined();
+  });
+
+  it("liefert ohne die Liste alles — das ist der Rueckfall fuer Aufrufer ohne Vorlagenbezug", async () => {
+    const resolver = echteResolver.getResolver("VERBEAMTUNG");
+    const alles = await resolver(ctx(undefined));
+    expect(alles.data.antrag_erklaerung).toBe("Ich bewerbe mich, weil ...");
   });
 });

@@ -14,7 +14,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FileTextIcon } from "lucide-react";
-import { DokumentenpaketDialog, type PaketAngebot } from "@/components/dokumentenpaket-dialog";
+import { DokumentenpaketDialog } from "@/components/dokumentenpaket-dialog";
+/**
+ * Der Typ kommt direkt aus der importfreien Typdatei, nicht mehr ueber den
+ * Dialog: Ein Umweg ueber eine Komponente laesst den Typ mit ihr wandern —
+ * wird der Dialog umbenannt oder geteilt, haengt die Karte an der falschen
+ * Datei. `PaketAngebotJson` und nicht `PaketAngebot`, weil die Karte das
+ * Angebot hinter JSON.parse sieht: `createdAt` und `altversand.am` sind dort
+ * Strings, deshalb weiter unten `new Date(...)`.
+ */
+import type { PaketAngebotJson } from "@/lib/types/dokumentenpaket";
 
 export function DokumentenpaketSection({
   modul,
@@ -24,6 +33,7 @@ export function DokumentenpaketSection({
   beschreibung = "Feste PDFs und befüllte Vorlagen gehen als Anhänge an die im Vorgang hinterlegte Adresse. Das Standardpaket wird unter Mandanten → Einrichtung → Standardpaket gepflegt.",
   offen: offenExtern,
   onOffenChange,
+  onVersendet,
 }: {
   modul: string;
   refId: string;
@@ -36,11 +46,33 @@ export function DokumentenpaketSection({
    */
   offen?: boolean;
   onOffenChange?: (offen: boolean) => void;
+  /**
+   * Wird nach einem angenommenen Versand gerufen — auch dann, wenn das Ergebnis
+   * Warnungen traegt. Die Mail ist in dem Fall raus, nur der Nachweis fehlt;
+   * die Nachbarkarten muessen trotzdem neu fragen, statt einen Stand von vor
+   * dem Versand weiterzuzeigen. Die Karte laedt ihr eigenes Angebot ohnehin
+   * nach; dieser Rueckruf ist fuer alles daneben.
+   */
+  onVersendet?: () => void;
 }) {
-  const [angebot, setAngebot] = useState<PaketAngebot | null>(null);
+  const [angebot, setAngebot] = useState<PaketAngebotJson | null>(null);
   const [laden, setLaden] = useState(true);
   const [fehler, setFehler] = useState("");
   const [offenIntern, setOffenIntern] = useState(false);
+  /**
+   * Nach einem Versand mit gescheitertem Nachweis kennt der Server keinen
+   * Verlauf — die Mail ist trotzdem raus. Die Nachweis-Transaktion legt
+   * DokumentenVersand, GeneratedDocument UND den Zeitstempel im Vorgang
+   * gemeinsam an; scheitert sie, ist alles zurueckgerollt, waehrend das
+   * Ergebnis SENT bleibt (siehe src/lib/dokumentenpaket.ts). Der anschliessende
+   * laedt()-Lauf brachte dann weder Verlauf noch Altversand, und die Karte
+   * stuende wieder auf "Noch nicht versendet". Der naechste Griff waere der
+   * zweite Versand desselben Pakets — genau das verhindert dieser Merker.
+   *
+   * Bewusst nur fuer die Dauer der Sitzung: Er ersetzt keinen Nachweis, er
+   * verhindert nur eine Falschaussage der Anzeige bis zum Seitenwechsel.
+   */
+  const [versendetInDieserSitzung, setVersendetInDieserSitzung] = useState(false);
   const offen = offenExtern ?? offenIntern;
   const setOffen = (wert: boolean) => {
     setOffenIntern(wert);
@@ -128,7 +160,9 @@ export function DokumentenpaketSection({
                 onClick={() => setOffen(true)}
                 className="inline-flex items-center gap-2 rounded-lg bg-credo-blau px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-credo-blau/90"
               >
-                {letzter || angebot.altversand ? "Erneut versenden…" : "Dokumente versenden…"}
+                {letzter || angebot.altversand || versendetInDieserSitzung
+                  ? "Erneut versenden…"
+                  : "Dokumente versenden…"}
               </button>
             )}
             <span className="text-xs text-muted-foreground">
@@ -144,7 +178,13 @@ export function DokumentenpaketSection({
                     `Bereits versendet am ${new Date(angebot.altversand.am).toLocaleString("de-DE")}${
                       angebot.altversand.anzahl > 1 ? ` (${angebot.altversand.anzahl}×)` : ""
                     } — vor Einführung des Nachweises, ohne Angabe der Dokumente`
-                  : "Noch nicht versendet"}
+                  : versendetInDieserSitzung
+                    ? // Versand angenommen, aber kein Verlauf zurueckgekommen:
+                      // Die Mail ist raus, der Nachweis fehlt. "Noch nicht
+                      // versendet" waere hier die gefaehrlichste aller
+                      // Falschaussagen.
+                      "Soeben versendet — der Nachweis konnte nicht gespeichert werden. Bitte die Warnung im Versanddialog und die Protokolle beachten."
+                    : "Noch nicht versendet"}
             </span>
           </div>
         </>
@@ -157,7 +197,18 @@ export function DokumentenpaketSection({
           refId={refId}
           titel={titel}
           onClose={() => setOffen(false)}
-          onVersendet={laedt}
+          onVersendet={() => {
+            // Erst das eigene Angebot (Verlauf, "Zuletzt am …"), dann die
+            // Nachbarkarte: Der Versand hat dort je Vorlage ein Dokument mit
+            // dem Etikett "per E-Mail versendet" angelegt.
+            //
+            // Bewusst OHNE Bedingung auf den Warnungsstand: Der Dialog meldet
+            // unmittelbar nach res.ok — und gerade der Warnfall (Mail raus,
+            // Nachweis gescheitert) ist der, in dem die Anzeige stimmen muss.
+            laedt();
+            setVersendetInDieserSitzung(true);
+            onVersendet?.();
+          }}
         />
       )}
     </div>

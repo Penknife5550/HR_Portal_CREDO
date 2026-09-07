@@ -7,21 +7,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "crypto";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canMutateBemContent } from "@/lib/permissions";
-import { validateUpload, saveUploadedFile, sanitizeFilename } from "@/lib/file-upload";
+import {
+  sanitizeFilename,
+  saveUploadedFile,
+  sha256Hex,
+  validateUpload,
+} from "@/lib/file-upload";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { syncBemFristen } from "@/lib/bem-fristen";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 const ERLAUBTE_ARTEN = ["DATENSCHUTZ", "DURCHFUEHRUNG"];
 
@@ -60,9 +57,15 @@ export async function POST(
 
     const filename = sanitizeFilename(file.name);
     const pfad = await saveUploadedFile(valid.buffer, `bem/${id}/einwilligung`, filename);
-    const hash = createHash("sha256").update(valid.buffer).digest("hex");
+    // Der Hash ist hier nicht nur Metadatum, sondern der Nachweis der auf Papier
+    // erteilten Einwilligung: Er landet gleich unten in derselben Transaktion an
+    // BemDokument.hash UND BemEinwilligung.dokumentHash. sha256Hex liefert
+    // zeichengleich dasselbe wie das bisherige createHash(...).digest("hex") —
+    // Verfahren und Kodierung duerfen sich nicht aendern, sonst passen
+    // Bestandsdaten nicht mehr zu neuen, ohne dass irgendetwas fehlschlaegt.
+    const hash = sha256Hex(valid.buffer);
     const now = new Date();
-    const ipAddress = clientIp(request);
+    const ipAddress = getClientIpOrNull(request);
 
     const result = await prisma.$transaction(async (tx) => {
       const dok = await tx.bemDokument.create({

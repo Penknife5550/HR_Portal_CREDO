@@ -51,6 +51,11 @@ interface SmtpConfig {
   fromEmail: string;
   fromName: string;
   replyToEmail: string;
+  /**
+   * Kommagetrennte Domains. Gilt NUR fuer abweichende Empfaenger des
+   * Dokumentenpaket-Versands; leer = keine Einschraenkung.
+   */
+  allowedRecipientDomains: string;
   isActive: boolean;
 }
 
@@ -583,7 +588,8 @@ function WebhooksTab() {
 function SmtpTab() {
   const [config, setConfig] = useState<SmtpConfig>({
     host: "", port: 587, secure: false, username: "",
-    password: "", fromEmail: "", fromName: "CREDO HR-Portal", replyToEmail: "", isActive: false,
+    password: "", fromEmail: "", fromName: "CREDO HR-Portal", replyToEmail: "",
+    allowedRecipientDomains: "", isActive: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -785,6 +791,25 @@ function SmtpTab() {
             />
             <p className="mt-1 text-xs text-muted-foreground">
               Antworten der Empfänger gehen an diese Adresse statt an den Absender. Nur eine Adresse möglich. Leer = keine Antwort-Adresse. Je Vorlage überschreibbar.
+            </p>
+          </FormField>
+
+          {/* Freigabeliste fuer abweichende Empfaenger (Dokumentenpaket-Versand) */}
+          <FormField label="Erlaubte Domains für abweichende Empfänger">
+            <input
+              type="text"
+              value={config.allowedRecipientDomains}
+              onChange={(e) => update("allowedRecipientDomains", e.target.value)}
+              placeholder="z.B. fes-minden.de, credo-gruppe.de"
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Gilt nur für den Dokumentenpaket-Versand und nur dann, wenn im Versand-Dialog eine
+              <strong> andere</strong> Adresse eingetragen wird als die im Vorgang hinterlegte. Die
+              Adresse aus dem Vorgang geht immer durch — auch an private Postfächer wie gmail.com
+              oder web.de, denn beim Onboarding ist das der Regelfall. Mehrere Domains mit Komma
+              trennen; verglichen wird die Domain exakt, Unterdomains müssen einzeln eingetragen
+              werden. <strong>Leer = keine Einschränkung.</strong>
             </p>
           </FormField>
 

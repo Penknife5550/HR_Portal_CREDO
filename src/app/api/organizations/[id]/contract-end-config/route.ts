@@ -18,6 +18,7 @@ import {
   CONTRACT_END_FIELD_REGISTRY,
   resolveContractEndFieldConfig,
 } from "@/lib/contract-end-fields";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 const KNOWN_FIELD_NAMES = new Set(CONTRACT_END_FIELD_REGISTRY.map((d) => d.name));
 
@@ -110,8 +111,7 @@ export async function PATCH(
       select: { id: true, name: true, mandantNumber: true, contractEndFieldConfig: true },
     });
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    const ipAddress = getClientIpOrNull(request);
 
     await prisma.auditLog
       .create({

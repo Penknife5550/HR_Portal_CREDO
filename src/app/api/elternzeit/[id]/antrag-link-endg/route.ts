@@ -17,6 +17,7 @@ import { generateAntragLinkEndgSchema } from "@/lib/validations/elternzeit";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
 import { hashToken } from "@/lib/token-hash";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 const ALLOWED_STATUSES = [
   "VORLAEUFIG_GENEHMIGT",
@@ -83,10 +84,7 @@ export async function POST(
       );
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const validityDays = ez.organization?.ezTokenValidityDays ?? 30;
     const token = randomUUID();

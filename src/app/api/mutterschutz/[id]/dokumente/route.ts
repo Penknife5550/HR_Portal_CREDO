@@ -21,6 +21,7 @@ import {
   saveUploadedFile,
   validateUpload,
 } from "@/lib/file-upload";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 import { unlink } from "fs/promises";
 import type { MutterschutzDokumentTyp } from "@prisma/client";
 
@@ -102,10 +103,7 @@ export async function POST(
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const formData = await request.formData();
     const file = formData.get("file");

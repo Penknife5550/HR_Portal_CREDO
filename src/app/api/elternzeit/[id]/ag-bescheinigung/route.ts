@@ -19,6 +19,7 @@ import { getSession } from "@/lib/auth";
 import { EXPORT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { generateAGBescheinigungElterngeld } from "@/lib/elternzeit-pdf";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 const bodySchema = z.object({
   brutto12Monate: z.string().min(1).max(100),
@@ -87,10 +88,7 @@ export async function POST(
       );
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const pdfBuffer = await generateAGBescheinigungElterngeld({
       firstName: ez.employeeFirstName,

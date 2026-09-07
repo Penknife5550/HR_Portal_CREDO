@@ -31,8 +31,14 @@ jest.mock("@/lib/url", () => ({
   redactUrlForLog: (url: string) => url,
 }));
 
-import { sendEventEmail, renderEventEmail, renderTemplate } from "@/lib/mailer";
+import {
+  sendEventEmail,
+  renderEventEmail,
+  renderTemplate,
+  pruefeVorlagenSyntax,
+} from "@/lib/mailer";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 
 const activeSmtpConfig = {
   id: "default",
@@ -413,5 +419,94 @@ describe("renderTemplate — bedingte Bloecke", () => {
     const t = "{{#a}}A{{/a}}|{{#b}}B{{/b}}";
     expect(renderTemplate(t, { a: "x", b: "" })).toBe("A|");
     expect(renderTemplate(t, { a: "", b: "y" })).toBe("|B");
+  });
+
+  it("entfernt einen verwaisten Marker, statt ihn zu versenden", () => {
+    // Ohne Sicherheitsnetz stuende "{{#nachricht}}" woertlich im Postfach der
+    // beschaeftigten Person. Die Warnung belegt, dass das Entfernen im Log
+    // sichtbar bleibt und nicht stillschweigend passiert.
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const ergebnis = renderTemplate("Hallo{{#nachricht}} Welt", { nachricht: "x" });
+
+    expect(ergebnis).toBe("Hallo Welt");
+    expect(ergebnis).not.toContain("{{#");
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("{{#nachricht}}"));
+    warn.mockRestore();
+  });
+
+  it("laesst geschweifte Klammern IM WERT unangetastet", () => {
+    // Belegt die Reihenfolge: bereinigt wird VOR dem Einsetzen der Werte. Sonst
+    // zerschnitte der Fix die freie Nachricht aus dem Dokumentenpaket-Dialog,
+    // die HR selbst eingegeben hat.
+    expect(renderTemplate("A {{nachricht}}", { nachricht: "{{#x}}" })).toBe("A {{#x}}");
+  });
+});
+
+describe("pruefeVorlagenSyntax", () => {
+  it("meldet ein fehlendes Schluss-Tag mit Feld, Marker, Name und Art", () => {
+    expect(pruefeVorlagenSyntax({ "HTML-Body": "{{#nachricht}}Hallo" })).toEqual([
+      {
+        feld: "HTML-Body",
+        marker: "{{#nachricht}}",
+        name: "nachricht",
+        art: "oeffnend",
+      },
+    ]);
+  });
+
+  it("meldet ein Schluss-Tag ohne Anfang", () => {
+    const fehler = pruefeVorlagenSyntax({ "HTML-Body": "Hallo{{/nachricht}}" });
+    expect(fehler).toHaveLength(1);
+    expect(fehler[0].art).toBe("schliessend");
+    expect(fehler[0].marker).toBe("{{/nachricht}}");
+  });
+
+  it("faengt einen vertippten Namen an beiden Enden", () => {
+    // Belegt, dass MARKER_MUSTER auch Namen sieht, die BEDINGTER_BLOCK
+    // (Rueckverweis auf denselben Namen) nie zu einem Paar zusammenfuehrt.
+    const fehler = pruefeVorlagenSyntax({ "HTML-Body": "{{#nachricht}}x{{/nachrich}}" });
+    expect(fehler).toHaveLength(2);
+  });
+
+  it("nimmt mehrere Bloecke gleichen Namens hin", () => {
+    expect(pruefeVorlagenSyntax({ "HTML-Body": "{{#a}}A{{/a}}|{{#a}}B{{/a}}" })).toEqual([]);
+  });
+
+  it("meldet eine Verschachtelung gleichen Namens", () => {
+    // Genau der Fall, den der Renderer stehen laesst: das lazy Muster loest nur
+    // das aeussere Paar auf, das innere {{#a}} bliebe in der Mail.
+    const fehler = pruefeVorlagenSyntax({ "HTML-Body": "{{#a}}x{{#a}}y{{/a}}" });
+    expect(fehler.length).toBeGreaterThanOrEqual(1);
+    expect(fehler.map((f) => f.marker)).toContain("{{#a}}");
+  });
+
+  it("haelt gewoehnliche Variablen nicht fuer Marker", () => {
+    expect(pruefeVorlagenSyntax({ Betreff: "Hallo {{vorname}}" })).toEqual([]);
+  });
+
+  it("nennt das Feld, in dem der Fehler steht", () => {
+    const felder = pruefeVorlagenSyntax({
+      Betreff: "{{#a}}",
+      "HTML-Body": "ok",
+      Plaintext: "{{/b}}",
+    }).map((f) => f.feld);
+
+    expect(felder).toEqual(["Betreff", "Plaintext"]);
+  });
+
+  it("die mitgelieferten Code-Vorlagen sind ausgeglichen", () => {
+    // Regressionsschutz: Ein Tippfehler in default-email-templates.ts liesse
+    // sich ueber den Editor nicht mehr korrigieren (die PUT-Route weist ihn ab)
+    // und ginge bis dahin an echte Empfaenger.
+    for (const t of DEFAULT_EMAIL_TEMPLATES) {
+      expect({
+        event: t.event,
+        fehler: pruefeVorlagenSyntax({
+          Betreff: t.subject,
+          "HTML-Body": t.bodyHtml,
+          Plaintext: t.bodyText,
+        }),
+      }).toEqual({ event: t.event, fehler: [] });
+    }
   });
 });

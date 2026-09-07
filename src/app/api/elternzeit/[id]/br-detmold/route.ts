@@ -13,6 +13,7 @@ import { EXPORT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { generateBRDetmoldSchreiben } from "@/lib/elternzeit-pdf";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function GET(
   request: NextRequest,
@@ -68,10 +69,7 @@ export async function GET(
       );
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const generiertAm = new Date();
     const pdfBuffer = await generateBRDetmoldSchreiben({

@@ -1,32 +1,36 @@
 # Dokumentenpaket-Versand — offene Punkte
 
-> **Stand:** 04.09.2026 · **auf `main` gemergt** (`53c484b`) und gepusht; noch nicht deployt
+> **Stand:** 07.09.2026 · Zweig `fix/dokumentenpaket-restbefunde`, noch nicht gemergt
 > **Plan:** [dokumentenpaket-versand-plan.html](dokumentenpaket-versand-plan.html) — vollständig abgearbeitet (Bausteine 1–15)
-> **Nachweise:** `npx tsc --noEmit` fehlerfrei · `npm run lint` 0 Fehler · **1074 Tests in 66 Suites** grün · `npm run build` exit 0
+> **Nachweise:** `npx tsc --noEmit` fehlerfrei · `npm run lint` 0 Fehler · **1244 Tests in 73 Suites** grün (auch nach `jest --clearCache`) · `npm run build` exit 0
 
-Dieses Dokument hält fest, was **nicht** erledigt ist. Es entstand aus einem
-Code-Review über den ganzen Zweig (zehn Prüfwinkel plus Nachlauf). Elf
-Merge-Blocker wurden behoben (Commit `98d56df`); was hier steht, ist bewusst
-liegengeblieben.
+Dieses Dokument hält fest, was **nicht** erledigt ist.
+
+Es entstand am 4. September aus einem Code-Review über den ganzen Zweig. Am
+7. September wurde nachgearbeitet: die vier Befunde aus Abschnitt 2 und die
+Liste aus Abschnitt 3 sind abgearbeitet, dabei fielen weitere Befunde an. Was
+jetzt hier steht, ist der Rest — und der ist kleiner, aber nicht leer.
 
 ---
 
 ## 0 · Wo es weitergeht
 
-Der Code liegt seit dem 4. September auf `main` (Merge-Commit `53c484b`,
-gepusht) — aber **auf keinem Server**. Was noch aussteht:
+Der Code liegt auf `main` (Merge-Commit `53c484b`) plus dem Zweig
+`fix/dokumentenpaket-restbefunde` — aber **auf keinem Server**. Was aussteht:
 
-1. ~~Zweig sichern~~ — erledigt, `feat/dokumentenpaket-versand` steht auf `origin`.
-2. ~~Nach `main` mergen~~ — erledigt am 4. September, ohne PR, mit Merge-Commit.
-   Gate davor: tsc sauber, Lint ohne Fehler, 1074 Tests in 66 Suites grün.
-3. **Deployen** nach dem Ablauf in
+1. **`fix/dokumentenpaket-restbefunde` nach `main` bringen.** Gate: tsc sauber,
+   Lint ohne Fehler, 1244 Tests in 73 Suites grün, Build exit 0 — alles vier
+   am 7. September gefahren.
+2. **Deployen** nach dem Ablauf in
    [../../historie/codereview-und-vorlagen-2026-09.md](../../historie/codereview-und-vorlagen-2026-09.md).
-   Neu gegenüber dem letzten Deploy: eine Tabelle (`dokumenten_versand`), zwei
-   Spalten, zwei Unique-Constraints — siehe Abschnitt 4.
-4. **Erst danach Abschnitt 1** (Verifikation mit echtem SMTP). Vorher hat
+   Schema-Delta gegenüber dem letzten Deploy siehe Abschnitt 4 — es ist um eine
+   Spalte gewachsen.
+3. **Erst danach Abschnitt 1** (Verifikation mit echtem SMTP). Vorher hat
    niemand belegt, dass eine Mail mit Anhängen tatsächlich ankommt.
-
-Die vier Befunde aus Abschnitt 2 blockieren keinen dieser Schritte.
+4. **Freigabeliste pflegen** (neu, siehe Abschnitt 2.1): Ohne gepflegte Domains
+   ist die Schranke gegen abweichende Empfängeradressen wirkungslos. Das ist
+   Absicht — eine ungepflegte Liste darf den Versand nicht lahmlegen —, aber es
+   heißt, dass der Schutz erst mit der Pflege entsteht.
 
 ---
 
@@ -48,117 +52,156 @@ Das gehört auf den Server, **bevor** jemand das erste echte Paket verschickt:
    `empfaenger` — und zwar der **zugestellten** Adresse
 5. Eine sensible Vorlage gegenprüfen: Ohne Häkchen muss der Server mit **409**
    abweisen
+6. **Neu:** Eine Domain in die Freigabeliste eintragen (Einstellungen → SMTP),
+   dann eine Adresse einer **anderen** Domain eingeben, die nicht die des
+   Vorgangs ist — der Server muss mit **409** abweisen, und der Dialog muss es
+   schon vor dem Klick sagen
 
 ---
 
-## 2 · Vier Befunde aus dem Review, bewusst nicht behoben
+## 2 · Am 7. September abgearbeitet
 
-Keiner richtet beim Deploy Schaden an; alle vier brauchen eine Entscheidung
-statt einer schnellen Korrektur.
+Alle vier Befunde aus dem Review vom 4. September sind behoben, ebenso die
+Liste aus dem damaligen Abschnitt 3. Kurz, was daraus wurde:
 
-### 2.1 Kein Rate-Limit auf dem Versand, Empfängeradresse völlig frei
-`src/app/api/dokumentenpaket/versenden/route.ts`
+### 2.1 Rate-Limit und Empfängeradresse
+Der Versand hat jetzt eine Bremse (10/Minute und 60/Stunde als **Nachfüllrate**
+je Benutzerkonto — der Kopfkommentar der Route sagt ausdrücklich, dass ein
+Token-Eimer nach Ruhe zusätzlich einen vollen Schub gewährt) und eine
+Freigabeliste für Empfängerdomains (`SmtpConfig.allowedRecipientDomains`).
 
-Der Endpunkt hat keinen Rate-Limiter, keine Domain-Einschränkung und keinen
-Abgleich gegen die im Vorgang hinterlegte Adresse — anders als vergleichbare
-Exporte sensibler Daten im Projekt (vgl. `civil-service/[id]/export`, 10/min).
+**Die Ausformung ist wichtiger als die Zahl:** Eine Allowlist über *alle*
+Adressen hätte den Normalfall blockiert — beim Onboarding geht das Paket an die
+private Adresse der neuen Person, die noch kein dienstliches Postfach hat.
+Deshalb gilt die Liste nur für **abweichende** Adressen; die im Vorgang
+hinterlegte geht immer durch. Leere Liste = keine Einschränkung.
 
-**Szenario:** Ein HR_SACHBEARBEITER sieht alle 16 Mandanten. Er kann über die
-Vorgangs-IDs des Dashboards iterieren und je Vorgang bis zu 50 Anhänge mit
-IBAN, SV-Nummer und Steuer-ID an eine eigene Freemail-Adresse schicken. Nichts
-bremst, nichts alarmiert; die Tat steht danach im Protokoll, die Daten sind
-draußen.
+Dazu gehört zwingend, dass die **Änderung der Vorgangsadresse protokolliert
+wird** — sonst ist die Schranke mit zwei Aufrufen umgangen (Adresse umbiegen,
+versenden, zurücksetzen). Das war bis zum 7. September *nicht* der Fall und ist
+jetzt in allen vier Modulen nachgerüstet, mit Vorher/Nachher im AuditLog.
 
-**Zu entscheiden:** Rate-Limit allein, oder zusätzlich eine Domain-Allowlist
-bzw. eine Zweitfreigabe für Pakete mit sensiblen Vorlagen? Letzteres widerspricht
-der Entscheidung vom 2. September („mit Bestätigung erlauben") nicht, ergänzt sie
-aber um eine zweite Person.
+### 2.2 bis 2.4
+Rennen in der Vorprüfung (AbortController plus Laufzähler), Prüfung auf
+verwaiste `{{#…}}`-Blöcke im Vorlagen-Editor, Reihenfolge im Dialog — alle drei
+behoben und mit Tests belegt, die nachweislich fallen, wenn man den Fix
+zurücknimmt.
 
-### 2.2 Ältere Vorprüfung überschreibt die neuere
-`src/components/dokumentenpaket-dialog.tsx` (Effekt um Zeile 185)
+### 2.5 Was beim Nacharbeiten zusätzlich gefunden wurde
+Eine adversariale Durchsicht mit acht Prüfwinkeln fand danach noch:
 
-Die entprellte Vorprüfung bricht laufende Anfragen nicht ab und hat keine
-Reihenfolgen-Sicherung. Es gewinnt, was zuletzt zurückkommt.
+- **Die Stundenbremse war praktisch wirkungslos.** Der Aufräum-Timer verwarf
+  Einträge nach 10 Minuten Ruhe, und der nächste Aufruf legte einen *vollen*
+  Eimer an — bei einem Stundenfenster. Im Takt „7 Minuten senden, 14 Minuten
+  Pause“ waren ~198 Versendungen pro Stunde möglich statt 60. Die Schwelle
+  hängt jetzt am Fenster des jeweiligen Speichers.
+- **Die 413-Grenze wurde zu früh durchgewunken.** Die Vorprüfung maß Rohbytes,
+  der Versand die base64-Größe (4/3 davon) — Pakete zwischen ~11,25 und 15 MB
+  liefen in genau den 409, den die neue Knopfsperre verhindern soll.
+- **Eine Freigabeliste aus lauter Trennzeichen** wurde klaglos als leere Liste
+  gespeichert und schaltete die Schranke damit still ab. Die Route lehnt das
+  jetzt ab; ein bewusst geleertes Feld bleibt erlaubt.
+- **Zwei Test-Attrappen.** Ein Test prüfte nach `unmount()` gegen einen leeren
+  String (immer wahr), und kein Test deckte, dass der Dialog `onVersendet()`
+  überhaupt ruft.
+- **Die Komponententest-Suite lief gar nicht.** `preset: "ts-jest"` bringt ein
+  eigenes Transform für `.tsx` mit, das Jest vor die eigenen Einträge legt.
+  Danach fiel bei *kaltem* Cache reproduzierbar eine `.tsx`-Suite um, solange
+  zwei Transform-Einträge nebeneinander standen — auf dem Entwicklerrechner
+  (warmer Cache) unsichtbar, in CI jedes Mal. Details stehen als Kommentar in
+  `jest.config.ts`; wer dort wieder aufteilt, holt sich den Fehler zurück.
 
-**Szenario:** Bei zehn Positionen dauert die Prüfung mehrere Sekunden. Der
-Nutzer kürzt auf zwei, die schnellere Antwort kommt zuerst, die alte
-überschreibt sie. Danach zeigt der Dialog fremde „Felder bleiben leer"-Hinweise
-und ein veraltetes `ueberGroessenGrenze`, das den Versand-Knopf fälschlich
-sperrt oder freigibt. Der Server bricht in dem Fall trotzdem korrekt ab.
-
-**Fix:** `AbortController` plus Generationszähler; nur die Antwort der zuletzt
-gestarteten Anfrage übernehmen.
-
-### 2.3 Offener Bedingungsblock wird wörtlich versendet
-`src/lib/mailer.ts` (`renderTemplate`, um Zeile 209)
-
-`{{#name}}…{{/name}}` wird nur als vollständiges Paar ersetzt. Ein fehlendes
-oder vertipptes Schluss-Tag bleibt unverändert stehen, und die
-Variablen-Ersetzung trifft `{{#name}}` nicht.
-
-**Szenario:** HR bearbeitet eine Vorlage unter Einstellungen und vertippt das
-Schluss-Tag. Die Mail erreicht die beschäftigte Person mit rohem
-`{{#nachricht}}`-Markup im Text. Die Vorprüfung meldet trotzdem grün, weil ihr
-Muster den öffnenden Marker erkennt.
-
-**Fix:** Nach dem Ersetzen auf verbliebene `{{#`/`{{/` prüfen und die Vorlage
-als fehlerhaft melden — im Vorlagen-Editor beim Speichern, nicht erst beim
-Versand.
-
-### 2.4 Dialog zeigt eine andere Reihenfolge, als er versendet
-`src/components/dokumentenpaket-dialog.tsx` (Auswahlblöcke, um Zeile 267)
-
-Die Blöcke zeigen `verfuegbar` (PDFs alphabetisch, dann Vorlagen alphabetisch);
-versendet wird `reihenfolge` nach dem konfigurierten `orderIndex`.
-
-**Szenario:** Die Konfigurationsseite verspricht „Reihenfolge = Reihenfolge der
-Anhänge" und bietet Pfeiltasten. Stellt ein Admin das Willkommensschreiben an
-Position 1 und das Leitbild an Position 2, erscheint im Dialog das Leitbild
-zuerst, im Postfach das Willkommensschreiben.
-
-**Fix:** Den Standardpaket-Block in Paketreihenfolge rendern statt alphabetisch.
+Nebenbei fielen zwei Befunde außerhalb des Dokumentenpakets an, die mit
+behoben wurden: zwei Download-Routen setzten `Content-Disposition` mit
+Nicht-ASCII, und drei Upload-Routen bildeten ihren Speichernamen ohne den
+Zeitstempel-/UUID-Schutz von `sanitizeFilename` — zwei gleichnamige Uploads
+überschrieben sich.
 
 ---
 
-## 3 · Weitere Befunde aus dem Review (kein Merge-Blocker)
+## 3 · Was weiterhin offen ist
 
-Kurz gehalten, damit sie nicht verloren gehen:
+### 3.1 Entschlüsselte Daten liegen als Datei im Klartext
+`uploads/brief-vorlagen-generiert/` · **Entscheidung vertagt (07.09.2026)**
 
-| Fund | Ort |
-|---|---|
-| **Zwei widersprüchliche `clientIp`**: Der Versand liest `X-Forwarded-For` von hinten (richtig), die Konfig-Route den ersten Eintrag (vom Client frei setzbar). Die IP im Konfigurations-Protokoll ist damit fälschbar. Im Projekt gibt es `getClientIp` in `src/lib/rate-limit.ts` | `organizations/[id]/starterpaket/route.ts` |
-| **`sendEventEmail` statt `triggerWebhooks`** — CLAUDE.md schreibt den Dispatcher vor. Technisch nötig, weil `triggerWebhooks` keine Anhänge durchreicht; entweder dort ergänzen oder in CLAUDE.md als Ausnahme vermerken | `dokumentenpaket.ts` |
-| **Resolver-N+1**: Der Vorgang wird je Vorlage neu geladen (~5 Abfragen pro Position). Eine Vorprüfung mit 3 Vorlagen + 3 PDFs ergibt ~21 Abfragen, davon 15 redundant | `dokumentenpaket.ts` |
-| **Vorprüfung liest ganze PDFs nur für `.length`**, obwohl `StarterpaketDokument.fileSize` in der Datenbank steht | `dokumentenpaket.ts` (Vorprüfung) |
-| **Tippen im Empfängerfeld löst eine volle Vorprüfung aus**, deren adressabhängige Felder der Dialog nie liest | `dokumentenpaket-dialog.tsx` |
-| **Fehlende Datei ist nur eine Warnung**, der Versand-Knopf sperrt nicht — der Server bricht dann mit 409 ab | `dokumentenpaket-dialog.tsx` |
-| **„Bereits erstellt" wird nach dem Versand nicht aktualisiert** — das Etikett „per E-Mail versendet" erscheint erst nach einem Seitenreload | `template-generation-section.tsx` |
-| **Doppelungen**: `ascii`/`asciiFilename`/`slugify`/`sanitizeFilename` (5 Fassungen), `formatBytes` (8 Kopien), `sha256` (7×), `EMAIL_MUSTER`/`EMAIL_PATTERN`, `alsHtmlAbsaetze`/`escapeHtml` aus `email-layout.ts`, `deutschesDatum`/`berlinerKalendertag` aus `minijob-fristen.ts` | mehrere |
-| **Server- und Client-Typen doppelt getippt** (~52 Zeilen) | `dokumentenpaket-dialog.tsx` |
-| **`leseVorlagenDatei` löst keine Symlinks auf** und erlaubt den ganzen `uploads/`-Baum inklusive BEM-Anlagen — der Docstring verspricht enger, als der Code hält | `dokumentenpaket.ts` |
-| **Entschlüsselte Daten liegen als DOCX/PDF im Klartext** unter `uploads/brief-vorlagen-generiert/` (12 Monate). Die Datenbank verschlüsselt die IBAN, das Dateisystem nicht. Betrifft auch den bestehenden Erzeugen-Weg | `dokumentenpaket.ts` |
-| **`starterpaket-dokumente.md` beschreibt die gelöschte Route** `POST /api/onboarding/[id]/starterpaket` | `docs/module/dokumente/` |
+Sobald ein Schreiben erzeugt ist, stehen IBAN, SV-Nummer und Steuer-ID
+unverschlüsselt in einer Datei im Volume `uploads_data` — 12 Monate lang
+(`AUFBEWAHRUNG_MONATE` in `src/lib/erzeugte-dokumente.ts`). Die Datenbank
+verschlüsselt diese Felder spaltenweise mit AES-256-GCM; wer das Volume lesen
+kann (Host-root, ein Backup, ein Image-Snapshot), liest sie ohne Schlüssel.
+
+**Das ist kein neuer Fehler des Dokumentenpakets** — der Erzeugen-Weg macht es
+seit jeher so. Es ist eine Grundsatzentscheidung, keine Codezeile. Vier Wege
+stehen offen:
+
+| Weg | Kosten | Was bricht |
+|---|---|---|
+| **Verschlüsselung at rest** (AES-256-GCM je Datei) | Buffer-Paar in `encryption.ts` (heute nur Zeichenketten), zwei Schreib-, eine Lesestelle, ein Marker für Bestandsdateien, einmalige Datenmigration | Nichts — wenn der Hash im Nachweis weiter über den **Klartext** gebildet wird. Braucht eine Entscheidung: `ENCRYPTION_KEY` mitbenutzen oder ein dritter Schlüssel wie `BEM_ENCRYPTION_KEY`? Ein eigener Schlüssel ist sauberer, kostet aber eine weitere Pflicht-Variable, ohne die der Container nicht startet |
+| **Kürzere Aufbewahrung** | eine Konstante | Der Cron begründet die 12 Monate ausdrücklich mit dem Vorlauf der Vertragsende-Fristenampel (7–12 Monate). Kürzer heißt: Dokumente laufender Vorgänge verschwinden |
+| **Gar nicht speichern** | Ablage-Teil der Transaktion entfällt | Der Download-Endpunkt hätte nichts mehr zu liefern. Neu-Erzeugen bei jedem Download bräuchte Resolver und Gotenberg zur Downloadzeit, entschlüsselte jedes Mal neu und lieferte womöglich ein *anderes* Dokument als das versendete — der Hash im Nachweis passte dann nicht mehr |
+| **Nur die heiklen sondern** | mittel | Zwei Aufbewahrungsregeln nebeneinander. „Harmlos“ heißt hier nur „ohne IBAN/SV-Nr/Steuer-ID“, nicht „ohne Personenbezug“ — Name, Adresse und Vertragsdaten stehen weiter im Klartext |
+
+Vor der Entscheidung ist eine Zahl hilfreich:
+`SELECT count(*) FROM generated_documents WHERE pfad_pdf IS NOT NULL;`
+
+### 3.2 Content-Disposition ohne `filename*`
+`onboarding/[id]/documents/[docId]`, `offboarding/[id]/documents/[docId]` u. a.
+
+Der Nicht-ASCII-Fehler ist behoben, aber der Weg dahin kostet den lesbaren
+deutschen Namen: Aus „Kündigung.pdf“ wird „Kuendigung.pdf“. Sauber wäre
+`filename="…"` **plus** `filename*=UTF-8''…`. Das gehört an *alle* Stellen
+zugleich, sonst zeigt dieselbe Anwendung je nach Route andere Namen — und
+`encodeURIComponent` genügt nicht, weil `'`, `(`, `)` und `*` nach RFC 5987
+keine `attr-char` sind. Also eine eigene, begründete Runde.
+
+Im selben Zug: `civil-service/[id]/documents/[docId]` bildet den Namen mit
+`encodeURIComponent` und ist damit eine dritte Fassung, die noch steht.
+
+### 3.3 Die Vorprüfung prüft bei Pool-PDFs nur den Pfad, nicht die Lesbarkeit
+`dokumentenpaket.ts` · **bewusst so**
+
+`pfadInWurzeln` löst den Pfad auf, liest aber kein Byte — sonst liefe bei jeder
+Auswahländerung ein voller Dateizugriff. Ein `EACCES` nach falschen Rechten im
+uploads-Volume fällt deshalb erst beim Versand auf (409). Der häufige Fall —
+Datei gelöscht oder Pfad außerhalb — wird erfasst und sperrt den Knopf.
+
+### 3.4 Doppelversand-Sperre ist prozesslokal
+`laufendeVersendungen` trägt nur, solange das Portal als **ein** Container
+läuft. Beim waagerechten Skalieren durch eine Datenbanksperre ersetzen. Dasselbe
+gilt für das neue Rate-Limit: Der Zähler lebt in einer Map im Prozess und ist
+nach einem Neustart weg.
+
+### 3.5 `canAccessProcess` fehlt in mehreren PATCH-Routen
+Heute folgenlos, deshalb nur vermerkt: `HR_EDIT_ROLES` und `GLOBAL_ROLES` sind
+dieselben drei Rollen, `canAccessProcess` liefert für sie ohnehin immer `true`.
+Die Prüfung fehlt trotzdem — sie würde erst beißen, wenn `HR_EDIT_ROLES` je eine
+nicht-globale Rolle bekommt. Verteidigung in der Tiefe, kein akutes Loch.
 
 ---
 
 ## 4 · Beim Deploy beachten
 
-- **Schema-Änderung**: `db push` legt `dokumenten_versand` und
-  `beschaeftigungs_angaben`-artige Tabellen an; der Entrypoint sichert vorher
-  per `pg_dump`. Voraussetzungen stehen in
+- **Schema-Änderung**: `db push` legt `dokumenten_versand` an, dazu zwei Spalten
+  und zwei Unique-Constraints auf `starterpaket_auswahl` — **und neu seit dem
+  7. September** die Spalte `smtp_config.allowed_recipient_domains`
+  (`String @default("")`, rein additiv). Der Entrypoint sichert vorher per
+  `pg_dump`. Voraussetzungen stehen in
   [../../historie/codereview-und-vorlagen-2026-09.md](../../historie/codereview-und-vorlagen-2026-09.md)
   — insbesondere `./backups:/backups` beim Dienst `app` **und**
   `sudo chown 1001 backups`.
-- **Zwei neue Unique-Constraints** auf `starterpaket_auswahl`. Beweisbar
-  erfüllbar (die alte Unique garantierte die Eindeutigkeit, `modul` kommt als
-  konstanter Wert dazu, `templateId` ist überall NULL) — vor dem Deploy
-  trotzdem einmal auf den echten Daten gegenprüfen.
+- **Zwei Unique-Constraints** auf `starterpaket_auswahl`: Beweisbar erfüllbar
+  (die alte Unique garantierte die Eindeutigkeit, `modul` kommt als konstanter
+  Wert dazu, `templateId` ist überall NULL) — vor dem Deploy trotzdem einmal
+  auf den echten Daten gegenprüfen.
 - **Gotenberg muss laufen.** Ohne den Dienst lassen sich Vorlagen nicht
   versenden; feste PDFs gehen weiterhin.
 - **Bestandsvorgänge**: Die Karte zeigt für Onboarding-Vorgänge mit altem
   `starterPacketSentAt` „Bereits versendet am … — vor Einführung des
-  Nachweises". Das ist Absicht: Es wurde bewusst **kein** Nachweis
-  nachträglich erfunden.
+  Nachweises". Das ist Absicht: Es wurde bewusst **kein** Nachweis nachträglich
+  erfunden.
+- **Sichtbare Änderung ohne Datenbezug**: Dateigrößen erscheinen jetzt überall
+  deutsch (`1,5 MB` statt `1.5 MB`, ganze KB darunter) — acht Stellen in der
+  Oberfläche, eine gemeinsame Funktion in `src/lib/format.ts`.
 
 ---
 
@@ -169,5 +212,8 @@ Kurz gehalten, damit sie nicht verloren gehen:
 - **Kein Serienbrief, keine Empfangsbestätigung, kein automatischer Versand bei
   Statuswechseln.** Der Versand bleibt eine bewusste Handlung von HR —
   Entscheidung vom Juni, im Plan bestätigt.
+- **Keine Zweitfreigabe** für Pakete mit sensiblen Vorlagen. Am 7. September
+  gegen Rate-Limit und Freigabeliste abgewogen und verworfen: spürbar mehr
+  Aufwand im Alltag für einen Fall, den die Protokollierung sichtbar macht.
 - **Phase 3** (Sammel-PDF, Vorschau einzelner Vorlagen, übergreifende
   Versandübersicht) steht im Plan und ist nicht beauftragt.

@@ -106,8 +106,31 @@ export function isValidUrl(url: string): boolean {
   }
 }
 
+/**
+ * Ein absichtlich grobes Muster: irgendetwas, ein @, irgendetwas, ein Punkt,
+ * irgendetwas — jeweils ohne Leerzeichen. Es soll Tippfehler abfangen, nicht
+ * RFC 5322 nachbilden; ein strengeres Muster weist erfahrungsgemaess gueltige
+ * Adressen ab, und ob eine Adresse wirklich existiert, weiss ohnehin erst der
+ * Zustellversuch.
+ *
+ * Stand vorher sechsmal zeichengleich im Projekt (mailer.ts, hier, zweimal in
+ * den Departments-Routen, im Dokumentenpaket-Dialog und in den
+ * Elternzeit-Modalen). Diese Datei hat KEINEN einzigen Import und ist deshalb
+ * die richtige Heimat: auch Client-Komponenten und die oeffentlichen
+ * Magic-Link-Seiten duerfen sie ziehen, waehrend @/lib/mailer nodemailer und
+ * Prisma in den Modulgraphen holen wuerde.
+ *
+ * NIEMALS ein /g-Flag anhaengen. Dieses RegExp-Objekt wird von allen Aufrufern
+ * geteilt; mit /g fuehrt es in `lastIndex` einen Zustand mit und liefert bei
+ * jedem zweiten `.test()` derselben Adresse `false`. Der Fehler traefe alle
+ * Aufrufer gleichzeitig, waere nur sporadisch reproduzierbar und faellt in
+ * keinem Einzeltest auf. Ohne /g ist `lastIndex` bedeutungslos und das geteilte
+ * Objekt zustandslos.
+ */
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return EMAIL_PATTERN.test(email);
 }
 
 // =============================================

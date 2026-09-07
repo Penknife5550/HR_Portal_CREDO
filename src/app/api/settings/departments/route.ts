@@ -10,13 +10,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { isValidEmail } from "@/lib/constants";
 
 const ADMIN_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
-
-// Einfache E-Mail-Validierung
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
 
 // =============================================
 // GET /api/settings/departments

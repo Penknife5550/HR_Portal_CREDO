@@ -14,21 +14,27 @@ import { getSession } from "@/lib/auth";
 import { canMutateBemContent } from "@/lib/permissions";
 import { resolveBemPlaceholders } from "@/lib/bem-doc";
 import { generateFromTemplate } from "@/lib/doc-generation";
-import { saveUploadedFile, readUploadedFile, DOCX_MIME } from "@/lib/file-upload";
+import {
+  DOCX_MIME,
+  readUploadedFile,
+  saveUploadedFile,
+  sha256Hex,
+} from "@/lib/file-upload";
 import { defaultAblage } from "@/lib/bem-aktentrennung";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { dokumentGenerierenSchema } from "@/lib/validations/bem";
 import type { DeckblattMeta } from "@/lib/pdf-deckblatt";
 import type { BemDokumentTyp } from "@prisma/client";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
-
+/**
+ * Basisname der abgelegten Datei.
+ *
+ * Bewusst NICHT durch asciiFilename() aus @/lib/file-upload ersetzt: Diese
+ * Fassung fasst Unterstrich-Laeufe zusammen (`_+`) und kappt bei 80 Zeichen,
+ * asciiFilename tut beides nicht. Aus demselben Vorlagennamen entstuenden also
+ * verschiedene Dateinamen — das sind zwei Regeln, keine Doppelung.
+ */
 function slug(name: string): string {
   return (name.replace(/[^\w\-.]/g, "_").replace(/_+/g, "_").slice(0, 80) || "dokument");
 }
@@ -146,7 +152,7 @@ export async function POST(
     const mime = wantPdf ? "application/pdf" : DOCX_MIME;
     const dateiname = `${base}.${ext}`;
     const pfad = await saveUploadedFile(buffer, subdir, dateiname);
-    const hash = crypto.createHash("sha256").update(buffer).digest("hex");
+    const hash = sha256Hex(buffer);
     const ablage = defaultAblage(d.typ as BemDokumentTyp);
 
     const dok = await prisma.bemDokument.create({
@@ -177,7 +183,7 @@ export async function POST(
         format: ext,
         missingPlaceholders: result.missing,
       },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json(

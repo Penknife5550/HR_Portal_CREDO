@@ -21,7 +21,15 @@ jest.mock("@/lib/permissions", () => ({
   HR_EDIT_ROLES: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"],
   canAccessOrg: mockCanAccessOrg,
 }));
-jest.mock("@/lib/file-upload", () => ({ readUploadedFile: mockReadUploadedFile }));
+// Nur den Plattenzugriff ersetzen, den Rest des Moduls ECHT lassen: Die Route
+// zieht ihren ASCII-Dateinamen seit der Zusammenlegung aus @/lib/file-upload.
+// Eine Attrappe, die nur readUploadedFile kennt, liesse asciiFilename undefined
+// werden — der Download liefe in den 500er-Zweig, und der Test unten pruefte
+// nicht mehr die echte Namensbildung, sondern nur noch eine Fehlerseite.
+jest.mock("@/lib/file-upload", () => ({
+  ...jest.requireActual("@/lib/file-upload"),
+  readUploadedFile: mockReadUploadedFile,
+}));
 jest.mock("@/lib/erzeugte-dokumente-vorgang", () => ({
   istModulUnterstuetzt: (m: string) =>
     ["ONBOARDING", "VERTRAGSVERLAENGERUNG"].includes(m),

@@ -13,6 +13,7 @@ import {
   RV_BEFREIUNG_HINWEIS,
   effektivePflichtDokumente,
 } from "@/lib/required-documents";
+import { formatBytes } from "@/lib/format";
 
 interface UploadedDoc {
   id: string;
@@ -52,12 +53,6 @@ const OPTIONAL_DOCUMENT_CATEGORIES = [
   { value: "zeugnis", label: "Zeugnis / Qualifikationsnachweis" },
   { value: "sonstiges", label: "Sonstiges Dokument" },
 ];
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 const TYPE_LABELS: Record<string, string> = {
   KK_BESCHEINIGUNG: "KK-Bescheinigung",
@@ -510,7 +505,7 @@ export function DocumentUpload({
                     </p>
                     <p className="text-[10px] text-muted-foreground">
                       {TYPE_LABELS[doc.type] || doc.type} &middot;{" "}
-                      {formatFileSize(doc.fileSize)}
+                      {formatBytes(doc.fileSize)}
                     </p>
                   </div>
                 </div>

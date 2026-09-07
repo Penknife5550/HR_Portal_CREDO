@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { ADMIN_ROLES } from "@/lib/permissions";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const configSchema = z.object({
@@ -111,10 +112,7 @@ export async function PATCH(
       select: SELECT_FIELDS,
     });
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     await prisma.auditLog
       .create({

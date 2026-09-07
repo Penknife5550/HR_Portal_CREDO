@@ -14,6 +14,7 @@ import { getSession } from "@/lib/auth";
 import { canAccessProcess } from "@/lib/permissions";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { encrypt, isEncryptionConfigured } from "@/lib/encryption";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 import { z } from "zod";
 
 // Editierbare Felder (Whitelist) — gleiche Menge wie der oeffentliche Fragebogen.
@@ -222,10 +223,7 @@ export async function PATCH(
       });
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     await prisma.auditLog
       .create({

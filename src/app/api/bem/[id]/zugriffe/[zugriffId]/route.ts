@@ -10,14 +10,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canManageBemAccess } from "@/lib/permissions";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function DELETE(
   request: NextRequest,
@@ -60,7 +53,7 @@ export async function DELETE(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.ZUGRIFF_ENTZOGEN,
       details: { entzogenFuer: zugriff.userId },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json({ data: { ok: true } });

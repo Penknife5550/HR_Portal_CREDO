@@ -11,6 +11,7 @@ import path from "path";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { HR_EDIT_ROLES, PORTAL_ROLES, canAccessProcess } from "@/lib/permissions";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function GET(
   _request: NextRequest,
@@ -95,10 +96,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Dokument nicht gefunden" }, { status: 404 });
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     // Datei vom Disk löschen (best effort)
     const uploadsRoot = path.resolve(process.cwd(), "uploads");

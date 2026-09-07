@@ -13,6 +13,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { hashToken } from "@/lib/token-hash";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 const submitSchema = z.object({
   entscheidung: z.enum(["GENEHMIGT", "ABGELEHNT"]),
@@ -116,10 +117,7 @@ export async function POST(
     }
 
     // Atomarer Single-Use-Schutz: updateMany mit count===1 verhindert Race
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const txResult = await prisma.$transaction(async (tx) => {
       const result = await tx.elternzeitProzess.updateMany({

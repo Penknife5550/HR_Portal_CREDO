@@ -28,16 +28,45 @@
  */
 import crypto from "crypto";
 import path from "path";
-import { readFile, unlink } from "fs/promises";
+import { readFile, realpath, unlink } from "fs/promises";
 import { prisma } from "@/lib/db";
-import { readUploadedFile, saveUploadedFile } from "@/lib/file-upload";
+import { asciiFilename, saveUploadedFile, sha256Hex } from "@/lib/file-upload";
 import { sendEventEmail, resolveEventTemplate, type MailAttachment } from "@/lib/mailer";
 import { renderDocx, TemplateError } from "@/lib/doc-templates";
 import { convertDocxToPdf, isGotenbergReachable } from "@/lib/gotenberg";
-import { getResolver, hasModuleResolver } from "@/lib/doc-template-resolvers";
+import {
+  getResolver,
+  hasModuleResolver,
+  type ResolvedPlaceholders,
+} from "@/lib/doc-template-resolvers";
 import { sensiblePlatzhalter, type SensiblesFeld } from "@/lib/placeholder-catalog";
 import { canAccessProcess, type SessionPayload } from "@/lib/permissions";
 import { istModulUnterstuetzt } from "@/lib/erzeugte-dokumente";
+import { escapeHtml } from "@/lib/email-layout";
+import { empfaengerFreigegeben, ladeErlaubteDomains } from "@/lib/empfaenger-allowlist";
+// Die Antwort-Typen stehen in einer eigenen, importfreien Datei, weil der
+// Versand-Dialog ("use client") dieselben braucht und diese Datei hier prisma,
+// fs und node:crypto mitzieht. Siehe Kopfkommentar dort.
+import type {
+  PaketAngebot,
+  PaketAngebotPosition,
+  PaketDokument,
+  PaketPruefung,
+  PaketVersandAntwort,
+  PruefPosition,
+} from "@/lib/types/dokumentenpaket";
+
+// Weiterhin von hier beziehbar: Routen und Tests sollen nicht wissen muessen,
+// wo die Typen wohnen.
+export type {
+  PaketAngebot,
+  PaketAngebotJson,
+  PaketAngebotPosition,
+  PaketDokument,
+  PaketPruefung,
+  PaketVersandAntwort,
+  PruefPosition,
+} from "@/lib/types/dokumentenpaket";
 
 // =============================================
 // Grenzen
@@ -78,7 +107,8 @@ export type PaketFehler =
   | "PDF_DIENST"
   | "ZU_GROSS"
   | "VERSAND"
-  | "VERSAND_LAEUFT";
+  | "VERSAND_LAEUFT"
+  | "EMPFAENGER_NICHT_ERLAUBT";
 
 export interface PaketPositionEingabe {
   art: "PDF" | "VORLAGE";
@@ -87,29 +117,10 @@ export interface PaketPositionEingabe {
   bestaetigt?: boolean;
 }
 
-/** Ein fertiger Anhang samt allem, was in den Nachweis gehoert. */
-export interface PaketDokument {
-  art: "PDF" | "VORLAGE";
-  name: string;
-  dateiname: string;
-  hash: string;
-  groesse: number;
-  templateId?: string;
-  generatedDocumentId?: string;
-  /** Platzhalter, die leer geblieben sind — Warnung, kein Abbruch. */
-  fehlendeFelder: string[];
-  /** Sensible Felder, die fuer dieses Dokument entschluesselt wurden. */
-  sensibleFelder: string[];
-}
-
 export type PaketErgebnis =
-  | {
-      status: "SENT";
-      versandId: string;
-      empfaenger: string;
-      dokumente: PaketDokument[];
-      warnungen: string[];
-    }
+  // Der SENT-Zweig ist die geteilte Antwort plus Status: Der Dialog liest genau
+  // dieses Objekt, nachdem die Route es als `data` durchgereicht hat.
+  | ({ status: "SENT" } & PaketVersandAntwort)
   | {
       status: "FEHLER";
       fehler: PaketFehler;
@@ -319,12 +330,81 @@ export function modulVerdrahtet(modul: string): boolean {
 // =============================================
 
 /**
+ * Vorlagen liegen in genau zwei Verzeichnissen: hochgeladene unter
+ * uploads/brief-vorlagen (der Unterordner ist in der Upload-Route hart
+ * kodiert), geseedete als Asset unter public/system-dokumente.
+ */
+const VORLAGEN_WURZELN = [
+  path.join(process.cwd(), "uploads", "brief-vorlagen"),
+  path.join(process.cwd(), "public", "system-dokumente"),
+];
+
+/**
+ * Feste Pool-PDFs liegen in genau einem Verzeichnis — auch hier ist der
+ * Unterordner in der Upload-Route hart kodiert.
+ */
+const POOL_WURZELN = [path.join(process.cwd(), "uploads", "starterpaket")];
+
+/**
+ * Loest einen Pfad auf und gibt ihn nur zurueck, wenn er WIRKLICH unterhalb
+ * einer der uebergebenen Wurzeln liegt.
+ *
+ * Zwei Dinge, die der frueher hier stehende Vergleich (path.resolve +
+ * startsWith) nicht leistet:
+ *
+ * 1. **Symlinks.** path.resolve normalisiert Zeichenketten, sonst nichts. Ein
+ *    Link, der brav unterhalb der Wurzel liegt und auf /etc oder in die
+ *    BEM-Anlagen zeigt, besteht jede Praefix-Pruefung — geprueft wird der
+ *    Link, gelesen wird sein Ziel. Erst realpath macht daraus dasselbe.
+ *    Aufgeloest werden muessen BEIDE Seiten: auch die Wurzel kann ein Link
+ *    oder ein Bind-Mount sein (das uploads-Volume ist genau das), und dann
+ *    passte sonst nichts mehr zusammen.
+ *
+ * 2. **Der Vergleich selbst.** startsWith kennt weder Pfadgrenzen noch die
+ *    Gross-/Kleinschreibung — entwickelt wird auf Windows, gelaufen wird im
+ *    Linux-Container. path.relative kennt beides: liegt das Ziel ausserhalb,
+ *    ist das erste Segment "..", auf einem anderen Laufwerk ist das Ergebnis
+ *    absolut. Verglichen wird das erste SEGMENT und nicht der Praefix "..",
+ *    sonst wiese ein Geschwisterordner namens "..alt" faelschlich ab.
+ *
+ * Eine Wurzel, die es auf dieser Maschine gar nicht gibt, wird uebersprungen
+ * statt zu werfen: Ob public/system-dokumente existiert, darf nicht darueber
+ * entscheiden, ob eine hochgeladene Vorlage lesbar ist.
+ *
+ * Weil realpath auch bei einer fehlenden Datei wirft, beantwortet diese
+ * Funktion zwei Fragen auf einmal — "liegt der Pfad im erlaubten Bereich" und
+ * "gibt es die Datei ueberhaupt". Die Vorpruefung nutzt genau das, ohne ein
+ * einziges Byte zu lesen.
+ */
+async function pfadInWurzeln(dateipfad: string, wurzeln: string[]): Promise<string> {
+  const ziel = await realpath(path.resolve(dateipfad));
+  for (const wurzel of wurzeln) {
+    let aufgeloest: string;
+    try {
+      aufgeloest = await realpath(path.resolve(wurzel));
+    } catch {
+      continue;
+    }
+    const rel = path.relative(aufgeloest, ziel);
+    if (rel === "" || (rel.split(path.sep)[0] !== ".." && !path.isAbsolute(rel))) {
+      return ziel;
+    }
+  }
+  throw new Error("Pfad ausserhalb der erlaubten Verzeichnisse");
+}
+
+/**
  * Liest eine Vorlagendatei — aus den beiden Verzeichnissen, in denen Vorlagen
  * legitim liegen, und aus keinem anderen.
  *
- * Hochgeladene Vorlagen liegen unter uploads/. System-Vorlagen liegen
- * bewusst als Asset unter public/system-dokumente/ (sie werden beim Start
- * geseedet, nicht hochgeladen) — readUploadedFile weist sie deshalb ab.
+ * Frueher stand hier der ganze uploads-Baum als Wurzel. Das war zu weit:
+ * darunter liegt auch uploads/bem/<id>/... — Gesundheitsdaten nach Art. 9
+ * DSGVO mit eigenem Schluessel, die in einem Dokumentenpaket nichts zu suchen
+ * haben. Geschrieben wird `dateipfad` ohnehin nur an zwei Stellen (Upload-Route
+ * mit hart kodiertem Unterordner "brief-vorlagen", seed-check.js mit dem
+ * Asset-Pfad), die Verengung bricht also keinen Bestandsfall — auch die
+ * BEM-Vorlagen nicht, die ganz normale DocumentTemplate-Zeilen aus derselben
+ * Upload-Route sind.
  *
  * Die bestehende Erzeugen-Route liest die Datei ohne jede Pruefung. Das wird
  * hier nicht nachgemacht: dateipfad steht in der Datenbank, und eine
@@ -332,15 +412,19 @@ export function modulVerdrahtet(modul: string): boolean {
  * verschicken.
  */
 async function leseVorlagenDatei(dateipfad: string): Promise<Buffer> {
-  const wurzeln = [
-    path.resolve(path.join(process.cwd(), "uploads")),
-    path.resolve(path.join(process.cwd(), "public", "system-dokumente")),
-  ];
-  const ziel = path.resolve(dateipfad);
-  if (!wurzeln.some((w) => ziel === w || ziel.startsWith(w + path.sep))) {
-    throw new Error("Pfad ausserhalb der erlaubten Vorlagen-Verzeichnisse");
-  }
-  return readFile(ziel);
+  return readFile(await pfadInWurzeln(dateipfad, VORLAGEN_WURZELN));
+}
+
+/**
+ * Liest ein festes Pool-PDF. Gleiche Begruendung, andere Wurzel.
+ *
+ * Frueher lief das ueber readUploadedFile und damit ebenfalls ueber den ganzen
+ * uploads-Baum. Ein Fragebogen-Upload (uploads/<onboardingId>/...) oder eine
+ * BEM-Anlage haette so als Pool-Dokument durchgehen koennen, wenn ihr Pfad je
+ * in einer StarterpaketDokument-Zeile landete.
+ */
+async function lesePoolDokument(dateipfad: string): Promise<Buffer> {
+  return readFile(await pfadInWurzeln(dateipfad, POOL_WURZELN));
 }
 
 /**
@@ -350,13 +434,20 @@ async function leseVorlagenDatei(dateipfad: string): Promise<Buffer> {
  * HTML-Teil der Mail. Ohne Maskierung koennte ein < im Text die Mail
  * zerlegen — und ein "<script>" waere im Postfach des Empfaengers.
  * Zeilenumbrueche werden zu <br>, damit die Absaetze erhalten bleiben.
+ *
+ * Maskiert wird ueber escapeHtml aus dem E-Mail-Layout: dieselben vier
+ * Ersetzungen standen hier ein zweites Mal, und zwei Fassungen einer
+ * Maskierung laufen frueher oder spaeter auseinander. Die Reihenfolge ist
+ * dabei zwingend — erst maskieren, dann umbrechen. Andersherum machte
+ * escapeHtml aus dem eingefuegten <br> ein &lt;br&gt;, und der Absatz stuende
+ * als sichtbarer Text im Postfach.
+ *
+ * Nicht mit paragraphsToHtml aus derselben Datei zusammenlegen: die erzeugt
+ * <p>-Absaetze, hier braucht es <br> innerhalb eines Absatzes. Gemeinsam ist
+ * nur der Maskierungskern, und genau der wird jetzt geteilt.
  */
 export function alsHtmlAbsaetze(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+  return escapeHtml(text)
     .replace(/\r\n?/g, "\n")
     .replace(/\n/g, "<br>");
 }
@@ -407,15 +498,6 @@ export function anzeigeDatum(zeitpunkt: Date | null | undefined): string {
   }).format(zeitpunkt);
 }
 
-function sha256(buffer: Buffer): string {
-  return crypto.createHash("sha256").update(buffer).digest("hex");
-}
-
-/** Auf ASCII reduzierter Dateiname — wie beim Download erzeugter Dokumente. */
-function ascii(name: string): string {
-  return name.replace(/[^\w\-.]/g, "_");
-}
-
 /**
  * Dateiname einer befuellten Vorlage: Vorlagenname_Nachname_JJJJ-MM-TT.pdf
  * (Entscheidung vom 3. September). Der Nachname macht Anhaenge in einem
@@ -432,8 +514,23 @@ export function vorlagenDateiname(
   // Vorlagenname das ".pdf" ab — und dann trifft `replace(/\.pdf$/i, ".docx")`
   // beim Ablegen nicht mehr, Word- und PDF-Fassung landen unter demselben Pfad
   // und ueberschreiben sich.
-  const basis = ascii(`${teile.join("_")}_${datum}`).slice(0, 140);
+  const basis = asciiFilename(`${teile.join("_")}_${datum}`).slice(0, 140);
   return `${basis}.pdf`;
+}
+
+/**
+ * Der blosse Dateiname aus einem gespeicherten Pfad — fuer Meldungen, die den
+ * Browser erreichen.
+ *
+ * Bewusst NICHT path.basename: Das trennt nur am Trennzeichen der laufenden
+ * Maschine. Ein unter Windows geschriebener Pfad ("uploads\\brief-vorlagen\\
+ * a.docx") kaeme im Linux-Container unveraendert zurueck — samt Verzeichnissen,
+ * also genau das, was hier nicht hinaus soll. Der Ausdruck trennt an beiden
+ * Zeichen und ist damit unabhaengig davon, wo der Wert entstanden ist.
+ */
+function dateinameOhnePfad(dateipfad: string | undefined): string {
+  const teile = (dateipfad ?? "").split(/[\\/]/);
+  return teile[teile.length - 1] || "unbekannt";
 }
 
 /** Dateiname eines Pool-PDFs — unveraendert aus starterpaket.ts uebernommen. */
@@ -463,6 +560,16 @@ interface AufgeloestePosition {
   dateipfad?: string;
   originalName?: string;
   hash?: string;
+  /**
+   * Groesse laut Datenbank — NUR fuer die Vorpruefung.
+   *
+   * Sie wird beim Upload aus `valid.buffer.length` geschrieben und danach nie
+   * mehr angefasst (die PATCH-Route aendert nur Name, Beschreibung und
+   * isActive); die Datei laesst sich ueber das Portal nicht austauschen. Der
+   * Versand misst trotzdem weiter die echten Bytes — dort haengt die
+   * 413-Grenze daran, und die muss belastbar bleiben.
+   */
+  fileSize?: number;
   /** Nur bei Vorlage */
   platzhalter?: unknown;
   modul?: string;
@@ -491,7 +598,18 @@ export async function stellePaketZusammen(opts: {
             isActive: true,
             OR: [{ organizationId: null }, { organizationId: opts.organizationId }],
           },
-          select: { id: true, name: true, dateipfad: true, originalName: true, hash: true },
+          select: {
+            id: true,
+            name: true,
+            dateipfad: true,
+            originalName: true,
+            hash: true,
+            // Fuer die Vorpruefung: Sie meldet die Groesse, ohne die Datei zu
+            // lesen. Der Dialog stoesst sie nach jeder Aenderung erneut an —
+            // bei fuenf Anhaengen zu je zwei Megabyte waeren das zehn Megabyte
+            // je Tastendruck, die sofort wieder weggeworfen werden.
+            fileSize: true,
+          },
         })
       : Promise.resolve([]),
     vorlagenIds.length
@@ -529,6 +647,7 @@ export async function stellePaketZusammen(opts: {
         dateipfad: d.dateipfad,
         originalName: d.originalName,
         hash: d.hash,
+        fileSize: d.fileSize,
       });
     } else {
       const t = vorlagenMap.get(p.id);
@@ -584,6 +703,82 @@ export function erlaubtePlatzhalter(position: AufgeloestePosition): string[] {
   if (position.bestaetigt) return alle;
   const gesperrt = new Set(position.sensibleFelder.map((f) => f.key.toLowerCase()));
   return alle.filter((k) => !gesperrt.has(k.trim().toLowerCase()));
+}
+
+/**
+ * Ruft den Resolver hoechstens einmal je Platzhalterliste — fuer EINEN Aufruf.
+ *
+ * Ein Paket besteht regelmaessig aus mehreren Brief-Vorlagen. Der Resolver
+ * laeuft je Vorlage einmal und laedt dabei jedes Mal denselben Vorgang, denselben
+ * Mandanten und dasselbe Benutzerkonto — bei drei Vorlagen fuenfzehn Abfragen
+ * statt fuenf. Der Dialog stoesst die Vorpruefung zudem nach jeder Aenderung
+ * erneut an.
+ *
+ * Drei Regeln, die diesen Speicher ungefaehrlich machen:
+ *
+ * 1. Er wird im Aufrufer angelegt und stirbt mit ihm. Es gibt bewusst KEINEN
+ *    Modul- oder globalThis-Speicher: Ein Eintrag mit entschluesselter IBAN
+ *    darf niemals eine Anfrage oder eine Person ueberleben. Alles andere
+ *    (Vorgang, Sitzung, IP) ist innerhalb eines Aufrufs ohnehin konstant.
+ *
+ * 2. Der Schluessel ist die VOLLSTAENDIGE, sortierte Platzhalterliste — nicht
+ *    nur der sensible Anteil. Das ist der Punkt, an dem diese kleine Variante
+ *    steht und faellt: `ctx.placeholders` steuert, welche Werte der Resolver
+ *    ueberhaupt setzt, und zwar nachweislich NICHT nur bei sensiblen Feldern.
+ *    Der Verbeamtungs-Resolver gated ueber dieselbe Abfrage auch
+ *    `beurteilung_<n>_ergebnis`, `beirat_entscheidung` und `antrag_erklaerung`
+ *    (setGeschuetzt) — und von denen ist nur `gemeinde` im Katalog als
+ *    `sensitive` markiert. Ein Schluessel aus den sensiblen Feldern allein
+ *    wuerde zwei Vorlagen mit verschiedenen Listen dasselbe Ergebnis geben:
+ *    die zweite bekaeme ein Feld, das sie nicht angefordert hat, oder — der
+ *    schlimmere Fall, weil er still bleibt — ihr fehlte eines, das sie nutzt,
+ *    und im Schreiben stuende an dieser Stelle nichts.
+ *    Der Preis der Genauigkeit: Zwei Vorlagen teilen sich das Ergebnis nur bei
+ *    gleicher Platzhalterliste. Das ist seltener als ein Schluessel aus den
+ *    sensiblen Feldern allein, aber es ist richtig — und ein falsch befuelltes
+ *    Schreiben an eine echte Adresse ist teurer als eine gesparte Abfrage.
+ *
+ * 3. Zwischengespeichert wird die PROMISE, nicht erst das Ergebnis. Sonst
+ *    liefen zwei Positionen mit gleicher Liste nebeneinander los. Ein
+ *    Fehlschlag wird wieder ausgetragen, damit ein Verbindungsabriss bei der
+ *    ersten Vorlage nicht alle folgenden mitreisst.
+ *
+ * Herausgegeben wird das Ergebnis als flache Kopie: Die Resolver liefern
+ * ausschliesslich Zeichenketten, und kein heutiger Aufrufer schreibt hinein —
+ * aber wer das spaeter tut, soll damit nicht der naechsten Vorlage in die Daten
+ * oder in ihre Liste entschluesselter Felder schreiben.
+ */
+function neuerResolverSpeicher(modul: string) {
+  const resolver = getResolver(modul);
+  const eintraege = new Map<string, Promise<ResolvedPlaceholders>>();
+
+  return async function aufloesen(
+    kontext: {
+      organizationId: string;
+      refId: string;
+      placeholders: string[];
+      session: SessionPayload;
+      ipAddress: string | null;
+    },
+  ): Promise<ResolvedPlaceholders> {
+    // Sortiert, damit zwei Vorlagen mit denselben Platzhaltern in anderer
+    // Reihenfolge denselben Schluessel bekommen. Als Zeichenkette dient das
+    // JSON der Liste und nicht ein zusammengefuegter Text: Mit einem
+    // Trennzeichen waeren ["a,b"] und ["a","b"] derselbe Schluessel, und ein
+    // Schluessel, der zwei verschiedene Platzhaltermengen zusammenwirft, ist
+    // genau der Fehler, den dieser Speicher nicht machen darf.
+    const schluessel = JSON.stringify([...kontext.placeholders].sort());
+    let lauf = eintraege.get(schluessel);
+    if (!lauf) {
+      lauf = resolver(kontext).catch((e) => {
+        eintraege.delete(schluessel);
+        throw e;
+      });
+      eintraege.set(schluessel, lauf);
+    }
+    const ergebnis = await lauf;
+    return { data: { ...ergebnis.data }, sensitiveFields: [...ergebnis.sensitiveFields] };
+  };
 }
 
 // =============================================
@@ -692,6 +887,31 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
     return fehler("VERSAND", "Der Vorgang hat keine Empfaengeradresse.");
   }
 
+  // --- 5b. Freigabe der Empfaengeradresse ---
+  // Hier und nicht weiter unten: Die Abweichung von der Vorgangsadresse wird
+  // in Abschnitt 9 zwar berechnet, aber erst NACH sendEventEmail — dort ist
+  // sie nur noch ein Vermerk im Nachweis. Eine Schranke muss vor dem Bauen der
+  // Anhaenge greifen; danach ist die Mail unterwegs und mit ihr die IBAN.
+  //
+  // Vor diesem Punkt wurde nichts entschluesselt, nichts gerendert und nichts
+  // abgelegt — der Abbruch laesst die Datenbank unberuehrt und fuegt sich damit
+  // in die Zusage "kein Abbruchpfad hinterlaesst einen Nachweis".
+  const erlaubteDomains = await ladeErlaubteDomains();
+  if (
+    !empfaengerFreigegeben({
+      empfaenger,
+      empfaengerVorgang: vorgang.empfaenger,
+      domains: erlaubteDomains,
+    })
+  ) {
+    return fehler(
+      "EMPFAENGER_NICHT_ERLAUBT",
+      `An "${empfaenger}" darf nicht versendet werden: Die Adresse weicht von der im Vorgang hinterlegten ab und ihre Domain ist nicht freigegeben (erlaubt: ${erlaubteDomains.join(
+        ", ",
+      )}). Bitte die Adresse des Vorgangs verwenden oder die Freigabeliste in den Einstellungen unter SMTP ergaenzen lassen.`,
+    );
+  }
+
   // --- 6. Anhaenge bauen ---
   const anhaenge: MailAttachment[] = [];
   const dokumente: PaketDokument[] = [];
@@ -716,11 +936,16 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
     );
   }
 
+  // Ein Zwischenspeicher fuer genau diesen Versand: Ohne ihn laedt jede Vorlage
+  // mit derselben Platzhalterliste Vorgang, Mandant und Benutzerkonto erneut.
+  // Er lebt nur in dieser Funktion und sieht deshalb genau eine Sitzung.
+  const aufloesen = neuerResolverSpeicher(opts.modul);
+
   for (const [index, pos] of zusammen.positionen.entries()) {
     if (pos.art === "PDF") {
       let inhalt: Buffer;
       try {
-        inhalt = await readUploadedFile(pos.dateipfad!);
+        inhalt = await lesePoolDokument(pos.dateipfad!);
       } catch {
         return fehler(
           "DATEI_FEHLT",
@@ -735,7 +960,7 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
         dateiname,
         // Hash des tatsaechlich gelesenen Inhalts, nicht der DB-Wert: Der
         // Nachweis soll die versendeten Bytes belegen, nicht eine Zusage.
-        hash: sha256(inhalt),
+        hash: sha256Hex(inhalt),
         groesse: inhalt.length,
         fehlendeFelder: [],
         sensibleFelder: [],
@@ -744,8 +969,7 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
     }
 
     // --- Vorlage: befuellen, wandeln ---
-    const resolver = getResolver(opts.modul);
-    const aufgeloest = await resolver({
+    const aufgeloest = await aufloesen({
       organizationId: vorgang.organizationId,
       refId: opts.refId,
       placeholders: erlaubtePlatzhalter(pos),
@@ -800,7 +1024,7 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
       art: "VORLAGE",
       name: pos.name,
       dateiname,
-      hash: sha256(pdf),
+      hash: sha256Hex(pdf),
       groesse: pdf.length,
       templateId: pos.id,
       fehlendeFelder: gerendert.missing,
@@ -812,7 +1036,7 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
       dateiname,
       docx: gerendert.buffer,
       pdf,
-      hash: sha256(gerendert.buffer),
+      hash: sha256Hex(gerendert.buffer),
       fehlendeFelder: gerendert.missing,
       index: dokumente.length - 1,
     });
@@ -845,6 +1069,20 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
     dokumente.map((d) => `<li>${alsHtmlAbsaetze(d.name)}</li>`).join("") +
     "</ol>";
   const nachricht = (opts.nachricht ?? "").trim();
+  // Bewusste Ausnahme von der Hausregel "immer ueber triggerWebhooks":
+  //
+  // Der Dispatcher reicht weder Anhaenge noch overrideTo durch — er koennte es
+  // nur, wenn seine Signatur um die Mailer-Optionen waechst. Genau das ist hier
+  // NICHT gewollt (Entscheidung des Nutzers): Ein Dokumentenpaket kann 15 MB
+  // Personalunterlagen tragen, und an einer frei konfigurierbaren Webhook-URL
+  // will sie niemand haben — auch nicht als base64 im JSON-Koerper, auch nicht
+  // in einem dritten Parameter, der heute nur die Mail betrifft und beim
+  // naechsten Umbau vielleicht nicht mehr.
+  //
+  // Der Preis, den das kostet und den man kennen muss: Ein in den Einstellungen
+  // ueber "Freies Event" angelegter Webhook auf die vier "*-sent"-Ereignisse
+  // wird angelegt, angezeigt — und feuert nie. Das EmailLog schreibt
+  // sendEventEmail selbst, der Protokollteil geht also nicht verloren.
   const ergebnis = await sendEventEmail(
     eintrag.event,
     {
@@ -1101,39 +1339,6 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
 /** Fuellwert fuer sensible Platzhalter waehrend der Vorpruefung. */
 export const SENSIBEL_MARKER = "(wird beim Versand eingesetzt)";
 
-export interface PruefPosition {
-  art: "PDF" | "VORLAGE";
-  id: string;
-  name: string;
-  groesse: number;
-  /**
-   * Bei Vorlagen ist die Groesse geschaetzt: Gemessen wird das befuellte
-   * Word-Dokument, versendet wird das daraus gewandelte PDF. Die Vorpruefung
-   * ruft den PDF-Dienst bewusst nicht — sie soll schnell und folgenlos sein.
-   */
-  geschaetzt: boolean;
-  fehlendeFelder: string[];
-  sensibleFelder: SensiblesFeld[];
-  bestaetigungNoetig: boolean;
-}
-
-export interface PaketPruefung {
-  empfaengerVorgang: string;
-  empfaengerAbweichend: boolean;
-  positionen: PruefPosition[];
-  gesamtGroesse: number;
-  gesamtGeschaetzt: boolean;
-  ueberGroessenGrenze: boolean;
-  pdfDienstErreichbar: boolean;
-  /**
-   * Kennt die Mailvorlage die Variable {{nachricht}}? Wer die Vorlage in der
-   * Datenbank angepasst hat, hat sie moeglicherweise nicht — dann verschwaende
-   * die eingegebene Nachricht stillschweigend.
-   */
-  mailvorlageKenntNachricht: boolean;
-  warnungen: string[];
-}
-
 export type PruefungErgebnis =
   | { status: "OK"; pruefung: PaketPruefung }
   | { status: "FEHLER"; fehler: PaketFehler; detail: string };
@@ -1212,12 +1417,49 @@ export async function pruefePaket(opts: {
     );
   }
 
+  // Ein Zwischenspeicher fuer genau diese Vorpruefung — siehe
+  // neuerResolverSpeicher. Der Dialog stoesst sie nach jeder Aenderung erneut
+  // an, jeder gesparte Lauf zaehlt hier also doppelt.
+  const aufloesen = neuerResolverSpeicher(opts.modul);
+
   for (const pos of zusammen.positionen) {
     if (pos.art === "PDF") {
-      let groesse = 0;
+      // Die Groesse kommt aus der Datenbank, nicht von der Platte: Sie wird
+      // beim Upload aus den tatsaechlichen Bytes geschrieben und danach nie
+      // veraendert, und die Vorpruefung laeuft nach JEDER Aenderung im Dialog
+      // erneut. Frueher stand hier ein vollstaendiges readUploadedFile, nur um
+      // .length zu lesen — bei drei Anhaengen zu je zwei Megabyte sechs
+      // Megabyte je Tastendruck im Adressfeld.
+      //
+      // Der Versand misst weiterhin die echten Bytes. Die 413-Grenze haengt
+      // dort und nur dort; hier geht es um eine Anzeige.
+      const groesse = pos.fileSize ?? 0;
+      // Kennzeichen fuer den Dialog: Genau dieser Fehlschlag laesst den Versand
+      // spaeter mit DATEI_FEHLT (409) abbrechen — lesePoolDokument nimmt
+      // denselben Weg durch pfadInWurzeln. Die Warnung darunter sagt dasselbe
+      // in Worten; der Dialog darf sie aber nicht nach Stichworten durchsuchen,
+      // um daraus eine Sperre zu bauen, also bekommt er ein Kennzeichen.
+      let blockiert = false;
       try {
-        groesse = (await readUploadedFile(pos.dateipfad!)).length;
+        // Kein Byte, nur der aufgeloeste Pfad: realpath wirft sowohl bei einer
+        // fehlenden Datei als auch bei einem Pfad ausserhalb des Pool-
+        // Verzeichnisses. Damit bleibt die Zusage der Vorpruefung erhalten —
+        // "dieses Dokument wuerde den Versand abbrechen" — ohne dass dafuer
+        // noch etwas gelesen werden muesste.
+        //
+        // BEWUSSTE LUECKE, und zwar eine bezahlte: Geprueft wird der Pfad, NICHT
+        // die Lesbarkeit. Stimmen die Rechte im uploads-Volume nicht (der
+        // Container laeuft als uid 1001 — siehe CLAUDE.md), existiert die Datei,
+        // realpath ist zufrieden, und erst der Versand faellt mit EACCES in den
+        // 409. Der Preis dafuer ist bekannt und wird trotzdem gezahlt: Der Dialog
+        // stoesst diese Pruefung 500 ms nach JEDER Aenderung erneut an; ein
+        // probeweises Oeffnen jeder Pool-Datei bei jedem Tastendruck im
+        // Adressfeld waere teurer als der seltene, gut erkennbare Rechte-Fehler.
+        // Wer das aendern will, prueft die Lesbarkeit (open/close statt read),
+        // nicht den Inhalt — sonst sind die eingesparten Megabyte wieder da.
+        await pfadInWurzeln(pos.dateipfad!, POOL_WURZELN);
       } catch {
+        blockiert = true;
         warnungen.push(`Dokument "${pos.name}" fehlt im Speicher und wuerde den Versand abbrechen.`);
       }
       positionen.push({
@@ -1229,6 +1471,7 @@ export async function pruefePaket(opts: {
         fehlendeFelder: [],
         sensibleFelder: [],
         bestaetigungNoetig: false,
+        blockiert,
       });
       continue;
     }
@@ -1241,7 +1484,7 @@ export async function pruefePaket(opts: {
       : [];
     const ohneSensible = alle.filter((k) => !gesperrt.has(k.trim().toLowerCase()));
 
-    const aufgeloest = await getResolver(opts.modul)({
+    const aufgeloest = await aufloesen({
       organizationId: vorgang.organizationId,
       refId: opts.refId,
       placeholders: ohneSensible,
@@ -1255,17 +1498,62 @@ export async function pruefePaket(opts: {
 
     let fehlendeFelder: string[] = [];
     let groesse = 0;
+    // Dieselben zwei Schritte macht der Versand (leseVorlagenDatei, renderDocx)
+    // und bricht dort mit DATEI_FEHLT bzw. VORLAGE_FEHLERHAFT ab — beides 409.
+    // Scheitert der Probelauf hier, wuerde also auch der echte Lauf scheitern.
+    //
+    // Bewusst NICHT blockierend: leere Felder. Sie stehen in fehlendeFelder,
+    // das Dokument geht mit Luecken hinaus, und der Versand kennt dafuer keinen
+    // Abbruch — nur eine Warnung. Ebenso wenig gehoeren PDF-Dienst (502),
+    // Groessengrenze (413), Empfaengerfreigabe und Bestaetigungspflicht hier
+    // hinein: Fuer jedes davon traegt die Pruefung ein eigenes Feld.
+    let blockiert = false;
+    // Zwei getrennte Schritte statt eines gemeinsamen try, weil ihre Fehler
+    // grundverschieden sind — und nur einer davon gefahrlos in den Browser darf.
+    let quelle: Buffer | null = null;
     try {
-      const quelle = await leseVorlagenDatei(pos.dateipfad!);
-      const gerendert = renderDocx(quelle, daten);
-      groesse = gerendert.buffer.length;
-      fehlendeFelder = gerendert.missing.filter((k) => !gesperrt.has(k.trim().toLowerCase()));
+      quelle = await leseVorlagenDatei(pos.dateipfad!);
     } catch (e) {
-      warnungen.push(
-        `Vorlage "${pos.name}" konnte nicht probeweise befuellt werden: ${
-          e instanceof Error ? e.message : "Unbekannter Fehler"
-        }`,
+      blockiert = true;
+      // Die Meldung des Dateisystems geht hier bewusst NICHT mit hinaus. Sie
+      // lautet woertlich "ENOENT: no such file or directory, open
+      // '/app/uploads/brief-vorlagen/<datei>'" und truege damit den absoluten
+      // Serverpfad bis in den Browser — die Verzeichnisstruktur des Servers ist
+      // nichts, was eine Fehlermeldung ueber ein fehlendes Dokument verraten
+      // muss. Dem Nutzer hilft sie ohnehin nicht: Er kann auf dem Server nichts
+      // nachsehen, er kann die Vorlage nur in der Vorlagenverwaltung suchen —
+      // und dafuer genuegen Name und Dateiname.
+      //
+      // Der vollstaendige Pfad bleibt erhalten, nur an der richtigen Stelle:
+      // im Serverprotokoll, wo ihn beim Suchen jemand braucht, der ohnehin
+      // Zugriff auf die Maschine hat.
+      console.error(
+        `[Dokumentenpaket] Vorlage "${pos.name}" nicht lesbar (${pos.dateipfad}):`,
+        e,
       );
+      warnungen.push(
+        `Vorlage "${pos.name}" (Datei "${dateinameOhnePfad(pos.dateipfad)}") konnte nicht geladen werden und wuerde den Versand abbrechen.`,
+      );
+    }
+
+    if (quelle) {
+      try {
+        const gerendert = renderDocx(quelle, daten);
+        groesse = gerendert.buffer.length;
+        fehlendeFelder = gerendert.missing.filter((k) => !gesperrt.has(k.trim().toLowerCase()));
+      } catch (e) {
+        blockiert = true;
+        // Diese Meldung darf unveraendert hinaus: Sie stammt aus
+        // doc-templates.ts, beschreibt die Vorlage selbst ("Ein Platzhalter
+        // wurde nicht geschlossen") und kennt keinen Pfad — renderDocx bekommt
+        // einen Puffer und weiss gar nicht, woher er stammt. Genau diese
+        // Meldung ist das, womit jemand die Vorlage reparieren kann.
+        warnungen.push(
+          `Vorlage "${pos.name}" konnte nicht probeweise befuellt werden: ${
+            e instanceof Error ? e.message : "Unbekannter Fehler"
+          }`,
+        );
+      }
     }
 
     positionen.push({
@@ -1277,11 +1565,39 @@ export async function pruefePaket(opts: {
       fehlendeFelder,
       sensibleFelder: pos.sensibleFelder,
       bestaetigungNoetig: pos.sensibleFelder.length > 0,
+      blockiert,
     });
   }
 
+  // Zwei Zahlen aus derselben Summe, und sie duerfen nicht verwechselt werden:
+  //
+  // `gesamtGroesse` ist der ANZEIGEWERT — die Rohbytes der Anhaenge. Genau das
+  // will die Person wissen, die im Dialog "8,2 MB von 15 MB" liest: wie gross
+  // ihre Dokumente sind, nicht wie gross deren base64-Fassung waere.
+  //
+  // Die GRENZE dagegen gilt fuer die fertige Nachricht. Der Versand misst in
+  // Abschnitt 7 kodierteGroesse(...) und weist mit 413 ab; die Vorpruefung hat
+  // hier lange die Rohbytes verglichen. Das Fenster dazwischen — rund 11,25 MB
+  // bis 15 MB roh — meldete "passt", der Dialog gab den Knopf frei, und der
+  // Klick lief in denselben 413, den die Knopfsperre gerade verhindern soll.
+  // Beide Seiten muessen dieselbe Zahl vergleichen, sonst ist die Vorpruefung
+  // an ihrer wichtigsten Stelle eine Zusage, die der Versand nicht haelt.
   const gesamtGroesse = positionen.reduce((s, p) => s + p.groesse, 0);
   const empfaenger = (opts.empfaenger || "").trim();
+
+  // Dieselbe Entscheidung wie im Versand, nur folgenlos: Der Dialog soll den
+  // Knopf schon waehrend des Tippens sperren koennen, statt die Person erst
+  // nach dem Klick in einen 409 laufen zu lassen.
+  const erlaubteDomains = await ladeErlaubteDomains();
+  // Ohne eingegebene Adresse gibt es nichts zu pruefen — der Dialog ruft die
+  // Vorpruefung auch dann, wenn das Feld noch leer ist.
+  const empfaengerErlaubt =
+    empfaenger === "" ||
+    empfaengerFreigegeben({
+      empfaenger,
+      empfaengerVorgang: vorgang.empfaenger,
+      domains: erlaubteDomains,
+    });
 
   return {
     status: "OK",
@@ -1289,10 +1605,17 @@ export async function pruefePaket(opts: {
       empfaengerVorgang: vorgang.empfaenger,
       empfaengerAbweichend:
         empfaenger !== "" && empfaenger.toLowerCase() !== vorgang.empfaenger.toLowerCase(),
+      empfaengerErlaubt,
+      erlaubteDomains,
       positionen,
       gesamtGroesse,
       gesamtGeschaetzt: positionen.some((p) => p.geschaetzt),
-      ueberGroessenGrenze: gesamtGroesse > MAX_PAKET_BYTES,
+      // Dieselbe Rechnung wie im Versand (Abschnitt 7), damit die Vorpruefung
+      // nicht freigibt, was der Versand dann mit 413 abweist. Die Groesse der
+      // Vorlagen ist dabei geschaetzt (docx vor der PDF-Wandlung) — das steht
+      // in `gesamtGeschaetzt` und bleibt so; eine Schaetzung ist hier besser als
+      // gar keine Warnung.
+      ueberGroessenGrenze: kodierteGroesse(gesamtGroesse) > MAX_PAKET_BYTES,
       pdfDienstErreichbar,
       mailvorlageKenntNachricht,
       warnungen,
@@ -1333,6 +1656,12 @@ export function statusFuerFehler(fehler: PaketFehler): number {
       return 502;
     case "VERSAND_LAEUFT":
       return 409;
+    // 409 und nicht 403: Die aufrufende Person DARF versenden, nur nicht an
+    // diese Adresse — sie kann es selbst beheben, indem sie die Adresse des
+    // Vorgangs nimmt. Genau die Bedeutung, die 409 hier schon traegt. 403
+    // hiesse "du darfst hier gar nichts", und das waere falsch.
+    case "EMPFAENGER_NICHT_ERLAUBT":
+      return 409;
     case "MODUL_NICHT_UNTERSTUETZT":
     case "POSITION_NICHT_VERFUEGBAR":
       return 400;
@@ -1342,39 +1671,6 @@ export function statusFuerFehler(fehler: PaketFehler): number {
 // =============================================
 // Zusammenstellung fuer den Dialog
 // =============================================
-
-export interface PaketAngebotPosition {
-  art: "PDF" | "VORLAGE";
-  id: string;
-  name: string;
-  beschreibung: string | null;
-  scope: "GLOBAL" | "MANDANT";
-  groesse: number;
-  sensibleFelder: SensiblesFeld[];
-}
-
-export interface PaketAngebot {
-  modul: string;
-  organizationId: string;
-  empfaengerVorschlag: string;
-  vorname: string;
-  nachname: string;
-  displayId: string | null;
-  /** Standardpaket des Mandanten, in Reihenfolge — im Dialog vorausgewaehlt. */
-  standardpaket: { art: "PDF" | "VORLAGE"; id: string }[];
-  /** Alles Waehlbare, Standardpaket eingeschlossen. */
-  verfuegbar: PaketAngebotPosition[];
-  verlauf: {
-    id: string;
-    createdAt: Date;
-    empfaenger: string;
-    anzahl: number;
-    empfaengerAbweichend: boolean;
-  }[];
-  /** Versand aus der Zeit vor dieser Tabelle — siehe VorgangsKontext. */
-  altversand: { am: Date; anzahl: number } | null;
-  maxBytes: number;
-}
 
 export type AngebotErgebnis =
   | { status: "OK"; angebot: PaketAngebot }

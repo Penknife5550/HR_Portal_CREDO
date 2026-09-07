@@ -139,6 +139,18 @@ export interface TemplateGenerationSectionProps {
   staticDocuments?: StaticDocument[];
   /** Hinweis, wenn keine Vorlagen hinterlegt sind. */
   emptyHint?: string;
+  /**
+   * Zaehler, der die Liste "Fuer diesen Vorgang bereits erstellt" nachlaedt.
+   *
+   * Der Paketversand legt fuer JEDE mitgeschickte Vorlage ein eigenes
+   * GeneratedDocument an — mit Versandbezug, also mit dem Etikett "per E-Mail
+   * versendet". Bis diese Sektion erneut fragt, fehlen diese Zeilen komplett;
+   * das Etikett ist nur der auffaelligste Teil davon. Die Karte "Dokumente
+   * versenden" ist ein Geschwisterelement und kann hier nichts aufrufen, also
+   * zaehlt die gemeinsame Elternkomponente hoch. Ohne das stimmte die Liste
+   * erst nach einem Seitenwechsel.
+   */
+  aktualisierung?: number;
 }
 
 export function TemplateGenerationSection({
@@ -148,6 +160,7 @@ export function TemplateGenerationSection({
   canEdit = false,
   staticDocuments = [],
   emptyHint,
+  aktualisierung = 0,
 }: TemplateGenerationSectionProps) {
   const [templates, setTemplates] = useState<VorlageItem[]>([]);
   // Vier ehrliche Zustaende statt "jeder Fehler ist eine leere Liste".
@@ -207,6 +220,19 @@ export function TemplateGenerationSection({
     laden();
     ladeErzeugte();
   }, [laden, ladeErzeugte]);
+
+  // Nach einem Paketversand nur die Liste der erzeugten Dokumente nachziehen —
+  // die Vorlagenliste aendert sich dabei nicht, ein zweiter Aufruf von laden()
+  // waere reine Last. Der Startwert 0 bleibt bewusst folgenlos, sonst liefe der
+  // erste Ladelauf doppelt.
+  //
+  // Der Zaehler wird IM Effekt gelesen und steht deshalb zu Recht in den
+  // Abhaengigkeiten. Wer ihn stattdessen an die Abhaengigkeitsliste von
+  // ladeErzeugte haengte, bekaeme von react-hooks/exhaustive-deps zu Recht eine
+  // "unnecessary dependency" gemeldet — der Rueckruf benutzt ihn ja nicht.
+  useEffect(() => {
+    if (aktualisierung > 0) ladeErzeugte();
+  }, [aktualisierung, ladeErzeugte]);
 
   function setMeldung(templateId: string, meldung: ZeilenMeldung | null) {
     setMeldungen((prev) => {

@@ -13,14 +13,7 @@ import { getSession } from "@/lib/auth";
 import { canManageBemAccess, GLOBAL_ROLES } from "@/lib/permissions";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { bemZugriffSchema } from "@/lib/validations/bem";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -129,7 +122,7 @@ export async function POST(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.ZUGRIFF_GEWAEHRT,
       details: { freigegebenFuer: userId, rolle },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json({ data: { ok: true } }, { status: 201 });

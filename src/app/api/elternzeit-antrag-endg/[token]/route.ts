@@ -15,6 +15,7 @@ import { publicAntragEndgSchema } from "@/lib/validations/elternzeit";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
 import { hashToken } from "@/lib/token-hash";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 // =============================================
 // GET – Token validieren + Daten laden
@@ -137,10 +138,7 @@ export async function POST(
     // Atomarer Single-Use-Schutz + Geburtsurkunden-Check in einer Transaktion.
     // updateMany mit count===1 verhindert Race-Condition: zwei parallele POSTs
     // koennen nicht beide passieren.
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const txResult = await prisma.$transaction(async (tx) => {
       const docCount = await tx.elternzeitDokument.count({

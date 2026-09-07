@@ -27,20 +27,13 @@ import {
 } from "@/lib/validations/brief-vorlagen";
 import { getResolver } from "@/lib/doc-template-resolvers";
 import { generateFromTemplate } from "@/lib/doc-generation";
-import { saveUploadedFile } from "@/lib/file-upload";
+import { asciiFilename, saveUploadedFile, sha256Hex } from "@/lib/file-upload";
 import { sendEmail } from "@/lib/mailer";
 import type { DeckblattMeta } from "@/lib/pdf-deckblatt";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-function clientIp(headers: Headers): string | null {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headers.get("x-real-ip") ||
-    null
-  );
-}
 
 function todayDe(): string {
   return new Date().toLocaleDateString("de-DE", {
@@ -50,6 +43,16 @@ function todayDe(): string {
   });
 }
 
+/**
+ * Basisname der erzeugten Datei auf der Platte.
+ *
+ * Bewusst NICHT durch asciiFilename() aus @/lib/file-upload ersetzt, obwohl
+ * beide Umlaute zu Unterstrichen machen: Der vorgeschaltete `["\n\r]`-Schritt
+ * entfernt Anfuehrungszeichen restlos, statt sie wie asciiFilename zu
+ * Unterstrichen zu machen, und `_+` fasst Laeufe zusammen. Aus
+ * `Vertrag "X"` wird hier `Vertrag_X`, dort `Vertrag__X_` — zwei verschiedene
+ * Dateinamen und damit zwei Regeln, keine Doppelung.
+ */
 function slugify(name: string): string {
   return (
     name
@@ -58,11 +61,6 @@ function slugify(name: string): string {
       .replace(/_+/g, "_")
       .slice(0, 80) || "dokument"
   );
-}
-
-function asciiFilename(name: string): string {
-  // Content-Disposition vertraegt keine Umlaute -> ASCII-Fallback
-  return name.replace(/[^\w\-.]/g, "_");
 }
 
 export const POST = apiHandler<GenerateInput>(
@@ -169,7 +167,7 @@ export const POST = apiHandler<GenerateInput>(
         ? (template.platzhalter as string[])
         : undefined,
       session,
-      ipAddress: clientIp(request.headers),
+      ipAddress: getClientIpOrNull(request),
     });
     const data: Record<string, unknown> = {
       ...resolverData,
@@ -286,10 +284,7 @@ export const POST = apiHandler<GenerateInput>(
     // Erzeugte Dateien persistieren (DMS / Audit) — bei mail erst NACH Versand
     const genId = crypto.randomUUID();
     const subdir = `brief-vorlagen-generiert/${genId}`;
-    const docxHash = crypto
-      .createHash("sha256")
-      .update(result.docx)
-      .digest("hex");
+    const docxHash = sha256Hex(result.docx);
 
     const pfadDocx = await saveUploadedFile(
       result.docx,
@@ -339,7 +334,7 @@ export const POST = apiHandler<GenerateInput>(
             ? { mailSent: true, mailTo: body.email!.to, pdfAttached: !!result.pdf }
             : {}),
         },
-        ipAddress: clientIp(request.headers),
+        ipAddress: getClientIpOrNull(request),
       },
     });
 

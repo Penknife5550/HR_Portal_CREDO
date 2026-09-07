@@ -37,10 +37,16 @@ function ctx(id: string = ORG_ID) {
   return { params: Promise.resolve({ id }) };
 }
 
-function putReq(body: unknown): NextRequest {
+/**
+ * `kopf` ergaenzt einzelne Kopfzeilen, ohne den content-type zu verlieren — der
+ * Handler wuerde den Koerper sonst gar nicht erst als JSON lesen. Gebraucht
+ * wird das nur von den beiden IP-Faellen weiter unten; alle anderen Aufrufe
+ * bleiben unveraendert.
+ */
+function putReq(body: unknown, kopf: Record<string, string> = {}): NextRequest {
   return new NextRequest(`http://localhost:3000/api/organizations/${ORG_ID}/starterpaket`, {
     method: "PUT",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...kopf },
     body: JSON.stringify(body),
   });
 }
@@ -380,6 +386,46 @@ describe("PUT — gemischte Positionen", () => {
             anzahlVorlagen: 1,
           }),
         }),
+      }),
+    );
+  });
+
+  it("protokolliert die IP des eigenen Proxys, nicht die vorgesetzte des Aufrufers", async () => {
+    // `X-Forwarded-For` ist eine Kette; jeder Proxy haengt hinten an. Der letzte
+    // Eintrag stammt vom eigenen Reverse Proxy, alles davor hat der Aufrufer
+    // selbst mitgeschickt. Vorher stand hier der ERSTE Eintrag — die Adresse im
+    // Pruefprotokoll konnte sich also aussuchen, wer die Anfrage stellte.
+    mockPrisma.starterpaketDokument.count.mockResolvedValue(1);
+    await PUT(
+      putReq(
+        { modul: "ONBOARDING", positionen: [{ art: "PDF", id: GLOBAL_DOC }] },
+        { "x-forwarded-for": "8.8.8.8, 203.0.113.9" },
+      ),
+      ctx(),
+    );
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ ipAddress: "203.0.113.9" }),
+      }),
+    );
+  });
+
+  it("laesst die Protokoll-IP leer, wenn nur X-Real-IP mitgeschickt wurde", async () => {
+    // Vor dem Portal steht Caddy mit einem blanken `reverse_proxy` — der setzt
+    // `X-Forwarded-For`, aber kein `X-Real-IP`. Der Header kaeme also nur vom
+    // Aufrufer selbst und darf im Nachweis nicht landen: Eine Luecke (null) ist
+    // ehrlicher als eine Adresse, die sich der Absender ausgesucht hat.
+    mockPrisma.starterpaketDokument.count.mockResolvedValue(1);
+    await PUT(
+      putReq(
+        { modul: "ONBOARDING", positionen: [{ art: "PDF", id: GLOBAL_DOC }] },
+        { "x-real-ip": "8.8.8.8" },
+      ),
+      ctx(),
+    );
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ ipAddress: null }),
       }),
     );
   });

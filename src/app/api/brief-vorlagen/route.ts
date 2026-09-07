@@ -6,7 +6,6 @@
  */
 
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import {
@@ -19,17 +18,11 @@ import {
   validateDocxUpload,
   saveUploadedFile,
   sanitizeFilename,
+  sha256Hex,
 } from "@/lib/file-upload";
 import { extractPlaceholders, TemplateError } from "@/lib/doc-templates";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 import { createTemplateMetaSchema } from "@/lib/validations/brief-vorlagen";
-
-function clientIp(headers: Headers): string | null {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headers.get("x-real-ip") ||
-    null
-  );
-}
 
 function formStr(value: FormDataEntryValue | null): string | undefined {
   if (typeof value === "string" && value.trim() !== "") return value;
@@ -192,7 +185,7 @@ export const POST = apiHandler(
     // Datei speichern
     const filename = sanitizeFilename(file.name);
     const dateipfad = await saveUploadedFile(valid.buffer, "brief-vorlagen", filename);
-    const hash = crypto.createHash("sha256").update(valid.buffer).digest("hex");
+    const hash = sha256Hex(valid.buffer);
 
     const template = await prisma.documentTemplate.create({
       data: {
@@ -233,7 +226,7 @@ export const POST = apiHandler(
           organizationId: template.organizationId,
           platzhalterCount: platzhalter.length,
         },
-        ipAddress: clientIp(request.headers),
+        ipAddress: getClientIpOrNull(request),
       },
     });
 

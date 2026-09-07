@@ -14,6 +14,7 @@ import { generateAntragLinkSchema } from "@/lib/validations/elternzeit";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
 import { hashToken } from "@/lib/token-hash";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -65,10 +66,7 @@ export async function POST(
       );
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     // Token (UUID, 30 Tage gueltig). Klartext nur in der Magic-URL,
     // in der DB liegt nur der SHA-256-Hash (siehe lib/token-hash.ts).

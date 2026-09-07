@@ -1265,18 +1265,29 @@ model WebhookConfig {
 // Primaerer Versandkanal fuer alle E-Mails des Portals
 // =============================================
 model SmtpConfig {
-  id           String   @id @default("default")
-  host         String   @default("")
-  port         Int      @default(587)
-  secure       Boolean  @default(false) // true = Port 465 (SSL), false = STARTTLS
-  username     String   @default("")
-  password     String   @default("") // Passwort – nur maskiert im Frontend anzeigen
-  fromEmail    String   @default("")
-  fromName     String   @default("CREDO HR-Portal")
-  replyToEmail String   @default("") // Antworten gehen an diese Adresse (Reply-To); leer = kein Reply-To
-  isActive     Boolean  @default(false) // muss nach der Einrichtung aktiviert werden
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id           String  @id @default("default")
+  host         String  @default("")
+  port         Int     @default(587)
+  secure       Boolean @default(false) // true = Port 465 (SSL), false = STARTTLS
+  username     String  @default("")
+  password     String  @default("") // Passwort – nur maskiert im Frontend anzeigen
+  fromEmail    String  @default("")
+  fromName     String  @default("CREDO HR-Portal")
+  replyToEmail String  @default("") // Antworten gehen an diese Adresse (Reply-To); leer = kein Reply-To
+
+  // Freigabeliste fuer ABWEICHENDE Empfaenger des Dokumentenpaket-Versands.
+  // Kommagetrennte Domains; leer = keine Einschraenkung. Die im Vorgang
+  // hinterlegte Adresse geht immer durch, auch an private Postfaecher —
+  // beim Onboarding ist gmail.com/web.de der Regelfall, nicht die Ausnahme.
+  // Steht hier, weil /api/settings/smtp bereits SUPER_ADMIN und HR_LEITUNG
+  // vorbehalten ist: Wer versenden darf (HR_EDIT_ROLES), kann die Schranke
+  // damit nicht selbst entfernen. Englischer Name wie die uebrigen Felder
+  // dieses Modells (host, fromEmail, replyToEmail).
+  allowedRecipientDomains String @default("")
+
+  isActive  Boolean  @default(false) // muss nach der Einrichtung aktiviert werden
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("smtp_config")
 }

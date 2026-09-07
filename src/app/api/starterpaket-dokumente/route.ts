@@ -7,7 +7,6 @@
  * Berechtigung: SUPER_ADMIN / HR_LEITUNG (Mandanten-/Stammdaten-Konfiguration).
  */
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { ADMIN_ROLES, canAccessOrg } from "@/lib/permissions";
@@ -15,16 +14,10 @@ import {
   validateUpload,
   saveUploadedFile,
   sanitizeFilename,
+  sha256Hex,
 } from "@/lib/file-upload";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 import { createStarterpaketDokumentMetaSchema } from "@/lib/validations/starterpaket";
-
-function clientIp(headers: Headers): string | null {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headers.get("x-real-ip") ||
-    null
-  );
-}
 
 function formStr(value: FormDataEntryValue | null): string | undefined {
   if (typeof value === "string" && value.trim() !== "") return value;
@@ -132,7 +125,7 @@ export const POST = apiHandler(
 
     const filename = sanitizeFilename(file.name);
     const dateipfad = await saveUploadedFile(valid.buffer, "starterpaket", filename);
-    const hash = crypto.createHash("sha256").update(valid.buffer).digest("hex");
+    const hash = sha256Hex(valid.buffer);
 
     const count = await prisma.starterpaketDokument.count();
     const created = await prisma.starterpaketDokument.create({
@@ -171,7 +164,7 @@ export const POST = apiHandler(
           organizationId: created.organizationId,
           fileSize: created.fileSize,
         },
-        ipAddress: clientIp(request.headers),
+        ipAddress: getClientIpOrNull(request),
       },
     });
 

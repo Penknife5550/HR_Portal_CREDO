@@ -10,7 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
-import { EMAIL_PATTERN } from "@/lib/mailer";
+import { pruefeVorlagenSyntax, beschreibeVerwaisteMarker } from "@/lib/mailer";
+import { EMAIL_PATTERN } from "@/lib/constants";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 
@@ -58,6 +59,23 @@ export async function PUT(
           { status: 400 }
         );
       }
+    }
+
+    // Bedingungsmarker pruefen: {{#name}} ohne {{/name}} loest der Renderer
+    // nicht auf, und die Variablen-Ersetzung greift dort auch nicht — der
+    // Rohtext ginge an die beschaeftigte Person. Deshalb hier beim Speichern,
+    // wo der Tippfehler entsteht und wer ihn gemacht hat noch davorsitzt.
+    // Feldnamen woertlich wie im Editor, damit die Meldung zur Oberflaeche passt.
+    const syntaxFehler = pruefeVorlagenSyntax({
+      Betreff: subject,
+      "HTML-Body": bodyHtml,
+      Plaintext: bodyText,
+    });
+    if (syntaxFehler.length > 0) {
+      return NextResponse.json(
+        { error: `Unvollstaendiger Bedingungsblock. ${beschreibeVerwaisteMarker(syntaxFehler)}` },
+        { status: 400 }
+      );
     }
 
     // Variablen für dieses Event aus Default-Template holen

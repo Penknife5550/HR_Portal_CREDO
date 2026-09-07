@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { PortalHeader } from "@/components/portal-header";
 import { VariablenKatalog } from "@/components/variablen-katalog";
 import { AVAILABLE_MODULES, moduleLabel } from "@/lib/placeholder-catalog";
+import { formatBytes } from "@/lib/format";
 import {
   filterVorlagen,
   istFilterAktiv,
@@ -53,12 +54,6 @@ const INPUT_CLASS =
 
 const FILTER_CLASS =
   "rounded-lg border border-input bg-background px-3 py-1.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring";
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function filenameFromHeaders(res: Response, fallback: string): string {
   const cd = res.headers.get("Content-Disposition") || "";

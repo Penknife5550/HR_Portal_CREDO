@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
+import { formatBytes } from "@/lib/format";
 
 interface User {
   userId: string;
@@ -72,12 +73,6 @@ const MODULE: ReadonlyArray<{ value: string; label: string }> = [
 
 const INPUT_CLASS =
   "mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring";
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /** Eindeutiger Schluessel einer Position — dieselbe UUID kann es je Art geben. */
 function posKey(p: Position): string {

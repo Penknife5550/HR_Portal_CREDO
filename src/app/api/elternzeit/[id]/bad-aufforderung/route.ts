@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { EXPORT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { generateBADAufforderungsbrief } from "@/lib/elternzeit-pdf";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function GET(
   request: NextRequest,
@@ -47,10 +48,7 @@ export async function GET(
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const pdfBuffer = await generateBADAufforderungsbrief({
       firstName: ez.employeeFirstName,

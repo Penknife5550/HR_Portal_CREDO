@@ -17,6 +17,7 @@ import {
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
 import { hashToken } from "@/lib/token-hash";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 // =============================================
 // GET – Token validieren + Daten laden
@@ -167,10 +168,7 @@ export async function POST(
     }
 
     // Daten in Transaktion speichern — atomarer Single-Use-Schutz via updateMany
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const txResult = await prisma.$transaction(async (tx) => {
       // Atomarer Single-Use-Check: nur wenn antragTokenVorlUsedAt noch null ist

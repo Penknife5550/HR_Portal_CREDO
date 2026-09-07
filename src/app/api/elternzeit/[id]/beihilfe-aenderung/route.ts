@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { EXPORT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { generateBeihilfeAenderungsformular } from "@/lib/elternzeit-pdf";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function GET(
   request: NextRequest,
@@ -63,10 +64,7 @@ export async function GET(
       );
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const pdfBuffer = await generateBeihilfeAenderungsformular({
       firstName: ez.employeeFirstName,

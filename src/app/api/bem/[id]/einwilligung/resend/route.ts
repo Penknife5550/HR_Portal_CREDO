@@ -12,14 +12,7 @@ import { getSession } from "@/lib/auth";
 import { canMutateBemContent } from "@/lib/permissions";
 import { einwilligungResendSchema } from "@/lib/validations/bem";
 import { sendBemEinwilligungLink } from "@/lib/bem-einladung";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -115,7 +108,7 @@ export async function POST(
       baseUrl,
       gueltigkeitstage: fall.organization.ezTokenValidityDays || 30,
       gesendetById: session.userId,
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     if (!result.ok) {

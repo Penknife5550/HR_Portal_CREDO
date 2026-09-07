@@ -11,7 +11,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { createRateLimiter } from "@/lib/rate-limit";
+import { createRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { loadVerifyAssessment } from "@/lib/verify-assessment";
 import { AuditView } from "./audit-view";
 
@@ -42,10 +42,15 @@ export default async function VerifyAssessmentPage({
   const { verifyToken } = await params;
 
   const headerList = await headers();
-  const ip =
-    headerList.get("x-forwarded-for")?.split(",")[0].trim() ||
-    headerList.get("x-real-ip") ||
-    "unknown";
+  // Hier bewusst `getClientIp` und NICHT `getClientIpOrNull`: Der Wert speist
+  // gleich zwei Stellen, die einen String verlangen — den Zaehlerschluessel der
+  // Bremse unten und `loadVerifyAssessment`, das die IP als `ipAddress: string`
+  // ins Protokoll schreibt. Ein `null`, das jemand spaeter mit `?? ""`
+  // glattzieht, liesse alle Zugriffe ohne Proxy-Header in EINEN Bremstopf unter
+  // dem leeren Schluessel fallen. `"unknown"` ist derselbe gemeinsame Topf, aber
+  // wenigstens benannt. Eine Server-Komponente hat kein Request-Objekt, nur
+  // `await headers()` — genau dafuer nimmt die Funktion auch `Headers` entgegen.
+  const ip = getClientIp(headerList);
 
   const rl = verifyPageLimiter.check(ip);
   if (!rl.allowed) {

@@ -18,6 +18,7 @@ import { prisma } from "@/lib/db";
 import { decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { getEventDefinition } from "@/lib/events";
+import { EMAIL_PATTERN } from "@/lib/constants";
 
 // =============================================
 // Typen
@@ -197,6 +198,95 @@ export async function testSmtpConnection(testEmail: string): Promise<SmtpTestRes
 // =============================================
 // Variablen in E-Mail-Vorlage ersetzen
 // =============================================
+
+/**
+ * Bedingter Block, so wie renderTemplate ihn versteht: oeffnender Marker,
+ * Inhalt, gleichnamiger Schluss-Marker. Bewusst EINE Quelle fuer Rendern und
+ * Pruefen — liefen beide Muster auseinander, meldete die Pruefung gruen, was
+ * der Renderer woertlich stehen laesst. Genau das war der Fehler.
+ */
+const BEDINGTER_BLOCK = /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g;
+
+/**
+ * Was ueberhaupt nach Bedingungsmarker aussieht. Absichtlich weiter gefasst als
+ * BEDINGTER_BLOCK (\w+): So faellt auch ein vertippter Name ({{#nachricht-1}})
+ * oder ein Leerzeichen ({{ #nachricht}}) auf — beides kommt als Paar nie in
+ * Frage und bliebe sonst unbemerkt in der Mail stehen.
+ */
+const MARKER_MUSTER = /\{\{\s*([#/])([^{}]*)\}\}/g;
+
+export interface VerwaisterMarker {
+  /** Feldbezeichnung, wie sie im Editor steht: "Betreff", "HTML-Body", "Plaintext" */
+  feld: string;
+  /** Der Marker im Wortlaut, z.B. "{{#nachricht}}" */
+  marker: string;
+  /** Name hinter dem Marker, getrimmt */
+  name: string;
+  art: "oeffnend" | "schliessend";
+}
+
+/**
+ * Findet Marker, die der Renderer NICHT als Paar aufloest.
+ *
+ * Der Trick ist, den Renderer nicht nachzubauen, sondern ihn zu befragen: Erst
+ * faellt weg, was er als Paar erkennt — uebrig bleibt exakt das, was er
+ * woertlich versenden wuerde. Der Ersatz behaelt den Inhalt ("$2"), damit ein
+ * gleichnamig verschachtelter Block sichtbar wird: bei {{#a}}x{{#a}}y{{/a}}
+ * loest das lazy Muster nur das aeussere Paar auf, das innere {{#a}} steht
+ * danach in der Mail — verschluckten wir den Inhalt, faende die Pruefung es nie.
+ *
+ * Zur Technik: `String.prototype.matchAll` klont das Muster intern, und
+ * `replace` mit /g setzt `lastIndex` zurueck. Die beiden Modul-Regexe tragen
+ * hier also keinen Zustand mit sich und duerfen geteilt werden.
+ */
+export function findeVerwaisteMarker(
+  text: string,
+): Array<Omit<VerwaisterMarker, "feld">> {
+  if (!text) return [];
+  const ohnePaare = text.replace(BEDINGTER_BLOCK, "$2");
+
+  const gefunden: Array<Omit<VerwaisterMarker, "feld">> = [];
+  const gesehen = new Set<string>();
+  for (const treffer of ohnePaare.matchAll(MARKER_MUSTER)) {
+    const marker = treffer[0];
+    // Denselben Tippfehler nur einmal melden — die Meldung soll die Stelle
+    // nennen, nicht sie zehnmal wiederholen.
+    if (gesehen.has(marker)) continue;
+    gesehen.add(marker);
+    gefunden.push({
+      marker,
+      name: treffer[2].trim(),
+      art: treffer[1] === "#" ? "oeffnend" : "schliessend",
+    });
+  }
+  return gefunden;
+}
+
+/**
+ * Prueft mehrere Vorlagenfelder auf einmal. Schluessel des Objekts ist die
+ * Feldbezeichnung, die spaeter in der Fehlermeldung steht — der Aufrufer
+ * uebergibt bewusst die Beschriftung aus dem Editor, damit HR die Stelle
+ * findet, ohne die Datenbankspalten zu kennen.
+ */
+export function pruefeVorlagenSyntax(
+  felder: Record<string, string | null | undefined>,
+): VerwaisterMarker[] {
+  return Object.entries(felder).flatMap(([feld, text]) =>
+    findeVerwaisteMarker(text ?? "").map((m) => ({ feld, ...m })),
+  );
+}
+
+/** Deutsche Fehlermeldung aus den gefundenen Markern. */
+export function beschreibeVerwaisteMarker(fehler: VerwaisterMarker[]): string {
+  return fehler
+    .map((f) =>
+      f.art === "oeffnend"
+        ? `Feld "${f.feld}": ${f.marker} wird nicht geschlossen (erwartet: {{/${f.name}}}).`
+        : `Feld "${f.feld}": ${f.marker} steht ohne passendes {{#${f.name}}}.`,
+    )
+    .join(" ");
+}
+
 export function renderTemplate(template: string, variables: Record<string, string>): string {
   // Bedingte Bloecke: {{#name}}...{{/name}} bleibt nur stehen, wenn die
   // Variable einen nicht-leeren Wert hat.
@@ -207,14 +297,40 @@ export function renderTemplate(template: string, variables: Record<string, strin
   // Namens, kein Negativ-Block. Wer mehr braucht, ergaenzt es hier bewusst und
   // stoesst nicht auf eine halbe Implementierung.
   const mitBloecken = template.replace(
-    /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+    BEDINGTER_BLOCK,
     (_treffer, name: string, inhalt: string) =>
       (variables[name] ?? "").trim() === "" ? "" : inhalt,
   );
 
+  // Sicherheitsnetz: Was jetzt noch nach einem Bedingungsmarker aussieht, ist
+  // ein Tippfehler in der Vorlage. Der Editor weist ihn seit dieser Aenderung
+  // beim Speichern ab; hierher kommt nur, was am Editor vorbei in die Datenbank
+  // geriet (direkter DB-Zugriff, Import, aeltere Bestandsvorlage).
+  //
+  // Warum entfernen und nicht stehen lassen: Ein rohes {{#nachricht}} in einer
+  // Mail an eine beschaeftigte Person ist schlimmer als stilles Entfernen — und
+  // die Ursache faengt kuenftig der Editor ab, sodass das Entfernen nur noch
+  // Bestandsvorlagen betrifft, die am Editor vorbei in die Datenbank gelangt
+  // sind. Ganz stillschweigend passiert es trotzdem nicht: Die Warnung nennt
+  // die Marker, damit der Fehler im Log auffaellt statt im Postfach.
+  //
+  // Reihenfolge ist wichtig: Das Entfernen laeuft VOR der Variablen-Ersetzung.
+  // Sonst zerschnitte es Werte, die HR selbst eingegeben hat (die freie
+  // Nachricht im Dokumentenpaket-Dialog kann geschweifte Klammern enthalten).
+  const verwaist = findeVerwaisteMarker(mitBloecken);
+  let bereinigt = mitBloecken;
+  if (verwaist.length > 0) {
+    console.warn(
+      `[Mailer] Vorlage enthaelt unvollstaendige Bedingungsmarker (entfernt): ${verwaist
+        .map((m) => m.marker)
+        .join(", ")}`,
+    );
+    bereinigt = mitBloecken.replace(MARKER_MUSTER, "");
+  }
+
   return Object.entries(variables).reduce(
     (result, [key, value]) => result.replaceAll(`{{${key}}}`, value ?? ""),
-    mitBloecken
+    bereinigt
   );
 }
 
@@ -222,8 +338,6 @@ export function renderTemplate(template: string, variables: Record<string, strin
 // Empfaenger-Felder rendern und validieren
 // Eingabe: kommagetrennte Liste aus Festadressen und {{variablen}}
 // =============================================
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 function renderRecipientField(
   field: string,
   vars: Record<string, string>

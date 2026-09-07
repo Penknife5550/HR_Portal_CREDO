@@ -30,6 +30,7 @@ import {
   wirkungAufhebung,
   wirkungDerBefreiung,
 } from "@/lib/minijob-fristen";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 /**
  * Kalendertag aus einer **`@db.Date`-Spalte**.
@@ -350,10 +351,7 @@ export async function PATCH(
               meldungAm: neueMeldung,
             },
           },
-          ipAddress:
-            request.headers.get("x-forwarded-for") ||
-            request.headers.get("x-real-ip") ||
-            null,
+          ipAddress: getClientIpOrNull(request),
         },
       })
       .catch(() => {

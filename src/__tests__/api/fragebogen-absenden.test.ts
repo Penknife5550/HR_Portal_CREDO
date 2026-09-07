@@ -31,6 +31,12 @@ jest.mock("@/lib/auth", () => ({
 jest.mock("@/lib/rate-limit", () => ({
   tokenRateLimiter: { check: () => ({ allowed: true }) },
   getClientIp: () => "203.0.113.7",
+  // Vorsorglich mitgemockt, obwohl die hier getesteten Routen heute nur
+  // `getClientIp` nutzen: Dieser Mock ersetzt das GANZE Modul. Stellt jemand
+  // eine dieser Routen spaeter auf die null-Fassung um, kaeme sonst
+  // stillschweigend `undefined` zurueck und der Test stuerbe an einem
+  // TypeError statt an einer sprechenden Erwartung.
+  getClientIpOrNull: () => "203.0.113.7",
 }));
 jest.mock("@/lib/n8n", () => ({ triggerN8nWebhook: jest.fn() }));
 jest.mock("@/lib/mailer", () => ({ sendEmail: (...a: unknown[]) => mockSendEmail(...a) }));

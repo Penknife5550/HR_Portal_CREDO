@@ -21,6 +21,7 @@ import { TemplateGenerationSection } from "@/components/template-generation-sect
 import { documentTypeLabel } from "@/lib/required-documents";
 import { statusLabel } from "@/lib/minijob-status";
 import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
+import { formatBytes } from "@/lib/format";
 
 // =============================================
 // Types
@@ -257,12 +258,6 @@ function formatDateTime(dateStr: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatBoolean(val: boolean | null): string {
@@ -1732,6 +1727,7 @@ function OnboardingErstellenSection({
   rvEntscheidung,
   betriebsnummerFehlt,
   istMinijob,
+  aktualisierung,
 }: {
   onboardingId: string;
   organizationId: string;
@@ -1740,6 +1736,8 @@ function OnboardingErstellenSection({
   betriebsnummerFehlt: boolean;
   /** Nur dort ist das RV-Merkblatt einschlaegig. */
   istMinijob: boolean;
+  /** Steigt nach jedem Paketversand — laedt die Liste "bereits erstellt" nach. */
+  aktualisierung: number;
 }) {
   // Nutzt die generische Hub-Komponente; Onboarding-Spezifika (Modul, amtliche
   // Formulare der Minijob-Checkliste) bleiben hier gekapselt.
@@ -1810,6 +1808,7 @@ function OnboardingErstellenSection({
         canEdit={canEdit}
         staticDocuments={statisch}
         emptyHint="Keine Onboarding-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ an."
+        aktualisierung={aktualisierung}
       />
     </>
   );
@@ -1827,6 +1826,11 @@ function TabDocuments({
   paketDialogOffen: boolean;
   setPaketDialogOffen: (offen: boolean) => void;
 }) {
+  // Ein Paketversand legt fuer jede mitgeschickte Vorlage ein Dokument an. Die
+  // Erstellen- und die Versenden-Karte sind Geschwister und wissen nichts
+  // voneinander — dieser Zaehler ist das Signal von der einen zur anderen.
+  const [versandZaehler, setVersandZaehler] = useState(0);
+
   const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
     UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
     REVIEWED: { label: "Geprüft", color: "bg-blue-100 text-blue-700" },
@@ -1880,6 +1884,7 @@ function TabDocuments({
         rvEntscheidung={data.personalData?.rvEntscheidung ?? null}
         betriebsnummerFehlt={!data.organization.betriebsnummer}
         istMinijob={data.questionnaireType === "MINIJOB"}
+        aktualisierung={versandZaehler}
       />
 
       {/* Dokumentenpaket versenden */}
@@ -1889,6 +1894,7 @@ function TabDocuments({
         canEdit={canEdit}
         offen={paketDialogOffen}
         onOffenChange={setPaketDialogOffen}
+        onVersendet={() => setVersandZaehler((n) => n + 1)}
       />
 
       {/* Hochgeladene Dokumente — vor den Export gezogen: der am haeufigsten
@@ -1934,7 +1940,7 @@ function TabDocuments({
                       <p className="truncate text-sm font-semibold text-foreground" title={doc.fileName}>
                         {doc.fileName}
                       </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{formatBytes(doc.fileSize)}</p>
                     </div>
                   </div>
 

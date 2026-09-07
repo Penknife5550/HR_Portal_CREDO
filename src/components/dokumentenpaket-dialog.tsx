@@ -4,8 +4,9 @@
  * Versand-Dialog fuer ein Dokumentenpaket.
  *
  * Modulneutral: Alles Vorgangsbezogene kommt ueber `modul` und `refId` vom
- * Server (GET /api/dokumentenpaket). Phase 2 bindet denselben Dialog in
- * Offboarding, Verbeamtung und Vertragsverlaengerung ein.
+ * Server (GET /api/dokumentenpaket). Genau derselbe Dialog haengt in allen vier
+ * Vorgangsmodulen — Onboarding, Vertragsverlaengerung, Verbeamtung,
+ * Offboarding.
  *
  * Die Bestaetigung sensibler Vorlagen ist hier eine Anzeige, keine Schranke —
  * die Schranke sitzt im Server (409 ohne Bestaetigung, und der Resolver bekommt
@@ -15,92 +16,42 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileTextIcon } from "lucide-react";
+import { EMAIL_PATTERN } from "@/lib/constants";
+import { empfaengerFreigegeben } from "@/lib/empfaenger-freigabe";
+import { formatBytes } from "@/lib/format";
+import type {
+  PaketAngebotJson as PaketAngebot,
+  PaketAngebotPosition as AngebotPosition,
+  PaketPruefung as Pruefung,
+  PaketVersandAntwort as Ergebnis,
+  PruefPosition,
+} from "@/lib/types/dokumentenpaket";
 
-export interface SensiblesFeld {
-  key: string;
-  label: string;
-}
-
-export interface AngebotPosition {
-  art: "PDF" | "VORLAGE";
-  id: string;
-  name: string;
-  beschreibung: string | null;
-  scope: "GLOBAL" | "MANDANT";
-  groesse: number;
-  sensibleFelder: SensiblesFeld[];
-}
-
-export interface PaketAngebot {
-  modul: string;
-  organizationId: string;
-  empfaengerVorschlag: string;
-  vorname: string;
-  nachname: string;
-  displayId: string | null;
-  standardpaket: { art: "PDF" | "VORLAGE"; id: string }[];
-  verfuegbar: AngebotPosition[];
-  verlauf: {
-    id: string;
-    createdAt: string;
-    empfaenger: string;
-    anzahl: number;
-    empfaengerAbweichend: boolean;
-  }[];
-  /** Versand aus der Zeit vor dem Nachweis — nur Zeitpunkt und Anzahl. */
-  altversand: { am: string; anzahl: number } | null;
-  maxBytes: number;
-}
-
-interface PruefPosition {
-  art: "PDF" | "VORLAGE";
-  id: string;
-  name: string;
-  groesse: number;
-  geschaetzt: boolean;
-  fehlendeFelder: string[];
-  sensibleFelder: SensiblesFeld[];
-  bestaetigungNoetig: boolean;
-}
-
-interface Pruefung {
-  empfaengerVorgang: string;
-  empfaengerAbweichend: boolean;
-  positionen: PruefPosition[];
-  gesamtGroesse: number;
-  gesamtGeschaetzt: boolean;
-  ueberGroessenGrenze: boolean;
-  pdfDienstErreichbar: boolean;
-  mailvorlageKenntNachricht: boolean;
-  warnungen: string[];
-}
-
-interface Ergebnis {
-  versandId: string;
-  empfaenger: string;
-  dokumente: { name: string; dateiname: string; art: string }[];
-  warnungen: string[];
-}
+/**
+ * `PaketAngebotJson` und nicht `PaketAngebot`: Der Dialog sieht das Angebot
+ * hinter JSON.parse, dort sind `createdAt` und `altversand.am` Strings —
+ * deshalb weiter unten `new Date(v.createdAt)`. Naehme jemand die Serversicht,
+ * kompilierte das zwar weiter, aber die Typen luegen.
+ *
+ * Der Re-Export haelt src/components/dokumentenpaket-section.tsx, das den Typ
+ * bisher von hier bezog, unveraendert lauffaehig.
+ */
+export type { PaketAngebot };
 
 function schluessel(p: { art: string; id: string }): string {
   return `${p.art}:${p.id}`;
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-
 /**
- * Wartezeit nach der letzten Aenderung, bevor die Vorpruefung laeuft.
+ * Wartezeit nach der letzten Aenderung der AUSWAHL, bevor die Vorpruefung
+ * laeuft.
  *
- * Sie rendert Vorlagen probeweise — bei jedem Tastendruck waere das zu viel.
- * Eine halbe Sekunde fasst Tippen zusammen und ist kurz genug, dass die
- * Rueckmeldung noch zur Aktion gehoert.
+ * Sie rendert Vorlagen probeweise, liest jede Vorlagendatei und fragt den
+ * PDF-Dienst — das soll nicht bei jedem Klick beim Zusammenstellen einzeln
+ * losgehen. Eine halbe Sekunde fasst schnelles An- und Abwaehlen zusammen und
+ * ist kurz genug, dass die Rueckmeldung noch zur Handlung gehoert.
+ *
+ * Am Empfaengerfeld haengt sie NICHT mehr (siehe Effekt weiter unten).
  */
 const VORPRUEFUNG_VERZOEGERUNG_MS = 500;
 
@@ -123,6 +74,9 @@ export function DokumentenpaketDialog({
     () => new Set(angebot.standardpaket.map(schluessel)),
   );
   const [bestaetigt, setBestaetigt] = useState<Set<string>>(new Set());
+  // Der EINZIGE Ort, an dem der Angebotswert noch unmittelbar zaehlt: als
+  // Startbelegung des Eingabefelds. Alles Urteilende (Sperre, Warnung,
+  // Empfehlung) fragt `adresseVorgang` weiter unten.
   const [empfaenger, setEmpfaenger] = useState(angebot.empfaengerVorschlag);
   const [nachricht, setNachricht] = useState("");
   const [pruefung, setPruefung] = useState<Pruefung | null>(null);
@@ -131,65 +85,247 @@ export function DokumentenpaketDialog({
   const [fehler, setFehler] = useState("");
   const [ergebnis, setErgebnis] = useState<Ergebnis | null>(null);
 
-  const positionen = useMemo(
-    () => angebot.verfuegbar.filter((p) => gewaehlt.has(schluessel(p))),
-    [angebot.verfuegbar, gewaehlt],
-  );
+  /**
+   * Die Bloecke des Dialogs von oben nach unten — und damit zugleich die Folge,
+   * in der die Anhaenge hinausgehen.
+   *
+   * Block 1 folgt `angebot.standardpaket`. Das ist der Kern der Sache: Der
+   * Server liefert `standardpaket` nach `orderIndex` sortiert (die Folge, die
+   * unter Mandanten → Standardpaket mit den Pfeiltasten gepflegt wird),
+   * `verfuegbar` dagegen alphabetisch. Frueher rendete der Dialog seinen ersten
+   * Block aus `verfuegbar` und versendete nach `standardpaket` — wer das
+   * Willkommensschreiben auf Position 1 zog, sah im Dialog das Leitbild oben und
+   * fand im Postfach das Willkommensschreiben als ersten Anhang.
+   *
+   * Bloecke 2 und 3 folgen `verfuegbar` und damit dem Alphabet; dort gibt es
+   * nichts Konfiguriertes zu respektieren. Ihre Reihenfolge zueinander
+   * (Vorlagen vor PDFs) ist eine Setzung — sie bestimmt jetzt auch die
+   * Versandfolge, weil beides aus derselben Liste kommt.
+   *
+   * MUSS ein useMemo bleiben: `reihenfolge` haengt daran, `pruefe` an
+   * `reihenfolge` und der 500-ms-Effekt an `pruefe`. Ein bei jedem Rendern neu
+   * erzeugtes Array setzte den Zeitgeber endlos zurueck — die Vorpruefung liefe
+   * nie an, und das saehe man nur daran, dass Groessen und fehlende Felder
+   * dauerhaft leer bleiben.
+   */
+  const bloecke = useMemo<{ titel: string; hinweis: string; eintraege: AngebotPosition[] }[]>(() => {
+    const imStandard = new Set(angebot.standardpaket.map(schluessel));
+    return [
+      {
+        titel: "Standardpaket",
+        hinweis: "Für diesen Mandanten hinterlegt und vorausgewählt.",
+        eintraege: angebot.standardpaket
+          .map((s) => angebot.verfuegbar.find((p) => schluessel(p) === schluessel(s)))
+          // Eine geloeschte oder deaktivierte Position faellt weg statt eine
+          // Luecke zu erzeugen. ladePaketAngebot siebt sie zwar schon aus, aber
+          // eine Anzeige, die auf undefined zugreift, waere der schlechtere
+          // Fehler.
+          .filter((p): p is AngebotPosition => p !== undefined),
+      },
+      {
+        titel: "Weitere Vorlagen",
+        hinweis: "Werden mit den Daten des Vorgangs befüllt.",
+        eintraege: angebot.verfuegbar.filter(
+          (p) => p.art === "VORLAGE" && !imStandard.has(schluessel(p)),
+        ),
+      },
+      {
+        titel: "Weitere Dokumente",
+        hinweis: "Feste PDFs, gehen unverändert mit.",
+        eintraege: angebot.verfuegbar.filter(
+          (p) => p.art === "PDF" && !imStandard.has(schluessel(p)),
+        ),
+      },
+    ];
+  }, [angebot.standardpaket, angebot.verfuegbar]);
 
-  // Reihenfolge: erst das Standardpaket in seiner konfigurierten Folge, dann
-  // alles zusaetzlich Gewaehlte. Der Server nimmt die Liste so, wie sie kommt.
-  const reihenfolge = useMemo(() => {
-    const standard = angebot.standardpaket
-      .map((s) => angebot.verfuegbar.find((p) => schluessel(p) === schluessel(s)))
-      .filter((p): p is AngebotPosition => Boolean(p) && gewaehlt.has(schluessel(p!)));
-    const rest = positionen.filter((p) => !standard.some((s) => s.id === p.id && s.art === p.art));
-    return [...standard, ...rest];
-  }, [angebot.standardpaket, angebot.verfuegbar, gewaehlt, positionen]);
+  /**
+   * Was tatsaechlich hinausgeht: die Bloecke von oben nach unten, ohne die
+   * abgewaehlten Zeilen. Der Server nimmt die Liste so, wie sie kommt
+   * (stellePaketZusammen sortiert bewusst nicht nach).
+   *
+   * Die drei Bloecke sind ueberschneidungsfrei — was im Standardpaket steht,
+   * ist aus 2 und 3 ausgeschlossen. Nur deshalb darf hier einfach abgeflacht
+   * werden: Ein doppelter Eintrag waere ein doppelter Anhang.
+   */
+  const reihenfolge = useMemo(
+    () => bloecke.flatMap((b) => b.eintraege).filter((p) => gewaehlt.has(schluessel(p))),
+    [bloecke, gewaehlt],
+  );
 
   const sensibleOffen = reihenfolge.filter(
     (p) => p.sensibleFelder.length > 0 && !bestaetigt.has(schluessel(p)),
   );
-  const adresseGueltig = EMAIL_MUSTER.test(empfaenger.trim());
-  const adresseAbweichend =
-    empfaenger.trim().toLowerCase() !== angebot.empfaengerVorschlag.trim().toLowerCase();
 
-  // --- Vorpruefung, verzoegert nach jeder Aenderung ---
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pruefe = useCallback(async () => {
-    setPruefend(true);
-    try {
-      const res = await fetch("/api/dokumentenpaket/pruefen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modul,
-          refId,
-          positionen: reihenfolge.map((p) => ({ art: p.art, id: p.id })),
-          empfaenger: adresseGueltig ? empfaenger.trim() : undefined,
-        }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setPruefung(j.data);
-        setFehler("");
-      } else {
+  /**
+   * Positionen, die den Versand mit 409 abbrechen wuerden (Datei fehlt im
+   * Speicher, Vorlage nicht befuellbar). Die Vorpruefung weiss das laengst —
+   * ohne Sperre erfaehrt es die Person erst nach dem Klick, wenn nichts
+   * hinausgegangen ist und das Paket neu zusammenzustellen waere.
+   *
+   * Fehlt die Zeile in der Pruefung (frisch angehakt, Pruefung laeuft noch),
+   * gilt die Position als unauffaellig: Der Knopf soll nicht an einer noch
+   * nicht gestellten Frage haengen.
+   *
+   * Steht bewusst HIER oben und nicht bei `pruefZeile` weiter unten —
+   * `versandGesperrt` liest die Liste, und ein Zugriff auf eine erst spaeter
+   * deklarierte const liefe in die temporale Totzone.
+   */
+  const blockierte = reihenfolge.filter((p) =>
+    pruefung?.positionen.some((z) => z.art === p.art && z.id === p.id && z.blockiert),
+  );
+
+  /**
+   * Die Adresse des Vorgangs — EINE Quelle fuer Sperre, Warnung und Empfehlung.
+   *
+   * Es gibt sie zweimal: `angebot.empfaengerVorschlag` stammt aus dem Abruf, der
+   * die Karte gefuellt hat, `pruefung.empfaengerVorgang` aus der zuletzt
+   * gelaufenen Vorpruefung. Serverseitig ist beides dasselbe Feld
+   * (`vorgang.empfaenger`), nur zu verschiedenen Zeitpunkten gelesen — und der
+   * Dialog steht offen, waehrend jemand anderes den Vorgang bearbeiten kann.
+   *
+   * Der FRISCHE Wert gilt. Der Grund ist nicht Aktualitaet um ihrer selbst
+   * willen, sondern Widerspruchsfreiheit: Gesperrt wird nach dem frischen Wert
+   * (`empfaengerFreigegeben` unten und, verbindlich, derselbe Aufruf im Server
+   * beim Versand). Empfaehle die Anzeige daneben den alten, riete sie zu genau
+   * der Adresse, die der Server ablehnt — "Bitte alt@… verwenden", gefolgt von
+   * einem 409 auf ebendiese Adresse. Und die gelbe Abweichungswarnung bliebe
+   * aus, obwohl der Nachweis den Versand als abweichend festhielte.
+   *
+   * `??` und nicht `||`: Ohne Vorpruefung (erstes Oeffnen, Netzfehler) oder bei
+   * einer Antwort von vor dem Rollout gibt es nur den Angebotswert. Ein leerer
+   * frischer Wert dagegen ist eine AUSSAGE — der Vorgang hat keine Adresse —
+   * und darf nicht stillschweigend durch den alten ersetzt werden.
+   *
+   * Das Eingabefeld selbst bleibt davon unberuehrt: Es startet mit dem
+   * Angebotswert (frueher gibt es nichts) und wird nie nachtraeglich
+   * ueberschrieben — sonst verloere jemand mitten im Tippen seine Eingabe.
+   */
+  const adresseVorgang = pruefung?.empfaengerVorgang ?? angebot.empfaengerVorschlag;
+
+  const adresseGueltig = EMAIL_PATTERN.test(empfaenger.trim());
+  const adresseAbweichend =
+    empfaenger.trim().toLowerCase() !== adresseVorgang.trim().toLowerCase();
+
+  /**
+   * Freigabe der Adresse — ohne eine einzige Anfrage je Tastendruck.
+   *
+   * Die gepflegte Domainliste kommt EINMAL mit der Vorpruefung (`erlaubteDomains`
+   * steht dort unabhaengig davon, ob eine Adresse mitgeschickt wurde). Die
+   * Entscheidung selbst faellt hier im Browser als reine Funktion. Frueher haette
+   * dafuer jeder Tastendruck eine volle Vorpruefung ausgeloest: Vorgang laden,
+   * Zugriff pruefen, jede Vorlage lesen und probeweise rendern — fuer einen
+   * einzigen booleschen Wert.
+   *
+   * Solange noch keine Pruefung eingetroffen ist, gilt die Adresse als erlaubt.
+   * Andernfalls sperrte ein Ausfall der Vorpruefung einen voellig gesunden
+   * Versand; die Schranke sitzt ohnehin im Server.
+   *
+   * `empfaengerFreigegeben` ist DIESELBE Funktion, die der Server als Schranke
+   * benutzt — sie liegt importfrei in @/lib/empfaenger-freigabe, damit dieser
+   * Client sie holen kann, ohne prisma mitzuziehen. Hier ist sie nur eine
+   * ANZEIGE: Sie sagt frueh, was der Server ohnehin ablehnen wuerde (409
+   * EMPFAENGER_NICHT_ERLAUBT).
+   */
+  const adresseErlaubt = useMemo(() => {
+    if (!pruefung) return true;
+    return empfaengerFreigegeben({
+      empfaenger,
+      empfaengerVorgang: adresseVorgang,
+      // Eine Antwort von vor dem Rollout kennt das Feld noch nicht — dann gibt
+      // es keine Liste und damit keine Einschraenkung.
+      domains: pruefung.erlaubteDomains ?? [],
+    });
+  }, [pruefung, empfaenger, adresseVorgang]);
+
+  // --- Vorpruefung, verzoegert nach jeder Aenderung der AUSWAHL ---
+  //
+  // Die ADRESSE steht bewusst NICHT in den Abhaengigkeiten und auch nicht mehr
+  // im Anfragekoerper. Die Vorpruefung liest jede Vorlage und rendert sie
+  // probeweise; je Tastendruck im Empfaengerfeld waere das eine teure Anfrage
+  // fuer ein Ergebnis, das der Dialog gar nicht anzeigt: Die beiden
+  // adressabhaengigen Felder der Antwort (`empfaengerAbweichend`,
+  // `empfaengerErlaubt`) rechnet er sich oben selbst aus — aus `adresseVorgang`
+  // (dem Vorgangswert derselben Antwort) und der einmal gelieferten
+  // Domainliste. Beide Felder haengen allein an der Eingabe, nicht an der
+  // Auswahl; sie werden mit jedem Tastendruck neu bewertet, ohne dass dafuer
+  // jemand gefragt werden muss.
+  //
+  // Zwei Dinge greifen ineinander, damit immer die JUENGSTE Antwort gewinnt,
+  // und sie haben verschiedene Aufgaben:
+  //
+  //  - Der Abbruch spart Arbeit. Eine ueberholte Anfrage soll das probeweise
+  //    Rendern nicht zu Ende bringen.
+  //  - Der Laufzaehler entscheidet. Er MUSS es tun, weil das `.catch(() => ({}))`
+  //    hinter res.json() einen Abbruch mitten im Lesen des Antwortkoerpers
+  //    verschluckt: Dort kaeme ein leeres `{}` bei res.ok === true an, und die
+  //    Anzeige stuende auf `undefined`. Ein blosser AbortController genuegt
+  //    also nicht.
+  //
+  // Ohne beides ueberschreibt die langsame Antwort zu zehn Positionen die
+  // schnelle zu zweien: Der Dialog zeigte fremde "Feld bleibt leer"-Hinweise
+  // und eine Groessengrenze, die den Versand-Knopf faelschlich sperrt oder
+  // freigibt — und die abgebrochene Anfrage haette der noch laufenden obendrein
+  // den Spinner ausgeschaltet.
+  const laufNr = useRef(0);
+  const pruefe = useCallback(
+    async (signal: AbortSignal, meineLaufNr: number) => {
+      try {
+        const res = await fetch("/api/dokumentenpaket/pruefen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal,
+          body: JSON.stringify({
+            modul,
+            refId,
+            positionen: reihenfolge.map((p) => ({ art: p.art, id: p.id })),
+          }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (laufNr.current !== meineLaufNr) return;
+        if (res.ok) {
+          setPruefung(j.data);
+          setFehler("");
+        } else {
+          setPruefung(null);
+          setFehler(j.error || "Die Vorprüfung ist fehlgeschlagen.");
+        }
+      } catch {
+        // Ein Abbruch landet auch hier. Dann ist der Zaehler aber schon
+        // weitergedreht, und "Verbindungsfehler" waere eine Falschmeldung ueber
+        // eine Anfrage, die niemand mehr wollte.
+        if (laufNr.current !== meineLaufNr) return;
         setPruefung(null);
-        setFehler(j.error || "Die Vorpruefung ist fehlgeschlagen.");
+        setFehler("Verbindungsfehler bei der Vorprüfung.");
+      } finally {
+        // Nur die juengste Anfrage darf den Spinner ausschalten, sonst nimmt ihn
+        // die abgebrochene der noch laufenden weg.
+        if (laufNr.current === meineLaufNr) setPruefend(false);
       }
-    } catch {
-      setPruefung(null);
-      setFehler("Verbindungsfehler bei der Vorpruefung.");
-    } finally {
-      setPruefend(false);
-    }
-  }, [modul, refId, reihenfolge, empfaenger, adresseGueltig]);
+    },
+    [modul, refId, reihenfolge],
+  );
 
   useEffect(() => {
     if (ergebnis) return;
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(pruefe, VORPRUEFUNG_VERZOEGERUNG_MS);
+    const controller = new AbortController();
+    const meineLaufNr = laufNr.current;
+    // Der Spinner beginnt schon mit der Wartezeit, nicht erst mit der Anfrage:
+    // In diesen 500 ms steht in der Zusammenfassung noch das Ergebnis der
+    // vorigen Auswahl — ohne Hinweis darauf saehe man eine Groessenangabe, die
+    // zur angezeigten Liste nicht mehr passt.
+    setPruefend(true);
+    const zeitgeber = setTimeout(() => {
+      void pruefe(controller.signal, meineLaufNr);
+    }, VORPRUEFUNG_VERZOEGERUNG_MS);
     return () => {
-      if (timer.current) clearTimeout(timer.current);
+      clearTimeout(zeitgeber);
+      // Weiterdrehen, BEVOR abgebrochen wird: Ab hier ist keine laufende
+      // Anfrage mehr die juengste — auch dann nicht, wenn der Dialog schliesst
+      // und gar keine neue folgt. So schreibt auch niemand mehr in den State
+      // einer ausgehaengten Komponente.
+      laufNr.current += 1;
+      controller.abort();
     };
   }, [pruefe, ergebnis]);
 
@@ -222,11 +358,18 @@ export function DokumentenpaketDialog({
     });
   }
 
+  // Bewusst NICHT dabei: `pruefung === null` und `pruefend`. Beim ersten
+  // Oeffnen und bei einem Netzfehler der Vorpruefung bliebe der Knopf sonst
+  // dauerhaft gesperrt, obwohl das Paket voellig versandfaehig ist — und mit
+  // `pruefend` flackerte er bei jeder Auswahlaenderung. Was wirklich abbrechen
+  // wuerde, faengt der Server ab (409/413).
   const versandGesperrt =
     sendend ||
     reihenfolge.length === 0 ||
     !adresseGueltig ||
+    !adresseErlaubt ||
     sensibleOffen.length > 0 ||
+    blockierte.length > 0 ||
     Boolean(pruefung?.ueberGroessenGrenze) ||
     (reihenfolge.some((p) => p.art === "VORLAGE") && pruefung?.pdfDienstErreichbar === false);
 
@@ -271,29 +414,6 @@ export function DokumentenpaketDialog({
 
   const pruefZeile = (p: AngebotPosition): PruefPosition | undefined =>
     pruefung?.positionen.find((x) => x.art === p.art && x.id === p.id);
-
-  const standardSchluessel = new Set(angebot.standardpaket.map(schluessel));
-  const bloecke: { titel: string; hinweis: string; eintraege: AngebotPosition[] }[] = [
-    {
-      titel: "Standardpaket",
-      hinweis: "Für diesen Mandanten hinterlegt und vorausgewählt.",
-      eintraege: angebot.verfuegbar.filter((p) => standardSchluessel.has(schluessel(p))),
-    },
-    {
-      titel: "Weitere Vorlagen",
-      hinweis: "Werden mit den Daten des Vorgangs befüllt.",
-      eintraege: angebot.verfuegbar.filter(
-        (p) => p.art === "VORLAGE" && !standardSchluessel.has(schluessel(p)),
-      ),
-    },
-    {
-      titel: "Weitere Dokumente",
-      hinweis: "Feste PDFs, gehen unverändert mit.",
-      eintraege: angebot.verfuegbar.filter(
-        (p) => p.art === "PDF" && !standardSchluessel.has(schluessel(p)),
-      ),
-    },
-  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
@@ -362,8 +482,28 @@ export function DokumentenpaketDialog({
             )}
             {adresseGueltig && adresseAbweichend && (
               <p className="mt-1 text-xs text-credo-gelb">
-                Weicht von der Adresse im Vorgang ab ({angebot.empfaengerVorschlag}). Die Abweichung
-                wird im Nachweis festgehalten.
+                {/* Der Vorgang KANN ohne Adresse dastehen (beim Offboarding etwa
+                    ist sie `privat || dienstlich`, und beides darf leer sein).
+                    Dann waere "ab ()" eine Klammer ohne Inhalt — die Abweichung
+                    selbst stimmt trotzdem, es gibt eben nichts, wovon sie
+                    abweicht. */}
+                {adresseVorgang.trim()
+                  ? `Weicht von der Adresse im Vorgang ab (${adresseVorgang.trim()}).`
+                  : "Im Vorgang ist keine Adresse hinterlegt."}{" "}
+                Die Abweichung wird im Nachweis festgehalten.
+              </p>
+            )}
+            {adresseGueltig && !adresseErlaubt && (
+              <p className="mt-1 text-xs font-semibold text-credo-rot">
+                An diese Adresse darf nicht versendet werden: Sie weicht von der Adresse im Vorgang
+                ab und ihre Domain ist nicht freigegeben
+                {(pruefung?.erlaubteDomains ?? []).length > 0
+                  ? ` (erlaubt: ${(pruefung?.erlaubteDomains ?? []).join(", ")})`
+                  : ""}
+                .{" "}
+                {adresseVorgang.trim()
+                  ? `Bitte ${adresseVorgang.trim()} verwenden oder die Freigabeliste in den Einstellungen (SMTP) ergänzen lassen.`
+                  : "Bitte die Freigabeliste in den Einstellungen (SMTP) ergänzen lassen."}
               </p>
             )}
 
@@ -412,6 +552,13 @@ export function DokumentenpaketDialog({
                                   {zeile.fehlendeFelder.length} Feld
                                   {zeile.fehlendeFelder.length === 1 ? "" : "er"} bleibt leer:{" "}
                                   {zeile.fehlendeFelder.join(", ")}
+                                </span>
+                              )}
+                              {an && zeile?.blockiert && (
+                                <span className="mt-1 block text-[11px] font-semibold text-credo-rot">
+                                  {p.art === "PDF"
+                                    ? "Diese Datei fehlt im Speicher und kann nicht mitgesendet werden — bitte abwählen."
+                                    : "Diese Vorlage lässt sich nicht befüllen und kann nicht mitgesendet werden — bitte abwählen."}
                                 </span>
                               )}
                             </span>
@@ -494,6 +641,12 @@ export function DokumentenpaketDialog({
               {sensibleOffen.length > 0 && (
                 <p className="mt-1 text-credo-rot">
                   {sensibleOffen.length} Vorlage(n) mit sensiblen Daten sind noch nicht bestätigt.
+                </p>
+              )}
+              {blockierte.length > 0 && (
+                <p className="mt-1 text-credo-rot">
+                  {blockierte.length} Dokument(e) können nicht versendet werden. Bitte die rot
+                  markierten Einträge abwählen — sonst bricht der Versand ab.
                 </p>
               )}
             </div>

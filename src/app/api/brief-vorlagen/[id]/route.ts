@@ -10,16 +10,9 @@ import { NextResponse } from "next/server";
 import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { ADMIN_ROLES, HR_EDIT_ROLES, canAccessOrg } from "@/lib/permissions";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 import { updateTemplateSchema } from "@/lib/validations/brief-vorlagen";
 import type { UpdateTemplateInput } from "@/lib/validations/brief-vorlagen";
-
-function clientIp(headers: Headers): string | null {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headers.get("x-real-ip") ||
-    null
-  );
-}
 
 export const GET = apiHandler(
   { roles: HR_EDIT_ROLES, logLabel: "BriefVorlage GET" },
@@ -141,7 +134,7 @@ export const PATCH = apiHandler<UpdateTemplateInput>(
         processType: "DOCUMENT_TEMPLATE",
         action: "DOC_TEMPLATE_UPDATED",
         details: { templateId: id, changes: Object.keys(updateData) },
-        ipAddress: clientIp(request.headers),
+        ipAddress: getClientIpOrNull(request),
       },
     });
 
@@ -178,7 +171,7 @@ export const DELETE = apiHandler(
         processType: "DOCUMENT_TEMPLATE",
         action: "DOC_TEMPLATE_DELETED",
         details: { templateId: id },
-        ipAddress: clientIp(request.headers),
+        ipAddress: getClientIpOrNull(request),
       },
     });
 

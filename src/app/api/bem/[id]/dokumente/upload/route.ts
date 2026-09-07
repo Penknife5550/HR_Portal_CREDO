@@ -8,22 +8,19 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "crypto";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canMutateBemContent } from "@/lib/permissions";
-import { validateUpload, saveUploadedFile, sanitizeFilename } from "@/lib/file-upload";
+import {
+  sanitizeFilename,
+  saveUploadedFile,
+  sha256Hex,
+  validateUpload,
+} from "@/lib/file-upload";
 import { defaultAblage } from "@/lib/bem-aktentrennung";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import type { BemDokumentTyp } from "@prisma/client";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 // Beim Upload erlaubte Typen (NICHT EINLADUNG/GESAMT_EXPORT — die entstehen
 // ausschliesslich systemseitig).
@@ -74,7 +71,7 @@ export async function POST(
 
     const filename = sanitizeFilename(file.name);
     const pfad = await saveUploadedFile(valid.buffer, `bem/${id}/dokumente/upload`, filename);
-    const hash = createHash("sha256").update(valid.buffer).digest("hex");
+    const hash = sha256Hex(valid.buffer);
     const ablage = defaultAblage(typ);
 
     const dok = await prisma.bemDokument.create({
@@ -98,7 +95,7 @@ export async function POST(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.DOKUMENT_HOCHGELADEN,
       details: { dokumentId: dok.id, typ, ablage, dateiname: file.name },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json({ data: { id: dok.id, ablage } }, { status: 201 });
