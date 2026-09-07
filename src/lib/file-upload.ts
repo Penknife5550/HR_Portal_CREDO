@@ -8,7 +8,7 @@
 
 import path from "path";
 import { mkdir, writeFile, readFile, unlink, rmdir } from "fs/promises";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 
 export const ALLOWED_UPLOAD_MIME = [
   "application/pdf",
@@ -56,6 +56,48 @@ export function sanitizeFilename(originalName: string): string {
   const timestamp = Date.now();
   const suffix = randomUUID().slice(0, 8);
   return `${timestamp}-${suffix}-${cleaned}`;
+}
+
+/**
+ * Auf ASCII reduzierter Dateiname fuer den Content-Disposition-Header.
+ *
+ * Der Header vertraegt nach RFC 6266 im `filename`-Parameter kein Zeichen
+ * ausserhalb von ISO-8859-1; Browser reagieren auf Umlaute unterschiedlich bis
+ * gar nicht — mal verstuemmeln sie den Namen, mal bricht der Download ab.
+ *
+ * Steht bewusst direkt unter sanitizeFilename(), damit der Unterschied der
+ * beiden im Code nebeneinander sichtbar ist: Das hier ist KEIN Speichername.
+ * Es kommt kein Zeitstempel und keine UUID davor, weil der Name im
+ * Download-Dialog des Empfaengers lesbar bleiben soll; Kollisionsschutz braucht
+ * er nicht, denn er landet nirgends auf der Platte.
+ *
+ * Aufeinanderfolgende Unterstriche werden NICHT zusammengefasst. Das
+ * unterscheidet die Funktion von den beiden `slugify`/`slug`-Fassungen in den
+ * Vorlagen-Routen, die genau das tun und deshalb bewusst nicht mit dieser hier
+ * zusammengelegt wurden — sie erzeugen bei Anfuehrungszeichen einen anderen
+ * Dateinamen.
+ */
+export function asciiFilename(name: string): string {
+  return name.replace(/[^\w\-.]/g, "_");
+}
+
+/**
+ * SHA-256 ueber die Bytes einer Datei, als Hex — der Nachweis, dass genau diese
+ * Bytes abgelegt bzw. versendet wurden.
+ *
+ * Kodierung (hex, Kleinbuchstaben) ist Teil des Vertrags und darf sich nicht
+ * aendern: Die Hashes stehen als Nachweis in der Datenbank (BEM-Papier-
+ * einwilligung, Dokumentenpaket-Versand). Wuerde hier auf base64 oder
+ * Grossbuchstaben umgestellt, passten Bestandsdaten nicht mehr zu neuen, ohne
+ * dass irgendetwas fehlschlaegt.
+ *
+ * Bewusst NUR fuer Buffer. Die beiden anderen Hash-Stellen im Projekt
+ * (token-hash.ts, fragebogen-pruefsumme.ts) hashen eine kanonische Zeichenkette
+ * mit expliziter utf8-Kodierung — dort ist die Kodierung die eigentliche
+ * Entscheidung und gehoert an ihre jeweilige Stelle, nicht hierher.
+ */
+export function sha256Hex(buffer: Buffer): string {
+  return createHash("sha256").update(buffer).digest("hex");
 }
 
 /**

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { asciiFilename } from "@/lib/file-upload";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -85,11 +86,40 @@ export async function GET(
 
     // Response mit korrekten Headers zurueckgeben
     // Buffer muss in Uint8Array umgewandelt werden für NextResponse-Kompatibilitaet
+    //
+    // Der Dateiname im Content-Disposition-Header laeuft ueber asciiFilename()
+    // (@/lib/file-upload) - dieselbe Funktion wie beim BEM-Download und beim
+    // Download erzeugter Brief-Dokumente.
+    //
+    // Vorher stand hier ein eigener Ausdruck,
+    // `.replace(/[^a-zA-Z0-9._\- \u00C0-\u024F]/g, "_")`, der den Bereich
+    // U+00C0-U+024F (Latin-1 Supplement und Latin Extended-A) ausdruecklich
+    // stehen liess - also genau die Umlaute. Damit trug ein HTTP-Header
+    // Nicht-ASCII-Zeichen: Der `filename`-Parameter vertraegt nach RFC 6266
+    // nichts ausserhalb von ISO-8859-1, und Browser reagieren darauf
+    // unterschiedlich bis gar nicht - mal kommt ein verstuemmelter Name an,
+    // mal bricht der Download ab. Ein Nachweis heisst im Portal nun einmal
+    // "Fuehrungszeugnis Mueller.pdf"; der Fall war also der Normalfall und
+    // nicht die Ausnahme.
+    //
+    // Der ausgelieferte Name aendert sich dadurch sichtbar: Umlaute UND
+    // Leerzeichen werden zu Unterstrichen ("Fuehrungszeugnis Mueller.pdf" ->
+    // "F_hrungszeugnis_M_ller.pdf"). Das ist gewollt - ein lesbarer, aber
+    // kaputt uebertragener Name ist schlechter als ein sperriger, der ankommt.
+    // Der Name in der Oberflaeche bleibt unberuehrt: Er kommt aus
+    // `document.fileName` und nicht aus diesem Header.
+    //
+    // Das nachgestellte `.replace(/"/g, "")` von frueher entfaellt ersatzlos.
+    // asciiFilename ersetzt das Anfuehrungszeichen - wie jedes Zeichen
+    // ausserhalb von \w, "-" und "." - durch einen Unterstrich; es kann den
+    // gequoteten Parameter also nicht mehr verlassen. Dasselbe gilt fuer
+    // Zeilenumbrueche, mit denen sich sonst ein zweiter Header einschmuggeln
+    // liesse.
     return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         "Content-Type": document.mimeType || "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${document.fileName.replace(/[^a-zA-Z0-9._\- \u00C0-\u024F]/g, "_").replace(/"/g, "")}"`,
+        "Content-Disposition": `attachment; filename="${asciiFilename(document.fileName)}"`,
         "Content-Length": fileBuffer.length.toString(),
       },
     });

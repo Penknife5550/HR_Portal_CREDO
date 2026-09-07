@@ -2,14 +2,17 @@
  * Tests fuer src/lib/file-upload.ts
  *
  * Fokus: Magic-Bytes-Validierung (insb. WebP-Bug), sanitizeFilename,
- * saveUploadedFile Path-Traversal-Schutz.
+ * asciiFilename, sha256Hex, saveUploadedFile Path-Traversal-Schutz.
  */
 
 import {
   validateMagicBytes,
   sanitizeFilename,
+  asciiFilename,
+  sha256Hex,
   saveUploadedFile,
 } from "@/lib/file-upload";
+import { createHash } from "crypto";
 import { rm } from "fs/promises";
 import path from "path";
 
@@ -117,6 +120,61 @@ describe("sanitizeFilename", () => {
     const r2 = sanitizeFilename("test.pdf");
     // Suffix verhindert Kollision
     expect(r1).not.toBe(r2);
+  });
+});
+
+describe("asciiFilename", () => {
+  it("entfernt jedes Zeichen ausserhalb von ASCII, Endung bleibt", () => {
+    // Der Content-Disposition-Header vertraegt kein Zeichen ausserhalb von
+    // ISO-8859-1 — bleibt hier eines stehen, verstuemmeln Browser den Namen
+    // oder brechen den Download ab.
+    const result = asciiFilename(
+      "Vertragsverlängerung für Lehrkräfte.docx",
+    );
+    expect(result).toMatch(/^[\x00-\x7F]*$/);
+    expect(result.endsWith(".docx")).toBe(true);
+  });
+
+  it("macht Leerzeichen und Slashes zu Unterstrichen", () => {
+    expect(asciiFilename("a b/c")).toBe("a_b_c");
+  });
+
+  it("fasst aufeinanderfolgende Unterstriche NICHT zusammen", () => {
+    // Die Abgrenzung gegen slugify (brief-vorlagen/[id]/generate) und slug
+    // (bem/dokumente/generieren), die genau das tun. Wer diese Erwartung
+    // reissen sieht, hat die drei Funktionen zusammengelegt, obwohl sie bei
+    // Anfuehrungszeichen verschiedene Dateinamen erzeugen.
+    expect(asciiFilename('x "y"')).toBe("x__y_");
+  });
+
+  it("laesst Buchstaben, Ziffern, Bindestrich, Punkt und Unterstrich stehen", () => {
+    expect(asciiFilename("Anlage-2_final.v3.pdf")).toBe("Anlage-2_final.v3.pdf");
+  });
+});
+
+describe("sha256Hex", () => {
+  it("liefert den bekannten Vektor fuer den leeren Buffer", () => {
+    expect(sha256Hex(Buffer.from(""))).toBe(
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    );
+  });
+
+  it("liefert 64 Zeichen Kleinbuchstaben-Hex", () => {
+    // Kodierung ist Teil des Vertrags: Die Hashes stehen als Nachweis in der
+    // Datenbank (BEM-Papiereinwilligung, Dokumentenpaket-Versand). Ein Wechsel
+    // auf base64 oder Grossbuchstaben wuerde Bestandsdaten von neuen trennen,
+    // ohne dass irgendetwas fehlschlaegt.
+    const hash = sha256Hex(Buffer.from("beliebiger Inhalt"));
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("ist deterministisch und bitgleich zum direkten createHash", () => {
+    // Der Beleg, dass die umgestellten Nachweis-Hashes weiterhin exakt das
+    // liefern, was die Bestandsdaten enthalten.
+    const buffer = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]);
+    const direkt = createHash("sha256").update(buffer).digest("hex");
+    expect(sha256Hex(buffer)).toBe(direkt);
+    expect(sha256Hex(buffer)).toBe(sha256Hex(Buffer.from(buffer)));
   });
 });
 

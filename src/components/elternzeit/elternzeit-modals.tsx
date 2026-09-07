@@ -17,6 +17,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { isValidEmail } from "@/lib/constants";
 
 // =============================================
 // Shared Modal-Wrapper
@@ -168,7 +169,11 @@ export function MagicLinkModal({
   const [email, setEmail] = useState(defaultEmail ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  // Bewusst ungetrimmt: `isValidEmail` bekommt die Roheingabe, weil das Muster
+  // Leerzeichen ohnehin verbietet. Ein `.trim()` hier wuerde den Absenden-Knopf
+  // schon bei "a@b.de " freigeben und damit den Zeitpunkt aendern, ab dem das
+  // Formular abschickbar ist — genau das Verhalten, das vorher galt.
+  const valid = isValidEmail(email);
 
   async function handleSubmit() {
     if (!valid || submitting) return;

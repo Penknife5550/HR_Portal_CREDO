@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { sanitizeFilename } from "@/lib/file-upload";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
@@ -176,10 +177,34 @@ export async function POST(
     const uploadDir = path.join(uploadBaseDir, id);
     await mkdir(uploadDir, { recursive: true });
 
-    // Dateiname sanitisieren und Path-Traversal verhindern
-    const safeFileName = path.basename(file.name).replace(/[^a-zA-Z0-9._-]/g, "_");
-    const finalFileName = safeFileName || "upload";
-    const fileName = `${Date.now()}_${finalFileName}`;
+    // Speichername ueber sanitizeFilename() (@/lib/file-upload) statt einer
+    // eigenen Bereinigung - Path-Traversal-Schutz UND Kollisionsschutz.
+    //
+    // Vorher stand hier `${Date.now()}_${bereinigterName}`. Der Zeitstempel
+    // allein traegt nicht: Er loest nur auf Millisekunden auf, und zwei
+    // Uploads derselben Datei in dieselbe Millisekunde ergeben denselben
+    // Pfad. Die zweite Datei ueberschreibt dann die erste, ohne dass
+    // irgendetwas fehlschlaegt - in der Datenbank stehen danach zwei
+    // Dokumentzeilen, die auf dieselben Bytes zeigen, und beide sehen richtig
+    // aus. Wer eine davon loescht, nimmt der anderen die Datei weg. Bei einem
+    // Offboarding trifft das ausgerechnet Kuendigungsschreiben und Zeugnisse.
+    //
+    // Wie eng der Fall ist, gehoert dazu: Die Ordner liegen je Vorgang
+    // getrennt (uploads/offboarding/<id>/), es braucht also zwei gleichzeitige
+    // Uploads desselben Dateinamens im SELBEN Vorgang - ein Doppelklick, zwei
+    // offene Registerkarten oder ein Wiederholungsversuch nach einer
+    // Zeitueberschreitung.
+    //
+    // sanitizeFilename setzt acht Zeichen einer UUID zwischen Zeitstempel und
+    // Namen und macht ihn damit auch bei Gleichzeitigkeit eindeutig. Die
+    // Bereinigung selbst bleibt dieselbe (alles ausserhalb von a-z, A-Z, 0-9,
+    // "." und "-" wird zum Unterstrich), zusaetzlich auf 100 Zeichen gekuerzt.
+    //
+    // Sichtbar aendert sich nichts: Der Originalname wird unveraendert in der
+    // Spalte `fileName` abgelegt (siehe unten), der Speichername taucht in der
+    // Oberflaeche nirgends auf. Bestandsdateien behalten ihren alten Pfad, er
+    // steht in der Datenbank und wird hier nicht neu berechnet.
+    const fileName = sanitizeFilename(path.basename(file.name) || "upload");
     const filePath = path.join(uploadDir, fileName);
 
     // Path-Traversal-Schutz
