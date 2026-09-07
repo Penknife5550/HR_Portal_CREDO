@@ -17,14 +17,7 @@ import { statusLabel } from "@/lib/bem-workflow";
 import { ABLAGE_LABELS } from "@/lib/bem-aktentrennung";
 import { buildBemGesamtExportPdf, type BemExportInput } from "@/lib/bem-export";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 function de(d: Date | null): string | null {
   return d ? d.toLocaleDateString("de-DE") : null;
@@ -264,7 +257,7 @@ export async function GET(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.EXPORT_ERSTELLT,
       details: { displayId: fall.displayId },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     const filename = `BEM-Gesamtexport_${fall.displayId}.pdf`;

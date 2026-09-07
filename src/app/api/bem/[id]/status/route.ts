@@ -11,14 +11,7 @@ import { getSession } from "@/lib/auth";
 import { bemStatusSchema } from "@/lib/validations/bem";
 import { bemTransition } from "@/lib/bem-transitions";
 import type { BemStatus } from "@/lib/bem-workflow";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -46,7 +39,7 @@ export async function POST(
       beendigungsgrund: parsed.data.beendigungsgrund ?? null,
       ergebnis: parsed.data.ergebnis ?? null,
       session,
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     if (!result.ok) {

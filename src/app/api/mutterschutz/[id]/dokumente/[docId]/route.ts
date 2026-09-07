@@ -15,6 +15,7 @@ import {
   PORTAL_ROLES,
   canAccessProcess,
 } from "@/lib/permissions";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function GET(
   _request: NextRequest,
@@ -99,10 +100,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Dokument nicht gefunden" }, { status: 404 });
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const uploadsRoot = path.resolve(process.cwd(), "uploads");
     const expectedDir = path.resolve(uploadsRoot, "mutterschutz", id);

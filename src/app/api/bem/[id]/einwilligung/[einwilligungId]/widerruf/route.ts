@@ -12,14 +12,7 @@ import { canMutateBemContent } from "@/lib/permissions";
 import { logBemAudit, logBemKommunikation, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { sendEmailDetailed } from "@/lib/mailer";
 import { renderCredoEmail, paragraphsToHtml } from "@/lib/email-layout";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -62,7 +55,7 @@ export async function POST(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.EINWILLIGUNG_WIDERRUFEN,
       details: { einwilligungId, art: e.art },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     // Nur der Widerruf einer TRAGENDEN Einwilligung (Datenschutz/Durchfuehrung)

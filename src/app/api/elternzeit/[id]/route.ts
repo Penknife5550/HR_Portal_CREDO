@@ -16,6 +16,7 @@ import {
   canAccessProcess,
 } from "@/lib/permissions";
 import { updateElternzeitSchema } from "@/lib/validations/elternzeit";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function GET(
   _request: NextRequest,
@@ -107,10 +108,7 @@ export async function PATCH(
         : null;
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const updated = await prisma.elternzeitProzess.update({
       where: { id },

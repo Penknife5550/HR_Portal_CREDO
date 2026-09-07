@@ -13,14 +13,7 @@ import { encryptBem } from "@/lib/encryption";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { createMassnahmeSchema } from "@/lib/validations/bem";
 import { istVerarbeitungGesperrt } from "@/lib/bem-einwilligung";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -71,7 +64,7 @@ export async function POST(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.MASSNAHME_ERFASST,
       details: { massnahmeId: massnahme.id, kategorie: d.kategorie },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json({ data: { id: massnahme.id } }, { status: 201 });

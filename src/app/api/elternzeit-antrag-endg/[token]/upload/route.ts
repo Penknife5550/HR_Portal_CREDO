@@ -14,6 +14,7 @@ import path from "path";
 import { prisma } from "@/lib/db";
 import { sanitizeFilename, saveUploadedFile, validateUpload } from "@/lib/file-upload";
 import { hashToken } from "@/lib/token-hash";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -100,10 +101,7 @@ export async function POST(
             processType: "ELTERNZEIT",
             action: "GEBURTSURKUNDE_UPLOADED",
             details: { dateiname: file.name, fileSize: file.size },
-            ipAddress:
-              request.headers.get("x-forwarded-for") ||
-              request.headers.get("x-real-ip") ||
-              null,
+            ipAddress: getClientIpOrNull(request),
           },
         });
 

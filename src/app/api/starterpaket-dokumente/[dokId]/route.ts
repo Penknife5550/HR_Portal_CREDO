@@ -11,18 +11,11 @@ import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { ADMIN_ROLES } from "@/lib/permissions";
 import { deleteUploadedFile } from "@/lib/file-upload";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 import {
   updateStarterpaketDokumentSchema,
   type UpdateStarterpaketDokument,
 } from "@/lib/validations/starterpaket";
-
-function clientIp(headers: Headers): string | null {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headers.get("x-real-ip") ||
-    null
-  );
-}
 
 export const PATCH = apiHandler<UpdateStarterpaketDokument>(
   {
@@ -91,7 +84,7 @@ export const DELETE = apiHandler(
           processType: "STARTERPAKET",
           action: "STARTERPAKET_DOC_DEACTIVATED",
           details: { dokumentId: dokId },
-          ipAddress: clientIp(request.headers),
+          ipAddress: getClientIpOrNull(request),
         },
       });
       return NextResponse.json({
@@ -108,7 +101,7 @@ export const DELETE = apiHandler(
         processType: "STARTERPAKET",
         action: "STARTERPAKET_DOC_DELETED",
         details: { dokumentId: dokId },
-        ipAddress: clientIp(request.headers),
+        ipAddress: getClientIpOrNull(request),
       },
     });
 

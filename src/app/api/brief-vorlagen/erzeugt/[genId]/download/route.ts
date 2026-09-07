@@ -13,16 +13,11 @@ import { NextResponse } from "next/server";
 import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { HR_EDIT_ROLES, canAccessOrg } from "@/lib/permissions";
-import { readUploadedFile } from "@/lib/file-upload";
+import { asciiFilename, readUploadedFile } from "@/lib/file-upload";
 import { istModulUnterstuetzt, ladeVorgangsMandant } from "@/lib/erzeugte-dokumente-vorgang";
 
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-/** Content-Disposition vertraegt keine Umlaute — ASCII-Fallback. */
-function asciiFilename(name: string): string {
-  return name.replace(/[^\w\-.]/g, "_");
-}
 
 export const GET = apiHandler(
   { roles: HR_EDIT_ROLES, logLabel: "ErzeugtesDokument Download" },

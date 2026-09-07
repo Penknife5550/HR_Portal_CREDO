@@ -13,6 +13,7 @@ import { getSession } from "@/lib/auth";
 import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 const trackingSchema = z
   .object({
@@ -81,10 +82,7 @@ export async function PATCH(
         : null;
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const updated = await prisma.elternzeitProzess.update({
       where: { id },

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { mutterschutzTransition } from "@/lib/mutterschutz-transitions";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -22,10 +23,7 @@ export async function POST(
     }
 
     const { id } = await params;
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const body = await request.json().catch(() => ({}));
     const extraData: Omit<Prisma.MutterschutzProzessUpdateInput, "status"> = {};

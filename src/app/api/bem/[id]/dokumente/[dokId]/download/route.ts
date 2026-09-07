@@ -9,20 +9,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canAccessBemContent } from "@/lib/permissions";
-import { readUploadedFile } from "@/lib/file-upload";
+import { asciiFilename, readUploadedFile } from "@/lib/file-upload";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
-
-function asciiFilename(name: string): string {
-  return name.replace(/[^\w\-.]/g, "_");
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function GET(
   request: NextRequest,
@@ -61,7 +50,7 @@ export async function GET(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.AKTE_GEOEFFNET,
       details: { dokumentId: dokId, typ: dok.typ, aktion: "download" },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return new NextResponse(buffer as unknown as BodyInit, {

@@ -19,14 +19,7 @@ import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { decryptBem } from "@/lib/encryption";
 import { bemFallPatchSchema } from "@/lib/validations/bem";
 import { getBemChecklisteItems } from "@/lib/bem-vorlagen";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 export async function GET(
   request: NextRequest,
@@ -178,7 +171,7 @@ export async function GET(
       bemFallId: id,
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.AKTE_GEOEFFNET,
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json({ data: { ...decrypted, checklistenVorlagen } });
@@ -248,7 +241,7 @@ export async function PATCH(
         userId: session.userId,
         action: BEM_AUDIT_ACTIONS.SCHWERBEHINDERUNG_GEAENDERT,
         details: { schwerbehindert: parsed.data.schwerbehindert },
-        ipAddress: clientIp(request),
+        ipAddress: getClientIpOrNull(request),
       });
     }
     if (parsed.data.diagnoseSchutz !== undefined) {
@@ -257,7 +250,7 @@ export async function PATCH(
         userId: session.userId,
         action: BEM_AUDIT_ACTIONS.DIAGNOSE_SCHUTZ_GEAENDERT,
         details: { diagnoseSchutz: parsed.data.diagnoseSchutz },
-        ipAddress: clientIp(request),
+        ipAddress: getClientIpOrNull(request),
       });
     }
 

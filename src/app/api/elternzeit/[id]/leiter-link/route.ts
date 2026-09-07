@@ -16,6 +16,7 @@ import { getSession } from "@/lib/auth";
 import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { hashToken } from "@/lib/token-hash";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 const schema = z.object({
   recipientEmail: z.string().email(),
@@ -82,10 +83,7 @@ export async function POST(
       );
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const validityDays = ez.organization?.ezTokenValidityDays ?? 14;
     const token = randomUUID();

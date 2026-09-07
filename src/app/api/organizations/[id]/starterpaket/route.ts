@@ -16,6 +16,7 @@ import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { ADMIN_ROLES } from "@/lib/permissions";
 import { sensiblePlatzhalter, type SensiblesFeld } from "@/lib/placeholder-catalog";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 import {
   setPaketAuswahlSchema,
   PAKET_MODULE,
@@ -44,14 +45,6 @@ interface PaketEintrag {
 function modulAusAbfrage(url: string): string {
   const roh = new URL(url).searchParams.get("modul")?.trim().toUpperCase();
   return roh && (PAKET_MODULE as readonly string[]).includes(roh) ? roh : STANDARD_MODUL;
-}
-
-function clientIp(headers: Headers): string | null {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headers.get("x-real-ip") ||
-    null
-  );
 }
 
 export const GET = apiHandler(
@@ -299,7 +292,7 @@ export const PUT = apiHandler<SetPaketAuswahl>(
           anzahlPdf: pdfIds.length,
           anzahlVorlagen: vorlagenIds.length,
         },
-        ipAddress: clientIp(request.headers),
+        ipAddress: getClientIpOrNull(request),
       },
     });
 

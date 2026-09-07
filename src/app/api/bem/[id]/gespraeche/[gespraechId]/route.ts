@@ -16,14 +16,7 @@ import { encryptBem } from "@/lib/encryption";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { updateGespraechSchema } from "@/lib/validations/bem";
 import { istVerarbeitungGesperrt } from "@/lib/bem-einwilligung";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 async function loadOwned(bemFallId: string, gespraechId: string) {
   return prisma.bemGespraech.findFirst({
@@ -90,7 +83,7 @@ export async function PATCH(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.GESPRAECH_AKTUALISIERT,
       details: { gespraechId },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json({ data: { id: gespraechId } });
@@ -124,7 +117,7 @@ export async function DELETE(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.GESPRAECH_GELOESCHT,
       details: { gespraechId },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json({ data: { ok: true } });

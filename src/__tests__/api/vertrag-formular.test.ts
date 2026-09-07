@@ -19,6 +19,12 @@ jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/rate-limit", () => ({
   tokenRateLimiter: { check: () => ({ allowed: true }) },
   getClientIp: () => "127.0.0.1",
+  // Vorsorglich mitgemockt, obwohl die hier getesteten Routen heute nur
+  // `getClientIp` nutzen: Dieser Mock ersetzt das GANZE Modul. Stellt jemand
+  // eine dieser Routen spaeter auf die null-Fassung um, kaeme sonst
+  // stillschweigend `undefined` zurueck und der Test stuerbe an einem
+  // TypeError statt an einer sprechenden Erwartung.
+  getClientIpOrNull: () => "127.0.0.1",
 }));
 
 import { GET, POST, PUT } from "@/app/api/vertrag-formular/[token]/route";

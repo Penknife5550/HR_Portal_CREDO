@@ -16,14 +16,7 @@ import { encryptBem } from "@/lib/encryption";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { updateMassnahmeSchema } from "@/lib/validations/bem";
 import { istVerarbeitungGesperrt } from "@/lib/bem-einwilligung";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 async function loadOwned(bemFallId: string, massnahmeId: string) {
   return prisma.bemMassnahme.findFirst({
@@ -83,7 +76,7 @@ export async function PATCH(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.MASSNAHME_AKTUALISIERT,
       details: { massnahmeId, status: d.status },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json({ data: { id: massnahmeId } });
@@ -117,7 +110,7 @@ export async function DELETE(
       userId: session.userId,
       action: BEM_AUDIT_ACTIONS.MASSNAHME_GELOESCHT,
       details: { massnahmeId },
-      ipAddress: clientIp(request),
+      ipAddress: getClientIpOrNull(request),
     });
 
     return NextResponse.json({ data: { ok: true } });

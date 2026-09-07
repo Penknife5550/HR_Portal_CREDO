@@ -15,6 +15,7 @@ import {
   pruefeAbrechnungstagEingabe,
   pruefeBetriebsnummerEingabe,
 } from "@/lib/betriebsnummer";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 // Gueltige OrganizationType-Werte (aus Prisma Schema)
 const VALID_ORG_TYPES = [
@@ -192,10 +193,7 @@ export async function PATCH(
               alt: vorher.betriebsnummer,
               neu: neueBetriebsnummer ?? null,
             },
-            ipAddress:
-              request.headers.get("x-forwarded-for") ||
-              request.headers.get("x-real-ip") ||
-              null,
+            ipAddress: getClientIpOrNull(request),
           },
         })
         .catch(() => {

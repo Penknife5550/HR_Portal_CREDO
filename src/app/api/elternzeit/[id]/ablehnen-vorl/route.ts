@@ -11,6 +11,7 @@ import { getSession } from "@/lib/auth";
 import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 const ablehnenSchema = z.object({
   ablehnungGrund: z.string().min(10).max(2000),
@@ -63,10 +64,7 @@ export async function POST(
       );
     }
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const updated = await prisma.elternzeitProzess.update({
       where: { id },

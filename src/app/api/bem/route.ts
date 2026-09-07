@@ -22,14 +22,7 @@ import { createBemSchema } from "@/lib/validations/bem";
 import { generateBemDisplayId } from "@/lib/bem-helpers";
 import { BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { syncBemFristen } from "@/lib/bem-fristen";
-
-function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null
-  );
-}
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 // =============================================
 // GET /api/bem – Liste (nur freigegebene Faelle)
@@ -153,7 +146,7 @@ export async function POST(request: NextRequest) {
       d.organizationId,
       shortName,
     );
-    const ipAddress = clientIp(request);
+    const ipAddress = getClientIpOrNull(request);
 
     const created = await prisma.$transaction(async (tx) => {
       const fall = await tx.bemFall.create({

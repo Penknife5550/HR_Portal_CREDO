@@ -14,7 +14,7 @@ import { triggerN8nWebhook } from "@/lib/n8n";
 import { sendEmail } from "@/lib/mailer";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/encryption";
-import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
+import { tokenRateLimiter, getClientIp, getClientIpOrNull } from "@/lib/rate-limit";
 import {
   computeMissingRequiredDocuments,
   RV_BEFREIUNG_HINWEIS,
@@ -484,15 +484,31 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
-  // Rate-Limiting
-  const clientIp = getClientIp(request);
-  const rlCheck = tokenRateLimiter.check(clientIp);
+  // Rate-Limiting. Der Zaehlerschluessel muss ein String sein, deshalb hier
+  // `getClientIp` mit seinem Ersatzwert "unknown" — ein gemeinsamer Topf fuer
+  // alle Aufrufe ohne Proxy-Header, der zu viel bremst, aber nichts oeffnet.
+  const rlCheck = tokenRateLimiter.check(getClientIp(request));
   if (!rlCheck.allowed) {
     return NextResponse.json(
       { error: "Zu viele Anfragen. Bitte warten Sie." },
       { status: 429 }
     );
   }
+
+  // Fuer die PROTOKOLLE dagegen die null-Fassung. `erklaerungIp` und
+  // `AuditLog.ipAddress` sind beide `String?` (prisma/schema.prisma), und
+  // "nicht ermittelbar" gehoert dort als Luecke hinein, nicht als erfundene
+  // Zeichenkette. Sonst fuehrte dieselbe Spalte zwei Schreibweisen fuer
+  // denselben Sachverhalt — NULL von allen uebrigen Protokollschreibern (BEM,
+  // Elternzeit, Mutterschutz, Dokumentenpaket) und "unknown" von hier. Wer
+  // spaeter nach Vorgaengen ohne IP sucht, muesste beide kennen, und die
+  // Wahrheitsversicherung ist der Unterschriftsersatz: Dort ist eine ehrliche
+  // Luecke mehr wert als ein Wert, der wie eine Feststellung aussieht.
+  //
+  // Zweiter Leseaufruf statt `?? "unknown"` an der Bremse oben: So bleibt der
+  // Ersatzwert an genau EINER Stelle (rate-limit.ts) und wird hier nicht
+  // nachgebaut. Es kostet das Lesen eines Headers.
+  const clientIp = getClientIpOrNull(request);
 
   const { token } = await params;
 

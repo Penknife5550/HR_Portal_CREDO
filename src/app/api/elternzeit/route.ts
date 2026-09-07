@@ -22,6 +22,7 @@ import { getElternzeitCheckliste } from "@/lib/elternzeit-checkliste-template";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { syncElternzeitFristen } from "@/lib/elternzeit-fristen";
 import { formatEmployeeName } from "@/lib/format";
+import { getClientIpOrNull } from "@/lib/rate-limit";
 
 // =============================================
 // GET /api/elternzeit – Liste
@@ -191,10 +192,7 @@ export async function POST(request: NextRequest) {
 
     const checklistTemplate = getElternzeitCheckliste(personalgruppe);
 
-    const ipAddress =
-      request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      null;
+    const ipAddress = getClientIpOrNull(request);
 
     const created = await prisma.$transaction(async (tx) => {
       const ez = await tx.elternzeitProzess.create({
