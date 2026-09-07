@@ -70,7 +70,7 @@ Branch: `feat/minijob-checkliste-2026`.
 
 | Datei | Inhalt |
 |---|---|
-| [module/dokumente/starterpaket-dokumente.md](module/dokumente/starterpaket-dokumente.md) | Konzept Dokumente-Hub und Starterpaket |
+| [module/dokumente/starterpaket-dokumente.md](module/dokumente/starterpaket-dokumente.md) | **Historisch (Juni 2026):** Konzept Dokumente-Hub und Starterpaket. Der dort geplante Versandweg (`src/lib/starterpaket.ts`, `POST /api/onboarding/[id]/starterpaket`) ist seit dem 4. September abgelöst — heute versendet `src/lib/dokumentenpaket.ts` hinter drei Routen unter `/api/dokumentenpaket/`. Die Abschnitte „Heute" im Dokument sind nachgeführt; der gültige Kurzstand steht in `CLAUDE.md`, Abschnitt „Dokumente & Starterpaket" |
 | [module/dokumente/erzeugte-dokumente-im-vorgang-plan.html](module/dokumente/erzeugte-dokumente-im-vorgang-plan.html) | Erzeugte Dokumente im Vorgang sichtbar machen |
 | [module/dokumente/erweiterungen-vorlagen-benutzer-plan.html](module/dokumente/erweiterungen-vorlagen-benutzer-plan.html) | Erweiterungen Vorlagen und Benutzerverwaltung |
 | [module/dokumente/mitteilung-hr-team-vorlagen-update.md](module/dokumente/mitteilung-hr-team-vorlagen-update.md) | Mitteilung ans HR-Team zum Vorlagen-Update |
