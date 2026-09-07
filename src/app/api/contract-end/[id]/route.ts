@@ -164,6 +164,40 @@ export async function PATCH(
     if (contractEndDate) auditDetails.contractEndDate = contractEndDate;
     if (mavStatus !== undefined) auditDetails.mavStatus = mavStatus;
 
+    // Adressaenderung MIT Vorher und Nachher — die Gegenprobe zur
+    // Empfaenger-Freigabe.
+    //
+    // Die Freigaberegel (src/lib/empfaenger-freigabe.ts) laesst die im Vorgang
+    // hinterlegte Adresse IMMER durch, auch wenn ihre Domain nicht auf der
+    // Liste steht, und stuetzt sich ausdruecklich darauf, dass eine Aenderung
+    // dieser Adresse "eine eigene, protokollpflichtige Handlung an anderer
+    // Stelle" ist. Diese Stelle ist hier.
+    //
+    // Das VORHER gehoert zwingend dazu: Wer eine Adresse fuer einen Versand
+    // umbiegt und danach zuruecksetzt, hinterliesse sonst zwei Eintraege, die
+    // beide die richtige Adresse zeigen.
+    //
+    // Fuer dieses Modul ist supervisorEmail das einzige hier aenderbare
+    // Adressfeld. Der Empfaenger des Dokumentenpakets ist employeeEmail —
+    // die nimmt updateContractEndSchema nicht an, und keine andere Route
+    // schreibt sie; kaeme das dazu, gehoert es nach demselben Muster hierher.
+    // supervisorEmail ist trotzdem protokollpflichtig: An sie geht der
+    // Magic-Link zum Vertragsformular (Strang A).
+    //
+    // Die Adresse selbst ist ein Personendatum. Sie steht trotzdem im
+    // Protokoll, weil ein Eintrag ohne sie nichts belegen kann; das AuditLog
+    // fuehrt an anderer Stelle bereits Adressen (u.a. die /supervisor-link-
+    // Route dieses Moduls und die Cron-Erinnerungen).
+    if (supervisorEmail !== undefined) {
+      // Exakt so normalisiert wie oben in updateData: "" wird zu null. Sonst
+      // meldete das Protokoll ein "" -> null als Aenderung, das keine ist.
+      const neueVorgesetztenadresse = supervisorEmail || null;
+      if (neueVorgesetztenadresse !== existing.supervisorEmail) {
+        auditDetails.supervisorEmailFrom = existing.supervisorEmail;
+        auditDetails.supervisorEmailTo = neueVorgesetztenadresse;
+      }
+    }
+
     await prisma.auditLog.create({
       data: {
         contractEndId: id,
