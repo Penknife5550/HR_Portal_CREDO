@@ -15,8 +15,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { sendEventEmail, EMAIL_PATTERN } from "@/lib/mailer";
+import { sendEventEmail, pruefeVorlagenSyntax, beschreibeVerwaisteMarker } from "@/lib/mailer";
 import { getEventDefinition } from "@/lib/events";
+import { EMAIL_PATTERN } from "@/lib/constants";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 
@@ -49,6 +50,21 @@ export async function POST(request: NextRequest) {
     if (typeof recipientCc === "string") templateOverride.recipientCc = recipientCc;
     if (typeof recipientBcc === "string") templateOverride.recipientBcc = recipientBcc;
     if (typeof recipientReplyTo === "string") templateOverride.recipientReplyTo = recipientReplyTo;
+
+    // Der Test-Versand nimmt ungespeicherte Editor-Felder entgegen und geht
+    // damit an der Pruefung beim Speichern vorbei. Ohne diese Zeilen bliebe
+    // genau der Weg offen, auf dem der Fehler auffallen soll.
+    const syntaxFehler = pruefeVorlagenSyntax({
+      Betreff: templateOverride.subject,
+      "HTML-Body": templateOverride.bodyHtml,
+      Plaintext: templateOverride.bodyText,
+    });
+    if (syntaxFehler.length > 0) {
+      return NextResponse.json(
+        { error: `Unvollstaendiger Bedingungsblock. ${beschreibeVerwaisteMarker(syntaxFehler)}` },
+        { status: 400 }
+      );
+    }
 
     const result = await sendEventEmail(definition.event, definition.samplePayload, {
       isTest: true,
