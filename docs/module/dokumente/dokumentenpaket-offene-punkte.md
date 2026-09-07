@@ -1,6 +1,6 @@
 # Dokumentenpaket-Versand — offene Punkte
 
-> **Stand:** 07.09.2026 · Zweig `fix/dokumentenpaket-restbefunde`, noch nicht gemergt
+> **Stand:** 07.09.2026 · **auf `main` gemergt** (`74f0975`) und gepusht; noch nicht deployt
 > **Plan:** [dokumentenpaket-versand-plan.html](dokumentenpaket-versand-plan.html) — vollständig abgearbeitet (Bausteine 1–15)
 > **Nachweise:** `npx tsc --noEmit` fehlerfrei · `npm run lint` 0 Fehler · **1244 Tests in 73 Suites** grün (auch nach `jest --clearCache`) · `npm run build` exit 0
 
@@ -15,12 +15,12 @@ jetzt hier steht, ist der Rest — und der ist kleiner, aber nicht leer.
 
 ## 0 · Wo es weitergeht
 
-Der Code liegt auf `main` (Merge-Commit `53c484b`) plus dem Zweig
-`fix/dokumentenpaket-restbefunde` — aber **auf keinem Server**. Was aussteht:
+Der Code liegt vollstaendig auf `main` (Merge-Commits `53c484b` und `74f0975`,
+beide gepusht) — aber **auf keinem Server**. Was aussteht:
 
-1. **`fix/dokumentenpaket-restbefunde` nach `main` bringen.** Gate: tsc sauber,
-   Lint ohne Fehler, 1244 Tests in 73 Suites grün, Build exit 0 — alles vier
-   am 7. September gefahren.
+1. ~~Nach `main` mergen~~ — erledigt am 7. September, ohne PR, mit Merge-Commit
+   (`74f0975`). Gate davor UND danach auf `main` selbst gefahren: tsc sauber,
+   Lint ohne Fehler, 1244 Tests in 73 Suites grün, Build exit 0.
 2. **Deployen** nach dem Ablauf in
    [../../historie/codereview-und-vorlagen-2026-09.md](../../historie/codereview-und-vorlagen-2026-09.md).
    Schema-Delta gegenüber dem letzten Deploy siehe Abschnitt 4 — es ist um eine
