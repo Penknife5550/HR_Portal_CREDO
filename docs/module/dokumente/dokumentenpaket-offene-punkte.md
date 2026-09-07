@@ -1,6 +1,6 @@
 # Dokumentenpaket-Versand — offene Punkte
 
-> **Stand:** 07.09.2026 · **auf `main` gemergt** (`74f0975`) und gepusht; noch nicht deployt
+> **Stand:** 07.09.2026 · auf `main` (`6124936`) **und auf dem Server ausgerollt**; SMTP-Versand einmal echt belegt
 > **Plan:** [dokumentenpaket-versand-plan.html](dokumentenpaket-versand-plan.html) — vollständig abgearbeitet (Bausteine 1–15)
 > **Nachweise:** `npx tsc --noEmit` fehlerfrei · `npm run lint` 0 Fehler · **1244 Tests in 73 Suites** grün (auch nach `jest --clearCache`) · `npm run build` exit 0
 
@@ -15,18 +15,18 @@ jetzt hier steht, ist der Rest — und der ist kleiner, aber nicht leer.
 
 ## 0 · Wo es weitergeht
 
-Der Code liegt vollstaendig auf `main` (Merge-Commits `53c484b` und `74f0975`,
-beide gepusht) — aber **auf keinem Server**. Was aussteht:
+Der Code liegt vollständig auf `main` (Merge-Commits `53c484b` und `74f0975`)
+und seit dem 7. September **auf dem Server**. Was aussteht:
 
 1. ~~Nach `main` mergen~~ — erledigt am 7. September, ohne PR, mit Merge-Commit
    (`74f0975`). Gate davor UND danach auf `main` selbst gefahren: tsc sauber,
    Lint ohne Fehler, 1244 Tests in 73 Suites grün, Build exit 0.
-2. **Deployen** nach dem Ablauf in
-   [../../historie/codereview-und-vorlagen-2026-09.md](../../historie/codereview-und-vorlagen-2026-09.md).
-   Schema-Delta gegenüber dem letzten Deploy siehe Abschnitt 4 — es ist um eine
-   Spalte gewachsen.
-3. **Erst danach Abschnitt 1** (Verifikation mit echtem SMTP). Vorher hat
-   niemand belegt, dass eine Mail mit Anhängen tatsächlich ankommt.
+2. ~~Deployen~~ — erledigt am 7. September. Ablauf, Log und die Stolpersteine
+   stehen in [../../historie/deploy-dokumentenpaket-2026-09-07.md](../../historie/deploy-dokumentenpaket-2026-09-07.md).
+3. **Abschnitt 1 zu Ende bringen.** Der Kern ist belegt: Die Mail kam an, beide
+   Anhänge waren dabei — feste PDF und befüllte Vorlage. Offen bleiben der
+   Nachweis in der Datenbank, der Dateiname der Vorlage und die zwei
+   Gegenproben im Dialog.
 4. **Freigabeliste pflegen** (neu, siehe Abschnitt 2.1): Ohne gepflegte Domains
    ist die Schranke gegen abweichende Empfängeradressen wirkungslos. Das ist
    Absicht — eine ungepflegte Liste darf den Versand nicht lahmlegen —, aber es
@@ -34,28 +34,30 @@ beide gepusht) — aber **auf keinem Server**. Was aussteht:
 
 ---
 
-## 1 · Zuerst: Verifikation mit echtem SMTP
+## 1 · Verifikation mit echtem SMTP — teilweise erledigt
 
-**Der Versand ist nie mit einem echten Mailserver gelaufen.** Die
-Entwicklungsumgebung hat weder SMTP noch Gotenberg. Geprüft sind jeder
-Abbruchpfad und die gesamte Kette bis zum Mailer — der letzte Schritt, dass
-eine Mail mit Anhängen tatsächlich ankommt, fehlt.
+**Der Kern ist belegt** (07.09.2026): Ein Testversand mit einem festen PDF und
+einer zur Laufzeit befüllten Vorlage kam an, beide Anhänge waren dabei. Damit
+ist die ganze Kette einmal durchlaufen — Resolver, Gotenberg, Anhangbau, SMTP.
 
-Das gehört auf den Server, **bevor** jemand das erste echte Paket verschickt:
+Was davon noch offen ist, bevor die erste echte Person ein Paket bekommt:
 
-1. Testvorgang anlegen, eigene Adresse als Empfänger eintragen
-2. Standardpaket mit einem PDF **und** einer Vorlage konfigurieren
-3. Versenden, Postfach prüfen: Kommen beide Anhänge an? Stimmen Dateinamen
-   (`Vorlagenname_Nachname_JJJJ-MM-TT.pdf`) und die Anhangliste in der Mail?
-4. Danach in der Datenbank: `DokumentenVersand` hat eine Zeile mit
-   `messageId`, `betreff`, `positionen` (inkl. `generatedDocumentId`) und
-   `empfaenger` — und zwar der **zugestellten** Adresse
-5. Eine sensible Vorlage gegenprüfen: Ohne Häkchen muss der Server mit **409**
-   abweisen
-6. **Neu:** Eine Domain in die Freigabeliste eintragen (Einstellungen → SMTP),
-   dann eine Adresse einer **anderen** Domain eingeben, die nicht die des
-   Vorgangs ist — der Server muss mit **409** abweisen, und der Dialog muss es
-   schon vor dem Klick sagen
+1. **Der Nachweis in der Datenbank.** Nach einem Versand muss dort eine Zeile
+   stehen — mit der Message-ID des Mailservers, der Anzahl der Anhänge und je
+   Anhang Name und Prüfsumme. Fehlt die Message-ID, ist die Mail nicht wirklich
+   hinausgegangen.
+
+   ```bash
+   sudo docker exec hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT modul, empfaenger, "empfaengerAbweichend", anzahl, "messageId" IS NOT NULL AS hat_messageid, "createdAt" FROM dokumenten_versand ORDER BY "createdAt" DESC LIMIT 1;'
+   ```
+
+2. **Der Dateiname der befüllten Vorlage** im Postfach:
+   `Vorlagenname_Nachname_JJJJ-MM-TT.pdf`.
+
+3. **Zwei Gegenproben im Dialog:** Eine Vorlage mit IBAN, SV-Nummer oder
+   Steuer-ID muss den Versand-Knopf sperren, solange das Häkchen fehlt. Und eine
+   Adresse einer Domain, die nicht freigegeben ist und nicht die des Vorgangs,
+   muss schon vor dem Klick abgewiesen werden.
 
 ---
 
