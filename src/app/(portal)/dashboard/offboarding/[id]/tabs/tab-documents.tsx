@@ -3,7 +3,8 @@
 import React from "react";
 import { OFFBOARDING_DOC_TYPE_LABELS } from "@/lib/constants";
 import type { OffboardingData } from "../types";
-import { formatDate, formatFileSize } from "../helpers";
+import { formatDate } from "../helpers";
+import { formatBytes } from "@/lib/format";
 import { DocumentIcon, UploadCloudIcon, DownloadIcon } from "../icons";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
@@ -34,6 +35,13 @@ export function TabDocuments({
   /** Darf die angemeldete Person Dokumente erzeugen? */
   canEdit: boolean;
 }) {
+  // Ein Paketversand legt fuer jede mitgeschickte Vorlage ein Dokument an. Die
+  // Erstellen- und die Versenden-Karte sind Geschwister und wissen nichts
+  // voneinander — dieser Zaehler ist das Signal von der einen zur anderen.
+  // React.useState, weil die Datei React als Default importiert und die Haken
+  // durchgaengig ueber den Namensraum anspricht (React.RefObject, React.ChangeEvent).
+  const [versandZaehler, setVersandZaehler] = React.useState(0);
+
   const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
     UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
     REVIEWED: { label: "Geprüft", color: "bg-credo-blau/10 text-credo-blau" },
@@ -54,6 +62,7 @@ export function TabDocuments({
         organizationId={data.organization.id}
         canEdit={canEdit}
         emptyHint="Keine Offboarding-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ (Modul Offboarding) an."
+        aktualisierung={versandZaehler}
       />
 
       {/* Versand: erst erstellen, dann verschicken — dieselbe Reihenfolge wie
@@ -65,6 +74,7 @@ export function TabDocuments({
         canEdit={canEdit}
         titel="Unterlagen zum Austritt versenden"
         beschreibung="Feste PDFs und befüllte Vorlagen gehen als Anhänge an die ausscheidende Person — vorgeschlagen wird die private Adresse, falls hinterlegt. Das Standardpaket wird unter Mandanten → Einrichtung → Dokumentenpakete gepflegt."
+        onVersendet={() => setVersandZaehler((n) => n + 1)}
       />
 
       {/* Upload Area */}
@@ -135,7 +145,7 @@ export function TabDocuments({
                       <p className="truncate text-sm font-semibold text-foreground" title={doc.fileName}>
                         {doc.fileName}
                       </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{formatBytes(doc.fileSize)}</p>
                     </div>
                   </div>
 

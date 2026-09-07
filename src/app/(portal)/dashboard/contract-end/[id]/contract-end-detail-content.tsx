@@ -101,6 +101,11 @@ export function ContractEndDetailContent({
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionInfo, setActionInfo] = useState<string | null>(null);
 
+  // Ein Paketversand legt fuer jede mitgeschickte Vorlage ein Dokument an. Die
+  // Erstellen- und die Versenden-Karte sind Geschwister und wissen nichts
+  // voneinander — dieser Zaehler ist das Signal von der einen zur anderen.
+  const [versandZaehler, setVersandZaehler] = useState(0);
+
   const canEdit = HR_EDIT_ROLES.includes(user.role);
 
   const loadData = useCallback(async () => {
@@ -529,6 +534,7 @@ export function ContractEndDetailContent({
                 organizationId={data.organization.id}
                 canEdit={canEdit}
                 emptyHint="Keine Vertragsvorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ (Modul Vertragsverlängerung) an."
+                aktualisierung={versandZaehler}
               />
               <DokumentenpaketSection
                 modul="VERTRAGSVERLAENGERUNG"
@@ -536,6 +542,7 @@ export function ContractEndDetailContent({
                 canEdit={canEdit}
                 titel="Unterlagen zur Vertragsverlängerung versenden"
                 beschreibung="Feste PDFs und befüllte Vorlagen gehen als Anhänge an die beschäftigte Person. Das Standardpaket wird unter Mandanten → Einrichtung → Dokumentenpakete gepflegt."
+                onVersendet={() => setVersandZaehler((n) => n + 1)}
               />
             </div>
           )}

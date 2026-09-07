@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { CIVIL_SERVICE_DOC_TYPES } from "@/lib/constants";
 import type { DocumentData, AssessmentData } from "../types";
-import { formatDate, formatFileSize } from "../helpers";
+import { formatDate } from "../helpers";
+import { formatBytes } from "@/lib/format";
 import { UploadIcon, DownloadIcon } from "../icons";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
@@ -209,6 +210,11 @@ export function TabDocuments({
   /** Darf die angemeldete Person Dokumente erzeugen? */
   canEdit: boolean;
 }) {
+  // Ein Paketversand legt fuer jede mitgeschickte Vorlage ein Dokument an. Die
+  // Erstellen- und die Versenden-Karte sind Geschwister und wissen nichts
+  // voneinander — dieser Zaehler ist das Signal von der einen zur anderen.
+  const [versandZaehler, setVersandZaehler] = useState(0);
+
   const docTypeEntries = Object.entries(CIVIL_SERVICE_DOC_TYPES);
 
   const getDocStatus = (type: string) => {
@@ -242,6 +248,7 @@ export function TabDocuments({
           organizationId={organizationId}
           canEdit={canEdit}
           emptyHint="Keine Verbeamtungs-Vorlagen hinterlegt. Vorlagen legen Sie unter „Brief-Vorlagen“ (Modul Verbeamtung) an."
+          aktualisierung={versandZaehler}
         />
       </div>
 
@@ -252,6 +259,7 @@ export function TabDocuments({
           canEdit={canEdit}
           titel="Unterlagen zur Verbeamtung versenden"
           beschreibung="Feste PDFs und befüllte Vorlagen gehen als Anhänge an die Lehrkraft. Das Standardpaket wird unter Mandanten → Einrichtung → Dokumentenpakete gepflegt."
+          onVersendet={() => setVersandZaehler((n) => n + 1)}
         />
       </div>
 
@@ -292,7 +300,7 @@ export function TabDocuments({
               {docFile && (
                 <div className="mb-2 text-xs text-gray-500">
                   <p className="truncate">{docFile.fileName}</p>
-                  <p>{formatFileSize(docFile.fileSize)} &middot; {formatDate(docFile.uploadedAt)}</p>
+                  <p>{formatBytes(docFile.fileSize)} &middot; {formatDate(docFile.uploadedAt)}</p>
                 </div>
               )}
 
@@ -351,7 +359,7 @@ export function TabDocuments({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-gray-800">{doc.fileName}</p>
                   <p className="text-[11px] text-gray-500">
-                    {formatDate(doc.uploadedAt)} &middot; {formatFileSize(doc.fileSize)}
+                    {formatDate(doc.uploadedAt)} &middot; {formatBytes(doc.fileSize)}
                   </p>
                 </div>
                 <a
