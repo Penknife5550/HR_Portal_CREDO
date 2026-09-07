@@ -21,6 +21,7 @@ const mockPrisma = {
   dokumentenVersand: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
   generatedDocument: { create: jest.fn() },
   auditLog: { create: jest.fn() },
+  smtpConfig: { findUnique: jest.fn() },
   $transaction: jest.fn(),
 };
 const mockGetSession = jest.fn();
@@ -30,12 +31,30 @@ const mockResolveEventTemplate = jest.fn();
 const mockRenderDocx = jest.fn();
 const mockConvertDocxToPdf = jest.fn();
 const mockGotenbergReachable = jest.fn();
-const mockReadUploadedFile = jest.fn();
 const mockSaveUploadedFile = jest.fn();
 const mockReadFile = jest.fn();
+const mockRealpath = jest.fn();
 const mockResolver = jest.fn();
+/** Ein Aufruf der Bremse: (name, key). Die Antwort steuert der Test. */
+const mockLimit = jest.fn();
 
-jest.mock("fs/promises", () => ({ readFile: (...a: unknown[]) => mockReadFile(...a) }));
+jest.mock("fs/promises", () => ({
+  readFile: (...a: unknown[]) => mockReadFile(...a),
+  realpath: (...a: unknown[]) => mockRealpath(...a),
+}));
+// Nur createRateLimiter ersetzen, getClientIpOrNull bleibt echt — die Route
+// braucht beides aus derselben Datei. Der echte Limiter fuehrt seinen Zaehler
+// modulweit und ueber die ganze Testdatei hinweg; ohne eine Reset-Moeglichkeit
+// liefen die spaeten Faelle sonst in eine 429, die mit ihrer Zusage nichts zu
+// tun hat. Was hier NICHT wegfaellt, ist die eigentliche Aussage: Mit welchem
+// Schluessel gefragt wird (userId, nicht IP) und was bei einem Nein passiert,
+// prueft die Datei weiterhin selbst.
+jest.mock("@/lib/rate-limit", () => ({
+  ...jest.requireActual("@/lib/rate-limit"),
+  createRateLimiter: (name: string, config: { maxRequests: number; windowMs: number }) => ({
+    check: (key: string) => mockLimit(name, key, config),
+  }),
+}));
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/auth", () => ({ getSession: mockGetSession }));
 jest.mock("@/lib/permissions", () => ({
@@ -54,8 +73,10 @@ jest.mock("@/lib/doc-templates", () => ({
   ...jest.requireActual("@/lib/doc-templates"),
   renderDocx: (...a: unknown[]) => mockRenderDocx(...a),
 }));
+// requireActual-Spread: dokumentenpaket.ts holt hier auch asciiFilename und
+// sha256Hex — eine Fabrik mit nur zwei Namen machte beide zu undefined.
 jest.mock("@/lib/file-upload", () => ({
-  readUploadedFile: (...a: unknown[]) => mockReadUploadedFile(...a),
+  ...jest.requireActual("@/lib/file-upload"),
   saveUploadedFile: (...a: unknown[]) => mockSaveUploadedFile(...a),
 }));
 jest.mock("@/lib/doc-template-resolvers", () => ({
@@ -76,6 +97,8 @@ const REF = "22222222-2222-4222-8222-222222222222";
 const PDF_ID = "33333333-3333-4333-8333-333333333333";
 const VORLAGE_ID = "44444444-4444-4444-8444-444444444444";
 const VORLAGE_PFAD = path.join(process.cwd(), "uploads", "brief-vorlagen", "a.docx");
+const POOL_PFAD = path.join(process.cwd(), "uploads", "starterpaket", "leitbild.pdf");
+const POOL_INHALT = Buffer.from("%PDF-1.4 pool");
 
 const session = {
   userId: "u1",
@@ -113,8 +136,8 @@ const POOL_PDF = {
   name: "Leitbild",
   beschreibung: null,
   organizationId: null,
-  fileSize: 500,
-  dateipfad: "uploads/starterpaket/leitbild.pdf",
+  fileSize: POOL_INHALT.length,
+  dateipfad: POOL_PFAD,
   originalName: "leitbild.pdf",
   hash: "x".repeat(64),
 };
@@ -132,6 +155,9 @@ beforeEach(() => {
     organization: { name: "Gymnasium" },
     personalData: null,
   });
+  // Standardfall: Beide Bremsen lassen durch. Nur die 429-Faelle sagen Nein.
+  mockLimit.mockReturnValue({ allowed: true, remaining: 9 });
+  mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "" });
   mockPrisma.starterpaketDokument.findMany.mockResolvedValue([POOL_PDF]);
   mockPrisma.documentTemplate.findMany.mockResolvedValue([SENSIBLE_VORLAGE]);
   mockPrisma.starterpaketAuswahl.findMany.mockResolvedValue([]);
@@ -144,8 +170,12 @@ beforeEach(() => {
   mockPrisma.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn(mockPrisma),
   );
-  mockReadUploadedFile.mockResolvedValue(Buffer.from("%PDF-1.4 pool"));
-  mockReadFile.mockResolvedValue(Buffer.from("PK docx"));
+  // Pool-PDFs und Vorlagen laufen ueber denselben Leseweg hinter der
+  // Pfadschranke — unterschieden wird an der Endung.
+  mockReadFile.mockImplementation(async (p: unknown) =>
+    String(p).toLowerCase().endsWith(".pdf") ? POOL_INHALT : Buffer.from("PK docx"),
+  );
+  mockRealpath.mockImplementation(async (p: unknown) => p as string);
   mockSaveUploadedFile.mockResolvedValue("uploads/irgendwo");
   mockGotenbergReachable.mockResolvedValue(true);
   mockRenderDocx.mockReturnValue({ buffer: Buffer.from("docx"), missing: [] });
@@ -368,7 +398,7 @@ describe("Abbruchpfade der Versandroute", () => {
   });
 
   it("meldet ein zu grosses Paket mit 413", async () => {
-    mockReadUploadedFile.mockResolvedValue(Buffer.alloc(MAX_PAKET_BYTES + 1));
+    mockReadFile.mockResolvedValue(Buffer.alloc(MAX_PAKET_BYTES + 1));
     const res = await VERSENDEN(postReq("versenden", mitPdf()), ctx());
     expect(res.status).toBe(413);
     expect(mockSendEventEmail).not.toHaveBeenCalled();
@@ -487,5 +517,143 @@ describe("POST /api/dokumentenpaket/pruefen", () => {
   it("weist einen ungueltigen Koerper ab (400)", async () => {
     const res = await PRUEFEN(postReq("pruefen", { modul: "ONBOARDING" }), ctx());
     expect(res.status).toBe(400);
+  });
+});
+
+// =============================================
+// Bremse der Versandroute
+// =============================================
+
+describe("Rate-Limit der Versandroute", () => {
+  const koerper = {
+    modul: "ONBOARDING",
+    refId: REF,
+    positionen: [{ art: "PDF", id: PDF_ID }],
+    empfaenger: "max@example.org",
+  };
+
+  it("bremst je Benutzerkonto: 10 pro Minute und 60 pro Stunde", async () => {
+    await VERSENDEN(postReq("versenden", koerper), ctx());
+    // Der Schluessel ist die userId und NICHT die IP: Wer hier Schaden
+    // anrichten kann, ist angemeldet, und eine IP wechselt man mit dem
+    // Mobilfunknetz. Ohne diesen Test waere ein spaeterer Wechsel auf
+    // getClientIp unbemerkt moeglich.
+    expect(mockLimit).toHaveBeenCalledWith("dokumentenpaket-versand", "u1", {
+      maxRequests: 10,
+      windowMs: 60_000,
+    });
+    expect(mockLimit).toHaveBeenCalledWith("dokumentenpaket-versand-stunde", "u1", {
+      maxRequests: 60,
+      windowMs: 60 * 60_000,
+    });
+  });
+
+  it("antwortet bei erschoepftem Minutenkontingent mit 429 und Retry-After", async () => {
+    mockLimit.mockImplementation((name: string) =>
+      name === "dokumentenpaket-versand"
+        ? { allowed: false, remaining: 0, retryAfterMs: 30_000 }
+        : { allowed: true, remaining: 9 },
+    );
+    const res = await VERSENDEN(postReq("versenden", koerper), ctx());
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("30");
+    const j = await res.json();
+    expect(j.error).toContain("Zu viele Versendungen");
+  });
+
+  it("bremst auch, wenn nur das Stundenkontingent erschoepft ist", async () => {
+    // Ein reines Minutenfenster liesse 600 Vorgaenge je Stunde durch — genau
+    // den langsamen Abfluss, um den es geht.
+    mockLimit.mockImplementation((name: string) =>
+      name === "dokumentenpaket-versand-stunde"
+        ? { allowed: false, remaining: 0, retryAfterMs: 900_000 }
+        : { allowed: true, remaining: 9 },
+    );
+    const res = await VERSENDEN(postReq("versenden", koerper), ctx());
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toContain("letzten Stunde");
+  });
+
+  it("versendet beim 429 nichts und schreibt nichts", async () => {
+    mockLimit.mockReturnValue({ allowed: false, remaining: 0, retryAfterMs: 1000 });
+    await VERSENDEN(postReq("versenden", koerper), ctx());
+    expect(mockSendEventEmail).not.toHaveBeenCalled();
+    nichtsGeschrieben();
+  });
+
+  it("kostet auch ein abgewiesener Versuch ein Kontingent", async () => {
+    // Sonst liesse sich ueber die Fehlerpfade beliebig oft probieren — und
+    // gerade die Fehlerpfade verraten, welche Vorgangs-ID existiert.
+    mockCanAccessProcess.mockResolvedValue(false);
+    const res = await VERSENDEN(postReq("versenden", koerper), ctx());
+    expect(res.status).toBe(404);
+    expect(mockLimit).toHaveBeenCalledWith("dokumentenpaket-versand", "u1", expect.anything());
+  });
+
+  it("laesst die Vorpruefung ungebremst", async () => {
+    // Der Dialog ruft sie nach jeder Aenderung erneut auf; eine Bremse traefe
+    // hier den Normalfall.
+    await PRUEFEN(
+      postReq("pruefen", { modul: "ONBOARDING", refId: REF, positionen: [{ art: "PDF", id: PDF_ID }] }),
+      ctx(),
+    );
+    expect(mockLimit).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================
+// Freigabeliste — der Dialog ist umgehbar, der Server nicht
+// =============================================
+
+describe("Freigabe abweichender Empfaenger ueber die API", () => {
+  beforeEach(() => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes-minden.de",
+    });
+  });
+
+  it("weist einen direkten Aufruf mit fremder Domain mit 409 ab", async () => {
+    const res = await VERSENDEN(
+      postReq("versenden", {
+        modul: "ONBOARDING",
+        refId: REF,
+        positionen: [{ art: "PDF", id: PDF_ID }],
+        empfaenger: "dieb@gmail.com",
+      }),
+      ctx(),
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()).fehler).toBe("EMPFAENGER_NICHT_ERLAUBT");
+    expect(mockSendEventEmail).not.toHaveBeenCalled();
+    nichtsGeschrieben();
+  });
+
+  it("laesst die Adresse des Vorgangs durch", async () => {
+    const res = await VERSENDEN(
+      postReq("versenden", {
+        modul: "ONBOARDING",
+        refId: REF,
+        positionen: [{ art: "PDF", id: PDF_ID }],
+        empfaenger: "max@example.org",
+      }),
+      ctx(),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("meldet es der Vorpruefung mit 200, damit der Dialog vorher warnen kann", async () => {
+    const res = await PRUEFEN(
+      postReq("pruefen", {
+        modul: "ONBOARDING",
+        refId: REF,
+        positionen: [{ art: "PDF", id: PDF_ID }],
+        empfaenger: "dieb@gmail.com",
+      }),
+      ctx(),
+    );
+    expect(res.status).toBe(200);
+    const { data } = await res.json();
+    expect(data.empfaengerErlaubt).toBe(false);
+    expect(data.erlaubteDomains).toEqual(["fes-minden.de"]);
   });
 });
