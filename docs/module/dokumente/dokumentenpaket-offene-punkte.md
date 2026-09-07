@@ -183,8 +183,11 @@ nicht-globale Rolle bekommt. Verteidigung in der Tiefe, kein akutes Loch.
 
 - **Schema-Änderung**: `db push` legt `dokumenten_versand` an, dazu zwei Spalten
   und zwei Unique-Constraints auf `starterpaket_auswahl` — **und neu seit dem
-  7. September** die Spalte `smtp_config.allowed_recipient_domains`
-  (`String @default("")`, rein additiv). Der Entrypoint sichert vorher per
+  7. September** die Spalte `allowedRecipientDomains` auf `smtp_config`
+  (`String @default("")`, rein additiv). Achtung beim Nachsehen in psql: Das
+  Schema bildet nur Tabellennamen per `@@map` ab, Spalten behalten camelCase —
+  sie müssen dort also in doppelte Anführungszeichen (`"organizationId"`).
+  Der Entrypoint sichert vorher per
   `pg_dump`. Voraussetzungen stehen in
   [../../historie/codereview-und-vorlagen-2026-09.md](../../historie/codereview-und-vorlagen-2026-09.md)
   — insbesondere `./backups:/backups` beim Dienst `app` **und**
