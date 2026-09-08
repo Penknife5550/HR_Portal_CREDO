@@ -12,6 +12,12 @@
  * nur diesen einen Minijob hat, sieht vier Fragen und ist fertig. Wo eine
  * gesetzliche Definition dahintersteckt, steht sie hinter einem Fragezeichen
  * statt in der Beschriftung.
+ *
+ * **Was der Schritt sendet:** die Zeilen (`beschaeftigungsAngaben`) UND die
+ * Kategorien, die er verantwortet (`beschaeftigungsKategorien`). Beides
+ * zusammen — sonst kann der Server ein „Nein" nicht von „dazu sende ich
+ * nichts" unterscheiden und lässt gelöschte Zeilen stehen. Die Begründung
+ * steht ausführlich am `onNext`-Aufruf.
  */
 
 import { useMemo, useState } from "react";
@@ -47,6 +53,18 @@ interface ZeileEingabe {
   arbeitstage: string;
   beiArbeitsagentur: boolean;
 }
+
+/**
+ * Wie viele Zeilen der Server insgesamt annimmt.
+ *
+ * Muss zu `beschaeftigungsAngabenListeSchema` passen (`.max(20)` in
+ * validations/beschaeftigungs-angaben.ts). Ohne diese Grenze im Formular liess
+ * sich beliebig viel eintragen, und erst der Klick auf "Weiter" beschied das
+ * Ganze mit einem nackten "Validierungsfehler" — nach zwanzig sorgfaeltig
+ * ausgefuellten Zeitraeumen die denkbar schlechteste Rueckmeldung. Der
+ * gleichnamige Test haelt beide Zahlen aneinander.
+ */
+export const MAX_BESCHAEFTIGUNGS_ZEILEN = 20;
 
 function leereZeile(kategorie: BeschaeftigungsKategorieWert): ZeileEingabe {
   return {
@@ -145,6 +163,21 @@ function JaNein({
   );
 }
 
+/** Gemeinsame Beschriftung der drei Hinzufügen-Knöpfe. */
+const hinzufuegenKlasse =
+  "rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:text-muted-foreground";
+
+/** Warum der Knopf daneben gerade nicht geht. */
+function GrenzeHinweis() {
+  return (
+    <p className="text-xs text-muted-foreground">
+      Sie haben {MAX_BESCHAEFTIGUNGS_ZEILEN} Einträge erfasst — mehr können wir
+      über dieses Formular nicht entgegennehmen. Bitte sprechen Sie uns auf
+      weitere Zeiträume an.
+    </p>
+  );
+}
+
 export function Step6Employment({
   data,
   onNext,
@@ -203,8 +236,38 @@ export function Step6Employment({
   const nachweis = nachweisFuerStatus(status);
   // Die Additionsfrage stellt das Muster nur, wenn keine Hauptbeschäftigung
   // vorliegt — sonst wird der erste Minijob gar nicht zusammengerechnet.
+  //
+  // Das Sichtbarkeits-Gate davor ist keine Feinheit, sondern der eigentliche
+  // Schutz: `beschaeftigungsStatus` ist nur in der Vorlage MINIJOB sichtbar
+  // (field-definitions.ts, defaultVisible: false) und bleibt sonst leer. Ohne
+  // `fc.isVisible(...)` waere die Statusbedingung in jedem anderen Fragebogen
+  // wahr — und ein TV-L- oder Beamten-Fragebogen klappte die 603-€-Frage auf,
+  // die seine Vorlage ausdruecklich abgeschaltet hat. Die Antwort landete in
+  // der Personalakte, zu einer Frage, die nie haette gestellt werden duerfen.
+  // Das Client-Schema (createStep6Schema) kennt dieses Gate laengst; hier
+  // fehlte es.
   const additionsfrageNoetig =
-    hatWeitere && status !== "ARBEITNEHMER_HAUPTBESCHAEFTIGUNG";
+    fc.isVisible("summeUeberGeringfuegigkeitsgrenze") &&
+    hatWeitere &&
+    status !== "ARBEITNEHMER_HAUPTBESCHAEFTIGUNG";
+
+  // Welche der drei Tabellen dieser Schritt ueberhaupt zeigt — und damit
+  // verantwortet. Siehe die Begruendung am `beschaeftigungsKategorien`-Feld
+  // weiter unten in `onSubmit`.
+  const verwalteteKategorien: BeschaeftigungsKategorieWert[] = [];
+  if (fc.isVisible("hasOtherEmployment")) verwalteteKategorien.push("WEITERE");
+  if (fc.isVisible("vorbeschaeftigungenVorhanden"))
+    verwalteteKategorien.push("VORBESCHAEFTIGUNG");
+  if (fc.isVisible("auslandsbeschaeftigungVorhanden"))
+    verwalteteKategorien.push("AUSLAND");
+
+  // Gezaehlt wird nur, was auch gesendet wird: Zeilen einer Tabelle, deren
+  // Grundfrage auf "Nein" steht, gehen nicht mit und belasten die Grenze nicht.
+  const aktiveZeilen =
+    (hatWeitere ? weitere.length : 0) +
+    (hatVor ? vor.length : 0) +
+    (hatAusland ? ausland.length : 0);
+  const grenzeErreicht = aktiveZeilen >= MAX_BESCHAEFTIGUNGS_ZEILEN;
 
   const onSubmit = (werte: Record<string, unknown>) => {
     // Zeilen der aktiven Tabellen einsammeln und einzeln prüfen.
@@ -213,6 +276,20 @@ export function Step6Employment({
       ...(hatVor ? vor : []),
       ...(hatAusland ? ausland : []),
     ];
+
+    // Die Knoepfe sind an der Grenze gesperrt — erreichbar bleibt sie
+    // trotzdem: Wer eine volle Tabelle auf "Nein" stellt, anderswo weiter
+    // eintraegt und dann wieder auf "Ja" zurueckgeht, bringt die alten Zeilen
+    // zurueck. Dann lieber hier ein deutscher Satz als vom Server ein
+    // "Validierungsfehler".
+    if (aktive.length > MAX_BESCHAEFTIGUNGS_ZEILEN) {
+      setZeilenFehler([
+        `Sie haben ${aktive.length} Einträge erfasst. Mehr als ` +
+          `${MAX_BESCHAEFTIGUNGS_ZEILEN} können wir nicht entgegennehmen — ` +
+          `bitte entfernen Sie einige und sprechen Sie uns auf den Rest an.`,
+      ]);
+      return;
+    }
 
     const fehler: string[] = [];
     const geprueft: unknown[] = [];
@@ -262,9 +339,26 @@ export function Step6Employment({
 
     onNext({
       ...bereinigt,
-      // Immer alle drei Kategorien mitsenden: Ein "Nein" muss die vorher
-      // eingetragenen Zeilen auch tatsächlich entfernen.
       beschaeftigungsAngaben: geprueft,
+      // Die Kategorien, die dieser Schritt verantwortet — ausdruecklich
+      // benannt, nicht aus den Zeilen abgeleitet.
+      //
+      // Der Server ersetzt die Zeilen je Kategorie und braucht dafuer die
+      // Frage „welche Kategorien darf ich leeren?". Aus der Zeilenliste laesst
+      // sie sich nicht beantworten: Eine leere Liste nennt keine Kategorie,
+      // also loeschte der Server nichts. Genau daran ging der Widerruf
+      // verloren — wer eine Beschaeftigung eintrug, speicherte, zurueckging
+      // und die Grundfrage auf „Nein" stellte, hatte die Zeilen weiterhin in
+      // der Personalakte, im PDF-Export und in der Pruefsumme der
+      // Wahrheitsversicherung. Das „Nein" stand daneben und widersprach ihnen.
+      //
+      // Genannt werden nur die SICHTBAREN Tabellen. Eine ausgeblendete zeigt
+      // dieser Schritt nicht, also kann er auch nicht behaupten, sie sei leer:
+      // Jede Vorlage traegt ihre Sichtbarkeiten selbst, und der Vorgang haelt
+      // davon einen eigenen Schnappschuss (`formTemplateSnapshot`). Zeilen
+      // einer heute ausgeblendeten Tabelle koennen also unter einer frueheren
+      // Fassung ordnungsgemaess entstanden sein.
+      beschaeftigungsKategorien: verwalteteKategorien,
     });
   };
 
@@ -440,7 +534,10 @@ export function Step6Employment({
               wert={hatWeitere}
               onChange={(v) => {
                 setValue("hasOtherEmployment", v);
-                if (v && weitere.length === 0) setWeitere([leereZeile("WEITERE")]);
+                // Die erste Zeile legt das Formular selbst an — aber nicht
+                // ueber die Grenze hinaus, sonst waere sie sofort ungueltig.
+                if (v && weitere.length === 0 && !grenzeErreicht)
+                  setWeitere([leereZeile("WEITERE")]);
               }}
             />
           </div>
@@ -504,6 +601,29 @@ export function Step6Employment({
                       />
                     </div>
                   </div>
+                  {/*
+                    Die Wortwahl („Eigenanteil zur Rentenversicherung") stammt
+                    aus der Minijob-Welt, die Frage steht aber in JEDEM
+                    Fragebogen: `hasOtherEmployment` ist defaultVisible: true.
+
+                    Trotzdem bekommt sie bewusst NICHT das Gate der
+                    603-€-Frage. Zwei Gründe:
+
+                    1. Sie ist beantwortbar und wird gebraucht. Ob eine zweite
+                       Stelle geringfügig ist oder mehr, entscheidet über die
+                       Zusammenrechnung nach § 8 SGB IV — das gilt auch für
+                       eine TV-L-Kraft mit Nebenjob, nicht nur für Minijobber.
+                    2. `art` ist Pflichtfeld der Kategorie WEITERE
+                       (validations/beschaeftigungs-angaben.ts). Wer das Feld
+                       ausblendet, ohne dort gleichzeitig die Pflicht zu
+                       lockern, macht aus einem Schönheitsfehler eine Sperre:
+                       Die Zeile wäre unabsendbar, und die rote Box verlangte
+                       ein Feld, das gar nicht mehr am Bildschirm steht.
+
+                    Wer die Frage wirklich abschalten will, braucht beides —
+                    einen eigenen Schalter in der Registry und ein bedingtes
+                    `art` im Zeilen-Schema. Ein Gate allein hier wäre falsch.
+                  */}
                   <div className="mt-3">
                     <span className={labelKlasse}>
                       Diese Beschäftigung ist <span className="text-destructive">*</span>
@@ -538,11 +658,13 @@ export function Step6Employment({
               ))}
               <button
                 type="button"
+                disabled={grenzeErreicht}
                 onClick={() => setWeitere([...weitere, leereZeile("WEITERE")])}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
+                className={hinzufuegenKlasse}
               >
                 + Weitere Beschäftigung hinzufügen
               </button>
+              {grenzeErreicht && <GrenzeHinweis />}
             </div>
           )}
 
@@ -596,7 +718,8 @@ export function Step6Employment({
               wert={hatVor}
               onChange={(v) => {
                 setValue("vorbeschaeftigungenVorhanden", v);
-                if (v && vor.length === 0) setVor([leereZeile("VORBESCHAEFTIGUNG")]);
+                if (v && vor.length === 0 && !grenzeErreicht)
+                  setVor([leereZeile("VORBESCHAEFTIGUNG")]);
               }}
             />
           </div>
@@ -705,11 +828,13 @@ export function Step6Employment({
               ))}
               <button
                 type="button"
+                disabled={grenzeErreicht}
                 onClick={() => setVor([...vor, leereZeile("VORBESCHAEFTIGUNG")])}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
+                className={hinzufuegenKlasse}
               >
                 + Weiteren Zeitraum hinzufügen
               </button>
+              {grenzeErreicht && <GrenzeHinweis />}
             </div>
           )}
         </fieldset>
@@ -737,7 +862,8 @@ export function Step6Employment({
               wert={hatAusland}
               onChange={(v) => {
                 setValue("auslandsbeschaeftigungVorhanden", v);
-                if (v && ausland.length === 0) setAusland([leereZeile("AUSLAND")]);
+                if (v && ausland.length === 0 && !grenzeErreicht)
+                  setAusland([leereZeile("AUSLAND")]);
               }}
             />
           </div>
@@ -801,11 +927,13 @@ export function Step6Employment({
               ))}
               <button
                 type="button"
+                disabled={grenzeErreicht}
                 onClick={() => setAusland([...ausland, leereZeile("AUSLAND")])}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary"
+                className={hinzufuegenKlasse}
               >
                 + Weitere Tätigkeit hinzufügen
               </button>
+              {grenzeErreicht && <GrenzeHinweis />}
               <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
                 Für diese Angabe brauchen wir später die{" "}
                 <strong>Bescheinigung A1</strong>, falls Sie eine haben. Sie können

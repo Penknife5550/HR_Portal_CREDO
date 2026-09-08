@@ -63,6 +63,58 @@ function dateInputValue(v: unknown): string {
 const SAMMEL_FEHLER = "Bitte prüfen Sie die rot markierten Felder.";
 
 /**
+ * GRENZEN, DIE DER BROWSER SCHON KENNT
+ * ============================================================================
+ * Die Obergrenzen stehen in `supervisor-data.ts` und gelten dort fuer Client-
+ * und Serverpruefung. Ohne Entsprechung im Eingabefeld erfaehrt die vorgesetzte
+ * Person davon aber erst, wenn "Weiter" den ganzen Schritt abweist — bei 400
+ * statt 40 Wochenstunden oder einer eingefuegten Stellenausschreibung also nach
+ * dem Tippen statt waehrend des Tippens. `max` und `maxLength` spiegeln die
+ * Schemagrenzen deshalb an der Stelle, an der die Eingabe entsteht.
+ *
+ * Die Werte muessen zu `supervisor-data.ts` passen. Sie sind bewusst NICHT von
+ * dort importiert: Die Schemata legen sie in `.max(...)`-Aufrufen ab, aus denen
+ * sich keine Zahl herauslesen laesst, ohne die interne Zod-Struktur anzufassen.
+ */
+const MAX_WOCHENSTUNDEN = 60;
+
+/** Zeichenobergrenzen der Textfelder — dieselben Werte wie in supervisor-data.ts. */
+const MAX_LAENGE = {
+  betriebsstaette: 500,
+  stellenbeschreibung: 2000,
+  // Nicht in der Befundliste, aber dasselbe Muster und dieselbe Schemagrenze:
+  // ein freies Textfeld ohne sichtbare Obergrenze.
+  befristungZweck: 500,
+  bemerkungVerguetung: 2000,
+  kostenstelle: 100,
+  zusatzvereinbarungen: 5000,
+} as const;
+
+/**
+ * Zeichenzaehler unter einem langen Textfeld.
+ *
+ * `maxLength` allein genuegt bei diesen Feldern nicht: Der Browser kappt
+ * eingefuegten Text STILL. Wer eine Stellenausschreibung hineinkopiert, sieht
+ * nicht, dass der Schluss fehlt — und der geht dann so in den Arbeitsvertrag.
+ * Der Zaehler macht die Grenze sichtbar, bevor sie zuschlaegt.
+ *
+ * Warum der Zaehler mehr sein kann als `max`: Bestandsdaten aus der Zeit vor
+ * diesen Grenzen werden von `maxLength` nicht gekuerzt, nur weiteres Tippen
+ * verhindert. Genau dann steht der Hinweis in Rot.
+ */
+function ZeichenZaehler({ wert, max }: { wert: string | undefined; max: number }) {
+  const laenge = wert?.length ?? 0;
+  // Ab neun Zehnteln faerben: Frueh genug, um noch zu kuerzen, spaet genug,
+  // um nicht bei jedem Satz zu mahnen.
+  const knapp = laenge >= max * 0.9;
+  return (
+    <p className={`text-right text-[10px] ${knapp ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+      {laenge.toLocaleString("de-DE")} / {max.toLocaleString("de-DE")} Zeichen
+    </p>
+  );
+}
+
+/**
  * Merker einer Feldgruppe, die zusammen ein- und ausgeblendet wird:
  * ob sie zuletzt sichtbar war und welche Werte beim Ausblenden darin standen.
  */
@@ -507,6 +559,8 @@ function SupStep1({
 
   const befristet = watch("befristet");
   const befristungsart = watch("befristungsart");
+  // Fuer den Zeichenzaehler: `watch` liefert bei jedem Tastendruck den Stand.
+  const stellenbeschreibung = watch("stellenbeschreibung");
 
   // Zweiter Rueckruf von handleSubmit: Scheitert die Pruefung, passiert sonst
   // sichtbar nichts – der Fehltext steht womoeglich weit oben ausserhalb des
@@ -526,13 +580,14 @@ function SupStep1({
     >
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Betriebsstätte <span className="text-destructive">*</span></label>
-        <input type="text" {...register("betriebsstaette")} placeholder="z.B. Gymnasium Minden" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <input type="text" {...register("betriebsstaette")} maxLength={MAX_LAENGE.betriebsstaette} placeholder="z.B. Gymnasium Minden" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
         {errors.betriebsstaette && <p className="text-xs text-destructive">{errors.betriebsstaette.message}</p>}
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Stellenbeschreibung (wird in Arbeitsvertrag übernommen!) <span className="text-destructive">*</span></label>
-        <textarea {...register("stellenbeschreibung")} rows={3} placeholder="z.B. Lehrkraft für Mathematik und Physik" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <textarea {...register("stellenbeschreibung")} rows={3} maxLength={MAX_LAENGE.stellenbeschreibung} placeholder="z.B. Lehrkraft für Mathematik und Physik" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <ZeichenZaehler wert={stellenbeschreibung} max={MAX_LAENGE.stellenbeschreibung} />
         {errors.stellenbeschreibung && <p className="text-xs text-destructive">{errors.stellenbeschreibung.message}</p>}
       </div>
 
@@ -590,6 +645,7 @@ function SupStep1({
                 <textarea
                   {...register("befristungZweck")}
                   rows={2}
+                  maxLength={MAX_LAENGE.befristungZweck}
                   placeholder="z.B. Ende der Kostenzusage des Jugendamtes für das Projekt ..."
                   className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                 />
@@ -712,7 +768,7 @@ function SupStep2({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Wochenstunden</label>
-            <input type="number" {...register("wochenstunden", zahlenFeld)} step={0.01} min={0} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            <input type="number" {...register("wochenstunden", zahlenFeld)} step={0.01} min={0} max={MAX_WOCHENSTUNDEN} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
             {errors.wochenstunden && <p className="text-xs text-destructive">{errors.wochenstunden.message}</p>}
           </div>
           <div className="space-y-2">
@@ -744,7 +800,7 @@ function SupStep2({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Stunden beim Hauptarbeitgeber</label>
-        <input type="number" {...register("hauptarbeitgeberStunden", zahlenFeld)} step={0.01} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <input type="number" {...register("hauptarbeitgeberStunden", zahlenFeld)} step={0.01} min={0} max={MAX_WOCHENSTUNDEN} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
         {errors.hauptarbeitgeberStunden && <p className="text-xs text-destructive">{errors.hauptarbeitgeberStunden.message}</p>}
       </div>
 
@@ -763,7 +819,7 @@ function SupStep2({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Stunden beim Nebenarbeitgeber</label>
-        <input type="number" {...register("nebenarbeitgeberStunden", zahlenFeld)} step={0.01} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <input type="number" {...register("nebenarbeitgeberStunden", zahlenFeld)} step={0.01} min={0} max={MAX_WOCHENSTUNDEN} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
         {errors.nebenarbeitgeberStunden && <p className="text-xs text-destructive">{errors.nebenarbeitgeberStunden.message}</p>}
       </div>
 
@@ -968,7 +1024,7 @@ function SupStep3({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Bemerkung zur Vergütung</label>
-        <textarea {...register("bemerkungVerguetung")} rows={2} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <textarea {...register("bemerkungVerguetung")} rows={2} maxLength={MAX_LAENGE.bemerkungVerguetung} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
         {errors.bemerkungVerguetung && <p className="text-xs text-destructive">{errors.bemerkungVerguetung.message}</p>}
       </div>
 
@@ -1071,6 +1127,8 @@ function SupStep4({
 
   const probezeit = watch("probezeit");
   const masern = watch("masernschutzErforderlich");
+  // Fuer den Zeichenzaehler: `watch` liefert bei jedem Tastendruck den Stand.
+  const zusatzvereinbarungen = watch("zusatzvereinbarungen");
   const [sammelFehler, setSammelFehler] = useState("");
 
   // Die Monatsangabe verschwindet mit dem Haken "Probezeit" – siehe
@@ -1097,7 +1155,7 @@ function SupStep4({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Kostenstelle</label>
-          <input type="text" {...register("kostenstelle")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+          <input type="text" {...register("kostenstelle")} maxLength={MAX_LAENGE.kostenstelle} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
           {errors.kostenstelle && <p className="text-xs text-destructive">{errors.kostenstelle.message}</p>}
         </div>
         <div className="space-y-2">
@@ -1161,7 +1219,8 @@ function SupStep4({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Zusätzliche Vereinbarungen / Bemerkungen</label>
-        <textarea {...register("zusatzvereinbarungen")} rows={4} placeholder="z.B. besondere Regelungen, Dienstwagen, etc." className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <textarea {...register("zusatzvereinbarungen")} rows={4} maxLength={MAX_LAENGE.zusatzvereinbarungen} placeholder="z.B. besondere Regelungen, Dienstwagen, etc." className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <ZeichenZaehler wert={zusatzvereinbarungen} max={MAX_LAENGE.zusatzvereinbarungen} />
         {errors.zusatzvereinbarungen && <p className="text-xs text-destructive">{errors.zusatzvereinbarungen.message}</p>}
       </div>
 

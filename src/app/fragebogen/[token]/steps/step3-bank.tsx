@@ -21,7 +21,9 @@ interface StepProps {
 }
 
 export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
-  const fc = fieldConfig ?? new FieldConfigHelper(3);
+  // Siehe step2-address.tsx: Ohne useMemo waere `fc` bei jedem Rendern ein
+  // neues Objekt und das Schema damit nie stabil.
+  const fc = useMemo(() => fieldConfig ?? new FieldConfigHelper(3), [fieldConfig]);
   const schema = useMemo(() => createStep3Schema(fc), [fc]);
   const {
     register,
@@ -45,7 +47,20 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
   }
 
   const onSubmit = (values: Step3Data) => {
-    onNext(values as unknown as Record<string, unknown>);
+    // Angezeigt wird in Vierergruppen, gespeichert wird ohne Trennzeichen.
+    //
+    // Die Formatierung blaeht eine 34-stellige IBAN auf 42 Zeichen auf. Der
+    // Server laesst hoechstens 34 durch (`fragebogenFieldsSchema`) — auf einem
+    // maltesischen (31) oder russischen (33) Konto scheiterte der Schritt also
+    // an einer IBAN, die er selbst so hingeschrieben hatte. Zudem liegt die
+    // IBAN verschluesselt in der Akte: Ein Vergleich trifft sonst nicht die
+    // Nummer, sondern deren Schreibweise.
+    const iban = (values.iban ?? "").replace(/[\s-]/g, "").toUpperCase();
+    // Ein voller BIC hat 11 Zeichen — genau die Grenze. Ein aus dem
+    // Online-Banking mitkopiertes Leerzeichen sprengt sie, ist aber im Feld
+    // nicht zu sehen.
+    const bic = (values.bic ?? "").replace(/\s/g, "").toUpperCase();
+    onNext({ ...values, iban, bic } as unknown as Record<string, unknown>);
   };
 
   return (
@@ -85,9 +100,13 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
           <input
             type="text"
             {...register("bic")}
+            maxLength={11}
             placeholder="COBADEFFXXX"
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 font-mono text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
+          {errors.bic && (
+            <p className="text-xs text-destructive">{errors.bic.message}</p>
+          )}
           <p className="text-xs text-muted-foreground">
             Für innerdeutsche Überweisungen ist der BIC nicht zwingend
             erforderlich.
@@ -104,9 +123,13 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
           <input
             type="text"
             {...register("bankName")}
+            maxLength={200}
             placeholder="z.B. Sparkasse Minden-Luebbecke"
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
+          {errors.bankName && (
+            <p className="text-xs text-destructive">{errors.bankName.message}</p>
+          )}
         </div>
       )}
 
@@ -119,9 +142,15 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
           <input
             type="text"
             {...register("accountHolder")}
+            maxLength={200}
             placeholder="Nur angeben, wenn Konto auf anderen Namen laeuft"
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
+          {errors.accountHolder && (
+            <p className="text-xs text-destructive">
+              {errors.accountHolder.message}
+            </p>
+          )}
         </div>
       )}
 

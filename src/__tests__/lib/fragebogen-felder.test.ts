@@ -16,12 +16,12 @@ import {
 } from "@/lib/fragebogen-felder";
 import {
   createStep1Schema,
+  createStep2Schema,
   createStep3Schema,
   createStep4Schema,
   createStep5Schema,
   createStep6Schema,
   createStep8Schema,
-  step2Schema,
   step9Schema,
 } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
@@ -47,10 +47,7 @@ function feldNamen(schema: ZodTypeAny): string[] {
 
 const SCHRITTE: Array<{ nummer: number; felder: string[] }> = [
   { nummer: 1, felder: feldNamen(createStep1Schema(new FieldConfigHelper(1))) },
-  // Schritt 2 hat keine Schema-Factory — der Pflicht-Schalter der Vorlage
-  // wirkt dort bis heute nicht (bekannte Luecke, siehe Plandokument
-  // Abschnitt 3). Geprueft wird deshalb das statische Schema.
-  { nummer: 2, felder: feldNamen(step2Schema) },
+  { nummer: 2, felder: feldNamen(createStep2Schema(new FieldConfigHelper(2))) },
   { nummer: 3, felder: feldNamen(createStep3Schema(new FieldConfigHelper(3))) },
   { nummer: 4, felder: feldNamen(createStep4Schema(new FieldConfigHelper(4))) },
   { nummer: 5, felder: feldNamen(createStep5Schema(new FieldConfigHelper(5))) },
@@ -98,15 +95,29 @@ describe("Freigabeliste des Auto-Save", () => {
     }
   });
 
-  it("erlaubt das Leeren nur bei Bedingungsfragen", () => {
+  it("erlaubt das Leeren nur bei Bedingungsfragen und leerbaren Zahlenfeldern", () => {
     // Absichtlich eng gehalten: Der Grundsatz lautet "niemals mit null
-    // überschreiben". Jede Ausnahme muss begründet sein.
+    // überschreiben". Jede Ausnahme muss begründet sein — die Begründung je
+    // Feld steht im Kopfkommentar von fragebogen-felder.ts.
     expect([...LEERBARE_FRAGEBOGEN_FELDER].sort()).toEqual([
       "agenturFuerArbeit",
       "beschaeftigungsStatusSonstige",
+      "childAllowance",
+      "disabilityDegree",
       "mitLeistungsbezug",
       "summeUeberGeringfuegigkeitsgrenze",
+      "taxAllowance",
     ]);
+  });
+
+  it("lässt die drei Zahlenfelder wieder leeren", () => {
+    // Ohne diese Freigabe kam die Person aus ihrer eigenen Eingabe nicht mehr
+    // heraus: Ein aufgehobener Freibetrag oder ein zurückgenommener Haken
+    // "schwerbehindert" blieb in der Personalakte stehen — der Auto-Save
+    // meldete Erfolg und schrieb nichts.
+    for (const feld of ["taxAllowance", "childAllowance", "disabilityDegree"]) {
+      expect(LEERBARE_FRAGEBOGEN_FELDER.has(feld)).toBe(true);
+    }
   });
 
   it("lässt keine sensiblen Felder heimlich leeren", () => {

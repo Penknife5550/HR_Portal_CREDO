@@ -5,7 +5,7 @@
  * Name, Geburtsdatum, Familienstand, Schwerbehinderung
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createStep1Schema, type Step1Data } from "@/lib/validations/personal-data";
@@ -27,6 +27,8 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
     register,
     handleSubmit,
     watch,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<Step1Data>({
     resolver: zodResolver(schema) as any,
@@ -52,6 +54,27 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
   });
 
   const severelyDisabled = watch("severelyDisabled");
+
+  /**
+   * Haken weg, Grad weg.
+   *
+   * Das Eingabefeld verschwindet zwar mit dem Haken, der zuletzt eingetippte
+   * Grad bleibt aber im Formularzustand — react-hook-form meldet ein Feld beim
+   * Ausblenden nicht ab (`shouldUnregister` steht auf `false`). Beim naechsten
+   * "Weiter" ginge deshalb `severelyDisabled: false` gemeinsam mit
+   * `disabilityDegree: 50` an den Server, und in der Personalakte stuende ein
+   * Behinderungsgrad fuer jemanden ohne Schwerbehinderung.
+   *
+   * Bewusst als Effekt und nicht nur im `onChange` des Hakens: So heilt das
+   * Formular auch Bestandsdaten, in denen diese Kombination schon gespeichert
+   * ist. Sie wird beim ersten Rendern erkannt und beim naechsten Speichern
+   * aufgeloest.
+   */
+  useEffect(() => {
+    if (severelyDisabled) return;
+    if (getValues("disabilityDegree") === null) return;
+    setValue("disabilityDegree", null, { shouldDirty: true, shouldValidate: true });
+  }, [severelyDisabled, getValues, setValue]);
 
   const onSubmit = (values: Step1Data) => {
     onNext(values as unknown as Record<string, unknown>);

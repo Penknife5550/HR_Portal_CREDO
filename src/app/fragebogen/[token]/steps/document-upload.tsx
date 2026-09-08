@@ -87,6 +87,15 @@ export function DocumentUpload({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("sonstiges");
+  /**
+   * Der Bestand konnte nicht geladen werden — nicht: es gibt keinen.
+   *
+   * Die Unterscheidung ist der ganze Punkt. `documents` ist bei beidem ein
+   * leeres Array, und ohne dieses Kennzeichen behauptet die Seite nach einer
+   * kurz gestoerten Verbindung, saemtliche Pflichtunterlagen fehlten. Wer das
+   * liest, laedt alles ein zweites Mal hoch.
+   */
+  const [ladeFehler, setLadeFehler] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const requiredFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -100,12 +109,15 @@ export function DocumentUpload({
   const loadDocuments = useCallback(async () => {
     try {
       const res = await fetch(`/api/fragebogen/${token}/documents`);
-      if (res.ok) {
-        const data = await res.json();
-        setDocuments(data.documents || []);
+      if (!res.ok) {
+        setLadeFehler(true);
+        return;
       }
+      const data = await res.json();
+      setDocuments(data.documents || []);
+      setLadeFehler(false);
     } catch {
-      // Fehler stillschweigend ignorieren
+      setLadeFehler(true);
     }
   }, [token]);
 
@@ -163,11 +175,19 @@ export function DocumentUpload({
         `/api/fragebogen/${token}/documents?documentId=${docId}`,
         { method: "DELETE" }
       );
-      if (res.ok) {
-        await loadDocuments();
+      if (!res.ok) {
+        // Ohne Meldung wirkt ein fehlgeschlagenes Loeschen wie ein Klick ins
+        // Leere: Die Zeile bleibt stehen, und niemand weiss, warum.
+        const koerper = await res.json().catch(() => null);
+        const meldung =
+          koerper && typeof koerper.error === "string" ? koerper.error : "";
+        setError(meldung || "Das Dokument konnte nicht gelöscht werden.");
+        return;
       }
+      setError("");
+      await loadDocuments();
     } catch {
-      setError("Fehler beim Löschen.");
+      setError("Verbindungsfehler beim Löschen.");
     }
   };
 
@@ -226,9 +246,14 @@ export function DocumentUpload({
 
   // Der Absende-Knopf in Schritt 10 haengt an dieser Liste. Sie liegt nur hier
   // vor, weil `documents` lokaler Zustand dieser Komponente ist.
-  const fehlend = pflichtTypen.filter(
-    (t) => !documents.some((d) => d.type === t)
-  );
+  //
+  // Bei `ladeFehler` wird NICHTS gemeldet: Was fehlt, ist dann unbekannt, und
+  // eine geratene Liste sperrte das Absenden mit Namen von Unterlagen, die
+  // laengst hochgeladen sind. Ein zu grosszuegiges Nichtstun ist hier gefahrlos
+  // — verbindlich prueft ohnehin der Server gegen den Datenbankstand.
+  const fehlend = ladeFehler
+    ? []
+    : pflichtTypen.filter((t) => !documents.some((d) => d.type === t));
   const fehlendSchluessel = fehlend.join(",");
   useEffect(() => {
     onMissingChange?.(fehlendSchluessel ? fehlendSchluessel.split(",") : []);
@@ -264,106 +289,133 @@ export function DocumentUpload({
           Die folgenden Unterlagen werden zwingend benötigt. Bitte laden Sie diese hoch (PDF, JPG, PNG, Word). Max. 10 MB pro Datei.
         </p>
 
-        <div className="space-y-3">
-          {activeRequiredDocs.map((reqDoc) => {
-            const uploaded = isRequiredUploaded(reqDoc.dbType);
-            const isCurrentlyUploading = uploadingType === reqDoc.value;
+        {/* Solange der Bestand unbekannt ist, wird er nicht dargestellt. Eine
+            Liste aus lauter „Noch nicht hochgeladen" waere hier keine
+            Unbekannte, sondern eine falsche Auskunft. */}
+        {ladeFehler ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/40 bg-destructive/5 p-3"
+          >
+            <p className="text-xs font-medium text-destructive">
+              Ihre bereits hochgeladenen Unterlagen konnten nicht abgerufen
+              werden.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Das liegt meist an einer kurz gestörten Verbindung. Bitte
+              versuchen Sie es erneut — laden Sie nichts vorsorglich ein
+              zweites Mal hoch, Ihre Dateien sind gespeichert.
+            </p>
+            <button
+              type="button"
+              onClick={() => loadDocuments()}
+              className="mt-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              Erneut versuchen
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activeRequiredDocs.map((reqDoc) => {
+              const uploaded = isRequiredUploaded(reqDoc.dbType);
+              const isCurrentlyUploading = uploadingType === reqDoc.value;
 
-            return (
-              <div
-                key={reqDoc.value}
-                className={`flex items-center justify-between rounded-lg border p-3 transition-colors ${
-                  uploaded
-                    ? "border-green-300 bg-green-50"
-                    : "border-amber-200 bg-white"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {uploaded ? (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-                      <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
-                      <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{reqDoc.label}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {uploaded ? "Hochgeladen" : "Noch nicht hochgeladen – Pflicht"}
-                    </p>
-                    {/* Beim Befreiungsantrag reicht der Hinweis „hochladen" nicht:
-                        Der Beschaeftigte muss wissen, woher das Blatt kommt und
-                        warum ein Haken hier nicht genuegt. */}
-                    {reqDoc.dbType === "RV_BEFREIUNG" && !uploaded && (
-                      <div className="mt-1.5 max-w-md">
-                        <p className="text-[11px] leading-relaxed text-amber-800">
-                          {RV_BEFREIUNG_HINWEIS}
-                        </p>
-                        {antragErzeugbar ? (
-                          <a
-                            href={`/api/fragebogen/${token}/rv-antrag?art=BEFREIUNG`}
-                            className="mt-1 inline-block text-[11px] font-semibold text-primary underline underline-offset-2"
-                          >
-                            Antrag ausgefüllt herunterladen (PDF)
-                          </a>
-                        ) : (
-                          <p className="mt-1 text-[11px] font-medium text-amber-900">
-                            Der Antrag kann derzeit nicht erstellt werden. Bitte
-                            wenden Sie sich an die Personalabteilung — Ihre
-                            Eingaben bleiben gespeichert.
-                          </p>
-                        )}
+              return (
+                <div
+                  key={reqDoc.value}
+                  className={`flex items-center justify-between rounded-lg border p-3 transition-colors ${
+                    uploaded
+                      ? "border-green-300 bg-green-50"
+                      : "border-amber-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {uploaded ? (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                        <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+                        <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
                       </div>
                     )}
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{reqDoc.label}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {uploaded ? "Hochgeladen" : "Noch nicht hochgeladen – Pflicht"}
+                      </p>
+                      {/* Beim Befreiungsantrag reicht der Hinweis „hochladen" nicht:
+                          Der Beschaeftigte muss wissen, woher das Blatt kommt und
+                          warum ein Haken hier nicht genuegt. */}
+                      {reqDoc.dbType === "RV_BEFREIUNG" && !uploaded && (
+                        <div className="mt-1.5 max-w-md">
+                          <p className="text-[11px] leading-relaxed text-amber-800">
+                            {RV_BEFREIUNG_HINWEIS}
+                          </p>
+                          {antragErzeugbar ? (
+                            <a
+                              href={`/api/fragebogen/${token}/rv-antrag?art=BEFREIUNG`}
+                              className="mt-1 inline-block text-[11px] font-semibold text-primary underline underline-offset-2"
+                            >
+                              Antrag ausgefüllt herunterladen (PDF)
+                            </a>
+                          ) : (
+                            <p className="mt-1 text-[11px] font-medium text-amber-900">
+                              Der Antrag kann derzeit nicht erstellt werden. Bitte
+                              wenden Sie sich an die Personalabteilung — Ihre
+                              Eingaben bleiben gespeichert.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {!uploaded && (
-                  <button
-                    type="button"
-                    disabled={uploading}
-                    onClick={() => requiredFileInputRefs.current[reqDoc.value]?.click()}
-                    className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
-                  >
-                    {isCurrentlyUploading ? "Wird hochgeladen..." : "Hochladen"}
-                  </button>
-                )}
-                {uploaded && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const doc = documents.find((d) => d.type === reqDoc.dbType);
-                      if (doc) handleDelete(doc.id);
+                  {!uploaded && (
+                    <button
+                      type="button"
+                      disabled={uploading}
+                      onClick={() => requiredFileInputRefs.current[reqDoc.value]?.click()}
+                      className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {isCurrentlyUploading ? "Wird hochgeladen..." : "Hochladen"}
+                    </button>
+                  )}
+                  {uploaded && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const doc = documents.find((d) => d.type === reqDoc.dbType);
+                        if (doc) handleDelete(doc.id);
+                      }}
+                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      title="Löschen"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
+
+                  <input
+                    ref={(el) => { requiredFileInputRefs.current[reqDoc.value] = el; }}
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) handleUpload(e.target.files[0], reqDoc.value);
                     }}
-                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    title="Löschen"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                )}
-
-                <input
-                  ref={(el) => { requiredFileInputRefs.current[reqDoc.value] = el; }}
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) handleUpload(e.target.files[0], reqDoc.value);
-                  }}
-                  disabled={uploading}
-                />
-              </div>
-            );
-          })}
-        </div>
+                    disabled={uploading}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {urkundenFehlenMoeglicherweise && (

@@ -61,8 +61,19 @@ export function Step9Masern({
 
   const handleUpload = async (file: File) => {
     if (!token) return;
-    setUploading(true);
     setUploadError(null);
+
+    // Dieselbe Grenze wie serverseitig — hier vorweggenommen, damit ein
+    // Handyfoto des Impfausweises nicht erst nach dem vollstaendigen Hochladen
+    // abgewiesen wird. Ueber Mobilfunk sind das mehrere Minuten Wartezeit fuer
+    // eine Absage, die von Anfang an feststand.
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError(`Datei "${file.name}" ist zu gross (max. 10 MB).`);
+      return;
+    }
+
+    setUploading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -71,10 +82,18 @@ export function Step9Masern({
       if (res.ok) {
         setUploadedFile(file.name);
       } else {
-        setUploadError("Upload fehlgeschlagen");
+        // Der Server nennt den Grund ("Datei ist zu gross...", "Dateityp nicht
+        // erlaubt..."). Ein pauschales "Upload fehlgeschlagen" verschweigt ihn
+        // und laesst nur den Weg, dieselbe Datei noch einmal zu probieren.
+        // `catch` faengt Antworten ohne JSON-Koerper ab (etwa eine Fehlerseite
+        // des Reverse Proxy).
+        const koerper = await res.json().catch(() => null);
+        const meldung =
+          koerper && typeof koerper.error === "string" ? koerper.error : "";
+        setUploadError(meldung || "Der Upload ist fehlgeschlagen.");
       }
     } catch {
-      setUploadError("Verbindungsfehler");
+      setUploadError("Verbindungsfehler beim Hochladen.");
     } finally {
       setUploading(false);
     }
@@ -178,10 +197,14 @@ export function Step9Masern({
                   </svg>
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-foreground">Masernschutz-Nachweis</p>
-                    {uploadedFile ? (
-                      <p className="text-[10px] text-credo-gruen truncate">{uploadedFile}</p>
-                    ) : uploadError ? (
+                    {/* Der Fehler steht VOR dem Dateinamen: Schlaegt das
+                        Ersetzen einer bereits hochgeladenen Datei fehl, waere
+                        der gruene Name sonst die einzige Rueckmeldung — es
+                        saehe aus, als haette es geklappt. */}
+                    {uploadError ? (
                       <p className="text-[10px] text-destructive">{uploadError}</p>
+                    ) : uploadedFile ? (
+                      <p className="text-[10px] text-credo-gruen truncate">{uploadedFile}</p>
                     ) : (
                       <p className="text-[10px] text-muted-foreground">Optional — kann auch spaeter nachgereicht werden</p>
                     )}

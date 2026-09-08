@@ -21,48 +21,113 @@
 
 import { z } from "zod";
 
-/** Datum als `YYYY-MM-DD`, wie es ein `<input type="date">` liefert. */
-const datum = z
-  .string()
-  .trim()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Bitte ein gültiges Datum angeben.");
+/**
+ * Datum als `YYYY-MM-DD`, wie es ein `<input type="date">` liefert.
+ *
+ * Eine Fabrik statt einer gemeinsamen Konstante, weil der Feldname in die
+ * Meldung gehoert: Der Aufrufer (`step6-employment.tsx`, `onSubmit`) sammelt
+ * die Meldungen einer Zeile ein, entdoppelt sie und schreibt sie als EINEN
+ * Satz in die rote Box. Eine Vorbeschaeftigung ohne Beginn und ohne Ende
+ * erzeugt aber zweimal dieselbe Meldung — daraus wurde nach dem Entdoppeln ein
+ * einziges "Bitte ein gültiges Datum angeben.", und die Person durfte raten,
+ * welches der beiden Felder gemeint war.
+ *
+ * Ein leeres Feld faellt bewusst in dieselbe Meldung wie ein unsinniges Datum:
+ * Zwei getrennte Pruefungen (`.min(1)` plus `.regex`) wuerden bei einem leeren
+ * Feld beide anschlagen, und in der Box staenden zwei Saetze fuer ein Feld.
+ */
+const datum = (bezeichnung: string) =>
+  z
+    .string({
+      required_error: `Bitte geben Sie ${bezeichnung} an.`,
+      invalid_type_error: `Bitte geben Sie ${bezeichnung} an.`,
+    })
+    .trim()
+    .regex(
+      /^\d{4}-\d{2}-\d{2}$/,
+      `Bitte geben Sie ${bezeichnung} als gültiges Datum an.`
+    );
 
 const arbeitgeberFelder = {
-  // Angabe freiwillig (Fussnote des amtlichen Musters).
-  arbeitgeberName: z.string().trim().max(200).nullish(),
-  arbeitgeberAdresse: z.string().trim().max(300).nullish(),
+  // Angabe freiwillig (Fussnote des amtlichen Musters) — aber wenn etwas
+  // dasteht, muss es in die Spalte passen.
+  arbeitgeberName: z
+    .string()
+    .trim()
+    .max(200, "Der Arbeitgeber darf höchstens 200 Zeichen lang sein.")
+    .nullish(),
+  arbeitgeberAdresse: z
+    .string()
+    .trim()
+    .max(300, "Die Adresse darf höchstens 300 Zeichen lang sein.")
+    .nullish(),
 };
 
+/**
+ * Jedes Pflichtfeld braucht seine eigene deutsche Meldung.
+ *
+ * Die Oberflaeche legt eine leere Zeile an, sobald jemand die Grundfrage mit Ja
+ * beantwortet. Wer sie stehen laesst und auf "Weiter" drueckt, las in der roten
+ * Box bisher nur "Required" — Zods englische Vorgabe, ohne jeden Hinweis,
+ * welches Feld gemeint ist. Bei mehreren leeren Feldern derselben Zeile stand
+ * das Wort obendrein nur einmal da, weil der Aufrufer gleiche Meldungen
+ * entdoppelt.
+ */
 const weitereSchema = z.object({
   kategorie: z.literal("WEITERE"),
-  beginn: datum,
-  art: z.enum([
-    "GERINGFUEGIG_MIT_EIGENANTEIL",
-    "GERINGFUEGIG_OHNE_EIGENANTEIL",
-    "MEHR_ALS_GERINGFUEGIG",
-  ]),
+  beginn: datum("den Beschäftigungsbeginn"),
+  art: z.enum(
+    [
+      "GERINGFUEGIG_MIT_EIGENANTEIL",
+      "GERINGFUEGIG_OHNE_EIGENANTEIL",
+      "MEHR_ALS_GERINGFUEGIG",
+    ],
+    // Deckt beides ab: das unberuehrte Feld (`undefined`) und den leeren
+    // Eintrag "Bitte waehlen..." — `required_error` allein nur das erste.
+    { errorMap: () => ({ message: "Bitte wählen Sie die Art der Beschäftigung." }) }
+  ),
   ...arbeitgeberFelder,
 });
 
 const vorbeschaeftigungSchema = z.object({
   kategorie: z.literal("VORBESCHAEFTIGUNG"),
-  beginn: datum,
-  ende: datum,
+  beginn: datum("den Beginn der Vorbeschäftigung"),
+  ende: datum("das Ende der Vorbeschäftigung"),
   // Nur das Merkmal, kein Betrag — siehe Kommentar am Modell.
-  entgeltUeberGrenze: z.boolean(),
+  entgeltUeberGrenze: z.boolean({
+    required_error:
+      "Bitte geben Sie an, ob das Entgelt über der Geringfügigkeitsgrenze lag.",
+    invalid_type_error:
+      "Bitte geben Sie an, ob das Entgelt über der Geringfügigkeitsgrenze lag.",
+  }),
   // Zaehlt fuer die Drei-Monats-/70-Tage-Grenze der Berufsmaessigkeit.
-  arbeitstage: z.number().int().min(0).max(366),
+  // `invalid_type_error` faengt auch die Nicht-Zahl ab: Das Eingabefeld liefert
+  // Text, und `Number("acht")` ist NaN — fuer Zod ein Typfehler, kein
+  // Bereichsfehler.
+  arbeitstage: z
+    .number({
+      required_error: "Bitte geben Sie die Zahl der Arbeitstage an.",
+      invalid_type_error: "Bitte geben Sie die Arbeitstage als Zahl an.",
+    })
+    .int("Bitte volle Arbeitstage angeben.")
+    .min(0, "Die Arbeitstage können nicht negativ sein.")
+    .max(366, "Mehr als 366 Arbeitstage hat ein Jahr nicht."),
   // Die Zeile kann eine Meldung bei der Arbeitsagentur statt einer
   // Beschaeftigung beschreiben. Beides zaehlt, muss aber unterscheidbar sein.
-  beiArbeitsagentur: z.boolean().default(false),
+  beiArbeitsagentur: z
+    .boolean({
+      invalid_type_error:
+        "Bitte geben Sie an, ob es sich um eine Meldung bei der Agentur für Arbeit handelt.",
+    })
+    .default(false),
   ...arbeitgeberFelder,
 });
 
 const auslandSchema = z.object({
   kategorie: z.literal("AUSLAND"),
-  beginn: datum,
+  beginn: datum("den Beginn der Tätigkeit im Ausland"),
   // Eine laufende Taetigkeit hat noch kein Ende.
-  ende: datum.nullish(),
+  ende: datum("das Ende der Tätigkeit im Ausland").nullish(),
   ...arbeitgeberFelder,
 });
 
@@ -73,11 +138,27 @@ const auslandSchema = z.object({
  * geht verloren und `kategorie` kommt als `unknown` heraus.
  */
 export const beschaeftigungsAngabeSchema = z
-  .discriminatedUnion("kategorie", [
-    weitereSchema,
-    vorbeschaeftigungSchema,
-    auslandSchema,
-  ])
+  .discriminatedUnion(
+    "kategorie",
+    [weitereSchema, vorbeschaeftigungSchema, auslandSchema],
+    // Die Vereinigung meldet nur zwei eigene Fehler, und beide entstehen nicht
+    // am Formular, sondern an einem manipulierten oder veralteten Aufruf. Ohne
+    // diese Zuordnung stuenden sie als "Invalid discriminator value. Expected
+    // 'WEITERE' | ..." in einer sonst deutschen Fehlerbox. `ctx.defaultError`
+    // bleibt fuer alles andere stehen — die Meldungen der Mitglieder haengen an
+    // deren eigenen Schemas und bleiben davon unberuehrt.
+    {
+      errorMap: (issue, ctx) => {
+        if (issue.code === z.ZodIssueCode.invalid_union_discriminator) {
+          return { message: "Unbekannte Art des Eintrags." };
+        }
+        if (issue.code === z.ZodIssueCode.invalid_type) {
+          return { message: "Der Eintrag ist unvollständig." };
+        }
+        return { message: ctx.defaultError };
+      },
+    }
+  )
   .superRefine((angabe, ctx) => {
     if (angabe.kategorie === "WEITERE") return;
     if (angabe.ende && angabe.ende < angabe.beginn) {

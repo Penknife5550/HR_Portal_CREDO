@@ -41,7 +41,9 @@ export function Step4SocialSecurity({
   fieldConfig,
   token,
 }: StepProps) {
-  const fc = fieldConfig ?? new FieldConfigHelper(4);
+  // Siehe step2-address.tsx: Ohne useMemo waere `fc` bei jedem Rendern ein
+  // neues Objekt und das Schema damit nie stabil.
+  const fc = useMemo(() => fieldConfig ?? new FieldConfigHelper(4), [fieldConfig]);
   const schema = useMemo(() => createStep4Schema(fc), [fc]);
   const {
     register,
@@ -171,11 +173,19 @@ export function Step4SocialSecurity({
 
   const onSubmit = (values: Step4Data) => {
     if (!validateChildren()) return;
-    // Kinder-Daten mitsenden
-    const result: Record<string, unknown> = { ...values };
-    if (parentStatus) {
-      result.children = children;
-    }
+    // Die Liste geht IMMER mit — ohne Haken als leere Liste.
+    //
+    // Der Server ersetzt die Kinderzeilen nur, wenn ein Array ankommt
+    // (`Array.isArray(children)` in api/fragebogen/[token]/route.ts); die leere
+    // Liste loescht sie. Wurde bei entferntem Haken gar nichts gesendet, blieben
+    // die alten Zeilen unangetastet: Wer den Haken versehentlich setzte, Kinder
+    // eintrug und ihn wieder entfernte, sah die Erfassung verschwinden — in der
+    // Personalakte standen die Kinder aber weiter. Der Bildschirm behauptete
+    // also das Gegenteil der Akte, und zwar stumm.
+    const result: Record<string, unknown> = {
+      ...values,
+      children: parentStatus ? children : [],
+    };
     onNext(result);
   };
 
@@ -191,9 +201,15 @@ export function Step4SocialSecurity({
             type="text"
             autoComplete="off"
             {...register("socialSecurityNumber")}
+            maxLength={20}
             placeholder="12 345678 A 123"
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 font-mono text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
+          {errors.socialSecurityNumber && (
+            <p className="text-xs text-destructive">
+              {errors.socialSecurityNumber.message}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
             Die SV-Nummer finden Sie auf Ihrem Sozialversicherungsausweis oder in
             Schreiben Ihres Rentenversicherungstraegers. Falls Sie Ihre Nummer

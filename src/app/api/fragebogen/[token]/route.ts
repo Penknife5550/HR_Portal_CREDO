@@ -196,6 +196,19 @@ const fragebogenFieldsSchema = z.object({
   // Zeilen der drei Tabellen aus Abschnitt 4. Die Validierung je Kategorie
   // steht in validations/beschaeftigungs-angaben.ts.
   beschaeftigungsAngaben: beschaeftigungsAngabenListeSchema.optional(),
+  // Welche Kategorien der sendende Schritt VERANTWORTET — unabhaengig davon,
+  // ob er gerade Zeilen dazu hat. Kein Feld von `PersonalData`, sondern eine
+  // Angabe ueber den Aufruf selbst; deshalb steht es nicht in
+  // ERLAUBTE_FRAGEBOGEN_FELDER und wird unten ausdruecklich herausgenommen.
+  //
+  // Optional, und das mit Absicht: Ein Browser, der die alte Fassung des
+  // Formulars geladen hat, sendet es nicht. Fuer ihn gilt weiter das alte
+  // Verhalten (siehe Speicherpfad), statt dass ihm ploetzlich Zeilen
+  // verschwinden.
+  beschaeftigungsKategorien: z
+    .array(z.enum(BESCHAEFTIGUNGS_KATEGORIEN))
+    .max(BESCHAEFTIGUNGS_KATEGORIEN.length)
+    .optional(),
 }).strip(); // strip() entfernt unbekannte Felder serverseitig (Defense in Depth zusaetzlich zur Whitelist)
 
 // =============================================
@@ -343,7 +356,13 @@ export async function PUT(
     );
   }
 
-  const { currentStep, children, beschaeftigungsAngaben, ...data } = parsed.data;
+  const {
+    currentStep,
+    children,
+    beschaeftigungsAngaben,
+    beschaeftigungsKategorien,
+    ...data
+  } = parsed.data;
 
   // Status auf IN_PROGRESS setzen falls noch INVITED
   if (onboarding.status === "INVITED") {
@@ -472,12 +491,25 @@ export async function PUT(
   }
 
   if (Array.isArray(beschaeftigungsAngaben)) {
-    // Nur die Kategorien anfassen, die tatsaechlich mitgeschickt wurden.
+    // Nur die Kategorien anfassen, die der sendende Schritt verantwortet.
     // Sonst loeschte ein Schritt, der nur 4a sendet, auch die Zeilen zu 4b
     // und 4c mit.
-    const gesendeteKategorien = new Set(
-      beschaeftigungsAngaben.map((a) => a.kategorie),
-    );
+    //
+    // Wer das ist, sagt der Schritt selbst (`beschaeftigungsKategorien`) — es
+    // aus den Zeilen abzuleiten, ging genau so lange gut, wie es Zeilen gab.
+    // Eine leere Liste nennt keine Kategorie, also wurde nichts geloescht: Ein
+    // Widerruf („Nein, doch keine weitere Beschaeftigung") kam nie an, und die
+    // Zeilen blieben in der Personalakte, im PDF und in der Pruefsumme der
+    // Wahrheitsversicherung stehen — im Widerspruch zum „Nein" daneben.
+    //
+    // Die Vereinigung mit den Zeilen-Kategorien ist der Rueckfall fuer
+    // Browser-Sitzungen mit der alten Formularfassung. Sie hat einen zweiten
+    // Zweck: Zeilen einer NICHT genannten Kategorie wuerden sonst angelegt,
+    // ohne dass die alten weichen — aus Ersetzen wuerde Verdoppeln.
+    const gesendeteKategorien = new Set<string>([
+      ...(beschaeftigungsKategorien ?? []),
+      ...beschaeftigungsAngaben.map((a) => a.kategorie),
+    ]);
 
     for (const kategorie of BESCHAEFTIGUNGS_KATEGORIEN) {
       if (!gesendeteKategorien.has(kategorie)) continue;

@@ -24,6 +24,11 @@ function fehlerPfade(eingabe: unknown): string[] {
   return ergebnis.success ? [] : ergebnis.error.issues.map((i) => i.path.join("."));
 }
 
+function fehlerMeldungen(eingabe: unknown): string[] {
+  const ergebnis = beschaeftigungsAngabeSchema.safeParse(eingabe);
+  return ergebnis.success ? [] : ergebnis.error.issues.map((i) => i.message);
+}
+
 const WEITERE = {
   kategorie: "WEITERE" as const,
   beginn: "2026-02-01",
@@ -231,6 +236,131 @@ describe("zuDatensatz — Abbildung auf die Datenbank", () => {
     );
     expect(satz.arbeitgeberName).toBeNull();
     expect(satz.arbeitgeberAdresse).toBeNull();
+  });
+});
+
+describe("Fehlermeldungen der Zeilen", () => {
+  /**
+   * Zods Rohmeldungen sind englisch, und sie sagen nicht, welches Feld gemeint
+   * ist. Genau so las sich die rote Box bisher: Wer die automatisch angelegte
+   * leere Zeile stehen liess, bekam das Wort "Required" zu sehen.
+   */
+  const ENGLISCHE_ROHMELDUNGEN =
+    /String must contain|Number must be|Invalid enum value|Expected \w+, received|^Required$|Invalid input|Invalid discriminator/;
+
+  /**
+   * Eine unberuehrte Zeile, so wie `zurPruefung()` in
+   * `src/app/fragebogen/[token]/steps/step6-employment.tsx` sie sendet: leere
+   * Textfelder als "", nicht beantwortete Fragen als `undefined`.
+   */
+  const LEERE_ZEILE: Record<string, Record<string, unknown>> = {
+    WEITERE: {
+      kategorie: "WEITERE",
+      beginn: "",
+      arbeitgeberName: null,
+      arbeitgeberAdresse: null,
+      art: undefined,
+    },
+    VORBESCHAEFTIGUNG: {
+      kategorie: "VORBESCHAEFTIGUNG",
+      beginn: "",
+      ende: "",
+      entgeltUeberGrenze: undefined,
+      arbeitstage: undefined,
+      beiArbeitsagentur: false,
+      arbeitgeberName: null,
+      arbeitgeberAdresse: null,
+    },
+    AUSLAND: {
+      kategorie: "AUSLAND",
+      beginn: "",
+      ende: null,
+      arbeitgeberName: null,
+      arbeitgeberAdresse: null,
+    },
+  };
+
+  it.each(Object.keys(LEERE_ZEILE))(
+    "meldet die leere %s-Zeile ohne englische Rohmeldung",
+    (kategorie) => {
+      const meldungen = fehlerMeldungen(LEERE_ZEILE[kategorie]);
+      expect(meldungen.length).toBeGreaterThan(0);
+      for (const m of meldungen) expect(m).not.toMatch(ENGLISCHE_ROHMELDUNGEN);
+    }
+  );
+
+  it("gibt jedem offenen Feld einer Zeile einen eigenen Satz", () => {
+    // Der Aufrufer entdoppelt die Meldungen einer Zeile, bevor er sie in die
+    // rote Box schreibt (step6-employment.tsx, onSubmit). Traegen zwei Felder
+    // denselben Satz, bleibt nach dem Entdoppeln einer uebrig — und die Person
+    // raet, welches Feld gemeint war. Vier offene Felder, vier Saetze.
+    const meldungen = fehlerMeldungen(LEERE_ZEILE.VORBESCHAEFTIGUNG);
+    expect(fehlerPfade(LEERE_ZEILE.VORBESCHAEFTIGUNG).sort()).toEqual([
+      "arbeitstage",
+      "beginn",
+      "ende",
+      "entgeltUeberGrenze",
+    ]);
+    expect(new Set(meldungen).size).toBe(4);
+  });
+
+  it("nennt in der Datumsmeldung, um welches Datum es geht", () => {
+    const [beginn] = fehlerMeldungen({ ...VORBESCHAEFTIGUNG, beginn: "" });
+    const [ende] = fehlerMeldungen({ ...VORBESCHAEFTIGUNG, ende: "" });
+    expect(beginn).toMatch(/Beginn/);
+    expect(ende).toMatch(/Ende/);
+    expect(beginn).not.toBe(ende);
+  });
+
+  it("meldet die Art der Beschäftigung mit einem Satz — leer wie unberührt", () => {
+    // Beide Faelle kann die Oberflaeche liefern: `undefined` als Vorgabewert
+    // und "" fuer den Eintrag "Bitte waehlen...".
+    const satz = "Bitte wählen Sie die Art der Beschäftigung.";
+    expect(fehlerMeldungen({ ...WEITERE, art: undefined })).toEqual([satz]);
+    expect(fehlerMeldungen({ ...WEITERE, art: "" })).toEqual([satz]);
+    expect(fehlerMeldungen({ ...WEITERE, art: "IRGENDWAS" })).toEqual([satz]);
+  });
+
+  it("erklärt das fehlende Entgelt-Merkmal", () => {
+    const [meldung] = fehlerMeldungen({
+      ...VORBESCHAEFTIGUNG,
+      entgeltUeberGrenze: undefined,
+    });
+    expect(meldung).toMatch(/Entgelt/);
+    expect(meldung).not.toMatch(ENGLISCHE_ROHMELDUNGEN);
+  });
+
+  it("meldet unbrauchbare Arbeitstage deutsch", () => {
+    // `Number("acht")` ist NaN — fuer Zod ein Typfehler, kein Bereichsfehler.
+    for (const wert of [undefined, Number.NaN, -1, 400, 12.5]) {
+      const meldungen = fehlerMeldungen({ ...VORBESCHAEFTIGUNG, arbeitstage: wert });
+      expect(meldungen.length).toBeGreaterThan(0);
+      for (const m of meldungen) expect(m).not.toMatch(ENGLISCHE_ROHMELDUNGEN);
+    }
+  });
+
+  it("meldet zu lange Arbeitgeber-Angaben deutsch", () => {
+    const name = fehlerMeldungen({ ...WEITERE, arbeitgeberName: "x".repeat(201) });
+    const adresse = fehlerMeldungen({ ...WEITERE, arbeitgeberAdresse: "x".repeat(301) });
+    expect(name.length).toBe(1);
+    expect(adresse.length).toBe(1);
+    for (const m of [...name, ...adresse]) expect(m).not.toMatch(ENGLISCHE_ROHMELDUNGEN);
+  });
+
+  it("meldet eine unbekannte Kategorie deutsch", () => {
+    // Nur ueber einen manipulierten oder veralteten Aufruf erreichbar — aber
+    // eine englische Rohmeldung in einer sonst deutschen Box faellt auf.
+    const meldungen = fehlerMeldungen({ ...WEITERE, kategorie: "SONSTIGES" });
+    expect(meldungen.length).toBeGreaterThan(0);
+    for (const m of meldungen) expect(m).not.toMatch(ENGLISCHE_ROHMELDUNGEN);
+  });
+
+  it("lässt die Meldungen der Mitglieder unberührt", () => {
+    // Die errorMap sitzt an der Vereinigung. Wuerde sie auf die Felder
+    // durchschlagen, stuende ueberall derselbe Satz.
+    expect(fehlerMeldungen({ ...WEITERE, art: undefined })).not.toEqual(
+      fehlerMeldungen({ ...WEITERE, beginn: "" })
+    );
   });
 });
 

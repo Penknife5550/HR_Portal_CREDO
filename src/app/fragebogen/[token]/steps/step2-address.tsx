@@ -5,9 +5,10 @@
  * Strasse, PLZ, Ort, Telefon, E-Mail
  */
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { step2Schema, type Step2Data } from "@/lib/validations/personal-data";
+import { createStep2Schema, type Step2Data } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 
 interface StepProps {
@@ -19,13 +20,22 @@ interface StepProps {
 }
 
 export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: StepProps) {
-  const fc = fieldConfig ?? new FieldConfigHelper(2);
+  // Der Rueckfall darf nicht bei jedem Tastendruck ein neues Helfer-Objekt
+  // bauen — sonst haengt das Schema unten an einer Kennung, die sich staendig
+  // aendert, und wird bei jedem Rendern neu gebaut.
+  const fc = useMemo(() => fieldConfig ?? new FieldConfigHelper(2), [fieldConfig]);
+  // Geprueft wird gegen dieselbe Konfiguration, aus der die Maske ihre
+  // Sternchen zeichnet. Vorher stand hier das feste `step2Schema`: Nahm HR ein
+  // Feld aus der Pflicht, verlangte der Schritt es weiter — ohne Stern, den man
+  // haette deuten koennen; und umgekehrt liess er ein neu zur Pflicht erklaertes
+  // Feld leer durch.
+  const schema = useMemo(() => createStep2Schema(fc), [fc]);
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<Step2Data>({
-    resolver: zodResolver(step2Schema),
+    resolver: zodResolver(schema),
     defaultValues: {
       street: (data.street as string) || "",
       houseNumber: (data.houseNumber as string) || "",
@@ -69,6 +79,7 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
               type="text"
               autoComplete="off"
               {...register("houseNumber")}
+              maxLength={20}
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
             />
             {errors.houseNumber && (
@@ -122,8 +133,12 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
           <input
             type="text"
             {...register("country")}
+            maxLength={100}
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
+          {errors.country && (
+            <p className="text-xs text-destructive">{errors.country.message}</p>
+          )}
         </div>
       )}
 
@@ -138,9 +153,13 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
               <input
                 type="tel"
                 {...register("phone")}
+                maxLength={50}
                 placeholder="0571 / 123456"
                 className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               />
+              {errors.phone && (
+                <p className="text-xs text-destructive">{errors.phone.message}</p>
+              )}
             </div>
           )}
           {fc.isVisible("mobile") && (
@@ -151,9 +170,13 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
               <input
                 type="tel"
                 {...register("mobile")}
+                maxLength={50}
                 placeholder="0170 / 1234567"
                 className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               />
+              {errors.mobile && (
+                <p className="text-xs text-destructive">{errors.mobile.message}</p>
+              )}
             </div>
           )}
         </div>

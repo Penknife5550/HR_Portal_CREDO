@@ -17,9 +17,10 @@
  * Fragebogentyp — TV-L, Beamte, Erzieher.
  *
  * Die Suite haelt drei Dinge fest: leere Auswahlfelder und leere Zahlenfelder
- * blockieren die Speicherung nicht mehr, ein leeres Feld landet trotzdem NICHT
- * als Wert in der Datenbank, und ein wirklich falscher Wert wird weiterhin
- * abgewiesen.
+ * blockieren die Speicherung nicht mehr, ein leerer Wert landet nie als solcher
+ * in der Datenbank (er loescht die Angabe oder laesst sie stehen — je nach
+ * Freigabeliste in src/lib/fragebogen-felder.ts), und ein wirklich falscher
+ * Wert wird weiterhin abgewiesen.
  */
 
 const mockPrisma = {
@@ -226,6 +227,20 @@ describe("Zahlenfelder vertragen ein geleertes Eingabefeld", () => {
     ["otherWeeklyHours", 10],
   ];
 
+  // Die drei Felder, die der Fragebogen selbst erhebt, muessen sich auch
+  // wieder LEEREN lassen: Das Finanzamt hebt einen Freibetrag auf, oder der
+  // Haken "schwerbehindert" faellt weg — dann darf kein Behinderungsgrad
+  // zurueckbleiben. Sie stehen deshalb in LEERBARE_FRAGEBOGEN_FELDER
+  // (src/lib/fragebogen-felder.ts, dort steht die Begruendung im Kopf).
+  //
+  // `otherWeeklyHours` steht bewusst NICHT darin: Das Altfeld wird im
+  // Fragebogen nicht mehr abgefragt, es fuellt nur noch die HR-Nacherfassung.
+  // Ein null von dort duerfte eine Angabe nicht loeschen.
+  const LEERBAR = ZAHLENFELDER.filter(([feld]) => feld !== "otherWeeklyHours");
+  const NICHT_LEERBAR = ZAHLENFELDER.filter(
+    ([feld]) => feld === "otherWeeklyHours",
+  );
+
   // "" kommt aus einem Textfeld ohne valueAsNumber, null aus JSON.stringify
   // eines NaN — react-hook-form liefert fuer ein geleertes Zahlenfeld NaN.
   it.each(ZAHLENFELDER)('%s: "" weist die Speicherung nicht ab', async (feld) => {
@@ -234,17 +249,33 @@ describe("Zahlenfelder vertragen ein geleertes Eingabefeld", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(gespeicherteFelder()).not.toHaveProperty(feld);
+    expect(gespeicherteFelder().firstName).toBe("Anna");
+    // Der leere String darf nie als Wert in einer Zahlenspalte landen. Ob das
+    // Feld dabei unberuehrt bleibt oder geleert wird, entscheidet die
+    // Freigabeliste — das pruefen die beiden Faelle darunter.
+    expect(gespeicherteFelder()[feld] ?? null).toBeNull();
   });
 
-  it.each(ZAHLENFELDER)("%s: null weist die Speicherung nicht ab", async (feld) => {
+  it.each(LEERBAR)("%s: null loescht die alte Angabe", async (feld) => {
     const res = await PUT(req({ [feld]: null, firstName: "Anna" }), {
       params: params(),
     });
 
     expect(res.status).toBe(200);
-    expect(gespeicherteFelder()).not.toHaveProperty(feld);
+    expect(gespeicherteFelder()[feld]).toBeNull();
   });
+
+  it.each(NICHT_LEERBAR)(
+    "%s: null laesst die alte Angabe unangetastet",
+    async (feld) => {
+      const res = await PUT(req({ [feld]: null, firstName: "Anna" }), {
+        params: params(),
+      });
+
+      expect(res.status).toBe(200);
+      expect(gespeicherteFelder()).not.toHaveProperty(feld);
+    },
+  );
 
   it.each(ZAHLENFELDER)("%s: die 0 bleibt eine Angabe", async (feld) => {
     const res = await PUT(req({ [feld]: 0 }), { params: params() });

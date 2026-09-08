@@ -18,9 +18,44 @@ import { z } from "zod";
 import { validateIBAN } from "@/lib/utils/iban-validator";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 
-// Helper: String-Feld das nur required ist wenn FieldConfig es verlangt
-function reqStr(fc: FieldConfigHelper, name: string, msg: string) {
-  return fc.isRequired(name) ? z.string().min(1, msg) : z.string();
+/**
+ * Text-Feld, dessen Pflicht die Vorlage bestimmt — mit optionaler Laengengrenze.
+ *
+ * Die Grenze gilt IMMER, unabhaengig von der Pflicht. Der Server begrenzt diese
+ * Felder ohnehin (`fragebogenFieldsSchema` in api/fragebogen/[token]/route.ts);
+ * fehlt die Grenze hier, laesst der Schritt die zu lange Eingabe durch, der
+ * Auto-Save antwortet mit 400 — und die Person liest ein "Validierungsfehler"
+ * ueber dem Formular, ohne dass irgendein Feld rot wird. Die Grenze gehoert
+ * deshalb an BEIDE Enden.
+ */
+function reqStr(
+  fc: FieldConfigHelper,
+  name: string,
+  msg: string,
+  grenze?: { max: number; msg: string }
+) {
+  const basis = grenze ? z.string().max(grenze.max, grenze.msg) : z.string();
+  return fc.isRequired(name) ? basis.min(1, msg) : basis;
+}
+
+/**
+ * Zahlen-Feld, dessen Pflicht die Vorlage bestimmt.
+ *
+ * Der Ausgabetyp bleibt in BEIDEN Zweigen `number | null`. Ein
+ * `.nullable()` wegzulassen waere naheliegend, aendert aber den abgeleiteten
+ * Typ des Schemas — und die Masken tippen ihr Formular an `StepNData` aus dem
+ * statischen Schema. Die Pflicht sitzt deshalb in einer Verfeinerung, nicht im
+ * Typ: Sie liefert bei `null` den deutschen Satz statt Zods "Expected number,
+ * received null".
+ */
+function reqZahl(fc: FieldConfigHelper, name: string, msg: string) {
+  const basis = z
+    .number({ invalid_type_error: "Bitte eine Zahl eingeben." })
+    .min(0, "Der Betrag kann nicht negativ sein.")
+    .nullable();
+  return fc.isRequired(name)
+    ? basis.refine((wert) => wert !== null, { message: msg })
+    : basis;
 }
 
 /**
@@ -45,9 +80,31 @@ function reqStr(fc: FieldConfigHelper, name: string, msg: string) {
 const leerZuUndefined = (wert: unknown) =>
   wert === "" || wert === null ? undefined : wert;
 
+/**
+ * Ein und derselbe deutsche Satz fuer JEDEN Fehlercode des Auswahlfeldes.
+ *
+ * `required_error` deckt allein `undefined` ab. Fuer alles andere bleibt Zods
+ * englischer Standardtext stehen — und der ist hier der Regelfall, nicht die
+ * Ausnahme: Ein `<select>` mit leerer Vorauswahl sendet `""`, und dafuer wirft
+ * Zod `invalid_enum_value`. Unter dem Pflichtfeld in „Bildung & Beruf" stand so
+ * woertlich „Invalid enum value. Expected 'ohne_schulabschluss' | ..., received
+ * ''" — mitten im deutschen Fragebogen.
+ *
+ * Die `errorMap` greift unabhaengig vom Code und deckt damit `""`, `null`,
+ * `undefined` und einen erfundenen Wert gleichermassen ab. Der `preprocess`
+ * darueber bleibt trotzdem noetig: Er unterscheidet „leer" von „falsch" und
+ * laesst ein FREIWILLIGES Feld leer passieren, statt es abzuweisen.
+ */
+function enumMeldung(msg: string): z.ZodErrorMap {
+  return () => ({ message: msg });
+}
+
 /** Pflicht-Enum mit deutscher Meldung — auch wenn nichts angehakt ist. */
 function pflichtEnum<T extends [string, ...string[]]>(values: T, msg: string) {
-  return z.preprocess(leerZuUndefined, z.enum(values, { required_error: msg }));
+  return z.preprocess(
+    leerZuUndefined,
+    z.enum(values, { errorMap: enumMeldung(msg) })
+  );
 }
 
 // Helper: Enum-Feld das nur required ist wenn FieldConfig es verlangt
@@ -59,7 +116,13 @@ function reqEnum<T extends [string, ...string[]]>(
 ) {
   return fc.isRequired(name)
     ? pflichtEnum(values, msg)
-    : z.preprocess(leerZuUndefined, z.enum(values).optional());
+    : z.preprocess(
+        leerZuUndefined,
+        // Auch der freiwillige Zweig braucht die Meldung: Leer ist hier
+        // erlaubt, ein Wert ausserhalb der Liste aber nicht — und dafuer stuende
+        // sonst wieder der englische Satz unter dem Feld.
+        z.enum(values, { errorMap: enumMeldung(msg) }).optional()
+      );
 }
 
 // =============================================
@@ -96,15 +159,18 @@ export type Step1Data = z.infer<typeof step1Schema>;
 // =============================================
 export const step2Schema = z.object({
   street: z.string().min(1, "Strasse ist erforderlich."),
-  houseNumber: z.string().min(1, "Hausnummer ist erforderlich."),
+  houseNumber: z
+    .string()
+    .min(1, "Hausnummer ist erforderlich.")
+    .max(20, "Die Hausnummer darf hoechstens 20 Zeichen lang sein."),
   zipCode: z
     .string()
     .min(4, "PLZ muss mindestens 4 Zeichen lang sein.")
-    .max(10),
+    .max(10, "Die PLZ darf hoechstens 10 Zeichen lang sein."),
   city: z.string().min(1, "Ort ist erforderlich."),
   country: z.string(),
-  phone: z.string(),
-  mobile: z.string(),
+  phone: z.string().max(50, "Die Telefonnummer darf hoechstens 50 Zeichen lang sein."),
+  mobile: z.string().max(50, "Die Mobilnummer darf hoechstens 50 Zeichen lang sein."),
   emailPrivate: z
     .string()
     .refine(
@@ -129,7 +195,7 @@ export const step3Schema = z.object({
       },
       { message: "Bitte geben Sie eine gültige IBAN ein." }
     ),
-  bic: z.string(),
+  bic: z.string().max(11, "Die BIC darf hoechstens 11 Zeichen lang sein."),
   bankName: z.string(),
   accountHolder: z.string(),
 });
@@ -140,7 +206,9 @@ export type Step3Data = z.infer<typeof step3Schema>;
 // Step 4: Sozialversicherung
 // =============================================
 export const step4Schema = z.object({
-  socialSecurityNumber: z.string(),
+  socialSecurityNumber: z
+    .string()
+    .max(20, "Die Sozialversicherungsnummer darf hoechstens 20 Zeichen lang sein."),
   healthInsuranceName: z.string().min(1, "Krankenkasse ist erforderlich."),
   healthInsuranceType: pflichtEnum(
     ["gesetzlich", "privat"],
@@ -298,6 +366,62 @@ export function createStep1Schema(fc: FieldConfigHelper) {
   });
 }
 
+/**
+ * Schritt 2 — Adresse und Kontakt.
+ *
+ * Schritt 2 war der einzige Schritt ohne Fabrik und prueft deshalb gegen das
+ * feste `step2Schema`. Die Maske zeichnet ihre Sternchen aber aus `fc` —
+ * beides lief auseinander, und zwar in beide Richtungen. Stellte HR die private
+ * E-Mail auf Pflicht, zeigte das Formular den Stern und liess das Feld
+ * trotzdem leer durch; nahm HR umgekehrt den Ort aus der Pflicht, verlangte der
+ * Schritt weiter „Ort ist erforderlich." — ohne Stern, den man haette deuten
+ * koennen.
+ */
+export function createStep2Schema(fc: FieldConfigHelper) {
+  return z.object({
+    street: reqStr(fc, "street", "Strasse ist erforderlich."),
+    houseNumber: reqStr(fc, "houseNumber", "Hausnummer ist erforderlich.", {
+      max: 20,
+      msg: "Die Hausnummer darf hoechstens 20 Zeichen lang sein.",
+    }),
+    // Die Untergrenze ist keine Pflicht, sondern eine Formregel: Eine
+    // dreistellige PLZ gibt es nicht. Wer das Feld freiwillig laesst, darf es
+    // leer lassen — aber nicht halb ausfuellen.
+    zipCode: fc.isRequired("zipCode")
+      ? z
+          .string()
+          .min(4, "PLZ muss mindestens 4 Zeichen lang sein.")
+          .max(10, "Die PLZ darf hoechstens 10 Zeichen lang sein.")
+      : z
+          .string()
+          .max(10, "Die PLZ darf hoechstens 10 Zeichen lang sein.")
+          .refine((wert) => wert === "" || wert.length >= 4, {
+            message: "PLZ muss mindestens 4 Zeichen lang sein.",
+          }),
+    city: reqStr(fc, "city", "Ort ist erforderlich."),
+    country: reqStr(fc, "country", "Land ist erforderlich."),
+    phone: reqStr(fc, "phone", "Telefonnummer ist erforderlich.", {
+      max: 50,
+      msg: "Die Telefonnummer darf hoechstens 50 Zeichen lang sein.",
+    }),
+    mobile: reqStr(fc, "mobile", "Mobilnummer ist erforderlich.", {
+      max: 50,
+      msg: "Die Mobilnummer darf hoechstens 50 Zeichen lang sein.",
+    }),
+    // Die Adressform wird immer geprueft, die Pflicht nur auf Ansage. Beim
+    // Pflichtfeld greift `min(1)` fuer das leere Feld; die Verfeinerung laesst
+    // "" bewusst durch, damit nicht zwei Meldungen gleichzeitig erscheinen.
+    emailPrivate: reqStr(
+      fc,
+      "emailPrivate",
+      "Private E-Mail-Adresse ist erforderlich."
+    ).refine(
+      (val) => val === "" || z.string().email().safeParse(val).success,
+      { message: "Bitte geben Sie eine gültige E-Mail-Adresse ein." }
+    ),
+  });
+}
+
 export function createStep3Schema(fc: FieldConfigHelper) {
   const ibanRequired = fc.isRequired("iban");
   return z.object({
@@ -310,15 +434,26 @@ export function createStep3Schema(fc: FieldConfigHelper) {
           (val) => { if (!val || val.trim() === "") return true; return validateIBAN(val); },
           { message: "Bitte geben Sie eine gültige IBAN ein." }
         ),
-    bic: z.string(),
-    bankName: z.string(),
-    accountHolder: z.string(),
+    bic: reqStr(fc, "bic", "BIC ist erforderlich.", {
+      max: 11,
+      msg: "Die BIC darf hoechstens 11 Zeichen lang sein.",
+    }),
+    bankName: reqStr(fc, "bankName", "Bank ist erforderlich."),
+    accountHolder: reqStr(fc, "accountHolder", "Kontoinhaber ist erforderlich."),
   });
 }
 
 export function createStep4Schema(fc: FieldConfigHelper) {
   return z.object({
-    socialSecurityNumber: z.string(),
+    socialSecurityNumber: reqStr(
+      fc,
+      "socialSecurityNumber",
+      "Sozialversicherungsnummer ist erforderlich.",
+      {
+        max: 20,
+        msg: "Die Sozialversicherungsnummer darf hoechstens 20 Zeichen lang sein.",
+      }
+    ),
     healthInsuranceName: reqStr(fc, "healthInsuranceName", "Krankenkasse ist erforderlich."),
     healthInsuranceType: reqEnum(
       fc, "healthInsuranceType",
@@ -344,8 +479,16 @@ export function createStep5Schema(fc: FieldConfigHelper) {
       ["I", "II", "III", "IV", "V", "VI"],
       "Bitte waehlen Sie die Steuerklasse."
     ),
-    taxAllowance: z.number().min(0).nullable(),
-    childAllowance: z.number().min(0).nullable(),
+    taxAllowance: reqZahl(
+      fc,
+      "taxAllowance",
+      "Bitte geben Sie den jaehrlichen Freibetrag an."
+    ),
+    childAllowance: reqZahl(
+      fc,
+      "childAllowance",
+      "Bitte geben Sie den Kinderfreibetrag an."
+    ),
     religion: reqEnum(
       fc, "religion",
       ["ev", "rk", "ak", "lt", "rf", "fr", "fg", "keine", "sonstige"],

@@ -104,14 +104,39 @@ export const ERLAUBTE_FRAGEBOGEN_FELDER: ReadonlySet<string> = new Set([
  * Grundsatz beim Auto-Save: **niemals mit null ueberschreiben.** Gesendet wird
  * immer nur eine Teilmenge, und ein fehlendes Feld darf keine Angabe loeschen.
  *
- * Diese hier haengen an einer Bedingungsfrage. Wird die gegenstandslos — der
+ * Die Ausnahmen zerfallen in zwei Gruppen — beide mit demselben Grund: Ohne sie
+ * bliebe eine ueberholte Angabe in der Personalakte stehen, und niemand kaeme
+ * mehr an sie heran.
+ *
+ * **Antworten auf eine Bedingungsfrage.** Wird die Frage gegenstandslos — der
  * Status wechselt, die Meldung bei der Agentur wird zurueckgenommen —, muss die
  * alte Antwort verschwinden. Sonst stuende in der Akte eine Antwort auf eine
  * Frage, die gar nicht gestellt wurde.
+ *
+ * **Zahlenfelder, die man wieder leeren koennen muss.** Ein leeres
+ * `<input type="number">` sendet null (siehe `zahlOderNull` in
+ * formular-zahlen.ts). Stand das Feld nicht hier, kam die Person aus ihrer
+ * eigenen Eingabe nicht mehr heraus: Der Auto-Save antwortete mit 200, das Feld
+ * blieb im Formular leer — und beim naechsten Laden stand der alte Wert wieder
+ * da. Betroffen sind genau die drei, bei denen sich der Sachverhalt aendern
+ * kann: Das Finanzamt hebt einen Freibetrag auf (`taxAllowance`,
+ * `childAllowance`), oder der Haken „schwerbehindert" faellt weg — dann darf
+ * kein Behinderungsgrad (`disabilityDegree`) zurueckbleiben, sonst weist die
+ * Akte eine Schwerbehinderung aus, die es nicht gibt.
+ *
+ * Gefahrlos ist das nur, weil jeder Schritt ausschliesslich SEINE eigenen
+ * Felder sendet (`handleNext` in fragebogen-form.tsx). Ein Rundumschlag, der
+ * den gesamten Formularzustand schickte, wuerde diese Felder bei jedem
+ * Speichern mitleeren — wer das aendert, muss diese Liste erneut pruefen.
+ * Sensible Felder (IBAN, SV-Nummer, Steuer-ID) bleiben aussen vor; ein Test
+ * haelt das fest.
  */
 export const LEERBARE_FRAGEBOGEN_FELDER: ReadonlySet<string> = new Set([
   "beschaeftigungsStatusSonstige",
   "agenturFuerArbeit",
   "mitLeistungsbezug",
   "summeUeberGeringfuegigkeitsgrenze",
+  "taxAllowance",
+  "childAllowance",
+  "disabilityDegree",
 ]);

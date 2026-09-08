@@ -148,6 +148,27 @@ function SummarySection({
   );
 }
 
+/**
+ * Wurde in diesem Abschnitt ueberhaupt etwas erfasst?
+ *
+ * Nicht jeder Schritt wird jedem Beschaeftigten gestellt: Die Vorlage schaltet
+ * Schritte ab (bei MINIJOB zum Beispiel den Masernschutz), und dann gibt es zu
+ * dessen Fragen keine Antwort — nicht die Antwort "Nein". Ein Abschnitt ohne
+ * eine einzige Angabe wird deshalb gar nicht erst gezeigt. Eine leere Karte
+ * ausgerechnet auf der Seite, auf der die Person die Richtigkeit ihrer Angaben
+ * verbindlich erklaert, wirft nur die Frage auf, was dort fehlt.
+ *
+ * `false` und `0` zaehlen als Angabe — beides sind Antworten, keine Luecken.
+ * Leer sind `undefined`, `null`, der leere String und das leere Array.
+ */
+function hatAngaben(...werte: unknown[]): boolean {
+  return werte.some((wert) => {
+    if (wert === undefined || wert === null || wert === "") return false;
+    if (Array.isArray(wert)) return wert.length > 0;
+    return true;
+  });
+}
+
 function SummaryRow({
   label,
   value,
@@ -266,6 +287,20 @@ export function Step10Summary({
     return "—";
   };
 
+  /**
+   * Zahlenangabe — anders als `str` faellt die 0 hier nicht heraus.
+   *
+   * `str` prueft auf Wahrheitswert und liefert fuer 0 ein "—", worauf
+   * `SummaryRow` die ganze Zeile verschluckt. Ein Freibetrag von 0 EUR oder ein
+   * Grad der Behinderung von 0 ist aber eine Angabe, die die Person hier
+   * wiederfinden und pruefen koennen muss.
+   */
+  const zahl = (val: unknown): string => {
+    if (typeof val === "number") return Number.isFinite(val) ? String(val) : "—";
+    if (typeof val === "string" && val.trim() !== "") return val;
+    return "—";
+  };
+
   /** Eine Beschaeftigungszeile als ein lesbarer Satzteil. */
   const beschreibeZeile = (z: BeschaeftigungEntry): string => {
     const teile: string[] = [];
@@ -328,152 +363,220 @@ export function Step10Summary({
         {!!d.severelyDisabled && (
           <SummaryRow
             label="Schwerbehinderung"
-            value={`Ja, GdB ${str(d.disabilityDegree)}`}
+            value={`Ja, GdB ${zahl(d.disabilityDegree)}`}
           />
         )}
       </SummarySection>
 
-      {/* Step 2: Adresse */}
-      <SummarySection title="2. Adresse & Kontakt">
-        <SummaryRow
-          label="Strasse"
-          value={`${str(d.street)} ${str(d.houseNumber)}`}
-        />
-        <SummaryRow
-          label="PLZ / Ort"
-          value={`${str(d.zipCode)} ${str(d.city)}`}
-        />
-        <SummaryRow label="Land" value={str(d.country)} />
-        {!!d.phone && <SummaryRow label="Telefon" value={str(d.phone)} />}
-        {!!d.mobile && <SummaryRow label="Mobil" value={str(d.mobile)} />}
-        {!!d.emailPrivate && (
-          <SummaryRow label="Private E-Mail" value={str(d.emailPrivate)} />
-        )}
-      </SummarySection>
+      {/* Step 2: Adresse
+          Ohne `country`: Die Spalte steht in prisma/schema.prisma auf
+          `@default("Deutschland")` und ist damit von Anfang an belegt. Sie
+          wuerde jeden Abschnitt „belegt" nennen, auch einen, in dem nie
+          jemand etwas eingetragen hat. */}
+      {hatAngaben(
+        d.street,
+        d.houseNumber,
+        d.zipCode,
+        d.city,
+        d.phone,
+        d.mobile,
+        d.emailPrivate
+      ) && (
+        <SummarySection title="2. Adresse & Kontakt">
+          <SummaryRow
+            label="Strasse"
+            value={`${str(d.street)} ${str(d.houseNumber)}`}
+          />
+          <SummaryRow
+            label="PLZ / Ort"
+            value={`${str(d.zipCode)} ${str(d.city)}`}
+          />
+          <SummaryRow label="Land" value={str(d.country)} />
+          {!!d.phone && <SummaryRow label="Telefon" value={str(d.phone)} />}
+          {!!d.mobile && <SummaryRow label="Mobil" value={str(d.mobile)} />}
+          {!!d.emailPrivate && (
+            <SummaryRow label="Private E-Mail" value={str(d.emailPrivate)} />
+          )}
+        </SummarySection>
+      )}
 
       {/* Step 3: Bank */}
-      <SummarySection title="3. Bankverbindung">
-        <SummaryRow label="IBAN" value={str(d.iban)} />
-        {!!d.bic && <SummaryRow label="BIC" value={str(d.bic)} />}
-        {!!d.bankName && <SummaryRow label="Bank" value={str(d.bankName)} />}
-        {!!d.accountHolder && (
-          <SummaryRow label="Kontoinhaber" value={str(d.accountHolder)} />
-        )}
-      </SummarySection>
+      {hatAngaben(d.iban, d.bic, d.bankName, d.accountHolder) && (
+        <SummarySection title="3. Bankverbindung">
+          <SummaryRow label="IBAN" value={str(d.iban)} />
+          {!!d.bic && <SummaryRow label="BIC" value={str(d.bic)} />}
+          {!!d.bankName && <SummaryRow label="Bank" value={str(d.bankName)} />}
+          {!!d.accountHolder && (
+            <SummaryRow label="Kontoinhaber" value={str(d.accountHolder)} />
+          )}
+        </SummarySection>
+      )}
 
       {/* Step 4: Sozialversicherung */}
-      <SummarySection title="4. Sozialversicherung">
-        {!!d.socialSecurityNumber && (
-          <SummaryRow label="SV-Nummer" value={str(d.socialSecurityNumber)} />
-        )}
-        <SummaryRow
-          label="Versicherungsart"
-          value={
-            INSURANCE_LABELS[str(d.healthInsuranceType)] ||
-            str(d.healthInsuranceType)
-          }
-        />
-        <SummaryRow
-          label="Krankenkasse"
-          value={str(d.healthInsuranceName)}
-        />
-        <SummaryRow
-          label="Elterneigenschaft"
-          value={d.parentStatus ? "Ja" : "Nein"}
-        />
-        {/* Nur noch fuer Altvorgaenge: Wer Schritt 11 durchlaufen hat, sieht
-            seine Entscheidung dort — zwei Antworten auf dieselbe Frage
-            waeren ein Widerspruch in der eigenen Akte. */}
-        {!d.rvEntscheidung && d.minijobRvBefreiung === true && (
+      {hatAngaben(
+        d.socialSecurityNumber,
+        d.healthInsuranceType,
+        d.healthInsuranceName,
+        d.parentStatus,
+        // Das Altfeld zaehlt nur, wenn es TRUE ist: Die Spalte traegt in
+        // prisma/schema.prisma ein `@default(false)` und ist damit ab dem
+        // Anlegen des Datensatzes belegt. Als "false" waere sie eine
+        // Konstante und kein Anzeichen dafuer, dass jemand gefragt wurde.
+        d.minijobRvBefreiung === true || undefined
+      ) && (
+        <SummarySection title="4. Sozialversicherung">
+          {!!d.socialSecurityNumber && (
+            <SummaryRow label="SV-Nummer" value={str(d.socialSecurityNumber)} />
+          )}
           <SummaryRow
-            label="RV-Befreiung (Minijob, frühere Erfassung)"
-            value="Ja"
+            label="Versicherungsart"
+            value={
+              INSURANCE_LABELS[str(d.healthInsuranceType)] ||
+              str(d.healthInsuranceType)
+            }
           />
-        )}
-      </SummarySection>
+          <SummaryRow
+            label="Krankenkasse"
+            value={str(d.healthInsuranceName)}
+          />
+          {/* `jaNein` statt `d.parentStatus ? "Ja" : "Nein"`: Wurde der Schritt
+              gar nicht durchlaufen, ist die Elterneigenschaft unbeantwortet —
+              ein hier gedrucktes "Nein" waere eine Angabe, die niemand gemacht
+              hat. Die Elterneigenschaft entscheidet ueber den Zuschlag zur
+              Pflegeversicherung. */}
+          <SummaryRow
+            label="Elterneigenschaft"
+            value={jaNein(d.parentStatus)}
+          />
+          {/* Nur noch fuer Altvorgaenge: Wer Schritt 11 durchlaufen hat, sieht
+              seine Entscheidung dort — zwei Antworten auf dieselbe Frage
+              waeren ein Widerspruch in der eigenen Akte. */}
+          {!d.rvEntscheidung && d.minijobRvBefreiung === true && (
+            <SummaryRow
+              label="RV-Befreiung (Minijob, frühere Erfassung)"
+              value="Ja"
+            />
+          )}
+        </SummarySection>
+      )}
 
       {/* Step 5: Steuer */}
-      <SummarySection title="5. Steuer">
-        <SummaryRow label="Steuer-ID" value={str(d.taxId)} />
-        <SummaryRow
-          label="Steuerklasse"
-          value={TAX_CLASS_LABELS[str(d.taxClass)] || str(d.taxClass)}
-        />
-        {!!d.taxAllowance && (
+      {hatAngaben(
+        d.taxId,
+        d.taxClass,
+        d.taxAllowance,
+        d.childAllowance,
+        d.religion
+      ) && (
+        <SummarySection title="5. Steuer">
+          <SummaryRow label="Steuer-ID" value={str(d.taxId)} />
+          <SummaryRow
+            label="Steuerklasse"
+            value={TAX_CLASS_LABELS[str(d.taxClass)] || str(d.taxClass)}
+          />
+          {/* Auf `!!` und `str` verzichtet: Beide werfen die 0 weg. Ein
+              Freibetrag von 0 EUR ist aber eine bewusste Eintragung — und der
+              einzige Ort, an dem die Person sie noch pruefen kann, ist diese
+              Seite. */}
           <SummaryRow
             label="Freibetrag"
-            value={`${str(d.taxAllowance)} EUR`}
+            value={
+              zahl(d.taxAllowance) === "—" ? "—" : `${zahl(d.taxAllowance)} EUR`
+            }
           />
-        )}
-        {!!d.childAllowance && (
           <SummaryRow
             label="Kinderfreibetrag"
-            value={str(d.childAllowance)}
+            value={zahl(d.childAllowance)}
           />
-        )}
-        <SummaryRow
-          label="Religion"
-          value={RELIGION_LABELS[str(d.religion)] || str(d.religion)}
-        />
-      </SummarySection>
+          <SummaryRow
+            label="Religion"
+            value={RELIGION_LABELS[str(d.religion)] || str(d.religion)}
+          />
+        </SummarySection>
+      )}
 
-      {/* Step 6: Weitere Beschäftigung */}
-      <SummarySection title="6. Weitere Beschäftigung">
-        <SummaryRow
-          label="Status"
-          value={
-            d.beschaeftigungsStatus
-              ? statusLabel(d.beschaeftigungsStatus as string)
-              : "—"
-          }
-        />
-        <SummaryRow
-          label="Und zwar"
-          value={str(d.beschaeftigungsStatusSonstige)}
-        />
-        <SummaryRow
-          label="Bei der Agentur für Arbeit gemeldet"
-          value={jaNein(d.alsArbeitsuchendGemeldet)}
-        />
-        <SummaryRow label="Agentur" value={str(d.agenturFuerArbeit)} />
-        <SummaryRow
-          label="Mit Leistungsbezug"
-          value={jaNein(d.mitLeistungsbezug)}
-        />
-        <SummaryRow
-          label="Weitere Beschäftigungen"
-          value={jaNein(d.hasOtherEmployment)}
-        />
-        <SummaryRow
-          label="Haupt-/Nebenarbeitgeber"
-          value={
-            EMPLOYER_TYPE_LABELS[str(d.employerType)] || str(d.employerType)
-          }
-        />
-        <SummaryRow
-          label="Summe über der Geringfügigkeitsgrenze"
-          value={jaNein(d.summeUeberGeringfuegigkeitsgrenze)}
-        />
-        <SummaryRow
-          label="Vorbeschäftigungen in diesem Jahr"
-          value={jaNein(d.vorbeschaeftigungenVorhanden)}
-        />
-        <SummaryRow
-          label="Tätigkeit im Ausland"
-          value={jaNein(d.auslandsbeschaeftigungVorhanden)}
-        />
-        {/* Altfelder: seit AP 6 nicht mehr erhoben — die Tabelle „Weitere
-            Beschäftigung“ hat sie abgeloest. Sie erscheinen nur noch, wenn ein
-            alter Vorgang sie mitbringt; sonst blendet SummaryRow sie aus. */}
-        <SummaryRow
-          label="Arbeitgeber (frühere Erfassung)"
-          value={str(d.otherEmployerName)}
-        />
-        <SummaryRow
-          label="Wochenstunden (frühere Erfassung)"
-          value={d.otherWeeklyHours ? `${str(d.otherWeeklyHours)} Std.` : "—"}
-        />
-      </SummarySection>
+      {/* Step 6: Weitere Beschäftigung
+          Die drei Grundfragen (`alsArbeitsuchendGemeldet`,
+          `vorbeschaeftigungenVorhanden`, `auslandsbeschaeftigungVorhanden`)
+          sind `Boolean?` ohne Vorgabe und werden von Schritt 6 immer
+          mitgeschickt — sie sagen genau, ob der Schritt gelaufen ist. */}
+      {hatAngaben(
+        d.beschaeftigungsStatus,
+        d.beschaeftigungsStatusSonstige,
+        d.alsArbeitsuchendGemeldet,
+        d.agenturFuerArbeit,
+        d.mitLeistungsbezug,
+        d.employerType,
+        d.summeUeberGeringfuegigkeitsgrenze,
+        d.vorbeschaeftigungenVorhanden,
+        d.auslandsbeschaeftigungVorhanden,
+        d.otherEmployerName,
+        d.otherWeeklyHours,
+        // Wie beim Altfeld oben: `hasOtherEmployment` traegt ein
+        // `@default(false)` und zaehlt deshalb nur als TRUE.
+        d.hasOtherEmployment === true || undefined
+      ) && (
+        <SummarySection title="6. Weitere Beschäftigung">
+          <SummaryRow
+            label="Status"
+            value={
+              d.beschaeftigungsStatus
+                ? statusLabel(d.beschaeftigungsStatus as string)
+                : "—"
+            }
+          />
+          <SummaryRow
+            label="Und zwar"
+            value={str(d.beschaeftigungsStatusSonstige)}
+          />
+          <SummaryRow
+            label="Bei der Agentur für Arbeit gemeldet"
+            value={jaNein(d.alsArbeitsuchendGemeldet)}
+          />
+          <SummaryRow label="Agentur" value={str(d.agenturFuerArbeit)} />
+          <SummaryRow
+            label="Mit Leistungsbezug"
+            value={jaNein(d.mitLeistungsbezug)}
+          />
+          <SummaryRow
+            label="Weitere Beschäftigungen"
+            value={jaNein(d.hasOtherEmployment)}
+          />
+          <SummaryRow
+            label="Haupt-/Nebenarbeitgeber"
+            value={
+              EMPLOYER_TYPE_LABELS[str(d.employerType)] || str(d.employerType)
+            }
+          />
+          <SummaryRow
+            label="Summe über der Geringfügigkeitsgrenze"
+            value={jaNein(d.summeUeberGeringfuegigkeitsgrenze)}
+          />
+          <SummaryRow
+            label="Vorbeschäftigungen in diesem Jahr"
+            value={jaNein(d.vorbeschaeftigungenVorhanden)}
+          />
+          <SummaryRow
+            label="Tätigkeit im Ausland"
+            value={jaNein(d.auslandsbeschaeftigungVorhanden)}
+          />
+          {/* Altfelder: seit AP 6 nicht mehr erhoben — die Tabelle „Weitere
+              Beschäftigung“ hat sie abgeloest. Sie erscheinen nur noch, wenn ein
+              alter Vorgang sie mitbringt; sonst blendet SummaryRow sie aus. */}
+          <SummaryRow
+            label="Arbeitgeber (frühere Erfassung)"
+            value={str(d.otherEmployerName)}
+          />
+          <SummaryRow
+            label="Wochenstunden (frühere Erfassung)"
+            value={
+              zahl(d.otherWeeklyHours) === "—"
+                ? "—"
+                : `${zahl(d.otherWeeklyHours)} Std.`
+            }
+          />
+        </SummarySection>
+      )}
 
       {/* Die drei Tabellen aus Abschnitt 4 der Checkliste. Nur zeigen, was
           wirklich eingetragen wurde — ein leerer Block sagt nichts. */}
@@ -505,54 +608,67 @@ export function Step10Summary({
         </SummarySection>
       )}
 
-      {/* Step 7: Kinder */}
-      <SummarySection title="7. Kinder">
-        {children.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Keine Kinder eingetragen.
-          </p>
-        ) : (
-          children.map((child, i) => (
-            <SummaryRow
-              key={i}
-              label={`Kind ${i + 1}`}
-              value={`${child.firstName} ${child.lastName || ""} (${formatDate(child.birthDate)})${child.taxAllowance ? " [KFB]" : ""}`}
-            />
-          ))
-        )}
-      </SummarySection>
+      {/* Step 7: Kinder — erfasst wird er innerhalb der Sozialversicherung,
+          und `parentStatus` ist dort die Frage, die den Kinder-Block
+          aufschliesst. Ist sie unbeantwortet, wurde nach Kindern nie gefragt;
+          dann waere "Keine Kinder eingetragen." keine Zusammenfassung, sondern
+          eine erfundene Auskunft. */}
+      {hatAngaben(d.parentStatus, children) && (
+        <SummarySection title="7. Kinder">
+          {children.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Keine Kinder eingetragen.
+            </p>
+          ) : (
+            children.map((child, i) => (
+              <SummaryRow
+                key={i}
+                label={`Kind ${i + 1}`}
+                value={`${child.firstName} ${child.lastName || ""} (${formatDate(child.birthDate)})${child.taxAllowance ? " [KFB]" : ""}`}
+              />
+            ))
+          )}
+        </SummarySection>
+      )}
 
       {/* Step 8: Bildung & Beruf */}
-      <SummarySection title="8. Bildung & Beruf">
-        <SummaryRow
-          label="Höchster Schulabschluss"
-          value={
-            SCHOOL_DEGREE_LABELS[str(d.highestSchoolDegree)] ||
-            str(d.highestSchoolDegree)
-          }
-        />
-        <SummaryRow
-          label="Höchste Berufsausbildung"
-          value={
-            PROFESSIONAL_DEGREE_LABELS[str(d.highestProfessionalDegree)] ||
-            str(d.highestProfessionalDegree)
-          }
-        />
-      </SummarySection>
-
-      {/* Step 9: Masernschutz */}
-      <SummarySection title="9. Masernschutz">
-        <SummaryRow
-          label="Nach 1970 geboren"
-          value={d.bornAfter1971 ? "Ja" : "Nein"}
-        />
-        {!!d.bornAfter1971 && (
+      {hatAngaben(d.highestSchoolDegree, d.highestProfessionalDegree) && (
+        <SummarySection title="8. Bildung & Beruf">
           <SummaryRow
-            label="Masernschutz vorhanden"
-            value={d.masernschutzProvided ? "Ja" : "Nein"}
+            label="Höchster Schulabschluss"
+            value={
+              SCHOOL_DEGREE_LABELS[str(d.highestSchoolDegree)] ||
+              str(d.highestSchoolDegree)
+            }
           />
-        )}
-      </SummarySection>
+          <SummaryRow
+            label="Höchste Berufsausbildung"
+            value={
+              PROFESSIONAL_DEGREE_LABELS[str(d.highestProfessionalDegree)] ||
+              str(d.highestProfessionalDegree)
+            }
+          />
+        </SummarySection>
+      )}
+
+      {/* Step 9: Masernschutz — bei der Vorlage MINIJOB ist der Schritt
+          abgeschaltet, die Frage wird nie gestellt. Der Abschnitt behauptete
+          trotzdem "Nach 1970 geboren: Nein" — und zwar auf der Seite, auf der
+          die Person die Richtigkeit ihrer Angaben verbindlich erklaert. */}
+      {hatAngaben(d.bornAfter1971, d.masernschutzProvided) && (
+        <SummarySection title="9. Masernschutz">
+          <SummaryRow
+            label="Nach 1970 geboren"
+            value={jaNein(d.bornAfter1971)}
+          />
+          {!!d.bornAfter1971 && (
+            <SummaryRow
+              label="Masernschutz vorhanden"
+              value={jaNein(d.masernschutzProvided)}
+            />
+          )}
+        </SummarySection>
+      )}
 
       {/* Rentenversicherung — bewusst ohne Ziffer im Titel: Die Nummern oben
           stammen aus der alten festen Schrittfolge, in der es diesen Schritt
