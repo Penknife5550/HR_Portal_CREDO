@@ -703,9 +703,24 @@ model SupervisorData {
   minijob     Boolean? @default(false)
   ehrenamt    Boolean? @default(false)
 
-  // -- Kostenstelle --
-  kostenstelle       String?
-  kostenstelleAnteil Float? // Prozentuale Aufteilung
+  // -- Kostenstellen --
+  // Die beiden Einzelfelder bleiben in DIESEM Release STEHEN, obwohl die
+  // Aufteilung ab jetzt in `kostenstellen` liegt. Grund ist die Reihenfolge im
+  // Startskript: entrypoint.sh schiebt erst das Schema
+  // (`prisma db push --accept-data-loss`) und laesst DANACH die Datenmigration
+  // laufen (`node prisma/seed-check.js`). Eine im selben Release entfernte
+  // Spalte ist weg, bevor die Migration sie lesen kann — und `--accept-data-loss`
+  // fragt nicht nach. Entfernt werden sie erst im NAECHSTEN Release, wenn
+  // `system_migrations` den Lauf von KOSTENSTELLEN_AUFTEILUNG_V1 auf dem
+  // Produktivserver bestaetigt. Neu geschrieben werden sie nicht mehr.
+  /// Bestand. Ab KOSTENSTELLEN_AUFTEILUNG_V1 nur noch Lesequelle.
+  kostenstelle           String?
+  /// Bestand. Ab KOSTENSTELLEN_AUFTEILUNG_V1 nur noch Lesequelle.
+  kostenstelleAnteil     Float? // Prozentuale Aufteilung
+  /// EIN Bemerkungsfeld fuer die GESAMTE Aufteilung, nicht je Zeile (so
+  /// gewuenscht). Deshalb steht es hier und nicht in SupervisorKostenstelle.
+  kostenstellenBemerkung String?
+  kostenstellen          SupervisorKostenstelle[]
 
   // -- Probezeit --
   probezeit       Boolean? @default(true)
@@ -750,6 +765,59 @@ model SupervisorData {
   updatedAt DateTime @updatedAt
 
   @@map("supervisor_data")
+}
+
+// =============================================
+// Aufteilung des Gehalts auf mehrere Kostenstellen
+//
+// Eine Zeile je Kostenstelle, wie die vorgesetzte Person sie eintraegt.
+// Nach dem Vorbild von BeschaeftigungsAngabe eine eigene Tabelle statt eines
+// Json-Feldes: "Welche Vorgaenge belasten Kostenstelle 4711?" bleibt damit
+// eine gewoehnliche Abfrage mit Index, und die Zeilen kommen typisiert aus
+// Prisma. Ein Prisma.JsonValue muesste jeder Leser (Maske, PDF, CSV,
+// Platzhalter) selbst nachvalidieren — genau dort entstehen stille
+// Abweichungen.
+// =============================================
+model SupervisorKostenstelle {
+  id               String         @id @default(uuid())
+  supervisorDataId String
+  supervisorData   SupervisorData @relation(fields: [supervisorDataId], references: [id], onDelete: Cascade)
+
+  /// Reihenfolge der Zeilen, wie sie eingetragen wurden.
+  orderIndex Int @default(0)
+
+  /// Freitext. Die Kostenstellen-Systematik ist je Mandant verschieden,
+  /// eine gepflegte Auswahlliste gibt es (noch) nicht.
+  bezeichnung String
+
+  /// Prozentanteil mit hoechstens zwei Nachkommastellen. Die Summe aller
+  /// Zeilen eines Vorgangs muss auf das Hundertstel genau 100 ergeben.
+  /// Geprueft wird in GANZEN Hundertsteln (Math.round(anteil * 100)) in
+  /// src/lib/validations/kostenstellen.ts: 5 + 63,01 + 31,99 ergibt als
+  /// Gleitkommazahl 99.99999999999999 und NICHT exakt 100.
+  /// Float und nicht Int, weil die Genauigkeit in der PRUEFUNG entsteht, nicht
+  /// in der Speicherung — und weil alle anderen Prozentfelder des Schemas
+  /// (sonderzahlungProzent, kostenstelleAnteil) ebenfalls Float sind.
+  anteil Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Dieselbe Kostenstelle zweimal in einer Aufteilung ist keine Angabe,
+  /// sondern ein Vertipper. Abgefangen wird das zuerst in Zod mit deutschem
+  /// Satz (kostenstellenListeSchema, Vergleich auf getrimmtem, klein
+  /// geschriebenem Text — also strenger als dieser Index). Der Index ist nur
+  /// das Netz darunter; wer ihn ausloest, hat die Route umgangen. Die
+  /// Speicherroute muss P2002 deshalb auf eine deutsche 400 abbilden, sonst
+  /// wird daraus ein 500.
+  ///
+  /// Ein zusaetzliches `@@index([supervisorDataId])` waere doppelt gemoppelt:
+  /// supervisorDataId ist die FUEHRENDE Spalte dieses Index, Postgres nutzt ihn
+  /// also auch fuer das blosse "alle Zeilen eines Vorgangs". Eine spaetere
+  /// Auswertung ueber `bezeichnung` (welche Vorgaenge belasten 4711?) braeuchte
+  /// dagegen einen eigenen Index — den legt an, wer die Auswertung baut.
+  @@unique([supervisorDataId, bezeichnung])
+  @@map("supervisor_kostenstellen")
 }
 
 // =============================================

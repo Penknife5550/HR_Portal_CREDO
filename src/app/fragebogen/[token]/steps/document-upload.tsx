@@ -10,9 +10,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
   DOCUMENT_TYPE_LABELS,
+  MASERNSCHUTZ_HINWEIS,
   RV_BEFREIUNG_HINWEIS,
   effektivePflichtDokumente,
+  istNachreichbar,
 } from "@/lib/required-documents";
+import { masernschutzPflichtig } from "@/lib/masernschutz";
 import { formatBytes } from "@/lib/format";
 
 interface UploadedDoc {
@@ -32,9 +35,29 @@ interface DocumentUploadProps {
   requiredDocuments?: string[];
   /** Entscheidung aus Schritt 11 — sie kann eine Pflicht erzeugen. */
   rvEntscheidung?: string | null;
+  /**
+   * Geburtsdatum aus Schritt 1 und Einrichtungstyp des Mandanten.
+   *
+   * Daraus — und nur daraus — entsteht die Masernschutz-Pflicht. Bewusst die
+   * Rohwerte statt eines fertigen Wahrheitswerts: Die Regel liegt in
+   * `src/lib/masernschutz.ts` und wird hier ausgewertet, damit der Aufrufer
+   * sie nicht anwenden (und dabei falsch anwenden) kann. Der Server ruft
+   * dieselbe Funktion mit denselben Eingaben auf.
+   *
+   * Fehlt eines von beiden: keine Pflicht. Ein Vorgang ohne Geburtsdatum darf
+   * keine Forderung erzeugen — die Person wurde nie danach gefragt.
+   */
+  geburtsdatum?: unknown;
+  organisationstyp?: string | null;
   /** Ist beim Mandanten eine Betriebsnummer hinterlegt? */
   antragErzeugbar?: boolean;
-  /** Meldet nach oben, was noch fehlt — Schritt 10 sperrt damit das Absenden. */
+  /**
+   * Meldet nach oben, was noch fehlt — Schritt 10 sperrt damit das Absenden.
+   *
+   * Enthaelt nur die **sperrenden** Pflichten. Eine nachreichbare Unterlage
+   * (Masernschutz) steht bewusst nicht darin, sonst sperrte sie ueber diesen
+   * Umweg doch.
+   */
   onMissingChange?: (missing: string[]) => void;
 }
 
@@ -78,6 +101,8 @@ export function DocumentUpload({
   anzahlKinder = 0,
   requiredDocuments,
   rvEntscheidung,
+  geburtsdatum,
+  organisationstyp,
   antragErzeugbar = true,
   onMissingChange,
 }: DocumentUploadProps) {
@@ -230,12 +255,18 @@ export function DocumentUpload({
     required: requiredTypes,
     hasChildren,
     rvEntscheidung,
+    masernschutzPflichtig: masernschutzPflichtig({
+      geburtsdatum,
+      organisationstyp,
+    }),
   });
 
   const activeRequiredDocs = pflichtTypen.map((t) => ({
     value: t.toLowerCase(),
     dbType: t,
     label: DOCUMENT_TYPE_LABELS[t] ?? t,
+    /** Haelt das Fehlen dieser Unterlage das Absenden auf? */
+    nachreichbar: istNachreichbar(t),
   }));
 
   // Was hier Pflicht ist, gehoert nicht zusaetzlich ins Dropdown der freiwilligen
@@ -251,9 +282,17 @@ export function DocumentUpload({
   // eine geratene Liste sperrte das Absenden mit Namen von Unterlagen, die
   // laengst hochgeladen sind. Ein zu grosszuegiges Nichtstun ist hier gefahrlos
   // — verbindlich prueft ohnehin der Server gegen den Datenbankstand.
+  //
+  // Gemeldet wird nur, was sperrt. Der Masernschutz-Nachweis steht als Pflicht
+  // in der Liste oben und wird angemahnt, darf das Absenden aber nicht
+  // aufhalten (Entscheidung 07.09.2026, Begruendung in required-documents.ts).
+  // Ginge er hier mit nach oben, waere die Nachreichbarkeit eine Behauptung und
+  // der Absende-Knopf trotzdem gesperrt.
   const fehlend = ladeFehler
     ? []
-    : pflichtTypen.filter((t) => !documents.some((d) => d.type === t));
+    : pflichtTypen.filter(
+        (t) => !istNachreichbar(t) && !documents.some((d) => d.type === t),
+      );
   const fehlendSchluessel = fehlend.join(",");
   useEffect(() => {
     onMissingChange?.(fehlendSchluessel ? fehlendSchluessel.split(",") : []);
@@ -286,7 +325,18 @@ export function DocumentUpload({
           Pflichtdokumente
         </h3>
         <p className="mb-4 text-xs text-amber-800">
-          Die folgenden Unterlagen werden zwingend benötigt. Bitte laden Sie diese hoch (PDF, JPG, PNG, Word). Max. 10 MB pro Datei.
+          Die folgenden Unterlagen werden benötigt. Bitte laden Sie diese hoch
+          (PDF, JPG, PNG, Word). Max. 10 MB pro Datei.
+          {/* Ohne diesen Zusatz stuende ueber einer nachreichbaren Unterlage
+              „zwingend benötigt", und wer sie nicht zur Hand hat, sucht den
+              Fehler bei sich oder bricht ab. */}
+          {pflichtTypen.some((t) => istNachreichbar(t)) && (
+            <>
+              {" "}
+              Einzelne Nachweise dürfen Sie nachreichen — das ist beim
+              jeweiligen Eintrag vermerkt.
+            </>
+          )}
         </p>
 
         {/* Solange der Bestand unbekannt ist, wird er nicht dargestellt. Eine
@@ -346,7 +396,11 @@ export function DocumentUpload({
                     <div>
                       <p className="text-sm font-medium text-foreground">{reqDoc.label}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        {uploaded ? "Hochgeladen" : "Noch nicht hochgeladen – Pflicht"}
+                        {uploaded
+                          ? "Hochgeladen"
+                          : reqDoc.nachreichbar
+                            ? "Noch nicht hochgeladen – Pflicht, nachreichbar"
+                            : "Noch nicht hochgeladen – Pflicht"}
                       </p>
                       {/* Beim Befreiungsantrag reicht der Hinweis „hochladen" nicht:
                           Der Beschaeftigte muss wissen, woher das Blatt kommt und
@@ -371,6 +425,15 @@ export function DocumentUpload({
                             </p>
                           )}
                         </div>
+                      )}
+                      {/* Beim Masernschutz steht die Erklaerung genau dort, wo
+                          die Person die Datei gerade in der Hand haelt: was
+                          zaehlt, dass sie nachreichen darf — und was folgt,
+                          wenn sie es nicht tut. */}
+                      {reqDoc.dbType === "MASERNSCHUTZ" && !uploaded && (
+                        <p className="mt-1.5 max-w-md text-[11px] leading-relaxed text-amber-800">
+                          {MASERNSCHUTZ_HINWEIS}
+                        </p>
                       )}
                     </div>
                   </div>

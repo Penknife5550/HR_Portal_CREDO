@@ -24,6 +24,16 @@ import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/const
 import { zahlenFeld, zahlOderNull } from "@/lib/formular-zahlen";
 import { fehlerMeldung } from "@/lib/formular-fehler";
 import {
+  MAX_KOSTENSTELLEN_ZEILEN,
+  MAX_KOSTENSTELLE_LAENGE,
+  VOLLE_HUNDERT_HUNDERTSTEL,
+  hundertstel,
+  kostenstellenListeSchema,
+  prozentText,
+  summeHundertstel,
+  summenFehler,
+} from "@/lib/validations/kostenstellen";
+import {
   supStep1Schema,
   supStep2Schema,
   supStep3Schema,
@@ -86,7 +96,11 @@ const MAX_LAENGE = {
   // ein freies Textfeld ohne sichtbare Obergrenze.
   befristungZweck: 500,
   bemerkungVerguetung: 2000,
-  kostenstelle: 100,
+  // Bestandsfeld ohne Eingabe. Die Zeilen der Aufteilung tragen dieselbe
+  // Grenze — sie kommt fuer sie aus `MAX_KOSTENSTELLE_LAENGE`, damit Maske und
+  // Pruefdatei nicht getrennt wandern koennen.
+  kostenstelle: MAX_KOSTENSTELLE_LAENGE,
+  kostenstellenBemerkung: 2000,
   zusatzvereinbarungen: 5000,
 } as const;
 
@@ -177,6 +191,110 @@ function zahlenfelderUmschalter<T extends FieldValues>(
   };
 }
 
+// =============================================
+// Kostenstellen-Aufteilung (Schritt 4)
+// =============================================
+/**
+ * Eine Zeile der Aufteilung, so wie sie im Formular steht: BEIDE Werte als
+ * Text.
+ *
+ * Warum der Anteil hier Text ist und nicht Zahl: Ein `<input type="number">`
+ * hat waehrend des Tippens Zwischenstaende, die keine Zahl sind ("", "1,",
+ * "-"). Wer sie sofort umwandelt, loescht die Eingabe unter den Fingern der
+ * Person. Die Umwandlung passiert deshalb erst bei der Pruefung, ueber
+ * `zahlOderNull` (nimmt auch das deutsche Komma).
+ */
+interface KostenstellenZeileEingabe {
+  bezeichnung: string;
+  anteil: string;
+}
+
+const leereKostenstellenZeile = (): KostenstellenZeileEingabe => ({
+  bezeichnung: "",
+  anteil: "",
+});
+
+/**
+ * Die gespeicherten Zeilen eines Vorgangs in Formularzeilen uebersetzen.
+ *
+ * Kein Rueckfall auf das alte Einzelfeld an dieser Stelle: Der passiert
+ * EINMAL beim Laden (`mitKostenstellenRueckfall`). Sonst brachte jeder Wechsel
+ * zurueck auf Schritt 4 eine geloeschte Zeile wieder zum Vorschein — das alte
+ * Feld bleibt in diesem Release ja stehen.
+ */
+function kostenstellenAusBestand(
+  data: Record<string, unknown>
+): KostenstellenZeileEingabe[] {
+  const roh = Array.isArray(data.kostenstellen) ? data.kostenstellen : [];
+  return roh
+    .filter(
+      (zeile): zeile is Record<string, unknown> =>
+        !!zeile && typeof zeile === "object"
+    )
+    .map((zeile) => ({
+      bezeichnung:
+        typeof zeile.bezeichnung === "string" ? zeile.bezeichnung : "",
+      anteil: typeof zeile.anteil === "number" ? String(zeile.anteil) : "",
+    }));
+}
+
+/**
+ * BESTANDSDATEN, DIE NOCH KEINE ZEILE HABEN — einmal beim Laden umschreiben.
+ *
+ * Die einmalige Datenmigration (`KOSTENSTELLEN_AUFTEILUNG_V1`) hat auf einem
+ * Server, der gerade erst aktualisiert wurde, womoeglich noch nicht gelaufen.
+ * Ohne diesen Rueckfall saehe die vorgesetzte Person dann eine leere Tabelle,
+ * obwohl im Vorgang eine Kostenstelle steht — und traege sie ein zweites Mal
+ * ein oder gar nicht mehr.
+ *
+ * Dieselbe Regel wie in der Datenmigration, damit beide Wege zum gleichen
+ * Ergebnis kommen: Fehlt der Anteil, traegt die eine Kostenstelle alles, also
+ * 100 Prozent. Ein hinterlegter Anteil wird dagegen UNVERAENDERT uebernommen,
+ * auch wenn er nicht 100 ergibt — die Zahl stammt von einem Menschen. Die
+ * Luecke wird dann sichtbar (die Summe stimmt nicht) statt stillschweigend
+ * geglaettet.
+ */
+function mitKostenstellenRueckfall(
+  supervisorData: Record<string, unknown>
+): Record<string, unknown> {
+  const vorhanden = Array.isArray(supervisorData.kostenstellen)
+    ? supervisorData.kostenstellen
+    : [];
+  if (vorhanden.length > 0) return supervisorData;
+
+  const alt =
+    typeof supervisorData.kostenstelle === "string"
+      ? supervisorData.kostenstelle.trim()
+      : "";
+  if (!alt) return supervisorData;
+
+  const anteil = zahlOderNull(supervisorData.kostenstelleAnteil);
+  return {
+    ...supervisorData,
+    kostenstellen: [
+      { bezeichnung: alt.slice(0, MAX_LAENGE.kostenstelle), anteil: anteil ?? 100 },
+    ],
+  };
+}
+
+/**
+ * Aus den Befunden der Listenpruefung Saetze machen, die die Zeile benennen.
+ *
+ * Zod nummeriert ab null, Menschen ab eins. Gleiche Meldungen werden entdoppelt
+ * — drei leere Anteile ergaeben sonst dreimal denselben Satz.
+ */
+function kostenstellenMeldungen(
+  befunde: readonly { path: (string | number)[]; message: string }[]
+): string[] {
+  const saetze = befunde.map((befund) => {
+    const index = befund.path.find((teil) => typeof teil === "number");
+    return typeof index === "number"
+      ? `Zeile ${index + 1}: ${befund.message}`
+      : befund.message;
+  });
+  return [...new Set(saetze)];
+}
+
 export default function ModalitaetenPage() {
   const params = useParams();
   const token = params.token as string;
@@ -203,7 +321,7 @@ export default function ModalitaetenPage() {
       const result = await res.json();
       setPageData(result);
       if (result.supervisorData) {
-        setFormData(result.supervisorData);
+        setFormData(mitKostenstellenRueckfall(result.supervisorData));
         setCurrentStep(result.supervisorData.currentStep || 0);
       }
     } catch {
@@ -1111,10 +1229,28 @@ function SupStep4({
   const { register, handleSubmit, watch, getValues, setValue, formState: { errors } } = useForm<SupStep4Data>({
     resolver: zodResolver(supStep4Schema),
     defaultValues: {
-      kostenstelle: (data.kostenstelle as string) || "",
+      // BESTAND, KEIN EINGABEFELD MEHR. Die beiden Werte werden durchgereicht,
+      // damit ein noch nicht migrierter Vorgang sie behaelt — die Aufteilung
+      // selbst steht in `zeilen` (siehe unten).
+      //
+      // WARUM SIE HIER IN DIE GRENZEN GEZWUNGEN WERDEN: Beide stehen weiter in
+      // `supStep4Schema`, haben aber kein Eingabefeld mehr. Ein Bestandswert
+      // ausserhalb der Grenze (ein vor deren Einfuehrung gespeicherter, zu
+      // langer Text) liesse die Pruefung an einem Feld scheitern, das niemand
+      // sehen und deshalb auch nicht berichtigen kann — "Weiter" bliebe
+      // wortlos stehen. Gekuerzt wird genau wie in der Datenmigration und im
+      // Rueckfall oben, die Zeile traegt denselben Text.
+      kostenstelle: ((data.kostenstelle as string) || "").slice(
+        0,
+        MAX_LAENGE.kostenstelle,
+      ),
       // Nicht `(... as number) || null`: ein gespeicherter Anteil von 0 waere
       // dabei verschwunden. Siehe src/lib/formular-zahlen.ts.
-      kostenstelleAnteil: zahlOderNull(data.kostenstelleAnteil),
+      kostenstelleAnteil: (() => {
+        const anteil = zahlOderNull(data.kostenstelleAnteil);
+        return anteil === null ? null : Math.min(100, Math.max(0, anteil));
+      })(),
+      kostenstellenBemerkung: (data.kostenstellenBemerkung as string) || "",
       probezeit: probezeitStart,
       probezeitMonate: zahlOderNull(data.probezeitMonate) ?? 6,
       urlaubstageProJahr: zahlOderNull(data.urlaubstageProJahr) ?? 30,
@@ -1129,7 +1265,97 @@ function SupStep4({
   const masern = watch("masernschutzErforderlich");
   // Fuer den Zeichenzaehler: `watch` liefert bei jedem Tastendruck den Stand.
   const zusatzvereinbarungen = watch("zusatzvereinbarungen");
+  const kostenstellenBemerkung = watch("kostenstellenBemerkung");
   const [sammelFehler, setSammelFehler] = useState("");
+
+  /**
+   * Die Zeilen der Kostenstellen-Aufteilung liegen NEBEN react-hook-form, in
+   * schlichtem `useState` — genau wie die Tabellen in step6-employment.tsx des
+   * Fragebogens. `useFieldArray` kommt im ganzen Projekt nicht vor; ein
+   * einzelner neuer Mechanismus fuer eine einzelne Tabelle waere ein zweites
+   * Muster fuer dieselbe Sache.
+   */
+  const [zeilen, setZeilen] = useState<KostenstellenZeileEingabe[]>(() =>
+    kostenstellenAusBestand(data),
+  );
+  const [zeilenFehler, setZeilenFehler] = useState<string[]>([]);
+
+  // Die laufende Summe wird in GANZEN HUNDERTSTELN gerechnet, nicht in Prozent
+  // als Gleitkommazahl — die Begruendung steht im Kopf von
+  // validations/kostenstellen.ts. Hier wird sie nur benutzt, nicht wiederholt.
+  const zeilenMitZahl = zeilen.map((zeile) => ({
+    bezeichnung: zeile.bezeichnung.trim(),
+    // Ein leeres Feld zaehlt fuer die ANZEIGE als 0 — es fehlt dann sichtbar an
+    // 100 Prozent. Bei der Pruefung bleibt es dagegen `null`, damit Zod es als
+    // fehlende Angabe meldet und nicht als eingetragene Null.
+    anteil: zahlOderNull(zeile.anteil) ?? 0,
+  }));
+  const summe = summeHundertstel(zeilenMitZahl);
+  const differenz = VOLLE_HUNDERT_HUNDERTSTEL - summe;
+  // Derselbe Satz, den auch `kostenstellenListeSchema` und die Route melden.
+  // Selbst formuliert stuende beim Weiterklicken ein anderer Wortlaut da als
+  // beim Tippen.
+  const summenMeldung = summenFehler(zeilenMitZahl);
+  // Null Zeilen sind erlaubt (Entscheidung des Nutzers): Wer die Kostenstelle
+  // beim Ausfuellen noch nicht kennt, darf weiterkommen. Erst SOBALD eine Zeile
+  // da ist, muss die Summe stimmen.
+  const summeStimmt = summenMeldung === null;
+  const grenzeErreicht = zeilen.length >= MAX_KOSTENSTELLEN_ZEILEN;
+
+  // "Rest zuschlagen" traegt die Differenz auf die letzte Zeile — so, wie die
+  // Kostenrechnung den Rundungsrest ohnehin behandelt. Nur moeglich, solange
+  // die letzte Zeile den Rest auch tragen kann (kein negativer Anteil, nicht
+  // ueber 100 Prozent).
+  const letzterAnteil =
+    zeilen.length > 0
+      ? hundertstel(zahlOderNull(zeilen[zeilen.length - 1].anteil) ?? 0)
+      : 0;
+  const restZiel = letzterAnteil + differenz;
+  const restZuschlagbar =
+    zeilen.length > 0 &&
+    differenz !== 0 &&
+    restZiel >= 0 &&
+    restZiel <= VOLLE_HUNDERT_HUNDERTSTEL;
+
+  const restZuschlagen = () => {
+    if (!restZuschlagbar) return;
+    // Ganzzahl durch 100: `String(3334 / 100)` ist "33.34" — der Punkt ist
+    // richtig so, `<input type="number">` erwartet ihn.
+    const neu = String(restZiel / 100);
+    setZeilen(
+      zeilen.map((zeile, i) =>
+        i === zeilen.length - 1 ? { ...zeile, anteil: neu } : zeile,
+      ),
+    );
+  };
+
+  /**
+   * Trotz gesperrtem Knopf noch einmal pruefen.
+   *
+   * Der Knopf laesst sich im Browser wieder freischalten, und die Sperre kennt
+   * ohnehin nur die Summe — Doppelungen, zu viele Nachkommastellen und leere
+   * Bezeichnungen faengt erst `kostenstellenListeSchema` ab. Dieselbe Datei
+   * prueft auch der Server; zwei Rechenwege darf es nicht geben.
+   */
+  const abschicken = (werte: SupStep4Data) => {
+    const geprueft = kostenstellenListeSchema.safeParse(
+      zeilen.map((zeile) => ({
+        bezeichnung: zeile.bezeichnung,
+        anteil: zahlOderNull(zeile.anteil),
+      })),
+    );
+    if (!geprueft.success) {
+      setSammelFehler("");
+      setZeilenFehler(kostenstellenMeldungen(geprueft.error.issues));
+      return;
+    }
+    setZeilenFehler([]);
+    setSammelFehler("");
+    onNext({
+      ...(werte as unknown as Record<string, unknown>),
+      kostenstellen: geprueft.data,
+    });
+  };
 
   // Die Monatsangabe verschwindet mit dem Haken "Probezeit" – siehe
   // zahlenfelderUmschalter().
@@ -1143,26 +1369,164 @@ function SupStep4({
 
   return (
     <form
-      onSubmit={handleSubmit(
-        (v) => {
-          setSammelFehler("");
-          onNext(v as unknown as Record<string, unknown>);
-        },
-        () => setSammelFehler(SAMMEL_FEHLER),
-      )}
+      onSubmit={handleSubmit(abschicken, () => setSammelFehler(SAMMEL_FEHLER))}
       className="space-y-5"
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">Kostenstelle</label>
-          <input type="text" {...register("kostenstelle")} maxLength={MAX_LAENGE.kostenstelle} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
-          {errors.kostenstelle && <p className="text-xs text-destructive">{errors.kostenstelle.message}</p>}
+      <div className="space-y-3 rounded-lg border border-border p-4">
+        <div>
+          <p className="text-sm font-medium text-foreground">Kostenstellen</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Das Gehalt kann auf mehrere Kostenstellen aufgeteilt werden. Sind
+            Zeilen eingetragen, müssen ihre Anteile zusammen genau 100 % ergeben.
+            Wenn die Kostenstelle noch nicht feststeht, lassen Sie die Tabelle
+            leer.
+          </p>
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">Kostenstellenanteil (%)</label>
-          <input type="number" {...register("kostenstelleAnteil", zahlenFeld)} min={0} max={100} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
-          {errors.kostenstelleAnteil && <p className="text-xs text-destructive">{errors.kostenstelleAnteil.message}</p>}
+
+        {zeilen.length > 0 && (
+          <div className="space-y-2">
+            {zeilen.map((zeile, i) => (
+              <div
+                key={i}
+                className="grid gap-2 sm:grid-cols-[1fr_8rem_auto] sm:items-end"
+              >
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Kostenstelle {i + 1}
+                  </label>
+                  <input
+                    type="text"
+                    value={zeile.bezeichnung}
+                    maxLength={MAX_LAENGE.kostenstelle}
+                    placeholder="z.B. 4711"
+                    onChange={(e) =>
+                      setZeilen(
+                        zeilen.map((z, x) =>
+                          x === i ? { ...z, bezeichnung: e.target.value } : z,
+                        ),
+                      )
+                    }
+                    className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Anteil %
+                  </label>
+                  <input
+                    type="number"
+                    value={zeile.anteil}
+                    step={0.01}
+                    min={0}
+                    max={100}
+                    onChange={(e) =>
+                      setZeilen(
+                        zeilen.map((z, x) =>
+                          x === i ? { ...z, anteil: e.target.value } : z,
+                        ),
+                      )
+                    }
+                    className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setZeilen(zeilen.filter((_, x) => x !== i))}
+                  className="justify-self-start rounded-lg border border-border px-3 py-2.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 sm:justify-self-auto"
+                >
+                  Entfernen
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={grenzeErreicht}
+            onClick={() => setZeilen([...zeilen, leereKostenstellenZeile()])}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:text-muted-foreground"
+          >
+            + Kostenstelle hinzufügen
+          </button>
+          {/* Der Rundungsrest per Klick auf die letzte Zeile — sonst muesste
+              man 33,33/33,33/33,34 von Hand ausrechnen. */}
+          {zeilen.length > 0 && differenz !== 0 && (
+            <button
+              type="button"
+              disabled={!restZuschlagbar}
+              onClick={restZuschlagen}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:text-muted-foreground"
+            >
+              Rest der letzten Zeile zuschlagen
+            </button>
+          )}
         </div>
+
+        {/* Die Grenze meldet das Formular, nicht erst der Server: Ein Knopf,
+            der ohne Begruendung nicht mehr reagiert, ist keine Rueckmeldung. */}
+        {grenzeErreicht && (
+          <p className="text-xs text-muted-foreground">
+            Sie haben {MAX_KOSTENSTELLEN_ZEILEN} Kostenstellen erfasst — mehr
+            können wir über dieses Formular nicht entgegennehmen. Bitte sprechen
+            Sie uns auf weitere an.
+          </p>
+        )}
+
+        {/* Die laufende Summe. Stimmt sie nicht, steht hier woertlich der Satz
+            aus der Pruefdatei — denselben bekommt die Person beim Absenden zu
+            lesen, und derselbe kaeme vom Server. */}
+        {zeilen.length > 0 &&
+          (summenMeldung ? (
+            <p className="text-sm font-medium text-destructive">{summenMeldung}</p>
+          ) : (
+            <p className="text-sm font-medium text-green-700">
+              Summe: {prozentText(summe)} % — vollständig aufgeteilt.
+            </p>
+          ))}
+
+        {zeilen.length > 0 && differenz !== 0 && !restZuschlagbar && (
+          <p className="text-xs text-muted-foreground">
+            Die letzte Zeile kann den Rest nicht tragen. Bitte passen Sie die
+            Anteile von Hand an.
+          </p>
+        )}
+
+        <div className="space-y-2 pt-1">
+          <label className="text-sm font-medium text-foreground">
+            Bemerkung zur Kostenstellen-Aufteilung
+          </label>
+          <textarea
+            {...register("kostenstellenBemerkung")}
+            rows={2}
+            maxLength={MAX_LAENGE.kostenstellenBemerkung}
+            placeholder="z.B. Aufteilung gilt ab dem zweiten Halbjahr"
+            className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+          />
+          <ZeichenZaehler
+            wert={kostenstellenBemerkung}
+            max={MAX_LAENGE.kostenstellenBemerkung}
+          />
+          {errors.kostenstellenBemerkung && (
+            <p className="text-xs text-destructive">
+              {errors.kostenstellenBemerkung.message}
+            </p>
+          )}
+        </div>
+
+        {zeilenFehler.length > 0 && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm font-semibold text-destructive">
+              Bitte prüfen Sie die Kostenstellen:
+            </p>
+            <ul className="mt-1 list-disc pl-5 text-xs text-destructive">
+              {zeilenFehler.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
@@ -1230,11 +1594,22 @@ function SupStep4({
         </p>
       )}
 
-      <div className="flex justify-between pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
         <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurück</button>
-        <button type="submit" disabled={saving} className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-          {saving ? "Speichern..." : "Weiter"}
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {/* Der Grund steht PERMANENT neben dem gesperrten Knopf. Ein Knopf,
+              der ohne Erklaerung nicht reagiert, ist genau die Stille, die im
+              Personalbuero als "das Formular hängt" ankommt. */}
+          {!summeStimmt && (
+            <p className="text-xs font-medium text-destructive">
+              „Weiter“ ist gesperrt, solange die Anteile nicht genau 100 %
+              ergeben.
+            </p>
+          )}
+          <button type="submit" disabled={saving || !summeStimmt} className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+            {saving ? "Speichern..." : "Weiter"}
+          </button>
+        </div>
       </div>
     </form>
   );
@@ -1269,6 +1644,24 @@ function SupStep5Summary({
     const org = organizations.find((o) => o.mandantNumber === id);
     return org ? `${org.name} (${org.mandantNumber})` : str(id);
   };
+
+  /**
+   * Die Zeilen der Kostenstellen-Aufteilung, wie sie Schritt 4 hinterlassen
+   * hat. Zeilen ohne brauchbaren Anteil fallen heraus — in der Zusammenfassung
+   * stuende sonst "NaN %".
+   */
+  const kostenstellenZeilen: { bezeichnung: string; anteil: number }[] = (
+    Array.isArray(data.kostenstellen) ? data.kostenstellen : []
+  )
+    .filter(
+      (zeile): zeile is Record<string, unknown> =>
+        !!zeile && typeof zeile === "object"
+    )
+    .map((zeile) => ({
+      bezeichnung: typeof zeile.bezeichnung === "string" ? zeile.bezeichnung : "",
+      anteil: zahlOderNull(zeile.anteil) ?? 0,
+    }));
+  const kostenstellenSumme = summeHundertstel(kostenstellenZeilen);
 
   const MODELL_LABELS: Record<string, string> = {
     TV_L: "TV-L",
@@ -1336,7 +1729,31 @@ function SupStep5Summary({
       <div className="rounded-lg border border-border">
         <div className="border-b bg-muted/50 px-4 py-2"><h3 className="text-sm font-semibold">4. Zusätzliche Angaben</h3></div>
         <div className="px-4 py-3 text-xs space-y-1">
-          {!!data.kostenstelle && <div className="flex justify-between"><span className="text-muted-foreground">Kostenstelle</span><span className="font-medium">{str(data.kostenstelle)}</span></div>}
+          {kostenstellenZeilen.length > 0 ? (
+            <div className="space-y-1 border-b border-border pb-2">
+              <span className="text-muted-foreground">Kostenstellen</span>
+              {kostenstellenZeilen.map((zeile, i) => (
+                <div key={i} className="flex justify-between gap-4 pl-3">
+                  <span className="text-muted-foreground">{zeile.bezeichnung}</span>
+                  <span className="font-medium">{prozentText(hundertstel(zeile.anteil))} %</span>
+                </div>
+              ))}
+              <div className="flex justify-between gap-4 pl-3">
+                <span className="text-muted-foreground">Summe</span>
+                <span className="font-medium">{prozentText(kostenstellenSumme)} %</span>
+              </div>
+              {!!data.kostenstellenBemerkung && (
+                <div className="flex justify-between gap-4 pl-3">
+                  <span className="shrink-0 text-muted-foreground">Bemerkung</span>
+                  <span className="max-w-[60%] text-right font-medium">{str(data.kostenstellenBemerkung)}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Rueckfall fuer einen Vorgang, der noch keine Zeile hat: Sonst
+            // verschwaende eine gespeicherte Kostenstelle aus der Anzeige.
+            !!data.kostenstelle && <div className="flex justify-between"><span className="text-muted-foreground">Kostenstelle</span><span className="font-medium">{str(data.kostenstelle)}</span></div>
+          )}
           <div className="flex justify-between"><span className="text-muted-foreground">Probezeit</span><span className="font-medium">{data.probezeit ? `${str(data.probezeitMonate)} Monate` : "Nein"}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Urlaubstage</span><span className="font-medium">{str(data.urlaubstageProJahr)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Zeiterfassung</span><span className="font-medium">{data.zeiterfassung ? "Ja" : "Nein"}</span></div>

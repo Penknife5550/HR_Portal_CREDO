@@ -1,9 +1,20 @@
 "use client";
 
 /**
- * Step 9 (ehem. 9): Masernschutz
+ * Step 9: Masernschutz
  * Fuer Gemeinschaftseinrichtungen (Schulen, Kitas) ab 01.03.2020 Pflicht
  * gemäß Masernschutzgesetz (IfSG §20 Abs. 8)
+ *
+ * DAS GEBURTSJAHR WIRD ABGELEITET, NICHT GEFRAGT. Frueher stand hier ein
+ * eigener Haken "Nach 1971 geboren?" neben dem Geburtsdatum aus Schritt 1 —
+ * zwei Wahrheiten zu derselben Tatsache. Blieb der Haken leer (und das tat er,
+ * weil niemand eine Frage beantwortet, die er schon beantwortet hat), stand in
+ * der Personalakte "Nein", obwohl das Geburtsjahr 2001 daneben stand. Die Regel
+ * liegt jetzt in `@/lib/masernschutz` und wird von Fragebogen, Dokumentenpflicht
+ * und Serverpruefung gemeinsam benutzt.
+ *
+ * Das Feld `bornAfter1971` wird weiterhin GESPEICHERT — Uebersicht, HR-Sicht und
+ * Personalakte-PDF lesen es. Nur eben abgeleitet statt getippt.
  *
  * Wenn Nachweis vorhanden: Inline-Upload für Impfausweis/Attest
  */
@@ -13,6 +24,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { step9Schema, type Step9Data } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
+import { istNachreichbar } from "@/lib/required-documents";
+import {
+  geburtsjahr,
+  istGemeinschaftseinrichtung,
+  istNach1970Geboren,
+  masernschutzPflichtig,
+} from "@/lib/masernschutz";
 
 interface StepProps {
   data: Record<string, unknown>;
@@ -34,6 +52,23 @@ export function Step9Masern({
   token,
 }: StepProps) {
   const fc = fieldConfig ?? new FieldConfigHelper(9);
+
+  // Abgeleitet aus Schritt 1. Der steht in jeder Vorlage vor Schritt 9 und ist
+  // ein Pflichtschritt mit Pflichtfeld `birthDate` — der Wert liegt hier also
+  // vor. `null` ist trotzdem vorgesehen: Er bedeutet "unbekannt" und fuehrt
+  // weder zu einer Pflicht noch zu einem stillen "Nein".
+  const geborenNach1970 = istNach1970Geboren(data.birthDate);
+  const jahr = geburtsjahr(data.birthDate);
+  const isGemeinschaftseinrichtung = istGemeinschaftseinrichtung(
+    organization.type
+  );
+  // Dieselbe Funktion, die spaeter ueber die Dokumentenpflicht entscheidet.
+  // Bauten Maske und Pflicht ihre eigene Bedingung, liefen sie auseinander.
+  const nachweisPflichtig = masernschutzPflichtig({
+    geburtsdatum: data.birthDate,
+    organisationstyp: organization.type,
+  });
+
   const {
     register,
     handleSubmit,
@@ -41,12 +76,14 @@ export function Step9Masern({
   } = useForm<Step9Data>({
     resolver: zodResolver(step9Schema),
     defaultValues: {
-      bornAfter1971: (data.bornAfter1971 as boolean) || false,
+      // `bornAfter1971` steht nur noch im Formularzustand, weil das Schema es
+      // verlangt — angezeigt und bearbeitet wird es nicht mehr. Was tatsaechlich
+      // gespeichert wird, entscheidet `onSubmit` aus dem abgeleiteten Wert.
+      bornAfter1971: geborenNach1970 ?? false,
       masernschutzProvided: (data.masernschutzProvided as boolean) || false,
     },
   });
 
-  const bornAfter1971 = watch("bornAfter1971");
   const masernschutzProvided = watch("masernschutzProvided");
 
   // Upload State
@@ -54,10 +91,6 @@ export function Step9Masern({
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  const isGemeinschaftseinrichtung = [
-    "GYMNASIUM", "GESAMTSCHULE", "GRUNDSCHULE", "BERUFSKOLLEG", "KITA",
-  ].includes(organization.type);
 
   const handleUpload = async (file: File) => {
     if (!token) return;
@@ -99,8 +132,28 @@ export function Step9Masern({
     }
   };
 
+  /**
+   * Gespeichert wird nur, was tatsaechlich beantwortet ist.
+   *
+   * Ohne Geburtsdatum geht GAR NICHTS mit: Ein `bornAfter1971: false` waere ein
+   * stilles "Nein" auf eine nie gestellte Frage — genau der Befund, der diesen
+   * Umbau ausgeloest hat. `masernschutzProvided` bleibt in diesem Fall ebenfalls
+   * unangetastet (die Route uebernimmt nur mitgesendete Felder, siehe
+   * `api/fragebogen/[token]/route.ts`), damit ein frueher gegebener Wert nicht
+   * durch ein Durchklicken geloescht wird.
+   */
   const onSubmit = (values: Step9Data) => {
-    onNext(values as unknown as Record<string, unknown>);
+    const nutzlast: Record<string, unknown> = {};
+    if (geborenNach1970 !== null) {
+      nutzlast.bornAfter1971 = geborenNach1970;
+      // Die Nachweisfrage wird nur gestellt, wenn die Person nach dem
+      // 31.12.1970 geboren ist. Wer davor geboren ist, gilt als immun — dann
+      // gibt es nichts zu beantworten und nichts zu ueberschreiben.
+      if (geborenNach1970) {
+        nutzlast.masernschutzProvided = values.masernschutzProvided;
+      }
+    }
+    onNext(nutzlast);
   };
 
   return (
@@ -123,39 +176,67 @@ export function Step9Masern({
               wurden.
             </>
           ) : (
+            /* Keine Gemeinschaftseinrichtung: IfSG §20 Abs. 8 traegt hier
+               nicht. Der Nachweis ist ein Gesundheitsdatum (Art. 9 DSGVO) und
+               darf deshalb nur freiwillig erbeten, nicht verlangt werden. */
             <>
-              Bitte geben Sie an, ob Sie nach 1970 geboren wurden und ob ein
-              Masernschutznachweis vorliegt. Diese Angabe ist für die
-              Personalakte relevant.
+              {organization.name} ist keine Gemeinschaftseinrichtung im Sinne des
+              Masernschutzgesetzes — ein Nachweis ist hier nicht vorgeschrieben.
+              Die folgende Angabe ist freiwillig.
             </>
           )}
         </p>
       </div>
 
-      {/* Geburtsjahr */}
+      {/* Geburtsjahr — abgeleitet aus Schritt 1, keine Eingabe.
+          `fc.isVisible` steuert weiterhin die ANZEIGE. Der abgeleitete Wert
+          wird trotzdem gespeichert: Er ist eine Tatsache aus dem Geburtsdatum
+          und keine Antwort, die HR per Schalter abbestellen koennte. */}
       {fc.isVisible("bornAfter1971") && (
         <div className="rounded-lg border border-border bg-muted/50 p-4">
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              {...register("bornAfter1971")}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-            />
-            <div>
-              <span className="text-sm font-medium text-foreground">
-                {fc.getLabel("bornAfter1971")}
-              </span>
-              <p className="text-xs text-muted-foreground">
-                Personen, die vor 1971 geboren sind, gelten als immun und
-                benoetigen keinen Nachweis.
+          {geborenNach1970 === null ? (
+            <>
+              <p className="text-sm font-medium text-foreground">
+                Ihr Geburtsdatum liegt uns noch nicht vor.
               </p>
-            </div>
-          </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Bitte tragen Sie es in Schritt 1 (Persönliche Angaben) nach —
+                erst daraus ergibt sich, ob ein Masernschutznachweis nötig ist.
+                Solange bleibt diese Angabe offen.
+              </p>
+            </>
+          ) : geborenNach1970 ? (
+            <>
+              <p className="text-sm font-medium text-foreground">
+                Sie sind nach dem 31.12.1970 geboren.
+                {nachweisPflichtig
+                  ? " Deshalb ist der Masernschutz nachzuweisen."
+                  : ""}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Abgeleitet aus Ihrem Geburtsjahr ({jahr}) aus Schritt 1. Stimmt
+                das nicht, korrigieren Sie bitte dort das Geburtsdatum.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-foreground">
+                Sie sind vor dem 01.01.1971 geboren — ein Masernschutznachweis
+                ist für Sie nicht erforderlich.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Personen, die vor 1971 geboren sind, gelten als immun.
+                Abgeleitet aus Ihrem Geburtsjahr ({jahr}) aus Schritt 1.
+              </p>
+            </>
+          )}
         </div>
       )}
 
-      {/* Masernschutz vorhanden */}
-      {bornAfter1971 && fc.isVisible("masernschutzProvided") && (
+      {/* Masernschutz vorhanden — nur, wenn die Frage sich ueberhaupt stellt.
+          Bei fehlendem Geburtsdatum (`null`) bleibt sie aus: Ohne die Grundlage
+          waere jede Antwort hier eine Behauptung ins Blaue. */}
+      {geborenNach1970 === true && fc.isVisible("masernschutzProvided") && (
         <div className="space-y-4 rounded-lg border border-border p-4">
           <label className="flex items-center gap-3">
             <input
@@ -164,6 +245,11 @@ export function Step9Masern({
               className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
             <div>
+              {/* KEIN Pflicht-Sternchen. Der Haken erzwingt nichts — die
+                  Pflicht haengt am hochgeladenen Nachweis, nicht an der
+                  Selbstauskunft. Ein Sternchen an einem Feld, das niemand
+                  prueft, ist genau die Sorte Anzeige, die diesen Schritt in den
+                  Befund gebracht hat. */}
               <span className="text-sm font-medium text-foreground">
                 {fc.getLabel("masernschutzProvided")}
               </span>
@@ -205,6 +291,20 @@ export function Step9Masern({
                       <p className="text-[10px] text-destructive">{uploadError}</p>
                     ) : uploadedFile ? (
                       <p className="text-[10px] text-credo-gruen truncate">{uploadedFile}</p>
+                    ) : nachweisPflichtig ? (
+                      /* "Optional" waere hier falsch — und zwar an der einen
+                         Stelle, an der die Person die Datei gerade in der Hand
+                         haelt. Ob das Absenden ohne den Nachweis aufgehalten
+                         wird, wird NICHT hier entschieden und auch nicht hier
+                         behauptet: Das sagt `istNachreichbar`, dieselbe
+                         Funktion, an der die Dokumentenliste in Schritt 10 und
+                         die Pruefung des Servers haengen. Ein eigener Satz
+                         waere die naechste Stelle, die mit ihr auseinanderlaeuft. */
+                      <p className="text-[10px] text-muted-foreground">
+                        {istNachreichbar("MASERNSCHUTZ")
+                          ? "Pflicht — Sie dürfen den Nachweis nachreichen"
+                          : "Pflicht — ohne den Nachweis können Sie nicht absenden"}
+                      </p>
                     ) : (
                       <p className="text-[10px] text-muted-foreground">Optional — kann auch spaeter nachgereicht werden</p>
                     )}

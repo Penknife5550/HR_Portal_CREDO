@@ -478,7 +478,7 @@ async function addFragebogenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
   // Masernschutz
   checkBreak(doc, 40, ctx, "Fragebogen");
   y = section(doc, "Masernschutz");
-  y = dataRow(doc, "Geboren nach 1971", yn(pd.bornAfter1971), y);
+  y = dataRow(doc, "Nach dem 31.12.1970 geboren", yn(pd.bornAfter1971), y);
   y = dataRow(doc, "Masernschutz nachgewiesen", yn(pd.masernschutzProvided), y);
 
   // Kinder

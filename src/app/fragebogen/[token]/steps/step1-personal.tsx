@@ -188,7 +188,17 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
 
       {/* Geburtsdatum + Geburtsort */}
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* Geburtsdatum – alwaysVisible */}
+        {/* Geburtsdatum – alwaysVisible
+            AN DIESEM FELD HAENGT DER MASERNSCHUTZ. Schritt 9 fragt das
+            Geburtsjahr nicht mehr ab, sondern leitet es hier ab
+            (src/lib/masernschutz.ts); daraus entsteht die Pflicht zum Nachweis.
+            Es traegt das zu Recht: Schritt 1 ist Pflichtschritt und steht immer
+            vorn, das Feld ist in der Registry `alwaysVisible`/`alwaysRequired`
+            und in `createStep1Schema` fest als Pflicht verdrahtet — es laesst
+            sich im Vorlagen-Editor also nicht abschalten. Und `type="date"`
+            liefert unabhaengig von der Anzeigesprache "JJJJ-MM-TT" oder "", das
+            Format, das die Ableitung liest. Wer eines davon aendert, aendert die
+            Masernschutz-Regel mit. */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">
             {fc.getLabel("birthDate")} <span className="text-destructive">*</span>

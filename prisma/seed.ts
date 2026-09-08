@@ -190,8 +190,17 @@ async function main() {
   );
 
   /**
-   * Minijob: Nur der Masernschutz faellt weg — er ist fuer geringfuegig
-   * Beschaeftigte in Schulen und Kitas nicht einschlaegig.
+   * Minijob: Es faellt kein Schritt mehr weg — der Steuer-Schritt wird nur auf
+   * die Steuer-ID reduziert (siehe oben).
+   *
+   * Der Masernschutz (9) war bis 07.09.2026 abgeschaltet mit der Begruendung,
+   * er sei fuer geringfuegig Beschaeftigte nicht einschlaegig. Das war falsch:
+   * Das Infektionsschutzgesetz knuepft an die **Taetigkeit in der
+   * Gemeinschaftseinrichtung** an, nicht an den Umfang der Beschaeftigung. Eine
+   * Aushilfe in der Kita faellt genauso darunter wie eine Erzieherin in
+   * Vollzeit. Ob daraus eine Dokumentenpflicht wird, entscheidet sich ohnehin
+   * erst am Vorgang (Geburtsjahr ab 1971 und Einrichtungstyp, siehe
+   * src/lib/masernschutz.ts) — der Schritt stellt nur die Frage.
    *
    * "Bildung & Beruf" bleibt bewusst aktiv: Der Taetigkeitsschluessel der
    * Meldung zur Sozialversicherung verlangt Schulabschluss und
@@ -199,11 +208,20 @@ async function main() {
    * 25.08.2026). "Weitere Beschaeftigung" bleibt aktiv, weil die
    * Beitragsverfahrensverordnung genau diese Erklaerung verlangt.
    */
-  const minijobSteps = stepsExcept([9]).map((s) =>
+  const minijobSteps = stepsExcept([]).map((s) =>
     s.step === 5 ? { ...s, fields: minijobTaxFields } : s,
   );
 
-  const ehrenamtSteps = stepsExcept([3, 4, 5, 6, 7, 8, 9, 11]);
+  /**
+   * Ehrenamt: minimaler Fragebogen — plus Masernschutz (9).
+   *
+   * Ehrenamtliche, die regelmaessig in einer Kita oder Schule taetig sind,
+   * fallen fachlich unter dieselbe Vorschrift wie Angestellte (Entscheidung
+   * 07.09.2026). Der Schritt kostet sie eine Frage; die Pflicht zum Nachweis
+   * entsteht auch hier nur bei Geburtsjahr ab 1971 und Gemeinschafts-
+   * einrichtung, und sie haelt das Absenden nicht auf.
+   */
+  const ehrenamtSteps = stepsExcept([3, 4, 5, 6, 7, 8, 11]);
 
   const formTemplates = [
     {

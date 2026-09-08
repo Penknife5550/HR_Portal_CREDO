@@ -210,7 +210,16 @@ export async function validateSupervisorToken(token: string, options?: { allowSu
     where: { supervisorToken: token },
     include: {
       organization: true,
-      supervisorData: true,
+      // Die Kostenstellen-Zeilen gehoeren zwingend dazu: Die GET-Route reicht
+      // `supervisorData` unveraendert an das Formular weiter, und die Maske
+      // stellt ihre Tabelle daraus wieder her. Ohne das `include` kaeme sie
+      // beim zweiten Oeffnen leer zurueck — die Aufteilung waere gespeichert,
+      // aber unsichtbar, und der naechste Klick auf "Weiter" ueberschriebe sie
+      // mit nichts. Die POST-Route prueft aus derselben Quelle, ob die Anteile
+      // 100 Prozent ergeben.
+      supervisorData: {
+        include: { kostenstellen: { orderBy: { orderIndex: "asc" } } },
+      },
       personalData: {
         select: { firstName: true, lastName: true },
       },

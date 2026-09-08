@@ -1568,7 +1568,7 @@ function TabFragebogenDaten({
       {/* Schritt 9: Masernschutz */}
       <SectionCard title="9. Masernschutz" icon="&#128137;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-          <FieldRow label="Nach 1971 geboren" value={formatBoolean(pd.bornAfter1971)} />
+          <FieldRow label="Nach dem 31.12.1970 geboren" value={formatBoolean(pd.bornAfter1971)} />
           <FieldRow label="Masernschutz nachgewiesen" value={formatBoolean(pd.masernschutzProvided)} />
         </div>
       </SectionCard>

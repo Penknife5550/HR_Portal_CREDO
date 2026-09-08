@@ -142,7 +142,7 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
 
   // Step 9: Masernschutz
   9: [
-    { name: "bornAfter1971",        label: "Nach 1971 geboren?",  defaultVisible: true, defaultRequired: false },
+    { name: "bornAfter1971",        label: "Nach dem 31.12.1970 geboren",  defaultVisible: true, defaultRequired: false },
     { name: "masernschutzProvided", label: "Masernschutz-Nachweis", defaultVisible: true, defaultRequired: false },
   ],
 

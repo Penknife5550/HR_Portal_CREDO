@@ -667,7 +667,7 @@ export function Step10Summary({
       {hatAngaben(d.bornAfter1971, d.masernschutzProvided) && (
         <SummarySection title="9. Masernschutz">
           <SummaryRow
-            label="Nach 1970 geboren"
+            label="Nach dem 31.12.1970 geboren"
             value={jaNein(d.bornAfter1971)}
           />
           {!!d.bornAfter1971 && (

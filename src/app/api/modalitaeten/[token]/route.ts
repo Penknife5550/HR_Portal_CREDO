@@ -13,6 +13,11 @@ import { triggerN8nWebhook } from "@/lib/n8n";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
 import { BEFRISTUNGSARTEN } from "@/lib/validations/supervisor-data";
+import {
+  kostenstellenListeSchema,
+  summenFehler,
+  zuDatensatz,
+} from "@/lib/validations/kostenstellen";
 
 // =============================================
 // Zod-Schema für Modalitaeten-Validierung (serverseitig)
@@ -39,6 +44,13 @@ const modalitaetenFieldsSchema = z.object({
   ehrenamt: z.boolean().optional(),
   kostenstelle: z.string().max(100).optional(),
   kostenstelleAnteil: z.number().min(0).max(100).nullable().optional(),
+  // Die Aufteilung des Gehalts auf mehrere Kostenstellen. Ohne diesen Eintrag
+  // faellt `kostenstellen` wegen `.strip()` weiter unten STILL aus dem Aufruf
+  // heraus — gespeichert wuerde nichts, gemeldet auch nichts.
+  // Dieselbe Datei prueft das Formular: zwei Rechenwege fuer dieselbe Regel
+  // waeren zwei Wahrheiten.
+  kostenstellen: kostenstellenListeSchema.optional(),
+  kostenstellenBemerkung: z.string().max(2000).optional(),
   probezeit: z.boolean().optional(),
   probezeitMonate: z.number().min(0).max(12).nullable().optional(),
   verguetungsmodell: z.enum(["TV_L", "TV_L_S", "HAUSTARIF", "SONSTIGES"]).optional(),
@@ -165,7 +177,11 @@ export async function PUT(
     "hauptarbeitgeberId", "hauptarbeitgeberStunden",
     "nebenarbeitgeberId", "nebenarbeitgeberStunden",
     "svPflichtig", "minijob", "ehrenamt",
-    "kostenstelle", "kostenstelleAnteil",
+    // `kostenstellen` steht hier BEWUSST NICHT: Die Zeilen liegen in einer
+    // eigenen Tabelle. Stuenden sie in der Liste, landete ein Array in
+    // `updateData` und damit unveraendert in `supervisorData.update` — Prisma
+    // kennt dort kein solches Feld.
+    "kostenstelle", "kostenstelleAnteil", "kostenstellenBemerkung",
     "probezeit", "probezeitMonate",
     "verguetungsmodell", "entgeltgruppe", "stufe",
     "festgehalt", "stundenlohn", "bemerkungVerguetung",
@@ -242,13 +258,48 @@ export async function PUT(
     updateData.currentStep = currentStep;
   }
 
-  await prisma.supervisorData.upsert({
-    where: { onboardingId: onboarding.id },
-    create: {
-      onboardingId: onboarding.id,
-      ...updateData,
-    },
-    update: updateData,
+  /**
+   * KOSTENSTELLEN-ZEILEN: nur anfassen, wenn der Aufruf sie mitschickt.
+   *
+   * `Array.isArray` und NICHT `if (zeilen.length)` — das ist der Unterschied
+   * zwischen "dazu sage ich nichts" und "keine mehr":
+   *   - `undefined` (die Schritte 1 bis 3 speichern) laesst die Aufteilung
+   *     stehen. Sonst loeschte jedes Zwischenspeichern sie mit.
+   *   - `[]` (alle Zeilen entfernt) MUSS loeschen. Ein Widerruf, der nicht
+   *     ankommt, laesst die alte Aufteilung in der Personalakte stehen — im
+   *     Widerspruch zu dem, was die vorgesetzte Person auf dem Schirm hatte.
+   * Denselben Fehler hatte der Fragebogen schon einmal; die Begruendung steht
+   * ausfuehrlich in src/app/api/fragebogen/[token]/route.ts.
+   */
+  const zeilen = parsed.data.kostenstellen;
+
+  // Interaktive Transaktion statt eines Arrays von Operationen: Die id des
+  // Upserts wird fuer die Zeilen gebraucht, und beim ersten Speichern gibt es
+  // sie vorher noch nicht.
+  await prisma.$transaction(async (tx) => {
+    const gespeichert = await tx.supervisorData.upsert({
+      where: { onboardingId: onboarding.id },
+      create: {
+        onboardingId: onboarding.id,
+        ...updateData,
+      },
+      update: updateData,
+    });
+
+    if (!Array.isArray(zeilen)) return;
+
+    // Ersetzen statt Abgleichen: Die Zeilen haben keine stabile Kennung im
+    // Formular, und die Reihenfolge ist Teil der Angabe.
+    await tx.supervisorKostenstelle.deleteMany({
+      where: { supervisorDataId: gespeichert.id },
+    });
+    if (zeilen.length > 0) {
+      await tx.supervisorKostenstelle.createMany({
+        data: zeilen.map((zeile, index) =>
+          zuDatensatz(zeile, gespeichert.id, index)
+        ),
+      });
+    }
   });
 
   return NextResponse.json({ success: true, currentStep });
@@ -308,6 +359,27 @@ export async function POST(
         { status: 400 }
       );
     }
+  }
+
+  /**
+   * Die harte Sperre fuer die Kostenstellen-Aufteilung.
+   *
+   * Im Formular ist "Weiter" gesperrt, solange die Summe nicht stimmt — das
+   * laesst sich im Browser aber wieder freischalten, und ein Aufruf muss diese
+   * Route auch ohne Formular erreichen duerfen. Gerechnet wird in ganzen
+   * Hundersteln, sonst wiese `=== 100` ausgerechnet 33,33 + 33,33 + 33,34 ab.
+   *
+   * Keine Zeile ist ausdruecklich in Ordnung: Wer die Kostenstelle beim
+   * Ausfuellen noch nicht kennt, soll nicht am Absenden gehindert werden.
+   */
+  const summenProblem = summenFehler(sd.kostenstellen ?? []);
+  if (summenProblem) {
+    return NextResponse.json(
+      {
+        error: `${summenProblem} Bitte teilen Sie das Gehalt auf genau 100 % auf oder entfernen Sie die Kostenstellen.`,
+      },
+      { status: 400 }
+    );
   }
 
   // SupervisorData als vollstaendig markieren

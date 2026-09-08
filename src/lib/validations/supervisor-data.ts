@@ -195,11 +195,31 @@ export type SupStep3Data = z.infer<typeof supStep3Schema>;
 // Step 4: Zusaetzliche Angaben
 // =============================================
 export const supStep4Schema = z.object({
+  // DIE BEIDEN EINZELFELDER SIND BESTAND, NICHT MEHR DIE EINGABE.
+  // Das Gehalt wird seit der Aufteilung in Zeilen erfasst
+  // (`SupervisorKostenstelle`, geprueft in validations/kostenstellen.ts). Die
+  // Zeilen stehen bewusst NICHT in diesem Schema: Sie werden ausserhalb von
+  // react-hook-form gehalten und einzeln geprueft — dasselbe Muster wie
+  // `beschaeftigungsAngaben` im Fragebogen.
+  //
+  // Die beiden Regeln hier bleiben trotzdem stehen, solange Bestandsdaten ohne
+  // Zeilen durch die Maske laufen: Das Formular reicht die gespeicherten Werte
+  // unveraendert weiter, und ein Schema ohne diese Schluessel wiese sie ab.
+  // Entfernt werden sie erst, wenn die Datenmigration nachweislich gelaufen ist.
   kostenstelle: z.string().max(100, "Bitte maximal 100 Zeichen."),
   kostenstelleAnteil: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })
     .min(0, "Der Anteil kann nicht negativ sein.")
     .max(100, "Der Anteil kann hoechstens 100 Prozent betragen.")
     .nullable(),
+  /**
+   * EIN Bemerkungsfeld fuer die GESAMTE Aufteilung, nicht je Zeile.
+   *
+   * 2000 Zeichen wie bei `bemerkungVerguetung`: Das Feld steht in einem
+   * oeffentlich erreichbaren Formular (Magic Link), eine Obergrenze gehoert
+   * dazu — und sie muss dieselbe sein wie in der Route, sonst antwortet der
+   * Server mit einem blanken "Validierungsfehler".
+   */
+  kostenstellenBemerkung: z.string().max(2000, "Bitte maximal 2000 Zeichen."),
   probezeit: z.boolean(),
   // .int(): Spalte ist Int? — 6,5 Monate scheiterten sonst erst bei Prisma.
   probezeitMonate: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })

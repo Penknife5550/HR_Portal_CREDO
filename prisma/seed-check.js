@@ -207,7 +207,9 @@ async function migrateCurrentStepToRegistryNumbers(prisma) {
  *   - Bildung & Beruf (8) an — der Taetigkeitsschluessel der Meldung zur
  *     Sozialversicherung verlangt Schulabschluss und Berufsausbildung auch
  *     bei geringfuegig Beschaeftigten
- *   - Masernschutz (9) bleibt unveraendert (aus)
+ *   - Masernschutz (9) wird hier nicht angefasst. Er war damals bewusst aus;
+ *     seit dem 07.09.2026 schaltet ihn `ensureMasernschutzSchritt` mit eigenem
+ *     Merker ein — diese Korrektur bleibt so stehen, wie sie gelaufen ist.
  *
  * Bewusst **keine** Rundum-Ueberschreibung: Nur diese drei Schritte werden
  * angefasst, alle uebrigen Einstellungen und alle anderen Vorlagen bleiben so,
@@ -577,6 +579,180 @@ async function ensureMinijobStep6Felder(prisma) {
 }
 
 // =============================================
+// Einmalige Datenmigration: Masernschutz-Schritt in ALLEN Vorlagen
+// =============================================
+const MASERNSCHUTZ_MARKER = "FORMTEMPLATE_MASERNSCHUTZ_V1";
+const MASERN_SCHRITT = 9;
+const MASERN_TITEL = "Masernschutz";
+
+/**
+ * Steht Schritt 9 in dieser Konfiguration auf „an"?
+ *
+ * Ein **fehlender** Eintrag zaehlt als aus (so wertet getActiveSteps ihn) — er
+ * muss also ergaenzt werden, nicht uebergangen.
+ */
+function masernSchrittAktiv(steps) {
+  const schritt = steps.find((s) => s.step === MASERN_SCHRITT);
+  return Boolean(schritt && schritt.enabled === true);
+}
+
+/**
+ * Schaltet ausschliesslich Schritt 9 ein.
+ *
+ * Bewusst so eng: Diese Migration fasst als erste **alle** Vorlagen an, nicht
+ * nur MINIJOB. Alles, was HR an Feldern, Titeln und anderen Schritten gepflegt
+ * hat, bleibt unangetastet — ein Rundum-Ueberschreiben wuerde hier in einem
+ * Zug fuenf Vorlagen und jeden laufenden Vorgang beschaedigen, und `db push
+ * --accept-data-loss` laeuft im selben Startvorgang.
+ *
+ * Ohne `fields`, wenn der Eintrag neu angelegt wird: Die Feld-Defaults kommen
+ * dann aus der Registry (mergeStepsConfig / FieldConfigHelper) — dieselbe
+ * Behandlung, die der Rentenversicherungs-Schritt bekommen hat.
+ */
+function aktiviereMasernSchritt(steps) {
+  const vorhanden = steps.some((s) => s.step === MASERN_SCHRITT);
+  return vorhanden
+    ? steps.map((s) =>
+        s.step === MASERN_SCHRITT ? { ...s, enabled: true } : s,
+      )
+    : [...steps, { step: MASERN_SCHRITT, title: MASERN_TITEL, enabled: true }];
+}
+
+/**
+ * Schaltet den Masernschutz-Schritt in allen Formularvorlagen frei
+ * (Entscheidung 07.09.2026).
+ *
+ * Bis dahin war er fuer MINIJOB und EHRENAMT aus, weil er dort als „nicht
+ * einschlaegig" galt. Das Infektionsschutzgesetz knuepft aber an die Taetigkeit
+ * in der Gemeinschaftseinrichtung an, nicht an den Umfang der Beschaeftigung.
+ *
+ * Der Schritt stellt nur die Frage. Ob daraus eine Dokumentenpflicht wird,
+ * entscheidet der Vorgang (Geburtsjahr ab 1971 und Einrichtungstyp,
+ * src/lib/masernschutz.ts), und selbst dann sperrt der fehlende Nachweis das
+ * Absenden nicht.
+ *
+ * Zieht die eingefrorenen Kopien laufender Vorgaenge nach — ohne das saehe ein
+ * bereits eingeladener Minijobber den Schritt nie, obwohl seine Vorlage ihn
+ * fuehrt. Anders als die bisherigen Migrationen ohne Filter auf
+ * `questionnaireType`: Betroffen sind alle Strecken.
+ *
+ * Idempotenz: Merker in `system_migrations`, geschrieben in derselben
+ * Transaktion wie die Updates.
+ */
+async function ensureMasernschutzSchritt(prisma) {
+  try {
+    if (await migrationErledigt(prisma, MASERNSCHUTZ_MARKER)) return;
+
+    const vorlagen = await prisma.formTemplate.findMany({
+      select: { id: true, questionnaireType: true, stepsConfig: true },
+    });
+
+    if (vorlagen.length === 0) {
+      // Kein Merker: Auf einer frischen Datenbank laeuft der Seed erst danach
+      // und legt die Vorlagen gleich richtig an. Sonst beim naechsten Start
+      // erneut versuchen — wie bei den MINIJOB-Korrekturen.
+      console.log(
+        "Noch keine Formularvorlagen vorhanden — Masernschutz-Schritt folgt beim naechsten Start.",
+      );
+      return;
+    }
+
+    const schreibvorgaenge = [];
+    const geaenderteVorlagen = [];
+    const uebersprungen = [];
+    for (const vorlage of vorlagen) {
+      if (!Array.isArray(vorlage.stepsConfig)) {
+        // Eine Vorlage ohne brauchbare Konfiguration wird NICHT neu gebaut:
+        // Hier ist nicht zu erkennen, was HR wollte, und ein erfundener
+        // Zielzustand waere schlimmer als ein fehlender Schritt.
+        uebersprungen.push(vorlage.questionnaireType);
+        console.warn(
+          "Masernschutz uebersprungen: Vorlage " +
+            vorlage.questionnaireType +
+            " hat keine Schrittliste.",
+        );
+        continue;
+      }
+      if (masernSchrittAktiv(vorlage.stepsConfig)) continue;
+      geaenderteVorlagen.push(vorlage.questionnaireType);
+      schreibvorgaenge.push(
+        prisma.formTemplate.update({
+          where: { id: vorlage.id },
+          data: { stepsConfig: aktiviereMasernSchritt(vorlage.stepsConfig) },
+        }),
+      );
+    }
+
+    const laufende = await prisma.onboardingProcess.findMany({
+      where: { status: { in: ["INVITED", "IN_PROGRESS"] } },
+      select: { id: true, formTemplateSnapshot: true },
+    });
+
+    let nachgezogen = 0;
+    for (const vorgang of laufende) {
+      if (!Array.isArray(vorgang.formTemplateSnapshot)) continue;
+      if (masernSchrittAktiv(vorgang.formTemplateSnapshot)) continue;
+      nachgezogen++;
+      schreibvorgaenge.push(
+        prisma.onboardingProcess.update({
+          where: { id: vorgang.id },
+          data: {
+            formTemplateSnapshot: aktiviereMasernSchritt(
+              vorgang.formTemplateSnapshot,
+            ),
+          },
+        }),
+      );
+    }
+
+    // Konnte etwas nicht angefasst werden, wird KEIN Merker gesetzt — sonst
+    // waere die Migration „erledigt", ohne diese Vorlage je erreicht zu haben.
+    //
+    // Dass das erlaubt ist, unterscheidet diese Migration von der
+    // currentStep-Umstellung: Sie ist von Bauart idempotent (ein bereits
+    // aktiver Schritt wird uebersprungen, ein erneutes Einschalten aendert
+    // nichts). Ein zweiter Lauf verschiebt hier nichts, er tut schlicht nichts.
+    // Der Preis: Solange eine Vorlage kaputt ist, wuerde ein spaeteres
+    // Abschalten von Schritt 9 durch HR beim naechsten Start rueckgaengig
+    // gemacht. Die Warnung oben nennt die Vorlage beim Namen.
+    const merker =
+      uebersprungen.length > 0
+        ? []
+        : [
+            markiereMigration(prisma, MASERNSCHUTZ_MARKER, {
+              changed: schreibvorgaenge.length > 0,
+              vorlagen: geaenderteVorlagen,
+              snapshotsNachgezogen: nachgezogen,
+            }),
+          ];
+
+    if (schreibvorgaenge.length === 0 && merker.length === 0) {
+      console.warn(
+        "Masernschutz-Schritt: nichts zu tun, aber Vorlagen ohne Schrittliste (" +
+          uebersprungen.join(", ") +
+          ") — kein Merker, naechster Start prueft erneut.",
+      );
+      return;
+    }
+
+    await prisma.$transaction([...schreibvorgaenge, ...merker]);
+    console.log(
+      (schreibvorgaenge.length === 0
+        ? "Masernschutz-Schritt war bereits ueberall aktiv."
+        : "Masernschutz-Schritt aktiviert in: " +
+          (geaenderteVorlagen.join(", ") || "keiner Vorlage") +
+          "; laufende Vorgaenge nachgezogen: " +
+          nachgezogen + ".") +
+        (uebersprungen.length > 0
+          ? " Kein Merker wegen: " + uebersprungen.join(", ") + "."
+          : ""),
+    );
+  } catch (error) {
+    console.error("Masernschutz-Schritt fehlgeschlagen:", error.message);
+  }
+}
+
+// =============================================
 // Einmalige Datenmigration: BA-Betriebsnummern der 16 Mandanten
 // =============================================
 const BETRIEBSNUMMERN_MARKER = "ORG_BETRIEBSNUMMERN_V1";
@@ -728,6 +904,160 @@ async function ensureBetriebsnummern(prisma) {
   }
 }
 
+// =============================================
+// Einmalige Datenmigration: die EINE Kostenstelle in die Aufteilung ueberfuehren
+// =============================================
+const KOSTENSTELLEN_MARKER = "KOSTENSTELLEN_AUFTEILUNG_V1";
+
+/** Muss zu MAX_KOSTENSTELLE_LAENGE in src/lib/validations/kostenstellen.ts passen. */
+const KOSTENSTELLE_MAX_LAENGE = 100;
+
+/**
+ * Entscheidet je Datensatz, welche Zeile aus dem Altbestand entsteht.
+ *
+ * Eigene, reine Funktion, damit ein Test sie ohne Datenbank halten kann
+ * (src/__tests__/lib/kostenstellen.test.ts). Die beiden Entscheidungen darin
+ * sind nach dem Lauf nicht mehr korrigierbar:
+ *
+ * (1) EIN HINTERLEGTER ANTEIL WIRD UNVERAENDERT UEBERNOMMEN, auch wenn er nicht
+ *     100 ergibt. Die Zahl stammt von einem Menschen; sie stillschweigend auf
+ *     100 zu heben waere eine gefaelschte Buchungsanweisung. Die Luecke wird
+ *     stattdessen sichtbar: Sie steht in `details` des Merkers und faellt beim
+ *     naechsten Oeffnen der Maske auf, weil die Summenregel dort greift. Das
+ *     schliesst die gespeicherte 0 ein — wer 0 eingetragen hat, hat 0 gemeint
+ *     (das Formular macht aus einem GELEERTEN Feld null, nicht 0; siehe
+ *     src/lib/formular-zahlen.ts). Eine 0 als "keine Angabe" zu deuten und
+ *     daraus 100 zu machen, waere dieselbe Faelschung.
+ *
+ * (2) FEHLT DER ANTEIL GANZ (null — heute moeglich, weil beide Felder optional
+ *     sind), traegt die eine Kostenstelle alles: 100. Das ist keine Erfindung,
+ *     sondern die einzige Lesart, die zu einer einzelnen Kostenstelle passt —
+ *     das gesamte Gehalt geht dorthin. Die Alternative (Zeile weglassen)
+ *     verloere eine gepflegte Angabe, die Alternative "0" erzeugte eine
+ *     Aufteilung, die nichts verteilt.
+ *
+ * Leere oder nur aus Leerraum bestehende Bezeichnungen werden uebersprungen:
+ * Daraus entstuende eine Zeile ohne Kostenstelle, die die Maske sofort wieder
+ * anmeckern wuerde.
+ */
+function planeKostenstellenZeilen(datensaetze) {
+  const zeilen = [];
+  let leer = 0;
+  let ohneAnteil = 0;
+  let nichtHundert = 0;
+
+  for (const sd of datensaetze) {
+    const bezeichnung = String(sd.kostenstelle ?? "")
+      .trim()
+      .slice(0, KOSTENSTELLE_MAX_LAENGE);
+    if (bezeichnung === "") {
+      leer++;
+      continue;
+    }
+
+    const hatAnteil =
+      typeof sd.kostenstelleAnteil === "number" &&
+      Number.isFinite(sd.kostenstelleAnteil);
+    const anteil = hatAnteil ? sd.kostenstelleAnteil : 100;
+
+    if (!hatAnteil) ohneAnteil++;
+    // In ganzen Hundertsteln vergleichen, nicht `anteil !== 100`: Dieselbe
+    // Regel wie in src/lib/validations/kostenstellen.ts, damit die Migration
+    // nicht anders zaehlt, als die Maske spaeter rechnet.
+    else if (Math.round(anteil * 100) !== 10000) nichtHundert++;
+
+    zeilen.push({
+      supervisorDataId: sd.id,
+      orderIndex: 0,
+      bezeichnung,
+      anteil,
+    });
+  }
+
+  return { zeilen, leer, ohneAnteil, nichtHundert };
+}
+
+/**
+ * Ueberfuehrt die einzelne Kostenstelle in die neue Aufteilung.
+ *
+ * Ohne sie muesste jede vorgesetzte Person eine bereits gepflegte Kostenstelle
+ * neu eintippen — und bis dahin stuende in Vorgangsansicht, CSV und PDF nichts.
+ *
+ * Die alten Spalten bleiben in DIESEM Release bestehen (siehe Kommentar an
+ * SupervisorData in prisma/schema.prisma): entrypoint.sh schiebt das Schema
+ * VOR diesem Lauf. Waeren sie im selben Release entfernt, laese diese Migration
+ * ins Leere.
+ *
+ * Idempotenz doppelt: Merker in `system_migrations`, geschrieben in DERSELBEN
+ * Transaktion wie die Zeilen — und die Bedingung `kostenstellen: { none: {} }`,
+ * die einen Datensatz mit bereits vorhandener Aufteilung gar nicht erst
+ * aufgreift. Ein Lauf ohne Merker bliebe damit folgenlos; der Merker bleibt
+ * trotzdem, so ist es Hausstandard.
+ */
+async function migriereKostenstellenAufteilung(prisma) {
+  try {
+    if (await migrationErledigt(prisma, KOSTENSTELLEN_MARKER)) return;
+
+    const datensaetze = await prisma.supervisorData.findMany({
+      where: { kostenstelle: { not: null }, kostenstellen: { none: {} } },
+      select: { id: true, kostenstelle: true, kostenstelleAnteil: true },
+    });
+
+    if (datensaetze.length === 0) {
+      // Frische oder bereits vollstaendig migrierte Datenbank. Anders als bei
+      // den MINIJOB-Korrekturen haengt hier nichts am Seed — es gibt schlicht
+      // nichts zu tun, also darf der Merker gesetzt werden.
+      await markiereMigration(prisma, KOSTENSTELLEN_MARKER, {
+        migriert: 0,
+        grund: "keine Einstellungsmodalitaeten mit Kostenstelle",
+      });
+      console.log("Kostenstellen-Migration: nichts zu tun, Merker gesetzt.");
+      return;
+    }
+
+    const { zeilen, leer, ohneAnteil, nichtHundert } =
+      planeKostenstellenZeilen(datensaetze);
+
+    const schreibvorgaenge = [];
+    if (zeilen.length > 0) {
+      schreibvorgaenge.push(prisma.supervisorKostenstelle.createMany({ data: zeilen }));
+    }
+    schreibvorgaenge.push(
+      markiereMigration(prisma, KOSTENSTELLEN_MARKER, {
+        geprueft: datensaetze.length,
+        migriert: zeilen.length,
+        leereBezeichnung: leer,
+        ohneAnteilAuf100Gesetzt: ohneAnteil,
+        // Diese Vorgaenge ergeben nach der Migration NICHT 100 Prozent. Die
+        // Zahl steht hier, damit HR sie gezielt nacharbeiten kann, statt sie
+        // zufaellig zu entdecken.
+        anteilUngleich100: nichtHundert,
+      }),
+    );
+
+    await prisma.$transaction(schreibvorgaenge);
+
+    console.log(
+      "Kostenstellen-Migration: " +
+        zeilen.length +
+        " von " +
+        datensaetze.length +
+        " uebernommen (ohne Anteil: " +
+        ohneAnteil +
+        ", Anteil ungleich 100: " +
+        nichtHundert +
+        ", leere Bezeichnung uebersprungen: " +
+        leer +
+        ").",
+    );
+  } catch (error) {
+    // Nicht-kritisch fuer den Start: Ohne Merker laeuft die Migration beim
+    // naechsten Start erneut, und die alten Spalten stehen bis zum naechsten
+    // Release noch da.
+    console.error("Kostenstellen-Migration fehlgeschlagen:", error.message);
+  }
+}
+
 async function main() {
   const prisma = new PrismaClient();
   try {
@@ -736,7 +1066,9 @@ async function main() {
     await ensureMinijobTemplateSteps(prisma);
     await ensureMinijobRenteSchritt(prisma);
     await ensureMinijobStep6Felder(prisma);
+    await ensureMasernschutzSchritt(prisma);
     await ensureBetriebsnummern(prisma);
+    await migriereKostenstellenAufteilung(prisma);
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {
@@ -775,8 +1107,15 @@ module.exports = {
   setzeStep6,
   legacyIndexToStepNumber,
   korrigiereMinijobSchritte,
+  MASERNSCHUTZ_MARKER,
+  MASERN_SCHRITT,
+  masernSchrittAktiv,
+  aktiviereMasernSchritt,
   BETRIEBSNUMMERN,
   BETRIEBSNUMMER_PLATZHALTER,
   normalisiereMandantNummer,
   planeBetriebsnummern,
+  KOSTENSTELLEN_MARKER,
+  KOSTENSTELLE_MAX_LAENGE,
+  planeKostenstellenZeilen,
 };

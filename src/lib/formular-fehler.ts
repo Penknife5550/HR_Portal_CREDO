@@ -107,7 +107,7 @@ export const FELD_BEZEICHNUNGEN: Record<string, string> = {
   employerType: "Art des Arbeitgebers",
   hasMinijob: "Minijob",
   minijobRvBefreiung: "Befreiung von der Rentenversicherung",
-  bornAfter1971: "Geburt nach 1970",
+  bornAfter1971: "Geburt nach dem 31.12.1970",
   masernschutzProvided: "Masernschutznachweis",
   beschaeftigungsStatus: "Status bei Beschäftigungsbeginn",
   beschaeftigungsStatusSonstige: "Status bei Beschäftigungsbeginn (Sonstiges)",
@@ -164,6 +164,13 @@ export const FELD_BEZEICHNUNGEN: Record<string, string> = {
   ehrenamt: "Ehrenamt",
   kostenstelle: "Kostenstelle",
   kostenstelleAnteil: "Anteil der Kostenstelle",
+  // Die Aufteilung auf mehrere Kostenstellen. `bezeichnung` und `anteil` sind
+  // die Feldnamen INNERHALB einer Zeile — ohne sie stuende im Fehlertext
+  // "Kostenstellen-Aufteilung, Eintrag 2, anteil", also der rohe Zod-Pfad.
+  kostenstellen: "Kostenstellen-Aufteilung",
+  kostenstellenBemerkung: "Bemerkung zur Kostenstellen-Aufteilung",
+  bezeichnung: "Kostenstelle",
+  anteil: "Anteil in Prozent",
   probezeit: "Probezeit",
   probezeitMonate: "Probezeit in Monaten",
 

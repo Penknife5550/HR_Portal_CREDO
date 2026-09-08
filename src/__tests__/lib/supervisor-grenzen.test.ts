@@ -70,6 +70,11 @@ const BASIS: Record<number, Record<string, unknown>> = {
   4: {
     kostenstelle: "",
     kostenstelleAnteil: null,
+    // Die Zeilen der Kostenstellen-Aufteilung stehen bewusst NICHT in
+    // `supStep4Schema` — sie werden neben react-hook-form gehalten und mit
+    // `kostenstellenListeSchema` geprueft (eigene Suite). Hier steht nur das
+    // Bemerkungsfeld, das die Maske ueber das Formular sendet.
+    kostenstellenBemerkung: "",
     probezeit: true,
     probezeitMonate: 6,
     urlaubstageProJahr: 30,
@@ -127,6 +132,7 @@ const TEXT_GRENZEN = [
   { schritt: 3, feld: "stufe", max: 50 },
   { schritt: 3, feld: "bemerkungVerguetung", max: 2000 },
   { schritt: 4, feld: "kostenstelle", max: 100 },
+  { schritt: 4, feld: "kostenstellenBemerkung", max: 2000 },
   { schritt: 4, feld: "zusatzvereinbarungen", max: 5000 },
 ] as const;
 

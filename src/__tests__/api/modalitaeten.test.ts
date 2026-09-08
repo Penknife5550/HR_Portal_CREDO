@@ -8,9 +8,14 @@
 
 const mockPrisma = {
   supervisorData: { upsert: jest.fn(), update: jest.fn() },
+  supervisorKostenstelle: { deleteMany: jest.fn(), createMany: jest.fn() },
   onboardingProcess: { update: jest.fn() },
   auditLog: { create: jest.fn() },
   organization: { findMany: jest.fn() },
+  // Die PUT-Route speichert Kopf und Zeilen in EINER interaktiven
+  // Transaktion. Der Mock reicht sich selbst als `tx` durch — geprueft wird
+  // hier, WAS geschrieben wird, nicht dass Postgres es atomar tut.
+  $transaction: jest.fn(),
 };
 const mockValidate = jest.fn();
 
@@ -74,10 +79,19 @@ const STEP1 = {
 beforeEach(() => {
   jest.clearAllMocks();
   mockValidate.mockResolvedValue(onboarding());
-  mockPrisma.supervisorData.upsert.mockResolvedValue({});
+  // Die id kommt aus dem Upsert und wird fuer die Zeilen gebraucht — deshalb
+  // eine interaktive Transaktion und nicht ein Array von Operationen.
+  mockPrisma.supervisorData.upsert.mockResolvedValue({ id: "sd1" });
   mockPrisma.supervisorData.update.mockResolvedValue({});
+  mockPrisma.supervisorKostenstelle.deleteMany.mockResolvedValue({ count: 0 });
+  mockPrisma.supervisorKostenstelle.createMany.mockResolvedValue({ count: 0 });
   mockPrisma.onboardingProcess.update.mockResolvedValue({});
   mockPrisma.auditLog.create.mockResolvedValue({});
+  mockPrisma.$transaction.mockImplementation((arg: unknown) =>
+    typeof arg === "function"
+      ? (arg as (tx: typeof mockPrisma) => unknown)(mockPrisma)
+      : Promise.all(arg as unknown[])
+  );
 });
 
 function savedData() {
@@ -197,6 +211,116 @@ describe("PUT – Zweckbefristung", () => {
   });
 });
 
+describe("PUT – Kostenstellen-Aufteilung", () => {
+  /** Was die deleteMany/createMany-Aufrufe der Zeilentabelle gesehen haben. */
+  function geschriebeneZeilen() {
+    return mockPrisma.supervisorKostenstelle.createMany.mock.calls[0][0]
+      .data as Record<string, unknown>[];
+  }
+
+  it("laesst die Aufteilung unberuehrt, wenn der Aufruf sie nicht mitschickt", async () => {
+    // DAS ist der gefaehrliche Fall: Die Schritte 1 bis 3 speichern ohne
+    // `kostenstellen`. Wuerde die Route die Zeilen trotzdem anfassen, waere die
+    // Aufteilung nach dem naechsten Zurueckblaettern weg.
+    const res = await PUT(req("PUT", STEP1), { params: params() });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.supervisorKostenstelle.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.supervisorKostenstelle.createMany).not.toHaveBeenCalled();
+  });
+
+  it("loescht alle Zeilen bei einem leeren Array", async () => {
+    // Der Widerruf. Ein Wahrheitswert-Test statt `Array.isArray` haette [] wie
+    // "nichts gesendet" behandelt und die alten Zeilen stehen lassen.
+    const res = await PUT(
+      req("PUT", { kostenstellen: [], currentStep: 4 }),
+      { params: params() }
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.supervisorKostenstelle.deleteMany).toHaveBeenCalledWith({
+      where: { supervisorDataId: "sd1" },
+    });
+    expect(mockPrisma.supervisorKostenstelle.createMany).not.toHaveBeenCalled();
+  });
+
+  it("ersetzt die Zeilen und behaelt die Reihenfolge", async () => {
+    const res = await PUT(
+      req("PUT", {
+        kostenstellen: [
+          { bezeichnung: "4711", anteil: 60 },
+          { bezeichnung: " 4712 ", anteil: 40 },
+        ],
+        kostenstellenBemerkung: "Aufteilung ab dem zweiten Halbjahr",
+        currentStep: 4,
+      }),
+      { params: params() }
+    );
+
+    expect(res.status).toBe(200);
+    // Erst raeumen, dann anlegen — sonst wuerde aus Ersetzen ein Verdoppeln.
+    expect(mockPrisma.supervisorKostenstelle.deleteMany).toHaveBeenCalled();
+    expect(geschriebeneZeilen()).toEqual([
+      { supervisorDataId: "sd1", orderIndex: 0, bezeichnung: "4711", anteil: 60 },
+      { supervisorDataId: "sd1", orderIndex: 1, bezeichnung: "4712", anteil: 40 },
+    ]);
+  });
+
+  it("legt das Zeilen-Array NICHT am SupervisorData ab", async () => {
+    // `kostenstellen` steht nicht in ALLOWED_FIELDS. Stuende es dort, ginge ein
+    // Array an eine Spalte, die es nicht gibt — Prisma antwortete mit 500.
+    await PUT(
+      req("PUT", {
+        kostenstellen: [{ bezeichnung: "4711", anteil: 100 }],
+        kostenstellenBemerkung: "Vollständig auf 4711",
+        currentStep: 4,
+      }),
+      { params: params() }
+    );
+
+    expect(savedData()).not.toHaveProperty("kostenstellen");
+    expect(savedData().kostenstellenBemerkung).toBe("Vollständig auf 4711");
+  });
+
+  it("weist eine Aufteilung ab, die nicht genau 100 Prozent ergibt", async () => {
+    const res = await PUT(
+      req("PUT", {
+        kostenstellen: [
+          { bezeichnung: "4711", anteil: 60 },
+          { bezeichnung: "4712", anteil: 30 },
+        ],
+        currentStep: 4,
+      }),
+      { params: params() }
+    );
+
+    expect(res.status).toBe(400);
+    // Nichts gespeichert: Ein halb angenommener Aufruf waere schlimmer als gar
+    // keiner.
+    expect(mockPrisma.supervisorData.upsert).not.toHaveBeenCalled();
+    expect(mockPrisma.supervisorKostenstelle.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("nimmt die Drittelung 33,33 / 33,33 / 33,34 an", async () => {
+    // Der Grund fuer die Rechnung in ganzen Hundertsteln: Als Gleitkommazahl
+    // ergibt diese Summe 100.00000000000001.
+    const res = await PUT(
+      req("PUT", {
+        kostenstellen: [
+          { bezeichnung: "4711", anteil: 33.33 },
+          { bezeichnung: "4712", anteil: 33.33 },
+          { bezeichnung: "4713", anteil: 33.34 },
+        ],
+        currentStep: 4,
+      }),
+      { params: params() }
+    );
+
+    expect(res.status).toBe(200);
+    expect(geschriebeneZeilen()).toHaveLength(3);
+  });
+});
+
 describe("POST – Absenden", () => {
   it("blockiert eine kalendermaessige Befristung ohne Vertragsende", async () => {
     mockValidate.mockResolvedValue(
@@ -240,6 +364,57 @@ describe("POST – Absenden", () => {
 
   it("laesst einen unbefristeten Vertrag durch", async () => {
     mockValidate.mockResolvedValue(onboarding({ befristet: false }));
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("blockiert eine Aufteilung, die nicht 100 Prozent ergibt", async () => {
+    // Die harte Sperre. Im Formular ist "Weiter" gesperrt — das laesst sich im
+    // Browser aber wieder freischalten, und diese Route ist auch ohne Formular
+    // erreichbar.
+    mockValidate.mockResolvedValue(
+      onboarding({
+        befristet: false,
+        kostenstellen: [{ bezeichnung: "4711", anteil: 60 }],
+      })
+    );
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error:
+        "Die Anteile ergeben zusammen 60,00 %. Es fehlen 40,00 % auf 100 %. " +
+        "Bitte teilen Sie das Gehalt auf genau 100 % auf oder entfernen Sie die Kostenstellen.",
+    });
+    expect(mockPrisma.onboardingProcess.update).not.toHaveBeenCalled();
+  });
+
+  it("laesst einen Vorgang ganz ohne Kostenstellen durch", async () => {
+    // Entscheidung des Nutzers: Wer die Kostenstelle noch nicht kennt, darf
+    // trotzdem absenden.
+    mockValidate.mockResolvedValue(
+      onboarding({ befristet: false, kostenstellen: [] })
+    );
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("laesst eine vollstaendige Aufteilung durch", async () => {
+    mockValidate.mockResolvedValue(
+      onboarding({
+        befristet: false,
+        kostenstellen: [
+          { bezeichnung: "4711", anteil: 33.33 },
+          { bezeichnung: "4712", anteil: 33.33 },
+          { bezeichnung: "4713", anteil: 33.34 },
+        ],
+      })
+    );
 
     const res = await POST(req("POST", {}), { params: params() });
 

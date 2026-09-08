@@ -448,6 +448,10 @@ describe("FELD_BEZEICHNUNGEN", () => {
       "probezeitMonate", "festgehalt", "stundenlohn", "sonderzahlungProzent",
       "sachbezuegeBetrag", "zulageBetrag", "urlaubstageProJahr",
       "kostenstelleAnteil", "hauptarbeitgeberStunden", "nebenarbeitgeberStunden",
+      // Die Kostenstellen-Aufteilung: `kostenstellen` ist der Listenpfad,
+      // `bezeichnung` und `anteil` sind die Felder INNERHALB einer Zeile.
+      // Fehlt eines davon, steht im Fehlertext der rohe Zod-Pfad.
+      "kostenstellen", "kostenstellenBemerkung", "bezeichnung", "anteil",
     ];
 
     for (const feld of pflicht) {

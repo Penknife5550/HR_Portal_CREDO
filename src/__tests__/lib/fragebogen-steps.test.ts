@@ -158,25 +158,28 @@ describe("getActiveSteps – die Vorlagen-Konfiguration wirkt", () => {
     }
   });
 
-  it("bildet die Minijob-Strecke ab: ohne Masernschutz, mit Bildung & Beruf", () => {
-    // Entscheidung 25.08.2026: Bildung & Beruf bleibt an, Masernschutz faellt weg.
-    // Seit AP 7 kommt die Rentenversicherung als Schritt 11 dazu — neun
-    // Schritte, genau der Endzustand aus den Masken-Entwuerfen.
-    const aktiv = getActiveSteps(configExcept([9]));
-    expect(aktiv.map((s) => s.step)).toEqual([1, 2, 3, 4, 5, 6, 8, 11, 10]);
-    expect(aktiv.map((s) => s.step)).toContain(8); // Bildung & Beruf
-    expect(aktiv.map((s) => s.step)).not.toContain(9); // Masernschutz
+  it("bildet die Minijob-Strecke ab: mit Bildung & Beruf und Masernschutz", () => {
+    // Entscheidung 25.08.2026: Bildung & Beruf bleibt an. Entscheidung
+    // 07.09.2026: Der Masernschutz kommt dazu — das Infektionsschutzgesetz
+    // knuepft an die Taetigkeit in der Gemeinschaftseinrichtung an, nicht an
+    // den Umfang der Beschaeftigung. Zusammen mit der Rentenversicherung
+    // (Schritt 11, AP 7) sind es zehn Schritte.
+    const aktiv = getActiveSteps(configExcept([]));
+    expect(aktiv.map((s) => s.step)).toEqual([1, 2, 3, 4, 5, 6, 8, 9, 11, 10]);
     // Der Mitarbeiter zaehlt durchgehend, ohne Luecke bei der 7.
     expect(indexOfStep(aktiv, 8) + 1).toBe(7);
-    expect(indexOfStep(aktiv, 11) + 1).toBe(8); // Rentenversicherung
-    expect(indexOfStep(aktiv, SUMMARY_STEP_NUMBER) + 1).toBe(9);
+    expect(indexOfStep(aktiv, 9) + 1).toBe(8); // Masernschutz
+    expect(indexOfStep(aktiv, 11) + 1).toBe(9); // Rentenversicherung
+    expect(indexOfStep(aktiv, SUMMARY_STEP_NUMBER) + 1).toBe(10);
   });
 
-  it("bildet die Ehrenamt-Strecke ab: nur Person, Adresse, Zusammenfassung", () => {
+  it("bildet die Ehrenamt-Strecke ab: Person, Adresse, Masernschutz, Zusammenfassung", () => {
     // Ein Ehrenamtlicher wird nicht sozialversichert — die Rentenfrage
-    // (Schritt 11) stellt sich fuer ihn gar nicht.
-    const aktiv = getActiveSteps(configExcept([3, 4, 5, 6, 7, 8, 9, 11]));
-    expect(aktiv.map((s) => s.step)).toEqual([1, 2, SUMMARY_STEP_NUMBER]);
+    // (Schritt 11) stellt sich fuer ihn gar nicht. Der Masernschutz schon:
+    // Wer regelmaessig in einer Kita oder Schule mitarbeitet, faellt fachlich
+    // unter dieselbe Vorschrift wie eine Angestellte (Entscheidung 07.09.2026).
+    const aktiv = getActiveSteps(configExcept([3, 4, 5, 6, 7, 8, 11]));
+    expect(aktiv.map((s) => s.step)).toEqual([1, 2, 9, SUMMARY_STEP_NUMBER]);
   });
 });
 
@@ -220,11 +223,12 @@ describe("describeProgress – Fortschritt fuer die HR-Ansicht", () => {
   });
 
   it("rechnet fuer die Minijob-Strecke gegen deren Laenge", () => {
-    const minijob = configExcept([9]);
+    // Seit dem 07.09.2026 laeuft ein Minijobber alle zehn Schritte.
+    const minijob = configExcept([]);
     const f = describeProgress(minijob, 8); // Bildung & Beruf
     expect(f.position).toBe(7);
-    expect(f.total).toBe(9);
-    expect(f.prozent).toBe(78);
+    expect(f.total).toBe(10);
+    expect(f.prozent).toBe(70);
   });
 
   it("meldet einen nicht begonnenen Fragebogen", () => {
@@ -435,7 +439,9 @@ describe("MINIJOB-Vorlagenkorrektur im Entrypoint", () => {
     expect(nach(5).enabled).toBe(true);
     expect(nach(6).enabled).toBe(true);
     expect(nach(8).enabled).toBe(true);
-    // Masernschutz bleibt bewusst aus.
+    // Den Masernschutz fasst diese Korrektur nicht an — sie ist auf der
+    // Produktivdatenbank bereits gelaufen und bleibt deshalb so, wie sie lief.
+    // Eingeschaltet wird er von ensureMasernschutzSchritt mit eigenem Merker.
     expect(nach(9).enabled).toBe(false);
   });
 
@@ -465,6 +471,80 @@ describe("MINIJOB-Vorlagenkorrektur im Entrypoint", () => {
     );
     const { geaendert } = korrigiereMinijobSchritte(schon);
     expect(geaendert).toEqual([]);
+  });
+});
+
+/**
+ * Die Migration, die den Masernschutz-Schritt nachtraeglich einschaltet
+ * (prisma/seed-check.js, Marker FORMTEMPLATE_MASERNSCHUTZ_V1).
+ *
+ * Sie ist die erste, die ALLE Vorlagen und alle laufenden Vorgaenge anfasst,
+ * und sie laeuft im selben Startvorgang wie `db push --accept-data-loss`. Die
+ * Tests halten deshalb vor allem eines fest: dass sie nichts anderes anfasst
+ * als `enabled` von Schritt 9.
+ */
+describe("Masernschutz-Schritt im Entrypoint", () => {
+  const { MASERN_SCHRITT, masernSchrittAktiv, aktiviereMasernSchritt } = seedCheck;
+
+  it("arbeitet auf der Registry-Nummer des Masernschutz-Schritts", () => {
+    expect(MASERN_SCHRITT).toBe(9);
+    expect(getStep(MASERN_SCHRITT)?.key).toBe("masern");
+  });
+
+  it("erkennt einen abgeschalteten und einen fehlenden Schritt gleichermassen", () => {
+    // Ein fehlender Eintrag gilt als aus (getActiveSteps) — er muss ergaenzt
+    // werden, nicht uebergangen.
+    expect(masernSchrittAktiv(configExcept([9]))).toBe(false);
+    expect(masernSchrittAktiv(configExcept([]).filter((s) => s.step !== 9))).toBe(
+      false
+    );
+    expect(masernSchrittAktiv(configExcept([]))).toBe(true);
+  });
+
+  it("schaltet einen vorhandenen Eintrag ein", () => {
+    const neu = aktiviereMasernSchritt(configExcept([9]));
+    expect(masernSchrittAktiv(neu)).toBe(true);
+    expect(getActiveSteps(neu).map((s) => s.step)).toContain(9);
+  });
+
+  it("ergaenzt einen fehlenden Eintrag", () => {
+    // Eine Konfiguration, die vor Schritt 9 gespeichert wurde, kennt ihn nicht.
+    const ohne = configExcept([]).filter((s) => s.step !== 9);
+    const neu = aktiviereMasernSchritt(ohne);
+    expect(neu).toHaveLength(ohne.length + 1);
+    expect(neu.find((s: { step: number }) => s.step === 9).title).toBe(
+      getStepTitle(9)
+    );
+    expect(getActiveSteps(neu).map((s) => s.step)).toContain(9);
+  });
+
+  it("laesst jeden anderen Schritt unveraendert – das ist die Sicherung", () => {
+    // HR pflegt Felder und Abschaltungen je Vorlage. Diese Migration darf
+    // davon nichts anfassen; ein Rundum-Ueberschreiben traefe in einem Zug
+    // alle Vorlagen und jeden laufenden Vorgang.
+    const vorher = configExcept([5, 9, 11]).map((s) =>
+      s.step === 5
+        ? { ...s, fields: [{ name: "taxId", visible: true, required: true }] }
+        : s
+    );
+    const neu = aktiviereMasernSchritt(vorher);
+    for (const alt of vorher) {
+      if (alt.step === 9) continue;
+      expect(neu.find((s: { step: number }) => s.step === alt.step)).toEqual(alt);
+    }
+    // Insbesondere bleiben abgeschaltete Schritte abgeschaltet.
+    expect(getActiveSteps(neu).map((s) => s.step)).not.toContain(5);
+    expect(getActiveSteps(neu).map((s) => s.step)).not.toContain(11);
+  });
+
+  it("aendert nichts mehr, wenn der Schritt schon an ist", () => {
+    // Die Migration schreibt nur, wo sich etwas aendert — und ein zweiter Lauf
+    // (Merker verloren, Backup eingespielt) darf nichts kaputtmachen.
+    const schon = configExcept([]);
+    expect(aktiviereMasernSchritt(schon)).toEqual(schon);
+    expect(aktiviereMasernSchritt(aktiviereMasernSchritt(configExcept([9])))).toEqual(
+      aktiviereMasernSchritt(configExcept([9]))
+    );
   });
 });
 
