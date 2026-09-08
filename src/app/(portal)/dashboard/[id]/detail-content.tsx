@@ -12,22 +12,40 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
-import { STATUS_LABELS, getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
+import {
+  STATUS_LABELS,
+  documentStatusLabel,
+  getBefristungSachgrundLabel,
+  getBefristungsartLabel,
+} from "@/lib/constants";
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
 import { RvFristenCard } from "./rv-fristen-card";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
-import { documentTypeLabel } from "@/lib/required-documents";
+import {
+  documentTypeLabel,
+  fehlendeNachreichbareDokumente,
+} from "@/lib/required-documents";
 import {
   ABLAUF_KATEGORIE_META,
   ablaufAmpel,
+  dringendeNachweisLagen,
   istFristpflichtig,
-  type AblaufAmpel,
+  nachweisLagen,
 } from "@/lib/dokument-fristen";
+import {
+  masernschutzPflichtig,
+  nach1970GeborenAnzeige,
+} from "@/lib/masernschutz";
 import { statusLabel } from "@/lib/minijob-status";
 import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 import { formatBytes } from "@/lib/format";
+import {
+  anteilText,
+  kostenstellenAnzeige,
+  summeText,
+} from "@/lib/kostenstellen-anzeige";
 
 // =============================================
 // Types
@@ -80,10 +98,16 @@ interface NoteData {
   createdBy: { firstName: string; lastName: string };
 }
 
-interface DetailData {
+export interface DetailData {
   id: string;
   /** Serverseitig gegen die Vorlage dieses Vorgangs berechnet. */
   fragebogenFortschritt: FragebogenFortschritt;
+  /**
+   * Die Pflicht-Dokumenttypen der Vorlage dieses Fragebogentyps, wie sie auch
+   * das Absenden auswertet. Ausgangspunkt fuer den Kasten „Offene Nachweise" —
+   * die bedingten Pflichten kommen erst in `effektivePflichtDokumente` dazu.
+   */
+  requiredDocuments: string[];
   displayId: string | null;
   email: string;
   firstName: string | null;
@@ -102,6 +126,11 @@ interface DetailData {
     name: string;
     mandantNumber: string;
     betriebsnummer?: string | null;
+    /**
+     * `OrganizationType` — entscheidet ueber die Masernschutzpflicht
+     * (Gemeinschaftseinrichtung ja/nein, siehe `src/lib/masernschutz.ts`).
+     */
+    type?: string | null;
   };
   personalData: {
     firstName: string | null;
@@ -127,6 +156,11 @@ interface DetailData {
     birthPlace: string | null;
     birthCountry: string | null;
     nationality: string | null;
+    /**
+     * Selbstauskunft aus Schritt 1. `null` heisst „noch nicht beantwortet" und
+     * erzeugt KEINE Pflicht — siehe `PflichtEingaben` in required-documents.ts.
+     */
+    aufenthaltstitelErforderlich?: boolean | null;
     maritalStatus: string | null;
     severelyDisabled: boolean | null;
     disabilityDegree: number | null;
@@ -210,8 +244,17 @@ interface DetailData {
     svPflichtig: boolean | null;
     minijob: boolean | null;
     ehrenamt: boolean | null;
+    /**
+     * Bestandsfelder. Ab KOSTENSTELLEN_AUFTEILUNG_V1 nur noch Lesequelle und
+     * ausschliesslich Rueckfall, solange `kostenstellen` leer ist — die Maske
+     * befuellt sie nicht mehr. Wer hier wieder direkt anzeigt, zeigt bei einem
+     * geaenderten Bestandsvorgang die ALTE Kostenstelle an.
+     */
     kostenstelle: string | null;
     kostenstelleAnteil: number | null;
+    /** Die gepflegte Aufteilung; kommt aus dem `include` in /api/onboarding/[id]. */
+    kostenstellen: { bezeichnung: string; anteil: number }[];
+    kostenstellenBemerkung: string | null;
     probezeit: boolean | null;
     probezeitMonate: number | null;
     verguetungsmodell: string | null;
@@ -782,6 +825,18 @@ export function DetailContent({
             wechselt. */}
         <NachweisFristenWarnung
           documents={data.documents}
+          onZuDenDokumenten={
+            activeTab === "documents" ? null : () => setActiveTab("documents")
+          }
+        />
+
+        {/* Ebenfalls auf JEDEM Tab und aus demselben Grund: Ein fehlender
+            Masernschutz-Nachweis ist eine Meldepflicht des Arbeitgebers, keine
+            Randnotiz des Dokumente-Reiters. Unter dem Fristenbalken, weil ein
+            abgelaufener Titel die dringendere Lage ist als ein noch nicht
+            eingetroffenes Papier. */}
+        <OffeneNachweiseKasten
+          data={data}
           onZuDenDokumenten={
             activeTab === "documents" ? null : () => setActiveTab("documents")
           }
@@ -1594,7 +1649,14 @@ function TabFragebogenDaten({
       {/* Schritt 9: Masernschutz */}
       <SectionCard title="9. Masernschutz" icon="&#128137;">
         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-          <FieldRow label="Nach dem 31.12.1970 geboren" value={formatBoolean(pd.bornAfter1971)} />
+          {/* Aus dem Geburtsdatum gerechnet, nicht aus der gleichnamigen Spalte
+              gelesen: Die Spalte wird beim Verlassen von Schritt 9 eingefroren
+              und veraltet, sobald jemand das Geburtsdatum danach korrigiert —
+              Begruendung in `nach1970GeborenAnzeige`. */}
+          <FieldRow
+            label="Nach dem 31.12.1970 geboren"
+            value={formatBoolean(nach1970GeborenAnzeige(pd.birthDate, pd.bornAfter1971))}
+          />
           <FieldRow label="Masernschutz nachgewiesen" value={formatBoolean(pd.masernschutzProvided)} />
         </div>
       </SectionCard>
@@ -1646,54 +1708,167 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
 // =============================================
 
 /**
- * Der massgebliche Befund je NACHWEISART (nicht je Dokument).
+ * Statuswerte, ab denen der Fragebogen als abgegeben gilt.
  *
- * Warum gruppiert: `Document` kennt keine Eindeutigkeit je Typ, und ein
- * nachgereichter Nachweis ERSETZT den alten nicht — wer seinen Aufenthaltstitel
- * verlaengert und den neuen hochlaedt, hat danach zwei Aufenthaltstitel im
- * Vorgang. Ein Warnbalken ueber alle Dokumente schriee dann fuer immer
- * „abgelaufen", obwohl ein gueltiges Papier vorliegt. Ein Balken, den niemand
- * abstellen kann, wird nach zwei Wochen ignoriert — und dann auch der echte.
- *
- * Massgeblich ist deshalb das Dokument mit dem SPAETESTEN Ablauf. Die einzelne
- * Dokumentenzeile zeigt weiterhin ihren eigenen Zustand: Dass das alte Papier
- * abgelaufen ist, stimmt ja.
+ * `submittedAt` ist der eigentliche Anker, aber nicht der einzige: Vorgaenge
+ * aus der Zeit vor dem Zeitstempel tragen ihn nicht, und genau die
+ * Bestandsakten sind der Grund fuer den Kasten unten.
  */
-interface NachweisLage {
-  typ: string;
-  /** `null` = fuer diese Art ist ueberhaupt kein Ablaufdatum erfasst. */
-  ampel: AblaufAmpel | null;
-}
+const ABGEGEBENE_STATUS: readonly string[] = [
+  "SUBMITTED",
+  "SUPERVISOR_PENDING",
+  "SUPERVISOR_SUBMITTED",
+  "REVIEWED",
+  "COMPLETED",
+];
 
-function nachweisLagen(documents: DocumentData[], jetzt: Date = new Date()): NachweisLage[] {
-  const proTyp = new Map<string, AblaufAmpel | null>();
+/**
+ * Der Kasten „Offene Nachweise" — die einzige Stelle, an der HR ueberhaupt
+ * erfaehrt, dass etwas fehlt.
+ *
+ * **Warum es ihn gibt.** Nachreichbare Pflichten (Masernschutz,
+ * Aufenthaltstitel, Arbeitserlaubnis, PKV-Nachweis) halten das Absenden nicht
+ * auf. Beim Masernschutz ist der Verzicht auf die Sperre ausdruecklich damit
+ * begruendet, dass das Infektionsschutzgesetz vom Arbeitgeber die MELDUNG eines
+ * fehlenden Nachweises ans Gesundheitsamt verlangt — und der Fragebogen sagt
+ * der Person woertlich zu, die Personalabteilung komme auf sie zu
+ * (`NACHREICHEN_FOLGEN_HINWEIS`). Beides setzt voraus, dass HR die Luecke
+ * sieht. Der Protokolleintrag `DOKUMENTE_NACHZUREICHEN` allein leistet das
+ * nicht: Er steht unter /audit-log hinter einem zugeklappten JSON, und die
+ * Vorgangsansicht hat gar keine Protokollanzeige.
+ *
+ * **Warum LIVE gerechnet und nicht aus dem Protokolleintrag gelesen.** Der
+ * Eintrag ist eine Momentaufnahme des Abgabezeitpunkts und taugt genau dafuer:
+ * als Nachweis dessen, was damals offen war. Als Arbeitsvorrat taugt er nicht,
+ * gleich zweifach — Vorgaenge, die VOR seiner Einfuehrung abgesendet wurden,
+ * haben keinen (darunter der gemeldete Masernschutz-Fall), und wird die
+ * Unterlage eine Woche spaeter hochgeladen, behauptet er weiter eine Luecke.
+ * Die Rechnung hier stimmt fuer Bestandsakten mit und wird still, sobald das
+ * Papier da ist.
+ *
+ * **Dieselben Funktionen wie Formular und Absendezweig** — keine zweite Regel:
+ * `masernschutzPflichtig` und `fehlendeNachreichbareDokumente`. Ein Nachbau
+ * liefe frueher oder spaeter auseinander, und dann mahnt HR etwas an, das
+ * niemand verlangt hat.
+ *
+ * **Die zweite Haelfte: Nachweise ohne Ablaufdatum.** Der vorgangsweite
+ * Warnbalken laesst diesen Fall bewusst aus (siehe `dringendeNachweisLagen`),
+ * und der naechtliche Cron sieht solche Dokumente nie — er filtert auf
+ * `gueltigBis: { not: null }`. Ein befristeter Aufenthaltstitel ohne erfasstes
+ * Datum liefe damit ab, ohne dass irgendwer etwas erfaehrt. Der Kasten fragt
+ * deshalb nach, er warnt nicht: Bei einer unbefristeten Niederlassungserlaubnis
+ * ist das leere Feld richtig so, ein Kennzeichen „unbefristet" gibt es nicht,
+ * und ein Vorwurf, den niemand ausraeumen kann, wird nach zwei Wochen
+ * ignoriert.
+ *
+ * Erst ab Abgabe: Solange der Fragebogen offen ist, laedt die Person selbst
+ * hoch und wird im Formular je Unterlage angemahnt. Vorher zu mahnen hiesse,
+ * HR hinter jemandem hertelefonieren zu lassen, der gerade in Schritt 3 sitzt.
+ */
+export function OffeneNachweiseKasten({
+  data,
+  onZuDenDokumenten,
+}: {
+  data: DetailData;
+  onZuDenDokumenten: (() => void) | null;
+}) {
+  const pd = data.personalData;
+  const abgegeben =
+    data.submittedAt !== null || ABGEGEBENE_STATUS.includes(data.status);
 
-  for (const doc of documents) {
-    if (!istFristpflichtig(doc.type)) continue;
-    const ampel = ablaufAmpel(doc.gueltigBis, jetzt);
+  const offen = abgegeben
+    ? fehlendeNachreichbareDokumente({
+        required: data.requiredDocuments ?? [],
+        hasChildren: (pd?.children.length ?? 0) > 0,
+        rvEntscheidung: pd?.rvEntscheidung ?? null,
+        masernschutzPflichtig: masernschutzPflichtig({
+          geburtsdatum: pd?.birthDate,
+          organisationstyp: data.organization.type,
+        }),
+        aufenthaltstitelErforderlich: pd?.aufenthaltstitelErforderlich ?? null,
+        healthInsuranceType: pd?.healthInsuranceType ?? null,
+        uploadedTypes: data.documents.map((d) => d.type),
+      })
+    : [];
 
-    if (!proTyp.has(doc.type)) {
-      proTyp.set(doc.type, ampel.kategorie ? ampel : null);
-      continue;
-    }
-    // Ein Dokument ohne Datum verdraengt nie eines mit Datum: Es beweist
-    // nichts, kann aber auch nichts widerlegen.
-    if (!ampel.kategorie) continue;
-    const bisher = proTyp.get(doc.type) ?? null;
-    if (!bisher || (bisher.tage ?? 0) < (ampel.tage ?? 0)) {
-      proTyp.set(doc.type, ampel);
-    }
-  }
+  // `nachweisLagen` gruppiert je Nachweisart und liefert `ampel: null` genau
+  // dann, wenn fuer diese Art ueberhaupt kein Ablaufdatum erfasst ist — ein
+  // nachgereichtes Papier MIT Datum raeumt die Nachfrage also ab.
+  const ohneFrist = nachweisLagen(data.documents)
+    .filter((l) => l.ampel === null)
+    .map((l) => l.typ);
 
-  return Array.from(proTyp, ([typ, ampel]) => ({ typ, ampel }));
+  if (offen.length === 0 && ohneFrist.length === 0) return null;
+
+  return (
+    <div className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+      <p className="text-sm font-bold text-amber-800">Offene Nachweise</p>
+
+      {offen.length > 0 && (
+        <>
+          <p className="mt-2 text-sm text-foreground">
+            Diese Pflichtunterlagen durften nachgereicht werden und liegen bis
+            heute nicht vor. Der Fragebogen hat zugesagt, dass die
+            Personalabteilung auf die Person zukommt und die Unterlage
+            entgegennimmt.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {offen.map((typ) => (
+              <li key={typ} className="text-sm font-semibold text-foreground">
+                {documentTypeLabel(typ)}
+              </li>
+            ))}
+          </ul>
+          {offen.includes("MASERNSCHUTZ") && (
+            <p className="mt-2 text-sm text-foreground">
+              Bleibt der Masernschutz-Nachweis dauerhaft aus, muss die
+              Personalabteilung das dem Gesundheitsamt melden — das
+              Infektionsschutzgesetz verlangt die Meldung, nicht das Anhalten
+              des Vorgangs.
+            </p>
+          )}
+        </>
+      )}
+
+      {ohneFrist.length > 0 && (
+        <>
+          <p className={`text-sm text-foreground ${offen.length > 0 ? "mt-4" : "mt-2"}`}>
+            Für diese Nachweise ist kein Ablaufdatum erfasst. Sie werden damit
+            nicht überwacht — weder der Warnbalken noch die nächtliche
+            Erinnerung erfassen sie. Bei einer unbefristeten
+            Niederlassungserlaubnis ist das richtig so; ist der Nachweis
+            befristet, tragen Sie das Datum bitte nach.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {ohneFrist.map((typ) => (
+              <li key={typ} className="text-sm font-semibold text-foreground">
+                {documentTypeLabel(typ)}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {onZuDenDokumenten && (
+        <button
+          onClick={onZuDenDokumenten}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+        >
+          Zu den Dokumenten
+        </button>
+      )}
+    </div>
+  );
 }
 
 /**
  * Der Warnbalken am Vorgang.
  *
- * Bewusst NUR bei „abgelaufen", „kritisch" (14 Tage) und „Frist fehlt".
- * BEOBACHTEN (90 Tage) und WARNUNG (42) traegt das Abzeichen an der
- * Dokumentenzeile — ein Balken, der drei Monate lang steht, ist Tapete.
+ * Bewusst NUR bei „abgelaufen" und „kritisch" (14 Tage) — welche Lagen das sind,
+ * entscheidet `dringendeNachweisLagen` in `src/lib/dokument-fristen.ts`; dort
+ * steht auch, warum „kein Ablaufdatum erfasst" NICHT dazugehoert (die
+ * unbefristete Niederlassungserlaubnis ist der Regelfall, nicht das Versaeumnis)
+ * und warum BEOBACHTEN/WARNUNG an der Dokumentenzeile bleiben.
  *
  * Und er sperrt nichts (Entscheidung des Nutzers): Ein abgelaufener Titel ist
  * ein Problem der BESCHAEFTIGUNG, nicht der Aktenfuehrung. Wer hier den Vorgang
@@ -1706,22 +1881,17 @@ function NachweisFristenWarnung({
   documents: DocumentData[];
   onZuDenDokumenten: (() => void) | null;
 }) {
-  const lagen = nachweisLagen(documents).filter(
-    (l) => !l.ampel || l.ampel.kategorie === "ABGELAUFEN" || l.ampel.kategorie === "KRITISCH"
-  );
+  const lagen = dringendeNachweisLagen(documents);
   if (lagen.length === 0) return null;
 
   const abgelaufen = lagen.some((l) => l.ampel?.kategorie === "ABGELAUFEN");
-  const kritisch = lagen.some((l) => l.ampel?.kategorie === "KRITISCH");
 
   const rahmen = abgelaufen
     ? "border-credo-rot/40 bg-credo-rot/5"
     : "border-amber-300 bg-amber-50";
   const ueberschrift = abgelaufen
     ? "⚠ Nachweis abgelaufen"
-    : kritisch
-      ? "Nachweis läuft in Kürze ab"
-      : "Ablaufdatum fehlt";
+    : "Nachweis läuft in Kürze ab";
   const titelFarbe = abgelaufen ? "text-credo-rot" : "text-amber-800";
 
   return (
@@ -1731,9 +1901,7 @@ function NachweisFristenWarnung({
         {lagen.map((l) => (
           <li key={l.typ} className="text-sm text-foreground">
             <span className="font-semibold">{documentTypeLabel(l.typ)}:</span>{" "}
-            {l.ampel
-              ? l.ampel.text
-              : "Kein Ablaufdatum erfasst — dieser Nachweis wird nicht überwacht."}
+            {l.ampel?.text}
           </li>
         ))}
       </ul>
@@ -1776,12 +1944,19 @@ function AblaufAbzeichen({ doc }: { doc: DocumentData }) {
   // Kein Datum ist kein Fehler (der Titel kann unbefristet sein, das Feld kann
   // schlicht noch leer sein) — aber es muss sichtbar sein. Sonst liest HR die
   // schweigende Ampel als „alles in Ordnung", obwohl gar nichts geprueft wird.
+  //
+  // Hier und NUR hier: Der vorgangsweite Balken laesst diesen Fall bewusst aus
+  // (siehe `dringendeNachweisLagen`). Deshalb muss der Satz an dieser Stelle
+  // beide Lesarten offenhalten — sonst liest jemand mit Niederlassungserlaubnis
+  // dauerhaft eine Ruege fuer eine Angabe, die es bei ihm nicht gibt.
   if (!ampel.kategorie) {
     return (
       <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5">
-        <p className="text-[11px] font-semibold text-amber-800">Frist fehlt</p>
+        <p className="text-[11px] font-semibold text-amber-800">Keine Frist hinterlegt</p>
         <p className="text-[11px] text-amber-900">
-          Kein Ablaufdatum erfasst — dieser Nachweis wird nicht überwacht.
+          Kein Ablaufdatum erfasst — dieser Nachweis wird nicht überwacht. Bei
+          einer unbefristeten Niederlassungserlaubnis ist das richtig so;
+          andernfalls bitte das Ablaufdatum nachtragen.
         </p>
       </div>
     );
@@ -2039,12 +2214,10 @@ function TabDocuments({
   // voneinander — dieser Zaehler ist das Signal von der einen zur anderen.
   const [versandZaehler, setVersandZaehler] = useState(0);
 
-  const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-    UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
-    REVIEWED: { label: "Geprüft", color: "bg-blue-100 text-blue-700" },
-    APPROVED: { label: "Genehmigt", color: "bg-green-100 text-green-700" },
-    REJECTED: { label: "Abgelehnt", color: "bg-red-100 text-red-700" },
-  };
+  // Die Statustabelle steht in `@/lib/constants` (DOCUMENT_STATUS_LABELS) und
+  // NICHT mehr hier: Als lokale Kopie fehlte ihr der Wert EXPIRED, den der
+  // naechtliche Cron setzt — und der Rueckfall `|| UPLOADED` machte daraus das
+  // graue Abzeichen „Hochgeladen" neben dem roten „Abgelaufen" der Ampel.
 
   // Schluessel MUESSEN dem Enum DocumentType entsprechen (prisma/schema.prisma).
   // Frueher standen hier PERSONALAUSWEIS, LOHNSTEUERBESCHEINIGUNG und
@@ -2132,7 +2305,7 @@ function TabDocuments({
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {data.documents.map((doc) => {
-              const statusLabel = DOC_STATUS_LABELS[doc.status] || DOC_STATUS_LABELS.UPLOADED;
+              const statusLabel = documentStatusLabel(doc.status);
               const typeColor = DOC_TYPE_COLORS[doc.type] || DOC_TYPE_COLORS.SONSTIGES;
 
               return (
@@ -2515,9 +2688,8 @@ function TabSupervisor({ data, appUrl }: { data: DetailData; appUrl: string }) {
 
       {/* Sektion 4: Weitere Angaben */}
       <Card title="Weitere Angaben">
+        <KostenstellenAufteilung sd={sd} />
         <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
-          <FieldRow label="Kostenstelle" value={sd.kostenstelle} />
-          <FieldRow label="Kostenstelle Anteil" value={formatNumber(sd.kostenstelleAnteil, "%")} />
           <FieldRow label="Probezeit" value={formatBoolean(sd.probezeit)} />
           <FieldRow label="Probezeit Monate" value={formatNumber(sd.probezeitMonate, "Monate")} />
           <FieldRow label="Urlaubstage/Jahr" value={formatNumber(sd.urlaubstageProJahr, "Tage")} />
@@ -2532,6 +2704,80 @@ function TabSupervisor({ data, appUrl }: { data: DetailData; appUrl: string }) {
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Die Kostenstellen-Aufteilung in der Vorgangsansicht.
+ *
+ * Hier stand bis zur Durchsicht 09/2026 ein blosses
+ * `<FieldRow label="Kostenstelle" value={sd.kostenstelle} />`. Das las die
+ * Alt-Spalte, die die Maske seit KOSTENSTELLEN_AUFTEILUNG_V1 nicht mehr
+ * befuellt: Bei einem neuen Vorgang stand dort ein Gedankenstrich, bei einem
+ * geaenderten Bestandsvorgang die laengst ersetzte alte Kostenstelle — und
+ * genau die gab HR dann an die Lohnbuchhaltung weiter.
+ *
+ * Eigene, exportierte Komponente statt JSX mitten in TabSupervisor: So laesst
+ * sich die Anzeige pruefen, ohne die ganze Detailseite mit Router, Sitzung und
+ * Nachladen aufzubauen (src/__tests__/components/kostenstellen-aufteilung.test.tsx).
+ */
+export function KostenstellenAufteilung({
+  sd,
+}: {
+  sd: DetailData["supervisorData"];
+}) {
+  const aufteilung = kostenstellenAnzeige(sd);
+
+  return (
+    <div className="mb-4">
+      <p className="mb-1 text-xs font-medium text-muted-foreground">
+        Kostenstellen-Aufteilung
+      </p>
+      {aufteilung.zeilen.length === 0 ? (
+        <p className="text-sm text-foreground">{"—"}</p>
+      ) : (
+        <>
+          <ul className="divide-y divide-border rounded-lg border border-border">
+            {aufteilung.zeilen.map((zeile, index) => (
+              <li
+                key={`${zeile.bezeichnung}-${index}`}
+                className="flex items-baseline justify-between gap-3 px-3 py-1.5"
+              >
+                <span className="text-sm text-foreground">{zeile.bezeichnung}</span>
+                <span className="text-sm font-medium text-foreground">
+                  {anteilText(zeile.anteil)}
+                </span>
+              </li>
+            ))}
+            <li className="flex items-baseline justify-between gap-3 px-3 py-1.5">
+              <span className="text-xs text-muted-foreground">Summe</span>
+              <span
+                className={`text-xs font-medium ${aufteilung.summeStimmt ? "text-muted-foreground" : "text-credo-rot"}`}
+              >
+                {summeText(aufteilung.summe)}
+                {aufteilung.summeStimmt ? "" : " – ergibt nicht 100 %"}
+              </span>
+            </li>
+          </ul>
+          {aufteilung.ausBestand && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Übernommen aus dem alten Einzelfeld – im Modalitäten-Formular noch
+              nicht aufgeteilt.
+            </p>
+          )}
+        </>
+      )}
+      {aufteilung.bemerkung && (
+        <div className="mt-2">
+          <p className="mb-0.5 text-xs font-medium text-muted-foreground">
+            Bemerkung zur Aufteilung
+          </p>
+          <p className="whitespace-pre-wrap text-sm text-foreground">
+            {aufteilung.bemerkung}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

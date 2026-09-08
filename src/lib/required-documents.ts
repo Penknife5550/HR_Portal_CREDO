@@ -287,12 +287,44 @@ export function computeMissingRequiredDocuments(
 }
 
 /**
+ * Die nachreichbaren Pflichten dieses Vorgangs — ohne Blick auf das schon
+ * Hochgeladene.
+ *
+ * Gedacht fuer die Stellen, die den Bestand gar nicht kennen und nur ankuendigen
+ * wollen, WAS nachgereicht werden darf.
+ *
+ * Die Zusammenfassung in Schritt 10 war einmal dieser Verwender, ist es aber
+ * nicht mehr: Sie bekommt die Liste inzwischen ueber einen Rueckkanal aus der
+ * Upload-Komponente, die den Bestand ohnehin fuehrt (siehe die Begruendung im
+ * Docblock von `step10-summary.tsx` — zwei Rechnungen nebeneinander liefen
+ * auseinander, weil `effektivePflichtDokumente` die regelbasierten Typen zuvor
+ * ausnahmslos aus der Vorlagenliste entfernt). Wer hier einen Aufrufer sucht,
+ * findet also unter Umstaenden gerade keinen; die Funktion bleibt trotzdem der
+ * richtige Weg fuer die naechste bestandslose Stelle.
+ *
+ * Nicht zu verwechseln mit `fehlendeNachreichbareDokumente`: Was hier
+ * herauskommt, ist die Pflicht — nicht die Luecke. Wer wissen will, was HEUTE
+ * noch fehlt (Kasten „Offene Nachweise" der Vorgangsansicht, Vermerk beim
+ * Absenden), nimmt jene Funktion.
+ */
+export function nachreichbarePflichtDokumente(opts: PflichtEingaben): string[] {
+  return effektivePflichtDokumente(opts).filter((t) => istNachreichbar(t));
+}
+
+/**
  * Die fehlenden Pflichtunterlagen, die **nicht** sperren.
  *
- * Zwei Verwender: das Formular (Mahnung an der Stelle, an der die Person die
- * Datei gerade in der Hand haelt) und der Server nach dem Absenden (Vorgang
- * sichtbar kennzeichnen, HR benachrichtigen). Ohne den zweiten waere die
- * Nachreichbarkeit ein stilles Fallenlassen der Pflicht.
+ * Der Verwender ist der Server nach dem Absenden: Er haelt die offenen
+ * Nachweise am Vorgang fest (Protokolleintrag `DOKUMENTE_NACHZUREICHEN` in
+ * derselben Transaktion wie die Abgabe) und macht sie damit abfragbar. Ohne ihn
+ * waere die Nachreichbarkeit ein stilles Fallenlassen der Pflicht: Der Vorgang
+ * ginge als vollstaendig durch, und die Meldung ans Gesundheitsamt, mit der der
+ * Verzicht auf die Sperre begruendet ist, haette keine Datengrundlage.
+ *
+ * Das Formular mahnt an einer anderen Stelle und mit anderen Mitteln — je
+ * Eintrag in der Karte „Pflichtdokumente" (dort liegt der Bestand vor) plus dem
+ * Ausblick aus `NACHREICHEN_FOLGEN_HINWEIS` in der Zusammenfassung. Diese
+ * Funktion braucht es dafuer nicht.
  */
 export function fehlendeNachreichbareDokumente(
   opts: PflichtEingaben & { uploadedTypes: readonly string[] },
@@ -394,3 +426,29 @@ export const PFLICHT_HINWEISE: Record<string, string> = {
   ARBEITSERLAUBNIS: ARBEITSERLAUBNIS_HINWEIS,
   PKV_NACHWEIS: PKV_NACHWEIS_HINWEIS,
 };
+
+/**
+ * Der Satz in der Zusammenfassung, unmittelbar vor dem Absende-Knopf.
+ *
+ * Die Hinweise oben stehen je Unterlage in der Upload-Karte und erklaeren, WAS
+ * verlangt wird. Hier steht das, was die Person unmittelbar vor der
+ * verbindlichen Abgabe wissen muss, und es sind drei Dinge:
+ *
+ * 1. **Das Absenden ist frei.** Ohne diese Zusage sucht jemand, der seinen Scan
+ *    gerade nicht hat, den gesperrten Knopf — und bricht ab. Der Knopf ist gar
+ *    nicht gesperrt.
+ * 2. **Der Vorgang wird trotzdem als offen gefuehrt.** Sonst liest sich die
+ *    Nachreichbarkeit wie ein Erlass. Die Pflicht bleibt, nur der Zeitpunkt
+ *    verschiebt sich.
+ * 3. **Der Link traegt danach nicht mehr.** Nach dem Absenden weist die
+ *    Upload-Route den Magic Link ab (validateMagicToken ohne allowSubmitted).
+ *    Wer das nicht weiss, legt die Unterlage beiseite mit dem Vorsatz, sie
+ *    „nachher ueber den Link" zu schicken — und der Nachweis kommt nie.
+ */
+export const NACHREICHEN_FOLGEN_HINWEIS =
+  "Sie können den Fragebogen absenden, auch wenn eine dieser Unterlagen noch " +
+  "fehlt. Ihr Vorgang wird dann mit dem Vermerk „Nachweis offen“ an die " +
+  "Personalabteilung übergeben; sie kommt auf Sie zu und nimmt die Unterlage " +
+  "entgegen. Über diesen Link können Sie nach dem Absenden nichts mehr " +
+  "hochladen — was Sie jetzt schon zur Hand haben, laden Sie deshalb besser " +
+  "oben gleich hoch.";

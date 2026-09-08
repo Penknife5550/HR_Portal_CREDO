@@ -112,6 +112,38 @@ export function istNach1970Geboren(geburtsdatum: unknown): boolean | null {
 }
 
 /**
+ * Was Akte, Vorgangsansicht und Personalakte-PDF zu "Nach dem 31.12.1970
+ * geboren" ANZEIGEN sollen.
+ *
+ * Warum es diese Funktion gibt: `bornAfter1971` ist eine Spalte, aber keine
+ * Antwort — es ist eine Ableitung aus `birthDate`. Geschrieben wird sie beim
+ * Verlassen von Schritt 9 des Fragebogens und danach nie wieder. Wer sein
+ * Geburtsdatum SPAETER korrigiert (Zahlendreher 1990 statt 1965 — und die
+ * Schrittleiste macht den Sprung zurueck zu Schritt 1 zum bequemen Regelweg),
+ * laesst den eingefrorenen Wert stehen: In der Akte steht dann ein "Ja" neben
+ * einem Geburtsjahr von 1965. Spiegelverkehrt entsteht ein "Nein" fuer eine nach
+ * 1970 geborene Person — also genau das stille "Nein", dessen Beseitigung der
+ * Anlass des ganzen Umbaus war.
+ *
+ * Deshalb gilt beim Lesen das Geburtsdatum, nicht die Spalte: Aus einem
+ * bekannten Geburtsdatum folgt die Antwort zwingend, und eine live gerechnete
+ * Ableitung kann nicht veralten (dasselbe Prinzip wie bei der Fristen-Ampel in
+ * `src/lib/dokument-fristen.ts`, die ihre Stufe nirgends speichert).
+ *
+ * Die gespeicherte Spalte ist der Rueckfall fuer den einen Fall, in dem die
+ * Rechnung nichts hergibt: kein oder unlesbares Geburtsdatum. Dann ist der
+ * frueher gegebene Wert immer noch besser als eine leere Zeile.
+ */
+export function nach1970GeborenAnzeige(
+  geburtsdatum: unknown,
+  gespeichert: boolean | null | undefined
+): boolean | null {
+  const abgeleitet = istNach1970Geboren(geburtsdatum);
+  if (abgeleitet !== null) return abgeleitet;
+  return gespeichert ?? null;
+}
+
+/**
  * Muss dieser Vorgang einen Masernschutznachweis erbringen?
  *
  * Ohne Geburtsdatum: NEIN. Niemals "im Zweifel Pflicht" — ein Vorgang ohne

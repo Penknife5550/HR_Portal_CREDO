@@ -253,6 +253,31 @@ function kostenstellenAusBestand(
  * auch wenn er nicht 100 ergibt — die Zahl stammt von einem Menschen. Die
  * Luecke wird dann sichtbar (die Summe stimmt nicht) statt stillschweigend
  * geglaettet.
+ *
+ * ============================================================================
+ * WORAUF DIESE FUNKTION SICH VERLAESST (bitte lesen, bevor jemand die
+ * Bedingung lockert oder die Alt-Spalte anders behandelt)
+ * ============================================================================
+ * "Keine Zeile, aber ein Altwert" ist fuer sich genommen ZWEIDEUTIG: Es kann
+ * "noch nicht migriert" heissen — oder "die Aufteilung wurde gerade bewusst
+ * geleert". Wer das nicht auseinanderhaelt, baut einen Wiedergaenger: Die
+ * vorgesetzte Person entfernt die Zeile, speichert, oeffnet den Link am
+ * naechsten Tag erneut — und der Rueckfall setzt die geloeschte Zeile wieder
+ * ein, das naechste "Weiter" schreibt sie zurueck in die Datenbank.
+ *
+ * Aufgeloest wird die Zweideutigkeit NICHT hier, sondern auf der
+ * Schreibseite: PUT /api/modalitaeten/:token fuehrt die Alt-Spalte bei jedem
+ * Speichern der Aufteilung mit (erste Zeile — oder null, wenn keine Zeile
+ * mehr da ist), und nimmt sie aus der Feld-Whitelist, damit kein Aufruf sie
+ * sonst noch setzen kann. Nach dem ersten bewussten Speichern sagen beide
+ * Quellen dasselbe; "Altwert ohne Zeile" bleibt dann nur noch fuer den einen
+ * Fall uebrig, fuer den dieser Rueckfall gedacht ist.
+ *
+ * Der Weg ueber den Merker der Datenmigration (`system_migrations`) waere die
+ * naheliegende Alternative gewesen. Er kostet eine zusaetzliche Abfrage samt
+ * neuem Feld in der GET-Antwort, laesst die beiden Quellen aber weiter
+ * auseinanderlaufen — die Alt-Spalte bliebe eingefroren, und Vorgangsansicht,
+ * CSV und PDF lesen sie in DIESEM Release noch.
  */
 function mitKostenstellenRueckfall(
   supervisorData: Record<string, unknown>
@@ -1229,9 +1254,14 @@ function SupStep4({
   const { register, handleSubmit, watch, getValues, setValue, formState: { errors } } = useForm<SupStep4Data>({
     resolver: zodResolver(supStep4Schema),
     defaultValues: {
-      // BESTAND, KEIN EINGABEFELD MEHR. Die beiden Werte werden durchgereicht,
-      // damit ein noch nicht migrierter Vorgang sie behaelt — die Aufteilung
-      // selbst steht in `zeilen` (siehe unten).
+      // BESTAND, KEIN EINGABEFELD MEHR. Die beiden Werte stehen hier nur noch,
+      // weil `supStep4Schema` sie verlangt (ein fehlender Schluessel ergaebe
+      // "Required" auf einem unsichtbaren Feld). AN DEN SERVER GEHEN SIE NICHT
+      // MEHR SO, WIE SIE HIER STEHEN: `abschicken` ersetzt sie unten durch die
+      // erste Zeile der Aufteilung, und die Route schreibt sie ohnehin nur noch
+      // selbst. Wuerde der geladene Altwert unveraendert zurueckgereicht,
+      // stuende nach dem Leeren der Aufteilung wieder die geloeschte
+      // Kostenstelle in der Datenbank.
       //
       // WARUM SIE HIER IN DIE GRENZEN GEZWUNGEN WERDEN: Beide stehen weiter in
       // `supStep4Schema`, haben aber kein Eingabefeld mehr. Ein Bestandswert
@@ -1354,6 +1384,26 @@ function SupStep4({
     onNext({
       ...(werte as unknown as Record<string, unknown>),
       kostenstellen: geprueft.data,
+      /**
+       * Die Alt-Spalten derselben Regel folgen lassen wie in der Route:
+       * erste Zeile, sonst leer.
+       *
+       * Sie gehen zwar nicht mehr als Eingabe an den Server (die Route hat
+       * sie aus der Feld-Whitelist genommen und leitet sie selbst ab) — aber
+       * `handleNext` legt genau dieses Objekt auch in `formData` ab, und die
+       * Zusammenfassung in Schritt 5 zeigt `data.kostenstelle` an, solange
+       * keine Zeile da ist. Ohne diese zwei Zeilen stuende dort nach dem
+       * Entfernen der letzten Zeile weiter die geloeschte Kostenstelle: Die
+       * Person bestaetigte beim Absenden eine Angabe, die weder auf ihrem
+       * Schirm noch in der Datenbank sein soll.
+       *
+       * Leerer String statt `null`: `modalitaetenFieldsSchema` in der Route
+       * erwartet fuer `kostenstelle` einen String, ein `null` im Rumpf
+       * ergaebe einen 400er "Validierungsfehler" an einem Feld, das die
+       * Person gar nicht sieht.
+       */
+      kostenstelle: geprueft.data[0]?.bezeichnung ?? "",
+      kostenstelleAnteil: geprueft.data[0]?.anteil ?? null,
     });
   };
 
@@ -1752,6 +1802,10 @@ function SupStep5Summary({
           ) : (
             // Rueckfall fuer einen Vorgang, der noch keine Zeile hat: Sonst
             // verschwaende eine gespeicherte Kostenstelle aus der Anzeige.
+            // Dass hier nicht eine GELOESCHTE Kostenstelle stehen bleibt,
+            // haengt an `abschicken` in Schritt 4: Der Schritt fuehrt
+            // `kostenstelle` mit der Aufteilung mit und leert es, sobald die
+            // letzte Zeile entfernt ist.
             !!data.kostenstelle && <div className="flex justify-between"><span className="text-muted-foreground">Kostenstelle</span><span className="font-medium">{str(data.kostenstelle)}</span></div>
           )}
           <div className="flex justify-between"><span className="text-muted-foreground">Probezeit</span><span className="font-medium">{data.probezeit ? `${str(data.probezeitMonate)} Monate` : "Nein"}</span></div>

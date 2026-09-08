@@ -61,11 +61,20 @@ const ACTION_LABELS: Record<string, string> = {
   ONBOARDING_CREATED: "Onboarding erstellt",
   OFFBOARDING_CREATED: "Offboarding erstellt",
   QUESTIONNAIRE_SUBMITTED: "Fragebogen eingereicht",
+  // Der Vermerk „Nachweis offen" aus dem Absendezweig des Fragebogens. Er haelt
+  // fest, was zum ABGABEZEITPUNKT fehlte — der heutige Stand steht live
+  // gerechnet im Kasten „Offene Nachweise" der Vorgangsansicht.
+  DOKUMENTE_NACHZUREICHEN: "Nachweise nachzureichen",
   RETURN_ITEM_UPDATED: "Rückgabe aktualisiert",
   DEPARTMENT_FEEDBACK_SUBMITTED: "Abteilungs-Feedback eingereicht",
 };
 
-function getActionLabel(action: string): string {
+/**
+ * Exportiert, damit die Uebersetzungstabelle ohne gerenderte Seite pruefbar
+ * ist: Ein Code ohne Eintrag steht sonst als rohes `DOKUMENTE_NACHZUREICHEN` in
+ * der Zeile, und das faellt niemandem auf, der die Tabelle nicht liest.
+ */
+export function getActionLabel(action: string): string {
   return ACTION_LABELS[action] || action;
 }
 

@@ -181,7 +181,15 @@ export async function PUT(
     // eigenen Tabelle. Stuenden sie in der Liste, landete ein Array in
     // `updateData` und damit unveraendert in `supervisorData.update` — Prisma
     // kennt dort kein solches Feld.
-    "kostenstelle", "kostenstelleAnteil", "kostenstellenBemerkung",
+    //
+    // `kostenstelle` und `kostenstelleAnteil` stehen hier EBENFALLS NICHT
+    // MEHR. Sie haben kein Eingabefeld mehr; das Formular reichte nur den
+    // GELADENEN Altwert unveraendert zurueck. Genau daraus entstand der
+    // Wiedergaenger: Wer die Aufteilung leerte, loeschte die Zeilen — und
+    // schrieb im selben Aufruf den alten Einzelwert erneut fest. Geschrieben
+    // werden die beiden Spalten ab jetzt an genau EINER Stelle, unten aus der
+    // Aufteilung abgeleitet. Ein Aufruf kann sie nicht mehr selbst setzen.
+    "kostenstellenBemerkung",
     "probezeit", "probezeitMonate",
     "verguetungsmodell", "entgeltgruppe", "stufe",
     "festgehalt", "stundenlohn", "bemerkungVerguetung",
@@ -272,6 +280,47 @@ export async function PUT(
    * ausfuehrlich in src/app/api/fragebogen/[token]/route.ts.
    */
   const zeilen = parsed.data.kostenstellen;
+
+  /**
+   * DIE ALT-SPALTEN MITFUEHREN — sonst ersteht eine geloeschte Aufteilung
+   * beim naechsten Oeffnen des Links wieder auf.
+   *
+   * Solange `kostenstelle`/`kostenstelleAnteil` neben der Aufteilung stehen
+   * (dieses eine Release, siehe Kommentar an SupervisorData in
+   * prisma/schema.prisma), gibt es ZWEI Quellen fuer dieselbe Angabe. Die
+   * Maske braucht deshalb einen Rueckfall auf die Alt-Spalte
+   * (`mitKostenstellenRueckfall` in src/app/modalitaeten/[token]/page.tsx) —
+   * ein Bestandsvorgang, dessen Datenmigration noch nicht gelaufen ist, soll
+   * seine Kostenstelle nicht verlieren.
+   *
+   * Dieser Rueckfall kann am Ergebnis aber nicht unterscheiden, ob nie eine
+   * Aufteilung gepflegt wurde oder ob sie gerade bewusst geleert worden ist:
+   * beide Male steht dort "keine Zeile, aber ein Altwert". Blieb die
+   * Alt-Spalte beim Loeschen stehen, setzte er die entfernte Zeile beim
+   * naechsten Laden wieder ein, und das naechste "Weiter" schrieb sie erneut
+   * in die Datenbank — der Widerruf hielt keinen Reload.
+   *
+   * Geheilt wird das hier, auf der SCHREIBSEITE: Sobald ein Aufruf die
+   * Aufteilung mitschickt, folgt ihr die Alt-Spalte.
+   *   - Zeilen vorhanden -> erste Zeile (Bezeichnung und Anteil). Dieselbe
+   *     Lesart benutzt der CSV-Export fuer die eine LOGA-Spalte
+   *     "Kostenstelle"; zwei Lesarten waeren zwei Wahrheiten.
+   *   - Keine Zeile mehr -> null. Damit findet der Rueckfall nichts mehr
+   *     vor, und der Widerruf haelt.
+   * Danach heisst "Altwert ohne Zeile" nur noch das eine, was es heissen
+   * soll: Dieser Vorgang ist noch nicht migriert.
+   *
+   * `Array.isArray` und nicht `zeilen?.length`: Ein Aufruf, der die
+   * Aufteilung gar nicht erwaehnt (die Schritte 1 bis 3), darf die Alt-Spalte
+   * so wenig anfassen wie die Zeilen selbst — sonst raeumte jedes
+   * Zwischenspeichern sie mit weg. Dieselbe Unterscheidung wie unten.
+   */
+  if (Array.isArray(zeilen)) {
+    // `bezeichnung` ist durch `kostenstellenListeSchema` bereits getrimmt und
+    // nicht leer; `?? null` greift also nur, wenn es keine Zeile mehr gibt.
+    updateData.kostenstelle = zeilen[0]?.bezeichnung ?? null;
+    updateData.kostenstelleAnteil = zeilen[0]?.anteil ?? null;
+  }
 
   // Interaktive Transaktion statt eines Arrays von Operationen: Die id des
   // Upserts wird fuer die Zeilen gebraucht, und beim ersten Speichern gibt es

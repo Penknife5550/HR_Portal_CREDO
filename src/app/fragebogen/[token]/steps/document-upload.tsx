@@ -69,9 +69,23 @@ interface DocumentUploadProps {
    *
    * Enthaelt nur die **sperrenden** Pflichten. Eine nachreichbare Unterlage
    * (Masernschutz) steht bewusst nicht darin, sonst sperrte sie ueber diesen
-   * Umweg doch.
+   * Umweg doch. Wer wissen will, welche der nachreichbaren Pflichten noch offen
+   * ist, nimmt `onNachzureichenChange` — die beiden Kanaele sind bewusst
+   * getrennt, damit kein Umbau an der Anzeige versehentlich die Sperre erweitert.
    */
   onMissingChange?: (missing: string[]) => void;
+  /**
+   * Das Gegenstueck: die **nachreichbaren** Pflichten, die noch offen sind.
+   *
+   * Schritt 10 sperrt damit NICHTS — er sagt nur, was tatsaechlich noch fehlt,
+   * und blendet seinen Ausblick aus, sobald alles da ist. Der Kanal existiert,
+   * weil `documents` lokaler Zustand dieser Komponente ist: Ein zweiter
+   * Ladeweg daneben liefe der Upload-Karte zwangslaeufig hinterher, und wer
+   * gerade hochgeladen hat, laese eine Sekunde spaeter, die Unterlage fehle
+   * noch. Gemeldet wird deshalb aus DERSELBEN Liste, aus der die Karte oben
+   * ihre Haken zeichnet.
+   */
+  onNachzureichenChange?: (offen: string[]) => void;
 }
 
 // Fallback-Pflichtdokumente, falls die Vorlage keine Konfiguration liefert.
@@ -137,6 +151,7 @@ export function DocumentUpload({
   healthInsuranceType,
   antragErzeugbar = true,
   onMissingChange,
+  onNachzureichenChange,
 }: DocumentUploadProps) {
   const [documents, setDocuments] = useState<UploadedDoc[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -404,6 +419,35 @@ export function DocumentUpload({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fehlendSchluessel]);
 
+  // Der zweite Kanal: die nachreichbaren Pflichten, die noch OFFEN sind.
+  //
+  // Er sperrt nichts — Schritt 10 sagt damit nur, was tatsaechlich noch fehlt,
+  // statt alle nachreichbaren Pflichten des Vorgangs aufzuzaehlen (auch die
+  // laengst hochgeladenen). Bewusst aus `pflichtTypen` gefiltert und nicht aus
+  // einer zweiten Auswertung der Regeln: Die Karte oben zeichnet ihre Haken aus
+  // genau dieser Liste, und zwei Berechnungen liefen frueher oder spaeter
+  // auseinander — etwa ueber den Rueckfall auf FALLBACK_REQUIRED_TYPES, den
+  // nur diese Komponente kennt.
+  //
+  // Bei `ladeFehler` wird — wie oben — nichts gemeldet: Was fehlt, ist dann
+  // unbekannt, und der Ausblick verschwindet lieber, als offene Posten zu
+  // behaupten. An seiner Stelle steht ohnehin der Fehlerkasten der Karte.
+  const offeneNachreichbare = ladeFehler
+    ? []
+    : pflichtTypen.filter(
+        (t) => istNachreichbar(t) && !documents.some((d) => d.type === t),
+      );
+  const offeneNachreichbareSchluessel = offeneNachreichbare.join(",");
+  useEffect(() => {
+    onNachzureichenChange?.(
+      offeneNachreichbareSchluessel
+        ? offeneNachreichbareSchluessel.split(",")
+        : [],
+    );
+    // Schluessel statt Array — siehe oben.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offeneNachreichbareSchluessel]);
+
   // Die Pflicht ist erfuellt, sobald EIN Dokument dieses Typs vorliegt — auch
   // bei mehreren Kindern. Das bleibt bewusst so: Ein Scan kann zwei Urkunden
   // enthalten, und wer solche Faelle aussperrt, schafft mehr Aerger als er
@@ -416,7 +460,24 @@ export function DocumentUpload({
     anzahlKinder > 1 && urkundenKinder > 0 && urkundenKinder < anzahlKinder;
 
   return (
-    <div className="space-y-4">
+    /*
+     * `data-dateibereich` sagt dem Rahmen (fragebogen-form.tsx), dass die
+     * Eingaben hier drin NICHT am „Weiter" haengen und deshalb aus der
+     * Verlust-Rueckfrage vor einem Schrittsprung herausfallen.
+     *
+     * Der Grund ist die Selbstumbau-Eigenschaft dieser Karte: Ein Upload — oder
+     * ein Loeschen, ein nachgetragenes Datum, ein Wechsel der Dokumentenart —
+     * aendert die Feldmenge, weil „Gültig bis" nur VOR dem Upload steht. Ohne
+     * das Merkmal las der Rahmen dieselbe Maske vorher und nachher
+     * unterschiedlich und warnte vor dem Verlust von Eingaben, die gerade
+     * nachweislich auf dem Server gelandet sind. Eine Warnung, die immer kommt,
+     * wird weggeklickt — und dahinter stehen echte ungespeicherte Eingaben.
+     *
+     * Verloren gehen kann hier nichts: Datei und Ablaufdatum speichert der
+     * POST, das nachgetragene Datum der PATCH — beide sofort und ueber eigene
+     * Knoepfe, nicht ueber das „Weiter" des Schritts.
+     */
+    <div className="space-y-4" data-dateibereich="">
       {/* ============================================= */}
       {/* PFLICHTDOKUMENTE */}
       {/* ============================================= */}

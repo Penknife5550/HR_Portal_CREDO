@@ -981,7 +981,17 @@ function planeKostenstellenZeilen(datensaetze) {
  * Ueberfuehrt die einzelne Kostenstelle in die neue Aufteilung.
  *
  * Ohne sie muesste jede vorgesetzte Person eine bereits gepflegte Kostenstelle
- * neu eintippen — und bis dahin stuende in Vorgangsansicht, CSV und PDF nichts.
+ * neu eintippen. Und bis dahin stuende in Vorgangsansicht, CSV und PDF nicht
+ * etwa nichts, sondern der ALTE Einzelwert aus `kostenstelle` — von den beiden
+ * Zustaenden der gefaehrlichere: Eine leere Anzeige faellt auf, eine gefuellte
+ * gibt niemandem Anlass zu zweifeln. Ein ungelaufener Lauf heisst also nicht
+ * "die Angabe fehlt", sondern "die Angabe steht da, aber nur als eine einzelne
+ * Kostenstelle statt als Aufteilung".
+ *
+ * Dass dieser Einzelwert wenigstens nicht EINFRIERT, sobald jemand die
+ * Aufteilung pflegt, besorgt die Speicherroute: PUT /api/modalitaeten/:token
+ * fuehrt `kostenstelle`/`kostenstelleAnteil` mit der ersten Zeile mit und
+ * setzt sie auf null, wenn keine Zeile mehr da ist.
  *
  * Die alten Spalten bleiben in DIESEM Release bestehen (siehe Kommentar an
  * SupervisorData in prisma/schema.prisma): entrypoint.sh schiebt das Schema

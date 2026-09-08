@@ -193,6 +193,17 @@ export async function POST(request: NextRequest) {
     // wenn zwei Zeilen desselben Typs dasselbe Datum tragen (Doppel-Upload) —
     // dann ueberholt keine die andere, und ohne diese Sperre gingen zwei
     // identische Mails hinaus.
+    //
+    // Der Schluessel wird BELEGT, sobald eine Zeile zustaendig ist (nach der
+    // Ueberholt-Pruefung), und NICHT erst, wenn sie heute tatsaechlich mahnt.
+    // Der Unterschied ist der ganze Zweck der Sperre: Wer seinen Aufenthaltstitel
+    // als Vorder- und Rueckseite hochlaedt und beide Male dasselbe Ablaufdatum
+    // eintraegt, hat zwei Zeilen mit demselben Schluessel. Belegte die erste den
+    // Schluessel nur an den Tagen, an denen sie mahnt, liefe die zweite am
+    // Folgetag in ihren eigenen Stufenwechsel — und ab da kaeme die Mahnung
+    // dauerhaft doppelt, um einen Tag versetzt. Zustaendig ist deshalb immer die
+    // erste nicht ueberholte Zeile; die Sortierung (gueltigBis asc, id asc) macht
+    // das ueber die Laeufe hinweg stabil.
     const behandelt = new Set<string>();
 
     for (const doc of dokumente) {
@@ -235,10 +246,16 @@ export async function POST(request: NextRequest) {
           results.uebersprungen++;
           continue;
         }
+
+        // (b2) Zustaendigkeit belegen — VOR jeder weiteren Pruefung, siehe den
+        //      Kommentar an `behandelt`. Ab hier schweigt jede weitere Zeile
+        //      desselben Schluessels in diesem Lauf, unabhaengig davon, ob die
+        //      zustaendige Zeile heute mahnt.
         if (behandelt.has(schluessel)) {
           results.uebersprungen++;
           continue;
         }
+        behandelt.add(schluessel);
 
         // (c) Kappung der Ueberfaelligkeit (siehe Konstante oben).
         if (tage < -UEBERFAELLIG_ERINNERN_BIS_TAGE) {
@@ -260,8 +277,6 @@ export async function POST(request: NextRequest) {
           results.uebersprungen++;
           continue;
         }
-
-        behandelt.add(schluessel);
 
         const name =
           [doc.onboarding.firstName, doc.onboarding.lastName].filter(Boolean).join(" ") ||

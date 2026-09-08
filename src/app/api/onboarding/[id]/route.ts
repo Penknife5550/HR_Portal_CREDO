@@ -42,7 +42,13 @@ export async function GET(
       include: {
         organization: true,
         personalData: { include: { children: true } },
-        supervisorData: true,
+        // Ohne dieses `include` zeigt die Vorgangsansicht bei einem neuen
+        // Vorgang gar keine Kostenstelle und bei einem migrierten den
+        // eingefrorenen Altwert — die gepflegte Aufteilung erreicht HR nie.
+        // Siehe src/lib/kostenstellen-anzeige.ts.
+        supervisorData: {
+          include: { kostenstellen: { orderBy: { orderIndex: "asc" } } },
+        },
         documents: true,
         checklistItems: {
           include: {
@@ -103,8 +109,33 @@ export async function GET(
 
     const vorlagen = await ladeVorlagenKonfigurationen();
 
+    /**
+     * Die konfigurierten Pflicht-Dokumenttypen dieses Fragebogentyps.
+     *
+     * Ohne sie kann die Vorgangsansicht den Kasten „Offene Nachweise" nicht
+     * live rechnen — alles Uebrige dafuer (Geburtsdatum, Einrichtungstyp,
+     * `aufenthaltstitelErforderlich`, `healthInsuranceType`, `rvEntscheidung`,
+     * Kinder, hochgeladene Dokumente) liegt in den `include`s oben bereits
+     * vor. Kein sensibles Feld kommt hinzu.
+     *
+     * Bewusst die AKTUELLE Vorlage und nicht der `formTemplateSnapshot` — samt
+     * desselben Rueckfalls wie beim Absenden
+     * (src/app/api/fragebogen/[token]/route.ts). Beide Stellen muessen
+     * dieselbe Pflichtliste sehen, sonst zeigt die Ansicht eine andere Luecke
+     * an, als der Server beim Absenden vermerkt hat.
+     */
+    const formTemplate = await prisma.formTemplate.findUnique({
+      where: { questionnaireType: onboarding.questionnaireType },
+      select: { requiredDocuments: true },
+    });
+    const requiredDocuments = formTemplate?.requiredDocuments ?? [
+      "GEBURTSURKUNDE_EIGEN",
+      "GEBURTSURKUNDE_KIND",
+    ];
+
     return NextResponse.json({
       ...safeOnboarding,
+      requiredDocuments,
       // Fortschritt gegen die Strecke *dieses* Vorgangs, nicht gegen alle
       // moeglichen Schritte — siehe fragebogen-fortschritt.ts.
       fragebogenFortschritt: fortschrittFuerVorgang(onboarding, vorlagen),

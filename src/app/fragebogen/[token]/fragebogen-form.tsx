@@ -63,6 +63,30 @@ interface FragebogenFormProps {
   initialData: OnboardingData;
 }
 
+/**
+ * Das Merkmal eines Bereichs, dessen Eingaben NICHT am „Weiter" haengen.
+ *
+ * Gesetzt wird es von `DocumentUpload` (steps/document-upload.tsx). Der Grund
+ * ist der Selbstumbau dieser Karte: Ein Upload — oder ein Loeschen, ein
+ * nachgetragenes Datum, ein Wechsel der Dokumentenart — laedt die
+ * Dokumentenliste neu und aendert dabei die Feldmenge, weil „Gültig bis" nur
+ * VOR dem Upload steht. `beruehrtRef` schuetzt davor nicht: Als Beruehrung
+ * zaehlt schon der Klick auf „Hochladen" selbst, und der friert den
+ * Ausgangsstand eine Sekunde vor dem Umbau ein. Die Rueckfrage kam damit nach
+ * JEDEM Upload — und behauptete, Eingaben gingen verloren, waehrend die Datei
+ * nachweislich auf dem Server lag (Nachpruefung 08.09.2026).
+ *
+ * Ausklammern ist hier richtig und nicht bloss bequem: Jedes Feld in diesem
+ * Bereich speichert sich ueber einen EIGENEN Knopf sofort selbst (POST beim
+ * Hochladen, PATCH beim Nachtragen des Ablaufdatums). Der Satz des Dialogs —
+ * „Gespeichert wird erst mit Weiter" — waere dort schlicht falsch; in der
+ * Zusammenfassung gibt es gar kein „Weiter". Der Preis ist ein eingetipptes,
+ * aber noch nicht abgeschicktes Ablaufdatum: Es geht beim Sprung ohne
+ * Rueckfrage verloren. Das ist die kleinere Einbusse — eine Warnung, die
+ * immer kommt, wird weggeklickt, und dann auch die vor echten Eingaben.
+ */
+const DATEIBEREICH = "[data-dateibereich]";
+
 export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
   // Die Schritte, die dieser Mitarbeiter laut Vorlage durchlaeuft —
   // in Anzeigereihenfolge, ohne die abgeschalteten.
@@ -215,59 +239,138 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
    */
   const inhaltRef = useRef<HTMLDivElement>(null);
 
-  /** Stand der Eingabefelder beim Betreten des Schritts. */
+  /** Stand der Maske, gegen den verglichen wird. */
   const ausgangswerteRef = useRef<string | null>(null);
 
   /**
-   * Die Werte aller Eingabefelder des aktuellen Schritts als ein Vergleichstext.
+   * Hat die Person in dieser Maske ueberhaupt etwas angefasst?
    *
-   * Nur Felder MIT `name` — das sind die von react-hook-form registrierten,
-   * also genau die, deren Inhalt beim naechsten "Weiter" zum Server ginge.
+   * Wer nichts angefasst hat, kann nichts verlieren — und solange das so ist,
+   * ist der zuletzt gezeichnete Stand der Ausgangsstand (siehe den Effekt
+   * unten). Das ist die Gegenmassnahme gegen den Fehlalarm: Die Zusammenfassung
+   * laedt ihre Dokumentenliste NACH dem Zeichnen nach und bringt dabei neue
+   * Felder mit (je Nachweis ein "Gueltig bis"). Ohne diesen Merker haette
+   * allein das Nachladen jeden Sprung von dort mit einer Rueckfrage belegt —
+   * und wer Fehlalarme gewohnt ist, klickt auch den echten weg.
    *
-   * Was damit bewusst NICHT erfasst wird:
-   *  - Die **Datei-Felder** (Masernnachweis, Bescheinigungen, Anlagen). Sie
-   *    tragen keinen Namen, laden beim Auswaehlen sofort hoch und haengen
-   *    nicht am Speichern des Schritts.
-   *  - Die **Bestaetigungsfelder der Zusammenfassung** (Ort, Haken zur
-   *    Erklaerung und zur DSGVO). Auch sie sind namenlos, weil sie den
-   *    Zustand der Maske fuehren und nicht die Personalakte: Gespeichert
-   *    werden sie erst mit dem Absenden, ein "Weiter" gibt es dort nicht.
+   * Der Merker allein genuegt nicht: Ein Klick in ein Feld hinein oder auf
+   * "Hochladen" aendert nichts. Erst beide Bedingungen zusammen — angefasst
+   * UND anderer Stand — ergeben die Rueckfrage.
+   */
+  const beruehrtRef = useRef(false);
+
+  /**
+   * Der Zustand der gesamten Maske als ein Vergleichstext.
    *
-   * Der Preis dafuer ist der Verzicht auf namenlose Felder insgesamt. Das ist
-   * die richtige Seite, auf der man irrt: Die Dokumentenliste der
-   * Zusammenfassung laedt nach dem Zeichnen nach und veraendert dabei den
-   * Bestand ihrer namenlosen Felder — jede Rueckfrage von dort waere ein
-   * Fehlalarm, und wer Fehlalarme gewoehnt ist, klickt auch den echten weg.
+   * Frueher standen hier nur Felder MIT `name`, also die von react-hook-form
+   * ueber `register()` gebundenen. Das hat ausgerechnet die folgenreichsten
+   * Eingaben des Fragebogens uebersehen:
+   *
+   *  - Die **Ja/Nein-Fragen** sind Schaltflaechen (`<button role="radio">`)
+   *    und tragen ihren Wert per `setValue` ins Formular, nicht ueber ein
+   *    Eingabefeld. Ein "Nein" bei "Brauchen Sie einen Aufenthaltstitel?" —
+   *    die Antwort, die Aufenthaltstitel und Arbeitserlaubnis aus den
+   *    Pflichtdokumenten fallen laesst — verschwand lautlos.
+   *  - Die **Zeilentabellen** (Kinder in Schritt 4; weitere Beschaeftigung,
+   *    Vorbeschaeftigung und Ausland in Schritt 6) fuehren ihren Zustand in
+   *    `useState` und rendern namenlose Felder. Drei eingetragene
+   *    Beschaeftigungszeilen waren beim Sprung weg, ohne dass gefragt wurde.
+   *
+   * Gelesen wird deshalb alles, was Zustand traegt: jedes Eingabefeld — mit
+   * `name` oder ohne — und jedes Element mit `aria-checked`, das sind die
+   * Ja/Nein-Schaltflaechen. Namenlose Felder haengen an ihrer **Position**,
+   * und das ist Absicht: Eine hinzugefuegte oder entfernte Tabellenzeile
+   * verschiebt alles Nachfolgende und faellt damit auch dann auf, wenn sie
+   * selbst noch leer ist.
+   *
+   * Ausgenommen bleiben die **Datei-Felder** (Masernnachweis, Bescheinigungen,
+   * Anlagen). Sie laden beim Auswaehlen sofort hoch, haengen nicht am
+   * Speichern des Schritts, und ihr `value` wird nach dem Upload ohnehin
+   * zurueckgesetzt. Mit ihnen faellt der ganze **Dateibereich** heraus —
+   * siehe `DATEIBEREICH` oben.
    */
   const leseEingaben = useCallback((): string | null => {
     const wurzel = inhaltRef.current;
     if (!wurzel) return null;
+
+    const teile: string[] = [];
+
+    // Eigener Zaehler statt des Laufindex der Knotenliste. Verschwindet im
+    // Dateibereich ein Feld, duerfen sich die Positionen der Felder DAHINTER
+    // (in der Zusammenfassung: Ort und die beiden Haken) nicht verschieben —
+    // sonst kaeme der Fehlalarm durch die Hintertuer zurueck.
+    let position = 0;
     const felder = wurzel.querySelectorAll<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >("input[name], select[name], textarea[name]");
-    return Array.from(felder)
-      .map((feld) => {
-        const typ = (feld as HTMLInputElement).type;
-        // Bei Haken und Radioknoepfen steht die Antwort in `checked`; `value`
-        // ist dort der feste Wert der Option und aendert sich nie.
-        const wert =
-          typ === "checkbox" || typ === "radio"
-            ? (feld as HTMLInputElement).checked
-              ? "1"
-              : "0"
-            : feld.value;
-        // Trennzeichen, die in keiner Eingabe vorkommen koennen.
-        return `${feld.name}\u001f${wert}`;
-      })
-      .join("\u001e");
+    >("input, select, textarea");
+    felder.forEach((feld) => {
+      const typ = (feld as HTMLInputElement).type;
+      if (typ === "file") return;
+      if (feld.closest(DATEIBEREICH)) return;
+      // Bei Haken und Radioknoepfen steht die Antwort in `checked`; `value`
+      // ist dort der feste Wert der Option und aendert sich nie.
+      const wert =
+        typ === "checkbox" || typ === "radio"
+          ? (feld as HTMLInputElement).checked
+            ? "1"
+            : "0"
+          : feld.value;
+      position += 1;
+      // Trennzeichen, die in keiner Eingabe vorkommen koennen.
+      teile.push(`${position}\u001f${feld.name}\u001f${wert}`);
+    });
+
+    // Alles, was seinen Zustand ueber `aria-checked` fuehrt statt ueber ein
+    // Eingabefeld — im Fragebogen sind das die Ja/Nein-Schaltflaechen.
+    // Derselbe eigene Zaehler und dieselbe Ausnahme wie oben: Im Dateibereich
+    // gibt es heute keine solche Schaltflaeche, aber eine morgen ergaenzte
+    // duerfte die Zaehlung der uebrigen nicht verschieben.
+    let ariaPosition = 0;
+    wurzel.querySelectorAll("[aria-checked]").forEach((knopf) => {
+      if (knopf.closest(DATEIBEREICH)) return;
+      ariaPosition += 1;
+      // Eigener Zaehlerstand unter dem Namen, den die Zeile darunter erwartet.
+      const position = ariaPosition;
+      teile.push(`a${position}\u001f${knopf.getAttribute("aria-checked")}`);
+    });
+
+    return teile.join("\u001e");
   }, []);
 
-  // Ausgangsstand merken, sobald die Maske eines Schritts steht. Der Effekt
-  // laeuft nach dem Zeichnen, react-hook-form hat seine `defaultValues` dann
-  // bereits in die Felder geschrieben.
+  // Ein neu betretener Schritt faengt unberuehrt an. Der Effekt laeuft nach dem
+  // Zeichnen, react-hook-form hat seine `defaultValues` dann bereits in die
+  // Felder geschrieben.
   useEffect(() => {
+    beruehrtRef.current = false;
     ausgangswerteRef.current = leseEingaben();
   }, [currentStep, leseEingaben]);
+
+  // Solange niemand etwas angefasst hat, ist der zuletzt gezeichnete Stand der
+  // Ausgangsstand. Bewusst OHNE Abhaengigkeitsliste, also nach JEDEM Zeichnen:
+  // Was eine Maske nach dem Oeffnen von sich aus nachlaedt, darf keine
+  // Rueckfrage ausloesen. Mit der ersten Beruehrung friert der Ausgangsstand
+  // ein — ab da ist jeder Unterschied die Eingabe der Person.
+  useEffect(() => {
+    if (!beruehrtRef.current) ausgangswerteRef.current = leseEingaben();
+  });
+
+  // Was als "angefasst" zaehlt: tippen (`input`), auswaehlen (`change`) und
+  // klicken (`click`). Das Klicken gehoert dazu, weil die Ja/Nein-Schaltflaechen
+  // und die Knoepfe "Zeile hinzufuegen"/"Entfernen" weder das eine noch das
+  // andere ausloesen. In der Auffangphase (`true`), damit der Merker auch dann
+  // gesetzt wird, wenn ein Handler die Weitergabe des Ereignisses stoppt.
+  useEffect(() => {
+    const wurzel = inhaltRef.current;
+    if (!wurzel) return;
+    const merken = () => {
+      beruehrtRef.current = true;
+    };
+    const arten = ["input", "change", "click"] as const;
+    arten.forEach((art) => wurzel.addEventListener(art, merken, true));
+    return () => {
+      arten.forEach((art) => wurzel.removeEventListener(art, merken, true));
+    };
+  }, []);
 
   /** Wechsel ausfuehren — ohne weitere Rueckfrage. */
   const wechsleZu = (index: number) => {
@@ -295,7 +398,10 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     // gleich wieder ueberschreiben.
     if (saving) return;
 
-    if (leseEingaben() !== ausgangswerteRef.current) {
+    // Beide Bedingungen: Ohne Beruehrung gibt es nichts zu verlieren, und ohne
+    // Unterschied ist nichts verloren gegangen. Die erste haelt die Rueckfrage
+    // vom Nachladen fern, die zweite vom blossen Anklicken.
+    if (beruehrtRef.current && leseEingaben() !== ausgangswerteRef.current) {
       setSprungZiel(index);
       return;
     }

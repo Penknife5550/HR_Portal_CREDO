@@ -319,6 +319,84 @@ describe("PUT – Kostenstellen-Aufteilung", () => {
     expect(res.status).toBe(200);
     expect(geschriebeneZeilen()).toHaveLength(3);
   });
+
+  /**
+   * DER WIEDERGAENGER.
+   *
+   * Solange `kostenstelle`/`kostenstelleAnteil` neben der Aufteilung stehen
+   * (dieses eine Release), braucht die Maske einen Rueckfall auf die
+   * Alt-Spalte — ein Vorgang, dessen Datenmigration noch nicht gelaufen ist,
+   * soll seine Kostenstelle nicht verlieren. Der Rueckfall kann aber "nie
+   * gepflegt" nicht von "gerade bewusst geleert" unterscheiden. Blieb die
+   * Alt-Spalte beim Loeschen stehen, setzte er die entfernte Zeile beim
+   * naechsten Oeffnen desselben Links wieder ein, und das naechste "Weiter"
+   * schrieb sie zurueck in die Datenbank — der Widerruf hielt keinen Reload.
+   *
+   * Deshalb folgt die Alt-Spalte hier der Aufteilung. Die drei Zusicherungen
+   * darunter sind die ganze Regel.
+   */
+  describe("Alt-Spalte folgt der Aufteilung", () => {
+    it("raeumt die Alt-Spalte mit, wenn die letzte Zeile entfernt wird", async () => {
+      // Genau der Widerruf: Die vorgesetzte Person entfernt die migrierte
+      // Zeile "4711". Bliebe die Alt-Spalte stehen, saehe sie beim naechsten
+      // Aufruf desselben Links wieder 4711 in der Maske.
+      const res = await PUT(
+        req("PUT", {
+          kostenstellen: [],
+          // Was das Formular vor der Behebung unveraendert zurueckreichte.
+          kostenstelle: "4711",
+          kostenstelleAnteil: 100,
+          currentStep: 4,
+        }),
+        { params: params() }
+      );
+
+      expect(res.status).toBe(200);
+      expect(savedData().kostenstelle).toBeNull();
+      expect(savedData().kostenstelleAnteil).toBeNull();
+    });
+
+    it("spiegelt die erste Zeile in die Alt-Spalte statt den gesendeten Altwert", async () => {
+      // Bestandsvorgang mit "4711", jetzt auf 5000/60 % + 6000/40 % geaendert.
+      // Der Altwert im Rumpf ist der Wiedergaenger — er darf nicht gewinnen.
+      // Die erste Zeile ist dieselbe Lesart, die der CSV-Export fuer die eine
+      // LOGA-Spalte "Kostenstelle" benutzt.
+      const res = await PUT(
+        req("PUT", {
+          kostenstellen: [
+            { bezeichnung: "5000", anteil: 60 },
+            { bezeichnung: "6000", anteil: 40 },
+          ],
+          kostenstelle: "4711",
+          kostenstelleAnteil: 100,
+          currentStep: 4,
+        }),
+        { params: params() }
+      );
+
+      expect(res.status).toBe(200);
+      expect(savedData().kostenstelle).toBe("5000");
+      expect(savedData().kostenstelleAnteil).toBe(60);
+    });
+
+    it("nimmt die Alt-Spalte nicht mehr aus dem Aufruf entgegen", async () => {
+      // Ohne `kostenstellen` sagt der Aufruf ueber die Aufteilung nichts —
+      // dann darf er auch die Alt-Spalte nicht setzen. Sonst bliebe ein Weg
+      // offen, ueber den eine Kostenstelle ohne Zeile in die Datenbank kommt,
+      // und der Rueckfall in der Maske machte daraus wieder eine Zeile.
+      const res = await PUT(
+        req("PUT", { kostenstelle: "9999", kostenstelleAnteil: 25, currentStep: 2 }),
+        { params: params() }
+      );
+
+      expect(res.status).toBe(200);
+      expect(savedData()).not.toHaveProperty("kostenstelle");
+      expect(savedData()).not.toHaveProperty("kostenstelleAnteil");
+      // Und die Zeilen bleiben unberuehrt — "dazu sage ich nichts" heisst
+      // nicht "keine mehr".
+      expect(mockPrisma.supervisorKostenstelle.deleteMany).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("POST – Absenden", () => {

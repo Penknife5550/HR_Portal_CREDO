@@ -2,6 +2,7 @@ import {
   ARBEITSERLAUBNIS_HINWEIS,
   AUFENTHALTSTITEL_HINWEIS,
   MASERNSCHUTZ_HINWEIS,
+  NACHREICHEN_FOLGEN_HINWEIS,
   PFLICHT_HINWEISE,
   PKV_NACHWEIS_HINWEIS,
   SELECTABLE_DOCUMENT_TYPES,
@@ -10,6 +11,7 @@ import {
   effektivePflichtDokumente,
   fehlendeNachreichbareDokumente,
   istNachreichbar,
+  nachreichbarePflichtDokumente,
   sperrendePflichtDokumente,
 } from "@/lib/required-documents";
 
@@ -344,6 +346,21 @@ describe("Hinweistexte der neuen Pflichten", () => {
     expect(PKV_NACHWEIS_HINWEIS).toMatch(/nachreichen/i);
   });
 
+  it("sagen vor dem Absenden alle drei Folgen des Nachreichens", () => {
+    // Der Satz steht unmittelbar vor dem verbindlichen Absenden und muss drei
+    // Fragen beantworten. Faellt eine weg, entsteht genau der Schaden, den sie
+    // verhindern soll: Abbruch vor dem freien Knopf, Nachreichbarkeit als
+    // Erlass missverstanden, oder eine Unterlage, die „nachher ueber den Link"
+    // kommen sollte und nie kommt.
+    expect(NACHREICHEN_FOLGEN_HINWEIS).toMatch(
+      /Sie können den Fragebogen absenden/,
+    );
+    expect(NACHREICHEN_FOLGEN_HINWEIS).toContain("Nachweis offen");
+    expect(NACHREICHEN_FOLGEN_HINWEIS).toMatch(
+      /nach dem Absenden nichts mehr hochladen/,
+    );
+  });
+
   it("sind ueber PFLICHT_HINWEISE erreichbar — die Oberflaeche verzweigt nicht selbst", () => {
     expect(PFLICHT_HINWEISE.AUFENTHALTSTITEL).toBe(AUFENTHALTSTITEL_HINWEIS);
     expect(PFLICHT_HINWEISE.ARBEITSERLAUBNIS).toBe(ARBEITSERLAUBNIS_HINWEIS);
@@ -399,6 +416,46 @@ describe("Mehrere bedingte Pflichten gleichzeitig", () => {
       "ARBEITSERLAUBNIS",
       "PKV_NACHWEIS",
     ]);
+  });
+
+  it("nennt dieselben vier als nachreichbar, ohne den Bestand zu kennen", () => {
+    // Die Zusammenfassung kuendigt an, WAS nachgereicht werden darf; sie hat
+    // die Dokumentenliste nicht (die ist lokaler Zustand der Upload-Karte).
+    // Deshalb eine eigene Funktion ohne `uploadedTypes` — und deshalb muss sie
+    // dieselbe Antwort geben wie die Luecken-Fassung bei leerem Bestand.
+    const eingaben = {
+      required: ["GEBURTSURKUNDE_EIGEN"],
+      hasChildren: false,
+      rvEntscheidung: "BEFREIUNG_BEANTRAGT",
+      masernschutzPflichtig: true,
+      aufenthaltstitelErforderlich: true,
+      healthInsuranceType: "privat",
+    };
+    expect(nachreichbarePflichtDokumente(eingaben)).toEqual([
+      "MASERNSCHUTZ",
+      "AUFENTHALTSTITEL",
+      "ARBEITSERLAUBNIS",
+      "PKV_NACHWEIS",
+    ]);
+    expect(nachreichbarePflichtDokumente(eingaben)).toEqual(
+      fehlendeNachreichbareDokumente({ ...eingaben, uploadedTypes: [] }),
+    );
+    // Der Befreiungsantrag gehoert NICHT dazu — er sperrt.
+    expect(nachreichbarePflichtDokumente(eingaben)).not.toContain(
+      "RV_BEFREIUNG",
+    );
+  });
+
+  it("meldet als nachreichbar nichts, wo keine Pflicht besteht", () => {
+    expect(
+      nachreichbarePflichtDokumente({
+        required: ["GEBURTSURKUNDE_EIGEN", "MASERNSCHUTZ", "AUFENTHALTSTITEL"],
+        hasChildren: false,
+        masernschutzPflichtig: false,
+        aufenthaltstitelErforderlich: false,
+        healthInsuranceType: "gesetzlich",
+      }),
+    ).toEqual([]);
   });
 
   it("laesst nur den Befreiungsantrag sperren", () => {

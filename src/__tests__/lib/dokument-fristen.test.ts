@@ -19,10 +19,12 @@ import {
   FRISTPFLICHTIGE_DOKUMENTTYPEN,
   ablaufAmpel,
   ablaufKalendertag,
+  dringendeNachweisLagen,
   getAblaufKategorie,
   istAbgelaufen,
   istFristpflichtig,
   kalendertagAlsDatum,
+  nachweisLagen,
   tageBisAblauf,
   type AblaufKategorie,
 } from "@/lib/dokument-fristen";
@@ -233,5 +235,97 @@ describe("Ablauf-Ampel: fristpflichtige Dokumenttypen", () => {
     expect(istFristpflichtig("MASERNSCHUTZ")).toBe(false);
     expect(istFristpflichtig(null)).toBe(false);
     expect(istFristpflichtig(undefined)).toBe(false);
+  });
+});
+
+// =============================================
+// Lage je Nachweisart
+// =============================================
+
+/** Ein hochgeladenes Papier, so wie es die Detailseite fuehrt. */
+const dok = (type: string, gueltigBis: Date | string | null) => ({ type, gueltigBis });
+
+describe("Lage je Nachweisart", () => {
+  it("nimmt je Art das Papier mit dem SPAETESTEN Ablauf", () => {
+    // Wer verlaengert, laedt den neuen Titel dazu — der alte bleibt liegen.
+    // Zaehlte der aelteste, schriee der Vorgang fuer immer "abgelaufen".
+    const lagen = nachweisLagen(
+      [
+        dok("AUFENTHALTSTITEL", ablaufIn(-30)),
+        dok("AUFENTHALTSTITEL", ablaufIn(500)),
+      ],
+      JETZT
+    );
+    expect(lagen).toHaveLength(1);
+    expect(lagen[0].ampel?.kategorie).toBe("AUSSERHALB");
+    expect(dringendeNachweisLagen(
+      [dok("AUFENTHALTSTITEL", ablaufIn(-30)), dok("AUFENTHALTSTITEL", ablaufIn(500))],
+      JETZT
+    )).toHaveLength(0);
+  });
+
+  it("laesst ein Papier ohne Datum keines mit Datum verdraengen", () => {
+    // Die Rueckseite ohne nachgetragenes Datum beweist nichts — sie darf aber
+    // auch die Frist der Vorderseite nicht loeschen.
+    const lagen = nachweisLagen(
+      [dok("AUFENTHALTSTITEL", ablaufIn(-5)), dok("AUFENTHALTSTITEL", null)],
+      JETZT
+    );
+    expect(lagen[0].ampel?.kategorie).toBe("ABGELAUFEN");
+    expect(dringendeNachweisLagen(
+      [dok("AUFENTHALTSTITEL", ablaufIn(-5)), dok("AUFENTHALTSTITEL", null)],
+      JETZT
+    )).toHaveLength(1);
+  });
+
+  it("ignoriert Dokumentarten ohne Frist", () => {
+    expect(nachweisLagen([dok("MASERNSCHUTZ", null), dok("SONSTIGES", ablaufIn(-1))], JETZT))
+      .toHaveLength(0);
+  });
+});
+
+describe("Vorgangsweiter Warnbalken: was ihn rechtfertigt", () => {
+  it("meldet abgelaufen und kritisch", () => {
+    expect(
+      dringendeNachweisLagen([dok("AUFENTHALTSTITEL", ablaufIn(-1))], JETZT).map(
+        (l) => l.ampel?.kategorie
+      )
+    ).toEqual(["ABGELAUFEN"]);
+    expect(
+      dringendeNachweisLagen([dok("ARBEITSERLAUBNIS", ablaufIn(14))], JETZT).map(
+        (l) => l.ampel?.kategorie
+      )
+    ).toEqual(["KRITISCH"]);
+  });
+
+  it("schweigt bei WARNUNG und BEOBACHTEN — ein Balken ueber Monate ist Tapete", () => {
+    expect(dringendeNachweisLagen([dok("AUFENTHALTSTITEL", ablaufIn(30))], JETZT)).toEqual([]);
+    expect(dringendeNachweisLagen([dok("AUFENTHALTSTITEL", ablaufIn(80))], JETZT)).toEqual([]);
+    expect(dringendeNachweisLagen([dok("AUFENTHALTSTITEL", ablaufIn(400))], JETZT)).toEqual([]);
+  });
+
+  it("schweigt bei einem Nachweis OHNE Ablaufdatum", () => {
+    // Die Niederlassungserlaubnis hat keine Frist; ein Datum wird beim
+    // Hochladen deshalb nicht erzwungen. Stuende dieser Fall im Balken, truege
+    // der Vorgang dieser Person auf JEDEM Reiter dauerhaft einen gelben Kasten,
+    // den niemand abstellen kann — und mit ihm verlernte man auch den echten.
+    // Die Auskunft geht nicht verloren: Sie steht an der Dokumentenzeile.
+    expect(nachweisLagen([dok("AUFENTHALTSTITEL", null)], JETZT)).toEqual([
+      { typ: "AUFENTHALTSTITEL", ampel: null },
+    ]);
+    expect(dringendeNachweisLagen([dok("AUFENTHALTSTITEL", null)], JETZT)).toEqual([]);
+    expect(dringendeNachweisLagen([dok("AUFENTHALTSTITEL", "")], JETZT)).toEqual([]);
+    expect(dringendeNachweisLagen([dok("AUFENTHALTSTITEL", "unlesbar")], JETZT)).toEqual([]);
+  });
+
+  it("meldet den abgelaufenen Titel auch neben einem fristlosen Nachweis anderer Art", () => {
+    // Gegenprobe: Die Ruhigstellung des fristlosen Falls darf den echten
+    // Alarm nicht mitnehmen.
+    const lagen = dringendeNachweisLagen(
+      [dok("ARBEITSERLAUBNIS", null), dok("AUFENTHALTSTITEL", ablaufIn(-2))],
+      JETZT
+    );
+    expect(lagen.map((l) => l.typ)).toEqual(["AUFENTHALTSTITEL"]);
+    expect(lagen[0].ampel?.text).toBe("Abgelaufen seit 2 Tagen (06.09.2026)");
   });
 });

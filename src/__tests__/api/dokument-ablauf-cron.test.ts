@@ -387,6 +387,60 @@ describe("POST /api/cron/dokument-ablauf", () => {
     expect(mockTriggerWebhooks).toHaveBeenCalledTimes(1);
   });
 
+  it("schweigt am Folgetag auch mit der ZWEITEN Zeile desselben Doppel-Uploads", async () => {
+    // Der Lauf davor hat docA gemahnt und dessen Merker gesetzt; docB blieb als
+    // uebersprungene Zeile ohne Merker zurueck. Heute ist docA nicht faellig
+    // (gleiche Stufe, Intervall 14 Tage noch nicht um). Belegte docA den
+    // Schluessel erst mit dem Mailversand, liefe docB jetzt in seinen EIGENEN
+    // Stufenwechsel (null !== "WARNUNG") — und ab da kaeme jede Mahnung doppelt,
+    // um einen Tag versetzt, an das HR-Postfach. Genau der Weg, den die Maske
+    // anbietet: Vorder- und Rueckseite des Aufenthaltstitels, beide Male
+    // dasselbe Ablaufdatum nachgetragen.
+    const gleich = ablaufIn(20);
+    mockPrisma.document.groupBy.mockResolvedValue([
+      { onboardingId: "onb1", type: "AUFENTHALTSTITEL", _max: { gueltigBis: gleich } },
+    ]);
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({
+        id: "docA",
+        gueltigBis: gleich,
+        ablaufErinnertAm: new Date(JETZT.getTime() - 1 * MS_PER_DAY),
+        ablaufErinnertStufe: "WARNUNG",
+      }),
+      dokument({ id: "docB", gueltigBis: gleich }),
+    ]);
+
+    const json = await (await POST(req())).json();
+    expect(json.erinnerungen).toBe(0);
+    expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+    // Und der Merker der schweigenden Zeile bleibt unberuehrt: Sie ist nicht
+    // "erledigt", sie ist unzustaendig.
+    expect(merkerUpdates()).toHaveLength(0);
+  });
+
+  it("laesst die zustaendige Zeile weiter mahnen, wenn ihr Intervall um ist", async () => {
+    // Gegenprobe zum Test darueber: Die Sperre darf die Mahnung nur
+    // VERDOPPELN verhindern, nicht sie abstellen.
+    const gleich = ablaufIn(20);
+    mockPrisma.document.groupBy.mockResolvedValue([
+      { onboardingId: "onb1", type: "AUFENTHALTSTITEL", _max: { gueltigBis: gleich } },
+    ]);
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({
+        id: "docA",
+        gueltigBis: gleich,
+        ablaufErinnertAm: new Date(JETZT.getTime() - 14 * MS_PER_DAY),
+        ablaufErinnertStufe: "WARNUNG",
+      }),
+      dokument({ id: "docB", gueltigBis: gleich }),
+    ]);
+
+    const json = await (await POST(req())).json();
+    expect(json.erinnerungen).toBe(1);
+    expect(mockTriggerWebhooks).toHaveBeenCalledTimes(1);
+    expect(merkerUpdates()[0][0].where).toEqual({ id: "docA" });
+  });
+
   // ---------------------------------------------------------------
   // Robustheit
   // ---------------------------------------------------------------

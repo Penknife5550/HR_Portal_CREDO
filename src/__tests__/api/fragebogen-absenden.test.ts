@@ -72,7 +72,20 @@ function req(body: Record<string, unknown>): NextRequest {
   });
 }
 
-function tokenAntwort(status = "IN_PROGRESS") {
+/**
+ * Der Vorgang, wie `validateMagicToken` ihn liefert — samt `organization` und
+ * `personalData`, denn beide laedt der Validierer mit.
+ *
+ * `type: "VERWALTUNG"` ist der neutrale Ausgangspunkt: Fuer die Verwaltung
+ * traegt IfSG § 20 Abs. 8 nicht, es entsteht also keine bedingte Pflicht, und
+ * die uebrigen Zusicherungen dieser Datei bleiben von den Dokumentenregeln
+ * unberuehrt.
+ */
+function tokenAntwort(
+  status = "IN_PROGRESS",
+  personalData: Record<string, unknown> = {},
+  organisationstyp = "VERWALTUNG",
+) {
   return {
     valid: true,
     onboarding: {
@@ -83,8 +96,14 @@ function tokenAntwort(status = "IN_PROGRESS") {
       lastName: "Beispiel",
       displayId: "AB123456",
       questionnaireType: "MINIJOB",
-      organization: { name: "Berufskolleg" },
-      personalData: { rvEntscheidung: null },
+      organization: { name: "Berufskolleg", type: organisationstyp },
+      personalData: {
+        rvEntscheidung: null,
+        birthDate: null,
+        aufenthaltstitelErforderlich: null,
+        healthInsuranceType: null,
+        ...personalData,
+      },
     },
   };
 }
@@ -262,6 +281,30 @@ describe("Absenden — Vorbedingungen", () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("laesst die vier nachreichbaren Pflichten NICHT sperren", async () => {
+    // Kita-Beschaeftigte, 1990 geboren, Aufenthaltstitel „Ja", privat
+    // versichert — vier offene Pflichten, kein einziges hochgeladenes Papier.
+    // Der Fragebogen muss trotzdem durchgehen: Im selben Formular stehen
+    // Bankverbindung und Steuer-ID, die die Lohnbuchhaltung zum Ersten braucht.
+    mockValidate.mockResolvedValue(
+      tokenAntwort(
+        "IN_PROGRESS",
+        {
+          birthDate: new Date("1990-04-17"),
+          aufenthaltstitelErforderlich: true,
+          healthInsuranceType: "privat",
+        },
+        "KITA",
+      ),
+    );
+    mockPrisma.formTemplate.findUnique.mockResolvedValue({
+      requiredDocuments: ["MASERNSCHUTZ", "AUFENTHALTSTITEL", "PKV_NACHWEIS"],
+    });
+
+    const res = await POST(req(absendeRumpf()), { params: params() });
+    expect(res.status).toBe(200);
+  });
+
   it("verlangt die Rentenversicherungsnummer, wenn eine Befreiung beantragt wurde", async () => {
     mockPrisma.personalData.findUnique.mockResolvedValue({
       onboardingId: "ob1",
@@ -279,5 +322,216 @@ describe("Absenden — Vorbedingungen", () => {
     const res = await POST(req(absendeRumpf()), { params: params() });
     expect(res.status).toBe(400);
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * „Nachreichbar" ist ein Tausch, kein Erlass (Entscheidung 07./08.09.2026): Der
+ * Vorgang entsteht, DAFUER wird er sichtbar als offen gefuehrt. Die zweite
+ * Haelfte fehlte vollstaendig — `fehlendeNachreichbareDokumente` hatte im
+ * gesamten Produktivcode keinen Aufrufer, und der Absendezweig uebergab die drei
+ * Eingaben (`masernschutzPflichtig`, `aufenthaltstitelErforderlich`,
+ * `healthInsuranceType`) gar nicht erst. Ergebnis: Der Server nahm an, und
+ * niemand erfuhr, dass etwas offen war. Gerade beim Masernschutz haengt daran
+ * die Begruendung fuer den Verzicht auf die Sperre — die Meldung ans
+ * Gesundheitsamt braucht eine Datengrundlage.
+ */
+describe("Absenden — offene nachreichbare Nachweise", () => {
+  /**
+   * Eine Transaktion mit EIGENEN Schreibern.
+   *
+   * Der Standard-Mock reicht `mockPrisma` als `tx` durch; dann sind „innerhalb"
+   * und „ausserhalb" der Transaktion nicht zu unterscheiden. Mit einem eigenen
+   * `tx` laesst sich belegen, dass der Vermerk wirklich im selben Commit steht
+   * wie die Abgabe — ein Vermerk, der danach einzeln geschrieben wuerde, fehlte
+   * genau dann, wenn die Verbindung abreisst.
+   */
+  function eigeneTransaktion() {
+    const tx = {
+      onboardingProcess: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      personalData: { update: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    mockPrisma.$transaction.mockImplementation(
+      async (fn: (t: unknown) => unknown) => fn(tx),
+    );
+    return tx;
+  }
+
+  /** Kita, 1990 geboren, Aufenthaltstitel „Ja", privat versichert. */
+  function vierOffene() {
+    mockValidate.mockResolvedValue(
+      tokenAntwort(
+        "IN_PROGRESS",
+        {
+          birthDate: new Date("1990-04-17"),
+          aufenthaltstitelErforderlich: true,
+          healthInsuranceType: "privat",
+        },
+        "KITA",
+      ),
+    );
+  }
+
+  /** Die Protokollsaetze einer Transaktion, nach Aktion aufgeschluesselt. */
+  function saetze(tx: { auditLog: { create: jest.Mock } }) {
+    const alle = tx.auditLog.create.mock.calls.map((c) => c[0].data);
+    return {
+      abgabe: alle.find((d) => d.action === "QUESTIONNAIRE_SUBMITTED"),
+      vermerk: alle.find((d) => d.action === "DOKUMENTE_NACHZUREICHEN"),
+      anzahl: alle.length,
+    };
+  }
+
+  it("haelt alle vier offenen Nachweise am Vorgang fest", async () => {
+    vierOffene();
+    const tx = eigeneTransaktion();
+
+    const res = await POST(req(absendeRumpf()), { params: params() });
+    expect(res.status).toBe(200);
+
+    const { vermerk } = saetze(tx);
+    expect(vermerk).toBeDefined();
+    expect(vermerk.onboardingId).toBe("ob1");
+    expect(vermerk.details.typen).toEqual([
+      "MASERNSCHUTZ",
+      "AUFENTHALTSTITEL",
+      "ARBEITSERLAUBNIS",
+      "PKV_NACHWEIS",
+    ]);
+    // Deutsche Bezeichnungen mit im Satz: Das Protokoll liest ein Mensch.
+    expect(vermerk.details.bezeichnungen).toContain("Masernschutz-Nachweis");
+    expect(vermerk.details.bezeichnungen).toContain(
+      "Nachweis private Krankenversicherung",
+    );
+  });
+
+  it("schreibt den Vermerk in DIESELBE Transaktion wie die Abgabe", async () => {
+    vierOffene();
+    const tx = eigeneTransaktion();
+
+    await POST(req(absendeRumpf()), { params: params() });
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(saetze(tx).anzahl).toBe(2);
+    // Nichts davon darf am Transaktionsclient vorbei geschrieben worden sein.
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("nennt die offenen Nachweise auch im Abgabesatz — als leere Liste, wenn nichts offen ist", async () => {
+    // Ohne das Feld im Abgabesatz waere das Fehlen des Vermerks zweideutig:
+    // nichts offen, oder Vermerk vergessen.
+    const tx = eigeneTransaktion();
+    await POST(req(absendeRumpf()), { params: params() });
+
+    const { abgabe, vermerk, anzahl } = saetze(tx);
+    expect(abgabe.details.offeneNachweise).toEqual([]);
+    expect(vermerk).toBeUndefined();
+    expect(anzahl).toBe(1);
+  });
+
+  it("laesst den Vermerk weg, sobald die Nachweise vorliegen", async () => {
+    vierOffene();
+    mockPrisma.document.findMany.mockResolvedValue([
+      { type: "MASERNSCHUTZ" },
+      { type: "AUFENTHALTSTITEL" },
+      { type: "ARBEITSERLAUBNIS" },
+      { type: "PKV_NACHWEIS" },
+    ]);
+    const tx = eigeneTransaktion();
+
+    await POST(req(absendeRumpf()), { params: params() });
+
+    const { abgabe, vermerk } = saetze(tx);
+    expect(abgabe.details.offeneNachweise).toEqual([]);
+    expect(vermerk).toBeUndefined();
+  });
+
+  it("wertet die Regeln aus und nicht die Vorlagenliste", async () => {
+    // Keine Vorlage fuehrt diese Typen in `requiredDocuments`; die Pflicht
+    // entsteht allein aus Geburtsjahr, Einrichtungstyp und den beiden
+    // Selbstauskuenften. Eine Regel, die die Liste nur durchsiebt, erzeugte sie
+    // nie.
+    vierOffene();
+    mockPrisma.formTemplate.findUnique.mockResolvedValue({
+      requiredDocuments: [],
+    });
+    const tx = eigeneTransaktion();
+
+    await POST(req(absendeRumpf()), { params: params() });
+
+    expect(saetze(tx).vermerk.details.typen).toContain("MASERNSCHUTZ");
+  });
+
+  it("erzeugt in der Verwaltung keinen Masernschutz-Vermerk", async () => {
+    // Fuer VERWALTUNG gibt es keine Rechtsgrundlage, einen Nachweis zu
+    // verlangen — ihn als offen zu protokollieren waere ein Gesundheitsdatum
+    // ohne Grundlage (Art. 9 DSGVO), und zwar eines, das dauerhaft im Protokoll
+    // steht.
+    mockValidate.mockResolvedValue(
+      tokenAntwort(
+        "IN_PROGRESS",
+        { birthDate: new Date("1990-04-17") },
+        "VERWALTUNG",
+      ),
+    );
+    mockPrisma.formTemplate.findUnique.mockResolvedValue({
+      requiredDocuments: ["MASERNSCHUTZ"],
+    });
+    const tx = eigeneTransaktion();
+
+    await POST(req(absendeRumpf()), { params: params() });
+    expect(saetze(tx).vermerk).toBeUndefined();
+  });
+
+  it("vermerkt nichts, solange die Frage nach dem Aufenthaltstitel unbeantwortet ist", async () => {
+    // `null` heisst „noch nicht gefragt". Ein Vermerk daraus waere eine offene
+    // Forderung, die die Person nie zu Gesicht bekommen hat.
+    mockValidate.mockResolvedValue(
+      tokenAntwort("IN_PROGRESS", { aufenthaltstitelErforderlich: null }),
+    );
+    const tx = eigeneTransaktion();
+
+    await POST(req(absendeRumpf()), { params: params() });
+    expect(saetze(tx).vermerk).toBeUndefined();
+  });
+
+  it("schreibt keinen Vermerk, wenn die Abgabe scheitert", async () => {
+    vierOffene();
+    mockPrisma.$transaction.mockRejectedValue(new Error("Verbindung verloren"));
+    const fehler = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(req(absendeRumpf()), { params: params() });
+
+    expect(res.status).toBe(500);
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    fehler.mockRestore();
+  });
+
+  it("laesst den Befreiungsantrag weiter sperren — und schreibt dann gar nichts", async () => {
+    // Die sperrende Haelfte bleibt unangetastet: Ohne die unterschriebene Seite
+    // kommt die Befreiung rechtlich nicht zustande.
+    mockValidate.mockResolvedValue(
+      tokenAntwort(
+        "IN_PROGRESS",
+        {
+          rvEntscheidung: "BEFREIUNG_BEANTRAGT",
+          birthDate: new Date("1990-04-17"),
+        },
+        "KITA",
+      ),
+    );
+    const tx = eigeneTransaktion();
+
+    const res = await POST(req(absendeRumpf()), { params: params() });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      missingDocuments: ["RV_BEFREIUNG"],
+    });
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 });

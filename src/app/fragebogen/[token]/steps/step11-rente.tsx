@@ -136,6 +136,25 @@ export function Step11Rente({
   const brauchtMerkblatt = gewaehlt?.brauchtMerkblatt === true;
   const brauchtBindung = gewaehlt?.brauchtBindung === true;
 
+  /**
+   * GREIFT die Vorauswahl gerade — oder behauptet der Kasten das nur?
+   *
+   * Der Unterschied ist die ganze Frage. Der Hinweistext hing frueher allein am
+   * Status und sagte deshalb woertlich „unten ist ... bereits gewaehlt", auch
+   * wenn eine abweichende gespeicherte Antwort gewonnen hatte (die
+   * Zustandslogik oben ist richtig: gespeichert schlaegt Vorgabe). Der Weg
+   * dahin ist kurz: erst hier „Ich moechte versichert bleiben" waehlen und
+   * speichern, dann ueber die Schrittleiste zurueck zu „Weitere Beschaeftigung",
+   * dort „Altersvollrentner" setzen und wieder herspringen. Danach stand die
+   * Behauptung im Kasten, das Abzeichen klebte an einer nicht angekreuzten
+   * Zeile — und angekreuzt war eine andere. Wer das liest und auf „Weiter"
+   * klickt, speichert nicht, was er zu speichern glaubt, und zwar bei der
+   * folgenreichsten Frage des Fragebogens.
+   */
+  const vorauswahlGreift =
+    statusMachtFrei && entscheidung === "RENTENVERSICHERUNGSFREI";
+  const freiLabel = getRvOption("RENTENVERSICHERUNGSFREI")?.label ?? "";
+
   const absenden = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -247,19 +266,42 @@ export function Step11Rente({
       {statusMachtFrei && (
         <div className="rounded-lg border-l-4 border-[#FBC900] bg-[#FBC900]/10 px-4 py-3 text-sm">
           <p className="font-semibold text-foreground">
-            Eine Antwort ist für Sie schon vorausgewählt
+            {vorauswahlGreift
+              ? "Eine Antwort ist für Sie schon vorausgewählt"
+              : "Ihre Angaben passen nicht zusammen"}
           </p>
           <p className="mt-1 text-foreground/80">
             Sie haben bei den Angaben zu Ihrer Beschäftigung „
             {statusLabel(statusWert)}“ angegeben. Damit sind Sie in der
             Rentenversicherung von Gesetzes wegen frei — eine Befreiung müssen
-            Sie gar nicht erst beantragen. Deshalb ist unten die Antwort „Ich
-            bin bereits von Gesetzes wegen frei“ bereits gewählt.
+            Sie gar nicht erst beantragen.
           </p>
-          <p className="mt-1 text-foreground/80">
-            Sie können sie trotzdem ändern: Sie kennen Ihre Lage besser als
-            dieses Formular.
-          </p>
+          {vorauswahlGreift ? (
+            <>
+              <p className="mt-1 text-foreground/80">
+                Deshalb ist unten die Antwort „{freiLabel}“ bereits gewählt.
+              </p>
+              <p className="mt-1 text-foreground/80">
+                Sie können sie trotzdem ändern: Sie kennen Ihre Lage besser als
+                dieses Formular.
+              </p>
+            </>
+          ) : (
+            /* Kein „ist vorausgewaehlt" mehr, wenn es nicht stimmt — und kein
+               stilles Umstellen der Auswahl: Was die Person zuletzt gewaehlt
+               hat, bleibt stehen. Der Kasten sagt nur, dass beides
+               auseinanderlaeuft, und ueberlaesst ihr die Entscheidung. */
+            <>
+              <p className="mt-1 text-foreground/80">
+                Gewählt haben Sie unten aber „
+                {getRvOption(entscheidung)?.label ?? "noch nichts"}“. Das ist
+                möglich — Sie kennen Ihre Lage besser als dieses Formular.
+              </p>
+              <p className="mt-1 text-foreground/80">
+                War das ein Versehen, wählen Sie bitte „{freiLabel}“.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -300,11 +342,15 @@ export function Step11Rente({
                     {option.label}
                   </p>
                   {/* Verbindet den Hinweis oben mit der Zeile, die er meint —
-                      sonst muss man raten, welche der Antworten gemeint war. */}
+                      sonst muss man raten, welche der Antworten gemeint war.
+                      Der Wortlaut haengt am tatsaechlichen Zustand: „vorausgewaehlt"
+                      darf nur an einer Zeile stehen, die auch angekreuzt ist. */}
                   {statusMachtFrei &&
                     option.wert === "RENTENVERSICHERUNGSFREI" && (
                       <p className="mt-1 inline-block rounded-full bg-[#FBC900]/20 px-2 py-0.5 text-[11px] font-semibold text-foreground">
-                        Aufgrund Ihrer Angabe vorausgewählt
+                        {vorauswahlGreift
+                          ? "Aufgrund Ihrer Angabe vorausgewählt"
+                          : "Passt zu Ihrer Angabe zur Beschäftigung"}
                       </p>
                     )}
                   <p className="mt-0.5 text-xs text-muted-foreground">

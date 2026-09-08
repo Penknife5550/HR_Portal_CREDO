@@ -274,3 +274,85 @@ export function ablaufAmpel(
     text: `Läuft in ${tage} ${tage === 1 ? "Tag" : "Tagen"} ab (${datum})`,
   };
 }
+
+/**
+ * Der massgebliche Befund je NACHWEISART (nicht je Dokument).
+ *
+ * Warum gruppiert: `Document` kennt keine Eindeutigkeit je Typ, und ein
+ * nachgereichter Nachweis ERSETZT den alten nicht — wer seinen Aufenthaltstitel
+ * verlaengert und den neuen hochlaedt, hat danach zwei Aufenthaltstitel im
+ * Vorgang. Ein Warnbalken ueber alle Dokumente schriee dann fuer immer
+ * "abgelaufen", obwohl ein gueltiges Papier vorliegt.
+ *
+ * Massgeblich ist deshalb das Dokument mit dem SPAETESTEN Ablauf — dieselbe
+ * Regel, nach der der Erinnerungs-Cron seine Kandidaten auswaehlt
+ * (`src/app/api/cron/dokument-ablauf/route.ts`). Die einzelne Dokumentenzeile
+ * zeigt weiterhin ihren eigenen Zustand: Dass das alte Papier abgelaufen ist,
+ * stimmt ja.
+ *
+ * Liegt hier und nicht in der Detailseite, weil die Regel eine Rechnung ist und
+ * keine Darstellung — und weil sie sich nur hier ohne gerenderte Seite pruefen
+ * laesst.
+ */
+export interface NachweisLage {
+  typ: string;
+  /** `null` = fuer diese Art ist ueberhaupt kein Ablaufdatum erfasst. */
+  ampel: AblaufAmpel | null;
+}
+
+export function nachweisLagen(
+  dokumente: readonly { type: string; gueltigBis: Date | string | null }[],
+  jetzt: Date = new Date()
+): NachweisLage[] {
+  const proTyp = new Map<string, AblaufAmpel | null>();
+
+  for (const doc of dokumente) {
+    if (!istFristpflichtig(doc.type)) continue;
+    const ampel = ablaufAmpel(doc.gueltigBis, jetzt);
+
+    if (!proTyp.has(doc.type)) {
+      proTyp.set(doc.type, ampel.kategorie ? ampel : null);
+      continue;
+    }
+    // Ein Dokument ohne Datum verdraengt nie eines mit Datum: Es beweist
+    // nichts, kann aber auch nichts widerlegen.
+    if (!ampel.kategorie) continue;
+    const bisher = proTyp.get(doc.type) ?? null;
+    if (!bisher || (bisher.tage ?? 0) < (ampel.tage ?? 0)) {
+      proTyp.set(doc.type, ampel);
+    }
+  }
+
+  return Array.from(proTyp, ([typ, ampel]) => ({ typ, ampel }));
+}
+
+/**
+ * Die Lagen, die einen VORGANGSWEITEN Warnbalken rechtfertigen: abgelaufen
+ * oder kritisch (14 Tage).
+ *
+ * Ausdruecklich NICHT dabei: "kein Ablaufdatum erfasst". Bei der
+ * Niederlassungserlaubnis ist ein Aufenthaltstitel ohne Ablaufdatum der
+ * Regelfall und kein Versaeumnis (Entscheidung 07.09.2026: ein Datum wird
+ * deshalb beim Hochladen nicht erzwungen). Stuende dieser Fall im Balken, truege
+ * der Vorgang dieser Personen auf JEDEM Reiter dauerhaft einen gelben Kasten,
+ * den niemand abstellen kann — es gibt kein Kennzeichen "unbefristet", mit dem
+ * sich das quittieren liesse. Genau davor warnt der Kommentar an
+ * `nachweisLagen`: Ein Balken, den niemand abstellen kann, wird nach zwei Wochen
+ * ignoriert — und dann auch der echte, hier der bussgeldbewehrte abgelaufene
+ * Titel.
+ *
+ * Verloren geht die Auskunft dadurch nicht: Die fehlende Frist steht weiterhin
+ * an der Dokumentenzeile selbst ("Frist fehlt"), also an der Stelle, an der man
+ * sie auch nachtragen kann.
+ *
+ * BEOBACHTEN (90 Tage) und WARNUNG (42) bleiben ebenfalls draussen — ein Balken,
+ * der drei Monate lang steht, ist Tapete.
+ */
+export function dringendeNachweisLagen(
+  dokumente: readonly { type: string; gueltigBis: Date | string | null }[],
+  jetzt: Date = new Date()
+): NachweisLage[] {
+  return nachweisLagen(dokumente, jetzt).filter(
+    (l) => l.ampel?.kategorie === "ABGELAUFEN" || l.ampel?.kategorie === "KRITISCH"
+  );
+}

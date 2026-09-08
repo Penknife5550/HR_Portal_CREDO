@@ -14,9 +14,11 @@ import { FieldConfigHelper } from "@/lib/field-definitions";
 import { formatVerantwortlicheStelle } from "@/lib/dsgvo";
 import { AKTUELLE_ERKLAERUNG } from "@/lib/erklaerung-arbeitnehmer";
 import {
+  NACHREICHEN_FOLGEN_HINWEIS,
   RV_BEFREIUNG_HINWEIS,
   documentTypeLabel,
 } from "@/lib/required-documents";
+import { nach1970GeborenAnzeige } from "@/lib/masernschutz";
 import { rvEntscheidungLabel } from "@/lib/minijob-rentenversicherung";
 import { statusLabel } from "@/lib/minijob-status";
 import {
@@ -218,6 +220,19 @@ export function Step10Summary({
    * verschwaende beim naechsten Haken lautlos.
    */
   const [fehlendeDokumente, setFehlendeDokumente] = useState<string[]>([]);
+  /**
+   * Die nachreichbaren Pflichten, die noch OFFEN sind — gemeldet von der
+   * Upload-Karte.
+   *
+   * Bewusst kein eigener Aufruf von `nachreichbarePflichtDokumente` daneben:
+   * Der wuesste nur, was nachgereicht werden DARF, nicht was noch fehlt. Und
+   * eine zweite Abfrage der Dokumentenliste liefe der Karte hinterher — der
+   * Bestand ist deren lokaler Zustand, und wer gerade hochgeladen hat, laese
+   * hier sonst weiter, die Unterlage fehle.
+   *
+   * Sperrt nichts. Der sperrende Weg ist `fehlendeDokumente` daneben.
+   */
+  const [offeneNachreichbare, setOffeneNachreichbare] = useState<string[]>([]);
   const [dokumenteFehler, setDokumenteFehler] = useState("");
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
@@ -225,6 +240,51 @@ export function Step10Summary({
   const children = (d.children as ChildEntry[]) || [];
   const beschaeftigungen =
     (d.beschaeftigungsAngaben as BeschaeftigungEntry[]) || [];
+
+  /**
+   * Die vier Angaben, aus denen die bedingten Pflichten ueberhaupt erst
+   * entstehen. Sie gehen an die Upload-Karte, und nur dorthin: Sie wertet die
+   * Regeln aus, und der Ausblick weiter unten erfaehrt sein Ergebnis ueber
+   * `onNachzureichenChange` zurueck — mit dem Bestand verrechnet, den nur sie
+   * kennt. Eine zweite Auswertung hier haette denselben Kasten mit Unterlagen
+   * gefuellt, die laengst hochgeladen sind.
+   *
+   * Sie hier zu vergessen ist teurer, als es aussieht: `DocumentUpload` nimmt
+   * alle vier als OPTIONALE Props, ein fehlender Wert ist also `undefined` und
+   * jede Bedingung faellt still auf „nicht pflichtig". Weil
+   * `effektivePflichtDokumente` die regelbasierten Typen zuvor ausnahmslos aus
+   * der Vorlagenliste wirft, koennen sie auch ueber die Vorlagen-Konfiguration
+   * nicht zurueckkommen: Aufenthaltstitel, Arbeitserlaubnis und PKV-Nachweis
+   * entstuenden nie, und der Masernschutz — der vor der Umstellung noch ueber
+   * `required` durchkam — verschwaende. TypeScript schweigt dazu, weil optional
+   * genau das bedeutet. Deshalb steht hier ein Kommentar und in
+   * src/__tests__/components/fragebogen-schritt10.test.tsx eine Probe, die die
+   * vier Pflichten am gerenderten Schritt nachweist.
+   */
+  const geburtsdatum = d.birthDate;
+  const aufenthaltstitelErforderlich =
+    (d.aufenthaltstitelErforderlich as boolean | null | undefined) ?? null;
+  const healthInsuranceType = (d.healthInsuranceType as string | null) ?? null;
+  const rvEntscheidung = (d.rvEntscheidung as string) ?? null;
+
+  /**
+   * Was der Masernschutz-Abschnitt unten ZEIGT — gerechnet, nicht abgelesen.
+   *
+   * `bornAfter1971` haelt den Stand beim Verlassen von Schritt 9 fest und wird
+   * danach nie wieder angefasst. Die Schrittleiste macht den Sprung zurueck zu
+   * Schritt 1 aber zum bequemen Regelweg: Zahlendreher 1990 eingetragen,
+   * Schritt 9 durchlaufen, zurueck zu Schritt 1, auf 1965 korrigiert, weiter
+   * nach Schritt 10 — und der eingefrorene Wert widerspricht dem Geburtsdatum,
+   * das eine Zeile weiter oben in derselben Uebersicht steht. Die Pflichtliste
+   * darunter rechnet ohnehin live (`masernschutzPflichtig`), also stuende hier
+   * ein "Ja" ueber einer Liste ohne Masernschutz-Nachweis — ausgerechnet auf
+   * der Seite, auf der die Person die Richtigkeit ihrer Angaben verbindlich
+   * erklaert. Dieselbe Funktion benutzen HR-Ansicht und Personalakte-PDF.
+   */
+  const nach1970Geboren = nach1970GeborenAnzeige(
+    geburtsdatum,
+    d.bornAfter1971 as boolean | null | undefined,
+  );
 
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -663,14 +723,20 @@ export function Step10Summary({
       {/* Step 9: Masernschutz — bei der Vorlage MINIJOB ist der Schritt
           abgeschaltet, die Frage wird nie gestellt. Der Abschnitt behauptete
           trotzdem "Nach 1970 geboren: Nein" — und zwar auf der Seite, auf der
-          die Person die Richtigkeit ihrer Angaben verbindlich erklaert. */}
+          die Person die Richtigkeit ihrer Angaben verbindlich erklaert.
+
+          OB der Abschnitt erscheint, haengt weiterhin an den GESPEICHERTEN
+          Angaben: Sie sind die einzige Spur davon, dass Schritt 9 ueberhaupt
+          gelaufen ist. WAS er zeigt, kommt dagegen aus dem Geburtsdatum
+          (`nach1970Geboren`, siehe oben) — sonst haenge auch die Nachweiszeile
+          weiter am Altwert. */}
       {hatAngaben(d.bornAfter1971, d.masernschutzProvided) && (
         <SummarySection title="9. Masernschutz">
           <SummaryRow
             label="Nach dem 31.12.1970 geboren"
-            value={jaNein(d.bornAfter1971)}
+            value={jaNein(nach1970Geboren)}
           />
-          {!!d.bornAfter1971 && (
+          {nach1970Geboren === true && (
             <SummaryRow
               label="Masernschutz vorhanden"
               value={jaNein(d.masernschutzProvided)}
@@ -706,13 +772,55 @@ export function Step10Summary({
           hasChildren={children.length > 0}
           anzahlKinder={children.length}
           requiredDocuments={requiredDocuments}
-          rvEntscheidung={(d.rvEntscheidung as string) ?? null}
+          rvEntscheidung={rvEntscheidung}
+          // Die vier Rohwerte, aus denen die bedingten Pflichten entstehen.
+          // Bewusst roh und nicht als fertiger Wahrheitswert: Die Regeln liegen
+          // in masernschutz.ts und required-documents.ts, und der Server ruft
+          // beim Absenden dieselben Funktionen mit denselben Eingaben auf.
+          geburtsdatum={geburtsdatum}
+          organisationstyp={organization.type}
+          aufenthaltstitelErforderlich={aufenthaltstitelErforderlich}
+          healthInsuranceType={healthInsuranceType}
           antragErzeugbar={antragErzeugbar}
           onMissingChange={(missing) => {
             setFehlendeDokumente(missing);
             if (missing.length === 0) setDokumenteFehler("");
           }}
+          // Der zweite Rueckkanal — er speist nur den Ausblick unten und darf
+          // nichts sperren. Deshalb landet er auch nicht in
+          // `fehlendeDokumente`, an dem `handleFinalSubmit` haengt.
+          onNachzureichenChange={setOffeneNachreichbare}
         />
+      )}
+
+      {/* ============================================= */}
+      {/* Nachreichbare Pflichten — der Ausblick vor der Abgabe */}
+      {/* ============================================= */}
+      {/* Der Kasten steht zwischen Upload und Erklaerung, also genau da, wo die
+          Person von den Unterlagen zur verbindlichen Abgabe wechselt. Er
+          wiederholt die Hinweistexte NICHT (die stehen oben an der jeweiligen
+          Unterlage), sondern beantwortet die eine Frage, die die Upload-Karte
+          offenlaesst: „Und wenn ich eine davon jetzt nicht habe?"
+
+          Gezeigt wird nur, was WIRKLICH noch offen ist. Eine Aufzaehlung aller
+          nachreichbaren Pflichten stuende auch dann noch da, wenn die Person
+          gerade alles hochgeladen hat — und liesse sie unmittelbar vor der
+          verbindlichen Abgabe glauben, sie habe etwas vergessen. Ist nichts
+          mehr offen, verschwindet der Kasten. */}
+      {token && offeneNachreichbare.length > 0 && (
+        <div className="rounded-lg border-2 border-[#FBC900] bg-[#FBC900]/10 p-4">
+          <h3 className="mb-2 text-sm font-bold text-foreground">
+            Diese Nachweise fehlen noch – Sie dürfen sie nachreichen
+          </h3>
+          <ul className="mb-2 ml-5 list-disc space-y-0.5 text-sm text-foreground">
+            {offeneNachreichbare.map((typ) => (
+              <li key={typ}>{documentTypeLabel(typ)}</li>
+            ))}
+          </ul>
+          <p className="text-xs leading-relaxed text-foreground/80">
+            {NACHREICHEN_FOLGEN_HINWEIS}
+          </p>
+        </div>
       )}
 
       {/* ============================================= */}

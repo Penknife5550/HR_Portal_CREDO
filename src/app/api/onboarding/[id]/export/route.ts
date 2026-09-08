@@ -16,6 +16,48 @@ import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 import { EXPORT_ROLES } from "@/lib/permissions";
 import { getBefristungsartLabel } from "@/lib/constants";
+import {
+  aufteilungText,
+  kostenstellenAnzeige,
+  type KostenstellenZeile,
+} from "@/lib/kostenstellen-anzeige";
+
+/**
+ * Zeilenumbrueche zu Leerzeichen — fuer jede Zelle, die aus einem
+ * mehrzeiligen Eingabefeld stammt.
+ *
+ * `csvZelle` (src/lib/csv.ts) quotet einen Umbruch zwar regelkonform, schreibt
+ * ihn aber mit. Bis zur Kostenstellen-Bemerkung enthielt diese CSV kein
+ * einziges mehrzeiliges Feld; ein Import, der die Datei zeilenweise liest,
+ * saehe ab dem ersten Umbruch einen abgeschnittenen Datensatz und danach einen
+ * Geisterdatensatz. Die vollstaendige, mehrzeilige Bemerkung bleibt in der
+ * Vorgangsansicht und im Personalakte-PDF stehen — dort gehoert sie hin.
+ */
+function einzeilig(text: string): string {
+  // Der Wagenruecklauf steht bewusst mit in der Zeichenklasse: Wer aus Word
+  // oder Outlook einfuegt, bringt CRLF mit, und ein allein stehendes \r trennt
+  // fuer manche Leser ebenso.
+  return text.replace(/\s*[\r\n]+\s*/g, " ");
+}
+
+/**
+ * Was in die Positionsspalte "Kostenstelle" darf.
+ *
+ * Diese Spalte ist EINE Zelle, LOGA liest sie nach Position. Eine Aufteilung
+ * ueber mehrere Kostenstellen passt da nicht hinein: Stuende dort die erste
+ * Bezeichnung, buchte LOGA bei 5000 = 60 % und 6000 = 40 % einfach 100 Prozent
+ * auf 5000 — die 40 Prozent verschwaenden lautlos, und die Zelle saehe dabei
+ * vollstaendig aus. Deshalb bleibt sie bei mehr als einer Zeile bewusst LEER:
+ * Ein fehlender Wert laesst den Import scheitern und wird bemerkt, eine
+ * falsche Vollbuchung nicht. Die vollstaendige Aufteilung steht in der
+ * angehaengten Spalte "Kostenstellen-Aufteilung".
+ *
+ * Bei genau EINER Zeile — auch dem Rueckfall auf den Bestandswert — stimmt die
+ * einzelne Zelle, dort bleibt die Bezeichnung stehen.
+ */
+function positionsspalteKostenstelle(zeilen: readonly KostenstellenZeile[]): string {
+  return zeilen.length === 1 ? zeilen[0].bezeichnung : "";
+}
 
 export async function GET(
   request: NextRequest,
@@ -43,7 +85,14 @@ export async function GET(
       include: {
         organization: true,
         personalData: { include: { children: true } },
-        supervisorData: true,
+        // Die Aufteilung MUSS mitkommen: Ohne dieses `include` liest der
+        // Export nur die eingefrorene Alt-Spalte `kostenstelle` — bei einem
+        // neuen Vorgang ist die leer, bei einem migrierten steht dort der alte
+        // Wert. Beides geht ungeprueft in den LOGA-Import. Siehe
+        // src/lib/kostenstellen-anzeige.ts.
+        supervisorData: {
+          include: { kostenstellen: { orderBy: { orderIndex: "asc" } } },
+        },
       },
     });
 
@@ -57,6 +106,7 @@ export async function GET(
     if (format === "csv") {
       const pd = onboarding.personalData;
       const sd = onboarding.supervisorData;
+      const kostenstellen = kostenstellenAnzeige(sd);
 
       // CSV-Header und -Zeile für LOGA-Import
       const headers = [
@@ -103,12 +153,17 @@ export async function GET(
         "Stufe",
         "Hauptarbeitgeber",
         "Nebenarbeitgeber",
+        // Bleibt an dieser Stelle stehen und behaelt ihren Namen: LOGA
+        // erwartet die Spaltenposition. Gefuellt nur bei genau EINER
+        // Kostenstelle — Begruendung bei `positionsspalteKostenstelle`.
         "Kostenstelle",
         // Neue Spalten bewusst am Ende: so verschiebt sich keine bestehende
         // Spaltenposition fuer den LOGA-Import.
         "Art der Befristung",
         "Zweckbefristung: Ende bei",
         "Vorauss. Ende",
+        "Kostenstellen-Aufteilung",
+        "Kostenstellen-Bemerkung",
       ];
 
       const values = [
@@ -159,13 +214,15 @@ export async function GET(
         sd?.stufe || "",
         sd?.hauptarbeitgeberId || "",
         sd?.nebenarbeitgeberId || "",
-        sd?.kostenstelle || "",
-        // Reihenfolge muss zu den drei angehaengten Kopfzeilen passen
+        positionsspalteKostenstelle(kostenstellen.zeilen),
+        // Reihenfolge muss zu den fuenf angehaengten Kopfzeilen passen
         sd?.befristet ? getBefristungsartLabel(sd.befristungsart) || "" : "",
         sd?.befristungZweck || "",
         sd?.vertragsendeVoraussichtlich
           ? new Date(sd.vertragsendeVoraussichtlich).toLocaleDateString("de-DE")
           : "",
+        aufteilungText(kostenstellen.zeilen),
+        einzeilig(kostenstellen.bemerkung || ""),
       ];
 
       // CSV-String bauen (mit Semikolon als Trennzeichen für deutsche Excel-Versionen)
@@ -203,6 +260,9 @@ export async function GET(
         createdAt: onboarding.createdAt,
       },
       personalData: decryptedPersonalData,
+      // Traegt dank des `include` oben die Zeilen der Kostenstellen-Aufteilung
+      // mit. Die Alt-Spalten bleiben daneben stehen, damit ein bestehender
+      // Abnehmer dieses JSON nichts verliert.
       supervisorData: onboarding.supervisorData,
     });
   } catch (error) {

@@ -17,9 +17,11 @@ import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { tokenRateLimiter, getClientIp, getClientIpOrNull } from "@/lib/rate-limit";
 import {
   computeMissingRequiredDocuments,
+  fehlendeNachreichbareDokumente,
   RV_BEFREIUNG_HINWEIS,
   documentTypeLabel,
 } from "@/lib/required-documents";
+import { istNach1970Geboren, masernschutzPflichtig } from "@/lib/masernschutz";
 import { MAX_STEP_NUMBER, SUMMARY_STEP_NUMBER } from "@/lib/fragebogen-steps";
 import { istBekannteErklaerung } from "@/lib/erklaerung-arbeitnehmer";
 import { berechnePruefsumme } from "@/lib/fragebogen-pruefsumme";
@@ -494,6 +496,39 @@ export async function PUT(
       data.aufenthaltstitelGueltigBis,
     );
 
+  /**
+   * `bornAfter1971` dem Geburtsdatum nachziehen.
+   *
+   * Die Spalte ist keine eigene Antwort, sondern eine Ableitung aus
+   * `birthDate` — geschrieben beim Verlassen von Schritt 9 und danach nie
+   * wieder. Wer sein Geburtsdatum spaeter in Schritt 1 korrigiert
+   * (Zahlendreher 1990 statt 1965; die Schrittleiste macht den Sprung zurueck
+   * zum bequemen Regelweg), liess bisher einen eingefrorenen Wert stehen.
+   * Portal-Ansicht und Personalakte-PDF fangen das beim LESEN mit
+   * `nach1970GeborenAnzeige` ab, der JSON-Export (`/api/onboarding/[id]/export`)
+   * gibt `personalData` dagegen unveraendert aus — zwei Auskuenfte zu einer
+   * Tatsache, und die falsche waere die maschinenlesbare gewesen. Deshalb steht
+   * die Korrektur hier an der Quelle; die Anzeigefunktion bleibt das Netz fuer
+   * Altbestand.
+   *
+   * NUR NACHZIEHEN, NIE NEU ERFINDEN: Ist die Spalte noch leer, wurde Schritt 9
+   * nie durchlaufen — bei der Vorlage MINIJOB ist er abgeschaltet, die Frage
+   * wird dort nie gestellt. Sie aus Schritt 1 heraus zu befuellen machte aus
+   * einer nie gestellten Frage eine beantwortete, und genau daran haengt die
+   * Zusammenfassung in Schritt 10, die den Masernschutz-Abschnitt nur bei
+   * vorhandener Angabe zeigt.
+   *
+   * Keine Kollision mit Schritt 9: Der sendet `bornAfter1971` ohne `birthDate`
+   * (und leitet es aus demselben Datum ab), Schritt 1 sendet `birthDate` ohne
+   * `bornAfter1971`. Treffen doch beide zusammen, gilt das Geburtsdatum.
+   */
+  if (data.birthDate && (onboarding.personalData?.bornAfter1971 ?? null) !== null) {
+    const abgeleitet = istNach1970Geboren(updateData.birthDate);
+    // `null` heisst "unlesbares Datum". Dann bleibt der frueher gegebene Wert
+    // stehen — er ist immer noch besser als ein stilles Ueberschreiben.
+    if (abgeleitet !== null) updateData.bornAfter1971 = abgeleitet;
+  }
+
   // currentStep aktualisieren
   if (typeof currentStep === "number") {
     updateData.currentStep = currentStep;
@@ -742,30 +777,58 @@ export async function POST(
     "GEBURTSURKUNDE_KIND",
   ];
 
+  const [uploaded, childCount] = await Promise.all([
+    prisma.document.findMany({
+      where: { onboardingId: onboarding.id },
+      select: { type: true },
+    }),
+    prisma.child.count({
+      where: { personalData: { onboardingId: onboarding.id } },
+    }),
+  ]);
+
+  // Verbindlich ist der Datenbankstand, nicht etwas Mitgeschicktes: In einem
+  // zweiten Tab kann ein Dokument geloescht worden sein, waehrend hier
+  // abgesendet wird.
+  const uploadedTypes = uploaded.map((d) => d.type);
+
+  /**
+   * Die Eingaben, aus denen sich die Pflichten dieses Vorgangs ergeben — EINMAL
+   * gebildet und von beiden Auswertungen unten benutzt.
+   *
+   * Alles darin liegt bereits vor: `validateMagicToken` laedt `organization`
+   * und `personalData` mit. Die vier bedingten Pflichten fehlten hier bisher
+   * ganz; sperrend wirkte sich das nicht aus (alle vier stehen in
+   * NACHREICHBARE_PFLICHTEN), aber damit erfuhr auch keine Stelle auf dem
+   * Server, dass ueberhaupt etwas offen ist.
+   *
+   * Die Regeln werden NICHT nachgebaut, sondern mit denselben Funktionen
+   * ausgewertet, die der Fragebogen aufruft (`masernschutzPflichtig`,
+   * `effektivePflichtDokumente`). Zwei Nachbauten liefen frueher oder spaeter
+   * auseinander — und dann sperrt der Server etwas, wovon das Formular nichts
+   * weiss.
+   */
+  const pflichtEingaben = {
+    required: requiredDocs,
+    hasChildren: childCount > 0,
+    rvEntscheidung: onboarding.personalData?.rvEntscheidung ?? null,
+    masernschutzPflichtig: masernschutzPflichtig({
+      geburtsdatum: onboarding.personalData?.birthDate,
+      organisationstyp: onboarding.organization.type,
+    }),
+    aufenthaltstitelErforderlich:
+      onboarding.personalData?.aufenthaltstitelErforderlich ?? null,
+    healthInsuranceType: onboarding.personalData?.healthInsuranceType ?? null,
+  };
+
   // Bewusst ohne `if (requiredDocs.length > 0)`: Die Pflicht zum
   // Befreiungsantrag entsteht aus der Entscheidung des Beschaeftigten, nicht aus
   // der Vorlage. Setzt HR die Pflichtdokumente einer Vorlage auf die leere
   // Liste, verschwaende der alte Guard diese Sperre lautlos mit.
   {
-    const [uploaded, childCount] = await Promise.all([
-      prisma.document.findMany({
-        where: { onboardingId: onboarding.id },
-        select: { type: true },
-      }),
-      prisma.child.count({
-        where: { personalData: { onboardingId: onboarding.id } },
-      }),
-    ]);
-
-    // Verbindlich ist der Datenbankstand, nicht etwas Mitgeschicktes: In einem
-    // zweiten Tab kann ein Dokument geloescht worden sein, waehrend hier
-    // abgesendet wird.
     const missing = computeMissingRequiredDocuments({
-      required: requiredDocs,
-      uploadedTypes: uploaded.map((d) => d.type),
-      hasChildren: childCount > 0,
-      // personalData ist ueber validateMagicToken bereits geladen.
-      rvEntscheidung: onboarding.personalData?.rvEntscheidung ?? null,
+      ...pflichtEingaben,
+      uploadedTypes,
     });
 
     if (missing.length > 0) {
@@ -782,6 +845,21 @@ export async function POST(
       );
     }
   }
+
+  /**
+   * Die Pflichtunterlagen, die fehlen und trotzdem nicht sperren.
+   *
+   * Der Verzicht auf die Sperre ist ein Tausch (Entscheidung 07./08.09.2026):
+   * Der Vorgang entsteht, DAFUER wird er sichtbar als offen gefuehrt und HR
+   * erfaehrt davon. Ohne diese Zeile waere nur die erste Haelfte gebaut — und
+   * gerade beim Masernschutz haengt die Begruendung daran, dass der Arbeitgeber
+   * einen fehlenden Nachweis dem Gesundheitsamt melden KANN. Das setzt voraus,
+   * dass irgendwo steht, dass er fehlt.
+   */
+  const offeneNachweise = fehlendeNachreichbareDokumente({
+    ...pflichtEingaben,
+    uploadedTypes,
+  });
 
   // =============================================
   // Wahrheitsversicherung pruefungsfest festhalten
@@ -900,10 +978,56 @@ export async function POST(
             erklaerungOrt: absenden.data.erklaerungOrt,
             erklaerungVersion: absenden.data.erklaerungVersion,
             erklaerungPruefsumme: pruefsumme,
+            // Immer mitgeschrieben, auch als leere Liste: Der Abgabesatz soll
+            // fuer sich sagen koennen, dass NICHTS offen war. Sonst ist die
+            // Abwesenheit des Vermerks unten zweideutig — nichts offen oder
+            // Vermerk vergessen.
+            offeneNachweise,
           },
           ipAddress: clientIp,
         },
       });
+
+      /**
+       * Der Vermerk „Nachweis offen" — ein eigener Satz, nicht bloss ein Feld
+       * im Abgabesatz.
+       *
+       * Er ist die abfragbare Haelfte des Tauschs. `action` ist eine
+       * gewoehnliche Spalte, der Zustand also mit einem gewoehnlichen
+       * `where: { action: "DOKUMENTE_NACHZUREICHEN" }` zu finden — im
+       * Abgabesatz braeuchte es dafuer eine Suche IM JSON. Fuer einen einzelnen
+       * Vorgang laeuft die Abfrage ueber `onboardingId`, und der ist indiziert;
+       * eine Auswertung ueber ALLE Vorgaenge liest die Tabelle voll (auf
+       * `action` liegt kein Index, siehe AuditLog in prisma/schema.prisma).
+       * Bei der heutigen Groessenordnung ist das unerheblich — wer daraus
+       * einmal eine Dauerabfrage macht, ergaenzt ihn.
+       *
+       * Genau hier kann ein Benachrichtigungsweg andocken: Der Vermerk steht
+       * fest, bevor irgendeine Mail verschickt wird.
+       *
+       * In DERSELBEN Transaktion wie die Abgabe: Ein Vermerk, der danach
+       * einzeln geschrieben wird, fehlt genau dann, wenn die Verbindung
+       * abreisst — und der Vorgang stuende als vollstaendig da, obwohl er es
+       * nicht ist. Lieber gar keine Abgabe als eine Abgabe ohne den Vermerk.
+       */
+      if (offeneNachweise.length > 0) {
+        await tx.auditLog.create({
+          data: {
+            onboardingId: onboarding.id,
+            processType: "ONBOARDING",
+            action: "DOKUMENTE_NACHZUREICHEN",
+            details: {
+              typen: offeneNachweise,
+              // Die deutschen Bezeichnungen mitschreiben: Das Protokoll wird
+              // von Menschen gelesen, und "PKV_NACHWEIS" steht dort sonst ohne
+              // Uebersetzung.
+              bezeichnungen: offeneNachweise.map((t) => documentTypeLabel(t)),
+              submittedAt: abgegebenAm.toISOString(),
+            },
+            ipAddress: clientIp,
+          },
+        });
+      }
     });
   } catch (error) {
     if (error instanceof BereitsEingereicht) {

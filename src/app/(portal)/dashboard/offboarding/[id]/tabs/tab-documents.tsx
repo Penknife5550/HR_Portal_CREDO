@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { OFFBOARDING_DOC_TYPE_LABELS } from "@/lib/constants";
+import { OFFBOARDING_DOC_TYPE_LABELS, documentStatusLabel } from "@/lib/constants";
 import type { OffboardingData } from "../types";
 import { formatDate } from "../helpers";
 import { formatBytes } from "@/lib/format";
@@ -42,12 +42,9 @@ export function TabDocuments({
   // durchgaengig ueber den Namensraum anspricht (React.RefObject, React.ChangeEvent).
   const [versandZaehler, setVersandZaehler] = React.useState(0);
 
-  const DOC_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-    UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
-    REVIEWED: { label: "Geprüft", color: "bg-credo-blau/10 text-credo-blau" },
-    APPROVED: { label: "Genehmigt", color: "bg-credo-gruen/10 text-credo-gruen" },
-    REJECTED: { label: "Abgelehnt", color: "bg-credo-rot/10 text-credo-rot" },
-  };
+  // Die Statustabelle steht in `@/lib/constants` (DOCUMENT_STATUS_LABELS): Als
+  // lokale Kopie fehlte ihr — wie der zweiten Kopie im Onboarding — der Wert
+  // EXPIRED, und der Rueckfall machte daraus „Hochgeladen".
 
   return (
     <div className="space-y-6">
@@ -128,7 +125,7 @@ export function TabDocuments({
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {data.documents.map((doc) => {
-              const statusLabel = DOC_STATUS_LABELS[doc.status] || DOC_STATUS_LABELS.UPLOADED;
+              const statusLabel = documentStatusLabel(doc.status);
               const typeLabel = OFFBOARDING_DOC_TYPE_LABELS[doc.type] || doc.type;
 
               return (

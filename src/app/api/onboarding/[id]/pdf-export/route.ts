@@ -64,7 +64,12 @@ export async function GET(
             },
           },
         },
-        supervisorData: true,
+        // Die Kostenstellen-Zeilen gehoeren in die Personalakte. Ohne das
+        // `include` haette der Export-Kontext sie nicht — und der Compiler
+        // besteht darauf, weil SupervisorDataExport.kostenstellen Pflicht ist.
+        supervisorData: {
+          include: { kostenstellen: { orderBy: { orderIndex: "asc" } } },
+        },
         documents: {
           orderBy: { createdAt: "desc" },
         },
@@ -224,6 +229,18 @@ export async function GET(
         probezeit: process.supervisorData.probezeit,
         probezeitMonate: process.supervisorData.probezeitMonate,
         zusatzvereinbarungen: process.supervisorData.zusatzvereinbarungen,
+        // Aufteilung und Alt-Spalten. Welche von beiden gedruckt wird,
+        // entscheidet kostenstellenAnzeige() im PDF-Modul — nicht diese Route.
+        kostenstelle: process.supervisorData.kostenstelle,
+        // Bewusst `?? null` statt des `x ? Number(x) : null` der Nachbarzeilen:
+        // Ein hinterlegter Anteil von 0 ist eine Angabe und darf nicht
+        // stillschweigend zu "kein Wert" werden.
+        kostenstelleAnteil: process.supervisorData.kostenstelleAnteil ?? null,
+        kostenstellenBemerkung: process.supervisorData.kostenstellenBemerkung,
+        kostenstellen: process.supervisorData.kostenstellen.map((zeile) => ({
+          bezeichnung: zeile.bezeichnung,
+          anteil: Number(zeile.anteil),
+        })),
       } : null,
       documents: process.documents.map((d) => ({
         type: d.type,
@@ -231,6 +248,9 @@ export async function GET(
         fileSize: d.fileSize,
         status: d.status,
         uploadedAt: d.createdAt.toISOString(),
+        // Ohne die Frist druckt die Personalakte einen abgelaufenen
+        // Aufenthaltstitel als unauffaelliges Blatt (siehe DocExport).
+        gueltigBis: d.gueltigBis?.toISOString() ?? null,
       })),
       checklistItems: process.checklistItems.map((c) => ({
         title: c.title,

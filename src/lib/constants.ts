@@ -264,6 +264,55 @@ export const DEPARTMENT_LABELS: Record<string, string> = {
 };
 
 // =============================================
+// Dokument-Status-Labels
+// =============================================
+/**
+ * Anzeige zu `DocumentStatus` (prisma/schema.prisma) — an EINER Stelle.
+ *
+ * Vorher stand diese Tabelle zweimal wortgleich in den Detailseiten (Onboarding
+ * und Offboarding), und beide Male ohne `EXPIRED`. Der Rueckfall `|| UPLOADED`
+ * machte daraus keinen leeren Platz, sondern die gegenteilige Aussage: Ein vom
+ * naechtlichen Cron als abgelaufen markierter Aufenthaltstitel trug das Abzeichen
+ * "Hochgeladen" in Grau — direkt neben dem roten Ampel-Abzeichen "Abgelaufen"
+ * auf derselben Karte.
+ *
+ * Deshalb hier und nicht dort: Der naechste neue Enum-Wert soll nicht wieder an
+ * zwei Stellen still durchfallen. Ein Test haelt die Tabelle gegen das Schema
+ * (src/__tests__/lib/dokument-status-labels.test.ts).
+ *
+ * EXPIRED traegt bewusst die Farben von `ABLAUF_KATEGORIE_META.ABGELAUFEN`
+ * (src/lib/dokument-fristen.ts) als feste Klassen — als Ausdruck geschrieben
+ * faende Tailwind sie beim Scannen der Quellen nicht. So sind Status- und
+ * Ampel-Abzeichen auf derselben Karte auch farblich dieselbe Aussage; das
+ * dunklere Rot unterscheidet "abgelaufen" von der Ablehnung eines Scans.
+ */
+export const DOCUMENT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  UPLOADED: { label: "Hochgeladen", color: "bg-gray-100 text-gray-600" },
+  REVIEWED: { label: "Geprüft", color: "bg-credo-blau/10 text-credo-blau" },
+  APPROVED: { label: "Genehmigt", color: "bg-credo-gruen/10 text-credo-gruen" },
+  REJECTED: { label: "Abgelehnt", color: "bg-credo-rot/10 text-credo-rot" },
+  EXPIRED: { label: "Abgelaufen", color: "bg-[#f7c9c9] text-[#7a0c12]" },
+};
+
+/**
+ * Die Anzeige zu einem Dokumentstatus — nie `undefined`.
+ *
+ * Der Rueckfall ist ausdruecklich NICHT "Hochgeladen": Ein unbekannter Wert ist
+ * ein unbekannter Wert, und ihn als harmlosen Normalfall auszugeben ist genau
+ * der Fehler, der EXPIRED zu "Hochgeladen" gemacht hat. Er zeigt deshalb den
+ * technischen Wert — haesslich, aber ehrlich, und in der Oberflaeche sofort als
+ * Luecke erkennbar.
+ */
+export function documentStatusLabel(status: string): { label: string; color: string } {
+  return (
+    DOCUMENT_STATUS_LABELS[status] ?? {
+      label: status,
+      color: "bg-gray-100 text-gray-600",
+    }
+  );
+}
+
+// =============================================
 // Exit-Interview Status-Labels
 // =============================================
 export const EXIT_INTERVIEW_STATUS_LABELS: Record<string, { label: string; color: string }> = {

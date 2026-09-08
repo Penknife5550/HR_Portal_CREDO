@@ -7,11 +7,22 @@
 
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
-import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
+import {
+  DOCUMENT_STATUS_LABELS,
+  getBefristungSachgrundLabel,
+  getBefristungsartLabel,
+} from "@/lib/constants";
+import { ablaufAmpel, istAbgelaufen } from "@/lib/dokument-fristen";
+import { nach1970GeborenAnzeige } from "@/lib/masernschutz";
 import { getErklaerung } from "@/lib/erklaerung-arbeitnehmer";
 import { statusLabel } from "@/lib/minijob-status";
 import { rvEntscheidungLabel } from "@/lib/minijob-rentenversicherung";
 import { ART_LABELS, KATEGORIE_LABELS } from "@/lib/validations/beschaeftigungs-angaben";
+import {
+  anteilText,
+  kostenstellenAnzeige,
+  summeText,
+} from "@/lib/kostenstellen-anzeige";
 
 // =============================================
 // Typen
@@ -140,6 +151,20 @@ interface SupervisorDataExport {
   probezeit: boolean | null;
   probezeitMonate: number | null;
   zusatzvereinbarungen: string | null;
+  /**
+   * Kostenstellen: die Aufteilung UND die beiden Alt-Spalten als Rueckfall.
+   *
+   * Alle vier sind PFLICHT und nicht optional — ein `kostenstellen?:` haette
+   * genau den Fehler wieder ermoeglicht, den dieser Abschnitt behebt: Die
+   * aufrufende Route haette das Feld vergessen koennen, der Compiler haette
+   * geschwiegen, und im Papierexport der Personalakte stuende wieder nichts
+   * oder der eingefrorene Altwert. Die Regel dahinter steht in
+   * src/lib/kostenstellen-anzeige.ts.
+   */
+  kostenstelle: string | null;
+  kostenstelleAnteil: number | null;
+  kostenstellenBemerkung: string | null;
+  kostenstellen: { bezeichnung: string; anteil: number }[];
 }
 
 interface DocExport {
@@ -148,6 +173,16 @@ interface DocExport {
   fileSize: number;
   status: string;
   uploadedAt: string;
+  /**
+   * Ablauf eines befristeten Nachweises (ISO), `null` ohne Frist.
+   *
+   * Muss mit ins Papier: Ohne diese Angabe druckt die Personalakte einen
+   * abgelaufenen Aufenthaltstitel als unauffaelliges Blatt — Typ, Dateiname,
+   * Status, Uploaddatum, kein Wort zum Ablauf. Und auf den Status allein ist
+   * kein Verlass: EXPIRED setzt erst der naechtliche Cron, zwischen Ablauftag
+   * und Lauf steht dort noch APPROVED.
+   */
+  gueltigBis?: string | null;
 }
 
 interface ChecklistExport {
@@ -478,7 +513,16 @@ async function addFragebogenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
   // Masernschutz
   checkBreak(doc, 40, ctx, "Fragebogen");
   y = section(doc, "Masernschutz");
-  y = dataRow(doc, "Nach dem 31.12.1970 geboren", yn(pd.bornAfter1971), y);
+  // Aus dem Geburtsdatum gerechnet statt aus der gleichnamigen Spalte gelesen:
+  // Die Spalte friert beim Verlassen von Schritt 9 ein und veraltet, sobald das
+  // Geburtsdatum danach korrigiert wird. In der Personalakte stuende sonst ein
+  // "Ja" neben einem Geburtsjahr von 1965 (Begruendung: `nach1970GeborenAnzeige`).
+  y = dataRow(
+    doc,
+    "Nach dem 31.12.1970 geboren",
+    yn(nach1970GeborenAnzeige(pd.birthDate, pd.bornAfter1971)),
+    y
+  );
   y = dataRow(doc, "Masernschutz nachgewiesen", yn(pd.masernschutzProvided), y);
 
   // Kinder
@@ -620,6 +664,36 @@ async function addModalitaetenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExpo
   if (sd.sonderzahlungProzent) y = dataRow(doc, "Sonderzahlung %", `${sd.sonderzahlungProzent}%`, y);
   y = dataRow(doc, "Urlaubstage/Jahr", str(sd.urlaubstageProJahr), y);
 
+  // Kostenstellen — die Aufteilung, nicht die Alt-Spalte. Der Abschnitt stand
+  // im PDF bisher gar nicht; damit fehlte die Kostenstelle im einzigen
+  // Ausdruck, den die Personalakte kennt.
+  checkBreak(doc, 80, ctx, "Modalitaeten");
+  y = section(doc, "Kostenstellen");
+  const kostenstellen = kostenstellenAnzeige(sd);
+  if (kostenstellen.zeilen.length === 0) {
+    y = dataRow(doc, "Aufteilung", "—", y);
+  } else {
+    for (const zeile of kostenstellen.zeilen) {
+      checkBreak(doc, 20, ctx, "Modalitaeten");
+      y = dataRow(doc, zeile.bezeichnung, anteilText(zeile.anteil), y);
+    }
+    y = dataRow(
+      doc,
+      "Summe",
+      kostenstellen.summeStimmt
+        ? summeText(kostenstellen.summe)
+        : `${summeText(kostenstellen.summe)} (ergibt nicht 100 %)`,
+      y
+    );
+    if (kostenstellen.ausBestand) {
+      y = dataRow(doc, "Hinweis", "Aus dem alten Einzelfeld uebernommen", y);
+    }
+  }
+  if (kostenstellen.bemerkung) {
+    checkBreak(doc, 20, ctx, "Modalitaeten");
+    y = dataRow(doc, "Bemerkung", kostenstellen.bemerkung, y);
+  }
+
   checkBreak(doc, 50, ctx, "Modalitaeten");
   y = section(doc, "Probezeit & Sonstiges");
   y = dataRow(doc, "Probezeit", yn(sd.probezeit), y);
@@ -650,13 +724,39 @@ async function addDokumentePages(doc: PDFKit.PDFDocument, ctx: OnboardingExportC
     checkBreak(doc, 35, ctx, "Dokumente");
     y = doc.y;
 
-    const statusColor = d.status === "APPROVED" ? C.gruen : d.status === "REJECTED" ? C.rot : C.gray;
-    const statusLabel = d.status === "APPROVED" ? "Genehmigt" : d.status === "REJECTED" ? "Abgelehnt" : d.status === "REVIEWED" ? "Geprueft" : "Hochgeladen";
+    // Die Statusbezeichnungen kommen aus derselben Tabelle wie im Portal
+    // (DOCUMENT_STATUS_LABELS). Der frueher hier stehende Ternaer-Turm kannte
+    // EXPIRED nicht und druckte einen abgelaufenen Nachweis als "Hochgeladen" —
+    // das Gegenteil dessen, was in der Datenbank stand.
+    const statusLabel = DOCUMENT_STATUS_LABELS[d.status]?.label ?? d.status;
+    const statusColor =
+      d.status === "APPROVED"
+        ? C.gruen
+        : d.status === "REJECTED" || d.status === "EXPIRED"
+          ? C.rot
+          : C.gray;
 
     doc.font("Helvetica-Bold").fontSize(9).fillColor(C.black).text(d.type, 50, y, { width: 150 });
     doc.font("Helvetica").fontSize(9).fillColor(C.black).text(d.fileName, 205, y, { width: 200 });
     doc.font("Helvetica").fontSize(8).fillColor(statusColor).text(statusLabel, 415, y, { width: 60 });
     doc.font("Helvetica").fontSize(8).fillColor(C.gray).text(fmt(d.uploadedAt), 480, y, { width: 80 });
+
+    // Die Frist als eigene Zeile — und nur, wenn eine erfasst ist. Der Text
+    // kommt aus der Ampel und nicht aus fmt(): Die Spalte ist @db.Date, steht
+    // also auf Mitternacht UTC, und toLocaleDateString rechnet in die Ortszeit
+    // des Prozesses. Ohne diese Zeile ist der Ablauf im Papierexport ueberhaupt
+    // nicht zu sehen.
+    if (d.gueltigBis) {
+      const ampel = ablaufAmpel(d.gueltigBis);
+      if (ampel.kategorie) {
+        y = doc.y + 1;
+        doc
+          .font("Helvetica")
+          .fontSize(8)
+          .fillColor(istAbgelaufen(d.gueltigBis) ? C.rot : C.gray)
+          .text(`Gueltig bis: ${ampel.text}`, 50, y, { width: 500 });
+      }
+    }
 
     y = doc.y + 4;
     doc.rect(50, y, 515, 0.5).fill(C.lightGray);

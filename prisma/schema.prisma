@@ -522,6 +522,23 @@ model PersonalData {
   summeUeberGeringfuegigkeitsgrenze Boolean?
 
   // -- Masernschutz --
+  /// Geburt nach dem 31.12.1970 (IfSG § 20 Abs. 8). Der Name ist um ein Jahr
+  /// daneben und bleibt trotzdem stehen: Es gibt keinen Migrationsordner, der
+  /// Entrypoint rollt mit `db push --accept-data-loss` aus, und eine
+  /// Umbenennung hiesse dort woertlich "alte Spalte loeschen" — der Preis fuer
+  /// den richtigen Namen waeren alle bisher gegebenen Antworten.
+  ///
+  /// KEINE eigene Antwort, sondern eine Ableitung aus `birthDate`. Gesetzt wird
+  /// sie beim Verlassen von Schritt 9 des Fragebogens; aendert sich das
+  /// Geburtsdatum danach, zieht `PUT /api/fragebogen/[token]` sie nach — aber
+  /// nur, wenn hier schon ein Wert steht. `null` heisst deshalb weiterhin
+  /// "Schritt 9 wurde nie durchlaufen" (bei der Vorlage MINIJOB ist er
+  /// abgeschaltet) und nicht "Nein".
+  ///
+  /// Beim LESEN gilt trotzdem `nach1970GeborenAnzeige(birthDate, spalte)` aus
+  /// src/lib/masernschutz.ts: Bestandsdatensaetze koennen aus der Zeit vor dem
+  /// Nachziehen stammen, und HR-Ansicht wie Personalakte-PDF duerfen kein "Ja"
+  /// neben ein Geburtsjahr von 1965 stellen.
   bornAfter1971        Boolean?
   masernschutzProvided Boolean?
 

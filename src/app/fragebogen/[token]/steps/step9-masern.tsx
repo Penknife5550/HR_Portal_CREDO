@@ -13,8 +13,14 @@
  * liegt jetzt in `@/lib/masernschutz` und wird von Fragebogen, Dokumentenpflicht
  * und Serverpruefung gemeinsam benutzt.
  *
- * Das Feld `bornAfter1971` wird weiterhin GESPEICHERT — Uebersicht, HR-Sicht und
- * Personalakte-PDF lesen es. Nur eben abgeleitet statt getippt.
+ * Das Feld `bornAfter1971` wird weiterhin GESPEICHERT. Es ist aber nicht mehr
+ * die Quelle der Anzeige: HR-Sicht und Personalakte-PDF rechnen den Wert mit
+ * `nach1970GeborenAnzeige` aus `birthDate` und greifen nur auf die Spalte
+ * zurueck, wenn kein Geburtsdatum vorliegt. Grund: Was hier gespeichert wird,
+ * ist der Stand beim Verlassen DIESES Schritts. Wer sein Geburtsdatum danach in
+ * Schritt 1 korrigiert (und die Schrittleiste macht den Sprung dorthin zum
+ * bequemen Regelweg), laesst hier einen eingefrorenen Wert stehen — in der Akte
+ * stuende sonst ein „Ja" neben einem Geburtsjahr von 1965.
  *
  * Wenn Nachweis vorhanden: Inline-Upload für Impfausweis/Attest
  */
