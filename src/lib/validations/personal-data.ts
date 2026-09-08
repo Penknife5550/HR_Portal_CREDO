@@ -23,8 +23,34 @@ function reqStr(fc: FieldConfigHelper, name: string, msg: string) {
   return fc.isRequired(name) ? z.string().min(1, msg) : z.string();
 }
 
+/**
+ * Was „keine Angabe" im Formular alles bedeuten kann.
+ *
+ * Ein <select> mit leerer Vorauswahl liefert `""`. Eine Radiogruppe, in der
+ * keine Option angehakt ist, liefert in react-hook-form dagegen `null`. Zod
+ * kennt fuer „nicht gesetzt" nur `undefined` — und daran haengen zwei echte
+ * Blockaden:
+ *
+ * - Bei einem PFLICHT-Enum greift `required_error` ausschliesslich bei
+ *   `undefined`. Bei `null` faellt Zod auf seine englische Standardmeldung
+ *   zurueck („Expected 'hauptarbeitgeber' | ... received null") — mitten im
+ *   deutschen Fragebogen.
+ * - Bei einem FREIWILLIGEN Enum scheiterte `null` an `z.enum().optional()`.
+ *   Der Schritt blockierte also an einem Feld, das gar nicht ausgefuellt
+ *   werden muss, und eine Radiogruppe liess sich nie wieder leeren.
+ *
+ * Deshalb sitzt diese Umschreibung ueber BEIDEN Zweigen, nicht nur ueber dem
+ * freiwilligen.
+ */
+const leerZuUndefined = (wert: unknown) =>
+  wert === "" || wert === null ? undefined : wert;
+
+/** Pflicht-Enum mit deutscher Meldung — auch wenn nichts angehakt ist. */
+function pflichtEnum<T extends [string, ...string[]]>(values: T, msg: string) {
+  return z.preprocess(leerZuUndefined, z.enum(values, { required_error: msg }));
+}
+
 // Helper: Enum-Feld das nur required ist wenn FieldConfig es verlangt
-// Bei optionalen Enums: leerer String "" (aus <select>) wird zu undefined konvertiert
 function reqEnum<T extends [string, ...string[]]>(
   fc: FieldConfigHelper,
   name: string,
@@ -32,20 +58,17 @@ function reqEnum<T extends [string, ...string[]]>(
   msg: string
 ) {
   return fc.isRequired(name)
-    ? z.enum(values, { required_error: msg })
-    : z.preprocess(
-        (val) => (val === "" ? undefined : val),
-        z.enum(values).optional()
-      );
+    ? pflichtEnum(values, msg)
+    : z.preprocess(leerZuUndefined, z.enum(values).optional());
 }
 
 // =============================================
 // Step 1: Persönliche Angaben
 // =============================================
 export const step1Schema = z.object({
-  salutation: z.enum(["Herr", "Frau"], {
-    required_error: "Bitte waehlen Sie eine Anrede.",
-  }),
+  // Radiogruppe: ohne angehakte Option liefert das Formular null, nicht
+  // undefined — siehe pflichtEnum.
+  salutation: pflichtEnum(["Herr", "Frau"], "Bitte waehlen Sie eine Anrede."),
   title: z.string(),
   firstName: z.string().min(1, "Vorname ist erforderlich.").max(100),
   lastName: z.string().min(1, "Nachname ist erforderlich.").max(100),
@@ -54,12 +77,16 @@ export const step1Schema = z.object({
   birthPlace: z.string().min(1, "Geburtsort ist erforderlich."),
   birthCountry: z.string(),
   nationality: z.string(),
-  maritalStatus: z.enum(
+  maritalStatus: pflichtEnum(
     ["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt_lebend", "eingetragene_partnerschaft"],
-    { required_error: "Bitte waehlen Sie den Familienstand." }
+    "Bitte waehlen Sie den Familienstand."
   ),
   severelyDisabled: z.boolean(),
-  disabilityDegree: z.number().min(0).max(100).nullable(),
+  disabilityDegree: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })
+      .int("Bitte einen vollen Grad angeben.")
+      .min(0, "Der Grad kann nicht negativ sein.")
+      .max(100, "Der Grad betraegt hoechstens 100.")
+      .nullable(),
 });
 
 export type Step1Data = z.infer<typeof step1Schema>;
@@ -115,9 +142,10 @@ export type Step3Data = z.infer<typeof step3Schema>;
 export const step4Schema = z.object({
   socialSecurityNumber: z.string(),
   healthInsuranceName: z.string().min(1, "Krankenkasse ist erforderlich."),
-  healthInsuranceType: z.enum(["gesetzlich", "privat"], {
-    required_error: "Bitte waehlen Sie die Versicherungsart.",
-  }),
+  healthInsuranceType: pflichtEnum(
+    ["gesetzlich", "privat"],
+    "Bitte waehlen Sie die Versicherungsart."
+  ),
   parentStatus: z.boolean(),
   minijobRvBefreiung: z.boolean(),
 });
@@ -132,14 +160,15 @@ export const step5Schema = z.object({
     .string()
     .min(1, "Steuer-ID ist erforderlich.")
     .regex(/^\d{10,11}$/, "Steuer-ID muss 10 oder 11 Ziffern enthalten."),
-  taxClass: z.enum(["I", "II", "III", "IV", "V", "VI"], {
-    required_error: "Bitte waehlen Sie die Steuerklasse.",
-  }),
+  taxClass: pflichtEnum(
+    ["I", "II", "III", "IV", "V", "VI"],
+    "Bitte waehlen Sie die Steuerklasse."
+  ),
   taxAllowance: z.number().min(0).nullable(),
   childAllowance: z.number().min(0).nullable(),
-  religion: z.enum(
+  religion: pflichtEnum(
     ["ev", "rk", "ak", "lt", "rf", "fr", "fg", "keine", "sonstige"],
-    { required_error: "Bitte waehlen Sie die Religionszugehörigkeit." }
+    "Bitte waehlen Sie die Religionszugehörigkeit."
   ),
 });
 
@@ -158,9 +187,10 @@ export const step6Schema = z.object({
   summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
   vorbeschaeftigungenVorhanden: z.boolean(),
   auslandsbeschaeftigungVorhanden: z.boolean(),
-  employerType: z.enum(["hauptarbeitgeber", "nebenarbeitgeber", "nein"], {
-    required_error: "Bitte waehlen Sie eine Option.",
-  }),
+  employerType: pflichtEnum(
+    ["hauptarbeitgeber", "nebenarbeitgeber", "nein"],
+    "Bitte waehlen Sie eine Option."
+  ),
 });
 
 export type Step6Data = z.infer<typeof step6Schema>;
@@ -186,21 +216,27 @@ export type ChildData = z.infer<typeof childSchema>;
 // Step 8: Bildung & Beruf
 // =============================================
 export const step8Schema = z.object({
-  highestSchoolDegree: z.enum([
-    "ohne_schulabschluss",
-    "hauptschulabschluss",
-    "mittlere_reife",
-    "abitur_fachabitur",
-    "sonstiges",
-  ], { required_error: "Bitte waehlen Sie den hoechsten Schulabschluss." }),
-  highestProfessionalDegree: z.enum([
-    "ohne_berufsausbildung",
-    "anerkannte_berufsausbildung",
-    "meister_techniker_fachschule",
-    "bachelor",
-    "diplom_magister_master_staatsexamen",
-    "promotion",
-  ], { required_error: "Bitte waehlen Sie die hoechste Berufsausbildung." }),
+  highestSchoolDegree: pflichtEnum(
+    [
+      "ohne_schulabschluss",
+      "hauptschulabschluss",
+      "mittlere_reife",
+      "abitur_fachabitur",
+      "sonstiges",
+    ],
+    "Bitte waehlen Sie den hoechsten Schulabschluss."
+  ),
+  highestProfessionalDegree: pflichtEnum(
+    [
+      "ohne_berufsausbildung",
+      "anerkannte_berufsausbildung",
+      "meister_techniker_fachschule",
+      "bachelor",
+      "diplom_magister_master_staatsexamen",
+      "promotion",
+    ],
+    "Bitte waehlen Sie die hoechste Berufsausbildung."
+  ),
 });
 
 export type Step8Data = z.infer<typeof step8Schema>;
@@ -236,9 +272,10 @@ export type Step10Data = z.infer<typeof step10Schema>;
 
 export function createStep1Schema(fc: FieldConfigHelper) {
   return z.object({
-    salutation: z.enum(["Herr", "Frau"], {
-      required_error: "Bitte waehlen Sie eine Anrede.",
-    }),
+    // Radiogruppe (siehe step1-personal.tsx): ohne angehakte Option kommt hier
+    // null an. Ohne pflichtEnum stuende im Formular die englische
+    // Zod-Standardmeldung statt des deutschen Satzes.
+    salutation: pflichtEnum(["Herr", "Frau"], "Bitte waehlen Sie eine Anrede."),
     title: z.string(),
     firstName: z.string().min(1, "Vorname ist erforderlich.").max(100),
     lastName: z.string().min(1, "Nachname ist erforderlich.").max(100),
@@ -253,7 +290,11 @@ export function createStep1Schema(fc: FieldConfigHelper) {
       "Bitte waehlen Sie den Familienstand."
     ),
     severelyDisabled: z.boolean(),
-    disabilityDegree: z.number().min(0).max(100).nullable(),
+    disabilityDegree: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })
+      .int("Bitte einen vollen Grad angeben.")
+      .min(0, "Der Grad kann nicht negativ sein.")
+      .max(100, "Der Grad betraegt hoechstens 100.")
+      .nullable(),
   });
 }
 

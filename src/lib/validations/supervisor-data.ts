@@ -73,10 +73,23 @@ export type SupStep1Data = z.infer<typeof supStep1Schema>;
 // =============================================
 export const supStep2Schema = z.object({
   vollzeit: z.boolean(),
-  wochenstunden: z.number().min(0).nullable(),
-  tageProWoche: z.number().min(1).max(7).nullable(),
+  wochenstunden: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })
+    .min(0, "Die Wochenstunden koennen nicht negativ sein.")
+    .max(60, "Mehr als 60 Wochenstunden sind nicht moeglich - bitte pruefen.")
+    .nullable(),
+  // .int(): Die Spalte ist Int? — ohne diese Regel kaemen 2,5 Tage durch die
+  // Pruefung und scheiterten erst bei Prisma, also als Serverfehler ohne
+  // brauchbare Meldung fuer die vorgesetzte Person.
+  tageProWoche: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })
+    .int("Bitte volle Tage angeben.")
+    .min(1, "Mindestens ein Tag pro Woche.")
+    .max(7, "Mehr als sieben Tage hat die Woche nicht.")
+    .nullable(),
   hauptarbeitgeberId: z.string().min(1, "Hauptarbeitgeber ist erforderlich."),
-  hauptarbeitgeberStunden: z.number().min(0).nullable(),
+  hauptarbeitgeberStunden: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })
+    .min(0, "Die Stunden koennen nicht negativ sein.")
+    .max(60, "Mehr als 60 Wochenstunden sind nicht moeglich - bitte pruefen.")
+    .nullable(),
   nebenarbeitgeberId: z.string(),
   nebenarbeitgeberStunden: z.number().min(0).nullable(),
   svPflichtig: z.boolean(),
@@ -113,10 +126,23 @@ export type SupStep3Data = z.infer<typeof supStep3Schema>;
 // =============================================
 export const supStep4Schema = z.object({
   kostenstelle: z.string(),
-  kostenstelleAnteil: z.number().min(0).max(100).nullable(),
+  kostenstelleAnteil: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })
+    .min(0, "Der Anteil kann nicht negativ sein.")
+    .max(100, "Der Anteil kann hoechstens 100 Prozent betragen.")
+    .nullable(),
   probezeit: z.boolean(),
-  probezeitMonate: z.number().min(0).max(12).nullable(),
-  urlaubstageProJahr: z.number().min(0).max(50).nullable(),
+  // .int(): Spalte ist Int? — 6,5 Monate scheiterten sonst erst bei Prisma.
+  probezeitMonate: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })
+    .int("Bitte volle Monate angeben.")
+    .min(0, "Die Probezeit kann nicht negativ sein.")
+    .max(12, "Die Probezeit betraegt hoechstens zwoelf Monate.")
+    .nullable(),
+  // .int(): Spalte ist Int? — halbe Urlaubstage scheiterten sonst erst bei Prisma.
+  urlaubstageProJahr: z.number({ invalid_type_error: "Bitte eine Zahl eingeben." })
+    .int("Bitte volle Tage angeben.")
+    .min(0, "Die Urlaubstage koennen nicht negativ sein.")
+    .max(50, "Mehr als 50 Urlaubstage sind nicht vorgesehen - bitte pruefen.")
+    .nullable(),
   masernschutzErforderlich: z.boolean(),
   masernschutzVorArbeitsbeginn: z.boolean(),
   zeiterfassung: z.boolean(),

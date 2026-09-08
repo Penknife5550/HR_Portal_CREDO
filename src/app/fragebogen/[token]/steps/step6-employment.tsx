@@ -240,6 +240,18 @@ export function Step6Employment({
     if (werte.beschaeftigungsStatus !== "SONSTIGE") {
       bereinigt.beschaeftigungsStatusSonstige = null;
     }
+    // Wo die Statusfrage ausgeblendet ist (TV-L, Beamte, Erzieher), bleibt das
+    // Feld auf seinem leeren Vorgabewert stehen. Ein leerer String ist aber
+    // keine Antwort, sondern eine unsinnige Auswahl — und der Server hat sie
+    // frueher zurueckgewiesen ("Validierungsfehler", ohne Feldangabe). Statt
+    // ihn mitzuschicken, lassen wir das Feld weg: `undefined` faellt bei
+    // JSON.stringify heraus, der gespeicherte Stand bleibt unberuehrt.
+    if (
+      typeof werte.beschaeftigungsStatus === "string" &&
+      werte.beschaeftigungsStatus.trim() === ""
+    ) {
+      bereinigt.beschaeftigungsStatus = undefined;
+    }
     if (!gemeldet) {
       bereinigt.agenturFuerArbeit = null;
       bereinigt.mitLeistungsbezug = null;

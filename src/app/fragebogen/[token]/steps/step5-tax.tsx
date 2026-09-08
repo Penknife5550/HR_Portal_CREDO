@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createStep5Schema, type Step5Data } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
+import { zahlenFeld, zahlOderNull } from "@/lib/formular-zahlen";
 
 interface StepProps {
   data: Record<string, unknown>;
@@ -31,8 +32,12 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
     defaultValues: {
       taxId: (data.taxId as string) || "",
       taxClass: (data.taxClass as Step5Data["taxClass"]) || undefined,
-      taxAllowance: (data.taxAllowance as number) || null,
-      childAllowance: (data.childAllowance as number) || null,
+      // Nicht `(... as number) || null`: ein bewusst eingetragener Freibetrag
+      // von 0 waere dabei zu null geworden und beim naechsten Laden
+      // verschwunden. `setValueAs` greift auf defaultValues nicht, deshalb wird
+      // hier von Hand normalisiert.
+      taxAllowance: zahlOderNull(data.taxAllowance),
+      childAllowance: zahlOderNull(data.childAllowance),
       religion: (data.religion as Step5Data["religion"]) || undefined,
     },
   });
@@ -102,7 +107,7 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
               <div className="relative">
                 <input
                   type="number"
-                  {...register("taxAllowance", { valueAsNumber: true })}
+                  {...register("taxAllowance", zahlenFeld)}
                   min={0}
                   step={0.01}
                   placeholder="0,00"
@@ -112,6 +117,11 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
                   EUR
                 </span>
               </div>
+              {errors.taxAllowance && (
+                <p className="text-xs text-destructive">
+                  {errors.taxAllowance.message}
+                </p>
+              )}
             </div>
           )}
           {fc.isVisible("childAllowance") && (
@@ -122,7 +132,7 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
               <div className="relative">
                 <input
                   type="number"
-                  {...register("childAllowance", { valueAsNumber: true })}
+                  {...register("childAllowance", zahlenFeld)}
                   min={0}
                   step={0.5}
                   placeholder="0"
@@ -132,6 +142,11 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
                   Anzahl
                 </span>
               </div>
+              {errors.childAllowance && (
+                <p className="text-xs text-destructive">
+                  {errors.childAllowance.message}
+                </p>
+              )}
             </div>
           )}
         </div>

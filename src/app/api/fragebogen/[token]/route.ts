@@ -38,8 +38,57 @@ import { z } from "zod";
 // Serverseitige Validierung: Zod-Schema für alle erlaubten Felder
 // Alle Felder sind optional (.optional()), da Auto-Save nur Teilmengen sendet
 // =============================================
+
+/**
+ * Auswahlfeld, das den leeren Vorgabewert ueberlebt.
+ *
+ * Ein `<select>` startet mit `value=""`, und das Client-Schema laesst das
+ * durch, wo das Feld ausgeblendet ist (siehe `beschaeftigungsStatus` in
+ * validations/personal-data.ts: sichtbar `z.string().min(1)`, unsichtbar ein
+ * blankes `z.string()`). Der Browser schickt dieses `""` also voellig
+ * regelkonform mit. Ein nacktes `z.enum([...]).optional()` weist es ab — und
+ * weil die Route dann den GANZEN Rumpf mit 400 „Validierungsfehler"
+ * zurueckgibt, scheitert nicht nur das eine Feld, sondern der ganze Schritt.
+ * Genau so wurde Schritt 6 fuer jeden Fragebogen unpassierbar, der nicht vom
+ * Typ MINIJOB ist.
+ *
+ * `undefined` statt `null`: Die Speicherschleife weiter unten ueberspringt
+ * `undefined` und schreibt nichts — ein leeres Auswahlfeld soll eine bereits
+ * gespeicherte Angabe nicht loeschen. Ein `""` darf keinesfalls durchgereicht
+ * werden; es waere weder ein gueltiger Enum-Wert noch eine Angabe.
+ */
+function enumOderLeer<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess(
+    (wert) => (wert === "" || wert === null ? undefined : wert),
+    schema.optional(),
+  );
+}
+
+/**
+ * Zahlenfeld, das ein geleertes Eingabefeld ueberlebt.
+ *
+ * `register("feld", { valueAsNumber: true })` liefert fuer ein geleertes Feld
+ * `NaN` — nicht `""` und nicht `null`. Ueber JSON wird daraus `null`, aus
+ * einem Textfeld ohne `valueAsNumber` dagegen `""`. Beide duerfen nicht die
+ * gesamte Speicherung abweisen: Eine Zahl eintippen und wieder loeschen ist
+ * ein alltaeglicher Handgriff.
+ *
+ * Ergebnis ist `null` (die Felder sind nullable). Die **0 bleibt 0** — ein
+ * Grad der Behinderung von 0 oder ein Freibetrag von 0 sind gueltige Angaben,
+ * deshalb wird hier auf `""`/`NaN` geprueft und nicht auf Falsy.
+ */
+function zahlOderLeer<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess(
+    (wert) =>
+      wert === "" || (typeof wert === "number" && Number.isNaN(wert))
+        ? null
+        : wert,
+    schema.nullable().optional(),
+  );
+}
+
 const fragebogenFieldsSchema = z.object({
-  salutation: z.enum(["Herr", "Frau"]).optional(),
+  salutation: enumOderLeer(z.enum(["Herr", "Frau"])),
   title: z.string().max(100).optional(),
   firstName: z.string().min(1).max(100).optional(),
   lastName: z.string().min(1).max(100).optional(),
@@ -48,9 +97,9 @@ const fragebogenFieldsSchema = z.object({
   birthPlace: z.string().max(200).optional(),
   birthCountry: z.string().max(100).optional(),
   nationality: z.string().max(100).optional(),
-  maritalStatus: z.enum(["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt_lebend", "eingetragene_partnerschaft"]).optional(),
+  maritalStatus: enumOderLeer(z.enum(["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt_lebend", "eingetragene_partnerschaft"])),
   severelyDisabled: z.boolean().optional(),
-  disabilityDegree: z.number().min(0).max(100).nullable().optional(),
+  disabilityDegree: zahlOderLeer(z.number().min(0).max(100)),
   street: z.string().max(200).optional(),
   houseNumber: z.string().max(20).optional(),
   zipCode: z.string().max(10).optional(),
@@ -65,15 +114,15 @@ const fragebogenFieldsSchema = z.object({
   accountHolder: z.string().max(200).optional(),
   socialSecurityNumber: z.string().max(20).optional(),
   healthInsuranceName: z.string().max(200).optional(),
-  healthInsuranceType: z.enum(["gesetzlich", "privat"]).optional(),
+  healthInsuranceType: enumOderLeer(z.enum(["gesetzlich", "privat"])),
   parentStatus: z.boolean().optional(),
   taxId: z.string().max(20).optional(),
-  taxClass: z.enum(["I", "II", "III", "IV", "V", "VI"]).optional(),
-  taxAllowance: z.number().min(0).nullable().optional(),
-  childAllowance: z.number().min(0).nullable().optional(),
-  religion: z.enum(["ev", "rk", "ak", "lt", "rf", "fr", "fg", "keine", "sonstige"]).optional(),
-  highestSchoolDegree: z.enum(["ohne_schulabschluss", "hauptschulabschluss", "mittlere_reife", "abitur_fachabitur", "sonstiges"]).optional(),
-  highestProfessionalDegree: z.enum(["ohne_berufsausbildung", "anerkannte_berufsausbildung", "meister_techniker_fachschule", "bachelor", "diplom_magister_master_staatsexamen", "promotion"]).optional(),
+  taxClass: enumOderLeer(z.enum(["I", "II", "III", "IV", "V", "VI"])),
+  taxAllowance: zahlOderLeer(z.number().min(0)),
+  childAllowance: zahlOderLeer(z.number().min(0)),
+  religion: enumOderLeer(z.enum(["ev", "rk", "ak", "lt", "rf", "fr", "fg", "keine", "sonstige"])),
+  highestSchoolDegree: enumOderLeer(z.enum(["ohne_schulabschluss", "hauptschulabschluss", "mittlere_reife", "abitur_fachabitur", "sonstiges"])),
+  highestProfessionalDegree: enumOderLeer(z.enum(["ohne_berufsausbildung", "anerkannte_berufsausbildung", "meister_techniker_fachschule", "bachelor", "diplom_magister_master_staatsexamen", "promotion"])),
   isBeamter: z.boolean().optional(),
   besoldungsgruppe: z.string().max(50).optional(),
   laufbahngruppe: z.string().max(50).optional(),
@@ -82,15 +131,20 @@ const fragebogenFieldsSchema = z.object({
   verfassungstreuePruefung: z.boolean().optional(),
   hasOtherEmployment: z.boolean().optional(),
   otherEmployerName: z.string().max(200).optional(),
-  otherWeeklyHours: z.number().min(0).max(60).nullable().optional(),
-  employerType: z.enum(["hauptarbeitgeber", "nebenarbeitgeber", "nein"]).optional(),
+  otherWeeklyHours: zahlOderLeer(z.number().min(0).max(60)),
+  employerType: enumOderLeer(z.enum(["hauptarbeitgeber", "nebenarbeitgeber", "nein"])),
   hasMinijob: z.boolean().optional(),
   minijobRvBefreiung: z.boolean().optional(),
   bornAfter1971: z.boolean().optional(),
   masernschutzProvided: z.boolean().optional(),
   // Abschnitt 2 der Minijob-Checkliste: Status bei Beginn der Beschaeftigung
   // und die Rueckfrage zur Agentur fuer Arbeit.
-  beschaeftigungsStatus: z.enum([
+  //
+  // Der Regelfall ist hier das LEERE Feld: Das Auswahlfeld ist nur in der
+  // Vorlage MINIJOB ueberhaupt sichtbar (field-definitions.ts,
+  // defaultVisible: false). Alle uebrigen Fragebogen senden den leeren
+  // Vorgabewert — deshalb `enumOderLeer`.
+  beschaeftigungsStatus: enumOderLeer(z.enum([
     "SCHUELER",
     "STUDENT",
     "SCHULENTLASSEN_BERUFSAUSBILDUNG",
@@ -108,7 +162,7 @@ const fragebogenFieldsSchema = z.object({
     "ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE",
     "VERSORGUNGSEMPFAENGER",
     "SONSTIGE",
-  ]).optional(),
+  ])),
   // nullable: Wird die Frage gegenstandslos, sendet das Formular null.
   beschaeftigungsStatusSonstige: z.string().max(200).nullable().optional(),
   alsArbeitsuchendGemeldet: z.boolean().optional(),
@@ -121,12 +175,12 @@ const fragebogenFieldsSchema = z.object({
   summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
   // Abschnitt 5 der Minijob-Checkliste: Entscheidung zur Rentenversicherung.
   // Zeitpunkte setzt der Server, nicht der Browser.
-  rvEntscheidung: z.enum([
+  rvEntscheidung: enumOderLeer(z.enum([
     "KEINE_BEFREIUNG",
     "BEFREIUNG_BEANTRAGT",
     "RENTENVERSICHERUNGSFREI",
     "AUFHEBUNG_BEANTRAGT",
-  ]).optional(),
+  ])),
   rvMerkblattGelesen: z.boolean().optional(),
   rvBindungBestaetigt: z.boolean().optional(),
   // Registry-Nummer des Schritts, auf dem der Vorgang steht — nicht die

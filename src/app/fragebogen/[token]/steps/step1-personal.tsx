@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createStep1Schema, type Step1Data } from "@/lib/validations/personal-data";
 import { FieldConfigHelper } from "@/lib/field-definitions";
+import { zahlenFeld, zahlOderNull } from "@/lib/formular-zahlen";
 
 interface StepProps {
   data: Record<string, unknown>;
@@ -42,7 +43,11 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
       maritalStatus:
         (data.maritalStatus as Step1Data["maritalStatus"]) || undefined,
       severelyDisabled: (data.severelyDisabled as boolean) || false,
-      disabilityDegree: (data.disabilityDegree as number) || null,
+      // Nicht `(... as number) || null`: ein gespeicherter Grad von 0 waere
+      // dabei zu null geworden und beim naechsten Laden verschwunden. 0 ist hier
+      // eine Angabe, keine Luecke. `setValueAs` greift auf defaultValues nicht,
+      // deshalb wird hier von Hand normalisiert.
+      disabilityDegree: zahlOderNull(data.disabilityDegree),
     },
   });
 
@@ -251,12 +256,17 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
               </label>
               <input
                 type="number"
-                {...register("disabilityDegree", { valueAsNumber: true })}
+                {...register("disabilityDegree", zahlenFeld)}
                 min={0}
                 max={100}
                 step={10}
                 className="w-32 rounded-lg border border-input bg-background px-4 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               />
+              {errors.disabilityDegree && (
+                <p className="text-xs text-destructive">
+                  {errors.disabilityDegree.message}
+                </p>
+              )}
             </div>
           )}
         </div>

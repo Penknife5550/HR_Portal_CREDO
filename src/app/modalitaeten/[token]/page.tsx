@@ -7,13 +7,22 @@
  * und Arbeitgeber-Zuordnung für den neuen Mitarbeiter aus.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
 import { useForm } from "react-hook-form";
+import type {
+  FieldValues,
+  Path,
+  PathValue,
+  UseFormGetValues,
+  UseFormSetValue,
+} from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
+import { zahlenFeld, zahlOderNull } from "@/lib/formular-zahlen";
+import { fehlerMeldung } from "@/lib/formular-fehler";
 import {
   supStep1Schema,
   supStep2Schema,
@@ -48,6 +57,72 @@ interface ModalitaetenData {
 function dateInputValue(v: unknown): string {
   if (!v || typeof v !== "string") return "";
   return v.slice(0, 10);
+}
+
+/** Sammelmeldung unter dem Formular, wenn "Weiter" an der Pruefung scheitert. */
+const SAMMEL_FEHLER = "Bitte prüfen Sie die rot markierten Felder.";
+
+/**
+ * Merker einer Feldgruppe, die zusammen ein- und ausgeblendet wird:
+ * ob sie zuletzt sichtbar war und welche Werte beim Ausblenden darin standen.
+ */
+type FelderMerker = { sichtbar: boolean; werte: Record<string, number | null> };
+
+/**
+ * WERTE AUSGEBLENDETER ZAHLENFELDER — warum es diese Funktion gibt
+ * ============================================================================
+ * Zod prueft immer den GANZEN Schritt, unabhaengig davon, was gerade auf dem
+ * Bildschirm steht. Ein hinter "Vollzeit" verstecktes `tageProWoche: 9` laeuft
+ * also gegen `.max(7)`, und `handleSubmit` ruft `onNext` nie auf — an einem
+ * Feld, das die Person gar nicht mehr sehen und deshalb auch nicht berichtigen
+ * kann. Dasselbe beim Wechsel des Verguetungsmodells und beim Entfernen der
+ * Haken fuer Sachbezuege, Zulage und Probezeit.
+ *
+ * Deshalb wird der Wert beim Ausblenden ausdruecklich auf null gesetzt. null
+ * ist in allen diesen Feldern gueltig (`z.number()....nullable()`), und es ist
+ * auch fachlich richtig: Wer Vollzeit anhakt, hat keine Wochenstunden.
+ *
+ * WARUM NICHT `shouldUnregister: true` (der naheliegende Weg):
+ * Das entfernt den Schluessel komplett aus den Formularwerten. Die Schemata in
+ * `supervisor-data.ts` sind aber `.nullable()`, NICHT `.optional()` — ein
+ * fehlender Schluessel ergaebe "Required" auf einem unsichtbaren Feld, also
+ * genau die Blockade, die hier verschwinden soll. Zusaetzlich wuerde
+ * `shouldUnregister` beim Absenden auch die Felder verschlucken, die gar kein
+ * Eingabefeld haben (z.B. `sonderzahlungProzent`), und der Server bekaeme sie
+ * nie zu sehen.
+ *
+ * WARUM EIN MERKER: Ein versehentliches Hin- und Herschalten darf nichts
+ * vernichten. Beim Ausblenden wird der Wert gemerkt und beim Wiedereinblenden
+ * zurueckgestellt — aber nur, wenn das Feld inzwischen leer geblieben ist,
+ * damit eine frische Eingabe nicht ueberschrieben wird. Der Vergleich mit
+ * `merker.current.sichtbar` sorgt dafuer, dass nur echte Wechsel etwas tun:
+ * Ein Wechsel von TV-L auf TV-L S blendet dieselbe Gruppe erneut aus und
+ * duerfte den gemerkten Wert nicht mit null ueberschreiben.
+ */
+function zahlenfelderUmschalter<T extends FieldValues>(
+  felder: readonly Path<T>[],
+  merker: { current: FelderMerker },
+  getValues: UseFormGetValues<T>,
+  setValue: UseFormSetValue<T>,
+): (sichtbar: boolean) => void {
+  return (sichtbar) => {
+    if (merker.current.sichtbar === sichtbar) return;
+    merker.current.sichtbar = sichtbar;
+
+    for (const feld of felder) {
+      if (sichtbar) {
+        const gemerkt = merker.current.werte[feld];
+        if (gemerkt !== null && gemerkt !== undefined && getValues(feld) == null) {
+          setValue(feld, gemerkt as unknown as PathValue<T, Path<T>>);
+        }
+      } else {
+        const aktuell = getValues(feld);
+        merker.current.werte[feld] =
+          typeof aktuell === "number" && Number.isFinite(aktuell) ? aktuell : null;
+        setValue(feld, null as unknown as PathValue<T, Path<T>>);
+      }
+    }
+  };
 }
 
 export default function ModalitaetenPage() {
@@ -90,6 +165,20 @@ export default function ModalitaetenPage() {
     loadData();
   }, [loadData]);
 
+  /**
+   * Fehler der Serverantwort anzeigen.
+   *
+   * Das Rollen gehoert dazu: Der Fehlerbanner steht ueber dem Formular, der
+   * Knopf, der ihn ausgeloest hat, weit darunter. Ohne das Rollen bliebe die
+   * Meldung ausserhalb des Bildausschnitts – also genau die Stille, die hier
+   * verschwinden soll.
+   */
+  const zeigeFehler = (text: string) => {
+    setSaveError(true);
+    setSaveMsg(text);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const saveStepData = async (
     stepData: Record<string, unknown>,
     nextStep: number
@@ -104,18 +193,19 @@ export default function ModalitaetenPage() {
         body: JSON.stringify({ ...stepData, currentStep: nextStep }),
       });
       if (!res.ok) {
-        // Ohne Meldung wirkt der "Weiter"-Button wie tot – Fehler immer sichtbar machen
+        // Ohne Meldung wirkt der "Weiter"-Button wie tot – Fehler immer sichtbar machen.
+        // `fehlerMeldung` liest auch das `details`-Feld der Antwort aus, in dem die
+        // Route die Zod-Befunde mitschickt: Statt "Validierungsfehler" steht dann
+        // dort, WELCHES Feld klemmt und warum.
         const err = await res.json().catch(() => ({}));
-        setSaveError(true);
-        setSaveMsg(err.error || "Speichern fehlgeschlagen. Bitte erneut versuchen.");
+        zeigeFehler(fehlerMeldung(err));
         return false;
       }
       setSaveMsg("Gespeichert");
       setTimeout(() => setSaveMsg(""), 2000);
       return true;
     } catch {
-      setSaveError(true);
-      setSaveMsg("Fehler beim Speichern.");
+      zeigeFehler("Fehler beim Speichern. Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.");
       return false;
     } finally {
       setSaving(false);
@@ -142,6 +232,8 @@ export default function ModalitaetenPage() {
 
   const handleSubmit = async () => {
     setSaving(true);
+    setSaveMsg("");
+    setSaveError(false);
     try {
       const res = await fetch(`/api/modalitaeten/${token}`, {
         method: "POST",
@@ -150,14 +242,12 @@ export default function ModalitaetenPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setSaveError(true);
-        setSaveMsg(err.error || "Fehler beim Absenden.");
+        zeigeFehler(fehlerMeldung(err));
         return;
       }
       setSubmitted(true);
     } catch {
-      setSaveError(true);
-      setSaveMsg("Verbindungsfehler.");
+      zeigeFehler("Verbindungsfehler. Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.");
     } finally {
       setSaving(false);
     }
@@ -252,8 +342,11 @@ export default function ModalitaetenPage() {
                 Speichern...
               </span>
             )}
-            {saveMsg && !saving && (
-              <span className={`text-xs ${saveError ? "font-medium text-destructive" : "text-green-600"}`}>{saveMsg}</span>
+            {/* Nur die kurze Erfolgsmeldung ("Gespeichert") passt in die Kopfzeile.
+                Fehlertexte nennen seit der Auswertung von `details` das betroffene
+                Feld und sind laenger als eine Zeile – die stehen unten im Banner. */}
+            {saveMsg && !saving && !saveError && (
+              <span className="text-xs text-green-600">{saveMsg}</span>
             )}
             <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
               Schritt {currentStep + 1} / {SUP_STEP_CONFIG.length}
@@ -302,6 +395,14 @@ export default function ModalitaetenPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-3xl px-4 py-6">
+        {saveError && saveMsg && !saving && (
+          <div
+            role="alert"
+            className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
+          >
+            {saveMsg}
+          </div>
+        )}
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
           <div className="border-b bg-muted/50 px-6 py-4">
             <h2 className="text-lg font-bold text-foreground">{SUP_STEP_CONFIG[currentStep].title}</h2>
@@ -407,8 +508,22 @@ function SupStep1({
   const befristet = watch("befristet");
   const befristungsart = watch("befristungsart");
 
+  // Zweiter Rueckruf von handleSubmit: Scheitert die Pruefung, passiert sonst
+  // sichtbar nichts – der Fehltext steht womoeglich weit oben ausserhalb des
+  // Bildausschnitts. Die Sammelmeldung sitzt direkt ueber dem Knopf.
+  const [sammelFehler, setSammelFehler] = useState("");
+
   return (
-    <form onSubmit={handleSubmit((v) => onNext(v as unknown as Record<string, unknown>))} className="space-y-5">
+    <form
+      onSubmit={handleSubmit(
+        (v) => {
+          setSammelFehler("");
+          onNext(v as unknown as Record<string, unknown>);
+        },
+        () => setSammelFehler(SAMMEL_FEHLER),
+      )}
+      className="space-y-5"
+    >
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Betriebsstätte <span className="text-destructive">*</span></label>
         <input type="text" {...register("betriebsstaette")} placeholder="z.B. Gymnasium Minden" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
@@ -432,6 +547,7 @@ function SupStep1({
           <input type="checkbox" {...register("befristet")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
           <span className="text-sm font-medium text-foreground">Befristeter Vertrag</span>
         </label>
+        {errors.befristet && <p className="mt-2 text-xs text-destructive">{errors.befristet.message}</p>}
       </div>
 
       {befristet && (
@@ -482,6 +598,7 @@ function SupStep1({
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Voraussichtliches Ende (optional)</label>
                 <input type="date" {...register("vertragsendeVoraussichtlich")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+                {errors.vertragsendeVoraussichtlich && <p className="text-xs text-destructive">{errors.vertragsendeVoraussichtlich.message}</p>}
                 <p className="text-xs text-muted-foreground">Unverbindlich &ndash; dient der Personalabteilung nur als Wiedervorlage.</p>
               </div>
             </>
@@ -496,8 +613,15 @@ function SupStep1({
               <option value="erprobung">Erprobung</option>
               <option value="sonstig">Sonstiger Sachgrund</option>
             </select>
+            {errors.befristungSachgrund && <p className="text-xs text-destructive">{errors.befristungSachgrund.message}</p>}
           </div>
         </div>
+      )}
+
+      {sammelFehler && (
+        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive">
+          {sammelFehler}
+        </p>
       )}
 
       <div className="flex justify-end pt-4">
@@ -525,16 +649,21 @@ function SupStep2({
   saving: boolean;
   organizations: OrgOption[];
 }) {
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<SupStep2Data>({
+  const vollzeitStart = (data.vollzeit as boolean) ?? true;
+
+  const { register, handleSubmit, watch, getValues, setValue, formState: { errors } } = useForm<SupStep2Data>({
     resolver: zodResolver(supStep2Schema),
     defaultValues: {
-      vollzeit: (data.vollzeit as boolean) ?? true,
-      wochenstunden: (data.wochenstunden as number) || null,
-      tageProWoche: (data.tageProWoche as number) || null,
+      vollzeit: vollzeitStart,
+      // Nicht `(... as number) || null`: gespeicherte 0 waere dabei zu null
+      // geworden. `setValueAs` greift auf defaultValues nicht, deshalb hier von
+      // Hand normalisieren (siehe src/lib/formular-zahlen.ts).
+      wochenstunden: zahlOderNull(data.wochenstunden),
+      tageProWoche: zahlOderNull(data.tageProWoche),
       hauptarbeitgeberId: (data.hauptarbeitgeberId as string) || "",
-      hauptarbeitgeberStunden: (data.hauptarbeitgeberStunden as number) || null,
+      hauptarbeitgeberStunden: zahlOderNull(data.hauptarbeitgeberStunden),
       nebenarbeitgeberId: (data.nebenarbeitgeberId as string) || "",
-      nebenarbeitgeberStunden: (data.nebenarbeitgeberStunden as number) || null,
+      nebenarbeitgeberStunden: zahlOderNull(data.nebenarbeitgeberStunden),
       svPflichtig: (data.svPflichtig as boolean) ?? true,
       minijob: (data.minijob as boolean) || false,
       ehrenamt: (data.ehrenamt as boolean) || false,
@@ -542,25 +671,54 @@ function SupStep2({
   });
 
   const vollzeit = watch("vollzeit");
+  const [sammelFehler, setSammelFehler] = useState("");
+
+  // Teilzeit-Felder verschwinden hinter dem Haken "Vollzeit" – siehe
+  // zahlenfelderUmschalter().
+  const merkerTeilzeit = useRef<FelderMerker>({ sichtbar: !vollzeitStart, werte: {} });
+  const teilzeitUmschalten = zahlenfelderUmschalter<SupStep2Data>(
+    ["wochenstunden", "tageProWoche"],
+    merkerTeilzeit,
+    getValues,
+    setValue,
+  );
 
   return (
-    <form onSubmit={handleSubmit((v) => onNext(v as unknown as Record<string, unknown>))} className="space-y-5">
+    <form
+      onSubmit={handleSubmit(
+        (v) => {
+          setSammelFehler("");
+          onNext(v as unknown as Record<string, unknown>);
+        },
+        () => setSammelFehler(SAMMEL_FEHLER),
+      )}
+      className="space-y-5"
+    >
       <div className="rounded-lg border border-border bg-muted/50 p-4">
         <label className="flex items-center gap-3">
-          <input type="checkbox" {...register("vollzeit")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+          <input
+            type="checkbox"
+            {...register("vollzeit", {
+              onChange: (e) => teilzeitUmschalten(!e.target.checked),
+            })}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+          />
           <span className="text-sm font-medium text-foreground">Vollzeit</span>
         </label>
+        {errors.vollzeit && <p className="mt-2 text-xs text-destructive">{errors.vollzeit.message}</p>}
       </div>
 
       {!vollzeit && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Wochenstunden</label>
-            <input type="number" {...register("wochenstunden", { valueAsNumber: true })} step={0.01} min={0} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            <input type="number" {...register("wochenstunden", zahlenFeld)} step={0.01} min={0} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            {errors.wochenstunden && <p className="text-xs text-destructive">{errors.wochenstunden.message}</p>}
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Tage pro Woche</label>
-            <input type="number" {...register("tageProWoche", { valueAsNumber: true })} min={1} max={7} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            <input type="number" {...register("tageProWoche", zahlenFeld)} min={1} max={7} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            {errors.tageProWoche && <p className="text-xs text-destructive">{errors.tageProWoche.message}</p>}
           </div>
         </div>
       )}
@@ -586,7 +744,8 @@ function SupStep2({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Stunden beim Hauptarbeitgeber</label>
-        <input type="number" {...register("hauptarbeitgeberStunden", { valueAsNumber: true })} step={0.01} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <input type="number" {...register("hauptarbeitgeberStunden", zahlenFeld)} step={0.01} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        {errors.hauptarbeitgeberStunden && <p className="text-xs text-destructive">{errors.hauptarbeitgeberStunden.message}</p>}
       </div>
 
       <div className="space-y-2">
@@ -599,11 +758,13 @@ function SupStep2({
             </option>
           ))}
         </select>
+        {errors.nebenarbeitgeberId && <p className="text-xs text-destructive">{errors.nebenarbeitgeberId.message}</p>}
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Stunden beim Nebenarbeitgeber</label>
-        <input type="number" {...register("nebenarbeitgeberStunden", { valueAsNumber: true })} step={0.01} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <input type="number" {...register("nebenarbeitgeberStunden", zahlenFeld)} step={0.01} min={0} className="w-32 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        {errors.nebenarbeitgeberStunden && <p className="text-xs text-destructive">{errors.nebenarbeitgeberStunden.message}</p>}
       </div>
 
       <div className="space-y-3 rounded-lg border border-border p-4">
@@ -612,15 +773,24 @@ function SupStep2({
           <input type="checkbox" {...register("svPflichtig")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
           SV-pflichtig
         </label>
+        {errors.svPflichtig && <p className="text-xs text-destructive">{errors.svPflichtig.message}</p>}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" {...register("minijob")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
           Minijob (geringfügig beschäftigt)
         </label>
+        {errors.minijob && <p className="text-xs text-destructive">{errors.minijob.message}</p>}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" {...register("ehrenamt")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
           Ehrenamt
         </label>
+        {errors.ehrenamt && <p className="text-xs text-destructive">{errors.ehrenamt.message}</p>}
       </div>
+
+      {sammelFehler && (
+        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive">
+          {sammelFehler}
+        </p>
+      )}
 
       <div className="flex justify-between pt-4">
         <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurück</button>
@@ -647,33 +817,80 @@ function SupStep3({
   saving: boolean;
   organizations: OrgOption[];
 }) {
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<SupStep3Data>({
+  const modellStart = (data.verguetungsmodell as SupStep3Data["verguetungsmodell"]) || undefined;
+  const sachbezStart = (data.sachbezuege as boolean) || false;
+  const zulageStart = (data.zulage as boolean) || false;
+
+  const { register, handleSubmit, watch, getValues, setValue, formState: { errors } } = useForm<SupStep3Data>({
     resolver: zodResolver(supStep3Schema),
     defaultValues: {
-      verguetungsmodell: (data.verguetungsmodell as SupStep3Data["verguetungsmodell"]) || undefined,
+      verguetungsmodell: modellStart,
       entgeltgruppe: (data.entgeltgruppe as string) || "",
       stufe: (data.stufe as string) || "",
-      festgehalt: (data.festgehalt as number) || null,
-      stundenlohn: (data.stundenlohn as number) || null,
+      // Nicht `(... as number) || null`: ein gespeichertes 0-Gehalt waere dabei
+      // verschwunden. Siehe src/lib/formular-zahlen.ts.
+      festgehalt: zahlOderNull(data.festgehalt),
+      stundenlohn: zahlOderNull(data.stundenlohn),
       bemerkungVerguetung: (data.bemerkungVerguetung as string) || "",
       jahressonderzahlung: (data.jahressonderzahlung as boolean) ?? true,
-      sonderzahlungProzent: (data.sonderzahlungProzent as number) || null,
-      sachbezuege: (data.sachbezuege as boolean) || false,
-      sachbezuegeBetrag: (data.sachbezuegeBetrag as number) || null,
-      zulage: (data.zulage as boolean) || false,
-      zulageBetrag: (data.zulageBetrag as number) || null,
+      sonderzahlungProzent: zahlOderNull(data.sonderzahlungProzent),
+      sachbezuege: sachbezStart,
+      sachbezuegeBetrag: zahlOderNull(data.sachbezuegeBetrag),
+      zulage: zulageStart,
+      zulageBetrag: zahlOderNull(data.zulageBetrag),
     },
   });
 
   const model = watch("verguetungsmodell");
   const sachbez = watch("sachbezuege");
   const zulage = watch("zulage");
+  const [sammelFehler, setSammelFehler] = useState("");
+
+  // Drei Feldgruppen blenden sich hier weg – siehe zahlenfelderUmschalter().
+  const istFestbetragModell = (wert: unknown) => wert === "HAUSTARIF" || wert === "SONSTIGES";
+  const merkerFestbetrag = useRef<FelderMerker>({ sichtbar: istFestbetragModell(modellStart), werte: {} });
+  const festbetragUmschalten = zahlenfelderUmschalter<SupStep3Data>(
+    ["festgehalt", "stundenlohn"],
+    merkerFestbetrag,
+    getValues,
+    setValue,
+  );
+
+  const merkerSachbezuege = useRef<FelderMerker>({ sichtbar: sachbezStart, werte: {} });
+  const sachbezuegeUmschalten = zahlenfelderUmschalter<SupStep3Data>(
+    ["sachbezuegeBetrag"],
+    merkerSachbezuege,
+    getValues,
+    setValue,
+  );
+
+  const merkerZulage = useRef<FelderMerker>({ sichtbar: zulageStart, werte: {} });
+  const zulageUmschalten = zahlenfelderUmschalter<SupStep3Data>(
+    ["zulageBetrag"],
+    merkerZulage,
+    getValues,
+    setValue,
+  );
 
   return (
-    <form onSubmit={handleSubmit((v) => onNext(v as unknown as Record<string, unknown>))} className="space-y-5">
+    <form
+      onSubmit={handleSubmit(
+        (v) => {
+          setSammelFehler("");
+          onNext(v as unknown as Record<string, unknown>);
+        },
+        () => setSammelFehler(SAMMEL_FEHLER),
+      )}
+      className="space-y-5"
+    >
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Vergütungsmodell <span className="text-destructive">*</span></label>
-        <select {...register("verguetungsmodell")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring">
+        <select
+          {...register("verguetungsmodell", {
+            onChange: (e) => festbetragUmschalten(istFestbetragModell(e.target.value)),
+          })}
+          className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+        >
           <option value="">Bitte wählen...</option>
           <option value="TV_L">TV-L (Tarifvertrag der Länder)</option>
           <option value="TV_L_S">TV-L S (Sozial- und Erziehungsdienst)</option>
@@ -713,6 +930,7 @@ function SupStep3({
                 </>
               )}
             </select>
+            {errors.entgeltgruppe && <p className="text-xs text-destructive">{errors.entgeltgruppe.message}</p>}
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Stufe</label>
@@ -722,6 +940,7 @@ function SupStep3({
               <option value="3">Stufe 3</option><option value="4">Stufe 4</option>
               <option value="5">Stufe 5</option><option value="6">Stufe 6</option>
             </select>
+            {errors.stufe && <p className="text-xs text-destructive">{errors.stufe.message}</p>}
           </div>
         </div>
       )}
@@ -731,16 +950,18 @@ function SupStep3({
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Festgehalt (brutto/Monat)</label>
             <div className="relative">
-              <input type="number" {...register("festgehalt", { valueAsNumber: true })} step={0.01} min={0} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 pr-12 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+              <input type="number" {...register("festgehalt", zahlenFeld)} step={0.01} min={0} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 pr-12 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">EUR</span>
             </div>
+            {errors.festgehalt && <p className="text-xs text-destructive">{errors.festgehalt.message}</p>}
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Stundenlohn (brutto)</label>
             <div className="relative">
-              <input type="number" {...register("stundenlohn", { valueAsNumber: true })} step={0.01} min={0} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 pr-12 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+              <input type="number" {...register("stundenlohn", zahlenFeld)} step={0.01} min={0} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 pr-12 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">EUR</span>
             </div>
+            {errors.stundenlohn && <p className="text-xs text-destructive">{errors.stundenlohn.message}</p>}
           </div>
         </div>
       )}
@@ -748,6 +969,7 @@ function SupStep3({
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Bemerkung zur Vergütung</label>
         <textarea {...register("bemerkungVerguetung")} rows={2} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        {errors.bemerkungVerguetung && <p className="text-xs text-destructive">{errors.bemerkungVerguetung.message}</p>}
       </div>
 
       <div className="space-y-3 rounded-lg border border-border p-4">
@@ -755,25 +977,51 @@ function SupStep3({
           <input type="checkbox" {...register("jahressonderzahlung")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
           <span className="text-sm font-medium text-foreground">Jahressonderzahlung</span>
         </label>
+        {errors.jahressonderzahlung && <p className="text-xs text-destructive">{errors.jahressonderzahlung.message}</p>}
         <label className="flex items-center gap-3">
-          <input type="checkbox" {...register("sachbezuege")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+          <input
+            type="checkbox"
+            {...register("sachbezuege", {
+              onChange: (e) => sachbezuegeUmschalten(e.target.checked),
+            })}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+          />
           <span className="text-sm font-medium text-foreground">Sachbezüge</span>
         </label>
+        {errors.sachbezuege && <p className="text-xs text-destructive">{errors.sachbezuege.message}</p>}
         {sachbez && (
-          <div className="ml-7">
-            <input type="number" {...register("sachbezuegeBetrag", { valueAsNumber: true })} step={0.01} min={0} placeholder="Betrag in EUR" className="w-40 rounded-lg border border-input bg-background px-4 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+          <div className="ml-7 space-y-1">
+            <input type="number" {...register("sachbezuegeBetrag", zahlenFeld)} step={0.01} min={0} placeholder="Betrag in EUR" className="w-40 rounded-lg border border-input bg-background px-4 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            {errors.sachbezuegeBetrag && <p className="text-xs text-destructive">{errors.sachbezuegeBetrag.message}</p>}
           </div>
         )}
         <label className="flex items-center gap-3">
-          <input type="checkbox" {...register("zulage")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+          <input
+            type="checkbox"
+            {...register("zulage", {
+              onChange: (e) => zulageUmschalten(e.target.checked),
+            })}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+          />
           <span className="text-sm font-medium text-foreground">Zulage</span>
         </label>
+        {errors.zulage && <p className="text-xs text-destructive">{errors.zulage.message}</p>}
         {zulage && (
-          <div className="ml-7">
-            <input type="number" {...register("zulageBetrag", { valueAsNumber: true })} step={0.01} min={0} placeholder="Betrag in EUR" className="w-40 rounded-lg border border-input bg-background px-4 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+          <div className="ml-7 space-y-1">
+            <input type="number" {...register("zulageBetrag", zahlenFeld)} step={0.01} min={0} placeholder="Betrag in EUR" className="w-40 rounded-lg border border-input bg-background px-4 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            {errors.zulageBetrag && <p className="text-xs text-destructive">{errors.zulageBetrag.message}</p>}
           </div>
         )}
       </div>
+
+      {/* `sonderzahlungProzent` hat kein Eingabefeld, kann also auch keinen
+          eigenen Fehlerabsatz bekommen. Der Wert wird aus den defaultValues
+          unveraendert mitgeschickt. */}
+      {sammelFehler && (
+        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive">
+          {sammelFehler}
+        </p>
+      )}
 
       <div className="flex justify-between pt-4">
         <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurück</button>
@@ -800,14 +1048,20 @@ function SupStep4({
   saving: boolean;
   organizations: OrgOption[];
 }) {
-  const { register, handleSubmit, watch } = useForm<SupStep4Data>({
+  const probezeitStart = (data.probezeit as boolean) ?? true;
+
+  // `formState: { errors }` fehlte hier ganz – in diesem Schritt konnte deshalb
+  // NIE ein Feldfehler erscheinen, und "Weiter" blieb wortlos stehen.
+  const { register, handleSubmit, watch, getValues, setValue, formState: { errors } } = useForm<SupStep4Data>({
     resolver: zodResolver(supStep4Schema),
     defaultValues: {
       kostenstelle: (data.kostenstelle as string) || "",
-      kostenstelleAnteil: (data.kostenstelleAnteil as number) || null,
-      probezeit: (data.probezeit as boolean) ?? true,
-      probezeitMonate: (data.probezeitMonate as number) ?? 6,
-      urlaubstageProJahr: (data.urlaubstageProJahr as number) ?? 30,
+      // Nicht `(... as number) || null`: ein gespeicherter Anteil von 0 waere
+      // dabei verschwunden. Siehe src/lib/formular-zahlen.ts.
+      kostenstelleAnteil: zahlOderNull(data.kostenstelleAnteil),
+      probezeit: probezeitStart,
+      probezeitMonate: zahlOderNull(data.probezeitMonate) ?? 6,
+      urlaubstageProJahr: zahlOderNull(data.urlaubstageProJahr) ?? 30,
       masernschutzErforderlich: (data.masernschutzErforderlich as boolean) || false,
       masernschutzVorArbeitsbeginn: (data.masernschutzVorArbeitsbeginn as boolean) || false,
       zeiterfassung: (data.zeiterfassung as boolean) ?? true,
@@ -817,36 +1071,67 @@ function SupStep4({
 
   const probezeit = watch("probezeit");
   const masern = watch("masernschutzErforderlich");
+  const [sammelFehler, setSammelFehler] = useState("");
+
+  // Die Monatsangabe verschwindet mit dem Haken "Probezeit" – siehe
+  // zahlenfelderUmschalter().
+  const merkerProbezeit = useRef<FelderMerker>({ sichtbar: probezeitStart, werte: {} });
+  const probezeitUmschalten = zahlenfelderUmschalter<SupStep4Data>(
+    ["probezeitMonate"],
+    merkerProbezeit,
+    getValues,
+    setValue,
+  );
 
   return (
-    <form onSubmit={handleSubmit((v) => onNext(v as unknown as Record<string, unknown>))} className="space-y-5">
+    <form
+      onSubmit={handleSubmit(
+        (v) => {
+          setSammelFehler("");
+          onNext(v as unknown as Record<string, unknown>);
+        },
+        () => setSammelFehler(SAMMEL_FEHLER),
+      )}
+      className="space-y-5"
+    >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Kostenstelle</label>
           <input type="text" {...register("kostenstelle")} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+          {errors.kostenstelle && <p className="text-xs text-destructive">{errors.kostenstelle.message}</p>}
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Kostenstellenanteil (%)</label>
-          <input type="number" {...register("kostenstelleAnteil", { valueAsNumber: true })} min={0} max={100} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+          <input type="number" {...register("kostenstelleAnteil", zahlenFeld)} min={0} max={100} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+          {errors.kostenstelleAnteil && <p className="text-xs text-destructive">{errors.kostenstelleAnteil.message}</p>}
         </div>
       </div>
 
       <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
         <label className="flex items-center gap-3">
-          <input type="checkbox" {...register("probezeit")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+          <input
+            type="checkbox"
+            {...register("probezeit", {
+              onChange: (e) => probezeitUmschalten(e.target.checked),
+            })}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+          />
           <span className="text-sm font-medium text-foreground">Probezeit</span>
         </label>
+        {errors.probezeit && <p className="text-xs text-destructive">{errors.probezeit.message}</p>}
         {probezeit && (
           <div className="ml-7 space-y-2">
             <label className="text-xs text-muted-foreground">Dauer in Monaten</label>
-            <input type="number" {...register("probezeitMonate", { valueAsNumber: true })} min={0} max={12} className="w-24 rounded-lg border border-input bg-background px-4 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            <input type="number" {...register("probezeitMonate", zahlenFeld)} min={0} max={12} className="w-24 rounded-lg border border-input bg-background px-4 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+            {errors.probezeitMonate && <p className="text-xs text-destructive">{errors.probezeitMonate.message}</p>}
           </div>
         )}
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Urlaubstage pro Jahr</label>
-        <input type="number" {...register("urlaubstageProJahr", { valueAsNumber: true })} min={0} max={50} className="w-24 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <input type="number" {...register("urlaubstageProJahr", zahlenFeld)} min={0} max={50} className="w-24 rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        {errors.urlaubstageProJahr && <p className="text-xs text-destructive">{errors.urlaubstageProJahr.message}</p>}
       </div>
 
       <div className="space-y-3 rounded-lg border border-border p-4">
@@ -854,11 +1139,15 @@ function SupStep4({
           <input type="checkbox" {...register("masernschutzErforderlich")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
           <span className="text-sm font-medium text-foreground">Masernschutz erforderlich</span>
         </label>
+        {errors.masernschutzErforderlich && <p className="text-xs text-destructive">{errors.masernschutzErforderlich.message}</p>}
         {masern && (
-          <label className="ml-7 flex items-center gap-3">
-            <input type="checkbox" {...register("masernschutzVorArbeitsbeginn")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
-            <span className="text-sm text-foreground">Muss vor Arbeitsbeginn vorliegen</span>
-          </label>
+          <>
+            <label className="ml-7 flex items-center gap-3">
+              <input type="checkbox" {...register("masernschutzVorArbeitsbeginn")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+              <span className="text-sm text-foreground">Muss vor Arbeitsbeginn vorliegen</span>
+            </label>
+            {errors.masernschutzVorArbeitsbeginn && <p className="ml-7 text-xs text-destructive">{errors.masernschutzVorArbeitsbeginn.message}</p>}
+          </>
         )}
       </div>
 
@@ -867,12 +1156,20 @@ function SupStep4({
           <input type="checkbox" {...register("zeiterfassung")} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
           <span className="text-sm font-medium text-foreground">Zeiterfassung erforderlich</span>
         </label>
+        {errors.zeiterfassung && <p className="mt-2 text-xs text-destructive">{errors.zeiterfassung.message}</p>}
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Zusätzliche Vereinbarungen / Bemerkungen</label>
         <textarea {...register("zusatzvereinbarungen")} rows={4} placeholder="z.B. besondere Regelungen, Dienstwagen, etc." className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        {errors.zusatzvereinbarungen && <p className="text-xs text-destructive">{errors.zusatzvereinbarungen.message}</p>}
       </div>
+
+      {sammelFehler && (
+        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive">
+          {sammelFehler}
+        </p>
+      )}
 
       <div className="flex justify-between pt-4">
         <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurück</button>

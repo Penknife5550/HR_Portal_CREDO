@@ -16,6 +16,7 @@ import {
   type FragebogenStepKey,
 } from "@/lib/fragebogen-steps";
 import { FieldConfigHelper, type StepFieldConfig } from "@/lib/field-definitions";
+import { fehlerMeldung } from "@/lib/formular-fehler";
 
 // Step-Komponenten
 import { Step1Personal } from "./steps/step1-personal";
@@ -76,7 +77,11 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     initialData.personalData || {}
   );
   const [saving, setSaving] = useState(false);
+  // Erfolg und Fehler getrennt halten. Vorher lief beides ueber `saveMessage`
+  // und wurde als kleiner gruener Text im Kopf angezeigt — eine Fehlermeldung
+  // in der Farbe des Erfolgs, die dazu noch leicht zu uebersehen war.
   const [saveMessage, setSaveMessage] = useState("");
+  const [fehler, setFehler] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
   // FieldConfig-Helper für jeden Step erstellen
@@ -95,6 +100,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     async (stepData: Record<string, unknown>, nextStepNumber: number) => {
       setSaving(true);
       setSaveMessage("");
+      setFehler("");
       try {
         const res = await fetch(`/api/fragebogen/${token}`, {
           method: "PUT",
@@ -106,8 +112,12 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
         });
 
         if (!res.ok) {
-          const err = await res.json();
-          setSaveMessage(err.error || "Fehler beim Speichern.");
+          // Die Antwort nennt in `details` das betroffene Feld. Frueher wurde
+          // nur `error` angezeigt — also woertlich "Validierungsfehler", ohne
+          // Feld und ohne Grund. `catch` faengt Antworten ohne JSON-Koerper ab
+          // (etwa eine Fehlerseite des Reverse Proxy).
+          const koerper = await res.json().catch(() => null);
+          setFehler(fehlerMeldung(koerper));
           return false;
         }
 
@@ -115,7 +125,10 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
         setTimeout(() => setSaveMessage(""), 2000);
         return true;
       } catch {
-        setSaveMessage("Verbindungsfehler beim Speichern.");
+        setFehler(
+          "Die Verbindung zum Server ist fehlgeschlagen. Bitte prüfen Sie Ihre " +
+            "Internetverbindung und versuchen Sie es erneut."
+        );
         return false;
       } finally {
         setSaving(false);
@@ -133,15 +146,21 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     if (nextIndex >= activeSteps.length) return;
 
     const saved = await saveStepData(stepData, activeSteps[nextIndex].step);
+    // In beiden Faellen nach oben: bei Erfolg steht dort der neue Schritt, im
+    // Fehlerfall die Meldung. Ohne das Scrollen bleibt die Person am Ende eines
+    // langen Schritts stehen und sieht auf ihren Klick hin gar nichts.
+    window.scrollTo({ top: 0, behavior: "smooth" });
     if (saved) {
       setCurrentStep(nextIndex);
-      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
   // Zurück zum vorherigen Step
   const handleBack = () => {
     if (currentStep > 0) {
+      // Die Meldung gehoert zum verlassenen Schritt — sie stehen zu lassen
+      // hiesse, einen Fehler an einer Stelle anzuzeigen, an der er nicht ist.
+      setFehler("");
       setCurrentStep(currentStep - 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -154,6 +173,8 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
   // — was der Browser behauptet, taugt als Nachweis nichts.
   const handleSubmit = async (erklaerung: { ort: string; version: string }) => {
     setSaving(true);
+    setSaveMessage("");
+    setFehler("");
     try {
       const res = await fetch(`/api/fragebogen/${token}`, {
         method: "POST",
@@ -167,15 +188,23 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        setSaveMessage(err.error || "Fehler beim Absenden.");
+        // Beim Absenden prueft der Server den GESAMTEN Fragebogen. Fehlt eine
+        // Angabe aus einem frueheren Schritt, nennt `details` sie — genau das
+        // braucht die Person, um den richtigen Schritt wieder aufzusuchen.
+        const koerper = await res.json().catch(() => null);
+        setFehler(fehlerMeldung(koerper));
+        window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
 
       setSubmissionTime(new Date());
       setSubmitted(true);
     } catch {
-      setSaveMessage("Verbindungsfehler. Bitte versuchen Sie es erneut.");
+      setFehler(
+        "Die Verbindung zum Server ist fehlgeschlagen. Bitte prüfen Sie Ihre " +
+          "Internetverbindung und versuchen Sie es erneut."
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSaving(false);
     }
@@ -447,6 +476,8 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
                 Speichern...
               </span>
             )}
+            {/* Nur Erfolgsmeldungen ("Gespeichert") — Fehler stehen rot im
+                Inhaltsbereich, nicht hier in Gruen. */}
             {saveMessage && !saving && (
               <span className="text-xs text-green-600">{saveMessage}</span>
             )}
@@ -479,7 +510,10 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
                 <button
                   key={step.step}
                   onClick={() => {
-                    if (isDone) setCurrentStep(index);
+                    if (isDone) {
+                      setFehler("");
+                      setCurrentStep(index);
+                    }
                   }}
                   disabled={isFuture}
                   className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
@@ -527,6 +561,37 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
 
       {/* Formular-Inhalt */}
       <main className="mx-auto max-w-3xl px-4 py-6">
+        {/* Fehler des letzten Speicher- oder Absendeversuchs. Bewusst hier im
+            Inhalt und in Rot statt als kleiner gruener Text im Kopf: Wer auf
+            "Weiter" klickt und nichts passieren sieht, muss den Grund finden
+            koennen. `role="alert"` liest ihn auch dem Screenreader vor. */}
+        {fehler && (
+          <div
+            role="alert"
+            className="mb-4 flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4"
+          >
+            <svg
+              className="mt-0.5 h-5 w-5 shrink-0 text-destructive"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v3.75m0 3.75h.008M10.34 3.94l-8.1 14.02A1.5 1.5 0 003.54 20.25h16.92a1.5 1.5 0 001.3-2.29l-8.1-14.02a1.5 1.5 0 00-2.6 0z"
+              />
+            </svg>
+            {/* Ohne eigene Ueberschrift: Die Meldung ist bereits ein
+                vollstaendiger Satz, und eine feste Zeile darueber („nicht
+                gespeichert") waere beim Absenden oder bei einem
+                Verbindungsabbruch schlicht falsch. */}
+            <p className="text-sm font-medium text-destructive">{fehler}</p>
+          </div>
+        )}
+
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
           {/* Step-Header */}
           <div className="border-b bg-muted/50 px-6 py-4">
