@@ -19,6 +19,71 @@ import { validateIBAN } from "@/lib/utils/iban-validator";
 import { FieldConfigHelper } from "@/lib/field-definitions";
 
 /**
+ * Die Laengengrenzen des Servers — Zahl und deutscher Satz an EINER Stelle.
+ *
+ * Jede Zahl spiegelt `fragebogenFieldsSchema` in
+ * `src/app/api/fragebogen/[token]/route.ts`. Sie steht hier zentral, weil jede
+ * Grenze zweimal gebraucht wird: einmal im statischen Schema (aus dem die
+ * Masken ihren Typ ziehen) und einmal in der Fabrik (die tatsaechlich prueft).
+ * Zwei getippte Zahlen laufen auseinander, sobald der Server eine Grenze
+ * verschiebt — eine benannte tut das nicht.
+ *
+ * Nicht aufgefuehrt sind Felder, deren vorhandene Regel schon strenger ist als
+ * die Server-Grenze: `taxId` (Server 20) laesst der Client nur als 10 oder 11
+ * Ziffern durch, `iban` (Server 34) begrenzt `validateIBAN` auf 34 Zeichen der
+ * Fassung OHNE Leerzeichen — siehe createStep3Schema.
+ */
+const GRENZE = {
+  title: { max: 100, msg: "Der Titel darf hoechstens 100 Zeichen lang sein." },
+  firstName: { max: 100, msg: "Der Vorname darf hoechstens 100 Zeichen lang sein." },
+  lastName: { max: 100, msg: "Der Nachname darf hoechstens 100 Zeichen lang sein." },
+  birthName: { max: 100, msg: "Der Geburtsname darf hoechstens 100 Zeichen lang sein." },
+  birthPlace: { max: 200, msg: "Der Geburtsort darf hoechstens 200 Zeichen lang sein." },
+  birthCountry: { max: 100, msg: "Das Geburtsland darf hoechstens 100 Zeichen lang sein." },
+  nationality: { max: 100, msg: "Die Staatsangehoerigkeit darf hoechstens 100 Zeichen lang sein." },
+  street: { max: 200, msg: "Die Strasse darf hoechstens 200 Zeichen lang sein." },
+  houseNumber: { max: 20, msg: "Die Hausnummer darf hoechstens 20 Zeichen lang sein." },
+  zipCode: { max: 10, msg: "Die PLZ darf hoechstens 10 Zeichen lang sein." },
+  city: { max: 200, msg: "Der Ort darf hoechstens 200 Zeichen lang sein." },
+  country: { max: 100, msg: "Das Land darf hoechstens 100 Zeichen lang sein." },
+  phone: { max: 50, msg: "Die Telefonnummer darf hoechstens 50 Zeichen lang sein." },
+  mobile: { max: 50, msg: "Die Mobilnummer darf hoechstens 50 Zeichen lang sein." },
+  emailPrivate: { max: 200, msg: "Die E-Mail-Adresse darf hoechstens 200 Zeichen lang sein." },
+  bic: { max: 11, msg: "Die BIC darf hoechstens 11 Zeichen lang sein." },
+  bankName: { max: 200, msg: "Der Name der Bank darf hoechstens 200 Zeichen lang sein." },
+  accountHolder: { max: 200, msg: "Der Kontoinhaber darf hoechstens 200 Zeichen lang sein." },
+  socialSecurityNumber: {
+    max: 20,
+    msg: "Die Sozialversicherungsnummer darf hoechstens 20 Zeichen lang sein.",
+  },
+  healthInsuranceName: {
+    max: 200,
+    msg: "Der Name der Krankenkasse darf hoechstens 200 Zeichen lang sein.",
+  },
+  beschaeftigungsStatusSonstige: {
+    max: 200,
+    msg: "Die Beschreibung darf hoechstens 200 Zeichen lang sein.",
+  },
+  agenturFuerArbeit: {
+    max: 200,
+    msg: "Die Angabe zur Agentur darf hoechstens 200 Zeichen lang sein.",
+  },
+  kindVorname: {
+    max: 100,
+    msg: "Der Vorname des Kindes darf hoechstens 100 Zeichen lang sein.",
+  },
+  kindNachname: {
+    max: 100,
+    msg: "Der Nachname des Kindes darf hoechstens 100 Zeichen lang sein.",
+  },
+} as const;
+
+/** Textfeld ohne Pflicht, aber mit Grenze und deutschem Satz. */
+function begrenzt(grenze: { max: number; msg: string }) {
+  return z.string().max(grenze.max, grenze.msg);
+}
+
+/**
  * Text-Feld, dessen Pflicht die Vorlage bestimmt — mit optionaler Laengengrenze.
  *
  * Die Grenze gilt IMMER, unabhaengig von der Pflicht. Der Server begrenzt diese
@@ -34,7 +99,7 @@ function reqStr(
   msg: string,
   grenze?: { max: number; msg: string }
 ) {
-  const basis = grenze ? z.string().max(grenze.max, grenze.msg) : z.string();
+  const basis = grenze ? begrenzt(grenze) : z.string();
   return fc.isRequired(name) ? basis.min(1, msg) : basis;
 }
 
@@ -132,14 +197,17 @@ export const step1Schema = z.object({
   // Radiogruppe: ohne angehakte Option liefert das Formular null, nicht
   // undefined — siehe pflichtEnum.
   salutation: pflichtEnum(["Herr", "Frau"], "Bitte waehlen Sie eine Anrede."),
-  title: z.string(),
-  firstName: z.string().min(1, "Vorname ist erforderlich.").max(100),
-  lastName: z.string().min(1, "Nachname ist erforderlich.").max(100),
-  birthName: z.string(),
+  title: begrenzt(GRENZE.title),
+  // Die Obergrenze stand hier schon, aber ohne Satz: Zod meldete dann
+  // "String must contain at most 100 character(s)" — englisch, mitten im
+  // deutschen Fragebogen. Die Pflicht (min) bleibt unangetastet.
+  firstName: begrenzt(GRENZE.firstName).min(1, "Vorname ist erforderlich."),
+  lastName: begrenzt(GRENZE.lastName).min(1, "Nachname ist erforderlich."),
+  birthName: begrenzt(GRENZE.birthName),
   birthDate: z.string().min(1, "Geburtsdatum ist erforderlich."),
-  birthPlace: z.string().min(1, "Geburtsort ist erforderlich."),
-  birthCountry: z.string(),
-  nationality: z.string(),
+  birthPlace: begrenzt(GRENZE.birthPlace).min(1, "Geburtsort ist erforderlich."),
+  birthCountry: begrenzt(GRENZE.birthCountry),
+  nationality: begrenzt(GRENZE.nationality),
   maritalStatus: pflichtEnum(
     ["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt_lebend", "eingetragene_partnerschaft"],
     "Bitte waehlen Sie den Familienstand."
@@ -158,21 +226,14 @@ export type Step1Data = z.infer<typeof step1Schema>;
 // Step 2: Adresse & Kontakt
 // =============================================
 export const step2Schema = z.object({
-  street: z.string().min(1, "Strasse ist erforderlich."),
-  houseNumber: z
-    .string()
-    .min(1, "Hausnummer ist erforderlich.")
-    .max(20, "Die Hausnummer darf hoechstens 20 Zeichen lang sein."),
-  zipCode: z
-    .string()
-    .min(4, "PLZ muss mindestens 4 Zeichen lang sein.")
-    .max(10, "Die PLZ darf hoechstens 10 Zeichen lang sein."),
-  city: z.string().min(1, "Ort ist erforderlich."),
-  country: z.string(),
-  phone: z.string().max(50, "Die Telefonnummer darf hoechstens 50 Zeichen lang sein."),
-  mobile: z.string().max(50, "Die Mobilnummer darf hoechstens 50 Zeichen lang sein."),
-  emailPrivate: z
-    .string()
+  street: begrenzt(GRENZE.street).min(1, "Strasse ist erforderlich."),
+  houseNumber: begrenzt(GRENZE.houseNumber).min(1, "Hausnummer ist erforderlich."),
+  zipCode: begrenzt(GRENZE.zipCode).min(4, "PLZ muss mindestens 4 Zeichen lang sein."),
+  city: begrenzt(GRENZE.city).min(1, "Ort ist erforderlich."),
+  country: begrenzt(GRENZE.country),
+  phone: begrenzt(GRENZE.phone),
+  mobile: begrenzt(GRENZE.mobile),
+  emailPrivate: begrenzt(GRENZE.emailPrivate)
     .refine(
       (val) => val === "" || z.string().email().safeParse(val).success,
       { message: "Bitte geben Sie eine gültige E-Mail-Adresse ein." }
@@ -195,9 +256,9 @@ export const step3Schema = z.object({
       },
       { message: "Bitte geben Sie eine gültige IBAN ein." }
     ),
-  bic: z.string().max(11, "Die BIC darf hoechstens 11 Zeichen lang sein."),
-  bankName: z.string(),
-  accountHolder: z.string(),
+  bic: begrenzt(GRENZE.bic),
+  bankName: begrenzt(GRENZE.bankName),
+  accountHolder: begrenzt(GRENZE.accountHolder),
 });
 
 export type Step3Data = z.infer<typeof step3Schema>;
@@ -206,10 +267,11 @@ export type Step3Data = z.infer<typeof step3Schema>;
 // Step 4: Sozialversicherung
 // =============================================
 export const step4Schema = z.object({
-  socialSecurityNumber: z
-    .string()
-    .max(20, "Die Sozialversicherungsnummer darf hoechstens 20 Zeichen lang sein."),
-  healthInsuranceName: z.string().min(1, "Krankenkasse ist erforderlich."),
+  socialSecurityNumber: begrenzt(GRENZE.socialSecurityNumber),
+  healthInsuranceName: begrenzt(GRENZE.healthInsuranceName).min(
+    1,
+    "Krankenkasse ist erforderlich."
+  ),
   healthInsuranceType: pflichtEnum(
     ["gesetzlich", "privat"],
     "Bitte waehlen Sie die Versicherungsart."
@@ -247,9 +309,11 @@ export type Step5Data = z.infer<typeof step5Schema>;
 // =============================================
 export const step6Schema = z.object({
   beschaeftigungsStatus: z.string(),
-  beschaeftigungsStatusSonstige: z.string().optional(),
+  beschaeftigungsStatusSonstige: begrenzt(
+    GRENZE.beschaeftigungsStatusSonstige
+  ).optional(),
   alsArbeitsuchendGemeldet: z.boolean(),
-  agenturFuerArbeit: z.string().optional(),
+  agenturFuerArbeit: begrenzt(GRENZE.agenturFuerArbeit).optional(),
   mitLeistungsbezug: z.boolean().nullable().optional(),
   hasOtherEmployment: z.boolean(),
   summeUeberGeringfuegigkeitsgrenze: z.boolean().nullable().optional(),
@@ -267,8 +331,11 @@ export type Step6Data = z.infer<typeof step6Schema>;
 // Step 7: Kinder
 // =============================================
 export const childSchema = z.object({
-  firstName: z.string().min(1, "Vorname des Kindes ist erforderlich."),
-  lastName: z.string(),
+  firstName: begrenzt(GRENZE.kindVorname).min(
+    1,
+    "Vorname des Kindes ist erforderlich."
+  ),
+  lastName: begrenzt(GRENZE.kindNachname),
   birthDate: z.string().min(1, "Geburtsdatum des Kindes ist erforderlich."),
   taxAllowance: z.boolean(),
 });
@@ -344,14 +411,21 @@ export function createStep1Schema(fc: FieldConfigHelper) {
     // null an. Ohne pflichtEnum stuende im Formular die englische
     // Zod-Standardmeldung statt des deutschen Satzes.
     salutation: pflichtEnum(["Herr", "Frau"], "Bitte waehlen Sie eine Anrede."),
-    title: z.string(),
-    firstName: z.string().min(1, "Vorname ist erforderlich.").max(100),
-    lastName: z.string().min(1, "Nachname ist erforderlich.").max(100),
-    birthName: z.string(),
+    title: begrenzt(GRENZE.title),
+    // Vor- und Nachname bleiben fest auf Pflicht — nur der englische
+    // Standardtext der Obergrenze weicht dem deutschen Satz.
+    firstName: begrenzt(GRENZE.firstName).min(1, "Vorname ist erforderlich."),
+    lastName: begrenzt(GRENZE.lastName).min(1, "Nachname ist erforderlich."),
+    birthName: begrenzt(GRENZE.birthName),
     birthDate: z.string().min(1, "Geburtsdatum ist erforderlich."),
-    birthPlace: reqStr(fc, "birthPlace", "Geburtsort ist erforderlich."),
-    birthCountry: z.string(),
-    nationality: z.string(),
+    birthPlace: reqStr(
+      fc,
+      "birthPlace",
+      "Geburtsort ist erforderlich.",
+      GRENZE.birthPlace
+    ),
+    birthCountry: begrenzt(GRENZE.birthCountry),
+    nationality: begrenzt(GRENZE.nationality),
     maritalStatus: reqEnum(
       fc, "maritalStatus",
       ["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt_lebend", "eingetragene_partnerschaft"],
@@ -379,42 +453,35 @@ export function createStep1Schema(fc: FieldConfigHelper) {
  */
 export function createStep2Schema(fc: FieldConfigHelper) {
   return z.object({
-    street: reqStr(fc, "street", "Strasse ist erforderlich."),
-    houseNumber: reqStr(fc, "houseNumber", "Hausnummer ist erforderlich.", {
-      max: 20,
-      msg: "Die Hausnummer darf hoechstens 20 Zeichen lang sein.",
-    }),
+    street: reqStr(fc, "street", "Strasse ist erforderlich.", GRENZE.street),
+    houseNumber: reqStr(
+      fc,
+      "houseNumber",
+      "Hausnummer ist erforderlich.",
+      GRENZE.houseNumber
+    ),
     // Die Untergrenze ist keine Pflicht, sondern eine Formregel: Eine
     // dreistellige PLZ gibt es nicht. Wer das Feld freiwillig laesst, darf es
-    // leer lassen — aber nicht halb ausfuellen.
+    // leer lassen — aber nicht halb ausfuellen. Die Obergrenze gilt in beiden
+    // Zweigen.
     zipCode: fc.isRequired("zipCode")
-      ? z
-          .string()
-          .min(4, "PLZ muss mindestens 4 Zeichen lang sein.")
-          .max(10, "Die PLZ darf hoechstens 10 Zeichen lang sein.")
-      : z
-          .string()
-          .max(10, "Die PLZ darf hoechstens 10 Zeichen lang sein.")
-          .refine((wert) => wert === "" || wert.length >= 4, {
-            message: "PLZ muss mindestens 4 Zeichen lang sein.",
-          }),
-    city: reqStr(fc, "city", "Ort ist erforderlich."),
-    country: reqStr(fc, "country", "Land ist erforderlich."),
-    phone: reqStr(fc, "phone", "Telefonnummer ist erforderlich.", {
-      max: 50,
-      msg: "Die Telefonnummer darf hoechstens 50 Zeichen lang sein.",
-    }),
-    mobile: reqStr(fc, "mobile", "Mobilnummer ist erforderlich.", {
-      max: 50,
-      msg: "Die Mobilnummer darf hoechstens 50 Zeichen lang sein.",
-    }),
+      ? begrenzt(GRENZE.zipCode).min(4, "PLZ muss mindestens 4 Zeichen lang sein.")
+      : begrenzt(GRENZE.zipCode).refine(
+          (wert) => wert === "" || wert.length >= 4,
+          { message: "PLZ muss mindestens 4 Zeichen lang sein." }
+        ),
+    city: reqStr(fc, "city", "Ort ist erforderlich.", GRENZE.city),
+    country: reqStr(fc, "country", "Land ist erforderlich.", GRENZE.country),
+    phone: reqStr(fc, "phone", "Telefonnummer ist erforderlich.", GRENZE.phone),
+    mobile: reqStr(fc, "mobile", "Mobilnummer ist erforderlich.", GRENZE.mobile),
     // Die Adressform wird immer geprueft, die Pflicht nur auf Ansage. Beim
     // Pflichtfeld greift `min(1)` fuer das leere Feld; die Verfeinerung laesst
     // "" bewusst durch, damit nicht zwei Meldungen gleichzeitig erscheinen.
     emailPrivate: reqStr(
       fc,
       "emailPrivate",
-      "Private E-Mail-Adresse ist erforderlich."
+      "Private E-Mail-Adresse ist erforderlich.",
+      GRENZE.emailPrivate
     ).refine(
       (val) => val === "" || z.string().email().safeParse(val).success,
       { message: "Bitte geben Sie eine gültige E-Mail-Adresse ein." }
@@ -425,6 +492,18 @@ export function createStep2Schema(fc: FieldConfigHelper) {
 export function createStep3Schema(fc: FieldConfigHelper) {
   const ibanRequired = fc.isRequired("iban");
   return z.object({
+    // Die Server-Grenze von 34 Zeichen steht hier BEWUSST nicht als `.max(34)`.
+    //
+    // Das Feld zeigt die IBAN in Vierergruppen (step3-bank.tsx formatiert bei
+    // jeder Eingabe), und der Resolver sieht genau diesen formatierten Wert —
+    // die Leerzeichen fallen erst in `onSubmit` weg, also NACH der Pruefung.
+    // Eine 34-stellige IBAN steht im Feld als 42 Zeichen; ein nacktes `.max(34)`
+    // wiese damit ausgerechnet die laengsten gueltigen IBANs ab, und zwar mit
+    // einer Meldung, die niemand an einer korrekt abgetippten Nummer erwartet.
+    //
+    // Gebraucht wird die Grenze auch nicht doppelt: `validateIBAN` misst die
+    // Fassung OHNE Leerzeichen und laesst nur 15 bis 34 Zeichen durch — genau
+    // die Spanne des Servers. Was hier durchkommt, passt dort hinein.
     iban: ibanRequired
       ? z.string().min(1, "IBAN ist erforderlich.").refine(
           (val) => { if (!val) return true; return validateIBAN(val); },
@@ -434,12 +513,14 @@ export function createStep3Schema(fc: FieldConfigHelper) {
           (val) => { if (!val || val.trim() === "") return true; return validateIBAN(val); },
           { message: "Bitte geben Sie eine gültige IBAN ein." }
         ),
-    bic: reqStr(fc, "bic", "BIC ist erforderlich.", {
-      max: 11,
-      msg: "Die BIC darf hoechstens 11 Zeichen lang sein.",
-    }),
-    bankName: reqStr(fc, "bankName", "Bank ist erforderlich."),
-    accountHolder: reqStr(fc, "accountHolder", "Kontoinhaber ist erforderlich."),
+    bic: reqStr(fc, "bic", "BIC ist erforderlich.", GRENZE.bic),
+    bankName: reqStr(fc, "bankName", "Bank ist erforderlich.", GRENZE.bankName),
+    accountHolder: reqStr(
+      fc,
+      "accountHolder",
+      "Kontoinhaber ist erforderlich.",
+      GRENZE.accountHolder
+    ),
   });
 }
 
@@ -449,12 +530,14 @@ export function createStep4Schema(fc: FieldConfigHelper) {
       fc,
       "socialSecurityNumber",
       "Sozialversicherungsnummer ist erforderlich.",
-      {
-        max: 20,
-        msg: "Die Sozialversicherungsnummer darf hoechstens 20 Zeichen lang sein.",
-      }
+      GRENZE.socialSecurityNumber
     ),
-    healthInsuranceName: reqStr(fc, "healthInsuranceName", "Krankenkasse ist erforderlich."),
+    healthInsuranceName: reqStr(
+      fc,
+      "healthInsuranceName",
+      "Krankenkasse ist erforderlich.",
+      GRENZE.healthInsuranceName
+    ),
     healthInsuranceType: reqEnum(
       fc, "healthInsuranceType",
       ["gesetzlich", "privat"],
@@ -528,13 +611,17 @@ export function createStep6Schema(fc: FieldConfigHelper) {
       beschaeftigungsStatus: fc.isVisible("beschaeftigungsStatus")
         ? z.string().min(1, "Bitte waehlen Sie aus, was auf Sie zutrifft.")
         : z.string(),
-      beschaeftigungsStatusSonstige: z.string().max(200).optional(),
+      // Die Grenze stand hier schon, aber ohne Satz — Zod meldete dann
+      // englisch.
+      beschaeftigungsStatusSonstige: begrenzt(
+        GRENZE.beschaeftigungsStatusSonstige
+      ).optional(),
 
       // Die vier Ja/Nein-Fragen brauchen keines: `z.boolean()` ist mit `false`
       // erfuellt, und `defaultValues` setzt sie immer. Ausgeblendet bleiben sie
       // schlicht auf "nein" stehen.
       alsArbeitsuchendGemeldet: z.boolean(),
-      agenturFuerArbeit: z.string().max(200).optional(),
+      agenturFuerArbeit: begrenzt(GRENZE.agenturFuerArbeit).optional(),
       mitLeistungsbezug: z.boolean().nullable().optional(),
 
       hasOtherEmployment: z.boolean(),

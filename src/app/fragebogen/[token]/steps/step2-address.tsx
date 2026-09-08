@@ -3,6 +3,14 @@
 /**
  * Step 2: Adresse & Kontakt
  * Strasse, PLZ, Ort, Telefon, E-Mail
+ *
+ * Die `maxLength` an den Textfeldern spiegeln die Grenzen des Servers
+ * (`fragebogenFieldsSchema` in api/fragebogen/[token]/route.ts). Ohne sie nimmt
+ * das Feld beliebig viel entgegen, und erst der Auto-Save antwortet mit 400 —
+ * die Person liest dann "Bitte pruefen Sie die Eingabe", ohne dass auf dem
+ * Bildschirm irgendetwas falsch aussieht. Der Fehlerabsatz unter dem Feld
+ * bleibt trotzdem noetig: `maxLength` bremst das Tippen, nicht das EINFUEGEN
+ * aus der Zwischenablage.
  */
 
 import { useMemo } from "react";
@@ -65,6 +73,7 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
               type="text"
               autoComplete="off"
               {...register("street")}
+              maxLength={200}
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
             />
             {errors.street && (
@@ -115,6 +124,7 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
             <input
               type="text"
               {...register("city")}
+              maxLength={200}
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
             />
             {errors.city && (
@@ -191,6 +201,7 @@ export function Step2Address({ data, onNext, onBack, saving, fieldConfig }: Step
           <input
             type="email"
             {...register("emailPrivate")}
+            maxLength={200}
             placeholder="vorname@beispiel.de"
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />

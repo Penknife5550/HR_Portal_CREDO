@@ -156,12 +156,34 @@ export function Step4SocialSecurity({
     }
   };
 
+  /**
+   * Laengengrenze der Kindernamen — dieselbe Zahl wie im Server-Schema
+   * (`children` in api/fragebogen/[token]/route.ts: firstName/lastName je
+   * `max(100)`).
+   *
+   * Die Kinderzeilen laufen an der Zod-Pruefung des Schritts vorbei: Sie sind
+   * eigener Zustand und werden erst in `onSubmit` an die Formularwerte
+   * gehaengt. Ohne die Pruefung hier meldet allein der Server — und der
+   * antwortet mit einem 400 fuer den GANZEN Schritt, waehrend auf dem
+   * Bildschirm nichts rot wird.
+   */
+  const MAX_KINDERNAME = 100;
+
   const validateChildren = (): boolean => {
     if (!parentStatus || children.length === 0) return true;
     const newErrors: Record<string, string> = {};
     children.forEach((child, index) => {
       if (!child.firstName.trim()) {
         newErrors[`${index}-firstName`] = "Vorname ist erforderlich.";
+      } else if (child.firstName.length > MAX_KINDERNAME) {
+        newErrors[`${index}-firstName`] =
+          `Der Vorname darf hoechstens ${MAX_KINDERNAME} Zeichen lang sein.`;
+      }
+      // `maxLength` am Feld bremst das Tippen, aber nicht jede Uebernahme aus
+      // der Zwischenablage oder einer Browser-Ausfuellhilfe.
+      if (child.lastName.length > MAX_KINDERNAME) {
+        newErrors[`${index}-lastName`] =
+          `Der Nachname darf hoechstens ${MAX_KINDERNAME} Zeichen lang sein.`;
       }
       if (!child.birthDate) {
         newErrors[`${index}-birthDate`] = "Geburtsdatum ist erforderlich.";
@@ -262,6 +284,7 @@ export function Step4SocialSecurity({
             type="text"
             autoComplete="off"
             {...register("healthInsuranceName")}
+            maxLength={200}
             placeholder="z.B. AOK, TK, Barmer, DAK"
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
@@ -343,6 +366,7 @@ export function Step4SocialSecurity({
                       <input
                         type="text"
                         autoComplete="off"
+                        maxLength={MAX_KINDERNAME}
                         value={child.firstName}
                         onChange={(e) => updateChild(index, "firstName", e.target.value)}
                         className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
@@ -357,10 +381,14 @@ export function Step4SocialSecurity({
                       <input
                         type="text"
                         autoComplete="off"
+                        maxLength={MAX_KINDERNAME}
                         value={child.lastName}
                         onChange={(e) => updateChild(index, "lastName", e.target.value)}
                         className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                       />
+                      {childErrors[`${index}-lastName`] && (
+                        <p className="text-xs text-destructive">{childErrors[`${index}-lastName`]}</p>
+                      )}
                     </div>
 
                     <div className="space-y-1">

@@ -55,6 +55,12 @@ export function Step5Tax({ data, onNext, onBack, saving, fieldConfig }: StepProp
             {fc.getLabel("taxId")}{" "}
             {fc.isRequired("taxId") && <span className="text-destructive">*</span>}
           </label>
+          {/* 11 und nicht 20, obwohl der Server 20 zulaesst: Die Steuer-ID ist
+              11-stellig, und das Schema dieses Schritts laesst hoechstens 11
+              Ziffern durch. Die 20 des Servers ist nur die grosszuegige
+              Obergrenze der Spalte, keine gueltige Eingabe. Wer hier auf 20
+              „korrigiert", macht das Feld nicht durchlaessiger, sondern
+              erlaubt Eingaben, die der Schritt danach selbst ablehnt. */}
           <input
             type="text"
             {...register("taxId")}

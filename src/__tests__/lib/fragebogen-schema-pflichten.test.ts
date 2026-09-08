@@ -19,10 +19,13 @@
  */
 
 import {
+  childSchema,
+  createStep1Schema,
   createStep2Schema,
   createStep3Schema,
   createStep4Schema,
   createStep5Schema,
+  createStep6Schema,
   createStep8Schema,
   step2Schema,
 } from "@/lib/validations/personal-data";
@@ -58,6 +61,21 @@ function meldungenZu(
     .map((i) => i.message);
 }
 
+const SCHRITT1_BASIS = {
+  salutation: "Herr",
+  title: "",
+  firstName: "Max",
+  lastName: "Mustermann",
+  birthName: "",
+  birthDate: "1990-01-01",
+  birthPlace: "Minden",
+  birthCountry: "Deutschland",
+  nationality: "deutsch",
+  maritalStatus: "ledig",
+  severelyDisabled: false,
+  disabilityDegree: null,
+};
+
 const SCHRITT2_BASIS = {
   street: "Musterstrasse",
   houseNumber: "12a",
@@ -92,10 +110,40 @@ const SCHRITT5_BASIS = {
   religion: "keine",
 };
 
+const SCHRITT6_BASIS = {
+  beschaeftigungsStatus: "SCHUELER",
+  beschaeftigungsStatusSonstige: "",
+  alsArbeitsuchendGemeldet: false,
+  agenturFuerArbeit: "",
+  mitLeistungsbezug: null,
+  hasOtherEmployment: false,
+  summeUeberGeringfuegigkeitsgrenze: null,
+  vorbeschaeftigungenVorhanden: false,
+  auslandsbeschaeftigungVorhanden: false,
+  employerType: "hauptarbeitgeber",
+};
+
 const SCHRITT8_BASIS = {
   highestSchoolDegree: "abitur_fachabitur",
   highestProfessionalDegree: "bachelor",
 };
+
+const KIND_BASIS = {
+  firstName: "Lena",
+  lastName: "Mustermann",
+  birthDate: "2015-04-03",
+  taxAllowance: false,
+};
+
+/**
+ * Eine gueltige IBAN in voller Laenge — 34 Zeichen ohne Trennzeichen.
+ *
+ * Pruefziffern nach ISO 13616 (Modulo 97) gerechnet, damit `validateIBAN` sie
+ * annimmt. Im Eingabefeld steht sie in Vierergruppen und belegt damit 42
+ * Zeichen; genau daran scheitert ein naiv gesetztes `.max(34)`.
+ */
+const IBAN_34 = "LC981234567890123456789012345678AB";
+const IBAN_34_FORMATIERT = "LC98 1234 5678 9012 3456 7890 1234 5678 AB";
 
 // =============================================
 // Befund 1: deutsche Meldung bei jedem Fehlercode
@@ -400,5 +448,212 @@ describe("Laengengrenzen greifen schon im Formular", () => {
     expect(meldungenZu(ergebnis, "socialSecurityNumber")).toEqual([
       "Die Sozialversicherungsnummer darf hoechstens 20 Zeichen lang sein.",
     ]);
+  });
+
+  // ---------------------------------------------------------------
+  // Die restlichen Grenzen aus fragebogenFieldsSchema (Server-Route).
+  // Je Feld: die Grenze selbst geht durch, ein Zeichen mehr nicht.
+  // ---------------------------------------------------------------
+
+  it.each<[string, number, string]>([
+    ["title", 100, "Der Titel darf hoechstens 100 Zeichen lang sein."],
+    ["firstName", 100, "Der Vorname darf hoechstens 100 Zeichen lang sein."],
+    ["lastName", 100, "Der Nachname darf hoechstens 100 Zeichen lang sein."],
+    ["birthName", 100, "Der Geburtsname darf hoechstens 100 Zeichen lang sein."],
+    ["birthPlace", 200, "Der Geburtsort darf hoechstens 200 Zeichen lang sein."],
+    ["birthCountry", 100, "Das Geburtsland darf hoechstens 100 Zeichen lang sein."],
+    [
+      "nationality",
+      100,
+      "Die Staatsangehoerigkeit darf hoechstens 100 Zeichen lang sein.",
+    ],
+  ])("begrenzt %s in Schritt 1 auf %i Zeichen", (feld, grenze, meldung) => {
+    const schritt1 = createStep1Schema(new FieldConfigHelper(1));
+
+    expect(
+      schritt1.safeParse({ ...SCHRITT1_BASIS, [feld]: "a".repeat(grenze) })
+        .success
+    ).toBe(true);
+
+    const ergebnis = schritt1.safeParse({
+      ...SCHRITT1_BASIS,
+      [feld]: "a".repeat(grenze + 1),
+    });
+    expect(ergebnis.success).toBe(false);
+    expect(meldungenZu(ergebnis, feld)).toEqual([meldung]);
+  });
+
+  it.each<[string, number, string]>([
+    ["street", 200, "Die Strasse darf hoechstens 200 Zeichen lang sein."],
+    ["city", 200, "Der Ort darf hoechstens 200 Zeichen lang sein."],
+    ["country", 100, "Das Land darf hoechstens 100 Zeichen lang sein."],
+  ])("begrenzt %s in Schritt 2 auf %i Zeichen", (feld, grenze, meldung) => {
+    const schritt2 = createStep2Schema(new FieldConfigHelper(2));
+
+    expect(
+      schritt2.safeParse({ ...SCHRITT2_BASIS, [feld]: "a".repeat(grenze) })
+        .success
+    ).toBe(true);
+
+    const ergebnis = schritt2.safeParse({
+      ...SCHRITT2_BASIS,
+      [feld]: "a".repeat(grenze + 1),
+    });
+    expect(ergebnis.success).toBe(false);
+    expect(meldungenZu(ergebnis, feld)).toEqual([meldung]);
+  });
+
+  it("begrenzt die private E-Mail-Adresse auf 200 Zeichen", () => {
+    // Die Adresse muss gueltig BLEIBEN, sonst meldet der Schritt zwei Dinge
+    // gleichzeitig und der Test prueft nicht mehr die Grenze.
+    const schritt2 = createStep2Schema(new FieldConfigHelper(2));
+    const rest = "@example.org";
+
+    expect(
+      schritt2.safeParse({
+        ...SCHRITT2_BASIS,
+        emailPrivate: "a".repeat(200 - rest.length) + rest,
+      }).success
+    ).toBe(true);
+
+    const ergebnis = schritt2.safeParse({
+      ...SCHRITT2_BASIS,
+      emailPrivate: "a".repeat(201 - rest.length) + rest,
+    });
+    expect(ergebnis.success).toBe(false);
+    expect(meldungenZu(ergebnis, "emailPrivate")).toEqual([
+      "Die E-Mail-Adresse darf hoechstens 200 Zeichen lang sein.",
+    ]);
+  });
+
+  it("begrenzt die PLZ nach oben, ohne die Untergrenze zu verlieren", () => {
+    const schritt2 = createStep2Schema(new FieldConfigHelper(2));
+
+    expect(
+      schritt2.safeParse({ ...SCHRITT2_BASIS, zipCode: "1".repeat(10) }).success
+    ).toBe(true);
+
+    const ergebnis = schritt2.safeParse({
+      ...SCHRITT2_BASIS,
+      zipCode: "1".repeat(11),
+    });
+    expect(ergebnis.success).toBe(false);
+    expect(meldungenZu(ergebnis, "zipCode")).toEqual([
+      "Die PLZ darf hoechstens 10 Zeichen lang sein.",
+    ]);
+  });
+
+  it.each<[string, number, string]>([
+    ["bankName", 200, "Der Name der Bank darf hoechstens 200 Zeichen lang sein."],
+    [
+      "accountHolder",
+      200,
+      "Der Kontoinhaber darf hoechstens 200 Zeichen lang sein.",
+    ],
+  ])("begrenzt %s in Schritt 3 auf %i Zeichen", (feld, grenze, meldung) => {
+    const schritt3 = createStep3Schema(new FieldConfigHelper(3));
+
+    expect(
+      schritt3.safeParse({ ...SCHRITT3_BASIS, [feld]: "a".repeat(grenze) })
+        .success
+    ).toBe(true);
+
+    const ergebnis = schritt3.safeParse({
+      ...SCHRITT3_BASIS,
+      [feld]: "a".repeat(grenze + 1),
+    });
+    expect(ergebnis.success).toBe(false);
+    expect(meldungenZu(ergebnis, feld)).toEqual([meldung]);
+  });
+
+  it("laesst eine 34-stellige IBAN durch, obwohl sie im Feld 42 Zeichen belegt", () => {
+    // Der Resolver sieht den FORMATIERTEN Wert; die Leerzeichen fallen erst in
+    // onSubmit weg (step3-bank.tsx). Ein `.max(34)` auf diesem Wert wiese
+    // ausgerechnet die laengsten gueltigen IBANs ab.
+    expect(IBAN_34).toHaveLength(34);
+    expect(IBAN_34_FORMATIERT).toHaveLength(42);
+
+    const schritt3 = createStep3Schema(new FieldConfigHelper(3));
+    expect(
+      schritt3.safeParse({ ...SCHRITT3_BASIS, iban: IBAN_34_FORMATIERT }).success
+    ).toBe(true);
+  });
+
+  it("weist eine IBAN ab, die ohne Leerzeichen laenger als 34 Zeichen ist", () => {
+    // Die Server-Grenze (34) haelt hier `validateIBAN` — es misst die Fassung
+    // ohne Trennzeichen.
+    const schritt3 = createStep3Schema(new FieldConfigHelper(3));
+    const ergebnis = schritt3.safeParse({
+      ...SCHRITT3_BASIS,
+      iban: IBAN_34_FORMATIERT + "CD",
+    });
+
+    expect(ergebnis.success).toBe(false);
+    expect(meldungenZu(ergebnis, "iban")).toEqual([
+      "Bitte geben Sie eine gültige IBAN ein.",
+    ]);
+  });
+
+  it("begrenzt den Namen der Krankenkasse auf 200 Zeichen", () => {
+    const schritt4 = createStep4Schema(new FieldConfigHelper(4));
+
+    expect(
+      schritt4.safeParse({
+        ...SCHRITT4_BASIS,
+        healthInsuranceName: "a".repeat(200),
+      }).success
+    ).toBe(true);
+
+    const ergebnis = schritt4.safeParse({
+      ...SCHRITT4_BASIS,
+      healthInsuranceName: "a".repeat(201),
+    });
+    expect(ergebnis.success).toBe(false);
+    expect(meldungenZu(ergebnis, "healthInsuranceName")).toEqual([
+      "Der Name der Krankenkasse darf hoechstens 200 Zeichen lang sein.",
+    ]);
+  });
+
+  it.each<[string, number, string]>([
+    [
+      "beschaeftigungsStatusSonstige",
+      200,
+      "Die Beschreibung darf hoechstens 200 Zeichen lang sein.",
+    ],
+    [
+      "agenturFuerArbeit",
+      200,
+      "Die Angabe zur Agentur darf hoechstens 200 Zeichen lang sein.",
+    ],
+  ])("begrenzt %s in Schritt 6 auf %i Zeichen", (feld, grenze, meldung) => {
+    const schritt6 = createStep6Schema(new FieldConfigHelper(6));
+
+    expect(
+      schritt6.safeParse({ ...SCHRITT6_BASIS, [feld]: "a".repeat(grenze) })
+        .success
+    ).toBe(true);
+
+    const ergebnis = schritt6.safeParse({
+      ...SCHRITT6_BASIS,
+      [feld]: "a".repeat(grenze + 1),
+    });
+    expect(ergebnis.success).toBe(false);
+    expect(meldungenZu(ergebnis, feld)).toEqual([meldung]);
+  });
+
+  it.each<[string, string]>([
+    ["firstName", "Der Vorname des Kindes darf hoechstens 100 Zeichen lang sein."],
+    ["lastName", "Der Nachname des Kindes darf hoechstens 100 Zeichen lang sein."],
+  ])("begrenzt %s eines Kindes auf 100 Zeichen", (feld, meldung) => {
+    expect(
+      childSchema.safeParse({ ...KIND_BASIS, [feld]: "a".repeat(100) }).success
+    ).toBe(true);
+
+    const ergebnis = childSchema.safeParse({
+      ...KIND_BASIS,
+      [feld]: "a".repeat(101),
+    });
+    expect(ergebnis.success).toBe(false);
+    expect(meldungenZu(ergebnis, feld)).toEqual([meldung]);
   });
 });

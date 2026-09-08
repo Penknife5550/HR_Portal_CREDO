@@ -79,9 +79,20 @@ export function Step3Bank({ data, onNext, onBack, saving, fieldConfig }: StepPro
           <label className="text-sm font-medium text-foreground">
             {fc.getLabel("iban")} {fc.isRequired("iban") && <span className="text-destructive">*</span>}
           </label>
+          {/* 42, nicht 34: Die Grenze zaehlt, was IM FELD steht, und im Feld
+              steht die formatierte Fassung. `formatIBAN` setzt nach jeder
+              Vierergruppe ein Leerzeichen, also werden aus den 34 Zeichen der
+              laengsten IBAN 8 volle Gruppen (32 Zeichen + 8 Leerzeichen) plus
+              ein Rest von 2 = 42. Ein maxLength={34} haette die Eingabe also
+              schon nach 28 echten Stellen abgeschnitten (7 Gruppen = 35 Zeichen
+              minus das getrimmte Leerzeichen am Ende) — schlimmer als gar keine
+              Grenze, weil die IBAN dann still unvollstaendig bliebe.
+              Gesendet wird ohne Trennzeichen (siehe onSubmit), damit passt sie
+              in die 34 des Servers. */}
           <input
             type="text"
             {...register("iban", { onChange: handleIbanChange })}
+            maxLength={42}
             placeholder="DE89 3704 0044 0532 0130 00"
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 font-mono text-sm tracking-wider outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />

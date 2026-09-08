@@ -3,6 +3,16 @@
 /**
  * Step 1: Persönliche Angaben
  * Name, Geburtsdatum, Familienstand, Schwerbehinderung
+ *
+ * Die `maxLength` an den Textfeldern spiegeln die Grenzen des Servers
+ * (`fragebogenFieldsSchema` in api/fragebogen/[token]/route.ts). Ohne sie nimmt
+ * das Feld beliebig viel entgegen, und erst der Auto-Save antwortet mit 400 —
+ * die Person liest dann "Bitte pruefen Sie die Eingabe", ohne dass auf dem
+ * Bildschirm irgendetwas falsch aussieht.
+ *
+ * Das `maxLength` allein genuegt aber nicht: Es bremst das Tippen, nicht das
+ * EINFUEGEN aus der Zwischenablage. Deshalb steht unter jedem dieser Felder
+ * zusaetzlich der Fehlerabsatz, der die Meldung des Schemas anzeigt.
  */
 
 import { useEffect, useMemo } from "react";
@@ -114,9 +124,13 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
           <input
             type="text"
             {...register("title")}
+            maxLength={100}
             placeholder="z.B. Dr., Prof."
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
+          {errors.title && (
+            <p className="text-xs text-destructive">{errors.title.message}</p>
+          )}
         </div>
       )}
 
@@ -129,6 +143,7 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
           <input
             type="text"
             {...register("firstName")}
+            maxLength={100}
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
           {errors.firstName && (
@@ -142,6 +157,7 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
           <input
             type="text"
             {...register("lastName")}
+            maxLength={100}
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
           {errors.lastName && (
@@ -159,8 +175,14 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
           <input
             type="text"
             {...register("birthName")}
+            maxLength={100}
             className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
           />
+          {errors.birthName && (
+            <p className="text-xs text-destructive">
+              {errors.birthName.message}
+            </p>
+          )}
         </div>
       )}
 
@@ -190,6 +212,7 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
             <input
               type="text"
               {...register("birthPlace")}
+              maxLength={200}
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
             />
             {errors.birthPlace && (
@@ -212,8 +235,14 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
               <input
                 type="text"
                 {...register("birthCountry")}
+                maxLength={100}
                 className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               />
+              {errors.birthCountry && (
+                <p className="text-xs text-destructive">
+                  {errors.birthCountry.message}
+                </p>
+              )}
             </div>
           )}
           {fc.isVisible("nationality") && (
@@ -224,8 +253,14 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
               <input
                 type="text"
                 {...register("nationality")}
+                maxLength={100}
                 className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               />
+              {errors.nationality && (
+                <p className="text-xs text-destructive">
+                  {errors.nationality.message}
+                </p>
+              )}
             </div>
           )}
         </div>
