@@ -107,10 +107,19 @@ const RELIGION_LABELS: Record<string, string> = {
   sonstige: "Sonstige",
 };
 
+/**
+ * Antworten auf „Sind wir Ihr Haupt- oder Nebenarbeitgeber?" (Schritt 6).
+ *
+ * Der interne Wert der dritten Option heisst historisch `"nein"`, in der Maske
+ * steht dort aber „Weiß ich nicht" — auf eine Entweder-oder-Frage ist „Nein"
+ * gar keine Antwort. Bitte den Wert NICHT umbenennen: In der Datenbank stehen
+ * bereits Fragebogen mit `"nein"`, ein Umbenennen brauchte also eine
+ * Datenmigration und braechte nichts, was das Label hier nicht auch loest.
+ */
 const EMPLOYER_TYPE_LABELS: Record<string, string> = {
   hauptarbeitgeber: "Ja, Hauptarbeitgeber",
   nebenarbeitgeber: "Ja, Nebenarbeitgeber",
-  nein: "Nein",
+  nein: "Weiß ich nicht",
 };
 
 const SCHOOL_DEGREE_LABELS: Record<string, string> = {

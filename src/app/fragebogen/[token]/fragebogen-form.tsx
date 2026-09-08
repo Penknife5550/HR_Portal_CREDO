@@ -7,7 +7,14 @@
  * und CREDO Corporate Design.
  */
 
-import { useState, useCallback, useMemo, type ReactNode } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
 import {
@@ -64,15 +71,43 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     [initialData.stepsConfig]
   );
 
+  // Einstiegsposition: bei einem neuen Fragebogen 0, bei einem fortgesetzten
+  // die Position des gespeicherten Schritts. Bewusst bei jedem Rendern neu
+  // berechnet statt als lazy initializer — `resolveResumeStep` ist ein
+  // findIndex, und so steht der Wert auch dem zweiten useState darunter zur
+  // Verfuegung, ohne die Berechnung zu verdoppeln.
+  const startIndex = resolveResumeStep(
+    activeSteps,
+    initialData.personalData?.currentStep as number | null | undefined
+  );
+
   // `currentStep` ist die Position in `activeSteps`, nicht die Registry-Nummer.
   // Gespeichert wird die Registry-Nummer — sie bleibt gueltig, auch wenn sich
   // die Vorlage aendert, waehrend der Vorgang laeuft.
-  const [currentStep, setCurrentStep] = useState(() =>
-    resolveResumeStep(
-      activeSteps,
-      initialData.personalData?.currentStep as number | null | undefined
-    )
-  );
+  const [currentStep, setCurrentStep] = useState(startIndex);
+
+  /**
+   * Die weiteste Position, die diese Person schon gesehen hat.
+   *
+   * Bis hierher darf die Schrittleiste springen — in BEIDE Richtungen. Vorher
+   * war nur `index < currentStep` anklickbar: Wer von Schritt 8 auf 5
+   * zuruecksprang, kam nur wieder nach vorn, indem er sich durch jeden Schritt
+   * einzeln klickte (Beobachtung aus dem Betrieb, 09/2026).
+   *
+   * Ein NIE gesehener Schritt bleibt gesperrt. Sonst ueberspringt man
+   * Pflichtangaben und erfaehrt davon erst beim Absenden, wo der Server den
+   * gesamten Fragebogen prueft.
+   *
+   * Der Startwert kommt aus dem gespeicherten Schritt. Nach einem Neuladen ist
+   * das nicht zwingend die weiteste je erreichte Position: `saveStepData`
+   * schreibt den Schritt, zu dem "Weiter" fuehrt — sprang jemand von 8 auf 5
+   * zurueck und klickte dort "Weiter", steht in der Datenbank die 6. Die Leiste
+   * sperrt 7 und 8 dann wieder, bis sie erneut durchlaufen sind. Das ist der
+   * Preis dafuer, dass EIN gespeichertes Feld zwei Fragen beantwortet (Wo
+   * steige ich wieder ein? Wie weit ist der Vorgang?); die eingegebenen Daten
+   * sind laengst gespeichert und gehen dabei nicht verloren.
+   */
+  const [maxErreicht, setMaxErreicht] = useState(startIndex);
   const [formData, setFormData] = useState<Record<string, unknown>>(
     initialData.personalData || {}
   );
@@ -83,6 +118,12 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
   const [saveMessage, setSaveMessage] = useState("");
   const [fehler, setFehler] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  /**
+   * Position, zu der gewechselt werden soll, sobald die Person den Verlust
+   * ihrer ungespeicherten Eingaben bestaetigt hat. `null` = keine Rueckfrage
+   * offen.
+   */
+  const [sprungZiel, setSprungZiel] = useState<number | null>(null);
 
   // FieldConfig-Helper für jeden Step erstellen
   const getFieldConfig = useCallback(
@@ -152,19 +193,119 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
     if (saved) {
       setCurrentStep(nextIndex);
+      // Erst jetzt gilt der neue Schritt als erreicht — nach dem GESPEICHERTEN
+      // "Weiter". Ein fehlgeschlagener Speicherversuch darf die Leiste nicht
+      // aufschliessen.
+      setMaxErreicht((bisher) => Math.max(bisher, nextIndex));
     }
   };
 
-  // Zurück zum vorherigen Step
-  const handleBack = () => {
-    if (currentStep > 0) {
-      // Die Meldung gehoert zum verlassenen Schritt — sie stehen zu lassen
-      // hiesse, einen Fehler an einer Stelle anzuzeigen, an der er nicht ist.
-      setFehler("");
-      setCurrentStep(currentStep - 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  // =============================================
+  // Sprung ueber die Schrittleiste
+  // =============================================
+
+  /**
+   * Der Bereich, in dem die Maske des aktuellen Schritts steht.
+   *
+   * Gebraucht wird er fuer die Frage "hat die Person hier gerade etwas
+   * eingetippt, das noch nicht gespeichert ist?". Jeder Schritt fuehrt sein
+   * eigenes react-hook-form; der Rahmen hier kommt an diese Werte nur ueber
+   * "Weiter" (also `handleNext`) heran. Ein Sprung ueber die Leiste laeuft
+   * daran vorbei — deshalb wird am DOM nachgesehen statt geraten.
+   */
+  const inhaltRef = useRef<HTMLDivElement>(null);
+
+  /** Stand der Eingabefelder beim Betreten des Schritts. */
+  const ausgangswerteRef = useRef<string | null>(null);
+
+  /**
+   * Die Werte aller Eingabefelder des aktuellen Schritts als ein Vergleichstext.
+   *
+   * Nur Felder MIT `name` — das sind die von react-hook-form registrierten,
+   * also genau die, deren Inhalt beim naechsten "Weiter" zum Server ginge.
+   *
+   * Was damit bewusst NICHT erfasst wird:
+   *  - Die **Datei-Felder** (Masernnachweis, Bescheinigungen, Anlagen). Sie
+   *    tragen keinen Namen, laden beim Auswaehlen sofort hoch und haengen
+   *    nicht am Speichern des Schritts.
+   *  - Die **Bestaetigungsfelder der Zusammenfassung** (Ort, Haken zur
+   *    Erklaerung und zur DSGVO). Auch sie sind namenlos, weil sie den
+   *    Zustand der Maske fuehren und nicht die Personalakte: Gespeichert
+   *    werden sie erst mit dem Absenden, ein "Weiter" gibt es dort nicht.
+   *
+   * Der Preis dafuer ist der Verzicht auf namenlose Felder insgesamt. Das ist
+   * die richtige Seite, auf der man irrt: Die Dokumentenliste der
+   * Zusammenfassung laedt nach dem Zeichnen nach und veraendert dabei den
+   * Bestand ihrer namenlosen Felder — jede Rueckfrage von dort waere ein
+   * Fehlalarm, und wer Fehlalarme gewoehnt ist, klickt auch den echten weg.
+   */
+  const leseEingaben = useCallback((): string | null => {
+    const wurzel = inhaltRef.current;
+    if (!wurzel) return null;
+    const felder = wurzel.querySelectorAll<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >("input[name], select[name], textarea[name]");
+    return Array.from(felder)
+      .map((feld) => {
+        const typ = (feld as HTMLInputElement).type;
+        // Bei Haken und Radioknoepfen steht die Antwort in `checked`; `value`
+        // ist dort der feste Wert der Option und aendert sich nie.
+        const wert =
+          typ === "checkbox" || typ === "radio"
+            ? (feld as HTMLInputElement).checked
+              ? "1"
+              : "0"
+            : feld.value;
+        // Trennzeichen, die in keiner Eingabe vorkommen koennen.
+        return `${feld.name}\u001f${wert}`;
+      })
+      .join("\u001e");
+  }, []);
+
+  // Ausgangsstand merken, sobald die Maske eines Schritts steht. Der Effekt
+  // laeuft nach dem Zeichnen, react-hook-form hat seine `defaultValues` dann
+  // bereits in die Felder geschrieben.
+  useEffect(() => {
+    ausgangswerteRef.current = leseEingaben();
+  }, [currentStep, leseEingaben]);
+
+  /** Wechsel ausfuehren — ohne weitere Rueckfrage. */
+  const wechsleZu = (index: number) => {
+    setSprungZiel(null);
+    // Die Meldung gehoert zum verlassenen Schritt — sie stehen zu lassen
+    // hiesse, einen Fehler an einer Stelle anzuzeigen, an der er nicht ist.
+    setFehler("");
+    setCurrentStep(index);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  /**
+   * Zu einem bereits erreichten Schritt wechseln.
+   *
+   * Ein Sprung speichert NICHT: Die Werte des aktuellen Schritts liegen im
+   * Formular des Schritts, nicht hier, und sie ungeprueft am Zod-Schema vorbei
+   * zum Server zu schicken waere schlimmer als sie zu verwerfen. Also wird
+   * gefragt, bevor etwas verloren geht — und nur dann, wenn wirklich etwas zu
+   * verlieren ist. Wer nichts angefasst hat, springt ohne Rueckfrage.
+   */
+  const springeZu = (index: number) => {
+    if (index === currentStep) return;
+    if (index < 0 || index > maxErreicht) return;
+    // Waehrend ein "Weiter" laeuft, wuerde dessen setCurrentStep den Sprung
+    // gleich wieder ueberschreiben.
+    if (saving) return;
+
+    if (leseEingaben() !== ausgangswerteRef.current) {
+      setSprungZiel(index);
+      return;
+    }
+    wechsleZu(index);
+  };
+
+  // Zurück zum vorherigen Step. Bewusst ueber denselben Weg wie die Leiste:
+  // Auch hier gehen ungespeicherte Eingaben verloren, und es waere schwer zu
+  // erklaeren, warum die Leiste davor warnt und der Knopf daneben nicht.
+  const handleBack = () => springeZu(currentStep - 1);
 
   // Fragebogen endgültig absenden.
   //
@@ -503,23 +644,29 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
           <div className="flex gap-1">
             {activeSteps.map((step, index) => {
               const isActive = index === currentStep;
-              const isDone = index < currentStep;
-              const isFuture = index > currentStep;
+              // Anklickbar ist alles, was schon einmal auf dem Bildschirm
+              // stand — vorwaerts wie rueckwaerts. Der Haken bleibt den
+              // Schritten vorbehalten, die mit "Weiter" abgeschlossen wurden;
+              // `maxErreicht` selbst wurde betreten, aber noch nicht bestaetigt.
+              const erreicht = index <= maxErreicht;
+              const isDone = index < maxErreicht;
 
               return (
                 <button
                   key={step.step}
-                  onClick={() => {
-                    if (isDone) {
-                      setFehler("");
-                      setCurrentStep(index);
-                    }
-                  }}
-                  disabled={isFuture}
+                  type="button"
+                  onClick={() => springeZu(index)}
+                  disabled={!erreicht || saving}
+                  aria-current={isActive ? "step" : undefined}
+                  title={
+                    erreicht
+                      ? `Schritt ${index + 1}: ${step.title}`
+                      : `Schritt ${index + 1}: ${step.title} — noch nicht erreicht`
+                  }
                   className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
                     isActive
                       ? "bg-primary text-primary-foreground"
-                      : isDone
+                      : erreicht
                         ? "bg-green-100 text-green-800 hover:bg-green-200"
                         : "text-muted-foreground opacity-50"
                   }`}
@@ -528,7 +675,7 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
                     className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
                       isActive
                         ? "bg-primary-foreground text-primary"
-                        : isDone
+                        : erreicht
                           ? "bg-green-600 text-white"
                           : "bg-muted text-muted-foreground"
                     }`}
@@ -603,12 +750,59 @@ export function FragebogenForm({ token, initialData }: FragebogenFormProps) {
             </p>
           </div>
 
-          {/* Step-Inhalt */}
-          <div className="p-6">
+          {/* Step-Inhalt. Der Ref liest vor einem Sprung ueber die Leiste die
+              Eingabefelder dieser Maske aus — siehe `leseEingaben`. */}
+          <div className="p-6" ref={inhaltRef}>
             {activeStep?.key ? stepComponents[activeStep.key] : null}
           </div>
         </div>
       </main>
+
+      {/* Rueckfrage vor dem Verwerfen ungespeicherter Eingaben.
+          Sie erscheint NUR, wenn sich in der Maske tatsaechlich etwas
+          geaendert hat: Ein Sprung, der stillschweigend Eingaben verwirft,
+          waere schlimmer als die alte, gesperrte Leiste — eine Rueckfrage bei
+          jedem Klick waere aber genau die Muehsal, die hier abgeschafft wird. */}
+      {sprungZiel !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sprung-titel"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setSprungZiel(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-2xl">
+            <h2 id="sprung-titel" className="text-base font-bold text-foreground">
+              Eingaben auf dieser Seite gehen verloren
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Sie haben auf dieser Seite etwas eingetragen oder geändert.
+              Gespeichert wird erst mit „Weiter“ am Ende der Seite. Wenn Sie
+              jetzt zu „{activeSteps[sprungZiel]?.title ?? "einem anderen Schritt"}“
+              wechseln, sind diese Eingaben weg.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setSprungZiel(null)}
+                className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Hier bleiben
+              </button>
+              <button
+                type="button"
+                onClick={() => wechsleZu(sprungZiel)}
+                className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
+              >
+                Ohne Speichern wechseln
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="mt-auto border-t bg-card py-4 text-center">

@@ -7,8 +7,9 @@
  * als sonst, und die vier Wege sind bewusst gleich ausführlich beschrieben —
  * niemand soll durch die Gestaltung in eine Richtung geschoben werden.
  *
- * Das Merkblatt steht **im Formular**, nicht nur als PDF-Anhang: Ein Download,
- * den niemand öffnet, erfüllt die Aufklärungspflicht nur auf dem Papier.
+ * Das Merkblatt steht **im Formular**, nicht nur hinter einem Verweis nach
+ * draußen: Ein Download, den niemand öffnet, erfüllt die Aufklärungspflicht nur
+ * auf dem Papier.
  */
 
 import { useMemo, useState } from "react";
@@ -23,6 +24,45 @@ import {
   istWaehlbar,
   prozent,
 } from "@/lib/minijob-rentenversicherung";
+import { statusLabel } from "@/lib/minijob-status";
+
+/**
+ * Wo der amtliche Wortlaut steht — verlinkt, nicht mitgeliefert.
+ *
+ * Frueher zeigte der Verweis auf `public/system-dokumente/merkblatt-rv-befreiung.pdf`
+ * mit dem Zusatz „Stand 30. Juni 2026". Eine mitgelieferte Datei muss von Hand
+ * nachgezogen werden, sobald die Minijob-Zentrale nachlegt — und bis das jemand
+ * bemerkt, liefern wir dem Beschaeftigten wissentlich einen veralteten Wortlaut
+ * aus, auf den er anschliessend seine Kenntnisnahme bestaetigt. Der Verweis auf
+ * die gepflegte Seite kann nicht veralten; ein festes Standdatum daneben waere
+ * irrefuehrend und faellt deshalb weg.
+ *
+ * Die Seite fuehrt die „Checkliste fuer geringfuegig entlohnte oder kurzfristig
+ * Beschaeftigte" — das Merkblatt zur Befreiung ist deren Anlage. Genau diese
+ * Adresse steht schon in der Projektdokumentation (docs/README.md,
+ * docs/module/minijob/minijob-umsetzungsstand.md) als Bezugsquelle des Originals.
+ */
+const MERKBLATT_QUELLE =
+  "https://www.minijob-zentrale.de/SharedDocs/Downloads/DE/Formulare/gewerblich/Checkliste_BDA_Personalfragebogen.html";
+
+/**
+ * Status aus dem Schritt „Weitere Beschaeftigung", bei denen die
+ * Rentenversicherungsfreiheit schon von Gesetzes wegen feststeht.
+ *
+ * Wer als Altersvollrentner nach der Regelaltersgrenze oder als
+ * Versorgungsempfaenger beschaeftigt wird, braucht keine Befreiung — es gibt
+ * schlicht nichts zu beantragen. Der Schritt wird trotzdem gezeigt: So steht
+ * die Feststellung „von Gesetzes wegen frei" im Fragebogen und im Nachweis,
+ * statt dort einfach zu fehlen. Ein uebersprungener Schritt hinterlaesst eine
+ * Luecke, die spaeter niemand mehr deuten kann.
+ *
+ * Die Werte sind dieselben wie im Server-Schema (`beschaeftigungsStatus` in
+ * `src/app/api/fragebogen/[token]/route.ts`) und in `minijob-status.ts`.
+ */
+const STATUS_VON_GESETZES_WEGEN_FREI: readonly string[] = [
+  "ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE",
+  "VERSORGUNGSEMPFAENGER",
+];
 
 interface StepProps {
   data: Record<string, unknown>;
@@ -53,8 +93,20 @@ export function Step11Rente({
   token,
   antragErzeugbar = true,
 }: StepProps) {
+  const gespeicherteEntscheidung = data.rvEntscheidung as string | undefined;
+
+  // Der Status aus dem Schritt „Weitere Beschaeftigung" beantwortet die Frage
+  // dieses Schritts unter Umstaenden schon. Dann ist die Angabe hier keine Wahl
+  // mehr, sondern eine Feststellung — also steht sie vor.
+  const statusWert = (data.beschaeftigungsStatus as string) || "";
+  const statusMachtFrei = STATUS_VON_GESETZES_WEGEN_FREI.includes(statusWert);
+
   const [entscheidung, setEntscheidung] = useState<string>(
-    (data.rvEntscheidung as string) || ""
+    // Vorausfuellen heisst nicht ueberschreiben: Der Vorgabewert greift nur,
+    // solange nichts gespeichert ist. Wer schon geantwortet hat, findet seine
+    // eigene Antwort wieder — auch dann, wenn sie der Vorgabe widerspricht.
+    gespeicherteEntscheidung ||
+      (statusMachtFrei ? "RENTENVERSICHERUNGSFREI" : "")
   );
   const [merkblattGelesen, setMerkblattGelesen] = useState(
     data.rvMerkblattGelesen === true
@@ -75,9 +127,8 @@ export function Step11Rente({
 
   // Der Server erzeugt den Antrag aus dem GESPEICHERTEN Stand. Solange die
   // Auswahl nur im Browser steht, liefe ein Download auf die alte Entscheidung
-  // — oder ins Leere. Deshalb haengt der Knopf am gespeicherten Wert, nicht am
-  // gerade angeklickten.
-  const gespeicherteEntscheidung = data.rvEntscheidung as string | undefined;
+  // — oder ins Leere. Deshalb haengt der Knopf am gespeicherten Wert (oben
+  // gelesen), nicht am gerade angeklickten.
   const antragSchonGespeichert =
     gespeicherteEntscheidung === "BEFREIUNG_BEANTRAGT";
 
@@ -169,23 +220,48 @@ export function Step11Rente({
             {/* Der Befreiungsantrag bestaetigt die Kenntnisnahme des amtlichen
                 Merkblatts. Was oben steht, ist unsere Zusammenfassung — das
                 Original gehoert daneben, sichtbar getrennt, damit die
-                Bestaetigung sich auf den amtlichen Wortlaut beziehen kann. */}
+                Bestaetigung sich auf den amtlichen Wortlaut beziehen kann.
+                Warum verlinkt statt mitgeliefert: siehe MERKBLATT_QUELLE. */}
             <p className="border-t border-border pt-3">
               <a
-                href="/system-dokumente/merkblatt-rv-befreiung.pdf"
+                href={MERKBLATT_QUELLE}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-semibold text-primary underline underline-offset-2"
               >
-                Amtliches Merkblatt der Minijob-Zentrale öffnen (PDF)
+                Amtliches Merkblatt bei der Minijob-Zentrale öffnen
               </a>
               <span className="mt-0.5 block text-muted-foreground">
-                Der Wortlaut im Original, Stand 30. Juni 2026.
+                Öffnet die Seite der Minijob-Zentrale in einem neuen Fenster.
+                Das Merkblatt gehört dort zur Checkliste — so lesen Sie immer
+                die Fassung, die gerade gilt.
               </span>
             </p>
           </div>
         )}
       </div>
+
+      {/* ============================================= */}
+      {/* Warum hier schon etwas angekreuzt ist          */}
+      {/* ============================================= */}
+      {statusMachtFrei && (
+        <div className="rounded-lg border-l-4 border-[#FBC900] bg-[#FBC900]/10 px-4 py-3 text-sm">
+          <p className="font-semibold text-foreground">
+            Eine Antwort ist für Sie schon vorausgewählt
+          </p>
+          <p className="mt-1 text-foreground/80">
+            Sie haben bei den Angaben zu Ihrer Beschäftigung „
+            {statusLabel(statusWert)}“ angegeben. Damit sind Sie in der
+            Rentenversicherung von Gesetzes wegen frei — eine Befreiung müssen
+            Sie gar nicht erst beantragen. Deshalb ist unten die Antwort „Ich
+            bin bereits von Gesetzes wegen frei“ bereits gewählt.
+          </p>
+          <p className="mt-1 text-foreground/80">
+            Sie können sie trotzdem ändern: Sie kennen Ihre Lage besser als
+            dieses Formular.
+          </p>
+        </div>
+      )}
 
       {/* ============================================= */}
       {/* Die vier Wege                                 */}
@@ -223,6 +299,14 @@ export function Step11Rente({
                   <p className="text-sm font-semibold text-foreground">
                     {option.label}
                   </p>
+                  {/* Verbindet den Hinweis oben mit der Zeile, die er meint —
+                      sonst muss man raten, welche der Antworten gemeint war. */}
+                  {statusMachtFrei &&
+                    option.wert === "RENTENVERSICHERUNGSFREI" && (
+                      <p className="mt-1 inline-block rounded-full bg-[#FBC900]/20 px-2 py-0.5 text-[11px] font-semibold text-foreground">
+                        Aufgrund Ihrer Angabe vorausgewählt
+                      </p>
+                    )}
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {option.kurz}
                   </p>

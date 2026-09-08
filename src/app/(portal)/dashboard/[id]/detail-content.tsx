@@ -1263,6 +1263,25 @@ const RELIGION_LABELS: Record<string, string> = {
   sonstige: "Sonstige",
 };
 
+/**
+ * Antworten auf „Sind wir Ihr Haupt- oder Nebenarbeitgeber?" (Schritt 6).
+ *
+ * Der interne Wert der dritten Option heisst historisch `"nein"`, in der Maske
+ * steht dort aber „Weiß ich nicht". Ohne diese Zuordnung stand hier der
+ * Rohwert — die Sachbearbeitung las „nein" und damit das Gegenteil dessen,
+ * was die Person angeklickt hat. Bitte den Wert NICHT umbenennen: In der
+ * Datenbank stehen bereits Fragebogen mit `"nein"`, ein Umbenennen brauchte
+ * eine Datenmigration und braechte nichts, was das Label hier nicht auch
+ * loest. Dieselbe Tabelle steht in der Zusammenfassung des Fragebogens
+ * (`src/app/fragebogen/[token]/steps/step10-summary.tsx`) — beide muessen
+ * zusammen geaendert werden.
+ */
+const EMPLOYER_TYPE_LABELS: Record<string, string> = {
+  hauptarbeitgeber: "Hauptarbeitgeber",
+  nebenarbeitgeber: "Nebenarbeitgeber",
+  nein: "Weiß ich nicht",
+};
+
 function TabFragebogenDaten({
   data,
   onboardingId,
@@ -1491,7 +1510,7 @@ function TabFragebogenDaten({
             </>
           )}
           <FieldRow label="Weitere Beschäftigungen" value={formatBoolean(pd.hasOtherEmployment)} />
-          <FieldRow label="Arbeitgebertyp" value={pd.employerType || "\u2014"} />
+          <FieldRow label="Arbeitgebertyp" value={pd.employerType ? (EMPLOYER_TYPE_LABELS[pd.employerType] || pd.employerType) : "\u2014"} />
           <FieldRow label="Summe über der Geringfügigkeitsgrenze" value={formatBoolean(pd.summeUeberGeringfuegigkeitsgrenze ?? null)} />
           <FieldRow label="Vorbeschäftigungen in diesem Jahr" value={formatBoolean(pd.vorbeschaeftigungenVorhanden ?? null)} />
           <FieldRow label="Tätigkeit im Ausland" value={formatBoolean(pd.auslandsbeschaeftigungVorhanden ?? null)} />
