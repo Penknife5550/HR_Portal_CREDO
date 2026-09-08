@@ -10,11 +10,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
   DOCUMENT_TYPE_LABELS,
-  MASERNSCHUTZ_HINWEIS,
-  RV_BEFREIUNG_HINWEIS,
+  PFLICHT_HINWEISE,
   effektivePflichtDokumente,
   istNachreichbar,
 } from "@/lib/required-documents";
+import { ablaufAmpel, istFristpflichtig } from "@/lib/dokument-fristen";
 import { masernschutzPflichtig } from "@/lib/masernschutz";
 import { formatBytes } from "@/lib/format";
 
@@ -23,6 +23,8 @@ interface UploadedDoc {
   fileName: string;
   fileSize: number;
   type: string;
+  /** Ablaufdatum als ISO-Zeichenkette; `null` = keine Frist erfasst. */
+  gueltigBis?: string | null;
   uploadedAt: string;
 }
 
@@ -49,6 +51,17 @@ interface DocumentUploadProps {
    */
   geburtsdatum?: unknown;
   organisationstyp?: string | null;
+  /**
+   * Selbstauskunft aus Schritt 1 — sie erzeugt die Pflicht zu Aufenthaltstitel
+   * und Arbeitserlaubnis.
+   *
+   * `null`/`undefined` heisst "noch nicht beantwortet" und erzeugt KEINE
+   * Pflicht; die Regel dazu steht in `required-documents.ts` und wird hier nur
+   * uebergeben, damit Client und Server dieselbe Antwort bekommen.
+   */
+  aufenthaltstitelErforderlich?: boolean | null;
+  /** "gesetzlich" | "privat" aus Schritt 4 — "privat" verlangt den PKV-Nachweis. */
+  healthInsuranceType?: string | null;
   /** Ist beim Mandanten eine Betriebsnummer hinterlegt? */
   antragErzeugbar?: boolean;
   /**
@@ -67,18 +80,22 @@ const FALLBACK_REQUIRED_TYPES = ["GEBURTSURKUNDE_EIGEN", "GEBURTSURKUNDE_KIND"];
 // Optionale Dokumente (Dropdown)
 const OPTIONAL_DOCUMENT_CATEGORIES = [
   { value: "kk_bescheinigung", label: "Mitgliedsbescheinigung Krankenkasse" },
+  { value: "pkv_nachweis", label: "Nachweis private Krankenversicherung" },
   { value: "sv_ausweis", label: "Sozialversicherungsausweis" },
   { value: "masernschutz", label: "Masernschutz-Nachweis" },
   { value: "sb_ausweis", label: "Schwerbehindertenausweis" },
   { value: "rv_befreiung", label: "Antrag RV-Befreiung (Minijob)" },
   { value: "vl_vertrag", label: "VL-Vertrag (Vermoeg. Leistungen)" },
   { value: "bav_vertrag", label: "bAV-Vertrag (Altersvorsorge)" },
+  { value: "aufenthaltstitel", label: "Aufenthaltstitel" },
+  { value: "arbeitserlaubnis", label: "Arbeitserlaubnis / Zusatzblatt" },
   { value: "zeugnis", label: "Zeugnis / Qualifikationsnachweis" },
   { value: "sonstiges", label: "Sonstiges Dokument" },
 ];
 
 const TYPE_LABELS: Record<string, string> = {
   KK_BESCHEINIGUNG: "KK-Bescheinigung",
+  PKV_NACHWEIS: "PKV-Nachweis",
   GEBURTSURKUNDE_EIGEN: "Geburtsurkunde (eigene)",
   GEBURTSURKUNDE_KIND: "Geburtsurkunde Kind",
   SV_AUSWEIS: "SV-Ausweis",
@@ -87,6 +104,8 @@ const TYPE_LABELS: Record<string, string> = {
   RV_BEFREIUNG: "RV-Befreiung",
   VL_VERTRAG: "VL-Vertrag",
   BAV_VERTRAG: "bAV-Vertrag",
+  AUFENTHALTSTITEL: "Aufenthaltstitel",
+  ARBEITSERLAUBNIS: "Arbeitserlaubnis",
   ZEUGNIS: "Zeugnis",
   SONSTIGES: "Sonstiges",
   ARBEITSVERTRAG: "Arbeitsvertrag",
@@ -94,6 +113,17 @@ const TYPE_LABELS: Record<string, string> = {
   ABSCHLUSSZEUGNIS: "Abschlusszeugnis",
   INFEKTIONSSCHUTZ: "Infektionsschutz",
 };
+
+/**
+ * Der Satz unter dem Datumsfeld — er beantwortet die Frage „warum wollt ihr das
+ * wissen?", bevor sie entsteht.
+ *
+ * Und er verspricht NICHT, dass die Person selbst erinnert wird: Die Erinnerung
+ * geht an das Postfach der Personalabteilung (Entscheidung 07.09.2026). Ein
+ * Satz, der etwas anderes zusagt, waere in einem Jahr eine gebrochene Zusage.
+ */
+const FRIST_ERKLAERUNG =
+  "Damit die Personalabteilung Sie rechtzeitig vor Ablauf ansprechen kann.";
 
 export function DocumentUpload({
   token,
@@ -103,6 +133,8 @@ export function DocumentUpload({
   rvEntscheidung,
   geburtsdatum,
   organisationstyp,
+  aufenthaltstitelErforderlich,
+  healthInsuranceType,
   antragErzeugbar = true,
   onMissingChange,
 }: DocumentUploadProps) {
@@ -122,6 +154,18 @@ export function DocumentUpload({
    */
   const [ladeFehler, setLadeFehler] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  /**
+   * Das eingetippte Ablaufdatum je Dokumenttyp, bevor die Datei gewaehlt wird
+   * — und das nachgetragene je Dokument-Id.
+   *
+   * Zwei Schluesselraeume in EINER Ablage waeren verwechselbar, deshalb zwei
+   * Zustaende. Der Wert ist die Zeichenkette aus `<input type="date">`
+   * ("JJJJ-MM-TT" oder ""), nicht `Date`: Umgerechnet wird erst auf dem Server,
+   * damit die Zeitzone des Browsers nicht in ein reines Datum hineinredet.
+   */
+  const [fristEingabe, setFristEingabe] = useState<Record<string, string>>({});
+  const [nachtragEingabe, setNachtragEingabe] = useState<Record<string, string>>({});
+  const [nachtragLaeuft, setNachtragLaeuft] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const requiredFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -162,12 +206,21 @@ export function DocumentUpload({
       return;
     }
 
+    const kategorie = typeOverride || selectedCategory;
+    const dbTyp = kategorie.toUpperCase();
+
     setUploading(true);
     if (typeOverride) setUploadingType(typeOverride);
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("type", typeOverride || selectedCategory);
+    formData.append("type", kategorie);
+    // Nur bei den Typen mitschicken, die ueberhaupt eine Frist tragen: Der
+    // Server weist ein Datum an allen anderen mit 400 zurueck — ein
+    // vergessener Eintrag im Zustand duerfte nicht den naechsten Upload eines
+    // ganz anderen Nachweises scheitern lassen.
+    const frist = istFristpflichtig(dbTyp) ? (fristEingabe[dbTyp] ?? "") : "";
+    if (frist) formData.append("gueltigBis", frist);
 
     try {
       const res = await fetch(`/api/fragebogen/${token}/documents`, {
@@ -183,6 +236,10 @@ export function DocumentUpload({
 
       setSuccess(`${file.name} erfolgreich hochgeladen.`);
       setTimeout(() => setSuccess(""), 3000);
+      // Das Datum ist jetzt am Dokument gespeichert; bliebe es zusaetzlich im
+      // Eingabefeld stehen, ginge es beim naechsten Upload desselben Typs
+      // ungefragt mit.
+      if (frist) setFristEingabe((v) => ({ ...v, [dbTyp]: "" }));
       await loadDocuments();
     } catch {
       setError("Verbindungsfehler beim Hochladen.");
@@ -190,6 +247,46 @@ export function DocumentUpload({
       setUploading(false);
       setUploadingType(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  /**
+   * Ablaufdatum an einem bereits hochgeladenen Nachweis nachtragen.
+   *
+   * Der Weg existiert, damit „Frist fehlt" keine Sackgasse ist: Ohne ihn muesste
+   * die Person ihren Scan loeschen und dieselbe Datei erneut hochladen, nur um
+   * ein Datum zu ergaenzen.
+   */
+  const handleFristNachtragen = async (docId: string) => {
+    const wert = (nachtragEingabe[docId] ?? "").trim();
+    if (!wert) {
+      setError("Bitte geben Sie ein Ablaufdatum an.");
+      return;
+    }
+
+    setError("");
+    setNachtragLaeuft(docId);
+    try {
+      const res = await fetch(`/api/fragebogen/${token}/documents`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId: docId, gueltigBis: wert }),
+      });
+      if (!res.ok) {
+        const koerper = await res.json().catch(() => null);
+        const meldung =
+          koerper && typeof koerper.error === "string" ? koerper.error : "";
+        setError(meldung || "Das Ablaufdatum konnte nicht gespeichert werden.");
+        return;
+      }
+      setNachtragEingabe((v) => ({ ...v, [docId]: "" }));
+      setSuccess("Ablaufdatum gespeichert.");
+      setTimeout(() => setSuccess(""), 3000);
+      await loadDocuments();
+    } catch {
+      setError("Verbindungsfehler beim Speichern des Ablaufdatums.");
+    } finally {
+      setNachtragLaeuft(null);
     }
   };
 
@@ -259,6 +356,8 @@ export function DocumentUpload({
       geburtsdatum,
       organisationstyp,
     }),
+    aufenthaltstitelErforderlich,
+    healthInsuranceType,
   });
 
   const activeRequiredDocs = pflichtTypen.map((t) => ({
@@ -267,6 +366,10 @@ export function DocumentUpload({
     label: DOCUMENT_TYPE_LABELS[t] ?? t,
     /** Haelt das Fehlen dieser Unterlage das Absenden auf? */
     nachreichbar: istNachreichbar(t),
+    /** Braucht dieser Nachweis zusaetzlich ein Ablaufdatum? */
+    mitFrist: istFristpflichtig(t),
+    /** Der erklaerende Satz, falls dieser Typ einen hat. */
+    hinweis: PFLICHT_HINWEISE[t],
   }));
 
   // Was hier Pflicht ist, gehoert nicht zusaetzlich ins Dropdown der freiwilligen
@@ -369,6 +472,13 @@ export function DocumentUpload({
             {activeRequiredDocs.map((reqDoc) => {
               const uploaded = isRequiredUploaded(reqDoc.dbType);
               const isCurrentlyUploading = uploadingType === reqDoc.value;
+              const doc = documents.find((d) => d.type === reqDoc.dbType);
+              // Nur bei fristpflichtigen Typen ueberhaupt gerechnet — sonst
+              // stuende an einer Geburtsurkunde „Keine Frist erfasst", was
+              // richtig, aber sinnlos ist.
+              const ampel =
+                reqDoc.mitFrist && doc ? ablaufAmpel(doc.gueltigBis) : null;
+              const fristFehlt = ampel !== null && ampel.kategorie === null;
 
               return (
                 <div
@@ -397,28 +507,37 @@ export function DocumentUpload({
                       <p className="text-sm font-medium text-foreground">{reqDoc.label}</p>
                       <p className="text-[10px] text-muted-foreground">
                         {uploaded
-                          ? "Hochgeladen"
+                          ? ampel
+                            ? `Hochgeladen – ${ampel.text}`
+                            : "Hochgeladen"
                           : reqDoc.nachreichbar
                             ? "Noch nicht hochgeladen – Pflicht, nachreichbar"
                             : "Noch nicht hochgeladen – Pflicht"}
                       </p>
-                      {/* Beim Befreiungsantrag reicht der Hinweis „hochladen" nicht:
-                          Der Beschaeftigte muss wissen, woher das Blatt kommt und
-                          warum ein Haken hier nicht genuegt. */}
+                      {/* Die Erklaerung steht genau dort, wo die Person die
+                          Datei gerade in der Hand haelt. Sie kommt aus
+                          required-documents.ts und nicht aus einer Kette von
+                          `if`s hier: Sonst bekommt der naechste Dokumenttyp
+                          seinen Satz nie, weil niemand die Verzweigung
+                          nachtraegt. */}
+                      {!uploaded && reqDoc.hinweis && (
+                        <p className="mt-1.5 max-w-md text-[11px] leading-relaxed text-amber-800">
+                          {reqDoc.hinweis}
+                        </p>
+                      )}
+                      {/* Der Befreiungsantrag braucht ueber den Satz hinaus das
+                          Blatt selbst — sonst weiss niemand, woher es kommt. */}
                       {reqDoc.dbType === "RV_BEFREIUNG" && !uploaded && (
-                        <div className="mt-1.5 max-w-md">
-                          <p className="text-[11px] leading-relaxed text-amber-800">
-                            {RV_BEFREIUNG_HINWEIS}
-                          </p>
+                        <div className="mt-1 max-w-md">
                           {antragErzeugbar ? (
                             <a
                               href={`/api/fragebogen/${token}/rv-antrag?art=BEFREIUNG`}
-                              className="mt-1 inline-block text-[11px] font-semibold text-primary underline underline-offset-2"
+                              className="inline-block text-[11px] font-semibold text-primary underline underline-offset-2"
                             >
                               Antrag ausgefüllt herunterladen (PDF)
                             </a>
                           ) : (
-                            <p className="mt-1 text-[11px] font-medium text-amber-900">
+                            <p className="text-[11px] font-medium text-amber-900">
                               Der Antrag kann derzeit nicht erstellt werden. Bitte
                               wenden Sie sich an die Personalabteilung — Ihre
                               Eingaben bleiben gespeichert.
@@ -426,14 +545,70 @@ export function DocumentUpload({
                           )}
                         </div>
                       )}
-                      {/* Beim Masernschutz steht die Erklaerung genau dort, wo
-                          die Person die Datei gerade in der Hand haelt: was
-                          zaehlt, dass sie nachreichen darf — und was folgt,
-                          wenn sie es nicht tut. */}
-                      {reqDoc.dbType === "MASERNSCHUTZ" && !uploaded && (
-                        <p className="mt-1.5 max-w-md text-[11px] leading-relaxed text-amber-800">
-                          {MASERNSCHUTZ_HINWEIS}
-                        </p>
+                      {/* Das Ablaufdatum wird VOR der Datei abgefragt, damit es
+                          mit ihr zusammen gespeichert werden kann. Es ist
+                          freiwillig: Ein Pflichtfeld daneben liesse den Upload
+                          scheitern, und der Scan ist das Wichtigere. */}
+                      {reqDoc.mitFrist && !uploaded && (
+                        <div className="mt-2 max-w-md">
+                          <label
+                            htmlFor={`frist-${reqDoc.value}`}
+                            className="mb-1 block text-[11px] font-medium text-foreground"
+                          >
+                            Gültig bis (Ablaufdatum)
+                          </label>
+                          <input
+                            id={`frist-${reqDoc.value}`}
+                            type="date"
+                            value={fristEingabe[reqDoc.dbType] ?? ""}
+                            onChange={(e) =>
+                              setFristEingabe((v) => ({
+                                ...v,
+                                [reqDoc.dbType]: e.target.value,
+                              }))
+                            }
+                            className="rounded-lg border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                          />
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {FRIST_ERKLAERUNG}
+                          </p>
+                        </div>
+                      )}
+                      {/* Hochgeladen, aber ohne Datum: Das darf nicht still
+                          bleiben. Die Ampel kann dann naemlich gar nichts
+                          sagen — und ein Nachweis ohne Frist sieht auf jeder
+                          Uebersicht genauso vollstaendig aus wie einer mit. */}
+                      {uploaded && fristFehlt && doc && (
+                        <div className="mt-2 max-w-md rounded-lg border border-amber-300 bg-amber-50 p-2">
+                          <p className="text-[11px] font-medium text-amber-900">
+                            Kein Ablaufdatum erfasst — wir können vor Ablauf
+                            nicht erinnern.
+                          </p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            <input
+                              type="date"
+                              aria-label={`Ablaufdatum für ${reqDoc.label}`}
+                              value={nachtragEingabe[doc.id] ?? ""}
+                              onChange={(e) =>
+                                setNachtragEingabe((v) => ({
+                                  ...v,
+                                  [doc.id]: e.target.value,
+                                }))
+                              }
+                              className="rounded-lg border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                            />
+                            <button
+                              type="button"
+                              disabled={nachtragLaeuft === doc.id}
+                              onClick={() => handleFristNachtragen(doc.id)}
+                              className="rounded-lg border border-amber-600 px-2 py-1 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                            >
+                              {nachtragLaeuft === doc.id
+                                ? "Wird gespeichert..."
+                                : "Datum speichern"}
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -530,6 +705,35 @@ export function DocumentUpload({
           </select>
         </div>
 
+        {/* Auch freiwillig hochgeladene Titel laufen ab. Ohne dieses Feld waere
+            das Ablaufdatum eine Eigenschaft des Weges („nur wenn es Pflicht
+            war") statt eine des Dokuments. */}
+        {istFristpflichtig(selectedCategory.toUpperCase()) && (
+          <div className="mb-3">
+            <label
+              htmlFor="frist-optional"
+              className="mb-1 block text-xs font-medium text-foreground"
+            >
+              Gültig bis (Ablaufdatum)
+            </label>
+            <input
+              id="frist-optional"
+              type="date"
+              value={fristEingabe[selectedCategory.toUpperCase()] ?? ""}
+              onChange={(e) =>
+                setFristEingabe((v) => ({
+                  ...v,
+                  [selectedCategory.toUpperCase()]: e.target.value,
+                }))
+              }
+              className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {FRIST_ERKLAERUNG}
+            </p>
+          </div>
+        )}
+
         {/* Drag & Drop Zone */}
         <div
           onDragEnter={handleDrag}
@@ -621,6 +825,13 @@ export function DocumentUpload({
                     <p className="text-[10px] text-muted-foreground">
                       {TYPE_LABELS[doc.type] || doc.type} &middot;{" "}
                       {formatBytes(doc.fileSize)}
+                      {/* Bei fristpflichtigen Nachweisen gehoert die Frist in
+                          dieselbe Zeile wie der Typ — sonst steht sie nur oben
+                          bei den Pflichten, und ein freiwillig hochgeladener
+                          Titel traegt sie nirgends. */}
+                      {istFristpflichtig(doc.type) && (
+                        <> &middot; {ablaufAmpel(doc.gueltigBis).text}</>
+                      )}
                     </p>
                   </div>
                 </div>

@@ -101,6 +101,7 @@ describe("Freigabeliste des Auto-Save", () => {
     // Feld steht im Kopfkommentar von fragebogen-felder.ts.
     expect([...LEERBARE_FRAGEBOGEN_FELDER].sort()).toEqual([
       "agenturFuerArbeit",
+      "aufenthaltstitelGueltigBis",
       "beschaeftigungsStatusSonstige",
       "childAllowance",
       "disabilityDegree",

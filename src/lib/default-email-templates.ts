@@ -3421,6 +3421,225 @@ CREDO Gruppe – {{einrichtung}}`,
       { key: "{{sachbearbeiter_name}}", description: "Wer versendet hat (Gruszformel)" },
     ],
   },
+
+  // =============================================
+  // Befristete Nachweise: Fristerinnerung an HR
+  //
+  // Beide Vorlagen sind so gebaut, dass HR handeln kann, ohne erst das Portal
+  // zu oeffnen: WER, WELCHES Papier, BIS WANN, WIE VIELE Tage — und was zu tun
+  // ist. Der Link ist die Abkuerzung, nicht die Voraussetzung.
+  // =============================================
+  {
+    event: "dokument-ablauf-warnung",
+    name: "Befristeter Nachweis läuft ab (HR-Erinnerung)",
+    subject: "Nachweis läuft ab: {{dokument_typ}} – {{mitarbeiter_name}} ({{dringlichkeit}})",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fff3c9;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#8a6d00;font-weight:bold;font-size:14px;">Fristerinnerung · {{dringlichkeit}}</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">{{dokument_typ}} von {{mitarbeiter_name}} läuft ab</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
+            der Nachweis <strong>{{dokument_typ}}</strong> für <strong>{{mitarbeiter_name}}</strong> gilt nur noch bis zum <strong>{{gueltig_bis}}</strong> — das sind noch <strong>{{tage_verbleibend}} Tage</strong>.
+          </p>
+
+          <!-- Daten -->
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 22px;">
+            <tr><td style="padding:16px 18px;">
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Person</p>
+              <p style="margin:0 0 16px;color:#374151;font-size:14px;">{{mitarbeiter_name}} · {{mitarbeiter_email}}<br>{{einrichtung}} · Vorgang {{vorgangsnummer}}</p>
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Nachweis</p>
+              <p style="margin:0 0 16px;color:#374151;font-size:14px;">{{dokument_typ}}<br><span style="color:#6b7280;font-size:13px;">{{dokument_datei}}</span></p>
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Frist</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{frist_text}}</p>
+            </td></tr>
+          </table>
+
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
+            Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate. Der neue Nachweis gehört anschließend <strong>mit seinem Ablaufdatum</strong> in den Vorgang — erst dann endet diese Erinnerung.
+          </p>
+
+          <!-- Button -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#575756;border-radius:8px;">
+              <a href="{{portalLink}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Vorgang im Portal öffnen →
+              </a>
+            </td></tr>
+          </table>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Diese Erinnerung wiederholt sich in kürzer werdenden Abständen, je näher der Ablauf rückt (ab 90 Tagen monatlich, ab 42 Tagen alle zwei Wochen, ab 14 Tagen alle drei Tage). Sie endet, sobald ein Nachweis mit späterer Frist im Vorgang liegt.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;">
+            <strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich
+          </p>
+          <p style="margin:0;color:#bbbbbb;font-size:11px;text-align:center;">{{einrichtung}}</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Fristerinnerung ({{dringlichkeit}}) – {{dokument_typ}} von {{mitarbeiter_name}} läuft ab
+
+Der Nachweis {{dokument_typ}} für {{mitarbeiter_name}} gilt nur noch bis zum {{gueltig_bis}} — das sind noch {{tage_verbleibend}} Tage.
+
+Person:   {{mitarbeiter_name}} · {{mitarbeiter_email}}
+          {{einrichtung}} · Vorgang {{vorgangsnummer}}
+Nachweis: {{dokument_typ}} ({{dokument_datei}})
+Frist:    {{frist_text}}
+
+Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate. Der neue Nachweis gehört anschließend mit seinem Ablaufdatum in den Vorgang — erst dann endet diese Erinnerung.
+
+Vorgang im Portal: {{portalLink}}
+
+Diese Erinnerung wiederholt sich in kürzer werdenden Abständen, je näher der Ablauf rückt (ab 90 Tagen monatlich, ab 42 Tagen alle zwei Wochen, ab 14 Tagen alle drei Tage). Sie endet, sobald ein Nachweis mit späterer Frist im Vorgang liegt.
+
+CREDO Gruppe – Freie Evangelische Schulen
+{{einrichtung}}`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name der beschäftigten Person" },
+      { key: "{{mitarbeiter_email}}", description: "E-Mail der beschäftigten Person (nur zur Anzeige, NICHT als Empfänger gedacht)" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
+      { key: "{{dokument_typ}}", description: "Art des Nachweises (z.B. Aufenthaltstitel)" },
+      { key: "{{dokument_datei}}", description: "Dateiname des hochgeladenen Nachweises" },
+      { key: "{{gueltig_bis}}", description: "Ablaufdatum des Nachweises (TT.MM.JJJJ)" },
+      { key: "{{tage_verbleibend}}", description: "Verbleibende Kalendertage bis zum Ablauf" },
+      { key: "{{frist_text}}", description: "Fertiger Satz zur Frist (z.B. „Läuft in 42 Tagen ab (20.10.2026)“)" },
+      { key: "{{dringlichkeit}}", description: "Ampel-Stufe (Beobachten/Warnung/Kritisch)" },
+      { key: "{{portalLink}}", description: "Link zur Vorgangs-Detailseite im Portal" },
+    ],
+  },
+
+  {
+    event: "dokument-abgelaufen",
+    name: "Befristeter Nachweis ist abgelaufen (HR-Warnung)",
+    subject: "ABGELAUFEN: {{dokument_typ}} – {{mitarbeiter_name}} (seit {{tage_ueberfaellig}} Tagen)",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#f7c9c9;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#7a0c12;font-weight:bold;font-size:14px;">Nachweis abgelaufen</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">{{dokument_typ}} von {{mitarbeiter_name}} ist abgelaufen</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
+            der Nachweis <strong>{{dokument_typ}}</strong> für <strong>{{mitarbeiter_name}}</strong> galt bis zum <strong>{{gueltig_bis}}</strong> und ist seit <strong>{{tage_ueberfaellig}} Tagen</strong> abgelaufen. Ein gültiger Nachfolge-Nachweis liegt im Portal nicht vor.
+          </p>
+
+          <!-- Daten -->
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 22px;">
+            <tr><td style="padding:16px 18px;">
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Person</p>
+              <p style="margin:0 0 16px;color:#374151;font-size:14px;">{{mitarbeiter_name}} · {{mitarbeiter_email}}<br>{{einrichtung}} · Vorgang {{vorgangsnummer}}</p>
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Nachweis</p>
+              <p style="margin:0 0 16px;color:#374151;font-size:14px;">{{dokument_typ}}<br><span style="color:#6b7280;font-size:13px;">{{dokument_datei}}</span></p>
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Frist</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{frist_text}}</p>
+            </td></tr>
+          </table>
+
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Bitte klären Sie <strong>umgehend</strong>, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer <strong>Fiktionsbescheinigung</strong> fort (§ 81 Abs. 4 AufenthG) — dann laden Sie diese als Nachweis hoch und die Warnung endet. Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
+            Das Portal sperrt nichts. Der Nachweis ist auf „Abgelaufen“ gesetzt und der Vorgang rot markiert — die Bewertung und die Entscheidung bleiben bei Ihnen.
+          </p>
+
+          <!-- Button -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#575756;border-radius:8px;">
+              <a href="{{portalLink}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Vorgang im Portal öffnen →
+              </a>
+            </td></tr>
+          </table>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
+          <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
+            Diese Warnung wiederholt sich alle drei Tage und endet 180 Tage nach dem Ablauf. Die Markierung im Portal bleibt danach bestehen.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;text-align:center;line-height:1.5;">
+            <strong style="color:#575756;">CREDO Gruppe</strong> – Freie Evangelische Schulen<br>lebensnah · wegweisend · christlich
+          </p>
+          <p style="margin:0;color:#bbbbbb;font-size:11px;text-align:center;">{{einrichtung}}</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `ABGELAUFEN – {{dokument_typ}} von {{mitarbeiter_name}}
+
+Der Nachweis {{dokument_typ}} für {{mitarbeiter_name}} galt bis zum {{gueltig_bis}} und ist seit {{tage_ueberfaellig}} Tagen abgelaufen. Ein gültiger Nachfolge-Nachweis liegt im Portal nicht vor.
+
+Person:   {{mitarbeiter_name}} · {{mitarbeiter_email}}
+          {{einrichtung}} · Vorgang {{vorgangsnummer}}
+Nachweis: {{dokument_typ}} ({{dokument_datei}})
+Frist:    {{frist_text}}
+
+Bitte klären Sie umgehend, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer Fiktionsbescheinigung fort (§ 81 Abs. 4 AufenthG) — dann laden Sie diese als Nachweis hoch und die Warnung endet. Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
+
+Das Portal sperrt nichts. Der Nachweis ist auf "Abgelaufen" gesetzt und der Vorgang rot markiert — die Bewertung und die Entscheidung bleiben bei Ihnen.
+
+Vorgang im Portal: {{portalLink}}
+
+Diese Warnung wiederholt sich alle drei Tage und endet 180 Tage nach dem Ablauf. Die Markierung im Portal bleibt danach bestehen.
+
+CREDO Gruppe – Freie Evangelische Schulen
+{{einrichtung}}`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name der beschäftigten Person" },
+      { key: "{{mitarbeiter_email}}", description: "E-Mail der beschäftigten Person (nur zur Anzeige, NICHT als Empfänger gedacht)" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
+      { key: "{{dokument_typ}}", description: "Art des Nachweises (z.B. Aufenthaltstitel)" },
+      { key: "{{dokument_datei}}", description: "Dateiname des hochgeladenen Nachweises" },
+      { key: "{{gueltig_bis}}", description: "Ablaufdatum des Nachweises (TT.MM.JJJJ)" },
+      { key: "{{tage_ueberfaellig}}", description: "Kalendertage seit dem Ablauf" },
+      { key: "{{frist_text}}", description: "Fertiger Satz zur Frist (z.B. „Abgelaufen seit 7 Tagen (01.09.2026)“)" },
+      { key: "{{portalLink}}", description: "Link zur Vorgangs-Detailseite im Portal" },
+    ],
+  },
 ];
 
 // =============================================

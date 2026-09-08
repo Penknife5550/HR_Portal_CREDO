@@ -58,6 +58,23 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
     { name: "birthPlace",       label: "Geburtsort",            defaultVisible: true,  defaultRequired: true },
     { name: "birthCountry",     label: "Geburtsland",           defaultVisible: true,  defaultRequired: false },
     { name: "nationality",      label: "Staatsangehörigkeit",   defaultVisible: true,  defaultRequired: false },
+    // Selbstauskunft statt Ableitung aus `nationality`: Das Feld daneben ist
+    // Freitext, es gibt im Projekt keine Laenderliste, und bei Doppelstaatlern
+    // steht dort "deutsch/tuerkisch" — eine Regel darauf spraeche einer
+    // Deutschen die Arbeitserlaubnis ab.
+    //
+    // Pflicht und ohne Vorbelegung, weil das Falsch-Negativ hier teurer ist als
+    // das Falsch-Positiv: Beschaeftigung ohne gueltigen Titel ist fuer den
+    // Arbeitgeber eine Ordnungswidrigkeit bis Straftat (§ 404 SGB III,
+    // § 98 AufenthG). Ein vorbelegtes "Nein" waere die folgenreichste Antwort
+    // des Fragebogens, die niemand bewusst gegeben haette.
+    { name: "aufenthaltstitelErforderlich", label: "Brauchen Sie einen Aufenthaltstitel?", defaultVisible: true, defaultRequired: true },
+    // Freiwillig, und das ist keine Nachlaessigkeit: Die Niederlassungserlaubnis
+    // ist ein Aufenthaltstitel OHNE Ablaufdatum. Als Pflichtfeld haette sie den
+    // Schritt fuer genau die Gruppe unpassierbar gemacht, die am laengsten hier
+    // lebt. HR kann die Pflicht im Vorlagen-Editor setzen; sie greift dann nur,
+    // wenn die Frage darueber mit "Ja" beantwortet ist (createStep1Schema).
+    { name: "aufenthaltstitelGueltigBis", label: "Aufenthaltstitel gültig bis", defaultVisible: true, defaultRequired: false },
     { name: "maritalStatus",    label: "Familienstand",         defaultVisible: true,  defaultRequired: true },
     { name: "severelyDisabled",  label: "Schwerbehinderung",    defaultVisible: true,  defaultRequired: false },
     { name: "disabilityDegree", label: "Behinderungsgrad (GdB)", defaultVisible: true, defaultRequired: false },
@@ -88,6 +105,13 @@ export const FIELD_REGISTRY: Record<number, FieldDefinition[]> = {
     { name: "socialSecurityNumber", label: "SV-Nummer",              defaultVisible: true, defaultRequired: false },
     { name: "healthInsuranceName",  label: "Krankenkasse",           defaultVisible: true, defaultRequired: true },
     { name: "healthInsuranceType",  label: "Versicherungsart",       defaultVisible: true, defaultRequired: true },
+    // Bewusst NICHT an `healthInsuranceType` gekoppelt: Die Frage wird bei
+    // gesetzlich UND privat gestellt. Rechtlich kennt zwar nur die GKV die
+    // beitragsfreie Familienversicherung (§ 10 SGB V); in der PKV ist die
+    // Mitversicherung ueber einen Familienangehoerigen aber ein alltaeglicher
+    // Sachverhalt, und die Personalstelle braucht die Angabe in beiden Faellen.
+    // Die Beschriftung im Fragebogen nennt deshalb beide Lesarten.
+    { name: "healthInsuranceMembership", label: "Eigene Mitgliedschaft oder Familienversicherung", defaultVisible: true, defaultRequired: true },
     { name: "parentStatus",         label: "Haben Sie Kinder?", defaultVisible: true, defaultRequired: false },
     // Altfeld. Ein einzelner Haken bildete die Vier-Wege-Entscheidung des
     // Abschnitts 5 nie ab; seit AP 7 steht sie als eigener Schritt 11. Bleibt

@@ -1,8 +1,9 @@
 /**
  * API: Dokumenten-Upload für den Personalfragebogen
  *
- * POST /api/fragebogen/:token/documents – Dokument hochladen
- * GET  /api/fragebogen/:token/documents – Hochgeladene Dokumente auflisten
+ * POST   /api/fragebogen/:token/documents – Dokument hochladen
+ * GET    /api/fragebogen/:token/documents – Hochgeladene Dokumente auflisten
+ * PATCH  /api/fragebogen/:token/documents – Ablaufdatum eines Nachweises nachtragen
  * DELETE via query param ?documentId=... – Einzelnes Dokument löschen
  */
 
@@ -11,6 +12,12 @@ import { prisma } from "@/lib/db";
 import { validateMagicToken } from "@/lib/auth";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { sanitizeFilename } from "@/lib/file-upload";
+import {
+  istFristpflichtig,
+  kalendertagAlsDatum,
+  tageBisAblauf,
+} from "@/lib/dokument-fristen";
+import { istKalendertag } from "@/lib/minijob-fristen";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 
@@ -60,8 +67,99 @@ const DOCUMENT_TYPE_MAP: Record<string, string> = {
   sb_ausweis: "SB_AUSWEIS",
   vl_vertrag: "VL_VERTRAG",
   bav_vertrag: "BAV_VERTRAG",
+  aufenthaltstitel: "AUFENTHALTSTITEL",
+  arbeitserlaubnis: "ARBEITSERLAUBNIS",
+  pkv_nachweis: "PKV_NACHWEIS",
   sonstiges: "SONSTIGES",
 };
+
+/**
+ * Wie weit darf ein Ablaufdatum in der Zukunft liegen?
+ *
+ * Kein Aufenthaltstitel wird auf 20 Jahre befristet — ein unbefristeter (die
+ * Niederlassungserlaubnis) traegt gar kein Ablaufdatum. Was darueber liegt, ist
+ * ein Tippfehler: 2206 statt 2026, oder 20226 in einem Feld ohne Maske. Der
+ * faellt niemandem auf, weil das Dokument danach vollstaendig AUSSIEHT — nur
+ * die Ampel schweigt fuer immer. Ein Tippfehler in die andere Richtung faellt
+ * dagegen sofort auf, weil das Dokument dann als abgelaufen angezeigt wird.
+ */
+const MAX_GUELTIG_BIS_TAGE = 20 * 366;
+
+type FristPruefung =
+  | { ok: true; gueltigBis: Date | null }
+  | { ok: false; fehler: string };
+
+/**
+ * Prueft das mitgeschickte Ablaufdatum — und wird IMMER aufgerufen, bevor die
+ * Datei auf die Platte geht.
+ *
+ * Die Reihenfolge ist der Punkt: Wer erst schreibt und dann prueft, laesst bei
+ * jedem 400 eine verwaiste Datei im Upload-Ordner zurueck, auf die keine
+ * Datenbankzeile mehr zeigt.
+ *
+ * Drei Antworten sind moeglich:
+ *
+ * - **Kein Datum** (`""`): angenommen, `gueltigBis` bleibt `null`. Der Upload
+ *   darf daran nicht scheitern — der Scan ist das Wichtige, und ein Formular,
+ *   das die Datei wegen eines fehlenden Nebenfeldes zurueckweist, bekommt
+ *   irgendein Datum eingetippt. Sichtbar bleibt es trotzdem: Die Maske
+ *   kennzeichnet solche Nachweise als „Frist fehlt", und die Ampel schweigt
+ *   (`dokument-fristen.ts` liefert ohne Datum KEINE Stufe).
+ * - **Datum an einem Typ, der keine Frist traegt**: 400. Es stillschweigend zu
+ *   verwerfen waere schlimmer — jemand hat es getippt und saehe es nie wieder.
+ * - **Unlesbares oder unmoegliches Datum**: 400.
+ *
+ * **Abweichung vom Plan (bewusst):** Der Plan verlangte „Datum in der Zukunft,
+ * sonst 400". Ein Datum in der VERGANGENHEIT wird hier trotzdem angenommen. Ein
+ * abgelaufener Titel ist eine Tatsache, die HR sehen muss; die Ampel zeigt sie
+ * dann als ABGELAUFEN an. Wer die Wahrheit mit einem 400 zurueckweist,
+ * erzieht zum Erfinden eines passenden Datums — und dann steht in der Akte eine
+ * Angabe mit Rechtsfolge, die niemand mehr anzweifelt.
+ */
+function pruefeGueltigBis(
+  roh: unknown,
+  documentType: string,
+  jetzt: Date = new Date(),
+): FristPruefung {
+  // `unknown` und nicht `string`: Aus `formData.get()` kann auch eine Datei
+  // kommen, aus `request.json()` jede beliebige Form. Ein `.trim()` darauf
+  // waere ein TypeError — und der faende sich am Ende als 500 wieder, wo ein
+  // klares "kein Datum" richtig ist.
+  const wert = typeof roh === "string" ? roh.trim() : "";
+  if (!wert) return { ok: true, gueltigBis: null };
+
+  if (!istFristpflichtig(documentType)) {
+    return {
+      ok: false,
+      fehler:
+        "Ein Ablaufdatum wird nur beim Aufenthaltstitel und bei der " +
+        "Arbeitserlaubnis erfasst.",
+    };
+  }
+
+  // Nur "JJJJ-MM-TT" — genau das, was <input type="date"> liefert. Alles andere
+  // wird NICHT geraten: `new Date("03.05.2027")` liest je nach Laufzeit den
+  // 3. Mai oder den 5. Maerz, und hier entscheidet der Tag ueber eine Warnung
+  // mit Rechtsfolge.
+  if (!istKalendertag(wert)) {
+    return {
+      ok: false,
+      fehler: "Bitte geben Sie das Ablaufdatum als Datum an (Tag, Monat, Jahr).",
+    };
+  }
+
+  const tage = tageBisAblauf(wert, jetzt);
+  if (tage !== null && tage > MAX_GUELTIG_BIS_TAGE) {
+    return {
+      ok: false,
+      fehler:
+        "Das Ablaufdatum liegt mehr als 20 Jahre in der Zukunft. Bitte " +
+        "prüfen Sie die Jahreszahl.",
+    };
+  }
+
+  return { ok: true, gueltigBis: kalendertagAlsDatum(wert) };
+}
 
 // =============================================
 // POST – Dokument hochladen
@@ -102,6 +200,21 @@ export async function POST(
         { error: "Keine Datei ausgewaehlt." },
         { status: 400 }
       );
+    }
+
+    // Dokument-Typ mappen — hier oben, weil die Frist-Pruefung ihn braucht.
+    //
+    // Aufrufer senden teils den Kategorie-Schluessel ("geburtsurkunde_kind"),
+    // teils die Enum-Schreibweise ("GEBURTSURKUNDE_KIND") — beides muss treffen,
+    // sonst landet das Dokument stillschweigend als SONSTIGES und gilt als fehlend.
+    const documentType =
+      DOCUMENT_TYPE_MAP[docType.toLowerCase()] || "SONSTIGES";
+
+    // Ablaufdatum VOR jedem Schreiben pruefen: Ein 400 nach dem writeFile liesse
+    // eine verwaiste Datei im Upload-Ordner zurueck.
+    const frist = pruefeGueltigBis(formData.get("gueltigBis"), documentType);
+    if (!frist.ok) {
+      return NextResponse.json({ error: frist.fehler }, { status: 400 });
     }
 
     // Dateigroesse pruefen
@@ -186,13 +299,6 @@ export async function POST(
     // buffer wurde bereits oben gelesen (Magic Bytes Validierung)
     await writeFile(filePath, buffer);
 
-    // Dokument-Typ mappen.
-    // Aufrufer senden teils den Kategorie-Schluessel ("geburtsurkunde_kind"),
-    // teils die Enum-Schreibweise ("GEBURTSURKUNDE_KIND") — beides muss treffen,
-    // sonst landet das Dokument stillschweigend als SONSTIGES und gilt als fehlend.
-    const documentType =
-      DOCUMENT_TYPE_MAP[docType.toLowerCase()] || "SONSTIGES";
-
     // Dokument in DB speichern
     const document = await prisma.document.create({
       data: {
@@ -202,6 +308,7 @@ export async function POST(
         filePath: `uploads/${onboarding.id}/${fileName}`,
         fileSize: buffer.length,
         mimeType: file.type,
+        gueltigBis: frist.gueltigBis,
       },
     });
 
@@ -211,6 +318,7 @@ export async function POST(
         fileName: document.fileName,
         fileSize: document.fileSize,
         type: document.type,
+        gueltigBis: document.gueltigBis,
         uploadedAt: document.uploadedAt,
       },
       { status: 201 }
@@ -252,12 +360,117 @@ export async function GET(
       fileSize: true,
       type: true,
       mimeType: true,
+      // Ohne dieses Feld koennte die Maske nicht zwischen „Frist erfasst" und
+      // „Frist fehlt" unterscheiden — und genau diese Unterscheidung ist der
+      // Grund, warum das Datum ueberhaupt erhoben wird.
+      gueltigBis: true,
       uploadedAt: true,
     },
     orderBy: { uploadedAt: "desc" },
   });
 
   return NextResponse.json({ documents });
+}
+
+// =============================================
+// PATCH – Ablaufdatum nachtragen oder korrigieren
+// =============================================
+/**
+ * Warum es diesen Weg gibt.
+ *
+ * Ein Nachweis ohne Ablaufdatum wird in der Maske als „Frist fehlt"
+ * gekennzeichnet. Ohne eine Moeglichkeit, es nachzutragen, waere das eine
+ * Warnung, auf die niemand reagieren kann: Der einzige Ausweg waere, den
+ * hochgeladenen Scan zu loeschen und dieselbe Datei erneut hochzuladen. Das
+ * traegt kein Mensch durch, und am Ende bleibt die Frist leer.
+ *
+ * Bewusst eng gehalten: NUR `gueltigBis`, NUR an fristpflichtigen Typen, NUR an
+ * Dokumenten des eigenen Vorgangs. Ein allgemeines „Dokument bearbeiten" ueber
+ * einen Magic Link waere eine andere Zusage, als dieser Link geben soll.
+ *
+ * Das Datum LOESCHEN kann dieser Weg nicht (ein leerer Wert ergibt 400). Sonst
+ * liesse sich die Ablaufkontrolle mit einem Klick stumm schalten, und zwar
+ * unauffaellig — von „nie erfasst" waere das hinterher nicht zu unterscheiden.
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  const clientIp = getClientIp(request);
+  const rlCheck = tokenRateLimiter.check(clientIp);
+  if (!rlCheck.allowed) {
+    return NextResponse.json(
+      { error: "Zu viele Anfragen. Bitte warten Sie." },
+      { status: 429 }
+    );
+  }
+
+  const { token } = await params;
+
+  const result = await validateMagicToken(token);
+  if (!result.valid) {
+    return NextResponse.json(
+      { error: result.reason },
+      { status: result.reason === "Token nicht gefunden" ? 404 : 410 }
+    );
+  }
+
+  const onboarding = result.onboarding!;
+
+  let koerper: { documentId?: unknown; gueltigBis?: unknown };
+  try {
+    koerper = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Ungültige Anfrage." },
+      { status: 400 }
+    );
+  }
+
+  const documentId =
+    typeof koerper.documentId === "string" ? koerper.documentId : "";
+  if (!documentId) {
+    return NextResponse.json(
+      { error: "documentId ist erforderlich." },
+      { status: 400 }
+    );
+  }
+
+  // Zugehoerigkeit zum eigenen Vorgang pruefen, bevor irgendetwas geschrieben
+  // wird — die documentId kommt aus der Anfrage, nicht aus dem Token.
+  const document = await prisma.document.findFirst({
+    where: { id: documentId, onboardingId: onboarding.id },
+    select: { id: true, type: true },
+  });
+
+  if (!document) {
+    return NextResponse.json(
+      { error: "Dokument nicht gefunden." },
+      { status: 404 }
+    );
+  }
+
+  const roh =
+    typeof koerper.gueltigBis === "string" ? koerper.gueltigBis.trim() : "";
+  if (!roh) {
+    return NextResponse.json(
+      { error: "Bitte geben Sie ein Ablaufdatum an." },
+      { status: 400 }
+    );
+  }
+
+  const frist = pruefeGueltigBis(roh, document.type);
+  if (!frist.ok) {
+    return NextResponse.json({ error: frist.fehler }, { status: 400 });
+  }
+
+  const aktualisiert = await prisma.document.update({
+    where: { id: document.id },
+    data: { gueltigBis: frist.gueltigBis },
+    select: { id: true, type: true, gueltigBis: true },
+  });
+
+  return NextResponse.json(aktualisiert);
 }
 
 // =============================================

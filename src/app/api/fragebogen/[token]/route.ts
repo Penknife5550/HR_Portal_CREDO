@@ -32,6 +32,7 @@ import {
   beschaeftigungsAngabenListeSchema,
   zuDatensatz,
 } from "@/lib/validations/beschaeftigungs-angaben";
+import { istKalendertag } from "@/lib/validations/personal-data";
 import { z } from "zod";
 
 // =============================================
@@ -87,6 +88,33 @@ function zahlOderLeer<T extends z.ZodTypeAny>(schema: T) {
   );
 }
 
+/**
+ * Datumsfeld, das ein geleertes Eingabefeld ueberlebt — und keinen Unsinn
+ * durchlaesst.
+ *
+ * `<input type="date">` sendet "JJJJ-MM-TT" oder "". Das `""` muss durchkommen,
+ * sonst laesst sich ein einmal gesetztes Datum nie wieder loeschen (die
+ * Freigabe dafuer steht in LEERBARE_FRAGEBOGEN_FELDER); die Speicherschleife
+ * weiter unten macht daraus dann `null`.
+ *
+ * Geprueft wird streng, weil der Wert danach in `new Date()` und von dort nach
+ * Prisma laeuft: "2026-02-31" hat das richtige Muster, ist aber kein
+ * Kalendertag, und `Invalid Date` waere ein 500 statt eines roten Feldes. Die
+ * Pruefung ist dieselbe wie im Client-Schema — `istKalendertag` steht dort und
+ * wird hier mitbenutzt, damit die beiden Enden nicht auseinanderlaufen.
+ */
+function datumOderLeer() {
+  return z.preprocess(
+    (wert) => (wert === null ? "" : wert),
+    z
+      .string()
+      .refine((wert) => wert === "" || istKalendertag(wert), {
+        message: "Bitte geben Sie ein gueltiges Datum an (TT.MM.JJJJ).",
+      })
+      .optional(),
+  );
+}
+
 const fragebogenFieldsSchema = z.object({
   salutation: enumOderLeer(z.enum(["Herr", "Frau"])),
   title: z.string().max(100).optional(),
@@ -97,6 +125,12 @@ const fragebogenFieldsSchema = z.object({
   birthPlace: z.string().max(200).optional(),
   birthCountry: z.string().max(100).optional(),
   nationality: z.string().max(100).optional(),
+  // Selbstauskunft zum Aufenthaltstitel. `nullable`, weil die Ja/Nein-Frage
+  // ohne Vorbelegung startet und ein noch nicht angeklicktes Feld `null`
+  // sendet — die Speicherschleife ueberspringt es dann, statt den ganzen
+  // Schritt mit 400 abzuweisen.
+  aufenthaltstitelErforderlich: z.boolean().nullable().optional(),
+  aufenthaltstitelGueltigBis: datumOderLeer(),
   maritalStatus: enumOderLeer(z.enum(["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt_lebend", "eingetragene_partnerschaft"])),
   severelyDisabled: z.boolean().optional(),
   disabilityDegree: zahlOderLeer(z.number().min(0).max(100)),
@@ -115,6 +149,11 @@ const fragebogenFieldsSchema = z.object({
   socialSecurityNumber: z.string().max(20).optional(),
   healthInsuranceName: z.string().max(200).optional(),
   healthInsuranceType: enumOderLeer(z.enum(["gesetzlich", "privat"])),
+  // Bewusst unabhaengig von healthInsuranceType: Die Frage wird bei gesetzlich
+  // UND privat gestellt (Begruendung in validations/personal-data.ts).
+  healthInsuranceMembership: enumOderLeer(
+    z.enum(["eigene_mitgliedschaft", "familienversicherung"]),
+  ),
   parentStatus: z.boolean().optional(),
   taxId: z.string().max(20).optional(),
   taxClass: enumOderLeer(z.enum(["I", "II", "III", "IV", "V", "VI"])),
@@ -305,6 +344,16 @@ export async function GET(
           birthDate: personalData.birthDate?.toISOString().split("T")[0] ?? "",
           dienstzeitBeginn:
             personalData.dienstzeitBeginn?.toISOString().split("T")[0] ?? "",
+          // Ohne diese Zeile kaeme das Datum als vollstaendiger Zeitstempel im
+          // Formular an. `<input type="date">` zeigt den nicht an — das Feld
+          // saehe beim Wiedereinstieg leer aus, und beim naechsten Speichern
+          // ginge der Zeitstempel als Wert zurueck und scheiterte an der
+          // Formatpruefung. Erst die Kuerzung auf den Tag macht das Feld
+          // wieder befuellbar.
+          aufenthaltstitelGueltigBis:
+            personalData.aufenthaltstitelGueltigBis
+              ?.toISOString()
+              .split("T")[0] ?? "",
           children: personalData.children.map((c) => ({
             id: c.id,
             firstName: c.firstName,
@@ -437,6 +486,13 @@ export async function PUT(
   if (data.birthDate) updateData.birthDate = new Date(data.birthDate);
   if (data.dienstzeitBeginn)
     updateData.dienstzeitBeginn = new Date(data.dienstzeitBeginn);
+  // Das leere Datum steht hier bewusst NICHT: Die Schleife oben hat es bereits
+  // auf `null` gesetzt (das Feld ist leerbar). Ein `new Date("")` waere
+  // `Invalid Date` und ueberschriebe die Loeschung mit einem Fehler.
+  if (data.aufenthaltstitelGueltigBis)
+    updateData.aufenthaltstitelGueltigBis = new Date(
+      data.aufenthaltstitelGueltigBis,
+    );
 
   // currentStep aktualisieren
   if (typeof currentStep === "number") {

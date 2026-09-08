@@ -124,6 +124,81 @@ function reqZahl(fc: FieldConfigHelper, name: string, msg: string) {
 }
 
 /**
+ * Ist das ein Kalendertag im Format JJJJ-MM-TT?
+ *
+ * `<input type="date">` liefert genau dieses Format — aber nur, solange der
+ * Browser den Typ kennt. Wo er ihn nicht kennt, faellt das Feld auf ein
+ * Textfeld zurueck, und dort tippt jemand "01.05.2026".
+ *
+ * Geprueft wird nicht nur die Form, sondern der Tag: "2026-02-31" hat das
+ * richtige Muster und ist trotzdem kein Datum. Auf der Serverseite laeuft der
+ * Wert ungeprueft in `new Date()` und von dort nach Prisma — ein `Invalid Date`
+ * waere ein 500 statt eines roten Feldes. Deshalb steht die Pruefung hier
+ * EINMAL und wird von der Route mitbenutzt, statt in zwei Fassungen
+ * auseinanderzulaufen.
+ */
+export function istKalendertag(wert: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(wert)) return false;
+  const [jahr, monat, tag] = wert.split("-").map(Number);
+  const geprueft = new Date(Date.UTC(jahr, monat - 1, tag));
+  return (
+    geprueft.getUTCFullYear() === jahr &&
+    geprueft.getUTCMonth() === monat - 1 &&
+    geprueft.getUTCDate() === tag
+  );
+}
+
+/** Ein Satz fuer jedes Datumsfeld, das kein Datum enthaelt. */
+const DATUM_UNGUELTIG = "Bitte geben Sie ein gueltiges Datum an (TT.MM.JJJJ).";
+
+/**
+ * Datumsfeld ohne Pflicht: leer ist erlaubt, Unsinn nicht.
+ *
+ * Der preprocess ist der Kern: Ein bedingtes Datumsfeld wird von der Maske gar
+ * nicht mitgeschickt, solange die Frage darueber mit "Nein" beantwortet ist —
+ * es kommt dann als `undefined` an, nicht als "". Ohne diese Umwandlung
+ * verlangte das nackte z.string() an dieser Stelle "Required", und zwar fuer ein
+ * Feld, das die Person nie zu sehen bekommen hat. Beim Aufenthaltstitel hiess
+ * das konkret: Wer die Frage mit "Nein" beantwortet — also die grosse Mehrheit —
+ * kam nicht durch Schritt 1.
+ */
+function datumFeld(msg: string) {
+  return z.preprocess(
+    (wert) => (wert === undefined || wert === null ? "" : wert),
+    z
+      .string()
+      .refine((wert) => wert === "" || istKalendertag(wert), { message: msg })
+  );
+}
+
+/**
+ * Ja/Nein-Frage ohne Vorbelegung.
+ *
+ * Ein `z.boolean()` mit Vorgabewert `false` waere hier die falsche Sparsamkeit.
+ * Bei einer Frage, deren „Nein" eine Pflicht entfallen laesst, ist die
+ * Vorbelegung selbst die Antwort — und zwar die, die niemand gegeben hat.
+ * Deshalb startet das Feld auf `null` („noch nicht beantwortet").
+ *
+ * Die Pflicht sitzt in einer Verfeinerung und nicht im Typ: Der Ausgabetyp
+ * bleibt in BEIDEN Zweigen `boolean | null`, sonst wanderte die Vorlagen-
+ * Konfiguration in den abgeleiteten Typ, an dem die Masken ihr Formular
+ * tippen. Gleiche Begruendung wie bei `reqZahl`.
+ */
+function reqJaNein(fc: FieldConfigHelper, name: string, msg: string) {
+  // `undefined` wird zu `null` gemacht, bevor Zod es sieht. Sonst haette
+  // dieselbe unbeantwortete Frage zwei Meldungen: den deutschen Satz aus der
+  // Verfeinerung fuer `null` und Zods englisches "Required" fuer `undefined` —
+  // je nachdem, ob die Maske das Feld ueberhaupt mitschickt.
+  const basis = z.preprocess(
+    (wert) => (wert === undefined ? null : wert),
+    z.boolean({ invalid_type_error: msg }).nullable()
+  );
+  return fc.isRequired(name)
+    ? basis.refine((wert) => wert !== null, { message: msg })
+    : basis;
+}
+
+/**
  * Was „keine Angabe" im Formular alles bedeuten kann.
  *
  * Ein <select> mit leerer Vorauswahl liefert `""`. Eine Radiogruppe, in der
@@ -208,6 +283,9 @@ export const step1Schema = z.object({
   birthPlace: begrenzt(GRENZE.birthPlace).min(1, "Geburtsort ist erforderlich."),
   birthCountry: begrenzt(GRENZE.birthCountry),
   nationality: begrenzt(GRENZE.nationality),
+  // Siehe createStep1Schema: `null` heisst „noch nicht beantwortet".
+  aufenthaltstitelErforderlich: z.boolean().nullable(),
+  aufenthaltstitelGueltigBis: datumFeld(DATUM_UNGUELTIG),
   maritalStatus: pflichtEnum(
     ["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt_lebend", "eingetragene_partnerschaft"],
     "Bitte waehlen Sie den Familienstand."
@@ -266,6 +344,21 @@ export type Step3Data = z.infer<typeof step3Schema>;
 // =============================================
 // Step 4: Sozialversicherung
 // =============================================
+
+/**
+ * Ein Satz fuer die Frage nach der Mitgliedschaft — an beiden Stellen derselbe.
+ *
+ * Die Frage haengt bewusst NICHT an `healthInsuranceType`. Rechtlich kennt zwar
+ * nur die gesetzliche Krankenversicherung die beitragsfreie
+ * Familienversicherung (§ 10 SGB V); in der privaten hat jede Person einen
+ * eigenen Vertrag. Betrieblich braucht die Personalstelle die Angabe aber in
+ * beiden Faellen — "ueber den Ehepartner mitversichert" ist auch dort ein
+ * alltaeglicher Sachverhalt. Deshalb steht die Frage immer, und die Beschriftung
+ * im Fragebogen nennt beide Lesarten, statt eine davon auszuschliessen.
+ */
+const MITGLIEDSCHAFT_FEHLT =
+  "Bitte waehlen Sie aus, ob Sie selbst Mitglied oder familienversichert sind.";
+
 export const step4Schema = z.object({
   socialSecurityNumber: begrenzt(GRENZE.socialSecurityNumber),
   healthInsuranceName: begrenzt(GRENZE.healthInsuranceName).min(
@@ -275,6 +368,10 @@ export const step4Schema = z.object({
   healthInsuranceType: pflichtEnum(
     ["gesetzlich", "privat"],
     "Bitte waehlen Sie die Versicherungsart."
+  ),
+  healthInsuranceMembership: pflichtEnum(
+    ["eigene_mitgliedschaft", "familienversicherung"],
+    MITGLIEDSCHAFT_FEHLT
   ),
   parentStatus: z.boolean(),
   minijobRvBefreiung: z.boolean(),
@@ -405,6 +502,19 @@ export type Step10Data = z.infer<typeof step10Schema>;
 // Verwenden FieldConfigHelper um Pflichtfelder dynamisch zu steuern
 // =============================================
 
+/**
+ * Schritt 1 — Persoenliche Angaben.
+ *
+ * Zur Aufenthaltsfrage: Sie steht bewusst NEBEN der Staatsangehoerigkeit und
+ * wird nicht aus ihr abgeleitet. `nationality` ist ein Freitextfeld, eine
+ * Laenderliste gibt es im Projekt nicht, und bei Doppelstaatlern steht dort
+ * "deutsch/tuerkisch" — jede Ableitung spraeche irgendwann einer Deutschen die
+ * Arbeitserlaubnis ab. Die Selbstauskunft ist die einzige Angabe, die traegt.
+ *
+ * Sie blockiert das Absenden des Fragebogens nicht (die Nachweise sind
+ * Pflichtdokumente, keine Feldpflicht) — beantwortet werden muss sie
+ * trotzdem, sonst entsteht die Dokumentenpflicht nie.
+ */
 export function createStep1Schema(fc: FieldConfigHelper) {
   return z.object({
     // Radiogruppe (siehe step1-personal.tsx): ohne angehakte Option kommt hier
@@ -426,6 +536,17 @@ export function createStep1Schema(fc: FieldConfigHelper) {
     ),
     birthCountry: begrenzt(GRENZE.birthCountry),
     nationality: begrenzt(GRENZE.nationality),
+    aufenthaltstitelErforderlich: reqJaNein(
+      fc,
+      "aufenthaltstitelErforderlich",
+      "Bitte beantworten Sie diese Frage."
+    ),
+    // Ohne Pflicht, auch wenn die Frage darueber mit "Ja" beantwortet ist: Die
+    // Niederlassungserlaubnis ist ein Aufenthaltstitel ohne Ablaufdatum. Wer
+    // hier ein Datum verlangte, machte den Schritt fuer die Gruppe
+    // unpassierbar, die am laengsten hier lebt. Die Pflicht laesst sich im
+    // Vorlagen-Editor setzen — siehe die Verfeinerung unten.
+    aufenthaltstitelGueltigBis: datumFeld(DATUM_UNGUELTIG),
     maritalStatus: reqEnum(
       fc, "maritalStatus",
       ["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt_lebend", "eingetragene_partnerschaft"],
@@ -437,6 +558,23 @@ export function createStep1Schema(fc: FieldConfigHelper) {
       .min(0, "Der Grad kann nicht negativ sein.")
       .max(100, "Der Grad betraegt hoechstens 100.")
       .nullable(),
+  })
+  .superRefine((werte, ctx) => {
+    // Die Pflicht am Ablaufdatum haengt an ZWEI Bedingungen, und beide muessen
+    // erfuellt sein: HR hat sie in der Vorlage gesetzt, UND die Frage darueber
+    // ist mit "Ja" beantwortet. Ohne die zweite verlangte der Schritt ein
+    // Datum zu einem Titel, den es nicht gibt — an einem Feld, das gar nicht
+    // eingeblendet ist. Dasselbe Muster wie bei der Additionsfrage in
+    // createStep6Schema.
+    if (werte.aufenthaltstitelErforderlich !== true) return;
+    if (!fc.isVisible("aufenthaltstitelGueltigBis")) return;
+    if (!fc.isRequired("aufenthaltstitelGueltigBis")) return;
+    if (werte.aufenthaltstitelGueltigBis) return;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["aufenthaltstitelGueltigBis"],
+      message: "Bitte geben Sie an, bis wann Ihr Aufenthaltstitel gilt.",
+    });
   });
 }
 
@@ -542,6 +680,11 @@ export function createStep4Schema(fc: FieldConfigHelper) {
       fc, "healthInsuranceType",
       ["gesetzlich", "privat"],
       "Bitte waehlen Sie die Versicherungsart."
+    ),
+    healthInsuranceMembership: reqEnum(
+      fc, "healthInsuranceMembership",
+      ["eigene_mitgliedschaft", "familienversicherung"],
+      MITGLIEDSCHAFT_FEHLT
     ),
     parentStatus: z.boolean(),
     minijobRvBefreiung: z.boolean(),

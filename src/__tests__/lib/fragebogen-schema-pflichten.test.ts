@@ -74,6 +74,10 @@ const SCHRITT1_BASIS = {
   maritalStatus: "ledig",
   severelyDisabled: false,
   disabilityDegree: null,
+  // Seit der Rueckmeldung des Personalbueros Pflicht: Die Frage nach dem
+  // Aufenthaltstitel wird JEDER Person gestellt, weil sie sich aus der
+  // Staatsangehoerigkeit (Freitext) nicht ableiten laesst.
+  aufenthaltstitelErforderlich: false,
 };
 
 const SCHRITT2_BASIS = {
@@ -98,6 +102,8 @@ const SCHRITT4_BASIS = {
   socialSecurityNumber: "",
   healthInsuranceName: "AOK",
   healthInsuranceType: "gesetzlich",
+  // Pflicht bei gesetzlich UND privat.
+  healthInsuranceMembership: "eigene_mitgliedschaft",
   parentStatus: false,
   minijobRvBefreiung: false,
 };

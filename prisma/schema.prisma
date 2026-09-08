@@ -359,6 +359,37 @@ model PersonalData {
   severelyDisabled Boolean?  @default(false)
   disabilityDegree Int?
 
+  // -- Aufenthalts- und Arbeitserlaubnis --
+  //
+  // Bewusst eine EIGENE Frage und KEINE Ableitung aus `nationality`: Das Feld
+  // ist Freitext (max. 100 Zeichen), es gibt im Projekt keine Laenderliste, und
+  // bei Doppelstaatlern steht dort "deutsch/tuerkisch". Eine Regel darauf
+  // spraeche einer Deutschen die Arbeitserlaubnis ab. Die Selbstauskunft ist
+  // die einzige Angabe, die traegt.
+  //
+  // Die beiden Datumsfelder sind die SELBSTAUSKUNFT des Beschaeftigten. Die
+  // Ampel und der Erinnerungs-Cron lesen dagegen `Document.gueltigBis` — das
+  // Datum am hochgeladenen Nachweis, das HR gegen das Bild bestaetigen kann.
+  // Zwei Angaben, zwei Zwecke: Hier steht, was jemand gesagt hat, dort, was
+  // belegt ist. Wer daraus eine Quelle machen will, muss entscheiden welche —
+  // stillschweigend beide zu lesen erzeugt genau den Widerspruch, den niemand
+  // bemerkt.
+
+  /// Braucht diese Person fuer die Beschaeftigung in Deutschland einen
+  /// Aufenthaltstitel? null = noch nicht beantwortet.
+  aufenthaltstitelErforderlich Boolean?
+
+  /// Ablauf des Aufenthaltstitels. Als reines Datum (@db.Date), nicht als
+  /// Zeitstempel: Die Ampel rechnet in Kalendertagen, eine mitgefuehrte Uhrzeit
+  /// verschoebe das Ergebnis ueber die Zeitzone um einen Tag. Gleiche
+  /// Begruendung wie bei rvAntragEingangAm.
+  aufenthaltstitelGueltigBis DateTime? @db.Date
+
+  /// Ablauf der Arbeitserlaubnis, WENN sie getrennt vom Titel erteilt ist
+  /// (Zusatzblatt, Beschaeftigungserlaubnis zur Duldung). Traegt der Titel die
+  /// Erlaubnis selbst ("Erwerbstaetigkeit gestattet"), bleibt das Feld leer.
+  arbeitserlaubnisGueltigBis DateTime? @db.Date
+
   // -- Adresse --
   street       String?
   houseNumber  String?
@@ -379,7 +410,13 @@ model PersonalData {
   socialSecurityNumber String?
   healthInsuranceName  String?
   healthInsuranceType  String? // "gesetzlich", "privat"
-  parentStatus         Boolean? // Elterneigenschaft fuer PV-Zuschlag
+
+  /// Eigene Mitgliedschaft oder Familienversicherung (§ 10 SGB V).
+  /// String und kein Enum, damit `reqEnum` genau wie beim Nachbarfeld
+  /// healthInsuranceType greift: "eigene_mitgliedschaft" | "familienversicherung"
+  healthInsuranceMembership String?
+
+  parentStatus Boolean? // Elterneigenschaft fuer PV-Zuschlag
 
   // -- Steuer --
   taxId          String?
@@ -836,6 +873,34 @@ model Document {
   status          DocumentStatus @default(UPLOADED)
   rejectionReason String?
 
+  /// Ablauf eines befristeten Nachweises (Aufenthaltstitel, Arbeitserlaubnis).
+  ///
+  /// Am DOKUMENT und nicht am Vorgang, weil Titel und Zusatzblatt eigene
+  /// Fristen tragen koennen — dasselbe Muster wie CivilServiceDocument.expiresAt.
+  /// null = unbefristet oder Frist nicht erfasst; die Ampel schweigt dann
+  /// (src/lib/dokument-fristen.ts liefert fuer null KEINE Stufe, nicht
+  /// "abgelaufen").
+  ///
+  /// Reines Datum (@db.Date): Die Ampel rechnet in Kalendertagen. Ein
+  /// Zeitstempel verschoebe den Ablauftag ueber die Zeitzone um einen Tag —
+  /// und der Ablauftag ist der Tag, an dem eine Beschaeftigung ohne Titel
+  /// beginnt.
+  gueltigBis DateTime? @db.Date
+
+  /// Wann zuletzt wegen dieses Ablaufs erinnert wurde und mit welcher Stufe.
+  /// Ohne diesen Merker ginge dieselbe Mail jeden Tag erneut raus; die Stufe
+  /// steht daneben, damit ein Stufenwechsel sofort erinnert, statt das
+  /// Intervall der milderen Stufe abzuwarten. Vorbild:
+  /// ContractEndProcess.lastSupervisorReminderAt.
+  /// Der Merker darf NUR nach einem echten SENT gesetzt werden — sonst
+  /// verbrennt eine fehlgeschlagene Zustellung die Erinnerung.
+  ablaufErinnertAm    DateTime?
+  /// Stufe aus src/lib/dokument-fristen.ts (AblaufKategorie) als Text. String
+  /// und kein Enum: Die Stufen sind eine Anzeige- und Versandregel des Codes,
+  /// keine Struktur der Daten — sie duerfen sich aendern, ohne dass eine
+  /// Enum-Migration ueber Bestandszeilen laeuft.
+  ablaufErinnertStufe String?
+
   uploadedAt   DateTime  @default(now())
   reviewedAt   DateTime?
   reviewedById String?
@@ -844,6 +909,11 @@ model Document {
   createdAt DateTime @default(now())
 
   @@index([onboardingId])
+  /// Traegt die Abfrage des Erinnerungs-Crons ("welche Nachweise laufen bis
+  /// zum Tag X ab"). Das Datum fuehrt, weil es die selektive Bedingung ist:
+  /// Nur eine Handvoll Dokumente traegt ueberhaupt eine Frist, alle uebrigen
+  /// stehen mit NULL am Ende des Index und werden nie angefasst.
+  @@index([gueltigBis])
   @@map("documents")
 }
 
@@ -862,6 +932,12 @@ enum DocumentType {
   SB_AUSWEIS
   VL_VERTRAG
   BAV_VERTRAG
+  // Befristete Nachweise. Sie sind die einzigen Typen, die heute ein
+  // `gueltigBis` tragen — die Ampel und der Erinnerungs-Cron haengen daran.
+  AUFENTHALTSTITEL
+  ARBEITSERLAUBNIS
+  // Gegenstueck zu KK_BESCHEINIGUNG fuer privat Versicherte.
+  PKV_NACHWEIS
   SONSTIGES
 }
 
@@ -870,6 +946,21 @@ enum DocumentStatus {
   REVIEWED
   APPROVED
   REJECTED
+  /// Die Gueltigkeit des Nachweises ist abgelaufen (Entscheidung 07.09.2026:
+  /// am Ablauftag warnen, aber NICHTS sperren).
+  ///
+  /// Der Status ist eine Ableitung, kein neuer Sachverhalt: Massgeblich bleibt
+  /// `gueltigBis`, und die Anzeige rechnet die Stufe live aus
+  /// (src/lib/dokument-fristen.ts). Persistiert wird sie trotzdem, damit eine
+  /// gewoehnliche Statusabfrage abgelaufene Nachweise findet, ohne jedes
+  /// Dokument durch die Ampel zu schicken.
+  ///
+  /// ACHTUNG: `status` traegt sonst den PRUEFSTAND (UPLOADED/REVIEWED/
+  /// APPROVED/REJECTED). Wer hier EXPIRED schreibt, ueberschreibt ihn. Dass
+  /// geprueft wurde, bleibt in reviewedAt/reviewedById lesbar — die
+  /// Entscheidung APPROVED vs. REJECTED nicht. Deshalb: nur auf einem
+  /// abgelaufenen Nachweis setzen, und nie zurueckschreiben.
+  EXPIRED
 }
 
 // =============================================

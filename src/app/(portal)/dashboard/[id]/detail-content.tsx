@@ -19,6 +19,12 @@ import { EditPersonalDataModal } from "./edit-personal-data-modal";
 import { RvFristenCard } from "./rv-fristen-card";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { documentTypeLabel } from "@/lib/required-documents";
+import {
+  ABLAUF_KATEGORIE_META,
+  ablaufAmpel,
+  istFristpflichtig,
+  type AblaufAmpel,
+} from "@/lib/dokument-fristen";
 import { statusLabel } from "@/lib/minijob-status";
 import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 import { formatBytes } from "@/lib/format";
@@ -43,6 +49,15 @@ interface DocumentData {
   mimeType: string;
   status: string;
   uploadedAt: string;
+  /**
+   * Ablauf eines befristeten Nachweises als ISO-Zeichenkette; `null`, wenn
+   * keiner erfasst ist. Wird NIE mit formatDate() angezeigt: Die Spalte ist
+   * `@db.Date`, kommt also als Mitternacht UTC herein — `toLocaleDateString()`
+   * rechnet in die Ortszeit des Browsers und macht daraus westlich von
+   * Greenwich den Vortag. Die Anzeige kommt deshalb ausschliesslich aus
+   * `ablaufAmpel()` (src/lib/dokument-fristen.ts).
+   */
+  gueltigBis: string | null;
 }
 
 interface ChecklistItemData {
@@ -761,6 +776,17 @@ export function DetailContent({
       {/* Tab Content                                   */}
       {/* ============================================= */}
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        {/* Ablauf-Warnbalken: bewusst VOR dem Tab-Inhalt und damit auf JEDEM
+            Tab. Ein abgelaufener Aufenthaltstitel ist kein Dokumententhema,
+            das sich wegklicken laesst, indem man auf den Reiter Uebersicht
+            wechselt. */}
+        <NachweisFristenWarnung
+          documents={data.documents}
+          onZuDenDokumenten={
+            activeTab === "documents" ? null : () => setActiveTab("documents")
+          }
+        />
+
         {activeTab === "overview" && (
           <TabOverview
             data={data}
@@ -1619,6 +1645,169 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
 // Tab 2: Dokumente
 // =============================================
 
+/**
+ * Der massgebliche Befund je NACHWEISART (nicht je Dokument).
+ *
+ * Warum gruppiert: `Document` kennt keine Eindeutigkeit je Typ, und ein
+ * nachgereichter Nachweis ERSETZT den alten nicht — wer seinen Aufenthaltstitel
+ * verlaengert und den neuen hochlaedt, hat danach zwei Aufenthaltstitel im
+ * Vorgang. Ein Warnbalken ueber alle Dokumente schriee dann fuer immer
+ * „abgelaufen", obwohl ein gueltiges Papier vorliegt. Ein Balken, den niemand
+ * abstellen kann, wird nach zwei Wochen ignoriert — und dann auch der echte.
+ *
+ * Massgeblich ist deshalb das Dokument mit dem SPAETESTEN Ablauf. Die einzelne
+ * Dokumentenzeile zeigt weiterhin ihren eigenen Zustand: Dass das alte Papier
+ * abgelaufen ist, stimmt ja.
+ */
+interface NachweisLage {
+  typ: string;
+  /** `null` = fuer diese Art ist ueberhaupt kein Ablaufdatum erfasst. */
+  ampel: AblaufAmpel | null;
+}
+
+function nachweisLagen(documents: DocumentData[], jetzt: Date = new Date()): NachweisLage[] {
+  const proTyp = new Map<string, AblaufAmpel | null>();
+
+  for (const doc of documents) {
+    if (!istFristpflichtig(doc.type)) continue;
+    const ampel = ablaufAmpel(doc.gueltigBis, jetzt);
+
+    if (!proTyp.has(doc.type)) {
+      proTyp.set(doc.type, ampel.kategorie ? ampel : null);
+      continue;
+    }
+    // Ein Dokument ohne Datum verdraengt nie eines mit Datum: Es beweist
+    // nichts, kann aber auch nichts widerlegen.
+    if (!ampel.kategorie) continue;
+    const bisher = proTyp.get(doc.type) ?? null;
+    if (!bisher || (bisher.tage ?? 0) < (ampel.tage ?? 0)) {
+      proTyp.set(doc.type, ampel);
+    }
+  }
+
+  return Array.from(proTyp, ([typ, ampel]) => ({ typ, ampel }));
+}
+
+/**
+ * Der Warnbalken am Vorgang.
+ *
+ * Bewusst NUR bei „abgelaufen", „kritisch" (14 Tage) und „Frist fehlt".
+ * BEOBACHTEN (90 Tage) und WARNUNG (42) traegt das Abzeichen an der
+ * Dokumentenzeile — ein Balken, der drei Monate lang steht, ist Tapete.
+ *
+ * Und er sperrt nichts (Entscheidung des Nutzers): Ein abgelaufener Titel ist
+ * ein Problem der BESCHAEFTIGUNG, nicht der Aktenfuehrung. Wer hier den Vorgang
+ * dichtmacht, hindert HR genau an der Arbeit, mit der das Problem behoben wird.
+ */
+function NachweisFristenWarnung({
+  documents,
+  onZuDenDokumenten,
+}: {
+  documents: DocumentData[];
+  onZuDenDokumenten: (() => void) | null;
+}) {
+  const lagen = nachweisLagen(documents).filter(
+    (l) => !l.ampel || l.ampel.kategorie === "ABGELAUFEN" || l.ampel.kategorie === "KRITISCH"
+  );
+  if (lagen.length === 0) return null;
+
+  const abgelaufen = lagen.some((l) => l.ampel?.kategorie === "ABGELAUFEN");
+  const kritisch = lagen.some((l) => l.ampel?.kategorie === "KRITISCH");
+
+  const rahmen = abgelaufen
+    ? "border-credo-rot/40 bg-credo-rot/5"
+    : "border-amber-300 bg-amber-50";
+  const ueberschrift = abgelaufen
+    ? "⚠ Nachweis abgelaufen"
+    : kritisch
+      ? "Nachweis läuft in Kürze ab"
+      : "Ablaufdatum fehlt";
+  const titelFarbe = abgelaufen ? "text-credo-rot" : "text-amber-800";
+
+  return (
+    <div className={`mb-6 rounded-2xl border-2 p-4 ${rahmen}`}>
+      <p className={`text-sm font-bold ${titelFarbe}`}>{ueberschrift}</p>
+      <ul className="mt-2 space-y-1">
+        {lagen.map((l) => (
+          <li key={l.typ} className="text-sm text-foreground">
+            <span className="font-semibold">{documentTypeLabel(l.typ)}:</span>{" "}
+            {l.ampel
+              ? l.ampel.text
+              : "Kein Ablaufdatum erfasst — dieser Nachweis wird nicht überwacht."}
+          </li>
+        ))}
+      </ul>
+      {abgelaufen && (
+        <p className="mt-2 text-sm text-foreground">
+          Eine Beschäftigung ohne gültigen Aufenthaltstitel ist für den Arbeitgeber
+          bußgeldbewehrt (§ 404 SGB III, § 98 AufenthG). Der Vorgang bleibt bedienbar —
+          bitte den verlängerten Nachweis anfordern und hochladen.
+        </p>
+      )}
+      {onZuDenDokumenten && (
+        <button
+          onClick={onZuDenDokumenten}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+        >
+          Zu den Dokumenten
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Das Abzeichen an der Dokumentenzeile — Stufe und Klartext.
+ *
+ * Gestaltung wie die Vertragsende-Ampel (`contract-end-config.tsx`): rundes
+ * Abzeichen, Farben aus dem Meta-Objekt als Inline-Stil, weil sie samt
+ * Hintergrund aus der Fristenrechnung kommen und nicht aus Tailwind.
+ *
+ * Anders als dort bekommt auch die harmloseste Stufe ein Abzeichen: Bei einem
+ * Vertragsende ist „noch weit weg" die Abwesenheit einer Aufgabe, hier ist es
+ * die Auskunft „dieses Papier gilt bis ..." — genau die Auskunft, wegen der
+ * jemand den Vorgang oeffnet.
+ */
+function AblaufAbzeichen({ doc }: { doc: DocumentData }) {
+  if (!istFristpflichtig(doc.type)) return null;
+
+  const ampel = ablaufAmpel(doc.gueltigBis);
+
+  // Kein Datum ist kein Fehler (der Titel kann unbefristet sein, das Feld kann
+  // schlicht noch leer sein) — aber es muss sichtbar sein. Sonst liest HR die
+  // schweigende Ampel als „alles in Ordnung", obwohl gar nichts geprueft wird.
+  if (!ampel.kategorie) {
+    return (
+      <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5">
+        <p className="text-[11px] font-semibold text-amber-800">Frist fehlt</p>
+        <p className="text-[11px] text-amber-900">
+          Kein Ablaufdatum erfasst — dieser Nachweis wird nicht überwacht.
+        </p>
+      </div>
+    );
+  }
+
+  const meta = ABLAUF_KATEGORIE_META[ampel.kategorie];
+  const dringend = ampel.kategorie === "ABGELAUFEN" || ampel.kategorie === "KRITISCH";
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span
+        className="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
+        style={{ color: meta.color, backgroundColor: meta.bg }}
+      >
+        {meta.label}
+      </span>
+      {/* Der Satz selbst bleibt in Theme-Farben: Die Meta-Farben sind fuer
+          Text AUF ihrem eigenen Hintergrund gedacht; frei auf der Karte waeren
+          sie im dunklen Erscheinungsbild kaum lesbar. */}
+      <span className={`text-[11px] ${dringend ? "font-semibold text-credo-rot" : "text-muted-foreground"}`}>
+        {ampel.text}
+      </span>
+    </div>
+  );
+}
+
 function OnboardingExportSection({ onboardingId }: { onboardingId: string }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   // Fehler erscheinen als Zeile in der Karte statt als Systemmeldung (alert).
@@ -1971,6 +2160,10 @@ function TabDocuments({
                       {statusLabel.label}
                     </span>
                   </div>
+
+                  {/* Ablauf-Ampel — nur bei fristpflichtigen Nachweisen
+                      (Aufenthaltstitel, Arbeitserlaubnis). */}
+                  <AblaufAbzeichen doc={doc} />
 
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-muted-foreground">{formatDate(doc.uploadedAt)}</span>

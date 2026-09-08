@@ -203,6 +203,76 @@ export const EVENT_CATALOG: EventDefinition[] = [
   },
 
   // =============================================
+  // Befristete Nachweise (Aufenthaltstitel, Arbeitserlaubnis)
+  //
+  // Ausgeloest vom taeglichen Cron /api/cron/dokument-ablauf. Zwei Events und
+  // nicht eines, weil der Ton ein voellig anderer ist: "bitte Termin bei der
+  // Auslaenderbehoerde anstossen" gegen "seit gestern besteht ein
+  // Beschaeftigungsverbot". Zwei Vorlagen heissen zwei Betreffzeilen — und HR
+  // kann die abgelaufenen Faelle eigens weiterleiten.
+  //
+  // Beide gehen NUR an das HR-Postfach (Entscheidung 07.09.2026): Den neuen
+  // Titel besorgt zwar die beschaeftigte Person, aber das
+  // Beschaeftigungsverbot trifft den Arbeitgeber — und der Magic Link der
+  // Person ist zum Ablaufzeitpunkt regelmaessig laengst tot.
+  //
+  // Die Adresse der Person steht deshalb als `mitarbeiter_email` im Payload
+  // und NICHT als `email`: `{{email}}` im An-Feld einer Vorlage soll keine
+  // Adresse ergeben (Ergebnis SKIPPED mit Protokolleintrag), statt die interne
+  // Warnung an die betroffene Person selbst zu schicken.
+  // =============================================
+  {
+    event: "dokument-ablauf-warnung",
+    name: "Befristeter Nachweis läuft ab (HR-Erinnerung)",
+    group: "Onboarding",
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
+    samplePayload: {
+      onboardingId: "00000000-0000-0000-0000-000000000001",
+      displayId: "2026-GYM-001",
+      documentId: "00000000-0000-0000-0000-0000000000d1",
+      mitarbeiter_name: "Max Mustermann",
+      mitarbeiter_email: "max.mustermann@example.org",
+      organization: "FES Minden",
+      dokument_typ: "Aufenthaltstitel",
+      dokument_datei: "aufenthaltstitel-vorderseite.pdf",
+      gueltig_bis: "20.10.2026",
+      tage_verbleibend: 42,
+      tage_ueberfaellig: 0,
+      dringlichkeit: "Warnung",
+      frist_text: "Läuft in 42 Tagen ab (20.10.2026)",
+      portalLink:
+        "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000001",
+    },
+    wired: true,
+  },
+  {
+    event: "dokument-abgelaufen",
+    name: "Befristeter Nachweis ist abgelaufen (HR-Warnung)",
+    group: "Onboarding",
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
+    samplePayload: {
+      onboardingId: "00000000-0000-0000-0000-000000000001",
+      displayId: "2026-GYM-001",
+      documentId: "00000000-0000-0000-0000-0000000000d1",
+      mitarbeiter_name: "Max Mustermann",
+      mitarbeiter_email: "max.mustermann@example.org",
+      organization: "FES Minden",
+      dokument_typ: "Aufenthaltstitel",
+      dokument_datei: "aufenthaltstitel-vorderseite.pdf",
+      gueltig_bis: "01.09.2026",
+      tage_verbleibend: -7,
+      tage_ueberfaellig: 7,
+      dringlichkeit: "Abgelaufen",
+      frist_text: "Abgelaufen seit 7 Tagen (01.09.2026)",
+      portalLink:
+        "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000001",
+    },
+    wired: true,
+  },
+
+  // =============================================
   // Dokumentenpaket in Offboarding, Verbeamtung und Vertragsverlaengerung
   //
   // Gleicher Aufbau wie onboarding-starter-packet-sent; je Modul kommt eine

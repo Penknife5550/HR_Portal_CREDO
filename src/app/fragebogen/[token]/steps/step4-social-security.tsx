@@ -58,6 +58,9 @@ export function Step4SocialSecurity({
       healthInsuranceType:
         (data.healthInsuranceType as Step4Data["healthInsuranceType"]) ||
         undefined,
+      healthInsuranceMembership:
+        (data.healthInsuranceMembership as Step4Data["healthInsuranceMembership"]) ||
+        undefined,
       parentStatus: (data.parentStatus as boolean) || false,
       minijobRvBefreiung: (data.minijobRvBefreiung as boolean) || false,
     },
@@ -271,6 +274,57 @@ export function Step4SocialSecurity({
               {errors.healthInsuranceType.message}
             </p>
           )}
+        </div>
+      )}
+
+      {/* Eigene Mitgliedschaft oder Familienversicherung
+
+          Die Frage haengt BEWUSST nicht an der Versicherungsart darueber.
+          Rechtlich kennt zwar nur die gesetzliche Krankenversicherung die
+          beitragsfreie Familienversicherung (§ 10 SGB V), in der privaten hat
+          jede Person einen eigenen Vertrag. Betrieblich braucht die
+          Personalstelle die Angabe aber in beiden Faellen — deshalb steht
+          neben „Familienversicherung" auch die private Lesart. Wer die Frage
+          an healthInsuranceType koppelt, muss zuerst klaeren, was privat
+          Versicherte dann antworten sollen. */}
+      {fc.isVisible("healthInsuranceMembership") && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">
+            {fc.getLabel("healthInsuranceMembership")} {fc.isRequired("healthInsuranceMembership") && <span className="text-destructive">*</span>}
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                value="eigene_mitgliedschaft"
+                {...register("healthInsuranceMembership")}
+                className="h-4 w-4 border-border text-primary focus:ring-primary"
+              />
+              Eigene Mitgliedschaft
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                value="familienversicherung"
+                {...register("healthInsuranceMembership")}
+                className="h-4 w-4 border-border text-primary focus:ring-primary"
+              />
+              Familienversicherung
+            </label>
+          </div>
+          {errors.healthInsuranceMembership && (
+            <p className="text-xs text-destructive">
+              {errors.healthInsuranceMembership.message}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            „Familienversicherung“ heißt: Sie sind über einen
+            Familienangehörigen mitversichert und zahlen keinen eigenen
+            Beitrag. Bei einer privaten Versicherung wählen Sie diese Angabe,
+            wenn Sie im Vertrag eines Angehörigen mitversichert sind. Sind Sie
+            selbst Versicherungsnehmer oder eigenes Mitglied Ihrer
+            Krankenkasse, ist es die eigene Mitgliedschaft.
+          </p>
         </div>
       )}
 

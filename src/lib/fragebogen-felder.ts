@@ -25,6 +25,13 @@ export const ERLAUBTE_FRAGEBOGEN_FELDER: ReadonlySet<string> = new Set([
   "birthPlace",
   "birthCountry",
   "nationality",
+  // Selbstauskunft zum Aufenthaltstitel. Die beiden Datumsfelder des Modells
+  // sind NICHT dasselbe: `aufenthaltstitelGueltigBis` sagt der Beschaeftigte
+  // selbst zu, `arbeitserlaubnisGueltigBis` steht nur am hochgeladenen
+  // Nachweis und wird nicht im Fragebogen erfragt — es fehlt hier deshalb
+  // absichtlich.
+  "aufenthaltstitelErforderlich",
+  "aufenthaltstitelGueltigBis",
   "maritalStatus",
   "severelyDisabled",
   "disabilityDegree",
@@ -49,6 +56,7 @@ export const ERLAUBTE_FRAGEBOGEN_FELDER: ReadonlySet<string> = new Set([
   "socialSecurityNumber",
   "healthInsuranceName",
   "healthInsuranceType",
+  "healthInsuranceMembership",
   "parentStatus",
 
   // Schritt 5 — Steuer
@@ -111,7 +119,11 @@ export const ERLAUBTE_FRAGEBOGEN_FELDER: ReadonlySet<string> = new Set([
  * **Antworten auf eine Bedingungsfrage.** Wird die Frage gegenstandslos — der
  * Status wechselt, die Meldung bei der Agentur wird zurueckgenommen —, muss die
  * alte Antwort verschwinden. Sonst stuende in der Akte eine Antwort auf eine
- * Frage, die gar nicht gestellt wurde.
+ * Frage, die gar nicht gestellt wurde. Beim Aufenthaltstitel waere das nicht
+ * nur unsauber, sondern gefaehrlich: Ein zurueckgebliebenes
+ * `aufenthaltstitelGueltigBis` neben einem "Nein" behauptet eine Befristung,
+ * die es nicht gibt — und ist zugleich die Angabe, an der die Ablauf-Ampel
+ * haengt.
  *
  * **Zahlenfelder, die man wieder leeren koennen muss.** Ein leeres
  * `<input type="number">` sendet null (siehe `zahlOderNull` in
@@ -132,6 +144,7 @@ export const ERLAUBTE_FRAGEBOGEN_FELDER: ReadonlySet<string> = new Set([
  * haelt das fest.
  */
 export const LEERBARE_FRAGEBOGEN_FELDER: ReadonlySet<string> = new Set([
+  "aufenthaltstitelGueltigBis",
   "beschaeftigungsStatusSonstige",
   "agenturFuerArbeit",
   "mitLeistungsbezug",

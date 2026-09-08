@@ -30,6 +30,52 @@ interface StepProps {
   fieldConfig?: FieldConfigHelper;
 }
 
+/**
+ * Ja/Nein als zwei Schaltflaechen — eindeutiger als eine einzelne Checkbox.
+ *
+ * Ein Haken kennt nur „gesetzt" und „nicht gesetzt", und „nicht gesetzt" liest
+ * sich wie ein Nein. Hier muss aber „noch nicht beantwortet" sichtbar bleiben:
+ * Das Nein laesst die Nachweispflicht entfallen, und es soll nur dort stehen,
+ * wo jemand es bewusst angeklickt hat.
+ *
+ * Baugleich mit der Fassung in step6-employment.tsx. Sie liegt dort ebenfalls
+ * lokal; zusammengelegt gehoert beides erst, wenn eine dritte Stelle sie
+ * braucht.
+ */
+function JaNein({
+  wert,
+  onChange,
+  name,
+}: {
+  wert: boolean | null;
+  onChange: (v: boolean) => void;
+  name: string;
+}) {
+  return (
+    <div className="flex gap-2" role="radiogroup" aria-label={name}>
+      {[
+        { v: false, t: "Nein" },
+        { v: true, t: "Ja" },
+      ].map(({ v, t }) => (
+        <button
+          key={t}
+          type="button"
+          role="radio"
+          aria-checked={wert === v}
+          onClick={() => onChange(v)}
+          className={`rounded-lg border px-4 py-1.5 text-sm font-medium transition-colors ${
+            wert === v
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-card text-muted-foreground hover:border-primary"
+          }`}
+        >
+          {t}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) {
   const fc = fieldConfig ?? new FieldConfigHelper(1);
   const schema = useMemo(() => createStep1Schema(fc), [fc]);
@@ -52,6 +98,16 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
       birthPlace: (data.birthPlace as string) || "",
       birthCountry: (data.birthCountry as string) || "Deutschland",
       nationality: (data.nationality as string) || "deutsch",
+      // Ohne Vorbelegung: `null` heisst „noch nicht beantwortet". Ein
+      // vorbelegtes `false` waere die folgenreichste Antwort des Fragebogens —
+      // sie laesst Aufenthaltstitel und Arbeitserlaubnis aus den
+      // Pflichtdokumenten fallen —, und niemand haette sie gegeben.
+      aufenthaltstitelErforderlich:
+        typeof data.aufenthaltstitelErforderlich === "boolean"
+          ? data.aufenthaltstitelErforderlich
+          : null,
+      aufenthaltstitelGueltigBis:
+        (data.aufenthaltstitelGueltigBis as string) || "",
       maritalStatus:
         (data.maritalStatus as Step1Data["maritalStatus"]) || undefined,
       severelyDisabled: (data.severelyDisabled as boolean) || false,
@@ -64,6 +120,7 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
   });
 
   const severelyDisabled = watch("severelyDisabled");
+  const aufenthaltstitelErforderlich = watch("aufenthaltstitelErforderlich");
 
   /**
    * Haken weg, Grad weg.
@@ -85,6 +142,30 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
     if (getValues("disabilityDegree") === null) return;
     setValue("disabilityDegree", null, { shouldDirty: true, shouldValidate: true });
   }, [severelyDisabled, getValues, setValue]);
+
+  /**
+   * Kein Aufenthaltstitel, kein Ablaufdatum.
+   *
+   * Dieselbe Falle wie beim Behinderungsgrad daneben, nur mit schwereren
+   * Folgen: Wer erst „Ja" anklickt, ein Datum eintraegt und dann auf „Nein"
+   * wechselt, hinterliesse in der Akte eine Befristung zu einem Titel, den es
+   * nach eigener Aussage gar nicht gibt — und genau an diesem Datum haengt
+   * spaeter die Ablauf-Ampel. Das leere Feld wird vom Server als `null`
+   * uebernommen (`aufenthaltstitelGueltigBis` steht in
+   * LEERBARE_FRAGEBOGEN_FELDER); ohne diese Freigabe bliebe der alte Wert
+   * stehen und der Auto-Save meldete trotzdem Erfolg.
+   *
+   * Als Effekt und nicht nur im Klick-Handler, damit auch ein bereits
+   * gespeicherter Widerspruch beim naechsten Speichern aufgeloest wird.
+   */
+  useEffect(() => {
+    if (aufenthaltstitelErforderlich === true) return;
+    if (getValues("aufenthaltstitelGueltigBis") === "") return;
+    setValue("aufenthaltstitelGueltigBis", "", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }, [aufenthaltstitelErforderlich, getValues, setValue]);
 
   const onSubmit = (values: Step1Data) => {
     onNext(values as unknown as Record<string, unknown>);
@@ -274,6 +355,78 @@ export function Step1Personal({ data, onNext, saving, fieldConfig }: StepProps) 
             </div>
           )}
         </div>
+      )}
+
+      {/* Aufenthaltstitel — steht bewusst direkt hinter der
+          Staatsangehoerigkeit, aber als EIGENE Frage. Aus dem Freitextfeld
+          darueber laesst sich der Aufenthaltsstatus nicht ableiten (siehe
+          createStep1Schema); gefragt wird deshalb rundheraus.
+
+          Der Erklaersatz ist kein Beiwerk. Die Frage geht an jede Person, auch
+          an die, die seit ihrer Geburt hier lebt — ohne den Satz liest sie sich
+          wie ein Verdacht. Mit ihm ist in einem Zug klar, dass sie einen
+          Grossteil der Belegschaft gar nicht betrifft. */}
+      {fc.isVisible("aufenthaltstitelErforderlich") && (
+        <fieldset className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
+          <legend className="px-1 text-sm font-medium text-foreground">
+            {fc.getLabel("aufenthaltstitelErforderlich")}{" "}
+            {fc.isRequired("aufenthaltstitelErforderlich") && (
+              <span className="text-destructive">*</span>
+            )}
+          </legend>
+          <p className="text-xs text-muted-foreground">
+            Diese Angabe brauchen wir nur, wenn Sie keine EU-Staatsangehörigkeit
+            haben. Mit der deutschen oder einer anderen Staatsangehörigkeit der
+            EU — ebenso aus Island, Liechtenstein, Norwegen oder der Schweiz —
+            dürfen Sie ohne Aufenthaltstitel arbeiten; antworten Sie dann bitte
+            mit „Nein“.
+          </p>
+          <JaNein
+            name={fc.getLabel("aufenthaltstitelErforderlich")}
+            wert={aufenthaltstitelErforderlich ?? null}
+            onChange={(v) =>
+              setValue("aufenthaltstitelErforderlich", v, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          />
+          {errors.aufenthaltstitelErforderlich && (
+            <p className="text-xs text-destructive">
+              {errors.aufenthaltstitelErforderlich.message}
+            </p>
+          )}
+
+          {aufenthaltstitelErforderlich === true &&
+            fc.isVisible("aufenthaltstitelGueltigBis") && (
+              <div className="space-y-2 border-t border-border pt-3">
+                <label className="text-sm font-medium text-foreground">
+                  {fc.getLabel("aufenthaltstitelGueltigBis")}{" "}
+                  {fc.isRequired("aufenthaltstitelGueltigBis") && (
+                    <span className="text-destructive">*</span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  {...register("aufenthaltstitelGueltigBis")}
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring sm:w-56"
+                />
+                {errors.aufenthaltstitelGueltigBis && (
+                  <p className="text-xs text-destructive">
+                    {errors.aufenthaltstitelGueltigBis.message}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Bitte lassen Sie das Feld leer, wenn Ihr Titel unbefristet ist
+                  — etwa bei einer Niederlassungserlaubnis. Den Aufenthaltstitel
+                  und, falls Sie eine gesonderte Arbeitserlaubnis haben, auch
+                  diese laden Sie am Ende des Fragebogens hoch. Fehlt ein
+                  Nachweis noch, können Sie den Fragebogen trotzdem absenden und
+                  ihn nachreichen.
+                </p>
+              </div>
+            )}
+        </fieldset>
       )}
 
       {/* Familienstand */}

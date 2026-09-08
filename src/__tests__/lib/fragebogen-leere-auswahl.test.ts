@@ -64,6 +64,7 @@ const SCHRITT1_BASIS = {
   nationality: "deutsch",
   maritalStatus: "ledig",
   severelyDisabled: false,
+  aufenthaltstitelErforderlich: false,
   disabilityDegree: null,
 };
 
