@@ -3,32 +3,35 @@
  */
 
 /**
- * Schritt 11 des Personalfragebogens — die Vorauswahl bei
+ * Schritt 11 des Personalfragebogens — der Hinweis bei
  * "Rentenversicherungsfrei von Gesetzes wegen".
  *
- * Die Zustandslogik des Schritts ist richtig: Eine gespeicherte Antwort
- * schlaegt die Vorgabe aus dem Beschaeftigungsstatus. Der begleitende TEXT hing
- * frueher aber allein am Status und nicht daran, ob die Vorauswahl auch
- * tatsaechlich greift. Ergebnis nach dem Weg, den die neue Schrittleiste
- * bequem macht — erst hier "versichert bleiben" waehlen und speichern, dann
- * zurueck zu "Weitere Beschaeftigung", dort "Altersvollrentner" setzen und
- * wieder herspringen:
+ * Hier gilt seit der Durchsicht 09/2026 eine harte Regel: **Der Schritt kreuzt
+ * NICHTS an.** Vorher belegte er die Auswahl mit "RENTENVERSICHERUNGSFREI" vor,
+ * sobald im Schritt "Weitere Beschaeftigung" ein freistellender Status stand.
+ * Damit genuegte ein Klick auf "Weiter", ohne dass die Person je eine der vier
+ * Zeilen angeklickt haette — und `PUT /api/fragebogen/[token]` schrieb den Wert
+ * samt `rvEntscheidungAm` fest. In der Akte stand dann eine datierte
+ * Entscheidung zur folgenreichsten Frage des Fragebogens, die niemand
+ * getroffen hat. Dieselbe Begruendung wie bei `reqJaNein` in
+ * validations/personal-data.ts: Bei einer Frage, deren Antwort eine Pflicht
+ * entfallen laesst, ist die Vorbelegung selbst die Antwort.
  *
- *   - der gelbe Kasten behauptete woertlich, "Ich bin bereits von Gesetzes
- *     wegen frei" sei bereits gewaehlt,
- *   - das Abzeichen "Aufgrund Ihrer Angabe vorausgewaehlt" klebte an dieser
- *     nicht angekreuzten Zeile,
- *   - angekreuzt war eine andere.
+ * Der Hinweis bleibt, er wird nur nicht mehr zum Kreuz. Und sein Wortlaut haengt
+ * am tatsaechlichen Zustand, nicht am Status allein — sonst entsteht der zweite
+ * Fehler, den diese Datei festhaelt: Nach dem Weg, den die Schrittleiste bequem
+ * macht (erst hier "versichert bleiben" waehlen und speichern, dann zurueck zu
+ * "Weitere Beschaeftigung", dort "Altersvollrentner" setzen und wieder
+ * herspringen), behauptete der gelbe Kasten woertlich, "Ich bin bereits von
+ * Gesetzes wegen frei" sei gewaehlt, und das Abzeichen klebte an dieser nicht
+ * angekreuzten Zeile.
  *
- * Wer das liest und auf "Weiter" klickt, speichert nicht, was er zu speichern
- * glaubt — und zwar bei der Frage, die der Dateikopf selbst als die
- * folgenreichste des ganzen Fragebogens bezeichnet. Deshalb pruefen die
- * Zusicherungen unten Text UND Ankreuzung gemeinsam.
+ * Deshalb pruefen die Zusicherungen unten Text UND Ankreuzung gemeinsam.
  *
  * Umgebung wie in fragebogen-schritt6.test.tsx: jsdom im Docblock, kein
  * @testing-library/jest-dom.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { Step11Rente } from "@/app/fragebogen/[token]/steps/step11-rente";
 import { getRvOption } from "@/lib/minijob-rentenversicherung";
 
@@ -38,11 +41,14 @@ import { getRvOption } from "@/lib/minijob-rentenversicherung";
 const FREI_LABEL = getRvOption("RENTENVERSICHERUNGSFREI")!.label;
 const BLEIBT_LABEL = getRvOption("KEINE_BEFREIUNG")!.label;
 
-function zeige(data: Record<string, unknown>) {
+function zeige(
+  data: Record<string, unknown>,
+  onNext: (werte: Record<string, unknown>) => void = () => {}
+) {
   return render(
     <Step11Rente
       data={data}
-      onNext={() => {}}
+      onNext={onNext}
       onBack={() => {}}
       saving={false}
       token="tok"
@@ -59,22 +65,65 @@ function radio(label: string): HTMLInputElement {
   return feld;
 }
 
-describe("Schritt 11: Vorauswahl bei gesetzlicher Rentenversicherungsfreiheit", () => {
-  it("kuendigt die Vorauswahl nur an, wo sie auch greift", () => {
-    zeige({ beschaeftigungsStatus: "ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE" });
+describe("Schritt 11: Hinweis bei gesetzlicher Rentenversicherungsfreiheit", () => {
+  it("kreuzt NICHTS an, auch nicht bei einem freistellenden Status", () => {
+    const { container } = zeige({
+      beschaeftigungsStatus: "ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE",
+    });
 
-    expect(radio(FREI_LABEL).checked).toBe(true);
-    expect(screen.getByText(/bereits gewählt/)).toBeTruthy();
-    expect(screen.getByText("Aufgrund Ihrer Angabe vorausgewählt")).toBeTruthy();
+    // Der Kern: keine der vier Zeilen ist angekreuzt.
+    expect(radio(FREI_LABEL).checked).toBe(false);
+    expect(radio(BLEIBT_LABEL).checked).toBe(false);
+
+    // Der Hinweis bleibt — er empfiehlt, er behauptet nichts.
+    const text = container.textContent ?? "";
+    expect(text).toContain("von Gesetzes wegen frei");
+    expect(text).toContain("vorausgekreuzt haben wir nichts");
+    expect(
+      screen.getByText("Empfohlen aufgrund Ihrer Angabe zur Beschäftigung")
+    ).toBeTruthy();
+    expect(screen.queryByText(/bereits gewählt/)).toBeNull();
   });
 
-  it("behauptet KEINE Vorauswahl, wenn eine abweichende Antwort gespeichert ist", () => {
+  it("speichert ohne eigene Auswahl NICHTS und sagt, was fehlt", () => {
+    const gesendet: Record<string, unknown>[] = [];
+    const { container } = zeige(
+      { beschaeftigungsStatus: "ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE" },
+      (werte) => gesendet.push(werte)
+    );
+
+    const formular = container.querySelector("form");
+    if (!formular) throw new Error("Kein Formular gefunden");
+    fireEvent.submit(formular);
+
+    // Genau der Befund: Frueher ging hier ein datiertes
+    // "RENTENVERSICHERUNGSFREI" an den Server, das niemand angeklickt hatte.
+    expect(gesendet).toHaveLength(0);
+    expect(
+      screen.getByText("Bitte wählen Sie aus, wie Sie sich entscheiden.")
+    ).toBeTruthy();
+  });
+
+  it("bestaetigt die Auswahl, wenn sie zur Angabe passt", () => {
+    zeige({
+      beschaeftigungsStatus: "ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE",
+      rvEntscheidung: "RENTENVERSICHERUNGSFREI",
+    });
+
+    expect(radio(FREI_LABEL).checked).toBe(true);
+    expect(
+      screen.getByText("Passt zu Ihrer Angabe zur Beschäftigung")
+    ).toBeTruthy();
+    expect(screen.getByText("Ihre Auswahl passt zu Ihren Angaben")).toBeTruthy();
+  });
+
+  it("behauptet KEINE Auswahl, wenn eine abweichende Antwort gespeichert ist", () => {
     zeige({
       beschaeftigungsStatus: "ALTERSVOLLRENTNER_NACH_REGELALTERSGRENZE",
       rvEntscheidung: "KEINE_BEFREIUNG",
     });
 
-    // Der Zustand, um den es geht: gespeichert schlaegt Vorgabe.
+    // Der Zustand, um den es geht: die gespeicherte Antwort steht.
     expect(radio(BLEIBT_LABEL).checked).toBe(true);
     expect(radio(FREI_LABEL).checked).toBe(false);
 
@@ -82,7 +131,9 @@ describe("Schritt 11: Vorauswahl bei gesetzlicher Rentenversicherungsfreiheit", 
     // Abzeichen an der nicht angekreuzten Zeile behauptet keine Auswahl.
     expect(screen.queryByText(/bereits gewählt/)).toBeNull();
     expect(screen.queryByText("Aufgrund Ihrer Angabe vorausgewählt")).toBeNull();
-    expect(screen.getByText("Passt zu Ihrer Angabe zur Beschäftigung")).toBeTruthy();
+    expect(
+      screen.getByText("Empfohlen aufgrund Ihrer Angabe zur Beschäftigung")
+    ).toBeTruthy();
   });
 
   it("benennt im Widerspruchsfall beides: was der Status sagt und was gewaehlt ist", () => {
@@ -115,8 +166,10 @@ describe("Schritt 11: Vorauswahl bei gesetzlicher Rentenversicherungsfreiheit", 
     });
 
     expect(radio(FREI_LABEL).checked).toBe(false);
-    expect(screen.queryByText("Aufgrund Ihrer Angabe vorausgewählt")).toBeNull();
     expect(screen.queryByText("Passt zu Ihrer Angabe zur Beschäftigung")).toBeNull();
+    expect(
+      screen.queryByText("Empfohlen aufgrund Ihrer Angabe zur Beschäftigung")
+    ).toBeNull();
     expect(container.textContent ?? "").not.toContain("War das ein Versehen");
   });
 });

@@ -356,3 +356,102 @@ export function dringendeNachweisLagen(
     (l) => l.ampel?.kategorie === "ABGELAUFEN" || l.ampel?.kategorie === "KRITISCH"
   );
 }
+
+// =============================================
+// Pruefung eines eingegebenen Ablaufdatums
+// =============================================
+
+/**
+ * Wie weit darf ein Ablaufdatum in der Zukunft liegen?
+ *
+ * Kein Aufenthaltstitel wird auf 20 Jahre befristet — ein unbefristeter (die
+ * Niederlassungserlaubnis) traegt gar kein Ablaufdatum. Was darueber liegt, ist
+ * ein Tippfehler: 2206 statt 2026, oder 20226 in einem Feld ohne Maske. Der
+ * faellt niemandem auf, weil das Dokument danach vollstaendig AUSSIEHT — nur
+ * die Ampel schweigt fuer immer. Ein Tippfehler in die andere Richtung faellt
+ * dagegen sofort auf, weil das Dokument dann als abgelaufen angezeigt wird.
+ */
+export const MAX_GUELTIG_BIS_TAGE = 20 * 366;
+
+export type FristPruefung =
+  | { ok: true; gueltigBis: Date | null }
+  | { ok: false; fehler: string };
+
+/**
+ * Prueft ein eingegebenes Ablaufdatum — die EINE Regel fuer alle Schreibwege.
+ *
+ * Drei Wege schreiben heute `Document.gueltigBis`: der Upload und das
+ * Nachtragen ueber den Magic Link (`/api/fragebogen/[token]/documents`) und die
+ * Korrektur durch HR (`/api/onboarding/[id]/documents/[docId]`). Sie stand
+ * urspruenglich nur in der ersten Route; die zweite haette sie nachbauen
+ * muessen, und zwei Fassungen einer Datumsregel laufen frueher oder spaeter
+ * auseinander — dann nimmt der eine Weg an, was der andere abweist.
+ *
+ * Beim Upload gilt zusaetzlich eine Reihenfolge: Diese Pruefung laeuft, BEVOR
+ * die Datei auf die Platte geht. Wer erst schreibt und dann prueft, laesst bei
+ * jedem 400 eine verwaiste Datei im Upload-Ordner zurueck, auf die keine
+ * Datenbankzeile mehr zeigt.
+ *
+ * Drei Antworten sind moeglich:
+ *
+ * - **Kein Datum** (`""`): angenommen, `gueltigBis` bleibt `null`. Der Upload
+ *   darf daran nicht scheitern — der Scan ist das Wichtige, und ein Formular,
+ *   das die Datei wegen eines fehlenden Nebenfeldes zurueckweist, bekommt
+ *   irgendein Datum eingetippt. Sichtbar bleibt es trotzdem: Die Maske
+ *   kennzeichnet solche Nachweise als „Frist fehlt", und die Ampel schweigt
+ *   (ohne Datum gibt es KEINE Stufe, siehe `getAblaufKategorie`).
+ * - **Datum an einem Typ, der keine Frist traegt**: Fehler. Es stillschweigend
+ *   zu verwerfen waere schlimmer — jemand hat es getippt und saehe es nie
+ *   wieder.
+ * - **Unlesbares oder unmoegliches Datum**: Fehler.
+ *
+ * **Ein Datum in der VERGANGENHEIT wird angenommen** (bewusst). Ein
+ * abgelaufener Titel ist eine Tatsache, die HR sehen muss; die Ampel zeigt sie
+ * dann als ABGELAUFEN an. Wer die Wahrheit mit einem Fehler zurueckweist,
+ * erzieht zum Erfinden eines passenden Datums — und dann steht in der Akte eine
+ * Angabe mit Rechtsfolge, die niemand mehr anzweifelt.
+ */
+export function pruefeGueltigBis(
+  roh: unknown,
+  documentType: string,
+  jetzt: Date = new Date()
+): FristPruefung {
+  // `unknown` und nicht `string`: Aus `formData.get()` kann auch eine Datei
+  // kommen, aus `request.json()` jede beliebige Form. Ein `.trim()` darauf
+  // waere ein TypeError — und der faende sich am Ende als 500 wieder, wo ein
+  // klares "kein Datum" richtig ist.
+  const wert = typeof roh === "string" ? roh.trim() : "";
+  if (!wert) return { ok: true, gueltigBis: null };
+
+  if (!istFristpflichtig(documentType)) {
+    return {
+      ok: false,
+      fehler:
+        "Ein Ablaufdatum wird nur beim Aufenthaltstitel und bei der " +
+        "Arbeitserlaubnis erfasst.",
+    };
+  }
+
+  // Nur "JJJJ-MM-TT" — genau das, was <input type="date"> liefert. Alles andere
+  // wird NICHT geraten: `new Date("03.05.2027")` liest je nach Laufzeit den
+  // 3. Mai oder den 5. Maerz, und hier entscheidet der Tag ueber eine Warnung
+  // mit Rechtsfolge.
+  if (!istKalendertag(wert)) {
+    return {
+      ok: false,
+      fehler: "Bitte geben Sie das Ablaufdatum als Datum an (Tag, Monat, Jahr).",
+    };
+  }
+
+  const tage = tageBisAblauf(wert, jetzt);
+  if (tage !== null && tage > MAX_GUELTIG_BIS_TAGE) {
+    return {
+      ok: false,
+      fehler:
+        "Das Ablaufdatum liegt mehr als 20 Jahre in der Zukunft. Bitte " +
+        "prüfen Sie die Jahreszahl.",
+    };
+  }
+
+  return { ok: true, gueltigBis: kalendertagAlsDatum(wert) };
+}

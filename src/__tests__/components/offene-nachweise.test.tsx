@@ -20,6 +20,9 @@
  *  3. Er fragt nach einem fehlenden Ablaufdatum, das sonst durch beide Netze
  *     faellt: `dringendeNachweisLagen` laesst den Fall aus, und der naechtliche
  *     Cron filtert auf `gueltigBis: { not: null }`.
+ *  4. Er schweigt vor der Abgabe — und zwar mit BEIDEN Haelften. Solange der
+ *     Fragebogen offen ist, fragt das Formular selbst nach Unterlage und
+ *     Ablaufdatum; HR hat dort nichts zu tun.
  *
  * Umgebung wie in dokumentenpaket-dialog.test.tsx: jsdom im Docblock
  * (jest.config.ts bleibt global auf "node"), ohne @testing-library/jest-dom.
@@ -199,6 +202,42 @@ describe("Offene Nachweise: fehlendes Ablaufdatum", () => {
     // Die unbefristete Niederlassungserlaubnis ist ein legitimer Grund fuer das
     // leere Feld. Steht das nicht da, liest sie sich als Ruege.
     expect(text).toContain("Niederlassungserlaubnis");
+  });
+
+  /**
+   * Die Sperre „erst ab Abgabe" gilt fuer BEIDE Haelften des Kastens.
+   *
+   * Sie war nur an der Liste der fehlenden Pflichtunterlagen verdrahtet; die
+   * Nachfrage nach dem Ablaufdatum lief ungebremst. Wer in Schritt 3 seinen
+   * Aufenthaltstitel hochlud und das Datumsfeld daneben (noch) leer liess,
+   * loeste damit den gelben Kasten auf JEDEM Reiter der HR-Ansicht aus —
+   * waehrend das Formular genau dieses Datum gerade selbst abfragt und die
+   * Person es dort ohne HR eintragen kann.
+   */
+  test("fragt erst nach der Abgabe nach — vorher gar nicht", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({
+          status: "IN_PROGRESS",
+          submittedAt: null,
+          requiredDocuments: ["GEBURTSURKUNDE_EIGEN"],
+          personalData: {
+            birthDate: "1965-05-03",
+            children: [],
+            rvEntscheidung: null,
+            aufenthaltstitelErforderlich: null,
+            healthInsuranceType: "gesetzlich",
+          },
+          documents: [dokument("AUFENTHALTSTITEL", null)],
+        })}
+        onZuDenDokumenten={null}
+      />,
+    );
+
+    expect(screen.queryByText("Offene Nachweise")).toBeNull();
+    expect(document.body.textContent ?? "").not.toContain(
+      "kein Ablaufdatum erfasst",
+    );
   });
 
   test("schweigt, sobald ein Datum erfasst ist", () => {

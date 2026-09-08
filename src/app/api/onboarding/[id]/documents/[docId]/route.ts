@@ -1,13 +1,20 @@
 /**
  * API: /api/onboarding/:id/documents/:docId
  *
- * GET – Dokument herunterladen (nur HR-Team)
+ * GET   – Dokument herunterladen (nur HR-Team)
+ * PATCH – Ablaufdatum eines befristeten Nachweises setzen, aendern oder loeschen
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
 import { asciiFilename } from "@/lib/file-upload";
+import {
+  ablaufKalendertag,
+  istFristpflichtig,
+  pruefeGueltigBis,
+} from "@/lib/dokument-fristen";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -129,5 +136,150 @@ export async function GET(
       { error: "Interner Serverfehler" },
       { status: 500 }
     );
+  }
+}
+
+// =============================================
+// PATCH /api/onboarding/:id/documents/:docId
+// =============================================
+/**
+ * Warum HR dieses Feld schreiben koennen MUSS.
+ *
+ * `Document.gueltigBis` traegt die gesamte Fristenueberwachung: die Ampel an
+ * der Dokumentenzeile, den Warnbalken am Vorgang und den naechtlichen
+ * Erinnerungs-Cron (der auf `gueltigBis: { not: null }` filtert und einen
+ * Nachweis ohne Datum deshalb nie sieht). Geschrieben werden konnte das Feld
+ * bis hierher aber ausschliesslich ueber den Magic Link der beschaeftigten
+ * Person — und der wird mit dem Absenden des Fragebogens ungueltig
+ * (`validateMagicToken` ohne `allowSubmitted`).
+ *
+ * Damit war jeder Nachweis, der ohne Datum abgegeben wurde, dauerhaft
+ * unueberwacht: Die Oberflaeche forderte HR an zwei Stellen woertlich auf, das
+ * Ablaufdatum „nachzutragen" — und es gab im ganzen Portal keine Stelle, an der
+ * das moeglich gewesen waere. Genauso wenig liess sich der Kreis schliessen,
+ * fuer den der Cron gebaut ist: Die Erinnerung geht an HR, die Person schickt
+ * den verlaengerten Titel, und die neue Frist konnte niemand eintragen.
+ *
+ * **Loeschen ist hier erlaubt, ueber den Magic Link nicht.** Dort waere ein
+ * leeres Datum ein Klick, mit dem sich die Ablaufkontrolle stumm schalten
+ * liesse, ohne dass es hinterher von „nie erfasst" zu unterscheiden waere. Hier
+ * ist es die einzige Moeglichkeit, ein faelschlich eingetragenes Datum an einem
+ * unbefristeten Titel (Niederlassungserlaubnis) wieder loszuwerden — und jede
+ * Aenderung landet mitsamt altem und neuem Wert im AuditLog. Der Unterschied
+ * ist also nicht Vertrauen, sondern die Spur.
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; docId: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+    }
+    if (!HR_EDIT_ROLES.includes(session.role)) {
+      return NextResponse.json(
+        { error: "Keine Berechtigung zum Bearbeiten dieses Vorgangs" },
+        { status: 403 }
+      );
+    }
+
+    const { id, docId } = await params;
+
+    let koerper: { gueltigBis?: unknown };
+    try {
+      koerper = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+    }
+
+    // Vorgang zuerst: Die Mandanten-Pruefung haengt an seiner Organisation, und
+    // ohne sie saehe eine Sachbearbeitung mit eingeschraenktem Zugriff zwar
+    // keinen fremden Vorgang, koennte aber ein Dokument daran aendern.
+    const onboarding = await prisma.onboardingProcess.findUnique({
+      where: { id },
+      select: { id: true, organizationId: true },
+    });
+    // Gleicher Text wie beim fremden Mandanten weiter unten: Ein eigener
+    // Statuscode fuer „gibt es, gehoert aber nicht dir" verriete genau das.
+    if (!onboarding) {
+      return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+    }
+    if (!(await canAccessProcess(session, onboarding.organizationId))) {
+      return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
+    }
+
+    const document = await prisma.document.findFirst({
+      where: { id: docId, onboardingId: onboarding.id },
+      select: { id: true, type: true, fileName: true, gueltigBis: true },
+    });
+    if (!document) {
+      return NextResponse.json(
+        { error: "Dokument nicht gefunden" },
+        { status: 404 }
+      );
+    }
+
+    // Ein Datum an einer Geburtsurkunde ist keine Angabe, sondern ein
+    // Bedienfehler — und `pruefeGueltigBis` liesse den leeren Wert an JEDEM Typ
+    // durch, wuerde die Ruecknahme hier also stillschweigend annehmen.
+    if (!istFristpflichtig(document.type)) {
+      return NextResponse.json(
+        {
+          error:
+            "Ein Ablaufdatum wird nur beim Aufenthaltstitel und bei der " +
+            "Arbeitserlaubnis erfasst.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const frist = pruefeGueltigBis(koerper.gueltigBis, document.type);
+    if (!frist.ok) {
+      return NextResponse.json({ error: frist.fehler }, { status: 400 });
+    }
+
+    const vorher = ablaufKalendertag(document.gueltigBis);
+    const nachher = ablaufKalendertag(frist.gueltigBis);
+    if (vorher === nachher) {
+      // Nichts zu tun — und vor allem kein Protokolleintrag, der eine Aenderung
+      // behauptet, die keine war.
+      return NextResponse.json({
+        id: document.id,
+        type: document.type,
+        gueltigBis: document.gueltigBis,
+      });
+    }
+
+    // Aenderung und Protokoll in EINER Transaktion: Ein Nachweis, dessen Frist
+    // sich ohne Spur verschiebt, ist genau der Zustand, den die Ampel
+    // verhindern soll.
+    const [aktualisiert] = await prisma.$transaction([
+      prisma.document.update({
+        where: { id: document.id },
+        data: { gueltigBis: frist.gueltigBis },
+        select: { id: true, type: true, gueltigBis: true },
+      }),
+      prisma.auditLog.create({
+        data: {
+          userId: session.userId,
+          onboardingId: onboarding.id,
+          processType: "ONBOARDING",
+          action: "DOKUMENT_FRIST_GEAENDERT",
+          details: {
+            documentId: document.id,
+            dokumentTyp: document.type,
+            dokumentDatei: document.fileName,
+            vorher,
+            nachher,
+          },
+        },
+      }),
+    ]);
+
+    return NextResponse.json(aktualisiert);
+  } catch (error) {
+    console.error("Fehler beim Aendern des Ablaufdatums:", error);
+    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
 }

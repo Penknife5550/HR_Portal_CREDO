@@ -27,11 +27,18 @@ import {
  * mehrzeiligen Eingabefeld stammt.
  *
  * `csvZelle` (src/lib/csv.ts) quotet einen Umbruch zwar regelkonform, schreibt
- * ihn aber mit. Bis zur Kostenstellen-Bemerkung enthielt diese CSV kein
- * einziges mehrzeiliges Feld; ein Import, der die Datei zeilenweise liest,
- * saehe ab dem ersten Umbruch einen abgeschnittenen Datensatz und danach einen
- * Geisterdatensatz. Die vollstaendige, mehrzeilige Bemerkung bleibt in der
- * Vorgangsansicht und im Personalakte-PDF stehen — dort gehoert sie hin.
+ * ihn aber mit. Ein Import, der die Datei zeilenweise liest, saehe ab dem
+ * ersten Umbruch einen abgeschnittenen Datensatz und danach einen
+ * Geisterdatensatz.
+ *
+ * Betroffen sind ALLE Zellen aus einem mehrzeiligen Eingabefeld, nicht nur die
+ * zuletzt hinzugekommene: Neben der Kostenstellen-Bemerkung ist das die
+ * Zweckbefristung („Wodurch endet der Vertrag?", ein `<textarea>` in
+ * src/app/modalitaeten/[token]/page.tsx). Wer hier eine Spalte ergaenzt, deren
+ * Wert aus einem `<textarea>` stammt, muss sie ebenfalls hier hindurchschicken.
+ *
+ * Der vollstaendige, mehrzeilige Text bleibt in der Vorgangsansicht und im
+ * Personalakte-PDF stehen — dort gehoert er hin.
  */
 function einzeilig(text: string): string {
   // Der Wagenruecklauf steht bewusst mit in der Zeichenklasse: Wer aus Word
@@ -217,7 +224,7 @@ export async function GET(
         positionsspalteKostenstelle(kostenstellen.zeilen),
         // Reihenfolge muss zu den fuenf angehaengten Kopfzeilen passen
         sd?.befristet ? getBefristungsartLabel(sd.befristungsart) || "" : "",
-        sd?.befristungZweck || "",
+        einzeilig(sd?.befristungZweck || ""),
         sd?.vertragsendeVoraussichtlich
           ? new Date(sd.vertragsendeVoraussichtlich).toLocaleDateString("de-DE")
           : "",

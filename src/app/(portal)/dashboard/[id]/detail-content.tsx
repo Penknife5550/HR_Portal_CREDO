@@ -30,6 +30,7 @@ import {
 import {
   ABLAUF_KATEGORIE_META,
   ablaufAmpel,
+  ablaufKalendertag,
   dringendeNachweisLagen,
   istFristpflichtig,
   nachweisLagen,
@@ -556,6 +557,31 @@ export function DetailContent({
     }
   }, [onboardingId]);
 
+  /**
+   * Eine geaenderte Dokumentenfrist in den geladenen Vorgang zurueckschreiben.
+   *
+   * Bewusst punktuell statt `loadData()`: Das Neuladen setzt `loading` und
+   * blendet die ganze Seite fuer einen Moment aus — fuer ein Datumsfeld, das
+   * die Route bereits bestaetigt hat, ist das die groessere Stoerung. Der
+   * Warnbalken und der Kasten „Offene Nachweise" rechnen live aus
+   * `data.documents` und stimmen mit diesem einen Feld sofort wieder.
+   */
+  const setzeDokumentFrist = useCallback(
+    (docId: string, gueltigBis: string | null) => {
+      setData((bisher) =>
+        bisher
+          ? {
+              ...bisher,
+              documents: bisher.documents.map((d) =>
+                d.id === docId ? { ...d, gueltigBis } : d
+              ),
+            }
+          : bisher
+      );
+    },
+    []
+  );
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -874,6 +900,7 @@ export function DetailContent({
             data={data}
             onboardingId={onboardingId}
             canEdit={HR_EDIT_ROLES.includes(user.role)}
+            onFristGeaendert={setzeDokumentFrist}
             paketDialogOffen={paketDialogOffen}
             setPaketDialogOffen={setPaketDialogOffen}
           />
@@ -1761,9 +1788,11 @@ const ABGEGEBENE_STATUS: readonly string[] = [
  * und ein Vorwurf, den niemand ausraeumen kann, wird nach zwei Wochen
  * ignoriert.
  *
- * Erst ab Abgabe: Solange der Fragebogen offen ist, laedt die Person selbst
- * hoch und wird im Formular je Unterlage angemahnt. Vorher zu mahnen hiesse,
- * HR hinter jemandem hertelefonieren zu lassen, der gerade in Schritt 3 sitzt.
+ * Erst ab Abgabe — und zwar BEIDE Haelften: Solange der Fragebogen offen ist,
+ * laedt die Person selbst hoch, wird im Formular je Unterlage angemahnt und
+ * bekommt das Ablaufdatum dort direkt neben der Datei abgefragt. Vorher zu
+ * mahnen hiesse, HR hinter jemandem hertelefonieren zu lassen, der gerade in
+ * Schritt 3 sitzt.
  */
 export function OffeneNachweiseKasten({
   data,
@@ -1794,9 +1823,17 @@ export function OffeneNachweiseKasten({
   // `nachweisLagen` gruppiert je Nachweisart und liefert `ampel: null` genau
   // dann, wenn fuer diese Art ueberhaupt kein Ablaufdatum erfasst ist — ein
   // nachgereichtes Papier MIT Datum raeumt die Nachfrage also ab.
-  const ohneFrist = nachweisLagen(data.documents)
-    .filter((l) => l.ampel === null)
-    .map((l) => l.typ);
+  //
+  // `abgegeben` gilt hier GENAUSO wie fuer die Liste darueber. Vorher lief
+  // diese Haelfte ungebremst: Wer in Schritt 3 seinen Aufenthaltstitel ohne
+  // Datum hochlud, loeste den Kasten auf JEDEM Reiter der HR-Ansicht aus —
+  // waehrend das Formular ihn selbst gerade nach dem Datum fragt. Genau davor
+  // warnt der Absatz „Erst ab Abgabe" im Kopf dieser Komponente.
+  const ohneFrist = abgegeben
+    ? nachweisLagen(data.documents)
+        .filter((l) => l.ampel === null)
+        .map((l) => l.typ)
+    : [];
 
   if (offen.length === 0 && ohneFrist.length === 0) return null;
 
@@ -1925,7 +1962,8 @@ function NachweisFristenWarnung({
 }
 
 /**
- * Das Abzeichen an der Dokumentenzeile — Stufe und Klartext.
+ * Das Abzeichen an der Dokumentenzeile — Stufe, Klartext und das Ablaufdatum
+ * selbst.
  *
  * Gestaltung wie die Vertragsende-Ampel (`contract-end-config.tsx`): rundes
  * Abzeichen, Farben aus dem Meta-Objekt als Inline-Stil, weil sie samt
@@ -1935,11 +1973,128 @@ function NachweisFristenWarnung({
  * Vertragsende ist „noch weit weg" die Abwesenheit einer Aufgabe, hier ist es
  * die Auskunft „dieses Papier gilt bis ..." — genau die Auskunft, wegen der
  * jemand den Vorgang oeffnet.
+ *
+ * **Warum hier auch geschrieben wird.** Der Satz „andernfalls bitte das
+ * Ablaufdatum nachtragen" stand hier, bevor es einen Weg dafuer gab:
+ * Geschrieben werden konnte `gueltigBis` nur ueber den Magic Link der
+ * beschaeftigten Person, und der ist mit dem Absenden des Fragebogens tot. Eine
+ * Aufforderung ohne Schaltflaeche ist keine Aufforderung, sondern ein Vorwurf —
+ * deshalb sitzt das Eingabefeld jetzt an derselben Stelle wie der Satz.
  */
-function AblaufAbzeichen({ doc }: { doc: DocumentData }) {
+function AblaufAbzeichen({
+  doc,
+  onboardingId,
+  canEdit,
+  onFristGeaendert,
+}: {
+  doc: DocumentData;
+  onboardingId: string;
+  canEdit: boolean;
+  onFristGeaendert: (docId: string, gueltigBis: string | null) => void;
+}) {
+  const [offen, setOffen] = useState(false);
+  const [eingabe, setEingabe] = useState("");
+  const [speichert, setSpeichert] = useState(false);
+  const [fehler, setFehler] = useState("");
+
+  // `ablaufKalendertag` und nicht `slice(0, 10)`: Die Spalte ist `@db.Date` und
+  // kommt als Mitternacht UTC herein; jede eigene Umrechnung waere die naechste
+  // Gelegenheit fuer den Zeitzonenfehler, gegen den dieses Modul gebaut ist.
+  const gespeicherterTag = ablaufKalendertag(doc.gueltigBis) ?? "";
+
+  const oeffne = () => {
+    setEingabe(gespeicherterTag);
+    setFehler("");
+    setOffen(true);
+  };
+
+  const speichere = async (wert: string) => {
+    setSpeichert(true);
+    setFehler("");
+    try {
+      const res = await fetch(
+        `/api/onboarding/${onboardingId}/documents/${doc.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gueltigBis: wert }),
+        }
+      );
+      const koerper = await res.json().catch(() => null);
+      if (!res.ok) {
+        setFehler(
+          koerper && typeof koerper.error === "string"
+            ? koerper.error
+            : "Das Ablaufdatum konnte nicht gespeichert werden."
+        );
+        return;
+      }
+      onFristGeaendert(
+        doc.id,
+        koerper && typeof koerper.gueltigBis === "string"
+          ? koerper.gueltigBis
+          : null
+      );
+      setOffen(false);
+    } catch {
+      setFehler("Verbindungsfehler beim Speichern des Ablaufdatums.");
+    } finally {
+      setSpeichert(false);
+    }
+  };
+
   if (!istFristpflichtig(doc.type)) return null;
 
   const ampel = ablaufAmpel(doc.gueltigBis);
+
+  // Dieselbe Eingabezeile fuer beide Faelle — „noch keins" und „falsches".
+  // Ein eigener Weg je Fall waere eine zweite Stelle, an der dieselbe Regel
+  // steht.
+  const editor = offen ? (
+    <div className="mt-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          aria-label={`Ablaufdatum für ${documentTypeLabel(doc.type)}`}
+          value={eingabe}
+          onChange={(e) => setEingabe(e.target.value)}
+          className="rounded-lg border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+        />
+        <button
+          type="button"
+          disabled={speichert || eingabe === ""}
+          onClick={() => speichere(eingabe)}
+          className="rounded-lg border border-border px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+        >
+          {speichert ? "Wird gespeichert..." : "Speichern"}
+        </button>
+        {/* Loeschen gibt es NUR hier, nicht ueber den Magic Link: Ein
+            faelschlich eingetragenes Datum an einer unbefristeten
+            Niederlassungserlaubnis waere sonst nicht mehr wegzubekommen. Jede
+            Aenderung steht im Protokoll. */}
+        {gespeicherterTag !== "" && (
+          <button
+            type="button"
+            disabled={speichert}
+            onClick={() => speichere("")}
+            className="rounded-lg border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
+            title="Der Nachweis gilt unbefristet"
+          >
+            Unbefristet
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={speichert}
+          onClick={() => setOffen(false)}
+          className="text-[11px] text-muted-foreground underline underline-offset-2 disabled:opacity-50"
+        >
+          Abbrechen
+        </button>
+      </div>
+      {fehler && <p className="mt-1 text-[11px] text-credo-rot">{fehler}</p>}
+    </div>
+  ) : null;
 
   // Kein Datum ist kein Fehler (der Titel kann unbefristet sein, das Feld kann
   // schlicht noch leer sein) — aber es muss sichtbar sein. Sonst liest HR die
@@ -1956,8 +2111,18 @@ function AblaufAbzeichen({ doc }: { doc: DocumentData }) {
         <p className="text-[11px] text-amber-900">
           Kein Ablaufdatum erfasst — dieser Nachweis wird nicht überwacht. Bei
           einer unbefristeten Niederlassungserlaubnis ist das richtig so;
-          andernfalls bitte das Ablaufdatum nachtragen.
+          andernfalls tragen Sie das Ablaufdatum bitte hier nach.
         </p>
+        {canEdit &&
+          (editor ?? (
+            <button
+              type="button"
+              onClick={oeffne}
+              className="mt-1.5 rounded-lg border border-amber-600 px-2 py-1 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100"
+            >
+              Ablaufdatum nachtragen
+            </button>
+          ))}
       </div>
     );
   }
@@ -1966,19 +2131,34 @@ function AblaufAbzeichen({ doc }: { doc: DocumentData }) {
   const dringend = ampel.kategorie === "ABGELAUFEN" || ampel.kategorie === "KRITISCH";
 
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span
-        className="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
-        style={{ color: meta.color, backgroundColor: meta.bg }}
-      >
-        {meta.label}
-      </span>
-      {/* Der Satz selbst bleibt in Theme-Farben: Die Meta-Farben sind fuer
-          Text AUF ihrem eigenen Hintergrund gedacht; frei auf der Karte waeren
-          sie im dunklen Erscheinungsbild kaum lesbar. */}
-      <span className={`text-[11px] ${dringend ? "font-semibold text-credo-rot" : "text-muted-foreground"}`}>
-        {ampel.text}
-      </span>
+    <div className="mb-3">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span
+          className="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
+          style={{ color: meta.color, backgroundColor: meta.bg }}
+        >
+          {meta.label}
+        </span>
+        {/* Der Satz selbst bleibt in Theme-Farben: Die Meta-Farben sind fuer
+            Text AUF ihrem eigenen Hintergrund gedacht; frei auf der Karte waeren
+            sie im dunklen Erscheinungsbild kaum lesbar. */}
+        <span className={`text-[11px] ${dringend ? "font-semibold text-credo-rot" : "text-muted-foreground"}`}>
+          {ampel.text}
+        </span>
+        {/* Auch ein VORHANDENES Datum muss aenderbar sein: Ein Zahlendreher im
+            Jahr laesst die Ampel jahrelang schweigen, und der verlaengerte
+            Titel bringt ohnehin eine neue Frist mit. */}
+        {canEdit && !offen && (
+          <button
+            type="button"
+            onClick={oeffne}
+            className="text-[11px] text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+          >
+            Ändern
+          </button>
+        )}
+      </div>
+      {editor}
     </div>
   );
 }
@@ -2200,12 +2380,15 @@ function TabDocuments({
   data,
   onboardingId,
   canEdit,
+  onFristGeaendert,
   paketDialogOffen,
   setPaketDialogOffen,
 }: {
   data: DetailData;
   onboardingId: string;
   canEdit: boolean;
+  /** Meldet eine geaenderte Dokumentenfrist nach oben — siehe `setzeDokumentFrist`. */
+  onFristGeaendert: (docId: string, gueltigBis: string | null) => void;
   paketDialogOffen: boolean;
   setPaketDialogOffen: (offen: boolean) => void;
 }) {
@@ -2335,8 +2518,15 @@ function TabDocuments({
                   </div>
 
                   {/* Ablauf-Ampel — nur bei fristpflichtigen Nachweisen
-                      (Aufenthaltstitel, Arbeitserlaubnis). */}
-                  <AblaufAbzeichen doc={doc} />
+                      (Aufenthaltstitel, Arbeitserlaubnis). Sie ist zugleich die
+                      EINZIGE Stelle im Portal, an der `gueltigBis` geschrieben
+                      werden kann, nachdem der Magic Link erloschen ist. */}
+                  <AblaufAbzeichen
+                    doc={doc}
+                    onboardingId={onboardingId}
+                    canEdit={canEdit}
+                    onFristGeaendert={onFristGeaendert}
+                  />
 
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-muted-foreground">{formatDate(doc.uploadedAt)}</span>

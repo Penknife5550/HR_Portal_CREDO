@@ -1,0 +1,295 @@
+/**
+ * Tests: HR aendert die Frist eines Nachweises
+ * (PATCH /api/onboarding/[id]/documents/[docId])
+ *
+ * ============================================================================
+ * WARUM ES DIESE ROUTE GIBT (Durchsicht 09/2026)
+ * ============================================================================
+ *
+ * `Document.gueltigBis` traegt die gesamte Fristenueberwachung: die Ampel an
+ * der Dokumentenzeile, den Warnbalken am Vorgang und den naechtlichen
+ * Erinnerungs-Cron (der auf `gueltigBis: { not: null }` filtert und einen
+ * Nachweis ohne Datum deshalb nie sieht).
+ *
+ * Geschrieben werden konnte das Feld aber nur ueber den Magic Link der
+ * beschaeftigten Person — und der wird mit dem Absenden des Fragebogens
+ * ungueltig. Damit war jeder Nachweis, der ohne Datum abgegeben wurde,
+ * dauerhaft unueberwacht: Die Oberflaeche forderte HR an zwei Stellen woertlich
+ * auf, das Datum „nachzutragen", und es gab im ganzen Portal keine Stelle
+ * dafuer. Genauso wenig liess sich der Kreis schliessen, fuer den der Cron
+ * gebaut ist — die Erinnerung geht an HR, die Person schickt den verlaengerten
+ * Titel, und die neue Frist konnte niemand eintragen.
+ *
+ * ============================================================================
+ * WORAUF DIE ZUSICHERUNGEN ZIELEN
+ * ============================================================================
+ *
+ *  1. Der Weg existiert ueberhaupt und schreibt ein reines Datum (Mitternacht
+ *     UTC, `@db.Date`) — keine Ortszeit, sonst verschiebt sich der Ablauftag.
+ *  2. Die Mandantengrenze. Die Schwester-Route GET prueft heute nur die
+ *     Zugehoerigkeit des Dokuments zum Vorgang; eine schreibende Route darf
+ *     sich damit nicht begnuegen.
+ *  3. Die Fristregel ist DIESELBE wie am Magic Link (`pruefeGueltigBis`), nicht
+ *     eine zweite Fassung daneben.
+ *  4. Loeschen ist hier erlaubt (am Magic Link nicht) — und jede Aenderung
+ *     hinterlaesst eine Spur, sonst waere genau das der stille Weg, die
+ *     Ablaufkontrolle abzuschalten.
+ */
+
+const mockGetSession = jest.fn();
+const mockCanAccessProcess = jest.fn();
+
+const mockPrisma = {
+  onboardingProcess: { findUnique: jest.fn() },
+  document: { findFirst: jest.fn(), update: jest.fn() },
+  auditLog: { create: jest.fn() },
+  // Die Route bindet Aenderung und Protokoll zusammen. Der Mock reicht die
+  // Ergebnisse in derselben Reihenfolge zurueck, damit `[aktualisiert]` stimmt.
+  $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
+};
+
+jest.mock("@/lib/auth", () => ({ getSession: mockGetSession }));
+jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
+jest.mock("@/lib/permissions", () => ({
+  ...jest.requireActual("@/lib/permissions"),
+  canAccessProcess: (...args: unknown[]) => mockCanAccessProcess(...args),
+}));
+
+import { PATCH } from "@/app/api/onboarding/[id]/documents/[docId]/route";
+import { NextRequest } from "next/server";
+
+const HR_SESSION = {
+  userId: "hr-1",
+  email: "hr@credo-gruppe.de",
+  role: "HR_SACHBEARBEITER",
+  firstName: "H",
+  lastName: "R",
+};
+
+const VORGANG = { id: "v1", organizationId: "org-1" };
+const TITEL = {
+  id: "d1",
+  type: "AUFENTHALTSTITEL",
+  fileName: "titel.pdf",
+  gueltigBis: null as Date | null,
+};
+
+function patch(koerper: unknown, id = "v1", docId = "d1") {
+  return PATCH(
+    new NextRequest(`http://localhost/api/onboarding/${id}/documents/${docId}`, {
+      method: "PATCH",
+      body: JSON.stringify(koerper),
+    }),
+    { params: Promise.resolve({ id, docId }) }
+  );
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockGetSession.mockResolvedValue(HR_SESSION);
+  mockCanAccessProcess.mockResolvedValue(true);
+  mockPrisma.onboardingProcess.findUnique.mockResolvedValue(VORGANG);
+  mockPrisma.document.findFirst.mockResolvedValue({ ...TITEL });
+  mockPrisma.document.update.mockImplementation(({ data }: { data: { gueltigBis: Date | null } }) =>
+    Promise.resolve({ id: "d1", type: "AUFENTHALTSTITEL", gueltigBis: data.gueltigBis })
+  );
+  mockPrisma.auditLog.create.mockResolvedValue({});
+});
+
+// =============================================
+// 1. Der Weg selbst
+// =============================================
+
+describe("HR traegt ein Ablaufdatum nach", () => {
+  test("schreibt es als reines Datum auf Mitternacht UTC", async () => {
+    const antwort = await patch({ gueltigBis: "2027-03-01" });
+
+    expect(antwort.status).toBe(200);
+    const geschrieben = mockPrisma.document.update.mock.calls[0][0];
+    expect(geschrieben.where).toEqual({ id: "d1" });
+    // NICHT `new Date(2027, 2, 1)`: Das stuende auf Mitternacht ORTSZEIT und
+    // landete oestlich von Greenwich als 28.02. in der `date`-Spalte.
+    expect((geschrieben.data.gueltigBis as Date).toISOString()).toBe(
+      "2027-03-01T00:00:00.000Z"
+    );
+  });
+
+  test("haelt die Aenderung mit altem und neuem Wert im Protokoll fest", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({
+      ...TITEL,
+      gueltigBis: new Date("2026-10-01T00:00:00.000Z"),
+    });
+
+    await patch({ gueltigBis: "2029-10-01" });
+
+    const log = mockPrisma.auditLog.create.mock.calls[0][0].data;
+    expect(log.action).toBe("DOKUMENT_FRIST_GEAENDERT");
+    expect(log.userId).toBe("hr-1");
+    expect(log.onboardingId).toBe("v1");
+    expect(log.details).toMatchObject({
+      documentId: "d1",
+      vorher: "2026-10-01",
+      nachher: "2029-10-01",
+    });
+  });
+
+  /**
+   * Die Aenderung und ihr Protokolleintrag gehoeren zusammen: Eine Frist, die
+   * sich ohne Spur verschiebt, ist genau der Zustand, den die Ampel verhindern
+   * soll.
+   */
+  test("schreibt Aenderung und Protokoll in EINER Transaktion", async () => {
+    await patch({ gueltigBis: "2027-03-01" });
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.$transaction.mock.calls[0][0]).toHaveLength(2);
+  });
+
+  /**
+   * Loeschen gibt es NUR hier, nicht am Magic Link: Dort waere ein leeres Datum
+   * der stille Klick, mit dem sich die Ablaufkontrolle abschalten liesse. Hier
+   * ist es die einzige Moeglichkeit, ein faelschlich eingetragenes Datum an
+   * einer unbefristeten Niederlassungserlaubnis wieder loszuwerden.
+   */
+  test("nimmt ein falsch gesetztes Datum wieder zurueck", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({
+      ...TITEL,
+      gueltigBis: new Date("2027-03-01T00:00:00.000Z"),
+    });
+
+    const antwort = await patch({ gueltigBis: "" });
+
+    expect(antwort.status).toBe(200);
+    expect(mockPrisma.document.update.mock.calls[0][0].data.gueltigBis).toBeNull();
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data.details).toMatchObject({
+      vorher: "2027-03-01",
+      nachher: null,
+    });
+  });
+
+  /**
+   * Ein Protokolleintrag, der eine Aenderung behauptet, die keine war, macht
+   * die Spur wertlos — dann steht in der Akte, HR habe etwas getan, was
+   * niemand getan hat.
+   */
+  test("schreibt nichts, wenn sich das Datum gar nicht aendert", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({
+      ...TITEL,
+      gueltigBis: new Date("2027-03-01T00:00:00.000Z"),
+    });
+
+    const antwort = await patch({ gueltigBis: "2027-03-01" });
+
+    expect(antwort.status).toBe(200);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================
+// 2. Wer darf, und wo die Grenze liegt
+// =============================================
+
+describe("Zugriffsgrenzen", () => {
+  test("weist ohne Sitzung ab", async () => {
+    mockGetSession.mockResolvedValue(null);
+    expect((await patch({ gueltigBis: "2027-03-01" })).status).toBe(401);
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+  });
+
+  test("weist eine nur lesende Rolle ab", async () => {
+    mockGetSession.mockResolvedValue({ ...HR_SESSION, role: "VIEWER" });
+    expect((await patch({ gueltigBis: "2027-03-01" })).status).toBe(403);
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Der fremde Mandant bekommt denselben 404 wie ein unbekannter Vorgang —
+   * ein eigener Code verriete, dass es ihn gibt.
+   */
+  test("weist einen fremden Mandanten mit 404 ab, nicht mit 403", async () => {
+    mockCanAccessProcess.mockResolvedValue(false);
+    const antwort = await patch({ gueltigBis: "2027-03-01" });
+
+    expect(antwort.status).toBe(404);
+    expect(await antwort.json()).toEqual({ error: "Vorgang nicht gefunden" });
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Die documentId kommt aus der Anfrage. Ohne die Bindung an den Vorgang
+   * liesse sich ueber einen eigenen Vorgang ein fremdes Dokument aendern.
+   */
+  test("aendert kein Dokument eines anderen Vorgangs", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue(null);
+    expect((await patch({ gueltigBis: "2027-03-01" })).status).toBe(404);
+
+    // Die Bindung steckt in der Abfrage selbst, nicht in einem nachtraeglichen
+    // Vergleich — sonst waere sie beim naechsten Umbau schnell weg.
+    expect(mockPrisma.document.findFirst.mock.calls[0][0].where).toEqual({
+      id: "d1",
+      onboardingId: "v1",
+    });
+  });
+});
+
+// =============================================
+// 3. Dieselbe Fristregel wie am Magic Link
+// =============================================
+
+describe("Fristregel", () => {
+  test("weist ein unlesbares Datum ab", async () => {
+    const antwort = await patch({ gueltigBis: "01.03.2027" });
+    expect(antwort.status).toBe(400);
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+  });
+
+  test("weist den 31. Februar ab, obwohl das Muster stimmt", async () => {
+    expect((await patch({ gueltigBis: "2027-02-31" })).status).toBe(400);
+  });
+
+  test("weist eine Jahreszahl weit in der Zukunft ab (Tippfehler)", async () => {
+    const antwort = await patch({ gueltigBis: "2206-03-01" });
+    expect(antwort.status).toBe(400);
+    expect((await antwort.json()).error).toContain("20 Jahre");
+  });
+
+  /**
+   * Ein abgelaufener Titel ist eine Tatsache, die HR sehen muss. Wer sie mit
+   * einem 400 zurueckweist, erzieht zum Erfinden eines passenden Datums.
+   */
+  test("nimmt ein Datum in der Vergangenheit an", async () => {
+    expect((await patch({ gueltigBis: "2020-01-01" })).status).toBe(200);
+  });
+
+  /**
+   * Ein Ablaufdatum an einer Geburtsurkunde ist ein Bedienfehler. Es
+   * stillschweigend zu verwerfen waere schlimmer — jemand hat es getippt.
+   */
+  test("weist ein Datum an einem Typ ohne Frist ab", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({
+      ...TITEL,
+      type: "GEBURTSURKUNDE_EIGEN",
+    });
+
+    const antwort = await patch({ gueltigBis: "2027-03-01" });
+    expect(antwort.status).toBe(400);
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Auch das LEEREN muss an einem Typ ohne Frist scheitern: `pruefeGueltigBis`
+   * laesst den leeren Wert ueberall durch, weil beim Upload jeder Typ ohne
+   * Datum ankommen darf. Hier waere das eine stille Zusage, dass die Ruecknahme
+   * geklappt hat.
+   */
+  test("weist auch die Ruecknahme an einem Typ ohne Frist ab", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({
+      ...TITEL,
+      type: "GEBURTSURKUNDE_EIGEN",
+    });
+
+    expect((await patch({ gueltigBis: "" })).status).toBe(400);
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+  });
+});

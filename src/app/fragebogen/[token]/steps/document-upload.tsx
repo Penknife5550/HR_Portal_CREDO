@@ -139,6 +139,64 @@ const TYPE_LABELS: Record<string, string> = {
 const FRIST_ERKLAERUNG =
   "Damit die Personalabteilung Sie rechtzeitig vor Ablauf ansprechen kann.";
 
+/**
+ * Das Nachtrag-Feld fuer ein Ablaufdatum an einem BEREITS hochgeladenen
+ * Nachweis.
+ *
+ * Eine Komponente und nicht zweimal dasselbe JSX: Der Fall tritt an zwei
+ * Stellen auf, und nur an einer war er urspruenglich bedacht. In der Karte
+ * „Pflichtdokumente" steht das Feld, weil dort die Pflicht steht — in der
+ * Liste „Hochgeladene Dokumente" muss es ebenfalls stehen, weil ein
+ * Aufenthaltstitel auch FREIWILLIG hochgeladen werden kann (die Auswahlliste
+ * bietet ihn an, und wer die Frage in Schritt 1 mit „Nein" beantwortet hat,
+ * bekommt oben gar keinen Pflichteintrag). Ohne das Feld dort blieb „Keine
+ * Frist erfasst" eine Sackgasse: Der einzige Ausweg waere gewesen, den Scan zu
+ * loeschen und dieselbe Datei erneut hochzuladen — genau das, wofuer der
+ * PATCH-Weg gebaut wurde. Dasselbe galt fuer ein zweites, aelteres Dokument
+ * desselben Typs, denn die Pflichtkarte fasst je Art nur EINES an.
+ */
+function FristNachtragen({
+  docId,
+  label,
+  wert,
+  onWert,
+  laeuft,
+  onSpeichern,
+}: {
+  docId: string;
+  label: string;
+  wert: string;
+  onWert: (wert: string) => void;
+  laeuft: boolean;
+  onSpeichern: () => void;
+}) {
+  return (
+    <div className="max-w-md rounded-lg border border-amber-300 bg-amber-50 p-2">
+      <p className="text-[11px] font-medium text-amber-900">
+        Kein Ablaufdatum erfasst — wir können vor Ablauf nicht erinnern.
+      </p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          id={`frist-nachtrag-${docId}`}
+          aria-label={`Ablaufdatum für ${label}`}
+          value={wert}
+          onChange={(e) => onWert(e.target.value)}
+          className="rounded-lg border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+        />
+        <button
+          type="button"
+          disabled={laeuft}
+          onClick={onSpeichern}
+          className="rounded-lg border border-amber-600 px-2 py-1 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50"
+        >
+          {laeuft ? "Wird gespeichert..." : "Datum speichern"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function DocumentUpload({
   token,
   hasChildren = false,
@@ -640,35 +698,20 @@ export function DocumentUpload({
                           sagen — und ein Nachweis ohne Frist sieht auf jeder
                           Uebersicht genauso vollstaendig aus wie einer mit. */}
                       {uploaded && fristFehlt && doc && (
-                        <div className="mt-2 max-w-md rounded-lg border border-amber-300 bg-amber-50 p-2">
-                          <p className="text-[11px] font-medium text-amber-900">
-                            Kein Ablaufdatum erfasst — wir können vor Ablauf
-                            nicht erinnern.
-                          </p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                            <input
-                              type="date"
-                              aria-label={`Ablaufdatum für ${reqDoc.label}`}
-                              value={nachtragEingabe[doc.id] ?? ""}
-                              onChange={(e) =>
-                                setNachtragEingabe((v) => ({
-                                  ...v,
-                                  [doc.id]: e.target.value,
-                                }))
-                              }
-                              className="rounded-lg border border-input bg-background px-2 py-1 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                            />
-                            <button
-                              type="button"
-                              disabled={nachtragLaeuft === doc.id}
-                              onClick={() => handleFristNachtragen(doc.id)}
-                              className="rounded-lg border border-amber-600 px-2 py-1 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50"
-                            >
-                              {nachtragLaeuft === doc.id
-                                ? "Wird gespeichert..."
-                                : "Datum speichern"}
-                            </button>
-                          </div>
+                        <div className="mt-2">
+                          <FristNachtragen
+                            docId={doc.id}
+                            label={reqDoc.label}
+                            wert={nachtragEingabe[doc.id] ?? ""}
+                            onWert={(v) =>
+                              setNachtragEingabe((alt) => ({
+                                ...alt,
+                                [doc.id]: v,
+                              }))
+                            }
+                            laeuft={nachtragLaeuft === doc.id}
+                            onSpeichern={() => handleFristNachtragen(doc.id)}
+                          />
                         </div>
                       )}
                     </div>
@@ -858,69 +901,91 @@ export function DocumentUpload({
             </h4>
           </div>
           <div className="divide-y">
-            {documents.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center justify-between px-4 py-2.5"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
-                    <svg
-                      className="h-4 w-4 text-[#009AC6]"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+            {documents.map((doc) => {
+              // Ein fristpflichtiger Nachweis ohne erfasstes Datum — hier
+              // ebenso nachtragbar wie oben in der Pflichtkarte.
+              const fristOffen =
+                istFristpflichtig(doc.type) &&
+                ablaufAmpel(doc.gueltigBis).kategorie === null;
+
+              return (
+                <div key={doc.id} className="px-4 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
+                        <svg
+                          className="h-4 w-4 text-[#009AC6]"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-foreground">
+                          {doc.fileName}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {TYPE_LABELS[doc.type] || doc.type} &middot;{" "}
+                          {formatBytes(doc.fileSize)}
+                          {/* Bei fristpflichtigen Nachweisen gehoert die Frist in
+                              dieselbe Zeile wie der Typ — sonst steht sie nur oben
+                              bei den Pflichten, und ein freiwillig hochgeladener
+                              Titel traegt sie nirgends. */}
+                          {istFristpflichtig(doc.type) && (
+                            <> &middot; {ablaufAmpel(doc.gueltigBis).text}</>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    {/* type="button" ist Pflicht: ohne das Attribut ist der Knopf
+                        ein Submit-Knopf und loest zusaetzlich zum Loeschen den
+                        verbindlichen Absende-Dialog aus (Schritt 10). */}
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(doc.id)}
+                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      title="Löschen"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {fristOffen && (
+                    <div className="mt-2">
+                      <FristNachtragen
+                        docId={doc.id}
+                        label={TYPE_LABELS[doc.type] || doc.type}
+                        wert={nachtragEingabe[doc.id] ?? ""}
+                        onWert={(v) =>
+                          setNachtragEingabe((alt) => ({ ...alt, [doc.id]: v }))
+                        }
+                        laeuft={nachtragLaeuft === doc.id}
+                        onSpeichern={() => handleFristNachtragen(doc.id)}
                       />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-foreground">
-                      {doc.fileName}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {TYPE_LABELS[doc.type] || doc.type} &middot;{" "}
-                      {formatBytes(doc.fileSize)}
-                      {/* Bei fristpflichtigen Nachweisen gehoert die Frist in
-                          dieselbe Zeile wie der Typ — sonst steht sie nur oben
-                          bei den Pflichten, und ein freiwillig hochgeladener
-                          Titel traegt sie nirgends. */}
-                      {istFristpflichtig(doc.type) && (
-                        <> &middot; {ablaufAmpel(doc.gueltigBis).text}</>
-                      )}
-                    </p>
-                  </div>
+                    </div>
+                  )}
                 </div>
-                {/* type="button" ist Pflicht: ohne das Attribut ist der Knopf
-                    ein Submit-Knopf und loest zusaetzlich zum Loeschen den
-                    verbindlichen Absende-Dialog aus (Schritt 10). */}
-                <button
-                  type="button"
-                  onClick={() => handleDelete(doc.id)}
-                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  title="Löschen"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

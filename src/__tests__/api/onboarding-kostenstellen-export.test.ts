@@ -70,6 +70,11 @@ interface SupervisorTeil {
   kostenstelleAnteil?: number | null;
   kostenstellenBemerkung?: string | null;
   kostenstellen?: { bezeichnung: string; anteil: number }[];
+  // Die Zweckbefristung ist die ZWEITE mehrzeilige Zelle dieser CSV — siehe
+  // den Test ganz unten.
+  befristet?: boolean;
+  befristungsart?: string | null;
+  befristungZweck?: string | null;
 }
 
 /** Ein Vorgang, reduziert auf das, was die beiden Exporte anfassen. */
@@ -352,6 +357,32 @@ describe("LOGA-CSV", () => {
     expect(werte[kopf.indexOf("Kostenstellen-Bemerkung")]).toBe(
       "Erste Zeile Zweite Zeile"
     );
+  });
+
+  /**
+   * Die Kostenstellen-Bemerkung war NICHT die erste mehrzeilige Zelle dieser
+   * Datei — der Kommentar an `einzeilig` behauptete das, und deshalb blieb die
+   * Nachbarzelle ungeschuetzt.
+   *
+   * "Wodurch endet der Vertrag?" (`befristungZweck`) ist seit dem
+   * Zweckbefristungs-Release ein `<textarea>` mit 500 Zeichen und steht in
+   * derselben Wertezeile, zwei Spalten weiter links. Ein Umbruch dort zerlegt
+   * den Datensatz genauso — nur faellt es weniger auf, weil die Spalte selten
+   * gefuellt ist.
+   */
+  it("macht auch die Zweckbefristung einzeilig", async () => {
+    const { kopf, werte, zeilen } = await csvFuer({
+      befristet: true,
+      befristungsart: "ZWECK",
+      befristungZweck:
+        "Ende der Kostenzusage des Jugendamtes\nfür das Projekt Ganztag\r\nStand 09/2026",
+    });
+
+    expect(zeilen).toHaveLength(2);
+    expect(werte[kopf.indexOf("Zweckbefristung: Ende bei")]).toBe(
+      "Ende der Kostenzusage des Jugendamtes für das Projekt Ganztag Stand 09/2026"
+    );
+    expect(werte).toHaveLength(kopf.length);
   });
 });
 

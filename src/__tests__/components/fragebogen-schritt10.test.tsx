@@ -56,21 +56,23 @@ const TOKEN = "magic-token-1234567890";
  * keine Liste, und dann prueften die Zusicherungen unten nur noch, dass ein
  * Fehlerkasten dasteht.
  */
-function dokumentenliste(typen: string[]) {
+function dokumentenliste(typen: string[], fristen: Record<string, string> = {}) {
   return typen.map((typ, i) => ({
     id: `doc${i}`,
     fileName: `${typ.toLowerCase()}.pdf`,
     fileSize: 1024,
     type: typ,
-    gueltigBis: null,
+    // `null` heisst „keine Frist erfasst" — genau der Zustand, den die
+    // Nachtrag-Zeile aufloesen koennen muss.
+    gueltigBis: fristen[typ] ?? null,
     uploadedAt: "2026-09-08T10:00:00.000Z",
   }));
 }
 
-function bestand(typen: string[] = []) {
+function bestand(typen: string[] = [], fristen: Record<string, string> = {}) {
   return jest.fn().mockResolvedValue({
     ok: true,
-    json: async () => ({ documents: dokumentenliste(typen) }),
+    json: async () => ({ documents: dokumentenliste(typen, fristen) }),
   });
 }
 
@@ -536,5 +538,83 @@ describe("Ausblick auf die nachreichbaren Pflichten", () => {
     expect(
       within(karte).getByText(/Einzelne Nachweise dürfen Sie nachreichen/),
     ).not.toBeNull();
+  });
+});
+
+// =============================================
+// Das Ablaufdatum nachtragen — auch ausserhalb der Pflichtkarte
+// =============================================
+
+/**
+ * „Keine Frist erfasst" darf an KEINER Stelle eine Sackgasse sein.
+ *
+ * Das Nachtrag-Feld sass zuerst nur in der Karte „Pflichtdokumente". Damit
+ * fehlte es genau dort, wo es am wahrscheinlichsten gebraucht wird: Ein
+ * Aufenthaltstitel laesst sich auch FREIWILLIG hochladen — die Auswahlliste
+ * bietet ihn an, und wer die Frage in Schritt 1 mit „Nein" beantwortet hat,
+ * bekommt oben gar keinen Pflichteintrag. Der einzige Ausweg waere gewesen, den
+ * Scan zu loeschen und dieselbe Datei erneut hochzuladen — genau der Weg, fuer
+ * dessen Abschaffung der PATCH-Zweig der Upload-Route gebaut wurde.
+ */
+describe("Fehlendes Ablaufdatum in der Liste der hochgeladenen Dokumente", () => {
+  /** Die untere Liste allein — die Pflichtkarte hat ihre eigene Zeile. */
+  function dokumentenkarte(): HTMLElement {
+    const ueberschrift = screen.getByText(/^Hochgeladene Dokumente/);
+    const karte = ueberschrift.closest("div")?.parentElement;
+    if (!karte) throw new Error("Karte 'Hochgeladene Dokumente' nicht gefunden");
+    return karte as HTMLElement;
+  }
+
+  it("bietet das Nachtragen auch bei einem freiwillig hochgeladenen Titel an", async () => {
+    // „Nein" in Schritt 1: Es gibt KEINEN Pflichteintrag zum Aufenthaltstitel,
+    // die Datei liegt trotzdem im Vorgang.
+    global.fetch = bestand(["AUFENTHALTSTITEL"]) as unknown as typeof fetch;
+    await rendern({
+      angaben: { birthDate: "1965-01-01", aufenthaltstitelErforderlich: false },
+    });
+
+    const karte = dokumentenkarte();
+    expect(
+      within(karte).getByText(
+        "Kein Ablaufdatum erfasst — wir können vor Ablauf nicht erinnern.",
+      ),
+    ).not.toBeNull();
+
+    const feld = within(karte).getByLabelText("Ablaufdatum für Aufenthaltstitel");
+    expect((feld as HTMLInputElement).type).toBe("date");
+    expect(within(karte).getByText("Datum speichern")).not.toBeNull();
+  });
+
+  it("schweigt, sobald das Datum erfasst ist", async () => {
+    global.fetch = bestand(["AUFENTHALTSTITEL"], {
+      AUFENTHALTSTITEL: "2030-01-01T00:00:00.000Z",
+    }) as unknown as typeof fetch;
+    await rendern({
+      angaben: { birthDate: "1965-01-01", aufenthaltstitelErforderlich: false },
+    });
+
+    const karte = dokumentenkarte();
+    expect(
+      within(karte).queryByText(
+        "Kein Ablaufdatum erfasst — wir können vor Ablauf nicht erinnern.",
+      ),
+    ).toBeNull();
+    // Die Frist steht stattdessen im Klartext an der Zeile.
+    expect(within(karte).getByText(/01\.01\.2030/)).not.toBeNull();
+  });
+
+  /**
+   * Eine Geburtsurkunde hat kein Ablaufdatum und soll auch keines bekommen —
+   * sonst stuende die Nachfrage an jedem Dokument jedes Vorgangs.
+   */
+  it("fragt nur bei fristpflichtigen Nachweisarten nach", async () => {
+    global.fetch = bestand(["GEBURTSURKUNDE_EIGEN"]) as unknown as typeof fetch;
+    await rendern({ angaben: { birthDate: "1965-01-01" } });
+
+    expect(
+      within(dokumentenkarte()).queryByText(
+        "Kein Ablaufdatum erfasst — wir können vor Ablauf nicht erinnern.",
+      ),
+    ).toBeNull();
   });
 });

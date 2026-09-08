@@ -96,17 +96,30 @@ export function Step11Rente({
   const gespeicherteEntscheidung = data.rvEntscheidung as string | undefined;
 
   // Der Status aus dem Schritt „Weitere Beschaeftigung" beantwortet die Frage
-  // dieses Schritts unter Umstaenden schon. Dann ist die Angabe hier keine Wahl
-  // mehr, sondern eine Feststellung — also steht sie vor.
+  // dieses Schritts unter Umstaenden schon. Der Kasten weiter unten sagt das
+  // — angekreuzt wird deshalb aber NICHTS.
   const statusWert = (data.beschaeftigungsStatus as string) || "";
   const statusMachtFrei = STATUS_VON_GESETZES_WEGEN_FREI.includes(statusWert);
 
+  /**
+   * KEINE VORAUSWAHL, auch nicht bei einem Status, der die Antwort nahelegt.
+   *
+   * Frueher stand hier `gespeicherteEntscheidung || (statusMachtFrei ?
+   * "RENTENVERSICHERUNGSFREI" : "")`. Damit genuegte ein Klick auf „Weiter",
+   * ohne dass die Person je eine der vier Zeilen angeklickt haette: `absenden`
+   * schickte den vorbelegten Wert, und `PUT /api/fragebogen/[token]` schrieb
+   * ihn samt `rvEntscheidungAm = new Date()` fest — eine datierte Entscheidung
+   * zur folgenreichsten Frage des Fragebogens, die niemand getroffen hat.
+   *
+   * Dieselbe Begruendung wie bei `reqJaNein` in validations/personal-data.ts:
+   * „Bei einer Frage, deren ,Nein' eine Pflicht entfallen laesst, ist die
+   * Vorbelegung selbst die Antwort — und zwar die, die niemand gegeben hat."
+   * Der Hinweis bleibt, er wird nur nicht mehr zum Kreuz: Der Kasten nennt die
+   * passende Zeile, das Abzeichen markiert sie, und `absenden` besteht wie
+   * bisher auf einer Auswahl.
+   */
   const [entscheidung, setEntscheidung] = useState<string>(
-    // Vorausfuellen heisst nicht ueberschreiben: Der Vorgabewert greift nur,
-    // solange nichts gespeichert ist. Wer schon geantwortet hat, findet seine
-    // eigene Antwort wieder — auch dann, wenn sie der Vorgabe widerspricht.
-    gespeicherteEntscheidung ||
-      (statusMachtFrei ? "RENTENVERSICHERUNGSFREI" : "")
+    gespeicherteEntscheidung || ""
   );
   const [merkblattGelesen, setMerkblattGelesen] = useState(
     data.rvMerkblattGelesen === true
@@ -137,22 +150,25 @@ export function Step11Rente({
   const brauchtBindung = gewaehlt?.brauchtBindung === true;
 
   /**
-   * GREIFT die Vorauswahl gerade — oder behauptet der Kasten das nur?
+   * Was der Hinweiskasten sagen darf, haengt am TATSAECHLICHEN Zustand.
    *
-   * Der Unterschied ist die ganze Frage. Der Hinweistext hing frueher allein am
-   * Status und sagte deshalb woertlich „unten ist ... bereits gewaehlt", auch
-   * wenn eine abweichende gespeicherte Antwort gewonnen hatte (die
-   * Zustandslogik oben ist richtig: gespeichert schlaegt Vorgabe). Der Weg
-   * dahin ist kurz: erst hier „Ich moechte versichert bleiben" waehlen und
-   * speichern, dann ueber die Schrittleiste zurueck zu „Weitere Beschaeftigung",
-   * dort „Altersvollrentner" setzen und wieder herspringen. Danach stand die
-   * Behauptung im Kasten, das Abzeichen klebte an einer nicht angekreuzten
-   * Zeile — und angekreuzt war eine andere. Wer das liest und auf „Weiter"
-   * klickt, speichert nicht, was er zu speichern glaubt, und zwar bei der
-   * folgenreichsten Frage des Fragebogens.
+   * Drei Lagen, drei Saetze — und keiner davon behauptet etwas ueber die
+   * Auswahl, was nicht stimmt:
+   *   - noch nichts gewaehlt  -> „passt zu Ihrer Angabe" (eine Empfehlung)
+   *   - passende Zeile gewaehlt -> Bestaetigung
+   *   - andere Zeile gewaehlt -> „Ihre Angaben passen nicht zusammen"
+   *
+   * Frueher hing der Text allein am Status und sagte woertlich „unten ist ...
+   * bereits gewaehlt" — auch dann, wenn gar nichts angekreuzt war oder eine
+   * abweichende gespeicherte Antwort stand. Der Weg dahin ist kurz: erst hier
+   * „Ich moechte versichert bleiben" waehlen und speichern, dann ueber die
+   * Schrittleiste zurueck zu „Weitere Beschaeftigung", dort
+   * „Altersvollrentner" setzen und wieder herspringen. Wer das liest und auf
+   * „Weiter" klickt, speichert nicht, was er zu speichern glaubt.
    */
-  const vorauswahlGreift =
+  const passendGewaehlt =
     statusMachtFrei && entscheidung === "RENTENVERSICHERUNGSFREI";
+  const nochNichtsGewaehlt = statusMachtFrei && entscheidung === "";
   const freiLabel = getRvOption("RENTENVERSICHERUNGSFREI")?.label ?? "";
 
   const absenden = (e: React.FormEvent) => {
@@ -266,9 +282,11 @@ export function Step11Rente({
       {statusMachtFrei && (
         <div className="rounded-lg border-l-4 border-[#FBC900] bg-[#FBC900]/10 px-4 py-3 text-sm">
           <p className="font-semibold text-foreground">
-            {vorauswahlGreift
-              ? "Eine Antwort ist für Sie schon vorausgewählt"
-              : "Ihre Angaben passen nicht zusammen"}
+            {passendGewaehlt
+              ? "Ihre Auswahl passt zu Ihren Angaben"
+              : nochNichtsGewaehlt
+                ? "Eine Antwort passt zu Ihren Angaben"
+                : "Ihre Angaben passen nicht zusammen"}
           </p>
           <p className="mt-1 text-foreground/80">
             Sie haben bei den Angaben zu Ihrer Beschäftigung „
@@ -276,13 +294,27 @@ export function Step11Rente({
             Rentenversicherung von Gesetzes wegen frei — eine Befreiung müssen
             Sie gar nicht erst beantragen.
           </p>
-          {vorauswahlGreift ? (
+          {passendGewaehlt ? (
             <>
               <p className="mt-1 text-foreground/80">
-                Deshalb ist unten die Antwort „{freiLabel}“ bereits gewählt.
+                Unten haben Sie „{freiLabel}“ gewählt — das passt.
               </p>
               <p className="mt-1 text-foreground/80">
-                Sie können sie trotzdem ändern: Sie kennen Ihre Lage besser als
+                Sie können die Auswahl trotzdem ändern: Sie kennen Ihre Lage
+                besser als dieses Formular.
+              </p>
+            </>
+          ) : nochNichtsGewaehlt ? (
+            /* Kein Kreuz von uns — nur der Hinweis, welche Zeile gemeint ist.
+               Eine vorbelegte Antwort waere die folgenreichste des Fragebogens,
+               und sie haette niemand gegeben. */
+            <>
+              <p className="mt-1 text-foreground/80">
+                Für Sie passt unten die Antwort „{freiLabel}“. Bitte wählen Sie
+                sie selbst aus — vorausgekreuzt haben wir nichts.
+              </p>
+              <p className="mt-1 text-foreground/80">
+                Eine andere Antwort ist möglich: Sie kennen Ihre Lage besser als
                 dieses Formular.
               </p>
             </>
@@ -343,14 +375,15 @@ export function Step11Rente({
                   </p>
                   {/* Verbindet den Hinweis oben mit der Zeile, die er meint —
                       sonst muss man raten, welche der Antworten gemeint war.
-                      Der Wortlaut haengt am tatsaechlichen Zustand: „vorausgewaehlt"
-                      darf nur an einer Zeile stehen, die auch angekreuzt ist. */}
+                      Der Wortlaut haengt am tatsaechlichen Zustand: Solange
+                      niemand geklickt hat, ist es eine Empfehlung und keine
+                      Feststellung ueber die Auswahl. */}
                   {statusMachtFrei &&
                     option.wert === "RENTENVERSICHERUNGSFREI" && (
                       <p className="mt-1 inline-block rounded-full bg-[#FBC900]/20 px-2 py-0.5 text-[11px] font-semibold text-foreground">
-                        {vorauswahlGreift
-                          ? "Aufgrund Ihrer Angabe vorausgewählt"
-                          : "Passt zu Ihrer Angabe zur Beschäftigung"}
+                        {passendGewaehlt
+                          ? "Passt zu Ihrer Angabe zur Beschäftigung"
+                          : "Empfohlen aufgrund Ihrer Angabe zur Beschäftigung"}
                       </p>
                     )}
                   <p className="mt-0.5 text-xs text-muted-foreground">
