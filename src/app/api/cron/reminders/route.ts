@@ -6,11 +6,27 @@
  * Wird taeglich von n8n per Cron-Workflow aufgerufen.
  * Sicherheit: Authentifizierung über CRON_SECRET Bearer-Token.
  *
- * Logik:
- * - Mitarbeiter-Erinnerung: Status INVITED/IN_PROGRESS, >7 Tage offen
- * - Vorgesetzten-Erinnerung: Status SUPERVISOR_PENDING, >7 Tage offen
- * - Eskalation: Zweite Erinnerung nach 14 Tagen
- * - Maximal 1 Erinnerung pro 7-Tage-Intervall
+ * Logik (seit 09/2026 fuer zwei parallele Spuren, siehe src/lib/onboarding-spuren.ts):
+ * - Mitarbeiter-Erinnerung: Fragebogen nicht abgesendet (`submittedAt` leer,
+ *   Status INVITED/IN_PROGRESS), Link noch gueltig, eingeladen vor > 7 Tagen.
+ * - Vorgesetzten-Erinnerung: Link erzeugt und noch gueltig, Modalitaeten nicht
+ *   abgesendet, Vorgang nicht geprueft/abgeschlossen/abgelaufen — AUCH solange
+ *   der Fragebogen noch offen ist. Erstmals 7 Tage nach dem Link.
+ * - Hoechstens eine Erinnerung je Seite und 7-Tage-Intervall.
+ * - Der Merker `last…ReminderAt` haengt am Mailergebnis (Entscheidung 09/2026):
+ *     SENT     Merker setzen, AuditLog „…_REMINDER_SENT".
+ *     SKIPPED  Merker TROTZDEM setzen, kein AuditLog. SKIPPED heisst: Vorlage
+ *              deaktiviert oder fehlt, kein Empfaenger — ein Versuch am
+ *              naechsten Tag aendert daran nichts. Ohne Merker liefe die
+ *              ganze Erinnerung taeglich statt woechentlich: `triggerWebhooks`
+ *              feuert die DB-Webhooks unabhaengig vom Mailergebnis (wer die
+ *              Vorlage abgeschaltet hat, weil n8n per Webhook erinnert, haette
+ *              die Person taeglich angeschrieben), und jeder Lauf schriebe je
+ *              Vorgang einen SKIPPED-Eintrag ins Versandprotokoll.
+ *     FAILED   (und `null`, falls der Dispatcher selbst scheitert) Merker NICHT
+ *              setzen: Ein SMTP-Ausfall ist voruebergehend, der naechste Lauf
+ *              versucht es erneut, statt die Erinnerung eine Woche lang als
+ *              erledigt zu fuehren.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,9 +34,26 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { getBaseUrl } from "@/lib/url";
+import { magicLinkGueltigkeitMs } from "@/lib/auth";
+import {
+  HR_STATUS,
+  MITARBEITER_NEUTRAL,
+  mitarbeiterName as nameDerPerson,
+  vorgesetzteAbgesendet,
+  vorgesetztenLinkErzeugtAm,
+} from "@/lib/onboarding-spuren";
+import type { EventEmailResult } from "@/lib/mailer";
 
 const REMINDER_INTERVAL_DAYS = 7;
 const MS_PER_DAY = 86400000;
+
+/**
+ * Soll der Merker „zuletzt erinnert" gesetzt werden? Bei SENT und SKIPPED ja,
+ * bei FAILED (oder ohne Ergebnis) nein — Begruendung im Kopfkommentar.
+ */
+function merkerSetzen(mail: EventEmailResult | null | undefined): boolean {
+  return mail?.status === "SENT" || mail?.status === "SKIPPED";
+}
 
 /** Timing-Safe String-Vergleich (verhindert Timing-Attacken auf CRON_SECRET) */
 function timingSafeCompare(a: string, b: string): boolean {
@@ -50,17 +83,26 @@ export async function POST(request: NextRequest) {
 
   const now = new Date();
   const reminderThreshold = new Date(now.getTime() - REMINDER_INTERVAL_DAYS * MS_PER_DAY);
-  const results = { employeeReminders: 0, supervisorReminders: 0, errors: 0 };
+  // `notSent`: faellige Erinnerungen, deren Mail nicht rausging (FAILED oder
+  // SKIPPED, z. B. Vorlage deaktiviert). Der Grund steht im EmailLog.
+  const results = { employeeReminders: 0, supervisorReminders: 0, notSent: 0, errors: 0 };
 
   try {
     // =============================================
     // 1. Mitarbeiter-Erinnerungen
-    // Status: INVITED oder IN_PROGRESS, eingeladen vor >7 Tagen,
-    // letzte Erinnerung >7 Tage her oder noch nie erinnert
+    // Fragebogen nicht abgesendet, Link noch gueltig, eingeladen vor >7 Tagen,
+    // letzte Erinnerung >7 Tage her oder noch nie erinnert.
+    //
+    // `submittedAt: null` zusaetzlich zum Status: Der Status fasst seit dem
+    // parallelen Ablauf beide Spuren zusammen; massgeblich ist die eigene.
+    // `tokenExpiresAt > jetzt`: Frueher gingen Erinnerungen auch mit einem
+    // Link hinaus, der beim Klick nur noch „Token abgelaufen" zeigte.
     // =============================================
     const employeeOverdue = await prisma.onboardingProcess.findMany({
       where: {
+        submittedAt: null,
         status: { in: ["INVITED", "IN_PROGRESS"] },
+        tokenExpiresAt: { gt: now },
         invitedAt: { lt: reminderThreshold },
         OR: [
           { lastEmployeeReminderAt: null },
@@ -82,7 +124,7 @@ export async function POST(request: NextRequest) {
         const vorname = process.personalData?.firstName || process.firstName || "";
         const nachname = process.personalData?.lastName || process.lastName || "";
 
-        await triggerWebhooks("employee-reminder", {
+        const mail = await triggerWebhooks("employee-reminder", {
           onboardingId: process.id,
           email: process.email,
           vorname,
@@ -97,12 +139,21 @@ export async function POST(request: NextRequest) {
           displayId: process.displayId || process.id.substring(0, 8),
         });
 
-        await prisma.onboardingProcess.update({
-          where: { id: process.id },
-          data: { lastEmployeeReminderAt: now },
-        });
+        // Merker bei SENT und SKIPPED, nicht bei FAILED (siehe Kopfkommentar).
+        // Ohne diese Unterscheidung stuende nach einem SMTP-Ausfall eine Woche
+        // lang „erinnert" im Vorgang, obwohl niemand etwas bekommen hat.
+        if (merkerSetzen(mail)) {
+          await prisma.onboardingProcess.update({
+            where: { id: process.id },
+            data: { lastEmployeeReminderAt: now },
+          });
+        }
+        if (mail?.status !== "SENT") {
+          results.notSent++;
+          continue;
+        }
 
-        // Audit-Log
+        // Audit-Log — nur fuer eine wirklich versendete Erinnerung
         await prisma.auditLog.create({
           data: {
             onboardingId: process.id,
@@ -120,42 +171,94 @@ export async function POST(request: NextRequest) {
 
     // =============================================
     // 2. Vorgesetzten-Erinnerungen
-    // Status: SUPERVISOR_PENDING, Supervisor-Token existiert,
-    // erstellt vor >7 Tagen
+    // Link erzeugt und noch gueltig, Modalitaeten nicht abgesendet, Vorgang
+    // nicht in HR-Hand. Frueher nur bei Status SUPERVISOR_PENDING — also erst,
+    // NACHDEM der Fragebogen da war. Im parallelen Ablauf entsteht der Link
+    // aber oft frueher, und die Fuehrungskraft bekam dann nie eine Erinnerung.
+    //
+    // Faellig 7 Tage nach der letzten Erinnerung, sonst 7 Tage nach dem Link
+    // (`supervisorLinkSentAt`).
+    //
+    // Links aus der Zeit vor dieser Spalte (Bestand beim Deploy) haben keinen
+    // `supervisorLinkSentAt`. Frueher galt fuer sie die Einladung der Person
+    // (`invitedAt`) — das traf, solange nur SUPERVISOR_PENDING erinnert wurde.
+    // Jetzt fallen auch Vorgaenge mit offenem Fragebogen darunter, deren Link
+    // HR vielleicht erst vor zwei Tagen erzeugt hat; sie bekaemen gleich beim
+    // ersten Lauf eine Erinnerung mit „seit 23 Tagen offen". Deshalb wird der
+    // Erzeugungszeitpunkt aus dem Ablauf zurueckgerechnet (Ablauf minus
+    // Gueltigkeit, nie vor der Einladung — `vorgesetztenLinkErzeugtAm`). Im
+    // WHERE heisst „erzeugt vor der Schwelle" damit: eingeladen vor der
+    // Schwelle UND Ablauf vor Schwelle + Gueltigkeit.
     // =============================================
+    const linkGueltigkeitMs = magicLinkGueltigkeitMs();
     const supervisorOverdue = await prisma.onboardingProcess.findMany({
       where: {
-        status: "SUPERVISOR_PENDING",
         supervisorToken: { not: null },
-        invitedAt: { lt: reminderThreshold },
+        supervisorEmail: { not: null },
+        supervisorSubmittedAt: null,
+        supervisorTokenExpiresAt: { gt: now },
+        status: { notIn: [...HR_STATUS] },
         OR: [
-          { lastSupervisorReminderAt: null },
           { lastSupervisorReminderAt: { lt: reminderThreshold } },
+          {
+            lastSupervisorReminderAt: null,
+            supervisorLinkSentAt: { lt: reminderThreshold },
+          },
+          {
+            lastSupervisorReminderAt: null,
+            supervisorLinkSentAt: null,
+            invitedAt: { lt: reminderThreshold },
+            supervisorTokenExpiresAt: {
+              lt: new Date(reminderThreshold.getTime() + linkGueltigkeitMs),
+            },
+          },
         ],
       },
       include: {
         organization: { select: { name: true } },
         personalData: { select: { firstName: true, lastName: true } },
+        supervisorData: { select: { isComplete: true } },
       },
     });
 
     for (const process of supervisorOverdue) {
-      // Ohne Supervisor-E-Mail koennen wir keine Erinnerung senden
+      // Ohne Supervisor-E-Mail koennen wir keine Erinnerung senden (steht auch
+      // im WHERE — die Zeile schuetzt den Typ und einen Altbestand mit "").
       if (!process.supervisorEmail) {
+        continue;
+      }
+      // Altfall: Modalitaeten abgesendet, aber ohne Zeitstempel (isComplete).
+      if (vorgesetzteAbgesendet(process)) {
         continue;
       }
 
       try {
+        // Offen seit dem Link, nicht seit der Einladung der Person: Im
+        // parallelen Ablauf liegen dazwischen oft Tage. Derselbe Anker wie im
+        // WHERE oben (Rueckrechnung fuer Bestandslinks).
+        const offenSeit = vorgesetztenLinkErzeugtAm(process, linkGueltigkeitMs);
         const daysOpen = Math.floor(
-          (now.getTime() - new Date(process.invitedAt).getTime()) / MS_PER_DAY
+          (now.getTime() - offenSeit.getTime()) / MS_PER_DAY
         );
 
-        const mitarbeiterName =
-          process.personalData?.firstName && process.personalData?.lastName
-            ? `${process.personalData.firstName} ${process.personalData.lastName}`
-            : process.email;
+        // Name aus Fragebogen oder Vorgang, sonst die neutrale Bezeichnung —
+        // NIE die private E-Mail-Adresse der Person (Datensparsamkeit, Art. 5
+        // Abs. 1 lit. c DSGVO). Seit die Erinnerung auch bei offenem
+        // Fragebogen kommt, ist „noch kein Name" der Normalfall: Die Adresse
+        // stuende sonst woechentlich in Betreff und Text an die Fuehrungskraft,
+        // 90 Tage im Versandprotokoll und in jedem Webhook. Die Vorlage sagt
+        // „Einstellungsmodalitäten für {{mitarbeiter_name}}" — genau der
+        // Akkusativ, fuer den MITARBEITER_NEUTRAL gebaut ist. Ausdruecklich
+        // gesetzt, nie leer: Ein leerer Wert fiele in `extractVariables`
+        // (mailer.ts) auf `payload.email` zurueck, und das ist hier die Adresse
+        // der Fuehrungskraft.
+        const mitarbeiterName = nameDerPerson(process) ?? MITARBEITER_NEUTRAL;
 
-        await triggerWebhooks("supervisor-reminder", {
+        // Frueher /vorgesetzter/<token> — diese Seite gibt es nicht; jede
+        // Vorgesetzten-Erinnerung fuehrte auf einen 404.
+        const modalitaetenLink = `${getBaseUrl()}/modalitaeten/${process.supervisorToken}`;
+
+        const mail = await triggerWebhooks("supervisor-reminder", {
           onboardingId: process.id,
           email: process.supervisorEmail,
           supervisorEmail: process.supervisorEmail,
@@ -163,15 +266,22 @@ export async function POST(request: NextRequest) {
           einrichtung: process.organization.name,
           organization: process.organization.name,
           tage_offen: daysOpen,
-          modalitaetenLink: `${getBaseUrl()}/vorgesetzter/${process.supervisorToken}`,
-          supervisor_link: `${getBaseUrl()}/vorgesetzter/${process.supervisorToken}`,
+          modalitaetenLink,
+          supervisor_link: modalitaetenLink,
           displayId: process.displayId || process.id.substring(0, 8),
         });
 
-        await prisma.onboardingProcess.update({
-          where: { id: process.id },
-          data: { lastSupervisorReminderAt: now },
-        });
+        // Merker bei SENT und SKIPPED, nicht bei FAILED (siehe Kopfkommentar).
+        if (merkerSetzen(mail)) {
+          await prisma.onboardingProcess.update({
+            where: { id: process.id },
+            data: { lastSupervisorReminderAt: now },
+          });
+        }
+        if (mail?.status !== "SENT") {
+          results.notSent++;
+          continue;
+        }
 
         await prisma.auditLog.create({
           data: {

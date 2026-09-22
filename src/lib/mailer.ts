@@ -19,6 +19,7 @@ import { decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { getEventDefinition } from "@/lib/events";
 import { EMAIL_PATTERN } from "@/lib/constants";
+import { formatDatumDE } from "@/lib/format";
 
 // =============================================
 // Typen
@@ -735,14 +736,56 @@ function extractVariables(
   }
 
   // Offboarding-spezifische Variablen
+  //
+  // Die Standardvorlagen dieser Gruppe sprechen deutsch ({{vorname}},
+  // {{abteilung}}, {{aufgabe}}, {{austrittsdatum}}, {{offene_aufgaben}},
+  // {{einrichtung}}), die Aufrufer senden seit jeher englische Feldnamen
+  // (employeeFirstName, departmentName, itemTitle bzw. taskTitle,
+  // lastWorkingDay, totalOpenItems, organizationName). Bis zu dieser
+  // Aenderung kannte dieser Block nur Namen, die kein Aufrufer je gesendet
+  // hat — Namen, Datum, Abteilung und Aufgabe blieben in allen
+  // Offboarding-Mails leer. Die Aufrufer senden die deutschen Felder
+  // inzwischen mit (src/lib/offboarding-mail.ts); die Aliase hier bleiben das
+  // Netz fuer alles, was dort nicht entsteht, und fuer gespeicherte Vorlagen.
+  //
+  // `erster` statt `a || b`: Eine Zahl 0 ist ein Wert. "0 offene Aufgaben"
+  // ist eine Aussage, ein leeres Feld ist keine.
   if (event.startsWith("offboarding-")) {
-    base.abteilung = str(payload.abteilung || payload.department);
-    base.aufgabe = str(payload.aufgabe || payload.task);
-    base.austrittsdatum = payload.austrittsdatum
-      ? new Date(str(payload.austrittsdatum)).toLocaleDateString("de-DE")
-      : str(payload.austrittsdatum || "");
-    base.offene_aufgaben = str(payload.offene_aufgaben || payload.openTasks || "");
-    base.link = str(payload.link || payload.offboardingLink || payload.magicLink || "");
+    const erster = (...werte: unknown[]): string => {
+      for (const wert of werte) {
+        if (wert != null && String(wert).trim() !== "") return String(wert);
+      }
+      return "";
+    };
+
+    base.vorname = erster(payload.vorname, payload.firstName, payload.employeeFirstName);
+    base.nachname = erster(payload.nachname, payload.lastName, payload.employeeLastName);
+    // Letzter Rueckfall fuer Payloads, die nur den ganzen Namen kennen: Der
+    // Name landet vollstaendig in {{vorname}}. Ein Aufteilen am Leerzeichen
+    // ginge bei "Anna Maria von Berg" schief; "{{vorname}} {{nachname}}"
+    // ergibt so trotzdem den richtigen Namen.
+    if (!base.vorname && !base.nachname) {
+      base.vorname = erster(payload.employeeName, payload.mitarbeiter_name);
+    }
+    base.einrichtung = erster(payload.organization, payload.einrichtung, payload.organizationName);
+    base.abteilung = erster(payload.abteilung, payload.department, payload.departmentName);
+    base.aufgabe = erster(payload.aufgabe, payload.task, payload.itemTitle, payload.taskTitle);
+    base.offene_aufgaben = erster(
+      payload.offene_aufgaben,
+      payload.openTasks,
+      payload.totalOpenItems,
+    );
+    base.link = erster(payload.link, payload.offboardingLink, payload.magicLink);
+
+    // Austrittsdatum: IMMER TT.MM.JJJJ in deutscher Zeit — und ein schon
+    // formatierter Wert bleibt, wie er ist. Das Dokumentenpaket
+    // (offboarding-documents-sent) liefert "31.12.2026"; der fruehere Code
+    // schickte das erneut durch new Date() und machte daraus "Invalid Date"
+    // bzw. aus "01.08.2026" den 8. Januar. formatDatumDE kennt beide Formen.
+    // Ergibt ein Wert gar kein Datum, steht er lieber roh in der Mail als
+    // "Invalid Date".
+    const rohDatum = erster(payload.austrittsdatum, payload.lastWorkingDay);
+    base.austrittsdatum = rohDatum ? formatDatumDE(rohDatum) || rohDatum : "";
   }
 
   return base;

@@ -13,6 +13,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { ContractEndFieldHelper, type ContractEndFieldConfig } from "@/lib/contract-end-fields";
+import {
+  STELLENBEZEICHNUNG_MAX_LAENGE,
+  alsEinzeiligeStellenbezeichnung,
+} from "@/lib/stellenbezeichnung";
 
 function CredoLinie() {
   return (
@@ -167,7 +171,9 @@ export default function VertragFormularPage() {
           urlaubstageProJahr: rd.urlaubstageProJahr != null ? String(rd.urlaubstageProJahr) : "",
           probezeit: Boolean(rd.probezeit),
           probezeitMonate: rd.probezeitMonate != null ? String(rd.probezeitMonate) : "",
-          stellenbeschreibung: (rd.stellenbeschreibung as string) || "",
+          // Zwischenstaende aus der Zeit des mehrzeiligen Feldes: Umbrueche
+          // werden zu ", ", sonst entfernte das einzeilige Feld sie still.
+          stellenbeschreibung: alsEinzeiligeStellenbezeichnung(rd.stellenbeschreibung),
           betriebsstaetteOrgId: (rd.betriebsstaetteOrgId as string) || "",
           zusatzvereinbarungen: (rd.zusatzvereinbarungen as string) || "",
         }));
@@ -183,7 +189,10 @@ export default function VertragFormularPage() {
             f.wochenstunden || (vb.wochenstunden != null ? String(vb.wochenstunden) : ""),
           entgeltgruppe: f.entgeltgruppe || vb.entgeltgruppe || "",
           stufe: f.stufe || vb.stufe || "",
-          stellenbeschreibung: f.stellenbeschreibung || vb.stellenbeschreibung || "",
+          // Die aktuelle Position aus DokuBit — eine Bezeichnung, also genau
+          // das, was das Feld fragt. Einzeilig gemacht wie oben.
+          stellenbeschreibung:
+            f.stellenbeschreibung || alsEinzeiligeStellenbezeichnung(vb.stellenbeschreibung),
           probezeitMonate:
             f.probezeitMonate || (vb.probezeitMonate != null ? String(vb.probezeitMonate) : ""),
         }));
@@ -301,6 +310,19 @@ export default function VertragFormularPage() {
       const missing = missingRequired();
       if (missing) {
         setMsg(`Bitte füllen Sie das Pflichtfeld „${missing}" aus.`);
+        return;
+      }
+      // Vor der Rueckfrage pruefen, nicht erst am Server: `maxLength` verhindert
+      // nur weiteres Tippen, ein laengerer Zwischenstand aus der Zeit des
+      // 2000-Zeichen-Feldes bleibt stehen. Ohne diese Pruefung bestaetigte die
+      // Fuehrungskraft "verbindlich absenden" und bekaeme danach eine Abweisung.
+      if (
+        vis("stellenbeschreibung") &&
+        form.stellenbeschreibung.length > STELLENBEZEICHNUNG_MAX_LAENGE
+      ) {
+        setMsg(
+          `„${helper.getLabel("stellenbeschreibung")}" ist zu lang: höchstens ${STELLENBEZEICHNUNG_MAX_LAENGE} Zeichen. Bitte kürzen Sie die Angabe.`,
+        );
         return;
       }
     }
@@ -565,7 +587,20 @@ export default function VertragFormularPage() {
             {vis("stellenbeschreibung") && (
               <div className="mt-4">
                 <label className="text-sm font-medium">{lbl("stellenbeschreibung")}</label>
-                <textarea value={form.stellenbeschreibung} onChange={(e) => set("stellenbeschreibung", e.target.value)} rows={2} className={INPUT} />
+                {/* Einzeilig wie im Onboarding (seit 09/2026): gefragt ist ein Titel, keine Beschreibung. */}
+                <input
+                  type="text"
+                  value={form.stellenbeschreibung}
+                  onChange={(e) => set("stellenbeschreibung", e.target.value)}
+                  maxLength={STELLENBEZEICHNUNG_MAX_LAENGE}
+                  placeholder="z.B. Lehrkraft für Mathematik und Physik"
+                  className={INPUT}
+                />
+                {form.stellenbeschreibung.length > STELLENBEZEICHNUNG_MAX_LAENGE && (
+                  <p className="mt-1 text-xs font-medium text-credo-rot">
+                    {form.stellenbeschreibung.length.toLocaleString("de-DE")} / {STELLENBEZEICHNUNG_MAX_LAENGE} Zeichen – bitte kürzen Sie die Angabe.
+                  </p>
+                )}
               </div>
             )}
             {vis("zusatzvereinbarungen") && (

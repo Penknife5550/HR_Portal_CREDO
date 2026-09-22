@@ -166,6 +166,36 @@ describe("Offene Nachweise: fehlende nachreichbare Pflichten", () => {
 
     expect(screen.queryByText("Offene Nachweise")).toBeNull();
   });
+
+  /**
+   * Zwei Spuren (09/2026): Hat die Fuehrungskraft zuerst abgesendet, stand der
+   * Status frueher auf SUPERVISOR_SUBMITTED, waehrend die Person noch in
+   * Schritt 4 sass — und der Kasten mahnte bei HR Nachweise an, die sie gerade
+   * selbst hochlaedt. Massgeblich ist die eigene Abgabe, nicht der Status.
+   */
+  test("schweigt auch bei einem Link-Status ohne eigene Abgabe (Fuehrungskraft war schneller)", () => {
+    for (const status of ["SUPERVISOR_SUBMITTED", "SUPERVISOR_PENDING", "SUBMITTED"]) {
+      const ansicht = render(
+        <OffeneNachweiseKasten
+          data={vorgang({ status, submittedAt: null })}
+          onZuDenDokumenten={null}
+        />,
+      );
+      expect(screen.queryByText("Offene Nachweise")).toBeNull();
+      ansicht.unmount();
+    }
+  });
+
+  test("meldet die Luecke nach der Abgabe auch bei „Bereit zur Prüfung“", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ status: "SUPERVISOR_SUBMITTED" })}
+        onZuDenDokumenten={null}
+      />,
+    );
+
+    expect(screen.queryByText("Masernschutz-Nachweis")).not.toBeNull();
+  });
 });
 
 // =============================================

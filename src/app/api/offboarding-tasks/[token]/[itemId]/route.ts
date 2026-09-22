@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { offboardingMailFelder } from "@/lib/offboarding-mail";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 
 // =============================================
@@ -86,17 +87,29 @@ export async function PATCH(
       include: { organization: true },
     });
 
-    // Webhook "offboarding-task-completed" triggern
+    // Webhook "offboarding-task-completed" triggern.
+    //
+    // Die Mail an HR nennt Aufgabe, Abteilung und wie viel im Vorgang noch
+    // offen ist ({{aufgabe}}, {{abteilung}}, {{offene_aufgaben}}). Keins der
+    // drei kam bisher unter diesem Namen an; die Zahl der offenen Aufgaben
+    // gab es gar nicht. Gezaehlt wird ueber den GANZEN Vorgang (nicht nur
+    // diese Abteilung): Fuer HR ist das die Frage, die die Mail beantworten
+    // soll — "wie weit ist der Austritt?". Die Portal-Route
+    // (/api/offboarding/[id]/checklist/[itemId]) zaehlt genauso, damit beide
+    // Wege dieselbe Vorlage sinnvoll fuellen.
     if (isCompleted && offboarding) {
+      const offeneAufgaben = await prisma.offboardingChecklistItem.count({
+        where: { offboardingId: link.offboardingId, isCompleted: false },
+      });
       await triggerWebhooks("offboarding-task-completed", {
-        offboardingId: link.offboardingId,
-        displayId: offboarding.displayId,
+        ...offboardingMailFelder(offboarding),
         departmentKey: link.departmentKey,
         departmentName: link.departmentName,
+        abteilung: link.departmentName,
         itemId: updatedItem.id,
         itemTitle: updatedItem.title,
-        employeeName: `${offboarding.employeeFirstName} ${offboarding.employeeLastName}`,
-        organizationName: offboarding.organization.name,
+        aufgabe: updatedItem.title,
+        offene_aufgaben: offeneAufgaben,
       });
     }
 
@@ -123,13 +136,11 @@ export async function PATCH(
     // Webhook "offboarding-department-completed" triggern wenn alle erledigt
     if (allComplete && offboarding) {
       await triggerWebhooks("offboarding-department-completed", {
-        offboardingId: link.offboardingId,
-        displayId: offboarding.displayId,
+        ...offboardingMailFelder(offboarding),
         departmentKey: link.departmentKey,
         departmentName: link.departmentName,
+        abteilung: link.departmentName,
         email: link.email,
-        employeeName: `${offboarding.employeeFirstName} ${offboarding.employeeLastName}`,
-        organizationName: offboarding.organization.name,
         completedAt: updatedLink.completedAt?.toISOString(),
       });
     }

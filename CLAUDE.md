@@ -176,6 +176,17 @@ src/
 - **Validierung:** Zod-Schemas in `src/lib/validations/`
 - **Berechtigungen:** Rollen-System in `src/lib/permissions.ts` (SUPER_ADMIN, ADMIN, HR_STAFF, VIEWER)
 
+## Onboarding: zwei Spuren
+
+Fragebogen (Mitarbeiter/in) und Einstellungsmodalitaeten (Fuehrungskraft) laufen seit 09/2026 **parallel, in beliebiger Reihenfolge**. Regeln und Begruendung: `src/lib/onboarding-spuren.ts` (rein, client-sicher) und `src/lib/onboarding-status-abgleich.ts`.
+
+- **Gates an Zeitstempeln, nicht am Status.** Jede Spur hat ihren eigenen Zeitstempel (`submittedAt` bzw. `supervisorSubmittedAt`, Altfall `…Data.isComplete`). Lesen, Schreiben und Absenden eines Links haengen nur daran plus an den HR-Status `REVIEWED`/`COMPLETED`/`EXPIRED` — nie am Stand der anderen Spur (`darfMitarbeiterSchreiben`, `darfVorgesetzteSchreiben`, Gates in `auth.ts`).
+- **Status NIE direkt setzen.** Er ist nur noch eine Zusammenfassung (`gesamtStatus`). Jeder Schreiber beansprucht in EINER interaktiven Transaktion zuerst seine Spur per bedingtem `updateMany` (WHERE eigener Zeitstempel `null`, `status notIn HR_STATUS`; count 0 → 409), ruft **danach** `statusAbgleichen(tx, id)` auf und schreibt das AuditLog im selben Commit. Nur so landen zwei gleichzeitige Abgaben korrekt auf „Bereit zur Prüfung". Ausnahmen: HR-PATCH (nur `REVIEWED` bei `bereitZurPruefung`, `COMPLETED` nur aus `REVIEWED`, `EXPIRED`) und der bedingte Wechsel `INVITED → IN_PROGRESS` beim ersten Speichern.
+- **`SUPERVISOR_SUBMITTED` heisst „Bereit zur Prüfung"** (beides eingereicht). Solange der Fragebogen offen ist, folgt der Status der Fragebogen-Spur (`INVITED`/`IN_PROGRESS`), auch wenn die Modalitaeten schon da sind.
+- **Vorgesetzten-Link** (`POST /api/onboarding/[id]/supervisor-link`) ist wiederholungssicher: gueltiger Link an dieselbe Adresse wird wiederverwendet (keine zweite Mail), andere Adresse **oder abgelaufener Link** = neuer Token (alter tot), nach Abgabe der Modalitaeten 409. Die Karte „Vorgesetzten-Link" in der Uebersicht bietet „Neuen Link erzeugen" an, sobald der Link abgelaufen ist oder eine andere Adresse eingetragen wird — sonst blockierte `bereitZurPruefung` (wartet bei jedem Link auf die Modalitaeten) den Vorgang dauerhaft.
+- **Erinnerungs-Cron** (`/api/cron/reminders`): Anker der Vorgesetzten-Erinnerung ist `supervisorLinkSentAt`, fuer Bestandslinks ohne diesen Wert Ablauf minus Link-Gueltigkeit, nie vor `invitedAt` (`vorgesetztenLinkErzeugtAm`). Ohne Namen heisst die Person dort `MITARBEITER_NEUTRAL`, nie ihre E-Mail-Adresse. Merker `last…ReminderAt`: bei SENT **und SKIPPED** setzen (Vorlage aus → sonst taeglich Webhook + Protokolleintrag), bei FAILED nicht (naechster Lauf versucht es erneut).
+- Die JS-Kopie von `gesamtStatus` in `prisma/seed-check.js` (Heil-Migration `ONBOARDING_PARALLELE_SPUREN_V1`) haelt ein Test gegen die TS-Fassung — beide gemeinsam aendern.
+
 ## E-Mail-Versand (SMTP primaer)
 
 - **Dispatcher:** `triggerWebhooks(event, payload)` in `src/lib/webhooks.ts` — sendet IMMER zuerst die E-Mail per SMTP (`sendEventEmail` in `src/lib/mailer.ts`), Webhooks feuern nur zusaetzlich

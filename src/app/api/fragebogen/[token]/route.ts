@@ -10,6 +10,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { validateMagicToken } from "@/lib/auth";
+import {
+  HR_STATUS,
+  istHrStatus,
+  mitarbeiterAbgesendet,
+} from "@/lib/onboarding-spuren";
+import { statusAbgleichen } from "@/lib/onboarding-status-abgleich";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { sendEmail } from "@/lib/mailer";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
@@ -271,7 +277,7 @@ export async function GET(
 
   const { token } = await params;
 
-  // GET erlaubt auch SUBMITTED-Status (Anzeige der eingereichten Daten)
+  // GET erlaubt auch nach der eigenen Abgabe (Anzeige der eingereichten Daten)
   const result = await validateMagicToken(token, { allowSubmitted: true });
   if (!result.valid) {
     return NextResponse.json(
@@ -323,6 +329,12 @@ export async function GET(
     },
     questionnaireType: onboarding.questionnaireType,
     status: onboarding.status,
+    // Die Seite entscheidet an DIESEM Feld, ob sie die Karte „bereits
+    // eingereicht" zeigt — nicht am Status. Der Status fasst seit dem
+    // parallelen Ablauf beide Spuren zusammen; hat die Fuehrungskraft zuerst
+    // abgesendet, stand er frueher auf SUPERVISOR_SUBMITTED, und die Person sah
+    // „bereits eingereicht", obwohl sie nichts abgesendet hatte.
+    mitarbeiterAbgesendet: mitarbeiterAbgesendet(onboarding),
     stepsConfig, // Feld-Konfiguration für den Fragebogen
     requiredDocuments, // Pflicht-Dokumente (pro Vorlage konfigurierbar)
     personalData: personalData
@@ -415,10 +427,22 @@ export async function PUT(
     ...data
   } = parsed.data;
 
-  // Status auf IN_PROGRESS setzen falls noch INVITED
+  // Status auf IN_PROGRESS setzen falls noch INVITED.
+  //
+  // Bedingt statt `update` auf den vorher gelesenen Stand: Zwischen dem Lesen
+  // in validateMagicToken und dieser Zeile kann die Person in einem zweiten
+  // Tab abgesendet haben. Ein unbedingtes Update schriebe dann IN_PROGRESS
+  // ueber SUBMITTED/SUPERVISOR_* — ein Lost Update. Das WHERE greift nur, wenn
+  // der Vorgang in der Datenbank WIRKLICH noch INVITED und nicht abgesendet
+  // ist. Das ist die eine erlaubte Ausnahme von „Status nur ueber
+  // statusAbgleichen" (siehe src/lib/onboarding-status-abgleich.ts): Der
+  // Wechsel ist genau das, was gesamtStatus fuer diesen Stand ergaebe.
+  //
+  // Die Vorpruefung auf den Lesestand bleibt: Sie spart bei jedem weiteren
+  // Speichern den Datenbankaufruf.
   if (onboarding.status === "INVITED") {
-    await prisma.onboardingProcess.update({
-      where: { id: onboarding.id },
+    await prisma.onboardingProcess.updateMany({
+      where: { id: onboarding.id, status: "INVITED", submittedAt: null },
       data: { status: "IN_PROGRESS" },
     });
   }
@@ -654,9 +678,6 @@ export async function PUT(
  */
 class BereitsEingereicht extends Error {}
 
-/** Aus diesen Staenden heraus darf abgesendet werden. */
-const ABSENDBAR = ["INVITED", "IN_PROGRESS"] as const;
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -705,10 +726,21 @@ export async function POST(
   //
   // Verlassen darf man sich darauf NICHT — zwischen dieser Zeile und dem
   // Schreiben liegen mehrere Datenbankabfragen. Die verbindliche Sperre ist das
-  // bedingte updateMany unten, das den Statuswechsel selbst als Sperre benutzt.
-  if (!ABSENDBAR.includes(onboarding.status as (typeof ABSENDBAR)[number])) {
+  // bedingte updateMany unten, das den eigenen Zeitstempel als Sperre benutzt.
+  //
+  // Geprueft wird die EIGENE Spur, nicht der Status: Frueher durfte nur aus
+  // INVITED/IN_PROGRESS abgesendet werden. Hatte die Fuehrungskraft zuerst
+  // abgesendet, stand der Status auf SUPERVISOR_SUBMITTED — und die Person
+  // konnte ihren Fragebogen nie mehr abgeben, auch nicht ueber die API.
+  if (mitarbeiterAbgesendet(onboarding)) {
     return NextResponse.json(
       { error: "Fragebogen wurde bereits eingereicht." },
+      { status: 409 }
+    );
+  }
+  if (istHrStatus(onboarding.status)) {
+    return NextResponse.json(
+      { error: "Der Vorgang wurde bereits geprüft oder abgeschlossen." },
       { status: 409 }
     );
   }
@@ -929,12 +961,21 @@ export async function POST(
   // der ersten Erklaerung ueberschreiben.
   //
   // Das bedingte updateMany ist zugleich die Sperre gegen den Doppel-Submit:
-  // Es ist EIN atomares UPDATE ... WHERE status IN (...), also gewinnt genau
-  // ein Aufrufer. Die vorgelagerte Statuspruefung allein genuegt nicht — der
+  // Es ist EIN atomares UPDATE ... WHERE "submittedAt" IS NULL, also gewinnt
+  // genau ein Aufrufer. Die vorgelagerte Pruefung allein genuegt nicht — der
   // Handler wartet danach auf mehrere Abfragen, und zwei offene Tabs oder ein
   // Retry nach Proxy-Timeout kommen beide durch. Zwei QUESTIONNAIRE_SUBMITTED
   // mit verschiedenen Pruefsummen zur selben Erklaerung machen den
   // Unterschriftsersatz in der Betriebspruefung mehrdeutig.
+  //
+  // Beansprucht wird die EIGENE Spur (`submittedAt`), nicht ein Status: Die
+  // Fuehrungskraft darf vorher, gleichzeitig oder danach absenden. Den Status
+  // setzt erst `statusAbgleichen`, NACH der Beanspruchung und aus dem frisch
+  // gelesenen Stand — sendet die Fuehrungskraft in derselben Sekunde ab, sieht
+  // die zweite Transaktion den Zeitstempel der ersten, und der Vorgang landet
+  // korrekt auf „Bereit zur Prüfung" (siehe onboarding-status-abgleich.ts).
+  // HR-Status (geprueft, abgeschlossen, abgelaufen) nimmt das WHERE aus: Ein
+  // Link darf einen solchen Vorgang nie zurueckschreiben.
   //
   // submittedAt traegt bewusst `abgegebenAm` — denselben Zeitpunkt wie die
   // Erklaerung und das Protokoll. Ein eigenes `new Date()` ergaebe drei
@@ -943,8 +984,12 @@ export async function POST(
   try {
     await prisma.$transaction(async (tx) => {
       const beansprucht = await tx.onboardingProcess.updateMany({
-        where: { id: onboarding.id, status: { in: [...ABSENDBAR] } },
-        data: { status: "SUBMITTED", submittedAt: abgegebenAm },
+        where: {
+          id: onboarding.id,
+          submittedAt: null,
+          status: { notIn: [...HR_STATUS] },
+        },
+        data: { submittedAt: abgegebenAm },
       });
       if (beansprucht.count === 0) throw new BereitsEingereicht();
 
@@ -966,6 +1011,11 @@ export async function POST(
         },
       });
 
+      // Erst jetzt den Status aus beiden Spuren ableiten: SUBMITTED (kein
+      // Vorgesetzten-Link), SUPERVISOR_PENDING (Link offen) oder
+      // SUPERVISOR_SUBMITTED (die Modalitaeten lagen schon vor).
+      const abgleich = await statusAbgleichen(tx, onboarding.id);
+
       // Der Protokolleintrag gehoert in denselben Commit: Er ist der Nachweis
       // der Abgabe, nicht bloss ein Logeintrag daneben.
       await tx.auditLog.create({
@@ -975,6 +1025,9 @@ export async function POST(
           details: {
             email: onboarding.email,
             submittedAt: abgegebenAm.toISOString(),
+            // Welcher Status sich daraus ergab — bei zwei Spuren ist das nicht
+            // mehr selbstverstaendlich SUBMITTED.
+            status: { von: abgleich.von, nach: abgleich.nach },
             erklaerungOrt: absenden.data.erklaerungOrt,
             erklaerungVersion: absenden.data.erklaerungVersion,
             erklaerungPruefsumme: pruefsumme,

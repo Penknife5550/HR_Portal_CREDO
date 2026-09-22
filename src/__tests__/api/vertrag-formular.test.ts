@@ -205,6 +205,24 @@ describe("PUT /api/vertrag-formular/[token] — Zwischenspeichern", () => {
     expect(res.status).toBe(200);
     expect(mockPrisma.contractEndProcess.update).not.toHaveBeenCalled();
   });
+
+  // Seit 09/2026 ist die Stellenbezeichnung einzeilig mit hoechstens 200
+  // Zeichen — dieselbe Grenze wie im Onboarding.
+  it("speichert eine Stellenbezeichnung mit genau 200 Zeichen", async () => {
+    const res = await PUT(putReq({ stellenbeschreibung: "x".repeat(200) }), { params: params() });
+    expect(res.status).toBe(200);
+    expect(mockPrisma.contractRenewalData.upsert).toHaveBeenCalled();
+  });
+
+  it("weist 201 Zeichen mit deutscher Meldung samt Feldnamen ab und speichert nichts", async () => {
+    const res = await PUT(putReq({ stellenbeschreibung: "x".repeat(201) }), { params: params() });
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    // Das Formular zeigt `error` woertlich an — ohne Feldnamen stuende dort
+    // ein Satz ohne Bezug.
+    expect(json.error).toBe("Stellenbezeichnung: Bitte maximal 200 Zeichen.");
+    expect(mockPrisma.contractRenewalData.upsert).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /api/vertrag-formular/[token] — Vorstand-Frage", () => {
@@ -311,6 +329,18 @@ describe("POST /api/vertrag-formular/[token] — Vorstand-Frage", () => {
     );
     const res = await POST(postReq(UEBERNAHME_BODY), { params: params() });
     expect(res.status).toBe(200);
+  });
+
+  it("weist beim verbindlichen Absenden eine zu lange Stellenbezeichnung ab", async () => {
+    const res = await POST(
+      postReq({ ...UEBERNAHME_BODY, vorstandAbgestimmt: false, stellenbeschreibung: "x".repeat(201) }),
+      { params: params() },
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("Stellenbezeichnung: Bitte maximal 200 Zeichen.");
+    // Nichts festgeschrieben: weder Vertragsdaten noch Status.
+    expect(mockTx.contractRenewalData.upsert).not.toHaveBeenCalled();
+    expect(mockTx.contractEndProcess.update).not.toHaveBeenCalled();
   });
 
   it("KEINE_UEBERNAHME braucht keine Vorstand-Antwort", async () => {

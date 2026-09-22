@@ -240,6 +240,12 @@ Es wird dringend empfohlen, das Passwort nach dem ersten Login zu aendern.
 | 3       | Vorgesetzter ergaenzt Einstellungsmodalitaeten | Vorgesetzter |
 | 4       | HR prueft und schliesst Vorgang ab           | HR-Mitarbeiter |
 
+Schritt 2 und 3 laufen seit 09/2026 **parallel, in beliebiger Reihenfolge**:
+Den Vorgesetzten-Link kann HR jederzeit erzeugen, auch bevor der Fragebogen
+da ist. Geprueft wird, sobald der Fragebogen eingereicht ist und — falls ein
+Vorgesetzten-Link besteht — auch die Modalitaeten (siehe
+[Onboarding-Status](#onboarding-status-zwei-spuren)).
+
 ### Personalfragebogen
 
 Mehrstufiges Formular mit folgenden Bereichen:
@@ -256,7 +262,7 @@ Fragebogentypen: Standard (TV-L), Beamte, Erzieher (TV-L S), Minijob, Ehrenamt
 ### Vorgesetzten-Modalitaeten
 
 Der Vorgesetzte erhaelt einen separaten Magic Link und ergaenzt:
-- Betriebsstaette und Stellenbeschreibung
+- Betriebsstaette und Stellenbezeichnung (einzeilig, max. 200 Zeichen, wird in den Arbeitsvertrag uebernommen; technischer Feldname bleibt `stellenbeschreibung`)
 - Vertragsdaten (Beginn, Befristung, Umfang)
 - Haupt-/Nebenarbeitgeber-Zuordnung
 - Verguetungsmodell (TV-L, TV-L S, Haustarif)
@@ -410,12 +416,36 @@ Das Datenmodell umfasst 16 Models. Die wichtigsten:
 | `EmailTemplate`      | E-Mail-Vorlagen pro Event mit Variablen.                         |
 | `FormTemplate`       | Konfigurierbare Fragebogen-Templates pro Typ (versioniert).      |
 
-### Onboarding-Status-Uebergaenge
+### Onboarding-Status (zwei Spuren)
 
-```
-INVITED -> IN_PROGRESS -> SUBMITTED -> SUPERVISOR_PENDING -> SUPERVISOR_SUBMITTED -> REVIEWED -> COMPLETED
-                                                                                              -> EXPIRED
-```
+Fragebogen und Einstellungsmodalitaeten sind zwei unabhaengige Spuren mit je
+eigenem Zeitstempel. Der Status ist keine Abfolge mehr, sondern eine
+**Zusammenfassung**, die `gesamtStatus` in `src/lib/onboarding-spuren.ts` aus
+den beiden Zeitstempeln ableitet (Regeln und Begruendung: CLAUDE.md, Abschnitt
+„Onboarding: zwei Spuren").
+
+| Spur                     | Wer            | Zeitstempel             | Altfall-Merker           |
+|--------------------------|----------------|-------------------------|--------------------------|
+| Personalfragebogen       | Mitarbeiter/in | `submittedAt`           | `personalData.isComplete`   |
+| Einstellungsmodalitaeten | Fuehrungskraft | `supervisorSubmittedAt` | `supervisorData.isComplete` |
+
+| Fragebogen          | Modalitaeten                 | Status                                        |
+|---------------------|------------------------------|-----------------------------------------------|
+| noch nicht begonnen | egal                         | `INVITED`                                     |
+| begonnen            | egal                         | `IN_PROGRESS`                                 |
+| eingereicht         | kein Vorgesetzten-Link       | `SUBMITTED` (pruefbar, z. B. Ehrenamt)        |
+| eingereicht         | Link offen                   | `SUPERVISOR_PENDING` („Vorgesetzter offen")   |
+| eingereicht         | eingereicht                  | `SUPERVISOR_SUBMITTED` („Bereit zur Pruefung") |
+
+HR setzt danach `REVIEWED` (nur wenn bereit zur Pruefung), `COMPLETED` (nur aus
+`REVIEWED`) oder jederzeit `EXPIRED`. Diese drei sperren beide Links.
+
+**Achtung bei Auswertungen (Reporting-API, n8n, Power BI):** Solange der
+Fragebogen offen ist, bleibt der Status `INVITED`/`IN_PROGRESS` — auch wenn die
+Fuehrungskraft die Modalitaeten schon eingereicht hat. `SUPERVISOR_SUBMITTED`
+heisst „beides eingereicht", nicht „Vorgesetzter fertig". Den Stand der
+Modalitaeten zeigt allein `supervisorSubmittedAt`; die Reporting-API
+(`/api/reports/onboardings`) liefert dieses Feld bisher nicht, nur den Status.
 
 ### Fragebogentypen
 

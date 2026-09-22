@@ -9,7 +9,10 @@
  *    das Feld "Stellenbeschreibung (wird in Arbeitsvertrag uebernommen!)"
  *    kopierte, kam durch das Formular — und das Speichern antwortete mit einem
  *    blanken "Validierungsfehler". Kein rotes Feld, kein Hinweis, welcher
- *    Absatz zu lang ist.
+ *    Absatz zu lang ist. (Seit 09/2026 heisst das Feld "Stellenbezeichnung",
+ *    ist einzeilig und nimmt hoechstens 200 Zeichen — der technische Name
+ *    `stellenbeschreibung` bleibt. Die Regel "beide Seiten dieselbe Grenze"
+ *    gilt unveraendert, die Tabelle unten haelt sie.)
  * 2. Ein Auswahlfeld meldete englisch. Der Vorgabewert ist `undefined`, das
  *    `<select>` sendet aber `""` — `required_error` greift nur im ersten Fall,
  *    und im zweiten stand "Invalid enum value. Expected 'TV_L' | ... received
@@ -123,7 +126,9 @@ function istDeutsch(meldung: string): boolean {
  */
 const TEXT_GRENZEN = [
   { schritt: 1, feld: "betriebsstaette", max: 500 },
-  { schritt: 1, feld: "stellenbeschreibung", max: 2000 },
+  // 200 seit 09/2026 (vorher 2000): Das Feld ist eine einzeilige
+  // Stellenbezeichnung, keine Stellenausschreibung mehr.
+  { schritt: 1, feld: "stellenbeschreibung", max: 200 },
   { schritt: 1, feld: "befristungZweck", max: 500 },
   { schritt: 1, feld: "befristungSachgrund", max: 500 },
   { schritt: 2, feld: "hauptarbeitgeberId", max: 200 },

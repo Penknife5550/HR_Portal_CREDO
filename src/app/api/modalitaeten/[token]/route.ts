@@ -9,6 +9,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { validateSupervisorToken } from "@/lib/auth";
+import {
+  HR_STATUS,
+  MITARBEITER_NEUTRAL,
+  mitarbeiterName,
+  vorgesetzteAbgesendet,
+} from "@/lib/onboarding-spuren";
+import { statusAbgleichen } from "@/lib/onboarding-status-abgleich";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -24,7 +31,7 @@ import {
 // =============================================
 const modalitaetenFieldsSchema = z.object({
   betriebsstaette: z.string().max(500).optional(),
-  stellenbeschreibung: z.string().max(2000).optional(),
+  stellenbeschreibung: z.string().max(200).optional(),
   vertragsbeginn: z.string().optional(),
   befristet: z.boolean().optional(),
   befristungsart: z.enum(BEFRISTUNGSARTEN).or(z.literal("")).optional(),
@@ -92,7 +99,7 @@ export async function GET(
 
   const { token } = await params;
 
-  // GET erlaubt auch SUPERVISOR_SUBMITTED-Status (Anzeige der eingereichten Daten)
+  // GET erlaubt auch nach der eigenen Abgabe (Anzeige der eingereichten Daten)
   const result = await validateSupervisorToken(token, { allowSubmitted: true });
   if (!result.valid) {
     return NextResponse.json(
@@ -112,10 +119,16 @@ export async function GET(
 
   return NextResponse.json({
     onboardingId: onboarding.id,
-    email: onboarding.email,
-    employeeName: onboarding.personalData
-      ? `${onboarding.personalData.firstName || ""} ${onboarding.personalData.lastName || ""}`.trim()
-      : onboarding.email,
+    // Frueher standen hier zusaetzlich `email` und als Namensersatz ebenfalls
+    // die E-Mail-Adresse der Person — beim Onboarding meist eine private
+    // Freemail-Adresse. Die Fuehrungskraft braucht sie fuer die Modalitaeten
+    // nicht (Datensparsamkeit), und die Seite hat `email` nie angezeigt.
+    //
+    // Der Name faellt seit dem parallelen Ablauf haeufig leer aus: Die
+    // Fuehrungskraft oeffnet ihren Link oft, bevor die Person im Fragebogen
+    // ihren Namen eingetragen hat. Dann gilt der Name am Vorgang, sonst eine
+    // neutrale Bezeichnung — nicht „für  · FES Gymnasium" mit leerem Namen.
+    employeeName: mitarbeiterName(onboarding) ?? MITARBEITER_NEUTRAL,
     organization: {
       name: onboarding.organization.name,
       mandantNumber: onboarding.organization.mandantNumber,
@@ -124,6 +137,11 @@ export async function GET(
     organizations,
     supervisorData: onboarding.supervisorData || null,
     status: onboarding.status,
+    // Die Seite zeigt „Vielen Dank!" an DIESEM Feld und nicht mehr am Status:
+    // Sendet die Fuehrungskraft vor der Person ab, bleibt der Status
+    // INVITED/IN_PROGRESS (er folgt dann der Fragebogen-Spur), und die Seite
+    // zeigte sonst wieder das Formular.
+    vorgesetzteAbgesendet: vorgesetzteAbgesendet(onboarding),
   });
 }
 
@@ -357,6 +375,15 @@ export async function PUT(
 // =============================================
 // POST – Modalitaeten endgültig absenden
 // =============================================
+/**
+ * Ein zweiter Absender war schneller (zweiter Tab, Retry nach Timeout).
+ *
+ * Eigene Klasse, weil die Beanspruchung INNERHALB der Transaktion passiert:
+ * Der einzige Weg, eine begonnene Transaktion zurueckzurollen, ist eine
+ * Ausnahme. Der Aufrufer antwortet 409.
+ */
+class BereitsEingereicht extends Error {}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -431,34 +458,78 @@ export async function POST(
     );
   }
 
-  // SupervisorData als vollstaendig markieren
-  await prisma.supervisorData.update({
-    where: { onboardingId: onboarding.id },
-    data: {
-      isComplete: true,
-    },
-  });
+  /**
+   * Der Abschluss — atomar, und ohne den Status hart zu setzen.
+   *
+   * Frueher schrieb diese Route drei Saetze einzeln und setzte den Status IMMER
+   * auf SUPERVISOR_SUBMITTED, gleich ob der Fragebogen schon da war. Sendete
+   * die Fuehrungskraft zuerst ab, sperrte das den Fragebogen-Link der Person:
+   * Seite, Gate und Absenden lasen den Status als „bereits eingereicht". Der
+   * Vorgang hing dauerhaft fest.
+   *
+   * Jetzt in EINER Transaktion und in dieser Reihenfolge:
+   *   1. Die eigene Spur beanspruchen: bedingtes updateMany auf
+   *      `supervisorSubmittedAt: null`. Das ist die verbindliche Sperre gegen
+   *      Doppel-Absenden (zwei Tabs, Retry) und sperrt die Zeile bis zum
+   *      Commit. `supervisorToken: token` gehoert ins WHERE: Hat HR den Link
+   *      inzwischen an eine andere Adresse neu vergeben, darf der alte Link
+   *      im Fenster zwischen Pruefung und Schreiben nicht mehr absenden.
+   *   2. `isComplete` setzen (Altfall-Merker, den Detailansicht und Export lesen).
+   *   3. `statusAbgleichen`: liest den Vorgang NACH der Sperre neu. Ist der
+   *      Fragebogen offen, bleibt der Status INVITED/IN_PROGRESS; ist er da,
+   *      wird er SUPERVISOR_SUBMITTED („Bereit zur Prüfung").
+   *   4. Der Protokolleintrag — Nachweis der Abgabe, also im selben Commit.
+   */
+  const abgegebenAm = new Date();
+  try {
+    await prisma.$transaction(async (tx) => {
+      const beansprucht = await tx.onboardingProcess.updateMany({
+        where: {
+          id: onboarding.id,
+          supervisorToken: token,
+          supervisorSubmittedAt: null,
+          status: { notIn: [...HR_STATUS] },
+        },
+        data: { supervisorSubmittedAt: abgegebenAm },
+      });
+      if (beansprucht.count === 0) throw new BereitsEingereicht();
 
-  // Onboarding-Status aktualisieren
-  await prisma.onboardingProcess.update({
-    where: { id: onboarding.id },
-    data: {
-      status: "SUPERVISOR_SUBMITTED",
-      supervisorSubmittedAt: new Date(),
-    },
-  });
+      await tx.supervisorData.update({
+        where: { onboardingId: onboarding.id },
+        data: { isComplete: true },
+      });
 
-  // Audit-Log
-  await prisma.auditLog.create({
-    data: {
-      onboardingId: onboarding.id,
-      action: "SUPERVISOR_DATA_SUBMITTED",
-      details: {
-        supervisorEmail: onboarding.supervisorEmail,
-        submittedAt: new Date().toISOString(),
+      const ergebnis = await statusAbgleichen(tx, onboarding.id);
+
+      await tx.auditLog.create({
+        data: {
+          onboardingId: onboarding.id,
+          action: "SUPERVISOR_DATA_SUBMITTED",
+          details: {
+            supervisorEmail: onboarding.supervisorEmail,
+            submittedAt: abgegebenAm.toISOString(),
+            status: { von: ergebnis.von, nach: ergebnis.nach },
+          },
+        },
+      });
+    });
+  } catch (error) {
+    if (error instanceof BereitsEingereicht) {
+      return NextResponse.json(
+        { error: "Die Einstellungsmodalitäten wurden bereits eingereicht." },
+        { status: 409 }
+      );
+    }
+    console.error("[Modalitaeten] Absenden fehlgeschlagen:", error);
+    return NextResponse.json(
+      {
+        error:
+          "Die Einstellungsmodalitäten konnten nicht eingereicht werden. " +
+          "Bitte versuchen Sie es erneut.",
       },
-    },
-  });
+      { status: 500 }
+    );
+  }
 
   // n8n Webhook
   await triggerN8nWebhook("supervisor-completed", {

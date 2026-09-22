@@ -6,10 +6,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
+import { LINK_STATUS, pruefungNichtMoeglichGrund } from "@/lib/onboarding-spuren";
+import { statusAenderungSchema } from "@/lib/validations/onboarding";
 import {
   ladeVorlagenKonfigurationen,
   fortschrittFuerVorgang,
@@ -152,6 +155,12 @@ export async function GET(
 // =============================================
 // PATCH /api/onboarding/:id – Status aendern
 // =============================================
+/**
+ * Zwischen Lesen und Schreiben hat sich der Vorgang bewegt. Eigene Klasse,
+ * weil nur eine Ausnahme die Transaktion zurueckrollt.
+ */
+class VorgangGeaendert extends Error {}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -169,61 +178,134 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json();
-    const { status } = body;
-    const reviewedById = session.userId;
-
-    // Status-Validierung: Nur gueltige Status-Werte erlauben
-    const VALID_STATUSES = [
-      "INVITED", "IN_PROGRESS", "SUBMITTED", "SUPERVISOR_PENDING",
-      "SUPERVISOR_SUBMITTED", "REVIEWED", "COMPLETED", "EXPIRED",
-    ];
-    if (status && !VALID_STATUSES.includes(status)) {
+    const parsed = statusAenderungSchema.safeParse(
+      await request.json().catch(() => null)
+    );
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Ungültiger Status-Wert" },
+        { error: parsed.error.issues[0]?.message ?? "Ungültiger Status-Wert" },
+        { status: 400 }
+      );
+    }
+    const { status } = parsed.data;
+
+    // Die Link-Status (INVITED bis SUPERVISOR_SUBMITTED) ergeben sich aus den
+    // beiden Spuren und werden per `statusAbgleichen` abgeleitet. Von Hand
+    // gesetzt, waeren sie beim naechsten Abgleich wieder falsch — und genau
+    // eine solche Handkorrektur (SUBMITTED ohne `submittedAt`) war eine der
+    // Quellen festhaengender Vorgaenge. Die Oberflaeche hat sie nie genutzt.
+    if ((LINK_STATUS as readonly string[]).includes(status)) {
+      return NextResponse.json(
+        {
+          error:
+            "Dieser Status ergibt sich aus Fragebogen und Einstellungsmodalitäten " +
+            "und kann nicht von Hand gesetzt werden.",
+        },
         { status: 400 }
       );
     }
 
-    // Vorgang pruefen
+    // Vorgang pruefen — mit den beiden Merkern, die `bereitZurPruefung` fuer
+    // Altfaelle ohne Zeitstempel braucht.
     const existing = await prisma.onboardingProcess.findUnique({
       where: { id },
+      include: {
+        personalData: { select: { currentStep: true, isComplete: true } },
+        supervisorData: { select: { isComplete: true } },
+      },
     });
-    if (!existing) {
+    // 404 auch bei fremdem Mandanten (gleicher Text) — heute sind alle
+    // HR_EDIT_ROLES global, die Pruefung haelt, falls sich das aendert.
+    if (!existing || !(await canAccessProcess(session, existing.organizationId))) {
       return NextResponse.json(
         { error: "Vorgang nicht gefunden" },
         { status: 404 }
       );
     }
 
-    // Update-Daten zusammenbauen
-    const updateData: Record<string, unknown> = {};
-    if (status) updateData.status = status;
+    // Uebergaenge (Entscheidung 21.09.2026):
+    //   REVIEWED  nur, wenn der Vorgang bereit zur Pruefung ist — Fragebogen
+    //             eingereicht und, falls ein Vorgesetzten-Link besteht, auch
+    //             die Modalitaeten. Frueher liess der Server jeden Uebergang
+    //             zu; nur die Oberflaeche schraenkte den Knopf ein, und im
+    //             festhaengenden Fall zeigte sie ihn trotz fehlendem Fragebogen.
+    //   COMPLETED nur aus REVIEWED.
+    //   EXPIRED   jederzeit (HR zieht einen Vorgang zurueck).
+    const jetzt = new Date();
+    let data: Prisma.OnboardingProcessUncheckedUpdateManyInput;
     if (status === "REVIEWED") {
-      updateData.reviewedAt = new Date();
-      if (reviewedById) updateData.reviewedById = reviewedById;
-    }
-    if (status === "COMPLETED") {
-      updateData.completedAt = new Date();
+      const grund = pruefungNichtMoeglichGrund(existing);
+      if (grund) {
+        return NextResponse.json({ error: grund }, { status: 409 });
+      }
+      data = { status, reviewedAt: jetzt, reviewedById: session.userId };
+    } else if (status === "COMPLETED") {
+      if (existing.status !== "REVIEWED") {
+        return NextResponse.json(
+          {
+            error:
+              "Ein Vorgang kann erst abgeschlossen werden, wenn er als geprüft markiert ist.",
+          },
+          { status: 409 }
+        );
+      }
+      data = { status, completedAt: jetzt };
+    } else {
+      if (existing.status === "EXPIRED") {
+        return NextResponse.json(
+          { error: "Der Vorgang ist bereits als abgelaufen markiert." },
+          { status: 409 }
+        );
+      }
+      data = { status };
     }
 
-    const updated = await prisma.onboardingProcess.update({
-      where: { id },
-      data: updateData,
-      include: { organization: true },
-    });
+    // Bedingt schreiben statt `update`: Zwischen dem Lesen oben und hier kann
+    // die Fuehrungskraft absenden, HR einen Vorgesetzten-Link erzeugen oder ein
+    // zweiter Tab den Status aendern. Das WHERE haelt genau die Felder fest,
+    // auf denen die Pruefung oben beruht — hat sich eines davon bewegt, wird
+    // nichts geschrieben (409), statt eine veraltete Entscheidung
+    // festzuschreiben. Status und Protokoll gehoeren in denselben Commit.
+    try {
+      await prisma.$transaction(async (tx) => {
+        const geschrieben = await tx.onboardingProcess.updateMany({
+          where: {
+            id,
+            status: existing.status,
+            submittedAt: existing.submittedAt,
+            supervisorSubmittedAt: existing.supervisorSubmittedAt,
+            supervisorToken: existing.supervisorToken,
+          },
+          data,
+        });
+        if (geschrieben.count === 0) throw new VorgangGeaendert();
 
-    // Audit-Log
-    await prisma.auditLog.create({
-      data: {
-        onboardingId: id,
-        userId: reviewedById || null,
-        action: "STATUS_CHANGED",
-        details: {
-          from: existing.status,
-          to: status,
+        await tx.auditLog.create({
+          data: {
+            onboardingId: id,
+            userId: session.userId || null,
+            action: "STATUS_CHANGED",
+            details: {
+              from: existing.status,
+              to: status,
+            },
+          },
+        });
+      });
+    } catch (error) {
+      if (!(error instanceof VorgangGeaendert)) throw error;
+      return NextResponse.json(
+        {
+          error:
+            "Der Vorgang wurde gerade geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
         },
-      },
+        { status: 409 }
+      );
+    }
+
+    const updated = await prisma.onboardingProcess.findUnique({
+      where: { id },
+      include: { organization: true },
     });
 
     return NextResponse.json(updated);

@@ -465,4 +465,29 @@ describe("FELD_BEZEICHNUNGEN", () => {
       expect(bezeichnung).not.toBe(feld);
     }
   });
+
+  it("nennt das Feld stellenbeschreibung „Stellenbezeichnung“ (zentrale Quelle seit 09/2026)", () => {
+    // Formular, Zusammenfassung, HR-Ansicht, PDF, Vertragsende-Registry und
+    // Variablenkatalog lesen den Begriff von hier. Steht hier wieder der alte
+    // Begriff, laeuft er an ALLEN diesen Stellen gleichzeitig zurueck.
+    expect(FELD_BEZEICHNUNGEN.stellenbeschreibung).toBe("Stellenbezeichnung");
+  });
+});
+
+describe("fehlerMeldung — Stellenbezeichnung", () => {
+  // Woertlich aus modalitaetenFieldsSchema (src/app/api/modalitaeten/[token]/route.ts).
+  const routenAusschnitt = z.object({
+    stellenbeschreibung: z.string().max(200).optional(),
+  });
+
+  it("uebersetzt die Serverabweisung eines zu langen Wertes mit neuem Begriff und Grenze 200", () => {
+    const geprueft = routenAusschnitt.safeParse({ stellenbeschreibung: "x".repeat(201) });
+    if (geprueft.success) throw new Error("Die Eingabe war unerwartet gültig.");
+
+    expect(
+      fehlerMeldung({ error: "Validierungsfehler", details: geprueft.error.issues }),
+    ).toBe(
+      "Stellenbezeichnung: Der Text ist zu lang. Bitte kürzen Sie ihn auf höchstens 200 Zeichen.",
+    );
+  });
 });

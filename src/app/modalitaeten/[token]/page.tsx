@@ -22,7 +22,11 @@ import type {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { getBefristungSachgrundLabel, getBefristungsartLabel } from "@/lib/constants";
 import { zahlenFeld, zahlOderNull } from "@/lib/formular-zahlen";
-import { fehlerMeldung } from "@/lib/formular-fehler";
+import { FELD_BEZEICHNUNGEN, fehlerMeldung } from "@/lib/formular-fehler";
+import {
+  STELLENBEZEICHNUNG_MAX_LAENGE,
+  alsEinzeiligeStellenbezeichnung,
+} from "@/lib/stellenbezeichnung";
 import {
   MAX_KOSTENSTELLEN_ZEILEN,
   MAX_KOSTENSTELLE_LAENGE,
@@ -55,12 +59,18 @@ interface OrgOption {
 
 interface ModalitaetenData {
   onboardingId: string;
-  email: string;
+  /** Name der Person oder eine neutrale Bezeichnung — nie ihre E-Mail-Adresse. */
   employeeName: string;
   organization: { name: string; mandantNumber: string; type: string };
   organizations: OrgOption[];
   supervisorData: Record<string, unknown> | null;
   status: string;
+  /**
+   * Hat die Fuehrungskraft selbst abgesendet? (`vorgesetzteAbgesendet` in
+   * src/lib/onboarding-spuren.ts). Optional, weil aeltere Antworten und
+   * Testfixtures es nicht tragen — fehlt es, bleibt das Formular sichtbar.
+   */
+  vorgesetzteAbgesendet?: boolean;
 }
 
 /** ISO-Datum aus der API ("2026-08-31T00:00:00.000Z") auf das Format von <input type="date"> kuerzen. */
@@ -78,7 +88,7 @@ const SAMMEL_FEHLER = "Bitte prüfen Sie die rot markierten Felder.";
  * Die Obergrenzen stehen in `supervisor-data.ts` und gelten dort fuer Client-
  * und Serverpruefung. Ohne Entsprechung im Eingabefeld erfaehrt die vorgesetzte
  * Person davon aber erst, wenn "Weiter" den ganzen Schritt abweist — bei 400
- * statt 40 Wochenstunden oder einer eingefuegten Stellenausschreibung also nach
+ * statt 40 Wochenstunden oder einer eingefuegten Zusatzvereinbarung also nach
  * dem Tippen statt waehrend des Tippens. `max` und `maxLength` spiegeln die
  * Schemagrenzen deshalb an der Stelle, an der die Eingabe entsteht.
  *
@@ -91,7 +101,10 @@ const MAX_WOCHENSTUNDEN = 60;
 /** Zeichenobergrenzen der Textfelder — dieselben Werte wie in supervisor-data.ts. */
 const MAX_LAENGE = {
   betriebsstaette: 500,
-  stellenbeschreibung: 2000,
+  // Einzeilige Stellenbezeichnung (seit 09/2026, vorher 2000 in einem
+  // dreizeiligen Feld). Aus derselben Konstante wie die Pruefschemata beider
+  // Formulare — Onboarding und Vertragsverlaengerung tragen dieselbe Grenze.
+  stellenbeschreibung: STELLENBEZEICHNUNG_MAX_LAENGE,
   // Nicht in der Befundliste, aber dasselbe Muster und dieselbe Schemagrenze:
   // ein freies Textfeld ohne sichtbare Obergrenze.
   befristungZweck: 500,
@@ -108,9 +121,10 @@ const MAX_LAENGE = {
  * Zeichenzaehler unter einem langen Textfeld.
  *
  * `maxLength` allein genuegt bei diesen Feldern nicht: Der Browser kappt
- * eingefuegten Text STILL. Wer eine Stellenausschreibung hineinkopiert, sieht
- * nicht, dass der Schluss fehlt — und der geht dann so in den Arbeitsvertrag.
- * Der Zaehler macht die Grenze sichtbar, bevor sie zuschlaegt.
+ * eingefuegten Text STILL. Wer einen laengeren Text hineinkopiert (etwa eine
+ * Zusatzvereinbarung oder eine zu lange Stellenbezeichnung), sieht nicht, dass
+ * der Schluss fehlt — und der geht dann so in den Arbeitsvertrag. Der Zaehler
+ * macht die Grenze sichtbar, bevor sie zuschlaegt.
  *
  * Warum der Zaehler mehr sein kann als `max`: Bestandsdaten aus der Zeit vor
  * diesen Grenzen werden von `maxLength` nicht gekuerzt, nur weiteres Tippen
@@ -481,8 +495,17 @@ export default function ModalitaetenPage() {
     );
   }
 
-  // Already submitted
-  if (submitted || pageData?.status === "SUPERVISOR_SUBMITTED" || pageData?.status === "REVIEWED" || pageData?.status === "COMPLETED") {
+  // Bereits eingereicht: an der EIGENEN Spur, nicht am Status. Sendet die
+  // Fuehrungskraft vor der Person ab, bleibt der Status INVITED/IN_PROGRESS —
+  // an `status === "SUPERVISOR_SUBMITTED"` gemessen, zeigte die Seite nach dem
+  // Neuladen wieder das Formular. Geprueft/abgeschlossen sperren den Link
+  // ohnehin fuers Schreiben.
+  if (
+    submitted ||
+    pageData?.vorgesetzteAbgesendet === true ||
+    pageData?.status === "REVIEWED" ||
+    pageData?.status === "COMPLETED"
+  ) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-4">
         <div className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-lg">
@@ -686,7 +709,11 @@ function SupStep1({
     resolver: zodResolver(supStep1Schema),
     defaultValues: {
       betriebsstaette: (data.betriebsstaette as string) || "",
-      stellenbeschreibung: (data.stellenbeschreibung as string) || "",
+      // Bestandswerte aus der Zeit des mehrzeiligen Feldes: Zeilenumbrueche
+      // werden zu ", ". Ohne die Umwandlung entfernte das einzeilige
+      // Eingabefeld sie STILL, und aus "Lehrkraft\nMathematik" wuerde
+      // "LehrkraftMathematik" gespeichert (siehe stellenbezeichnung.ts).
+      stellenbeschreibung: alsEinzeiligeStellenbezeichnung(data.stellenbeschreibung),
       vertragsbeginn: dateInputValue(data.vertragsbeginn),
       befristet: (data.befristet as boolean) || false,
       // Altdaten kennen nur das kalendermaessige Enddatum -> als KALENDER vorbelegen
@@ -728,8 +755,9 @@ function SupStep1({
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">Stellenbeschreibung (wird in Arbeitsvertrag übernommen!) <span className="text-destructive">*</span></label>
-        <textarea {...register("stellenbeschreibung")} rows={3} maxLength={MAX_LAENGE.stellenbeschreibung} placeholder="z.B. Lehrkraft für Mathematik und Physik" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        {/* Begriff aus FELD_BEZEICHNUNGEN (zentrale Quelle), Feldname bleibt stellenbeschreibung. */}
+        <label className="text-sm font-medium text-foreground">{FELD_BEZEICHNUNGEN.stellenbeschreibung} (wird in Arbeitsvertrag übernommen!) <span className="text-destructive">*</span></label>
+        <input type="text" {...register("stellenbeschreibung")} maxLength={MAX_LAENGE.stellenbeschreibung} placeholder="z.B. Lehrkraft für Mathematik und Physik" className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
         <ZeichenZaehler wert={stellenbeschreibung} max={MAX_LAENGE.stellenbeschreibung} />
         {errors.stellenbeschreibung && <p className="text-xs text-destructive">{errors.stellenbeschreibung.message}</p>}
       </div>
@@ -1733,7 +1761,8 @@ function SupStep5Summary({
         <div className="border-b bg-muted/50 px-4 py-2"><h3 className="text-sm font-semibold">1. Stelle & Vertrag</h3></div>
         <div className="px-4 py-3 text-xs space-y-1">
           <div className="flex justify-between"><span className="text-muted-foreground">Betriebsstätte</span><span className="font-medium">{str(data.betriebsstaette)}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Stelle</span><span className="font-medium">{str(data.stellenbeschreibung)}</span></div>
+          {/* Gleiche Aufteilung wie "Ende bei": Ein Bestandswert kann laenger als eine Zeile sein. */}
+          <div className="flex justify-between gap-4"><span className="shrink-0 text-muted-foreground">{FELD_BEZEICHNUNGEN.stellenbeschreibung}</span><span className="max-w-[60%] text-right font-medium">{str(data.stellenbeschreibung)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Vertragsbeginn</span><span className="font-medium">{dateDe(data.vertragsbeginn)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Befristet</span><span className="font-medium">{data.befristet ? "Ja" : "Nein"}</span></div>
           {!!data.befristet && (

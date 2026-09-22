@@ -9,6 +9,8 @@
  * Mandanten-Konfig UND im oeffentlichen Formular erscheinen.
  */
 
+import { FELD_BEZEICHNUNGEN } from "@/lib/formular-fehler";
+
 export interface ContractEndFieldDefinition {
   name: string; // Feldname (= Key in ContractRenewalData / Formular-State)
   label: string; // Standard-Anzeigename
@@ -43,7 +45,19 @@ export const CONTRACT_END_FIELD_REGISTRY: ContractEndFieldDefinition[] = [
   { name: "stufe", label: "Stufe", defaultVisible: true, defaultRequired: false },
   { name: "urlaubstageProJahr", label: "Urlaubstage / Jahr", defaultVisible: true, defaultRequired: false },
   { name: "betriebsstaette", label: "Betriebsstätte", defaultVisible: true, defaultRequired: false },
-  { name: "stellenbeschreibung", label: "Stellenbeschreibung", defaultVisible: true, defaultRequired: false },
+  // Begriff seit 09/2026 „Stellenbezeichnung" — derselbe wie im Onboarding,
+  // aus der zentralen Quelle. Der Feldname bleibt (Spalte, gespeicherte
+  // Mandanten-Konfigurationen, Word-Platzhalter). Weil die Konfigurationsmaske
+  // IMMER alle Labels speichert, stand der alte Standard „Stellenbeschreibung"
+  // bei jedem Mandanten, der die Maske einmal gespeichert hat, fest in der
+  // Datenbank; die einmalige Startmigration VERTRAGSENDE_LABEL_STELLENBEZEICHNUNG_V1
+  // (prisma/seed-check.js) ersetzt genau diesen Wert. Eigene Labels bleiben.
+  {
+    name: "stellenbeschreibung",
+    label: FELD_BEZEICHNUNGEN.stellenbeschreibung,
+    defaultVisible: true,
+    defaultRequired: false,
+  },
   {
     name: "probezeit",
     label: "Probezeit",

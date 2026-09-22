@@ -257,6 +257,15 @@ model OnboardingProcess {
   supervisorEmail          String?
   supervisorToken          String?   @unique
   supervisorTokenExpiresAt DateTime?
+  // Zeitpunkt, zu dem der (aktuelle) Vorgesetzten-Link erzeugt und sein Versand
+  // angestossen wurde (seit 09/2026, rein additiv). Anker der ersten
+  // Vorgesetzten-Erinnerung (7 Tage danach) und von `tage_offen` — seit beide
+  // Links parallel laufen, liegt der Link oft lange nach `invitedAt`. Vorbild:
+  // ContractEndProcess.supervisorLinkSentAt. Bestandsvorgaenge bleiben null;
+  // der Cron rechnet den Erzeugungszeitpunkt dann aus supervisorTokenExpiresAt
+  // minus Link-Gueltigkeit zurueck, nie vor invitedAt
+  // (`vorgesetztenLinkErzeugtAm` in src/lib/onboarding-spuren.ts).
+  supervisorLinkSentAt     DateTime?
 
   // Prozesstyp & Status
   processType       ProcessType       @default(EINSTELLUNG)
@@ -308,12 +317,17 @@ model OnboardingProcess {
   @@map("onboarding_processes")
 }
 
+// Seit 09/2026 eine ZUSAMMENFASSUNG zweier Spuren (Fragebogen: submittedAt,
+// Modalitaeten: supervisorSubmittedAt), abgeleitet in src/lib/onboarding-spuren.ts
+// (gesamtStatus) und nur ueber statusAbgleichen geschrieben. Die Link-Status
+// folgen bis zur eigenen Abgabe der Fragebogen-Spur; der Stand der
+// Modalitaeten steht dann in supervisorSubmittedAt, nicht im Status.
 enum OnboardingStatus {
-  INVITED // Link versendet, noch nicht geoeffnet
-  IN_PROGRESS // MA hat angefangen auszufuellen
-  SUBMITTED // MA hat Fragebogen abgeschickt
-  SUPERVISOR_PENDING // Warte auf Vorgesetzten-Eingabe
-  SUPERVISOR_SUBMITTED // Vorgesetzter hat ausgefuellt
+  INVITED // Fragebogen noch nicht begonnen
+  IN_PROGRESS // MA fuellt den Fragebogen aus (Modalitaeten koennen parallel laufen)
+  SUBMITTED // Fragebogen eingereicht, kein Vorgesetzten-Link
+  SUPERVISOR_PENDING // Fragebogen eingereicht, Modalitaeten noch offen
+  SUPERVISOR_SUBMITTED // Beides eingereicht („Bereit zur Prüfung")
   REVIEWED // HR hat geprueft
   COMPLETED // Alles erledigt, Daten exportiert
   EXPIRED // Link abgelaufen
@@ -725,7 +739,11 @@ model SupervisorData {
   // -- Betriebsstaette --
   betriebsstaette String?
 
-  // -- Stellenbeschreibung (wird in Arbeitsvertrag uebernommen!) --
+  // -- Stellenbezeichnung (wird in Arbeitsvertrag uebernommen!) --
+  // UI-Begriff seit 09/2026: Stellenbezeichnung (einzeilig, max. 200 Zeichen).
+  // Spaltenname bleibt bewusst `stellenbeschreibung` - Umbenennen loescht Daten
+  // bei db push (--accept-data-loss rollt es als DROP + ADD aus). Auch
+  // JSON-Export und Word-Platzhalter {stellenbeschreibung} haengen am Namen.
   stellenbeschreibung String?
 
   // -- Vertragsdaten --
@@ -3609,6 +3627,8 @@ model ContractRenewalData {
   stufe             String?
 
   // Stelle
+  // UI-Begriff seit 09/2026: Stellenbezeichnung (einzeilig, max. 200 Zeichen).
+  // Spaltenname bleibt bewusst - Umbenennen loescht Daten bei db push.
   stellenbeschreibung  String?
   betriebsstaette      String? // Freitext-Fallback (Altbestand)
   betriebsstaetteOrgId String? // gewaehlte Betriebsstaette/Mandant (Organization.id); Auswahl-UI in #5

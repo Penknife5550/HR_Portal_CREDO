@@ -15,6 +15,12 @@ beim Verschieben müssen Handbuch und Bildordner zusammenbleiben.
 
 ## Module
 
+### Onboarding — *Änderungsplan zur Freigabe*
+
+| Datei | Inhalt |
+|---|---|
+| [module/onboarding/aenderungsplan-2026-09.html](module/onboarding/aenderungsplan-2026-09.html) | **Plan (21.09.2026, nicht umgesetzt):** Stellenbezeichnung statt Stellenbeschreibung, Fragebogen und Modalitäten parallel (Fix für festhängende Vorgänge), individuelle E-Mail mit Anhang in vier Modulen, Unterlagen nachfordern in allen sechs Vorgangsarten (Fassung 2). Mit Vorher/Nachher-Mockups, Entscheidungen, Deploy-Prüfungen |
+
 ### Minijob-Checkliste 2026 — *AP 1 und AP 2 umgesetzt, Phase 1 läuft*
 
 | Datei | Inhalt |

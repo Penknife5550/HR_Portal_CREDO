@@ -17,7 +17,14 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
-import { formatEmployeeName } from "@/lib/format";
+import { formatDatumDE, formatEmployeeName } from "@/lib/format";
+import { getBaseUrl } from "@/lib/url";
+import {
+  fristenMailFelder,
+  sortiereFristWarnungen,
+  type FristSchwere,
+  type FristWarnung,
+} from "@/lib/psi-fristen-mail";
 
 const MS_PER_DAY = 86400000;
 
@@ -27,17 +34,11 @@ function timingSafeCompare(a: string, b: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
-type Severity = "WARNING" | "URGENT" | "OVERDUE";
-
-interface DeadlineWarning {
-  processId: string;
-  displayId: string;
-  employeeName: string;
-  type: string;
-  severity: Severity;
-  message: string;
-  dueDate: string;
-}
+// Die Typen liegen in src/lib/psi-fristen-mail.ts, weil die Mailtexte dort
+// aus genau diesen Hinweisen gebaut werden. Die alten Namen bleiben als
+// Alias, damit der Rest dieser Datei unveraendert lesbar bleibt.
+type Severity = FristSchwere;
+type DeadlineWarning = FristWarnung;
 
 /** Monate zu einem Datum addieren */
 function addMonths(date: Date, months: number): Date {
@@ -272,7 +273,9 @@ export async function POST(request: NextRequest) {
           employeeName,
           type: "RV_BEFREIUNG_MISSING",
           severity: "OVERDUE",
-          message: `RV-Befreiungsantrag überfällig. Frist war ${deadline.toLocaleDateString("de-DE")}.`,
+          // Datum in deutscher Zeit, nicht in der des Servers (UTC) — die
+          // Meldung steht seit der Aenderung woertlich in der HR-Mail.
+          message: `RV-Befreiungsantrag überfällig. Frist war ${formatDatumDE(deadline)}.`,
           dueDate: deadline.toISOString(),
         });
       }
@@ -322,7 +325,7 @@ export async function POST(request: NextRequest) {
           employeeName,
           type: "BR_GENEHMIGUNG_MISSING",
           severity: "OVERDUE",
-          message: `BR-Genehmigung überfällig. BR-Antrag eingereicht am ${sentDate.toLocaleDateString("de-DE")}, 8-Wochen-Frist abgelaufen.`,
+          message: `BR-Genehmigung überfällig. BR-Antrag eingereicht am ${formatDatumDE(sentDate)}, 8-Wochen-Frist abgelaufen.`,
           dueDate: deadline.toISOString(),
         });
       }
@@ -360,11 +363,18 @@ export async function POST(request: NextRequest) {
             ? "URGENT"
             : "WARNING";
 
+      // Dringendstes zuerst, DANN abschneiden: Faellt etwas weg, sind es die
+      // am wenigsten dringenden Hinweise (siehe sortiereFristWarnungen).
       const MAX_WARNINGS_PER_MAIL = 50;
-      const includedWarnings = warnings.slice(0, MAX_WARNINGS_PER_MAIL);
+      const includedWarnings = sortiereFristWarnungen(warnings).slice(0, MAX_WARNINGS_PER_MAIL);
       const omittedCount = Math.max(0, warnings.length - MAX_WARNINGS_PER_MAIL);
 
       // Fire-and-forget: triggerWebhooks wirft nie, blockiert Cron-Response nicht.
+      //
+      // Die Felder aus fristenMailFelder machen die Mail erst aussagekraeftig:
+      // Liste der Hinweise (HTML maskiert + Klartext), deutsche Dringlichkeit,
+      // Zaehler je Stufe. `warnings` bleibt als Liste fuer Webhooks (n8n) —
+      // eine Vorlage kann eine Liste nicht einsetzen, ein Webhook schon.
       triggerWebhooks("psi-deadline-warning", {
         timestamp: now.toISOString(),
         totalWarnings: warnings.length,
@@ -374,6 +384,10 @@ export async function POST(request: NextRequest) {
         bySeverity,
         topSeverity,
         warnings: includedWarnings,
+        ...fristenMailFelder(warnings, {
+          maxAnzeige: MAX_WARNINGS_PER_MAIL,
+          portalBasis: getBaseUrl(),
+        }),
       }).catch((err) =>
         console.error("[psi-deadline-warning] Webhook-Fehler:", err instanceof Error ? err.message : err)
       );

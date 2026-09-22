@@ -9,7 +9,13 @@
 const mockPrisma = {
   supervisorData: { upsert: jest.fn(), update: jest.fn() },
   supervisorKostenstelle: { deleteMany: jest.fn(), createMany: jest.fn() },
-  onboardingProcess: { update: jest.fn() },
+  // updateMany: Beanspruchung der eigenen Spur (`supervisorSubmittedAt`).
+  // findUniqueOrThrow + update: `statusAbgleichen` danach.
+  onboardingProcess: {
+    update: jest.fn(),
+    updateMany: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+  },
   auditLog: { create: jest.fn() },
   organization: { findMany: jest.fn() },
   // Die PUT-Route speichert Kopf und Zeilen in EINER interaktiven
@@ -35,7 +41,7 @@ jest.mock("@/lib/rate-limit", () => ({
 }));
 jest.mock("@/lib/n8n", () => ({ triggerN8nWebhook: jest.fn() }));
 
-import { POST, PUT } from "@/app/api/modalitaeten/[token]/route";
+import { GET, POST, PUT } from "@/app/api/modalitaeten/[token]/route";
 import { NextRequest } from "next/server";
 
 const TOKEN = "supervisor-token-1234567890";
@@ -54,11 +60,31 @@ function onboarding(supervisorData: Record<string, unknown> | null = null) {
     valid: true,
     onboarding: {
       id: "ob1",
+      status: "IN_PROGRESS",
+      submittedAt: null,
+      supervisorSubmittedAt: null,
+      supervisorToken: TOKEN,
       email: "neu@example.de",
       supervisorEmail: "chef@example.de",
       organization: { name: "Christliche Familienhilfe Minden e. V." },
       supervisorData,
     },
+  };
+}
+
+/**
+ * Der Vorgang, wie `statusAbgleichen` ihn NACH der Beanspruchung liest: Die
+ * Modalitaeten sind abgesendet. Ob der Fragebogen schon da ist, bestimmt der Test.
+ */
+function standNachAbgabe(vorgang: Record<string, unknown> = {}) {
+  return {
+    status: "IN_PROGRESS",
+    submittedAt: null,
+    supervisorSubmittedAt: new Date("2026-09-18T09:00:00Z"),
+    supervisorToken: TOKEN,
+    personalData: { currentStep: 4, isComplete: false },
+    supervisorData: { isComplete: true },
+    ...vorgang,
   };
 }
 
@@ -86,6 +112,8 @@ beforeEach(() => {
   mockPrisma.supervisorKostenstelle.deleteMany.mockResolvedValue({ count: 0 });
   mockPrisma.supervisorKostenstelle.createMany.mockResolvedValue({ count: 0 });
   mockPrisma.onboardingProcess.update.mockResolvedValue({});
+  mockPrisma.onboardingProcess.updateMany.mockResolvedValue({ count: 1 });
+  mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(standNachAbgabe());
   mockPrisma.auditLog.create.mockResolvedValue({});
   mockPrisma.$transaction.mockImplementation((arg: unknown) =>
     typeof arg === "function"
@@ -435,9 +463,9 @@ describe("POST – Absenden", () => {
     const res = await POST(req("POST", {}), { params: params() });
 
     expect(res.status).toBe(200);
-    expect(mockPrisma.onboardingProcess.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: "SUPERVISOR_SUBMITTED" }) })
-    );
+    // Die Abgabe ist beansprucht (eigene Spur) — der Status haengt am
+    // Fragebogen, der hier noch offen ist (siehe „parallele Spuren" unten).
+    expect(mockPrisma.onboardingProcess.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it("laesst einen unbefristeten Vertrag durch", async () => {
@@ -497,5 +525,174 @@ describe("POST – Absenden", () => {
     const res = await POST(req("POST", {}), { params: params() });
 
     expect(res.status).toBe(200);
+  });
+});
+
+/**
+ * Zwei Spuren: Die Modalitaeten haengen nicht mehr am Fragebogen. Frueher
+ * setzte das Absenden den Vorgang hart auf SUPERVISOR_SUBMITTED — sendete die
+ * Fuehrungskraft zuerst ab, sperrte das den Fragebogen-Link der Person.
+ */
+describe("POST – parallele Spuren", () => {
+  const ABGESCHLOSSEN = { befristet: false, kostenstellen: [] };
+
+  it("laesst den Status auf der Fragebogen-Spur, solange der Fragebogen offen ist", async () => {
+    mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(200);
+    // IN_PROGRESS bleibt IN_PROGRESS — KEIN hartes SUPERVISOR_SUBMITTED mehr.
+    expect(mockPrisma.onboardingProcess.update).not.toHaveBeenCalled();
+    const protokoll = mockPrisma.auditLog.create.mock.calls[0][0].data;
+    expect(protokoll.details.status).toEqual({ von: "IN_PROGRESS", nach: "IN_PROGRESS" });
+  });
+
+  it("setzt „Bereit zur Prüfung“, wenn der Fragebogen schon eingereicht ist", async () => {
+    mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
+    mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(
+      standNachAbgabe({
+        status: "SUPERVISOR_PENDING",
+        submittedAt: new Date("2026-09-17T12:00:00Z"),
+        personalData: { currentStep: 12, isComplete: true },
+      }),
+    );
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.onboardingProcess.update).toHaveBeenCalledWith({
+      where: { id: "ob1" },
+      data: { status: "SUPERVISOR_SUBMITTED" },
+    });
+  });
+
+  it("beansprucht die eigene Spur bedingt — samt Token, ohne HR-Status", async () => {
+    mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
+
+    await POST(req("POST", {}), { params: params() });
+
+    const arg = mockPrisma.onboardingProcess.updateMany.mock.calls[0][0];
+    // `supervisorToken` im WHERE: Hat HR den Link inzwischen an eine andere
+    // Adresse neu vergeben, darf der alte nicht mehr absenden.
+    expect(arg.where).toEqual({
+      id: "ob1",
+      supervisorToken: TOKEN,
+      supervisorSubmittedAt: null,
+      status: { notIn: ["REVIEWED", "COMPLETED", "EXPIRED"] },
+    });
+    expect(arg.data.supervisorSubmittedAt).toBeInstanceOf(Date);
+    expect(arg.data.status).toBeUndefined();
+  });
+
+  it("antwortet 409 beim zweiten Absenden und schreibt dann nichts", async () => {
+    mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
+    mockPrisma.onboardingProcess.updateMany.mockResolvedValue({ count: 0 });
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Die Einstellungsmodalitäten wurden bereits eingereicht.",
+    });
+    expect(mockPrisma.supervisorData.update).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("schreibt Beanspruchung, isComplete, Status und Protokoll in EINER Transaktion, in dieser Reihenfolge", async () => {
+    mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
+
+    await POST(req("POST", {}), { params: params() });
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    const beanspruchen = mockPrisma.onboardingProcess.updateMany.mock.invocationCallOrder[0];
+    const fertig = mockPrisma.supervisorData.update.mock.invocationCallOrder[0];
+    const lesen = mockPrisma.onboardingProcess.findUniqueOrThrow.mock.invocationCallOrder[0];
+    const protokoll = mockPrisma.auditLog.create.mock.invocationCallOrder[0];
+    expect(beanspruchen).toBeLessThan(fertig);
+    expect(fertig).toBeLessThan(lesen);
+    expect(lesen).toBeLessThan(protokoll);
+  });
+
+  it("meldet 500 und keinen Erfolg, wenn die Transaktion bricht", async () => {
+    mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
+    mockPrisma.$transaction.mockRejectedValue(new Error("Verbindung verloren"));
+    const fehler = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(500);
+    fehler.mockRestore();
+  });
+});
+
+describe("GET – Anzeige fuer die Fuehrungskraft", () => {
+  beforeEach(() => {
+    mockPrisma.organization.findMany.mockResolvedValue([]);
+  });
+
+  function vorgang(extra: Record<string, unknown>) {
+    const basis = onboarding(null);
+    return {
+      ...basis,
+      onboarding: {
+        ...basis.onboarding,
+        organization: { name: "FES Gymnasium", mandantNumber: "10", type: "SCHULE" },
+        firstName: null,
+        lastName: null,
+        personalData: { firstName: null, lastName: null },
+        ...extra,
+      },
+    };
+  }
+
+  async function laden() {
+    const res = await GET(
+      new NextRequest(`http://localhost:3000/api/modalitaeten/${TOKEN}`),
+      { params: params() },
+    );
+    return res.json();
+  }
+
+  it("gibt die E-Mail-Adresse der Person nicht heraus", async () => {
+    mockValidate.mockResolvedValue(vorgang({}));
+    const daten = await laden();
+    expect(daten.email).toBeUndefined();
+    expect(JSON.stringify(daten)).not.toContain("neu@example.de");
+  });
+
+  it("nennt den Namen aus dem Fragebogen", async () => {
+    mockValidate.mockResolvedValue(
+      vorgang({ personalData: { firstName: "Anna", lastName: "Beispiel" } }),
+    );
+    expect((await laden()).employeeName).toBe("Anna Beispiel");
+  });
+
+  it("faellt auf den Namen am Vorgang zurueck, solange der Fragebogen leer ist", async () => {
+    // Im parallelen Ablauf oeffnet die Fuehrungskraft oft VOR der Person.
+    mockValidate.mockResolvedValue(vorgang({ firstName: "Anna", lastName: "Beispiel" }));
+    expect((await laden()).employeeName).toBe("Anna Beispiel");
+  });
+
+  it("zeigt ohne jeden Namen eine neutrale Bezeichnung statt einer leeren Stelle", async () => {
+    mockValidate.mockResolvedValue(vorgang({}));
+    expect((await laden()).employeeName).toBe(
+      "die neue Mitarbeiterin / den neuen Mitarbeiter",
+    );
+  });
+
+  it("meldet die eigene Abgabe unabhaengig vom Status", async () => {
+    // Die Fuehrungskraft war zuerst fertig: Status noch IN_PROGRESS.
+    mockValidate.mockResolvedValue(
+      vorgang({ status: "IN_PROGRESS", supervisorSubmittedAt: new Date() }),
+    );
+    const daten = await laden();
+    expect(daten.status).toBe("IN_PROGRESS");
+    expect(daten.vorgesetzteAbgesendet).toBe(true);
+  });
+
+  it("meldet keine Abgabe, solange die Fuehrungskraft nicht abgesendet hat", async () => {
+    mockValidate.mockResolvedValue(vorgang({ status: "SUPERVISOR_PENDING" }));
+    expect((await laden()).vorgesetzteAbgesendet).toBe(false);
   });
 });

@@ -18,6 +18,7 @@ import { getErklaerung } from "@/lib/erklaerung-arbeitnehmer";
 import { statusLabel } from "@/lib/minijob-status";
 import { rvEntscheidungLabel } from "@/lib/minijob-rentenversicherung";
 import { ART_LABELS, KATEGORIE_LABELS } from "@/lib/validations/beschaeftigungs-angaben";
+import { FELD_BEZEICHNUNGEN } from "@/lib/formular-fehler";
 import {
   anteilText,
   kostenstellenAnzeige,
@@ -624,7 +625,9 @@ async function addModalitaetenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExpo
   pageHeader(doc, ctx, "Modalitaeten");
   let y = section(doc, "Einsatzort & Vertrag", 55);
   y = dataRow(doc, "Betriebsstaette", str(sd.betriebsstaette), y);
-  y = dataRow(doc, "Stellenbeschreibung", str(sd.stellenbeschreibung), y);
+  // Begriff aus der zentralen Quelle („Stellenbezeichnung", ohne Umlaut —
+  // die Standardschrift des PDF braucht hier also keine Sonderbehandlung).
+  y = dataRow(doc, FELD_BEZEICHNUNGEN.stellenbeschreibung, str(sd.stellenbeschreibung), y);
   y = dataRow(doc, "Vertragsbeginn", fmt(sd.vertragsbeginn), y);
   y = dataRow(doc, "Befristet", yn(sd.befristet), y);
   if (sd.befristet) {

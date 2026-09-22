@@ -11,6 +11,12 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { cookies, headers } from "next/headers";
 import { prisma } from "./db";
+import {
+  darfMitarbeiterSchreiben,
+  darfVorgesetzteSchreiben,
+  mitarbeiterAbgesendet,
+  vorgesetzteAbgesendet,
+} from "./onboarding-spuren";
 
 /**
  * Lazy JWT_SECRET-Initialisierung.
@@ -197,10 +203,27 @@ export async function validateMagicToken(token: string, options?: { allowSubmitt
     return { valid: false, reason: "Vorgang abgelaufen" };
   if (onboarding.status === "COMPLETED")
     return { valid: false, reason: "Vorgang bereits abgeschlossen" };
-  // SUBMITTED-Status blockiert schreibende Operationen (PUT/POST/DELETE)
-  // GET-Anfragen koennen allowSubmitted: true setzen, um Daten noch anzuzeigen
-  if (onboarding.status === "SUBMITTED" && !options?.allowSubmitted)
-    return { valid: false, reason: "Fragebogen wurde bereits eingereicht" };
+  // Schreibsperre (PUT, POST, Dokumente hochladen/aendern/loeschen). GET-
+  // Anfragen setzen allowSubmitted: true, um die Angaben weiter anzuzeigen.
+  //
+  // Die Sperre haengt an der EIGENEN Spur (`submittedAt`, siehe
+  // onboarding-spuren.ts), nicht am Vorgangsstatus. Frueher sperrte hier nur
+  // `status === "SUBMITTED"` — mit zwei Folgen:
+  //   - Sobald HR den Vorgesetzten-Link erzeugte (SUPERVISOR_PENDING) oder
+  //     prueft (REVIEWED), war der Link nach dem eigenen Absenden wieder
+  //     beschreibbar. Die Pruefsumme der abgegebenen Erklaerung passte danach
+  //     nicht mehr zu den gespeicherten Angaben.
+  //   - Umgekehrt haengt der Status seit dem parallelen Ablauf auch an der
+  //     Fuehrungskraft; ein statusbasiertes Gate sperrte eine Person, die
+  //     selbst noch gar nichts abgesendet hat.
+  if (!options?.allowSubmitted && !darfMitarbeiterSchreiben(onboarding)) {
+    return {
+      valid: false,
+      reason: mitarbeiterAbgesendet(onboarding)
+        ? "Fragebogen wurde bereits eingereicht"
+        : "Vorgang wurde bereits geprüft",
+    };
+  }
 
   return { valid: true, onboarding };
 }
@@ -236,12 +259,20 @@ export async function validateSupervisorToken(token: string, options?: { allowSu
     return { valid: false, reason: "Vorgang bereits abgeschlossen" };
   if (onboarding.status === "EXPIRED")
     return { valid: false, reason: "Vorgang abgelaufen" };
-  // Bereits eingereichte Supervisor-Daten: Schreibzugriff verhindern (GET kann erlaubt werden)
-  if (
-    (onboarding.status === "SUPERVISOR_SUBMITTED" || onboarding.status === "REVIEWED") &&
-    !options?.allowSubmitted
-  )
-    return { valid: false, reason: "Modalitaeten wurden bereits eingereicht" };
+  // Schreibsperre an der EIGENEN Spur (`supervisorSubmittedAt`, Altfall
+  // `supervisorData.isComplete`), nicht am Status: Seit beide Links parallel
+  // laufen, sagt der Status nichts mehr darueber, ob die Fuehrungskraft selbst
+  // abgesendet hat. Frueher sperrte hier `SUPERVISOR_SUBMITTED` — der Status
+  // gilt jetzt erst, wenn BEIDE Spuren eingereicht sind. Hat die Fuehrungskraft
+  // zuerst abgesendet, bliebe ihr Link sonst beschreibbar.
+  if (!options?.allowSubmitted && !darfVorgesetzteSchreiben(onboarding)) {
+    return {
+      valid: false,
+      reason: vorgesetzteAbgesendet(onboarding)
+        ? "Die Einstellungsmodalitäten wurden bereits eingereicht"
+        : "Vorgang wurde bereits geprüft",
+    };
+  }
 
   return { valid: true, onboarding };
 }
@@ -255,7 +286,27 @@ export function generateToken(): string {
   return crypto.randomUUID();
 }
 
+/** Standard-Gueltigkeit eines Magic Links: 30 Tage. */
+const MAGIC_LINK_STANDARD_STUNDEN = 720;
+
+/**
+ * Wie lange ein neu erzeugter Magic Link gilt, in Millisekunden
+ * (`MAGIC_LINK_EXPIRY_HOURS`, Standard 720 h).
+ *
+ * Eigene Funktion, weil nicht nur das Erzeugen die Frist braucht: Der
+ * Erinnerungs-Cron rechnet fuer Vorgesetzten-Links aus der Zeit vor
+ * `supervisorLinkSentAt` den Erzeugungszeitpunkt zurueck (Ablauf minus
+ * Gueltigkeit). Beide Stellen muessen dieselbe Zahl sehen.
+ *
+ * Ein unlesbarer oder nicht positiver Wert faellt auf den Standard zurueck —
+ * frueher entstand daraus ein `Invalid Date`, an dem erst Prisma scheiterte.
+ */
+export function magicLinkGueltigkeitMs(): number {
+  const stunden = parseInt(process.env.MAGIC_LINK_EXPIRY_HOURS || String(MAGIC_LINK_STANDARD_STUNDEN));
+  const gueltig = Number.isFinite(stunden) && stunden > 0 ? stunden : MAGIC_LINK_STANDARD_STUNDEN;
+  return gueltig * 60 * 60 * 1000;
+}
+
 export function getTokenExpiryDate(): Date {
-  const hours = parseInt(process.env.MAGIC_LINK_EXPIRY_HOURS || "720");
-  return new Date(Date.now() + hours * 60 * 60 * 1000);
+  return new Date(Date.now() + magicLinkGueltigkeitMs());
 }

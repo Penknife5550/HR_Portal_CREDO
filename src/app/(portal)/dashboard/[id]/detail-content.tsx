@@ -42,6 +42,14 @@ import {
 import { statusLabel } from "@/lib/minijob-status";
 import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 import { formatBytes } from "@/lib/format";
+import { FELD_BEZEICHNUNGEN } from "@/lib/formular-fehler";
+import {
+  bereitZurPruefung,
+  istHrStatus,
+  mitarbeiterAbgesendet,
+  vorgesetzteAbgesendet,
+  vorgesetztenLinkAbgelaufen,
+} from "@/lib/onboarding-spuren";
 import {
   anteilText,
   kostenstellenAnzeige,
@@ -118,8 +126,21 @@ export interface DetailData {
   token: string;
   supervisorToken: string | null;
   supervisorEmail: string | null;
+  /**
+   * Ablauf des Vorgesetzten-Links (per Spread aus GET /api/onboarding/[id]).
+   * Ist er vorbei, bietet die Karte „Vorgesetzten-Link" einen neuen an — sonst
+   * sperrte `bereitZurPruefung` den Vorgang dauerhaft (wartet auf Modalitaeten,
+   * die mit dem toten Link niemand mehr absenden kann).
+   */
+  supervisorTokenExpiresAt: string | null;
   invitedAt: string;
   submittedAt: string | null;
+  /**
+   * Zeitpunkt, zu dem die Fuehrungskraft die Modalitaeten abgesendet hat — die
+   * zweite Spur neben `submittedAt` (src/lib/onboarding-spuren.ts). Kommt per
+   * Spread aus GET /api/onboarding/[id].
+   */
+  supervisorSubmittedAt: string | null;
   starterPacketSentAt: string | null;
   starterPacketSentCount: number;
   organization: {
@@ -296,6 +317,12 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
+/**
+ * Rueckmeldung zum Vorgesetzten-Link: ein Fehler (rot — Ablehnung, Mail nicht
+ * versendet) oder ein neutraler Hinweis (der bestehende Link gilt weiter).
+ */
+type LinkMeldung = { art: "fehler" | "hinweis"; text: string };
+
 // =============================================
 // Helper Functions
 // =============================================
@@ -469,6 +496,10 @@ export function DetailContent({
   const [supervisorEmail, setSupervisorEmail] = useState("");
   const [generatingLink, setGeneratingLink] = useState(false);
   const [linkResult, setLinkResult] = useState<string | null>(null);
+  // Fehler bzw. Hinweis zum Vorgesetzten-Link. Frueher schluckte die Seite
+  // jede Ablehnung still („// silent"); seit die Route 409 kennt (Modalitaeten
+  // schon eingereicht, Vorgang geprueft) muss HR den Grund sehen.
+  const [linkMeldung, setLinkMeldung] = useState<LinkMeldung | null>(null);
 
   // Checklist state
   const [checklistItems, setChecklistItems] = useState<ChecklistItemData[]>([]);
@@ -478,6 +509,10 @@ export function DetailContent({
   const [savingChecklistNote, setSavingChecklistNote] = useState(false);
   const [completingProcess, setCompletingProcess] = useState(false);
   const [reviewingProcess, setReviewingProcess] = useState(false);
+  // Ablehnung von „Als geprüft markieren" / „Vorgang abschließen". Der Server
+  // prueft die Uebergaenge selbst (409 mit deutschem Grund) — ohne Anzeige
+  // saehe HR nur einen Knopf, der nichts tut.
+  const [statusFehler, setStatusFehler] = useState<string | null>(null);
 
   // Dokumentenpaket-Versand: Der Dialog gehoert der Karte im Dokumente-Tab,
   // der Knopf im Abschluss-Schritt oeffnet denselben.
@@ -488,10 +523,12 @@ export function DetailContent({
   // ---- Status-Aktionen ----
   const isAdmin = user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
 
-  // "Als geprüft markieren" – wenn Vorgesetzter fertig ist
-  const canReview = data &&
-    ["SUBMITTED", "SUPERVISOR_SUBMITTED"].includes(data.status) &&
-    isAdmin;
+  // "Als geprüft markieren" – wenn der Fragebogen eingereicht ist und, falls ein
+  // Vorgesetzten-Link besteht, auch die Modalitaeten (Entscheidung 21.09.2026).
+  // Dieselbe Funktion wie im PATCH. Frueher hing der Knopf am Status und
+  // erschien im festhaengenden Fall („Vorgesetzter fertig", Fragebogen offen),
+  // obwohl der Fragebogen fehlte.
+  const canReview = data && isAdmin && bereitZurPruefung(data);
 
   // "Vorgang abschließen" – wenn geprueft
   const canComplete = data &&
@@ -502,6 +539,7 @@ export function DetailContent({
   const handleReviewProcess = async () => {
     if (!data || !canReview) return;
     setReviewingProcess(true);
+    setStatusFehler(null);
     try {
       const res = await fetch(`/api/onboarding/${data.id}`, {
         method: "PATCH",
@@ -510,9 +548,14 @@ export function DetailContent({
       });
       if (res.ok) {
         await loadData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setStatusFehler(
+          err.error || "Der Vorgang konnte nicht als geprüft markiert werden."
+        );
       }
     } catch {
-      // silent
+      setStatusFehler("Verbindungsfehler. Bitte versuchen Sie es erneut.");
     } finally {
       setReviewingProcess(false);
     }
@@ -522,6 +565,7 @@ export function DetailContent({
     if (!data || !canComplete) return;
     if (!window.confirm("Möchten Sie diesen Vorgang wirklich als abgeschlossen markieren? Diese Aktion kann nicht rückgängig gemacht werden.")) return;
     setCompletingProcess(true);
+    setStatusFehler(null);
     try {
       const res = await fetch(`/api/onboarding/${data.id}`, {
         method: "PATCH",
@@ -530,9 +574,12 @@ export function DetailContent({
       });
       if (res.ok) {
         await loadData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setStatusFehler(err.error || "Der Vorgang konnte nicht abgeschlossen werden.");
       }
     } catch {
-      // silent
+      setStatusFehler("Verbindungsfehler. Bitte versuchen Sie es erneut.");
     } finally {
       setCompletingProcess(false);
     }
@@ -612,19 +659,48 @@ export function DetailContent({
   const generateSupervisorLink = async () => {
     if (!supervisorEmail.trim()) return;
     setGeneratingLink(true);
+    setLinkMeldung(null);
     try {
       const res = await fetch(`/api/onboarding/${onboardingId}/supervisor-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ supervisorEmail: supervisorEmail.trim() }),
       });
+      const result = await res.json().catch(() => ({}));
       if (res.ok) {
-        const result = await res.json();
         setLinkResult(result.modalitaetenLink);
+        // Der Link ist da, aber ist die Mail auch raus? Die Route meldet den
+        // Versandstatus mit — FAILED/SKIPPED heisst: HR muss den Link selbst
+        // weitergeben. Bei einem wiederverwendeten Link geht bewusst keine
+        // zweite Mail hinaus.
+        if (result.wiederverwendet) {
+          setLinkMeldung({
+            art: "hinweis",
+            text: "Der bestehende Link gilt weiter. Es wurde keine neue E-Mail versendet.",
+          });
+        } else if (result.mailVersand && result.mailVersand !== "SENT") {
+          setLinkMeldung({
+            art: "fehler",
+            text: "Link erstellt, aber die E-Mail an die Führungskraft wurde nicht versendet. Bitte geben Sie den Link selbst weiter.",
+          });
+        } else if (result.mailVersand === "SENT") {
+          // Beim Ersetzen (abgelaufener Link, andere Adresse) aendert sich in
+          // der Karte sonst nur die Zeichenkette im Linkfeld — HR soll sehen,
+          // dass der neue Link auch unterwegs ist.
+          setLinkMeldung({
+            art: "hinweis",
+            text: `Link erstellt und per E-Mail an ${result.supervisorEmail ?? "die Führungskraft"} versendet.`,
+          });
+        }
         loadData();
+      } else {
+        setLinkMeldung({
+          art: "fehler",
+          text: result.error || "Der Vorgesetzten-Link konnte nicht erstellt werden.",
+        });
       }
     } catch {
-      // silent
+      setLinkMeldung({ art: "fehler", text: "Verbindungsfehler. Bitte versuchen Sie es erneut." });
     } finally {
       setGeneratingLink(false);
     }
@@ -777,6 +853,13 @@ export function DetailContent({
             )}
           </div>
 
+          {/* Ablehnung einer Statusaktion — der Server nennt den Grund. */}
+          {statusFehler && (
+            <p role="alert" className="mt-2 text-xs font-medium text-destructive">
+              {statusFehler}
+            </p>
+          )}
+
           {/* Row 2: Person info */}
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{displayName}</span>
@@ -877,6 +960,7 @@ export function DetailContent({
             generatingLink={generatingLink}
             generateSupervisorLink={generateSupervisorLink}
             linkResult={linkResult}
+            linkMeldung={linkMeldung}
             notes={notes}
             newNote={newNote}
             setNewNote={setNewNote}
@@ -936,6 +1020,7 @@ function TabOverview({
   generatingLink,
   generateSupervisorLink,
   linkResult,
+  linkMeldung,
   notes,
   newNote,
   setNewNote,
@@ -952,6 +1037,8 @@ function TabOverview({
   generatingLink: boolean;
   generateSupervisorLink: () => void;
   linkResult: string | null;
+  /** Fehler oder Hinweis zum Vorgesetzten-Link (z. B. Mail nicht versendet). */
+  linkMeldung: LinkMeldung | null;
   notes: NoteData[];
   newNote: string;
   setNewNote: (v: string) => void;
@@ -976,6 +1063,21 @@ function TabOverview({
   const checklistDone = data.checklistItems.filter((i) => i.isCompleted).length;
   const checklistAllDone = checklistTotal > 0 && checklistDone === checklistTotal;
   const isCompleted = data.status === "COMPLETED";
+
+  // Neuer Vorgesetzten-Link: moeglich, solange die Modalitaeten offen sind und
+  // HR den Vorgang nicht geprueft/abgeschlossen/abgelaufen gesetzt hat — genau
+  // die Bedingungen, unter denen die Route einen Link ersetzt (sonst 409).
+  // Angeboten wird er, wenn der alte abgelaufen ist oder HR eine andere
+  // Adresse eintraegt (falscher Empfaenger). Frueher gab es bei vorhandenem
+  // Link nur „Kopieren": Ein abgelaufener, nie benutzter Link sperrte den
+  // Vorgang dauerhaft, weil `bereitZurPruefung` auf die Modalitaeten wartet.
+  const linkAbgelaufen = vorgesetztenLinkAbgelaufen(data);
+  const neuerLinkMoeglich =
+    supervisorLinkExists && !vorgesetzteAbgesendet(data) && !istHrStatus(data.status);
+  const andereAdresse =
+    supervisorEmail.trim().toLowerCase() !== (data.supervisorEmail ?? "").trim().toLowerCase();
+  const neuenLinkErzeugenAktiv =
+    neuerLinkMoeglich && !!supervisorEmail.trim() && (linkAbgelaufen || andereAdresse);
 
   const workflowSteps: import("@/components/process-workflow-stepper").WorkflowStep[] = [
     {
@@ -1007,6 +1109,8 @@ function TabOverview({
       description: "Vorgesetzter fuellt Vertragsdetails aus",
       status: supervisorDone ? "completed" : !fragebogenDone ? "upcoming" : "active",
       info: supervisorDone ? undefined
+        : supervisorLinkExists && linkAbgelaufen
+        ? `Link abgelaufen am ${formatDate(data.supervisorTokenExpiresAt)} — bitte neuen Link erzeugen`
         : supervisorLinkExists && supervisorStarted
         ? `Modalitaeten in Bearbeitung (Schritt ${data.supervisorData?.currentStep || 1} von 5)`
         : supervisorLinkExists
@@ -1015,7 +1119,11 @@ function TabOverview({
         ? "Vorgesetzten-Link muss noch erstellt werden"
         : undefined,
       actions: !supervisorDone && fragebogenDone ? (
-        supervisorLinkExists && modalitaetenLink
+        // Ein abgelaufener Link hilft niemandem beim Kopieren — hier der
+        // Ausweg aus der Pruefsperre (dieselbe Route, dieselbe Adresse).
+        linkAbgelaufen && neuerLinkMoeglich
+          ? [{ label: "Neuen Vorgesetzten-Link erzeugen", onClick: generateSupervisorLink, variant: "primary" as const, disabled: !supervisorEmail.trim(), loading: generatingLink }]
+          : supervisorLinkExists && modalitaetenLink
           ? [{ label: "Modalitaeten-Link kopieren", onClick: () => { navigator.clipboard.writeText(modalitaetenLink); }, variant: "secondary" as const }]
           : [{ label: "Vorgesetzten-Link erstellen", onClick: generateSupervisorLink, variant: "primary" as const, disabled: !supervisorEmail.trim(), loading: generatingLink }]
       ) : undefined,
@@ -1137,6 +1245,21 @@ function TabOverview({
         <div className="space-y-6">
           {/* Supervisor Link Card */}
           <Card title="Vorgesetzten-Link">
+            {/* Ueber beiden Zweigen: Nach dem Erzeugen laedt die Seite neu und
+                wechselt in den „Link vorhanden"-Zweig — ein Hinweis wie „E-Mail
+                nicht versendet" muss dort noch zu sehen sein. */}
+            {linkMeldung && (
+              <p
+                role={linkMeldung.art === "fehler" ? "alert" : "status"}
+                className={`mb-3 rounded-md border px-3 py-2 text-xs ${
+                  linkMeldung.art === "fehler"
+                    ? "border-destructive/30 bg-destructive/5 text-destructive"
+                    : "border-border bg-muted text-muted-foreground"
+                }`}
+              >
+                {linkMeldung.text}
+              </p>
+            )}
             {data.supervisorToken ? (
               <div className="space-y-3">
                 <FieldRow
@@ -1150,6 +1273,12 @@ function TabOverview({
                   }
                 />
                 {data.supervisorEmail && <FieldRow label="E-Mail Vorgesetzter" value={data.supervisorEmail} />}
+                {neuerLinkMoeglich && data.supervisorTokenExpiresAt && (
+                  <FieldRow
+                    label={linkAbgelaufen ? "Link abgelaufen am" : "Link gültig bis"}
+                    value={formatDate(data.supervisorTokenExpiresAt)}
+                  />
+                )}
                 <div className="mt-2">
                   <label className="mb-1 block text-xs font-medium text-muted-foreground">Modalitaeten-Link</label>
                   <div className="flex items-center gap-2">
@@ -1162,6 +1291,36 @@ function TabOverview({
                     {modalitaetenLink && <CopyButton text={modalitaetenLink} />}
                   </div>
                 </div>
+                {/* Neuer Link: bei abgelaufenem Link oder anderer Adresse. Die
+                    Route ersetzt den Token; was die Fuehrungskraft schon
+                    eingetragen hat, bleibt stehen. */}
+                {neuerLinkMoeglich && (
+                  <div className="space-y-2 border-t border-border pt-3">
+                    <p className={`text-xs ${linkAbgelaufen ? "text-destructive" : "text-muted-foreground"}`}>
+                      {linkAbgelaufen
+                        ? "Der Link ist abgelaufen – die Führungskraft kann damit nichts mehr absenden. Erzeugen Sie einen neuen Link; bereits eingetragene Angaben bleiben erhalten."
+                        : "Falscher Empfänger? Mit einer anderen Adresse wird ein neuer Link erzeugt, der bisherige wird damit ungültig."}
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        aria-label="E-Mail der Führungskraft"
+                        value={supervisorEmail}
+                        onChange={(e) => setSupervisorEmail(e.target.value)}
+                        placeholder="vorgesetzter@einrichtung.de"
+                        className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-credo-blau focus:ring-1 focus:ring-credo-blau"
+                        onKeyDown={(e) => e.key === "Enter" && neuenLinkErzeugenAktiv && generateSupervisorLink()}
+                      />
+                      <button
+                        onClick={generateSupervisorLink}
+                        disabled={generatingLink || !neuenLinkErzeugenAktiv}
+                        className="shrink-0 rounded-md bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
+                      >
+                        {generatingLink ? "..." : "Neuen Link erzeugen"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -1223,7 +1382,9 @@ function TabOverview({
                   data.supervisorData?.isComplete
                     ? "Fertig"
                     : data.supervisorToken
-                      ? "Ausstehend"
+                      ? linkAbgelaufen
+                        ? "Link abgelaufen"
+                        : "Ausstehend"
                       : "Kein Link"
                 }
                 done={data.supervisorData?.isComplete ?? false}
@@ -1735,19 +1896,21 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
 // =============================================
 
 /**
- * Statuswerte, ab denen der Fragebogen als abgegeben gilt.
+ * HR-Status, bei denen der Fragebogen auch ohne Zeitstempel als abgegeben gilt.
  *
- * `submittedAt` ist der eigentliche Anker, aber nicht der einzige: Vorgaenge
- * aus der Zeit vor dem Zeitstempel tragen ihn nicht, und genau die
- * Bestandsakten sind der Grund fuer den Kasten unten.
+ * Anker ist die eigene Spur der Person (`mitarbeiterAbgesendet`:
+ * `submittedAt`, Altfall `personalData.isComplete`). Die geprueften und
+ * abgeschlossenen Bestandsakten stehen zusaetzlich hier, weil der Kasten unten
+ * gerade fuer sie gebaut wurde.
+ *
+ * SUBMITTED, SUPERVISOR_PENDING und SUPERVISOR_SUBMITTED stehen hier NICHT
+ * mehr: Seit Fragebogen und Modalitaeten parallel laufen, konnte der Status
+ * „Vorgesetzter fertig" lauten, waehrend die Person noch in Schritt 4 sass —
+ * und der Kasten mahnte bei HR Nachweise an, die die Person gerade selbst
+ * hochlaedt. Ein Link-Status ohne Zeitstempel ist ein festhaengender Vorgang,
+ * den die Heil-Migration (ONBOARDING_PARALLELE_SPUREN_V1) zuruecksetzt.
  */
-const ABGEGEBENE_STATUS: readonly string[] = [
-  "SUBMITTED",
-  "SUPERVISOR_PENDING",
-  "SUPERVISOR_SUBMITTED",
-  "REVIEWED",
-  "COMPLETED",
-];
+const ABGEGEBENE_STATUS: readonly string[] = ["REVIEWED", "COMPLETED"];
 
 /**
  * Der Kasten „Offene Nachweise" — die einzige Stelle, an der HR ueberhaupt
@@ -1803,7 +1966,7 @@ export function OffeneNachweiseKasten({
 }) {
   const pd = data.personalData;
   const abgegeben =
-    data.submittedAt !== null || ABGEGEBENE_STATUS.includes(data.status);
+    mitarbeiterAbgesendet(data) || ABGEGEBENE_STATUS.includes(data.status);
 
   const offen = abgegeben
     ? fehlendeNachreichbareDokumente({
@@ -2770,22 +2933,52 @@ function TabChecklist({
 // Tab 4: Vorgesetzter (Einstellungsmodalitaeten)
 // =============================================
 
+/**
+ * Leiste mit dem Modalitaeten-Link im Reiter „Vorgesetzter".
+ *
+ * Ist der Link abgelaufen (und die Modalitaeten noch offen), steht statt
+ * „Kopieren" der Hinweis, wo ein neuer entsteht: Ein abgelaufener Link hilft
+ * der Fuehrungskraft nicht mehr, und ohne neuen Link bleibt die Pruefung
+ * gesperrt (`bereitZurPruefung`).
+ */
+function ModalitaetenLinkLeiste({
+  link,
+  abgelaufenAm,
+}: {
+  link: string;
+  abgelaufenAm: string | null;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-[#009AC6]/30 bg-[#009AC6]/5 p-4">
+      <LinkIcon className="h-5 w-5 text-[#009AC6]" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-foreground">Modalitaeten-Formular</p>
+        <p className="truncate text-xs text-muted-foreground">{link}</p>
+        {abgelaufenAm && (
+          <p className="mt-1 text-xs text-destructive">
+            Link abgelaufen am {abgelaufenAm}. Einen neuen Link erzeugen Sie im Reiter
+            „Übersicht“ unter „Vorgesetzten-Link“.
+          </p>
+        )}
+      </div>
+      {!abgelaufenAm && <CopyButton text={link} label="Link kopieren" />}
+    </div>
+  );
+}
+
 function TabSupervisor({ data, appUrl }: { data: DetailData; appUrl: string }) {
   const sd = data.supervisorData;
   const modalitaetenLink = data.supervisorToken ? `${appUrl}/modalitaeten/${data.supervisorToken}` : null;
+  const abgelaufenAm =
+    !vorgesetzteAbgesendet(data) && vorgesetztenLinkAbgelaufen(data)
+      ? formatDate(data.supervisorTokenExpiresAt)
+      : null;
 
   if (!sd || (!sd.isComplete && sd.currentStep === 0 && !sd.betriebsstaette)) {
     return (
       <div className="space-y-4">
         {modalitaetenLink && (
-          <div className="flex items-center gap-3 rounded-xl border border-[#009AC6]/30 bg-[#009AC6]/5 p-4">
-            <LinkIcon className="h-5 w-5 text-[#009AC6]" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">Modalitaeten-Formular</p>
-              <p className="truncate text-xs text-muted-foreground">{modalitaetenLink}</p>
-            </div>
-            <CopyButton text={modalitaetenLink} label="Link kopieren" />
-          </div>
+          <ModalitaetenLinkLeiste link={modalitaetenLink} abgelaufenAm={abgelaufenAm} />
         )}
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card py-16">
           <svg className="mb-4 h-16 w-16 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -2804,21 +2997,14 @@ function TabSupervisor({ data, appUrl }: { data: DetailData; appUrl: string }) {
     <div className="space-y-6">
       {/* Link bar */}
       {modalitaetenLink && (
-        <div className="flex items-center gap-3 rounded-xl border border-[#009AC6]/30 bg-[#009AC6]/5 p-4">
-          <LinkIcon className="h-5 w-5 text-[#009AC6]" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">Modalitaeten-Formular</p>
-            <p className="truncate text-xs text-muted-foreground">{modalitaetenLink}</p>
-          </div>
-          <CopyButton text={modalitaetenLink} label="Link kopieren" />
-        </div>
+        <ModalitaetenLinkLeiste link={modalitaetenLink} abgelaufenAm={abgelaufenAm} />
       )}
 
       {/* Sektion 1: Stelle & Vertrag */}
       <Card title="Stelle & Vertrag">
         <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
-          <FieldRow label="Betriebsstaette" value={sd.betriebsstaette} />
-          <FieldRow label="Stellenbeschreibung" value={sd.stellenbeschreibung} />
+          <FieldRow label="Betriebsstätte" value={sd.betriebsstaette} />
+          <FieldRow label={FELD_BEZEICHNUNGEN.stellenbeschreibung} value={sd.stellenbeschreibung} />
           <FieldRow label="Vertragsbeginn" value={formatDate(sd.vertragsbeginn)} />
           <FieldRow label="Befristet" value={formatBoolean(sd.befristet)} />
           {sd.befristet && (

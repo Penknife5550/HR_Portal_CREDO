@@ -132,6 +132,71 @@ describe("API /api/cron/civil-service-deadlines POST", () => {
       expect(payload.warnings).toHaveLength(1);
     });
 
+    it("liefert der Mail die einzelnen Hinweise — dringendste zuerst, maskiert und mit deutscher Stufe", async () => {
+      // Zwei Hinweise aus verschiedenen Pruefungen: Die Vorwarnung (Amtsarzt,
+      // Block A) entsteht im Cron VOR der ueberfaelligen BR-Genehmigung
+      // (Block D). In der Mail muss die Ueberfaellige trotzdem oben stehen.
+      mockPrisma.civilServiceDocument.findMany.mockImplementation(
+        async ({ where }: { where: { documentType?: unknown } }) => {
+          if (
+            where.documentType &&
+            typeof where.documentType === "object" &&
+            "in" in where.documentType
+          ) {
+            return [
+              {
+                id: "doc-a",
+                documentType: "AMTSARZT_PROBE",
+                expiresAt: new Date(Date.now() + 45 * 86400000),
+                process: {
+                  id: "psi-a",
+                  displayId: "PSI-2026-FES-001",
+                  employeeFirstName: "Anna",
+                  employeeLastName: "<Lehrerin>",
+                },
+              },
+            ];
+          }
+          return [
+            {
+              id: "doc-br",
+              documentType: "BR_ANTRAG_PROBE",
+              uploadedAt: new Date(Date.now() - 70 * 86400000),
+              process: {
+                id: "psi-b",
+                displayId: "PSI-2026-FES-002",
+                employeeFirstName: "Bernd",
+                employeeLastName: "Beispiel",
+                documents: [],
+              },
+            },
+          ];
+        }
+      );
+
+      const res = await POST(createRequest(`Bearer ${TEST_SECRET}`));
+      expect(res.status).toBe(200);
+
+      const payload = mockTriggerWebhooks.mock.calls[0][1];
+      expect(payload.warnings.map((w: { displayId: string }) => w.displayId)).toEqual([
+        "PSI-2026-FES-002",
+        "PSI-2026-FES-001",
+      ]);
+      expect(payload).toMatchObject({
+        topSeverity: "OVERDUE",
+        hoechste_dringlichkeit: "Überfällig",
+        anzahl_vorgaenge: 2,
+        anzahl_ueberfaellig: 1,
+        anzahl_vorwarnung: 1,
+        weitere_warnungen: "",
+      });
+      const zeilen = payload.warnungen_liste.split("\n");
+      expect(zeilen[0]).toMatch(/^- \[Überfällig\] PSI-2026-FES-002 · Bernd Beispiel: BR-Genehmigung überfällig\. BR-Antrag eingereicht am \d{2}\.\d{2}\.\d{4}/);
+      expect(payload.warnungen_liste).toContain("[Vorwarnung] PSI-2026-FES-001 · Anna <Lehrerin>");
+      expect(payload.warnungen_liste_html).toContain("Anna &lt;Lehrerin&gt;");
+      expect(payload.warnungen_liste_html).toContain("/dashboard/civil-service/psi-b");
+    });
+
     it("sollte truncated=true setzen wenn mehr als 50 Warnungen", async () => {
       // 60 abgelaufene Amtsarzt-Dokumente erzeugen 60 OVERDUE-Warnungen
       const fakeDocs = Array.from({ length: 60 }, (_, i) => ({

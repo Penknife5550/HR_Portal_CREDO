@@ -18,6 +18,12 @@ import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import { DEPARTMENT_KEYS, DEPARTMENT_LABELS } from "@/lib/constants";
 import { EVENT_GROUP_ORDER } from "@/lib/events";
+import {
+  EREIGNIS_GRUPPEN,
+  ereignisOption,
+  ereignisOptionLabel,
+  type EreignisOption,
+} from "@/lib/ereignis-liste";
 
 // =============================================
 // Typen
@@ -75,6 +81,11 @@ interface EmailTemplate {
   group: string;
   recipientHint: string;
   wired: boolean;
+  /** "db" = gespeicherte Fassung gilt, "default" = Standardtext aus dem Code */
+  source?: "db" | "default";
+  /** Gespeicherter Text (Betreff/HTML/Plaintext) weicht vom aktuellen Standard ab */
+  weichtVomStandardAb?: boolean;
+  updatedAt?: string;
 }
 
 interface DepartmentConfig {
@@ -95,59 +106,10 @@ interface OrganizationOption {
 // =============================================
 // Konstanten
 // =============================================
-const WEBHOOK_EVENTS = [
-  // Onboarding
-  { value: "onboarding-created", label: "Onboarding erstellt", group: "Onboarding" },
-  { value: "questionnaire-completed", label: "Fragebogen eingereicht", group: "Onboarding" },
-  { value: "supervisor-link-created", label: "Vorgesetzten-Link erstellt", group: "Onboarding" },
-  { value: "supervisor-completed", label: "Modalitäten eingereicht", group: "Onboarding" },
-  { value: "employee-reminder", label: "Erinnerung Mitarbeiter", group: "Onboarding" },
-  { value: "supervisor-reminder", label: "Erinnerung Vorgesetzter", group: "Onboarding" },
-  // Offboarding
-  { value: "offboarding-created", label: "Offboarding erstellt", group: "Offboarding" },
-  { value: "offboarding-department-assigned", label: "Abteilung zugewiesen", group: "Offboarding" },
-  { value: "offboarding-task-completed", label: "Aufgabe erledigt", group: "Offboarding" },
-  { value: "offboarding-department-completed", label: "Abteilung fertig", group: "Offboarding" },
-  { value: "offboarding-task-overdue", label: "Aufgabe überfällig", group: "Offboarding" },
-  { value: "offboarding-reminder", label: "Reminder gesendet", group: "Offboarding" },
-  { value: "offboarding-completed", label: "Offboarding abgeschlossen", group: "Offboarding" },
-  { value: "exit-interview-invited", label: "Exit-Interview versendet", group: "Offboarding" },
-  { value: "exit-interview-submitted", label: "Exit-Interview ausgefüllt", group: "Offboarding" },
-  { value: "zeugnis-bewertung-invited", label: "Zeugnis-Bewertung versendet", group: "Offboarding" },
-  { value: "zeugnis-bewertung-submitted", label: "Zeugnis-Bewertung eingereicht", group: "Offboarding" },
-  // Verbeamtung
-  { value: "psi-created", label: "Verbeamtung angelegt", group: "Verbeamtung" },
-  { value: "psi-assessment-requested", label: "Beurteilung angefordert", group: "Verbeamtung" },
-  { value: "psi-assessment-completed", label: "Beurteilung eingegangen", group: "Verbeamtung" },
-  { value: "psi-assessment-released", label: "Beurteilung zur Bekanntgabe", group: "Verbeamtung" },
-  { value: "psi-assessment-acknowledged", label: "Beurteilung quittiert", group: "Verbeamtung" },
-  { value: "psi-assessment-archived", label: "Beurteilung in Personalakte", group: "Verbeamtung" },
-  { value: "psi-phase-completed", label: "Phase abgeschlossen", group: "Verbeamtung" },
-  { value: "psi-deadline-warning", label: "Frist-Warnung", group: "Verbeamtung" },
-  { value: "psi-completed", label: "Verbeamtung abgeschlossen", group: "Verbeamtung" },
-  // Elternzeit
-  { value: "elternzeit-angelegt", label: "Elternzeit angelegt", group: "Elternzeit" },
-  { value: "elternzeit-antrag-link-versandt", label: "Vorl. Magic-Link versandt", group: "Elternzeit" },
-  { value: "elternzeit-antrag-eingereicht", label: "Vorl. Antrag eingereicht", group: "Elternzeit" },
-  { value: "elternzeit-vorl-genehmigt", label: "Vorl. genehmigt", group: "Elternzeit" },
-  { value: "elternzeit-vorl-abgelehnt", label: "Vorl. abgelehnt", group: "Elternzeit" },
-  { value: "elternzeit-leiter-link-versandt", label: "Leiter-Magic-Link versandt", group: "Elternzeit" },
-  { value: "elternzeit-leiter-genehmigt", label: "Durch Leitung genehmigt", group: "Elternzeit" },
-  { value: "elternzeit-leiter-abgelehnt", label: "Durch Leitung abgelehnt", group: "Elternzeit" },
-  { value: "elternzeit-endg-genehmigt", label: "Endg. genehmigt", group: "Elternzeit" },
-  { value: "elternzeit-endg-abgelehnt", label: "Endg. abgelehnt", group: "Elternzeit" },
-  { value: "elternzeit-br-detmold-generiert", label: "BR-Detmold-Brief generiert", group: "Elternzeit" },
-  { value: "elternzeit-vbl-generiert", label: "VBL-Info-Brief generiert", group: "Elternzeit" },
-  { value: "elternzeit-ag-bescheinigung-generiert", label: "AG-Bescheinigung generiert", group: "Elternzeit" },
-  { value: "elternzeit-br-genehmigung-eingegangen", label: "BR-Genehmigung eingegangen", group: "Elternzeit" },
-  { value: "elternzeit-frist-eskaliert", label: "Frist eskaliert (Cron)", group: "Elternzeit" },
-  // Mutterschutz
-  { value: "mutterschutz-angelegt", label: "Mutterschutz angelegt", group: "Mutterschutz" },
-  { value: "mutterschutz-bad-beauftragt", label: "BAD beauftragt", group: "Mutterschutz" },
-  { value: "mutterschutz-bad-abgeschlossen", label: "BAD abgeschlossen", group: "Mutterschutz" },
-  { value: "mutterschutz-aktiviert", label: "Mutterschutz aktiviert", group: "Mutterschutz" },
-  { value: "mutterschutz-beendet", label: "Mutterschutz beendet", group: "Mutterschutz" },
-];
+// Die Ereignisliste fuer Webhooks und Versandprotokoll stand hier frueher als
+// hart kodierte Liste (WEBHOOK_EVENTS) und veraltete mit jedem neuen Modul.
+// Sie kommt jetzt aus dem Event-Katalog: EREIGNIS_GRUPPEN in
+// src/lib/ereignis-liste.ts.
 
 const AUTH_TYPES = [
   { value: "none", label: "Keine Authentifizierung" },
@@ -156,9 +118,25 @@ const AUTH_TYPES = [
   { value: "basic", label: "Basic Auth (Benutzername / Passwort)" },
 ];
 
-const EVENT_LABELS: Record<string, string> = Object.fromEntries(
-  WEBHOOK_EVENTS.map((e) => [e.value, e.label])
-);
+/**
+ * Optionen der Ereignis-Auswahl, gruppiert wie im Katalog. Geteilt von
+ * Webhook-Dialog und Versandprotokoll, damit beide dieselbe Liste zeigen.
+ */
+function EreignisOptgroups() {
+  return (
+    <>
+      {EREIGNIS_GRUPPEN.map(({ group, events }) => (
+        <optgroup key={group} label={group}>
+          {events.map((ev) => (
+            <option key={ev.value} value={ev.value}>
+              {ereignisOptionLabel(ev)}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </>
+  );
+}
 
 // =============================================
 // Haupt-Komponente
@@ -329,30 +307,56 @@ function WebhooksTab() {
     }
   }
 
-  // Webhooks nach Prozess-Gruppe und dann Event gruppieren
-  const groups = [
-    "Onboarding",
-    "Offboarding",
-    "Verbeamtung",
-    "Elternzeit",
-    "Mutterschutz",
-  ] as const;
+  // Webhooks nach Prozess-Gruppe und dann Event gruppieren. Gruppen und
+  // Events kommen aus dem Event-Katalog (EREIGNIS_GRUPPEN), damit jedes neue
+  // Ereignis hier von selbst erscheint.
+  //
+  // Webhooks auf Events AUSSERHALB des Katalogs — Altlasten der frueher hart
+  // kodierten Liste (z.B. exit-interview-submitted) oder frei eingegebene
+  // Namen — bekommen eine eigene Gruppe. Das Portal loest sie nie aus, aber
+  // ohne diese Gruppe waeren sie unsichtbar und liessen sich weder bearbeiten
+  // noch loeschen.
+  const UNBEKANNT = "Unbekannte Ereignisse";
   const groupColors: Record<string, string> = {
     Onboarding: "bg-credo-blau/10 text-credo-blau",
     Offboarding: "bg-credo-gruen/10 text-credo-gruen",
+    Vertragsende: "bg-orange-100 text-orange-800",
+    "Exit-Interview": "bg-teal-100 text-teal-800",
     Verbeamtung: "bg-purple-100 text-purple-800",
     Elternzeit: "bg-credo-gelb/20 text-foreground",
     Mutterschutz: "bg-credo-rot/10 text-credo-rot",
+    [UNBEKANNT]: "bg-gray-200 text-gray-700",
   };
+
+  type EreignisZeile = Pick<EreignisOption, "value" | "label" | "wired" | "webhookHinweis">;
+  const unbekannteEvents = [...new Set(webhooks.map((w) => w.event))]
+    .filter((event) => !ereignisOption(event))
+    .sort();
+  const abschnitte: { group: string; events: EreignisZeile[] }[] = [
+    ...EREIGNIS_GRUPPEN,
+    ...(unbekannteEvents.length > 0
+      ? [
+          {
+            group: UNBEKANNT,
+            events: unbekannteEvents.map((event) => ({
+              value: event,
+              label: "Nicht im Event-Katalog",
+              wired: false,
+              webhookHinweis: null,
+            })),
+          },
+        ]
+      : []),
+  ];
 
   // Filter anwenden: filterGroup + Suchtext (Label oder Event-Name)
   const filterTextLower = filterText.trim().toLowerCase();
-  const grouped = groups
-    .filter((g) => filterGroup === "ALLE" || filterGroup === g)
-    .map((group) => ({
-      group,
-      color: groupColors[group],
-      events: WEBHOOK_EVENTS.filter((ev) => ev.group === group)
+  const grouped = abschnitte
+    .filter((a) => filterGroup === "ALLE" || filterGroup === a.group)
+    .map((abschnitt) => ({
+      group: abschnitt.group,
+      color: groupColors[abschnitt.group] ?? "bg-muted text-muted-foreground",
+      events: abschnitt.events
         .filter((ev) =>
           filterTextLower
             ? ev.label.toLowerCase().includes(filterTextLower) ||
@@ -362,6 +366,8 @@ function WebhooksTab() {
         .map((ev) => ({
           event: ev.value,
           label: ev.label,
+          wired: ev.wired,
+          webhookHinweis: ev.webhookHinweis,
           webhooks: webhooks.filter((w) => w.event === ev.value),
         })),
     }))
@@ -406,9 +412,9 @@ function WebhooksTab() {
           className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
         >
           <option value="ALLE">Alle Gruppen</option>
-          {groups.map((g) => (
-            <option key={g} value={g}>
-              {g}
+          {abschnitte.map((a) => (
+            <option key={a.group} value={a.group}>
+              {a.group}
             </option>
           ))}
         </select>
@@ -440,6 +446,12 @@ function WebhooksTab() {
                 {section.events.reduce((sum, ev) => sum + ev.webhooks.length, 0)} Webhook{section.events.reduce((sum, ev) => sum + ev.webhooks.length, 0) !== 1 ? "s" : ""} konfiguriert
               </span>
             </div>
+            {section.group === UNBEKANNT && (
+              <p className="text-xs text-muted-foreground">
+                Diese Ereignisse stehen nicht im Event-Katalog – das Portal löst sie nie aus. Die
+                Webhooks bleiben hier sichtbar, damit Sie sie bearbeiten oder löschen können.
+              </p>
+            )}
 
             {section.events.map((group) => (
           <div key={group.event} className="overflow-hidden rounded-lg border bg-card">
@@ -450,30 +462,43 @@ function WebhooksTab() {
                 <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
                   {group.event}
                 </span>
+                {!group.wired && (
+                  <span
+                    className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700"
+                    title="Das Ereignis ist definiert, wird aber von keiner Stelle im Portal ausgelöst."
+                  >
+                    Wird nie ausgelöst
+                  </span>
+                )}
+                {group.webhookHinweis && (
+                  <p className="mt-1 text-xs text-amber-800">{group.webhookHinweis}</p>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="text-xs text-muted-foreground">
                   {group.webhooks.length} Webhook{group.webhooks.length !== 1 ? "s" : ""}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditWebhook(null);
-                    setPrefillEvent(group.event);
-                    setShowModal(true);
-                  }}
-                  className="rounded-md border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/5"
-                  title={`Neuen Webhook für Event '${group.event}' anlegen`}
-                >
-                  + Webhook
-                </button>
+                {section.group !== UNBEKANNT && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditWebhook(null);
+                      setPrefillEvent(group.event);
+                      setShowModal(true);
+                    }}
+                    className="rounded-md border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                    title={`Neuen Webhook für Event '${group.event}' anlegen`}
+                  >
+                    + Webhook
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Webhook-Einträge */}
             {group.webhooks.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">
-                Kein Webhook konfiguriert – Event wird nicht ausgelöst.
+                Kein Webhook konfiguriert. Der E-Mail-Versand läuft unabhängig davon.
               </p>
             ) : (
               <div className="divide-y">
@@ -1002,6 +1027,14 @@ function StatusTab({ onConfigureSmtp }: { onConfigureSmtp: () => void }) {
                         Standard-Vorlage
                       </span>
                     )}
+                    {e.templateSource === "db" && (
+                      <span
+                        className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800"
+                        title="In den Einstellungen gespeicherte Fassung – neue Standardtexte kommen hier nur nach „Text auf Standard zurücksetzen“ an."
+                      >
+                        Angepasst
+                      </span>
+                    )}
                     {e.webhookCount > 0 && (
                       <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
                         +{e.webhookCount} Webhook{e.webhookCount > 1 ? "s" : ""}
@@ -1329,9 +1362,7 @@ function ProtokollTab() {
           className={`${inputClass} w-auto max-w-xs`}
         >
           <option value="">Alle Events</option>
-          {WEBHOOK_EVENTS.map((ev) => (
-            <option key={ev.value} value={ev.value}>{ev.label}</option>
-          ))}
+          <EreignisOptgroups />
         </select>
         <button
           onClick={loadLogs}
@@ -1437,14 +1468,24 @@ function VorlagenTab({ userEmail }: { userEmail: string }) {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [filter, setFilter] = useState<"alle" | "kein-empfaenger" | "deaktiviert" | "aktiv">("alle");
   const [search, setSearch] = useState("");
+  /** ID der Vorlage, deren Text gerade zurueckgesetzt wird (sperrt den Knopf) */
+  const [zuruecksetzenId, setZuruecksetzenId] = useState<string | null>(null);
+
+  // Liste laden — beim Oeffnen des Reiters und nach Speichern/Zuruecksetzen.
+  // Die Kennzeichen „Angepasst“ und „weicht vom Standard ab“ berechnet der
+  // Server; neu laden statt lokal nachbilden, damit sie nie auseinanderlaufen.
+  const laden = useCallback(async () => {
+    const res = await fetch("/api/settings/email-templates");
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(json?.error ?? "Vorlagen konnten nicht geladen werden");
+    setTemplates(json?.data ?? []);
+  }, []);
 
   useEffect(() => {
-    fetch("/api/settings/email-templates")
-      .then((r) => r.json())
-      .then((d) => setTemplates(d.data ?? []))
+    laden()
       .catch(() => setError("Vorlagen konnten nicht geladen werden"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [laden]);
 
   useAutoHide(success, setSuccess, 4000);
   useAutoHide(error, setError, 6000);
@@ -1508,10 +1549,65 @@ function VorlagenTab({ userEmail }: { userEmail: string }) {
       setTemplates((prev) => prev.map((t) => (t.event === template.event ? { ...t, ...updated } : t)));
       setExpanded(null);
       setSuccess(`Vorlage "${template.name}" gespeichert`);
+      // Danach frisch laden: Aus einer Standard-Vorlage ist jetzt eine
+      // gespeicherte Fassung geworden, und ob sie vom Standard abweicht, weiss
+      // nur der Server. Scheitert das, bleibt der gemergte Stand von oben.
+      laden().catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
     } finally {
       setSaving(false);
+    }
+  }
+
+  /**
+   * Setzt NUR Betreff, HTML-Body und Plaintext auf den aktuellen Standardtext
+   * zurueck. Empfaenger und Aktiv-Schalter bleiben — HR-interne Ereignisse
+   * haben keinen Empfaenger-Default und blieben ohne ihr An-Feld liegen.
+   */
+  async function handleReset(template: EmailTemplate) {
+    const bestaetigt = confirm(
+      `Text der Vorlage „${template.name}“ auf den aktuellen Standard zurücksetzen?\n\n` +
+        "Betreff, HTML-Body und Plaintext werden durch den Standardtext ersetzt. Ihre Textanpassungen " +
+        "gehen dabei verloren (der bisherige Text bleibt im Audit-Log nachvollziehbar). Ungespeicherte " +
+        "Änderungen im Editor werden verworfen.\n\n" +
+        "Empfänger (An, CC, BCC, Antwort-Adresse) und der Aktiv-Schalter bleiben unverändert.",
+    );
+    if (!bestaetigt) return;
+
+    setZuruecksetzenId(template.id);
+    setError(null);
+    try {
+      let res: Response;
+      try {
+        res = await fetch(
+          `/api/settings/email-templates/${encodeURIComponent(template.id)}/zuruecksetzen`,
+          { method: "POST" },
+        );
+      } catch {
+        // Netzwerkfehler: fetch wirft mit englischer Browsermeldung
+        throw new Error("Zurücksetzen fehlgeschlagen: Der Server ist nicht erreichbar.");
+      }
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.error ?? `Zurücksetzen fehlgeschlagen (Fehler ${res.status}).`);
+      }
+
+      setExpanded(null);
+      setEditData({});
+      setTestResult(null);
+      setSuccess(
+        `Text der Vorlage „${template.name}“ auf Standard zurückgesetzt. Empfänger und Aktiv-Schalter sind unverändert.`,
+      );
+      try {
+        await laden();
+      } catch {
+        setError("Der Text wurde zurückgesetzt, die Liste konnte aber nicht neu geladen werden. Bitte die Seite neu laden.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Zurücksetzen fehlgeschlagen.");
+    } finally {
+      setZuruecksetzenId(null);
     }
   }
 
@@ -1590,30 +1686,94 @@ function VorlagenTab({ userEmail }: { userEmail: string }) {
             {/* Vorlage-Header */}
             <button
               onClick={() => handleExpand(template)}
-              className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/30 transition-colors"
+              className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-muted/30 transition-colors"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-foreground">{template.name}</span>
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-700">
-                  {template.event}
-                </span>
-                {!template.isActive && (
-                  <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
-                    Deaktiviert
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-foreground">{template.name}</span>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-700">
+                    {template.event}
                   </span>
-                )}
-                {!template.recipientTo && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                    Kein Empfänger
-                  </span>
+                  {template.source === "default" && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                      Standard-Vorlage
+                    </span>
+                  )}
+                  {template.source === "db" && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      Angepasst
+                    </span>
+                  )}
+                  {!template.isActive && (
+                    <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+                      Deaktiviert
+                    </span>
+                  )}
+                  {!template.recipientTo && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      Kein Empfänger
+                    </span>
+                  )}
+                </div>
+                {template.source === "db" && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {template.updatedAt
+                      ? `Gespeichert am ${new Date(template.updatedAt).toLocaleDateString("de-DE", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}`
+                      : "Gespeicherte Fassung"}
+                    {template.weichtVomStandardAb && (
+                      <span className="text-amber-800">
+                        {" · "}Der Standardtext weicht von Ihrer gespeicherten Fassung ab.
+                      </span>
+                    )}
+                  </p>
                 )}
               </div>
-              <span className="text-muted-foreground text-sm">{isOpen ? "▲ Schließen" : "▼ Bearbeiten"}</span>
+              <span className="shrink-0 text-muted-foreground text-sm">{isOpen ? "▲ Schließen" : "▼ Bearbeiten"}</span>
             </button>
 
             {/* Editor */}
             {isOpen && (
               <div className="border-t p-5 space-y-4">
+                {/* Gespeicherte Fassung vs. Standardtext. Nur bei DB-Vorlagen:
+                    Ohne gespeicherte Fassung gilt der Standard ohnehin. */}
+                {template.source === "db" && (
+                  <div
+                    className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 ${
+                      template.weichtVomStandardAb
+                        ? "border-amber-300 bg-amber-50"
+                        : "border-border bg-muted/40"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1 text-sm">
+                      {template.weichtVomStandardAb ? (
+                        <p className="font-medium text-amber-900">
+                          Der Standardtext weicht von Ihrer gespeicherten Fassung ab.
+                        </p>
+                      ) : (
+                        <p className="text-foreground">
+                          Ihre gespeicherte Fassung entspricht dem aktuellen Standardtext.
+                        </p>
+                      )}
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Solange diese Fassung gespeichert ist, kommen neue Standardtexte aus Updates hier
+                        nicht an. Beim Zurücksetzen bleiben Empfänger und Aktiv-Schalter erhalten.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleReset(template)}
+                      disabled={zuruecksetzenId !== null || saving}
+                      className="shrink-0 rounded-lg border border-amber-400 bg-card px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                    >
+                      {zuruecksetzenId === template.id ? "Wird zurückgesetzt..." : "Text auf Standard zurücksetzen"}
+                    </button>
+                  </div>
+                )}
+
                 {/* Verfügbare Variablen */}
                 <div className="rounded-lg bg-muted/50 p-3">
                   <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase">
@@ -1769,7 +1929,7 @@ function VorlagenTab({ userEmail }: { userEmail: string }) {
                   </button>
                   <button
                     onClick={() => handleSave(template)}
-                    disabled={saving}
+                    disabled={saving || zuruecksetzenId !== null}
                     className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
                     {saving ? "Wird gespeichert..." : "Vorlage speichern"}
@@ -1849,16 +2009,29 @@ function WebhookModal({
 
           {/* Event */}
           <FormField label="Event" required>
-            <select value={form.event ?? ""} onChange={(e) => upd("event", e.target.value)} className={inputClass}>
-              {WEBHOOK_EVENTS.map((ev) => (
-                <option key={ev.value} value={ev.value}>{ev.label}</option>
-              ))}
+            {/* Ein Event ausserhalb des Katalogs (Altlast oder frei eingegeben)
+                zeigt die Auswahl als „Freies Event“ — sonst stuende dort
+                optisch der erste Eintrag, gespeichert bliebe aber der alte Name. */}
+            <select
+              value={ereignisOption(form.event) ? form.event : ""}
+              onChange={(e) => upd("event", e.target.value)}
+              className={inputClass}
+            >
+              <EreignisOptgroups />
               <option value="">── Freies Event (eigenen Namen eingeben) ──</option>
             </select>
+            {ereignisOption(form.event)?.webhookHinweis && (
+              <p className="mt-1 text-xs text-amber-800">{ereignisOption(form.event)?.webhookHinweis}</p>
+            )}
+            {ereignisOption(form.event)?.wired === false && (
+              <p className="mt-1 text-xs text-amber-800">
+                Dieses Ereignis wird derzeit von keiner Stelle im Portal ausgelöst – der Webhook würde nie aufgerufen.
+              </p>
+            )}
           </FormField>
 
-          {/* Falls kein Standard-Event */}
-          {!WEBHOOK_EVENTS.find((e) => e.value === form.event) && (
+          {/* Falls kein Katalog-Event */}
+          {!ereignisOption(form.event) && (
             <FormField label="Event-Name (frei)" required>
               <input
                 type="text"

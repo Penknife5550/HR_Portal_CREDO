@@ -19,8 +19,11 @@ export const STATUS_LABELS: Record<string, { label: string; color: string }> = {
     label: "Vorgesetzter offen",
     color: "bg-[var(--color-status-supervisor-pending)]/15 text-[var(--color-status-supervisor-pending)]",
   },
+  // Seit dem parallelen Ablauf (09/2026) heisst der Status wirklich „beides
+  // eingereicht" (gesamtStatus in src/lib/onboarding-spuren.ts). „Vorgesetzter
+  // fertig" stand frueher auch dann da, wenn der Fragebogen noch fehlte.
   SUPERVISOR_SUBMITTED: {
-    label: "Vorgesetzter fertig",
+    label: "Bereit zur Prüfung",
     color: "bg-[var(--color-status-supervisor-submitted)]/15 text-[var(--color-status-supervisor-submitted)]",
   },
   REVIEWED: { label: "Geprüft", color: "bg-[var(--color-status-reviewed)]/15 text-[var(--color-status-reviewed)]" },

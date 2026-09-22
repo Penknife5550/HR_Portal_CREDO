@@ -419,30 +419,51 @@ export function OffboardingDetailContent({
   };
 
   // ---- Department Link actions ----
+  //
+  // Beide Aktionen pruefen die Antwort. Vorher riefen sie fetch auf und
+  // luden danach neu — egal, was zurueckkam. Ein 404 oder 500 sah im Portal
+  // aus wie ein Erfolg, und genau so blieb die kaputte Erinnerung (siehe
+  // sendReminder) unbemerkt.
   const sendDepartmentLinks = async () => {
     setSendingLinks(true);
     try {
-      await fetch(`/api/offboarding/${offboardingId}/department-links`, {
+      const res = await fetch(`/api/offboarding/${offboardingId}/department-links`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Abteilungs-Links konnten nicht versendet werden.");
+        return;
+      }
       await loadData();
     } catch {
-      setActionError("Abteilungs-Links konnten nicht generiert werden.");
+      setActionError("Verbindungsfehler beim Versenden der Abteilungs-Links.");
     } finally {
       setSendingLinks(false);
     }
   };
 
+  // Die Erinnerung laeuft ueber dieselbe Route wie das Versenden, mit
+  // { action: "remind", departmentKey } im Body. Die hier frueher
+  // aufgerufene Route .../department-links/<key>/reminder hat es nie
+  // gegeben — der Knopf hat nie eine Erinnerung verschickt.
   const sendReminder = async (departmentKey: string) => {
     setSendingReminder(departmentKey);
     try {
-      await fetch(`/api/offboarding/${offboardingId}/department-links/${departmentKey}/reminder`, {
+      const res = await fetch(`/api/offboarding/${offboardingId}/department-links`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remind", departmentKey }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Erinnerung konnte nicht gesendet werden.");
+        return;
+      }
       await loadData();
     } catch {
-      setActionError("Reminder konnte nicht gesendet werden.");
+      setActionError("Verbindungsfehler beim Senden der Erinnerung.");
     } finally {
       setSendingReminder(null);
     }

@@ -44,7 +44,8 @@ const STATUS_LABELS: Record<string, string> = {
   IN_PROGRESS: "In Bearbeitung",
   SUBMITTED: "Eingereicht",
   SUPERVISOR_PENDING: "Vorges. offen",
-  SUPERVISOR_SUBMITTED: "Vorges. fertig",
+  // Kurzform von „Bereit zur Prüfung" (STATUS_LABELS in src/lib/constants.ts).
+  SUPERVISOR_SUBMITTED: "Bereit z. Prüfung",
   REVIEWED: "Geprüft",
   COMPLETED: "Abgeschlossen",
   EXPIRED: "Abgelaufen",

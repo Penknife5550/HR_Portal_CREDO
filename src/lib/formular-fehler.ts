@@ -142,7 +142,20 @@ export const FELD_BEZEICHNUNGEN: Record<string, string> = {
 
   // --- Einstellungsmodalitaeten: Stelle und Vertrag ---
   betriebsstaette: "Betriebsstätte",
-  stellenbeschreibung: "Stellenbeschreibung",
+  // ZENTRALE QUELLE fuer den Begriff „Stellenbezeichnung" (seit 09/2026).
+  // Formular-Label und Zusammenfassung der Modalitaeten, Pflichtmeldung,
+  // HR-Ansicht, PDF-Personalakte, Registry des Vertragsdaten-Formulars
+  // (Vertragsende) und der Variablenkatalog der Brief-Vorlagen lesen ihn von
+  // hier — so kann der Begriff nicht wieder an einzelnen Stellen
+  // auseinanderlaufen. Die Datei hat keine Importe und ist damit client-sicher.
+  //
+  // Der Schluessel heisst BEWUSST weiter `stellenbeschreibung`: So heissen
+  // Datenbankspalte, JSON-Export, Mandanten-Konfiguration und der Word-
+  // Platzhalter {stellenbeschreibung}. Eine Umbenennung der Spalte rollte
+  // `prisma db push --accept-data-loss` als DROP + ADD aus und loeschte alle
+  // Stellenangaben. Fachlich ist das Feld ein Titel („Lehrkraft fuer
+  // Mathematik und Physik"), keine Beschreibung — daher nur der UI-Begriff.
+  stellenbeschreibung: "Stellenbezeichnung",
   vertragsbeginn: "Vertragsbeginn",
   befristet: "Befristung",
   befristungsart: "Art der Befristung",

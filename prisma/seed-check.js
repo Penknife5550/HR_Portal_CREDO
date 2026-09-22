@@ -371,6 +371,26 @@ async function ensureMinijobTemplateSteps(prisma) {
   }
 }
 
+/**
+ * Steht Schritt 11 (Rentenversicherung) in dieser Konfiguration auf „an"?
+ *
+ * Aus `ensureMinijobRenteSchritt` herausgezogen (09/2026, verhaltensgleich),
+ * damit die Heilung festhaengender Vorgaenge (`migriereParalleleSpuren`)
+ * dieselbe Regel nachziehen kann statt eine zweite zu bauen.
+ */
+function renteSchrittAktiv(steps) {
+  const schritt = steps.find((s) => s.step === RENTE_SCHRITT);
+  return Boolean(schritt && schritt.enabled === true);
+}
+
+/** Schaltet ausschliesslich Schritt 11 ein — und ergaenzt ihn, falls er fehlt. */
+function aktiviereRenteSchritt(steps) {
+  const vorhanden = steps.some((s) => s.step === RENTE_SCHRITT);
+  return vorhanden
+    ? steps.map((s) => (s.step === RENTE_SCHRITT ? { ...s, enabled: true } : s))
+    : [...steps, { step: RENTE_SCHRITT, title: "Rentenversicherung", enabled: true }];
+}
+
 async function ensureMinijobRenteSchritt(prisma) {
   try {
     if (await migrationErledigt(prisma, MINIJOB_RENTE_MARKER)) return;
@@ -391,8 +411,7 @@ async function ensureMinijobRenteSchritt(prisma) {
       return;
     }
 
-    const vorhanden = steps.find((s) => s.step === RENTE_SCHRITT);
-    if (vorhanden && vorhanden.enabled === true) {
+    if (renteSchrittAktiv(steps)) {
       await markiereMigration(prisma, MINIJOB_RENTE_MARKER, {
         changed: false,
         reason: "Schritt 11 bereits aktiv",
@@ -400,9 +419,7 @@ async function ensureMinijobRenteSchritt(prisma) {
       return;
     }
 
-    const neu = vorhanden
-      ? steps.map((s) => (s.step === RENTE_SCHRITT ? { ...s, enabled: true } : s))
-      : [...steps, { step: RENTE_SCHRITT, title: "Rentenversicherung", enabled: true }];
+    const neu = aktiviereRenteSchritt(steps);
 
     // Laufende Vorgaenge tragen eine eingefrorene Kopie — ohne Nachziehen saehe
     // ein bereits eingeladener Minijobber den Schritt nicht.
@@ -423,16 +440,11 @@ async function ensureMinijobRenteSchritt(prisma) {
 
     for (const vorgang of laufende) {
       if (!Array.isArray(vorgang.formTemplateSnapshot)) continue;
-      const snap = vorgang.formTemplateSnapshot;
-      const hatSchritt = snap.find((s) => s.step === RENTE_SCHRITT);
-      if (hatSchritt && hatSchritt.enabled === true) continue;
-      const snapNeu = hatSchritt
-        ? snap.map((s) => (s.step === RENTE_SCHRITT ? { ...s, enabled: true } : s))
-        : [...snap, { step: RENTE_SCHRITT, title: "Rentenversicherung", enabled: true }];
+      if (renteSchrittAktiv(vorgang.formTemplateSnapshot)) continue;
       schreibvorgaenge.push(
         prisma.onboardingProcess.update({
           where: { id: vorgang.id },
-          data: { formTemplateSnapshot: snapNeu },
+          data: { formTemplateSnapshot: aktiviereRenteSchritt(vorgang.formTemplateSnapshot) },
         }),
       );
     }
@@ -1068,6 +1080,450 @@ async function migriereKostenstellenAufteilung(prisma) {
   }
 }
 
+// =============================================
+// Einmalige Datenmigration: Vertragsende-Label „Stellenbezeichnung"
+// =============================================
+const STELLENBEZEICHNUNG_LABEL_MARKER = "VERTRAGSENDE_LABEL_STELLENBEZEICHNUNG_V1";
+
+/** Name des Feldes in der Registry (src/lib/contract-end-fields.ts) — bleibt. */
+const STELLENBEZEICHNUNG_FELD = "stellenbeschreibung";
+
+/** Das fruehere Standard-Label der Registry, das ersetzt wird. */
+const STELLENBEZEICHNUNG_ALTES_LABEL = "Stellenbeschreibung";
+
+/**
+ * Der neue Standard. Muss `FELD_BEZEICHNUNGEN.stellenbeschreibung` in
+ * src/lib/formular-fehler.ts entsprechen — hier als reines JS dupliziert, weil
+ * im Container kein tsx verfuegbar ist. Der Test
+ * (src/__tests__/lib/stellenbezeichnung.test.ts) haelt beide zusammen.
+ */
+const STELLENBEZEICHNUNG_NEUES_LABEL = "Stellenbezeichnung";
+
+/**
+ * Entscheidet je Mandant, ob seine gespeicherte Vertragsende-Konfiguration
+ * angepasst wird.
+ *
+ * WARUM es die Migration gibt: Die Konfigurationsmaske
+ * (/mandanten/[id]/vertragsende-config) speichert beim Sichern IMMER alle
+ * Labels — auch die, die niemand angefasst hat. Bei jedem Mandanten, der die
+ * Maske einmal gespeichert hat, steht deshalb der alte Standard
+ * „Stellenbeschreibung" woertlich in `Organization.contractEndFieldConfig` und
+ * gewinnt gegen den neuen Registry-Standard. Nur die Registry zu aendern,
+ * haette bei genau diesen Mandanten nichts bewirkt.
+ *
+ * Die Regel ist bewusst eng: Ersetzt wird NUR ein Label, das getrimmt exakt
+ * dem alten Standard entspricht (also auch „Stellenbeschreibung " mit
+ * Leerzeichen, das die Maske nicht wegtrimmt). Ein eigenes Label wie
+ * „Taetigkeit" ist eine Entscheidung des Mandanten und bleibt stehen; es wird
+ * nur gemeldet, damit HR es sieht. Alle uebrigen Eintraege (andere Felder,
+ * visible/required) werden unveraendert uebernommen.
+ *
+ * Rein und ohne Datenbank, damit ein Test die Regel halten kann. Die Eingabe
+ * wird nicht veraendert — geschrieben wird eine Kopie.
+ */
+function planeStellenbezeichnungLabels(organisationen) {
+  const zuSchreiben = [];
+  const eigeneLabels = [];
+
+  for (const org of organisationen) {
+    const konfig = org.contractEndFieldConfig;
+    // null (nie gespeichert) oder kein Array: Dort greift ohnehin der neue
+    // Registry-Standard — nichts zu tun.
+    if (!Array.isArray(konfig)) continue;
+
+    let geaendert = false;
+    const neu = konfig.map((eintrag) => {
+      if (
+        !eintrag ||
+        typeof eintrag !== "object" ||
+        eintrag.name !== STELLENBEZEICHNUNG_FELD ||
+        typeof eintrag.label !== "string"
+      ) {
+        return eintrag;
+      }
+      const label = eintrag.label.trim();
+      if (label === STELLENBEZEICHNUNG_ALTES_LABEL) {
+        geaendert = true;
+        return { ...eintrag, label: STELLENBEZEICHNUNG_NEUES_LABEL };
+      }
+      // Leeres Label faellt beim Lesen auf den Registry-Standard zurueck, der
+      // neue Standard ist schon der Zielwert — beides kein eigenes Label.
+      if (label !== "" && label !== STELLENBEZEICHNUNG_NEUES_LABEL) {
+        eigeneLabels.push({
+          id: org.id,
+          mandantNumber: org.mandantNumber,
+          name: org.name,
+          label: eintrag.label,
+        });
+      }
+      return eintrag;
+    });
+
+    if (geaendert) {
+      zuSchreiben.push({
+        id: org.id,
+        mandantNumber: org.mandantNumber,
+        name: org.name,
+        contractEndFieldConfig: neu,
+      });
+    }
+  }
+
+  return { zuSchreiben, eigeneLabels };
+}
+
+/**
+ * Ersetzt in den gespeicherten Vertragsende-Konfigurationen das alte
+ * Standard-Label „Stellenbeschreibung" durch „Stellenbezeichnung".
+ *
+ * Laeuft vor dem Serverstart (entrypoint.sh), also ohne gleichzeitiges
+ * Speichern aus der Maske. Ein spaeteres Speichern schreibt ohnehin den neuen
+ * Begriff, weil die Maske ihn aus der Registry anzeigt.
+ *
+ * Idempotenz: Merker in `system_migrations`, geschrieben in DERSELBEN
+ * Transaktion wie die Updates — entweder beides oder nichts. Ein zweiter Lauf
+ * waere hier zwar folgenlos (der alte Wert ist dann weg), der Merker bleibt
+ * trotzdem, so ist es Hausstandard. Ohne Mandanten oder ohne Treffer wird er
+ * ebenfalls gesetzt: Neue Mandanten haben keine gespeicherte Konfiguration
+ * und bekommen den neuen Standard direkt aus der Registry.
+ */
+async function ensureStellenbezeichnungLabels(prisma) {
+  try {
+    if (await migrationErledigt(prisma, STELLENBEZEICHNUNG_LABEL_MARKER)) return;
+
+    const organisationen = await prisma.organization.findMany({
+      select: { id: true, mandantNumber: true, name: true, contractEndFieldConfig: true },
+    });
+
+    const { zuSchreiben, eigeneLabels } = planeStellenbezeichnungLabels(organisationen);
+
+    for (const e of eigeneLabels) {
+      console.log(
+        "Vertragsende-Label bleibt: " + e.name + " (" + e.mandantNumber + ") nutzt das eigene Label \"" +
+          e.label + "\" statt des Standards.",
+      );
+    }
+
+    const schreibvorgaenge = zuSchreiben.map((e) =>
+      prisma.organization.update({
+        where: { id: e.id },
+        data: { contractEndFieldConfig: e.contractEndFieldConfig },
+      }),
+    );
+    schreibvorgaenge.push(
+      markiereMigration(prisma, STELLENBEZEICHNUNG_LABEL_MARKER, {
+        geprueft: organisationen.length,
+        angepasst: zuSchreiben.map((e) => e.mandantNumber),
+        eigeneLabels: eigeneLabels.map((e) => ({ mandant: e.mandantNumber, label: e.label })),
+      }),
+    );
+
+    await prisma.$transaction(schreibvorgaenge);
+    console.log(
+      "Vertragsende-Label \"Stellenbezeichnung\": " + zuSchreiben.length + " von " +
+        organisationen.length + " Mandanten angepasst.",
+    );
+  } catch (error) {
+    // Nicht kritisch fuer den Start: Ohne Merker laeuft die Migration beim
+    // naechsten Start erneut. Bis dahin zeigt das Formular dieser Mandanten
+    // weiter den alten Begriff — unschoen, aber ohne Datenverlust.
+    console.error("Stellenbezeichnung-Label-Migration fehlgeschlagen:", error.message);
+  }
+}
+
+// =============================================
+// Einmalige Datenmigration: festhaengende Onboarding-Vorgaenge heilen
+// (Fragebogen und Modalitaeten parallel, Aenderungsplan 09/2026 Abschnitt 2)
+// =============================================
+const PARALLELE_SPUREN_MARKER = "ONBOARDING_PARALLELE_SPUREN_V1";
+
+/** Status, die nur HR setzt — dieselbe Liste wie HR_STATUS in src/lib/onboarding-spuren.ts. */
+const SPUREN_HR_STATUS = ["REVIEWED", "COMPLETED", "EXPIRED"];
+
+/** Link-Status, die „Fragebogen abgegeben" behaupten. Ohne Zeitstempel: festhaengend. */
+const SPUREN_ABGABE_STATUS = ["SUBMITTED", "SUPERVISOR_PENDING", "SUPERVISOR_SUBMITTED"];
+
+/*
+ * JS-Kopie der Spurenregeln aus src/lib/onboarding-spuren.ts — im Container
+ * gibt es kein tsx. Der Test src/__tests__/lib/parallele-spuren-migration.test.ts
+ * haelt `spurenGesamtStatus` ueber die ganze Matrix gegen `gesamtStatus`.
+ * Wer die Regel dort aendert, muss sie hier mitaendern (der Test sagt es).
+ */
+function spurenMitarbeiterAbgesendet(v) {
+  return Boolean(v.submittedAt) || Boolean(v.personalData && v.personalData.isComplete === true);
+}
+
+function spurenVorgesetzteAbgesendet(v) {
+  return (
+    Boolean(v.supervisorSubmittedAt) ||
+    Boolean(v.supervisorData && v.supervisorData.isComplete === true)
+  );
+}
+
+function spurenGesamtStatus(v) {
+  if (SPUREN_HR_STATUS.includes(v.status)) return v.status;
+
+  if (spurenMitarbeiterAbgesendet(v)) {
+    if (spurenVorgesetzteAbgesendet(v)) return "SUPERVISOR_SUBMITTED";
+    if (v.supervisorToken) return "SUPERVISOR_PENDING";
+    return "SUBMITTED";
+  }
+
+  const schritt = (v.personalData && v.personalData.currentStep) || 0;
+  const begonnen = v.status === "IN_PROGRESS" || schritt > 0;
+  return begonnen ? "IN_PROGRESS" : "INVITED";
+}
+
+/**
+ * Die Snapshot-Korrekturen der frueheren Migrationen — in ihrer Laufreihenfolge
+ * aus `main()`, weil sie aufeinander aufbauen (Schritt 6 ueberschreibt die
+ * Felder, die MINIJOB_TEMPLATE_STEPS_V1 nur eingeschaltet hat).
+ *
+ * WARUM. Alle vier zogen die eingefrorene Fragebogen-Konfiguration
+ * (`formTemplateSnapshot`) nur bei Vorgaengen mit Status INVITED/IN_PROGRESS
+ * nach. Festhaengende Vorgaenge standen zu dem Zeitpunkt auf
+ * SUBMITTED/SUPERVISOR_* und wurden uebersprungen. Der Fragebogen liest
+ * bevorzugt diese Kopie — nach der Heilung fuellte die Person also mit alter
+ * Schrittfolge weiter, etwa ohne Masernschutz-Schritt. Den Nachweis koennte
+ * danach niemand mehr hochladen.
+ *
+ * `greift(merker)` bildet nach, ob die fruehere Migration Snapshots ueberhaupt
+ * angefasst HAETTE: MINIJOB_TEMPLATE_RENTE_V1 kehrte bei bereits aktivem
+ * Vorlagenschritt frueh zurueck, ohne einen Snapshot anzusehen („changed:
+ * false") — dann zieht auch die Heilung dort nichts nach.
+ */
+const SNAPSHOT_KORREKTUREN = [
+  {
+    merker: MINIJOB_TEMPLATE_MARKER,
+    nurMinijob: true,
+    greift: () => true,
+    anwenden: (steps) => {
+      const { neu, geaendert } = korrigiereMinijobSchritte(steps);
+      return geaendert.length > 0 ? neu : null;
+    },
+  },
+  {
+    merker: MINIJOB_RENTE_MARKER,
+    nurMinijob: true,
+    greift: (merker) => !(merker.details && merker.details.changed === false),
+    anwenden: (steps) => (renteSchrittAktiv(steps) ? null : aktiviereRenteSchritt(steps)),
+  },
+  {
+    merker: MINIJOB_STEP6_MARKER,
+    nurMinijob: true,
+    greift: () => true,
+    anwenden: (steps) => (step6Passt(steps) ? null : setzeStep6(steps)),
+  },
+  {
+    merker: MASERNSCHUTZ_MARKER,
+    nurMinijob: false,
+    greift: () => true,
+    anwenden: (steps) => (masernSchrittAktiv(steps) ? null : aktiviereMasernSchritt(steps)),
+  },
+];
+
+/**
+ * Zieht bei EINEM geheilten Vorgang nach, was die frueheren Migrationen bei ihm
+ * ausgelassen haben. Liefert `null`, wenn sich nichts aendert.
+ *
+ * `merkerListe`: die Eintraege aus `system_migrations` ({ name, appliedAt,
+ * details }). Nachgezogen wird eine Korrektur nur, wenn
+ *   - ihre Migration schon gelaufen ist (sonst holt sie den Vorgang beim
+ *     naechsten Start selbst ab — er steht dann ja auf INVITED/IN_PROGRESS),
+ *   - sie Snapshots ueberhaupt angefasst haette (`greift`), und
+ *   - der Vorgang VOR ihrem Lauf angelegt wurde. Der Snapshot entsteht beim
+ *     Anlegen; ein spaeter angelegter Vorgang traegt schon die korrigierte
+ *     Vorlage — oder eine, die HR danach bewusst anders eingestellt hat. Die
+ *     darf die Heilung nicht zurueckdrehen.
+ */
+function planeSnapshotNachzug(vorgang, merkerListe) {
+  if (!Array.isArray(vorgang.formTemplateSnapshot)) return null;
+
+  let steps = vorgang.formTemplateSnapshot;
+  const korrekturen = [];
+  const angelegt = vorgang.createdAt ? new Date(vorgang.createdAt) : null;
+
+  for (const k of SNAPSHOT_KORREKTUREN) {
+    if (k.nurMinijob && vorgang.questionnaireType !== "MINIJOB") continue;
+    const merker = merkerListe.find((m) => m.name === k.merker);
+    if (!merker || !k.greift(merker)) continue;
+    if (!angelegt || angelegt >= new Date(merker.appliedAt)) continue;
+    const neu = k.anwenden(steps);
+    if (!neu) continue;
+    steps = neu;
+    korrekturen.push(k.merker);
+  }
+
+  return korrekturen.length > 0 ? { snapshot: steps, korrekturen } : null;
+}
+
+/**
+ * Plant die Heilung — rein und ohne Datenbank, damit ein Test sie halten kann.
+ *
+ * Fuer jeden Vorgang ausserhalb der HR-Status wird der Status aus beiden
+ * Spuren neu abgeleitet (`spurenGesamtStatus`). Das erfasst:
+ *   - FESTHAENGENDE Vorgaenge: Link-Status SUBMITTED/SUPERVISOR_* ohne eigene
+ *     Abgabe der Person (Fuehrungskraft war schneller, oder eine
+ *     Handkorrektur im HR-PATCH). Sie gehen zurueck auf IN_PROGRESS, wenn die
+ *     Person schon gespeichert hat (`currentStep > 0`), sonst auf INVITED — und
+ *     bekommen die ausgelassenen Snapshot-Korrekturen nachgezogen.
+ *   - SUBMITTED mit offenem Vorgesetzten-Link -> SUPERVISOR_PENDING. Solche
+ *     Vorgaenge entstanden, wenn HR den Link VOR der Abgabe erzeugt hatte,
+ *     und bekamen nie eine Vorgesetzten-Erinnerung.
+ *   - SUPERVISOR_SUBMITTED, obwohl die Modalitaeten fehlen, und umgekehrt.
+ *
+ * Geprueft/abgeschlossen OHNE eigene Abgabe (HR hat einen festhaengenden
+ * Vorgang trotzdem abgehakt) wird NICHT angefasst, nur gemeldet
+ * (`hrOhneAbgabe`) — diese Faelle klaert HR einzeln.
+ */
+function planeStatusAbgleich(vorgaenge, merkerListe = []) {
+  const aenderungen = [];
+  const hrOhneAbgabe = [];
+
+  for (const v of vorgaenge) {
+    if (SPUREN_HR_STATUS.includes(v.status)) {
+      if (
+        (v.status === "REVIEWED" || v.status === "COMPLETED") &&
+        !spurenMitarbeiterAbgesendet(v)
+      ) {
+        hrOhneAbgabe.push({ id: v.id, displayId: v.displayId || null, status: v.status });
+      }
+      continue;
+    }
+
+    const nach = spurenGesamtStatus(v);
+    if (nach === v.status) continue;
+
+    const festhaengend =
+      SPUREN_ABGABE_STATUS.includes(v.status) && !spurenMitarbeiterAbgesendet(v);
+    const nachzug = festhaengend ? planeSnapshotNachzug(v, merkerListe) : null;
+
+    aenderungen.push({
+      id: v.id,
+      displayId: v.displayId || null,
+      von: v.status,
+      nach,
+      festhaengend,
+      snapshot: nachzug ? nachzug.snapshot : null,
+      snapshotKorrekturen: nachzug ? nachzug.korrekturen : [],
+    });
+  }
+
+  return { aenderungen, hrOhneAbgabe };
+}
+
+/**
+ * Heilt Onboarding-Vorgaenge, die am gemeinsamen Status festhaengen.
+ *
+ * Bis 09/2026 setzte das Absenden der Modalitaeten den Status hart auf
+ * SUPERVISOR_SUBMITTED. War die Fuehrungskraft schneller als die Person,
+ * sperrte das deren Fragebogen-Link dauerhaft. Die neue Logik haengt Zugriff
+ * und Sperre an die Zeitstempel und heilt diese Vorgaenge funktional schon ohne
+ * diese Migration — aber bis zur Abgabe stuenden sie mit falschem Status in
+ * Liste, Statistik und Reporting-API, bekaemen keine Erinnerung und fuellten
+ * mit veralteter Schrittfolge weiter.
+ *
+ * Sicherung: Die neue Spalte `supervisorLinkSentAt` ist ein Schema-Delta, also
+ * zieht entrypoint.sh vor diesem Lauf automatisch einen pg_dump. Zusaetzlich
+ * stehen alle alten Status im Merker (Rueckweg ohne Dump).
+ *
+ * Idempotenz: Merker in `system_migrations`, geschrieben in DERSELBEN
+ * Transaktion wie die Updates — entweder alles oder nichts. Die Planung ist
+ * ausserdem von Bauart idempotent: Ein geheilter Vorgang ergibt bei einem
+ * zweiten Lauf keine Aenderung mehr. Ohne Treffer wird der Merker trotzdem
+ * gesetzt (frische oder saubere Datenbank). Fehler werden geloggt, brechen den
+ * Start aber nicht ab; ohne Merker laeuft die Heilung beim naechsten Start erneut.
+ */
+async function migriereParalleleSpuren(prisma) {
+  try {
+    if (await migrationErledigt(prisma, PARALLELE_SPUREN_MARKER)) return;
+
+    const vorgaenge = await prisma.onboardingProcess.findMany({
+      where: {
+        OR: [
+          { status: { notIn: SPUREN_HR_STATUS } },
+          // Nur zum Melden, nicht zum Aendern (siehe planeStatusAbgleich).
+          { status: { in: ["REVIEWED", "COMPLETED"] }, submittedAt: null },
+        ],
+      },
+      select: {
+        id: true,
+        displayId: true,
+        status: true,
+        submittedAt: true,
+        supervisorSubmittedAt: true,
+        supervisorToken: true,
+        questionnaireType: true,
+        formTemplateSnapshot: true,
+        createdAt: true,
+        personalData: { select: { currentStep: true, isComplete: true } },
+        supervisorData: { select: { isComplete: true } },
+      },
+    });
+
+    const merkerListe = await prisma.systemMigration.findMany({
+      where: { name: { in: SNAPSHOT_KORREKTUREN.map((k) => k.merker) } },
+      select: { name: true, appliedAt: true, details: true },
+    });
+
+    const { aenderungen, hrOhneAbgabe } = planeStatusAbgleich(vorgaenge, merkerListe);
+
+    const schreibvorgaenge = aenderungen.map((a) =>
+      prisma.onboardingProcess.updateMany({
+        // `status: a.von`: Nur den Stand aendern, den die Planung gesehen hat.
+        where: { id: a.id, status: a.von },
+        data: a.snapshot
+          ? { status: a.nach, formTemplateSnapshot: a.snapshot }
+          : { status: a.nach },
+      }),
+    );
+
+    const geheilt = aenderungen.filter((a) => a.festhaengend);
+    schreibvorgaenge.push(
+      markiereMigration(prisma, PARALLELE_SPUREN_MARKER, {
+        geprueft: vorgaenge.length,
+        geaendert: aenderungen.length,
+        festhaengendGeheilt: geheilt.map((a) => a.displayId || a.id),
+        // Der Rueckweg: jeder alte Status, dazu welche Snapshot-Korrekturen
+        // nachgezogen wurden.
+        aenderungen: aenderungen.map((a) => ({
+          id: a.id,
+          displayId: a.displayId,
+          von: a.von,
+          nach: a.nach,
+          snapshotKorrekturen: a.snapshotKorrekturen,
+        })),
+        // HR hat diese Vorgaenge geprueft/abgeschlossen, obwohl der Fragebogen
+        // nie abgesendet wurde. Nicht angefasst — einzeln klaeren.
+        hrOhneAbgabe,
+      }),
+    );
+
+    await prisma.$transaction(schreibvorgaenge);
+
+    console.log(
+      "Onboarding parallele Spuren: " +
+        aenderungen.length +
+        " von " +
+        vorgaenge.length +
+        " Vorgaengen korrigiert (davon festhaengend geheilt: " +
+        geheilt.length +
+        ").",
+    );
+    if (hrOhneAbgabe.length > 0) {
+      console.warn(
+        "Onboarding parallele Spuren: geprueft/abgeschlossen ohne abgesendeten Fragebogen (nicht geaendert): " +
+          hrOhneAbgabe.map((h) => (h.displayId || h.id) + " (" + h.status + ")").join(", "),
+      );
+    }
+  } catch (error) {
+    // Nicht kritisch fuer den Start: Die neue Logik laesst festhaengende
+    // Personen schon ohne diese Migration weiter ausfuellen. Ohne Merker
+    // laeuft sie beim naechsten Start erneut.
+    console.error("Parallele-Spuren-Migration fehlgeschlagen:", error.message);
+  }
+}
+
 async function main() {
   const prisma = new PrismaClient();
   try {
@@ -1079,6 +1535,10 @@ async function main() {
     await ensureMasernschutzSchritt(prisma);
     await ensureBetriebsnummern(prisma);
     await migriereKostenstellenAufteilung(prisma);
+    await ensureStellenbezeichnungLabels(prisma);
+    // Nach den Snapshot-Migrationen: Die Heilung zieht deren Korrekturen bei
+    // festhaengenden Vorgaengen nach und braucht dafuer ihre Merker.
+    await migriereParalleleSpuren(prisma);
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {
@@ -1128,4 +1588,18 @@ module.exports = {
   KOSTENSTELLEN_MARKER,
   KOSTENSTELLE_MAX_LAENGE,
   planeKostenstellenZeilen,
+  STELLENBEZEICHNUNG_LABEL_MARKER,
+  STELLENBEZEICHNUNG_ALTES_LABEL,
+  STELLENBEZEICHNUNG_NEUES_LABEL,
+  planeStellenbezeichnungLabels,
+  MINIJOB_TEMPLATE_MARKER,
+  MINIJOB_RENTE_MARKER,
+  MINIJOB_STEP6_MARKER,
+  renteSchrittAktiv,
+  aktiviereRenteSchritt,
+  PARALLELE_SPUREN_MARKER,
+  SPUREN_HR_STATUS,
+  spurenGesamtStatus,
+  planeSnapshotNachzug,
+  planeStatusAbgleich,
 };

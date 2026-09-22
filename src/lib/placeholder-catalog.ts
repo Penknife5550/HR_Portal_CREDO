@@ -7,6 +7,10 @@
  * (src/lib/doc-template-resolvers.ts) gelieferten Platzhaltern.
  */
 
+// Einziger Import: die Feldbezeichnungen der Formulare — selbst ohne Importe,
+// also genauso client-sicher wie diese Datei.
+import { FELD_BEZEICHNUNGEN } from "@/lib/formular-fehler";
+
 /**
  * Modul-Auswahl fuer die UI (Wert + Anzeige). Liegt hier statt in
  * doc-template-resolvers.ts, damit Client-Komponenten sie ohne Server-Import
@@ -107,7 +111,10 @@ export const ONBOARDING_PLACEHOLDERS: PlaceholderDef[] = [
   { key: "befristung_zweck", label: "Zweckbefristung: wodurch der Vertrag endet", example: "Ende der Kostenzusage des Jugendamtes", group: "Vertrag" },
   { key: "vertragsende_voraussichtlich", label: "Voraussichtliches Ende (unverbindlich)", example: "31.08.2027", group: "Vertrag" },
   { key: "befristung_sachgrund", label: "Sachgrund der Befristung", example: "Projektbezogen", group: "Vertrag" },
-  { key: "stellenbeschreibung", label: "Stellenbeschreibung", group: "Vertrag" },
+  // Schluessel bleibt {stellenbeschreibung}: Hochgeladene .docx-Vorlagen haben
+  // ihn in DocumentTemplate.platzhalter gespeichert, eine Umbenennung liesse sie
+  // "___" drucken. Nur die Beschriftung folgt dem UI-Begriff (seit 09/2026).
+  { key: "stellenbeschreibung", label: FELD_BEZEICHNUNGEN.stellenbeschreibung, group: "Vertrag" },
   { key: "betriebsstaette", label: "Betriebsstaette", group: "Vertrag" },
   { key: "entgeltgruppe", label: "Entgeltgruppe", example: "E11", group: "Vertrag" },
   { key: "stufe", label: "Stufe", group: "Vertrag" },
@@ -136,7 +143,8 @@ export const VERTRAGSVERLAENGERUNG_PLACEHOLDERS: PlaceholderDef[] = [
   { key: "stufe", label: "Stufe", group: "Neuer Vertrag" },
   { key: "urlaubstage", label: "Urlaubstage pro Jahr", example: "30", group: "Neuer Vertrag" },
   { key: "probezeit_monate", label: "Probezeit (Monate)", group: "Neuer Vertrag" },
-  { key: "stellenbeschreibung", label: "Stellenbeschreibung", group: "Neuer Vertrag" },
+  // Schluessel bleibt, nur die Beschriftung folgt dem UI-Begriff (wie oben).
+  { key: "stellenbeschreibung", label: FELD_BEZEICHNUNGEN.stellenbeschreibung, group: "Neuer Vertrag" },
   { key: "betriebsstaette", label: "Betriebsstaette", group: "Neuer Vertrag" },
   // Person (DokuBit) — Stammdaten aus der n8n-Meldung (dokubitDaten)
   { key: "anrede", label: "Anrede", example: "Frau", group: "Person (DokuBit)" },

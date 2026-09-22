@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
-import { getBaseUrl } from "@/lib/url";
+import { abteilungsAufgabenLink, offboardingMailFelder } from "@/lib/offboarding-mail";
 
 const MS_PER_DAY = 86400000;
 
@@ -142,26 +142,25 @@ export async function POST(request: NextRequest) {
 
         // Reminder senden
         try {
-          const employeeName = `${offboarding.employeeFirstName} ${offboarding.employeeLastName}`;
-
+          // Gemeinsame Felder aus offboardingMailFelder — derselbe Aufbau wie
+          // bei der Erinnerung per Knopf (department-links), damit eine
+          // Vorlage fuer beide Wege passt. `offene_aufgaben` ist der Name,
+          // den die Vorlage benutzt; `totalOpenItems` bleibt fuer Webhooks.
+          // Der Link zeigt auf /offboarding-tasks/<token>, die Seite, die es
+          // gibt (siehe abteilungsAufgabenLink).
           await triggerWebhooks("offboarding-reminder", {
-            offboardingId: offboarding.id,
-            displayId: offboarding.displayId,
-            employeeName,
-            employeeFirstName: offboarding.employeeFirstName,
-            employeeLastName: offboarding.employeeLastName,
-            einrichtung: offboarding.organization.name,
-            organization: offboarding.organization.name,
+            ...offboardingMailFelder(offboarding),
             departmentKey: deptLink.departmentKey,
             departmentName: deptLink.departmentName,
+            abteilung: deptLink.departmentName,
             email: deptLink.email,
             level,
             overdueItems,
             upcomingItems,
             totalOpenItems: deptItems.length,
+            offene_aufgaben: deptItems.length,
             maxOverdueDays: Math.floor(maxOverdueDays),
-            magicLink: `${getBaseUrl()}/offboarding/abteilung/${deptLink.token}`,
-            lastWorkingDay: offboarding.lastWorkingDay.toISOString(),
+            magicLink: abteilungsAufgabenLink(deptLink.token),
           });
 
           // DepartmentLink aktualisieren

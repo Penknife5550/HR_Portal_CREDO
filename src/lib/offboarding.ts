@@ -15,6 +15,7 @@
 import type { ExitType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { offboardingMailFelder } from "@/lib/offboarding-mail";
 
 /** Checklisten-Template-Name anhand OrganizationType. */
 export function getTemplateNameForOrgType(orgType: string): string {
@@ -163,16 +164,24 @@ export async function createOffboardingProcess(input: CreateOffboardingInput) {
     return created;
   });
 
-  // Webhook ausserhalb der Transaktion triggern (wirft nie)
+  // Webhook ausserhalb der Transaktion triggern (wirft nie).
+  //
+  // Die gemeinsamen Felder (Name, Einrichtung, Austrittsdatum — auch unter
+  // den deutschen Namen der Vorlage) kommen aus offboardingMailFelder. Die
+  // Organisation stammt bewusst aus `org` (vom Aufrufer geladen) und nicht aus
+  // dem include des Vorgangs: Beide sind dieselbe Zeile, aber `org` ist die
+  // Quelle, auf die sich der Aufrufer schon verlassen hat.
   await triggerWebhooks("offboarding-created", {
-    offboardingId: offboarding.id,
-    displayId: offboarding.displayId,
+    ...offboardingMailFelder({
+      id: offboarding.id,
+      displayId: offboarding.displayId,
+      employeeFirstName: offboarding.employeeFirstName,
+      employeeLastName: offboarding.employeeLastName,
+      lastWorkingDay: offboarding.lastWorkingDay,
+      organization: { name: org.name, mandantNumber: org.mandantNumber },
+    }),
     employeeEmail: offboarding.employeeEmail,
-    employeeName: `${offboarding.employeeFirstName} ${offboarding.employeeLastName}`,
-    organization: org.name,
-    mandantNumber: org.mandantNumber,
     exitType: offboarding.exitType,
-    lastWorkingDay: offboarding.lastWorkingDay.toISOString(),
   });
 
   return offboarding;

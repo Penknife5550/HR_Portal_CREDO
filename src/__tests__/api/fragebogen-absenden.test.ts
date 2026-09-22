@@ -16,7 +16,14 @@ const mockPrisma = {
   document: { findMany: jest.fn() },
   child: { count: jest.fn() },
   personalData: { findUnique: jest.fn(), update: jest.fn() },
-  onboardingProcess: { updateMany: jest.fn() },
+  // updateMany: die Beanspruchung der eigenen Spur (`submittedAt`).
+  // findUniqueOrThrow + update: `statusAbgleichen` liest danach neu und
+  // schreibt den Status, der sich aus beiden Spuren ergibt.
+  onboardingProcess: {
+    updateMany: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn(),
+  },
   auditLog: { create: jest.fn() },
   emailTemplate: { findUnique: jest.fn() },
   $transaction: jest.fn(),
@@ -85,12 +92,16 @@ function tokenAntwort(
   status = "IN_PROGRESS",
   personalData: Record<string, unknown> = {},
   organisationstyp = "VERWALTUNG",
+  vorgang: Record<string, unknown> = {},
 ) {
   return {
     valid: true,
     onboarding: {
       id: "ob1",
       status,
+      submittedAt: null,
+      supervisorSubmittedAt: null,
+      supervisorToken: null,
       email: "neu@example.de",
       firstName: "Anna",
       lastName: "Beispiel",
@@ -104,8 +115,31 @@ function tokenAntwort(
         healthInsuranceType: null,
         ...personalData,
       },
+      ...vorgang,
     },
   };
+}
+
+/**
+ * Der Vorgang, wie `statusAbgleichen` ihn NACH der Beanspruchung liest:
+ * `submittedAt` ist gesetzt. Was die andere Spur beitraegt, bestimmt der Test.
+ */
+function standNachAbgabe(vorgang: Record<string, unknown> = {}) {
+  return {
+    status: "IN_PROGRESS",
+    submittedAt: new Date("2026-09-22T08:00:00Z"),
+    supervisorSubmittedAt: null,
+    supervisorToken: null,
+    personalData: { currentStep: 12, isComplete: true },
+    supervisorData: null,
+    ...vorgang,
+  };
+}
+
+/** Der Status, den `statusAbgleichen` geschrieben hat — oder undefined. */
+function geschriebenerStatus(update: jest.Mock = mockPrisma.onboardingProcess.update) {
+  const aufruf = update.mock.calls.find((c) => c[0]?.data?.status);
+  return aufruf?.[0].data.status;
 }
 
 /** Fuehrt die Transaktions-Rueckrufe echt aus, gegen dieselben Mocks. */
@@ -137,20 +171,31 @@ beforeEach(() => {
   mockPrisma.emailTemplate.findUnique.mockResolvedValue(null);
   // Standardfall: dieser Aufrufer beansprucht den Vorgang erfolgreich.
   mockPrisma.onboardingProcess.updateMany.mockResolvedValue({ count: 1 });
+  // Standardfall: kein Vorgesetzten-Link -> SUBMITTED.
+  mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(standNachAbgabe());
+  mockPrisma.onboardingProcess.update.mockResolvedValue({});
   transaktionLaeuftDurch();
 });
 
 describe("Absenden — Erfolgsfall", () => {
-  it("nimmt den Fragebogen an und beansprucht den Vorgang bedingt", async () => {
+  it("nimmt den Fragebogen an und beansprucht die EIGENE Spur bedingt", async () => {
     const res = await POST(req(absendeRumpf()), { params: params() });
     expect(res.status).toBe(200);
 
-    // Der Statuswechsel ist die Sperre: EIN UPDATE ... WHERE status IN (...).
+    // Die Sperre ist der eigene Zeitstempel: EIN UPDATE ... WHERE
+    // "submittedAt" IS NULL AND status NOT IN (HR-Status). Kein Status im
+    // Beanspruchen — den leitet erst statusAbgleichen ab.
     expect(mockPrisma.onboardingProcess.updateMany).toHaveBeenCalledTimes(1);
     const arg = mockPrisma.onboardingProcess.updateMany.mock.calls[0][0];
-    expect(arg.where).toMatchObject({ id: "ob1" });
-    expect(arg.where.status.in).toEqual(["INVITED", "IN_PROGRESS"]);
-    expect(arg.data.status).toBe("SUBMITTED");
+    expect(arg.where).toEqual({
+      id: "ob1",
+      submittedAt: null,
+      status: { notIn: ["REVIEWED", "COMPLETED", "EXPIRED"] },
+    });
+    expect(arg.data.status).toBeUndefined();
+    expect(arg.data.submittedAt).toBeInstanceOf(Date);
+    // Ohne Vorgesetzten-Link ergibt sich SUBMITTED.
+    expect(geschriebenerStatus()).toBe("SUBMITTED");
   });
 
   it("schreibt Erklaerung, Status und Protokoll in genau einer Transaktion", async () => {
@@ -223,11 +268,134 @@ describe("Absenden — Doppel-Submit", () => {
   });
 
   it("weist den schnellen Weg ab, wenn der Vorgang schon eingereicht ist", async () => {
-    mockValidate.mockResolvedValue(tokenAntwort("SUBMITTED"));
+    mockValidate.mockResolvedValue(
+      tokenAntwort("SUBMITTED", {}, "VERWALTUNG", {
+        submittedAt: new Date("2026-09-20T10:00:00Z"),
+      }),
+    );
     const res = await POST(req(absendeRumpf()), { params: params() });
     expect(res.status).toBe(409);
     // Gar nicht erst Dokumente und Pruefsumme laden.
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("weist den schnellen Weg auch beim Altfall ohne Zeitstempel ab (isComplete)", async () => {
+    // Vor dem atomaren Absenden konnte `isComplete` ohne `submittedAt` stehen
+    // bleiben. Ein solcher Fragebogen ist abgegeben — ein zweites Absenden
+    // ueberschriebe Ort, Zeitpunkt und Pruefsumme der Erklaerung.
+    mockValidate.mockResolvedValue(tokenAntwort("SUBMITTED", { isComplete: true }));
+    const res = await POST(req(absendeRumpf()), { params: params() });
+    expect(res.status).toBe(409);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("weist einen geprueften Vorgang ab, auch wenn nie abgesendet wurde", async () => {
+    mockValidate.mockResolvedValue(tokenAntwort("REVIEWED"));
+    const res = await POST(req(absendeRumpf()), { params: params() });
+    expect(res.status).toBe(409);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Zwei Spuren: Die Fuehrungskraft darf vorher, gleichzeitig oder danach
+ * absenden. Frueher sperrte ihre Abgabe (Status SUPERVISOR_SUBMITTED) den
+ * Fragebogen dauerhaft — auch ueber die API (409), und der Vorgang hing fest.
+ */
+describe("Absenden — parallele Spuren", () => {
+  it("laesst die Person absenden, nachdem die Fuehrungskraft schon abgesendet hat", async () => {
+    // Neuer Ablauf: Der Status folgt bis zur eigenen Abgabe der
+    // Fragebogen-Spur (IN_PROGRESS), die Modalitaeten stehen im Zeitstempel.
+    mockValidate.mockResolvedValue(
+      tokenAntwort("IN_PROGRESS", {}, "VERWALTUNG", {
+        supervisorToken: "vg-token",
+        supervisorSubmittedAt: new Date("2026-09-18T09:00:00Z"),
+      }),
+    );
+    mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(
+      standNachAbgabe({
+        supervisorToken: "vg-token",
+        supervisorSubmittedAt: new Date("2026-09-18T09:00:00Z"),
+        supervisorData: { isComplete: true },
+      }),
+    );
+
+    const res = await POST(req(absendeRumpf()), { params: params() });
+
+    expect(res.status).toBe(200);
+    // Beides eingereicht -> „Bereit zur Prüfung".
+    expect(geschriebenerStatus()).toBe("SUPERVISOR_SUBMITTED");
+  });
+
+  it("heilt den festhaengenden Altfall (Status SUPERVISOR_SUBMITTED, nichts abgesendet)", async () => {
+    // Genau der gemeldete Fehler: Die Fuehrungskraft war schneller, der
+    // Status stand hart auf SUPERVISOR_SUBMITTED. Jetzt geht das Absenden.
+    mockValidate.mockResolvedValue(
+      tokenAntwort("SUPERVISOR_SUBMITTED", { currentStep: 4 }, "VERWALTUNG", {
+        supervisorToken: "vg-token",
+        supervisorSubmittedAt: new Date("2026-09-18T09:00:00Z"),
+      }),
+    );
+    mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(
+      standNachAbgabe({
+        status: "SUPERVISOR_SUBMITTED",
+        supervisorToken: "vg-token",
+        supervisorSubmittedAt: new Date("2026-09-18T09:00:00Z"),
+      }),
+    );
+
+    const res = await POST(req(absendeRumpf()), { params: params() });
+
+    expect(res.status).toBe(200);
+    // Der Status stimmt nach der Abgabe schon — kein ueberfluessiges Schreiben.
+    expect(mockPrisma.onboardingProcess.update).not.toHaveBeenCalled();
+    const abgabe = mockPrisma.auditLog.create.mock.calls[0][0].data;
+    expect(abgabe.details.status).toEqual({
+      von: "SUPERVISOR_SUBMITTED",
+      nach: "SUPERVISOR_SUBMITTED",
+    });
+  });
+
+  it("setzt SUPERVISOR_PENDING, wenn ein Vorgesetzten-Link offen ist", async () => {
+    mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(
+      standNachAbgabe({ supervisorToken: "vg-token" }),
+    );
+    const res = await POST(req(absendeRumpf()), { params: params() });
+    expect(res.status).toBe(200);
+    expect(geschriebenerStatus()).toBe("SUPERVISOR_PENDING");
+  });
+
+  it("berechnet den Status aus dem Stand NACH der Beanspruchung, nicht aus dem Lesestand", async () => {
+    // Rennen: Beim Validieren war die Fuehrungskraft noch offen. Sie hat
+    // zwischen Validieren und unserer Zeilensperre abgesendet und committet.
+    // Unsere Beanspruchung hat auf ihre Sperre gewartet; das Neulesen danach
+    // sieht ihren Zeitstempel. Wer zuletzt committet, setzt „Bereit zur Prüfung".
+    mockValidate.mockResolvedValue(
+      tokenAntwort("IN_PROGRESS", {}, "VERWALTUNG", { supervisorToken: "vg-token" }),
+    );
+    mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(
+      standNachAbgabe({
+        supervisorToken: "vg-token",
+        supervisorSubmittedAt: new Date(),
+      }),
+    );
+
+    await POST(req(absendeRumpf()), { params: params() });
+
+    expect(geschriebenerStatus()).toBe("SUPERVISOR_SUBMITTED");
+  });
+
+  it("beansprucht zuerst, liest dann neu, schreibt dann den Status — in einer Transaktion", async () => {
+    await POST(req(absendeRumpf()), { params: params() });
+
+    const beanspruchen = mockPrisma.onboardingProcess.updateMany.mock.invocationCallOrder[0];
+    const lesen = mockPrisma.onboardingProcess.findUniqueOrThrow.mock.invocationCallOrder[0];
+    const schreiben = mockPrisma.onboardingProcess.update.mock.invocationCallOrder[0];
+    const protokoll = mockPrisma.auditLog.create.mock.invocationCallOrder[0];
+    expect(beanspruchen).toBeLessThan(lesen);
+    expect(lesen).toBeLessThan(schreiben);
+    expect(schreiben).toBeLessThan(protokoll);
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -350,6 +518,8 @@ describe("Absenden — offene nachreichbare Nachweise", () => {
     const tx = {
       onboardingProcess: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(standNachAbgabe()),
+        update: jest.fn().mockResolvedValue({}),
       },
       personalData: { update: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({}) },

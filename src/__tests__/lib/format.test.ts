@@ -10,7 +10,7 @@
  * irgendetwas fehlschlaegt.
  */
 
-import { formatBytes, formatEmployeeName } from "@/lib/format";
+import { formatBytes, formatDatumDE, formatEmployeeName } from "@/lib/format";
 
 describe("formatBytes", () => {
   describe("fehlende Angabe gegen leere Datei", () => {
@@ -109,5 +109,45 @@ describe("formatEmployeeName", () => {
     expect(
       formatEmployeeName({ employeeFirstName: "Anna", employeeLastName: "" }),
     ).toBe("Anna");
+  });
+});
+
+describe("formatDatumDE", () => {
+  it("formatiert ein Date als TT.MM.JJJJ mit fuehrenden Nullen", () => {
+    expect(formatDatumDE(new Date("2026-08-01T00:00:00.000Z"))).toBe("01.08.2026");
+  });
+
+  it("nimmt den Kalendertag in deutscher Zeit, nicht in UTC", () => {
+    // 22:00 UTC ist in der Sommerzeit schon 00:00 des Folgetags. Der
+    // Container laeuft in UTC; die Serverzeit ergaebe hier den 30.08.
+    expect(formatDatumDE("2026-08-30T22:00:00.000Z")).toBe("31.08.2026");
+    // Winterzeit: eine Stunde Versatz.
+    expect(formatDatumDE("2026-12-31T23:30:00.000Z")).toBe("01.01.2027");
+  });
+
+  it("laesst die als UTC-Mitternacht gespeicherten Tagesdaten auf ihrem Tag", () => {
+    // So liegen lastWorkingDay & Co. in der Datenbank (new Date("2026-08-31")).
+    expect(formatDatumDE("2026-08-31T00:00:00.000Z")).toBe("31.08.2026");
+  });
+
+  it("stellt ein reines Kalenderdatum ohne Zeitzonen-Umweg um", () => {
+    expect(formatDatumDE("2026-08-31")).toBe("31.08.2026");
+  });
+
+  it("reicht ein schon deutsch formatiertes Datum durch — ohne Tag und Monat zu tauschen", () => {
+    // Der eigentliche Fehler: new Date("31.12.2026") ist Invalid Date, und
+    // new Date("01.08.2026") liest der Parser als 8. Januar.
+    expect(formatDatumDE("31.12.2026")).toBe("31.12.2026");
+    expect(formatDatumDE("01.08.2026")).toBe("01.08.2026");
+    expect(formatDatumDE("1.8.2026")).toBe("01.08.2026");
+  });
+
+  it("liefert fuer Leeres und Unlesbares einen leeren Text statt 'Invalid Date'", () => {
+    expect(formatDatumDE(null)).toBe("");
+    expect(formatDatumDE(undefined)).toBe("");
+    expect(formatDatumDE("")).toBe("");
+    expect(formatDatumDE("   ")).toBe("");
+    expect(formatDatumDE("demnaechst")).toBe("");
+    expect(formatDatumDE(new Date("kaputt"))).toBe("");
   });
 });

@@ -256,7 +256,7 @@ CREDO Gruppe – Freie Evangelische Schulen
           <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">
             <tr><td style="background-color:#f9fafb;border:1px solid #eceef1;border-radius:8px;padding:16px 20px;">
               <p style="margin:0 0 10px;color:#2d2d2d;font-size:14px;font-weight:bold;">Diese Eckdaten werden abgefragt</p>
-              <p style="margin:0;color:#374151;font-size:14px;line-height:1.9;">› Stellenbeschreibung (wird in den Arbeitsvertrag übernommen)<br>› Vertragsbeginn, ggf. Befristung<br>› Arbeitszeit (Wochenstunden)<br>› Vergütung (Entgeltgruppe/Stufe oder Festgehalt)</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.9;">› Stellenbezeichnung (wird in den Arbeitsvertrag übernommen)<br>› Vertragsbeginn, ggf. Befristung<br>› Arbeitszeit (Wochenstunden)<br>› Vergütung (Entgeltgruppe/Stufe oder Festgehalt)</p>
             </td></tr>
           </table>
 
@@ -293,7 +293,7 @@ Formular öffnen:
 {{link}}
 
 Diese Eckdaten werden abgefragt:
-- Stellenbeschreibung (wird in den Arbeitsvertrag übernommen)
+- Stellenbezeichnung (wird in den Arbeitsvertrag übernommen)
 - Vertragsbeginn, ggf. Befristung
 - Arbeitszeit (Wochenstunden)
 - Vergütung (Entgeltgruppe/Stufe oder Festgehalt)
@@ -319,7 +319,12 @@ CREDO Gruppe – Freie Evangelische Schulen
   {
     event: "contract-end-supervisor-link",
     name: "Einladung Vorgesetzter (Vertragsverlängerung)",
-    subject: "Vertragsverlängerung für {{mitarbeiter_name}} – bitte Vertragsdaten erfassen",
+    // Seit die Fuehrungskraft SELBST ueber die Uebernahme entscheidet (Ja/Nein
+    // im Formular, Nein mit Begruendung), setzt diese Mail die Verlaengerung
+    // nicht mehr voraus: Betreff, Text und Knopf bitten um die Entscheidung,
+    // die Vertragsdaten sind der Ja-Fall. Wortwahl wie in der Erinnerung
+    // (contract-end-supervisor-reminder), damit beide Mails zusammenpassen.
+    subject: "Vertragsverlängerung für {{mitarbeiter_name}} – Ihre Entscheidung erbeten",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -336,19 +341,19 @@ CREDO Gruppe – Freie Evangelische Schulen
 
         <!-- Body -->
         <tr><td style="background-color:#ffffff;padding:32px;">
-          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Bitte erfassen Sie die Vertragsdaten</h2>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Bitte entscheiden Sie über die Weiterbeschäftigung</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Der befristete Vertrag von <strong>{{mitarbeiter_name}}</strong> bei {{einrichtung}} läuft aus. Da der/die Mitarbeiter:in weiterbeschäftigt werden soll, bitten wir Sie um die Vertragsdaten für die Verlängerung. Mit Ihren Angaben erstellt die Personalabteilung den neuen Vertrag.
+            Der befristete Vertrag von <strong>{{mitarbeiter_name}}</strong> bei {{einrichtung}} läuft aus. Bitte teilen Sie uns mit, ob der/die Mitarbeiter:in über das Vertragsende hinaus weiterbeschäftigt werden soll.
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
-            Das Ausfüllen dauert nur wenige Minuten.
+            Bei „Ja“ erfassen Sie im selben Formular gleich die Vertragsdaten für die Verlängerung – mit Ihren Angaben erstellt die Personalabteilung den neuen Vertrag. Bei „Nein“ genügt eine kurze Begründung. Das Ausfüllen dauert nur wenige Minuten.
           </p>
 
           <!-- Button -->
           <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
             <tr><td style="background-color:#575756;border-radius:8px;">
               <a href="{{link}}" style="display:inline-block;padding:14px 30px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
-                Vertragsdaten erfassen →
+                Jetzt entscheiden →
               </a>
             </td></tr>
           </table>
@@ -361,8 +366,8 @@ CREDO Gruppe – Freie Evangelische Schulen
           <!-- Eckdaten -->
           <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">
             <tr><td style="background-color:#f9fafb;border:1px solid #eceef1;border-radius:8px;padding:16px 20px;">
-              <p style="margin:0 0 10px;color:#2d2d2d;font-size:14px;font-weight:bold;">Diese Eckdaten werden abgefragt</p>
-              <p style="margin:0;color:#374151;font-size:14px;line-height:1.9;">› Neuer Vertragsbeginn, ggf. Befristung<br>› Arbeitszeit (Wochenstunden)<br>› Vergütung (Entgeltgruppe/Stufe)<br>› Stellenbeschreibung</p>
+              <p style="margin:0 0 10px;color:#2d2d2d;font-size:14px;font-weight:bold;">Bei Weiterbeschäftigung werden diese Eckdaten abgefragt</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.9;">› Neuer Vertragsbeginn, ggf. Befristung<br>› Arbeitszeit (Wochenstunden)<br>› Vergütung (Entgeltgruppe/Stufe)<br>› Stellenbezeichnung</p>
             </td></tr>
           </table>
 
@@ -390,18 +395,20 @@ CREDO Gruppe – Freie Evangelische Schulen
   </table>
 </body>
 </html>`,
-    bodyText: `Bitte erfassen Sie die Vertragsdaten
+    bodyText: `Bitte entscheiden Sie über die Weiterbeschäftigung
 
-Der befristete Vertrag von {{mitarbeiter_name}} bei {{einrichtung}} läuft aus. Da der/die Mitarbeiter:in weiterbeschäftigt werden soll, bitten wir Sie um die Vertragsdaten für die Verlängerung. Mit Ihren Angaben erstellt die Personalabteilung den neuen Vertrag. Das dauert nur wenige Minuten.
+Der befristete Vertrag von {{mitarbeiter_name}} bei {{einrichtung}} läuft aus. Bitte teilen Sie uns mit, ob der/die Mitarbeiter:in über das Vertragsende hinaus weiterbeschäftigt werden soll.
+
+Bei „Ja“ erfassen Sie im selben Formular gleich die Vertragsdaten für die Verlängerung – mit Ihren Angaben erstellt die Personalabteilung den neuen Vertrag. Bei „Nein“ genügt eine kurze Begründung. Das dauert nur wenige Minuten.
 
 Formular öffnen:
 {{link}}
 
-Diese Eckdaten werden abgefragt:
+Bei Weiterbeschäftigung werden diese Eckdaten abgefragt:
 - Neuer Vertragsbeginn, ggf. Befristung
 - Arbeitszeit (Wochenstunden)
 - Vergütung (Entgeltgruppe/Stufe)
-- Stellenbeschreibung
+- Stellenbezeichnung
 
 So geht es weiter: Nach dem Absenden übernimmt die Personalabteilung alles Weitere. Der Link ist bis zum {{ablaufdatum}} gültig.
 
@@ -413,7 +420,7 @@ CREDO Gruppe – Freie Evangelische Schulen
       { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des Mitarbeiters" },
       { key: "{{supervisorEmail}}", description: "E-Mail des Vorgesetzten" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
-      { key: "{{link}}", description: "Link zum Vertragsdaten-Formular" },
+      { key: "{{link}}", description: "Link zum Entscheidungs-/Vertragsdaten-Formular" },
       { key: "{{ablaufdatum}}", description: "Gültig-bis-Datum des Links" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (VE-...)" },
     ],
@@ -992,8 +999,11 @@ CREDO Gruppe – {{einrichtung}}`,
   // =============================================
   {
     event: "supervisor-reminder",
-    name: "Erinnerung Vorgesetzter (Modalitaeten ausstehend)",
-    subject: "Erinnerung: Einstellungsmodalitaeten für {{mitarbeiter_name}} offen",
+    // Name identisch mit dem Katalog (events.ts) — der Test events-catalog
+    // erzwingt das. Betreff und Text mit Umlauten wie die Einladung
+    // (supervisor-link-created), zu der diese Mail die Erinnerung ist.
+    name: "Erinnerung Vorgesetzter (Modalitäten ausstehend)",
+    subject: "Erinnerung: Einstellungsmodalitäten für {{mitarbeiter_name}} offen",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -1009,17 +1019,17 @@ CREDO Gruppe – {{einrichtung}}`,
           <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
             <span style="color:#92400e;font-weight:bold;font-size:14px;">⏰ Erinnerung</span>
           </div>
-          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Einstellungsmodalitaeten ausstehend</h2>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Einstellungsmodalitäten ausstehend</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Die Einstellungsmodalitaeten für <strong>{{mitarbeiter_name}}</strong> sind seit <strong>{{tage_offen}} Tagen</strong> offen.
+            Die Einstellungsmodalitäten für <strong>{{mitarbeiter_name}}</strong> sind seit <strong>{{tage_offen}} Tagen</strong> offen.
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
-            Bitte fuellen Sie das Formular zeitnah aus, damit die Personalabteilung den Arbeitsvertrag vorbereiten kann.
+            Bitte füllen Sie das Formular zeitnah aus, damit die Personalabteilung den Arbeitsvertrag vorbereiten kann.
           </p>
           <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
             <tr><td style="background-color:#f59e0b;border-radius:8px;">
               <a href="{{supervisor_link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
-                Einstellungsmodalitaeten ausfüllen →
+                Einstellungsmodalitäten ausfüllen →
               </a>
             </td></tr>
           </table>
@@ -1042,11 +1052,11 @@ CREDO Gruppe – {{einrichtung}}`,
   </table>
 </body>
 </html>`,
-    bodyText: `Erinnerung: Einstellungsmodalitaeten ausstehend
+    bodyText: `Erinnerung: Einstellungsmodalitäten ausstehend
 
-Die Einstellungsmodalitaeten für {{mitarbeiter_name}} sind seit {{tage_offen}} Tagen offen.
+Die Einstellungsmodalitäten für {{mitarbeiter_name}} sind seit {{tage_offen}} Tagen offen.
 
-Bitte fuellen Sie das Formular aus:
+Bitte füllen Sie das Formular aus:
 {{supervisor_link}}
 
 CREDO Gruppe – {{einrichtung}}`,
@@ -1062,6 +1072,15 @@ CREDO Gruppe – {{einrichtung}}`,
 
   // =============================================
   // Offboarding: Neuer Vorgang erstellt
+  //
+  // Fuer alle Offboarding-Vorlagen gilt: {{vorname}}, {{nachname}},
+  // {{einrichtung}} und {{austrittsdatum}} (TT.MM.JJJJ) liefert jede
+  // Aufrufstelle ueber offboardingMailFelder (src/lib/offboarding-mail.ts).
+  // Aliase fuer die englischen Feldnamen stehen in extractVariables
+  // (src/lib/mailer.ts). Bis September 2026 blieben diese Platzhalter leer,
+  // weil Vorlagen und Aufrufer verschiedene Namen benutzten — wer hier einen
+  // neuen Platzhalter einfuehrt, prueft ihn gegen ALLE Aufrufer
+  // (Test: src/__tests__/api/offboarding-mails.test.ts).
   // =============================================
   {
     event: "offboarding-created",
@@ -1084,7 +1103,7 @@ CREDO Gruppe – {{einrichtung}}`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Neuer Offboarding-Vorgang</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Fuer <strong>{{vorname}} {{nachname}}</strong> wurde ein Offboarding-Vorgang angelegt.
+            Für <strong>{{vorname}} {{nachname}}</strong> wurde ein Offboarding-Vorgang angelegt.
           </p>
           <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
             <tr><td style="padding:16px;">
@@ -1238,8 +1257,8 @@ CREDO HR-Portal`,
               <p style="margin:0;color:#374151;font-size:14px;">{{abteilung}}</p>
             </td></tr>
             <tr><td style="padding:0 16px 16px;">
-              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Offene Aufgaben</p>
-              <p style="margin:0;color:#374151;font-size:14px;">{{offene_aufgaben}}</p>
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Noch offen im Vorgang</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{offene_aufgaben}} Aufgabe(n)</p>
             </td></tr>
           </table>
           <p style="color:#9ca3af;font-size:12px;margin:0;">
@@ -1257,16 +1276,17 @@ CREDO HR-Portal`,
     bodyText: `Aufgabe erledigt: {{aufgabe}} ({{vorname}} {{nachname}})
 
 Abteilung: {{abteilung}}
-Offene Aufgaben: {{offene_aufgaben}}
+Noch offen im Vorgang: {{offene_aufgaben}} Aufgabe(n)
 
 CREDO HR-Portal`,
     variables: [
       { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
       { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
       { key: "{{aufgabe}}", description: "Name der erledigten Aufgabe" },
-      { key: "{{abteilung}}", description: "Abteilung der Aufgabe" },
+      { key: "{{abteilung}}", description: "Abteilung der Aufgabe („Keine Abteilung zugeordnet“, wenn im Portal ohne Abteilung abgehakt)" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
-      { key: "{{offene_aufgaben}}", description: "Anzahl verbleibender offener Aufgaben" },
+      { key: "{{offene_aufgaben}}", description: "Anzahl der im ganzen Vorgang noch offenen Aufgaben" },
+      { key: "{{austrittsdatum}}", description: "Letzter Arbeitstag (TT.MM.JJJJ)" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
     ],
   },
@@ -1295,7 +1315,7 @@ CREDO HR-Portal`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offene Offboarding-Aufgaben</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Fuer das Offboarding von <strong>{{vorname}} {{nachname}}</strong> sind noch <strong>{{offene_aufgaben}} Aufgaben</strong> offen. Das Austrittsdatum ist der <strong>{{austrittsdatum}}</strong>.
+            Für das Offboarding von <strong>{{vorname}} {{nachname}}</strong> hat Ihre Abteilung noch offene Aufgaben (Anzahl: <strong>{{offene_aufgaben}}</strong>). Das Austrittsdatum ist der <strong>{{austrittsdatum}}</strong>.
           </p>
           <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
             <tr><td style="background-color:#f59e0b;border-radius:8px;">
@@ -1318,7 +1338,7 @@ CREDO HR-Portal`,
 </html>`,
     bodyText: `Erinnerung: Offene Aufgaben für {{vorname}} {{nachname}}
 
-Offene Aufgaben: {{offene_aufgaben}}
+Offene Aufgaben Ihrer Abteilung: {{offene_aufgaben}}
 Austrittsdatum: {{austrittsdatum}}
 
 Aufgaben ansehen: {{link}}
@@ -1328,9 +1348,10 @@ CREDO HR-Portal`,
       { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
       { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
-      { key: "{{austrittsdatum}}", description: "Geplantes Austrittsdatum" },
-      { key: "{{offene_aufgaben}}", description: "Anzahl offener Aufgaben" },
-      { key: "{{link}}", description: "Link zu den Offboarding-Aufgaben" },
+      { key: "{{abteilung}}", description: "Name der erinnerten Abteilung" },
+      { key: "{{austrittsdatum}}", description: "Geplantes Austrittsdatum (TT.MM.JJJJ)" },
+      { key: "{{offene_aufgaben}}", description: "Anzahl der offenen Aufgaben dieser Abteilung" },
+      { key: "{{link}}", description: "Link zu den Offboarding-Aufgaben der Abteilung" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
     ],
   },
@@ -1359,8 +1380,13 @@ CREDO HR-Portal`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offboarding abgeschlossen</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Das Offboarding von <strong>{{vorname}} {{nachname}}</strong> wurde erfolgreich abgeschlossen. Alle Aufgaben sind erledigt.
+            Das Offboarding von <strong>{{vorname}} {{nachname}}</strong> wurde abgeschlossen.
           </p>
+          {{#offene_aufgaben_beim_abschluss}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 16px;">
+            <tr><td style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;">
+              <p style="margin:0;color:#92400e;font-size:14px;line-height:1.5;">Hinweis: Beim Abschluss waren noch <strong>{{offene_aufgaben_beim_abschluss}}</strong> Aufgabe(n) der Checkliste offen. Bitte prüfen Sie im Vorgang, ob sie noch erledigt werden müssen.</p>
+            </td></tr>
+          </table>{{/offene_aufgaben_beim_abschluss}}
           <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
             <tr><td style="padding:16px;">
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Mitarbeiter</p>
@@ -1391,9 +1417,9 @@ CREDO HR-Portal`,
 
 Austrittsdatum: {{austrittsdatum}}
 Einrichtung: {{einrichtung}}
-
-Alle Aufgaben wurden erledigt.
-
+{{#offene_aufgaben_beim_abschluss}}
+Hinweis: Beim Abschluss waren noch {{offene_aufgaben_beim_abschluss}} Aufgabe(n) der Checkliste offen. Bitte prüfen Sie im Vorgang, ob sie noch erledigt werden müssen.
+{{/offene_aufgaben_beim_abschluss}}
 CREDO HR-Portal`,
     variables: [
       { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
@@ -1401,6 +1427,7 @@ CREDO HR-Portal`,
       { key: "{{email}}", description: "E-Mail des Mitarbeiters" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{austrittsdatum}}", description: "Austrittsdatum" },
+      { key: "{{offene_aufgaben_beim_abschluss}}", description: "Anzahl offener Checklisten-Aufgaben beim Abschluss (leer, wenn alles erledigt ist; für den Bedingungsblock {{#offene_aufgaben_beim_abschluss}}…{{/offene_aufgaben_beim_abschluss}})" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
     ],
   },
@@ -1432,7 +1459,7 @@ CREDO HR-Portal`,
             Vielen Dank. Im Rahmen des Offboardings von <strong>{{employeeName}}</strong> wurden alle Aufgaben der Abteilung <strong>{{departmentName}}</strong> als erledigt markiert.
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
-            Es sind keine weiteren Schritte Ihrerseits erforderlich. Diese E-Mail dient als Bestaetigung.
+            Es sind keine weiteren Schritte Ihrerseits erforderlich. Diese E-Mail dient als Bestätigung.
           </p>
           <p style="color:#9ca3af;font-size:12px;margin:0;">
             Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
@@ -2026,6 +2053,13 @@ CREDO HR-Portal`,
 
   // =============================================
   // Verbeamtung / PSI: Fristen-Warnung (Sammelmail an HR)
+  //
+  // Nennt die einzelnen Hinweise. Vorher stand hier nur eine Zahl — die
+  // zudem falsch beschriftet war: {{totalWarnings}} zaehlt HINWEISE, nicht
+  // Vorgaenge (ein Vorgang kann mehrere haben). Die Liste kommt fertig
+  // gebaut und maskiert aus src/lib/psi-fristen-mail.ts; die Vorlage setzt
+  // sie nur ein. Markup im bisherigen Aufbau, die CI-Umfaerbung unten
+  // (applyCredoCi) greift wie bei allen Vorlagen.
   // =============================================
   {
     event: "psi-deadline-warning",
@@ -2047,10 +2081,19 @@ CREDO HR-Portal`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offene Fristen im Verbeamtungsverfahren</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Im taeglichen Fristen-Lauf wurden <strong>{{totalWarnings}}</strong> Verbeamtungsvorgang/-vorgaenge mit fristrelevanten Hinweisen erkannt. Hoechste Dringlichkeit: <strong>{{topSeverity}}</strong>.
+            Im täglichen Fristen-Lauf wurden <strong>{{totalWarnings}}</strong> fristrelevante Hinweise in <strong>{{anzahl_vorgaenge}}</strong> Verbeamtungsvorgang/-vorgängen erkannt. Höchste Dringlichkeit: <strong>{{hoechste_dringlichkeit}}</strong>.
           </p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 16px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 12px;color:#6b7280;font-size:12px;">Überfällig: {{anzahl_ueberfaellig}} · Dringend: {{anzahl_dringend}} · Vorwarnung: {{anzahl_vorwarnung}}</p>
+              {{warnungen_liste_html}}
+            </td></tr>
+          </table>
+{{#weitere_warnungen}}
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 16px;">{{weitere_warnungen}}</p>
+{{/weitere_warnungen}}
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
-            Bitte pruefen Sie die betroffenen Vorgaenge im HR-Portal und veranlassen Sie die erforderlichen Schritte.
+            Bitte prüfen Sie die betroffenen Vorgänge im HR-Portal und veranlassen Sie die erforderlichen Schritte.
           </p>
           <p style="color:#9ca3af;font-size:12px;margin:0;">
             Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
@@ -2066,15 +2109,30 @@ CREDO HR-Portal`,
 </html>`,
     bodyText: `Verbeamtung: Fristen-Warnung
 
-Im taeglichen Fristen-Lauf wurden {{totalWarnings}} Vorgang/Vorgaenge mit fristrelevanten Hinweisen erkannt.
-Hoechste Dringlichkeit: {{topSeverity}}
+Im täglichen Fristen-Lauf wurden {{totalWarnings}} fristrelevante Hinweise in {{anzahl_vorgaenge}} Vorgang/Vorgängen erkannt.
+Höchste Dringlichkeit: {{hoechste_dringlichkeit}}
+Überfällig: {{anzahl_ueberfaellig}} · Dringend: {{anzahl_dringend}} · Vorwarnung: {{anzahl_vorwarnung}}
 
-Bitte pruefen Sie die betroffenen Vorgaenge im HR-Portal.
+{{warnungen_liste}}
+{{#weitere_warnungen}}
+{{weitere_warnungen}}
+{{/weitere_warnungen}}
+
+Bitte prüfen Sie die betroffenen Vorgänge im HR-Portal.
 
 CREDO HR-Portal`,
     variables: [
-      { key: "{{totalWarnings}}", description: "Anzahl betroffener Vorgaenge" },
-      { key: "{{topSeverity}}", description: "Hoechste Dringlichkeitsstufe (OVERDUE/URGENT/WARNING)" },
+      { key: "{{totalWarnings}}", description: "Anzahl der Hinweise (nicht der Vorgänge)" },
+      { key: "{{anzahl_vorgaenge}}", description: "Anzahl der betroffenen Vorgänge" },
+      { key: "{{hoechste_dringlichkeit}}", description: "Höchste Dringlichkeit (Überfällig/Dringend/Vorwarnung)" },
+      { key: "{{anzahl_ueberfaellig}}", description: "Anzahl überfälliger Hinweise" },
+      { key: "{{anzahl_dringend}}", description: "Anzahl dringender Hinweise" },
+      { key: "{{anzahl_vorwarnung}}", description: "Anzahl der Vorwarnungen" },
+      { key: "{{warnungen_liste_html}}", description: "Liste der Hinweise als <ul>, maskiert, mit Link in das Portal (HTML-Teil)" },
+      { key: "{{warnungen_liste}}", description: "Liste der Hinweise, eine Zeile je Hinweis (Textteil)" },
+      { key: "{{weitere_warnungen}}", description: "Satz zu nicht aufgeführten Hinweisen (ab 50); sonst leer" },
+      { key: "{{#weitere_warnungen}}...{{/weitere_warnungen}}", description: "Block, der nur erscheint, wenn Hinweise weggelassen wurden" },
+      { key: "{{topSeverity}}", description: "Höchste Dringlichkeit als Code (OVERDUE/URGENT/WARNING), für ältere Vorlagen" },
     ],
   },
 

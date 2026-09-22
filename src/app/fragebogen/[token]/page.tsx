@@ -23,7 +23,32 @@ interface OnboardingData {
   };
   questionnaireType: string;
   status: string;
+  /**
+   * Hat die Person selbst abgesendet? Kommt aus der API
+   * (`mitarbeiterAbgesendet` in src/lib/onboarding-spuren.ts). Optional, weil
+   * aeltere Antworten und Testfixtures es nicht tragen — fehlt es, gilt es als
+   * nicht abgesendet, und das Formular bleibt sichtbar.
+   */
+  mitarbeiterAbgesendet?: boolean;
   personalData: Record<string, unknown> | null;
+}
+
+/**
+ * Wann die Karte „bereits eingereicht" statt des Formulars erscheint.
+ *
+ * Nur wenn die Person SELBST abgesendet hat — oder HR den Vorgang schon
+ * geprueft oder abgeschlossen hat (dann ist der Link fuer sie ohnehin zu).
+ * Frueher reichte ein Status SUPERVISOR_PENDING/SUPERVISOR_SUBMITTED: Sendete
+ * die Fuehrungskraft zuerst ab, sah die Person „bereits eingereicht", obwohl
+ * ihr Fragebogen bei Schritt 4 stand — und kam nie mehr hinein.
+ */
+function istEingereicht(data: OnboardingData | null): boolean {
+  if (!data) return false;
+  return (
+    data.mitarbeiterAbgesendet === true ||
+    data.status === "REVIEWED" ||
+    data.status === "COMPLETED"
+  );
 }
 
 export default function FragebogenPage() {
@@ -113,8 +138,8 @@ export default function FragebogenPage() {
     );
   }
 
-  // Fragebogen bereits eingereicht
-  if (data?.status === "SUBMITTED" || data?.status === "COMPLETED" || data?.status === "REVIEWED" || data?.status === "SUPERVISOR_PENDING" || data?.status === "SUPERVISOR_SUBMITTED") {
+  // Fragebogen bereits eingereicht (siehe istEingereicht)
+  if (istEingereicht(data)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-4">
         <div className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-lg">

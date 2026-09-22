@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { FELD_BEZEICHNUNGEN } from "@/lib/formular-fehler";
+import { STELLENBEZEICHNUNG_MAX_LAENGE } from "@/lib/stellenbezeichnung";
 
 /**
  * Validierungen fuer das Modul Vertragsende.
@@ -47,7 +49,17 @@ export const renewalDataSchema = z
     verguetungsmodell: z.string().max(50).optional(),
     entgeltgruppe: z.string().max(20).optional(),
     stufe: z.string().max(20).optional(),
-    stellenbeschreibung: z.string().max(2000).optional(),
+    // Einzeilige Stellenbezeichnung, dieselbe Grenze wie im Onboarding
+    // (seit 09/2026, vorher 2000). Eigene deutsche Meldung MIT Feldname: Die
+    // Route gibt nur `errors[0].message` aus, ohne Pfad — Zods englische
+    // Standardmeldung stuende sonst ohne jeden Bezug im Formular.
+    stellenbeschreibung: z
+      .string()
+      .max(
+        STELLENBEZEICHNUNG_MAX_LAENGE,
+        `${FELD_BEZEICHNUNGEN.stellenbeschreibung}: Bitte maximal ${STELLENBEZEICHNUNG_MAX_LAENGE} Zeichen.`,
+      )
+      .optional(),
     betriebsstaette: z.string().max(200).optional(),
     betriebsstaetteOrgId: z.string().uuid("Ungültige Betriebsstätte").optional().or(z.literal("")),
     probezeit: z.boolean().optional(),

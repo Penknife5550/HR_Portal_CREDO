@@ -10,6 +10,8 @@
  */
 
 import { z } from "zod";
+import { FELD_BEZEICHNUNGEN } from "@/lib/formular-fehler";
+import { STELLENBEZEICHNUNG_MAX_LAENGE } from "@/lib/stellenbezeichnung";
 
 // =============================================
 // Gemeinsame Bausteine
@@ -58,13 +60,23 @@ export const supStep1Schema = z
       .string()
       .min(1, "Betriebsstaette ist erforderlich.")
       .max(500, "Bitte maximal 500 Zeichen."),
-    // 2000 Zeichen: Die Beschriftung lautet "wird in Arbeitsvertrag
-    // uebernommen!" — das ist die Einladung, eine ganze Stellenausschreibung
-    // hineinzukopieren. Ohne diese Grenze faellt das erst dem Server auf.
+    // Im Formular heisst das Feld „Stellenbezeichnung" (seit 09/2026), der
+    // technische Name bleibt `stellenbeschreibung` — Spalte, JSON-Export und
+    // Word-Platzhalter haengen daran (siehe FELD_BEZEICHNUNGEN).
+    //
+    // 200 Zeichen, einzeilig: Gefragt ist ein Titel („Lehrkraft fuer Mathematik
+    // und Physik"), keine Stellenausschreibung. Frueher waren es 2000 Zeichen in
+    // einem dreizeiligen Feld, weil die Beschriftung „wird in Arbeitsvertrag
+    // uebernommen!" zum Hineinkopieren ganzer Ausschreibungen einlud. Die Grenze
+    // steht hier UND in der Route; ohne sie hier fiele ein zu langer
+    // Bestandswert erst dem Server auf.
     stellenbeschreibung: z
       .string()
-      .min(1, "Stellenbeschreibung ist erforderlich.")
-      .max(2000, "Bitte maximal 2000 Zeichen."),
+      .min(1, `${FELD_BEZEICHNUNGEN.stellenbeschreibung} ist erforderlich.`)
+      .max(
+        STELLENBEZEICHNUNG_MAX_LAENGE,
+        `Bitte maximal ${STELLENBEZEICHNUNG_MAX_LAENGE} Zeichen.`
+      ),
     vertragsbeginn: z.string().min(1, "Vertragsbeginn ist erforderlich."),
     befristet: z.boolean(),
     // Die leere Auswahl gehoert in die Liste statt hinter ein
@@ -248,7 +260,8 @@ export const SUP_STEP_CONFIG = [
   {
     number: 1,
     title: "Stelle & Vertrag",
-    description: "Betriebsstaette, Stellenbeschreibung, Vertragsdaten",
+    // Sichtbarer Untertitel der Formularkarte — deshalb mit echtem Umlaut.
+    description: `Betriebsstätte, ${FELD_BEZEICHNUNGEN.stellenbeschreibung}, Vertragsdaten`,
   },
   {
     number: 2,

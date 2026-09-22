@@ -54,6 +54,74 @@ export interface EventDefinition {
 
 const BEISPIEL_LINK = "https://hr.fes-credo.de/beispiel-link";
 
+/**
+ * Gemeinsamer Teil aller Offboarding-Beispiele — genau die Felder, die
+ * offboardingMailFelder (src/lib/offboarding-mail.ts) jeder Aufrufstelle
+ * liefert. Bewusst abgeschrieben statt aufgerufen: Die Funktion haengt ueber
+ * getBaseUrl an Node-Modulen, dieser Katalog wird auch im Browser geladen.
+ * Test src/__tests__/api/offboarding-mails.test.ts vergleicht beide.
+ */
+const OFFBOARDING_BEISPIEL = {
+  offboardingId: "00000000-0000-0000-0000-000000000002",
+  displayId: "OFF-2026-GYM-001",
+  employeeName: "Max Mustermann",
+  employeeFirstName: "Max",
+  employeeLastName: "Mustermann",
+  vorname: "Max",
+  nachname: "Mustermann",
+  organization: "FES Minden",
+  organizationName: "FES Minden",
+  einrichtung: "FES Minden",
+  mandantNumber: "01",
+  lastWorkingDay: "2026-08-31T00:00:00.000Z",
+  austrittsdatum: "31.08.2026",
+};
+
+/**
+ * Beispiel-Hinweise fuer die Fristen-Sammelmail der Verbeamtung — genau die
+ * Felder, die der Cron (cron/civil-service-deadlines) je Hinweis erzeugt.
+ *
+ * Die Mailfelder daraus (Liste als HTML und Klartext, Zaehler) stehen unten im
+ * Beispiel-Payload als fertiger Text. Sie werden bewusst NICHT hier mit
+ * fristenMailFelder (src/lib/psi-fristen-mail.ts) erzeugt: Dieser Katalog
+ * bleibt ohne Importe, weil er im Browser geladen wird (ein Test in
+ * ereignis-liste.test.ts erzwingt das). Stattdessen prueft
+ * src/__tests__/lib/psi-fristen-mail.test.ts, dass der Text genau dem
+ * entspricht, was fristenMailFelder aus diesen Hinweisen baut. Aendert sich
+ * dort das Markup, schlaegt der Test an und nennt den neuen Text.
+ */
+export const PSI_FRISTEN_BEISPIEL: {
+  processId: string;
+  displayId: string;
+  employeeName: string;
+  type: string;
+  severity: "WARNING" | "URGENT" | "OVERDUE";
+  message: string;
+  dueDate: string;
+}[] = [
+  {
+    processId: "00000000-0000-0000-0000-000000000003",
+    displayId: "PSI-2026-GYM-001",
+    employeeName: "Max Mustermann",
+    type: "BR_GENEHMIGUNG_MISSING",
+    severity: "OVERDUE",
+    message: "BR-Genehmigung überfällig. BR-Antrag eingereicht am 02.06.2026, 8-Wochen-Frist abgelaufen.",
+    dueDate: "2026-07-28T00:00:00.000Z",
+  },
+  {
+    processId: "00000000-0000-0000-0000-000000000004",
+    displayId: "PSI-2026-GYM-002",
+    employeeName: "Erika Beispiel",
+    type: "ASSESSMENT_2_MISSING",
+    severity: "WARNING",
+    message: "2. Beurteilung steht an (T+9 Monate erreicht).",
+    dueDate: "2026-11-01T00:00:00.000Z",
+  },
+];
+
+/** Portal-Adresse, mit der das Beispiel seine Links baut. */
+export const PSI_FRISTEN_BEISPIEL_BASIS = "https://hr.fes-credo.de";
+
 export const EVENT_CATALOG: EventDefinition[] = [
   // =============================================
   // Onboarding
@@ -160,7 +228,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
   },
   {
     event: "supervisor-reminder",
-    name: "Erinnerung Vorgesetzter (Modalitaeten ausstehend)",
+    name: "Erinnerung Vorgesetzter (Modalitäten ausstehend)",
     group: "Onboarding",
     recipientHint: "Leitung (Erinnerung)",
     defaultRecipients: { to: "{{supervisorEmail}}" },
@@ -284,9 +352,14 @@ export const EVENT_CATALOG: EventDefinition[] = [
     group: "Offboarding",
     recipientHint: "Ausscheidende:r (private Adresse bevorzugt, im Dialog aenderbar)",
     defaultRecipients: { to: "{{email}}" },
+    // Wie versendePaket (dokumentenpaket.ts) ihn baut: nur `refId`, kein
+    // `offboardingId`; `austrittsdatum` kommt SCHON formatiert (TT.MM.JJJJ).
+    // Der Mailer reicht es seit der Reparatur unveraendert durch — vorher
+    // machte er daraus "Invalid Date". "01.08.2026" statt eines Datums, dessen
+    // Tag groesser als 12 ist, damit ein vertauschtes Tag/Monat im
+    // Testversand sofort auffiele.
     samplePayload: {
       refId: "00000000-0000-0000-0000-000000000001",
-      offboardingId: "00000000-0000-0000-0000-000000000001",
       displayId: "OFF-2026-GYM-001",
       email: "max.mustermann@example.org",
       vorname: "Max",
@@ -299,7 +372,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
       nachricht: "",
       nachricht_html: "",
       sachbearbeiter_name: "Erika Sachbearbeiter",
-      austrittsdatum: "31.12.2026",
+      austrittsdatum: "01.08.2026",
     },
     wired: true,
   },
@@ -368,14 +441,9 @@ export const EVENT_CATALOG: EventDefinition[] = [
     recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
     defaultRecipients: { to: "" },
     samplePayload: {
-      offboardingId: "00000000-0000-0000-0000-000000000002",
-      displayId: "OFF-2026-GYM-001",
+      ...OFFBOARDING_BEISPIEL,
       employeeEmail: "max.mustermann@example.org",
-      employeeName: "Max Mustermann",
-      organization: "FES Minden",
-      mandantNumber: "01",
-      exitType: "RESIGNATION",
-      lastWorkingDay: "2026-08-31T00:00:00.000Z",
+      exitType: "KUENDIGUNG_ARBEITNEHMER",
     },
     wired: true,
   },
@@ -386,34 +454,36 @@ export const EVENT_CATALOG: EventDefinition[] = [
     recipientHint: "Abteilung (Magic-Link zur Checkliste)",
     defaultRecipients: { to: "{{email}}" },
     samplePayload: {
-      offboardingId: "00000000-0000-0000-0000-000000000002",
-      displayId: "OFF-2026-GYM-001",
+      ...OFFBOARDING_BEISPIEL,
       departmentKey: "IT",
       departmentName: "IT-Abteilung",
+      abteilung: "IT-Abteilung",
       email: "it@example.org",
-      expiresAt: "2026-08-31T00:00:00.000Z",
-      employeeName: "Max Mustermann",
-      organizationName: "FES Minden",
-      lastWorkingDay: "2026-08-31T00:00:00.000Z",
+      expiresAt: "2026-11-29T00:00:00.000Z",
       taskCount: 4,
+      token: "00000000-0000-0000-0000-00000000000a",
       magicLink: BEISPIEL_LINK,
     },
     wired: true,
   },
   {
+    // Zwei Aufrufer (Magic Link der Abteilung und Portal-Checkliste) mit
+    // demselben Aufbau; das Beispiel zeigt den Magic-Link-Weg. Der
+    // Portal-Weg sendet zusaetzlich taskId/taskTitle/taskCategory/completedById.
     event: "offboarding-task-completed",
     name: "Offboarding-Aufgabe erledigt",
     group: "Offboarding",
     recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
     defaultRecipients: { to: "" },
     samplePayload: {
-      offboardingId: "00000000-0000-0000-0000-000000000002",
-      displayId: "OFF-2026-GYM-001",
+      ...OFFBOARDING_BEISPIEL,
       departmentKey: "IT",
       departmentName: "IT-Abteilung",
-      itemTitle: "Laptop zurueckgeben",
-      employeeName: "Max Mustermann",
-      organizationName: "FES Minden",
+      abteilung: "IT-Abteilung",
+      itemId: "00000000-0000-0000-0000-00000000000b",
+      itemTitle: "Laptop zurückgeben",
+      aufgabe: "Laptop zurückgeben",
+      offene_aufgaben: 3,
     },
     wired: true,
   },
@@ -424,35 +494,38 @@ export const EVENT_CATALOG: EventDefinition[] = [
     recipientHint: "Abteilung (Bestaetigung)",
     defaultRecipients: { to: "{{email}}" },
     samplePayload: {
-      offboardingId: "00000000-0000-0000-0000-000000000002",
-      displayId: "OFF-2026-GYM-001",
+      ...OFFBOARDING_BEISPIEL,
       departmentKey: "IT",
       departmentName: "IT-Abteilung",
+      abteilung: "IT-Abteilung",
       email: "it@example.org",
-      employeeName: "Max Mustermann",
-      organizationName: "FES Minden",
       completedAt: "2026-08-15T10:00:00.000Z",
     },
     wired: true,
   },
   {
+    // Cron und Knopf im Portal senden denselben Aufbau; `reminderCount`
+    // kommt nur vom Knopf, overdueItems/upcomingItems/maxOverdueDays nur
+    // vom Cron. Das Beispiel enthaelt beides.
     event: "offboarding-reminder",
     name: "Erinnerung: Offene Offboarding-Aufgaben",
     group: "Offboarding",
     recipientHint: "Abteilung (Erinnerung)",
     defaultRecipients: { to: "{{email}}" },
     samplePayload: {
-      offboardingId: "00000000-0000-0000-0000-000000000002",
-      displayId: "OFF-2026-GYM-001",
+      ...OFFBOARDING_BEISPIEL,
       departmentKey: "IT",
       departmentName: "IT-Abteilung",
+      abteilung: "IT-Abteilung",
       email: "it@example.org",
+      level: "WARNING",
+      overdueItems: 1,
+      upcomingItems: 1,
+      totalOpenItems: 2,
+      offene_aufgaben: 2,
+      maxOverdueDays: 1,
       reminderCount: 1,
-      employeeName: "Max Mustermann",
-      organizationName: "FES Minden",
-      lastWorkingDay: "2026-08-31T00:00:00.000Z",
       magicLink: BEISPIEL_LINK,
-      level: "INFO",
     },
     wired: true,
   },
@@ -478,10 +551,11 @@ export const EVENT_CATALOG: EventDefinition[] = [
     recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
     defaultRecipients: { to: "" },
     samplePayload: {
-      offboardingId: "00000000-0000-0000-0000-000000000002",
-      displayId: "OFF-2026-GYM-001",
-      employeeName: "Max Mustermann",
-      status: "COMPLETED",
+      ...OFFBOARDING_BEISPIEL,
+      employeeEmail: "max.mustermann@example.org",
+      completedAt: "2026-09-01T10:00:00.000Z",
+      // Beispiel mit offenem Rest, damit der Testversand den Hinweisblock zeigt.
+      offene_aufgaben_beim_abschluss: "2",
     },
     wired: true,
   },
@@ -570,14 +644,42 @@ export const EVENT_CATALOG: EventDefinition[] = [
     group: "Verbeamtung",
     recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
     defaultRecipients: { to: "" },
+    // Die echten Felder des Crons (cron/civil-service-deadlines). Das alte
+    // Beispiel zeigte die Felder EINES Hinweises auf oberster Ebene — so
+    // sieht der Payload nie aus, und der Testversand rendert "0 Frist(en)"
+    // mit leerer Dringlichkeit. `warnings` (Liste) und `bySeverity` (Objekt)
+    // fehlen hier, weil der Katalog nur skalare Werte kennt; ihre Inhalte
+    // stehen in den flachen Feldern daneben.
     samplePayload: {
-      processId: "00000000-0000-0000-0000-000000000003",
-      displayId: "PSI-2026-GYM-001",
-      employeeName: "Max Mustermann",
-      type: "AMTSARZT_EXPIRING",
-      severity: "WARNING",
-      message: "Amtsarzt-Termin laeuft in 14 Tagen ab",
-      dueDate: "2026-06-25T00:00:00.000Z",
+      timestamp: "2026-09-22T06:00:00.000Z",
+      totalWarnings: PSI_FRISTEN_BEISPIEL.length,
+      shownWarnings: PSI_FRISTEN_BEISPIEL.length,
+      truncated: false,
+      omittedCount: 0,
+      topSeverity: "OVERDUE",
+      // Ab hier: was fristenMailFelder(PSI_FRISTEN_BEISPIEL, { maxAnzeige: 50,
+      // portalBasis: PSI_FRISTEN_BEISPIEL_BASIS }) liefert (per Test belegt).
+      hoechste_dringlichkeit: "Überfällig",
+      anzahl_vorgaenge: 2,
+      anzahl_ueberfaellig: 1,
+      anzahl_dringend: 0,
+      anzahl_vorwarnung: 1,
+      warnungen_liste:
+        "- [Überfällig] PSI-2026-GYM-001 · Max Mustermann: BR-Genehmigung überfällig. BR-Antrag eingereicht am 02.06.2026, 8-Wochen-Frist abgelaufen. (Frist: 28.07.2026)\n" +
+        "  https://hr.fes-credo.de/dashboard/civil-service/00000000-0000-0000-0000-000000000003\n" +
+        "- [Vorwarnung] PSI-2026-GYM-002 · Erika Beispiel: 2. Beurteilung steht an (T+9 Monate erreicht). (Frist: 01.11.2026)\n" +
+        "  https://hr.fes-credo.de/dashboard/civil-service/00000000-0000-0000-0000-000000000004",
+      warnungen_liste_html:
+        '<ul style="margin:0;padding:0 0 0 18px;color:#374151;font-size:14px;line-height:1.5;">' +
+        '<li style="margin:0 0 10px;"><strong style="color:#991b1b;">Überfällig</strong> · ' +
+        '<a href="https://hr.fes-credo.de/dashboard/civil-service/00000000-0000-0000-0000-000000000003" style="color:#575756;">PSI-2026-GYM-001</a> · Max Mustermann<br>' +
+        '<span style="color:#374151;">BR-Genehmigung überfällig. BR-Antrag eingereicht am 02.06.2026, 8-Wochen-Frist abgelaufen.</span><br>' +
+        '<span style="color:#6b7280;font-size:12px;">Frist: 28.07.2026</span></li>' +
+        '<li style="margin:0 0 10px;"><strong style="color:#1e40af;">Vorwarnung</strong> · ' +
+        '<a href="https://hr.fes-credo.de/dashboard/civil-service/00000000-0000-0000-0000-000000000004" style="color:#575756;">PSI-2026-GYM-002</a> · Erika Beispiel<br>' +
+        '<span style="color:#374151;">2. Beurteilung steht an (T+9 Monate erreicht).</span><br>' +
+        '<span style="color:#6b7280;font-size:12px;">Frist: 01.11.2026</span></li></ul>',
+      weitere_warnungen: "",
     },
     wired: true,
   },

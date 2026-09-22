@@ -11,8 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { triggerWebhooks } from "@/lib/webhooks";
-import { getBaseUrl } from "@/lib/url";
-import { formatEmployeeName } from "@/lib/format";
+import { abteilungsAufgabenLink, offboardingMailFelder } from "@/lib/offboarding-mail";
 import crypto from "crypto";
 
 // Abteilungen die direkt im Portal arbeiten (keine Magic Links)
@@ -177,20 +176,22 @@ async function handleGenerateLinks(offboardingId: string, session: { userId: str
 
     createdLinks.push(link);
 
-    // Webhook pro Abteilung triggern
+    // Webhook pro Abteilung triggern.
+    //
+    // Gemeinsame Felder (Name, Einrichtung, Austrittsdatum) aus
+    // offboardingMailFelder, dazu `abteilung` unter dem Namen, den die
+    // Vorlage benutzt. Der Link zeigt auf /offboarding-tasks/<token> — die
+    // Seite, die es gibt (siehe abteilungsAufgabenLink).
     await triggerWebhooks("offboarding-department-assigned", {
-      offboardingId,
-      displayId: offboarding.displayId,
+      ...offboardingMailFelder(offboarding),
       departmentKey,
       departmentName: config.departmentName,
+      abteilung: config.departmentName,
       email: config.email,
       expiresAt: expiresAt.toISOString(),
-      employeeName: formatEmployeeName(offboarding),
-      organizationName: offboarding.organization.name,
-      lastWorkingDay: offboarding.lastWorkingDay.toISOString(),
       taskCount: items.length,
       token: link.token,
-      magicLink: `${getBaseUrl()}/offboarding/abteilung/${link.token}`,
+      magicLink: abteilungsAufgabenLink(link.token),
     });
   }
 
@@ -259,18 +260,30 @@ async function handleReminder(
     },
   });
 
+  // Die Erinnerung nennt, wie viele Aufgaben die Abteilung noch offen hat
+  // ("noch 3 Aufgaben offen"). Der Cron zaehlt das ohnehin (totalOpenItems);
+  // die Erinnerung per Knopf hat die Zahl bisher nicht mitgeschickt, und in
+  // der Mail stand "noch  Aufgaben offen". Gleicher Name, gleiche Bedeutung
+  // wie im Cron: offen UND dieser Abteilung zugeordnet.
+  const offeneAufgaben = await prisma.offboardingChecklistItem.count({
+    where: {
+      offboardingId,
+      assigneeDepartment: link.departmentKey,
+      isCompleted: false,
+    },
+  });
+
   // Webhook "offboarding-reminder" triggern
   await triggerWebhooks("offboarding-reminder", {
-    offboardingId,
-    displayId: offboarding.displayId,
+    ...offboardingMailFelder(offboarding),
     departmentKey: link.departmentKey,
     departmentName: link.departmentName,
+    abteilung: link.departmentName,
     email: link.email,
     reminderCount: updated.reminderCount,
-    employeeName: formatEmployeeName(offboarding),
-    organizationName: offboarding.organization.name,
-    lastWorkingDay: offboarding.lastWorkingDay.toISOString(),
-    magicLink: `${getBaseUrl()}/offboarding/abteilung/${link.token}`,
+    totalOpenItems: offeneAufgaben,
+    offene_aufgaben: offeneAufgaben,
+    magicLink: abteilungsAufgabenLink(link.token),
     level: "INFO",
   });
 

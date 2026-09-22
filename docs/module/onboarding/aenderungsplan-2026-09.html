@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Änderungsplan Onboarding &amp; Versand</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+/* Bewusst einheitlich hell: Das Dokument zeigt die helle Portal-Oberfläche 1:1. */
+*, *::before, *::after { box-sizing: border-box; }
+:root {
+  color-scheme: light;
+  --grau: #575756;
+  --hellgrau: #DADADA;
+  --text: #2b2b2b;
+  --text2: #62625f;
+  --gelb: #FBC900;
+  --gruen: #6BAA24;
+  --rot: #E2001A;
+  --blau: #009AC6;
+  --weiss: #ffffff;
+  --linie: #dcdcd8;
+  --grund: #efefec;
+  --papier: #ffffff;
+  --code-bg: #f1f1ee;
+  /* Portal-Tokens aus src/app/globals.css */
+  --ui-bg: #fafafa;
+  --ui-border: #e5e5e5;
+  --ui-fg: #1a1a1a;
+  --ui-muted: #737373;
+  --ui-primary: #575756;
+  --st-invited: #3b82f6;
+  --st-progress: #f59e0b;
+  --st-submitted: #8b5cf6;
+  --st-sv-pending: #ec4899;
+  --st-sv-submitted: #a855f7;
+  --st-reviewed: #10b981;
+  --hinweis-bg: #eaf5fa;
+  --warn-bg: #fef8e1;
+  --kritik-bg: #fdeeee;
+  --ok-bg: #eef6e6;
+}
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--grund);
+  color: var(--text);
+  font-family: "Montserrat", Arial, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+  padding-inline: 16px;
+  padding-block: 28px;
+}
+.seite { max-width: 1080px; margin: 0 auto; background: var(--papier); box-shadow: 0 2px 16px rgba(40,40,30,.08); }
+.credo-balken { display: flex; height: 6px; }
+.credo-balken span { display: block; }
+.credo-balken .g { flex: 1; background: var(--hellgrau); }
+.credo-balken .y, .credo-balken .n, .credo-balken .r, .credo-balken .b { flex: .125; }
+.credo-balken .y { background: var(--gelb); } .credo-balken .n { background: var(--gruen); }
+.credo-balken .r { background: var(--rot); } .credo-balken .b { background: var(--blau); }
+
+.kopf { background: var(--grau); color: var(--weiss); padding: 40px 48px 30px; }
+.kopf .etikett { display: inline-block; background: var(--blau); color: var(--weiss); font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; }
+.kopf h1 { font-size: 27px; line-height: 1.25; margin: 14px 0 0; font-weight: 700; text-wrap: balance; }
+.kopf .unter { margin: 8px 0 0; font-size: 14px; opacity: .85; max-width: 62ch; }
+.kopf .meta { margin-top: 22px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.22); font-size: 11.5px; opacity: .72; display: flex; flex-wrap: wrap; gap: 6px 22px; }
+
+.inhalt-nav { background: #f5f5f3; border-bottom: 1px solid var(--linie); padding: 22px 48px; }
+.inhalt-nav h2 { margin: 0 0 10px; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--grau); }
+.inhalt-nav ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 36px; }
+.inhalt-nav li { font-size: 13px; margin-bottom: 4px; break-inside: avoid; }
+.inhalt-nav a { color: var(--grau); text-decoration: none; font-weight: 500; }
+.inhalt-nav a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--blau); outline-offset: 2px; }
+
+.rumpf { padding: 8px 48px 48px; }
+section.abschnitt { margin-top: 46px; }
+.abschnitt-titel { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid var(--grau); padding-bottom: 10px; margin-bottom: 18px; }
+.abschnitt-titel .nr { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--grau); color: var(--weiss); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+.abschnitt-titel h2 { margin: 0; font-size: 19px; color: var(--grau); text-wrap: balance; }
+h3 { font-size: 14.5px; color: var(--grau); margin: 28px 0 10px; }
+h4 { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text2); margin: 18px 0 8px; }
+p { margin: 0 0 12px; max-width: 78ch; }
+ul, ol { margin: 0 0 12px; padding-left: 22px; }
+li { margin-bottom: 6px; }
+li::marker { color: var(--text2); }
+strong { font-weight: 700; }
+code { font-family: Consolas, "Courier New", monospace; font-size: 12px; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; color: #243c44; overflow-wrap: anywhere; }
+pre { background: #2b2b29; color: #ecece6; font-family: Consolas, "Courier New", monospace; font-size: 11.5px; line-height: 1.55; padding: 12px 14px; border-radius: 6px; overflow-x: auto; margin: 8px 0 14px; }
+
+.kasten { border-radius: 6px; padding: 12px 16px; margin: 14px 0; font-size: 13px; border-left: 4px solid; }
+.kasten p:last-child { margin-bottom: 0; }
+.kasten strong.t { display: block; margin-bottom: 3px; }
+.kasten.hinweis { background: var(--hinweis-bg); border-color: var(--blau); }
+.kasten.warn { background: var(--warn-bg); border-color: var(--gelb); }
+.kasten.kritik { background: var(--kritik-bg); border-color: var(--rot); }
+.kasten.ok { background: var(--ok-bg); border-color: var(--gruen); }
+
+.tabelle { overflow-x: auto; margin: 14px 0 18px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--grau); color: var(--weiss); text-align: left; padding: 8px 12px; font-size: 12px; font-weight: 600; }
+td { padding: 8px 12px; border-bottom: 1px solid var(--linie); vertical-align: top; }
+tbody tr:nth-child(even) td { background: #fafaf8; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.alt { color: #9b2b2b; text-decoration: line-through; text-decoration-color: rgba(226,0,26,.5); }
+.neu-text { color: #3a6613; font-weight: 600; }
+
+.entscheidungen { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 8px 18px; margin: 12px 0 6px; padding: 0; list-style: none; }
+.entscheidungen li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; margin: 0; padding: 8px 12px; background: #f6f8f2; border: 1px solid #dde8cf; border-radius: 6px; }
+.entscheidungen .haken { color: var(--gruen); font-weight: 700; line-height: 1.5; }
+
+.schritte { counter-reset: s; list-style: none; padding: 0; margin: 10px 0 16px; }
+.schritte > li { counter-increment: s; position: relative; padding: 0 0 0 38px; margin-bottom: 12px; }
+.schritte > li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 24px; height: 24px; border-radius: 50%; background: #e9e9e5; color: var(--grau); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.aufwand { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 600; background: #f1f1ee; color: var(--grau); padding: 3px 10px; border-radius: 12px; }
+
+/* ---------- Mockup-Fenster ---------- */
+.paar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0 20px; align-items: start; }
+@media (max-width: 860px) { .paar { grid-template-columns: minmax(0, 1fr); } }
+.fenster { border: 1px solid #cfcfca; border-radius: 9px; overflow: hidden; background: var(--weiss); box-shadow: 0 3px 12px rgba(0,0,0,.06); margin: 16px 0; min-width: 0; }
+.paar > .fenster { margin: 0; }
+.fenster-leiste { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid #d8d8d3; font-size: 11px; color: var(--text2); font-weight: 600; }
+.fenster-leiste .tag { font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 1px 7px; border-radius: 3px; color: var(--weiss); }
+.fenster.heute .fenster-leiste { background: #f3e7e7; }
+.fenster.heute .tag { background: var(--rot); }
+.fenster.neu .fenster-leiste { background: #e5f0dc; }
+.fenster.neu .tag { background: var(--gruen); }
+.fenster-rumpf { background: var(--ui-bg); padding: 14px; font-size: 12.5px; color: var(--ui-fg); line-height: 1.5; }
+.fenster-rumpf.weiss { background: var(--weiss); }
+.unterschrift { font-size: 12px; color: var(--text2); margin: -8px 0 18px; }
+
+/* Markierung geänderter Stellen im Nachher-Bild */
+.mark { background: rgba(251,201,0,.32); box-shadow: 0 0 0 1px rgba(190,150,0,.55); border-radius: 3px; padding: 0 3px; }
+.mark-block { box-shadow: 0 0 0 2px rgba(251,201,0,.9), 0 0 0 5px rgba(251,201,0,.22); border-radius: 12px; }
+.anno { display: block; margin: 8px 0 0; padding: 6px 9px; font-size: 11px; line-height: 1.45; border-radius: 4px; border-left: 3px solid var(--rot); background: #fdecec; color: #95001a; font-weight: 500; }
+.anno.gut { border-color: var(--gruen); background: #edf6e4; color: #36600f; }
+.anno.info { border-color: var(--blau); background: #e7f4f9; color: #0a5e7a; }
+
+/* Portal-Bausteine */
+.ui-kopf { background: var(--weiss); border: 1px solid var(--ui-border); border-radius: 8px 8px 0 0; padding: 9px 12px 0; }
+.ui-kopf-zeile { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 8px; }
+.logo { font-weight: 700; letter-spacing: .14em; font-size: 12px; color: var(--grau); border: 1.5px solid var(--grau); padding: 1px 6px; border-radius: 3px; }
+.ui-kopf .titel { font-weight: 700; font-size: 12.5px; }
+.ui-kopf .sub { font-size: 11px; color: var(--ui-muted); }
+.pille { display: inline-block; border-radius: 999px; background: var(--ui-bg); color: var(--ui-muted); font-size: 10.5px; font-weight: 500; padding: 2px 9px; white-space: nowrap; }
+.fortschritt { height: 4px; background: #efefef; margin: 0 -12px; }
+.fortschritt span { display: block; height: 100%; background: var(--ui-primary); }
+.linie4 { display: flex; height: 3px; margin: 0 -12px; }
+.linie4 i { display: block; }
+.linie4 .g { flex: 1; background: #DADADA; } .linie4 .y { flex: .125; background: #FBC900; } .linie4 .n { flex: .125; background: #6BAA24; } .linie4 .r { flex: .125; background: #E2001A; } .linie4 .b { flex: .125; background: #009AC6; }
+.ui-schritte { display: flex; flex-wrap: wrap; gap: 4px; background: var(--weiss); border: 1px solid var(--ui-border); border-top: 0; padding: 7px 10px; }
+.ui-schritt { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 500; padding: 3px 8px; border-radius: 6px; color: var(--ui-muted); opacity: .6; }
+.ui-schritt b { width: 16px; height: 16px; border-radius: 50%; background: #efefef; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; }
+.ui-schritt.aktiv { background: var(--ui-primary); color: #fff; opacity: 1; }
+.ui-schritt.aktiv b { background: #fff; color: var(--ui-primary); }
+.ui-schritt.erledigt { background: #dcfce7; color: #166534; opacity: 1; }
+.ui-schritt.erledigt b { background: #16a34a; color: #fff; }
+
+.ui-karte { background: var(--weiss); border: 1px solid var(--ui-border); border-radius: 12px; overflow: hidden; }
+.ui-karte + .ui-karte { margin-top: 10px; }
+.ui-karte-kopf { padding: 10px 14px; border-bottom: 1px solid var(--ui-border); background: #fcfcfc; }
+.ui-karte-kopf .t { font-size: 14px; font-weight: 700; }
+.ui-karte-kopf .s { font-size: 11.5px; color: var(--ui-muted); }
+.ui-karte-rumpf { padding: 12px 14px; display: grid; gap: 11px; }
+.ui-feld { display: grid; gap: 4px; }
+.ui-label { font-size: 11.5px; font-weight: 500; }
+.stern { color: #dc2626; }
+.ui-input { border: 1px solid var(--ui-border); border-radius: 8px; background: var(--weiss); padding: 6px 10px; font-size: 11.5px; color: #9a9a9a; min-height: 30px; }
+.ui-input.wert { color: var(--ui-fg); }
+.ui-input.flaeche { min-height: 58px; }
+.ui-input.flaeche.gross { min-height: 104px; color: var(--ui-fg); white-space: pre-line; }
+.ui-zaehler { font-size: 9.5px; color: var(--ui-muted); text-align: right; margin-top: -2px; }
+.ui-check { display: flex; gap: 8px; align-items: center; border: 1px solid var(--ui-border); border-radius: 8px; background: #fcfcfc; padding: 8px 10px; font-size: 11.5px; font-weight: 500; }
+.box { width: 13px; height: 13px; border: 1.5px solid #8a8a8a; border-radius: 3px; background: #fff; flex-shrink: 0; }
+.ui-knopfzeile { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.knopf { display: inline-flex; align-items: center; gap: 5px; border-radius: 8px; font-size: 11px; font-weight: 600; padding: 6px 12px; border: 1px solid transparent; white-space: nowrap; }
+.knopf.primaer { background: var(--ui-primary); color: #fff; }
+.knopf.blau { background: var(--blau); color: #fff; }
+.knopf.blau-rand { border-color: var(--blau); color: var(--blau); background: #fff; }
+.knopf.gruen { background: var(--gruen); color: #fff; }
+.knopf.rand { border-color: var(--ui-border); background: #fff; color: var(--ui-fg); }
+.knopf.pruefen { background: #2563eb; color: #fff; }
+.knopf.klein { padding: 3px 9px; font-size: 10.5px; border-radius: 6px; }
+.knopf.gesperrt { opacity: .45; }
+.ui-hinweistext { font-size: 10.5px; color: var(--ui-muted); }
+.badge { display: inline-block; border-radius: 999px; font-size: 10.5px; font-weight: 600; padding: 2px 9px; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; font-size: 10px; font-weight: 500; padding: 1px 8px; border: 1px solid; white-space: nowrap; }
+.mono { font-family: Consolas, "Courier New", monospace; font-size: 11px; font-weight: 700; background: var(--ui-bg); border-radius: 6px; padding: 2px 8px; }
+
+/* Einzelkarte (Fragebogen gesperrt / Danke) */
+.zentriert { display: flex; justify-content: center; padding: 10px 0; }
+.solo { width: 100%; max-width: 330px; background: #fff; border-radius: 12px; box-shadow: 0 8px 22px rgba(0,0,0,.12); overflow: hidden; text-align: center; }
+.solo .innen { padding: 22px 20px 18px; }
+.solo .kreis { width: 46px; height: 46px; border-radius: 50%; background: #dcfce7; color: #16a34a; font-size: 22px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 12px auto 10px; }
+.solo h5 { margin: 0; font-size: 14px; }
+.solo p { font-size: 11.5px; color: var(--ui-muted); margin: 6px auto 0; }
+
+/* HR-Kopfzeile und Stepper */
+.hr-kopf { background: #fff; border: 1px solid var(--ui-border); border-radius: 10px; padding: 10px 12px; }
+.hr-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.hr-zeile .rechts { margin-left: auto; }
+.hr-meta { font-size: 11px; color: var(--ui-muted); margin-top: 6px; }
+.hr-meta b { color: var(--ui-fg); }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--ui-border); margin: 10px 0 12px; background: #fff; border-radius: 8px 8px 0 0; padding: 0 6px; }
+.tabs span { font-size: 11px; font-weight: 500; color: var(--ui-muted); padding: 7px 9px; border-bottom: 2px solid transparent; }
+.tabs span.aktiv { color: var(--gruen); border-color: var(--gruen); }
+.st-parallel-hinweis { font-size: 11px; font-weight: 600; color: var(--blau); margin-bottom: 6px; }
+.st-raster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 560px) { .st-raster { grid-template-columns: minmax(0, 1fr); } }
+.st-aktiv { border: 2px solid var(--blau); border-radius: 14px; background: #fff; overflow: hidden; }
+.st-aktiv + .st-aktiv { margin-top: 0; }
+.st-kopf { display: flex; gap: 9px; align-items: flex-start; padding: 10px 12px; background: rgba(0,154,198,.05); border-bottom: 1px solid rgba(0,154,198,.12); }
+.st-kreis { width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: var(--blau); color: #fff; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+.st-titel { font-weight: 700; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.st-chip { font-size: 9.5px; font-weight: 600; color: var(--blau); background: rgba(0,154,198,.1); padding: 1px 7px; border-radius: 999px; }
+.st-beschr { font-size: 11px; color: var(--ui-muted); }
+.st-rumpf { padding: 10px 12px; display: grid; gap: 8px; }
+.st-info { border: 1px solid rgba(0,154,198,.22); background: rgba(0,154,198,.05); color: #007da1; border-radius: 8px; padding: 6px 10px; font-size: 11px; }
+.st-liste { background: #fff; border: 1px solid #efefef; border-radius: 14px; padding: 10px 12px; margin-top: 10px; }
+.st-liste .k { font-size: 11.5px; font-weight: 700; margin-bottom: 6px; }
+.st-zeile { display: flex; gap: 8px; align-items: center; border: 1px solid #f1f1f1; border-radius: 8px; padding: 5px 8px; margin-top: 5px; font-size: 11px; background: #fbfbfb; }
+.st-zeile.blass { opacity: .6; }
+.st-zeile .n { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; background: #e5e7eb; color: #6b7280; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.st-zeile .n.ok { background: rgba(107,170,36,.14); color: var(--gruen); }
+.st-zeile .d { margin-left: auto; font-size: 10px; color: var(--ui-muted); }
+
+/* Tabellen-Mock */
+.ui-tab { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--ui-border); border-radius: 8px; font-size: 11px; }
+.ui-tab th { background: #fafafa; color: var(--ui-muted); font-weight: 600; font-size: 10.5px; padding: 6px 8px; border-bottom: 1px solid var(--ui-border); }
+.ui-tab td { padding: 7px 8px; border-bottom: 0; background: #fff !important; }
+
+/* Dialog-Mock */
+.dialog { background: #fff; border: 1px solid #bdbdb8; border-radius: 14px; box-shadow: 0 12px 32px rgba(0,0,0,.16); overflow: hidden; }
+.dialog-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--ui-border); }
+.dialog-kopf .t { font-size: 14px; font-weight: 700; }
+.dialog-kopf .s { font-size: 11px; color: var(--ui-muted); }
+.dialog-rumpf { padding: 13px 16px; display: grid; gap: 11px; }
+.dialog-fuss { padding: 10px 16px; border-top: 1px solid var(--ui-border); background: #fafafa; display: flex; justify-content: flex-end; gap: 8px; }
+.zweispaltig { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 520px) { .zweispaltig { grid-template-columns: minmax(0, 1fr); } }
+.abgrenzung { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ui-muted); margin-top: 2px; }
+.ablage { border: 2px dashed var(--ui-border); border-radius: 8px; background: #fafafa; text-align: center; padding: 12px; font-size: 11.5px; }
+.ablage u { color: var(--blau); }
+.datei { display: flex; align-items: center; gap: 8px; border: 1px solid var(--ui-border); border-radius: 8px; background: #fff; padding: 5px 9px; font-size: 11.5px; }
+.datei .ic { width: 16px; height: 19px; border: 1.5px solid #9a9a9a; border-radius: 2px; flex-shrink: 0; position: relative; background: #fff; }
+.datei .ic::after { content: ""; position: absolute; left: 2px; right: 2px; top: 5px; height: 1px; background: #bbb; box-shadow: 0 3px 0 #bbb, 0 6px 0 #bbb; }
+.datei .gr { color: var(--ui-muted); font-size: 10px; }
+.datei .weg { margin-left: auto; color: #c0392b; font-size: 10.5px; font-weight: 600; }
+.datei.falsch { border-color: #f1a9a9; background: #fff6f6; }
+.datei.falsch .fehler { color: #b3261e; font-size: 10px; }
+.summe { background: #f4f4f4; border-radius: 8px; padding: 8px 10px; font-size: 11px; }
+.balken { height: 5px; background: #e2e2e2; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+.balken span { display: block; height: 100%; background: var(--blau); }
+.gelbkasten { border: 1px solid rgba(251,201,0,.5); background: rgba(251,201,0,.12); border-radius: 8px; padding: 7px 10px; font-size: 11px; }
+.verlauf { font-size: 11px; color: var(--ui-muted); }
+
+/* Paketkarte und neue Mail-Karte */
+.paketkarte { border: 2px solid rgba(0,154,198,.3); background: rgba(0,154,198,.05); border-radius: 14px; padding: 12px 14px; }
+.mailkarte { border: 1px solid var(--ui-border); background: #fff; border-radius: 14px; padding: 12px 14px; }
+.kartentitel { font-size: 12.5px; font-weight: 700; }
+.kartentext { font-size: 10.5px; color: var(--ui-muted); margin: 2px 0 8px; }
+.zeile-klein { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 10.5px; color: var(--ui-muted); }
+.graukarte { border: 1px solid var(--ui-border); background: #fff; border-radius: 14px; padding: 10px 14px; font-size: 11.5px; }
+.graukarte .kartentitel { margin-bottom: 2px; }
+.stapel { display: grid; gap: 9px; }
+.pfad { background: #fff; border: 1px solid var(--ui-border); border-radius: 10px; padding: 7px 10px; font-size: 10.5px; color: var(--ui-muted); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.pfad .ja { color: var(--gruen); }
+.pfad .hier { background: rgba(0,154,198,.1); color: var(--blau); border-radius: 999px; padding: 0 7px; }
+
+/* E-Mail-Vorschau */
+.mail { background: #eeeeec; padding: 14px; border-radius: 8px; }
+.mail-innen { max-width: 470px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.mail-kopf { background: var(--grau); color: #fff; padding: 12px 16px; }
+.mail-kopf .t { font-weight: 700; font-size: 13px; }
+.mail-kopf .s { font-size: 10.5px; opacity: .75; }
+.mail-rumpf { padding: 14px 16px; color: #374151; }
+.mail-rumpf p { margin: 0 0 9px; }
+.mail-anhang { background: #f7f7f7; border: 1px solid #ececec; border-radius: 6px; padding: 8px 10px; font-size: 11px; margin: 10px 0; }
+.mail-fuss { border-top: 1px solid #ececec; padding: 9px 16px; font-size: 10px; color: #8a8a8a; }
+.mailkopfzeilen { font-size: 10.5px; color: var(--text2); background: #fff; border: 1px solid #dededa; border-radius: 6px; padding: 6px 10px; max-width: 470px; margin: 0 auto 8px; line-height: 1.6; }
+
+details { margin: 10px 0 14px; border: 1px solid var(--linie); border-radius: 6px; background: #fbfbf9; }
+details > summary { cursor: pointer; padding: 9px 14px; font-weight: 600; font-size: 13px; color: var(--grau); }
+details > div { padding: 0 14px 12px; }
+
+.pakete { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+@media (max-width: 820px) { .pakete { grid-template-columns: minmax(0, 1fr); } }
+.paket { border: 1px solid var(--linie); border-radius: 8px; padding: 12px 14px; background: #fcfcfa; }
+.paket .ph { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--blau); }
+.paket h5 { margin: 3px 0 6px; font-size: 14px; color: var(--grau); }
+.paket ul { font-size: 12.5px; padding-left: 18px; margin-bottom: 8px; }
+
+/* Unterlagen nachfordern */
+.nf-karte { border: 2px solid rgba(251,201,0,.55); background: rgba(251,201,0,.06); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
+.nf-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pill { display: inline-block; border-radius: 999px; font-size: 10px; font-weight: 600; padding: 1px 8px; white-space: nowrap; }
+.p-offen { background: #fef3c7; color: #92400e; }
+.p-pruefen { background: rgba(0,154,198,.12); color: #007da1; }
+.p-ok { background: rgba(107,170,36,.14); color: #3d6d10; }
+.p-zurueck { background: rgba(226,0,26,.1); color: #b3001a; }
+.p-entf { background: #f1f1f1; color: #666; }
+.nf-balken { display: flex; height: 6px; border-radius: 4px; overflow: hidden; background: #ececec; }
+.nf-balken .ok { background: var(--gruen); }
+.nf-balken .pr { background: var(--blau); }
+.pos { border: 1px solid var(--ui-border); background: #fff; border-radius: 8px; padding: 7px 10px; display: grid; gap: 4px; font-size: 11px; }
+.pos-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pos-kopf b { font-size: 11.5px; }
+.pos .klein { font-size: 10px; color: var(--ui-muted); }
+.pos .aktionen { display: flex; gap: 6px; flex-wrap: wrap; }
+.knopf.ja { background: var(--gruen); color: #fff; }
+.knopf.nein { border-color: rgba(226,0,26,.4); color: #b3001a; background: #fff; }
+.knopf.gelb { background: var(--ui-primary); color: #fff; }
+.amber-kasten { border: 2px solid #fcd34d; background: #fffbeb; border-radius: 14px; padding: 11px 13px; font-size: 11.5px; }
+.amber-kasten .t { font-weight: 700; color: #92400e; font-size: 12.5px; }
+.amber-kasten ul { margin: 5px 0 0; padding-left: 16px; }
+.amber-kasten li { margin: 2px 0; font-weight: 600; }
+.amber-kasten li span { font-weight: 400; color: var(--ui-muted); font-size: 10.5px; }
+.oeff-kopf { background: #fff; border: 1px solid var(--ui-border); border-radius: 10px 10px 0 0; padding: 9px 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.oeff-rumpf { background: #fff; border: 1px solid var(--ui-border); border-top: 0; padding: 12px; display: grid; gap: 9px; }
+.fristkasten { border: 2px solid #FBC900; background: rgba(251,201,0,.1); border-radius: 8px; padding: 7px 10px; font-size: 11.5px; }
+.upl { border: 1px solid; border-radius: 8px; padding: 8px 10px; display: grid; gap: 5px; font-size: 11px; }
+.upl .kopfz { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.upl .kreis-k { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.upl.rot { border-color: rgba(226,0,26,.4); background: rgba(226,0,26,.05); }
+.upl.rot .kreis-k { background: rgba(226,0,26,.15); color: #b3001a; }
+.upl.amber { border-color: #fde68a; background: #fff; }
+.upl.amber .kreis-k { background: #fef3c7; color: #b45309; }
+.upl.blau { border-color: rgba(0,154,198,.3); background: rgba(0,154,198,.05); }
+.upl.blau .kreis-k { background: rgba(0,154,198,.15); color: #007da1; }
+.upl .knopf.amber { background: #d97706; color: #fff; }
+.oeff-fuss { background: #fff; border: 1px solid var(--ui-border); border-top: 0; border-radius: 0 0 10px 10px; padding: 9px 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; box-shadow: 0 -3px 8px rgba(0,0,0,.04); }
+.fluss { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; margin: 14px 0 6px; }
+.fluss .s { flex: 1 1 140px; border: 1px solid var(--linie); border-radius: 8px; background: #fcfcfa; padding: 8px 10px; font-size: 12px; }
+.fluss .s b { display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text2); margin-bottom: 2px; }
+.fluss .pf { align-self: center; color: var(--text2); font-weight: 700; }
+@media (max-width: 700px) { .fluss .pf { display: none; } }
+.fluss-neben { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+@media (max-width: 700px) { .fluss-neben { grid-template-columns: minmax(0, 1fr); } }
+.fluss-neben div { border-radius: 6px; padding: 7px 10px; font-size: 12px; }
+.fluss-neben .gut { background: var(--ok-bg); border-left: 3px solid var(--gruen); }
+.fluss-neben .schlecht { background: var(--kritik-bg); border-left: 3px solid var(--rot); }
+.fluss-neben .zeit { background: var(--warn-bg); border-left: 3px solid var(--gelb); }
+.fluss-neben .hr { background: var(--hinweis-bg); border-left: 3px solid var(--blau); }
+
+.fuss { border-top: 1px solid var(--linie); padding: 18px 48px 26px; font-size: 11.5px; color: var(--text2); background: #f7f7f5; }
+
+@media (max-width: 700px) {
+  .kopf { padding: 28px 20px 22px; }
+  .kopf h1 { font-size: 22px; }
+  .inhalt-nav { padding: 18px 20px; }
+  .inhalt-nav ol { columns: 1; }
+  .rumpf { padding: 4px 20px 36px; }
+  .fuss { padding: 16px 20px 22px; }
+}
+</style>
+
+</head>
+<body>
+<div class="seite">
+  <div class="credo-balken" aria-hidden="true"><span class="g"></span><span class="y"></span><span class="n"></span><span class="r"></span><span class="b"></span></div>
+
+  <header class="kopf">
+    <span class="etikett">Plan · zur Freigabe</span>
+    <h1>Stellenbezeichnung, paralleler Zugriff, individuelle E-Mail und Unterlagen nachfordern</h1>
+    <p class="unter">Vier Änderungswünsche am HR-Portal: wie ich sie umsetzen würde, was sich für HR, Führungskräfte und Beschäftigte ändert, mit Vorher/Nachher-Ansichten.</p>
+    <div class="meta">
+      <span>Stand 21.09.2026 · Fassung 2 (ergänzt um „Unterlagen nachfordern“)</span>
+      <span>Grundlage: Quellcode auf <code style="background:rgba(255,255,255,.14);color:#fff">main</code> (ae490ba), analysiert und gegengeprüft</span>
+      <span>Noch nichts umgesetzt</span>
+    </div>
+  </header>
+
+  <nav class="inhalt-nav" aria-label="Inhalt">
+    <h2>Inhalt</h2>
+    <ol>
+      <li><a href="#ueberblick">Auf einen Blick und Ihre Entscheidungen</a></li>
+      <li><a href="#a1">Stellenbezeichnung statt Stellenbeschreibung</a></li>
+      <li><a href="#a2">Fragebogen und Modalitäten parallel</a></li>
+      <li><a href="#a3">Individuelle E-Mail mit Anhang</a></li>
+      <li><a href="#a4">Unterlagen nachfordern</a></li>
+      <li><a href="#mails">Alle E-Mails und Vorlagen im Überblick</a></li>
+      <li><a href="#ablauf">Reihenfolge, Deploy und Handschritte</a></li>
+      <li><a href="#offen">Entschiedene und offene Punkte</a></li>
+    </ol>
+  </nav>
+
+  <main class="rumpf">
+
+    <!-- ================= ÜBERBLICK ================= -->
+    <section class="abschnitt" id="ueberblick">
+      <div class="abschnitt-titel"><span class="nr">0</span><h2>Auf einen Blick</h2></div>
+
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Änderung</th><th>Was sich ändert</th><th>Datenbank</th><th>Aufwand</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>1 · Stellenbezeichnung</strong></td>
+              <td>Der Begriff heißt überall „Stellenbezeichnung“, im Onboarding und in der Vertragsverlängerung. Das Feld wird einzeilig, höchstens 200 Zeichen.</td>
+              <td>Kein Umbau. Einmalig werden gespeicherte Standard-Beschriftungen angepasst.</td>
+              <td class="num">0,5–1 Tag</td>
+            </tr>
+            <tr>
+              <td><strong>2 · Paralleler Zugriff</strong></td>
+              <td>Fragebogen und Einstellungsmodalitäten laufen unabhängig voneinander, in beliebiger Reihenfolge. Name und Führungskraft lassen sich schon beim Anlegen eintragen. Festhängende Vorgänge werden repariert.</td>
+              <td>Eine neue Spalte (Zeitpunkt des Vorgesetzten-Links), dazu einmalige Korrektur festhängender Vorgänge.</td>
+              <td class="num">2,5–3 Tage</td>
+            </tr>
+            <tr>
+              <td><strong>3 · Individuelle E-Mail</strong></td>
+              <td>Neue Karte „Individuelle E-Mail“ in Onboarding, Offboarding, Verbeamtung und Vertragsverlängerung: eigener Betreff, eigener Text, eigene PDF- oder Bild-Anhänge. Eine Kopie bleibt 12 Monate im Vorgang.</td>
+              <td>Zwei neue Spalten im Versandnachweis, rein additiv.</td>
+              <td class="num">5–6 Tage</td>
+            </tr>
+            <tr>
+              <td><strong>4 · Unterlagen nachfordern</strong></td>
+              <td>HR fordert aus jedem Vorgang (alle sechs Vorgangsarten) gezielt Unterlagen an. Die Person lädt sie über einen persönlichen Link hoch. HR prüft jede Unterlage einzeln: Angenommene landen in den Dokumenten des Vorgangs, zurückgewiesene werden automatisch neu angefordert. Mit Frist, Erinnerungen und HR-Meldungen.</td>
+              <td>Vier neue Tabellen, rein additiv.</td>
+              <td class="num">19–21 Tage</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Ihre Entscheidungen vom 21.09.2026</h3>
+      <h4>Änderungen 1 bis 3</h4>
+      <ul class="entscheidungen">
+        <li><span class="haken">✓</span><span>„Stellenbezeichnung“ überall einheitlich, auch im Vertragsverlängerungs-Formular.</span></li>
+        <li><span class="haken">✓</span><span>Das Feld wird einzeilig mit höchstens 200 Zeichen.</span></li>
+        <li><span class="haken">✓</span><span>„Als geprüft markieren“ erst, wenn der Fragebogen eingereicht ist und, falls ein Vorgesetzten-Link besteht, auch die Modalitäten.</span></li>
+        <li><span class="haken">✓</span><span>„Neuer Vorgang“ bekommt optional Vor- und Nachname sowie die E-Mail der Führungskraft.</span></li>
+        <li><span class="haken">✓</span><span>Individuelle E-Mail in Onboarding, Offboarding, Verbeamtung und Vertragsverlängerung. Nicht in Elternzeit und Mutterschutz, nicht ohne Vorgang.</span></li>
+        <li><span class="haken">✓</span><span>Anhänge: PDF, JPG, PNG, WebP.</span></li>
+        <li><span class="haken">✓</span><span>Eine Kopie der Anhänge bleibt 12 Monate im Vorgang.</span></li>
+        <li><span class="haken">✓</span><span>Antworten gehen an das zentrale HR-Postfach.</span></li>
+        <li><span class="haken">✓</span><span>Die Links erzeugt und versendet das Portal selbst per SMTP. Kein n8n-Workflow ruft den Vorgesetzten-Link auf.</span></li>
+        <li><span class="haken">✓</span><span>Status „Bereit zur Prüfung“ wie im Mockup.</span></li>
+        <li><span class="haken">✓</span><span>Parallele Darstellung im Stepper auch im Offboarding.</span></li>
+      </ul>
+      <h4>Änderung 4: Unterlagen nachfordern</h4>
+      <ul class="entscheidungen">
+        <li><span class="haken">✓</span><span>HR fordert Unterlagen zum Hochladen an. Kein Wiederöffnen des Fragebogens und kein HR-eigener Upload.</span></li>
+        <li><span class="haken">✓</span><span>In allen sechs Vorgangsarten: Onboarding, Offboarding, Verbeamtung, Vertragsverlängerung, Elternzeit, Mutterschutz.</span></li>
+        <li><span class="haken">✓</span><span>Empfänger ist die Person des Vorgangs. Die Adresse ist vorbelegt und änderbar, abweichende Adressen nur mit freigegebener Domain.</span></li>
+        <li><span class="haken">✓</span><span>Die Auswahl kommt aus den Dokumentarten des Moduls, dazu beliebig viele freie Zeilen, jeweils mit Hinweis.</span></li>
+        <li><span class="haken">✓</span><span>Mit Frist. Automatische Erinnerung 7 Tage vorher und am Fristtag, HR-Meldung, wenn die Frist verstrichen ist.</span></li>
+        <li><span class="haken">✓</span><span>HR-Mail, wenn alles da ist. Teilstände sind im Vorgang und in der Liste zu sehen.</span></li>
+        <li><span class="haken">✓</span><span>HR nimmt jede Unterlage an oder weist sie mit Begründung zurück. Eine Zurückweisung fordert automatisch neu an.</span></li>
+        <li><span class="haken">✓</span><span>Nur Angefordertes, je Unterlage eine oder mehrere Dateien.</span></li>
+        <li><span class="haken">✓</span><span>Eine Frist je Nachforderung, jederzeit verlängerbar.</span></li>
+        <li><span class="haken">✓</span><span>Bei der Vertragsverlängerung erst nach der Zusage der Übernahme.</span></li>
+        <li><span class="haken">✓</span><span>HR-Mails an die anfordernde Person, das zentrale HR-Postfach in Kopie.</span></li>
+        <li><span class="haken">✓</span><span>Korrektur über „Annahme zurücknehmen“.</span></li>
+      </ul>
+      <p class="unterschrift" style="margin-top:6px">Onboarding bei der individuellen E-Mail habe ich aus Ihrem ursprünglichen Wunsch übernommen („einer Person im Onboarding, aber auch grundsätzlich“).</p>
+    </section>
+
+    <!-- ================= 1 STELLENBEZEICHNUNG ================= -->
+    <section class="abschnitt" id="a1">
+      <div class="abschnitt-titel"><span class="nr">1</span><h2>Stellenbezeichnung statt Stellenbeschreibung</h2></div>
+      <p>Die Führungskraft trägt im ersten Schritt der Einstellungsmodalitäten ein, als was die Person eingestellt wird. Der Wert wird in den Arbeitsvertrag übernommen. Fachlich ist das ein Titel („Lehrkraft für Mathematik und Physik“), keine Beschreibung. Beim Vertragsende belegt das Portal dasselbe Feld sogar schon mit der „Position“ aus DokuBit vor.</p>
+
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> /modalitaeten/… · Schritt 1</div>
+          <div class="fenster-rumpf">
+            <div class="ui-kopf">
+              <div class="ui-kopf-zeile">
+                <div style="display:flex;gap:9px;align-items:center"><span class="logo">CREDO</span><div><div class="titel">Einstellungsmodalitäten</div><div class="sub">für Anna Beispiel · FES Gymnasium</div></div></div>
+                <span class="pille">Schritt 1 / 5</span>
+              </div>
+              <div class="fortschritt"><span style="width:20%"></span></div>
+              <div class="linie4"><i class="g"></i><i class="y"></i><i class="n"></i><i class="r"></i><i class="b"></i></div>
+            </div>
+            <div class="ui-schritte"><span class="ui-schritt aktiv"><b>1</b>Stelle &amp; Vertrag</span><span class="ui-schritt"><b>2</b>Arbeitszeit</span><span class="ui-schritt"><b>3</b>Vergütung</span><span class="ui-schritt"><b>4</b>Zusaetzliche Angaben</span><span class="ui-schritt"><b>5</b>Zusammenfassung</span></div>
+            <div class="ui-karte" style="margin-top:10px">
+              <div class="ui-karte-kopf"><div class="t">Stelle &amp; Vertrag</div><div class="s">Betriebsstaette, Stellenbeschreibung, Vertragsdaten</div></div>
+              <div class="ui-karte-rumpf">
+                <div class="ui-feld"><span class="ui-label">Betriebsstätte <span class="stern">*</span></span><div class="ui-input">z.B. Gymnasium Minden</div></div>
+                <div class="ui-feld"><span class="ui-label">Stellenbeschreibung (wird in Arbeitsvertrag übernommen!) <span class="stern">*</span></span><div class="ui-input flaeche">z.B. Lehrkraft für Mathematik und Physik</div><div class="ui-zaehler">0 / 2.000 Zeichen</div></div>
+                <div class="ui-feld"><span class="ui-label">Vertragsbeginn <span class="stern">*</span></span><div class="ui-input">tt.mm.jjjj</div></div>
+                <div class="ui-check"><span class="box"></span>Befristeter Vertrag</div>
+                <div class="ui-knopfzeile"><span class="knopf primaer">Weiter</span></div>
+              </div>
+            </div>
+            <span class="anno">Dreizeiliges Textfeld für bis zu 2.000 Zeichen. Der Kommentar im Code rechnet damit, dass ganze Stellenausschreibungen hineinkopiert werden.</span>
+          </div>
+        </div>
+
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> /modalitaeten/… · Schritt 1</div>
+          <div class="fenster-rumpf">
+            <div class="ui-kopf">
+              <div class="ui-kopf-zeile">
+                <div style="display:flex;gap:9px;align-items:center"><span class="logo">CREDO</span><div><div class="titel">Einstellungsmodalitäten</div><div class="sub">für Anna Beispiel · FES Gymnasium</div></div></div>
+                <span class="pille">Schritt 1 / 5</span>
+              </div>
+              <div class="fortschritt"><span style="width:20%"></span></div>
+              <div class="linie4"><i class="g"></i><i class="y"></i><i class="n"></i><i class="r"></i><i class="b"></i></div>
+            </div>
+            <div class="ui-schritte"><span class="ui-schritt aktiv"><b>1</b>Stelle &amp; Vertrag</span><span class="ui-schritt"><b>2</b>Arbeitszeit</span><span class="ui-schritt"><b>3</b>Vergütung</span><span class="ui-schritt"><b>4</b>Zusaetzliche Angaben</span><span class="ui-schritt"><b>5</b>Zusammenfassung</span></div>
+            <div class="ui-karte" style="margin-top:10px">
+              <div class="ui-karte-kopf"><div class="t">Stelle &amp; Vertrag</div><div class="s"><span class="mark">Betriebsstätte, Stellenbezeichnung</span>, Vertragsdaten</div></div>
+              <div class="ui-karte-rumpf">
+                <div class="ui-feld"><span class="ui-label">Betriebsstätte <span class="stern">*</span></span><div class="ui-input">z.B. Gymnasium Minden</div></div>
+                <div class="ui-feld"><span class="ui-label"><span class="mark">Stellenbezeichnung</span> (wird in Arbeitsvertrag übernommen!) <span class="stern">*</span></span><div class="ui-input mark-block" style="border-radius:8px">z.B. Lehrkraft für Mathematik und Physik</div><div class="ui-zaehler"><span class="mark">0 / 200 Zeichen</span></div></div>
+                <div class="ui-feld"><span class="ui-label">Vertragsbeginn <span class="stern">*</span></span><div class="ui-input">tt.mm.jjjj</div></div>
+                <div class="ui-check"><span class="box"></span>Befristeter Vertrag</div>
+                <div class="ui-knopfzeile"><span class="knopf primaer">Weiter</span></div>
+              </div>
+            </div>
+            <span class="anno gut">Einzeilig wie „Betriebsstätte“, höchstens 200 Zeichen. Bei leerem Feld: „Stellenbezeichnung ist erforderlich.“</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Wo der Begriff außerdem steht</h3>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Stelle</th><th>Heute</th><th>Neu</th></tr></thead>
+          <tbody>
+            <tr><td>Zusammenfassung vor dem Absenden (Führungskraft)</td><td class="alt">Stelle</td><td class="neu-text">Stellenbezeichnung</td></tr>
+            <tr><td>Fehlermeldungen im Formular und vom Server</td><td class="alt">Stellenbeschreibung ist erforderlich.</td><td class="neu-text">Stellenbezeichnung ist erforderlich. / Bitte maximal 200 Zeichen.</td></tr>
+            <tr><td>HR-Detailseite, Reiter „Vorgesetzter“, Karte „Stelle &amp; Vertrag“</td><td class="alt">Stellenbeschreibung</td><td class="neu-text">Stellenbezeichnung</td></tr>
+            <tr><td>PDF-Personalakte, Seite „Modalitäten“</td><td class="alt">Stellenbeschreibung</td><td class="neu-text">Stellenbezeichnung</td></tr>
+            <tr><td>Einladungsmail an die Führungskraft (Onboarding)</td><td class="alt">› Stellenbeschreibung (wird in den Arbeitsvertrag übernommen)</td><td class="neu-text">› Stellenbezeichnung (wird in den Arbeitsvertrag übernommen)</td></tr>
+            <tr><td>Vertragsverlängerungs-Formular der Führungskraft</td><td class="alt">Stellenbeschreibung, zweizeiliges Textfeld</td><td class="neu-text">Stellenbezeichnung, einzeilig, 200 Zeichen, weiterhin mit der Position aus DokuBit vorbelegt</td></tr>
+            <tr><td>HR-Ansicht „Vertragsdaten (Verlängerung)“ und Einladungsmail zur Verlängerung</td><td class="alt">Stellenbeschreibung</td><td class="neu-text">Stellenbezeichnung</td></tr>
+            <tr><td>Mandanten → Vertragsende-Konfiguration (Feld-Beschriftung)</td><td class="alt">Stellenbeschreibung</td><td class="neu-text">Stellenbezeichnung (eigene Beschriftungen eines Mandanten bleiben erhalten)</td></tr>
+            <tr><td>Variablen-Katalog der Brief-Vorlagen</td><td><code>{stellenbeschreibung}</code> Stellenbeschreibung</td><td><code>{stellenbeschreibung}</code> <span class="neu-text">Stellenbezeichnung</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> HR · Onboarding · Reiter „Vorgesetzter“</div>
+          <div class="fenster-rumpf">
+            <div class="graukarte">
+              <div class="kartentitel"><span style="color:var(--gruen)">●</span> Stelle &amp; Vertrag</div>
+              <div class="zweispaltig" style="margin-top:6px">
+                <div class="zeile-klein" style="justify-content:space-between"><span>Betriebsstaette</span><b style="color:var(--ui-fg)">Gymnasium Minden</b></div>
+                <div class="zeile-klein" style="justify-content:space-between"><span>Vertragsbeginn</span><b style="color:var(--ui-fg)">01.10.2026</b></div>
+                <div class="zeile-klein" style="justify-content:space-between"><span>Stellenbeschreibung</span><b style="color:var(--ui-fg)">Lehrkraft für Mathematik und Physik</b></div>
+                <div class="zeile-klein" style="justify-content:space-between"><span>Befristet</span><b style="color:var(--ui-fg)">Nein</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> HR · Onboarding · Reiter „Vorgesetzter“</div>
+          <div class="fenster-rumpf">
+            <div class="graukarte">
+              <div class="kartentitel"><span style="color:var(--gruen)">●</span> Stelle &amp; Vertrag</div>
+              <div class="zweispaltig" style="margin-top:6px">
+                <div class="zeile-klein" style="justify-content:space-between"><span class="mark">Betriebsstätte</span><b style="color:var(--ui-fg)">Gymnasium Minden</b></div>
+                <div class="zeile-klein" style="justify-content:space-between"><span>Vertragsbeginn</span><b style="color:var(--ui-fg)">01.10.2026</b></div>
+                <div class="zeile-klein" style="justify-content:space-between"><span class="mark">Stellenbezeichnung</span><b style="color:var(--ui-fg)">Lehrkraft für Mathematik und Physik</b></div>
+                <div class="zeile-klein" style="justify-content:space-between"><span>Befristet</span><b style="color:var(--ui-fg)">Nein</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>So setze ich es um</h3>
+      <ol class="schritte">
+        <li><strong>Nur Beschriftungen ändern, der interne Feldname bleibt <code>stellenbeschreibung</code>.</strong> Würde ich die Datenbankspalte umbenennen, löscht der Deploy (<code>db push --accept-data-loss</code>) alle bisher eingetragenen Stellen. JSON-Export und Word-Vorlagen hängen ebenfalls am Feldnamen. Ein Kommentar am Feld erklärt die Abweichung, damit niemand sie später „korrigiert“.</li>
+        <li><strong>Den Begriff an einer Stelle führen.</strong> Formular, Zusammenfassung, HR-Ansicht, PDF und Fehlermeldungen lesen die Beschriftung aus derselben Konstante. Ein Test stellt sicher, dass dort „Stellenbezeichnung“ steht.</li>
+        <li><strong>Einzeilig mit 200 Zeichen, in beiden Formularen.</strong> Browser und Server nutzen dieselbe Grenze, ein vorhandener Test hält beide Seiten zusammen. Bereits abgesendete Angaben bleiben unverändert und werden weiter vollständig angezeigt. In noch offenen Formularen werden Zeilenumbrüche beim Öffnen zu „, “. Ist ein Entwurf länger als 200 Zeichen, meldet das Formular „Bitte maximal 200 Zeichen.“</li>
+        <li><strong>Mandanten-Konfiguration Vertragsende:</strong> Die Maske speichert heute immer alle Beschriftungen. Eine einmalige Korrektur beim Start ersetzt deshalb die gespeicherte Standard-Beschriftung „Stellenbeschreibung“ durch „Stellenbezeichnung“ (mit Merker in <code>system_migrations</code>). Eigene Beschriftungen bleiben unberührt.</li>
+        <li><strong>Brief-Vorlagen:</strong> Der Platzhalter bleibt <code>{stellenbeschreibung}</code>, nur seine Beschriftung im Katalog ändert sich. Alle hochgeladenen Word-Vorlagen funktionieren unverändert weiter.</li>
+      </ol>
+      <div class="kasten warn">
+        <strong class="t">Ein Handschritt nach dem Deploy</strong>
+        <p>Wurde die Mail „Einladung Vorgesetzter (Einstellungsmodalitäten)“ oder „(Vertragsverlängerung)“ schon einmal unter Einstellungen → E-Mail-Vorlagen gespeichert, gilt diese gespeicherte Fassung und nicht der Text aus dem Code. Das reicht schon, wenn nur ein Empfänger oder die Antwortadresse eingetragen wurde. Erkennbar ist das am fehlenden Abzeichen „Standard-Vorlage“. In diesem Fall ändere ich den Begriff dort von Hand (etwa 5 Minuten).</p>
+      </div>
+      <p><span class="aufwand">Aufwand 0,5–1 Tag</span></p>
+    </section>
+
+    <!-- ================= 2 PARALLEL ================= -->
+    <section class="abschnitt" id="a2">
+      <div class="abschnitt-titel"><span class="nr">2</span><h2>Fragebogen und Modalitäten parallel</h2></div>
+
+      <div class="kasten kritik">
+        <strong class="t">Warum es heute hängt</strong>
+        <p>Beide Links teilen sich <em>einen</em> Vorgangsstatus. Sendet die Führungskraft die Modalitäten zuerst ab, setzt das Portal ihn fest auf „Vorgesetzter fertig“. Der Fragebogen-Link liest diesen Status als „bereits eingereicht“ und sperrt, obwohl die Person nichts abgesendet hat. Auch das Absenden über die Schnittstelle wird abgewiesen. Der Vorgang hängt dauerhaft fest, und HR kann ihn in der Oberfläche nicht mehr lösen.</p>
+      </div>
+
+      <h3>Was die neue Mitarbeiterin sieht</h3>
+      <p class="unterschrift" style="margin:0 0 6px">Szenario: Vorgang 2026-GYM-014, Anna Beispiel. Die Schulleitung hat die Modalitäten am 18.09. abgesendet, Anna ist im Fragebogen bei Schritt 4 von 9.</p>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> /fragebogen/… · Anna öffnet ihren Link</div>
+          <div class="fenster-rumpf">
+            <div class="zentriert">
+              <div class="solo">
+                <div class="innen">
+                  <span class="logo">CREDO</span>
+                  <div class="kreis">✓</div>
+                  <h5>Fragebogen bereits eingereicht</h5>
+                  <p>Vielen Dank! Ihr Personalfragebogen wurde bereits erfolgreich eingereicht. Sie können dieses Fenster schließen.</p>
+                </div>
+                <div class="linie4" style="margin:0"><i class="g"></i><i class="y"></i><i class="n"></i><i class="r"></i><i class="b"></i></div>
+              </div>
+            </div>
+            <span class="anno">Anna hat nichts abgesendet. Die Angaben ab Schritt 5 fehlen, und der Link ist trotzdem gesperrt.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> /fragebogen/… · Anna öffnet ihren Link</div>
+          <div class="fenster-rumpf">
+            <div class="ui-kopf">
+              <div class="ui-kopf-zeile">
+                <div style="display:flex;gap:9px;align-items:center"><span class="logo">CREDO</span><div><div class="titel">Personalfragebogen</div><div class="sub">FES Gymnasium</div></div></div>
+                <span class="pille">Schritt 4 / 9</span>
+              </div>
+              <div class="fortschritt"><span style="width:44%"></span></div>
+              <div class="linie4"><i class="g"></i><i class="y"></i><i class="n"></i><i class="r"></i><i class="b"></i></div>
+            </div>
+            <div class="ui-schritte"><span class="ui-schritt erledigt"><b>✓</b>Person</span><span class="ui-schritt erledigt"><b>✓</b>Adresse</span><span class="ui-schritt erledigt"><b>✓</b>Bank</span><span class="ui-schritt aktiv"><b>4</b>Sozialvers.</span><span class="ui-schritt"><b>5</b>Steuer</span><span class="ui-schritt"><b>…</b></span></div>
+            <div class="ui-karte" style="margin-top:10px">
+              <div class="ui-karte-kopf"><div class="t">Sozialversicherung</div><div class="s">Rentenversicherungsnummer, Krankenkasse</div></div>
+              <div class="ui-karte-rumpf">
+                <div class="ui-feld"><span class="ui-label">Rentenversicherungsnummer <span class="stern">*</span></span><div class="ui-input">12 345678 A 123</div></div>
+                <div class="ui-knopfzeile"><span class="knopf rand">Zurück</span><span class="knopf primaer">Weiter</span></div>
+              </div>
+            </div>
+            <span class="anno gut">Anna füllt normal weiter aus. Die Abgabe der Führungskraft hat keinen Einfluss auf ihren Link. Die Karte „bereits eingereicht“ erscheint nur noch, wenn Anna selbst abgesendet hat.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Neuer Vorgang: Name und Führungskraft gleich beim Anlegen</h3>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Dashboard · „+ Neuer Vorgang“</div>
+          <div class="fenster-rumpf">
+            <div class="dialog">
+              <div class="dialog-kopf"><div class="t">Neuer Onboarding-Vorgang</div><span style="color:var(--ui-muted)">✕</span></div>
+              <div class="dialog-rumpf">
+                <div class="ui-feld"><span class="ui-label">E-Mail des neuen Mitarbeiters <span class="stern">*</span></span><div class="ui-input">vorname.nachname@beispiel.de</div></div>
+                <div class="ui-feld"><span class="ui-label">Einrichtung / Mandant <span class="stern">*</span></span><div class="ui-input">Bitte waehlen... ▾</div></div>
+                <div class="ui-feld"><span class="ui-label">Vorgangsart</span><div class="ui-input wert">Einstellung (Neueinstellung) ▾</div></div>
+                <div class="ui-feld"><span class="ui-label">Fragebogentyp</span><div class="ui-input wert">Standard (Angestellte) ▾</div></div>
+              </div>
+              <div class="dialog-fuss"><span class="knopf rand">Abbrechen</span><span class="knopf primaer">Vorgang anlegen</span></div>
+            </div>
+            <span class="anno">Kein Name, keine Führungskraft. Den Vorgesetzten-Link gibt es erst später in der Detailseite. Öffnet die Führungskraft ihn vor Anna, steht im Kopf nur „für · FES Gymnasium“.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Dashboard · „+ Neuer Vorgang“</div>
+          <div class="fenster-rumpf">
+            <div class="dialog">
+              <div class="dialog-kopf"><div class="t">Neuer Onboarding-Vorgang</div><span style="color:var(--ui-muted)">✕</span></div>
+              <div class="dialog-rumpf">
+                <div class="ui-feld"><span class="ui-label">E-Mail des neuen Mitarbeiters <span class="stern">*</span></span><div class="ui-input wert">anna.beispiel@example.org</div></div>
+                <div class="zweispaltig mark-block" style="padding:4px">
+                  <div class="ui-feld"><span class="ui-label">Vorname <span class="ui-hinweistext">(optional)</span></span><div class="ui-input wert">Anna</div></div>
+                  <div class="ui-feld"><span class="ui-label">Nachname <span class="ui-hinweistext">(optional)</span></span><div class="ui-input wert">Beispiel</div></div>
+                </div>
+                <div class="ui-feld"><span class="ui-label">Einrichtung / Mandant <span class="stern">*</span></span><div class="ui-input wert">FES Gymnasium (10) ▾</div></div>
+                <div class="ui-feld"><span class="ui-label">Vorgangsart</span><div class="ui-input wert">Einstellung (Neueinstellung) ▾</div></div>
+                <div class="ui-feld"><span class="ui-label">Fragebogentyp</span><div class="ui-input wert">Standard (Angestellte) ▾</div></div>
+                <div class="mark-block" style="padding:6px">
+                  <div class="abgrenzung">Führungskraft (optional)</div>
+                  <div class="ui-feld" style="margin-top:4px"><span class="ui-label">E-Mail der Führungskraft</span><div class="ui-input wert">schulleitung@fes-gym.example.org</div></div>
+                  <div class="ui-hinweistext" style="margin-top:4px">Ist sie eingetragen, bekommt die Führungskraft den Link zu den Einstellungsmodalitäten sofort, parallel zum Fragebogen. Sonst lässt sich der Link später jederzeit in der Übersicht erstellen.</div>
+                </div>
+              </div>
+              <div class="dialog-fuss"><span class="knopf rand">Abbrechen</span><span class="knopf primaer">Vorgang anlegen</span></div>
+            </div>
+            <span class="anno gut">Der Name wird im Fragebogen vorausgefüllt, Anna kann ihn korrigieren. Führungskraft, Mails und Liste zeigen ihn von Anfang an.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Nach „Vorgang anlegen“</div>
+          <div class="fenster-rumpf">
+            <div class="dialog">
+              <div class="dialog-kopf"><div class="t">Vorgang angelegt</div><span style="color:var(--ui-muted)">✕</span></div>
+              <div class="dialog-rumpf">
+                <div style="background:#f0fdf4;border-radius:8px;padding:8px 10px;color:#166534;font-size:11.5px">✓ Onboarding-Vorgang wurde erfolgreich angelegt!</div>
+                <div class="ui-feld"><span class="ui-label">Fragebogen-Link (für den neuen Mitarbeiter):</span><div style="display:flex;gap:6px"><div class="ui-input wert" style="flex:1;font-family:Consolas,monospace;font-size:10.5px;background:#fafafa">https://hr.fes-credo.de/fragebogen/3f2a…</div><span class="knopf primaer klein">Kopieren</span></div></div>
+                <div class="ui-hinweistext">Senden Sie diesen Link an den neuen Mitarbeiter (z.B. per E-Mail über n8n). Der Link ist 30 Tage gültig.</div>
+              </div>
+            </div>
+            <span class="anno">Der Hinweis ist veraltet: Die Einladung geht längst automatisch per SMTP hinaus.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Nach „Vorgang anlegen“</div>
+          <div class="fenster-rumpf">
+            <div class="dialog">
+              <div class="dialog-kopf"><div class="t">Vorgang angelegt</div><span style="color:var(--ui-muted)">✕</span></div>
+              <div class="dialog-rumpf">
+                <div style="background:#f0fdf4;border-radius:8px;padding:8px 10px;color:#166534;font-size:11.5px">✓ Onboarding-Vorgang 2026-GYM-014 wurde angelegt.</div>
+                <div class="mark-block" style="padding:6px;display:grid;gap:5px;font-size:11px">
+                  <div>✉ Einladung zum Personalfragebogen an <b>anna.beispiel@example.org</b> versendet</div>
+                  <div>✉ Link zu den Einstellungsmodalitäten an <b>schulleitung@fes-gym.example.org</b> versendet</div>
+                </div>
+                <div class="ui-feld"><span class="ui-label">Fragebogen-Link</span><div style="display:flex;gap:6px"><div class="ui-input wert" style="flex:1;font-family:Consolas,monospace;font-size:10.5px;background:#fafafa">https://hr.fes-credo.de/fragebogen/3f2a…</div><span class="knopf primaer klein">Kopieren</span></div></div>
+                <div class="ui-feld"><span class="ui-label">Modalitäten-Link</span><div style="display:flex;gap:6px"><div class="ui-input wert" style="flex:1;font-family:Consolas,monospace;font-size:10.5px;background:#fafafa">https://hr.fes-credo.de/modalitaeten/9c1d…</div><span class="knopf primaer klein">Kopieren</span></div></div>
+                <div class="ui-hinweistext">Die Links sind bis 21.10.2026 gültig. Beide Seiten können unabhängig voneinander ausfüllen.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Was HR in der Übersicht sieht</h3>
+      <div class="fenster heute">
+        <div class="fenster-leiste"><span class="tag">HEUTE</span> /dashboard/[id] · Reiter „Übersicht“ · Führungskraft war schneller</div>
+        <div class="fenster-rumpf">
+          <div class="hr-kopf">
+            <div class="hr-zeile">
+              <span style="font-size:11px;color:var(--ui-muted)">← Zurück</span>
+              <span class="mono">2026-GYM-014</span>
+              <span class="badge" style="background:rgba(168,85,247,.15);color:#a855f7">Vorgesetzter fertig</span>
+              <span class="pille" style="border-radius:6px">STANDARD</span>
+              <span class="rechts knopf pruefen">✓ Als geprüft markieren</span>
+            </div>
+            <div class="hr-meta"><b>Anna Beispiel</b> · anna.beispiel@example.org · FES Gymnasium (10) · Eingeladen am 08.09.2026</div>
+          </div>
+          <span class="anno">Der Knopf „Als geprüft markieren“ erscheint, obwohl der Fragebogen fehlt.</span>
+          <div class="tabs"><span class="aktiv">Übersicht</span><span>Fragebogen-Daten 4/9</span><span>Dokumente</span><span>Checkliste 0/12</span><span>Vorgesetzter</span></div>
+          <div class="st-aktiv">
+            <div class="st-kopf"><span class="st-kreis">2</span><div><div class="st-titel">Personalfragebogen <span class="st-chip">Aktueller Schritt</span></div><div class="st-beschr">Mitarbeiter fuellt den Personalfragebogen aus</div></div></div>
+            <div class="st-rumpf"><div class="st-info">Fragebogen in Bearbeitung — Schritt 4 von 9 · Sozialversicherung</div><div><span class="knopf rand">Fragebogen-Link kopieren</span></div></div>
+          </div>
+          <span class="anno">HR soll einen Link weitergeben, den das Portal für Anna gesperrt hat.</span>
+          <div class="st-liste">
+            <div class="k">→ Kommende Schritte (3)</div>
+            <div class="st-zeile blass"><span class="n">4</span>Daten pruefen</div>
+            <div class="st-zeile blass"><span class="n">5</span>Checkliste abarbeiten <span class="d">0/12</span></div>
+            <div class="st-zeile blass"><span class="n">6</span>Abschluss</div>
+          </div>
+          <div class="st-liste">
+            <div class="k" style="color:var(--gruen)">✓ Erledigt (2 Schritte)</div>
+            <div class="st-zeile"><span class="n ok">✓</span>Einladung versenden <span class="d">08.09.2026</span></div>
+            <div class="st-zeile"><span class="n ok">✓</span>Einstellungsmodalitaeten <span class="d"></span></div>
+          </div>
+          <span class="anno info">Sind beide Links offen, zeigt der Stepper heute nur <em>einen</em> aktiven Schritt. Der zweite („Einstellungsmodalitäten“) steht ausgegraut unter „Kommende Schritte“, ohne Knöpfe.</span>
+        </div>
+      </div>
+
+      <div class="fenster neu">
+        <div class="fenster-leiste"><span class="tag">NEU</span> /dashboard/[id] · Reiter „Übersicht“ · beide Links offen</div>
+        <div class="fenster-rumpf">
+          <div class="hr-kopf">
+            <div class="hr-zeile">
+              <span style="font-size:11px;color:var(--ui-muted)">← Zurück</span>
+              <span class="mono">2026-GYM-014</span>
+              <span class="badge" style="background:rgba(245,158,11,.15);color:#c77c02">In Bearbeitung</span>
+              <span class="pille" style="border-radius:6px">STANDARD</span>
+              <span class="chip mark" style="border-color:rgba(245,158,11,.45);color:#b45309;background:rgba(245,158,11,.1)">Fragebogen: Schritt 4 von 9</span>
+              <span class="chip mark" style="border-color:rgba(0,154,198,.35);color:#007da1;background:rgba(0,154,198,.07)">Modalitäten: Schritt 2 von 5</span>
+              <span class="rechts ui-hinweistext mark" style="font-style:italic">ⓘ Prüfung möglich, sobald Fragebogen und Modalitäten eingereicht sind</span>
+            </div>
+            <div class="hr-meta"><b>Anna Beispiel</b> · anna.beispiel@example.org · FES Gymnasium (10) · Eingeladen am 08.09.2026</div>
+          </div>
+          <div class="tabs"><span class="aktiv">Übersicht</span><span>Fragebogen-Daten 4/9</span><span>Dokumente</span><span>Checkliste 0/12</span><span>Vorgesetzter</span></div>
+          <div class="st-parallel-hinweis">⇄ Schritte 2 und 3 laufen parallel, in beliebiger Reihenfolge</div>
+          <div class="st-raster mark-block" style="padding:4px">
+            <div class="st-aktiv">
+              <div class="st-kopf"><span class="st-kreis">2</span><div><div class="st-titel">Personalfragebogen <span class="st-chip">Läuft parallel</span></div><div class="st-beschr">Mitarbeiter/in füllt den Personalfragebogen aus</div></div></div>
+              <div class="st-rumpf"><div class="st-info">Fragebogen in Bearbeitung — Schritt 4 von 9 · Sozialversicherung</div><div><span class="knopf rand">Fragebogen-Link kopieren</span></div></div>
+            </div>
+            <div class="st-aktiv">
+              <div class="st-kopf"><span class="st-kreis">3</span><div><div class="st-titel">Einstellungsmodalitäten <span class="st-chip">Läuft parallel</span></div><div class="st-beschr">Führungskraft füllt die Vertragsdetails aus</div></div></div>
+              <div class="st-rumpf"><div class="st-info">Modalitäten in Bearbeitung — Schritt 2 von 5 · schulleitung@fes-gym.example.org</div><div><span class="knopf rand">Modalitäten-Link kopieren</span></div></div>
+            </div>
+          </div>
+          <div class="st-liste">
+            <div class="k">→ Kommende Schritte (3)</div>
+            <div class="st-zeile blass"><span class="n">4</span>Daten prüfen</div>
+            <div class="st-zeile blass"><span class="n">5</span>Checkliste abarbeiten <span class="d">0/12</span></div>
+            <div class="st-zeile blass"><span class="n">6</span>Abschluss</div>
+          </div>
+          <div class="st-liste">
+            <div class="k" style="color:var(--gruen)">✓ Erledigt (1 Schritt)</div>
+            <div class="st-zeile"><span class="n ok">✓</span>Einladung versenden <span class="d">08.09.2026</span></div>
+          </div>
+          <span class="anno info">Ohne Vorgesetzten-Link zeigt Karte 3 das E-Mail-Feld und „Vorgesetzten-Link erstellen“, und zwar von Anfang an, nicht erst nach dem Fragebogen.</span>
+        </div>
+      </div>
+
+      <div class="paar">
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Führungskraft war schneller</div>
+          <div class="fenster-rumpf">
+            <div class="hr-kopf">
+              <div class="hr-zeile">
+                <span class="mono">2026-GYM-014</span>
+                <span class="badge" style="background:rgba(245,158,11,.15);color:#c77c02">In Bearbeitung</span>
+                <span class="chip" style="border-color:rgba(245,158,11,.45);color:#b45309;background:rgba(245,158,11,.1)">Fragebogen: Schritt 4 von 9</span>
+                <span class="chip" style="border-color:rgba(107,170,36,.35);color:#4e8a12;background:rgba(107,170,36,.07)">✓ Modalitäten: eingereicht 18.09.</span>
+              </div>
+            </div>
+            <div class="st-aktiv" style="margin-top:10px">
+              <div class="st-kopf"><span class="st-kreis">2</span><div><div class="st-titel">Personalfragebogen <span class="st-chip">Aktueller Schritt</span></div><div class="st-beschr">Mitarbeiter/in füllt den Personalfragebogen aus</div></div></div>
+              <div class="st-rumpf"><div class="st-info">Fragebogen in Bearbeitung — Schritt 4 von 9 · Sozialversicherung</div><div style="font-size:10.5px;color:var(--gruen)">✓ Einstellungsmodalitäten bereits eingereicht am 18.09.2026, unabhängig vom Fragebogen.</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Beides eingereicht</div>
+          <div class="fenster-rumpf">
+            <div class="hr-kopf">
+              <div class="hr-zeile">
+                <span class="mono">2026-GYM-014</span>
+                <span class="badge mark" style="background:rgba(168,85,247,.15);color:#9333ea">Bereit zur Prüfung</span>
+                <span class="rechts knopf pruefen">✓ Als geprüft markieren</span>
+              </div>
+            </div>
+            <div class="st-aktiv" style="margin-top:10px">
+              <div class="st-kopf"><span class="st-kreis">4</span><div><div class="st-titel">Daten prüfen <span class="st-chip">Aktueller Schritt</span></div><div class="st-beschr">HR prüft Fragebogen-Daten und Dokumente</div></div></div>
+              <div class="st-rumpf" style="font-size:11px"><div>✓ Personalfragebogen vollständig</div><div>✓ Modalitäten vollständig</div><div>✓ 2 Dokumente hochgeladen</div></div>
+            </div>
+            <span class="anno info">Der Status „Vorgesetzter fertig“ heißt künftig „Bereit zur Prüfung“, weil er dann tatsächlich „beides eingereicht“ bedeutet.</span>
+          </div>
+        </div>
+      </div>
+
+      <h4>Zeile in der Onboarding-Liste</h4>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Dashboard · Liste</div>
+          <div class="fenster-rumpf" style="overflow-x:auto">
+            <table class="ui-tab"><thead><tr><th>Vorgang</th><th>Status</th><th>Fragebogen</th><th>Vorgesetzter</th></tr></thead>
+              <tbody><tr><td>2026-GYM-014<br><span style="color:var(--ui-muted)">Anna Beispiel</span></td><td><span class="badge" style="background:rgba(168,85,247,.15);color:#a855f7">Vorgesetzter fertig</span></td><td>Schritt 4 von 9</td><td>Vollständig</td></tr></tbody></table>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Dashboard · Liste</div>
+          <div class="fenster-rumpf" style="overflow-x:auto">
+            <table class="ui-tab"><thead><tr><th>Vorgang</th><th>Status</th><th>Fragebogen</th><th>Vorgesetzter</th></tr></thead>
+              <tbody><tr><td>2026-GYM-014<br><span style="color:var(--ui-muted)">Anna Beispiel</span></td><td><span class="badge mark" style="background:rgba(245,158,11,.15);color:#c77c02">In Bearbeitung</span></td><td>Schritt 4 von 9</td><td><span class="mark" style="color:var(--gruen)">Eingereicht</span></td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <h3>Die Regeln danach</h3>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th></th><th>Fragebogen-Link (Mitarbeitende)</th><th>Modalitäten-Link (Führungskraft)</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Öffnen</strong></td><td>solange der Link gültig ist und der Vorgang nicht abgeschlossen oder abgelaufen ist</td><td>genauso</td></tr>
+            <tr><td><strong>Bearbeiten und absenden</strong></td><td>bis die Person <em>selbst</em> abgesendet hat oder HR geprüft hat</td><td>bis die Führungskraft <em>selbst</em> abgesendet hat oder HR geprüft hat</td></tr>
+            <tr><td><strong>Hängt vom anderen Link ab?</strong></td><td>Nein</td><td>Nein</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Situation</th><th>Status in Liste und Kopf</th></tr></thead>
+          <tbody>
+            <tr><td>Fragebogen noch offen, egal wie weit die Modalitäten sind</td><td>Eingeladen / In Bearbeitung. Der Stand der Modalitäten steht in der Spalte „Vorgesetzter“ und im Chip.</td></tr>
+            <tr><td>Fragebogen eingereicht, kein Vorgesetzten-Link</td><td>Eingereicht (prüfbar, z.B. Ehrenamt)</td></tr>
+            <tr><td>Fragebogen eingereicht, Modalitäten noch offen</td><td>Vorgesetzter offen</td></tr>
+            <tr><td>Beides eingereicht</td><td><span class="alt">Vorgesetzter fertig</span> → <span class="neu-text">Bereit zur Prüfung</span></td></tr>
+            <tr><td>HR hat geprüft oder abgeschlossen</td><td>Geprüft / Abgeschlossen, beide Links sind gesperrt</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>So setze ich es um</h3>
+      <ol class="schritte">
+        <li><strong>Zwei Spuren statt eines gemeinsamen Status.</strong> Jede Seite hat schon heute ihren eigenen Zeitstempel (<code>submittedAt</code>, <code>supervisorSubmittedAt</code>). Zugriff und Sperre hängen künftig nur am <em>eigenen</em> Zeitstempel. Den Status in Liste und Kopf berechnet eine einzige Funktion daraus, niemand setzt ihn mehr direkt.</li>
+        <li><strong>Gleichzeitiges Absenden ist sicher.</strong> Senden beide in derselben Sekunde ab, beansprucht jede Seite zuerst ihre Spur in der Datenbank, liest danach den Vorgang neu und berechnet erst dann den Status. Wer zuletzt fertig ist, setzt „Bereit zur Prüfung“.</li>
+        <li><strong>Sicherheitslücke nebenbei geschlossen.</strong> Heute kann eine Person nach dem eigenen Absenden über die Schnittstelle wieder Angaben ändern und Dateien hochladen, sobald HR den Vorgesetzten-Link erzeugt. Dadurch passt die Prüfsumme ihrer Erklärung nicht mehr. Künftig ist der Link ab der eigenen Abgabe schreibgeschützt. Die Oberfläche bot das ohnehin nie an.</li>
+        <li><strong>Vorgesetzten-Link wiederholungssicher.</strong> Heute erzeugt jeder Aufruf einen neuen Link und macht den laufenden ungültig, schon bei einem Doppelklick. Künftig bleibt ein gültiger Link erhalten. Nach Abgabe der Modalitäten gibt es keinen neuen Link mehr, damit keine andere Person die Vergütungsangaben sieht.</li>
+        <li><strong>„Neuer Vorgang“:</strong> Die optionalen Namensfelder füllen den Fragebogen vor. Ist die E-Mail der Führungskraft eingetragen, gehen beide Einladungen sofort hinaus, über dieselbe Logik wie der Knopf in der Übersicht.</li>
+        <li><strong>Erinnerungen:</strong> Die Führungskraft wird auch erinnert, während der Fragebogen noch offen ist, erstmals 7 Tage nach dem Link. Dafür kommt eine neue Spalte „Link versendet am“ hinzu. Nebenbefund: Der Link in der Vorgesetzten-Erinnerung führt heute auf eine Seite, die es nicht gibt (<code>/vorgesetzter/…</code>, Fehler 404), und wird korrigiert. Mitarbeitende werden nicht mehr erinnert, wenn ihr Link schon abgelaufen ist.</li>
+        <li><strong>HR-Mails:</strong> „Modalitäten eingegangen“ behauptet heute „Der Vorgang kann jetzt abgeschlossen werden“, auch wenn der Fragebogen fehlt. Der Text wird neutral. Beide HR-Mails bekommen Vorgangsnummer und Namen in den Betreff, der heute oft leer bleibt.</li>
+        <li><strong>Stepper mit mehreren laufenden Schritten.</strong> Das betrifft auch das Offboarding: Dort laufen heute schon zwei Schritte gleichzeitig („Abteilungen“ und „Rückgaben“), und einer davon wird verschluckt. Der wird damit gleich mit angezeigt.</li>
+        <li><strong>Festhängende Vorgänge reparieren.</strong> Eine einmalige Korrektur beim Start (Merker <code>ONBOARDING_PARALLELE_SPUREN_V1</code>) setzt ihren Status zurück auf „In Bearbeitung“ bzw. „Eingeladen“. Sie zieht außerdem die Fragebogen-Konfiguration nach, die frühere Korrekturen bei genau diesen Vorgängen ausgelassen haben (Masernschutz-Schritt, Minijob-Schritte). Die alten Werte stehen im Merker, und die neue Spalte löst beim Deploy automatisch eine Datenbanksicherung aus. Vorgänge, die HR trotz fehlendem Fragebogen schon als „geprüft“ markiert hat, fasst die Korrektur nicht an. Die klären wir einzeln anhand der Liste unten.</li>
+      </ol>
+      <div class="kasten hinweis">
+        <strong class="t">In zwei Stufen, weil echte Mitarbeitende festhängen</strong>
+        <p><strong>Stufe A (etwa 1 Tag):</strong> Links entsperren, Absenden in beliebiger Reihenfolge, Reparatur der Altfälle, Link in der Erinnerung. Das ist schnell ausrollbar. <strong>Stufe B (etwa 1,5–2 Tage):</strong> HR-Übersicht mit parallelem Stepper, Chips und Beschriftungen, erweiterter Dialog „Neuer Vorgang“, Erinnerungsregeln und Mailtexte.</p>
+      </div>
+      <p><span class="aufwand">Aufwand 2,5–3 Tage</span></p>
+    </section>
+
+    <!-- ================= 3 INDIVIDUELLE E-MAIL ================= -->
+    <section class="abschnitt" id="a3">
+      <div class="abschnitt-titel"><span class="nr">3</span><h2>Individuelle E-Mail mit Anhang</h2></div>
+      <p>Heute gibt es aus einem Vorgang nur einen Versandweg: das Dokumentenpaket. Es braucht mindestens ein Dokument aus dem Pool oder eine Brief-Vorlage. Betreff und Anschreiben sind fest („Herzlich willkommen bei … – Ihr Starterpaket“), frei ist nur ein Zusatztext. Eine eigene Datei vom PC lässt sich nicht anhängen. Über den Pool ginge es nur, dann wäre sie aber für alle Vorgänge des Mandanten sichtbar.</p>
+
+      <h3>Reiter „Dokumente“ im Vorgang</h3>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Onboarding · Reiter „Dokumente“</div>
+          <div class="fenster-rumpf">
+            <div class="stapel">
+              <div class="pfad">Sie sind hier: <span class="ja">✓ Einladung</span> › <span class="ja">✓ Fragebogen</span> › <span class="ja">✓ Modalitäten</span> › <span class="hier">Prüfen</span> › Checkliste › Abschluss</div>
+              <div class="graukarte"><div class="kartentitel">Dokumente erstellen <span class="pille">3</span></div><div class="kartentext">Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.</div></div>
+              <div class="paketkarte">
+                <div class="kartentitel">Dokumente versenden</div>
+                <div class="kartentext">Feste PDFs und befüllte Vorlagen gehen als Anhänge an die im Vorgang hinterlegte Adresse.</div>
+                <div class="zeile-klein"><span class="knopf blau">Dokumente versenden…</span><span>Noch nicht versendet</span></div>
+              </div>
+              <div class="graukarte"><div class="kartentitel">3 Dokumente hochgeladen</div></div>
+              <div class="graukarte"><div class="kartentitel">PDF-Export für DMS</div></div>
+            </div>
+            <span class="anno">Keine Möglichkeit, eine freie Nachricht mit eigener Datei zu schicken.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Onboarding · Reiter „Dokumente“</div>
+          <div class="fenster-rumpf">
+            <div class="stapel">
+              <div class="pfad">Sie sind hier: <span class="ja">✓ Einladung</span> › <span class="ja">✓ Fragebogen</span> › <span class="ja">✓ Modalitäten</span> › <span class="hier">Prüfen</span> › Checkliste › Abschluss</div>
+              <div class="graukarte"><div class="kartentitel">Dokumente erstellen <span class="pille">3</span></div><div class="kartentext">Aus Vorlagen erzeugte Schreiben werden automatisch mit den Vorgangsdaten befüllt.</div></div>
+              <div class="paketkarte">
+                <div class="kartentitel">Dokumente versenden</div>
+                <div class="kartentext">Feste PDFs und befüllte Vorlagen gehen als Anhänge an die im Vorgang hinterlegte Adresse.</div>
+                <div class="zeile-klein"><span class="knopf blau">Dokumente versenden…</span><span>Noch nicht versendet</span></div>
+              </div>
+              <div class="mailkarte mark-block">
+                <div class="kartentitel">✉ Individuelle E-Mail</div>
+                <div class="kartentext">Freie Nachricht mit eigenem Betreff und eigenen Anhängen, z.B. dem unterschriebenen Vertrag, unabhängig vom Standardpaket.</div>
+                <div class="zeile-klein"><span class="knopf blau-rand">E-Mail schreiben…</span><span>Zuletzt am 21.09.2026, 14:05 an anna.beispiel@example.org – „Ihr unterschriebener Arbeitsvertrag“ · 2 Anhänge</span></div>
+              </div>
+              <div class="graukarte"><div class="kartentitel">3 Dokumente hochgeladen</div></div>
+              <div class="graukarte"><div class="kartentitel">PDF-Export für DMS</div></div>
+            </div>
+            <span class="anno gut">Dieselbe Karte sitzt im Offboarding, in der Verbeamtung und in der Vertragsverlängerung direkt unter der Paketkarte. Die Paketkarte bleibt unverändert und zählt weiter nur Pakete.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Der neue Dialog „E-Mail schreiben“</h3>
+      <div class="fenster neu">
+        <div class="fenster-leiste"><span class="tag">NEU</span> Dialog nach Klick auf „E-Mail schreiben…“</div>
+        <div class="fenster-rumpf">
+          <div class="dialog" style="max-width:640px;margin:0 auto">
+            <div class="dialog-kopf"><div><div class="t">E-Mail schreiben</div><div class="s">Anna Beispiel · 2026-GYM-014</div></div><span class="knopf rand klein">Schließen</span></div>
+            <div class="dialog-rumpf">
+              <div class="ui-feld"><span class="ui-label">An</span><div class="ui-input wert">anna.beispiel@example.org</div><span class="ui-hinweistext">Adresse aus dem Vorgang. Im Offboarding stehen private und dienstliche Adresse zur Auswahl, die private ist vorausgewählt.</span></div>
+              <div class="ui-feld"><span class="ui-label">Betreff <span class="stern">*</span></span><div class="ui-input wert">Ihr unterschriebener Arbeitsvertrag</div></div>
+              <div class="ui-feld"><span class="ui-label">Nachricht <span class="stern">*</span></span><div class="ui-input flaeche gross">Guten Tag Frau Beispiel,
+
+anbei erhalten Sie Ihren gegengezeichneten Arbeitsvertrag und Ihren Stundenplan für die ersten Wochen. Bei Fragen melden Sie sich gern.
+
+Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="ui-hinweistext">Unter Ihren Text setzt das Portal Ihren Namen und die Einrichtung.</span></div>
+              <div class="ui-feld">
+                <span class="ui-label">Anhänge (optional)</span>
+                <div class="ablage">☁ Dateien hierher ziehen oder <u>auswählen</u><div class="ui-hinweistext" style="margin-top:3px">PDF, JPG, PNG oder WebP · bis zu 10 Dateien · zusammen höchstens 9 MB</div></div>
+                <div class="datei"><span class="ic"></span><span>Arbeitsvertrag_unterschrieben.pdf</span><span class="gr">1,2 MB</span><span class="weg">Entfernen</span></div>
+                <div class="datei"><span class="ic"></span><span>Stundenplan_Oktober.png</span><span class="gr">480 KB</span><span class="weg">Entfernen</span></div>
+                <div class="datei falsch"><span class="ic"></span><span>Fahrtkosten.docx <span class="fehler">– Dateityp nicht erlaubt, bitte als PDF speichern.</span></span><span class="weg">Entfernen</span></div>
+              </div>
+              <div class="summe">2 Anhänge · 1,7 MB von 9 MB<div class="balken"><span style="width:19%"></span></div></div>
+              <div class="gelbkasten">Die E-Mail geht unverschlüsselt hinaus. Bankverbindung, Sozialversicherungsnummer oder Gesundheitsdaten nur versenden, wenn es nicht anders geht.<br>Antworten gehen an das HR-Postfach: <b>personal@fes-credo.example.org</b> · Eine Kopie der Anhänge bleibt 12 Monate im Vorgang.</div>
+              <div class="verlauf">▸ Bisher gesendete E-Mails (1)</div>
+            </div>
+            <div class="dialog-fuss"><span class="knopf rand">Abbrechen</span><span class="knopf blau gesperrt">E-Mail senden</span></div>
+          </div>
+          <span class="anno info">„E-Mail senden“ ist gesperrt, solange eine Datei ungültig ist, Betreff oder Nachricht fehlen, die Adresse ungültig oder nicht freigegeben ist oder die Größe überschritten wird. Hier liegt es an der .docx. Nach dem Entfernen wird der Knopf aktiv.</span>
+        </div>
+      </div>
+
+      <div class="paar">
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Nach dem Senden</div>
+          <div class="fenster-rumpf">
+            <div class="dialog">
+              <div class="dialog-kopf"><div><div class="t">E-Mail schreiben</div><div class="s">Anna Beispiel · 2026-GYM-014</div></div></div>
+              <div class="dialog-rumpf">
+                <div style="border:1px solid rgba(107,170,36,.3);background:rgba(107,170,36,.1);color:#3d6d10;border-radius:8px;padding:8px 10px;font-size:11.5px">✓ E-Mail „Ihr unterschriebener Arbeitsvertrag“ an anna.beispiel@example.org versendet.</div>
+                <div class="datei"><span class="ic"></span><span>Arbeitsvertrag_unterschrieben.pdf <span class="gr">1,2 MB · Prüfsumme a3f9…c21e</span></span><span class="weg" style="color:var(--blau)">Öffnen</span></div>
+                <div class="datei"><span class="ic"></span><span>Stundenplan_Oktober.png <span class="gr">480 KB · Prüfsumme 07bd…9e41</span></span><span class="weg" style="color:var(--blau)">Öffnen</span></div>
+              </div>
+              <div class="dialog-fuss"><span class="knopf primaer">Fertig</span></div>
+            </div>
+            <span class="anno info">„Öffnen“ ist 12 Monate lang möglich, danach löscht der nächtliche Aufbewahrungslauf die Datei. Der Nachweis mit Datum, Empfänger, Betreff, Dateinamen und Prüfsummen bleibt.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> So kommt die Mail an</div>
+          <div class="fenster-rumpf">
+            <div class="mailkopfzeilen">Von: CREDO HR-Portal &lt;hr-portal@…&gt;<br>An: anna.beispiel@example.org<br>Antwort an: personal@fes-credo.example.org<br>Betreff: <b>Ihr unterschriebener Arbeitsvertrag</b></div>
+            <div class="mail">
+              <div class="mail-innen">
+                <div class="mail-kopf"><div class="t">FES Gymnasium</div><div class="s">Personalabteilung</div></div>
+                <div class="linie4" style="margin:0"><i class="g"></i><i class="y"></i><i class="n"></i><i class="r"></i><i class="b"></i></div>
+                <div class="mail-rumpf">
+                  <p>Guten Tag Frau Beispiel,</p>
+                  <p>anbei erhalten Sie Ihren gegengezeichneten Arbeitsvertrag und Ihren Stundenplan für die ersten Wochen. Bei Fragen melden Sie sich gern.</p>
+                  <p>Freundliche Grüße</p>
+                  <div class="mail-anhang"><b>Im Anhang (2)</b><br>Arbeitsvertrag_unterschrieben.pdf<br>Stundenplan_Oktober.png</div>
+                  <p style="margin:0">Erika Muster<br>FES Gymnasium</p>
+                </div>
+                <div class="mail-fuss">Diese Nachricht wurde über das CREDO HR-Portal versendet.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>So setze ich es um</h3>
+      <ol class="schritte">
+        <li><strong>Eigener Knopf, eigener Dialog, eigener Server-Weg.</strong> Das Dokumentenpaket fasse ich nicht an. Seine Schnittstelle, sein Dialog und rund 30 Tests bleiben unverändert. Eine Rückfrage-Mail darf das Starterpaket nicht als „versendet“ markieren; deshalb zeigt die Paketkarte weiter nur echte Pakete.</li>
+        <li><strong>Dieselben Schutzregeln wie beim Paket:</strong>
+          <ul>
+            <li>Zugriff auf den Vorgang wird geprüft.</li>
+            <li>Die Adresse aus dem Vorgang ist immer erlaubt, eine abweichende nur mit freigegebener Domain. Die Freigabeliste ist heute leer, und leer heißt „keine Einschränkung“. Sie sollte vor dem Start gepflegt sein.</li>
+            <li>Höchstens 10 Versendungen pro Minute und 60 pro Stunde je Benutzerkonto, gemeinsam mit dem Paket.</li>
+            <li>Ein Nachweis entsteht nur nach erfolgreichem Versand.</li>
+          </ul>
+          Neu kommt eine Kennung je geöffnetem Dialog hinzu. Bricht beim Hochladen die Verbindung ab und HR klickt erneut, geht die Mail trotzdem nur einmal hinaus.</li>
+        <li><strong>Anhänge:</strong> PDF, JPG, PNG und WebP. Geprüft wird der Inhalt, nicht nur die Endung. Höchstens 10 Dateien und zusammen 9 MB. Grund für die 9 MB: Next.js schneidet Anfragen über 10 MB ab. Die Grenze allgemein anzuheben würde auch die öffentlichen Formulare betreffen. Dateinamen werden bereinigt, und die Endung passt immer zum geprüften Inhalt.</li>
+        <li><strong>Kopie 12 Monate:</strong> Die Anhänge liegen im Vorgang und sind im Verlauf abrufbar. Der vorhandene nächtliche Aufbewahrungslauf löscht nach 12 Monaten die Dateien und den Nachrichtentext. Als Nachweis bleiben Datum, Empfänger, Betreff, Dateinamen und Prüfsummen.</li>
+        <li><strong>Mailvorlage:</strong> Neu unter Einstellungen → E-Mail-Vorlagen, Gruppe „Allgemein“: „Individuelle E-Mail aus einem Vorgang“. Betreff und Text kommen aus dem Dialog, darunter die Signatur mit Name und Einrichtung. Admins können Rahmen und Signatur anpassen. Antworten gehen an die Antwortadresse aus den SMTP-Einstellungen, also an das zentrale HR-Postfach. Das Portal macht das heute schon so, dafür ist kein Umbau nötig.</li>
+        <li><strong>Protokoll:</strong> Jede Mail erscheint im Protokoll des jeweiligen Vorgangs und im Audit-Log, und zwar bewusst nicht auf der öffentlichen Prüfseite der Verbeamtung.</li>
+        <li><strong>Nebenbei behoben:</strong> Steht im Freitext ein Dollarzeichen mit bestimmten Folgezeichen (etwa „5$'“), kopiert der Mail-Baustein heute Teile der Vorlage in die Mail. Das betrifft schon jetzt die persönliche Nachricht im Dokumentenpaket.</li>
+      </ol>
+      <div class="kasten hinweis">
+        <strong class="t">Bewusst nicht dabei (Ihre Entscheidung bzw. spätere Ausbaustufe)</strong>
+        <p>Elternzeit und Mutterschutz, E-Mails ohne Vorgang, Word und Excel als Anhang, vorhandene Dokumente des Vorgangs als Anhang auswählen, „Kopie an mich“.</p>
+      </div>
+      <p><span class="aufwand">Aufwand 5–6 Tage</span></p>
+    </section>
+
+    <!-- ================= 4 UNTERLAGEN NACHFORDERN ================= -->
+    <section class="abschnitt" id="a4">
+      <div class="abschnitt-titel"><span class="nr">4</span><h2>Unterlagen nachfordern</h2></div>
+      <p>Heute sagt der Fragebogen der Person zu, dass die Personalabteilung wegen fehlender Nachweise auf sie zukommt. Einen Weg, die Unterlagen dann ins Portal zu bekommen, gibt es aber nicht: Nach dem Absenden nimmt der Link nichts mehr an, und im Onboarding kann HR selbst nichts hochladen. Auch in den anderen Vorgängen gibt es keine geregelte Anforderung mit Frist und Rückmeldung.</p>
+      <p>Neu ist eine Karte <strong>„Unterlagen nachfordern“</strong> in jedem der sechs Vorgänge. Sie ist bewusst gelb, damit sie sich von „Dokumente erstellen“ (weiß) und „Dokumente versenden“ (blau) abhebt.</p>
+
+      <h3>Der Ablauf</h3>
+      <div class="fluss" role="list">
+        <div class="s" role="listitem"><b>HR</b>wählt Unterlagen aus, setzt eine Frist und sendet ab</div>
+        <span class="pf" aria-hidden="true">→</span>
+        <div class="s" role="listitem"><b>Person</b>erhält eine E-Mail mit persönlichem Link</div>
+        <span class="pf" aria-hidden="true">→</span>
+        <div class="s" role="listitem"><b>Person</b>lädt je Unterlage eine oder mehrere Dateien hoch und klickt „Übermitteln“</div>
+        <span class="pf" aria-hidden="true">→</span>
+        <div class="s" role="listitem"><b>HR</b>bekommt eine Mail, sobald alles da ist, und prüft jede Unterlage einzeln</div>
+      </div>
+      <div class="fluss-neben">
+        <div class="gut"><strong>Angenommen:</strong> Die Unterlage wandert in die Dokumente des Vorgangs. Dort greift alles wie gewohnt (offene Nachweise, Ablauf-Ampel, Checkliste). Sind alle angenommen, ist die Nachforderung erledigt. Eine neue lässt sich jederzeit starten.</div>
+        <div class="schlecht"><strong>Zurückgewiesen:</strong> HR schreibt eine Begründung (z. B. „Rückseite fehlt“). Die Person bekommt automatisch eine Mail mit Link, genau für diese Unterlage.</div>
+        <div class="zeit"><strong>Frist:</strong> Die Person wird 7 Tage vorher und am Fristtag erinnert. Nach der Frist bleibt der Link noch 14 Tage nutzbar.</div>
+        <div class="hr"><strong>Frist verstrichen:</strong> HR bekommt einmal eine Mail und kann die Frist verlängern, den Link erneut senden oder die Nachforderung zurückziehen.</div>
+      </div>
+
+      <h3>Onboarding: Kasten „Offene Nachweise“</h3>
+      <p class="unterschrift" style="margin:0 0 6px">Der Kasten steht über jedem Reiter, sobald der Fragebogen abgegeben ist und Pflichtnachweise fehlen.</p>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> /dashboard/[id] · über jedem Reiter</div>
+          <div class="fenster-rumpf">
+            <div class="amber-kasten">
+              <div class="t">Offene Nachweise</div>
+              <p style="margin:5px 0 0">Diese Pflichtunterlagen durften nachgereicht werden und liegen bis heute nicht vor. Der Fragebogen hat zugesagt, dass die Personalabteilung auf die Person zukommt und die Unterlage entgegennimmt.</p>
+              <ul><li>Masernschutz-Nachweis</li><li>Aufenthaltstitel</li></ul>
+              <div style="margin-top:8px"><span class="knopf rand klein">Zu den Dokumenten</span></div>
+            </div>
+            <span class="anno">Es bleibt beim Hinweis. HR muss die Person außerhalb des Portals ansprechen und hat keinen Weg, die Unterlage im Vorgang abzulegen.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> /dashboard/[id] · über jedem Reiter</div>
+          <div class="fenster-rumpf">
+            <div class="amber-kasten">
+              <div class="t">Offene Nachweise</div>
+              <p style="margin:5px 0 0">Diese Pflichtunterlagen durften nachgereicht werden und liegen bis heute nicht vor. <span class="mark">Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie genau diese Nachweise hochlädt.</span></p>
+              <ul><li>Masernschutz-Nachweis <span class="mark">— eingegangen, bitte prüfen</span></li><li>Aufenthaltstitel <span class="mark">— angefordert am 12.09.2026, Frist 26.09.2026</span></li></ul>
+              <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><span class="knopf gelb klein mark-block">Zur Nachforderung</span><span class="knopf rand klein">Zu den Dokumenten</span></div>
+            </div>
+            <span class="anno gut">Ohne laufende Nachforderung heißt der Knopf „Unterlagen nachfordern…“. Er öffnet den Dialog, in dem die fehlenden Nachweise schon angekreuzt sind. Läuft ein Aufenthaltstitel ab, bietet der rote Warnbalken zusätzlich „Verlängerten Nachweis anfordern…“ an.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Der Dialog „Unterlagen nachfordern“</h3>
+      <div class="fenster neu">
+        <div class="fenster-leiste"><span class="tag">NEU</span> Dialog, geöffnet aus dem Kasten „Offene Nachweise“</div>
+        <div class="fenster-rumpf">
+          <div class="dialog" style="max-width:640px;margin:0 auto">
+            <div class="dialog-kopf"><div><div class="t">Unterlagen nachfordern</div><div class="s">Anna Beispiel · 2026-GYM-014</div></div><span class="knopf rand klein">Schließen</span></div>
+            <div class="dialog-rumpf">
+              <div class="ui-feld"><span class="abgrenzung">Empfänger</span><div class="ui-input wert">anna.beispiel@example.org</div><span class="ui-hinweistext">Aus dem Vorgang. Eine andere Adresse braucht eine freigegebene Domain.</span></div>
+              <div>
+                <div class="abgrenzung">Unterlagen aus dem Vorgang</div>
+                <div class="ui-hinweistext" style="margin:3px 0 4px">Vorgeschlagen (offene Nachweise)</div>
+                <div class="pos" style="margin-bottom:5px"><div class="pos-kopf"><span style="display:flex;gap:7px;align-items:center"><span class="box" style="background:var(--blau);border-color:var(--blau)"></span><b>Masernschutz-Nachweis</b></span><span class="pill p-zurueck">Gesundheitsdaten</span></div><div class="ui-input wert" style="min-height:26px;font-size:10.5px">Impfpass-Seite mit beiden Masern-Impfungen oder ärztliches Zeugnis über die Immunität.</div></div>
+                <div class="pos" style="margin-bottom:5px"><div class="pos-kopf"><span style="display:flex;gap:7px;align-items:center"><span class="box" style="background:var(--blau);border-color:var(--blau)"></span><b>Aufenthaltstitel</b></span><span class="pill p-zurueck">Aufenthaltsstatus</span></div><div class="ui-input wert" style="min-height:26px;font-size:10.5px">Bitte Vorder- und Rückseite der Karte hochladen und das Ablaufdatum angeben.</div></div>
+                <div class="ui-hinweistext" style="margin:6px 0 4px">Weitere</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px"><span style="display:flex;gap:5px;align-items:center"><span class="box"></span>Abschlusszeugnis</span><span style="display:flex;gap:5px;align-items:center"><span class="box"></span>Sozialversicherungsausweis</span><span style="display:flex;gap:5px;align-items:center"><span class="box"></span>Führungszeugnis <span class="pill p-zurueck">Art. 10 DSGVO</span></span><span style="display:flex;gap:5px;align-items:center"><span class="box"></span>Geburtsurkunde</span><span class="ui-hinweistext">…</span></div>
+              </div>
+              <div>
+                <div class="abgrenzung">Weitere Unterlagen</div>
+                <div class="pos" style="margin-top:4px"><div class="zweispaltig"><div class="ui-feld"><span class="ui-label">Bezeichnung</span><div class="ui-input wert">Unterschriebener RV-Antrag</div></div><div class="ui-feld"><span class="ui-label">Hinweis (optional)</span><div class="ui-input">z. B. Bitte beide Seiten.</div></div></div></div>
+                <div style="margin-top:5px"><span class="knopf rand klein">+ Weitere Unterlage hinzufügen</span></div>
+              </div>
+              <div class="zweispaltig">
+                <div class="ui-feld"><span class="abgrenzung">Frist</span><div class="ui-input wert">26.09.2026</div></div>
+                <div class="ui-feld"><span class="abgrenzung">Nachricht (optional)</span><div class="ui-input">Erscheint in der E-Mail und auf der Upload-Seite.</div></div>
+              </div>
+              <div class="ui-hinweistext">Die Person wird 7 Tage vorher und am Fristtag automatisch erinnert. Ist die Frist verstrichen, erhalten Sie eine E-Mail. Der Link bleibt danach noch 14 Tage nutzbar.</div>
+              <div class="summe">3 Unterlagen · Frist 26.09.2026 · an anna.beispiel@example.org</div>
+            </div>
+            <div class="dialog-fuss"><span class="knopf rand">Abbrechen</span><span class="knopf blau">Anfordern und E-Mail senden</span></div>
+          </div>
+          <span class="anno info">Sensible Unterlagen (Gesundheitsdaten, Führungszeugnis, Aufenthaltsstatus) sind gekennzeichnet. Im Onboarding erscheinen sie nur, wenn sie für diesen Vorgang tatsächlich Pflicht sind. So wird z. B. kein Aufenthaltstitel ohne Anlass verlangt.</span>
+        </div>
+      </div>
+
+      <h3>Was die Person bekommt</h3>
+      <div class="paar">
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> E-Mail an die Person</div>
+          <div class="fenster-rumpf">
+            <div class="mailkopfzeilen">An: anna.beispiel@example.org<br>Antwort an: personal@fes-credo.example.org<br>Betreff: <b>Unterlagen zu Ihrem Vorgang 2026-GYM-014</b></div>
+            <div class="mail">
+              <div class="mail-innen">
+                <div class="mail-kopf"><div class="t">FES Gymnasium</div><div class="s">Personalabteilung</div></div>
+                <div class="linie4" style="margin:0"><i class="g"></i><i class="y"></i><i class="n"></i><i class="r"></i><i class="b"></i></div>
+                <div class="mail-rumpf">
+                  <p>Guten Tag Anna Beispiel,</p>
+                  <p>für Ihren Vorgang bei FES Gymnasium benötigt die Personalabteilung noch folgende Unterlagen:</p>
+                  <div class="mail-anhang"><b>Masernschutz-Nachweis</b><br><span style="color:#888">Impfpass-Seite mit beiden Masern-Impfungen …</span><br><b>Aufenthaltstitel</b><br><span style="color:#888">Vorder- und Rückseite, bitte Ablaufdatum angeben</span><br><b>Unterschriebener RV-Antrag</b></div>
+                  <p>Bitte laden Sie die Unterlagen bis zum <b>Freitag, 26.09.2026</b> hoch:</p>
+                  <p style="text-align:center"><span class="knopf blau">Unterlagen hochladen</span></p>
+                  <p style="font-size:10.5px;color:#888">PDF, JPG, PNG oder WebP. Zu jeder Unterlage können Sie mehrere Dateien hochladen. Der Link ist persönlich, bitte nicht weiterleiten.</p>
+                </div>
+              </div>
+            </div>
+            <span class="anno info">Der Betreff nennt keine Unterlage, weil das Versandprotokoll Betreffzeilen 90 Tage speichert. Beim Mutterschutz fehlen auch Vorgangsnummer und Namen der Unterlagen in der Mail. Die Liste steht dann nur auf der Upload-Seite.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> /unterlagen/… · öffentliche Upload-Seite</div>
+          <div class="fenster-rumpf">
+            <div class="oeff-kopf"><span class="logo">CREDO</span><span class="ui-hinweistext">Vorgang <span class="mono" style="font-size:10px">2026-GYM-014</span></span></div>
+            <div class="linie4" style="margin:0"><i class="g"></i><i class="y"></i><i class="n"></i><i class="r"></i><i class="b"></i></div>
+            <div class="oeff-rumpf">
+              <div><div style="font-weight:700;font-size:13.5px">Unterlagen nachreichen</div><div class="ui-hinweistext">Anna Beispiel · FES Gymnasium</div></div>
+              <div class="fristkasten">Bitte laden Sie die Unterlagen bis <b>Freitag, 26.09.2026</b> hoch.</div>
+              <div class="upl rot">
+                <div class="kopfz"><span class="kreis-k">!</span><b>Masernschutz-Nachweis</b><span class="pill p-zurueck">Bitte erneut hochladen</span></div>
+                <div style="color:#8b0015">Die Personalabteilung konnte Ihre Unterlage nicht annehmen: <i>Auf dem Foto ist das Impfdatum nicht lesbar.</i></div>
+                <div><span class="knopf amber klein">Datei hinzufügen</span></div>
+              </div>
+              <div class="upl amber">
+                <div class="kopfz"><span class="kreis-k">+</span><b>Aufenthaltstitel</b><span class="pill p-offen">2 Dateien bereit, noch nicht übermittelt</span></div>
+                <div class="datei" style="font-size:10.5px"><span class="ic"></span>titel-vorne.jpg <span class="gr">1,1 MB</span><span class="weg">Entfernen</span></div>
+                <div class="datei" style="font-size:10.5px"><span class="ic"></span>titel-hinten.jpg <span class="gr">0,9 MB</span><span class="weg">Entfernen</span></div>
+                <div class="ui-feld"><span class="ui-label">Gültig bis (Ablaufdatum)</span><div class="ui-input wert">31.03.2028</div><span class="ui-hinweistext">Leer lassen, wenn Ihr Nachweis unbefristet ist (z. B. Niederlassungserlaubnis).</span></div>
+              </div>
+              <div class="upl blau">
+                <div class="kopfz"><span class="kreis-k">✓</span><b>Unterschriebener RV-Antrag</b><span class="pill p-pruefen">Übermittelt am 15.09.2026, wird geprüft</span></div>
+              </div>
+            </div>
+            <div class="oeff-fuss"><span>1 Unterlage bereit zum Übermitteln</span><span class="knopf primaer">Unterlagen übermitteln</span></div>
+            <span class="anno info">Hochladen speichert sofort, erst „Übermitteln“ gibt die Dateien an HR frei. Bis dahin kann die Person sie noch entfernen. Andere Daten des Vorgangs zeigt die Seite nicht.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Was HR im Vorgang sieht und prüft</h3>
+      <div class="fenster neu">
+        <div class="fenster-leiste"><span class="tag">NEU</span> Reiter „Dokumente“ · Karte „Unterlagen nachfordern“ (laufend)</div>
+        <div class="fenster-rumpf">
+          <div class="nf-karte">
+            <div class="nf-kopf"><span class="kartentitel">Unterlagen nachfordern</span><span class="pill p-pruefen">1 zu prüfen</span></div>
+            <div class="ui-hinweistext">Angefordert am 12.09.2026 von Erika Muster · an anna.beispiel@example.org</div>
+            <div style="font-size:11px">Frist: Freitag, 26.09.2026 · noch 5 Tage</div>
+            <div class="nf-balken" aria-hidden="true"><span class="ok" style="width:33%"></span><span class="pr" style="width:33%"></span></div>
+            <div class="ui-hinweistext">1 von 3 angenommen · 1 zu prüfen · 1 offen</div>
+            <div class="pos">
+              <div class="pos-kopf"><b>Unterschriebener RV-Antrag</b><span class="pill p-ok">Angenommen</span></div>
+              <div class="klein">Angenommen am 16.09.2026 von Erika Muster · in die Dokumente des Vorgangs übernommen</div>
+            </div>
+            <div class="pos">
+              <div class="pos-kopf"><b>Aufenthaltstitel</b><span class="pill p-pruefen">Zu prüfen</span></div>
+              <div class="klein">titel-vorne.jpg · 1,1 MB · <u style="color:var(--blau)">Öffnen</u> &nbsp; titel-hinten.jpg · 0,9 MB · <u style="color:var(--blau)">Öffnen</u></div>
+              <div class="klein">Gültig bis (Angabe der Person): 31.03.2028</div>
+              <div class="aktionen"><span class="knopf ja klein">Annehmen</span><span class="knopf nein klein">Zurückweisen…</span><span class="knopf rand klein">Entfällt…</span></div>
+            </div>
+            <div class="pos">
+              <div class="pos-kopf"><b>Masernschutz-Nachweis</b><span class="pill p-zurueck">Zurückgewiesen, erneut angefordert</span></div>
+              <div class="klein">Ihre Begründung: Auf dem Foto ist das Impfdatum nicht lesbar. · 2. Einreichung</div>
+              <div class="klein"><s>impfpass.jpg · 0,4 MB</s> zurückgewiesen am 16.09.2026</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="knopf rand klein">Unterlagen ergänzen…</span><span class="knopf rand klein">Frist ändern…</span><span class="knopf rand klein">Link erneut senden</span><span class="knopf rand klein">Zurückziehen…</span></div>
+            <div class="ui-hinweistext">E-Mails an die Person: Aufforderung 12.09. · Zurückweisung 16.09. · Erinnerung 19.09.</div>
+          </div>
+          <span class="anno info">Beim Aufenthaltstitel fragt „Annehmen“ das Ablaufdatum ab, vorbelegt mit der Angabe der Person. Damit greifen Ablauf-Ampel und nächtliche Erinnerung. „Annehmen“ lässt sich zurücknehmen, falls HR sich verklickt.</span>
+        </div>
+      </div>
+
+      <div class="paar">
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> „Zurückweisen…“</div>
+          <div class="fenster-rumpf">
+            <div class="dialog">
+              <div class="dialog-kopf"><div><div class="t">Unterlage zurückweisen</div><div class="s">Masernschutz-Nachweis</div></div></div>
+              <div class="dialog-rumpf">
+                <div class="ui-feld"><span class="ui-label">Begründung für die Person <span class="stern">*</span></span><div class="ui-input wert flaeche">Auf dem Foto ist das Impfdatum nicht lesbar.</div><span class="ui-hinweistext">Die Person erhält Ihre Begründung per E-Mail und kann die Unterlage erneut hochladen.</span></div>
+                <div class="ui-feld"><span class="ui-label">Frist für die erneute Einreichung</span><div class="ui-input wert">26.09.2026</div></div>
+              </div>
+              <div class="dialog-fuss"><span class="knopf rand">Abbrechen</span><span class="knopf" style="background:var(--rot);color:#fff">Zurückweisen und E-Mail senden</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Listen aller sechs Vorgangsarten · Spalte „Unterlagen“</div>
+          <div class="fenster-rumpf" style="overflow-x:auto">
+            <table class="ui-tab"><thead><tr><th>Vorgang</th><th>Status</th><th>Unterlagen</th></tr></thead>
+              <tbody>
+                <tr><td>2026-GYM-014<br><span style="color:var(--ui-muted)">Anna Beispiel</span></td><td><span class="badge" style="background:rgba(16,185,129,.15);color:#0f9f6e">Geprüft</span></td><td><span class="pill p-pruefen">1 zu prüfen</span></td></tr>
+                <tr><td>OFF-2026-GS-007<br><span style="color:var(--ui-muted)">Jonas Probe</span></td><td><span class="badge" style="background:#f1f1f1;color:#555">Übergabe</span></td><td><span class="pill p-offen">1/3</span></td></tr>
+                <tr><td>EZ-2026-KITA-002<br><span style="color:var(--ui-muted)">Lea Test</span></td><td><span class="badge" style="background:#f1f1f1;color:#555">Genehmigt</span></td><td><span class="pill p-zurueck">Frist verstrichen</span></td></tr>
+                <tr><td>PSI-2026-GYM-003<br><span style="color:var(--ui-muted)">Tim Muster</span></td><td><span class="badge" style="background:#f1f1f1;color:#555">Verwaltung</span></td><td style="color:var(--ui-muted)">—</td></tr>
+              </tbody></table>
+            <span class="anno info">Reihenfolge der Anzeige: „zu prüfen“ vor „Frist verstrichen“ vor „x/y eingegangen“. Ohne laufende Nachforderung steht ein Strich.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Was in welchem Vorgang passiert</h3>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Vorgang</th><th>Möglich</th><th>Vorgeschlagene Adresse</th><th>Auswahl (Beispiele)</th><th>Angenommen landet in …</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Onboarding</strong></td><td>ab Abgabe des Fragebogens, auch nach Abschluss (z. B. verlängerter Aufenthaltstitel)</td><td>Adresse aus dem Vorgang</td><td>offene Nachweise vorangekreuzt; Zeugnisse, SV-Ausweis, Geburtsurkunde …</td><td>Reiter „Dokumente“. „Offene Nachweise“ und Ablauf-Ampel räumen sich selbst ab.</td></tr>
+            <tr><td><strong>Offboarding</strong></td><td>bis zum Abschluss, nicht bei Austrittsart „Tod“</td><td>private Adresse, weil das dienstliche Postfach erlischt</td><td>unterschriebener Aufhebungsvertrag, Rückgabeprotokoll …</td><td>Reiter „Dokumente“</td></tr>
+            <tr><td><strong>Verbeamtung</strong></td><td>bis zum Abschluss</td><td>Adresse der Lehrkraft</td><td>aus der Checkliste: Antrag, Amtsarzt-Attest, Beihilfe-Datenschutzerklärung, Familienzuschläge …</td><td>Reiter „Dokumente“. Der passende Checklistenpunkt wird abgehakt.</td></tr>
+            <tr><td><strong>Vertragsverlängerung</strong></td><td>nach Zusage der Übernahme</td><td>Adresse aus dem Vorgang</td><td>Scan des unterschriebenen Vertrags, Qualifikationsnachweis</td><td>in der Karte selbst (das Modul hat heute keine Dokumentenablage)</td></tr>
+            <tr><td><strong>Elternzeit</strong></td><td>bis zum Ende; Geburtsurkunde nicht, solange der endgültige Antrag offen ist</td><td>Adresse aus dem Vorgang, mit Hinweis, dass das dienstliche Postfach evtl. nicht gelesen wird</td><td>Geburtsurkunde, unterschriebener Antrag, Beihilfe-Formular</td><td>Dokumente. Die Geburtsurkunde gilt als vorliegend, die Frist „nachreichen“ ist erledigt.</td></tr>
+            <tr><td><strong>Mutterschutz</strong></td><td>bis zum Ende</td><td>Adresse aus dem Vorgang</td><td>ärztliches Zeugnis, BAD-Bescheinigung, Geburtsurkunde</td><td>Dokumente. Mails ohne Vorgangsnummer und ohne Namen der Unterlagen (Gesundheitsdaten).</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="kasten warn">
+        <strong class="t">Schriftform</strong>
+        <p>Kündigung, Aufhebungsvertrag, Elternzeitantrag und unterschriebene Verträge brauchen die Unterschrift im Original. Ein Scan ersetzt sie nicht. Solche Unterlagen lassen sich anfordern, tragen aber immer den festen Hinweis „Bitte geben Sie zusätzlich das unterschriebene Original ab“. Ein angenommener Scan hakt keinen Checklistenpunkt „Original zurück“ ab und setzt beim Vertragsende nicht „Vertrag unterschrieben“.</p>
+      </div>
+
+      <h3>So setze ich es um</h3>
+      <ol class="schritte">
+        <li><strong>Eine gemeinsame Funktion für alle sechs Vorgänge.</strong> Vier neue Tabellen: Nachforderung, angeforderte Unterlagen, Dateien und versendete Links. Dazu je Vorgangsart ein kleiner Baustein, der drei Fragen beantwortet: Wer ist Empfänger, welche Unterlagen stehen zur Auswahl, wohin wird eine angenommene Unterlage übernommen? Die Schemaänderung ist rein additiv.</li>
+        <li><strong>Übernahme erst beim Annehmen.</strong> Bis dahin liegen die Dateien bei der Nachforderung. Angenommene gehen in die Dokumente des Vorgangs über, und ab dann ist nur noch das Modul für die Datei zuständig. Zurückgewiesene erreichen den Vorgang nie und werden nach 30 Tagen gelöscht. Als Nachweis bleiben Name, Prüfsumme und Begründung.</li>
+        <li><strong>Link und Upload sicher.</strong>
+          <ul>
+            <li>Der Link wird nur als Hash gespeichert, jede Mail bekommt einen eigenen. Gültig bis Frist plus 14 Tage.</li>
+            <li>Upload nur PDF und Bilder mit Inhaltsprüfung, höchstens 9,5 MB je Datei (Grenze von Next.js), nur zu den angeforderten Unterlagen.</li>
+            <li>HR sieht Dateien erst nach „Übermitteln“.</li>
+            <li>Die Upload-Seite nennt die verantwortliche Stelle des Mandanten, wie der Fragebogen.</li>
+            <li>Bremsen gegen Missbrauch sind eingebaut. Der Upload-Link geht nicht an Webhooks.</li>
+          </ul></li>
+        <li><strong>Eine laufende Nachforderung je Vorgang.</strong> Mehr Unterlagen kommen während der Laufzeit über „Ergänzen“ dazu. Danach lässt sich jederzeit eine neue starten, das ist der Folgeauftrag. Doppelklicks und gleichzeitige Entscheidungen zweier HR-Kräfte sind in der Datenbank abgesichert.</li>
+        <li><strong>Mails:</strong> Fünf neue Vorlagen unter Einstellungen → E-Mail-Vorlagen, Gruppe „Unterlagen“. An die Person: Aufforderung, Erinnerung, Zurückweisung. An HR: „alles da“ und „Frist verstrichen“. Die HR-Mail „alles da“ geht erst raus, nachdem die Person ihre Bestätigung gesehen hat, so wartet sie nicht auf den Mailserver.</li>
+        <li><strong>Täglicher Lauf</strong> (in n8n eingeplant wie die anderen): Erinnerungen, HR-Meldung bei verstrichener Frist, Nachholen fehlgeschlagener Mails, Aufräumen. Er kommt gleich mit der ersten Stufe, damit Dialog und Mail nichts versprechen, was noch fehlt.</li>
+        <li><strong>Vorher behoben:</strong>
+          <ul>
+            <li>Die Verbeamtung zeigt hochgeladene Dokumente heute unter „Weitere Dokumente“ statt im Raster (siehe erste Übersicht).</li>
+            <li>Der endgültige Elternzeitantrag löscht heute jede vorhandene Geburtsurkunde, auch von HR hochgeladene. Das begrenze ich auf die eigenen Uploads der Person.</li>
+          </ul></li>
+        <li><strong>Onboarding und der Fragebogen-Link:</strong> Mit Paket 1 wird der Fragebogen nach der eigenen Abgabe schreibgeschützt. Danach gibt es genau einen Weg zum Nachreichen, die Nachforderung.</li>
+      </ol>
+
+      <div class="kasten hinweis">
+        <strong class="t">In zwei Stufen</strong>
+        <p><strong>Stufe 1: Onboarding komplett (etwa 13–14 Tage).</strong> Enthält Vorarbeiten, Tabellen, Upload-Seite, HR-Karte, Dialog, Prüfen, Mails und den täglichen Lauf, ab dann produktiv nutzbar. <strong>Stufe 2: die übrigen fünf Vorgänge und die Spalte „Unterlagen“ in allen Listen (etwa 6–7 Tage).</strong></p>
+      </div>
+      <p><span class="aufwand">Aufwand 19–21 Tage</span> <span class="ui-hinweistext" style="margin-left:6px">der größte Baustein; unabhängig von Paket 3</span></p>
+    </section>
+
+    <!-- ================= 5 MAILS UND VORLAGEN ================= -->
+    <section class="abschnitt" id="mails">
+      <div class="abschnitt-titel"><span class="nr">5</span><h2>Alle E-Mails und Vorlagen im Überblick</h2></div>
+      <p>Die vier Pakete berühren an vielen Stellen E-Mails, Mailvorlagen und Word-Vorlagen. Hier steht alles an einem Ort: was sich an bestehenden Vorlagen ändert, was neu hinzukommt, was bewusst gleich bleibt und wo ein Handschritt nötig ist.</p>
+
+      <div class="kasten warn">
+        <strong class="t">Wichtig für alle geänderten Mailtexte</strong>
+        <p>Jede Mailvorlage hat einen Standardtext im Code. Sobald jemand eine Vorlage unter Einstellungen → E-Mail-Vorlagen einmal gespeichert hat, und sei es nur mit einem Empfänger in Kopie, gilt die gespeicherte Fassung. Textänderungen aus dem Code kommen dort dann nicht mehr an. Einen Knopf „Auf Standard zurücksetzen“ gibt es heute nicht. Deshalb schlage ich ihn als kleine Ergänzung vor (siehe unten). Bis dahin prüfe ich jede Vorlage aus Tabelle A vor dem Deploy und passe gespeicherte Fassungen von Hand an.</p>
+      </div>
+
+      <h3>A · Bestehende Mailvorlagen, die sich ändern</h3>
+      <p class="unterschrift" style="margin:0 0 6px">Namen wie in Einstellungen → E-Mail-Vorlagen, technischer Schlüssel in Klammern.</p>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Vorlage</th><th>Paket</th><th>Was sich ändert</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Einladung Vorgesetzter (Einstellungsmodalitäten)</strong><br><code>supervisor-link-created</code></td><td class="num">1, 2</td><td>„Stellenbeschreibung“ wird „Stellenbezeichnung“. Kann schon beim Anlegen des Vorgangs verschickt werden. Nennt den Namen aus „Neuer Vorgang“, nicht mehr die private E-Mail-Adresse der Person.</td></tr>
+            <tr><td><strong>Einladung Vorgesetzter (Vertragsverlängerung)</strong><br><code>contract-end-supervisor-link</code></td><td class="num">1</td><td>„Stellenbeschreibung“ wird „Stellenbezeichnung“. Außerdem stimmt der Satz „Da der/die Mitarbeiter:in weiterbeschäftigt werden soll …“ nicht mehr, seit die Führungskraft selbst über die Übernahme entscheidet. Er wird neutral formuliert.</td></tr>
+            <tr><td><strong>Erinnerung Vorgesetzter (Modalitäten ausstehend)</strong><br><code>supervisor-reminder</code></td><td class="num">1</td><td>Der Link darin führt heute auf eine Seite, die es nicht gibt (Fehler 404), und wird korrigiert. Künftig kommt die Erinnerung auch, solange der Fragebogen offen ist, erstmals 7 Tage nach dem Link. Umlaut im Betreff.</td></tr>
+            <tr><td><strong>Erinnerung Mitarbeiter (Fragebogen ausstehend)</strong><br><code>employee-reminder</code></td><td class="num">1</td><td>Wird nicht mehr verschickt, wenn der Link schon abgelaufen ist.</td></tr>
+            <tr><td><strong>Einladung Mitarbeiter (Personalfragebogen)</strong><br><code>onboarding-created</code></td><td class="num">2</td><td>Die Anrede „Herzlich willkommen, {{vorname}}!“ läuft heute ins Leere („Herzlich willkommen, !“), weil beim Anlegen kein Name bekannt ist. Künftig steht dort der Name aus „Neuer Vorgang“, ohne Namen „Herzlich willkommen!“.</td></tr>
+            <tr><td><strong>Fragebogen eingereicht (HR-Benachrichtigung)</strong><br><code>questionnaire-completed</code></td><td class="num">2</td><td>Die Vorgangsnummer im Betreff bleibt heute leer. Künftig stehen Vorgangsnummer und Name darin. Neuer Satz: ob die Modalitäten schon vorliegen, und wenn ja, „Der Vorgang ist bereit zur Prüfung“.</td></tr>
+            <tr><td><strong>Einstellungsmodalitäten eingereicht (HR-Benachrichtigung)</strong><br><code>supervisor-completed</code></td><td class="num">2</td><td>„Alle Daten eingegangen … Der Vorgang kann jetzt abgeschlossen werden“ ist falsch, wenn der Fragebogen noch fehlt. Wird neutral, „bereit zur Prüfung“ nur, wenn beides da ist. Vorgangsnummer im Betreff.</td></tr>
+            <tr><td><strong>Eingangsbestätigung Mitarbeiter (Fragebogen eingereicht)</strong><br><code>questionnaire-confirmation-employee</code></td><td class="num">2</td><td>Geht heute am normalen Versandweg vorbei: kein Eintrag im Versandprotokoll, und Deaktivieren, Empfänger und Antwortadresse aus den Einstellungen wirken nicht. Läuft künftig über den normalen Weg. Der Text bleibt.</td></tr>
+            <tr><td><strong>Alle Vorlagen</strong></td><td class="num">3</td><td>Fehlerbehebung im Mail-Baustein: Ein Dollarzeichen im Freitext (z. B. „5$'“) kopiert heute Teile der Vorlage in die Mail.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Einladung Vorgesetzter, früh verschickt</div>
+          <div class="fenster-rumpf">
+            <div class="mailkopfzeilen">Betreff: <b>Einstellungsmodalitäten für anna.beispiel@example.org – bitte ausfüllen</b></div>
+            <div class="mail"><div class="mail-innen"><div class="mail-kopf"><div class="t">FES Gymnasium</div></div><div class="mail-rumpf">
+              <p>… Diese Eckdaten werden abgefragt:</p>
+              <div class="mail-anhang">› Stellenbeschreibung (wird in den Arbeitsvertrag übernommen)<br>› Vertragsbeginn, ggf. Befristung<br>› Arbeitszeit (Wochenstunden)</div>
+            </div></div></div>
+            <span class="anno">Ohne Namen steht die private Adresse der Person im Betreff, und der alte Begriff im Text.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Einladung Vorgesetzter, früh verschickt</div>
+          <div class="fenster-rumpf">
+            <div class="mailkopfzeilen">Betreff: <b>Einstellungsmodalitäten für <span class="mark">Anna Beispiel</span> – bitte ausfüllen</b></div>
+            <div class="mail"><div class="mail-innen"><div class="mail-kopf"><div class="t">FES Gymnasium</div></div><div class="mail-rumpf">
+              <p>… Diese Eckdaten werden abgefragt:</p>
+              <div class="mail-anhang">› <span class="mark">Stellenbezeichnung</span> (wird in den Arbeitsvertrag übernommen)<br>› Vertragsbeginn, ggf. Befristung<br>› Arbeitszeit (Wochenstunden)</div>
+            </div></div></div>
+            <span class="anno gut">Der Name kommt aus „Neuer Vorgang“. Fehlt er, steht dort „die neue Mitarbeiterin / den neuen Mitarbeiter“ statt der Adresse.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>B · Neue Mailvorlagen</h3>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Neue Vorlage (Gruppe)</th><th>An</th><th>Wann</th><th>Paket</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Individuelle E-Mail aus einem Vorgang</strong> (Allgemein)</td><td>Adresse aus dem Dialog; An, Cc und Bcc der Vorlage wirken hier nicht</td><td>„E-Mail schreiben“</td><td class="num">3</td></tr>
+            <tr><td><strong>Unterlagen angefordert</strong> (Unterlagen)</td><td>Person des Vorgangs</td><td>Anfordern, Ergänzen, Link erneut senden, Frist verlängert</td><td class="num">4</td></tr>
+            <tr><td><strong>Erinnerung: Unterlagen</strong> (Unterlagen)</td><td>Person des Vorgangs</td><td>7 Tage vor der Frist und am Fristtag</td><td class="num">4</td></tr>
+            <tr><td><strong>Unterlage zurückgewiesen</strong> (Unterlagen)</td><td>Person des Vorgangs</td><td>HR weist eine Unterlage zurück</td><td class="num">4</td></tr>
+            <tr><td><strong>Unterlagen vollständig eingegangen</strong> (Unterlagen)</td><td>anfordernde HR-Person, Kopie an das zentrale HR-Postfach</td><td>alle Unterlagen übermittelt</td><td class="num">4</td></tr>
+            <tr><td><strong>Frist für Unterlagen verstrichen</strong> (Unterlagen)</td><td>anfordernde HR-Person, Kopie an das zentrale HR-Postfach</td><td>einmal nach Fristende</td><td class="num">4</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li><strong>Einheitlich für alle neuen Vorlagen:</strong>
+          <ul>
+            <li>Sie erscheinen unter Einstellungen → E-Mail-Vorlagen und in der Ampel „Versand-Status“, im CREDO-Design.</li>
+            <li>Sie sind im Editor änderbar.</li>
+            <li>Der Testversand zeigt sinnvolle Beispieldaten.</li>
+            <li>Jeder Versand steht im Versandprotokoll.</li>
+          </ul></li>
+        <li><strong>Datenschutz:</strong> Die Betreffzeilen nennen keine Unterlage. Beim Mutterschutz fehlen in den Mails an die Person auch Vorgangsnummer und Unterlagen-Namen. Das regelt ein Bedingungsblock in derselben Vorlage, eine zweite Vorlage braucht es nicht.</li>
+        <li><strong>Antwortadresse:</strong> Antworten an die Person gehen an das zentrale HR-Postfach (Antwortadresse aus den SMTP-Einstellungen). Es dient zugleich als Kopie-Empfänger der beiden HR-Meldungen.</li>
+      </ul>
+
+      <h3>C · Word-Vorlagen und Platzhalter</h3>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Stelle</th><th>Änderung</th></tr></thead>
+          <tbody>
+            <tr><td>Platzhalter <code>{stellenbeschreibung}</code> (Onboarding, Vertragsverlängerung)</td><td>Er bleibt gleich, nur die Beschriftung im Variablen-Katalog heißt „Stellenbezeichnung“. Hochgeladene Word-Vorlagen funktionieren unverändert.</td></tr>
+            <tr><td><code>{vorname}</code>, <code>{nachname}</code> im Onboarding</td><td>Solange der Fragebogen noch leer ist, greifen sie auf den Namen aus „Neuer Vorgang“ zurück. So lässt sich z. B. ein Willkommensschreiben schon früh erstellen.</td></tr>
+            <tr><td>Dokumentenpaket, System-Vorlage „Führungszeugnis“, Standardpakete der Mandanten</td><td>Unverändert.</td></tr>
+            <tr><td>Pakete 3 und 4</td><td>Bringen keine neuen Word-Platzhalter mit.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>D · Einstellungsseite</h3>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Einstellungen → E-Mail-Vorlagen</div>
+          <div class="fenster-rumpf">
+            <div class="tabs"><span>Versand-Status</span><span class="aktiv">E-Mail-Vorlagen</span><span>Versandprotokoll</span><span>SMTP</span><span>Webhooks</span></div>
+            <div class="abgrenzung">Onboarding</div>
+            <div class="stapel" style="margin-top:5px">
+              <div class="pos"><div class="pos-kopf"><b>Einladung Vorgesetzter (Einstellungsmodalitäten)</b><span class="pill p-entf">Angepasst</span></div><div class="klein">Gespeichert am 03.07.2026. Neue Standardtexte kommen hier nicht an.</div></div>
+              <div class="pos"><div class="pos-kopf"><b>Einstellungsmodalitäten eingereicht (HR)</b><span class="pill p-ok">Standard-Vorlage</span></div></div>
+            </div>
+            <span class="anno">Eine einmal gespeicherte Vorlage lässt sich nicht zurück auf den Standard setzen.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Einstellungen → E-Mail-Vorlagen</div>
+          <div class="fenster-rumpf">
+            <div class="tabs"><span>Versand-Status</span><span class="aktiv">E-Mail-Vorlagen</span><span>Versandprotokoll</span><span>SMTP</span><span>Webhooks</span></div>
+            <div class="abgrenzung">Onboarding</div>
+            <div class="stapel" style="margin-top:5px">
+              <div class="pos"><div class="pos-kopf"><b>Einladung Vorgesetzter (Einstellungsmodalitäten)</b><span class="pill p-entf">Angepasst</span></div><div class="klein">Gespeichert am 03.07.2026 · <span class="mark">Der Standardtext wurde seitdem geändert.</span></div><div class="aktionen"><span class="knopf rand klein mark-block">Auf Standard zurücksetzen</span></div></div>
+            </div>
+            <div class="abgrenzung" style="margin-top:8px"><span class="mark">Allgemein</span></div>
+            <div class="pos" style="margin-top:5px"><div class="pos-kopf"><b>Individuelle E-Mail aus einem Vorgang</b><span class="pill p-ok">Standard-Vorlage</span></div></div>
+            <div class="abgrenzung" style="margin-top:8px"><span class="mark">Unterlagen</span></div>
+            <div class="stapel" style="margin-top:5px">
+              <div class="pos"><div class="pos-kopf"><b>Unterlagen angefordert</b><span class="pill p-ok">Standard-Vorlage</span></div></div>
+              <div class="pos"><div class="pos-kopf"><b>Erinnerung: Unterlagen</b><span class="pill p-ok">Standard-Vorlage</span></div></div>
+              <div class="pos"><div class="pos-kopf"><b>Unterlage zurückgewiesen</b><span class="pill p-ok">Standard-Vorlage</span></div></div>
+              <div class="pos"><div class="pos-kopf"><b>Unterlagen vollständig eingegangen (HR)</b><span class="pill p-ok">Standard-Vorlage</span></div></div>
+              <div class="pos"><div class="pos-kopf"><b>Frist für Unterlagen verstrichen (HR)</b><span class="pill p-ok">Standard-Vorlage</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ul>
+        <li><strong>„Auf Standard zurücksetzen“ (Vorschlag, etwa 0,5 Tage, in Paket 1).</strong> Das Portal löscht die gespeicherte Fassung einer Vorlage, danach gilt wieder der Standardtext. Ein Hinweis zeigt an, wenn sich der Standard seit dem Speichern geändert hat. Damit kommen die Änderungen aus Tabelle A per Klick an, ohne Abtippen und ohne Datenbankzugriff. Die Aktion wird protokolliert.</li>
+        <li><strong>Reiter „Webhooks“ und Filter im Versandprotokoll:</strong> Die Ereignisliste dort ist fest einprogrammiert und schon heute veraltet (über ein Dutzend Ereignisse fehlen). Ich leite sie künftig aus dem Katalog ab, damit auch alle neuen Ereignisse erscheinen. Dazu zwei Hinweise: Die individuelle E-Mail löst bewusst keinen Webhook aus, weil sie Anhänge hat, und bei den Unterlagen-Mails geht der Upload-Link nicht an Webhooks.</li>
+      </ul>
+
+      <h3>E · Bestehende Mailfehler außerhalb der vier Pakete</h3>
+      <p>Beim Durchsehen aufgefallen. Sie betreffen Vorlagen, die die Pakete nicht anfassen.</p>
+      <ul>
+        <li><strong>Offboarding-Mails</strong> (Neuer Vorgang, Aufgaben für Abteilung, Aufgabe erledigt, Erinnerung, Abgeschlossen): Namen, Austrittsdatum, Abteilung und Aufgabe bleiben leer, weil Vorlage und gesendete Daten verschiedene Feldnamen benutzen. Der Link zu den Abteilungsaufgaben führt ins Leere.</li>
+        <li><strong>„Unterlagen zum Austritt“</strong> (Dokumentenpaket Offboarding): Das Austrittsdatum wird doppelt umgewandelt und erscheint als „Invalid Date“ oder mit vertauschtem Tag und Monat.</li>
+        <li><strong>„Verbeamtung: Fristen-Warnung“:</strong> Die Beispieldaten des Testversands passen nicht zu den echten Daten, und die Sammelmail kommt täglich, ohne die einzelnen Fristen zu nennen.</li>
+      </ul>
+      <p>Mein Vorschlag: ein kleines eigenes <strong>Mail-Reparaturpaket (etwa 1–1,5 Tage)</strong>, das sich gut an Paket 1 anhängen lässt.</p>
+    </section>
+
+    <!-- ================= ABLAUF ================= -->
+    <section class="abschnitt" id="ablauf">
+      <div class="abschnitt-titel"><span class="nr">6</span><h2>Reihenfolge, Deploy und Handschritte</h2></div>
+      <div class="pakete" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+        <div class="paket">
+          <div class="ph">Paket 1 · zuerst</div>
+          <h5>Stellenbezeichnung + Entsperren</h5>
+          <ul><li>Änderung 1 komplett</li><li>Änderung 2, Stufe A: Links unabhängig, Reparatur der Altfälle, Erinnerungslink</li><li>„Auf Standard zurücksetzen“ für Mailvorlagen</li><li>optional: Mail-Reparaturpaket (+1–1,5 Tage)</li></ul>
+          <span class="aufwand">2–2,5 Tage</span>
+        </div>
+        <div class="paket">
+          <div class="ph">Paket 2</div>
+          <h5>HR-Übersicht + Neuer Vorgang</h5>
+          <ul><li>Paralleler Stepper, Chips, „Bereit zur Prüfung“</li><li>Name und Führungskraft beim Anlegen</li><li>Erinnerungen, HR-Mailtexte</li></ul>
+          <span class="aufwand">1,5–2 Tage</span>
+        </div>
+        <div class="paket">
+          <div class="ph">Paket 3</div>
+          <h5>Individuelle E-Mail</h5>
+          <ul><li>Karte und Dialog in vier Modulen</li><li>Nachweis, Kopie 12 Monate, Mailvorlage</li></ul>
+          <span class="aufwand">5–6 Tage</span>
+        </div>
+        <div class="paket">
+          <div class="ph">Paket 4</div>
+          <h5>Unterlagen nachfordern</h5>
+          <ul><li>Stufe 1: Onboarding komplett inkl. täglichem Lauf</li><li>Stufe 2: übrige fünf Vorgänge, Listen-Spalte</li></ul>
+          <span class="aufwand">19–21 Tage</span>
+        </div>
+      </div>
+      <p>Paket 1 kommt zuerst, weil Mitarbeitende heute festhängen. Paket 4 setzt Paket 1 voraus, weil der Fragebogen dann schreibgeschützt ist und die Nachforderung der einzige Weg zum Nachreichen wird. Pakete 3 und 4 hängen nicht voneinander ab, ihre Reihenfolge richtet sich nach Ihrer Priorität. Zusammen etwa 28–32 Arbeitstage, mit dem Mail-Reparaturpaket etwa 29–33.</p>
+
+      <div class="kasten warn">
+        <strong class="t">Der erste Deploy nimmt den ausstehenden Stand mit</strong>
+        <p>Auf <code>main</code> liegen seit dem 07.09. neun Commits, die noch nicht auf dem Server sind: Formular-Validierung und die Rückmeldung des Personalbüros. Sie bringen Schemaänderungen (Kostenstellen, Aufenthaltstitel, Ablaufdaten) und eine Datenmigration mit. Paket 1 geht zusammen mit ihnen hinaus. Voraussetzung auf dem Server bleibt <code>./backups</code>, eingehängt und <code>sudo chown 1001 backups</code>.</p>
+      </div>
+
+      <h3>Vor dem Deploy: drei Prüfungen auf dem Server (nur lesend)</h3>
+      <details>
+        <summary>1 · Welche Onboarding-Vorgänge hängen heute fest?</summary>
+        <div>
+          <p>Die Liste zeigt, welche Vorgänge die Reparatur anfasst und welche HR schon als geprüft markiert hat. Diese besprechen wir einzeln.</p>
+          <p>Besonders die Zeilen mit <code>link_abgelaufen = true</code>: Heute sind sie prüfbar, nach dem Deploy wartet die Prüfung auf die Modalitäten, und mit dem abgelaufenen Link kann die Führungskraft nichts mehr absenden. Ausweg ist ein neuer Link (Übersicht, Karte „Vorgesetzten-Link“ → „Neuen Link erzeugen“). Diese Fälle vorab mit HR klären.</p>
+<pre>SELECT "displayId", status, "submittedAt", "supervisorSubmittedAt",
+       "supervisorToken" IS NOT NULL AS link,
+       "supervisorTokenExpiresAt" &lt; now() AS link_abgelaufen
+FROM onboarding_processes
+WHERE ("submittedAt" IS NULL
+       AND status IN ('SUBMITTED','SUPERVISOR_PENDING','SUPERVISOR_SUBMITTED','REVIEWED'))
+   OR (status = 'SUBMITTED' AND "supervisorToken" IS NOT NULL
+       AND "supervisorSubmittedAt" IS NULL);</pre>
+        </div>
+      </details>
+      <details>
+        <summary>2 · Gibt es offene Formulare mit mehr als 200 Zeichen Stellenangabe?</summary>
+        <div>
+<pre>SELECT o.status, count(*) AS anzahl,
+       max(length(s.stellenbeschreibung)) AS max_zeichen,
+       count(*) FILTER (WHERE length(s.stellenbeschreibung) &gt; 200) AS ueber_200
+FROM supervisor_data s
+JOIN onboarding_processes o ON o.id = s."onboardingId"
+WHERE s.stellenbeschreibung IS NOT NULL
+GROUP BY o.status;</pre>
+        </div>
+      </details>
+      <details>
+        <summary>3 · Liegen betroffene Mailvorlagen als gespeicherte Fassung in der Datenbank?</summary>
+        <div>
+<pre>SELECT event, "updatedAt" FROM email_templates
+WHERE event IN ('supervisor-link-created', 'contract-end-supervisor-link',
+                'supervisor-reminder', 'employee-reminder', 'onboarding-created',
+                'questionnaire-completed', 'supervisor-completed',
+                'questionnaire-confirmation-employee');</pre>
+          <p>Das sind alle bestehenden Vorlagen aus Abschnitt 5, Tabelle A. Jede Zeile hier bedeutet: Die Textänderung aus dem Code wirkt für dieses Event nicht. Dort setze ich die Vorlage mit „Auf Standard zurücksetzen“ zurück oder ändere sie von Hand, wenn HR den Text bewusst angepasst hat.</p>
+        </div>
+      </details>
+
+      <h3>Nach dem Deploy</h3>
+      <ul>
+        <li><code>system_migrations</code> prüfen: Sind die neuen Merker gesetzt, und wie viele Vorgänge wurden repariert?</li>
+        <li>Gespeicherte Mailvorlagen wie oben anpassen.</li>
+        <li>Vor Paket 3 und 4: die Freigabeliste für abweichende Empfängeradressen pflegen (Einstellungen → SMTP).</li>
+        <li>Mit Paket 4: den täglichen Lauf <code>/api/cron/unterlagen-fristen</code> in n8n einplanen, der erste Lauf nur zur Probe (<code>?dryRun=1</code>).</li>
+        <li>Jedes Paket durchläuft vor dem Push <code>tsc</code>, <code>lint</code>, alle Tests und <code>build</code>, mit neuen Tests für jede der drei Änderungen.</li>
+      </ul>
+    </section>
+
+    <!-- ================= OFFEN ================= -->
+    <section class="abschnitt" id="offen">
+      <div class="abschnitt-titel"><span class="nr">7</span><h2>Entschiedene und offene Punkte</h2></div>
+      <h3>Entschieden am 21. und 22.09.2026</h3>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Frage</th><th>Entscheidung</th></tr></thead>
+          <tbody>
+            <tr><td>Nachforderung: eine Frist für alle Unterlagen oder je Unterlage?</td><td>Eine Frist je Nachforderung, jederzeit verlängerbar. Unterlagen mit langer Laufzeit fordert HR bei Bedarf getrennt an.</td></tr>
+            <tr><td>Nachforderung beim Vertragsende: ab wann?</td><td>Erst nach der Zusage der Übernahme.</td></tr>
+            <tr><td>Wer bekommt die HR-Mails „alles da“ und „Frist verstrichen“?</td><td>Die HR-Person, die angefordert hat, dazu das zentrale HR-Postfach in Kopie. Antworten der Person gehen an das zentrale HR-Postfach.</td></tr>
+            <tr><td>Versehentlich angenommene Unterlage korrigieren?</td><td>Über „Annahme zurücknehmen“ in der Nachforderung, mit Protokoll.</td></tr>
+            <tr><td>Soll HR einen abgesendeten Fragebogen zur Korrektur wieder öffnen können?</td><td>Nein, nicht gewünscht.</td></tr>
+            <tr><td>Ruft ein n8n-Workflow den Vorgesetzten-Link auf?</td><td>Nein, das Portal erzeugt die Links selbst und versendet sie per SMTP. Die Route wird trotzdem wiederholungssicher, wegen der Doppelklicks.</td></tr>
+            <tr><td>Status „Vorgesetzter fertig“ künftig „Bereit zur Prüfung“?</td><td>Ja, wie im Mockup.</td></tr>
+            <tr><td>Parallele Darstellung auch im Offboarding-Stepper?</td><td>Ja, wie im Mockup.</td></tr>
+            <tr><td>Folgeauftrag, wenn Unterlagen nachgereicht werden müssen</td><td>Ja, als neue Funktion „Unterlagen nachfordern“, siehe Abschnitt 4. Den Fragebogen wieder zu öffnen, ist nicht gewünscht.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Noch offen</h3>
+      <p>Blockiert den Start nicht.</p>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Frage</th><th>Mein Vorgehen ohne Rückmeldung</th></tr></thead>
+          <tbody>
+            <tr><td>Knopf „Auf Standard zurücksetzen“ für Mailvorlagen (Abschnitt 5 D)</td><td>Baue ich in Paket 1 mit ein. Ohne ihn müssten alle geänderten Vorlagen, die in der Datenbank gespeichert sind, von Hand nachgezogen werden.</td></tr>
+            <tr><td>Mail-Reparaturpaket für die bestehenden Fehler in Offboarding- und Verbeamtungsmails (Abschnitt 5 E)</td><td>Nur auf Ihr Ja. Mein Vorschlag: zusammen mit Paket 1.</td></tr>
+            <tr><td>Die Brief-Vorlagen-Funktion „Per E-Mail“ hat keine der Schutzregeln (keine Freigabeliste, kein Protokoll, sensible Felder ohne Bestätigung).</td><td>Nicht Teil dieses Plans. Ich empfehle, sie nach Paket 3 auf dieselben Regeln umzustellen oder abzuschalten.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="fuss">
+    Erstellt am 21.09.2026, Fassung 2 mit „Unterlagen nachfordern“ · Grundlage: Analyse des Quellcodes auf <code>main</code> (ae490ba) mit unabhängiger Gegenprüfung · Mockups zeigen den Stand von <code>main</code>. Die Produktion kann bis zum nächsten Deploy in Details abweichen (z.B. der Zeichenzähler) · Nach Ihrer Freigabe setze ich Paket für Paket um.
+  </footer>
+</div>
+</body>
+</html>

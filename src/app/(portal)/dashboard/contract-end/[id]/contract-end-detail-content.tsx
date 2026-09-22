@@ -15,6 +15,7 @@ import { CONTRACT_END_STATUS_LABELS } from "@/lib/constants";
 import { getContractEndCategory, CONTRACT_END_CATEGORY_META } from "@/lib/contract-end-fristen";
 import { getSignatureWarning, getKettenbefristungWarning } from "@/lib/contract-end-warnings";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { FELD_BEZEICHNUNGEN } from "@/lib/formular-fehler";
 
 interface User {
   userId: string;
@@ -804,7 +805,7 @@ function RenewalView({ data }: { data: ContractEndData }) {
       </dl>
       {rd.stellenbeschreibung && (
         <div className="mt-3 border-t border-border/50 pt-3 text-sm">
-          <p className="text-muted-foreground">Stellenbeschreibung</p>
+          <p className="text-muted-foreground">{FELD_BEZEICHNUNGEN.stellenbeschreibung}</p>
           <p className="mt-1 text-foreground">{rd.stellenbeschreibung}</p>
         </div>
       )}

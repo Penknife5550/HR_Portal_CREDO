@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { decrypt, encrypt } from "@/lib/encryption";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { offboardingMailFelder } from "@/lib/offboarding-mail";
 import { updateOffboardingSchema } from "@/lib/validations/offboarding";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
 
@@ -345,16 +346,36 @@ export async function PATCH(
       },
     });
 
-    // Webhook bei COMPLETED
+    // Webhook bei COMPLETED.
+    //
+    // Die Vorlage nennt Name, Austrittsdatum und Einrichtung. Das
+    // Austrittsdatum fehlte hier bisher ganz, und {{vorname}} / {{nachname}}
+    // gab es unter keinem Namen — die Abschlussmeldung an HR lautete
+    // "Offboarding abgeschlossen:  ". Die gemeinsamen Felder kommen jetzt aus
+    // offboardingMailFelder, wie bei allen Offboarding-Mails.
+    //
+    // Offene Aufgaben beim Abschluss: SUPER_ADMIN/HR_LEITUNG duerfen auch mit
+    // offener Checkliste abschliessen. Die Vorlage behauptete frueher pauschal
+    // "Alle Aufgaben sind erledigt" — jetzt nennt sie die Zahl nur, wenn
+    // wirklich etwas offen ist (Bedingungsblock, leerer Wert = kein Hinweis).
+    // Ein Fehler beim Zaehlen darf den Abschluss nicht aufhalten.
     if (status === "COMPLETED") {
+      let offeneAufgaben: number | undefined = 0;
+      try {
+        offeneAufgaben = await prisma.offboardingChecklistItem.count({
+          where: { offboardingId: id, isCompleted: false },
+        });
+      } catch {
+        offeneAufgaben = 0;
+      }
       await triggerWebhooks("offboarding-completed", {
-        offboardingId: updated.id,
-        displayId: updated.displayId,
+        ...offboardingMailFelder(updated),
         employeeEmail: updated.employeeEmail,
-        employeeName: `${updated.employeeFirstName} ${updated.employeeLastName}`,
-        organization: updated.organization.name,
-        mandantNumber: updated.organization.mandantNumber,
         completedAt: updated.completedAt?.toISOString(),
+        offene_aufgaben_beim_abschluss:
+          typeof offeneAufgaben === "number" && offeneAufgaben > 0
+            ? String(offeneAufgaben)
+            : "",
       });
     }
 
