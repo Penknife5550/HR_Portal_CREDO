@@ -138,6 +138,8 @@ export const EVENT_CATALOG: EventDefinition[] = [
       email: "max.mustermann@example.org",
       vorname: "Max",
       nachname: "Mustermann",
+      firstName: "Max",
+      lastName: "Mustermann",
       fragebogenLink: BEISPIEL_LINK,
       organization: "FES Minden",
       mandantNumber: "01",
@@ -180,11 +182,15 @@ export const EVENT_CATALOG: EventDefinition[] = [
     group: "Onboarding",
     recipientHint: "Leitung (Magic-Link zu den Modalitaeten)",
     defaultRecipients: { to: "{{supervisorEmail}}" },
+    // Kein Feld `email`: Der Name der Person faellt nie auf ihre Adresse
+    // zurueck (vorgesetztenLinkMailFelder in src/lib/onboarding-einladung.ts).
     samplePayload: {
       onboardingId: "00000000-0000-0000-0000-000000000001",
+      displayId: "2026-GYM-001",
       supervisorEmail: "leitung@example.org",
       modalitaetenLink: BEISPIEL_LINK,
       employeeName: "Max Mustermann",
+      mitarbeiter_name: "Max Mustermann",
       organization: "FES Minden",
       mandantNumber: "01",
       supervisorTokenExpiresAt: "2026-07-15T12:00:00.000Z",

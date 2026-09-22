@@ -110,7 +110,7 @@ const BASE_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
 
         <!-- Body -->
         <tr><td style="background-color:#ffffff;padding:32px;">
-          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Herzlich willkommen, {{vorname}}!</h2>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Herzlich willkommen{{#vorname}}, {{vorname}}{{/vorname}}!</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
             Schön, dass Sie zu <strong>{{einrichtung}}</strong> kommen. Damit zu Ihrem Start alles bereitliegt – vom Arbeitsvertrag bis zur pünktlichen Gehaltszahlung – benötigen wir einmalig einige Angaben von Ihnen.
           </p>
@@ -172,7 +172,7 @@ const BASE_EMAIL_TEMPLATES: EmailTemplateDefinition[] = [
   </table>
 </body>
 </html>`,
-    bodyText: `Herzlich willkommen, {{vorname}}!
+    bodyText: `Herzlich willkommen{{#vorname}}, {{vorname}}{{/vorname}}!
 
 Schön, dass Sie zu {{einrichtung}} kommen. Damit zu Ihrem Start alles bereitliegt – vom Arbeitsvertrag bis zur pünktlichen Gehaltszahlung – benötigen wir einmalig einige Angaben von Ihnen.
 
@@ -197,9 +197,13 @@ Haben Sie Fragen? Schreiben Sie uns gern an personalbuchhaltung@fes-minden.de.
 CREDO Gruppe – Freie Evangelische Schulen
 {{einrichtung}}`,
     variables: [
-      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
-      { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
-      { key: "{{email}}", description: "E-Mail des Mitarbeiters" },
+      {
+        key: "{{vorname}}",
+        description:
+          "Vorname (aus ‚Neuer Vorgang‘ oder dem Fragebogen; kann leer sein – für die Anrede {{#vorname}}…{{/vorname}} verwenden)",
+      },
+      { key: "{{nachname}}", description: "Nachname (kann leer sein)" },
+      { key: "{{email}}", description: "E-Mail der neuen Person" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{link}}", description: "Link zum Personalfragebogen" },
       { key: "{{ablaufdatum}}", description: "Ablaufdatum des Links" },
@@ -232,11 +236,19 @@ CREDO Gruppe – Freie Evangelische Schulen
         <tr><td style="background-color:#ffffff;padding:32px;">
           <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Bitte ergänzen Sie die Einstellungsmodalitäten</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Für die Einstellung von <strong>{{mitarbeiter_name}}</strong> bei {{einrichtung}} fehlen noch die Einstellungsmodalitäten. Mit Ihren Angaben kann die Personalabteilung den Arbeitsvertrag erstellen.
+            Für <strong>{{mitarbeiter_name}}</strong> fehlen bei {{einrichtung}} noch die Einstellungsmodalitäten. Mit Ihren Angaben kann die Personalabteilung den Arbeitsvertrag erstellen.
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
-            Das Ausfüllen dauert nur wenige Minuten.
+            Das Ausfüllen dauert nur wenige Minuten. Sie können sofort beginnen, unabhängig davon, ob der Personalfragebogen schon ausgefüllt ist.
           </p>
+          {{#ablaufdatum}}
+          <!-- Frist -->
+          <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
+            <tr><td style="background-color:#f9fafb;border-left:4px solid #575756;padding:13px 16px;">
+              <p style="margin:0;color:#2d2d2d;font-size:14px;line-height:1.6;"><strong>Bitte ausfüllen bis:</strong> {{ablaufdatum}}</p>
+            </td></tr>
+          </table>
+          {{/ablaufdatum}}
 
           <!-- Button -->
           <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
@@ -287,9 +299,11 @@ CREDO Gruppe – Freie Evangelische Schulen
 </html>`,
     bodyText: `Bitte ergänzen Sie die Einstellungsmodalitäten
 
-Für die Einstellung von {{mitarbeiter_name}} bei {{einrichtung}} fehlen noch die Einstellungsmodalitäten. Mit Ihren Angaben kann die Personalabteilung den Arbeitsvertrag erstellen. Das dauert nur wenige Minuten.
+Für {{mitarbeiter_name}} fehlen bei {{einrichtung}} noch die Einstellungsmodalitäten. Mit Ihren Angaben kann die Personalabteilung den Arbeitsvertrag erstellen. Das dauert nur wenige Minuten. Sie können sofort beginnen, unabhängig davon, ob der Personalfragebogen schon ausgefüllt ist.
 
-Formular öffnen:
+{{#ablaufdatum}}Bitte ausfüllen bis: {{ablaufdatum}}
+
+{{/ablaufdatum}}Formular öffnen:
 {{link}}
 
 Diese Eckdaten werden abgefragt:
@@ -305,10 +319,18 @@ Bei Rückfragen erreichen Sie uns unter personalbuchhaltung@fes-minden.de.
 CREDO Gruppe – Freie Evangelische Schulen
 {{einrichtung}}`,
     variables: [
-      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des neuen Mitarbeiters" },
-      { key: "{{email}}", description: "E-Mail des Vorgesetzten" },
+      {
+        key: "{{mitarbeiter_name}}",
+        description:
+          "Name der neuen Person; ohne Namen ‚die neue Mitarbeiterin / den neuen Mitarbeiter‘ (Akkusativ – nur nach ‚für‘ verwenden)",
+      },
+      { key: "{{email}}", description: "E-Mail der Führungskraft" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{link}}", description: "Link zu den Einstellungsmodalitäten" },
+      {
+        key: "{{ablaufdatum}}",
+        description: "Ablaufdatum des Links (für den Block {{#ablaufdatum}}…{{/ablaufdatum}})",
+      },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
     ],
   },
@@ -941,7 +963,7 @@ CREDO HR-Portal`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Ihr Personalfragebogen wartet auf Sie</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Hallo {{vorname}}, wir haben festgestellt, dass Ihr Personalfragebogen seit <strong>{{tage_offen}} Tagen</strong> noch nicht vollständig ausgefüllt wurde.
+            Hallo{{#vorname}} {{vorname}}{{/vorname}}, wir haben festgestellt, dass Ihr Personalfragebogen seit <strong>{{tage_offen}} Tagen</strong> noch nicht vollständig ausgefüllt wurde.
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
             Bitte füllen Sie den Fragebogen zeitnah aus, damit wir Ihre Einstellung reibungslos vorbereiten können.
@@ -975,7 +997,7 @@ CREDO HR-Portal`,
 </html>`,
     bodyText: `Erinnerung: Ihr Personalfragebogen wartet auf Sie
 
-Hallo {{vorname}}, Ihr Personalfragebogen ist seit {{tage_offen}} Tagen offen.
+Hallo{{#vorname}} {{vorname}}{{/vorname}}, Ihr Personalfragebogen ist seit {{tage_offen}} Tagen offen.
 
 Bitte fuellen Sie ihn zeitnah aus:
 {{link}}
@@ -984,7 +1006,11 @@ Bei Fragen wenden Sie sich bitte an Ihre HR-Ansprechperson.
 
 CREDO Gruppe – {{einrichtung}}`,
     variables: [
-      { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
+      {
+        key: "{{vorname}}",
+        description:
+          "Vorname (aus ‚Neuer Vorgang‘ oder dem Fragebogen; kann leer sein – für die Anrede {{#vorname}}…{{/vorname}} verwenden)",
+      },
       { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
       { key: "{{email}}", description: "E-Mail des Mitarbeiters" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },

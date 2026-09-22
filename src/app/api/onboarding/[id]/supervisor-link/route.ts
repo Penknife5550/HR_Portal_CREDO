@@ -28,33 +28,33 @@
  *     Verguetungsangaben, die jemand anderes eingetragen hat. Ebenso 409 bei
  *     geprueften, abgeschlossenen oder abgelaufenen Vorgaengen: Dort waere der
  *     Link ohnehin schreibgesperrt.
+ *   - NICHT AN DIE PERSON SELBST. Ist die Adresse die der neuen Person, antwortet
+ *     die Route 400 — dieselbe Regel wie beim Anlegen.
  */
 
 import { NextResponse } from "next/server";
 import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
-import { generateToken, getTokenExpiryDate } from "@/lib/auth";
 import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
-import { triggerN8nWebhook } from "@/lib/n8n";
+import { triggerWebhooks } from "@/lib/webhooks";
 import {
-  HR_STATUS,
   istHrStatus,
   mitarbeiterName,
   vorgesetzteAbgesendet,
   vorgesetztenLinkWiederverwendbar,
 } from "@/lib/onboarding-spuren";
-import { statusAbgleichen } from "@/lib/onboarding-status-abgleich";
 import {
+  LinkGeaendert,
+  modalitaetenLinkZu,
+  vorgesetztenLinkMailFelder,
+  vorgesetztenLinkSetzen,
+} from "@/lib/onboarding-einladung";
+import {
+  gleicheAdresse,
+  MELDUNG_EIGENE_ADRESSE,
   supervisorLinkSchema,
   type SupervisorLinkInput,
 } from "@/lib/validations/onboarding";
-
-/**
- * Zwischen Lesen und Schreiben hat sich der Link geaendert (Doppelklick,
- * zweiter Tab). Eigene Klasse, weil nur eine Ausnahme die Transaktion
- * zurueckrollt.
- */
-class LinkGeaendert extends Error {}
 
 /** Was die Route vom Vorgang liest — einmal vor und ggf. einmal nach dem Schreiben. */
 const VORGANG_INCLUDE = {
@@ -62,11 +62,6 @@ const VORGANG_INCLUDE = {
   personalData: { select: { firstName: true, lastName: true } },
   supervisorData: { select: { isComplete: true } },
 } as const;
-
-function linkZu(token: string): string {
-  const appUrl = process.env.APP_URL || "http://localhost:3000";
-  return `${appUrl}/modalitaeten/${token}`;
-}
 
 export const POST = apiHandler<SupervisorLinkInput>(
   {
@@ -116,6 +111,13 @@ export const POST = apiHandler<SupervisorLinkInput>(
       );
     }
 
+    // Dieselbe Regel wie beim Anlegen (onboardingAnlegenSchema) — hier erst
+    // pruefbar, weil das Schema die Adresse der Person nicht kennt. Vor dem
+    // Wiederverwenden: Auch ein alter Link an die Person selbst gilt nicht weiter.
+    if (gleicheAdresse(supervisorEmail, onboarding.email)) {
+      return NextResponse.json({ error: MELDUNG_EIGENE_ADRESSE }, { status: 400 });
+    }
+
     const employeeName = mitarbeiterName(onboarding);
 
     /** Antwort, wenn der bestehende Link weiter gilt — ohne neue Mail. */
@@ -127,7 +129,7 @@ export const POST = apiHandler<SupervisorLinkInput>(
       NextResponse.json({
         id: v.id,
         supervisorEmail,
-        modalitaetenLink: linkZu(v.supervisorToken!),
+        modalitaetenLink: modalitaetenLinkZu(v.supervisorToken!),
         organization: {
           id: onboarding.organization.id,
           name: onboarding.organization.name,
@@ -143,64 +145,20 @@ export const POST = apiHandler<SupervisorLinkInput>(
       return wiederverwendet(onboarding);
     }
 
-    const supervisorToken = generateToken();
-    const supervisorTokenExpiresAt = getTokenExpiryDate();
-    const jetzt = new Date();
-
+    // Schreiben, Status abgleichen und Protokoll in EINER Transaktion —
+    // dieselbe Funktion wie beim Anlegen mit Fuehrungskraft.
+    let link: Awaited<ReturnType<typeof vorgesetztenLinkSetzen>>;
     try {
-      await prisma.$transaction(async (tx) => {
-        // Optimistische Sperre: Geschrieben wird nur, wenn der Link noch der
-        // ist, den wir oben gelesen haben (bzw. es noch keinen gibt), die
-        // Modalitaeten weiter offen sind und HR den Vorgang nicht inzwischen
-        // abgeschlossen hat. Ein zweiter, gleichzeitiger Aufruf (Doppelklick)
-        // wartet auf unsere Zeilensperre, findet danach einen anderen Token
-        // vor und bekommt count 0 — statt unseren frischen Link zu ersetzen.
-        const gesetzt = await tx.onboardingProcess.updateMany({
-          where: {
-            id,
-            supervisorToken: onboarding.supervisorToken,
-            supervisorSubmittedAt: null,
-            status: { notIn: [...HR_STATUS] },
-          },
-          data: {
-            supervisorEmail,
-            supervisorToken,
-            supervisorTokenExpiresAt,
-            supervisorLinkSentAt: jetzt,
-            // Erinnerungen zaehlen ab DIESEM Link. Eine Erinnerung zum alten
-            // (ersetzten) Link darf die erste zum neuen nicht verschieben.
-            lastSupervisorReminderAt: null,
-          },
-        });
-        if (gesetzt.count === 0) throw new LinkGeaendert();
-
-        // Leerer Datensatz fuer das Formular. Beim Ersetzen bleibt alles
-        // stehen, was schon eingetragen wurde — die richtige Person soll dort
-        // weitermachen koennen.
-        await tx.supervisorData.upsert({
-          where: { onboardingId: id },
-          update: {},
-          create: { onboardingId: id },
-        });
-
-        const abgleich = await statusAbgleichen(tx, id);
-
-        await tx.auditLog.create({
-          data: {
-            onboardingId: id,
-            userId: session.userId,
-            action: "SUPERVISOR_LINK_CREATED",
-            details: {
-              supervisorEmail,
-              organization: onboarding.organization.name,
-              // War schon ein Link da, ist er jetzt ungueltig — das gehoert
-              // ins Protokoll (falscher Empfaenger, abgelaufener Link).
-              ersetztLinkAn: onboarding.supervisorToken ? onboarding.supervisorEmail : null,
-              status: { von: abgleich.von, nach: abgleich.nach },
-            },
-          },
-        });
-      });
+      link = await prisma.$transaction((tx) =>
+        vorgesetztenLinkSetzen(tx, {
+          id,
+          supervisorEmail,
+          bisherigerToken: onboarding.supervisorToken,
+          bisherigeEmail: onboarding.supervisorEmail,
+          userId: session.userId,
+          organizationName: onboarding.organization.name,
+        }),
+      );
     } catch (error) {
       if (!(error instanceof LinkGeaendert)) throw error;
 
@@ -227,25 +185,23 @@ export const POST = apiHandler<SupervisorLinkInput>(
       );
     }
 
-    const modalitaetenLink = linkZu(supervisorToken);
+    const { supervisorToken, supervisorTokenExpiresAt } = link;
+    const modalitaetenLink = modalitaetenLinkZu(supervisorToken);
 
     // E-Mail an die Fuehrungskraft (SMTP primaer, Webhooks nur zusaetzlich).
     // Wirft nicht; das Ergebnis steht im EmailLog und geht an die Oberflaeche,
-    // damit HR weiss, ob der Link selbst weitergegeben werden muss.
-    //
-    // Der Namensrueckfall auf die E-Mail-Adresse der Person bleibt hier
-    // vorerst stehen: Die Vorlage setzt {{mitarbeiter_name}} in Saetze wie
-    // „Für die Einstellung von …", in die eine neutrale Bezeichnung
-    // grammatisch nicht passt. Das loest die Vorlagenaenderung aus Paket 2.
-    const mail = await triggerN8nWebhook("supervisor-link-created", {
-      onboardingId: id,
-      supervisorEmail,
-      modalitaetenLink,
-      employeeName: employeeName ?? onboarding.email,
-      organization: onboarding.organization.name,
-      mandantNumber: onboarding.organization.mandantNumber,
-      supervisorTokenExpiresAt: supervisorTokenExpiresAt.toISOString(),
-    });
+    // damit HR weiss, ob der Link selbst weitergegeben werden muss. Ohne Namen
+    // heisst die Person dort MITARBEITER_NEUTRAL, nie ihre E-Mail-Adresse
+    // (Payload-Baustein in src/lib/onboarding-einladung.ts).
+    const mail = await triggerWebhooks(
+      "supervisor-link-created",
+      vorgesetztenLinkMailFelder({
+        ...onboarding,
+        supervisorEmail,
+        supervisorToken,
+        supervisorTokenExpiresAt,
+      }),
+    );
 
     return NextResponse.json(
       {

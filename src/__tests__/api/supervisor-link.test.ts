@@ -36,12 +36,13 @@ jest.mock("@/lib/auth", () => ({
   generateToken: () => "neuer-token",
   getTokenExpiryDate: () => new Date("2026-10-22T10:00:00Z"),
 }));
-jest.mock("@/lib/n8n", () => ({
-  triggerN8nWebhook: (...a: unknown[]) => mockWebhook(...a),
+jest.mock("@/lib/webhooks", () => ({
+  triggerWebhooks: (...a: unknown[]) => mockWebhook(...a),
 }));
 
 import { POST } from "@/app/api/onboarding/[id]/supervisor-link/route";
 import { NextRequest } from "next/server";
+import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
 
 const HR = {
   userId: "u1",
@@ -66,6 +67,7 @@ function aufrufen(body: unknown = { supervisorEmail: "schulleitung@fes.example" 
 function vorgang(teil: Record<string, unknown> = {}) {
   return {
     id: "ob1",
+    displayId: "2026-GYM-014",
     organizationId: "org1",
     status: "IN_PROGRESS",
     email: "anna.privat@example.org",
@@ -138,6 +140,35 @@ describe("Zugriff und Eingabe", () => {
   it("antwortet 404 fuer einen unbekannten Vorgang", async () => {
     mockPrisma.onboardingProcess.findUnique.mockResolvedValue(null);
     expect((await aufrufen()).status).toBe(404);
+  });
+
+  // Dieselbe Regel wie beim Anlegen: Sonst saehe die Person ueber den
+  // Modalitaeten-Link ihre eigenen Verguetungsangaben.
+  it("weist die Adresse der Person selbst ab (400) — ohne Gross/Klein", async () => {
+    const res = await aufrufen({ supervisorEmail: " Anna.Privat@EXAMPLE.org " });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(
+      "Die Führungskraft braucht eine eigene E-Mail-Adresse – nicht die der neuen Person.",
+    );
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockWebhook).not.toHaveBeenCalled();
+  });
+
+  it("verwendet auch einen alten, gueltigen Link an die Person selbst nicht weiter", async () => {
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
+      vorgang({
+        supervisorToken: "alter-token",
+        supervisorEmail: "anna.privat@example.org",
+        supervisorTokenExpiresAt: MORGEN(),
+      }),
+    );
+
+    const res = await aufrufen({ supervisorEmail: "anna.privat@example.org" });
+
+    expect(res.status).toBe(400);
+    expect(mockPrisma.onboardingProcess.updateMany).not.toHaveBeenCalled();
+    expect(mockWebhook).not.toHaveBeenCalled();
   });
 });
 
@@ -221,6 +252,26 @@ describe("Neuer Link", () => {
     );
     await aufrufen();
     expect(mockWebhook.mock.calls[0][1].employeeName).toBe("Anna");
+  });
+
+  it("nennt ohne Namen die neutrale Bezeichnung — nie die private Adresse der Person", async () => {
+    await aufrufen();
+    const nutzlast = mockWebhook.mock.calls[0][1];
+    expect(nutzlast.employeeName).toBe(MITARBEITER_NEUTRAL);
+    expect(nutzlast.mitarbeiter_name).toBe(MITARBEITER_NEUTRAL);
+    // Weder als eigenes Feld noch irgendwo im Payload: Der Mailer faellt fuer
+    // {{mitarbeiter_name}} auf `email` zurueck, und Webhooks bekaemen alles.
+    expect(nutzlast).not.toHaveProperty("email");
+    expect(nutzlast).not.toHaveProperty("employeeEmail");
+    expect(JSON.stringify(nutzlast)).not.toContain("anna.privat@example.org");
+  });
+
+  it("gibt die Vorgangsnummer und die Frist des Links mit", async () => {
+    await aufrufen();
+    expect(mockWebhook.mock.calls[0][1]).toMatchObject({
+      displayId: "2026-GYM-014",
+      supervisorTokenExpiresAt: "2026-10-22T10:00:00.000Z",
+    });
   });
 });
 

@@ -12,6 +12,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { NeuerVorgangModal } from "@/components/neuer-vorgang-modal";
 import { STATUS_LABELS } from "@/lib/constants";
+import { mitarbeiterName } from "@/lib/onboarding-spuren";
 import {
   OverdueBanner,
   DurationKPI,
@@ -469,10 +470,11 @@ export function DashboardContent({ user }: { user: User }) {
                       return OPEN_STATUSES.includes(ob.status) && daysOpen >= 7;
                     })
                     .map((ob) => {
-                    const displayName =
-                      ob.personalData?.firstName && ob.personalData?.lastName
-                        ? `${ob.personalData.firstName} ${ob.personalData.lastName}`
-                        : ob.email;
+                    // Auch der beim Anlegen eingetragene Name zaehlt, und ein
+                    // einzelner Teil genuegt — sonst stuende bis zum Fragebogen
+                    // nur die Adresse da.
+                    const name = mitarbeiterName(ob);
+                    const displayName = name ?? ob.email;
                     const statusInfo =
                       STATUS_LABELS[ob.status] || STATUS_LABELS.INVITED;
 
@@ -495,7 +497,7 @@ export function DashboardContent({ user }: { user: User }) {
                           <div className="font-medium text-foreground">
                             {displayName}
                           </div>
-                          {ob.personalData?.firstName && (
+                          {name && (
                             <div className="text-xs text-muted-foreground">
                               {ob.email}
                             </div>
@@ -635,11 +637,16 @@ export function DashboardContent({ user }: { user: User }) {
         </div>
       </main>
 
-      {/* Neuer Vorgang Modal */}
+      {/* Neuer Vorgang Modal. darfVorgesetztenLink: dieselbe Liste wie
+          HR_EDIT_ROLES (src/lib/permissions.ts), bewusst abgeschrieben wie die
+          Rollenliste des Knopfs „+ Neuer Vorgang" oben — permissions.ts zieht
+          @/lib/db (Prisma) mit ins Einstiegs-Bundle des Dashboards. Der Server
+          prueft selbst (403); hier wird nur der Block „Führungskraft" ausgeblendet. */}
       <NeuerVorgangModal
         open={showNewModal}
         onClose={() => setShowNewModal(false)}
         onCreated={loadOnboardings}
+        darfVorgesetztenLink={["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"].includes(user.role)}
       />
 
     </div>

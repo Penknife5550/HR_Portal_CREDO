@@ -33,7 +33,7 @@ import { FieldConfigHelper } from "@/lib/field-definitions";
  * Ziffern durch, `iban` (Server 34) begrenzt `validateIBAN` auf 34 Zeichen der
  * Fassung OHNE Leerzeichen — siehe createStep3Schema.
  */
-const GRENZE = {
+export const GRENZE = {
   title: { max: 100, msg: "Der Titel darf hoechstens 100 Zeichen lang sein." },
   firstName: { max: 100, msg: "Der Vorname darf hoechstens 100 Zeichen lang sein." },
   lastName: { max: 100, msg: "Der Nachname darf hoechstens 100 Zeichen lang sein." },

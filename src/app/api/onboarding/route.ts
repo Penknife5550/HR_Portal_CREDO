@@ -1,225 +1,320 @@
 /**
  * API: /api/onboarding
  *
- * POST – Neuen Onboarding-Vorgang anlegen (für n8n oder Dashboard)
+ * POST – Neuen Onboarding-Vorgang anlegen (für das Dashboard, Dialog „Neuer Vorgang“)
  * GET  – Alle Vorgaenge auflisten (für Dashboard)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateToken, getTokenExpiryDate, getSession } from "@/lib/auth";
-import { triggerN8nWebhook } from "@/lib/n8n";
-import { orgFilter, PORTAL_ROLES, PROCESS_CREATE_ROLES } from "@/lib/permissions";
+import { apiHandler } from "@/lib/api-handler";
+import { triggerWebhooks } from "@/lib/webhooks";
+import {
+  canAccessProcess,
+  canEditProcess,
+  orgFilter,
+  PORTAL_ROLES,
+  PROCESS_CREATE_ROLES,
+} from "@/lib/permissions";
 import {
   ladeVorlagenKonfigurationen,
   fortschrittFuerVorgang,
 } from "@/lib/fragebogen-fortschritt";
+import {
+  einladungMailFelder,
+  fragebogenLinkZu,
+  modalitaetenLinkZu,
+  vorgesetztenLinkMailFelder,
+  vorgesetztenLinkSetzen,
+} from "@/lib/onboarding-einladung";
+import {
+  onboardingAnlegenSchema,
+  type OnboardingAnlegenInput,
+} from "@/lib/validations/onboarding";
+
+/** So oft wird das Anlegen versucht, wenn die Vorgangsnummer gerade vergeben wurde. */
+const VERSUCHE_VORGANGSNUMMER = 3;
+
+/**
+ * Prisma meldet mit P2002 eine verletzte Eindeutigkeit; `meta.target` nennt
+ * das Feld (je nach Treiber als Liste der Felder oder als Name des Index).
+ * Geprueft wird nur der Code statt `instanceof
+ * Prisma.PrismaClientKnownRequestError` — wie beim Zuruecksetzen der
+ * E-Mail-Vorlagen: haengt nicht an der Klassenidentitaet des generierten
+ * Clients.
+ */
+function istVorgangsnummerVergeben(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { code, meta } = error as { code?: unknown; meta?: { target?: unknown } };
+  if (code !== "P2002") return false;
+  const ziel = meta?.target;
+  if (Array.isArray(ziel)) return ziel.includes("displayId");
+  return typeof ziel === "string" && ziel.includes("displayId");
+}
+
+/**
+ * Vorgangsnummer vorschlagen: {Jahr}-{Org-Kuerzel}-{laufende Nummer}.
+ *
+ * Pruefen-dann-Schreiben, also nur ein Vorschlag: Zwei gleichzeitige Aufrufe
+ * koennen dieselbe Nummer bekommen. Der zweite scheitert dann am Unique-Index
+ * (P2002), seine Transaktion rollt vollstaendig zurueck, und die Route fragt
+ * hier erneut an.
+ */
+async function vorgangsnummerVorschlagen(
+  shortName: string,
+): Promise<{ displayId: string; sequentialNumber: number }> {
+  const currentYear = new Date().getFullYear();
+  const yearStart = new Date(currentYear, 0, 1);
+  const yearEnd = new Date(currentYear + 1, 0, 1);
+
+  let displayId = "";
+  let sequentialNumber = 0;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const countThisYear = await prisma.onboardingProcess.count({
+      where: { createdAt: { gte: yearStart, lt: yearEnd } },
+    });
+    sequentialNumber = countThisYear + 1 + attempt;
+    displayId = `${currentYear}-${shortName}-${sequentialNumber
+      .toString()
+      .padStart(3, "0")}`;
+    const exists = await prisma.onboardingProcess.findUnique({
+      where: { displayId },
+      select: { id: true },
+    });
+    if (!exists) break;
+  }
+  return { displayId, sequentialNumber };
+}
 
 // =============================================
 // POST /api/onboarding – Neuen Vorgang anlegen
 // =============================================
-export async function POST(request: NextRequest) {
-  try {
-    // Auth + Rollen-Check
-    const session = await getSession();
+//
+// Alles, was zum Vorgang gehoert — Vorgang, Vorbelegung der Personaldaten,
+// Checkliste, Protokoll und (falls eingetragen) der Vorgesetzten-Link — steht
+// in EINER Transaktion. Frueher waren es sechs einzelne Schreibvorgaenge; brach
+// einer ab, blieb ein halber Vorgang ohne Personaldaten oder Checkliste zurueck.
+//
+// Die Mails gehen erst NACH dem Commit hinaus: Nach einem Rollback kaeme sonst
+// ein toter Link an. Ein Fehlschlag beim Versand rollt nichts zurueck — die
+// Antwort meldet ihn je Link (`mailVersand`), und die Oberflaeche bittet dann,
+// den Link selbst weiterzugeben.
+export const POST = apiHandler<OnboardingAnlegenInput>(
+  {
+    roles: PROCESS_CREATE_ROLES,
+    bodySchema: onboardingAnlegenSchema,
+    logLabel: "Onboarding anlegen",
+  },
+  async ({ body, session }) => {
     if (!session) {
+      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+    }
+
+    const {
+      email,
+      organizationId,
+      processType,
+      questionnaireType,
+      firstName,
+      lastName,
+      supervisorEmail,
+    } = body;
+
+    // Dieselbe Regel wie in /supervisor-link: Wer den Link spaeter nicht
+    // erzeugen darf, kann es auch beim Anlegen nicht.
+    if (supervisorEmail && !canEditProcess(session)) {
       return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
+        {
+          error:
+            "Den Link zu den Einstellungsmodalitäten können nur Administration, HR-Leitung und HR-Sachbearbeitung erzeugen.",
+        },
+        { status: 403 },
       );
     }
-    if (!PROCESS_CREATE_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
-    }
 
-    const body = await request.json();
-
-    const { email, organizationId, questionnaireType, processType } = body;
-    const invitedById = session.userId;
-
-    // Validierung
-    if (!email || !organizationId) {
-      return NextResponse.json(
-        { error: "email und organizationId sind Pflichtfelder" },
-        { status: 400 }
-      );
-    }
-
-    // Pruefen ob Organisation existiert (inkl. shortName für displayId)
+    // 404 auch bei fremdem Mandanten — gleicher Text, damit die Antwort nicht
+    // verraet, dass es die Einrichtung gibt.
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
     });
-    if (!org) {
+    if (!org || !(await canAccessProcess(session, org.id))) {
       return NextResponse.json(
         { error: "Organisation nicht gefunden" },
         { status: 404 }
       );
     }
 
-    // Token generieren
+    // Vorlagen VOR der Transaktion lesen: Fragebogen-Versionierung (Snapshot
+    // zum Zeitpunkt der Erstellung) und die aktive Checkliste zum Typ.
+    const [formTemplate, checklistTemplate] = await Promise.all([
+      prisma.formTemplate.findUnique({
+        where: { questionnaireType },
+      }),
+      prisma.checklistTemplate.findFirst({
+        where: { questionnaireType, isActive: true },
+        include: { items: { orderBy: { orderIndex: "asc" } } },
+      }),
+    ]);
+    const checklistItems =
+      checklistTemplate?.items.map((templateItem) => ({
+        templateItemId: templateItem.id,
+        title: templateItem.title,
+        category: templateItem.category,
+        orderIndex: templateItem.orderIndex,
+        dueDate: null,
+        assignee: templateItem.defaultAssignee,
+      })) ?? [];
+
     const token = generateToken();
     const tokenExpiresAt = getTokenExpiryDate();
 
-    // Vorgangs-ID generieren: {Jahr}-{Org-Kuerzel}-{laufende Nummer}
-    // Retry-Logik gegen Race-Condition bei gleichzeitigen Requests
-    const currentYear = new Date().getFullYear();
-    const yearStart = new Date(currentYear, 0, 1);
-    const yearEnd = new Date(currentYear + 1, 0, 1);
-    const shortName = org.shortName || org.mandantNumber;
+    // Vorbelegung: Name am Vorgang UND in den Personaldaten. Der Fragebogen
+    // liest nur die Personaldaten (die Person sieht den Namen dort und kann
+    // ihn korrigieren), Reporting, PDF und Word-Vorlagen lesen den Vorgang.
+    // Nur gesetzt, was angegeben ist — das Schema macht aus Leerem `undefined`.
+    // KEIN status/currentStep/isComplete: Der Vorgang bleibt INVITED, der
+    // Fragebogen „noch nicht begonnen".
+    const name = {
+      ...(firstName ? { firstName } : {}),
+      ...(lastName ? { lastName } : {}),
+    };
 
-    let displayId = "";
-    let sequentialNumber = 0;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const countThisYear = await prisma.onboardingProcess.count({
-        where: { createdAt: { gte: yearStart, lt: yearEnd } },
-      });
-      sequentialNumber = countThisYear + 1 + attempt;
-      displayId = `${currentYear}-${shortName}-${sequentialNumber
-        .toString()
-        .padStart(3, "0")}`;
-      const exists = await prisma.onboardingProcess.findUnique({
-        where: { displayId },
-        select: { id: true },
-      });
-      if (!exists) break;
+    let angelegt = null;
+    for (let versuch = 0; versuch < VERSUCHE_VORGANGSNUMMER && !angelegt; versuch++) {
+      const { displayId, sequentialNumber } = await vorgangsnummerVorschlagen(
+        org.shortName || org.mandantNumber,
+      );
+      try {
+        angelegt = await prisma.$transaction(async (tx) => {
+          const onboarding = await tx.onboardingProcess.create({
+            data: {
+              email,
+              organizationId: org.id,
+              processType,
+              questionnaireType,
+              token,
+              tokenExpiresAt,
+              invitedById: session.userId,
+              displayId,
+              sequentialNumber,
+              ...name,
+              personalData: { create: { ...name } },
+              ...(formTemplate
+                ? {
+                    formTemplateVersion: formTemplate.version ?? 1,
+                    formTemplateSnapshot: formTemplate.stepsConfig as object,
+                  }
+                : {}),
+              ...(checklistTemplate && checklistItems.length > 0
+                ? {
+                    checklistTemplateId: checklistTemplate.id,
+                    checklistItems: { createMany: { data: checklistItems } },
+                  }
+                : {}),
+            },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              onboardingId: onboarding.id,
+              userId: session.userId,
+              action: "ONBOARDING_CREATED",
+              details: {
+                email,
+                organization: org.name,
+                questionnaireType,
+                // Der Name im Reiter „Persönliche Daten" sieht aus wie eine
+                // Angabe der Person — hier steht, dass HR ihn vorbelegt hat.
+                nameVorbelegt: !!(firstName || lastName),
+                mitVorgesetztenLink: !!supervisorEmail,
+              },
+            },
+          });
+
+          // Frische Zeile, noch kein Link: Das bedingte UPDATE trifft immer,
+          // `statusAbgleichen` ergibt INVITED -> INVITED und schreibt nichts.
+          const link = supervisorEmail
+            ? await vorgesetztenLinkSetzen(tx, {
+                id: onboarding.id,
+                supervisorEmail,
+                bisherigerToken: null,
+                bisherigeEmail: null,
+                userId: session.userId,
+                organizationName: org.name,
+              })
+            : null;
+
+          return { onboarding, link };
+        });
+      } catch (error) {
+        // Nur die vergebene Vorgangsnummer ist einen neuen Versuch wert.
+        if (!istVorgangsnummerVergeben(error)) throw error;
+      }
     }
 
-    // Onboarding-Vorgang anlegen
-    // ProcessType validieren
-    const VALID_PROCESS_TYPES = ["EINSTELLUNG", "VERBEAMTUNG", "VERTRAGSAENDERUNG", "KUENDIGUNG"];
-    const resolvedProcessType = processType && VALID_PROCESS_TYPES.includes(processType)
-      ? processType
-      : "EINSTELLUNG";
-
-    const onboarding = await prisma.onboardingProcess.create({
-      data: {
-        email,
-        organizationId,
-        processType: resolvedProcessType,
-        questionnaireType: questionnaireType || "STANDARD",
-        token,
-        tokenExpiresAt,
-        invitedById: invitedById || null,
-        status: "INVITED",
-        displayId,
-        sequentialNumber,
-      },
-      include: {
-        organization: true,
-      },
-    });
-
-    // PersonalData-Datensatz anlegen (leer, wird vom MA gefuellt)
-    await prisma.personalData.create({
-      data: {
-        onboardingId: onboarding.id,
-      },
-    });
-
-    // Fragebogen-Versionierung: Template-Snapshot zum Zeitpunkt der Erstellung speichern
-    const effectiveTypeForTemplate = questionnaireType || "STANDARD";
-    const formTemplate = await prisma.formTemplate.findUnique({
-      where: { questionnaireType: effectiveTypeForTemplate },
-    });
-    if (formTemplate) {
-      await prisma.onboardingProcess.update({
-        where: { id: onboarding.id },
-        data: {
-          formTemplateVersion: formTemplate.version ?? 1,
-          formTemplateSnapshot: formTemplate.stepsConfig as object,
-        },
-      });
+    if (!angelegt) {
+      return NextResponse.json(
+        { error: "Die Vorgangsnummer wurde gerade vergeben. Bitte versuchen Sie es erneut." },
+        { status: 409 },
+      );
     }
 
-    // Checkliste zuweisen: Suche aktive ChecklistTemplate passend zum questionnaireType
-    const effectiveType = questionnaireType || "STANDARD";
-    const checklistTemplate = await prisma.checklistTemplate.findFirst({
-      where: {
-        questionnaireType: effectiveType,
-        isActive: true,
-      },
-      include: {
-        items: {
-          orderBy: { orderIndex: "asc" },
-        },
-      },
-    });
+    const { onboarding, link } = angelegt;
+    const fragebogenLink = fragebogenLinkZu(token);
 
-    if (checklistTemplate && checklistTemplate.items.length > 0) {
-      // ChecklistItems aus den TemplateItems erstellen (Batch-Insert)
-      await prisma.checklistItem.createMany({
-        data: checklistTemplate.items.map((templateItem) => ({
-          onboardingId: onboarding.id,
-          templateItemId: templateItem.id,
-          title: templateItem.title,
-          category: templateItem.category,
-          orderIndex: templateItem.orderIndex,
-          dueDate: null,
-          assignee: templateItem.defaultAssignee,
-        })),
-      });
-
-      // checklistTemplateId auf dem OnboardingProcess setzen
-      await prisma.onboardingProcess.update({
-        where: { id: onboarding.id },
-        data: { checklistTemplateId: checklistTemplate.id },
-      });
-    }
-
-    // Audit-Log
-    await prisma.auditLog.create({
-      data: {
-        onboardingId: onboarding.id,
-        userId: invitedById || null,
-        action: "ONBOARDING_CREATED",
-        details: {
-          email,
-          organization: org.name,
-          questionnaireType: questionnaireType || "STANDARD",
-        },
-      },
-    });
-
-    // Link zusammenbauen
-    const appUrl = process.env.APP_URL || "http://localhost:3000";
-    const fragebogenLink = `${appUrl}/fragebogen/${token}`;
-
-    // n8n Webhook: Onboarding erstellt (damit n8n die Magic-Link-E-Mail senden kann)
-    await triggerN8nWebhook("onboarding-created", {
-      onboardingId: onboarding.id,
-      displayId: onboarding.displayId,
-      email: onboarding.email,
-      fragebogenLink,
-      organization: org.name,
-      mandantNumber: org.mandantNumber,
-      tokenExpiresAt: onboarding.tokenExpiresAt.toISOString(),
-    });
+    // Beide Mails parallel: Webhooks mit Wiederholung koennen je Ereignis
+    // Sekunden kosten. `triggerWebhooks` wirft nie.
+    const [mail, fkMail] = await Promise.all([
+      triggerWebhooks(
+        "onboarding-created",
+        einladungMailFelder({ ...onboarding, token, organization: org }),
+      ),
+      link && supervisorEmail
+        ? triggerWebhooks(
+            "supervisor-link-created",
+            vorgesetztenLinkMailFelder({
+              ...onboarding,
+              supervisorEmail,
+              supervisorToken: link.supervisorToken,
+              supervisorTokenExpiresAt: link.supervisorTokenExpiresAt,
+              organization: org,
+            }),
+          )
+        : null,
+    ]);
 
     return NextResponse.json(
       {
         id: onboarding.id,
         displayId: onboarding.displayId,
         email: onboarding.email,
+        firstName: onboarding.firstName,
+        lastName: onboarding.lastName,
         fragebogenLink,
         organization: {
           id: org.id,
           name: org.name,
           mandantNumber: org.mandantNumber,
         },
-        status: onboarding.status,
+        status: link?.abgleich.nach ?? onboarding.status,
         tokenExpiresAt: onboarding.tokenExpiresAt,
         createdAt: onboarding.createdAt,
+        mailVersand: mail?.status ?? null,
+        vorgesetzter:
+          link && supervisorEmail
+            ? {
+                supervisorEmail,
+                modalitaetenLink: modalitaetenLinkZu(link.supervisorToken),
+                supervisorTokenExpiresAt: link.supervisorTokenExpiresAt,
+                mailVersand: fkMail?.status ?? null,
+              }
+            : null,
       },
-      { status: 201 }
+      { status: 201 },
     );
-  } catch (error) {
-    console.error("Fehler beim Anlegen des Onboarding-Vorgangs:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
-  }
-}
+  },
+);
 
 // =============================================
 // GET /api/onboarding – Alle Vorgaenge auflisten

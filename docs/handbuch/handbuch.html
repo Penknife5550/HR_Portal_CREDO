@@ -613,22 +613,25 @@
 
     <div class="hinweis info">
       <span class="label">Wer darf das?</span>
-      <p>Einen neuen Vorgang anlegen dürfen: Administrator, HR-Leitung, Sachbearbeiter und Einrichtungsleitung.</p>
+      <p>Einen neuen Vorgang anlegen dürfen: Administrator, HR-Leitung, Sachbearbeiter und Einrichtungsleitung. Die E-Mail der Führungskraft können nur Administrator, HR-Leitung und Sachbearbeiter eintragen. Bei allen anderen Rollen erscheint dieses Feld nicht.</p>
     </div>
 
     <h3 id="onboarding-anlegen">3.1 Einen Onboarding-Vorgang anlegen</h3>
-    <p>Mit dem ersten Schritt eröffnen Sie den Vorgang. Das Portal erstellt dabei automatisch einen persönlichen Einladungs-Link für die neue Person.</p>
+    <p>Mit dem ersten Schritt eröffnen Sie den Vorgang. Das Portal erstellt dabei automatisch einen persönlichen Einladungs-Link für die neue Person. Tragen Sie die Führungskraft gleich mit ein, entsteht auch ihr Link zu den Einstellungsmodalitäten.</p>
     <ol>
       <li>Klicken Sie auf den Reiter <strong>Onboarding</strong>.</li>
       <li>Klicken Sie oben rechts auf die Schaltfläche <strong>+ Neuer Vorgang</strong>.</li>
       <li>Geben Sie in das Feld <strong>E-Mail des neuen Mitarbeiters</strong> die E-Mail-Adresse ein. Dieses Feld ist ein Pflichtfeld.</li>
+      <li>Tragen Sie, wenn bekannt, <strong>Vorname</strong> und <strong>Nachname</strong> ein. Beides ist freiwillig. Der Name erscheint in der Einladung und ist im Fragebogen schon vorausgefüllt; die Person kann ihn dort korrigieren.</li>
       <li>Wählen Sie im Klappmenü <strong>Einrichtung / Mandant</strong> die zuständige Schule oder Kita aus. Auch das ist ein Pflichtfeld.</li>
       <li>Wählen Sie bei <strong>Fragebogentyp</strong> die passende Art aus (zum Beispiel „Standard – Angestellte" oder „Beamte").</li>
+      <li>Optional: Tragen Sie im Bereich <strong>Führungskraft (optional)</strong> die <strong>E-Mail der Führungskraft</strong> ein. Ist sie eingetragen, bekommt die Führungskraft den Link zu den Einstellungsmodalitäten sofort, parallel zum Fragebogen. Sonst erstellen Sie den Link später in der Übersicht des Vorgangs. Die Adresse muss sich von der Adresse der neuen Person unterscheiden.</li>
       <li>Klicken Sie auf <strong>Vorgang anlegen</strong>.</li>
     </ol>
 
     <figure class="screenshot">
-      <img src="screenshots/neuer-vorgang.png" alt="Das Eingabefenster Neuer Onboarding-Vorgang mit den Feldern E-Mail des neuen Mitarbeiters (Pflichtfeld), Einrichtung/Mandant (Pflichtfeld), Vorgangsart und Fragebogentyp sowie den Schaltflächen Abbrechen und Vorgang anlegen.">
+      <!-- Der Screenshot zeigt noch den Dialog ohne Name und Führungskraft. Nach dem Deploy neu aufnehmen (Handschritt). -->
+      <img src="screenshots/neuer-vorgang.png" alt="Das Eingabefenster Neuer Onboarding-Vorgang mit den Feldern E-Mail des neuen Mitarbeiters (Pflichtfeld), Vorname und Nachname (freiwillig), Einrichtung/Mandant (Pflichtfeld), Vorgangsart und Fragebogentyp, dem Bereich Führungskraft (optional) mit dem Feld E-Mail der Führungskraft sowie den Schaltflächen Abbrechen und Vorgang anlegen.">
       <figcaption>Das Fenster „Neuer Onboarding-Vorgang". Die mit einem roten Sternchen <code>*</code> markierten Felder sind Pflichtfelder.</figcaption>
     </figure>
 
@@ -644,25 +647,25 @@
 
     <div class="ergebnis">
       <span class="label">Das Ergebnis ist</span>
-      <p>Eine grüne Bestätigung erscheint: „Onboarding-Vorgang wurde erfolgreich angelegt!". Darunter sehen Sie einen Einladungs-Link für den Personalfragebogen.</p>
+      <p>Eine grüne Bestätigung nennt die Vorgangsnummer (zum Beispiel „Onboarding-Vorgang 2026-GYM-014 wurde angelegt."). Darunter steht, an wen die Einladungen versendet wurden, und die Links zum Kopieren.</p>
     </div>
 
-    <h4>Die Einladung an die neue Person senden</h4>
-    <p>Damit die neue Person ihren Fragebogen ausfüllen kann, braucht sie den Einladungs-Link. Das Portal verschickt die Einladung automatisch per E-Mail – über SMTP, den E-Mail-Versand des Portals. Sie können den Link aber auch selbst kopieren und versenden.</p>
+    <h4>Die Einladungen</h4>
+    <p>Das Portal verschickt die Einladung zum Personalfragebogen – und, falls eingetragen, den Link an die Führungskraft – automatisch per E-Mail. Steht in der Bestätigung „nicht versendet", kopieren Sie den Link mit <strong>Kopieren</strong> und geben ihn selbst weiter.</p>
     <ol>
-      <li>Klicken Sie in der Bestätigung auf die Schaltfläche <strong>Kopieren</strong> neben dem Link.</li>
-      <li>Fügen Sie den Link bei Bedarf in eine eigene E-Mail ein (mit <kbd>Strg</kbd>+<kbd>V</kbd>).</li>
-      <li>Klicken Sie auf <strong>Schließen</strong>, um zum Dashboard zurückzukehren.</li>
+      <li>Klicken Sie in der Bestätigung neben dem betroffenen Link (<strong>Fragebogen-Link</strong> oder <strong>Modalitäten-Link</strong>) auf <strong>Kopieren</strong>.</li>
+      <li>Fügen Sie den Link in eine eigene E-Mail ein (mit <kbd>Strg</kbd>+<kbd>V</kbd>).</li>
+      <li>Klicken Sie auf <strong>Zum Vorgang</strong>, um den Vorgang gleich zu öffnen, oder auf <strong>Schließen</strong>, um zum Dashboard zurückzukehren.</li>
     </ol>
 
     <div class="hinweis info">
       <span class="label">Wer darf das? / Wie lange gilt der Link?</span>
-      <p>Der Einladungs-Link ist ein sogenannter „Magic Link" – ein besonderer Einmal-Zugang ganz ohne Passwort. Wer ihn hat, gelangt direkt zum Fragebogen. Behandeln Sie ihn deshalb vertraulich. Der Link ist <strong>30 Tage</strong> gültig.</p>
+      <p>Der Einladungs-Link ist ein sogenannter „Magic Link" – ein besonderer Einmal-Zugang ganz ohne Passwort. Wer ihn hat, gelangt direkt zum Fragebogen. Behandeln Sie ihn deshalb vertraulich. Bis wann er gilt, steht in der Bestätigung („Gültig bis …"); standardmäßig sind es 30 Tage. Für den Link der Führungskraft gilt dasselbe.</p>
     </div>
 
     <div class="ergebnis">
       <span class="label">Das Ergebnis ist</span>
-      <p>Der neue Vorgang steht jetzt in der Tabelle auf dem Dashboard. Sein Status lautet „Eingeladen". Die neue Person kann nun ihren Fragebogen ausfüllen.</p>
+      <p>Der neue Vorgang steht jetzt in der Tabelle auf dem Dashboard. Sein Status lautet „Eingeladen". Die neue Person kann nun ihren Fragebogen ausfüllen. Hat die Führungskraft ihren Link bekommen, kann sie die Einstellungsmodalitäten gleichzeitig ausfüllen – beide Seiten arbeiten unabhängig voneinander.</p>
     </div>
 
     <h3 id="onboarding-fragebogen">3.2 Der Personalfragebogen (aus Sicht des neuen Mitarbeitenden)</h3>

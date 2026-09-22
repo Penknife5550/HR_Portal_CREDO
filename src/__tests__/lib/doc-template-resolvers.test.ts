@@ -166,6 +166,23 @@ describe("Onboarding-Resolver", () => {
     expect(data.iban).toBe("DE999");
     expect(sensitiveFields).toEqual(["iban"]);
   });
+
+  it("nimmt den Namen am Vorgang, solange der Fragebogen noch keinen hat (Vorbelegung im Dialog „Neuer Vorgang“)", async () => {
+    mockFindOnboarding.mockResolvedValue({
+      displayId: "2026-GYM-014",
+      email: "anna.privat@example.org",
+      firstName: "Anna",
+      lastName: null,
+      organizationId: "org1",
+      personalData: { firstName: null, lastName: null },
+      supervisorData: null,
+    });
+
+    const { data } = await getResolver("ONBOARDING")(ctx());
+    expect(data.vorname).toBe("Anna");
+    expect(data.name).toBe("Anna");
+    expect(data.nachname).toBeUndefined();
+  });
 });
 
 describe("Sachbearbeiter-Platzhalter", () => {

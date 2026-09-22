@@ -297,9 +297,9 @@ Der Dispatcher arbeitet wie folgt:
 
 | Event                      | Beschreibung                                           | Payload (Auswahl)                      |
 |----------------------------|--------------------------------------------------------|----------------------------------------|
-| `onboarding-created`       | Neuer Onboarding-Vorgang erstellt                      | email, firstName, lastName, fragebogenLink, organization |
+| `onboarding-created`       | Neuer Onboarding-Vorgang erstellt                      | email, vorname, nachname, firstName, lastName, displayId, fragebogenLink, organization, tokenExpiresAt |
 | `questionnaire-completed`  | Mitarbeiter hat Personalfragebogen abgeschickt          | email, displayId, organization         |
-| `supervisor-link-created`  | Magic Link fuer Vorgesetzten generiert                  | supervisorEmail, modalitaetenLink      |
+| `supervisor-link-created`  | Magic Link fuer Vorgesetzten generiert (auch direkt beim Anlegen) | supervisorEmail, modalitaetenLink, employeeName / mitarbeiter_name (Name oder neutrale Bezeichnung, nie die Adresse der Person), displayId, supervisorTokenExpiresAt |
 | `supervisor-completed`     | Vorgesetzter hat Modalitaeten ausgefuellt               | email, displayId, supervisorEmail      |
 
 ### Konfiguration

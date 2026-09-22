@@ -20,6 +20,8 @@ import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { getEventDefinition } from "@/lib/events";
 import { EMAIL_PATTERN } from "@/lib/constants";
 import { formatDatumDE } from "@/lib/format";
+import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
+import { escapeHtml } from "@/lib/email-layout";
 
 // =============================================
 // Typen
@@ -413,6 +415,35 @@ export interface RenderedEventEmail {
   text?: string;
 }
 
+/**
+ * Namen, die im HTML-Teil maskiert werden.
+ *
+ * Sie stammen aus Freitextfeldern (Fragebogen, Dialog „Neuer Vorgang",
+ * Stammdaten), die nur die Laenge begrenzen. `renderTemplate` maskiert nicht —
+ * manche Variablen tragen bewusst fertiges, schon maskiertes HTML (etwa
+ * `warnungen_liste_html`). Ein Vorname `<a href="…">Anmelden</a>` stuende sonst
+ * als klickbarer fremder Link in der Mail an die Fuehrungskraft. Betreff und
+ * Textteil bleiben roh: Dort waere `&lt;` falsch und `<` ist harmlos.
+ */
+const NAMENS_VARIABLEN = [
+  "vorname",
+  "nachname",
+  "mitarbeiter_name",
+  "employeeName",
+  "firstName",
+  "lastName",
+  "employeeFirstName",
+  "employeeLastName",
+];
+
+function mitMaskiertenNamen(vars: Record<string, string>): Record<string, string> {
+  const maskiert = { ...vars };
+  for (const name of NAMENS_VARIABLEN) {
+    if (maskiert[name]) maskiert[name] = escapeHtml(maskiert[name]);
+  }
+  return maskiert;
+}
+
 export function renderEventEmail(
   template: Pick<
     ResolvedTemplate,
@@ -431,7 +462,7 @@ export function renderEventEmail(
 
   const body = {
     subject: renderTemplate(template.subject, vars),
-    html: renderTemplate(template.bodyHtml, vars),
+    html: renderTemplate(template.bodyHtml, mitMaskiertenNamen(vars)),
     text: template.bodyText ? renderTemplate(template.bodyText, vars) : undefined,
   };
 
@@ -667,6 +698,13 @@ function extractVariables(
 ): Record<string, string> {
   const str = (v: unknown) => (v != null ? String(v) : "");
 
+  // Frist des Links: in deutscher Zeit und als TT.MM.JJJJ (formatDatumDE) —
+  // wie „Gültig bis" im Dialog und die Frist des Vorgesetzten-Links unten.
+  // Frueher toLocaleDateString in der Zeitzone des Servers (im Container UTC,
+  // dazu „1.9.2026"): Wer kurz nach Mitternacht anlegte, las in der Einladung
+  // an die Person einen Tag frueher als in der Mail an die Fuehrungskraft.
+  const frist = payload.tokenExpiresAt || payload.expiresAt;
+
   // Generischer Durchreich: jedes skalare Payload-Feld wird unter seinem
   // Originalnamen als Platzhalter verfuegbar (z.B. {{employeeName}}, {{displayId}},
   // {{magicUrl}}). Die kuratierten Felder unten ueberschreiben diese gezielt.
@@ -705,11 +743,7 @@ function extractVariables(
         payload.formularLink ||
         payload.link,
     ),
-    ablaufdatum: payload.tokenExpiresAt
-      ? new Date(str(payload.tokenExpiresAt)).toLocaleDateString("de-DE")
-      : payload.expiresAt
-        ? new Date(str(payload.expiresAt)).toLocaleDateString("de-DE")
-        : "",
+    ablaufdatum: frist instanceof Date ? formatDatumDE(frist) : formatDatumDE(str(frist)),
     supervisor_email: str(payload.supervisorEmail),
     supervisor_link: str(payload.supervisor_link || payload.modalitaetenLink),
     tage_offen: str(payload.tage_offen || ""),
@@ -719,6 +753,19 @@ function extractVariables(
   if (event === "supervisor-link-created" || event === "supervisor-reminder") {
     base.email = str(payload.supervisorEmail || payload.email);
     base.link = str(payload.modalitaetenLink || payload.supervisor_link);
+    // Sicherheitsnetz fuer den Namen: Der allgemeine Rueckfall oben endet bei
+    // `payload.email` — das ist hier die Adresse der Fuehrungskraft (Erinnerung)
+    // oder, bei einem Aufrufer, der sie doch mitschickt, die private Adresse
+    // der Person. Beides gehoert nicht in „Einstellungsmodalitäten für …".
+    // Ohne Namen deshalb die neutrale Bezeichnung (Akkusativ, passt nach „für").
+    base.mitarbeiter_name =
+      str(payload.mitarbeiter_name || payload.employeeName).trim() ||
+      [base.vorname.trim(), base.nachname.trim()].filter(Boolean).join(" ") ||
+      MITARBEITER_NEUTRAL;
+    // Frist des Vorgesetzten-Links fuer den Kasten „Bitte ausfüllen bis".
+    if (!base.ablaufdatum && payload.supervisorTokenExpiresAt) {
+      base.ablaufdatum = formatDatumDE(str(payload.supervisorTokenExpiresAt));
+    }
   }
 
   // PSI-Beurteilungs-Anfrage: Empfaenger ist der/die Gutachter:in (recipientEmail),

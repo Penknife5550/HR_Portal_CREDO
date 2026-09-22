@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
+import { CopyButton } from "@/components/copy-button";
 import {
   STATUS_LABELS,
   documentStatusLabel,
@@ -47,6 +48,7 @@ import {
   bereitZurPruefung,
   istHrStatus,
   mitarbeiterAbgesendet,
+  mitarbeiterName,
   vorgesetzteAbgesendet,
   vorgesetztenLinkAbgelaufen,
 } from "@/lib/onboarding-spuren";
@@ -373,14 +375,6 @@ function ArrowLeftIcon({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
-function ClipboardIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-    </svg>
-  );
-}
-
 function CheckIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -434,39 +428,6 @@ function LinkIcon({ className = "h-4 w-4" }: { className?: string }) {
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
     </svg>
-  );
-}
-
-// =============================================
-// Copy Button (reusable)
-// =============================================
-
-function CopyButton({ text, label = "Kopieren" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:bg-muted active:scale-95"
-    >
-      {copied ? (
-        <>
-          <CheckIcon className="h-3.5 w-3.5 text-credo-gruen" />
-          <span className="text-credo-gruen">Kopiert!</span>
-        </>
-      ) : (
-        <>
-          <ClipboardIcon className="h-3.5 w-3.5" />
-          <span>{label}</span>
-        </>
-      )}
-    </button>
   );
 }
 
@@ -753,12 +714,9 @@ export function DetailContent({
 
   // ---- Computed values ----
   const statusInfo = data ? STATUS_LABELS[data.status] || STATUS_LABELS.INVITED : STATUS_LABELS.INVITED;
-  const displayName =
-    data?.personalData?.firstName && data?.personalData?.lastName
-      ? `${data.personalData.firstName} ${data.personalData.lastName}`
-      : data?.firstName && data?.lastName
-        ? `${data.firstName} ${data.lastName}`
-        : data?.email || "";
+  // mitarbeiterName: erst der Name aus dem Fragebogen, dann der beim Anlegen
+  // eingetragene — und ohne „Anna null", wenn nur ein Teil bekannt ist.
+  const displayName = (data ? mitarbeiterName(data) : null) ?? data?.email ?? "";
 
   // ---- Render ----
   if (loading) {
@@ -1196,16 +1154,7 @@ function TabOverview({
           {/* Person Card */}
           <Card title="Person">
             <FieldRow label="E-Mail" value={data.email} />
-            <FieldRow
-              label="Name"
-              value={
-                data.personalData?.firstName
-                  ? `${data.personalData.firstName} ${data.personalData.lastName}`
-                  : data.firstName
-                    ? `${data.firstName} ${data.lastName}`
-                    : "\u2014"
-              }
-            />
+            <FieldRow label="Name" value={mitarbeiterName(data) ?? "\u2014"} />
             <FieldRow
               label="Einrichtung"
               value={`${data.organization.name} (${data.organization.mandantNumber})`}
