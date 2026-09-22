@@ -345,6 +345,49 @@ details > div { padding: 0 14px 12px; }
 .fluss-neben .zeit { background: var(--warn-bg); border-left: 3px solid var(--gelb); }
 .fluss-neben .hr { background: var(--hinweis-bg); border-left: 3px solid var(--blau); }
 
+/* Abteilungsaufgaben */
+.abt-karte { border: 1px solid var(--ui-border); background: #fff; border-radius: 12px; padding: 10px 12px; display: grid; gap: 7px; }
+.abt-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.abt-zeile { border: 1px solid #efefef; background: #fbfbfb; border-radius: 8px; padding: 6px 9px; display: grid; gap: 3px; font-size: 11px; }
+.abt-zeile.warn { border-color: rgba(251,201,0,.6); background: rgba(251,201,0,.08); }
+.abt-zeile.fehler { border-color: rgba(226,0,26,.3); background: rgba(226,0,26,.04); }
+.abt-zeile .oben { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.abt-zeile .rechts { margin-left: auto; display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.abt-zeile .unten { font-size: 10px; color: var(--ui-muted); }
+.abt-badge { display: inline-block; border-radius: 999px; background: rgba(0,154,198,.12); color: #007da1; font-size: 10px; font-weight: 600; padding: 1px 8px; white-space: nowrap; }
+.abt-badge.roh { background: #eef2ff; color: #4338ca; font-family: Consolas, "Courier New", monospace; }
+.abt-badge.leer { min-width: 54px; min-height: 15px; background: #ececec; }
+.adresse { font-size: 10.5px; color: var(--ui-muted); overflow-wrap: anywhere; }
+.p-grau { background: #f1f1f1; color: #666; }
+.p-gelb { background: #fef3c7; color: #92400e; }
+.p-blau { background: rgba(0,154,198,.12); color: #007da1; }
+.p-rot { background: rgba(226,0,26,.1); color: #b3001a; }
+.aufg { border: 1px solid var(--ui-border); background: #fff; border-radius: 8px; padding: 7px 10px; display: grid; gap: 4px; font-size: 11px; }
+.aufg .oben { display: flex; gap: 8px; align-items: flex-start; }
+.aufg .oben .rechts { margin-left: auto; }
+.cb { width: 15px; height: 15px; border: 1.5px solid #9a9a9a; border-radius: 4px; flex-shrink: 0; margin-top: 1px; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; color: #fff; }
+.cb.ok { background: #16a34a; border-color: #16a34a; }
+.aufg .ttl { font-weight: 600; }
+.aufg .ttl.durch { text-decoration: line-through; color: var(--ui-muted); }
+.aufg .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 10px; color: var(--ui-muted); padding-left: 23px; }
+.aufg .hinw { padding-left: 23px; font-size: 10.5px; color: var(--ui-muted); }
+.kom-box { margin-left: 23px; border-radius: 6px; padding: 5px 8px; font-size: 10.5px; background: rgba(0,154,198,.07); border: 1px solid rgba(0,154,198,.25); color: #0a5e7a; }
+.notiz-box { margin-left: 23px; border-radius: 6px; padding: 5px 8px; font-size: 10.5px; background: #fffbea; border: 1px solid #fde68a; color: #7a5a00; }
+.kategorie { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ui-muted); display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.kategorie::after { content: ""; flex: 1; height: 1px; background: var(--ui-border); }
+.meldung { border-radius: 8px; padding: 6px 10px; font-size: 11px; border: 1px solid; }
+.meldung.gut { background: #f0f9e8; border-color: #c7e3a6; color: #36600f; }
+.meldung.gelb { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.meldung.rot { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.info-raster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 12px; font-size: 11px; background: #fafafa; border: 1px solid var(--ui-border); border-radius: 8px; padding: 8px 10px; }
+.info-raster .l { display: block; font-size: 9px; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .05em; }
+.info-raster .voll { grid-column: 1 / -1; border-top: 1px dashed var(--ui-border); padding-top: 6px; }
+.empf-block { border: 1px solid var(--ui-border); border-radius: 8px; padding: 7px 10px; font-size: 11px; }
+.empf-block .k { font-weight: 700; font-size: 11.5px; }
+.empf-block ul { margin: 3px 0 0; padding-left: 16px; }
+.empf-block li { margin: 1px 0; }
+.leiste-wahl { display: flex; flex-wrap: wrap; gap: 4px; }
+
 .fuss { border-top: 1px solid var(--linie); padding: 18px 48px 26px; font-size: 11.5px; color: var(--text2); background: #f7f7f5; }
 
 @media (max-width: 700px) {
@@ -356,7 +399,6 @@ details > div { padding: 0 14px 12px; }
   .fuss { padding: 16px 20px 22px; }
 }
 </style>
-
 </head>
 <body>
 <div class="seite">
@@ -364,12 +406,12 @@ details > div { padding: 0 14px 12px; }
 
   <header class="kopf">
     <span class="etikett">Plan · zur Freigabe</span>
-    <h1>Stellenbezeichnung, paralleler Zugriff, individuelle E-Mail und Unterlagen nachfordern</h1>
-    <p class="unter">Vier Änderungswünsche am HR-Portal: wie ich sie umsetzen würde, was sich für HR, Führungskräfte und Beschäftigte ändert, mit Vorher/Nachher-Ansichten.</p>
+    <h1>Stellenbezeichnung, paralleler Zugriff, individuelle E-Mail, Unterlagen nachfordern und Abteilungsaufgaben</h1>
+    <p class="unter">Änderungswünsche am HR-Portal: wie ich sie umsetze bzw. umsetzen würde, was sich für HR, Führungskräfte, Abteilungen und Beschäftigte ändert, mit Vorher/Nachher-Ansichten.</p>
     <div class="meta">
-      <span>Stand 21.09.2026 · Fassung 2 (ergänzt um „Unterlagen nachfordern“)</span>
+      <span>Stand 22.09.2026 · Fassung 4 (Paket 1 umgesetzt, ergänzt um Abteilungsaufgaben)</span>
       <span>Grundlage: Quellcode auf <code style="background:rgba(255,255,255,.14);color:#fff">main</code> (ae490ba), analysiert und gegengeprüft</span>
-      <span>Noch nichts umgesetzt</span>
+      <span>Paket 1 umgesetzt (5a016ba), noch nicht deployt</span>
     </div>
   </header>
 
@@ -381,6 +423,8 @@ details > div { padding: 0 14px 12px; }
       <li><a href="#a2">Fragebogen und Modalitäten parallel</a></li>
       <li><a href="#a3">Individuelle E-Mail mit Anhang</a></li>
       <li><a href="#a4">Unterlagen nachfordern</a></li>
+      <li><a href="#a5">Abteilungsaufgaben im Offboarding reparieren</a></li>
+      <li><a href="#a6">Abteilungsaufgaben im Onboarding</a></li>
       <li><a href="#mails">Alle E-Mails und Vorlagen im Überblick</a></li>
       <li><a href="#ablauf">Reihenfolge, Deploy und Handschritte</a></li>
       <li><a href="#offen">Entschiedene und offene Punkte</a></li>
@@ -401,13 +445,13 @@ details > div { padding: 0 14px 12px; }
               <td><strong>1 · Stellenbezeichnung</strong></td>
               <td>Der Begriff heißt überall „Stellenbezeichnung“, im Onboarding und in der Vertragsverlängerung. Das Feld wird einzeilig, höchstens 200 Zeichen.</td>
               <td>Kein Umbau. Einmalig werden gespeicherte Standard-Beschriftungen angepasst.</td>
-              <td class="num">0,5–1 Tag</td>
+              <td class="num">✓ umgesetzt</td>
             </tr>
             <tr>
               <td><strong>2 · Paralleler Zugriff</strong></td>
               <td>Fragebogen und Einstellungsmodalitäten laufen unabhängig voneinander, in beliebiger Reihenfolge. Name und Führungskraft lassen sich schon beim Anlegen eintragen. Festhängende Vorgänge werden repariert.</td>
               <td>Eine neue Spalte (Zeitpunkt des Vorgesetzten-Links), dazu einmalige Korrektur festhängender Vorgänge.</td>
-              <td class="num">2,5–3 Tage</td>
+              <td class="num">Stufe A und „Neuer Vorgang“ ✓,<br>Rest (Paket 2) etwa 1–1,5 Tage</td>
             </tr>
             <tr>
               <td><strong>3 · Individuelle E-Mail</strong></td>
@@ -420,6 +464,18 @@ details > div { padding: 0 14px 12px; }
               <td>HR fordert aus jedem Vorgang (alle sechs Vorgangsarten) gezielt Unterlagen an. Die Person lädt sie über einen persönlichen Link hoch. HR prüft jede Unterlage einzeln: Angenommene landen in den Dokumenten des Vorgangs, zurückgewiesene werden automatisch neu angefordert. Mit Frist, Erinnerungen und HR-Meldungen.</td>
               <td>Vier neue Tabellen, rein additiv.</td>
               <td class="num">19–21 Tage</td>
+            </tr>
+            <tr>
+              <td><strong>5 · Abteilungsaufgaben im Offboarding reparieren</strong> (Paket 1b)</td>
+              <td>Kommentare der Abteilungen kommen an. Erneutes Versenden zerstört keine Links mehr. Neue Abteilungen lassen sich anlegen. Aufgaben für Vorgesetzte gehen an die Führungskraft. HR sieht, wer informiert wurde und wer nicht.</td>
+              <td>Wenige neue Spalten, rein additiv.</td>
+              <td class="num">etwa 6 Tage (vollständig)</td>
+            </tr>
+            <tr>
+              <td><strong>6 · Abteilungsaufgaben im Onboarding</strong> (Paket 5)</td>
+              <td>HR informiert per Knopf IT, Verwaltung, Facility, Datenschutz und die Führungskraft über ihre Aufgaben zum Dienstbeginn. Die Abteilungen haken ohne Anmeldung ab und kommentieren, mit Fälligkeiten relativ zum Vertragsbeginn und mit Erinnerungen.</td>
+              <td>Die bestehende Link-Tabelle wird erweitert, dazu wenige Spalten, rein additiv.</td>
+              <td class="num">8–9 Tage</td>
             </tr>
           </tbody>
         </table>
@@ -454,6 +510,16 @@ details > div { padding: 0 14px 12px; }
         <li><span class="haken">✓</span><span>Bei der Vertragsverlängerung erst nach der Zusage der Übernahme.</span></li>
         <li><span class="haken">✓</span><span>HR-Mails an die anfordernde Person, das zentrale HR-Postfach in Kopie.</span></li>
         <li><span class="haken">✓</span><span>Korrektur über „Annahme zurücknehmen“.</span></li>
+      </ul>
+      <h4>Paket 1 und Abteilungsaufgaben (22.09.2026)</h4>
+      <ul class="entscheidungen">
+        <li><span class="haken">✓</span><span>Das Mail-Reparaturpaket ist in Paket 1 aufgenommen. Paket 1 ist umgesetzt und committet (5a016ba), aber noch nicht deployt.</span></li>
+        <li><span class="haken">✓</span><span>Die Offboarding-Abschlussmail behauptet nicht mehr pauschal „Alle Aufgaben sind erledigt“.</span></li>
+        <li><span class="haken">✓</span><span>Abteilungsaufgaben im Onboarding werden geplant. HR stößt sie per Knopf an, nicht automatisch.</span></li>
+        <li><span class="haken">✓</span><span>Die Schwächen der Abteilungsaufgaben im Offboarding werden vorher als eigenes Paket repariert, und zwar vollständig (Punkte 1–13).</span></li>
+        <li><span class="haken">✓</span><span>Neue feste Abteilung „Verwaltung / Sekretariat“ mit Adresse je Einrichtung.</span></li>
+        <li><span class="haken">✓</span><span>Ohne eingereichte Modalitäten bleibt „Abteilungen informieren“ gesperrt, mit Erklärung.</span></li>
+        <li><span class="haken">✓</span><span>HR bekommt je erledigter Aufgabe eine Mail mit dem Kommentar der Abteilung.</span></li>
       </ul>
       <p class="unterschrift" style="margin-top:6px">Onboarding bei der individuellen E-Mail habe ich aus Ihrem ursprünglichen Wunsch übernommen („einer Person im Onboarding, aber auch grundsätzlich“).</p>
     </section>
@@ -1278,31 +1344,459 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
       <p><span class="aufwand">Aufwand 19–21 Tage</span> <span class="ui-hinweistext" style="margin-left:6px">der größte Baustein; unabhängig von Paket 3</span></p>
     </section>
 
-    <!-- ================= 5 MAILS UND VORLAGEN ================= -->
+    <!-- ================= 5 ABTEILUNGSAUFGABEN OFFBOARDING ================= -->
+    <section class="abschnitt" id="a5">
+      <div class="abschnitt-titel"><span class="nr">5</span><h2>Abteilungsaufgaben im Offboarding reparieren (Paket 1b)</h2></div>
+      <p>Im Offboarding gibt es den Mechanismus schon. HR klickt im Tab „Checkliste“ auf „Magic Links versenden“. Jede Abteilung, die in der Checkliste Aufgaben hat, bekommt eine Mail mit einem Link und hakt ihre Aufgaben ohne Anmeldung ab. Das Portal sucht die Adresse dafür unter Einstellungen → Abteilungen. Beim genauen Hinsehen funktioniert der Mechanismus an mehreren Stellen nicht. Die Reparatur kommt vor Paket 5, weil das Onboarding denselben Mechanismus nutzen soll.</p>
+
+      <div class="kasten warn">
+        <strong class="t">Meine erste Schätzung war zu knapp</strong>
+        <p>Ich hatte für die Reparatur 1–1,5 Tage genannt. Beim Nachprüfen im Code fanden sich 16 Schwächen statt 4, jede mit Fundstelle belegt; zusammengefasst sind es die 14 Zeilen unten. Ich teile das Paket deshalb in einen <strong>Kern (etwa 5 Tage)</strong>, ohne den Paket 5 nicht sinnvoll ist, und einen <strong>abwählbaren Rest (etwa 1 Tag)</strong>.</p>
+      </div>
+
+      <h3>Was heute nicht funktioniert</h3>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>#</th><th>Schwäche</th><th>Folge</th><th>Teil</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td><strong>Der Kommentar der Abteilung geht verloren.</strong> Die Seite schickt ihn ab, der Server speichert ihn nicht. Stattdessen zeigt die Seite der Abteilung die <em>interne HR-Notiz</em> als „Kommentar“ an.</td><td>HR erfährt nie, was die Abteilung schreibt. Die Abteilung liest Notizen, die nur für HR gedacht sind.</td><td>Kern</td></tr>
+            <tr><td class="num">2</td><td><strong>Jeder Klick erzeugt neue Links für alle Abteilungen.</strong> Auch Abteilungen, die schon fertig sind, bekommen die Mail erneut.</td><td>Alle vorher verschickten Links führen auf „Link nicht gültig“.</td><td>Kern</td></tr>
+            <tr><td class="num">3</td><td><strong>Fehler bleiben still.</strong> Fehlt eine Adresse oder scheitert der Versand, meldet das Portal trotzdem Erfolg.</td><td>Die Zeile zeigt „Gesendet“, obwohl nichts ankam.</td><td>Kern</td></tr>
+            <tr><td class="num">4</td><td><strong>Aufgaben für Vorgesetzte gehen an niemanden.</strong> Im Offboarding gibt es keine Adresse der Führungskraft.</td><td>Die Aufgaben werden ohne Hinweis übersprungen.</td><td>Kern</td></tr>
+            <tr><td class="num">5</td><td><strong>Einstellungen → Abteilungen ist kaputt.</strong> Anlegen scheitert immer, weil Seite und Server verschiedene Feldnamen benutzen. Die Namensspalte bleibt leer, Meldungen zeigen „undefined“.</td><td>Neue Abteilungen (etwa ein Sekretariat) lassen sich nicht anlegen.</td><td>Kern</td></tr>
+            <tr><td class="num">6</td><td><strong>Erinnerungen folgen falschen Regeln.</strong> Die erste kommt direkt nach der Erstmail, auch an abgelaufene Links und an die alte Adresse. Nach einem Fehlversand gilt sie trotzdem als verschickt. Eskalationen laufen ohne Ende weiter.</td><td>Zu viele, zu frühe oder verlorene Erinnerungen.</td><td>Kern</td></tr>
+            <tr><td class="num">7</td><td><strong>Rechte und Status werden nicht geprüft.</strong> Versandknopf und Abhaken im Portal prüfen weder Rolle noch Mandant noch Vorgangsstatus.</td><td>Links gehen auch bei abgeschlossenem Vorgang hinaus. Ein Datenleck gibt es heute nicht, weil die Middleware fremde Mandanten abfängt. Die zweite Schranke fehlt aber.</td><td>Kern</td></tr>
+            <tr><td class="num">8</td><td><strong>Der öffentliche Link hat keine Leitplanken.</strong> Er bleibt nach dem Abschluss änderbar, und kaputte Eingaben führen zum Serverfehler. Jedes erneute Speichern löst die Mails „Aufgabe erledigt“ und „Abteilung abgeschlossen“ noch einmal aus, ein Protokoll entsteht nicht. Außerdem liefert der Link den Fortschritt aller Abteilungen mit.</td><td>Doppelte Mails, keine Nachvollziehbarkeit, mehr Daten als nötig.</td><td>Kern</td></tr>
+            <tr><td class="num">9</td><td><strong>Abhaken im Portal rechnet nur halb.</strong> Hängt HR eine Aufgabe auf eine andere Abteilung um, wird nur die neue Abteilung neu berechnet. HR bekommt außerdem eine Mail über das eigene Häkchen.</td><td>Falscher Status „fertig“ oder „offen“.</td><td>Kern</td></tr>
+            <tr><td class="num">10</td><td>Ein neuer letzter Arbeitstag verschiebt die Fälligkeiten nicht.</td><td>Erinnerungen und Countdown richten sich nach dem alten Datum.</td><td>optional</td></tr>
+            <tr><td class="num">11</td><td>Die Erinnerungsstufen ändern nur die Häufigkeit, der Text ist immer gleich.</td><td>Eine überfällige Aufgabe klingt wie eine freundliche Erinnerung.</td><td>optional</td></tr>
+            <tr><td class="num">12</td><td>Die öffentliche Seite nennt in der Fußzeile fest „Christlicher Schulverein Minden e.V.“, für alle 16 Mandanten. „Gesamtfortschritt“ zeigt in Wahrheit nur die eigene Abteilung, und Kategorien fehlen.</td><td>Irreführende Angaben für andere Träger.</td><td>optional</td></tr>
+            <tr><td class="num">13</td><td>Das Seed-Skript setzt gepflegte Abteilungsadressen bei jedem Lauf auf die Platzhalter <code>@credo-gruppe.de</code> zurück.</td><td>Ein versehentlicher Seed-Lauf leitet die Mails an Platzhalteradressen.</td><td>optional</td></tr>
+            <tr><td class="num">14</td><td>Eingeloggte Führungskräfte würden auf ihrer eigenen Aufgabenseite „Keine Berechtigung“ sehen.</td><td>Heute ohne Wirkung, weil sich eingeschränkte Rollen nicht vergeben lassen.</td><td>zurückgestellt</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Tab „Checkliste“ im Offboarding</h3>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Offboarding OFF-2027-014 · Tab „Checkliste“</div>
+          <div class="fenster-rumpf">
+            <div class="abt-karte">
+              <div class="abt-kopf"><div class="kartentitel">Abteilungs-Links</div><span class="knopf gruen klein">Magic Links versenden</span></div>
+              <div class="abt-zeile"><div class="oben"><span class="abt-badge">IT-Abteilung</span><span class="adresse">it@credo-gruppe.de</span><span class="rechts"><span class="pill p-blau">Geöffnet (3x)</span><span class="knopf rand klein">Reminder</span><span class="knopf rand klein">Link</span></span></div></div>
+              <div class="abt-zeile"><div class="oben"><span class="abt-badge">Facility Management</span><span class="adresse">facility@credo-gruppe.de</span><span class="rechts"><span class="pill p-gelb">Gesendet</span><span class="knopf rand klein">Reminder</span><span class="knopf rand klein">Link</span></span></div></div>
+            </div>
+            <span class="anno">Ein zweiter Klick auf „Magic Links versenden“ macht beide Links ungültig. Die Führungskraft fehlt ohne Hinweis. Nach dem Versand erscheint keine Meldung.</span>
+            <div class="kategorie" style="margin-top:10px">Phase 5: Letzter Tag</div>
+            <div class="aufg" style="margin-top:6px">
+              <div class="oben"><span class="cb ok">✓</span><span class="ttl durch">IT-Zugänge und E-Mail-Konto sperren</span></div>
+              <div class="meta"><span class="abt-badge">IT-Abteilung</span><span>Fällig: 31.07.2027</span><span>am 29.07.2027</span></div>
+              <div class="notiz-box">Rücksprache mit der Schulleitung wegen Postfach</div>
+            </div>
+            <span class="anno">Diese interne Notiz sieht die IT auf ihrer Seite als „Kommentar“. Was die IT selbst schreibt, kommt nie an. Wer abgehakt hat, steht nirgends.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Offboarding OFF-2027-014 · Tab „Checkliste“</div>
+          <div class="fenster-rumpf">
+            <div class="stapel">
+              <div class="meldung gut">2 Abteilungen informiert: IT-Abteilung, Facility Management.</div>
+              <div class="meldung gelb">Nicht informiert: Führungskraft (keine Adresse hinterlegt).</div>
+            </div>
+            <div class="abt-karte mark-block" style="margin-top:8px">
+              <div class="abt-kopf">
+                <div><div class="kartentitel"><span class="mark">Aufgaben für Abteilungen</span></div><div class="kartentext" style="margin:0">Aufgaben mit zuständiger Abteilung erhält die Abteilung per Link, ohne Anmeldung. Fälligkeiten richten sich nach dem letzten Arbeitstag (31.07.2027).</div></div>
+                <span class="knopf gruen klein"><span class="mark" style="background:none;box-shadow:none;padding:0">Weitere Abteilungen informieren (1)</span></span>
+              </div>
+              <div class="abt-zeile">
+                <div class="oben"><span class="abt-badge">IT-Abteilung</span><span class="adresse">it@credo-gruppe.de</span><span class="adresse">· 2 Aufgaben, 1 offen</span><span class="rechts"><span class="pill p-blau">Geöffnet (3×), zuletzt 14.07.2027</span></span></div>
+                <div class="unten">Link gültig bis 30.10.2027 · 1 Erinnerung, zuletzt 25.07.2027</div>
+                <div class="oben"><span class="rechts"><span class="knopf rand klein">Erinnern</span><span class="knopf rand klein">Erneut senden</span><span class="knopf rand klein">Link kopieren</span><span class="knopf rand klein">…</span></span></div>
+              </div>
+              <div class="abt-zeile">
+                <div class="oben"><span class="abt-badge">Facility Management</span><span class="adresse">facility@credo-gruppe.de</span><span class="adresse">· 1 Aufgabe</span><span class="rechts"><span class="pill p-ok">Erledigt am 29.07.2027</span></span></div>
+              </div>
+              <div class="abt-zeile fehler">
+                <div class="oben"><span class="abt-badge">Datenschutzbeauftragte/r</span><span class="adresse">dsb@credo-gruppe.de</span><span class="rechts"><span class="pill p-rot">Versand fehlgeschlagen</span><span class="knopf rand klein">Erneut senden</span></span></div>
+                <div class="unten">SMTP-Server nicht erreichbar (25.07.2027, 08:02)</div>
+              </div>
+              <div class="abt-zeile warn">
+                <div class="oben"><span class="abt-badge">Führungskraft</span><span class="adresse">Keine Führungskraft hinterlegt – bitte im Tab Übersicht eintragen</span><span class="rechts"><span class="knopf rand klein">Eintragen</span></span></div>
+              </div>
+            </div>
+            <div class="kategorie" style="margin-top:10px">Phase 5: Letzter Tag</div>
+            <div class="aufg" style="margin-top:6px">
+              <div class="oben"><span class="cb ok">✓</span><span class="ttl durch">IT-Zugänge und E-Mail-Konto sperren</span></div>
+              <div class="meta"><span class="abt-badge">IT-Abteilung</span><span>Fällig: 31.07.2027</span><span class="mark">erledigt von IT-Abteilung (Link) am 29.07.2027, 10:14</span></div>
+              <div class="kom-box"><span class="mark">Kommentar IT-Abteilung, 29.07.2027:</span> Konto gesperrt, Postfach an die Schulleitung weitergeleitet.</div>
+              <div class="notiz-box"><b>Interne Notiz (nur im Portal):</b> Rücksprache mit der Schulleitung wegen Postfach</div>
+            </div>
+            <span class="anno gut">Links bleiben gültig, der Knopf informiert nur, wer noch nichts bekommen hat. Jede Zeile nennt ihren Stand, auch Fehlschläge und Lücken. Kommentar der Abteilung und interne Notiz sind getrennt.</span>
+          </div>
+        </div>
+      </div>
+      <p class="unterschrift">„…“ öffnet „Link erneuern…“: Der alte Link wird sofort ungültig, die Abteilung bekommt eine neue Mail. Das Portal fragt vorher nach und schreibt einen Protokolleintrag.</p>
+
+      <h3>Einstellungen → Abteilungen</h3>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Einstellungen → Abteilungen</div>
+          <div class="fenster-rumpf">
+            <div class="zeile-klein" style="justify-content:space-between"><span>Abteilungen verwalten, die Offboarding-Aufgaben per Magic Link erhalten.</span><span class="knopf primaer klein">+ Abteilung hinzufügen</span></div>
+            <div class="meldung rot" style="margin-top:8px">departmentKey ist ein Pflichtfeld, departmentName ist ein Pflichtfeld</div>
+            <table class="ui-tab" style="margin-top:8px">
+              <thead><tr><th>Abteilung</th><th>E-Mail</th><th>Einrichtung</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td><span class="abt-badge leer"></span></td><td>it@credo-gruppe.de</td><td><span class="abt-badge">Zentral</span></td><td><span class="pill p-ok">Aktiv</span></td></tr>
+                <tr><td><span class="abt-badge leer"></span></td><td>facility@credo-gruppe.de</td><td><span class="abt-badge">Zentral</span></td><td><span class="pill p-ok">Aktiv</span></td></tr>
+                <tr><td><span class="abt-badge leer"></span></td><td>buchhaltung@credo-gruppe.de</td><td><span class="abt-badge">Zentral</span></td><td><span class="pill p-ok">Aktiv</span></td></tr>
+              </tbody>
+            </table>
+            <span class="anno">Jedes Anlegen endet mit der roten Meldung. Die Spalte „Abteilung“ bleibt leer, „Löschen“ fragt „Abteilung "undefined" wirklich löschen?“. In der Auswahl stehen auch „Vorgesetzter“ und „Mitarbeiter“, die nie einen Link bekommen.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Einstellungen → Abteilungen</div>
+          <div class="fenster-rumpf">
+            <div class="zeile-klein" style="justify-content:space-between"><span>Abteilungen, die ihre Aufgaben aus den <span class="mark">Onboarding- und Offboarding-Checklisten</span> per Link erhalten – ohne Anmeldung im Portal.</span><span class="knopf primaer klein">+ Abteilung hinzufügen</span></div>
+            <div class="meldung gelb" style="margin-top:8px">Die Vorlage „Standard-Einstellung (TV-L)“ nutzt „Verwaltung / Sekretariat“. Dafür ist keine aktive Adresse hinterlegt. Diese Aufgaben können nicht per Link verschickt werden.</div>
+            <table class="ui-tab" style="margin-top:8px">
+              <thead><tr><th>Abteilung</th><th>Schlüssel</th><th>E-Mail</th><th>Gilt für</th><th>Verwendet in</th></tr></thead>
+              <tbody>
+                <tr><td><b class="mark">IT-Abteilung</b></td><td><span class="mono">IT</span></td><td>it@credo-gruppe.de</td><td><span class="abt-badge">Zentral</span></td><td class="mark">5 Aufgaben in 3 Vorlagen</td></tr>
+                <tr><td><b>Facility Management</b></td><td><span class="mono">FACILITY</span></td><td>facility@credo-gruppe.de</td><td><span class="abt-badge">Zentral</span></td><td>2 Aufgaben in 2 Vorlagen</td></tr>
+                <tr><td><b>Buchhaltung</b></td><td><span class="mono">BUCHHALTUNG</span></td><td>buchhaltung@credo-gruppe.de</td><td><span class="abt-badge">Zentral</span></td><td><span class="pill p-gelb">In keiner Vorlage</span></td></tr>
+              </tbody>
+            </table>
+            <div class="ui-hinweistext" style="margin-top:6px">Personalabteilung und Mitarbeitende arbeiten im Portal und bekommen keinen Link. <span class="mark">Aufgaben für Vorgesetzte gehen an die im Vorgang hinterlegte Führungskraft.</span></div>
+            <span class="anno gut">Anlegen funktioniert, auch zentral. Name und Adresse sind bearbeitbar, ein doppelter Eintrag wird abgewiesen. Die Spalte „Verwendet in“ zeigt, wofür eine Adresse gebraucht wird. Jede Änderung wird protokolliert. Neu in der Auswahl: „Verwaltung / Sekretariat“.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Führungskraft im Offboarding</h3>
+      <p>Aufgaben mit der Zuständigkeit „Vorgesetzter“ gehen künftig an die Führungskraft des Vorgangs, nie an eine zentrale Adresse. Ein zentraler Eintrag schickte sonst die Führungsaufgaben aller Einrichtungen an ein einziges Postfach. Dafür bekommt der Offboarding-Vorgang zwei neue, optionale Felder: E-Mail und Name der Führungskraft.</p>
+      <ul>
+        <li><strong>Vorbelegt</strong> aus der Zeugnis-Bewertung desselben Austritts, sonst aus dem Vertragsende, wenn der Austritt von dort kommt.</li>
+        <li><strong>Änderbar</strong> in „Neuer Austritt“ und im Tab Übersicht.</li>
+        <li><strong>Geprüft:</strong> Eine frei eingetippte Adresse unterliegt derselben Freigabeliste wie das Dokumentenpaket (Einstellungen → SMTP). Bei leerer Liste gibt es keine Einschränkung.</li>
+        <li><strong>Fehlt sie</strong>, zeigt die Karte die gelbe Zeile „Keine Führungskraft hinterlegt“. Die übrigen Abteilungen werden trotzdem informiert.</li>
+      </ul>
+
+      <h3>Die Regeln danach</h3>
+      <ul>
+        <li><strong>Ein verschickter Link bleibt gültig.</strong> Einen neuen Link gibt es nur über „Link erneuern…“ oder wenn HR nach einer Adressänderung selbst erneut sendet. Beides wird protokolliert. Der tägliche Lauf erzeugt nie still einen neuen Link.</li>
+        <li><strong>Nachweis nur bei echtem Versand.</strong> Scheitert der Versand, bleibt die Zeile rot und bietet „Erneut senden“ an. Der Server antwortet mit 409, wenn fachlich nichts zu versenden war, und mit 502, wenn der Mailserver scheiterte. Beide Antworten nennen jede Abteilung mit Grund.</li>
+        <li><strong>Mails nur bei echtem Wechsel.</strong> „Aufgabe erledigt“ und „Abteilung abgeschlossen“ gehen genau einmal raus. Auch zwei gleichzeitige Häkchen auf die letzten beiden Aufgaben dürfen den Abschluss nicht verpassen, deshalb läuft der Übergang in einer gesperrten Transaktion.</li>
+        <li><strong>Erinnerungen</strong> nur an informierte Abteilungen mit offenen Aufgaben. Sie zählen ab dem letzten Versand, an die aktuelle Adresse, und enden 30 Tage nach der letzten Fälligkeit. Nach einem Fehlversand wird es am nächsten Tag erneut versucht. „Erinnern“ und „Erneut senden“ sind je Link für 10 Minuten gesperrt.</li>
+        <li><strong>Vorgangsstatus:</strong> Nach dem Abschluss ist der Link nur lesbar. Nach einem Abbruch zeigt er „Dieser Vorgang wurde abgebrochen. Bitte keine weiteren Schritte unternehmen.“</li>
+        <li><strong>Nur das Nötige:</strong> Die öffentliche Seite zeigt nur die eigenen Aufgaben, ohne den Fortschritt anderer Abteilungen und ohne interne Notizen.</li>
+        <li><strong>Kommentare</strong> (höchstens 1000 Zeichen) stehen in einem eigenen Feld. In HTML-Mails erscheinen sie nur maskiert, auch wenn ein Admin die Vorlage im Editor ändert.</li>
+      </ul>
+
+      <h3>So setze ich es um</h3>
+      <ul>
+        <li><strong>Gemeinsame Regeln</strong> in <code>src/lib/abteilungsaufgaben.ts</code>: Empfänger auflösen, Versandentscheidung, Gültigkeit, Erinnerungsstufe und Mailfelder. Reine Funktionen, vollständig getestet. Paket 5 nutzt sie unverändert.</li>
+        <li><strong>Eine Link-Tabelle für beide Module.</strong> Die bestehende Tabelle bleibt samt allen laufenden Links erhalten und bekommt in Paket 5 eine zweite, optionale Verbindung zum Onboarding-Vorgang. Das folgt dem Muster des AuditLogs, und kein Link muss umziehen.</li>
+        <li><strong>Datenbank rein additiv:</strong> Führungskraft (2 Spalten) am Offboarding-Vorgang, Kommentar der Abteilung (2 Spalten) an der Aufgabe, dazu Versandstand und tatsächlicher Empfänger (3 Spalten) am Link. Wer abgehakt hat, lässt sich aus den vorhandenen Daten ableiten.</li>
+        <li><strong>Versandroute</strong> mit den Aktionen Informieren, Erneut senden, Erinnern und Link erneuern, dazu Rolle, Mandant, Status und eine Sperre gegen Doppelklicks.</li>
+        <li><strong>Öffentliche Routen</strong> mit Eingabeprüfung, Statussperre, Protokoll und einem zweiten Anfragelimit je Link, zusätzlich zum bestehenden je IP.</li>
+        <li><strong>Einstellungen → Abteilungen</strong> mit einheitlichen Feldnamen, Eingabeprüfung, Protokoll und der Spalte „Verwendet in“.</li>
+        <li><strong>Mails:</strong> vier Offboarding-Vorlagen bekommen Aufgabenliste, Gültigkeit und Kommentar (Einzelheiten in Abschnitt 7). Sie werden nach dem Deploy mit „Text auf Standard zurücksetzen“ aktualisiert.</li>
+        <li><strong>Tests</strong> für jede Zeile der Tabelle oben, dazu das Handbuch mit den neuen Begriffen.</li>
+      </ul>
+      <p><span class="aufwand">Aufwand Kern etwa 5 Tage</span> <span class="aufwand">mit Punkt 10–13 etwa 6 Tage</span> <span class="ui-hinweistext" style="margin-left:6px">Voraussetzung für Paket 5</span></p>
+    </section>
+
+    <!-- ================= 6 ABTEILUNGSAUFGABEN ONBOARDING ================= -->
+    <section class="abschnitt" id="a6">
+      <div class="abschnitt-titel"><span class="nr">6</span><h2>Abteilungsaufgaben im Onboarding (Paket 5)</h2></div>
+      <p>Im Onboarding gibt es heute keinen Versand an Abteilungen. Die Zuständigkeit einer Aufgabe ist ein freier Text wie „IT“ oder „Verwaltung“, und die Fälligkeiten bleiben immer leer. Anstoßen lässt sich nichts. Künftig läuft es wie im reparierten Offboarding, ausgelöst von HR per Knopf.</p>
+
+      <div class="fluss">
+        <div class="s"><b>1 · Anlegen</b>Die Aufgaben kommen wie bisher aus der Checklisten-Vorlage, jetzt mit Zuständigkeit und Fälligkeit in Tagen.</div>
+        <div class="pf">›</div>
+        <div class="s"><b>2 · Modalitäten</b>Die Führungskraft reicht ein. Damit steht der Vertragsbeginn fest, und das Portal rechnet die Fälligkeiten einmal aus.</div>
+        <div class="pf">›</div>
+        <div class="s"><b>3 · Vorschau</b>HR sieht im Tab „Checkliste“, wer welche Aufgaben bekommt und wer übersprungen wird.</div>
+        <div class="pf">›</div>
+        <div class="s"><b>4 · Informieren</b>HR klickt „Abteilungen informieren…“ und bestätigt im Dialog.</div>
+        <div class="pf">›</div>
+        <div class="s"><b>5 · Abhaken</b>Die Abteilungen haken ohne Anmeldung ab und kommentieren. Erinnerungen laufen täglich.</div>
+      </div>
+      <div class="fluss-neben">
+        <div class="gut"><strong>Nichts passiert automatisch:</strong> kein Versand beim Anlegen, bei der Abgabe der Modalitäten oder beim Statuswechsel.</div>
+        <div class="hr"><strong>Voraussetzung:</strong> Die Modalitäten sind eingereicht. Ein Vertragsbeginn, den die Führungskraft nur zwischengespeichert hat, zählt nicht, er kann sich noch ändern.</div>
+      </div>
+
+      <h3>Tab „Checkliste“ im Onboarding</h3>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Onboarding ONB-2026-031 · Tab „Checkliste“</div>
+          <div class="fenster-rumpf">
+            <div class="tabs"><span>Übersicht</span><span>Fragebogen-Daten</span><span>Dokumente</span><span class="aktiv">Checkliste 2/14</span><span>Vorgesetzter</span></div>
+            <div class="graukarte"><div class="zeile-klein" style="justify-content:space-between"><b style="color:var(--ui-fg)">Fortschritt</b><b style="color:var(--ui-fg)">14 %</b></div><div class="zeile-klein">2 von 14 Aufgaben erledigt</div><div class="balken"><span style="width:14%;background:var(--gruen)"></span></div></div>
+            <div class="kategorie" style="margin-top:10px">Vor Arbeitsbeginn</div>
+            <div class="stapel" style="margin-top:6px">
+              <div class="aufg"><div class="oben"><span class="cb"></span><span class="ttl">IT-Zugänge beantragt</span></div><div class="meta"><span class="abt-badge roh">IT</span></div></div>
+              <div class="aufg"><div class="oben"><span class="cb"></span><span class="ttl">Schlüssel/Ausweis bestellt</span></div><div class="meta"><span class="abt-badge roh">Verwaltung</span></div></div>
+              <div class="aufg"><div class="oben"><span class="cb"></span><span class="ttl">Einarbeitungsplan besprochen</span></div><div class="meta"><span class="abt-badge roh">Vorgesetzter</span></div></div>
+            </div>
+            <span class="anno">Die Zuständigkeit ist nur ein Etikett. Keine Fälligkeit, kein Versand, kein Knopf. Ob die IT Bescheid weiß, sieht HR nicht.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Onboarding ONB-2026-031 · Tab „Checkliste“, vor dem Versand</div>
+          <div class="fenster-rumpf">
+            <div class="tabs"><span>Übersicht</span><span>Fragebogen-Daten</span><span>Dokumente</span><span class="aktiv">Checkliste 2/14</span><span>Vorgesetzter</span></div>
+            <div class="graukarte"><div class="zeile-klein" style="justify-content:space-between"><b style="color:var(--ui-fg)">Fortschritt</b><b style="color:var(--ui-fg)">14 %</b></div><div class="zeile-klein">2 von 14 Aufgaben erledigt</div><div class="balken"><span style="width:14%;background:var(--gruen)"></span></div></div>
+            <div class="abt-karte mark-block" style="margin-top:8px">
+              <div class="abt-kopf">
+                <div><div class="kartentitel">Aufgaben für Abteilungen</div><div class="kartentext" style="margin:0">Aufgaben mit zuständiger Abteilung erhält die Abteilung per Link, ohne Anmeldung. Fälligkeiten richten sich nach dem Vertragsbeginn (01.10.2026).</div></div>
+                <span class="knopf gruen klein">Abteilungen informieren…</span>
+              </div>
+              <div class="abt-zeile"><div class="oben"><span class="abt-badge">IT-Abteilung</span><span class="adresse">it@credo-gruppe.de · 3 Aufgaben, nächste fällig 24.09.2026</span><span class="rechts"><span class="pill p-grau">Noch nicht informiert</span></span></div></div>
+              <div class="abt-zeile"><div class="oben"><span class="abt-badge">Verwaltung / Sekretariat</span><span class="adresse">sekretariat@example.org · 2 Aufgaben</span><span class="rechts"><span class="pill p-grau">Noch nicht informiert</span></span></div></div>
+              <div class="abt-zeile"><div class="oben"><span class="abt-badge">Führungskraft</span><span class="adresse">a.leitung@example.org · 3 Aufgaben</span><span class="rechts"><span class="pill p-grau">Noch nicht informiert</span></span></div></div>
+              <div class="abt-zeile warn"><div class="oben"><span class="abt-badge">Datenschutzbeauftragte/r</span><span class="adresse">keine aktive Adresse hinterlegt (Einstellungen → Abteilungen)</span></div></div>
+            </div>
+            <div class="kategorie" style="margin-top:10px">Vor Arbeitsbeginn</div>
+            <div class="stapel" style="margin-top:6px">
+              <div class="aufg"><div class="oben"><span class="cb"></span><span class="ttl">Benutzerkonto und dienstliche E-Mail-Adresse anlegen</span></div><div class="meta"><span class="abt-badge mark">IT-Abteilung</span><span class="mark">Fällig: 24.09.2026</span></div></div>
+              <div class="aufg"><div class="oben"><span class="cb"></span><span class="ttl">Schlüssel/Transponder bestellen</span></div><div class="meta"><span class="abt-badge">Verwaltung / Sekretariat</span><span>Fällig: 24.09.2026</span></div></div>
+            </div>
+            <span class="anno gut">Etiketten mit echtem Namen, Fälligkeiten ab Vertragsbeginn. Die Vorschau zeigt vor dem Versand, wer etwas bekommt und wer nicht.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="paar">
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Solange die Modalitäten fehlen</div>
+          <div class="fenster-rumpf">
+            <div class="abt-karte">
+              <div class="abt-kopf"><div class="kartentitel">Aufgaben für Abteilungen</div><span class="knopf gruen klein gesperrt">Abteilungen informieren…</span></div>
+              <div class="gelbkasten">Die Einstellungsmodalitäten sind noch nicht eingereicht. Erst mit ihnen steht der Vertragsbeginn fest, nach dem sich die Fälligkeiten richten. Danach lassen sich die Abteilungen informieren.</div>
+              <div class="abt-zeile"><div class="oben"><span class="abt-badge">IT-Abteilung</span><span class="adresse">it@credo-gruppe.de · 3 Aufgaben</span></div></div>
+              <div class="abt-zeile"><div class="oben"><span class="abt-badge">Verwaltung / Sekretariat</span><span class="adresse">sekretariat@example.org · 2 Aufgaben</span></div></div>
+            </div>
+            <span class="anno info">Entschieden: Ohne eingereichte Modalitäten (etwa beim Ehrenamt) bleibt der Knopf gesperrt. Ein Ersatzdatum gibt es nicht.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Nach dem Versand</div>
+          <div class="fenster-rumpf">
+            <div class="abt-karte">
+              <div class="abt-kopf"><div class="kartentitel">Aufgaben für Abteilungen</div><span class="pill p-grau">Abteilungen: 1 von 3 fertig</span></div>
+              <div class="abt-zeile">
+                <div class="oben"><span class="abt-badge">IT-Abteilung</span><span class="adresse">3 Aufgaben, 1 offen</span><span class="rechts"><span class="pill p-blau">Geöffnet (2×), zuletzt 25.09.2026</span></span></div>
+                <div class="unten">Link gültig bis 30.12.2026 · keine Erinnerung</div>
+              </div>
+              <div class="abt-zeile"><div class="oben"><span class="abt-badge">Verwaltung / Sekretariat</span><span class="adresse">2 Aufgaben</span><span class="rechts"><span class="pill p-ok">Erledigt am 26.09.2026</span></span></div></div>
+              <div class="abt-zeile"><div class="oben"><span class="abt-badge">Führungskraft</span><span class="adresse">3 Aufgaben, 3 offen</span><span class="rechts"><span class="pill p-gelb">Informiert am 23.09.2026</span></span></div></div>
+            </div>
+            <div class="aufg" style="margin-top:8px">
+              <div class="oben"><span class="cb ok">✓</span><span class="ttl durch">Benutzerkonto und dienstliche E-Mail-Adresse anlegen</span></div>
+              <div class="meta"><span class="abt-badge">IT-Abteilung</span><span>Fällig: 24.09.2026</span><span>erledigt von IT-Abteilung (Link) am 25.09.2026, 09:12</span></div>
+              <div class="kom-box">Kommentar IT-Abteilung, 25.09.2026: Konto angelegt, Zugangsdaten liegen im Sekretariat.</div>
+            </div>
+            <span class="anno info">Aktionen wie im Offboarding: Erinnern, Erneut senden, Link kopieren, Link erneuern. Der Stepper in der Übersicht zeigt „Abteilungen: 1 von 3 fertig“.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Der Dialog vor dem Versand und die Mail an die Abteilung</h3>
+      <div class="paar">
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Dialog „Abteilungen informieren“</div>
+          <div class="fenster-rumpf weiss">
+            <div class="dialog">
+              <div class="dialog-kopf"><div><div class="t">Abteilungen informieren</div><div class="s">Folgende Stellen erhalten eine E-Mail mit einem Link zu ihren Aufgaben. Der Link funktioniert ohne Anmeldung und ist gültig bis 30.12.2026.</div></div></div>
+              <div class="dialog-rumpf">
+                <div class="empf-block"><div class="k">IT-Abteilung – it@credo-gruppe.de</div><ul><li>Benutzerkonto und dienstliche E-Mail-Adresse anlegen – fällig 24.09.2026</li><li>Zugänge zu Fachanwendungen einrichten – fällig 28.09.2026</li><li>Arbeitsplatz/Endgerät einrichten, Zugangsdaten übergeben – fällig 01.10.2026</li></ul></div>
+                <div class="empf-block"><div class="k">Verwaltung / Sekretariat – sekretariat@example.org</div><ul><li>Schlüssel/Transponder bestellen – fällig 24.09.2026</li><li>Postfach, Namensschild und Telefonliste vorbereiten – fällig 28.09.2026</li></ul></div>
+                <div class="empf-block"><div class="k">Führungskraft – a.leitung@example.org</div><ul><li>Einarbeitungspatin/-paten benennen – fällig 24.09.2026</li><li>…und 2 weitere</li></ul></div>
+                <div class="st-info"><b>Was die Empfänger sehen:</b> Name, Einrichtung, Vorgangsnummer und Vertragsbeginn sowie ihre eigenen Aufgaben. Die IT-Abteilung sieht zusätzlich Stellenbezeichnung, Betriebsstätte und die Adresse der Führungskraft. Keine Angaben aus dem Personalfragebogen.</div>
+                <div class="gelbkasten"><b>Nicht informiert werden:</b> Datenschutzbeauftragte/r – keine aktive Adresse hinterlegt.</div>
+              </div>
+              <div class="dialog-fuss"><span class="knopf rand">Abbrechen</span><span class="knopf gruen">3 E-Mails senden</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Mail an die IT-Abteilung</div>
+          <div class="fenster-rumpf">
+            <div class="mailkopfzeilen">An: it@credo-gruppe.de<br>Betreff: <b>Onboarding-Aufgaben für IT-Abteilung: Dienstbeginn 01.10.2026 (FES Minden)</b></div>
+            <div class="mail"><div class="mail-innen">
+              <div class="mail-kopf"><div class="t">CREDO HR-Portal</div><div class="s">FES Minden</div></div>
+              <div class="mail-rumpf">
+                <p><b>Aufgaben zum Dienstbeginn</b></p>
+                <p>Guten Tag, bitte bereiten Sie den Dienstbeginn für Anna Beispiel am 01.10.2026 in FES Minden vor. Für die IT-Abteilung sind folgende Aufgaben vorgesehen:</p>
+                <div class="mail-anhang">• Benutzerkonto und dienstliche E-Mail-Adresse anlegen – fällig 24.09.2026<br><span style="color:#8a8a8a">Konto in der Schulverwaltung und in Microsoft 365; Zugangsdaten an die Führungskraft.</span><br>• Zugänge zu Fachanwendungen einrichten – fällig 28.09.2026<br>• Arbeitsplatz/Endgerät einrichten, Zugangsdaten übergeben – fällig 01.10.2026</div>
+                <p style="font-size:11px">Vertragsbeginn: 01.10.2026 · Vorgangsnummer: ONB-2026-031<br>Stellenbezeichnung: Lehrkraft Sek. I · Betriebsstätte: Minden, Hauptstandort<br>Ansprechpartner (Führungskraft): a.leitung@example.org</p>
+                <p><span class="knopf blau">Aufgaben öffnen und abhaken →</span></p>
+                <p style="font-size:10.5px;color:#8a8a8a">Der Link funktioniert ohne Anmeldung und ist bis 30.12.2026 gültig. Bitte geben Sie ihn nur innerhalb Ihrer Abteilung weiter. Rückfragen beantwortet die Personalabteilung.</p>
+              </div>
+              <div class="mail-fuss">Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.</div>
+            </div></div>
+            <span class="anno info">Ohne bekannten Namen steht „die neue Mitarbeiterin / den neuen Mitarbeiter“, nie eine E-Mail-Adresse. Die Buchhaltung bekäme die Zeilen zu Stelle, Betriebsstätte und Führungskraft nicht.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Die Seite, die die Abteilung öffnet</h3>
+      <p>Offboarding und Onboarding teilen sich künftig eine Seite. Links das heutige Offboarding, rechts das neue Onboarding.</p>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> /offboarding-tasks/… (Offboarding, IT)</div>
+          <div class="fenster-rumpf">
+            <div class="oeff-kopf"><span><span class="logo">CREDO</span> <b style="font-size:11px">HR-Portal</b> <span class="ui-hinweistext">Offboarding</span></span><span class="pille">1 / 2 erledigt</span></div>
+            <div class="oeff-rumpf">
+              <b>Offboarding-Aufgaben: IT-Abteilung</b>
+              <div class="info-raster"><div><span class="l">Mitarbeiter</span>Thomas Muster</div><div><span class="l">Countdown</span><span style="color:#b3001a">3 Tage überfällig</span></div></div>
+              <div class="zeile-klein">Gesamtfortschritt 50 %</div>
+              <div class="aufg"><div class="oben"><span class="cb"></span><span class="ttl">IT-Zugänge und E-Mail-Konto sperren</span></div><div class="hinw"><u>Kommentar hinzufügen</u></div><div class="hinw"><span class="ui-input" style="display:block">Konto gesperrt, Postfach weitergeleitet.</span></div></div>
+              <div class="ui-hinweistext">© 2027 Christlicher Schulverein Minden e.V.</div>
+            </div>
+            <span class="anno">Der getippte Kommentar geht beim Abhaken verloren. „Gesamtfortschritt“ meint nur die eigene Abteilung. Die Fußzeile nennt für alle 16 Mandanten denselben Träger.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> /onboarding-tasks/… (Onboarding, IT)</div>
+          <div class="fenster-rumpf">
+            <div class="oeff-kopf"><span><span class="logo">CREDO</span> <b style="font-size:11px">HR-Portal</b> <span class="ui-hinweistext">Onboarding</span></span><span class="pille">1 / 3 erledigt</span></div>
+            <div class="oeff-rumpf">
+              <b>Onboarding-Aufgaben: IT-Abteilung</b>
+              <div class="info-raster">
+                <div><span class="l">Neue Mitarbeiterin / neuer Mitarbeiter</span>Anna Beispiel</div>
+                <div><span class="l">Einrichtung</span>FES Minden</div>
+                <div><span class="l">Vertragsbeginn</span>01.10.2026</div>
+                <div><span class="l">Bis zum Dienstbeginn</span>Noch 9 Tage</div>
+                <div class="voll"><span class="l">Nur für die IT</span>Lehrkraft Sek. I · Minden, Hauptstandort · Führungskraft a.leitung@example.org</div>
+              </div>
+              <div class="zeile-klein"><span class="mark">Fortschritt Ihrer Aufgaben</span> 33 %</div>
+              <div class="kategorie">Vor Arbeitsbeginn</div>
+              <div class="aufg">
+                <div class="oben"><span class="cb"></span><span class="ttl">Zugänge zu Fachanwendungen einrichten</span><span class="rechts pill p-blau">Fällig 28.09.2026</span></div>
+                <div class="hinw">Schulverwaltung, Lernplattform, Zeiterfassung</div>
+                <div class="hinw"><span class="ui-input wert" style="display:block">Lernplattform folgt, Lizenz ist bestellt.</span></div>
+                <div class="hinw"><span class="knopf rand klein">Kommentar speichern</span> <span class="ui-hinweistext">Sichtbar für die Personalabteilung, höchstens 1000 Zeichen.</span></div>
+              </div>
+              <div class="aufg">
+                <div class="oben"><span class="cb ok">✓</span><span class="ttl durch">Benutzerkonto und dienstliche E-Mail-Adresse anlegen</span></div>
+                <div class="hinw">Erledigt am 25.09.2026, 09:12 · <span class="mark">Ihr Kommentar: Konto angelegt, Zugangsdaten liegen im Sekretariat.</span> <u>Kommentar ändern</u></div>
+              </div>
+              <div class="ui-hinweistext">Dieser Link ist für Ihre Abteilung bestimmt und gültig bis 30.12.2026. Bitte nicht außerhalb Ihrer Abteilung weitergeben.<br><span class="mark">© 2026 FES Minden</span></div>
+            </div>
+            <span class="anno gut">Kommentar kommt an und bleibt stehen, auch beim Wiederöffnen. Kategorien, Hinweise aus der Vorlage und die richtige Einrichtung in der Fußzeile. Nach dem Abschluss ist die Seite nur lesbar.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Checklisten-Vorlagen: Zuständigkeit und Fälligkeit</h3>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Checklisten-Vorlagen → Punkt bearbeiten (Onboarding)</div>
+          <div class="fenster-rumpf">
+            <div class="zweispaltig">
+              <div class="ui-feld"><span class="ui-label">Titel <span class="stern">*</span></span><span class="ui-input wert">Schlüssel/Ausweis bestellt</span></div>
+              <div class="ui-feld"><span class="ui-label">Kategorie <span class="stern">*</span></span><span class="ui-input wert">Vor Arbeitsbeginn</span></div>
+              <div class="ui-feld"><span class="ui-label">Fälligkeitstage (z.B. -7)</span><span class="ui-input wert">-3</span></div>
+              <div class="ui-feld"><span class="ui-label">Verantwortlicher (z.B. HR, IT)</span><span class="ui-input wert">Verwaltung</span></div>
+            </div>
+            <span class="anno">Die Zuständigkeit ist Freitext. „Verwaltung“, „Sekretariat“ und „Verw.“ wären drei verschiedene Stellen. Die Fälligkeit wird zwar gespeichert, im Vorgang aber nie genutzt. Beim Speichern löscht die Seite alle Punkte und legt sie neu an, ohne auf Fehler zu prüfen.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Checklisten-Vorlagen → Punkt bearbeiten (Onboarding)</div>
+          <div class="fenster-rumpf">
+            <div class="zweispaltig">
+              <div class="ui-feld"><span class="ui-label">Titel <span class="stern">*</span></span><span class="ui-input wert">Schlüssel/Transponder bestellen</span></div>
+              <div class="ui-feld"><span class="ui-label">Kategorie <span class="stern">*</span></span><span class="ui-input wert">Vor Arbeitsbeginn</span></div>
+              <div class="ui-feld"><span class="ui-label"><span class="mark">Fällig (Tage)</span></span><span class="ui-input wert">-7</span><span class="ui-hinweistext">relativ zum Vertragsbeginn (−7 = eine Woche vorher, 0 = am Vertragsbeginn)</span></div>
+              <div class="ui-feld"><span class="ui-label"><span class="mark">Zuständig</span></span><span class="ui-input wert">Verwaltung / Sekretariat · per Link ▾</span><span class="ui-hinweistext">Im Portal: Personalabteilung, Mitarbeiter/in · Per Link: IT, Verwaltung, Facility, Buchhaltung, Datenschutz, Führungskraft des Vorgangs</span></div>
+            </div>
+            <div class="ui-feld" style="margin-top:8px"><span class="ui-label"><span class="mark">Hinweis für die zuständige Stelle (optional)</span></span><span class="ui-input wert">Transponder für Haupteingang und Lehrerzimmer</span><span class="ui-zaehler">48 / 500</span></div>
+            <span class="anno gut">Auswahlliste statt Freitext, alte Freitexte werden einmalig umgestellt. Unbekannte Altwerte erscheinen als „Unbekannt: … (bitte zuordnen)“. Gespeichert wird in einem Schritt, der ganz oder gar nicht gelingt.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Wer sieht was</h3>
+      <p>Der Link funktioniert ohne Anmeldung, und die Mail ist ein offener Kanal. Deshalb bekommt jede Stelle nur, was sie für ihre Aufgabe braucht.</p>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Empfänger</th><th>Sieht zusätzlich zu Name, Einrichtung, Vorgangsnummer, Vertragsbeginn und den eigenen Aufgaben</th></tr></thead>
+          <tbody>
+            <tr><td>IT-Abteilung</td><td>Stellenbezeichnung, Betriebsstätte, Adresse der Führungskraft</td></tr>
+            <tr><td>Verwaltung / Sekretariat, Facility Management</td><td>Betriebsstätte, Adresse der Führungskraft</td></tr>
+            <tr><td>Datenschutzbeauftragte/r</td><td>Stellenbezeichnung</td></tr>
+            <tr><td>Führungskraft</td><td>Stellenbezeichnung, Betriebsstätte</td></tr>
+            <tr><td>Buchhaltung, eigene Abteilungen</td><td>nichts</td></tr>
+            <tr><td><strong>Niemand</strong></td><td>private E-Mail-Adresse, Anschrift, Geburtsdatum, IBAN, SV-Nummer, Steuer-ID, Kinder, Krankenkasse, Aufenthaltstitel, Masernschutz, Gehalt, Kostenstellen, interne Notizen, Fortschritt anderer Abteilungen</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Die Regeln danach</h3>
+      <ul>
+        <li><strong>Auslöser ist nur der Knopf</strong> von HR (Super-Admin, HR-Leitung, HR-Sachbearbeitung). Mandant und Vorgangsstatus prüft jede Route selbst. Ein fremder Vorgang bekommt dieselbe Meldung wie ein unbekannter.</li>
+        <li><strong>Fälligkeiten werden einmal berechnet:</strong> Vertragsbeginn plus die Tage aus der Vorlage. Punkte ohne Tagesangabe bleiben ohne Fälligkeit und lösen keine Erinnerung aus. Nach der Abgabe ändert sich der Vertragsbeginn nicht mehr, deshalb muss nichts nachgerechnet werden.</li>
+        <li><strong>Empfänger:</strong> „Führungskraft“ geht immer an die Adresse aus dem Vorgang, also an die, die auch den Modalitäten-Link bekam. Alle anderen gehen an die Adresse aus Einstellungen → Abteilungen, wobei die Einrichtung Vorrang vor „Zentral“ hat. Personalabteilung und Mitarbeitende bekommen nie einen Link.</li>
+        <li><strong>Nach dem Abschluss</strong> ist der Link nur lesbar, und die Erinnerungen enden. Steht der Vorgang auf „Abgelaufen“, zeigt der Link „Dieser Vorgang ist nicht mehr aktiv. Bitte keine weiteren Schritte unternehmen.“</li>
+        <li><strong>Offene Abteilungsaufgaben blockieren den Abschluss nicht.</strong> Das ist schon heute so. Der Stepper weist darauf hin.</li>
+        <li>Alles Übrige gilt wie im reparierten Offboarding: Links bleiben gültig, Nachweis nur bei echtem Versand, Mails nur bei echtem Wechsel, Erinnerungsregeln, Kommentar maskiert.</li>
+      </ul>
+
+      <h3>So setze ich es um</h3>
+      <ul>
+        <li><strong>Datenbank rein additiv:</strong> Die Link-Tabelle aus Paket 1b bekommt die Verbindung zum Onboarding-Vorgang. Die Onboarding-Aufgabe bekommt Hinweis, Tagesangabe und Kommentar der Abteilung, der Vorlagenpunkt einen Hinweis.</li>
+        <li><strong>Einmalige Datenmigration</strong> in <code>prisma/seed-check.js</code>: Freitext-Zuständigkeiten der Onboarding-Vorlagen und der laufenden Vorgänge werden auf feste Schlüssel umgestellt, etwa „Vorgesetzter“ auf die Führungskraft. Merker und Änderung laufen in einer Transaktion. Unbekannte Texte bleiben stehen und werden gemeldet.</li>
+        <li><strong>Ein Name für jede Stelle:</strong> Überall, wo heute der rohe Text steht (Tab, Stepper, PDF-Export), erscheint die Bezeichnung „IT-Abteilung“, „Führungskraft“ und so weiter.</li>
+        <li><strong>Neue Routen</strong> für Vorschau und Versand im Vorgang sowie für die öffentliche Seite, mit eigenem Datenzuschnitt. Sie nutzen bewusst nicht die Detailroute, die IBAN und SV-Nummer entschlüsselt.</li>
+        <li><strong>Erinnerungen</strong> hängen am bestehenden täglichen Lauf <code>/api/cron/reminders</code>, ein neuer n8n-Schritt ist nicht nötig.</li>
+        <li><strong>Checklisten-Editor:</strong> Speichern in einem Schritt statt „alles löschen, neu anlegen“. Erst danach prüft der Server Zuständigkeit und Hinweis, sonst gingen Punkte mit unbekanntem Altwert still verloren.</li>
+        <li><strong>Vier neue Mailvorlagen</strong> in der Gruppe Onboarding (Abschnitt 7 B), dazu Beispieldaten für den Testversand.</li>
+        <li><strong>Tests</strong> für Fälligkeit, Empfänger, Datenzuschnitt, Migration, Mails und Erinnerungen, dazu Handbuch und <code>CLAUDE.md</code>.</li>
+      </ul>
+      <div class="kasten hinweis">
+        <strong class="t">Ohne Pflege durch HR bewirkt der Knopf nichts</strong>
+        <p>Die Checklisten-Vorlagen in der Produktion sind Daten von HR. Die Migration stellt nur die Zuständigkeiten um. Neue Punkte wie „Datenschutz-Unterweisung“, Tagesangaben und Hinweise trägt HR einmalig unter Checklisten-Vorlagen ein. Einen Vorschlag für die Standard-Einstellung lege ich bei. Für Erzieher, Beamte und Ehrenamt gibt es heute keine Onboarding-Vorlage; dort sagt die Karte das.</p>
+      </div>
+      <p><span class="aufwand">Aufwand 8–9 Tage</span> <span class="ui-hinweistext" style="margin-left:6px">setzt Paket 1b voraus; dazu etwa 1–2 Stunden Pflege der Vorlagen und Adressen durch HR</span></p>
+    </section>
+
+    <!-- ================= 7 MAILS UND VORLAGEN ================= -->
     <section class="abschnitt" id="mails">
-      <div class="abschnitt-titel"><span class="nr">5</span><h2>Alle E-Mails und Vorlagen im Überblick</h2></div>
-      <p>Die vier Pakete berühren an vielen Stellen E-Mails, Mailvorlagen und Word-Vorlagen. Hier steht alles an einem Ort: was sich an bestehenden Vorlagen ändert, was neu hinzukommt, was bewusst gleich bleibt und wo ein Handschritt nötig ist.</p>
+      <div class="abschnitt-titel"><span class="nr">7</span><h2>Alle E-Mails und Vorlagen im Überblick</h2></div>
+      <p>Die Pakete berühren an vielen Stellen E-Mails, Mailvorlagen und Word-Vorlagen. Hier steht alles an einem Ort: was sich an bestehenden Vorlagen ändert, was neu hinzukommt, was bewusst gleich bleibt und wo ein Handschritt nötig ist.</p>
 
       <div class="kasten warn">
         <strong class="t">Wichtig für alle geänderten Mailtexte</strong>
-        <p>Jede Mailvorlage hat einen Standardtext im Code. Sobald jemand eine Vorlage unter Einstellungen → E-Mail-Vorlagen einmal gespeichert hat, und sei es nur mit einem Empfänger in Kopie, gilt die gespeicherte Fassung. Textänderungen aus dem Code kommen dort dann nicht mehr an. Einen Knopf „Auf Standard zurücksetzen“ gibt es heute nicht. Deshalb schlage ich ihn als kleine Ergänzung vor (siehe unten). Bis dahin prüfe ich jede Vorlage aus Tabelle A vor dem Deploy und passe gespeicherte Fassungen von Hand an.</p>
+        <p>Jede Mailvorlage hat einen Standardtext im Code. Sobald jemand eine Vorlage unter Einstellungen → E-Mail-Vorlagen einmal gespeichert hat, und sei es nur mit einem Empfänger in Kopie, gilt die gespeicherte Fassung. Textänderungen aus dem Code kommen dort dann nicht mehr an. <strong>Seit Paket 1 gibt es dafür den Knopf „Text auf Standard zurücksetzen“.</strong> Er setzt Betreff und Text zurück; Empfänger und Aktiv-Schalter bleiben, der alte Text steht im Protokoll. Nach jedem Deploy setze ich damit die Vorlagen aus Tabelle A zurück, die als „weicht vom Standard ab“ markiert sind, es sei denn, HR hat den Text bewusst angepasst.</p>
       </div>
 
       <h3>A · Bestehende Mailvorlagen, die sich ändern</h3>
-      <p class="unterschrift" style="margin:0 0 6px">Namen wie in Einstellungen → E-Mail-Vorlagen, technischer Schlüssel in Klammern.</p>
+      <p class="unterschrift" style="margin:0 0 6px">Namen wie in Einstellungen → E-Mail-Vorlagen, technischer Schlüssel in Klammern. <strong>✓</strong> = mit Paket 1 umgesetzt (Commit 5a016ba), noch nicht deployt.</p>
       <div class="tabelle">
         <table>
           <thead><tr><th>Vorlage</th><th>Paket</th><th>Was sich ändert</th></tr></thead>
           <tbody>
-            <tr><td><strong>Einladung Vorgesetzter (Einstellungsmodalitäten)</strong><br><code>supervisor-link-created</code></td><td class="num">1, 2</td><td>„Stellenbeschreibung“ wird „Stellenbezeichnung“. Kann schon beim Anlegen des Vorgangs verschickt werden. Nennt den Namen aus „Neuer Vorgang“, nicht mehr die private E-Mail-Adresse der Person.</td></tr>
-            <tr><td><strong>Einladung Vorgesetzter (Vertragsverlängerung)</strong><br><code>contract-end-supervisor-link</code></td><td class="num">1</td><td>„Stellenbeschreibung“ wird „Stellenbezeichnung“. Außerdem stimmt der Satz „Da der/die Mitarbeiter:in weiterbeschäftigt werden soll …“ nicht mehr, seit die Führungskraft selbst über die Übernahme entscheidet. Er wird neutral formuliert.</td></tr>
-            <tr><td><strong>Erinnerung Vorgesetzter (Modalitäten ausstehend)</strong><br><code>supervisor-reminder</code></td><td class="num">1</td><td>Der Link darin führt heute auf eine Seite, die es nicht gibt (Fehler 404), und wird korrigiert. Künftig kommt die Erinnerung auch, solange der Fragebogen offen ist, erstmals 7 Tage nach dem Link. Umlaut im Betreff.</td></tr>
-            <tr><td><strong>Erinnerung Mitarbeiter (Fragebogen ausstehend)</strong><br><code>employee-reminder</code></td><td class="num">1</td><td>Wird nicht mehr verschickt, wenn der Link schon abgelaufen ist.</td></tr>
-            <tr><td><strong>Einladung Mitarbeiter (Personalfragebogen)</strong><br><code>onboarding-created</code></td><td class="num">2</td><td>Die Anrede „Herzlich willkommen, {{vorname}}!“ läuft heute ins Leere („Herzlich willkommen, !“), weil beim Anlegen kein Name bekannt ist. Künftig steht dort der Name aus „Neuer Vorgang“, ohne Namen „Herzlich willkommen!“.</td></tr>
+            <tr><td><strong>Einladung Vorgesetzter (Einstellungsmodalitäten)</strong><br><code>supervisor-link-created</code></td><td class="num">1 ✓</td><td>„Stellenbeschreibung“ wird „Stellenbezeichnung“. Kann schon beim Anlegen des Vorgangs verschickt werden. Nennt den Namen aus „Neuer Vorgang“, nicht mehr die private E-Mail-Adresse der Person; ohne Namen „die neue Mitarbeiterin / den neuen Mitarbeiter“. Neuer Fristkasten „Bitte ausfüllen bis“.</td></tr>
+            <tr><td><strong>Einladung Vorgesetzter (Vertragsverlängerung)</strong><br><code>contract-end-supervisor-link</code></td><td class="num">1 ✓</td><td>„Stellenbeschreibung“ wird „Stellenbezeichnung“. Außerdem stimmt der Satz „Da der/die Mitarbeiter:in weiterbeschäftigt werden soll …“ nicht mehr, seit die Führungskraft selbst über die Übernahme entscheidet. Er wird neutral formuliert.</td></tr>
+            <tr><td><strong>Erinnerung Vorgesetzter (Modalitäten ausstehend)</strong><br><code>supervisor-reminder</code></td><td class="num">1 ✓</td><td>Der Link darin führt heute auf eine Seite, die es nicht gibt (Fehler 404), und wird korrigiert. Künftig kommt die Erinnerung auch, solange der Fragebogen offen ist, erstmals 7 Tage nach dem Link. Umlaut im Betreff.</td></tr>
+            <tr><td><strong>Erinnerung Mitarbeiter (Fragebogen ausstehend)</strong><br><code>employee-reminder</code></td><td class="num">1 ✓</td><td>Wird nicht mehr verschickt, wenn der Link schon abgelaufen ist.</td></tr>
+            <tr><td><strong>Einladung Mitarbeiter (Personalfragebogen)</strong><br><code>onboarding-created</code></td><td class="num">1 ✓</td><td>Die Anrede „Herzlich willkommen, {{vorname}}!“ läuft heute ins Leere („Herzlich willkommen, !“), weil beim Anlegen kein Name bekannt ist. Künftig steht dort der Name aus „Neuer Vorgang“, ohne Namen „Herzlich willkommen!“.</td></tr>
             <tr><td><strong>Fragebogen eingereicht (HR-Benachrichtigung)</strong><br><code>questionnaire-completed</code></td><td class="num">2</td><td>Die Vorgangsnummer im Betreff bleibt heute leer. Künftig stehen Vorgangsnummer und Name darin. Neuer Satz: ob die Modalitäten schon vorliegen, und wenn ja, „Der Vorgang ist bereit zur Prüfung“.</td></tr>
             <tr><td><strong>Einstellungsmodalitäten eingereicht (HR-Benachrichtigung)</strong><br><code>supervisor-completed</code></td><td class="num">2</td><td>„Alle Daten eingegangen … Der Vorgang kann jetzt abgeschlossen werden“ ist falsch, wenn der Fragebogen noch fehlt. Wird neutral, „bereit zur Prüfung“ nur, wenn beides da ist. Vorgangsnummer im Betreff.</td></tr>
             <tr><td><strong>Eingangsbestätigung Mitarbeiter (Fragebogen eingereicht)</strong><br><code>questionnaire-confirmation-employee</code></td><td class="num">2</td><td>Geht heute am normalen Versandweg vorbei: kein Eintrag im Versandprotokoll, und Deaktivieren, Empfänger und Antwortadresse aus den Einstellungen wirken nicht. Läuft künftig über den normalen Weg. Der Text bleibt.</td></tr>
             <tr><td><strong>Alle Vorlagen</strong></td><td class="num">3</td><td>Fehlerbehebung im Mail-Baustein: Ein Dollarzeichen im Freitext (z. B. „5$'“) kopiert heute Teile der Vorlage in die Mail.</td></tr>
+            <tr><td><strong>Offboarding abgeschlossen</strong><br><code>offboarding-completed</code></td><td class="num">1 ✓</td><td>Der Satz „Alle Aufgaben sind erledigt“ entfällt, er stimmte oft nicht. Waren beim Abschluss noch Aufgaben offen, nennt ein Hinweis deren Anzahl: „Beim Abschluss waren noch 2 Aufgabe(n) der Checkliste offen. Bitte prüfen Sie im Vorgang, ob sie noch erledigt werden müssen.“</td></tr>
+            <tr><td><strong>Offboarding-Aufgaben für Abteilung zugewiesen</strong><br><code>offboarding-department-assigned</code></td><td class="num">1b</td><td>Nennt die Aufgaben mit Fälligkeit und das Gültigkeitsdatum des Links. Passt auch für die Führungskraft, weil „Ihrer Abteilung“ entfällt. Beim erneuten Senden steht der Satz „Diese Nachricht wurde erneut gesendet. Der Link ist unverändert.“ Alle bisherigen Datenfelder bleiben für Webhooks erhalten.</td></tr>
+            <tr><td><strong>Erinnerung: Offene Offboarding-Aufgaben</strong><br><code>offboarding-reminder</code></td><td class="num">1b</td><td>Nennt die offenen Aufgaben. Bei Überfälligkeit steht ein eigener Absatz („2 Aufgabe(n) sind überfällig, die älteste seit 3 Tag(en) …“). Knopf und täglicher Lauf senden künftig dieselbe Fassung.</td></tr>
+            <tr><td><strong>Offboarding-Aufgabe erledigt</strong><br><code>offboarding-task-completed</code></td><td class="num">1b</td><td>Enthält den Kommentar der Abteilung und „Erledigt über: Link der Abteilung“. Kommt genau einmal je Aufgabe, nicht bei jedem Speichern. Das eigene Häkchen von HR im Portal löst sie nur noch bei Aufgaben einer Link-Abteilung aus. Wie bisher geht sie nur hinaus, wenn in der Vorlage ein HR-Empfänger steht.</td></tr>
+            <tr><td><strong>Offboarding: Abteilung abgeschlossen (Bestätigung)</strong><br><code>offboarding-department-completed</code></td><td class="num">1b</td><td>Der Text bleibt, er kommt aber genau einmal, beim echten Abschluss der Abteilung. Deshalb ist hier kein Zurücksetzen nötig.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1343,9 +1837,14 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
             <tr><td><strong>Unterlage zurückgewiesen</strong> (Unterlagen)</td><td>Person des Vorgangs</td><td>HR weist eine Unterlage zurück</td><td class="num">4</td></tr>
             <tr><td><strong>Unterlagen vollständig eingegangen</strong> (Unterlagen)</td><td>anfordernde HR-Person, Kopie an das zentrale HR-Postfach</td><td>alle Unterlagen übermittelt</td><td class="num">4</td></tr>
             <tr><td><strong>Frist für Unterlagen verstrichen</strong> (Unterlagen)</td><td>anfordernde HR-Person, Kopie an das zentrale HR-Postfach</td><td>einmal nach Fristende</td><td class="num">4</td></tr>
+            <tr><td><strong>Onboarding-Aufgaben für Abteilung zugewiesen</strong> (Onboarding)</td><td>Abteilung bzw. Führungskraft</td><td>„Abteilungen informieren…“, „Erneut senden“, „Link erneuern…“</td><td class="num">5</td></tr>
+            <tr><td><strong>Erinnerung: Offene Onboarding-Aufgaben</strong> (Onboarding)</td><td>Abteilung bzw. Führungskraft</td><td>täglicher Lauf und Knopf „Erinnern“; mit eigenem Absatz bei Überfälligkeit</td><td class="num">5</td></tr>
+            <tr><td><strong>Onboarding-Aufgabe erledigt</strong> (Onboarding)</td><td>HR, Empfänger in der Vorlage eintragen, sonst wird nichts versendet</td><td>eine Abteilung hakt eine Aufgabe über den Link ab; mit ihrem Kommentar</td><td class="num">5</td></tr>
+            <tr><td><strong>Onboarding: Abteilung abgeschlossen (Bestätigung)</strong> (Onboarding)</td><td>Abteilung; HR optional in Kopie</td><td>einmal, wenn die letzte Aufgabe einer Abteilung erledigt ist</td><td class="num">5</td></tr>
           </tbody>
         </table>
       </div>
+      <p class="unterschrift" style="margin:-6px 0 12px">Die vier Onboarding-Vorlagen haben eigene Texte („Dienstbeginn“ statt „Austrittsdatum“) und laufen wie alle Mails zuerst per SMTP, Webhooks nur zusätzlich. In keiner steht die private Adresse der Person.</p>
       <ul>
         <li><strong>Einheitlich für alle neuen Vorlagen:</strong>
           <ul>
@@ -1391,7 +1890,7 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
             <div class="tabs"><span>Versand-Status</span><span class="aktiv">E-Mail-Vorlagen</span><span>Versandprotokoll</span><span>SMTP</span><span>Webhooks</span></div>
             <div class="abgrenzung">Onboarding</div>
             <div class="stapel" style="margin-top:5px">
-              <div class="pos"><div class="pos-kopf"><b>Einladung Vorgesetzter (Einstellungsmodalitäten)</b><span class="pill p-entf">Angepasst</span></div><div class="klein">Gespeichert am 03.07.2026 · <span class="mark">Der Standardtext wurde seitdem geändert.</span></div><div class="aktionen"><span class="knopf rand klein mark-block">Auf Standard zurücksetzen</span></div></div>
+              <div class="pos"><div class="pos-kopf"><b>Einladung Vorgesetzter (Einstellungsmodalitäten)</b><span class="pill p-entf">Angepasst</span></div><div class="klein">Gespeichert am 03.07.2026 · <span class="mark">Der Standardtext wurde seitdem geändert.</span></div><div class="aktionen"><span class="knopf rand klein mark-block">Text auf Standard zurücksetzen</span></div></div>
             </div>
             <div class="abgrenzung" style="margin-top:8px"><span class="mark">Allgemein</span></div>
             <div class="pos" style="margin-top:5px"><div class="pos-kopf"><b>Individuelle E-Mail aus einem Vorgang</b><span class="pill p-ok">Standard-Vorlage</span></div></div>
@@ -1407,35 +1906,38 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
         </div>
       </div>
       <ul>
-        <li><strong>„Auf Standard zurücksetzen“ (Vorschlag, etwa 0,5 Tage, in Paket 1).</strong> Das Portal löscht die gespeicherte Fassung einer Vorlage, danach gilt wieder der Standardtext. Ein Hinweis zeigt an, wenn sich der Standard seit dem Speichern geändert hat. Damit kommen die Änderungen aus Tabelle A per Klick an, ohne Abtippen und ohne Datenbankzugriff. Die Aktion wird protokolliert.</li>
-        <li><strong>Reiter „Webhooks“ und Filter im Versandprotokoll:</strong> Die Ereignisliste dort ist fest einprogrammiert und schon heute veraltet (über ein Dutzend Ereignisse fehlen). Ich leite sie künftig aus dem Katalog ab, damit auch alle neuen Ereignisse erscheinen. Dazu zwei Hinweise: Die individuelle E-Mail löst bewusst keinen Webhook aus, weil sie Anhänge hat, und bei den Unterlagen-Mails geht der Upload-Link nicht an Webhooks.</li>
+        <li><strong>„Text auf Standard zurücksetzen“ (✓ mit Paket 1 umgesetzt).</strong> Setzt Betreff und Text einer gespeicherten Vorlage auf den Standard zurück. Empfänger und Aktiv-Schalter bleiben, der alte Text steht im Protokoll. Das Kennzeichen „weicht vom Standard ab“ zeigt, wo sich das lohnt.</li>
+        <li><strong>Reiter „Webhooks“ und Filter im Versandprotokoll (✓ mit Paket 1 umgesetzt):</strong> Die Ereignisliste wird aus dem Katalog abgeleitet, so erscheinen auch alle neuen Ereignisse, darunter die vier Onboarding-Ereignisse aus Paket 5. Die individuelle E-Mail löst bewusst keinen Webhook aus, weil sie Anhänge hat, und bei den Unterlagen-Mails geht der Upload-Link nicht an Webhooks.</li>
       </ul>
 
-      <h3>E · Bestehende Mailfehler außerhalb der vier Pakete</h3>
-      <p>Beim Durchsehen aufgefallen. Sie betreffen Vorlagen, die die Pakete nicht anfassen.</p>
+      <h3>E · Bestehende Mailfehler außerhalb der Pakete</h3>
+      <p>Beim Durchsehen aufgefallen und <strong>mit Paket 1 als Mail-Reparaturpaket behoben</strong> (✓, noch nicht deployt):</p>
       <ul>
-        <li><strong>Offboarding-Mails</strong> (Neuer Vorgang, Aufgaben für Abteilung, Aufgabe erledigt, Erinnerung, Abgeschlossen): Namen, Austrittsdatum, Abteilung und Aufgabe bleiben leer, weil Vorlage und gesendete Daten verschiedene Feldnamen benutzen. Der Link zu den Abteilungsaufgaben führt ins Leere.</li>
-        <li><strong>„Unterlagen zum Austritt“</strong> (Dokumentenpaket Offboarding): Das Austrittsdatum wird doppelt umgewandelt und erscheint als „Invalid Date“ oder mit vertauschtem Tag und Monat.</li>
-        <li><strong>„Verbeamtung: Fristen-Warnung“:</strong> Die Beispieldaten des Testversands passen nicht zu den echten Daten, und die Sammelmail kommt täglich, ohne die einzelnen Fristen zu nennen.</li>
+        <li><strong>Offboarding-Mails</strong> (Neuer Vorgang, Aufgaben für Abteilung, Aufgabe erledigt, Erinnerung, Abgeschlossen): Namen, Austrittsdatum, Abteilung und Aufgabe blieben leer, weil Vorlage und gesendete Daten verschiedene Feldnamen benutzten. Der Link zu den Abteilungsaufgaben führte ins Leere.</li>
+        <li><strong>„Unterlagen zum Austritt“</strong> (Dokumentenpaket Offboarding): Das Austrittsdatum erschien als „Invalid Date“ oder mit vertauschtem Tag und Monat.</li>
+        <li><strong>„Verbeamtung: Fristen-Warnung“:</strong> Die Sammelmail nennt jetzt die einzelnen Hinweise, die Beispieldaten passen zu den echten Daten.</li>
       </ul>
-      <p>Mein Vorschlag: ein kleines eigenes <strong>Mail-Reparaturpaket (etwa 1–1,5 Tage)</strong>, das sich gut an Paket 1 anhängen lässt.</p>
+      <div class="kasten kritik">
+        <strong class="t">Möglicher zweiter Absender: n8n</strong>
+        <p>Im Repository liegt ein älterer n8n-Workflow, der für die Offboarding-Ereignisse eigene Mails verschickt. In seiner Abschlussmail steht pauschal „Alle Abteilungen haben ihre Offboarding-Aufgaben erledigt“. Ist unter Einstellungen → Webhooks dafür ein Eintrag aktiv, kommen Mails doppelt, und der alte Satz bleibt in der Welt. Das prüfe ich vor dem Deploy (Abschnitt 8, Prüfung 4).</p>
+      </div>
     </section>
 
-    <!-- ================= ABLAUF ================= -->
+    <!-- ================= 8 ABLAUF ================= -->
     <section class="abschnitt" id="ablauf">
-      <div class="abschnitt-titel"><span class="nr">6</span><h2>Reihenfolge, Deploy und Handschritte</h2></div>
+      <div class="abschnitt-titel"><span class="nr">8</span><h2>Reihenfolge, Deploy und Handschritte</h2></div>
       <div class="pakete" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
-        <div class="paket">
-          <div class="ph">Paket 1 · zuerst</div>
+        <div class="paket" style="border-color:#c7e3a6;background:#f6faf1">
+          <div class="ph" style="color:var(--gruen)">Paket 1 · ✓ umgesetzt</div>
           <h5>Stellenbezeichnung + Entsperren</h5>
-          <ul><li>Änderung 1 komplett</li><li>Änderung 2, Stufe A: Links unabhängig, Reparatur der Altfälle, Erinnerungslink</li><li>„Auf Standard zurücksetzen“ für Mailvorlagen</li><li>optional: Mail-Reparaturpaket (+1–1,5 Tage)</li></ul>
-          <span class="aufwand">2–2,5 Tage</span>
+          <ul><li>Änderung 1 komplett</li><li>Änderung 2, Stufe A: Links unabhängig, Reparatur der Altfälle, Erinnerungslink</li><li>„Text auf Standard zurücksetzen“ für Mailvorlagen</li><li>Mail-Reparaturpaket</li><li>Neuer Vorgang mit Name und Führungskraft, beide Links beim Anlegen (nachgezogen am 22.09.)</li></ul>
+          <span class="aufwand">5a016ba + Nachtrag · nicht deployt</span>
         </div>
         <div class="paket">
           <div class="ph">Paket 2</div>
           <h5>HR-Übersicht + Neuer Vorgang</h5>
-          <ul><li>Paralleler Stepper, Chips, „Bereit zur Prüfung“</li><li>Name und Führungskraft beim Anlegen</li><li>Erinnerungen, HR-Mailtexte</li></ul>
-          <span class="aufwand">1,5–2 Tage</span>
+          <ul><li>Paralleler Stepper, Chips, „Bereit zur Prüfung“</li><li>Erinnerungen, HR-Mailtexte</li></ul>
+          <span class="aufwand">1–1,5 Tage</span>
         </div>
         <div class="paket">
           <div class="ph">Paket 3</div>
@@ -1449,23 +1951,34 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
           <ul><li>Stufe 1: Onboarding komplett inkl. täglichem Lauf</li><li>Stufe 2: übrige fünf Vorgänge, Listen-Spalte</li></ul>
           <span class="aufwand">19–21 Tage</span>
         </div>
+        <div class="paket">
+          <div class="ph">Paket 1b</div>
+          <h5>Abteilungsaufgaben Offboarding reparieren</h5>
+          <ul><li>Punkte 1–13 aus Abschnitt 5 (entschieden: alles)</li><li>Einstellungen → Abteilungen</li><li>Führungskraft im Offboarding</li></ul>
+          <span class="aufwand">etwa 6 Tage</span>
+        </div>
+        <div class="paket">
+          <div class="ph">Paket 5 · nach 1b</div>
+          <h5>Abteilungsaufgaben Onboarding</h5>
+          <ul><li>Karte, Dialog, öffentliche Seite</li><li>Checklisten-Editor, Migration</li><li>vier neue Mailvorlagen</li></ul>
+          <span class="aufwand">8–9 Tage</span>
+        </div>
       </div>
-      <p>Paket 1 kommt zuerst, weil Mitarbeitende heute festhängen. Paket 4 setzt Paket 1 voraus, weil der Fragebogen dann schreibgeschützt ist und die Nachforderung der einzige Weg zum Nachreichen wird. Pakete 3 und 4 hängen nicht voneinander ab, ihre Reihenfolge richtet sich nach Ihrer Priorität. Zusammen etwa 28–32 Arbeitstage, mit dem Mail-Reparaturpaket etwa 29–33.</p>
+      <p>Paket 1 ist umgesetzt, weil Mitarbeitende heute festhängen. Paket 4 setzt Paket 1 voraus, weil der Fragebogen dann schreibgeschützt ist und die Nachforderung der einzige Weg zum Nachreichen wird. Paket 5 setzt Paket 1b voraus. Die übrigen Pakete hängen nicht voneinander ab, ihre Reihenfolge richtet sich nach Ihrer Priorität. Mein Vorschlag: erst Paket 2, weil es Änderung 2 abrundet und kurz ist, dann 1b und 5, dann 3 und 4. Offen sind zusammen noch etwa 39–43 Arbeitstage.</p>
 
       <div class="kasten warn">
         <strong class="t">Der erste Deploy nimmt den ausstehenden Stand mit</strong>
         <p>Auf <code>main</code> liegen seit dem 07.09. neun Commits, die noch nicht auf dem Server sind: Formular-Validierung und die Rückmeldung des Personalbüros. Sie bringen Schemaänderungen (Kostenstellen, Aufenthaltstitel, Ablaufdaten) und eine Datenmigration mit. Paket 1 geht zusammen mit ihnen hinaus. Voraussetzung auf dem Server bleibt <code>./backups</code>, eingehängt und <code>sudo chown 1001 backups</code>.</p>
       </div>
 
-      <h3>Vor dem Deploy: drei Prüfungen auf dem Server (nur lesend)</h3>
+      <h3>Vor dem Deploy: Prüfungen auf dem Server (nur lesend)</h3>
+      <p class="unterschrift" style="margin:0 0 6px">Prüfung 1–3 vor dem Deploy von Paket 1, Prüfung 4 und 5 vor Paket 1b.</p>
       <details>
         <summary>1 · Welche Onboarding-Vorgänge hängen heute fest?</summary>
         <div>
           <p>Die Liste zeigt, welche Vorgänge die Reparatur anfasst und welche HR schon als geprüft markiert hat. Diese besprechen wir einzeln.</p>
-          <p>Besonders die Zeilen mit <code>link_abgelaufen = true</code>: Heute sind sie prüfbar, nach dem Deploy wartet die Prüfung auf die Modalitäten, und mit dem abgelaufenen Link kann die Führungskraft nichts mehr absenden. Ausweg ist ein neuer Link (Übersicht, Karte „Vorgesetzten-Link“ → „Neuen Link erzeugen“). Diese Fälle vorab mit HR klären.</p>
 <pre>SELECT "displayId", status, "submittedAt", "supervisorSubmittedAt",
-       "supervisorToken" IS NOT NULL AS link,
-       "supervisorTokenExpiresAt" &lt; now() AS link_abgelaufen
+       "supervisorToken" IS NOT NULL AS link
 FROM onboarding_processes
 WHERE ("submittedAt" IS NULL
        AND status IN ('SUBMITTED','SUPERVISOR_PENDING','SUPERVISOR_SUBMITTED','REVIEWED'))
@@ -1492,8 +2005,26 @@ GROUP BY o.status;</pre>
 WHERE event IN ('supervisor-link-created', 'contract-end-supervisor-link',
                 'supervisor-reminder', 'employee-reminder', 'onboarding-created',
                 'questionnaire-completed', 'supervisor-completed',
-                'questionnaire-confirmation-employee');</pre>
-          <p>Das sind alle bestehenden Vorlagen aus Abschnitt 5, Tabelle A. Jede Zeile hier bedeutet: Die Textänderung aus dem Code wirkt für dieses Event nicht. Dort setze ich die Vorlage mit „Auf Standard zurücksetzen“ zurück oder ändere sie von Hand, wenn HR den Text bewusst angepasst hat.</p>
+                'questionnaire-confirmation-employee', 'psi-deadline-warning')
+   OR event LIKE 'offboarding-%';</pre>
+          <p>Das sind die bestehenden Vorlagen aus Abschnitt 7, Tabelle A, dazu die Vorlagen aus dem Mail-Reparaturpaket (Offboarding, Fristen-Warnung Verbeamtung) und aus Paket 1b. Jede Zeile hier bedeutet: Die Textänderung aus dem Code wirkt für dieses Event nicht. Dort setze ich die Vorlage mit „Text auf Standard zurücksetzen“ zurück, es sei denn, HR hat den Text bewusst angepasst.</p>
+        </div>
+      </details>
+      <details>
+        <summary>4 · Sind Webhooks für Offboarding-Ereignisse aktiv (möglicher Doppelversand)?</summary>
+        <div>
+<pre>SELECT event, name, url, "isActive" FROM webhook_configs
+WHERE event LIKE 'offboarding-%' ORDER BY event;</pre>
+          <p>Zeigt ein aktiver Eintrag auf n8n, verschickt n8n womöglich eigene Mails, zusätzlich zu denen des Portals. Dann entscheiden wir, ob der Eintrag deaktiviert wird oder die Portal-Vorlage. Paket 1b wertet einen Versand über den Webhook bei deaktivierter Portal-Vorlage als „übergeben“, damit der Knopf nicht jedes Mal erneut feuert.</p>
+        </div>
+      </details>
+      <details>
+        <summary>5 · Welche Abteilungsadressen sind hinterlegt und aktiv?</summary>
+        <div>
+<pre>SELECT "departmentKey", "departmentName", email,
+       "organizationId" IS NULL AS zentral, "isActive"
+FROM department_configs ORDER BY "departmentKey";</pre>
+          <p>Aktive Platzhalter mit <code>@credo-gruppe.de</code> aus der Erstinstallation würden nach Paket 1b echte Mails erhalten. Einträge mit <code>VORGESETZTER</code>, <code>HR</code> oder <code>MITARBEITER</code> werden danach ignoriert und können gelöscht werden.</p>
         </div>
       </details>
 
@@ -1503,13 +2034,15 @@ WHERE event IN ('supervisor-link-created', 'contract-end-supervisor-link',
         <li>Gespeicherte Mailvorlagen wie oben anpassen.</li>
         <li>Vor Paket 3 und 4: die Freigabeliste für abweichende Empfängeradressen pflegen (Einstellungen → SMTP).</li>
         <li>Mit Paket 4: den täglichen Lauf <code>/api/cron/unterlagen-fristen</code> in n8n einplanen, der erste Lauf nur zur Probe (<code>?dryRun=1</code>).</li>
+        <li>Mit Paket 1b: unter Einstellungen → Abteilungen echte Adressen eintragen und Platzhalter ersetzen. In n8n prüfen, ob die täglichen Läufe <code>/api/cron/reminders</code> und <code>/api/cron/offboarding-reminders</code> auf <code>hr.fes-credo.de</code> zeigen; die Workflows im Repository nennen noch <code>hr.credo-schulen.de</code>.</li>
+        <li>Mit Paket 5: Zuständigkeit, Tagesangabe und Hinweise der Onboarding-Checklisten pflegen. Bei „Onboarding-Aufgabe erledigt“ das HR-Postfach als Empfänger eintragen, sonst wird sie nicht versendet. Je neuer Vorlage einmal „Test senden“.</li>
         <li>Jedes Paket durchläuft vor dem Push <code>tsc</code>, <code>lint</code>, alle Tests und <code>build</code>, mit neuen Tests für jede der drei Änderungen.</li>
       </ul>
     </section>
 
-    <!-- ================= OFFEN ================= -->
+    <!-- ================= 9 OFFEN ================= -->
     <section class="abschnitt" id="offen">
-      <div class="abschnitt-titel"><span class="nr">7</span><h2>Entschiedene und offene Punkte</h2></div>
+      <div class="abschnitt-titel"><span class="nr">9</span><h2>Entschiedene und offene Punkte</h2></div>
       <h3>Entschieden am 21. und 22.09.2026</h3>
       <div class="tabelle">
         <table>
@@ -1524,17 +2057,27 @@ WHERE event IN ('supervisor-link-created', 'contract-end-supervisor-link',
             <tr><td>Status „Vorgesetzter fertig“ künftig „Bereit zur Prüfung“?</td><td>Ja, wie im Mockup.</td></tr>
             <tr><td>Parallele Darstellung auch im Offboarding-Stepper?</td><td>Ja, wie im Mockup.</td></tr>
             <tr><td>Folgeauftrag, wenn Unterlagen nachgereicht werden müssen</td><td>Ja, als neue Funktion „Unterlagen nachfordern“, siehe Abschnitt 4. Den Fragebogen wieder zu öffnen, ist nicht gewünscht.</td></tr>
+            <tr><td>Knopf „Text auf Standard zurücksetzen“ für Mailvorlagen</td><td>Ja, mit Paket 1 umgesetzt.</td></tr>
+            <tr><td>Mail-Reparaturpaket für die Fehler in Offboarding- und Verbeamtungsmails</td><td>Ja, mit Paket 1 umgesetzt, dazu die entschärfte Offboarding-Abschlussmail.</td></tr>
+            <tr><td>Abteilungsaufgaben im Onboarding</td><td>Ja, als Paket 5. Auslöser ist der Knopf von HR, nichts passiert automatisch.</td></tr>
+            <tr><td>Schwächen der Abteilungsaufgaben im Offboarding</td><td>Ja, vorab als eigenes Paket 1b.</td></tr>
+            <tr><td>Umfang Paket 1b: nur der Kern oder alles?</td><td>Alles (Punkte 1–13), etwa 6 Tage.</td></tr>
+            <tr><td>„Verwaltung“ in den Onboarding-Vorlagen</td><td>Neuer fester Schlüssel „Verwaltung / Sekretariat“, Adresse je Einrichtung.</td></tr>
+            <tr><td>Onboarding ohne Modalitäten (etwa Ehrenamt)</td><td>„Abteilungen informieren“ bleibt gesperrt, die Karte erklärt warum. Kein Ersatzdatum.</td></tr>
+            <tr><td>Wie erfährt HR vom Fortschritt?</td><td>Eine Mail je erledigter Aufgabe an das HR-Postfach, mit dem Kommentar der Abteilung. Ohne Empfänger in der Vorlage bleibt es beim Blick ins Portal.</td></tr>
           </tbody>
         </table>
       </div>
       <h3>Noch offen</h3>
-      <p>Blockiert den Start nicht.</p>
+      <p>Blockiert nichts. Ohne Rückmeldung gilt mein Vorgehen.</p>
       <div class="tabelle">
         <table>
-          <thead><tr><th>Frage</th><th>Mein Vorgehen ohne Rückmeldung</th></tr></thead>
+          <thead><tr><th>Frage</th><th>Meine Empfehlung</th></tr></thead>
           <tbody>
-            <tr><td>Knopf „Auf Standard zurücksetzen“ für Mailvorlagen (Abschnitt 5 D)</td><td>Baue ich in Paket 1 mit ein. Ohne ihn müssten alle geänderten Vorlagen, die in der Datenbank gespeichert sind, von Hand nachgezogen werden.</td></tr>
-            <tr><td>Mail-Reparaturpaket für die bestehenden Fehler in Offboarding- und Verbeamtungsmails (Abschnitt 5 E)</td><td>Nur auf Ihr Ja. Mein Vorschlag: zusammen mit Paket 1.</td></tr>
+            <tr><td>Führungskraft im Offboarding: woher?</td><td>Optional, vorbelegt aus der Zeugnis-Bewertung oder dem Vertragsende. Frei eingetippte Adressen unterliegen der Freigabeliste.</td></tr>
+            <tr><td>Sollen informierte Abteilungen bei Abbruch des Vorgangs eine Mail bekommen („bitte keine Zugänge anlegen“)?</td><td>Später, als eigenes Ereignis je Modul (je etwa 0,5 Tage). Bis dahin zeigt der Link einen Hinweis.</td></tr>
+            <tr><td>Soll HR bei Überfälligkeit selbst eine Mail bekommen?</td><td>Später. Vorerst sieht HR Überfälliges im Portal, und die Abteilung bekommt den Überfällig-Absatz.</td></tr>
+            <tr><td>Soll die IT das Vertragsende sehen, um Zugänge zu befristen?</td><td>Vorerst nein, aus Gründen der Datensparsamkeit.</td></tr>
             <tr><td>Die Brief-Vorlagen-Funktion „Per E-Mail“ hat keine der Schutzregeln (keine Freigabeliste, kein Protokoll, sensible Felder ohne Bestätigung).</td><td>Nicht Teil dieses Plans. Ich empfehle, sie nach Paket 3 auf dieselben Regeln umzustellen oder abzuschalten.</td></tr>
           </tbody>
         </table>
@@ -1543,7 +2086,7 @@ WHERE event IN ('supervisor-link-created', 'contract-end-supervisor-link',
   </main>
 
   <footer class="fuss">
-    Erstellt am 21.09.2026, Fassung 2 mit „Unterlagen nachfordern“ · Grundlage: Analyse des Quellcodes auf <code>main</code> (ae490ba) mit unabhängiger Gegenprüfung · Mockups zeigen den Stand von <code>main</code>. Die Produktion kann bis zum nächsten Deploy in Details abweichen (z.B. der Zeichenzähler) · Nach Ihrer Freigabe setze ich Paket für Paket um.
+    Erstellt am 21.09.2026, Fassung 4 vom 22.09.2026 mit den Abteilungsaufgaben (Paket 1b und 5) und dem Stand nach Paket 1 · Grundlage: Analyse des Quellcodes auf <code>main</code> (ae490ba) mit unabhängiger Gegenprüfung · Mockups zeigen den Stand von <code>main</code>. Die Produktion kann bis zum nächsten Deploy in Details abweichen (z.B. der Zeichenzähler) · Nach Ihrer Freigabe setze ich Paket für Paket um.
   </footer>
 </div>
 </body>
