@@ -78,6 +78,75 @@ const OFFBOARDING_BEISPIEL = {
 };
 
 /**
+ * Beispiel fuer die Mails der Abteilungsaufgaben (Paket 1b): die Aufgaben der
+ * IT-Abteilung im Offboarding von Max Mustermann (letzter Arbeitstag
+ * 31.08.2026). Die Beispiel-Payloads unten erzaehlen EINE Geschichte:
+ *
+ *   17.08.2026, 08:00 UTC  IT informiert — Link gueltig bis +90 Tage (15.11.)
+ *   30.08.2026, 06:00 UTC  taeglicher Lauf erinnert: Laptop seit 2 Tagen
+ *                          ueberfaellig (Stufe WARNING), Link verlaengert (28.11.)
+ *   31.08.2026             IT hakt "IT-Zugänge …" mit Kommentar ab
+ *   01.09.2026, 09:30 UTC  letzte IT-Aufgabe erledigt — Abteilung fertig
+ *
+ * Aufgabenliste (Klartext und HTML), Zaehler, Stufenfelder und Kommentar
+ * stehen unten als fertiger Text. Sie werden bewusst NICHT hier mit
+ * aufgabenlisteMailFelder/stufenMailFelder/kommentarMailFelder
+ * (src/lib/abteilungsaufgaben.ts) erzeugt: Dieser Katalog bleibt ohne
+ * Importe (Test in ereignis-liste.test.ts). Stattdessen spielt
+ * src/__tests__/api/offboarding-mails.test.ts die Geschichte mit dem echten
+ * Dienst nach und prueft, dass er genau diese Payloads baut. Aendert sich dort
+ * ein Feld oder das Markup der Liste, schlaegt der Test an.
+ */
+export const OFFBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN: {
+  id: string;
+  title: string;
+  dueDate: string | null;
+}[] = [
+  {
+    id: "00000000-0000-0000-0000-00000000000c",
+    title: "Laptop & Zubehör zurücknehmen",
+    dueDate: "2026-08-28T00:00:00.000Z",
+  },
+  {
+    id: "00000000-0000-0000-0000-00000000000b",
+    title: "IT-Zugänge und E-Mail-Konto sperren",
+    dueDate: "2026-08-31T00:00:00.000Z",
+  },
+  {
+    id: "00000000-0000-0000-0000-00000000000d",
+    title: "Postfach an die Schulleitung weiterleiten",
+    dueDate: null,
+  },
+];
+
+/** Kommentar der IT beim Abhaken von "IT-Zugänge …" (Rohtext, mit Zeilenumbruch). */
+export const OFFBOARDING_ABTEILUNG_BEISPIEL_KOMMENTAR =
+  "Konto gesperrt & Abwesenheitsnotiz eingerichtet.\nDer Laptop fehlt noch.";
+
+/** Gemeinsamer Teil der Beispiele: die Abteilung, an die geschrieben wird. */
+const OFFBOARDING_ABTEILUNG_IT = {
+  departmentKey: "IT",
+  departmentName: "IT-Abteilung",
+  abteilung: "IT-Abteilung",
+};
+
+/** aufgabenlisteMailFelder(OFFBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN), abgeschrieben. */
+const OFFBOARDING_ABTEILUNG_AUFGABENLISTE = {
+  aufgabenliste:
+    "- Laptop & Zubehör zurücknehmen – fällig 28.08.2026\n" +
+    "- IT-Zugänge und E-Mail-Konto sperren – fällig 31.08.2026\n" +
+    "- Postfach an die Schulleitung weiterleiten",
+  aufgabenliste_html:
+    '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+    '<li style="margin:0 0 4px;">Laptop &amp; Zubehör zurücknehmen – fällig 28.08.2026</li>' +
+    '<li style="margin:0 0 4px;">IT-Zugänge und E-Mail-Konto sperren – fällig 31.08.2026</li>' +
+    '<li style="margin:0 0 4px;">Postfach an die Schulleitung weiterleiten</li>' +
+    "</ul>",
+  anzahl_aufgaben: 3,
+  naechste_faelligkeit: "28.08.2026",
+};
+
+/**
  * Beispiel-Hinweise fuer die Fristen-Sammelmail der Verbeamtung — genau die
  * Felder, die der Cron (cron/civil-service-deadlines) je Hinweis erzeugt.
  *
@@ -454,28 +523,38 @@ export const EVENT_CATALOG: EventDefinition[] = [
     wired: true,
   },
   {
+    // Ausloeser: "Abteilungen informieren", "Erneut senden", "Link erneuern"
+    // und "Erinnern" nach einer Adressaenderung (zuweisungsPayload in
+    // src/lib/abteilungsaufgaben-dienst.ts). Das Beispiel ist die Erstmail an
+    // die IT (siehe OFFBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN).
     event: "offboarding-department-assigned",
     name: "Offboarding-Aufgaben für Abteilung zugewiesen",
     group: "Offboarding",
-    recipientHint: "Abteilung (Magic-Link zur Checkliste)",
+    recipientHint: "Abteilung bzw. Führungskraft (Link zu den Aufgaben)",
     defaultRecipients: { to: "{{email}}" },
     samplePayload: {
       ...OFFBOARDING_BEISPIEL,
-      departmentKey: "IT",
-      departmentName: "IT-Abteilung",
-      abteilung: "IT-Abteilung",
+      ...OFFBOARDING_ABTEILUNG_IT,
       email: "it@example.org",
-      expiresAt: "2026-11-29T00:00:00.000Z",
-      taskCount: 4,
+      // informiert am 17.08.2026, 08:00 UTC + 90 Tage
+      expiresAt: "2026-11-15T08:00:00.000Z",
+      taskCount: 3,
       token: "00000000-0000-0000-0000-00000000000a",
       magicLink: BEISPIEL_LINK,
+      link: BEISPIEL_LINK,
+      ...OFFBOARDING_ABTEILUNG_AUFGABENLISTE,
+      erneut_gesendet: "",
+      neuer_link: "",
+      ist_fuehrungskraft: "",
     },
     wired: true,
   },
   {
-    // Zwei Aufrufer (Magic Link der Abteilung und Portal-Checkliste) mit
-    // demselben Aufbau; das Beispiel zeigt den Magic-Link-Weg. Der
-    // Portal-Weg sendet zusaetzlich taskId/taskTitle/taskCategory/completedById.
+    // Zwei Aufrufer (Link der Abteilung und Portal-Checkliste) mit demselben
+    // Aufbau (aufgabeErledigtMelden in src/lib/abteilungsaufgaben-uebergaenge.ts);
+    // das Beispiel zeigt den Link-Weg. Der Portal-Weg sendet zusaetzlich
+    // taskId/taskTitle/taskCategory/completedById. `kommentar` ist schon
+    // maskiert (fuer das HTML), `kommentar_text` der Rohtext (Textteil).
     event: "offboarding-task-completed",
     name: "Offboarding-Aufgabe erledigt",
     group: "Offboarding",
@@ -483,55 +562,68 @@ export const EVENT_CATALOG: EventDefinition[] = [
     defaultRecipients: { to: "" },
     samplePayload: {
       ...OFFBOARDING_BEISPIEL,
-      departmentKey: "IT",
-      departmentName: "IT-Abteilung",
-      abteilung: "IT-Abteilung",
+      ...OFFBOARDING_ABTEILUNG_IT,
       itemId: "00000000-0000-0000-0000-00000000000b",
-      itemTitle: "Laptop zurückgeben",
-      aufgabe: "Laptop zurückgeben",
-      offene_aufgaben: 3,
+      itemTitle: "IT-Zugänge und E-Mail-Konto sperren",
+      aufgabe: "IT-Zugänge und E-Mail-Konto sperren",
+      offene_aufgaben: 5,
+      offene_aufgaben_abteilung: 2,
+      erledigt_ueber: "Link der Abteilung",
+      kommentar: "Konto gesperrt &amp; Abwesenheitsnotiz eingerichtet.<br>Der Laptop fehlt noch.",
+      kommentar_text: OFFBOARDING_ABTEILUNG_BEISPIEL_KOMMENTAR,
     },
     wired: true,
   },
   {
+    // Genau einmal beim Uebergang der Abteilung auf "fertig" ueber ihren Link.
     event: "offboarding-department-completed",
     name: "Offboarding: Abteilung abgeschlossen (Bestaetigung)",
     group: "Offboarding",
-    recipientHint: "Abteilung (Bestaetigung)",
+    recipientHint: "Abteilung bzw. Führungskraft (Bestätigung)",
     defaultRecipients: { to: "{{email}}" },
     samplePayload: {
       ...OFFBOARDING_BEISPIEL,
-      departmentKey: "IT",
-      departmentName: "IT-Abteilung",
-      abteilung: "IT-Abteilung",
+      ...OFFBOARDING_ABTEILUNG_IT,
       email: "it@example.org",
-      completedAt: "2026-08-15T10:00:00.000Z",
+      completedAt: "2026-09-01T09:30:00.000Z",
+      anzahl_aufgaben: 3,
+      ist_fuehrungskraft: "",
     },
     wired: true,
   },
   {
-    // Cron und Knopf im Portal senden denselben Aufbau; `reminderCount`
-    // kommt nur vom Knopf, overdueItems/upcomingItems/maxOverdueDays nur
-    // vom Cron. Das Beispiel enthaelt beides.
+    // Knopf "Erinnern" und taeglicher Lauf senden denselben Aufbau
+    // (erinnerungsPayload in src/lib/abteilungsaufgaben-dienst.ts). Die
+    // englischen Felder (level, overdueItems, …) bleiben fuer Webhooks, die
+    // deutschen Merker (ist_warnung, …) steuern die Bloecke der Vorlage.
     event: "offboarding-reminder",
     name: "Erinnerung: Offene Offboarding-Aufgaben",
     group: "Offboarding",
-    recipientHint: "Abteilung (Erinnerung)",
+    recipientHint: "Abteilung bzw. Führungskraft (Erinnerung)",
     defaultRecipients: { to: "{{email}}" },
     samplePayload: {
       ...OFFBOARDING_BEISPIEL,
-      departmentKey: "IT",
-      departmentName: "IT-Abteilung",
-      abteilung: "IT-Abteilung",
+      ...OFFBOARDING_ABTEILUNG_IT,
       email: "it@example.org",
+      reminderCount: 1,
+      // beim Erinnern am 30.08.2026, 06:00 UTC auf + 90 Tage verlaengert
+      expiresAt: "2026-11-28T06:00:00.000Z",
+      magicLink: BEISPIEL_LINK,
+      link: BEISPIEL_LINK,
       level: "WARNING",
       overdueItems: 1,
       upcomingItems: 1,
-      totalOpenItems: 2,
-      offene_aufgaben: 2,
-      maxOverdueDays: 1,
-      reminderCount: 1,
-      magicLink: BEISPIEL_LINK,
+      totalOpenItems: 3,
+      offene_aufgaben: 3,
+      maxOverdueDays: 2,
+      ueberfaellige_aufgaben: "1",
+      tage_ueberfaellig: "2",
+      ist_ueberfaellig: "ja",
+      ist_info: "",
+      ist_warnung: "ja",
+      ist_eskalation: "",
+      ...OFFBOARDING_ABTEILUNG_AUFGABENLISTE,
+      ist_fuehrungskraft: "",
     },
     wired: true,
   },

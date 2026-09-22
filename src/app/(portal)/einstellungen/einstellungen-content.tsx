@@ -9,14 +9,14 @@
  * 3. Versandprotokoll – EmailLog (SENT/FAILED/SKIPPED) mit Filtern
  * 4. SMTP             – Primaerer Versandkanal konfigurieren und testen
  * 5. Webhooks         – Optionaler Zusatzkanal (z.B. n8n), pro Event
- * 6. Abteilungen      – Offboarding-Abteilungen mit E-Mail verwalten
+ * 6. Abteilungen      – Adressen der Abteilungen, die Checklisten-Aufgaben per Link bekommen
  * 7. API-Zugang       – API-Keys fuer die Reporting-API
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
-import { DEPARTMENT_KEYS, DEPARTMENT_LABELS } from "@/lib/constants";
+import { abteilungLabel, LINK_ABTEILUNGEN } from "@/lib/constants";
 import { EVENT_GROUP_ORDER } from "@/lib/events";
 import {
   EREIGNIS_GRUPPEN,
@@ -88,14 +88,32 @@ interface EmailTemplate {
   updatedAt?: string;
 }
 
+/** Eine Zeile aus GET /api/settings/departments (Feldnamen wie in der Datenbank). */
 interface DepartmentConfig {
   id: string;
-  name: string;
-  key: string;
+  departmentKey: string;
+  departmentName: string;
   email: string;
   isActive: boolean;
   organizationId: string | null;
-  organizationName: string | null;
+  organization: { id: string; name: string } | null;
+  /** Anzeigename des Schlüssels (constants.ts) */
+  label: string;
+  /** Altbestand HR/MITARBEITER/VORGESETZTER: wird nie angeschrieben */
+  reserviert: boolean;
+}
+
+/** „5 Aufgaben in 3 Vorlagen" je Schlüssel (GET …/departments, `verwendung`). */
+interface AbteilungsVerwendung {
+  aufgaben: number;
+  vorlagen: number;
+}
+
+/** Vorlage nutzt eine Link-Abteilung ohne aktive Adresse (`fehlendeAdressen`). */
+interface FehlendeAdresse {
+  vorlage: string;
+  departmentKey: string;
+  label: string;
 }
 
 interface OrganizationOption {
@@ -2171,37 +2189,93 @@ function WebhookModal({
 // =============================================
 // TAB 4: Abteilungen
 // =============================================
-function DepartmentsTab() {
+// Adressen der Abteilungen, die ihre Checklisten-Aufgaben per Link bekommen
+// (Paket 1b, M8). Server: /api/settings/departments. Regeln (Einrichtung vor
+// zentral, Führungskraft aus dem Vorgang) in src/lib/abteilungsaufgaben.ts.
+
+/** Auswahlwert für „Eigener Schlüssel…" (kein gültiger Schlüssel, kollidiert also nie). */
+const EIGENER_SCHLUESSEL = "__eigener__";
+
+const PORTAL_HINWEIS =
+  "Personalabteilung und Mitarbeitende arbeiten im Portal und bekommen keinen Link. Aufgaben für Vorgesetzte gehen an die im Vorgang hinterlegte Führungskraft.";
+
+/** „5 Aufgaben in 3 Vorlagen" bzw. „1 Aufgabe in 1 Vorlage". */
+function verwendungText(v: AbteilungsVerwendung): string {
+  const aufgaben = `${v.aufgaben} ${v.aufgaben === 1 ? "Aufgabe" : "Aufgaben"}`;
+  const vorlagen = `${v.vorlagen} ${v.vorlagen === 1 ? "Vorlage" : "Vorlagen"}`;
+  return `${aufgaben} in ${vorlagen}`;
+}
+
+/** Warum eine Altzeile mit reserviertem Schlüssel nie angeschrieben wird. */
+function reserviertHinweis(departmentKey: string): string {
+  if (departmentKey === "VORGESETZTER") {
+    return "Wird nicht mehr verwendet – Aufgaben für Vorgesetzte gehen an die Führungskraft des Vorgangs.";
+  }
+  if (departmentKey === "HR") return "Wird nicht mehr verwendet – die Personalabteilung arbeitet im Portal.";
+  return "Wird nicht mehr verwendet – Mitarbeitende arbeiten im Portal.";
+}
+
+/** Einrichtung für Rückfrage und Anzeige; zentral = „Zentral". */
+function geltungText(dept: DepartmentConfig): string {
+  if (!dept.organizationId) return "Zentral";
+  return dept.organization?.name ?? "Einrichtung";
+}
+
+/** fetch + JSON; bei !ok wirft sie mit dem `error` der API (sonst `rueckfall`). */
+async function abteilungsAnfrage(url: string, init: RequestInit | undefined, rueckfall: string) {
+  const res = await fetch(url, init);
+  const daten = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof daten?.error === "string" && daten.error ? daten.error : rueckfall);
+  return daten as { data?: DepartmentConfig };
+}
+
+const JSON_HEADER = { "Content-Type": "application/json" };
+
+export function DepartmentsTab() {
   const [departments, setDepartments] = useState<DepartmentConfig[]>([]);
+  const [verwendung, setVerwendung] = useState<Record<string, AbteilungsVerwendung>>({});
+  const [fehlende, setFehlende] = useState<FehlendeAdresse[]>([]);
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ladefehler, setLadefehler] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editEmail, setEditEmail] = useState("");
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Neues Abteilungs-Formular
-  const [newName, setNewName] = useState("");
+  // Bearbeiten in der Zeile (Anzeigename + E-Mail)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  /** Zeile mit laufender Anfrage — deren Knöpfe sind gesperrt (Doppelklick). */
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Formular „Neue Abteilung"
   const [newKey, setNewKey] = useState("");
   const [newCustomKey, setNewCustomKey] = useState("");
+  const [newName, setNewName] = useState("");
+  /** true, sobald jemand den Anzeigenamen selbst tippt — dann nicht mehr vorbelegen. */
+  const [nameAngepasst, setNameAngepasst] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newOrgId, setNewOrgId] = useState("");
   const [formSaving, setFormSaving] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       const [deptRes, orgRes] = await Promise.all([
         fetch("/api/settings/departments"),
         fetch("/api/organizations"),
       ]);
-      const deptData = await deptRes.json();
-      const orgData = await orgRes.json();
-      setDepartments(deptData.data ?? []);
-      setOrganizations(orgData.data ?? orgData ?? []);
+      const deptData = await deptRes.json().catch(() => ({}));
+      if (!deptRes.ok || !Array.isArray(deptData?.data)) throw new Error("Laden fehlgeschlagen");
+      setDepartments(deptData.data);
+      setVerwendung(deptData.verwendung ?? {});
+      setFehlende(Array.isArray(deptData.fehlendeAdressen) ? deptData.fehlendeAdressen : []);
+      setLadefehler(false);
+      // Ohne Einrichtungsliste bleibt „Alle Einrichtungen (zentral)" wählbar.
+      const orgData = orgRes.ok ? await orgRes.json().catch(() => ({})) : {};
+      setOrganizations(Array.isArray(orgData?.data) ? orgData.data : []);
     } catch {
-      setError("Abteilungen konnten nicht geladen werden");
+      setLadefehler(true);
     } finally {
       setLoading(false);
     }
@@ -2211,187 +2285,271 @@ function DepartmentsTab() {
   useAutoHide(success, setSuccess, 4000);
   useAutoHide(error, setError, 6000);
 
-  const deptKeyOptions = Object.entries(DEPARTMENT_KEYS).map(([, value]) => ({
-    value,
-    label: DEPARTMENT_LABELS[value] || value,
-  }));
+  function formularZuruecksetzen() {
+    setShowForm(false);
+    setNewKey("");
+    setNewCustomKey("");
+    setNewName("");
+    setNameAngepasst(false);
+    setNewEmail("");
+    setNewOrgId("");
+  }
+
+  function handleKeyChange(wert: string) {
+    setNewKey(wert);
+    // Anzeigename mit dem Label vorbelegen, solange niemand ihn selbst getippt hat.
+    if (!nameAngepasst) {
+      setNewName(wert && wert !== EIGENER_SCHLUESSEL ? abteilungLabel(wert) : "");
+    }
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    const finalKey = newKey === "__custom__" ? newCustomKey : newKey;
-    if (!newName || !finalKey || !newEmail) {
+    const departmentKey = newKey === EIGENER_SCHLUESSEL ? newCustomKey.trim() : newKey;
+    const departmentName = newName.trim();
+    const email = newEmail.trim();
+    if (!departmentKey || !departmentName || !email) {
       setError("Bitte alle Pflichtfelder ausfüllen");
       return;
     }
     setFormSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/settings/departments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newName,
-          key: finalKey,
-          email: newEmail,
-          organizationId: newOrgId || null,
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error);
-      setSuccess(`Abteilung "${newName}" angelegt`);
-      setShowForm(false);
-      setNewName("");
-      setNewKey("");
-      setNewCustomKey("");
-      setNewEmail("");
-      setNewOrgId("");
-      load();
+      const daten = await abteilungsAnfrage(
+        "/api/settings/departments",
+        {
+          method: "POST",
+          headers: JSON_HEADER,
+          body: JSON.stringify({ departmentKey, departmentName, email, organizationId: newOrgId || null }),
+        },
+        "Die Abteilung konnte nicht angelegt werden.",
+      );
+      setSuccess(`Abteilung „${daten.data?.departmentName ?? departmentName}“ angelegt`);
+      formularZuruecksetzen();
+      await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler beim Anlegen");
+      setError(err instanceof Error ? err.message : "Die Abteilung konnte nicht angelegt werden.");
     } finally {
       setFormSaving(false);
     }
   }
 
   async function handleToggleActive(dept: DepartmentConfig) {
+    setBusyId(dept.id);
     try {
-      const res = await fetch(`/api/settings/departments/${dept.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !dept.isActive }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error);
-      setSuccess(`"${dept.name}" ${dept.isActive ? "deaktiviert" : "aktiviert"}`);
-      load();
+      await abteilungsAnfrage(
+        `/api/settings/departments/${dept.id}`,
+        { method: "PATCH", headers: JSON_HEADER, body: JSON.stringify({ isActive: !dept.isActive }) },
+        "Der Status konnte nicht geändert werden.",
+      );
+      setSuccess(`„${dept.departmentName}“ ${dept.isActive ? "deaktiviert" : "aktiviert"}`);
+      await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler");
+      setError(err instanceof Error ? err.message : "Der Status konnte nicht geändert werden.");
+    } finally {
+      setBusyId(null);
     }
   }
 
-  async function handleUpdateEmail(dept: DepartmentConfig) {
-    if (!editEmail) { setError("E-Mail darf nicht leer sein"); return; }
+  function startEdit(dept: DepartmentConfig) {
+    setEditingId(dept.id);
+    setEditName(dept.departmentName);
+    setEditEmail(dept.email);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditName("");
+    setEditEmail("");
+  }
+
+  async function handleSaveEdit(dept: DepartmentConfig) {
+    const departmentName = editName.trim();
+    const email = editEmail.trim();
+    if (!departmentName || !email) {
+      setError("Anzeigename und E-Mail-Adresse dürfen nicht leer sein");
+      return;
+    }
+    setBusyId(dept.id);
     try {
-      const res = await fetch(`/api/settings/departments/${dept.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: editEmail }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error);
-      setSuccess(`E-Mail für "${dept.name}" aktualisiert`);
-      setEditingId(null);
-      setEditEmail("");
-      load();
+      const daten = await abteilungsAnfrage(
+        `/api/settings/departments/${dept.id}`,
+        { method: "PATCH", headers: JSON_HEADER, body: JSON.stringify({ departmentName, email }) },
+        "Die Änderungen konnten nicht gespeichert werden.",
+      );
+      setSuccess(`Änderungen an „${daten.data?.departmentName ?? departmentName}“ gespeichert`);
+      cancelEdit();
+      await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler");
+      setError(err instanceof Error ? err.message : "Die Änderungen konnten nicht gespeichert werden.");
+    } finally {
+      setBusyId(null);
     }
   }
 
   async function handleDelete(dept: DepartmentConfig) {
-    if (!confirm(`Abteilung "${dept.name}" wirklich löschen?`)) return;
+    const frage =
+      `Abteilung „${dept.departmentName}“ (${geltungText(dept)}) wirklich löschen? ` +
+      "Bereits verschickte Links bleiben gültig, Erinnerungen gehen aber nicht mehr an diese Adresse.";
+    if (!confirm(frage)) return;
+    setBusyId(dept.id);
     try {
-      const res = await fetch(`/api/settings/departments/${dept.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error((await res.json()).error);
-      setSuccess(`"${dept.name}" gelöscht`);
-      load();
+      await abteilungsAnfrage(
+        `/api/settings/departments/${dept.id}`,
+        { method: "DELETE" },
+        "Die Abteilung konnte nicht gelöscht werden.",
+      );
+      setSuccess(`„${dept.departmentName}“ gelöscht`);
+      if (editingId === dept.id) cancelEdit();
+      await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler");
+      setError(err instanceof Error ? err.message : "Die Abteilung konnte nicht gelöscht werden.");
+    } finally {
+      setBusyId(null);
     }
   }
 
-  if (loading) return <LoadingCard text="Lade Abteilungen..." />;
+  if (loading) return <LoadingCard text="Lade Abteilungen…" />;
+
+  const labelClass = "mb-1 block text-sm font-medium text-foreground";
+  const pflicht = <span className="text-red-500">*</span>;
 
   return (
     <div className="space-y-4">
       {success && <Alert type="success">{success}</Alert>}
       {error && <Alert type="error">{error}</Alert>}
+      {ladefehler && <Alert type="error">Abteilungen konnten nicht geladen werden</Alert>}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Abteilungen verwalten, die Offboarding-Aufgaben per Magic Link erhalten.
+          Abteilungen, die ihre Aufgaben aus den Onboarding- und Offboarding-Checklisten per Link erhalten – ohne
+          Anmeldung im Portal.
         </p>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => (showForm ? formularZuruecksetzen() : setShowForm(true))}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           {showForm ? "Abbrechen" : "+ Abteilung hinzufügen"}
         </button>
       </div>
 
-      {/* Inline-Formular */}
+      {/* Vorlagen, deren Link-Abteilung keine aktive Adresse hat */}
+      {fehlende.map((f, i) => (
+        <div
+          key={`${f.departmentKey}-${i}`}
+          className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-900"
+        >
+          Die Vorlage „{f.vorlage}“ nutzt „{f.label}“. Dafür ist keine aktive Adresse hinterlegt. Diese Aufgaben
+          können nicht per Link verschickt werden.
+        </div>
+      ))}
+
+      {/* Formular „Neue Abteilung" */}
       {showForm && (
         <form onSubmit={handleCreate} className="rounded-lg border bg-card p-5 space-y-4">
           <h3 className="font-semibold text-foreground">Neue Abteilung</h3>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Abteilungsname" required>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="z.B. IT-Abteilung Zweigstelle"
-                className={inputClass}
-              />
-            </FormField>
-
-            <FormField label="Abteilungs-Schlüssel" required>
+            <div>
+              <label htmlFor="abteilung-neu-schluessel" className={labelClass}>
+                Abteilung {pflicht}
+              </label>
               <select
+                id="abteilung-neu-schluessel"
                 value={newKey}
-                onChange={(e) => setNewKey(e.target.value)}
+                onChange={(e) => handleKeyChange(e.target.value)}
                 className={inputClass}
               >
-                <option value="">-- Bitte waehlen --</option>
-                {deptKeyOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label} ({opt.value})
+                <option value="">Bitte wählen…</option>
+                {LINK_ABTEILUNGEN.map((key) => (
+                  <option key={key} value={key}>
+                    {abteilungLabel(key)} ({key})
                   </option>
                 ))}
-                <option value="__custom__">Eigener Schlüssel...</option>
+                <option value={EIGENER_SCHLUESSEL}>Eigener Schlüssel…</option>
               </select>
-            </FormField>
+              <p className="mt-1 text-xs text-muted-foreground">{PORTAL_HINWEIS}</p>
+            </div>
+
+            {newKey === EIGENER_SCHLUESSEL && (
+              <div>
+                <label htmlFor="abteilung-neu-eigener-schluessel" className={labelClass}>
+                  Eigener Schlüssel {pflicht}
+                </label>
+                <input
+                  id="abteilung-neu-eigener-schluessel"
+                  type="text"
+                  value={newCustomKey}
+                  maxLength={30}
+                  onChange={(e) => setNewCustomKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))}
+                  placeholder="z.B. EMPFANG"
+                  className={`${inputClass} font-mono`}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Nur Großbuchstaben A–Z, Ziffern 0–9 und _, beginnend mit einem Buchstaben.
+                </p>
+              </div>
+            )}
           </div>
 
-          {newKey === "__custom__" && (
-            <FormField label="Eigener Schlüssel" required>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="abteilung-neu-name" className={labelClass}>
+                Anzeigename {pflicht}
+              </label>
               <input
+                id="abteilung-neu-name"
                 type="text"
-                value={newCustomKey}
-                onChange={(e) => setNewCustomKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))}
-                placeholder="z.B. EMPFANG"
+                value={newName}
+                maxLength={100}
+                onChange={(e) => {
+                  setNewName(e.target.value);
+                  setNameAngepasst(true);
+                }}
+                placeholder="z.B. IT-Support FES Minden"
                 className={inputClass}
               />
-            </FormField>
-          )}
+            </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="E-Mail" required>
+            <div>
+              <label htmlFor="abteilung-neu-email" className={labelClass}>
+                E-Mail-Adresse {pflicht}
+              </label>
               <input
+                id="abteilung-neu-email"
                 type="email"
                 value={newEmail}
+                maxLength={254}
                 onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="abteilung@credo-gruppe.de"
+                placeholder="it@einrichtung.de"
                 className={inputClass}
               />
-            </FormField>
+            </div>
 
-            <FormField label="Einrichtung (optional)">
+            <div>
+              <label htmlFor="abteilung-neu-einrichtung" className={labelClass}>
+                Gilt für
+              </label>
               <select
+                id="abteilung-neu-einrichtung"
                 value={newOrgId}
                 onChange={(e) => setNewOrgId(e.target.value)}
                 className={inputClass}
               >
-                <option value="">Zentral (alle Einrichtungen)</option>
+                <option value="">Alle Einrichtungen (zentral)</option>
                 {organizations.map((org) => (
                   <option key={org.id} value={org.id}>
                     {org.name}
                   </option>
                 ))}
               </select>
-            </FormField>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-1">
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={formularZuruecksetzen}
               className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
             >
               Abbrechen
@@ -2401,7 +2559,7 @@ function DepartmentsTab() {
               disabled={formSaving}
               className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              {formSaving ? "Wird angelegt..." : "Abteilung anlegen"}
+              {formSaving ? "Wird angelegt…" : "Abteilung anlegen"}
             </button>
           </div>
         </form>
@@ -2414,8 +2572,10 @@ function DepartmentsTab() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left font-semibold text-foreground">Abteilung</th>
+                <th className="px-4 py-3 text-left font-semibold text-foreground">Schlüssel</th>
                 <th className="px-4 py-3 text-left font-semibold text-foreground">E-Mail</th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground">Einrichtung</th>
+                <th className="px-4 py-3 text-left font-semibold text-foreground">Gilt für</th>
+                <th className="px-4 py-3 text-left font-semibold text-foreground">Verwendet in</th>
                 <th className="px-4 py-3 text-left font-semibold text-foreground">Status</th>
                 <th className="px-4 py-3 text-right font-semibold text-foreground">Aktionen</th>
               </tr>
@@ -2423,115 +2583,167 @@ function DepartmentsTab() {
             <tbody className="divide-y">
               {departments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                    Keine Abteilungen konfiguriert.
+                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                    {ladefehler ? "Abteilungen konnten nicht geladen werden" : "Keine Abteilungen konfiguriert."}
                   </td>
                 </tr>
               ) : (
-                departments.map((dept) => (
-                  <tr key={dept.id} className={`${!dept.isActive ? "opacity-50" : ""}`}>
-                    {/* Abteilung */}
-                    <td className="px-4 py-3">
-                      <div>
-                        <span className="font-medium text-foreground">{dept.name}</span>
-                        <span className="ml-2 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-                          {dept.key}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* E-Mail (inline-edit) */}
-                    <td className="px-4 py-3">
-                      {editingId === dept.id ? (
-                        <div className="flex items-center gap-2">
+                departments.map((dept) => {
+                  const bearbeiten = editingId === dept.id;
+                  const beschaeftigt = busyId === dept.id;
+                  const nutzung = verwendung[dept.departmentKey];
+                  return (
+                    <tr key={dept.id} data-abteilung={dept.departmentKey} className={!dept.isActive && !bearbeiten ? "opacity-60" : ""}>
+                      {/* Abteilung (Anzeigename) */}
+                      <td className="px-4 py-3 align-top">
+                        {bearbeiten ? (
                           <input
-                            type="email"
-                            value={editEmail}
-                            onChange={(e) => setEditEmail(e.target.value)}
-                            className="w-48 rounded border border-input bg-background px-2 py-1 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                            type="text"
+                            aria-label="Anzeigename"
+                            value={editName}
+                            maxLength={100}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="w-44 rounded border border-input bg-background px-2 py-1 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                             autoFocus
                           />
-                          <button
-                            onClick={() => handleUpdateEmail(dept)}
-                            className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90"
-                          >
-                            OK
-                          </button>
-                          <button
-                            onClick={() => { setEditingId(null); setEditEmail(""); }}
-                            className="rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
-                          >
-                            X
-                          </button>
+                        ) : (
+                          <span className="font-semibold text-foreground">{dept.departmentName}</span>
+                        )}
+                        {dept.reserviert && (
+                          <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                            {reserviertHinweis(dept.departmentKey)}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Schlüssel */}
+                      <td className="px-4 py-3 align-top">
+                        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                          {dept.departmentKey}
+                        </span>
+                      </td>
+
+                      {/* E-Mail */}
+                      <td className="px-4 py-3 align-top">
+                        {bearbeiten ? (
+                          <input
+                            type="email"
+                            aria-label="E-Mail-Adresse"
+                            value={editEmail}
+                            maxLength={254}
+                            onChange={(e) => setEditEmail(e.target.value)}
+                            className="w-52 rounded border border-input bg-background px-2 py-1 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                          />
+                        ) : (
+                          <span className="break-all text-foreground">{dept.email}</span>
+                        )}
+                      </td>
+
+                      {/* Gilt für */}
+                      <td className="px-4 py-3 align-top">
+                        {dept.organizationId ? (
+                          <span className="text-foreground">{geltungText(dept)}</span>
+                        ) : (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            Zentral
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Verwendet in */}
+                      <td className="px-4 py-3 align-top">
+                        {dept.reserviert ? (
+                          <span className="text-muted-foreground">–</span>
+                        ) : nutzung ? (
+                          <span className="text-foreground">{verwendungText(nutzung)}</span>
+                        ) : (
+                          <span className="rounded bg-yellow-50 px-1.5 py-0.5 text-xs text-yellow-800">
+                            In keiner Checklisten-Vorlage verwendet
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-3 align-top">
+                        {dept.isActive ? (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                            Aktiv
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                            Inaktiv
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Aktionen */}
+                      <td className="px-4 py-3 text-right align-top">
+                        <div className="flex flex-wrap items-center justify-end gap-1">
+                          {bearbeiten ? (
+                            <>
+                              <button
+                                onClick={() => handleSaveEdit(dept)}
+                                disabled={beschaeftigt}
+                                className="rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                              >
+                                Speichern
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                disabled={beschaeftigt}
+                                className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-50"
+                              >
+                                Abbrechen
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => startEdit(dept)}
+                                disabled={beschaeftigt}
+                                className="rounded-md border px-2.5 py-1 text-xs text-foreground hover:bg-accent disabled:opacity-50"
+                              >
+                                Bearbeiten
+                              </button>
+                              <button
+                                onClick={() => handleToggleActive(dept)}
+                                disabled={beschaeftigt}
+                                className={`rounded-md border px-2.5 py-1 text-xs disabled:opacity-50 ${
+                                  dept.isActive
+                                    ? "border-red-200 text-red-700 hover:bg-red-50"
+                                    : "border-green-200 text-green-700 hover:bg-green-50"
+                                }`}
+                              >
+                                {dept.isActive ? "Deaktivieren" : "Aktivieren"}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(dept)}
+                                disabled={beschaeftigt}
+                                className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                Löschen
+                              </button>
+                            </>
+                          )}
                         </div>
-                      ) : (
-                        <span
-                          className="cursor-pointer text-foreground hover:underline"
-                          onClick={() => { setEditingId(dept.id); setEditEmail(dept.email); }}
-                          title="Klicken zum Bearbeiten"
-                        >
-                          {dept.email}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Einrichtung */}
-                    <td className="px-4 py-3">
-                      {dept.organizationId ? (
-                        <span className="text-foreground">{dept.organizationName}</span>
-                      ) : (
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                          Zentral
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-4 py-3">
-                      {dept.isActive ? (
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                          Aktiv
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                          Inaktiv
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Aktionen */}
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleToggleActive(dept)}
-                          className={`rounded-md border px-2.5 py-1 text-xs ${
-                            dept.isActive
-                              ? "border-red-200 text-red-700 hover:bg-red-50"
-                              : "border-green-200 text-green-700 hover:bg-green-50"
-                          }`}
-                        >
-                          {dept.isActive ? "Deakt." : "Aktiv."}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(dept)}
-                          className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50"
-                        >
-                          Löschen
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {!showForm && <p className="text-xs text-muted-foreground">{PORTAL_HINWEIS}</p>}
+
       {/* Hinweis */}
       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        <strong>Hinweis:</strong> Zentrale Abteilungen gelten für alle Einrichtungen.
-        Einrichtungsspezifische Abteilungen überschreiben die zentrale Konfiguration für die jeweilige Einrichtung.
+        Eine Adresse für eine bestimmte Einrichtung hat Vorrang vor der zentralen Adresse. Eine geänderte Adresse
+        gilt für Abteilungen, die ab jetzt informiert werden. In Vorgängen, die schon informiert sind, pausieren die
+        automatischen Erinnerungen, bis dort „Erneut senden“ gewählt wird – das schickt einen neuen Link an die
+        neue Adresse.
       </div>
     </div>
   );

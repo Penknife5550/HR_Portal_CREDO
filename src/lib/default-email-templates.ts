@@ -1174,12 +1174,34 @@ CREDO HR-Portal`,
   },
 
   // =============================================
-  // Offboarding: Abteilung zugewiesen
+  // Offboarding: Aufgaben fuer eine Abteilung bzw. die Fuehrungskraft
+  // (Paket 1b)
+  //
+  // Fuer die drei Vorlagen der Abteilungsaufgaben (zugewiesen, Erinnerung,
+  // erledigt) gilt zusaetzlich:
+  //   - Ausloeser und Payload stehen in src/lib/abteilungsaufgaben-dienst.ts
+  //     (zuweisungsPayload, erinnerungsPayload) und
+  //     src/lib/abteilungsaufgaben-uebergaenge.ts (aufgabeErledigtMelden).
+  //   - Empfaenger ist eine Abteilung ODER die Fuehrungskraft des Vorgangs
+  //     (Schluessel VORGESETZTER, dann {{abteilung}} = "Führungskraft"). Der
+  //     Text setzt {{abteilung}} deshalb nie hinter einen Artikel: "für
+  //     IT-Abteilung" fehlt der Artikel, "für die Führungskraft" passte nicht
+  //     zur Abteilung. Die Zustaendigkeit steht in Klammern ("zuständig: …"),
+  //     angesprochen ist "Sie" — das traegt beide Empfaenger.
+  //   - {{aufgabenliste_html}} und {{kommentar}} sind schon maskiert
+  //     (aufgabenlisteMailFelder, kommentarMailFelder) und gehoeren ins HTML;
+  //     die Rohtexte {{aufgabenliste}} und {{kommentar_text}} nur in den
+  //     Textteil. Im HTML maskiert der Mailer sie trotzdem (FREITEXT_VARIABLEN),
+  //     falls ein Admin sie dort einsetzt.
+  //   - Bedingungsbloecke brauchen einen nicht leeren Wert; die Merker
+  //     (erneut_gesendet, neuer_link, ist_fuehrungskraft, ist_info,
+  //     ist_warnung, ist_eskalation, ist_ueberfaellig) sind "ja" oder "".
+  //     Bloecke nie verschachteln — renderTemplate loest nur eine Ebene auf.
   // =============================================
   {
     event: "offboarding-department-assigned",
     name: "Offboarding-Aufgaben für Abteilung zugewiesen",
-    subject: "Offboarding-Aufgaben für {{abteilung}}: {{vorname}} {{nachname}}",
+    subject: "Offboarding-Aufgaben für {{abteilung}}: {{vorname}} {{nachname}} (letzter Arbeitstag {{austrittsdatum}})",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -1197,29 +1219,38 @@ CREDO HR-Portal`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offboarding-Aufgaben für {{abteilung}}</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Im Rahmen des Offboardings von <strong>{{vorname}} {{nachname}}</strong> wurden Ihrer Abteilung Aufgaben zugewiesen. Bitte bearbeiten Sie diese bis zum Austrittsdatum.
+            Im Rahmen des Austritts von <strong>{{vorname}} {{nachname}}</strong> ({{einrichtung}}) sind folgende Aufgaben für Sie vorgesehen (zuständig: {{abteilung}}):
           </p>
+          {{aufgabenliste_html}}
+          {{#ist_fuehrungskraft}}<p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">
+            Sie erhalten diese Aufgaben, weil Sie im Austrittsvorgang als Führungskraft eingetragen sind. Falls das nicht zutrifft, geben Sie bitte der Personalabteilung Bescheid.
+          </p>{{/ist_fuehrungskraft}}
           <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
             <tr><td style="padding:16px;">
-              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Mitarbeiter</p>
-              <p style="margin:0;color:#374151;font-size:14px;">{{vorname}} {{nachname}}</p>
-            </td></tr>
-            <tr><td style="padding:0 16px 16px;">
-              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Abteilung</p>
-              <p style="margin:0;color:#374151;font-size:14px;">{{abteilung}}</p>
-            </td></tr>
-            <tr><td style="padding:0 16px 16px;">
-              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Austrittsdatum</p>
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Letzter Arbeitstag</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{austrittsdatum}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vorgangsnummer</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{vorgangsnummer}}</p>
             </td></tr>
           </table>
           <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
             <tr><td style="background-color:#2563eb;border-radius:8px;">
               <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
-                Aufgaben ansehen →
+                Aufgaben öffnen und abhaken →
               </a>
             </td></tr>
           </table>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Der Link funktioniert ohne Anmeldung und ist bis {{ablaufdatum}} gültig. Bitte leiten Sie ihn nur innerhalb Ihres Bereichs weiter.
+          </p>
+          {{#erneut_gesendet}}<p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Diese Nachricht wurde erneut gesendet. Der Link ist unverändert.
+          </p>{{/erneut_gesendet}}
+          {{#neuer_link}}<p style="color:#92400e;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Dies ist ein neuer Link. Ein früher versendeter Link ist nicht mehr gültig.
+          </p>{{/neuer_link}}
           <p style="color:#9ca3af;font-size:12px;margin:0;">
             Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
           </p>
@@ -1232,27 +1263,53 @@ CREDO HR-Portal`,
   </table>
 </body>
 </html>`,
-    bodyText: `Offboarding-Aufgaben für {{abteilung}}: {{vorname}} {{nachname}}
+    bodyText: `Offboarding-Aufgaben für {{abteilung}}: {{vorname}} {{nachname}} (letzter Arbeitstag {{austrittsdatum}})
 
-Im Rahmen des Offboardings wurden Ihrer Abteilung Aufgaben zugewiesen.
-Austrittsdatum: {{austrittsdatum}}
+Im Rahmen des Austritts von {{vorname}} {{nachname}} ({{einrichtung}}) sind folgende Aufgaben für Sie vorgesehen (zuständig: {{abteilung}}):
 
-Aufgaben ansehen: {{link}}
+{{aufgabenliste}}
+{{#ist_fuehrungskraft}}
+Sie erhalten diese Aufgaben, weil Sie im Austrittsvorgang als Führungskraft eingetragen sind. Falls das nicht zutrifft, geben Sie bitte der Personalabteilung Bescheid.
+{{/ist_fuehrungskraft}}
+Letzter Arbeitstag: {{austrittsdatum}}
+
+Aufgaben öffnen und abhaken: {{link}}
+Der Link funktioniert ohne Anmeldung und ist bis {{ablaufdatum}} gültig. Bitte leiten Sie ihn nur innerhalb Ihres Bereichs weiter.
+{{#erneut_gesendet}}
+Diese Nachricht wurde erneut gesendet. Der Link ist unverändert.
+{{/erneut_gesendet}}{{#neuer_link}}
+Dies ist ein neuer Link. Ein früher versendeter Link ist nicht mehr gültig.
+{{/neuer_link}}
+Vorgangsnummer: {{vorgangsnummer}}
 
 CREDO HR-Portal`,
     variables: [
       { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
       { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
-      { key: "{{abteilung}}", description: "Name der zugewiesenen Abteilung" },
+      { key: "{{abteilung}}", description: "Zuständigkeit: Name der Abteilung bzw. „Führungskraft“" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
-      { key: "{{austrittsdatum}}", description: "Geplantes Austrittsdatum" },
-      { key: "{{link}}", description: "Link zu den Offboarding-Aufgaben" },
+      { key: "{{austrittsdatum}}", description: "Letzter Arbeitstag (TT.MM.JJJJ)" },
+      { key: "{{link}}", description: "Link zu den Aufgaben (ohne Anmeldung)" },
+      { key: "{{ablaufdatum}}", description: "Der Link ist gültig bis (TT.MM.JJJJ)" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+      { key: "{{aufgabenliste}}", description: "Aufgaben als Klartext, eine Zeile je Aufgabe („- Titel – fällig TT.MM.JJJJ“) – für den Textteil" },
+      { key: "{{aufgabenliste_html}}", description: "Dieselben Aufgaben als HTML-Liste, bereits maskiert – für den HTML-Teil" },
+      { key: "{{anzahl_aufgaben}}", description: "Anzahl der gelisteten Aufgaben" },
+      { key: "{{naechste_faelligkeit}}", description: "Früheste Fälligkeit der gelisteten Aufgaben (TT.MM.JJJJ, leer ohne Fälligkeit)" },
+      { key: "{{erneut_gesendet}}", description: "„ja“, wenn die Mail mit unverändertem Link erneut gesendet wird, sonst leer (für {{#erneut_gesendet}}…{{/erneut_gesendet}})" },
+      { key: "{{neuer_link}}", description: "„ja“, wenn ein neuer Link vergeben wurde (Link erneuert oder Adresse geändert) – der alte gilt dann nicht mehr; sonst leer" },
+      { key: "{{ist_fuehrungskraft}}", description: "„ja“, wenn die Mail an die Führungskraft geht, sonst leer" },
     ],
   },
 
   // =============================================
-  // Offboarding: Aufgabe erledigt
+  // Offboarding: Aufgabe erledigt (an HR)
+  //
+  // Geht nur hinaus, wenn in der Vorlage ein An-Feld steht (Katalog to: "").
+  // Ausloeser: die Abteilung hakt ueber ihren Link ab, oder HR hakt im Portal
+  // eine Aufgabe einer Link-Abteilung ab — genau einmal je Wechsel offen →
+  // erledigt. {{kommentar}} ist schon maskiert (Zeilenumbrueche als <br>),
+  // {{kommentar_text}} ist der Rohtext und steht NUR im Textteil.
   // =============================================
   {
     event: "offboarding-task-completed",
@@ -1283,10 +1340,20 @@ CREDO HR-Portal`,
               <p style="margin:0;color:#374151;font-size:14px;">{{abteilung}}</p>
             </td></tr>
             <tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Erledigt über</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{erledigt_ueber}}</p>
+            </td></tr>
+            <tr><td style="padding:0 16px 16px;">
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Noch offen im Vorgang</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{offene_aufgaben}} Aufgabe(n)</p>
             </td></tr>
           </table>
+          {{#kommentar}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">
+            <tr><td style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;">
+              <p style="margin:0 0 4px;color:#1e40af;font-size:12px;font-weight:bold;">Kommentar der Abteilung:</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.5;">{{kommentar}}</p>
+            </td></tr>
+          </table>{{/kommentar}}
           <p style="color:#9ca3af;font-size:12px;margin:0;">
             Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
           </p>
@@ -1302,16 +1369,23 @@ CREDO HR-Portal`,
     bodyText: `Aufgabe erledigt: {{aufgabe}} ({{vorname}} {{nachname}})
 
 Abteilung: {{abteilung}}
+Erledigt über: {{erledigt_ueber}}
 Noch offen im Vorgang: {{offene_aufgaben}} Aufgabe(n)
-
+{{#kommentar_text}}
+Kommentar der Abteilung: {{kommentar_text}}
+{{/kommentar_text}}
 CREDO HR-Portal`,
     variables: [
       { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
       { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
       { key: "{{aufgabe}}", description: "Name der erledigten Aufgabe" },
-      { key: "{{abteilung}}", description: "Abteilung der Aufgabe („Keine Abteilung zugeordnet“, wenn im Portal ohne Abteilung abgehakt)" },
+      { key: "{{abteilung}}", description: "Zuständige Abteilung der Aufgabe bzw. „Führungskraft“" },
+      { key: "{{erledigt_ueber}}", description: "„Link der Abteilung“, „Link der Führungskraft“ oder „Portal“" },
+      { key: "{{kommentar}}", description: "Kommentar der Abteilung für den HTML-Teil, bereits maskiert (Zeilenumbrüche als <br>); leer ohne Kommentar (für {{#kommentar}}…{{/kommentar}})" },
+      { key: "{{kommentar_text}}", description: "Kommentar der Abteilung als Rohtext – nur für den Textteil (im HTML-Teil wird er maskiert)" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{offene_aufgaben}}", description: "Anzahl der im ganzen Vorgang noch offenen Aufgaben" },
+      { key: "{{offene_aufgaben_abteilung}}", description: "Anzahl der noch offenen Aufgaben dieser Abteilung" },
       { key: "{{austrittsdatum}}", description: "Letzter Arbeitstag (TT.MM.JJJJ)" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
     ],
@@ -1319,11 +1393,18 @@ CREDO HR-Portal`,
 
   // =============================================
   // Offboarding: Erinnerung offene Aufgaben
+  //
+  // Knopf "Erinnern" und taeglicher Lauf senden denselben Aufbau
+  // (erinnerungsPayload). Die Stufe steckt in je einem Merker, weil
+  // renderTemplate nicht vergleichen kann: ist_info (bald faellig),
+  // ist_warnung (ueberfaellig), ist_eskalation (seit 3 Tagen und mehr
+  // ueberfaellig). ist_ueberfaellig haengt an den Aufgaben, nicht an der Stufe.
+  // Bewusst KEIN Satz, HR werde informiert — eine HR-Eskalation gibt es nicht.
   // =============================================
   {
     event: "offboarding-reminder",
     name: "Erinnerung: Offene Offboarding-Aufgaben",
-    subject: "Erinnerung: Offene Aufgaben für {{vorname}} {{nachname}}",
+    subject: "{{#ist_eskalation}}Dringend – {{/ist_eskalation}}Erinnerung: Offboarding-Aufgaben für {{abteilung}} ({{vorname}} {{nachname}})",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -1336,20 +1417,35 @@ CREDO HR-Portal`,
           <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
         </td></tr>
         <tr><td style="background-color:#ffffff;padding:32px;">
-          <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+          {{#ist_info}}<div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
             <span style="color:#92400e;font-weight:bold;font-size:14px;">Erinnerung</span>
-          </div>
+          </div>{{/ist_info}}
+          {{#ist_warnung}}<div style="display:inline-block;background-color:#ffedd5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#9a3412;font-weight:bold;font-size:14px;">Überfällig</span>
+          </div>{{/ist_warnung}}
+          {{#ist_eskalation}}<div style="display:inline-block;background-color:#fee2e2;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#991b1b;font-weight:bold;font-size:14px;">Dringend: überfällig</span>
+          </div>{{/ist_eskalation}}
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Offene Offboarding-Aufgaben</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Für das Offboarding von <strong>{{vorname}} {{nachname}}</strong> hat Ihre Abteilung noch offene Aufgaben (Anzahl: <strong>{{offene_aufgaben}}</strong>). Das Austrittsdatum ist der <strong>{{austrittsdatum}}</strong>.
+            Für den Austritt von <strong>{{vorname}} {{nachname}}</strong> am {{austrittsdatum}} sind für Sie noch <strong>{{offene_aufgaben}}</strong> Aufgabe(n) offen (zuständig: {{abteilung}}):
           </p>
+          {{aufgabenliste_html}}
+          {{#ist_ueberfaellig}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">
+            <tr><td style="background-color:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;">
+              <p style="margin:0;color:#991b1b;font-size:14px;line-height:1.5;">{{ueberfaellige_aufgaben}} Aufgabe(n) sind überfällig, die älteste seit {{tage_ueberfaellig}} Tag(en). Bitte erledigen Sie sie umgehend oder geben Sie der Personalabteilung Bescheid.</p>
+            </td></tr>
+          </table>{{/ist_ueberfaellig}}
           <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
             <tr><td style="background-color:#f59e0b;border-radius:8px;">
               <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
-                Aufgaben ansehen →
+                Aufgaben öffnen und abhaken →
               </a>
             </td></tr>
           </table>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Der Link funktioniert ohne Anmeldung und ist bis {{ablaufdatum}} gültig.
+          </p>
           <p style="color:#9ca3af;font-size:12px;margin:0;">
             Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
           </p>
@@ -1362,22 +1458,38 @@ CREDO HR-Portal`,
   </table>
 </body>
 </html>`,
-    bodyText: `Erinnerung: Offene Aufgaben für {{vorname}} {{nachname}}
+    bodyText: `{{#ist_eskalation}}Dringend – {{/ist_eskalation}}Erinnerung: Offboarding-Aufgaben für {{abteilung}} ({{vorname}} {{nachname}})
 
-Offene Aufgaben Ihrer Abteilung: {{offene_aufgaben}}
-Austrittsdatum: {{austrittsdatum}}
+Für den Austritt von {{vorname}} {{nachname}} am {{austrittsdatum}} sind für Sie noch {{offene_aufgaben}} Aufgabe(n) offen (zuständig: {{abteilung}}):
 
-Aufgaben ansehen: {{link}}
+{{aufgabenliste}}
+{{#ist_ueberfaellig}}
+{{ueberfaellige_aufgaben}} Aufgabe(n) sind überfällig, die älteste seit {{tage_ueberfaellig}} Tag(en). Bitte erledigen Sie sie umgehend oder geben Sie der Personalabteilung Bescheid.
+{{/ist_ueberfaellig}}
+Aufgaben öffnen und abhaken: {{link}}
+Der Link funktioniert ohne Anmeldung und ist bis {{ablaufdatum}} gültig.
 
 CREDO HR-Portal`,
     variables: [
       { key: "{{vorname}}", description: "Vorname des Mitarbeiters" },
       { key: "{{nachname}}", description: "Nachname des Mitarbeiters" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
-      { key: "{{abteilung}}", description: "Name der erinnerten Abteilung" },
-      { key: "{{austrittsdatum}}", description: "Geplantes Austrittsdatum (TT.MM.JJJJ)" },
+      { key: "{{abteilung}}", description: "Zuständigkeit: Name der erinnerten Abteilung bzw. „Führungskraft“" },
+      { key: "{{austrittsdatum}}", description: "Letzter Arbeitstag (TT.MM.JJJJ)" },
       { key: "{{offene_aufgaben}}", description: "Anzahl der offenen Aufgaben dieser Abteilung" },
-      { key: "{{link}}", description: "Link zu den Offboarding-Aufgaben der Abteilung" },
+      { key: "{{aufgabenliste}}", description: "Offene Aufgaben als Klartext, eine Zeile je Aufgabe („- Titel – fällig TT.MM.JJJJ“) – für den Textteil" },
+      { key: "{{aufgabenliste_html}}", description: "Dieselben Aufgaben als HTML-Liste, bereits maskiert – für den HTML-Teil" },
+      { key: "{{anzahl_aufgaben}}", description: "Anzahl der gelisteten (offenen) Aufgaben" },
+      { key: "{{naechste_faelligkeit}}", description: "Früheste Fälligkeit der offenen Aufgaben (TT.MM.JJJJ, leer ohne Fälligkeit)" },
+      { key: "{{ueberfaellige_aufgaben}}", description: "Anzahl der überfälligen Aufgaben (leer, wenn nichts überfällig ist)" },
+      { key: "{{tage_ueberfaellig}}", description: "So viele Tage ist die älteste überfällige Aufgabe überfällig (leer, wenn nichts überfällig ist)" },
+      { key: "{{ist_ueberfaellig}}", description: "„ja“, wenn mindestens eine Aufgabe überfällig ist, sonst leer (für {{#ist_ueberfaellig}}…{{/ist_ueberfaellig}})" },
+      { key: "{{ist_info}}", description: "„ja“ bei der Stufe „Erinnerung“ (bald fällig), sonst leer" },
+      { key: "{{ist_warnung}}", description: "„ja“ bei der Stufe „Überfällig“, sonst leer" },
+      { key: "{{ist_eskalation}}", description: "„ja“ bei der Stufe „Dringend“ (seit 3 Tagen oder länger überfällig), sonst leer" },
+      { key: "{{ist_fuehrungskraft}}", description: "„ja“, wenn die Mail an die Führungskraft geht, sonst leer" },
+      { key: "{{link}}", description: "Link zu den Aufgaben (ohne Anmeldung)" },
+      { key: "{{ablaufdatum}}", description: "Der Link ist gültig bis (TT.MM.JJJJ)" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
     ],
   },
@@ -1460,11 +1572,20 @@ CREDO HR-Portal`,
 
   // =============================================
   // Offboarding: Abteilung vollstaendig abgeschlossen
+  //
+  // Paket 1b: Die englischen Platzhalter {{employeeName}}, {{departmentName}}
+  // und {{organizationName}} bleiben (sie kommen ueber den generischen
+  // Durchreich in extractVariables an). Neu ist, WANN die Mail kommt: genau
+  // einmal beim Uebergang auf "fertig" ueber den Link
+  // (abteilungsaufgaben-uebergaenge.ts), nie beim Abhaken im Portal.
+  // Der Text ist neutral formuliert, weil die Bestaetigung auch an die
+  // Fuehrungskraft geht (VORGESETZTER): "Ihre Aufgaben (Führungskraft)" statt
+  // "Aufgaben der Abteilung Führungskraft".
   // =============================================
   {
     event: "offboarding-department-completed",
     name: "Offboarding: Abteilung abgeschlossen (Bestaetigung)",
-    subject: "Offboarding-Aufgaben Ihrer Abteilung abgeschlossen: {{employeeName}}",
+    subject: "Offboarding-Aufgaben erledigt: {{employeeName}}",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -1478,11 +1599,11 @@ CREDO HR-Portal`,
         </td></tr>
         <tr><td style="background-color:#ffffff;padding:32px;">
           <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
-            <span style="color:#065f46;font-weight:bold;font-size:14px;">Abteilung abgeschlossen</span>
+            <span style="color:#065f46;font-weight:bold;font-size:14px;">Aufgaben erledigt</span>
           </div>
-          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Alle Aufgaben Ihrer Abteilung erledigt</h2>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Alle Ihre Aufgaben sind erledigt</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Vielen Dank. Im Rahmen des Offboardings von <strong>{{employeeName}}</strong> wurden alle Aufgaben der Abteilung <strong>{{departmentName}}</strong> als erledigt markiert.
+            Vielen Dank. Im Rahmen des Offboardings von <strong>{{employeeName}}</strong> sind alle Ihnen zugewiesenen Aufgaben (<strong>{{departmentName}}</strong>) als erledigt markiert.
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
             Es sind keine weiteren Schritte Ihrerseits erforderlich. Diese E-Mail dient als Bestätigung.
@@ -1499,19 +1620,21 @@ CREDO HR-Portal`,
   </table>
 </body>
 </html>`,
-    bodyText: `Offboarding-Aufgaben Ihrer Abteilung abgeschlossen: {{employeeName}}
+    bodyText: `Offboarding-Aufgaben erledigt: {{employeeName}}
 
-Im Rahmen des Offboardings von {{employeeName}} wurden alle Aufgaben der Abteilung {{departmentName}} erledigt.
+Vielen Dank. Im Rahmen des Offboardings von {{employeeName}} sind alle Ihnen zugewiesenen Aufgaben ({{departmentName}}) erledigt.
 
 Es sind keine weiteren Schritte Ihrerseits erforderlich.
 
 CREDO HR-Portal`,
     variables: [
       { key: "{{employeeName}}", description: "Name des ausscheidenden Mitarbeiters" },
-      { key: "{{departmentName}}", description: "Name der abgeschlossenen Abteilung" },
+      { key: "{{departmentName}}", description: "Name der Abteilung bzw. „Führungskraft“" },
       { key: "{{organizationName}}", description: "Name der Einrichtung" },
       { key: "{{email}}", description: "E-Mail der Abteilungs-Kontaktperson (Empfaenger)" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
+      { key: "{{anzahl_aufgaben}}", description: "Anzahl der erledigten Aufgaben dieser Abteilung" },
+      { key: "{{ist_fuehrungskraft}}", description: "„ja“, wenn die Bestätigung an die Führungskraft geht, sonst leer" },
     ],
   },
 

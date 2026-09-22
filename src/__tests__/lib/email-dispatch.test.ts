@@ -440,6 +440,21 @@ describe("renderTemplate — bedingte Bloecke", () => {
     // die HR selbst eingegeben hat.
     expect(renderTemplate("A {{nachricht}}", { nachricht: "{{#x}}" })).toBe("A {{#x}}");
   });
+
+  it("setzt Platzhalter IN einem Wert nicht ein — egal in welcher Reihenfolge die Variablen stehen", () => {
+    // Frueher lief je Variable ein eigenes replaceAll: Schrieb eine Abteilung
+    // "{{vorgangsnummer}}" in ihren Kommentar, stand in der HR-Mail die echte Nummer.
+    const t = "Kommentar: {{kommentar}} ({{vorgangsnummer}})";
+    const erwartet = "Kommentar: siehe {{vorgangsnummer}} (OFF-1)";
+    expect(renderTemplate(t, { kommentar: "siehe {{vorgangsnummer}}", vorgangsnummer: "OFF-1" })).toBe(erwartet);
+    expect(renderTemplate(t, { vorgangsnummer: "OFF-1", kommentar: "siehe {{vorgangsnummer}}" })).toBe(erwartet);
+  });
+
+  it("unbekannte Platzhalter bleiben stehen, bekannte ohne Wert werden leer", () => {
+    expect(renderTemplate("{{a}}|{{unbekannt}}|{{b}}", { a: "1", b: undefined as unknown as string })).toBe(
+      "1|{{unbekannt}}|",
+    );
+  });
 });
 
 describe("pruefeVorlagenSyntax", () => {

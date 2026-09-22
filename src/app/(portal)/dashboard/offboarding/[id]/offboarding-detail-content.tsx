@@ -30,6 +30,11 @@ import { TABS } from "./types";
 import { STATUS_TRANSITIONS, formatDate, daysUntilLabel } from "./helpers";
 import { ArrowLeftIcon, ChevronDownIcon } from "./icons";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
+import type { AbteilungsAktion } from "@/lib/abteilungsaufgaben";
+import {
+  abteilungsAktionSenden,
+  type AktionsMeldung,
+} from "@/components/abteilungsaufgaben/abteilungen-karte";
 import {
   TabOverview,
   TabChecklist,
@@ -87,11 +92,6 @@ export function OffboardingDetailContent({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  // Department Links
-  const [sendingLinks, setSendingLinks] = useState(false);
-  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
-  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
-
   // Inline Edit
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
@@ -99,6 +99,12 @@ export function OffboardingDetailContent({
 
   // Action-Feedback
   const [actionError, setActionError] = useState<string | null>(null);
+  // Ergebnis der Abteilungs-Aktionen (Informieren, Erinnern, Erneut senden,
+  // Link erneuern): gruene bzw. rote Leiste plus gelber Hinweis. Eigener
+  // Zustand neben actionError, weil der Versandbericht auch bei Erfolg etwas
+  // zu sagen hat („Nicht informiert: Führungskraft (…)") und nicht nach fuenf
+  // Sekunden verschwinden darf.
+  const [actionInfo, setActionInfo] = useState<AktionsMeldung | null>(null);
 
   // Exit-Interview & Zeugnis
   const [exitInterview, setExitInterview] = useState<ExitInterviewData | null>(null);
@@ -107,7 +113,9 @@ export function OffboardingDetailContent({
   const [creatingZeugnis, setCreatingZeugnis] = useState(false);
   useEffect(() => {
     if (!actionError) return;
-    const timer = setTimeout(() => setActionError(null), 5000);
+    // Lange Meldungen (etwa die Freigabeliste der Führungskraft) brauchen
+    // mehr Lesezeit als ein „Verbindungsfehler."
+    const timer = setTimeout(() => setActionError(null), actionError.length > 100 ? 12000 : 5000);
     return () => clearTimeout(timer);
   }, [actionError]);
 
@@ -132,9 +140,15 @@ export function OffboardingDetailContent({
   const canEdit = HR_EDIT_ROLES.includes(user.role);
 
   // ---- Data Loading ----
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  //
+  // `leise`: nach einer Aktion neu laden, ohne die ganze Seite gegen den
+  // Lade-Kreisel zu tauschen (sonst flackert jedes Haekchen), und ohne bei
+  // einem Fehler die geladene Ansicht durch die Fehlerseite zu ersetzen.
+  const loadData = useCallback(async (leise = false) => {
+    if (!leise) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const res = await fetch(`/api/offboarding/${offboardingId}`);
       if (!res.ok) throw new Error("Vorgang konnte nicht geladen werden");
@@ -144,9 +158,11 @@ export function OffboardingDetailContent({
       setChecklistItems(result.checklistItems || []);
       setReturnItems(result.returnItems || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+      const text = err instanceof Error ? err.message : "Unbekannter Fehler";
+      if (leise) setActionError(`${text}.`);
+      else setError(text);
     } finally {
-      setLoading(false);
+      if (!leise) setLoading(false);
     }
   }, [offboardingId]);
 
@@ -196,7 +212,8 @@ export function OffboardingDetailContent({
       if (res.ok) {
         await loadData();
       } else {
-        setActionError("Status konnte nicht geändert werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Status konnte nicht geändert werden.");
       }
     } catch {
       setActionError("Verbindungsfehler bei Status-Änderung.");
@@ -206,8 +223,14 @@ export function OffboardingDetailContent({
   };
 
   // ---- Inline field edit ----
+  // Sperre gegen einen zweiten Aufruf, solange der erste laeuft (Doppel-Enter,
+  // gehaltene Taste): Ein Ref, weil `savingField` erst nach dem naechsten
+  // Rendern greift. Der Server faengt doppelte Datumsaenderungen selbst ab
+  // (Zeilensperre), aber ein zweiter PATCH braucht es gar nicht erst.
+  const speichertFeld = useRef(false);
   const handleFieldSave = async (fieldPath: string, value: string) => {
-    if (!data) return;
+    if (!data || speichertFeld.current) return;
+    speichertFeld.current = true;
     setSavingField(true);
     try {
       const res = await fetch(`/api/offboarding/${data.id}`, {
@@ -216,17 +239,31 @@ export function OffboardingDetailContent({
         body: JSON.stringify({ [fieldPath]: value }),
       });
       if (res.ok) {
-        await loadData();
+        await loadData(true);
         setEditingField(null);
         setEditingValue("");
       } else {
-        setActionError("Feld konnte nicht gespeichert werden.");
+        // Den Text des Servers zeigen: etwa 409 „Die Adresse der Führungskraft
+        // liegt in keiner freigegebenen Domain …" — ein pauschales „konnte
+        // nicht gespeichert werden" liesse HR raten, was falsch war. Das
+        // Eingabefeld bleibt offen, damit die Adresse korrigiert werden kann.
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Feld konnte nicht gespeichert werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Speichern.");
     } finally {
+      speichertFeld.current = false;
       setSavingField(false);
     }
+  };
+
+  // Link „Eintragen" in der Karte „Aufgaben für Abteilungen": in den Tab
+  // Übersicht wechseln und das Feld der Führungskraft gleich öffnen.
+  const fuehrungskraftEintragen = () => {
+    setActiveTab("overview");
+    setEditingField("supervisorEmail");
+    setEditingValue(data?.supervisorEmail ?? "");
   };
 
   // ---- Note actions ----
@@ -302,8 +339,12 @@ export function OffboardingDetailContent({
       if (res.ok) {
         const result = await res.json();
         setChecklistItems((prev) => prev.map((item) => (item.id === itemId ? (result.item || result) : item)));
+        // Der Abteilungsstand kann sich mitaendern (letzte Aufgabe erledigt →
+        // „Erledigt am …"), deshalb die Karte leise nachladen.
+        await loadData(true);
       } else {
-        setActionError("Checklisten-Eintrag konnte nicht aktualisiert werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Checklisten-Eintrag konnte nicht aktualisiert werden.");
       }
     } catch {
       setActionError("Verbindungsfehler bei Checkliste.");
@@ -330,7 +371,8 @@ export function OffboardingDetailContent({
         setEditingChecklistNoteId(null);
         setChecklistNoteText("");
       } else {
-        setActionError("Checklisten-Notiz konnte nicht gespeichert werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Checklisten-Notiz konnte nicht gespeichert werden.");
       }
     } catch {
       setActionError("Verbindungsfehler bei Checklisten-Notiz.");
@@ -418,55 +460,22 @@ export function OffboardingDetailContent({
     if (file) uploadDocument(file);
   };
 
-  // ---- Department Link actions ----
+  // ---- Abteilungs-Aktionen (Karte „Aufgaben für Abteilungen") ----
   //
-  // Beide Aktionen pruefen die Antwort. Vorher riefen sie fetch auf und
-  // luden danach neu — egal, was zurueckkam. Ein 404 oder 500 sah im Portal
-  // aus wie ein Erfolg, und genau so blieb die kaputte Erinnerung (siehe
-  // sendReminder) unbemerkt.
-  const sendDepartmentLinks = async () => {
-    setSendingLinks(true);
-    try {
-      const res = await fetch(`/api/offboarding/${offboardingId}/department-links`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        setActionError(err?.error || "Abteilungs-Links konnten nicht versendet werden.");
-        return;
-      }
-      await loadData();
-    } catch {
-      setActionError("Verbindungsfehler beim Versenden der Abteilungs-Links.");
-    } finally {
-      setSendingLinks(false);
-    }
-  };
-
-  // Die Erinnerung laeuft ueber dieselbe Route wie das Versenden, mit
-  // { action: "remind", departmentKey } im Body. Die hier frueher
-  // aufgerufene Route .../department-links/<key>/reminder hat es nie
-  // gegeben — der Knopf hat nie eine Erinnerung verschickt.
-  const sendReminder = async (departmentKey: string) => {
-    setSendingReminder(departmentKey);
-    try {
-      const res = await fetch(`/api/offboarding/${offboardingId}/department-links`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "remind", departmentKey }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        setActionError(err?.error || "Erinnerung konnte nicht gesendet werden.");
-        return;
-      }
-      await loadData();
-    } catch {
-      setActionError("Verbindungsfehler beim Senden der Erinnerung.");
-    } finally {
-      setSendingReminder(null);
-    }
+  // Eine Route fuer alle vier Aktionen: Informieren (`{}`), Erinnern, Erneut
+  // senden und Link erneuern (`{ aktion, departmentKey }`). Die Antwort traegt
+  // den Versandbericht als fertige Meldung (201 gruen, 409/502 rot) samt
+  // Hinweis (gelb). Danach IMMER neu laden — auch ein 409/502 kann den Stand
+  // aendern (etwa „Versand fehlgeschlagen" an der Zeile).
+  const abteilungsAktion = async (aktion: AbteilungsAktion, departmentKey?: string) => {
+    setActionInfo(null);
+    const meldung = await abteilungsAktionSenden(
+      `/api/offboarding/${offboardingId}/department-links`,
+      aktion,
+      departmentKey,
+    );
+    setActionInfo(meldung);
+    await loadData(true);
   };
 
   const createExitInterview = async () => {
@@ -730,7 +739,6 @@ export function OffboardingDetailContent({
             setEditingField={setEditingField}
             setEditingValue={setEditingValue}
             handleFieldSave={handleFieldSave}
-            departmentLinks={data.departmentLinks || []}
             onNavigateTab={(tab) => setActiveTab(tab as TabId)}
           />
         )}
@@ -747,13 +755,14 @@ export function OffboardingDetailContent({
             setChecklistNoteText={setChecklistNoteText}
             savingChecklistNote={savingChecklistNote}
             saveChecklistNote={saveChecklistNote}
-            departmentLinks={data.departmentLinks || []}
-            sendDepartmentLinks={sendDepartmentLinks}
-            sendingLinks={sendingLinks}
-            sendReminder={sendReminder}
-            sendingReminder={sendingReminder}
-            copiedLinkId={copiedLinkId}
-            setCopiedLinkId={setCopiedLinkId}
+            abteilungen={data.abteilungen}
+            fuehrungskraft={data.fuehrungskraft}
+            darfAbteilungsAktionen={canEdit}
+            abgebrochen={data.status === "CANCELLED"}
+            onAbteilungsAktion={abteilungsAktion}
+            abteilungsMeldung={actionInfo}
+            onAbteilungsMeldungSchliessen={() => setActionInfo(null)}
+            onFuehrungskraftEintragen={fuehrungskraftEintragen}
           />
         )}
 

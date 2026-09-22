@@ -246,9 +246,22 @@ export const OFFBOARDING_DOC_TYPE_LABELS: Record<string, string> = {
 // =============================================
 // Abteilungs-Schlüssel
 // =============================================
+//
+// Wer eine Checklisten-Aufgabe erledigt, steht als Schluessel an der Aufgabe
+// (OffboardingChecklistItem.assigneeDepartment). Drei Arten:
+//   - im Portal (PORTAL_ZUSTAENDIGE): Personalabteilung und die Person selbst.
+//     Sie bekommen NIE einen Link.
+//   - per Link an eine Abteilung (LINK_ABTEILUNGEN und eigene Schluessel aus
+//     Einstellungen → Abteilungen): Adresse aus DepartmentConfig, die der
+//     Einrichtung vor der zentralen.
+//   - per Link an die Fuehrungskraft (VORGESETZTER): IMMER die Adresse aus dem
+//     Vorgang, nie aus DepartmentConfig — ein zentraler Eintrag schickte sonst
+//     die Fuehrungsaufgaben aller Einrichtungen an ein einziges Postfach.
+// Die Regeln dazu stehen in src/lib/abteilungsaufgaben.ts.
 export const DEPARTMENT_KEYS = {
   HR: "HR",
   IT: "IT",
+  VERWALTUNG: "VERWALTUNG",
   FACILITY: "FACILITY",
   BUCHHALTUNG: "BUCHHALTUNG",
   VORGESETZTER: "VORGESETZTER",
@@ -259,12 +272,44 @@ export const DEPARTMENT_KEYS = {
 export const DEPARTMENT_LABELS: Record<string, string> = {
   HR: "Personalabteilung",
   IT: "IT-Abteilung",
+  VERWALTUNG: "Verwaltung / Sekretariat",
   FACILITY: "Facility Management",
   BUCHHALTUNG: "Buchhaltung",
-  VORGESETZTER: "Vorgesetzter",
+  // Frueher "Vorgesetzter". Die Aufgaben gehen an die im Vorgang hinterlegte
+  // Fuehrungskraft; so heisst die Zeile auch auf der Karte und in der Mail.
+  VORGESETZTER: "Führungskraft",
   MITARBEITER: "Mitarbeiter",
-  DSB: "Datenschutzbeauftragter",
+  DSB: "Datenschutzbeauftragte/r",
 };
+
+/**
+ * Feste Abteilungen, die ihre Aufgaben per Link bekommen (Adresse aus
+ * Einstellungen → Abteilungen). Reihenfolge = Reihenfolge in Auswahllisten.
+ * Eigene Schluessel aus den Einstellungen sind ebenfalls Link-Abteilungen,
+ * stehen aber naturgemaess nicht hier.
+ */
+export const LINK_ABTEILUNGEN = ["IT", "VERWALTUNG", "FACILITY", "BUCHHALTUNG", "DSB"] as const;
+
+/** Zustaendige, die im Portal arbeiten und NIE einen Link bekommen. */
+export const PORTAL_ZUSTAENDIGE = ["HR", "MITARBEITER"] as const;
+
+/**
+ * Schluessel, die unter Einstellungen → Abteilungen nicht angelegt werden
+ * duerfen: die beiden Portal-Zustaendigen und VORGESETZTER (geht immer an die
+ * Fuehrungskraft des Vorgangs).
+ */
+export const RESERVIERTE_ABTEILUNGSSCHLUESSEL = ["HR", "MITARBEITER", "VORGESETZTER"] as const;
+
+/**
+ * Anzeigename zu einem Zustaendigkeits-Schluessel.
+ *
+ * Unbekanntes (eigener Schluessel aus den Einstellungen, Alttext aus einer
+ * Vorlage) bleibt, wie es ist: haesslich, aber ehrlich. Nur leer/null ergibt "".
+ */
+export function abteilungLabel(schluesselOderText: string | null | undefined): string {
+  if (!schluesselOderText) return "";
+  return DEPARTMENT_LABELS[schluesselOderText] ?? schluesselOderText;
+}
 
 // =============================================
 // Dokument-Status-Labels

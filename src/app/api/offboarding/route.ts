@@ -11,6 +11,8 @@ import { getSession } from "@/lib/auth";
 import { createOffboardingSchema } from "@/lib/validations/offboarding";
 import { orgFilter, PORTAL_ROLES, PROCESS_CREATE_ROLES, HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { createOffboardingProcess } from "@/lib/offboarding";
+import { fuehrungskraftAdresseFreigegeben } from "@/lib/abteilungsaufgaben-dienst";
+import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
 
 // =============================================
 // GET /api/offboarding – Alle Vorgaenge auflisten
@@ -171,6 +173,8 @@ export async function POST(request: NextRequest) {
       lastWorkingDay,
       employeePrivateEmail,
       employeePersonalNr,
+      supervisorEmail,
+      supervisorName,
     } = parsed.data;
 
     // Organisation pruefen
@@ -181,6 +185,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Organisation nicht gefunden" },
         { status: 404 }
+      );
+    }
+
+    // Fuehrungskraft: Eine frei eingetippte Adresse bekommt spaeter einen Link
+    // mit Namen und Aufgaben. Dieselbe Freigabeliste wie das Dokumentenpaket
+    // (Einstellungen → SMTP, leere Liste = keine Einschraenkung). Bei der
+    // Anlage kennt das Portal noch keine Adresse dieses Vorgangs, also gibt es
+    // keine "bekannten" Ausnahmen. Geprueft VOR der Elternzeit-Rueckfrage:
+    // erst die Eingabe korrigieren, dann bestaetigen.
+    if (supervisorEmail && !(await fuehrungskraftAdresseFreigegeben(supervisorEmail, []))) {
+      return NextResponse.json(
+        { error: MELDUNGEN.FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN },
+        { status: 409 }
       );
     }
 
@@ -238,6 +255,8 @@ export async function POST(request: NextRequest) {
       exitType,
       lastWorkingDay: parsedLastWorkingDay,
       initiatedById: session.userId,
+      supervisorEmail: supervisorEmail ?? null,
+      supervisorName: supervisorName ?? null,
     });
 
     // Vorgang mit allen Includes zurueckgeben

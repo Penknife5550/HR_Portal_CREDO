@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
+import { ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufgaben";
 
 interface User {
   userId: string;
@@ -67,6 +68,11 @@ const ACTION_LABELS: Record<string, string> = {
   DOKUMENTE_NACHZUREICHEN: "Nachweise nachzureichen",
   RETURN_ITEM_UPDATED: "Rückgabe aktualisiert",
   DEPARTMENT_FEEDBACK_SUBMITTED: "Abteilungs-Feedback eingereicht",
+  // Abteilungsaufgaben (Paket 1b): Informieren, Erinnern, Link erneuern,
+  // Abhaken und Kommentieren ueber den Link, Einstellungen → Abteilungen.
+  // Eine Quelle mit dem Dienst, der die Codes schreibt (ABTEILUNGS_AUDIT).
+  // DEPARTMENT_LINKS_GENERATED oben bleibt fuer Alteintraege stehen.
+  ...ABTEILUNGS_AUDIT_LABELS,
 };
 
 /**

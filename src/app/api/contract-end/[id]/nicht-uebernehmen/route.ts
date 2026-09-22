@@ -4,7 +4,8 @@
  * Strang B des Vertragsende-Prozesses: HR entscheidet, den Mitarbeiter NICHT
  * zu uebernehmen. Per Klick wird halbautomatisch ein Offboarding-Vorgang
  * (ExitType BEFRISTUNGSENDE) angelegt, mit dem Vertragsende-Vorgang verknuepft
- * und der letzte Arbeitstag auf das Vertragsende gesetzt.
+ * und der letzte Arbeitstag auf das Vertragsende gesetzt. Die Fuehrungskraft
+ * des Vertragsendes wird als Fuehrungskraft des Austritts uebernommen.
  *
  * Idempotent: ein bereits "entschiedener" Vorgang wird per atomarem
  * Conditional-Update geschuetzt (Schutz gegen Doppelklick / parallele Requests).
@@ -101,6 +102,12 @@ export async function POST(
         exitType: ExitType.BEFRISTUNGSENDE,
         lastWorkingDay: contractEnd.contractEndDate,
         initiatedById: session.userId,
+        // Die Fuehrungskraft des Vertragsendes bekommt die Aufgaben mit der
+        // Zustaendigkeit "Führungskraft" (Paket 1b). Keine Freigabepruefung:
+        // Die Adresse ist dem Portal aus dem Vertragsende schon bekannt. Einen
+        // Namen fuehrt das Vertragsende nicht.
+        supervisorEmail: contractEnd.supervisorEmail ?? null,
+        supervisorName: null,
         auditDetails: {
           herkunft: "VERTRAGSENDE",
           contractEndId: contractEnd.id,

@@ -48,7 +48,7 @@ Das CREDO HR-Portal digitalisiert den Einstellungsprozess fuer alle 16 Mandanten
 | Datenbank        | PostgreSQL 16                        |
 | ORM              | Prisma 6                             |
 | Authentifizierung| JWT (jose + jsonwebtoken), bcryptjs  |
-| E-Mail           | Nodemailer (SMTP-Fallback)           |
+| E-Mail           | Nodemailer (SMTP, primaer)           |
 | Containerisierung| Docker, Docker Compose               |
 | Reverse Proxy    | Caddy (extern)                       |
 | Sprache          | TypeScript 5                         |
@@ -288,10 +288,10 @@ Der Vorgesetzte erhaelt einen separaten Magic Link und ergaenzt:
 
 Das Portal versendet bei bestimmten Ereignissen HTTP-POST-Requests an konfigurierte Webhook-URLs. Der primaere Anwendungsfall ist die Integration mit n8n-Workflows, z.B. zum E-Mail-Versand oder zur Synchronisation mit Drittsystemen.
 
-Der Dispatcher arbeitet wie folgt:
-1. Aktive Webhooks fuer das ausgeloeste Event aus der Datenbank laden
-2. Jeden Webhook mit Retry-Logik ausfuehren (max. 3 Versuche, 10s Timeout)
-3. Falls kein Webhook erfolgreich war: SMTP-Fallback aktivieren
+Der Dispatcher (`triggerWebhooks` in `src/lib/webhooks.ts`) arbeitet wie folgt:
+1. Die E-Mail IMMER zuerst selbst per SMTP senden (`sendEventEmail`, Vorlage aus Einstellungen > E-Mail-Vorlagen; Ergebnis im Versandprotokoll)
+2. Zusaetzlich aktive Webhooks fuer das Event aus der Datenbank laden
+3. Jeden Webhook mit Retry-Logik ausfuehren (max. 3 Versuche, 10s Timeout) — unabhaengig vom Mailergebnis
 
 ### Events
 
@@ -301,6 +301,23 @@ Der Dispatcher arbeitet wie folgt:
 | `questionnaire-completed`  | Mitarbeiter hat Personalfragebogen abgeschickt          | email, displayId, organization         |
 | `supervisor-link-created`  | Magic Link fuer Vorgesetzten generiert (auch direkt beim Anlegen) | supervisorEmail, modalitaetenLink, employeeName / mitarbeiter_name (Name oder neutrale Bezeichnung, nie die Adresse der Person), displayId, supervisorTokenExpiresAt |
 | `supervisor-completed`     | Vorgesetzter hat Modalitaeten ausgefuellt               | email, displayId, supervisorEmail      |
+| `offboarding-department-assigned` | Abteilung bzw. Fuehrungskraft bekommt ihre Offboarding-Aufgaben per Link („Abteilungen informieren", „Erneut senden", „Link erneuern", „Erinnern" nach Adressaenderung) | email, departmentKey, departmentName / abteilung, link / magicLink, token, expiresAt, taskCount (gelistete Aufgaben), aufgabenliste, aufgabenliste_html, anzahl_aufgaben, naechste_faelligkeit, erneut_gesendet, neuer_link, ist_fuehrungskraft |
+| `offboarding-reminder`     | Erinnerung an eine informierte Abteilung — Knopf „Erinnern" und taeglicher Lauf mit gleichem Aufbau | email, departmentName / abteilung, link, expiresAt, reminderCount, level (INFO/WARNING/ESCALATION), overdueItems, upcomingItems, totalOpenItems, maxOverdueDays, ist_info, ist_warnung, ist_eskalation, ist_ueberfaellig, ueberfaellige_aufgaben, tage_ueberfaellig, aufgabenliste, aufgabenliste_html |
+| `offboarding-task-completed` | Aufgabe offen → erledigt, genau einmal: ueber den Link oder im Portal (dort nur Aufgaben einer Link-Abteilung). Geht nur hinaus, wenn in der Vorlage ein An-Feld steht | itemId, aufgabe, departmentKey, departmentName / abteilung, erledigt_ueber („Link der Abteilung", „Link der Führungskraft", „Portal"), offene_aufgaben, offene_aufgaben_abteilung, kommentar (schon maskiert), kommentar_text (roh); Portal zusaetzlich taskId, taskTitle, taskCategory, completedById — kein `email` |
+| `offboarding-department-completed` | Abteilung hat ueber ihren Link alles erledigt, genau einmal | email, departmentKey, departmentName / abteilung, completedAt, anzahl_aufgaben, ist_fuehrungskraft |
+
+Die vier Offboarding-Events tragen zusaetzlich die Vorgangsfelder (offboardingId, displayId, employeeName, vorname, nachname, einrichtung, lastWorkingDay, austrittsdatum). Merker wie `neuer_link` oder `ist_warnung` sind `"ja"` oder leer. Alle aelteren Felder bleiben fuer bestehende Webhook-Abnehmer erhalten. Ist die Portal-Vorlage deaktiviert und fuer das Event ein Webhook aktiv, gilt der Link als zugestellt (Status `WEBHOOK`); sonst verschickt das Portal die Mail selbst, und ein zusaetzlicher n8n-Workflow mit eigener Mail fuehrt zu Doppelversand. Regeln: CLAUDE.md, Abschnitt „Abteilungsaufgaben".
+
+### Offboarding: Abteilungsaufgaben (Routen)
+
+| Route | Wer | Zweck |
+|-------|-----|-------|
+| `POST /api/offboarding/[id]/department-links` | HR (Admin, HR-Leitung, Sachbearbeitung) | Body leer/`{}` = Abteilungen informieren; `{ "aktion": "erneut-senden" \| "erinnern" \| "link-erneuern", "departmentKey": "IT" }`. Antwort 201 (mindestens eine Mail versendet), 409 (nichts zu versenden, Grund je Abteilung), 502 (alle Versuche am Mailserver gescheitert); Body `{ data: { aktion, versendet[], uebersprungen[] }, meldung, hinweis }` |
+| `GET /api/offboarding-tasks/[token]` | Abteilung, ohne Anmeldung | Nur die eigenen Aufgaben (ohne interne Notiz, ohne Fortschritt anderer Abteilungen); 404 ungueltig, 410 abgelaufen oder Vorgang abgebrochen |
+| `PATCH /api/offboarding-tasks/[token]/[itemId]` | Abteilung, ohne Anmeldung | `{ "isCompleted": true, "comment": "…" }` (Kommentar max. 1000 Zeichen, `""` loescht); 409 bei abgeschlossenem Vorgang, 429 je IP bzw. je Link |
+| `POST /api/cron/offboarding-reminders` | n8n, `Authorization: Bearer <CRON_SECRET>` | Taegliche Erinnerungen. Antwort `{ success, timestamp, remindersProcessed, errors, details[], uebersprungen[] }`; `details` fuehrt jeden Versuch mit `status` (SENT/WEBHOOK/SKIPPED/FAILED), `uebersprungen` die Links mit geaenderter oder fehlender Adresse |
+
+Die Adressen der Abteilungen stehen unter **Einstellungen** > **Abteilungen** (`/api/settings/departments`), die Adresse der Fuehrungskraft am Offboarding-Vorgang (`supervisorEmail`, `supervisorName`).
 
 ### Konfiguration
 
@@ -335,8 +352,8 @@ Ein **Test-Button** im Admin-Portal ermoeglicht das Versenden eines Test-Payload
 
 | Prioritaet | Kanal              | Beschreibung                                              |
 |------------|--------------------|-----------------------------------------------------------|
-| 1 (primaer)| n8n via Webhooks   | E-Mails werden durch n8n-Workflows versendet              |
-| 2 (Fallback)| SMTP direkt       | Nur wenn kein Webhook erfolgreich war                     |
+| 1 (primaer)| SMTP direkt        | Das Portal versendet jede E-Mail selbst (Versandprotokoll) |
+| 2 (Zusatz) | n8n via Webhooks   | Optional, feuert zusaetzlich — nicht als Ersatz fuer SMTP |
 
 ### SMTP-Konfiguration
 

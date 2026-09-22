@@ -1665,6 +1665,14 @@ model OffboardingProcess {
   // Status
   status OffboardingStatus @default(INITIATED)
 
+  // Fuehrungskraft (Paket 1b, optional): Empfaenger der Checklisten-Aufgaben
+  // mit Zustaendigkeit VORGESETZTER. Nie eine zentrale Adresse aus
+  // DepartmentConfig — die schickte die Fuehrungsaufgaben aller Einrichtungen
+  // an ein einziges Postfach. Leer = Rueckfall auf ZeugnisBewertung bzw.
+  // Vertragsende (src/lib/abteilungsaufgaben-dienst.ts, fuehrungskraftErmitteln).
+  supervisorEmail String?
+  supervisorName  String?
+
   // Initiierung
   initiatedById String
   initiatedBy   User      @relation("OffboardingInitiator", fields: [initiatedById], references: [id])
@@ -1764,9 +1772,15 @@ model OffboardingChecklistItem {
 
   isCompleted   Boolean   @default(false)
   completedAt   DateTime?
-  completedById String?
+  completedById String? // gesetzt = im Portal abgehakt, null bei erledigt = ueber den Link der Abteilung
   dueDate       DateTime?
-  notes         String?
+  notes         String? // INTERNE HR-Notiz — verlaesst nie das Portal (nicht auf der Link-Seite)
+
+  // Kommentar der Abteilung ueber den Link (Paket 1b), hoechstens 1000 Zeichen.
+  // Getrennt von `notes`: Frueher zeigte die Link-Seite die interne Notiz als
+  // "Kommentar" an, und was die Abteilung schrieb, ging verloren.
+  abteilungKommentar   String?
+  abteilungKommentarAm DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1872,14 +1886,24 @@ model OffboardingDepartmentLink {
 
   departmentKey  String
   departmentName String
-  email          String
-  token          String   @unique
+  email          String // konfigurierte Adresse beim letzten Versand (Vergleich "Adresse geaendert")
+  token          String   @unique // nur beim Anlegen und bei HR-Aktionen neu: "Link erneuern", Erneut senden/Erinnern nach Adressaenderung
   expiresAt      DateTime
 
-  sentAt        DateTime?
-  firstOpenedAt DateTime?
-  lastOpenedAt  DateTime?
-  openCount     Int       @default(0)
+  // ERSTER erfolgreicher Versand (SENT oder an Webhook uebergeben), bleibt stehen.
+  // Scheitert die Mail zu einem NEUEN Token, zurueck auf null (der gueltige Link kam nie an).
+  sentAt         DateTime?
+  // Paket 1b: Versandstand. lastSentAt = letzter erfolgreicher Versand
+  // (Anker der Erinnerungen, Rueckfall sentAt). lastSendStatus/-Detail = Ergebnis
+  // des letzten Versuchs: SENT | WEBHOOK | FAILED | SKIPPED, Grund gekuerzt.
+  // zugestelltAn = tatsaechlicher Empfaenger aus EventEmailResult.recipient.
+  lastSentAt     DateTime?
+  lastSendStatus String?
+  lastSendDetail String?
+  zugestelltAn   String?
+  firstOpenedAt  DateTime?
+  lastOpenedAt   DateTime?
+  openCount      Int       @default(0)
 
   lastReminderAt DateTime?
   reminderCount  Int       @default(0)

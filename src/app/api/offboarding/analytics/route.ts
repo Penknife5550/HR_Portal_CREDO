@@ -443,7 +443,12 @@ export async function GET(request: NextRequest) {
     // =============================================
     // 7. Abteilungs-Performance
     // =============================================
-    const deptWhere: Record<string, unknown> = {};
+    // Nur Links, die wirklich hinausgingen (sentAt gesetzt). Ein Link, dessen
+    // Mail scheiterte oder nie versucht wurde, ist keiner Abteilung
+    // "zugewiesen" und verfaelschte sonst totalAssigned. sentAt ist der ERSTE
+    // erfolgreiche Versand und bleibt stehen — die Antwortzeit misst also ab
+    // der ersten Mail, nicht ab einem spaeteren "Erneut senden".
+    const deptWhere: Record<string, unknown> = { sentAt: { not: null } };
     if (organizationId || fromParam || toParam) {
       deptWhere.offboarding = where;
     }

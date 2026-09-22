@@ -101,4 +101,35 @@ describe("Strang B: nicht-uebernehmen", () => {
       }),
     );
   });
+
+  // Paket 1b: Die Fuehrungskraft des Vertragsendes bekommt im Offboarding die
+  // Aufgaben mit der Zustaendigkeit "Führungskraft".
+  describe("Führungskraft aus dem Vertragsende", () => {
+    function anlageVorbereiten(ce: Record<string, unknown>) {
+      mockPrisma.contractEndProcess.findUnique.mockResolvedValue(ce);
+      mockPrisma.contractEndProcess.updateMany.mockResolvedValue({ count: 1 });
+      mockCreateOffboarding.mockResolvedValue({ id: "off1", displayId: "OFF-2026-GYM-004" });
+      mockPrisma.contractEndProcess.update.mockResolvedValue({ id: "ce1" });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+    }
+
+    it("übernimmt die Adresse der Führungskraft in den Offboarding-Vorgang (ohne Namen)", async () => {
+      anlageVorbereiten({ ...ceBase, supervisorEmail: "leitung@example.org" });
+      const res = await POST(req(), { params: params() });
+      expect(res.status).toBe(201);
+      const arg = mockCreateOffboarding.mock.calls[0][0];
+      expect(arg.supervisorEmail).toBe("leitung@example.org");
+      expect(arg.supervisorName).toBeNull();
+    });
+
+    it("ohne Führungskraft im Vertragsende bleibt sie leer", async () => {
+      anlageVorbereiten({ ...ceBase, supervisorEmail: null });
+      const res = await POST(req(), { params: params() });
+      expect(res.status).toBe(201);
+      expect(mockCreateOffboarding.mock.calls[0][0]).toMatchObject({
+        supervisorEmail: null,
+        supervisorName: null,
+      });
+    });
+  });
 });

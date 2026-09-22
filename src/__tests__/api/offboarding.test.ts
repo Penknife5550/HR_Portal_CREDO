@@ -31,6 +31,10 @@ const mockPrisma = {
   auditLog: {
     create: jest.fn(),
   },
+  // Freigabeliste der Empfaenger-Domains (Fuehrungskraft, Paket 1b)
+  smtpConfig: {
+    findUnique: jest.fn(),
+  },
   $transaction: jest.fn(),
 };
 const mockTriggerWebhooks = jest.fn();
@@ -221,6 +225,141 @@ describe("API /api/offboarding", () => {
         mockPrisma.offboardingProcess.create.mock.calls[0][0];
       const generatedDisplayId = createCall.data.displayId;
       expect(generatedDisplayId).toMatch(/^OFF-\d{4}-[A-Z0-9]+-\d{3}$/);
+    });
+  });
+
+  // =============================================
+  // Fuehrungskraft bei der Anlage (Paket 1b)
+  // =============================================
+  describe("POST – Führungskraft", () => {
+    const mockOrg = {
+      id: validBody.organizationId,
+      name: "CREDO Gymnasium",
+      shortName: "GYM",
+      mandantNumber: "100",
+      type: "GYMNASIUM",
+    };
+
+    /** Anlage bis zum Ende durchspielen (echter createOffboardingProcess, Prisma gemockt). */
+    function anlageVorbereiten() {
+      mockPrisma.organization.findUnique.mockResolvedValue(mockOrg);
+      mockPrisma.elternzeitProzess.findFirst.mockResolvedValue(null);
+      mockPrisma.offboardingProcess.count.mockResolvedValue(0);
+      mockPrisma.offboardingProcess.findUnique
+        .mockResolvedValueOnce(null) // displayId frei
+        .mockResolvedValueOnce({ id: "created-id" }); // Rueckgabe der Route
+      mockPrisma.checklistTemplate.findFirst.mockResolvedValue(null);
+      mockPrisma.$transaction.mockImplementation(
+        async (fn: (tx: typeof mockPrisma) => Promise<unknown>) => fn(mockPrisma)
+      );
+      mockPrisma.offboardingProcess.create.mockResolvedValue({
+        id: "created-id",
+        displayId: `OFF-${new Date().getFullYear()}-GYM-001`,
+        employeeEmail: validBody.employeeEmail,
+        employeeFirstName: "Max",
+        employeeLastName: "Mustermann",
+        exitType: validBody.exitType,
+        lastWorkingDay: new Date("2025-12-31"),
+        organization: mockOrg,
+      });
+      mockPrisma.offboardingExitData.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockTriggerWebhooks.mockResolvedValue(undefined);
+    }
+
+    beforeEach(() => {
+      // Standard: leere Freigabeliste = keine Einschraenkung
+      mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "" });
+    });
+
+    it("gibt E-Mail und Name der Führungskraft an createOffboardingProcess weiter und protokolliert „hinterlegt“", async () => {
+      anlageVorbereiten();
+      const res = await POST(
+        createRequest("POST", {
+          ...validBody,
+          supervisorEmail: " leitung@credo.de ",
+          supervisorName: "Anna Leitung",
+        })
+      );
+      expect(res.status).toBe(201);
+
+      const createData = mockPrisma.offboardingProcess.create.mock.calls[0][0].data;
+      expect(createData).toMatchObject({
+        supervisorEmail: "leitung@credo.de",
+        supervisorName: "Anna Leitung",
+      });
+      const audit = mockPrisma.auditLog.create.mock.calls[0][0].data;
+      expect(audit).toMatchObject({
+        action: "OFFBOARDING_CREATED",
+        details: expect.objectContaining({ fuehrungskraftHinterlegt: true }),
+      });
+    });
+
+    it("ohne Angabe (oder leer) bleibt die Führungskraft leer", async () => {
+      anlageVorbereiten();
+      const res = await POST(
+        createRequest("POST", { ...validBody, supervisorEmail: "", supervisorName: "" })
+      );
+      expect(res.status).toBe(201);
+      const createData = mockPrisma.offboardingProcess.create.mock.calls[0][0].data;
+      expect(createData).toMatchObject({ supervisorEmail: null, supervisorName: null });
+      expect(mockPrisma.auditLog.create.mock.calls[0][0].data.details).toMatchObject({
+        fuehrungskraftHinterlegt: false,
+      });
+      // Ohne Adresse wird die Freigabeliste gar nicht erst gelesen.
+      expect(mockPrisma.smtpConfig.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("Adresse ausserhalb der Freigabeliste → 409, nichts angelegt", async () => {
+      // Nur die Einrichtung — die Pruefung steht vor Elternzeit-Rueckfrage und Anlage.
+      mockPrisma.organization.findUnique.mockResolvedValue(mockOrg);
+      mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "credo.de" });
+      const res = await POST(
+        createRequest("POST", { ...validBody, supervisorEmail: "chefin@gmail.com" })
+      );
+      const data = await res.json();
+
+      expect(res.status).toBe(409);
+      expect(data.error).toBe(
+        "Die Adresse der Führungskraft liegt in keiner freigegebenen Domain (Einstellungen → SMTP → Erlaubte Empfänger-Domains). Bitte eine dienstliche Adresse eintragen."
+      );
+      expect(mockPrisma.elternzeitProzess.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.offboardingProcess.create).not.toHaveBeenCalled();
+      expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+    });
+
+    it("Adresse in einer freigegebenen Domain → 201", async () => {
+      anlageVorbereiten();
+      mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "credo.de" });
+      const res = await POST(
+        createRequest("POST", { ...validBody, supervisorEmail: "leitung@credo.de" })
+      );
+      expect(res.status).toBe(201);
+    });
+
+    it("ungültige Adresse → 400 mit deutscher Meldung", async () => {
+      const res = await POST(
+        createRequest("POST", { ...validBody, supervisorEmail: "keine-adresse" })
+      );
+      const data = await res.json();
+      expect(res.status).toBe(400);
+      expect(data.error).toBe("Bitte eine gültige E-Mail-Adresse der Führungskraft angeben.");
+    });
+
+    it("Name mit spitzen Klammern → 400", async () => {
+      const res = await POST(
+        createRequest("POST", { ...validBody, supervisorName: "<b>Chef</b>" })
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe("POST – letzter Arbeitstag", () => {
+    it("ein Text im Format, aber ohne gültiges Datum → 400 statt 500", async () => {
+      const res = await POST(createRequest("POST", { ...validBody, lastWorkingDay: "2025-13-45" }));
+      const data = await res.json();
+      expect(res.status).toBe(400);
+      expect(data.error).toBe("Ungültiges Datum");
     });
   });
 

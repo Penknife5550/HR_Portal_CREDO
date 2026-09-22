@@ -7,7 +7,9 @@
  *
  * Kapselt displayId-Generierung, Checklisten-Template-Auswahl, die Transaktion
  * (Vorgang + leere ExitData + Checkliste + AuditLog) und den Event-Versand
- * "offboarding-created". Die Org-Existenz stellt der Aufrufer sicher und
+ * "offboarding-created". Die Fuehrungskraft (optional) wird mitgespeichert;
+ * eine Beschreibung der Vorlagenpunkte gibt es nicht (ChecklistTemplateItem
+ * hat kein solches Feld). Die Org-Existenz stellt der Aufrufer sicher und
  * uebergibt die geladene Organisation (damit die Route weiterhin 404 liefern
  * kann, bevor der Service laeuft).
  */
@@ -54,6 +56,15 @@ export interface CreateOffboardingInput {
   initiatedById: string;
   /** Optionale Verknuepfung zur zentralen Personalakte. */
   employeeId?: string | null;
+  /**
+   * Fuehrungskraft (Paket 1b, optional): Empfaengerin der Checklisten-Aufgaben
+   * mit der Zustaendigkeit VORGESETZTER. Die Freigabepruefung einer frei
+   * eingetippten Adresse macht der Aufrufer VOR dem Anlegen
+   * (POST /api/offboarding); aus dem Vertragsende kommt eine dem Portal schon
+   * bekannte Adresse ohne Pruefung.
+   */
+  supervisorEmail?: string | null;
+  supervisorName?: string | null;
   /** Zusaetzliche Audit-Details (z.B. Herkunft aus einem Vertragsende-Vorgang). */
   auditDetails?: Record<string, unknown>;
 }
@@ -99,6 +110,11 @@ export async function createOffboardingProcess(input: CreateOffboardingInput) {
     include: { items: { orderBy: { orderIndex: "asc" } } },
   });
 
+  // Leer oder nur Leerzeichen = keine Fuehrungskraft (dann greift spaeter der
+  // Rueckfall auf Zeugnis-Bewertung bzw. Vertragsende, fuehrungskraftErmitteln).
+  const supervisorEmail = input.supervisorEmail?.trim() || null;
+  const supervisorName = input.supervisorName?.trim() || null;
+
   // Gesamte Erstellung in einer Transaktion
   const offboarding = await prisma.$transaction(async (tx) => {
     const created = await tx.offboardingProcess.create({
@@ -116,6 +132,8 @@ export async function createOffboardingProcess(input: CreateOffboardingInput) {
         lastWorkingDay: input.lastWorkingDay,
         status: "INITIATED",
         initiatedById: input.initiatedById,
+        supervisorEmail,
+        supervisorName,
       },
       include: { organization: true },
     });
@@ -156,6 +174,9 @@ export async function createOffboardingProcess(input: CreateOffboardingInput) {
           organization: org.name,
           exitType: input.exitType,
           lastWorkingDay: input.lastWorkingDay.toISOString(),
+          // Nur ob, nicht wer: Die Adresse steht am Vorgang. Das Protokoll
+          // haelt fest, ob sie schon bei der Anlage hinterlegt wurde.
+          fuehrungskraftHinterlegt: supervisorEmail !== null,
           ...(input.auditDetails || {}),
         },
       },

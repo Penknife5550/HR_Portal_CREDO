@@ -2,6 +2,10 @@
 // Types
 // =============================================
 
+// Nur Typen: Die Regeldatei ist client-sicher, der Dienst nicht (Prisma) —
+// `import type` verschwindet beim Uebersetzen, es landet nichts im Bundle.
+import type { AbteilungsZeile, Anzeige, ErledigtVon, Fuehrungskraft } from "@/lib/abteilungsaufgaben";
+
 export interface User {
   userId: string;
   email: string;
@@ -44,7 +48,13 @@ export interface ChecklistItemData {
   completedAt: string | null;
   completedById: string | null;
   dueDate: string | null;
+  /** Interne HR-Notiz — nur im Portal, nie auf der Seite der Abteilung. */
   notes: string | null;
+  /** Kommentar der Abteilung ueber ihren Link (Paket 1b). */
+  abteilungKommentar?: string | null;
+  abteilungKommentarAm?: string | null;
+  /** Wer hat abgehakt: im Portal (Name) oder ueber den Link (Abteilung). */
+  erledigtVon?: ErledigtVon;
 }
 
 export interface ReturnItemData {
@@ -158,6 +168,23 @@ export interface DepartmentLinkData {
   completedAt: string | null;
   lastReminderAt: string | null;
   reminderCount: number;
+  lastSentAt?: string | null;
+  lastSendStatus?: string | null;
+  lastSendDetail?: string | null;
+  zugestelltAn?: string | null;
+  /** Kopierbare Adresse vom Server (APP_URL) — nie aus window.location bauen. */
+  url?: string;
+  anzeige?: Anzeige;
+}
+
+/** Karte „Aufgaben für Abteilungen" — so liefert sie GET /api/offboarding/[id]. */
+export interface AbteilungenData {
+  zeilen: AbteilungsZeile[];
+  informierbar: number;
+  niemandInformiert: boolean;
+  vorgangAbgeschlossen: boolean;
+  /** Letzter Arbeitstag (ISO) — Bezug der Faelligkeiten. */
+  bezugsdatum: string;
 }
 
 export interface OffboardingData {
@@ -188,6 +215,13 @@ export interface OffboardingData {
   checklistItems: ChecklistItemData[];
   notes: NoteData[];
   departmentLinks: DepartmentLinkData[];
+  /** Im Vorgang hinterlegte Fuehrungskraft (Spalten des Vorgangs). */
+  supervisorEmail?: string | null;
+  supervisorName?: string | null;
+  /** Wirksame Fuehrungskraft: Vorgang → Zeugnis-Bewertung → Vertragsende. */
+  fuehrungskraft?: Fuehrungskraft;
+  /** Quelle der Karte „Aufgaben für Abteilungen" (auch nicht informierte Abteilungen). */
+  abteilungen?: AbteilungenData;
 }
 
 // =============================================

@@ -11,6 +11,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
+import { abteilungLabel, DEPARTMENT_KEYS } from "@/lib/constants";
 
 // =============================================
 // Types
@@ -100,21 +101,20 @@ const OFFBOARDING_CATEGORY_SUGGESTIONS = [
   "Phase 6: Nach Austritt",
 ];
 
-// Abteilungs-Optionen für Offboarding-Items
-const DEPARTMENT_OPTIONS: { key: string; label: string }[] = [
-  { key: "HR", label: "Personalabteilung" },
-  { key: "IT", label: "IT-Abteilung" },
-  { key: "FACILITY", label: "Facility Management" },
-  { key: "BUCHHALTUNG", label: "Buchhaltung" },
-  { key: "VORGESETZTER", label: "Vorgesetzter" },
-  { key: "MITARBEITER", label: "Mitarbeiter" },
-  { key: "DSB", label: "Datenschutzbeauftragter" },
-];
+// Abteilungs-Optionen für Offboarding-Items — aus constants.ts statt einer
+// eigenen Liste (die hier kannte VERWALTUNG nicht und hiess noch
+// „Vorgesetzter"/„Datenschutzbeauftragter"). Eigene Schlüssel aus
+// Einstellungen → Abteilungen kommen mit dem Editor-Umbau in Paket 5 dazu.
+const DEPARTMENT_OPTIONS: { key: string; label: string }[] = Object.values(DEPARTMENT_KEYS).map((key) => ({
+  key,
+  label: abteilungLabel(key),
+}));
 
-// Farben pro Abteilung für Badges
+// Farben pro Abteilung für Badges (feste Klassen, damit Tailwind sie findet)
 const DEPARTMENT_BADGE_COLORS: Record<string, string> = {
   HR: "bg-blue-100 text-blue-800",
   IT: "bg-purple-100 text-purple-800",
+  VERWALTUNG: "bg-teal-100 text-teal-800",
   FACILITY: "bg-orange-100 text-orange-800",
   BUCHHALTUNG: "bg-yellow-100 text-yellow-800",
   VORGESETZTER: "bg-green-100 text-green-800",
@@ -122,10 +122,9 @@ const DEPARTMENT_BADGE_COLORS: Record<string, string> = {
   DSB: "bg-red-100 text-red-800",
 };
 
-// Abteilungs-Label nachschlagen
+// Abteilungs-Label nachschlagen (unbekannter Schlüssel/Freitext bleibt, wie er ist)
 function getDepartmentLabel(key: string): string {
-  const dept = DEPARTMENT_OPTIONS.find((d) => d.key === key);
-  return dept ? dept.label : key;
+  return abteilungLabel(key);
 }
 
 // Pruefen ob ein Template ein Offboarding-Template ist

@@ -2,11 +2,17 @@
  * API: /api/offboarding/:id/checklist
  *
  * GET – Alle Checklisten-Items eines Offboardings abrufen
+ *
+ * Rolle PORTAL_ROLES, Mandant per canAccessProcess. Ein Vorgang eines fremden
+ * Mandanten bekommt dieselbe 404 mit demselben Text wie ein unbekannter —
+ * die Antwort verraet nicht, dass es ihn gibt.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { canAccessProcess, PORTAL_ROLES } from "@/lib/permissions";
+import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
 
 // =============================================
 // GET /api/offboarding/:id/checklist
@@ -23,18 +29,20 @@ export async function GET(
         { status: 401 }
       );
     }
+    if (!PORTAL_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    }
 
     const { id } = await params;
 
-    // Pruefen ob Offboarding existiert
     const offboarding = await prisma.offboardingProcess.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, organizationId: true },
     });
 
-    if (!offboarding) {
+    if (!offboarding || !(await canAccessProcess(session, offboarding.organizationId))) {
       return NextResponse.json(
-        { error: "Offboarding-Vorgang nicht gefunden" },
+        { error: MELDUNGEN.VORGANG_NICHT_GEFUNDEN },
         { status: 404 }
       );
     }

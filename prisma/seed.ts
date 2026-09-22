@@ -587,39 +587,63 @@ async function main() {
   // =============================================
   // 6. Standard-Abteilungs-Konfigurationen (zentral, ohne Mandant)
   // =============================================
-  console.log("📋 Abteilungs-Konfigurationen anlegen...\n");
-
+  // NUR ANLEGEN, NIE AKTUALISIEREN (Paket 1b, M15). Frueher setzte jeder Lauf
+  // Name und Adresse vorhandener Eintraege auf die Platzhalter unten zurueck —
+  // ein versehentliches `node prisma/seed.js` auf dem Server haette die unter
+  // Einstellungen → Abteilungen gepflegten Adressen ueberschrieben, und die
+  // Abteilungsaufgaben waeren an *@credo-gruppe.de gegangen. Ein vorhandener
+  // zentraler Eintrag bleibt deshalb, wie er ist, auch wenn er deaktiviert ist.
+  // VERWALTUNG fehlt bewusst: Das Sekretariat hat je Einrichtung eine eigene
+  // Adresse, ein zentraler Platzhalter waere falsch.
+  //
+  // Und NUR bei der Erstinstallation (noch gar keine Abteilung): Wer unter
+  // Einstellungen → Abteilungen eine zentrale Platzhalterzeile bewusst
+  // geloescht hat, bekaeme sie sonst beim naechsten Seed-Lauf aktiv mit
+  // *@credo-gruppe.de zurueck — und Einrichtungen ohne eigenen Eintrag ihre
+  // Aufgaben wieder an diese Adresse.
   const departmentConfigs = [
     { departmentKey: "IT", departmentName: "IT-Abteilung", email: "it@credo-gruppe.de" },
     { departmentKey: "FACILITY", departmentName: "Facility Management", email: "facility@credo-gruppe.de" },
     { departmentKey: "BUCHHALTUNG", departmentName: "Buchhaltung", email: "buchhaltung@credo-gruppe.de" },
-    { departmentKey: "DSB", departmentName: "Datenschutzbeauftragter", email: "dsb@credo-gruppe.de" },
+    { departmentKey: "DSB", departmentName: "Datenschutzbeauftragte/r", email: "dsb@credo-gruppe.de" },
   ];
 
-  for (const dept of departmentConfigs) {
+  const vorhandeneAbteilungen = await prisma.departmentConfig.count();
+  let departmentConfigsAngelegt = 0;
+  if (vorhandeneAbteilungen > 0) {
+    console.log(
+      `📋 Abteilungs-Konfigurationen: ${vorhandeneAbteilungen} vorhanden — keine Platzhalter angelegt (Pflege unter Einstellungen → Abteilungen).\n`,
+    );
+  } else {
+    console.log("📋 Abteilungs-Konfigurationen anlegen (Erstinstallation)...\n");
+  }
+  for (const dept of vorhandeneAbteilungen > 0 ? [] : departmentConfigs) {
+    // findFirst statt findUnique: Der zusammengesetzte Schluessel nimmt
+    // organizationId null nicht an (zentral).
     const existing = await prisma.departmentConfig.findFirst({
       where: { departmentKey: dept.departmentKey, organizationId: null },
     });
 
     if (existing) {
-      await prisma.departmentConfig.update({
-        where: { id: existing.id },
-        data: { departmentName: dept.departmentName, email: dept.email },
-      });
-    } else {
-      await prisma.departmentConfig.create({
-        data: {
-          departmentKey: dept.departmentKey,
-          departmentName: dept.departmentName,
-          email: dept.email,
-          organizationId: null,
-        },
-      });
+      console.log(`  ⏭️  Abteilung vorhanden, unverändert: ${existing.departmentName} (${existing.email})`);
+      continue;
     }
-    console.log(`  ✅ Abteilung: ${dept.departmentName} (${dept.email})`);
+
+    await prisma.departmentConfig.create({
+      data: {
+        departmentKey: dept.departmentKey,
+        departmentName: dept.departmentName,
+        email: dept.email,
+        organizationId: null,
+      },
+    });
+    departmentConfigsAngelegt++;
+    console.log(`  ✅ Abteilung angelegt: ${dept.departmentName} (${dept.email})`);
   }
 
-  console.log(`\n📋 ${departmentConfigs.length} Abteilungs-Konfigurationen angelegt/aktualisiert.\n`);
+  console.log(
+    `\n📋 ${departmentConfigsAngelegt} von ${departmentConfigs.length} Abteilungs-Konfigurationen neu angelegt.\n`,
+  );
 
   // =============================================
   // 7. Phase 2: Exit-Interview Default Template

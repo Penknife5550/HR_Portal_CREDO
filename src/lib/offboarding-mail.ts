@@ -73,12 +73,19 @@ export function offboardingMailFelder(
  * Magic Link einer Abteilung auf ihre Offboarding-Aufgaben.
  *
  * Die Seite heisst /offboarding-tasks/<token> (src/app/offboarding-tasks).
- * Die Mails zeigten bis zu dieser Aenderung auf /offboarding/abteilung/<token>
+ * Die Mails zeigten bis September 2026 auf /offboarding/abteilung/<token>
  * — eine Seite, die es nie gab. Jede Abteilung, die auf "Aufgaben ansehen"
- * klickte, landete auf einer 404. Nur der Kopier-Knopf im Portal
- * (tab-checklist.tsx) baute den Link richtig; der laeuft im Browser und kann
- * diese Funktion nicht nutzen (getBaseUrl haengt an Node-Modulen). Beide
- * Stellen muessen deshalb bei einer Umbenennung der Seite mitgezogen werden.
+ * klickte, landete auf einer 404.
+ *
+ * Seit Paket 1b ist dies die EINZIGE Stelle, die den Link baut: Mails
+ * (abteilungsaufgaben-dienst.ts) und der Knopf "Link kopieren" im Portal
+ * nutzen sie beide. Der Knopf baut die Adresse nicht mehr im Browser aus
+ * window.location, sondern bekommt sie fertig vom Server (`url` an
+ * `departmentLinks[]` und `abteilungen.zeilen[].link` in GET
+ * /api/offboarding/[id], abteilungsUebersichtLaden). So zeigen Mail und
+ * kopierter Link auf dieselbe Adresse (APP_URL), auch wenn HR das Portal ueber
+ * eine interne Adresse aufruft. Eine Umbenennung der Seite braucht nur hier
+ * eine Aenderung.
  */
 export function abteilungsAufgabenLink(token: string): string {
   return `${getBaseUrl()}/offboarding-tasks/${token}`;

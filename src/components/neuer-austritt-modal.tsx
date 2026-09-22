@@ -4,10 +4,17 @@
  * Modal: Neuen Offboarding-Vorgang (Austritt) anlegen
  *
  * Felder: Vorname, Nachname, Dienst-E-Mail, Private E-Mail,
- * Einrichtung, Austrittsart, Letzter Arbeitstag, Personalnummer
+ * Einrichtung, E-Mail und Name der Führungskraft (optional, Paket 1b),
+ * Austrittsart, Letzter Arbeitstag, Personalnummer
+ *
+ * Die Führungskraft bekommt die Checklisten-Aufgaben mit der Zuständigkeit
+ * „Führungskraft" per Link. Eine frei eingetippte Adresse prüft der Server
+ * gegen die Freigabeliste (Einstellungen → SMTP); die 409-Meldung erscheint
+ * hier im Formular.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { EXIT_TYPE_LABELS } from "@/lib/constants";
 
 interface Organization {
@@ -35,6 +42,8 @@ export function NeuerAustrittModal({
   const [workEmail, setWorkEmail] = useState("");
   const [privateEmail, setPrivateEmail] = useState("");
   const [organizationId, setOrganizationId] = useState("");
+  const [supervisorEmail, setSupervisorEmail] = useState("");
+  const [supervisorName, setSupervisorName] = useState("");
   const [exitType, setExitType] = useState("");
   const [lastWorkingDay, setLastWorkingDay] = useState("");
   const [personalNumber, setPersonalNumber] = useState("");
@@ -45,12 +54,30 @@ export function NeuerAustrittModal({
     offboardingId: string;
   } | null>(null);
 
-  // Escape-Taste zum Schliessen + Focus Trap
+  const handleClose = useCallback(() => {
+    setFirstName("");
+    setLastName("");
+    setWorkEmail("");
+    setPrivateEmail("");
+    setOrganizationId("");
+    setSupervisorEmail("");
+    setSupervisorName("");
+    setExitType("");
+    setLastWorkingDay("");
+    setPersonalNumber("");
+    setError("");
+    setResult(null);
+    onClose();
+  }, [onClose]);
+
+  // Escape-Taste zum Schliessen + Focus Trap. Escape laeuft ueber
+  // handleClose (nicht direkt onClose): Sonst stuenden beim naechsten Oeffnen
+  // die alten Eingaben da — mit der Führungskraft eines fremden Austritts.
   useEffect(() => {
     if (!open) return;
     const handleKeydown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        handleClose();
         return;
       }
       if (e.key === "Tab") {
@@ -79,7 +106,7 @@ export function NeuerAustrittModal({
       first?.focus();
     }, 50);
     return () => document.removeEventListener("keydown", handleKeydown);
-  }, [open, onClose]);
+  }, [open, handleClose]);
 
   // Einrichtungen laden
   useEffect(() => {
@@ -98,6 +125,10 @@ export function NeuerAustrittModal({
     setLoading(true);
 
     try {
+      // Leere optionale Felder gar nicht mitschicken (JSON.stringify laesst
+      // `undefined` weg) — "" hiesse fuer den Server „angegeben, aber leer".
+      const fuehrungskraftEmail = supervisorEmail.trim();
+      const fuehrungskraftName = supervisorName.trim();
       const res = await fetch("/api/offboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -107,6 +138,8 @@ export function NeuerAustrittModal({
           employeeEmail: workEmail,
           employeePrivateEmail: privateEmail || undefined,
           organizationId,
+          supervisorEmail: fuehrungskraftEmail || undefined,
+          supervisorName: fuehrungskraftName || undefined,
           exitType,
           lastWorkingDay,
           employeePersonalNr: personalNumber || undefined,
@@ -114,8 +147,10 @@ export function NeuerAustrittModal({
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Fehler beim Anlegen des Vorgangs.");
+        // Auch 409 (Adresse der Führungskraft nicht freigegeben) nennt den
+        // Grund im Feld `error`.
+        const data = await res.json().catch(() => null);
+        setError(data?.error || "Fehler beim Anlegen des Vorgangs.");
         return;
       }
 
@@ -130,20 +165,6 @@ export function NeuerAustrittModal({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleClose = () => {
-    setFirstName("");
-    setLastName("");
-    setWorkEmail("");
-    setPrivateEmail("");
-    setOrganizationId("");
-    setExitType("");
-    setLastWorkingDay("");
-    setPersonalNumber("");
-    setError("");
-    setResult(null);
-    onClose();
   };
 
   if (!open) return null;
@@ -216,12 +237,12 @@ export function NeuerAustrittModal({
                 </div>
               </div>
 
-              <a
+              <Link
                 href={`/dashboard/offboarding/${result.offboardingId}`}
                 className="block rounded-lg border border-border px-4 py-3 text-center text-sm font-medium text-foreground transition-colors hover:bg-accent"
               >
                 Vorgang öffnen
-              </a>
+              </Link>
             </div>
           ) : (
             /* Formular */
@@ -322,6 +343,47 @@ export function NeuerAustrittModal({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Führungskraft (optional) */}
+              <div className="space-y-2">
+                <label htmlFor="austritt-fuehrungskraft-email" className="text-sm font-medium text-foreground">
+                  E-Mail der Führungskraft{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (optional)
+                  </span>
+                </label>
+                <input autoComplete="off"
+                  id="austritt-fuehrungskraft-email"
+                  type="email"
+                  value={supervisorEmail}
+                  onChange={(e) => setSupervisorEmail(e.target.value)}
+                  placeholder="leitung@einrichtung.de"
+                  aria-describedby="austritt-fuehrungskraft-hinweis"
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                />
+                <p id="austritt-fuehrungskraft-hinweis" className="text-xs text-muted-foreground">
+                  Bekommt die Aufgaben mit der Zuständigkeit „Führungskraft“ per Link. Später im Tab
+                  Übersicht änderbar.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="austritt-fuehrungskraft-name" className="text-sm font-medium text-foreground">
+                  Name der Führungskraft{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (optional)
+                  </span>
+                </label>
+                <input autoComplete="off"
+                  id="austritt-fuehrungskraft-name"
+                  type="text"
+                  value={supervisorName}
+                  onChange={(e) => setSupervisorName(e.target.value)}
+                  placeholder="z.B. Anna Leitung"
+                  maxLength={200}
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                />
               </div>
 
               {/* Austrittsart */}

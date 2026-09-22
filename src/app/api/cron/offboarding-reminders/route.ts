@@ -6,35 +6,26 @@
  * Wird taeglich von n8n per Cron-Workflow aufgerufen.
  * Sicherheit: Authentifizierung über CRON_SECRET Bearer-Token.
  *
- * 3-Stufen-Logik:
- * - INFO: Item faellig in 3 Tagen, kein Reminder in letzten 3 Tagen
- * - WARNING: Item 1 Tag ueberfaellig, kein Reminder in letzten 2 Tagen
- * - ESCALATION: Item 3+ Tage ueberfaellig, kein Reminder in letzten 5 Tagen
+ * Die Regeln stehen nicht mehr hier:
+ *   - 3-Stufen-Logik (INFO / WARNING / ESCALATION), Mindestabstand ab dem
+ *     letzten Versand bzw. der letzten Erinnerung und das Ende 30 Tage nach
+ *     der spaetesten offenen Faelligkeit: rein und getestet in
+ *     src/lib/abteilungsaufgaben.ts (stufeBerechnen, erinnerungsStufe).
+ *   - Versand, Merker (SENT/WEBHOOK/SKIPPED ja, FAILED nein), Verlaengerung
+ *     des Links mit GLEICHEM Token und das Ueberspringen bei geaenderter oder
+ *     fehlender Adresse: erinnerungenSenden in src/lib/abteilungsaufgaben-dienst.ts.
+ * Erinnert werden nur Abteilungen, die die Erstmail wirklich bekommen haben
+ * (sentAt gesetzt). Der Lauf erzeugt nie still einen neuen Link.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { prisma } from "@/lib/db";
-import { triggerWebhooks } from "@/lib/webhooks";
-import { abteilungsAufgabenLink, offboardingMailFelder } from "@/lib/offboarding-mail";
-
-const MS_PER_DAY = 86400000;
+import { erinnerungenSenden } from "@/lib/abteilungsaufgaben-dienst";
 
 /** Timing-Safe String-Vergleich (verhindert Timing-Attacken auf CRON_SECRET) */
 function timingSafeCompare(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
-
-interface ReminderDetail {
-  offboardingId: string;
-  displayId: string;
-  departmentKey: string;
-  departmentName: string;
-  email: string;
-  level: "INFO" | "WARNING" | "ESCALATION";
-  overdueItems: number;
-  upcomingItems: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -58,164 +49,16 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date();
-  const details: ReminderDetail[] = [];
-  let errors = 0;
 
   try {
-    // Alle aktiven Offboardings laden (nicht COMPLETED, nicht CANCELLED)
-    const activeOffboardings = await prisma.offboardingProcess.findMany({
-      where: {
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
-      },
-      include: {
-        organization: { select: { name: true } },
-        departmentLinks: true,
-        checklistItems: {
-          where: { isCompleted: false },
-          select: {
-            id: true,
-            title: true,
-            dueDate: true,
-            assigneeDepartment: true,
-          },
-        },
-      },
-    });
-
-    for (const offboarding of activeOffboardings) {
-      // Pro Department-Link pruefen ob Reminder noetig
-      for (const deptLink of offboarding.departmentLinks) {
-        if (deptLink.allTasksComplete) continue;
-
-        // Offene Items für diese Abteilung finden
-        const deptItems = offboarding.checklistItems.filter(
-          (item) => item.assigneeDepartment === deptLink.departmentKey
-        );
-
-        if (deptItems.length === 0) continue;
-
-        // Kategorisierung der Items
-        const threeDaysFromNow = new Date(now.getTime() + 3 * MS_PER_DAY);
-        let upcomingItems = 0; // Faellig in 3 Tagen
-        let overdueItems = 0;
-        let maxOverdueDays = 0;
-
-        for (const item of deptItems) {
-          if (!item.dueDate) continue;
-          const dueDate = new Date(item.dueDate);
-          const diffMs = now.getTime() - dueDate.getTime();
-          const diffDays = diffMs / MS_PER_DAY;
-
-          if (diffDays > 0) {
-            // Ueberfaellig
-            overdueItems++;
-            if (diffDays > maxOverdueDays) maxOverdueDays = diffDays;
-          } else if (dueDate <= threeDaysFromNow) {
-            // Faellig in den naechsten 3 Tagen
-            upcomingItems++;
-          }
-        }
-
-        // Reminder-Level bestimmen
-        let level: "INFO" | "WARNING" | "ESCALATION" | null = null;
-        let minIntervalDays = 0;
-
-        if (maxOverdueDays >= 3) {
-          level = "ESCALATION";
-          minIntervalDays = 5;
-        } else if (maxOverdueDays >= 1) {
-          level = "WARNING";
-          minIntervalDays = 2;
-        } else if (upcomingItems > 0) {
-          level = "INFO";
-          minIntervalDays = 3;
-        }
-
-        if (!level) continue;
-
-        // Pruefen ob Reminder-Intervall eingehalten wird
-        if (deptLink.lastReminderAt) {
-          const daysSinceLastReminder =
-            (now.getTime() - new Date(deptLink.lastReminderAt).getTime()) / MS_PER_DAY;
-          if (daysSinceLastReminder < minIntervalDays) continue;
-        }
-
-        // Reminder senden
-        try {
-          // Gemeinsame Felder aus offboardingMailFelder — derselbe Aufbau wie
-          // bei der Erinnerung per Knopf (department-links), damit eine
-          // Vorlage fuer beide Wege passt. `offene_aufgaben` ist der Name,
-          // den die Vorlage benutzt; `totalOpenItems` bleibt fuer Webhooks.
-          // Der Link zeigt auf /offboarding-tasks/<token>, die Seite, die es
-          // gibt (siehe abteilungsAufgabenLink).
-          await triggerWebhooks("offboarding-reminder", {
-            ...offboardingMailFelder(offboarding),
-            departmentKey: deptLink.departmentKey,
-            departmentName: deptLink.departmentName,
-            abteilung: deptLink.departmentName,
-            email: deptLink.email,
-            level,
-            overdueItems,
-            upcomingItems,
-            totalOpenItems: deptItems.length,
-            offene_aufgaben: deptItems.length,
-            maxOverdueDays: Math.floor(maxOverdueDays),
-            magicLink: abteilungsAufgabenLink(deptLink.token),
-          });
-
-          // DepartmentLink aktualisieren
-          await prisma.offboardingDepartmentLink.update({
-            where: { id: deptLink.id },
-            data: {
-              lastReminderAt: now,
-              reminderCount: { increment: 1 },
-            },
-          });
-
-          // Audit-Log
-          await prisma.auditLog.create({
-            data: {
-              offboardingId: offboarding.id,
-              processType: "OFFBOARDING",
-              action: "OFFBOARDING_REMINDER_SENT",
-              details: {
-                level,
-                departmentKey: deptLink.departmentKey,
-                departmentName: deptLink.departmentName,
-                email: deptLink.email,
-                overdueItems,
-                upcomingItems,
-                reminderCount: deptLink.reminderCount + 1,
-              },
-            },
-          });
-
-          details.push({
-            offboardingId: offboarding.id,
-            displayId: offboarding.displayId,
-            departmentKey: deptLink.departmentKey,
-            departmentName: deptLink.departmentName,
-            email: deptLink.email,
-            level,
-            overdueItems,
-            upcomingItems,
-          });
-        } catch (err) {
-          console.error(
-            `[Offboarding-Reminders] Fehler bei ${offboarding.displayId} / ${deptLink.departmentKey}:`,
-            err
-          );
-          errors++;
-        }
-      }
-    }
-
+    const ergebnis = await erinnerungenSenden(now);
     return NextResponse.json({
       success: true,
       timestamp: now.toISOString(),
-      remindersProcessed: details.length,
-      errors,
-      details,
+      remindersProcessed: ergebnis.remindersProcessed,
+      errors: ergebnis.errors,
+      details: ergebnis.details,
+      uebersprungen: ergebnis.uebersprungen,
     });
   } catch (error) {
     console.error("[Offboarding-Reminders] Schwerer Fehler:", error);

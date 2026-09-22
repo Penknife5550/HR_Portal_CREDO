@@ -218,6 +218,13 @@ const BEDINGTER_BLOCK = /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g;
  */
 const MARKER_MUSTER = /\{\{\s*([#/])([^{}]*)\}\}/g;
 
+/**
+ * Ein Platzhalter {{name}} fuer die Variablen-Ersetzung in renderTemplate —
+ * ohne die #//-Marker der Bedingungsbloecke (die sind vorher aufgeloest bzw.
+ * entfernt).
+ */
+const PLATZHALTER = /\{\{([^{}#/][^{}]*)\}\}/g;
+
 export interface VerwaisterMarker {
   /** Feldbezeichnung, wie sie im Editor steht: "Betreff", "HTML-Body", "Plaintext" */
   feld: string;
@@ -331,9 +338,15 @@ export function renderTemplate(template: string, variables: Record<string, strin
     bereinigt = mitBloecken.replace(MARKER_MUSTER, "");
   }
 
-  return Object.entries(variables).reduce(
-    (result, [key, value]) => result.replaceAll(`{{${key}}}`, value ?? ""),
-    bereinigt
+  // EIN Durchgang ueber die Vorlage: Jeder Platzhalter wird genau einmal
+  // ersetzt, eingesetzte Werte werden nicht erneut durchsucht. Frueher lief je
+  // Variable ein eigenes replaceAll ueber das Zwischenergebnis — schrieb eine
+  // Abteilung "{{vorgangsnummer}}" in ihren Kommentar, stand in der HR-Mail die
+  // echte Nummer (je nach Reihenfolge der Variablen). Werte, die Menschen
+  // eingeben (Kommentar, Nachricht im Dokumentenpaket), bleiben so wortgetreu.
+  // Unbekannte Platzhalter bleiben wie bisher stehen.
+  return bereinigt.replace(PLATZHALTER, (treffer, name: string) =>
+    Object.prototype.hasOwnProperty.call(variables, name) ? (variables[name] ?? "") : treffer,
   );
 }
 
@@ -436,9 +449,28 @@ const NAMENS_VARIABLEN = [
   "employeeLastName",
 ];
 
-function mitMaskiertenNamen(vars: Record<string, string>): Record<string, string> {
+/**
+ * Rohtexte fuer den Textteil, die im HTML-Teil ebenfalls maskiert werden
+ * (Abteilungsaufgaben, src/lib/abteilungsaufgaben.ts):
+ *
+ *   - `kommentar_text`: Kommentar, den eine Abteilung ueber ihren Link ohne
+ *     Anmeldung eingibt — der einzige Freitext hier, den jemand ausserhalb des
+ *     Portals schreibt.
+ *   - `aufgabenliste`: Klartext-Liste der Aufgabentitel.
+ *
+ * Die Standardvorlagen setzen im HTML die schon maskierten Geschwister
+ * `kommentar` bzw. `aufgabenliste_html` ein und benutzen die Rohtexte nur im
+ * Textteil. Aendert ein Admin die Vorlage im Editor und setzt doch
+ * `{{kommentar_text}}` ins HTML, darf daraus kein Markup werden. `kommentar`
+ * und `aufgabenliste_html` stehen bewusst NICHT hier — sie sind schon maskiert,
+ * ein zweites Maskieren machte aus `&amp;` ein sichtbares `&amp;amp;`.
+ */
+const FREITEXT_VARIABLEN = ["kommentar_text", "aufgabenliste"];
+
+/** Variablen fuer den HTML-Teil: Namen und Rohtexte maskiert, der Rest unveraendert. */
+function fuerHtmlMaskiert(vars: Record<string, string>): Record<string, string> {
   const maskiert = { ...vars };
-  for (const name of NAMENS_VARIABLEN) {
+  for (const name of [...NAMENS_VARIABLEN, ...FREITEXT_VARIABLEN]) {
     if (maskiert[name]) maskiert[name] = escapeHtml(maskiert[name]);
   }
   return maskiert;
@@ -462,7 +494,7 @@ export function renderEventEmail(
 
   const body = {
     subject: renderTemplate(template.subject, vars),
-    html: renderTemplate(template.bodyHtml, mitMaskiertenNamen(vars)),
+    html: renderTemplate(template.bodyHtml, fuerHtmlMaskiert(vars)),
     text: template.bodyText ? renderTemplate(template.bodyText, vars) : undefined,
   };
 

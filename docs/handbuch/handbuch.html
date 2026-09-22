@@ -871,6 +871,7 @@
       <li>Wählen Sie bei <strong>Austrittsart</strong> den Grund aus (zum Beispiel „Kündigung Arbeitnehmer" oder „Rente / Pension").</li>
       <li>Tragen Sie bei <strong>Letzter Arbeitstag</strong> das Datum ein.</li>
       <li>Geben Sie optional eine <strong>private E-Mail</strong> an – sie wird für die Abschluss-Befragung gebraucht.</li>
+      <li>Tragen Sie, wenn bekannt, die <strong>E-Mail der Führungskraft</strong> und optional den <strong>Namen der Führungskraft</strong> ein. Die Führungskraft bekommt die Aufgaben mit der Zuständigkeit „Führungskraft" per Link (siehe <a href="#offboarding-abteilungen">Aufgaben für Abteilungen</a>). Beides können Sie später im Reiter <strong>Übersicht</strong> ergänzen oder ändern.</li>
       <li>Klicken Sie auf <strong>Austritt anlegen</strong>.</li>
     </ol>
 
@@ -887,8 +888,8 @@
     <h3>Den Austritt bearbeiten</h3>
     <p>Auf der Detailseite begleiten Sie den Austritt bis zum Abschluss. Sie nutzen dazu die Reiter:</p>
     <ul>
-      <li><strong>Übersicht</strong> – Stammdaten und der Bearbeitungsstand.</li>
-      <li><strong>Checkliste</strong> – alle Aufgaben zum Abhaken.</li>
+      <li><strong>Übersicht</strong> – Stammdaten, die Führungskraft und der Bearbeitungsstand.</li>
+      <li><strong>Checkliste</strong> – alle Aufgaben zum Abhaken und die Karte „Aufgaben für Abteilungen".</li>
       <li><strong>Rückgaben</strong> – Gegenstände wie Schlüssel, Laptop oder Dienstwagen erfassen und als zurückgegeben markieren.</li>
       <li><strong>Dokumente</strong> – Dateien hochladen und ablegen.</li>
       <li><strong>Notizen</strong> – Bemerkungen festhalten.</li>
@@ -917,16 +918,114 @@
       <p>Der Gegenstand ist als zurückgegeben markiert. So sehen Sie auf einen Blick, was noch fehlt.</p>
     </div>
 
-    <h4>Aufgaben an Abteilungen verteilen</h4>
-    <p>Beim Austritt müssen oft mehrere Abteilungen mithelfen – etwa die IT und die Hausverwaltung. Das Portal kann jeder Abteilung ihre eigene Aufgabenliste per Link zusenden. Die Abteilung braucht dafür keine Anmeldung.</p>
+    <h3 id="offboarding-abteilungen">Aufgaben für Abteilungen</h3>
+    <p>Beim Austritt müssen oft mehrere Stellen mithelfen – etwa die IT, das Sekretariat oder die Führungskraft. Das Portal schickt jeder dieser Stellen ihre eigenen Aufgaben aus der Checkliste per Link. Die Abteilung braucht dafür keine Anmeldung: Sie öffnet den Link, hakt ihre Aufgaben ab und kann Ihnen einen Kommentar hinterlassen.</p>
+
+    <p>Wer eine Aufgabe bekommt, steht bei jeder Aufgabe der Checkliste (die „Zuständigkeit"). Festgelegt wird sie in der Checklisten-Vorlage (siehe Kapitel 11.3). Dabei gilt:</p>
+    <ul>
+      <li><strong>Abteilungen</strong> wie IT-Abteilung, Verwaltung / Sekretariat, Facility Management, Buchhaltung und Datenschutzbeauftragte/r bekommen ihre Aufgaben an die Adresse, die unter <strong>Einstellungen → Abteilungen</strong> hinterlegt ist (siehe <a href="#verwaltung-abteilungen">Kapitel 12.3</a>).</li>
+      <li>Aufgaben mit der Zuständigkeit <strong>Führungskraft</strong> gehen an die Führungskraft, die im Vorgang eingetragen ist – nie an eine allgemeine Adresse.</li>
+      <li>Aufgaben der <strong>Personalabteilung</strong> und der Mitarbeiterin oder des Mitarbeiters erledigen Sie im Portal. Dafür gibt es keinen Link.</li>
+    </ul>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Abteilungen informieren, erinnern, erneut senden und Links erneuern dürfen Administrator, HR-Leitung und Sachbearbeiter. Die Adressen unter <strong>Einstellungen → Abteilungen</strong> pflegen Administrator und HR-Leitung.</p>
+    </div>
+
+    <h4>Die Führungskraft eintragen</h4>
+    <p>Damit die Führungskraft ihre Aufgaben bekommt, braucht das Portal ihre E-Mail-Adresse. Haben Sie sie beim Anlegen nicht eingetragen, holen Sie das so nach:</p>
     <ol>
-      <li>Suchen Sie auf der Detailseite den Bereich <strong>Abteilungs-Checklisten</strong>.</li>
-      <li>Klicken Sie auf <strong>Abteilungs-Links versenden</strong>.</li>
+      <li>Öffnen Sie den Reiter <strong>Übersicht</strong>.</li>
+      <li>Fahren Sie in der Karte <strong>Führungskraft</strong> mit der Maus über die Zeile <strong>E-Mail der Führungskraft</strong> und klicken Sie auf das Stift-Symbol.</li>
+      <li>Tragen Sie die Adresse ein und klicken Sie auf <strong>OK</strong> (oder drücken Sie <kbd>Enter</kbd>).</li>
+      <li>Optional: Tragen Sie auf dieselbe Weise den <strong>Namen der Führungskraft</strong> ein.</li>
     </ol>
+    <p>Ist im Vorgang keine Führungskraft eingetragen, nimmt das Portal die Adresse aus der Zeugnis-Bewertung desselben Austritts oder aus dem Vertragsende, aus dem der Austritt entstanden ist. Die Karte sagt dann zum Beispiel: „Verwendet wird … aus der Zeugnis-Bewertung, solange hier nichts eingetragen ist." Um die Führungskraft wieder zu entfernen, leeren Sie das Feld und klicken auf <strong>OK</strong>.</p>
+
+    <div class="hinweis">
+      <span class="label">Tipp: die dienstliche Adresse eintragen</span>
+      <p>Eine neu eingetippte Adresse prüft das Portal gegen die Liste <strong>Erlaubte Domains für abweichende Empfänger</strong> (Einstellungen → SMTP). Liegt sie in keiner freigegebenen Domain, erscheint die Meldung „Die Adresse der Führungskraft liegt in keiner freigegebenen Domain …". Tragen Sie dann die dienstliche Adresse ein. Ist die Liste leer, gibt es keine Einschränkung.</p>
+    </div>
+
+    <h4>Abteilungen informieren</h4>
+    <p>Sobald die Checkliste steht, schicken Sie allen beteiligten Abteilungen ihre Aufgaben.</p>
+    <ol>
+      <li>Öffnen Sie den Reiter <strong>Checkliste</strong>.</li>
+      <li>Unter dem Fortschrittsbalken steht die Karte <strong>Aufgaben für Abteilungen</strong>. Sie zeigt je Abteilung eine Zeile – auch für Abteilungen, die noch nichts bekommen haben, und für die Führungskraft.</li>
+      <li>Klicken Sie oben rechts in der Karte auf <strong>Abteilungen informieren</strong>.</li>
+    </ol>
+
+    <figure class="screenshot">
+      <div class="platzhalter">Screenshot folgt: Reiter „Checkliste" mit der Karte „Aufgaben für Abteilungen" – je Abteilung eine Zeile mit Status sowie den Knöpfen „Erinnern", „Erneut senden" und „Link kopieren".</div>
+      <figcaption>Wird nach dem nächsten Update des Portals ergänzt.</figcaption>
+    </figure>
 
     <div class="ergebnis">
       <span class="label">Das Ergebnis ist</span>
-      <p>Die beteiligten Abteilungen erhalten je einen Link zu ihrer Aufgabenliste. Ihre Rückmeldungen laufen automatisch im Vorgang zusammen.</p>
+      <p>Eine grüne Leiste nennt, wer informiert wurde, zum Beispiel „2 Abteilungen informiert: IT-Abteilung, Facility Management." Konnte eine Abteilung nicht angeschrieben werden, nennt eine gelbe Leiste darunter Abteilung und Grund, etwa „Nicht informiert: Führungskraft (keine Führungskraft hinterlegt – bitte im Tab Übersicht eintragen)." Jede informierte Abteilung erhält eine E-Mail mit ihren Aufgaben, den Fälligkeiten und ihrem Link.</p>
+    </div>
+
+    <p>Den Knopf dürfen Sie ruhig mehrmals drücken: Er schreibt nur an, wer noch nichts bekommen hat. Bereits verschickte Links bleiben gültig. Kommen später Abteilungen hinzu – etwa weil Sie die Führungskraft nachgetragen haben –, heißt der Knopf <strong>Weitere Abteilungen informieren (1)</strong>. Die Zahl sagt, wie viele Abteilungen er anschreiben würde. Gibt es niemanden mehr zu informieren, verschwindet der Knopf. Ist der Vorgang abgeschlossen oder abgebrochen, zeigt die Karte nur noch den Stand.</p>
+
+    <p>Steht in der Karte „In dieser Checkliste ist keine Aufgabe einer Abteilung zugeordnet.", ist in der Checklisten-Vorlage keine Aufgabe einer Abteilung oder der Führungskraft zugewiesen.</p>
+
+    <h4>Was die Zeilen bedeuten</h4>
+    <p>Jede Zeile nennt die Abteilung, ihre Adresse, die Zahl der Aufgaben und ihren Stand. Darunter steht, bis wann der Link gilt und wie oft schon erinnert wurde (zum Beispiel „Link gültig bis 30.10.2027 · 1 Erinnerung, zuletzt 25.07.2027").</p>
+    <table>
+      <caption>Der Stand einer Abteilung</caption>
+      <thead>
+        <tr><th scope="col">Anzeige</th><th scope="col">Bedeutung</th><th scope="col">Was Sie tun können</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Noch nicht informiert</strong> (grau)</td><td>Die Abteilung hat noch keinen Link bekommen.</td><td><strong>Abteilungen informieren</strong> wählen.</td></tr>
+        <tr><td><strong>Informiert am …</strong> (gelb)</td><td>Die E-Mail ist hinausgegangen, der Link wurde noch nicht geöffnet.</td><td>Abwarten oder <strong>Erinnern</strong>.</td></tr>
+        <tr><td><strong>Geöffnet (3×), zuletzt …</strong> (blau)</td><td>Die Abteilung hat ihre Aufgaben aufgerufen und arbeitet daran.</td><td>Nichts – bei Bedarf <strong>Erinnern</strong>.</td></tr>
+        <tr><td><strong>Erledigt am …</strong> (grün)</td><td>Alle Aufgaben der Abteilung sind abgehakt.</td><td>Nichts.</td></tr>
+        <tr><td><strong>Versand fehlgeschlagen</strong> (rot)</td><td>Die E-Mail ist nicht angekommen. Der Grund steht darunter, etwa ein Fehler des Mailservers.</td><td><strong>Erneut senden</strong>.</td></tr>
+        <tr><td><strong>Nicht versendet: …</strong> (rot)</td><td>Das Portal hat die E-Mail nicht verschickt, zum Beispiel weil die E-Mail-Vorlage deaktiviert ist oder kein Empfänger darin steht.</td><td>Den genannten Grund unter <strong>Einstellungen → E-Mail-Vorlagen</strong> beheben, dann <strong>Erneut senden</strong>.</td></tr>
+        <tr><td><strong>Link abgelaufen</strong> (rot)</td><td>Der Link gilt nicht mehr.</td><td><strong>Link erneuern…</strong> wählen.</td></tr>
+        <tr><td><strong>Keine offenen Aufgaben</strong> (grau)</td><td>Die Aufgaben dieser Abteilung sind schon erledigt, etwa von Ihnen im Portal. Ein Link ist nicht nötig.</td><td>Nichts.</td></tr>
+        <tr><td>Gelbe Zeile mit Grund, zum Beispiel „keine aktive Adresse hinterlegt (Einstellungen → Abteilungen)" oder „Abteilung ist deaktiviert (Einstellungen → Abteilungen)"</td><td>Die Abteilung kann nicht angeschrieben werden.</td><td>Die Adresse unter <strong>Einstellungen → Abteilungen</strong> anlegen oder aktivieren, dann <strong>Weitere Abteilungen informieren</strong>.</td></tr>
+        <tr><td>Gelbe Zeile „Keine Führungskraft hinterlegt – bitte im Tab Übersicht eintragen"</td><td>Für die Aufgaben der Führungskraft fehlt die Adresse.</td><td>Auf <strong>Eintragen</strong> klicken: Das Portal wechselt in den Reiter Übersicht und öffnet das Feld.</td></tr>
+      </tbody>
+    </table>
+    <p>Manchmal steht unter einer Zeile ein zusätzlicher Hinweis. „Adresse geändert (jetzt …)" bedeutet: Unter Einstellungen → Abteilungen steht inzwischen eine andere Adresse als die, an die der Link ging. Die automatischen Erinnerungen pausieren dann; <strong>Erneut senden</strong> schickt einen neuen Link an die neue Adresse, der bisherige wird ungültig. „Letzte E-Mail nicht zugestellt: …" heißt, dass eine spätere E-Mail an diese Abteilung gescheitert ist – der Link selbst ist angekommen und gilt weiter.</p>
+
+    <h4>Erinnern, Erneut senden, Link kopieren und Link erneuern</h4>
+    <p>Rechts in jeder Zeile stehen nur die Knöpfe, die gerade möglich sind:</p>
+    <ul>
+      <li><strong>Erinnern</strong> – schickt sofort eine Erinnerung mit den offenen Aufgaben. Nur bei Abteilungen, die schon informiert sind und noch Aufgaben offen haben.</li>
+      <li><strong>Erneut senden</strong> – schickt die E-Mail mit den Aufgaben noch einmal, mit demselben Link. Das hilft, wenn die Abteilung die E-Mail nicht mehr findet oder der Versand fehlgeschlagen war.</li>
+      <li><strong>Link kopieren</strong> – legt den Link in die Zwischenablage (kurz erscheint „Kopiert!"), etwa um ihn selbst weiterzugeben.</li>
+      <li><strong>…</strong> → <strong>Link erneuern…</strong> – erzeugt einen neuen Link und schickt ihn per E-Mail. Der bisherige Link wird sofort ungültig. Das Portal fragt vorher nach („Link der … erneuern?"); Sie bestätigen mit <strong>Link erneuern und senden</strong>. Nutzen Sie das, wenn ein Link abgelaufen ist oder in falsche Hände geraten sein könnte.</li>
+    </ul>
+    <p>Nach jedem Versand sind <strong>Erinnern</strong> und <strong>Erneut senden</strong> für diese Abteilung zehn Minuten lang grau. Fahren Sie mit der Maus darüber, sehen Sie, bis wann („Bitte kurz warten (bis 10:24 Uhr)."). So bekommt niemand versehentlich mehrere E-Mails kurz hintereinander. Nach jeder Aktion meldet eine grüne Leiste, was verschickt wurde, oder eine rote Leiste, warum nicht.</p>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: Links vertraulich behandeln</span>
+      <p>Wer einen Link hat, kann die Aufgaben dieser Abteilung ohne Anmeldung sehen und abhaken. Geben Sie kopierte Links nur an die zuständige Stelle weiter. Ist ein Link in falsche Hände geraten, machen Sie ihn mit <strong>Link erneuern…</strong> ungültig – das geht, solange die Abteilung noch Aufgaben offen hat.</p>
+    </div>
+
+    <h4>Automatische Erinnerungen</h4>
+    <p>Sie müssen nicht selbst nachfassen. Das Portal prüft einmal täglich, welche informierten Abteilungen noch offene Aufgaben haben, und erinnert sie: kurz bevor eine Aufgabe fällig wird, und deutlicher, sobald sie überfällig ist – dann nennt die E-Mail, wie viele Aufgaben überfällig sind und seit wie vielen Tagen die älteste. 30 Tage nach der letzten Fälligkeit hört das Portal auf zu erinnern. Abteilungen, die noch keinen Link bekommen haben, erinnert es nie. Schlägt eine Erinnerung fehl, versucht es das Portal am nächsten Tag erneut.</p>
+
+    <div class="hinweis">
+      <span class="label">Tipp: den letzten Arbeitstag ändern</span>
+      <p>Die Fälligkeiten richten sich nach dem letzten Arbeitstag. Ändern Sie ihn im Reiter <strong>Übersicht</strong> (Karte „Austrittsdaten"), verschieben sich die Fälligkeiten aller offenen Aufgaben um dieselbe Zahl von Tagen, und die Links bleiben entsprechend länger gültig. Abteilungen, die schon informiert sind, bekommen darüber keine eigene Nachricht. Mit <strong>Erneut senden</strong> schicken Sie ihnen die Aufgaben mit den neuen Fälligkeiten.</p>
+    </div>
+
+    <h4>Was die Abteilung sieht</h4>
+    <p>Die Abteilung öffnet den Link aus der E-Mail und sieht die Seite „Offboarding-Aufgaben" mit dem Namen der Person, der Einrichtung, dem letzten Arbeitstag und nur ihren eigenen Aufgaben – nach Phasen geordnet und mit Fälligkeit. Sie hakt jede erledigte Aufgabe ab und kann über <strong>Kommentar hinzufügen</strong> eine Nachricht an die Personalabteilung schreiben (höchstens 1000 Zeichen). Die Aufgaben anderer Abteilungen und Ihre internen Notizen sieht sie nicht. Hakt die Abteilung über ihren Link die letzte Aufgabe ab, bekommt sie eine Bestätigung per E-Mail.</p>
+    <p>Ist der Vorgang abgeschlossen, kann die Abteilung ihre Aufgaben nur noch ansehen. Ist er abgebrochen, zeigt der Link „Dieser Vorgang wurde abgebrochen. Bitte keine weiteren Schritte unternehmen."</p>
+
+    <h4>Rückmeldungen und Kommentare der Abteilungen</h4>
+    <p>Im Reiter <strong>Checkliste</strong> steht bei jeder erledigten Aufgabe, wer sie abgehakt hat – zum Beispiel „erledigt von IT-Abteilung (Link) am 29.07.2027, 10:14" oder „erledigt im Portal von Erika Muster am 29.07.2027, 10:14". Den Stand je Abteilung sehen Sie außerdem im Reiter <strong>Übersicht</strong> beim Schritt „Abteilungen informieren".</p>
+    <p>Hat eine Abteilung einen Kommentar geschrieben, steht er in einem blauen Kasten, etwa „Kommentar IT-Abteilung, 29.07.2027: Konto gesperrt …". Ihre eigene Notiz steht getrennt davon im gelben Kasten <strong>Interne Notiz (nur im Portal)</strong> – diese Notiz sieht die Abteilung nie.</p>
+
+    <div class="hinweis">
+      <span class="label">Tipp: bei jeder erledigten Aufgabe eine E-Mail bekommen</span>
+      <p>Möchten Sie erfahren, sobald eine Abteilung etwas abhakt – samt ihrem Kommentar? Tragen Sie unter <strong>Einstellungen → E-Mail-Vorlagen</strong> in der Vorlage „Offboarding-Aufgabe erledigt" das Postfach der Personalabteilung im Feld <strong>An</strong> ein. Ohne Empfänger verschickt das Portal diese E-Mail nicht; die Rückmeldungen sehen Sie dann nur im Portal.</p>
     </div>
 
     <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
@@ -1039,7 +1138,7 @@
 
     <div class="ergebnis">
       <span class="label">Das Ergebnis ist</span>
-      <p>Das Portal legt automatisch einen Offboarding-Vorgang an (Austrittsgrund „Befristungsende") und übernimmt dabei die Personendaten sowie den letzten Arbeitstag (= das bisherige Vertragsende). Der Vertragsende-Vorgang zeigt danach den Status „Keine Übernahme" und ist mit dem neuen Offboarding verknüpft. Von dort an läuft alles im gewohnten Offboarding-Ablauf weiter (siehe Kapitel 4) – inklusive Auslaufmitteilung und Arbeitszeugnis.</p>
+      <p>Das Portal legt automatisch einen Offboarding-Vorgang an (Austrittsgrund „Befristungsende") und übernimmt dabei die Personendaten, den letzten Arbeitstag (= das bisherige Vertragsende) und die E-Mail-Adresse der Führungskraft – sie bekommt im Offboarding die Aufgaben mit der Zuständigkeit „Führungskraft" per Link. Der Vertragsende-Vorgang zeigt danach den Status „Keine Übernahme" und ist mit dem neuen Offboarding verknüpft. Von dort an läuft alles im gewohnten Offboarding-Ablauf weiter (siehe Kapitel 4) – inklusive Auslaufmitteilung und Arbeitszeugnis.</p>
     </div>
 
     <h3 id="vertragsende-schutz">5.5 Die eingebauten Schutz-Hinweise</h3>
@@ -1437,7 +1536,7 @@
       <tbody>
         <tr>
           <td><strong>Checklisten</strong></td>
-          <td>Feste Aufgabenlisten für Onboarding, Offboarding und Verbeamtung. Sie legen die Aufgaben, ihre Reihenfolge und Fristen fest.</td>
+          <td>Feste Aufgabenlisten für Onboarding, Offboarding und Verbeamtung. Sie legen die Aufgaben, ihre Reihenfolge und Fristen fest – im Offboarding auch die zuständige Abteilung, die ihre Aufgaben per Link bekommt (siehe Kapitel 4, „Aufgaben für Abteilungen").</td>
         </tr>
         <tr>
           <td><strong>Exit-Interview</strong></td>
@@ -1587,7 +1686,7 @@
         <tr><td><strong>Versandprotokoll</strong></td><td>Die Liste aller verschickten E-Mails mit Status (verschickt, fehlgeschlagen, übersprungen).</td></tr>
         <tr><td><strong>SMTP</strong></td><td>Die technischen Zugangsdaten für den E-Mail-Versand. „SMTP" ist das Standardverfahren, mit dem Programme E-Mails versenden – und der <strong>primäre Versandweg</strong> des Portals.</td></tr>
         <tr><td><strong>Webhooks</strong></td><td>Nur ein optionaler Zusatzkanal, um andere Programme anzubinden. Für den E-Mail-Versand nicht nötig – das übernimmt SMTP.</td></tr>
-        <tr><td><strong>Abteilungen</strong></td><td>Die Abteilungen mit E-Mail-Adressen, die beim Offboarding ihre Aufgabenlisten erhalten.</td></tr>
+        <tr><td><strong>Abteilungen</strong></td><td>Die E-Mail-Adressen der Abteilungen, die ihre Checklisten-Aufgaben per Link erhalten – zentral oder je Einrichtung (siehe „Abteilungen pflegen" unten).</td></tr>
         <tr><td><strong>API-Zugang</strong></td><td>Zugangsschlüssel für andere Programme, die Auswertungen abrufen dürfen.</td></tr>
       </tbody>
     </table>
@@ -1614,6 +1713,30 @@
     <div class="ergebnis">
       <span class="label">Das Ergebnis ist</span>
       <p>Die Test-E-Mail kommt in Ihrem Postfach an. Der SMTP-Status zeigt Grün. Das Portal kann nun automatische E-Mails versenden.</p>
+    </div>
+
+    <h4 id="verwaltung-abteilungen">Abteilungen pflegen</h4>
+    <p>Im Reiter <strong>Abteilungen</strong> legen Sie fest, an welche E-Mail-Adresse eine Abteilung ihre Aufgaben aus der Checkliste bekommt (siehe Kapitel 4, <a href="#offboarding-abteilungen">„Aufgaben für Abteilungen"</a>). Eine Adresse gilt entweder für alle Einrichtungen („zentral") oder nur für eine bestimmte Einrichtung. Die Adresse der Einrichtung hat Vorrang: Ist zum Beispiel für ein Gymnasium ein eigenes Sekretariat eingetragen, gehen dessen Aufgaben dorthin – alle anderen Einrichtungen nutzen die zentrale Adresse.</p>
+    <ol>
+      <li>Öffnen Sie <strong>Einstellungen</strong> und den Reiter <strong>Abteilungen</strong>.</li>
+      <li>Klicken Sie auf <strong>+ Abteilung hinzufügen</strong>.</li>
+      <li>Wählen Sie bei <strong>Abteilung</strong> die Abteilung aus, zum Beispiel „Verwaltung / Sekretariat (VERWALTUNG)". Der <strong>Anzeigename</strong> wird vorbelegt; Sie können ihn anpassen, etwa zu „Sekretariat FES Gymnasium".</li>
+      <li>Tragen Sie die <strong>E-Mail-Adresse</strong> ein.</li>
+      <li>Wählen Sie bei <strong>Gilt für</strong> entweder „Alle Einrichtungen (zentral)" oder die Einrichtung.</li>
+      <li>Klicken Sie auf <strong>Abteilung anlegen</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die Abteilung steht in der Tabelle. Die Spalte „Verwendet in" zeigt, wie oft sie in den Checklisten-Vorlagen vorkommt, zum Beispiel „5 Aufgaben in 3 Vorlagen".</p>
+    </div>
+
+    <p>In der Tabelle ändern Sie mit <strong>Bearbeiten</strong> Anzeigename und Adresse. Mit <strong>Deaktivieren</strong> nehmen Sie eine Adresse aus dem Versand, ohne sie zu löschen; mit <strong>Löschen</strong> entfernen Sie sie ganz. Ein gelber Kasten über der Tabelle warnt, wenn eine Checklisten-Vorlage eine Abteilung nutzt, für die keine aktive Adresse hinterlegt ist – deren Aufgaben können dann nicht per Link verschickt werden. Über „Eigener Schlüssel…" legen Sie eine weitere Abteilung an, die es in der Auswahl nicht gibt; in den Checklisten-Vorlagen lassen sich bisher allerdings nur die festen Zuständigkeiten auswählen.</p>
+
+    <div class="hinweis info">
+      <span class="label">Gut zu wissen</span>
+      <p>Personalabteilung und Mitarbeitende arbeiten im Portal und bekommen keinen Link. Aufgaben für Vorgesetzte gehen an die im Vorgang hinterlegte Führungskraft – dafür legen Sie hier nichts an. Ältere Einträge mit dem Hinweis „Wird nicht mehr verwendet" können Sie löschen.</p>
+      <p>Eine geänderte Adresse gilt für Abteilungen, die ab jetzt informiert werden. In Vorgängen, die schon informiert sind, pausieren die automatischen Erinnerungen, bis dort „Erneut senden" gewählt wird – das schickt einen neuen Link an die neue Adresse. Löschen Sie eine Abteilung, bleiben bereits verschickte Links gültig; Erinnerungen gehen aber nicht mehr an diese Adresse.</p>
     </div>
 
     <h4>Eine Ferienzeit für die Elternzeit hinterlegen</h4>
@@ -1718,7 +1841,7 @@
         <tr><td><strong>Fristen-Ampel</strong></td><td>Die farbige Einstufung eines Vertragsendes nach verbleibender Zeit: Blau „Beobachten", Gelb „Warnung", Rot „Kritisch".</td></tr>
         <tr><td><strong>IBAN</strong></td><td>Die internationale Kontonummer für die Bankverbindung.</td></tr>
         <tr><td><strong>Klappmenü (Dropdown)</strong></td><td>Eine Auswahlliste, die sich beim Anklicken nach unten öffnet.</td></tr>
-        <tr><td><strong>Magic Link</strong></td><td>Ein besonderer Einmal-Zugangslink ohne Passwort, zum Beispiel für den Personalfragebogen.</td></tr>
+        <tr><td><strong>Magic Link</strong></td><td>Ein besonderer Einmal-Zugangslink ohne Passwort, zum Beispiel für den Personalfragebogen oder für die Aufgaben einer Abteilung im Offboarding.</td></tr>
         <tr><td><strong>Mandant</strong></td><td>Eine Einrichtung der CREDO-Gruppe – eine Schule, Kita oder ein Verein.</td></tr>
         <tr><td><strong>MAV</strong></td><td>Mitarbeitervertretung. Muss bei kirchlichen Trägern bei bestimmten Personalentscheidungen beteiligt werden, zum Beispiel beim Vertragsende.</td></tr>
         <tr><td><strong>Modul</strong></td><td>Ein Bereich des Portals, zum Beispiel Onboarding oder Elternzeit.</td></tr>
