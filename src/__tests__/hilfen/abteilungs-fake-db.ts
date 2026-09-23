@@ -1,13 +1,21 @@
 /**
- * Test-Hilfe: kleine In-Memory-Datenbank fuer die Abteilungsaufgaben (Paket 1b)
+ * Test-Hilfe: kleine In-Memory-Datenbank fuer die Abteilungsaufgaben (Paket 1b,
+ * erweitert um das Onboarding in Paket 5)
  *
- * Versteht genau die Abfrageformen von src/lib/abteilungsaufgaben-dienst.ts und
- * src/lib/abteilungsaufgaben-uebergaenge.ts: where mit Gleichheit, not/in/notIn,
- * zusammengesetzter Schluessel offboardingId_departmentKey, bedingtes
- * updateMany, increment, select-Projektion (flach), include offboarding am
- * Link, include der Relationen am Vorgang (GET/PATCH /api/offboarding/[id]),
+ * Versteht genau die Abfrageformen von src/lib/abteilungsaufgaben-dienst.ts,
+ * src/lib/abteilungsaufgaben-uebergaenge.ts und
+ * src/lib/abteilungsaufgaben-onboarding.ts: where mit Gleichheit,
+ * not/in/notIn, zusammengesetzte Schluessel offboardingId_departmentKey und
+ * onboardingId_departmentKey, bedingtes updateMany, increment,
+ * select-Projektion (flach), include offboarding/onboarding am Link, include
+ * der Relationen am Vorgang (GET/PATCH /api/offboarding/[id]),
  * offboardingProcess.update/updateMany, $transaction (ruft die Funktion mit
  * demselben Objekt auf).
+ *
+ * Onboarding (Paket 5): Tabellen `onboardingVorgaenge` (Zeilen tragen
+ * personalData, supervisorData und organization direkt) und
+ * `onboardingAufgaben` (ChecklistItem, Zustaendigkeit in `assignee`). Die
+ * Links beider Module liegen in `links` (offboardingId ODER onboardingId).
  *
  * Einbinden (Pfad relativ zur Testdatei):
  *
@@ -33,6 +41,10 @@ export const db: {
   users: Zeile[];
   domains: string;
   zuweisungen: Zeile[];
+  /** Paket 5: OnboardingProcess-Zeilen. */
+  onboardingVorgaenge: Zeile[];
+  /** Paket 5: ChecklistItem-Zeilen (Onboarding). */
+  onboardingAufgaben: Zeile[];
 } = {
   vorgaenge: [],
   aufgaben: [],
@@ -43,6 +55,8 @@ export const db: {
   users: [],
   domains: "",
   zuweisungen: [],
+  onboardingVorgaenge: [],
+  onboardingAufgaben: [],
 };
 
 let idZaehler = 0;
@@ -64,6 +78,11 @@ function passt(zeile: Zeile, where: Record<string, unknown> | undefined): boolea
     if (k === "offboardingId_departmentKey") {
       const b = bed as { offboardingId: string; departmentKey: string };
       if (zeile.offboardingId !== b.offboardingId || zeile.departmentKey !== b.departmentKey) return false;
+      continue;
+    }
+    if (k === "onboardingId_departmentKey") {
+      const b = bed as { onboardingId: string; departmentKey: string };
+      if (zeile.onboardingId !== b.onboardingId || zeile.departmentKey !== b.departmentKey) return false;
       continue;
     }
     if (k === "userId_organizationId") return false;
@@ -128,6 +147,9 @@ function sortieren(zeilen: Zeile[], orderBy?: unknown): Zeile[] {
 export function neuerLink(data: Zeile): Zeile {
   return {
     id: `l-${naechsteId()}`,
+    // Genau eines von beiden setzt der Aufrufer (Paket 5: eine Tabelle, zwei Module).
+    offboardingId: null,
+    onboardingId: null,
     sentAt: null,
     lastSentAt: null,
     lastSendStatus: null,
@@ -168,6 +190,28 @@ function vorgangMitInclude(v: Zeile, include: Record<string, unknown>): Zeile {
     } else {
       r[k] = structuredClone(v[k] ?? null);
     }
+  }
+  return r;
+}
+
+/**
+ * select am Onboarding-Vorgang: flache Felder und die direkt an der Zeile
+ * stehenden Relationen (personalData, supervisorData, organization) wie
+ * `projizieren`; `checklistItems` und `departmentLinks` aus ihren Tabellen.
+ * Ohne select die ganze Zeile.
+ */
+function onboardingProjektion(v: Zeile, select?: Record<string, unknown>): Zeile {
+  if (!select) return structuredClone(v);
+  const r = projizieren(v, select);
+  if (select.checklistItems) {
+    const s = select.checklistItems as { select?: Zeile };
+    r.checklistItems = sortieren(
+      db.onboardingAufgaben.filter((a) => a.onboardingId === v.id),
+      [{ category: "asc" }, { orderIndex: "asc" }],
+    ).map((a) => projizieren(a, s.select));
+  }
+  if (select.departmentLinks) {
+    r.departmentLinks = db.links.filter((l) => l.onboardingId === v.id).map((l) => structuredClone(l));
   }
   return r;
 }
@@ -247,12 +291,23 @@ export const fakePrisma: Record<string, unknown> = {
       db.links.filter((l) => passt(l, where)).map((l) => projizieren(l, select)),
     ),
     findUnique: jest.fn(
-      async ({ where, select, include }: { where: Zeile; select?: Zeile; include?: { offboarding?: unknown } }) => {
+      async ({
+        where,
+        select,
+        include,
+      }: {
+        where: Zeile;
+        select?: Zeile;
+        include?: { offboarding?: unknown; onboarding?: unknown };
+      }) => {
         const l = db.links.find((x) => passt(x, where));
         if (!l) return null;
         const r = projizieren(l, select);
         if (include?.offboarding) {
-          r.offboarding = structuredClone(db.vorgaenge.find((v) => v.id === l.offboardingId));
+          r.offboarding = structuredClone(db.vorgaenge.find((v) => v.id === l.offboardingId)) ?? null;
+        }
+        if (include?.onboarding) {
+          r.onboarding = structuredClone(db.onboardingVorgaenge.find((v) => v.id === l.onboardingId)) ?? null;
         }
         return r;
       },
@@ -273,6 +328,61 @@ export const fakePrisma: Record<string, unknown> = {
     updateMany: jest.fn(async ({ where, data }: { where: Zeile; data: Zeile }) => {
       const treffer = db.links.filter((l) => passt(l, where));
       treffer.forEach((l) => anwenden(l, data));
+      return { count: treffer.length };
+    }),
+  },
+  // ---- Paket 5: Onboarding ----
+  onboardingProcess: {
+    findUnique: jest.fn(async ({ where, select }: { where: Zeile; select?: Record<string, unknown> }) => {
+      const v = db.onboardingVorgaenge.find((x) => passt(x, where));
+      return v ? onboardingProjektion(v, select) : null;
+    }),
+    findMany: jest.fn(async ({ where, select }: { where: Record<string, Zeile>; select?: Record<string, unknown> }) => {
+      const status = where.status as { notIn: string[] } | undefined;
+      const some = (where.departmentLinks as { some?: Zeile } | undefined)?.some;
+      return db.onboardingVorgaenge
+        .filter((v) => !status || !status.notIn.includes(v.status as string))
+        .filter((v) => !some || db.links.some((l) => l.onboardingId === v.id && passt(l, some)))
+        .map((v) => onboardingProjektion(v, select));
+    }),
+    update: jest.fn(async ({ where, data }: { where: Zeile; data: Zeile }) => {
+      const v = db.onboardingVorgaenge.find((x) => passt(x, where));
+      if (!v) throw new Error("Onboarding-Vorgang fehlt");
+      anwenden(v, data);
+      return structuredClone(v);
+    }),
+    updateMany: jest.fn(async ({ where, data }: { where: Zeile; data: Zeile }) => {
+      const treffer = db.onboardingVorgaenge.filter((v) => passt(v, where));
+      treffer.forEach((v) => anwenden(v, data));
+      return { count: treffer.length };
+    }),
+  },
+  checklistItem: {
+    findMany: jest.fn(async ({ where, select, orderBy }: { where: Zeile; select?: Zeile; orderBy?: unknown }) =>
+      sortieren(db.onboardingAufgaben.filter((a) => passt(a, where)), orderBy).map((a) => projizieren(a, select)),
+    ),
+    findUnique: jest.fn(
+      async ({ where, select, include }: { where: Zeile; select?: Zeile; include?: { completedBy?: unknown } }) => {
+        const a = db.onboardingAufgaben.find((x) => passt(x, where));
+        if (!a) return null;
+        const r = projizieren(a, select);
+        if (include?.completedBy) {
+          const u = db.users.find((x) => x.id === a.completedById);
+          r.completedBy = u ? { firstName: u.firstName, lastName: u.lastName } : null;
+        }
+        return r;
+      },
+    ),
+    count: jest.fn(async ({ where }: { where: Zeile }) => db.onboardingAufgaben.filter((a) => passt(a, where)).length),
+    update: jest.fn(async ({ where, data }: { where: Zeile; data: Zeile }) => {
+      const a = db.onboardingAufgaben.find((x) => passt(x, where));
+      if (!a) throw new Error("Onboarding-Aufgabe fehlt");
+      anwenden(a, data);
+      return structuredClone(a);
+    }),
+    updateMany: jest.fn(async ({ where, data }: { where: Zeile; data: Zeile }) => {
+      const treffer = db.onboardingAufgaben.filter((a) => passt(a, where));
+      treffer.forEach((a) => anwenden(a, data));
       return { count: treffer.length };
     }),
   },
@@ -318,4 +428,6 @@ export function dbLeeren(): void {
   db.users = [];
   db.domains = "";
   db.zuweisungen = [];
+  db.onboardingVorgaenge = [];
+  db.onboardingAufgaben = [];
 }

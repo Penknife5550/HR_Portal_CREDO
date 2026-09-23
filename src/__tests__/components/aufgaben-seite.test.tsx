@@ -19,9 +19,13 @@
  *     `{ isCompleted: false }` ohne `comment: null`; Zähler bis 1000.
  *  4. Nur lesen (Vorgang abgeschlossen): Banner, Checkboxen und Kommentar aus.
  *  5. Fehlerseite mit dem Text des Servers.
+ *  6. Onboarding (/onboarding-tasks/[token]): dieselbe Komponente mit den
+ *     Onboarding-Begriffen, Countdown „Bis zum Dienstbeginn", die zusaetzliche
+ *     Reihe „Nur für {Abteilung}" und der Hinweis aus der Vorlage.
  */
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import OffboardingTasksPage from "@/app/offboarding-tasks/[token]/page";
+import OnboardingTasksPage from "@/app/onboarding-tasks/[token]/page";
 import type { AufgabenSeitenDaten, OeffentlicheAufgabe } from "@/components/abteilungsaufgaben/aufgaben-seite";
 
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
@@ -480,5 +484,184 @@ describe("Fehlerseite", () => {
     global.fetch = jest.fn(() => Promise.reject(new Error("offline"))) as unknown as typeof fetch;
     await zeigeSeite();
     expect(seitentext()).toContain("Verbindungsfehler. Bitte versuchen Sie es später erneut.");
+  });
+});
+
+// =============================================
+// 6. Onboarding (/onboarding-tasks/[token])
+//
+// Dieselbe Komponente, andere Huelle: Nur Begriffe, Countdown und die
+// zusaetzliche Reihe der Infokarte unterscheiden sich. Der Rest — Abhaken,
+// Kommentar, Fusszeile, Fehlerseite — ist oben belegt und wird hier nicht
+// zweimal geprueft.
+// =============================================
+
+describe("Onboarding-Seite", () => {
+  /** 22.09.2026, 12:00 Uhr deutscher Zeit — neun Tage vor dem 01.10. */
+  const ONB_JETZT = new Date("2026-09-22T10:00:00.000Z");
+
+  function onbAufgabe(teil: Partial<OeffentlicheAufgabe> = {}): OeffentlicheAufgabe {
+    return {
+      id: "o1",
+      title: "Benutzerkonto anlegen",
+      category: "Vor dem ersten Tag",
+      orderIndex: 0,
+      isCompleted: false,
+      completedAt: null,
+      dueDate: "2026-09-24T00:00:00.000Z",
+      abteilungKommentar: null,
+      abteilungKommentarAm: null,
+      description: null,
+      ...teil,
+    };
+  }
+
+  function onbDaten(teil: Partial<AufgabenSeitenDaten> = {}): AufgabenSeitenDaten {
+    const aufgaben = teil.aufgaben ?? [onbAufgabe()];
+    const erledigt = aufgaben.filter((a) => a.isCompleted).length;
+    return {
+      abteilung: { key: "IT", name: "IT-Abteilung" },
+      vorgang: {
+        vorgangsnummer: "ONB-2026-031",
+        mitarbeiterName: "Anna Beispiel",
+        einrichtung: "FES Minden",
+        bezugsdatum: "2026-10-01T00:00:00.000Z",
+      },
+      zusatz: {
+        stellenbezeichnung: "Lehrkraft Sek. I",
+        betriebsstaette: "Minden, Hauptstandort",
+        ansprechpartner_email: "a.leitung@example.org",
+      },
+      readOnly: false,
+      gueltigBis: "2026-12-30T00:00:00.000Z",
+      aufgaben,
+      fortschritt: {
+        gesamt: aufgaben.length,
+        erledigt,
+        prozent: aufgaben.length ? Math.round((erledigt / aufgaben.length) * 100) : 100,
+      },
+      allTasksComplete: aufgaben.length > 0 && erledigt === aufgaben.length,
+      ...teil,
+    };
+  }
+
+  async function zeigeOnboarding() {
+    await act(async () => {
+      render(<OnboardingTasksPage />);
+    });
+  }
+
+  it("lädt über die Onboarding-Route und nennt die Onboarding-Begriffe", async () => {
+    uhrStellen(ONB_JETZT);
+    getAntwort = { status: 200, body: { data: onbDaten() } };
+    await zeigeOnboarding();
+    expect(anfragen[0]).toEqual({ url: "/api/onboarding-tasks/tok-it", method: "GET", body: null });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Onboarding-Aufgaben: IT-Abteilung");
+    const text = seitentext();
+    expect(text).toContain("Neue Mitarbeiterin / neuer Mitarbeiter");
+    expect(text).toContain("Anna Beispiel");
+    expect(text).toContain("Vertragsbeginn");
+    expect(text).toContain("01.10.2026");
+    expect(text).not.toContain("Letzter Arbeitstag");
+  });
+
+  it.each([
+    ["2026-09-22T10:00:00.000Z", "Noch 9 Tage"],
+    ["2026-09-30T10:00:00.000Z", "Morgen beginnt der Dienst"],
+    ["2026-10-01T21:30:00.000Z", "Heute ist der erste Arbeitstag"], // 23:30 Uhr in Berlin
+    ["2026-10-02T10:00:00.000Z", "Seit 1 Tag im Dienst"],
+    ["2026-10-05T10:00:00.000Z", "Seit 4 Tagen im Dienst"],
+  ])("Countdown am %s: „%s“ unter „Bis zum Dienstbeginn“", async (zeit, erwartet) => {
+    uhrStellen(new Date(zeit));
+    getAntwort = { status: 200, body: { data: onbDaten() } };
+    await zeigeOnboarding();
+    expect(document.querySelector("[data-countdown]")?.textContent).toBe(erwartet);
+    expect(seitentext()).toContain("Bis zum Dienstbeginn");
+  });
+
+  it("Zusatzreihe „Nur für IT-Abteilung“ mit den erlaubten Feldern", async () => {
+    uhrStellen(ONB_JETZT);
+    getAntwort = { status: 200, body: { data: onbDaten() } };
+    await zeigeOnboarding();
+    const reihe = document.querySelector("[data-zusatz]") as HTMLElement;
+    expect(reihe.textContent).toContain("Nur für IT-Abteilung");
+    expect(reihe.textContent).toContain("Stellenbezeichnung");
+    expect(reihe.textContent).toContain("Lehrkraft Sek. I");
+    expect(reihe.textContent).toContain("Betriebsstätte");
+    expect(reihe.textContent).toContain("Minden, Hauptstandort");
+    expect(reihe.textContent).toContain("Ansprechpartner (Führungskraft)");
+    expect(reihe.textContent).toContain("a.leitung@example.org");
+  });
+
+  it("ohne erlaubte Zusatzfelder (z. B. Buchhaltung) fehlt die Reihe ganz", async () => {
+    uhrStellen(ONB_JETZT);
+    const d = onbDaten();
+    getAntwort = {
+      status: 200,
+      body: { data: { ...d, abteilung: { key: "BUCHHALTUNG", name: "Buchhaltung" }, zusatz: {} } },
+    };
+    await zeigeOnboarding();
+    expect(document.querySelector("[data-zusatz]")).toBeNull();
+    expect(seitentext()).not.toContain("Nur für Buchhaltung");
+  });
+
+  it("Hinweis aus der Vorlage steht unter dem Titel", async () => {
+    uhrStellen(ONB_JETZT);
+    getAntwort = {
+      status: 200,
+      body: {
+        data: onbDaten({
+          aufgaben: [onbAufgabe({ description: "Konto in der Schulverwaltung und in Microsoft 365 anlegen" })],
+        }),
+      },
+    };
+    await zeigeOnboarding();
+    const hinweis = karteVon("o1").querySelector('[data-hinweis="beschreibung"]') as HTMLElement;
+    expect(hinweis.textContent).toBe("Konto in der Schulverwaltung und in Microsoft 365 anlegen");
+  });
+
+  it("ohne Vertragsbeginn: weder Zeile noch Countdown, und kein „Invalid Date“", async () => {
+    uhrStellen(ONB_JETZT);
+    const d = onbDaten();
+    getAntwort = {
+      status: 200,
+      body: { data: { ...d, vorgang: { ...d.vorgang, bezugsdatum: null } } },
+    };
+    await zeigeOnboarding();
+    expect(document.querySelector("[data-countdown]")).toBeNull();
+    const text = seitentext();
+    expect(text).not.toContain("Bis zum Dienstbeginn");
+    expect(text).not.toContain("Invalid Date");
+    expect(text).not.toContain("NaN");
+    // Die Aufgaben bleiben bedienbar.
+    expect(within(karteVon("o1")).getByRole("button", { name: "Als erledigt markieren" })).not.toBeNull();
+  });
+
+  it("Kommentar speichern schickt { comment } an die Onboarding-Route", async () => {
+    uhrStellen(ONB_JETZT);
+    getAntwort = { status: 200, body: { data: onbDaten() } };
+    await zeigeOnboarding();
+    fireEvent.click(within(karteVon("o1")).getByRole("button", { name: "Kommentar hinzufügen" }));
+    fireEvent.change(screen.getByLabelText("Kommentar für die Personalabteilung"), {
+      target: { value: "Konto angelegt." },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Kommentar speichern" }));
+    });
+    expect(patches()).toEqual([
+      { url: "/api/onboarding-tasks/tok-it/o1", method: "PATCH", body: { comment: "Konto angelegt." } },
+    ]);
+  });
+
+  it("410 „nicht mehr aktiv“: Fehlerseite mit dem Text des Servers", async () => {
+    getAntwort = {
+      status: 410,
+      body: { error: "Dieser Vorgang ist nicht mehr aktiv. Bitte keine weiteren Schritte unternehmen." },
+    };
+    await zeigeOnboarding();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Link nicht gültig");
+    expect(seitentext()).toContain(
+      "Dieser Vorgang ist nicht mehr aktiv. Bitte keine weiteren Schritte unternehmen.",
+    );
   });
 });

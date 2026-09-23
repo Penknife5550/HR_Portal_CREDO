@@ -31,6 +31,11 @@ export type WebhookEvent =
   | "supervisor-completed"
   | "employee-reminder"
   | "supervisor-reminder"
+  // Onboarding — Abteilungsaufgaben (Paket 5)
+  | "onboarding-department-assigned"
+  | "onboarding-department-reminder"
+  | "onboarding-task-completed"
+  | "onboarding-department-completed"
   // Offboarding
   | "offboarding-created"
   | "offboarding-completed"

@@ -6,12 +6,34 @@
  * Zeigt alle Checklisten-Vorlagen als Karten an.
  * SUPER_ADMIN und HR_LEITUNG koennen Vorlagen erstellen, bearbeiten und löschen.
  * Items werden nach Kategorie gruppiert und sind aufklappbar.
+ *
+ * Paket 5 – drei Aenderungen, die zusammengehoeren:
+ *
+ *  1. SPEICHERN IN EINEM SCHRITT. Frueher loeschte diese Seite beim Bearbeiten
+ *     erst ALLE Punkte einzeln und legte sie danach einzeln neu an — ohne eine
+ *     einzige Antwort zu pruefen. Brach etwas dazwischen ab, war die Vorlage
+ *     leer, und die Oberflaeche meldete trotzdem „erfolgreich aktualisiert".
+ *     Jetzt geht genau EIN `PUT /api/checklisten/[id]` hinaus (bzw. POST beim
+ *     Anlegen), die Antwort wird geprueft, und vorhandene Punkte behalten ihre
+ *     ID (sonst zeigte `ChecklistItem.templateItemId` laufender Vorgaenge ins
+ *     Leere).
+ *  2. ZUSTAENDIGKEIT ALS AUSWAHL, auch im Onboarding. Dort war sie Freitext:
+ *     „Verwaltung", „Sekretariat" und „Verw." waeren drei verschiedene Stellen
+ *     gewesen, und keine davon haette einen Link bekommen. Alte Werte gehen
+ *     nicht still verloren — sie stehen als „Unbekannt: … (bitte zuordnen)" in
+ *     der Auswahl, und der Server nimmt sie erst nach der Zuordnung an.
+ *  3. FAELLIGKEIT UND HINWEIS. Die Fälligkeit in Tagen wirkt seit Paket 5 im
+ *     Vorgang (Vertragsbeginn bzw. letzter Arbeitstag plus Tage); der neue
+ *     Hinweis wird in die Aufgabe kopiert und steht auf der Link-Seite und in
+ *     der Mail an die Abteilung.
  */
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import { abteilungLabel, DEPARTMENT_KEYS } from "@/lib/constants";
+import { istFuehrungskraft, istLinkAbteilung } from "@/lib/abteilungsaufgaben";
+import { CHECKLISTEN_HINWEIS_MAX } from "@/lib/validations/abteilungsaufgaben";
 
 // =============================================
 // Types
@@ -32,6 +54,7 @@ interface ChecklistTemplateItem {
   orderIndex: number;
   defaultDueDays: number | null;
   defaultAssignee: string | null;
+  description: string | null;
   createdAt: string;
 }
 
@@ -47,12 +70,22 @@ interface ChecklistTemplate {
   updatedAt: string;
 }
 
+/** Eine Abteilung aus Einstellungen → Abteilungen (nur, was der Editor braucht). */
+interface AbteilungsKonfigZeile {
+  departmentKey: string;
+  departmentName: string;
+  isActive: boolean;
+}
+
 interface NewItem {
+  /** Vorhandener Punkt — wird mitgeschickt, damit die ID erhalten bleibt. */
+  id?: string;
   title: string;
   category: string;
   orderIndex: number;
   defaultDueDays: number | null;
   defaultAssignee: string;
+  description: string;
 }
 
 interface ModalData {
@@ -86,6 +119,7 @@ const CATEGORY_SUGGESTIONS = [
   "Vor Arbeitsbeginn",
   "Erster Arbeitstag",
   "Erste Woche",
+  "Einarbeitung",
   "Dokumente",
   "IT-Einrichtung",
   "Verwaltung",
@@ -101,14 +135,29 @@ const OFFBOARDING_CATEGORY_SUGGESTIONS = [
   "Phase 6: Nach Austritt",
 ];
 
-// Abteilungs-Optionen für Offboarding-Items — aus constants.ts statt einer
-// eigenen Liste (die hier kannte VERWALTUNG nicht und hiess noch
-// „Vorgesetzter"/„Datenschutzbeauftragter"). Eigene Schlüssel aus
-// Einstellungen → Abteilungen kommen mit dem Editor-Umbau in Paket 5 dazu.
-const DEPARTMENT_OPTIONS: { key: string; label: string }[] = Object.values(DEPARTMENT_KEYS).map((key) => ({
-  key,
-  label: abteilungLabel(key),
-}));
+/**
+ * Zustaendige, die im Portal arbeiten. Sie bekommen NIE einen Link — deshalb
+ * stehen sie in einer eigenen Gruppe der Auswahl. „Mitarbeiter/in" statt des
+ * Katalog-Labels „Mitarbeiter", weil hier eine Person gemeint ist.
+ */
+const PORTAL_OPTIONEN: { key: string; label: string }[] = [
+  { key: DEPARTMENT_KEYS.HR, label: "Personalabteilung" },
+  { key: DEPARTMENT_KEYS.MITARBEITER, label: "Mitarbeiter/in" },
+];
+
+/**
+ * Feste Stellen, die ihre Aufgaben per Link bekommen. „Führungskraft des
+ * Vorgangs", damit klar ist, dass die Adresse aus dem Vorgang stammt und nicht
+ * aus den Einstellungen.
+ */
+const LINK_OPTIONEN: { key: string; label: string }[] = [
+  { key: DEPARTMENT_KEYS.IT, label: "IT-Abteilung" },
+  { key: DEPARTMENT_KEYS.VERWALTUNG, label: "Verwaltung / Sekretariat" },
+  { key: DEPARTMENT_KEYS.FACILITY, label: "Facility Management" },
+  { key: DEPARTMENT_KEYS.BUCHHALTUNG, label: "Buchhaltung" },
+  { key: DEPARTMENT_KEYS.DSB, label: "Datenschutzbeauftragte/r" },
+  { key: DEPARTMENT_KEYS.VORGESETZTER, label: "Führungskraft des Vorgangs" },
+];
 
 // Farben pro Abteilung für Badges (feste Klassen, damit Tailwind sie findet)
 const DEPARTMENT_BADGE_COLORS: Record<string, string> = {
@@ -142,14 +191,50 @@ function createEmptyItem(orderIndex: number): NewItem {
     orderIndex,
     defaultDueDays: null,
     defaultAssignee: "",
+    description: "",
   };
 }
+
+/** Beschriftungen, die sich je Modul unterscheiden. */
+interface ModulText {
+  /** Hilfetext unter „Fällig (Tage)". */
+  bezugKurz: string;
+  /** Formulierung fuer 0 Tage. */
+  bezugAm: string;
+  /** Formulierung nach „… Tage vor". */
+  bezugVor: string;
+  /** Formulierung nach „… Tage nach". */
+  bezugNach: string;
+  /** Infokasten ueber den Punkten. */
+  infobox: string;
+}
+
+const MODUL_TEXT: Record<"onboarding" | "offboarding", ModulText> = {
+  onboarding: {
+    bezugKurz: "relativ zum Vertragsbeginn",
+    bezugAm: "Am Vertragsbeginn",
+    bezugVor: "Vertragsbeginn",
+    bezugNach: "Vertragsbeginn",
+    infobox:
+      "Jeder Punkt braucht Titel und Kategorie. Optional: Fälligkeit in Tagen relativ zum Vertragsbeginn (−7 = eine Woche vorher, 0 = am Vertragsbeginn) und die zuständige Stelle. Aufgaben von IT, Verwaltung, Facility, Buchhaltung, Datenschutz und Führungskraft kann HR im Vorgang per Link verschicken.",
+  },
+  offboarding: {
+    bezugKurz: "relativ zum letzten Arbeitstag",
+    bezugAm: "Am letzten Arbeitstag",
+    bezugVor: "dem letzten Arbeitstag",
+    bezugNach: "dem letzten Arbeitstag",
+    infobox:
+      "Jeder Punkt braucht Titel und Kategorie. Optional: Fälligkeit in Tagen relativ zum letzten Arbeitstag (−7 = eine Woche vorher, 0 = am letzten Arbeitstag) und die zuständige Stelle. Aufgaben von IT, Verwaltung, Facility, Buchhaltung, Datenschutz und Führungskraft kann HR im Vorgang per Link verschicken.",
+  },
+};
 
 // =============================================
 // Component
 // =============================================
 export function ChecklistenContent({ user }: { user: User }) {
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
+  const [abteilungen, setAbteilungen] = useState<AbteilungsKonfigZeile[]>([]);
+  const [abteilungenGeladen, setAbteilungenGeladen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -174,17 +259,61 @@ export function ChecklistenContent({ user }: { user: User }) {
   const canEdit =
     user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
 
-  // Gefilterte Templates nach aktivem Tab
-  const filteredTemplates = templates.filter((t) =>
-    activeTab === "offboarding"
-      ? isOffboardingTemplate(t)
-      : !isOffboardingTemplate(t)
-  );
+  // Gefilterte Templates nach aktivem Tab. Der Tab „Verbeamtung" zeigte hier
+  // frueher die Onboarding-Vorlagen mit an — die Verbeamtungs-Checkliste
+  // entsteht aber im Vorgang und hat gar keine Vorlage.
+  const filteredTemplates =
+    activeTab === "verbeamtung"
+      ? []
+      : templates.filter((t) =>
+          activeTab === "offboarding"
+            ? isOffboardingTemplate(t)
+            : !isOffboardingTemplate(t)
+        );
 
   // Helfer: Ist das Modal gerade im Offboarding-Modus?
   const isModalOffboarding =
     activeTab === "offboarding" ||
     (modalData.id != null && isOffboardingTemplate(modalData));
+
+  const modulText = isModalOffboarding ? MODUL_TEXT.offboarding : MODUL_TEXT.onboarding;
+  const listenText = activeTab === "offboarding" ? MODUL_TEXT.offboarding : MODUL_TEXT.onboarding;
+
+  // Eigene Schlüssel aus den Einstellungen (alles, was nicht fest ist)
+  const feste = new Set<string>(Object.values(DEPARTMENT_KEYS));
+  const eigeneOptionen: { key: string; label: string }[] = [];
+  for (const zeile of abteilungen) {
+    if (feste.has(zeile.departmentKey)) continue;
+    if (eigeneOptionen.some((o) => o.key === zeile.departmentKey)) continue;
+    eigeneOptionen.push({ key: zeile.departmentKey, label: zeile.departmentName || zeile.departmentKey });
+  }
+
+  /** Alle Schlüssel, die die Auswahl anbietet. */
+  const bekannteSchluessel = new Set<string>([
+    ...PORTAL_OPTIONEN.map((o) => o.key),
+    ...LINK_OPTIONEN.map((o) => o.key),
+    ...eigeneOptionen.map((o) => o.key),
+  ]);
+
+  /** Link-Abteilungen mit hinterlegter, aktiver Adresse. */
+  const schluesselMitAdresse = new Set(
+    abteilungen.filter((a) => a.isActive).map((a) => a.departmentKey)
+  );
+
+  /**
+   * Anzeigename einer Zustaendigkeit — nie der rohe Schluessel, wenn wir es
+   * besser wissen.
+   *
+   * `abteilungLabel()` kennt nur die festen Schluessel und gibt alles andere
+   * unveraendert zurueck. Fuer einen SELBST angelegten Schluessel stand damit
+   * „EMPFANG" auf der Karte, waehrend die Auswahl direkt darueber „Empfang"
+   * anbot. Den echten Namen liefern die Einstellungen (`abteilungen`).
+   */
+  function zustaendigLabel(schluesselOderText: string | null | undefined): string {
+    if (!schluesselOderText) return "";
+    const eigener = eigeneOptionen.find((o) => o.key === schluesselOderText);
+    return eigener?.label ?? getDepartmentLabel(schluesselOderText);
+  }
 
   // =============================================
   // Vorlagen laden
@@ -208,9 +337,30 @@ export function ChecklistenContent({ user }: { user: User }) {
     }
   }, []);
 
+  // =============================================
+  // Abteilungen laden (fuer Auswahl und Adress-Warnung)
+  //
+  // Scheitert der Aufruf, bleibt die Liste leer: Die Auswahl zeigt dann nur die
+  // festen Stellen, und es wird KEINE Adress-Warnung behauptet.
+  // =============================================
+  const loadAbteilungen = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/departments");
+      if (!res.ok) return;
+      const json = await res.json();
+      if (Array.isArray(json.data)) {
+        setAbteilungen(json.data as AbteilungsKonfigZeile[]);
+        setAbteilungenGeladen(true);
+      }
+    } catch {
+      // Ohne Abteilungsliste bleibt der Editor benutzbar.
+    }
+  }, []);
+
   useEffect(() => {
     loadTemplates();
-  }, [loadTemplates]);
+    loadAbteilungen();
+  }, [loadTemplates, loadAbteilungen]);
 
   // =============================================
   // Kategorien gruppieren
@@ -259,13 +409,34 @@ export function ChecklistenContent({ user }: { user: User }) {
   }
 
   // =============================================
+  // Punkte ohne hinterlegte Adresse (je Vorlage)
+  //
+  // Die Führungskraft zaehlt nicht mit: Ihre Adresse steht im Vorgang, nicht in
+  // den Einstellungen.
+  // =============================================
+  function fehlendeAdressen(template: ChecklistTemplate): { label: string; anzahl: number }[] {
+    if (!abteilungenGeladen) return [];
+    const zaehler = new Map<string, number>();
+    for (const item of template.items) {
+      const key = item.defaultAssignee?.trim();
+      if (!key || !istLinkAbteilung(key) || istFuehrungskraft(key)) continue;
+      if (schluesselMitAdresse.has(key)) continue;
+      zaehler.set(key, (zaehler.get(key) ?? 0) + 1);
+    }
+    return [...zaehler.entries()].map(([key, anzahl]) => ({
+      label: zustaendigLabel(key),
+      anzahl,
+    }));
+  }
+
+  // =============================================
   // Modal oeffnen: Neu erstellen
   // =============================================
   function handleCreate() {
     setModalData({
       name: activeTab === "offboarding" ? "Offboarding: " : "",
       description: "",
-      questionnaireType: activeTab === "offboarding" ? "" : "",
+      questionnaireType: "",
       items: [createEmptyItem(0)],
     });
     setShowModal(true);
@@ -281,11 +452,14 @@ export function ChecklistenContent({ user }: { user: User }) {
       description: template.description || "",
       questionnaireType: template.questionnaireType || "",
       items: template.items.map((item) => ({
+        // Die ID geht mit hinaus — nur so behaelt der Punkt sie beim Speichern.
+        id: item.id,
         title: item.title,
         category: item.category,
         orderIndex: item.orderIndex,
         defaultDueDays: item.defaultDueDays,
         defaultAssignee: item.defaultAssignee || "",
+        description: item.description || "",
       })),
     });
     setShowModal(true);
@@ -331,6 +505,9 @@ export function ChecklistenContent({ user }: { user: User }) {
 
   // =============================================
   // Modal: Speichern (Erstellen oder Bearbeiten)
+  //
+  // EIN Aufruf, dessen Antwort geprueft wird. Vorhandene Punkte schicken ihre
+  // `id` mit; der Server ersetzt Metadaten und Punkte in einer Transaktion.
   // =============================================
   async function handleSave() {
     if (!modalData.name.trim()) {
@@ -338,13 +515,27 @@ export function ChecklistenContent({ user }: { user: User }) {
       return;
     }
 
-    const validItems = modalData.items.filter(
-      (item) => item.title.trim() && item.category.trim()
-    );
-    if (validItems.length === 0) {
-      setError("Mindestens ein Checklisten-Punkt mit Titel und Kategorie ist erforderlich");
+    // Unvollstaendige Punkte werden GEMELDET, nicht weggefiltert.
+    //
+    // Frueher ging nur eine gefilterte Liste in den Rumpf. Ein VORHANDENER Punkt,
+    // dessen Titel oder Kategorie im Modal geleert wurde (etwa um ihn neu zu
+    // tippen), fehlte damit in `items`, seine ID stand nicht in `behalten` —
+    // und das `deleteMany` der PUT-Route loeschte ihn endgueltig, waehrend die
+    // Oberflaeche „erfolgreich aktualisiert" meldete. Der Server sagt beim
+    // Speichern dasselbe („Punkt n: Titel ist ein Pflichtfeld."); hier kommen
+    // wir ihm nur zuvor, damit die Zeilennummer schon vor dem Absenden steht.
+    if (modalData.items.length === 0) {
+      setError("Mindestens ein Checklisten-Punkt ist erforderlich.");
       return;
     }
+    const unvollstaendig = modalData.items.findIndex(
+      (item) => !item.title.trim() || !item.category.trim()
+    );
+    if (unvollstaendig >= 0) {
+      setError(`Punkt ${unvollstaendig + 1}: Titel und Kategorie sind Pflichtfelder.`);
+      return;
+    }
+    const punkte = modalData.items;
 
     // Offboarding-spezifisch: Name-Prefix sicherstellen, questionnaireType = null
     let finalName = modalData.name.trim();
@@ -356,81 +547,44 @@ export function ChecklistenContent({ user }: { user: User }) {
       finalQuestionnaireType = null;
     }
 
+    const rumpf = {
+      name: finalName,
+      description: modalData.description.trim() || null,
+      questionnaireType: finalQuestionnaireType,
+      items: punkte.map((item, index) => ({
+        ...(item.id ? { id: item.id } : {}),
+        title: item.title.trim(),
+        category: item.category.trim(),
+        orderIndex: index,
+        defaultDueDays: item.defaultDueDays,
+        defaultAssignee: item.defaultAssignee.trim() || null,
+        description: item.description.trim() || null,
+      })),
+    };
+
     setSaving(true);
     setError(null);
 
     try {
-      if (modalData.id) {
-        // Bearbeiten: Template updaten + Items komplett ersetzen
-        // 1. Template-Metadaten updaten
-        const templateRes = await fetch(`/api/checklisten/${modalData.id}`, {
-          method: "PATCH",
+      const res = await fetch(
+        modalData.id ? `/api/checklisten/${modalData.id}` : "/api/checklisten",
+        {
+          method: modalData.id ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: finalName,
-            description: modalData.description.trim() || null,
-            questionnaireType: finalQuestionnaireType,
-          }),
-        });
-        if (!templateRes.ok) {
-          const json = await templateRes.json();
-          throw new Error(json.error || "Fehler beim Speichern");
+          body: JSON.stringify(rumpf),
         }
+      );
 
-        // 2. Bestehende Items löschen
-        const existingTemplate = templates.find((t) => t.id === modalData.id);
-        if (existingTemplate) {
-          for (const item of existingTemplate.items) {
-            await fetch(
-              `/api/checklisten/${modalData.id}/items?itemId=${item.id}`,
-              { method: "DELETE" }
-            );
-          }
-        }
-
-        // 3. Neue Items anlegen
-        for (const item of validItems) {
-          await fetch(`/api/checklisten/${modalData.id}/items`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: item.title.trim(),
-              category: item.category.trim(),
-              orderIndex: item.orderIndex,
-              defaultDueDays: item.defaultDueDays,
-              defaultAssignee: item.defaultAssignee?.trim() || null,
-            }),
-          });
-        }
-
-        setSuccessMessage("Checkliste erfolgreich aktualisiert");
-      } else {
-        // Neu erstellen
-        const res = await fetch("/api/checklisten", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: finalName,
-            description: modalData.description.trim() || null,
-            questionnaireType: finalQuestionnaireType,
-            items: validItems.map((item) => ({
-              title: item.title.trim(),
-              category: item.category.trim(),
-              orderIndex: item.orderIndex,
-              defaultDueDays: item.defaultDueDays,
-              defaultAssignee: item.defaultAssignee?.trim() || null,
-            })),
-          }),
-        });
-
-        if (!res.ok) {
-          const json = await res.json();
-          throw new Error(json.error || "Fehler beim Erstellen");
-        }
-
-        setSuccessMessage("Checkliste erfolgreich erstellt");
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Fehler beim Speichern");
       }
 
+      setSuccessMessage(
+        modalData.id
+          ? "Checkliste erfolgreich aktualisiert"
+          : "Checkliste erfolgreich erstellt"
+      );
       setShowModal(false);
       await loadTemplates();
 
@@ -504,13 +658,17 @@ export function ChecklistenContent({ user }: { user: User }) {
   }
 
   // =============================================
-  // Render: Faelligkeitstage formatieren
+  // Render: Faelligkeitstage formulieren (je Modul)
   // =============================================
-  function formatDueDays(days: number | null): string {
+  function formatDueDays(days: number | null, texte: ModulText): string {
     if (days === null || days === undefined) return "-";
-    if (days < 0) return `${Math.abs(days)} Tage vorher`;
-    if (days === 0) return "Am Vertragsbeginn";
-    return `${days} Tage danach`;
+    if (days === 0) return texte.bezugAm;
+    // „1 Tage vor …" war deutsch danebengegriffen; HR kann ±1 jederzeit
+    // eintragen, auch wenn der Seed die Werte nicht nutzt.
+    const anzahl = Math.abs(days);
+    const einheit = anzahl === 1 ? "Tag" : "Tage";
+    if (days < 0) return `${anzahl} ${einheit} vor ${texte.bezugVor}`;
+    return `${anzahl} ${einheit} nach ${texte.bezugNach}`;
   }
 
   // =============================================
@@ -528,11 +686,10 @@ export function ChecklistenContent({ user }: { user: User }) {
               Checklisten-Vorlagen
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Erstellen und verwalten Sie Checklisten für{" "}
-              {activeTab === "offboarding" ? "den Offboarding-Prozess" : "den Onboarding-Prozess"}
+              Erstellen und verwalten Sie Checklisten für Onboarding und Offboarding
             </p>
           </div>
-          {canEdit && (
+          {canEdit && activeTab !== "verbeamtung" && (
             <button
               onClick={handleCreate}
               className="rounded-lg bg-[#6BAA24] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#5a9120]"
@@ -594,7 +751,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                 <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="rounded-lg bg-muted p-3">
                     <p className="text-xs text-muted-foreground">Phase I</p>
-                    <p className="text-sm font-semibold text-foreground">Antrag & Beurteilung</p>
+                    <p className="text-sm font-semibold text-foreground">Antrag &amp; Beurteilung</p>
                     <p className="text-xs text-muted-foreground">11 Punkte</p>
                   </div>
                   <div className="rounded-lg bg-muted p-3">
@@ -641,8 +798,10 @@ export function ChecklistenContent({ user }: { user: User }) {
           </div>
         )}
 
-        {/* Fehlermeldung */}
-        {error && (
+        {/* Fehlermeldung. Bei offenem Modal steht sie IM Modal — hier laege sie
+            hinter der Abdeckung, und ein gescheitertes Speichern saehe aus wie
+            gar nichts. */}
+        {error && !showModal && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             <div className="flex items-center justify-between">
               <span>{error}</span>
@@ -657,7 +816,7 @@ export function ChecklistenContent({ user }: { user: User }) {
         )}
 
         {/* Ladeanzeige */}
-        {loading && (
+        {loading && activeTab !== "verbeamtung" && (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
               <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -669,7 +828,7 @@ export function ChecklistenContent({ user }: { user: User }) {
         )}
 
         {/* Keine Vorlagen */}
-        {!loading && filteredTemplates.length === 0 && !error && (
+        {!loading && activeTab !== "verbeamtung" && filteredTemplates.length === 0 && !error && (
           <div className="rounded-xl border bg-card p-8 text-center shadow-sm">
             <p className="text-muted-foreground">
               Keine {activeTab === "offboarding" ? "Offboarding" : "Onboarding"}-Checklisten-Vorlagen gefunden.
@@ -686,12 +845,13 @@ export function ChecklistenContent({ user }: { user: User }) {
         )}
 
         {/* Template-Karten */}
-        {!loading && filteredTemplates.length > 0 && (
+        {!loading && activeTab !== "verbeamtung" && filteredTemplates.length > 0 && (
           <div className="space-y-6">
             {filteredTemplates.map((template) => {
               const groups = groupByCategory(template.items);
               const categories = getUniqueCategories(template.items);
               const categoryCount = categories.length;
+              const ohneAdresse = fehlendeAdressen(template);
 
               return (
                 <div
@@ -778,6 +938,18 @@ export function ChecklistenContent({ user }: { user: User }) {
                     </div>
                   )}
 
+                  {/* Warnung: Link-Abteilung ohne hinterlegte Adresse */}
+                  {ohneAdresse.length > 0 && (
+                    <div className="border-b border-amber-200 bg-amber-50 px-6 py-2">
+                      {ohneAdresse.map((eintrag) => (
+                        <p key={eintrag.label} className="text-xs text-amber-800">
+                          {eintrag.anzahl} {eintrag.anzahl === 1 ? "Punkt" : "Punkte"} ohne Adresse:{" "}
+                          {eintrag.label} ist unter Einstellungen → Abteilungen nicht hinterlegt.
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Items nach Kategorie gruppiert */}
                   <div className="px-6 py-4">
                     <div className="space-y-2">
@@ -829,31 +1001,60 @@ export function ChecklistenContent({ user }: { user: User }) {
                             {expanded && (
                               <div className="border-t px-4 py-2">
                                 <div className="space-y-1">
-                                  {items.map((item) => (
-                                    <div
-                                      key={item.id}
-                                      className="flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-muted/50"
-                                    >
-                                      <span className="text-foreground">
-                                        {item.title}
-                                      </span>
-                                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                        {item.defaultAssignee && (
-                                          <span
-                                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                              DEPARTMENT_BADGE_COLORS[item.defaultAssignee] ||
-                                              "bg-[#009AC6]/10 text-[#009AC6]"
-                                            }`}
-                                          >
-                                            {getDepartmentLabel(item.defaultAssignee)}
+                                  {items.map((item) => {
+                                    const perLink = istLinkAbteilung(item.defaultAssignee);
+                                    return (
+                                      <div
+                                        key={item.id}
+                                        className="flex items-start justify-between gap-4 rounded-md px-3 py-2 text-sm hover:bg-muted/50"
+                                      >
+                                        <div className="min-w-0">
+                                          <span className="text-foreground">{item.title}</span>
+                                          {item.description && (
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                              {item.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div className="flex shrink-0 items-center gap-4 text-xs text-muted-foreground">
+                                          {item.defaultAssignee && (
+                                            <span
+                                              title={
+                                                perLink
+                                                  ? "Wird im Vorgang per Link an die Abteilung verschickt"
+                                                  : undefined
+                                              }
+                                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                                                DEPARTMENT_BADGE_COLORS[item.defaultAssignee] ||
+                                                "bg-[#009AC6]/10 text-[#009AC6]"
+                                              }`}
+                                            >
+                                              {perLink && (
+                                                <svg
+                                                  aria-hidden="true"
+                                                  className="h-3 w-3"
+                                                  fill="none"
+                                                  viewBox="0 0 24 24"
+                                                  stroke="currentColor"
+                                                  strokeWidth={2}
+                                                >
+                                                  <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"
+                                                  />
+                                                </svg>
+                                              )}
+                                              {zustaendigLabel(item.defaultAssignee)}
+                                            </span>
+                                          )}
+                                          <span>
+                                            {formatDueDays(item.defaultDueDays, listenText)}
                                           </span>
-                                        )}
-                                        <span>
-                                          {formatDueDays(item.defaultDueDays)}
-                                        </span>
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
@@ -893,6 +1094,7 @@ export function ChecklistenContent({ user }: { user: User }) {
               </h3>
               <button
                 onClick={() => setShowModal(false)}
+                aria-label="Schliessen"
                 className="text-muted-foreground hover:text-foreground"
               >
                 <svg
@@ -913,6 +1115,17 @@ export function ChecklistenContent({ user }: { user: User }) {
 
             {/* Modal Body */}
             <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
+              {/* Fehlermeldung des Servers (z.B. „Punkt 2: Die Zuständigkeit
+                  „Werkstatt“ ist unbekannt – bitte in der Auswahl zuordnen.") */}
+              {error && (
+                <div
+                  role="alert"
+                  className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+                >
+                  {error}
+                </div>
+              )}
+
               {/* Name */}
               <div className="mb-4">
                 <label className="mb-1 block text-sm font-medium text-foreground">
@@ -978,19 +1191,16 @@ export function ChecklistenContent({ user }: { user: User }) {
               {isModalOffboarding && (
                 <div className="mb-6 rounded-lg border border-orange-200 bg-orange-50 p-3">
                   <p className="text-xs text-orange-800">
-                    Offboarding-Vorlage: Der Name wird automatisch mit &quot;Offboarding: &quot; prefixed.
-                    Weisen Sie jedem Checklisten-Punkt eine zustaendige Abteilung zu.
+                    Offboarding-Vorlage: Der Name beginnt automatisch mit „Offboarding: “.
+                    Ein Fragebogentyp wird dabei entfernt, damit die Vorlage nicht
+                    versehentlich als Onboarding-Checkliste verwendet wird.
                   </p>
                 </div>
               )}
 
               {/* Info-Box */}
               <div className="mb-4 rounded-lg border border-[#009AC6]/20 bg-[#009AC6]/5 p-3">
-                <p className="text-xs text-[#009AC6]">
-                  Fügen Sie Checklisten-Punkte hinzu. Jeder Punkt benötigt einen
-                  Titel und eine Kategorie. Optional können Sie Fälligkeitstage
-                  (relativ zum Vertragsbeginn) und einen Verantwortlichen festlegen.
-                </p>
+                <p className="text-xs text-[#009AC6]">{modulText.infobox}</p>
               </div>
 
               {/* Items-Liste */}
@@ -1008,93 +1218,132 @@ export function ChecklistenContent({ user }: { user: User }) {
                 </div>
 
                 <div className="space-y-3">
-                  {modalData.items.map((item, index) => (
-                    <div
-                      key={index}
-                      className="rounded-lg border border-border bg-muted/30 p-3"
-                    >
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Punkt {index + 1}
-                        </span>
-                        {modalData.items.length > 1 && (
-                          <button
-                            onClick={() => handleRemoveItem(index)}
-                            className="text-xs text-red-500 hover:text-red-700"
-                          >
-                            Entfernen
-                          </button>
-                        )}
-                      </div>
+                  {modalData.items.map((item, index) => {
+                    const zugeordnet = item.defaultAssignee.trim();
+                    // Ein Altwert, den die Auswahl nicht kennt, darf nicht still
+                    // verschwinden — er steht als eigener Eintrag darin.
+                    const unbekannt =
+                      zugeordnet !== "" && !bekannteSchluessel.has(zugeordnet)
+                        ? zugeordnet
+                        : null;
 
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {/* Titel */}
-                        <div>
-                          <input
-                            type="text"
-                            value={item.title}
-                            onChange={(e) =>
-                              handleItemChange(index, "title", e.target.value)
-                            }
-                            placeholder="Titel *"
-                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
+                    return (
+                      <div
+                        key={index}
+                        className="rounded-lg border border-border bg-muted/30 p-3"
+                      >
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Punkt {index + 1}
+                          </span>
+                          {modalData.items.length > 1 && (
+                            <button
+                              onClick={() => handleRemoveItem(index)}
+                              className="text-xs text-red-500 hover:text-red-700"
+                            >
+                              Entfernen
+                            </button>
+                          )}
                         </div>
 
-                        {/* Kategorie */}
-                        <div>
-                          <input
-                            type="text"
-                            value={item.category}
-                            onChange={(e) =>
-                              handleItemChange(
-                                index,
-                                "category",
-                                e.target.value
-                              )
-                            }
-                            list={`category-suggestions-${index}`}
-                            placeholder="Kategorie *"
-                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                          <datalist id={`category-suggestions-${index}`}>
-                            {(isModalOffboarding
-                              ? OFFBOARDING_CATEGORY_SUGGESTIONS
-                              : CATEGORY_SUGGESTIONS
-                            ).map((cat) => (
-                              <option key={cat} value={cat} />
-                            ))}
-                          </datalist>
-                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {/* Titel */}
+                          <div>
+                            <label
+                              htmlFor={`punkt-titel-${index}`}
+                              className="mb-1 block text-xs font-medium text-muted-foreground"
+                            >
+                              Titel *
+                            </label>
+                            <input
+                              id={`punkt-titel-${index}`}
+                              type="text"
+                              value={item.title}
+                              onChange={(e) =>
+                                handleItemChange(index, "title", e.target.value)
+                              }
+                              placeholder="Titel *"
+                              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
 
-                        {/* Faelligkeitstage */}
-                        <div>
-                          <input
-                            type="number"
-                            value={
-                              item.defaultDueDays !== null &&
-                              item.defaultDueDays !== undefined
-                                ? item.defaultDueDays
-                                : ""
-                            }
-                            onChange={(e) =>
-                              handleItemChange(
-                                index,
-                                "defaultDueDays",
-                                e.target.value !== ""
-                                  ? parseInt(e.target.value)
-                                  : null
-                              )
-                            }
-                            placeholder="Fälligkeitstage (z.B. -7)"
-                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
+                          {/* Kategorie */}
+                          <div>
+                            <label
+                              htmlFor={`punkt-kategorie-${index}`}
+                              className="mb-1 block text-xs font-medium text-muted-foreground"
+                            >
+                              Kategorie *
+                            </label>
+                            <input
+                              id={`punkt-kategorie-${index}`}
+                              type="text"
+                              value={item.category}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "category",
+                                  e.target.value
+                                )
+                              }
+                              list={`category-suggestions-${index}`}
+                              placeholder="Kategorie *"
+                              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            <datalist id={`category-suggestions-${index}`}>
+                              {(isModalOffboarding
+                                ? OFFBOARDING_CATEGORY_SUGGESTIONS
+                                : CATEGORY_SUGGESTIONS
+                              ).map((cat) => (
+                                <option key={cat} value={cat} />
+                              ))}
+                            </datalist>
+                          </div>
 
-                        {/* Verantwortlicher / Abteilung */}
-                        <div>
-                          {isModalOffboarding ? (
+                          {/* Faelligkeit in Tagen */}
+                          <div>
+                            <label
+                              htmlFor={`punkt-faellig-${index}`}
+                              className="mb-1 block text-xs font-medium text-muted-foreground"
+                            >
+                              Fällig (Tage)
+                            </label>
+                            <input
+                              id={`punkt-faellig-${index}`}
+                              type="number"
+                              value={
+                                item.defaultDueDays !== null &&
+                                item.defaultDueDays !== undefined
+                                  ? item.defaultDueDays
+                                  : ""
+                              }
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "defaultDueDays",
+                                  e.target.value !== ""
+                                    ? parseInt(e.target.value)
+                                    : null
+                                )
+                              }
+                              placeholder="z.B. -7"
+                              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {modulText.bezugKurz}
+                            </p>
+                          </div>
+
+                          {/* Zustaendigkeit */}
+                          <div>
+                            <label
+                              htmlFor={`punkt-zustaendig-${index}`}
+                              className="mb-1 block text-xs font-medium text-muted-foreground"
+                            >
+                              Zuständig
+                            </label>
                             <select
+                              id={`punkt-zustaendig-${index}`}
                               value={item.defaultAssignee}
                               onChange={(e) =>
                                 handleItemChange(
@@ -1105,32 +1354,56 @@ export function ChecklistenContent({ user }: { user: User }) {
                               }
                               className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                             >
-                              <option value="">Abteilung waehlen...</option>
-                              {DEPARTMENT_OPTIONS.map((dept) => (
-                                <option key={dept.key} value={dept.key}>
-                                  {dept.label}
+                              <option value="">— keine —</option>
+                              {unbekannt && (
+                                <option value={unbekannt}>
+                                  Unbekannt: {unbekannt} (bitte zuordnen)
                                 </option>
-                              ))}
+                              )}
+                              <optgroup label="Im Portal">
+                                {PORTAL_OPTIONEN.map((opt) => (
+                                  <option key={opt.key} value={opt.key}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Per Link">
+                                {[...LINK_OPTIONEN, ...eigeneOptionen].map((opt) => (
+                                  <option key={opt.key} value={opt.key}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </optgroup>
                             </select>
-                          ) : (
-                            <input
-                              type="text"
-                              value={item.defaultAssignee}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  "defaultAssignee",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Verantwortlicher (z.B. HR, IT)"
-                              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                            />
-                          )}
+                          </div>
+                        </div>
+
+                        {/* Hinweis fuer die zustaendige Stelle */}
+                        <div className="mt-3">
+                          <label
+                            htmlFor={`punkt-hinweis-${index}`}
+                            className="mb-1 block text-xs font-medium text-muted-foreground"
+                          >
+                            Hinweis für die zuständige Stelle (optional)
+                          </label>
+                          <textarea
+                            id={`punkt-hinweis-${index}`}
+                            value={item.description}
+                            maxLength={CHECKLISTEN_HINWEIS_MAX}
+                            onChange={(e) =>
+                              handleItemChange(index, "description", e.target.value)
+                            }
+                            placeholder="z.B. Konto in der Schulverwaltung und in Microsoft 365 anlegen"
+                            rows={2}
+                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                          <p className="mt-1 text-right text-xs text-muted-foreground">
+                            {item.description.length} / {CHECKLISTEN_HINWEIS_MAX}
+                          </p>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

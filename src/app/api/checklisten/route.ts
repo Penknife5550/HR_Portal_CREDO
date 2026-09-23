@@ -3,11 +3,21 @@
  *
  * GET  – Alle Checklisten-Vorlagen auflisten (inkl. Items-Count, questionnaireType)
  * POST – Neue Vorlage erstellen (nur SUPER_ADMIN / HR_LEITUNG)
+ *
+ * Paket 5: Der Rumpf des POST laeuft jetzt durch `checklistenVorlageSchema`
+ * (Zustaendigkeit als Schluessel, Hinweis hoechstens 500 Zeichen). Die
+ * Antwortform bleibt bewusst der nackte Datensatz mit 201 — anders als GET und
+ * PUT, die `{ data }` liefern; der Editor liest beide Formen.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { istOffboardingVorlagenName } from "@/lib/abteilungsaufgaben";
+import {
+  checklistenFehlerMeldung,
+  checklistenVorlageSchema,
+} from "@/lib/validations/abteilungsaufgaben";
 
 // =============================================
 // GET /api/checklisten – Alle Vorlagen auflisten
@@ -65,58 +75,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { name, description, questionnaireType, items } = body;
-
-    // Validierung
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
+    const roh = await request.json().catch(() => undefined);
+    const geprueft = checklistenVorlageSchema.safeParse(roh);
+    if (!geprueft.success) {
       return NextResponse.json(
-        { error: "Name ist ein Pflichtfeld" },
+        { error: checklistenFehlerMeldung(geprueft.error) },
         { status: 400 }
       );
     }
+    const daten = geprueft.data;
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "Mindestens ein Checklisten-Punkt ist erforderlich" },
-        { status: 400 }
-      );
-    }
+    // Wie beim PUT: Eine „Offboarding: …"-Vorlage darf keinen Fragebogentyp
+    // tragen, sonst zieht POST /api/onboarding sie als Onboarding-Checkliste.
+    const questionnaireType = istOffboardingVorlagenName(daten.name)
+      ? null
+      : daten.questionnaireType ?? null;
 
-    // Vorlage + Items in einer Transaktion erstellen
-    const template = await prisma.$transaction(async (tx) => {
-      const created = await tx.checklistTemplate.create({
-        data: {
-          name: name.trim(),
-          description: description?.trim() || null,
-          questionnaireType: questionnaireType || null,
-          items: {
-            create: items.map((item: {
-              title: string;
-              category: string;
-              orderIndex?: number;
-              defaultDueDays?: number | null;
-              defaultAssignee?: string | null;
-            }, index: number) => ({
-              title: item.title.trim(),
-              category: item.category.trim(),
-              orderIndex: item.orderIndex ?? index,
-              defaultDueDays: item.defaultDueDays ?? null,
-              defaultAssignee: item.defaultAssignee?.trim() || null,
-            })),
-          },
+    // Vorlage + Punkte in einer Transaktion erstellen. Ein mitgeschicktes
+    // `items[].id` wird uebergangen — eine neue Vorlage bekommt neue Punkte.
+    const template = await prisma.checklistTemplate.create({
+      data: {
+        name: daten.name,
+        description: daten.description ?? null,
+        questionnaireType,
+        ...(daten.isActive !== undefined && { isActive: daten.isActive }),
+        items: {
+          create: daten.items.map((punkt, index) => ({
+            title: punkt.title,
+            category: punkt.category,
+            orderIndex: punkt.orderIndex ?? index,
+            defaultDueDays: punkt.defaultDueDays ?? null,
+            defaultAssignee: punkt.defaultAssignee ?? null,
+            description: punkt.description ?? null,
+          })),
         },
-        include: {
-          items: {
-            orderBy: { orderIndex: "asc" },
-          },
-          _count: {
-            select: { items: true, onboardings: true },
-          },
+      },
+      include: {
+        items: {
+          orderBy: { orderIndex: "asc" },
         },
-      });
-
-      return created;
+        _count: {
+          select: { items: true, onboardings: true },
+        },
+      },
     });
 
     return NextResponse.json(template, { status: 201 });

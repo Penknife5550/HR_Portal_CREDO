@@ -1,8 +1,14 @@
 /**
  * API: /api/onboarding/:id
  *
- * GET   – Einzelnen Vorgang mit allen Daten abrufen
+ * GET   – Einzelnen Vorgang mit allen Daten abrufen, dazu die
+ *         Abteilungsuebersicht (Karte „Aufgaben für Abteilungen", Stepper,
+ *         Urheber der Haekchen, Faelligkeiten) aus
+ *         onboardingAbteilungsUebersichtLaden
  * PATCH – Status aendern
+ *
+ * Mandant: Ein Vorgang eines fremden Mandanten bekommt in BEIDEN Methoden
+ * dieselbe 404 mit demselben Text wie ein unbekannter.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,6 +19,8 @@ import { decrypt } from "@/lib/encryption";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
 import { LINK_STATUS, pruefungNichtMoeglichGrund } from "@/lib/onboarding-spuren";
 import { statusAenderungSchema } from "@/lib/validations/onboarding";
+import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { onboardingAbteilungsUebersichtLaden } from "@/lib/abteilungsaufgaben-onboarding";
 import {
   ladeVorlagenKonfigurationen,
   fortschrittFuerVorgang,
@@ -69,6 +77,10 @@ export async function GET(
           },
           orderBy: { createdAt: "desc" },
         },
+        // Quelle der Karte „Aufgaben für Abteilungen" (Paket 5). Ohne sie
+        // kaeme `abteilungen` ohne Versandstand zurueck — jede informierte
+        // Abteilung stuende wieder auf „Noch nicht informiert".
+        departmentLinks: true,
         invitedBy: {
           select: { firstName: true, lastName: true, email: true },
         },
@@ -81,16 +93,13 @@ export async function GET(
       },
     });
 
-    if (!onboarding) {
+    // Fremder Mandant = unbekannter Vorgang (frueher 403 mit eigenem Text —
+    // der verriet, dass es den Vorgang gibt).
+    if (!onboarding || !(await canAccessProcess(session, onboarding.organizationId))) {
       return NextResponse.json(
-        { error: "Vorgang nicht gefunden" },
+        { error: MELDUNGEN.ONBOARDING_VORGANG_NICHT_GEFUNDEN },
         { status: 404 }
       );
-    }
-
-    // Org-Zugriffspruefung
-    if (!(await canAccessProcess(session, onboarding.organizationId))) {
-      return NextResponse.json({ error: "Keine Berechtigung für diesen Vorgang" }, { status: 403 });
     }
 
     // Tokens BLEIBEN enthalten: Diese Detail-Ansicht ist auth- + org-geschuetzt
@@ -136,12 +145,18 @@ export async function GET(
       "GEBURTSURKUNDE_KIND",
     ];
 
+    // Abteilungsuebersicht darueber legen (Paket 5): departmentLinks bekommen
+    // `url` (vom Server, APP_URL) und `anzeige`, checklistItems bekommen
+    // `erledigtVon` und `faelligAm`, dazu `abteilungen` (Quelle der Karte und
+    // des Steppers, auch nicht informierte und uebersprungene Abteilungen) und
+    // `fuehrungskraft`.
     return NextResponse.json({
       ...safeOnboarding,
       requiredDocuments,
       // Fortschritt gegen die Strecke *dieses* Vorgangs, nicht gegen alle
       // moeglichen Schritte — siehe fragebogen-fortschritt.ts.
       fragebogenFortschritt: fortschrittFuerVorgang(onboarding, vorlagen),
+      ...(await onboardingAbteilungsUebersichtLaden(onboarding)),
     });
   } catch (error) {
     console.error("Fehler beim Laden des Vorgangs:", error);

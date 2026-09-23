@@ -272,7 +272,7 @@ Der Vorgesetzte erhaelt einen separaten Magic Link und ergaenzt:
 ### Weitere Features
 
 - **Export**: Daten fuer die Weiterverarbeitung exportieren
-- **Checklisten**: Konfigurierbare Checklisten-Vorlagen pro Fragebogentyp
+- **Checklisten**: Konfigurierbare Checklisten-Vorlagen pro Fragebogentyp — je Punkt mit Zustaendigkeit (Auswahl), Faelligkeit in Tagen und einem Hinweis fuer die zustaendige Stelle; Aufgaben mit zustaendiger Abteilung verschickt HR im Vorgang per Link (Onboarding und Offboarding)
 - **Mandantenverwaltung**: 16 Einrichtungen (Schulen, Kitas, Verwaltung) verwalten
 - **Vorlagen-Konfiguration**: Formularfelder und -schritte pro Fragebogentyp anpassen (versioniert)
 - **Einstellungen**: Webhooks, SMTP, E-Mail-Vorlagen ueber das Admin-Portal konfigurieren
@@ -305,10 +305,16 @@ Der Dispatcher (`triggerWebhooks` in `src/lib/webhooks.ts`) arbeitet wie folgt:
 | `offboarding-reminder`     | Erinnerung an eine informierte Abteilung — Knopf „Erinnern" und taeglicher Lauf mit gleichem Aufbau | email, departmentName / abteilung, link, expiresAt, reminderCount, level (INFO/WARNING/ESCALATION), overdueItems, upcomingItems, totalOpenItems, maxOverdueDays, ist_info, ist_warnung, ist_eskalation, ist_ueberfaellig, ueberfaellige_aufgaben, tage_ueberfaellig, aufgabenliste, aufgabenliste_html |
 | `offboarding-task-completed` | Aufgabe offen → erledigt, genau einmal: ueber den Link oder im Portal (dort nur Aufgaben einer Link-Abteilung). Geht nur hinaus, wenn in der Vorlage ein An-Feld steht | itemId, aufgabe, departmentKey, departmentName / abteilung, erledigt_ueber („Link der Abteilung", „Link der Führungskraft", „Portal"), offene_aufgaben, offene_aufgaben_abteilung, kommentar (schon maskiert), kommentar_text (roh); Portal zusaetzlich taskId, taskTitle, taskCategory, completedById — kein `email` |
 | `offboarding-department-completed` | Abteilung hat ueber ihren Link alles erledigt, genau einmal | email, departmentKey, departmentName / abteilung, completedAt, anzahl_aufgaben, ist_fuehrungskraft |
+| `onboarding-department-assigned` | Abteilung bzw. Fuehrungskraft bekommt ihre Onboarding-Aufgaben per Link („Abteilungen informieren", „Erneut senden", „Link erneuern", „Erinnern" nach Adressaenderung) | email, departmentKey, departmentName / abteilung, link / magicLink, expiresAt, taskCount, aufgabenliste, aufgabenliste_html, anzahl_aufgaben, naechste_faelligkeit, erneut_gesendet, neuer_link, ist_fuehrungskraft; je nach Schluessel stellenbezeichnung, betriebsstaette, ansprechpartner_email — **kein `token`** |
+| `onboarding-department-reminder` | Erinnerung an eine informierte Abteilung — Knopf „Erinnern" und Abschnitt 3 des taeglichen Laufs `/api/cron/reminders` mit gleichem Aufbau | email, departmentName / abteilung, link, expiresAt, reminderCount, level (INFO/WARNING/ESCALATION), overdueItems, upcomingItems, totalOpenItems, offene_aufgaben, maxOverdueDays, ist_info, ist_warnung, ist_eskalation, ist_ueberfaellig, ueberfaellige_aufgaben, tage_ueberfaellig, aufgabenliste, aufgabenliste_html, ist_fuehrungskraft |
+| `onboarding-task-completed` | Aufgabe offen → erledigt, genau einmal und **nur ueber den Link** der Abteilung (das HR-Haekchen im Portal loest hier nichts aus). Geht nur hinaus, wenn in der Vorlage ein An-Feld steht | itemId, itemTitle, aufgabe, departmentKey, departmentName / abteilung, erledigt_ueber („Link der Abteilung" / „Link der Führungskraft"), offene_aufgaben, offene_aufgaben_abteilung, kommentar (schon maskiert), kommentar_text (roh) — kein `email` |
+| `onboarding-department-completed` | Abteilung hat ueber ihren Link alle Onboarding-Aufgaben erledigt, genau einmal | email, departmentKey, departmentName / abteilung, completedAt, anzahl_aufgaben, ist_fuehrungskraft |
 
-Die vier Offboarding-Events tragen zusaetzlich die Vorgangsfelder (offboardingId, displayId, employeeName, vorname, nachname, einrichtung, lastWorkingDay, austrittsdatum). Merker wie `neuer_link` oder `ist_warnung` sind `"ja"` oder leer. Alle aelteren Felder bleiben fuer bestehende Webhook-Abnehmer erhalten. Ist die Portal-Vorlage deaktiviert und fuer das Event ein Webhook aktiv, gilt der Link als zugestellt (Status `WEBHOOK`); sonst verschickt das Portal die Mail selbst, und ein zusaetzlicher n8n-Workflow mit eigener Mail fuehrt zu Doppelversand. Regeln: CLAUDE.md, Abschnitt „Abteilungsaufgaben".
+Die vier Offboarding-Events tragen zusaetzlich die Vorgangsfelder (offboardingId, displayId, employeeName, vorname, nachname, einrichtung, lastWorkingDay, austrittsdatum), die vier Onboarding-Events entsprechend onboardingId, displayId, employeeName / mitarbeiter_name (Name oder neutrale Bezeichnung, nie die private Adresse der Person), vorname, nachname, organization / einrichtung, contractStartDate und vertragsbeginn. Merker wie `neuer_link` oder `ist_warnung` sind `"ja"` oder leer. Alle aelteren Felder bleiben fuer bestehende Webhook-Abnehmer erhalten. Ist die Portal-Vorlage deaktiviert und fuer das Event ein Webhook aktiv, gilt der Link als zugestellt (Status `WEBHOOK`); sonst verschickt das Portal die Mail selbst, und ein zusaetzlicher n8n-Workflow mit eigener Mail fuehrt zu Doppelversand. Regeln: CLAUDE.md, Abschnitt „Abteilungsaufgaben".
 
-### Offboarding: Abteilungsaufgaben (Routen)
+### Abteilungsaufgaben: Routen (Offboarding und Onboarding)
+
+**Offboarding**
 
 | Route | Wer | Zweck |
 |-------|-----|-------|
@@ -317,7 +323,17 @@ Die vier Offboarding-Events tragen zusaetzlich die Vorgangsfelder (offboardingId
 | `PATCH /api/offboarding-tasks/[token]/[itemId]` | Abteilung, ohne Anmeldung | `{ "isCompleted": true, "comment": "…" }` (Kommentar max. 1000 Zeichen, `""` loescht); 409 bei abgeschlossenem Vorgang, 429 je IP bzw. je Link |
 | `POST /api/cron/offboarding-reminders` | n8n, `Authorization: Bearer <CRON_SECRET>` | Taegliche Erinnerungen. Antwort `{ success, timestamp, remindersProcessed, errors, details[], uebersprungen[] }`; `details` fuehrt jeden Versuch mit `status` (SENT/WEBHOOK/SKIPPED/FAILED), `uebersprungen` die Links mit geaenderter oder fehlender Adresse |
 
-Die Adressen der Abteilungen stehen unter **Einstellungen** > **Abteilungen** (`/api/settings/departments`), die Adresse der Fuehrungskraft am Offboarding-Vorgang (`supervisorEmail`, `supervisorName`).
+**Onboarding**
+
+| Route | Wer | Zweck |
+|-------|-----|-------|
+| `POST /api/onboarding/[id]/abteilungen` | HR (Admin, HR-Leitung, Sachbearbeitung) | Gleiche Body-Form wie im Offboarding (leer/`{}` = informieren, sonst `{ "aktion": …, "departmentKey": … }`). Antwort 201 / 409 / 502 mit demselben Bericht. Zusaetzlich 409 mit `grund: "MODALITAETEN_FEHLEN"` bzw. `"VERTRAGSBEGINN_FEHLT"`, solange die Einstellungsmodalitaeten nicht eingereicht sind — vorher steht der Vertragsbeginn nicht fest, nach dem sich die Faelligkeiten richten |
+| `GET /api/onboarding/[id]/abteilungen` | Portal-Rollen | Uebersicht fuer Karte, Stepper und Dialog (`{ abteilungen, fuehrungskraft }`). Schreibt nichts und entschluesselt nichts |
+| `GET /api/onboarding-tasks/[token]` | Abteilung, ohne Anmeldung | Nur die eigenen Aufgaben mit dem Hinweis aus der Vorlage, dazu Name, Vorgangsnummer, Einrichtung, Vertragsbeginn und die Zusatzangaben, die dieser Schluessel sehen darf (`zusatz`); 404 ungueltig (auch bei einem Offboarding-Token), 410 abgelaufen oder Vorgang nicht mehr aktiv |
+| `PATCH /api/onboarding-tasks/[token]/[itemId]` | Abteilung, ohne Anmeldung | `{ "isCompleted": true, "comment": "…" }` (Kommentar max. 1000 Zeichen, `""` loescht); 409 bei abgeschlossenem Vorgang, 429 je IP bzw. je Link |
+| `POST /api/cron/reminders` | n8n, `Authorization: Bearer <CRON_SECRET>` | Der **bestehende** taegliche Lauf; Abschnitt 3 erinnert die informierten Abteilungen. Die Antwort traegt zusaetzlich `departmentReminders` (`{ remindersProcessed, errors, details[], uebersprungen[] }`), `total` bleibt Mitarbeiter + Vorgesetzte. Ein eigener Cron ist nicht noetig |
+
+Die Adressen der Abteilungen stehen unter **Einstellungen** > **Abteilungen** (`/api/settings/departments`), die Adresse der Fuehrungskraft am Vorgang (`supervisorEmail`, `supervisorName`) — im Onboarding immer die Adresse, die auch den Modalitaeten-Link bekommen hat.
 
 ### Konfiguration
 

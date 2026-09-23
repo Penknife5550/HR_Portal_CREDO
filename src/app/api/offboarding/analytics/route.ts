@@ -448,7 +448,15 @@ export async function GET(request: NextRequest) {
     // "zugewiesen" und verfaelschte sonst totalAssigned. sentAt ist der ERSTE
     // erfolgreiche Versand und bleibt stehen — die Antwortzeit misst also ab
     // der ersten Mail, nicht ab einem spaeteren "Erneut senden".
-    const deptWhere: Record<string, unknown> = { sentAt: { not: null } };
+    //
+    // `offboardingId: { not: null }` (Paket 5): Seit dem Onboarding teilen sich
+    // beide Module EINE Link-Tabelle (offboardingId ODER onboardingId gesetzt).
+    // Ohne diese Zeile zaehlten die Onboarding-Links in der
+    // Offboarding-Auswertung mit.
+    const deptWhere: Record<string, unknown> = {
+      sentAt: { not: null },
+      offboardingId: { not: null },
+    };
     if (organizationId || fromParam || toParam) {
       deptWhere.offboarding = where;
     }

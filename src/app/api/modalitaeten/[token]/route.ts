@@ -16,6 +16,7 @@ import {
   vorgesetzteAbgesendet,
 } from "@/lib/onboarding-spuren";
 import { statusAbgleichen } from "@/lib/onboarding-status-abgleich";
+import { faelligkeitenSetzen } from "@/lib/abteilungsaufgaben-onboarding";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -529,6 +530,23 @@ export async function POST(
       },
       { status: 500 }
     );
+  }
+
+  /**
+   * Jetzt — und nur jetzt — steht der Vertragsbeginn fest: Der Modalitaeten-Link
+   * ist mit der Abgabe gesperrt (auth.ts), das Datum aendert sich nicht mehr.
+   * Also die Faelligkeiten der Checkliste EINMAL ausrechnen (Vertragsbeginn +
+   * Tagesangabe aus der Vorlage). Punkte ohne Tagesangabe bleiben ohne Frist.
+   *
+   * Bewusst NACH dem Commit der Abgabe und in einer eigenen Transaktion: Die
+   * Abgabe darf daran nicht scheitern. Und bewusst OHNE Versand — Abteilungen
+   * informiert nur HR per Knopf (Entscheidung Paket 5). Geht es hier schief,
+   * holt das erste „Abteilungen informieren" es nach.
+   */
+  try {
+    await prisma.$transaction((tx) => faelligkeitenSetzen(tx, onboarding.id));
+  } catch (err) {
+    console.error("[Modalitaeten] Faelligkeiten konnten nicht gesetzt werden:", err);
   }
 
   // n8n Webhook

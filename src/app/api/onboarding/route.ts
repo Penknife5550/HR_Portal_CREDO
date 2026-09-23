@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { generateToken, getTokenExpiryDate, getSession } from "@/lib/auth";
 import { apiHandler } from "@/lib/api-handler";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { abteilungAusZustaendigkeit } from "@/lib/abteilungsaufgaben";
 import {
   canAccessProcess,
   canEditProcess,
@@ -156,6 +157,21 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
         include: { items: { orderBy: { orderIndex: "asc" } } },
       }),
     ]);
+    // Die Aufgaben dieses Vorgangs aus der Vorlage (Paket 5):
+    //   assignee        Schluessel statt Freitext. `abteilungAusZustaendigkeit`
+    //                   setzt bekannte Altwerte um ("Verwaltung" → VERWALTUNG);
+    //                   Unbekanntes bleibt als Freitext stehen und erscheint
+    //                   spaeter als „unbekannte Zuständigkeit". Das `|| null`
+    //                   ist Absicht: Bei `defaultAssignee: "   "` ergaebe
+    //                   `?? null` den LEEREN Text — weder Schluessel noch
+    //                   Freitext, und die Uebersicht meldete ihn weder als
+    //                   Zeile noch als unbekannte Zustaendigkeit.
+    //   description     Hinweis fuer die zustaendige Stelle (Link-Seite, Mail).
+    //   relativeDueDays Kopie der Tagesangabe; `templateItemId` zeigt nach
+    //                   Vorlagen-Aenderungen oft ins Leere.
+    //   dueDate         bleibt null — der Vertragsbeginn steht noch nicht fest.
+    //                   faelligkeitenSetzen rechnet ihn einmalig aus, sobald
+    //                   die Einstellungsmodalitaeten eingereicht sind.
     const checklistItems =
       checklistTemplate?.items.map((templateItem) => ({
         templateItemId: templateItem.id,
@@ -163,7 +179,11 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
         category: templateItem.category,
         orderIndex: templateItem.orderIndex,
         dueDate: null,
-        assignee: templateItem.defaultAssignee,
+        assignee:
+          abteilungAusZustaendigkeit(templateItem.defaultAssignee) ??
+          (templateItem.defaultAssignee?.trim() || null),
+        description: templateItem.description ?? null,
+        relativeDueDays: templateItem.defaultDueDays ?? null,
       })) ?? [];
 
     const token = generateToken();

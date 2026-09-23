@@ -10,10 +10,13 @@
  * Diese Datei enthaelt NUR Regeln: keine Datenbank, keine Node-Module, keine
  * Uhr (jede Funktion bekommt `jetzt`). Sie ist damit im Browser nutzbar (die
  * Karte im Portal zeigt dieselben Texte wie der Server) und ohne Datenbank
- * testbar (src/__tests__/lib/abteilungsaufgaben.test.ts). Paket 5 (Onboarding)
- * nutzt sie unveraendert — deshalb spricht hier nichts von "Offboarding",
- * "Austritt" oder "letzter Arbeitstag". Der Datenbankteil steht in
- * src/lib/abteilungsaufgaben-dienst.ts und abteilungsaufgaben-uebergaenge.ts.
+ * testbar (src/__tests__/lib/abteilungsaufgaben.test.ts). Seit Paket 5 gilt
+ * sie fuer Offboarding UND Onboarding; was je Modul verschieden ist (Texte,
+ * Zusatzfelder, Faelligkeit ab Vertragsbeginn, Sperre ohne Modalitaeten),
+ * steht im Abschnitt "Module" und ist ausdruecklich nach Modul benannt. Der
+ * Datenbankteil steht in src/lib/abteilungsaufgaben-dienst.ts,
+ * abteilungsaufgaben-uebergaenge.ts und (Onboarding)
+ * abteilungsaufgaben-onboarding.ts.
  *
  * Die Regeln in einem Satz je Thema:
  *   - Empfaenger: VORGESETZTER geht IMMER an die Fuehrungskraft des Vorgangs,
@@ -38,6 +41,7 @@ import {
 } from "@/lib/constants";
 import { escapeHtml } from "@/lib/email-layout";
 import { formatDatumDE } from "@/lib/format";
+import { vorgesetzteAbgesendet } from "@/lib/onboarding-spuren";
 
 // =============================================
 // Konstanten
@@ -108,6 +112,25 @@ export const MELDUNGEN = {
   NIEMAND_OFFEN: "Es gibt keine Abteilung, die noch informiert werden muss.",
   FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN:
     "Die Adresse der Führungskraft liegt in keiner freigegebenen Domain (Einstellungen → SMTP → Erlaubte Empfänger-Domains). Bitte eine dienstliche Adresse eintragen.",
+  // ---- Paket 5: Onboarding ----
+  /** 404 im Onboarding — derselbe Text wie in GET/PATCH /api/onboarding/[id]. */
+  ONBOARDING_VORGANG_NICHT_GEFUNDEN: "Vorgang nicht gefunden",
+  /** Oeffentliche Seite, Onboarding EXPIRED (410). */
+  VORGANG_NICHT_MEHR_AKTIV: "Dieser Vorgang ist nicht mehr aktiv. Bitte keine weiteren Schritte unternehmen.",
+  /** HR-Aktion im Onboarding mit Status EXPIRED (409). */
+  HR_VORGANG_ABGELAUFEN:
+    "Der Vorgang ist abgelaufen. Abteilungen können nicht mehr informiert werden.",
+  /** Portal-PATCH im Onboarding mit Status EXPIRED (409; Notiz geht). */
+  CHECKLISTE_ABGELAUFEN:
+    "Der Vorgang ist abgelaufen. Die Checkliste kann nicht mehr geändert werden.",
+  /** Sperre ohne eingereichte Einstellungsmodalitaeten (409, Karte, Stepper). */
+  MODALITAETEN_FEHLEN:
+    "Die Einstellungsmodalitäten sind noch nicht eingereicht. Erst mit ihnen steht der Vertragsbeginn fest, nach dem sich die Fälligkeiten richten. Danach lassen sich die Abteilungen informieren.",
+  /** Modalitaeten eingereicht, aber ohne Vertragsbeginn (Altfall, 409). */
+  VERTRAGSBEGINN_FEHLT:
+    "Der Vertragsbeginn fehlt. Die Fälligkeiten der Aufgaben richten sich nach dem Vertragsbeginn aus den Einstellungsmodalitäten.",
+  /** Oeffentliche Onboarding-Seite, solange kein Name bekannt ist. */
+  NAME_FOLGT: "Name folgt",
 } as const;
 
 /**
@@ -219,9 +242,20 @@ export function istPortalZustaendig(schluessel: string | null | undefined): bool
  * Bekommt die Aufgaben per Link: jede Zustaendigkeit ausser HR/MITARBEITER —
  * also die festen Link-Abteilungen, die Fuehrungskraft UND eigene Schluessel.
  * Eine Aufgabe ohne Zustaendigkeit gehoert niemandem.
+ *
+ * Seit Paket 5 nur ein Wert in SCHLUESSELFORM (ABTEILUNGS_SCHLUESSEL_MUSTER):
+ * Ein Freitext wie „Werkstatt" oder „Kantine", den die Migration
+ * ONBOARDING_ABTEILUNGSAUFGABEN_V1 keinem Schluessel zuordnen konnte, ist keine
+ * Abteilung, an die ein Link ginge — er erscheint als unbekannte Zustaendigkeit
+ * (`unbekannteZustaendigkeiten` in abteilungsZeilenBauen), nicht als Zeile
+ * „keine aktive Adresse". Im Offboarding stehen ohnehin nur Schluessel.
  */
 export function istLinkAbteilung(schluessel: string | null | undefined): boolean {
-  return !!schluessel && schluessel.trim() !== "" && !istPortalZustaendig(schluessel);
+  return (
+    !!schluessel &&
+    abteilungsSchluesselGueltig(schluessel) &&
+    !istPortalZustaendig(schluessel)
+  );
 }
 
 export function istFuehrungskraft(schluessel: string | null | undefined): boolean {
@@ -259,6 +293,85 @@ export function abteilungsReihenfolge(schluessel: Iterable<string>): string[] {
     .sort();
   const fuehrung = alle.filter(istFuehrungskraft);
   return [...fest, ...eigene, ...fuehrung];
+}
+
+// =============================================
+// Zustaendigkeit aus Freitext (Paket 5, Onboarding)
+// =============================================
+
+/** Kleinbuchstaben, Umlaute ausgeschrieben, alles ausser a–z/0–9 als Leerzeichen. */
+function zustaendigkeitNormalisieren(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Freitext-Zustaendigkeit → Schluessel. Bis Paket 5 trugen die Onboarding-
+ * Vorlagen Freitext („Verwaltung", „Vorgesetzter"); die Migration
+ * ONBOARDING_ABTEILUNGSAUFGABEN_V1 stellt ihn damit um, die Anlage eines
+ * Vorgangs (POST /api/onboarding) normalisiert ebenso.
+ *
+ *   leer                                          → null
+ *   Schluesselform (IT, HR, DSB, EMPFANG_2 …)     → bleibt, wie er ist
+ *   HR…, Personal…                                → HR
+ *   IT… (erstes Wort), EDV…                       → IT
+ *   Verw…, …sekretariat…                          → VERWALTUNG
+ *   Vorgesetzt…, …führungskraft…, …leitung (Wort) → VORGESETZTER
+ *   Facility…, …hausmeister…, …haustechnik…       → FACILITY
+ *   …buchhaltung…                                 → BUCHHALTUNG
+ *   Datenschutz…, DSB                             → DSB
+ *   Mitarbeit…, Beschäftigt…                      → MITARBEITER
+ *   sonst                                         → null (unbekannt: bleibt
+ *                                                   stehen und wird gemeldet)
+ *
+ * Die Anzeigenamen aus DEPARTMENT_LABELS bilden sich auf ihren Schluessel ab.
+ * Eine JS-Kopie steht in prisma/seed-check.js (abteilungAusZustaendigkeitJs);
+ * src/__tests__/lib/onboarding-abteilungsaufgaben-migration.test.ts haelt beide
+ * zusammen — wer hier aendert, aendert dort mit.
+ */
+export function abteilungAusZustaendigkeit(text: string | null | undefined): string | null {
+  const roh = (text ?? "").trim();
+  if (!roh) return null;
+  if (ABTEILUNGS_SCHLUESSEL_MUSTER.test(roh)) return roh;
+
+  const n = zustaendigkeitNormalisieren(roh);
+  if (!n) return null;
+  const woerter = n.split(" ");
+  const erstes = woerter[0];
+
+  if (erstes === "hr" || n.startsWith("personal")) return DEPARTMENT_KEYS.HR;
+  if (erstes === "it" || n.startsWith("edv")) return DEPARTMENT_KEYS.IT;
+  if (n.startsWith("verw") || n.includes("sekretariat")) return DEPARTMENT_KEYS.VERWALTUNG;
+  if (
+    n.startsWith("vorgesetzt") ||
+    n.includes("fuehrungskraft") ||
+    woerter.some((w) => w.endsWith("leitung"))
+  ) {
+    return DEPARTMENT_KEYS.VORGESETZTER;
+  }
+  if (n.startsWith("facility") || n.includes("hausmeister") || n.includes("haustechnik")) {
+    return DEPARTMENT_KEYS.FACILITY;
+  }
+  if (n.includes("buchhaltung")) return DEPARTMENT_KEYS.BUCHHALTUNG;
+  if (n.startsWith("datenschutz") || erstes === "dsb") return DEPARTMENT_KEYS.DSB;
+  if (n.startsWith("mitarbeit") || n.startsWith("beschaeftigt")) return DEPARTMENT_KEYS.MITARBEITER;
+  return null;
+}
+
+/**
+ * Offboarding-Vorlage? Die Checklisten-Vorlagen beider Module liegen in
+ * derselben Tabelle; unterschieden werden sie seit jeher am Namen
+ * („Offboarding: …", checklisten-content.tsx und src/lib/offboarding.ts).
+ * Dieselbe Regel steht als JS in prisma/seed-check.js.
+ */
+export function istOffboardingVorlagenName(name: string | null | undefined): boolean {
+  return (name ?? "").trim().startsWith("Offboarding:");
 }
 
 // =============================================
@@ -417,6 +530,39 @@ export function verlaengerungNoetig(expiresAt: Date | string, neuBis: Date): boo
 /** Faelligkeit um dieselbe Spanne verschieben, um die sich der Bezugstag verschoben hat. */
 export function faelligkeitVerschoben(faellig: Date, altBezug: Date, neuBezug: Date): Date {
   return new Date(faellig.getTime() + (neuBezug.getTime() - altBezug.getTime()));
+}
+
+const BERLIN_KALENDERTAG = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Berlin",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * Faelligkeit = Bezugstag + `tage` Kalendertage, als UTC-Mitternacht (so liegen
+ * alle Tagesdaten in der Datenbank, vgl. offboarding.ts: lastWorkingDay +
+ * defaultDueDays). Im Onboarding ist der Bezugstag der Vertragsbeginn aus den
+ * EINGEREICHTEN Modalitaeten.
+ *
+ * Der Bezugstag wird als Kalendertag in deutscher Zeit gelesen — das ist der
+ * Tag, den formatDatumDE anzeigt. Fuer die ueblichen Werte (UTC-Mitternacht,
+ * `new Date("2026-10-01")`) ist das derselbe Tag; ein Wert wie
+ * 2026-09-30T22:00Z (deutsche Mitternacht) wird so nicht zum 30.09.
+ *
+ * `null`, wenn Bezugstag oder Tage fehlen: Punkte ohne Tagesangabe bleiben
+ * ohne Faelligkeit (keine kuenstlichen Fristen, keine Erinnerung). 0 bleibt 0.
+ */
+export function faelligkeitAus(
+  bezug: Date | string | null | undefined,
+  tage: number | null | undefined,
+): Date | null {
+  const d = alsDatum(bezug);
+  if (!d || tage == null || !Number.isFinite(tage)) return null;
+  const teile = Object.fromEntries(BERLIN_KALENDERTAG.formatToParts(d).map((t) => [t.type, t.value]));
+  return new Date(
+    Date.UTC(Number(teile.year), Number(teile.month) - 1, Number(teile.day) + Math.trunc(tage)),
+  );
 }
 
 // =============================================
@@ -603,14 +749,38 @@ export function stufenMailFelder(
 export interface AufgabeFuerListe {
   title: string;
   dueDate: Date | string | null;
+  /**
+   * Hinweis fuer die zustaendige Stelle (Paket 5, aus der Vorlage kopiert).
+   * Fehlt er oder ist er leer, sieht die Liste aus wie in Paket 1b.
+   */
+  description?: string | null;
+}
+
+/**
+ * Frueheste Faelligkeit zuerst, ohne Faelligkeit zuletzt, sonst Reihenfolge
+ * wie uebergeben — dieselbe Ordnung in Mail, Dialog und Vorschau.
+ */
+export function nachFaelligkeitSortiert<T extends { dueDate: Date | string | null }>(
+  aufgaben: ReadonlyArray<T>,
+): T[] {
+  return aufgaben
+    .map((a, i) => ({ a, i, d: alsDatum(a.dueDate) }))
+    .sort((x, y) => {
+      if (x.d && y.d) return x.d.getTime() - y.d.getTime() || x.i - y.i;
+      if (x.d) return -1;
+      if (y.d) return 1;
+      return x.i - y.i;
+    })
+    .map((s) => s.a);
 }
 
 /**
  * Aufgabenliste fuer die Mail, frueheste Faelligkeit zuerst (ohne Faelligkeit
  * zuletzt, sonst Reihenfolge wie uebergeben).
  *
- *   aufgabenliste       Klartext, eine Zeile je Aufgabe: "- Titel – fällig TT.MM.JJJJ"
- *   aufgabenliste_html  <ul>…</ul>, Titel maskiert (renderTemplate maskiert nichts)
+ *   aufgabenliste       Klartext, eine Zeile je Aufgabe: "- Titel – fällig TT.MM.JJJJ",
+ *                       ein Hinweis steht eingerueckt in der Zeile darunter
+ *   aufgabenliste_html  <ul>…</ul>, Titel und Hinweis maskiert (renderTemplate maskiert nichts)
  *   anzahl_aufgaben     Anzahl
  *   naechste_faelligkeit TT.MM.JJJJ der fruehesten Faelligkeit, sonst ""
  */
@@ -620,22 +790,22 @@ export function aufgabenlisteMailFelder(aufgaben: ReadonlyArray<AufgabeFuerListe
   anzahl_aufgaben: number;
   naechste_faelligkeit: string;
 } {
-  const sortiert = aufgaben
-    .map((a, i) => ({ a, i, d: alsDatum(a.dueDate) }))
-    .sort((x, y) => {
-      if (x.d && y.d) return x.d.getTime() - y.d.getTime() || x.i - y.i;
-      if (x.d) return -1;
-      if (y.d) return 1;
-      return x.i - y.i;
-    });
+  const sortiert = nachFaelligkeitSortiert(aufgaben).map((a) => ({ a, d: alsDatum(a.dueDate) }));
 
   const zeilen: string[] = [];
   const punkte: string[] = [];
   for (const { a, d } of sortiert) {
     const titel = a.title.replace(/\s+/g, " ").trim();
     const faellig = d ? ` – fällig ${formatDatumDE(d)}` : "";
-    zeilen.push(`- ${titel}${faellig}`);
-    punkte.push(`<li style="margin:0 0 4px;">${escapeHtml(titel)}${faellig}</li>`);
+    const hinweis = (a.description ?? "").replace(/\s+/g, " ").trim();
+    zeilen.push(`- ${titel}${faellig}${hinweis ? `\n  ${hinweis}` : ""}`);
+    punkte.push(
+      `<li style="margin:0 0 4px;">${escapeHtml(titel)}${faellig}${
+        hinweis
+          ? `<br><span style="color:#6b7280;font-size:13px;">${escapeHtml(hinweis)}</span>`
+          : ""
+      }</li>`,
+    );
   }
 
   const erste = sortiert.find((s) => s.d)?.d ?? null;
@@ -1041,6 +1211,21 @@ export interface AufgabeFuerZeile {
   assigneeDepartment: string | null;
   isCompleted: boolean;
   dueDate: Date | string | null;
+  /** Fuer die Vorschau des Dialogs (Paket 5); ohne id/title keine Vorschau-Zeile. */
+  id?: string;
+  title?: string;
+  description?: string | null;
+}
+
+/**
+ * Was „Abteilungen informieren" dieser Zeile schicken wuerde — fuer den Dialog
+ * vor dem Versand (beide Module). Nur bei `informierbar`, sonst null.
+ */
+export interface ZeilenVorschau {
+  /** Offene Aufgaben in Mail-Reihenfolge (frueheste Faelligkeit zuerst). */
+  aufgaben: { id: string; title: string; dueDate: string | null; description: string | null }[];
+  /** Gueltigkeit, die ein neuer Link jetzt bekaeme (ISO). */
+  gueltigBis: string;
 }
 
 export interface LinkFuerZeile extends LinkAnzeigeStand {
@@ -1102,6 +1287,8 @@ export interface AbteilungsZeile {
   aktionen: ZeilenAktionen;
   /** ISO, solange Erinnern/Erneut senden gesperrt sind. */
   sperreBis: string | null;
+  /** Paket 5: Inhalt der Mail fuer den Dialog „Abteilungen informieren" (nur bei informierbar). */
+  vorschau: ZeilenVorschau | null;
 }
 
 function iso(wert: Date | string | null | undefined): string | null {
@@ -1116,6 +1303,16 @@ function iso(wert: Date | string | null | undefined): string | null {
  *
  * `linkUrl` baut die kopierbare Adresse (Server: getBaseUrl/APP_URL), damit
  * "Link kopieren" dieselbe Adresse liefert wie die Mail.
+ *
+ * Paket 5:
+ *   - `gesperrt` (Onboarding ohne eingereichte Modalitaeten): Die Zeilen zeigen
+ *     Empfaenger und Aufgaben als Vorschau, aber nichts ist informierbar und
+ *     keine Aktion ausser „Link kopieren" wird angeboten.
+ *   - `vorschau` je informierbarer Zeile: die Aufgabenliste der Mail und die
+ *     Gueltigkeit des Links — fuer den Dialog vor dem Versand.
+ *   - `unbekannteZustaendigkeiten`: Freitexte an offenen Aufgaben, die keine
+ *     Abteilung sind (istLinkAbteilung) und auch nicht HR/MITARBEITER — sie
+ *     gehen nie per Link hinaus; die Karte nennt sie, statt sie zu verschweigen.
  */
 export function abteilungsZeilenBauen(opts: {
   aufgaben: ReadonlyArray<AufgabeFuerZeile>;
@@ -1124,9 +1321,17 @@ export function abteilungsZeilenBauen(opts: {
   organizationId: string;
   fuehrungskraft: FuehrungskraftDaten | null;
   vorgangAbgeschlossen: boolean;
+  /** Versand grundsaetzlich gesperrt (Onboarding: Modalitaeten fehlen). */
+  gesperrt?: boolean;
   linkUrl: (token: string) => string;
   jetzt: Date;
-}): { zeilen: AbteilungsZeile[]; informierbar: number; niemandInformiert: boolean } {
+}): {
+  zeilen: AbteilungsZeile[];
+  informierbar: number;
+  niemandInformiert: boolean;
+  unbekannteZustaendigkeiten: string[];
+} {
+  const gesperrt = opts.gesperrt === true;
   const schluessel = abteilungsReihenfolge([
     ...opts.aufgaben.map((a) => a.assigneeDepartment ?? ""),
     ...opts.links.map((l) => l.departmentKey),
@@ -1147,7 +1352,7 @@ export function abteilungsZeilenBauen(opts: {
       fuehrungskraft: opts.fuehrungskraft,
     });
     const entscheidung = versandEntscheidung({ offeneAufgaben: offene.length, link, empfaenger });
-    const informierbar = !opts.vorgangAbgeschlossen && entscheidung.senden;
+    const informierbar = !opts.vorgangAbgeschlossen && !gesperrt && entscheidung.senden;
 
     let anzeige = linkAnzeige(link, opts.jetzt, {
       grund: entscheidung.senden ? null : entscheidung.grund,
@@ -1176,7 +1381,7 @@ export function abteilungsZeilenBauen(opts: {
     // schickte eine Aufforderung zu laengst erledigten Aufgaben.
     const moeglich = !!link && offen && empfaenger.ok;
     const erinnernMoeglich = moeglich && !!alsDatum(link?.sentAt);
-    const aktionen: ZeilenAktionen = opts.vorgangAbgeschlossen
+    const aktionen: ZeilenAktionen = opts.vorgangAbgeschlossen || gesperrt
       ? {
           erinnern: false,
           erneutSenden: false,
@@ -1232,13 +1437,38 @@ export function abteilungsZeilenBauen(opts: {
       anzeige,
       aktionen,
       sperreBis: sperre ? sperre.toISOString() : null,
+      vorschau: informierbar
+        ? {
+            aufgaben: nachFaelligkeitSortiert(offene)
+              .filter((a) => !!a.id)
+              .map((a) => ({
+                id: a.id as string,
+                title: a.title ?? "",
+                dueDate: iso(a.dueDate),
+                description: a.description?.trim() || null,
+              })),
+            gueltigBis: gueltigBis(
+              opts.jetzt,
+              offene.map((a) => a.dueDate),
+            ).toISOString(),
+          }
+        : null,
     };
   });
+
+  const unbekannt = new Set<string>();
+  for (const a of opts.aufgaben) {
+    const wert = a.assigneeDepartment?.trim();
+    if (!a.isCompleted && wert && !istLinkAbteilung(wert) && !istPortalZustaendig(wert)) {
+      unbekannt.add(wert);
+    }
+  }
 
   return {
     zeilen,
     informierbar: zeilen.filter((z) => z.informierbar).length,
     niemandInformiert: !opts.links.some((l) => !!alsDatum(l.sentAt)),
+    unbekannteZustaendigkeiten: [...unbekannt].sort(),
   };
 }
 
@@ -1352,6 +1582,202 @@ export function fehlendeAdressen(
 }
 
 // =============================================
+// Module (Paket 5): Offboarding und Onboarding
+// =============================================
+
+/** Die beiden Module, deren Checklisten Aufgaben per Link verteilen. */
+export type AbteilungsModul = "OFFBOARDING" | "ONBOARDING";
+
+export interface ModulTexte {
+  /** „Onboarding" / „Offboarding" — Kopf der Link-Seite, „{modulTitel}-Aufgaben: …". */
+  modulTitel: string;
+  /** Beschriftung der Person auf der Link-Seite. */
+  personLabel: string;
+  /** Beschriftung des Bezugstags auf der Link-Seite („Vertragsbeginn"). */
+  bezugsdatumLabel: string;
+  /** Im Satz nach „Fälligkeiten richten sich nach dem …" (Karte). */
+  bezugImSatz: string;
+  /** Was ALLE Empfaenger sehen (Dialog „Was die Empfänger sehen"). */
+  grunddaten: string;
+  /** API der Link-Seite: GET `${apiBasis}/${token}`, PATCH `${apiBasis}/${token}/${itemId}`. */
+  apiBasis: string;
+  /** Pfad der Link-Seite (Mail und „Link kopieren" bauen die volle Adresse auf dem Server). */
+  seitenPfad: string;
+}
+
+export const MODUL_TEXTE: Record<AbteilungsModul, ModulTexte> = {
+  OFFBOARDING: {
+    modulTitel: "Offboarding",
+    personLabel: "Mitarbeiterin / Mitarbeiter",
+    bezugsdatumLabel: "Letzter Arbeitstag",
+    bezugImSatz: "letzten Arbeitstag",
+    grunddaten: "Name, Einrichtung, Vorgangsnummer und den letzten Arbeitstag sowie ihre eigenen Aufgaben.",
+    apiBasis: "/api/offboarding-tasks",
+    seitenPfad: "/offboarding-tasks",
+  },
+  ONBOARDING: {
+    modulTitel: "Onboarding",
+    personLabel: "Neue Mitarbeiterin / neuer Mitarbeiter",
+    bezugsdatumLabel: "Vertragsbeginn",
+    bezugImSatz: "Vertragsbeginn",
+    grunddaten: "Name, Einrichtung, Vorgangsnummer und Vertragsbeginn sowie ihre eigenen Aufgaben.",
+    apiBasis: "/api/onboarding-tasks",
+    seitenPfad: "/onboarding-tasks",
+  },
+};
+
+/**
+ * Zusaetzliche Angaben, die eine Stelle im ONBOARDING sieht — in der Mail
+ * (Payload-Felder gleichen Namens) und auf der Link-Seite (`zusatz`).
+ * Datensparsamkeit (Plan, Tabelle „Wer sieht was"): Der Link ist ein
+ * Inhaber-Token ohne Anmeldung, die Mail ein offener Kanal. Jede Stelle bekommt
+ * nur, was sie fuer ihre Aufgabe braucht.
+ */
+export type ZusatzFeld = "stellenbezeichnung" | "betriebsstaette" | "ansprechpartner_email";
+
+export const ZUSATZFELD_LABELS: Record<ZusatzFeld, string> = {
+  stellenbezeichnung: "Stellenbezeichnung",
+  betriebsstaette: "Betriebsstätte",
+  ansprechpartner_email: "Adresse der Führungskraft",
+};
+
+/**
+ * Je Schluessel die erlaubten Zusatzfelder. Wer hier fehlt (BUCHHALTUNG, eigene
+ * Schluessel, HR, MITARBEITER), sieht nur die Grunddaten.
+ * NIE — fuer niemanden: private Adresse der Person (OnboardingProcess.email),
+ * Anschrift, Geburtsdatum, IBAN, SV-Nummer, Steuer-ID, Kinder, Krankenkasse,
+ * Aufenthaltstitel, Masernschutz, Gehalt, Kostenstellen, interne Notizen,
+ * Fortschritt anderer Abteilungen.
+ */
+export const ONBOARDING_ZUSATZFELDER: Readonly<Record<string, readonly ZusatzFeld[]>> = {
+  IT: ["stellenbezeichnung", "betriebsstaette", "ansprechpartner_email"],
+  VERWALTUNG: ["betriebsstaette", "ansprechpartner_email"],
+  FACILITY: ["betriebsstaette", "ansprechpartner_email"],
+  DSB: ["stellenbezeichnung"],
+  VORGESETZTER: ["stellenbezeichnung", "betriebsstaette"],
+};
+
+/** Erlaubte Zusatzfelder eines Schluessels im Onboarding (unbekannt → keine). */
+export function zusatzfelderFuer(departmentKey: string | null | undefined): readonly ZusatzFeld[] {
+  if (!departmentKey) return [];
+  return ONBOARDING_ZUSATZFELDER[departmentKey] ?? [];
+}
+
+/**
+ * Die Zusatzwerte fuer EINE Stelle: nur erlaubte Felder, nur nicht leere Werte.
+ * Nicht erlaubte Felder fehlen ganz (auch nicht als "") — so steht in keinem
+ * Payload und keinem Webhook mehr, als die Stelle sehen darf.
+ */
+export function zusatzWerte(
+  departmentKey: string | null | undefined,
+  quelle: {
+    stellenbezeichnung?: string | null;
+    betriebsstaette?: string | null;
+    fuehrungskraftEmail?: string | null;
+  },
+): Partial<Record<ZusatzFeld, string>> {
+  const werte: Record<ZusatzFeld, string> = {
+    stellenbezeichnung: (quelle.stellenbezeichnung ?? "").trim(),
+    betriebsstaette: (quelle.betriebsstaette ?? "").trim(),
+    ansprechpartner_email: (quelle.fuehrungskraftEmail ?? "").trim(),
+  };
+  const ergebnis: Partial<Record<ZusatzFeld, string>> = {};
+  for (const feld of zusatzfelderFuer(departmentKey)) {
+    if (werte[feld]) ergebnis[feld] = werte[feld];
+  }
+  return ergebnis;
+}
+
+export interface SichtbarkeitsHinweis {
+  /** Was alle Empfaenger sehen (ein Satz). */
+  alle: string;
+  /** Wer zusaetzlich was sieht — nur Stellen mit Zusatzfeldern. */
+  zusaetzlich: { departmentKey: string; departmentName: string; felder: string[] }[];
+  /** Schlusssatz, im Onboarding „Keine Angaben aus dem Personalfragebogen." */
+  hinweis: string | null;
+}
+
+/**
+ * Text fuer den Dialog „Abteilungen informieren", Abschnitt „Was die
+ * Empfänger sehen" — aus derselben Tabelle, nach der Payload und Link-Seite
+ * zugeschnitten werden (eine Quelle, kein zweiter Text in der Oberflaeche).
+ */
+export function sichtbarkeitsHinweis(
+  modul: AbteilungsModul,
+  empfaenger: ReadonlyArray<{ departmentKey: string; departmentName: string }>,
+): SichtbarkeitsHinweis {
+  const texte = MODUL_TEXTE[modul];
+  if (modul === "OFFBOARDING") {
+    return { alle: texte.grunddaten, zusaetzlich: [], hinweis: null };
+  }
+  const gesehen = new Set<string>();
+  const zusaetzlich: SichtbarkeitsHinweis["zusaetzlich"] = [];
+  for (const e of empfaenger) {
+    if (gesehen.has(e.departmentKey)) continue;
+    gesehen.add(e.departmentKey);
+    const felder = zusatzfelderFuer(e.departmentKey).map((f) => ZUSATZFELD_LABELS[f]);
+    if (felder.length > 0) zusaetzlich.push({ departmentKey: e.departmentKey, departmentName: e.departmentName, felder });
+  }
+  return { alle: texte.grunddaten, zusaetzlich, hinweis: "Keine Angaben aus dem Personalfragebogen." };
+}
+
+/** Warum der Versand grundsaetzlich gesperrt ist (Onboarding). */
+export type SperrGrund = "MODALITAETEN_FEHLEN" | "VERTRAGSBEGINN_FEHLT";
+
+export interface VersandSperre {
+  grund: SperrGrund;
+  text: string;
+}
+
+/**
+ * Voraussetzung im Onboarding: Die Einstellungsmodalitaeten sind EINGEREICHT
+ * (vorgesetzteAbgesendet: supervisorSubmittedAt, Altfall isComplete) und
+ * enthalten einen Vertragsbeginn. Ein nur zwischengespeicherter Vertragsbeginn
+ * zaehlt NICHT — er kann sich per Autosave noch aendern. Ohne Modalitaeten
+ * (z. B. Ehrenamt ohne Vorgesetzten-Link) bleibt der Versand gesperrt; ein
+ * Ersatzdatum gibt es nicht (Entscheidung 22.09.2026). `null` = frei.
+ */
+export function onboardingVersandSperre(v: {
+  status: string;
+  supervisorSubmittedAt?: Date | string | null;
+  supervisorData?: { isComplete?: boolean | null; vertragsbeginn?: Date | string | null } | null;
+}): VersandSperre | null {
+  if (!vorgesetzteAbgesendet(v)) {
+    return { grund: "MODALITAETEN_FEHLEN", text: MELDUNGEN.MODALITAETEN_FEHLEN };
+  }
+  if (!alsDatum(v.supervisorData?.vertragsbeginn)) {
+    return { grund: "VERTRAGSBEGINN_FEHLT", text: MELDUNGEN.VERTRAGSBEGINN_FEHLT };
+  }
+  return null;
+}
+
+/** Endstatus: keine Aktion, keine Erinnerung, Link nur lesend bzw. 410. */
+export const ONBOARDING_ENDSTATUS = ["COMPLETED", "EXPIRED"] as const;
+
+/**
+ * Stand der Karte „Aufgaben für Abteilungen" — dieselbe Form in beiden Modulen
+ * (`abteilungen` in GET /api/offboarding/[id], GET /api/onboarding/[id] und
+ * GET /api/onboarding/[id]/abteilungen).
+ */
+export interface AbteilungsUebersichtDaten {
+  modul: AbteilungsModul;
+  zeilen: AbteilungsZeile[];
+  /** So viele Zeilen wuerde „Abteilungen informieren" jetzt anschreiben. */
+  informierbar: number;
+  niemandInformiert: boolean;
+  /** Endstatus (Offboarding COMPLETED/CANCELLED, Onboarding COMPLETED/EXPIRED). */
+  vorgangAbgeschlossen: boolean;
+  /** Offboarding CANCELLED bzw. Onboarding EXPIRED — waehlt den Hinweistext. */
+  vorgangAbgebrochen: boolean;
+  /** Bezugstag der Faelligkeiten (ISO): letzter Arbeitstag bzw. Vertragsbeginn; null, solange er fehlt. */
+  bezugsdatum: string | null;
+  /** Onboarding ohne eingereichte Modalitaeten; im Offboarding immer null. */
+  gesperrt: VersandSperre | null;
+  /** Freitext-Zustaendigkeiten offener Aufgaben, die nie per Link hinausgehen. */
+  unbekannteZustaendigkeiten: string[];
+}
+
+// =============================================
 // Protokoll (AuditLog)
 // =============================================
 
@@ -1360,6 +1786,10 @@ export const ABTEILUNGS_AUDIT = {
   ERNEUT_GESENDET: "DEPARTMENT_LINK_RESENT",
   ERINNERT_KNOPF: "DEPARTMENT_REMINDER_SENT",
   ERINNERT_CRON: "OFFBOARDING_REMINDER_SENT",
+  /** Paket 5: taeglicher Lauf im Onboarding (/api/cron/reminders, Abschnitt 3). */
+  ERINNERT_CRON_ONBOARDING: "ONBOARDING_DEPARTMENT_REMINDER_SENT",
+  /** Paket 5: Faelligkeiten aus Vertragsbeginn + Tagen einmal gesetzt. */
+  FAELLIGKEITEN_GESETZT: "CHECKLIST_DUE_DATES_SET",
   LINK_ERNEUERT: "DEPARTMENT_LINK_RENEWED",
   ERLEDIGT: "ABTEILUNGSAUFGABE_ERLEDIGT",
   WIEDER_GEOEFFNET: "ABTEILUNGSAUFGABE_WIEDER_GEOEFFNET",
@@ -1378,6 +1808,8 @@ export const ABTEILUNGS_AUDIT_LABELS: Record<string, string> = {
   DEPARTMENT_LINK_RESENT: "Abteilungs-Mail erneut gesendet",
   DEPARTMENT_REMINDER_SENT: "Abteilung erinnert",
   OFFBOARDING_REMINDER_SENT: "Abteilung automatisch erinnert",
+  ONBOARDING_DEPARTMENT_REMINDER_SENT: "Abteilung automatisch erinnert",
+  CHECKLIST_DUE_DATES_SET: "Fälligkeiten der Checkliste gesetzt",
   DEPARTMENT_LINK_RENEWED: "Abteilungs-Link erneuert",
   ABTEILUNGSAUFGABE_ERLEDIGT: "Aufgabe per Link erledigt",
   ABTEILUNGSAUFGABE_WIEDER_GEOEFFNET: "Aufgabe per Link wieder geöffnet",

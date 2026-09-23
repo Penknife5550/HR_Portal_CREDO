@@ -104,6 +104,29 @@ export async function GET(
       } catch { decryptedTaxId = "***verschluesselt***"; }
     }
 
+    // Anzeigenamen der Abteilungen: Fuer SELBST angelegte Schluessel kennt
+    // `abteilungLabel` keinen Namen und gaebe den Rohwert („EMPFANG") aus.
+    // Scheitert die Abfrage, bleibt es dabei — ein Export darf daran nicht
+    // scheitern.
+    // Eine Abteilung kann je Einrichtung einen eigenen Namen tragen; die
+    // Zeile der Einrichtung dieses Vorgangs sticht die allgemeine.
+    const abteilungsNamen: Record<string, string> = {};
+    try {
+      const konfigs = await prisma.departmentConfig.findMany({
+        where: { OR: [{ organizationId: null }, { organizationId: process.organizationId }] },
+        select: { departmentKey: true, departmentName: true, organizationId: true },
+        orderBy: { organizationId: "asc" },
+      });
+      for (const k of konfigs) {
+        if (!k.departmentName) continue;
+        if (k.organizationId || !abteilungsNamen[k.departmentKey]) {
+          abteilungsNamen[k.departmentKey] = k.departmentName;
+        }
+      }
+    } catch (err) {
+      console.error("[PDF-Export] Abteilungsnamen konnten nicht geladen werden:", err);
+    }
+
     const ctx: OnboardingExportContext = {
       firstName: process.firstName,
       lastName: process.lastName,
@@ -261,6 +284,7 @@ export async function GET(
         notes: c.notes,
         dueDate: c.dueDate?.toISOString() || null,
       })),
+      abteilungsNamen,
     };
 
     const pdfBuffer = await generateOnboardingPDF(ctx, type as OnboardingExportType);

@@ -4,11 +4,22 @@
  * POST   – Neues Item zur Vorlage hinzufuegen
  * PATCH  – Bestehendes Item bearbeiten (erfordert itemId im Body)
  * DELETE – Item entfernen (erfordert itemId als Query-Param)
+ *
+ * Paket 5: Beide schreibenden Methoden pruefen den Rumpf mit
+ * `checklistenPunktSchema` bzw. `checklistenPunktPatchSchema`. Die Routen
+ * bleiben als API bestehen; der Editor speichert seit Paket 5 ueber
+ * PUT /api/checklisten/[id] — in EINEM Schritt statt „alles loeschen, neu
+ * anlegen".
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import {
+  checklistenFehlerMeldung,
+  checklistenPunktPatchSchema,
+  checklistenPunktSchema,
+} from "@/lib/validations/abteilungsaufgaben";
 
 // =============================================
 // POST /api/checklisten/:id/items – Neues Item hinzufuegen
@@ -35,12 +46,21 @@ export async function POST(
     }
 
     const { id } = await params;
-    const body = await request.json();
-    const { title, category, orderIndex, defaultDueDays, defaultAssignee } = body;
+
+    const roh = await request.json().catch(() => undefined);
+    const geprueft = checklistenPunktSchema.safeParse(roh);
+    if (!geprueft.success) {
+      return NextResponse.json(
+        { error: checklistenFehlerMeldung(geprueft.error) },
+        { status: 400 }
+      );
+    }
+    const punkt = geprueft.data;
 
     // Vorlage pruefen
     const template = await prisma.checklistTemplate.findUnique({
       where: { id },
+      select: { id: true },
     });
     if (!template) {
       return NextResponse.json(
@@ -49,23 +69,9 @@ export async function POST(
       );
     }
 
-    // Validierung
-    if (!title || typeof title !== "string" || title.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Titel ist ein Pflichtfeld" },
-        { status: 400 }
-      );
-    }
-    if (!category || typeof category !== "string" || category.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Kategorie ist ein Pflichtfeld" },
-        { status: 400 }
-      );
-    }
-
     // Naechsten orderIndex ermitteln, falls nicht angegeben
-    let finalOrderIndex = orderIndex;
-    if (finalOrderIndex === undefined || finalOrderIndex === null) {
+    let finalOrderIndex = punkt.orderIndex;
+    if (finalOrderIndex === undefined) {
       const maxItem = await prisma.checklistTemplateItem.findFirst({
         where: { templateId: id },
         orderBy: { orderIndex: "desc" },
@@ -74,14 +80,16 @@ export async function POST(
       finalOrderIndex = (maxItem?.orderIndex ?? -1) + 1;
     }
 
+    // Ein mitgeschicktes `id` wird uebergangen — hier entsteht ein neuer Punkt.
     const item = await prisma.checklistTemplateItem.create({
       data: {
         templateId: id,
-        title: title.trim(),
-        category: category.trim(),
+        title: punkt.title,
+        category: punkt.category,
         orderIndex: finalOrderIndex,
-        defaultDueDays: defaultDueDays ?? null,
-        defaultAssignee: defaultAssignee?.trim() || null,
+        defaultDueDays: punkt.defaultDueDays ?? null,
+        defaultAssignee: punkt.defaultAssignee ?? null,
+        description: punkt.description ?? null,
       },
     });
 
@@ -120,19 +128,32 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json();
-    const { itemId, title, category, orderIndex, defaultDueDays, defaultAssignee } = body;
 
-    if (!itemId) {
+    const roh = await request.json().catch(() => undefined);
+    const itemId =
+      typeof roh === "object" && roh !== null
+        ? (roh as { itemId?: unknown }).itemId
+        : undefined;
+    if (typeof itemId !== "string" || itemId.trim().length === 0) {
       return NextResponse.json(
         { error: "itemId ist erforderlich" },
         { status: 400 }
       );
     }
 
+    const geprueft = checklistenPunktPatchSchema.safeParse(roh);
+    if (!geprueft.success) {
+      return NextResponse.json(
+        { error: checklistenFehlerMeldung(geprueft.error) },
+        { status: 400 }
+      );
+    }
+    const punkt = geprueft.data;
+
     // Item pruefen (muss zur Vorlage gehoeren)
     const existing = await prisma.checklistTemplateItem.findFirst({
       where: { id: itemId, templateId: id },
+      select: { id: true },
     });
     if (!existing) {
       return NextResponse.json(
@@ -141,13 +162,15 @@ export async function PATCH(
       );
     }
 
-    // Update-Daten zusammenbauen
+    // Update-Daten zusammenbauen: `undefined` = nicht mitgeschickt (unveraendert),
+    // `null` = ausdruecklich geleert.
     const updateData: Record<string, unknown> = {};
-    if (title !== undefined) updateData.title = title.trim();
-    if (category !== undefined) updateData.category = category.trim();
-    if (orderIndex !== undefined) updateData.orderIndex = orderIndex;
-    if (defaultDueDays !== undefined) updateData.defaultDueDays = defaultDueDays;
-    if (defaultAssignee !== undefined) updateData.defaultAssignee = defaultAssignee?.trim() || null;
+    if (punkt.title !== undefined) updateData.title = punkt.title;
+    if (punkt.category !== undefined) updateData.category = punkt.category;
+    if (punkt.orderIndex !== undefined) updateData.orderIndex = punkt.orderIndex;
+    if (punkt.defaultDueDays !== undefined) updateData.defaultDueDays = punkt.defaultDueDays;
+    if (punkt.defaultAssignee !== undefined) updateData.defaultAssignee = punkt.defaultAssignee;
+    if (punkt.description !== undefined) updateData.description = punkt.description;
 
     const updated = await prisma.checklistTemplateItem.update({
       where: { id: itemId },

@@ -457,6 +457,10 @@ const NAMENS_VARIABLEN = [
  *     Anmeldung eingibt — der einzige Freitext hier, den jemand ausserhalb des
  *     Portals schreibt.
  *   - `aufgabenliste`: Klartext-Liste der Aufgabentitel.
+ *   - `aufgabe`: Titel einer Aufgabe aus der Checklisten-Vorlage.
+ *   - `stellenbezeichnung`, `betriebsstaette` (Paket 5): Die Fuehrungskraft
+ *     tippt beide ueber den Modalitaeten-Link ein — ohne `<>`-Verbot. In der
+ *     Zuweisungsmail an eine Abteilung darf daraus kein Markup werden.
  *
  * Die Standardvorlagen setzen im HTML die schon maskierten Geschwister
  * `kommentar` bzw. `aufgabenliste_html` ein und benutzen die Rohtexte nur im
@@ -465,7 +469,13 @@ const NAMENS_VARIABLEN = [
  * und `aufgabenliste_html` stehen bewusst NICHT hier — sie sind schon maskiert,
  * ein zweites Maskieren machte aus `&amp;` ein sichtbares `&amp;amp;`.
  */
-const FREITEXT_VARIABLEN = ["kommentar_text", "aufgabenliste"];
+const FREITEXT_VARIABLEN = [
+  "kommentar_text",
+  "aufgabenliste",
+  "aufgabe",
+  "stellenbezeichnung",
+  "betriebsstaette",
+];
 
 /** Variablen fuer den HTML-Teil: Namen und Rohtexte maskiert, der Rest unveraendert. */
 function fuerHtmlMaskiert(vars: Record<string, string>): Record<string, string> {

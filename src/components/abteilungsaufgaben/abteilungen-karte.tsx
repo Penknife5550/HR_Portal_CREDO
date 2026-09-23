@@ -26,27 +26,34 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
   MELDUNGEN,
+  MODUL_TEXTE,
   type AbteilungsAktion,
+  type AbteilungsUebersichtDaten,
   type AbteilungsZeile,
   type AnzeigeFarbe,
+  type ErledigtVon,
   type Fuehrungskraft,
 } from "@/lib/abteilungsaufgaben";
+import { AbteilungenDialog } from "@/components/abteilungsaufgaben/abteilungen-dialog";
 import { formatDatumDE } from "@/lib/format";
 
 // =============================================
 // Typen
 // =============================================
 
-export interface AbteilungenKarteDaten {
-  zeilen: AbteilungsZeile[];
-  informierbar: number;
-  niemandInformiert: boolean;
-  vorgangAbgeschlossen: boolean;
-  /** Bezugstag der Faelligkeiten (ISO), im Offboarding der letzte Arbeitstag. */
-  bezugsdatum: string;
-}
+/**
+ * Stand der Karte, wie ihn beide Module liefern (`abteilungen` in
+ * GET /api/offboarding/[id] und GET /api/onboarding/[id]).
+ *
+ * Seit Paket 5 ist das EIN Typ aus dem Fundament: Das Onboarding kennt
+ * `gesperrt` (Modalitaeten fehlen) und ein `bezugsdatum`, das noch `null` sein
+ * darf. Ein eigener Kartentyp daneben hiesse, beide Formen von Hand
+ * gleichzuhalten — genau dabei faellt spaeter ein Feld unter den Tisch.
+ */
+export type AbteilungenKarteDaten = AbteilungsUebersichtDaten;
 
 /** Ergebnis einer Aktion fuer die Leisten ueber der Karte. */
 export interface AktionsMeldung {
@@ -61,12 +68,17 @@ export interface AbteilungenKarteProps {
   abteilungen: AbteilungenKarteDaten;
   /** Wirksame Fuehrungskraft — fuer den Zusatz „aus der Zeugnis-Bewertung". */
   fuehrungskraft?: Fuehrungskraft | null;
-  /** Steht im Untertitel: „Fälligkeiten richten sich nach dem {…} (TT.MM.JJJJ)." */
+  /**
+   * Steht im Untertitel: „Fälligkeiten richten sich nach dem {…} (TT.MM.JJJJ)."
+   * Ohne Wert der Text des Moduls (`MODUL_TEXTE[…].bezugImSatz`).
+   */
   bezugsdatumLabel?: string;
   /** Darf die angemeldete Rolle informieren/erinnern? Sonst nur lesen und kopieren. */
   darfAktionen?: boolean;
   /** Vorgang abgebrochen (statt abgeschlossen) — waehlt den Hinweistext. */
   abgebrochen?: boolean;
+  /** Zeigt im Leerfall den Link zu den Checklisten-Vorlagen (nur fuer Admins). */
+  zeigeVorlagenLink?: boolean;
   /** Fuehrt eine Aktion aus. Die Karte zeigt „Wird gesendet…", bis das Promise fertig ist. */
   onAktion: (aktion: AbteilungsAktion, departmentKey?: string) => Promise<unknown> | void;
   /** Link „Eintragen" in der Zeile der Fuehrungskraft. */
@@ -74,6 +86,13 @@ export interface AbteilungenKarteProps {
   /** Meldung der letzten Aktion (Zustand haelt die Seite). */
   meldung?: AktionsMeldung | null;
   onMeldungSchliessen?: () => void;
+  /**
+   * Dialog „Abteilungen informieren" von aussen steuern — der Stepper-Schritt
+   * „Checkliste abarbeiten" oeffnet denselben Dialog. Ohne diese beiden Props
+   * haelt die Karte den Zustand selbst.
+   */
+  dialogOffen?: boolean;
+  setDialogOffen?: (offen: boolean) => void;
   /** Nur fuer Tests: Bezugszeit fuer die Sperre „Bitte kurz warten". */
   jetzt?: Date;
 }
@@ -107,6 +126,24 @@ function gueltigesDatum(wert: string | Date | null | undefined): Date | null {
 export function datumUhrzeitDE(wert: string | Date | null | undefined): string {
   const d = gueltigesDatum(wert);
   return d ? BERLIN_DATUM_ZEIT.format(d) : "";
+}
+
+/**
+ * Wer hat abgehakt — aus `erledigtVon` (beide Module, Server-Ergebnis von
+ * `erledigtVonBestimmen`):
+ *   LINK   „erledigt von IT-Abteilung (Link) am 29.07.2027, 10:14"
+ *   PORTAL „erledigt im Portal von Erika Muster am 29.07.2027, 10:14"
+ *   null   „am 29.07.2027" (Altbestand, Urheber unbekannt)
+ */
+export function erledigtText(item: {
+  completedAt: string | null;
+  erledigtVon?: ErledigtVon;
+}): string {
+  const am = item.completedAt ? ` am ${datumUhrzeitDE(item.completedAt)}` : "";
+  const von = item.erledigtVon;
+  if (von?.art === "LINK") return `erledigt von ${von.name} (Link)${am}`;
+  if (von?.art === "PORTAL") return `erledigt im Portal von ${von.name}${am}`;
+  return item.completedAt ? `am ${formatDatumDE(item.completedAt)}` : "";
 }
 
 /** „2 Aufgaben, 1 offen" / „1 Aufgabe" / „3 Aufgaben". */
@@ -245,13 +282,16 @@ export function AktionsMeldungen({
 export function AbteilungenKarte({
   abteilungen,
   fuehrungskraft = null,
-  bezugsdatumLabel = "letzten Arbeitstag",
+  bezugsdatumLabel,
   darfAktionen = true,
   abgebrochen = false,
+  zeigeVorlagenLink = false,
   onAktion,
   onFuehrungskraftEintragen,
   meldung = null,
   onMeldungSchliessen,
+  dialogOffen,
+  setDialogOffen,
   jetzt,
 }: AbteilungenKarteProps) {
   const [laeuft, setLaeuft] = useState<string | null>(null);
@@ -259,9 +299,18 @@ export function AbteilungenKarte({
   // saehen beide noch `laeuft === null`.
   const laeuftRef = useRef(false);
   const [erneuernFuer, setErneuernFuer] = useState<AbteilungsZeile | null>(null);
+  // Der Dialog laesst sich von aussen steuern (Stepper-Schritt „Checkliste
+  // abarbeiten" oeffnet denselben); ohne die Props haelt die Karte ihn selbst.
+  const [dialogIntern, setDialogIntern] = useState(false);
+  const dialogAn = dialogOffen ?? dialogIntern;
+  const dialogSetzen = setDialogOffen ?? setDialogIntern;
 
-  const { zeilen, informierbar, niemandInformiert, vorgangAbgeschlossen } = abteilungen;
+  const { zeilen, informierbar, niemandInformiert, vorgangAbgeschlossen, gesperrt } = abteilungen;
   const nurLesen = vorgangAbgeschlossen || !darfAktionen;
+  const bezugImSatz = bezugsdatumLabel ?? MODUL_TEXTE[abteilungen.modul].bezugImSatz;
+  // Onboarding EXPIRED und Offboarding CANCELLED heissen beide „abgebrochen",
+  // lesen sich aber verschieden („abgelaufen" bzw. „wurde abgebrochen").
+  const abgebrochenEff = abgebrochen || abteilungen.vorgangAbgebrochen;
 
   const ausfuehren = async (aktion: AbteilungsAktion, departmentKey?: string) => {
     if (laeuftRef.current) return;
@@ -275,11 +324,15 @@ export function AbteilungenKarte({
     }
   };
 
+  // Gesperrt (Onboarding ohne eingereichte Modalitaeten): Der Knopf bleibt
+  // sichtbar, aber grau — sonst suchte HR ihn, statt den Grund zu lesen.
+  // `informierbar` ist dann 0 (abteilungsZeilenBauen), deshalb der eigene Zweig.
+  const zeigeGesperrtenKnopf = !nurLesen && !!gesperrt && zeilen.length > 0;
   const hauptknopfText =
-    nurLesen || informierbar <= 0
+    nurLesen || (informierbar <= 0 && !zeigeGesperrtenKnopf)
       ? null
-      : niemandInformiert
-        ? "Abteilungen informieren"
+      : niemandInformiert || zeigeGesperrtenKnopf
+        ? "Abteilungen informieren…"
         : `Weitere Abteilungen informieren (${informierbar})`;
 
   const bezug = formatDatumDE(abteilungen.bezugsdatum);
@@ -300,16 +353,17 @@ export function AbteilungenKarte({
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
             Aufgaben mit zuständiger Abteilung erhält die Abteilung per Link, ohne Anmeldung.
-            Fälligkeiten richten sich nach dem {bezugsdatumLabel}
+            Fälligkeiten richten sich nach dem {bezugImSatz}
             {bezug ? ` (${bezug})` : ""}.
           </p>
         </div>
         {hauptknopfText && (
           <button
             type="button"
-            onClick={() => ausfuehren("informieren")}
-            disabled={laeuft !== null}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-credo-gruen px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#5a9420] disabled:opacity-50"
+            onClick={() => dialogSetzen(true)}
+            disabled={laeuft !== null || !!gesperrt}
+            title={gesperrt?.text}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-credo-gruen px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#5a9420] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -319,6 +373,17 @@ export function AbteilungenKarte({
         )}
       </div>
 
+      {/* Voraussetzung fehlt (Onboarding): Grund im Klartext, nicht nur ein
+          grauer Knopf. Die Zeilen darunter bleiben als Vorschau stehen. */}
+      {gesperrt && !vorgangAbgeschlossen && (
+        <p
+          className="mb-3 rounded-lg border border-credo-gelb/40 bg-credo-gelb/10 px-3 py-2 text-xs text-amber-900"
+          data-hinweis="gesperrt"
+        >
+          {gesperrt.text}
+        </p>
+      )}
+
       {meldung && (
         <div className="mb-3">
           <AktionsMeldungen meldung={meldung} onSchliessen={onMeldungSchliessen} />
@@ -327,14 +392,25 @@ export function AbteilungenKarte({
 
       {vorgangAbgeschlossen && (
         <p className="mb-3 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-          {abgebrochen ? MELDUNGEN.HR_VORGANG_ABGEBROCHEN : MELDUNGEN.HR_VORGANG_ABGESCHLOSSEN}
+          {!abgebrochenEff
+            ? MELDUNGEN.HR_VORGANG_ABGESCHLOSSEN
+            : abteilungen.modul === "ONBOARDING"
+              ? MELDUNGEN.HR_VORGANG_ABGELAUFEN
+              : MELDUNGEN.HR_VORGANG_ABGEBROCHEN}
         </p>
       )}
 
       {zeilen.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-          {MELDUNGEN.KEINE_ABTEILUNGSAUFGABEN} Zuständigkeiten legen Sie in den
-          Checklisten-Vorlagen fest.
+          {MELDUNGEN.KEINE_ABTEILUNGSAUFGABEN} Zuständigkeiten legen Sie in den{" "}
+          {zeigeVorlagenLink ? (
+            <Link href="/checklisten" className="font-semibold text-credo-blau underline-offset-2 hover:underline">
+              Checklisten-Vorlagen
+            </Link>
+          ) : (
+            "Checklisten-Vorlagen"
+          )}{" "}
+          fest.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -352,6 +428,31 @@ export function AbteilungenKarte({
             />
           ))}
         </ul>
+      )}
+
+      {/* Freitext-Zustaendigkeiten: Sie gehen nie per Link hinaus. Ohne diesen
+          Hinweis waere die Aufgabe einfach nicht da — die schlimmste Form von
+          „nicht verschickt". */}
+      {abteilungen.unbekannteZustaendigkeiten.length > 0 && (
+        <p
+          className="mt-3 rounded-lg border border-credo-gelb/40 bg-credo-gelb/10 px-3 py-2 text-xs text-amber-900"
+          data-hinweis="unbekannte-zustaendigkeiten"
+        >
+          Aufgaben mit unbekannter Zuständigkeit (
+          {abteilungen.unbekannteZustaendigkeiten.map((t) => `„${t}“`).join(", ")}) werden nicht per
+          Link verschickt – bitte in den Checklisten-Vorlagen zuordnen.
+        </p>
+      )}
+
+      {dialogAn && (
+        <AbteilungenDialog
+          abteilungen={abteilungen}
+          sendet={laeuft === "informieren"}
+          onAbbrechen={() => dialogSetzen(false)}
+          onSenden={() => {
+            void ausfuehren("informieren").then(() => dialogSetzen(false));
+          }}
+        />
       )}
 
       {erneuernFuer && (
@@ -522,7 +623,14 @@ function AbteilungsZeileAnzeige({
               {zeile.istFuehrungskraft && zeile.fuehrungskraftName ? ` (${zeile.fuehrungskraftName})` : ""}
             </span>
           )}
-          <span className="text-xs text-muted-foreground">· {aufgabenText(zeile.aufgaben)}</span>
+          <span className="text-xs text-muted-foreground">
+            · {aufgabenText(zeile.aufgaben)}
+            {/* Die naechste Frist gehoert neben die Zahl: Ohne sie steht „3
+                Aufgaben" da, und wie eilig es ist, weiss nur die Abteilung. */}
+            {zeile.aufgaben.naechsteFaelligkeit
+              ? `, nächste fällig ${formatDatumDE(zeile.aufgaben.naechsteFaelligkeit)}`
+              : ""}
+          </span>
           <span
             className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${PILL_FARBEN[anzeige.farbe]}`}
             title={anzeige.status === "FEHLGESCHLAGEN" && anzeige.hinweis ? anzeige.hinweis : undefined}

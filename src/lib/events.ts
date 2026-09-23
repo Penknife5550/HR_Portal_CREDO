@@ -147,6 +147,122 @@ const OFFBOARDING_ABTEILUNG_AUFGABENLISTE = {
 };
 
 /**
+ * Gemeinsamer Teil aller Onboarding-Abteilungsbeispiele (Paket 5) — genau die
+ * Felder, die onboardingAbteilungsMailFelder (src/lib/onboarding-abteilung-mail.ts)
+ * jeder Aufrufstelle liefert. Wie oben bewusst abgeschrieben statt aufgerufen:
+ * Die Funktion haengt ueber getBaseUrl an Node-Modulen, dieser Katalog wird auch
+ * im Browser geladen (ereignis-liste.test.ts erzwingt „keine Importe").
+ * src/__tests__/api/onboarding-abteilungs-mails.test.ts haelt beide gleich.
+ *
+ * DATENSPARSAMKEIT: kein Feld der privaten Adresse der Person
+ * (OnboardingProcess.email) — `email` ist immer die Adresse des EMPFAENGERS.
+ */
+const ONBOARDING_ABTEILUNG_BEISPIEL = {
+  onboardingId: "00000000-0000-0000-0000-000000000005",
+  displayId: "ONB-2026-031",
+  vorname: "Anna",
+  nachname: "Beispiel",
+  mitarbeiter_name: "Anna Beispiel",
+  employeeName: "Anna Beispiel",
+  organization: "FES Minden",
+  organizationName: "FES Minden",
+  einrichtung: "FES Minden",
+  mandantNumber: "01",
+  contractStartDate: "2026-10-01T00:00:00.000Z",
+  vertragsbeginn: "01.10.2026",
+};
+
+/**
+ * Beispiel fuer die vier Onboarding-Abteilungsmails (Paket 5): die Aufgaben der
+ * IT-Abteilung zum Dienstbeginn von Anna Beispiel am 01.10.2026. Wie im
+ * Offboarding erzaehlen die Beispiel-Payloads unten EINE Geschichte:
+ *
+ *   22.09.2026, 08:00 UTC  IT informiert — Link gueltig bis +90 Tage (21.12.)
+ *   26.09.2026, 06:00 UTC  taeglicher Lauf erinnert: Benutzerkonto seit 2 Tagen
+ *                          ueberfaellig (Stufe WARNING), Link verlaengert (25.12.)
+ *   28.09.2026             IT hakt "Benutzerkonto …" mit Kommentar ab
+ *   01.10.2026, 09:30 UTC  letzte IT-Aufgabe erledigt — Abteilung fertig
+ *
+ * Neu gegenueber Paket 1b ist der `description`-Hinweis aus der Vorlage: Er
+ * steht in der Klartextliste eingerueckt und im HTML als graue zweite Zeile.
+ */
+export const ONBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN: {
+  id: string;
+  title: string;
+  dueDate: string | null;
+  description: string | null;
+}[] = [
+  {
+    id: "00000000-0000-0000-0000-00000000001a",
+    title: "Benutzerkonto und E-Mail-Adresse anlegen",
+    // Vertragsbeginn (01.10.) minus 7 Tage
+    dueDate: "2026-09-24T00:00:00.000Z",
+    description: "Konto in der Schulverwaltung und in Microsoft 365 anlegen",
+  },
+  {
+    id: "00000000-0000-0000-0000-00000000001b",
+    title: "Notebook & Zubehör bereitstellen",
+    // am Vertragsbeginn
+    dueDate: "2026-10-01T00:00:00.000Z",
+    description: null,
+  },
+  {
+    id: "00000000-0000-0000-0000-00000000001c",
+    title: "WLAN-Zugang einrichten",
+    dueDate: null,
+    description: null,
+  },
+];
+
+/**
+ * Kommentar der IT beim Abhaken von "Benutzerkonto …" (Rohtext, mit
+ * Zeilenumbruch und einem &, damit das Beispiel die Maskierung zeigt). Bewusst
+ * OHNE E-Mail-Adresse: events-catalog.test.ts laesst im Katalog nur
+ * @example.org zu, und in einem Kommentar hat eine echte Adresse nichts zu
+ * suchen.
+ */
+export const ONBOARDING_ABTEILUNG_BEISPIEL_KOMMENTAR =
+  "Konto angelegt & Postfach eingerichtet.\nDas Notebook kommt nächste Woche.";
+
+/** Gemeinsamer Teil der Beispiele: die Abteilung, an die geschrieben wird. */
+const ONBOARDING_ABTEILUNG_IT = {
+  departmentKey: "IT",
+  departmentName: "IT-Abteilung",
+  abteilung: "IT-Abteilung",
+};
+
+/**
+ * Die Zusatzangaben, die der Schluessel IT im Onboarding sehen darf
+ * (ONBOARDING_ZUSATZFELDER in src/lib/abteilungsaufgaben.ts). Andere Schluessel
+ * bekommen weniger oder nichts — die Felder fehlen dann GANZ im Payload.
+ * Sie stehen nur in der Zuweisungsmail, nicht in Erinnerung, Erledigt-Meldung
+ * oder Bestaetigung.
+ */
+const ONBOARDING_ABTEILUNG_ZUSATZ = {
+  stellenbezeichnung: "Lehrkraft Sek. I",
+  betriebsstaette: "Minden, Hauptstandort",
+  ansprechpartner_email: "a.leitung@example.org",
+};
+
+/** aufgabenlisteMailFelder(ONBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN), abgeschrieben. */
+const ONBOARDING_ABTEILUNG_AUFGABENLISTE = {
+  aufgabenliste:
+    "- Benutzerkonto und E-Mail-Adresse anlegen – fällig 24.09.2026\n" +
+    "  Konto in der Schulverwaltung und in Microsoft 365 anlegen\n" +
+    "- Notebook & Zubehör bereitstellen – fällig 01.10.2026\n" +
+    "- WLAN-Zugang einrichten",
+  aufgabenliste_html:
+    '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+    '<li style="margin:0 0 4px;">Benutzerkonto und E-Mail-Adresse anlegen – fällig 24.09.2026' +
+    '<br><span style="color:#6b7280;font-size:13px;">Konto in der Schulverwaltung und in Microsoft 365 anlegen</span></li>' +
+    '<li style="margin:0 0 4px;">Notebook &amp; Zubehör bereitstellen – fällig 01.10.2026</li>' +
+    '<li style="margin:0 0 4px;">WLAN-Zugang einrichten</li>' +
+    "</ul>",
+  anzahl_aufgaben: 3,
+  naechste_faelligkeit: "24.09.2026",
+};
+
+/**
  * Beispiel-Hinweise fuer die Fristen-Sammelmail der Verbeamtung — genau die
  * Felder, die der Cron (cron/civil-service-deadlines) je Hinweis erzeugt.
  *
@@ -341,6 +457,128 @@ export const EVENT_CATALOG: EventDefinition[] = [
       nachricht: "Wir freuen uns auf Sie am 1. Oktober, Ihr Buero ist Raum 214.",
       nachricht_html: "Wir freuen uns auf Sie am 1. Oktober, Ihr Buero ist Raum 214.",
       sachbearbeiter_name: "Erika Sachbearbeiter",
+    },
+    wired: true,
+  },
+
+  // =============================================
+  // Onboarding: Abteilungsaufgaben (Paket 5)
+  //
+  // Dieselben vier Ereignisse wie im Offboarding, aber mit dem Dienstbeginn
+  // statt dem Austritt als Bezug. Ausloeser und Payload stehen in
+  // src/lib/abteilungsaufgaben-dienst.ts (zuweisungsPayload,
+  // erinnerungsPayload) und src/lib/abteilungsaufgaben-uebergaenge.ts
+  // (aufgabeErledigtMelden, abteilungFertigMelden); der gemeinsame Teil kommt
+  // aus src/lib/onboarding-abteilung-mail.ts.
+  //
+  // Zwei Unterschiede zum Offboarding, beide bewusst:
+  //   - KEIN `token` im Payload (der Link genuegt, Datensparsamkeit).
+  //   - Zusatzangaben je Schluessel (Stellenbezeichnung, Betriebsstaette,
+  //     Adresse der Fuehrungskraft) nur in der Zuweisungsmail und nur, wenn
+  //     ONBOARDING_ZUSATZFELDER sie dem Schluessel erlaubt. Nicht erlaubte
+  //     Felder fehlen ganz — auch im Webhook.
+  // =============================================
+  {
+    // Ausloeser: "Abteilungen informieren", "Erneut senden", "Link erneuern"
+    // und "Erinnern" nach einer Adressaenderung — immer per HR-Knopf. Das
+    // Beispiel ist die Erstmail an die IT (ONBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN).
+    event: "onboarding-department-assigned",
+    name: "Onboarding-Aufgaben für Abteilung zugewiesen",
+    group: "Onboarding",
+    recipientHint: "Abteilung bzw. Führungskraft (Link zu den Aufgaben)",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      ...ONBOARDING_ABTEILUNG_BEISPIEL,
+      ...ONBOARDING_ABTEILUNG_IT,
+      email: "it@example.org",
+      // informiert am 22.09.2026, 08:00 UTC + 90 Tage
+      expiresAt: "2026-12-21T08:00:00.000Z",
+      taskCount: 3,
+      magicLink: BEISPIEL_LINK,
+      link: BEISPIEL_LINK,
+      ...ONBOARDING_ABTEILUNG_AUFGABENLISTE,
+      erneut_gesendet: "",
+      neuer_link: "",
+      ist_fuehrungskraft: "",
+      ...ONBOARDING_ABTEILUNG_ZUSATZ,
+    },
+    wired: true,
+  },
+  {
+    // Knopf "Erinnern" und Abschnitt 3 des taeglichen Laufs
+    // (/api/cron/reminders) senden denselben Aufbau. Die englischen Felder
+    // (level, overdueItems, …) bleiben fuer Webhooks, die deutschen Merker
+    // (ist_warnung, …) steuern die Bloecke der Vorlage. Keine Zusatzangaben.
+    event: "onboarding-department-reminder",
+    name: "Erinnerung: Offene Onboarding-Aufgaben",
+    group: "Onboarding",
+    recipientHint: "Abteilung bzw. Führungskraft (Erinnerung)",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      ...ONBOARDING_ABTEILUNG_BEISPIEL,
+      ...ONBOARDING_ABTEILUNG_IT,
+      email: "it@example.org",
+      reminderCount: 1,
+      // beim Erinnern am 26.09.2026, 06:00 UTC auf + 90 Tage verlaengert
+      expiresAt: "2026-12-25T06:00:00.000Z",
+      magicLink: BEISPIEL_LINK,
+      link: BEISPIEL_LINK,
+      level: "WARNING",
+      overdueItems: 1,
+      upcomingItems: 0,
+      totalOpenItems: 3,
+      offene_aufgaben: 3,
+      maxOverdueDays: 2,
+      ueberfaellige_aufgaben: "1",
+      tage_ueberfaellig: "2",
+      ist_ueberfaellig: "ja",
+      ist_info: "",
+      ist_warnung: "ja",
+      ist_eskalation: "",
+      ...ONBOARDING_ABTEILUNG_AUFGABENLISTE,
+      ist_fuehrungskraft: "",
+    },
+    wired: true,
+  },
+  {
+    // NUR ueber den Link der Abteilung — das HR-Haekchen im Portal loest im
+    // Onboarding nichts aus (Entscheidung Paket 5). Kein `email`-Feld:
+    // Empfaenger ist das An-Feld der Vorlage (ohne An-Feld SKIPPED).
+    // `kommentar` ist schon maskiert (fuer das HTML), `kommentar_text` der
+    // Rohtext (nur Textteil).
+    event: "onboarding-task-completed",
+    name: "Onboarding-Aufgabe erledigt",
+    group: "Onboarding",
+    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
+    defaultRecipients: { to: "" },
+    samplePayload: {
+      ...ONBOARDING_ABTEILUNG_BEISPIEL,
+      ...ONBOARDING_ABTEILUNG_IT,
+      itemId: "00000000-0000-0000-0000-00000000001a",
+      itemTitle: "Benutzerkonto und E-Mail-Adresse anlegen",
+      aufgabe: "Benutzerkonto und E-Mail-Adresse anlegen",
+      offene_aufgaben: 5,
+      offene_aufgaben_abteilung: 2,
+      erledigt_ueber: "Link der Abteilung",
+      kommentar: "Konto angelegt &amp; Postfach eingerichtet.<br>Das Notebook kommt nächste Woche.",
+      kommentar_text: ONBOARDING_ABTEILUNG_BEISPIEL_KOMMENTAR,
+    },
+    wired: true,
+  },
+  {
+    // Genau einmal beim Uebergang der Abteilung auf "fertig" ueber ihren Link.
+    event: "onboarding-department-completed",
+    name: "Onboarding: Abteilung abgeschlossen (Bestaetigung)",
+    group: "Onboarding",
+    recipientHint: "Abteilung bzw. Führungskraft (Bestätigung)",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      ...ONBOARDING_ABTEILUNG_BEISPIEL,
+      ...ONBOARDING_ABTEILUNG_IT,
+      email: "it@example.org",
+      completedAt: "2026-10-01T09:30:00.000Z",
+      anzahl_aufgaben: 3,
+      ist_fuehrungskraft: "",
     },
     wired: true,
   },

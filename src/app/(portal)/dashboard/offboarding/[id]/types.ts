@@ -4,7 +4,12 @@
 
 // Nur Typen: Die Regeldatei ist client-sicher, der Dienst nicht (Prisma) —
 // `import type` verschwindet beim Uebersetzen, es landet nichts im Bundle.
-import type { AbteilungsZeile, Anzeige, ErledigtVon, Fuehrungskraft } from "@/lib/abteilungsaufgaben";
+import type {
+  AbteilungsUebersichtDaten,
+  Anzeige,
+  ErledigtVon,
+  Fuehrungskraft,
+} from "@/lib/abteilungsaufgaben";
 
 export interface User {
   userId: string;
@@ -177,15 +182,16 @@ export interface DepartmentLinkData {
   anzeige?: Anzeige;
 }
 
-/** Karte „Aufgaben für Abteilungen" — so liefert sie GET /api/offboarding/[id]. */
-export interface AbteilungenData {
-  zeilen: AbteilungsZeile[];
-  informierbar: number;
-  niemandInformiert: boolean;
-  vorgangAbgeschlossen: boolean;
-  /** Letzter Arbeitstag (ISO) — Bezug der Faelligkeiten. */
-  bezugsdatum: string;
-}
+/**
+ * Karte „Aufgaben für Abteilungen" — so liefert sie GET /api/offboarding/[id].
+ *
+ * Seit Paket 5 ist das der gemeinsame Typ beider Module
+ * (`AbteilungsUebersichtDaten`): Er traegt zusaetzlich `modul`,
+ * `vorgangAbgebrochen`, `gesperrt` und `unbekannteZustaendigkeiten`, und sein
+ * `bezugsdatum` darf `null` sein. Eine zweite Beschreibung derselben Antwort
+ * hier haette nur eine Aufgabe: irgendwann von ihr abzuweichen.
+ */
+export type AbteilungenData = AbteilungsUebersichtDaten;
 
 export interface OffboardingData {
   id: string;

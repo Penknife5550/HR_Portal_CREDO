@@ -4,7 +4,7 @@ import { abteilungLabel } from "@/lib/constants";
 import type { AbteilungsAktion, Fuehrungskraft } from "@/lib/abteilungsaufgaben";
 import {
   AbteilungenKarte,
-  datumUhrzeitDE,
+  erledigtText,
   type AktionsMeldung,
 } from "@/components/abteilungsaufgaben/abteilungen-karte";
 import type { AbteilungenData, ChecklistItemData } from "../types";
@@ -18,19 +18,9 @@ import {
   NoteIndicatorIcon,
 } from "../icons";
 
-/**
- * Wer hat abgehakt — aus `erledigtVon` (GET /api/offboarding/[id]):
- *   LINK   „erledigt von IT-Abteilung (Link) am 29.07.2027, 10:14"
- *   PORTAL „erledigt im Portal von Erika Muster am 29.07.2027, 10:14"
- *   null   „am 29.07.2027" (Altbestand, Urheber unbekannt)
- */
-export function erledigtText(item: Pick<ChecklistItemData, "completedAt" | "erledigtVon">): string {
-  const am = item.completedAt ? ` am ${datumUhrzeitDE(item.completedAt)}` : "";
-  const von = item.erledigtVon;
-  if (von?.art === "LINK") return `erledigt von ${von.name} (Link)${am}`;
-  if (von?.art === "PORTAL") return `erledigt im Portal von ${von.name}${am}`;
-  return item.completedAt ? `am ${formatDate(item.completedAt)}` : "";
-}
+// Der Urhebertext steht seit Paket 5 bei den gemeinsamen Helfern der Karte —
+// Onboarding und Offboarding benennen dieselbe Sache sonst verschieden.
+export { erledigtText };
 
 export function TabChecklist({
   checklistItems,
@@ -126,7 +116,7 @@ export function TabChecklist({
         </div>
       </div>
 
-      {/* Aufgaben für Abteilungen (Paket 1b) */}
+      {/* Aufgaben für Abteilungen (Paket 1b; Versand-Dialog ab Paket 5) */}
       {abteilungen && (
         <AbteilungenKarte
           abteilungen={abteilungen}

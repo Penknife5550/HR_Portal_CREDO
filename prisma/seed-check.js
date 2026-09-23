@@ -1524,6 +1524,295 @@ async function migriereParalleleSpuren(prisma) {
   }
 }
 
+// =============================================
+// Einmalige Datenmigration: Abteilungsaufgaben im Onboarding (Paket 5)
+// =============================================
+const ONBOARDING_ABTEILUNGEN_MARKER = "ONBOARDING_ABTEILUNGSAUFGABEN_V1";
+
+/** Wie ABTEILUNGS_SCHLUESSEL_MUSTER in src/lib/abteilungsaufgaben.ts. */
+const ABTEILUNGS_SCHLUESSEL_MUSTER_JS = /^[A-Z][A-Z0-9_]{1,29}$/;
+
+/** Hoechstens so viele IDs je updateMany (Postgres-Parametergrenze mit Luft). */
+const MIGRATION_ID_BLOCK = 1000;
+
+function zustaendigkeitNormalisierenJs(text) {
+  return text
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/*
+ * JS-Kopie von `abteilungAusZustaendigkeit` (src/lib/abteilungsaufgaben.ts) —
+ * im Container gibt es kein tsx. Der Test
+ * src/__tests__/lib/onboarding-abteilungsaufgaben-migration.test.ts haelt beide
+ * Fassungen ueber eine lange Liste von Eingaben zusammen. Wer die Regel dort
+ * aendert, muss sie hier mitaendern (der Test sagt es).
+ */
+function abteilungAusZustaendigkeitJs(text) {
+  const roh = String(text == null ? "" : text).trim();
+  if (!roh) return null;
+  if (ABTEILUNGS_SCHLUESSEL_MUSTER_JS.test(roh)) return roh;
+
+  const n = zustaendigkeitNormalisierenJs(roh);
+  if (!n) return null;
+  const woerter = n.split(" ");
+  const erstes = woerter[0];
+
+  if (erstes === "hr" || n.startsWith("personal")) return "HR";
+  if (erstes === "it" || n.startsWith("edv")) return "IT";
+  if (n.startsWith("verw") || n.includes("sekretariat")) return "VERWALTUNG";
+  if (
+    n.startsWith("vorgesetzt") ||
+    n.includes("fuehrungskraft") ||
+    woerter.some((w) => w.endsWith("leitung"))
+  ) {
+    return "VORGESETZTER";
+  }
+  if (n.startsWith("facility") || n.includes("hausmeister") || n.includes("haustechnik")) {
+    return "FACILITY";
+  }
+  if (n.includes("buchhaltung")) return "BUCHHALTUNG";
+  if (n.startsWith("datenschutz") || erstes === "dsb") return "DSB";
+  if (n.startsWith("mitarbeit") || n.startsWith("beschaeftigt")) return "MITARBEITER";
+  return null;
+}
+
+/** Wie istOffboardingVorlagenName in src/lib/abteilungsaufgaben.ts. */
+function istOffboardingVorlagenNameJs(name) {
+  return String(name == null ? "" : name).trim().startsWith("Offboarding:");
+}
+
+/**
+ * Plant die Umstellung — rein und ohne Datenbank, damit ein Test sie halten kann.
+ *
+ * Eingabe:
+ *   vorlagen        [{ id, name }]                         alle Checklisten-Vorlagen
+ *   vorlagenPunkte  [{ id, templateId, title, defaultAssignee, defaultDueDays }]
+ *                   (in orderIndex-Reihenfolge)
+ *   aufgaben        [{ id, templateItemId, title, assignee, relativeDueDays,
+ *                      checklistTemplateId }]              alle ChecklistItems
+ *                   (Onboarding), checklistTemplateId vom Vorgang
+ *
+ * Regeln:
+ *   (a) Punkte der ONBOARDING-Vorlagen (Name beginnt nicht mit „Offboarding:"):
+ *       Freitext-Zustaendigkeit → Schluessel (abteilungAusZustaendigkeitJs).
+ *       Offboarding-Vorlagen bleiben unberuehrt (dort stehen schon Schluessel).
+ *   (b) Laufende Onboarding-Aufgaben: `assignee` ebenso — gruppiert je Alttext,
+ *       damit die Migration wenige Updates schreibt.
+ *   (c) relativeDueDays der Aufgaben ohne Wert: ueber templateItemId die
+ *       defaultDueDays des Vorlagenpunkts; zeigt templateItemId ins Leere
+ *       (der Editor legte Punkte bis Paket 5 bei jedem Speichern neu an),
+ *       Rueckfall: derselbe Titel in derselben Vorlage (erster Treffer mit
+ *       Tagesangabe); sonst bleibt null (= ohne Faelligkeit).
+ *   Unbekanntes bleibt, wie es ist, und wird gemeldet (`unbekannt`, je Text
+ *   mit Anzahl in Vorlagen und Aufgaben). Grossbuchstaben-Schluessel bleiben.
+ *
+ * Die Planung ist von Bauart idempotent: Ein zweiter Lauf findet nur noch
+ * Schluessel und gesetzte Tagesangaben und plant nichts.
+ */
+function planeOnboardingAbteilungsaufgaben({ vorlagen, vorlagenPunkte, aufgaben }) {
+  const onboardingVorlagen = new Set(
+    (vorlagen || []).filter((v) => !istOffboardingVorlagenNameJs(v.name)).map((v) => v.id),
+  );
+  const unbekannt = new Map();
+  function merkeUnbekannt(text, art) {
+    const eintrag = unbekannt.get(text) || { text, vorlagenPunkte: 0, aufgaben: 0 };
+    eintrag[art]++;
+    unbekannt.set(text, eintrag);
+  }
+
+  // (a) Vorlagenpunkte
+  const punkte = [];
+  for (const p of vorlagenPunkte || []) {
+    if (!onboardingVorlagen.has(p.templateId)) continue;
+    const alt = p.defaultAssignee == null ? "" : String(p.defaultAssignee);
+    if (!alt.trim()) continue;
+    const neu = abteilungAusZustaendigkeitJs(alt);
+    if (!neu) {
+      merkeUnbekannt(alt.trim(), "vorlagenPunkte");
+      continue;
+    }
+    if (neu !== alt) punkte.push({ id: p.id, von: alt, nach: neu });
+  }
+
+  // (b) Aufgaben: je Alttext gruppiert
+  const zuordnungenMap = new Map();
+  for (const a of aufgaben || []) {
+    const alt = a.assignee == null ? "" : String(a.assignee);
+    if (!alt.trim()) continue;
+    const neu = abteilungAusZustaendigkeitJs(alt);
+    if (!neu) {
+      merkeUnbekannt(alt.trim(), "aufgaben");
+      continue;
+    }
+    if (neu === alt) continue;
+    const z = zuordnungenMap.get(alt) || { von: alt, nach: neu, anzahl: 0 };
+    z.anzahl++;
+    zuordnungenMap.set(alt, z);
+  }
+
+  // (c) relativeDueDays
+  const punktNachId = new Map((vorlagenPunkte || []).map((p) => [p.id, p]));
+  const faelligkeitenMap = new Map();
+  let ueberTitel = 0;
+  for (const a of aufgaben || []) {
+    if (a.relativeDueDays != null) continue;
+    let tage = null;
+    const punkt = a.templateItemId ? punktNachId.get(a.templateItemId) : undefined;
+    if (punkt) {
+      tage = punkt.defaultDueDays == null ? null : punkt.defaultDueDays;
+    } else if (a.checklistTemplateId) {
+      const titel = String(a.title || "").trim();
+      const treffer = (vorlagenPunkte || []).find(
+        (p) =>
+          p.templateId === a.checklistTemplateId &&
+          String(p.title || "").trim() === titel &&
+          p.defaultDueDays != null,
+      );
+      if (treffer) {
+        tage = treffer.defaultDueDays;
+        ueberTitel++;
+      }
+    }
+    if (tage == null) continue;
+    const liste = faelligkeitenMap.get(tage) || [];
+    liste.push(a.id);
+    faelligkeitenMap.set(tage, liste);
+  }
+
+  return {
+    punkte,
+    zuordnungen: [...zuordnungenMap.values()],
+    faelligkeiten: [...faelligkeitenMap.entries()]
+      .sort((x, y) => x[0] - y[0])
+      .map(([tage, ids]) => ({ tage, ids })),
+    ueberTitel,
+    unbekannt: [...unbekannt.values()].sort((x, y) => (x.text < y.text ? -1 : x.text > y.text ? 1 : 0)),
+  };
+}
+
+/**
+ * Stellt die Freitext-Zustaendigkeiten der Onboarding-Checklisten auf
+ * Schluessel um und fuellt relativeDueDays der laufenden Aufgaben nach
+ * (Paket 5, Abteilungsaufgaben im Onboarding).
+ *
+ * WARUM: Bis Paket 5 war die Zustaendigkeit im Onboarding Freitext
+ * („Verwaltung", „Vorgesetzter"). Der Versand an Abteilungen, die Labels in
+ * Tab, Stepper und PDF und der Editor arbeiten jetzt mit Schluesseln (IT,
+ * VERWALTUNG, VORGESETZTER …). Ohne Umstellung ginge keine Bestandsaufgabe
+ * per Link hinaus. Neue Punkte, Tagesangaben und Hinweise traegt HR im Editor
+ * ein — die Migration aendert nur die Zuordnung und die Tagesangabe.
+ *
+ * Sicherung: Die neuen Spalten sind ein Schema-Delta, also zieht entrypoint.sh
+ * vor diesem Lauf automatisch einen pg_dump. Zusaetzlich stehen alle alten
+ * Werte im Merker (Rueckweg ohne Dump).
+ *
+ * Idempotenz: Merker in `system_migrations`, geschrieben in DERSELBEN
+ * Transaktion wie die Updates — entweder alles oder nichts. Die Updates tragen
+ * den alten Wert im WHERE (Punkte) bzw. `relativeDueDays: null`. Ohne Treffer
+ * wird der Merker trotzdem gesetzt (frische Datenbank — der Seed legt die
+ * Vorlagen danach schon mit Schluesseln an). Fehler werden geloggt, brechen
+ * den Start aber nicht ab; ohne Merker laeuft die Migration beim naechsten
+ * Start erneut.
+ */
+async function migriereOnboardingAbteilungsaufgaben(prisma) {
+  try {
+    if (await migrationErledigt(prisma, ONBOARDING_ABTEILUNGEN_MARKER)) return;
+
+    const [vorlagen, vorlagenPunkte, aufgabenRoh] = await Promise.all([
+      prisma.checklistTemplate.findMany({ select: { id: true, name: true } }),
+      prisma.checklistTemplateItem.findMany({
+        select: { id: true, templateId: true, title: true, defaultAssignee: true, defaultDueDays: true },
+        orderBy: [{ templateId: "asc" }, { orderIndex: "asc" }],
+      }),
+      prisma.checklistItem.findMany({
+        select: {
+          id: true,
+          templateItemId: true,
+          title: true,
+          assignee: true,
+          relativeDueDays: true,
+          onboarding: { select: { checklistTemplateId: true } },
+        },
+      }),
+    ]);
+    const aufgaben = aufgabenRoh.map((a) => ({
+      id: a.id,
+      templateItemId: a.templateItemId,
+      title: a.title,
+      assignee: a.assignee,
+      relativeDueDays: a.relativeDueDays,
+      checklistTemplateId: a.onboarding ? a.onboarding.checklistTemplateId : null,
+    }));
+
+    const plan = planeOnboardingAbteilungsaufgaben({ vorlagen, vorlagenPunkte, aufgaben });
+
+    const schreibvorgaenge = [];
+    for (const p of plan.punkte) {
+      schreibvorgaenge.push(
+        prisma.checklistTemplateItem.updateMany({
+          where: { id: p.id, defaultAssignee: p.von },
+          data: { defaultAssignee: p.nach },
+        }),
+      );
+    }
+    for (const z of plan.zuordnungen) {
+      schreibvorgaenge.push(
+        prisma.checklistItem.updateMany({ where: { assignee: z.von }, data: { assignee: z.nach } }),
+      );
+    }
+    for (const f of plan.faelligkeiten) {
+      for (let i = 0; i < f.ids.length; i += MIGRATION_ID_BLOCK) {
+        schreibvorgaenge.push(
+          prisma.checklistItem.updateMany({
+            where: { id: { in: f.ids.slice(i, i + MIGRATION_ID_BLOCK) }, relativeDueDays: null },
+            data: { relativeDueDays: f.tage },
+          }),
+        );
+      }
+    }
+    const mitTagen = plan.faelligkeiten.reduce((summe, f) => summe + f.ids.length, 0);
+    schreibvorgaenge.push(
+      markiereMigration(prisma, ONBOARDING_ABTEILUNGEN_MARKER, {
+        geprueft: { vorlagen: vorlagen.length, vorlagenPunkte: vorlagenPunkte.length, aufgaben: aufgaben.length },
+        // Der Rueckweg: jeder alte Wert.
+        vorlagenPunkte: plan.punkte,
+        aufgaben: plan.zuordnungen,
+        faelligkeiten: plan.faelligkeiten.map((f) => ({ tage: f.tage, anzahl: f.ids.length })),
+        faelligkeitUeberTitel: plan.ueberTitel,
+        unbekannt: plan.unbekannt,
+      }),
+    );
+
+    await prisma.$transaction(schreibvorgaenge);
+
+    console.log(
+      "Onboarding-Abteilungsaufgaben (" + ONBOARDING_ABTEILUNGEN_MARKER + "): " +
+        plan.punkte.length + " Vorlagenpunkte und " +
+        plan.zuordnungen.reduce((s, z) => s + z.anzahl, 0) + " Aufgaben auf Schluessel umgestellt, " +
+        mitTagen + " Aufgaben mit Tagesangabe (davon ueber den Titel: " + plan.ueberTitel + ").",
+    );
+    if (plan.unbekannt.length > 0) {
+      console.warn(
+        "Onboarding-Abteilungsaufgaben: unbekannte Zustaendigkeiten (nicht geaendert, bitte unter Checklisten-Vorlagen zuordnen): " +
+          plan.unbekannt
+            .map((u) => "\"" + u.text + "\" (" + u.vorlagenPunkte + " Vorlagenpunkte, " + u.aufgaben + " Aufgaben)")
+            .join(", "),
+      );
+    }
+  } catch (error) {
+    // Nicht kritisch fuer den Start: Ohne Umstellung bleiben die Freitexte
+    // stehen (Anzeige wie bisher, kein Versand per Link). Ohne Merker laeuft
+    // die Migration beim naechsten Start erneut.
+    console.error("Onboarding-Abteilungsaufgaben-Migration fehlgeschlagen:", error.message);
+  }
+}
+
 async function main() {
   const prisma = new PrismaClient();
   try {
@@ -1539,6 +1828,10 @@ async function main() {
     // Nach den Snapshot-Migrationen: Die Heilung zieht deren Korrekturen bei
     // festhaengenden Vorgaengen nach und braucht dafuer ihre Merker.
     await migriereParalleleSpuren(prisma);
+    // Paket 5: Zustaendigkeiten der Onboarding-Checklisten auf Schluessel.
+    // Auf einer frischen Datenbank (Seed folgt unten) setzt sie nur den
+    // Merker — deshalb legt prisma/seed.ts die Vorlagen schon mit Schluesseln an.
+    await migriereOnboardingAbteilungsaufgaben(prisma);
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {
@@ -1602,4 +1895,8 @@ module.exports = {
   spurenGesamtStatus,
   planeSnapshotNachzug,
   planeStatusAbgleich,
+  ONBOARDING_ABTEILUNGEN_MARKER,
+  abteilungAusZustaendigkeitJs,
+  istOffboardingVorlagenNameJs,
+  planeOnboardingAbteilungsaufgaben,
 };

@@ -1,13 +1,15 @@
 /**
- * CREDO HR-Portal – Abteilungsaufgaben im Offboarding: Versand, Uebersicht,
- * Erinnerungen, Fristen, Fuehrungskraft (Datenbankteil, nur Server)
+ * CREDO HR-Portal – Abteilungsaufgaben: Versand, Uebersicht, Erinnerungen,
+ * Fristen, Fuehrungskraft (Datenbankteil, nur Server)
  *
  * Die Regeln selbst stehen rein und getestet in src/lib/abteilungsaufgaben.ts.
- * Hier werden sie auf den Offboarding-Vorgang angewandt. Die Uebergaenge beim
- * Abhaken (Link der Abteilung und Portal) stehen in
+ * Hier werden sie auf einen Vorgang angewandt — im Offboarding (Paket 1b) und,
+ * ueber denselben Versandkern, im Onboarding (Paket 5,
+ * src/lib/abteilungsaufgaben-onboarding.ts). Die Uebergaenge beim Abhaken
+ * (Link der Abteilung und Portal) stehen in
  * src/lib/abteilungsaufgaben-uebergaenge.ts.
  *
- * Wer ruft was:
+ * Wer ruft was (Offboarding):
  *   POST /api/offboarding/[id]/department-links → abteilungsAktionAusfuehren
  *   GET  /api/offboarding/[id]                  → abteilungsUebersichtLaden
  *   PATCH /api/offboarding/[id]                 → letztenArbeitstagSperren,
@@ -15,6 +17,16 @@
  *                                                 fuehrungskraftAdresseFreigegeben
  *   POST /api/offboarding                       → fuehrungskraftAdresseFreigegeben
  *   POST /api/cron/offboarding-reminders        → erinnerungenSenden
+ *
+ * MODULKERN (Paket 5). Was je Modul verschieden ist, steckt in einem
+ * `VersandModul` (Vorgang, Fuehrungskraft, gemeinsame Mailfelder, Zusatzfelder
+ * je Schluessel) und in MODUL_KONFIG (Ereignisnamen, Link-Adresse, Protokoll).
+ * Aufgaben laedt `aufgabenLaden` je Modul und bildet die Zustaendigkeit auf
+ * `assigneeDepartment` ab (Onboarding: ChecklistItem.assignee). Links liegen
+ * fuer beide Module in derselben Tabelle (offboardingId ODER onboardingId,
+ * `LinkBereich` in -uebergaenge.ts). Der eigentliche Versand (informieren,
+ * erneut senden, erinnern, Link erneuern, taeglicher Lauf) ist EIN Code fuer
+ * beide Module.
  *
  * Ablauf eines Versands je Abteilung (Nachweis nur nach echtem Versand):
  *   1. Link anlegen bzw. anpassen (Token nur beim Anlegen oder bei
@@ -39,6 +51,7 @@ import type { OffboardingDepartmentLink, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { abteilungsAufgabenLink, offboardingMailFelder } from "@/lib/offboarding-mail";
+import { onboardingAufgabenLink } from "@/lib/onboarding-abteilung-mail";
 import { canAccessProcess, HR_EDIT_ROLES, type SessionPayload } from "@/lib/permissions";
 import { ladeErlaubteDomains, empfaengerFreigegeben } from "@/lib/empfaenger-allowlist";
 import {
@@ -69,7 +82,8 @@ import {
   versandStatusAusErgebnis,
   type AbteilungsAktion,
   type AbteilungsKonfig,
-  type AbteilungsZeile,
+  type AbteilungsModul,
+  type AbteilungsUebersichtDaten,
   type Anzeige,
   type BerichtEintrag,
   type DienstAntwort,
@@ -77,14 +91,21 @@ import {
   type ErinnerungsStufe,
   type ErledigtVon,
   type Fuehrungskraft,
+  type FuehrungskraftDaten,
   type FuehrungskraftQuelle,
   type Grund,
   type LinkVersandErgebnis,
   type StufenBerechnung,
   type VersandBericht,
 } from "@/lib/abteilungsaufgaben";
-import { abteilungsAktionSchema } from "@/lib/validations/abteilungsaufgaben";
-import { linksSperren } from "@/lib/abteilungsaufgaben-uebergaenge";
+import { abteilungsAktionSchema, type AbteilungsAktionInput } from "@/lib/validations/abteilungsaufgaben";
+import {
+  auditBezug,
+  linkBereichWhere,
+  linkEindeutig,
+  linksSperren,
+  type LinkBereich,
+} from "@/lib/abteilungsaufgaben-uebergaenge";
 
 // =============================================
 // Konstanten
@@ -97,8 +118,41 @@ export function vorgangBeendet(status: string): boolean {
   return (OFFBOARDING_ENDSTATUS as readonly string[]).includes(status);
 }
 
-const EVENT_ZUGEWIESEN = "offboarding-department-assigned";
-const EVENT_ERINNERUNG = "offboarding-reminder";
+/** Was je Modul fest ist (Ereignisse, Link-Adresse, Protokoll, Log). */
+interface ModulKonfig {
+  events: { zugewiesen: string; erinnerung: string };
+  linkUrl: (token: string) => string;
+  /**
+   * `token` im Payload von *-department-assigned: Im Offboarding lesen
+   * Webhook-Abnehmer das Feld seit jeher (bleibt). Im Onboarding nicht — der
+   * Link genuegt (Datensparsamkeit, Entwurf Paket 5).
+   */
+  tokenImPayload: boolean;
+  auditErinnertCron: string;
+  logPraefix: string;
+}
+
+const MODUL_KONFIG: Record<AbteilungsModul, ModulKonfig> = {
+  OFFBOARDING: {
+    events: { zugewiesen: "offboarding-department-assigned", erinnerung: "offboarding-reminder" },
+    linkUrl: abteilungsAufgabenLink,
+    tokenImPayload: true,
+    auditErinnertCron: ABTEILUNGS_AUDIT.ERINNERT_CRON,
+    logPraefix: "[Offboarding-Reminders]",
+  },
+  ONBOARDING: {
+    events: { zugewiesen: "onboarding-department-assigned", erinnerung: "onboarding-department-reminder" },
+    linkUrl: onboardingAufgabenLink,
+    tokenImPayload: false,
+    auditErinnertCron: ABTEILUNGS_AUDIT.ERINNERT_CRON_ONBOARDING,
+    logPraefix: "[Onboarding-Abteilungs-Erinnerungen]",
+  },
+};
+
+/** Link-Adresse eines Tokens im jeweiligen Modul (Mail und „Link kopieren"). */
+export function modulLinkUrl(modul: AbteilungsModul, token: string): string {
+  return MODUL_KONFIG[modul].linkUrl(token);
+}
 
 /** Felder des Vorgangs, die Versand und Mails brauchen. */
 const VORGANG_AUSWAHL = {
@@ -126,9 +180,59 @@ const AUFGABEN_AUSWAHL = {
   dueDate: true,
   isCompleted: true,
   assigneeDepartment: true,
+  description: true,
 } satisfies Prisma.OffboardingChecklistItemSelect;
 
-type AufgabeFuerVersand = Prisma.OffboardingChecklistItemGetPayload<{ select: typeof AUFGABEN_AUSWAHL }>;
+const ONBOARDING_AUFGABEN_AUSWAHL = {
+  id: true,
+  title: true,
+  category: true,
+  orderIndex: true,
+  dueDate: true,
+  isCompleted: true,
+  assignee: true,
+  description: true,
+} satisfies Prisma.ChecklistItemSelect;
+
+/** Eine Aufgabe fuer den Versand — Zustaendigkeit in beiden Modulen als `assigneeDepartment`. */
+export interface AufgabeFuerVersand {
+  id: string;
+  title: string;
+  category: string;
+  orderIndex: number;
+  dueDate: Date | null;
+  isCompleted: boolean;
+  assigneeDepartment: string | null;
+  description: string | null;
+}
+
+/**
+ * Aufgaben eines Vorgangs (sortiert nach Kategorie und Reihenfolge). Im
+ * Onboarding heisst die Spalte `assignee` — sie wird hier auf
+ * `assigneeDepartment` abgebildet, damit Versand und Regeln nur einen Namen
+ * kennen.
+ */
+export async function aufgabenLaden(
+  modul: AbteilungsModul,
+  vorgangId: string,
+  nurOffen = false,
+): Promise<AufgabeFuerVersand[]> {
+  const orderBy = [{ category: "asc" as const }, { orderIndex: "asc" as const }];
+  const offen = nurOffen ? { isCompleted: false } : {};
+  if (modul === "OFFBOARDING") {
+    return prisma.offboardingChecklistItem.findMany({
+      where: { offboardingId: vorgangId, ...offen },
+      select: AUFGABEN_AUSWAHL,
+      orderBy,
+    });
+  }
+  const zeilen = await prisma.checklistItem.findMany({
+    where: { onboardingId: vorgangId, ...offen },
+    select: ONBOARDING_AUFGABEN_AUSWAHL,
+    orderBy,
+  });
+  return zeilen.map(({ assignee, ...rest }) => ({ ...rest, assigneeDepartment: assignee }));
+}
 
 // =============================================
 // Fuehrungskraft
@@ -196,7 +300,8 @@ async function webhookAktiv(event: string): Promise<boolean> {
   }
 }
 
-async function konfigsLaden(): Promise<AbteilungsKonfig[]> {
+/** Alle Eintraege aus Einstellungen → Abteilungen (auch deaktivierte). */
+export async function konfigsLaden(): Promise<AbteilungsKonfig[]> {
   return prisma.departmentConfig.findMany({
     select: { departmentKey: true, departmentName: true, email: true, organizationId: true, isActive: true },
   });
@@ -204,7 +309,7 @@ async function konfigsLaden(): Promise<AbteilungsKonfig[]> {
 
 /** Protokoll nach dem Versand — ein Fehler hier darf den Versand nicht ungeschehen melden. */
 async function protokollieren(
-  offboardingId: string,
+  modul: VersandModul,
   userId: string | null,
   action: string,
   details: Record<string, unknown>,
@@ -213,15 +318,14 @@ async function protokollieren(
     await prisma.auditLog.create({
       data: {
         userId,
-        offboardingId,
-        processType: "OFFBOARDING",
+        ...auditBezug(modul),
         action,
         details: details as Prisma.InputJsonValue,
       },
     });
   } catch (err) {
     console.error(
-      `[Abteilungsaufgaben] Protokolleintrag ${action} fuer ${offboardingId} fehlgeschlagen — der Versand ist trotzdem erfolgt:`,
+      `[Abteilungsaufgaben] Protokolleintrag ${action} fuer ${modul.vorgangId} fehlgeschlagen — der Versand ist trotzdem erfolgt:`,
       err instanceof Error ? err.message : err,
     );
   }
@@ -231,8 +335,39 @@ async function protokollieren(
 // Versandkontext
 // =============================================
 
-interface VersandKontext {
-  vorgang: VorgangFuerVersand;
+/**
+ * Was der Versandkern von einem Vorgang braucht — je Modul gebaut
+ * (offboardingVersandModul hier, onboardingVersandModul in
+ * abteilungsaufgaben-onboarding.ts). Ist zugleich der `LinkBereich`
+ * (modul + vorgangId) fuer die Link-Tabelle.
+ */
+export interface VersandModul extends LinkBereich {
+  displayId: string;
+  organizationId: string;
+  fuehrungskraft: FuehrungskraftDaten;
+  /** Gemeinsamer Teil JEDES Payloads (offboardingMailFelder bzw. onboardingAbteilungsMailFelder). */
+  mailFelder: Record<string, unknown>;
+  /**
+   * Zusatzfelder der Zuweisungsmail je Schluessel. Offboarding: keine.
+   * Onboarding: zusatzWerte (Datensparsamkeit; nicht erlaubte Felder fehlen ganz).
+   */
+  zusatzFelder: (departmentKey: string) => Record<string, unknown>;
+}
+
+function offboardingVersandModul(vorgang: VorgangFuerVersand): VersandModul {
+  return {
+    modul: "OFFBOARDING",
+    vorgangId: vorgang.id,
+    displayId: vorgang.displayId,
+    organizationId: vorgang.organizationId,
+    fuehrungskraft: fuehrungskraftErmitteln(vorgang),
+    mailFelder: offboardingMailFelder(vorgang),
+    zusatzFelder: () => ({}),
+  };
+}
+
+export interface VersandKontext {
+  modul: VersandModul;
   aufgaben: AufgabeFuerVersand[];
   links: Map<string, OffboardingDepartmentLink>;
   konfigs: AbteilungsKonfig[];
@@ -247,20 +382,18 @@ interface VersandKontext {
   warnungen: string[];
 }
 
-async function versandKontextLaden(vorgang: VorgangFuerVersand, jetzt: Date): Promise<VersandKontext> {
+/** Aufgaben, Links, Einstellungen und Webhook-Stand eines Vorgangs laden. */
+export async function versandKontextLaden(modul: VersandModul, jetzt: Date): Promise<VersandKontext> {
+  const events = MODUL_KONFIG[modul.modul].events;
   const [aufgaben, links, konfigs, zugewiesen, erinnerung] = await Promise.all([
-    prisma.offboardingChecklistItem.findMany({
-      where: { offboardingId: vorgang.id },
-      select: AUFGABEN_AUSWAHL,
-      orderBy: [{ category: "asc" }, { orderIndex: "asc" }],
-    }),
-    prisma.offboardingDepartmentLink.findMany({ where: { offboardingId: vorgang.id } }),
+    aufgabenLaden(modul.modul, modul.vorgangId),
+    prisma.offboardingDepartmentLink.findMany({ where: linkBereichWhere(modul) }),
     konfigsLaden(),
-    webhookAktiv(EVENT_ZUGEWIESEN),
-    webhookAktiv(EVENT_ERINNERUNG),
+    webhookAktiv(events.zugewiesen),
+    webhookAktiv(events.erinnerung),
   ]);
   return {
-    vorgang,
+    modul,
     aufgaben,
     links: new Map(links.map((l) => [l.departmentKey, l])),
     konfigs,
@@ -281,9 +414,9 @@ function offeneVon(ctx: VersandKontext, key: string): AufgabeFuerVersand[] {
 function empfaengerFuer(ctx: VersandKontext, key: string): Empfaenger {
   return empfaengerAufloesen({
     departmentKey: key,
-    organizationId: ctx.vorgang.organizationId,
+    organizationId: ctx.modul.organizationId,
     konfigs: ctx.konfigs,
-    fuehrungskraft: fuehrungskraftErmitteln(ctx.vorgang),
+    fuehrungskraft: ctx.modul.fuehrungskraft,
   });
 }
 
@@ -347,7 +480,7 @@ async function ergebnisSpeichern(
     return await prisma.offboardingDepartmentLink.update({ where: { id: link.id }, data: daten });
   } catch (err) {
     console.error(
-      `[Abteilungsaufgaben] Mail an ${link.departmentName} (${ctx.vorgang.displayId}) ist versendet, das Ergebnis konnte aber nicht gespeichert werden:`,
+      `[Abteilungsaufgaben] Mail an ${link.departmentName} (${ctx.modul.displayId}) ist versendet, das Ergebnis konnte aber nicht gespeichert werden:`,
       err instanceof Error ? err.message : err,
     );
     ctx.warnungen.push(link.departmentName);
@@ -362,9 +495,10 @@ async function ergebnisSpeichern(
 type ZuweisungsModus = "ERSTMAIL" | "ERNEUT" | "NEUER_LINK";
 
 /**
- * Payload von offboarding-department-assigned. Alle bisherigen Felder bleiben
+ * Payload von *-department-assigned. Alle bisherigen Offboarding-Felder bleiben
  * (Webhook-Abnehmer lesen sie, offboarding-mail.ts), neu sind Aufgabenliste,
- * link, erneut_gesendet, neuer_link und ist_fuehrungskraft.
+ * link, erneut_gesendet, neuer_link und ist_fuehrungskraft; im Onboarding
+ * dazu die erlaubten Zusatzfelder des Schluessels und KEIN `token`.
  * `taskCount` = Anzahl der Aufgaben in der Liste (offene; ohne offene alle).
  * `neuer_link` = "ja", wenn ein frueher zugestellter Link nicht mehr gilt
  * (siehe `alterLinkUngueltig` in zuweisungSenden).
@@ -372,26 +506,28 @@ type ZuweisungsModus = "ERSTMAIL" | "ERNEUT" | "NEUER_LINK";
 function zuweisungsPayload(
   ctx: VersandKontext,
   link: OffboardingDepartmentLink,
-  liste: ReadonlyArray<{ title: string; dueDate: Date | null }>,
+  liste: ReadonlyArray<{ title: string; dueDate: Date | null; description?: string | null }>,
   modus: ZuweisungsModus,
   alterLinkUngueltig: boolean,
 ): Record<string, unknown> {
-  const url = abteilungsAufgabenLink(link.token);
+  const konfig = MODUL_KONFIG[ctx.modul.modul];
+  const url = konfig.linkUrl(link.token);
   return {
-    ...offboardingMailFelder(ctx.vorgang),
+    ...ctx.modul.mailFelder,
     departmentKey: link.departmentKey,
     departmentName: link.departmentName,
     abteilung: link.departmentName,
     email: link.email,
     expiresAt: link.expiresAt.toISOString(),
     taskCount: liste.length,
-    token: link.token,
+    ...(konfig.tokenImPayload ? { token: link.token } : {}),
     magicLink: url,
     link: url,
     ...aufgabenlisteMailFelder(liste),
     erneut_gesendet: modus === "ERNEUT" ? "ja" : "",
     neuer_link: alterLinkUngueltig ? "ja" : "",
     ist_fuehrungskraft: istFuehrungskraft(link.departmentKey) ? "ja" : "",
+    ...ctx.modul.zusatzFelder(link.departmentKey),
   };
 }
 
@@ -420,11 +556,12 @@ async function zuweisungSenden(
   if (!vorhanden) {
     // upsert statt create: Zwei Aufrufe in derselben Millisekunde haelt schon
     // die Sperre je Vorgang ab; das upsert ist das Netz darunter (unique
-    // offboardingId+departmentKey) und vergibt KEINEN zweiten Token.
+    // Vorgang+departmentKey je Modul) und vergibt KEINEN zweiten Token. Gesetzt
+    // wird GENAU EINE der beiden Vorgangsspalten (linkBereichWhere).
     link = await prisma.offboardingDepartmentLink.upsert({
-      where: { offboardingId_departmentKey: { offboardingId: ctx.vorgang.id, departmentKey: key } },
+      where: linkEindeutig(ctx.modul, key),
       create: {
-        offboardingId: ctx.vorgang.id,
+        ...linkBereichWhere(ctx.modul),
         departmentKey: key,
         departmentName: empfaenger.departmentName,
         email: empfaenger.email,
@@ -460,7 +597,7 @@ async function zuweisungSenden(
   }
 
   const ergebnis = await triggerWebhooks(
-    EVENT_ZUGEWIESEN,
+    MODUL_KONFIG[ctx.modul.modul].events.zugewiesen,
     zuweisungsPayload(ctx, link, liste, modus, alterLinkUngueltig),
   );
   const v = versandStatusAusErgebnis(ergebnis, ctx.webhook.zugewiesen);
@@ -507,13 +644,13 @@ async function zuweisungSenden(
 function erinnerungsPayload(
   ctx: VersandKontext,
   link: OffboardingDepartmentLink,
-  offene: ReadonlyArray<{ title: string; dueDate: Date | null }>,
+  offene: ReadonlyArray<{ title: string; dueDate: Date | null; description?: string | null }>,
   stufe: StufenBerechnung,
   level: ErinnerungsStufe,
 ): Record<string, unknown> {
-  const url = abteilungsAufgabenLink(link.token);
+  const url = MODUL_KONFIG[ctx.modul.modul].linkUrl(link.token);
   return {
-    ...offboardingMailFelder(ctx.vorgang),
+    ...ctx.modul.mailFelder,
     departmentKey: link.departmentKey,
     departmentName: link.departmentName,
     abteilung: link.departmentName,
@@ -547,7 +684,10 @@ async function erinnerungSenden(
     aktuell = await prisma.offboardingDepartmentLink.update({ where: { id: link.id }, data: { expiresAt: bis } });
   }
 
-  const ergebnis = await triggerWebhooks(EVENT_ERINNERUNG, erinnerungsPayload(ctx, aktuell, offene, stufe, level));
+  const ergebnis = await triggerWebhooks(
+    MODUL_KONFIG[ctx.modul.modul].events.erinnerung,
+    erinnerungsPayload(ctx, aktuell, offene, stufe, level),
+  );
   const v = versandStatusAusErgebnis(ergebnis, ctx.webhook.erinnerung);
 
   const merker = erinnerungsMerkerSetzen(v.status);
@@ -578,18 +718,18 @@ async function erinnerungSenden(
 }
 
 // =============================================
-// Aktionen (POST /api/offboarding/[id]/department-links)
+// Aktionen (beide Module)
 // =============================================
 
 /**
  * Laufende Aktionen je Vorgang. Die Oberflaeche sperrt ihre Knoepfe, aber zwei
  * parallele Aufrufe schrieben sonst zweimal an dieselben Abteilungen. BEWUSST
- * prozesslokal (ein Container), siehe Dateikopf.
+ * prozesslokal (ein Container), siehe Dateikopf. Schluessel "MODUL:vorgangId".
  */
 const laufendeAbteilungsVersendungen = new Set<string>();
 
-function versandSperreSchluessel(offboardingId: string): string {
-  return `OFFBOARDING:${offboardingId}`;
+function versandSperreSchluessel(b: LinkBereich): string {
+  return `${b.modul}:${b.vorgangId}`;
 }
 
 /**
@@ -598,15 +738,15 @@ function versandSperreSchluessel(offboardingId: string): string {
  * Token, den "Link erneuern" gerade ersetzt hat, oder eine Abteilung bekaeme
  * zwei Erinnerungen, weil HR waehrend des Laufs "Erinnern" klickt.
  */
-function versandSperreNehmen(offboardingId: string): boolean {
-  const sperre = versandSperreSchluessel(offboardingId);
+export function versandSperreNehmen(b: LinkBereich): boolean {
+  const sperre = versandSperreSchluessel(b);
   if (laufendeAbteilungsVersendungen.has(sperre)) return false;
   laufendeAbteilungsVersendungen.add(sperre);
   return true;
 }
 
-function versandSperreFreigeben(offboardingId: string): void {
-  laufendeAbteilungsVersendungen.delete(versandSperreSchluessel(offboardingId));
+export function versandSperreFreigeben(b: LinkBereich): void {
+  laufendeAbteilungsVersendungen.delete(versandSperreSchluessel(b));
 }
 
 async function informieren(ctx: VersandKontext, userId: string): Promise<VersandBericht> {
@@ -635,7 +775,7 @@ async function informieren(ctx: VersandKontext, userId: string): Promise<Versand
   // Protokoll nur, wenn wirklich eine Mail versucht wurde — ein Klick, bei dem
   // alle schon informiert waren, ist kein "Abteilungen informiert".
   if (versucht) {
-    await protokollieren(ctx.vorgang.id, userId, ABTEILUNGS_AUDIT.INFORMIERT, {
+    await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.INFORMIERT, {
       versendet: bericht.versendet.map((e) => ({ departmentKey: e.departmentKey, email: e.email, status: e.status })),
       uebersprungen: bericht.uebersprungen.map((e) => ({ departmentKey: e.departmentKey, grund: e.grund })),
     });
@@ -690,7 +830,7 @@ async function erneutSenden(ctx: VersandKontext, key: string, userId: string): P
   (eintrag.status ? bericht.versendet : bericht.uebersprungen).push(eintrag);
 
   if (adresseNeu) {
-    await protokollieren(ctx.vorgang.id, userId, ABTEILUNGS_AUDIT.LINK_ERNEUERT, {
+    await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.LINK_ERNEUERT, {
       departmentKey: key,
       grund: "ADRESSE_GEAENDERT",
       ausloeser: "erneut-senden",
@@ -699,7 +839,7 @@ async function erneutSenden(ctx: VersandKontext, key: string, userId: string): P
       status: v.status,
     });
   }
-  await protokollieren(ctx.vorgang.id, userId, ABTEILUNGS_AUDIT.ERNEUT_GESENDET, {
+  await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.ERNEUT_GESENDET, {
     departmentKey: key,
     email: empfaenger.email,
     status: v.status,
@@ -724,7 +864,7 @@ async function erinnern(ctx: VersandKontext, key: string, userId: string): Promi
     const alteAdresse = link.email;
     const { eintrag, v } = await zuweisungSenden(ctx, key, empfaenger, "NEUER_LINK");
     (eintrag.status ? bericht.versendet : bericht.uebersprungen).push(eintrag);
-    await protokollieren(ctx.vorgang.id, userId, ABTEILUNGS_AUDIT.LINK_ERNEUERT, {
+    await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.LINK_ERNEUERT, {
       departmentKey: key,
       grund: "ADRESSE_GEAENDERT",
       ausloeser: "erinnern",
@@ -741,7 +881,7 @@ async function erinnern(ctx: VersandKontext, key: string, userId: string): Promi
   const level: ErinnerungsStufe = stufe.level ?? "INFO";
   const { eintrag, v, link: aktuell } = await erinnerungSenden(ctx, link, stufe, level);
   (eintrag.status ? bericht.versendet : bericht.uebersprungen).push(eintrag);
-  await protokollieren(ctx.vorgang.id, userId, ABTEILUNGS_AUDIT.ERINNERT_KNOPF, {
+  await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.ERINNERT_KNOPF, {
     departmentKey: key,
     email: aktuell.email,
     level,
@@ -762,7 +902,7 @@ async function linkErneuern(ctx: VersandKontext, key: string, userId: string): P
   const alteAdresse = link.email;
   const { eintrag, v } = await zuweisungSenden(ctx, key, empfaenger, "NEUER_LINK");
   (eintrag.status ? bericht.versendet : bericht.uebersprungen).push(eintrag);
-  await protokollieren(ctx.vorgang.id, userId, ABTEILUNGS_AUDIT.LINK_ERNEUERT, {
+  await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.LINK_ERNEUERT, {
     departmentKey: key,
     grund: "HR",
     ausloeser: "link-erneuern",
@@ -771,6 +911,37 @@ async function linkErneuern(ctx: VersandKontext, key: string, userId: string): P
     status: v.status,
   });
   return bericht;
+}
+
+/**
+ * Fuehrt eine (schon validierte) Aktion mit geladenem Kontext aus und baut die
+ * Antwort (Versandbericht, Status, Meldung). Aufrufer halten die Sperre je
+ * Vorgang und haben Rolle, Mandant, Status und (Onboarding) Voraussetzung
+ * vorher geprueft.
+ */
+export async function aktionMitKontextAusfuehren(
+  ctx: VersandKontext,
+  aktion: AbteilungsAktionInput,
+  userId: string,
+): Promise<DienstAntwort> {
+  const bericht: VersandBericht =
+    aktion.aktion === "informieren"
+      ? await informieren(ctx, userId)
+      : aktion.aktion === "erneut-senden"
+        ? await erneutSenden(ctx, aktion.departmentKey, userId)
+        : aktion.aktion === "erinnern"
+          ? await erinnern(ctx, aktion.departmentKey, userId)
+          : await linkErneuern(ctx, aktion.departmentKey, userId);
+  const status = httpStatusAusBericht(bericht);
+  const { meldung, hinweis } = berichtMeldung(bericht);
+  // Versendet, aber nicht gespeichert: Die Warnung steht VOR dem uebrigen
+  // Hinweis — sie entscheidet, ob HR gleich noch einmal klickt.
+  const warnung = ctx.warnungen.length > 0 ? meldungNachweisFehlt(ctx.warnungen) : null;
+  const hinweisGesamt = [warnung, hinweis].filter((t): t is string => !!t).join(" ") || null;
+  return {
+    status,
+    body: { data: bericht, meldung, hinweis: hinweisGesamt, ...(status >= 400 ? { error: meldung } : {}) },
+  };
 }
 
 /**
@@ -821,33 +992,16 @@ export async function abteilungsAktionAusfuehren(opts: {
     };
   }
 
-  if (!versandSperreNehmen(vorgang.id)) {
+  const modul = offboardingVersandModul(vorgang);
+  if (!versandSperreNehmen(modul)) {
     return { status: 409, body: { error: MELDUNGEN.VERSAND_LAEUFT } };
   }
   try {
-    const ctx = await versandKontextLaden(vorgang, jetzt);
-    const userId = opts.session.userId;
-    const bericht: VersandBericht =
-      aktion.aktion === "informieren"
-        ? await informieren(ctx, userId)
-        : aktion.aktion === "erneut-senden"
-          ? await erneutSenden(ctx, aktion.departmentKey, userId)
-          : aktion.aktion === "erinnern"
-            ? await erinnern(ctx, aktion.departmentKey, userId)
-            : await linkErneuern(ctx, aktion.departmentKey, userId);
-    const status = httpStatusAusBericht(bericht);
-    const { meldung, hinweis } = berichtMeldung(bericht);
-    // Versendet, aber nicht gespeichert: Die Warnung steht VOR dem uebrigen
-    // Hinweis — sie entscheidet, ob HR gleich noch einmal klickt.
-    const warnung = ctx.warnungen.length > 0 ? meldungNachweisFehlt(ctx.warnungen) : null;
-    const hinweisGesamt = [warnung, hinweis].filter((t): t is string => !!t).join(" ") || null;
-    return {
-      status,
-      body: { data: bericht, meldung, hinweis: hinweisGesamt, ...(status >= 400 ? { error: meldung } : {}) },
-    };
+    const ctx = await versandKontextLaden(modul, jetzt);
+    return await aktionMitKontextAusfuehren(ctx, aktion, opts.session.userId);
   } finally {
     // Genau eine Freigabestelle — kein Rueckgabepfad darf die Sperre stehen lassen.
-    versandSperreFreigeben(vorgang.id);
+    versandSperreFreigeben(modul);
   }
 }
 
@@ -861,6 +1015,9 @@ export interface UebersichtVorgang extends FuehrungskraftQuellen {
   status: string;
   lastWorkingDay: Date;
   checklistItems: ReadonlyArray<{
+    id?: string;
+    title?: string;
+    description?: string | null;
     assigneeDepartment: string | null;
     isCompleted: boolean;
     dueDate: Date | null;
@@ -874,16 +1031,22 @@ export interface AbteilungsUebersicht<I, L> {
   departmentLinks: Array<L & { url: string; anzeige: Anzeige }>;
   /** Die Aufgaben wie bisher, dazu `erledigtVon` (Portal + Name bzw. Link + Abteilung). */
   checklistItems: Array<I & { erledigtVon: ErledigtVon }>;
-  abteilungen: {
-    zeilen: AbteilungsZeile[];
-    /** So viele Zeilen wuerde "Abteilungen informieren" jetzt anschreiben. */
-    informierbar: number;
-    niemandInformiert: boolean;
-    vorgangAbgeschlossen: boolean;
-    /** Letzter Arbeitstag (ISO) — Bezug der Faelligkeiten. */
-    bezugsdatum: string;
-  };
+  /** Quelle der Karte (Form fuer beide Module gleich, AbteilungsUebersichtDaten). */
+  abteilungen: AbteilungsUebersichtDaten;
   fuehrungskraft: Fuehrungskraft;
+}
+
+/** Namen der Benutzer, die im Portal abgehakt haben (fuer erledigtVon). */
+export async function benutzerNamenLaden(
+  completedByIds: ReadonlyArray<string | null | undefined>,
+): Promise<Record<string, string>> {
+  const ids = [...new Set(completedByIds.filter((id): id is string => !!id))];
+  if (ids.length === 0) return {};
+  const benutzer = await prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, firstName: true, lastName: true },
+  });
+  return Object.fromEntries(benutzer.map((b) => [b.id, `${b.firstName} ${b.lastName}`.trim()]));
 }
 
 /**
@@ -903,22 +1066,14 @@ export async function abteilungsUebersichtLaden<
   },
   jetzt: Date = new Date(),
 ): Promise<AbteilungsUebersicht<I, L>> {
-  const benutzerIds = [
-    ...new Set(vorgang.checklistItems.map((i) => i.completedById).filter((id): id is string => !!id)),
-  ];
-  const [konfigs, benutzer] = await Promise.all([
+  const [konfigs, benutzerNamen] = await Promise.all([
     konfigsLaden(),
-    benutzerIds.length > 0
-      ? prisma.user.findMany({
-          where: { id: { in: benutzerIds } },
-          select: { id: true, firstName: true, lastName: true },
-        })
-      : Promise.resolve([] as { id: string; firstName: string; lastName: string }[]),
+    benutzerNamenLaden(vorgang.checklistItems.map((i) => i.completedById)),
   ]);
 
   const fuehrungskraft = fuehrungskraftErmitteln(vorgang);
   const abgeschlossen = vorgangBeendet(vorgang.status);
-  const { zeilen, informierbar, niemandInformiert } = abteilungsZeilenBauen({
+  const { zeilen, informierbar, niemandInformiert, unbekannteZustaendigkeiten } = abteilungsZeilenBauen({
     aufgaben: vorgang.checklistItems,
     links: vorgang.departmentLinks,
     konfigs,
@@ -929,9 +1084,6 @@ export async function abteilungsUebersichtLaden<
     jetzt,
   });
 
-  const benutzerNamen = Object.fromEntries(
-    benutzer.map((b) => [b.id, `${b.firstName} ${b.lastName}`.trim()]),
-  );
   const abteilungsNamen = Object.fromEntries(zeilen.map((z) => [z.departmentKey, z.departmentName]));
 
   return {
@@ -945,22 +1097,29 @@ export async function abteilungsUebersichtLaden<
       erledigtVon: erledigtVonBestimmen(i, { benutzer: benutzerNamen, abteilungen: abteilungsNamen }),
     })),
     abteilungen: {
+      modul: "OFFBOARDING",
       zeilen,
       informierbar,
       niemandInformiert,
       vorgangAbgeschlossen: abgeschlossen,
+      vorgangAbgebrochen: vorgang.status === "CANCELLED",
       bezugsdatum: vorgang.lastWorkingDay.toISOString(),
+      gesperrt: null,
+      unbekannteZustaendigkeiten,
     },
     fuehrungskraft,
   };
 }
 
 // =============================================
-// Taeglicher Lauf (POST /api/cron/offboarding-reminders)
+// Taeglicher Lauf (beide Module)
 // =============================================
 
 export interface CronDetail {
-  offboardingId: string;
+  /** Gesetzt im Offboarding (Paket 1b). */
+  offboardingId?: string;
+  /** Gesetzt im Onboarding (Paket 5). */
+  onboardingId?: string;
   displayId: string;
   departmentKey: string;
   departmentName: string;
@@ -973,7 +1132,8 @@ export interface CronDetail {
 }
 
 export interface CronUebersprungen {
-  offboardingId: string;
+  offboardingId?: string;
+  onboardingId?: string;
   displayId: string;
   departmentKey: string;
   grund: Grund;
@@ -991,93 +1151,21 @@ export interface CronErgebnis {
   uebersprungen: CronUebersprungen[];
 }
 
-/**
- * Erinnert alle informierten Abteilungen mit offenen Aufgaben, deren Stufe
- * heute faellig ist (erinnerungsStufe). Nie an nicht informierte Links, nie
- * bei COMPLETED/CANCELLED, nie laenger als 30 Tage nach der spaetesten
- * offenen Faelligkeit.
- *
- * Die Adresse wird bei jedem Lauf neu aufgeloest. Weicht sie von der des Links
- * ab, erzeugt der Lauf NIE still einen neuen Link — er ueberspringt mit
- * "Adresse geändert, bitte Link erneuern" und vermerkt das am Link (die Karte
- * zeigt es). Merkerregel: SENT/WEBHOOK/SKIPPED ja, FAILED nein.
- *
- * Je Vorgang nimmt der Lauf dieselbe Sperre wie die HR-Aktionen und liest
- * Vorgang, Links und Aufgaben erst DANN frisch. Laeuft gerade eine HR-Aktion
- * fuer den Vorgang, bleibt er heute aus (die Aktion schreibt ohnehin an; eine
- * faellige Erinnerung holt der naechste Lauf nach).
- */
-export async function erinnerungenSenden(jetzt: Date = new Date()): Promise<CronErgebnis> {
-  const ergebnis: CronErgebnis = { remindersProcessed: 0, errors: 0, details: [], uebersprungen: [] };
-
-  // Nur die Kandidaten — den Stand liest vorgangErinnern unter der Sperre.
-  const kandidaten = await prisma.offboardingProcess.findMany({
-    where: {
-      status: { notIn: [...OFFBOARDING_ENDSTATUS] },
-      departmentLinks: { some: { sentAt: { not: null }, allTasksComplete: false } },
-    },
-    select: { id: true, displayId: true },
-  });
-  if (kandidaten.length === 0) return ergebnis;
-
-  const [konfigs, erinnerungsWebhook] = await Promise.all([konfigsLaden(), webhookAktiv(EVENT_ERINNERUNG)]);
-
-  for (const kandidat of kandidaten) {
-    if (!versandSperreNehmen(kandidat.id)) {
-      console.info(
-        `[Offboarding-Reminders] ${kandidat.displayId} uebersprungen: Fuer den Vorgang laeuft gerade ein Versand aus dem Portal.`,
-      );
-      continue;
-    }
-    try {
-      await vorgangErinnern(kandidat.id, { konfigs, erinnerungsWebhook, jetzt, ergebnis });
-    } catch (err) {
-      console.error(
-        `[Offboarding-Reminders] Fehler bei ${kandidat.displayId}:`,
-        err instanceof Error ? err.message : err,
-      );
-      ergebnis.errors++;
-    } finally {
-      versandSperreFreigeben(kandidat.id);
-    }
-  }
-  return ergebnis;
+/** Vorgangs-ID unter dem Namen des Moduls (fuer Cron-Ergebnis). */
+function vorgangIdFeld(b: LinkBereich): { offboardingId: string } | { onboardingId: string } {
+  return linkBereichWhere(b);
 }
 
-/** Ein Vorgang im taeglichen Lauf — nur unter der Sperre je Vorgang aufrufen. */
-async function vorgangErinnern(
-  offboardingId: string,
-  lauf: { konfigs: AbteilungsKonfig[]; erinnerungsWebhook: boolean; jetzt: Date; ergebnis: CronErgebnis },
-): Promise<void> {
-  const { jetzt, ergebnis } = lauf;
-  // Frisch lesen: Der Lauf kann dauern, und HR kann bis eben "Link erneuern",
-  // "Erneut senden" oder "Erinnern" gewaehlt haben. Mit dem Stand vom Beginn
-  // des Laufs ginge eine Erinnerung mit einem toten Token hinaus, oder ein
-  // SKIPPED "Adresse geändert" ueberschriebe ein frisches SENT.
-  const [vorgang, departmentLinks, checklistItems] = await Promise.all([
-    prisma.offboardingProcess.findUnique({ where: { id: offboardingId }, select: VORGANG_AUSWAHL }),
-    prisma.offboardingDepartmentLink.findMany({
-      where: { offboardingId, sentAt: { not: null }, allTasksComplete: false },
-    }),
-    prisma.offboardingChecklistItem.findMany({
-      where: { offboardingId, isCompleted: false },
-      select: AUFGABEN_AUSWAHL,
-      orderBy: [{ category: "asc" }, { orderIndex: "asc" }],
-    }),
-  ]);
-  if (!vorgang || vorgangBeendet(vorgang.status)) return;
-
-  const ctx: VersandKontext = {
-    vorgang,
-    aufgaben: checklistItems,
-    links: new Map(departmentLinks.map((l) => [l.departmentKey, l])),
-    konfigs: lauf.konfigs,
-    webhook: { zugewiesen: false, erinnerung: lauf.erinnerungsWebhook },
-    jetzt,
-    warnungen: [],
-  };
-
-  for (const link of departmentLinks) {
+/**
+ * Erinnert die informierten Abteilungen EINES Vorgangs, deren Stufe heute
+ * faellig ist — nur unter der Sperre je Vorgang und mit FRISCH geladenem
+ * Kontext aufrufen (ctx.aufgaben = offene Aufgaben, ctx.links = informierte,
+ * offene Links). Gemeinsam fuer beide Module.
+ */
+export async function kontextErinnern(ctx: VersandKontext, ergebnis: CronErgebnis): Promise<void> {
+  const { jetzt, modul } = ctx;
+  const konfig = MODUL_KONFIG[modul.modul];
+  for (const link of [...ctx.links.values()]) {
     try {
       const entscheidung = erinnerungsStufe(link, offeneVon(ctx, link.departmentKey), jetzt);
       if (!entscheidung.erinnern) continue;
@@ -1099,8 +1187,8 @@ async function vorgangErinnern(
           });
         }
         ergebnis.uebersprungen.push({
-          offboardingId: vorgang.id,
-          displayId: vorgang.displayId,
+          ...vorgangIdFeld(modul),
+          displayId: modul.displayId,
           departmentKey: link.departmentKey,
           grund: problem,
           detail: text,
@@ -1111,7 +1199,7 @@ async function vorgangErinnern(
       const { stufe } = entscheidung;
       const warnungenVorher = ctx.warnungen.length;
       const { v, link: aktuell } = await erinnerungSenden(ctx, link, stufe, stufe.level);
-      await protokollieren(vorgang.id, null, ABTEILUNGS_AUDIT.ERINNERT_CRON, {
+      await protokollieren(modul, null, konfig.auditErinnertCron, {
         level: stufe.level,
         departmentKey: aktuell.departmentKey,
         departmentName: aktuell.departmentName,
@@ -1127,8 +1215,8 @@ async function vorgangErinnern(
       // morgen koennte dieselbe Erinnerung noch einmal hinausgehen.
       if (ctx.warnungen.length > warnungenVorher) ergebnis.errors++;
       ergebnis.details.push({
-        offboardingId: vorgang.id,
-        displayId: vorgang.displayId,
+        ...vorgangIdFeld(modul),
+        displayId: modul.displayId,
         departmentKey: aktuell.departmentKey,
         departmentName: aktuell.departmentName,
         email: aktuell.email,
@@ -1139,12 +1227,117 @@ async function vorgangErinnern(
       });
     } catch (err) {
       console.error(
-        `[Offboarding-Reminders] Fehler bei ${vorgang.displayId} / ${link.departmentKey}:`,
+        `${konfig.logPraefix} Fehler bei ${modul.displayId} / ${link.departmentKey}:`,
         err instanceof Error ? err.message : err,
       );
       ergebnis.errors++;
     }
   }
+}
+
+/**
+ * Laeuft ueber die Kandidaten eines Moduls: je Vorgang Sperre nehmen, frisch
+ * laden (`laden` liefert null, wenn der Vorgang weg oder beendet ist),
+ * erinnern, Sperre freigeben. Laeuft gerade eine HR-Aktion fuer den Vorgang,
+ * bleibt er heute aus (die Aktion schreibt ohnehin an; eine faellige
+ * Erinnerung holt der naechste Lauf nach).
+ */
+export interface ErinnerungsLaufStand {
+  konfigs: AbteilungsKonfig[];
+  erinnerungsWebhook: boolean;
+  jetzt: Date;
+}
+
+export async function erinnerungsLauf(
+  modul: AbteilungsModul,
+  kandidaten: ReadonlyArray<{ id: string; displayId: string | null }>,
+  laden: (vorgangId: string, lauf: ErinnerungsLaufStand) => Promise<VersandKontext | null>,
+  jetzt: Date,
+): Promise<CronErgebnis> {
+  const ergebnis: CronErgebnis = { remindersProcessed: 0, errors: 0, details: [], uebersprungen: [] };
+  if (kandidaten.length === 0) return ergebnis;
+  const konfig = MODUL_KONFIG[modul];
+  const [konfigs, erinnerungsWebhook] = await Promise.all([konfigsLaden(), webhookAktiv(konfig.events.erinnerung)]);
+
+  for (const kandidat of kandidaten) {
+    const bereich: LinkBereich = { modul, vorgangId: kandidat.id };
+    const name = kandidat.displayId || kandidat.id.substring(0, 8);
+    if (!versandSperreNehmen(bereich)) {
+      console.info(
+        `${konfig.logPraefix} ${name} uebersprungen: Fuer den Vorgang laeuft gerade ein Versand aus dem Portal.`,
+      );
+      continue;
+    }
+    try {
+      const ctx = await laden(kandidat.id, { konfigs, erinnerungsWebhook, jetzt });
+      if (ctx) await kontextErinnern(ctx, ergebnis);
+    } catch (err) {
+      console.error(`${konfig.logPraefix} Fehler bei ${name}:`, err instanceof Error ? err.message : err);
+      ergebnis.errors++;
+    } finally {
+      versandSperreFreigeben(bereich);
+    }
+  }
+  return ergebnis;
+}
+
+/**
+ * POST /api/cron/offboarding-reminders.
+ *
+ * Erinnert alle informierten Abteilungen mit offenen Aufgaben, deren Stufe
+ * heute faellig ist (erinnerungsStufe). Nie an nicht informierte Links, nie
+ * bei COMPLETED/CANCELLED, nie laenger als 30 Tage nach der spaetesten
+ * offenen Faelligkeit.
+ *
+ * Die Adresse wird bei jedem Lauf neu aufgeloest. Weicht sie von der des Links
+ * ab, erzeugt der Lauf NIE still einen neuen Link — er ueberspringt mit
+ * "Adresse geändert, bitte Link erneuern" und vermerkt das am Link (die Karte
+ * zeigt es). Merkerregel: SENT/WEBHOOK/SKIPPED ja, FAILED nein.
+ *
+ * Je Vorgang nimmt der Lauf dieselbe Sperre wie die HR-Aktionen und liest
+ * Vorgang, Links und Aufgaben erst DANN frisch.
+ */
+export async function erinnerungenSenden(jetzt: Date = new Date()): Promise<CronErgebnis> {
+  // Nur die Kandidaten — den Stand liest der Lauf unter der Sperre.
+  const kandidaten = await prisma.offboardingProcess.findMany({
+    where: {
+      status: { notIn: [...OFFBOARDING_ENDSTATUS] },
+      departmentLinks: { some: { sentAt: { not: null }, allTasksComplete: false } },
+    },
+    select: { id: true, displayId: true },
+  });
+  return erinnerungsLauf("OFFBOARDING", kandidaten, offboardingErinnerungsKontext, jetzt);
+}
+
+/**
+ * Frischer Kontext eines Offboarding-Vorgangs fuer den Lauf: nur informierte,
+ * offene Links und offene Aufgaben. Frisch lesen: Der Lauf kann dauern, und
+ * HR kann bis eben "Link erneuern", "Erneut senden" oder "Erinnern" gewaehlt
+ * haben. Mit dem Stand vom Beginn des Laufs ginge eine Erinnerung mit einem
+ * toten Token hinaus, oder ein SKIPPED "Adresse geändert" ueberschriebe ein
+ * frisches SENT.
+ */
+async function offboardingErinnerungsKontext(
+  offboardingId: string,
+  lauf: ErinnerungsLaufStand,
+): Promise<VersandKontext | null> {
+  const [vorgang, departmentLinks, aufgaben] = await Promise.all([
+    prisma.offboardingProcess.findUnique({ where: { id: offboardingId }, select: VORGANG_AUSWAHL }),
+    prisma.offboardingDepartmentLink.findMany({
+      where: { offboardingId, sentAt: { not: null }, allTasksComplete: false },
+    }),
+    aufgabenLaden("OFFBOARDING", offboardingId, true),
+  ]);
+  if (!vorgang || vorgangBeendet(vorgang.status)) return null;
+  return {
+    modul: offboardingVersandModul(vorgang),
+    aufgaben,
+    links: new Map(departmentLinks.map((l) => [l.departmentKey, l])),
+    konfigs: lauf.konfigs,
+    webhook: { zugewiesen: false, erinnerung: lauf.erinnerungsWebhook },
+    jetzt: lauf.jetzt,
+    warnungen: [],
+  };
 }
 
 // =============================================

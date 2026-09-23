@@ -15,6 +15,10 @@ const mockPrisma = {
     update: jest.fn(),
     updateMany: jest.fn(),
     findUniqueOrThrow: jest.fn(),
+    // Paket 5: `faelligkeitenSetzen` liest damit nach der Abgabe den Vorgang.
+    // Ohne Rueckgabe bricht es sauber ab (gesetzt 0) — die Regeln dazu stehen
+    // in src/__tests__/lib/abteilungsaufgaben-onboarding.test.ts.
+    findUnique: jest.fn(),
   },
   auditLog: { create: jest.fn() },
   organization: { findMany: jest.fn() },
@@ -38,6 +42,11 @@ jest.mock("@/lib/rate-limit", () => ({
   // stillschweigend `undefined` zurueck und der Test stuerbe an einem
   // TypeError statt an einer sprechenden Erwartung.
   getClientIpOrNull: () => "127.0.0.1",
+  // Seit Paket 5 zieht die POST-Route ueber faelligkeitenSetzen auch
+  // src/lib/abteilungsaufgaben-uebergaenge.ts herein, und die baut beim Laden
+  // ihre eigene Bremse je Link. Ohne diese Zeile scheitert schon das Laden des
+  // Moduls ("createRateLimiter is not a function").
+  createRateLimiter: () => ({ check: () => ({ allowed: true }) }),
 }));
 jest.mock("@/lib/n8n", () => ({ triggerN8nWebhook: jest.fn() }));
 
@@ -601,10 +610,12 @@ describe("POST – parallele Spuren", () => {
 
   it("schreibt Beanspruchung, isComplete, Status und Protokoll in EINER Transaktion, in dieser Reihenfolge", async () => {
     mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
-
+    // Die Faelligkeiten der Checkliste (Paket 5) laufen danach in einer
+    // ZWEITEN, bewusst getrennten Transaktion — sie sind kein Teil der Abgabe
+    // und duerfen sie nicht zum Scheitern bringen.
     await POST(req("POST", {}), { params: params() });
 
-    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
     const beanspruchen = mockPrisma.onboardingProcess.updateMany.mock.invocationCallOrder[0];
     const fertig = mockPrisma.supervisorData.update.mock.invocationCallOrder[0];
     const lesen = mockPrisma.onboardingProcess.findUniqueOrThrow.mock.invocationCallOrder[0];

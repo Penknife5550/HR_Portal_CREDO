@@ -150,6 +150,9 @@ export async function createOffboardingProcess(input: CreateOffboardingInput) {
           category: templateItem.category,
           orderIndex: templateItem.orderIndex,
           assigneeDepartment: templateItem.defaultAssignee || null,
+          // Hinweis fuer die zustaendige Stelle (Paket 5) — steht auf der
+          // Link-Seite und in der Mail an die Abteilung.
+          description: templateItem.description ?? null,
           dueDate:
             templateItem.defaultDueDays != null
               ? new Date(

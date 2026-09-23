@@ -459,7 +459,9 @@ describe("GET /api/offboarding-tasks/[token]", () => {
     expect(mockLinkLaden).toHaveBeenCalledWith("tok-x");
   });
 
-  it("mit dem echten Dienst: nur die eigenen Aufgaben, ohne interne Notiz, Beschreibung und Urheber", async () => {
+  // Paket 5: `description` ist seither der Hinweis aus der Vorlage FUER die
+  // zustaendige Stelle und steht deshalb auf der Link-Seite (vorher immer leer).
+  it("mit dem echten Dienst: nur die eigenen Aufgaben mit Hinweis, ohne interne Notiz und Urheber", async () => {
     db.links = [link({ token: "tok-it" })];
     db.aufgaben = [
       aufgabe({ title: "Konto sperren", notes: "Intern: Rücksprache Schulleitung", description: "alt", completedById: null }),
@@ -478,6 +480,7 @@ describe("GET /api/offboarding-tasks/[token]", () => {
         "abteilungKommentarAm",
         "category",
         "completedAt",
+        "description",
         "dueDate",
         "id",
         "isCompleted",
@@ -485,6 +488,7 @@ describe("GET /api/offboarding-tasks/[token]", () => {
         "title",
       ].sort(),
     );
+    expect(data.aufgaben[0].description).toBe("alt");
     expect(JSON.stringify(data)).not.toContain("Intern: Rücksprache");
     expect(data).not.toHaveProperty("progress");
     expect(db.links[0].openCount).toBe(1);
@@ -1139,6 +1143,37 @@ describe("GET /api/offboarding/analytics — Abteilungen", () => {
     // Nie versendete Links (FAILED oder nie versucht) zaehlen nicht als "zugewiesen".
     expect(body.data.departmentPerformance).toEqual([
       expect.objectContaining({ departmentKey: "IT", totalAssigned: 1, completedOnTime: 1, avgResponseDays: 2 }),
+    ]);
+  });
+
+  it("zählt Onboarding-Links nicht mit (Paket 5: eine Tabelle, zwei Module)", async () => {
+    const versand = new Date("2027-07-10T00:00:00Z");
+    db.links = [
+      link({ departmentKey: "IT", sentAt: versand }),
+      // Derselbe Schluessel, aber ein ONBOARDING-Link: gehoert nicht in die
+      // Offboarding-Auswertung, sonst stuende dort die doppelte Zahl.
+      neuerLink({
+        offboardingId: null,
+        onboardingId: "onb-1",
+        departmentKey: "IT",
+        departmentName: "IT-Abteilung",
+        email: "it@example.org",
+        token: "tok-onb",
+        expiresAt: new Date(Date.now() + 60 * TAG),
+        sentAt: versand,
+        lastSendStatus: "SENT",
+      }),
+    ];
+    const res = await auswertungLaden(anfrage(`${BASIS}/api/offboarding/analytics`, "GET"));
+    const body = await res.json();
+
+    expect(fp.offboardingDepartmentLink.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ sentAt: { not: null }, offboardingId: { not: null } }),
+      }),
+    );
+    expect(body.data.departmentPerformance).toEqual([
+      expect.objectContaining({ departmentKey: "IT", totalAssigned: 1 }),
     ]);
   });
 });

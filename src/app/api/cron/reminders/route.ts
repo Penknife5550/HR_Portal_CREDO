@@ -27,12 +27,19 @@
  *              setzen: Ein SMTP-Ausfall ist voruebergehend, der naechste Lauf
  *              versucht es erneut, statt die Erinnerung eine Woche lang als
  *              erledigt zu fuehren.
+ * - Abschnitt 3 (Paket 5): Erinnerungen an die Abteilungen eines Onboardings
+ *   (onboardingErinnerungenSenden). Eigene Regeln, eigener Merker je Link —
+ *   sie stehen in src/lib/abteilungsaufgaben-dienst.ts. Das Ergebnis kommt als
+ *   `departmentReminders` zurueck; `total` bleibt Mitarbeiter + Vorgesetzte,
+ *   damit die bestehenden n8n-Workflows unveraendert weiterlaufen.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { onboardingErinnerungenSenden } from "@/lib/abteilungsaufgaben-onboarding";
+import type { CronErgebnis } from "@/lib/abteilungsaufgaben-dienst";
 import { getBaseUrl } from "@/lib/url";
 import { magicLinkGueltigkeitMs } from "@/lib/auth";
 import {
@@ -298,6 +305,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // =============================================
+    // 3. Abteilungs-Erinnerungen im Onboarding (Paket 5)
+    //
+    // Eigene Regeln (Stufe nach Faelligkeit, Abstand ab dem letzten Versand,
+    // Merker je Link, nie bei COMPLETED/EXPIRED) — alles im Dienst. Ein Fehler
+    // hier darf die Abschnitte 1 und 2 nicht entwerten: Sie sind an dieser
+    // Stelle laengst gelaufen und verbucht, also wird nur gezaehlt und
+    // weitergemacht.
+    // =============================================
+    let departmentReminders: CronErgebnis = {
+      remindersProcessed: 0,
+      errors: 0,
+      details: [],
+      uebersprungen: [],
+    };
+    try {
+      departmentReminders = await onboardingErinnerungenSenden(now);
+    } catch (err) {
+      console.error("[Reminders] Abteilungs-Erinnerungen fehlgeschlagen:", err);
+      departmentReminders.errors++;
+    }
+
     // EmailLog-Aufbewahrung (90 Tage, DSGVO): taeglich hier durchsetzen,
     // unabhaengig davon ob jemand das Versandprotokoll in der UI oeffnet
     try {
@@ -311,7 +340,10 @@ export async function POST(request: NextRequest) {
       success: true,
       timestamp: now.toISOString(),
       ...results,
+      // `total` bewusst OHNE die Abteilungs-Erinnerungen: n8n prueft diese Zahl
+      // seit Langem gegen die beiden Onboarding-Spuren.
       total: results.employeeReminders + results.supervisorReminders,
+      departmentReminders,
     });
   } catch (error) {
     console.error("[Reminders] Schwerer Fehler:", error);

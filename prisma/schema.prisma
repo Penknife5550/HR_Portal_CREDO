@@ -301,11 +301,14 @@ model OnboardingProcess {
   starterPacketSentCount Int       @default(0)
 
   // Relationen
-  personalData   PersonalData?
-  supervisorData SupervisorData?
-  documents      Document[]
-  notes          OnboardingNote[]
-  auditLogs      AuditLog[]
+  personalData    PersonalData?
+  supervisorData  SupervisorData?
+  documents       Document[]
+  notes           OnboardingNote[]
+  auditLogs       AuditLog[]
+  // Paket 5: Links der Abteilungen auf ihre Onboarding-Aufgaben (gemeinsame
+  // Tabelle mit dem Offboarding, siehe OffboardingDepartmentLink).
+  departmentLinks OffboardingDepartmentLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1398,8 +1401,17 @@ model ChecklistTemplateItem {
   title           String // z.B. "Arbeitsvertrag unterschrieben"
   category        String // z.B. "Dokumente", "IT-Einrichtung", "Vor Arbeitsbeginn"
   orderIndex      Int     @default(0)
-  defaultDueDays  Int? // Tage nach Vertragsbeginn (z.B. -7 = 7 Tage vorher)
-  defaultAssignee String? // Standard-Verantwortlicher (z.B. "HR", "IT", "Vorgesetzter")
+  defaultDueDays  Int? // Tage relativ zum Bezugstag (Onboarding: Vertragsbeginn, Offboarding: letzter Arbeitstag; -7 = 7 Tage vorher)
+  // Zustaendigkeit als Schluessel (HR, IT, VERWALTUNG, VORGESETZTER, eigene …;
+  // Muster ABTEILUNGS_SCHLUESSEL_MUSTER). Bis Paket 5 im Onboarding Freitext —
+  // die Migration ONBOARDING_ABTEILUNGSAUFGABEN_V1 (prisma/seed-check.js) stellt
+  // um; Unbekanntes bleibt stehen und zeigt der Editor als „Unbekannt: …".
+  defaultAssignee String?
+  // Paket 5: Hinweis fuer die zustaendige Stelle (hoechstens 500 Zeichen). Wird
+  // beim Anlegen eines Vorgangs in ChecklistItem.description bzw.
+  // OffboardingChecklistItem.description kopiert und steht auf der Link-Seite
+  // und in der Mail an die Abteilung.
+  description     String?
 
   createdAt DateTime @default(now())
 
@@ -1424,8 +1436,24 @@ model ChecklistItem {
   completedById String?
   completedBy   User?     @relation("CompletedChecklistItems", fields: [completedById], references: [id])
   dueDate       DateTime?
-  assignee      String? // Verantwortlicher
-  notes         String? // Optionale Notizen
+  // Zustaendigkeit. Seit Paket 5 ein Schluessel wie OffboardingChecklistItem.
+  // assigneeDepartment (HR, IT, VERWALTUNG, VORGESETZTER …); Altbestand stellt
+  // ONBOARDING_ABTEILUNGSAUFGABEN_V1 um. Angezeigt wird immer abteilungLabel(),
+  // nie der Rohwert. Bewusst KEIN zweites Feld assigneeDepartment — zwei Felder
+  // fuer dieselbe Aussage liefen auseinander.
+  assignee      String?
+  notes         String? // INTERNE HR-Notiz — verlaesst nie das Portal (nicht auf der Link-Seite)
+
+  // Paket 5 (Abteilungsaufgaben im Onboarding):
+  // Hinweis fuer die zustaendige Stelle, beim Anlegen aus der Vorlage kopiert.
+  description          String?
+  // Kopie von ChecklistTemplateItem.defaultDueDays beim Anlegen (templateItemId
+  // zeigt nach Vorlagen-Edits oft ins Leere). dueDate = Vertragsbeginn + Tage,
+  // EINMAL gesetzt (faelligkeitenSetzen), null = ohne Faelligkeit.
+  relativeDueDays      Int?
+  // Kommentar der Abteilung ueber den Link (max. 1000), getrennt von `notes`.
+  abteilungKommentar   String?
+  abteilungKommentarAm DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1877,12 +1905,29 @@ model DepartmentConfig {
 }
 
 // =============================================
-// Magic Links pro Abteilung pro Offboarding
+// Magic Links pro Abteilung — Offboarding UND (seit Paket 5) Onboarding
+//
+// EINE Tabelle fuer beide Module, nach dem Muster des AuditLog (mehrere
+// nullbare, typisierte Fremdschluessel mit echtem onDelete Cascade). Der
+// Modellname bleibt aus Kompatibilitaet "OffboardingDepartmentLink" (und die
+// Tabelle "offboarding_department_links"): Laufende Offboarding-Tokens stecken
+// in verschickten Mails, ein Umzug waere eine Datenmigration unter
+// --accept-data-loss. Paket 5 hat nur additiv geaendert: offboardingId ist
+// nullbar geworden (DROP NOT NULL), onboardingId kam dazu.
+//
+// GENAU EINES von offboardingId/onboardingId ist gesetzt. Prisma kennt keine
+// CHECK-Constraints; das sichert der Code (einzige Schreiber:
+// src/lib/abteilungsaufgaben-dienst.ts, Anlage per upsert ueber den
+// zusammengesetzten Schluessel des jeweiligen Moduls). Die beiden
+// @@unique-Paare vertragen NULL: Postgres behandelt NULL als verschieden.
 // =============================================
 model OffboardingDepartmentLink {
-  id            String             @id @default(uuid())
-  offboardingId String
-  offboarding   OffboardingProcess @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  id            String              @id @default(uuid())
+  offboardingId String?
+  offboarding   OffboardingProcess? @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+  // Paket 5: Link einer Abteilung auf ihre Onboarding-Aufgaben (ChecklistItem).
+  onboardingId  String?
+  onboarding    OnboardingProcess?  @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
 
   departmentKey  String
   departmentName String
@@ -1915,6 +1960,7 @@ model OffboardingDepartmentLink {
   updatedAt DateTime @updatedAt
 
   @@unique([offboardingId, departmentKey])
+  @@unique([onboardingId, departmentKey])
   @@map("offboarding_department_links")
 }
 

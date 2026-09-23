@@ -15,10 +15,23 @@ import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
 import { CopyButton } from "@/components/copy-button";
 import {
   STATUS_LABELS,
+  abteilungLabel,
   documentStatusLabel,
   getBefristungSachgrundLabel,
   getBefristungsartLabel,
 } from "@/lib/constants";
+import type {
+  AbteilungsAktion,
+  AbteilungsUebersichtDaten,
+  ErledigtVon,
+  Fuehrungskraft,
+} from "@/lib/abteilungsaufgaben";
+import {
+  AbteilungenKarte,
+  abteilungsAktionSenden,
+  erledigtText,
+  type AktionsMeldung,
+} from "@/components/abteilungsaufgaben/abteilungen-karte";
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
@@ -89,7 +102,7 @@ interface DocumentData {
   gueltigBis: string | null;
 }
 
-interface ChecklistItemData {
+export interface ChecklistItemData {
   id: string;
   title: string;
   category: string;
@@ -98,8 +111,27 @@ interface ChecklistItemData {
   completedAt: string | null;
   completedBy: { firstName: string; lastName: string } | null;
   dueDate: string | null;
+  /**
+   * Zustaendigkeit als SCHLUESSEL („IT", „VORGESETZTER") seit Paket 5 — nie
+   * roh anzeigen, sondern ueber den Namen aus `abteilungen.zeilen` bzw.
+   * `abteilungLabel()`. Altbestand kann noch Freitext tragen.
+   */
   assignee: string | null;
   notes: string | null;
+  /** Hinweis aus der Vorlage; steht auch auf der Link-Seite und in der Mail. */
+  description?: string | null;
+  /** Kopie von `defaultDueDays` — Grundlage von `faelligAm`. */
+  relativeDueDays?: number | null;
+  /** Rueckmeldung der Abteilung ueber ihren Link. */
+  abteilungKommentar?: string | null;
+  abteilungKommentarAm?: string | null;
+  /** Wer abgehakt hat (Portal-Benutzer oder Abteilung per Link). */
+  erledigtVon?: ErledigtVon;
+  /**
+   * Faelligkeit (ISO): die gespeicherte, sonst die aus Vertragsbeginn und
+   * `relativeDueDays` berechnete Vorschau. Kommt fertig vom Server.
+   */
+  faelligAm?: string | null;
 }
 
 interface NoteData {
@@ -303,6 +335,13 @@ export interface DetailData {
   checklistItems: ChecklistItemData[];
   notes: NoteData[];
   _count: { notes: number };
+  /**
+   * Karte „Aufgaben für Abteilungen" (Paket 5) — fehlt, solange die Route sie
+   * nicht liefert (Bestandsstand, anderer Zweig).
+   */
+  abteilungen?: AbteilungsUebersichtDaten;
+  /** Wirksame Fuehrungskraft des Vorgangs (Adresse aus den Modalitaeten). */
+  fuehrungskraft?: Fuehrungskraft;
 }
 
 // =============================================
@@ -479,6 +518,16 @@ export function DetailContent({
   // der Knopf im Abschluss-Schritt oeffnet denselben.
   const [paketDialogOffen, setPaketDialogOffen] = useState(false);
 
+  // Karte „Aufgaben für Abteilungen" (Paket 5): Ergebnis der letzten Aktion
+  // und der Dialog „Abteilungen informieren" — beide hier, weil auch der
+  // Stepper-Schritt „Checkliste abarbeiten" den Dialog oeffnet.
+  const [abteilungsMeldung, setAbteilungsMeldung] = useState<AktionsMeldung | null>(null);
+  const [abteilungenDialogOffen, setAbteilungenDialogOffen] = useState(false);
+  // Fehler beim Abhaken oder Notieren in der Checkliste. Frueher verschluckte
+  // die Seite jede Ablehnung („// silent") — ein abgelaufener Vorgang sah
+  // dann aus wie ein Knopf, der nichts tut.
+  const [checklistFehler, setChecklistFehler] = useState<string | null>(null);
+
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   // ---- Status-Aktionen ----
@@ -547,8 +596,15 @@ export function DetailContent({
   };
 
   // ---- Data Loading ----
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  //
+  // `leise` laedt nach, ohne die Seite gegen „Lade Vorgangsdaten…" zu
+  // tauschen: Beim Abhaken einer Checklisten-Aufgabe und nach einer
+  // Abteilungs-Aktion verschwaende das Vollneuladen die halbe Sekunde
+  // sichtbar — der Scrollstand spraenge nach oben, und die Anzeige „Wird
+  // gesendet…" des Dialogs waere nie zu sehen. Das Offboarding macht es
+  // ebenso (`loadData(true)`).
+  const loadData = useCallback(async (leise = false) => {
+    if (!leise) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/onboarding/${onboardingId}`);
@@ -561,7 +617,7 @@ export function DetailContent({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     } finally {
-      setLoading(false);
+      if (!leise) setLoading(false);
     }
   }, [onboardingId]);
 
@@ -668,20 +724,46 @@ export function DetailContent({
   };
 
   // ---- Checklist actions ----
-  const toggleChecklistItem = async (itemId: string, currentState: boolean) => {
-    setTogglingItems((prev) => new Set(prev).add(itemId));
+  //
+  // Die Route antwortet seit Paket 5 mit `{ item, progress }` statt mit dem
+  // nackten Datensatz. Wer hier weiter das ganze JSON in die Liste schriebe,
+  // ersetzte die Aufgabe durch ein Objekt ohne `title` — die Zeile waere leer.
+  const checklistPatch = async (
+    itemId: string,
+    body: Record<string, unknown>,
+  ): Promise<boolean> => {
+    setChecklistFehler(null);
     try {
       const res = await fetch(`/api/onboarding/${onboardingId}/checklist/${itemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isCompleted: !currentState }),
+        body: JSON.stringify(body),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setChecklistItems((prev) => prev.map((item) => (item.id === itemId ? updated : item)));
+      const antwort = (await res.json().catch(() => null)) as
+        | { item?: ChecklistItemData; error?: string }
+        | null;
+      if (!res.ok || !antwort?.item) {
+        setChecklistFehler(antwort?.error || "Die Aufgabe konnte nicht gespeichert werden.");
+        return false;
       }
+      const item = antwort.item;
+      setChecklistItems((prev) => prev.map((alt) => (alt.id === itemId ? { ...alt, ...item } : alt)));
+      return true;
     } catch {
-      // silent
+      setChecklistFehler("Verbindungsfehler. Bitte versuchen Sie es erneut.");
+      return false;
+    }
+  };
+
+  const toggleChecklistItem = async (itemId: string, currentState: boolean) => {
+    setTogglingItems((prev) => new Set(prev).add(itemId));
+    try {
+      const ok = await checklistPatch(itemId, { isCompleted: !currentState });
+      // Der Abteilungsstand haengt am Abhaken (letzte Aufgabe erledigt →
+      // Zeile „Erledigt", Knopf verschwindet). Deshalb neu laden, nicht nur
+      // die eine Zeile ersetzen — aber leise, sonst verschwindet die Seite
+      // bei jedem Klick auf eine Checkbox.
+      if (ok) await loadData(true);
     } finally {
       setTogglingItems((prev) => {
         const next = new Set(prev);
@@ -694,22 +776,31 @@ export function DetailContent({
   const saveChecklistNote = async (itemId: string) => {
     setSavingChecklistNote(true);
     try {
-      const res = await fetch(`/api/onboarding/${onboardingId}/checklist/${itemId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: checklistNoteText }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setChecklistItems((prev) => prev.map((item) => (item.id === itemId ? updated : item)));
+      if (await checklistPatch(itemId, { notes: checklistNoteText })) {
         setEditingNoteId(null);
         setChecklistNoteText("");
       }
-    } catch {
-      // silent
     } finally {
       setSavingChecklistNote(false);
     }
+  };
+
+  // ---- Abteilungs-Aktionen (Karte „Aufgaben für Abteilungen") ----
+  //
+  // Eine Route fuer alle vier Aktionen: Informieren (`{}`), Erinnern, Erneut
+  // senden und Link erneuern (`{ aktion, departmentKey }`). Die Antwort traegt
+  // den Versandbericht als fertige Meldung (201 gruen, 409/502 rot) samt
+  // Hinweis (gelb). Danach IMMER neu laden — auch ein 409/502 kann den Stand
+  // aendern (etwa „Versand fehlgeschlagen" an der Zeile).
+  const abteilungsAktion = async (aktion: AbteilungsAktion, departmentKey?: string) => {
+    setAbteilungsMeldung(null);
+    const meldung = await abteilungsAktionSenden(
+      `/api/onboarding/${onboardingId}/abteilungen`,
+      aktion,
+      departmentKey,
+    );
+    setAbteilungsMeldung(meldung);
+    await loadData(true);
   };
 
   // ---- Computed values ----
@@ -926,6 +1017,10 @@ export function DetailContent({
             addNote={addNote}
             setActiveTab={setActiveTab}
             oeffnePaketDialog={() => setPaketDialogOffen(true)}
+            oeffneAbteilungenDialog={() => {
+              setActiveTab("checklist");
+              setAbteilungenDialogOffen(true);
+            }}
             onboardingId={onboardingId}
           />
         )}
@@ -958,6 +1053,16 @@ export function DetailContent({
             setChecklistNoteText={setChecklistNoteText}
             savingChecklistNote={savingChecklistNote}
             saveChecklistNote={saveChecklistNote}
+            checklistFehler={checklistFehler}
+            abteilungen={data.abteilungen}
+            fuehrungskraft={data.fuehrungskraft}
+            darfAbteilungsAktionen={HR_EDIT_ROLES.includes(user.role)}
+            istAdmin={isAdmin}
+            onAbteilungsAktion={abteilungsAktion}
+            abteilungsMeldung={abteilungsMeldung}
+            onAbteilungsMeldungSchliessen={() => setAbteilungsMeldung(null)}
+            abteilungenDialogOffen={abteilungenDialogOffen}
+            setAbteilungenDialogOffen={setAbteilungenDialogOffen}
           />
         )}
         {activeTab === "supervisor" && <TabSupervisor data={data} appUrl={appUrl} />}
@@ -970,7 +1075,8 @@ export function DetailContent({
 // Tab 1: Uebersicht
 // =============================================
 
-function TabOverview({
+/** Exportiert fuer den Komponententest (Stepper-Schritt „Checkliste abarbeiten"). */
+export function TabOverview({
   data,
   appUrl,
   supervisorEmail,
@@ -987,6 +1093,7 @@ function TabOverview({
   onboardingId,
   setActiveTab,
   oeffnePaketDialog,
+  oeffneAbteilungenDialog,
 }: {
   data: DetailData;
   appUrl: string;
@@ -1005,6 +1112,8 @@ function TabOverview({
   onboardingId: string;
   setActiveTab: (tab: TabId) => void;
   oeffnePaketDialog: () => void;
+  /** Wechselt in den Tab Checkliste und oeffnet „Abteilungen informieren". */
+  oeffneAbteilungenDialog: () => void;
 }) {
   const fragebogenLink = `${appUrl}/fragebogen/${data.token}`;
   const modalitaetenLink = data.supervisorToken
@@ -1021,6 +1130,25 @@ function TabOverview({
   const checklistDone = data.checklistItems.filter((i) => i.isCompleted).length;
   const checklistAllDone = checklistTotal > 0 && checklistDone === checklistTotal;
   const isCompleted = data.status === "COMPLETED";
+
+  // ---- Abteilungen im Schritt „Checkliste abarbeiten" ----
+  // „Fertig" heisst: kein offener Punkt mehr fuer diese Stelle — unabhaengig
+  // davon, ob sie schon informiert wurde.
+  const abt = data.abteilungen;
+  const abtZeilen = abt?.zeilen ?? [];
+  const abtFertig = abtZeilen.filter((z) => z.aufgaben.offen === 0).length;
+  const abtGesperrt = abt?.gesperrt ?? null;
+  const abtInformierbar = abt?.informierbar ?? 0;
+  const abtInfo = [
+    checklistTotal === 0 ? "Keine Checkliste zugewiesen" : null,
+    abtZeilen.length > 0 ? `Abteilungen: ${abtFertig} von ${abtZeilen.length} fertig` : null,
+    abtGesperrt?.text ?? null,
+    abtZeilen.length > 0 && !abtGesperrt && (abt?.niemandInformiert ?? false)
+      ? "Noch keine Abteilung informiert – im Tab Checkliste „Abteilungen informieren“ wählen."
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   // Neuer Vorgesetzten-Link: moeglich, solange die Modalitaeten offen sind und
   // HR den Vorgang nicht geprueft/abgeschlossen/abgelaufen gesetzt hat — genau
@@ -1105,7 +1233,7 @@ function TabOverview({
     {
       key: "checkliste",
       title: "Checkliste abarbeiten",
-      description: "Interne Onboarding-Aufgaben erledigen",
+      description: "Interne Aufgaben erledigen und Abteilungen informieren",
       status: checklistAllDone || isCompleted ? "completed"
         : data.status !== "REVIEWED" && !(fragebogenDone && supervisorDone) ? "upcoming"
         : "active",
@@ -1114,11 +1242,26 @@ function TabOverview({
         id: i.id,
         title: i.title,
         isCompleted: false,
-        assignee: i.assignee || undefined,
+        // Nie der rohe Schluessel: „IT" heisst hier „IT-Abteilung", und der
+        // Name aus den Einstellungen geht dem festen Label vor.
+        assignee:
+          abtZeilen.find((z) => z.departmentKey === i.assignee)?.departmentName ||
+          abteilungLabel(i.assignee) ||
+          undefined,
         assigneeColor: "bg-credo-blau/10 text-credo-blau",
         note: i.notes,
       })) : undefined,
-      info: checklistTotal === 0 ? "Keine Checkliste zugewiesen" : undefined,
+      info: abtInfo || undefined,
+      actions:
+        !isCompleted && !abtGesperrt && abtInformierbar > 0
+          ? [
+              {
+                label: "Abteilungen informieren…",
+                onClick: oeffneAbteilungenDialog,
+                variant: "primary" as const,
+              },
+            ]
+          : undefined,
     },
     {
       key: "abschluss",
@@ -1126,6 +1269,12 @@ function TabOverview({
       description: "Vorgang abschliessen und Daten exportieren",
       status: isCompleted ? "completed" : !checklistAllDone ? "upcoming" : "active",
       completedAt: isCompleted && data.submittedAt ? formatDate(data.submittedAt) : undefined,
+      // Die Abteilungen arbeiten an ihren eigenen Aufgaben weiter; der Vorgang
+      // wartet nicht auf sie. Ohne diesen Satz sucht HR den Grund dafuer,
+      // dass der Abschluss trotz offener Abteilungsaufgaben moeglich ist.
+      info: abtZeilen.some((z) => z.aufgaben.offen > 0)
+        ? "Offene Aufgaben von Abteilungen verhindern den Abschluss nicht."
+        : undefined,
       actions: !isCompleted && checklistAllDone ? [
         { label: "CSV Export (LOGA)", onClick: () => { window.location.href = `/api/onboarding/${onboardingId}/export?format=csv`; }, variant: "secondary" as const },
         {
@@ -2669,7 +2818,8 @@ function TabDocuments({
 // Tab 3: Checkliste
 // =============================================
 
-function TabChecklist({
+/** Exportiert fuer den Komponententest (Aufgabenkarte, Karte, Dialog). */
+export function TabChecklist({
   checklistItems,
   togglingItems,
   toggleChecklistItem,
@@ -2679,6 +2829,16 @@ function TabChecklist({
   setChecklistNoteText,
   savingChecklistNote,
   saveChecklistNote,
+  checklistFehler,
+  abteilungen,
+  fuehrungskraft,
+  darfAbteilungsAktionen = true,
+  istAdmin = false,
+  onAbteilungsAktion,
+  abteilungsMeldung,
+  onAbteilungsMeldungSchliessen,
+  abteilungenDialogOffen,
+  setAbteilungenDialogOffen,
 }: {
   checklistItems: ChecklistItemData[];
   togglingItems: Set<string>;
@@ -2689,6 +2849,19 @@ function TabChecklist({
   setChecklistNoteText: (v: string) => void;
   savingChecklistNote: boolean;
   saveChecklistNote: (id: string) => void;
+  /** Ablehnung des Servers beim Abhaken/Notieren (z. B. Vorgang abgelaufen). */
+  checklistFehler: string | null;
+  /** Karte „Aufgaben für Abteilungen" (fehlt, solange die API sie nicht liefert). */
+  abteilungen?: AbteilungsUebersichtDaten;
+  fuehrungskraft?: Fuehrungskraft;
+  darfAbteilungsAktionen?: boolean;
+  /** Nur Admins sehen den Link zu den Checklisten-Vorlagen (Route ist gesperrt). */
+  istAdmin?: boolean;
+  onAbteilungsAktion: (aktion: AbteilungsAktion, departmentKey?: string) => Promise<unknown> | void;
+  abteilungsMeldung?: AktionsMeldung | null;
+  onAbteilungsMeldungSchliessen?: () => void;
+  abteilungenDialogOffen: boolean;
+  setAbteilungenDialogOffen: (offen: boolean) => void;
 }) {
   if (checklistItems.length === 0) {
     return (
@@ -2705,6 +2878,12 @@ function TabChecklist({
   const completed = checklistItems.filter((i) => i.isCompleted).length;
   const total = checklistItems.length;
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  // Anzeigename je Zustaendigkeit: der Name aus der Karte (bei eigenen
+  // Schluesseln z. B. „Empfang FES Minden" statt „EMPFANG"), sonst das Label.
+  // Nie der rohe Schluessel — „VORGESETZTER" ist keine Beschriftung.
+  const abteilungsName = (key: string) =>
+    abteilungen?.zeilen.find((z) => z.departmentKey === key)?.departmentName ?? abteilungLabel(key);
 
   // Group by category
   const grouped: Record<string, ChecklistItemData[]> = {};
@@ -2740,6 +2919,32 @@ function TabChecklist({
         </div>
       </div>
 
+      {/* Aufgaben für Abteilungen (Paket 5) */}
+      {abteilungen && (
+        <AbteilungenKarte
+          abteilungen={abteilungen}
+          fuehrungskraft={fuehrungskraft ?? null}
+          bezugsdatumLabel="Vertragsbeginn"
+          darfAktionen={darfAbteilungsAktionen}
+          abgebrochen={abteilungen.vorgangAbgebrochen}
+          zeigeVorlagenLink={istAdmin}
+          onAktion={onAbteilungsAktion}
+          meldung={abteilungsMeldung}
+          onMeldungSchliessen={onAbteilungsMeldungSchliessen}
+          dialogOffen={abteilungenDialogOffen}
+          setDialogOffen={setAbteilungenDialogOffen}
+        />
+      )}
+
+      {checklistFehler && (
+        <p
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+        >
+          {checklistFehler}
+        </p>
+      )}
+
       {/* Grouped Items */}
       {Object.entries(grouped).map(([category, items]) => (
         <div key={category}>
@@ -2751,126 +2956,177 @@ function TabChecklist({
           <div className="space-y-2">
             {items
               .sort((a, b) => a.orderIndex - b.orderIndex)
-              .map((item) => (
-                <div key={item.id} className="rounded-xl border border-border bg-card transition-all hover:shadow-sm">
-                  <div className="flex items-start gap-3 p-4">
-                    {/* Checkbox */}
-                    <button
-                      onClick={() => toggleChecklistItem(item.id, item.isCompleted)}
-                      disabled={togglingItems.has(item.id)}
-                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
-                        item.isCompleted
-                          ? "border-credo-gruen bg-credo-gruen"
-                          : "border-border hover:border-credo-gruen/50"
-                      } ${togglingItems.has(item.id) ? "opacity-50" : ""}`}
-                    >
-                      {item.isCompleted && <CheckIcon className="h-3.5 w-3.5 text-white" />}
-                    </button>
+              .map((item) => {
+                const name = item.assignee ? abteilungsName(item.assignee) : null;
+                const erledigt = item.isCompleted ? erledigtText(item) : "";
+                // `faelligAm` ist die gespeicherte Faelligkeit ODER die aus
+                // Vertragsbeginn und Tagen berechnete Vorschau — deshalb hat
+                // sie Vorrang vor `dueDate`.
+                const faellig = item.faelligAm ?? item.dueDate;
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-border bg-card transition-all hover:shadow-sm"
+                    data-aufgabe={item.id}
+                  >
+                    <div className="flex items-start gap-3 p-4">
+                      {/* Checkbox */}
+                      <button
+                        type="button"
+                        onClick={() => toggleChecklistItem(item.id, item.isCompleted)}
+                        disabled={togglingItems.has(item.id)}
+                        aria-label={item.isCompleted ? "Als offen markieren" : "Als erledigt markieren"}
+                        aria-pressed={item.isCompleted}
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
+                          item.isCompleted
+                            ? "border-credo-gruen bg-credo-gruen"
+                            : "border-border hover:border-credo-gruen/50"
+                        } ${togglingItems.has(item.id) ? "opacity-50" : ""}`}
+                      >
+                        {item.isCompleted && <CheckIcon className="h-3.5 w-3.5 text-white" />}
+                      </button>
 
-                    {/* Content */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p
-                          className={`text-sm font-medium ${
-                            item.isCompleted ? "text-muted-foreground line-through" : "text-foreground"
-                          }`}
-                        >
-                          {item.title}
-                        </p>
+                      {/* Content */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p
+                            className={`text-sm font-medium ${
+                              item.isCompleted ? "text-muted-foreground line-through" : "text-foreground"
+                            }`}
+                          >
+                            {item.title}
+                          </p>
 
-                        {/* Note button */}
-                        <button
-                          onClick={() => {
-                            if (editingNoteId === item.id) {
-                              setEditingNoteId(null);
-                              setChecklistNoteText("");
-                            } else {
-                              setEditingNoteId(item.id);
-                              setChecklistNoteText(item.notes || "");
-                            }
-                          }}
-                          className={`relative shrink-0 rounded-md p-1.5 transition-colors ${
-                            editingNoteId === item.id
-                              ? "bg-[#009AC6]/10 text-[#009AC6]"
-                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                          }`}
-                          title="Notiz"
-                        >
-                          <ChatBubbleIcon className="h-4 w-4" />
-                          {item.notes && (
-                            <span className="absolute -right-0.5 -top-0.5">
-                              <NoteIndicatorIcon className="h-2.5 w-2.5 text-[#FBC900]" />
+                          {/* Note button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (editingNoteId === item.id) {
+                                setEditingNoteId(null);
+                                setChecklistNoteText("");
+                              } else {
+                                setEditingNoteId(item.id);
+                                setChecklistNoteText(item.notes || "");
+                              }
+                            }}
+                            className={`relative shrink-0 rounded-md p-1.5 transition-colors ${
+                              editingNoteId === item.id
+                                ? "bg-[#009AC6]/10 text-[#009AC6]"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            }`}
+                            title="Interne Notiz"
+                            aria-label="Interne Notiz"
+                          >
+                            <ChatBubbleIcon className="h-4 w-4" />
+                            {item.notes && (
+                              <span className="absolute -right-0.5 -top-0.5">
+                                <NoteIndicatorIcon className="h-2.5 w-2.5 text-[#FBC900]" />
+                              </span>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Hinweis aus der Vorlage — steht auch auf der Link-Seite */}
+                        {item.description && (
+                          <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                            {item.description}
+                          </p>
+                        )}
+
+                        {/* Meta info */}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          {name && (
+                            <span className="inline-flex rounded-full bg-[#009AC6]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#009AC6]">
+                              {name}
                             </span>
                           )}
-                        </button>
-                      </div>
-
-                      {/* Meta info */}
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        {item.assignee && (
-                          <span className="inline-flex rounded-full bg-[#009AC6]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#009AC6]">
-                            {item.assignee}
-                          </span>
-                        )}
-                        {item.dueDate && (
-                          <span className="text-[11px] text-muted-foreground">
-                            Fällig: {formatDate(item.dueDate)}
-                          </span>
-                        )}
-                        {item.isCompleted && item.completedBy && (
-                          <span className="text-[11px] text-muted-foreground">
-                            von {item.completedBy.firstName} {item.completedBy.lastName}
-                          </span>
-                        )}
-                        {item.isCompleted && item.completedAt && (
-                          <span className="text-[11px] text-muted-foreground">
-                            am {formatDate(item.completedAt)}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Existing note display */}
-                      {item.notes && editingNoteId !== item.id && (
-                        <div className="mt-2 rounded-md border border-[#FBC900]/30 bg-[#FBC900]/5 px-3 py-2">
-                          <p className="text-xs text-foreground">{item.notes}</p>
+                          {faellig && (
+                            <span className="text-[11px] text-muted-foreground">
+                              Fällig: {formatDate(faellig)}
+                            </span>
+                          )}
+                          {erledigt && (
+                            <span className="text-[11px] text-muted-foreground" data-urheber>
+                              {erledigt}
+                            </span>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Inline note editor */}
-                  {editingNoteId === item.id && (
-                    <div className="border-t border-border bg-muted/30 p-4">
-                      <textarea
-                        value={checklistNoteText}
-                        onChange={(e) => setChecklistNoteText(e.target.value)}
-                        placeholder="Notiz eingeben..."
-                        rows={2}
-                        className="mb-2 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-credo-blau focus:ring-1 focus:ring-credo-blau"
-                        autoFocus
-                      />
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setEditingNoteId(null);
-                            setChecklistNoteText("");
-                          }}
-                          className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
-                        >
-                          Abbrechen
-                        </button>
-                        <button
-                          onClick={() => saveChecklistNote(item.id)}
-                          disabled={savingChecklistNote}
-                          className="rounded-md bg-credo-gruen px-4 py-1.5 text-xs font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
-                        >
-                          {savingChecklistNote ? "..." : "Speichern"}
-                        </button>
+                        {/* Kommentar der Abteilung (ueber ihren Link) — React maskiert */}
+                        {item.abteilungKommentar && (
+                          <div
+                            className="mt-2 rounded-md border border-credo-blau/30 bg-credo-blau/5 px-3 py-2"
+                            data-box="abteilungskommentar"
+                          >
+                            <p className="whitespace-pre-wrap break-words text-xs text-foreground">
+                              <span className="font-semibold text-credo-blau">
+                                Kommentar {name ?? "der Abteilung"}
+                                {item.abteilungKommentarAm ? `, ${formatDate(item.abteilungKommentarAm)}` : ""}:
+                              </span>{" "}
+                              {item.abteilungKommentar}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Interne HR-Notiz — nur im Portal */}
+                        {item.notes && editingNoteId !== item.id && (
+                          <div
+                            className="mt-2 rounded-md border border-[#FBC900]/30 bg-[#FBC900]/5 px-3 py-2"
+                            data-box="interne-notiz"
+                          >
+                            <p className="text-[11px] font-semibold text-amber-800">
+                              Interne Notiz (nur im Portal)
+                            </p>
+                            <p className="whitespace-pre-wrap break-words text-xs text-foreground">{item.notes}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* Inline note editor */}
+                    {editingNoteId === item.id && (
+                      <div className="border-t border-border bg-muted/30 p-4">
+                        <label
+                          htmlFor={`interne-notiz-${item.id}`}
+                          className="mb-1 block text-[11px] font-semibold text-amber-800"
+                        >
+                          Interne Notiz (nur im Portal)
+                        </label>
+                        <textarea
+                          id={`interne-notiz-${item.id}`}
+                          autoComplete="off"
+                          value={checklistNoteText}
+                          onChange={(e) => setChecklistNoteText(e.target.value)}
+                          placeholder="Notiz eingeben..."
+                          rows={2}
+                          className="mb-2 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-credo-blau focus:ring-1 focus:ring-credo-blau"
+                          autoFocus
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingNoteId(null);
+                              setChecklistNoteText("");
+                            }}
+                            className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                          >
+                            Abbrechen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveChecklistNote(item.id)}
+                            disabled={savingChecklistNote}
+                            className="rounded-md bg-credo-gruen px-4 py-1.5 text-xs font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
+                          >
+                            {savingChecklistNote ? "..." : "Speichern"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         </div>
       ))}

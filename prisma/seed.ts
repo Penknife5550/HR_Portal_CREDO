@@ -13,6 +13,25 @@ import { generateFullStepsConfig } from "../src/lib/field-definitions";
 
 const prisma = new PrismaClient();
 
+/**
+ * Ein Punkt einer Checklisten-Vorlage im Seed.
+ *
+ * `defaultAssignee` ist ein Abteilungs-SCHLUESSEL (siehe DEPARTMENT_KEYS in
+ * src/lib/constants.ts), kein Freitext — nur so kann HR die Aufgabe im Vorgang
+ * per Link an die Abteilung schicken. `description` ist der optionale Hinweis
+ * fuer die zustaendige Stelle (hoechstens 500 Zeichen); er wird beim Anlegen
+ * eines Vorgangs in die Aufgabe kopiert und steht auf der Link-Seite und in der
+ * Mail.
+ */
+type SeedVorlagenPunkt = {
+  title: string;
+  category: string;
+  orderIndex: number;
+  defaultDueDays: number;
+  defaultAssignee: string;
+  description?: string;
+};
+
 async function main() {
   console.log("🏫 Seeding CREDO HR-Portal Datenbank...\n");
 
@@ -278,6 +297,22 @@ async function main() {
   // =============================================
   // 4. Checklisten-Vorlagen (Standard-Checklisten für Onboarding)
   // =============================================
+  //
+  // WICHTIG (Paket 5): `defaultAssignee` ist ein SCHLUESSEL (HR, IT,
+  // VERWALTUNG, VORGESETZTER, DSB …), kein Freitext. Frueher stand hier
+  // „Verwaltung" bzw. „Vorgesetzter"; daraus wurde nie eine Abteilung, an die
+  // ein Link haette gehen koennen. Die einmalige Datenmigration
+  // ONBOARDING_ABTEILUNGSAUFGABEN_V1 (prisma/seed-check.js) stellt Bestaende
+  // um — sie laeuft aber VOR dem Seed und setzt auf einer leeren Datenbank nur
+  // ihren Merker. Ohne Schluessel hier haette eine frische Installation also
+  // wieder Freitext. `src/__tests__/api/checklisten-vorlagen.test.ts` haelt das
+  // fest.
+  //
+  // Die Punkte, Tagesangaben und Hinweise folgen dem Vorschlag
+  // „Standard-Einstellung (TV-L)" aus dem Aenderungsplan (Paket 5). In der
+  // Produktion sind die Vorlagen Daten von HR — der Seed laeuft dort nicht.
+  // BUCHHALTUNG bekommt bewusst keinen Standardpunkt (Gehalt laeuft ueber
+  // LOGA/HR, Datensparsamkeit).
   console.log("📋 Checklisten-Vorlagen anlegen...\n");
 
   // Checkliste 1: Standard-Einstellung (TV-L)
@@ -303,24 +338,51 @@ async function main() {
     where: { templateId: standardChecklist.id },
   });
 
-  const standardItems = [
+  const standardItems: SeedVorlagenPunkt[] = [
     // Kategorie: Vor Arbeitsbeginn
     { title: "Arbeitsvertrag erstellt und versendet", category: "Vor Arbeitsbeginn", orderIndex: 0, defaultDueDays: -14, defaultAssignee: "HR" },
     { title: "Arbeitsvertrag unterschrieben retour", category: "Vor Arbeitsbeginn", orderIndex: 1, defaultDueDays: -7, defaultAssignee: "HR" },
-    { title: "IT-Zugaenge beantragt", category: "Vor Arbeitsbeginn", orderIndex: 2, defaultDueDays: -7, defaultAssignee: "IT" },
-    { title: "Schlüssel/Ausweis bestellt", category: "Vor Arbeitsbeginn", orderIndex: 3, defaultDueDays: -3, defaultAssignee: "Verwaltung" },
+    {
+      title: "Benutzerkonto und dienstliche E-Mail-Adresse anlegen",
+      category: "Vor Arbeitsbeginn",
+      orderIndex: 2,
+      defaultDueDays: -7,
+      defaultAssignee: "IT",
+      description: "Konto in der Schulverwaltung und im Microsoft-365-Mandanten der Einrichtung; Zugangsdaten an die Führungskraft.",
+    },
+    {
+      title: "Zugänge zu Fachanwendungen einrichten",
+      category: "Vor Arbeitsbeginn",
+      orderIndex: 3,
+      defaultDueDays: -3,
+      defaultAssignee: "IT",
+      description: "Schulverwaltung, Lernplattform, Zeiterfassung.",
+    },
+    { title: "Schlüssel/Transponder bestellen", category: "Vor Arbeitsbeginn", orderIndex: 4, defaultDueDays: -7, defaultAssignee: "VERWALTUNG" },
+    { title: "Postfach, Namensschild und Telefonliste vorbereiten", category: "Vor Arbeitsbeginn", orderIndex: 5, defaultDueDays: -3, defaultAssignee: "VERWALTUNG" },
+    { title: "Einarbeitungspatin/-paten benennen", category: "Vor Arbeitsbeginn", orderIndex: 6, defaultDueDays: -7, defaultAssignee: "VORGESETZTER" },
+    { title: "Arbeitsplatz bzw. Einsatz- und Stundenplan vorbereiten", category: "Vor Arbeitsbeginn", orderIndex: 7, defaultDueDays: -3, defaultAssignee: "VORGESETZTER" },
     // Kategorie: Erster Arbeitstag
-    { title: "Begrüßung und Vorstellung im Team", category: "Erster Arbeitstag", orderIndex: 4, defaultDueDays: 0, defaultAssignee: "Vorgesetzter" },
-    { title: "Arbeitsplatz eingerichtet", category: "Erster Arbeitstag", orderIndex: 5, defaultDueDays: 0, defaultAssignee: "IT" },
-    { title: "Einweisung Arbeitssicherheit", category: "Erster Arbeitstag", orderIndex: 6, defaultDueDays: 0, defaultAssignee: "HR" },
+    { title: "Begrüßung und Vorstellung im Team", category: "Erster Arbeitstag", orderIndex: 8, defaultDueDays: 0, defaultAssignee: "VORGESETZTER" },
+    { title: "Arbeitsplatz/Endgerät einrichten, Zugangsdaten übergeben", category: "Erster Arbeitstag", orderIndex: 9, defaultDueDays: 0, defaultAssignee: "IT" },
+    { title: "Schlüsselübergabe dokumentieren", category: "Erster Arbeitstag", orderIndex: 10, defaultDueDays: 0, defaultAssignee: "VERWALTUNG" },
+    { title: "Einweisung Arbeitssicherheit", category: "Erster Arbeitstag", orderIndex: 11, defaultDueDays: 0, defaultAssignee: "HR" },
     // Kategorie: Erste Woche
-    { title: "Schluesseluebergabe dokumentiert", category: "Erste Woche", orderIndex: 7, defaultDueDays: 5, defaultAssignee: "Verwaltung" },
-    { title: "Zeiterfassung eingerichtet", category: "Erste Woche", orderIndex: 8, defaultDueDays: 5, defaultAssignee: "HR" },
-    { title: "Einarbeitungsplan besprochen", category: "Erste Woche", orderIndex: 9, defaultDueDays: 5, defaultAssignee: "Vorgesetzter" },
+    {
+      title: "Datenschutz-Unterweisung und Verpflichtung auf Vertraulichkeit",
+      category: "Erste Woche",
+      orderIndex: 12,
+      defaultDueDays: 7,
+      defaultAssignee: "DSB",
+    },
+    { title: "Einarbeitungsplan besprochen", category: "Erste Woche", orderIndex: 13, defaultDueDays: 5, defaultAssignee: "VORGESETZTER" },
+    { title: "Zeiterfassung eingerichtet", category: "Erste Woche", orderIndex: 14, defaultDueDays: 5, defaultAssignee: "HR" },
     // Kategorie: Dokumente
-    { title: "Personalfragebogen vollstaendig", category: "Dokumente", orderIndex: 10, defaultDueDays: 0, defaultAssignee: "HR" },
-    { title: "Alle Unterlagen eingegangen", category: "Dokumente", orderIndex: 11, defaultDueDays: 14, defaultAssignee: "HR" },
-    { title: "Daten in LOGA erfasst", category: "Dokumente", orderIndex: 12, defaultDueDays: 14, defaultAssignee: "HR" },
+    { title: "Personalfragebogen vollständig", category: "Dokumente", orderIndex: 15, defaultDueDays: 0, defaultAssignee: "HR" },
+    { title: "Alle Unterlagen eingegangen", category: "Dokumente", orderIndex: 16, defaultDueDays: 14, defaultAssignee: "HR" },
+    { title: "Daten in LOGA erfasst", category: "Dokumente", orderIndex: 17, defaultDueDays: 14, defaultAssignee: "HR" },
+    // Kategorie: Einarbeitung
+    { title: "Feedbackgespräch nach sechs Wochen", category: "Einarbeitung", orderIndex: 18, defaultDueDays: 42, defaultAssignee: "VORGESETZTER" },
   ];
 
   for (const item of standardItems) {
@@ -357,13 +419,20 @@ async function main() {
     where: { templateId: minijobChecklist.id },
   });
 
-  const minijobItems = [
+  const minijobItems: SeedVorlagenPunkt[] = [
     // Kategorie: Vor Arbeitsbeginn
     { title: "Arbeitsvertrag erstellt", category: "Vor Arbeitsbeginn", orderIndex: 0, defaultDueDays: -7, defaultAssignee: "HR" },
-    { title: "RV-Befreiungsantrag geklaert", category: "Vor Arbeitsbeginn", orderIndex: 1, defaultDueDays: -7, defaultAssignee: "HR" },
+    { title: "RV-Befreiungsantrag geklärt", category: "Vor Arbeitsbeginn", orderIndex: 1, defaultDueDays: -7, defaultAssignee: "HR" },
+    {
+      title: "Schlüssel/Transponder bestellen (falls nötig)",
+      category: "Vor Arbeitsbeginn",
+      orderIndex: 2,
+      defaultDueDays: -3,
+      defaultAssignee: "VERWALTUNG",
+    },
     // Kategorie: Dokumente
-    { title: "Personalfragebogen vollstaendig", category: "Dokumente", orderIndex: 2, defaultDueDays: 0, defaultAssignee: "HR" },
-    { title: "Daten in LOGA erfasst", category: "Dokumente", orderIndex: 3, defaultDueDays: 7, defaultAssignee: "HR" },
+    { title: "Personalfragebogen vollständig", category: "Dokumente", orderIndex: 3, defaultDueDays: 0, defaultAssignee: "HR" },
+    { title: "Daten in LOGA erfasst", category: "Dokumente", orderIndex: 4, defaultDueDays: 7, defaultAssignee: "HR" },
   ];
 
   for (const item of minijobItems) {

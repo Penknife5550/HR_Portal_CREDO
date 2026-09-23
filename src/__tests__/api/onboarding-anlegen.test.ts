@@ -140,7 +140,15 @@ beforeEach(() => {
   mockPrisma.checklistTemplate.findFirst.mockResolvedValue({
     id: "cl1",
     items: [
-      { id: "ti1", title: "Schlüssel", category: "Verwaltung", orderIndex: 0, defaultAssignee: "Sekretariat" },
+      {
+        id: "ti1",
+        title: "Schlüssel",
+        category: "Verwaltung",
+        orderIndex: 0,
+        defaultAssignee: "Sekretariat",
+        defaultDueDays: -7,
+        description: "Transponder für Haupteingang",
+      },
     ],
   });
   mockPrisma.onboardingProcess.count.mockResolvedValue(13);
@@ -342,6 +350,9 @@ describe("Anlegen ohne Fuehrungskraft", () => {
       formTemplateSnapshot: [{ step: 1 }],
       checklistTemplateId: "cl1",
     });
+    // Paket 5: Zustaendigkeit als SCHLUESSEL (aus dem Freitext der Vorlage
+    // abgeleitet), dazu Hinweis und Tagesangabe. `dueDate` bleibt null — der
+    // Vertragsbeginn steht beim Anlegen noch nicht fest.
     expect(daten.checklistItems).toEqual({
       createMany: {
         data: [
@@ -351,7 +362,9 @@ describe("Anlegen ohne Fuehrungskraft", () => {
             category: "Verwaltung",
             orderIndex: 0,
             dueDate: null,
-            assignee: "Sekretariat",
+            assignee: "VERWALTUNG",
+            description: "Transponder für Haupteingang",
+            relativeDueDays: -7,
           },
         ],
       },
@@ -370,6 +383,50 @@ describe("Anlegen ohne Fuehrungskraft", () => {
         mitVorgesetztenLink: false,
       },
     });
+  });
+
+  /** Genau diese Vorlagenpunkte liefert die Checklisten-Vorlage diesmal. */
+  function vorlagenPunkte(...punkte: Array<Record<string, unknown>>) {
+    mockPrisma.checklistTemplate.findFirst.mockResolvedValue({
+      id: "cl1",
+      items: punkte.map((p, i) => ({
+        id: `ti${i + 1}`,
+        title: "Punkt",
+        category: "Vor Arbeitsbeginn",
+        orderIndex: i,
+        defaultAssignee: null,
+        defaultDueDays: null,
+        description: null,
+        ...p,
+      })),
+    });
+  }
+
+  /** Die kopierten Aufgaben des (ersten) create-Aufrufs. */
+  function kopiertePunkte(): Array<Record<string, unknown>> {
+    return (angelegteDaten().checklistItems as { createMany: { data: Array<Record<string, unknown>> } }).createMany
+      .data;
+  }
+
+  it("macht aus leerer Zuständigkeit null — nicht den leeren Text", async () => {
+    // `?? null` ergaebe hier "" — weder Schluessel noch Freitext. Die Aufgabe
+    // erschiene dann weder als Abteilungszeile noch als „unbekannte
+    // Zuständigkeit", sondern verschwaende still.
+    vorlagenPunkte({ defaultAssignee: "   " });
+    await anlegen();
+    expect(kopiertePunkte()[0].assignee).toBeNull();
+  });
+
+  it("behält unbekannten Freitext als Zuständigkeit (er wird später gemeldet)", async () => {
+    vorlagenPunkte({ defaultAssignee: "  Kantine  " });
+    await anlegen();
+    expect(kopiertePunkte()[0].assignee).toBe("Kantine");
+  });
+
+  it("übernimmt defaultDueDays 0 als 0, nicht als null", async () => {
+    vorlagenPunkte({ defaultDueDays: 0 });
+    await anlegen();
+    expect(kopiertePunkte()[0].relativeDueDays).toBe(0);
   });
 
   it("laesst Checkliste und Snapshot weg, wenn es keine Vorlage gibt", async () => {

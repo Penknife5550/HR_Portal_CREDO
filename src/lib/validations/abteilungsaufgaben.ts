@@ -1,13 +1,19 @@
 /**
- * Validierung: Abteilungsaufgaben (Paket 1b)
+ * Validierung: Abteilungsaufgaben (Paket 1b, erweitert in Paket 5)
  *
  *   - abteilungsAktionSchema        POST  /api/offboarding/[id]/department-links
+ *                                   POST  /api/onboarding/[id]/abteilungen (Paket 5, dieselbe Form)
  *   - aufgabeLinkPatchSchema        PATCH /api/offboarding-tasks/[token]/[itemId]  (oeffentlich)
+ *                                   PATCH /api/onboarding-tasks/[token]/[itemId]   (oeffentlich, Paket 5)
  *   - portalAufgabePatchSchema      PATCH /api/offboarding/[id]/checklist/[itemId]
+ *   - onboardingPortalAufgabePatchSchema  PATCH /api/onboarding/[id]/checklist/[itemId] (Paket 5)
  *   - abteilungConfigSchema         POST  /api/settings/departments
  *   - abteilungConfigUpdateSchema   PATCH /api/settings/departments/[id]
  *   - fuehrungskraftAnlageFelder    POST  /api/offboarding (in createOffboardingSchema einmischen)
  *   - fuehrungskraftAenderungFelder PATCH /api/offboarding/[id] (in updateOffboardingSchema einmischen)
+ *   - checklistenPunktSchema,
+ *     checklistenVorlageSchema,
+ *     checklistenFehlerMeldung      Checklisten-Vorlagen (/api/checklisten…, Paket 5)
  *
  * Alle Meldungen deutsch; die Routen geben `error.errors[0].message` als
  * `{ error }` mit 400 zurueck (Muster der uebrigen Routen).
@@ -285,3 +291,231 @@ export const fuehrungskraftAenderungFelder = {
     fuehrungskraftName.nullable().optional(),
   ),
 };
+
+// =============================================
+// PATCH /api/onboarding/[id]/checklist/[itemId] (Portal, Paket 5)
+// =============================================
+
+/** Datum als YYYY-MM-DD mit Rueckprobe (kein 31.02.). */
+const TAGESDATUM = /^\d{4}-\d{2}-\d{2}$/;
+function tagesdatumGueltig(text: string): boolean {
+  if (!TAGESDATUM.test(text)) return false;
+  const d = new Date(`${text}T00:00:00.000Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === text;
+}
+
+/**
+ * Aenderung einer Onboarding-Aufgabe im Portal.
+ *
+ *   isCompleted  boolean, optional
+ *   notes        interne HR-Notiz, hoechstens 2000 Zeichen; "" oder null = loeschen
+ *   assignee     Schluessel (ABTEILUNGS_SCHLUESSEL_MUSTER) oder null = keine
+ *                Zustaendigkeit; "" = null. Ob er BEKANNT ist, prueft der Dienst.
+ *                (Feldname wie die Spalte ChecklistItem.assignee.)
+ *   dueDate      "YYYY-MM-DD" oder null = ohne Faelligkeit
+ *
+ * Mindestens ein Feld. Unbekannte Felder wirft zod weg (frueher schrieb die
+ * Route den rohen Body ins Protokoll und jeden String in `assignee`).
+ */
+export const onboardingPortalAufgabePatchSchema = z
+  .object(
+    {
+      isCompleted: z.boolean({ invalid_type_error: "isCompleted muss wahr oder falsch sein." }).optional(),
+      notes: z
+        .string({ invalid_type_error: "Die Notiz muss ein Text sein." })
+        .max(2000, "Die Notiz darf höchstens 2000 Zeichen lang sein.")
+        .nullable()
+        .optional(),
+      assignee: z
+        .preprocess(
+          (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+          z
+            .string({ invalid_type_error: MELDUNG_SCHLUESSEL })
+            .trim()
+            .regex(ABTEILUNGS_SCHLUESSEL_MUSTER, MELDUNG_SCHLUESSEL)
+            .nullable(),
+        )
+        .optional(),
+      dueDate: z
+        .preprocess(
+          (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+          z
+            .string({ invalid_type_error: "Datum im Format YYYY-MM-DD erforderlich." })
+            .trim()
+            .refine(tagesdatumGueltig, "Datum im Format YYYY-MM-DD erforderlich.")
+            .nullable(),
+        )
+        .optional(),
+    },
+    KEIN_OBJEKT,
+  )
+  .refine(
+    (d) =>
+      d.isCompleted !== undefined || d.notes !== undefined || d.assignee !== undefined || d.dueDate !== undefined,
+    { message: "Mindestens ein Feld erforderlich." },
+  );
+
+export type OnboardingPortalAufgabePatchInput = z.infer<typeof onboardingPortalAufgabePatchSchema>;
+
+// =============================================
+// Checklisten-Vorlagen (/api/checklisten…, Paket 5)
+// =============================================
+
+/** Hoechstlaenge des Hinweises fuer die zustaendige Stelle. */
+export const CHECKLISTEN_HINWEIS_MAX = 500;
+
+/** Fragebogentypen (Enum QuestionnaireType) — hier als Liste, ohne @prisma/client im Browser. */
+export const FRAGEBOGEN_TYPEN = ["STANDARD", "BEAMTE", "ERZIEHER", "MINIJOB", "EHRENAMT"] as const;
+
+/** Unbekannte Zustaendigkeit im Vorlagen-Editor (Freitext-Altwert). */
+export function meldungVorlagenZustaendigkeit(wert: string): string {
+  return `Die Zuständigkeit „${wert}“ ist unbekannt – bitte in der Auswahl zuordnen.`;
+}
+
+/**
+ * Ein Punkt einer Checklisten-Vorlage.
+ *
+ *   id               vorhandener Punkt (beim Ersetzen: bleibt erhalten, damit
+ *                    ChecklistItem.templateItemId laufender Vorgaenge gueltig
+ *                    bleibt); fehlt = neuer Punkt
+ *   title            1–200 Zeichen
+ *   category         1–100 Zeichen
+ *   orderIndex       ganze Zahl >= 0, optional (sonst Position in der Liste)
+ *   defaultDueDays   ganze Zahl −365…365 oder null (relativ zum Vertragsbeginn
+ *                    bzw. letzten Arbeitstag)
+ *   defaultAssignee  Schluessel (ABTEILUNGS_SCHLUESSEL_MUSTER) oder null;
+ *                    "" = null. Ein Freitext-Altwert („Werkstatt") wird
+ *                    abgewiesen — die Oberflaeche zeigt ihn als „Unbekannt: …
+ *                    (bitte zuordnen)", gespeichert wird erst nach Zuordnung.
+ *   description      Hinweis fuer die zustaendige Stelle, hoechstens 500
+ *                    Zeichen; "" / nur Leerzeichen = null
+ */
+export const checklistenPunktSchema = z.object(
+  {
+    id: z.string({ invalid_type_error: "Ungültige Punkt-ID." }).trim().min(1).max(100).optional(),
+    title: z
+      .string({ required_error: "Titel ist ein Pflichtfeld.", invalid_type_error: "Titel ist ein Pflichtfeld." })
+      .trim()
+      .min(1, "Titel ist ein Pflichtfeld.")
+      .max(200, "Der Titel darf höchstens 200 Zeichen lang sein."),
+    category: z
+      .string({ required_error: "Kategorie ist ein Pflichtfeld.", invalid_type_error: "Kategorie ist ein Pflichtfeld." })
+      .trim()
+      .min(1, "Kategorie ist ein Pflichtfeld.")
+      .max(100, "Die Kategorie darf höchstens 100 Zeichen lang sein."),
+    orderIndex: z
+      .number({ invalid_type_error: "Die Reihenfolge muss eine Zahl sein." })
+      .int("Die Reihenfolge muss eine ganze Zahl sein.")
+      .min(0, "Die Reihenfolge darf nicht negativ sein.")
+      .optional(),
+    defaultDueDays: z
+      .number({ invalid_type_error: "Die Fälligkeit muss eine Zahl (Tage) sein." })
+      .int("Die Fälligkeit muss eine ganze Zahl (Tage) sein.")
+      .min(-365, "Die Fälligkeit darf höchstens 365 Tage vorher liegen.")
+      .max(365, "Die Fälligkeit darf höchstens 365 Tage danach liegen.")
+      .nullable()
+      .optional(),
+    defaultAssignee: z
+      .preprocess(
+        (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+        z
+          .string({ invalid_type_error: "Die Zuständigkeit muss ein Text sein." })
+          .trim()
+          .superRefine((wert, ctx) => {
+            if (!ABTEILUNGS_SCHLUESSEL_MUSTER.test(wert)) {
+              ctx.addIssue({ code: z.ZodIssueCode.custom, message: meldungVorlagenZustaendigkeit(wert) });
+            }
+          })
+          .nullable(),
+      )
+      .optional(),
+    description: z
+      .preprocess(
+        (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+        z
+          .string({ invalid_type_error: "Der Hinweis muss ein Text sein." })
+          .trim()
+          .max(CHECKLISTEN_HINWEIS_MAX, `Der Hinweis darf höchstens ${CHECKLISTEN_HINWEIS_MAX} Zeichen lang sein.`)
+          .nullable(),
+      )
+      .optional(),
+  },
+  KEIN_OBJEKT,
+);
+
+export type ChecklistenPunktInput = z.infer<typeof checklistenPunktSchema>;
+
+/**
+ * Derselbe Punkt, aber fuer PATCH /api/checklisten/[id]/items: Jedes Feld ist
+ * freiwillig, die Regeln der mitgeschickten Felder gelten unveraendert.
+ *
+ * Steht hier statt in der Route, weil Zod-Schemata laut Hausregel in
+ * `src/lib/validations/` gehoeren — und weil ein `.partial()` an der
+ * Aufrufstelle leicht aus dem Blick geraet, wenn jemand das Grundschema
+ * erweitert. Bewusst NICHT `.strict()`: Die Route bekommt neben den Feldern
+ * auch `itemId` mitgeschickt; die soll sie verwerfen, nicht mit 400 abweisen.
+ */
+export const checklistenPunktPatchSchema = checklistenPunktSchema.partial();
+
+export type ChecklistenPunktPatchInput = z.infer<typeof checklistenPunktPatchSchema>;
+
+/**
+ * Eine ganze Vorlage — POST /api/checklisten (neu) und PUT
+ * /api/checklisten/[id] (Metadaten + alle Punkte in EINER Transaktion ersetzen).
+ * Punkt-IDs duerfen nicht doppelt vorkommen.
+ */
+export const checklistenVorlageSchema = z
+  .object(
+    {
+      name: z
+        .string({ required_error: "Name ist ein Pflichtfeld.", invalid_type_error: "Name ist ein Pflichtfeld." })
+        .trim()
+        .min(1, "Name ist ein Pflichtfeld.")
+        .max(200, "Der Name darf höchstens 200 Zeichen lang sein."),
+      description: z
+        .preprocess(
+          (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+          z
+            .string({ invalid_type_error: "Die Beschreibung muss ein Text sein." })
+            .trim()
+            .max(1000, "Die Beschreibung darf höchstens 1000 Zeichen lang sein.")
+            .nullable(),
+        )
+        .optional(),
+      questionnaireType: z
+        .preprocess(
+          (v) => (v === "" ? null : v),
+          z.enum(FRAGEBOGEN_TYPEN, { errorMap: () => ({ message: "Unbekannter Fragebogentyp." }) }).nullable(),
+        )
+        .optional(),
+      isActive: z.boolean({ invalid_type_error: "isActive muss wahr oder falsch sein." }).optional(),
+      items: z
+        .array(checklistenPunktSchema, {
+          required_error: "Mindestens ein Checklisten-Punkt ist erforderlich.",
+          invalid_type_error: "Mindestens ein Checklisten-Punkt ist erforderlich.",
+        })
+        .min(1, "Mindestens ein Checklisten-Punkt ist erforderlich.")
+        .max(300, "Eine Vorlage darf höchstens 300 Punkte haben."),
+    },
+    KEIN_OBJEKT,
+  )
+  .superRefine((v, ctx) => {
+    const ids = v.items.map((p) => p.id).filter((id): id is string => !!id);
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["items"], message: "Ein Punkt ist doppelt enthalten." });
+    }
+  });
+
+export type ChecklistenVorlageInput = z.infer<typeof checklistenVorlageSchema>;
+
+/**
+ * Erste Meldung eines gescheiterten Checklisten-Schemas, bei Punkten mit
+ * „Punkt n: " davor (n ab 1), damit HR im Editor weiss, welcher gemeint ist.
+ */
+export function checklistenFehlerMeldung(fehler: z.ZodError): string {
+  const erster = fehler.errors[0];
+  if (!erster) return MELDUNGEN.UNGUELTIGE_EINGABE;
+  const [feld, index] = erster.path;
+  if (feld === "items" && typeof index === "number") return `Punkt ${index + 1}: ${erster.message}`;
+  return erster.message;
+}

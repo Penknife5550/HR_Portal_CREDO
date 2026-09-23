@@ -19,6 +19,14 @@
  *      einem zwei Tage alten Link.
  *   5. Ohne bekannten Namen steht in der Vorgesetzten-Erinnerung die neutrale
  *      Bezeichnung, nie die private E-Mail-Adresse der Person.
+ *
+ * Dazu aus Paket 5:
+ *   6. Abschnitt 3 erinnert die Abteilungen eines Onboardings und meldet sein
+ *      Ergebnis als `departmentReminders`. `total` bleibt Mitarbeiter +
+ *      Vorgesetzte (n8n prueft diese Zahl). Der Dienst ist hier eine Huelle —
+ *      seine Regeln stehen in src/__tests__/lib/abteilungsaufgaben-onboarding.test.ts;
+ *      ungemockt liefe er gegen den schmalen Prisma-Mock dieser Datei und
+ *      verbrauchte die `findMany`-Antworten der Abschnitte 1 und 2.
  */
 
 const mockPrisma = {
@@ -27,10 +35,14 @@ const mockPrisma = {
   emailLog: { deleteMany: jest.fn() },
 };
 const mockTriggerWebhooks = jest.fn();
+const mockAbteilungsErinnerungen = jest.fn();
 
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/webhooks", () => ({ triggerWebhooks: mockTriggerWebhooks }));
 jest.mock("@/lib/url", () => ({ getBaseUrl: () => "https://hr.example" }));
+jest.mock("@/lib/abteilungsaufgaben-onboarding", () => ({
+  onboardingErinnerungenSenden: (...a: unknown[]) => mockAbteilungsErinnerungen(...a),
+}));
 
 import { POST } from "@/app/api/cron/reminders/route";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
@@ -106,6 +118,12 @@ beforeEach(() => {
   mockPrisma.auditLog.create.mockResolvedValue({});
   mockPrisma.emailLog.deleteMany.mockResolvedValue({ count: 0 });
   mockTriggerWebhooks.mockResolvedValue({ status: "SENT" });
+  mockAbteilungsErinnerungen.mockResolvedValue({
+    remindersProcessed: 0,
+    errors: 0,
+    details: [],
+    uebersprungen: [],
+  });
 });
 
 describe("Zugriff", () => {
@@ -388,5 +406,71 @@ describe("Vorgesetzten-Erinnerung", () => {
     await POST(req());
 
     expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================
+// Abschnitt 3: Abteilungs-Erinnerungen (Paket 5)
+// =============================================
+
+describe("Abteilungs-Erinnerungen im Onboarding", () => {
+  it("meldet das Ergebnis als departmentReminders, ohne `total` zu verändern", async () => {
+    mockPrisma.onboardingProcess.findMany
+      .mockResolvedValueOnce([maVorgang()])
+      .mockResolvedValueOnce([vgVorgang()]);
+    mockAbteilungsErinnerungen.mockResolvedValue({
+      remindersProcessed: 2,
+      errors: 0,
+      details: [
+        {
+          onboardingId: "ob3",
+          displayId: "ONB-2026-031",
+          departmentKey: "IT",
+          departmentName: "IT-Abteilung",
+          email: "it@example.org",
+          level: "WARNING",
+          overdueItems: 1,
+          upcomingItems: 2,
+          status: "SENT",
+        },
+      ],
+      uebersprungen: [],
+    });
+
+    const daten = await (await POST(req())).json();
+
+    expect(mockAbteilungsErinnerungen).toHaveBeenCalledWith(expect.any(Date));
+    expect(daten.departmentReminders.remindersProcessed).toBe(2);
+    expect(daten.departmentReminders.details[0]).toMatchObject({ departmentKey: "IT", status: "SENT" });
+    // n8n prueft `total` seit Langem gegen die beiden Onboarding-Spuren —
+    // die Abteilungen zaehlen dort bewusst NICHT mit.
+    expect(daten.total).toBe(2);
+    expect(daten.employeeReminders).toBe(1);
+    expect(daten.supervisorReminders).toBe(1);
+  });
+
+  it("lässt einen Fehler in Abschnitt 3 die Abschnitte 1 und 2 nicht entwerten", async () => {
+    const stumm = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockPrisma.onboardingProcess.findMany
+      .mockResolvedValueOnce([maVorgang()])
+      .mockResolvedValueOnce([vgVorgang()]);
+    mockAbteilungsErinnerungen.mockRejectedValue(new Error("Datenbank weg"));
+
+    const res = await POST(req());
+    const daten = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(daten.success).toBe(true);
+    expect(daten.employeeReminders).toBe(1);
+    expect(daten.supervisorReminders).toBe(1);
+    expect(daten.departmentReminders).toEqual({
+      remindersProcessed: 0,
+      errors: 1,
+      details: [],
+      uebersprungen: [],
+    });
+    // Das Aufraeumen des Versandprotokolls laeuft trotzdem.
+    expect(mockPrisma.emailLog.deleteMany).toHaveBeenCalled();
+    stumm.mockRestore();
   });
 });

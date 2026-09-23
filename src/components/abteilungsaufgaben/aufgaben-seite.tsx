@@ -28,7 +28,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
-import { KOMMENTAR_MAX, MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import {
+  KOMMENTAR_MAX,
+  MELDUNGEN,
+  ZUSATZFELD_LABELS,
+  type ZusatzFeld,
+} from "@/lib/abteilungsaufgaben";
 import { formatDatumDE } from "@/lib/format";
 import { datumUhrzeitDE } from "@/components/abteilungsaufgaben/abteilungen-karte";
 
@@ -46,6 +51,8 @@ export interface OeffentlicheAufgabe {
   dueDate: string | null;
   abteilungKommentar: string | null;
   abteilungKommentarAm: string | null;
+  /** Hinweis aus der Checklisten-Vorlage (Paket 5, beide Module). */
+  description?: string | null;
 }
 
 export interface AufgabenSeitenDaten {
@@ -54,9 +61,18 @@ export interface AufgabenSeitenDaten {
     vorgangsnummer: string;
     mitarbeiterName: string;
     einrichtung: string;
-    /** Bezugsdatum (ISO), im Offboarding der letzte Arbeitstag. */
-    bezugsdatum: string;
+    /**
+     * Bezugsdatum (ISO): letzter Arbeitstag bzw. Vertragsbeginn. `null` ist
+     * moeglich (Altbestand ohne Modalitaeten) — Zeile und Countdown entfallen
+     * dann, statt „Invalid Date" zu zeigen.
+     */
+    bezugsdatum: string | null;
   };
+  /**
+   * Zusaetzliche Angaben, die genau DIESE Stelle sehen darf (Paket 5,
+   * Onboarding). Der Server schneidet zu; die Seite zeigt nur, was ankommt.
+   */
+  zusatz?: Partial<Record<ZusatzFeld, string>>;
   /** Vorgang abgeschlossen: nur lesen. */
   readOnly: boolean;
   gueltigBis: string;
@@ -77,6 +93,11 @@ export interface AufgabenSeiteProps {
   bezugsdatumLabel: string;
   /** Countdown zum Bezugsdatum; `tage` > 0 Zukunft, 0 heute, < 0 vorbei. */
   countdownText: (tage: number) => string;
+  /**
+   * Überschrift ueber dem Countdown, z. B. „Bis zum Dienstbeginn". Ohne Wert
+   * bleibt die Zeile wie im Offboarding ohne Überschrift.
+   */
+  countdownLabel?: string;
   /** Anzeige einer Kategorie (Zwischenüberschrift); ohne: der Rohwert. */
   kategorieLabel?: (kategorie: string) => string;
   /** Nur fuer Tests: Bezugszeit fuer Countdown, Überfälligkeit und Jahr. */
@@ -113,6 +134,19 @@ export function tageBis(ziel: string | Date, jetzt: Date): number {
   return kalendertag(d) - kalendertag(jetzt);
 }
 
+/**
+ * Beschriftung der Zusatzfelder auf der Link-Seite.
+ *
+ * Bis auf eines dieselben Worte wie im Dialog „Abteilungen informieren"
+ * (`ZUSATZFELD_LABELS`): Dort heisst das Feld „Adresse der Führungskraft",
+ * weil HR dort liest, WAS hinausgeht. Hier liest die Abteilung, WEN sie
+ * fragen kann — deshalb „Ansprechpartner (Führungskraft)".
+ */
+const ZUSATZ_LABELS_SEITE: Record<ZusatzFeld, string> = {
+  ...ZUSATZFELD_LABELS,
+  ansprechpartner_email: "Ansprechpartner (Führungskraft)",
+};
+
 const FEHLER_LADEN = "Fehler beim Laden der Aufgaben.";
 const FEHLER_VERBINDUNG = "Verbindungsfehler. Bitte versuchen Sie es später erneut.";
 const FEHLER_SPEICHERN = "Fehler beim Speichern.";
@@ -137,6 +171,7 @@ export function AufgabenSeite({
   personLabel,
   bezugsdatumLabel,
   countdownText,
+  countdownLabel,
   kategorieLabel,
   jetzt,
 }: AufgabenSeiteProps) {
@@ -375,9 +410,15 @@ export function AufgabenSeite({
   const gesamt = aufgaben.length;
   const erledigt = erledigteAufgaben.length;
   const prozent = gesamt > 0 ? Math.round((erledigt / gesamt) * 100) : 100;
+  // Ohne Bezugsdatum (Altbestand ohne Modalitaeten) entfallen Zeile UND
+  // Countdown — `formatDatumDE(null)` waere leer, `tageBis(null)` aber 0 und
+  // damit „Heute ist der erste Arbeitstag".
   const bezug = daten.vorgang.bezugsdatum;
   const einrichtung = daten.vorgang.einrichtung.trim();
   const kategorie = (k: string) => (kategorieLabel ? kategorieLabel(k) : k);
+  const zusatzFelder = (Object.entries(daten.zusatz ?? {}) as [ZusatzFeld, string][]).filter(
+    ([feld, wert]) => !!wert && feld in ZUSATZ_LABELS_SEITE,
+  );
 
   const renderAufgabe = (aufgabe: OeffentlicheAufgabe) => {
     const laeuft = speichert.has(aufgabe.id);
@@ -443,6 +484,16 @@ export function AufgabenSeite({
                 </span>
               )}
             </div>
+
+            {/* Hinweis aus der Checklisten-Vorlage — was genau gemeint ist. */}
+            {aufgabe.description && (
+              <p
+                className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground"
+                data-hinweis="beschreibung"
+              >
+                {aufgabe.description}
+              </p>
+            )}
 
             {aufgabe.isCompleted && aufgabe.completedAt && (
               <p className="mt-1.5 text-xs text-green-700">
@@ -557,14 +608,41 @@ export function AufgabenSeite({
               <dt className="text-xs text-muted-foreground">Einrichtung</dt>
               <dd className="break-words font-medium text-foreground">{einrichtung || "—"}</dd>
             </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">{bezugsdatumLabel}</dt>
-              <dd className="font-medium text-foreground">{formatDatumDE(bezug)}</dd>
-            </div>
+            {bezug && (
+              <div>
+                <dt className="text-xs text-muted-foreground">{bezugsdatumLabel}</dt>
+                <dd className="font-medium text-foreground">{formatDatumDE(bezug)}</dd>
+              </div>
+            )}
           </dl>
-          <p className="mt-3 text-sm font-medium text-foreground" data-countdown>
-            {countdownText(tageBis(bezug, nun))}
-          </p>
+
+          {/* Zweite Reihe: nur, was genau diese Stelle sehen darf. */}
+          {zusatzFelder.length > 0 && (
+            <div className="mt-3 border-t pt-3" data-zusatz>
+              <p className="text-xs font-semibold text-foreground">
+                Nur für {daten.abteilung.name}
+              </p>
+              <dl className="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                {zusatzFelder.map(([feld, wert]) => (
+                  <div key={feld}>
+                    <dt className="text-xs text-muted-foreground">{ZUSATZ_LABELS_SEITE[feld]}</dt>
+                    <dd className="break-words font-medium text-foreground">{wert}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+
+          {bezug && (
+            <div className="mt-3">
+              {countdownLabel && (
+                <p className="text-xs text-muted-foreground">{countdownLabel}</p>
+              )}
+              <p className="text-sm font-medium text-foreground" data-countdown>
+                {countdownText(tageBis(bezug, nun))}
+              </p>
+            </div>
+          )}
 
           <div className="mt-4">
             <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">

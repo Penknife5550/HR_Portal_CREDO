@@ -11,8 +11,10 @@
  * als Pill, Hinweis und erlaubte Aktion liefert, steht so auf der Karte.
  *
  * Belegt wird:
- *  1. Der Hauptknopf: „Abteilungen informieren" / „Weitere Abteilungen
- *     informieren (2)" / ausgeblendet.
+ *  1. Der Hauptknopf: „Abteilungen informieren…" / „Weitere Abteilungen
+ *     informieren (2)" / ausgeblendet; er oeffnet seit Paket 5 den Dialog,
+ *     dazu die Onboarding-Zustaende (gesperrt, unbekannte Zustaendigkeit,
+ *     abgelaufen).
  *  2. Lücken sind sichtbar: Führungskraft ohne Adresse (gelb, „Eintragen"),
  *     übersprungene Abteilung (gelb, mit Grund).
  *  3. Die Sperrzeit graut „Erinnern"/„Erneut senden" aus, mit Uhrzeit im Tooltip.
@@ -25,6 +27,10 @@
  *     Kommentar der Abteilung GETRENNT von der gelben internen Notiz.
  *  9. Tab Übersicht: Schritt 2 aus den Zeilen, Hinweis zur Führungskraft.
  * 10. „Neuer Austritt": Felder der Führungskraft im Body, 409 als Meldung.
+ * 11. Onboarding, Tab Checkliste: Label statt Rohschluessel, „Fällig" aus
+ *     `faelligAm`, Hinweis aus der Vorlage, Fehler statt stillem Nichtstun.
+ * 12. Onboarding, Stepper-Schritt „Checkliste abarbeiten": Stand der
+ *     Abteilungen, Aktion und Sperre.
  *
  * Umgebung wie in dokumentenpaket-dialog.test.tsx: jsdom im Docblock, ohne
  * @testing-library/jest-dom.
@@ -37,12 +43,15 @@ import {
   type AbteilungenKarteDaten,
   type AktionsMeldung,
 } from "@/components/abteilungsaufgaben/abteilungen-karte";
+import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
 import {
   abteilungsZeilenBauen,
   type AbteilungsKonfig,
+  type AbteilungsModul,
   type AufgabeFuerZeile,
   type FuehrungskraftDaten,
   type LinkFuerZeile,
+  type VersandSperre,
 } from "@/lib/abteilungsaufgaben";
 import { TabChecklist } from "@/app/(portal)/dashboard/offboarding/[id]/tabs/tab-checklist";
 import { TabOverview } from "@/app/(portal)/dashboard/offboarding/[id]/tabs/tab-overview";
@@ -50,6 +59,11 @@ import type {
   ChecklistItemData,
   OffboardingData,
 } from "@/app/(portal)/dashboard/offboarding/[id]/types";
+import {
+  TabChecklist as OnboardingTabChecklist,
+  TabOverview as OnboardingTabOverview,
+  type ChecklistItemData as OnboardingChecklistItem,
+} from "@/app/(portal)/dashboard/[id]/detail-content";
 import { NeuerAustrittModal } from "@/components/neuer-austritt-modal";
 
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
@@ -118,8 +132,13 @@ function daten(opts: {
   fuehrungskraft?: FuehrungskraftDaten | null;
   aufgaben?: AufgabeFuerZeile[];
   abgeschlossen?: boolean;
+  abgebrochen?: boolean;
+  gesperrt?: VersandSperre | null;
+  modul?: AbteilungsModul;
+  bezugsdatum?: string | null;
 } = {}): AbteilungenKarteDaten {
   const abgeschlossen = opts.abgeschlossen ?? false;
+  const gesperrt = opts.gesperrt ?? null;
   const r = abteilungsZeilenBauen({
     aufgaben: opts.aufgaben ?? AUFGABEN,
     links: opts.links ?? [],
@@ -127,10 +146,18 @@ function daten(opts: {
     organizationId: ORG,
     fuehrungskraft: opts.fuehrungskraft ?? null,
     vorgangAbgeschlossen: abgeschlossen,
+    gesperrt: !!gesperrt,
     linkUrl: (t) => `${URL_BASIS}${t}`,
     jetzt: JETZT,
   });
-  return { ...r, vorgangAbgeschlossen: abgeschlossen, bezugsdatum: BEZUG };
+  return {
+    ...r,
+    modul: opts.modul ?? "OFFBOARDING",
+    vorgangAbgeschlossen: abgeschlossen,
+    vorgangAbgebrochen: opts.abgebrochen ?? false,
+    bezugsdatum: opts.bezugsdatum === undefined ? BEZUG : opts.bezugsdatum,
+    gesperrt,
+  };
 }
 
 function karte(d: AbteilungenKarteDaten, extra: Partial<React.ComponentProps<typeof AbteilungenKarte>> = {}) {
@@ -152,24 +179,37 @@ const zeile = (key: string) => document.querySelector(`[data-zeile="${key}"]`) a
 const knopf = (name: string | RegExp) => screen.queryByRole("button", { name });
 const seitentext = () => document.body.textContent ?? "";
 
+/**
+ * Der Hauptknopf oeffnet seit Paket 5 den Dialog; erst dessen „n E-Mails
+ * senden" loest die Aktion aus. Beide Klicks in einem Schritt.
+ */
+async function informieren() {
+  await act(async () => {
+    fireEvent.click(knopf(/Abteilungen informieren/)!);
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /E-Mails? senden$/ }));
+  });
+}
+
 // =============================================
 // 1. Hauptknopf
 // =============================================
 
 describe("Hauptknopf", () => {
-  it("heißt „Abteilungen informieren“, solange niemand informiert ist", () => {
+  it("heißt „Abteilungen informieren…“, solange niemand informiert ist", () => {
     const d = daten();
     expect(d.niemandInformiert).toBe(true);
     expect(d.informierbar).toBe(2); // IT und Facility; Verwaltung ohne Adresse, Führungskraft fehlt
     karte(d);
-    expect(knopf("Abteilungen informieren")).not.toBeNull();
+    expect(knopf("Abteilungen informieren…")).not.toBeNull();
   });
 
   it("zählt die noch offenen: „Weitere Abteilungen informieren (2)“", () => {
     // IT informiert; Facility und die (jetzt hinterlegte) Führungskraft fehlen noch.
     karte(daten({ links: [linkIt()], fuehrungskraft: { email: "leitung@fes-minden.de", name: "Anna Leitung" } }));
     expect(knopf("Weitere Abteilungen informieren (2)")).not.toBeNull();
-    expect(knopf("Abteilungen informieren")).toBeNull();
+    expect(knopf("Abteilungen informieren…")).toBeNull();
   });
 
   it("verschwindet, wenn niemand mehr zu informieren ist", () => {
@@ -182,20 +222,61 @@ describe("Hauptknopf", () => {
     expect(knopf(/Abteilungen informieren/)).toBeNull();
   });
 
-  it("schickt „informieren“ ohne Abteilung und zeigt „Wird gesendet…“, bis die Aktion fertig ist", async () => {
+  it("öffnet den Dialog und schickt „informieren“ erst nach der Bestätigung", async () => {
     let fertig!: () => void;
     const onAktion = jest.fn(() => new Promise<void>((r) => (fertig = r)));
     karte(daten(), { onAktion });
     await act(async () => {
-      fireEvent.click(knopf("Abteilungen informieren")!);
+      fireEvent.click(knopf("Abteilungen informieren…")!);
+    });
+    // Der Klick allein versendet nichts.
+    expect(onAktion).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).not.toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "2 E-Mails senden" }));
     });
     expect(onAktion).toHaveBeenCalledWith("informieren", undefined);
-    expect(knopf("Wird gesendet…")).not.toBeNull();
+    expect(screen.getAllByRole("button", { name: "Wird gesendet…" }).length).toBeGreaterThan(0);
     // Doppelklick waehrend des Versands: kein zweiter Aufruf.
-    fireEvent.click(knopf("Wird gesendet…")!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Wird gesendet…" })[0]);
     expect(onAktion).toHaveBeenCalledTimes(1);
     await act(async () => fertig());
-    expect(knopf("Abteilungen informieren")).not.toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(knopf("Abteilungen informieren…")).not.toBeNull();
+  });
+
+  it("gesperrt (Onboarding ohne Modalitäten): Knopf grau, Grund im Text und im Tooltip", () => {
+    const sperre: VersandSperre = { grund: "MODALITAETEN_FEHLEN", text: MELDUNGEN.MODALITAETEN_FEHLEN };
+    karte(daten({ modul: "ONBOARDING", gesperrt: sperre, bezugsdatum: null }));
+    const k = knopf("Abteilungen informieren…") as HTMLButtonElement;
+    expect(k.disabled).toBe(true);
+    expect(k.title).toBe(sperre.text);
+    expect(document.querySelector('[data-hinweis="gesperrt"]')?.textContent).toBe(sperre.text);
+    // Die Zeilen bleiben als Vorschau stehen, samt Aufgabenzahl.
+    expect(zeile("IT").textContent).toContain("2 Aufgaben, 1 offen");
+    // Ohne Bezugsdatum kein Klammerteil im Untertitel.
+    expect(seitentext()).toContain("Fälligkeiten richten sich nach dem Vertragsbeginn.");
+  });
+
+  it("unbekannte Zuständigkeit: gelber Hinweis mit dem Freitext", () => {
+    karte(
+      daten({
+        modul: "ONBOARDING",
+        aufgaben: [...AUFGABEN, { assigneeDepartment: "Hausmeister", isCompleted: false, dueDate: null }],
+      }),
+    );
+    expect(document.querySelector('[data-hinweis="unbekannte-zustaendigkeiten"]')?.textContent).toBe(
+      "Aufgaben mit unbekannter Zuständigkeit („Hausmeister“) werden nicht per Link verschickt – bitte in den Checklisten-Vorlagen zuordnen.",
+    );
+  });
+
+  it("abgelaufener Onboarding-Vorgang: nur lesend, mit dem Text „abgelaufen“", () => {
+    karte(daten({ modul: "ONBOARDING", abgeschlossen: true, abgebrochen: true }));
+    expect(seitentext()).toContain(
+      "Der Vorgang ist abgelaufen. Abteilungen können nicht mehr informiert werden.",
+    );
+    expect(knopf(/Abteilungen informieren/)).toBeNull();
   });
 });
 
@@ -227,7 +308,8 @@ describe("Zeilen ohne Versand", () => {
     karte(daten());
     const z = zeile("IT");
     expect(z.textContent).toContain("it@credo-gruppe.de");
-    expect(z.textContent).toContain("2 Aufgaben, 1 offen");
+    // Zahl UND naechste Frist — „2 Aufgaben" allein sagt nichts ueber die Eile.
+    expect(z.textContent).toContain("2 Aufgaben, 1 offen, nächste fällig 31.07.2027");
     expect(z.querySelector("[data-status]")?.textContent).toBe("Noch nicht informiert");
     expect(within(z).queryByRole("button", { name: "Erinnern" })).toBeNull();
     expect(within(z).queryByRole("button", { name: "Link kopieren" })).toBeNull();
@@ -402,9 +484,7 @@ describe("Meldungen nach einer Aktion", () => {
       hinweis: "Nicht informiert: Führungskraft (keine Führungskraft hinterlegt – bitte im Tab Übersicht eintragen).",
     });
     render(<Seite d={daten()} />);
-    await act(async () => {
-      fireEvent.click(knopf("Abteilungen informieren")!);
-    });
+    await informieren();
     expect(anfragen[0].url).toBe(ROUTE);
     expect(JSON.parse(String(anfragen[0].init.body))).toEqual({});
     const status = screen.getAllByRole("status");
@@ -423,9 +503,7 @@ describe("Meldungen nach einer Aktion", () => {
       hinweis: null,
     });
     render(<Seite d={daten()} />);
-    await act(async () => {
-      fireEvent.click(knopf("Abteilungen informieren")!);
-    });
+    await informieren();
     const rot = screen.getByRole("alert");
     expect(rot.getAttribute("data-art")).toBe("fehler");
     expect(rot.textContent).toContain("Es wurde niemand informiert.");
@@ -780,5 +858,243 @@ describe("Neuer Austritt: Führungskraft", () => {
     expect(seitentext()).toContain(
       "Bekommt die Aufgaben mit der Zuständigkeit „Führungskraft“ per Link. Später im Tab Übersicht änderbar.",
     );
+  });
+});
+
+// =============================================
+// 11. Onboarding: Tab Checkliste (Paket 5)
+//
+// Dieselbe Karte, dieselben Aufgabenkarten — nur mit den Daten der
+// Onboarding-Route. Belegt wird vor allem, was dort neu ist: Label statt
+// Rohschluessel, „Fällig" aus `faelligAm` (auch ohne gespeicherte
+// `dueDate`), Hinweis aus der Vorlage und der Dialog von aussen gesteuert.
+// =============================================
+
+describe("Onboarding: Tab Checkliste", () => {
+  function onbAufgabe(teil: Partial<OnboardingChecklistItem> = {}): OnboardingChecklistItem {
+    return {
+      id: "o1",
+      title: "Benutzerkonto anlegen",
+      category: "Vor dem ersten Tag",
+      orderIndex: 0,
+      isCompleted: false,
+      completedAt: null,
+      completedBy: null,
+      dueDate: null,
+      assignee: "IT",
+      notes: null,
+      description: null,
+      relativeDueDays: -7,
+      abteilungKommentar: null,
+      abteilungKommentarAm: null,
+      erledigtVon: null,
+      faelligAm: "2027-07-24T00:00:00.000Z",
+      ...teil,
+    };
+  }
+
+  function onboarding(
+    items: OnboardingChecklistItem[],
+    extra: Partial<React.ComponentProps<typeof OnboardingTabChecklist>> = {},
+  ) {
+    const setDialog = jest.fn();
+    render(
+      <OnboardingTabChecklist
+        checklistItems={items}
+        togglingItems={new Set()}
+        toggleChecklistItem={jest.fn()}
+        editingNoteId={null}
+        setEditingNoteId={jest.fn()}
+        checklistNoteText=""
+        setChecklistNoteText={jest.fn()}
+        savingChecklistNote={false}
+        saveChecklistNote={jest.fn()}
+        checklistFehler={null}
+        abteilungen={daten({ modul: "ONBOARDING" })}
+        onAbteilungsAktion={jest.fn()}
+        abteilungenDialogOffen={false}
+        setAbteilungenDialogOffen={setDialog}
+        {...extra}
+      />,
+    );
+    return { setDialog };
+  }
+
+  const onbKarte = (id: string) => document.querySelector(`[data-aufgabe="${id}"]`) as HTMLElement;
+
+  it("Badge mit dem Namen, nie mit dem Schlüssel", () => {
+    onboarding([
+      onbAufgabe({ id: "it", assignee: "IT" }),
+      onbAufgabe({ id: "vo", assignee: "VORGESETZTER" }),
+      onbAufgabe({ id: "frei", assignee: "Hausmeister" }),
+    ]);
+    expect(onbKarte("it").textContent).toContain("IT-Abteilung");
+    expect(onbKarte("vo").textContent).toContain("Führungskraft");
+    expect(onbKarte("vo").textContent).not.toContain("VORGESETZTER");
+    // Freitext bleibt, wie er ist — sonst verschwaende die Zuordnung still.
+    expect(onbKarte("frei").textContent).toContain("Hausmeister");
+  });
+
+  it("„Fällig“ kommt aus faelligAm, auch ohne gespeicherte dueDate", () => {
+    onboarding([onbAufgabe({ dueDate: null, faelligAm: "2027-07-24T00:00:00.000Z" })]);
+    expect(onbKarte("o1").textContent).toContain("Fällig: 24.07.2027");
+  });
+
+  it("Hinweis aus der Vorlage steht unter dem Titel", () => {
+    onboarding([onbAufgabe({ description: "Konto in der Schulverwaltung und in Microsoft 365 anlegen" })]);
+    expect(onbKarte("o1").textContent).toContain(
+      "Konto in der Schulverwaltung und in Microsoft 365 anlegen",
+    );
+  });
+
+  it("Urheber und Kommentar der Abteilung, getrennt von der internen Notiz", () => {
+    onboarding([
+      onbAufgabe({
+        isCompleted: true,
+        completedAt: "2027-07-29T08:14:00.000Z",
+        erledigtVon: { art: "LINK", name: "IT-Abteilung" },
+        abteilungKommentar: "Konto angelegt, Notebook bestellt.",
+        abteilungKommentarAm: "2027-07-29T08:14:00.000Z",
+        notes: "Rücksprache mit der Schulleitung",
+      }),
+    ]);
+    const k = onbKarte("o1");
+    expect(k.querySelector("[data-urheber]")?.textContent).toBe(
+      "erledigt von IT-Abteilung (Link) am 29.07.2027, 10:14",
+    );
+    const blau = k.querySelector('[data-box="abteilungskommentar"]') as HTMLElement;
+    const gelb = k.querySelector('[data-box="interne-notiz"]') as HTMLElement;
+    expect(blau.textContent).toBe(
+      "Kommentar IT-Abteilung, 29.07.2027: Konto angelegt, Notebook bestellt.",
+    );
+    expect(gelb.textContent).toContain("Interne Notiz (nur im Portal)");
+    expect(blau.textContent).not.toContain("Rücksprache");
+  });
+
+  it("zeigt die Ablehnung des Servers statt stillem Nichtstun", () => {
+    onboarding([onbAufgabe()], {
+      checklistFehler: "Der Vorgang ist abgelaufen. Die Checkliste kann nicht mehr geändert werden.",
+    });
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Der Vorgang ist abgelaufen. Die Checkliste kann nicht mehr geändert werden.",
+    );
+  });
+
+  it("der Hauptknopf der Karte meldet „Dialog öffnen“ nach oben (Stepper nutzt denselben)", () => {
+    const { setDialog } = onboarding([onbAufgabe()]);
+    fireEvent.click(knopf("Abteilungen informieren…")!);
+    expect(setDialog).toHaveBeenCalledWith(true);
+    // Solange die Seite den Zustand nicht umlegt, bleibt der Dialog zu.
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("mit offenem Dialog: Empfänger und Sendeknopf", () => {
+    onboarding([onbAufgabe()], { abteilungenDialogOffen: true });
+    expect(screen.getByRole("dialog")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "2 E-Mails senden" })).not.toBeNull();
+  });
+});
+
+// =============================================
+// 12. Onboarding: Stepper-Schritt „Checkliste abarbeiten"
+// =============================================
+
+describe("Onboarding: Stepper", () => {
+  /**
+   * Nur die Felder, die der Schritt liest. Der Rest des Vorgangs steht dem
+   * Stepper nicht zur Verfuegung und soll es auch nicht — deshalb die
+   * bewusste Verengung statt eines vollstaendigen Vorgangs.
+   */
+  function onbVorgang(abteilungen: AbteilungenKarteDaten, teil: Record<string, unknown> = {}) {
+    return {
+      id: "onb-1",
+      displayId: "ONB-2026-031",
+      email: "anna.beispiel@fes-minden.de",
+      status: "REVIEWED",
+      token: "tok-fb",
+      invitedAt: "2026-09-01T00:00:00.000Z",
+      submittedAt: "2026-09-10T00:00:00.000Z",
+      supervisorToken: "tok-sv",
+      supervisorEmail: "a.leitung@fes-minden.de",
+      supervisorTokenExpiresAt: "2026-12-30T00:00:00.000Z",
+      supervisorSubmittedAt: "2026-09-12T00:00:00.000Z",
+      organization: { id: ORG, name: "FES Minden", mandantNumber: "10" },
+      fragebogenFortschritt: { position: 12, total: 12, prozent: 100 },
+      requiredDocuments: [],
+      personalData: { isComplete: true, currentStep: 12 },
+      supervisorData: { isComplete: true, currentStep: 5, vertragsbeginn: "2026-10-01T00:00:00.000Z" },
+      documents: [],
+      checklistItems: [
+        { id: "c1", title: "Benutzerkonto anlegen", category: "Vor dem ersten Tag", orderIndex: 0, isCompleted: false, completedAt: null, completedBy: null, dueDate: null, assignee: "IT", notes: null },
+      ],
+      notes: [],
+      _count: { notes: 0 },
+      abteilungen,
+      ...teil,
+    };
+  }
+
+  function stepper(abteilungen: AbteilungenKarteDaten, teil: Record<string, unknown> = {}) {
+    const oeffnen = jest.fn();
+    render(
+      <OnboardingTabOverview
+        data={onbVorgang(abteilungen, teil) as unknown as React.ComponentProps<typeof OnboardingTabOverview>["data"]}
+        appUrl="https://hr.fes-credo.de"
+        supervisorEmail="a.leitung@fes-minden.de"
+        setSupervisorEmail={jest.fn()}
+        generatingLink={false}
+        generateSupervisorLink={jest.fn()}
+        linkResult={null}
+        linkMeldung={null}
+        notes={[]}
+        newNote=""
+        setNewNote={jest.fn()}
+        savingNote={false}
+        addNote={jest.fn()}
+        onboardingId="onb-1"
+        setActiveTab={jest.fn()}
+        oeffnePaketDialog={jest.fn()}
+        oeffneAbteilungenDialog={oeffnen}
+      />,
+    );
+    return { oeffnen };
+  }
+
+  it("nennt den Stand der Abteilungen und den Hinweis, solange niemand informiert ist", () => {
+    stepper(daten({ modul: "ONBOARDING" }));
+    const text = seitentext();
+    expect(text).toContain("Interne Aufgaben erledigen und Abteilungen informieren");
+    // Vier Zeilen (IT, Facility, Verwaltung, Führungskraft), keine ist fertig.
+    expect(text).toContain("Abteilungen: 0 von 4 fertig");
+    expect(text).toContain("Noch keine Abteilung informiert – im Tab Checkliste „Abteilungen informieren“ wählen.");
+  });
+
+  it("„Abteilungen informieren…“ öffnet den Dialog im Tab Checkliste", () => {
+    const { oeffnen } = stepper(daten({ modul: "ONBOARDING" }));
+    fireEvent.click(screen.getByRole("button", { name: "Abteilungen informieren…" }));
+    expect(oeffnen).toHaveBeenCalledTimes(1);
+  });
+
+  it("gesperrt: Grund im Schritt, keine Aktion", () => {
+    stepper(
+      daten({
+        modul: "ONBOARDING",
+        gesperrt: { grund: "MODALITAETEN_FEHLEN", text: MELDUNGEN.MODALITAETEN_FEHLEN },
+        bezugsdatum: null,
+      }),
+    );
+    expect(seitentext()).toContain(MELDUNGEN.MODALITAETEN_FEHLEN);
+    expect(knopf("Abteilungen informieren…")).toBeNull();
+  });
+
+  it("Abschluss: offene Abteilungsaufgaben verhindern ihn nicht", () => {
+    // Der Schritt „Abschluss" wird erst aktiv (und damit sichtbar), wenn die
+    // interne Checkliste durch ist — die Abteilungen sind es hier nicht.
+    stepper(daten({ modul: "ONBOARDING" }), {
+      checklistItems: [
+        { id: "c1", title: "Benutzerkonto anlegen", category: "Vor dem ersten Tag", orderIndex: 0, isCompleted: true, completedAt: "2026-09-20T08:00:00.000Z", completedBy: null, dueDate: null, assignee: "IT", notes: null },
+      ],
+    });
+    expect(seitentext()).toContain("Offene Aufgaben von Abteilungen verhindern den Abschluss nicht.");
   });
 });

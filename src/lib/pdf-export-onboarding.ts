@@ -9,6 +9,7 @@ import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import {
   DOCUMENT_STATUS_LABELS,
+  abteilungLabel,
   getBefristungSachgrundLabel,
   getBefristungsartLabel,
 } from "@/lib/constants";
@@ -44,6 +45,14 @@ export interface OnboardingExportContext {
   supervisorData: SupervisorDataExport | null;
   documents: DocExport[];
   checklistItems: ChecklistExport[];
+  /**
+   * Anzeigenamen SELBST angelegter Abteilungsschluessel (Einstellungen →
+   * Abteilungen), Schluessel → Name. Die festen Schluessel kennt
+   * `abteilungLabel` ohnehin; ohne diese Tabelle staende fuer einen eigenen
+   * Schluessel der Rohwert („EMPFANG") in der Akte. Optional: Fehlt sie,
+   * bleibt es beim bisherigen Verhalten.
+   */
+  abteilungsNamen?: Record<string, string>;
 }
 
 interface PersonalDataExport {
@@ -810,10 +819,17 @@ async function addChecklistePages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
       doc.font("Helvetica-Bold").fontSize(9).fillColor(iconColor).text(icon, 55, iy);
 
       const titleColor = item.isCompleted ? C.gray : C.black;
-      doc.font("Helvetica").fontSize(9).fillColor(titleColor).text(item.title, 72, iy, { width: 340 });
+      doc.font("Helvetica").fontSize(9).fillColor(titleColor).text(item.title, 72, iy, { width: 330 });
 
-      if (item.assignee) {
-        doc.font("Helvetica").fontSize(7).fillColor(C.blau).text(item.assignee, 420, iy, { width: 60 });
+      // Nie der rohe Schluessel: Seit Paket 5 steht in `assignee` „IT" bzw.
+      // „VORGESETZTER"; in der Akte gehoert „IT-Abteilung"/„Führungskraft".
+      // Eigene Schluessel loest `abteilungsNamen` auf (aus den Einstellungen);
+      // Freitext-Altwerte bleiben, wie sie sind.
+      const zustaendig = item.assignee
+        ? (ctx.abteilungsNamen?.[item.assignee] ?? abteilungLabel(item.assignee))
+        : "";
+      if (zustaendig) {
+        doc.font("Helvetica").fontSize(7).fillColor(C.blau).text(zustaendig, 410, iy, { width: 70 });
       }
       if (item.isCompleted && item.completedAt) {
         doc.font("Helvetica").fontSize(7).fillColor(C.gray).text(fmt(item.completedAt), 485, iy, { width: 80, align: "right" });
