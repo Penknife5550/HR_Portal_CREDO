@@ -16,6 +16,7 @@ import {
   vorgesetzteAbgesendet,
 } from "@/lib/onboarding-spuren";
 import { statusAbgleichen } from "@/lib/onboarding-status-abgleich";
+import type { StatusAbgleich } from "@/lib/onboarding-status-abgleich";
 import { faelligkeitenSetzen } from "@/lib/abteilungsaufgaben-onboarding";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
@@ -482,8 +483,14 @@ export async function POST(
    *   4. Der Protokolleintrag — Nachweis der Abgabe, also im selben Commit.
    */
   const abgegebenAm = new Date();
+
+  // Der Abgleich wird aus der Transaktion HERAUSGEREICHT: Die HR-Mail unten
+  // braucht den Status, den DIESELBE Transaktion aus beiden Spuren berechnet
+  // hat. Der Lesestand von vor der Transaktion kennt eine gleichzeitige
+  // Abgabe des Fragebogens nicht.
+  let abgleich: StatusAbgleich | null = null;
   try {
-    await prisma.$transaction(async (tx) => {
+    abgleich = await prisma.$transaction(async (tx) => {
       const beansprucht = await tx.onboardingProcess.updateMany({
         where: {
           id: onboarding.id,
@@ -513,6 +520,8 @@ export async function POST(
           },
         },
       });
+
+      return ergebnis;
     });
   } catch (error) {
     if (error instanceof BereitsEingereicht) {
@@ -549,12 +558,30 @@ export async function POST(
     console.error("[Modalitaeten] Faelligkeiten konnten nicht gesetzt werden:", err);
   }
 
-  // n8n Webhook
+  // HR-Benachrichtigung „Einstellungsmodalitaeten eingereicht".
+  //
+  // Nach der Beanspruchung der eigenen Spur kann `nach` nur
+  // SUPERVISOR_SUBMITTED (beides da) oder INVITED/IN_PROGRESS (Fragebogen
+  // offen) sein — die HR-Status nimmt das `updateMany` aus. Die Merker sind
+  // Zeichenketten, keine Wahrheitswerte: `renderTemplate` kennt nur
+  // „nicht leer", und String(false) waere nicht leer.
+  //
+  // Die Rueckfallrichtung ist bewusst asymmetrisch: Ohne `abgleich` gilt
+  // „Fragebogen offen" — nie eine unbelegte „bereit zur Prüfung"-Aussage.
+  const bereit = abgleich?.nach === "SUPERVISOR_SUBMITTED";
   await triggerN8nWebhook("supervisor-completed", {
     onboardingId: onboarding.id,
+    displayId: onboarding.displayId || onboarding.id.substring(0, 8).toUpperCase(),
+    // bleibt fuer bestehende Webhook-Abnehmer
     email: onboarding.email,
     supervisorEmail: onboarding.supervisorEmail,
+    // Ausdruecklich gesetzt und nie leer: {{mitarbeiter_name}} faellt in
+    // `extractVariables` sonst auf `payload.email` zurueck — die private
+    // Adresse der Person im Betreff der HR-Mail.
+    mitarbeiter_name: mitarbeiterName(onboarding) ?? MITARBEITER_NEUTRAL,
     organization: onboarding.organization.name,
+    fragebogen_eingereicht: bereit ? "ja" : "",
+    fragebogen_offen: bereit ? "" : "ja",
   });
 
   return NextResponse.json({

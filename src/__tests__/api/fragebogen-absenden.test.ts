@@ -29,7 +29,11 @@ const mockPrisma = {
   $transaction: jest.fn(),
 };
 const mockValidate = jest.fn();
-const mockSendEmail = jest.fn();
+// Seit Paket 2 laeuft auch die Eingangsbestaetigung an die Person ueber den
+// Dispatcher (triggerN8nWebhook -> triggerWebhooks -> sendEventEmail). Die
+// Route ruft `sendEmail` nicht mehr, deshalb gibt es hier keinen
+// `@/lib/mailer`-Mock mehr — was versendet wird, haengt an diesem Griff.
+const mockN8n = jest.fn();
 
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/auth", () => ({
@@ -45,8 +49,9 @@ jest.mock("@/lib/rate-limit", () => ({
   // TypeError statt an einer sprechenden Erwartung.
   getClientIpOrNull: () => "203.0.113.7",
 }));
-jest.mock("@/lib/n8n", () => ({ triggerN8nWebhook: jest.fn() }));
-jest.mock("@/lib/mailer", () => ({ sendEmail: (...a: unknown[]) => mockSendEmail(...a) }));
+jest.mock("@/lib/n8n", () => ({
+  triggerN8nWebhook: (...a: unknown[]) => mockN8n(...a),
+}));
 jest.mock("@/lib/encryption", () => ({
   encrypt: (v: string) => v,
   decrypt: (v: string) => v,
@@ -407,10 +412,11 @@ describe("Absenden — Fehlerfall bleibt folgenlos", () => {
     const res = await POST(req(absendeRumpf()), { params: params() });
 
     expect(res.status).toBe(500);
-    // Kein "erfolgreich eingereicht" an den Beschaeftigten und keine
-    // Bestaetigungsmail zu einem Vorgang, der nicht abgesendet wurde.
+    // Kein "erfolgreich eingereicht" an den Beschaeftigten und KEINES der
+    // beiden Ereignisse zu einem Vorgang, der nicht abgesendet wurde — weder
+    // die HR-Benachrichtigung noch die Bestaetigung an die Person.
     await expect(res.json()).resolves.not.toMatchObject({ success: true });
-    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockN8n).not.toHaveBeenCalled();
     fehler.mockRestore();
   });
 });

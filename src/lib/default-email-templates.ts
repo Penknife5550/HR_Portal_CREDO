@@ -814,7 +814,7 @@ CREDO Gruppe – {{einrichtung}}`,
           </table>
           <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Personalfragebogen vollständig</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
-            Der Personalfragebogen von <strong>{{mitarbeiter_name}}</strong> wurde soeben ausgefüllt und eingereicht.
+            Der Personalfragebogen für <strong>{{mitarbeiter_name}}</strong> wurde soeben ausgefüllt und eingereicht.
           </p>
           <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
             <tr><td style="background-color:#f9fafb;border:1px solid #eceef1;border-radius:8px;padding:4px 0;">
@@ -834,8 +834,29 @@ CREDO Gruppe – {{einrichtung}}`,
               </table>
             </td></tr>
           </table>
+          {{#modalitaeten_eingereicht}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
+            <tr><td style="background-color:#eef6e3;border-left:3px solid #41671a;border-radius:6px;padding:14px 18px;">
+              <p style="margin:0;color:#41671a;font-size:14px;line-height:1.6;">
+                Die Einstellungsmodalitäten der Führungskraft liegen bereits vor. <strong>Der Vorgang ist bereit zur Prüfung.</strong>
+              </p>
+            </td></tr>
+          </table>{{/modalitaeten_eingereicht}}
+          {{#ohne_vorgesetzten_link}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
+            <tr><td style="background-color:#eef6e3;border-left:3px solid #41671a;border-radius:6px;padding:14px 18px;">
+              <p style="margin:0;color:#41671a;font-size:14px;line-height:1.6;">
+                Für diesen Vorgang ist kein Vorgesetzten-Link vergeben. <strong>Der Vorgang ist bereit zur Prüfung.</strong>
+              </p>
+            </td></tr>
+          </table>{{/ohne_vorgesetzten_link}}
+          {{#modalitaeten_offen}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
+            <tr><td style="background-color:#fef3c7;border-left:3px solid #b45309;border-radius:6px;padding:14px 18px;">
+              <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
+                Die Einstellungsmodalitäten der Führungskraft stehen noch aus. Der Vorgang ist prüfbar, sobald sie eingegangen sind.
+              </p>
+            </td></tr>
+          </table>{{/modalitaeten_offen}}
           <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
-            Sie können den Vorgang jetzt im HR-Portal prüfen und weiterbearbeiten.
+            Sie können den Vorgang im HR-Portal öffnen und weiterbearbeiten.
           </p>
         </td></tr>
         <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
@@ -848,20 +869,45 @@ CREDO Gruppe – {{einrichtung}}`,
 </html>`,
     bodyText: `Fragebogen eingereicht – {{vorgangsnummer}}
 
-Der Personalfragebogen von {{mitarbeiter_name}} wurde soeben ausgefüllt und eingereicht.
+Der Personalfragebogen für {{mitarbeiter_name}} wurde soeben ausgefüllt und eingereicht.
 
 Vorgang: {{vorgangsnummer}}
 Mitarbeiter: {{mitarbeiter_name}} · {{email}}
 Einrichtung: {{einrichtung}}
-
-Sie können den Vorgang jetzt im HR-Portal prüfen und weiterbearbeiten.
+{{#modalitaeten_eingereicht}}
+Die Einstellungsmodalitäten der Führungskraft liegen bereits vor. Der Vorgang ist bereit zur Prüfung.
+{{/modalitaeten_eingereicht}}{{#ohne_vorgesetzten_link}}
+Für diesen Vorgang ist kein Vorgesetzten-Link vergeben. Der Vorgang ist bereit zur Prüfung.
+{{/ohne_vorgesetzten_link}}{{#modalitaeten_offen}}
+Die Einstellungsmodalitäten der Führungskraft stehen noch aus. Der Vorgang ist prüfbar, sobald sie eingegangen sind.
+{{/modalitaeten_offen}}
+Sie können den Vorgang im HR-Portal öffnen und weiterbearbeiten.
 
 CREDO HR-Portal`,
     variables: [
-      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des Mitarbeiters" },
+      {
+        key: "{{mitarbeiter_name}}",
+        description:
+          "Vollständiger Name des Mitarbeiters (ohne Namen die neutrale Bezeichnung – nie die E-Mail-Adresse)",
+      },
       { key: "{{email}}", description: "E-Mail des Mitarbeiters" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+      {
+        key: "{{modalitaeten_eingereicht}}",
+        description:
+          "„ja“, wenn die Einstellungsmodalitäten schon vorliegen – der Vorgang ist dann bereit zur Prüfung (für {{#modalitaeten_eingereicht}}…{{/modalitaeten_eingereicht}})",
+      },
+      {
+        key: "{{modalitaeten_offen}}",
+        description:
+          "„ja“, wenn ein Vorgesetzten-Link vergeben ist, die Modalitäten aber noch fehlen (für {{#modalitaeten_offen}}…{{/modalitaeten_offen}})",
+      },
+      {
+        key: "{{ohne_vorgesetzten_link}}",
+        description:
+          "„ja“, wenn für den Vorgang kein Vorgesetzten-Link vergeben ist (z. B. Ehrenamt) – der Vorgang ist dann bereit zur Prüfung (für {{#ohne_vorgesetzten_link}}…{{/ohne_vorgesetzten_link}})",
+      },
     ],
   },
 
@@ -871,7 +917,12 @@ CREDO HR-Portal`,
   {
     event: "supervisor-completed",
     name: "Einstellungsmodalitäten eingereicht (HR-Benachrichtigung)",
-    subject: "Modalitäten vollständig – {{mitarbeiter_name}} ({{vorgangsnummer}})",
+    // „für {{mitarbeiter_name}}": Ohne Namen setzt der Aufrufer
+    // MITARBEITER_NEUTRAL („die neue Mitarbeiterin / den neuen Mitarbeiter") —
+    // ein Akkusativ, der nur nach „für" traegt. Im parallelen Ablauf ist
+    // „noch kein Name" der Regelfall, weil die Fuehrungskraft oft vor der
+    // Person abgibt. Dieselbe Bauform nutzt supervisor-link-created.
+    subject: "Einstellungsmodalitäten für {{mitarbeiter_name}} eingereicht ({{vorgangsnummer}})",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"></head>
@@ -887,9 +938,9 @@ CREDO HR-Portal`,
           <table cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
             <tr><td style="background-color:#eef6e3;border-radius:6px;padding:8px 16px;"><span style="color:#41671a;font-weight:bold;font-size:14px;">✓ Einstellungsmodalitäten vollständig</span></td></tr>
           </table>
-          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Alle Daten eingegangen</h2>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">Einstellungsmodalitäten eingegangen</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
-            Die Einstellungsmodalitäten für <strong>{{mitarbeiter_name}}</strong> wurden vom Vorgesetzten eingereicht. Der Vorgang kann jetzt abgeschlossen werden.
+            Die Einstellungsmodalitäten für <strong>{{mitarbeiter_name}}</strong> wurden von der Führungskraft eingereicht.
           </p>
           <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
             <tr><td style="background-color:#f9fafb;border:1px solid #eceef1;border-radius:8px;padding:4px 0;">
@@ -909,8 +960,22 @@ CREDO HR-Portal`,
               </table>
             </td></tr>
           </table>
+          {{#fragebogen_eingereicht}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
+            <tr><td style="background-color:#eef6e3;border-left:3px solid #41671a;border-radius:6px;padding:14px 18px;">
+              <p style="margin:0;color:#41671a;font-size:14px;line-height:1.6;">
+                Der Personalfragebogen liegt bereits vor. <strong>Der Vorgang ist bereit zur Prüfung.</strong>
+              </p>
+            </td></tr>
+          </table>{{/fragebogen_eingereicht}}
+          {{#fragebogen_offen}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
+            <tr><td style="background-color:#fef3c7;border-left:3px solid #b45309;border-radius:6px;padding:14px 18px;">
+              <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
+                Der Personalfragebogen steht noch aus. Der Vorgang ist prüfbar, sobald er eingegangen ist.
+              </p>
+            </td></tr>
+          </table>{{/fragebogen_offen}}
           <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
-            Bitte schließen Sie den Vorgang im HR-Portal ab.
+            Sie können den Vorgang im HR-Portal öffnen.
           </p>
         </td></tr>
         <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:18px 32px;border-top:1px solid #e5e7eb;">
@@ -921,21 +986,39 @@ CREDO HR-Portal`,
   </table>
 </body>
 </html>`,
-    bodyText: `Einstellungsmodalitäten vollständig – {{vorgangsnummer}}
+    bodyText: `Einstellungsmodalitäten eingegangen – {{vorgangsnummer}}
 
-Die Einstellungsmodalitäten für {{mitarbeiter_name}} wurden vom Vorgesetzten eingereicht. Der Vorgang kann jetzt abgeschlossen werden.
+Die Einstellungsmodalitäten für {{mitarbeiter_name}} wurden von der Führungskraft eingereicht.
 
 Vorgang: {{vorgangsnummer}}
 Mitarbeiter: {{mitarbeiter_name}}
 Einrichtung: {{einrichtung}}
-
-Bitte schließen Sie den Vorgang im HR-Portal ab.
+{{#fragebogen_eingereicht}}
+Der Personalfragebogen liegt bereits vor. Der Vorgang ist bereit zur Prüfung.
+{{/fragebogen_eingereicht}}{{#fragebogen_offen}}
+Der Personalfragebogen steht noch aus. Der Vorgang ist prüfbar, sobald er eingegangen ist.
+{{/fragebogen_offen}}
+Sie können den Vorgang im HR-Portal öffnen.
 
 CREDO HR-Portal`,
     variables: [
-      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name des Mitarbeiters" },
+      {
+        key: "{{mitarbeiter_name}}",
+        description:
+          "Vollständiger Name des Mitarbeiters (ohne Namen die neutrale Bezeichnung – nie die E-Mail-Adresse)",
+      },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+      {
+        key: "{{fragebogen_eingereicht}}",
+        description:
+          "„ja“, wenn der Personalfragebogen schon vorliegt – der Vorgang ist dann bereit zur Prüfung (für {{#fragebogen_eingereicht}}…{{/fragebogen_eingereicht}})",
+      },
+      {
+        key: "{{fragebogen_offen}}",
+        description:
+          "„ja“, solange der Personalfragebogen aussteht (für {{#fragebogen_offen}}…{{/fragebogen_offen}})",
+      },
     ],
   },
 

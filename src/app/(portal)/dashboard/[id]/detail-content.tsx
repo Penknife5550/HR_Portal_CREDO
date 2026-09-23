@@ -62,9 +62,20 @@ import {
   istHrStatus,
   mitarbeiterAbgesendet,
   mitarbeiterName,
+  pruefungNichtMoeglichGrund,
   vorgesetzteAbgesendet,
   vorgesetztenLinkAbgelaufen,
 } from "@/lib/onboarding-spuren";
+import {
+  formatModalitaetenFortschritt,
+  modalitaetenFortschritt,
+} from "@/lib/validations/supervisor-data";
+import {
+  onboardingKurzschritte,
+  onboardingWorkflowSchritte,
+  spurenChips,
+  type SpurChip,
+} from "./uebersicht-schritte";
 import {
   anteilText,
   kostenstellenAnzeige,
@@ -175,6 +186,16 @@ export interface DetailData {
    * Spread aus GET /api/onboarding/[id].
    */
   supervisorSubmittedAt: string | null;
+  /**
+   * Die drei folgenden Felder kommen seit jeher per Spread aus
+   * GET /api/onboarding/[id] (prisma/schema.prisma), waren hier aber nie
+   * deklariert — deshalb zeigte der Abschluss-Schritt das Datum der
+   * Fragebogen-Abgabe statt des Abschlusses.
+   */
+  reviewedAt: string | null;
+  completedAt: string | null;
+  /** Wann der Vorgesetzten-Link verschickt wurde (Anker der Erinnerung). */
+  supervisorLinkSentAt: string | null;
   starterPacketSentAt: string | null;
   starterPacketSentCount: number;
   organization: {
@@ -879,6 +900,10 @@ export function DetailContent({
               {data.questionnaireType}
             </span>
 
+            {/* Je ein Chip pro Spur. Der Vorgangsstatus fasst seit Paket 1 nur
+                noch zusammen; welche Seite wie weit ist, steht hier. */}
+            <SpurenChips chips={spurenChips(data)} />
+
             {/* Status-Aktionen: Nur für SUPER_ADMIN / HR_LEITUNG */}
             {canReview && (
               <button
@@ -899,6 +924,17 @@ export function DetailContent({
                 <CheckIcon className="h-3.5 w-3.5" />
                 {completingProcess ? "Wird abgeschlossen..." : "Vorgang abschließen"}
               </button>
+            )}
+
+            {/* Fehlt der Knopf „Als geprüft markieren", stand bisher NICHTS da
+                — HR sah nur eine Leerstelle. `pruefungNichtMoeglichGrund` ist
+                dieselbe Quelle wie die Ablehnung im PATCH und deckt auch den
+                abgelaufenen Vorgesetzten-Link samt Ausweg ab. Bei bereits
+                geprueften Vorgaengen bleibt der Satz weg (Dauerrauschen). */}
+            {isAdmin && !canReview && !istHrStatus(data.status) && (
+              <p data-hinweis="pruefung-nicht-moeglich" className="ml-auto text-xs text-muted-foreground">
+                {"ⓘ"} {pruefungNichtMoeglichGrund(data)}
+              </p>
             )}
           </div>
 
@@ -947,13 +983,16 @@ export function DetailContent({
                   }`}
                 >
                   {tab.label}
+                  {/* Die Spur, nicht `isComplete`: Im Altfall „Zeitstempel ohne
+                      isComplete" stand neben dem Kopf-Chip „✓ Fragebogen:
+                      eingereicht" ein Reiter-Zaehler „4/9". */}
                   {tab.id === "questionnaire" && data.personalData && (
                     <span className={`ml-1.5 inline-flex h-5 w-auto min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
-                      data.personalData.isComplete
+                      mitarbeiterAbgesendet(data)
                         ? "bg-green-100 text-green-800"
                         : "bg-amber-100 text-amber-800"
                     }`}>
-                      {data.personalData.isComplete ? "Komplett" : `${data.fragebogenFortschritt.position}/${data.fragebogenFortschritt.total}`}
+                      {mitarbeiterAbgesendet(data) ? "Komplett" : `${data.fragebogenFortschritt.position}/${data.fragebogenFortschritt.total}`}
                     </span>
                   )}
                   {tab.id === "documents" && data.documents.length > 0 && (
@@ -1120,35 +1159,7 @@ export function TabOverview({
     ? `${appUrl}/modalitaeten/${data.supervisorToken}`
     : null;
 
-  // ---- Workflow-Steps berechnen ----
-  const fragebogenDone = data.personalData?.isComplete ?? false;
-  const fragebogenStarted = !!data.personalData;
   const supervisorLinkExists = !!data.supervisorToken;
-  const supervisorDone = data.supervisorData?.isComplete ?? false;
-  const supervisorStarted = !!data.supervisorData;
-  const checklistTotal = data.checklistItems.length;
-  const checklistDone = data.checklistItems.filter((i) => i.isCompleted).length;
-  const checklistAllDone = checklistTotal > 0 && checklistDone === checklistTotal;
-  const isCompleted = data.status === "COMPLETED";
-
-  // ---- Abteilungen im Schritt „Checkliste abarbeiten" ----
-  // „Fertig" heisst: kein offener Punkt mehr fuer diese Stelle — unabhaengig
-  // davon, ob sie schon informiert wurde.
-  const abt = data.abteilungen;
-  const abtZeilen = abt?.zeilen ?? [];
-  const abtFertig = abtZeilen.filter((z) => z.aufgaben.offen === 0).length;
-  const abtGesperrt = abt?.gesperrt ?? null;
-  const abtInformierbar = abt?.informierbar ?? 0;
-  const abtInfo = [
-    checklistTotal === 0 ? "Keine Checkliste zugewiesen" : null,
-    abtZeilen.length > 0 ? `Abteilungen: ${abtFertig} von ${abtZeilen.length} fertig` : null,
-    abtGesperrt?.text ?? null,
-    abtZeilen.length > 0 && !abtGesperrt && (abt?.niemandInformiert ?? false)
-      ? "Noch keine Abteilung informiert – im Tab Checkliste „Abteilungen informieren“ wählen."
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 
   // Neuer Vorgesetzten-Link: moeglich, solange die Modalitaeten offen sind und
   // HR den Vorgang nicht geprueft/abgeschlossen/abgelaufen gesetzt hat — genau
@@ -1165,131 +1176,31 @@ export function TabOverview({
   const neuenLinkErzeugenAktiv =
     neuerLinkMoeglich && !!supervisorEmail.trim() && (linkAbgelaufen || andereAdresse);
 
-  const workflowSteps: import("@/components/process-workflow-stepper").WorkflowStep[] = [
-    {
-      key: "einladung",
-      title: "Einladung versenden",
-      description: "Magic Link an den neuen Mitarbeiter senden",
-      status: data.token ? "completed" : "active",
-      completedAt: data.token ? formatDate(data.invitedAt) : undefined,
-      info: data.token ? undefined : "Fragebogen-Link wird beim Anlegen automatisch erstellt.",
+  // Die Schritte selbst stehen rein und getestet in `./uebersicht-schritte`.
+  // Sie lesen ausschliesslich die Spuren-Funktionen (`mitarbeiterAbgesendet`,
+  // `vorgesetzteAbgesendet`, `bereitZurPruefung`) — die Modalitaeten-Spur
+  // haengt dort an KEINER Stelle am Fragebogen.
+  const workflowSteps = onboardingWorkflowSchritte(data, {
+    fragebogenLink,
+    modalitaetenLink,
+    supervisorAdresseEingetragen: !!supervisorEmail.trim(),
+    linkWirdErzeugt: generatingLink,
+    vorgesetztenLinkErzeugen: generateSupervisorLink,
+    abteilungenInformieren: oeffneAbteilungenDialog,
+    csvExport: () => {
+      window.location.href = `/api/onboarding/${onboardingId}/export?format=csv`;
     },
-    {
-      key: "fragebogen",
-      title: "Personalfragebogen",
-      description: "Mitarbeiter fuellt den Personalfragebogen aus",
-      status: fragebogenDone ? "completed" : !data.token ? "upcoming" : "active",
-      completedAt: fragebogenDone && data.submittedAt ? formatDate(data.submittedAt) : undefined,
-      info: !fragebogenDone && fragebogenStarted
-        ? `Fragebogen in Bearbeitung — ${formatProgress(data.fragebogenFortschritt)}`
-        : !fragebogenDone && data.token
-        ? "Wartet auf Einreichung durch den Mitarbeiter"
-        : undefined,
-      actions: !fragebogenDone && data.token ? [
-        { label: "Fragebogen-Link kopieren", onClick: () => { navigator.clipboard.writeText(fragebogenLink); }, variant: "secondary" },
-      ] : undefined,
+    // Oeffnet denselben Dialog wie die Karte — und wechselt dorthin, damit
+    // sichtbar bleibt, wo der Versand zuhause ist.
+    dokumenteVersenden: () => {
+      setActiveTab("documents");
+      oeffnePaketDialog();
     },
-    {
-      key: "modalitaeten",
-      title: "Einstellungsmodalitaeten",
-      description: "Vorgesetzter fuellt Vertragsdetails aus",
-      status: supervisorDone ? "completed" : !fragebogenDone ? "upcoming" : "active",
-      info: supervisorDone ? undefined
-        : supervisorLinkExists && linkAbgelaufen
-        ? `Link abgelaufen am ${formatDate(data.supervisorTokenExpiresAt)} — bitte neuen Link erzeugen`
-        : supervisorLinkExists && supervisorStarted
-        ? `Modalitaeten in Bearbeitung (Schritt ${data.supervisorData?.currentStep || 1} von 5)`
-        : supervisorLinkExists
-        ? "Link gesendet — wartet auf Bearbeitung durch den Vorgesetzten"
-        : fragebogenDone
-        ? "Vorgesetzten-Link muss noch erstellt werden"
-        : undefined,
-      actions: !supervisorDone && fragebogenDone ? (
-        // Ein abgelaufener Link hilft niemandem beim Kopieren — hier der
-        // Ausweg aus der Pruefsperre (dieselbe Route, dieselbe Adresse).
-        linkAbgelaufen && neuerLinkMoeglich
-          ? [{ label: "Neuen Vorgesetzten-Link erzeugen", onClick: generateSupervisorLink, variant: "primary" as const, disabled: !supervisorEmail.trim(), loading: generatingLink }]
-          : supervisorLinkExists && modalitaetenLink
-          ? [{ label: "Modalitaeten-Link kopieren", onClick: () => { navigator.clipboard.writeText(modalitaetenLink); }, variant: "secondary" as const }]
-          : [{ label: "Vorgesetzten-Link erstellen", onClick: generateSupervisorLink, variant: "primary" as const, disabled: !supervisorEmail.trim(), loading: generatingLink }]
-      ) : undefined,
-    },
-    {
-      key: "pruefen",
-      title: "Daten pruefen",
-      description: "HR prueft Fragebogen-Daten und Dokumente",
-      status: data.status === "REVIEWED" || isCompleted ? "completed"
-        : !(fragebogenDone && supervisorDone) ? "upcoming"
-        : "active",
-      info: fragebogenDone && supervisorDone && data.status !== "REVIEWED" && !isCompleted
-        ? `${data.documents.length} Dokument${data.documents.length !== 1 ? "e" : ""} hochgeladen`
-        : undefined,
-      items: fragebogenDone && supervisorDone ? [
-        { id: "fb", title: "Personalfragebogen vollstaendig", isCompleted: true, assignee: "Mitarbeiter", assigneeColor: "bg-credo-gruen/10 text-credo-gruen" },
-        { id: "sv", title: "Modalitaeten vollstaendig", isCompleted: true, assignee: "Vorgesetzter", assigneeColor: "bg-purple-100 text-purple-700" },
-        { id: "docs", title: `${data.documents.length} Dokument${data.documents.length !== 1 ? "e" : ""} hochgeladen`, isCompleted: data.documents.length > 0, assignee: "Mitarbeiter", assigneeColor: "bg-credo-gruen/10 text-credo-gruen" },
-      ] : undefined,
-    },
-    {
-      key: "checkliste",
-      title: "Checkliste abarbeiten",
-      description: "Interne Aufgaben erledigen und Abteilungen informieren",
-      status: checklistAllDone || isCompleted ? "completed"
-        : data.status !== "REVIEWED" && !(fragebogenDone && supervisorDone) ? "upcoming"
-        : "active",
-      progress: checklistTotal > 0 ? { done: checklistDone, total: checklistTotal } : undefined,
-      items: checklistTotal > 0 && !checklistAllDone && (fragebogenDone && supervisorDone) ? data.checklistItems.filter((i) => !i.isCompleted).slice(0, 5).map((i) => ({
-        id: i.id,
-        title: i.title,
-        isCompleted: false,
-        // Nie der rohe Schluessel: „IT" heisst hier „IT-Abteilung", und der
-        // Name aus den Einstellungen geht dem festen Label vor.
-        assignee:
-          abtZeilen.find((z) => z.departmentKey === i.assignee)?.departmentName ||
-          abteilungLabel(i.assignee) ||
-          undefined,
-        assigneeColor: "bg-credo-blau/10 text-credo-blau",
-        note: i.notes,
-      })) : undefined,
-      info: abtInfo || undefined,
-      actions:
-        !isCompleted && !abtGesperrt && abtInformierbar > 0
-          ? [
-              {
-                label: "Abteilungen informieren…",
-                onClick: oeffneAbteilungenDialog,
-                variant: "primary" as const,
-              },
-            ]
-          : undefined,
-    },
-    {
-      key: "abschluss",
-      title: "Abschluss",
-      description: "Vorgang abschliessen und Daten exportieren",
-      status: isCompleted ? "completed" : !checklistAllDone ? "upcoming" : "active",
-      completedAt: isCompleted && data.submittedAt ? formatDate(data.submittedAt) : undefined,
-      // Die Abteilungen arbeiten an ihren eigenen Aufgaben weiter; der Vorgang
-      // wartet nicht auf sie. Ohne diesen Satz sucht HR den Grund dafuer,
-      // dass der Abschluss trotz offener Abteilungsaufgaben moeglich ist.
-      info: abtZeilen.some((z) => z.aufgaben.offen > 0)
-        ? "Offene Aufgaben von Abteilungen verhindern den Abschluss nicht."
-        : undefined,
-      actions: !isCompleted && checklistAllDone ? [
-        { label: "CSV Export (LOGA)", onClick: () => { window.location.href = `/api/onboarding/${onboardingId}/export?format=csv`; }, variant: "secondary" as const },
-        {
-          label: "Dokumente versenden…",
-          // Oeffnet denselben Dialog wie die Karte — und wechselt dorthin,
-          // damit sichtbar bleibt, wo der Versand zuhause ist.
-          onClick: () => {
-            setActiveTab("documents");
-            oeffnePaketDialog();
-          },
-          variant: "primary" as const,
-        },
-      ] : undefined,
-    },
-  ];
+  });
+
+  // Speist die Karte „Status-Übersicht" — dieselbe Quelle wie die Chips im
+  // Kopf der Seite (E10).
+  const chips = spurenChips(data);
 
   return (
     <div className="space-y-6">
@@ -1317,11 +1228,14 @@ export function TabOverview({
             <FieldRow
               label="Status"
               value={
-                data.personalData?.isComplete
-                  ? "Vollständig"
-                  : data.personalData
-                    ? formatProgress(data.fragebogenFortschritt)
-                    : "Nicht begonnen"
+                // Die Spur, nicht `isComplete`: Im Altfall „Zeitstempel ohne
+                // isComplete" stand hier „in Bearbeitung", waehrend Server und
+                // Statuszeile „eingereicht" sagten.
+                mitarbeiterAbgesendet(data)
+                  ? data.submittedAt
+                    ? `Eingereicht am ${formatDate(data.submittedAt)}`
+                    : "Eingereicht"
+                  : formatProgress(data.fragebogenFortschritt)
               }
             />
             <div className="mt-3">
@@ -1363,11 +1277,17 @@ export function TabOverview({
                 <FieldRow
                   label="Status"
                   value={
-                    data.supervisorData?.isComplete
-                      ? "Vollständig"
-                      : data.supervisorData
-                        ? `Schritt ${data.supervisorData.currentStep} von 5`
-                        : "Nicht begonnen"
+                    // `currentStep` ist ein 0-basierter INDEX — roh angezeigt
+                    // stand hier „Schritt 0 von 5", waehrend die Fuehrungskraft
+                    // „Schritt 1 / 5" sah. `modalitaetenFortschritt` rechnet um
+                    // und kennt den Fall „noch nicht begonnen" wieder.
+                    vorgesetzteAbgesendet(data)
+                      ? data.supervisorSubmittedAt
+                        ? `Eingereicht am ${formatDate(data.supervisorSubmittedAt)}`
+                        : "Eingereicht"
+                      : formatModalitaetenFortschritt(
+                          modalitaetenFortschritt(data.supervisorData),
+                        )
                   }
                 />
                 {data.supervisorEmail && <FieldRow label="E-Mail Vorgesetzter" value={data.supervisorEmail} />}
@@ -1463,29 +1383,18 @@ export function TabOverview({
           {/* Quick Status Card */}
           <Card title="Status-Übersicht">
             <div className="grid grid-cols-2 gap-3">
+              {/* DIESELBE Quelle wie die Chips im Kopf (`spurenChips`): Zwei
+                  Rechnungen ueber denselben Stand liefen frueher auseinander —
+                  die Karte kannte „Ausstehend", der Stepper „Schritt 1 von 5". */}
               <StatusMiniCard
                 label="Fragebogen"
-                value={
-                  data.personalData?.isComplete
-                    ? "Fertig"
-                    : data.personalData
-                      ? `${data.fragebogenFortschritt.position}/${data.fragebogenFortschritt.total}`
-                      : "Offen"
-                }
-                done={data.personalData?.isComplete ?? false}
+                value={chips[0].kurz}
+                done={chips[0].ton === "fertig"}
               />
               <StatusMiniCard
                 label="Vorgesetzter"
-                value={
-                  data.supervisorData?.isComplete
-                    ? "Fertig"
-                    : data.supervisorToken
-                      ? linkAbgelaufen
-                        ? "Link abgelaufen"
-                        : "Ausstehend"
-                      : "Kein Link"
-                }
-                done={data.supervisorData?.isComplete ?? false}
+                value={chips[1].kurz}
+                done={chips[1].ton === "fertig"}
               />
               <StatusMiniCard
                 label="Dokumente"
@@ -1661,6 +1570,11 @@ function TabFragebogenDaten({
   onSaved: () => void;
 }) {
   const pd = data.personalData;
+  // Die Spur, nicht `personalData.isComplete`: Im Altfall „Zeitstempel ohne
+  // isComplete" zeigte dieser Reiter „in Bearbeitung — Schritt 4 von 9" und
+  // einen halben Balken, waehrend Kopf, Uebersicht und Server „eingereicht"
+  // sagten.
+  const abgesendet = mitarbeiterAbgesendet(data);
   const [showEdit, setShowEdit] = useState(false);
 
   if (!pd) {
@@ -1688,8 +1602,12 @@ function TabFragebogenDaten({
           Erklaerung des Arbeitnehmers (Unterschriftsersatz)
           =============================================
           Steht bewusst weit oben: In einer Betriebspruefung ist das der
-          Nachweis, dass der Beschaeftigte die Angaben bestaetigt hat. */}
-      {pd.isComplete && (
+          Nachweis, dass der Beschaeftigte die Angaben bestaetigt hat.
+          Gebunden an die SPUR: Der Altfall-Hinweis weiter unten („eingereicht,
+          bevor das Portal Zeitpunkt, Ort und Pruefsumme festgehalten hat") gilt
+          genau fuer Vorgaenge mit Zeitstempel ohne `isComplete` — an
+          `pd.isComplete` gebunden war er nie zu sehen. */}
+      {abgesendet && (
         <div
           className={`rounded-lg border p-4 ${
             pd.erklaerungAccepted
@@ -1764,7 +1682,7 @@ function TabFragebogenDaten({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">
-              Fragebogen-Status: {pd.isComplete ? "Vollständig ausgefüllt" : `in Bearbeitung — ${formatProgress(data.fragebogenFortschritt)}`}
+              Fragebogen-Status: {abgesendet ? "Vollständig ausgefüllt" : `in Bearbeitung — ${formatProgress(data.fragebogenFortschritt)}`}
             </p>
             {pd.dsgvoAccepted && pd.dsgvoAcceptedAt && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -1784,9 +1702,9 @@ function TabFragebogenDaten({
               </button>
             )}
             <div className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              pd.isComplete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+              abgesendet ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
             }`}>
-              {pd.isComplete ? "Komplett" : "In Bearbeitung"}
+              {abgesendet ? "Komplett" : "In Bearbeitung"}
             </div>
           </div>
         </div>
@@ -1794,7 +1712,7 @@ function TabFragebogenDaten({
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-credo-gruen transition-all"
-            style={{ width: `${pd.isComplete ? 100 : data.fragebogenFortschritt.prozent}%` }}
+            style={{ width: `${abgesendet ? 100 : data.fragebogenFortschritt.prozent}%` }}
           />
         </div>
       </div>
@@ -2499,43 +2417,28 @@ function OnboardingExportSection({ onboardingId }: { onboardingId: string }) {
 }
 
 // ---- Schritt-Anzeige im Dokumente-Hub ("Sie sind hier") ----
-function onboardingSteps(data: DetailData) {
-  const fragebogenDone = data.personalData?.isComplete ?? false;
-  const supervisorDone = data.supervisorData?.isComplete ?? false;
-  const checklistTotal = data.checklistItems.length;
-  const checklistAllDone = checklistTotal > 0 && data.checklistItems.every((i) => i.isCompleted);
-  const isCompleted = data.status === "COMPLETED";
-  const reviewed = data.status === "REVIEWED" || isCompleted;
-  const steps = [
-    { label: "Einladung", done: !!data.token },
-    { label: "Fragebogen", done: fragebogenDone },
-    { label: "Modalitäten", done: supervisorDone },
-    { label: "Prüfen", done: reviewed },
-    { label: "Checkliste", done: checklistAllDone || isCompleted },
-    { label: "Abschluss", done: isCompleted },
-  ];
-  const firstOpen = steps.findIndex((s) => !s.done);
-  return { steps, currentIdx: firstOpen === -1 ? steps.length - 1 : firstOpen };
-}
-
+//
+// Die Stationen kommen aus `onboardingKurzschritte` (rein, getestet). Neu ist,
+// dass ZWEI Stationen gleichzeitig hervorgehoben sein koennen: Solange weder
+// Fragebogen noch Modalitaeten da sind, ist HR an zwei Stellen zugleich.
 function StepHinweis({ data }: { data: DetailData }) {
-  const { steps, currentIdx } = onboardingSteps(data);
+  const { schritte, aktuell } = onboardingKurzschritte(data);
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-3">
       <span className="mr-1 text-xs text-muted-foreground">Sie sind hier:</span>
-      {steps.map((s, i) => (
+      {schritte.map((s, i) => (
         <span key={s.label} className="flex items-center gap-1.5">
           {i > 0 && <span className="text-border">&rsaquo;</span>}
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-              i === currentIdx
+              aktuell.has(i)
                 ? "bg-credo-blau/10 text-credo-blau"
                 : s.done
                   ? "text-credo-gruen"
                   : "text-muted-foreground"
             }`}
           >
-            {s.done && i !== currentIdx && <CheckIcon className="h-3 w-3" />}
+            {s.done && !aktuell.has(i) && <CheckIcon className="h-3 w-3" />}
             {s.label}
           </span>
         </span>
@@ -3179,7 +3082,9 @@ function TabSupervisor({ data, appUrl }: { data: DetailData; appUrl: string }) {
       ? formatDate(data.supervisorTokenExpiresAt)
       : null;
 
-  if (!sd || (!sd.isComplete && sd.currentStep === 0 && !sd.betriebsstaette)) {
+  // Die Spur statt `sd.isComplete` — sonst zeigte der Altfall „Zeitstempel ohne
+  // isComplete" hier „Noch keine Daten", obwohl die Modalitaeten vorliegen.
+  if (!sd || (!vorgesetzteAbgesendet(data) && sd.currentStep === 0 && !sd.betriebsstaette)) {
     return (
       <div className="space-y-4">
         {modalitaetenLink && (
@@ -3385,6 +3290,35 @@ function FieldRow({ label, value }: { label: string; value: string | null | unde
       <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
       <span className="text-right text-sm font-medium text-foreground">{value || "\u2014"}</span>
     </div>
+  );
+}
+
+/**
+ * Die beiden Spur-Chips im Kopf der Detailseite.
+ *
+ * Grün = abgesendet, Amber = Aufmerksamkeit (abgelaufener Link), sonst grau.
+ * Die Texte kommen fertig aus `spurenChips` — die Oberflaeche formuliert
+ * nichts selbst, sonst laufen Kopf und Karte „Status-Übersicht" auseinander.
+ */
+function SpurenChips({ chips }: { chips: readonly SpurChip[] }) {
+  return (
+    <>
+      {chips.map((c) => (
+        <span
+          key={c.key}
+          data-spur={c.key}
+          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+            c.ton === "fertig"
+              ? "bg-credo-gruen/10 text-credo-gruen"
+              : c.ton === "warnung"
+                ? "bg-amber-100 text-amber-800"
+                : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {c.text}
+        </span>
+      ))}
+    </>
   );
 }
 

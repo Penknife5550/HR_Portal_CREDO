@@ -12,7 +12,15 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { NeuerVorgangModal } from "@/components/neuer-vorgang-modal";
 import { STATUS_LABELS } from "@/lib/constants";
-import { mitarbeiterName } from "@/lib/onboarding-spuren";
+import {
+  mitarbeiterAbgesendet,
+  mitarbeiterName,
+  vorgesetzteAbgesendet,
+} from "@/lib/onboarding-spuren";
+import {
+  formatModalitaetenFortschritt,
+  modalitaetenFortschritt,
+} from "@/lib/validations/supervisor-data";
 import {
   OverdueBanner,
   DurationKPI,
@@ -79,6 +87,15 @@ interface Onboarding {
   questionnaireType: string;
   invitedAt: string;
   submittedAt: string | null;
+  /**
+   * Die zweite Spur (src/lib/onboarding-spuren.ts). Kommt per Spread aus
+   * GET /api/onboarding mit, war hier aber nie deklariert — deshalb las die
+   * Liste bisher `supervisorData.isComplete` und verfehlte den Altfall
+   * „Zeitstempel ohne isComplete".
+   */
+  supervisorSubmittedAt: string | null;
+  /** Ohne Link gibt es nichts auszufuellen — die Spalte zeigt dann „—". */
+  supervisorToken: string | null;
   organization: {
     name: string;
     mandantNumber: string;
@@ -518,19 +535,24 @@ export function DashboardContent({ user }: { user: User }) {
                             {statusInfo.label}
                           </span>
                         </td>
+                        {/* Beide Spalten lesen die SPUR, nicht `isComplete` —
+                            dieselbe Quelle wie Server, Statuszeile und
+                            Detailseite. */}
                         <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {ob.personalData?.isComplete
-                            ? "Vollständig"
+                          {mitarbeiterAbgesendet(ob)
+                            ? "Eingereicht"
                             : ob.personalData
                               ? formatProgress(ob.fragebogenFortschritt)
                               : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {ob.supervisorData?.isComplete
-                            ? "Vollständig"
-                            : ob.supervisorData
-                              ? "In Bearbeitung"
-                              : "—"}
+                          {vorgesetzteAbgesendet(ob)
+                            ? "Eingereicht"
+                            : !ob.supervisorToken
+                              ? "—"
+                              : formatModalitaetenFortschritt(
+                                  modalitaetenFortschritt(ob.supervisorData),
+                                )}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {ob._count?.notes && ob._count.notes > 0 ? (

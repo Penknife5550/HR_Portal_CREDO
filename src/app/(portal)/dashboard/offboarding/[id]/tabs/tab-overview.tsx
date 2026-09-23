@@ -165,7 +165,7 @@ export function TabOverview({
     },
     {
       key: "rueckgaben",
-      title: "Rueckgaben einsammeln",
+      title: "Rückgaben einsammeln",
       description: "Hardware, Schlüssel, Fahrzeuge und Dokumente zurückfordern",
       status: calcStatus(step3Done, step1Done),
       progress: returnTotal > 0 ? { done: returnDone, total: returnTotal } : undefined,
@@ -176,15 +176,15 @@ export function TabOverview({
         assignee: i.category,
         assigneeColor: "bg-orange-100 text-orange-700",
       })) : undefined,
-      info: returnTotal === 0 ? "Keine Rueckgaben erfasst — erfasse sie im Rueckgaben-Tab" : undefined,
+      info: returnTotal === 0 ? "Keine Rückgaben erfasst — erfasse sie im Rückgaben-Tab" : undefined,
       actions: !step3Done && onNavigateTab ? [
-        { label: "Zum Rueckgaben-Tab", onClick: () => onNavigateTab("returns"), variant: "secondary" as const },
+        { label: "Zum Rückgaben-Tab", onClick: () => onNavigateTab("returns"), variant: "secondary" as const },
       ] : undefined,
     },
     {
       key: "exit-interview",
       title: "Exit-Interview",
-      description: "Austrittsgespraech fuehren und dokumentieren",
+      description: "Austrittsgespräch führen und dokumentieren",
       status: calcStatus(step4Done, step2Done && step3Done),
       info: hasExitInterview
         ? (exitInterviewDone ? undefined : "Exit-Interview wurde erstellt — wartet auf Einreichung")
@@ -221,7 +221,7 @@ export function TabOverview({
     {
       key: "abschluss",
       title: "Abschluss",
-      description: "Vorgang abschliessen und archivieren",
+      description: "Vorgang abschließen und archivieren",
       status: isCompleted ? "completed" : "upcoming",
       completedAt: isCompleted && data.completedAt ? formatDate(data.completedAt) : undefined,
     },

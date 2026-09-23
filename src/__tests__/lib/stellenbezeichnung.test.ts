@@ -121,7 +121,7 @@ describe("Einstellungsmodalitaeten — Schritt 1", () => {
     );
     // Die Schritttitel bleiben — die Komponententests haengen daran.
     expect(SUP_STEP_CONFIG[0].title).toBe("Stelle & Vertrag");
-    expect(SUP_STEP_CONFIG[3].title).toBe("Zusaetzliche Angaben");
+    expect(SUP_STEP_CONFIG[3].title).toBe("Zusätzliche Angaben");
   });
 });
 

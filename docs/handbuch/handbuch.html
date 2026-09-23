@@ -709,7 +709,7 @@
 
     <figure class="screenshot">
       <img src="screenshots/onboarding-detail.png" alt="Die Detailseite eines Onboarding-Vorgangs mit Vorgangsnummer und Status oben, den Reitern Übersicht, Fragebogen-Daten, Dokumente, Checkliste und Vorgesetzter sowie dem Fortschritts-Überblick mit aktuellem Schritt, kommenden und erledigten Schritten.">
-      <figcaption>Die Detailseite im Reiter „Übersicht". Der Fortschritts-Überblick zeigt den aktuellen Schritt und was noch aussteht. (Beispieldaten)</figcaption>
+      <figcaption>Die Detailseite im Reiter „Übersicht". Der Fortschritts-Überblick zeigt die gerade laufenden Schritte und was noch aussteht. (Beispieldaten)</figcaption>
     </figure>
 
     <p>Die Detailseite hat mehrere Reiter. So springen Sie schnell zwischen den Bereichen eines Vorgangs:</p>
@@ -720,6 +720,41 @@
       <li><strong>Checkliste</strong> – die Aufgabenliste rund um die Einstellung.</li>
       <li><strong>Vorgesetzter</strong> – die Angaben der oder des Vorgesetzten zum Arbeitsvertrag.</li>
     </ul>
+
+    <h4>Zwei Spuren: Fragebogen und Einstellungsmodalitäten laufen nebeneinander</h4>
+    <p>Bei einer Einstellung arbeiten zwei Seiten gleichzeitig: Die neue Person füllt ihren Personalfragebogen aus, die Führungskraft die Einstellungsmodalitäten – also die Vertragsdetails. Beide Wege sind voneinander unabhängig. Keine Seite muss auf die andere warten, und die Reihenfolge spielt keine Rolle. Den Link für die Führungskraft können Sie jederzeit erzeugen, auch wenn der Fragebogen noch gar nicht begonnen wurde.</p>
+
+    <p>Im Reiter <strong>Übersicht</strong> sehen Sie deshalb beide Wege nebeneinander:</p>
+    <ul>
+      <li>Solange beide offen sind, stehen <strong>zwei Karten nebeneinander</strong>: „Personalfragebogen" und „Einstellungsmodalitäten". Darüber steht die Zeile <strong>„Schritte 2 und 3 laufen parallel, in beliebiger Reihenfolge"</strong>, und beide Karten sind mit <strong>„Läuft parallel"</strong> gekennzeichnet.</li>
+      <li>Ist nur noch einer der Schritte offen, steht wieder eine einzelne Karte da – mit der gewohnten Kennzeichnung <strong>„Aktueller Schritt"</strong>.</li>
+      <li>Erledigte Schritte rutschen mit Datum nach unten in die Liste <strong>Erledigt</strong>, noch nicht begonnene nach <strong>Kommende Schritte</strong>.</li>
+    </ul>
+
+    <p>Auf den beiden Karten steht jeweils, wie weit diese Seite ist, und der Knopf, der gerade passt:</p>
+    <ul>
+      <li><strong>Personalfragebogen:</strong> „Fragebogen in Bearbeitung — Schritt 4 von 10 · Sozialversicherung" oder „Fragebogen noch nicht begonnen". Mit <strong>Fragebogen-Link kopieren</strong> legen Sie den Einladungs-Link in die Zwischenablage. Hat die Führungskraft ihre Angaben schon abgegeben, steht auf dieser Karte zusätzlich „✓ Einstellungsmodalitäten bereits eingereicht am …, unabhängig vom Fragebogen".</li>
+      <li><strong>Einstellungsmodalitäten:</strong> Ist noch kein Link vergeben, steht dort „Kann sofort erstellt werden, unabhängig vom Fragebogen …", und der Knopf heißt <strong>Vorgesetzten-Link erstellen</strong>. Er bleibt so lange grau, bis Sie weiter unten in der Karte <strong>Vorgesetzten-Link</strong> eine E-Mail-Adresse eingetragen haben. Ist der Link verschickt, steht dort „Link versendet am … — noch nicht begonnen" oder „Modalitäten in Bearbeitung — Schritt 2 von 5 · …", dazu der Knopf <strong>Modalitäten-Link kopieren</strong>. Ist der Link abgelaufen, steht „Link abgelaufen am … — bitte neuen Link erzeugen", und der Knopf heißt <strong>Neuen Vorgesetzten-Link erzeugen</strong>.</li>
+    </ul>
+
+    <h4>Die beiden Kennzeichen oben im Kopf</h4>
+    <p>Ganz oben auf der Detailseite steht neben Vorgangsnummer und Status je ein kleines Feld pro Spur. So sehen Sie den Stand beider Seiten, ohne zu scrollen. Dieselben Angaben stehen weiter unten noch einmal in der Karte <strong>Status-Übersicht</strong>.</p>
+    <table>
+      <caption>Was in den beiden Feldern stehen kann</caption>
+      <thead>
+        <tr><th scope="col">Anzeige</th><th scope="col">Bedeutung</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>✓ Fragebogen: eingereicht 18.09.2026</strong> (grün)</td><td>Die neue Person hat ihren Fragebogen abgeschickt.</td></tr>
+        <tr><td><strong>Fragebogen: Schritt 4 von 10</strong> (grau)</td><td>Die Person füllt gerade aus und ist beim vierten Schritt.</td></tr>
+        <tr><td><strong>Fragebogen: noch nicht begonnen</strong> (grau)</td><td>Die Person hat den Link noch nicht genutzt oder noch nichts gespeichert.</td></tr>
+        <tr><td><strong>✓ Modalitäten: eingereicht 16.09.2026</strong> (grün)</td><td>Die Führungskraft hat die Vertragsdetails abgeschickt.</td></tr>
+        <tr><td><strong>Modalitäten: kein Link</strong> (grau)</td><td>Für diesen Vorgang ist noch kein Link an eine Führungskraft vergeben – zum Beispiel beim Ehrenamt. Prüfen können Sie den Vorgang trotzdem, sobald der Fragebogen da ist.</td></tr>
+        <tr><td><strong>Modalitäten: noch nicht begonnen</strong> (grau)</td><td>Der Link ist verschickt, die Führungskraft hat aber noch nichts gespeichert.</td></tr>
+        <tr><td><strong>Modalitäten: Schritt 2 von 5</strong> (grau)</td><td>Die Führungskraft füllt gerade aus. Es ist dieselbe Zahl, die sie selbst in ihrem Formular sieht.</td></tr>
+        <tr><td><strong>Modalitäten: Link abgelaufen</strong> (gelb)</td><td>Mit diesem Link kann die Führungskraft nichts mehr absenden. Erzeugen Sie in der Karte <strong>Vorgesetzten-Link</strong> einen neuen.</td></tr>
+      </tbody>
+    </table>
 
     <h4>Eine Angabe nachträglich korrigieren</h4>
     <p>Hat sich ein Tippfehler eingeschlichen, können Sie die Daten anpassen. So bleibt die Akte korrekt.</p>
@@ -740,10 +775,53 @@
       <li>Klicken Sie oben rechts auf <strong>Als geprüft markieren</strong>.</li>
     </ol>
 
+    <p>Der Knopf erscheint nur, wenn der Vorgang wirklich prüfbar ist: Der Personalfragebogen muss eingereicht sein – und falls ein Link an eine Führungskraft vergeben wurde, auch die Einstellungsmodalitäten. Ist kein Vorgesetzten-Link vergeben (zum Beispiel beim Ehrenamt), genügt der Fragebogen.</p>
+
+    <p>Fehlt der Knopf, steht an seiner Stelle der Grund, mit einem <strong>ⓘ</strong> davor:</p>
+    <ul>
+      <li>„Der Personalfragebogen ist noch nicht eingereicht. Der Vorgang kann erst danach als geprüft markiert werden."</li>
+      <li>„Die Einstellungsmodalitäten sind noch nicht eingereicht. Der Vorgang kann erst danach als geprüft markiert werden."</li>
+      <li>„Die Einstellungsmodalitäten sind noch nicht eingereicht, und der Vorgesetzten-Link ist abgelaufen. Erzeugen Sie in der Übersicht unter „Vorgesetzten-Link" einen neuen Link." – ohne diesen Schritt bleibt der Vorgang hängen, denn mit einem abgelaufenen Link kann die Führungskraft nichts mehr absenden.</li>
+    </ul>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Einen Vorgang als geprüft markieren und ihn abschließen dürfen Administrator und HR-Leitung. Bei den anderen Rollen erscheint weder der Knopf noch der Hinweis daneben.</p>
+    </div>
+
     <div class="ergebnis">
       <span class="label">Das Ergebnis ist</span>
-      <p>Der Status des Vorgangs wechselt auf „Geprüft". In der Übersicht sehen Sie, dass dieser Schritt abgeschlossen ist.</p>
+      <p>Der Status des Vorgangs wechselt auf „Geprüft". In der Übersicht sehen Sie, dass dieser Schritt abgeschlossen ist. Erst jetzt wird der Schritt „Checkliste abarbeiten" zum aktuellen Schritt.</p>
     </div>
+
+    <h4>Welche E-Mails Sie dabei bekommen</h4>
+    <p>Jede der beiden Abgaben meldet das Portal sofort an die Personalabteilung – einmal für den Fragebogen, einmal für die Einstellungsmodalitäten. Weil beide Seiten unabhängig voneinander arbeiten, sagt jede dieser E-Mails ausdrücklich dazu, wie es um die andere Seite steht.</p>
+    <table>
+      <caption>Die beiden E-Mails an die Personalabteilung</caption>
+      <thead>
+        <tr><th scope="col">Wann</th><th scope="col">E-Mail-Vorlage</th><th scope="col">Der Satz zur anderen Seite</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Die neue Person schickt den Fragebogen ab</td>
+          <td>„Fragebogen eingereicht (HR-Benachrichtigung)"</td>
+          <td>Entweder „Die Einstellungsmodalitäten der Führungskraft liegen bereits vor. Der Vorgang ist bereit zur Prüfung." oder „Für diesen Vorgang ist kein Vorgesetzten-Link vergeben. Der Vorgang ist bereit zur Prüfung." oder „Die Einstellungsmodalitäten der Führungskraft stehen noch aus. Der Vorgang ist prüfbar, sobald sie eingegangen sind."</td>
+        </tr>
+        <tr>
+          <td>Die Führungskraft schickt die Einstellungsmodalitäten ab</td>
+          <td>„Einstellungsmodalitäten eingereicht (HR-Benachrichtigung)"</td>
+          <td>Entweder „Der Personalfragebogen liegt bereits vor. Der Vorgang ist bereit zur Prüfung." oder „Der Personalfragebogen steht noch aus. Der Vorgang ist prüfbar, sobald er eingegangen ist."</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>„Bereit zur Prüfung" steht also nur dann in der E-Mail, wenn der Vorgang es auch wirklich ist – genau dann finden Sie auf der Detailseite den Knopf <strong>Als geprüft markieren</strong>.</p>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: ohne Empfänger keine E-Mail</span>
+      <p>Diese beiden E-Mails gehen an die Personalabteilung. Verschickt werden sie nur, wenn unter <strong>Einstellungen → E-Mail-Vorlagen</strong> in der jeweiligen Vorlage im Feld <strong>An</strong> ein Postfach eingetragen ist. Steht dort nichts, sehen Sie die Abgaben nur im Portal. Jeder Versand – auch ein übersprungener – steht im <strong>Versandprotokoll</strong>.</p>
+    </div>
+
+    <p>Die neue Person selbst bekommt unmittelbar nach dem Absenden eine <strong>Eingangsbestätigung</strong>. Deren Text ändern Sie unter <strong>Einstellungen → E-Mail-Vorlagen</strong> in der Vorlage „Eingangsbestaetigung Mitarbeiter (Fragebogen eingereicht)". Ist diese Vorlage dort abgeschaltet, bekommt die neue Person keine Bestätigung mehr; im Versandprotokoll steht dann der Grund.</p>
 
     <h4>Notizen festhalten</h4>
     <p>Im Reiter <strong>Übersicht</strong> können Sie jederzeit Notizen zum Vorgang hinterlassen – etwa Absprachen oder offene Punkte. So geht nichts verloren, und Kolleginnen sehen den Stand.</p>

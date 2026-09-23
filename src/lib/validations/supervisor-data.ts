@@ -275,12 +275,74 @@ export const SUP_STEP_CONFIG = [
   },
   {
     number: 4,
-    title: "Zusaetzliche Angaben",
+    title: "Zusätzliche Angaben",
     description: "Kostenstelle, Probezeit, Urlaub, Masernschutz",
   },
   {
     number: 5,
     title: "Zusammenfassung",
-    description: "Pruefen und Absenden",
+    description: "Prüfen und Absenden",
   },
 ] as const;
+
+// =============================================
+// Fortschritt der Modalitaeten (fuer die HR-Ansicht)
+// =============================================
+
+/**
+ * Wie weit ist die Fuehrungskraft mit den Einstellungsmodalitaeten?
+ *
+ * Steht hier neben `SUP_STEP_CONFIG` und nicht in `onboarding-spuren.ts`: Dort
+ * geht es um Spuren, nicht um Schrittkonfiguration — und ein Fortschritt, der
+ * von seiner Quelle getrennt liegt, laeuft ihr beim naechsten neuen Schritt
+ * davon. Die Datei ist client-sicher (das Modalitaeten-Formular importiert sie
+ * ohnehin).
+ */
+export interface ModalitaetenFortschritt {
+  /** 1-basierte Anzeigeposition — dieselbe Zahl, die die Fuehrungskraft sieht. */
+  position: number;
+  total: number;
+  titel: string;
+  /** Hat die Fuehrungskraft schon einmal „Weiter" gedrueckt? */
+  begonnen: boolean;
+}
+
+/**
+ * `SupervisorData.currentStep` ist der 0-BASIERTE INDEX des Schritts, auf dem
+ * die Fuehrungskraft steht (Schema-Default 0 = „nie gespeichert"). Die
+ * Formularseite rechnet fuer ihre Anzeige `currentStep + 1`, die HR-Ansicht tat
+ * das bis 09/2026 nicht: Sie zeigte `currentStep || 1` bzw. den Rohwert. Die
+ * Fuehrungskraft sah „Schritt 2 / 5", HR „Schritt 1 von 5" bzw. „Schritt 0 von
+ * 5" — zwei Zahlen fuer denselben Stand, und eine davon gibt es gar nicht.
+ *
+ * Alles ausserhalb der Strecke wird gekappt: Ein Bestandswert jenseits des
+ * letzten Schritts (frueherer Zaehlweise) ergaebe sonst „Schritt 10 von 5".
+ */
+export function modalitaetenFortschritt(
+  sd?: { currentStep?: number | null } | null,
+): ModalitaetenFortschritt {
+  const total = SUP_STEP_CONFIG.length;
+  const roh = sd?.currentStep;
+  const index =
+    typeof roh === "number" && Number.isFinite(roh) && roh > 0 ? Math.trunc(roh) : 0;
+  const position = Math.min(index + 1, total);
+  return {
+    position,
+    total,
+    titel: SUP_STEP_CONFIG[position - 1].title,
+    begonnen: index > 0,
+  };
+}
+
+/**
+ * Kurzform fuer Statuszeilen: „Schritt 2 von 5 · Arbeitszeit & Arbeitgeber".
+ *
+ * Vor dem ersten Speichern gibt es keinen Schritt zu nennen — „Schritt 1 von 5"
+ * waere dort eine Behauptung ueber eine Bearbeitung, die nie stattgefunden hat.
+ * Damit bekommt auch der bis dahin tote Zweig „Nicht begonnen" der Karte
+ * „Vorgesetzten-Link" seinen Fall zurueck.
+ */
+export function formatModalitaetenFortschritt(f: ModalitaetenFortschritt): string {
+  if (!f.begonnen) return "noch nicht begonnen";
+  return `Schritt ${f.position} von ${f.total} · ${f.titel}`;
+}

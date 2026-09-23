@@ -1,0 +1,564 @@
+/**
+ * Die Schritte der HR-Uebersicht (Onboarding, Paket 2).
+ *
+ * Geprueft wird die REINE Datei `dashboard/[id]/uebersicht-schritte.ts`, nicht
+ * ein Render von `TabOverview`: Die fuenf Konstellationen sind Datenfaelle, und
+ * ueber einen Render gepruefte Datenfaelle machen jeden unbeteiligten Umbau in
+ * der 3400-Zeilen-Datei zum Testbruch.
+ *
+ * Die Kernaussage aller Faelle: DIE MODALITAETEN-SPUR HAENGT NICHT AM
+ * FRAGEBOGEN. Frueher stand ihr Schritt auf „upcoming" und trug keinen Knopf,
+ * solange der Fragebogen offen war — obwohl die Route beides laengst erlaubt.
+ */
+import type { WorkflowStep } from "@/components/process-workflow-stepper";
+import {
+  onboardingKurzschritte,
+  onboardingWorkflowSchritte,
+  spurenChips,
+  type SchritteStand,
+  type SchrittAktionen,
+} from "@/app/(portal)/dashboard/[id]/uebersicht-schritte";
+
+const JETZT = new Date("2026-09-20T12:00:00.000Z");
+
+function stand(teil: Partial<SchritteStand> = {}): SchritteStand {
+  return {
+    status: "IN_PROGRESS",
+    token: "tok-fb",
+    invitedAt: "2026-09-08T12:00:00.000Z",
+    submittedAt: null,
+    supervisorSubmittedAt: null,
+    supervisorToken: null,
+    supervisorEmail: null,
+    supervisorTokenExpiresAt: null,
+    supervisorLinkSentAt: null,
+    reviewedAt: null,
+    completedAt: null,
+    fragebogenFortschritt: {
+      position: 4,
+      total: 9,
+      titel: "Sozialversicherung",
+      prozent: 44,
+    },
+    personalData: { isComplete: false, currentStep: 4 },
+    supervisorData: null,
+    documents: { length: 0 },
+    checklistItems: [],
+    ...teil,
+  };
+}
+
+function aktionen(teil: Partial<SchrittAktionen> = {}): SchrittAktionen {
+  return {
+    fragebogenLink: "https://hr.fes-credo.de/fragebogen/tok-fb",
+    modalitaetenLink: null,
+    supervisorAdresseEingetragen: true,
+    linkWirdErzeugt: false,
+    vorgesetztenLinkErzeugen: jest.fn(),
+    abteilungenInformieren: jest.fn(),
+    csvExport: jest.fn(),
+    dokumenteVersenden: jest.fn(),
+    ...teil,
+  };
+}
+
+function schritte(s: SchritteStand, a: Partial<SchrittAktionen> = {}): WorkflowStep[] {
+  return onboardingWorkflowSchritte(s, aktionen(a), JETZT);
+}
+
+function finde(alle: WorkflowStep[], key: string): WorkflowStep {
+  const treffer = alle.find((x) => x.key === key);
+  if (!treffer) throw new Error(`Schritt „${key}" fehlt`);
+  return treffer;
+}
+
+function knopfnamen(step: WorkflowStep): string[] {
+  return (step.actions ?? []).map((x) => x.label);
+}
+
+// =============================================
+// (a) Beide Spuren offen
+// =============================================
+
+describe("beide Spuren offen", () => {
+  it("Fragebogen UND Modalitaeten sind gleichzeitig aktiv", () => {
+    const alle = schritte(stand());
+    expect(finde(alle, "fragebogen").status).toBe("active");
+    expect(finde(alle, "modalitaeten").status).toBe("active");
+    expect(alle.filter((x) => x.status === "active").map((x) => x.key)).toEqual([
+      "fragebogen",
+      "modalitaeten",
+    ]);
+  });
+
+  it("ohne Link: Knopf „Vorgesetzten-Link erstellen“ (frueher blockiert durch den Fragebogen)", () => {
+    const step = finde(schritte(stand()), "modalitaeten");
+    expect(knopfnamen(step)).toEqual(["Vorgesetzten-Link erstellen"]);
+    expect(step.actions?.[0].disabled).toBe(false);
+    expect(step.info).toContain("Kann sofort erstellt werden, unabhängig vom Fragebogen.");
+  });
+
+  it("ohne eingetragene Adresse bleibt der Knopf deaktiviert", () => {
+    const step = finde(
+      schritte(stand(), { supervisorAdresseEingetragen: false }),
+      "modalitaeten",
+    );
+    expect(step.actions?.[0].disabled).toBe(true);
+  });
+
+  it("mit Link: „Modalitäten-Link kopieren“ und der Stand der Fuehrungskraft", () => {
+    const step = finde(
+      schritte(
+        stand({
+          supervisorToken: "tok-sv",
+          supervisorEmail: "leitung@example.org",
+          supervisorTokenExpiresAt: "2026-10-20T12:00:00.000Z",
+          supervisorData: { isComplete: false, currentStep: 1 },
+        }),
+        { modalitaetenLink: "https://hr.fes-credo.de/modalitaeten/tok-sv" },
+      ),
+      "modalitaeten",
+    );
+    expect(knopfnamen(step)).toEqual(["Modalitäten-Link kopieren"]);
+    // Die Zahl der Fuehrungskraft, nicht der Rohindex.
+    expect(step.info).toBe(
+      "Modalitäten in Bearbeitung — Schritt 2 von 5 · Arbeitszeit & Arbeitgeber · leitung@example.org",
+    );
+  });
+
+  it("Link verschickt, aber nie geoeffnet: Datum statt „Schritt 1 von 5“", () => {
+    const step = finde(
+      schritte(
+        stand({
+          supervisorToken: "tok-sv",
+          supervisorLinkSentAt: "2026-09-09T12:00:00.000Z",
+          supervisorTokenExpiresAt: "2026-10-20T12:00:00.000Z",
+          supervisorData: { isComplete: false, currentStep: 0 },
+        }),
+      ),
+      "modalitaeten",
+    );
+    expect(step.info).toBe("Link versendet am 09.09.2026 — noch nicht begonnen");
+  });
+
+  it("„Daten prüfen“ bleibt kommend, die Checkliste ebenso", () => {
+    const alle = schritte(stand());
+    expect(finde(alle, "pruefen").status).toBe("upcoming");
+    expect(finde(alle, "pruefen").items).toBeUndefined();
+    expect(finde(alle, "checkliste").status).toBe("upcoming");
+  });
+
+  it("„Einladung versenden“ ist immer erledigt und traegt das Einladungsdatum", () => {
+    const step = finde(schritte(stand()), "einladung");
+    expect(step.status).toBe("completed");
+    expect(step.completedAt).toBe("08.09.2026");
+    expect(step.info).toBeUndefined();
+  });
+
+  it("der Fragebogen-Schritt traegt seinen Fortschritt", () => {
+    const step = finde(schritte(stand()), "fragebogen");
+    expect(step.progress).toEqual({ done: 4, total: 9 });
+    expect(step.info).toBe("Fragebogen in Bearbeitung — Schritt 4 von 9 · Sozialversicherung");
+    expect(knopfnamen(step)).toEqual(["Fragebogen-Link kopieren"]);
+  });
+
+  it("nie begonnener Fragebogen: „noch nicht begonnen“ statt des toten Wartesatzes", () => {
+    const step = finde(
+      schritte(
+        stand({
+          fragebogenFortschritt: { position: 0, total: 9, titel: "noch nicht begonnen", prozent: 0 },
+          personalData: { isComplete: false, currentStep: 0 },
+        }),
+      ),
+      "fragebogen",
+    );
+    expect(step.info).toBe("Fragebogen noch nicht begonnen");
+  });
+});
+
+// =============================================
+// (b) Nur die Modalitaeten sind eingereicht
+// =============================================
+
+describe("Fuehrungskraft war schneller", () => {
+  const s = stand({
+    supervisorToken: "tok-sv",
+    supervisorEmail: "leitung@example.org",
+    supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+    supervisorTokenExpiresAt: "2026-10-20T12:00:00.000Z",
+    supervisorData: { isComplete: true, currentStep: 5 },
+  });
+
+  it("Modalitaeten erledigt mit Datum, Fragebogen weiter aktiv", () => {
+    const alle = schritte(s);
+    expect(finde(alle, "modalitaeten").status).toBe("completed");
+    expect(finde(alle, "modalitaeten").completedAt).toBe("18.09.2026");
+    expect(finde(alle, "modalitaeten").actions).toBeUndefined();
+    expect(finde(alle, "fragebogen").status).toBe("active");
+    expect(alle.filter((x) => x.status === "active")).toHaveLength(1);
+  });
+
+  it("der Fragebogen-Schritt sagt, dass die Gegenspur schon da ist", () => {
+    expect(finde(schritte(s), "fragebogen").info).toContain(
+      "✓ Einstellungsmodalitäten bereits eingereicht am 18.09.2026, unabhängig vom Fragebogen.",
+    );
+  });
+
+  it("noch nicht pruefbar", () => {
+    expect(finde(schritte(s), "pruefen").status).toBe("upcoming");
+  });
+});
+
+// =============================================
+// (c) Beides eingereicht
+// =============================================
+
+describe("beides eingereicht", () => {
+  const s = stand({
+    status: "SUPERVISOR_SUBMITTED",
+    submittedAt: "2026-09-19T12:00:00.000Z",
+    personalData: { isComplete: true, currentStep: 9 },
+    supervisorToken: "tok-sv",
+    supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+    supervisorData: { isComplete: true, currentStep: 5 },
+    documents: { length: 2 },
+  });
+
+  it("„Daten prüfen“ ist aktiv, mit beiden Haken und der Dokumentenzahl", () => {
+    const step = finde(schritte(s), "pruefen");
+    expect(step.status).toBe("active");
+    expect(step.info).toBe("2 Dokumente hochgeladen");
+    expect((step.items ?? []).map((i) => i.title)).toEqual([
+      "Personalfragebogen vollständig",
+      "Modalitäten vollständig",
+      "2 Dokumente hochgeladen",
+    ]);
+  });
+
+  it("beide Spuren-Schritte sind erledigt; AKTIV ist allein „Daten prüfen“", () => {
+    // Die Checkliste beginnt erst mit der Pruefung. Waere sie hier schon aktiv,
+    // stuende bei JEDEM Vorgang „Schritte 4 und 5 laufen parallel“ ueber zwei
+    // Karten — und der Satz gehoert den beiden SPUREN, nicht der HR-Arbeit.
+    expect(schritte(s).filter((x) => x.status === "active").map((x) => x.key)).toEqual([
+      "pruefen",
+    ]);
+    expect(finde(schritte(s), "checkliste").status).toBe("upcoming");
+    expect(finde(schritte(s), "fragebogen").status).toBe("completed");
+    expect(finde(schritte(s), "modalitaeten").status).toBe("completed");
+  });
+});
+
+// =============================================
+// (d) Ehrenamt: kein Vorgesetzten-Link
+// =============================================
+
+describe("ohne Vorgesetzten-Link (z. B. Ehrenamt)", () => {
+  const s = stand({
+    status: "SUBMITTED",
+    submittedAt: "2026-09-19T12:00:00.000Z",
+    personalData: { isComplete: true, currentStep: 9 },
+    documents: { length: 1 },
+  });
+
+  it("„Daten prüfen“ ist aktiv — frueher blieb der Schritt kommend, waehrend im Kopf schon der Knopf stand", () => {
+    expect(finde(schritte(s), "pruefen").status).toBe("active");
+  });
+
+  it("ohne Link fehlt die Zeile „Modalitäten vollständig“ — sie waere eine Luege", () => {
+    const titel = (finde(schritte(s), "pruefen").items ?? []).map((i) => i.title);
+    expect(titel).toEqual(["Personalfragebogen vollständig", "1 Dokument hochgeladen"]);
+  });
+
+  it("der Modalitaeten-Schritt bleibt daneben aktiv und bietet den Link an", () => {
+    expect(finde(schritte(s), "modalitaeten").status).toBe("active");
+    expect(knopfnamen(finde(schritte(s), "modalitaeten"))).toEqual([
+      "Vorgesetzten-Link erstellen",
+    ]);
+  });
+
+  it("aktiv sind genau ZWEI Schritte — die Checkliste zaehlt nicht dazu", () => {
+    // Ohne diese Zusicherung stuenden drei Karten in einem zweispaltigen
+    // Raster, ueberschrieben mit „Die Schritte 3, 4 und 5 laufen parallel".
+    expect(schritte(s).filter((x) => x.status === "active").map((x) => x.key)).toEqual([
+      "modalitaeten",
+      "pruefen",
+    ]);
+  });
+});
+
+// =============================================
+// (e) HR hat geprueft
+// =============================================
+
+describe("HR-Status", () => {
+  const s = stand({
+    status: "REVIEWED",
+    submittedAt: "2026-09-19T12:00:00.000Z",
+    reviewedAt: "2026-09-21T12:00:00.000Z",
+    personalData: { isComplete: true, currentStep: 9 },
+    supervisorToken: "tok-sv",
+    supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+    supervisorData: { isComplete: true, currentStep: 5 },
+    checklistItems: [
+      { id: "c1", title: "Benutzerkonto anlegen", isCompleted: false, assignee: "IT", notes: null },
+    ],
+  });
+
+  it("„Daten prüfen“ erledigt mit Pruefdatum, Checkliste aktiv", () => {
+    const alle = schritte(s);
+    expect(finde(alle, "pruefen").status).toBe("completed");
+    expect(finde(alle, "pruefen").completedAt).toBe("21.09.2026");
+    expect(finde(alle, "checkliste").status).toBe("active");
+    expect(alle.filter((x) => x.status === "active")).toHaveLength(1);
+  });
+
+  it("der erledigte Schritt „Daten prüfen“ behaelt seine drei Haken", () => {
+    // `bereitZurPruefung` ist mit dem HR-Status false. Haengen die Haken daran,
+    // klappt HR den erledigten Schritt auf und sieht NICHTS — dabei sind sie
+    // gerade dann die Begruendung des Hakens.
+    expect((finde(schritte(s), "pruefen").items ?? []).map((i) => i.title)).toEqual([
+      "Personalfragebogen vollständig",
+      "Modalitäten vollständig",
+      "0 Dokumente hochgeladen",
+    ]);
+  });
+
+  it("EXPIRED gilt NICHT als geprueft", () => {
+    // `istHrStatus` umfasst auch EXPIRED. Haengt der Haken daran, traegt ein
+    // abgelaufener Vorgang einen gruenen Haken an „Daten prüfen“ — ohne Datum
+    // und ohne dass je jemand geprueft haette.
+    const alle = schritte(stand({ status: "EXPIRED", submittedAt: "2026-09-19T12:00:00.000Z" }));
+    expect(finde(alle, "pruefen").status).toBe("upcoming");
+    expect(finde(alle, "pruefen").items).toBeUndefined();
+    expect(finde(alle, "checkliste").status).toBe("upcoming");
+  });
+
+  it("geprueft ohne Modalitaeten (Ehrenamt): der Schritt steht still statt ewig aktiv zu bleiben", () => {
+    const alle = schritte(
+      stand({
+        status: "REVIEWED",
+        submittedAt: "2026-09-19T12:00:00.000Z",
+        personalData: { isComplete: true, currentStep: 9 },
+      }),
+    );
+    expect(finde(alle, "modalitaeten").status).toBe("upcoming");
+    expect(finde(alle, "modalitaeten").actions).toBeUndefined();
+  });
+
+  it("Abschluss traegt `completedAt`, nicht das Datum der Fragebogen-Abgabe", () => {
+    const alle = schritte(
+      stand({
+        status: "COMPLETED",
+        submittedAt: "2026-09-19T12:00:00.000Z",
+        completedAt: "2026-09-25T12:00:00.000Z",
+        personalData: { isComplete: true, currentStep: 9 },
+        supervisorToken: "tok-sv",
+        supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+        checklistItems: [
+          { id: "c1", title: "Konto", isCompleted: true, assignee: "IT", notes: null },
+        ],
+      }),
+    );
+    expect(finde(alle, "abschluss").status).toBe("completed");
+    expect(finde(alle, "abschluss").completedAt).toBe("25.09.2026");
+  });
+});
+
+// =============================================
+// (f) Altfall: Zeitstempel fehlt, isComplete steht
+// =============================================
+
+describe("Altfaelle ohne Zeitstempel", () => {
+  it("`personalData.isComplete` allein zaehlt als eingereicht", () => {
+    const alle = schritte(
+      stand({ submittedAt: null, personalData: { isComplete: true, currentStep: 9 } }),
+    );
+    expect(finde(alle, "fragebogen").status).toBe("completed");
+    // Ohne Zeitstempel bleibt das Datum leer statt „—" zu behaupten.
+    expect(finde(alle, "fragebogen").completedAt).toBeUndefined();
+  });
+
+  it("`supervisorData.isComplete` allein zaehlt ebenso", () => {
+    const alle = schritte(
+      stand({
+        supervisorToken: "tok-sv",
+        supervisorSubmittedAt: null,
+        supervisorData: { isComplete: true, currentStep: 5 },
+      }),
+    );
+    expect(finde(alle, "modalitaeten").status).toBe("completed");
+    expect(finde(alle, "fragebogen").info).toContain(
+      "✓ Einstellungsmodalitäten bereits eingereicht, unabhängig vom Fragebogen.",
+    );
+  });
+});
+
+// =============================================
+// (g) Abgelaufener Vorgesetzten-Link
+// =============================================
+
+describe("abgelaufener Vorgesetzten-Link", () => {
+  const s = stand({
+    supervisorToken: "tok-sv",
+    supervisorEmail: "leitung@example.org",
+    supervisorTokenExpiresAt: "2026-09-15T12:00:00.000Z",
+    supervisorData: { isComplete: false, currentStep: 2 },
+  });
+
+  it("Info nennt den Ablauftag, die Aktion den Ausweg", () => {
+    const step = finde(schritte(s, { modalitaetenLink: "https://hr.fes-credo.de/modalitaeten/tok-sv" }), "modalitaeten");
+    expect(step.info).toBe("Link abgelaufen am 15.09.2026 — bitte neuen Link erzeugen");
+    expect(knopfnamen(step)).toEqual(["Neuen Vorgesetzten-Link erzeugen"]);
+  });
+});
+
+// =============================================
+// Checkliste und Abteilungen
+// =============================================
+
+describe("Schritt „Checkliste abarbeiten“", () => {
+  it("ohne Abteilungsdaten bleibt der Hinweis leer, der Fortschritt zaehlt", () => {
+    const alle = schritte(
+      stand({
+        status: "REVIEWED",
+        submittedAt: "2026-09-19T12:00:00.000Z",
+        personalData: { isComplete: true, currentStep: 9 },
+        checklistItems: [
+          { id: "c1", title: "Konto anlegen", isCompleted: true, assignee: "IT", notes: null },
+          { id: "c2", title: "Schlüssel", isCompleted: false, assignee: null, notes: "Notiz" },
+        ],
+      }),
+    );
+    const step = finde(alle, "checkliste");
+    expect(step.progress).toEqual({ done: 1, total: 2 });
+    expect((step.items ?? []).map((i) => i.title)).toEqual(["Schlüssel"]);
+    // Rohschluessel werden nie angezeigt.
+    expect(step.items?.[0].assignee).toBeUndefined();
+    expect(step.info).toBeUndefined();
+  });
+});
+
+// =============================================
+// spurenChips
+// =============================================
+
+describe("spurenChips", () => {
+  it("Fragebogen: eingereicht / in Bearbeitung / nicht begonnen", () => {
+    const [fertig] = spurenChips(
+      stand({ submittedAt: "2026-09-19T12:00:00.000Z", personalData: { isComplete: true, currentStep: 9 } }),
+      JETZT,
+    );
+    expect(fertig.text).toBe("✓ Fragebogen: eingereicht 19.09.2026");
+    expect(fertig.kurz).toBe("eingereicht 19.09.2026");
+    expect(fertig.ton).toBe("fertig");
+
+    const [laufend] = spurenChips(stand(), JETZT);
+    expect(laufend.text).toBe("Fragebogen: Schritt 4 von 9");
+    expect(laufend.kurz).toBe("Schritt 4 von 9");
+    expect(laufend.ton).toBe("offen");
+
+    const [leer] = spurenChips(
+      stand({
+        fragebogenFortschritt: { position: 0, total: 9, titel: "noch nicht begonnen", prozent: 0 },
+      }),
+      JETZT,
+    );
+    expect(leer.text).toBe("Fragebogen: noch nicht begonnen");
+  });
+
+  it("Modalitaeten: eingereicht / kein Link / abgelaufen / in Bearbeitung / nicht begonnen", () => {
+    const [, eingereicht] = spurenChips(
+      stand({
+        supervisorToken: "tok-sv",
+        supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+        supervisorData: { isComplete: true, currentStep: 5 },
+      }),
+      JETZT,
+    );
+    expect(eingereicht.text).toBe("✓ Modalitäten: eingereicht 18.09.2026");
+    expect(eingereicht.ton).toBe("fertig");
+
+    const [, ohneLink] = spurenChips(stand(), JETZT);
+    expect(ohneLink.text).toBe("Modalitäten: kein Link");
+    expect(ohneLink.kurz).toBe("kein Link");
+
+    const [, abgelaufen] = spurenChips(
+      stand({
+        supervisorToken: "tok-sv",
+        supervisorTokenExpiresAt: "2026-09-15T12:00:00.000Z",
+        supervisorData: { isComplete: false, currentStep: 2 },
+      }),
+      JETZT,
+    );
+    expect(abgelaufen.text).toBe("Modalitäten: Link abgelaufen");
+    expect(abgelaufen.ton).toBe("warnung");
+
+    const [, laufend] = spurenChips(
+      stand({
+        supervisorToken: "tok-sv",
+        supervisorTokenExpiresAt: "2026-10-20T12:00:00.000Z",
+        supervisorData: { isComplete: false, currentStep: 1 },
+      }),
+      JETZT,
+    );
+    expect(laufend.text).toBe("Modalitäten: Schritt 2 von 5");
+
+    const [, unberuehrt] = spurenChips(
+      stand({
+        supervisorToken: "tok-sv",
+        supervisorTokenExpiresAt: "2026-10-20T12:00:00.000Z",
+        supervisorData: { isComplete: false, currentStep: 0 },
+      }),
+      JETZT,
+    );
+    expect(unberuehrt.text).toBe("Modalitäten: noch nicht begonnen");
+    expect(unberuehrt.kurz).toBe("noch nicht begonnen");
+  });
+});
+
+// =============================================
+// „Sie sind hier"
+// =============================================
+
+describe("onboardingKurzschritte", () => {
+  it("beide Spuren offen: ZWEI aktuelle Stationen", () => {
+    const { schritte: stationen, aktuell } = onboardingKurzschritte(stand());
+    expect(stationen.map((x) => x.label)).toEqual([
+      "Einladung",
+      "Fragebogen",
+      "Modalitäten",
+      "Prüfen",
+      "Checkliste",
+      "Abschluss",
+    ]);
+    expect([...aktuell].sort()).toEqual([1, 2]);
+  });
+
+  it("eine Spur fertig: nur die erste offene Station", () => {
+    const { aktuell } = onboardingKurzschritte(
+      stand({
+        submittedAt: "2026-09-19T12:00:00.000Z",
+        personalData: { isComplete: true, currentStep: 9 },
+        supervisorToken: "tok-sv",
+      }),
+    );
+    expect([...aktuell]).toEqual([2]);
+  });
+
+  it("abgeschlossen: die letzte Station", () => {
+    const { schritte: stationen, aktuell } = onboardingKurzschritte(
+      stand({
+        status: "COMPLETED",
+        submittedAt: "2026-09-19T12:00:00.000Z",
+        personalData: { isComplete: true, currentStep: 9 },
+        supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+        supervisorData: { isComplete: true, currentStep: 5 },
+        checklistItems: [
+          { id: "c1", title: "Konto", isCompleted: true, assignee: null, notes: null },
+        ],
+      }),
+    );
+    expect(stationen.every((x) => x.done)).toBe(true);
+    expect([...aktuell]).toEqual([5]);
+  });
+});

@@ -246,6 +246,11 @@ da ist. Geprueft wird, sobald der Fragebogen eingereicht ist und — falls ein
 Vorgesetzten-Link besteht — auch die Modalitaeten (siehe
 [Onboarding-Status](#onboarding-status-zwei-spuren)).
 
+HR sieht beide Spuren nebeneinander: Die Uebersicht des Vorgangs zeigt die
+Schritte „Personalfragebogen" und „Einstellungsmodalitaeten" als zwei
+gleichzeitig aktive Karten, im Kopf der Detailseite steht je Spur ein
+Status-Chip.
+
 ### Personalfragebogen
 
 Mehrstufiges Formular mit folgenden Bereichen:
@@ -298,9 +303,10 @@ Der Dispatcher (`triggerWebhooks` in `src/lib/webhooks.ts`) arbeitet wie folgt:
 | Event                      | Beschreibung                                           | Payload (Auswahl)                      |
 |----------------------------|--------------------------------------------------------|----------------------------------------|
 | `onboarding-created`       | Neuer Onboarding-Vorgang erstellt                      | email, vorname, nachname, firstName, lastName, displayId, fragebogenLink, organization, tokenExpiresAt |
-| `questionnaire-completed`  | Mitarbeiter hat Personalfragebogen abgeschickt          | email, displayId, organization         |
+| `questionnaire-confirmation-employee` | Eingangsbestaetigung an die neue Person, direkt nach dem Absenden des Fragebogens. Laeuft seit 09/2026 ueber den Dispatcher (vorher versendete die Route selbst per `sendEmail`) — damit wirken Versandprotokoll, Aktiv-Schalter, Empfaenger- und Antwortfelder der Vorlage, und ein Webhook auf dieses Ereignis feuert tatsaechlich | onboardingId, displayId, email, vorname, nachname, organization. Empfaenger ohne gespeicherte Vorlage: Katalog-Default `{{email}}` |
+| `questionnaire-completed`  | Mitarbeiter hat Personalfragebogen abgeschickt (HR-Benachrichtigung) | onboardingId, displayId, email, mitarbeiter_name (Name oder neutrale Bezeichnung, nie die Adresse der Person), organization sowie genau EIN Merker zur Gegenspur: modalitaeten_eingereicht, modalitaeten_offen oder ohne_vorgesetzten_link |
 | `supervisor-link-created`  | Magic Link fuer Vorgesetzten generiert (auch direkt beim Anlegen) | supervisorEmail, modalitaetenLink, employeeName / mitarbeiter_name (Name oder neutrale Bezeichnung, nie die Adresse der Person), displayId, supervisorTokenExpiresAt |
-| `supervisor-completed`     | Vorgesetzter hat Modalitaeten ausgefuellt               | email, displayId, supervisorEmail      |
+| `supervisor-completed`     | Vorgesetzter hat Modalitaeten ausgefuellt (HR-Benachrichtigung) | onboardingId, displayId, email, supervisorEmail, mitarbeiter_name (Name oder neutrale Bezeichnung), organization sowie genau EIN Merker zur Gegenspur: fragebogen_eingereicht oder fragebogen_offen |
 | `offboarding-department-assigned` | Abteilung bzw. Fuehrungskraft bekommt ihre Offboarding-Aufgaben per Link („Abteilungen informieren", „Erneut senden", „Link erneuern", „Erinnern" nach Adressaenderung) | email, departmentKey, departmentName / abteilung, link / magicLink, token, expiresAt, taskCount (gelistete Aufgaben), aufgabenliste, aufgabenliste_html, anzahl_aufgaben, naechste_faelligkeit, erneut_gesendet, neuer_link, ist_fuehrungskraft |
 | `offboarding-reminder`     | Erinnerung an eine informierte Abteilung — Knopf „Erinnern" und taeglicher Lauf mit gleichem Aufbau | email, departmentName / abteilung, link, expiresAt, reminderCount, level (INFO/WARNING/ESCALATION), overdueItems, upcomingItems, totalOpenItems, maxOverdueDays, ist_info, ist_warnung, ist_eskalation, ist_ueberfaellig, ueberfaellige_aufgaben, tage_ueberfaellig, aufgabenliste, aufgabenliste_html |
 | `offboarding-task-completed` | Aufgabe offen → erledigt, genau einmal: ueber den Link oder im Portal (dort nur Aufgaben einer Link-Abteilung). Geht nur hinaus, wenn in der Vorlage ein An-Feld steht | itemId, aufgabe, departmentKey, departmentName / abteilung, erledigt_ueber („Link der Abteilung", „Link der Führungskraft", „Portal"), offene_aufgaben, offene_aufgaben_abteilung, kommentar (schon maskiert), kommentar_text (roh); Portal zusaetzlich taskId, taskTitle, taskCategory, completedById — kein `email` |
@@ -311,6 +317,18 @@ Der Dispatcher (`triggerWebhooks` in `src/lib/webhooks.ts`) arbeitet wie folgt:
 | `onboarding-department-completed` | Abteilung hat ueber ihren Link alle Onboarding-Aufgaben erledigt, genau einmal | email, departmentKey, departmentName / abteilung, completedAt, anzahl_aufgaben, ist_fuehrungskraft |
 
 Die vier Offboarding-Events tragen zusaetzlich die Vorgangsfelder (offboardingId, displayId, employeeName, vorname, nachname, einrichtung, lastWorkingDay, austrittsdatum), die vier Onboarding-Events entsprechend onboardingId, displayId, employeeName / mitarbeiter_name (Name oder neutrale Bezeichnung, nie die private Adresse der Person), vorname, nachname, organization / einrichtung, contractStartDate und vertragsbeginn. Merker wie `neuer_link` oder `ist_warnung` sind `"ja"` oder leer. Alle aelteren Felder bleiben fuer bestehende Webhook-Abnehmer erhalten. Ist die Portal-Vorlage deaktiviert und fuer das Event ein Webhook aktiv, gilt der Link als zugestellt (Status `WEBHOOK`); sonst verschickt das Portal die Mail selbst, und ein zusaetzlicher n8n-Workflow mit eigener Mail fuehrt zu Doppelversand. Regeln: CLAUDE.md, Abschnitt „Abteilungsaufgaben".
+
+Die beiden HR-Benachrichtigungen `questionnaire-completed` und
+`supervisor-completed` sagen „bereit zur Pruefung" nur, wenn beide Spuren
+vorliegen. Welcher Satz erscheint, steuert genau ein Merker im Payload
+(`"ja"` oder leer, nie `true`/`false` — die Vorlagen kennen nur „nicht leer"):
+`modalitaeten_eingereicht` bzw. `fragebogen_eingereicht` = bereit,
+`ohne_vorgesetzten_link` = kein Vorgesetzten-Link vergeben (z. B. Ehrenamt,
+ebenfalls bereit), `modalitaeten_offen` bzw. `fragebogen_offen` = die
+Gegenspur fehlt noch. Die Merker kommen aus dem Status, den dieselbe
+Transaktion aus beiden Spuren berechnet hat, nicht aus dem Lesestand davor.
+Nach einem Deploy zeigen bereits gespeicherte Vorlagen den neuen Text erst
+nach „Text auf Standard zuruecksetzen".
 
 ### Abteilungsaufgaben: Routen (Offboarding und Onboarding)
 

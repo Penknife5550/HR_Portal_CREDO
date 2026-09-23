@@ -39,6 +39,7 @@ import {
 } from "@/lib/mailer";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
+import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
 
 const activeSmtpConfig = {
   id: "default",
@@ -523,5 +524,273 @@ describe("pruefeVorlagenSyntax", () => {
         }),
       }).toEqual({ event: t.event, fehler: [] });
     }
+  });
+});
+
+/**
+ * Paket 2: Die beiden HR-Mails sprechen ueber die GEGENSPUR. `renderTemplate`
+ * kann nicht negieren, deshalb liegen die Faelle als flache, sich gegenseitig
+ * ausschliessende Bloecke nebeneinander. Hier wird nachgehalten, dass immer
+ * genau einer davon stehen bleibt — und dass „bereit zur Prüfung" nie ohne
+ * Beleg erscheint.
+ */
+describe("HR-Mails der parallelen Onboarding-Spuren", () => {
+  const BEREIT = "bereit zur Prüfung";
+
+  /** Die Code-Vorlage des Ereignisses, mit einem HR-Empfaenger versehen. */
+  function codeVorlage(event: string) {
+    const t = DEFAULT_EMAIL_TEMPLATES.find((v) => v.event === event)!;
+    return {
+      ...baseTemplate,
+      event,
+      subject: t.subject,
+      bodyHtml: t.bodyHtml,
+      bodyText: t.bodyText,
+      recipientTo: "personal@example.org",
+    };
+  }
+
+  function rendern(event: string, merker: Record<string, string>) {
+    const { rendered } = renderEventEmail(codeVorlage(event), event, {
+      onboardingId: "o1",
+      displayId: "2026-GYM-042",
+      email: "privat@gmx.example",
+      mitarbeiter_name: "Anna Beispiel",
+      supervisorEmail: "leitung@example.org",
+      organization: "Berufskolleg",
+      ...merker,
+    });
+    return rendered!;
+  }
+
+  /** Wie oft ein Satz in Betreff, HTML und Textteil zusammen vorkommt. */
+  function wieOft(mail: { subject: string; html: string; text?: string }, satz: string) {
+    return [mail.subject, mail.html, mail.text ?? ""]
+      .map((teil) => teil.split(satz).length - 1)
+      .reduce((a, b) => a + b, 0);
+  }
+
+  it("Fragebogen-Mail: „bereit zur Prüfung“ nur, wenn die Modalitaeten vorliegen", () => {
+    const mail = rendern("questionnaire-completed", {
+      modalitaeten_eingereicht: "ja",
+      modalitaeten_offen: "",
+      ohne_vorgesetzten_link: "",
+    });
+
+    expect(mail.html).toContain("Die Einstellungsmodalitäten der Führungskraft liegen bereits vor.");
+    expect(mail.text).toContain("Die Einstellungsmodalitäten der Führungskraft liegen bereits vor.");
+    expect(mail.html).not.toContain("stehen noch aus");
+    expect(mail.html).not.toContain("kein Vorgesetzten-Link vergeben");
+  });
+
+  it("Fragebogen-Mail: offene Modalitaeten behaupten NICHT „bereit zur Prüfung“", () => {
+    const mail = rendern("questionnaire-completed", {
+      modalitaeten_eingereicht: "",
+      modalitaeten_offen: "ja",
+      ohne_vorgesetzten_link: "",
+    });
+
+    expect(mail.html).toContain("stehen noch aus");
+    expect(mail.text).toContain("stehen noch aus");
+    expect(wieOft(mail, BEREIT)).toBe(0);
+  });
+
+  it("Fragebogen-Mail: ohne Vorgesetzten-Link ist der Vorgang prueffaehig", () => {
+    const mail = rendern("questionnaire-completed", {
+      modalitaeten_eingereicht: "",
+      modalitaeten_offen: "",
+      ohne_vorgesetzten_link: "ja",
+    });
+
+    expect(mail.html).toContain("kein Vorgesetzten-Link vergeben");
+    expect(mail.html).not.toContain("stehen noch aus");
+  });
+
+  it("Fragebogen-Mail: nie zwei Statussaetze zugleich", () => {
+    for (const merker of [
+      { modalitaeten_eingereicht: "ja", modalitaeten_offen: "", ohne_vorgesetzten_link: "" },
+      { modalitaeten_eingereicht: "", modalitaeten_offen: "ja", ohne_vorgesetzten_link: "" },
+      { modalitaeten_eingereicht: "", modalitaeten_offen: "", ohne_vorgesetzten_link: "ja" },
+    ]) {
+      const mail = rendern("questionnaire-completed", merker);
+      const saetze = [
+        "liegen bereits vor",
+        "stehen noch aus",
+        "kein Vorgesetzten-Link vergeben",
+      ].filter((satz) => mail.html.includes(satz));
+      expect({ merker, saetze }).toEqual({ merker, saetze: [saetze[0]] });
+    }
+  });
+
+  it("Fragebogen-Mail: ohne jeden Merker steht gar kein Statussatz da", () => {
+    // Sicherheitsnetz fuer den Fall, dass der Abgleich fehlt: kein Satz ist
+    // besser als ein falscher.
+    const mail = rendern("questionnaire-completed", {
+      modalitaeten_eingereicht: "",
+      modalitaeten_offen: "",
+      ohne_vorgesetzten_link: "",
+    });
+
+    expect(wieOft(mail, BEREIT)).toBe(0);
+    expect(mail.html).not.toContain("stehen noch aus");
+    expect(mail.html).not.toContain("kein Vorgesetzten-Link vergeben");
+  });
+
+  it("Modalitaeten-Mail: „bereit zur Prüfung“ nur mit vorliegendem Fragebogen", () => {
+    const fertig = rendern("supervisor-completed", {
+      fragebogen_eingereicht: "ja",
+      fragebogen_offen: "",
+    });
+    const offen = rendern("supervisor-completed", {
+      fragebogen_eingereicht: "",
+      fragebogen_offen: "ja",
+    });
+
+    expect(fertig.html).toContain("Der Personalfragebogen liegt bereits vor.");
+    expect(fertig.html).not.toContain("steht noch aus");
+    expect(offen.html).toContain("Der Personalfragebogen steht noch aus.");
+    expect(wieOft(offen, BEREIT)).toBe(0);
+  });
+
+  it("Modalitaeten-Mail: behauptet nicht mehr, der Vorgang sei abzuschliessen", () => {
+    // Alter Text: „Alle Daten eingegangen" / „Der Vorgang kann jetzt
+    // abgeschlossen werden" — beides falsch, solange der Fragebogen fehlt.
+    const mail = rendern("supervisor-completed", {
+      fragebogen_eingereicht: "",
+      fragebogen_offen: "ja",
+    });
+
+    expect(mail.html).not.toContain("Alle Daten eingegangen");
+    expect(mail.html).not.toContain("kann jetzt abgeschlossen werden");
+    expect(mail.text).not.toContain("Bitte schließen Sie den Vorgang im HR-Portal ab.");
+  });
+
+  it("beide Mails tragen Name und Vorgangsnummer im Betreff — nie die private Adresse", () => {
+    const fragebogen = rendern("questionnaire-completed", { modalitaeten_offen: "ja" });
+    const modalitaeten = rendern("supervisor-completed", { fragebogen_offen: "ja" });
+
+    for (const mail of [fragebogen, modalitaeten]) {
+      expect(mail.subject).toContain("Anna Beispiel");
+      expect(mail.subject).toContain("2026-GYM-042");
+      expect(mail.subject).not.toContain("privat@gmx.example");
+    }
+  });
+
+  it("ohne Namen bleibt der Satz lesbar: „für“, nicht „von“", () => {
+    // `MITARBEITER_NEUTRAL` ist ein AKKUSATIV („die neue Mitarbeiterin / den
+    // neuen Mitarbeiter"). Nach „von" (Dativ) stand da „Der Personalfragebogen
+    // von die neue Mitarbeiterin / den neuen Mitarbeiter…". Im parallelen
+    // Ablauf ist „noch kein Name" der Regelfall, nicht die Ausnahme.
+    const mail = rendern("questionnaire-completed", {
+      mitarbeiter_name: MITARBEITER_NEUTRAL,
+      modalitaeten_offen: "ja",
+    });
+
+    expect(mail.html).toContain(
+      `Der Personalfragebogen für <strong>${MITARBEITER_NEUTRAL}</strong> wurde soeben`,
+    );
+    expect(mail.text).toContain(`Der Personalfragebogen für ${MITARBEITER_NEUTRAL} wurde soeben`);
+    expect(mail.html).not.toContain("Personalfragebogen von");
+    expect(mail.text).not.toContain("Personalfragebogen von");
+    // Bei der Modalitaeten-Mail traegt „für" den Akkusativ schon immer.
+    const mod = rendern("supervisor-completed", {
+      mitarbeiter_name: MITARBEITER_NEUTRAL,
+      fragebogen_offen: "ja",
+    });
+    expect(mod.subject).toBe(
+      `Einstellungsmodalitäten für ${MITARBEITER_NEUTRAL} eingereicht (2026-GYM-042)`,
+    );
+  });
+
+  it("laesst keinen rohen {{...}}-Marker in der fertigen Mail stehen", () => {
+    for (const mail of [
+      rendern("questionnaire-completed", { modalitaeten_eingereicht: "ja" }),
+      rendern("questionnaire-completed", { modalitaeten_offen: "ja" }),
+      rendern("questionnaire-completed", { ohne_vorgesetzten_link: "ja" }),
+      rendern("supervisor-completed", { fragebogen_eingereicht: "ja" }),
+      rendern("supervisor-completed", { fragebogen_offen: "ja" }),
+    ]) {
+      for (const teil of [mail.subject, mail.html, mail.text ?? ""]) {
+        expect(teil).not.toMatch(/\{\{/);
+      }
+    }
+  });
+});
+
+/**
+ * Paket 2: Die Eingangsbestaetigung an die Person lief frueher an
+ * `sendEventEmail` vorbei (eigene `replaceAll`-Schleife, `sendEmail` direkt).
+ * Damit wirkten weder Versandprotokoll noch Aktiv-Schalter noch die
+ * Empfaengerfelder der Vorlage. Hier wird der neue Weg festgehalten.
+ */
+describe("Eingangsbestaetigung an die Person (questionnaire-confirmation-employee)", () => {
+  const EVENT = "questionnaire-confirmation-employee";
+  const nutzlast = {
+    onboardingId: "o1",
+    displayId: "2026-GYM-042",
+    email: "privat@gmx.example",
+    vorname: "Anna",
+    nachname: "Beispiel",
+    organization: "Berufskolleg",
+  };
+
+  it("geht ohne gespeicherte Vorlage an die Person — der Empfaenger kommt aus dem Katalog", async () => {
+    // resolveEventTemplate liefert fuer Code-Vorlagen recipientTo: "";
+    // renderEventEmail faellt dann auf den Katalog-Default {{email}} zurueck.
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue(null);
+
+    const result = await sendEventEmail(EVENT, nutzlast);
+
+    expect(result.status).toBe("SENT");
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "privat@gmx.example" })
+    );
+  });
+
+  it("landet im Versandprotokoll", async () => {
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue(null);
+
+    await sendEventEmail(EVENT, nutzlast);
+
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ event: EVENT, status: "SENT" }),
+    });
+  });
+
+  it("respektiert den Aktiv-Schalter der Vorlage", async () => {
+    // Frueher wirkungslos: Die Route las die Vorlage selbst und versendete
+    // ohne jede Pruefung.
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({
+      ...baseTemplate,
+      event: EVENT,
+      recipientTo: "{{email}}",
+      isActive: false,
+    });
+
+    const result = await sendEventEmail(EVENT, nutzlast);
+
+    expect(result.status).toBe("SKIPPED");
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ event: EVENT, status: "SKIPPED" }),
+    });
+  });
+
+  it("nimmt den Empfaenger aus der Vorlage, wenn HR dort einen eintraegt", async () => {
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({
+      ...baseTemplate,
+      event: EVENT,
+      recipientTo: "{{email}}",
+      recipientCc: "personal@example.org",
+    });
+
+    await sendEventEmail(EVENT, nutzlast);
+
+    expect(mockSendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "privat@gmx.example",
+        cc: "personal@example.org",
+      })
+    );
   });
 });

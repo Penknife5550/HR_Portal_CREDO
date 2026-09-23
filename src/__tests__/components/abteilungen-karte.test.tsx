@@ -754,6 +754,37 @@ describe("Tab Übersicht", () => {
     expect(text).not.toContain("VERWALTUNG");
   });
 
+  it("offene Abteilungen UND offene Rückgaben: beide Schritte sind sichtbar", () => {
+    // Bis Paket 2 rendere der Stepper nur den ERSTEN aktiven Schritt — Schritt 3
+    // („Rueckgaben einsammeln") verschwand spurlos, obwohl `calcStatus` ihn
+    // seit jeher parallel zu Schritt 2 aktiv setzt. Die Logik ist unveraendert,
+    // nur die Anzeige holt ihn jetzt ans Licht.
+    uebersicht(
+      vorgang({
+        returnItems: [
+          {
+            id: "r1",
+            category: "Hardware",
+            itemName: "Dienstlaptop",
+            serialNumber: null,
+            isReturned: false,
+            returnedAt: null,
+            condition: null,
+            notes: null,
+          },
+        ],
+      }),
+    );
+    const text = seitentext();
+    expect(text).toContain("Aufgaben per Link an Abteilungen und Führungskraft verteilen");
+    expect(text).toContain("Hardware, Schlüssel, Fahrzeuge und Dokumente zurückfordern");
+    expect(text).toContain("Dienstlaptop");
+    expect(
+      document.querySelector('[data-hinweis="parallele-schritte"]')?.textContent ?? "",
+    ).toContain("Schritte 2 und 3 laufen parallel, in beliebiger Reihenfolge");
+    expect(screen.queryAllByText("Läuft parallel")).toHaveLength(2);
+  });
+
   it("Führungskraft aus der Zeugnis-Bewertung: grauer Hinweis, solange nichts eingetragen ist", () => {
     uebersicht(
       vorgang({ fuehrungskraft: { email: "chef@fes-minden.de", name: "Karl Chef", quelle: "ZEUGNIS" } }),

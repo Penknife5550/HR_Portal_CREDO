@@ -36,7 +36,6 @@ jest.mock("@/lib/rate-limit", () => ({
   getClientIpOrNull: () => "203.0.113.7",
 }));
 jest.mock("@/lib/n8n", () => ({ triggerN8nWebhook: jest.fn() }));
-jest.mock("@/lib/mailer", () => ({ sendEmail: jest.fn() }));
 jest.mock("@/lib/encryption", () => ({
   encrypt: (v: string) => v,
   decrypt: (v: string) => v,

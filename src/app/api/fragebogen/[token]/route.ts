@@ -14,11 +14,12 @@ import {
   HR_STATUS,
   istHrStatus,
   mitarbeiterAbgesendet,
+  mitarbeiterName,
+  MITARBEITER_NEUTRAL,
 } from "@/lib/onboarding-spuren";
 import { statusAbgleichen } from "@/lib/onboarding-status-abgleich";
+import type { StatusAbgleich } from "@/lib/onboarding-status-abgleich";
 import { triggerN8nWebhook } from "@/lib/n8n";
-import { sendEmail } from "@/lib/mailer";
-import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { encrypt, decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { tokenRateLimiter, getClientIp, getClientIpOrNull } from "@/lib/rate-limit";
 import {
@@ -981,8 +982,14 @@ export async function POST(
   // Erklaerung und das Protokoll. Ein eigenes `new Date()` ergaebe drei
   // minimal verschiedene Zeitstempel fuer einen Vorgang, und submittedAt ist
   // der Anker fuer das RV-Wirkungsdatum beim Aufhebungsantrag.
+  //
+  // Der Abgleich wird aus der Transaktion HERAUSGEREICHT: Die HR-Mail unten
+  // braucht den Status, den DIESELBE Transaktion aus beiden Spuren berechnet
+  // hat. Der Lesestand von vor der Transaktion (validateMagicToken) kennt eine
+  // gleichzeitige Abgabe der Fuehrungskraft nicht.
+  let abgleich: StatusAbgleich | null = null;
   try {
-    await prisma.$transaction(async (tx) => {
+    abgleich = await prisma.$transaction(async (tx) => {
       const beansprucht = await tx.onboardingProcess.updateMany({
         where: {
           id: onboarding.id,
@@ -1014,7 +1021,7 @@ export async function POST(
       // Erst jetzt den Status aus beiden Spuren ableiten: SUBMITTED (kein
       // Vorgesetzten-Link), SUPERVISOR_PENDING (Link offen) oder
       // SUPERVISOR_SUBMITTED (die Modalitaeten lagen schon vor).
-      const abgleich = await statusAbgleichen(tx, onboarding.id);
+      const ergebnis = await statusAbgleichen(tx, onboarding.id);
 
       // Der Protokolleintrag gehoert in denselben Commit: Er ist der Nachweis
       // der Abgabe, nicht bloss ein Logeintrag daneben.
@@ -1027,7 +1034,7 @@ export async function POST(
             submittedAt: abgegebenAm.toISOString(),
             // Welcher Status sich daraus ergab — bei zwei Spuren ist das nicht
             // mehr selbstverstaendlich SUBMITTED.
-            status: { von: abgleich.von, nach: abgleich.nach },
+            status: { von: ergebnis.von, nach: ergebnis.nach },
             erklaerungOrt: absenden.data.erklaerungOrt,
             erklaerungVersion: absenden.data.erklaerungVersion,
             erklaerungPruefsumme: pruefsumme,
@@ -1081,6 +1088,8 @@ export async function POST(
           },
         });
       }
+
+      return ergebnis;
     });
   } catch (error) {
     if (error instanceof BereitsEingereicht) {
@@ -1100,66 +1109,52 @@ export async function POST(
     );
   }
 
-  // n8n Webhook aufrufen (falls konfiguriert) – HR-Benachrichtigung
+  const vorgangsnummer =
+    onboarding.displayId || onboarding.id.substring(0, 8).toUpperCase();
+
+  // Ausdruecklich gesetzt und nie leer: `extractVariables` faellt fuer
+  // {{mitarbeiter_name}} zuletzt auf `payload.email` zurueck (mailer.ts) — im
+  // Betreff der HR-Mail stuende dann die PRIVATE Adresse der Person.
+  const name = mitarbeiterName(onboarding) ?? MITARBEITER_NEUTRAL;
+
+  // HR-Benachrichtigung „Fragebogen eingereicht".
   await triggerN8nWebhook("questionnaire-completed", {
     onboardingId: onboarding.id,
+    displayId: vorgangsnummer,
+    // bleibt: {{email}} im Datenkasten und bestehende Webhook-Abnehmer
     email: onboarding.email,
+    mitarbeiter_name: name,
     organization: onboarding.organization.name,
+    // Genau EINER der drei Merker ist gesetzt. Quelle ist der Status, den
+    // DIESELBE Transaktion aus beiden Spuren berechnet hat (statusAbgleichen).
+    // Das `updateMany` oben schliesst die HR-Status aus, nach
+    // `mitarbeiterAbgesendet` bleiben also nur diese drei Faelle uebrig
+    // (gesamtStatus in onboarding-spuren.ts). Ist `abgleich` null, bleiben
+    // alle drei leer: kein Satz ist besser als ein falscher.
+    //
+    // Zeichenketten, keine Wahrheitswerte: `renderTemplate` kennt nur
+    // „nicht leer", und String(false) waere nicht leer — der Block bliebe
+    // stehen.
+    modalitaeten_eingereicht: abgleich?.nach === "SUPERVISOR_SUBMITTED" ? "ja" : "",
+    modalitaeten_offen: abgleich?.nach === "SUPERVISOR_PENDING" ? "ja" : "",
+    ohne_vorgesetzten_link: abgleich?.nach === "SUBMITTED" ? "ja" : "",
   });
 
-  // Bestaetigungs-E-Mail direkt an den Mitarbeiter senden
-  try {
-    // Personaldata für Vorname laden
-    const personalData = await prisma.personalData.findUnique({
-      where: { onboardingId: onboarding.id },
-      select: { firstName: true, lastName: true },
-    });
-
-    const vorname = personalData?.firstName || onboarding.firstName || "";
-    const nachname = personalData?.lastName || onboarding.lastName || "";
-    const displayId = onboarding.displayId || onboarding.id.substring(0, 8).toUpperCase();
-
-    // Template aus DB laden oder Default verwenden
-    const dbTemplate = await prisma.emailTemplate.findUnique({
-      where: { event: "questionnaire-confirmation-employee" },
-    });
-
-    const defaultTpl = DEFAULT_EMAIL_TEMPLATES.find(
-      (t) => t.event === "questionnaire-confirmation-employee"
-    );
-
-    const template = dbTemplate || defaultTpl;
-
-    if (template) {
-      const vars: Record<string, string> = {
-        "{{vorname}}": vorname,
-        "{{nachname}}": nachname,
-        "{{email}}": onboarding.email,
-        "{{einrichtung}}": onboarding.organization.name,
-        "{{vorgangsnummer}}": displayId,
-      };
-
-      let subject = dbTemplate ? dbTemplate.subject : defaultTpl!.subject;
-      let html = dbTemplate ? dbTemplate.bodyHtml : defaultTpl!.bodyHtml;
-      let text = dbTemplate ? (dbTemplate.bodyText || undefined) : defaultTpl!.bodyText;
-
-      for (const [key, value] of Object.entries(vars)) {
-        subject = subject.replaceAll(key, value);
-        html = html.replaceAll(key, value);
-        if (text) text = text.replaceAll(key, value);
-      }
-
-      await sendEmail({
-        to: onboarding.email,
-        subject,
-        html,
-        text,
-      });
-    }
-  } catch (emailError) {
-    // Bestaetigungs-E-Mail ist nicht kritisch – Fehler loggen, aber nicht abbrechen
-    console.error("[Fragebogen] Bestaetigungs-E-Mail an Mitarbeiter fehlgeschlagen:", emailError);
-  }
+  // Eingangsbestaetigung an die Person — seit Paket 2 ueber den normalen
+  // Versandweg statt ueber `sendEmail` mit selbst geladener Vorlage. Damit
+  // wirken Versandprotokoll, Aktiv-Schalter, Empfaenger- und Antwortfelder
+  // der Vorlage und ein etwaiger Webhook. Den Empfaenger traegt ohne
+  // gespeicherte Vorlage der Katalog-Default `{{email}}` (events.ts).
+  // `personalData` liefert `validateMagicToken` bereits mit — die zweite
+  // Abfrage war nie noetig.
+  await triggerN8nWebhook("questionnaire-confirmation-employee", {
+    onboardingId: onboarding.id,
+    displayId: vorgangsnummer,
+    email: onboarding.email,
+    vorname: onboarding.personalData?.firstName || onboarding.firstName || "",
+    nachname: onboarding.personalData?.lastName || onboarding.lastName || "",
+    organization: onboarding.organization.name,
+  });
 
   return NextResponse.json({
     success: true,

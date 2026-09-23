@@ -154,7 +154,7 @@ describe("Kostenstellen: eine entfernte Zeile bleibt entfernt", () => {
         kostenstellen: [{ bezeichnung: "4711", anteil: 100 }],
       }),
     );
-    expect(stepTitel()).toBe("Zusaetzliche Angaben");
+    expect(stepTitel()).toBe("Zusätzliche Angaben");
     expect(zeilenFelder().map((f) => f.value)).toEqual(["4711"]);
 
     await klicke("Entfernen");

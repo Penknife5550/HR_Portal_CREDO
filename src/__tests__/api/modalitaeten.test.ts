@@ -48,7 +48,12 @@ jest.mock("@/lib/rate-limit", () => ({
   // Moduls ("createRateLimiter is not a function").
   createRateLimiter: () => ({ check: () => ({ allowed: true }) }),
 }));
-jest.mock("@/lib/n8n", () => ({ triggerN8nWebhook: jest.fn() }));
+// Griff auf den Dispatcher: Die HR-Mail „Einstellungsmodalitaeten
+// eingereicht" muss dieselbe Aussage tragen wie der berechnete Status.
+const mockN8n = jest.fn();
+jest.mock("@/lib/n8n", () => ({
+  triggerN8nWebhook: (...a: unknown[]) => mockN8n(...a),
+}));
 
 import { GET, POST, PUT } from "@/app/api/modalitaeten/[token]/route";
 import { NextRequest } from "next/server";
@@ -555,6 +560,13 @@ describe("POST – parallele Spuren", () => {
     expect(mockPrisma.onboardingProcess.update).not.toHaveBeenCalled();
     const protokoll = mockPrisma.auditLog.create.mock.calls[0][0].data;
     expect(protokoll.details.status).toEqual({ von: "IN_PROGRESS", nach: "IN_PROGRESS" });
+    // Und die HR-Mail sagt dasselbe: kein „bereit zur Prüfung", solange der
+    // Fragebogen fehlt. Die Merker sind Zeichenketten — `renderTemplate`
+    // kennt nur „nicht leer".
+    expect(mockN8n).toHaveBeenCalledWith(
+      "supervisor-completed",
+      expect.objectContaining({ fragebogen_eingereicht: "", fragebogen_offen: "ja" }),
+    );
   });
 
   it("setzt „Bereit zur Prüfung“, wenn der Fragebogen schon eingereicht ist", async () => {
@@ -574,6 +586,17 @@ describe("POST – parallele Spuren", () => {
       where: { id: "ob1" },
       data: { status: "SUPERVISOR_SUBMITTED" },
     });
+    // Die Aussage der HR-Mail kommt aus DEMSELBEN Abgleich — sie stammt aus
+    // der Transaktion, nicht aus dem Lesestand davor.
+    expect(mockN8n).toHaveBeenCalledWith(
+      "supervisor-completed",
+      expect.objectContaining({
+        displayId: expect.any(String),
+        mitarbeiter_name: expect.any(String),
+        fragebogen_eingereicht: "ja",
+        fragebogen_offen: "",
+      }),
+    );
   });
 
   it("beansprucht die eigene Spur bedingt — samt Token, ohne HR-Status", async () => {

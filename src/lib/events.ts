@@ -354,10 +354,19 @@ export const EVENT_CATALOG: EventDefinition[] = [
     group: "Onboarding",
     recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
     defaultRecipients: { to: "" },
+    // Genau EINER der drei Merker ist im Echtbetrieb gesetzt (Paket 2) — sie
+    // schliessen einander aus, damit die Vorlage keinen zweiten Statussatz
+    // zeigt. `renderTemplate` kennt nur „nicht leer", also Zeichenketten
+    // ("ja" / ""), keine Wahrheitswerte: String(false) waere nicht leer.
     samplePayload: {
       onboardingId: "00000000-0000-0000-0000-000000000001",
+      displayId: "2026-GYM-001",
       email: "max.mustermann@example.org",
+      mitarbeiter_name: "Max Mustermann",
       organization: "FES Minden",
+      modalitaeten_eingereicht: "ja",
+      modalitaeten_offen: "",
+      ohne_vorgesetzten_link: "",
     },
     wired: true,
   },
@@ -388,10 +397,17 @@ export const EVENT_CATALOG: EventDefinition[] = [
     group: "Onboarding",
     recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
     defaultRecipients: { to: "" },
+    // Die beiden Merker schliessen einander aus (Paket 2): Entweder liegt der
+    // Fragebogen schon vor („bereit zur Prüfung") oder er steht noch aus.
     samplePayload: {
       onboardingId: "00000000-0000-0000-0000-000000000001",
+      displayId: "2026-GYM-001",
       email: "max.mustermann@example.org",
+      supervisorEmail: "leitung@example.org",
+      mitarbeiter_name: "Max Mustermann",
       organization: "FES Minden",
+      fragebogen_eingereicht: "",
+      fragebogen_offen: "ja",
     },
     wired: true,
   },
