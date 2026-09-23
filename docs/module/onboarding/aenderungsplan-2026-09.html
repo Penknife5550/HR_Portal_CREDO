@@ -409,9 +409,9 @@ details > div { padding: 0 14px 12px; }
     <h1>Stellenbezeichnung, paralleler Zugriff, individuelle E-Mail, Unterlagen nachfordern und Abteilungsaufgaben</h1>
     <p class="unter">Änderungswünsche am HR-Portal: wie ich sie umsetze bzw. umsetzen würde, was sich für HR, Führungskräfte, Abteilungen und Beschäftigte ändert, mit Vorher/Nachher-Ansichten.</p>
     <div class="meta">
-      <span>Stand 22.09.2026 · Fassung 4 (Paket 1 umgesetzt, ergänzt um Abteilungsaufgaben)</span>
+      <span>Stand 22.09.2026 · Fassung 5 (Pakete 1, 1b und 5 umgesetzt)</span>
       <span>Grundlage: Quellcode auf <code style="background:rgba(255,255,255,.14);color:#fff">main</code> (ae490ba), analysiert und gegengeprüft</span>
-      <span>Paket 1 umgesetzt (5a016ba), noch nicht deployt</span>
+      <span>Pakete 1, 1b und 5 umgesetzt, noch nicht deployt</span>
     </div>
   </header>
 
@@ -469,13 +469,13 @@ details > div { padding: 0 14px 12px; }
               <td><strong>5 · Abteilungsaufgaben im Offboarding reparieren</strong> (Paket 1b)</td>
               <td>Kommentare der Abteilungen kommen an. Erneutes Versenden zerstört keine Links mehr. Neue Abteilungen lassen sich anlegen. Aufgaben für Vorgesetzte gehen an die Führungskraft. HR sieht, wer informiert wurde und wer nicht.</td>
               <td>Wenige neue Spalten, rein additiv.</td>
-              <td class="num">etwa 6 Tage (vollständig)</td>
+              <td class="num">✓ umgesetzt</td>
             </tr>
             <tr>
               <td><strong>6 · Abteilungsaufgaben im Onboarding</strong> (Paket 5)</td>
               <td>HR informiert per Knopf IT, Verwaltung, Facility, Datenschutz und die Führungskraft über ihre Aufgaben zum Dienstbeginn. Die Abteilungen haken ohne Anmeldung ab und kommentieren, mit Fälligkeiten relativ zum Vertragsbeginn und mit Erinnerungen.</td>
               <td>Die bestehende Link-Tabelle wird erweitert, dazu wenige Spalten, rein additiv.</td>
-              <td class="num">8–9 Tage</td>
+              <td class="num">✓ umgesetzt</td>
             </tr>
           </tbody>
         </table>
@@ -1506,7 +1506,7 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
         <li><strong>Mails:</strong> vier Offboarding-Vorlagen bekommen Aufgabenliste, Gültigkeit und Kommentar (Einzelheiten in Abschnitt 7). Sie werden nach dem Deploy mit „Text auf Standard zurücksetzen“ aktualisiert.</li>
         <li><strong>Tests</strong> für jede Zeile der Tabelle oben, dazu das Handbuch mit den neuen Begriffen.</li>
       </ul>
-      <p><span class="aufwand">Aufwand Kern etwa 5 Tage</span> <span class="aufwand">mit Punkt 10–13 etwa 6 Tage</span> <span class="ui-hinweistext" style="margin-left:6px">Voraussetzung für Paket 5</span></p>
+      <p><span class="aufwand">✓ umgesetzt (Commit 6584ca2)</span> <span class="ui-hinweistext" style="margin-left:6px">vollständig, Punkte 1–13; noch nicht deployt</span></p>
     </section>
 
     <!-- ================= 6 ABTEILUNGSAUFGABEN ONBOARDING ================= -->
@@ -1764,7 +1764,7 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
         <strong class="t">Ohne Pflege durch HR bewirkt der Knopf nichts</strong>
         <p>Die Checklisten-Vorlagen in der Produktion sind Daten von HR. Die Migration stellt nur die Zuständigkeiten um. Neue Punkte wie „Datenschutz-Unterweisung“, Tagesangaben und Hinweise trägt HR einmalig unter Checklisten-Vorlagen ein. Einen Vorschlag für die Standard-Einstellung lege ich bei. Für Erzieher, Beamte und Ehrenamt gibt es heute keine Onboarding-Vorlage; dort sagt die Karte das.</p>
       </div>
-      <p><span class="aufwand">Aufwand 8–9 Tage</span> <span class="ui-hinweistext" style="margin-left:6px">setzt Paket 1b voraus; dazu etwa 1–2 Stunden Pflege der Vorlagen und Adressen durch HR</span></p>
+      <p><span class="aufwand">✓ umgesetzt</span> <span class="ui-hinweistext" style="margin-left:6px">auf dem Branch, noch nicht deployt; dazu etwa 1–2 Stunden Pflege der Vorlagen und Adressen durch HR</span></p>
     </section>
 
     <!-- ================= 7 MAILS UND VORLAGEN ================= -->
@@ -1952,19 +1952,19 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
           <span class="aufwand">19–21 Tage</span>
         </div>
         <div class="paket">
-          <div class="ph">Paket 1b</div>
+          <div class="ph" style="color:var(--gruen)">Paket 1b · ✓ umgesetzt</div>
           <h5>Abteilungsaufgaben Offboarding reparieren</h5>
           <ul><li>Punkte 1–13 aus Abschnitt 5 (entschieden: alles)</li><li>Einstellungen → Abteilungen</li><li>Führungskraft im Offboarding</li></ul>
-          <span class="aufwand">etwa 6 Tage</span>
+          <span class="aufwand">Commit 6584ca2 · nicht deployt</span>
         </div>
         <div class="paket">
-          <div class="ph">Paket 5 · nach 1b</div>
+          <div class="ph" style="color:var(--gruen)">Paket 5 · ✓ umgesetzt</div>
           <h5>Abteilungsaufgaben Onboarding</h5>
           <ul><li>Karte, Dialog, öffentliche Seite</li><li>Checklisten-Editor, Migration</li><li>vier neue Mailvorlagen</li></ul>
-          <span class="aufwand">8–9 Tage</span>
+          <span class="aufwand">auf dem Branch · nicht deployt</span>
         </div>
       </div>
-      <p>Paket 1 ist umgesetzt, weil Mitarbeitende heute festhängen. Paket 4 setzt Paket 1 voraus, weil der Fragebogen dann schreibgeschützt ist und die Nachforderung der einzige Weg zum Nachreichen wird. Paket 5 setzt Paket 1b voraus. Die übrigen Pakete hängen nicht voneinander ab, ihre Reihenfolge richtet sich nach Ihrer Priorität. Mein Vorschlag: erst Paket 2, weil es Änderung 2 abrundet und kurz ist, dann 1b und 5, dann 3 und 4. Offen sind zusammen noch etwa 39–43 Arbeitstage.</p>
+      <p>Paket 1 ist umgesetzt, weil Mitarbeitende heute festhängen. Paket 4 setzt Paket 1 voraus, weil der Fragebogen dann schreibgeschützt ist und die Nachforderung der einzige Weg zum Nachreichen wird. Paket 5 setzt Paket 1b voraus. Die übrigen Pakete hängen nicht voneinander ab, ihre Reihenfolge richtet sich nach Ihrer Priorität. Umgesetzt sind Paket 1 (mit dem Dialog „Neuer Vorgang“), Paket 1b und Paket 5. Offen sind noch der Rest von Paket 2 (etwa 1–1,5 Tage), Paket 3 (5–6) und Paket 4 (19–21), zusammen etwa 25–29 Arbeitstage.</p>
 
       <div class="kasten warn">
         <strong class="t">Der erste Deploy nimmt den ausstehenden Stand mit</strong>
