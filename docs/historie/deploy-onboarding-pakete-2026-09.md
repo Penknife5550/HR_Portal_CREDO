@@ -1,21 +1,193 @@
 # Deploy 09/2026 — Onboarding-Pakete (Ablaufplan)
 
-> **Stand:** Server `6124936` (Deploy vom 07.09.2026) → Ziel `7bc91ec` · 18 Commits
+> **Stand:** Server `ae490ba` (Deploy vom 08.09.2026, im Repo nicht protokolliert) → Ziel `7bc91ec` · 8 Commits (6 mit Code, 2 nur Doku)
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
-> **Art:** Ablaufplan **vor** dem Deploy, erstellt am 24.09.2026. Nach dem Deploy
-> wird er um Log und Ergebnisse ergänzt, wie das
+> **Art:** Ablaufplan **und Protokoll**. Der Deploy lief am 24.09.2026 erfolgreich;
+> das Ergebnis steht direkt unten unter „Protokoll vom 24.09.2026“. Aufbau wie das
 > [Protokoll vom 07.09.](deploy-dokumentenpaket-2026-09-07.md).
 
-Dieser Deploy ist größer als der letzte. Er bringt drei Stände auf einmal auf den
-Server, die seit dem 07.09. auf `main` liegen: die Formular-Validierung, die
-Rückmeldung des Personalbüros (Minijob) und die Onboarding-Pakete 1, 1b, 5 und 2.
-Genau das warnte Lehre 4 aus dem letzten Protokoll
-(`deploy-dokumentenpaket-2026-09-07.md:166-168`). Deshalb gibt es hier mehr
-Prüfungen und zwei zusätzliche Sicherheitsnetze: eine Vorschau dessen, was
-`db push` tun wird, und eine eigene Sicherung vor dem Start.
+> **Korrektur 24.09.2026:** Der Plan wurde zuerst für `6124936` (Deploy vom 07.09.)
+> geschrieben; der Server stand tatsächlich auf `ae490ba`. Belegt per SSH am 24.09.:
+> - `sudo git log -1`: `ae490ba fix(fristen+fragebogen): fuenf Correctness-Befunde aus dem Codereview`
+>   (08.09.2026 16:32 +0200). Image und Container vom 08.09.2026 14:45 UTC
+>   (`hr_portal_credo-app:latest`, `sha256:99579d69…`, 656 MB), letzte
+>   Entrypoint-Sicherung `backups/vor-schema-abgleich-20260908-144512.sql`.
+> - **Seit 08.09. live:** Formular-Validierung (`b1d62f4`, `6592dee`, `300c019`) und
+>   Minijob-Rückmeldung (`29b4a30`, `c346263`, `89fa722`, `c6b7396`, `ae490ba`),
+>   samt Cron `/api/cron/dokument-ablauf`.
+> - **7 Migrations-Merker gesetzt**, darunter `FORMTEMPLATE_MASERNSCHUTZ_V1` und
+>   `KOSTENSTELLEN_AUFTEILUNG_V1`. Offen sind nur noch drei.
+> - **Schema-Delta ab `ae490ba`:** 15 Spalten, 1 Unique-Index, 1 Fremdschlüssel,
+>   eine gelockerte Pflichtspalte. Keine Tabelle, keine Enum-Werte.
+> - Projektordner und `.git` gehören `root:root`: **Jedes `git` auf dem Server braucht `sudo`** (1.1).
+> - Rückfall-Etikett: `hr-portal-app:ae490ba` (1.6, Abschnitt 7).
+>
+> Alle Abschnitte sind darauf umgestellt; `6124936` steht nur noch dort, wo der
+> Deploy vom 07.09. oder die Proben der ersten Fassung gemeint sind. Die VORHER- und
+> NACHHER-Dateien sind byte-gleich geblieben (Prüfsummen in 2.1 und 4.2), angepasst
+> sind nur die Erwartungen dazu. Die Ergebnisse von 1.1–1.5 und 1.7 vom 24.09. stehen
+> in Abschnitt 1.
+>
+> **Gegenprüfung derselben Korrektur (24.09.):** Delta und Zählung aus den Schemas
+> nachgerechnet (15/0/0/1/1), Logzeilen in 3.6 gegen `seed-check.js` von `7bc91ec`
+> nachgelesen, Prüfsummen bestätigt. Geändert: Fehlt in S-V2 bis S-V4 etwas vom
+> 08.09., ist das jetzt STOPP statt ENTSCHEIDUNG; die Abkürzung in 3 ist nicht mehr
+> empfohlen; der Log-Filter in 3.6 fängt auch die Betriebsnummer-Warnungen; 6.1 warnt
+> vor dem Mailschub nach einer Korrektur in n8n.
+
+Dieser Deploy bringt die Onboarding-Pakete 1, 1b, 5 und 2 samt Nachtrag „Neuer
+Vorgang“ und den Code-Review-Fixes auf den Server, sechs Code-Commits aus zwei
+Wochen. Das ist mehr als ein Schritt, und genau davor warnte Lehre 4 aus dem
+Protokoll vom 07.09. (`deploy-dokumentenpaket-2026-09-07.md:166-168`). Deshalb gibt
+es hier mehr Prüfungen und zwei zusätzliche Sicherheitsnetze: eine Vorschau dessen,
+was `db push` tun wird, und eine eigene Sicherung vor dem Start.
 
 **Grundregel für alles Folgende:** Wo „an Claude“ steht, wird angehalten. Das
 Portal läuft bis Schritt 3.4 unverändert weiter, Anhalten kostet also nichts.
+
+---
+
+## Protokoll vom 24.09.2026
+
+> **Stand nach dem Deploy:** Server auf `8952e1a` (Code = `7bc91ec`, danach nur Doku),
+> vorher `ae490ba`. Ausfallzeit etwa **zwei Minuten** (12:20–12:22 MESZ). Kein
+> Rückfall nötig. Alle Uhrzeiten MESZ; Dateinamen und Logzeitstempel des Containers
+> sind UTC.
+
+### Kurzfassung
+
+| Punkt | Ergebnis |
+|---|---|
+| Vorab-Prüfungen (Abschnitt 1) | Ausgangsstand war `ae490ba`, nicht `6124936` (Plan umgestellt, siehe Korrektur oben). Drift `0`, Sicherungsverzeichnis beschreibbar, 15 GB frei |
+| SQL VORHER (Abschnitt 2) | 39/39, Exit 0, keine STOPP-Abweichung |
+| Vorschau `db push` (3.3) | 15 / 0 / 0 / 1 / 1 und genau eine Zeile `DROP NOT NULL` — wie erwartet |
+| Schema-Abgleich | 529 ms, nur die angekündigte Unique-Warnung |
+| Migrationen | 3 neue Merker (`VERTRAGSENDE_LABEL_STELLENBEZEICHNUNG_V1`, `ONBOARDING_PARALLELE_SPUREN_V1`, `ONBOARDING_ABTEILUNGSAUFGABEN_V1`), zusammen jetzt 10 |
+| SQL NACHHER (4.2) | 26/26, Exit 0, alle Erwartungen erfüllt |
+| Health / Browser | `{"status":"ok"}`, Container `healthy`; Browser-Test (Dashboard, Übersicht, Checkliste, Einstellungen) unauffällig |
+| Mailvorlagen | 15 gespeicherte Vorlagen per SQL aktualisiert (13:23 MESZ), 15/15, Gegenprobe per md5 bestanden |
+
+### Entscheidungen vor dem Start
+
+- **Heilung festhängender Vorgänge:** Zwei Onboarding-Vorgänge standen auf
+  „Modalitäten eingereicht“, ohne dass der Fragebogen je abgesendet war. Entscheidung:
+  reparieren lassen (Migration `ONBOARDING_PARALLELE_SPUREN_V1`). Beide Personen
+  können den Fragebogen wieder ausfüllen; es ging keine Mail hinaus.
+- **Gespeicherte Mailvorlagen:** HR hat mehrere Vorlagen bewusst gestaltet. Deshalb
+  kein pauschales „Text auf Standard zurücksetzen“, sondern Zusammenführung (siehe
+  „Mailvorlagen“ unten).
+- **Keine Webhooks** in der Datenbank, also kein Doppelversand. Freigabeliste für
+  Empfängerdomains leer (keine Einschränkung).
+
+### Ablauf
+
+| Zeit (MESZ) | Schritt |
+|---|---|
+| vormittags | Abschnitt 1 und 2 lesend; Image `99579d69…` zusätzlich als `hr-portal-app:ae490ba` etikettiert (ein versehentlich gesetztes Etikett `:6124936` auf dasselbe Image wieder entfernt) |
+| — | `sudo git pull`: Fast-forward `ae490ba..8952e1a`; `git diff --stat 7bc91ec HEAD -- . ':!docs'` leer |
+| — | `sudo docker compose build app` (Portal lief weiter), Vorschau 3.3 wie erwartet |
+| 12:20 | `docker compose stop app`, eigene Sicherung aus dem DB-Container (`pg_dump` 16): 1 561 038 Bytes, „dump complete“ = 1 |
+| 12:21 | `docker compose up -d`; Entrypoint: Sicherung 1 561 066 Bytes, `db push` 529 ms, Migrationen, `✓ Ready in 154ms` |
+| 12:26 | Health `ok`, Entrypoint-Sicherung unter festem Namen kopiert |
+| danach | SQL NACHHER 26/26, Browser-Test |
+| 13:23 | Mailvorlagen per `vorlagen-update.sql` aktualisiert |
+
+**Log des Starts** (Auszug, wörtlich):
+
+```
+Schema-Unterschied erkannt — Sicherung wird angelegt...
+Sicherung abgelegt: /backups/vor-schema-abgleich-20260924-102154.sql (1561066 Bytes)
+Datenbank-Schema wird synchronisiert...
+⚠️  There might be data loss when applying the changes:
+  • A unique constraint covering the columns `[onboardingId,departmentKey]` on the table `offboarding_department_links` will be added. If there are existing duplicate values, this will fail.
+🚀  Your database is now in sync with your Prisma schema. Done in 529ms
+Datenbank-Schema synchronisiert.
+Pruefe ob Seed notwendig...
+System-Vorlage (Fuehrungszeugnis) ist aktuell.
+Vertragsende-Label "Stellenbezeichnung": 0 von 16 Mandanten angepasst.
+Onboarding parallele Spuren: 2 von 41 Vorgaengen korrigiert (davon festhaengend geheilt: 2).
+Onboarding-Abteilungsaufgaben (ONBOARDING_ABTEILUNGSAUFGABEN_V1): 6 Vorlagenpunkte und 192 Aufgaben auf Schluessel umgestellt, 584 Aufgaben mit Tagesangabe (davon ueber den Titel: 518).
+Onboarding-Abteilungsaufgaben: unbekannte Zustaendigkeiten (nicht geaendert, bitte unter Checklisten-Vorlagen zuordnen): "Öffentlichkeitsarbeit" (2 Vorlagenpunkte, 20 Aufgaben)
+Datenbank bereits geseeded (7 User vorhanden). Seed uebersprungen.
+ ✓ Ready in 154ms
+```
+
+Jede Zahl entsprach der Vorhersage aus den VORHER-Abfragen (M-V3, M-V4a, M-V5a–c, B-B9).
+
+### Sicherungen auf dem Server
+
+| Datei | Größe | Zweck |
+|---|---|---|
+| `backups/vor-deploy-7bc91ec-manuell.sql` | 1 561 038 | **maßgeblich für einen Rückfall** — `pg_dump` 16.13 aus dem DB-Container |
+| `backups/vor-deploy-7bc91ec-entrypoint.sql` | 1 561 066 | Kopie der Entrypoint-Sicherung, aus der Rotation genommen (`pg_dump` 18.6 aus dem App-Container) |
+| `~/deploy-7bc91ec/email_templates-vor-update.sql` | — | Tabelle `email_templates` vor dem Vorlagen-Update |
+| Image `hr-portal-app:ae490ba` | 656 MB | altes Image für Weg A/B in Abschnitt 7 |
+
+### Mailvorlagen
+
+Die Produktion hatte 16 gespeicherte Zeilen der betroffenen Ereignisse. Ein Vergleich
+mit den Code-Standards aller Stände ergab:
+
+- **6 unverändert vom alten Standard** (`dokument-abgelaufen`, `dokument-ablauf-warnung`,
+  `employee-reminder`, `psi-deadline-warning`, `supervisor-link-created`,
+  `supervisor-reminder`) → neuer Standard.
+- **2 alter Standard vom März** (`questionnaire-completed`, `supervisor-completed`) →
+  neuer Standard; sie sagen „bereit zur Prüfung“ jetzt nur mit Beleg.
+- **7 mit HR-Gestaltung** (`onboarding-created` und sechs `offboarding-*`) →
+  zusammengeführt: Layout und Formulierungen von HR bleiben, falsche Aussagen sind
+  ersetzt. Behoben wurden dabei Fehler, die schon vor dem Deploy in Produktion
+  steckten: „Herzlich willkommen, !“ ohne Vornamen, wörtliches `{{personalnummer}}`,
+  Knöpfe mit leerem `href`, „die Abteilung Führungskraft“ und die pauschale
+  Abschlussmeldung „alles erledigt … fristgerecht“.
+- **1 schon aktuell** (`questionnaire-confirmation-employee`), nicht angefasst.
+
+Das Skript (`vorlagen-update.sql`, md5 `6a7a4236621baf52cbd264fc0f11ddc3`, eine
+Transaktion, Schutz über `updatedAt` des Exports, md5-Gegenprobe vor dem COMMIT)
+lief vorher auf einer Wegwerf-Datenbank: Einspielen 15/15, zweiter Lauf bricht ab und
+ändert nichts. Empfänger, Aktiv-Schalter und Namen blieben unberührt. Das Skript
+liegt auf dem Server unter `~/deploy-7bc91ec/`, nicht im Repo.
+
+> **Für HR:** Bei den 7 Vorlagen mit HR-Gestaltung zeigt der Editor „weicht vom
+> Standard ab“. Das ist gewollt — dort **nie** „Text auf Standard zurücksetzen“.
+
+### Offen nach dem Deploy
+
+1. **n8n-Erinnerungen laufen nicht.** Seit mindestens 60 Tagen keine
+   `employee-reminder`/`supervisor-reminder` im Versandprotokoll; nur der
+   Vertragsende-Lauf kommt an. Die Exporte im Repo rufen `hr.credo-schulen.de` auf
+   (`n8n/CREDO_Reminder_Cron_Workflow.json`, `n8n/CREDO_Offboarding_Reminder_Workflow.json`).
+   Nach der Korrektur verschickt der erste Lauf fünf Fragebogen-Erinnerungen.
+2. **`/api/cron/dokument-ablauf`** ist in n8n nicht eingeplant (derzeit hat kein
+   Nachweis ein Ablaufdatum).
+3. **Abteilungen IT und Verwaltung / Sekretariat** ohne Adresse (192 Onboarding-Aufgaben
+   hängen daran); **An-Feld** für `onboarding-task-completed` eintragen — beides vor dem
+   ersten „Abteilungen informieren…“.
+4. **„Öffentlichkeitsarbeit“** (2 Vorlagenpunkte, 20 Aufgaben): eigener Schlüssel
+   unter Einstellungen → Abteilungen oder bewusst ohne Link lassen.
+5. **Kostenstellen:** drei Vorgänge mit einer Aufteilung ungleich 100 % (M-N2b) → HR.
+6. **Code:** Offboarding-Ereignisse schicken keine Personalnummer und keinen
+   Vorgangslink mit (die Vorlagen tragen die Portal-Adresse deshalb fest ein);
+   Namenszeile ohne Namen in zwei HR-Mails glätten.
+
+### Lehren für den nächsten Deploy
+
+1. **Ausgangsstand zuerst auf dem Server lesen** (`sudo git log -1`), dann planen. Der
+   Deploy vom 08.09. war nicht protokolliert; der Plan musste mitten in der
+   Vorbereitung auf `ae490ba` umgestellt werden. Jeder Deploy bekommt ein Protokoll.
+2. **Das Repo auf dem Server gehört root** — jedes `git` mit `sudo`, nie
+   `safe.directory` global setzen.
+3. **`pg_dump` im App-Container ist Version 18, die Datenbank 16.** Dumps aus dem
+   App-Container enthalten `SET transaction_timeout`, das PostgreSQL 16 ablehnt. Für
+   einen Rückfall gilt die eigene Sicherung aus dem DB-Container (3.4).
+4. **Keine direkte Verbindung vom Arbeitsplatz zum Server.** Dateien überträgt die IT,
+   und zwar binär; danach immer `md5sum`. Über das Terminal kopierte Dateien kamen
+   mit veränderten Zeilenumbrüchen an.
+5. **Befehle ohne Sternchen weitergeben.** In der Chat-Anzeige gehen `*` verloren (der
+   Glob `vor-schema-abgleich-*.sql` kam als `vor-schema-abgleich-.sql` an); besser
+   den genauen Dateinamen aus dem Log nehmen.
+6. **Gespeicherte Mailvorlagen vor jedem Deploy gegen die Code-Standards vergleichen.**
+   Eine DB-Zeile überschreibt den Standard vollständig; HR-Gestaltung nie blind
+   zurücksetzen.
 
 ---
 
@@ -25,36 +197,47 @@ Portal läuft bis Schritt 3.4 unverändert weiter, Anhalten kostet also nichts.
 
 | Bereich | Commits | Inhalt |
 |---|---|---|
-| Formular-Validierung | `b1d62f4`, `6592dee`, `300c019` | Fragebogen und Vorgesetzten-Formular blockierten stumm. Der Fehler besteht in Produktion noch und endet mit diesem Deploy. |
-| Minijob-Rückmeldung Personalbüro | `29b4a30`, `c346263`, `89fa722`, `c6b7396`, `ae490ba` | Masernschutz-Pflicht, Kostenstellen-Aufteilung, Aufenthaltstitel und private KV mit Fristen-Ampel, neuer Cron `dokument-ablauf` |
 | Paket 1 | `5a016ba` | Stellenbezeichnung, paralleler Zugriff beider Spuren, Knopf „Text auf Standard zurücksetzen“, Mail-Reparatur |
 | Nachtrag „Neuer Vorgang“ | `3a23bc8` | Name und Führungskraft beim Anlegen, beide Links in einem Schritt |
 | Paket 1b | `6584ca2` | Abteilungsaufgaben im Offboarding repariert (Kommentar, Erinnern, Erneut senden, Link erneuern) |
 | Paket 5 | `db6fe2f` | Abteilungsaufgaben im Onboarding, vier neue Mailvorlagen |
 | Paket 2 | `c565b01` | HR-Übersicht zeigt beide Spuren nebeneinander, HR-Mails sagen „bereit zur Prüfung“ nur mit Beleg |
-| Code-Review-Fixes | `7bc91ec` | 8 Befunde, u. a. Freigabeliste auch für frei eingetippte Führungskraft-Adressen |
-| Doku | `d29228a`, `891483e`, `c40f7fb`, `9a396e3` | nur `docs/` |
+| Code-Review-Fixes | `7bc91ec` | 8 Befunde, u. a. Freigabeliste auch für frei eingetippte Führungskraft-Adressen, Vorgangsjahr in deutscher Zeit. **Ändert auch zwei Minijob-Teile, die seit 08.09. live sind:** den Cron `dokument-ablauf` (Merker jetzt auch bei SKIPPED, zwei neue Zähler, ohne Namen „die neue Mitarbeiterin / den neuen Mitarbeiter“ statt der privaten Adresse; 6.2) und die Frist-Korrektur an Nachweisen (HR und Magic Link nehmen `EXPIRED` zurück, wenn die neue Frist nicht abgelaufen ist, und leeren die Ablauf-Merker) |
+| Doku | `c40f7fb`, `9a396e3` | nur `docs/` |
 
-Vollständige Liste: `git log --oneline 6124936..7bc91ec`.
+Vollständige Liste: `git log --oneline ae490ba..7bc91ec` (auf dem Server mit `sudo`).
+
+**Schon seit 08.09.2026 auf dem Server, nicht Teil dieses Deploys:**
+
+| Bereich | Commits | Inhalt |
+|---|---|---|
+| Formular-Validierung | `b1d62f4`, `6592dee`, `300c019` | Fragebogen und Vorgesetzten-Formular blockierten stumm |
+| Minijob-Rückmeldung Personalbüro | `29b4a30`, `c346263`, `89fa722`, `c6b7396`, `ae490ba` | Masernschutz-Pflicht, Kostenstellen-Aufteilung, Aufenthaltstitel und private KV mit Fristen-Ampel, Cron `dokument-ablauf` |
+| Doku | `d29228a`, `891483e` | Protokoll 07.09., Handbuch Dokumente |
 
 ### Was sich an Datenbank und Betrieb ändert
 
-- **Schema:** 23 neue Spalten (alle nullable), eine neue Tabelle
-  `supervisor_kostenstellen`, 4 neue Enum-Werte, 3 Indizes und 2 Fremdschlüssel.
-  Dazu wird eine Pflichtspalte gelockert (`offboarding_department_links."offboardingId"`).
-  Es gibt kein DROP, kein RENAME und keinen Typwechsel. Das Delta lief zweimal
-  fehlerfrei auf einer Wegwerf-Datenbank mit altem Schema. Danach meldete der
-  Vergleich mit dem neuen Schema „No difference detected“.
-- **Einmalige Migrationen:** fünf neue in `prisma/seed-check.js`. Sie laufen beim
-  Start nach dem Schema-Abgleich (`seed-check.js:1819-1834`) und verschicken keine
-  Mails, denn die Datei lädt nur `@prisma/client`, `fs`, `path` und `crypto`
-  (`seed-check.js:5-8`).
+- **Schema (ab `ae490ba`):** 15 neue Spalten (alle nullable), ein Unique-Index und
+  ein Fremdschlüssel für die Onboarding-Links. Dazu wird eine Pflichtspalte
+  gelockert (`offboarding_department_links."offboardingId"`). Keine neue Tabelle,
+  keine Enum-Werte, kein DROP, kein RENAME, kein Typwechsel. Das Delta ist eine
+  Teilmenge des Deltas ab `6124936`, das am 24.09. zweimal fehlerfrei auf einer
+  Wegwerf-Datenbank lief; danach meldete der Vergleich mit dem neuen Schema „No
+  difference detected“. `supervisor_kostenstellen`, die Enum-Werte und die übrigen
+  8 Spalten jenes Deltas stehen seit 08.09. auf dem Server.
+- **Einmalige Migrationen:** drei offene in `prisma/seed-check.js`,
+  `VERTRAGSENDE_LABEL_STELLENBEZEICHNUNG_V1`, `ONBOARDING_PARALLELE_SPUREN_V1` und
+  `ONBOARDING_ABTEILUNGSAUFGABEN_V1`. Sie laufen beim Start nach dem Schema-Abgleich
+  (`seed-check.js:1827, 1830, 1834`) und verschicken keine Mails, denn die Datei lädt
+  nur `@prisma/client`, `fs`, `path` und `crypto` (`seed-check.js:5-8`).
+  Masernschutz und Kostenstellen liefen am 08.09. und bleiben stumm (3.6).
 - **Unverändert:** `docker-compose.yml`, `Dockerfile`, `entrypoint.sh`,
   `package.json`, `package-lock.json`, `.env.production.example`, `.dockerignore`
   und `next.config.ts`. Das belegt
-  `git diff --stat 6124936 7bc91ec -- docker-compose.yml Dockerfile entrypoint.sh package.json package-lock.json .env.production.example .dockerignore next.config.ts`,
-  die Ausgabe ist leer. (Ohne die Pfadangabe listet der Befehl alle 214 geänderten
-  Dateien.) Es gibt also keine neue Umgebungsvariable und keine neue Abhängigkeit.
+  `git diff --stat ae490ba 7bc91ec -- docker-compose.yml Dockerfile entrypoint.sh package.json package-lock.json .env.production.example .dockerignore next.config.ts`,
+  die Ausgabe ist leer (auf dem Server mit `sudo`). (Ohne die Pfadangabe listet der
+  Befehl alle 168 geänderten Dateien.) Es gibt also keine neue Umgebungsvariable und
+  keine neue Abhängigkeit.
 
 ### Dauer (Schätzung, nicht gemessen)
 
@@ -69,11 +252,13 @@ Vollständige Liste: `git log --oneline 6124936..7bc91ec`.
 
 ### Risiko in einem Satz
 
-Der Start selbst ist risikoarm, weil das Delta rein additiv und zweimal geprobt ist;
-die echten Risiken liegen danach in falschen Mails aus alten gespeicherten Vorlagen,
-in einer Erinnerungswelle beim ersten Cron-Lauf, in Abteilungslinks des Offboardings,
-deren Erinnerungen nach dem Deploy verstummen (B-B10, 5.2), und in einem Rückfall,
-bei dem das alte Image mit dem normalen Entrypoint gegen die neue Datenbank startet.
+Der Start selbst ist risikoarm, weil das Delta rein additiv und als Teil des größeren
+Deltas geprobt ist; die echten Risiken liegen danach in falschen Mails aus alten
+gespeicherten Vorlagen, in einer Erinnerungswelle beim ersten Cron-Lauf, in
+Abteilungslinks des Offboardings, deren Erinnerungen nach dem Deploy verstummen
+(B-B10, 5.2), im Cron `dokument-ablauf`, der ab jetzt auch ohne An-Feld seinen Merker
+setzt (6.2), und in einem Rückfall, bei dem das alte Image mit dem normalen
+Entrypoint gegen die neue Datenbank startet.
 
 ### Termin
 
@@ -104,16 +289,26 @@ In `~/deploy-7bc91ec/` landen alle Arbeitsdateien, also **außerhalb** des Repos
 ### 1.1 Stand des Repos
 
 ```bash
-git log -1 --oneline
-git status --short
+sudo git log -1 --oneline
+sudo git status --short
 ls docker-compose.override.yml 2>/dev/null || echo "kein Override"
 ```
 
+**`git` auf dem Server immer mit `sudo`.** Projektordner und `.git` gehören
+`root:root`. Ohne `sudo` bricht jeder `git`-Befehl mit `fatal: detected dubious
+ownership in repository` ab. Das gilt für alle `git`-Befehle in diesem Plan
+(`fetch`, `checkout`, `pull`, `log`, `show`, `status`, `diff`). **Nicht**
+`git config --global safe.directory …` setzen: Das schaltet die Schutzprüfung ab,
+statt den Befehl mit der Kennung auszuführen, der das Repo gehört. Fragt
+`sudo git fetch` nach Zugangsdaten: abbrechen, an Claude.
+
 | Erwartet | Wenn nicht |
 |---|---|
-| `6124936 docs: Spaltenname richtigstellen - camelCase, nicht snake_case` | **STOPP, an Claude.** Der Plan gilt nur für diesen Ausgangsstand. |
-| `git status` leer oder nur `?? backups/` | Andere Zeilen (`M …`, `?? …`): **STOPP, an Claude.** `?? backups/` ist normal: `.gitignore:67` ignoriert nur `backups/*.dump`, die `.sql`-Sicherungen stehen als unversioniert da. |
+| `ae490ba fix(fristen+fragebogen): fuenf Correctness-Befunde aus dem Codereview` | **STOPP, an Claude.** Der Plan gilt nur für diesen Ausgangsstand. |
+| Nur Zeilen `?? backups/<datei>.sql`, je Sicherung eine. Am 24.09.: `backup_2026-06-15_1629.sql`, `vor-schema-abgleich-20260904-072839.sql`, `vor-schema-abgleich-20260907-134416.sql`, `vor-schema-abgleich-20260908-144512.sql` | Andere Zeilen (`M …`, `?? …` außerhalb von `backups/`): **STOPP, an Claude.** Die Sicherungen sind normal: `.gitignore:67` ignoriert nur `backups/*.dump`. Sie stehen einzeln da und nicht als `?? backups/`, weil `backups/.gitkeep` versioniert ist. |
 | `kein Override` | Eine `docker-compose.override.yml` verändert den Start: **an Claude.** |
+
+**Ergebnis 24.09.:** alle drei wie erwartet.
 
 > Auf dem Server nie `git add -A`, `git stash -u` oder `git clean` ausführen. Die
 > Sicherungen in `backups/` sind unversioniert, und diese Befehle würden sie
@@ -127,8 +322,12 @@ sudo docker inspect --format '{{.Created}} {{.Image}}' hr-portal-app
 ```
 
 Erwartet: `app`, `db` und `gotenberg` laufen, `app` und `db` mit `(healthy)`. Das
-Erstelldatum von `hr-portal-app` ist der 07.09.2026. Bei einem anderen Datum:
-an Claude, vielleicht wurde seitdem neu gebaut.
+Erstelldatum von `hr-portal-app` ist der 08.09.2026 (`2026-09-08T14:45…Z`, UTC).
+Bei einem anderen Datum: an Claude, vielleicht wurde seitdem neu gebaut.
+
+**Ergebnis 24.09.:** `app`, `db` und `gotenberg` `(healthy)`, Container und Image
+vom 08.09.2026 14:45 UTC, Image `hr_portal_credo-app:latest` (`sha256:99579d69…`,
+656 MB).
 
 ### 1.3 Sicherungsverzeichnis (sonst bricht der Start ab)
 
@@ -148,6 +347,9 @@ Der Schreibtest ist der aus CLAUDE.md („Docker / Deployment“), mit dem Image
 laufenden Containers. `sudo` vor `docker` ändert nichts an der Kennung im
 Container, und `chgrp 1001` hilft nicht (CLAUDE.md, gleicher Abschnitt).
 
+**Ergebnis 24.09.:** `2`; `1001 n8n backups`; `uid=1001(nextjs) gid=65533(nogroup) …`
+und `OK`.
+
 ### 1.4 Plattenplatz
 
 ```bash
@@ -161,6 +363,9 @@ Dazu kommen zwei Sicherungen. Die vom 07.09. hatte 1 389 174 Bytes (Protokoll
 07.09.:89). **Faustregel:** Ist weniger frei als die doppelte Image-Größe: an
 Claude.
 
+**Ergebnis 24.09.:** `/var/lib/docker` 15 GB frei, `/vol/container` 362 GB frei,
+`backups` 4,9 MB (vier Sicherungen), Image 656 MB. Reicht.
+
 ### 1.5 Werkzeug-Versionen und Link-Gültigkeit notieren
 
 ```bash
@@ -171,24 +376,31 @@ sudo docker exec hr-portal-app printenv MAGIC_LINK_EXPIRY_HOURS || echo "nicht g
 
 - **Die beiden Versionen** braucht nur ein Rückfall (Abschnitt 7). Die Sicherung des
   Entrypoints schreibt `pg_dump` aus dem App-Container, eingespielt wird mit `psql`
-  aus dem DB-Container. Welche Versionen dort laufen, ist **ungeklärt**, deshalb
-  notieren.
+  aus dem DB-Container.
 - **Der dritte Wert** wird für die Abfrage B-B2 gebraucht, die mit 720 h rechnet.
-  Weicht er ab, ist B-B2 nur eine Näherung. Dann den Wert mit an Claude schicken.
-  Er kommt aus dem laufenden Container, also genau der Wert, mit dem die heutigen
-  Links erzeugt wurden (`env_file: .env`, `docker-compose.yml:19-20`; Standard 720 h,
-  `src/lib/auth.ts:305`). Ein `grep` in `.env` meldete bei fehlendem Leserecht einen
-  Fehler und zeigte trotzdem „nicht gesetzt“.
+  Weicht er ab, ist B-B2 nur eine Näherung. Er kommt aus dem laufenden Container,
+  also genau der Wert, mit dem die heutigen Links erzeugt wurden (`env_file: .env`,
+  `docker-compose.yml:19-20`; Standard 720 h, `src/lib/auth.ts:305`). Ein `grep` in
+  `.env` meldete bei fehlendem Leserecht einen Fehler und zeigte trotzdem „nicht
+  gesetzt“.
+
+**Ergebnis 24.09.:** `pg_dump` im App-Container **18.6**, `psql` im DB-Container
+**16.13**, `MAGIC_LINK_EXPIRY_HOURS` **720**. Damit rechnet B-B2 exakt. Der
+Versionsunterschied hat eine Folge: Die Sicherungen des Entrypoints (pg_dump 18.6)
+lassen sich nach allem, was bekannt ist, nicht unverändert in die PostgreSQL-16-Datenbank
+einspielen. Maßgeblich für einen Rückfall ist die eigene Sicherung aus 3.4
+(Begründung und Stand der Probe in 7.3).
 
 ### 1.6 Altes Image aufheben (für den Rückfall)
 
 ```bash
-sudo docker tag "$(sudo docker inspect --format '{{.Image}}' hr-portal-app)" hr-portal-app:6124936
+sudo docker tag "$(sudo docker inspect --format '{{.Image}}' hr-portal-app)" hr-portal-app:ae490ba
 sudo docker image ls hr-portal-app
 ```
 
-Erwartet ist eine Zeile `hr-portal-app   6124936`. Ohne dieses Etikett wäre das alte
-Image nach dem Deploy namenlos und könnte beim Aufräumen verschwinden.
+Erwartet ist eine Zeile `hr-portal-app   ae490ba`. Ohne dieses Etikett wäre das alte
+Image nach dem Deploy namenlos und könnte beim Aufräumen verschwinden. Das Etikett
+heißt nach dem Code-Stand im Image, also `ae490ba`, nicht `6124936`.
 
 ### 1.7 Drift gegen das alte Schema (nur lesend)
 
@@ -196,32 +408,42 @@ Image nach dem Deploy namenlos und könnte beim Aufräumen verschwinden.
 sudo docker exec hr-portal-app sh -c 'npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel ./prisma/schema.prisma --exit-code >/dev/null 2>&1; echo $?'
 ```
 
-Erwartet ist `0`: Die Datenbank entspricht genau dem Schema von `6124936`. Bei `2`
+Erwartet ist `0`: Die Datenbank entspricht genau dem Schema von `ae490ba`. Bei `2`
 wurde die Datenbank außerhalb des Deploys verändert, bei `1` gab es einen Fehler.
 In beiden Fällen: **STOPP, an Claude.** Es ist derselbe Befehl, den der Entrypoint
-bei jedem Start ausführt (`entrypoint.sh:60-63`). Auf dem Server selbst wurde er
-nicht geprobt.
+bei jedem Start ausführt (`entrypoint.sh:60-63`).
+
+**Ergebnis 24.09.:** `0`.
 
 ---
 
-## 2 · SQL-Prüfungen VORHER (gegen das alte Schema `6124936`)
+## 2 · SQL-Prüfungen VORHER (gegen den Serverstand `ae490ba`)
 
 Es sind 39 Abfragen. Die ersten 37 sind die getestete Endfassung aus der SQL-Probe
 vom 24.09.2026, byte-genau übernommen. Getestet wurde so:
 
-- mit psql 16 und `ON_ERROR_STOP=1` gegen eine Wegwerf-Datenbank mit altem Schema:
-  Exit 0, 37 von 37;
+- mit psql 16 und `ON_ERROR_STOP=1` gegen eine Wegwerf-Datenbank mit dem Schema von
+  `6124936`: Exit 0, 37 von 37;
 - gegen das neue Schema: ebenfalls Exit 0;
 - lesend gegen die Dev-Datenbank.
 
 Die letzten beiden, B-B10 und B-B11, kamen mit der Gegenprüfung dazu. Sie liefen mit
 psql 16 lesend gegen die Dev-Datenbank (neues Schema): ganze Datei Exit 0, 39 von 39.
-Gegen das alte Schema sind sie nur per Namensabgleich mit `schema.prisma` von
-`6124936` geprüft, eine Wegwerf-Datenbank gab es dafür nicht mehr. Sie benutzen nur
-Tabellen und Spalten, die es in beiden Ständen gibt. Die einzige neue Spalte,
-`offboarding_processes."supervisorEmail"`, lesen sie über `to_jsonb(p) ->> …`: Fehlt
-die Spalte, ergibt das NULL statt eines Fehlers. Die Logik von B-B10 ist mit
-Testzeilen geprüft, die die echten Tabellen im selben Befehl überdecken (nur lesend).
+Sie benutzen nur Tabellen und Spalten, die es in allen drei Ständen gibt. Die einzige
+Spalte, die erst mit diesem Deploy kommt, `offboarding_processes."supervisorEmail"`,
+lesen sie über `to_jsonb(p) ->> …`: Fehlt die Spalte, ergibt das NULL statt eines
+Fehlers. Die Logik von B-B10 ist mit Testzeilen geprüft, die die echten Tabellen im
+selben Befehl überdecken (nur lesend).
+
+**Gegen den echten Ausgangsstand geprobt (24.09.):** Die ganze Datei (md5 unten) lief
+mit psql 16 und `ON_ERROR_STOP=1` gegen eine Wegwerf-Datenbank mit dem Schema von
+`ae490ba`: Exit 0, 39 Abschnitte, 0 `ERROR`.
+
+**Die Datei bleibt, wie sie ist.** Sie wurde für `6124936` geschrieben, deshalb
+nennen ihre Kommentare noch diesen Stand, und einige Beschriftungen im Ergebnis
+stimmen auf `ae490ba` nicht mehr (etwa „NEU“ bei den `dokument-*`-Vorlagen). Was die
+Ergebnisse auf `ae490ba` bedeuten, steht in 2.3. Die Datei nicht anpassen, sonst
+passt die Prüfsumme nicht mehr.
 
 **Namen:** Tabellen heißen `snake_case` (`@@map`), Spalten `"camelCase"` in
 Anführungszeichen. Das Schema hat kein einziges Spalten-`@map`. Es wird `COUNT(1)`
@@ -234,14 +456,17 @@ verwendet (Lehren 1 und 2 aus dem Protokoll vom 07.09.:161-163).
 ### 2.1 Datei auf dem Server anlegen
 
 **Variante 1: ohne Einfügen.** Das geht nur, wenn dieses Dokument schon auf
-`origin/main` liegt. `git fetch` holt dabei nur den Stand, der Arbeitsordner und
+`origin/main` liegt. `sudo git fetch` holt dabei nur den Stand, der Arbeitsordner und
 `HEAD` bleiben unverändert.
 
 ```bash
-cd /vol/container/HR_Portal_CREDO && git fetch origin
-git show origin/main:docs/historie/deploy-onboarding-pakete-2026-09.md \
+cd /vol/container/HR_Portal_CREDO && sudo git fetch origin
+sudo git show origin/main:docs/historie/deploy-onboarding-pakete-2026-09.md \
   | awk '/^cat > ~\/deploy-7bc91ec\/vorher-alle.sql/{f=1;next} /^ENDE_SQL$/{f=0} f' > ~/deploy-7bc91ec/vorher-alle.sql
 ```
+
+`sudo` gilt nur für `git`. Die Umleitung `>` macht die eigene Shell, die Datei in
+`~/deploy-7bc91ec/` gehört also dem angemeldeten Benutzer.
 
 **Variante 2: Einfügen.** Den ganzen folgenden Block ins Terminal kopieren.
 `set +H` schaltet die Verlaufsersetzung von `!` ab. Das Ende-Wort in
@@ -850,8 +1075,8 @@ md5sum ~/deploy-7bc91ec/vorher-alle.sql
 Erwartet: `4db0ff9691c3cdd12b73a8f7e869da02`. Steht dort etwas anderes, wurde beim
 Kopieren etwas verändert. Dann die Datei neu anlegen und **nicht ausführen**.
 Steht dort `28a87349c1180ea82d38917fcecb654d`, ist es die ältere Fassung ohne B-B10
-und B-B11 (Commit `b403448`): `git fetch origin` wiederholen und Variante 1 erneut
-ausführen.
+und B-B11 (Commit `b403448`): `sudo git fetch origin` wiederholen und Variante 1
+erneut ausführen.
 
 ### 2.2 Ausführen (einheitlicher Aufruf)
 
@@ -888,56 +1113,67 @@ In der Spalte „Art“ steht, was aus dem Ergebnis folgt:
 #### A · Schema-Drift (STOPP-Prüfungen)
 
 Keine Anweisung des Deltas kann an vorhandenen Daten scheitern. Scheitern kann
-der Push nur, wenn Teile des neuen Schemas **schon da** sind.
+der Push nur, wenn Teile des Deltas **schon da** sind. Die Abfragen prüfen noch die
+Liste ab `6124936`; auf `ae490ba` ist ein Teil davon seit dem 08.09. vorhanden und
+**muss** es sein. STOPP heißt deshalb: Ein Teil des Deltas ab `ae490ba` ist schon
+da, oder etwas, das seit dem 08.09. da sein müsste, fehlt, oder ein Merker weicht ab.
+Das Fehlen widerspricht 1.7 (Drift `0`) und hieße: Die Abfrage lief nicht gegen die
+Datenbank, die der Plan beschreibt, oder sie steht nicht auf `ae490ba`. Dann passt
+auch die Zählung in 3.3 nicht mehr.
 
 | Nr | Zeigt | Erwartet | Art · wenn nicht |
 |---|---|---|---|
 | S-V1 | PostgreSQL-Version | `16.x` (`docker-compose.yml:60`) | STOPP · an Claude |
-| S-V2 | Sind die neuen Enum-Werte schon da? | `(0 rows)` | STOPP · an Claude |
-| S-V3 | Sind die 23 neuen Spalten schon da? | `(0 rows)` | STOPP · an Claude |
-| S-V4 | Sind die neue Tabelle, die Indizes und der Fremdschlüssel schon da? | eine Zeile, alle fünf Felder leer | STOPP · an Claude |
-| S-V5 | Ist `offboardingId` noch Pflicht? Dazu die Zahl der Link-Zeilen und der zu übernehmenden Kostenstellen | `NO` · Zahl · Zahl | `YES`: STOPP. Die beiden Zahlen sind INFO. `kostenstellen_zu_migrieren` taucht später im Log als „übernommen“ wieder auf. |
-| M-V0 | Vorhandene Migrations-Merker | genau 5: `CURRENT_STEP_REGISTRY_V1`, `MINIJOB_TEMPLATE_STEPS_V1`, `MINIJOB_TEMPLATE_RENTE_V1`, `MINIJOB_TEMPLATE_STEP6_FELDER_V1`, `ORG_BETRIEBSNUMMERN_V1` (die Merker von `6124936`: `git show 6124936:prisma/seed-check.js`, Z. 107, 217, 229, 458, 582) | Einer der fünf **neuen** Namen ist schon da (siehe Abschnitt B): STOPP. Einer der alten fehlt: ENTSCHEIDUNG, dann läuft beim Start eine alte Migration mit. |
+| S-V2 | Enum-Werte `AUFENTHALTSTITEL`, `ARBEITSERLAUBNIS`, `PKV_NACHWEIS` (`DocumentType`) und `EXPIRED` (`DocumentStatus`) | **4 Zeilen**: alle vier seit 08.09. da, dieser Deploy bringt keinen Enum-Wert | Weniger als 4: **STOPP · an Claude** (widerspricht 1.7) |
+| S-V3 | Welche der 23 Spalten der Liste schon da sind | **genau 8 Zeilen** (seit 08.09.): `documents` `ablaufErinnertAm`, `ablaufErinnertStufe`, `gueltigBis`; `personal_data` `arbeitserlaubnisGueltigBis`, `aufenthaltstitelErforderlich`, `aufenthaltstitelGueltigBis`, `healthInsuranceMembership`; `supervisor_data` `kostenstellenBemerkung`. Die übrigen 15 fehlen, sie sind das Delta. | Eine der 15 übrigen ist da oder eine der 8 fehlt: **STOPP · an Claude** (das Fehlen widerspricht 1.7). |
+| S-V4 | Tabelle, Indizes und Fremdschlüssel | eine Zeile: `tabelle` = `supervisor_kostenstellen`, `uq_kst` und `idx_gueltig_bis` gefüllt (seit 08.09.); `uq_onb_links` und `fk_onb` **leer** | `uq_onb_links` oder `fk_onb` gefüllt, oder eines der ersten drei Felder leer: **STOPP · an Claude** (das Leere widerspricht 1.7). |
+| S-V5 | Ist `offboardingId` noch Pflicht? Dazu die Zahl der Link-Zeilen und der Kostenstellen in der Altspalte | `NO` · Zahl · Zahl | `YES`: **STOPP.** Die beiden Zahlen sind INFO. `kostenstellen_zu_migrieren` wird nicht mehr migriert: Die Übernahme lief am 08.09., und seitdem spiegelt die Altspalte nur die erste Zeile der Aufteilung (`src/app/api/modalitaeten/[token]/route.ts:345-350`), zählt also auch neue Vorgänge. Im Log erscheint die Zahl nicht. |
+| M-V0 | Vorhandene Migrations-Merker | **genau 7:** `CURRENT_STEP_REGISTRY_V1`, `MINIJOB_TEMPLATE_STEPS_V1`, `MINIJOB_TEMPLATE_RENTE_V1`, `MINIJOB_TEMPLATE_STEP6_FELDER_V1`, `ORG_BETRIEBSNUMMERN_V1`, `FORMTEMPLATE_MASERNSCHUTZ_V1`, `KOSTENSTELLEN_AUFTEILUNG_V1` (die Merker von `ae490ba`: `sudo git show ae490ba:prisma/seed-check.js`, Z. 107, 219, 231, 460, 584, 758, 910). Die beiden letzten voraussichtlich mit `appliedAt` vom 08.09.2026 (UTC); ein späteres Datum ist nur INFO, es verschiebt aber die Stichtage in M-V4a. | Einer der drei **offenen** Namen (`VERTRAGSENDE_LABEL_STELLENBEZEICHNUNG_V1`, `ONBOARDING_PARALLELE_SPUREN_V1`, `ONBOARDING_ABTEILUNGSAUFGABEN_V1`) ist schon da: **STOPP.** Einer der sieben fehlt: **STOPP**, dann ist am 08.09. eine Migration nicht durchgelaufen und liefe beim Start mit. |
 
-#### B · Vorschau der fünf neuen Migrationen
+#### B · Vorschau der drei offenen Migrationen, Kontrolle der beiden vom 08.09.
 
-Die Migrationen laufen in dieser Reihenfolge (`seed-check.js:1819-1834`):
-`FORMTEMPLATE_MASERNSCHUTZ_V1` → `KOSTENSTELLEN_AUFTEILUNG_V1` →
-`VERTRAGSENDE_LABEL_STELLENBEZEICHNUNG_V1` → `ONBOARDING_PARALLELE_SPUREN_V1` →
-`ONBOARDING_ABTEILUNGSAUFGABEN_V1`. Jede setzt ihren Merker in derselben
-Transaktion wie ihre Änderung. Scheitert eine, wird das geloggt, der Start läuft
-weiter, und beim nächsten Start versucht sie es erneut.
+Offen sind drei Migrationen. Sie laufen in dieser Reihenfolge (`seed-check.js:1827,
+1830, 1834`): `VERTRAGSENDE_LABEL_STELLENBEZEICHNUNG_V1` →
+`ONBOARDING_PARALLELE_SPUREN_V1` → `ONBOARDING_ABTEILUNGSAUFGABEN_V1`. Jede setzt
+ihren Merker in derselben Transaktion wie ihre Änderung. Scheitert eine, wird das
+geloggt, der Start läuft weiter, und beim nächsten Start versucht sie es erneut.
+
+`FORMTEMPLATE_MASERNSCHUTZ_V1` und `KOSTENSTELLEN_AUFTEILUNG_V1` sind **bereits am
+08.09. gelaufen**. Beim Start kehren sie wegen ihres Merkers sofort zurück
+(`seed-check.js:656, 1021`). M-V1a bis M-V2b beschreiben deshalb nur den heutigen
+Stand und sind **nur INFO**. Die Spalte `aktion` bzw. `ergebnis` darin sagt, was die
+Migration täte; sie läuft aber nicht mehr.
 
 | Nr | Zeigt | Erwartet | Art · wenn nicht |
 |---|---|---|---|
-| M-V1a | Masernschutz-Schritt (Schritt 9) je Formularvorlage | „bereits aktiv“, „wird eingeschaltet“ oder „wird ergänzt“. Schritt 9 in **allen** Vorlagen ist so entschieden (07.09.2026, `seed-check.js:634-640`). | „UEBERSPRUNGEN“: ENTSCHEIDUNG, denn dann wird kein Merker gesetzt, und die Migration läuft bei jedem Start erneut (`seed-check.js:720-745`). Hatte HR Schritt 9 in einer Vorlage **bewusst** aus: merken, siehe 5.3. |
-| M-V1b | Laufende Vorgänge (eingeladen/in Bearbeitung), deren Fragebogen den Schritt dazubekommt | beliebig | INFO: Diese Personen sehen einen Schritt mehr. |
-| M-V2a | Kostenstellen-Übernahme in Zahlen | beliebig. `migriert` ist die spätere Log-Zahl. | INFO. Ist `anteil_ungleich_100` > 0, geht die Liste M-V2b an HR (5.3). |
-| M-V2b | Einzelliste dieser Sonderfälle | beliebig | INFO für HR |
+| M-V1a | Masernschutz-Schritt (Schritt 9) je Formularvorlage. **Bereits am 08.09. gelaufen, nur INFO.** | „bereits aktiv“ bei allen Vorlagen | INFO. Jede andere Zeile heißt: HR hat Schritt 9 nach dem 08.09. ausgeschaltet oder eine Vorlage ohne ihn angelegt. Das bleibt so, der Merker verhindert ein erneutes Einschalten (`seed-check.js:656`). Auch „UEBERSPRUNGEN“ ist nur noch INFO. |
+| M-V1b | Laufende Vorgänge (eingeladen/in Bearbeitung) ohne aktiven Schritt 9. **Bereits am 08.09. gelaufen, nur INFO.** | `(0 rows)`, außer Vorgängen aus einer Vorlage, die in M-V1a nicht „bereits aktiv“ zeigt | INFO. Durch diesen Deploy bekommt hier niemand einen Schritt dazu. Nur festhängende Vorgänge, die die Heil-Migration wieder öffnet, bekommen ihn nachgezogen, wenn sie vor dem 08.09. angelegt wurden (M-V4a). |
+| M-V2a | Kostenstellen in der Altspalte, in Zahlen. **Bereits am 08.09. gelaufen, nur INFO.** | beliebig | INFO, ohne Aussage für diesen Deploy: Seit 08.09. trägt die Altspalte die erste Zeile jeder neuen Aufteilung (`modalitaeten/[token]/route.ts:345-350`), `anteil_ungleich_100` zählt also auch korrekt aufgeteilte Vorgänge. Maßgeblich ist M-N2a/b nach dem Deploy. |
+| M-V2b | Einzelliste dazu. **Bereits am 08.09. gelaufen, nur INFO.** | beliebig | INFO, wie M-V2a |
 | M-V3, M-V3-2 | Beschriftung „Stellenbeschreibung“ beim Vertragsende je Mandant | „wird zu ‚Stellenbezeichnung‘“ oder „nichts zu tun“ | „eigenes Label bleibt“: INFO, dafür erscheint nur eine Logzeile. |
-| M-V4a | Jeder Onboarding-Vorgang, dessen Status die Heil-Migration ändert (`von` → `nach`) | Zeilen mit `festhaengend = t` sind der Zweck der Reparatur: Diese Personen können danach weiter ausfüllen. | ENTSCHEIDUNG, sobald Zeilen da sind: an Claude. |
+| M-V4a | Jeder Onboarding-Vorgang, dessen Status die Heil-Migration ändert (`von` → `nach`) | Zeilen mit `festhaengend = t` sind der Zweck der Reparatur: Diese Personen können danach weiter ausfüllen. `masern_im_snapshot = nein` bei einem festhängenden Vorgang: Die Heilung zieht Schritt 9 nach, wenn der Vorgang vor dem Masernschutz-Merker (08.09.) angelegt wurde, sonst nicht (`seed-check.js:1339-1358`). | ENTSCHEIDUNG, sobald Zeilen da sind: an Claude. |
 | M-V4b | Vorgänge, die geprüft oder abgeschlossen sind, obwohl der Fragebogen nie abgesendet wurde | `(0 rows)` | ENTSCHEIDUNG. Die Migration ändert diese Vorgänge nicht, sie meldet sie nur (`seed-check.js:1375-1377`). Jeder Fall wird einzeln mit HR geklärt. |
 | M-V5-0 | Zeichenregel der Datenbank | `en_US.utf8` | INFO. Bei anderem Wert sind M-V5a/b nur ungefähr, maßgeblich ist die Migration selbst (JS). |
 | M-V5a | Zuständigkeit in den Punkten der Onboarding-Checklisten-Vorlagen | „schon Schluessel“ oder „wird umgestellt“ | „UNBEKANNT“ oder „EIGENER Schluessel“: ENTSCHEIDUNG. Unbekannte bleiben stehen und gehen nie per Link hinaus. Ein eigener Schlüssel braucht einen Eintrag unter Einstellungen → Abteilungen. |
 | M-V5b | Dasselbe für die Aufgaben in laufenden und alten Vorgängen | wie M-V5a | wie M-V5a |
 | M-V5c | Woher die Tagesangabe einer Aufgabe kommt | Quelle 1 oder 3 | „4 keine Quelle“: INFO. Diese Aufgaben bekommen keine Fälligkeit und keine Erinnerung. |
 | M-V5d | Abteilungsadressen | echte Postfächer | Aktive Platzhalter `…@credo-gruppe.de` machen den PFLICHT-Handschritt 5.2 nötig. Zeilen mit `HR`, `MITARBEITER` oder `VORGESETZTER` werden nach dem Deploy gelöscht (5.2). |
-| M-V6 | Beschäftigungszeilen, die trotz „Nein“ stehen geblieben sind (Formular-Fix) | `(0 rows)` | ENTSCHEIDUNG: an Claude. Wie sich das korrigieren lässt, ist **ungeklärt**. |
+| M-V6 | Beschäftigungszeilen, die trotz „Nein“ stehen geblieben sind | `(0 rows)` | INFO, kein Hindernis für diesen Deploy. Der Formular-Fix (`6592dee`) ist seit 08.09. live, Zeilen stammen also aus der Zeit davor, und dieser Deploy ändert daran nichts. Wie sie sich korrigieren lassen, ist **ungeklärt** (Abschnitt 8). Ergebnis trotzdem an Claude. |
 
 #### C · Mailvorlagen und Webhooks
 
 | Nr | Zeigt | Erwartet | Art · wenn nicht |
 |---|---|---|---|
-| MAIL1 | Die 21 betroffenen Vorlagen: gespeichert oder nicht, aktiv, Empfänger und Textstand | `gespeichert = f`: nichts zu tun, der neue Code-Text gilt. | „ALTER TEXT: nach Deploy zuruecksetzen“ kommt auf die Reset-Liste (5.4). Hat HR einen dieser Texte **bewusst** angepasst: ENTSCHEIDUNG. Bei `questionnaire-confirmation-employee` ist jede dieser Angaben eine ENTSCHEIDUNG, denn bisher schickte der Code die Bestätigung immer an die Person und ignorierte Aktiv-Schalter und Empfängerfelder (`git show 6124936:src/app/api/fragebogen/[token]/route.ts`, Z. 803-838). Ab jetzt wirken sie (`mailer.ts:519-528, 540-542`): `isActive = f` (die Bestätigung bleibt aus), ein nicht leeres `recipientTo` außer `{{email}}` (es **ersetzt** die Adresse der Person), ein gesetztes `recipientCc` oder `recipientBcc` (geht ab jetzt in Kopie mit). |
-| MAIL2 | Die 30 HR-internen Vorlagen: An-Feld, Aktiv-Schalter, SKIPPED der letzten 90 Tage | beliebig | INFO für 5.1 und 5.3. Ohne An-Feld werden sie übersprungen (`mailer.ts:529-538`). |
-| MAIL3 | Alle Webhooks, ohne Zugangsdaten | `(0 rows)` oder nur inaktive | Jede **aktive** Zeile: ENTSCHEIDUNG, möglicher Doppelversand (6.4). |
+| MAIL1 | Die 21 betroffenen Vorlagen: gespeichert oder nicht, aktiv, Empfänger und Textstand | `gespeichert = f`: nichts zu tun, der neue Code-Text gilt. | „ALTER TEXT: nach Deploy zuruecksetzen“ kommt auf die Reset-Liste (5.4). Hat HR einen dieser Texte **bewusst** angepasst: ENTSCHEIDUNG. Bei `questionnaire-confirmation-employee` ist jede dieser Angaben eine ENTSCHEIDUNG, denn bisher schickte der Code die Bestätigung immer an die Person und ignorierte Aktiv-Schalter und Empfängerfelder (`sudo git show 'ae490ba:src/app/api/fragebogen/[token]/route.ts'`, Z. 1068-1104). Ab jetzt wirken sie (`mailer.ts:519-528, 540-542`): `isActive = f` (die Bestätigung bleibt aus), ein nicht leeres `recipientTo` außer `{{email}}` (es **ersetzt** die Adresse der Person), ein gesetztes `recipientCc` oder `recipientBcc` (geht ab jetzt in Kopie mit). **`dokument-ablauf-warnung` und `dokument-abgelaufen`** tragen im Ergebnis noch „NEU (An-Feld!)“, gibt es aber seit 08.09. Ist eine davon `gespeichert = t`, kommt sie auf die Reset-Liste (5.4): Ihr Code-Text ändert sich mit diesem Deploy, `textstand` zeigt das mangels Kennzeichen nur als `-`. Ein schon eingetragenes `recipientTo` ist dann erledigt (5.1 Nr. 2). |
+| MAIL2 | Die 30 HR-internen Vorlagen: An-Feld, Aktiv-Schalter, SKIPPED der letzten 90 Tage | beliebig | INFO für 5.1 und 5.3. Ohne An-Feld werden sie übersprungen (`mailer.ts:529-538`). `neu_im_deploy = t` stimmt nur noch für `onboarding-task-completed`. **Bei den beiden `dokument-*`-Zeilen** heißt `skipped_ohne_empfaenger_90_tage` > 0: Der Cron `dokument-ablauf` wird auf dem Server aufgerufen und findet kein An-Feld. Das ist bisher der einzige Hinweis, ob n8n ihn einplant (6.2). `0` beweist das Gegenteil nicht: Ohne fälligen Nachweis versucht der Lauf gar keine Mail, und mit An-Feld gibt es kein SKIPPED. |
+| MAIL3 | Alle Webhooks, ohne Zugangsdaten | `(0 rows)` oder nur inaktive | Jede **aktive** Zeile: ENTSCHEIDUNG, möglicher Doppelversand (6.4). Die Beschriftung „NEU: Cron /api/cron/dokument-ablauf“ ist veraltet: Diese Ereignisse feuern seit 08.09. |
 
 #### D · Betrieb und erster Cron-Lauf
 
 | Nr | Zeigt | Erwartet | Art · wenn nicht |
 |---|---|---|---|
 | B-B1 | Mitarbeiter-Erinnerungen, die der erste Lauf nach dem Deploy verschickt | beliebig | INFO. Enthält auch Personen, die heute festhängen und nach der Heil-Migration wieder eingeladen sind. |
-| B-B2 | Führungskraft-Erinnerungen im ersten Lauf. Neu: auch bei offenem Fragebogen (`cron/reminders/route.ts:195-222`) | beliebig | Jede Zeile ist eine Mail an eine Führungskraft. Soll eine davon nicht hinausgehen: ENTSCHEIDUNG, vor dem nächsten 08:00-Lauf. |
+| B-B2 | Führungskraft-Erinnerungen im ersten Lauf. Neu: auch bei offenem Fragebogen (`cron/reminders/route.ts:195-222`). Rechnet mit 720 h, das ist der Serverwert (1.5). | beliebig | Jede Zeile ist eine Mail an eine Führungskraft. Soll eine davon nicht hinausgehen: ENTSCHEIDUNG, vor dem nächsten 08:00-Lauf. |
 | B-B3 | Abteilungs-Erinnerungen im Offboarding im ersten Lauf (Näherung, zählt zu viel: Links aus B-B10 mit „Cron schweigt“ werden übersprungen) | beliebig | Der Cron erinnert nur an die Adresse, an die der Link ging (`email`), und nur, solange sie mit der heutigen Adresse übereinstimmt (`abteilungsaufgaben-dienst.ts:1174-1196`). Zeigt `email` einen Platzhalter, geht die Erinnerung an den Platzhalter. Nach dem Ersetzen (5.2) schweigt der Cron für diesen Link, bis HR „Erneut senden“ wählt. Welche Links das betrifft, zeigt B-B10. |
 | B-B4 | Gespeicherte Erinnerungs-Vorlagen | – | INFO für 5.4 |
 | B-B5 | Webhooks auf Erinnerungen und Offboarding | wie MAIL3 | wie MAIL3 |
@@ -974,27 +1210,32 @@ Das ist der bewährte Ablauf vom 07.09. (`deploy-dokumentenpaket-2026-09-07.md:7
 diesmal in Einzelschritte zerlegt. Dazwischen stehen zwei zusätzliche Netze: die
 Vorschau in 3.3 und die eigene Sicherung in 3.4.
 
-Wer beide Netze nicht will, kann 3.2 bis 3.5 durch den Befehl vom 07.09. ersetzen,
-`sudo docker compose up -d --build`. Dann fehlen aber die Vorschau und die
-Sicherung mit passender `psql`-Version für den Rückfall.
+Der Befehl vom 07.09., `sudo docker compose up -d --build`, ersetzt 3.2 bis 3.5, ist
+diesmal aber **nicht zu empfehlen**: Ohne 3.4 gibt es für einen Rückfall nach Weg A
+keine Sicherung, die sich einspielen lässt. Die Sicherung des Entrypoints schreibt
+`pg_dump` 18.6 und scheitert voraussichtlich an PostgreSQL 16 (1.5, 7.3). Außerdem
+fehlt die Vorschau aus 3.3.
 
 ### 3.1 Code holen
 
 ```bash
 cd /vol/container/HR_Portal_CREDO
-git fetch origin && git checkout main && git pull
-git log -1 --oneline
-git diff --stat 7bc91ec HEAD -- . ':!docs'
+sudo git fetch origin && sudo git checkout main && sudo git pull
+sudo git log -1 --oneline
+sudo git diff --stat 7bc91ec HEAD -- . ':!docs'
+sudo git status --short
 ```
 
 **Erwartet:**
 - `git log` zeigt `7bc91ec fix: Befunde der Code-Review vor dem Deploy`. Ein neuerer
   Commit ist auch in Ordnung, etwa der, der dieses Dokument enthält.
-- Der letzte Befehl gibt **nichts** aus. Nach `7bc91ec` kam also nur Doku.
+- Der vorletzte Befehl gibt **nichts** aus. Nach `7bc91ec` kam also nur Doku.
+- `git status` zeigt wie in 1.1 nur die Sicherungen in `backups/`.
 
-**Wenn nicht:** Meldet `git pull` einen Konflikt, oder gibt der letzte Befehl Dateien
-außerhalb von `docs/` aus: **STOPP, an Claude.** Dieser Plan beschreibt dann nicht
-mehr den Stand, der ausgerollt würde.
+**Wenn nicht:** Meldet `git pull` einen Konflikt, oder gibt der vorletzte Befehl
+Dateien außerhalb von `docs/` aus: **STOPP, an Claude.** Dieser Plan beschreibt dann
+nicht mehr den Stand, der ausgerollt würde. Ohne `sudo` kommt nur `dubious
+ownership` (1.1).
 
 ### 3.2 Image bauen (das Portal läuft weiter)
 
@@ -1019,31 +1260,39 @@ grep -nE 'DROP|RENAME|ALTER COLUMN .* TYPE' "$V"
 **Erwartet:**
 
 ```
-ADD COLUMN      23
-ADD VALUE       4
-CREATE TABLE    1
-INDEX           3
-ADD CONSTRAINT  2
+ADD COLUMN      15
+ADD VALUE       0
+CREATE TABLE    0
+INDEX           1
+ADD CONSTRAINT  1
 <Nr>:ALTER COLUMN "offboardingId" DROP NOT NULL;
 ```
 
-Die letzte Zeile muss genau einmal kommen, ihre Nummer ist egal.
+Die letzte Zeile muss genau einmal kommen, ihre Nummer ist egal. `grep -c` zählt
+Zeilen, und `prisma migrate diff` schreibt jede `ADD COLUMN` in eine eigene Zeile:
+1 (`onboarding_processes`) + 1 (`checklist_template_items`) + 4 (`checklist_items`)
++ 2 (`offboarding_processes`) + 2 (`offboarding_checklist_items`) + 5
+(`offboarding_department_links`) = 15. `INDEX` ist der Unique-Index
+`offboarding_department_links_onboardingId_departmentKey_key`, `ADD CONSTRAINT` der
+Fremdschlüssel `offboarding_department_links_onboardingId_fkey`.
 
 **Beleg:**
-- Genau diese Zählung ergibt das Delta, das `prisma migrate diff` aus altem und neuem
-  Schema erzeugt.
-- Dieselbe Zählung ergibt der Vergleich einer Probedatenbank mit altem Schema gegen
-  das neue Schema. Dort stehen die Anweisungen nur in anderer Reihenfolge, sortiert
-  sind sie gleich.
+- Genau diese Zählung ergibt das Delta, das `prisma migrate diff` aus den Schemas von
+  `ae490ba` und `7bc91ec` erzeugt (24.09., bei der Korrektur und in der Gegenprüfung
+  mit genau dieser Schleife nachgezählt).
+- Jede Anweisung darin steht auch im Delta ab `6124936`, dessen Zählung zusätzlich
+  gegen eine Probedatenbank bestätigt wurde. Gegen eine Datenbank mit Schema
+  `ae490ba` ist das kleinere Delta nicht eigens gezählt.
 - Der Befehl stammt aus der Schema-Analyse zu diesem Deploy. Auf dem Server wurde er
   **nicht geprobt**.
 
 **Wenn nicht:**
 - Weicht eine Zahl ab, oder erscheint eine weitere `DROP`/`RENAME`/`TYPE`-Zeile:
   **STOPP, nicht starten.** Die Datei `vorschau-delta.sql` an Claude schicken. Das
-  Portal läuft ja noch mit dem alten Container.
+  Portal läuft ja noch mit dem alten Container. Die alten Zahlen `23 · 4 · 1 · 3 · 2`
+  hießen: Die Datenbank steht auf `6124936`, nicht auf `ae490ba`.
 - Scheitert der Befehl selbst, kommt also eine Fehlermeldung statt SQL: an Claude.
-  Die Drift-Prüfungen S-V2 bis S-V5 und 1.7 decken dasselbe ab. Ohne Vorschau geht es
+  Die Drift-Prüfungen S-V3 bis S-V5 und 1.7 decken dasselbe ab. Ohne Vorschau geht es
   aber nur nach Rücksprache weiter.
 
 ### 3.4 Portal anhalten, eigene Sicherung anlegen
@@ -1058,15 +1307,20 @@ sudo grep -c 'PostgreSQL database dump complete' backups/vor-deploy-7bc91ec-manu
 **Ab hier ist das Portal offline.** Warum diese zweite Sicherung neben der des
 Entrypoints:
 
-- **Gleiche Version:** Sie entsteht mit `pg_dump` aus dem DB-Container, also derselben
-  Version wie das `psql`, das sie im Rückfall einspielt. Genau diese Kombination
-  (postgres:16-alpine, `--schema=public`, einspielen nach `DROP SCHEMA public CASCADE`)
-  wurde auf einer Wegwerf-Datenbank geprobt.
+- **Gleiche Version:** Sie entsteht mit `pg_dump` aus dem DB-Container. Das Image
+  postgres:16-alpine bringt `pg_dump` und `psql` in derselben Version mit (dort
+  16.13, 1.5), passend zum Server und zum `psql`, das sie im Rückfall einspielt. Genau diese Kombination (postgres:16-alpine, `--schema=public`, einspielen
+  nach `DROP SCHEMA public CASCADE`) wurde auf einer Wegwerf-Datenbank geprobt. Die
+  Sicherung des Entrypoints schreibt dagegen `pg_dump` 18.6 (1.5) und lässt sich nicht
+  unverändert einspielen (7.3). **Für Weg A ist diese Sicherung also die maßgebliche,
+  nicht nur eine zweite.**
 - **Kein Wegräumen:** Ihr Name fällt nicht unter die Rotation des Entrypoints. Die
   erfasst nur `vor-schema-abgleich-*.sql` (`entrypoint.sh:111`).
 
 **Erwartet:**
-- Die Größe liegt in der Gegend von 1,4 MB oder darüber (07.09.: 1 389 174 Bytes).
+- Die Größe liegt in der Gegend der Sicherung vom 08.09. oder darüber:
+  `sudo ls -l backups/vor-schema-abgleich-20260908-144512.sql` zeigt sie (07.09.:
+  1 389 174 Bytes).
 - `grep` meldet `1`.
 
 **Wenn nicht:** Ist die Datei deutlich kleiner als 1 MB oder meldet `grep` `0`:
@@ -1098,8 +1352,6 @@ Datenbank-Schema wird synchronisiert...
 Datenbank-Schema synchronisiert.
 Pruefe ob Seed notwendig...
 System-Vorlage (Fuehrungszeugnis) ist aktuell.
-Masernschutz-Schritt aktiviert in: …; laufende Vorgaenge nachgezogen: ….
-Kostenstellen-Migration: … von … uebernommen (ohne Anteil: …, Anteil ungleich 100: …, leere Bezeichnung uebersprungen: …).
 Vertragsende-Label "Stellenbezeichnung": … von … Mandanten angepasst.
 Onboarding parallele Spuren: … von … Vorgaengen korrigiert (davon festhaengend geheilt: …).
 Onboarding-Abteilungsaufgaben (ONBOARDING_ABTEILUNGSAUFGABEN_V1): … Vorlagenpunkte und … Aufgaben auf Schluessel umgestellt, … Aufgaben mit Tagesangabe (davon ueber den Titel: …).
@@ -1118,7 +1370,7 @@ Next.js Server startet auf Port 3000...
   - `Datenbank-Schema ist bereits deckungsgleich — kein Abgleich noetig.`
     (`entrypoint.sh:68`). Dann fehlen Sicherung und Push. Bei **jedem späteren**
     Neustart ist das die normale Zeile. Beim **ersten** Start des neuen Images darf
-    sie nicht kommen, denn S-V2 bis S-V5 und 3.3 haben ein offenes Delta gezeigt.
+    sie nicht kommen, denn S-V3 bis S-V5 und 3.3 haben ein offenes Delta gezeigt.
 - **Warnung:** Der Warnungstext stammt aus dem Probelauf, es ist **genau diese eine**
   Warnung. Sie ist der angekündigte Text von `--accept-data-loss` (wie am 07.09.,
   Protokoll :102-106). Entscheidend ist die Zeile darunter.
@@ -1130,30 +1382,46 @@ Next.js Server startet auf Port 3000...
   - Möglich ist ein Kasten „Update available …“.
   - Gibt es mehr als zehn alte Sicherungen, kommt `Alte Sicherung entfernt: …`
     (`entrypoint.sh:111-116`).
-- **Migrations-Zeilen:** Ihr Wortlaut steht in `seed-check.js:751-760, 1036, 1062-1074,
-  1222-1225, 1504-1511, 1794-1799, 1844-1846`. Erlaubte Abweichungen:
-  - Masernschutz: `Masernschutz-Schritt war bereits ueberall aktiv.`, auch mit dem
-    Zusatz `Kein Merker wegen: …`, wenn M-V1a „UEBERSPRUNGEN“ zeigte.
-  - Kostenstellen: `Kostenstellen-Migration: nichts zu tun, Merker gesetzt.`
-  - Vertragsende-Label: davor Zeilen `Vertragsende-Label bleibt: …` für Mandanten mit
-    eigenem Label.
+- **Migrations-Zeilen:** Ihr Wortlaut steht in `seed-check.js:58, 1222-1225,
+  1504-1511, 1794-1799, 1844-1846`. Erlaubte Abweichung: beim Vertragsende-Label davor
+  Zeilen `Vertragsende-Label bleibt: …` für Mandanten mit eigenem Label
+  (`seed-check.js:1200-1203`).
+- **System-Vorlage:** Sie hat keinen Merker und meldet sich bei jedem Start mit genau
+  einer Zeile (`seed-check.js:53, 56, 58`). `ist aktuell` ist richtig, denn
+  `public/system-dokumente/` ist seit `ae490ba` unverändert. `angelegt` oder
+  `aktualisiert`: an Claude.
 - **Warnzeilen, die kommen dürfen**, dann aber an Claude gehen:
   - `Onboarding parallele Spuren: geprueft/abgeschlossen ohne abgesendeten Fragebogen (nicht geaendert): …`
     (`seed-check.js:1514-1517`)
   - `Onboarding-Abteilungsaufgaben: unbekannte Zustaendigkeiten (nicht geaendert, bitte unter Checklisten-Vorlagen zuordnen): …`
     (`seed-check.js:1801-1806`)
-  - `Masernschutz uebersprungen: Vorlage … hat keine Schrittliste.` (`seed-check.js:681-685`)
-    und `Masernschutz-Schritt: nichts zu tun, aber Vorlagen ohne Schrittliste (…)` (`:742-746`)
-- **Stille alte Migrationen:** Die alten Migrationen und die Betriebsnummern bleiben
-  stumm, denn ihre Merker sind gesetzt (M-V0).
+- **Stille Migrationen (sieben):** `CURRENT_STEP_REGISTRY_V1`, die drei MINIJOB-Merker,
+  Masernschutz, Betriebsnummern und Kostenstellen kehren wegen ihres Merkers ohne jede
+  Zeile zurück (`seed-check.js:134, 284, 396, 534, 656, 869, 1021`; Merker laut M-V0).
+  **Nicht erscheinen dürfen** deshalb Zeilen mit `currentStep-Migration`,
+  `MINIJOB-Vorlage`, `Masernschutz`, `Noch keine Formularvorlagen`, `Betriebsnummer`,
+  `Noch keine Mandanten` oder `Kostenstellen-Migration`. Die alte Erwartung
+  „Masernschutz-Schritt aktiviert …“ und „Kostenstellen-Migration: … uebernommen …“
+  galt für `6124936`. Kommt eine solche Zeile: an Claude, dann fehlte ein Merker
+  trotz M-V0.
 
 **Log sichern und die Migrationszeilen herausziehen:** Der Filter stammt aus der
-SQL-Probe und ist gegen das Probe-Log getestet.
+SQL-Probe und ist gegen das Probe-Log getestet. In der Gegenprüfung wurde
+`Betriebsnummern` zu `Betriebsnummer` verkürzt, damit auch die Warnzeilen
+`Betriebsnummer ohne Mandant …` und `Betriebsnummer uebersprungen …`
+(`seed-check.js:886-894`) hängen bleiben; der Filter trifft dadurch nur mehr, nie weniger.
 
 ```bash
 sudo docker compose logs --no-log-prefix app > ~/deploy-7bc91ec/start-log.txt
-sudo docker compose logs app | grep -E 'System-Vorlage|Masernschutz|Betriebsnummern|Kostenstellen|Vertragsende-Label|parallele Spuren|Abteilungsaufgaben|MINIJOB|currentStep|Fehler|fehlgeschlagen|geseeded|Seed'
+sudo docker compose logs app | grep -E 'System-Vorlage|Masernschutz|Betriebsnummer|Kostenstellen|Vertragsende-Label|parallele Spuren|Abteilungsaufgaben|MINIJOB|currentStep|Fehler|fehlgeschlagen|geseeded|Seed'
 ```
+
+Erwartet im Filter, ausgehend von `ae490ba`: `Pruefe ob Seed notwendig...`, die Zeile der
+System-Vorlage, gegebenenfalls `Vertragsende-Label bleibt: …`, dann je eine Zeile
+Vertragsende-Label, parallele Spuren und Abteilungsaufgaben, gegebenenfalls die beiden
+Warnzeilen von oben, zuletzt `Datenbank bereits geseeded …`. **Keine** Zeile mit
+`Masernschutz`, `Kostenstellen`, `Betriebsnummer`, `MINIJOB`, `currentStep`, `Fehler`
+oder `fehlgeschlagen`.
 
 > **Ergebnis an Claude schicken:** `start-log.txt`, bei jedem Deploy.
 
@@ -1167,7 +1435,7 @@ sudo docker compose logs app | grep -E 'System-Vorlage|Masernschutz|Betriebsnumm
 | `FATAL: Sicherung nach … fehlgeschlagen.` | Rechte auf `backups/` (`entrypoint.sh:98-105`). Die Datenbank ist unverändert. | `sudo chown 1001 backups`. Der Container startet von selbst neu (`restart: unless-stopped`, `docker-compose.yml:15`). |
 | Nach `Datenbank-Schema wird synchronisiert...` kommt eine Prisma-Fehlermeldung statt `…synchronisiert.`, und `sudo docker compose ps` zeigt `Restarting` | Der Push ist gescheitert, der Container hängt in einer Neustart-Schleife. | **Sofort** `sudo docker compose stop app`. Jeder Neustart legt eine neue Sicherung an, und nach zehn Neustarts ist die Sicherung vom Deploy weggeräumt (`entrypoint.sh:111-116`). Danach an Claude. |
 | `… fehlgeschlagen: …` einer Migration, `Seed-Check Fehler:` oder `System-Vorlage-Seed Fehler` | Die Migration ist nicht gelaufen, der Start geht trotzdem weiter (`entrypoint.sh:125`). | an Claude. Ohne Merker läuft sie beim nächsten Start erneut. |
-| `Seed-Check fehlgeschlagen (nicht kritisch).` | `node prisma/seed-check.js` ist mit Fehler ausgestiegen (`entrypoint.sh:125`). Fehler einzelner Migrationen fängt die Datei selbst ab (`seed-check.js:1848-1851`), diese Zeile heißt also: Das Skript selbst ist abgebrochen, womöglich lief **keine** der fünf Migrationen. Der Server startet trotzdem. | an Claude, mit `start-log.txt`. M-N0 zeigt, welche Merker fehlen. |
+| `Seed-Check fehlgeschlagen (nicht kritisch).` | `node prisma/seed-check.js` ist mit Fehler ausgestiegen (`entrypoint.sh:125`). Fehler einzelner Migrationen fängt die Datei selbst ab (`seed-check.js:1848-1851`), diese Zeile heißt also: Das Skript selbst ist abgebrochen, womöglich lief **keine** der drei offenen Migrationen. Der Server startet trotzdem. | an Claude, mit `start-log.txt`. M-N0 zeigt, welche Merker fehlen. |
 | Kein `✓ Ready`, oder der Health-Check (4.1) meldet einen Fehler | Die App startet nicht. | an Claude, mit `start-log.txt` |
 
 ### 3.8 Die Sicherung des Entrypoints aus der Rotation nehmen
@@ -1179,7 +1447,8 @@ sudo sh -c 'cd /vol/container/HR_Portal_CREDO/backups && cp -p "$(ls -1t vor-sch
 ```
 
 Erwartet sind zwei Dateien, `…-entrypoint.sql` und `…-manuell.sql`, fast gleich groß.
-Kleine Unterschiede können von verschiedenen `pg_dump`-Versionen kommen.
+Kleine Unterschiede kommen von den verschiedenen `pg_dump`-Versionen (18.6 im
+App-Container, 16.13 im DB-Container, 1.5).
 
 ---
 
@@ -1212,14 +1481,19 @@ gegen eine Probedatenbank mit neuem Schema, einmal vor und einmal nach
 dazu, ist dieselbe Abfrage wie B-B10 und lief lesend gegen die Dev-Datenbank: ganze
 Datei Exit 0, 26 von 26.
 
-**Vor dem Deploy ausgeführt bricht die Datei ab**, und zwar bei S-N2 mit Exit 3. Das
-ist gewollt: Diese Abfragen kennen Spalten, die es vorher noch nicht gibt.
+**Vor dem Deploy ausgeführt bricht die Datei ab**, auch auf `ae490ba`, und zwar bei
+S-N2 mit Exit 3 (`offboarding_department_links."onboardingId"` gibt es vorher nicht).
+Das ist gewollt.
+
+Die Datei ist unverändert und kennt noch den Ausgangsstand `6124936`: Einige
+Abfragen prüfen die Minijob-Migrationen, die seit 08.09. gelaufen sind. Sie sind in
+der Tabelle unten als **Kontrolle, schon seit 08.09.** gekennzeichnet.
 
 **Datei anlegen, Variante 1 (ohne Einfügen):**
 
 ```bash
 cd /vol/container/HR_Portal_CREDO
-git show HEAD:docs/historie/deploy-onboarding-pakete-2026-09.md \
+sudo git show HEAD:docs/historie/deploy-onboarding-pakete-2026-09.md \
   | awk '/^cat > ~\/deploy-7bc91ec\/nachher-alle.sql/{f=1;next} /^ENDE_SQL$/{f=0} f' > ~/deploy-7bc91ec/nachher-alle.sql
 ```
 
@@ -1624,14 +1898,14 @@ grep -c 'ERROR' ~/deploy-7bc91ec/nachher-ergebnis.txt
 
 | Nr | Zeigt | Erwartet | Wenn nicht |
 |---|---|---|---|
-| S-N1 | Neue Spalten, `offboardingId` nullable, neue Enum-Werte | `23` · `YES` · `4` | an Claude |
+| S-N1 | Spalten der Liste, `offboardingId` nullable, Enum-Werte | `23` · `YES` · `4`. Davon gibt es 8 Spalten und alle 4 Enum-Werte seit 08.09., neu sind 15 Spalten und `YES`. | an Claude |
 | S-N2 | Link-Tabelle: Ist je Zeile genau ein Modul gesetzt? Gibt es Onboarding-Duplikate? | `0` · `0` | an Claude |
-| S-R1 | Was ein Rückfall verlieren würde, dazu die Blocker | Blocker-Zeilen `0`. Direkt nach dem Deploy liegen nur `supervisor_kostenstellen` (= `migriert` aus M-V2a) und `checklist_items…` (Tagesangaben aus der Migration) über 0. | Diese Zahlen **aufheben**: Sie sind die Grundlage jeder Rückfall-Entscheidung (Abschnitt 7). |
-| M-N0 | Die neuen Merker | 5 Zeilen, `appliedAt` = Startzeit (UTC) | Nur 4 Zeilen, `FORMTEMPLATE_MASERNSCHUTZ_V1` fehlt: in Ordnung, **wenn** M-V1a „UEBERSPRUNGEN“ zeigte. Sonst an Claude. |
-| M-N0b | Die Details der Merker, darin die alten Werte | – | Mitschicken, das ist das Protokoll der Umstellung. |
-| M-N1, M-N1-2 | Vorlagen und laufende Snapshots ohne aktiven Schritt 9 | `(0 rows)` | an Claude, außer bei „UEBERSPRUNGEN“ in M-V1a |
-| M-N2a | Kostenstellen ohne Aufteilung | `0` | an Claude |
-| M-N2b | Aufteilungen, die nicht 100 % ergeben | genau die Zeilen aus M-V2b mit `ergebnis` „Anteil bleibt, Summe <> 100 -> HR pflegt nach“. Die Zeilen „ohne Anteil -> 100“ ergeben 100 %, und aus „leer - keine Zeile“ entsteht keine Aufteilung (`seed-check.js:962-979`); beide fehlen hier also. | Liste an HR (5.3) |
+| S-R1 | Was ein Rückfall verlieren würde, dazu die Blocker. **Die Abfrage kennt noch den Rückfall auf `6124936`.** Für den Rückfall auf `ae490ba` zählen nur die Zeilen `onboarding_processes.supervisorLinkSentAt`, `checklist_template_items.description`, `checklist_items.description/relativeDueDays/abteilungKommentar`, `offboarding_processes.supervisorEmail/Name`, `offboarding_checklist_items.abteilungKommentar`, `offboarding_department_links.lastSent*/zugestelltAn` und als einziger Blocker `BLOCKER: Onboarding-Links (offboardingId NULL)`. | Direkt nach dem Deploy: der Blocker `0`, von den gezählten Zeilen nur `checklist_items…` über 0 (Tagesangaben aus der Migration). Die Zeilen `personal_data…`, `supervisor_data.kostenstellenBemerkung`, `supervisor_kostenstellen`, `documents…` und die drei übrigen `BLOCKER`-Zeilen (neue Typen, `requiredDocuments`, `EXPIRED`) gehören zum Stand `ae490ba`: beliebig, sie gingen bei einem Rückfall nicht verloren und blockieren ihn nicht. | Diese Zahlen **aufheben**: Sie sind die Grundlage jeder Rückfall-Entscheidung (Abschnitt 7). |
+| M-N0 | Die fünf Merker, nach denen die Abfrage fragt | **5 Zeilen:** `FORMTEMPLATE_MASERNSCHUTZ_V1` und `KOSTENSTELLEN_AUFTEILUNG_V1` mit `appliedAt` vom 08.09.2026, die drei neuen (`VERTRAGSENDE_LABEL_STELLENBEZEICHNUNG_V1`, `ONBOARDING_PARALLELE_SPUREN_V1`, `ONBOARDING_ABTEILUNGSAUFGABEN_V1`) mit `appliedAt` = Startzeit (UTC) | an Claude. Fehlt einer der drei neuen, ist seine Migration gescheitert (3.7) und läuft beim nächsten Start erneut. |
+| M-N0b | Die Details der Merker, darin die alten Werte | – | Mitschicken, das ist das Protokoll der Umstellung. Die Details von Masernschutz und Kostenstellen stammen vom 08.09. |
+| M-N1, M-N1-2 | Vorlagen und laufende Snapshots ohne aktiven Schritt 9. **Kontrolle, schon seit 08.09.** | `(0 rows)`, außer den Vorlagen, die in M-V1a nicht „bereits aktiv“ zeigten, und den Vorgängen, die schon in M-V1b standen | INFO für diese; jede weitere Zeile: an Claude |
+| M-N2a | Kostenstellen ohne Aufteilung. **Kontrolle, schon seit 08.09.** | `0` | an Claude |
+| M-N2b | Aufteilungen, die nicht 100 % ergeben. **Kontrolle, schon seit 08.09.** | beliebig: Sonderfälle aus der Übernahme vom 08.09. und Aufteilungen, die seitdem gepflegt wurden. M-V2b ist dafür kein Vergleich mehr (Altspalte spiegelt nur die erste Zeile). | Liste an HR (5.3), falls sie sie nach dem 08.09. nicht schon bekommen hat |
 | M-N3 | Beschriftung „Stellenbeschreibung“ noch vorhanden | `(0 rows)` | an Claude |
 | M-N4 | Status passt nicht zu den beiden Zeitstempeln | `(0 rows)` | an Claude |
 | M-N4b | `hrOhneAbgabe` laut Merker | dieselben Fälle wie in M-V4b | einzeln mit HR klären (5.3) |
@@ -1640,12 +1914,12 @@ grep -c 'ERROR' ~/deploy-7bc91ec/nachher-ergebnis.txt
 | M-N5c | Unbekannte Zuständigkeiten laut Merker | dieselben wie „UNBEKANNT“ in M-V5a/b | zuordnen (5.3) |
 | M-N5d | Aufgaben ohne Tagesangabe, obwohl es eine Quelle gibt | `0` | an Claude |
 | M-N5e | Tagesangaben und Fälligkeiten | `davon_noch_ohne_datum` = `mit_tagen` ist normal | INFO. Das Datum entsteht erst bei der Abgabe der Modalitäten oder beim ersten „Abteilungen informieren“. |
-| MAIL1–MAIL3 | wie VORHER | Nach 5.1 zeigt keine PFLICHT-Zeile mehr „ALTER TEXT“, und die drei neuen An-Felder sind gesetzt. | an Claude. Nach 5.3 lohnt ein zweiter Lauf für die EMPFOHLEN-Zeilen. |
-| B-N1 | Alle Merker | 10 Zeilen (9, wenn Masernschutz übersprungen wurde) | an Claude |
+| MAIL1–MAIL3 | wie VORHER | Nach 5.1 zeigt keine PFLICHT-Zeile mehr „ALTER TEXT“, und die drei An-Felder aus 5.1 Nr. 2 sind gesetzt. | an Claude. Nach 5.3 lohnt ein zweiter Lauf für die EMPFOHLEN-Zeilen. |
+| B-N1 | Alle Merker | **10 Zeilen:** die 7 aus M-V0 und die 3 neuen | an Claude |
 | B-N2 | Heil-Migration: geändert, geheilt, `hrOhneAbgabe` | – | INFO |
-| B-N3 | Dokumente mit Ablaufdatum | `0` · `0`, denn keine Migration füllt `gueltigBis` | INFO |
+| B-N3 | Dokumente mit Ablaufdatum | beliebig: Seit 08.09. kann HR Ablaufdaten erfassen (Fristen-Ampel), keine Migration füllt `gueltigBis` | INFO. `im_horizont` > 0 heißt: Der nächste Lauf von `dokument-ablauf` mailt oder setzt Merker, falls er eingeplant ist (6.2). |
 | B-N4 | Onboarding-Links | `0` · `0` | an Claude, denn niemand hat bisher geklickt |
-| B-N5 | Mailprotokoll der letzten 24 h | normaler Tagesverkehr. Der Start selbst verschickt nichts. | Nach dem ersten Cron-Lauf erneut ansehen |
+| B-N5 | Mailprotokoll der letzten 24 h | normaler Tagesverkehr, dazu `dokument-*`-Einträge, falls der Lauf eingeplant ist. Der Start selbst verschickt nichts. | Nach dem ersten Cron-Lauf erneut ansehen |
 | B-N6 | wie B-B10: Offboarding-Abteilungslinks, deren Erinnerungen schweigen | direkt nach dem Start dieselben Zeilen wie B-B10, nach 5.2 `(0 rows)` | Die Zeilen sind die Arbeitsliste für 5.2 Nr. 2. Nach 5.2 erneut ausführen. Bleibt eine Zeile stehen, ohne dass HR sie bewusst ruhen lässt: an Claude. |
 
 ### 4.3 Cron-Probe (ohne Mails)
@@ -1654,19 +1928,24 @@ grep -c 'ERROR' ~/deploy-7bc91ec/nachher-ergebnis.txt
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://hr.fes-credo.de/api/cron/dokument-ablauf
 ```
 
-Erwartet `401`. Vor dem Deploy gab es die Route nicht (404). Die Middleware lässt
-`/api/…` ohne Sitzung durch (`src/middleware.ts:89-116`), und die Route selbst lehnt
-den fehlenden Schlüssel ab (`src/app/api/cron/dokument-ablauf/route.ts:145-147`).
+Erwartet `401`. Die Middleware lässt `/api/…` ohne Sitzung durch
+(`src/middleware.ts:89-116`), und die Route selbst lehnt den fehlenden Schlüssel ab
+(`src/app/api/cron/dokument-ablauf/route.ts:145-147`). Die Route gibt es seit 08.09.,
+`401` kam also auch schon vor dem Deploy. Die Probe zeigt nur, dass die Route und
+ihre Prüfung nach dem Start antworten, nicht, dass der neue Code läuft; das zeigen
+3.6 und M-N0.
 
-**Nur wenn B-N3 = 0 ist, optional:**
+**Nur wenn B-N3 beide Zahlen `0` zeigt, optional:**
 
 ```bash
 sudo docker exec hr-portal-app sh -c 'curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/dokument-ablauf'
 ```
 
-Erwartet `{"success":true,…,"geprueft":0,"erinnerungen":0,…}` (`route.ts:158-166, 440-444`).
-Ohne Dokumente mit Ablaufdatum liest dieser Lauf nichts, schreibt nichts und mailt
-nichts.
+Erwartet `{"success":true,…,"geprueft":0,"erinnerungen":0,…}` (`route.ts:158-166, 440-444`),
+jetzt mit den neuen Feldern `nichtZugestellt` und `mailUebersprungen`. Ohne Dokumente
+mit Ablaufdatum liest dieser Lauf nichts, schreibt nichts und mailt nichts. **Zeigt
+B-N3 eine Zahl über 0, nicht von Hand aufrufen:** Der Lauf mailt dann an HR oder
+setzt ohne An-Feld die Merker (6.2).
 
 **Nicht mit dem Secret aufrufen:** `reminders` und `offboarding-reminders`. Beide
 verschicken echte Erinnerungen.
@@ -1736,15 +2015,21 @@ Anfang.
    Claude entschieden. Der alte Text bleibt nach dem Reset im AuditLog
    (`EMAIL_TEMPLATE_RESET`, `zuruecksetzen/route.ts:107-124`).
 
-2. **An-Feld mit dem HR-Postfach eintragen und speichern.** Das betrifft die drei
-   neuen HR-internen Vorlagen, deren Katalog-Empfänger leer ist
+2. **An-Feld mit dem HR-Postfach eintragen und speichern.** Das betrifft drei
+   HR-interne Vorlagen, deren Katalog-Empfänger leer ist
    (`src/lib/events.ts:565, 622, 647`):
-   - Onboarding-Aufgabe erledigt (`onboarding-task-completed`)
-   - Befristeter Nachweis läuft ab (HR-Erinnerung) (`dokument-ablauf-warnung`)
-   - Befristeter Nachweis ist abgelaufen (HR-Warnung) (`dokument-abgelaufen`)
+   - Onboarding-Aufgabe erledigt (`onboarding-task-completed`), neu mit diesem Deploy
+   - Befristeter Nachweis läuft ab (HR-Erinnerung) (`dokument-ablauf-warnung`), seit 08.09.
+   - Befristeter Nachweis ist abgelaufen (HR-Warnung) (`dokument-abgelaufen`), seit 08.09.
 
    Ohne An-Feld werden sie übersprungen. Das Protokoll vermerkt dann „Kein Empfaenger
-   konfiguriert“ (`mailer.ts:529-538`).
+   konfiguriert“ (`mailer.ts:529-538`). Bei den beiden `dokument-*`-Vorlagen hat HR
+   das An-Feld vielleicht schon nach dem 08.09. eingetragen; MAIL1 zeigt es in
+   `recipientTo`. Fehlt es, ist es **ab diesem Deploy dringender als bisher**: Der Lauf
+   `dokument-ablauf` setzt jetzt auch bei SKIPPED seinen Merker, eine fehlende Adresse
+   verschiebt die Erinnerung also um 30, 14 oder 3 Tage, statt am nächsten Tag erneut
+   zu versuchen (6.2). Deshalb vor dem nächsten Lauf eintragen, und die gespeicherten
+   Vorlagen zurücksetzen (5.4); das An-Feld bleibt beim Reset erhalten (5.5).
 
    **Welche Adresse, ist ungeklärt.** Die Vorlagen und der n8n-Bericht nennen
    `personalbuchhaltung@fes-minden.de` (`default-email-templates.ts:158`,
@@ -1822,8 +2107,9 @@ Anfang.
    - Der Hilfetext unter dem Feld ist veraltet: Er sagt „Gilt nur für den
      Dokumentenpaket-Versand“ (`einstellungen-content.tsx:849-855`). HR sollte das
      wissen.
-4. **n8n:** URL, Timeout und Zeitplan prüfen (6.1). Soll der erste Lauf erst nach 5.2
-   und 5.3 kommen, beide Workflows so lange pausieren (6.3).
+4. **n8n:** URL, Timeout und Zeitplan prüfen (6.1), dazu, ob `dokument-ablauf`
+   eingeplant ist (6.2). Soll der erste Lauf erst nach 5.2 und 5.3 kommen, beide
+   Workflows so lange pausieren (6.3).
 
 ### 5.3 EMPFOHLEN (am selben Tag oder zeitnah)
 
@@ -1850,21 +2136,20 @@ Anfang.
   Unbekannte Zuständigkeiten aus M-N5c zuordnen. Ohne Schlüssel geht eine Aufgabe an
   niemanden, ohne Tagesangabe gibt es keine Fälligkeit und keine Erinnerung. Der Seed
   fasst die Vorlagen in Produktion nicht an (`seed.ts:315-316`).
-- **Kostenstellen** aus M-N2b an HR geben, damit sie auf 100 % gepflegt werden. Bei
-  einer Aufteilung bleibt die LOGA-Positionsspalte leer. Die Absprache mit der
+- **Kostenstellen** aus M-N2b an HR geben, damit sie auf 100 % gepflegt werden, falls
+  HR die Liste nach der Übernahme vom 08.09. nicht schon bekommen hat. Bei einer
+  Aufteilung bleibt die LOGA-Positionsspalte leer. Die Absprache mit der
   Lohnbuchhaltung ist offen (Abschnitt 8).
 - **`hrOhneAbgabe`-Fälle** (M-N4b) einzeln mit HR klären.
-- **Masernschutz:** Hatte HR Schritt 9 in einer Vorlage bewusst aus (M-V1a), ihn jetzt
-  im Vorlagen-Editor wieder ausschalten. Der Merker verhindert, dass die Migration ihn
-  erneut einschaltet. Das gilt aber nur, wenn M-N0 den Merker
-  `FORMTEMPLATE_MASERNSCHUTZ_V1` zeigt. Fehlt er, weil eine Vorlage übersprungen wurde,
-  schaltet der nächste Start Schritt 9 wieder ein (`seed-check.js:727-729`). Dann erst
-  an Claude.
-- **„Test senden“** an die eigene Adresse, einmal je neuer Vorlage:
+- **Masernschutz: nichts zu tun.** Die Migration lief am 08.09. und hat Schritt 9 in
+  allen Vorlagen eingeschaltet. Hat HR ihn danach in einer Vorlage bewusst
+  ausgeschaltet (M-V1a), bleibt das so: Der Merker `FORMTEMPLATE_MASERNSCHUTZ_V1` steht
+  seit 08.09. (M-V0), die Migration kehrt sofort zurück (`seed-check.js:656`).
+- **„Test senden“** an die eigene Adresse, einmal je Vorlage:
   - `onboarding-department-assigned`, `onboarding-department-reminder`,
-    `onboarding-department-completed`, `onboarding-task-completed`
-  - `dokument-ablauf-warnung`
-  - `dokument-abgelaufen`
+    `onboarding-department-completed`, `onboarding-task-completed` (neu)
+  - `dokument-ablauf-warnung` und `dokument-abgelaufen` (seit 08.09., Text neu, nach
+    dem Reset aus 5.4)
 - **Rollen (B-B9):**
   - EINRICHTUNGSLEITUNG darf Vorgänge anlegen, aber keine Führungskraft eintragen.
     Das ergibt 403 (`src/lib/permissions.ts:33-36`).
@@ -1901,11 +2186,16 @@ Code-Text automatisch (`mailer.ts:383-415`).
 | Erinnerung: Offene Onboarding-Aufgaben | `onboarding-department-reminder` | NEU | wie oben | Test senden |
 | Onboarding-Aufgabe erledigt | `onboarding-task-completed` | NEU, **PFLICHT An-Feld** | Katalog-Empfänger leer (`events.ts:565`). Nur über den Link, das Häkchen im Portal löst nichts aus. | An-Feld (5.1 Nr. 2) |
 | Onboarding: Abteilung abgeschlossen (Bestaetigung) | `onboarding-department-completed` | NEU | wie oben | Test senden |
-| Befristeter Nachweis läuft ab (HR-Erinnerung) | `dokument-ablauf-warnung` | NEU, **PFLICHT An-Feld** | Katalog-Empfänger leer (`events.ts:622`). Muss **vor** dem Einplanen des Crons stehen (6.2). | An-Feld (5.1 Nr. 2) |
-| Befristeter Nachweis ist abgelaufen (HR-Warnung) | `dokument-abgelaufen` | NEU, **PFLICHT An-Feld** | wie oben (`events.ts:647`) | An-Feld (5.1 Nr. 2) |
+| Befristeter Nachweis läuft ab (HR-Erinnerung) | `dokument-ablauf-warnung` | seit 08.09., **PFLICHT An-Feld**; Reset EMPFOHLEN, vor dem nächsten Lauf von `dokument-ablauf` | Katalog-Empfänger leer (`events.ts:622`). Muss **vor** dem nächsten Lauf stehen (6.2). Text neu: „für {{mitarbeiter_name}}“ statt „von …“ bzw. „– …“, Labels „Nachweis für“/„Dokument“ (`default-email-templates.ts:4169-4171`). Ohne Namen setzt der Lauf jetzt „die neue Mitarbeiterin / den neuen Mitarbeiter“ statt der privaten Adresse ein (`dokument-ablauf/route.ts:349`); im alten Text ergibt das „… von die neue Mitarbeiterin …“. MAIL1 zeigt den Textstand nicht (`-`). | Reset, falls `gespeichert = t` · An-Feld (5.1 Nr. 2) |
+| Befristeter Nachweis ist abgelaufen (HR-Warnung) | `dokument-abgelaufen` | wie oben | wie oben (`events.ts:647`, `default-email-templates.ts:4273-4275`) | Reset, falls `gespeichert = t` · An-Feld (5.1 Nr. 2) |
 
 Die Einstufungen und die Belege für den alten Text stammen aus der Mail-Analyse
-zu diesem Deploy (Diff der Code-Defaults `6124936` gegen `7bc91ec`).
+zu diesem Deploy (Diff der Code-Defaults `6124936` gegen `7bc91ec`). Maßgeblich ist
+der Diff ab `ae490ba`: Zwischen `6124936` und `ae490ba` kamen nur die beiden
+`dokument-*`-Vorlagen dazu (`git diff 6124936 ae490ba -- src/lib/default-email-templates.ts`,
+auf dem Server mit `sudo`),
+alle übrigen Zeilen gelten also unverändert; die beiden `dokument-*`-Zeilen sind
+nachgetragen.
 
 **Diese Änderungen wirken auch mit alter gespeicherter Zeile, ohne Reset:**
 
@@ -1981,6 +2271,13 @@ Im Repo liegen nur drei alte Exporte vom 28.03. (`git ls-files n8n`, alle aus Co
 **Ob die Läufe heute überhaupt ankommen**, zeigt das Portal: Einstellungen →
 Versandprotokoll, Einträge zu `employee-reminder` und `supervisor-reminder`.
 
+> **Achtung, eine Korrektur in n8n verschickt Mails.** Kommen die Läufe heute nicht
+> an (falsche URL, pausiert, nicht eingeplant), ist der Lauf nach der Korrektur der
+> erste überhaupt: Dann gehen alle Erinnerungen aus B-B1, B-B2 und B-B3 auf einmal
+> hinaus, beim Einplanen von `dokument-ablauf` dazu die Mails aus B-N3 (6.2). URL,
+> Zeitplan oder Pausenschalter erst ändern, wenn 5.1 und 5.2 erledigt sind und Claude
+> die Zeilen aus B-B1 bis B-B3 mit Ihnen angesehen hat.
+
 **Neu in der Antwort von `reminders`:**
 - Es gibt ein zusätzliches Feld `departmentReminders`.
 - `total` bleibt Mitarbeiter plus Vorgesetzte (`cron/reminders/route.ts:339-347`).
@@ -1990,20 +2287,41 @@ Versandprotokoll, Einträge zu `employee-reminder` und `supervisor-reminder`.
 **Neu in der Antwort von `offboarding-reminders`:** `details` führt jetzt jeden Versuch
 mit Status. Ein Bericht „X versendet“ zählt also auch FAILED- und SKIPPED-Zeilen mit.
 
-### 6.2 Neuer Lauf: `dokument-ablauf`
+### 6.2 Lauf `dokument-ablauf` (seit 08.09. auf dem Server, Verhalten ändert sich)
 
 | URL | Zeitplan | Voraussetzung |
 |---|---|---|
-| `https://hr.fes-credo.de/api/cron/dokument-ablauf` | täglich, Empfehlung 07:30 | **Erst einplanen, wenn in beiden Vorlagen `dokument-ablauf-warnung` und `dokument-abgelaufen` das An-Feld steht** (5.1 Nr. 2) |
+| `https://hr.fes-credo.de/api/cron/dokument-ablauf` | täglich, Empfehlung 07:30 | **Das An-Feld muss in beiden Vorlagen `dokument-ablauf-warnung` und `dokument-abgelaufen` stehen, bevor der Lauf nach dem Deploy das erste Mal kommt** (5.1 Nr. 2) |
 
-Warum die Reihenfolge zählt:
-- Der Lauf setzt seinen Merker auch dann, wenn eine Mail übersprungen wurde
-  (`dokument-ablauf/route.ts:389-398`).
-- Fehlt das An-Feld, verschiebt sich die nächste Erinnerung darum um das Intervall der
-  Stufe, also 30, 14 oder 3 Tage (`src/lib/dokument-fristen.ts:224-230`).
+**Kein neuer Lauf.** Die Route kam mit `89fa722` und ist seit dem Deploy vom 08.09. auf
+dem Server. **Ob n8n sie einplant, ist ungeklärt.** Hinweise liefern MAIL2
+(`skipped_ohne_empfaenger_90_tage` > 0 bei den `dokument-*`-Zeilen heißt: Der Lauf
+kommt an, das An-Feld fehlt), das Versandprotokoll und die Workflows in n8n. Ist er
+nicht eingeplant: erst nach 5.1 Nr. 2 einplanen.
 
-Die Antwort enthält `geprueft`, `erinnerungen`, `abgelaufenMarkiert`, `uebersprungen`,
-`nichtZugestellt`, `mailUebersprungen` und `fehler` (`route.ts:158-166`).
+**Was sich mit diesem Deploy ändert** (`7bc91ec`):
+- **Merker bei SENT und SKIPPED, nicht bei FAILED** (`dokument-ablauf/route.ts:108-110, 389-395`),
+  dieselbe Hausregel wie bei `/api/cron/reminders`. Auf `ae490ba` setzte nur SENT den
+  Merker: Ohne An-Feld blieb die Erinnerung fällig und schrieb jeden Tag einen
+  SKIPPED-Eintrag. Ab jetzt verschiebt ein SKIPPED die nächste Erinnerung um das
+  Intervall der Stufe, also 30, 14 oder 3 Tage (`src/lib/dokument-fristen.ts:224-230`).
+  Deshalb muss das An-Feld vor dem ersten Lauf nach dem Deploy stehen.
+- **Zwei neue Zähler** in der Antwort: `nichtZugestellt` (FAILED, nächster Lauf
+  versucht es erneut) und `mailUebersprungen` (SKIPPED, Merker gesetzt).
+  `uebersprungen` bleibt die Summe wie bisher. Die Antwort enthält damit `geprueft`,
+  `erinnerungen`, `abgelaufenMarkiert`, `uebersprungen`, `nichtZugestellt`,
+  `mailUebersprungen` und `fehler` (`route.ts:158-166`).
+- **Status und Merker nur bei unverändertem `gueltigBis`** (bedingtes `updateMany`):
+  Ändert HR die Frist während eines Laufs, schreibt der Lauf nicht darüber.
+- **Name statt privater Adresse:** Ohne bekannten Namen steht „die neue Mitarbeiterin /
+  den neuen Mitarbeiter“ in Betreff und Überschrift (`route.ts:349`). Gespeicherte
+  Vorlagen zurücksetzen (5.4).
+- **Frist-Korrektur** außerhalb des Laufs: Ändert HR oder die Person über den
+  Magic Link das Ablaufdatum, wird `EXPIRED` zu `UPLOADED`, wenn die neue Frist nicht
+  abgelaufen ist, und die Ablauf-Merker werden geleert. `DOKUMENT_FRIST_GEAENDERT`
+  protokollierte auf `ae490ba` nur der Weg über HR, jetzt auch der Magic Link
+  (`src/app/api/onboarding/[id]/documents/[docId]/route.ts:174-193`,
+  `src/app/api/fragebogen/[token]/documents/route.ts:313, 434`).
 
 ### 6.3 Der erste Lauf nach dem Deploy
 
@@ -2016,7 +2334,8 @@ Was sich im ersten Lauf ändert:
 Der erste Lauf verschickt ungefähr B-B1 + B-B2 Onboarding-Erinnerungen und B-B3
 Offboarding-Erinnerungen. Von B-B3 gehen die Links ab, die B-B10 mit „Cron schweigt“
 führt, und die Platzhalter-Links, deren Adresse vor 08:00 ersetzt wurde. Sie werden
-übersprungen, nicht erinnert (5.2 Nr. 2).
+übersprungen, nicht erinnert (5.2 Nr. 2). Ist `dokument-ablauf` eingeplant, kommen
+bis zu `im_horizont` aus B-N3 Mails an HR dazu, ohne An-Feld nur gesetzte Merker (6.2).
 
 - **Empfehlung:** nach dem 08:00-Lauf deployen, 5.1 und 5.2 am selben Tag erledigen.
 - **Geht das nicht:** beide Workflows in n8n pausieren, bis 5.1 und 5.2 erledigt sind.
@@ -2044,7 +2363,9 @@ noch so aussieht, zeigt nur n8n.
 - `questionnaire-confirmation-employee`: Bisher lief der Versand an `triggerWebhooks`
   vorbei. Ein alter n8n-Workflow mit eigener Bestätigung ergäbe jetzt eine doppelte Mail.
 - Die vier `onboarding-department-*`/`onboarding-task-completed`-Events.
-- `dokument-ablauf-warnung` und `dokument-abgelaufen`.
+
+`dokument-ablauf-warnung` und `dokument-abgelaufen` feuern schon seit 08.09., sofern
+der Lauf eingeplant ist; ein Webhook darauf ist also nicht neu.
 
 **Feuert anders:**
 - `supervisor-link-created`: jetzt auch beim Anlegen (`api/onboarding/route.ts:310-316`).
@@ -2052,6 +2373,10 @@ noch so aussieht, zeigt nur n8n.
 - `supervisor-reminder` und `employee-reminder`: im neuen Takt (6.3).
 - Die vier `offboarding-department*`-Events: über die neuen Knöpfe, und nur bei echten
   Wechseln.
+- `dokument-ablauf-warnung` und `dokument-abgelaufen`: Bei abgeschalteter Portal-Vorlage
+  (SKIPPED) feuerte ein Webhook bisher bei jedem Lauf, ab jetzt nur im Intervall der
+  Stufe (6.2). `mitarbeiter_name` trägt ohne Namen die neutrale Bezeichnung statt der
+  Adresse, `mitarbeiter_email` bleibt im Payload.
 
 **Sonderregel Offboarding-Abteilungen:** Ist die Portal-Vorlage deaktiviert und ein
 Webhook aktiv, zählt der Link als zugestellt (`abteilungsaufgaben-dienst.ts:297-302`).
@@ -2064,19 +2389,23 @@ MAIL3 zeigt deshalb auch `portal_vorlage_aktiv`.
 ### 7.1 Was man NICHT tun darf
 
 **Das alte Image nie mit dem normalen Entrypoint gegen die neue Datenbank starten.**
-Das gilt für jeden dieser Wege: `git checkout 6124936 && sudo docker compose up -d --build`
-oder das Image `hr-portal-app:6124936` ohne vorheriges Einspielen der Sicherung.
+Das gilt für jeden dieser Wege: `sudo git checkout ae490ba && sudo docker compose up -d --build`
+oder das Image `hr-portal-app:ae490ba` ohne vorheriges Einspielen der Sicherung.
 
 Der Entrypoint vergleicht dann das alte Schema mit der Datenbank, stellt einen
 Unterschied fest und schiebt das **alte** Schema mit `--accept-data-loss` darüber
-(`entrypoint.sh:59-65, 119`). Auf einer Probedatenbank mit dem alten Image kamen drei
-Fälle vor:
+(`entrypoint.sh:59-65, 119`). Geprobt wurde das auf einer Probedatenbank mit dem Image
+`6124936`; für `ae490ba` sind die Fälle daraus abgeleitet, **nicht erneut geprobt**:
 
 | Fall | Wann | Folge |
 |---|---|---|
 | A | Es gibt schon Onboarding-Links (`offboardingId` leer) | Prisma bricht vorher ab („Made the column `offboardingId` … required, but there are … existing NULL values“). Die Datenbank bleibt unverändert, aber der Container hängt in einer **Neustart-Schleife**. Jeder Durchgang legt eine neue Sicherung an, und nach zehn ist die vom Deploy weg. |
-| B | Es gibt Dokumente mit neuen Typen oder dem Status `EXPIRED` | Fehler „invalid input value for enum …“, sonst wie A |
-| C | Keiner der beiden Blocker | Exit 0 und **stiller Datenverlust**: 23 Spalten und die Tabelle `supervisor_kostenstellen` werden gelöscht, samt Aufenthaltstitel-Daten, KV-Mitgliedschaft, Kostenstellen-Aufteilung, Abteilungskommentaren, Fristen, Versandnachweisen und der Führungskraft im Offboarding. |
+| B | Keine Onboarding-Links | Exit 0 und **stiller Datenverlust**: Die 15 Spalten dieses Deploys werden gelöscht, dazu Unique-Index und Fremdschlüssel der Onboarding-Links (keine Tabelle). Verloren gingen `supervisorLinkSentAt`, Hinweise und Tagesangaben der Checklisten, die Kommentare der Abteilungen in beiden Modulen, die Führungskraft im Offboarding und die Versandnachweise der Abteilungslinks (`lastSentAt`, `lastSendStatus`, `lastSendDetail`, `zugestelltAn`). |
+
+Der frühere Fall „Dokumente mit neuen Typen oder Status `EXPIRED`“ entfällt: Diese
+Enum-Werte stehen seit 08.09. im Schema von `ae490ba`. Aufenthaltstitel-Daten,
+KV-Mitgliedschaft, Kostenstellen-Aufteilung und Fristen gehören ebenfalls zu
+`ae490ba` und blieben erhalten.
 
 **Ebenso nicht:**
 - `sudo docker compose down -v`: löscht die Volumes, also Datenbank und Uploads.
@@ -2093,7 +2422,7 @@ Entrypoint „bereits deckungsgleich“ und macht weder Sicherung noch Push
 (`entrypoint.sh:67-68`).
 
 Zurück nur mit Claude. Vorher S-R1 aus 4.2 frisch ausführen, sie zählt, was verloren
-ginge.
+ginge. Für den Rückfall auf `ae490ba` zählen nur die Zeilen, die 4.2 dafür nennt.
 
 ### 7.3 Weg A: Sicherung einspielen, dann altes Image (nur direkt nach dem Deploy)
 
@@ -2161,13 +2490,14 @@ sudo docker exec hr-portal-db psql -U hrportal -d hr_portal -v ON_ERROR_STOP=1 -
 sudo docker exec hr-portal-db psql -U hrportal -d hr_portal -v ON_ERROR_STOP=1 -1 -f /backups/vor-deploy-7bc91ec-manuell.sql
 
 # 4. Das alte Image festlegen und VOR dem Start prüfen, dass es nichts pushen wird
-cat > docker-compose.override.yml <<'EOF'
+#    (sudo tee, weil der Projektordner root gehört)
+sudo tee docker-compose.override.yml >/dev/null <<'EOF'
 services:
   app:
-    image: hr-portal-app:6124936
+    image: hr-portal-app:ae490ba
 EOF
 sudo docker compose run --rm -T --no-deps --entrypoint sh app -c 'npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel ./prisma/schema.prisma --exit-code >/dev/null 2>&1; echo $?'
-# erwartet: 0. Bei allem anderen NICHT starten: an Claude.
+# erwartet: 0 (Datenbank aus 3.4 = Schema ae490ba = Schema im Image). Bei allem anderen NICHT starten: an Claude.
 
 # 5. Starten
 sudo docker compose up -d --no-build app
@@ -2185,13 +2515,25 @@ sudo docker compose logs -f app
 **Wenn Schritt 3 scheitert**, ist das Schema leer. Dann **nicht** die App starten,
 sondern die Sicherung aus Schritt 1 genauso einspielen und an Claude.
 
-**Muss die Sicherung des Entrypoints eingespielt werden** (`vor-deploy-7bc91ec-entrypoint.sql`),
-etwa weil 3.4 übersprungen wurde, dann zuerst an Claude. Sie stammt aus dem
-`pg_dump` des App-Containers, und dessen Version ist ungeklärt (1.5).
-- Neuere `pg_dump`-Versionen schreiben Zeilen wie `SET transaction_timeout` oder
-  `\restrict`, die ein älteres `psql` 16 nicht kennt.
-- Das ist Vorsicht aus dem Versionsunterschied und wurde **nicht geprobt**. Vor dem
-  Einspielen gehört der Dateikopf geprüft.
+**Maßgeblich ist die Sicherung aus 3.4, nicht die des Entrypoints.** Die
+Entrypoint-Sicherung (`vor-deploy-7bc91ec-entrypoint.sql`, ebenso jede
+`vor-schema-abgleich-*.sql`) schreibt `pg_dump` **18.6** aus dem App-Container.
+Eingespielt würde sie mit `psql` **16.13** in eine PostgreSQL-**16**-Datenbank (1.5):
+- **`\restrict …` / `\unrestrict …`** (Kopf und Ende von Dumps neuerer `pg_dump`):
+  kein Hindernis. Das sind reine `psql`-Befehle, und `psql` 16 kennt sie. Lokal geprobt
+  mit `psql` 16.12 gegen die Dev-Datenbank: `\restrict` und `\unrestrict` laufen
+  durch, Exit 0; 16.13 ist neuer.
+- **`SET transaction_timeout = 0;`** (Kopf jedes Dumps ab `pg_dump` 17): Hindernis.
+  Den Parameter kennt erst der Server ab Version 17; in PostgreSQL 16 fehlt er (lokal
+  gegen 16.12 geprüft: kein Eintrag in `pg_settings`). Mit `ON_ERROR_STOP=1` und `-1`
+  bricht das Einspielen an dieser Kopfzeile ab, bevor eine Tabelle steht. Nach
+  `DROP SCHEMA public CASCADE` bliebe das Schema **leer**.
+- Deshalb ist die Sicherung aus 3.4 (`pg_dump` aus dem DB-Container, Version 16) die
+  Quelle für Weg A. Ohne sie: **an Claude**. Die Entrypoint-Sicherung müsste vor dem
+  Einspielen um die Zeile `SET transaction_timeout` bereinigt werden, weitere
+  Unterschiede sind nicht ausgeschlossen. Das ist **nicht geprobt**, eine Datei vom
+  Server lag nicht vor. Nachprüfbar ohne etwas zu verändern:
+  `sudo head -40 backups/vor-schema-abgleich-20260908-144512.sql | grep -nE 'Dumped by|transaction_timeout|restrict'`
 
 ### 7.4 Weg B: altes Image ohne Entrypoint, Schema bleibt (nur mit Claude)
 
@@ -2199,25 +2541,27 @@ etwa weil 3.4 übersprungen wurde, dann zuerst an Claude. Sie stammt aus dem
 Prisma-Client ignoriert die zusätzlichen Spalten, die alle nullable sind.
 
 ```yaml
-# docker-compose.override.yml, nur für die Dauer des Rückfalls
+# docker-compose.override.yml, nur für die Dauer des Rückfalls (anlegen mit sudo tee, wie in 7.3)
 services:
   app:
-    image: hr-portal-app:6124936
+    image: hr-portal-app:ae490ba
     entrypoint: ["node", "server.js"]
 ```
 
 **Risiken:**
 - Der Entrypoint muss bei **jedem** Start des alten Images umgangen sein, sonst tritt
-  Fall A, B oder C ein.
-- **Ungeklärt, nicht getestet:** Zeilen mit neuen Enum-Werten oder Onboarding-Links
-  können im alten Client Lesefehler auslösen.
-- Die Umstellungen der Migrationen bleiben stehen, nämlich geheilte Status und
-  Zuständigkeiten als Schlüssel.
+  Fall A oder B ein.
+- **Ungeklärt, nicht getestet:** Onboarding-Links (`offboardingId` leer) können im
+  alten Client Lesefehler auslösen, denn dort ist `offboardingId` Pflicht. Die
+  Enum-Werte sind kein Risiko mehr, `ae490ba` kennt sie.
+- Die Umstellungen der Migrationen bleiben stehen, nämlich geheilte Status,
+  Zuständigkeiten als Schlüssel und die Beschriftung „Stellenbezeichnung“.
 
 ### 7.5 Nach einem Rückfall
 
-- Die `docker-compose.override.yml` **löschen**, bevor wieder vorwärts deployt wird.
-  Solange sie existiert, bekäme ein neuer Build das Etikett `hr-portal-app:6124936`.
+- Die `docker-compose.override.yml` **löschen** (`sudo rm docker-compose.override.yml`),
+  bevor wieder vorwärts deployt wird. Solange sie existiert, bekäme ein neuer Build das
+  Etikett `hr-portal-app:ae490ba`.
 - Der Repo-Stand auf dem Server bleibt `main`. Die Reparatur kommt als neuer Commit.
 - Die Sicherungen `vor-deploy-7bc91ec-*.sql` und `vor-rueckfall-*.sql` aufheben.
 
@@ -2231,16 +2575,24 @@ services:
   nicht gibt.
 - Die Korrektur der als `SONSTIGES` abgelegten Nachweise ist eine offene Entscheidung.
 
-**Folgen, die dieser Deploy sichtbar macht:**
+**Folgen des Minijob-Deploys vom 08.09., die noch offen sind:**
 - **Kostenstellen:**
-  - Die Altspalten `kostenstelle`/`kostenstelleAnteil` fallen erst im nächsten Release,
-    wenn M-N0 den Merker `KOSTENSTELLEN_AUFTEILUNG_V1` auf dem Server zeigt
-    (`schema.prisma:782-790`).
+  - Die Altspalten `kostenstelle`/`kostenstelleAnteil` dürfen fallen, sobald der
+    Server den Merker `KOSTENSTELLEN_AUFTEILUNG_V1` zeigt (`schema.prisma:781-790`).
+    Das tut er seit 08.09. (M-V0); frühestens im nächsten Release also, samt dem
+    Spiegel in `modalitaeten/[token]/route.ts:345-350` und dem Rückfall der Maske.
   - Die Absprache mit der Lohnbuchhaltung zum LOGA-Import bei Aufteilung ist offen.
-- **Beschäftigungszeilen trotz „Nein“** (M-V6): Wie sie sich korrigieren lassen, ist
-  ungeklärt. Stehen gebliebene Kinder lassen sich per SQL nicht erkennen.
-- **Wieder geöffnete Altvorgänge** behalten ihren alten Fragebogen-Stand, jetzt auch
-  beim Masernschutz (`minijob-offene-punkte.md:125-133`).
+- **Beschäftigungszeilen trotz „Nein“** (M-V6): Der Fix ist seit 08.09. live, die
+  Altzeilen davor stehen noch. Wie sie sich korrigieren lassen, ist ungeklärt. Stehen
+  gebliebene Kinder lassen sich per SQL nicht erkennen.
+- **Wieder geöffnete Altvorgänge** behalten ihren alten Fragebogen-Stand, seit 08.09.
+  auch beim Masernschutz (`minijob-offene-punkte.md:125-133`). Die Heil-Migration
+  dieses Deploys zieht die Korrekturen nur bei den festhängenden Vorgängen nach, die
+  sie selbst wieder öffnet (`seed-check.js:1339-1358`).
+- **Der Deploy vom 08.09. ist im Repo nicht protokolliert.** Ob die Handschritte von
+  damals erledigt sind (An-Felder der `dokument-*`-Vorlagen, Kostenstellen-Liste an HR,
+  Einplanen von `dokument-ablauf`), ist ungeklärt; dieser Plan fängt sie in 5.1, 5.3
+  und 6.2 mit auf.
 
 **Kosmetisch oder bekannt:**
 - Ein abgeschlossener Vorgang ohne Vorgesetzten-Link zeigt unter „Kommende Schritte“
@@ -2262,8 +2614,9 @@ services:
 
 **Nach dem Deploy:**
 - Dieses Dokument um Log und Ergebnisse ergänzen.
-- Claude setzt seine Memory-Einträge auf „deployt“: Änderungsplan,
-  Formular-Validierung, Minijob-Rückmeldung.
+- Claude setzt seinen Memory-Eintrag zum Änderungsplan auf „deployt“. Die Einträge zur
+  Formular-Validierung und zur Minijob-Rückmeldung sind schon jetzt falsch: Beide
+  stehen seit 08.09. auf dem Server.
 
 ---
 
@@ -2271,7 +2624,7 @@ services:
 
 | Wann | Was schicken | Weiter erst nach Antwort? |
 |---|---|---|
-| 1.1–1.7 | jede Abweichung vom Erwarteten, dazu die Versionen aus 1.5 | ja, bei STOPP |
+| 1.1–1.7 | jede Abweichung vom Erwarteten (am 24.09. erledigt, alles wie erwartet; 1.6 steht noch aus) | ja, bei STOPP |
 | 2.2 | `vorher-ergebnis.txt`, **immer** | **ja** |
 | 3.1 | Konflikt bei `git pull`, oder Dateien außerhalb von `docs/` nach `7bc91ec` | ja |
 | 3.3 | `vorschau-delta.sql`, wenn Zählung oder DROP-Zeile abweichen oder der Befehl scheitert | ja |
@@ -2285,7 +2638,10 @@ services:
 ## Anhang B · Ungeklärt
 
 - **n8n:** der Live-Stand, also URL (`hr.credo-schulen.de` im Export), Timeout,
-  Zeitplan und welche Crons überhaupt eingeplant sind.
+  Zeitplan und welche Crons überhaupt eingeplant sind, **besonders `dokument-ablauf`**
+  (seit 08.09. auf dem Server; Hinweis in MAIL2, 6.2).
+- **Deploy vom 08.09.:** nicht im Repo protokolliert. Ob seine Handschritte erledigt
+  sind, ist offen (Abschnitt 8).
 - **HR-Postfach** für die An-Felder: `personalbuchhaltung@fes-minden.de` laut Vorlagen
   und Reminder-Export, bestätigen. Der Offboarding-Export
   (`n8n/CREDO_HR_Portal_Offboarding_Workflow.json`) schreibt dagegen an
@@ -2295,18 +2651,24 @@ services:
 - **Schweigende Abteilungslinks:** wie viele es auf dem Server gibt (B-B10) und ob HR
   jeden davon neu versenden will. Die Logik von B-B10 ist nur mit Testzeilen geprüft,
   auf der Dev-Datenbank gibt es keine informierten Offboarding-Links.
-- **Versionen:** `pg_dump` im App-Container und `psql` im DB-Container (1.5). Das ist
-  nur für einen Rückfall mit der Sicherung des Entrypoints wichtig.
 - **Build-Dauer.** Sie wurde am 07.09. nicht protokolliert.
 - **Server-Befehle nicht geprobt:** die Vorschau per `docker compose run` (3.3) und der
   Start über die Override-Datei (7.3). Die Befehle sind nur lesend bzw. vorgeschlagen.
-- **Weg B:** Lesefehler des alten Clients bei neuen Enum-Werten und Onboarding-Links.
+- **Rückfall auf `ae490ba`:** Die Fälle in 7.1 sind aus der Probe mit dem Image
+  `6124936` abgeleitet, nicht mit `ae490ba` geprobt. Das Einspielen einer
+  Entrypoint-Sicherung (pg_dump 18.6) in PostgreSQL 16 ist nicht an einer Datei vom
+  Server geprobt (7.3).
+- **Weg B:** Lesefehler des alten Clients bei Onboarding-Links (`offboardingId` leer).
 - **Vorlagentexte:** Ob HR gespeicherte Texte bewusst angepasst hat, zeigt MAIL1 nicht,
   nur ob sie gespeichert sind.
 - **Beschäftigungszeilen trotz „Nein“:** wie sie sich korrigieren lassen (M-V6).
-- **Link-Gültigkeit:** ob `MAGIC_LINK_EXPIRY_HOURS` auf dem Server von 720 abweicht
-  (1.5, B-B2).
-- **Nicht auf einer Wegwerf-Datenbank mit altem Schema geprobt:** B-B10 und B-B11 in
-  der VORHER-Datei (nur Namensabgleich mit dem alten Schema, lesend gegen Dev mit
-  neuem Schema). Die Prüfung „ob gearbeitet wurde“ in 7.3 lief nur gegen Dev, der
-  Befehl `docker logs -t hr-portal-app` nicht auf dem Server.
+- **Nur gegen Dev geprobt:** die Prüfung „ob gearbeitet wurde“ in 7.3; der Befehl
+  `docker logs -t hr-portal-app` nicht auf dem Server.
+
+**Geklärt am 24.09.:**
+- **Stand des Servers:** `ae490ba`, nicht `6124936` (Korrektur oben, 1.1, 1.2).
+- **Versionen:** `pg_dump` 18.6 im App-Container, `psql` 16.13 im DB-Container (1.5).
+  Folge: Für Weg A zählt die Sicherung aus 3.4 (7.3).
+- **Link-Gültigkeit:** `MAGIC_LINK_EXPIRY_HOURS` = 720, B-B2 rechnet exakt (1.5).
+- **B-B10 und B-B11:** Die ganze VORHER-Datei lief gegen eine Wegwerf-Datenbank mit
+  dem Schema von `ae490ba` (Abschnitt 2).

@@ -95,6 +95,7 @@ Branch: `feat/minijob-checkliste-2026`.
 |---|---|
 | [historie/FEHLER_PDF_FIXES.md](historie/FEHLER_PDF_FIXES.md) | Behobene PDF-Fehler |
 | [historie/onboarding-fixes-2026-08.md](historie/onboarding-fixes-2026-08.md) | Onboarding-Fixes August 2026 (Zweckbefristung, Dokument-Typ-Mapping) |
+| [historie/deploy-onboarding-pakete-2026-09.md](historie/deploy-onboarding-pakete-2026-09.md) | **Deploy 24.09.2026** (Onboarding-Pakete 1, 1b, 2, 5 und Code-Review-Fixes): Ablaufplan, Protokoll, Mailvorlagen, Lehren |
 | [historie/codereview-und-vorlagen-2026-09.md](historie/codereview-und-vorlagen-2026-09.md) | **Gesamtdurchsicht + Vorlagen für Offboarding/Verbeamtung, Sept. 2026** — enthält die Deploy-Voraussetzung `./backups:/backups` und die offenen Punkte |
 
 ---
