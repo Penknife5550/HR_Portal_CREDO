@@ -41,6 +41,38 @@
   --warn-bg: #fef8e1;
   --kritik-bg: #fdeeee;
   --ok-bg: #eef6e6;
+  /* Paket 6 · Offene Aufgaben: Farben aus dem Portal (Tailwind-Klasse im Kommentar) */
+  --badge-offen-bg: #f3f4f6;            /* bg-gray-100: Badge grau „5 offen“ */
+  --badge-offen-fg: #4b5563;            /* text-gray-600 */
+  --badge-ueber-bg: rgba(226,0,26,.1);  /* bg-credo-rot/10: Badge rot „… überfällig“ */
+  --badge-ueber-fg: #b3001a;            /* text-credo-rot, für Kontrast abgedunkelt wie .p-rot */
+  --lage-bald-bg: rgba(0,154,198,.12);  /* bg-credo-blau/10: „heute“, „morgen“ */
+  --lage-bald-fg: #007da1;
+  --kachel-rot-bg: #fef2f2;             /* bg-red-50: Kennzahl „Überfällig“ */
+  --kachel-rot-rand: #fecaca;           /* border-red-200 */
+  --nd-rot-bg: #fee2e2;                 /* bg-red-100: Abzeichen „14d“ (Alter des Vorgangs) */
+  --nd-rot-fg: #b91c1c;                 /* text-red-700 */
+  --zust-gelb-bg: #fef3c7;              /* bg-amber-100: Zuständigkeit ohne Link */
+  --zust-gelb-fg: #92400e;              /* text-amber-800 */
+  --st-orange-bg: #ffedd5;              /* bg-orange-100: Offboarding „Übergabe“ */
+  --st-orange-fg: #9a3412;              /* text-orange-800 */
+  --st-lila-bg: #f3e8ff;                /* bg-purple-100: Offboarding „Endabrechnung“ */
+  --st-lila-fg: #6b21a8;                /* text-purple-800 */
+  --st-gruen-bg: #dcfce7;               /* bg-green-100: „Abgeschlossen“ */
+  --st-gruen-fg: #166534;               /* text-green-800 */
+  --modul-on-bg: rgba(107,170,36,.14);  /* Modul-Kennzeichen Onboarding (grün) */
+  --modul-on-fg: #3d6d10;
+  --modul-off-bg: var(--st-orange-bg);  /* Offboarding (orange) */
+  --modul-off-fg: var(--st-orange-fg);
+  --modul-psi-bg: rgba(0,154,198,.12);  /* Verbeamtung (blau) */
+  --modul-psi-fg: #007da1;
+  --modul-fam-bg: #f1f1f1;              /* Mutterschutz, Elternzeit (grau) */
+  --modul-fam-fg: #555555;
+  --tooltip-bg: #2b2b2b;
+  --schatten-pop: 0 6px 16px rgba(0,0,0,.18);
+  --schatten-leicht: 0 1px 3px rgba(0,0,0,.06);
+  --paket-fertig-rand: #c7e3a6;         /* Paketkarte „deployt“ (Abschnitt 9) */
+  --paket-fertig-bg: #f6faf1;
 }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
@@ -292,6 +324,8 @@ details > div { padding: 0 14px 12px; }
 .paket .ph { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--blau); }
 .paket h5 { margin: 3px 0 6px; font-size: 14px; color: var(--grau); }
 .paket ul { font-size: 12.5px; padding-left: 18px; margin-bottom: 8px; }
+.paket.fertig { border-color: var(--paket-fertig-rand); background: var(--paket-fertig-bg); }
+.paket.fertig .ph { color: var(--gruen); }
 
 /* Unterlagen nachfordern */
 .nf-karte { border: 2px solid rgba(251,201,0,.55); background: rgba(251,201,0,.06); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
@@ -388,6 +422,95 @@ details > div { padding: 0 14px 12px; }
 .empf-block li { margin: 1px 0; }
 .leiste-wahl { display: flex; flex-wrap: wrap; gap: 4px; }
 
+/* Offene Aufgaben (Paket 6) — nur Tokens aus :root */
+.aufg-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; font-size: 10.5px; font-weight: 500; padding: 1px 8px; white-space: nowrap; }
+.aufg-badge::before { content: "\2611"; font-size: 10px; line-height: 1; }
+.aufg-badge.grau { background: var(--badge-offen-bg); color: var(--badge-offen-fg); }
+.aufg-badge.rot { background: var(--badge-ueber-bg); color: var(--badge-ueber-fg); font-weight: 600; }
+.aufg-strich { color: var(--ui-muted); font-size: 13px; font-weight: 600; line-height: 1; }
+.aufg-strich.hilfe { border-bottom: 1px dotted var(--ui-muted); cursor: help; }
+.aufg-alt { color: var(--ui-muted); font-size: 10.5px; }
+.tooltip { position: relative; display: block; width: fit-content; max-width: 100%; margin-top: 8px; background: var(--tooltip-bg); color: var(--weiss); border-radius: 6px; font-size: 10.5px; line-height: 1.55; padding: 6px 9px; box-shadow: var(--schatten-pop); font-weight: 400; white-space: normal; }
+.tooltip::before { content: ""; position: absolute; top: -5px; left: 14px; border: 5px solid transparent; border-top: 0; border-bottom-color: var(--tooltip-bg); }
+.b-invited { background: color-mix(in srgb, var(--st-invited) 15%, transparent); color: var(--st-invited); }
+.b-progress { background: color-mix(in srgb, var(--st-progress) 15%, transparent); color: var(--st-progress); }
+.b-bereit { background: color-mix(in srgb, var(--st-sv-submitted) 15%, transparent); color: var(--st-sv-submitted); }
+.b-geprueft { background: color-mix(in srgb, var(--st-reviewed) 15%, transparent); color: var(--st-reviewed); }
+.b-orange { background: var(--st-orange-bg); color: var(--st-orange-fg); }
+.b-lila { background: var(--st-lila-bg); color: var(--st-lila-fg); }
+.b-gruen { background: var(--st-gruen-bg); color: var(--st-gruen-fg); }
+.b-blau { background: var(--modul-psi-bg); color: var(--modul-psi-fg); }
+.nd { display: inline-flex; margin-left: 6px; border-radius: 999px; font-size: 9.5px; font-weight: 500; padding: 0 7px; background: var(--nd-rot-bg); color: var(--nd-rot-fg); }
+.nav-kopf { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; background: var(--weiss); border: 1px solid var(--ui-border); border-radius: 8px; padding: 8px 12px; box-shadow: var(--schatten-leicht); }
+.nav-marke { display: flex; align-items: center; gap: 8px; }
+.nav-marke b { display: block; font-size: 12px; line-height: 1.2; }
+.nav-marke small { display: block; font-size: 9.5px; color: var(--ui-muted); }
+.nav-punkte { display: flex; flex-wrap: wrap; gap: 3px; }
+.nav-punkt { display: inline-flex; align-items: center; border-radius: 6px; padding: 3px 9px; font-size: 11px; font-weight: 500; color: var(--ui-muted); white-space: nowrap; }
+.nav-punkt.aktiv { background: var(--ui-primary); color: var(--weiss); }
+.nav-zaehler { display: inline-block; margin-left: 5px; border-radius: 999px; background: var(--rot); color: var(--weiss); font-size: 9.5px; font-weight: 700; line-height: 1; padding: 2px 5px; }
+.nav-rechts { margin-left: auto; font-size: 10.5px; color: var(--ui-muted); }
+.seitenkopf { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 12px; }
+.seitenkopf b { font-size: 14px; }
+.kpi-raster { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0 4px; }
+@media (max-width: 560px) { .kpi-raster { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.handy .kpi-raster { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.kpi { border: 1px solid var(--ui-border); background: var(--weiss); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+.kpi .z { display: block; font-size: 18px; font-weight: 700; line-height: 1.2; }
+.kpi .l { display: block; font-size: 10px; color: var(--ui-muted); }
+.kpi.rot { background: var(--kachel-rot-bg); border-color: var(--kachel-rot-rand); }
+.kpi.rot .z { color: var(--badge-ueber-fg); }
+.kpi.gewaehlt { box-shadow: 0 0 0 2px var(--ui-primary); }
+.filterleiste { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+.filterleiste .ui-input { min-height: 28px; padding: 4px 9px; font-size: 11px; white-space: nowrap; }
+.filterleiste .suche { flex: 1 1 190px; white-space: normal; }
+.umschalter { display: inline-flex; border: 1px solid var(--ui-border); border-radius: 8px; overflow: hidden; }
+.umschalter span { font-size: 10.5px; font-weight: 600; padding: 4px 9px; color: var(--ui-muted); background: var(--weiss); white-space: nowrap; }
+.umschalter span.an { background: var(--ui-primary); color: var(--weiss); }
+.rollbar { overflow-x: auto; }
+.ui-tab.breit { min-width: 860px; }
+.ui-tab.gross .mono { white-space: nowrap; }
+.ui-tab.gross th { text-transform: uppercase; letter-spacing: .04em; font-size: 9.5px; text-align: left; }
+.ui-tab.gross td { border-top: 1px solid var(--ui-border); vertical-align: top; }
+.ui-tab.gross th, .ui-tab.gross td { padding-left: 6px; padding-right: 6px; }
+.lage { display: inline-block; border-radius: 999px; font-size: 9.5px; font-weight: 600; padding: 0 7px; background: var(--badge-offen-bg); color: var(--badge-offen-fg); white-space: nowrap; }
+.lage.rot { background: var(--badge-ueber-bg); color: var(--badge-ueber-fg); }
+.lage.bald { background: var(--lage-bald-bg); color: var(--lage-bald-fg); }
+.modul-chip { display: inline-block; border-radius: 999px; font-size: 9.5px; font-weight: 600; padding: 0 7px; white-space: nowrap; }
+.modul-chip.on { background: var(--modul-on-bg); color: var(--modul-on-fg); }
+.modul-chip.off { background: var(--modul-off-bg); color: var(--modul-off-fg); }
+.modul-chip.psi { background: var(--modul-psi-bg); color: var(--modul-psi-fg); }
+.modul-chip.fam { background: var(--modul-fam-bg); color: var(--modul-fam-fg); }
+.zusatz { display: block; font-size: 10px; color: var(--ui-muted); }
+.zusatz.gelb, .zust-gelb { color: var(--zust-gelb-fg); }
+.zusatz.rot { color: var(--badge-ueber-fg); }
+.zust-gelb { background: var(--zust-gelb-bg); border-radius: 4px; padding: 0 4px; }
+.zum-vorgang { color: var(--blau); font-weight: 600; font-size: 10.5px; white-space: nowrap; }
+.weitere { color: var(--ui-muted); font-size: 10.5px; text-align: center; }
+.ohne-frist { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; border: 1px dashed var(--ui-border); border-radius: 8px; background: var(--weiss); padding: 7px 10px; margin-top: 8px; font-size: 11px; }
+.aufg.ziel { box-shadow: 0 0 0 2px var(--blau); border-color: var(--blau); }
+.frist-rot { display: inline-block; border-radius: 999px; background: var(--badge-ueber-bg); color: var(--badge-ueber-fg); font-weight: 600; padding: 0 7px; }
+.handy { width: 100%; max-width: 390px; margin: 0 auto; border: 1px solid var(--ui-border); border-radius: 18px; background: var(--ui-bg); overflow: hidden; box-shadow: var(--schatten-leicht); }
+.handy-kopf { display: flex; align-items: center; gap: 8px; background: var(--weiss); border-bottom: 1px solid var(--ui-border); padding: 8px 16px; }
+.burger { position: relative; margin-left: auto; font-size: 15px; line-height: 1; color: var(--ui-muted); }
+.burger .punkt { position: absolute; top: -3px; right: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--rot); }
+.handy-menue { display: flex; flex-wrap: wrap; gap: 4px; background: var(--weiss); border-bottom: 1px solid var(--ui-border); padding: 8px 16px; }
+.handy-menue .nav-punkt { font-size: 10.5px; }
+.handy-rumpf { padding: 12px 16px; display: grid; gap: 8px; }
+.karte-handy { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; align-items: center; background: var(--weiss); border: 1px solid var(--ui-border); border-radius: 10px; padding: 8px 10px; font-size: 11px; }
+.karte-handy > * { grid-column: 1; min-width: 0; }
+.karte-handy > .pfeil { grid-column: 2; grid-row: 1 / span 4; color: var(--ui-muted); font-size: 15px; }
+.karte-handy .z1 { display: flex; flex-wrap: wrap; gap: 5px; }
+.karte-handy b { font-size: 11.5px; }
+.karte-handy .klein { font-size: 10px; color: var(--ui-muted); overflow-wrap: anywhere; }
+.legende { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.leg-zelle { background: var(--weiss); border: 1px solid var(--ui-border); border-radius: 10px; padding: 9px 11px; font-size: 11px; display: grid; gap: 5px; align-content: start; min-width: 0; }
+.leg-zelle .t { font-weight: 700; font-size: 11.5px; }
+.stand-pille { display: inline-block; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 1px 8px; white-space: nowrap; }
+.stand-pille.spaeter { background: var(--badge-offen-bg); color: var(--badge-offen-fg); }
+.stand-pille.hr { background: var(--zust-gelb-bg); color: var(--zust-gelb-fg); }
+.stand-pille.code { background: var(--lage-bald-bg); color: var(--lage-bald-fg); }
+
 .fuss { border-top: 1px solid var(--linie); padding: 18px 48px 26px; font-size: 11.5px; color: var(--text2); background: #f7f7f5; }
 
 @media (max-width: 700px) {
@@ -406,12 +529,12 @@ details > div { padding: 0 14px 12px; }
 
   <header class="kopf">
     <span class="etikett">Plan · zur Freigabe</span>
-    <h1>Stellenbezeichnung, paralleler Zugriff, individuelle E-Mail, Unterlagen nachfordern und Abteilungsaufgaben</h1>
+    <h1>Stellenbezeichnung, paralleler Zugriff, individuelle E-Mail, Unterlagen nachfordern, Abteilungsaufgaben und offene Aufgaben</h1>
     <p class="unter">Änderungswünsche am HR-Portal: wie ich sie umsetze bzw. umsetzen würde, was sich für HR, Führungskräfte, Abteilungen und Beschäftigte ändert, mit Vorher/Nachher-Ansichten.</p>
     <div class="meta">
-      <span>Stand 22.09.2026 · Fassung 5 (Pakete 1, 1b und 5 umgesetzt)</span>
-      <span>Grundlage: Quellcode auf <code style="background:rgba(255,255,255,.14);color:#fff">main</code> (ae490ba), analysiert und gegengeprüft</span>
-      <span>Pakete 1, 1b und 5 umgesetzt, noch nicht deployt</span>
+      <span>Stand 24.09.2026 · Fassung 6 (Pakete 1, 1b, 5 und 2 deployt; neu: Paket 6 „Offene Aufgaben“)</span>
+      <span>Grundlage: Quellcode auf <code style="background:rgba(255,255,255,.14);color:#fff">main</code> (53353e8), analysiert und gegengeprüft</span>
+      <span>Produktion seit 24.09.2026 auf Code 7bc91ec</span>
     </div>
   </header>
 
@@ -425,6 +548,7 @@ details > div { padding: 0 14px 12px; }
       <li><a href="#a4">Unterlagen nachfordern</a></li>
       <li><a href="#a5">Abteilungsaufgaben im Offboarding reparieren</a></li>
       <li><a href="#a6">Abteilungsaufgaben im Onboarding</a></li>
+      <li><a href="#a7">Offene Aufgaben: Übersicht und Badge</a></li>
       <li><a href="#mails">Alle E-Mails und Vorlagen im Überblick</a></li>
       <li><a href="#ablauf">Reihenfolge, Deploy und Handschritte</a></li>
       <li><a href="#offen">Entschiedene und offene Punkte</a></li>
@@ -445,13 +569,13 @@ details > div { padding: 0 14px 12px; }
               <td><strong>1 · Stellenbezeichnung</strong></td>
               <td>Der Begriff heißt überall „Stellenbezeichnung“, im Onboarding und in der Vertragsverlängerung. Das Feld wird einzeilig, höchstens 200 Zeichen.</td>
               <td>Kein Umbau. Einmalig werden gespeicherte Standard-Beschriftungen angepasst.</td>
-              <td class="num">✓ umgesetzt</td>
+              <td class="num">✓ deployt 24.09.</td>
             </tr>
             <tr>
               <td><strong>2 · Paralleler Zugriff</strong></td>
               <td>Fragebogen und Einstellungsmodalitäten laufen unabhängig voneinander, in beliebiger Reihenfolge. Name und Führungskraft lassen sich schon beim Anlegen eintragen. Festhängende Vorgänge werden repariert.</td>
               <td>Eine neue Spalte (Zeitpunkt des Vorgesetzten-Links), dazu einmalige Korrektur festhängender Vorgänge.</td>
-              <td class="num">Stufe A und „Neuer Vorgang“ ✓,<br>Rest (Paket 2) etwa 1–1,5 Tage</td>
+              <td class="num">✓ deployt 24.09.<br>(Paket 1 und 2)</td>
             </tr>
             <tr>
               <td><strong>3 · Individuelle E-Mail</strong></td>
@@ -469,19 +593,30 @@ details > div { padding: 0 14px 12px; }
               <td><strong>5 · Abteilungsaufgaben im Offboarding reparieren</strong> (Paket 1b)</td>
               <td>Kommentare der Abteilungen kommen an. Erneutes Versenden zerstört keine Links mehr. Neue Abteilungen lassen sich anlegen. Aufgaben für Vorgesetzte gehen an die Führungskraft. HR sieht, wer informiert wurde und wer nicht.</td>
               <td>Wenige neue Spalten, rein additiv.</td>
-              <td class="num">✓ umgesetzt</td>
+              <td class="num">✓ deployt 24.09.</td>
             </tr>
             <tr>
               <td><strong>6 · Abteilungsaufgaben im Onboarding</strong> (Paket 5)</td>
               <td>HR informiert per Knopf IT, Verwaltung, Facility, Datenschutz und die Führungskraft über ihre Aufgaben zum Dienstbeginn. Die Abteilungen haken ohne Anmeldung ab und kommentieren, mit Fälligkeiten relativ zum Vertragsbeginn und mit Erinnerungen.</td>
               <td>Die bestehende Link-Tabelle wird erweitert, dazu wenige Spalten, rein additiv.</td>
-              <td class="num">✓ umgesetzt</td>
+              <td class="num">✓ deployt 24.09.</td>
+            </tr>
+            <tr>
+              <td><strong>7 · Offene Aufgaben: Übersicht und Badge</strong> (Paket 6, neu)</td>
+              <td>Die fünf Vorgangslisten mit Checkliste zeigen je Vorgang ein Badge: grau „5 offen“, rot „5 offen · 2 überfällig“. Ein Klick öffnet die Checkliste des Vorgangs. Neue Seite „Aufgaben“ mit allen offenen Checklisten-Aufgaben der laufenden Vorgänge, nach Dringlichkeit sortiert. In der Kopfleiste zählt ein roter Zähler das Überfällige.</td>
+              <td>Keine Änderung, auch kein Index. Keine neue Mail.</td>
+              <td class="num">8–8,5 Tage</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <h3>Ihre Entscheidungen vom 21.09.2026</h3>
+      <div class="kasten ok">
+        <strong class="t">Stand am 24.09.2026</strong>
+        <p>Paket 1 (mit „Neuer Vorgang“), 1b, 5 und 2 sind deployt, dazu die acht Befunde der Code-Review (7bc91ec). Das Protokoll mit allen Zahlen steht in <code>docs/historie/deploy-onboarding-pakete-2026-09.md</code> („Protokoll vom 24.09.2026“). Offen sind Paket 3, das neue Paket 6 und Paket 4. Die n8n-Umstellung kommt später, so haben Sie es entschieden. <strong>Meine Empfehlung für die Reihenfolge: erst Paket 3, dann Paket 6, dann Paket 4</strong>. Die Begründung steht in Abschnitt 9, umstellen können Sie jederzeit.</p>
+      </div>
+
+      <h3>Ihre Entscheidungen vom 21., 22. und 24.09.2026</h3>
       <h4>Änderungen 1 bis 3</h4>
       <ul class="entscheidungen">
         <li><span class="haken">✓</span><span>„Stellenbezeichnung“ überall einheitlich, auch im Vertragsverlängerungs-Formular.</span></li>
@@ -513,7 +648,7 @@ details > div { padding: 0 14px 12px; }
       </ul>
       <h4>Paket 1 und Abteilungsaufgaben (22.09.2026)</h4>
       <ul class="entscheidungen">
-        <li><span class="haken">✓</span><span>Das Mail-Reparaturpaket ist in Paket 1 aufgenommen. Paket 1 ist umgesetzt und committet (5a016ba), aber noch nicht deployt.</span></li>
+        <li><span class="haken">✓</span><span>Das Mail-Reparaturpaket ist in Paket 1 aufgenommen. Paket 1 ist umgesetzt (5a016ba) und seit dem 24.09.2026 deployt.</span></li>
         <li><span class="haken">✓</span><span>Die Offboarding-Abschlussmail behauptet nicht mehr pauschal „Alle Aufgaben sind erledigt“.</span></li>
         <li><span class="haken">✓</span><span>Abteilungsaufgaben im Onboarding werden geplant. HR stößt sie per Knopf an, nicht automatisch.</span></li>
         <li><span class="haken">✓</span><span>Die Schwächen der Abteilungsaufgaben im Offboarding werden vorher als eigenes Paket repariert, und zwar vollständig (Punkte 1–13).</span></li>
@@ -521,7 +656,15 @@ details > div { padding: 0 14px 12px; }
         <li><span class="haken">✓</span><span>Ohne eingereichte Modalitäten bleibt „Abteilungen informieren“ gesperrt, mit Erklärung.</span></li>
         <li><span class="haken">✓</span><span>HR bekommt je erledigter Aufgabe eine Mail mit dem Kommentar der Abteilung.</span></li>
       </ul>
-      <p class="unterschrift" style="margin-top:6px">Onboarding bei der individuellen E-Mail habe ich aus Ihrem ursprünglichen Wunsch übernommen („einer Person im Onboarding, aber auch grundsätzlich“).</p>
+      <h4>Offene Aufgaben (Paket 6) und Reihenfolge (24.09.2026)</h4>
+      <ul class="entscheidungen">
+        <li><span class="haken">✓</span><span>Gezählt werden alle offenen Checklisten-Aufgaben, gleich wer zuständig ist: Personalabteilung, Abteilungen, Führungskraft per Link oder niemand. Die Übersicht lässt sich nach Zuständigkeit filtern.</span></li>
+        <li><span class="haken">✓</span><span>Dabei sind alle Module mit Checkliste: Onboarding, Offboarding, Verbeamtung, Elternzeit, Mutterschutz. BEM nie (versiegelte Akte). Das Vertragsende hat keine Checkliste.</span></li>
+        <li><span class="haken">✓</span><span>Badge in der Vorgangsliste: grau „5 offen“, rot „5 offen · 2 überfällig“, sobald etwas überfällig ist. Kein Badge, wenn nichts offen ist.</span></li>
+        <li><span class="haken">✓</span><span>Keine persönliche Zuweisung, kein „Meine Aufgaben“. HR bleibt ein Team, die Zuständigkeit bleibt beim Abteilungsschlüssel.</span></li>
+        <li><span class="haken">✓</span><span>Paket 3 und das neue Paket 6 gehen vor. Die n8n-Umstellung kommt später. Paket 4 bleibt offen.</span></li>
+      </ul>
+      <p class="unterschrift" style="margin-top:6px">Onboarding bei der individuellen E-Mail (Änderung 3) habe ich aus Ihrem ursprünglichen Wunsch übernommen („einer Person im Onboarding, aber auch grundsätzlich“). Die offenen Fragen zu Paket 6 (E1–E7) stehen mit meiner Empfehlung in Abschnitt 10.</p>
     </section>
 
     <!-- ================= 1 STELLENBEZEICHNUNG ================= -->
@@ -640,11 +783,11 @@ details > div { padding: 0 14px 12px; }
         <li><strong>Mandanten-Konfiguration Vertragsende:</strong> Die Maske speichert heute immer alle Beschriftungen. Eine einmalige Korrektur beim Start ersetzt deshalb die gespeicherte Standard-Beschriftung „Stellenbeschreibung“ durch „Stellenbezeichnung“ (mit Merker in <code>system_migrations</code>). Eigene Beschriftungen bleiben unberührt.</li>
         <li><strong>Brief-Vorlagen:</strong> Der Platzhalter bleibt <code>{stellenbeschreibung}</code>, nur seine Beschriftung im Katalog ändert sich. Alle hochgeladenen Word-Vorlagen funktionieren unverändert weiter.</li>
       </ol>
-      <div class="kasten warn">
-        <strong class="t">Ein Handschritt nach dem Deploy</strong>
-        <p>Wurde die Mail „Einladung Vorgesetzter (Einstellungsmodalitäten)“ oder „(Vertragsverlängerung)“ schon einmal unter Einstellungen → E-Mail-Vorlagen gespeichert, gilt diese gespeicherte Fassung und nicht der Text aus dem Code. Das reicht schon, wenn nur ein Empfänger oder die Antwortadresse eingetragen wurde. Erkennbar ist das am fehlenden Abzeichen „Standard-Vorlage“. In diesem Fall ändere ich den Begriff dort von Hand (etwa 5 Minuten).</p>
+      <div class="kasten ok">
+        <strong class="t">Handschritt nach dem Deploy: erledigt am 24.09.2026</strong>
+        <p>Wurde eine Mailvorlage unter Einstellungen → E-Mail-Vorlagen gespeichert, gilt die gespeicherte Fassung und nicht der Text aus dem Code. „Einladung Vorgesetzter (Einstellungsmodalitäten)“ (<code>supervisor-link-created</code>) lag gespeichert vor, aber unverändert im alten Standard. Sie ist per SQL auf den neuen Standard gesetzt. „(Vertragsverlängerung)“ (<code>contract-end-supervisor-link</code>) war nicht gespeichert, dort gilt der Code ohnehin.</p>
       </div>
-      <p><span class="aufwand">Aufwand 0,5–1 Tag</span></p>
+      <p><span class="aufwand">✓ umgesetzt (Commit 5a016ba)</span> <span class="ui-hinweistext" style="margin-left:6px">deployt am 24.09.2026; geschätzt waren 0,5–1 Tag</span></p>
     </section>
 
     <!-- ================= 2 PARALLEL ================= -->
@@ -949,10 +1092,10 @@ details > div { padding: 0 14px 12px; }
         <li><strong>Festhängende Vorgänge reparieren.</strong> Eine einmalige Korrektur beim Start (Merker <code>ONBOARDING_PARALLELE_SPUREN_V1</code>) setzt ihren Status zurück auf „In Bearbeitung“ bzw. „Eingeladen“. Sie zieht außerdem die Fragebogen-Konfiguration nach, die frühere Korrekturen bei genau diesen Vorgängen ausgelassen haben (Masernschutz-Schritt, Minijob-Schritte). Die alten Werte stehen im Merker, und die neue Spalte löst beim Deploy automatisch eine Datenbanksicherung aus. Vorgänge, die HR trotz fehlendem Fragebogen schon als „geprüft“ markiert hat, fasst die Korrektur nicht an. Die klären wir einzeln anhand der Liste unten.</li>
       </ol>
       <div class="kasten hinweis">
-        <strong class="t">In zwei Stufen, weil echte Mitarbeitende festhängen</strong>
+        <strong class="t">In zwei Stufen, weil echte Mitarbeitende festhingen</strong>
         <p><strong>Stufe A (etwa 1 Tag):</strong> Links entsperren, Absenden in beliebiger Reihenfolge, Reparatur der Altfälle, Link in der Erinnerung. Das ist schnell ausrollbar. <strong>Stufe B (etwa 1,5–2 Tage):</strong> HR-Übersicht mit parallelem Stepper, Chips und Beschriftungen, erweiterter Dialog „Neuer Vorgang“, Erinnerungsregeln und Mailtexte.</p>
       </div>
-      <p><span class="aufwand">Aufwand 2,5–3 Tage</span></p>
+      <p><span class="aufwand">✓ umgesetzt (Stufe A 5a016ba, „Neuer Vorgang“ 3a23bc8, Stufe B als Paket 2 c565b01)</span> <span class="ui-hinweistext" style="margin-left:6px">deployt am 24.09.2026; die Korrektur beim Start hat die zwei festhängenden Vorgänge geheilt, ohne dass eine Mail hinausging</span></p>
     </section>
 
     <!-- ================= 3 INDIVIDUELLE E-MAIL ================= -->
@@ -1328,7 +1471,7 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
           </ul></li>
         <li><strong>Eine laufende Nachforderung je Vorgang.</strong> Mehr Unterlagen kommen während der Laufzeit über „Ergänzen“ dazu. Danach lässt sich jederzeit eine neue starten, das ist der Folgeauftrag. Doppelklicks und gleichzeitige Entscheidungen zweier HR-Kräfte sind in der Datenbank abgesichert.</li>
         <li><strong>Mails:</strong> Fünf neue Vorlagen unter Einstellungen → E-Mail-Vorlagen, Gruppe „Unterlagen“. An die Person: Aufforderung, Erinnerung, Zurückweisung. An HR: „alles da“ und „Frist verstrichen“. Die HR-Mail „alles da“ geht erst raus, nachdem die Person ihre Bestätigung gesehen hat, so wartet sie nicht auf den Mailserver.</li>
-        <li><strong>Täglicher Lauf</strong> (in n8n eingeplant wie die anderen): Erinnerungen, HR-Meldung bei verstrichener Frist, Nachholen fehlgeschlagener Mails, Aufräumen. Er kommt gleich mit der ersten Stufe, damit Dialog und Mail nichts versprechen, was noch fehlt.</li>
+        <li><strong>Täglicher Lauf</strong> (in n8n eingeplant wie die anderen): Erinnerungen, HR-Meldung bei verstrichener Frist, Nachholen fehlgeschlagener Mails, Aufräumen. Er kommt gleich mit der ersten Stufe, damit Dialog und Mail nichts versprechen, was noch fehlt. Die n8n-Umstellung stellen Sie zurück (Entscheidung 24.09.). Ohne sie kämen die Erinnerungen dieses Pakets nicht an, auch deshalb steht Paket 4 in der Reihenfolge hinten.</li>
         <li><strong>Vorher behoben:</strong>
           <ul>
             <li>Die Verbeamtung zeigt hochgeladene Dokumente heute unter „Weitere Dokumente“ statt im Raster (siehe erste Übersicht).</li>
@@ -1341,7 +1484,7 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
         <strong class="t">In zwei Stufen</strong>
         <p><strong>Stufe 1: Onboarding komplett (etwa 13–14 Tage).</strong> Enthält Vorarbeiten, Tabellen, Upload-Seite, HR-Karte, Dialog, Prüfen, Mails und den täglichen Lauf, ab dann produktiv nutzbar. <strong>Stufe 2: die übrigen fünf Vorgänge und die Spalte „Unterlagen“ in allen Listen (etwa 6–7 Tage).</strong></p>
       </div>
-      <p><span class="aufwand">Aufwand 19–21 Tage</span> <span class="ui-hinweistext" style="margin-left:6px">der größte Baustein; unabhängig von Paket 3</span></p>
+      <p><span class="aufwand">Aufwand 19–21 Tage</span> <span class="ui-hinweistext" style="margin-left:6px">der größte Baustein; unabhängig von Paket 3. Nach Paket 6 steht die Spalte „Unterlagen“ rechts neben „Aufgaben“, in derselben Pillenform (Abschnitt 7).</span></p>
     </section>
 
     <!-- ================= 5 ABTEILUNGSAUFGABEN OFFBOARDING ================= -->
@@ -1503,10 +1646,10 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
         <li><strong>Versandroute</strong> mit den Aktionen Informieren, Erneut senden, Erinnern und Link erneuern, dazu Rolle, Mandant, Status und eine Sperre gegen Doppelklicks.</li>
         <li><strong>Öffentliche Routen</strong> mit Eingabeprüfung, Statussperre, Protokoll und einem zweiten Anfragelimit je Link, zusätzlich zum bestehenden je IP.</li>
         <li><strong>Einstellungen → Abteilungen</strong> mit einheitlichen Feldnamen, Eingabeprüfung, Protokoll und der Spalte „Verwendet in“.</li>
-        <li><strong>Mails:</strong> vier Offboarding-Vorlagen bekommen Aufgabenliste, Gültigkeit und Kommentar (Einzelheiten in Abschnitt 7). Sie werden nach dem Deploy mit „Text auf Standard zurücksetzen“ aktualisiert.</li>
+        <li><strong>Mails:</strong> vier Offboarding-Vorlagen bekommen Aufgabenliste, Gültigkeit und Kommentar (Einzelheiten in Abschnitt 8). Die gespeicherten Fassungen hatte HR gestaltet. Beim Deploy am 24.09. habe ich sie deshalb per SQL mit dem neuen Standard zusammengeführt statt sie zurückzusetzen. Dort bitte nie „Text auf Standard zurücksetzen“ wählen.</li>
         <li><strong>Tests</strong> für jede Zeile der Tabelle oben, dazu das Handbuch mit den neuen Begriffen.</li>
       </ul>
-      <p><span class="aufwand">✓ umgesetzt (Commit 6584ca2)</span> <span class="ui-hinweistext" style="margin-left:6px">vollständig, Punkte 1–13; noch nicht deployt</span></p>
+      <p><span class="aufwand">✓ umgesetzt (Commit 6584ca2)</span> <span class="ui-hinweistext" style="margin-left:6px">vollständig, Punkte 1–13; deployt am 24.09.2026</span></p>
     </section>
 
     <!-- ================= 6 ABTEILUNGSAUFGABEN ONBOARDING ================= -->
@@ -1757,28 +1900,554 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
         <li><strong>Neue Routen</strong> für Vorschau und Versand im Vorgang sowie für die öffentliche Seite, mit eigenem Datenzuschnitt. Sie nutzen bewusst nicht die Detailroute, die IBAN und SV-Nummer entschlüsselt.</li>
         <li><strong>Erinnerungen</strong> hängen am bestehenden täglichen Lauf <code>/api/cron/reminders</code>, ein neuer n8n-Schritt ist nicht nötig.</li>
         <li><strong>Checklisten-Editor:</strong> Speichern in einem Schritt statt „alles löschen, neu anlegen“. Erst danach prüft der Server Zuständigkeit und Hinweis, sonst gingen Punkte mit unbekanntem Altwert still verloren.</li>
-        <li><strong>Vier neue Mailvorlagen</strong> in der Gruppe Onboarding (Abschnitt 7 B), dazu Beispieldaten für den Testversand.</li>
+        <li><strong>Vier neue Mailvorlagen</strong> in der Gruppe Onboarding (Abschnitt 8 B), dazu Beispieldaten für den Testversand.</li>
         <li><strong>Tests</strong> für Fälligkeit, Empfänger, Datenzuschnitt, Migration, Mails und Erinnerungen, dazu Handbuch und <code>CLAUDE.md</code>.</li>
       </ul>
       <div class="kasten hinweis">
         <strong class="t">Ohne Pflege durch HR bewirkt der Knopf nichts</strong>
         <p>Die Checklisten-Vorlagen in der Produktion sind Daten von HR. Die Migration stellt nur die Zuständigkeiten um. Neue Punkte wie „Datenschutz-Unterweisung“, Tagesangaben und Hinweise trägt HR einmalig unter Checklisten-Vorlagen ein. Einen Vorschlag für die Standard-Einstellung lege ich bei. Für Erzieher, Beamte und Ehrenamt gibt es heute keine Onboarding-Vorlage; dort sagt die Karte das.</p>
       </div>
-      <p><span class="aufwand">✓ umgesetzt</span> <span class="ui-hinweistext" style="margin-left:6px">auf dem Branch, noch nicht deployt; dazu etwa 1–2 Stunden Pflege der Vorlagen und Adressen durch HR</span></p>
+      <p><span class="aufwand">✓ umgesetzt (Commit db6fe2f)</span> <span class="ui-hinweistext" style="margin-left:6px">deployt am 24.09.2026. Offen ist die Pflege durch HR (etwa 1–2 Stunden): Adressen für IT und Verwaltung / Sekretariat, das An-Feld von „Onboarding-Aufgabe erledigt“ und die Zuständigkeit „Öffentlichkeitsarbeit“ (Abschnitt 9, „Betrieb nach dem Deploy“).</span></p>
     </section>
 
-    <!-- ================= 7 MAILS UND VORLAGEN ================= -->
+    <!-- ================= 7 OFFENE AUFGABEN ================= -->
+    <section class="abschnitt" id="a7">
+      <div class="abschnitt-titel"><span class="nr">7</span><h2>Offene Aufgaben: Übersicht und Badge (Paket 6)</h2></div>
+      <p>Offene Aufgaben sieht HR heute nur im einzelnen Vorgang. Die Onboarding-Liste zählt keine Aufgaben. Ihr rotes Abzeichen „14d“ misst, wie lange der <em>Vorgang</em> schon läuft, und nicht, was an ihm liegen geblieben ist. Das Offboarding zeigt „3/12“ als grauen Text, die Verbeamtung einen Balken über alle 67 Punkte, Mutterschutz und Elternzeit zeigen nichts. Eine Sicht über alle Vorgänge fehlt. Selbst in der Checkliste des Vorgangs ist eine überfällige Aufgabe so grau wie jede andere. Wer wissen will, was liegen geblieben ist, muss heute jeden Vorgang einzeln öffnen.</p>
+      <p>Neu steht in jeder Vorgangsliste mit Checkliste ein <strong>Badge</strong>: grau „5 offen“, rot „5 offen · 2 überfällig“. Ein Klick darauf öffnet die Checkliste des Vorgangs. Dazu kommen die Seite <strong>„Aufgaben“</strong> mit allen offenen Checklisten-Aufgaben der laufenden Vorgänge, nach Dringlichkeit sortiert, und ein <strong>roter Zähler</strong> in der Kopfleiste für alles Überfällige. Das Paket braucht keine Schemaänderung und keine neue Mail.</p>
+
+      <div class="fluss-neben">
+        <div class="gut"><strong>Gezählt:</strong> alle offenen Checklisten-Aufgaben laufender Vorgänge, gleich wer zuständig ist. Die Übersicht lässt sich nach Zuständigkeit filtern.</div>
+        <div class="hr"><strong>Module:</strong> Onboarding, Offboarding, Verbeamtung, Mutterschutz, Elternzeit. Das Vertragsende hat keine Checkliste.</div>
+        <div class="zeit"><strong>Badge:</strong> grau, sobald etwas offen ist, rot, sobald etwas überfällig ist. Ist nichts offen, gibt es kein Badge. Eine gelbe Stufe gibt es nicht.</div>
+        <div class="schlecht"><strong>Nie dabei:</strong> BEM, die versiegelte Akte mit eigener Sicht und eigenem Zähler. Auch keine persönliche Zuweisung, HR bleibt ein Team.</div>
+      </div>
+      <p class="unterschrift" style="margin-top:0">Den Rahmen setzen Ihre Entscheidungen vom 24.09.2026.</p>
+
+      <h3>Was „offen“ und „überfällig“ heißt</h3>
+      <p>Badge, Übersicht, Zähler, die rote Fälligkeit in der Checkliste und künftig auch die Erinnerungsmails lesen dieselbe Definition. Eine zweite Regel im Browser, in SQL oder in einer einzelnen Route gibt es nicht.</p>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Begriff</th><th>In Klartext</th><th>Technisch</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Offene Aufgabe</strong></td><td>Eine Aufgabe der Checkliste, die noch nicht abgehakt ist, in einem Vorgang, der noch läuft. Abgeschlossene, abgebrochene, abgelaufene, abgelehnte und beendete Vorgänge zählen nie.</td><td><code>isCompleted = false</code> bzw. <code>erledigtAm</code> leer. Die Endstatus je Modul stehen einmal in <code>AUFGABEN_ENDSTATUS</code>, ein Test gleicht sie mit dem Schema ab.</td></tr>
+            <tr><td><strong>Jetzt dran</strong></td><td><strong>Onboarding:</strong> ab Abgabe der Modalitäten oder ab „Geprüft“. Die Aufgaben gibt es schon vorher, sie laufen dann aber noch nicht (E1). <strong>Verbeamtung:</strong> nur Phasen, die der Vorgang erreicht hat und die weder abgeschlossen noch übersprungen sind (E3). <strong>Elternzeit:</strong> Phasen bis einschließlich der aktuellen. „Rueckkehrdatum + Stundenumfang mit MA abstimmen“ zählt schon ab Beginn der Elternzeit, weil erst dieser Schritt in die Rückkehrphase führt. <strong>Mutterschutz:</strong> die Punkte zur Geburt (Geburtsmeldung, Kind in LOGA, Kinderlosenzuschlag) erst ab Status „Aktiv“. <strong>Offboarding:</strong> alle.</td><td>reine Funktionen je Modul, dieselben für Badge und Übersicht</td></tr>
+            <tr><td><strong>Fälligkeit</strong></td><td>Das Datum, das auch die Checkliste im Vorgang zeigt. Im Onboarding ist das die gespeicherte Frist. Solange keine gespeichert ist, gilt der Vertragsbeginn plus die Tagesangabe aus der Vorlage, sobald die Modalitäten mit Vertragsbeginn eingereicht sind.</td><td><code>dueDate ?? faelligkeitAus(vertragsbeginn, relativeDueDays)</code>, dieselbe Funktion wie auf der Detailseite</td></tr>
+            <tr><td><strong>Ohne Frist</strong></td><td>Es ist kein Datum hinterlegt. Das gilt immer für den Mutterschutz und für die Checkliste der Elternzeit. In der Verbeamtung gilt es praktisch auch, weil dort heute niemand eine Frist an die Punkte setzt. Solche Aufgaben sind grau, nie rot.</td><td><code>dueDate</code> leer und keine berechnete Frist</td></tr>
+            <tr><td><strong>Überfällig</strong></td><td>Der Fälligkeitstag liegt vor dem heutigen Kalendertag in deutscher Zeit. Am Fälligkeitstag selbst ist eine Aufgabe „heute fällig“ und noch nicht überfällig.</td><td><code>tageBis(fällig, jetzt) &lt; 0</code>, ein Helfer für alle Stellen, auch für die Stufen der Erinnerungsmails</td></tr>
+            <tr><td><strong>Nächste 7 Tage</strong></td><td>Heute und die sechs folgenden Tage. Die Beschriftung nennt das Enddatum („bis 30.09.“), damit niemand an eine Kalenderwoche denkt.</td><td><code>0 ≤ tageBis ≤ 6</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="kasten warn">
+        <strong class="t">Gezählt werden nur Checklisten-Aufgaben</strong>
+        <p>Die Fristen der Verbeamtung (Amtsarzt, Beurteilungen, RV-Befreiung, BR-Genehmigung) melden sich weiter per Mail „Verbeamtung: Fristen-Warnung“ und stehen am Vorgang. Die Elternzeit hat den Reiter „Fristen“, BEM hat eine eigene Sicht. Keine dieser Fristen zählt hier mit. Deshalb heißt der leere Zustand „Keine Checklisten-Aufgabe überfällig.“ und nicht „Alle Fristen sind eingehalten.“. Der Tooltip der Verbeamtung verweist mit „Fristen siehe Vorgang“ auf den Vorgang. Ob diese Fristen später als eigene Zeilen dazukommen, entscheiden Sie (E6).</p>
+      </div>
+
+      <h4>Legende: das Badge und sein Tooltip</h4>
+      <div class="fenster neu">
+        <div class="fenster-leiste"><span class="tag">NEU</span> Alle Zustände des Badges · Beispieldaten, heute ist Donnerstag, 24.09.2026</div>
+        <div class="fenster-rumpf">
+          <div class="legende">
+            <div class="leg-zelle">
+              <div><span class="aufg-strich">—</span></div>
+              <div class="t">Kein Badge</div>
+              <div class="ui-hinweistext">Nichts ist offen, oder der Vorgang ist abgeschlossen. Im Archiv des Offboardings bleibt der alte Stand grau stehen, etwa „10/12“.</div>
+            </div>
+            <div class="leg-zelle">
+              <div><span class="aufg-strich hilfe">—</span></div>
+              <div class="t">Onboarding, bevor die Aufgaben laufen</div>
+              <div class="ui-hinweistext">Die Modalitäten fehlen noch, und der Vorgang ist noch nicht geprüft (E1).</div>
+              <div class="tooltip">Checkliste startet mit Abgabe der Modalitäten</div>
+            </div>
+            <div class="leg-zelle">
+              <div><span class="aufg-badge grau">5 offen</span></div>
+              <div class="t">Offen, nichts überfällig</div>
+              <div class="ui-hinweistext">Grau, auch wenn eine Frist bald kommt. „Bald“ steht nur im Tooltip und in der Übersicht.</div>
+              <div class="tooltip">5 offen · nichts überfällig<br>Nächste Frist: 19.10.2026 (in 25 Tagen)<br>HR 3 · Führungskraft 2<br>13 von 18 erledigt</div>
+            </div>
+            <div class="leg-zelle">
+              <div><span class="aufg-badge rot">9 offen · 2 überfällig</span></div>
+              <div class="t">Mindestens eine Aufgabe überfällig</div>
+              <div class="ui-hinweistext">Rot zeigt das Badge immer, im Onboarding auch, bevor die Aufgaben laufen (E1). Dort steht dann nur „1 überfällig“. Das kommt selten vor, weil sich vor der Abgabe der Modalitäten eine Frist nur über die Schnittstelle setzen lässt.</div>
+              <div class="tooltip">9 offen · 2 überfällig, älteste seit 16.09.2026 (8 Tage)<br>Nächste Frist: morgen, 25.09.2026<br>HR 4 · Mitarbeiter/in 2 · IT 2 · Facility 1<br>3 von 12 erledigt</div>
+            </div>
+          </div>
+          <span class="anno info">Der Tooltip steht im <code>title</code> und im <code>aria-label</code> des Badges. Auf dem Handy gibt es keinen Tooltip, dort führt ein Tipp direkt zur Checkliste. Das Badge ist ein eigener Link und löst den Klick auf die ganze Zeile nicht aus.</span>
+        </div>
+      </div>
+
+      <h3>Kopfleiste: neuer Punkt „Aufgaben“ mit rotem Zähler</h3>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> Kopfleiste auf /dashboard/bem</div>
+          <div class="fenster-rumpf">
+            <div class="nav-kopf">
+              <div class="nav-marke"><span class="logo">CREDO</span><div><b>HR-Portal</b><small>Personalmanagement</small></div></div>
+              <div class="nav-punkte">
+                <span class="nav-punkt aktiv">Dashboard</span>
+                <span class="nav-punkt aktiv">🔒 BEM<span class="nav-zaehler">2</span></span>
+                <span class="nav-punkt">Vorlagen ▾</span>
+                <span class="nav-punkt">Verwaltung ▾</span>
+              </div>
+            </div>
+            <span class="anno">Nirgends ein Hinweis auf offene oder überfällige Aufgaben. Auf der BEM-Seite sind zwei Punkte aktiv, weil „Dashboard“ zu jedem Pfad unter <code>/dashboard</code> passt.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Kopfleiste auf jeder Portalseite</div>
+          <div class="fenster-rumpf">
+            <div class="nav-kopf">
+              <div class="nav-marke"><span class="logo">CREDO</span><div><b>HR-Portal</b><small>Personalmanagement</small></div></div>
+              <div class="nav-punkte">
+                <span class="nav-punkt aktiv">Dashboard</span>
+                <span class="nav-punkt mark">Aufgaben<span class="nav-zaehler">3</span></span>
+                <span class="nav-punkt">🔒 BEM<span class="nav-zaehler">2</span></span>
+                <span class="nav-punkt">Vorlagen ▾</span>
+                <span class="nav-punkt">Verwaltung ▾</span>
+              </div>
+            </div>
+            <div class="tooltip">3 überfällige Aufgaben</div>
+            <span class="anno gut">Der neue Punkt steht zwischen „Dashboard“ und „🔒 BEM“ und ist nur für Super-Admin, HR-Leitung und HR-Sachbearbeitung sichtbar. Der rote Zähler zählt nur Überfälliges (E2) und verschwindet bei 0. Ein Klick öffnet die Übersicht gleich mit dem Filter „Überfällig“. Aktiv ist immer genau ein Punkt, auf der BEM-Seite also nur „🔒 BEM“.</span>
+          </div>
+        </div>
+      </div>
+      <p class="unterschrift">Der BEM-Zähler bleibt, wie er ist. Er zählt den Handlungsbedarf, also das Überfällige und alles, was in den nächsten 14 Tagen fällig wird. Gleich ist nur das Aussehen. Der neue Zähler zählt bewusst nur Überfälliges: Rot heißt im ganzen Paket „überfällig“, und die Zahl geht auf 0, wenn die Arbeit getan ist.</p>
+
+      <h3>Onboarding-Liste: neue Spalte „Aufgaben“</h3>
+      <div class="fenster heute">
+        <div class="fenster-leiste"><span class="tag">HEUTE</span> /dashboard?tab=onboarding · Liste, Ausschnitt mit Beispieldaten</div>
+        <div class="fenster-rumpf">
+          <div class="tabs"><span class="aktiv">Onboarding</span><span>Offboarding</span><span>Vertragsende</span><span>Verbeamtung</span><span>Mutterschutz</span><span>Elternzeit</span></div>
+          <div class="meldung rot">⚠ 2 Vorgänge überfällig (2 kritisch, &gt;14 Tage)</div>
+          <div class="rollbar" style="margin-top:8px">
+            <table class="ui-tab gross breit">
+              <thead><tr><th>Vorgangs-ID</th><th>Name / E-Mail</th><th>Einrichtung</th><th>Status</th><th>Fragebogen</th><th>Vorgesetzter</th><th>Notizen</th><th>Datum</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono">2026-GYM-014</span></td><td>Anna Beispiel<span class="zusatz">anna.beispiel@example.org</span></td><td>FES Gymnasium (10)</td><td><span class="badge b-bereit">Bereit zur Prüfung</span></td><td>Eingereicht</td><td>Eingereicht</td><td><span class="pill p-offen">💬 2</span></td><td>08.09.2026</td></tr>
+                <tr><td><span class="mono">2026-GS-009</span></td><td>Ben Probe<span class="zusatz">ben.probe@example.org</span></td><td>FES Grundschule (20)</td><td><span class="badge b-geprueft">Geprüft</span></td><td>Eingereicht</td><td>Eingereicht</td><td class="aufg-alt">—</td><td>01.09.2026</td></tr>
+                <tr><td><span class="mono">2026-KITA-011</span></td><td>Clara Muster<span class="zusatz">clara.muster@example.org</span></td><td>FES Kita (40)</td><td><span class="badge b-invited">Eingeladen</span></td><td>—</td><td>Schritt 2 von 5</td><td class="aufg-alt">—</td><td>10.09.2026<span class="nd">14d</span></td></tr>
+                <tr><td><span class="mono">2026-GES-006</span></td><td>Emil Test<span class="zusatz">emil.test@example.org</span></td><td>FES Gesamtschule (30)</td><td><span class="badge b-geprueft">Geprüft</span></td><td>Eingereicht</td><td>Eingereicht</td><td class="aufg-alt">—</td><td>18.08.2026</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <span class="anno">Die Liste hat keine Spalte für Aufgaben. „Überfällig“ im Banner und das rote „14d“ meinen das Alter des Vorgangs. Das Banner zählt alles, was seit über 7 Tagen nicht geprüft ist, also auch Anna, die kein Abzeichen trägt. Dass bei Anna eine Frist seit einer Woche verstrichen ist, sieht man erst in ihrer Checkliste.</span>
+        </div>
+      </div>
+      <div class="fenster neu">
+        <div class="fenster-leiste"><span class="tag">NEU</span> /dashboard?tab=onboarding · dieselben vier Vorgänge</div>
+        <div class="fenster-rumpf">
+          <div class="tabs"><span class="aktiv">Onboarding</span><span>Offboarding</span><span>Vertragsende</span><span>Verbeamtung</span><span>Mutterschutz</span><span>Elternzeit</span></div>
+          <div class="meldung rot">⚠ <span class="mark">2 Vorgänge seit über 7 Tagen ohne Prüfung</span> (2 seit über 14 Tagen)</div>
+          <div class="rollbar" style="margin-top:8px">
+            <table class="ui-tab gross breit">
+              <thead><tr><th>Vorgangs-ID</th><th>Name / E-Mail</th><th>Einrichtung</th><th>Status</th><th><span class="mark">Aufgaben</span></th><th>Fragebogen</th><th>Vorgesetzter</th><th>Notizen</th><th>Datum</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono">2026-GYM-014</span></td><td>Anna Beispiel<span class="zusatz">anna.beispiel@example.org</span></td><td>FES Gymnasium (10)</td><td><span class="badge b-bereit">Bereit zur Prüfung</span></td><td><span class="aufg-badge rot">13 offen · 1 überfällig</span></td><td>Eingereicht</td><td>Eingereicht</td><td><span class="pill p-offen">💬 2</span></td><td>08.09.2026</td></tr>
+                <tr><td><span class="mono">2026-GS-009</span></td><td>Ben Probe<span class="zusatz">ben.probe@example.org</span></td><td>FES Grundschule (20)</td><td><span class="badge b-geprueft">Geprüft</span></td><td><span class="aufg-badge grau">5 offen</span></td><td>Eingereicht</td><td>Eingereicht</td><td class="aufg-alt">—</td><td>01.09.2026</td></tr>
+                <tr><td><span class="mono">2026-KITA-011</span></td><td>Clara Muster<span class="zusatz">clara.muster@example.org</span></td><td>FES Kita (40)</td><td><span class="badge b-invited">Eingeladen</span></td><td><span class="aufg-strich hilfe" title="Checkliste startet mit Abgabe der Modalitäten">—</span></td><td>—</td><td>Schritt 2 von 5</td><td class="aufg-alt">—</td><td>10.09.2026<span class="nd mark" title="seit 14 Tagen eingeladen">14d</span></td></tr>
+                <tr><td><span class="mono">2026-GES-006</span></td><td>Emil Test<span class="zusatz">emil.test@example.org</span></td><td>FES Gesamtschule (30)</td><td><span class="badge b-geprueft">Geprüft</span></td><td><span class="aufg-strich">—</span></td><td>Eingereicht</td><td>Eingereicht</td><td class="aufg-alt">—</td><td>18.08.2026</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="ui-hinweistext" style="margin-top:10px">Maus über dem Badge von 2026-GYM-014:</div>
+          <div style="margin-top:4px"><span class="aufg-badge rot">13 offen · 1 überfällig</span></div>
+          <div class="tooltip">13 offen · 1 überfällig, seit 17.09.2026 (7 Tage)<br>Die Frist lag schon vor Eingang der Modalitäten (18.09.)<br>Nächste Frist: heute, 24.09.2026<br>Führungskraft 4 · HR 3 · Verwaltung 2 · IT 2 · DSB 1 · Öffentlichkeitsarbeit 1<br>Prüfung steht noch aus · 5 von 18 erledigt</div>
+          <span class="anno gut">Die neue Spalte steht direkt nach „Status“. Anna ist rot, weil „Arbeitsvertrag erstellt und versendet“ seit dem 17.09. fällig ist. Ben ist grau, bei ihm ist nichts überfällig. Clara bekommt einen Strich mit Hinweis, weil ihre Aufgaben erst mit den Modalitäten laufen (E1). Bei Emil ist alles erledigt.</span>
+          <span class="anno info">Damit nur ein Rot „überfällig“ heißt, bekommt das Banner einen neuen Text und das Abzeichen „14d“ den Tooltip „seit 14 Tagen eingeladen“. Der Tooltip des Badges nennt zwei Sonderfälle: „Prüfung steht noch aus“ (passend zum Stepper, der die Checkliste erst ab „Geprüft“ freigibt) und eine Frist, die schon vor dem Eingang der Modalitäten lag. Mit Paket 4 kommt rechts neben „Aufgaben“ die Spalte „Unterlagen“ in derselben Pillenform dazu. Die Tabelle hat dann zehn Spalten und scrollt auf schmalen Bildschirmen in sich.</span>
+        </div>
+      </div>
+
+      <h3>Offboarding-Liste: „Aufgaben“ statt „Checkliste 3/12“</h3>
+      <div>
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> /dashboard?tab=offboarding · Ausschnitt</div>
+          <div class="fenster-rumpf">
+            <div class="rollbar">
+              <table class="ui-tab gross" style="min-width:400px">
+                <thead><tr><th>Vorgang</th><th>Letzter Arbeitstag</th><th>Status</th><th>Checkliste</th></tr></thead>
+                <tbody>
+                  <tr><td><span class="mono">OFF-2026-GS-007</span><span class="zusatz">Jonas Probe</span></td><td>30.09.2026</td><td><span class="badge b-orange">Übergabe</span></td><td class="aufg-alt">3/12</td></tr>
+                  <tr><td><span class="mono">OFF-2026-GYM-005</span><span class="zusatz">Mia Muster</span></td><td>18.09.2026 <span class="lage rot">Überfällig</span></td><td><span class="badge b-lila">Endabrechnung</span></td><td class="aufg-alt">11/12</td></tr>
+                  <tr><td><span class="mono">OFF-2026-KITA-002</span><span class="zusatz">Paul Beispiel</span></td><td>31.08.2026</td><td><span class="badge b-gruen">Abgeschlossen</span></td><td class="aufg-alt">10/12</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <span class="anno">„3/12“ sagt nicht, ob etwas überfällig ist. Die rote Pille „Überfällig“ meint den letzten Arbeitstag und erscheint schon an diesem Tag selbst, ab 02:00 Uhr.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> /dashboard?tab=offboarding · Ausschnitt</div>
+          <div class="fenster-rumpf">
+            <div class="rollbar">
+              <table class="ui-tab gross" style="min-width:400px">
+                <thead><tr><th>Vorgang</th><th>Letzter Arbeitstag</th><th>Status</th><th><span class="mark">Aufgaben</span></th></tr></thead>
+                <tbody>
+                  <tr><td><span class="mono">OFF-2026-GS-007</span><span class="zusatz">Jonas Probe</span></td><td>30.09.2026</td><td><span class="badge b-orange">Übergabe</span></td><td><span class="aufg-badge rot">9 offen · 2 überfällig</span></td></tr>
+                  <tr><td><span class="mono">OFF-2026-GYM-005</span><span class="zusatz">Mia Muster</span></td><td>18.09.2026 <span class="lage rot mark">vorbei</span></td><td><span class="badge b-lila">Endabrechnung</span></td><td><span class="aufg-badge grau">1 offen</span></td></tr>
+                  <tr><td><span class="mono">OFF-2026-KITA-002</span><span class="zusatz">Paul Beispiel</span></td><td>31.08.2026</td><td><span class="badge b-gruen">Abgeschlossen</span></td><td class="aufg-alt">10/12</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <span class="anno gut">„Aufgaben“ ersetzt „Checkliste“, der alte Stand „3 von 12 erledigt“ steht im Tooltip. Im Archiv bleibt „10/12“ grau stehen. Die Pille am Datum heißt „vorbei“ und zählt nach dem Kalendertag, erscheint also erst am Tag nach dem letzten Arbeitstag.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fenster neu">
+        <div class="fenster-leiste"><span class="tag">NEU</span> Verbeamtung, Elternzeit und Mutterschutz · die neue Spalte „Aufgaben“ (Ausschnitte aus drei Listen)</div>
+        <div class="fenster-rumpf">
+          <div class="rollbar">
+            <table class="ui-tab gross" style="min-width:480px">
+              <thead><tr><th>Liste</th><th>Vorgang</th><th>Status</th><th>Aufgaben</th></tr></thead>
+              <tbody>
+                <tr><td>Verbeamtung</td><td><span class="mono">PSI-2026-GYM-003</span><span class="zusatz">Tim Muster</span></td><td><span class="badge b-blau">Verwaltung</span></td><td><span class="aufg-badge grau">27 offen</span><div class="balken" style="max-width:110px"><span style="width:21%;background:var(--gruen)"></span></div><span class="zusatz">14/67 über alle Phasen</span></td></tr>
+                <tr><td>Elternzeit</td><td><span class="mono">EZ-2026-KITA-002</span><span class="zusatz">Lea Test</span></td><td><span class="badge b-gruen">Genehmigt</span></td><td><span class="aufg-badge grau">6 offen</span></td></tr>
+                <tr><td>Mutterschutz</td><td><span class="mono">MU-2026-GS-004</span><span class="zusatz">Nora Beispiel</span></td><td><span class="badge b-gruen">Aktiv</span></td><td><span class="aufg-badge grau">5 offen</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="tooltip">Phase II (Verwaltung) · 27 offen · keine Frist gesetzt<br>Fristen (Amtsarzt, Beurteilungen, RV-Befreiung, BR-Genehmigung) siehe Vorgang<br>14 von 67 erledigt</div>
+          <span class="anno info">In der Verbeamtung heißt die Spalte „Aufgaben“ statt „Fortschritt“. Das Badge zählt nur, was jetzt dran ist, der Balken darunter zeigt wie bisher den Stand über alle Jahre. In diesen drei Modulen setzt heute niemand Fristen an die Checkliste, deshalb ist das Badge hier nie rot.</span>
+        </div>
+      </div>
+
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Liste</th><th>Heute</th><th>Neu</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Onboarding</strong></td><td>keine Aufgabenspalte</td><td>neue Spalte „Aufgaben“ direkt nach „Status“</td></tr>
+            <tr><td><strong>Offboarding</strong></td><td>„Checkliste 3/12“, Pille „Überfällig“ am letzten Arbeitstag</td><td>„Aufgaben“ ersetzt „Checkliste“, im Archiv bleibt „x/y“ grau. Die Pille heißt „vorbei“. Die Analytics-Kachel „Überfällig“ bekommt einen neuen Namen.</td></tr>
+            <tr><td><strong>Verbeamtung</strong></td><td>„Fortschritt“ mit Balken 14/67, Kachel „Frist!“</td><td>„Aufgaben“ mit Badge und Balken. Die Kachel „Frist!“ entfällt, weil sie auf einen Status filtert, den es nicht gibt.</td></tr>
+            <tr><td><strong>Mutterschutz, Elternzeit</strong></td><td>keine Aufgabenspalte</td><td>neue Spalte „Aufgaben“ nach „Status“, immer grau</td></tr>
+            <tr><td><strong>Vertragsende</strong></td><td>keine Checkliste</td><td>unverändert; mit Paket 4 kommt nur „Unterlagen“</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Die neue Seite „Offene Aufgaben“</h3>
+      <p>Die Listen mit Badge sind schon die Sicht je Vorgang. Die neue Seite kann etwas, das keine Liste kann: Sie ordnet alle offenen Aufgaben über alle Module nach Dringlichkeit. Oben steht, was überfällig ist, die älteste Aufgabe zuerst. Danach folgt alles nach Fälligkeit, Aufgaben ohne Frist stehen am Ende. Jede Zeile nennt ihren Vorgang und führt dorthin.</p>
+      <div class="fenster neu">
+        <div class="fenster-leiste"><span class="tag">NEU</span> /dashboard/aufgaben · Standardansicht „Mit Frist“ · Beispieldaten, heute ist Donnerstag, 24.09.2026</div>
+        <div class="fenster-rumpf">
+          <div class="nav-kopf">
+            <div class="nav-marke"><span class="logo">CREDO</span><div><b>HR-Portal</b><small>Personalmanagement</small></div></div>
+            <div class="nav-punkte"><span class="nav-punkt">Dashboard</span><span class="nav-punkt aktiv">Aufgaben<span class="nav-zaehler">3</span></span><span class="nav-punkt">🔒 BEM<span class="nav-zaehler">2</span></span><span class="nav-punkt">Vorlagen ▾</span><span class="nav-punkt">Verwaltung ▾</span></div>
+            <span class="nav-rechts">Erika Muster · HR-Leitung</span>
+          </div>
+          <div class="seitenkopf"><b>Offene Aufgaben</b><span class="ui-hinweistext">aus allen laufenden Vorgängen · Stand heute, 24.09.2026</span></div>
+          <div class="kpi-raster">
+            <div class="kpi rot"><span class="z">3</span><span class="l">Überfällig</span></div>
+            <div class="kpi"><span class="z">12</span><span class="l">Nächste 7 Tage · bis 30.09.</span></div>
+            <div class="kpi gewaehlt"><span class="z">28</span><span class="l">Mit Frist · Standard</span></div>
+            <div class="kpi"><span class="z">38</span><span class="l">Ohne Frist</span></div>
+          </div>
+          <div class="ui-hinweistext">66 offene Aufgaben in 7 Vorgängen. Die Zahlen gelten für die übrigen Filter.</div>
+          <div class="filterleiste">
+            <span class="ui-input suche">🔍 Vorgangsnummer, Name oder Aufgabe …</span>
+            <span class="ui-input wert">Modul: Alle ▾</span>
+            <span class="ui-input wert">Zuständig: Alle ▾</span>
+            <span class="ui-input wert">Einrichtung: Alle ▾</span>
+            <span class="umschalter"><span class="an">Nach Fälligkeit</span><span>Nach Vorgang</span></span>
+          </div>
+          <div class="rollbar">
+            <table class="ui-tab gross breit">
+              <thead><tr><th>Fällig</th><th>Aufgabe</th><th>Zuständig</th><th>Vorgang</th><th>Einrichtung</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>16.09.2026<br><span class="lage rot">seit 8 Tagen</span></td><td><b>Wissenstransfer durchfuehren</b><span class="zusatz">Phase 3: Uebergabe</span></td><td>Mitarbeiter/in</td><td><span class="modul-chip off">Offboarding</span> <span class="mono">OFF-2026-GS-007</span><span class="zusatz">Jonas Probe</span></td><td>FES Grundschule (20)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>17.09.2026<br><span class="lage rot">seit 7 Tagen</span></td><td><b>Arbeitsvertrag erstellt und versendet</b><span class="zusatz">Vor Arbeitsbeginn</span></td><td>Personalabteilung</td><td><span class="modul-chip on">Onboarding</span> <span class="mono">2026-GYM-014</span><span class="zusatz">Anna Beispiel</span></td><td>FES Gymnasium (10)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>23.09.2026<br><span class="lage rot">seit 1 Tag</span></td><td><b>Arbeitszeugnis erstellen</b><span class="zusatz">Phase 3: Uebergabe</span></td><td>Personalabteilung</td><td><span class="modul-chip off">Offboarding</span> <span class="mono">OFF-2026-GS-007</span><span class="zusatz">Jonas Probe</span></td><td>FES Grundschule (20)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>24.09.2026<br><span class="lage bald">heute</span></td><td><b>Arbeitsvertrag unterschrieben retour</b><span class="zusatz">Vor Arbeitsbeginn</span></td><td>Personalabteilung</td><td><span class="modul-chip on">Onboarding</span> <span class="mono">2026-GYM-014</span><span class="zusatz">Anna Beispiel</span></td><td>FES Gymnasium (10)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>24.09.2026<br><span class="lage bald">heute</span></td><td><b>Schlüssel/Transponder bestellen</b><span class="zusatz">Vor Arbeitsbeginn</span></td><td>Verwaltung / Sekretariat<span class="zusatz gelb">keine Adresse hinterlegt</span></td><td><span class="modul-chip on">Onboarding</span> <span class="mono">2026-GYM-014</span><span class="zusatz">Anna Beispiel</span></td><td>FES Gymnasium (10)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>24.09.2026<br><span class="lage bald">heute</span></td><td><b>Einarbeitungspatin/-paten benennen</b><span class="zusatz">Vor Arbeitsbeginn</span></td><td>Führungskraft (per Link)<span class="zusatz">informiert am 22.09.</span></td><td><span class="modul-chip on">Onboarding</span> <span class="mono">2026-GYM-014</span><span class="zusatz">Anna Beispiel</span></td><td>FES Gymnasium (10)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>25.09.2026<br><span class="lage bald">morgen</span></td><td><b>Exit-Interview durchfuehren</b><span class="zusatz">Phase 4: Letzte Woche</span></td><td>Personalabteilung</td><td><span class="modul-chip off">Offboarding</span> <span class="mono">OFF-2026-GS-007</span><span class="zusatz">Jonas Probe</span></td><td>FES Grundschule (20)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>28.09.2026<br><span class="lage">in 4 Tagen</span></td><td><b>Zugänge zu Fachanwendungen einrichten</b> <span title="Die IT hat über ihren Link kommentiert, der Text steht im Vorgang">💬</span><span class="zusatz">Vor Arbeitsbeginn</span></td><td>IT-Abteilung<span class="zusatz">informiert am 22.09.</span></td><td><span class="modul-chip on">Onboarding</span> <span class="mono">2026-GYM-014</span><span class="zusatz">Anna Beispiel</span></td><td>FES Gymnasium (10)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>28.09.2026<br><span class="lage">in 4 Tagen</span></td><td><b>Postfach, Namensschild und Telefonliste vorbereiten</b><span class="zusatz">Vor Arbeitsbeginn</span></td><td>Verwaltung / Sekretariat<span class="zusatz gelb">keine Adresse hinterlegt</span></td><td><span class="modul-chip on">Onboarding</span> <span class="mono">2026-GYM-014</span><span class="zusatz">Anna Beispiel</span></td><td>FES Gymnasium (10)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>28.09.2026<br><span class="lage">in 4 Tagen</span></td><td><b>Arbeitsplatz bzw. Einsatz- und Stundenplan vorbereiten</b><span class="zusatz">Vor Arbeitsbeginn</span></td><td>Führungskraft (per Link)<span class="zusatz">informiert am 22.09.</span></td><td><span class="modul-chip on">Onboarding</span> <span class="mono">2026-GYM-014</span><span class="zusatz">Anna Beispiel</span></td><td>FES Gymnasium (10)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td>28.09.2026<br><span class="lage">in 4 Tagen</span></td><td><b>Foto und Kurzvorstellung für die Homepage</b><span class="zusatz">Vor Arbeitsbeginn</span></td><td><span class="zust-gelb">Öffentlichkeitsarbeit</span><span class="zusatz gelb">nicht per Link – in der Checkliste zuordnen</span></td><td><span class="modul-chip on">Onboarding</span> <span class="mono">2026-GYM-014</span><span class="zusatz">Anna Beispiel</span></td><td>FES Gymnasium (10)</td><td><span class="zum-vorgang">Zum Vorgang →</span></td></tr>
+                <tr><td colspan="6" class="weitere">… 17 weitere Aufgaben mit Frist, die letzte am 11.11.2026</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="ohne-frist"><span>▸</span><b>Ohne Frist</b><span>· 38 Aufgaben: Verbeamtung 27 · Elternzeit 6 · Mutterschutz 5</span><span class="zum-vorgang">anzeigen</span></div>
+          <div class="ui-hinweistext" style="margin-top:8px">Gezählt werden Checklisten-Aufgaben laufender Vorgänge. Onboarding: ab Abgabe der Modalitäten oder ab „Geprüft“, Überfälliges immer. Verbeamtung und Elternzeit: nur erreichte Phasen. Nicht enthalten: die Fristen der Verbeamtung (Amtsarzt, Beurteilungen, RV-Befreiung, BR-Genehmigung; per Mail und am Vorgang), der Reiter „Fristen“ der Elternzeit und BEM (unter 🔒 BEM).</div>
+          <span class="anno info">Standard ist „Mit Frist“. Ohne diesen Filter beherrschten die 38 Aufgaben ohne Frist Zahl und Seite, fast alle aus der Verbeamtung. Sie stehen eingeklappt darunter. Filter und Ansicht stehen in der Adresse (<code>?faellig=mit&amp;modul=…</code>). So stellt „Zurück“ aus dem Vorgang sie wieder her, und der rote Zähler öffnet <code>?faellig=ueberfaellig</code>.</span>
+          <span class="anno info">„Nach Vorgang“ zeigt dieselben Zeilen, gruppiert je Vorgang, mit dem Badge im Kopf jeder Gruppe (E4). Abhaken lässt sich hier nichts, die Zeile führt in den Vorgang (Regeln unten). Leere Zustände: „Keine offenen Aufgaben.“, „Keine Checklisten-Aufgabe überfällig.“ und bei Filtern ohne Treffer „Keine Aufgaben für diese Filter.“ mit „Filter zurücksetzen“.</span>
+        </div>
+      </div>
+
+      <h4>Was unter „Zuständig“ steht</h4>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>Zuständigkeit</th><th>Erste Zeile</th><th>Zweite Zeile</th></tr></thead>
+          <tbody>
+            <tr><td>Personalabteilung (HR), dazu alle Punkte von Mutterschutz und Elternzeit</td><td>Personalabteilung</td><td>—</td></tr>
+            <tr><td>Abteilung per Link (IT, Verwaltung / Sekretariat, Facility, Buchhaltung, DSB, eigene Schlüssel)</td><td>Name aus Einstellungen → Abteilungen</td><td>„informiert am 22.09.“, „noch nicht informiert“, gelb „keine Adresse hinterlegt“ oder rot „Mail nicht zugestellt“, wenn der letzte Versand gescheitert ist</td></tr>
+            <tr><td>Führungskraft (Onboarding, Offboarding)</td><td>Führungskraft (per Link)</td><td>wie bei den Abteilungen, dazu gelb „keine Führungskraft hinterlegt“</td></tr>
+            <tr><td>Mitarbeiter/in</td><td>Mitarbeiter/in</td><td>—</td></tr>
+            <tr><td>Verbeamtung: SL, LK, EXTERN, BEIRAT</td><td>Schulleitung, Lehrkraft, Extern, Beirat</td><td>—</td></tr>
+            <tr><td>ohne Zuständigkeit oder Freitext, z. B. „Öffentlichkeitsarbeit“ (20 Onboarding-Aufgaben in Produktion)</td><td>gelb „ohne Zuständigkeit“ bzw. der Text</td><td>gelb „nicht per Link – in der Checkliste zuordnen“</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="unterschrift">„Keine Adresse hinterlegt“ ist heute der Normalfall für IT und Verwaltung / Sekretariat, an beiden hängen 192 Onboarding-Aufgaben (Abschnitt 9, „Betrieb nach dem Deploy“). Ein bloßes „noch nicht informiert“ ließe HR glauben, ein Klick genüge. Der Filter „Zuständig“ gruppiert so: Personalabteilung · Abteilungen per Link · Führungskraft (per Link) · Mitarbeiter/in · Verbeamtung · Sonstige. Er sagt bewusst „Führungskraft (per Link)“, weil die Rolle „Vorgesetzter“ im Portal etwas anderes meint.</p>
+
+      <h3>Auf dem Handy</h3>
+      <div class="paar">
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Handy, 390 px · Menü aufgeklappt</div>
+          <div class="fenster-rumpf">
+            <div class="handy">
+              <div class="handy-kopf"><span class="logo">CREDO</span><span class="burger mark" title="3 überfällige Aufgaben · 2 BEM-Fristen">☰<span class="punkt"></span></span><span class="knopf rand klein">Abmelden</span></div>
+              <div class="handy-menue"><span class="nav-punkt">Dashboard</span><span class="nav-punkt mark">Aufgaben<span class="nav-zaehler">3</span></span><span class="nav-punkt">🔒 BEM<span class="nav-zaehler">2</span></span><span class="nav-punkt">Formulare</span><span class="nav-punkt">Brief-Vorlagen</span><span class="nav-punkt">Checklisten</span><span class="nav-punkt">…</span></div>
+              <div class="handy-rumpf"><div class="ui-hinweistext">Onboarding-Vorgänge (12 Vorgänge) …</div></div>
+            </div>
+            <span class="anno gut">Heute zeigt das Handy-Menü keinen Zähler, auch den für BEM nicht, und seine Punkte erscheinen erst nach dem Aufklappen. Neu: ein roter Punkt am Menüknopf, sobald einer der beiden Zähler über 0 liegt, und im Menü beide Zähler.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> Handy · /dashboard/aufgaben?faellig=ueberfaellig</div>
+          <div class="fenster-rumpf">
+            <div class="handy">
+              <div class="handy-kopf"><span class="logo">CREDO</span><span class="burger">☰<span class="punkt"></span></span></div>
+              <div class="handy-rumpf">
+                <b style="font-size:13px">Offene Aufgaben</b>
+                <div class="kpi-raster">
+                  <div class="kpi rot gewaehlt"><span class="z">3</span><span class="l">Überfällig</span></div>
+                  <div class="kpi"><span class="z">12</span><span class="l">Nächste 7 Tage</span></div>
+                  <div class="kpi"><span class="z">28</span><span class="l">Mit Frist</span></div>
+                  <div class="kpi"><span class="z">38</span><span class="l">Ohne Frist</span></div>
+                </div>
+                <div class="filterleiste" style="margin:0"><span class="ui-input suche">🔍 Suchen …</span><span class="knopf rand klein">Filter</span></div>
+                <div class="karte-handy">
+                  <div class="z1"><span class="lage rot">seit 8 Tagen</span><span class="modul-chip off">Offboarding</span></div>
+                  <b>Wissenstransfer durchfuehren</b>
+                  <div class="klein">Mitarbeiter/in</div>
+                  <div class="klein">OFF-2026-GS-007 · Jonas Probe · FES Grundschule (20)</div>
+                  <span class="pfeil">›</span>
+                </div>
+                <div class="karte-handy">
+                  <div class="z1"><span class="lage rot">seit 7 Tagen</span><span class="modul-chip on">Onboarding</span></div>
+                  <b>Arbeitsvertrag erstellt und versendet</b>
+                  <div class="klein">Personalabteilung</div>
+                  <div class="klein">2026-GYM-014 · Anna Beispiel · FES Gymnasium (10)</div>
+                  <span class="pfeil">›</span>
+                </div>
+                <div class="karte-handy">
+                  <div class="z1"><span class="lage rot">seit 1 Tag</span><span class="modul-chip off">Offboarding</span></div>
+                  <b>Arbeitszeugnis erstellen</b>
+                  <div class="klein">Personalabteilung</div>
+                  <div class="klein">OFF-2026-GS-007 · Jonas Probe · FES Grundschule (20)</div>
+                  <span class="pfeil">›</span>
+                </div>
+              </div>
+            </div>
+            <span class="anno gut">So kommt man über den roten Zähler an: Kennzahlen als 2 × 2 Raster, Karten statt Tabelle, 16 px Rand und kein seitliches Scrollen. Modul, Zuständigkeit und Einrichtung liegen hinter „Filter“. Sind welche gesetzt, nennt der Knopf ihre Zahl, etwa „Filter (2)“. Die ganze Karte ist ein Link.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Ziel des Klicks: Reiter „Checkliste“ mit markierter Aufgabe</h3>
+      <div class="paar">
+        <div class="fenster heute">
+          <div class="fenster-leiste"><span class="tag">HEUTE</span> /dashboard/[id] · jeder Einstieg</div>
+          <div class="fenster-rumpf">
+            <div class="hr-kopf">
+              <div class="hr-zeile"><span style="font-size:11px;color:var(--ui-muted)">← Zurück</span><span class="mono">2026-GYM-014</span><span class="badge b-bereit">Bereit zur Prüfung</span></div>
+              <div class="hr-meta"><b>Anna Beispiel</b> · FES Gymnasium (10) · Vertragsbeginn 01.10.2026</div>
+            </div>
+            <div class="tabs"><span class="aktiv">Übersicht</span><span>Fragebogen-Daten</span><span>Dokumente</span><span>Checkliste 5/18</span><span>Vorgesetzter</span></div>
+            <span class="anno">Jede der fünf Detailseiten startet auf „Übersicht“, keine liest den Reiter aus der Adresse. Die Aufgabe muss man selbst suchen.</span>
+            <div class="kategorie" style="margin-top:10px">Vor Arbeitsbeginn · nach Klick auf „Checkliste“</div>
+            <div class="stapel" style="margin-top:6px">
+              <div class="aufg"><div class="oben"><span class="cb"></span><span class="ttl">Arbeitsvertrag erstellt und versendet</span></div><div class="meta"><span class="abt-badge">Personalabteilung</span><span>Fällig: 17.09.2026</span></div></div>
+              <div class="aufg"><div class="oben"><span class="cb"></span><span class="ttl">Arbeitsvertrag unterschrieben retour</span></div><div class="meta"><span class="abt-badge">Personalabteilung</span><span>Fällig: 24.09.2026</span></div></div>
+            </div>
+            <span class="anno">Die überfällige Aufgabe ist so grau wie jede andere. Wer einem roten Badge folgt, fände sie nicht.</span>
+          </div>
+        </div>
+        <div class="fenster neu">
+          <div class="fenster-leiste"><span class="tag">NEU</span> /dashboard/[id]?tab=checklist&amp;aufgabe=… · aus „Offene Aufgaben“</div>
+          <div class="fenster-rumpf">
+            <div class="hr-kopf">
+              <div class="hr-zeile"><span style="font-size:11px;color:var(--ui-muted)">← Zurück</span><span class="mono">2026-GYM-014</span><span class="badge b-bereit">Bereit zur Prüfung</span></div>
+              <div class="hr-meta"><b>Anna Beispiel</b> · FES Gymnasium (10) · Vertragsbeginn 01.10.2026</div>
+            </div>
+            <div class="tabs"><span>Übersicht</span><span>Fragebogen-Daten</span><span>Dokumente</span><span class="aktiv mark">Checkliste 5/18</span><span>Vorgesetzter</span></div>
+            <div class="kategorie">Vor Arbeitsbeginn</div>
+            <div class="stapel" style="margin-top:6px">
+              <div class="aufg ziel"><div class="oben"><span class="cb"></span><span class="ttl">Arbeitsvertrag erstellt und versendet</span></div><div class="meta"><span class="abt-badge">Personalabteilung</span><span class="frist-rot">Überfällig seit 17.09.2026</span></div></div>
+              <div class="aufg"><div class="oben"><span class="cb"></span><span class="ttl">Arbeitsvertrag unterschrieben retour</span></div><div class="meta"><span class="abt-badge">Personalabteilung</span><span>Fällig heute, 24.09.2026</span></div></div>
+              <div class="aufg"><div class="oben"><span class="cb ok">✓</span><span class="ttl durch">Benutzerkonto und dienstliche E-Mail-Adresse anlegen</span></div><div class="meta"><span class="abt-badge">IT-Abteilung</span><span>Fällig: 24.09.2026</span><span>erledigt von IT-Abteilung (Link) am 23.09.2026, 10:14</span></div></div>
+            </div>
+            <span class="anno gut">Der Link öffnet den Reiter „Checkliste“, scrollt zur Aufgabe und hebt sie zwei Sekunden lang blau hervor. Die rote Fälligkeit ist dieselbe wie in Badge und Übersicht, ob gespeichert oder aus Vertragsbeginn und Tagesangabe berechnet.</span>
+            <span class="anno info">Das Badge in der Liste führt ohne <code>aufgabe</code> in denselben Reiter. Offboarding und Verbeamtung nutzen dafür <code>?tab=checklist</code>, Mutterschutz und Elternzeit <code>?tab=checkliste</code>. Wechselt HR den Reiter, schreibt ihn die Seite in die Adresse, und „Zurück“ führt in die Übersicht mit denselben Filtern.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Die Regeln danach</h3>
+      <ul>
+        <li><strong>Wer:</strong> Punkt und Seite sehen Super-Admin, HR-Leitung und HR-Sachbearbeitung. Die Schnittstelle prüft die Portal-Rollen wie die Listen. Einrichtungsleitungen und Vorgesetzte hält schon heute die Middleware ab, und <code>/api/aufgaben</code> kommt bewusst nicht auf deren Freigabeliste. Der n8n-Schlüssel bekommt 403.</li>
+        <li><strong>Mandanten:</strong> Die Auswahl „Einrichtung“ wird mit dem Mandantenfilter geschnitten, nie überschrieben. Eine fremde Einrichtung liefert eine leere Liste statt eines Fehlers, damit die Antwort nichts verrät. Kennzahlen und Zähler kommen aus derselben Menge wie die Liste.</li>
+        <li><strong>BEM nie:</strong> Keine BEM-Tabelle wird gelesen, BEM steht nicht im Modulfilter, <code>modul=BEM</code> ergibt 400. Ein Test mit einer Datenbank-Attrappe, die bei jedem BEM-Zugriff abbricht, hält das fest.</li>
+        <li><strong>Nur das Nötige:</strong> Titel, Kategorie bzw. Phase, Zuständigkeit, Fälligkeit, Vorgangsnummer, Name und Einrichtung. Nie die interne Notiz, die Beschreibung oder den LOGA-Hinweis, keine E-Mail-Adressen, keine Angaben aus dem Fragebogen. Vom Kommentar einer Abteilung erscheint nur das Zeichen 💬, der Text steht im Vorgang. Beim Mutterschutz verraten schon die Titel eine Schwangerschaft. Die Seite öffnet sie aber keinem neuen Personenkreis, denn den Reiter sehen dieselben Rollen. Fehlt im Onboarding der Name, steht dort „Name noch nicht erfasst“, nie die private Adresse.</li>
+        <li><strong>Abhaken nur im Vorgang:</strong> Die Seite verlinkt, sie hakt nicht selbst ab. Es gibt vier Schreibwege mit eigenen Nebenwirkungen: die Mail an HR im Offboarding, den Phasensprung in der Verbeamtung, die Sperrreihenfolge der Abteilungsaufgaben. Aufgaben einer Abteilung hakt die Abteilung außerdem selbst über ihren Link ab.</li>
+        <li><strong>Nur ein Rot heißt „überfällig“:</strong> Wo das Wort heute etwas anderes meint, bekommt es einen anderen Namen (Schritt 9 unten).</li>
+        <li><strong>Keine Mail, kein Protokoll:</strong> Die Seite liest nur. Wie die Listen schreibt sie nichts ins Audit-Log. Es gibt keine neue und keine geänderte Mailvorlage.</li>
+      </ul>
+
+      <h3>So setze ich es um</h3>
+      <ol class="schritte">
+        <li><strong>Eine Definition an einer Stelle.</strong> Ein neues reines Modul <code>src/lib/offene-aufgaben.ts</code>, client-sicher, ohne Uhr und ohne Datenbank, enthält:
+          <ul>
+            <li>Endstatus und Relevanz je Modul,</li>
+            <li>die Lage einer Aufgabe und <code>aufgabenStand</code> (offen, überfällig, nächste 7 Tage, ohne Frist, nächste Frist, Zuständige),</li>
+            <li>Text und Tooltip des Badges, die Sortierung und das Sprungziel je Modul.</li>
+          </ul>
+          Der Kalendertag-Helfer <code>tageBis</code> zieht aus der Link-Seite der Abteilungen in ein kleines neutrales Modul. So importiert die öffentliche Seite keine Portal-Interna. Er baut auf <code>tageZwischen</code> aus den Minijob-Fristen auf, das dafür seine Monatsschleife verliert (heute rund 24&nbsp;000 Durchläufe je Datum, also etwa 48&nbsp;000 je Aufruf). So kommt keine weitere eigene Tagesrechnung hinzu, nach demselben Grundsatz wie in <code>dokument-fristen.ts</code>.</li>
+        <li><strong>Onboarding-Fälligkeit wie in der Checkliste.</strong> Seit dem 24.09. haben 584 Bestandsaufgaben nur eine Tagesangabe und kein Datum. Zählte nur das gespeicherte Datum, stünden gerade die Vorgänge, an denen HR arbeitet, in Badge und Übersicht „ohne Frist“, während die Checkliste „Fällig: 17.09.“ sagt. Deshalb gilt dieselbe Fälligkeit wie auf der Detailseite, aus derselben Funktion. Die berechnete Frist ist dieselbe, die später gespeichert wird, denn nach der Abgabe ändert sich der Vertragsbeginn nicht mehr.</li>
+        <li><strong>Schnittstelle <code>GET /api/aufgaben</code></strong> über den zentralen Wrapper, mit denselben Rollen wie die Listen. Der Lader liest vom Vorgang her, also Vorgänge mit ihren offenen Aufgaben, eine Abfrage je Modul. So gelten Sperre und Phasen je Vorgang, und Kopf, Einrichtung und Links stehen nicht bei jeder Aufgabe doppelt. Filter: Modul, Zuständigkeit (einzeln oder als Gruppe), Einrichtung, Fälligkeit, Suche, Ansicht und Seite. Zur Sicherheit liest sie höchstens 5&nbsp;000 Zeilen je Modul. Darüber zeigt die Seite einen Hinweis, statt still abzuschneiden.</li>
+        <li><strong>Zähler billig und ohne Flackern.</strong> Für den Zähler (<code>countOnly</code>) zählt die Datenbank gespeicherte Fristen vor dem heutigen Tagesbeginn in Berlin. Nur die wenigen Onboarding-Aufgaben mit berechneter Frist prüft der Server einzeln, mit derselben Funktion. Ein Test hält fest, dass beide Wege dasselbe ergeben. Die Kopfleiste merkt sich den Wert 60 Sekunden lang, damit er beim Seitenwechsel nicht von 0 hochspringt. Nach jedem Haken in einer Checkliste holt ein Ereignis ihn sofort neu.</li>
+        <li><strong>Badge in fünf Listen</strong> über eine gemeinsame Komponente <code>aufgaben-badge.tsx</code>. Sie ist ein <code>&lt;Link&gt;</code> zur Checkliste, der den Zeilenklick nicht auslöst. Je Liste:
+          <ul>
+            <li>Onboarding: eine Zusatzabfrage nur für die Vorgänge der aktuellen Seite (bis zu 200), mit Tagesangabe und Vertragsbeginn.</li>
+            <li>Offboarding und Verbeamtung: <code>dueDate</code> kommt in die vorhandene Abfrage.</li>
+            <li>Mutterschutz und Elternzeit: die offenen Punkte werden gezählt.</li>
+          </ul>
+          Weil die Dateien ohnehin offen sind, schneiden alle sechs Listen die Einrichtung künftig mit dem Mandantenfilter. Die Status-Kacheln in Offboarding, Verbeamtung und Vertragsende folgen dann dem Filter (Nebenbefunde 8a und 8b).</li>
+        <li><strong>Seite <code>/dashboard/aufgaben</code></strong> mit Kennzahlen, Filtern in der Adresse, der Ansicht „Nach Vorgang“, dem eingeklappten Abschnitt „Ohne Frist“, leeren Zuständen und Handykarten. Die Server-Komponente leitet andere Rollen aufs Dashboard um. Die Datei heißt <code>offene-aufgaben-content.tsx</code>, weil <code>aufgaben-seite.tsx</code> schon die Link-Seite der Abteilungen ist.</li>
+        <li><strong>Kopfleiste:</strong> der Punkt „Aufgaben“, der rote Zähler, der Punkt am Handy-Menüknopf und beide Zähler im Handy-Menü. Aktiv ist der längste passende Pfad, damit „Dashboard“ auf <code>/dashboard/bem</code> und <code>/dashboard/aufgaben</code> nicht mitleuchtet.</li>
+        <li><strong>Sprungziel in fünf Detailseiten.</strong> <code>?tab=</code> öffnet den Reiter, <code>?aufgabe=</code> scrollt zur Zeile und hebt sie hervor. Unbekannte Werte führen zur „Übersicht“. Ein Reiterwechsel wird in die Adresse geschrieben. In den Checklisten von Onboarding und Offboarding steht Überfälliges künftig rot, mit derselben Fälligkeit wie das Badge. Die Verbeamtung stellt ihre eigene Regel auf den gemeinsamen Helfer um.</li>
+        <li><strong>Andere „überfällig“ entschärfen:</strong>
+          <ul>
+            <li>Onboarding: Das Banner heißt „seit über 7 Tagen ohne Prüfung“, das Abzeichen „14d“ bekommt einen Tooltip.</li>
+            <li>Offboarding: Die Pille am letzten Arbeitstag heißt „vorbei“ und zählt nach dem Kalendertag. Die Analytics-Kachel „Überfällig / Sofortige Aufmerksamkeit nötig“ heißt etwa „Austritt vorbei, Vorgang offen“.</li>
+            <li>Verbeamtung: Die Kachel „Frist!“ fällt weg. Sie filtert auf einen Status, den es im Schema nicht gibt. Was sie heute im Browser anzeigt, prüfe ich beim Umsetzen.</li>
+            <li>Im Offboarding-Archiv bleibt „10/12“ grau stehen.</li>
+          </ul></li>
+        <li><strong>Erinnerungsmails auf denselben Kalendertag</strong> (eigener Commit, Nebenbefund 8f). Die Stufe der Erinnerung rechnet künftig in Berliner Kalendertagen wie die Link-Seite der Abteilungen. Das ändert nur die Zeit zwischen 00:00 und 02:00 Uhr. Die vorhandenen Tests bleiben grün, neue prüfen Mitternacht und beide Zeitumstellungen.</li>
+        <li><strong>Tests und Abschluss:</strong> Getestet werden die reinen Funktionen an allen Grenzen und die Schnittstelle mit Rechten, BEM-Attrappe, Datenzuschnitt, Mandantenschnitt und Zähler. Dazu kommen Tests für Badge, Seite und Listen-Schnittstellen, ein Browser-Test auf Desktop und Handy, ein Abschnitt in <code>CLAUDE.md</code> und eine Kurzanleitung für HR.</li>
+      </ol>
+
+      <details>
+        <summary>Vor dem Rollout: offene Aufgaben nur lesend zählen (auf dem Server)</summary>
+        <div>
+          <p>Mit der Onboarding-Regel aus Schritt 2 werden laufende Vorgänge, deren Vertragsbeginn schon vorbei ist, beim Rollout auf einen Schlag rot. Viele Tagesangaben sind negativ, etwa −14 Tage. Im Offboarding gilt dasselbe für Vorgänge nach dem letzten Arbeitstag. Deshalb zähle ich vorher und gehe die Liste mit HR durch (E5). Abfrage 1 zeigt die Mengen je Modul. Das ist die Obergrenze, die Relevanzregeln ziehen noch ab. Abfrage 2 nennt die Vorgänge, deren Stichtag vorbei ist. Beide ändern nichts.</p>
+<pre>-- 1 · Offene Aufgaben laufender Vorgänge je Modul (alle Phasen, vor E1/E3)
+WITH heute AS (SELECT (now() AT TIME ZONE 'Europe/Berlin')::date AS d),
+onb AS (
+  SELECT COALESCE(
+           (ci."dueDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::date,
+           CASE WHEN (op."supervisorSubmittedAt" IS NOT NULL OR sd."isComplete")
+                 AND sd.vertragsbeginn IS NOT NULL AND ci."relativeDueDays" IS NOT NULL
+                THEN (sd.vertragsbeginn AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::date
+                     + ci."relativeDueDays" END) AS faellig,
+         ci."dueDate" IS NULL AS ohne_datum
+  FROM checklist_items ci
+  JOIN onboarding_processes op ON op.id = ci."onboardingId"
+  LEFT JOIN supervisor_data sd ON sd."onboardingId" = op.id
+  WHERE NOT ci."isCompleted" AND op.status NOT IN ('COMPLETED','EXPIRED'))
+SELECT 'Onboarding' AS modul, count(*) AS offen, count(faellig) AS mit_frist,
+       count(*) FILTER (WHERE ohne_datum AND faellig IS NOT NULL) AS davon_berechnet,
+       count(*) FILTER (WHERE faellig &lt; (SELECT d FROM heute)) AS ueberfaellig
+FROM onb
+UNION ALL
+SELECT 'Offboarding', count(*), count(i."dueDate"), 0,
+       count(*) FILTER (WHERE (i."dueDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::date
+                              &lt; (SELECT d FROM heute))
+FROM offboarding_checklist_items i JOIN offboarding_processes p ON p.id = i."offboardingId"
+WHERE NOT i."isCompleted" AND p.status NOT IN ('COMPLETED','CANCELLED')
+UNION ALL
+SELECT 'Verbeamtung', count(*), count(i."dueDate"), 0, 0
+FROM civil_service_checklist_items i JOIN civil_service_processes p ON p.id = i."processId"
+WHERE NOT i."isCompleted" AND p.status NOT IN ('COMPLETED','REJECTED','CANCELLED')
+UNION ALL
+SELECT 'Mutterschutz', count(*), 0, 0, 0
+FROM mutterschutz_checkliste i JOIN mutterschutz_prozesse p ON p.id = i."mutterschutzId"
+WHERE i."erledigtAm" IS NULL AND p.status &lt;&gt; 'BEENDET'
+UNION ALL
+SELECT 'Elternzeit', count(*), 0, 0, 0
+FROM elternzeit_checkliste i JOIN elternzeit_prozesse p ON p.id = i."elternzeitId"
+WHERE i."erledigtAm" IS NULL
+  AND p.status NOT IN ('BEENDET','ABGELEHNT','VORLAEUFIG_ABGELEHNT');
+
+-- 2 · Laufende Vorgänge, deren Stichtag schon vorbei ist
+SELECT 'Onboarding' AS modul, op."displayId",
+       (sd.vertragsbeginn AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::date AS stichtag,
+       op.status::text AS status,
+       (SELECT count(*) FROM checklist_items ci
+         WHERE ci."onboardingId" = op.id AND NOT ci."isCompleted") AS offen
+FROM onboarding_processes op JOIN supervisor_data sd ON sd."onboardingId" = op.id
+WHERE op.status NOT IN ('COMPLETED','EXPIRED')
+  AND (op."supervisorSubmittedAt" IS NOT NULL OR sd."isComplete")
+  AND (sd.vertragsbeginn AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::date
+      &lt; (now() AT TIME ZONE 'Europe/Berlin')::date
+UNION ALL
+SELECT 'Offboarding', p."displayId",
+       (p."lastWorkingDay" AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::date,
+       p.status::text,
+       (SELECT count(*) FROM offboarding_checklist_items i
+         WHERE i."offboardingId" = p.id AND NOT i."isCompleted")
+FROM offboarding_processes p
+WHERE p.status NOT IN ('COMPLETED','CANCELLED')
+  AND (p."lastWorkingDay" AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::date
+      &lt; (now() AT TIME ZONE 'Europe/Berlin')::date
+ORDER BY 1, 3;</pre>
+        </div>
+      </details>
+
+      <div class="kasten hinweis">
+        <strong class="t">Bewusst nicht dabei (spätere Stufe bzw. Ihre Entscheidung)</strong>
+        <ul>
+          <li>BEM, nie: Die Akte ist versiegelt und hat ihre eigene Sicht mit Zähler.</li>
+          <li>Die Fristen der Verbeamtung und der Elternzeit als eigene Zeilen (E6), die Rückgaben im Offboarding.</li>
+          <li>„Daten prüfen“ bei „Bereit zur Prüfung“ als eigene Zeile: die häufigste HR-Aufgabe, aber keine Checklisten-Aufgabe.</li>
+          <li>Persönliche Zuweisung und „Meine Aufgaben“ (Ihre Entscheidung).</li>
+          <li>Direktes Abhaken in der Übersicht. Falls später gewünscht: nur für Aufgaben der Personalabteilung, nie für Link-Abteilungen und nie in der Verbeamtung, immer mit „Rückgängig“ und über dieselben Schreibwege.</li>
+          <li>Fristen für die Punkte der Verbeamtung (eigenes Paket, danach wird Rot dort ohne weitere Änderung möglich).</li>
+          <li>Roter Punkt an den Modul-Reitern, Spaltensortierung, CSV-Export, Vorauswahlen wie „Nur Personalabteilung“ oder „Wartet auf andere“, eine tägliche Mail an HR.</li>
+          <li>Die Mandantenlücke in <code>/api/dashboard/stats</code> und die fehlende Prüfung in den Verbeamtungs-Routen: als eigenes kleines Paket (Abschnitt 10).</li>
+        </ul>
+      </div>
+      <details>
+        <summary>Aufwand im Einzelnen</summary>
+        <div>
+          <div class="tabelle">
+            <table>
+              <thead><tr><th>Block</th><th>Tage</th></tr></thead>
+              <tbody>
+                <tr><td>Reine Funktionen (Definition, Relevanz je Modul, Lage, Stand, Badge und Tooltip, Sortierung, Sprungziel, aktiver Menüpunkt, Kalendertag-Helfer) mit Tests</td><td class="num">1,0</td></tr>
+                <tr><td>Schnittstelle <code>/api/aufgaben</code>: Lader vom Vorgang her, Onboarding-Fälligkeit, Zähler, Kennzahlen, Filter; Tests für Rechte, BEM und Datenzuschnitt</td><td class="num">1,25</td></tr>
+                <tr><td>Badge-Komponente und fünf Listen, dabei Mandantenschnitt und Status-Kacheln (8a, 8b)</td><td class="num">1,25–1,5</td></tr>
+                <tr><td>Seite „Aufgaben“: zwei Ansichten, Filter in der Adresse, Abschnitt „Ohne Frist“, Handykarten</td><td class="num">2,0</td></tr>
+                <tr><td>Kopfleiste: Punkt, Zähler, Handy, Aktiv-Markierung</td><td class="num">0,5</td></tr>
+                <tr><td>Sprungziel in fünf Detailseiten, rote Fälligkeit in den Checklisten</td><td class="num">1,0–1,25</td></tr>
+                <tr><td>Andere „überfällig“ entschärfen, Offboarding-Archiv, Erinnerungsstufe auf den Kalendertag (eigener Commit)</td><td class="num">0,5</td></tr>
+                <tr><td>Durchsicht, Browser-Test (Desktop und Handy), Zählung vor dem Rollout, <code>CLAUDE.md</code>, Kurzanleitung für HR</td><td class="num">0,5</td></tr>
+                <tr><td><strong>Summe</strong></td><td class="num"><strong>8,0–8,5</strong></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Ohne die Ansicht „Nach Vorgang“ (E4, Variante B) sind es etwa 0,25 Tage weniger. Das kleine Mandanten-Paket kommt getrennt dazu (etwa 0,5 Tage).</p>
+        </div>
+      </details>
+      <p><span class="aufwand">Aufwand 8–8,5 Tage</span> <span class="ui-hinweistext" style="margin-left:6px">keine Schemaänderung, keine neue Mail, Deploy ohne <code>db push</code></span></p>
+    </section>
+
+    <!-- ================= 8 MAILS UND VORLAGEN ================= -->
     <section class="abschnitt" id="mails">
-      <div class="abschnitt-titel"><span class="nr">7</span><h2>Alle E-Mails und Vorlagen im Überblick</h2></div>
+      <div class="abschnitt-titel"><span class="nr">8</span><h2>Alle E-Mails und Vorlagen im Überblick</h2></div>
       <p>Die Pakete berühren an vielen Stellen E-Mails, Mailvorlagen und Word-Vorlagen. Hier steht alles an einem Ort: was sich an bestehenden Vorlagen ändert, was neu hinzukommt, was bewusst gleich bleibt und wo ein Handschritt nötig ist.</p>
 
       <div class="kasten warn">
         <strong class="t">Wichtig für alle geänderten Mailtexte</strong>
-        <p>Jede Mailvorlage hat einen Standardtext im Code. Sobald jemand eine Vorlage unter Einstellungen → E-Mail-Vorlagen einmal gespeichert hat, und sei es nur mit einem Empfänger in Kopie, gilt die gespeicherte Fassung. Textänderungen aus dem Code kommen dort dann nicht mehr an. <strong>Seit Paket 1 gibt es dafür den Knopf „Text auf Standard zurücksetzen“.</strong> Er setzt Betreff und Text zurück; Empfänger und Aktiv-Schalter bleiben, der alte Text steht im Protokoll. Nach jedem Deploy setze ich damit die Vorlagen aus Tabelle A zurück, die als „weicht vom Standard ab“ markiert sind, es sei denn, HR hat den Text bewusst angepasst.</p>
+        <p>Jede Mailvorlage hat einen Standardtext im Code. Sobald jemand eine Vorlage unter Einstellungen → E-Mail-Vorlagen einmal gespeichert hat, und sei es nur mit einem Empfänger in Kopie, gilt die gespeicherte Fassung. Textänderungen aus dem Code kommen dort dann nicht mehr an. <strong>Seit Paket 1 gibt es dafür den Knopf „Text auf Standard zurücksetzen“.</strong> Er setzt Betreff und Text zurück; Empfänger und Aktiv-Schalter bleiben, der alte Text steht im Protokoll.</p>
+        <p><strong>So bin ich beim Deploy am 24.09. vorgegangen, und so bleibt es:</strong> Vorher vergleiche ich die gespeicherten Fassungen mit den Code-Standards, statt pauschal zurückzusetzen. Von 16 gespeicherten Zeilen habe ich 15 per SQL aktualisiert. 7 davon hatte HR gestaltet. Dort blieben Layout und Formulierungen von HR stehen, nur falsche Aussagen wurden ersetzt. Bei diesen 7 (<code>onboarding-created</code> und sechs <code>offboarding-*</code>) zeigt der Editor „weicht vom Standard ab“. Das ist gewollt: dort <strong>nie</strong> „Text auf Standard zurücksetzen“.</p>
       </div>
 
       <h3>A · Bestehende Mailvorlagen, die sich ändern</h3>
-      <p class="unterschrift" style="margin:0 0 6px">Namen wie in Einstellungen → E-Mail-Vorlagen, technischer Schlüssel in Klammern. <strong>✓</strong> = mit Paket 1 umgesetzt (Commit 5a016ba), noch nicht deployt.</p>
+      <p class="unterschrift" style="margin:0 0 6px">Namen wie in Einstellungen → E-Mail-Vorlagen, technischer Schlüssel in Klammern. <strong>✓</strong> = umgesetzt und am 24.09.2026 deployt; die gespeicherten Fassungen sind angeglichen.</p>
       <div class="tabelle">
         <table>
           <thead><tr><th>Vorlage</th><th>Paket</th><th>Was sich ändert</th></tr></thead>
@@ -1788,15 +2457,16 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
             <tr><td><strong>Erinnerung Vorgesetzter (Modalitäten ausstehend)</strong><br><code>supervisor-reminder</code></td><td class="num">1 ✓</td><td>Der Link darin führt heute auf eine Seite, die es nicht gibt (Fehler 404), und wird korrigiert. Künftig kommt die Erinnerung auch, solange der Fragebogen offen ist, erstmals 7 Tage nach dem Link. Umlaut im Betreff.</td></tr>
             <tr><td><strong>Erinnerung Mitarbeiter (Fragebogen ausstehend)</strong><br><code>employee-reminder</code></td><td class="num">1 ✓</td><td>Wird nicht mehr verschickt, wenn der Link schon abgelaufen ist.</td></tr>
             <tr><td><strong>Einladung Mitarbeiter (Personalfragebogen)</strong><br><code>onboarding-created</code></td><td class="num">1 ✓</td><td>Die Anrede „Herzlich willkommen, {{vorname}}!“ läuft heute ins Leere („Herzlich willkommen, !“), weil beim Anlegen kein Name bekannt ist. Künftig steht dort der Name aus „Neuer Vorgang“, ohne Namen „Herzlich willkommen!“.</td></tr>
-            <tr><td><strong>Fragebogen eingereicht (HR-Benachrichtigung)</strong><br><code>questionnaire-completed</code></td><td class="num">2</td><td>Die Vorgangsnummer im Betreff bleibt heute leer. Künftig stehen Vorgangsnummer und Name darin. Neuer Satz: ob die Modalitäten schon vorliegen, und wenn ja, „Der Vorgang ist bereit zur Prüfung“.</td></tr>
-            <tr><td><strong>Einstellungsmodalitäten eingereicht (HR-Benachrichtigung)</strong><br><code>supervisor-completed</code></td><td class="num">2</td><td>„Alle Daten eingegangen … Der Vorgang kann jetzt abgeschlossen werden“ ist falsch, wenn der Fragebogen noch fehlt. Wird neutral, „bereit zur Prüfung“ nur, wenn beides da ist. Vorgangsnummer im Betreff.</td></tr>
-            <tr><td><strong>Eingangsbestätigung Mitarbeiter (Fragebogen eingereicht)</strong><br><code>questionnaire-confirmation-employee</code></td><td class="num">2</td><td>Geht heute am normalen Versandweg vorbei: kein Eintrag im Versandprotokoll, und Deaktivieren, Empfänger und Antwortadresse aus den Einstellungen wirken nicht. Läuft künftig über den normalen Weg. Der Text bleibt.</td></tr>
+            <tr><td><strong>Fragebogen eingereicht (HR-Benachrichtigung)</strong><br><code>questionnaire-completed</code></td><td class="num">2 ✓</td><td>Die Vorgangsnummer im Betreff bleibt heute leer. Künftig stehen Vorgangsnummer und Name darin. Neuer Satz: ob die Modalitäten schon vorliegen, und wenn ja, „Der Vorgang ist bereit zur Prüfung“.</td></tr>
+            <tr><td><strong>Einstellungsmodalitäten eingereicht (HR-Benachrichtigung)</strong><br><code>supervisor-completed</code></td><td class="num">2 ✓</td><td>„Alle Daten eingegangen … Der Vorgang kann jetzt abgeschlossen werden“ ist falsch, wenn der Fragebogen noch fehlt. Wird neutral, „bereit zur Prüfung“ nur, wenn beides da ist. Vorgangsnummer im Betreff.</td></tr>
+            <tr><td><strong>Eingangsbestätigung Mitarbeiter (Fragebogen eingereicht)</strong><br><code>questionnaire-confirmation-employee</code></td><td class="num">2 ✓</td><td>Ging bis zum Deploy am normalen Versandweg vorbei: kein Eintrag im Versandprotokoll, und Deaktivieren, Empfänger und Antwortadresse aus den Einstellungen wirkten nicht. Läuft jetzt über den normalen Weg. Der Text bleibt; die gespeicherte Fassung war schon aktuell.</td></tr>
             <tr><td><strong>Alle Vorlagen</strong></td><td class="num">3</td><td>Fehlerbehebung im Mail-Baustein: Ein Dollarzeichen im Freitext (z. B. „5$'“) kopiert heute Teile der Vorlage in die Mail.</td></tr>
             <tr><td><strong>Offboarding abgeschlossen</strong><br><code>offboarding-completed</code></td><td class="num">1 ✓</td><td>Der Satz „Alle Aufgaben sind erledigt“ entfällt, er stimmte oft nicht. Waren beim Abschluss noch Aufgaben offen, nennt ein Hinweis deren Anzahl: „Beim Abschluss waren noch 2 Aufgabe(n) der Checkliste offen. Bitte prüfen Sie im Vorgang, ob sie noch erledigt werden müssen.“</td></tr>
-            <tr><td><strong>Offboarding-Aufgaben für Abteilung zugewiesen</strong><br><code>offboarding-department-assigned</code></td><td class="num">1b</td><td>Nennt die Aufgaben mit Fälligkeit und das Gültigkeitsdatum des Links. Passt auch für die Führungskraft, weil „Ihrer Abteilung“ entfällt. Beim erneuten Senden steht der Satz „Diese Nachricht wurde erneut gesendet. Der Link ist unverändert.“ Alle bisherigen Datenfelder bleiben für Webhooks erhalten.</td></tr>
-            <tr><td><strong>Erinnerung: Offene Offboarding-Aufgaben</strong><br><code>offboarding-reminder</code></td><td class="num">1b</td><td>Nennt die offenen Aufgaben. Bei Überfälligkeit steht ein eigener Absatz („2 Aufgabe(n) sind überfällig, die älteste seit 3 Tag(en) …“). Knopf und täglicher Lauf senden künftig dieselbe Fassung.</td></tr>
-            <tr><td><strong>Offboarding-Aufgabe erledigt</strong><br><code>offboarding-task-completed</code></td><td class="num">1b</td><td>Enthält den Kommentar der Abteilung und „Erledigt über: Link der Abteilung“. Kommt genau einmal je Aufgabe, nicht bei jedem Speichern. Das eigene Häkchen von HR im Portal löst sie nur noch bei Aufgaben einer Link-Abteilung aus. Wie bisher geht sie nur hinaus, wenn in der Vorlage ein HR-Empfänger steht.</td></tr>
-            <tr><td><strong>Offboarding: Abteilung abgeschlossen (Bestätigung)</strong><br><code>offboarding-department-completed</code></td><td class="num">1b</td><td>Der Text bleibt, er kommt aber genau einmal, beim echten Abschluss der Abteilung. Deshalb ist hier kein Zurücksetzen nötig.</td></tr>
+            <tr><td><strong>Offboarding-Aufgaben für Abteilung zugewiesen</strong><br><code>offboarding-department-assigned</code></td><td class="num">1b ✓</td><td>Nennt die Aufgaben mit Fälligkeit und das Gültigkeitsdatum des Links. Passt auch für die Führungskraft, weil „Ihrer Abteilung“ entfällt. Beim erneuten Senden steht der Satz „Diese Nachricht wurde erneut gesendet. Der Link ist unverändert.“ Alle bisherigen Datenfelder bleiben für Webhooks erhalten.</td></tr>
+            <tr><td><strong>Erinnerung: Offene Offboarding-Aufgaben</strong><br><code>offboarding-reminder</code></td><td class="num">1b ✓</td><td>Nennt die offenen Aufgaben. Bei Überfälligkeit steht ein eigener Absatz („2 Aufgabe(n) sind überfällig, die älteste seit 3 Tag(en) …“). Knopf und täglicher Lauf senden künftig dieselbe Fassung.</td></tr>
+            <tr><td><strong>Offboarding-Aufgabe erledigt</strong><br><code>offboarding-task-completed</code></td><td class="num">1b ✓</td><td>Enthält den Kommentar der Abteilung und „Erledigt über: Link der Abteilung“. Kommt genau einmal je Aufgabe, nicht bei jedem Speichern. Das eigene Häkchen von HR im Portal löst sie nur noch bei Aufgaben einer Link-Abteilung aus. Wie bisher geht sie nur hinaus, wenn in der Vorlage ein HR-Empfänger steht.</td></tr>
+            <tr><td><strong>Offboarding: Abteilung abgeschlossen (Bestätigung)</strong><br><code>offboarding-department-completed</code></td><td class="num">1b ✓</td><td>Der Text bleibt, er kommt aber genau einmal, beim echten Abschluss der Abteilung. Deshalb ist hier kein Zurücksetzen nötig.</td></tr>
+            <tr><td><strong>Erinnerung: Offene Offboarding-Aufgaben</strong> und <strong>Erinnerung: Offene Onboarding-Aufgaben</strong><br><code>offboarding-reminder</code>, <code>onboarding-department-reminder</code></td><td class="num">6</td><td>Der Text bleibt, ebenso die gespeicherten Fassungen. Ob eine Aufgabe als „überfällig“ gilt, rechnet die Stufe künftig nach dem Kalendertag in deutscher Zeit, wie Badge und Übersicht. Das wirkt nur zwischen 00:00 und 02:00 Uhr (eigener Commit, Abschnitt 7). Kein Handschritt.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1844,7 +2514,7 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
           </tbody>
         </table>
       </div>
-      <p class="unterschrift" style="margin:-6px 0 12px">Die vier Onboarding-Vorlagen haben eigene Texte („Dienstbeginn“ statt „Austrittsdatum“) und laufen wie alle Mails zuerst per SMTP, Webhooks nur zusätzlich. In keiner steht die private Adresse der Person.</p>
+      <p class="unterschrift" style="margin:-6px 0 12px">Die vier Onboarding-Vorlagen haben eigene Texte („Dienstbeginn“ statt „Austrittsdatum“) und laufen wie alle Mails zuerst per SMTP, Webhooks nur zusätzlich. In keiner steht die private Adresse der Person. Paket 6 bringt keine neue Vorlage und kein neues Ereignis im Katalog.</p>
       <ul>
         <li><strong>Einheitlich für alle neuen Vorlagen:</strong>
           <ul>
@@ -1865,7 +2535,7 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
             <tr><td>Platzhalter <code>{stellenbeschreibung}</code> (Onboarding, Vertragsverlängerung)</td><td>Er bleibt gleich, nur die Beschriftung im Variablen-Katalog heißt „Stellenbezeichnung“. Hochgeladene Word-Vorlagen funktionieren unverändert.</td></tr>
             <tr><td><code>{vorname}</code>, <code>{nachname}</code> im Onboarding</td><td>Solange der Fragebogen noch leer ist, greifen sie auf den Namen aus „Neuer Vorgang“ zurück. So lässt sich z. B. ein Willkommensschreiben schon früh erstellen.</td></tr>
             <tr><td>Dokumentenpaket, System-Vorlage „Führungszeugnis“, Standardpakete der Mandanten</td><td>Unverändert.</td></tr>
-            <tr><td>Pakete 3 und 4</td><td>Bringen keine neuen Word-Platzhalter mit.</td></tr>
+            <tr><td>Pakete 3, 4 und 6</td><td>Bringen keine neuen Word-Platzhalter mit. Paket 6 lässt auch den PDF-Export der Checkliste unverändert.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1911,68 +2581,93 @@ Freundliche Grüße</div><div class="ui-zaehler">236 / 5.000</div><span class="u
       </ul>
 
       <h3>E · Bestehende Mailfehler außerhalb der Pakete</h3>
-      <p>Beim Durchsehen aufgefallen und <strong>mit Paket 1 als Mail-Reparaturpaket behoben</strong> (✓, noch nicht deployt):</p>
+      <p>Beim Durchsehen aufgefallen und <strong>mit Paket 1 als Mail-Reparaturpaket behoben</strong> (✓, deployt am 24.09.2026):</p>
       <ul>
         <li><strong>Offboarding-Mails</strong> (Neuer Vorgang, Aufgaben für Abteilung, Aufgabe erledigt, Erinnerung, Abgeschlossen): Namen, Austrittsdatum, Abteilung und Aufgabe blieben leer, weil Vorlage und gesendete Daten verschiedene Feldnamen benutzten. Der Link zu den Abteilungsaufgaben führte ins Leere.</li>
         <li><strong>„Unterlagen zum Austritt“</strong> (Dokumentenpaket Offboarding): Das Austrittsdatum erschien als „Invalid Date“ oder mit vertauschtem Tag und Monat.</li>
         <li><strong>„Verbeamtung: Fristen-Warnung“:</strong> Die Sammelmail nennt jetzt die einzelnen Hinweise, die Beispieldaten passen zu den echten Daten.</li>
       </ul>
-      <div class="kasten kritik">
-        <strong class="t">Möglicher zweiter Absender: n8n</strong>
-        <p>Im Repository liegt ein älterer n8n-Workflow, der für die Offboarding-Ereignisse eigene Mails verschickt. In seiner Abschlussmail steht pauschal „Alle Abteilungen haben ihre Offboarding-Aufgaben erledigt“. Ist unter Einstellungen → Webhooks dafür ein Eintrag aktiv, kommen Mails doppelt, und der alte Satz bleibt in der Welt. Das prüfe ich vor dem Deploy (Abschnitt 8, Prüfung 4).</p>
+      <div class="kasten ok">
+        <strong class="t">Möglicher zweiter Absender n8n: geprüft am 24.09.2026, kein Doppelversand</strong>
+        <p>Im Repository liegt ein älterer n8n-Workflow, der für die Offboarding-Ereignisse eigene Mails verschickt, mit dem pauschalen Satz „Alle Abteilungen haben ihre Offboarding-Aufgaben erledigt“. Die Prüfung vor dem Deploy (Abschnitt 9, Prüfung 4) ergab: In der Datenbank ist kein Webhook eingetragen. Es kommt also keine Mail doppelt.</p>
       </div>
     </section>
 
-    <!-- ================= 8 ABLAUF ================= -->
+    <!-- ================= 9 ABLAUF ================= -->
     <section class="abschnitt" id="ablauf">
-      <div class="abschnitt-titel"><span class="nr">8</span><h2>Reihenfolge, Deploy und Handschritte</h2></div>
+      <div class="abschnitt-titel"><span class="nr">9</span><h2>Reihenfolge, Deploy und Handschritte</h2></div>
+      <h4>Deployt am 24.09.2026</h4>
       <div class="pakete" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
-        <div class="paket" style="border-color:#c7e3a6;background:#f6faf1">
-          <div class="ph" style="color:var(--gruen)">Paket 1 · ✓ umgesetzt</div>
+        <div class="paket fertig">
+          <div class="ph">Paket 1 · ✓ deployt 24.09.</div>
           <h5>Stellenbezeichnung + Entsperren</h5>
           <ul><li>Änderung 1 komplett</li><li>Änderung 2, Stufe A: Links unabhängig, Reparatur der Altfälle, Erinnerungslink</li><li>„Text auf Standard zurücksetzen“ für Mailvorlagen</li><li>Mail-Reparaturpaket</li><li>Neuer Vorgang mit Name und Führungskraft, beide Links beim Anlegen (nachgezogen am 22.09.)</li></ul>
-          <span class="aufwand">5a016ba + Nachtrag · nicht deployt</span>
+          <span class="aufwand">5a016ba + 3a23bc8</span>
         </div>
-        <div class="paket">
-          <div class="ph">Paket 2</div>
+        <div class="paket fertig">
+          <div class="ph">Paket 1b · ✓ deployt 24.09.</div>
+          <h5>Abteilungsaufgaben Offboarding reparieren</h5>
+          <ul><li>Punkte 1–13 aus Abschnitt 5 (entschieden: alles)</li><li>Einstellungen → Abteilungen</li><li>Führungskraft im Offboarding</li></ul>
+          <span class="aufwand">Commit 6584ca2</span>
+        </div>
+        <div class="paket fertig">
+          <div class="ph">Paket 5 · ✓ deployt 24.09.</div>
+          <h5>Abteilungsaufgaben Onboarding</h5>
+          <ul><li>Karte, Dialog, öffentliche Seite</li><li>Checklisten-Editor, Migration</li><li>vier neue Mailvorlagen</li></ul>
+          <span class="aufwand">Commit db6fe2f</span>
+        </div>
+        <div class="paket fertig">
+          <div class="ph">Paket 2 · ✓ deployt 24.09.</div>
           <h5>HR-Übersicht + Neuer Vorgang</h5>
-          <ul><li>Paralleler Stepper, Chips, „Bereit zur Prüfung“</li><li>Erinnerungen, HR-Mailtexte</li></ul>
-          <span class="aufwand">1–1,5 Tage</span>
+          <ul><li>Paralleler Stepper, Chips, „Bereit zur Prüfung“</li><li>Erinnerungen, HR-Mailtexte mit Beleg</li><li>Eingangsbestätigung über den normalen Versandweg</li></ul>
+          <span class="aufwand">Commit c565b01</span>
         </div>
+        <div class="paket fertig">
+          <div class="ph">Code-Review · ✓ deployt 24.09.</div>
+          <h5>Acht Befunde vor dem Deploy</h5>
+          <ul><li>Dokument-Frist und Ablauf-Lauf: Status, Merker, Protokoll</li><li>Ablauf-Mails ohne private Adresse</li><li>Adresse der Führungskraft gegen die Freigabeliste</li><li>„Abteilungen informieren…“ schon vor der Prüfung</li><li>Vorgangsnummern in deutscher Zeit</li></ul>
+          <span class="aufwand">Commit 7bc91ec</span>
+        </div>
+      </div>
+      <h4>Offen, in der empfohlenen Reihenfolge</h4>
+      <div class="pakete" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
         <div class="paket">
-          <div class="ph">Paket 3</div>
+          <div class="ph">Paket 3 · als Nächstes</div>
           <h5>Individuelle E-Mail</h5>
           <ul><li>Karte und Dialog in vier Modulen</li><li>Nachweis, Kopie 12 Monate, Mailvorlage</li></ul>
           <span class="aufwand">5–6 Tage</span>
         </div>
         <div class="paket">
-          <div class="ph">Paket 4</div>
+          <div class="ph">Paket 6 · danach · neu</div>
+          <h5>Offene Aufgaben: Übersicht und Badge</h5>
+          <ul><li>Badge in fünf Vorgangslisten</li><li>Seite „Aufgaben“, roter Zähler in der Kopfleiste</li><li>Sprung in die Checkliste, Überfälliges rot</li></ul>
+          <span class="aufwand">8–8,5 Tage</span>
+        </div>
+        <div class="paket">
+          <div class="ph">Paket 4 · zuletzt</div>
           <h5>Unterlagen nachfordern</h5>
           <ul><li>Stufe 1: Onboarding komplett inkl. täglichem Lauf</li><li>Stufe 2: übrige fünf Vorgänge, Listen-Spalte</li></ul>
           <span class="aufwand">19–21 Tage</span>
         </div>
-        <div class="paket">
-          <div class="ph" style="color:var(--gruen)">Paket 1b · ✓ umgesetzt</div>
-          <h5>Abteilungsaufgaben Offboarding reparieren</h5>
-          <ul><li>Punkte 1–13 aus Abschnitt 5 (entschieden: alles)</li><li>Einstellungen → Abteilungen</li><li>Führungskraft im Offboarding</li></ul>
-          <span class="aufwand">Commit 6584ca2 · nicht deployt</span>
-        </div>
-        <div class="paket">
-          <div class="ph" style="color:var(--gruen)">Paket 5 · ✓ umgesetzt</div>
-          <h5>Abteilungsaufgaben Onboarding</h5>
-          <ul><li>Karte, Dialog, öffentliche Seite</li><li>Checklisten-Editor, Migration</li><li>vier neue Mailvorlagen</li></ul>
-          <span class="aufwand">auf dem Branch · nicht deployt</span>
-        </div>
       </div>
-      <p>Paket 1 ist umgesetzt, weil Mitarbeitende heute festhängen. Paket 4 setzt Paket 1 voraus, weil der Fragebogen dann schreibgeschützt ist und die Nachforderung der einzige Weg zum Nachreichen wird. Paket 5 setzt Paket 1b voraus. Die übrigen Pakete hängen nicht voneinander ab, ihre Reihenfolge richtet sich nach Ihrer Priorität. Umgesetzt sind Paket 1 (mit dem Dialog „Neuer Vorgang“), Paket 1b und Paket 5. Offen sind noch der Rest von Paket 2 (etwa 1–1,5 Tage), Paket 3 (5–6) und Paket 4 (19–21), zusammen etwa 25–29 Arbeitstage.</p>
-
-      <div class="kasten warn">
-        <strong class="t">Der erste Deploy nimmt den ausstehenden Stand mit</strong>
-        <p>Auf <code>main</code> liegen seit dem 07.09. neun Commits, die noch nicht auf dem Server sind: Formular-Validierung und die Rückmeldung des Personalbüros. Sie bringen Schemaänderungen (Kostenstellen, Aufenthaltstitel, Ablaufdaten) und eine Datenmigration mit. Paket 1 geht zusammen mit ihnen hinaus. Voraussetzung auf dem Server bleibt <code>./backups</code>, eingehängt und <code>sudo chown 1001 backups</code>.</p>
+      <p>Paket 4 setzt Paket 1 voraus, weil der Fragebogen seitdem schreibgeschützt ist und die Nachforderung der einzige Weg zum Nachreichen wird. Paket 5 setzte Paket 1b voraus. Paket 3 und Paket 6 hängen weder voneinander noch von Paket 4 ab. Gemeinsam berühren sie nur die Onboarding-Detailseite, und nacheinander umgesetzt ist das unkritisch. Offen sind Paket 3 (5–6 Tage), Paket 6 (8–8,5) und Paket 4 (19–21), zusammen <strong>32–35,5 Arbeitstage</strong>. Dazu kommt das kleine Mandanten-Paket aus Abschnitt 10 mit etwa 0,5 Tagen, insgesamt also etwa 32,5–36 Tage.</p>
+      <div class="kasten hinweis">
+        <strong class="t">Meine Empfehlung: Paket 3, dann Paket 6, dann Paket 4</strong>
+        <ul>
+          <li><strong>Paket 3 zuerst:</strong> Sie haben es zuerst genannt. Es ist fertig beschrieben, mit Mockups (Abschnitt 3), und hängt an nichts. Vorher sollte nur die Freigabeliste für Empfängeradressen gepflegt sein.</li>
+          <li><strong>Paket 6 danach:</strong> Es ist mittelgroß und kommt ohne Schemaänderung und ohne Mail aus, der Deploy braucht also weder <code>db push</code> noch Vorlagenpflege. Es legt drei Dinge, auf denen Paket 4 aufbaut: saubere Listen-Schnittstellen mit korrektem Mandantenschnitt, das Spalten- und Pillenmuster, neben das „Unterlagen“ kommt, und den gemeinsamen Kalendertag-Helfer für Fristen. Bis die n8n-Umstellung kommt, laufen voraussichtlich auch die Erinnerungen der Abteilungsaufgaben nicht. Paket 6 macht Überfälliges bis dahin wenigstens im Portal sichtbar.</li>
+          <li><strong>Paket 4 zuletzt:</strong> Es ist mit Abstand das größte Paket und bringt Schema, fünf neue Mails und einen neuen täglichen Lauf in n8n. Die n8n-Umstellung haben Sie zurückgestellt, deshalb passt Paket 4 ohnehin erst danach.</li>
+        </ul>
+        <p>Umstellen können Sie jederzeit. Technisch hängt nur Paket 4 an Paket 1, und diese Bedingung ist erfüllt.</p>
       </div>
 
-      <h3>Vor dem Deploy: Prüfungen auf dem Server (nur lesend)</h3>
-      <p class="unterschrift" style="margin:0 0 6px">Prüfung 1–3 vor dem Deploy von Paket 1, Prüfung 4 und 5 vor Paket 1b.</p>
+      <div class="kasten ok">
+        <strong class="t">Erledigt: Deploy vom 24.09.2026</strong>
+        <p>Der Server steht jetzt auf Code 7bc91ec, vorher lief ae490ba. Die Ausfallzeit lag bei etwa zwei Minuten, ein Rückfall war nicht nötig. <strong>Korrektur zu Fassung 5:</strong> Dort stand, auf <code>main</code> lägen seit dem 07.09. neun Commits, die noch nicht auf dem Server seien. Tatsächlich stand der Server seit dem 08.09. auf ae490ba, Formular-Validierung und Rückmeldung des Personalbüros liefen also schon. Das Protokoll mit allen Zahlen steht in <code>docs/historie/deploy-onboarding-pakete-2026-09.md</code>. Für jeden weiteren Deploy bleibt die Voraussetzung: <code>./backups</code> eingehängt und <code>sudo chown 1001 backups</code>.</p>
+      </div>
+
+      <h3>Vor dem Deploy: Prüfungen auf dem Server (nur lesend) · ✓ erledigt am 24.09.</h3>
+      <p class="unterschrift" style="margin:0 0 6px">Alle Prüfungen liefen am 24.09. (SQL VORHER 39/39, keine STOPP-Abweichung). Die Abfragen bleiben als Vorlage für den nächsten Deploy stehen.</p>
       <details>
         <summary>1 · Welche Onboarding-Vorgänge hängen heute fest?</summary>
         <div>
@@ -1984,6 +2679,7 @@ WHERE ("submittedAt" IS NULL
        AND status IN ('SUBMITTED','SUPERVISOR_PENDING','SUPERVISOR_SUBMITTED','REVIEWED'))
    OR (status = 'SUBMITTED' AND "supervisorToken" IS NOT NULL
        AND "supervisorSubmittedAt" IS NULL);</pre>
+          <p><strong>Ergebnis 24.09.:</strong> Zwei Onboarding-Vorgänge standen auf „Modalitäten eingereicht“, obwohl der Fragebogen nie abgesendet worden war. Die Korrektur beim Start hat beide geheilt, dabei ging keine Mail hinaus.</p>
         </div>
       </details>
       <details>
@@ -2007,7 +2703,8 @@ WHERE event IN ('supervisor-link-created', 'contract-end-supervisor-link',
                 'questionnaire-completed', 'supervisor-completed',
                 'questionnaire-confirmation-employee', 'psi-deadline-warning')
    OR event LIKE 'offboarding-%';</pre>
-          <p>Das sind die bestehenden Vorlagen aus Abschnitt 7, Tabelle A, dazu die Vorlagen aus dem Mail-Reparaturpaket (Offboarding, Fristen-Warnung Verbeamtung) und aus Paket 1b. Jede Zeile hier bedeutet: Die Textänderung aus dem Code wirkt für dieses Event nicht. Dort setze ich die Vorlage mit „Text auf Standard zurücksetzen“ zurück, es sei denn, HR hat den Text bewusst angepasst.</p>
+          <p>Das sind die bestehenden Vorlagen aus Abschnitt 8, Tabelle A, dazu die Vorlagen aus dem Mail-Reparaturpaket (Offboarding, Fristen-Warnung Verbeamtung) und aus Paket 1b. Jede Zeile hier bedeutet: Die Textänderung aus dem Code wirkt für dieses Event nicht.</p>
+          <p><strong>Ergebnis 24.09.:</strong> 16 gespeicherte Zeilen. Statt zurückzusetzen habe ich sie mit den Code-Standards verglichen und 15 per SQL aktualisiert. 7 davon hatte HR gestaltet, sie sind zusammengeführt. Eine war schon aktuell (Abschnitt 8).</p>
         </div>
       </details>
       <details>
@@ -2016,6 +2713,7 @@ WHERE event IN ('supervisor-link-created', 'contract-end-supervisor-link',
 <pre>SELECT event, name, url, "isActive" FROM webhook_configs
 WHERE event LIKE 'offboarding-%' ORDER BY event;</pre>
           <p>Zeigt ein aktiver Eintrag auf n8n, verschickt n8n womöglich eigene Mails, zusätzlich zu denen des Portals. Dann entscheiden wir, ob der Eintrag deaktiviert wird oder die Portal-Vorlage. Paket 1b wertet einen Versand über den Webhook bei deaktivierter Portal-Vorlage als „übergeben“, damit der Knopf nicht jedes Mal erneut feuert.</p>
+          <p><strong>Ergebnis 24.09.:</strong> Keine Webhooks in der Datenbank, also kein Doppelversand.</p>
         </div>
       </details>
       <details>
@@ -2025,25 +2723,35 @@ WHERE event LIKE 'offboarding-%' ORDER BY event;</pre>
        "organizationId" IS NULL AS zentral, "isActive"
 FROM department_configs ORDER BY "departmentKey";</pre>
           <p>Aktive Platzhalter mit <code>@credo-gruppe.de</code> aus der Erstinstallation würden nach Paket 1b echte Mails erhalten. Einträge mit <code>VORGESETZTER</code>, <code>HR</code> oder <code>MITARBEITER</code> werden danach ignoriert und können gelöscht werden.</p>
+          <p><strong>Stand laut Protokoll vom 24.09.:</strong> Für IT und Verwaltung / Sekretariat ist keine Adresse hinterlegt. An ihnen hängen 192 Onboarding-Aufgaben, siehe „Betrieb nach dem Deploy“.</p>
         </div>
       </details>
 
-      <h3>Nach dem Deploy</h3>
+      <h3>Nach dem Deploy · ✓ erledigt am 24.09.</h3>
       <ul>
-        <li><code>system_migrations</code> prüfen: Sind die neuen Merker gesetzt, und wie viele Vorgänge wurden repariert?</li>
-        <li>Gespeicherte Mailvorlagen wie oben anpassen.</li>
-        <li>Vor Paket 3 und 4: die Freigabeliste für abweichende Empfängeradressen pflegen (Einstellungen → SMTP).</li>
-        <li>Mit Paket 4: den täglichen Lauf <code>/api/cron/unterlagen-fristen</code> in n8n einplanen, der erste Lauf nur zur Probe (<code>?dryRun=1</code>).</li>
-        <li>Mit Paket 1b: unter Einstellungen → Abteilungen echte Adressen eintragen und Platzhalter ersetzen. In n8n prüfen, ob die täglichen Läufe <code>/api/cron/reminders</code> und <code>/api/cron/offboarding-reminders</code> auf <code>hr.fes-credo.de</code> zeigen; die Workflows im Repository nennen noch <code>hr.credo-schulen.de</code>.</li>
-        <li>Mit Paket 5: Zuständigkeit, Tagesangabe und Hinweise der Onboarding-Checklisten pflegen. Bei „Onboarding-Aufgabe erledigt“ das HR-Postfach als Empfänger eintragen, sonst wird sie nicht versendet. Je neuer Vorlage einmal „Test senden“.</li>
-        <li>Jedes Paket durchläuft vor dem Push <code>tsc</code>, <code>lint</code>, alle Tests und <code>build</code>, mit neuen Tests für jede der drei Änderungen.</li>
+        <li>✓ <code>system_migrations</code> geprüft: drei neue Merker, zusammen jetzt zehn. Zwei von 41 Onboarding-Vorgängen sind geheilt. 192 Aufgaben stehen auf Schlüssel statt Freitext, 584 haben eine Tagesangabe.</li>
+        <li>✓ Gespeicherte Mailvorlagen: verglichen und per SQL angeglichen statt zurückgesetzt (Abschnitt 8).</li>
+        <li>Bleibt als Regel: Jedes Paket durchläuft vor dem Push <code>tsc</code>, <code>lint</code>, alle Tests und <code>build</code>, jede Änderung mit eigenen Tests. Jeder Deploy bekommt ein Protokoll.</li>
+      </ul>
+
+      <h3>Betrieb nach dem Deploy (offen)</h3>
+      <p class="unterschrift" style="margin:0 0 6px">Aus dem Protokoll vom 24.09.2026 („Offen nach dem Deploy“), ergänzt um die übrigen Handschritte.</p>
+      <ul>
+        <li><span class="stand-pille spaeter">n8n · später</span> <strong>Die n8n-Erinnerungen laufen nicht.</strong> Die Workflows rufen <code>hr.credo-schulen.de</code> auf statt <code>hr.fes-credo.de</code> (<code>/api/cron/reminders</code>, <code>/api/cron/offboarding-reminders</code>). Seit mindestens 60 Tagen steht keine Fragebogen- oder Vorgesetzten-Erinnerung im Versandprotokoll. Damit bleiben voraussichtlich auch die Erinnerungen der Abteilungsaufgaben aus, weil sie an denselben Läufen hängen. Nach der Korrektur verschickt der erste Lauf fünf Fragebogen-Erinnerungen auf einmal. <strong>Zurückgestellt, Ihre Entscheidung vom 24.09.</strong></li>
+        <li><span class="stand-pille spaeter">n8n · später</span> <strong><code>/api/cron/dokument-ablauf</code></strong> ist in n8n nicht eingeplant. Derzeit hat kein Nachweis ein Ablaufdatum, es eilt also nicht. Das kommt mit der n8n-Umstellung, ebenso später der Lauf <code>/api/cron/unterlagen-fristen</code> aus Paket 4 (erster Lauf nur zur Probe mit <code>?dryRun=1</code>).</li>
+        <li><span class="stand-pille hr">HR</span> <strong>IT und Verwaltung / Sekretariat ohne Adresse</strong> (192 Onboarding-Aufgaben), dazu das <strong>An-Feld</strong> der Vorlage „Onboarding-Aufgabe erledigt“ eintragen, sonst geht sie nicht hinaus. Beides vor dem ersten „Abteilungen informieren…“.</li>
+        <li><span class="stand-pille hr">HR</span> <strong>„Öffentlichkeitsarbeit“</strong> (2 Vorlagenpunkte, 20 Aufgaben): unter Einstellungen → Abteilungen einen eigenen Schlüssel anlegen oder die Aufgaben bewusst ohne Link lassen. In Paket 6 erscheinen sie gelb mit „nicht per Link“.</li>
+        <li><span class="stand-pille hr">HR</span> <strong>Onboarding-Checklisten pflegen</strong> (Paket 5): Zuständigkeit, Tagesangabe und Hinweise, je neuer Vorlage einmal „Test senden“.</li>
+        <li><span class="stand-pille hr">HR</span> <strong>Kostenstellen:</strong> drei Vorgänge mit einer Aufteilung ungleich 100 %.</li>
+        <li><span class="stand-pille hr">HR</span> <strong>Freigabeliste</strong> für abweichende Empfängeradressen pflegen (Einstellungen → SMTP), vor Paket 3. Heute ist sie leer, also gibt es keine Einschränkung.</li>
+        <li><span class="stand-pille code">Code</span> <strong>Offboarding-Ereignisse</strong> schicken keine Personalnummer und keinen Vorgangslink mit, deshalb tragen die Vorlagen die Portal-Adresse fest ein. Außerdem ist die Namenszeile ohne Namen in zwei HR-Mails zu glätten. Klein, passt zu Paket 3.</li>
       </ul>
     </section>
 
-    <!-- ================= 9 OFFEN ================= -->
+    <!-- ================= 10 OFFEN ================= -->
     <section class="abschnitt" id="offen">
-      <div class="abschnitt-titel"><span class="nr">9</span><h2>Entschiedene und offene Punkte</h2></div>
-      <h3>Entschieden am 21. und 22.09.2026</h3>
+      <div class="abschnitt-titel"><span class="nr">10</span><h2>Entschiedene und offene Punkte</h2></div>
+      <h3>Entschieden am 21., 22. und 24.09.2026</h3>
       <div class="tabelle">
         <table>
           <thead><tr><th>Frage</th><th>Entscheidung</th></tr></thead>
@@ -2065,10 +2773,54 @@ FROM department_configs ORDER BY "departmentKey";</pre>
             <tr><td>„Verwaltung“ in den Onboarding-Vorlagen</td><td>Neuer fester Schlüssel „Verwaltung / Sekretariat“, Adresse je Einrichtung.</td></tr>
             <tr><td>Onboarding ohne Modalitäten (etwa Ehrenamt)</td><td>„Abteilungen informieren“ bleibt gesperrt, die Karte erklärt warum. Kein Ersatzdatum.</td></tr>
             <tr><td>Wie erfährt HR vom Fortschritt?</td><td>Eine Mail je erledigter Aufgabe an das HR-Postfach, mit dem Kommentar der Abteilung. Ohne Empfänger in der Vorlage bleibt es beim Blick ins Portal.</td></tr>
+            <tr><td>Offene Aufgaben: Welche Aufgaben zählen? (24.09.)</td><td>Alle offenen Checklisten-Aufgaben, gleich wer zuständig ist: Personalabteilung, Abteilungen, Führungskraft per Link oder niemand. Die Übersicht lässt sich nach Zuständigkeit filtern.</td></tr>
+            <tr><td>Offene Aufgaben: Welche Module? (24.09.)</td><td>Alle mit Checkliste: Onboarding, Offboarding, Verbeamtung, Elternzeit, Mutterschutz. BEM nie (versiegelte Akte). Das Vertragsende hat keine Checkliste.</td></tr>
+            <tr><td>Offene Aufgaben: Wie sieht das Badge aus? (24.09.)</td><td>Grau „5 offen“, rot „5 offen · 2 überfällig“, sobald etwas überfällig ist. Kein Badge, wenn nichts offen ist.</td></tr>
+            <tr><td>Offene Aufgaben: persönliche Zuweisung, „Meine Aufgaben“? (24.09.)</td><td>Nein. HR bleibt ein Team, die Zuständigkeit bleibt beim Abteilungsschlüssel.</td></tr>
+            <tr><td>Reihenfolge der offenen Pakete (24.09.)</td><td>Paket 3 und das neue Paket 6 vor der n8n-Umstellung, die später kommt. Paket 4 bleibt offen. Meine Empfehlung innerhalb dessen: 3 → 6 → 4 (Abschnitt 9).</td></tr>
+            <tr><td>Paket 6: Einzelfragen E1–E7 (24.09.)</td><td>Alle Empfehlungen übernommen, siehe die folgende Tabelle.</td></tr>
           </tbody>
         </table>
       </div>
-      <h3>Noch offen</h3>
+
+      <h3>Entschieden zu Paket 6 (24.09.2026)</h3>
+      <p>Alle Empfehlungen sind übernommen. Die Alternativen bleiben zur Nachvollziehbarkeit stehen.</p>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>#</th><th>Frage</th><th>Entscheidung</th><th>Verworfene Alternativen</th></tr></thead>
+          <tbody>
+            <tr><td class="num">E1</td><td>Ab wann zeigt das <strong>Onboarding</strong> die graue Offen-Zahl?</td><td>Ab Abgabe der Modalitäten oder ab „Geprüft“. Die Aufgaben entstehen schon beim Einladen, im Schnitt rund 15 je Vorgang. Eine Zahl, die an jeder Zeile steht, erkennt niemand „schnell“. Überfälliges ist immer rot, auch vorher.</td><td>(B) immer, ab der Einladung an jeder Zeile; (C) erst ab „Geprüft“. Dann fehlte das Badge aber, während IT und Verwaltung schon arbeiten.</td></tr>
+            <tr><td class="num">E2</td><td>Was zählt der <strong>rote Zähler</strong> in der Kopfleiste?</td><td>Nur Überfälliges. Er bedeutet dasselbe wie Rot im Badge und geht auf 0, wenn alles erledigt ist.</td><td>(B) Überfälliges plus die nächsten 7 Tage, ähnlich dem BEM-Zähler; (C) kein Zähler</td></tr>
+            <tr><td class="num">E3</td><td><strong>Verbeamtung und Elternzeit:</strong> alle offenen Punkte oder nur die, die jetzt dran sind?</td><td>Nur erreichte Phasen, die weder abgeschlossen noch übersprungen sind, in der Elternzeit bis einschließlich der aktuellen. Dazu zwei Feinheiten: Den Rückkehr-Punkt zählt die Elternzeit schon ab ihrem Beginn, die Geburtspunkte im Mutterschutz erst ab „Aktiv“. Der Balken „14/67“ zeigt weiter den Gesamtstand.</td><td>(B) alle offenen, in der Verbeamtung bis zu 67 je Vorgang, über Jahre an jeder Zeile</td></tr>
+            <tr><td class="num">E4</td><td><strong>Standardansicht</strong> der Übersicht</td><td>„Nach Fälligkeit“ mit dem Filter „Mit Frist“, dazu der Umschalter „Nach Vorgang“ und der eingeklappte Abschnitt „Ohne Frist“</td><td>(B) ohne Umschalter, spart etwa 0,25 Tage; (C) „Nach Vorgang“ als Standard</td></tr>
+            <tr><td class="num">E5</td><td><strong>Altfälle vor dem Rollout:</strong> laufende Vorgänge, deren Vertragsbeginn bzw. letzter Arbeitstag schon vorbei ist</td><td>Vorher mit den Abfragen aus Abschnitt 7 zählen und die Liste mit HR durchgehen: abschließen, was erledigt ist, oder die Checkliste nachziehen. Sonst sind diese Vorgänge beim Rollout auf einen Schlag rot.</td><td>(B) ohne Aufräumen ausrollen und das Rot als Arbeitsliste nutzen</td></tr>
+            <tr><td class="num">E6</td><td>Sollen <strong>weitere Fristen</strong> später als eigene Zeilen in die Übersicht (Verbeamtung: Amtsarzt, Beurteilungen, RV-Befreiung, BR-Genehmigung; Elternzeit-Fristen)?</td><td>Nicht in Paket 6, weil Ihre Entscheidung nur die Checklisten nennt. Später als eigene Stufe, weil diese Fristen echte Daten haben. Bis dahin verweisen Fußhinweis und Tooltip auf sie.</td><td>(B) gleich mitnehmen. Den Aufwand schätze ich dann gesondert, weil die Verbeamtungs-Fristen heute nur im täglichen Lauf berechnet und nirgends gespeichert werden.</td></tr>
+            <tr><td class="num">E7</td><td>Soll eine Frist, die schon <strong>vor dem Eingang der Modalitäten</strong> lag, auf den Eingangstag verschoben werden?</td><td>Nein. Der Tooltip nennt den Fall („Die Frist lag schon vor Eingang der Modalitäten“). Eine Verschiebung würde auch die Erinnerungsmails ändern und gehört, wenn überhaupt, in ein eigenes Paket.</td><td>(B) Frist bei der Abgabe auf den Eingangstag setzen</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="unterschrift">Die frühere Frage zum Onboarding-Altbestand ohne gespeichertes Datum entfällt. Badge und Übersicht zählen dieselbe Fälligkeit wie die Checkliste, auch wenn sie nur berechnet ist (Abschnitt 7, Schritt 2).</p>
+
+      <h3>Nebenbefunde aus der Prüfung (Mandanten, Zähler, Tagesgrenzen)</h3>
+      <p>Die Einstufung „latent“ heißt: Der Fehler steckt im Code, wirkt heute aber nicht. Mandantenbeschränkte Rollen bekommen schon an der Middleware auf jedem <code>/api</code>-Pfad außer <code>/api/auth</code> eine 403, und vergeben lassen sich diese Rollen nicht.</p>
+      <div class="tabelle">
+        <table>
+          <thead><tr><th>#</th><th>Befund</th><th>Einstufung</th><th>Wo es behoben wird</th></tr></thead>
+          <tbody>
+            <tr><td class="num">8a</td><td>Sechs Vorgangslisten überschreiben den Mandantenfilter mit dem Einrichtungs-Parameter, statt ihn zu schneiden.</td><td>latent, bestätigt</td><td>Paket 6 (dieselben Dateien); Voraussetzung, bevor je eine Liste für Einrichtungsleitungen freigegeben wird</td></tr>
+            <tr><td class="num">8b</td><td>Die Status-Kacheln in Offboarding, Verbeamtung und Vertragsende zählen ohne jeden Filter.</td><td>heute sichtbar: Sie folgen weder Einrichtung noch Suche noch Zeitraum</td><td>Paket 6</td></tr>
+            <tr><td class="num">8c</td><td><code>/api/dashboard/stats</code> wendet den Mandantenfilter auf keine Abfrage an. Die Liste überfälliger Vorgänge nennt Namen, E-Mail-Adressen und Einrichtung aus allen Mandanten.</td><td>latent, bestätigt</td><td>eigenes kleines Paket (etwa 0,5 Tage, zusammen mit 8d)</td></tr>
+            <tr><td class="num">8d</td><td>Die Verbeamtungs-Routen zum Ändern prüfen den Vorgangszugriff nicht selbst.</td><td>widerlegt als Lücke: Nur globale Rollen kommen hinein</td><td>trotzdem nachziehen, im kleinen Paket mit 8c. Sonst öffnet sich die Lücke bei jeder Angleichung der Rollen.</td></tr>
+            <tr><td class="num">8e</td><td>Kopfleiste: „Dashboard“ ist auf der BEM-Seite mit aktiv, die Handy-Navigation zeigt keinen Zähler.</td><td>heute sichtbar</td><td>Paket 6</td></tr>
+            <tr><td class="num">8f</td><td>Zwei Tagesgrenzen für „überfällig“ bei denselben Abteilungsaufgaben: Erinnerungsstufe ab 02:00 Uhr (im Winter 01:00 Uhr, Mitternacht UTC), Link-Seite ab 00:00 Uhr.</td><td>heute sichtbar, nur zwischen 00:00 und 02:00 Uhr</td><td>Paket 6, eigener Commit</td></tr>
+            <tr><td class="num">8g</td><td>Die HR-Checklisten von Onboarding und Offboarding zeigen Überfälliges nicht rot.</td><td>heute sichtbar</td><td>Paket 6</td></tr>
+            <tr><td class="num">8h</td><td>„Überfällig“ mit anderer Bedeutung: Offboarding-Pille schon am letzten Arbeitstag ab 02:00 Uhr, Analytics-Kachel, Verbeamtungs-Kachel „Frist!“ auf einen Status, den es nicht gibt.</td><td>heute sichtbar (die Wirkung der Kachel „Frist!“ im Browser ist noch ungeprüft)</td><td>Paket 6</td></tr>
+            <tr><td class="num">8i</td><td>Die generische Liste kennt die Endstatus „Beendet“ und „Abgelehnt“ nicht. Beendete Mutterschutz- und Elternzeit-Vorgänge stehen deshalb in der laufenden Ansicht.</td><td>heute sichtbar</td><td>nicht in Paket 6 (dort bekommen sie nur kein Badge); passt zu Paket 4</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Noch offen (übrige Pakete)</h3>
       <p>Blockiert nichts. Ohne Rückmeldung gilt mein Vorgehen.</p>
       <div class="tabelle">
         <table>
@@ -2076,7 +2828,7 @@ FROM department_configs ORDER BY "departmentKey";</pre>
           <tbody>
             <tr><td>Führungskraft im Offboarding: woher?</td><td>Optional, vorbelegt aus der Zeugnis-Bewertung oder dem Vertragsende. Frei eingetippte Adressen unterliegen der Freigabeliste.</td></tr>
             <tr><td>Sollen informierte Abteilungen bei Abbruch des Vorgangs eine Mail bekommen („bitte keine Zugänge anlegen“)?</td><td>Später, als eigenes Ereignis je Modul (je etwa 0,5 Tage). Bis dahin zeigt der Link einen Hinweis.</td></tr>
-            <tr><td>Soll HR bei Überfälligkeit selbst eine Mail bekommen?</td><td>Später. Vorerst sieht HR Überfälliges im Portal, und die Abteilung bekommt den Überfällig-Absatz.</td></tr>
+            <tr><td>Soll HR bei Überfälligkeit selbst eine Mail bekommen?</td><td>Später, als eigenes Ereignis im Katalog. Mit Paket 6 sieht HR Überfälliges im Portal: Badge, Seite „Aufgaben“ und roter Zähler. Die Abteilung bekommt den Überfällig-Absatz, sobald die n8n-Läufe wieder ankommen.</td></tr>
             <tr><td>Soll die IT das Vertragsende sehen, um Zugänge zu befristen?</td><td>Vorerst nein, aus Gründen der Datensparsamkeit.</td></tr>
             <tr><td>Die Brief-Vorlagen-Funktion „Per E-Mail“ hat keine der Schutzregeln (keine Freigabeliste, kein Protokoll, sensible Felder ohne Bestätigung).</td><td>Nicht Teil dieses Plans. Ich empfehle, sie nach Paket 3 auf dieselben Regeln umzustellen oder abzuschalten.</td></tr>
           </tbody>
@@ -2086,7 +2838,7 @@ FROM department_configs ORDER BY "departmentKey";</pre>
   </main>
 
   <footer class="fuss">
-    Erstellt am 21.09.2026, Fassung 4 vom 22.09.2026 mit den Abteilungsaufgaben (Paket 1b und 5) und dem Stand nach Paket 1 · Grundlage: Analyse des Quellcodes auf <code>main</code> (ae490ba) mit unabhängiger Gegenprüfung · Mockups zeigen den Stand von <code>main</code>. Die Produktion kann bis zum nächsten Deploy in Details abweichen (z.B. der Zeichenzähler) · Nach Ihrer Freigabe setze ich Paket für Paket um.
+    Erstellt am 21.09.2026, Fassung 6 vom 24.09.2026 mit dem Stand nach dem Deploy und dem neuen Paket 6 (offene Aufgaben) · Grundlage: Analyse des Quellcodes auf <code>main</code> (53353e8) mit unabhängiger Gegenprüfung; die Produktion läuft seit dem 24.09.2026 auf Code 7bc91ec · Mockups zeigen den Stand von <code>main</code> bzw. den geplanten Stand. Namen, Vorgangsnummern und Adressen darin sind erfunden · Nach Ihrer Freigabe setze ich Paket für Paket um.
   </footer>
 </div>
 </body>
