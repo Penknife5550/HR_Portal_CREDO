@@ -30,6 +30,14 @@
  *     Link ohnehin schreibgesperrt.
  *   - NICHT AN DIE PERSON SELBST. Ist die Adresse die der neuen Person, antwortet
  *     die Route 400 — dieselbe Regel wie beim Anlegen.
+ *   - NUR AN FREIGEGEBENE DOMAINS. An die Fuehrungskraft geht ein Link zu den
+ *     Verguetungsangaben. Eine NEUE Adresse muss deshalb in einer freigegebenen
+ *     Domain liegen (Einstellungen → SMTP, leere Liste = keine Einschraenkung),
+ *     sonst 409 mit MELDUNGEN.FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN — dieselbe Regel
+ *     und dieselbe Funktion wie im Offboarding (`fuehrungskraftAdresseFreigegeben`).
+ *     Die schon im Vorgang hinterlegte Adresse ist immer erlaubt: Wiederverwenden
+ *     und Erneuern eines abgelaufenen Links scheitern nie an einer spaeter
+ *     gepflegten Liste. Geprueft VOR jedem Schreiben und vor jeder Mail.
  */
 
 import { NextResponse } from "next/server";
@@ -37,6 +45,8 @@ import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { fuehrungskraftAdresseFreigegeben } from "@/lib/abteilungsaufgaben-dienst";
+import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
 import {
   istHrStatus,
   mitarbeiterName,
@@ -116,6 +126,17 @@ export const POST = apiHandler<SupervisorLinkInput>(
     // Wiederverwenden: Auch ein alter Link an die Person selbst gilt nicht weiter.
     if (gleicheAdresse(supervisorEmail, onboarding.email)) {
       return NextResponse.json({ error: MELDUNG_EIGENE_ADRESSE }, { status: 400 });
+    }
+
+    // Freigabeliste (Kopfkommentar): nur eine NEUE Adresse; die hinterlegte
+    // ist bekannt und immer erlaubt — ohne Datenbankabfrage.
+    if (
+      !(await fuehrungskraftAdresseFreigegeben(supervisorEmail, [onboarding.supervisorEmail]))
+    ) {
+      return NextResponse.json(
+        { error: MELDUNGEN.FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN },
+        { status: 409 },
+      );
     }
 
     const employeeName = mitarbeiterName(onboarding);

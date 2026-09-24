@@ -14,7 +14,10 @@
  *   4. MAILS NACH DEM COMMIT — parallel, je Link gemeldet; ein Fehlschlag rollt
  *      nichts zurueck. Die Mail an die Fuehrungskraft nennt nie die private
  *      Adresse der Person.
- *   5. VORGANGSNUMMER — bei P2002 auf displayId neuer Versuch, nach drei 409.
+ *   5. VORGANGSNUMMER — bei P2002 auf displayId neuer Versuch, nach drei 409;
+ *      Jahr und Zaehlbereich in deutscher Zeit (`vorgangsjahrInBerlin`).
+ *   6. FREIGABELISTE — eine Fuehrungskraft ausserhalb der freigegebenen Domains
+ *      ergibt 409, bevor irgendetwas geschrieben oder gemailt wird.
  */
 
 // Die Links werden aus APP_URL gebaut — fest, damit die Erwartungen unten
@@ -45,6 +48,8 @@ const mockPrisma = {
     findUnique: jest.fn(),
   },
   userOrgAssignment: { findUnique: jest.fn() },
+  // Freigabeliste der Empfaenger-Domains (Einstellungen → SMTP).
+  smtpConfig: { findUnique: jest.fn() },
   $transaction: jest.fn(),
 };
 const mockSession = jest.fn();
@@ -61,10 +66,25 @@ jest.mock("@/lib/auth", () => ({
 jest.mock("@/lib/webhooks", () => ({
   triggerWebhooks: (...a: unknown[]) => mockWebhook(...a),
 }));
+// Die echte Rechnung, aber uebersteuerbar: Ein Test setzt einmalig ein Jahr,
+// das keine Uhr liefert (Verdrahtung, unabhaengig von der Zeitzone des
+// Rechners). Als Umweg ueber `mockJahrVorgabe` und nicht als
+// `jest.fn(echt…)`: `resetAllMocks` im beforeEach loeschte sonst die echte
+// Implementierung mit.
+const mockJahrVorgabe = jest.fn();
+jest.mock("@/lib/vorgangsjahr", () => {
+  const echt = jest.requireActual("@/lib/vorgangsjahr");
+  return {
+    ...echt,
+    vorgangsjahrInBerlin: (jetzt?: Date) => mockJahrVorgabe(jetzt) ?? echt.vorgangsjahrInBerlin(jetzt),
+  };
+});
 
 import { POST } from "@/app/api/onboarding/route";
 import { NextRequest } from "next/server";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
+import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
 
 const HR = {
   userId: "u1",
@@ -75,7 +95,9 @@ const HR = {
 };
 
 const ORG = { id: "org1", name: "FES Gymnasium", shortName: "GYM", mandantNumber: "10" };
-const JAHR = new Date().getFullYear();
+// Deutsche Zeit wie die Route — sonst liefe der Test in der ersten Stunde
+// eines Jahres auf einem UTC-Rechner auseinander.
+const JAHR = vorgangsjahrInBerlin().jahr;
 const NUMMER = `${JAHR}-GYM-014`;
 const PRIVAT = "anna.privat@example.org";
 const LEITUNG = "schulleitung@fes.example";
@@ -172,6 +194,8 @@ beforeEach(() => {
   mockTx.supervisorData.upsert.mockResolvedValue({});
   mockTx.auditLog.create.mockResolvedValue({});
   mockPrisma.userOrgAssignment.findUnique.mockResolvedValue(null);
+  // Leere Liste = keine Einschraenkung (Auslieferungszustand).
+  mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "" });
   mockPrisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
     fn(mockTx),
   );
@@ -628,6 +652,54 @@ describe("Anlegen mit Fuehrungskraft", () => {
   });
 });
 
+describe("Freigabeliste der Fuehrungskraft", () => {
+  it("erlaubt bei leerer Liste jede Adresse", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "" });
+    const res = await anlegen({ supervisorEmail: "leitung@freemail.example" });
+    expect(res.status).toBe(201);
+  });
+
+  it("erlaubt eine Adresse in einer freigegebenen Domain", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes.example, credo.example",
+    });
+    const res = await anlegen({ supervisorEmail: LEITUNG });
+    expect(res.status).toBe(201);
+  });
+
+  it("weist eine nicht freigegebene Domain mit 409 ab — nichts angelegt, keine Mail", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes.example",
+    });
+
+    const res = await anlegen({ supervisorEmail: "leitung@freemail.example" });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: MELDUNGEN.FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN });
+    // Vor jedem Schreiben: weder Vorgang noch Nummer noch Mail.
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockTx.onboardingProcess.create).not.toHaveBeenCalled();
+    expect(mockPrisma.onboardingProcess.count).not.toHaveBeenCalled();
+    expect(mockWebhook).not.toHaveBeenCalled();
+  });
+
+  it("vergleicht die Domain exakt — eine Subdomain-Attrappe gilt nicht", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes.example",
+    });
+    const res = await anlegen({ supervisorEmail: "leitung@evil-fes.example" });
+    expect(res.status).toBe(409);
+  });
+
+  it("prueft ohne Fuehrungskraft gar nicht erst", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes.example",
+    });
+    expect((await anlegen()).status).toBe(201);
+    expect(mockPrisma.smtpConfig.findUnique).not.toHaveBeenCalled();
+  });
+});
+
 describe("Mailversand", () => {
   it("meldet FAILED und SKIPPED je Link — der Vorgang bleibt (201)", async () => {
     mockWebhook.mockImplementation(async (event: string) =>
@@ -662,6 +734,56 @@ describe("Mailversand", () => {
 });
 
 describe("Vorgangsnummer", () => {
+  it("nimmt Jahr und Zaehlbereich aus der deutschen Zeit — auch in der Silvesternacht", async () => {
+    // 31.12.2026, 23:30 UTC ist in Berlin schon der 1.1.2027, 00:30 Uhr. Der
+    // Container laeuft in UTC; frueher bekam der Vorgang hier „2026-…".
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+    jest.setSystemTime(new Date("2026-12-31T23:30:00.000Z"));
+    try {
+      mockPrisma.onboardingProcess.count.mockResolvedValue(0);
+
+      const res = await anlegen();
+
+      expect(res.status).toBe(201);
+      expect(angelegteDaten().displayId).toBe("2027-GYM-001");
+      expect(mockPrisma.onboardingProcess.count).toHaveBeenCalledWith({
+        where: {
+          createdAt: {
+            gte: new Date("2026-12-31T23:00:00.000Z"),
+            lt: new Date("2027-12-31T23:00:00.000Z"),
+          },
+        },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("nimmt Jahr und Bereich woertlich aus vorgangsjahrInBerlin (unabhaengig von der Rechner-Zeitzone)", async () => {
+    // Der Silvester-Test oben ist auf einem Rechner in Europe/Berlin auch mit
+    // dem ALTEN Code gruen — dort ist Ortszeit deutsche Zeit. Erst dieses Jahr,
+    // das keine Uhr liefern kann, belegt die Verdrahtung ueberall.
+    mockJahrVorgabe.mockReturnValueOnce({
+      jahr: 2031,
+      von: new Date("2030-12-31T23:00:00.000Z"),
+      bis: new Date("2031-12-31T23:00:00.000Z"),
+    });
+    mockPrisma.onboardingProcess.count.mockResolvedValue(0);
+
+    const res = await anlegen();
+
+    expect(res.status).toBe(201);
+    expect(angelegteDaten().displayId).toBe("2031-GYM-001");
+    expect(mockPrisma.onboardingProcess.count).toHaveBeenCalledWith({
+      where: {
+        createdAt: {
+          gte: new Date("2030-12-31T23:00:00.000Z"),
+          lt: new Date("2031-12-31T23:00:00.000Z"),
+        },
+      },
+    });
+  });
+
   it("versucht es nach P2002 auf displayId mit einer neu ermittelten Nummer erneut", async () => {
     mockPrisma.onboardingProcess.count.mockResolvedValueOnce(13).mockResolvedValueOnce(14);
     mockTx.onboardingProcess.create.mockRejectedValueOnce(nummerVergeben());

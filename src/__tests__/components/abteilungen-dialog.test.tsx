@@ -17,11 +17,12 @@
  *  2. „Was die Empfänger sehen" nennt die Zusatzfelder genau der Stellen, die
  *     sie bekommen (IT ja, Buchhaltung nein) — im Offboarding gar keine.
  *  3. Gelber Block „Nicht informiert werden" mit dem Grund des Servers.
- *  4. Knopf „n E-Mails senden", „Wird gesendet…", Abbrechen ohne Wirkung.
+ *  4. Knopf „n E-Mails senden", „Wird gesendet…", Abbrechen ohne Wirkung;
+ *     Escape schliesst wie „Abbrechen" — waehrend des Versands nicht.
  *  5. Die Gueltigkeit im Einleitungssatz; bei verschiedenen Daten die
  *     frueheste als Untergrenze.
  */
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import {
   AbteilungenDialog,
   gueltigkeitsText,
@@ -261,6 +262,61 @@ describe("Knöpfe", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onAbbrechen).toHaveBeenCalledTimes(2);
     expect(onSenden).not.toHaveBeenCalled();
+  });
+
+  it("Escape während des Versands schließt NICHT (wie der gesperrte Knopf „Abbrechen“)", () => {
+    const { onAbbrechen } = zeige(daten(), { sendet: true });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it("Escape liest `sendet` aktuell — kein veralteter Wert nach einem Wechsel", () => {
+    // Dieselbe Dialog-Instanz durch alle drei Stände: Ein Horcher mit
+    // veralteter Closure schloesse im zweiten Stand trotzdem (bzw. im dritten
+    // nicht mehr).
+    const onAbbrechen = jest.fn();
+    const onSenden = jest.fn();
+    const d = daten();
+    const { rerender } = render(
+      <AbteilungenDialog abteilungen={d} sendet={false} onAbbrechen={onAbbrechen} onSenden={onSenden} />,
+    );
+
+    rerender(<AbteilungenDialog abteilungen={d} sendet onAbbrechen={onAbbrechen} onSenden={onSenden} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onAbbrechen).not.toHaveBeenCalled();
+
+    rerender(<AbteilungenDialog abteilungen={d} sendet={false} onAbbrechen={onAbbrechen} onSenden={onSenden} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+  });
+
+  it("Escape nach dem Schließen: kein Horcher bleibt zurück", () => {
+    const { onAbbrechen } = zeige(daten());
+    cleanup();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it("andere Tasten schließen nicht", () => {
+    const { onAbbrechen } = zeige(daten());
+    fireEvent.keyDown(document, { key: "Enter" });
+    expect(onAbbrechen).not.toHaveBeenCalled();
+  });
+
+  it("Fokus liegt beim Öffnen auf „Abbrechen“ und springt beim Neuzeichnen nicht zurück", () => {
+    // Die Karte reicht `onAbbrechen` als neue Pfeilfunktion je Render. Hing der
+    // Fokus am selben Effekt wie die Taste, riss jedes Neuzeichnen ihn zurueck.
+    const d = daten();
+    const { rerender } = render(
+      <AbteilungenDialog abteilungen={d} onAbbrechen={() => {}} onSenden={() => {}} />,
+    );
+    const abbrechen = screen.getByRole("button", { name: "Abbrechen" });
+    const senden = screen.getByRole("button", { name: "3 E-Mails senden" });
+    expect(document.activeElement).toBe(abbrechen);
+
+    senden.focus();
+    rerender(<AbteilungenDialog abteilungen={d} onAbbrechen={() => {}} onSenden={() => {}} />);
+    expect(document.activeElement).toBe(senden);
   });
 
   it("ohne Empfänger: Hinweis statt Versand, Knopf gesperrt", () => {

@@ -53,6 +53,13 @@ describe("Protokoll-Beschriftungen", () => {
     );
   });
 
+  test("die Codes der befristeten Nachweise sind uebersetzt", () => {
+    // DOKUMENT_FRIST_GEAENDERT schreiben HR und seit der Durchsicht 09/2026
+    // auch der Magic Link (Statusruecknahme) — beide landen in derselben Zeile.
+    expect(getActionLabel("DOKUMENT_FRIST_GEAENDERT")).toBe("Ablaufdatum geändert");
+    expect(getActionLabel("DOKUMENT_ABLAUF_ERINNERT")).toBe("Ablauf-Erinnerung gesendet");
+  });
+
   test("ein unbekannter Code faellt auf sich selbst zurueck", () => {
     // Bewusst so: Eine erfundene Beschriftung waere schlimmer als der Code.
     expect(getActionLabel("GIBT_ES_NICHT")).toBe("GIBT_ES_NICHT");

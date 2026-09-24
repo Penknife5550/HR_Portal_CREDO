@@ -77,6 +77,16 @@ export interface SchritteStand {
 
 /** Was die Oberflaeche an Knoepfen beisteuert. */
 export interface SchrittAktionen {
+  /**
+   * Darf die angemeldete Person den Vorgang bearbeiten (`HR_EDIT_ROLES`)?
+   * Ohne dieses Recht bekommt der Stepper KEINE schreibenden Knoepfe
+   * (Vorgesetzten-Link erstellen/erneuern, Abteilungen informieren, Dokumente
+   * versenden) — die Routen antworteten darauf ohnehin mit 403, und ein Knopf,
+   * der nur einen Fehler erzeugt, ist keiner. Kopieren und Export bleiben.
+   * Pflichtfeld und nicht optional: Ein vergessener Wert darf nicht still
+   * „ja" heissen.
+   */
+  darfBearbeiten: boolean;
   fragebogenLink: string;
   modalitaetenLink: string | null;
   /** Steht im Formular der Karte „Vorgesetzten-Link" eine Adresse? */
@@ -206,7 +216,10 @@ export function onboardingWorkflowSchritte(
   if (modAb) {
     modalitaetenInfo = undefined;
   } else if (linkAbgelaufen) {
-    modalitaetenInfo = `Link abgelaufen am ${datum(s.supervisorTokenExpiresAt) ?? "—"} — bitte neuen Link erzeugen`;
+    // Die Aufforderung nur, wenn es den Knopf dazu gibt (`darfBearbeiten`).
+    modalitaetenInfo =
+      `Link abgelaufen am ${datum(s.supervisorTokenExpiresAt) ?? "—"}` +
+      (a.darfBearbeiten ? " — bitte neuen Link erzeugen" : "");
   } else if (s.supervisorToken && modFortschritt.begonnen) {
     modalitaetenInfo =
       `Modalitäten in Bearbeitung — ${formatModalitaetenFortschritt(modFortschritt)}` +
@@ -215,6 +228,10 @@ export function onboardingWorkflowSchritte(
     modalitaetenInfo = `Link versendet am ${datum(s.supervisorLinkSentAt)} — noch nicht begonnen`;
   } else if (s.supervisorToken) {
     modalitaetenInfo = "Link versendet — noch nicht begonnen";
+  } else if (!a.darfBearbeiten) {
+    // Ohne Bearbeitungsrecht hat die Karte daneben kein Formular — der Satz
+    // unten waere eine Aufforderung ohne Weg.
+    modalitaetenInfo = "Noch kein Vorgesetzten-Link erstellt.";
   } else {
     // Kein Eingabefeld im Stepper (Entscheidung 22.09.2026): `WorkflowStep`
     // hat keinen Slot dafuer, und zwei Felder fuer dieselbe Adresse laufen
@@ -268,20 +285,25 @@ export function onboardingWorkflowSchritte(
       status: modAb ? "completed" : hrStatus ? "upcoming" : "active",
       completedAt: datum(s.supervisorSubmittedAt),
       info: modalitaetenInfo,
+      // Erstellen und Erneuern nur mit Bearbeitungsrecht (`darfBearbeiten`);
+      // Kopieren eines gueltigen Links darf jede Rolle, die den Vorgang sieht —
+      // die Karte daneben zeigt denselben Link ohnehin.
       actions:
         !modAb && !hrStatus
           ? linkAbgelaufen
-            ? [
-                {
-                  // Ein abgelaufener Link hilft niemandem beim Kopieren — hier
-                  // der Ausweg aus der Pruefsperre.
-                  label: "Neuen Vorgesetzten-Link erzeugen",
-                  onClick: a.vorgesetztenLinkErzeugen,
-                  variant: "primary" as const,
-                  disabled: !a.supervisorAdresseEingetragen,
-                  loading: a.linkWirdErzeugt,
-                },
-              ]
+            ? a.darfBearbeiten
+              ? [
+                  {
+                    // Ein abgelaufener Link hilft niemandem beim Kopieren — hier
+                    // der Ausweg aus der Pruefsperre.
+                    label: "Neuen Vorgesetzten-Link erzeugen",
+                    onClick: a.vorgesetztenLinkErzeugen,
+                    variant: "primary" as const,
+                    disabled: !a.supervisorAdresseEingetragen,
+                    loading: a.linkWirdErzeugt,
+                  },
+                ]
+              : undefined
             : a.modalitaetenLink
               ? [
                   {
@@ -292,15 +314,17 @@ export function onboardingWorkflowSchritte(
                     variant: "secondary" as const,
                   },
                 ]
-              : [
-                  {
-                    label: "Vorgesetzten-Link erstellen",
-                    onClick: a.vorgesetztenLinkErzeugen,
-                    variant: "primary" as const,
-                    disabled: !a.supervisorAdresseEingetragen,
-                    loading: a.linkWirdErzeugt,
-                  },
-                ]
+              : a.darfBearbeiten
+                ? [
+                    {
+                      label: "Vorgesetzten-Link erstellen",
+                      onClick: a.vorgesetztenLinkErzeugen,
+                      variant: "primary" as const,
+                      disabled: !a.supervisorAdresseEingetragen,
+                      loading: a.linkWirdErzeugt,
+                    },
+                  ]
+                : undefined
           : undefined,
     },
     {
@@ -379,8 +403,18 @@ export function onboardingWorkflowSchritte(
               }))
           : undefined,
       info: abtInfo || undefined,
+      // Informieren darf HR, sobald die Modalitaeten eingereicht sind
+      // (`onboardingVersandSperre`) — also schon VOR der Pruefung, waehrend
+      // dieser Schritt noch „upcoming" ist. Den Schritt dafuer aktiv zu setzen,
+      // hiesse die Entscheidung oben umzuwerfen (parallel sind nur die Spuren).
+      // Stattdessen zeigt der Stepper den Knopf schmal in der Zeile unter
+      // „Kommende Schritte". Wann er erscheint, entscheidet allein die
+      // Bedingung an `actions` — bei gesperrtem Versand gibt es keinen, ohne
+      // Bearbeitungsrecht auch nicht (die Karte im Tab Checkliste blendet ihren
+      // Knopf dann ebenfalls aus, und die Route antwortete mit 403).
+      aktionenAuchKommend: true,
       actions:
-        !istAbgeschlossen && !abtGesperrt && abtInformierbar > 0
+        a.darfBearbeiten && !istAbgeschlossen && !abtGesperrt && abtInformierbar > 0
           ? [
               {
                 label: "Abteilungen informieren…",
@@ -404,15 +438,22 @@ export function onboardingWorkflowSchritte(
       info: abtZeilen.some((z) => z.aufgaben.offen > 0)
         ? "Offene Aufgaben von Abteilungen verhindern den Abschluss nicht."
         : undefined,
+      // Der Export bleibt fuer alle stehen (eigene Rollenpruefung der Route,
+      // wie die uebrigen Export-Links der Seite); versenden nur mit
+      // Bearbeitungsrecht — der Versand verlangt HR_EDIT_ROLES.
       actions:
         !istAbgeschlossen && checklistAllDone
           ? [
               { label: "CSV Export (LOGA)", onClick: a.csvExport, variant: "secondary" as const },
-              {
-                label: "Dokumente versenden…",
-                onClick: a.dokumenteVersenden,
-                variant: "primary" as const,
-              },
+              ...(a.darfBearbeiten
+                ? [
+                    {
+                      label: "Dokumente versenden…",
+                      onClick: a.dokumenteVersenden,
+                      variant: "primary" as const,
+                    },
+                  ]
+                : []),
             ]
           : undefined,
     },

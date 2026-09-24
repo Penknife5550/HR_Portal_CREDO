@@ -566,6 +566,24 @@ describe("nur lesen", () => {
     expect(within(zeile("IT")).queryByRole("button", { name: "Erinnern" })).toBeNull();
     expect(within(zeile("IT")).queryByRole("button", { name: "Link kopieren" })).not.toBeNull();
   });
+
+  it("von aussen geoeffneter Dialog erscheint ohne Recht nicht (Durchsicht 09/2026)", () => {
+    // Der Stepper der Uebersicht oeffnet den Dialog ueber `dialogOffen`. Ohne
+    // Recht blendete die Karte nur IHREN Knopf aus — der Dialog kam trotzdem,
+    // und „Senden" endete in 403.
+    karte(daten(), { darfAktionen: false, dialogOffen: true, setDialogOffen: jest.fn() });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("… und auch bei abgeschlossenem Vorgang nicht", () => {
+    karte(daten({ abgeschlossen: true }), { dialogOffen: true, setDialogOffen: jest.fn() });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Gegenprobe: mit Recht oeffnet `dialogOffen` den Dialog wie bisher", () => {
+    karte(daten(), { dialogOffen: true, setDialogOffen: jest.fn() });
+    expect(screen.queryByRole("dialog")).not.toBeNull();
+  });
 });
 
 // =============================================
@@ -1065,7 +1083,11 @@ describe("Onboarding: Stepper", () => {
     };
   }
 
-  function stepper(abteilungen: AbteilungenKarteDaten, teil: Record<string, unknown> = {}) {
+  function stepper(
+    abteilungen: AbteilungenKarteDaten,
+    teil: Record<string, unknown> = {},
+    darfBearbeiten = true,
+  ) {
     const oeffnen = jest.fn();
     render(
       <OnboardingTabOverview
@@ -1086,6 +1108,7 @@ describe("Onboarding: Stepper", () => {
         setActiveTab={jest.fn()}
         oeffnePaketDialog={jest.fn()}
         oeffneAbteilungenDialog={oeffnen}
+        darfBearbeiten={darfBearbeiten}
       />,
     );
     return { oeffnen };
@@ -1104,6 +1127,12 @@ describe("Onboarding: Stepper", () => {
     const { oeffnen } = stepper(daten({ modul: "ONBOARDING" }));
     fireEvent.click(screen.getByRole("button", { name: "Abteilungen informieren…" }));
     expect(oeffnen).toHaveBeenCalledTimes(1);
+  });
+
+  it("ohne Bearbeitungsrecht: kein „Abteilungen informieren…“, der Stand bleibt sichtbar", () => {
+    stepper(daten({ modul: "ONBOARDING" }), {}, false);
+    expect(knopf("Abteilungen informieren…")).toBeNull();
+    expect(seitentext()).toContain("Abteilungen: 0 von 4 fertig");
   });
 
   it("gesperrt: Grund im Schritt, keine Aktion", () => {

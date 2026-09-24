@@ -74,7 +74,11 @@ function vorgang(teil: Record<string, unknown> = {}) {
   };
 }
 
-function uebersicht(teil: Record<string, unknown> = {}, supervisorEmail = "") {
+function uebersicht(
+  teil: Record<string, unknown> = {},
+  supervisorEmail = "",
+  darfBearbeiten = true,
+) {
   render(
     <TabOverview
       data={vorgang(teil) as unknown as React.ComponentProps<typeof TabOverview>["data"]}
@@ -94,6 +98,7 @@ function uebersicht(teil: Record<string, unknown> = {}, supervisorEmail = "") {
       setActiveTab={jest.fn()}
       oeffnePaketDialog={jest.fn()}
       oeffneAbteilungenDialog={jest.fn()}
+      darfBearbeiten={darfBearbeiten}
     />,
   );
 }
@@ -139,6 +144,41 @@ describe("Onboarding-Übersicht: beide Spuren offen", () => {
     // Die alten, abweichenden Texte gibt es nicht mehr.
     expect(text).not.toContain("Ausstehend");
     expect(text).not.toContain("Nicht begonnen");
+  });
+});
+
+describe("Onboarding-Übersicht: ohne Bearbeitungsrecht", () => {
+  // Durchsicht 09/2026: Die Uebersicht pruefte keine Rolle. Eine Rolle ohne
+  // HR_EDIT_ROLES sah Formular und Knoepfe und bekam beim Absenden 403.
+  it("Karte „Vorgesetzten-Link“ ohne Formular, Stepper ohne „erstellen“", () => {
+    uebersicht({}, "leitung@example.org", false);
+    expect(screen.queryByRole("button", { name: "Generieren" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Vorgesetzten-Link erstellen" })).toBeNull();
+    expect(screen.queryByPlaceholderText("vorgesetzter@einrichtung.de")).toBeNull();
+    expect(seitentext()).toContain("Noch kein Vorgesetzten-Link generiert.");
+    expect(seitentext()).not.toContain("Kann sofort erstellt werden");
+    // Kopieren bleibt.
+    expect(screen.getByRole("button", { name: "Fragebogen-Link kopieren" })).not.toBeNull();
+  });
+
+  it("abgelaufener Link: kein „Neuen Link erzeugen“ in der Karte", () => {
+    const abgelaufen = {
+      supervisorToken: "tok-sv",
+      supervisorEmail: "leitung@example.org",
+      supervisorTokenExpiresAt: "2020-01-01T12:00:00.000Z",
+      supervisorData: { isComplete: false, currentStep: 1 },
+    };
+    uebersicht(abgelaufen, "leitung@example.org", false);
+    expect(screen.queryByRole("button", { name: "Neuen Link erzeugen" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Neuen Vorgesetzten-Link erzeugen" })).toBeNull();
+    // Der Stand bleibt lesbar.
+    expect(seitentext()).toContain("Link abgelaufen am");
+  });
+
+  it("Gegenprobe mit Recht: Formular und Knoepfe wie bisher", () => {
+    uebersicht({}, "leitung@example.org", true);
+    expect(screen.getByRole("button", { name: "Generieren" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Vorgesetzten-Link erstellen" })).not.toBeNull();
   });
 });
 

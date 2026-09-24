@@ -44,8 +44,33 @@
  * BEOBACHTEN" und erinnert sofort. Auch das Intervall verschluckt nichts — die
  * Bedingung ist "mindestens so lange her", nicht "genau so lange her".
  *
- * Gesetzt wird der Merker NUR nach `status === "SENT"`. Ein SKIPPED (kein
- * Empfaenger konfiguriert) oder FAILED darf die Erinnerung nicht verbrennen.
+ * Der Merker haengt am Mailergebnis — dieselbe Hausregel wie im
+ * Erinnerungs-Cron (`/api/cron/reminders`, Entscheidung 09/2026):
+ *
+ *   SENT     Merker setzen, AuditLog DOKUMENT_ABLAUF_ERINNERT.
+ *   SKIPPED  Merker TROTZDEM setzen, kein AuditLog. SKIPPED heisst: Vorlage
+ *            deaktiviert oder fehlt, kein Empfaenger in der Vorlage — ein
+ *            Versuch am naechsten Tag aendert daran nichts. Ohne Merker liefe
+ *            die Erinnerung taeglich statt im Intervall der Stufe:
+ *            `triggerWebhooks` feuert die DB-Webhooks unabhaengig vom
+ *            Mailergebnis (wer die Vorlage abgeschaltet hat, weil n8n per
+ *            Webhook erinnert, bekaeme jeden Tag dieselbe Meldung), und jeder
+ *            Lauf schriebe je Dokument einen SKIPPED-Eintrag ins
+ *            Versandprotokoll. Ist die Vorlage wieder eingerichtet, kommt die
+ *            naechste Mail spaetestens beim naechsten Stufenwechsel oder nach
+ *            dem Intervall.
+ *   FAILED   (und `null`, falls der Dispatcher selbst scheitert) Merker NICHT
+ *            setzen: Ein SMTP-Ausfall ist voruebergehend, der naechste Lauf
+ *            versucht es erneut, statt die Erinnerung ein ganzes Intervall
+ *            lang als erledigt zu fuehren.
+ *
+ * Aendert HR (oder die Person ueber den Magic Link) das Ablaufdatum, leert die
+ * Schreibroute den Merker und nimmt ein EXPIRED zurueck, wenn die neue Frist
+ * nicht abgelaufen ist — fuer die neue Frist beginnt ein neuer Zyklus
+ * (PATCH /api/onboarding/[id]/documents/[docId]). Damit ein Lauf, der das
+ * Dokument VOR dieser Aenderung gelesen hat, sie nicht mit dem alten Stand
+ * ueberschreibt, schreibt er Status und Merker nur, solange `gueltigBis` noch
+ * dem gelesenen Wert entspricht (bedingtes `updateMany`).
  *
  * ## Was am Ablauftag passiert
  *
@@ -70,8 +95,19 @@ import {
   kalendertagAlsDatum,
 } from "@/lib/dokument-fristen";
 import { formatiere, heuteInBerlin, tageSpaeter } from "@/lib/minijob-fristen";
+import { MITARBEITER_NEUTRAL, mitarbeiterName } from "@/lib/onboarding-spuren";
+import type { EventEmailResult } from "@/lib/mailer";
 
 const MS_PER_DAY = 86400000;
+
+/**
+ * Soll der Merker „zuletzt erinnert" gesetzt werden? Bei SENT und SKIPPED ja,
+ * bei FAILED (oder ohne Ergebnis) nein — Begruendung im Kopfkommentar. Dieselbe
+ * Regel wie `merkerSetzen` in /api/cron/reminders.
+ */
+function merkerSetzen(mail: EventEmailResult | null | undefined): boolean {
+  return mail?.status === "SENT" || mail?.status === "SKIPPED";
+}
 
 /**
  * Wie lange nach dem Ablauf ueberhaupt noch erinnert wird.
@@ -112,11 +148,20 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date();
+  // `uebersprungen` zaehlt wie bisher ALLE Zeilen ohne versendete Erinnerung
+  // (nicht faellig, ueberholt, unzustaendig — und faellige, deren Mail nicht
+  // hinausging). Die beiden neuen Zaehler schluesseln den letzten Fall auf,
+  // ohne dass sich die Summe fuer bestehende n8n-Auswertungen aendert:
+  //   nichtZugestellt  faellig, Mail FAILED — der naechste Lauf versucht es erneut
+  //   mailUebersprungen faellig, Mail SKIPPED (Vorlage aus/kein Empfaenger) —
+  //                     Merker gesetzt, naechster Versuch im Intervall der Stufe
   const results = {
     geprueft: 0,
     erinnerungen: 0,
     abgelaufenMarkiert: 0,
     uebersprungen: 0,
+    nichtZugestellt: 0,
+    mailUebersprungen: 0,
     fehler: 0,
   };
 
@@ -183,6 +228,9 @@ export async function POST(request: NextRequest) {
             lastName: true,
             email: true,
             organization: { select: { name: true } },
+            // Name aus dem Fragebogen zuerst (mitarbeiterName), sonst der
+            // Name am Vorgang.
+            personalData: { select: { firstName: true, lastName: true } },
           },
         },
       },
@@ -228,13 +276,20 @@ export async function POST(request: NextRequest) {
         // (a) Statusfortschreibung. Unabhaengig vom Mailversand: Der Ablauf ist
         //     eine Tatsache des Datums, kein Ergebnis der Zustellung. REJECTED
         //     ist schon in der Abfrage ausgeschlossen — sonst ueberschriebe
-        //     EXPIRED die Ablehnungsentscheidung.
+        //     EXPIRED die Ablehnungsentscheidung. Die Bedingung steht trotzdem
+        //     noch einmal im WHERE, zusammen mit dem gelesenen Datum: Hat HR
+        //     die Frist seit dem Lesen geaendert (und EXPIRED zurueckgenommen)
+        //     oder den Scan abgelehnt, schreibt dieser Lauf nichts darueber.
         if (kategorie === "ABGELAUFEN" && doc.status !== "EXPIRED") {
-          await prisma.document.update({
-            where: { id: doc.id },
+          const markiert = await prisma.document.updateMany({
+            where: {
+              id: doc.id,
+              gueltigBis: doc.gueltigBis,
+              status: { notIn: ["EXPIRED", "REJECTED"] },
+            },
             data: { status: "EXPIRED" },
           });
-          results.abgelaufenMarkiert++;
+          if (markiert.count > 0) results.abgelaufenMarkiert++;
         }
 
         const schluessel = `${doc.onboardingId}|${doc.type}`;
@@ -278,9 +333,20 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const name =
-          [doc.onboarding.firstName, doc.onboarding.lastName].filter(Boolean).join(" ") ||
-          doc.onboarding.email;
+        // Name aus Fragebogen oder Vorgang, sonst die neutrale Bezeichnung —
+        // NIE die private E-Mail-Adresse der Person an seiner Stelle
+        // (Datensparsamkeit, Art. 5 Abs. 1 lit. c DSGVO): `mitarbeiter_name`
+        // steht im Betreff und in der Ueberschrift, der Betreff 90 Tage im
+        // Versandprotokoll (`EmailLog.subject`). Die Adresse selbst bleibt
+        // bewusst erhalten — als `mitarbeiter_email` im Payload (bestehende
+        // Webhook-Abnehmer) und im Datenblock der Mail, wo HR sie zum
+        // Nachfragen braucht; neu ist nur, dass sie nicht mehr an Stelle des
+        // Namens auftaucht. MITARBEITER_NEUTRAL ist ein Akkusativ; die
+        // Vorlagen setzen den Namen deshalb nur nach „für" (auch als Label
+        // „Nachweis für"). Ausdruecklich gesetzt, nie leer — ein leerer Wert
+        // fiele in `extractVariables` (mailer.ts) auf andere Payload-Felder
+        // zurueck.
+        const name = mitarbeiterName(doc.onboarding) ?? MITARBEITER_NEUTRAL;
 
         // Die Adresse der beschaeftigten Person heisst hier bewusst
         // `mitarbeiter_email` und NICHT `email`: Der Mailer loest `{{email}}`
@@ -312,14 +378,32 @@ export async function POST(request: NextRequest) {
         const event = kategorie === "ABGELAUFEN" ? EVENT_ABGELAUFEN : EVENT_WARNUNG;
         const mailResult = await triggerWebhooks(event, payload);
 
+        // Merker nur, solange das Datum noch das gelesene ist — sonst truege
+        // eine gerade von HR geaenderte Frist den Merker der alten.
+        const merkerSchreiben = () =>
+          prisma.document.updateMany({
+            where: { id: doc.id, gueltigBis: doc.gueltigBis },
+            data: { ablaufErinnertAm: now, ablaufErinnertStufe: kategorie },
+          });
+
         if (mailResult?.status !== "SENT") {
-          // Merker NICHT setzen: Der naechste Lauf versucht es erneut, bis der
-          // Empfaenger in der Vorlage konfiguriert bzw. SMTP wieder erreichbar
-          // ist. Sonst waere die Erinnerung verbrannt.
+          // Merker bei SKIPPED ja, bei FAILED nein (Kopfkommentar). In beiden
+          // Faellen kein AuditLog: Es ist keine Erinnerung angekommen.
+          const skipped = merkerSetzen(mailResult);
+          if (skipped) {
+            await merkerSchreiben();
+            results.mailUebersprungen++;
+          } else {
+            results.nichtZugestellt++;
+          }
           console.warn(
             `[cron/dokument-ablauf] "${event}" fuer Dokument ${doc.id} nicht zugestellt ` +
-              `(${mailResult?.status ?? "unbekannt"}) — wird beim naechsten Lauf erneut ` +
-              `versucht. Empfaenger in Einstellungen -> E-Mail-Versand konfigurieren.`
+              `(${mailResult?.status ?? "unbekannt"}${mailResult?.detail ? `: ${mailResult.detail}` : ""}) — ` +
+              (skipped
+                ? `naechster Versuch beim Stufenwechsel oder nach ` +
+                  `${intervall} Tagen. Vorlage und Empfaenger unter ` +
+                  `Einstellungen -> E-Mail-Versand pruefen.`
+                : `wird beim naechsten Lauf erneut versucht.`)
           );
           results.uebersprungen++;
           continue;
@@ -327,10 +411,7 @@ export async function POST(request: NextRequest) {
 
         // Merker und Protokoll in EINER Transaktion.
         await prisma.$transaction([
-          prisma.document.update({
-            where: { id: doc.id },
-            data: { ablaufErinnertAm: now, ablaufErinnertStufe: kategorie },
-          }),
+          merkerSchreiben(),
           prisma.auditLog.create({
             data: {
               onboardingId: doc.onboardingId,

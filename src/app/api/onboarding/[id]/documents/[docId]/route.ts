@@ -12,6 +12,7 @@ import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
 import { asciiFilename } from "@/lib/file-upload";
 import {
   ablaufKalendertag,
+  istAbgelaufen,
   istFristpflichtig,
   pruefeGueltigBis,
 } from "@/lib/dokument-fristen";
@@ -167,6 +168,30 @@ export async function GET(
  * unbefristeten Titel (Niederlassungserlaubnis) wieder loszuwerden — und jede
  * Aenderung landet mitsamt altem und neuem Wert im AuditLog. Der Unterschied
  * ist also nicht Vertrauen, sondern die Spur.
+ *
+ * **Eine neue Frist beginnt von vorn** (Durchsicht 09/2026). Der naechtliche
+ * Lauf (`/api/cron/dokument-ablauf`) schreibt zwei Dinge an das Dokument, die
+ * am ALTEN Datum haengen: den Status EXPIRED und den Erinnerungs-Merker
+ * (`ablaufErinnertAm`/`ablaufErinnertStufe`). Blieben beide stehen, truege ein
+ * korrigierter Titel dauerhaft das Abzeichen „Abgelaufen" neben der gruenen
+ * Ampel, und die erste Erinnerung zur neuen Frist wartete das Intervall der
+ * alten Stufe ab. Deshalb gilt bei jeder ECHTEN Aenderung des Datums:
+ *
+ *   - Der Merker wird geleert — fuer die neue Frist beginnt ein neuer Zyklus.
+ *   - EXPIRED wird zu UPLOADED, wenn das neue Datum nicht (mehr) abgelaufen ist
+ *     (`istAbgelaufen`, dieselbe Ampel wie Anzeige und Lauf; ohne Datum ist
+ *     nichts abgelaufen). UPLOADED und nicht „der Status davor", weil der nicht
+ *     gespeichert ist (EXPIRED ueberschreibt ihn, siehe DocumentStatus in
+ *     prisma/schema.prisma) — und weil das Onboarding einen Nachweis heute
+ *     ohnehin nur als UPLOADED oder EXPIRED kennt. Die Pruefung liegt damit
+ *     wieder bei HR.
+ *   - Ist das neue Datum selbst schon vorbei, bleibt der Status, wie er ist;
+ *     EXPIRED setzt dann der naechste Lauf (die eine Stelle, die ihn setzt).
+ *   - REJECTED bleibt unberuehrt: Die Ablehnung gilt dem Scan, nicht dem
+ *     Datum. Die Ruecknahme trifft deshalb NUR EXPIRED — als Bedingung in der
+ *     Abfrage (`updateMany … status: "EXPIRED"`), nicht nach dem vorher
+ *     gelesenen Stand. Setzt der Lauf EXPIRED genau zwischen Lesen und
+ *     Schreiben, wird es trotzdem zurueckgenommen.
  */
 export async function PATCH(
   request: NextRequest,
@@ -211,7 +236,7 @@ export async function PATCH(
 
     const document = await prisma.document.findFirst({
       where: { id: docId, onboardingId: onboarding.id },
-      select: { id: true, type: true, fileName: true, gueltigBis: true },
+      select: { id: true, type: true, fileName: true, gueltigBis: true, status: true },
     });
     if (!document) {
       return NextResponse.json(
@@ -248,19 +273,37 @@ export async function PATCH(
         id: document.id,
         type: document.type,
         gueltigBis: document.gueltigBis,
+        status: document.status,
       });
     }
 
+    // Abgelaufen nach der NEUEN Frist? Dieselbe Rechnung wie Ampel und Lauf.
+    const neuAbgelaufen = istAbgelaufen(frist.gueltigBis);
+
     // Aenderung und Protokoll in EINER Transaktion: Ein Nachweis, dessen Frist
     // sich ohne Spur verschiebt, ist genau der Zustand, den die Ampel
-    // verhindern soll.
-    const [aktualisiert] = await prisma.$transaction([
-      prisma.document.update({
+    // verhindern soll. Interaktiv, weil das Protokoll wissen muss, ob der
+    // Status tatsaechlich zurueckgenommen wurde (Kopfkommentar).
+    const aktualisiert = await prisma.$transaction(async (tx) => {
+      const statusZurueck = neuAbgelaufen
+        ? { count: 0 }
+        : await tx.document.updateMany({
+            where: { id: document.id, status: "EXPIRED" },
+            data: { status: "UPLOADED" },
+          });
+
+      const ergebnis = await tx.document.update({
         where: { id: document.id },
-        data: { gueltigBis: frist.gueltigBis },
-        select: { id: true, type: true, gueltigBis: true },
-      }),
-      prisma.auditLog.create({
+        data: {
+          gueltigBis: frist.gueltigBis,
+          // Neuer Zyklus fuer die neue Frist (Kopfkommentar).
+          ablaufErinnertAm: null,
+          ablaufErinnertStufe: null,
+        },
+        select: { id: true, type: true, gueltigBis: true, status: true },
+      });
+
+      await tx.auditLog.create({
         data: {
           userId: session.userId,
           onboardingId: onboarding.id,
@@ -272,10 +315,17 @@ export async function PATCH(
             dokumentDatei: document.fileName,
             vorher,
             nachher,
+            // Nur bei einem echten Wechsel — sonst stuende im Protokoll eine
+            // Statusaenderung, die keine war.
+            ...(statusZurueck.count > 0
+              ? { statusVorher: "EXPIRED", statusNachher: "UPLOADED" }
+              : {}),
           },
         },
-      }),
-    ]);
+      });
+
+      return ergebnis;
+    });
 
     return NextResponse.json(aktualisiert);
   } catch (error) {

@@ -18,6 +18,7 @@ import type { ExitType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { offboardingMailFelder } from "@/lib/offboarding-mail";
+import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
 
 /** Checklisten-Template-Name anhand OrganizationType. */
 export function getTemplateNameForOrgType(orgType: string): string {
@@ -76,10 +77,10 @@ export interface CreateOffboardingInput {
 export async function createOffboardingProcess(input: CreateOffboardingInput) {
   const { organization: org } = input;
 
-  // displayId generieren: "OFF-{year}-{orgShortName}-{sequential}"
-  const currentYear = new Date().getFullYear();
-  const yearStart = new Date(currentYear, 0, 1);
-  const yearEnd = new Date(currentYear + 1, 0, 1);
+  // displayId generieren: "OFF-{year}-{orgShortName}-{sequential}" — Jahr und
+  // Zaehlbereich in deutscher Zeit, der Container laeuft in UTC
+  // (src/lib/vorgangsjahr.ts).
+  const { jahr: currentYear, von: yearStart, bis: yearEnd } = vorgangsjahrInBerlin(new Date());
   const shortName = org.shortName || org.mandantNumber;
 
   let displayId = "";

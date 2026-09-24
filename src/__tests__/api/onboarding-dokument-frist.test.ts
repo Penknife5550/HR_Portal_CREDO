@@ -41,11 +41,12 @@ const mockCanAccessProcess = jest.fn();
 
 const mockPrisma = {
   onboardingProcess: { findUnique: jest.fn() },
-  document: { findFirst: jest.fn(), update: jest.fn() },
+  document: { findFirst: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
   auditLog: { create: jest.fn() },
-  // Die Route bindet Aenderung und Protokoll zusammen. Der Mock reicht die
-  // Ergebnisse in derselben Reihenfolge zurueck, damit `[aktualisiert]` stimmt.
-  $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
+  // Die Route bindet Aenderung, Statusruecknahme und Protokoll zusammen —
+  // interaktiv, weil das Protokoll wissen muss, ob der Status wirklich
+  // zurueckgenommen wurde. Der Mock reicht sich selbst als `tx` durch.
+  $transaction: jest.fn(),
 };
 
 jest.mock("@/lib/auth", () => ({ getSession: mockGetSession }));
@@ -72,6 +73,7 @@ const TITEL = {
   type: "AUFENTHALTSTITEL",
   fileName: "titel.pdf",
   gueltigBis: null as Date | null,
+  status: "UPLOADED",
 };
 
 function patch(koerper: unknown, id = "v1", docId = "d1") {
@@ -91,9 +93,18 @@ beforeEach(() => {
   mockPrisma.onboardingProcess.findUnique.mockResolvedValue(VORGANG);
   mockPrisma.document.findFirst.mockResolvedValue({ ...TITEL });
   mockPrisma.document.update.mockImplementation(({ data }: { data: { gueltigBis: Date | null } }) =>
-    Promise.resolve({ id: "d1", type: "AUFENTHALTSTITEL", gueltigBis: data.gueltigBis })
+    Promise.resolve({
+      id: "d1",
+      type: "AUFENTHALTSTITEL",
+      gueltigBis: data.gueltigBis,
+      status: "UPLOADED",
+    })
   );
+  mockPrisma.document.updateMany.mockResolvedValue({ count: 0 });
   mockPrisma.auditLog.create.mockResolvedValue({});
+  mockPrisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+    fn(mockPrisma)
+  );
 });
 
 // =============================================
@@ -142,7 +153,11 @@ describe("HR traegt ein Ablaufdatum nach", () => {
     await patch({ gueltigBis: "2027-03-01" });
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.$transaction.mock.calls[0][0]).toHaveLength(2);
+    // Interaktiv: Beide Schreibvorgaenge laufen ueber `tx`, innerhalb des
+    // einen Aufrufs.
+    expect(typeof mockPrisma.$transaction.mock.calls[0][0]).toBe("function");
+    expect(mockPrisma.document.update).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledTimes(1);
   });
 
   /**
@@ -183,6 +198,10 @@ describe("HR traegt ein Ablaufdatum nach", () => {
     expect(antwort.status).toBe(200);
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    // Auch Merker und Status bleiben: Ein erneutes Speichern desselben Datums
+    // startet keinen neuen Erinnerungszyklus.
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+    expect(mockPrisma.document.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -291,5 +310,125 @@ describe("Fristregel", () => {
 
     expect((await patch({ gueltigBis: "" })).status).toBe(400);
     expect(mockPrisma.document.update).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================
+// 4. Eine neue Frist beginnt von vorn (Durchsicht 09/2026)
+// =============================================
+//
+// Der naechtliche Lauf schreibt EXPIRED und den Erinnerungs-Merker an das
+// Dokument — beides haengt am ALTEN Datum. Ohne Ruecknahme truege ein
+// korrigierter Titel dauerhaft „Abgelaufen" neben der gruenen Ampel, und die
+// erste Erinnerung zur neuen Frist wartete das Intervall der alten Stufe ab.
+
+describe("Neue Frist, neuer Zyklus", () => {
+  /** 23.09.2026, 10:00 UTC — die Stufen haengen an „heute in Berlin". */
+  const JETZT = new Date("2026-09-23T10:00:00.000Z");
+
+  beforeAll(() => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+    jest.setSystemTime(JETZT);
+  });
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
+  const ABGELAUFENER_TITEL = {
+    ...TITEL,
+    gueltigBis: new Date("2026-09-01T00:00:00.000Z"),
+    status: "EXPIRED",
+  };
+
+  test("leert bei jeder Aenderung den Erinnerungs-Merker", async () => {
+    await patch({ gueltigBis: "2027-03-01" });
+
+    expect(mockPrisma.document.update.mock.calls[0][0].data).toMatchObject({
+      ablaufErinnertAm: null,
+      ablaufErinnertStufe: null,
+    });
+  });
+
+  test("nimmt EXPIRED zurueck, wenn die neue Frist nicht abgelaufen ist — mit Spur", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({ ...ABGELAUFENER_TITEL });
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+
+    const antwort = await patch({ gueltigBis: "2027-09-01" });
+
+    expect(antwort.status).toBe(200);
+    // Bedingt in der Abfrage, nicht nach dem gelesenen Stand: trifft NUR
+    // EXPIRED, nie REJECTED — auch wenn der Lauf EXPIRED gerade erst gesetzt hat.
+    expect(mockPrisma.document.updateMany).toHaveBeenCalledWith({
+      where: { id: "d1", status: "EXPIRED" },
+      data: { status: "UPLOADED" },
+    });
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data.details).toMatchObject({
+      vorher: "2026-09-01",
+      nachher: "2027-09-01",
+      statusVorher: "EXPIRED",
+      statusNachher: "UPLOADED",
+    });
+    // Die Antwort traegt den Status, damit die Oberflaeche ihn nachziehen kann.
+    expect(await antwort.json()).toHaveProperty("status");
+  });
+
+  test("laesst den Status stehen, wenn auch die neue Frist schon abgelaufen ist", async () => {
+    // EXPIRED setzt dann der naechste Lauf — die eine Stelle, die ihn setzt.
+    mockPrisma.document.findFirst.mockResolvedValue({ ...ABGELAUFENER_TITEL });
+
+    await patch({ gueltigBis: "2026-09-10" });
+
+    expect(mockPrisma.document.updateMany).not.toHaveBeenCalled();
+    // Der Merker wird trotzdem geleert: Fuer die korrigierte Frist meldet sich
+    // der Lauf beim naechsten Mal sofort.
+    expect(mockPrisma.document.update.mock.calls[0][0].data).toMatchObject({
+      ablaufErinnertAm: null,
+      ablaufErinnertStufe: null,
+    });
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data.details).not.toHaveProperty(
+      "statusVorher"
+    );
+  });
+
+  test("der Ablauftag selbst gilt noch — EXPIRED wird zurueckgenommen", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({ ...ABGELAUFENER_TITEL });
+
+    await patch({ gueltigBis: "2026-09-23" });
+
+    expect(mockPrisma.document.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  test("ohne Datum ist nichts abgelaufen — auch das Loeschen nimmt EXPIRED zurueck", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({ ...ABGELAUFENER_TITEL });
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+
+    await patch({ gueltigBis: "" });
+
+    expect(mockPrisma.document.updateMany).toHaveBeenCalledWith({
+      where: { id: "d1", status: "EXPIRED" },
+      data: { status: "UPLOADED" },
+    });
+  });
+
+  test("REJECTED bleibt unberuehrt — kein Statuswechsel im Protokoll", async () => {
+    // Die Ablehnung gilt dem Scan, nicht dem Datum. Die bedingte Abfrage trifft
+    // die Zeile nicht (count 0), und das Protokoll behauptet keinen Wechsel.
+    mockPrisma.document.findFirst.mockResolvedValue({
+      ...TITEL,
+      gueltigBis: new Date("2026-09-01T00:00:00.000Z"),
+      status: "REJECTED",
+    });
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 0 });
+
+    await patch({ gueltigBis: "2027-09-01" });
+
+    expect(mockPrisma.document.updateMany.mock.calls[0][0].where).toEqual({
+      id: "d1",
+      status: "EXPIRED",
+    });
+    expect(mockPrisma.document.update.mock.calls[0][0].data).not.toHaveProperty("status");
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data.details).not.toHaveProperty(
+      "statusVorher"
+    );
   });
 });

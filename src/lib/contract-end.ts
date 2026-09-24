@@ -13,6 +13,7 @@
 
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
 
 export interface CreateContractEndInput {
   /** Bereits geladene Organisation (Aufrufer prueft Existenz). */
@@ -56,10 +57,10 @@ export interface CreateContractEndInput {
 export async function createContractEndProcess(input: CreateContractEndInput) {
   const { organization: org } = input;
 
-  // displayId generieren: "VE-{year}-{orgShortName}-{sequential}"
-  const currentYear = new Date().getFullYear();
-  const yearStart = new Date(currentYear, 0, 1);
-  const yearEnd = new Date(currentYear + 1, 0, 1);
+  // displayId generieren: "VE-{year}-{orgShortName}-{sequential}" — Jahr und
+  // Zaehlbereich in deutscher Zeit, der Container laeuft in UTC
+  // (src/lib/vorgangsjahr.ts).
+  const { jahr: currentYear, von: yearStart, bis: yearEnd } = vorgangsjahrInBerlin(new Date());
   const shortName = org.shortName || org.mandantNumber;
 
   let displayId = "";

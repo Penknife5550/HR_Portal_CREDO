@@ -9,6 +9,9 @@
  *      Sperre, nicht aus dem vorher gelesenen Stand (frueher: Lost Update).
  *   3. NICHT NACH DER ABGABE — sonst saehe eine neue Person die kompletten
  *      Verguetungsangaben.
+ *   4. FREIGABELISTE — eine NEUE Adresse ausserhalb der freigegebenen Domains
+ *      ergibt 409 vor jedem Schreiben und jeder Mail; die hinterlegte Adresse
+ *      ist immer erlaubt (wie im Offboarding).
  */
 
 // Der Link wird aus APP_URL gebaut — fest, damit die Erwartungen unten nicht
@@ -25,6 +28,8 @@ const mockPrisma = {
   supervisorData: { upsert: jest.fn() },
   auditLog: { create: jest.fn() },
   userOrgAssignment: { findUnique: jest.fn() },
+  // Freigabeliste der Empfaenger-Domains (Einstellungen → SMTP).
+  smtpConfig: { findUnique: jest.fn() },
   $transaction: jest.fn(),
 };
 const mockSession = jest.fn();
@@ -43,6 +48,7 @@ jest.mock("@/lib/webhooks", () => ({
 import { POST } from "@/app/api/onboarding/[id]/supervisor-link/route";
 import { NextRequest } from "next/server";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
+import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
 
 const HR = {
   userId: "u1",
@@ -113,6 +119,8 @@ beforeEach(() => {
     fn(mockPrisma),
   );
   mockWebhook.mockResolvedValue({ status: "SENT" });
+  // Leere Liste = keine Einschraenkung (Auslieferungszustand).
+  mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "" });
 });
 
 describe("Zugriff und Eingabe", () => {
@@ -386,4 +394,86 @@ describe("Gesperrt", () => {
       expect(mockPrisma.onboardingProcess.updateMany).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("Freigabeliste der Fuehrungskraft", () => {
+  const nurFes = () =>
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({
+      allowedRecipientDomains: "fes.example",
+    });
+
+  it("erlaubt bei leerer Liste jede Adresse", async () => {
+    const res = await aufrufen({ supervisorEmail: "leitung@freemail.example" });
+    expect(res.status).toBe(201);
+  });
+
+  it("erlaubt eine neue Adresse in einer freigegebenen Domain", async () => {
+    nurFes();
+    expect((await aufrufen()).status).toBe(201);
+  });
+
+  it("weist eine neue Adresse ausserhalb der Liste mit 409 ab — ohne Schreiben, ohne Mail", async () => {
+    nurFes();
+
+    const res = await aufrufen({ supervisorEmail: "leitung@freemail.example" });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: MELDUNGEN.FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN });
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.onboardingProcess.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    expect(mockWebhook).not.toHaveBeenCalled();
+  });
+
+  it("weist auch den Wechsel eines bestehenden Links an eine fremde Domain ab", async () => {
+    nurFes();
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
+      vorgang({
+        supervisorToken: "alter-token",
+        supervisorEmail: "schulleitung@fes.example",
+        supervisorTokenExpiresAt: MORGEN(),
+      }),
+    );
+
+    const res = await aufrufen({ supervisorEmail: "leitung@freemail.example" });
+
+    expect(res.status).toBe(409);
+    // Der alte Link bleibt unangetastet.
+    expect(mockPrisma.onboardingProcess.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("verwendet die hinterlegte Adresse immer wieder — auch ausserhalb der Liste", async () => {
+    // Die Liste wurde gepflegt, nachdem der Link hinausging. Wiederverwenden
+    // darf daran nie scheitern — und braucht die Liste gar nicht erst.
+    nurFes();
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
+      vorgang({
+        supervisorToken: "alter-token",
+        supervisorEmail: "Leitung@Freemail.example",
+        supervisorTokenExpiresAt: MORGEN(),
+      }),
+    );
+
+    const res = await aufrufen({ supervisorEmail: "leitung@freemail.example" });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).wiederverwendet).toBe(true);
+    expect(mockPrisma.smtpConfig.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("erneuert einen abgelaufenen Link an die hinterlegte Adresse — auch ausserhalb der Liste", async () => {
+    nurFes();
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
+      vorgang({
+        supervisorToken: "alter-token",
+        supervisorEmail: "leitung@freemail.example",
+        supervisorTokenExpiresAt: new Date(Date.now() - 1000),
+      }),
+    );
+
+    const res = await aufrufen({ supervisorEmail: "leitung@freemail.example" });
+
+    expect(res.status).toBe(201);
+    expect(mockWebhook).toHaveBeenCalledTimes(1);
+  });
 });

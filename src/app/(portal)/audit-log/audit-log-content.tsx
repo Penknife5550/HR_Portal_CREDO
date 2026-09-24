@@ -66,6 +66,10 @@ const ACTION_LABELS: Record<string, string> = {
   // fest, was zum ABGABEZEITPUNKT fehlte — der heutige Stand steht live
   // gerechnet im Kasten „Offene Nachweise" der Vorgangsansicht.
   DOKUMENTE_NACHZUREICHEN: "Nachweise nachzureichen",
+  // Befristete Nachweise: Fristaenderung durch HR oder ueber den Magic Link
+  // (`details.quelle`), Erinnerung des naechtlichen Laufs.
+  DOKUMENT_FRIST_GEAENDERT: "Ablaufdatum geändert",
+  DOKUMENT_ABLAUF_ERINNERT: "Ablauf-Erinnerung gesendet",
   RETURN_ITEM_UPDATED: "Rückgabe aktualisiert",
   DEPARTMENT_FEEDBACK_SUBMITTED: "Abteilungs-Feedback eingereicht",
   // Abteilungsaufgaben (Paket 1b): Informieren, Erinnern, Link erneuern,

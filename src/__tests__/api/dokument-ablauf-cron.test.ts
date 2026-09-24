@@ -6,9 +6,11 @@
  * - Absicherung (CRON_SECRET),
  * - dass NICHT jeden Tag dieselbe Mail hinausgeht,
  * - dass ein Cron-AUSFALL die faellige Erinnerung nicht verschluckt,
- * - dass der Merker nur nach einem echten SENT gesetzt wird,
+ * - dass der Merker bei SENT und SKIPPED gesetzt wird, bei FAILED nicht
+ *   (Hausregel des Erinnerungs-Crons),
  * - dass ein nachgereichter Nachweis die Mahnung beendet,
- * - und dass die interne Warnung nicht bei der betroffenen Person landet.
+ * - dass die interne Warnung nicht bei der betroffenen Person landet,
+ * - und dass die private Adresse nie als Name im Betreff steht.
  *
  * **Die Uhr steht.** Die Route rechnet in Kalendertagen ab "heute in Berlin";
  * ohne feste Systemzeit waeren die Stufengrenzen an manchen Tagen knapp
@@ -16,7 +18,12 @@
  */
 
 const mockPrisma = {
-  document: { findMany: jest.fn(), groupBy: jest.fn(), update: jest.fn() },
+  document: {
+    findMany: jest.fn(),
+    groupBy: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
+  },
   auditLog: { create: jest.fn() },
   $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
 };
@@ -31,6 +38,9 @@ import { NextRequest } from "next/server";
 import { EVENT_CATALOG } from "@/lib/events";
 import { kalendertagAlsDatum } from "@/lib/dokument-fristen";
 import { tageSpaeter } from "@/lib/minijob-fristen";
+import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
+import { renderEventEmail } from "@/lib/mailer";
+import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 
 const SECRET = "test-cron-secret-mindestens-24-zeichen";
 const MS_PER_DAY = 86400000;
@@ -69,22 +79,43 @@ function dokument(overrides: Record<string, unknown> = {}) {
       lastName: "Mustermann",
       email: "max.mustermann@example.org",
       organization: { name: "Gymnasium" },
+      personalData: null as { firstName: string | null; lastName: string | null } | null,
     },
     ...overrides,
   };
 }
 
-/** Alle document.update-Aufrufe, die den Erinnerungs-Merker schreiben. */
+/**
+ * Alle Schreibaufrufe, die den Erinnerungs-Merker setzen. Seit 09/2026 als
+ * bedingtes `updateMany` (nur solange `gueltigBis` der gelesene Wert ist) —
+ * `update` wird mit abgefragt, damit ein Rueckbau nicht still durchrutscht.
+ */
 function merkerUpdates() {
-  return mockPrisma.document.update.mock.calls.filter(
-    (c) => "ablaufErinnertAm" in (c[0]?.data ?? {})
-  );
+  return [
+    ...mockPrisma.document.update.mock.calls,
+    ...mockPrisma.document.updateMany.mock.calls,
+  ].filter((c) => "ablaufErinnertAm" in (c[0]?.data ?? {}));
 }
 
-/** Alle document.update-Aufrufe, die den Status auf EXPIRED setzen. */
+/** Alle Schreibaufrufe, die den Status auf EXPIRED setzen. */
 function statusUpdates() {
-  return mockPrisma.document.update.mock.calls.filter(
-    (c) => c[0]?.data?.status === "EXPIRED"
+  return [
+    ...mockPrisma.document.update.mock.calls,
+    ...mockPrisma.document.updateMany.mock.calls,
+  ].filter((c) => c[0]?.data?.status === "EXPIRED");
+}
+
+/**
+ * Steht die Fundstelle bei `index` direkt nach „für"? Im Satz („für
+ * <strong>…"), im Betreff und im Label „Nachweis für" (HTML: eigener Absatz
+ * davor, Text: „Nachweis für: …").
+ */
+function stehtNachFuer(teil: string, index: number): boolean {
+  const davor = teil.slice(Math.max(0, index - 200), index);
+  return (
+    /für (<strong>)?$/.test(davor) ||
+    /Nachweis für:\s*$/.test(davor) ||
+    /Nachweis für<\/p>\s*<p[^>]*>$/.test(davor)
   );
 }
 
@@ -105,6 +136,7 @@ describe("POST /api/cron/dokument-ablauf", () => {
     // Leer = kein Nachweis ueberholt einen anderen (der Regelfall).
     mockPrisma.document.groupBy.mockResolvedValue([]);
     mockPrisma.document.update.mockResolvedValue({});
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.auditLog.create.mockResolvedValue({});
     mockTriggerWebhooks.mockResolvedValue({ status: "SENT" });
   });
@@ -167,8 +199,10 @@ describe("POST /api/cron/dokument-ablauf", () => {
         dringlichkeit: "Warnung",
       })
     );
+    // Bedingt auf das gelesene Datum: Hat HR die Frist inzwischen geaendert
+    // (und damit den Merker geleert), ueberschreibt dieser Lauf das nicht.
     expect(merkerUpdates()[0][0]).toEqual({
-      where: { id: "doc1" },
+      where: { id: "doc1", gueltigBis: ablaufIn(30) },
       data: { ablaufErinnertAm: JETZT, ablaufErinnertStufe: "WARNUNG" },
     });
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
@@ -275,8 +309,14 @@ describe("POST /api/cron/dokument-ablauf", () => {
       "dokument-abgelaufen",
       expect.objectContaining({ tage_ueberfaellig: 7, tage_verbleibend: -7 })
     );
+    // Bedingt: nur auf dem gelesenen Datum und nie ueber REJECTED — hat HR
+    // die Frist seit dem Lesen korrigiert, bleibt deren Ruecknahme stehen.
     expect(statusUpdates()[0][0]).toEqual({
-      where: { id: "doc1" },
+      where: {
+        id: "doc1",
+        gueltigBis: ablaufIn(-7),
+        status: { notIn: ["EXPIRED", "REJECTED"] },
+      },
       data: { status: "EXPIRED" },
     });
   });
@@ -323,26 +363,77 @@ describe("POST /api/cron/dokument-ablauf", () => {
   });
 
   // ---------------------------------------------------------------
-  // Merker nur nach echtem SENT
+  // Merker: SENT und SKIPPED ja, FAILED nein (Hausregel wie /cron/reminders)
   // ---------------------------------------------------------------
-  it("setzt den Merker NICHT, wenn kein Empfaenger konfiguriert ist (SKIPPED)", async () => {
-    // Sonst waere die Erinnerung verbrannt: Der naechste Lauf haelt sie fuer
-    // erledigt, obwohl nie jemand eine Mail bekommen hat.
+  it("setzt den Merker auch bei SKIPPED — ohne Protokoll, als eigener Zaehler", async () => {
+    // SKIPPED heisst: Vorlage aus oder kein Empfaenger. Ein Versuch am naechsten
+    // Tag aendert daran nichts; ohne Merker feuerten die Webhooks taeglich und
+    // jeder Lauf schriebe einen SKIPPED-Eintrag ins Versandprotokoll.
     mockTriggerWebhooks.mockResolvedValue({ status: "SKIPPED", detail: "Kein Empfaenger" });
     mockPrisma.document.findMany.mockResolvedValue([dokument()]);
 
     const json = await (await POST(req())).json();
     expect(json.erinnerungen).toBe(0);
+    expect(json.mailUebersprungen).toBe(1);
+    expect(json.nichtZugestellt).toBe(0);
+    // Das bestehende Feld zaehlt wie bisher mit (n8n-Auswertungen).
+    expect(json.uebersprungen).toBe(1);
+    expect(merkerUpdates()).toHaveLength(1);
+    expect(merkerUpdates()[0][0].data).toEqual({
+      ablaufErinnertAm: JETZT,
+      ablaufErinnertStufe: "WARNUNG",
+    });
+    // Angekommen ist nichts — also auch kein DOKUMENT_ABLAUF_ERINNERT.
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("schweigt nach einem SKIPPED am naechsten Tag, statt taeglich neu zu feuern", async () => {
+    // Der Merker vom Vortag (gleiche Stufe, Intervall 14 Tage) haelt.
+    mockTriggerWebhooks.mockResolvedValue({ status: "SKIPPED" });
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({
+        ablaufErinnertAm: new Date(JETZT.getTime() - 1 * MS_PER_DAY),
+        ablaufErinnertStufe: "WARNUNG",
+      }),
+    ]);
+
+    await POST(req());
+    expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+  });
+
+  it("setzt den Merker NICHT bei FAILED — der naechste Lauf versucht es erneut", async () => {
+    mockTriggerWebhooks.mockResolvedValue({ status: "FAILED", detail: "SMTP weg" });
+    mockPrisma.document.findMany.mockResolvedValue([dokument()]);
+
+    const json = await (await POST(req())).json();
+    expect(json.erinnerungen).toBe(0);
+    expect(json.nichtZugestellt).toBe(1);
+    expect(json.mailUebersprungen).toBe(0);
+    expect(json.uebersprungen).toBe(1);
     expect(merkerUpdates()).toHaveLength(0);
     expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
   });
 
-  it("setzt den Merker NICHT bei FAILED", async () => {
-    mockTriggerWebhooks.mockResolvedValue({ status: "FAILED", detail: "SMTP weg" });
+  it("behandelt ein fehlendes Ergebnis des Dispatchers wie FAILED", async () => {
+    mockTriggerWebhooks.mockResolvedValue(null);
     mockPrisma.document.findMany.mockResolvedValue([dokument()]);
 
-    expect((await (await POST(req())).json()).erinnerungen).toBe(0);
+    const json = await (await POST(req())).json();
+    expect(json.nichtZugestellt).toBe(1);
     expect(merkerUpdates()).toHaveLength(0);
+  });
+
+  it("zaehlt den Ablauf nur, wenn das bedingte Update wirklich getroffen hat", async () => {
+    // count 0: HR hat die Frist seit dem Lesen geaendert oder den Scan
+    // abgelehnt — dann hat dieser Lauf nichts markiert.
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 0 });
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({ gueltigBis: ablaufIn(-2), status: "UPLOADED" }),
+    ]);
+
+    const json = await (await POST(req())).json();
+    expect(json.abgelaufenMarkiert).toBe(0);
+    expect(statusUpdates()).toHaveLength(1);
   });
 
   // ---------------------------------------------------------------
@@ -438,7 +529,7 @@ describe("POST /api/cron/dokument-ablauf", () => {
     const json = await (await POST(req())).json();
     expect(json.erinnerungen).toBe(1);
     expect(mockTriggerWebhooks).toHaveBeenCalledTimes(1);
-    expect(merkerUpdates()[0][0].where).toEqual({ id: "docA" });
+    expect(merkerUpdates()[0][0].where).toEqual({ id: "docA", gueltigBis: gleich });
   });
 
   // ---------------------------------------------------------------
@@ -492,6 +583,109 @@ describe("POST /api/cron/dokument-ablauf", () => {
     await POST(req());
 
     expect(mockTriggerWebhooks.mock.calls[0][1]).not.toHaveProperty("ablaufdatum");
+  });
+
+  // ---------------------------------------------------------------
+  // Name der Person: Fragebogen, Vorgang, neutral — nie die Adresse
+  // ---------------------------------------------------------------
+  it("nimmt den Namen aus dem Fragebogen vor dem Namen am Vorgang", async () => {
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({
+        onboarding: {
+          ...dokument().onboarding,
+          personalData: { firstName: "Maximilian", lastName: "Mustermann-Neu" },
+        },
+      }),
+    ]);
+    await POST(req());
+
+    expect(mockTriggerWebhooks.mock.calls[0][1].mitarbeiter_name).toBe(
+      "Maximilian Mustermann-Neu"
+    );
+    // Die Abfrage muss die Fragebogen-Namen ueberhaupt mitlesen.
+    const select = mockPrisma.document.findMany.mock.calls[0][0].select;
+    expect(select.onboarding.select.personalData).toEqual({
+      select: { firstName: true, lastName: true },
+    });
+  });
+
+  it("nimmt ohne Fragebogen-Namen den Namen am Vorgang", async () => {
+    mockPrisma.document.findMany.mockResolvedValue([dokument()]);
+    await POST(req());
+    expect(mockTriggerWebhooks.mock.calls[0][1].mitarbeiter_name).toBe("Max Mustermann");
+  });
+
+  it("faellt ohne Namen auf MITARBEITER_NEUTRAL zurueck — nie auf die private Adresse", async () => {
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({
+        onboarding: {
+          ...dokument().onboarding,
+          firstName: null,
+          lastName: "  ",
+          personalData: { firstName: "", lastName: null },
+        },
+      }),
+    ]);
+    await POST(req());
+
+    const payload = mockTriggerWebhooks.mock.calls[0][1];
+    expect(payload.mitarbeiter_name).toBe(MITARBEITER_NEUTRAL);
+    expect(payload.mitarbeiter_name).not.toContain("@");
+    // Das Feld selbst bleibt fuer bestehende Webhook-Abnehmer im Payload.
+    expect(payload.mitarbeiter_email).toBe("max.mustermann@example.org");
+  });
+
+  it("beide Vorlagen bleiben mit der neutralen Bezeichnung grammatisch", () => {
+    // MITARBEITER_NEUTRAL ist ein Akkusativ. Nach „von" (Dativ) oder als
+    // Wert hinter einem Gedankenstrich zerbraeche der Satz; die Vorlagen
+    // setzen den Namen deshalb nur nach „für".
+    for (const event of ["dokument-ablauf-warnung", "dokument-abgelaufen"]) {
+      const vorlage = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event)!;
+      const { rendered } = renderEventEmail(
+        {
+          subject: vorlage.subject,
+          bodyHtml: vorlage.bodyHtml,
+          bodyText: vorlage.bodyText,
+          recipientTo: "personal@example.org",
+          recipientCc: "",
+          recipientBcc: "",
+          recipientReplyTo: "",
+        },
+        event,
+        {
+          onboardingId: "onb1",
+          displayId: "2026-GYM-001",
+          mitarbeiter_name: MITARBEITER_NEUTRAL,
+          mitarbeiter_email: "privat@gmx.example",
+          organization: "Gymnasium",
+          dokument_typ: "Aufenthaltstitel",
+          dokument_datei: "titel.pdf",
+          gueltig_bis: "08.10.2026",
+          tage_verbleibend: 30,
+          tage_ueberfaellig: 0,
+          dringlichkeit: "Warnung",
+          frist_text: "Läuft in 30 Tagen ab (08.10.2026)",
+          portalLink: "http://localhost:3000/dashboard/onb1",
+        }
+      );
+      const mail = rendered!;
+      expect(mail.subject).toContain(`Aufenthaltstitel für ${MITARBEITER_NEUTRAL}`);
+
+      for (const teil of [mail.subject, mail.html, mail.text ?? ""]) {
+        let index = teil.indexOf(MITARBEITER_NEUTRAL);
+        expect({ event, gefunden: index >= 0 }).toEqual({ event, gefunden: true });
+        while (index >= 0) {
+          const umgebung = teil.slice(Math.max(0, index - 60), index);
+          expect({ event, umgebung, nachFuer: stehtNachFuer(teil, index) }).toEqual({
+            event,
+            umgebung,
+            nachFuer: true,
+          });
+          index = teil.indexOf(MITARBEITER_NEUTRAL, index + 1);
+        }
+        expect(teil).not.toMatch(/\{\{/);
+      }
+    }
   });
 
   it("beide Events stehen im Katalog und gehen ausschliesslich an HR", async () => {

@@ -930,8 +930,11 @@ model Document {
   /// steht daneben, damit ein Stufenwechsel sofort erinnert, statt das
   /// Intervall der milderen Stufe abzuwarten. Vorbild:
   /// ContractEndProcess.lastSupervisorReminderAt.
-  /// Der Merker darf NUR nach einem echten SENT gesetzt werden — sonst
-  /// verbrennt eine fehlgeschlagene Zustellung die Erinnerung.
+  /// Gesetzt bei SENT UND SKIPPED (Vorlage aus/kein Empfaenger — sonst liefe
+  /// die Erinnerung samt Webhook taeglich), NIE bei FAILED: Eine
+  /// fehlgeschlagene Zustellung darf die Erinnerung nicht verbrennen
+  /// (src/app/api/cron/dokument-ablauf/route.ts). Eine geaenderte Frist leert
+  /// den Merker wieder — fuer sie beginnt ein neuer Zyklus.
   ablaufErinnertAm    DateTime?
   /// Stufe aus src/lib/dokument-fristen.ts (AblaufKategorie) als Text. String
   /// und kein Enum: Die Stufen sind eine Anzeige- und Versandregel des Codes,
@@ -997,7 +1000,12 @@ enum DocumentStatus {
   /// APPROVED/REJECTED). Wer hier EXPIRED schreibt, ueberschreibt ihn. Dass
   /// geprueft wurde, bleibt in reviewedAt/reviewedById lesbar — die
   /// Entscheidung APPROVED vs. REJECTED nicht. Deshalb: nur auf einem
-  /// abgelaufenen Nachweis setzen, und nie zurueckschreiben.
+  /// abgelaufenen Nachweis setzen (einzige Stelle: der naechtliche Lauf, nie
+  /// ueber REJECTED). Zurueckgenommen wird EXPIRED nur an EINER Stelle: wenn
+  /// die Frist auf ein nicht abgelaufenes Datum korrigiert wird (HR-PATCH
+  /// bzw. Magic Link) — dann auf UPLOADED, weil der Stand davor nicht
+  /// gespeichert ist; die Pruefung liegt damit wieder bei HR, und der
+  /// Wechsel steht im AuditLog (DOKUMENT_FRIST_GEAENDERT).
   EXPIRED
 }
 

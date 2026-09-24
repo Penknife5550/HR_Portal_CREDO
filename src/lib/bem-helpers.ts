@@ -6,14 +6,15 @@
  */
 
 import { prisma } from "@/lib/db";
+import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
 
 export async function generateBemDisplayId(
   organizationId: string,
   shortName: string,
 ): Promise<{ displayId: string; sequentialNumber: number }> {
-  const currentYear = new Date().getFullYear();
-  const yearStart = new Date(currentYear, 0, 1);
-  const yearEnd = new Date(currentYear + 1, 0, 1);
+  // Jahr und Zaehlbereich in deutscher Zeit — der Container laeuft in UTC
+  // (src/lib/vorgangsjahr.ts).
+  const { jahr: currentYear, von: yearStart, bis: yearEnd } = vorgangsjahrInBerlin(new Date());
 
   let displayId = "";
   let sequentialNumber = 0;

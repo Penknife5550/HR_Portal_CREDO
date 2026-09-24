@@ -79,14 +79,28 @@ export function AbteilungenDialog({
 }: AbteilungenDialogProps) {
   const abbrechenRef = useRef<HTMLButtonElement>(null);
 
+  // Fokus EINMAL beim Oeffnen. Frueher lief er im selben Effekt wie die Taste
+  // und haengte an `onAbbrechen` — die Karte reicht dort eine neue Pfeilfunktion
+  // je Render, der Fokus sprang also bei jedem Neuzeichnen der Karte zurueck
+  // auf „Abbrechen".
   useEffect(() => {
     abbrechenRef.current?.focus();
+  }, []);
+
+  // Escape schliesst wie „Abbrechen" — und genau wie dieser Knopf NICHT waehrend
+  // des Versands: Sonst verschwaende der Dialog, waehrend die Mails noch
+  // hinausgehen, und ein zweiter Klick auf „Abteilungen informieren" liefe in
+  // die Versandsperre. `sendet` ist Abhaengigkeit des Effekts: Der Horcher wird
+  // bei jedem Wechsel neu gesetzt (bzw. waehrend des Versands gar nicht), liest
+  // also nie einen veralteten Wert aus einer frueheren Closure.
+  useEffect(() => {
+    if (sendet) return;
     const taste = (e: KeyboardEvent) => {
       if (e.key === "Escape") onAbbrechen();
     };
     document.addEventListener("keydown", taste);
     return () => document.removeEventListener("keydown", taste);
-  }, [onAbbrechen]);
+  }, [onAbbrechen, sendet]);
 
   const empfaenger = informierbareZeilen(abteilungen);
   const uebersprungen = nichtInformierteZeilen(abteilungen);

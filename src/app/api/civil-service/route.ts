@@ -12,6 +12,7 @@ import { createCivilServiceSchema } from "@/lib/validations/civil-service";
 import { orgFilter, PORTAL_ROLES } from "@/lib/permissions";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { formatEmployeeName } from "@/lib/format";
+import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
 import {
   CIVIL_SERVICE_CHECKLIST_TEMPLATE,
   CIVIL_SERVICE_PHASES,
@@ -210,10 +211,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // displayId generieren: "PSI-{year}-{orgShortName}-{sequential}"
-    const currentYear = new Date().getFullYear();
-    const yearStart = new Date(currentYear, 0, 1);
-    const yearEnd = new Date(currentYear + 1, 0, 1);
+    // displayId generieren: "PSI-{year}-{orgShortName}-{sequential}" — Jahr
+    // und Zaehlbereich in deutscher Zeit, der Container laeuft in UTC
+    // (src/lib/vorgangsjahr.ts).
+    const { jahr: currentYear, von: yearStart, bis: yearEnd } = vorgangsjahrInBerlin(new Date());
     const shortName = org.shortName || org.mandantNumber;
 
     let displayId = "";

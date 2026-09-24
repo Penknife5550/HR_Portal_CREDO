@@ -5,7 +5,9 @@
  *
  * Zeigt einen gefuehrten Prozess:
  * - Aktive Schritte: prominent, blau hervorgehoben, mit Aktions-Buttons
- * - Kommende Schritte: kompakt, ausgegraut
+ * - Kommende Schritte: kompakt, ausgegraut, ohne Knoepfe — es sei denn, der
+ *   Schritt verlangt es ausdruecklich (`aktionenAuchKommend`); dann stehen
+ *   seine Aktionen schmal unter der Zeile
  * - Erledigte Schritte: zusammengeklappt mit Haken
  *
  * MEHRERE SCHRITTE KOENNEN GLEICHZEITIG AKTIV SEIN (Paket 2, 09/2026).
@@ -57,6 +59,20 @@ export interface WorkflowStep {
   completedAt?: string;
   /** Haupt-Aktionen für den aktiven Schritt */
   actions?: WorkflowAction[];
+  /**
+   * Die Aktionen auch zeigen, solange der Schritt noch KOMMT (`upcoming`) —
+   * schmal in seiner Zeile unter „Kommende Schritte". Ohne dieses Feld bleiben
+   * kommende Schritte knopflos wie bisher (Offboarding, alle uebrigen
+   * Onboarding-Schritte). Fuer `blocked` gilt es bewusst nicht: Ein Knopf an
+   * einem gesperrten Schritt widerspraeche seinem roten Kreuz.
+   *
+   * Anlass (Onboarding): „Abteilungen informieren" ist erlaubt, sobald die
+   * Modalitaeten eingereicht sind — also vor der Pruefung, waehrend
+   * „Checkliste abarbeiten" noch kommt. Den Schritt dafuer aktiv zu setzen,
+   * stellte „Daten prüfen" und die Checkliste als parallel dar; parallel sind
+   * aber nur die beiden Spuren.
+   */
+  aktionenAuchKommend?: boolean;
   /** Sub-Items (z.B. Checklist-Items, Abteilungen, Rueckgaben) */
   items?: WorkflowSubItem[];
   /** Fortschritt (z.B. 3/5) */
@@ -224,33 +240,44 @@ function AktiveSchrittKarte({
         {/* Aktions-Buttons */}
         {step.actions && step.actions.length > 0 && (
           <div className="flex flex-wrap gap-2 pt-1">
-            {step.actions.map((action, i) => {
-              const base = "rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50";
-              const variant = action.variant === "danger"
-                ? "bg-credo-rot text-white hover:bg-credo-rot/90"
-                : action.variant === "secondary"
-                ? "border border-border bg-card text-foreground hover:bg-accent"
-                : "bg-primary text-primary-foreground hover:bg-primary/90";
-              return (
-                <button
-                  key={i}
-                  onClick={action.onClick}
-                  disabled={action.disabled || action.loading}
-                  className={`${base} ${variant}`}
-                >
-                  {action.loading ? (
-                    <span className="flex items-center gap-2">
-                      <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-                      {action.label}
-                    </span>
-                  ) : action.label}
-                </button>
-              );
-            })}
+            {step.actions.map((action, i) => (
+              <AktionsKnopf key={i} action={action} />
+            ))}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Ein Aktionsknopf — in der Karte eines aktiven Schritts in voller Groesse,
+ * in der Zeile eines kommenden Schritts (`aktionenAuchKommend`) schmal.
+ * EINE Stelle fuer Varianten, Sperre und Ladeanzeige, damit beide Orte sich
+ * gleich verhalten; das Markup der grossen Fassung ist unveraendert.
+ */
+function AktionsKnopf({ action, schmal = false }: { action: WorkflowAction; schmal?: boolean }) {
+  const base = schmal
+    ? "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+    : "rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50";
+  const variant = action.variant === "danger"
+    ? "bg-credo-rot text-white hover:bg-credo-rot/90"
+    : action.variant === "secondary"
+    ? "border border-border bg-card text-foreground hover:bg-accent"
+    : "bg-primary text-primary-foreground hover:bg-primary/90";
+  return (
+    <button
+      onClick={action.onClick}
+      disabled={action.disabled || action.loading}
+      className={`${base} ${variant}`}
+    >
+      {action.loading ? (
+        <span className="flex items-center gap-2">
+          <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+          {action.label}
+        </span>
+      ) : action.label}
+    </button>
   );
 }
 
@@ -337,8 +364,8 @@ export function ProcessWorkflowStepper({ steps, title }: ProcessWorkflowStepperP
             {upcomingSteps.map((s) => {
               const idx = steps.indexOf(s) + 1;
               const style = STATUS_STYLES[s.status];
-              return (
-                <div key={s.key} className={`flex items-center gap-3 rounded-lg border ${style.border} ${style.bg} px-4 py-3 opacity-60`}>
+              const kopf = (
+                <>
                   <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${style.circle}`}>
                     {s.status === "blocked" ? "✗" : idx}
                   </div>
@@ -349,6 +376,37 @@ export function ProcessWorkflowStepper({ steps, title }: ProcessWorkflowStepperP
                   {s.progress && (
                     <span className="text-xs text-muted-foreground">{s.progress.done}/{s.progress.total}</span>
                   )}
+                </>
+              );
+
+              // Nur auf ausdruecklichen Wunsch des Schritts (`aktionenAuchKommend`).
+              const kommendeAktionen =
+                s.status === "upcoming" && s.aktionenAuchKommend && s.actions && s.actions.length > 0
+                  ? s.actions
+                  : null;
+
+              if (!kommendeAktionen) {
+                return (
+                  <div key={s.key} className={`flex items-center gap-3 rounded-lg border ${style.border} ${style.bg} px-4 py-3 opacity-60`}>
+                    {kopf}
+                  </div>
+                );
+              }
+
+              // Die Zeile bleibt ausgegraut (der Schritt kommt noch); die Knoepfe
+              // stehen AUSSERHALB der Transparenz — sie sind ja schon benutzbar.
+              return (
+                <div
+                  key={s.key}
+                  data-kommend-mit-aktionen={s.key}
+                  className={`rounded-lg border ${style.border} ${style.bg} px-4 py-3`}
+                >
+                  <div className="flex items-center gap-3 opacity-60">{kopf}</div>
+                  <div className="mt-2 flex flex-wrap gap-2 pl-10">
+                    {kommendeAktionen.map((action, i) => (
+                      <AktionsKnopf key={i} action={action} schmal />
+                    ))}
+                  </div>
                 </div>
               );
             })}

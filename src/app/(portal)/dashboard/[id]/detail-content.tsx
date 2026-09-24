@@ -113,6 +113,41 @@ interface DocumentData {
   gueltigBis: string | null;
 }
 
+/**
+ * Was die Frist-Route (PATCH /api/onboarding/[id]/documents/[docId]) nach
+ * einer Aenderung zurueckmeldet.
+ */
+export interface FristAenderung {
+  gueltigBis: string | null;
+  /**
+   * Der Status NACH der Aenderung, sofern die Antwort ihn traegt. Eine
+   * korrigierte, nicht abgelaufene Frist nimmt EXPIRED zurueck (UPLOADED);
+   * fehlt das Feld, bleibt der bisherige Status stehen.
+   */
+  status?: string;
+}
+
+/**
+ * Eine bestaetigte Fristaenderung in die geladene Dokumentliste uebernehmen —
+ * Datum UND Status. Frueher nur das Datum: Nach einer Korrektur stand bis zum
+ * Neuladen das Abzeichen „Abgelaufen" neben der gruenen Ampel, obwohl der
+ * Server den Status laengst zurueckgenommen hatte. Rein und exportiert fuer
+ * den Test.
+ */
+export function fristAenderungUebernehmen<
+  T extends { id: string; gueltigBis: string | null; status: string },
+>(dokumente: T[], docId: string, aenderung: FristAenderung): T[] {
+  return dokumente.map((d) =>
+    d.id === docId
+      ? {
+          ...d,
+          gueltigBis: aenderung.gueltigBis,
+          ...(aenderung.status ? { status: aenderung.status } : {}),
+        }
+      : d
+  );
+}
+
 export interface ChecklistItemData {
   id: string;
   title: string;
@@ -650,16 +685,18 @@ export function DetailContent({
    * die Route bereits bestaetigt hat, ist das die groessere Stoerung. Der
    * Warnbalken und der Kasten „Offene Nachweise" rechnen live aus
    * `data.documents` und stimmen mit diesem einen Feld sofort wieder.
+   *
+   * Den Status gleich mit (`fristAenderungUebernehmen`): Eine korrigierte Frist
+   * nimmt EXPIRED zurueck — ohne ihn stuende bis zum Neuladen „Abgelaufen"
+   * neben der gruenen Ampel.
    */
   const setzeDokumentFrist = useCallback(
-    (docId: string, gueltigBis: string | null) => {
+    (docId: string, aenderung: FristAenderung) => {
       setData((bisher) =>
         bisher
           ? {
               ...bisher,
-              documents: bisher.documents.map((d) =>
-                d.id === docId ? { ...d, gueltigBis } : d
-              ),
+              documents: fristAenderungUebernehmen(bisher.documents, docId, aenderung),
             }
           : bisher
       );
@@ -1061,6 +1098,7 @@ export function DetailContent({
               setAbteilungenDialogOffen(true);
             }}
             onboardingId={onboardingId}
+            darfBearbeiten={HR_EDIT_ROLES.includes(user.role)}
           />
         )}
         {activeTab === "questionnaire" && (
@@ -1133,6 +1171,7 @@ export function TabOverview({
   setActiveTab,
   oeffnePaketDialog,
   oeffneAbteilungenDialog,
+  darfBearbeiten,
 }: {
   data: DetailData;
   appUrl: string;
@@ -1153,6 +1192,12 @@ export function TabOverview({
   oeffnePaketDialog: () => void;
   /** Wechselt in den Tab Checkliste und oeffnet „Abteilungen informieren". */
   oeffneAbteilungenDialog: () => void;
+  /**
+   * `HR_EDIT_ROLES` — ohne dieses Recht zeigt die Uebersicht keine
+   * schreibenden Knoepfe (Stepper und Karte „Vorgesetzten-Link"). Die Routen
+   * lehnen mit 403 ab; ein Knopf, der nur diesen Fehler erzeugt, ist keiner.
+   */
+  darfBearbeiten: boolean;
 }) {
   const fragebogenLink = `${appUrl}/fragebogen/${data.token}`;
   const modalitaetenLink = data.supervisorToken
@@ -1181,6 +1226,7 @@ export function TabOverview({
   // `vorgesetzteAbgesendet`, `bereitZurPruefung`) — die Modalitaeten-Spur
   // haengt dort an KEINER Stelle am Fragebogen.
   const workflowSteps = onboardingWorkflowSchritte(data, {
+    darfBearbeiten,
     fragebogenLink,
     modalitaetenLink,
     supervisorAdresseEingetragen: !!supervisorEmail.trim(),
@@ -1311,8 +1357,9 @@ export function TabOverview({
                 </div>
                 {/* Neuer Link: bei abgelaufenem Link oder anderer Adresse. Die
                     Route ersetzt den Token; was die Fuehrungskraft schon
-                    eingetragen hat, bleibt stehen. */}
-                {neuerLinkMoeglich && (
+                    eingetragen hat, bleibt stehen. Nur mit Bearbeitungsrecht
+                    (die Route verlangt HR_EDIT_ROLES). */}
+                {neuerLinkMoeglich && darfBearbeiten && (
                   <div className="space-y-2 border-t border-border pt-3">
                     <p className={`text-xs ${linkAbgelaufen ? "text-destructive" : "text-muted-foreground"}`}>
                       {linkAbgelaufen
@@ -1340,6 +1387,12 @@ export function TabOverview({
                   </div>
                 )}
               </div>
+            ) : !darfBearbeiten ? (
+              // Ohne Bearbeitungsrecht nur der Stand — kein Formular, das beim
+              // Absenden an der Rollenpruefung der Route scheitert.
+              <p className="text-xs text-muted-foreground">
+                Noch kein Vorgesetzten-Link generiert.
+              </p>
             ) : (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
@@ -2159,8 +2212,10 @@ function NachweisFristenWarnung({
  * beschaeftigten Person, und der ist mit dem Absenden des Fragebogens tot. Eine
  * Aufforderung ohne Schaltflaeche ist keine Aufforderung, sondern ein Vorwurf —
  * deshalb sitzt das Eingabefeld jetzt an derselben Stelle wie der Satz.
+ *
+ * Exportiert fuer den Komponententest (Status nach einer Fristkorrektur).
  */
-function AblaufAbzeichen({
+export function AblaufAbzeichen({
   doc,
   onboardingId,
   canEdit,
@@ -2169,7 +2224,7 @@ function AblaufAbzeichen({
   doc: DocumentData;
   onboardingId: string;
   canEdit: boolean;
-  onFristGeaendert: (docId: string, gueltigBis: string | null) => void;
+  onFristGeaendert: (docId: string, aenderung: FristAenderung) => void;
 }) {
   const [offen, setOffen] = useState(false);
   const [eingabe, setEingabe] = useState("");
@@ -2208,12 +2263,19 @@ function AblaufAbzeichen({
         );
         return;
       }
-      onFristGeaendert(
-        doc.id,
-        koerper && typeof koerper.gueltigBis === "string"
-          ? koerper.gueltigBis
-          : null
-      );
+      // Den Status aus der Antwort mitnehmen: Eine korrigierte Frist nimmt
+      // EXPIRED zurueck, und das Abzeichen „Abgelaufen" soll nicht bis zum
+      // Neuladen neben der gruenen Ampel stehen bleiben.
+      onFristGeaendert(doc.id, {
+        gueltigBis:
+          koerper && typeof koerper.gueltigBis === "string"
+            ? koerper.gueltigBis
+            : null,
+        status:
+          koerper && typeof koerper.status === "string"
+            ? koerper.status
+            : undefined,
+      });
       setOffen(false);
     } catch {
       setFehler("Verbindungsfehler beim Speichern des Ablaufdatums.");
@@ -2552,7 +2614,7 @@ function TabDocuments({
   onboardingId: string;
   canEdit: boolean;
   /** Meldet eine geaenderte Dokumentenfrist nach oben — siehe `setzeDokumentFrist`. */
-  onFristGeaendert: (docId: string, gueltigBis: string | null) => void;
+  onFristGeaendert: (docId: string, aenderung: FristAenderung) => void;
   paketDialogOffen: boolean;
   setPaketDialogOffen: (offen: boolean) => void;
 }) {

@@ -10,7 +10,9 @@ import { prisma } from "@/lib/db";
 import { generateToken, getTokenExpiryDate, getSession } from "@/lib/auth";
 import { apiHandler } from "@/lib/api-handler";
 import { triggerWebhooks } from "@/lib/webhooks";
-import { abteilungAusZustaendigkeit } from "@/lib/abteilungsaufgaben";
+import { abteilungAusZustaendigkeit, MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { fuehrungskraftAdresseFreigegeben } from "@/lib/abteilungsaufgaben-dienst";
+import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
 import {
   canAccessProcess,
   canEditProcess,
@@ -61,13 +63,19 @@ function istVorgangsnummerVergeben(error: unknown): boolean {
  * koennen dieselbe Nummer bekommen. Der zweite scheitert dann am Unique-Index
  * (P2002), seine Transaktion rollt vollstaendig zurueck, und die Route fragt
  * hier erneut an.
+ *
+ * Jahr und Zaehlbereich in deutscher Zeit (`vorgangsjahrInBerlin`): Der
+ * Container laeuft in UTC, und in der ersten Stunde des neuen Jahres bekaeme
+ * ein Vorgang sonst noch die Jahreszahl des alten.
  */
 async function vorgangsnummerVorschlagen(
   shortName: string,
 ): Promise<{ displayId: string; sequentialNumber: number }> {
-  const currentYear = new Date().getFullYear();
-  const yearStart = new Date(currentYear, 0, 1);
-  const yearEnd = new Date(currentYear + 1, 0, 1);
+  const {
+    jahr: currentYear,
+    von: yearStart,
+    bis: yearEnd,
+  } = vorgangsjahrInBerlin(new Date());
 
   let displayId = "";
   let sequentialNumber = 0;
@@ -143,6 +151,19 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
       return NextResponse.json(
         { error: "Organisation nicht gefunden" },
         { status: 404 }
+      );
+    }
+
+    // Fuehrungskraft: An die frei eingetippte Adresse geht gleich ein Link zu
+    // den Verguetungsangaben. Dieselbe Freigabeliste und Funktion wie in
+    // /supervisor-link und im Offboarding (Einstellungen → SMTP, leere Liste =
+    // keine Einschraenkung). Bei der Anlage kennt das Portal noch keine Adresse
+    // dieses Vorgangs, also gibt es keine „bekannten" Ausnahmen. Geprueft VOR
+    // jedem Schreiben — nichts wird angelegt, keine Mail geht hinaus.
+    if (supervisorEmail && !(await fuehrungskraftAdresseFreigegeben(supervisorEmail, []))) {
+      return NextResponse.json(
+        { error: MELDUNGEN.FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN },
+        { status: 409 },
       );
     }
 

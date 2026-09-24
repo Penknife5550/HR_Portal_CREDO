@@ -4158,11 +4158,17 @@ CREDO Gruppe – {{einrichtung}}`,
   // Beide Vorlagen sind so gebaut, dass HR handeln kann, ohne erst das Portal
   // zu oeffnen: WER, WELCHES Papier, BIS WANN, WIE VIELE Tage — und was zu tun
   // ist. Der Link ist die Abkuerzung, nicht die Voraussetzung.
+  //
+  // `{{mitarbeiter_name}}` steht nur nach „für“ (auch als Label „Nachweis für“):
+  // Ohne bekannten Namen setzt der Cron MITARBEITER_NEUTRAL ein, einen
+  // Akkusativ („die neue Mitarbeiterin / den neuen Mitarbeiter“) — nach „von“
+  // oder als Subjekt zerbraeche der Satz. Frueher stand dort die private
+  // E-Mail-Adresse der Person im Betreff.
   // =============================================
   {
     event: "dokument-ablauf-warnung",
     name: "Befristeter Nachweis läuft ab (HR-Erinnerung)",
-    subject: "Nachweis läuft ab: {{dokument_typ}} – {{mitarbeiter_name}} ({{dringlichkeit}})",
+    subject: "Nachweis läuft ab: {{dokument_typ}} für {{mitarbeiter_name}} ({{dringlichkeit}})",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -4182,7 +4188,7 @@ CREDO Gruppe – {{einrichtung}}`,
           <div style="display:inline-block;background-color:#fff3c9;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
             <span style="color:#8a6d00;font-weight:bold;font-size:14px;">Fristerinnerung · {{dringlichkeit}}</span>
           </div>
-          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">{{dokument_typ}} von {{mitarbeiter_name}} läuft ab</h2>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">{{dokument_typ}} für {{mitarbeiter_name}} läuft ab</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
             der Nachweis <strong>{{dokument_typ}}</strong> für <strong>{{mitarbeiter_name}}</strong> gilt nur noch bis zum <strong>{{gueltig_bis}}</strong> — das sind noch <strong>{{tage_verbleibend}} Tage</strong>.
           </p>
@@ -4190,9 +4196,9 @@ CREDO Gruppe – {{einrichtung}}`,
           <!-- Daten -->
           <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 22px;">
             <tr><td style="padding:16px 18px;">
-              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Person</p>
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Nachweis für</p>
               <p style="margin:0 0 16px;color:#374151;font-size:14px;">{{mitarbeiter_name}} · {{mitarbeiter_email}}<br>{{einrichtung}} · Vorgang {{vorgangsnummer}}</p>
-              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Nachweis</p>
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Dokument</p>
               <p style="margin:0 0 16px;color:#374151;font-size:14px;">{{dokument_typ}}<br><span style="color:#6b7280;font-size:13px;">{{dokument_datei}}</span></p>
               <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Frist</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{frist_text}}</p>
@@ -4231,14 +4237,14 @@ CREDO Gruppe – {{einrichtung}}`,
   </table>
 </body>
 </html>`,
-    bodyText: `Fristerinnerung ({{dringlichkeit}}) – {{dokument_typ}} von {{mitarbeiter_name}} läuft ab
+    bodyText: `Fristerinnerung ({{dringlichkeit}}) – {{dokument_typ}} für {{mitarbeiter_name}} läuft ab
 
 Der Nachweis {{dokument_typ}} für {{mitarbeiter_name}} gilt nur noch bis zum {{gueltig_bis}} — das sind noch {{tage_verbleibend}} Tage.
 
-Person:   {{mitarbeiter_name}} · {{mitarbeiter_email}}
-          {{einrichtung}} · Vorgang {{vorgangsnummer}}
-Nachweis: {{dokument_typ}} ({{dokument_datei}})
-Frist:    {{frist_text}}
+Nachweis für: {{mitarbeiter_name}} · {{mitarbeiter_email}}
+              {{einrichtung}} · Vorgang {{vorgangsnummer}}
+Dokument:     {{dokument_typ}} ({{dokument_datei}})
+Frist:        {{frist_text}}
 
 Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate. Der neue Nachweis gehört anschließend mit seinem Ablaufdatum in den Vorgang — erst dann endet diese Erinnerung.
 
@@ -4249,7 +4255,7 @@ Diese Erinnerung wiederholt sich in kürzer werdenden Abständen, je näher der 
 CREDO Gruppe – Freie Evangelische Schulen
 {{einrichtung}}`,
     variables: [
-      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name der beschäftigten Person" },
+      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name der beschäftigten Person; ohne bekannten Namen „die neue Mitarbeiterin / den neuen Mitarbeiter“ (Akkusativ, daher nur nach „für“ einsetzen)" },
       { key: "{{mitarbeiter_email}}", description: "E-Mail der beschäftigten Person (nur zur Anzeige, NICHT als Empfänger gedacht)" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
@@ -4266,7 +4272,7 @@ CREDO Gruppe – Freie Evangelische Schulen
   {
     event: "dokument-abgelaufen",
     name: "Befristeter Nachweis ist abgelaufen (HR-Warnung)",
-    subject: "ABGELAUFEN: {{dokument_typ}} – {{mitarbeiter_name}} (seit {{tage_ueberfaellig}} Tagen)",
+    subject: "ABGELAUFEN: {{dokument_typ}} für {{mitarbeiter_name}} (seit {{tage_ueberfaellig}} Tagen)",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -4286,7 +4292,7 @@ CREDO Gruppe – Freie Evangelische Schulen
           <div style="display:inline-block;background-color:#f7c9c9;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
             <span style="color:#7a0c12;font-weight:bold;font-size:14px;">Nachweis abgelaufen</span>
           </div>
-          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">{{dokument_typ}} von {{mitarbeiter_name}} ist abgelaufen</h2>
+          <h2 style="color:#1a1a2e;font-size:19px;margin:0 0 16px;">{{dokument_typ}} für {{mitarbeiter_name}} ist abgelaufen</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
             der Nachweis <strong>{{dokument_typ}}</strong> für <strong>{{mitarbeiter_name}}</strong> galt bis zum <strong>{{gueltig_bis}}</strong> und ist seit <strong>{{tage_ueberfaellig}} Tagen</strong> abgelaufen. Ein gültiger Nachfolge-Nachweis liegt im Portal nicht vor.
           </p>
@@ -4294,9 +4300,9 @@ CREDO Gruppe – Freie Evangelische Schulen
           <!-- Daten -->
           <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 22px;">
             <tr><td style="padding:16px 18px;">
-              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Person</p>
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Nachweis für</p>
               <p style="margin:0 0 16px;color:#374151;font-size:14px;">{{mitarbeiter_name}} · {{mitarbeiter_email}}<br>{{einrichtung}} · Vorgang {{vorgangsnummer}}</p>
-              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Nachweis</p>
+              <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Dokument</p>
               <p style="margin:0 0 16px;color:#374151;font-size:14px;">{{dokument_typ}}<br><span style="color:#6b7280;font-size:13px;">{{dokument_datei}}</span></p>
               <p style="margin:0 0 10px;color:#6b7280;font-size:12px;">Frist</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{frist_text}}</p>
@@ -4338,14 +4344,14 @@ CREDO Gruppe – Freie Evangelische Schulen
   </table>
 </body>
 </html>`,
-    bodyText: `ABGELAUFEN – {{dokument_typ}} von {{mitarbeiter_name}}
+    bodyText: `ABGELAUFEN – {{dokument_typ}} für {{mitarbeiter_name}}
 
 Der Nachweis {{dokument_typ}} für {{mitarbeiter_name}} galt bis zum {{gueltig_bis}} und ist seit {{tage_ueberfaellig}} Tagen abgelaufen. Ein gültiger Nachfolge-Nachweis liegt im Portal nicht vor.
 
-Person:   {{mitarbeiter_name}} · {{mitarbeiter_email}}
-          {{einrichtung}} · Vorgang {{vorgangsnummer}}
-Nachweis: {{dokument_typ}} ({{dokument_datei}})
-Frist:    {{frist_text}}
+Nachweis für: {{mitarbeiter_name}} · {{mitarbeiter_email}}
+              {{einrichtung}} · Vorgang {{vorgangsnummer}}
+Dokument:     {{dokument_typ}} ({{dokument_datei}})
+Frist:        {{frist_text}}
 
 Bitte klären Sie umgehend, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer Fiktionsbescheinigung fort (§ 81 Abs. 4 AufenthG) — dann laden Sie diese als Nachweis hoch und die Warnung endet. Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
 
@@ -4358,7 +4364,7 @@ Diese Warnung wiederholt sich alle drei Tage und endet 180 Tage nach dem Ablauf.
 CREDO Gruppe – Freie Evangelische Schulen
 {{einrichtung}}`,
     variables: [
-      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name der beschäftigten Person" },
+      { key: "{{mitarbeiter_name}}", description: "Vollständiger Name der beschäftigten Person; ohne bekannten Namen „die neue Mitarbeiterin / den neuen Mitarbeiter“ (Akkusativ, daher nur nach „für“ einsetzen)" },
       { key: "{{mitarbeiter_email}}", description: "E-Mail der beschäftigten Person (nur zur Anzeige, NICHT als Empfänger gedacht)" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },

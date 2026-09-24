@@ -11,12 +11,26 @@
  * Diese Tests sichern beide Schreibweisen ab.
  */
 
-const mockPrisma = {
+const mockPrisma: {
+  document: Record<string, jest.Mock>;
+  auditLog: { create: jest.Mock };
+  $transaction: jest.Mock;
+} = {
   document: {
     create: jest.fn(),
     findFirst: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   },
+  auditLog: { create: jest.fn() },
+  // PATCH schreibt Datum, Merker, ggf. die Statusruecknahme und das Protokoll
+  // gemeinsam — als interaktive Transaktion (der Eintrag muss wissen, ob der
+  // Status zurueckgenommen wurde). `tx` ist hier dasselbe Mock-Objekt.
+  $transaction: jest.fn((arg: unknown) =>
+    typeof arg === "function"
+      ? (arg as (tx: unknown) => unknown)(mockPrisma)
+      : Promise.all(arg as unknown[]),
+  ),
 };
 const mockValidateMagicToken = jest.fn();
 
@@ -144,6 +158,8 @@ const fsMock = jest.requireMock("fs/promises") as {
 
 /** Ein Jahr, das nie „in die Vergangenheit rutscht", wenn der Test alt wird. */
 const ZUKUNFT = `${new Date().getUTCFullYear() + 2}-03-01`;
+/** Sicher abgelaufen, unabhaengig vom Tag, an dem die Tests laufen. */
+const VERGANGENHEIT = `${new Date().getUTCFullYear() - 2}-03-01`;
 
 async function uploadMitFrist(type: string, gueltigBis?: string) {
   const formData = new FormData();
@@ -276,6 +292,9 @@ describe("Ablaufdatum nachtragen", () => {
       type: "AUFENTHALTSTITEL",
       gueltigBis: (data as { gueltigBis: Date }).gueltigBis,
     }));
+    // Standard: nichts war EXPIRED. Einzelne Tests setzen count 1.
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 0 });
+    mockPrisma.auditLog.create.mockResolvedValue({});
   });
 
   it("traegt das Datum an einem hochgeladenen Nachweis nach", async () => {
@@ -284,9 +303,119 @@ describe("Ablaufdatum nachtragen", () => {
     const res = await patchFrist({ documentId: "doc-1", gueltigBis: ZUKUNFT });
     expect(res.status).toBe(200);
     expect(mockPrisma.document.update).toHaveBeenCalledTimes(1);
+    // Mit dem Datum wird der Erinnerungs-Merker geleert: Fuer eine geaenderte
+    // Frist beginnt ein neuer Zyklus (dieselbe Regel wie bei HR).
     expect(mockPrisma.document.update.mock.calls[0][0].data).toEqual({
       gueltigBis: new Date(`${ZUKUNFT}T00:00:00.000Z`),
+      ablaufErinnertAm: null,
+      ablaufErinnertStufe: null,
     });
+  });
+
+  it("nimmt EXPIRED zurueck, wenn die neue Frist nicht abgelaufen ist — nur EXPIRED", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({
+      id: "doc-1",
+      type: "AUFENTHALTSTITEL",
+      fileName: "titel.pdf",
+      gueltigBis: new Date(`${VERGANGENHEIT}T00:00:00.000Z`),
+    });
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+
+    await patchFrist({ documentId: "doc-1", gueltigBis: ZUKUNFT });
+
+    // Bedingt in der Abfrage: REJECTED (Entscheidung ueber den Scan) trifft
+    // sie nie, und ein gerade erst vom Lauf gesetztes EXPIRED trotzdem.
+    expect(mockPrisma.document.updateMany).toHaveBeenCalledWith({
+      where: { id: "doc-1", status: "EXPIRED" },
+      data: { status: "UPLOADED" },
+    });
+    // Datum, Ruecknahme und Protokoll gehoeren zusammen: EINE Transaktion.
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(typeof mockPrisma.$transaction.mock.calls[0][0]).toBe("function");
+  });
+
+  it("protokolliert die Ruecknahme — HR hat die Ablaufmail in der Hand", async () => {
+    // Durchsicht 09/2026: Der Nachtlauf hatte EXPIRED gesetzt und HR
+    // „ABGELAUFEN" gemailt; ein Zukunftsdatum ueber den Link stellte den
+    // Nachweis wieder auf gruen — ohne jede Spur.
+    mockPrisma.document.findFirst.mockResolvedValue({
+      id: "doc-1",
+      type: "AUFENTHALTSTITEL",
+      fileName: "titel.pdf",
+      gueltigBis: new Date(`${VERGANGENHEIT}T00:00:00.000Z`),
+    });
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+
+    const res = await patchFrist({ documentId: "doc-1", gueltigBis: ZUKUNFT });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledTimes(1);
+    const eintrag = mockPrisma.auditLog.create.mock.calls[0][0].data;
+    expect(eintrag).toMatchObject({
+      onboardingId: "onb-1",
+      processType: "ONBOARDING",
+      action: "DOKUMENT_FRIST_GEAENDERT",
+      ipAddress: "127.0.0.1",
+      details: {
+        documentId: "doc-1",
+        dokumentTyp: "AUFENTHALTSTITEL",
+        dokumentDatei: "titel.pdf",
+        vorher: VERGANGENHEIT,
+        nachher: ZUKUNFT,
+        quelle: "MAGIC_LINK",
+        statusVorher: "EXPIRED",
+        statusNachher: "UPLOADED",
+      },
+    });
+    // Kein Benutzer: Ueber den Magic Link schreibt die beschaeftigte Person.
+    expect(eintrag.userId).toBeUndefined();
+  });
+
+  it("protokolliert auch eine Aenderung ohne Statuswechsel — aber ohne Statusfelder", async () => {
+    // Nichts war EXPIRED (count 0): Der Eintrag behauptet keinen Wechsel.
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 0 });
+
+    await patchFrist({ documentId: "doc-1", gueltigBis: ZUKUNFT });
+
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledTimes(1);
+    const details = mockPrisma.auditLog.create.mock.calls[0][0].data.details;
+    expect(details).toMatchObject({ vorher: null, nachher: ZUKUNFT, quelle: "MAGIC_LINK" });
+    expect(details).not.toHaveProperty("statusVorher");
+    expect(details).not.toHaveProperty("statusNachher");
+  });
+
+  it("laesst den Status stehen, wenn auch die neue Frist schon abgelaufen ist", async () => {
+    await patchFrist({ documentId: "doc-1", gueltigBis: VERGANGENHEIT });
+
+    expect(mockPrisma.document.update).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.document.updateMany).not.toHaveBeenCalled();
+    // Die Aenderung selbst steht trotzdem im Protokoll — ohne Statuswechsel.
+    const details = mockPrisma.auditLog.create.mock.calls[0][0].data.details;
+    expect(details).not.toHaveProperty("statusVorher");
+  });
+
+  it("meldet keinen Erfolg, wenn das Protokoll scheitert", async () => {
+    // Datum und Eintrag im selben Commit: Scheitert der Eintrag, wirft die
+    // Transaktion — die Route meldet keinen Erfolg.
+    mockPrisma.auditLog.create.mockRejectedValueOnce(new Error("DB weg"));
+    await expect(
+      patchFrist({ documentId: "doc-1", gueltigBis: ZUKUNFT }),
+    ).rejects.toThrow("DB weg");
+  });
+
+  it("schreibt nichts, wenn dasselbe Datum erneut gespeichert wird", async () => {
+    // Sonst begaenne mit jedem Speichern ein neuer Erinnerungszyklus, und HR
+    // bekaeme dieselbe Mahnung noch einmal.
+    mockPrisma.document.findFirst.mockResolvedValue({
+      id: "doc-1",
+      type: "AUFENTHALTSTITEL",
+      gueltigBis: new Date(`${ZUKUNFT}T00:00:00.000Z`),
+    });
+
+    const res = await patchFrist({ documentId: "doc-1", gueltigBis: ZUKUNFT });
+    expect(res.status).toBe(200);
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+    expect(mockPrisma.document.updateMany).not.toHaveBeenCalled();
   });
 
   it("sucht das Dokument nur im eigenen Vorgang", async () => {

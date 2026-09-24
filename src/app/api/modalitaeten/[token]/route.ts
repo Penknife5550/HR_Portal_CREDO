@@ -322,9 +322,16 @@ export async function PUT(
    *
    * Geheilt wird das hier, auf der SCHREIBSEITE: Sobald ein Aufruf die
    * Aufteilung mitschickt, folgt ihr die Alt-Spalte.
-   *   - Zeilen vorhanden -> erste Zeile (Bezeichnung und Anteil). Dieselbe
-   *     Lesart benutzt der CSV-Export fuer die eine LOGA-Spalte
-   *     "Kostenstelle"; zwei Lesarten waeren zwei Wahrheiten.
+   *   - Zeilen vorhanden -> erste Zeile (Bezeichnung und Anteil). Die
+   *     Alt-Spalte ist nur noch der Rueckfall fuer nicht migrierte Vorgaenge
+   *     und traegt bei mehreren Zeilen deshalb schlicht die erste. Der
+   *     CSV-Export liest bei vorhandenen Zeilen die ZEILEN, nicht diese
+   *     Spalte (`kostenstellenAnzeige`, Rueckfall nur ohne Zeile), und
+   *     `positionsspalteKostenstelle` (src/app/api/onboarding/[id]/export/
+   *     route.ts) laesst die LOGA-Positionsspalte "Kostenstelle" bei mehr als
+   *     einer Zeile bewusst LEER — die erste Bezeichnung dort buchte in LOGA
+   *     100 Prozent auf eine Kostenstelle. Die vollstaendige Aufteilung steht
+   *     in der Spalte "Kostenstellen-Aufteilung".
    *   - Keine Zeile mehr -> null. Damit findet der Rueckfall nichts mehr
    *     vor, und der Widerruf haelt.
    * Danach heisst "Altwert ohne Zeile" nur noch das eine, was es heissen

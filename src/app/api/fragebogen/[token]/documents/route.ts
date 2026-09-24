@@ -12,7 +12,11 @@ import { prisma } from "@/lib/db";
 import { validateMagicToken } from "@/lib/auth";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { sanitizeFilename } from "@/lib/file-upload";
-import { pruefeGueltigBis } from "@/lib/dokument-fristen";
+import {
+  ablaufKalendertag,
+  istAbgelaufen,
+  pruefeGueltigBis,
+} from "@/lib/dokument-fristen";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 
@@ -298,6 +302,22 @@ export async function GET(
  * Das Datum LOESCHEN kann dieser Weg nicht (ein leerer Wert ergibt 400). Sonst
  * liesse sich die Ablaufkontrolle mit einem Klick stumm schalten, und zwar
  * unauffaellig — von „nie erfasst" waere das hinterher nicht zu unterscheiden.
+ *
+ * Eine GEAENDERTE Frist beginnt von vorn — dieselbe Regel wie bei der
+ * Korrektur durch HR (PATCH /api/onboarding/[id]/documents/[docId], dort mit
+ * Begruendung): Erinnerungs-Merker leeren, EXPIRED zu UPLOADED, wenn das neue
+ * Datum nicht abgelaufen ist, REJECTED nie anfassen. Ein unveraendertes Datum
+ * schreibt nichts — sonst begaenne mit jedem erneuten Speichern ein neuer
+ * Erinnerungszyklus, und HR bekaeme dieselbe Mahnung noch einmal.
+ *
+ * Jede ECHTE Aenderung steht im Protokoll (`DOKUMENT_FRIST_GEAENDERT`, wie
+ * bei HR, hier mit `quelle: "MAGIC_LINK"`, ohne Benutzer, mit IP) — und zwar
+ * im selben Commit. Anlass (Durchsicht 09/2026): Laedt die Person einen Titel
+ * mit vergangenem Datum hoch, setzt der Nachtlauf EXPIRED und HR bekommt die
+ * Mail „ABGELAUFEN". Traegt sie danach ein Zukunftsdatum ein, stand der
+ * Nachweis wieder auf UPLOADED und gruen — ohne jede Spur, obwohl HR die
+ * Ablaufmail in der Hand hat. Die Statusruecknahme steht deshalb ausdruecklich
+ * im Eintrag (`statusVorher`/`statusNachher`, nur bei echtem Wechsel).
  */
 export async function PATCH(
   request: NextRequest,
@@ -347,7 +367,7 @@ export async function PATCH(
   // wird — die documentId kommt aus der Anfrage, nicht aus dem Token.
   const document = await prisma.document.findFirst({
     where: { id: documentId, onboardingId: onboarding.id },
-    select: { id: true, type: true },
+    select: { id: true, type: true, fileName: true, gueltigBis: true },
   });
 
   if (!document) {
@@ -371,10 +391,67 @@ export async function PATCH(
     return NextResponse.json({ error: frist.fehler }, { status: 400 });
   }
 
-  const aktualisiert = await prisma.document.update({
-    where: { id: document.id },
-    data: { gueltigBis: frist.gueltigBis },
-    select: { id: true, type: true, gueltigBis: true },
+  const vorher = ablaufKalendertag(document.gueltigBis);
+  const nachher = ablaufKalendertag(frist.gueltigBis);
+  if (vorher === nachher) {
+    return NextResponse.json({
+      id: document.id,
+      type: document.type,
+      gueltigBis: document.gueltigBis,
+    });
+  }
+
+  // Abgelaufen nach der NEUEN Frist? Dieselbe Rechnung wie Ampel und Lauf.
+  const neuAbgelaufen = istAbgelaufen(frist.gueltigBis);
+
+  // Datum, Merker, ggf. Status UND Protokoll in EINER Transaktion. Interaktiv,
+  // weil der Eintrag wissen muss, ob der Status tatsaechlich zurueckgenommen
+  // wurde. Die Ruecknahme von EXPIRED steht als Bedingung in der Abfrage und
+  // nicht am vorher gelesenen Stand — setzt der naechtliche Lauf EXPIRED genau
+  // dazwischen, greift sie trotzdem. REJECTED trifft sie nie.
+  const aktualisiert = await prisma.$transaction(async (tx) => {
+    const statusZurueck = neuAbgelaufen
+      ? { count: 0 }
+      : await tx.document.updateMany({
+          where: { id: document.id, status: "EXPIRED" },
+          data: { status: "UPLOADED" },
+        });
+
+    const ergebnis = await tx.document.update({
+      where: { id: document.id },
+      data: {
+        gueltigBis: frist.gueltigBis,
+        ablaufErinnertAm: null,
+        ablaufErinnertStufe: null,
+      },
+      select: { id: true, type: true, gueltigBis: true },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        onboardingId: onboarding.id,
+        processType: "ONBOARDING",
+        action: "DOKUMENT_FRIST_GEAENDERT",
+        details: {
+          documentId: document.id,
+          dokumentTyp: document.type,
+          dokumentDatei: document.fileName,
+          vorher,
+          nachher,
+          // Wer geaendert hat, steht sonst in `userId` — ueber den Magic Link
+          // gibt es keinen Benutzer, nur die beschaeftigte Person.
+          quelle: "MAGIC_LINK",
+          // Nur bei einem echten Wechsel — sonst stuende im Protokoll eine
+          // Statusaenderung, die keine war.
+          ...(statusZurueck.count > 0
+            ? { statusVorher: "EXPIRED", statusNachher: "UPLOADED" }
+            : {}),
+        },
+        ipAddress: clientIp,
+      },
+    });
+
+    return ergebnis;
   });
 
   return NextResponse.json(aktualisiert);

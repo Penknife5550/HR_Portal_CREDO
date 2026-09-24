@@ -444,7 +444,10 @@ export function AbteilungenKarte({
         </p>
       )}
 
-      {dialogAn && (
+      {/* `!nurLesen` auch hier, nicht nur am eigenen Knopf: Der Dialog laesst
+          sich von aussen oeffnen (Stepper der Uebersicht). Ohne Recht oder bei
+          abgeschlossenem Vorgang endete „Senden" nur in 403 bzw. 409. */}
+      {dialogAn && !nurLesen && (
         <AbteilungenDialog
           abteilungen={abteilungen}
           sendet={laeuft === "informieren"}

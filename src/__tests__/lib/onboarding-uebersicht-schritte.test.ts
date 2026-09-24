@@ -18,8 +18,47 @@ import {
   type SchritteStand,
   type SchrittAktionen,
 } from "@/app/(portal)/dashboard/[id]/uebersicht-schritte";
+import {
+  abteilungsZeilenBauen,
+  onboardingVersandSperre,
+  type AbteilungsUebersichtDaten,
+} from "@/lib/abteilungsaufgaben";
 
 const JETZT = new Date("2026-09-20T12:00:00.000Z");
+
+/**
+ * Stand der Karte „Aufgaben für Abteilungen" mit der ECHTEN Regel des Servers
+ * (`abteilungsZeilenBauen`, `onboardingVersandSperre`): eine offene IT-Aufgabe,
+ * IT mit hinterlegter Adresse. `gesperrt` = Modalitaeten fehlen.
+ */
+function abteilungen(opts: { gesperrt?: boolean } = {}): AbteilungsUebersichtDaten {
+  const sperre = opts.gesperrt
+    ? onboardingVersandSperre({ status: "IN_PROGRESS", supervisorSubmittedAt: null, supervisorData: null })
+    : null;
+  const r = abteilungsZeilenBauen({
+    aufgaben: [
+      { id: "c1", title: "Benutzerkonto anlegen", assigneeDepartment: "IT", isCompleted: false, dueDate: null },
+    ],
+    links: [],
+    konfigs: [
+      { departmentKey: "IT", departmentName: "IT-Abteilung", email: "it@credo-gruppe.de", organizationId: null, isActive: true },
+    ],
+    organizationId: "org-1",
+    fuehrungskraft: null,
+    vorgangAbgeschlossen: false,
+    gesperrt: !!sperre,
+    linkUrl: (t) => `https://hr.fes-credo.de/onboarding-tasks/${t}`,
+    jetzt: JETZT,
+  });
+  return {
+    ...r,
+    modul: "ONBOARDING",
+    vorgangAbgeschlossen: false,
+    vorgangAbgebrochen: false,
+    bezugsdatum: sperre ? null : "2026-10-01T00:00:00.000Z",
+    gesperrt: sperre,
+  };
+}
 
 function stand(teil: Partial<SchritteStand> = {}): SchritteStand {
   return {
@@ -50,6 +89,7 @@ function stand(teil: Partial<SchritteStand> = {}): SchritteStand {
 
 function aktionen(teil: Partial<SchrittAktionen> = {}): SchrittAktionen {
   return {
+    darfBearbeiten: true,
     fragebogenLink: "https://hr.fes-credo.de/fragebogen/tok-fb",
     modalitaetenLink: null,
     supervisorAdresseEingetragen: true,
@@ -435,6 +475,211 @@ describe("Schritt „Checkliste abarbeiten“", () => {
     // Rohschluessel werden nie angezeigt.
     expect(step.items?.[0].assignee).toBeUndefined();
     expect(step.info).toBeUndefined();
+  });
+});
+
+// =============================================
+// „Abteilungen informieren…" schon vor der Pruefung
+// =============================================
+
+describe("„Abteilungen informieren…“ vor der Prüfung", () => {
+  // Informieren darf HR, sobald die Modalitaeten eingereicht sind
+  // (onboardingVersandSperre) — der Schritt „Checkliste abarbeiten" kommt dann
+  // aber noch. Der Knopf muss trotzdem erreichbar sein, OHNE dass der Schritt
+  // aktiv wird (parallel sind nur die beiden Spuren).
+  const IT_AUFGABE = [
+    { id: "c1", title: "Benutzerkonto anlegen", isCompleted: false, assignee: "IT", notes: null },
+  ];
+  const beidesEingereicht = stand({
+    status: "SUPERVISOR_SUBMITTED",
+    submittedAt: "2026-09-19T12:00:00.000Z",
+    personalData: { isComplete: true, currentStep: 9 },
+    supervisorToken: "tok-sv",
+    supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+    supervisorData: { isComplete: true, currentStep: 5 },
+    checklistItems: IT_AUFGABE,
+  });
+
+  it("beides eingereicht, noch nicht geprueft: Schritt kommt, traegt aber den Knopf", () => {
+    const abteilungenInformieren = jest.fn();
+    const alle = schritte(
+      { ...beidesEingereicht, abteilungen: abteilungen() },
+      { abteilungenInformieren },
+    );
+    const step = finde(alle, "checkliste");
+    expect(step.status).toBe("upcoming");
+    expect(step.aktionenAuchKommend).toBe(true);
+    expect(knopfnamen(step)).toEqual(["Abteilungen informieren…"]);
+
+    step.actions?.[0].onClick();
+    expect(abteilungenInformieren).toHaveBeenCalledTimes(1);
+
+    // Die Entscheidung aus Paket 2 bleibt: aktiv ist allein „Daten prüfen".
+    expect(alle.filter((x) => x.status === "active").map((x) => x.key)).toEqual(["pruefen"]);
+  });
+
+  it("Modalitaeten eingereicht, Fragebogen noch offen: der Knopf steht ebenfalls da", () => {
+    // Die Sperre liest nur die Modalitaeten-Spur — der Fragebogen spielt fuer
+    // den Versand an die Abteilungen keine Rolle.
+    const alle = schritte(
+      stand({
+        supervisorToken: "tok-sv",
+        supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+        supervisorData: { isComplete: true, currentStep: 5 },
+        checklistItems: IT_AUFGABE,
+        abteilungen: abteilungen(),
+      }),
+    );
+    expect(finde(alle, "checkliste").status).toBe("upcoming");
+    expect(knopfnamen(finde(alle, "checkliste"))).toEqual(["Abteilungen informieren…"]);
+  });
+
+  it("ohne eingereichte Modalitaeten (gesperrt): kein Knopf", () => {
+    const alle = schritte(
+      stand({
+        status: "SUBMITTED",
+        submittedAt: "2026-09-19T12:00:00.000Z",
+        personalData: { isComplete: true, currentStep: 9 },
+        checklistItems: IT_AUFGABE,
+        abteilungen: abteilungen({ gesperrt: true }),
+      }),
+    );
+    const step = finde(alle, "checkliste");
+    expect(step.status).toBe("upcoming");
+    expect(step.actions).toBeUndefined();
+  });
+
+  it("nichts informierbar (alle schon informiert o. ae.): kein Knopf", () => {
+    const d = abteilungen();
+    const alle = schritte({
+      ...beidesEingereicht,
+      abteilungen: { ...d, informierbar: 0, zeilen: d.zeilen.map((z) => ({ ...z, informierbar: false })) },
+    });
+    expect(finde(alle, "checkliste").actions).toBeUndefined();
+  });
+
+  it("nach der Pruefung: derselbe Knopf an der AKTIVEN Checkliste (unveraendert)", () => {
+    const alle = schritte({
+      ...beidesEingereicht,
+      status: "REVIEWED",
+      reviewedAt: "2026-09-21T12:00:00.000Z",
+      abteilungen: abteilungen(),
+    });
+    const step = finde(alle, "checkliste");
+    expect(step.status).toBe("active");
+    expect(knopfnamen(step)).toEqual(["Abteilungen informieren…"]);
+  });
+
+  it("nur die Checkliste verlangt Knoepfe im kommenden Zustand", () => {
+    const alle = schritte({ ...beidesEingereicht, abteilungen: abteilungen() });
+    expect(alle.filter((x) => x.aktionenAuchKommend).map((x) => x.key)).toEqual(["checkliste"]);
+  });
+});
+
+// =============================================
+// Ohne Bearbeitungsrecht (HR_EDIT_ROLES) keine schreibenden Knoepfe
+// =============================================
+
+describe("ohne Bearbeitungsrecht", () => {
+  // Durchsicht 09/2026: Die Uebersicht pruefte keine Rolle. Mit dem Knopf vor
+  // der Pruefung (aktionenAuchKommend) sah z. B. eine Einrichtungsleitung
+  // „Abteilungen informieren…" — und bekam beim Senden 403. Kopieren und
+  // Export bleiben: Sie schreiben nichts.
+  const IT_AUFGABE = [
+    { id: "c1", title: "Benutzerkonto anlegen", isCompleted: false, assignee: "IT", notes: null },
+  ];
+  const ohneRecht = { darfBearbeiten: false };
+
+  it("kein „Abteilungen informieren…“ — weder vor noch nach der Pruefung", () => {
+    const vorher = schritte(
+      stand({
+        status: "SUPERVISOR_SUBMITTED",
+        submittedAt: "2026-09-19T12:00:00.000Z",
+        personalData: { isComplete: true, currentStep: 9 },
+        supervisorToken: "tok-sv",
+        supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+        supervisorData: { isComplete: true, currentStep: 5 },
+        checklistItems: IT_AUFGABE,
+        abteilungen: abteilungen(),
+      }),
+      ohneRecht,
+    );
+    expect(finde(vorher, "checkliste").actions).toBeUndefined();
+
+    const nachher = schritte(
+      stand({
+        status: "REVIEWED",
+        reviewedAt: "2026-09-21T12:00:00.000Z",
+        submittedAt: "2026-09-19T12:00:00.000Z",
+        personalData: { isComplete: true, currentStep: 9 },
+        supervisorToken: "tok-sv",
+        supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+        supervisorData: { isComplete: true, currentStep: 5 },
+        checklistItems: IT_AUFGABE,
+        abteilungen: abteilungen(),
+      }),
+      ohneRecht,
+    );
+    const step = finde(nachher, "checkliste");
+    expect(step.status).toBe("active");
+    expect(step.actions).toBeUndefined();
+    // Die Information bleibt — nur der Knopf faellt weg.
+    expect(step.info).toContain("Abteilungen: 0 von 1 fertig");
+  });
+
+  it("kein „Vorgesetzten-Link erstellen“ und kein „Neuen … erzeugen“", () => {
+    const ohneLink = schritte(stand(), ohneRecht);
+    expect(finde(ohneLink, "modalitaeten").actions).toBeUndefined();
+    // Der Stand bleibt stehen — ohne Aufforderung, fuer die es keinen Weg gibt.
+    expect(finde(ohneLink, "modalitaeten").status).toBe("active");
+    expect(finde(ohneLink, "modalitaeten").info).toBe("Noch kein Vorgesetzten-Link erstellt.");
+
+    const abgelaufen = schritte(
+      stand({
+        supervisorToken: "tok-sv",
+        supervisorEmail: "leitung@example.org",
+        supervisorTokenExpiresAt: "2026-09-15T12:00:00.000Z",
+        supervisorData: { isComplete: false, currentStep: 2 },
+      }),
+      { ...ohneRecht, modalitaetenLink: "https://hr.fes-credo.de/modalitaeten/tok-sv" },
+    );
+    expect(finde(abgelaufen, "modalitaeten").actions).toBeUndefined();
+    expect(finde(abgelaufen, "modalitaeten").info).toBe("Link abgelaufen am 15.09.2026");
+  });
+
+  it("Kopieren bleibt: Fragebogen- und gueltiger Modalitaeten-Link", () => {
+    const alle = schritte(
+      stand({
+        supervisorToken: "tok-sv",
+        supervisorEmail: "leitung@example.org",
+        supervisorTokenExpiresAt: "2026-10-20T12:00:00.000Z",
+        supervisorData: { isComplete: false, currentStep: 1 },
+      }),
+      { ...ohneRecht, modalitaetenLink: "https://hr.fes-credo.de/modalitaeten/tok-sv" },
+    );
+    expect(knopfnamen(finde(alle, "fragebogen"))).toEqual(["Fragebogen-Link kopieren"]);
+    expect(knopfnamen(finde(alle, "modalitaeten"))).toEqual(["Modalitäten-Link kopieren"]);
+  });
+
+  it("Abschluss: CSV-Export bleibt, „Dokumente versenden…“ faellt weg", () => {
+    const erledigt = [
+      { id: "c1", title: "Benutzerkonto anlegen", isCompleted: true, assignee: "IT", notes: null },
+    ];
+    const basis = stand({
+      status: "REVIEWED",
+      reviewedAt: "2026-09-21T12:00:00.000Z",
+      submittedAt: "2026-09-19T12:00:00.000Z",
+      personalData: { isComplete: true, currentStep: 9 },
+      checklistItems: erledigt,
+    });
+    expect(knopfnamen(finde(schritte(basis, ohneRecht), "abschluss"))).toEqual([
+      "CSV Export (LOGA)",
+    ]);
+    // Gegenprobe mit Recht: beide Knoepfe wie bisher.
+    expect(knopfnamen(finde(schritte(basis), "abschluss"))).toEqual([
+      "CSV Export (LOGA)",
+      "Dokumente versenden…",
+    ]);
   });
 });
 
