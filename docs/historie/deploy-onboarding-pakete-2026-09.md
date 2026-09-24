@@ -51,8 +51,10 @@ Vollständige Liste: `git log --oneline 6124936..7bc91ec`.
   (`seed-check.js:5-8`).
 - **Unverändert:** `docker-compose.yml`, `Dockerfile`, `entrypoint.sh`,
   `package.json`, `package-lock.json`, `.env.production.example`, `.dockerignore`
-  und `next.config.ts`. Das belegt `git diff --stat 6124936 7bc91ec`, die Ausgabe ist
-  leer. Es gibt also keine neue Umgebungsvariable und keine neue Abhängigkeit.
+  und `next.config.ts`. Das belegt
+  `git diff --stat 6124936 7bc91ec -- docker-compose.yml Dockerfile entrypoint.sh package.json package-lock.json .env.production.example .dockerignore next.config.ts`,
+  die Ausgabe ist leer. (Ohne die Pfadangabe listet der Befehl alle 214 geänderten
+  Dateien.) Es gibt also keine neue Umgebungsvariable und keine neue Abhängigkeit.
 
 ### Dauer (Schätzung, nicht gemessen)
 
@@ -69,8 +71,9 @@ Vollständige Liste: `git log --oneline 6124936..7bc91ec`.
 
 Der Start selbst ist risikoarm, weil das Delta rein additiv und zweimal geprobt ist;
 die echten Risiken liegen danach in falschen Mails aus alten gespeicherten Vorlagen,
-in einer Erinnerungswelle beim ersten Cron-Lauf und in einem Rückfall, bei dem das
-alte Image mit dem normalen Entrypoint gegen die neue Datenbank startet.
+in einer Erinnerungswelle beim ersten Cron-Lauf, in Abteilungslinks des Offboardings,
+deren Erinnerungen nach dem Deploy verstummen (B-B10, 5.2), und in einem Rückfall,
+bei dem das alte Image mit dem normalen Entrypoint gegen die neue Datenbank startet.
 
 ### Termin
 
@@ -163,7 +166,7 @@ Claude.
 ```bash
 sudo docker exec hr-portal-app pg_dump --version
 sudo docker exec hr-portal-db psql --version
-grep '^MAGIC_LINK_EXPIRY_HOURS' .env || echo "nicht gesetzt (Standard 720 h)"
+sudo docker exec hr-portal-app printenv MAGIC_LINK_EXPIRY_HOURS || echo "nicht gesetzt (Standard 720 h)"
 ```
 
 - **Die beiden Versionen** braucht nur ein Rückfall (Abschnitt 7). Die Sicherung des
@@ -172,6 +175,10 @@ grep '^MAGIC_LINK_EXPIRY_HOURS' .env || echo "nicht gesetzt (Standard 720 h)"
   notieren.
 - **Der dritte Wert** wird für die Abfrage B-B2 gebraucht, die mit 720 h rechnet.
   Weicht er ab, ist B-B2 nur eine Näherung. Dann den Wert mit an Claude schicken.
+  Er kommt aus dem laufenden Container, also genau der Wert, mit dem die heutigen
+  Links erzeugt wurden (`env_file: .env`, `docker-compose.yml:19-20`; Standard 720 h,
+  `src/lib/auth.ts:305`). Ein `grep` in `.env` meldete bei fehlendem Leserecht einen
+  Fehler und zeigte trotzdem „nicht gesetzt“.
 
 ### 1.6 Altes Image aufheben (für den Rückfall)
 
@@ -199,13 +206,22 @@ nicht geprobt.
 
 ## 2 · SQL-Prüfungen VORHER (gegen das alte Schema `6124936`)
 
-Die Abfragen sind die getestete Endfassung aus der SQL-Probe vom 24.09.2026, byte-genau
-übernommen. Es sind 37 Abfragen. Getestet wurde so:
+Es sind 39 Abfragen. Die ersten 37 sind die getestete Endfassung aus der SQL-Probe
+vom 24.09.2026, byte-genau übernommen. Getestet wurde so:
 
 - mit psql 16 und `ON_ERROR_STOP=1` gegen eine Wegwerf-Datenbank mit altem Schema:
   Exit 0, 37 von 37;
 - gegen das neue Schema: ebenfalls Exit 0;
 - lesend gegen die Dev-Datenbank.
+
+Die letzten beiden, B-B10 und B-B11, kamen mit der Gegenprüfung dazu. Sie liefen mit
+psql 16 lesend gegen die Dev-Datenbank (neues Schema): ganze Datei Exit 0, 39 von 39.
+Gegen das alte Schema sind sie nur per Namensabgleich mit `schema.prisma` von
+`6124936` geprüft, eine Wegwerf-Datenbank gab es dafür nicht mehr. Sie benutzen nur
+Tabellen und Spalten, die es in beiden Ständen gibt. Die einzige neue Spalte,
+`offboarding_processes."supervisorEmail"`, lesen sie über `to_jsonb(p) ->> …`: Fehlt
+die Spalte, ergibt das NULL statt eines Fehlers. Die Logik von B-B10 ist mit
+Testzeilen geprüft, die die echten Tabellen im selben Befehl überdecken (nur lesend).
 
 **Namen:** Tabellen heißen `snake_case` (`@@map`), Spalten `"camelCase"` in
 Anführungszeichen. Das Schema hat kein einziges Spalten-`@map`. Es wird `COUNT(1)`
@@ -238,6 +254,8 @@ cat > ~/deploy-7bc91ec/vorher-alle.sql <<'ENDE_SQL'
 -- VORHER (Schema 6124936, VOR dem Deploy) - NUR LESEND.
 -- Getestet am 24.09.2026 mit psql 16 (ON_ERROR_STOP=1) gegen eine Wegwerf-DB mit
 -- altem Schema 6124936 und lesend gegen die Dev-DB.
+-- B-B10 und B-B11 (am Ende) kamen mit der Gegenpruefung dazu: nur lesend gegen
+-- die Dev-DB (neues Schema) getestet, Namen gegen schema.prisma von 6124936 geprueft.
 -- Aufruf auf dem Server (Datei im Projektordner, Ausgabe in eine Datei):
 --   sudo docker exec -i -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db \
 --     psql -U hrportal -d hr_portal -v ON_ERROR_STOP=1 < vorher-alle.sql > vorher-ergebnis.txt 2>&1
@@ -765,6 +783,61 @@ GROUP BY domain ORDER BY 2 DESC;
 \echo '== VORHER B-B9'
 SELECT role, COUNT(1) FILTER (WHERE "isActive") AS aktiv, COUNT(1) AS gesamt
 FROM users GROUP BY role ORDER BY role;
+
+-- ---------------------------------------------------------------------
+-- Ergaenzung Gegenpruefung: Abteilungslinks, die nach dem Deploy verstummen;
+-- Checklisten-Vorlagen je Fragebogentyp
+-- ---------------------------------------------------------------------
+\echo '== VORHER B-B10'
+WITH basis AS (
+  SELECT p."displayId", p.status::text AS status, l."departmentKey",
+         btrim(l.email) AS link_adresse, l."sentAt",
+         CASE
+           WHEN l."departmentKey" = 'VORGESETZTER' THEN
+             COALESCE(NULLIF(btrim(to_jsonb(p) ->> 'supervisorEmail'), ''),
+                      NULLIF(btrim(z."supervisorEmail"), ''),
+                      NULLIF(btrim(c."supervisorEmail"), ''))
+           ELSE COALESCE(
+             (SELECT btrim(d.email) FROM department_configs d
+              WHERE d."departmentKey" = l."departmentKey" AND d."isActive"
+                AND d."organizationId" = p."organizationId" LIMIT 1),
+             (SELECT btrim(d.email) FROM department_configs d
+              WHERE d."departmentKey" = l."departmentKey" AND d."isActive"
+                AND d."organizationId" IS NULL LIMIT 1))
+         END AS adresse_heute
+  FROM offboarding_department_links l
+  JOIN offboarding_processes p ON p.id = l."offboardingId"
+  LEFT JOIN zeugnis_bewertungen z ON z."offboardingId" = p.id
+  LEFT JOIN contract_end_processes c ON c."offboardingId" = p.id
+  WHERE l."sentAt" IS NOT NULL
+    AND l."allTasksComplete" = false
+    AND p.status NOT IN ('COMPLETED', 'CANCELLED')
+    AND l."departmentKey" NOT IN ('HR', 'MITARBEITER')
+), bewertet AS (
+  SELECT b.*,
+         CASE
+           WHEN lower(link_adresse) IN ('it@credo-gruppe.de', 'facility@credo-gruppe.de',
+                                        'buchhaltung@credo-gruppe.de', 'dsb@credo-gruppe.de')
+             THEN 'PLATZHALTER: nach dem Ersetzen "Erneut senden"'
+           WHEN adresse_heute IS NULL
+             THEN 'KEINE ADRESSE: Cron schweigt'
+           WHEN lower(link_adresse) <> lower(adresse_heute)
+             THEN 'ADRESSE WEICHT AB: Cron schweigt, "Erneut senden"'
+         END AS nach_dem_deploy
+  FROM basis b
+)
+SELECT "displayId", status, "departmentKey", link_adresse, adresse_heute,
+       "sentAt"::date AS informiert, nach_dem_deploy
+FROM bewertet
+WHERE nach_dem_deploy IS NOT NULL
+ORDER BY 1, 3;
+\echo '== VORHER B-B11'
+SELECT name, "questionnaireType", "isActive",
+       regexp_replace(name, '^\s+', '') LIKE 'Offboarding:%' AS offboarding_name,
+       count(1) FILTER (WHERE "isActive") OVER (PARTITION BY "questionnaireType") AS aktiv_je_typ
+FROM checklist_templates
+WHERE "questionnaireType" IS NOT NULL
+ORDER BY 2, 1;
 ENDE_SQL
 ```
 
@@ -774,8 +847,11 @@ ENDE_SQL
 md5sum ~/deploy-7bc91ec/vorher-alle.sql
 ```
 
-Erwartet: `28a87349c1180ea82d38917fcecb654d`. Steht dort etwas anderes, wurde beim
+Erwartet: `4db0ff9691c3cdd12b73a8f7e869da02`. Steht dort etwas anderes, wurde beim
 Kopieren etwas verändert. Dann die Datei neu anlegen und **nicht ausführen**.
+Steht dort `28a87349c1180ea82d38917fcecb654d`, ist es die ältere Fassung ohne B-B10
+und B-B11 (Commit `b403448`): `git fetch origin` wiederholen und Variante 1 erneut
+ausführen.
 
 ### 2.2 Ausführen (einheitlicher Aufruf)
 
@@ -788,7 +864,7 @@ grep -c 'ERROR' ~/deploy-7bc91ec/vorher-ergebnis.txt
 less ~/deploy-7bc91ec/vorher-ergebnis.txt
 ```
 
-**Erwartet:** `Exit: 0`, `37`, `0`. Jede Abfrage beginnt in der Ausgabe mit einer
+**Erwartet:** `Exit: 0`, `39`, `0`. Jede Abfrage beginnt in der Ausgabe mit einer
 Zeile `== VORHER <Nr>`.
 
 - **Exit 3:** Eine Abfrage ist gescheitert. Die Datei an Claude schicken.
@@ -852,7 +928,7 @@ weiter, und beim nächsten Start versucht sie es erneut.
 
 | Nr | Zeigt | Erwartet | Art · wenn nicht |
 |---|---|---|---|
-| MAIL1 | Die 21 betroffenen Vorlagen: gespeichert oder nicht, aktiv, Empfänger und Textstand | `gespeichert = f`: nichts zu tun, der neue Code-Text gilt. | „ALTER TEXT: nach Deploy zuruecksetzen“ kommt auf die Reset-Liste (5.4). Hat HR einen dieser Texte **bewusst** angepasst: ENTSCHEIDUNG. Zeigt `questionnaire-confirmation-employee` `isActive = f`: ENTSCHEIDUNG, denn ab jetzt bleibt die Bestätigung an die Person dann wirklich aus. |
+| MAIL1 | Die 21 betroffenen Vorlagen: gespeichert oder nicht, aktiv, Empfänger und Textstand | `gespeichert = f`: nichts zu tun, der neue Code-Text gilt. | „ALTER TEXT: nach Deploy zuruecksetzen“ kommt auf die Reset-Liste (5.4). Hat HR einen dieser Texte **bewusst** angepasst: ENTSCHEIDUNG. Bei `questionnaire-confirmation-employee` ist jede dieser Angaben eine ENTSCHEIDUNG, denn bisher schickte der Code die Bestätigung immer an die Person und ignorierte Aktiv-Schalter und Empfängerfelder (`git show 6124936:src/app/api/fragebogen/[token]/route.ts`, Z. 803-838). Ab jetzt wirken sie (`mailer.ts:519-528, 540-542`): `isActive = f` (die Bestätigung bleibt aus), ein nicht leeres `recipientTo` außer `{{email}}` (es **ersetzt** die Adresse der Person), ein gesetztes `recipientCc` oder `recipientBcc` (geht ab jetzt in Kopie mit). |
 | MAIL2 | Die 30 HR-internen Vorlagen: An-Feld, Aktiv-Schalter, SKIPPED der letzten 90 Tage | beliebig | INFO für 5.1 und 5.3. Ohne An-Feld werden sie übersprungen (`mailer.ts:529-538`). |
 | MAIL3 | Alle Webhooks, ohne Zugangsdaten | `(0 rows)` oder nur inaktive | Jede **aktive** Zeile: ENTSCHEIDUNG, möglicher Doppelversand (6.4). |
 
@@ -862,13 +938,15 @@ weiter, und beim nächsten Start versucht sie es erneut.
 |---|---|---|---|
 | B-B1 | Mitarbeiter-Erinnerungen, die der erste Lauf nach dem Deploy verschickt | beliebig | INFO. Enthält auch Personen, die heute festhängen und nach der Heil-Migration wieder eingeladen sind. |
 | B-B2 | Führungskraft-Erinnerungen im ersten Lauf. Neu: auch bei offenem Fragebogen (`cron/reminders/route.ts:195-222`) | beliebig | Jede Zeile ist eine Mail an eine Führungskraft. Soll eine davon nicht hinausgehen: ENTSCHEIDUNG, vor dem nächsten 08:00-Lauf. |
-| B-B3 | Abteilungs-Erinnerungen im Offboarding im ersten Lauf (Näherung) | beliebig | Zeigt die Spalte `email` einen Platzhalter: vor dem nächsten 08:00-Lauf korrigieren (5.2). |
+| B-B3 | Abteilungs-Erinnerungen im Offboarding im ersten Lauf (Näherung, zählt zu viel: Links aus B-B10 mit „Cron schweigt“ werden übersprungen) | beliebig | Der Cron erinnert nur an die Adresse, an die der Link ging (`email`), und nur, solange sie mit der heutigen Adresse übereinstimmt (`abteilungsaufgaben-dienst.ts:1174-1196`). Zeigt `email` einen Platzhalter, geht die Erinnerung an den Platzhalter. Nach dem Ersetzen (5.2) schweigt der Cron für diesen Link, bis HR „Erneut senden“ wählt. Welche Links das betrifft, zeigt B-B10. |
 | B-B4 | Gespeicherte Erinnerungs-Vorlagen | – | INFO für 5.4 |
 | B-B5 | Webhooks auf Erinnerungen und Offboarding | wie MAIL3 | wie MAIL3 |
 | B-B6 | Freigabeliste (`allowedRecipientDomains`) und Reply-To | beliebig | Ist die Liste **nicht leer**, sperrt sie ab jetzt auch Führungskraft-Adressen. Dann mit B-B8 abgleichen (5.2). |
 | B-B7 | Abteilungen | wie M-V5d | – |
 | B-B8 | Domains der eingetragenen Führungskräfte | – | INFO, Grundlage für die Freigabeliste |
 | B-B9 | Benutzer je Rolle | – | INFO (5.3) |
+| B-B10 | Informierte, offene Offboarding-Abteilungslinks, deren Erinnerungen nach dem Deploy verstummen, und warum (Spalte `nach_dem_deploy`). `adresse_heute` ist die Adresse, die der neue Code auflöst: Einrichtung vor zentral, `VORGESETZTER` über die Führungskraft des Vorgangs (Zeugnis-Bewertung, dann Vertragsende; `abteilungsaufgaben-dienst.ts:259-269`, `abteilungsaufgaben.ts:441-469`). | `(0 rows)` | ENTSCHEIDUNG, sobald Zeilen da sind. `PLATZHALTER`: Nach dem Ersetzen in 5.2 schweigt der Cron. `ADRESSE WEICHT AB`: Der Cron schweigt ab dem Deploy, etwa weil `VORGESETZTER` jetzt an die Führungskraft geht statt an den Eintrag unter Abteilungen. `KEINE ADRESSE`: Es gibt keine aktive Abteilung oder keine Führungskraft. Jede Zeile braucht in 5.2 ein „Erneut senden“ mit **echter Mail und neuem Link**, oder HR entscheidet bewusst, den Link ruhen zu lassen. |
+| B-B11 | Checklisten-Vorlagen mit Fragebogentyp: Name, aktiv, `offboarding_name`, `aktiv_je_typ` | Kein `offboarding_name = t`, `aktiv_je_typ` höchstens `1` | ENTSCHEIDUNG. `POST /api/onboarding` nimmt die erste aktive Vorlage zum Typ, ohne Reihenfolge und ohne Blick auf den Namen (`src/app/api/onboarding/route.ts:176-179`). Die Sperre für „Offboarding:“-Vorlagen aus Paket 5 greift erst, wenn die Vorlage gespeichert wird (`src/app/api/checklisten/[id]/route.ts:136-142, 262-272`, `src/app/api/checklisten/route.ts:88-92`). Eine solche Vorlage oder eine zweite aktive je Typ zöge sonst die falschen Aufgaben in neue Einstellungen, und mit Paket 5 gehen sie per Link an Abteilungen. Abhilfe nach dem Deploy: die Vorlage unter `/checklisten` öffnen und speichern, oder die überzählige deaktivieren. |
 
 #### E · Prüfungen 1–5 aus dem Änderungsplan
 
@@ -1032,8 +1110,15 @@ Next.js Server startet auf Port 3000...
 
 **Erläuterungen zu den Zeilen:**
 
-- **Schema-Teil:** Die Zeilen stehen in `entrypoint.sh:36, 71, 107, 118, 120, 124, 130`.
+- **Schema-Teil:** Die Zeilen stehen in `entrypoint.sh:9, 36, 71, 107, 118, 120, 124, 130`.
   Der Zeitstempel im Dateinamen der Sicherung ist UTC, denn der Container läuft in UTC.
+- **Statt der dritten Zeile können zwei andere kommen**, beide gehören zu 3.7:
+  - `Schema-Vergleich nicht moeglich (Status 1) — Sicherung vorsichtshalber.`
+    (`entrypoint.sh:73`). Sicherung und Push laufen trotzdem weiter.
+  - `Datenbank-Schema ist bereits deckungsgleich — kein Abgleich noetig.`
+    (`entrypoint.sh:68`). Dann fehlen Sicherung und Push. Bei **jedem späteren**
+    Neustart ist das die normale Zeile. Beim **ersten** Start des neuen Images darf
+    sie nicht kommen, denn S-V2 bis S-V5 und 3.3 haben ein offenes Delta gezeigt.
 - **Warnung:** Der Warnungstext stammt aus dem Probelauf, es ist **genau diese eine**
   Warnung. Sie ist der angekündigte Text von `--accept-data-loss` (wie am 07.09.,
   Protokoll :102-106). Entscheidend ist die Zeile darunter.
@@ -1076,10 +1161,13 @@ sudo docker compose logs app | grep -E 'System-Vorlage|Masernschutz|Betriebsnumm
 
 | Zeichen im Log | Bedeutung | Sofort |
 |---|---|---|
+| `Datenbank-Schema ist bereits deckungsgleich — kein Abgleich noetig.` beim **ersten** Start | Das gestartete Image kennt das neue Schema nicht, vermutlich läuft noch das alte Image, etwa weil der Build in 3.2 gescheitert ist (`entrypoint.sh:67-68`). Die Datenbank ist unverändert. | an Claude, mit `start-log.txt` und der Ausgabe von `sudo docker compose images app` |
+| `Schema-Vergleich nicht moeglich (Status …) — Sicherung vorsichtshalber.` | `prisma migrate diff` konnte nicht vergleichen (`entrypoint.sh:72-74`). Der Entrypoint sichert und pusht trotzdem. | an Claude, mit `start-log.txt`. Solange keine Neustart-Schleife entsteht, nicht eingreifen. |
 | `FATAL: Sicherungsverzeichnis /backups fehlt.` | Die Einhängung fehlt (`entrypoint.sh:76-85`). Die Datenbank ist unverändert. | an Claude |
 | `FATAL: Sicherung nach … fehlgeschlagen.` | Rechte auf `backups/` (`entrypoint.sh:98-105`). Die Datenbank ist unverändert. | `sudo chown 1001 backups`. Der Container startet von selbst neu (`restart: unless-stopped`, `docker-compose.yml:15`). |
 | Nach `Datenbank-Schema wird synchronisiert...` kommt eine Prisma-Fehlermeldung statt `…synchronisiert.`, und `sudo docker compose ps` zeigt `Restarting` | Der Push ist gescheitert, der Container hängt in einer Neustart-Schleife. | **Sofort** `sudo docker compose stop app`. Jeder Neustart legt eine neue Sicherung an, und nach zehn Neustarts ist die Sicherung vom Deploy weggeräumt (`entrypoint.sh:111-116`). Danach an Claude. |
 | `… fehlgeschlagen: …` einer Migration, `Seed-Check Fehler:` oder `System-Vorlage-Seed Fehler` | Die Migration ist nicht gelaufen, der Start geht trotzdem weiter (`entrypoint.sh:125`). | an Claude. Ohne Merker läuft sie beim nächsten Start erneut. |
+| `Seed-Check fehlgeschlagen (nicht kritisch).` | `node prisma/seed-check.js` ist mit Fehler ausgestiegen (`entrypoint.sh:125`). Fehler einzelner Migrationen fängt die Datei selbst ab (`seed-check.js:1848-1851`), diese Zeile heißt also: Das Skript selbst ist abgebrochen, womöglich lief **keine** der fünf Migrationen. Der Server startet trotzdem. | an Claude, mit `start-log.txt`. M-N0 zeigt, welche Merker fehlen. |
 | Kein `✓ Ready`, oder der Health-Check (4.1) meldet einen Fehler | Die App startet nicht. | an Claude, mit `start-log.txt` |
 
 ### 3.8 Die Sicherung des Entrypoints aus der Rotation nehmen
@@ -1118,8 +1206,11 @@ Erwartet:
 
 ### 4.2 SQL NACHHER (gegen das neue Schema `7bc91ec`)
 
-Die getestete Endfassung hat 25 Abfragen. Sie liefen gegen eine Probedatenbank mit
-neuem Schema, einmal vor und einmal nach `seed-check.js`: jeweils Exit 0, 25 von 25.
+Die Datei hat 26 Abfragen. Die ersten 25 sind die getestete Endfassung. Sie liefen
+gegen eine Probedatenbank mit neuem Schema, einmal vor und einmal nach
+`seed-check.js`: jeweils Exit 0, 25 von 25. B-N6 am Ende kam mit der Gegenprüfung
+dazu, ist dieselbe Abfrage wie B-B10 und lief lesend gegen die Dev-Datenbank: ganze
+Datei Exit 0, 26 von 26.
 
 **Vor dem Deploy ausgeführt bricht die Datei ab**, und zwar bei S-N2 mit Exit 3. Das
 ist gewollt: Diese Abfragen kennen Spalten, die es vorher noch nicht gibt.
@@ -1141,6 +1232,7 @@ cat > ~/deploy-7bc91ec/nachher-alle.sql <<'ENDE_SQL'
 -- NACHHER (Schema 7bc91ec, NACH dem Start des neuen Containers) - NUR LESEND.
 -- Getestet am 24.09.2026 mit psql 16 (ON_ERROR_STOP=1) gegen eine Wegwerf-DB mit
 -- neuem Schema 7bc91ec (altes Schema + delta.sql) und lesend gegen die Dev-DB.
+-- B-N6 (am Ende) kam mit der Gegenpruefung dazu: nur lesend gegen die Dev-DB getestet.
 -- Aufruf auf dem Server (Datei im Projektordner, Ausgabe in eine Datei):
 --   sudo docker exec -i -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db \
 --     psql -U hrportal -d hr_portal -v ON_ERROR_STOP=1 < nachher-alle.sql > nachher-ergebnis.txt 2>&1
@@ -1463,6 +1555,53 @@ SELECT event, status, COUNT(1) AS anzahl
 FROM email_logs
 WHERE "createdAt" > now() - interval '1 day' AND "isTest" = false
 GROUP BY event, status ORDER BY event, status;
+
+-- ---------------------------------------------------------------------
+-- Ergaenzung Gegenpruefung: Abteilungslinks, deren Erinnerungen schweigen (wie B-B10)
+-- ---------------------------------------------------------------------
+\echo '== NACHHER B-N6'
+WITH basis AS (
+  SELECT p."displayId", p.status::text AS status, l."departmentKey",
+         btrim(l.email) AS link_adresse, l."sentAt",
+         CASE
+           WHEN l."departmentKey" = 'VORGESETZTER' THEN
+             COALESCE(NULLIF(btrim(to_jsonb(p) ->> 'supervisorEmail'), ''),
+                      NULLIF(btrim(z."supervisorEmail"), ''),
+                      NULLIF(btrim(c."supervisorEmail"), ''))
+           ELSE COALESCE(
+             (SELECT btrim(d.email) FROM department_configs d
+              WHERE d."departmentKey" = l."departmentKey" AND d."isActive"
+                AND d."organizationId" = p."organizationId" LIMIT 1),
+             (SELECT btrim(d.email) FROM department_configs d
+              WHERE d."departmentKey" = l."departmentKey" AND d."isActive"
+                AND d."organizationId" IS NULL LIMIT 1))
+         END AS adresse_heute
+  FROM offboarding_department_links l
+  JOIN offboarding_processes p ON p.id = l."offboardingId"
+  LEFT JOIN zeugnis_bewertungen z ON z."offboardingId" = p.id
+  LEFT JOIN contract_end_processes c ON c."offboardingId" = p.id
+  WHERE l."sentAt" IS NOT NULL
+    AND l."allTasksComplete" = false
+    AND p.status NOT IN ('COMPLETED', 'CANCELLED')
+    AND l."departmentKey" NOT IN ('HR', 'MITARBEITER')
+), bewertet AS (
+  SELECT b.*,
+         CASE
+           WHEN lower(link_adresse) IN ('it@credo-gruppe.de', 'facility@credo-gruppe.de',
+                                        'buchhaltung@credo-gruppe.de', 'dsb@credo-gruppe.de')
+             THEN 'PLATZHALTER: nach dem Ersetzen "Erneut senden"'
+           WHEN adresse_heute IS NULL
+             THEN 'KEINE ADRESSE: Cron schweigt'
+           WHEN lower(link_adresse) <> lower(adresse_heute)
+             THEN 'ADRESSE WEICHT AB: Cron schweigt, "Erneut senden"'
+         END AS nach_dem_deploy
+  FROM basis b
+)
+SELECT "displayId", status, "departmentKey", link_adresse, adresse_heute,
+       "sentAt"::date AS informiert, nach_dem_deploy
+FROM bewertet
+WHERE nach_dem_deploy IS NOT NULL
+ORDER BY 1, 3;
 ENDE_SQL
 ```
 
@@ -1477,8 +1616,9 @@ grep -c 'ERROR' ~/deploy-7bc91ec/nachher-ergebnis.txt
 ```
 
 **Erwartet:**
-- md5 `4b326c1abf68d6d321cf98eb9129ddbc`
-- `Exit: 0`, `25`, `0`
+- md5 `39b9185b6004458876fde82e54234ffa` (die ältere Fassung ohne B-N6 hatte
+  `4b326c1abf68d6d321cf98eb9129ddbc`)
+- `Exit: 0`, `26`, `0`
 
 > **Ergebnis an Claude schicken — immer:** `nachher-ergebnis.txt`.
 
@@ -1491,7 +1631,7 @@ grep -c 'ERROR' ~/deploy-7bc91ec/nachher-ergebnis.txt
 | M-N0b | Die Details der Merker, darin die alten Werte | – | Mitschicken, das ist das Protokoll der Umstellung. |
 | M-N1, M-N1-2 | Vorlagen und laufende Snapshots ohne aktiven Schritt 9 | `(0 rows)` | an Claude, außer bei „UEBERSPRUNGEN“ in M-V1a |
 | M-N2a | Kostenstellen ohne Aufteilung | `0` | an Claude |
-| M-N2b | Aufteilungen, die nicht 100 % ergeben | dieselben Fälle wie in M-V2b | Liste an HR (5.3) |
+| M-N2b | Aufteilungen, die nicht 100 % ergeben | genau die Zeilen aus M-V2b mit `ergebnis` „Anteil bleibt, Summe <> 100 -> HR pflegt nach“. Die Zeilen „ohne Anteil -> 100“ ergeben 100 %, und aus „leer - keine Zeile“ entsteht keine Aufteilung (`seed-check.js:962-979`); beide fehlen hier also. | Liste an HR (5.3) |
 | M-N3 | Beschriftung „Stellenbeschreibung“ noch vorhanden | `(0 rows)` | an Claude |
 | M-N4 | Status passt nicht zu den beiden Zeitstempeln | `(0 rows)` | an Claude |
 | M-N4b | `hrOhneAbgabe` laut Merker | dieselben Fälle wie in M-V4b | einzeln mit HR klären (5.3) |
@@ -1506,6 +1646,7 @@ grep -c 'ERROR' ~/deploy-7bc91ec/nachher-ergebnis.txt
 | B-N3 | Dokumente mit Ablaufdatum | `0` · `0`, denn keine Migration füllt `gueltigBis` | INFO |
 | B-N4 | Onboarding-Links | `0` · `0` | an Claude, denn niemand hat bisher geklickt |
 | B-N5 | Mailprotokoll der letzten 24 h | normaler Tagesverkehr. Der Start selbst verschickt nichts. | Nach dem ersten Cron-Lauf erneut ansehen |
+| B-N6 | wie B-B10: Offboarding-Abteilungslinks, deren Erinnerungen schweigen | direkt nach dem Start dieselben Zeilen wie B-B10, nach 5.2 `(0 rows)` | Die Zeilen sind die Arbeitsliste für 5.2 Nr. 2. Nach 5.2 erneut ausführen. Bleibt eine Zeile stehen, ohne dass HR sie bewusst ruhen lässt: an Claude. |
 
 ### 4.3 Cron-Probe (ohne Mails)
 
@@ -1610,12 +1751,16 @@ Anfang.
    `n8n/CREDO_Reminder_Cron_Workflow.json:53`). Bitte bestätigen.
 
 3. **Eingangsbestätigung Mitarbeiter (Fragebogen eingereicht)**
-   (`questionnaire-confirmation-employee`): Der Aktiv-Schalter muss an sein. Die
-   Vorlage läuft jetzt über den normalen Versandweg (`fragebogen/[token]/route.ts:1144-1150`).
-   - Ein ausgeschalteter Schalter heißt ab jetzt wirklich: keine Bestätigung. Früher
-     wurde trotzdem gesendet.
-   - Das An-Feld leer lassen. Dann gilt der Katalog-Default `{{email}}`
-     (`mailer.ts:519-528`).
+   (`questionnaire-confirmation-employee`): Die Vorlage läuft jetzt über den normalen
+   Versandweg (`fragebogen/[token]/route.ts:1144-1150`). Damit wirken drei
+   Einstellungen, die bisher ohne Wirkung waren (MAIL1, 2.3):
+   - **Aktiv-Schalter an.** Ausgeschaltet heißt ab jetzt wirklich: keine Bestätigung
+     (`mailer.ts:663-664`). Früher wurde trotzdem gesendet.
+   - **An-Feld leeren oder `{{email}}` eintragen.** Leer gilt der Katalog-Default
+     `{{email}}` (`src/lib/events.ts:340`, `mailer.ts:519-528`). Jede andere Angabe
+     **ersetzt** die Adresse der Person, die Bestätigung erreicht sie dann nicht mehr.
+   - **CC und BCC** nur so stehen lassen, wie es in 2.3 entschieden wurde. Sie gehen
+     ab jetzt wirklich in Kopie (`mailer.ts:540-542`).
 
 4. **Webhooks:** Jede aktive Zeile aus MAIL3 so umsetzen, wie es in 2.3 entschieden
    wurde (6.4).
@@ -1635,12 +1780,39 @@ Anfang.
    - **Altzeilen löschen:** `HR`, `MITARBEITER`, `VORGESETZTER`. Diese Schlüssel sind
      reserviert (`src/lib/constants.ts:301`) und werden nie angeschrieben.
    - **Warum vor 08:00:**
-     - Der Offboarding-Cron erinnert bereits informierte Links an die aktuelle Adresse
-       (B-B3).
+     - Der Offboarding-Cron erinnert informierte Links nur an die Adresse, an die der
+       Link ging, und nur, solange sie mit der heutigen übereinstimmt
+       (`abteilungsaufgaben-dienst.ts:1174-1196`). Steht der Platzhalter um 08:00
+       noch, geht die Erinnerung an den Platzhalter (B-B3).
+     - Wird die Adresse ersetzt, schweigt der Cron für die schon informierten Links.
+       Er vermerkt am Link „Adresse geändert, bitte Link erneuern“ und schickt nichts,
+       auch nicht an die neue Adresse (CLAUDE.md, Abteilungsaufgaben Regel 5). Erst
+       „Erneut senden“ (Nr. 2) erreicht die neue Adresse.
      - Aufgaben ohne aktive Adresse bleiben gelb und gehen nicht hinaus.
-     - Wird die Adresse eines schon informierten Links geändert, pausieren seine
-       Erinnerungen bis „Erneut senden“ (CLAUDE.md, Abteilungsaufgaben Regel 5).
-2. **Einstellungen → SMTP → Erlaubte Domains** (nur wenn B-B6 nicht leer ist):
+2. **Schweigende Abteilungslinks im Offboarding**, Liste B-N6 (vorher B-B10), je Zeile
+   so, wie es in 2.3 entschieden wurde. Das betrifft Links an ersetzte Platzhalter
+   und Links an `VORGESETZTER`: Dieser Schlüssel geht jetzt an die Führungskraft des
+   Vorgangs, nicht mehr an den Eintrag unter Abteilungen (CLAUDE.md, Abteilungsaufgaben
+   Regel 6). Fehlt
+   sie oder weicht ihre Adresse ab, schweigt der Cron ebenfalls.
+   - Den Offboarding-Vorgang (`displayId`) öffnen, Tab Checkliste, Karte „Aufgaben
+     für Abteilungen“. Die Zeile nennt „Adresse geändert (jetzt …)“ oder den Grund,
+     warum es keine Adresse gibt (`abteilungsaufgaben.ts:1362-1372`).
+   - Bei `VORGESETZTER` zuerst im Tab Übersicht die Führungskraft eintragen, wenn sie
+     fehlt oder nicht stimmt. Ist B-B6 nicht leer, muss die Domain einer frei
+     eingetippten Adresse freigegeben sein (Nr. 3), sonst lehnt das Portal mit 409 ab.
+     Adressen aus Zeugnis-Bewertung oder Vertragsende sind immer erlaubt
+     (`abteilungsaufgaben-dienst.ts:271-293`).
+   - Bei `KEINE ADRESSE` einer Abteilung: unter Einstellungen → Abteilungen einen
+     aktiven Eintrag anlegen (Nr. 1).
+   - Dann **„Erneut senden“**. **Achtung, das verschickt eine echte Mail** an die neue
+     Adresse, mit **neuem Link**. Der bisherige Link wird ungültig, erledigte Aufgaben
+     bleiben erledigt (`abteilungsaufgaben-dienst.ts:575-588, 818-851`). Danach sind
+     „Erneut senden“ und „Erinnern“ für diesen Link 10 Minuten gesperrt
+     (`abteilungsaufgaben.ts:60`).
+   - Zum Schluss die NACHHER-Datei erneut ausführen (4.2). B-N6 zeigt dann
+     `(0 rows)`, außer Links, die HR bewusst ruhen lässt.
+3. **Einstellungen → SMTP → Erlaubte Domains** (nur wenn B-B6 nicht leer ist):
    - Die Liste sperrt ab jetzt auch frei eingetippte Führungskraft-Adressen mit 409:
      - beim „Neuen Vorgang“ (`api/onboarding/route.ts:163-165`)
      - beim Vorgesetzten-Link (`…/supervisor-link/route.ts:134-137`)
@@ -1650,7 +1822,7 @@ Anfang.
    - Der Hilfetext unter dem Feld ist veraltet: Er sagt „Gilt nur für den
      Dokumentenpaket-Versand“ (`einstellungen-content.tsx:849-855`). HR sollte das
      wissen.
-3. **n8n:** URL, Timeout und Zeitplan prüfen (6.1). Soll der erste Lauf erst nach 5.2
+4. **n8n:** URL, Timeout und Zeitplan prüfen (6.1). Soll der erste Lauf erst nach 5.2
    und 5.3 kommen, beide Workflows so lange pausieren (6.3).
 
 ### 5.3 EMPFOHLEN (am selben Tag oder zeitnah)
@@ -1724,7 +1896,7 @@ Code-Text automatisch (`mailer.ts:383-415`).
 | Erinnerung Vorgesetzter (Modalitäten ausstehend) | `supervisor-reminder` | egal | nur Umlaute. Der Link-Fix (`/modalitaeten/`) steckt im Payload (`cron/reminders/route.ts:266`). | – |
 | Neuer Offboarding-Vorgang erstellt | `offboarding-created` | egal | „Fuer“ wird „Für“ | An-Feld prüfen |
 | Unterlagen zum Austritt (Offboarding) | `offboarding-documents-sent` | egal | Der Datumsfix sitzt im Mailer und wirkt auch mit alter Zeile. | – |
-| Eingangsbestaetigung Mitarbeiter (Fragebogen eingereicht) | `questionnaire-confirmation-employee` | PFLICHT prüfen | Text unverändert, **Verhalten neu** (5.1 Nr. 3) | Aktiv-Schalter prüfen |
+| Eingangsbestaetigung Mitarbeiter (Fragebogen eingereicht) | `questionnaire-confirmation-employee` | PFLICHT prüfen | Text unverändert, **Verhalten neu**: Aktiv-Schalter, An-Feld, CC und BCC wirken jetzt (5.1 Nr. 3) | Aktiv-Schalter und Empfängerfelder prüfen |
 | Onboarding-Aufgaben für Abteilung zugewiesen | `onboarding-department-assigned` | NEU | Es gibt noch keine gespeicherte Zeile, der Code-Text gilt. | Test senden |
 | Erinnerung: Offene Onboarding-Aufgaben | `onboarding-department-reminder` | NEU | wie oben | Test senden |
 | Onboarding-Aufgabe erledigt | `onboarding-task-completed` | NEU, **PFLICHT An-Feld** | Katalog-Empfänger leer (`events.ts:565`). Nur über den Link, das Häkchen im Portal löst nichts aus. | An-Feld (5.1 Nr. 2) |
@@ -1775,16 +1947,29 @@ Danach muss also kein Empfänger neu eingetragen werden.
 
 ## 6 · n8n
 
-Im Repo liegen nur zwei alte Exporte vom 28.03. (`n8n/CREDO_Reminder_Cron_Workflow.json`,
-`n8n/CREDO_Offboarding_Reminder_Workflow.json`), und `/n8n/` steht inzwischen in
-`.gitignore:71`. **Der tatsächliche Stand in n8n ist ungeklärt** und nur in der
-n8n-Oberfläche prüfbar.
+Im Repo liegen nur drei alte Exporte vom 28.03. (`git ls-files n8n`, alle aus Commit
+`48696a1`), und `/n8n/` steht inzwischen in `.gitignore:71`:
+
+- `n8n/CREDO_Reminder_Cron_Workflow.json`: Zeitplan für `/api/cron/reminders`
+- `n8n/CREDO_Offboarding_Reminder_Workflow.json`: Zeitplan für `/api/cron/offboarding-reminders`
+- `n8n/CREDO_HR_Portal_Offboarding_Workflow.json`: **kein Zeitplan**, sondern fünf
+  Webhook-Empfänger für `offboarding-created`, `offboarding-department-assigned`,
+  `offboarding-task-completed`, `offboarding-department-completed` und
+  `offboarding-completed` (Z. 7, 31, 55, 79, 103). Jeder verschickt per SMTP eine
+  **eigene Mail**: an die Abteilung mit dem Link aus dem Payload (Z. 136) oder an
+  `personal@credo-gruppe.de` (Z. 126, 146, 156, 166). Zur Bedeutung für den
+  Doppelversand siehe 6.4.
+
+**Der tatsächliche Stand in n8n ist ungeklärt** und nur in der n8n-Oberfläche prüfbar.
 
 **Für alle Cron-Aufrufe gilt:**
 - Methode `POST`
 - Header `Authorization: Bearer <CRON_SECRET>`, den Wert aus `.env` eintragen, nicht hier
-- ohne Secret antwortet der Server mit 500, mit falschem Secret mit 401
-  (`dokument-ablauf/route.ts:141-147`, gleiches Muster in allen Cron-Routen)
+- Aufruf ohne Header oder mit falschem Secret: 401. Fehlt `CRON_SECRET` in der `.env`
+  des Servers: 500 („CRON_SECRET nicht konfiguriert“). Belege:
+  `dokument-ablauf/route.ts:141-147`, `reminders/route.ts:74-89`,
+  `offboarding-reminders/route.ts:34-49`. Die 401 in 4.3 ist also der erwartete
+  Fall „ohne Header“.
 
 ### 6.1 Bestehende Läufe prüfen
 
@@ -1829,7 +2014,9 @@ Was sich im ersten Lauf ändert:
 - **Festhängende Personen** sind nach der Heil-Migration wieder erinnerungsfähig.
 
 Der erste Lauf verschickt ungefähr B-B1 + B-B2 Onboarding-Erinnerungen und B-B3
-Offboarding-Erinnerungen.
+Offboarding-Erinnerungen. Von B-B3 gehen die Links ab, die B-B10 mit „Cron schweigt“
+führt, und die Platzhalter-Links, deren Adresse vor 08:00 ersetzt wurde. Sie werden
+übersprungen, nicht erinnert (5.2 Nr. 2).
 
 - **Empfehlung:** nach dem 08:00-Lauf deployen, 5.1 und 5.2 am selben Tag erledigen.
 - **Geht das nicht:** beide Workflows in n8n pausieren, bis 5.1 und 5.2 erledigt sind.
@@ -1841,6 +2028,17 @@ Offboarding-Erinnerungen.
 (`src/lib/webhooks.ts:84-106`). Für jede aktive Zeile aus MAIL3 wird geklärt:
 **Verschickt der n8n-Workflow dahinter eine eigene Mail?** Wenn ja, wird entweder der
 Webhook deaktiviert oder die Portal-Vorlage. Das entscheidet Claude mit Ihnen.
+
+**Für die fünf Offboarding-Ereignisse ist die Antwort sehr wahrscheinlich ja.** Der
+Repo-Export `n8n/CREDO_HR_Portal_Offboarding_Workflow.json` empfängt genau
+`offboarding-created`, `offboarding-department-assigned`, `offboarding-task-completed`,
+`offboarding-department-completed` und `offboarding-completed` und mailt selbst
+(Aufzählung am Anfang von Abschnitt 6). Das Portal mailt dieselben Ereignisse selbst
+per SMTP, bevor es die Webhooks auslöst (CLAUDE.md, „E-Mail-Versand“). Jede aktive
+Zeile auf eines dieser Ereignisse in MAIL3/B-B5/P4 heißt also voraussichtlich: zwei
+Mails je Ereignis, solange auch die Portal-Vorlage aktiv ist, bei
+`offboarding-department-assigned` zwei Mails an die Abteilung. Ob der Workflow live
+noch so aussieht, zeigt nur n8n.
 
 **Feuert neu:**
 - `questionnaire-confirmation-employee`: Bisher lief der Versand an `triggerWebhooks`
@@ -1901,8 +2099,50 @@ ginge.
 
 **Wann:** Nur solange seit dem Start **niemand gearbeitet hat**. Weg A verwirft alles,
 was seit 3.4 geschrieben wurde, in allen Tabellen. Dazu gehören auch Fragebögen, die
-Beschäftigte über ihre Links ausgefüllt haben. Ob seitdem gearbeitet wurde, zeigen HR
-und B-N5.
+Beschäftigte über ihre Links ausgefüllt haben, und automatisches Zwischenspeichern
+über die öffentlichen Links. B-N5 zeigt nur das Mailprotokoll und reicht dafür nicht.
+
+**Vorher prüfen, ob gearbeitet wurde (nur lesend).** Der Befehl zählt je Tabelle die
+Zeilen, die nach der ersten Zeile `✓ Ready` geschrieben wurden (`"updatedAt"`, bei
+reinen Protokolltabellen wie `audit_logs` `"createdAt"`). Maßgeblich ist die
+Ready-Zeit, nicht die Startzeit, denn die Migrationen setzen `updatedAt` schon während
+des Starts. Der Zeitstempel aus `docker logs -t` ist UTC, die Spalten speichern UTC.
+
+```bash
+cd /vol/container/HR_Portal_CREDO
+READY=$(sudo docker logs -t hr-portal-app 2>&1 | grep -m1 'Ready in' | cut -d' ' -f1)
+echo "Ready (UTC): ${READY:-keine Ready-Zeile}"
+[ -n "$READY" ] && sudo docker exec -i -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db \
+  psql -U hrportal -d hr_portal -v ON_ERROR_STOP=1 -v ready="$READY" <<'ENDE_PRUEFUNG'
+SELECT 'SELECT * FROM (' || string_agg(format(
+         'SELECT %L::text AS tabelle, COUNT(1) AS zeilen FROM public.%I WHERE %I > (%L::timestamptz AT TIME ZONE ''UTC'')',
+         table_name, table_name, spalte, :'ready'), ' UNION ALL ')
+       || ') x WHERE zeilen > 0 ORDER BY 2 DESC, 1'
+FROM (SELECT table_name::text AS table_name,
+             CASE WHEN bool_or(column_name = 'updatedAt') THEN 'updatedAt' ELSE 'createdAt' END AS spalte
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND column_name IN ('updatedAt', 'createdAt')
+      GROUP BY table_name) t
+\gexec
+ENDE_PRUEFUNG
+```
+
+- **Keine Ready-Zeile:** Das Portal hat nie Anfragen angenommen, also kann niemand
+  gearbeitet haben.
+- **Erwartbar**, wenn nur die Handschritte liefen: `email_templates`,
+  `department_configs`, `smtp_config`, `webhook_configs`, `users` (Anmeldung),
+  `audit_logs` und `email_logs` (etwa „Test senden“). Diese Einstellungen gehen mit
+  Weg A verloren und müssen nach einem späteren erneuten Deploy wiederholt werden.
+- **Jede andere Tabelle**, besonders `personal_data`, `supervisor_data`,
+  `onboarding_processes`, `checklist_items`, `offboarding_*` und `documents`, heißt:
+  Es wurde gearbeitet. Dann **kein Weg A**, sondern an Claude (vorwärts reparieren
+  oder Weg B).
+- Geprobt: lesend gegen die Dev-Datenbank mit psql 16, Exit 0. **Lücke:** Acht
+  Tabellen haben keine der beiden Spalten und fehlen deshalb: `bem_kommunikation`,
+  `bem_zugriffe`, `elternzeit_checkliste`, `elternzeit_dokumente`,
+  `mutterschutz_checkliste`, `mutterschutz_dokumente`, `offboarding_documents`,
+  `system_migrations`. Arbeit, die nur dort landet, zeigt der Befehl nicht. HR
+  zusätzlich fragen.
 
 ```bash
 cd /vol/container/HR_Portal_CREDO
@@ -2039,15 +2279,22 @@ services:
 | 3.6 | `start-log.txt`, **immer**, besonders bei Warnzeilen | nein, außer bei Fehlern |
 | 3.7 | jeder Fehlschlag, nach `sudo docker compose stop app` bei einer Neustart-Schleife | ja |
 | 4.2 | `nachher-ergebnis.txt`, **immer** | nein, außer bei Abweichungen |
-| 5–6 | Entscheidungen zu angepassten Vorlagen, aktiven Webhooks, Führungskraft-Erinnerungen | ja, je Punkt |
-| 7 | vor **jedem** Rückfall, mit frischem S-R1 | **ja** |
+| 5–6 | Entscheidungen zu angepassten Vorlagen, Empfängerfeldern der Eingangsbestätigung, aktiven Webhooks, Führungskraft-Erinnerungen, „Erneut senden“ je Zeile aus B-B10/B-N6, Checklisten-Vorlagen aus B-B11 | ja, je Punkt |
+| 7 | vor **jedem** Rückfall, mit frischem S-R1 und, vor Weg A, der Ausgabe der Prüfung „ob gearbeitet wurde“ (7.3) | **ja** |
 
 ## Anhang B · Ungeklärt
 
 - **n8n:** der Live-Stand, also URL (`hr.credo-schulen.de` im Export), Timeout,
   Zeitplan und welche Crons überhaupt eingeplant sind.
 - **HR-Postfach** für die An-Felder: `personalbuchhaltung@fes-minden.de` laut Vorlagen
-  und n8n-Export, bestätigen.
+  und Reminder-Export, bestätigen. Der Offboarding-Export
+  (`n8n/CREDO_HR_Portal_Offboarding_Workflow.json`) schreibt dagegen an
+  `personal@credo-gruppe.de`.
+- **n8n-Offboarding-Workflow:** ob er live noch aktiv ist und ob Webhooks im Portal
+  auf ihn zeigen (MAIL3, 6.4). Davon hängt der Doppelversand ab.
+- **Schweigende Abteilungslinks:** wie viele es auf dem Server gibt (B-B10) und ob HR
+  jeden davon neu versenden will. Die Logik von B-B10 ist nur mit Testzeilen geprüft,
+  auf der Dev-Datenbank gibt es keine informierten Offboarding-Links.
 - **Versionen:** `pg_dump` im App-Container und `psql` im DB-Container (1.5). Das ist
   nur für einen Rückfall mit der Sicherung des Entrypoints wichtig.
 - **Build-Dauer.** Sie wurde am 07.09. nicht protokolliert.
@@ -2059,3 +2306,7 @@ services:
 - **Beschäftigungszeilen trotz „Nein“:** wie sie sich korrigieren lassen (M-V6).
 - **Link-Gültigkeit:** ob `MAGIC_LINK_EXPIRY_HOURS` auf dem Server von 720 abweicht
   (1.5, B-B2).
+- **Nicht auf einer Wegwerf-Datenbank mit altem Schema geprobt:** B-B10 und B-B11 in
+  der VORHER-Datei (nur Namensabgleich mit dem alten Schema, lesend gegen Dev mit
+  neuem Schema). Die Prüfung „ob gearbeitet wurde“ in 7.3 lief nur gegen Dev, der
+  Befehl `docker logs -t hr-portal-app` nicht auf dem Server.
