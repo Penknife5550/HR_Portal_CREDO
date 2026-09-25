@@ -284,6 +284,69 @@ describe("Lage je Nachweisart", () => {
   });
 });
 
+describe("Lage je Nachweisart: Kennzeichen „unbefristet“ (Paket 4, Z1)", () => {
+  /** Ein ausdruecklich unbefristetes Papier, etwa die Niederlassungserlaubnis. */
+  const unbefristet = (type: string) => ({ type, gueltigBis: null, unbefristet: true });
+
+  it("verdraengt einen abgelaufenen Titel — die Art ist erledigt", () => {
+    // Der wichtigste Fall: Niederlassungserlaubnis nach einem abgelaufenen
+    // Titel. Ohne Kennzeichen bliebe der alte Titel massgeblich, der rote
+    // Balken stuende weiter.
+    const dokumente = [dok("AUFENTHALTSTITEL", ablaufIn(-40)), unbefristet("AUFENTHALTSTITEL")];
+    expect(nachweisLagen(dokumente, JETZT)).toEqual([
+      { typ: "AUFENTHALTSTITEL", ampel: null, unbefristet: true },
+    ]);
+    expect(dringendeNachweisLagen(dokumente, JETZT)).toEqual([]);
+  });
+
+  it("verdraengt auch ein kritisches und ein noch gueltiges Datum, gleich in welcher Reihenfolge", () => {
+    for (const dokumente of [
+      [unbefristet("AUFENTHALTSTITEL"), dok("AUFENTHALTSTITEL", ablaufIn(3))],
+      [dok("AUFENTHALTSTITEL", ablaufIn(3)), unbefristet("AUFENTHALTSTITEL")],
+      [dok("AUFENTHALTSTITEL", ablaufIn(500)), unbefristet("AUFENTHALTSTITEL"), dok("AUFENTHALTSTITEL", null)],
+    ]) {
+      expect(nachweisLagen(dokumente, JETZT)).toEqual([
+        { typ: "AUFENTHALTSTITEL", ampel: null, unbefristet: true },
+      ]);
+      expect(dringendeNachweisLagen(dokumente, JETZT)).toEqual([]);
+    }
+  });
+
+  it("wirkt nur auf die eigene Art: der abgelaufene Titel der ANDEREN Art bleibt im Balken", () => {
+    const dokumente = [unbefristet("ARBEITSERLAUBNIS"), dok("AUFENTHALTSTITEL", ablaufIn(-2))];
+    const lagen = nachweisLagen(dokumente, JETZT);
+    expect(lagen.map((l) => [l.typ, l.unbefristet ?? false])).toEqual([
+      ["ARBEITSERLAUBNIS", true],
+      ["AUFENTHALTSTITEL", false],
+    ]);
+    expect(dringendeNachweisLagen(dokumente, JETZT).map((l) => l.typ)).toEqual(["AUFENTHALTSTITEL"]);
+  });
+
+  it("ohne Kennzeichen bleibt alles wie bisher — auch `unbefristet: false` und `null`", () => {
+    // Die Lage traegt das Feld dann gar nicht: Bestehende Zusicherungen mit
+    // `toEqual({ typ, ampel })` bleiben gueltig.
+    expect(nachweisLagen([{ ...dok("AUFENTHALTSTITEL", null), unbefristet: false }], JETZT)).toEqual([
+      { typ: "AUFENTHALTSTITEL", ampel: null },
+    ]);
+    const lagen = nachweisLagen(
+      [
+        { ...dok("AUFENTHALTSTITEL", ablaufIn(-5)), unbefristet: false },
+        { ...dok("AUFENTHALTSTITEL", null), unbefristet: null },
+      ],
+      JETZT
+    );
+    expect(lagen).toHaveLength(1);
+    expect(lagen[0].ampel?.kategorie).toBe("ABGELAUFEN");
+    expect("unbefristet" in lagen[0]).toBe(false);
+    expect(dringendeNachweisLagen([{ ...dok("ARBEITSERLAUBNIS", ablaufIn(10)), unbefristet: false }], JETZT))
+      .toHaveLength(1);
+  });
+
+  it("ignoriert das Kennzeichen an einer Art ohne Frist", () => {
+    expect(nachweisLagen([unbefristet("MASERNSCHUTZ")], JETZT)).toEqual([]);
+  });
+});
+
 describe("Vorgangsweiter Warnbalken: was ihn rechtfertigt", () => {
   it("meldet abgelaufen und kritisch", () => {
     expect(

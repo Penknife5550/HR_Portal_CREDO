@@ -293,21 +293,45 @@ export function ablaufAmpel(
  * Liegt hier und nicht in der Detailseite, weil die Regel eine Rechnung ist und
  * keine Darstellung — und weil sie sich nur hier ohne gerenderte Seite pruefen
  * laesst.
+ *
+ * **Unbefristet (Paket 4, Z1).** Liegt fuer eine Art ein Dokument mit
+ * `unbefristet = true` vor (etwa die Niederlassungserlaubnis nach einem
+ * abgelaufenen Titel), ist die Art erledigt: Die Lage heisst
+ * `{ typ, ampel: null, unbefristet: true }` und verdraengt JEDES datierte
+ * Dokument dieser Art, auch ein abgelaufenes. Ohne das Kennzeichen bliebe der
+ * alte, befristete Titel massgeblich — ein Dokument ohne Datum verdraengt ja
+ * nie eines mit Datum —, und Warnbalken wie Erinnerungen liefen bis zu 180 Tage
+ * weiter. Ohne Kennzeichen ist alles wie bisher; die Lage traegt das Feld dann
+ * gar nicht.
  */
 export interface NachweisLage {
   typ: string;
-  /** `null` = fuer diese Art ist ueberhaupt kein Ablaufdatum erfasst. */
+  /** `null` = fuer diese Art ist kein Ablaufdatum erfasst ODER sie ist unbefristet. */
   ampel: AblaufAmpel | null;
+  /** Nur bei einem ausdruecklich unbefristeten Dokument dieser Art gesetzt. */
+  unbefristet?: true;
 }
 
 export function nachweisLagen(
-  dokumente: readonly { type: string; gueltigBis: Date | string | null }[],
+  dokumente: readonly {
+    type: string;
+    gueltigBis: Date | string | null;
+    unbefristet?: boolean | null;
+  }[],
   jetzt: Date = new Date()
 ): NachweisLage[] {
   const proTyp = new Map<string, AblaufAmpel | null>();
+  const unbefristet = new Set<string>();
 
   for (const doc of dokumente) {
     if (!istFristpflichtig(doc.type)) continue;
+    if (doc.unbefristet === true) {
+      unbefristet.add(doc.type);
+      // Nur, um die Reihenfolge der Arten zu halten — das Ergebnis setzt die
+      // Lage unten ohnehin auf „unbefristet".
+      if (!proTyp.has(doc.type)) proTyp.set(doc.type, null);
+      continue;
+    }
     const ampel = ablaufAmpel(doc.gueltigBis, jetzt);
 
     if (!proTyp.has(doc.type)) {
@@ -323,7 +347,9 @@ export function nachweisLagen(
     }
   }
 
-  return Array.from(proTyp, ([typ, ampel]) => ({ typ, ampel }));
+  return Array.from(proTyp, ([typ, ampel]): NachweisLage =>
+    unbefristet.has(typ) ? { typ, ampel: null, unbefristet: true } : { typ, ampel }
+  );
 }
 
 /**
@@ -335,11 +361,11 @@ export function nachweisLagen(
  * Regelfall und kein Versaeumnis (Entscheidung 07.09.2026: ein Datum wird
  * deshalb beim Hochladen nicht erzwungen). Stuende dieser Fall im Balken, truege
  * der Vorgang dieser Personen auf JEDEM Reiter dauerhaft einen gelben Kasten,
- * den niemand abstellen kann — es gibt kein Kennzeichen "unbefristet", mit dem
- * sich das quittieren liesse. Genau davor warnt der Kommentar an
+ * den niemand abstellen kann. Genau davor warnt der Kommentar an
  * `nachweisLagen`: Ein Balken, den niemand abstellen kann, wird nach zwei Wochen
  * ignoriert — und dann auch der echte, hier der bussgeldbewehrte abgelaufene
- * Titel.
+ * Titel. Ein ausdruecklich unbefristetes Dokument (Z1) steht ebenfalls nie im
+ * Balken: Seine Lage traegt `ampel: null`.
  *
  * Verloren geht die Auskunft dadurch nicht: Die fehlende Frist steht weiterhin
  * an der Dokumentenzeile selbst ("Frist fehlt"), also an der Stelle, an der man
@@ -349,7 +375,11 @@ export function nachweisLagen(
  * der drei Monate lang steht, ist Tapete.
  */
 export function dringendeNachweisLagen(
-  dokumente: readonly { type: string; gueltigBis: Date | string | null }[],
+  dokumente: readonly {
+    type: string;
+    gueltigBis: Date | string | null;
+    unbefristet?: boolean | null;
+  }[],
   jetzt: Date = new Date()
 ): NachweisLage[] {
   return nachweisLagen(dokumente, jetzt).filter(

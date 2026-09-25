@@ -317,3 +317,75 @@ describe("Offene Nachweise: fehlendes Ablaufdatum", () => {
     expect(screen.queryByText("Offene Nachweise")).toBeNull();
   });
 });
+
+// =============================================
+// 3. Kennzeichen „unbefristet" (Paket 4, Z1)
+// =============================================
+
+describe("Offene Nachweise: ausdrücklich unbefristeter Nachweis", () => {
+  const ohnePflichten = {
+    requiredDocuments: ["GEBURTSURKUNDE_EIGEN"],
+    personalData: {
+      birthDate: "1965-05-03",
+      children: [],
+      rvEntscheidung: null,
+      aufenthaltstitelErforderlich: null,
+      healthInsuranceType: "gesetzlich",
+    },
+  };
+
+  /**
+   * Ein Dokument mit `unbefristet: true` ist erledigt — nachzufragen gibt es
+   * nichts, auch wenn daneben die Rueckseite ohne Datum liegt. Die Detailroute
+   * liefert die Spalte ueber `documents: true` von selbst mit.
+   */
+  test("fragt bei einem unbefristeten Nachweis nicht nach dem Ablaufdatum", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({
+          ...ohnePflichten,
+          documents: [
+            { ...dokument("AUFENTHALTSTITEL", null), unbefristet: true },
+            { id: "d-rueckseite", type: "AUFENTHALTSTITEL", gueltigBis: null },
+          ],
+        })}
+        onZuDenDokumenten={null}
+      />,
+    );
+
+    expect(screen.queryByText("Offene Nachweise")).toBeNull();
+  });
+
+  test("Gegenprobe: die andere Art ohne Datum bleibt in der Nachfrage", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({
+          ...ohnePflichten,
+          documents: [
+            { ...dokument("AUFENTHALTSTITEL", null), unbefristet: true },
+            dokument("ARBEITSERLAUBNIS", null),
+          ],
+        })}
+        onZuDenDokumenten={null}
+      />,
+    );
+
+    expect(screen.queryByText("Arbeitserlaubnis / Zusatzblatt")).not.toBeNull();
+    expect(screen.queryByText("Aufenthaltstitel")).toBeNull();
+  });
+
+  test("`unbefristet: false` ändert nichts — die Nachfrage bleibt", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({
+          ...ohnePflichten,
+          documents: [{ ...dokument("AUFENTHALTSTITEL", null), unbefristet: false }],
+        })}
+        onZuDenDokumenten={null}
+      />,
+    );
+
+    expect(screen.queryByText("Aufenthaltstitel")).not.toBeNull();
+    expect(document.body.textContent ?? "").toContain("kein Ablaufdatum erfasst");
+  });
+});

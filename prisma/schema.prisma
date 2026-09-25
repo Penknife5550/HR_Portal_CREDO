@@ -301,14 +301,16 @@ model OnboardingProcess {
   starterPacketSentCount Int       @default(0)
 
   // Relationen
-  personalData    PersonalData?
-  supervisorData  SupervisorData?
-  documents       Document[]
-  notes           OnboardingNote[]
-  auditLogs       AuditLog[]
+  personalData              PersonalData?
+  supervisorData            SupervisorData?
+  documents                 Document[]
+  notes                     OnboardingNote[]
+  auditLogs                 AuditLog[]
   // Paket 5: Links der Abteilungen auf ihre Onboarding-Aufgaben (gemeinsame
   // Tabelle mit dem Offboarding, siehe OffboardingDepartmentLink).
-  departmentLinks OffboardingDepartmentLink[]
+  departmentLinks           OffboardingDepartmentLink[]
+  // Paket 4: Nachforderungen von Unterlagen (nur die Gegenrichtung, keine Spalte).
+  unterlagenNachforderungen UnterlagenNachforderung[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -942,6 +944,21 @@ model Document {
   /// Enum-Migration ueber Bestandszeilen laeuft.
   ablaufErinnertStufe String?
 
+  /// Paket 4 (EP-6): Name einer FREIEN Zeile der Nachforderung („Unterschriebener
+  /// RV-Antrag"), die als SONSTIGES uebernommen wurde. Die Dokumentenliste zeigt
+  /// ihn an. Nullbar, Bestandszeilen bleiben unberuehrt.
+  bezeichnung String?
+
+  /// Paket 4 (Z1): Der Nachweis ist ausdruecklich UNBEFRISTET (etwa die
+  /// Niederlassungserlaubnis). Nicht dasselbe wie `gueltigBis = null` — das heisst
+  /// auch „Frist noch nicht erfasst". Liegt fuer eine Art ein Dokument mit
+  /// `unbefristet = true` vor, ist die Art erledigt und verdraengt jedes datierte
+  /// Dokument derselben Art (`nachweisLagen` in src/lib/dokument-fristen.ts): kein
+  /// Warnbalken, keine Zeile „Frist fehlt". Setzen (Annehmen, Knopf „Unbefristet")
+  /// und das Ueberspringen im Lauf `dokument-ablauf` kommen mit den weiteren
+  /// Schritten von Paket 4 (Feinplanung Abschnitt 18, Z1).
+  unbefristet Boolean @default(false)
+
   uploadedAt   DateTime  @default(now())
   reviewedAt   DateTime?
   reviewedById String?
@@ -1071,6 +1088,10 @@ model User {
   createdDocumentTemplates   DocumentTemplate[]
   createdGeneratedDocuments  GeneratedDocument[]
   versendeteDokumentenpakete DokumentenVersand[]
+
+  // Paket 4: Unterlagen nachfordern
+  angeforderteUnterlagen UnterlagenNachforderung[] @relation("UnterlagenAngefordert")
+  entschiedeneUnterlagen UnterlagenPosition[]      @relation("UnterlagenEntschieden")
 
   // BEM (E1)
   createdBemFaelle         BemFall[]          @relation("BemFallCreatedBy")
@@ -1358,6 +1379,167 @@ model GeneratedDocument {
   @@index([organizationId])
   @@index([versandId])
   @@map("generated_documents")
+}
+
+// =============================================
+// Paket 4 · Unterlagen nachfordern (Stufe 1: Onboarding)
+//
+// HR fordert fehlende oder verlaengerte Nachweise ueber einen persoenlichen Link
+// an; die Person laedt hoch und uebermittelt, HR prueft jede Unterlage einzeln.
+// Erst eine angenommene Unterlage wird zum `Document` des Vorgangs.
+// Feinplanung: docs/module/onboarding/paket4-feinplanung.md (Abschnitte 2 und 3).
+//
+// Zustaende als String, nicht als Enum: Der Entrypoint ruft `db push
+// --accept-data-loss` auf, ein umbenannter Enum-Wert ginge ohne Rueckfrage
+// hinaus. Welche Werte gelten, legen die Konstanten in src/lib/unterlagen.ts und
+// die Zod-Schemas in src/lib/validations/unterlagen.ts fest.
+// =============================================
+
+// Paket 4 · Unterlagen nachfordern. Kopf; alle Kinder haengen nur hier.
+model UnterlagenNachforderung {
+  id           String             @id @default(uuid())
+  modul        String // "ONBOARDING" (Stufe 1)
+  // GENAU EINES gesetzt, passend zu `modul`; einziger Schreiber nachforderungAnlegen.
+  // Stufe 2: offboardingId, civilServiceId, contractEndId, elternzeitId,
+  // mutterschutzId (je String? + Relation, onDelete Cascade).
+  onboardingId String?
+  onboarding   OnboardingProcess? @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+
+  status            String  @default("LAUFEND") // LAUFEND | ERLEDIGT | ZURUECKGEZOGEN
+  laufendSchluessel String? @unique // "<MODUL>:<vorgangId>" solange LAUFEND, sonst null
+
+  empfaenger           String // alle Mails an die Person gehen NUR hierhin (overrideTo)
+  empfaengerVorgang    String? // Adresse im Vorgang beim Anlegen/letzten Wechsel (Nachweis)
+  empfaengerAbweichend Boolean @default(false)
+
+  frist     DateTime @db.Date // Kalendertag Berlin
+  nachricht String? // max 1000; Mail + Upload-Seite; im AuditLog nur Laenge
+  reduziert Boolean  @default(false) // Stufe 2 (Mutterschutz)
+
+  angefordertVonId String?
+  angefordertVon   User?    @relation("UnterlagenAngefordert", fields: [angefordertVonId], references: [id], onDelete: SetNull)
+  angefordertAm    DateTime @default(now())
+
+  // Merker (Hausregel: bei SENT und SKIPPED gesetzt, bei FAILED nicht)
+  erinnertFuerFrist      DateTime? @db.Date // Fristwert der letzten Erinnerung
+  erinnertStufe          String? // VORAB | FRISTTAG
+  fristGemeldetFuer      DateTime? @db.Date // "Frist verstrichen" an HR fuer diesen Fristwert
+  vollstaendigSeit       DateTime? // Tabelle "Merker vollstaendig" (2.1)
+  vollstaendigGemeldetAm DateTime? // bedingter Anspruch der HR-Meldung, bei FAILED zurueck auf null
+
+  uploadsGesamt Int @default(0) // Obergrenze 200 ueber die ganze Laufzeit
+
+  erledigtAm          DateTime?
+  zurueckgezogenAm    DateTime?
+  zurueckgezogenVonId String? // nur Protokoll, ohne Relation
+
+  positionen UnterlagenPosition[]
+  dateien    UnterlagenDatei[]
+  links      UnterlagenLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // Sperranker
+
+  @@index([onboardingId])
+  @@index([status])
+  @@map("unterlagen_nachforderungen")
+}
+
+model UnterlagenPosition {
+  id              String                  @id @default(uuid())
+  nachforderungId String
+  nachforderung   UnterlagenNachforderung @relation(fields: [nachforderungId], references: [id], onDelete: Cascade)
+  reihenfolge     Int
+
+  typ                  String? // Katalogschluessel (Onboarding: DocumentType, nie SONSTIGES); null = freie Zeile
+  bezeichnung          String // Katalog: Label-Kopie; frei: Eingabe HR (max 120)
+  hinweis              String? // max 500; Mail + Upload-Seite
+  originalErforderlich Boolean @default(false) // Schriftform (P:1457)
+  sensibel             Boolean @default(false) // Kopie beim Anlegen (E-1); steuert die neutrale Nennung (E-2)
+  fristpflichtig       Boolean @default(false) // istFristpflichtig(typ): "Gueltig bis" abfragen
+
+  status           String    @default("ANGEFORDERT") // ANGEFORDERT|EINGEREICHT|ANGENOMMEN|ZURUECKGEWIESEN|ENTFAELLT
+  einreichungen    Int       @default(0)
+  gueltigBisAngabe DateTime? @db.Date // Angabe der Person; NIE nach PersonalData
+  angefordertAm    DateTime  @default(now()) // "(neu)" nach Ergaenzen
+  uebermitteltAm   DateTime?
+  begruendung      String? // letzte Zurueckweisung (max 1000)
+  entfaelltNotiz   String? // intern, max 500
+  entschiedenAm    DateTime?
+  entschiedenVonId String?
+  entschiedenVon   User?     @relation("UnterlagenEntschieden", fields: [entschiedenVonId], references: [id], onDelete: SetNull)
+
+  dateien UnterlagenDatei[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Jeder Katalogtyp hoechstens einmal je Nachforderung (freie Zeilen: NULL kollidiert nicht)
+  @@unique([nachforderungId, typ])
+  @@map("unterlagen_positionen")
+}
+
+model UnterlagenDatei {
+  id              String                  @id // = Speichername; randomUUID() VOR dem Schreiben der Datei
+  positionId      String
+  position        UnterlagenPosition      @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  nachforderungId String // aus der gesperrten Positionszeile, nie aus dem Link
+  nachforderung   UnterlagenNachforderung @relation(fields: [nachforderungId], references: [id], onDelete: Cascade)
+
+  status        String // ENTWURF|EINGEREICHT|ANGENOMMEN|ZURUECKGEWIESEN|VERWORFEN
+  anzeigeName   String // bereinigt, Endung = erkannter Typ; nie in Pfad, Mail, AuditLog, Konsole
+  speicherPfad  String? // relativ "uploads/unterlagen/<nfId>/<id>.<ext>"; null = geloescht/umgezogen
+  mimeType      String // aus den Bytes erkannt, nie vom Client
+  groesse       Int
+  sha256        String  @db.Char(64)
+  pdfHinweise   String? // "VERSCHLUESSELT,AKTIVE_INHALTE" - nur Hinweis fuer HR
+  einreichungNr Int?
+
+  hochgeladenAm  DateTime  @default(now())
+  uebermitteltAm DateTime? // HR sieht nur Zeilen mit Wert
+  entschiedenAm  DateTime?
+  begruendung    String? // Kopie der Zurueckweisung (Nachweis nach dem Loeschen, P:1463)
+
+  uebernahmeZiel String? // "DOCUMENT" (Stufe 1); Stufe 2 z. B. "IN_KARTE" (P:1449)
+  uebernommenId  String? // Id der Zielzeile, bewusst OHNE FK
+  uebernommenAm  DateTime?
+
+  loeschenAb       DateTime? // ab wann der Lauf die Datei loeschen darf
+  dateiGeloeschtAm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([nachforderungId, status])
+  @@index([positionId])
+  @@index([loeschenAb])
+  @@map("unterlagen_dateien")
+}
+
+model UnterlagenLink {
+  id              String                  @id @default(uuid())
+  nachforderungId String
+  nachforderung   UnterlagenNachforderung @relation(fields: [nachforderungId], references: [id], onDelete: Cascade)
+
+  tokenHash  String   @unique @db.Char(64) // hashToken(); Klartext NIE gespeichert
+  gueltigBis DateTime @db.Date // beim Anlegen Frist + 14; nur lebende Links werden fortgeschrieben
+  anlass     String // ANFORDERUNG|ERGAENZUNG|ERNEUT|FRISTAENDERUNG|ZURUECKWEISUNG|ERINNERUNG_VORAB|ERINNERUNG_FRISTTAG
+  positionId String? // bei ZURUECKWEISUNG
+  empfaenger String
+
+  mailStatus      String    @default("AUSSTEHEND") // AUSSTEHEND|SENT|FAILED|SKIPPED
+  mailDetail      String? // gekuerzt (300)
+  messageId       String?
+  gesendetAm      DateTime?
+  nachholVersuche Int       @default(0) // Nachholen durch den Lauf, max 3
+  entwertetAm     DateTime?
+  entwertetGrund  String? // ADRESSE (-> 404) | GESPERRT (-> 410)
+  erstelltVonId   String? // null = taeglicher Lauf; Grundlage der Mail-Bremse (5.2)
+
+  createdAt DateTime @default(now())
+
+  @@index([nachforderungId, createdAt])
+  @@map("unterlagen_links")
 }
 
 // =============================================

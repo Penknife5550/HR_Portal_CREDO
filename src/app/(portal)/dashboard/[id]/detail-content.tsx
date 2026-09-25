@@ -110,6 +110,13 @@ interface DocumentData {
    * `ablaufAmpel()` (src/lib/dokument-fristen.ts).
    */
   gueltigBis: string | null;
+  /**
+   * Ausdruecklich unbefristeter Nachweis (Paket 4, Z1; `Document.unbefristet`).
+   * Kasten und Warnbalken reichen es an `nachweisLagen` weiter: Eine
+   * unbefristete Art verdraengt jedes datierte Dokument derselben Art.
+   * Optional, weil aeltere Antworten das Feld nicht tragen.
+   */
+  unbefristet?: boolean;
 }
 
 /**
@@ -1999,9 +2006,11 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
  * `gueltigBis: { not: null }`. Ein befristeter Aufenthaltstitel ohne erfasstes
  * Datum liefe damit ab, ohne dass irgendwer etwas erfaehrt. Der Kasten fragt
  * deshalb nach, er warnt nicht: Bei einer unbefristeten Niederlassungserlaubnis
- * ist das leere Feld richtig so, ein Kennzeichen „unbefristet" gibt es nicht,
- * und ein Vorwurf, den niemand ausraeumen kann, wird nach zwei Wochen
- * ignoriert.
+ * ist das leere Feld richtig so, und ein Vorwurf, den niemand ausraeumen kann,
+ * wird nach zwei Wochen ignoriert. Ein Dokument mit dem Kennzeichen
+ * `unbefristet` (Paket 4, Z1) erscheint hier nicht. Setzen laesst es sich erst
+ * mit den weiteren Schritten von Paket 4 (Annehmen einer nachgeforderten
+ * Unterlage, Knopf „Unbefristet").
  *
  * Erst ab Abgabe — und zwar BEIDE Haelften: Solange der Fragebogen offen ist,
  * laedt die Person selbst hoch, wird im Formular je Unterlage angemahnt und
@@ -2035,7 +2044,9 @@ export function OffeneNachweiseKasten({
 
   // `nachweisLagen` gruppiert je Nachweisart und liefert `ampel: null` genau
   // dann, wenn fuer diese Art ueberhaupt kein Ablaufdatum erfasst ist — ein
-  // nachgereichtes Papier MIT Datum raeumt die Nachfrage also ab.
+  // nachgereichtes Papier MIT Datum raeumt die Nachfrage also ab. Ebenso ein
+  // ausdruecklich unbefristetes (Paket 4, Z1): Dessen Lage traegt zwar auch
+  // `ampel: null`, dazu aber `unbefristet` — nachzufragen gibt es da nichts.
   //
   // `abgegeben` gilt hier GENAUSO wie fuer die Liste darueber. Vorher lief
   // diese Haelfte ungebremst: Wer in Schritt 3 seinen Aufenthaltstitel ohne
@@ -2044,7 +2055,7 @@ export function OffeneNachweiseKasten({
   // warnt der Absatz „Erst ab Abgabe" im Kopf dieser Komponente.
   const ohneFrist = abgegeben
     ? nachweisLagen(data.documents)
-        .filter((l) => l.ampel === null)
+        .filter((l) => l.ampel === null && !l.unbefristet)
         .map((l) => l.typ)
     : [];
 
