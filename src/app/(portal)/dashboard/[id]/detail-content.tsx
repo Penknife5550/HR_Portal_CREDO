@@ -30,8 +30,23 @@ import {
   AbteilungenKarte,
   abteilungsAktionSenden,
   erledigtText,
+  PILL_FARBEN,
   type AktionsMeldung,
 } from "@/components/abteilungsaufgaben/abteilungen-karte";
+import { NachforderungDialog } from "@/components/unterlagen/nachforderung-dialog";
+import {
+  NachforderungKarte,
+  UnterlagenMeldungen,
+  type UnterlagenMeldung,
+} from "@/components/unterlagen/nachforderung-karte";
+import {
+  nachweisStandText,
+  offeneNachweiseAktion,
+  warnbalkenAktion,
+  type NachforderungDialogAnfrage,
+  type NachweisAktion,
+  type UnterlagenUebersicht,
+} from "@/lib/unterlagen";
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
@@ -117,6 +132,12 @@ interface DocumentData {
    * Optional, weil aeltere Antworten das Feld nicht tragen.
    */
   unbefristet?: boolean;
+  /**
+   * Name einer frei benannten Unterlage, die als SONSTIGES uebernommen wurde
+   * (Paket 4, EP-6; `Document.bezeichnung`), etwa „Unterschriebener
+   * RV-Antrag". Sonst null bzw. fehlend.
+   */
+  bezeichnung?: string | null;
 }
 
 /**
@@ -131,14 +152,19 @@ export interface FristAenderung {
    * fehlt das Feld, bleibt der bisherige Status stehen.
    */
   status?: string;
+  /**
+   * Das Kennzeichen „unbefristet" NACH der Aenderung (Paket 4, Z1), sofern die
+   * Antwort es traegt. Ein gesetztes Datum nimmt es zurueck.
+   */
+  unbefristet?: boolean;
 }
 
 /**
  * Eine bestaetigte Fristaenderung in die geladene Dokumentliste uebernehmen —
- * Datum UND Status. Frueher nur das Datum: Nach einer Korrektur stand bis zum
- * Neuladen das Abzeichen „Abgelaufen" neben der gruenen Ampel, obwohl der
- * Server den Status laengst zurueckgenommen hatte. Rein und exportiert fuer
- * den Test.
+ * Datum, Status und das Kennzeichen „unbefristet". Frueher nur das Datum: Nach
+ * einer Korrektur stand bis zum Neuladen das Abzeichen „Abgelaufen" neben der
+ * gruenen Ampel, obwohl der Server den Status laengst zurueckgenommen hatte.
+ * Rein und exportiert fuer den Test.
  */
 export function fristAenderungUebernehmen<
   T extends { id: string; gueltigBis: string | null; status: string },
@@ -149,6 +175,7 @@ export function fristAenderungUebernehmen<
           ...d,
           gueltigBis: aenderung.gueltigBis,
           ...(aenderung.status ? { status: aenderung.status } : {}),
+          ...(typeof aenderung.unbefristet === "boolean" ? { unbefristet: aenderung.unbefristet } : {}),
         }
       : d
   );
@@ -404,21 +431,60 @@ export interface DetailData {
   abteilungen?: AbteilungsUebersichtDaten;
   /** Wirksame Fuehrungskraft des Vorgangs (Adresse aus den Modalitaeten). */
   fuehrungskraft?: Fuehrungskraft;
+  /**
+   * „Unterlagen nachfordern" (Paket 4) — fertig aus `unterlagenUebersichtLaden`
+   * (src/lib/unterlagen.ts, `uebersichtBauen`). Karte, Kasten „Offene
+   * Nachweise", Warnbalken, Reiter-Pille, Mini-Karte und Dokumentenliste lesen
+   * nur hieraus; `loadData(true)` aktualisiert alle zugleich. Fehlt, solange
+   * die Route es nicht liefert.
+   */
+  unterlagen?: UnterlagenUebersicht;
 }
 
 // =============================================
 // Constants
 // =============================================
 
+// `alias`: der deutsche Name des Reiters fuer `?tab=` (siehe `reiterAusSuche`).
 const TABS = [
-  { id: "overview", label: "Übersicht" },
-  { id: "questionnaire", label: "Fragebogen-Daten" },
-  { id: "documents", label: "Dokumente" },
-  { id: "checklist", label: "Checkliste" },
-  { id: "supervisor", label: "Vorgesetzter" },
+  { id: "overview", label: "Übersicht", alias: "uebersicht" },
+  { id: "questionnaire", label: "Fragebogen-Daten", alias: "fragebogen" },
+  { id: "documents", label: "Dokumente", alias: "dokumente" },
+  { id: "checklist", label: "Checkliste", alias: "checkliste" },
+  { id: "supervisor", label: "Vorgesetzter", alias: "vorgesetzter" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
+
+/**
+ * `?tab=` → Reiter: die interne Id oder der deutsche Name, beides aus `TABS`
+ * abgeleitet — ein neuer Reiter ist damit ohne zweite Liste erreichbar. Eine
+ * Map statt eines Objekts: `?tab=constructor` darf nicht auf
+ * `Object.prototype` treffen.
+ */
+const REITER_AUS_SUCHE: ReadonlyMap<string, TabId> = new Map<string, TabId>(
+  TABS.flatMap((t): [string, TabId][] => [
+    [t.id, t.id],
+    [t.alias, t.id],
+  ]),
+);
+
+/**
+ * Der Reiter aus `?tab=…` (`window.location.search`), sonst `null` — dann
+ * bleibt es bei „Übersicht". Unbekannte Werte werden ignoriert, nie als
+ * Fehler gezeigt. Rein und exportiert fuer den Test.
+ *
+ * Heute setzt kein Link des Portals den Parameter: `portalLink` der HR-Mails
+ * zeigt nach Feinplanung 8.2 auf `/dashboard/<id>` (Modul-Baustein
+ * `portalPfad`) und oeffnet damit die „Übersicht". Die Seite versteht
+ * `?tab=dokumente` schon; ob die Mails ihn tragen sollen, ist eine eigene
+ * Entscheidung (offen fuer Schritt 11, Abweichung von 8.2).
+ */
+export function reiterAusSuche(suche: string): TabId | null {
+  const wert = new URLSearchParams(suche).get("tab");
+  if (!wert) return null;
+  return REITER_AUS_SUCHE.get(wert.trim().toLowerCase()) ?? null;
+}
 
 /**
  * Rueckmeldung zum Vorgesetzten-Link: ein Fehler (rot — Ablehnung, Mail nicht
@@ -589,6 +655,30 @@ export function DetailContent({
   // die Seite jede Ablehnung („// silent") — ein abgelaufener Vorgang sah
   // dann aus wie ein Knopf, der nichts tut.
   const [checklistFehler, setChecklistFehler] = useState<string | null>(null);
+
+  // „Unterlagen nachfordern" (Paket 4): Der Dialog gehoert der Karte im
+  // Dokumente-Tab — der Kasten „Offene Nachweise" und der Warnbalken oeffnen
+  // denselben und wechseln dafuer dorthin (wie „Dokumente versenden…").
+  // `vorauswahl` kreuzt der Dialog ZUSAETZLICH zu seinen Vorschlaegen (den
+  // offenen Nachweisen) an, `null` heisst nur die Vorschlaege
+  // (`NachforderungDialogAnfrage`). Die Meldung des Dialogs steht ueber der
+  // Karte: gruen nur, wenn auch die Mail an die Person hinausging.
+  const [nachforderungDialog, setNachforderungDialog] = useState<NachforderungDialogAnfrage | null>(null);
+  const [unterlagenMeldung, setUnterlagenMeldung] = useState<UnterlagenMeldung | null>(null);
+  // „Zur Nachforderung": zaehlt hoch, der Dokumente-Tab rollt dann zur Karte
+  // und meldet den Sprung als erledigt (zurueck auf 0).
+  const [karteSprung, setKarteSprung] = useState(0);
+  const karteSprungErledigt = useCallback(() => setKarteSprung(0), []);
+
+  // `?tab=dokumente` oeffnet gleich einen Reiter (`reiterAusSuche`; heute
+  // setzt ihn noch kein Link des Portals). Einmal beim Oeffnen — danach gilt,
+  // was HR klickt. Im Effekt, nicht im Anfangszustand: Die Seite wird auch auf
+  // dem Server gerendert, und dort gibt es kein `window`. Der Effekt laeuft,
+  // waehrend die Seite noch laedt — die „Übersicht" blitzt also nicht auf.
+  useEffect(() => {
+    const reiter = reiterAusSuche(window.location.search);
+    if (reiter) setActiveTab(reiter);
+  }, []);
 
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -867,6 +957,34 @@ export function DetailContent({
     await loadData(true);
   };
 
+  // ---- Unterlagen nachfordern (Paket 4) ----
+  const darfBearbeiten = HR_EDIT_ROLES.includes(user.role);
+
+  const nachfordern = (anfrage: NachforderungDialogAnfrage) => {
+    setActiveTab("documents");
+    setUnterlagenMeldung(null);
+    setNachforderungDialog(anfrage);
+  };
+
+  const zurNachforderung = () => {
+    setActiveTab("documents");
+    setKarteSprung((n) => n + 1);
+  };
+
+  // Erst neu laden, dann schliessen: So steht der neue Stand (Karte, Kasten,
+  // Reiter-Pille) schon da, wenn der Dialog verschwindet. Die Meldung kommt
+  // fertig vom Dialog — gruen nur, wenn auch die Mail hinausging. `fehler`
+  // (rot) nimmt die Seite schon an: Die Karte zeigt eine nicht zugestellte
+  // Mail (FAILED) rot, der Dialog meldet sie bisher als `warnung` (gelb).
+  const nachforderungErfolg = async (m: { art: "erfolg" | "warnung" | "fehler"; text: string }) => {
+    try {
+      await loadData(true);
+    } finally {
+      setNachforderungDialog(null);
+      setUnterlagenMeldung({ art: m.art, meldung: m.text, hinweis: null });
+    }
+  };
+
   // ---- Computed values ----
   const statusInfo = data ? STATUS_LABELS[data.status] || STATUS_LABELS.INVITED : STATUS_LABELS.INVITED;
   // mitarbeiterName: erst der Name aus dem Fragebogen, dann der beim Anlegen
@@ -1018,6 +1136,8 @@ export function DetailContent({
               return (
                 <button
                   key={tab.id}
+                  data-reiter={tab.id}
+                  aria-current={isActive ? "page" : undefined}
                   onClick={() => setActiveTab(tab.id)}
                   className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
                     isActive
@@ -1041,6 +1161,23 @@ export function DetailContent({
                   {tab.id === "documents" && data.documents.length > 0 && (
                     <span className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
                       {data.documents.length}
+                    </span>
+                  )}
+                  {/* Stand der laufenden Nachforderung: „1 zu prüfen" vor
+                      „Frist verstrichen" vor „x/y" (`unterlagenPille`, fertig
+                      aus der Uebersicht). Ohne laufende keine Pille. Neben der
+                      Anzahl der Dokumente waere „1/3" ohne Namen mehrdeutig —
+                      deshalb „Nachforderung:" fuer Screenreader und im Tooltip
+                      der Kurzstand. */}
+                  {tab.id === "documents" && data.unterlagen?.pille && (
+                    <span
+                      data-pille="reiter"
+                      data-farbe={data.unterlagen.pille.farbe}
+                      title={`Nachforderung: ${data.unterlagen.kurzstand ?? data.unterlagen.pille.text}`}
+                      className={`ml-1.5 inline-flex h-5 items-center rounded-full px-1.5 text-[10px] font-bold ${PILL_FARBEN[data.unterlagen.pille.farbe]}`}
+                    >
+                      <span className="sr-only">Nachforderung: </span>
+                      {data.unterlagen.pille.text}
                     </span>
                   )}
                   {tab.id === "checklist" && checklistItems.length > 0 && (
@@ -1068,6 +1205,9 @@ export function DetailContent({
           onZuDenDokumenten={
             activeTab === "documents" ? null : () => setActiveTab("documents")
           }
+          unterlagen={data.unterlagen}
+          onNachfordern={darfBearbeiten ? nachfordern : null}
+          onZurNachforderung={zurNachforderung}
         />
 
         {/* Ebenfalls auf JEDEM Tab und aus demselben Grund: Ein fehlender
@@ -1080,6 +1220,8 @@ export function DetailContent({
           onZuDenDokumenten={
             activeTab === "documents" ? null : () => setActiveTab("documents")
           }
+          onNachfordern={darfBearbeiten ? nachfordern : null}
+          onZurNachforderung={zurNachforderung}
         />
 
         {activeTab === "overview" && (
@@ -1119,10 +1261,19 @@ export function DetailContent({
           <TabDocuments
             data={data}
             onboardingId={onboardingId}
-            canEdit={HR_EDIT_ROLES.includes(user.role)}
+            canEdit={darfBearbeiten}
             onFristGeaendert={setzeDokumentFrist}
             paketDialogOffen={paketDialogOffen}
             setPaketDialogOffen={setPaketDialogOffen}
+            onAktualisiert={() => loadData(true)}
+            nachforderungDialog={nachforderungDialog}
+            onNachfordern={nachfordern}
+            onNachforderungSchliessen={() => setNachforderungDialog(null)}
+            onNachforderungErfolg={nachforderungErfolg}
+            unterlagenMeldung={unterlagenMeldung}
+            onUnterlagenMeldungSchliessen={() => setUnterlagenMeldung(null)}
+            karteSprung={karteSprung}
+            onKarteSprungErledigt={karteSprungErledigt}
           />
         )}
         {activeTab === "checklist" && (
@@ -1455,10 +1606,14 @@ export function TabOverview({
                 value={chips[1].kurz}
                 done={chips[1].ton === "fertig"}
               />
+              {/* Mit laufender Nachforderung darunter ihr Kurzstand, fertig aus
+                  der Uebersicht („1 von 3 angenommen · 1 zu prüfen · Frist …").
+                  Dann ist die Karte auch nicht gruen: Es fehlt noch etwas. */}
               <StatusMiniCard
                 label="Dokumente"
                 value={`${data.documents.length} Datei${data.documents.length !== 1 ? "en" : ""}`}
-                done={data.documents.length > 0}
+                done={data.documents.length > 0 && !data.unterlagen?.laufend}
+                zusatz={data.unterlagen?.kurzstand ? `Nachforderung: ${data.unterlagen.kurzstand}` : null}
               />
               <StatusMiniCard
                 label="Checkliste"
@@ -1979,11 +2134,23 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
  * auf. Beim Masernschutz ist der Verzicht auf die Sperre ausdruecklich damit
  * begruendet, dass das Infektionsschutzgesetz vom Arbeitgeber die MELDUNG eines
  * fehlenden Nachweises ans Gesundheitsamt verlangt — und der Fragebogen sagt
- * der Person woertlich zu, die Personalabteilung komme auf sie zu
+ * der Person zu, die Personalabteilung fordere die Unterlage bei ihr an
  * (`NACHREICHEN_FOLGEN_HINWEIS`). Beides setzt voraus, dass HR die Luecke
  * sieht. Der Protokolleintrag `DOKUMENTE_NACHZUREICHEN` allein leistet das
  * nicht: Er steht unter /audit-log hinter einem zugeklappten JSON, und die
  * Vorgangsansicht hat gar keine Protokollanzeige.
+ *
+ * **Der Weg dazu (Paket 4).** Seit „Unterlagen nachfordern" fuehrt der Kasten
+ * selbst dorthin: Je Nachweis steht der Stand der Nachforderung daneben
+ * (`nachweisStandText`: „eingegangen, bitte prüfen", „angefordert am …, Frist
+ * …"), und die Knoepfe „Unterlagen nachfordern…", „Ergänzen…" bzw. „Zur
+ * Nachforderung" oeffnen den Dialog mit genau den offenen Arten vorangekreuzt
+ * oder springen zur Karte. Was geht, entscheidet `offeneNachweiseAktion`
+ * (src/lib/unterlagen.ts) aus der Uebersicht des Servers; der Satz „Mit
+ * „Unterlagen nachfordern“ …" steht nur, wo er sich befolgen laesst, sonst der
+ * Grund (etwa ein eingestellter Vorgang) bzw. ohne Recht ein Satz ueber die
+ * Personalabteilung (`nachforderungsSatz`). Die Rechnung selbst bleibt, wie
+ * sie ist: Erst ein ANGENOMMENES Dokument raeumt einen Nachweis ab.
  *
  * **Warum LIVE gerechnet und nicht aus dem Protokolleintrag gelesen.** Der
  * Eintrag ist eine Momentaufnahme des Abgabezeitpunkts und taugt genau dafuer:
@@ -2006,11 +2173,12 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
  * `gueltigBis: { not: null }`. Ein befristeter Aufenthaltstitel ohne erfasstes
  * Datum liefe damit ab, ohne dass irgendwer etwas erfaehrt. Der Kasten fragt
  * deshalb nach, er warnt nicht: Bei einer unbefristeten Niederlassungserlaubnis
- * ist das leere Feld richtig so, und ein Vorwurf, den niemand ausraeumen kann,
- * wird nach zwei Wochen ignoriert. Ein Dokument mit dem Kennzeichen
- * `unbefristet` (Paket 4, Z1) erscheint hier nicht. Setzen laesst es sich erst
- * mit den weiteren Schritten von Paket 4 (Annehmen einer nachgeforderten
- * Unterlage, Knopf „Unbefristet").
+ * gibt es kein Datum, und ein Vorwurf, den niemand ausraeumen kann, wird nach
+ * zwei Wochen ignoriert. Ausraeumen laesst er sich seit Paket 4 (Z1): Ein
+ * Dokument mit dem Kennzeichen `unbefristet` erscheint hier nicht mehr.
+ * Setzen laesst es sich beim Annehmen einer nachgeforderten Unterlage und mit
+ * dem Knopf „Unbefristet" an der Dokumentenzeile (`AblaufAbzeichen`) — auf den
+ * der Satz im Kasten verweist.
  *
  * Erst ab Abgabe — und zwar BEIDE Haelften: Solange der Fragebogen offen ist,
  * laedt die Person selbst hoch, wird im Formular je Unterlage angemahnt und
@@ -2023,9 +2191,21 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
 export function OffeneNachweiseKasten({
   data,
   onZuDenDokumenten,
+  onNachfordern = null,
+  onZurNachforderung = null,
 }: {
   data: DetailData;
   onZuDenDokumenten: (() => void) | null;
+  /**
+   * Oeffnet den Dialog „Unterlagen nachfordern…" bzw. „Unterlagen ergänzen…"
+   * mit den offenen Arten vorangekreuzt (und wechselt dafuer in den Reiter
+   * „Dokumente"). Nur mit `HR_EDIT_ROLES`, sonst `null` — dann zeigt der Kasten
+   * keinen schreibenden Knopf. Optional, damit Einbauten ohne Nachforderung
+   * unveraendert bleiben.
+   */
+  onNachfordern?: ((anfrage: NachforderungDialogAnfrage) => void) | null;
+  /** Zur Karte der laufenden Nachforderung im Reiter „Dokumente". */
+  onZurNachforderung?: (() => void) | null;
 }) {
   const pd = data.personalData;
   const abgegeben = nachweiseAbgegeben(data);
@@ -2061,24 +2241,41 @@ export function OffeneNachweiseKasten({
 
   if (offen.length === 0 && ohneFrist.length === 0) return null;
 
+  const unterlagen = data.unterlagen ?? null;
+  const aktion = offeneNachweiseAktion(offen, unterlagen);
+  // Mit Recht heisst: Die Seite reicht den Rueckruf (HR_EDIT_ROLES) UND die
+  // Uebersicht des Servers sagt dasselbe.
+  const mitRecht = !!onNachfordern && !!unterlagen?.darfAktionen;
+  const anfrage = mitRecht ? aktion.anfrage : null;
+  const zurKarte = onZurNachforderung && aktion.zurNachforderung ? onZurNachforderung : null;
+  const wegSatz = nachforderungsSatz(aktion, mitRecht, {
+    aufforderung: NACHFORDERN_SAETZE.KASTEN,
+    ohneRecht: NACHFORDERN_SAETZE.KASTEN_OHNE_RECHT,
+  });
+
   return (
-    <div className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+    <div className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4" data-kasten="offene-nachweise">
       <p className="text-sm font-bold text-amber-800">Offene Nachweise</p>
 
       {offen.length > 0 && (
         <>
-          <p className="mt-2 text-sm text-foreground">
+          <p className="mt-2 text-sm text-foreground" data-zeile="kasten-satz">
             Diese Pflichtunterlagen durften nachgereicht werden und liegen bis
-            heute nicht vor. Der Fragebogen hat zugesagt, dass die
-            Personalabteilung auf die Person zukommt und die Unterlage
-            entgegennimmt.
+            heute nicht vor.{wegSatz && ` ${wegSatz}`}
           </p>
           <ul className="mt-2 space-y-1">
-            {offen.map((typ) => (
-              <li key={typ} className="text-sm font-semibold text-foreground">
-                {documentTypeLabel(typ)}
-              </li>
-            ))}
+            {/* Je Nachweis der Stand der Nachforderung, fertig aus der
+                Uebersicht (P:1285) — die Bezeichnung in einem eigenen Element,
+                der Zusatz daneben. */}
+            {offen.map((typ) => {
+              const stand = nachweisStandText(typ, unterlagen);
+              return (
+                <li key={typ} className="text-sm text-foreground" data-nachweis={typ}>
+                  <span className="font-semibold">{documentTypeLabel(typ)}</span>
+                  {stand && <span className="text-amber-900" data-zeile="stand">{` — ${stand}`}</span>}
+                </li>
+              );
+            })}
           </ul>
           {offen.includes("MASERNSCHUTZ") && (
             <p className="mt-2 text-sm text-foreground">
@@ -2096,9 +2293,10 @@ export function OffeneNachweiseKasten({
           <p className={`text-sm text-foreground ${offen.length > 0 ? "mt-4" : "mt-2"}`}>
             Für diese Nachweise ist kein Ablaufdatum erfasst. Sie werden damit
             nicht überwacht — weder der Warnbalken noch die nächtliche
-            Erinnerung erfassen sie. Bei einer unbefristeten
-            Niederlassungserlaubnis ist das richtig so; ist der Nachweis
-            befristet, tragen Sie das Datum bitte nach.
+            Erinnerung erfassen sie. Ist der Nachweis unbefristet (etwa eine
+            Niederlassungserlaubnis), klicken Sie an der Unterlage im Reiter
+            „Dokumente“ auf „Unbefristet“; ist er befristet, tragen Sie dort
+            das Ablaufdatum nach.
           </p>
           <ul className="mt-2 space-y-1">
             {ohneFrist.map((typ) => (
@@ -2110,16 +2308,88 @@ export function OffeneNachweiseKasten({
         </>
       )}
 
-      {onZuDenDokumenten && (
-        <button
-          onClick={onZuDenDokumenten}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
-        >
-          Zu den Dokumenten
-        </button>
+      {(anfrage || zurKarte || onZuDenDokumenten) && (
+        <div className="mt-3 flex flex-wrap gap-1.5" data-block="kasten-knoepfe">
+          {anfrage && (
+            <button
+              type="button"
+              onClick={() => onNachfordern?.(anfrage)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-credo-blau px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-credo-blau/90"
+            >
+              {anfrage.modus === "ergaenzen" ? "Ergänzen…" : "Unterlagen nachfordern…"}
+            </button>
+          )}
+          {zurKarte && (
+            <button
+              type="button"
+              onClick={zurKarte}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-credo-gelb bg-credo-gelb/20 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-credo-gelb/30"
+            >
+              Zur Nachforderung
+            </button>
+          )}
+          {onZuDenDokumenten && (
+            <button
+              type="button"
+              onClick={onZuDenDokumenten}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Zu den Dokumenten
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
+}
+
+/**
+ * Die Arten fuer „Verlängerten Nachweis anfordern…" am Warnbalken: die
+ * abgelaufenen bzw. bald ablaufenden, beim Aufenthaltstitel dazu die
+ * Arbeitserlaubnis — die Pflichtregel verlangt beide (required-documents.ts),
+ * und meist steht die Erlaubnis auf dem Titel selbst (N4: dieselbe Karte zu
+ * beiden Positionen, oder HR quittiert mit „Entfällt…"). Eine Regel des
+ * Onboardings, deshalb hier und nicht im modulneutralen unterlagen.ts
+ * (Feinplanung 2.1); ob und wie der Knopf erscheint, sagt `warnbalkenAktion`.
+ * Rein, exportiert fuer den Test.
+ */
+export function verlaengerungVorauswahl(dringendeTypen: readonly string[]): string[] {
+  const typen = Array.from(new Set(dringendeTypen));
+  if (typen.includes("AUFENTHALTSTITEL") && !typen.includes("ARBEITSERLAUBNIS")) typen.push("ARBEITSERLAUBNIS");
+  return typen;
+}
+
+/** Die Saetze von Kasten und Warnbalken zum Weg ueber „Unterlagen nachfordern" (P:1285). */
+const NACHFORDERN_SAETZE = {
+  KASTEN: "Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie genau diese Nachweise hochlädt.",
+  KASTEN_OHNE_RECHT: "Die Personalabteilung kann sie über „Unterlagen nachfordern“ bei der Person anfordern.",
+  // „Annehmen" allein genuegt nicht: Ohne Datum verdraengt der neue Nachweis
+  // den abgelaufenen nie (`nachweisLagen`, Z1 „Datum später nachtragen").
+  BALKEN:
+    "Fordern Sie den verlängerten Nachweis bei der Person an und nehmen Sie ihn mit seinem Ablaufdatum oder als unbefristet an – ohne Datum bleibt der abgelaufene Nachweis maßgeblich und diese Warnung stehen.",
+  BALKEN_OHNE_RECHT:
+    "Die Personalabteilung kann den verlängerten Nachweis über „Unterlagen nachfordern“ bei der Person anfordern.",
+} as const;
+
+/**
+ * Welcher Satz zum Weg ueber die Nachforderung dasteht — nur einer, der sich
+ * befolgen laesst:
+ * - mit Recht und moeglich (oder eine Nachforderung laeuft): die Aufforderung;
+ * - mit Recht, aber gesperrt (etwa ein eingestellter Vorgang): der Grund des
+ *   Servers statt einer Aufforderung ohne Knopf;
+ * - ohne Recht: ein Satz ueber die Personalabteilung — ausser es laeuft schon
+ *   eine, dann sprechen die Zeilen selbst („angefordert am …").
+ * Bei einer laufenden Nachforderung eines eingestellten Vorgangs steht keiner;
+ * warum, sagt die Karte hinter „Zur Nachforderung" (`eingestelltHinweis`).
+ */
+function nachforderungsSatz(
+  aktion: NachweisAktion,
+  mitRecht: boolean,
+  saetze: { aufforderung: string; ohneRecht: string },
+): string | null {
+  if (!mitRecht) return aktion.zurNachforderung ? null : saetze.ohneRecht;
+  if (aktion.aufforderung) return saetze.aufforderung;
+  return aktion.grund;
 }
 
 /**
@@ -2134,16 +2404,53 @@ export function OffeneNachweiseKasten({
  * Und er sperrt nichts (Entscheidung des Nutzers): Ein abgelaufener Titel ist
  * ein Problem der BESCHAEFTIGUNG, nicht der Aktenfuehrung. Wer hier den Vorgang
  * dichtmacht, hindert HR genau an der Arbeit, mit der das Problem behoben wird.
+ *
+ * Seit Paket 4 bietet er den Weg dazu an: „Verlängerten Nachweis anfordern…"
+ * oeffnet den Dialog mit den betroffenen Arten vorangekreuzt
+ * (`verlaengerungVorauswahl`, `warnbalkenAktion`; der Dialog kreuzt dazu die
+ * offenen Nachweise an), mit laufender Nachforderung dazu „Zur
+ * Nachforderung". Nimmt HR den neuen Nachweis MIT Datum oder als unbefristet
+ * an, endet die Warnung von selbst — `nachweisLagen` nimmt das spaeteste Datum
+ * bzw. ein unbefristetes Dokument; ohne Datum bleibt der alte Titel
+ * massgeblich, und genau das sagt der Satz. Wie im Kasten steht die
+ * Aufforderung nur, wo sie sich befolgen laesst (`nachforderungsSatz`).
+ *
+ * Exportiert fuer den Komponententest.
  */
-function NachweisFristenWarnung({
+export function NachweisFristenWarnung({
   documents,
   onZuDenDokumenten,
+  unterlagen = null,
+  onNachfordern = null,
+  onZurNachforderung = null,
 }: {
   documents: DocumentData[];
   onZuDenDokumenten: (() => void) | null;
+  /** `unterlagen` aus GET /api/onboarding/[id] (Paket 4). */
+  unterlagen?: UnterlagenUebersicht | null;
+  /** Oeffnet den Dialog; nur mit `HR_EDIT_ROLES`, sonst `null`. */
+  onNachfordern?: ((anfrage: NachforderungDialogAnfrage) => void) | null;
+  /** Zur Karte der laufenden Nachforderung im Reiter „Dokumente". */
+  onZurNachforderung?: (() => void) | null;
 }) {
   const lagen = dringendeNachweisLagen(documents);
   if (lagen.length === 0) return null;
+
+  const aktion = warnbalkenAktion(
+    verlaengerungVorauswahl(lagen.map((l) => l.typ)),
+    unterlagen,
+  );
+  const mitRecht = !!onNachfordern && !!unterlagen?.darfAktionen;
+  const anfrage = mitRecht ? aktion.anfrage : null;
+  const zurKarte = onZurNachforderung && aktion.zurNachforderung ? onZurNachforderung : null;
+  const wegSatz = nachforderungsSatz(aktion, mitRecht, {
+    aufforderung: NACHFORDERN_SAETZE.BALKEN,
+    ohneRecht: NACHFORDERN_SAETZE.BALKEN_OHNE_RECHT,
+  });
+  // „Bleibt bedienbar" nur vor einem Weg — nicht vor dem Grund, warum es
+  // keinen gibt (etwa ein eingestellter Vorgang).
+  const gesperrt = mitRecht && !aktion.aufforderung;
+  const balkenSatz = wegSatz && !gesperrt ? `Der Vorgang bleibt bedienbar. ${wegSatz}` : wegSatz;
 
   const abgelaufen = lagen.some((l) => l.ampel?.kategorie === "ABGELAUFEN");
 
@@ -2156,7 +2463,7 @@ function NachweisFristenWarnung({
   const titelFarbe = abgelaufen ? "text-credo-rot" : "text-amber-800";
 
   return (
-    <div className={`mb-6 rounded-2xl border-2 p-4 ${rahmen}`}>
+    <div className={`mb-6 rounded-2xl border-2 p-4 ${rahmen}`} data-kasten="nachweis-fristen">
       <p className={`text-sm font-bold ${titelFarbe}`}>{ueberschrift}</p>
       <ul className="mt-2 space-y-1">
         {lagen.map((l) => (
@@ -2167,19 +2474,41 @@ function NachweisFristenWarnung({
         ))}
       </ul>
       {abgelaufen && (
-        <p className="mt-2 text-sm text-foreground">
+        <p className="mt-2 text-sm text-foreground" data-zeile="balken-satz">
           Eine Beschäftigung ohne gültigen Aufenthaltstitel ist für den Arbeitgeber
-          bußgeldbewehrt (§ 404 SGB III, § 98 AufenthG). Der Vorgang bleibt bedienbar —
-          bitte den verlängerten Nachweis anfordern und hochladen.
+          bußgeldbewehrt (§ 404 SGB III, § 98 AufenthG).{balkenSatz && ` ${balkenSatz}`}
         </p>
       )}
-      {onZuDenDokumenten && (
-        <button
-          onClick={onZuDenDokumenten}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
-        >
-          Zu den Dokumenten
-        </button>
+      {(anfrage || zurKarte || onZuDenDokumenten) && (
+        <div className="mt-3 flex flex-wrap gap-1.5" data-block="warnbalken-knoepfe">
+          {anfrage && (
+            <button
+              type="button"
+              onClick={() => onNachfordern?.(anfrage)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-credo-blau px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-credo-blau/90"
+            >
+              Verlängerten Nachweis anfordern…
+            </button>
+          )}
+          {zurKarte && (
+            <button
+              type="button"
+              onClick={zurKarte}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-credo-gelb bg-credo-gelb/20 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-credo-gelb/30"
+            >
+              Zur Nachforderung
+            </button>
+          )}
+          {onZuDenDokumenten && (
+            <button
+              type="button"
+              onClick={onZuDenDokumenten}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Zu den Dokumenten
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -2205,6 +2534,15 @@ function NachweisFristenWarnung({
  * Aufforderung ohne Schaltflaeche ist keine Aufforderung, sondern ein Vorwurf —
  * deshalb sitzt das Eingabefeld jetzt an derselben Stelle wie der Satz.
  *
+ * **„Unbefristet" (Paket 4, Z1).** Der Knopf setzt das Kennzeichen
+ * (`{ gueltigBis: null, unbefristet: true }`) statt nur das Datum zu leeren —
+ * sonst bliebe ein alter, befristeter Titel maßgeblich, und Warnbalken und
+ * Erinnerungen liefen weiter. Er steht auch ohne gespeichertes Datum da (der
+ * haeufigste Fall: die Niederlassungserlaubnis kam ohne Datum), und ein so
+ * gekennzeichnetes Dokument zeigt „Unbefristet" statt „Keine Frist
+ * hinterlegt". Ein Datum nimmt das Kennzeichen zurueck (der Server setzt es
+ * dann auf false).
+ *
  * Exportiert fuer den Komponententest (Status nach einer Fristkorrektur).
  */
 export function AblaufAbzeichen({
@@ -2222,6 +2560,18 @@ export function AblaufAbzeichen({
   const [eingabe, setEingabe] = useState("");
   const [speichert, setSpeichert] = useState(false);
   const [fehler, setFehler] = useState("");
+  // Nach dem Speichern verschwindet der geklickte Knopf (der Editor schliesst,
+  // „Unbefristet" wechselt die Darstellung) — ohne Ziel laege der Fokus auf
+  // `body`. Er geht auf den Einstieg der neuen Darstellung: „Ändern" bzw.
+  // „Ablaufdatum nachtragen". Gesetzt erst, wenn die Seite das neue Dokument
+  // gerendert hat (Effekt ohne Abhaengigkeiten, der Merker haelt ihn still).
+  const einstiegRef = useRef<HTMLButtonElement>(null);
+  const fokusNachSpeichern = useRef(false);
+  useEffect(() => {
+    if (!fokusNachSpeichern.current || offen || !einstiegRef.current) return;
+    fokusNachSpeichern.current = false;
+    einstiegRef.current.focus();
+  });
 
   // `ablaufKalendertag` und nicht `slice(0, 10)`: Die Spalte ist `@db.Date` und
   // kommt als Mitternacht UTC herein; jede eigene Umrechnung waere die naechste
@@ -2234,7 +2584,10 @@ export function AblaufAbzeichen({
     setOffen(true);
   };
 
-  const speichere = async (wert: string) => {
+  // Zwei Formen: ein Datum (`{ gueltigBis: "JJJJ-MM-TT" }`) oder das
+  // Kennzeichen (`{ gueltigBis: null, unbefristet: true }`). Beides zugleich
+  // weist der Server als Widerspruch ab.
+  const speichere = async (anfrage: { gueltigBis: string } | { gueltigBis: null; unbefristet: true }) => {
     setSpeichert(true);
     setFehler("");
     try {
@@ -2243,7 +2596,7 @@ export function AblaufAbzeichen({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ gueltigBis: wert }),
+          body: JSON.stringify(anfrage),
         }
       );
       const koerper = await res.json().catch(() => null);
@@ -2267,7 +2620,12 @@ export function AblaufAbzeichen({
           koerper && typeof koerper.status === "string"
             ? koerper.status
             : undefined,
+        unbefristet:
+          koerper && typeof koerper.unbefristet === "boolean"
+            ? koerper.unbefristet
+            : undefined,
       });
+      fokusNachSpeichern.current = true;
       setOffen(false);
     } catch {
       setFehler("Verbindungsfehler beim Speichern des Ablaufdatums.");
@@ -2279,6 +2637,18 @@ export function AblaufAbzeichen({
   if (!istFristpflichtig(doc.type)) return null;
 
   const ampel = ablaufAmpel(doc.gueltigBis);
+
+  const unbefristetKnopf = (klassen: string) => (
+    <button
+      type="button"
+      disabled={speichert}
+      onClick={() => speichere({ gueltigBis: null, unbefristet: true })}
+      className={klassen}
+      title="Der Nachweis gilt unbefristet (etwa eine Niederlassungserlaubnis)"
+    >
+      Unbefristet
+    </button>
+  );
 
   // Dieselbe Eingabezeile fuer beide Faelle — „noch keins" und „falsches".
   // Ein eigener Weg je Fall waere eine zweite Stelle, an der dieselbe Regel
@@ -2296,26 +2666,17 @@ export function AblaufAbzeichen({
         <button
           type="button"
           disabled={speichert || eingabe === ""}
-          onClick={() => speichere(eingabe)}
+          onClick={() => speichere({ gueltigBis: eingabe })}
           className="rounded-lg border border-border px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
         >
           {speichert ? "Wird gespeichert..." : "Speichern"}
         </button>
-        {/* Loeschen gibt es NUR hier, nicht ueber den Magic Link: Ein
-            faelschlich eingetragenes Datum an einer unbefristeten
-            Niederlassungserlaubnis waere sonst nicht mehr wegzubekommen. Jede
-            Aenderung steht im Protokoll. */}
-        {gespeicherterTag !== "" && (
-          <button
-            type="button"
-            disabled={speichert}
-            onClick={() => speichere("")}
-            className="rounded-lg border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
-            title="Der Nachweis gilt unbefristet"
-          >
-            Unbefristet
-          </button>
-        )}
+        {/* Das Datum entfernen gibt es NUR hier, nicht ueber den Magic Link:
+            Ein faelschlich eingetragenes Datum an einer unbefristeten
+            Niederlassungserlaubnis waere sonst nicht mehr wegzubekommen. Seit
+            Z1 setzt der Knopf dabei das Kennzeichen — auch ohne gespeichertes
+            Datum. Jede Aenderung steht im Protokoll. */}
+        {!doc.unbefristet && unbefristetKnopf("rounded-lg border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50")}
         <button
           type="button"
           disabled={speichert}
@@ -2325,9 +2686,42 @@ export function AblaufAbzeichen({
           Abbrechen
         </button>
       </div>
-      {fehler && <p className="mt-1 text-[11px] text-credo-rot">{fehler}</p>}
+      {fehler && (
+        <p role="alert" className="mt-1 text-[11px] text-credo-rot">
+          {fehler}
+        </p>
+      )}
     </div>
   ) : null;
+
+  // Ausdruecklich unbefristet (Z1): kein Vorwurf, keine Nachfrage — die
+  // Auskunft selbst. „Ändern" bleibt: Ein Verklicken muss sich mit einem Datum
+  // zuruecknehmen lassen (das nimmt das Kennzeichen zurueck).
+  if (doc.unbefristet) {
+    return (
+      <div className="mb-3" data-ablauf="unbefristet">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-semibold text-foreground">
+            Unbefristet
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            Kein Ablaufdatum – der Nachweis gilt unbefristet.
+          </span>
+          {canEdit && !offen && (
+            <button
+              ref={einstiegRef}
+              type="button"
+              onClick={oeffne}
+              className="text-[11px] text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+            >
+              Ändern
+            </button>
+          )}
+        </div>
+        {editor}
+      </div>
+    );
+  }
 
   // Kein Datum ist kein Fehler (der Titel kann unbefristet sein, das Feld kann
   // schlicht noch leer sein) — aber es muss sichtbar sein. Sonst liest HR die
@@ -2335,27 +2729,41 @@ export function AblaufAbzeichen({
   //
   // Hier und NUR hier: Der vorgangsweite Balken laesst diesen Fall bewusst aus
   // (siehe `dringendeNachweisLagen`). Deshalb muss der Satz an dieser Stelle
-  // beide Lesarten offenhalten — sonst liest jemand mit Niederlassungserlaubnis
-  // dauerhaft eine Ruege fuer eine Angabe, die es bei ihm nicht gibt.
+  // beide Lesarten offenhalten — und seit Z1 fuer beide einen Knopf anbieten:
+  // „Ablaufdatum nachtragen" und „Unbefristet".
   if (!ampel.kategorie) {
     return (
-      <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5">
+      <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5" data-ablauf="ohne-frist">
         <p className="text-[11px] font-semibold text-amber-800">Keine Frist hinterlegt</p>
         <p className="text-[11px] text-amber-900">
-          Kein Ablaufdatum erfasst — dieser Nachweis wird nicht überwacht. Bei
-          einer unbefristeten Niederlassungserlaubnis ist das richtig so;
-          andernfalls tragen Sie das Ablaufdatum bitte hier nach.
+          Kein Ablaufdatum erfasst — dieser Nachweis wird nicht überwacht. Ist
+          der Nachweis unbefristet (etwa eine Niederlassungserlaubnis), klicken
+          Sie auf „Unbefristet“; andernfalls tragen Sie das Ablaufdatum bitte
+          hier nach.
         </p>
         {canEdit &&
           (editor ?? (
-            <button
-              type="button"
-              onClick={oeffne}
-              className="mt-1.5 rounded-lg border border-amber-600 px-2 py-1 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100"
-            >
-              Ablaufdatum nachtragen
-            </button>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              <button
+                ref={einstiegRef}
+                type="button"
+                onClick={oeffne}
+                className="rounded-lg border border-amber-600 px-2 py-1 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100"
+              >
+                Ablaufdatum nachtragen
+              </button>
+              {unbefristetKnopf(
+                "rounded-lg border border-amber-600 px-2 py-1 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50",
+              )}
+            </div>
           ))}
+        {/* Ohne offenen Editor steht ein Fehler des direkten Knopfs sonst
+            nirgends — als Alarm, denn der Fokus liegt noch auf dem Knopf. */}
+        {!offen && fehler && (
+          <p role="alert" className="mt-1 text-[11px] text-credo-rot">
+            {fehler}
+          </p>
+        )}
       </div>
     );
   }
@@ -2383,6 +2791,7 @@ export function AblaufAbzeichen({
             Titel bringt ohnehin eine neue Frist mit. */}
         {canEdit && !offen && (
           <button
+            ref={einstiegRef}
             type="button"
             onClick={oeffne}
             className="text-[11px] text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
@@ -2594,26 +3003,74 @@ function OnboardingErstellenSection({
     </>
   );
 }
-function TabDocuments({
+/** Id des Rahmens um Meldung und Karte „Unterlagen nachfordern" — Fokusziel nach dem Dialog. */
+const NACHFORDERUNG_FOKUSZIEL = "unterlagen-nachforderung";
+
+/**
+ * Reiter „Dokumente". Exportiert fuer den Komponententest (Position der Karte
+ * „Unterlagen nachfordern", Dokumentenliste mit Bezeichnung und Herkunft).
+ */
+export function TabDocuments({
   data,
   onboardingId,
   canEdit,
   onFristGeaendert,
   paketDialogOffen,
   setPaketDialogOffen,
+  onAktualisiert = () => {},
+  nachforderungDialog = null,
+  onNachfordern = () => {},
+  onNachforderungSchliessen = () => {},
+  onNachforderungErfolg = () => {},
+  unterlagenMeldung = null,
+  onUnterlagenMeldungSchliessen = () => {},
+  karteSprung = 0,
+  onKarteSprungErledigt,
 }: {
   data: DetailData;
   onboardingId: string;
+  /** `HR_EDIT_ROLES` — zugleich `darfAktionen` der Karte „Unterlagen nachfordern". */
   canEdit: boolean;
   /** Meldet eine geaenderte Dokumentenfrist nach oben — siehe `setzeDokumentFrist`. */
   onFristGeaendert: (docId: string, aenderung: FristAenderung) => void;
   paketDialogOffen: boolean;
   setPaketDialogOffen: (offen: boolean) => void;
+  /** Vorgang leise neu laden (`loadData(true)`) — nach jeder Aktion der Karte. */
+  onAktualisiert?: () => void | Promise<unknown>;
+  /** Offener Dialog „Unterlagen nachfordern…"/„Unterlagen ergänzen…", sonst null. */
+  nachforderungDialog?: NachforderungDialogAnfrage | null;
+  /** Oeffnet den Dialog (Knoepfe der Karte). */
+  onNachfordern?: (anfrage: NachforderungDialogAnfrage) => void;
+  onNachforderungSchliessen?: () => void;
+  /** Der Dialog meldet Erfolg (gruen) oder Warnung (gelb: Mail nicht zugestellt); `fehler` waere rot. */
+  onNachforderungErfolg?: (meldung: { art: "erfolg" | "warnung" | "fehler"; text: string }) => void | Promise<void>;
+  unterlagenMeldung?: UnterlagenMeldung | null;
+  onUnterlagenMeldungSchliessen?: () => void;
+  /** Zaehlt bei „Zur Nachforderung" hoch — dann rollt der Reiter zur Karte. */
+  karteSprung?: number;
+  /**
+   * Der Sprung ist erledigt: Die Seite setzt den Zaehler zurueck — sonst
+   * rollte der Reiter bei jedem spaeteren Wechsel hierher erneut zur Karte.
+   */
+  onKarteSprungErledigt?: () => void;
 }) {
   // Ein Paketversand legt fuer jede mitgeschickte Vorlage ein Dokument an. Die
   // Erstellen- und die Versenden-Karte sind Geschwister und wissen nichts
   // voneinander — dieser Zaehler ist das Signal von der einen zur anderen.
   const [versandZaehler, setVersandZaehler] = useState(0);
+
+  const unterlagen = data.unterlagen ?? null;
+
+  // „Zur Nachforderung" (Kasten, Warnbalken): zur Karte rollen und den Fokus
+  // dorthin setzen, damit auch die Tastatur dort weitermacht. Beim Wechsel aus
+  // einem anderen Reiter laeuft der Effekt gleich beim Einhaengen.
+  const karteRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!karteSprung) return;
+    karteRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    karteRef.current?.focus({ preventScroll: true });
+    onKarteSprungErledigt?.();
+  }, [karteSprung, onKarteSprungErledigt]);
 
   // Die Statustabelle steht in `@/lib/constants` (DOCUMENT_STATUS_LABELS) und
   // NICHT mehr hier: Als lokale Kopie fehlte ihr der Wert EXPIRED, den der
@@ -2639,6 +3096,10 @@ function TabDocuments({
     SB_AUSWEIS: "bg-indigo-100 text-indigo-700",
     VL_VERTRAG: "bg-lime-100 text-lime-700",
     BAV_VERTRAG: "bg-lime-100 text-lime-700",
+    // Befristete Nachweise und PKV — fielen bis Paket 4 auf Grau zurueck.
+    AUFENTHALTSTITEL: "bg-rose-100 text-rose-700",
+    ARBEITSERLAUBNIS: "bg-rose-100 text-rose-700",
+    PKV_NACHWEIS: "bg-credo-gruen/10 text-credo-gruen",
     SONSTIGES: "bg-gray-100 text-gray-600",
   };
 
@@ -2679,6 +3140,57 @@ function TabDocuments({
         onVersendet={() => setVersandZaehler((n) => n + 1)}
       />
 
+      {/* Unterlagen nachfordern (Paket 4) — nach „Dokumente versenden" und vor
+          den hochgeladenen Dokumenten: Was die Karte annimmt, erscheint direkt
+          darunter in der Liste. Die Meldung des Dialogs steht darueber.
+          Der Rahmen ist zugleich das Fokusziel nach dem Dialog und nach „Zur
+          Nachforderung": Nach dem Anfordern ist der ausloesende Knopf weg
+          (Kasten: jetzt „Zur Nachforderung", Karte: die laufende), ohne Ziel
+          laege der Fokus auf `body`. Eine Gruppe mit Namen, keine zweite
+          Landmarke — die Karte selbst ist schon ein benannter Abschnitt. */}
+      {unterlagen && (
+        <div
+          ref={karteRef}
+          id={NACHFORDERUNG_FOKUSZIEL}
+          tabIndex={-1}
+          role="group"
+          aria-label="Unterlagen nachfordern"
+          className="scroll-mt-4 space-y-3 outline-none"
+          data-block="nachforderung"
+        >
+          {unterlagenMeldung && (
+            <UnterlagenMeldungen meldung={unterlagenMeldung} onSchliessen={onUnterlagenMeldungSchliessen} />
+          )}
+          {/* Jede Aktion der Karte bringt ihre eigene Meldung mit — die des
+              Dialogs darueber waere dann veraltet und stuende womoeglich gruen
+              ueber einer neuen roten. */}
+          <NachforderungKarte
+            uebersicht={unterlagen}
+            vorgangId={onboardingId}
+            darfAktionen={canEdit}
+            onAktualisiert={() => {
+              onUnterlagenMeldungSchliessen();
+              return onAktualisiert();
+            }}
+            onNachfordern={onNachfordern}
+          />
+        </div>
+      )}
+      {canEdit && unterlagen?.darfAktionen && nachforderungDialog && (
+        <NachforderungDialog
+          vorgangId={onboardingId}
+          uebersicht={unterlagen}
+          modus={nachforderungDialog.modus}
+          vorauswahl={nachforderungDialog.vorauswahl}
+          onSchliessen={onNachforderungSchliessen}
+          onErfolg={onNachforderungErfolg}
+          // Letzte Kontrolle vor einer Mail an eine private Adresse: Name ·
+          // Vorgangsnummer unter dem Titel (Mockup P:1299).
+          kopf={{ name: mitarbeiterName(data), vorgangsnummer: data.displayId }}
+          fokusZiel={NACHFORDERUNG_FOKUSZIEL}
+        />
+      )}
+
       {/* Hochgeladene Dokumente — vor den Export gezogen: der am haeufigsten
           konsultierte Bereich, waehrend der Export der seltenste Vorgang ist. */}
       {data.documents.length === 0 ? (
@@ -2708,18 +3220,32 @@ function TabDocuments({
             {data.documents.map((doc) => {
               const statusLabel = documentStatusLabel(doc.status);
               const typeColor = DOC_TYPE_COLORS[doc.type] || DOC_TYPE_COLORS.SONSTIGES;
+              // Paket 4: Name einer frei benannten Unterlage (sonst stuende da
+              // nur „Sonstiges") und die Herkunft aus einer Nachforderung samt
+              // PDF-Hinweisen — beides fertig vom Server.
+              const bezeichnung = doc.bezeichnung?.trim() || null;
+              const herkunft = unterlagen?.dokumentHerkunft[doc.id] ?? null;
 
               return (
                 <div
                   key={doc.id}
                   className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-[#009AC6]/30 hover:shadow-md"
+                  data-dokument={doc.id}
                 >
                   <div className="mb-3 flex items-start gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                       <DocumentIcon className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-foreground" title={doc.fileName}>
+                      {bezeichnung && (
+                        <p className="truncate text-sm font-semibold text-foreground" title={bezeichnung} data-feld="bezeichnung">
+                          {bezeichnung}
+                        </p>
+                      )}
+                      <p
+                        className={`truncate ${bezeichnung ? "text-xs text-muted-foreground" : "text-sm font-semibold text-foreground"}`}
+                        title={doc.fileName}
+                      >
                         {doc.fileName}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">{formatBytes(doc.fileSize)}</p>
@@ -2734,6 +3260,17 @@ function TabDocuments({
                       {statusLabel.label}
                     </span>
                   </div>
+
+                  {herkunft && (
+                    <p className="mb-3 text-[11px] text-muted-foreground" data-feld="herkunft">
+                      {herkunft.text}
+                      {herkunft.hinweise.length > 0 && (
+                        <span className="ml-1 font-medium text-amber-800" data-hinweis="pdf">
+                          ({herkunft.hinweise.join(", ")})
+                        </span>
+                      )}
+                    </p>
+                  )}
 
                   {/* Ablauf-Ampel — nur bei fristpflichtigen Nachweisen
                       (Aufenthaltstitel, Arbeitserlaubnis). Sie ist zugleich die
@@ -3376,11 +3913,30 @@ function SpurenChips({ chips }: { chips: readonly SpurChip[] }) {
   );
 }
 
-function StatusMiniCard({ label, value, done }: { label: string; value: string; done: boolean }) {
+function StatusMiniCard({
+  label,
+  value,
+  done,
+  zusatz = null,
+}: {
+  label: string;
+  value: string;
+  done: boolean;
+  /** Zweite, kleine Zeile — etwa der Kurzstand einer laufenden Nachforderung. */
+  zusatz?: string | null;
+}) {
   return (
-    <div className={`rounded-lg border p-3 transition-colors ${done ? "border-credo-gruen/30 bg-credo-gruen/5" : "border-border bg-muted/30"}`}>
+    <div
+      className={`rounded-lg border p-3 transition-colors ${done ? "border-credo-gruen/30 bg-credo-gruen/5" : "border-border bg-muted/30"}`}
+      data-mini-karte={label}
+    >
       <p className="text-[11px] text-muted-foreground">{label}</p>
       <p className={`text-sm font-bold ${done ? "text-credo-gruen" : "text-foreground"}`}>{value}</p>
+      {zusatz && (
+        <p className="mt-0.5 break-words text-[11px] text-amber-800" data-zeile="kurzstand">
+          {zusatz}
+        </p>
+      )}
     </div>
   );
 }

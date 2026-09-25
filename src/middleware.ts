@@ -39,6 +39,16 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Die Upload-Seite der Nachforderung (Paket 4, 5.3) traegt den Token im Pfad.
+  // Mit „strict-origin-when-cross-origin" ginge er zwar nicht nach aussen, aber
+  // als volle URL mit jeder Anfrage desselben Ursprungs (etwa den API-Aufrufen
+  // der Seite) — und ein `Referer` landet leicht in einem Proxy-Log.
+  // `no-referrer` gibt ihn gar nicht weiter. Das Meta-Tag der Seite sagt
+  // dasselbe; der Kopf gilt aber schon, bevor es geparst ist.
+  if (pathname === "/unterlagen" || pathname.startsWith("/unterlagen/")) {
+    response.headers.set("Referrer-Policy", "no-referrer");
+  }
+
   // CSP (Aufbau in src/lib/content-security-policy.ts): In Dev-Modus
   // unsafe-eval (Next.js HMR). NICHT fuer Routen, die ihre CSP selbst setzen
   // (Datei-Route der Nachforderung: `sandbox` fuer Bilder) — Next.js haengt

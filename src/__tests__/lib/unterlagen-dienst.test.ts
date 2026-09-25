@@ -1341,6 +1341,8 @@ describe("unterlagenUebersichtLaden", () => {
     expect(udb.aufrufe).toContain("employee.findUnique");
 
     expect(unterlagen.darfAktionen).toBe(true);
+    // Die Basis der HR-Routen kommt vom Modul-Baustein — Karte und Dialog kennen die Routen nicht selbst.
+    expect(unterlagen.apiBasis).toBe(`/api/onboarding/${VORGANG_ID}/unterlagen`);
     expect(unterlagen.anfordern).toEqual({ moeglich: false, grund: null });
     const l = unterlagen.laufend!;
     expect(l.id).toBe(n.id);
@@ -1394,6 +1396,7 @@ describe("unterlagenUebersichtLaden", () => {
     mitDateien();
     const { unterlagen } = await uebersicht(VORGESETZTE);
     expect(unterlagen.darfAktionen).toBe(false);
+    expect(unterlagen.apiBasis).toBeNull();
     // Die Adresse der Personalakte wird fuer Leser gar nicht erst geladen.
     expect(udb.aufrufe).not.toContain("employee.findUnique");
     expect(JSON.stringify(unterlagen)).not.toContain("credo-gruppe.de");

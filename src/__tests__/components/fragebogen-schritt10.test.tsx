@@ -397,6 +397,9 @@ describe("Ausblick auf die nachreichbaren Pflichten", () => {
     expect(text).toMatch(/absenden/i);
     expect(text).toContain("Nachweis offen");
     expect(text).toMatch(/nach dem Absenden nichts mehr hochladen/);
+    // Paket 4: der Weg danach — HR fordert an, dann kommt der eigene Link.
+    expect(text).toContain("E-Mail mit einem persönlichen Link");
+    expect(text).not.toContain("kommt auf Sie zu");
   });
 
   it("bleibt weg, wenn es nichts nachzureichen gibt", async () => {

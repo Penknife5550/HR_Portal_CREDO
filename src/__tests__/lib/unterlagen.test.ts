@@ -59,6 +59,7 @@ import {
   nachforderungUebergang,
   nachweisStandText,
   oeffentlicherFristSatz,
+  offeneNachweiseAktion,
   pdfHinweisTexte,
   pdfHinweiseLesen,
   pdfHinweiseSpeichern,
@@ -69,6 +70,7 @@ import {
   uebersichtBauen,
   unterlagenPille,
   vollstaendigMerker,
+  warnbalkenAktion,
   zaehlen,
   zurueckweisenFrist,
   zurueckweisenFristPruefen,
@@ -1629,7 +1631,11 @@ describe("uebersichtBauen", () => {
     expect(u.pille).toEqual(l.pille);
     expect(l.kopfZeile).toBe("Angefordert am 14.09.2026 von Erika Muster · an anna.beispiel@example.org");
     expect(l.fristZeile).toBe("Frist: Freitag, 25.09.2026 · noch 4 Tage");
-    expect(l.fortschritt).toEqual({ anteil: 1 / 3, text: "1 von 3 angenommen · 1 zu prüfen · 1 offen" });
+    expect(l.fortschritt).toEqual({
+      anteil: 1 / 3,
+      anteilZuPruefen: 1 / 3,
+      text: "1 von 3 angenommen · 1 zu prüfen · 1 offen",
+    });
     expect(l.mailVerlaufText).toBe("E-Mails an die Person: Aufforderung 14.09. · Zurückweisung 16.09. · Erinnerung 19.09.");
     expect(u.kurzstand).toBe("1 von 3 angenommen · 1 zu prüfen · 1 offen · Frist 25.09.2026");
     // Positionen nach `reihenfolge`.
@@ -1883,6 +1889,79 @@ describe("uebersichtBauen", () => {
     expect(bauen([]).dialog).toBeNull();
   });
 
+  it("Fortschritt: der gelbe Balkenteil „zu prüfen“ kommt fertig vom Server, ENTFAELLT zählt nicht mit", () => {
+    const n = nachforderung({
+      positionen: [
+        position({ id: "a", status: "EINGEREICHT", einreichungen: 1, uebermitteltAm: new Date("2026-09-15T08:00:00Z") }),
+        position({ id: "b", typ: "MASERNSCHUTZ", status: "EINGEREICHT", einreichungen: 1, uebermitteltAm: new Date("2026-09-15T08:00:00Z") }),
+        position({ id: "c", typ: "PKV_NACHWEIS", status: "ANGEFORDERT" }),
+        position({ id: "d", typ: "ARBEITSERLAUBNIS", status: "ENTFAELLT", entschiedenAm: new Date("2026-09-16T08:00:00Z") }),
+      ],
+    });
+    expect(bauen([n]).laufend!.fortschritt).toEqual({
+      anteil: 0,
+      anteilZuPruefen: 2 / 3,
+      text: "0 von 3 angenommen · 2 zu prüfen · 1 offen · 1 entfällt",
+    });
+    // Ohne zaehlbare Position: keine Division durch null.
+    const leer = nachforderung({ positionen: [position({ id: "x", status: "ENTFAELLT", entschiedenAm: new Date("2026-09-16T08:00:00Z") })] });
+    expect(bauen([leer]).laufend!.fortschritt).toMatchObject({ anteil: 0, anteilZuPruefen: 0 });
+  });
+
+  it("Fristzeile: Restlaufzeit nur bei der laufenden, sonst die Ersatzzeile „Frist war …“", () => {
+    expect(bauen([mockup()]).laufend!.fristZeile).toBe("Frist: Freitag, 25.09.2026 · noch 4 Tage");
+    const erledigt = nachforderung({
+      status: "ERLEDIGT",
+      erledigtAm: new Date("2026-09-16T08:00:00Z"),
+      positionen: [position({ status: "ANGENOMMEN", entschiedenAm: new Date("2026-09-16T08:00:00Z") })],
+    });
+    expect(bauen([erledigt]).zuletztErledigt!.fristZeile).toBe("Frist war Freitag, 25.09.2026");
+    // Auch nach der Frist keine Restlaufzeit und kein „verstrichen“ fuer eine abgeschlossene.
+    const spaet = bauen([erledigt], { jetzt: new Date("2026-10-10T08:00:00Z") }).zuletztErledigt!;
+    expect(spaet.fristZeile).toBe("Frist war Freitag, 25.09.2026");
+  });
+
+  it("eingestellter Vorgang: Hinweis, warum Knöpfe fehlen — nur bei der laufenden und nur mit Recht", () => {
+    const u = bauen([mockup()], { vorgangEingestellt: true });
+    // EIN Text fuer Karte und 409 derselben Aktionen — zwei gingen auseinander.
+    expect(u.laufend!.eingestelltHinweis).toBe(MELDUNGEN.HR_VORGANG_EINGESTELLT);
+    expect(Object.keys(MELDUNGEN)).not.toContain("NACHFORDERUNG_VORGANG_EINGESTELLT");
+    // Der Hinweis passt zu dem, was tatsaechlich fehlt.
+    expect(u.laufend!.aktionen).toMatchObject({ ergaenzen: false, fristAendern: false, erneutSenden: false, zurueckziehen: true });
+    for (const p of u.laufend!.positionen) expect(p.aktionen.zurueckweisen).toBe(false);
+    // ... und zu dem, was bleibt: annehmen (p-titel ist eingereicht), entfallen, Annahme zuruecknehmen (p-rv).
+    const aktionen = Object.fromEntries(u.laufend!.positionen.map((p) => [p.id, p.aktionen]));
+    expect(aktionen["p-titel"]).toMatchObject({ annehmen: true, entfaellt: true });
+    expect(aktionen["p-rv"]).toMatchObject({ annahmeZuruecknehmen: true });
+
+    expect(bauen([mockup()]).laufend!.eingestelltHinweis).toBeNull();
+    expect(bauen([mockup()], { vorgangEingestellt: true, darfAktionen: false }).laufend!.eingestelltHinweis).toBeNull();
+    const erledigt = nachforderung({
+      status: "ERLEDIGT",
+      erledigtAm: new Date("2026-09-16T08:00:00Z"),
+      positionen: [position({ status: "ANGENOMMEN", entschiedenAm: new Date("2026-09-16T08:00:00Z") })],
+    });
+    expect(bauen([erledigt], { vorgangEingestellt: true }).zuletztErledigt!.eingestelltHinweis).toBeNull();
+  });
+
+  it("eingestellter Vorgang: der Text nennt die Frist, die für HR zählt (Z2)", () => {
+    // Der naechste Lauf zieht die Nachforderung zurueck; danach laesst sich
+    // nichts mehr annehmen, und ungepruefte Dateien werden verworfen.
+    const text = MELDUNGEN.HR_VORGANG_EINGESTELLT;
+    expect(text).toContain("Bis zum nächsten täglichen Lauf können Sie eingegangene Unterlagen noch annehmen");
+    expect(text).toContain("Danach zieht der Lauf die Nachforderung von selbst zurück, und ungeprüfte Dateien werden nach 30 Tagen gelöscht.");
+    expect(text).toContain("die Nachforderung zurückziehen");
+    // Die Aussage „nach dem Lauf nichts mehr annehmen" haelt die Regel: ZURUECKGEZOGEN nimmt nichts mehr an.
+    expect(positionUebergang("ANNEHMEN", "EINGEREICHT", kontext({ nachforderungStatus: "ZURUECKGEZOGEN" })).erlaubt).toBe(false);
+  });
+
+  it("apiBasis aus dem Modul-Baustein — nur mit Bearbeitungsrecht", () => {
+    const basis = "/api/onboarding/v1/unterlagen";
+    expect(bauen([], { apiBasis: basis }).apiBasis).toBe(basis);
+    expect(bauen([], { apiBasis: basis, darfAktionen: false }).apiBasis).toBeNull();
+    expect(bauen([]).apiBasis).toBeNull();
+  });
+
   it("JSON-Text ergibt dieselbe Übersicht wie Prisma-Date", () => {
     const alsJson = JSON.parse(JSON.stringify(mockup())) as NachforderungEingabe;
     expect(bauen([alsJson])).toEqual(bauen([mockup()]));
@@ -1892,6 +1971,137 @@ describe("uebersichtBauen", () => {
 // =============================================
 // Personen-Sicht, Antworten, Meldungen
 // =============================================
+
+// =============================================
+// Der Weg zur Nachforderung aus Kasten und Warnbalken (P:1285)
+// =============================================
+
+describe("offeneNachweiseAktion und warnbalkenAktion", () => {
+  const GRUND = "Der Vorgang ist abgelaufen und wird nicht mehr bearbeitet. Unterlagen lassen sich nicht mehr nachfordern.";
+  const bauen = (
+    nachforderungen: NachforderungEingabe[],
+    teil: Partial<Parameters<typeof uebersichtBauen>[0]> = {},
+  ): UnterlagenUebersicht =>
+    uebersichtBauen({
+      modul: "ONBOARDING",
+      nachforderungen,
+      verfuegbar: { ok: true },
+      vorgangEingestellt: false,
+      darfAktionen: true,
+      dateiUrl: DATEI_URL,
+      jetzt: JETZT,
+      ...teil,
+    });
+  /** Eine aeltere, erledigte Nachforderung, in der HR die Arbeitserlaubnis als entfallen vermerkt hat. */
+  const erledigtMitEntfallen = () =>
+    nachforderung({
+      id: "n-alt",
+      status: "ERLEDIGT",
+      angefordertAm: new Date("2026-09-01T07:00:00.000Z"),
+      erledigtAm: new Date("2026-09-10T08:00:00.000Z"),
+      positionen: [
+        position({ id: "p-ae-alt", typ: "ARBEITSERLAUBNIS", status: "ENTFAELLT", entschiedenAm: new Date("2026-09-10T08:00:00Z") }),
+      ],
+    });
+  /** Die laufende: Titel angefordert, PKV-Nachweis darin als entfallen vermerkt. */
+  const laufend = () =>
+    nachforderung({
+      positionen: [
+        position({ id: "p-at", typ: "AUFENTHALTSTITEL" }),
+        position({ id: "p-pkv", reihenfolge: 2, typ: "PKV_NACHWEIS", sensibel: false, fristpflichtig: false, status: "ENTFAELLT", entschiedenAm: new Date("2026-09-16T08:00:00Z") }),
+      ],
+    });
+  const OFFEN = ["MASERNSCHUTZ", "AUFENTHALTSTITEL", "ARBEITSERLAUBNIS", "PKV_NACHWEIS"];
+  const KEINE = { anfrage: null, zurNachforderung: false, aufforderung: false, grund: null };
+
+  it("ohne Übersicht oder ohne offene Arten: nichts", () => {
+    expect(offeneNachweiseAktion(OFFEN, null)).toEqual(KEINE);
+    expect(offeneNachweiseAktion([], bauen([laufend()]))).toEqual(KEINE);
+    expect(warnbalkenAktion(["AUFENTHALTSTITEL"], undefined)).toEqual(KEINE);
+  });
+
+  it("Kasten ohne laufende: genau die offenen Arten — auch eine früher als entfallen vermerkte", () => {
+    // Sie ist weiter Pflicht und offen; der Dialog schlaegt sie ohnehin vor
+    // (`vorgeschlagen` = offene Nachweise), und `vorauswahl` kreuzt nur ZUSAETZLICH an.
+    expect(offeneNachweiseAktion(OFFEN, bauen([erledigtMitEntfallen()]))).toEqual({
+      anfrage: { modus: "neu", vorauswahl: OFFEN },
+      zurNachforderung: false,
+      aufforderung: true,
+      grund: null,
+    });
+  });
+
+  it("Kasten ohne Recht: kein Knopf, keine Aufforderung, kein Grund", () => {
+    expect(offeneNachweiseAktion(OFFEN, bauen([], { darfAktionen: false }))).toEqual(KEINE);
+  });
+
+  it("Kasten bei eingestelltem Vorgang ohne laufende: statt der Aufforderung der Grund des Servers", () => {
+    expect(offeneNachweiseAktion(OFFEN, bauen([], { verfuegbar: { ok: false, grund: GRUND } }))).toEqual({
+      anfrage: null,
+      zurNachforderung: false,
+      aufforderung: false,
+      grund: GRUND,
+    });
+  });
+
+  it("Kasten mit laufender: „Ergänzen…“ nur um Arten, die NICHT in ihr stehen — die dort entfallene nicht", () => {
+    const aktion = offeneNachweiseAktion(OFFEN, bauen([laufend(), erledigtMitEntfallen()]));
+    // Die Arbeitserlaubnis ist nur in der AELTEREN entfallen und gehoert dazu;
+    // der PKV-Nachweis ist in der laufenden entfallen — wieder anfordern nur im Dialog.
+    expect(aktion).toEqual({
+      anfrage: { modus: "ergaenzen", vorauswahl: ["MASERNSCHUTZ", "ARBEITSERLAUBNIS"] },
+      zurNachforderung: true,
+      aufforderung: true,
+      grund: null,
+    });
+  });
+
+  it("Kasten mit laufender, alle offenen Arten schon darin: nur „Zur Nachforderung“, die Aufforderung bleibt", () => {
+    const aktion = offeneNachweiseAktion(["AUFENTHALTSTITEL", "PKV_NACHWEIS"], bauen([laufend()]));
+    expect(aktion).toEqual({ anfrage: null, zurNachforderung: true, aufforderung: true, grund: null });
+  });
+
+  it("laufende bei eingestelltem Vorgang: nur der Sprung — keine Aufforderung, die sich nicht befolgen lässt", () => {
+    const u = bauen([laufend()], { vorgangEingestellt: true });
+    expect(offeneNachweiseAktion(OFFEN, u)).toEqual({ anfrage: null, zurNachforderung: true, aufforderung: false, grund: null });
+    expect(warnbalkenAktion(["AUFENTHALTSTITEL"], u)).toEqual({
+      anfrage: null,
+      zurNachforderung: true,
+      aufforderung: false,
+      grund: null,
+    });
+  });
+
+  it("laufende ohne Recht: nur der Sprung", () => {
+    const u = bauen([laufend()], { darfAktionen: false });
+    expect(offeneNachweiseAktion(OFFEN, u)).toEqual({ anfrage: null, zurNachforderung: true, aufforderung: false, grund: null });
+  });
+
+  it("Warnbalken ohne laufende: neu mit den übergebenen Arten; gesperrt mit Grund", () => {
+    expect(warnbalkenAktion(["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"], bauen([])).anfrage).toEqual({
+      modus: "neu",
+      vorauswahl: ["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"],
+    });
+    expect(warnbalkenAktion(["AUFENTHALTSTITEL"], bauen([], { verfuegbar: { ok: false, grund: GRUND } }))).toEqual({
+      anfrage: null,
+      zurNachforderung: false,
+      aufforderung: false,
+      grund: GRUND,
+    });
+  });
+
+  it("Warnbalken mit laufender: eine dort entfallene Art kreuzt er an, eine dort angeforderte nicht", () => {
+    const aktion = warnbalkenAktion(["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS", "PKV_NACHWEIS"], bauen([laufend()]));
+    expect(aktion).toEqual({
+      anfrage: { modus: "ergaenzen", vorauswahl: ["ARBEITSERLAUBNIS", "PKV_NACHWEIS"] },
+      zurNachforderung: true,
+      aufforderung: true,
+      grund: null,
+    });
+    // Steht nur der angeforderte Titel an: kein Ergaenzen, aber der Sprung.
+    expect(warnbalkenAktion(["AUFENTHALTSTITEL"], bauen([laufend()])).anfrage).toBeNull();
+  });
+});
 
 describe("personenStand (2.2)", () => {
   it("Entwürfe haben Vorrang, sonst der Zustand", () => {
@@ -1975,9 +2185,10 @@ describe("Meldungen der öffentlichen Seite (5.5)", () => {
     expect(MELDUNGEN.ZU_VIELE_ANFRAGEN).toBe("Zu viele Anfragen, bitte warten Sie einen Moment.");
   });
 
-  it("409 bei eingestelltem Vorgang nennt alles, was bleibt — auch die Rücknahme (EP-3)", () => {
+  it("409 bei eingestelltem Vorgang nennt alles, was bleibt — auch die Rücknahme (EP-3) — und bis wann (Z2)", () => {
+    // Derselbe Text steht als `eingestelltHinweis` auf der Karte.
     expect(MELDUNGEN.HR_VORGANG_EINGESTELLT).toBe(
-      "Der Vorgang wird nicht mehr bearbeitet. E-Mails an die Person sind nicht mehr möglich – Unterlagen lassen sich nur noch annehmen, als entfallen vermerken oder eine Annahme zurücknehmen; die Nachforderung lässt sich nur noch zurückziehen.",
+      "Der Vorgang wird nicht mehr bearbeitet. E-Mails an die Person sind nicht mehr möglich. Deshalb können Sie keine Unterlagen mehr ergänzen oder zurückweisen, die Frist nicht mehr ändern und den Link nicht erneut senden. Bis zum nächsten täglichen Lauf können Sie eingegangene Unterlagen noch annehmen, Unterlagen als entfallen vermerken, eine Annahme zurücknehmen oder die Nachforderung zurückziehen. Danach zieht der Lauf die Nachforderung von selbst zurück, und ungeprüfte Dateien werden nach 30 Tagen gelöscht.",
     );
   });
 

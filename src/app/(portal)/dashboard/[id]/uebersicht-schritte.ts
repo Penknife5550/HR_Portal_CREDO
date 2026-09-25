@@ -22,6 +22,7 @@
 
 import type { WorkflowStep } from "@/components/process-workflow-stepper";
 import type { AbteilungsUebersichtDaten } from "@/lib/abteilungsaufgaben";
+import type { UnterlagenUebersicht } from "@/lib/unterlagen";
 import { abteilungLabel } from "@/lib/constants";
 import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 import {
@@ -73,6 +74,12 @@ export interface SchritteStand {
     notes: string | null;
   }[];
   abteilungen?: AbteilungsUebersichtDaten;
+  /**
+   * Nachforderung von Unterlagen (Paket 4) — gelesen wird nur, ob eine laeuft
+   * (Info-Satz im Abschluss-Schritt, EP-4). Fehlt, solange die Route sie nicht
+   * liefert.
+   */
+  unterlagen?: Pick<UnterlagenUebersicht, "laufend"> | null;
 }
 
 /** Was die Oberflaeche an Knoepfen beisteuert. */
@@ -128,6 +135,21 @@ function datum(wert?: string | null): string | undefined {
 
 function dokumenteText(anzahl: number): string {
   return `${anzahl} Dokument${anzahl !== 1 ? "e" : ""} hochgeladen`;
+}
+
+/**
+ * Der eine Info-Satz im Abschluss-Schritt (EP-4): Offene Abteilungsaufgaben
+ * und eine laufende Nachforderung halten den Abschluss nicht auf. Beides
+ * zugleich ergibt EINEN Satz — zwei Saetze derselben Aussage nebeneinander
+ * laesen sich wie zwei verschiedene Warnungen.
+ */
+function abschlussInfo(abteilungenOffen: boolean, nachforderungLaeuft: boolean): string | undefined {
+  if (abteilungenOffen && nachforderungLaeuft) {
+    return "Offene Aufgaben von Abteilungen und eine laufende Nachforderung verhindern den Abschluss nicht.";
+  }
+  if (abteilungenOffen) return "Offene Aufgaben von Abteilungen verhindern den Abschluss nicht.";
+  if (nachforderungLaeuft) return "Eine laufende Nachforderung verhindert den Abschluss nicht.";
+  return undefined;
 }
 
 // =============================================
@@ -432,12 +454,15 @@ export function onboardingWorkflowSchritte(
       // `completedAt`, nicht `submittedAt`: Der Abschluss-Schritt zeigte bisher
       // den Tag, an dem die Person ihren Fragebogen abgegeben hat.
       completedAt: istAbgeschlossen ? datum(s.completedAt) : undefined,
-      // Die Abteilungen arbeiten an ihren eigenen Aufgaben weiter; der Vorgang
-      // wartet nicht auf sie. Ohne diesen Satz sucht HR den Grund dafuer,
-      // dass der Abschluss trotz offener Abteilungsaufgaben moeglich ist.
-      info: abtZeilen.some((z) => z.aufgaben.offen > 0)
-        ? "Offene Aufgaben von Abteilungen verhindern den Abschluss nicht."
-        : undefined,
+      // Die Abteilungen arbeiten an ihren eigenen Aufgaben weiter, und eine
+      // laufende Nachforderung sperrt weder die Pruefung noch den Abschluss
+      // (EP-4) — der Vorgang wartet auf keins von beiden. Ohne diesen Satz
+      // sucht HR den Grund dafuer, dass der Abschluss trotzdem moeglich ist.
+      // EIN Satz fuer beides, nicht zwei nebeneinander.
+      info: abschlussInfo(
+        abtZeilen.some((z) => z.aufgaben.offen > 0),
+        !!s.unterlagen?.laufend,
+      ),
       // Der Export bleibt fuer alle stehen (eigene Rollenpruefung der Route,
       // wie die uebrigen Export-Links der Seite); versenden nur mit
       // Bearbeitungsrecht — der Versand verlangt HR_EDIT_ROLES.

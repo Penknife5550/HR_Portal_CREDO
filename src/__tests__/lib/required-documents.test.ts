@@ -375,6 +375,21 @@ describe("Hinweistexte der neuen Pflichten", () => {
     );
   });
 
+  it("nennen den Weg der Nachforderung ehrlich: erst fordert HR an, dann kommt der Link (Paket 4)", () => {
+    // Frueher: „sie kommt auf Sie zu“ — ohne Weg, auf dem die Unterlage ins
+    // Portal kaeme. Jetzt der Ablauf in der richtigen Reihenfolge: HR fordert
+    // an, erst dann kommt die E-Mail mit dem persoenlichen Link. Kein Satz,
+    // der einen Link verspricht, der von selbst kaeme.
+    expect(NACHREICHEN_FOLGEN_HINWEIS).toContain(
+      "Die Personalabteilung fordert die fehlende Unterlage bei Ihnen an und schickt Ihnen dafür eine E-Mail mit einem persönlichen Link, über den Sie sie hochladen.",
+    );
+    expect(NACHREICHEN_FOLGEN_HINWEIS).not.toContain("kommt auf Sie zu");
+    // Zwei Links, zwei Namen: Tot ist nach dem Absenden der des Fragebogens.
+    expect(NACHREICHEN_FOLGEN_HINWEIS).toContain(
+      "Über den Link dieses Fragebogens können Sie nach dem Absenden nichts mehr hochladen",
+    );
+  });
+
   it("sind ueber PFLICHT_HINWEISE erreichbar — die Oberflaeche verzweigt nicht selbst", () => {
     expect(PFLICHT_HINWEISE.AUFENTHALTSTITEL).toBe(AUFENTHALTSTITEL_HINWEIS);
     expect(PFLICHT_HINWEISE.ARBEITSERLAUBNIS).toBe(ARBEITSERLAUBNIS_HINWEIS);

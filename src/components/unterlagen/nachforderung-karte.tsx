@@ -61,6 +61,7 @@ import {
   MELDUNGEN,
   type MailVerlaufEintrag,
   type NachforderungAnsicht,
+  type NachforderungDialogAnfrage,
   type NachforderungsAktionen,
   type PositionsAktionen,
   type UnterlagenDateiZeile,
@@ -74,12 +75,12 @@ import {
 // Typen
 // =============================================
 
-/** Was der Dialog „Unterlagen nachfordern…" (Schritt 10) zum Oeffnen braucht. */
-export interface NachforderungDialogAnfrage {
-  modus: "neu" | "ergaenzen";
-  /** Vorangekreuzte Arten; `null` = die Vorschlaege des Servers. */
-  vorauswahl: string[] | null;
-}
+/**
+ * Was der Dialog „Unterlagen nachfordern…" zum Oeffnen braucht — der Typ steht
+ * bei den reinen Regeln (src/lib/unterlagen.ts), weil auch Kasten und
+ * Warnbalken ihn dort bekommen (`offeneNachweiseAktion`, `warnbalkenAktion`).
+ */
+export type { NachforderungDialogAnfrage };
 
 /**
  * Meldung der letzten Aktion. `erfolg`/`fehler` zeigt `AktionsMeldungen`
@@ -110,8 +111,6 @@ export interface NachforderungKarteProps {
   onAktualisiert: () => void | Promise<unknown>;
   /** Oeffnet den Dialog „Unterlagen nachfordern…" bzw. „Unterlagen ergänzen…" (Schritt 10). */
   onNachfordern: (anfrage: NachforderungDialogAnfrage) => void;
-  /** Basis der HR-Routen; ohne Angabe die des Moduls (`unterlagenApiBasis`). */
-  apiBasis?: string;
   /** Nur fuer Tests: Bezugszeit (Sperrzeit „Link erneut senden", Ablauf-Warnung). */
   jetzt?: Date;
 }
@@ -122,8 +121,9 @@ export interface NachforderungKarteProps {
 
 /**
  * Basis der HR-Routen je Modul — dieselbe wie `apiBasis` im Modul-Baustein
- * (src/lib/unterlagen-onboarding.ts, Server). Stufe 2 traegt hier ihre Module
- * nach oder reicht `apiBasis` als Prop.
+ * (src/lib/unterlagen-onboarding.ts, Server). Nur noch Rueckfall fuer eine
+ * Uebersicht ohne `apiBasis` (die Route liefert sie seit Schritt 10 mit
+ * Bearbeitungsrecht immer); Stufe 2 braucht hier also keinen Eintrag mehr.
  */
 const API_BASIS: Readonly<Record<string, (vorgangId: string) => string>> = {
   ONBOARDING: (id) => `/api/onboarding/${id}/unterlagen`,
@@ -397,7 +397,6 @@ export function NachforderungKarte({
   darfAktionen,
   onAktualisiert,
   onNachfordern,
-  apiBasis,
   jetzt,
 }: NachforderungKarteProps) {
   const titelId = `${useId()}-unterlagen-titel`;
@@ -415,7 +414,9 @@ export function NachforderungKarte({
   // Knopf ist waehrend der Aktion gesperrt und nach einer Annahme verschwunden.
   const fokusNachAktion = useRef<{ ausloeser: HTMLElement | null; positionId: string } | null>(null);
 
-  const basis = apiBasis ?? unterlagenApiBasis(uebersicht.modul, vorgangId);
+  // Die Basis der Routen nennt der Server (`uebersicht.apiBasis`); die Tabelle
+  // des Moduls nur, wenn eine Uebersicht sie nicht traegt (wie der Dialog).
+  const basis = uebersicht.apiBasis ?? unterlagenApiBasis(uebersicht.modul, vorgangId);
   // Doppelt gesichert: Die Uebersicht laesst ohne Recht Aktionen und URLs weg,
   // und die Karte zeigt ohne Recht (oder ohne bekannte Route) keinen Knopf.
   const darf = darfAktionen && uebersicht.darfAktionen && basis !== null;
@@ -702,11 +703,10 @@ function NachforderungBlock({
 
   const zeigeErneut = a.erneutSenden || a.erneutSendenGesperrt;
   const fussKnoepfe = darf && (a.ergaenzen || a.fristAendern || zeigeErneut || a.zurueckziehen);
+  // Zwei Balkenteile wie im Mockup (P:1388): angenommen (gruen) und zu pruefen
+  // (gelb) — beide Anteile rechnet der Server.
   const prozent = balkenProzent(ansicht.fortschritt.anteil);
-  // Zweiter Balkenteil „zu prüfen" wie im Mockup (P:1388) — aus den Zaehlern
-  // des Servers, nur ins Bild gesetzt wie `anteil`.
-  const z = ansicht.zaehler;
-  const prozentZuPruefen = balkenProzent(z.gesamt > 0 ? z.zuPruefen / z.gesamt : 0);
+  const prozentZuPruefen = balkenProzent(ansicht.fortschritt.anteilZuPruefen);
 
   return (
     <div className="space-y-3" data-nachforderung={ansicht.id}>
@@ -715,12 +715,17 @@ function NachforderungBlock({
           {ansicht.kopfZeile}
         </p>
         {/* Die Frist samt Restlaufzeit nur bei der laufenden: Eine erledigte nimmt nichts
-            mehr an, „noch 5 Tage" fuehrte in die Irre. Eine eigene Zeile baut die Karte nicht. */}
-        {ansicht.status === "LAUFEND" && (
+            mehr an, „noch 5 Tage" fuehrte in die Irre. Fuer sie liefert der Server die
+            Ersatzzeile „Frist war …" — die Karte formuliert keine eigene. */}
+        {ansicht.status === "LAUFEND" ? (
           <p
             className={ansicht.fristVerstrichen ? "font-semibold text-credo-rot" : "text-foreground"}
             data-zeile="frist"
           >
+            {ansicht.fristZeile}
+          </p>
+        ) : (
+          <p className="text-muted-foreground" data-zeile="frist-ende">
             {ansicht.fristZeile}
           </p>
         )}
@@ -770,6 +775,17 @@ function NachforderungBlock({
           />
         ))}
       </ul>
+
+      {/* Eingestellter Vorgang: Warum Ergaenzen, Frist aendern, erneut senden und
+          Zurueckweisen fehlen — der Text kommt fertig vom Server. */}
+      {darf && ansicht.eingestelltHinweis && (
+        <p
+          className="rounded-lg border border-credo-gelb/50 bg-card px-3 py-2 text-xs text-amber-900"
+          data-hinweis="eingestellt"
+        >
+          {ansicht.eingestelltHinweis}
+        </p>
+      )}
 
       {fussKnoepfe && (
         <div className="space-y-1">

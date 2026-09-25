@@ -10,12 +10,11 @@
  *     Next.js 15 streamt die Metadaten fuer normale Browser in den Body
  *     (`<div hidden>` mit Suspense); das `<meta name="referrer">` greift also
  *     erst NACH den Anfragen aus dem `<head>` (Skripte, CSS, Schrift unter
- *     /_next/static). Fuer diese gilt der HTTP-Kopf der Middleware,
- *     `strict-origin-when-cross-origin` — an die eigene Domain heisst das:
- *     volle URL samt Token im Referer, und damit auch im Zugriffsprotokoll.
- *     Massgeblich ist deshalb der HTTP-Kopf: `Referrer-Policy: no-referrer`
- *     fuer `/unterlagen/` gehoert in die Middleware (offen, dort nachziehen).
- *     Nach aussen geht der Token nicht: Die Seite hat keine externen Links,
+ *     /_next/static). Massgeblich ist deshalb der HTTP-Kopf
+ *     `Referrer-Policy: no-referrer`, den die Middleware fuer `/unterlagen/`
+ *     setzt (src/middleware.ts) — sonst gaelte dort
+ *     `strict-origin-when-cross-origin`, an die eigene Domain also die volle
+ *     URL samt Token im Referer. Nach aussen geht der Token nicht: Die Seite hat keine externen Links,
  *     die Schrift liefert next/font selbst aus.
  *
  * CSP, X-Frame-Options und nosniff kommen weiter von der Middleware: Die

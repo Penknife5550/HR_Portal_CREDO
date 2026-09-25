@@ -3032,6 +3032,7 @@ async function uebersichtLaden<V extends UnterlagenVorgang>(
     vorgangEingestellt: v.eingestellt,
     darfAktionen,
     dateiUrl: (dateiId) => `${baustein.apiBasis(v.id)}/dateien/${dateiId}`,
+    apiBasis: baustein.apiBasis(v.id),
     dialog,
     jetzt,
   });

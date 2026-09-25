@@ -557,21 +557,27 @@ export const PFLICHT_HINWEISE: Record<string, string> = {
  * 1. **Das Absenden ist frei.** Ohne diese Zusage sucht jemand, der seinen Scan
  *    gerade nicht hat, den gesperrten Knopf — und bricht ab. Der Knopf ist gar
  *    nicht gesperrt.
- * 2. **Der Vorgang wird trotzdem als offen gefuehrt.** Sonst liest sich die
- *    Nachreichbarkeit wie ein Erlass. Die Pflicht bleibt, nur der Zeitpunkt
- *    verschiebt sich.
- * 3. **Der Link traegt danach nicht mehr.** Nach dem Absenden weist die
- *    Upload-Route den Magic Link ab (validateMagicToken ohne allowSubmitted).
- *    Wer das nicht weiss, legt die Unterlage beiseite mit dem Vorsatz, sie
- *    „nachher ueber den Link" zu schicken — und der Nachweis kommt nie.
+ * 2. **Der Vorgang wird trotzdem als offen gefuehrt — und wie es weitergeht.**
+ *    Sonst liest sich die Nachreichbarkeit wie ein Erlass. Die Pflicht bleibt,
+ *    nur der Zeitpunkt verschiebt sich. Seit Paket 4 („Unterlagen nachfordern")
+ *    gibt es dafuer einen Weg: HR fordert die Unterlage im Vorgang an, und erst
+ *    DANN kommt eine E-Mail mit einem eigenen Link. Der Satz sagt es in dieser
+ *    Reihenfolge — kein Versprechen eines Links, der automatisch kaeme.
+ * 3. **Der Fragebogen-Link traegt danach nicht mehr.** Nach dem Absenden weist
+ *    die Upload-Route den Magic Link ab (validateMagicToken ohne
+ *    allowSubmitted). Wer das nicht weiss, legt die Unterlage beiseite mit dem
+ *    Vorsatz, sie „nachher ueber den Link" zu schicken — und der Nachweis kommt
+ *    nie. Deshalb heisst er hier ausdruecklich „der Link dieses Fragebogens":
+ *    Es gibt jetzt zwei Links, und der zweite ist der der Nachforderung.
  */
 export const NACHREICHEN_FOLGEN_HINWEIS =
   "Sie können den Fragebogen absenden, auch wenn eine dieser Unterlagen noch " +
   "fehlt. Ihr Vorgang wird dann mit dem Vermerk „Nachweis offen“ an die " +
-  "Personalabteilung übergeben; sie kommt auf Sie zu und nimmt die Unterlage " +
-  "entgegen. Über diesen Link können Sie nach dem Absenden nichts mehr " +
-  "hochladen — was Sie jetzt schon zur Hand haben, laden Sie deshalb besser " +
-  "oben gleich hoch.";
+  "Personalabteilung übergeben. Die Personalabteilung fordert die fehlende " +
+  "Unterlage bei Ihnen an und schickt Ihnen dafür eine E-Mail mit einem " +
+  "persönlichen Link, über den Sie sie hochladen. Über den Link dieses " +
+  "Fragebogens können Sie nach dem Absenden nichts mehr hochladen — was Sie " +
+  "jetzt schon zur Hand haben, laden Sie deshalb besser oben gleich hoch.";
 
 // =============================================
 // Paket 4 „Unterlagen nachfordern"

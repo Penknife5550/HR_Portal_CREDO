@@ -321,6 +321,15 @@ describe("Zeilen aus der Übersicht des Servers", () => {
     ]);
   });
 
+  it("die Balkenteile lesen die Anteile des Servers, die Karte rechnet nicht selbst", () => {
+    const u = uebersicht();
+    const l = u.laufend!;
+    // Absichtlich andere Werte als die Zaehler hergaeben: Die Karte muss sie nehmen, wie sie kommen.
+    karte({ ...u, laufend: { ...l, fortschritt: { ...l.fortschritt, anteil: 0.5, anteilZuPruefen: 0.25 } } });
+    const teile = Array.from(document.querySelectorAll<HTMLElement>("[data-balken]")).map((el) => el.style.width);
+    expect(teile).toEqual(["50%", "25%"]);
+  });
+
   it("jede Zeile trägt genau die Texte des Servers, in seiner Reihenfolge", () => {
     const u = uebersicht();
     karte(u);
@@ -385,6 +394,35 @@ describe("Aktionen nur, wenn der Server sie erlaubt", () => {
     const fuss = document.querySelector('[data-block="fuss"]') as HTMLElement;
     expect(knoepfeIn(fuss)).toEqual(["Zurückziehen…"]);
     expect(knoepfeIn(zeile("p-at"))).toEqual(["Annehmen…", "Entfällt…"]);
+  });
+
+  it("eingestellter Vorgang: der Hinweis des Servers sagt, warum die Knöpfe fehlen", () => {
+    const u = uebersicht({ vorgangEingestellt: true });
+    karte(u);
+    const hinweis = document.querySelector('[data-hinweis="eingestellt"]') as HTMLElement;
+    expect(hinweis.textContent).toBe(u.laufend!.eingestelltHinweis);
+    // Derselbe Text wie die 409 dieser Aktionen — samt der Frist bis zum naechsten Lauf (Z2).
+    expect(hinweis.textContent).toBe(MELDUNGEN.HR_VORGANG_EINGESTELLT);
+    expect(hinweis.textContent).toContain("Bis zum nächsten täglichen Lauf");
+  });
+
+  it("ohne eingestellten Vorgang oder ohne Recht: kein solcher Hinweis", () => {
+    const ohne = karte(uebersicht());
+    expect(document.querySelector('[data-hinweis="eingestellt"]')).toBeNull();
+    ohne.unmount();
+    // Die Uebersicht MIT Recht, die Seite ohne: kein Hinweis auf Knoepfe, die es ohnehin nicht gibt.
+    karte(uebersicht({ vorgangEingestellt: true }), { darfAktionen: false });
+    expect(document.querySelector('[data-hinweis="eingestellt"]')).toBeNull();
+  });
+
+  it("die Routen kommen aus der Übersicht des Servers (`apiBasis`)", async () => {
+    const f = fetchMit(200, { meldung: "Die Unterlage ist angenommen." });
+    const u = { ...uebersicht({ nachforderungen: [nachforderung({ positionen: [RV, TITEL, MASERN, PKV] })] }), apiBasis: "/api/modul-x/vg-1/unterlagen" };
+    karte(u);
+    await act(async () => {
+      fireEvent.click(within(zeile("p-pkv")).getByRole("button", { name: "Annehmen – PKV-Nachweis" }));
+    });
+    expect((f.mock.calls[0] as unknown as [string])[0]).toBe("/api/modul-x/vg-1/unterlagen/positionen/p-pkv");
   });
 
   it("gleichlautende Knöpfe nennen ihre Unterlage für Screenreader", () => {
@@ -822,8 +860,10 @@ describe("Ohne laufende Nachforderung", () => {
     expect(summary.textContent).toContain("Erledigt am 18.09.2026");
     // `display: list-item` bleibt (Tailwind-Preflight), sonst fehlt das Aufklapp-Dreieck.
     expect(summary.classList.contains("flex")).toBe(false);
-    // Die Restlaufzeit einer erledigten („noch 5 Tage") fuehrte in die Irre.
+    // Die Restlaufzeit einer erledigten („noch 5 Tage") fuehrte in die Irre —
+    // statt ihrer steht die Ersatzzeile des Servers da.
     expect(details.querySelector('[data-zeile="frist"]')).toBeNull();
+    expect(details.querySelector('[data-zeile="frist-ende"]')?.textContent).toBe("Frist war Samstag, 26.09.2026");
     expect(within(details).getByRole("button", { name: "Annahme zurücknehmen – Unterschriebener RV-Antrag" })).toBeTruthy();
     // Daneben der Knopf fuer eine neue Nachforderung.
     expect(screen.getByRole("button", { name: "Unterlagen nachfordern…" })).toBeTruthy();

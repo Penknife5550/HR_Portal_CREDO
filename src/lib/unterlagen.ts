@@ -330,9 +330,17 @@ export const MELDUNGEN = {
     "Für diesen Vorgang läuft bereits eine Nachforderung. Weitere Unterlagen fordern Sie dort mit „Unterlagen ergänzen…“ an.",
   NICHT_LAUFEND: "Die Nachforderung läuft nicht mehr.",
   NICHT_ABSCHLIESSBAR: "Es sind noch nicht alle Unterlagen angenommen oder entfallen.",
-  /** 409 (EP-3): Anlegen, Ergaenzen, Frist aendern, erneut senden, Zurueckweisen. Nennt, was bleibt. */
+  /**
+   * 409 (EP-3): Anlegen, Ergaenzen, Frist aendern, erneut senden, Zurueckweisen —
+   * und derselbe Text als Hinweis der Karte bei einer laufenden Nachforderung
+   * (`eingestelltHinweis`), damit HR die fehlenden Knoepfe nicht fuer einen
+   * Fehler haelt. EIN Text fuer beides: Zwei Texte ueber dieselbe Sache gingen
+   * auseinander. Nennt, was bleibt — und wie lange: Der naechste taegliche Lauf
+   * zieht die Nachforderung zurueck (Z2); danach laesst sich nichts mehr
+   * annehmen, und wer die Pruefung aufschiebt, verliert die eingereichten Dateien.
+   */
   HR_VORGANG_EINGESTELLT:
-    "Der Vorgang wird nicht mehr bearbeitet. E-Mails an die Person sind nicht mehr möglich – Unterlagen lassen sich nur noch annehmen, als entfallen vermerken oder eine Annahme zurücknehmen; die Nachforderung lässt sich nur noch zurückziehen.",
+    "Der Vorgang wird nicht mehr bearbeitet. E-Mails an die Person sind nicht mehr möglich. Deshalb können Sie keine Unterlagen mehr ergänzen oder zurückweisen, die Frist nicht mehr ändern und den Link nicht erneut senden. Bis zum nächsten täglichen Lauf können Sie eingegangene Unterlagen noch annehmen, Unterlagen als entfallen vermerken, eine Annahme zurücknehmen oder die Nachforderung zurückziehen. Danach zieht der Lauf die Nachforderung von selbst zurück, und ungeprüfte Dateien werden nach 30 Tagen gelöscht.",
   /** 409: prozesslokale Sperre je Vorgang (Abschnitt 7). */
   AKTION_LAEUFT: "Gerade läuft eine andere Aktion für diesen Vorgang. Bitte versuchen Sie es in einem Moment erneut.",
   EMPFAENGER_NICHT_FREIGEGEBEN:
@@ -1928,7 +1936,11 @@ export interface NachforderungAnsicht {
   empfaengerAbweichend: boolean;
   frist: Kalendertag;
   fristLang: string;
-  /** „Frist: Freitag, 26.09.2026 · noch 5 Tage" */
+  /**
+   * LAUFEND: „Frist: Freitag, 26.09.2026 · noch 5 Tage". Erledigt oder
+   * zurueckgezogen die Ersatzzeile „Frist war Freitag, 26.09.2026" — ohne
+   * Restlaufzeit, die fuer eine abgeschlossene Nachforderung in die Irre fuehrte.
+   */
   fristZeile: string;
   /** „Frist verstrichen" nach 2.1: LAUFEND, heute > Frist und noch etwas wartet auf die Person. */
   fristVerstrichen: boolean;
@@ -1937,8 +1949,12 @@ export interface NachforderungAnsicht {
   linkAbgelaufen: boolean;
   nachricht: string | null;
   zaehler: UnterlagenZaehler;
-  /** Balken (0 bis 1) und „1 von 3 angenommen · 1 zu prüfen · 1 offen". */
-  fortschritt: { anteil: number; text: string };
+  /**
+   * Balken und „1 von 3 angenommen · 1 zu prüfen · 1 offen". `anteil` ist der
+   * gruene Teil (angenommen), `anteilZuPruefen` der gelbe daneben (P:1388) —
+   * beide 0 bis 1, beide bezogen auf `zaehler.gesamt`.
+   */
+  fortschritt: { anteil: number; anteilZuPruefen: number; text: string };
   positionen: UnterlagenPositionZeile[];
   /** „E-Mails an die Person: Aufforderung 12.09. · Zurückweisung 16.09." (leer ohne Mail). */
   mailVerlaufText: string;
@@ -1949,6 +1965,13 @@ export interface NachforderungAnsicht {
   hrMeldungHinweis: string | null;
   /** „Erledigt am 20.09.2026" bzw. „Zurückgezogen am …". */
   abschlussText: string | null;
+  /**
+   * LAUFEND bei eingestelltem Vorgang (EP-3), nur mit Bearbeitungsrecht: warum
+   * Ergaenzen, Frist aendern, erneut senden und Zurueckweisen fehlen und wie
+   * lange der Rest noch geht (`MELDUNGEN.HR_VORGANG_EINGESTELLT`, derselbe Text
+   * wie die 409 dieser Aktionen). Sonst null.
+   */
+  eingestelltHinweis: string | null;
   aktionen: NachforderungsAktionen;
   sperreBis: string | null;
   /** Fuer die Dialoge (EP-1, EP-5). */
@@ -2012,11 +2035,19 @@ export interface DokumentHerkunft {
 /**
  * Die Uebersicht in `GET /api/onboarding/[id]` (Feld `unterlagen`). Karte,
  * Kasten „Offene Nachweise", Warnbalken, Reiter-Pille und Mini-Karte lesen nur
- * hieraus — die Oberflaeche rechnet nichts selbst (10.1).
+ * hieraus (Kasten und Warnbalken ueber `offeneNachweiseAktion` bzw.
+ * `warnbalkenAktion`) — die Oberflaeche rechnet nichts selbst (10.1).
  */
 export interface UnterlagenUebersicht {
   modul: string;
   darfAktionen: boolean;
+  /**
+   * Basis der HR-Routen des Moduls (Modul-Baustein `apiBasis`, Onboarding
+   * `/api/onboarding/<id>/unterlagen`) — Karte und Dialog bauen daraus ihre
+   * Aufrufe, statt die Routen je Modul selbst zu kennen. Nur mit
+   * Bearbeitungsrecht; ohne gibt es nichts aufzurufen.
+   */
+  apiBasis: string | null;
   /** Knopf „Unterlagen nachfordern…" — nur ohne laufende Nachforderung. */
   anfordern: {
     moeglich: boolean;
@@ -2038,6 +2069,138 @@ export interface UnterlagenUebersicht {
   laufHinweis: string | null;
   /** Daten der Dialoge aus dem Modul-Baustein; `null` ohne Bearbeitungsrecht oder ohne Angabe. */
   dialog: UnterlagenDialogDaten | null;
+}
+
+// =============================================
+// Der Weg zur Nachforderung ausserhalb der Karte (Kasten, Warnbalken; P:1285)
+// =============================================
+
+/** Womit ein Knopf den Dialog „Unterlagen nachfordern…"/„Unterlagen ergänzen…" oeffnet. */
+export interface NachforderungDialogAnfrage {
+  modus: "neu" | "ergaenzen";
+  /**
+   * Katalogarten, die der Dialog ZUSAETZLICH zu seinen Vorschlaegen ankreuzt;
+   * `null` = nur die Vorschlaege. Vorschlaege sind die offenen Nachweise
+   * (`dialog.auswahl[].vorgeschlagen`, 10.1) — beim Ergaenzen nur die, die noch
+   * nicht in der laufenden Nachforderung stehen. Eine dort entfallene Art kreuzt
+   * der Dialog nur ueber diese Liste an („wieder anfordern" auf Zuruf).
+   */
+  vorauswahl: string[] | null;
+}
+
+/**
+ * Was der Kasten „Offene Nachweise" bzw. der Warnbalken zur Nachforderung
+ * anbietet. Die Beschriftungen setzt die Oberflaeche; ob etwas geht, sagt nur
+ * die Uebersicht des Servers (`anfordern`, `laufend.aktionen`, `typen`) — kein
+ * Knopf, den die Route mit 409 ablehnte, und kein Satz, der zu einer Aktion
+ * auffordert, die es fuer diesen Vorgang oder diese Rolle nicht gibt.
+ */
+export interface NachweisAktion {
+  /** Schreibender Knopf: oeffnet den Dialog. Nur mit Recht und wenn der Server die Aktion ausfuehrt. */
+  anfrage: NachforderungDialogAnfrage | null;
+  /** „Zur Nachforderung": Es laeuft eine — auch ohne Recht, das ist nur ein Sprung zur Karte. */
+  zurNachforderung: boolean;
+  /**
+   * Laesst sich die Aufforderung befolgen („Mit „Unterlagen nachfordern“
+   * schicken Sie …", P:1285)? Mit Recht, und entweder laesst sich anfordern
+   * bzw. ergaenzen, oder eine Nachforderung laeuft bei nicht eingestelltem
+   * Vorgang (EP-3). Sonst steht der Satz nicht da.
+   */
+  aufforderung: boolean;
+  /**
+   * Mit Recht, ohne laufende, aber nicht moeglich: der Grund des Servers im
+   * Klartext (`anfordern.grund`, etwa ein eingestellter Vorgang). Sonst null.
+   */
+  grund: string | null;
+}
+
+const KEINE_NACHWEIS_AKTION: NachweisAktion = { anfrage: null, zurNachforderung: false, aufforderung: false, grund: null };
+
+/** Ohne laufende Nachforderung: Anfordern mit `arten` vorangekreuzt, sonst der Grund. */
+function neueNachforderungAktion(arten: readonly string[], u: UnterlagenUebersicht): NachweisAktion {
+  const anfrage: NachforderungDialogAnfrage | null =
+    u.darfAktionen && u.anfordern.moeglich ? { modus: "neu", vorauswahl: [...arten] } : null;
+  return {
+    anfrage,
+    zurNachforderung: false,
+    aufforderung: anfrage !== null,
+    grund: u.darfAktionen && !u.anfordern.moeglich ? u.anfordern.grund : null,
+  };
+}
+
+/**
+ * Die Knoepfe des Kastens „Offene Nachweise" (P:1285, Feinplanung 10.2 und 13).
+ *
+ * - Ohne laufende Nachforderung: „Unterlagen nachfordern…" mit GENAU den
+ *   offenen Arten — dieselben, die der Dialog als Vorschlaege ankreuzt, auch
+ *   eine, die in einer frueheren Nachforderung als entfallen vermerkt ist: Sie
+ *   ist weiter Pflicht und offen, der Kasten nennt ihren Stand, und HR waehlt
+ *   sie im Dialog ab, wenn es dabei bleibt.
+ * - Mit laufender: „Zur Nachforderung"; stehen offene Arten noch NICHT in ihr,
+ *   dazu „Ergänzen…" mit genau diesen (die Vorschlaege des Dialogs beim
+ *   Ergaenzen). Eine in der laufenden entfallene Art kreuzt der Knopf nicht an:
+ *   Diese Entscheidung hat HR gerade erst getroffen; wieder anfordern laesst
+ *   sie sich im Dialog.
+ * - Ohne offene Pflichtunterlage (nur die Nachfrage nach dem Ablaufdatum) hat
+ *   der Kasten mit der Nachforderung nichts zu tun.
+ */
+export function offeneNachweiseAktion(
+  offen: readonly string[],
+  u: UnterlagenUebersicht | null | undefined,
+): NachweisAktion {
+  if (!u || offen.length === 0) return KEINE_NACHWEIS_AKTION;
+  const { laufend, typen } = u;
+  if (!laufend) return neueNachforderungAktion(offen, u);
+
+  const fehlend = offen.filter((typ) => !typen[typ]?.laufend);
+  return {
+    anfrage:
+      u.darfAktionen && laufend.aktionen.ergaenzen && fehlend.length > 0
+        ? { modus: "ergaenzen", vorauswahl: fehlend }
+        : null,
+    zurNachforderung: true,
+    // Frist aendern geht genau dann, wenn die laufende bei nicht eingestelltem
+    // Vorgang mit Recht bearbeitet werden kann.
+    aufforderung: u.darfAktionen && laufend.aktionen.fristAendern,
+    grund: null,
+  };
+}
+
+/**
+ * Die Knoepfe des Warnbalkens (abgelaufener bzw. bald ablaufender Nachweis):
+ * „Verlängerten Nachweis anfordern…" mit `arten` vorangekreuzt.
+ *
+ * - Ohne laufende Nachforderung: neu. Der Dialog kreuzt dazu seine Vorschlaege
+ *   an, die offenen Nachweise (10.1) — gewollt: Die Mail an die Person nennt
+ *   dann alles, was fehlt; HR kann abwaehlen.
+ * - Mit laufender: „Zur Nachforderung"; stehen die Arten dort noch nicht oder
+ *   nur als entfallen, dazu derselbe Knopf als Ergaenzung. Anders als im
+ *   Kasten kreuzt er eine entfallene Art an: Der abgelaufene Nachweis ist der
+ *   ausdrueckliche Anlass, sie wieder anzufordern. Eine dort schon angeforderte,
+ *   eingegangene oder angenommene Art fordert er nicht erneut an; den Weg dazu
+ *   nennt der Dialog.
+ */
+export function warnbalkenAktion(
+  arten: readonly string[],
+  u: UnterlagenUebersicht | null | undefined,
+): NachweisAktion {
+  if (!u || arten.length === 0) return KEINE_NACHWEIS_AKTION;
+  const { laufend, typen } = u;
+  if (!laufend) return neueNachforderungAktion(arten, u);
+
+  const fehlend = arten.filter((typ) => {
+    const stand = typen[typ];
+    return !stand || !stand.laufend || stand.status === "ENTFAELLT";
+  });
+  return {
+    anfrage:
+      u.darfAktionen && laufend.aktionen.ergaenzen && fehlend.length > 0
+        ? { modus: "ergaenzen", vorauswahl: fehlend }
+        : null,
+    zurNachforderung: true,
+    aufforderung: u.darfAktionen && laufend.aktionen.fristAendern,
+    grund: null,
+  };
 }
 
 export const ANLASS_LABELS: Readonly<Record<LinkAnlass, string>> = {
@@ -2241,6 +2404,11 @@ function nachforderungAnsichtBauen(
   if (status === "ERLEDIGT") abschlussText = `Erledigt am ${datumText(n.erledigtAm)}`;
   else if (status === "ZURUECKGEZOGEN") abschlussText = `Zurückgezogen am ${datumText(n.zurueckgezogenAm)}`;
 
+  // Die Restlaufzeit gilt nur fuer die laufende; eine abgeschlossene nennt nur
+  // noch, welche Frist sie hatte.
+  const fristZeile =
+    status === "LAUFEND" ? `Frist: ${fristText(frist, ctx.heute)}` : `Frist war ${formatKalendertagLang(frist)}`;
+
   return {
     id: n.id,
     modul: n.modul,
@@ -2251,19 +2419,26 @@ function nachforderungAnsichtBauen(
     empfaengerAbweichend: n.empfaengerAbweichend,
     frist,
     fristLang: formatKalendertagLang(frist),
-    fristZeile: `Frist: ${fristText(frist, ctx.heute)}`,
+    fristZeile,
     fristVerstrichen,
     linkende: ende,
     linkAbgelaufen: ctx.heute > ende,
     nachricht: n.nachricht?.trim() || null,
     zaehler: z,
-    fortschritt: { anteil: z.gesamt > 0 ? z.angenommen / z.gesamt : 0, text: fortschrittText(z) },
+    fortschritt: {
+      anteil: z.gesamt > 0 ? z.angenommen / z.gesamt : 0,
+      anteilZuPruefen: z.gesamt > 0 ? z.zuPruefen / z.gesamt : 0,
+      text: fortschrittText(z),
+    },
     positionen,
     mailVerlaufText: mails.text,
     mailVerlauf: mails.eintraege,
     mailHinweis: mails.hinweis,
     hrMeldungHinweis: n.hrMeldungOhneEmpfaenger ? MELDUNGEN.HR_MELDUNG_OHNE_EMPFAENGER : null,
     abschlussText,
+    // Nur, wer die Knoepfe sonst saehe, braucht die Erklaerung, warum sie fehlen.
+    eingestelltHinweis:
+      status === "LAUFEND" && ctx.vorgangEingestellt && ctx.darfAktionen ? MELDUNGEN.HR_VORGANG_EINGESTELLT : null,
     aktionen: erlaubt.nachforderung,
     sperreBis: erlaubt.sperreBis,
     dialog: {
@@ -2283,7 +2458,9 @@ function nachforderungAnsichtBauen(
  * - `anfordern`: der Knopf „Unterlagen nachfordern…" — nur mit Recht, ohne
  *   laufende und wenn der Modul-Baustein den Vorgang `verfuegbar` nennt; sonst
  *   der Grund im Klartext (wie `abteilungen-karte.tsx`).
- * - Datei-URLs, Dateinamen und Aktionen nur mit `darfAktionen` (EP-14, SI-K4).
+ * - Datei-URLs, Dateinamen, Aktionen und `apiBasis` nur mit `darfAktionen`
+ *   (EP-14, SI-K4). Mit Recht erklaert `eingestelltHinweis` bei einem
+ *   eingestellten Vorgang, warum Knoepfe fehlen.
  * - Eine zurueckgezogene Nachforderung werten Pille, Kurzstand und
  *   `nachweisStandText` nie aus (2.2); ihre uebernommenen Dokumente behalten
  *   aber ihre Herkunft, und der Waechter prueft auch ihre Loeschungen.
@@ -2299,6 +2476,8 @@ export function uebersichtBauen(opts: {
   darfAktionen: boolean;
   /** Baut die URL der HR-Dateiroute zu einer Datei-Id. */
   dateiUrl: (dateiId: string) => string;
+  /** Basis der HR-Routen aus dem Modul-Baustein; nur mit `darfAktionen` weitergegeben. */
+  apiBasis?: string | null;
   /** Auswahl und Adressvorschlaege aus dem Modul-Baustein; nur mit `darfAktionen` weitergegeben. */
   dialog?: UnterlagenDialogDaten | null;
   jetzt: Date;
@@ -2399,6 +2578,7 @@ export function uebersichtBauen(opts: {
   return {
     modul: opts.modul,
     darfAktionen: opts.darfAktionen,
+    apiBasis: opts.darfAktionen ? (opts.apiBasis ?? null) : null,
     anfordern,
     laufend,
     zuletztErledigt,

@@ -23,15 +23,46 @@
  *  4. Er schweigt vor der Abgabe — und zwar mit BEIDEN Haelften. Solange der
  *     Fragebogen offen ist, fragt das Formular selbst nach Unterlage und
  *     Ablaufdatum; HR hat dort nichts zu tun.
+ *  5. Paket 4 („Unterlagen nachfordern"): der neue Satz statt der alten
+ *     Zusage — nur, wo er sich befolgen laesst (sonst der Grund bzw. ohne
+ *     Recht ein Satz ueber die Personalabteilung) —, je Nachweis der Stand der
+ *     Nachforderung (`nachweisStandText`), die Knoepfe je Recht und Stand —
+ *     „Unterlagen nachfordern…" bekommt genau die offenen Arten, „Ergänzen…"
+ *     nur die noch nicht angeforderten, „Zur Nachforderung" springt zur Karte.
+ *     Dazu der Warnbalken mit „Verlängerten Nachweis anfordern…".
+ *  6. Was davon im ECHTEN Dialog angekreuzt ist (`vorauswahl` kreuzt dort
+ *     zusaetzlich zu den Vorschlaegen an).
+ *
+ * Die Uebersicht der Nachforderung entsteht mit der ECHTEN Regel des Servers
+ * (`uebersichtBauen`), die Knopfregeln kommen aus src/lib/unterlagen.ts
+ * (`offeneNachweiseAktion`, `warnbalkenAktion`, dort eigens getestet) — der
+ * Kasten rechnet nichts selbst.
  *
  * Umgebung wie in dokumentenpaket-dialog.test.tsx: jsdom im Docblock
  * (jest.config.ts bleibt global auf "node"), ohne @testing-library/jest-dom.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import {
+  NachweisFristenWarnung,
   OffeneNachweiseKasten,
+  verlaengerungVorauswahl,
   type DetailData,
 } from "@/app/(portal)/dashboard/[id]/detail-content";
+import { NachforderungDialog } from "@/components/unterlagen/nachforderung-dialog";
+import { documentTypeLabel } from "@/lib/required-documents";
+import {
+  uebersichtBauen,
+  type AuswahlEintrag,
+  type NachforderungDialogAnfrage,
+  type NachforderungEingabe,
+  type PositionEingabe,
+  type UnterlagenDialogDaten,
+  type UnterlagenUebersicht,
+} from "@/lib/unterlagen";
+
+// React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf
+// (der echte Dialog setzt beim Oeffnen den Fokus).
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // =============================================
 // Testdaten
@@ -230,8 +261,15 @@ describe("Offene Nachweise: fehlendes Ablaufdatum", () => {
     const text = document.body.textContent ?? "";
     expect(text).toContain("kein Ablaufdatum erfasst");
     // Die unbefristete Niederlassungserlaubnis ist ein legitimer Grund fuer das
-    // leere Feld. Steht das nicht da, liest sie sich als Ruege.
+    // leere Feld. Steht das nicht da, liest sie sich als Ruege — und seit Z1
+    // steht der Weg dabei, sie als solche zu kennzeichnen.
     expect(text).toContain("Niederlassungserlaubnis");
+    expect(text).toContain(
+      "Ist der Nachweis unbefristet (etwa eine Niederlassungserlaubnis), klicken Sie an der Unterlage im Reiter „Dokumente“ auf „Unbefristet“",
+    );
+    // Der alte Satz behauptete, das leere Feld sei „richtig so" — der alte,
+    // befristete Titel blieb dann aber massgeblich (Z1).
+    expect(text).not.toContain("richtig so");
   });
 
   /**
@@ -387,5 +425,502 @@ describe("Offene Nachweise: ausdrücklich unbefristeter Nachweis", () => {
 
     expect(screen.queryByText("Aufenthaltstitel")).not.toBeNull();
     expect(document.body.textContent ?? "").toContain("kein Ablaufdatum erfasst");
+  });
+});
+
+// =============================================
+// 4. Paket 4: Stand je Nachweis und der Weg zur Nachforderung
+// =============================================
+
+/** Montag, 21.09.2026, 12:00 Uhr deutscher Zeit. */
+const JETZT = new Date("2026-09-21T10:00:00.000Z");
+
+/** Abgegeben, privat versichert, Titel erforderlich: vier offene Nachweise. */
+const VIER_OFFEN = {
+  personalData: {
+    birthDate: "1990-05-03",
+    children: [],
+    rvEntscheidung: null,
+    aufenthaltstitelErforderlich: true,
+    healthInsuranceType: "privat",
+  },
+};
+const VIER_OFFENE_ARTEN = ["MASERNSCHUTZ", "AUFENTHALTSTITEL", "ARBEITSERLAUBNIS", "PKV_NACHWEIS"];
+
+function position(teil: Partial<PositionEingabe> & { id: string; typ: string }): PositionEingabe {
+  return {
+    reihenfolge: 0,
+    bezeichnung: teil.typ,
+    hinweis: null,
+    originalErforderlich: false,
+    sensibel: false,
+    fristpflichtig: false,
+    status: "ANGEFORDERT",
+    einreichungen: 0,
+    gueltigBisAngabe: null,
+    angefordertAm: "2026-09-12T08:00:00.000Z",
+    uebermitteltAm: null,
+    begruendung: null,
+    entfaelltNotiz: null,
+    entschiedenAm: null,
+    entschiedenVonName: null,
+    dateien: [],
+    ...teil,
+  };
+}
+
+function nachforderung(teil: Partial<NachforderungEingabe> = {}): NachforderungEingabe {
+  return {
+    id: "nf-1",
+    modul: "ONBOARDING",
+    status: "LAUFEND",
+    empfaenger: "anna.beispiel@example.org",
+    empfaengerAbweichend: false,
+    frist: new Date("2026-09-26T00:00:00.000Z"),
+    nachricht: null,
+    angefordertAm: "2026-09-12T08:00:00.000Z",
+    angefordertVonName: "Erika Muster",
+    erinnertFuerFrist: null,
+    erinnertStufe: null,
+    erledigtAm: null,
+    zurueckgezogenAm: null,
+    positionen: [],
+    links: [],
+    ...teil,
+  };
+}
+
+/** Masernschutz eingereicht, Aufenthaltstitel angefordert — der Stand aus P:1285. */
+const LAUFEND_ZWEI = nachforderung({
+  positionen: [
+    position({
+      id: "p-ms",
+      typ: "MASERNSCHUTZ",
+      status: "EINGEREICHT",
+      einreichungen: 1,
+      uebermitteltAm: "2026-09-15T08:00:00.000Z",
+    }),
+    position({ id: "p-at", typ: "AUFENTHALTSTITEL", reihenfolge: 1 }),
+  ],
+});
+
+function uebersicht(
+  opts: {
+    nachforderungen?: NachforderungEingabe[];
+    darfAktionen?: boolean;
+    verfuegbar?: { ok: true } | { ok: false; grund: string };
+    vorgangEingestellt?: boolean;
+    dialog?: UnterlagenDialogDaten | null;
+  } = {},
+): UnterlagenUebersicht {
+  return uebersichtBauen({
+    modul: "ONBOARDING",
+    nachforderungen: opts.nachforderungen ?? [],
+    verfuegbar: opts.verfuegbar ?? { ok: true },
+    vorgangEingestellt: opts.vorgangEingestellt ?? false,
+    darfAktionen: opts.darfAktionen ?? true,
+    dateiUrl: (id) => `/api/onboarding/v1/unterlagen/dateien/${id}`,
+    apiBasis: "/api/onboarding/v1/unterlagen",
+    dialog: opts.dialog ?? null,
+    jetzt: JETZT,
+  });
+}
+
+const kastenKnoepfe = () =>
+  Array.from(document.querySelectorAll('[data-block="kasten-knoepfe"] button')).map((b) => b.textContent);
+const zeileVon = (typ: string) => document.querySelector(`[data-nachweis="${typ}"]`)?.textContent;
+const kastenSatz = () => document.querySelector('[data-zeile="kasten-satz"]')?.textContent ?? "";
+
+const SATZ_P1285 =
+  "Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie genau diese Nachweise hochlädt.";
+const SATZ_OHNE_RECHT = "Die Personalabteilung kann sie über „Unterlagen nachfordern“ bei der Person anfordern.";
+const GRUND_EINGESTELLT =
+  "Der Vorgang ist abgelaufen und wird nicht mehr bearbeitet. Unterlagen lassen sich nicht mehr nachfordern.";
+
+/** Eine aeltere, erledigte Nachforderung: Die Arbeitserlaubnis ist dort als entfallen vermerkt. */
+const ERLEDIGT_AE_ENTFALLEN = nachforderung({
+  id: "nf-alt",
+  status: "ERLEDIGT",
+  angefordertAm: "2026-09-01T08:00:00.000Z",
+  erledigtAm: "2026-09-10T08:00:00.000Z",
+  positionen: [
+    position({ id: "p-ae", typ: "ARBEITSERLAUBNIS", status: "ENTFAELLT", entschiedenAm: "2026-09-10T08:00:00.000Z" }),
+  ],
+});
+
+describe("Offene Nachweise: Paket 4 — Text, Stand, Knöpfe", () => {
+  test("mit Recht der neue Satz aus P:1285 statt der Zusage des Fragebogens", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ unterlagen: uebersicht() })}
+        onZuDenDokumenten={null}
+        onNachfordern={jest.fn()}
+      />,
+    );
+    expect(kastenSatz()).toBe(
+      `Diese Pflichtunterlagen durften nachgereicht werden und liegen bis heute nicht vor. ${SATZ_P1285}`,
+    );
+    expect(document.body.textContent).not.toContain("Der Fragebogen hat zugesagt");
+  });
+
+  test("ohne Recht (oder ohne Übersicht) keine Aufforderung an „Sie“, sondern ein Satz über die Personalabteilung", () => {
+    const ohneRecht = render(
+      <OffeneNachweiseKasten
+        data={vorgang({ unterlagen: uebersicht({ darfAktionen: false }) })}
+        onZuDenDokumenten={null}
+        onNachfordern={null}
+      />,
+    );
+    expect(kastenSatz()).toContain(SATZ_OHNE_RECHT);
+    expect(kastenSatz()).not.toContain("schicken Sie");
+    ohneRecht.unmount();
+
+    render(<OffeneNachweiseKasten data={vorgang()} onZuDenDokumenten={null} />);
+    expect(kastenSatz()).toContain(SATZ_OHNE_RECHT);
+    expect(document.body.textContent).not.toContain("Der Fragebogen hat zugesagt");
+  });
+
+  test("eingestellter Vorgang (EXPIRED): kein Verweis auf eine gesperrte Aktion, sondern der Grund", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({
+          status: "EXPIRED",
+          unterlagen: uebersicht({ verfuegbar: { ok: false, grund: GRUND_EINGESTELLT }, vorgangEingestellt: true }),
+        })}
+        onZuDenDokumenten={jest.fn()}
+        onNachfordern={jest.fn()}
+      />,
+    );
+    expect(kastenSatz()).toContain(GRUND_EINGESTELLT);
+    expect(kastenSatz()).not.toContain("schicken Sie");
+    expect(kastenKnoepfe()).toEqual(["Zu den Dokumenten"]);
+  });
+
+  test("eingestellter Vorgang mit laufender Nachforderung: nur der Sprung, keine Aufforderung", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({
+          ...VIER_OFFEN,
+          status: "EXPIRED",
+          unterlagen: uebersicht({ nachforderungen: [LAUFEND_ZWEI], vorgangEingestellt: true }),
+        })}
+        onZuDenDokumenten={null}
+        onNachfordern={jest.fn()}
+        onZurNachforderung={jest.fn()}
+      />,
+    );
+    expect(kastenSatz()).toBe("Diese Pflichtunterlagen durften nachgereicht werden und liegen bis heute nicht vor.");
+    expect(kastenKnoepfe()).toEqual(["Zur Nachforderung"]);
+  });
+
+  test("je Nachweis der Stand der laufenden Nachforderung (P:1285)", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...VIER_OFFEN, unterlagen: uebersicht({ nachforderungen: [LAUFEND_ZWEI] }) })}
+        onZuDenDokumenten={null}
+      />,
+    );
+    expect(zeileVon("MASERNSCHUTZ")).toBe("Masernschutz-Nachweis — eingegangen, bitte prüfen");
+    expect(zeileVon("AUFENTHALTSTITEL")).toBe("Aufenthaltstitel — angefordert am 12.09.2026, Frist 26.09.2026");
+    // Nicht angefordert: nur die Bezeichnung.
+    expect(zeileVon("PKV_NACHWEIS")).toBe("Nachweis private Krankenversicherung");
+    // Die Bezeichnung bleibt ein eigenes Element — frueher suchten Tests (und Leser) genau sie.
+    expect(screen.queryByText("Masernschutz-Nachweis")).not.toBeNull();
+  });
+
+  test("ohne Übersicht (ältere Antwort): Zeilen wie bisher, keine Nachforderungs-Knöpfe", () => {
+    const onNachfordern = jest.fn();
+    render(<OffeneNachweiseKasten data={vorgang()} onZuDenDokumenten={null} onNachfordern={onNachfordern} />);
+    expect(zeileVon("MASERNSCHUTZ")).toBe("Masernschutz-Nachweis");
+    expect(kastenKnoepfe()).toEqual([]);
+  });
+
+  test("ohne laufende Nachforderung: „Unterlagen nachfordern…“ bekommt genau die offenen Arten", () => {
+    const onNachfordern = jest.fn();
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...VIER_OFFEN, unterlagen: uebersicht() })}
+        onZuDenDokumenten={jest.fn()}
+        onNachfordern={onNachfordern}
+        onZurNachforderung={jest.fn()}
+      />,
+    );
+    expect(kastenKnoepfe()).toEqual(["Unterlagen nachfordern…", "Zu den Dokumenten"]);
+    fireEvent.click(screen.getByRole("button", { name: "Unterlagen nachfordern…" }));
+    expect(onNachfordern).toHaveBeenCalledTimes(1);
+    expect(onNachfordern).toHaveBeenCalledWith({ modus: "neu", vorauswahl: VIER_OFFENE_ARTEN });
+  });
+
+  test("ohne Bearbeitungsrecht: kein schreibender Knopf — weder ohne Rückruf noch ohne Recht in der Übersicht", () => {
+    const ohneRueckruf = render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...VIER_OFFEN, unterlagen: uebersicht() })}
+        onZuDenDokumenten={jest.fn()}
+        onNachfordern={null}
+      />,
+    );
+    expect(kastenKnoepfe()).toEqual(["Zu den Dokumenten"]);
+    ohneRueckruf.unmount();
+
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...VIER_OFFEN, unterlagen: uebersicht({ darfAktionen: false }) })}
+        onZuDenDokumenten={jest.fn()}
+        onNachfordern={jest.fn()}
+      />,
+    );
+    expect(kastenKnoepfe()).toEqual(["Zu den Dokumenten"]);
+  });
+
+  test("laufende Nachforderung: „Ergänzen…“ nur mit den noch nicht angeforderten Arten, dazu „Zur Nachforderung“", () => {
+    const onNachfordern = jest.fn();
+    const onZurNachforderung = jest.fn();
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...VIER_OFFEN, unterlagen: uebersicht({ nachforderungen: [LAUFEND_ZWEI] }) })}
+        onZuDenDokumenten={null}
+        onNachfordern={onNachfordern}
+        onZurNachforderung={onZurNachforderung}
+      />,
+    );
+    expect(kastenKnoepfe()).toEqual(["Ergänzen…", "Zur Nachforderung"]);
+    // Die Aufforderung steht auch hier — so zeigt es das Mockup (P:1285).
+    expect(kastenSatz()).toContain(SATZ_P1285);
+    fireEvent.click(screen.getByRole("button", { name: "Ergänzen…" }));
+    expect(onNachfordern).toHaveBeenCalledWith({
+      modus: "ergaenzen",
+      vorauswahl: ["ARBEITSERLAUBNIS", "PKV_NACHWEIS"],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Zur Nachforderung" }));
+    expect(onZurNachforderung).toHaveBeenCalledTimes(1);
+  });
+
+  test("laufende Nachforderung mit allen offenen Arten: nur „Zur Nachforderung“ — auch ohne Recht", () => {
+    const alle = nachforderung({
+      positionen: VIER_OFFENE_ARTEN.map((typ, i) => position({ id: `p-${i}`, typ, reihenfolge: i })),
+    });
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...VIER_OFFEN, unterlagen: uebersicht({ nachforderungen: [alle], darfAktionen: false }) })}
+        onZuDenDokumenten={null}
+        onNachfordern={null}
+        onZurNachforderung={jest.fn()}
+      />,
+    );
+    expect(kastenKnoepfe()).toEqual(["Zur Nachforderung"]);
+    // Ohne Recht, und die Zeilen sagen schon „angefordert am …": kein weiterer Satz.
+    expect(kastenSatz()).toBe("Diese Pflichtunterlagen durften nachgereicht werden und liegen bis heute nicht vor.");
+  });
+
+  test("früher als entfallen vermerkt: Stand erklärt — und trotzdem unter den offenen Arten (Feinplanung 13)", () => {
+    const onNachfordern = jest.fn();
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...VIER_OFFEN, unterlagen: uebersicht({ nachforderungen: [ERLEDIGT_AE_ENTFALLEN] }) })}
+        onZuDenDokumenten={null}
+        onNachfordern={onNachfordern}
+      />,
+    );
+    expect(zeileVon("ARBEITSERLAUBNIS")).toBe(
+      "Arbeitserlaubnis / Zusatzblatt — entfällt laut Nachforderung (vermerkt am 10.09.2026)",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Unterlagen nachfordern…" }));
+    // Genau die offenen Arten: Der Dialog schlaegt die Arbeitserlaubnis ohnehin
+    // vor (sie ist Pflicht und fehlt) — HR waehlt sie dort ab, wenn es beim
+    // Entfallen bleibt (echter Dialog: unten).
+    expect(onNachfordern).toHaveBeenCalledWith({ modus: "neu", vorauswahl: VIER_OFFENE_ARTEN });
+  });
+});
+
+// =============================================
+// 5. Der Warnbalken: „Verlängerten Nachweis anfordern…"
+// =============================================
+
+describe("Warnbalken: verlängerten Nachweis anfordern", () => {
+  type BalkenProps = React.ComponentProps<typeof NachweisFristenWarnung>;
+  const ABGELAUFEN = [
+    { id: "d-at", type: "AUFENTHALTSTITEL", gueltigBis: "2020-01-01T00:00:00.000Z" },
+  ] as unknown as BalkenProps["documents"];
+  const warnKnoepfe = () =>
+    Array.from(document.querySelectorAll('[data-block="warnbalken-knoepfe"] button')).map((b) => b.textContent);
+  const balkenSatz = () => document.querySelector('[data-zeile="balken-satz"]')?.textContent ?? "";
+
+  function balken(teil: Partial<BalkenProps> = {}) {
+    return render(<NachweisFristenWarnung documents={ABGELAUFEN} onZuDenDokumenten={null} {...teil} />);
+  }
+
+  test("Knopf mit Vorauswahl: der abgelaufene Titel und die Arbeitserlaubnis", () => {
+    const onNachfordern = jest.fn();
+    balken({ unterlagen: uebersicht(), onNachfordern, onZurNachforderung: jest.fn() });
+    expect(warnKnoepfe()).toEqual(["Verlängerten Nachweis anfordern…"]);
+    fireEvent.click(screen.getByRole("button", { name: "Verlängerten Nachweis anfordern…" }));
+    expect(onNachfordern).toHaveBeenCalledWith({ modus: "neu", vorauswahl: ["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"] });
+  });
+
+  test("der Satz nennt den Weg — und dass die Warnung erst mit Datum oder „unbefristet“ endet", () => {
+    balken({ unterlagen: uebersicht(), onNachfordern: jest.fn() });
+    expect(balkenSatz()).toBe(
+      "Eine Beschäftigung ohne gültigen Aufenthaltstitel ist für den Arbeitgeber bußgeldbewehrt (§ 404 SGB III, § 98 AufenthG). " +
+        "Der Vorgang bleibt bedienbar. Fordern Sie den verlängerten Nachweis bei der Person an und nehmen Sie ihn mit seinem Ablaufdatum oder als unbefristet an – ohne Datum bleibt der abgelaufene Nachweis maßgeblich und diese Warnung stehen.",
+    );
+    expect(balkenSatz()).not.toContain("anfordern und hochladen");
+    expect(balkenSatz()).not.toContain("sobald Sie ihn annehmen");
+  });
+
+  test("eingestellter Vorgang: statt der Aufforderung der Grund — und kein Knopf", () => {
+    balken({
+      unterlagen: uebersicht({ verfuegbar: { ok: false, grund: GRUND_EINGESTELLT }, vorgangEingestellt: true }),
+      onNachfordern: jest.fn(),
+    });
+    expect(balkenSatz()).toContain(GRUND_EINGESTELLT);
+    expect(balkenSatz()).not.toContain("Fordern Sie");
+    expect(balkenSatz()).not.toContain("bleibt bedienbar");
+    expect(warnKnoepfe()).toEqual([]);
+  });
+
+  test("ohne Bearbeitungsrecht kein Knopf und keine Aufforderung an „Sie“", () => {
+    const erster = balken({ unterlagen: uebersicht({ darfAktionen: false }), onNachfordern: jest.fn() });
+    expect(warnKnoepfe()).toEqual([]);
+    expect(balkenSatz()).toContain(
+      "Die Personalabteilung kann den verlängerten Nachweis über „Unterlagen nachfordern“ bei der Person anfordern.",
+    );
+    expect(balkenSatz()).not.toContain("Fordern Sie");
+    erster.unmount();
+    const zweiter = balken({ unterlagen: uebersicht(), onNachfordern: null });
+    expect(within(zweiter.container).queryByRole("button")).toBeNull();
+  });
+
+  test("laufende Nachforderung mit dem Titel: Ergänzen nur um die Arbeitserlaubnis, dazu „Zur Nachforderung“", () => {
+    const onNachfordern = jest.fn();
+    balken({
+      unterlagen: uebersicht({ nachforderungen: [LAUFEND_ZWEI] }),
+      onNachfordern,
+      onZurNachforderung: jest.fn(),
+      onZuDenDokumenten: jest.fn(),
+    });
+    expect(warnKnoepfe()).toEqual(["Verlängerten Nachweis anfordern…", "Zur Nachforderung", "Zu den Dokumenten"]);
+    fireEvent.click(screen.getByRole("button", { name: "Verlängerten Nachweis anfordern…" }));
+    expect(onNachfordern).toHaveBeenCalledWith({ modus: "ergaenzen", vorauswahl: ["ARBEITSERLAUBNIS"] });
+  });
+
+  test("verlaengerungVorauswahl: der Titel zieht die Arbeitserlaubnis nach (N4)", () => {
+    expect(verlaengerungVorauswahl(["AUFENTHALTSTITEL"])).toEqual(["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"]);
+    expect(verlaengerungVorauswahl(["ARBEITSERLAUBNIS", "AUFENTHALTSTITEL"])).toEqual([
+      "ARBEITSERLAUBNIS",
+      "AUFENTHALTSTITEL",
+    ]);
+    expect(verlaengerungVorauswahl(["ARBEITSERLAUBNIS"])).toEqual(["ARBEITSERLAUBNIS"]);
+  });
+});
+
+// =============================================
+// 6. Kasten und Warnbalken → der ECHTE Dialog: was angekreuzt ist
+// =============================================
+
+/**
+ * `vorauswahl` kreuzt der Dialog ZUSAETZLICH zu seinen Vorschlaegen an (den
+ * offenen Nachweisen, `dialog.auswahl[].vorgeschlagen`). Die Rueckrufe allein
+ * belegen deshalb nicht, was HR im Dialog sieht — hier geht die Anfrage aus
+ * Kasten bzw. Warnbalken in den echten Dialog, und geprueft werden die
+ * Kaestchen.
+ */
+describe("Kasten und Warnbalken öffnen den echten Dialog", () => {
+  /** Eine Art, wie der Modul-Baustein sie liefert (`auswahl`). */
+  function art(typ: string, vorgeschlagen: boolean): AuswahlEintrag {
+    return {
+      typ,
+      label: documentTypeLabel(typ),
+      vorgeschlagen,
+      sensibel: false,
+      erlaubt: true,
+      grund: null,
+      originalErforderlich: false,
+      fristpflichtig: typ === "AUFENTHALTSTITEL" || typ === "ARBEITSERLAUBNIS",
+      hinweis: null,
+    };
+  }
+  const empfaenger = {
+    vorgang: "anna.beispiel@example.org",
+    vorschlaege: [{ adresse: "anna.beispiel@example.org", quelle: "VORGANG" as const }],
+    erlaubteDomains: [],
+  };
+  const kaestchen = (typ: string) =>
+    within(document.querySelector(`[data-art="${typ}"]`) as HTMLElement).getByRole("checkbox") as HTMLInputElement;
+
+  function dialogAus(anfrage: NachforderungDialogAnfrage, u: UnterlagenUebersicht) {
+    return render(
+      <NachforderungDialog
+        vorgangId="v1"
+        uebersicht={u}
+        modus={anfrage.modus}
+        vorauswahl={anfrage.vorauswahl}
+        onSchliessen={jest.fn()}
+        onErfolg={jest.fn()}
+        jetzt={JETZT}
+      />,
+    );
+  }
+
+  test("Kasten: genau die offenen Nachweise angekreuzt — eine früher entfallene Art eingeschlossen, sonst nichts", () => {
+    const u = uebersicht({
+      nachforderungen: [ERLEDIGT_AE_ENTFALLEN],
+      dialog: {
+        auswahl: [...VIER_OFFENE_ARTEN.map((t) => art(t, true)), art("ABSCHLUSSZEUGNIS", false)],
+        empfaenger,
+      },
+    });
+    const onNachfordern = jest.fn();
+    const kasten = render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...VIER_OFFEN, unterlagen: u })}
+        onZuDenDokumenten={null}
+        onNachfordern={onNachfordern}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Unterlagen nachfordern…" }));
+    kasten.unmount();
+
+    dialogAus(onNachfordern.mock.calls[0][0], u);
+    for (const typ of VIER_OFFENE_ARTEN) {
+      expect({ typ, angekreuzt: kaestchen(typ).checked }).toEqual({ typ, angekreuzt: true });
+    }
+    expect(kaestchen("ABSCHLUSSZEUGNIS").checked).toBe(false);
+  });
+
+  test("Warnbalken: die ablaufenden Arten dazu — neben den offenen Nachweisen, die der Dialog ohnehin vorschlägt", () => {
+    // Titel und Arbeitserlaubnis liegen als (abgelaufene) Dokumente vor, sind
+    // also KEIN Vorschlag; offen ist nur der Masernschutz.
+    const u = uebersicht({
+      dialog: {
+        auswahl: [
+          art("MASERNSCHUTZ", true),
+          art("AUFENTHALTSTITEL", false),
+          art("ARBEITSERLAUBNIS", false),
+          art("ABSCHLUSSZEUGNIS", false),
+        ],
+        empfaenger,
+      },
+    });
+    type BalkenProps = React.ComponentProps<typeof NachweisFristenWarnung>;
+    const onNachfordern = jest.fn();
+    const warn = render(
+      <NachweisFristenWarnung
+        documents={
+          [{ id: "d-at", type: "AUFENTHALTSTITEL", gueltigBis: "2020-01-01T00:00:00.000Z" }] as unknown as BalkenProps["documents"]
+        }
+        onZuDenDokumenten={null}
+        unterlagen={u}
+        onNachfordern={onNachfordern}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Verlängerten Nachweis anfordern…" }));
+    warn.unmount();
+
+    dialogAus(onNachfordern.mock.calls[0][0], u);
+    expect(kaestchen("AUFENTHALTSTITEL").checked).toBe(true);
+    expect(kaestchen("ARBEITSERLAUBNIS").checked).toBe(true);
+    // Bewusst: Die Mail an die Person nennt alles, was fehlt; HR kann abwaehlen.
+    expect(kaestchen("MASERNSCHUTZ").checked).toBe(true);
+    expect(kaestchen("ABSCHLUSSZEUGNIS").checked).toBe(false);
   });
 });

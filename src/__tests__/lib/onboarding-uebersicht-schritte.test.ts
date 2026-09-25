@@ -23,6 +23,7 @@ import {
   onboardingVersandSperre,
   type AbteilungsUebersichtDaten,
 } from "@/lib/abteilungsaufgaben";
+import { uebersichtBauen, type NachforderungEingabe, type UnterlagenUebersicht } from "@/lib/unterlagen";
 
 const JETZT = new Date("2026-09-20T12:00:00.000Z");
 
@@ -680,6 +681,110 @@ describe("ohne Bearbeitungsrecht", () => {
       "CSV Export (LOGA)",
       "Dokumente versenden…",
     ]);
+  });
+});
+
+// =============================================
+// Abschluss: EIN Info-Satz (Paket 4, EP-4)
+// =============================================
+
+describe("Abschluss-Schritt: ein zusammengeführter Info-Satz", () => {
+  /** Eine laufende Nachforderung, gebaut mit der ECHTEN Regel des Servers. */
+  function nachforderung(status: "LAUFEND" | "ERLEDIGT"): UnterlagenUebersicht {
+    const n: NachforderungEingabe = {
+      id: "nf-1",
+      modul: "ONBOARDING",
+      status,
+      empfaenger: "anna.beispiel@example.org",
+      empfaengerAbweichend: false,
+      frist: "2026-10-02T00:00:00.000Z",
+      nachricht: null,
+      angefordertAm: "2026-09-18T08:00:00.000Z",
+      angefordertVonName: "Erika Muster",
+      erinnertFuerFrist: null,
+      erinnertStufe: null,
+      erledigtAm: status === "ERLEDIGT" ? "2026-09-19T08:00:00.000Z" : null,
+      zurueckgezogenAm: null,
+      positionen: [
+        {
+          id: "p-1",
+          reihenfolge: 0,
+          typ: "AUFENTHALTSTITEL",
+          bezeichnung: "Aufenthaltstitel",
+          hinweis: null,
+          originalErforderlich: false,
+          sensibel: true,
+          fristpflichtig: true,
+          status: status === "LAUFEND" ? "ANGEFORDERT" : "ENTFAELLT",
+          einreichungen: 0,
+          gueltigBisAngabe: null,
+          angefordertAm: "2026-09-18T08:00:00.000Z",
+          uebermitteltAm: null,
+          begruendung: null,
+          entfaelltNotiz: null,
+          entschiedenAm: status === "ERLEDIGT" ? "2026-09-19T08:00:00.000Z" : null,
+          entschiedenVonName: null,
+          dateien: [],
+        },
+      ],
+      links: [],
+    };
+    return uebersichtBauen({
+      modul: "ONBOARDING",
+      nachforderungen: [n],
+      verfuegbar: { ok: true },
+      vorgangEingestellt: false,
+      darfAktionen: true,
+      dateiUrl: (id) => `/api/onboarding/onb-1/unterlagen/dateien/${id}`,
+      jetzt: JETZT,
+    });
+  }
+
+  const geprueft = stand({
+    status: "REVIEWED",
+    reviewedAt: "2026-09-21T12:00:00.000Z",
+    submittedAt: "2026-09-19T12:00:00.000Z",
+    personalData: { isComplete: true, currentStep: 9 },
+    checklistItems: [{ id: "c1", title: "Benutzerkonto anlegen", isCompleted: true, assignee: "IT", notes: null }],
+  });
+  const info = (s: SchritteStand) => finde(schritte(s), "abschluss").info;
+
+  it("offene Abteilungsaufgaben UND laufende Nachforderung: genau ein Satz", () => {
+    expect(info({ ...geprueft, abteilungen: abteilungen(), unterlagen: nachforderung("LAUFEND") })).toBe(
+      "Offene Aufgaben von Abteilungen und eine laufende Nachforderung verhindern den Abschluss nicht.",
+    );
+  });
+
+  it("nur offene Abteilungsaufgaben: der bisherige Satz, unverändert", () => {
+    expect(info({ ...geprueft, abteilungen: abteilungen() })).toBe(
+      "Offene Aufgaben von Abteilungen verhindern den Abschluss nicht.",
+    );
+    // Auch eine erledigte Nachforderung aendert daran nichts.
+    expect(info({ ...geprueft, abteilungen: abteilungen(), unterlagen: nachforderung("ERLEDIGT") })).toBe(
+      "Offene Aufgaben von Abteilungen verhindern den Abschluss nicht.",
+    );
+  });
+
+  it("nur eine laufende Nachforderung", () => {
+    expect(info({ ...geprueft, unterlagen: nachforderung("LAUFEND") })).toBe(
+      "Eine laufende Nachforderung verhindert den Abschluss nicht.",
+    );
+  });
+
+  it("weder noch (auch: erledigte Nachforderung, keine Übersicht): kein Satz", () => {
+    expect(info(geprueft)).toBeUndefined();
+    expect(info({ ...geprueft, unterlagen: nachforderung("ERLEDIGT") })).toBeUndefined();
+    expect(info({ ...geprueft, unterlagen: null })).toBeUndefined();
+  });
+
+  it("die laufende Nachforderung sperrt nichts: Status und Knöpfe aller Schritte bleiben gleich", () => {
+    const fest = aktionen();
+    const ohne = onboardingWorkflowSchritte(geprueft, fest, JETZT);
+    const mit = onboardingWorkflowSchritte({ ...geprueft, unterlagen: nachforderung("LAUFEND") }, fest, JETZT);
+    const ohneInfo = (alle: WorkflowStep[]) => alle.map((x) => ({ ...x, info: x.key === "abschluss" ? null : x.info }));
+    expect(ohneInfo(mit)).toEqual(ohneInfo(ohne));
+    expect(finde(mit, "abschluss").status).toBe("active");
+    expect(knopfnamen(finde(mit, "abschluss"))).toEqual(["CSV Export (LOGA)", "Dokumente versenden…"]);
   });
 });
 
