@@ -1638,6 +1638,23 @@ export function nachweisStandText(
   }
 }
 
+/**
+ * Hat HR diese Art in einer FRUEHEREN (erledigten) Nachforderung als entfallen
+ * vermerkt? Dann steht sie im Kasten mit „entfällt laut Nachforderung (vermerkt
+ * am …)" — dieselbe Quelle (`typen`, juengste Fundstelle zuerst). Eine neue
+ * Nachforderung kreuzt sie nicht von selbst an: weder der Knopf der Karte
+ * (`vorauswahl: null`) noch der Kasten (`offeneNachweiseAktion`). Sie bleibt
+ * sichtbar und laesst sich im Dialog ankreuzen. Eine in der LAUFENDEN
+ * entfallene Art zaehlt nicht hierzu — die steht dort selbst („wieder anfordern").
+ */
+export function frueherEntfallen(
+  typ: string,
+  uebersicht: { typen: Readonly<Record<string, TypStand>> } | null | undefined,
+): boolean {
+  const stand = uebersicht?.typen[typ];
+  return !!stand && !stand.laufend && stand.status === "ENTFAELLT";
+}
+
 // =============================================
 // Aktionen (EP-3, E-3, EP-16, 5.2) — nur, was der Server auch ausfuehrt
 // =============================================
@@ -2079,11 +2096,16 @@ export interface UnterlagenUebersicht {
 export interface NachforderungDialogAnfrage {
   modus: "neu" | "ergaenzen";
   /**
-   * Katalogarten, die der Dialog ZUSAETZLICH zu seinen Vorschlaegen ankreuzt;
-   * `null` = nur die Vorschlaege. Vorschlaege sind die offenen Nachweise
-   * (`dialog.auswahl[].vorgeschlagen`, 10.1) — beim Ergaenzen nur die, die noch
-   * nicht in der laufenden Nachforderung stehen. Eine dort entfallene Art kreuzt
-   * der Dialog nur ueber diese Liste an („wieder anfordern" auf Zuruf).
+   * Welche Katalogarten der Dialog ankreuzt.
+   * - Eine Liste (Kasten, Warnbalken) legt sie FEST: genau diese Arten, soweit
+   *   waehlbar. Die uebrigen Vorschlaege stehen sichtbar, aber nicht angekreuzt
+   *   darunter. Eine in der laufenden Nachforderung entfallene Art kreuzt der
+   *   Dialog nur ueber diese Liste an („wieder anfordern" auf Zuruf).
+   * - `null` (Knoepfe der Karte): die Vorschlaege, also die offenen Nachweise
+   *   (`dialog.auswahl[].vorgeschlagen`, 10.1) — beim Ergaenzen nur die, die
+   *   noch nicht in der laufenden Nachforderung stehen, und nie eine Art, die
+   *   in einer frueheren Nachforderung als entfallen vermerkt ist
+   *   (`frueherEntfallen`).
    */
   vorauswahl: string[] | null;
 }
@@ -2096,7 +2118,10 @@ export interface NachforderungDialogAnfrage {
  * auffordert, die es fuer diesen Vorgang oder diese Rolle nicht gibt.
  */
 export interface NachweisAktion {
-  /** Schreibender Knopf: oeffnet den Dialog. Nur mit Recht und wenn der Server die Aktion ausfuehrt. */
+  /**
+   * Schreibender Knopf: oeffnet den Dialog. Nur mit Recht, wenn der Server die
+   * Aktion ausfuehrt und es etwas vorzukreuzen gibt.
+   */
   anfrage: NachforderungDialogAnfrage | null;
   /** „Zur Nachforderung": Es laeuft eine — auch ohne Recht, das ist nur ein Sprung zur Karte. */
   zurNachforderung: boolean;
@@ -2116,14 +2141,19 @@ export interface NachweisAktion {
 
 const KEINE_NACHWEIS_AKTION: NachweisAktion = { anfrage: null, zurNachforderung: false, aufforderung: false, grund: null };
 
-/** Ohne laufende Nachforderung: Anfordern mit `arten` vorangekreuzt, sonst der Grund. */
+/**
+ * Ohne laufende Nachforderung: Anfordern mit `arten` vorangekreuzt, sonst der
+ * Grund. Ohne `arten` (im Kasten: alle offenen frueher als entfallen vermerkt)
+ * gibt es keinen Knopf — er oeffnete einen Dialog, in dem nichts angekreuzt
+ * ist. Anfordern laesst sich trotzdem (Karte), deshalb bleibt `aufforderung`;
+ * welcher Satz dann dasteht, entscheidet der Kasten.
+ */
 function neueNachforderungAktion(arten: readonly string[], u: UnterlagenUebersicht): NachweisAktion {
-  const anfrage: NachforderungDialogAnfrage | null =
-    u.darfAktionen && u.anfordern.moeglich ? { modus: "neu", vorauswahl: [...arten] } : null;
+  const moeglich = u.darfAktionen && u.anfordern.moeglich;
   return {
-    anfrage,
+    anfrage: moeglich && arten.length > 0 ? { modus: "neu", vorauswahl: [...arten] } : null,
     zurNachforderung: false,
-    aufforderung: anfrage !== null,
+    aufforderung: moeglich,
     grund: u.darfAktionen && !u.anfordern.moeglich ? u.anfordern.grund : null,
   };
 }
@@ -2132,15 +2162,19 @@ function neueNachforderungAktion(arten: readonly string[], u: UnterlagenUebersic
  * Die Knoepfe des Kastens „Offene Nachweise" (P:1285, Feinplanung 10.2 und 13).
  *
  * - Ohne laufende Nachforderung: „Unterlagen nachfordern…" mit GENAU den
- *   offenen Arten — dieselben, die der Dialog als Vorschlaege ankreuzt, auch
- *   eine, die in einer frueheren Nachforderung als entfallen vermerkt ist: Sie
- *   ist weiter Pflicht und offen, der Kasten nennt ihren Stand, und HR waehlt
- *   sie im Dialog ab, wenn es dabei bleibt.
- * - Mit laufender: „Zur Nachforderung"; stehen offene Arten noch NICHT in ihr,
- *   dazu „Ergänzen…" mit genau diesen (die Vorschlaege des Dialogs beim
- *   Ergaenzen). Eine in der laufenden entfallene Art kreuzt der Knopf nicht an:
- *   Diese Entscheidung hat HR gerade erst getroffen; wieder anfordern laesst
- *   sie sich im Dialog.
+ *   offenen Arten — dieselben, die der Dialog mit dem Knopf der Karte ankreuzt
+ *   (`vorauswahl: null`). Eine Art, die in einer frueheren Nachforderung als
+ *   entfallen vermerkt ist (`frueherEntfallen`), ist weiter Pflicht und offen,
+ *   und der Kasten nennt ihren Stand — angekreuzt wird sie aber nicht: HR hat
+ *   sie schon einmal quittiert. Im Dialog steht sie sichtbar darunter und
+ *   laesst sich ankreuzen, wenn sie doch gebraucht wird. Sind ALLE offenen
+ *   Arten so vermerkt, bietet der Kasten keinen Knopf an (nichts vorzukreuzen);
+ *   sein Satz verweist dann auf die Karte.
+ * - Mit laufender: „Zur Nachforderung"; stehen offene Arten weder in ihr noch
+ *   als entfallen in einer frueheren, dazu „Ergänzen…" mit genau diesen (die
+ *   Vorschlaege des Dialogs beim Ergaenzen). Eine in der laufenden oder einer
+ *   frueheren entfallene Art kreuzt der Knopf nicht an — diese Entscheidung hat
+ *   HR schon getroffen; wieder anfordern laesst sie sich im Dialog.
  * - Ohne offene Pflichtunterlage (nur die Nachfrage nach dem Ablaufdatum) hat
  *   der Kasten mit der Nachforderung nichts zu tun.
  */
@@ -2150,9 +2184,10 @@ export function offeneNachweiseAktion(
 ): NachweisAktion {
   if (!u || offen.length === 0) return KEINE_NACHWEIS_AKTION;
   const { laufend, typen } = u;
-  if (!laufend) return neueNachforderungAktion(offen, u);
+  const vorschlaege = offen.filter((typ) => !frueherEntfallen(typ, u));
+  if (!laufend) return neueNachforderungAktion(vorschlaege, u);
 
-  const fehlend = offen.filter((typ) => !typen[typ]?.laufend);
+  const fehlend = vorschlaege.filter((typ) => !typen[typ]?.laufend);
   return {
     anfrage:
       u.darfAktionen && laufend.aktionen.ergaenzen && fehlend.length > 0
@@ -2170,9 +2205,9 @@ export function offeneNachweiseAktion(
  * Die Knoepfe des Warnbalkens (abgelaufener bzw. bald ablaufender Nachweis):
  * „Verlängerten Nachweis anfordern…" mit `arten` vorangekreuzt.
  *
- * - Ohne laufende Nachforderung: neu. Der Dialog kreuzt dazu seine Vorschlaege
- *   an, die offenen Nachweise (10.1) — gewollt: Die Mail an die Person nennt
- *   dann alles, was fehlt; HR kann abwaehlen.
+ * - Ohne laufende Nachforderung: neu, angekreuzt sind genau diese Arten. Die
+ *   offenen Nachweise (Vorschlaege des Dialogs, 10.1) stehen darunter, nicht
+ *   angekreuzt: Anlass ist der Ablauf, HR kreuzt sie bei Bedarf dazu.
  * - Mit laufender: „Zur Nachforderung"; stehen die Arten dort noch nicht oder
  *   nur als entfallen, dazu derselbe Knopf als Ergaenzung. Anders als im
  *   Kasten kreuzt er eine entfallene Art an: Der abgelaufene Nachweis ist der

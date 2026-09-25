@@ -12,14 +12,15 @@
  *
  *  1. Reiter „Dokumente": die Pille der laufenden Nachforderung (mit Namen,
  *     neben der Anzahl der Dokumente); `?tab=dokumente` oeffnet den Reiter,
- *     ohne die Reiterwahl danach zu stoeren (heute setzt den Parameter noch
- *     kein Link des Portals — `portalLink` der HR-Mails ist `/dashboard/<id>`).
+ *     ohne die Reiterwahl danach zu stoeren (so kommt `portalLink` der
+ *     HR-Mails an: `/dashboard/<id>?tab=dokumente`, Modul-Baustein `portalPfad`).
  *  2. Die Karte steht nach „Dokumente versenden" und vor den hochgeladenen
  *     Dokumenten; der Dialog oeffnet dort mit Name · Vorgangsnummer und einem
- *     Fokusziel, seine Meldung steht ueber der Karte — gelb, nie gruen, wenn
- *     die Mail nicht hinausging — und weicht der naechsten Aktion der Karte.
- *     Mit dem ECHTEN Dialog: Nach dem Anfordern liegt der Fokus auf dem Block
- *     der Karte, nicht auf `body`.
+ *     Fokusziel, seine Meldung steht ueber der Karte — rot bei nicht
+ *     zugestellter Mail (FAILED, mit „Link erneut senden"), gelb bei
+ *     uebersprungener, nie gruen, wenn die Mail nicht hinausging — und weicht
+ *     der naechsten Aktion der Karte. Mit dem ECHTEN Dialog: Nach dem Anfordern
+ *     liegt der Fokus auf dem Block der Karte, nicht auf `body`.
  *  3. Die Dokumentenliste zeigt `Document.bezeichnung` und die Herkunft
  *     „aus Nachforderung angenommen am …" samt PDF-Hinweisen.
  *  4. Die Mini-Karte „Dokumente" der Status-Übersicht traegt den Kurzstand.
@@ -88,7 +89,8 @@ jest.mock("@/components/template-generation-section", () => ({
 }));
 
 // Der Dialog als Attrappe: Er zeigt, womit er geoeffnet wurde, und meldet auf
-// Zuruf Erfolg bzw. Warnung — so wie der echte nach einer Antwort des Servers.
+// Zuruf Erfolg, Fehler (FAILED) bzw. Warnung (SKIPPED) — so wie der echte nach
+// einer Antwort des Servers.
 // Mit `mockEchterDialog = true` rendert der echte (Fokus nach dem Anfordern).
 let mockEchterDialog = false;
 jest.mock("@/components/unterlagen/nachforderung-dialog", () => {
@@ -98,7 +100,7 @@ jest.mock("@/components/unterlagen/nachforderung-dialog", () => {
       modus: string;
       vorauswahl: string[] | null;
       onSchliessen: () => void;
-      onErfolg: (m: { art: "erfolg" | "warnung"; text: string }) => void | Promise<void>;
+      onErfolg: (m: { art: "erfolg" | "warnung" | "fehler"; text: string }) => void | Promise<void>;
       kopf?: { name?: string | null; vorgangsnummer?: string | null } | null;
       fokusZiel?: string;
     }) =>
@@ -118,8 +120,19 @@ jest.mock("@/components/unterlagen/nachforderung-dialog", () => {
         type="button"
         onClick={() =>
           p.onErfolg({
-            art: "warnung",
+            art: "fehler",
             text: "Die Unterlagen sind angefordert. Die E-Mail konnte nicht zugestellt werden; der tägliche Lauf versucht es erneut.",
+          })
+        }
+      >
+        Attrappe: Fehler
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          p.onErfolg({
+            art: "warnung",
+            text: "Die Unterlagen sind angefordert. Die E-Mail wurde nicht versendet: Vorlage deaktiviert.",
           })
         }
       >
@@ -578,7 +591,7 @@ describe("Karte „Unterlagen nachfordern“ im Reiter „Dokumente“", () => {
 });
 
 describe("Ablauf in der Seite: Kasten → Dialog → Meldung", () => {
-  it("„Unterlagen nachfordern…“ im Kasten wechselt in den Reiter, öffnet den Dialog mit den offenen Arten; nach der Warnung neu laden, schließen, gelbe Leiste", async () => {
+  it("„Unterlagen nachfordern…“ im Kasten wechselt in den Reiter, öffnet den Dialog mit den offenen Arten; nicht zugestellt: neu laden, schließen, rote Leiste", async () => {
     const ohneLaufende = vorgang({ unterlagen: unterlagen({ nachforderungen: [] }) });
     const f = fetchMit(ohneLaufende, vorgang());
     await seite();
@@ -593,18 +606,33 @@ describe("Ablauf in der Seite: Kasten → Dialog → Meldung", () => {
     expect(dialog.dataset.vorauswahl).toBe('["MASERNSCHUTZ"]');
 
     await act(async () => {
-      fireEvent.click(within(dialog).getByRole("button", { name: "Attrappe: Warnung" }));
+      fireEvent.click(within(dialog).getByRole("button", { name: "Attrappe: Fehler" }));
     });
 
-    // Neu geladen (leise: die Seite bleibt stehen), Dialog zu, gelbe Leiste.
+    // Neu geladen (leise: die Seite bleibt stehen), Dialog zu, rote Leiste.
     expect(f).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("dialog")).toBeNull();
-    const warnung = document.querySelector('[data-block="nachforderung"] [data-art="warnung"]') as HTMLElement;
-    expect(warnung.textContent).toContain("Die E-Mail konnte nicht zugestellt werden");
+    const fehler = document.querySelector('[data-block="nachforderung"] [data-art="fehler"]') as HTMLElement;
+    expect(fehler.textContent).toContain("Die E-Mail konnte nicht zugestellt werden");
+    expect(fehler.getAttribute("role")).toBe("alert");
     expect(document.querySelector('[data-art="erfolg"]')).toBeNull();
+    expect(document.querySelector('[data-art="warnung"]')).toBeNull();
     // Der neue Stand ist da: Pille am Reiter, Stand im Kasten.
     expect(reiter("documents").querySelector('[data-pille="reiter"]')?.textContent).toBe("Nachforderung: 1 zu prüfen");
     expect(document.querySelector('[data-nachweis="MASERNSCHUTZ"]')?.textContent).toContain("angefordert am 12.09.2026");
+  });
+
+  it("übersprungen (SKIPPED): gelbe Leiste, nie grün", async () => {
+    fetchMit(vorgang({ unterlagen: unterlagen({ nachforderungen: [] }) }), vorgang());
+    await seite();
+    fireEvent.click(screen.getByRole("button", { name: "Unterlagen nachfordern…" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Attrappe: Warnung" }));
+    });
+    const warnung = document.querySelector('[data-block="nachforderung"] [data-art="warnung"]') as HTMLElement;
+    expect(warnung.textContent).toContain("Vorlage deaktiviert");
+    expect(document.querySelector('[data-art="erfolg"]')).toBeNull();
+    expect(document.querySelector('[data-art="fehler"]')).toBeNull();
   });
 
   it("Erfolg: grüne Leiste", async () => {
@@ -685,6 +713,62 @@ describe("Ablauf in der Seite: Kasten → Dialog → Meldung", () => {
     expect(document.querySelector('[data-block="nachforderung"] [data-art="erfolg"]')?.textContent).toContain(
       "angefordert",
     );
+  });
+
+  it("echter Dialog, Mail nicht zugestellt (FAILED): rote Leiste über der Karte — angefordert, Weg über „Link erneut senden“", async () => {
+    mockEchterDialog = true;
+    const masern: AuswahlEintrag = {
+      typ: "MASERNSCHUTZ",
+      label: "Masernschutz-Nachweis",
+      vorgeschlagen: true,
+      sensibel: true,
+      erlaubt: true,
+      grund: null,
+      originalErforderlich: false,
+      fristpflichtig: false,
+      hinweis: null,
+    };
+    const vorher = vorgang({ unterlagen: unterlagen({ nachforderungen: [], auswahl: [masern] }) });
+    const nachher = vorgang();
+    const mail = { status: "FAILED" as const, detail: "ETIMEDOUT" };
+    let geladen = 0;
+    const f = jest.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ nachforderungId: "nf-1", mail, ...aktionsTexte("anfordern", mail) }),
+        };
+      }
+      const daten = geladen++ === 0 ? vorher : nachher;
+      return { ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(daten)) };
+    });
+    global.fetch = f as unknown as typeof fetch;
+    await seite();
+
+    fireEvent.click(
+      within(document.querySelector('[data-kasten="offene-nachweise"]') as HTMLElement).getByRole("button", {
+        name: "Unterlagen nachfordern…",
+      }),
+    );
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole("button", { name: "Anfordern und E-Mail senden" }));
+    });
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
+
+    const rot = document.querySelector('[data-block="nachforderung"] [data-art="fehler"]') as HTMLElement;
+    expect(rot.textContent).toContain("Die Unterlagen sind angefordert.");
+    expect(rot.textContent).toContain("Die E-Mail konnte nicht zugestellt werden");
+    expect(rot.textContent).toContain(
+      "Über „Link erneut senden“ in der Karte können Sie die E-Mail auch selbst noch einmal senden",
+    );
+    expect(document.querySelector('[data-block="nachforderung"] [data-art="warnung"]')).toBeNull();
+    expect(document.querySelector('[data-block="nachforderung"] [data-art="erfolg"]')).toBeNull();
+    // Den Weg gibt es wirklich: Die Karte der laufenden Nachforderung bietet ihn an.
+    expect(within(document.querySelector('[data-karte="unterlagen"]') as HTMLElement).queryByRole("button", {
+      name: "Link erneut senden",
+    })).not.toBeNull();
   });
 
   it("ohne Bearbeitungsrecht: im Kasten kein „Unterlagen nachfordern…“", async () => {

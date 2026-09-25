@@ -42,6 +42,7 @@ import {
   fristPruefen,
   fristText,
   fristWochenendeHinweis,
+  frueherEntfallen,
   hochladenErlaubt,
   istWochenende,
   laufWaechter,
@@ -2020,15 +2021,40 @@ describe("offeneNachweiseAktion und warnbalkenAktion", () => {
     expect(warnbalkenAktion(["AUFENTHALTSTITEL"], undefined)).toEqual(KEINE);
   });
 
-  it("Kasten ohne laufende: genau die offenen Arten — auch eine früher als entfallen vermerkte", () => {
-    // Sie ist weiter Pflicht und offen; der Dialog schlaegt sie ohnehin vor
-    // (`vorgeschlagen` = offene Nachweise), und `vorauswahl` kreuzt nur ZUSAETZLICH an.
+  it("Kasten ohne laufende: genau die offenen Arten — ohne eine früher als entfallen vermerkte", () => {
+    // `vorauswahl` legt fest, was der Dialog ankreuzt. Die Arbeitserlaubnis ist
+    // weiter Pflicht und offen (der Kasten nennt ihren Stand), aber HR hat sie
+    // schon einmal quittiert — wie beim Knopf der Karte (`vorauswahl: null`)
+    // bleibt sie im Dialog sichtbar, aber nicht angekreuzt.
     expect(offeneNachweiseAktion(OFFEN, bauen([erledigtMitEntfallen()]))).toEqual({
-      anfrage: { modus: "neu", vorauswahl: OFFEN },
+      anfrage: { modus: "neu", vorauswahl: ["MASERNSCHUTZ", "AUFENTHALTSTITEL", "PKV_NACHWEIS"] },
       zurNachforderung: false,
       aufforderung: true,
       grund: null,
     });
+    // Ohne fruehere Nachforderung: alle offenen Arten.
+    expect(offeneNachweiseAktion(OFFEN, bauen([])).anfrage).toEqual({ modus: "neu", vorauswahl: OFFEN });
+  });
+
+  it("Kasten ohne laufende, alle offenen Arten früher entfallen: kein Knopf (nichts vorzukreuzen), anfordern geht trotzdem", () => {
+    // Ein Knopf oeffnete einen Dialog ohne Kreuz. `aufforderung` bleibt: Die
+    // Karte bietet „Unterlagen nachfordern…" an, und darauf verweist der Kasten.
+    expect(offeneNachweiseAktion(["ARBEITSERLAUBNIS"], bauen([erledigtMitEntfallen()]))).toEqual({
+      anfrage: null,
+      zurNachforderung: false,
+      aufforderung: true,
+      grund: null,
+    });
+    // Ohne Recht bzw. bei eingestelltem Vorgang wie sonst.
+    expect(offeneNachweiseAktion(["ARBEITSERLAUBNIS"], bauen([erledigtMitEntfallen()], { darfAktionen: false }))).toEqual(
+      KEINE,
+    );
+    expect(
+      offeneNachweiseAktion(
+        ["ARBEITSERLAUBNIS"],
+        bauen([erledigtMitEntfallen()], { verfuegbar: { ok: false, grund: GRUND } }),
+      ),
+    ).toEqual({ anfrage: null, zurNachforderung: false, aufforderung: false, grund: GRUND });
   });
 
   it("Kasten ohne Recht: kein Knopf, keine Aufforderung, kein Grund", () => {
@@ -2044,16 +2070,39 @@ describe("offeneNachweiseAktion und warnbalkenAktion", () => {
     });
   });
 
-  it("Kasten mit laufender: „Ergänzen…“ nur um Arten, die NICHT in ihr stehen — die dort entfallene nicht", () => {
+  it("Kasten mit laufender: „Ergänzen…“ nur um Arten, die in KEINER Nachforderung stehen — entfallene nicht", () => {
     const aktion = offeneNachweiseAktion(OFFEN, bauen([laufend(), erledigtMitEntfallen()]));
-    // Die Arbeitserlaubnis ist nur in der AELTEREN entfallen und gehoert dazu;
-    // der PKV-Nachweis ist in der laufenden entfallen — wieder anfordern nur im Dialog.
+    // Der PKV-Nachweis ist in der laufenden entfallen, die Arbeitserlaubnis in
+    // der AELTEREN — wieder anfordern beides nur im Dialog.
     expect(aktion).toEqual({
-      anfrage: { modus: "ergaenzen", vorauswahl: ["MASERNSCHUTZ", "ARBEITSERLAUBNIS"] },
+      anfrage: { modus: "ergaenzen", vorauswahl: ["MASERNSCHUTZ"] },
       zurNachforderung: true,
       aufforderung: true,
       grund: null,
     });
+    // Ohne die aeltere gehoert die Arbeitserlaubnis dazu.
+    expect(offeneNachweiseAktion(OFFEN, bauen([laufend()])).anfrage).toEqual({
+      modus: "ergaenzen",
+      vorauswahl: ["MASERNSCHUTZ", "ARBEITSERLAUBNIS"],
+    });
+  });
+
+  it("frueherEntfallen: nur ENTFAELLT aus einer früheren Nachforderung — nicht aus der laufenden, nicht zurückgezogen", () => {
+    const u = bauen([laufend(), erledigtMitEntfallen()]);
+    expect(frueherEntfallen("ARBEITSERLAUBNIS", u)).toBe(true);
+    // In der laufenden entfallen: steht dort selbst („wieder anfordern").
+    expect(frueherEntfallen("PKV_NACHWEIS", u)).toBe(false);
+    // In der laufenden angefordert bzw. in keiner Nachforderung.
+    expect(frueherEntfallen("AUFENTHALTSTITEL", u)).toBe(false);
+    expect(frueherEntfallen("MASERNSCHUTZ", u)).toBe(false);
+    expect(frueherEntfallen("ARBEITSERLAUBNIS", null)).toBe(false);
+    // Eine zurueckgezogene Nachforderung wertet `typen` nie aus (2.2).
+    const zurueckgezogen = nachforderung({
+      ...erledigtMitEntfallen(),
+      status: "ZURUECKGEZOGEN",
+      zurueckgezogenAm: new Date("2026-09-10T08:00:00.000Z"),
+    });
+    expect(frueherEntfallen("ARBEITSERLAUBNIS", bauen([zurueckgezogen]))).toBe(false);
   });
 
   it("Kasten mit laufender, alle offenen Arten schon darin: nur „Zur Nachforderung“, die Aufforderung bleibt", () => {
@@ -2079,6 +2128,12 @@ describe("offeneNachweiseAktion und warnbalkenAktion", () => {
 
   it("Warnbalken ohne laufende: neu mit den übergebenen Arten; gesperrt mit Grund", () => {
     expect(warnbalkenAktion(["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"], bauen([])).anfrage).toEqual({
+      modus: "neu",
+      vorauswahl: ["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"],
+    });
+    // Anders als der Kasten: auch eine frueher entfallene Art — der Ablauf ist
+    // der ausdrueckliche Anlass, sie wieder anzufordern.
+    expect(warnbalkenAktion(["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"], bauen([erledigtMitEntfallen()])).anfrage).toEqual({
       modus: "neu",
       vorauswahl: ["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"],
     });

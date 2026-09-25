@@ -21,6 +21,19 @@
  * eine schon angeforderte Art nur, wenn sie entfaellt) und
  * `empfaengerFreigegeben` (nur Anzeige). Die Schranke bleibt der Server.
  *
+ * **Was angekreuzt ist, legt der Aufrufer fest** (`vorauswahl`):
+ *   - eine Liste (Kasten „Offene Nachweise", Warnbalken): genau diese Arten,
+ *     soweit waehlbar. Sie stehen oben, die uebrigen Vorschlaege sichtbar,
+ *     aber nicht angekreuzt darunter, unter eigener Ueberschrift „Weitere
+ *     offene Nachweise (nicht vorausgewählt)" — Kasten und Warnbalken sagen
+ *     vorher, worum es geht, und der Dialog kreuzt nicht mehr an als dort
+ *     genannt;
+ *   - `null` (Knoepfe der Karte): alle Vorschlaege, ausser einer Art, die HR
+ *     in einer frueheren Nachforderung als entfallen vermerkt hat
+ *     (`frueherEntfallen`, dieselbe Regel wie im Kasten). Sie steht mit dem
+ *     Hinweis „Entfällt laut einer früheren Nachforderung …" da und laesst
+ *     sich ankreuzen.
+ *
  * Der Weg einer Art, die schon in der Nachforderung steht, kommt aus den
  * Aktionen der Karte (`positionen[].aktionen`): „Annahme zurücknehmen, dann
  * zurückweisen" nennt der Dialog nur, wenn der Server die Ruecknahme auch
@@ -32,17 +45,18 @@
  * letzten Nachforderung danach nicht mehr zuruecknehmen lassen (E-3).
  *
  * Eine nicht zugestellte Mail ist nie ein Erfolg: Die Route antwortet 2xx,
- * sobald die Nachforderung gespeichert ist (EP-11); FAILED, SKIPPED und
- * „versendet, aber nicht gespeichert" (N2) melden sich an `onErfolg` als
- * `warnung`. Ein Fehler (400/403/404/409/429) bleibt im Dialog (`role="alert"`),
- * damit die Eingabe korrigiert werden kann. Nach `onErfolg` schliesst der
- * Aufrufer den Dialog.
+ * sobald die Nachforderung gespeichert ist (EP-11). Wie auf der Karte
+ * (`unterlagenAntwortAuswerten`) meldet sich FAILED an `onErfolg` als `fehler`
+ * (rot: gespeichert, aber nicht zugestellt, dazu der Weg ueber „Link erneut
+ * senden"), SKIPPED und „versendet, aber nicht gespeichert" (N2) als
+ * `warnung` (gelb), nur SENT als `erfolg`. Ein Fehler ohne gespeicherte Aktion
+ * (400/403/404/409/429) bleibt im Dialog (`role="alert"`), damit die Eingabe
+ * korrigiert werden kann. Nach `onErfolg` schliesst der Aufrufer den Dialog.
  */
 
 import { useEffect, useId, useRef, useState } from "react";
+import { adresseGleich, saetze, unterlagenAktionSenden, unterlagenApiBasis } from "@/components/unterlagen/aktionen";
 import { DialogRahmen } from "@/components/unterlagen/dialog-rahmen";
-import { unterlagenAktionSenden, unterlagenApiBasis } from "@/components/unterlagen/nachforderung-karte";
-import { adresseGleich } from "@/components/unterlagen/pruef-dialoge";
 import { empfaengerFreigegeben } from "@/lib/empfaenger-freigabe";
 import {
   formatKalendertag,
@@ -59,6 +73,7 @@ import {
   fristGrenzen,
   fristPruefen,
   fristWochenendeHinweis,
+  frueherEntfallen,
   HINWEIS_MAX,
   MAX_POSITIONEN,
   MELDUNGEN,
@@ -101,11 +116,18 @@ export interface NachforderungDialogProps {
   /** `unterlagen` aus GET /api/onboarding/[id] — Auswahl und Adressen in `dialog`. */
   uebersicht: UnterlagenUebersicht;
   modus: "neu" | "ergaenzen";
-  /** Katalogarten, die ZUSAETZLICH zu den Vorschlaegen angekreuzt werden (Warnbalken); `null` = nur die Vorschlaege. */
+  /**
+   * Genau diese Katalogarten sind angekreuzt (Kasten, Warnbalken); `null` =
+   * alle Vorschlaege ausser frueher als entfallen vermerkten (Karte).
+   */
   vorauswahl: string[] | null;
   onSchliessen: () => void;
-  /** 200/201: Meldung fuer die Leiste — `warnung`, wenn die Mail nicht (sicher) ankam. */
-  onErfolg: (meldung: { art: "erfolg" | "warnung"; text: string }) => void | Promise<void>;
+  /**
+   * 200/201, gespeichert: Meldung fuer die Leiste — `erfolg` nur bei
+   * zugestellter Mail, `fehler` (rot) bei nicht zugestellter (FAILED),
+   * `warnung` (gelb) bei uebersprungener (SKIPPED) bzw. N2.
+   */
+  onErfolg: (meldung: { art: "erfolg" | "warnung" | "fehler"; text: string }) => void | Promise<void>;
   /**
    * Zeile unter dem Titel: Name der Person und Vorgangsnummer (Mockup P:1299)
    * — die letzte Kontrolle, ob man im richtigen Vorgang ist, bevor eine Mail an
@@ -159,8 +181,17 @@ const TEXTE = {
   // der aelteren zuruecknehmen — und danach zeigt die Karte nur noch die neue.
   RUECKNAHME_ENDET:
     "Mit dem Anfordern lässt sich keine Annahme der letzten Nachforderung mehr zurücknehmen. War eine Annahme ein Versehen, nehmen Sie sie vorher dort zurück.",
+  // Ueberschrift der Vorschlaege, die eine Vorauswahl (Kasten, Warnbalken) nicht nennt.
+  WEITERE_VORSCHLAEGE: "Weitere offene Nachweise (nicht vorausgewählt)",
   NACHRICHT_HINWEIS: "Erscheint in der E-Mail und auf der Upload-Seite.",
   NACHRICHT_BLEIBT: "Leer lassen: Die bisherige Nachricht bleibt.",
+  // Nach FAILED (EP-11): gespeichert ist die Aktion — das sagt schon der Satz
+  // des Servers („sind angefordert", „ist ergänzt") —, nur die Mail fehlt. Der
+  // naechste Schritt steht dabei, als Moeglichkeit, nicht als Zusage: Auch
+  // „Link erneut senden" kann an derselben Adresse scheitern, und nach einer
+  // zugestellten ERNEUT-Mail ist der Knopf 10 Minuten gesperrt.
+  NICHT_ZUGESTELLT:
+    "Über „Link erneut senden“ in der Karte können Sie die E-Mail auch selbst noch einmal senden, bei Bedarf an eine korrigierte Adresse.",
 } as const;
 
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -168,11 +199,6 @@ const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EINGABE =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-base outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:opacity-60 sm:text-sm";
 const UEBERSCHRIFT = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
-
-/** Mehrere Saetze zu einem, ohne denselben Satz zweimal (wie auf der Karte). */
-function saetze(...teile: Array<string | null | undefined>): string {
-  return Array.from(new Set(teile.map((t) => t?.trim()).filter((t): t is string => !!t))).join(" ");
-}
 
 /**
  * „3 Unterlagen" — beim Ergaenzen „2 weitere Unterlagen": Dort zaehlt die
@@ -221,6 +247,17 @@ const QUELLE_TEXT: Readonly<Record<EmpfaengerVorschlag["quelle"], string>> = {
   PERSONALAKTE: "aus der Personalakte",
 };
 
+/**
+ * Der Satz zu einer Art, die HR in einer frueheren Nachforderung als entfallen
+ * vermerkt hat — dieselbe Aussage wie im Kasten („entfällt laut Nachforderung
+ * (vermerkt am …)"). Er erklaert, warum der Vorschlag nicht angekreuzt ist.
+ */
+function frueherEntfallenText(am: Kalendertag | null): string {
+  return am
+    ? `Entfällt laut einer früheren Nachforderung (vermerkt am ${formatKalendertag(am)}).`
+    : "Entfällt laut einer früheren Nachforderung.";
+}
+
 /** Stand einer Katalogart im Dialog: waehlbar oder gesperrt mit Grund. */
 interface ArtStand {
   waehlbar: boolean;
@@ -228,17 +265,24 @@ interface ArtStand {
   grund: string | null;
   /** Zusatz im Label („entfällt bisher – wieder anfordern"). */
   zusatz: string | null;
-  /** Hinweis, der die Wahl nicht sperrt (Modus „neu": in der letzten Nachforderung angenommen). */
-  info: string | null;
+  /**
+   * Hinweis, der die Wahl nicht sperrt (Modus „neu": in der letzten
+   * Nachforderung angenommen; beide Modi: frueher als entfallen vermerkt).
+   */
+  info: { text: string; name: "zuletzt-angenommen" | "frueher-entfallen" } | null;
   /** Steht schon in der laufenden Nachforderung (Modus „ergaenzen")? */
   bestehend: boolean;
+  /** Frueher als entfallen vermerkt (`frueherEntfallen`) — ohne Vorauswahl nicht angekreuzt. */
+  frueherEntfallen: boolean;
 }
 
 function artStand(
   a: AuswahlEintrag,
   bestand: UnterlagenPositionZeile | undefined,
   zuletztAngenommen: UnterlagenPositionZeile | undefined,
+  entfallen: { am: Kalendertag | null } | null,
 ): ArtStand {
+  const frueher = !bestand && !!entfallen;
   if (!a.erlaubt) {
     return {
       waehlbar: false,
@@ -246,38 +290,43 @@ function artStand(
       zusatz: null,
       info: null,
       bestehend: !!bestand,
+      frueherEntfallen: frueher,
     };
   }
   if (bestand) {
+    const basis = { info: null, bestehend: true, frueherEntfallen: false } as const;
     switch (bestand.status) {
       case "ENTFAELLT":
-        return { waehlbar: true, grund: null, zusatz: TEXTE.WIEDER_ANFORDERN, info: null, bestehend: true };
+        return { ...basis, waehlbar: true, grund: null, zusatz: TEXTE.WIEDER_ANFORDERN };
       case "ANGENOMMEN":
         return {
+          ...basis,
           waehlbar: false,
           grund: bestand.aktionen.annahmeZuruecknehmen ? TEXTE.ANGENOMMEN_WEG : TEXTE.BEREITS_ANGENOMMEN,
           zusatz: null,
-          info: null,
-          bestehend: true,
         };
       case "EINGEREICHT":
         return {
+          ...basis,
           waehlbar: false,
           grund: bestand.aktionen.zurueckweisen ? TEXTE.EINGEGANGEN_WEG : TEXTE.BEREITS_EINGEGANGEN,
           zusatz: null,
-          info: null,
-          bestehend: true,
         };
       default:
-        return { waehlbar: false, grund: TEXTE.BEREITS_ANGEFORDERT, zusatz: null, info: null, bestehend: true };
+        return { ...basis, waehlbar: false, grund: TEXTE.BEREITS_ANGEFORDERT, zusatz: null };
     }
   }
   return {
     waehlbar: true,
     grund: null,
     zusatz: null,
-    info: zuletztAngenommen ? TEXTE.ZULETZT_ANGENOMMEN : null,
+    info: zuletztAngenommen
+      ? { text: TEXTE.ZULETZT_ANGENOMMEN, name: "zuletzt-angenommen" }
+      : entfallen
+        ? { text: frueherEntfallenText(entfallen.am), name: "frueher-entfallen" }
+        : null,
     bestehend: false,
+    frueherEntfallen: frueher,
   };
 }
 
@@ -336,18 +385,30 @@ export function NachforderungDialog({
       .filter((p) => p.typ !== null && p.status === "ANGENOMMEN" && p.aktionen.annahmeZuruecknehmen)
       .map((p) => [p.typ as string, p]),
   );
-  const stand = (a: AuswahlEintrag) => artStand(a, bestandJeTyp.get(a.typ), zuletztAngenommen.get(a.typ));
-  const vorausgewaehlt = (a: AuswahlEintrag) => (vorauswahl ?? []).includes(a.typ);
+  // Frueher als entfallen vermerkt: dieselbe Quelle wie der Kasten (`typen`).
+  const entfallen = (typ: string) =>
+    frueherEntfallen(typ, uebersicht) ? { am: uebersicht.typen[typ]?.entschiedenAm ?? null } : null;
+  const stand = (a: AuswahlEintrag) =>
+    artStand(a, bestandJeTyp.get(a.typ), zuletztAngenommen.get(a.typ), entfallen(a.typ));
+  const inVorauswahl = (a: AuswahlEintrag) => vorauswahl !== null && vorauswahl.includes(a.typ);
+
+  /**
+   * Angekreuzt beim Oeffnen: Mit Vorauswahl genau diese Arten (Kasten,
+   * Warnbalken). Ohne (Karte) die Vorschlaege — aber nur, wenn die Art noch
+   * nicht in der Nachforderung steht (eine dort entfallene hat HR bewusst
+   * abgewaehlt) und nicht frueher als entfallen vermerkt ist; wieder anfordern
+   * beides nur auf Zuruf.
+   */
+  const anfangsWahl = (a: AuswahlEintrag): boolean => {
+    const s = stand(a);
+    if (!s.waehlbar) return false;
+    if (vorauswahl !== null) return inVorauswahl(a);
+    return a.vorgeschlagen && !s.bestehend && !s.frueherEntfallen;
+  };
 
   const [katalog, setKatalog] = useState<Record<string, KatalogWahl>>(() => {
     const anfang: Record<string, KatalogWahl> = {};
-    for (const a of eintraege) {
-      const s = stand(a);
-      // Vorschlaege nur, wenn die Art noch nicht in der Nachforderung steht —
-      // eine entfallene hat HR bewusst abgewaehlt; wieder anfordern nur auf Zuruf.
-      const vorschlag = a.vorgeschlagen && !s.bestehend;
-      anfang[a.typ] = { gewaehlt: s.waehlbar && (vorschlag || vorausgewaehlt(a)), hinweis: a.hinweis ?? "" };
-    }
+    for (const a of eintraege) anfang[a.typ] = { gewaehlt: anfangsWahl(a), hinweis: a.hinweis ?? "" };
     return anfang;
   });
   const [freie, setFreie] = useState<FreieZeile[]>([]);
@@ -422,9 +483,15 @@ export function NachforderungDialog({
   }
 
   // ---- Positionen, in der Reihenfolge der Anzeige ----
-  const obenEintraege = eintraege.filter((a) => a.vorgeschlagen || vorausgewaehlt(a));
-  const weitereEintraege = eintraege.filter((a) => !a.vorgeschlagen && !vorausgewaehlt(a));
-  const gewaehlteArten = [...obenEintraege, ...weitereEintraege].filter(
+  // Ohne Vorauswahl oben die Vorschlaege in der Reihenfolge des Servers. Mit
+  // Vorauswahl oben genau diese Arten, darunter die uebrigen Vorschlaege unter
+  // eigener Ueberschrift — sonst stuende etwa beim Warnbalken ein offener
+  // Nachweis ohne Kreuz und ohne Erklaerung zwischen den angekreuzten.
+  const obenEintraege =
+    vorauswahl !== null ? eintraege.filter(inVorauswahl) : eintraege.filter((a) => a.vorgeschlagen);
+  const offeneEintraege = vorauswahl !== null ? eintraege.filter((a) => a.vorgeschlagen && !inVorauswahl(a)) : [];
+  const weitereEintraege = eintraege.filter((a) => !a.vorgeschlagen && !inVorauswahl(a));
+  const gewaehlteArten = [...obenEintraege, ...offeneEintraege, ...weitereEintraege].filter(
     (a) => katalog[a.typ]?.gewaehlt && stand(a).waehlbar,
   );
   const positionen: NachforderungPositionBody[] = [
@@ -515,10 +582,12 @@ export function NachforderungDialog({
     setFehler(null);
     try {
       const ergebnis = await unterlagenAktionSenden(basis, body());
+      const { art } = ergebnis.meldung;
       const text = saetze(ergebnis.meldung.meldung, ergebnis.meldung.hinweis);
       if (ergebnis.ausgefuehrt) {
-        // Gespeichert — gruen nur, wenn die Mail wirklich hinausging.
-        await onErfolg({ art: ergebnis.meldung.art === "erfolg" ? "erfolg" : "warnung", text });
+        // Gespeichert — gruen nur, wenn die Mail wirklich hinausging; rot, wenn
+        // sie nicht zugestellt wurde (FAILED), dann mit dem Weg „Link erneut senden".
+        await onErfolg({ art, text: saetze(text, art === "fehler" ? TEXTE.NICHT_ZUGESTELLT : null) });
       } else {
         setFehler(text);
       }
@@ -728,6 +797,12 @@ export function NachforderungDialog({
               {nurVorschlaege ? "Vorgeschlagen (offene Nachweise)" : "Vorgeschlagen"}
             </p>
             {artListe(obenEintraege)}
+          </div>
+        )}
+        {offeneEintraege.length > 0 && (
+          <div className={obenEintraege.length > 0 ? "mt-3" : undefined} data-block="weitere-vorschlaege">
+            <p className={`mb-1 ${UEBERSCHRIFT}`}>{TEXTE.WEITERE_VORSCHLAEGE}</p>
+            {artListe(offeneEintraege)}
           </div>
         )}
         {weitereEintraege.length > 0 && (
@@ -1030,8 +1105,12 @@ function ArtZeile({
         </p>
       )}
       {s.info && (
-        <p id={infoId} className="mt-1 text-xs text-amber-900" data-hinweis="zuletzt-angenommen">
-          {s.info}
+        <p
+          id={infoId}
+          className={`mt-1 text-xs ${s.info.name === "zuletzt-angenommen" ? "text-amber-900" : "text-muted-foreground"}`}
+          data-hinweis={s.info.name}
+        >
+          {s.info.text}
         </p>
       )}
       {gewaehlt && (

@@ -186,8 +186,8 @@ describe("Standardvorlagen der Nachforderung (Paket 4)", () => {
   });
 
   it("der Knopf der HR-Mails verspricht nicht mehr, als der Link haelt", () => {
-    // portalLink fuehrt auf die Uebersicht des Vorgangs, nicht in den Reiter
-    // „Dokumente“ — beschriftet wie die Nachbarvorlagen.
+    // portalLink fuehrt auf den Vorgang (Reiter „Dokumente“, `?tab=dokumente`),
+    // nicht auf die Nachforderung selbst — beschriftet wie die Nachbarvorlagen.
     const v = vorlage("unterlagen-frist-verstrichen");
     expect(v.bodyHtml).toContain("Vorgang im Portal öffnen →");
     expect(v.bodyText).toContain("Vorgang im Portal: {{portalLink}}");

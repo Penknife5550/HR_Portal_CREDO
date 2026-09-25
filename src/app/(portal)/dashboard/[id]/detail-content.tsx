@@ -33,13 +33,11 @@ import {
   PILL_FARBEN,
   type AktionsMeldung,
 } from "@/components/abteilungsaufgaben/abteilungen-karte";
+import type { UnterlagenMeldung } from "@/components/unterlagen/aktionen";
 import { NachforderungDialog } from "@/components/unterlagen/nachforderung-dialog";
+import { NachforderungKarte, UnterlagenMeldungen } from "@/components/unterlagen/nachforderung-karte";
 import {
-  NachforderungKarte,
-  UnterlagenMeldungen,
-  type UnterlagenMeldung,
-} from "@/components/unterlagen/nachforderung-karte";
-import {
+  frueherEntfallen,
   nachweisStandText,
   offeneNachweiseAktion,
   warnbalkenAktion,
@@ -474,11 +472,11 @@ const REITER_AUS_SUCHE: ReadonlyMap<string, TabId> = new Map<string, TabId>(
  * bleibt es bei „Übersicht". Unbekannte Werte werden ignoriert, nie als
  * Fehler gezeigt. Rein und exportiert fuer den Test.
  *
- * Heute setzt kein Link des Portals den Parameter: `portalLink` der HR-Mails
- * zeigt nach Feinplanung 8.2 auf `/dashboard/<id>` (Modul-Baustein
- * `portalPfad`) und oeffnet damit die „Übersicht". Die Seite versteht
- * `?tab=dokumente` schon; ob die Mails ihn tragen sollen, ist eine eigene
- * Entscheidung (offen fuer Schritt 11, Abweichung von 8.2).
+ * Gesetzt wird der Parameter von `portalLink` der HR-Mails zu „Unterlagen
+ * nachfordern": Der Modul-Baustein (`portalPfad`) zeigt auf
+ * `/dashboard/<id>?tab=dokumente` — „Im Portal prüfen" landet so gleich bei
+ * der Karte, nicht in der „Übersicht" (Schritt 11, Abweichung von
+ * Feinplanung 8.2).
  */
 export function reiterAusSuche(suche: string): TabId | null {
   const wert = new URLSearchParams(suche).get("tab");
@@ -659,8 +657,8 @@ export function DetailContent({
   // „Unterlagen nachfordern" (Paket 4): Der Dialog gehoert der Karte im
   // Dokumente-Tab — der Kasten „Offene Nachweise" und der Warnbalken oeffnen
   // denselben und wechseln dafuer dorthin (wie „Dokumente versenden…").
-  // `vorauswahl` kreuzt der Dialog ZUSAETZLICH zu seinen Vorschlaegen (den
-  // offenen Nachweisen) an, `null` heisst nur die Vorschlaege
+  // `vorauswahl` legt fest, was der Dialog ankreuzt; `null` (Karte) heisst die
+  // Vorschlaege ohne frueher als entfallen vermerkte Arten
   // (`NachforderungDialogAnfrage`). Die Meldung des Dialogs steht ueber der
   // Karte: gruen nur, wenn auch die Mail an die Person hinausging.
   const [nachforderungDialog, setNachforderungDialog] = useState<NachforderungDialogAnfrage | null>(null);
@@ -670,8 +668,8 @@ export function DetailContent({
   const [karteSprung, setKarteSprung] = useState(0);
   const karteSprungErledigt = useCallback(() => setKarteSprung(0), []);
 
-  // `?tab=dokumente` oeffnet gleich einen Reiter (`reiterAusSuche`; heute
-  // setzt ihn noch kein Link des Portals). Einmal beim Oeffnen — danach gilt,
+  // `?tab=dokumente` oeffnet gleich einen Reiter (`reiterAusSuche`; so kommen
+  // die HR-Mails der Nachforderung an). Einmal beim Oeffnen — danach gilt,
   // was HR klickt. Im Effekt, nicht im Anfangszustand: Die Seite wird auch auf
   // dem Server gerendert, und dort gibt es kein `window`. Der Effekt laeuft,
   // waehrend die Seite noch laedt — die „Übersicht" blitzt also nicht auf.
@@ -973,9 +971,10 @@ export function DetailContent({
 
   // Erst neu laden, dann schliessen: So steht der neue Stand (Karte, Kasten,
   // Reiter-Pille) schon da, wenn der Dialog verschwindet. Die Meldung kommt
-  // fertig vom Dialog — gruen nur, wenn auch die Mail hinausging. `fehler`
-  // (rot) nimmt die Seite schon an: Die Karte zeigt eine nicht zugestellte
-  // Mail (FAILED) rot, der Dialog meldet sie bisher als `warnung` (gelb).
+  // fertig vom Dialog, in denselben Farben wie die Aktionen der Karte: gruen
+  // nur, wenn die Mail hinausging, rot bei nicht zugestellter Mail (FAILED —
+  // gespeichert ist die Nachforderung trotzdem, der Text nennt „Link erneut
+  // senden"), gelb bei uebersprungener (SKIPPED) bzw. N2.
   const nachforderungErfolg = async (m: { art: "erfolg" | "warnung" | "fehler"; text: string }) => {
     try {
       await loadData(true);
@@ -2145,12 +2144,16 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
  * (`nachweisStandText`: „eingegangen, bitte prüfen", „angefordert am …, Frist
  * …"), und die Knoepfe „Unterlagen nachfordern…", „Ergänzen…" bzw. „Zur
  * Nachforderung" oeffnen den Dialog mit genau den offenen Arten vorangekreuzt
- * oder springen zur Karte. Was geht, entscheidet `offeneNachweiseAktion`
+ * (ohne frueher als entfallen vermerkte — deren Stand nennt die Zeile) oder
+ * springen zur Karte. Was geht, entscheidet `offeneNachweiseAktion`
  * (src/lib/unterlagen.ts) aus der Uebersicht des Servers; der Satz „Mit
  * „Unterlagen nachfordern“ …" steht nur, wo er sich befolgen laesst, sonst der
  * Grund (etwa ein eingestellter Vorgang) bzw. ohne Recht ein Satz ueber die
- * Personalabteilung (`nachforderungsSatz`). Die Rechnung selbst bleibt, wie
- * sie ist: Erst ein ANGENOMMENES Dokument raeumt einen Nachweis ab.
+ * Personalabteilung (`nachforderungsSatz`). Er sagt nur zu, was der Knopf
+ * ankreuzt: Sind Arten frueher als entfallen vermerkt, nennt er die Ausnahme;
+ * sind es alle, gibt es keinen Knopf, und der Satz verweist auf die Karte. Die
+ * Rechnung selbst bleibt, wie sie ist: Erst ein ANGENOMMENES Dokument raeumt
+ * einen Nachweis ab.
  *
  * **Warum LIVE gerechnet und nicht aus dem Protokolleintrag gelesen.** Der
  * Eintrag ist eine Momentaufnahme des Abgabezeitpunkts und taugt genau dafuer:
@@ -2248,8 +2251,16 @@ export function OffeneNachweiseKasten({
   const mitRecht = !!onNachfordern && !!unterlagen?.darfAktionen;
   const anfrage = mitRecht ? aktion.anfrage : null;
   const zurKarte = onZurNachforderung && aktion.zurNachforderung ? onZurNachforderung : null;
+  // Frueher als entfallen vermerkte Arten kreuzt kein Knopf an (dieselbe Regel
+  // wie im Dialog) — der Satz sagt das, statt „genau diese Nachweise" zuzusagen.
+  const entfallen = offen.filter((typ) => frueherEntfallen(typ, unterlagen)).length;
   const wegSatz = nachforderungsSatz(aktion, mitRecht, {
-    aufforderung: NACHFORDERN_SAETZE.KASTEN,
+    aufforderung:
+      entfallen === 0
+        ? NACHFORDERN_SAETZE.KASTEN
+        : entfallen < offen.length
+          ? NACHFORDERN_SAETZE.KASTEN_TEILS_ENTFALLEN
+          : NACHFORDERN_SAETZE.KASTEN_ALLE_ENTFALLEN,
     ohneRecht: NACHFORDERN_SAETZE.KASTEN_OHNE_RECHT,
   });
 
@@ -2362,6 +2373,15 @@ export function verlaengerungVorauswahl(dringendeTypen: readonly string[]): stri
 /** Die Saetze von Kasten und Warnbalken zum Weg ueber „Unterlagen nachfordern" (P:1285). */
 const NACHFORDERN_SAETZE = {
   KASTEN: "Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie genau diese Nachweise hochlädt.",
+  // Frueher als entfallen vermerkte Arten kreuzt der Dialog nicht an
+  // (`frueherEntfallen`); „genau diese" stimmte dann nicht mehr.
+  KASTEN_TEILS_ENTFALLEN:
+    "Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie diese Nachweise hochlädt – außer den als entfallen vermerkten; die lassen sich im Dialog bei Bedarf dazunehmen.",
+  // Alle so vermerkt: Der Kasten hat keinen Knopf (nichts vorzukreuzen), der
+  // Weg fuehrt ueber die Karte — ohne laufende „Unterlagen nachfordern…", mit
+  // laufender „Unterlagen ergänzen…".
+  KASTEN_ALLE_ENTFALLEN:
+    "Laut einer früheren Nachforderung sind sie als entfallen vermerkt; werden sie doch gebraucht, fordern Sie sie in der Karte „Unterlagen nachfordern“ im Reiter „Dokumente“ wieder an.",
   KASTEN_OHNE_RECHT: "Die Personalabteilung kann sie über „Unterlagen nachfordern“ bei der Person anfordern.",
   // „Annehmen" allein genuegt nicht: Ohne Datum verdraengt der neue Nachweis
   // den abgelaufenen nie (`nachweisLagen`, Z1 „Datum später nachtragen").
@@ -2406,9 +2426,9 @@ function nachforderungsSatz(
  * dichtmacht, hindert HR genau an der Arbeit, mit der das Problem behoben wird.
  *
  * Seit Paket 4 bietet er den Weg dazu an: „Verlängerten Nachweis anfordern…"
- * oeffnet den Dialog mit den betroffenen Arten vorangekreuzt
- * (`verlaengerungVorauswahl`, `warnbalkenAktion`; der Dialog kreuzt dazu die
- * offenen Nachweise an), mit laufender Nachforderung dazu „Zur
+ * oeffnet den Dialog mit genau den betroffenen Arten vorangekreuzt
+ * (`verlaengerungVorauswahl`, `warnbalkenAktion`; offene Nachweise stehen
+ * darunter, nicht angekreuzt), mit laufender Nachforderung dazu „Zur
  * Nachforderung". Nimmt HR den neuen Nachweis MIT Datum oder als unbefristet
  * an, endet die Warnung von selbst — `nachweisLagen` nimmt das spaeteste Datum
  * bzw. ein unbefristetes Dokument; ohne Datum bleibt der alte Titel
@@ -3042,7 +3062,10 @@ export function TabDocuments({
   /** Oeffnet den Dialog (Knoepfe der Karte). */
   onNachfordern?: (anfrage: NachforderungDialogAnfrage) => void;
   onNachforderungSchliessen?: () => void;
-  /** Der Dialog meldet Erfolg (gruen) oder Warnung (gelb: Mail nicht zugestellt); `fehler` waere rot. */
+  /**
+   * Der Dialog meldet gespeichert: `erfolg` (gruen, Mail zugestellt), `fehler`
+   * (rot, Mail nicht zugestellt) oder `warnung` (gelb, Mail uebersprungen bzw. N2).
+   */
   onNachforderungErfolg?: (meldung: { art: "erfolg" | "warnung" | "fehler"; text: string }) => void | Promise<void>;
   unterlagenMeldung?: UnterlagenMeldung | null;
   onUnterlagenMeldungSchliessen?: () => void;

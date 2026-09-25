@@ -35,11 +35,8 @@
  */
 import { useState } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import {
-  NachforderungKarte,
-  unterlagenAntwortAuswerten,
-  unterlagenApiBasis,
-} from "@/components/unterlagen/nachforderung-karte";
+import { unterlagenAntwortAuswerten, unterlagenApiBasis } from "@/components/unterlagen/aktionen";
+import { NachforderungKarte } from "@/components/unterlagen/nachforderung-karte";
 import {
   MELDUNGEN,
   laufWaechterText,

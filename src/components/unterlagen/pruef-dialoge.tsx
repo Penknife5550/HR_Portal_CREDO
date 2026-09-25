@@ -27,6 +27,7 @@
  */
 
 import { useState, type ReactNode } from "react";
+import { adresseGleich } from "@/components/unterlagen/aktionen";
 import { DialogRahmen } from "@/components/unterlagen/dialog-rahmen";
 import { ablaufAmpel } from "@/lib/dokument-fristen";
 import { empfaengerFreigegeben } from "@/lib/empfaenger-freigabe";
@@ -754,15 +755,6 @@ export interface ErneutSendenDialogProps extends DialogBasis<ErneutSendenBody> {
   nachforderung: NachforderungAnsicht;
   /** `uebersicht.dialog.empfaenger` — Adresse im Vorgang und freigegebene Domains; `null` ohne Angabe. */
   empfaenger: UnterlagenDialogDaten["empfaenger"] | null;
-}
-
-/**
- * Dieselbe Regel wie `gleicheAdresse` (src/lib/validations/onboarding.ts):
- * Gross- und Kleinschreibung und Leerraum am Rand zaehlen nicht. Nicht von dort
- * importiert — die Datei zoege die Zod-Schemas des Fragebogens in den Browser.
- */
-export function adresseGleich(a: string, b: string): boolean {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
 /**

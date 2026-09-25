@@ -27,11 +27,15 @@
  *     Zusage — nur, wo er sich befolgen laesst (sonst der Grund bzw. ohne
  *     Recht ein Satz ueber die Personalabteilung) —, je Nachweis der Stand der
  *     Nachforderung (`nachweisStandText`), die Knoepfe je Recht und Stand —
- *     „Unterlagen nachfordern…" bekommt genau die offenen Arten, „Ergänzen…"
+ *     „Unterlagen nachfordern…" bekommt genau die offenen Arten (ohne frueher
+ *     als entfallen vermerkte — der Satz nennt dann die Ausnahme, und sind es
+ *     alle, gibt es keinen Knopf, nur den Verweis auf die Karte), „Ergänzen…"
  *     nur die noch nicht angeforderten, „Zur Nachforderung" springt zur Karte.
  *     Dazu der Warnbalken mit „Verlängerten Nachweis anfordern…".
- *  6. Was davon im ECHTEN Dialog angekreuzt ist (`vorauswahl` kreuzt dort
- *     zusaetzlich zu den Vorschlaegen an).
+ *  6. Was davon im ECHTEN Dialog angekreuzt ist: `vorauswahl` legt es fest,
+ *     die uebrigen Vorschlaege stehen darunter unter „Weitere offene Nachweise
+ *     (nicht vorausgewählt)“ — und der Kasten kreuzt dasselbe an wie der Knopf
+ *     der Karte.
  *
  * Die Uebersicht der Nachforderung entsteht mit der ECHTEN Regel des Servers
  * (`uebersichtBauen`), die Knopfregeln kommen aus src/lib/unterlagen.ts
@@ -534,6 +538,12 @@ const kastenSatz = () => document.querySelector('[data-zeile="kasten-satz"]')?.t
 const SATZ_P1285 =
   "Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie genau diese Nachweise hochlädt.";
 const SATZ_OHNE_RECHT = "Die Personalabteilung kann sie über „Unterlagen nachfordern“ bei der Person anfordern.";
+/** Einige offene Arten sind frueher als entfallen vermerkt: Der Knopf kreuzt sie nicht an. */
+const SATZ_TEILS_ENTFALLEN =
+  "Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie diese Nachweise hochlädt – außer den als entfallen vermerkten; die lassen sich im Dialog bei Bedarf dazunehmen.";
+/** Alle offenen Arten so vermerkt: kein Knopf im Kasten, der Weg fuehrt ueber die Karte. */
+const SATZ_ALLE_ENTFALLEN =
+  "Laut einer früheren Nachforderung sind sie als entfallen vermerkt; werden sie doch gebraucht, fordern Sie sie in der Karte „Unterlagen nachfordern“ im Reiter „Dokumente“ wieder an.";
 const GRUND_EINGESTELLT =
   "Der Vorgang ist abgelaufen und wird nicht mehr bearbeitet. Unterlagen lassen sich nicht mehr nachfordern.";
 
@@ -712,7 +722,7 @@ describe("Offene Nachweise: Paket 4 — Text, Stand, Knöpfe", () => {
     expect(kastenSatz()).toBe("Diese Pflichtunterlagen durften nachgereicht werden und liegen bis heute nicht vor.");
   });
 
-  test("früher als entfallen vermerkt: Stand erklärt — und trotzdem unter den offenen Arten (Feinplanung 13)", () => {
+  test("früher als entfallen vermerkt: Stand erklärt — offen, aber nicht in der Vorauswahl", () => {
     const onNachfordern = jest.fn();
     render(
       <OffeneNachweiseKasten
@@ -721,14 +731,89 @@ describe("Offene Nachweise: Paket 4 — Text, Stand, Knöpfe", () => {
         onNachfordern={onNachfordern}
       />,
     );
+    // Weiter unter den offenen Nachweisen, mit ihrem Stand.
     expect(zeileVon("ARBEITSERLAUBNIS")).toBe(
       "Arbeitserlaubnis / Zusatzblatt — entfällt laut Nachforderung (vermerkt am 10.09.2026)",
     );
     fireEvent.click(screen.getByRole("button", { name: "Unterlagen nachfordern…" }));
-    // Genau die offenen Arten: Der Dialog schlaegt die Arbeitserlaubnis ohnehin
-    // vor (sie ist Pflicht und fehlt) — HR waehlt sie dort ab, wenn es beim
-    // Entfallen bleibt (echter Dialog: unten).
-    expect(onNachfordern).toHaveBeenCalledWith({ modus: "neu", vorauswahl: VIER_OFFENE_ARTEN });
+    // Die offenen Arten ohne die quittierte: HR hat sie schon einmal als
+    // entfallen vermerkt; im Dialog steht sie sichtbar, aber nicht angekreuzt
+    // (echter Dialog: unten).
+    expect(onNachfordern).toHaveBeenCalledWith({
+      modus: "neu",
+      vorauswahl: ["MASERNSCHUTZ", "AUFENTHALTSTITEL", "PKV_NACHWEIS"],
+    });
+    // Der Satz sagt nicht mehr „genau diese Nachweise", sondern nennt die Ausnahme.
+    expect(kastenSatz()).toBe(
+      `Diese Pflichtunterlagen durften nachgereicht werden und liegen bis heute nicht vor. ${SATZ_TEILS_ENTFALLEN}`,
+    );
+    expect(kastenSatz()).not.toContain("genau diese");
+  });
+
+  /** Nur die Arbeitserlaubnis ist offen — und die ist in der aelteren Nachforderung als entfallen vermerkt. */
+  const NUR_AE_OFFEN = {
+    ...VIER_OFFEN,
+    documents: [
+      dokument("MASERNSCHUTZ"),
+      dokument("AUFENTHALTSTITEL", "2030-01-01T00:00:00.000Z"),
+      dokument("PKV_NACHWEIS"),
+    ],
+  };
+
+  test("alle offenen Arten früher entfallen: kein Knopf, der einen Dialog ohne Kreuz öffnet — der Satz nennt den Weg", () => {
+    const onNachfordern = jest.fn();
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...NUR_AE_OFFEN, unterlagen: uebersicht({ nachforderungen: [ERLEDIGT_AE_ENTFALLEN] }) })}
+        onZuDenDokumenten={jest.fn()}
+        onNachfordern={onNachfordern}
+        onZurNachforderung={jest.fn()}
+      />,
+    );
+    expect(Array.from(document.querySelectorAll("[data-nachweis]")).map((el) => el.getAttribute("data-nachweis"))).toEqual([
+      "ARBEITSERLAUBNIS",
+    ]);
+    expect(zeileVon("ARBEITSERLAUBNIS")).toBe(
+      "Arbeitserlaubnis / Zusatzblatt — entfällt laut Nachforderung (vermerkt am 10.09.2026)",
+    );
+    expect(kastenKnoepfe()).toEqual(["Zu den Dokumenten"]);
+    expect(onNachfordern).not.toHaveBeenCalled();
+    expect(kastenSatz()).toBe(
+      `Diese Pflichtunterlagen durften nachgereicht werden und liegen bis heute nicht vor. ${SATZ_ALLE_ENTFALLEN}`,
+    );
+  });
+
+  test("alle offenen Arten früher entfallen, mit laufender Nachforderung: nur „Zur Nachforderung“, derselbe Satz", () => {
+    const laufendOhneAe = nachforderung({ positionen: [position({ id: "p-az", typ: "ABSCHLUSSZEUGNIS" })] });
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({
+          ...NUR_AE_OFFEN,
+          unterlagen: uebersicht({ nachforderungen: [laufendOhneAe, ERLEDIGT_AE_ENTFALLEN] }),
+        })}
+        onZuDenDokumenten={null}
+        onNachfordern={jest.fn()}
+        onZurNachforderung={jest.fn()}
+      />,
+    );
+    expect(kastenKnoepfe()).toEqual(["Zur Nachforderung"]);
+    expect(kastenSatz()).toContain(SATZ_ALLE_ENTFALLEN);
+    expect(kastenSatz()).not.toContain("schicken Sie");
+  });
+
+  test("früher entfallen, ohne Recht: der Satz über die Personalabteilung bleibt", () => {
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({
+          ...NUR_AE_OFFEN,
+          unterlagen: uebersicht({ nachforderungen: [ERLEDIGT_AE_ENTFALLEN], darfAktionen: false }),
+        })}
+        onZuDenDokumenten={null}
+        onNachfordern={null}
+      />,
+    );
+    expect(kastenSatz()).toContain(SATZ_OHNE_RECHT);
+    expect(kastenSatz()).not.toContain("wieder an");
   });
 });
 
@@ -818,11 +903,12 @@ describe("Warnbalken: verlängerten Nachweis anfordern", () => {
 // =============================================
 
 /**
- * `vorauswahl` kreuzt der Dialog ZUSAETZLICH zu seinen Vorschlaegen an (den
- * offenen Nachweisen, `dialog.auswahl[].vorgeschlagen`). Die Rueckrufe allein
- * belegen deshalb nicht, was HR im Dialog sieht — hier geht die Anfrage aus
- * Kasten bzw. Warnbalken in den echten Dialog, und geprueft werden die
- * Kaestchen.
+ * `vorauswahl` legt fest, was der Dialog ankreuzt; die uebrigen Vorschlaege
+ * (offene Nachweise, `dialog.auswahl[].vorgeschlagen`) stehen darunter, nicht
+ * angekreuzt. Die Rueckrufe allein belegen nicht, was HR im Dialog sieht —
+ * hier geht die Anfrage aus Kasten bzw. Warnbalken in den echten Dialog, und
+ * geprueft werden die Kaestchen, auch gegen den Knopf der Karte
+ * (`vorauswahl: null`).
  */
 describe("Kasten und Warnbalken öffnen den echten Dialog", () => {
   /** Eine Art, wie der Modul-Baustein sie liefert (`auswahl`). */
@@ -861,7 +947,12 @@ describe("Kasten und Warnbalken öffnen den echten Dialog", () => {
     );
   }
 
-  test("Kasten: genau die offenen Nachweise angekreuzt — eine früher entfallene Art eingeschlossen, sonst nichts", () => {
+  const angekreuzt = () =>
+    Array.from(document.querySelectorAll("[data-art]"))
+      .filter((el) => (within(el as HTMLElement).getByRole("checkbox") as HTMLInputElement).checked)
+      .map((el) => (el as HTMLElement).dataset.art);
+
+  test("Kasten: genau die offenen Nachweise angekreuzt — eine früher entfallene Art sichtbar, aber nicht", () => {
     const u = uebersicht({
       nachforderungen: [ERLEDIGT_AE_ENTFALLEN],
       dialog: {
@@ -881,13 +972,46 @@ describe("Kasten und Warnbalken öffnen den echten Dialog", () => {
     kasten.unmount();
 
     dialogAus(onNachfordern.mock.calls[0][0], u);
-    for (const typ of VIER_OFFENE_ARTEN) {
-      expect({ typ, angekreuzt: kaestchen(typ).checked }).toEqual({ typ, angekreuzt: true });
-    }
+    expect(angekreuzt()).toEqual(["MASERNSCHUTZ", "AUFENTHALTSTITEL", "PKV_NACHWEIS"]);
+    // Die quittierte Arbeitserlaubnis steht darunter bei den nicht
+    // vorausgewaehlten offenen Nachweisen, waehlbar und mit ihrem Stand.
+    const offen = document.querySelector('[data-block="weitere-vorschlaege"]') as HTMLElement;
+    expect(offen.contains(document.querySelector('[data-art="ARBEITSERLAUBNIS"]'))).toBe(true);
+    expect(kaestchen("ARBEITSERLAUBNIS").disabled).toBe(false);
+    expect(document.querySelector('[data-art="ARBEITSERLAUBNIS"] [data-hinweis="frueher-entfallen"]')?.textContent).toBe(
+      "Entfällt laut einer früheren Nachforderung (vermerkt am 10.09.2026).",
+    );
     expect(kaestchen("ABSCHLUSSZEUGNIS").checked).toBe(false);
   });
 
-  test("Warnbalken: die ablaufenden Arten dazu — neben den offenen Nachweisen, die der Dialog ohnehin vorschlägt", () => {
+  test("Kasten und Knopf der Karte kreuzen dasselbe an", () => {
+    const u = uebersicht({
+      nachforderungen: [ERLEDIGT_AE_ENTFALLEN],
+      dialog: {
+        auswahl: [...VIER_OFFENE_ARTEN.map((t) => art(t, true)), art("ABSCHLUSSZEUGNIS", false)],
+        empfaenger,
+      },
+    });
+    const onNachfordern = jest.fn();
+    const kasten = render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...VIER_OFFEN, unterlagen: u })}
+        onZuDenDokumenten={null}
+        onNachfordern={onNachfordern}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Unterlagen nachfordern…" }));
+    kasten.unmount();
+
+    const ausKasten = dialogAus(onNachfordern.mock.calls[0][0], u);
+    const kreuzeKasten = angekreuzt();
+    ausKasten.unmount();
+    // Der Knopf „Unterlagen nachfordern…" der Karte oeffnet ohne Vorauswahl.
+    dialogAus({ modus: "neu", vorauswahl: null }, u);
+    expect(angekreuzt()).toEqual(kreuzeKasten);
+  });
+
+  test("Warnbalken: genau die ablaufenden Arten — die offenen Nachweise stehen darunter, nicht angekreuzt", () => {
     // Titel und Arbeitserlaubnis liegen als (abgelaufene) Dokumente vor, sind
     // also KEIN Vorschlag; offen ist nur der Masernschutz.
     const u = uebersicht({
@@ -917,10 +1041,21 @@ describe("Kasten und Warnbalken öffnen den echten Dialog", () => {
     warn.unmount();
 
     dialogAus(onNachfordern.mock.calls[0][0], u);
-    expect(kaestchen("AUFENTHALTSTITEL").checked).toBe(true);
-    expect(kaestchen("ARBEITSERLAUBNIS").checked).toBe(true);
-    // Bewusst: Die Mail an die Person nennt alles, was fehlt; HR kann abwaehlen.
-    expect(kaestchen("MASERNSCHUTZ").checked).toBe(true);
+    expect(angekreuzt()).toEqual(["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"]);
+    // Anlass ist der Ablauf: Der offene Masernschutz steht sichtbar darunter,
+    // unter einer eigenen Ueberschrift, die sagt, warum er kein Kreuz hat — HR
+    // kreuzt ihn bei Bedarf dazu.
+    const arten = (block: string) =>
+      Array.from(document.querySelectorAll(`[data-block="${block}"] [data-art]`)).map(
+        (el) => (el as HTMLElement).dataset.art,
+      );
+    expect(arten("vorgeschlagen")).toEqual(["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"]);
+    expect(arten("weitere-vorschlaege")).toEqual(["MASERNSCHUTZ"]);
+    expect(document.querySelector('[data-block="weitere-vorschlaege"] p')?.textContent).toBe(
+      "Weitere offene Nachweise (nicht vorausgewählt)",
+    );
+    expect(kaestchen("MASERNSCHUTZ").checked).toBe(false);
+    expect(kaestchen("MASERNSCHUTZ").disabled).toBe(false);
     expect(kaestchen("ABSCHLUSSZEUGNIS").checked).toBe(false);
   });
 });

@@ -1493,7 +1493,8 @@ describe("hrVollstaendigMelden", () => {
       hr_postfach: "personal@credo-gruppe.de",
       angefordert_von: "Erika Muster",
       mitarbeiter_name: "Anna Beispiel",
-      portalLink: `${BASIS}/dashboard/${VORGANG_ID}`,
+      // „Im Portal prüfen" landet im Reiter „Dokumente" bei der Karte.
+      portalLink: `${BASIS}/dashboard/${VORGANG_ID}?tab=dokumente`,
       anzahl_zu_pruefen: 1,
       erneut_eingereicht: "ja",
     });

@@ -473,7 +473,10 @@ export const onboardingBaustein: UnterlagenModulBaustein<OnboardingUnterlagenVor
   kopfDaten: (id) => ({ modul: "ONBOARDING", onboardingId: id }),
   vorgangIdAus: (bezug) => bezug.onboardingId ?? null,
   audit: (id) => ({ processType: "ONBOARDING", fk: { onboardingId: id } }),
-  portalPfad: (id) => `/dashboard/${id}`,
+  // Die HR-Mails („Im Portal prüfen") landen gleich im Reiter „Dokumente" bei
+  // der Karte, nicht in der „Übersicht" (`reiterAusSuche` in detail-content.tsx;
+  // Abweichung von Feinplanung 8.2, die `/dashboard/<id>` nennt).
+  portalPfad: (id) => `/dashboard/${id}?tab=dokumente`,
   apiBasis: (id) => `/api/onboarding/${id}/unterlagen`,
   annahmePruefen,
   uebernehmen,

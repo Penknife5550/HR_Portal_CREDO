@@ -15,8 +15,12 @@
  * auf und nicht erst im Betrieb.
  *
  * Belegt wird:
- *  1. Vorauswahl: Vorschlaege angekreuzt mit dem Hinweis aus
- *     `NACHFORDERUNG_HINWEISE` (editierbar); `vorauswahl` kreuzt zusaetzlich an.
+ *  1. Vorauswahl: ohne `vorauswahl` (Karte) die Vorschlaege angekreuzt mit dem
+ *     Hinweis aus `NACHFORDERUNG_HINWEISE` (editierbar) — ausser einer frueher
+ *     als entfallen vermerkten Art (sichtbar, mit Hinweis, waehlbar); mit
+ *     `vorauswahl` (Kasten, Warnbalken) genau diese Arten, die uebrigen
+ *     Vorschlaege darunter unter „Weitere offene Nachweise (nicht
+ *     vorausgewählt)“, nicht angekreuzt.
  *  2. Kennzeichen „Vertraulich" (bzw. die Kategorie des Servers) und
  *     „Original" in der Beschreibung des Kaestchens; gesperrte Art mit Grund;
  *     SONSTIGES nie unter „Weitere".
@@ -32,8 +36,11 @@
  *     waehlbar ausser ENTFAELLT, Weg bei angenommener Art, Frist optional und
  *     nach Fristablauf Pflicht, Hinweis bei verkuerzter Frist, Info-Satz ohne
  *     „erhalten Sie"; Modus „neu": Hinweis, dass die Ruecknahme endet.
- *  8. Ergebnis: Erfolg nur bei zugestellter Mail, sonst Warnung; Fehler im
- *     Dialog mit role="alert"; Doppelklick ergibt einen Aufruf.
+ *  8. Ergebnis: Erfolg nur bei zugestellter Mail; nicht zugestellt (FAILED)
+ *     rot mit dem Weg ueber „Link erneut senden" (als Moeglichkeit, nicht als
+ *     Zusage), uebersprungen (SKIPPED)
+ *     und N2 gelb; Fehler im Dialog mit role="alert"; Doppelklick ergibt einen
+ *     Aufruf.
  *  9. Rahmen: Fokus auf „Abbrechen", Escape — nicht waehrend des Sendens;
  *     Name · Vorgangsnummer unter dem Titel; Ersatzziel beim Schliessen.
  */
@@ -332,28 +339,161 @@ describe("Vorauswahl", () => {
     expect(hinweisFeld("MASERNSCHUTZ").value).toBe("Nur die Seite mit den Impfungen.");
   });
 
-  it("`vorauswahl` kreuzt zusätzlich an — nur erlaubte Arten, SONSTIGES nie", () => {
+  it("`vorauswahl` legt fest: genau diese Arten angekreuzt — die übrigen Vorschläge darunter, nicht angekreuzt", () => {
     dialog({ vorauswahl: ["ARBEITSERLAUBNIS", "FUEHRUNGSZEUGNIS", "SONSTIGES"] });
-    expect(kaestchen("MASERNSCHUTZ").checked).toBe(true);
-    expect(kaestchen("AUFENTHALTSTITEL").checked).toBe(true);
     expect(kaestchen("ARBEITSERLAUBNIS").checked).toBe(true);
     expect(hinweisFeld("ARBEITSERLAUBNIS").value).toBe(NACHFORDERUNG_HINWEISE.ARBEITSERLAUBNIS);
-    // Die Vorauswahl steht oben bei den Vorschlaegen — die Ueberschrift sagt dann nicht mehr „offene Nachweise".
+    // Die Vorschlaege bleiben sichtbar und waehlbar, aber nicht angekreuzt.
+    expect(kaestchen("MASERNSCHUTZ").checked).toBe(false);
+    expect(kaestchen("MASERNSCHUTZ").disabled).toBe(false);
+    expect(kaestchen("AUFENTHALTSTITEL").checked).toBe(false);
+    // Oben nur die Vorauswahl — die Ueberschrift sagt dann nicht mehr „offene
+    // Nachweise" —, darunter die Vorschlaege unter eigener Ueberschrift, die
+    // sagt, warum sie kein Kreuz haben.
+    const reiheIn = (block: string) =>
+      Array.from(document.querySelectorAll(`[data-block="${block}"] [data-art]`)).map(
+        (el) => (el as HTMLElement).dataset.art,
+      );
     const oben = document.querySelector('[data-block="vorgeschlagen"]') as HTMLElement;
-    expect(oben.contains(artZeile("ARBEITSERLAUBNIS"))).toBe(true);
+    expect(reiheIn("vorgeschlagen")).toEqual(["FUEHRUNGSZEUGNIS", "ARBEITSERLAUBNIS"]);
     expect(oben.textContent).not.toContain("offene Nachweise");
-    // Gesperrt bleibt gesperrt, auch auf Zuruf.
+    expect(reiheIn("weitere-vorschlaege")).toEqual(["MASERNSCHUTZ", "AUFENTHALTSTITEL"]);
+    expect(document.querySelector('[data-block="weitere-vorschlaege"] p')?.textContent).toBe(
+      "Weitere offene Nachweise (nicht vorausgewählt)",
+    );
+    // Gesperrt bleibt gesperrt, auch auf Zuruf — mit seinem Grund oben sichtbar.
     expect(kaestchen("FUEHRUNGSZEUGNIS").checked).toBe(false);
     expect(kaestchen("FUEHRUNGSZEUGNIS").disabled).toBe(true);
     expect(artZeile("SONSTIGES")).toBeNull();
-    expect(zeileText("summe")).toContain("3 Unterlagen");
+    expect(zeileText("summe")).toContain("1 Unterlage ·");
+    // Ein Vorschlag laesst sich dazu ankreuzen.
+    fireEvent.click(kaestchen("MASERNSCHUTZ"));
+    expect(zeileText("summe")).toContain("2 Unterlagen");
   });
 
-  it("ohne `vorauswahl` nur die Vorschläge", () => {
+  it("`vorauswahl` mit genau den Vorschlägen: alle angekreuzt, Überschrift „offene Nachweise“", () => {
+    dialog({ vorauswahl: ["MASERNSCHUTZ", "AUFENTHALTSTITEL"] });
+    expect(kaestchen("MASERNSCHUTZ").checked).toBe(true);
+    expect(kaestchen("AUFENTHALTSTITEL").checked).toBe(true);
+    expect((document.querySelector('[data-block="vorgeschlagen"]') as HTMLElement).textContent).toContain(
+      "Vorgeschlagen (offene Nachweise)",
+    );
+    // Kein uebriger Vorschlag — keine zweite Ueberschrift.
+    expect(document.querySelector('[data-block="weitere-vorschlaege"]')).toBeNull();
+  });
+
+  it("leere `vorauswahl`: nichts angekreuzt, die Vorschläge stehen unter „nicht vorausgewählt“", () => {
+    dialog({ vorauswahl: [] });
+    expect(kaestchen("MASERNSCHUTZ").checked).toBe(false);
+    expect(kaestchen("AUFENTHALTSTITEL").checked).toBe(false);
+    expect(document.querySelector('[data-block="vorgeschlagen"]')).toBeNull();
+    const offen = document.querySelector('[data-block="weitere-vorschlaege"]') as HTMLElement;
+    expect(offen.contains(artZeile("MASERNSCHUTZ"))).toBe(true);
+    expect(anfordernKnopf().disabled).toBe(true);
+    expect(grundZeile()).toBe(MELDUNGEN.KEINE_POSITION);
+  });
+
+  it("ohne `vorauswahl` nur die Vorschläge — in einem Block, ohne „nicht vorausgewählt“", () => {
     dialog({ vorauswahl: null });
     expect(kaestchen("ARBEITSERLAUBNIS").checked).toBe(false);
     const weitere = document.querySelector('[data-block="weitere"]') as HTMLElement;
     expect(weitere.contains(artZeile("ARBEITSERLAUBNIS"))).toBe(true);
+    expect(document.querySelector('[data-block="weitere-vorschlaege"]')).toBeNull();
+  });
+
+  describe("früher als entfallen vermerkt (dieselbe Regel wie im Kasten)", () => {
+    /** Eine aeltere, erledigte Nachforderung: Masernschutz dort als entfallen vermerkt. */
+    const erledigtMitEntfallen = (teil: Partial<NachforderungEingabe> = {}) =>
+      nachforderung({
+        id: "nf-alt",
+        status: "ERLEDIGT",
+        angefordertAm: "2026-09-01T08:00:00.000Z",
+        erledigtAm: "2026-09-10T08:00:00.000Z",
+        links: [],
+        positionen: [
+          position({
+            id: "p-ms-alt",
+            typ: "MASERNSCHUTZ",
+            bezeichnung: "Masernschutz-Nachweis",
+            sensibel: true,
+            status: "ENTFAELLT",
+            entschiedenAm: "2026-09-10T08:00:00.000Z",
+          }),
+        ],
+        ...teil,
+      });
+    const ENTFALLEN_SATZ = "Entfällt laut einer früheren Nachforderung (vermerkt am 10.09.2026).";
+
+    it("Knopf der Karte (`null`): nicht angekreuzt, sichtbar oben mit Hinweis — und wählbar", () => {
+      const u = uebersicht({ nachforderungen: [erledigtMitEntfallen()] });
+      // Dieselbe Quelle wie der Kasten: `typen`, auch ohne rücknehmbare Annahme (zuletztErledigt fehlt).
+      expect(u.zuletztErledigt).toBeNull();
+      dialog({ u, vorauswahl: null });
+      const ms = kaestchen("MASERNSCHUTZ");
+      expect(ms.checked).toBe(false);
+      expect(ms.disabled).toBe(false);
+      const oben = document.querySelector('[data-block="vorgeschlagen"]') as HTMLElement;
+      expect(oben.contains(artZeile("MASERNSCHUTZ"))).toBe(true);
+      const info = artZeile("MASERNSCHUTZ").querySelector('[data-hinweis="frueher-entfallen"]') as HTMLElement;
+      expect(info.textContent).toBe(ENTFALLEN_SATZ);
+      expect(beschreibung(ms)).toEqual(["Vertraulich", ENTFALLEN_SATZ]);
+      // Die uebrigen Vorschlaege bleiben angekreuzt.
+      expect(kaestchen("AUFENTHALTSTITEL").checked).toBe(true);
+      expect(zeileText("summe")).toContain("1 Unterlage ·");
+      fireEvent.click(ms);
+      expect(ms.checked).toBe(true);
+    });
+
+    it("mit `vorauswahl`, die sie nennt, ist sie angekreuzt — der Hinweis bleibt", () => {
+      dialog({ u: uebersicht({ nachforderungen: [erledigtMitEntfallen()] }), vorauswahl: ["MASERNSCHUTZ"] });
+      expect(kaestchen("MASERNSCHUTZ").checked).toBe(true);
+      expect(artZeile("MASERNSCHUTZ").querySelector('[data-hinweis="frueher-entfallen"]')?.textContent).toBe(
+        ENTFALLEN_SATZ,
+      );
+      expect(kaestchen("AUFENTHALTSTITEL").checked).toBe(false);
+    });
+
+    it("beim Ergänzen (`null`): eine früher entfallene Art ist nicht angekreuzt, ein neuer Vorschlag schon", () => {
+      // Arbeitserlaubnis: in der aelteren entfallen; Arbeitsvertrag: in keiner Nachforderung.
+      const auswahl = AUSWAHL.map((a) =>
+        a.typ === "ARBEITSERLAUBNIS" || a.typ === "ARBEITSVERTRAG" ? { ...a, vorgeschlagen: true } : a,
+      );
+      const alt = erledigtMitEntfallen({
+        positionen: [
+          position({
+            id: "p-ae-alt",
+            typ: "ARBEITSERLAUBNIS",
+            bezeichnung: "Arbeitserlaubnis / Zusatzblatt",
+            status: "ENTFAELLT",
+            entschiedenAm: "2026-09-10T08:00:00.000Z",
+          }),
+        ],
+      });
+      dialog({
+        modus: "ergaenzen",
+        vorauswahl: null,
+        u: uebersicht({ nachforderungen: [nachforderung(), alt], dialog: { ...DIALOG, auswahl } }),
+      });
+      expect(kaestchen("ARBEITSERLAUBNIS").checked).toBe(false);
+      expect(artZeile("ARBEITSERLAUBNIS").querySelector('[data-hinweis="frueher-entfallen"]')?.textContent).toBe(
+        ENTFALLEN_SATZ,
+      );
+      expect(kaestchen("ARBEITSVERTRAG").checked).toBe(true);
+      // Die in der LAUFENDEN entfallene Art traegt ihren eigenen Zusatz, keinen Hinweis auf eine fruehere.
+      expect(artZeile("PKV_NACHWEIS").querySelector('[data-hinweis="frueher-entfallen"]')).toBeNull();
+    });
+
+    it("beim Ergänzen mit `vorauswahl` (Warnbalken): eine in der laufenden entfallene Art ist angekreuzt, eine angeforderte nicht", () => {
+      dialog({
+        modus: "ergaenzen",
+        vorauswahl: ["PKV_NACHWEIS", "MASERNSCHUTZ"],
+        u: uebersicht({ nachforderungen: [nachforderung()] }),
+      });
+      expect(kaestchen("PKV_NACHWEIS").checked).toBe(true);
+      expect(kaestchen("MASERNSCHUTZ").checked).toBe(false);
+      expect(kaestchen("MASERNSCHUTZ").disabled).toBe(true);
+      expect(zeileText("summe")).toContain("1 weitere Unterlage");
+    });
   });
 });
 
@@ -1078,16 +1218,40 @@ describe("Ergebnis", () => {
     expect(onErfolg).toHaveBeenCalledWith({ art: "erfolg", text: "Die Unterlagen sind angefordert." });
   });
 
-  it("Mail nicht zugestellt (FAILED): Warnung statt Erfolg", async () => {
+  /** Der Weg nach FAILED — als Moeglichkeit, nicht als Zusage eines zugestellten Links. */
+  const WEG_NICHT_ZUGESTELLT =
+    "Über „Link erneut senden“ in der Karte können Sie die E-Mail auch selbst noch einmal senden, bei Bedarf an eine korrigierte Adresse.";
+
+  it("Mail nicht zugestellt (FAILED): rot — gespeichert, nicht zugestellt, „Link erneut senden“ als Weg", async () => {
     const { onErfolg } = await anfordern(201, anfordernAntwort({ status: "FAILED", detail: "ETIMEDOUT" }));
     expect(onErfolg).toHaveBeenCalledTimes(1);
-    const meldung = onErfolg.mock.calls[0][0];
-    expect(meldung.art).toBe("warnung");
-    expect(meldung.text).toContain("Die Unterlagen sind angefordert.");
-    expect(meldung.text).toContain(MELDUNGEN.MAIL_NICHT_ZUGESTELLT);
+    expect(onErfolg.mock.calls[0][0]).toEqual({
+      art: "fehler",
+      text: `Die Unterlagen sind angefordert. ${MELDUNGEN.MAIL_NICHT_ZUGESTELLT} ${WEG_NICHT_ZUGESTELLT}`,
+    });
+    // Keine Zusage, die „Link erneut senden" nicht halten kann (dieselbe Adresse
+    // kann wieder scheitern), und „gespeichert" nicht doppelt.
+    const text = onErfolg.mock.calls[0][0].text as string;
+    expect(text).not.toContain("bekommt die Person");
+    expect(text).not.toContain("bleibt gespeichert");
   });
 
-  it("Mail übersprungen (SKIPPED, Vorlage deaktiviert): Warnung", async () => {
+  it("beim Ergänzen nicht zugestellt: rot, dieselbe Aussage — ohne „sofort“ (Sperrzeit von „Link erneut senden“)", async () => {
+    const mail: UnterlagenMailErgebnis = { status: "FAILED", detail: "ETIMEDOUT" };
+    fetchMit(200, { nachforderungId: NF_ID, mail, ...aktionsTexte("ergaenzen", mail) });
+    const { onErfolg } = dialog({ modus: "ergaenzen", u: uebersicht({ nachforderungen: [nachforderung()] }) });
+    fireEvent.click(kaestchen("PKV_NACHWEIS"));
+    await act(async () => {
+      fireEvent.click(ergaenzenKnopf());
+    });
+    expect(onErfolg.mock.calls[0][0]).toEqual({
+      art: "fehler",
+      text: `Die Nachforderung ist ergänzt. ${MELDUNGEN.MAIL_NICHT_ZUGESTELLT} ${WEG_NICHT_ZUGESTELLT}`,
+    });
+    expect(onErfolg.mock.calls[0][0].text).not.toContain("sofort");
+  });
+
+  it("Mail übersprungen (SKIPPED, Vorlage deaktiviert): Warnung — ohne den Weg über „Link erneut senden“", async () => {
     const { onErfolg } = await anfordern(
       201,
       anfordernAntwort({ status: "SKIPPED", detail: "Vorlage deaktiviert" }),
@@ -1095,6 +1259,8 @@ describe("Ergebnis", () => {
     const meldung = onErfolg.mock.calls[0][0];
     expect(meldung.art).toBe("warnung");
     expect(meldung.text).toContain("nicht versendet");
+    // Bei einer abgeschalteten Vorlage haelfe ein neuer Link nichts.
+    expect(meldung.text).not.toContain("Link erneut senden");
   });
 
   it("versendet, aber nicht gespeichert (N2): Warnung", async () => {
