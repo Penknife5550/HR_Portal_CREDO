@@ -437,6 +437,9 @@ export interface RenderedEventEmail {
  * `warnungen_liste_html`). Ein Vorname `<a href="…">Anmelden</a>` stuende sonst
  * als klickbarer fremder Link in der Mail an die Fuehrungskraft. Betreff und
  * Textteil bleiben roh: Dort waere `&lt;` falsch und `<` ist harmlos.
+ *
+ * `angefordert_von` (Paket 4): Name der HR-Kraft, die Unterlagen nachgefordert
+ * hat, in den HR-Mails der Nachforderung (src/lib/unterlagen-mail.ts).
  */
 const NAMENS_VARIABLEN = [
   "vorname",
@@ -447,6 +450,7 @@ const NAMENS_VARIABLEN = [
   "lastName",
   "employeeFirstName",
   "employeeLastName",
+  "angefordert_von",
 ];
 
 /**
@@ -461,12 +465,20 @@ const NAMENS_VARIABLEN = [
  *   - `stellenbezeichnung`, `betriebsstaette` (Paket 5): Die Fuehrungskraft
  *     tippt beide ueber den Modalitaeten-Link ein — ohne `<>`-Verbot. In der
  *     Zuweisungsmail an eine Abteilung darf daraus kein Markup werden.
+ *   - `unterlagenliste`, `unterlage`, `begruendung`, `nachricht` (Paket 4,
+ *     src/lib/unterlagen-mail.ts): Bezeichnungen und Hinweise freier
+ *     Unterlagen, die Begruendung einer Zurueckweisung und die Nachricht an
+ *     die Person — alles von HR frei getippt. `nachricht` betrifft auch die
+ *     Vorlagen des Dokumentenpakets; die setzen im HTML aber nur
+ *     `nachricht_html` ein und `{{#nachricht}}` als Bedingung, deren
+ *     Leer-Pruefung das Maskieren nicht aendert.
  *
  * Die Standardvorlagen setzen im HTML die schon maskierten Geschwister
- * `kommentar` bzw. `aufgabenliste_html` ein und benutzen die Rohtexte nur im
+ * `kommentar` bzw. `aufgabenliste_html` (Paket 4: `unterlagenliste_html`,
+ * `begruendung_html`, `nachricht_html`) ein und benutzen die Rohtexte nur im
  * Textteil. Aendert ein Admin die Vorlage im Editor und setzt doch
- * `{{kommentar_text}}` ins HTML, darf daraus kein Markup werden. `kommentar`
- * und `aufgabenliste_html` stehen bewusst NICHT hier — sie sind schon maskiert,
+ * `{{kommentar_text}}` ins HTML, darf daraus kein Markup werden. Die `_html`-
+ * Felder und `kommentar` stehen bewusst NICHT hier — sie sind schon maskiert,
  * ein zweites Maskieren machte aus `&amp;` ein sichtbares `&amp;amp;`.
  */
 const FREITEXT_VARIABLEN = [
@@ -475,6 +487,10 @@ const FREITEXT_VARIABLEN = [
   "aufgabe",
   "stellenbezeichnung",
   "betriebsstaette",
+  "unterlagenliste",
+  "unterlage",
+  "begruendung",
+  "nachricht",
 ];
 
 /** Variablen fuer den HTML-Teil: Namen und Rohtexte maskiert, der Rest unveraendert. */

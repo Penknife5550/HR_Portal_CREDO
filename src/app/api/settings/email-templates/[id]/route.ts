@@ -12,6 +12,7 @@ import { getSession } from "@/lib/auth";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { pruefeVorlagenSyntax, beschreibeVerwaisteMarker } from "@/lib/mailer";
 import { EMAIL_PATTERN } from "@/lib/constants";
+import { betreffMitVerschachteltenMarkern, verboteneBetreffVariablen } from "@/lib/events";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 
@@ -44,6 +45,30 @@ export async function PUT(
     if (!event?.trim()) return NextResponse.json({ error: "Event ist ein Pflichtfeld" }, { status: 400 });
     if (!subject?.trim()) return NextResponse.json({ error: "Betreff ist ein Pflichtfeld" }, { status: 400 });
     if (!bodyHtml?.trim()) return NextResponse.json({ error: "HTML-Body ist ein Pflichtfeld" }, { status: 400 });
+
+    // Betreff ohne Unterlagennamen, Begruendung, Nachricht und Link (Paket 4,
+    // betreffOhne im Event-Katalog): Das Versandprotokoll speichert Betreffzeilen
+    // 90 Tage — ein {{link}} laege dort als gueltiger Zugang zur Personalakte.
+    const imBetreffVerboten = verboteneBetreffVariablen(event.trim(), subject);
+    if (imBetreffVerboten.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Der Betreff darf ${imBetreffVerboten.map((name) => `{{${name}}}`).join(", ")} nicht enthalten: Betreffzeilen stehen 90 Tage im Versandprotokoll. Unterlagen, Begründungen, Nachrichten und der persönliche Link gehören nur in den Text der E-Mail.`,
+        },
+        { status: 400 }
+      );
+    }
+    // Zusammengesetzte Platzhalter wie „{{li{{#x}}{{/x}}nk}}“ ergaeben erst beim
+    // Versand ein {{link}} — die Pruefung oben liest nur den Rohtext.
+    if (betreffMitVerschachteltenMarkern(event.trim(), subject)) {
+      return NextResponse.json(
+        {
+          error:
+            "Der Betreff enthält ineinander geschachtelte oder unvollständige Platzhalter. Bei dieser Vorlage ist das nicht erlaubt: Beim Versand könnte daraus ein gesperrter Platzhalter wie {{link}} werden, und Betreffzeilen stehen 90 Tage im Versandprotokoll. Bitte jeden Platzhalter vollständig und einzeln schreiben, z. B. {{einrichtung}}.",
+        },
+        { status: 400 }
+      );
+    }
 
     // Empfaenger-Felder pruefen: kommagetrennt, je Eintrag E-Mail oder {{variable}}
     for (const [label, value] of [

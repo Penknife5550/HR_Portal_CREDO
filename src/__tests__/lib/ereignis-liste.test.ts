@@ -19,6 +19,7 @@ import {
   ereignisOptionLabel,
 } from "@/lib/ereignis-liste";
 import { EVENT_CATALOG, EVENT_GROUP_ORDER, getEventDefinition } from "@/lib/events";
+import { UNTERLAGEN_EVENTS, UNTERLAGEN_PERSONEN_EVENTS } from "@/lib/unterlagen-mail";
 
 const werte = EREIGNIS_OPTIONEN.map((o) => o.value);
 
@@ -94,7 +95,9 @@ describe("Ereignisliste — Kennzeichen", () => {
     expect(ereignisOptionLabel(ausgeloest)).toBe(ausgeloest.label);
   });
 
-  it("nur die vier Dokumentenpaket-Events tragen den Hinweis, dass Webhooks nicht feuern", () => {
+  it("genau die sieben direkt versendeten Events tragen den Hinweis, dass Webhooks nicht feuern", () => {
+    // Vier Dokumentenpaket-Events (Anhaenge) und die drei Mails der
+    // Nachforderung an die Person (persoenlicher Upload-Link, Paket 4).
     const mitHinweis = EREIGNIS_OPTIONEN.filter((o) => o.webhookHinweis).map((o) => o.value).sort();
     expect(mitHinweis).toEqual(
       [
@@ -102,23 +105,38 @@ describe("Ereignisliste — Kennzeichen", () => {
         "contract-renewal-documents-sent",
         "offboarding-documents-sent",
         "onboarding-starter-packet-sent",
+        "unterlagen-angefordert",
+        "unterlagen-erinnerung",
+        "unterlage-zurueckgewiesen",
       ].sort()
     );
     for (const event of mitHinweis) {
       expect(ereignisOption(event)!.webhookHinweis).toMatch(/Webhooks auf dieses Ereignis feuern nicht/);
     }
+    for (const event of UNTERLAGEN_PERSONEN_EVENTS) {
+      expect(ereignisOption(event)!.webhookHinweis).toMatch(/persönlichen Upload-Link/);
+    }
   });
 
-  it("EVENTS_OHNE_WEBHOOK deckt genau die Events des Dokumentenpaket-Versands ab", () => {
+  it("EVENTS_OHNE_WEBHOOK deckt genau Dokumentenpaket und Personen-Mails der Nachforderung ab", () => {
     // dokumentenpaket.ts ruft sendEventEmail direkt (ohne Dispatcher, also ohne
     // Webhooks). Kommt dort ein Modul dazu, muss es auch hier stehen — sonst
-    // verspricht der Webhook-Reiter einen Aufruf, der nie kommt.
+    // verspricht der Webhook-Reiter einen Aufruf, der nie kommt. Dasselbe gilt
+    // fuer die drei Mails der Nachforderung an die Person
+    // (UNTERLAGEN_PERSONEN_EVENTS in unterlagen-mail.ts).
     const quelle = fs.readFileSync(path.join(process.cwd(), "src/lib/dokumentenpaket.ts"), "utf8");
     const paketEvents = [...quelle.matchAll(/\bevent:\s*"([a-z0-9-]+)"/g)].map((m) => m[1]).sort();
     expect(paketEvents.length).toBeGreaterThanOrEqual(4);
-    expect(Object.keys(EVENTS_OHNE_WEBHOOK).sort()).toEqual(paketEvents);
-    for (const event of paketEvents) {
+    expect(Object.keys(EVENTS_OHNE_WEBHOOK).sort()).toEqual([...paketEvents, ...UNTERLAGEN_PERSONEN_EVENTS].sort());
+    for (const event of Object.keys(EVENTS_OHNE_WEBHOOK)) {
       expect(getEventDefinition(event)).toBeDefined();
+    }
+  });
+
+  it("die HR-Mails der Nachforderung feuern Webhooks — sie tragen weder Link noch Unterlagennamen", () => {
+    for (const event of [UNTERLAGEN_EVENTS.VOLLSTAENDIG, UNTERLAGEN_EVENTS.FRIST_VERSTRICHEN]) {
+      expect(EVENTS_OHNE_WEBHOOK[event]).toBeUndefined();
+      expect(ereignisOption(event)!.webhookHinweis).toBeNull();
     }
   });
 
@@ -128,6 +146,7 @@ describe("Ereignisliste — Kennzeichen", () => {
     expect(ereignisOption("")).toBeUndefined();
     expect(ereignisOption("frei-erfunden")).toBeUndefined();
     expect(ereignisOption("contract-end-supervisor-link")?.group).toBe("Vertragsende");
+    expect(ereignisOption("unterlage-zurueckgewiesen")?.group).toBe("Unterlagen");
   });
 });
 

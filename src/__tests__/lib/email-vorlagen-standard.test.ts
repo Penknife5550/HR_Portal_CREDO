@@ -109,3 +109,151 @@ describe("standardFassung", () => {
     }
   });
 });
+
+/**
+ * Paket 4 „Unterlagen nachfordern“: die fuenf neuen Standardvorlagen. Was sie
+ * mit echten Payloads ergeben, prueft src/__tests__/lib/unterlagen-mails.test.ts;
+ * hier geht es um den Aufbau der Vorlagen selbst.
+ */
+describe("Standardvorlagen der Nachforderung (Paket 4)", () => {
+  const PERSON = ["unterlagen-angefordert", "unterlagen-erinnerung", "unterlage-zurueckgewiesen"];
+  const HR = ["unterlagen-vollstaendig", "unterlagen-frist-verstrichen"];
+  const vorlage = (event: string) => DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event)!;
+
+  it("es gibt alle fuenf, jede mit Textteil und Variablenliste", () => {
+    for (const event of [...PERSON, ...HR]) {
+      const v = vorlage(event);
+      expect({ event, da: Boolean(v) }).toEqual({ event, da: true });
+      expect(v.bodyText.trim().length).toBeGreaterThan(100);
+      expect(v.variables.length).toBeGreaterThan(5);
+    }
+  });
+
+  it("jede traegt die CREDO-Linie — die Kopfzeile passt also zum historischen Geruest", () => {
+    // applyCredoCi setzt die Linie per Regex hinter die Kopfzeile. Weicht deren
+    // Stil ab, fehlt die Linie still.
+    for (const event of [...PERSON, ...HR]) {
+      const html = vorlage(event).bodyHtml;
+      expect({ event, linie: html.includes('bgcolor="#FBC900"') }).toEqual({ event, linie: true });
+      expect(html).not.toContain("#1a1a2e");
+      expect(html).not.toContain("#2563eb");
+    }
+  });
+
+  it("die Mails an die Person tragen den Link im Knopf, im Ersatzlink und im Textteil — nie im Betreff", () => {
+    for (const event of PERSON) {
+      const v = vorlage(event);
+      expect(v.bodyHtml.match(/href="\{\{link\}\}"/g)).toHaveLength(2);
+      expect(v.bodyText).toContain("{{link}}");
+      expect(v.subject).not.toContain("link");
+    }
+  });
+
+  it("die Mails an die Person warnen vor Unterlagen per E-Mail und vor dem Weiterleiten", () => {
+    for (const event of PERSON) {
+      for (const teil of [vorlage(event).bodyHtml, vorlage(event).bodyText]) {
+        expect(teil).toContain("Bitte senden Sie Unterlagen nicht per E-Mail, sondern nur über den Link.");
+        expect(teil).toContain("Der Link ist persönlich, bitte nicht weiterleiten.");
+      }
+    }
+  });
+
+  it("das Linkende steht nur im Block „Frist verstrichen“ — sonst nennt die Mail ein Datum, die Frist", () => {
+    for (const event of PERSON) {
+      for (const teil of [vorlage(event).bodyHtml, vorlage(event).bodyText]) {
+        const ohneBlock = teil.replace(/\{\{#frist_verstrichen\}\}[\s\S]*?\{\{\/frist_verstrichen\}\}/g, "");
+        expect({ event, rest: ohneBlock.includes("link_gueltig_bis") }).toEqual({ event, rest: false });
+        expect(ohneBlock).not.toContain("{{ablaufdatum}}");
+      }
+    }
+  });
+
+  it("die HR-Mails verweisen auf das Portal und nennen keine Unterlage", () => {
+    for (const event of HR) {
+      const v = vorlage(event);
+      expect(v.bodyHtml).toContain('href="{{portalLink}}"');
+      expect(v.bodyText).toContain("{{portalLink}}");
+      for (const teil of [v.subject, v.bodyHtml, v.bodyText]) {
+        expect(teil).not.toMatch(/\{\{(unterlage|unterlagenliste|begruendung|nachricht|link|email)(_html)?\}\}/);
+      }
+      // MITARBEITER_NEUTRAL ist ein Akkusativ: der Name nur nach „für“.
+      for (const teil of [v.subject, v.bodyHtml, v.bodyText]) {
+        for (const treffer of teil.matchAll(/(\S+)\s+\{\{mitarbeiter_name\}\}/g)) {
+          expect({ event, davor: treffer[1] }).toEqual({ event, davor: "für" });
+        }
+      }
+    }
+  });
+
+  it("der Knopf der HR-Mails verspricht nicht mehr, als der Link haelt", () => {
+    // portalLink fuehrt auf die Uebersicht des Vorgangs, nicht in den Reiter
+    // „Dokumente“ — beschriftet wie die Nachbarvorlagen.
+    const v = vorlage("unterlagen-frist-verstrichen");
+    expect(v.bodyHtml).toContain("Vorgang im Portal öffnen →");
+    expect(v.bodyText).toContain("Vorgang im Portal: {{portalLink}}");
+    for (const event of HR) {
+      for (const teil of [vorlage(event).bodyHtml, vorlage(event).bodyText]) {
+        expect(teil).not.toContain("Nachforderung im Portal öffnen");
+      }
+    }
+  });
+
+  it("kein Bedingungsblock steht in einem anderen (renderTemplate loest innere nicht auf)", () => {
+    for (const event of [...PERSON, ...HR]) {
+      const v = vorlage(event);
+      for (const teil of [v.subject, v.bodyHtml, v.bodyText]) {
+        for (const block of teil.matchAll(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g)) {
+          expect({ event, block: block[1], innen: /\{\{[#/]/.test(block[2]) }).toEqual({
+            event,
+            block: block[1],
+            innen: false,
+          });
+        }
+      }
+    }
+  });
+});
+
+/**
+ * Ergaenzung Z3 der Feinplanung: Im Onboarding kann HR selbst nichts hochladen.
+ * Die beiden HR-Mails zum Ablauf eines Titels verweisen deshalb auf die
+ * Nachforderung — in HTML UND Textteil.
+ */
+describe("Ablauf-Mails verweisen auf „Unterlagen nachfordern“ (Z3)", () => {
+  const vorlage = (event: string) => DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event)!;
+
+  it.each(["dokument-ablauf-warnung", "dokument-abgelaufen"])("%s traegt den neuen Satz in HTML und Text", (event) => {
+    const v = vorlage(event);
+    for (const teil of [v.bodyHtml, v.bodyText]) {
+      expect(teil).toContain("im Vorgang über „Unterlagen nachfordern“ an; sobald Sie");
+      expect(teil).toMatch(/annehmen, endet (die Warnung|diese Erinnerung)\./);
+      expect(teil).not.toContain("als Nachweis hoch");
+    }
+  });
+
+  it("dokument-ablauf-warnung nennt auch den Weg „Unbefristet“ (Z1, Niederlassungserlaubnis)", () => {
+    // Nach einem befristeten Titel folgt oft die Niederlassungserlaubnis ohne
+    // Ablaufdatum. Das Kennzeichen „unbefristet“ beendet die Erinnerung
+    // ebenso — nennte die Mail nur das Ablaufdatum, suchte HR eines, das es
+    // nicht gibt. Die Vorlage wird nach dem Deploy nur einmal zurueckgesetzt.
+    const v = vorlage("dokument-ablauf-warnung");
+    expect(v.bodyHtml).toContain(
+      "sobald Sie ihn <strong>mit seinem Ablaufdatum</strong> oder – etwa bei einer Niederlassungserlaubnis – als <strong>„Unbefristet“</strong> annehmen, endet diese Erinnerung.",
+    );
+    expect(v.bodyText).toContain(
+      "sobald Sie ihn mit seinem Ablaufdatum oder – etwa bei einer Niederlassungserlaubnis – als „Unbefristet“ annehmen, endet diese Erinnerung.",
+    );
+    for (const teil of [v.bodyHtml, v.bodyText]) {
+      expect(teil).toContain("Sie endet, sobald ein Nachweis mit späterer Frist oder ein unbefristeter Nachweis im Vorgang liegt.");
+    }
+  });
+
+  it("dokument-abgelaufen: die Fiktionsbescheinigung wird nachgefordert, nicht von HR hochgeladen", () => {
+    const v = vorlage("dokument-abgelaufen");
+    for (const teil of [v.bodyHtml, v.bodyText]) {
+      expect(teil).toContain(
+        "— dann fordern Sie diese im Vorgang über „Unterlagen nachfordern“ an; sobald Sie sie als Aufenthaltstitel mit ihrem Ablaufdatum annehmen, endet die Warnung.",
+      );
+    }
+  });
+});

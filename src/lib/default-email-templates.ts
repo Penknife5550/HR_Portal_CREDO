@@ -4164,6 +4164,15 @@ CREDO Gruppe – {{einrichtung}}`,
   // Akkusativ („die neue Mitarbeiterin / den neuen Mitarbeiter“) — nach „von“
   // oder als Subjekt zerbraeche der Satz. Frueher stand dort die private
   // E-Mail-Adresse der Person im Betreff.
+  //
+  // Den neuen Nachweis holt HR ueber „Unterlagen nachfordern“ (Paket 4, Z3):
+  // Im Onboarding kann HR selbst nichts hochladen, der fruehere Satz „dann
+  // laden Sie diese als Nachweis hoch“ lief ins Leere. Die Erinnerung nennt
+  // auch den Weg „Unbefristet“ (Z1, etwa die Niederlassungserlaubnis nach
+  // einem befristeten Titel): Das Kennzeichen verdraengt jedes datierte
+  // Dokument, der Lauf dokument-ablauf ueberspringt die Art dann. Beide
+  // Vorlagen liegen in Produktion als gespeicherte Zeilen — nach dem Deploy
+  // „Text auf Standard zurücksetzen“, sonst kommt der neue Satz nicht an.
   // =============================================
   {
     event: "dokument-ablauf-warnung",
@@ -4206,7 +4215,7 @@ CREDO Gruppe – {{einrichtung}}`,
           </table>
 
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
-            Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate. Der neue Nachweis gehört anschließend <strong>mit seinem Ablaufdatum</strong> in den Vorgang — erst dann endet diese Erinnerung.
+            Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate. Den neuen Nachweis fordern Sie anschließend im Vorgang über „Unterlagen nachfordern“ an; sobald Sie ihn <strong>mit seinem Ablaufdatum</strong> oder – etwa bei einer Niederlassungserlaubnis – als <strong>„Unbefristet“</strong> annehmen, endet diese Erinnerung.
           </p>
 
           <!-- Button -->
@@ -4220,7 +4229,7 @@ CREDO Gruppe – {{einrichtung}}`,
 
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 18px;">
           <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0;">
-            Diese Erinnerung wiederholt sich in kürzer werdenden Abständen, je näher der Ablauf rückt (ab 90 Tagen monatlich, ab 42 Tagen alle zwei Wochen, ab 14 Tagen alle drei Tage). Sie endet, sobald ein Nachweis mit späterer Frist im Vorgang liegt.
+            Diese Erinnerung wiederholt sich in kürzer werdenden Abständen, je näher der Ablauf rückt (ab 90 Tagen monatlich, ab 42 Tagen alle zwei Wochen, ab 14 Tagen alle drei Tage). Sie endet, sobald ein Nachweis mit späterer Frist oder ein unbefristeter Nachweis im Vorgang liegt.
           </p>
         </td></tr>
 
@@ -4246,11 +4255,11 @@ Nachweis für: {{mitarbeiter_name}} · {{mitarbeiter_email}}
 Dokument:     {{dokument_typ}} ({{dokument_datei}})
 Frist:        {{frist_text}}
 
-Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate. Der neue Nachweis gehört anschließend mit seinem Ablaufdatum in den Vorgang — erst dann endet diese Erinnerung.
+Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate. Den neuen Nachweis fordern Sie anschließend im Vorgang über „Unterlagen nachfordern“ an; sobald Sie ihn mit seinem Ablaufdatum oder – etwa bei einer Niederlassungserlaubnis – als „Unbefristet“ annehmen, endet diese Erinnerung.
 
 Vorgang im Portal: {{portalLink}}
 
-Diese Erinnerung wiederholt sich in kürzer werdenden Abständen, je näher der Ablauf rückt (ab 90 Tagen monatlich, ab 42 Tagen alle zwei Wochen, ab 14 Tagen alle drei Tage). Sie endet, sobald ein Nachweis mit späterer Frist im Vorgang liegt.
+Diese Erinnerung wiederholt sich in kürzer werdenden Abständen, je näher der Ablauf rückt (ab 90 Tagen monatlich, ab 42 Tagen alle zwei Wochen, ab 14 Tagen alle drei Tage). Sie endet, sobald ein Nachweis mit späterer Frist oder ein unbefristeter Nachweis im Vorgang liegt.
 
 CREDO Gruppe – Freie Evangelische Schulen
 {{einrichtung}}`,
@@ -4310,7 +4319,7 @@ CREDO Gruppe – Freie Evangelische Schulen
           </table>
 
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Bitte klären Sie <strong>umgehend</strong>, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer <strong>Fiktionsbescheinigung</strong> fort (§ 81 Abs. 4 AufenthG) — dann laden Sie diese als Nachweis hoch und die Warnung endet. Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
+            Bitte klären Sie <strong>umgehend</strong>, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer <strong>Fiktionsbescheinigung</strong> fort (§ 81 Abs. 4 AufenthG) — dann fordern Sie diese im Vorgang über „Unterlagen nachfordern“ an; sobald Sie sie als Aufenthaltstitel mit ihrem Ablaufdatum annehmen, endet die Warnung. Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
             Das Portal sperrt nichts. Der Nachweis ist auf „Abgelaufen“ gesetzt und der Vorgang rot markiert — die Bewertung und die Entscheidung bleiben bei Ihnen.
@@ -4353,7 +4362,7 @@ Nachweis für: {{mitarbeiter_name}} · {{mitarbeiter_email}}
 Dokument:     {{dokument_typ}} ({{dokument_datei}})
 Frist:        {{frist_text}}
 
-Bitte klären Sie umgehend, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer Fiktionsbescheinigung fort (§ 81 Abs. 4 AufenthG) — dann laden Sie diese als Nachweis hoch und die Warnung endet. Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
+Bitte klären Sie umgehend, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer Fiktionsbescheinigung fort (§ 81 Abs. 4 AufenthG) — dann fordern Sie diese im Vorgang über „Unterlagen nachfordern“ an; sobald Sie sie als Aufenthaltstitel mit ihrem Ablaufdatum annehmen, endet die Warnung. Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
 
 Das Portal sperrt nichts. Der Nachweis ist auf "Abgelaufen" gesetzt und der Vorgang rot markiert — die Bewertung und die Entscheidung bleiben bei Ihnen.
 
@@ -4374,6 +4383,642 @@ CREDO Gruppe – Freie Evangelische Schulen
       { key: "{{tage_ueberfaellig}}", description: "Kalendertage seit dem Ablauf" },
       { key: "{{frist_text}}", description: "Fertiger Satz zur Frist (z.B. „Abgelaufen seit 7 Tagen (01.09.2026)“)" },
       { key: "{{portalLink}}", description: "Link zur Vorgangs-Detailseite im Portal" },
+    ],
+  },
+
+  // =============================================
+  // Unterlagen nachfordern (Paket 4)
+  //
+  // Drei Mails an die Person, zwei an HR. Die Payloads baut
+  // src/lib/unterlagen-mail.ts; dort stehen auch die Regeln. Fuer die Texte
+  // gilt zusaetzlich:
+  //   - Kein Betreff nennt eine Unterlage, eine Begruendung, die Nachricht
+  //     oder den Link: Das Versandprotokoll haelt Betreffzeilen 90 Tage fest.
+  //     Der Editor weist solche Betreffzeilen ab (betreffOhne in events.ts).
+  //   - Sensible Unterlagen stehen in der Liste nur neutral („Eine
+  //     vertrauliche Unterlage – …“), bei einer Zurueckweisung fehlen Name
+  //     und Begruendung ganz — deshalb stehen beide in eigenen Bloecken.
+  //   - Die Mails an die Person nennen EIN Datum, die Frist. Das Linkende
+  //     erscheint nur, wenn die Frist schon verstrichen ist
+  //     ({{#frist_verstrichen}}); vorher hielte man es fuer die Frist.
+  //   - „Bitte senden Sie Unterlagen nicht per E-Mail“: Die Antwortadresse ist
+  //     das HR-Postfach, ein Anhang landete dort unverschluesselt und
+  //     ausserhalb des Portals.
+  //   - {{#mit_details}}/{{#ohne_details}} stehen schon jetzt in den Vorlagen,
+  //     obwohl Stufe 1 immer Details zeigt: Eine gespeicherte Vorlage
+  //     verdraengt den Standardtext vollstaendig, der Mutterschutz (Stufe 2)
+  //     bekaeme sonst die Liste nie los.
+  //   - Bloecke sind nie verschachtelt — renderTemplate loest einen inneren
+  //     Block nicht auf.
+  //   - {{mitarbeiter_name}} steht in den HR-Mails nur nach „für“ (ohne Namen
+  //     „die neue Mitarbeiterin / den neuen Mitarbeiter“, Akkusativ).
+  // =============================================
+  {
+    event: "unterlagen-angefordert",
+    name: "Unterlagen angefordert",
+    subject:
+      "{{#ist_ergaenzung}}Ergänzung: {{/ist_ergaenzung}}Unterlagen zu Ihrem Vorgang{{vorgang_zusatz}} – {{einrichtung}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">{{einrichtung}}</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">Personalabteilung</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#92400e;font-weight:bold;font-size:14px;">Unterlagen angefordert</span>
+          </div>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Guten Tag{{#vorname}} {{vorname}}{{/vorname}}{{#nachname}} {{nachname}}{{/nachname}},
+          </p>
+          {{#mit_details}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
+            für Ihren Vorgang bei {{einrichtung}} benötigt die Personalabteilung noch folgende Unterlagen von Ihnen:
+          </p>{{/mit_details}}
+          {{unterlagenliste_html}}
+          {{#ohne_details}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            für Ihren Vorgang bei {{einrichtung}} benötigt die Personalabteilung noch Unterlagen von Ihnen. Welche, sehen Sie nach dem Öffnen des Links.
+          </p>{{/ohne_details}}
+          {{#ist_ergaenzung}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Die Personalabteilung hat ihre Anforderung um weitere Unterlagen ergänzt. Unterlagen, die Sie bereits übermittelt haben, müssen Sie nicht noch einmal hochladen.
+          </p>{{/ist_ergaenzung}}
+          {{#ist_fristaenderung}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Die Personalabteilung hat die Frist für Ihre Unterlagen geändert. Es gilt die unten genannte Frist.
+          </p>{{/ist_fristaenderung}}
+          {{#ist_erneut}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Sie erhalten Ihren persönlichen Link hier noch einmal. Bitte verwenden Sie den Link aus dieser E-Mail.
+          </p>{{/ist_erneut}}
+          {{#ist_nachgeholt}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Unsere letzte E-Mail hat Sie möglicherweise nicht erreicht. Deshalb erhalten Sie Ihren persönlichen Link hier noch einmal.
+          </p>{{/ist_nachgeholt}}
+{{#nachricht}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;border-left:3px solid #FBC900;background-color:#fffbea;border-radius:4px;margin:0 0 24px;">
+            <tr><td style="padding:14px 16px;">
+              <p style="margin:0 0 6px;color:#6b7280;font-size:12px;">Nachricht der Personalabteilung</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{nachricht_html}}</p>
+            </td></tr>
+          </table>
+{{/nachricht}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
+            <tr><td style="background-color:#f9fafb;border-left:4px solid #575756;padding:13px 16px;">
+              <p style="margin:0;color:#2d2d2d;font-size:14px;line-height:1.6;"><strong>Frist:</strong> {{frist_lang}}{{#frist_verstrichen}}<br><span style="color:#92400e;">Die Frist ist abgelaufen. Sie können die Unterlagen noch bis zum {{link_gueltig_bis}} hochladen.</span>{{/frist_verstrichen}}</p>
+            </td></tr>
+          </table>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+            <tr><td style="background-color:#2563eb;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Unterlagen hochladen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:0 0 6px;">
+            Falls der Knopf nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:
+          </p>
+          <p style="margin:0 0 24px;"><a href="{{link}}" style="color:#2563eb;font-size:12px;word-break:break-all;text-decoration:underline;">{{link}}</a></p>
+          {{#original_erforderlich}}<p style="color:#92400e;font-size:14px;line-height:1.6;margin:0 0 16px;">
+            Bei Unterlagen mit dem Zusatz „bitte zusätzlich das unterschriebene Original abgeben“ genügt der Scan allein nicht: Bitte geben Sie das unterschriebene Original zusätzlich bei der Personalabteilung ab.
+          </p>{{/original_erforderlich}}
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Erlaubt sind PDF, JPG, PNG und WebP mit höchstens 9,5 MB je Datei. Zu einer Unterlage können Sie mehrere Dateien hochladen, etwa Vorder- und Rückseite. Erst mit „Unterlagen übermitteln“ erreichen die Dateien die Personalabteilung.
+          </p>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Bitte senden Sie Unterlagen nicht per E-Mail, sondern nur über den Link. Der Link ist persönlich, bitte nicht weiterleiten. Bei Fragen wenden Sie sich bitte an die Personalabteilung.
+          </p>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            {{#vorgangsnummer}}Vorgang {{vorgangsnummer}} · {{/vorgangsnummer}}Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Guten Tag{{#vorname}} {{vorname}}{{/vorname}}{{#nachname}} {{nachname}}{{/nachname}},
+
+{{#mit_details}}für Ihren Vorgang bei {{einrichtung}} benötigt die Personalabteilung noch folgende Unterlagen von Ihnen:
+
+{{unterlagenliste}}
+{{/mit_details}}{{#ohne_details}}für Ihren Vorgang bei {{einrichtung}} benötigt die Personalabteilung noch Unterlagen von Ihnen. Welche, sehen Sie nach dem Öffnen des Links.
+{{/ohne_details}}{{#ist_ergaenzung}}
+Die Personalabteilung hat ihre Anforderung um weitere Unterlagen ergänzt. Unterlagen, die Sie bereits übermittelt haben, müssen Sie nicht noch einmal hochladen.
+{{/ist_ergaenzung}}{{#ist_fristaenderung}}
+Die Personalabteilung hat die Frist für Ihre Unterlagen geändert. Es gilt die unten genannte Frist.
+{{/ist_fristaenderung}}{{#ist_erneut}}
+Sie erhalten Ihren persönlichen Link hier noch einmal. Bitte verwenden Sie den Link aus dieser E-Mail.
+{{/ist_erneut}}{{#ist_nachgeholt}}
+Unsere letzte E-Mail hat Sie möglicherweise nicht erreicht. Deshalb erhalten Sie Ihren persönlichen Link hier noch einmal.
+{{/ist_nachgeholt}}{{#nachricht}}
+Nachricht der Personalabteilung:
+{{nachricht}}
+{{/nachricht}}
+Frist: {{frist_lang}}{{#frist_verstrichen}}
+Die Frist ist abgelaufen. Sie können die Unterlagen noch bis zum {{link_gueltig_bis}} hochladen.{{/frist_verstrichen}}
+
+Unterlagen hochladen:
+{{link}}
+{{#original_erforderlich}}
+Bei Unterlagen mit dem Zusatz „bitte zusätzlich das unterschriebene Original abgeben“ genügt der Scan allein nicht: Bitte geben Sie das unterschriebene Original zusätzlich bei der Personalabteilung ab.
+{{/original_erforderlich}}
+Erlaubt sind PDF, JPG, PNG und WebP mit höchstens 9,5 MB je Datei. Zu einer Unterlage können Sie mehrere Dateien hochladen, etwa Vorder- und Rückseite. Erst mit „Unterlagen übermitteln“ erreichen die Dateien die Personalabteilung.
+
+Bitte senden Sie Unterlagen nicht per E-Mail, sondern nur über den Link. Der Link ist persönlich, bitte nicht weiterleiten. Bei Fragen wenden Sie sich bitte an die Personalabteilung.
+
+{{einrichtung}} – Personalabteilung{{#vorgangsnummer}}
+Vorgang {{vorgangsnummer}}{{/vorgangsnummer}}`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname der Person (kann leer sein)" },
+      { key: "{{nachname}}", description: "Nachname der Person (kann leer sein)" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (leer, wenn der Vorgang keine hat oder die Mail ohne Details geht)" },
+      { key: "{{vorgang_zusatz}}", description: "Leerzeichen plus Vorgangsnummer, sonst leer – für den Betreff („Vorgang{{vorgang_zusatz}}“), damit ohne Nummer kein doppeltes Leerzeichen entsteht" },
+      { key: "{{link}}", description: "Persönlicher Upload-Link dieser Mail – nie in den Betreff (das Portal weist das ab)" },
+      { key: "{{frist}}", description: "Frist (TT.MM.JJJJ)" },
+      { key: "{{frist_lang}}", description: "Frist mit Wochentag („Freitag, 25.09.2026“)" },
+      { key: "{{frist_verstrichen}}", description: "„ja“, wenn die Frist schon abgelaufen ist, sonst leer (für {{#frist_verstrichen}}…{{/frist_verstrichen}})" },
+      { key: "{{link_gueltig_bis}}", description: "Bis wann der Link noch trägt (TT.MM.JJJJ) – nur gesetzt, wenn die Frist verstrichen ist" },
+      { key: "{{unterlagenliste}}", description: "Offene Unterlagen als Klartext, eine Zeile je Unterlage, Hinweis eingerückt darunter – für den Textteil; nie in den Betreff" },
+      { key: "{{unterlagenliste_html}}", description: "Dieselben Unterlagen als HTML-Liste, bereits maskiert – für den HTML-Teil. Vertrauliche Unterlagen erscheinen nur als „Eine vertrauliche Unterlage“" },
+      { key: "{{anzahl_unterlagen}}", description: "Anzahl der offenen Unterlagen" },
+      { key: "{{original_erforderlich}}", description: "„ja“, wenn mindestens eine Unterlage zusätzlich im Original abzugeben ist, sonst leer" },
+      { key: "{{nachricht}}", description: "Nachricht der Personalabteilung (Textteil); nie in den Betreff" },
+      { key: "{{nachricht_html}}", description: "Dieselbe Nachricht HTML-sicher, Umbrüche als <br>" },
+      { key: "{{#nachricht}}...{{/nachricht}}", description: "Block, der nur bei eingegebener Nachricht erscheint" },
+      { key: "{{ist_erstmalig}}", description: "„ja“ bei der ersten Anforderung, sonst leer" },
+      { key: "{{ist_ergaenzung}}", description: "„ja“, wenn die Personalabteilung weitere Unterlagen ergänzt hat, sonst leer" },
+      { key: "{{ist_erneut}}", description: "„ja“, wenn der Link erneut gesendet wird, sonst leer" },
+      { key: "{{ist_fristaenderung}}", description: "„ja“, wenn die Frist geändert wurde, sonst leer" },
+      { key: "{{ist_nachgeholt}}", description: "„ja“, wenn der tägliche Lauf eine gescheiterte Mail nachholt, sonst leer (dann ist keiner der anderen Anlässe gesetzt)" },
+      { key: "{{mit_details}}", description: "„ja“, wenn die Mail Unterlagen und Vorgangsnummer nennen darf (Stufe 1: immer)" },
+      { key: "{{ohne_details}}", description: "„ja“, wenn sie es nicht darf (Stufe 2, Mutterschutz), sonst leer" },
+      { key: "{{email}}", description: "Adresse der Nachforderung – die Mail geht nur dorthin, An, Cc und Bcc dieser Vorlage wirken nicht" },
+    ],
+  },
+
+  {
+    event: "unterlagen-erinnerung",
+    name: "Erinnerung: Unterlagen",
+    subject:
+      "{{#ist_fristtag}}Heute: {{/ist_fristtag}}Erinnerung: Unterlagen zu Ihrem Vorgang{{vorgang_zusatz}} – Frist {{frist}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">{{einrichtung}}</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">Personalabteilung</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#92400e;font-weight:bold;font-size:14px;">Erinnerung</span>
+          </div>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Guten Tag{{#vorname}} {{vorname}}{{/vorname}}{{#nachname}} {{nachname}}{{/nachname}},
+          </p>
+          {{#ist_vorab}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            die Frist für Ihre Unterlagen endet am <strong>{{frist_lang}}</strong>.
+          </p>{{/ist_vorab}}
+          {{#ist_fristtag}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            heute, am <strong>{{frist_lang}}</strong>, endet die Frist für Ihre Unterlagen.
+          </p>{{/ist_fristtag}}
+          {{#mit_details}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
+            Folgende Unterlagen fehlen noch:
+          </p>{{/mit_details}}
+          {{unterlagenliste_html}}
+          {{#ohne_details}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Einige Unterlagen fehlen noch. Welche, sehen Sie nach dem Öffnen des Links.
+          </p>{{/ohne_details}}
+          {{#entwurf_vorhanden}}<table cellpadding="0" cellspacing="0" style="width:100%;border-left:3px solid #FBC900;background-color:#fffbea;border-radius:4px;margin:0 0 24px;">
+            <tr><td style="padding:14px 16px;">
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">Sie haben bereits Dateien hochgeladen, aber noch nicht auf „Unterlagen übermitteln“ geklickt. Erst damit erreichen die Dateien die Personalabteilung.</p>
+            </td></tr>
+          </table>{{/entwurf_vorhanden}}
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+            <tr><td style="background-color:#2563eb;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Unterlagen hochladen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:0 0 6px;">
+            Falls der Knopf nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:
+          </p>
+          <p style="margin:0 0 24px;"><a href="{{link}}" style="color:#2563eb;font-size:12px;word-break:break-all;text-decoration:underline;">{{link}}</a></p>
+          {{#original_erforderlich}}<p style="color:#92400e;font-size:14px;line-height:1.6;margin:0 0 16px;">
+            Bei Unterlagen mit dem Zusatz „bitte zusätzlich das unterschriebene Original abgeben“ genügt der Scan allein nicht: Bitte geben Sie das unterschriebene Original zusätzlich bei der Personalabteilung ab.
+          </p>{{/original_erforderlich}}
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Bitte senden Sie Unterlagen nicht per E-Mail, sondern nur über den Link. Der Link ist persönlich, bitte nicht weiterleiten. Schaffen Sie die Frist nicht oder haben Sie Fragen, wenden Sie sich bitte an die Personalabteilung.
+          </p>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            {{#vorgangsnummer}}Vorgang {{vorgangsnummer}} · {{/vorgangsnummer}}Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Guten Tag{{#vorname}} {{vorname}}{{/vorname}}{{#nachname}} {{nachname}}{{/nachname}},
+
+{{#ist_vorab}}die Frist für Ihre Unterlagen endet am {{frist_lang}}.
+{{/ist_vorab}}{{#ist_fristtag}}heute, am {{frist_lang}}, endet die Frist für Ihre Unterlagen.
+{{/ist_fristtag}}{{#mit_details}}
+Folgende Unterlagen fehlen noch:
+
+{{unterlagenliste}}
+{{/mit_details}}{{#ohne_details}}
+Einige Unterlagen fehlen noch. Welche, sehen Sie nach dem Öffnen des Links.
+{{/ohne_details}}{{#entwurf_vorhanden}}
+Sie haben bereits Dateien hochgeladen, aber noch nicht auf „Unterlagen übermitteln“ geklickt. Erst damit erreichen die Dateien die Personalabteilung.
+{{/entwurf_vorhanden}}
+Unterlagen hochladen:
+{{link}}
+{{#original_erforderlich}}
+Bei Unterlagen mit dem Zusatz „bitte zusätzlich das unterschriebene Original abgeben“ genügt der Scan allein nicht: Bitte geben Sie das unterschriebene Original zusätzlich bei der Personalabteilung ab.
+{{/original_erforderlich}}
+Bitte senden Sie Unterlagen nicht per E-Mail, sondern nur über den Link. Der Link ist persönlich, bitte nicht weiterleiten. Schaffen Sie die Frist nicht oder haben Sie Fragen, wenden Sie sich bitte an die Personalabteilung.
+
+{{einrichtung}} – Personalabteilung{{#vorgangsnummer}}
+Vorgang {{vorgangsnummer}}{{/vorgangsnummer}}`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname der Person (kann leer sein)" },
+      { key: "{{nachname}}", description: "Nachname der Person (kann leer sein)" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (leer, wenn der Vorgang keine hat oder die Mail ohne Details geht)" },
+      { key: "{{vorgang_zusatz}}", description: "Leerzeichen plus Vorgangsnummer, sonst leer – für den Betreff" },
+      { key: "{{link}}", description: "Persönlicher Upload-Link dieser Mail – nie in den Betreff (das Portal weist das ab)" },
+      { key: "{{frist}}", description: "Frist (TT.MM.JJJJ)" },
+      { key: "{{frist_lang}}", description: "Frist mit Wochentag („Freitag, 25.09.2026“)" },
+      { key: "{{ist_vorab}}", description: "„ja“ bei der Erinnerung 7 Tage vor der Frist, sonst leer" },
+      { key: "{{ist_fristtag}}", description: "„ja“ bei der Erinnerung am Tag der Frist, sonst leer" },
+      { key: "{{entwurf_vorhanden}}", description: "„ja“, wenn die Person Dateien hochgeladen, aber noch nicht übermittelt hat, sonst leer" },
+      { key: "{{unterlagenliste}}", description: "Offene Unterlagen als Klartext – für den Textteil; nie in den Betreff" },
+      { key: "{{unterlagenliste_html}}", description: "Dieselben Unterlagen als HTML-Liste, bereits maskiert. Vertrauliche Unterlagen erscheinen nur als „Eine vertrauliche Unterlage“" },
+      { key: "{{anzahl_unterlagen}}", description: "Anzahl der offenen Unterlagen" },
+      { key: "{{original_erforderlich}}", description: "„ja“, wenn mindestens eine Unterlage zusätzlich im Original abzugeben ist, sonst leer" },
+      { key: "{{nachricht}}", description: "Nachricht der Personalabteilung beim Anfordern (Textteil); nie in den Betreff" },
+      { key: "{{nachricht_html}}", description: "Dieselbe Nachricht HTML-sicher, Umbrüche als <br>" },
+      { key: "{{mit_details}}", description: "„ja“, wenn die Mail Unterlagen und Vorgangsnummer nennen darf (Stufe 1: immer)" },
+      { key: "{{ohne_details}}", description: "„ja“, wenn sie es nicht darf (Stufe 2, Mutterschutz), sonst leer" },
+      { key: "{{email}}", description: "Adresse der Nachforderung – die Mail geht nur dorthin, An, Cc und Bcc dieser Vorlage wirken nicht" },
+    ],
+  },
+
+  {
+    event: "unterlage-zurueckgewiesen",
+    name: "Unterlage zurückgewiesen",
+    subject: "Bitte erneut hochladen: Unterlage zu Ihrem Vorgang{{vorgang_zusatz}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">{{einrichtung}}</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">Personalabteilung</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fee2e2;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#991b1b;font-weight:bold;font-size:14px;">Bitte erneut hochladen</span>
+          </div>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Guten Tag{{#vorname}} {{vorname}}{{/vorname}}{{#nachname}} {{nachname}}{{/nachname}},
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            die Personalabteilung konnte eine Unterlage nicht annehmen.
+          </p>
+          {{#unterlage}}<table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 16px;">
+            <tr><td style="padding:14px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Unterlage</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{unterlage}}</p>
+            </td></tr>
+          </table>{{/unterlage}}
+          {{#begruendung}}<table cellpadding="0" cellspacing="0" style="width:100%;border-left:3px solid #E2001A;background-color:#fef2f2;border-radius:4px;margin:0 0 24px;">
+            <tr><td style="padding:14px 16px;">
+              <p style="margin:0 0 6px;color:#6b7280;font-size:12px;">Begründung</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{begruendung_html}}</p>
+            </td></tr>
+          </table>{{/begruendung}}
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Nach dem Öffnen des Links sehen Sie alle Einzelheiten und können die Unterlage erneut hochladen.
+          </p>
+          {{#ist_nachgeholt}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Unsere letzte E-Mail hat Sie möglicherweise nicht erreicht. Deshalb erhalten Sie Ihren persönlichen Link hier noch einmal.
+          </p>{{/ist_nachgeholt}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 22px;">
+            <tr><td style="background-color:#f9fafb;border-left:4px solid #575756;padding:13px 16px;">
+              <p style="margin:0;color:#2d2d2d;font-size:14px;line-height:1.6;"><strong>Frist:</strong> {{frist_lang}}{{#frist_verstrichen}}<br><span style="color:#92400e;">Die Frist ist abgelaufen. Sie können die Unterlage noch bis zum {{link_gueltig_bis}} hochladen.</span>{{/frist_verstrichen}}</p>
+            </td></tr>
+          </table>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+            <tr><td style="background-color:#2563eb;border-radius:8px;">
+              <a href="{{link}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Unterlage erneut hochladen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7280;font-size:12px;line-height:1.5;margin:0 0 6px;">
+            Falls der Knopf nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:
+          </p>
+          <p style="margin:0 0 24px;"><a href="{{link}}" style="color:#2563eb;font-size:12px;word-break:break-all;text-decoration:underline;">{{link}}</a></p>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Erlaubt sind PDF, JPG, PNG und WebP mit höchstens 9,5 MB je Datei. Erst mit „Unterlagen übermitteln“ erreichen die Dateien die Personalabteilung.
+          </p>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Bitte senden Sie Unterlagen nicht per E-Mail, sondern nur über den Link. Der Link ist persönlich, bitte nicht weiterleiten. Bei Fragen wenden Sie sich bitte an die Personalabteilung.
+          </p>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            {{#vorgangsnummer}}Vorgang {{vorgangsnummer}} · {{/vorgangsnummer}}Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Guten Tag{{#vorname}} {{vorname}}{{/vorname}}{{#nachname}} {{nachname}}{{/nachname}},
+
+die Personalabteilung konnte eine Unterlage nicht annehmen.
+{{#unterlage}}
+Unterlage: {{unterlage}}
+{{/unterlage}}{{#begruendung}}
+Begründung:
+{{begruendung}}
+{{/begruendung}}
+Nach dem Öffnen des Links sehen Sie alle Einzelheiten und können die Unterlage erneut hochladen.
+{{#ist_nachgeholt}}
+Unsere letzte E-Mail hat Sie möglicherweise nicht erreicht. Deshalb erhalten Sie Ihren persönlichen Link hier noch einmal.
+{{/ist_nachgeholt}}
+Frist: {{frist_lang}}{{#frist_verstrichen}}
+Die Frist ist abgelaufen. Sie können die Unterlage noch bis zum {{link_gueltig_bis}} hochladen.{{/frist_verstrichen}}
+
+Unterlage erneut hochladen:
+{{link}}
+
+Erlaubt sind PDF, JPG, PNG und WebP mit höchstens 9,5 MB je Datei. Erst mit „Unterlagen übermitteln“ erreichen die Dateien die Personalabteilung.
+
+Bitte senden Sie Unterlagen nicht per E-Mail, sondern nur über den Link. Der Link ist persönlich, bitte nicht weiterleiten. Bei Fragen wenden Sie sich bitte an die Personalabteilung.
+
+{{einrichtung}} – Personalabteilung{{#vorgangsnummer}}
+Vorgang {{vorgangsnummer}}{{/vorgangsnummer}}`,
+    variables: [
+      { key: "{{vorname}}", description: "Vorname der Person (kann leer sein)" },
+      { key: "{{nachname}}", description: "Nachname der Person (kann leer sein)" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (leer, wenn der Vorgang keine hat oder die Mail ohne Details geht)" },
+      { key: "{{vorgang_zusatz}}", description: "Leerzeichen plus Vorgangsnummer, sonst leer – für den Betreff" },
+      { key: "{{link}}", description: "Persönlicher Upload-Link dieser Mail – nie in den Betreff (das Portal weist das ab)" },
+      { key: "{{frist}}", description: "Frist für die erneute Einreichung (TT.MM.JJJJ)" },
+      { key: "{{frist_lang}}", description: "Dieselbe Frist mit Wochentag" },
+      { key: "{{frist_verstrichen}}", description: "„ja“, wenn die Frist schon abgelaufen ist, sonst leer" },
+      { key: "{{link_gueltig_bis}}", description: "Bis wann der Link noch trägt (TT.MM.JJJJ) – nur gesetzt, wenn die Frist verstrichen ist" },
+      { key: "{{unterlage}}", description: "Name der zurückgewiesenen Unterlage – leer bei vertraulichen Unterlagen (dann nur auf der Upload-Seite); nie in den Betreff" },
+      { key: "{{begruendung}}", description: "Begründung für die Person (Textteil) – leer bei vertraulichen Unterlagen; nie in den Betreff" },
+      { key: "{{begruendung_html}}", description: "Dieselbe Begründung HTML-sicher, Umbrüche als <br>" },
+      { key: "{{einreichung_nr}}", description: "Die wievielte Einreichung zurückgewiesen wurde (1 = erste)" },
+      { key: "{{ist_nachgeholt}}", description: "„ja“, wenn der tägliche Lauf eine gescheiterte Mail nachholt, sonst leer" },
+      { key: "{{unterlagenliste}}", description: "Alle noch offenen Unterlagen als Klartext (einschließlich der zurückgewiesenen)" },
+      { key: "{{unterlagenliste_html}}", description: "Dieselben Unterlagen als HTML-Liste, bereits maskiert" },
+      { key: "{{anzahl_unterlagen}}", description: "Anzahl der offenen Unterlagen" },
+      { key: "{{nachricht}}", description: "Nachricht der Personalabteilung beim Anfordern (Textteil); nie in den Betreff" },
+      { key: "{{nachricht_html}}", description: "Dieselbe Nachricht HTML-sicher, Umbrüche als <br>" },
+      { key: "{{mit_details}}", description: "„ja“, wenn die Mail Unterlagen und Vorgangsnummer nennen darf (Stufe 1: immer)" },
+      { key: "{{ohne_details}}", description: "„ja“, wenn sie es nicht darf (Stufe 2, Mutterschutz), sonst leer" },
+      { key: "{{email}}", description: "Adresse der Nachforderung – die Mail geht nur dorthin, An, Cc und Bcc dieser Vorlage wirken nicht" },
+    ],
+  },
+
+  {
+    event: "unterlagen-vollstaendig",
+    name: "Unterlagen vollständig eingegangen (HR)",
+    subject: "Unterlagen eingegangen: {{vorgang_kurz}} für {{mitarbeiter_name}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#065f46;font-weight:bold;font-size:14px;">Eingegangen</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Unterlagen für {{mitarbeiter_name}} eingegangen</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Guten Tag,
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            die angeforderten Unterlagen sind vollständig übermittelt und warten auf Ihre Prüfung. Angenommene Unterlagen übernimmt das Portal in die Dokumente des Vorgangs.
+          </p>
+          {{#erneut_eingereicht}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Darunter ist mindestens eine Unterlage, die nach einer Zurückweisung erneut eingereicht wurde.
+          </p>{{/erneut_eingereicht}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px 18px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vorgang</p>
+              <p style="margin:0 0 12px;color:#374151;font-size:14px;">{{einrichtung}}{{#vorgangsnummer}} · {{vorgangsnummer}}{{/vorgangsnummer}}</p>
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Angefordert</p>
+              <p style="margin:0 0 12px;color:#374151;font-size:14px;">am {{angefordert_am}}{{#angefordert_von}} von {{angefordert_von}}{{/angefordert_von}}</p>
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Übermittelt</p>
+              <p style="margin:0 0 12px;color:#374151;font-size:14px;">am {{uebermittelt_am}} (Frist: {{frist_lang}})</p>
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Stand</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{anzahl_zu_pruefen}} zu prüfen · {{anzahl_angenommen}} angenommen</p>
+            </td></tr>
+          </table>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#2563eb;border-radius:8px;">
+              <a href="{{portalLink}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Im Portal prüfen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Welche Unterlagen es sind, sehen Sie im Portal – diese E-Mail nennt sie bewusst nicht.
+          </p>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Unterlagen für {{mitarbeiter_name}} eingegangen
+
+Guten Tag,
+
+die angeforderten Unterlagen sind vollständig übermittelt und warten auf Ihre Prüfung. Angenommene Unterlagen übernimmt das Portal in die Dokumente des Vorgangs.
+{{#erneut_eingereicht}}
+Darunter ist mindestens eine Unterlage, die nach einer Zurückweisung erneut eingereicht wurde.
+{{/erneut_eingereicht}}
+Vorgang:     {{einrichtung}}{{#vorgangsnummer}} · {{vorgangsnummer}}{{/vorgangsnummer}}
+Angefordert: am {{angefordert_am}}{{#angefordert_von}} von {{angefordert_von}}{{/angefordert_von}}
+Übermittelt: am {{uebermittelt_am}} (Frist: {{frist_lang}})
+Stand:       {{anzahl_zu_pruefen}} zu prüfen · {{anzahl_angenommen}} angenommen
+
+Im Portal prüfen: {{portalLink}}
+
+Welche Unterlagen es sind, sehen Sie im Portal – diese E-Mail nennt sie bewusst nicht.
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Name der Person – ohne bekannten Namen „die neue Mitarbeiterin / den neuen Mitarbeiter“ (Akkusativ, daher nur nach „für“; nie eine E-Mail-Adresse)" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (leer, wenn der Vorgang keine hat oder die Mail ohne Details geht)" },
+      { key: "{{vorgang_kurz}}", description: "„Vorgang 2026-GYM-014“, ohne Nummer nur „Vorgang“ – für den Betreff" },
+      { key: "{{anfordernde_email}}", description: "HR-Kraft, die die Unterlagen angefordert hat (An); ist ihr Konto inaktiv oder gelöscht, das HR-Postfach" },
+      { key: "{{hr_postfach}}", description: "HR-Postfach = Antwortadresse aus den SMTP-Einstellungen (Cc); leer, wenn es mit der anfordernden Adresse übereinstimmt" },
+      { key: "{{angefordert_von}}", description: "Name der anfordernden HR-Kraft (kann leer sein)" },
+      { key: "{{angefordert_am}}", description: "Datum der Anforderung (TT.MM.JJJJ)" },
+      { key: "{{uebermittelt_am}}", description: "Datum der Übermittlung (TT.MM.JJJJ)" },
+      { key: "{{frist}}", description: "Frist (TT.MM.JJJJ)" },
+      { key: "{{frist_lang}}", description: "Frist mit Wochentag" },
+      { key: "{{anzahl_unterlagen}}", description: "Angeforderte Unterlagen ohne die entfallenen" },
+      { key: "{{anzahl_zu_pruefen}}", description: "Übermittelte, noch nicht geprüfte Unterlagen" },
+      { key: "{{anzahl_angenommen}}", description: "Bereits angenommene Unterlagen" },
+      { key: "{{anzahl_offen}}", description: "Unterlagen, die noch auf die Person warten (hier immer 0)" },
+      { key: "{{erneut_eingereicht}}", description: "„ja“, wenn eine der zu prüfenden Unterlagen nach einer Zurückweisung erneut kam, sonst leer" },
+      { key: "{{portalLink}}", description: "Link zum Vorgang im Portal" },
+    ],
+  },
+
+  {
+    event: "unterlagen-frist-verstrichen",
+    name: "Frist für Unterlagen verstrichen (HR)",
+    subject: "Frist verstrichen ({{frist}}): Unterlagen für {{vorgang_kurz}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#92400e;font-weight:bold;font-size:14px;">Frist verstrichen</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Unterlagen für {{mitarbeiter_name}} noch nicht vollständig</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Guten Tag,
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            die Frist für die angeforderten Unterlagen endete am {{frist_lang}}. Es fehlen noch Unterlagen der Person.
+          </p>
+          {{#nie_zugestellt}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
+            <tr><td style="background-color:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;">
+              <p style="margin:0;color:#991b1b;font-size:14px;line-height:1.5;">Die Aufforderung wurde der Person nie zugestellt – bitte Adresse prüfen.</p>
+            </td></tr>
+          </table>{{/nie_zugestellt}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 20px;">
+            <tr><td style="padding:16px 18px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vorgang</p>
+              <p style="margin:0 0 12px;color:#374151;font-size:14px;">{{einrichtung}}{{#vorgangsnummer}} · {{vorgangsnummer}}{{/vorgangsnummer}}</p>
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Angefordert</p>
+              <p style="margin:0 0 12px;color:#374151;font-size:14px;">am {{angefordert_am}}{{#angefordert_von}} von {{angefordert_von}}{{/angefordert_von}}</p>
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Stand</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{anzahl_offen}} offen · {{anzahl_zu_pruefen}} zu prüfen · {{anzahl_angenommen}} angenommen</p>
+            </td></tr>
+          </table>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 8px;">
+            Im Portal können Sie
+          </p>
+          <ul style="margin:0 0 20px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">
+            <li style="margin:0 0 4px;">die Frist ändern – die Person erhält dann eine E-Mail mit neuem Link,</li>
+            <li style="margin:0 0 4px;">den Link erneut senden – möglich bis zum {{link_gueltig_bis}},</li>
+            <li style="margin:0 0 4px;">die Nachforderung zurückziehen.</li>
+          </ul>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#2563eb;border-radius:8px;">
+              <a href="{{portalLink}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Vorgang im Portal öffnen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Welche Unterlagen fehlen, sehen Sie im Portal – diese E-Mail nennt sie bewusst nicht. Die Meldung kommt einmal je Frist; ändern Sie die Frist, beginnt die Überwachung neu.
+          </p>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Unterlagen für {{mitarbeiter_name}} noch nicht vollständig
+
+Guten Tag,
+
+die Frist für die angeforderten Unterlagen endete am {{frist_lang}}. Es fehlen noch Unterlagen der Person.
+{{#nie_zugestellt}}
+Die Aufforderung wurde der Person nie zugestellt – bitte Adresse prüfen.
+{{/nie_zugestellt}}
+Vorgang:     {{einrichtung}}{{#vorgangsnummer}} · {{vorgangsnummer}}{{/vorgangsnummer}}
+Angefordert: am {{angefordert_am}}{{#angefordert_von}} von {{angefordert_von}}{{/angefordert_von}}
+Stand:       {{anzahl_offen}} offen · {{anzahl_zu_pruefen}} zu prüfen · {{anzahl_angenommen}} angenommen
+
+Im Portal können Sie
+- die Frist ändern – die Person erhält dann eine E-Mail mit neuem Link,
+- den Link erneut senden – möglich bis zum {{link_gueltig_bis}},
+- die Nachforderung zurückziehen.
+
+Vorgang im Portal: {{portalLink}}
+
+Welche Unterlagen fehlen, sehen Sie im Portal – diese E-Mail nennt sie bewusst nicht. Die Meldung kommt einmal je Frist; ändern Sie die Frist, beginnt die Überwachung neu.
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Name der Person – ohne bekannten Namen „die neue Mitarbeiterin / den neuen Mitarbeiter“ (Akkusativ, daher nur nach „für“; nie eine E-Mail-Adresse)" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (leer, wenn der Vorgang keine hat oder die Mail ohne Details geht)" },
+      { key: "{{vorgang_kurz}}", description: "„Vorgang 2026-GYM-014“, ohne Nummer nur „Vorgang“ – für den Betreff" },
+      { key: "{{anfordernde_email}}", description: "HR-Kraft, die die Unterlagen angefordert hat (An); ist ihr Konto inaktiv oder gelöscht, das HR-Postfach" },
+      { key: "{{hr_postfach}}", description: "HR-Postfach = Antwortadresse aus den SMTP-Einstellungen (Cc); leer, wenn es mit der anfordernden Adresse übereinstimmt" },
+      { key: "{{angefordert_von}}", description: "Name der anfordernden HR-Kraft (kann leer sein)" },
+      { key: "{{angefordert_am}}", description: "Datum der Anforderung (TT.MM.JJJJ)" },
+      { key: "{{frist}}", description: "Die verstrichene Frist (TT.MM.JJJJ)" },
+      { key: "{{frist_lang}}", description: "Dieselbe Frist mit Wochentag" },
+      { key: "{{link_gueltig_bis}}", description: "Bis wann der Link erneut gesendet werden kann (TT.MM.JJJJ, Frist + 14 Tage)" },
+      { key: "{{nie_zugestellt}}", description: "„ja“, wenn der Person nie eine Mail zugestellt wurde, sonst leer" },
+      { key: "{{anzahl_unterlagen}}", description: "Angeforderte Unterlagen ohne die entfallenen" },
+      { key: "{{anzahl_offen}}", description: "Unterlagen, die noch auf die Person warten" },
+      { key: "{{anzahl_zu_pruefen}}", description: "Übermittelte, noch nicht geprüfte Unterlagen" },
+      { key: "{{anzahl_angenommen}}", description: "Bereits angenommene Unterlagen" },
+      { key: "{{portalLink}}", description: "Link zum Vorgang im Portal" },
     ],
   },
 ];

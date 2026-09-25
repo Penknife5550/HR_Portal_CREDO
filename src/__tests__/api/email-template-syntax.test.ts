@@ -116,3 +116,91 @@ describe("PUT /api/settings/email-templates/[id] — Bedingungsmarker", () => {
     expect(mockPrisma.emailTemplate.upsert).toHaveBeenCalled();
   });
 });
+
+/**
+ * Paket 4: Das Versandprotokoll haelt Betreffzeilen 90 Tage fest. Fuer die
+ * Mails der Nachforderung sind deshalb Unterlagennamen, Begruendung, Nachricht
+ * und jeder Weg zum Link im Betreff verboten (betreffOhne im Event-Katalog).
+ */
+describe("PUT /api/settings/email-templates/[id] — verbotene Variablen im Betreff", () => {
+  it("weist {{link}} im Betreff ab und nennt den Grund", async () => {
+    const res = await PUT(
+      req(vorlage({ event: "unterlagen-angefordert", subject: "Ihr Upload-Link: {{link}}" })),
+      params("t1"),
+    );
+
+    expect(res.status).toBe(400);
+    const { error } = await res.json();
+    expect(error).toContain("{{link}}");
+    expect(error).toContain("90 Tage im Versandprotokoll");
+    // Die Vorlage landet gar nicht erst in der Datenbank.
+    expect(mockPrisma.emailTemplate.upsert).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["unterlage-zurueckgewiesen", "Zurückgewiesen: {{unterlage}}", "{{unterlage}}"],
+    ["unterlage-zurueckgewiesen", "Grund: {{ begruendung }}", "{{begruendung}}"],
+    ["unterlagen-erinnerung", "Offen: {{unterlagenliste}}", "{{unterlagenliste}}"],
+    ["unterlagen-angefordert", "{{#nachricht}}Mit Nachricht{{/nachricht}}", "{{nachricht}}"],
+    ["unterlagen-vollstaendig", "Eingegangen {{magicLink}}", "{{magicLink}}"],
+  ])("%s: %s ergibt 400", async (event, subject, genannt) => {
+    const res = await PUT(req(vorlage({ event, subject })), params("t1"));
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain(genannt);
+    expect(mockPrisma.emailTemplate.upsert).not.toHaveBeenCalled();
+  });
+
+  it("nennt alle verbotenen Variablen auf einmal", async () => {
+    const res = await PUT(
+      req(vorlage({ event: "unterlage-zurueckgewiesen", subject: "{{unterlage}} – {{link}}" })),
+      params("t1"),
+    );
+
+    expect(res.status).toBe(400);
+    const { error } = await res.json();
+    expect(error).toContain("{{unterlage}}");
+    expect(error).toContain("{{link}}");
+  });
+
+  it("speichert den Standard-Betreff der Nachforderung", async () => {
+    const res = await PUT(
+      req(
+        vorlage({
+          event: "unterlagen-angefordert",
+          subject: "{{#ist_ergaenzung}}Ergänzung: {{/ist_ergaenzung}}Unterlagen zu Ihrem Vorgang{{vorgang_zusatz}} – {{einrichtung}}",
+        }),
+      ),
+      params("t1"),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.emailTemplate.upsert).toHaveBeenCalled();
+  });
+
+  // Der Renderer loest zuerst die Bloecke auf und setzt danach ein: Aus diesen
+  // Betreffzeilen entstuende beim Versand ein echtes {{link}} bzw. die Liste der
+  // Unterlagen, obwohl der Rohtext keinen verbotenen Platzhalter nennt.
+  it.each([
+    ["unterlagen-angefordert", "Unterlagen {{li{{#x}}{{/x}}nk}}"],
+    ["unterlagen-angefordert", "Unterlagen {{lin{{#x}}zz{{/x}}k}}"],
+    ["unterlagen-erinnerung", "{{l{{#ist_vorab}}i{{/ist_vorab}}n{{#ist_fristtag}}zz{{/ist_fristtag}}k}}"],
+    ["unterlage-zurueckgewiesen", "{{unterlage{{#ist_erneut}}{{/ist_erneut}}nliste}}"],
+    ["unterlagen-vollstaendig", "Eingegangen {{{#x}}{{/x}}{link}}"],
+  ])("%s: zusammengesetzter Platzhalter %s ergibt 400", async (event, subject) => {
+    const res = await PUT(req(vorlage({ event, subject })), params("t1"));
+
+    expect(res.status).toBe(400);
+    const { error } = await res.json();
+    expect(error).toContain("ineinander geschachtelte");
+    expect(error).toContain("90 Tage im Versandprotokoll");
+    expect(mockPrisma.emailTemplate.upsert).not.toHaveBeenCalled();
+  });
+
+  it("laesst Ereignisse ohne Sperrliste unberuehrt ({{link}} im Betreff der Einladung bleibt erlaubt)", async () => {
+    const res = await PUT(req(vorlage({ subject: "Ihr Fragebogen: {{link}}" })), params("t1"));
+
+    expect(res.status).toBe(200);
+  });
+});

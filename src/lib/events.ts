@@ -24,7 +24,8 @@ export type EventGroup =
   | "Exit-Interview"
   | "Verbeamtung"
   | "Elternzeit"
-  | "Mutterschutz";
+  | "Mutterschutz"
+  | "Unterlagen";
 
 export interface EventRecipientDefaults {
   to: string;
@@ -50,6 +51,17 @@ export interface EventDefinition {
    * ausgeloest — wird in der Status-Ampel entsprechend ausgewiesen.
    */
   wired: boolean;
+  /**
+   * Variablen, die im Betreff dieser Vorlage nicht stehen duerfen. Das
+   * EmailLog speichert Betreffzeilen 90 Tage lang (src/lib/mailer.ts,
+   * writeEmailLog) — ein Unterlagenname, eine Begruendung oder gar der
+   * persoenliche Link laege dort fuer jeden mit Zugriff auf das
+   * Versandprotokoll offen. PUT /api/settings/email-templates/[id] weist
+   * einen solchen Betreff mit 400 ab (verboteneBetreffVariablen), ebenso
+   * ineinander geschachtelte Marker, aus denen der Renderer erst einen
+   * verbotenen Platzhalter zusammensetzte (betreffMitVerschachteltenMarkern).
+   */
+  betreffOhne?: string[];
 }
 
 const BEISPIEL_LINK = "https://hr.fes-credo.de/beispiel-link";
@@ -306,6 +318,183 @@ export const PSI_FRISTEN_BEISPIEL: {
 
 /** Portal-Adresse, mit der das Beispiel seine Links baut. */
 export const PSI_FRISTEN_BEISPIEL_BASIS = "https://hr.fes-credo.de";
+
+/**
+ * Beispiel fuer die fuenf Mails der Nachforderung (Paket 4 „Unterlagen
+ * nachfordern“). Wie bei den Abteilungsaufgaben erzaehlen die Beispiel-Payloads
+ * EINE Geschichte — mit echten Wochentagen (das Mockup nannte den 26.09.2026
+ * einen Freitag, es ist ein Samstag):
+ *
+ *   Mo 14.09.2026  Erika Muster fordert bei Anna Beispiel drei Unterlagen an,
+ *                  Frist Fr 25.09.2026 (Mail „Unterlagen angefordert“)
+ *   Di 15.09.      Anna uebermittelt PKV-Nachweis und RV-Antrag
+ *   Mi 16.09.      HR weist den PKV-Nachweis zurueck (Mail „Unterlage
+ *                  zurückgewiesen“), der RV-Antrag wird am 17.09. angenommen
+ *   Fr 18.09.      Vorab-Erinnerung, Frist − 7; Anna hat den neuen PKV-Nachweis
+ *                  schon hochgeladen, aber noch nicht uebermittelt
+ *   Mo 21.09.      Anna uebermittelt Masernschutz und PKV-Nachweis — nichts
+ *                  wartet mehr auf sie (HR-Mail „vollständig“, erneut
+ *                  eingereicht)
+ *   Di 22.09.      HR nimmt den PKV-Nachweis an und weist den
+ *                  Masernschutz-Nachweis zurueck. Der Dialog schlaegt als
+ *                  Frist Di 29.09. vor (heute + 7, weil der 25.09. keine
+ *                  7 Tage mehr entfernt liegt, EP-1); HR stellt bewusst
+ *                  den 25.09. wieder ein. Anna reagiert nicht.
+ *   Sa 26.09.      Frist verstrichen (HR-Mail), Link gueltig bis Fr 09.10.2026
+ *
+ * Der Masernschutz-Nachweis ist sensibel (E-2): In keiner Mail steht sein
+ * Name oder sein Hinweis, nur „Eine vertrauliche Unterlage – …“.
+ *
+ * Die Mailfelder stehen unten als fertiger Text. Sie werden bewusst NICHT hier
+ * mit den Bausteinen aus src/lib/unterlagen-mail.ts erzeugt: Dieser Katalog
+ * bleibt ohne Importe (Test in ereignis-liste.test.ts). Stattdessen spielt
+ * src/__tests__/lib/unterlagen-mails.test.ts die Geschichte mit den echten
+ * Bausteinen nach und prueft, dass sie genau diese Payloads bauen.
+ */
+export const UNTERLAGEN_BEISPIEL_UNTERLAGEN: {
+  bezeichnung: string;
+  hinweis: string | null;
+  sensibel: boolean;
+  originalErforderlich: boolean;
+}[] = [
+  {
+    bezeichnung: "Masernschutz-Nachweis",
+    hinweis: "Bitte laden Sie nur die Seite Ihres Impfpasses mit den Masern-Impfungen hoch.",
+    sensibel: true,
+    originalErforderlich: false,
+  },
+  {
+    bezeichnung: "Nachweis private Krankenversicherung",
+    hinweis:
+      "Bitte nur die Bescheinigung über den bestehenden Versicherungsschutz, keine Beitragsübersicht und nicht den Vertrag.",
+    sensibel: false,
+    originalErforderlich: false,
+  },
+  {
+    bezeichnung: "Unterschriebener Antrag auf Befreiung von der Rentenversicherungspflicht",
+    hinweis: null,
+    sensibel: false,
+    originalErforderlich: true,
+  },
+];
+
+/** Nachricht von HR beim Anfordern (Rohtext, mit Zeilenumbruch). */
+export const UNTERLAGEN_BEISPIEL_NACHRICHT =
+  "Den RV-Antrag können Sie auch an Ihrem ersten Arbeitstag im Original mitbringen.\nVielen Dank für Ihre Mithilfe!";
+
+/** Begruendung der Zurueckweisung vom 16.09. (Rohtext, mit Zeilenumbruch). */
+export const UNTERLAGEN_BEISPIEL_BEGRUENDUNG =
+  "Auf der Bescheinigung fehlt der Beginn des Versicherungsschutzes.\nBitte laden Sie die vollständige Bescheinigung Ihrer Krankenkasse hoch.";
+
+/** Was alle fuenf Mails tragen (gemeinsameFelder in unterlagen-mail.ts). */
+const UNTERLAGEN_BEISPIEL = {
+  nachforderungId: "00000000-0000-0000-0000-000000000041",
+  modul: "ONBOARDING",
+  refId: "00000000-0000-0000-0000-000000000014",
+  onboardingId: "00000000-0000-0000-0000-000000000014",
+  vorgangsart: "Onboarding",
+  displayId: "2026-GYM-014",
+  einrichtung: "FES Minden",
+  organization: "FES Minden",
+  frist: "25.09.2026",
+  frist_lang: "Freitag, 25.09.2026",
+  mit_details: "ja",
+  ohne_details: "",
+  vorgang_zusatz: " 2026-GYM-014",
+  vorgang_kurz: "Vorgang 2026-GYM-014",
+};
+
+/**
+ * Was die drei Mails an die Person zusaetzlich tragen. Die Frist ist in
+ * allen drei noch nicht verstrichen, deshalb bleibt das Linkende leer.
+ */
+const UNTERLAGEN_BEISPIEL_PERSON = {
+  email: "anna.beispiel@example.org",
+  link: BEISPIEL_LINK,
+  vorname: "Anna",
+  nachname: "Beispiel",
+  mitarbeiter_name: "Anna Beispiel",
+  nachricht: UNTERLAGEN_BEISPIEL_NACHRICHT,
+  nachricht_html:
+    "Den RV-Antrag können Sie auch an Ihrem ersten Arbeitstag im Original mitbringen.<br>Vielen Dank für Ihre Mithilfe!",
+  frist_verstrichen: "",
+  link_gueltig_bis: "",
+};
+
+/** unterlagenlisteMailFelder am 14.09.: alle drei Unterlagen offen. */
+const UNTERLAGEN_BEISPIEL_LISTE_ALLE = {
+  unterlagenliste:
+    "- Eine vertrauliche Unterlage – Einzelheiten sehen Sie nach dem Öffnen des Links\n" +
+    "- Nachweis private Krankenversicherung\n" +
+    "  Bitte nur die Bescheinigung über den bestehenden Versicherungsschutz, keine Beitragsübersicht und nicht den Vertrag.\n" +
+    "- Unterschriebener Antrag auf Befreiung von der Rentenversicherungspflicht – bitte zusätzlich das unterschriebene Original abgeben",
+  unterlagenliste_html:
+    '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+    '<li style="margin:0 0 6px;">Eine vertrauliche Unterlage – Einzelheiten sehen Sie nach dem Öffnen des Links</li>' +
+    '<li style="margin:0 0 6px;"><strong>Nachweis private Krankenversicherung</strong>' +
+    '<br><span style="color:#6b7280;font-size:13px;">Bitte nur die Bescheinigung über den bestehenden Versicherungsschutz, keine Beitragsübersicht und nicht den Vertrag.</span></li>' +
+    '<li style="margin:0 0 6px;"><strong>Unterschriebener Antrag auf Befreiung von der Rentenversicherungspflicht</strong> – bitte zusätzlich das unterschriebene Original abgeben</li>' +
+    "</ul>",
+  anzahl_unterlagen: 3,
+  original_erforderlich: "ja",
+};
+
+/** unterlagenlisteMailFelder am 16. und 18.09.: Masernschutz offen, PKV zurueckgewiesen. */
+const UNTERLAGEN_BEISPIEL_LISTE_ZWEI = {
+  unterlagenliste:
+    "- Eine vertrauliche Unterlage – Einzelheiten sehen Sie nach dem Öffnen des Links\n" +
+    "- Nachweis private Krankenversicherung\n" +
+    "  Bitte nur die Bescheinigung über den bestehenden Versicherungsschutz, keine Beitragsübersicht und nicht den Vertrag.",
+  unterlagenliste_html:
+    '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+    '<li style="margin:0 0 6px;">Eine vertrauliche Unterlage – Einzelheiten sehen Sie nach dem Öffnen des Links</li>' +
+    '<li style="margin:0 0 6px;"><strong>Nachweis private Krankenversicherung</strong>' +
+    '<br><span style="color:#6b7280;font-size:13px;">Bitte nur die Bescheinigung über den bestehenden Versicherungsschutz, keine Beitragsübersicht und nicht den Vertrag.</span></li>' +
+    "</ul>",
+  anzahl_unterlagen: 2,
+  original_erforderlich: "",
+};
+
+/**
+ * Was beide HR-Mails zusaetzlich tragen. Bewusst OHNE `email`, ohne Link der
+ * Person und ohne Namen von Unterlagen (Feinplanung Abschnitt 11) — die
+ * HR-Mails duerfen an Webhooks.
+ */
+const UNTERLAGEN_BEISPIEL_HR = {
+  anzahl_unterlagen: 3,
+  anfordernde_email: "erika.muster@example.org",
+  hr_postfach: "personal@example.org",
+  angefordert_von: "Erika Muster",
+  angefordert_am: "14.09.2026",
+  mitarbeiter_name: "Anna Beispiel",
+  portalLink: "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000014",
+};
+
+/**
+ * Verbotene Betreff-Variablen aller fuenf Mails (Feinplanung 8.3): Namen von
+ * Unterlagen, Begruendung, Nachricht — und jeder Weg zum Link. Ein
+ * {{link}} im Betreff legte einen gueltigen Zugang 90 Tage ins Versandprotokoll.
+ */
+const UNTERLAGEN_BETREFF_OHNE = [
+  "unterlage",
+  "unterlagenliste",
+  "unterlagenliste_html",
+  "begruendung",
+  "begruendung_html",
+  "nachricht",
+  "nachricht_html",
+  "link",
+  "magicLink",
+  "magicUrl",
+];
+
+/** Hinweis fuer die drei Mails an die Person (Anzeige unter Einstellungen). */
+const UNTERLAGEN_PERSON_HINWEIS =
+  "Person des Vorgangs (persönlicher Upload-Link) – geht nur an die Adresse der Nachforderung; An, Cc und Bcc der Vorlage wirken nicht";
+
+/** Hinweis fuer die beiden HR-Mails. */
+const UNTERLAGEN_HR_HINWEIS =
+  "Anfordernde HR-Person, Kopie an das HR-Postfach (Antwortadresse aus den SMTP-Einstellungen)";
 
 export const EVENT_CATALOG: EventDefinition[] = [
   // =============================================
@@ -1534,6 +1723,125 @@ export const EVENT_CATALOG: EventDefinition[] = [
     },
     wired: true,
   },
+
+  // =============================================
+  // Unterlagen nachfordern (Paket 4)
+  //
+  // Drei Mails an die Person (mit persoenlichem Upload-Link) und zwei an HR.
+  // Die Payloads baut src/lib/unterlagen-mail.ts; die Namen sind modulneutral,
+  // Stufe 2 nutzt dieselben Ereignisse fuer die uebrigen Vorgangsarten.
+  //
+  // Die Mails an die Person gehen DIREKT ueber sendEventEmail mit overrideTo
+  // (Adresse der Nachforderung), nie ueber triggerWebhooks — ein Webhook
+  // bekaeme sonst den Link, einen Zugang zur Personalakte (EVENTS_OHNE_WEBHOOK).
+  // An, Cc und Bcc der Vorlage wirken dort nicht. Der Default {{email}} steht
+  // trotzdem hier: So meldet die Status-Ampel keinen fehlenden Empfaenger,
+  // wie beim Dokumentenpaket.
+  //
+  // Die HR-Mails gehen ueber triggerWebhooks an die anfordernde HR-Person, mit
+  // Kopie an das HR-Postfach (SmtpConfig.replyToEmail). Ihre Payload traegt
+  // weder Link noch Adresse der Person noch Namen von Unterlagen.
+  // =============================================
+  {
+    // Anfordern, Ergaenzen, Frist aendern, Link erneut senden und das
+    // Nachholen durch den Lauf. Genau EIN Anlass-Merker ist "ja".
+    event: "unterlagen-angefordert",
+    name: "Unterlagen angefordert",
+    group: "Unterlagen",
+    recipientHint: UNTERLAGEN_PERSON_HINWEIS,
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      ...UNTERLAGEN_BEISPIEL,
+      ...UNTERLAGEN_BEISPIEL_LISTE_ALLE,
+      ...UNTERLAGEN_BEISPIEL_PERSON,
+      ist_erstmalig: "ja",
+      ist_ergaenzung: "",
+      ist_erneut: "",
+      ist_fristaenderung: "",
+      ist_nachgeholt: "",
+    },
+    wired: true,
+    betreffOhne: UNTERLAGEN_BETREFF_OHNE,
+  },
+  {
+    // Der taegliche Lauf: 7 Tage vor der Frist (ist_vorab) und am Fristtag.
+    event: "unterlagen-erinnerung",
+    name: "Erinnerung: Unterlagen",
+    group: "Unterlagen",
+    recipientHint: UNTERLAGEN_PERSON_HINWEIS,
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      ...UNTERLAGEN_BEISPIEL,
+      ...UNTERLAGEN_BEISPIEL_LISTE_ZWEI,
+      ...UNTERLAGEN_BEISPIEL_PERSON,
+      ist_vorab: "ja",
+      ist_fristtag: "",
+      entwurf_vorhanden: "ja",
+    },
+    wired: true,
+    betreffOhne: UNTERLAGEN_BETREFF_OHNE,
+  },
+  {
+    // Genau eine Mail je Zurueckweisung. Bei einer sensiblen Unterlage
+    // bleiben `unterlage` und `begruendung` leer (nur auf der Upload-Seite).
+    event: "unterlage-zurueckgewiesen",
+    name: "Unterlage zurückgewiesen",
+    group: "Unterlagen",
+    recipientHint: UNTERLAGEN_PERSON_HINWEIS,
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      ...UNTERLAGEN_BEISPIEL,
+      ...UNTERLAGEN_BEISPIEL_LISTE_ZWEI,
+      ...UNTERLAGEN_BEISPIEL_PERSON,
+      unterlage: "Nachweis private Krankenversicherung",
+      begruendung: UNTERLAGEN_BEISPIEL_BEGRUENDUNG,
+      begruendung_html:
+        "Auf der Bescheinigung fehlt der Beginn des Versicherungsschutzes.<br>Bitte laden Sie die vollständige Bescheinigung Ihrer Krankenkasse hoch.",
+      einreichung_nr: 1,
+      ist_nachgeholt: "",
+    },
+    wired: true,
+    betreffOhne: UNTERLAGEN_BETREFF_OHNE,
+  },
+  {
+    // Nach der Uebermittlung, die nichts mehr offen laesst (after() der
+    // Upload-Route, sonst der Lauf). Nur die Uebermittlung der Person meldet.
+    event: "unterlagen-vollstaendig",
+    name: "Unterlagen vollständig eingegangen (HR)",
+    group: "Unterlagen",
+    recipientHint: UNTERLAGEN_HR_HINWEIS,
+    defaultRecipients: { to: "{{anfordernde_email}}", cc: "{{hr_postfach}}" },
+    samplePayload: {
+      ...UNTERLAGEN_BEISPIEL,
+      ...UNTERLAGEN_BEISPIEL_HR,
+      anzahl_zu_pruefen: 2,
+      anzahl_angenommen: 1,
+      anzahl_offen: 0,
+      uebermittelt_am: "21.09.2026",
+      erneut_eingereicht: "ja",
+    },
+    wired: true,
+    betreffOhne: UNTERLAGEN_BETREFF_OHNE,
+  },
+  {
+    // Der Lauf, einmal je Fristwert — nur, solange etwas auf die Person wartet.
+    event: "unterlagen-frist-verstrichen",
+    name: "Frist für Unterlagen verstrichen (HR)",
+    group: "Unterlagen",
+    recipientHint: UNTERLAGEN_HR_HINWEIS,
+    defaultRecipients: { to: "{{anfordernde_email}}", cc: "{{hr_postfach}}" },
+    samplePayload: {
+      ...UNTERLAGEN_BEISPIEL,
+      ...UNTERLAGEN_BEISPIEL_HR,
+      anzahl_zu_pruefen: 0,
+      anzahl_angenommen: 2,
+      anzahl_offen: 1,
+      link_gueltig_bis: "09.10.2026",
+      nie_zugestellt: "",
+    },
+    wired: true,
+    betreffOhne: UNTERLAGEN_BETREFF_OHNE,
+  },
 ];
 
 // =============================================
@@ -1545,6 +1853,48 @@ export function getEventDefinition(event: string): EventDefinition | undefined {
   return catalogByEvent.get(event);
 }
 
+/**
+ * Platzhalter und Bedingungsmarker im Betreff: {{name}}, {{#name}}, {{/name}},
+ * auch mit Leerzeichen. Bewusst weiter gefasst als der Renderer — geprueft
+ * wird, was im Betreff steht, nicht nur, was er einsetzen wuerde.
+ */
+const BETREFF_VARIABLE = /\{\{\s*[#/]?\s*([^{}#/\s][^{}]*?)\s*\}\}/g;
+
+/**
+ * Die Variablen aus `betreffOhne` des Ereignisses, die im Betreff stehen —
+ * leer, wenn alles erlaubt ist (auch fuer Ereignisse ohne Sperrliste).
+ * Genutzt beim Speichern einer Vorlage (PUT /api/settings/email-templates/[id]).
+ */
+export function verboteneBetreffVariablen(event: string, betreff: string): string[] {
+  const verboten = getEventDefinition(event)?.betreffOhne ?? [];
+  if (verboten.length === 0 || !betreff) return [];
+  const genutzt = new Set([...betreff.matchAll(BETREFF_VARIABLE)].map((treffer) => treffer[1]));
+  return verboten.filter((name) => genutzt.has(name));
+}
+
+/** Ein vollstaendiger Marker ohne Klammern darin: {{name}}, {{#name}}, {{/name}}. */
+const VOLLSTAENDIGER_MARKER = /\{\{[^{}]*\}\}/g;
+
+/**
+ * true, wenn im Betreff eines Ereignisses mit Sperrliste Marker ineinander
+ * stecken oder Klammern uebrig bleiben — etwa „{{li{{#x}}{{/x}}nk}}“.
+ *
+ * verboteneBetreffVariablen liest nur den Rohtext. renderTemplate loest aber
+ * ZUERST die Bloecke auf (gesetzt: Inhalt bleibt, leer: alles faellt weg) und
+ * setzt erst danach die Platzhalter ein; aus dem Beispiel wuerde so ein
+ * echtes {{link}}, und der Upload-Link stuende 90 Tage im Versandprotokoll.
+ * Statt den Renderer mit jeder Kombination gesetzter und leerer Bloecke
+ * nachzuspielen, gilt die strengere Regel: Bleibt nach dem Entfernen aller
+ * vollstaendigen Marker noch „{{“ oder „}}“ stehen, wird abgewiesen. Ein neuer
+ * Platzhalter kann nur aus Klammern entstehen, die in keinem vollstaendigen
+ * Marker stecken — genau die bleiben hier stehen.
+ */
+export function betreffMitVerschachteltenMarkern(event: string, betreff: string): boolean {
+  if (!getEventDefinition(event)?.betreffOhne?.length || !betreff) return false;
+  const rest = betreff.replace(VOLLSTAENDIGER_MARKER, "");
+  return rest.includes("{{") || rest.includes("}}");
+}
+
 /** Gruppen in fester Anzeige-Reihenfolge */
 export const EVENT_GROUP_ORDER: EventGroup[] = [
   "Onboarding",
@@ -1554,4 +1904,5 @@ export const EVENT_GROUP_ORDER: EventGroup[] = [
   "Verbeamtung",
   "Elternzeit",
   "Mutterschutz",
+  "Unterlagen",
 ];

@@ -34,15 +34,28 @@ import { EVENT_CATALOG, EVENT_GROUP_ORDER, type EventGroup } from "@/lib/events"
  * CLAUDE.md, Abschnitt „Dokumente & Starterpaket“). Ein Test gleicht diese
  * Liste mit den Events in dokumentenpaket.ts ab — kommt dort ein Modul hinzu,
  * faellt er auf.
+ *
+ * Die drei Mails der Nachforderung an die Person (Paket 4, zweite begruendete
+ * Ausnahme): Sie tragen den persoenlichen Upload-Link, einen Zugang zur
+ * Personalakte. triggerWebhooks reichte die Payload samt Link an jede frei
+ * konfigurierte Webhook-URL weiter — deshalb ruft der Dienst sendEventEmail
+ * direkt. Die beiden HR-Mails der Nachforderung (vollstaendig, Frist
+ * verstrichen) laufen dagegen ueber den Dispatcher und stehen NICHT hier.
  */
 const DOKUMENTENPAKET_HINWEIS =
   "Webhooks auf dieses Ereignis feuern nicht: Das Dokumentenpaket wird mit Anhängen direkt per SMTP versendet, ohne Webhook-Aufruf.";
+
+const UNTERLAGEN_HINWEIS =
+  "Webhooks auf dieses Ereignis feuern nicht: Die Mail enthält den persönlichen Upload-Link und wird deshalb direkt per SMTP versendet, ohne Webhook-Aufruf.";
 
 export const EVENTS_OHNE_WEBHOOK: Readonly<Record<string, string>> = {
   "onboarding-starter-packet-sent": DOKUMENTENPAKET_HINWEIS,
   "offboarding-documents-sent": DOKUMENTENPAKET_HINWEIS,
   "civil-service-documents-sent": DOKUMENTENPAKET_HINWEIS,
   "contract-renewal-documents-sent": DOKUMENTENPAKET_HINWEIS,
+  "unterlagen-angefordert": UNTERLAGEN_HINWEIS,
+  "unterlagen-erinnerung": UNTERLAGEN_HINWEIS,
+  "unterlage-zurueckgewiesen": UNTERLAGEN_HINWEIS,
 };
 
 export interface EreignisOption {
