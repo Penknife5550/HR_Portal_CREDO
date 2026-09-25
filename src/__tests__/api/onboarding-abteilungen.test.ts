@@ -153,6 +153,13 @@ fp.formTemplate = {
   findUnique: jest.fn(async () => null),
 };
 
+// GET /api/onboarding/[id] legt seit Paket 4 auch `unterlagen` ueber den Vorgang
+// (unterlagenUebersichtLaden). Hier gibt es keine Nachforderungen; getestet ist
+// die Uebersicht in unterlagen-hr-routen.test.ts und unterlagen-dienst.test.ts.
+fp.unterlagenNachforderung = {
+  findMany: jest.fn(async () => []),
+};
+
 // =============================================
 // Testdaten
 // =============================================

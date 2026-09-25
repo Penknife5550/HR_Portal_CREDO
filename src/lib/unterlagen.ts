@@ -129,7 +129,7 @@ export const BREMSEN = {
   HOCHLADEN: { anzahl: 30, fensterMs: 10 * MS_PRO_MINUTE },
   /** Uebrige oeffentliche Schreibwege je Nachforderung: 60 pro Minute. */
   SCHREIBEN: { anzahl: 60, fensterMs: MS_PRO_MINUTE },
-  /** Mails an die Person durch HR je Nachforderung (gezaehlt aus UnterlagenLink). */
+  /** Mails an die Person durch HR je Vorgang, ueber alle seine Nachforderungen (gezaehlt aus UnterlagenLink). */
   MAILS_JE_STUNDE: 6,
   MAILS_JE_TAG: 20,
 } as const;
@@ -361,7 +361,7 @@ export const MELDUNGEN = {
     "Der Link ist abgelaufen. Bitte geben Sie eine neue Frist an – sie geht mit der Zurückweisung in einer E-Mail hinaus.",
   NICHTS_OFFEN: "Keine Unterlage wartet mehr auf die Person. Eine E-Mail ist nicht nötig.",
   SPERRZEIT: `Der Link wurde vor weniger als ${SPERRZEIT_MINUTEN} Minuten gesendet. Bitte warten Sie kurz.`,
-  /** 429: Mail-Bremse je Nachforderung (6 je Stunde, 20 je Tag). */
+  /** 429: Mail-Bremse je Vorgang, ueber alle seine Nachforderungen (6 je Stunde, 20 je Tag). */
   MAIL_BREMSE:
     "An die Person sind in kurzer Zeit schon viele E-Mails gegangen. Bitte versuchen Sie es später erneut.",
   NICHT_ZU_PRUEFEN: "Diese Unterlage wartet nicht auf eine Prüfung.",
@@ -2411,6 +2411,12 @@ export interface UnterlagenFehlerAntwort {
   grund?: string;
   /** Nur oeffentlich bei 410 „Linkende". */
   linkGueltigBis?: Kalendertag;
+  /** 409 SENSIBEL_NICHT_ERLAUBT: die abgelehnte Katalogart … */
+  typ?: string;
+  /** … und warum sie fuer diesen Vorgang nicht anforderbar ist (Klartext, Abschnitt 11). */
+  hinweis?: string;
+  /** 409 SPERRZEIT bei „Link erneut senden": Ende der Sperrzeit (ISO). */
+  sperreBis?: string;
 }
 
 export type HrAktion =

@@ -27,6 +27,10 @@
  * Braucht ein Test weitere Methoden (z. B. departmentConfig.create), haengt er
  * sie IN SEINER DATEI an `fakePrisma` an. Das Sperrverhalten von Postgres
  * bildet der Fake nicht nach.
+ *
+ * Die Helfer passt/anwenden/projizieren/sortieren sind exportiert, damit die
+ * Fake-Datenbank von Paket 4 (unterlagen-fake-db.ts) dieselben Regeln nutzt —
+ * ihr Verhalten ist dadurch unveraendert.
  */
 
 export type Zeile = Record<string, unknown>;
@@ -71,7 +75,7 @@ function gleich(a: unknown, b: unknown): boolean {
   return a === b;
 }
 
-function passt(zeile: Zeile, where: Record<string, unknown> | undefined): boolean {
+export function passt(zeile: Zeile, where: Record<string, unknown> | undefined): boolean {
   if (!where) return true;
   for (const [k, bed] of Object.entries(where)) {
     if (bed === undefined) continue;
@@ -108,7 +112,7 @@ function passt(zeile: Zeile, where: Record<string, unknown> | undefined): boolea
   return true;
 }
 
-function anwenden(zeile: Zeile, data: Record<string, unknown>) {
+export function anwenden(zeile: Zeile, data: Record<string, unknown>) {
   for (const [k, v] of Object.entries(data)) {
     if (v !== null && typeof v === "object" && !(v instanceof Date) && "increment" in (v as object)) {
       zeile[k] = (zeile[k] as number) + (v as { increment: number }).increment;
@@ -119,7 +123,7 @@ function anwenden(zeile: Zeile, data: Record<string, unknown>) {
   if (!("updatedAt" in data)) zeile.updatedAt = new Date();
 }
 
-function projizieren(zeile: Zeile, select?: Record<string, unknown>): Zeile {
+export function projizieren(zeile: Zeile, select?: Record<string, unknown>): Zeile {
   if (!select) return structuredClone(zeile);
   const r: Zeile = {};
   for (const [k, v] of Object.entries(select)) {
@@ -129,7 +133,7 @@ function projizieren(zeile: Zeile, select?: Record<string, unknown>): Zeile {
   return r;
 }
 
-function sortieren(zeilen: Zeile[], orderBy?: unknown): Zeile[] {
+export function sortieren(zeilen: Zeile[], orderBy?: unknown): Zeile[] {
   if (!orderBy) return zeilen;
   const felder = (Array.isArray(orderBy) ? orderBy : [orderBy]).map((o) => Object.keys(o as object)[0]);
   return [...zeilen].sort((a, b) => {

@@ -133,6 +133,40 @@ describe("Ereignisliste — Kennzeichen", () => {
     }
   });
 
+  it("unterlagen-dienst.ts schickt die Personen-Mails nur ueber sendEventEmail, nie ueber triggerWebhooks", () => {
+    // Der Hinweis in EVENTS_OHNE_WEBHOOK stimmt nur, solange der Dienst die
+    // drei Mails mit Upload-Link wirklich am Dispatcher vorbeischickt.
+    const quelle = fs.readFileSync(path.join(process.cwd(), "src/lib/unterlagen-dienst.ts"), "utf8");
+    const personenSchluessel = (Object.keys(UNTERLAGEN_EVENTS) as (keyof typeof UNTERLAGEN_EVENTS)[]).filter((k) =>
+      UNTERLAGEN_PERSONEN_EVENTS.includes(UNTERLAGEN_EVENTS[k]),
+    );
+
+    // Jedes Personen-Event, das der Dienst anfasst, traegt den Hinweis …
+    const genutzt = [...quelle.matchAll(/UNTERLAGEN_EVENTS\.(\w+)/g)].map((m) => m[1]);
+    const genutztePersonen = personenSchluessel.filter((k) => genutzt.includes(k));
+    expect(genutztePersonen.length).toBeGreaterThan(0);
+    for (const k of genutztePersonen) {
+      expect(EVENTS_OHNE_WEBHOOK[UNTERLAGEN_EVENTS[k]]).toMatch(/persönlichen Upload-Link/);
+    }
+    // … und steht nie als Literal im Quelltext (nur ueber die Konstante).
+    for (const event of UNTERLAGEN_PERSONEN_EVENTS) {
+      expect(quelle).not.toContain(`"${event}"`);
+    }
+
+    // Kein triggerWebhooks-Aufruf bekommt ein Personen-Event; der einzige
+    // Aufruf ist auf die beiden HR-Events getypt.
+    const aufrufe = [...quelle.matchAll(/\btriggerWebhooks\(\s*([^,)]+)/g)].map((m) => m[1].trim());
+    expect(aufrufe.length).toBeGreaterThan(0);
+    for (const arg of aufrufe) {
+      for (const k of personenSchluessel) expect(arg).not.toContain(`UNTERLAGEN_EVENTS.${k}`);
+    }
+    expect(quelle).toMatch(/export async function hrMeldungSenden\(opts: \{\s*event: UnterlagenHrEvent;/);
+
+    // Die Mail an die Person: sendEventEmail mit erzwungenem Empfaenger.
+    expect(quelle).toMatch(/export async function personenMailSenden\(opts: \{\s*event: UnterlagenPersonenEvent;/);
+    expect(quelle).toMatch(/sendEventEmail\(opts\.event, vorbereitet\.payload, \{ overrideTo: vorbereitet\.empfaenger \}\)/);
+  });
+
   it("die HR-Mails der Nachforderung feuern Webhooks — sie tragen weder Link noch Unterlagennamen", () => {
     for (const event of [UNTERLAGEN_EVENTS.VOLLSTAENDIG, UNTERLAGEN_EVENTS.FRIST_VERSTRICHEN]) {
       expect(EVENTS_OHNE_WEBHOOK[event]).toBeUndefined();

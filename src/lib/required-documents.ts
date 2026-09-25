@@ -350,9 +350,9 @@ export interface PflichtQuelle {
    * Die Pflicht-Dokumenttypen der Vorlage, so wie der Aufrufer sie hat.
    *
    * Der Rueckfall auf die Geburtsurkunden fuer einen Fragebogentyp OHNE
-   * Vorlage passiert beim Laden der Vorlage, nicht hier: Absendezweig und
-   * `GET /api/onboarding/[id]` schreiben `vorlage?.requiredDocuments ?? [...]`.
-   * Das ist `??` und nicht `||` — eine Vorlage mit leerer Liste bleibt leer.
+   * Vorlage passiert beim Laden der Vorlage, nicht hier: Alle Server-Leser
+   * nehmen `pflichtDokumenteAusVorlage` (unten). Eine Vorlage mit leerer Liste
+   * bleibt leer.
    *
    * `null`/`undefined` heisst „keine Liste bekommen" und gilt als leere Liste.
    * So hielt es die Vorgangsansicht (`data.requiredDocuments ?? []`); der
@@ -369,6 +369,35 @@ export interface PflichtQuelle {
     aufenthaltstitelErforderlich?: boolean | null;
     healthInsuranceType?: string | null;
   } | null;
+}
+
+/**
+ * Die Pflichtliste fuer einen Fragebogentyp, zu dem es (noch) keine Vorlage
+ * gibt: die beiden Geburtsurkunden — derselbe Wert wie der Standard der Spalte
+ * `FormTemplate.requiredDocuments` im Schema.
+ */
+export const PFLICHT_DOKUMENTE_OHNE_VORLAGE: readonly DocumentType[] = [
+  "GEBURTSURKUNDE_EIGEN",
+  "GEBURTSURKUNDE_KIND",
+] as DocumentType[];
+
+/**
+ * Die Pflicht-Dokumenttypen aus der geladenen Vorlage, mit dem Rueckfall ohne
+ * Vorlage — EINE Stelle fuer alle Server-Leser: Laden und Absenden des
+ * Fragebogens (`/api/fragebogen/[token]`), die Vorgangsansicht
+ * (`GET /api/onboarding/[id]`) und die Nachforderung (Paket 4,
+ * `unterlagen-onboarding.ts`). Stand der Rueckfall an einer Stelle anders,
+ * mahnte die Ansicht eine andere Luecke an, als der Server beim Absenden
+ * vermerkt hat.
+ *
+ * `??` und nicht `||`: Eine Vorlage mit LEERER Liste bleibt leer — HR hat dann
+ * bewusst nichts verlangt. Der Rueckfall wird kopiert, damit kein Aufrufer die
+ * Konstante veraendern kann.
+ */
+export function pflichtDokumenteAusVorlage(
+  vorlage: { requiredDocuments: readonly string[] } | null | undefined,
+): readonly string[] {
+  return vorlage?.requiredDocuments ?? [...PFLICHT_DOKUMENTE_OHNE_VORLAGE];
 }
 
 /**

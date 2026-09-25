@@ -4,7 +4,8 @@
  * GET   – Einzelnen Vorgang mit allen Daten abrufen, dazu die
  *         Abteilungsuebersicht (Karte „Aufgaben für Abteilungen", Stepper,
  *         Urheber der Haekchen, Faelligkeiten) aus
- *         onboardingAbteilungsUebersichtLaden
+ *         onboardingAbteilungsUebersichtLaden und die Nachforderungen von
+ *         Unterlagen (`unterlagen`, Paket 4) aus unterlagenUebersichtLaden
  * PATCH – Status aendern
  *
  * Mandant: Ein Vorgang eines fremden Mandanten bekommt in BEIDEN Methoden
@@ -21,6 +22,8 @@ import { LINK_STATUS, pruefungNichtMoeglichGrund } from "@/lib/onboarding-spuren
 import { statusAenderungSchema } from "@/lib/validations/onboarding";
 import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
 import { onboardingAbteilungsUebersichtLaden } from "@/lib/abteilungsaufgaben-onboarding";
+import { pflichtDokumenteAusVorlage } from "@/lib/required-documents";
+import { unterlagenUebersichtLaden } from "@/lib/unterlagen-dienst";
 import {
   ladeVorlagenKonfigurationen,
   fortschrittFuerVorgang,
@@ -140,16 +143,16 @@ export async function GET(
       where: { questionnaireType: onboarding.questionnaireType },
       select: { requiredDocuments: true },
     });
-    const requiredDocuments = formTemplate?.requiredDocuments ?? [
-      "GEBURTSURKUNDE_EIGEN",
-      "GEBURTSURKUNDE_KIND",
-    ];
+    const requiredDocuments = pflichtDokumenteAusVorlage(formTemplate);
 
     // Abteilungsuebersicht darueber legen (Paket 5): departmentLinks bekommen
     // `url` (vom Server, APP_URL) und `anzeige`, checklistItems bekommen
     // `erledigtVon` und `faelligAm`, dazu `abteilungen` (Quelle der Karte und
     // des Steppers, auch nicht informierte und uebersprungene Abteilungen) und
-    // `fuehrungskraft`.
+    // `fuehrungskraft`. Daneben `unterlagen` (Paket 4): Karte, Kasten „Offene
+    // Nachweise", Warnbalken und Reiter lesen daraus — Datei-URLs, Dateinamen,
+    // Aktionen und Dialogdaten nur mit HR_EDIT_ROLES, Entwuerfe nie. Aus
+    // dieser Zeile und derselben Pflichtliste, ohne zweites Laden.
     return NextResponse.json({
       ...safeOnboarding,
       requiredDocuments,
@@ -157,6 +160,7 @@ export async function GET(
       // moeglichen Schritte — siehe fragebogen-fortschritt.ts.
       fragebogenFortschritt: fortschrittFuerVorgang(onboarding, vorlagen),
       ...(await onboardingAbteilungsUebersichtLaden(onboarding)),
+      ...(await unterlagenUebersichtLaden(onboarding, session, { requiredDocuments })),
     });
   } catch (error) {
     console.error("Fehler beim Laden des Vorgangs:", error);

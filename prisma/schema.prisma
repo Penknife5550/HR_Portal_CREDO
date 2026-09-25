@@ -1427,6 +1427,14 @@ model UnterlagenNachforderung {
   vollstaendigSeit       DateTime? // Tabelle "Merker vollstaendig" (2.1)
   vollstaendigGemeldetAm DateTime? // bedingter Anspruch der HR-Meldung, bei FAILED zurueck auf null
 
+  // Ergebnis der LETZTEN HR-Mail ("vollstaendig", "Frist verstrichen"), damit die
+  // Karte "HR-Meldung nicht zugestellt (kein Empfaenger)" zeigen kann (8.1).
+  // Das EmailLog wird nach 90 Tagen geloescht und kennt die Nachforderung nicht.
+  hrMeldungStatus String? // SENT | FAILED | SKIPPED
+  // Nur ein Grundcode, NIE der Rohtext des Mailers (der kann Adressen tragen):
+  // KEIN_EMPFAENGER | VORLAGE_DEAKTIVIERT | NICHT_VERSENDET | VERSAND_FEHLGESCHLAGEN
+  hrMeldungDetail String?
+
   uploadsGesamt Int @default(0) // Obergrenze 200 ueber die ganze Laufzeit
 
   erledigtAm          DateTime?

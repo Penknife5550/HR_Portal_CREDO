@@ -25,6 +25,7 @@ import { tokenRateLimiter, getClientIp, getClientIpOrNull } from "@/lib/rate-lim
 import {
   computeMissingRequiredDocuments,
   fehlendeNachreichbareDokumente,
+  pflichtDokumenteAusVorlage,
   pflichtEingabenAusVorgang,
   RV_BEFREIUNG_HINWEIS,
   documentTypeLabel,
@@ -307,10 +308,7 @@ export async function GET(
     select: { stepsConfig: true, requiredDocuments: true },
   });
   const stepsConfig = onboarding.formTemplateSnapshot ?? formTemplate?.stepsConfig ?? null;
-  const requiredDocuments = formTemplate?.requiredDocuments ?? [
-    "GEBURTSURKUNDE_EIGEN",
-    "GEBURTSURKUNDE_KIND",
-  ];
+  const requiredDocuments = pflichtDokumenteAusVorlage(formTemplate);
 
   return NextResponse.json({
     onboardingId: onboarding.id,
@@ -806,10 +804,7 @@ export async function POST(
     select: { requiredDocuments: true },
   });
   // Fallback auf Geburtsurkunden, falls (noch) keine Vorlage existiert.
-  const requiredDocs = template?.requiredDocuments ?? [
-    "GEBURTSURKUNDE_EIGEN",
-    "GEBURTSURKUNDE_KIND",
-  ];
+  const requiredDocs = pflichtDokumenteAusVorlage(template);
 
   const [uploaded, childCount] = await Promise.all([
     prisma.document.findMany({

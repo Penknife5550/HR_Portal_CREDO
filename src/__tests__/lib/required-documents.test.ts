@@ -19,6 +19,8 @@ import {
   istNachreichbar,
   nachreichbarePflichtDokumente,
   offeneNachweise,
+  PFLICHT_DOKUMENTE_OHNE_VORLAGE,
+  pflichtDokumenteAusVorlage,
   pflichtEingabenAusVorgang,
   sensibelAnforderbar,
   sperrendePflichtDokumente,
@@ -890,5 +892,39 @@ describe("NACHFORDERUNG_HINWEISE", () => {
     expect(
       Object.keys(NACHFORDERUNG_HINWEISE).filter((t) => SENSIBLE_DOKUMENTTYPEN.includes(t)).sort(),
     ).toEqual(["ARBEITSERLAUBNIS", "AUFENTHALTSTITEL", "MASERNSCHUTZ"]);
+  });
+});
+
+describe("pflichtDokumenteAusVorlage (ein Rueckfall fuer alle Server-Leser)", () => {
+  it("ohne Vorlage: die beiden Geburtsurkunden — wie der Standard der Spalte", () => {
+    expect(pflichtDokumenteAusVorlage(null)).toEqual(["GEBURTSURKUNDE_EIGEN", "GEBURTSURKUNDE_KIND"]);
+    expect(pflichtDokumenteAusVorlage(undefined)).toEqual([...PFLICHT_DOKUMENTE_OHNE_VORLAGE]);
+  });
+
+  it("mit Vorlage: deren Liste unveraendert — auch eine LEERE bleibt leer (?? statt ||)", () => {
+    const liste = ["SV_AUSWEIS", "MASERNSCHUTZ"];
+    expect(pflichtDokumenteAusVorlage({ requiredDocuments: liste })).toBe(liste);
+    expect(pflichtDokumenteAusVorlage({ requiredDocuments: [] })).toEqual([]);
+  });
+
+  it("der Rueckfall ist eine Kopie: ein Aufrufer kann die Konstante nicht veraendern", () => {
+    const a = pflichtDokumenteAusVorlage(null) as string[];
+    a.push("SONSTIGES");
+    expect(pflichtDokumenteAusVorlage(null)).toEqual(["GEBURTSURKUNDE_EIGEN", "GEBURTSURKUNDE_KIND"]);
+  });
+
+  it("die drei Server-Leser schreiben den Rueckfall nicht mehr selbst", () => {
+    // Stand bis Paket 4: dreimal `?? ["GEBURTSURKUNDE_EIGEN", "GEBURTSURKUNDE_KIND"]`.
+    const fs = jest.requireActual<typeof import("fs")>("fs");
+    const path = jest.requireActual<typeof import("path")>("path");
+    for (const datei of [
+      "src/app/api/fragebogen/[token]/route.ts",
+      "src/app/api/onboarding/[id]/route.ts",
+      "src/lib/unterlagen-onboarding.ts",
+    ]) {
+      const quelle = fs.readFileSync(path.join(process.cwd(), datei), "utf8");
+      expect({ datei, rueckfall: /\?\?\s*\[\s*"GEBURTSURKUNDE_EIGEN"/.test(quelle) }).toEqual({ datei, rueckfall: false });
+      expect(quelle).toContain("pflichtDokumenteAusVorlage(");
+    }
   });
 });
