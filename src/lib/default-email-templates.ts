@@ -4170,9 +4170,15 @@ CREDO Gruppe – {{einrichtung}}`,
   // laden Sie diese als Nachweis hoch“ lief ins Leere. Die Erinnerung nennt
   // auch den Weg „Unbefristet“ (Z1, etwa die Niederlassungserlaubnis nach
   // einem befristeten Titel): Das Kennzeichen verdraengt jedes datierte
-  // Dokument, der Lauf dokument-ablauf ueberspringt die Art dann. Beide
-  // Vorlagen liegen in Produktion als gespeicherte Zeilen — nach dem Deploy
-  // „Text auf Standard zurücksetzen“, sonst kommt der neue Satz nicht an.
+  // Dokument, der Lauf dokument-ablauf ueberspringt die Art dann. Der Satz
+  // steht in `{{#nachforderung_moeglich}}`: Bei einem EXPIRED-Vorgang oder
+  // offenem Fragebogen bietet das Portal die Nachforderung nicht an, dann
+  // nennt `{{nachforderung_hinweis}}` den Grund und den Weg. Die Art im Satz
+  // der Ablaufwarnung ist `{{dokument_typ}}` — der Lauf mahnt Aufenthaltstitel
+  // UND Arbeitserlaubnis, und die Warnung endet nur mit einem Nachweis
+  // DERSELBEN Art. Beide Vorlagen liegen in Produktion als gespeicherte
+  // Zeilen — nach dem Deploy „Text auf Standard zurücksetzen“, sonst kommt
+  // der neue Satz nicht an.
   // =============================================
   {
     event: "dokument-ablauf-warnung",
@@ -4215,7 +4221,7 @@ CREDO Gruppe – {{einrichtung}}`,
           </table>
 
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
-            Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate. Den neuen Nachweis fordern Sie anschließend im Vorgang über „Unterlagen nachfordern“ an; sobald Sie ihn <strong>mit seinem Ablaufdatum</strong> oder – etwa bei einer Niederlassungserlaubnis – als <strong>„Unbefristet“</strong> annehmen, endet diese Erinnerung.
+            Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate.{{#nachforderung_moeglich}} Den neuen Nachweis fordern Sie anschließend im Vorgang über „Unterlagen nachfordern“ an; sobald Sie ihn <strong>mit seinem Ablaufdatum</strong> oder – etwa bei einer Niederlassungserlaubnis – als <strong>„Unbefristet“</strong> annehmen, endet diese Erinnerung.{{/nachforderung_moeglich}}{{#nachforderung_gesperrt}} {{nachforderung_hinweis}}{{/nachforderung_gesperrt}}
           </p>
 
           <!-- Button -->
@@ -4255,7 +4261,7 @@ Nachweis für: {{mitarbeiter_name}} · {{mitarbeiter_email}}
 Dokument:     {{dokument_typ}} ({{dokument_datei}})
 Frist:        {{frist_text}}
 
-Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate. Den neuen Nachweis fordern Sie anschließend im Vorgang über „Unterlagen nachfordern“ an; sobald Sie ihn mit seinem Ablaufdatum oder – etwa bei einer Niederlassungserlaubnis – als „Unbefristet“ annehmen, endet diese Erinnerung.
+Bitte stoßen Sie die Verlängerung jetzt an. Den Antrag stellt die beschäftigte Person selbst bei der Ausländerbehörde; von der Terminvergabe bis zum neuen Titel vergehen regelmäßig Wochen bis Monate.{{#nachforderung_moeglich}} Den neuen Nachweis fordern Sie anschließend im Vorgang über „Unterlagen nachfordern“ an; sobald Sie ihn mit seinem Ablaufdatum oder – etwa bei einer Niederlassungserlaubnis – als „Unbefristet“ annehmen, endet diese Erinnerung.{{/nachforderung_moeglich}}{{#nachforderung_gesperrt}} {{nachforderung_hinweis}}{{/nachforderung_gesperrt}}
 
 Vorgang im Portal: {{portalLink}}
 
@@ -4275,6 +4281,9 @@ CREDO Gruppe – Freie Evangelische Schulen
       { key: "{{frist_text}}", description: "Fertiger Satz zur Frist (z.B. „Läuft in 42 Tagen ab (20.10.2026)“)" },
       { key: "{{dringlichkeit}}", description: "Ampel-Stufe (Beobachten/Warnung/Kritisch)" },
       { key: "{{portalLink}}", description: "Link zur Vorgangs-Detailseite im Portal" },
+      { key: "{{nachforderung_moeglich}}", description: "„ja“, wenn sich der Nachweis im Vorgang über „Unterlagen nachfordern“ anfordern lässt; sonst leer (Bedingungsblock)" },
+      { key: "{{nachforderung_gesperrt}}", description: "„ja“, wenn das Portal die Nachforderung für diesen Vorgang nicht anbietet (Vorgang abgelaufen, Fragebogen offen); sonst leer (Bedingungsblock)" },
+      { key: "{{nachforderung_hinweis}}", description: "Nur bei gesperrter Nachforderung: fertiger Satz mit Grund und Weg (z. B. „Die Person hat ihren Personalfragebogen noch nicht abgesendet …“)" },
     ],
   },
 
@@ -4319,7 +4328,7 @@ CREDO Gruppe – Freie Evangelische Schulen
           </table>
 
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Bitte klären Sie <strong>umgehend</strong>, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer <strong>Fiktionsbescheinigung</strong> fort (§ 81 Abs. 4 AufenthG) — dann fordern Sie diese im Vorgang über „Unterlagen nachfordern“ an; sobald Sie sie als Aufenthaltstitel mit ihrem Ablaufdatum annehmen, endet die Warnung. Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
+            Bitte klären Sie <strong>umgehend</strong>, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer <strong>Fiktionsbescheinigung</strong> fort (§ 81 Abs. 4 AufenthG){{#nachforderung_moeglich}} — dann fordern Sie diese im Vorgang über „Unterlagen nachfordern“ an; sobald Sie sie als {{dokument_typ}} mit ihrem Ablaufdatum annehmen, endet die Warnung{{/nachforderung_moeglich}}.{{#nachforderung_gesperrt}} {{nachforderung_hinweis}}{{/nachforderung_gesperrt}} Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
           </p>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">
             Das Portal sperrt nichts. Der Nachweis ist auf „Abgelaufen“ gesetzt und der Vorgang rot markiert — die Bewertung und die Entscheidung bleiben bei Ihnen.
@@ -4362,7 +4371,7 @@ Nachweis für: {{mitarbeiter_name}} · {{mitarbeiter_email}}
 Dokument:     {{dokument_typ}} ({{dokument_datei}})
 Frist:        {{frist_text}}
 
-Bitte klären Sie umgehend, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer Fiktionsbescheinigung fort (§ 81 Abs. 4 AufenthG) — dann fordern Sie diese im Vorgang über „Unterlagen nachfordern“ an; sobald Sie sie als Aufenthaltstitel mit ihrem Ablaufdatum annehmen, endet die Warnung. Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
+Bitte klären Sie umgehend, ob eine Verlängerung beantragt wurde: Wurde der Antrag rechtzeitig gestellt, gilt der bisherige Titel mit einer Fiktionsbescheinigung fort (§ 81 Abs. 4 AufenthG){{#nachforderung_moeglich}} — dann fordern Sie diese im Vorgang über „Unterlagen nachfordern“ an; sobald Sie sie als {{dokument_typ}} mit ihrem Ablaufdatum annehmen, endet die Warnung{{/nachforderung_moeglich}}.{{#nachforderung_gesperrt}} {{nachforderung_hinweis}}{{/nachforderung_gesperrt}} Liegt nichts vor, ist die Beschäftigung zu prüfen: Sie ist für den Arbeitgeber eine Ordnungswidrigkeit (§ 404 SGB III) und kann eine Straftat sein (§ 98 AufenthG).
 
 Das Portal sperrt nichts. Der Nachweis ist auf "Abgelaufen" gesetzt und der Vorgang rot markiert — die Bewertung und die Entscheidung bleiben bei Ihnen.
 
@@ -4383,6 +4392,9 @@ CREDO Gruppe – Freie Evangelische Schulen
       { key: "{{tage_ueberfaellig}}", description: "Kalendertage seit dem Ablauf" },
       { key: "{{frist_text}}", description: "Fertiger Satz zur Frist (z.B. „Abgelaufen seit 7 Tagen (01.09.2026)“)" },
       { key: "{{portalLink}}", description: "Link zur Vorgangs-Detailseite im Portal" },
+      { key: "{{nachforderung_moeglich}}", description: "„ja“, wenn sich der Nachweis im Vorgang über „Unterlagen nachfordern“ anfordern lässt; sonst leer (Bedingungsblock)" },
+      { key: "{{nachforderung_gesperrt}}", description: "„ja“, wenn das Portal die Nachforderung für diesen Vorgang nicht anbietet (Vorgang abgelaufen, Fragebogen offen); sonst leer (Bedingungsblock)" },
+      { key: "{{nachforderung_hinweis}}", description: "Nur bei gesperrter Nachforderung: fertiger Satz mit Grund und Weg (z. B. „Die Person hat ihren Personalfragebogen noch nicht abgesendet …“)" },
     ],
   },
 

@@ -266,6 +266,43 @@ async function verknuepfen(quelle: string, ziel: string, sha256: string): Promis
   return true;
 }
 
+/** Versuche, bis ein Verknuepfen ein ENOENT weitergibt (Zielordner zwischendurch abgeraeumt). */
+const VERKNUEPFEN_VERSUCHE = 3;
+
+async function gibtEs(datei: string): Promise<boolean> {
+  try {
+    await stat(datei);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `verknuepfen` in den Ordner `<zielWurzel>/<id>` — mit derselben Wiederholung
+ * wie `entwurfSpeichern`: Fehlt der Ordner zwischen `zielVerzeichnisPruefen`
+ * und `link`/`copyFile` (ENOENT), legt ein neuer Versuch ihn wieder an. Das
+ * trifft die Ruecknahme: Der oeffentliche Weg „Entfernen" nimmt keine
+ * Prozesssperre und raeumt nach seinem Commit den leer gewordenen Ordner der
+ * Nachforderung per `rmdir` ab (`entwuerfeLoeschen`). Fehlt dagegen die
+ * QUELLE, hilft kein neuer Versuch: DATEI_FEHLT (409 statt 500).
+ */
+async function inOrdnerVerknuepfen(
+  quelle: { echt: string; sha256: string },
+  ziel: { wurzel: string; id: string; name: string },
+): Promise<boolean> {
+  for (let versuch = 1; ; versuch++) {
+    try {
+      const verzeichnis = await zielVerzeichnisPruefen(ziel.wurzel, ziel.id);
+      return await verknuepfen(quelle.echt, path.join(verzeichnis, ziel.name), quelle.sha256);
+    } catch (fehler) {
+      if (fehlerCode(fehler) !== "ENOENT") throw fehler;
+      if (!(await gibtEs(quelle.echt))) throw new UnterlagenDateiFehler("DATEI_FEHLT");
+      if (versuch >= VERKNUEPFEN_VERSUCHE) throw fehler;
+    }
+  }
+}
+
 async function quelleLesen(quellPfad: string, wurzel: string): Promise<{ echt: string; sha256: string }> {
   let echt: string;
   try {
@@ -296,8 +333,11 @@ export async function verknuepfenInVorgang(opts: {
   const zielPfad = vorgangsPfad(opts.vorgangId, opts.dateiId, opts.mimeType);
   const quelle = await quelleLesen(opts.speicherPfad, nachforderungsWurzel(opts.nachforderungId));
   if (quelle.sha256 !== opts.sha256) throw new UnterlagenDateiFehler("DATEI_VERAENDERT");
-  const verzeichnis = await zielVerzeichnisPruefen(uploadsWurzel(), opts.vorgangId);
-  const neu = await verknuepfen(quelle.echt, path.join(verzeichnis, path.posix.basename(zielPfad)), opts.sha256);
+  const neu = await inOrdnerVerknuepfen(quelle, {
+    wurzel: uploadsWurzel(),
+    id: opts.vorgangId,
+    name: path.posix.basename(zielPfad),
+  });
   return { zielPfad, neu };
 }
 
@@ -319,8 +359,11 @@ export async function zurueckVerknuepfen(opts: {
   const speicherPfad = nachforderungsPfad(opts.nachforderungId, opts.dateiId, opts.mimeType);
   const quelle = await quelleLesen(opts.dokumentPfad, vorgangsWurzel(opts.vorgangId));
   if (quelle.sha256 !== opts.sha256) throw new UnterlagenDateiFehler("DATEI_VERAENDERT");
-  const verzeichnis = await zielVerzeichnisPruefen(path.join(uploadsWurzel(), UNTERLAGEN_ORDNER), opts.nachforderungId);
-  const neu = await verknuepfen(quelle.echt, path.join(verzeichnis, path.posix.basename(speicherPfad)), opts.sha256);
+  const neu = await inOrdnerVerknuepfen(quelle, {
+    wurzel: path.join(uploadsWurzel(), UNTERLAGEN_ORDNER),
+    id: opts.nachforderungId,
+    name: path.posix.basename(speicherPfad),
+  });
   return { speicherPfad, neu };
 }
 

@@ -189,14 +189,31 @@ export type LinkAnlass = (typeof LINK_ANLAESSE)[number];
  * Anlaesse, deren gescheiterte Mail der Lauf nachholt (Abschnitt 9, Schritt 2).
  * Erinnerungen stehen nicht hier: Sie holt der nicht gesetzte Merker nach.
  */
-export const NACHHOLBARE_ANLAESSE: readonly LinkAnlass[] = [
+export const NACHHOLBARE_ANLAESSE = [
   "ANFORDERUNG",
   "ERGAENZUNG",
   "ERNEUT",
   "FRISTAENDERUNG",
   "ZURUECKWEISUNG",
-];
+] as const satisfies readonly LinkAnlass[];
+/**
+ * Aus der Liste abgeleitet, nie daneben geschrieben: Kommt ein Anlass hinzu,
+ * meldet tsc jede Stelle, die ihn noch nicht kennt (etwa die Mail-Merker der
+ * Aufforderung, `UnterlagenAufforderungAnlass`).
+ */
+export type NachholAnlass = (typeof NACHHOLBARE_ANLAESSE)[number];
 
+/** Nachholbar? Grenzt auf `NachholAnlass` ein — gegen DIESELBE Liste. */
+export function istNachholAnlass(anlass: string): anlass is NachholAnlass {
+  return istEiner(NACHHOLBARE_ANLAESSE, anlass);
+}
+
+/**
+ * `mailStatus` und `entwertetGrund` sind im Schema Strings (3.2). Jede
+ * Schreibstelle bindet ihr Literal an diese Typen (`"ADRESSE" satisfies
+ * EntwertungGrund`) — ein Tippfehler dort kompilierte sonst, und `linkGueltig`
+ * antwortete 404 statt 410.
+ */
 export const MAIL_STATUS = ["AUSSTEHEND", "SENT", "FAILED", "SKIPPED"] as const;
 export type MailStatus = (typeof MAIL_STATUS)[number];
 
@@ -240,9 +257,16 @@ export function istUnterlagenModul(wert: unknown): wert is UnterlagenModul {
   return istEiner(UNTERLAGEN_MODULE, wert);
 }
 
-/** „Wartet auf die Person": ANGEFORDERT oder ZURUECKGEWIESEN (Begriffe, Abschnitt 2). */
+/**
+ * „Wartet auf die Person" (Begriffe, Abschnitt 2) — EINE Liste fuer Karte,
+ * Lauf, Mails, Upload-Seite und die Prisma-Bedingungen der oeffentlichen API
+ * (`status: { in: [...WARTET_AUF_PERSON_STATUS] }`).
+ */
+export const WARTET_AUF_PERSON_STATUS = ["ANGEFORDERT", "ZURUECKGEWIESEN"] as const;
+
+/** „Wartet auf die Person": ANGEFORDERT oder ZURUECKGEWIESEN. */
 export function wartetAufPerson(status: string): boolean {
-  return status === "ANGEFORDERT" || status === "ZURUECKGEWIESEN";
+  return istEiner(WARTET_AUF_PERSON_STATUS, status);
 }
 
 /** „Zu prüfen": EINGEREICHT. */
@@ -341,6 +365,14 @@ export const MELDUNGEN = {
    */
   HR_VORGANG_EINGESTELLT:
     "Der Vorgang wird nicht mehr bearbeitet. E-Mails an die Person sind nicht mehr möglich. Deshalb können Sie keine Unterlagen mehr ergänzen oder zurückweisen, die Frist nicht mehr ändern und den Link nicht erneut senden. Bis zum nächsten täglichen Lauf können Sie eingegangene Unterlagen noch annehmen, Unterlagen als entfallen vermerken, eine Annahme zurücknehmen oder die Nachforderung zurückziehen. Danach zieht der Lauf die Nachforderung von selbst zurück, und ungeprüfte Dateien werden nach 30 Tagen gelöscht.",
+  /**
+   * Rueckfrage „Annahme zurücknehmen?" bei eingestelltem Vorgang (EP-3 mit Z2):
+   * Die Nachforderung laeuft danach wieder — und der naechste Lauf zieht sie
+   * zurueck. Zurueckweisen ist gesperrt, eine nicht erneut angenommene Datei
+   * wird verworfen.
+   */
+  RUECKNAHME_VORGANG_EINGESTELLT:
+    "Der Vorgang wird nicht mehr bearbeitet: Nehmen Sie die Unterlage nicht vor dem nächsten täglichen Lauf erneut an, zieht der Lauf die Nachforderung zurück. Die Datei wird dann verworfen und nach 30 Tagen gelöscht; zurückweisen lässt sie sich nicht mehr.",
   /** 409: prozesslokale Sperre je Vorgang (Abschnitt 7). */
   AKTION_LAEUFT: "Gerade läuft eine andere Aktion für diesen Vorgang. Bitte versuchen Sie es in einem Moment erneut.",
   EMPFAENGER_NICHT_FREIGEGEBEN:
@@ -436,7 +468,6 @@ export const MELDUNGEN = {
   NICHT_ZUSTELLBAR: "nicht zustellbar – Adresse prüfen",
 } as const;
 
-export type MeldungSchluessel = keyof typeof MELDUNGEN;
 
 /** 410 „Linkende": „Dieser Link war bis 09.10.2026 gültig. …" (5.5). */
 export function meldungLinkAbgelaufen(linkende: Kalendertag | null | undefined): string {
@@ -1055,6 +1086,37 @@ export function linkGueltig(opts: {
   return { gueltig: true, status: 200, readOnly: false, schluessel: null, meldung: null, linkende: ende };
 }
 
+/**
+ * „Nur die eigenen Entwürfe" (5.3, U-17): Ab wann ein Entwurf der Person
+ * gehoert, die JETZT einen gueltigen Link hat — nach dem letzten Adresswechsel.
+ * „Link erneut senden" an eine neue Adresse entwertet alle aelteren Links
+ * (ADRESSE, 404); was ueber sie hochgeladen wurde, kann von der falschen
+ * Empfaengerin stammen. `UnterlagenDatei` kennt ihren Link nicht, die Grenze
+ * ist deshalb der Zeitpunkt der Entwertung — genommen UNTER der Zeilensperre
+ * der Nachforderung, wie `hochgeladenAm` (`zeitpunktUnterSperre`), damit die
+ * Reihenfolge der Sperre die Reihenfolge der Zeitstempel bestimmt.
+ *
+ * EINE Regel fuer die Upload-Seite (Anzeigen, Entfernen, Uebermitteln,
+ * Kontingente) und den Merker `entwurf_vorhanden` der Erinnerung.
+ */
+export function entwuerfeAb(
+  links: ReadonlyArray<{ entwertetGrund: string | null; entwertetAm: Date | string | null }>,
+): Date | null {
+  let ab: Date | null = null;
+  for (const l of links) {
+    const am = l.entwertetGrund === ("ADRESSE" satisfies EntwertungGrund) ? alsDatum(l.entwertetAm) : null;
+    if (am && (!ab || am > ab)) ab = am;
+  }
+  return ab;
+}
+
+/** Ein Entwurf der Person, die den Link jetzt hat (`entwuerfeAb`): erst NACH dem letzten Adresswechsel hochgeladen. */
+export function eigenerEntwurf(d: { status: string; hochgeladenAm: Date | string }, ab: Date | null): boolean {
+  if (d.status !== "ENTWURF") return false;
+  const hochgeladen = alsDatum(d.hochgeladenAm);
+  return !ab || (!!hochgeladen && hochgeladen > ab);
+}
+
 // =============================================
 // Frist (EP-1, EP-5, EP-16)
 // =============================================
@@ -1134,9 +1196,19 @@ export function fristText(frist: Kalendertag, heute: Kalendertag): string {
  * stimmt. Die Vorab-Erinnerung geht nur, wenn die letzte Mail vor
  * „Frist − 7" lag; die Mail, die der Dialog gleich verschickt, geht heute
  * hinaus. Bei einer Frist unter 8 Tagen entfaellt „7 Tage vorher" also.
+ *
+ * Wer die Mail „Frist verstrichen" bekommt, ist die ANFORDERNDE HR-Kraft
+ * (`angefordertVon`, 8.1) — nicht, wer gerade ergaenzt oder die Frist aendert.
+ * „Sie" stimmt deshalb nur beim Anfordern selbst; Ergaenzen und „Frist
+ * ändern" rufen mit `"ANFORDERNDE"`.
  */
-export function dialogErinnerungsSatz(frist: Kalendertag, heute: Kalendertag): string {
-  const danach = "Ist die Frist verstrichen, erhalten Sie eine E-Mail. Der Link bleibt danach noch 14 Tage nutzbar.";
+export function dialogErinnerungsSatz(
+  frist: Kalendertag,
+  heute: Kalendertag,
+  hrMailAn: "SIE" | "ANFORDERNDE" = "SIE",
+): string {
+  const erhaelt = hrMailAn === "SIE" ? "erhalten Sie eine E-Mail" : "erhält die anfordernde HR-Kraft eine E-Mail";
+  const danach = `Ist die Frist verstrichen, ${erhaelt}. Der Link bleibt danach noch 14 Tage nutzbar.`;
   if (!istKalendertag(frist)) return danach;
   const tage = tageZwischen(heute, frist);
   if (tage > ERINNERUNG_VORAB_TAGE) {
@@ -1144,7 +1216,7 @@ export function dialogErinnerungsSatz(frist: Kalendertag, heute: Kalendertag): s
   }
   if (tage > 0) return `Die Person wird am Fristtag automatisch erinnert. ${danach}`;
   if (tage === 0) {
-    return "Die Frist endet heute; eine Erinnerung geht nicht mehr hinaus. Ist sie verstrichen, erhalten Sie eine E-Mail. Der Link bleibt danach noch 14 Tage nutzbar.";
+    return `Die Frist endet heute; eine Erinnerung geht nicht mehr hinaus. Ist sie verstrichen, ${erhaelt}. Der Link bleibt danach noch 14 Tage nutzbar.`;
   }
   const ende = linkGueltigBisFuer(frist);
   return heute <= ende
@@ -1427,6 +1499,14 @@ export interface WaechterBefund {
 }
 
 /**
+ * Anlaesse einer HR-Mail, mit der sich die Frist geaendert haben KANN
+ * (Anfordern setzt sie, Ergaenzen und Zurueckweisen koennen sie verlaengern,
+ * „Frist ändern" aendert sie immer). „Link erneut senden" und die Mails des
+ * Laufs aendern sie nie.
+ */
+const FRIST_SETZENDE_ANLAESSE: readonly LinkAnlass[] = ["ANFORDERUNG", "ERGAENZUNG", "FRISTAENDERUNG", "ZURUECKWEISUNG"];
+
+/**
  * Der Lauf-Waechter ohne neue Tabelle (EP-13). Anlass: Die Erinnerungen standen
  * mindestens 60 Tage still, ohne dass es auffiel (P:2740).
  *
@@ -1440,7 +1520,12 @@ export interface WaechterBefund {
  *   Mail nachholte: Je Lauf geht hoechstens EINE Mail an die Person, das
  *   Nachholen (Schritt 2) kommt vor der Erinnerung (Schritt 3). Das praezisiert
  *   den Wortlaut von Abschnitt 9, dessen Zweck „kein Fehlalarm, wenn der Lauf
- *   lief" es ist.
+ *   lief" es ist. Ebenso kein Alarm, solange der gestrige Lauf die Frist noch
+ *   nicht kennen konnte: Hat HR sie gestern oder heute gesetzt (eine
+ *   HR-Mail mit fristsetzendem Anlass, gleich mit welchem Ergebnis) und ruecken
+ *   sie damit ins Vorab-Fenster, lief der Lauf von gestern womoeglich schon
+ *   vorher. Ab dem Tag danach gilt die Regel wieder — so bleibt ein Lauf, der
+ *   gar nicht laeuft, hoechstens einen Tag laenger unbemerkt.
  * - **Loeschung ueberfaellig:** Eine Datei hat `loeschenAb < heute − 1` und kein
  *   `dateiGeloeschtAm`, oder ein Entwurf liegt mehr als 31 Tage hinter dem
  *   Linkende (Frist + 14). Der eine Tag Luft deckt einen Lauf, der heute noch
@@ -1452,7 +1537,12 @@ export function laufWaechter(stand: WaechterStand, heute: Kalendertag): Waechter
   const frist = datumsTag(stand.frist);
 
   if (!stand.vorgangEingestellt && frist) {
-    if (erinnerungFaellig(stand, tageSpaeter(heute, -1)) === "VORAB") {
+    const gesternLauf = tageSpaeter(heute, -1);
+    const fristNeuSeitGestern = stand.links.some((l) => {
+      const tag = zeitpunktTag(l.createdAt);
+      return l.erstelltVonId !== null && istEiner(FRIST_SETZENDE_ANLAESSE, l.anlass) && !!tag && tag >= gesternLauf;
+    });
+    if (!fristNeuSeitGestern && erinnerungFaellig(stand, gesternLauf) === "VORAB") {
       const fensterBeginn = tageSpaeter(frist, -ERINNERUNG_VORAB_TAGE);
       const spur = stand.links.some((l) => {
         const tag = zeitpunktTag(l.createdAt);
@@ -1653,6 +1743,20 @@ export function frueherEntfallen(
 ): boolean {
   const stand = uebersicht?.typen[typ];
   return !!stand && !stand.laufend && stand.status === "ENTFAELLT";
+}
+
+/**
+ * Steht die Art als entfallen vermerkt — in einer FRUEHEREN oder in der
+ * LAUFENDEN Nachforderung? Keiner der Knoepfe des Kastens kreuzt sie an:
+ * die fruehere nicht (`frueherEntfallen`), die laufende nicht, weil sie dort
+ * schon steht (`offeneNachweiseAktion` ergaenzt nur fehlende). Der Satz des
+ * Kastens darf fuer sie also nicht „genau diese Nachweise" zusagen.
+ */
+export function alsEntfallenVermerkt(
+  typ: string,
+  uebersicht: { typen: Readonly<Record<string, TypStand>> } | null | undefined,
+): boolean {
+  return uebersicht?.typen[typ]?.status === "ENTFAELLT";
 }
 
 // =============================================
@@ -1862,7 +1966,6 @@ export interface NachforderungEingabe {
   modul: string;
   status: string;
   empfaenger: string;
-  empfaengerAbweichend: boolean;
   frist: Date | string;
   nachricht: string | null;
   angefordertAm: Date | string;
@@ -1950,7 +2053,6 @@ export interface NachforderungAnsicht {
   /** „Angefordert am 12.09.2026 von Erika Muster · an anna.beispiel@example.org" */
   kopfZeile: string;
   empfaenger: string;
-  empfaengerAbweichend: boolean;
   frist: Kalendertag;
   fristLang: string;
   /**
@@ -1963,7 +2065,6 @@ export interface NachforderungAnsicht {
   fristVerstrichen: boolean;
   /** Frist + 14. */
   linkende: Kalendertag;
-  linkAbgelaufen: boolean;
   nachricht: string | null;
   zaehler: UnterlagenZaehler;
   /**
@@ -1973,8 +2074,11 @@ export interface NachforderungAnsicht {
    */
   fortschritt: { anteil: number; anteilZuPruefen: number; text: string };
   positionen: UnterlagenPositionZeile[];
-  /** „E-Mails an die Person: Aufforderung 12.09. · Zurückweisung 16.09." (leer ohne Mail). */
-  mailVerlaufText: string;
+  /**
+   * Je Mail an die Person ein Eintrag („Aufforderung 12.09.", „Zurückweisung
+   * 16.09. (nicht zugestellt)"). Die Zeile „E-Mails an die Person: … · …"
+   * setzt die Karte daraus zusammen — je Eintrag mit eigener Farbe.
+   */
   mailVerlauf: MailVerlaufEintrag[];
   /** Nach drei gescheiterten Nachholversuchen: „nicht zustellbar – Adresse prüfen". */
   mailHinweis: string | null;
@@ -1997,6 +2101,13 @@ export interface NachforderungAnsicht {
     /** Ergaenzen nach Fristablauf: neue Frist Pflicht. */
     ergaenzenFristPflicht: boolean;
     zurueckweisenFrist: { vorschlag: Kalendertag; pflicht: boolean };
+    /**
+     * Zusaetzliche Folge in der Rueckfrage „Annahme zurücknehmen?" bei
+     * eingestelltem Vorgang (`MELDUNGEN.RUECKNAHME_VORGANG_EINGESTELLT`):
+     * Z2 zieht die danach wieder laufende Nachforderung beim naechsten Lauf
+     * zurueck. Sonst null.
+     */
+    ruecknahmeFolge: string | null;
   };
 }
 
@@ -2355,7 +2466,6 @@ function positionZeile(
 
 function mailVerlaufBauen(links: ReadonlyArray<LinkEingabe>): {
   eintraege: MailVerlaufEintrag[];
-  text: string;
   hinweis: string | null;
 } {
   const sortiert = [...links].sort(
@@ -2387,11 +2497,7 @@ function mailVerlaufBauen(links: ReadonlyArray<LinkEingabe>): {
       ? MELDUNGEN.NICHT_ZUSTELLBAR
       : null;
 
-  return {
-    eintraege,
-    text: eintraege.length > 0 ? `E-Mails an die Person: ${eintraege.map((e) => e.text).join(" · ")}` : "",
-    hinweis,
-  };
+  return { eintraege, hinweis };
 }
 
 function nachforderungAnsichtBauen(
@@ -2451,13 +2557,11 @@ function nachforderungAnsichtBauen(
     pille: unterlagenPille({ status, zaehler: z, fristVerstrichen }),
     kopfZeile: `Angefordert am ${datumText(n.angefordertAm)}${von} · an ${n.empfaenger}`,
     empfaenger: n.empfaenger,
-    empfaengerAbweichend: n.empfaengerAbweichend,
     frist,
     fristLang: formatKalendertagLang(frist),
     fristZeile,
     fristVerstrichen,
     linkende: ende,
-    linkAbgelaufen: ctx.heute > ende,
     nachricht: n.nachricht?.trim() || null,
     zaehler: z,
     fortschritt: {
@@ -2466,7 +2570,6 @@ function nachforderungAnsichtBauen(
       text: fortschrittText(z),
     },
     positionen,
-    mailVerlaufText: mails.text,
     mailVerlauf: mails.eintraege,
     mailHinweis: mails.hinweis,
     hrMeldungHinweis: n.hrMeldungOhneEmpfaenger ? MELDUNGEN.HR_MELDUNG_OHNE_EMPFAENGER : null,
@@ -2480,6 +2583,7 @@ function nachforderungAnsichtBauen(
       fristGrenzen: fristGrenzen(ctx.heute),
       ergaenzenFristPflicht: ctx.heute > frist,
       zurueckweisenFrist: zurueckweisenFrist(frist, ctx.heute),
+      ruecknahmeFolge: ctx.vorgangEingestellt ? MELDUNGEN.RUECKNAHME_VORGANG_EINGESTELLT : null,
     },
   };
 }

@@ -42,6 +42,7 @@ import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
 import { renderEventEmail } from "@/lib/mailer";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { documentTypeLabel } from "@/lib/required-documents";
+import { ONBOARDING_NACHFORDERUNG_GESPERRT_MAIL } from "@/lib/unterlagen-onboarding";
 
 const SECRET = "test-cron-secret-mindestens-24-zeichen";
 const MS_PER_DAY = 86400000;
@@ -79,8 +80,11 @@ function dokument(overrides: Record<string, unknown> = {}) {
       firstName: "Max",
       lastName: "Mustermann",
       email: "max.mustermann@example.org",
+      // Der Regelfall des Laufs: Onboarding laengst abgeschlossen.
+      status: "COMPLETED",
+      submittedAt: new Date("2026-06-01T08:00:00.000Z") as Date | null,
       organization: { name: "Gymnasium" },
-      personalData: null as { firstName: string | null; lastName: string | null } | null,
+      personalData: null as { firstName: string | null; lastName: string | null; isComplete?: boolean | null } | null,
     },
     ...overrides,
   };
@@ -606,7 +610,7 @@ describe("POST /api/cron/dokument-ablauf", () => {
     // Die Abfrage muss die Fragebogen-Namen ueberhaupt mitlesen.
     const select = mockPrisma.document.findMany.mock.calls[0][0].select;
     expect(select.onboarding.select.personalData).toEqual({
-      select: { firstName: true, lastName: true },
+      select: { firstName: true, lastName: true, isComplete: true },
     });
   });
 
@@ -806,5 +810,119 @@ describe("POST /api/cron/dokument-ablauf", () => {
       });
       expect(rendered!.html).toContain("hochgeladen am 14.09.2026</span>");
     }
+  });
+
+  // ---------------------------------------------------------------
+  // Paket 4, Z3: „Unterlagen nachfordern“ nur, wo das Portal es anbietet
+  // ---------------------------------------------------------------
+  describe("Handlungsanweisung Z3 je Vorgang", () => {
+    const vorlage = (event: string) => DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event)!;
+
+    function rendern(event: string, extra: Record<string, unknown>) {
+      const v = vorlage(event);
+      const { rendered } = renderEventEmail(
+        {
+          subject: v.subject,
+          bodyHtml: v.bodyHtml,
+          bodyText: v.bodyText,
+          recipientTo: "personal@example.org",
+          recipientCc: "",
+          recipientBcc: "",
+          recipientReplyTo: "",
+        },
+        event,
+        {
+          onboardingId: "onb1",
+          displayId: "2026-GYM-001",
+          mitarbeiter_name: "Max Mustermann",
+          mitarbeiter_email: "max@example.org",
+          organization: "Gymnasium",
+          dokument_typ: "Aufenthaltstitel",
+          dokument_datei: "hochgeladen am 14.09.2026",
+          gueltig_bis: "08.10.2026",
+          tage_verbleibend: 30,
+          tage_ueberfaellig: 0,
+          dringlichkeit: "Warnung",
+          frist_text: "Läuft in 30 Tagen ab (08.10.2026)",
+          portalLink: "http://localhost:3000/dashboard/onb1",
+          ...extra,
+        },
+      );
+      return rendered!;
+    }
+
+    it("abgeschlossener Vorgang: Merker „möglich“, kein Hinweis", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([dokument()]);
+      await POST(req());
+      expect(mockTriggerWebhooks.mock.calls[0][1]).toMatchObject({
+        nachforderung_moeglich: "ja",
+        nachforderung_gesperrt: "",
+        nachforderung_hinweis: "",
+      });
+      const select = mockPrisma.document.findMany.mock.calls[0][0].select;
+      expect(select.onboarding.select).toMatchObject({ status: true, submittedAt: true });
+    });
+
+    it("EXPIRED-Vorgang: die Mail verweist NICHT auf „Unterlagen nachfordern“ (dort 409), sondern nennt den Grund", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        dokument({ onboarding: { ...dokument().onboarding, status: "EXPIRED" } }),
+      ]);
+      await POST(req());
+      expect(mockTriggerWebhooks.mock.calls[0][1]).toMatchObject({
+        nachforderung_moeglich: "",
+        nachforderung_gesperrt: "ja",
+        nachforderung_hinweis: ONBOARDING_NACHFORDERUNG_GESPERRT_MAIL.VORGANG_EINGESTELLT,
+      });
+    });
+
+    it("Fragebogen noch offen: Hinweis auf den Fragebogen — auch ein alter Fragebogen ohne Zeitstempel zaehlt (isComplete)", async () => {
+      const offen = { ...dokument().onboarding, status: "IN_PROGRESS", submittedAt: null };
+      mockPrisma.document.findMany.mockResolvedValue([
+        dokument({ id: "doc1", onboarding: offen }),
+        dokument({
+          id: "doc2",
+          onboardingId: "onb2",
+          onboarding: { ...offen, personalData: { firstName: null, lastName: null, isComplete: true } },
+        }),
+      ]);
+      await POST(req());
+      expect(mockTriggerWebhooks.mock.calls[0][1]).toMatchObject({
+        nachforderung_moeglich: "",
+        nachforderung_gesperrt: "ja",
+        nachforderung_hinweis: ONBOARDING_NACHFORDERUNG_GESPERRT_MAIL.FRAGEBOGEN_OFFEN,
+      });
+      expect(mockTriggerWebhooks.mock.calls[1][1]).toMatchObject({ nachforderung_moeglich: "ja", nachforderung_gesperrt: "" });
+    });
+
+    it.each(["dokument-ablauf-warnung", "dokument-abgelaufen"])(
+      "%s: mit „möglich“ der Satz zu „Unterlagen nachfordern“, gesperrt nur der Hinweis — in HTML und Text",
+      (event) => {
+        const moeglich = rendern(event, { nachforderung_moeglich: "ja", nachforderung_gesperrt: "", nachforderung_hinweis: "" });
+        const hinweis = ONBOARDING_NACHFORDERUNG_GESPERRT_MAIL.VORGANG_EINGESTELLT;
+        const gesperrt = rendern(event, { nachforderung_moeglich: "", nachforderung_gesperrt: "ja", nachforderung_hinweis: hinweis });
+        for (const teil of [moeglich.html, moeglich.text ?? ""]) {
+          expect(teil).toContain("im Vorgang über „Unterlagen nachfordern“ an; sobald Sie");
+          expect(teil).not.toContain(hinweis);
+        }
+        for (const teil of [gesperrt.html, gesperrt.text ?? ""]) {
+          expect(teil).not.toContain("im Vorgang über „Unterlagen nachfordern“ an");
+          expect(teil).toContain(hinweis);
+          expect(teil).not.toMatch(/\{\{/);
+        }
+      },
+    );
+
+    it("dokument-abgelaufen nennt die Art der Mahnung — die Arbeitserlaubnis endet nur mit einer Arbeitserlaubnis", () => {
+      const mail = rendern("dokument-abgelaufen", {
+        dokument_typ: documentTypeLabel("ARBEITSERLAUBNIS"),
+        nachforderung_moeglich: "ja",
+        nachforderung_gesperrt: "",
+        nachforderung_hinweis: "",
+      });
+      for (const teil of [mail.html, mail.text ?? ""]) {
+        expect(teil).toContain(`sobald Sie sie als ${documentTypeLabel("ARBEITSERLAUBNIS")} mit ihrem Ablaufdatum annehmen, endet die Warnung.`);
+        expect(teil).not.toContain("als Aufenthaltstitel mit ihrem Ablaufdatum");
+      }
+    });
   });
 });

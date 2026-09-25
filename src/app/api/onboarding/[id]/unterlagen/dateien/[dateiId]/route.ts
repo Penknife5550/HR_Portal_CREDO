@@ -23,7 +23,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { portalCsp } from "@/lib/content-security-policy";
-import { fehlerKennung, unterlagenDateiOeffnen } from "@/lib/unterlagen-dienst";
+import { fehlerKennung } from "@/lib/fehler-kennung";
+import { unterlagenDateiOeffnen } from "@/lib/unterlagen-dienst";
 
 /** Eine JSON-Antwort ohne Datei: `no-store` und die CSP des Portals, wie sonst die Middleware. */
 function antwortOhneDatei(body: unknown, status: number, headers: Record<string, string> = {}): NextResponse {

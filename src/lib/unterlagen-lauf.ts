@@ -20,7 +20,8 @@
  *   3. **Je Kandidat:** die Sperre des Vorgangs nehmen (dieselbe wie die
  *      HR-Aktionen, `unterlagenSperreNehmen`); ist sie belegt, vormerken und
  *      am Ende EINMAL erneut versuchen — sonst fiele eine Fristtag-Erinnerung
- *      endgueltig aus. Dann frisch lesen, planen, handeln, im `finally`
+ *      endgueltig aus. Dann frisch lesen, Mails ohne Ergebnis klaeren
+ *      (`ergebnisseKlaeren`, siehe 5.), planen, handeln, im `finally`
  *      freigeben. Ein Fehler in einem Schritt zaehlt als `errors` und haelt
  *      weder die uebrigen Schritte noch den Lauf an.
  *   4. **Mails** (nie bei einem eingestellten Vorgang, EP-3): an die Person
@@ -38,6 +39,14 @@
  *      scheitert auch im zweiten Versuch (N2), zaehlt sie als zugestellt UND
  *      als `errors` (Status NACHWEIS_FEHLT) — dann fehlt der Merker, und der
  *      naechste Lauf schickte dieselbe Mail noch einmal; n8n meldet das HR.
+ *      Ein Link, der seit ueber einer Stunde auf AUSSTEHEND steht, bekommt
+ *      VOR der Planung sein Ergebnis aus dem Versandprotokoll (`EmailLog`,
+ *      SENT fuer dasselbe Ereignis an dieselbe Adresse): So schickt der Lauf
+ *      eine Mail, bei der nur das Speichern scheiterte (N2, auch nach einer
+ *      HR-Aktion mit „bitte nicht erneut senden"), nicht noch einmal. Ohne
+ *      Protokolleintrag gilt sie als nicht zugestellt (FAILED „kein
+ *      Ergebnis"): Ein nachholbarer Anlass wird nachgeholt, und auch eine
+ *      Erinnerung steht nicht mehr fuer immer auf „wird gesendet".
  *      Holt der Lauf eine „Link erneut senden"-Mail mit „frühere Links
  *      sperren" nach, sperrt er die frueheren Links im selben Commit (5.1).
  *   6. **SMTP-Bremse:** Nach drei FAILED in Folge geht keine Mail mehr hinaus
@@ -75,9 +84,11 @@
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 import { deleteUploadedDirIfEmpty } from "@/lib/file-upload";
 import { ablaufKalendertag, heuteInBerlin, kalendertagAlsDatum, type Kalendertag } from "@/lib/kalendertag";
 import {
+  AUSSTEHEND_NACHHOLEN_MINUTEN,
   MELDUNGEN,
   SMTP_BREMSE_FEHLER_IN_FOLGE,
   UNTERLAGEN_AUDIT,
@@ -85,6 +96,7 @@ import {
   linkGueltigBisFuer,
   nachforderungLinkende,
   type LinkAnlass,
+  type MailStatus,
   type UnterlagenMailErgebnis,
 } from "@/lib/unterlagen";
 import {
@@ -98,7 +110,6 @@ import {
 } from "@/lib/unterlagen-dateien";
 import {
   BEZUG_AUSWAHL,
-  fehlerKennung,
   fruehereLinksSperrenIn,
   hrMeldungSenden,
   hrVollstaendigMelden,
@@ -128,6 +139,7 @@ import {
 import {
   UNTERLAGEN_EVENTS,
   aufforderungMailFelder,
+  personenEventFuerAnlass,
   erinnerungMailFelder,
   fristVerstrichenMailFelder,
   zurueckweisungMailFelder,
@@ -140,6 +152,8 @@ import { getBaseUrl } from "@/lib/url";
 
 export type LaufSchritt =
   | "LESEN"
+  /** Ein Link stand seit ueber einer Stunde auf AUSSTEHEND (`ergebnisseKlaeren`). */
+  | "ERGEBNIS"
   | "ZURUECKZIEHEN"
   | "VOLLSTAENDIG"
   | "NACHHOLEN"
@@ -149,7 +163,9 @@ export type LaufSchritt =
   | "SPERRE";
 
 /**
- * SENT/SKIPPED/FAILED — Ergebnis einer Mail. NACHWEIS_FEHLT — versendet, aber
+ * SENT/SKIPPED/FAILED — Ergebnis einer Mail; beim Schritt ERGEBNIS das
+ * nachgetragene Ergebnis eines haengenden Links (SENT laut Versandprotokoll,
+ * sonst FAILED). NACHWEIS_FEHLT — versendet, aber
  * Ergebnis, Merker und Protokoll nicht gespeichert (N2): zaehlt als zugestellt
  * UND in `errors`, bitte nicht erneut senden. GEBREMST — wegen der
  * SMTP-Bremse nicht versucht. GEPLANT — Probelauf. ERLEDIGT — Zurueckziehen
@@ -287,6 +303,7 @@ const LAUF_AUSWAHL = {
     select: {
       id: true,
       anlass: true,
+      empfaenger: true,
       mailStatus: true,
       gesendetAm: true,
       createdAt: true,
@@ -503,8 +520,8 @@ async function laufLinkAnlegen(
     if (gesperrt.count === 0) return null;
     if (opts.nachholen?.abgebrochen) {
       await tx.unterlagenLink.updateMany({
-        where: { id: opts.nachholen.linkId, mailStatus: "AUSSTEHEND" },
-        data: { mailStatus: "FAILED", mailDetail: MELDUNGEN.MAIL_OHNE_ERGEBNIS },
+        where: { id: opts.nachholen.linkId, mailStatus: "AUSSTEHEND" satisfies MailStatus },
+        data: { mailStatus: "FAILED" satisfies MailStatus, mailDetail: MELDUNGEN.MAIL_OHNE_ERGEBNIS },
       });
     }
     return linkAnlegen(tx, {
@@ -520,6 +537,77 @@ async function laufLinkAnlegen(
       jetzt,
     });
   });
+}
+
+// =============================================
+// Vor der Planung: Mails ohne Ergebnis klaeren
+// =============================================
+
+const AUSSTEHEND_MS = AUSSTEHEND_NACHHOLEN_MINUTEN * 60_000;
+
+/**
+ * Links, die seit ueber einer Stunde auf AUSSTEHEND stehen, bekommen VOR der
+ * Planung ein Ergebnis. Ohne diesen Schritt hielte die Planung jede solche
+ * Mail fuer einen Absturz zwischen Link und Versand und schickte sie noch
+ * einmal — auch dann, wenn sie draussen war und nur das Speichern des
+ * Ergebnisses scheiterte (N2), und HR gerade „bitte nicht erneut senden"
+ * gelesen hat.
+ *
+ *   - Das Versandprotokoll kennt ein SENT fuer dasselbe Ereignis
+ *     (`personenEventFuerAnlass`) an dieselbe Adresse, nach dem Anlegen dieses
+ *     Links und vor dem naechsten Link der Nachforderung (hoechstens eine
+ *     Stunde): SENT mit Zeit und Message-ID des Protokolls. Wollte HR mit
+ *     dieser Mail die frueheren Links sperren (`fruehereSperren`) und ist sie
+ *     die juengste, sperrt der Lauf sie im selben Commit — N2 liess das aus.
+ *     Den Merker einer Erinnerung setzt er NICHT nach (bewusst wie N2 im Kopf
+ *     dieser Datei: eine Erinnerung ggf. doppelt).
+ *   - Sonst FAILED „kein Ergebnis": Absturz zwischen Link und Versand, oder
+ *     auch das Protokoll fehlt (Datenbank ganz weg). Schritt 2 holt einen
+ *     nachholbaren Anlass nach; eine Erinnerung kommt wieder, solange sie
+ *     faellig ist — und steht im Mailverlauf nicht mehr fuer immer auf „wird
+ *     gesendet".
+ *
+ * Geschrieben wird bedingt auf AUSSTEHEND. Der Probelauf liest nur und traegt
+ * das Ergebnis allein in `zeile.links` ein — die Planung sieht dasselbe wie im
+ * scharfen Lauf.
+ */
+async function ergebnisseKlaeren(c: LaufKontext, k: Kopf, zeile: LaufZeile): Promise<void> {
+  const grenze = c.jetzt.getTime() - AUSSTEHEND_MS;
+  const juengste = zeile.links.at(-1);
+  for (const [i, l] of zeile.links.entries()) {
+    if (l.mailStatus !== ("AUSSTEHEND" satisfies MailStatus) || l.createdAt.getTime() > grenze) continue;
+    const naechster = zeile.links[i + 1]?.createdAt.getTime() ?? Number.POSITIVE_INFINITY;
+    const bis = new Date(Math.min(naechster, l.createdAt.getTime() + AUSSTEHEND_MS));
+    const protokoll = await prisma.emailLog.findFirst({
+      where: {
+        event: personenEventFuerAnlass(l.anlass),
+        recipient: l.empfaenger,
+        status: "SENT",
+        isTest: false,
+        createdAt: { gte: l.createdAt, lt: bis },
+      },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true, messageId: true },
+    });
+    const ergebnis: MailStatus = protokoll ? "SENT" : "FAILED";
+    if (!c.dryRun) {
+      const data: Prisma.UnterlagenLinkUpdateManyMutationInput = protokoll
+        ? { mailStatus: ergebnis, mailDetail: null, messageId: protokoll.messageId, gesendetAm: protokoll.createdAt }
+        : { mailStatus: ergebnis, mailDetail: MELDUNGEN.MAIL_OHNE_ERGEBNIS };
+      await prisma.$transaction(async (tx) => {
+        const r = await tx.unterlagenLink.updateMany({
+          where: { id: l.id, mailStatus: "AUSSTEHEND" satisfies MailStatus },
+          data,
+        });
+        if (r.count === 1 && protokoll && l.fruehereSperren && l.id === juengste?.id) {
+          await fruehereLinksSperrenIn(tx, zeile.id, l.id, zeitstempel(c));
+        }
+      });
+    }
+    l.mailStatus = ergebnis;
+    if (protokoll) l.gesendetAm = protokoll.createdAt;
+    detail(c, k, "ERGEBNIS", c.dryRun ? "GEPLANT" : ergebnis, l.anlass);
+  }
 }
 
 // =============================================
@@ -567,7 +655,7 @@ async function nachholen(c: LaufKontext, k: Kopf, n: Bearbeitung, plan: NachholP
   if (!mailVersuchen(c, k, "NACHHOLEN", "NACHHOLEN", plan.anlass)) return;
   const { zeile } = n;
   const v = n.v as UnterlagenVorgang;
-  const event = plan.anlass === "ZURUECKWEISUNG" ? UNTERLAGEN_EVENTS.ZURUECKGEWIESEN : UNTERLAGEN_EVENTS.ANGEFORDERT;
+  const event = personenEventFuerAnlass(plan.anlass);
   const untauglich = await vorlageUntauglich(c, event);
 
   // Gleicher Anlass, neuer Link (Abschnitt 9, Schritt 2).
@@ -923,6 +1011,8 @@ async function bearbeiten(c: LaufKontext, k: Kopf): Promise<"FERTIG" | "GESPERRT
   try {
     const zeile = await prisma.unterlagenNachforderung.findUnique({ where: { id: k.id }, select: LAUF_AUSWAHL });
     if (!zeile) return "FERTIG";
+    // Scheitert das Klaeren, faengt die Planung haengende Links selbst ab (`abgebrochen`).
+    await schritt(c, k, "ERGEBNIS", () => ergebnisseKlaeren(c, k, zeile));
     const v = zeile.status === "LAUFEND" ? await baustein.vorgangLaden(vorgangId) : null;
     const plan = laufPlanen(zeile, { heute: c.heute, jetzt: c.jetzt, vorgangEingestellt: v?.eingestellt ?? false });
     const n: Bearbeitung = { baustein, vorgangId, zeile, v, zugestelltImLauf: false };

@@ -28,6 +28,8 @@ import {
   type OnboardingUnterlagenQuelle,
 } from "@/lib/unterlagen-onboarding";
 import { MELDUNGEN } from "@/lib/unterlagen";
+import { UNTERLAGEN_EVENTS } from "@/lib/unterlagen-mail";
+import { getEventDefinition } from "@/lib/events";
 import {
   NACHFORDERUNG_HINWEISE,
   SELECTABLE_DOCUMENT_TYPES,
@@ -261,6 +263,17 @@ describe("Laden und Sperren", () => {
     expect(url.searchParams.get("tab")).toBe("dokumente");
     expect(onboardingBaustein.apiBasis(ID)).toBe(`/api/onboarding/${ID}/unterlagen`);
     expect(onboardingBaustein.mitDetails(abbilden(zeile()))).toBe(true);
+  });
+
+  it("das Katalogbeispiel der HR-Mails zeigt den Link so, wie der Dienst ihn baut (`portalPfad`)", () => {
+    // Testversand, Vorschau und Webhook-Abnehmer lernen die URL-Form aus dem
+    // Katalog — sie muss dieselbe sein wie in echten Mails.
+    for (const event of [UNTERLAGEN_EVENTS.VOLLSTAENDIG, UNTERLAGEN_EVENTS.FRIST_VERSTRICHEN]) {
+      const beispiel = String(getEventDefinition(event)!.samplePayload.portalLink);
+      const url = new URL(beispiel);
+      const id = url.pathname.split("/").at(-1)!;
+      expect({ event, link: beispiel }).toEqual({ event, link: `${url.origin}${onboardingBaustein.portalPfad(id)}` });
+    }
   });
 });
 

@@ -4,8 +4,9 @@
  *
  * Karte (nachforderung-karte.tsx), Dialog „Unterlagen nachfordern…"
  * (nachforderung-dialog.tsx) und Pruef-Dialoge (pruef-dialoge.tsx) brauchen
- * dieselben kleinen Bausteine: die Basis der HR-Routen, den Aufruf samt
- * Auswertung der Antwort, die Meldungsaufbereitung und den Adressvergleich.
+ * dieselben kleinen Bausteine: den Aufruf samt Auswertung der Antwort, die
+ * Meldungsaufbereitung, den heutigen Tag eines Frist-Dialogs und die Pruefung
+ * einer Adresse (Vergleich, Format, Texte).
  * Sie stehen hier, damit keine Komponente eine andere nur wegen eines Helfers
  * importiert — frueher holte sich der Dialog den Aufruf aus der Karte und den
  * Adressvergleich aus den Pruef-Dialogen, waehrend die Karte die Pruef-Dialoge
@@ -17,7 +18,9 @@
  */
 
 import type { AktionsMeldung } from "@/components/abteilungsaufgaben/abteilungen-karte";
-import { MELDUNGEN } from "@/lib/unterlagen";
+import { EMAIL_PATTERN } from "@/lib/constants";
+import { heuteInBerlin, tageSpaeter } from "@/lib/kalendertag";
+import { FRIST_MIN_TAGE, MELDUNGEN, type FristGrenzen, type Kalendertag } from "@/lib/unterlagen";
 
 // =============================================
 // Typen
@@ -43,21 +46,24 @@ export interface UnterlagenAktionsErgebnis {
 }
 
 // =============================================
-// Basis der HR-Routen
+// Der heutige Tag eines Frist-Dialogs (KO-K3)
 // =============================================
 
 /**
- * Basis der HR-Routen je Modul — dieselbe wie `apiBasis` im Modul-Baustein
- * (src/lib/unterlagen-onboarding.ts, Server). Nur noch Rueckfall fuer eine
- * Uebersicht ohne `apiBasis` (die Route liefert sie seit Schritt 10 mit
- * Bearbeitungsrecht immer); Stufe 2 braucht hier also keinen Eintrag mehr.
+ * Heute fuer einen Dialog mit Frist („Unterlagen nachfordern…", „Frist
+ * ändern…", „Zurückweisen…"): der Tag des Servers beim Bauen der Uebersicht
+ * (morgen ist die frueheste Frist, EP-5 — also `min − 1`), aber NIE frueher
+ * als der Berliner Tag im Browser. Steht die Seite ueber Mitternacht offen,
+ * ist der Tag des Servers von gestern: Das Feld liesse dann eine Frist zu,
+ * die der Server mit 400 FRIST_ZU_FRUEH ablehnt, und der Info-Satz sagte eine
+ * Vorab-Erinnerung zu, die der Lauf nie verschickt. Kalendertage
+ * (JJJJ-MM-TT) vergleichen sich als Text. Die Feldgrenzen baut jeder Dialog
+ * daraus mit `fristGrenzen(heute)`.
  */
-const API_BASIS: Readonly<Record<string, (vorgangId: string) => string>> = {
-  ONBOARDING: (id) => `/api/onboarding/${id}/unterlagen`,
-};
-
-export function unterlagenApiBasis(modul: string, vorgangId: string): string | null {
-  return API_BASIS[modul]?.(vorgangId) ?? null;
+export function dialogHeute(serverGrenzen: FristGrenzen | null, jetzt: Date = new Date()): Kalendertag {
+  const browser = heuteInBerlin(jetzt);
+  const server = serverGrenzen ? tageSpaeter(serverGrenzen.min, -FRIST_MIN_TAGE) : null;
+  return server && server > browser ? server : browser;
 }
 
 // =============================================
@@ -162,4 +168,24 @@ export async function unterlagenAktionSenden(url: string, body: unknown): Promis
  */
 export function adresseGleich(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+/** Die Texte der Adresspruefung in beiden Adressdialogen („Unterlagen nachfordern…", „Link erneut senden"). */
+export const ADRESS_TEXTE = {
+  EMAIL_FEHLT: "Bitte geben Sie eine E-Mail-Adresse an.",
+  EMAIL_UNGUELTIG: "Bitte geben Sie eine gültige E-Mail-Adresse an.",
+  NICHT_FREIGEGEBEN_KURZ: "Diese Adresse ist nicht freigegeben.",
+} as const;
+
+/**
+ * Das Format einer Adresse, bevor Freigabe und Abweichung zaehlen — dasselbe
+ * Muster wie der Dokumentenpaket-Dialog (`EMAIL_PATTERN`). Sonst liesse ein
+ * Dialog „anna.beispiel@" durch, und der Server antwortete 400.
+ *
+ * @returns der Grund, oder null bei einer Adresse in gueltiger Form
+ */
+export function adressFormatFehler(adresse: string): string | null {
+  const wert = adresse.trim();
+  if (!wert) return ADRESS_TEXTE.EMAIL_FEHLT;
+  return EMAIL_PATTERN.test(wert) ? null : ADRESS_TEXTE.EMAIL_UNGUELTIG;
 }

@@ -54,6 +54,8 @@ export const udb: {
   users: Zeile[];
   /** EmailTemplate-Zeilen (gespeicherte Vorlagen; sonst gilt der Code-Standard). */
   emailVorlagen: Zeile[];
+  /** EmailLog-Zeilen (Versandprotokoll) — der Lauf gleicht haengende Links damit ab. */
+  emailLogs: Zeile[];
   zuweisungen: Zeile[];
   smtp: { allowedRecipientDomains: string; replyToEmail: string };
   /** Protokoll aller Aufrufe als "tabelle.methode" in Reihenfolge. */
@@ -71,6 +73,7 @@ export const udb: {
   audits: [],
   users: [],
   emailVorlagen: [],
+  emailLogs: [],
   zuweisungen: [],
   smtp: { allowedRecipientDomains: "", replyToEmail: "" },
   aufrufe: [],
@@ -593,7 +596,14 @@ export const fakePrisma: Record<string, unknown> = {
     }),
   },
   emailLog: {
-    create: protokolliert("emailLog.create", async ({ data }: Args) => data),
+    create: protokolliert("emailLog.create", async ({ data }: Args) => {
+      udb.emailLogs.push(realmSicher(data ?? {}));
+      return data;
+    }),
+    findFirst: protokolliert("emailLog.findFirst", async ({ where, select, orderBy }: Args) => {
+      const e = sortierenU(udb.emailLogs.filter((x) => passtU(x, where)), orderBy)[0];
+      return e ? proj(e, select) : null;
+    }),
   },
   userOrgAssignment: {
     findUnique: protokolliert(
@@ -626,6 +636,7 @@ export function udbLeeren(): void {
   udb.audits = [];
   udb.users = [];
   udb.emailVorlagen = [];
+  udb.emailLogs = [];
   udb.zuweisungen = [];
   udb.smtp = { allowedRecipientDomains: "", replyToEmail: "" };
   udb.aufrufe = [];

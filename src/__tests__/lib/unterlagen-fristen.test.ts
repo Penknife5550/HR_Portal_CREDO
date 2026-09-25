@@ -277,6 +277,31 @@ describe("personenMailNachholen", () => {
       "p-2",
     ]);
   });
+
+  it("Ergaenzung, zweiter und dritter Nachholversuch: dieselben Positionen tragen weiter „(neu)“", () => {
+    // HR ergaenzt (FAILED), der Lauf holt an zwei Tagen nach — beide FAILED.
+    // Die juengste Mail ist dann der Link des Laufs; Bezug bleibt der von HR.
+    const seit = um10(tag(-6));
+    const ergaenzung = link({ anlass: "ERGAENZUNG", mailStatus: "FAILED", gesendetAm: null, createdAt: seit });
+    const versuch1 = link({ anlass: "ERGAENZUNG", mailStatus: "FAILED", gesendetAm: null, createdAt: um10(tag(-5)), nachholVersuche: 1 });
+    const versuch2 = link({ anlass: "ERGAENZUNG", mailStatus: "FAILED", gesendetAm: null, createdAt: um10(tag(-4)), nachholVersuche: 2 });
+    const positionen = [
+      { id: "p-1", status: "ANGEFORDERT", angefordertAm: um10("2026-09-14") },
+      { id: "p-2", status: "ANGEFORDERT", angefordertAm: seit },
+    ];
+    const zweiter = personenMailNachholen(stand({ positionen, links: [link(), ergaenzung, versuch1] }), heute, jetzt);
+    expect(zweiter).toMatchObject({ versuch: 2, neuePositionen: ["p-2"] });
+    const dritter = personenMailNachholen(stand({ positionen, links: [link(), ergaenzung, versuch1, versuch2] }), heute, jetzt);
+    expect(dritter).toMatchObject({ versuch: 3, neuePositionen: ["p-2"] });
+    // Eine zweite Ergaenzung beginnt eine eigene Kette — nur IHRE Positionen sind neu.
+    const spaeter = um10(tag(-3));
+    const zweiteErgaenzung = link({ anlass: "ERGAENZUNG", mailStatus: "FAILED", gesendetAm: null, createdAt: spaeter });
+    const mitZweiter = [...positionen, { id: "p-3", status: "ANGEFORDERT", angefordertAm: spaeter }];
+    expect(
+      personenMailNachholen(stand({ positionen: mitZweiter, links: [link(), ergaenzung, versuch1, zweiteErgaenzung] }), heute, jetzt)
+        ?.neuePositionen,
+    ).toEqual(["p-3"]);
+  });
 });
 
 // =============================================

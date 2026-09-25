@@ -467,7 +467,9 @@ const UNTERLAGEN_BEISPIEL_HR = {
   angefordert_von: "Erika Muster",
   angefordert_am: "14.09.2026",
   mitarbeiter_name: "Anna Beispiel",
-  portalLink: "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000014",
+  // Wie der Dienst ihn baut: `getBaseUrl()` + `portalPfad` des Bausteins,
+  // also mit dem Reiter „Dokumente" (U-25; ein Test haelt beide gleich).
+  portalLink: "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000014?tab=dokumente",
 };
 
 /**
@@ -829,6 +831,9 @@ export const EVENT_CATALOG: EventDefinition[] = [
       frist_text: "Läuft in 42 Tagen ab (20.10.2026)",
       portalLink:
         "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000001",
+      nachforderung_moeglich: "ja",
+      nachforderung_gesperrt: "",
+      nachforderung_hinweis: "",
     },
     wired: true,
   },
@@ -854,6 +859,9 @@ export const EVENT_CATALOG: EventDefinition[] = [
       frist_text: "Abgelaufen seit 7 Tagen (01.09.2026)",
       portalLink:
         "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000001",
+      nachforderung_moeglich: "ja",
+      nachforderung_gesperrt: "",
+      nachforderung_hinweis: "",
     },
     wired: true,
   },

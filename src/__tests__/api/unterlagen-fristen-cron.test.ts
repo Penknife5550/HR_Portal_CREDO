@@ -659,6 +659,135 @@ describe("Mail an die Person nachholen", () => {
     expect(mails().map((m) => m.an)).toEqual([n.empfaenger]);
   });
 
+  /** Ein Eintrag im Versandprotokoll, wie `sendEventEmail` ihn bei SENT schreibt. */
+  function protokoll(teil: Zeile): Zeile {
+    const e = { id: randomUUID(), status: "SENT", isTest: false, cc: null, bcc: null, subject: "", detail: null, ...teil };
+    udb.emailLogs.push(e);
+    return e;
+  }
+
+  it("N2 nach einer HR-Aktion: Das Versandprotokoll kennt die Mail — SENT nachgetragen, KEINE zweite Mail", async () => {
+    // HR fordert an, die Mail geht hinaus, das Speichern scheitert zweimal:
+    // HR liest „bitte nicht erneut senden", der Link steht auf AUSSTEHEND.
+    const n = nachforderung(vorgang());
+    const alt = link(n, { mailStatus: "AUSSTEHEND", gesendetAm: null, createdAt: vor(20 * STUNDE) });
+    const versendet = new Date((alt.createdAt as Date).getTime() + 40_000);
+    protokoll({ event: UNTERLAGEN_EVENTS.ANGEFORDERT, recipient: n.empfaenger, createdAt: versendet, messageId: "<m-9@example.org>" });
+
+    const b = await bericht();
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(alt).toMatchObject({ mailStatus: "SENT", gesendetAm: versendet, messageId: "<m-9@example.org>", mailDetail: null });
+    expect(udb.links).toHaveLength(1);
+    expect(b).toMatchObject({ nachgeholt: 0, errors: 0, total: 0 });
+    expect(b.details).toEqual([
+      { nachforderungId: n.id, modul: "ONBOARDING", schritt: "ERGEBNIS", anlass: "ANFORDERUNG", status: "SENT" },
+    ]);
+  });
+
+  it("… nur dasselbe Ereignis an dieselbe Adresse im Fenster des Links zaehlt — sonst „kein Ergebnis“ und Nachholen", async () => {
+    const n = nachforderung(vorgang());
+    const alt = link(n, { mailStatus: "AUSSTEHEND", gesendetAm: null, createdAt: vor(20 * STUNDE) });
+    const t = (alt.createdAt as Date).getTime();
+    protokoll({ event: UNTERLAGEN_EVENTS.ANGEFORDERT, recipient: "jemand.anders@example.org", createdAt: new Date(t + 40_000) });
+    protokoll({ event: UNTERLAGEN_EVENTS.ERINNERUNG, recipient: n.empfaenger, createdAt: new Date(t + 40_000) });
+    protokoll({ event: UNTERLAGEN_EVENTS.ANGEFORDERT, recipient: n.empfaenger, createdAt: new Date(t - 60_000) });
+    protokoll({ event: UNTERLAGEN_EVENTS.ANGEFORDERT, recipient: n.empfaenger, createdAt: new Date(t + 2 * STUNDE) });
+    protokoll({ event: UNTERLAGEN_EVENTS.ANGEFORDERT, recipient: n.empfaenger, createdAt: new Date(t + 40_000), isTest: true });
+    protokoll({ event: UNTERLAGEN_EVENTS.ANGEFORDERT, recipient: n.empfaenger, createdAt: new Date(t + 40_000), status: "FAILED" });
+
+    const b = await bericht();
+    expect(alt).toMatchObject({ mailStatus: "FAILED", mailDetail: MELDUNGEN.MAIL_OHNE_ERGEBNIS });
+    expect(mails().map((m) => m.an)).toEqual([n.empfaenger]);
+    expect(b.details.map((d) => [d.schritt, d.status])).toEqual([
+      ["ERGEBNIS", "FAILED"],
+      ["NACHHOLEN", "SENT"],
+    ]);
+  });
+
+  it("… das Protokoll eines SPAETEREN Links der Nachforderung gehoert nicht zu diesem", async () => {
+    const n = nachforderung(vorgang());
+    const alt = link(n, { mailStatus: "AUSSTEHEND", gesendetAm: null, createdAt: vor(20 * STUNDE) });
+    const spaeter = new Date((alt.createdAt as Date).getTime() + 10 * 60_000);
+    link(n, { anlass: "FRISTAENDERUNG", mailStatus: "SENT", gesendetAm: spaeter, createdAt: spaeter });
+    protokoll({ event: UNTERLAGEN_EVENTS.ANGEFORDERT, recipient: n.empfaenger, createdAt: new Date(spaeter.getTime() + 30_000) });
+
+    await bericht();
+    expect(alt).toMatchObject({ mailStatus: "FAILED", mailDetail: MELDUNGEN.MAIL_OHNE_ERGEBNIS });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("… „frühere Links sperren“ an der nachgetragenen Mail: der Lauf sperrt die frueheren im selben Commit", async () => {
+    const n = nachforderung(vorgang());
+    const erste = link(n);
+    const erneut = link(n, {
+      anlass: "ERNEUT",
+      mailStatus: "AUSSTEHEND",
+      gesendetAm: null,
+      fruehereSperren: true,
+      createdAt: vor(20 * STUNDE),
+    });
+    protokoll({
+      event: UNTERLAGEN_EVENTS.ANGEFORDERT,
+      recipient: n.empfaenger,
+      createdAt: new Date((erneut.createdAt as Date).getTime() + 5_000),
+    });
+
+    await bericht();
+    expect(erneut).toMatchObject({ mailStatus: "SENT", entwertetAm: null });
+    expect(erste).toMatchObject({ entwertetGrund: "GESPERRT", entwertetAm: JETZT });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("haengende Erinnerung: SENT laut Protokoll bzw. „kein Ergebnis“ — nie mehr fuer immer „wird gesendet“", async () => {
+    const n = nachforderung(vorgang(), { erinnertFuerFrist: datum(FRIST), erinnertStufe: "VORAB" });
+    link(n);
+    const erinnerung = link(n, {
+      anlass: "ERINNERUNG_VORAB",
+      erstelltVonId: null,
+      mailStatus: "AUSSTEHEND",
+      gesendetAm: null,
+      createdAt: vor(2 * TAG),
+    });
+    const ohne = nachforderung(vorgang(), { erinnertFuerFrist: datum(FRIST), erinnertStufe: "VORAB" });
+    link(ohne);
+    const verloren = link(ohne, {
+      anlass: "ERINNERUNG_VORAB",
+      erstelltVonId: null,
+      mailStatus: "AUSSTEHEND",
+      gesendetAm: null,
+      createdAt: vor(2 * TAG),
+    });
+    protokoll({
+      event: UNTERLAGEN_EVENTS.ERINNERUNG,
+      recipient: n.empfaenger,
+      createdAt: new Date((erinnerung.createdAt as Date).getTime() + 5_000),
+    });
+
+    await bericht();
+    expect(erinnerung).toMatchObject({ mailStatus: "SENT" });
+    expect(verloren).toMatchObject({ mailStatus: "FAILED", mailDetail: MELDUNGEN.MAIL_OHNE_ERGEBNIS });
+    // Erinnerungen holt Schritt 2 nicht nach — keine Mail.
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("dryRun: liest das Protokoll, schreibt nichts — die Planung sieht dasselbe wie der scharfe Lauf", async () => {
+    const n = nachforderung(vorgang());
+    const alt = link(n, { mailStatus: "AUSSTEHEND", gesendetAm: null, createdAt: vor(20 * STUNDE) });
+    protokoll({
+      event: UNTERLAGEN_EVENTS.ANGEFORDERT,
+      recipient: n.empfaenger,
+      createdAt: new Date((alt.createdAt as Date).getTime() + 40_000),
+    });
+
+    const b = await bericht({ dryRun: true });
+    expect(alt).toMatchObject({ mailStatus: "AUSSTEHEND", gesendetAm: null });
+    expect(schreibzugriffe()).toEqual([]);
+    expect(b).toMatchObject({ nachgeholt: 0, total: 0 });
+    expect(b.details).toEqual([
+      { nachforderungId: n.id, modul: "ONBOARDING", schritt: "ERGEBNIS", anlass: "ANFORDERUNG", status: "GEPLANT" },
+    ]);
+  });
+
   it("nach der Frist mit `frist_verstrichen` und Linkende; nach dem Linkende nicht mehr", async () => {
     const n = nachforderung(vorgang(), { frist: datum("2026-09-18"), fristGemeldetFuer: datum("2026-09-18") });
     link(n, { anlass: "FRISTAENDERUNG", mailStatus: "FAILED", gesendetAm: null });

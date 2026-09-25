@@ -203,7 +203,6 @@ function laufendeNachforderung(): NachforderungEingabe {
     modul: "ONBOARDING",
     status: "LAUFEND",
     empfaenger: "anna.beispiel@example.org",
-    empfaengerAbweichend: false,
     frist: new Date("2026-09-26T00:00:00.000Z"),
     nachricht: null,
     angefordertAm: "2026-09-12T08:00:00.000Z",

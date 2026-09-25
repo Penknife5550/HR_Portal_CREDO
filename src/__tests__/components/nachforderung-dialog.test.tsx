@@ -153,7 +153,6 @@ function nachforderung(teil: Partial<NachforderungEingabe> = {}): NachforderungE
     modul: "ONBOARDING",
     status: "LAUFEND",
     empfaenger: ADRESSE_VORGANG,
-    empfaengerAbweichend: false,
     frist: new Date("2026-10-02T00:00:00.000Z"),
     nachricht: null,
     angefordertAm: "2026-09-12T08:00:00.000Z",
@@ -220,6 +219,7 @@ function uebersicht(
     vorgangEingestellt: false,
     darfAktionen: true,
     dateiUrl: (id) => `${BASIS}/dateien/${id}`,
+    apiBasis: BASIS,
     dialog: opts.dialog === undefined ? DIALOG : opts.dialog,
     jetzt: JETZT,
   });
@@ -239,7 +239,6 @@ function dialog(
   const onErfolg = jest.fn();
   const r = render(
     <NachforderungDialog
-      vorgangId={VORGANG}
       uebersicht={opts.u ?? uebersicht()}
       modus={opts.modus ?? "neu"}
       vorauswahl={opts.vorauswahl ?? null}
@@ -681,6 +680,7 @@ describe("Frist", () => {
         vorgangEingestellt: false,
         darfAktionen: true,
         dateiUrl: (id) => `${BASIS}/dateien/${id}`,
+        apiBasis: BASIS,
         dialog: DIALOG,
         jetzt: new Date("2026-09-22T10:00:00.000Z"),
       });
@@ -949,6 +949,15 @@ describe("Body", () => {
       fireEvent.click(anfordernKnopf());
     });
     expect(f).toHaveBeenCalledWith("/api/modul/vg-9/unterlagen", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("ohne `apiBasis` (kein Bearbeitungsrecht) bleibt der Knopf gesperrt — keine zweite Routentabelle im Client", () => {
+    const f = fetchMit(201, anfordernAntwort({ status: "SENT", detail: null }));
+    dialog({ u: { ...uebersicht(), apiBasis: null } });
+    expect(anfordernKnopf().disabled).toBe(true);
+    expect(grundZeile()).toBe("Die Auswahl der Unterlagen fehlt. Bitte laden Sie die Seite neu.");
+    fireEvent.click(anfordernKnopf());
+    expect(f).not.toHaveBeenCalled();
   });
 
   it("ein geleerter Hinweis und eine leere Nachricht fehlen im Body", async () => {

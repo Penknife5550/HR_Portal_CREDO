@@ -27,16 +27,16 @@
  */
 
 import { useState, type ReactNode } from "react";
-import { adresseGleich } from "@/components/unterlagen/aktionen";
+import { ADRESS_TEXTE, adresseGleich, adressFormatFehler, dialogHeute } from "@/components/unterlagen/aktionen";
 import { DialogRahmen } from "@/components/unterlagen/dialog-rahmen";
 import { ablaufAmpel } from "@/lib/dokument-fristen";
 import { empfaengerFreigegeben } from "@/lib/empfaenger-freigabe";
-import { formatKalendertag, formatKalendertagLang, istKalendertag, tageSpaeter } from "@/lib/kalendertag";
+import { formatKalendertag, formatKalendertagLang, istKalendertag } from "@/lib/kalendertag";
 import {
   BEGRUENDUNG_MAX,
   dialogErinnerungsSatz,
   ENTFAELLT_NOTIZ_MAX,
-  FRIST_MIN_TAGE,
+  fristGrenzen,
   fristPruefen,
   fristWochenendeHinweis,
   LOESCHEN_NACH_TAGEN,
@@ -119,16 +119,6 @@ export function annehmenBrauchtDialog(position: Pick<UnterlagenPositionZeile, "t
     position.fristpflichtig ||
     EINGANGSDATUM_SELBST_ERFASSEN.includes(position.typ)
   );
-}
-
-/**
- * Der heutige Tag, wie der Server ihn beim Bauen der Uebersicht sah: morgen ist
- * die frueheste Frist (EP-5). So passen Feldgrenzen, Pruefung und
- * Erinnerungssatz zusammen, auch wenn der Dialog kurz vor Mitternacht
- * geoeffnet wurde.
- */
-function heuteAus(grenzen: FristGrenzen): Kalendertag {
-  return tageSpaeter(grenzen.min, -FRIST_MIN_TAGE);
 }
 
 const EINGABE =
@@ -396,7 +386,10 @@ export interface ZurueckweisenDialogProps extends DialogBasis<ZurueckweisenBody>
   position: UnterlagenPositionZeile;
   /** `nachforderung.dialog` aus der Uebersicht: Vorschlag und Pflicht nach EP-1, Grenzen nach EP-5. */
   frist: NachforderungAnsicht["dialog"]["zurueckweisenFrist"];
+  /** Die Grenzen des Servers — daraus sein Tag; nie frueher als heute im Browser (`dialogHeute`). */
   grenzen: FristGrenzen;
+  /** Bezugszeit (Tests); ohne Angabe jetzt. */
+  jetzt?: Date;
 }
 
 /**
@@ -412,7 +405,8 @@ export interface ZurueckweisenDialogProps extends DialogBasis<ZurueckweisenBody>
 export function ZurueckweisenDialog({
   position,
   frist: fristVorgabe,
-  grenzen,
+  grenzen: serverGrenzen,
+  jetzt,
   sendet,
   fehler,
   onAbbrechen,
@@ -421,7 +415,8 @@ export function ZurueckweisenDialog({
 }: ZurueckweisenDialogProps) {
   const [begruendung, setBegruendung] = useState("");
   const [frist, setFrist] = useState<string>(fristVorgabe.vorschlag);
-  const heute = heuteAus(grenzen);
+  const heute = dialogHeute(serverGrenzen, jetzt);
+  const grenzen = fristGrenzen(heute);
 
   const fristWert = frist.trim();
   let fristFehler: string | null = null;
@@ -620,6 +615,11 @@ export interface AnnahmeZuruecknehmenDialogProps extends DialogBasis<AnnahmeZuru
   position: UnterlagenPositionZeile;
   /** Steht die Nachforderung auf ERLEDIGT? Dann laeuft sie danach wieder. */
   nachforderungErledigt: boolean;
+  /**
+   * `nachforderung.dialog.ruecknahmeFolge` — bei eingestelltem Vorgang die
+   * Folge aus Z2 (der naechste Lauf zieht zurueck), sonst null.
+   */
+  zusatzFolge?: string | null;
 }
 
 /**
@@ -627,11 +627,13 @@ export interface AnnahmeZuruecknehmenDialogProps extends DialogBasis<AnnahmeZuru
  * Dateien zurueckgeholt — auch wenn HR ihr Ablaufdatum inzwischen geaendert
  * hat (E-3). Die Unterlage steht danach wieder auf „Zu prüfen". Versprochen
  * wird nur das erneute Annehmen: Zurueckweisen sperrt der Server bei einem
- * eingestellten Vorgang (EP-3).
+ * eingestellten Vorgang (EP-3) — und dort zieht der naechste Lauf die wieder
+ * laufende Nachforderung zurueck (Z2); das sagt `zusatzFolge` VOR der Aktion.
  */
 export function AnnahmeZuruecknehmenDialog({
   position,
   nachforderungErledigt,
+  zusatzFolge,
   sendet,
   fehler,
   onAbbrechen,
@@ -644,6 +646,7 @@ export function AnnahmeZuruecknehmenDialog({
     "Die Person bekommt keine E-Mail.",
   ];
   if (nachforderungErledigt) folgen.push("Die Nachforderung läuft danach wieder.");
+  if (zusatzFolge) folgen.push(zusatzFolge);
 
   return (
     <DialogRahmen
@@ -671,6 +674,8 @@ export function AnnahmeZuruecknehmenDialog({
 
 export interface FristAendernDialogProps extends DialogBasis<FristAendernBody> {
   nachforderung: NachforderungAnsicht;
+  /** Bezugszeit (Tests); ohne Angabe jetzt. */
+  jetzt?: Date;
 }
 
 /**
@@ -678,18 +683,20 @@ export interface FristAendernDialogProps extends DialogBasis<FristAendernBody> {
  * auf die Person, bekommt sie eine Mail mit neuem Link; sonst keine. Der Satz
  * zu den Erinnerungen kommt aus `dialogErinnerungsSatz` — nur, was auch stimmt:
  * Wartet nichts mehr auf die Person, erinnert der Lauf sie nicht und meldet HR
- * keine verstrichene Frist (Abschnitt 9), der Satz entfaellt dann.
+ * keine verstrichene Frist (Abschnitt 9), der Satz entfaellt dann. Die Mail
+ * „Frist verstrichen" geht an die ANFORDERNDE HR-Kraft, nicht an „Sie" (8.1).
  */
 export function FristAendernDialog({
   nachforderung,
+  jetzt,
   sendet,
   fehler,
   onAbbrechen,
   onBestaetigen,
   fokusZiel,
 }: FristAendernDialogProps) {
-  const grenzen = nachforderung.dialog.fristGrenzen;
-  const heute = heuteAus(grenzen);
+  const heute = dialogHeute(nachforderung.dialog.fristGrenzen, jetzt);
+  const grenzen = fristGrenzen(heute);
   const [frist, setFrist] = useState<string>(grenzen.vorschlag);
 
   const wert = frist.trim();
@@ -740,7 +747,7 @@ export function FristAendernDialog({
       </p>
       {wartet && pruefung.ok && (
         <p className="text-xs text-muted-foreground" data-zeile="erinnerung">
-          {dialogErinnerungsSatz(pruefung.tag, heute)}
+          {dialogErinnerungsSatz(pruefung.tag, heute, "ANFORDERNDE")}
         </p>
       )}
     </DialogRahmen>
@@ -786,6 +793,9 @@ export function ErneutSendenDialog({
   const [sperren, setSperren] = useState(false);
 
   const wert = adresse.trim();
+  // Erst das Format (wie „Unterlagen nachfordern…"): Rot und Gelb gelten nur
+  // fuer eine Adresse, die als solche stimmt.
+  const formatFehler = adressFormatFehler(wert);
   const neu = !adresseGleich(wert, nachforderung.empfaenger);
   const adresswechsel = neu && !!wert;
   const ausVorgang = empfaenger?.vorgang ?? null;
@@ -801,8 +811,8 @@ export function ErneutSendenDialog({
 
   // Der ausfuehrliche Text steht rot bzw. gelb am Feld; unten am Knopf nur kurz.
   let grund: string | null = null;
-  if (!wert) grund = "Bitte geben Sie eine E-Mail-Adresse an.";
-  else if (!freigegeben) grund = "Diese Adresse ist nicht freigegeben.";
+  if (formatFehler) grund = formatFehler;
+  else if (!freigegeben) grund = ADRESS_TEXTE.NICHT_FREIGEGEBEN_KURZ;
   else if (abweichend && !bestaetigt) grund = MELDUNGEN.ADRESSE_NICHT_BESTAETIGT;
 
   const senden = () => {
@@ -840,9 +850,9 @@ export function ErneutSendenDialog({
             setBestaetigt(false);
           }}
           autoComplete="off"
-          aria-invalid={!freigegeben || undefined}
+          aria-invalid={(!!wert && !!formatFehler) || (!formatFehler && !freigegeben) || undefined}
           disabled={sendet}
-          className={`mt-1 ${EINGABE} ${freigegeben ? "" : "border-credo-rot"}`}
+          className={`mt-1 ${EINGABE} ${!formatFehler && !freigegeben ? "border-credo-rot" : ""}`}
         />
         {adresswechsel && (
           <p className="mt-1 text-xs text-muted-foreground" data-hinweis="adresswechsel">
@@ -851,12 +861,12 @@ export function ErneutSendenDialog({
         )}
       </div>
 
-      {abweichend && wert && !freigegeben && (
+      {abweichend && !formatFehler && !freigegeben && (
         <Hinweis art="rot" name="nicht-freigegeben">
           {MELDUNGEN.EMPFAENGER_NICHT_FREIGEGEBEN}
         </Hinweis>
       )}
-      {abweichend && wert && freigegeben && (
+      {abweichend && !formatFehler && freigegeben && (
         <div className="rounded-lg border border-credo-gelb/40 bg-credo-gelb/10 px-3 py-2" data-hinweis="abweichend">
           <p className="text-xs text-amber-900">
             Die Adresse weicht von der im Vorgang hinterlegten ab

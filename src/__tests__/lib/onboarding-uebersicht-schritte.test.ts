@@ -696,7 +696,6 @@ describe("Abschluss-Schritt: ein zusammengeführter Info-Satz", () => {
       modul: "ONBOARDING",
       status,
       empfaenger: "anna.beispiel@example.org",
-      empfaengerAbweichend: false,
       frist: "2026-10-02T00:00:00.000Z",
       nachricht: null,
       angefordertAm: "2026-09-18T08:00:00.000Z",

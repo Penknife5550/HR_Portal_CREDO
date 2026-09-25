@@ -47,7 +47,7 @@
 import type { DocumentType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ablaufKalendertag, istFristpflichtig, pruefeGueltigBis } from "@/lib/dokument-fristen";
-import { nachweiseAbgegeben } from "@/lib/onboarding-spuren";
+import { nachweiseAbgegeben, type MitarbeiterSpur } from "@/lib/onboarding-spuren";
 import {
   documentTypeLabel,
   effektivePflichtDokumente,
@@ -252,10 +252,36 @@ export const ONBOARDING_KATALOG: readonly string[] = SELECTABLE_DOCUMENT_TYPES.f
   (t) => !SAMMELARTEN.includes(t),
 );
 
+/**
+ * Warum sich fuer diesen Vorgang (noch) nichts nachfordern laesst, oder null.
+ * DIE Regel hinter `verfuegbar` — auch fuer Aufrufer ohne vollstaendigen
+ * Vorgang: Der Lauf `dokument-ablauf` waehlt damit den Satz seiner HR-Mail
+ * (`ONBOARDING_NACHFORDERUNG_GESPERRT_MAIL`), statt auf einen Knopf zu
+ * verweisen, den das Portal fuer diesen Vorgang gar nicht anbietet.
+ */
+export function onboardingNachforderungGesperrt(
+  v: MitarbeiterSpur,
+): keyof typeof ONBOARDING_NICHT_VERFUEGBAR | null {
+  if (v.status === "EXPIRED") return "VORGANG_EINGESTELLT";
+  if (!nachweiseAbgegeben(v)) return "FRAGEBOGEN_OFFEN";
+  return null;
+}
+
+/**
+ * Der Satz der HR-Mails `dokument-ablauf-warnung`/`dokument-abgelaufen`
+ * (`{{nachforderung_hinweis}}`), wenn „Unterlagen nachfordern" fuer den
+ * Vorgang gesperrt ist — statt der Handlungsanweisung Z3.
+ */
+export const ONBOARDING_NACHFORDERUNG_GESPERRT_MAIL: Readonly<Record<keyof typeof ONBOARDING_NICHT_VERFUEGBAR, string>> = {
+  FRAGEBOGEN_OFFEN:
+    "Die Person hat ihren Personalfragebogen noch nicht abgesendet: Den Nachweis lädt sie dort selbst hoch, mit seinem Ablaufdatum. „Unterlagen nachfordern“ steht erst danach bereit.",
+  VORGANG_EINGESTELLT:
+    "Der Vorgang ist abgelaufen und wird nicht mehr bearbeitet – über „Unterlagen nachfordern“ lässt sich dort nichts mehr anfordern. Ist die Person weiterhin beschäftigt, klären Sie den Nachweis bitte direkt mit ihr.",
+};
+
 function verfuegbar(v: OnboardingUnterlagenVorgang): { ok: true } | { ok: false; grund: string } {
-  if (v.eingestellt) return { ok: false, grund: ONBOARDING_NICHT_VERFUEGBAR.VORGANG_EINGESTELLT };
-  if (!nachweiseAbgegeben(v)) return { ok: false, grund: ONBOARDING_NICHT_VERFUEGBAR.FRAGEBOGEN_OFFEN };
-  return { ok: true };
+  const gesperrt = onboardingNachforderungGesperrt(v);
+  return gesperrt ? { ok: false, grund: ONBOARDING_NICHT_VERFUEGBAR[gesperrt] } : { ok: true };
 }
 
 /**

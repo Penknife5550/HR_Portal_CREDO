@@ -479,7 +479,6 @@ function nachforderung(teil: Partial<NachforderungEingabe> = {}): NachforderungE
     modul: "ONBOARDING",
     status: "LAUFEND",
     empfaenger: "anna.beispiel@example.org",
-    empfaengerAbweichend: false,
     frist: new Date("2026-09-26T00:00:00.000Z"),
     nachricht: null,
     angefordertAm: "2026-09-12T08:00:00.000Z",
@@ -541,9 +540,9 @@ const SATZ_OHNE_RECHT = "Die Personalabteilung kann sie über „Unterlagen nach
 /** Einige offene Arten sind frueher als entfallen vermerkt: Der Knopf kreuzt sie nicht an. */
 const SATZ_TEILS_ENTFALLEN =
   "Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie diese Nachweise hochlädt – außer den als entfallen vermerkten; die lassen sich im Dialog bei Bedarf dazunehmen.";
-/** Alle offenen Arten so vermerkt: kein Knopf im Kasten, der Weg fuehrt ueber die Karte. */
+/** Alle offenen Arten so vermerkt (frueher oder in der laufenden): kein Knopf im Kasten, der Weg fuehrt ueber die Karte. */
 const SATZ_ALLE_ENTFALLEN =
-  "Laut einer früheren Nachforderung sind sie als entfallen vermerkt; werden sie doch gebraucht, fordern Sie sie in der Karte „Unterlagen nachfordern“ im Reiter „Dokumente“ wieder an.";
+  "Laut Nachforderung sind sie als entfallen vermerkt; werden sie doch gebraucht, fordern Sie sie in der Karte „Unterlagen nachfordern“ im Reiter „Dokumente“ wieder an.";
 const GRUND_EINGESTELLT =
   "Der Vorgang ist abgelaufen und wird nicht mehr bearbeitet. Unterlagen lassen sich nicht mehr nachfordern.";
 
@@ -801,6 +800,48 @@ describe("Offene Nachweise: Paket 4 — Text, Stand, Knöpfe", () => {
     expect(kastenSatz()).not.toContain("schicken Sie");
   });
 
+  test("in der LAUFENDEN Nachforderung entfallen: kein „genau diese Nachweise“ — der Knopf kreuzt die Art nicht an", () => {
+    // Die Arbeitserlaubnis steht in der laufenden auf „Entfällt“, der
+    // Masernschutz fehlt dort ganz: „Ergänzen…“ kreuzt nur ihn an.
+    const laufendAeEntfallen = nachforderung({
+      positionen: [
+        position({ id: "p-ae", typ: "ARBEITSERLAUBNIS", status: "ENTFAELLT", entschiedenAm: "2026-09-14T08:00:00.000Z" }),
+      ],
+    });
+    const onNachfordern = jest.fn();
+    const nurZweiOffen = {
+      ...VIER_OFFEN,
+      documents: [dokument("AUFENTHALTSTITEL", "2030-01-01T00:00:00.000Z"), dokument("PKV_NACHWEIS")],
+    };
+    const { unmount } = render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...nurZweiOffen, unterlagen: uebersicht({ nachforderungen: [laufendAeEntfallen] }) })}
+        onZuDenDokumenten={null}
+        onNachfordern={onNachfordern}
+        onZurNachforderung={jest.fn()}
+      />,
+    );
+    expect(zeileVon("ARBEITSERLAUBNIS")).toContain("entfällt laut Nachforderung");
+    fireEvent.click(screen.getByRole("button", { name: "Ergänzen…" }));
+    expect(onNachfordern).toHaveBeenCalledWith({ modus: "ergaenzen", vorauswahl: ["MASERNSCHUTZ"] });
+    expect(kastenSatz()).toContain(SATZ_TEILS_ENTFALLEN);
+    expect(kastenSatz()).not.toContain("genau diese");
+    unmount();
+
+    // Ist sie die einzige offene Art: nur „Zur Nachforderung“, und der Satz nennt den Weg.
+    render(
+      <OffeneNachweiseKasten
+        data={vorgang({ ...NUR_AE_OFFEN, unterlagen: uebersicht({ nachforderungen: [laufendAeEntfallen] }) })}
+        onZuDenDokumenten={null}
+        onNachfordern={jest.fn()}
+        onZurNachforderung={jest.fn()}
+      />,
+    );
+    expect(kastenKnoepfe()).toEqual(["Zur Nachforderung"]);
+    expect(kastenSatz()).toContain(SATZ_ALLE_ENTFALLEN);
+    expect(kastenSatz()).not.toContain("genau diese");
+  });
+
   test("früher entfallen, ohne Recht: der Satz über die Personalabteilung bleibt", () => {
     render(
       <OffeneNachweiseKasten
@@ -936,7 +977,6 @@ describe("Kasten und Warnbalken öffnen den echten Dialog", () => {
   function dialogAus(anfrage: NachforderungDialogAnfrage, u: UnterlagenUebersicht) {
     return render(
       <NachforderungDialog
-        vorgangId="v1"
         uebersicht={u}
         modus={anfrage.modus}
         vorauswahl={anfrage.vorauswahl}

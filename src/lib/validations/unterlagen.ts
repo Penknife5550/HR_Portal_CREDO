@@ -362,8 +362,6 @@ export const dokumentFristPatchSchema = z
     }
   });
 
-export type DokumentFristPatchInput = z.infer<typeof dokumentFristPatchSchema>;
-
 // =============================================
 // Oeffentliche Upload-Seite (Token)
 // =============================================
@@ -382,8 +380,6 @@ export const gueltigBisPatchSchema = z.object(
   KEIN_OBJEKT,
 );
 
-export type GueltigBisPatchInput = z.infer<typeof gueltigBisPatchSchema>;
-
 /**
  * POST /api/unterlagen/[token]/uebermitteln — die Seite schickt die Daten
  * „Gültig bis" mit, damit sie in DERSELBEN Transaktion gespeichert werden
@@ -400,8 +396,6 @@ export const uebermittelnSchema = z.object(
   },
   KEIN_OBJEKT,
 );
-
-export type UebermittelnInput = z.infer<typeof uebermittelnSchema>;
 
 // =============================================
 // Body lesen

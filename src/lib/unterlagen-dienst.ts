@@ -111,6 +111,7 @@ import type { Prisma } from "@prisma/client";
 import { VORLAGE_DEAKTIVIERT_DETAIL } from "@/lib/abteilungsaufgaben";
 import { prisma } from "@/lib/db";
 import { ladeErlaubteDomains } from "@/lib/empfaenger-allowlist";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 import { empfaengerFreigegeben } from "@/lib/empfaenger-freigabe";
 import { betreffMitVerschachteltenMarkern, getEventDefinition, verboteneBetreffVariablen } from "@/lib/events";
 import { portalCsp } from "@/lib/content-security-policy";
@@ -145,8 +146,10 @@ import {
   type AnfordernAntwort,
   type AuswahlEintrag,
   type EmpfaengerVorschlag,
+  type EntwertungGrund,
   type ErneutSendenAntwort,
   type LinkAnlass,
+  type MailStatus,
   type NachforderungEingabe,
   type NachforderungsAktionAntwort,
   type NachforderungStatus,
@@ -392,19 +395,6 @@ function fehler(
   extra: Pick<UnterlagenFehlerAntwort, "typ" | "hinweis" | "sperreBis"> = {},
 ): UnterlagenDienstAntwort {
   return { status, body: { error: text, ...(grund ? { grund } : {}), ...extra } satisfies UnterlagenFehlerAntwort };
-}
-
-/**
- * Fuer die Konsole: nur `code ?? name`, nie die Meldung (sie kann Adressen
- * oder Pfade tragen, Abschnitt 11). Auch die Routen des Pakets loggen damit.
- */
-export function fehlerKennung(err: unknown): string {
-  if (typeof err === "object" && err !== null) {
-    const { code, name } = err as { code?: unknown; name?: unknown };
-    if (code !== undefined && code !== null) return String(code);
-    if (typeof name === "string") return name;
-  }
-  return "unbekannt";
 }
 
 /** P2002 auf einem bestimmten Unique-Index (nur ueber den Code, wie api/onboarding/route.ts). */
@@ -659,7 +649,7 @@ async function linkErgebnisSpeichern(
   merker?: PersonenMailMerker,
 ): Promise<boolean> {
   const data: Prisma.UnterlagenLinkUpdateManyMutationInput = {
-    mailStatus: ergebnis.status,
+    mailStatus: ergebnis.status satisfies MailStatus,
     mailDetail: ergebnis.status === "SENT" ? null : kuerzen(ergebnis.detail),
     messageId: ergebnis.status === "SENT" ? (ergebnis.messageId ?? null) : null,
     ...(ergebnis.status === "SENT" ? { gesendetAm: jetzt } : {}),
@@ -669,11 +659,11 @@ async function linkErgebnisSpeichern(
     try {
       if (merker && status !== "FAILED") {
         await prisma.$transaction(async (tx) => {
-          await tx.unterlagenLink.updateMany({ where: { id: linkId, mailStatus: "AUSSTEHEND" }, data });
+          await tx.unterlagenLink.updateMany({ where: { id: linkId, mailStatus: "AUSSTEHEND" satisfies MailStatus }, data });
           await merker(tx, status);
         });
       } else {
-        await prisma.unterlagenLink.updateMany({ where: { id: linkId, mailStatus: "AUSSTEHEND" }, data });
+        await prisma.unterlagenLink.updateMany({ where: { id: linkId, mailStatus: "AUSSTEHEND" satisfies MailStatus }, data });
       }
       return true;
     } catch (err) {
@@ -1073,6 +1063,21 @@ function nachforderungLaden(
     where: { id, ...ctx.baustein.bereichWhere(ctx.v.id) },
     select: AKTION_AUSWAHL,
   });
+}
+
+/**
+ * Die Zeit UNTER einer Zeilensperre — fuer Zeitstempel, die gegeneinander
+ * verglichen werden: `entwertetAm` eines Adresswechsels und `hochgeladenAm`
+ * eines Entwurfs (`entwuerfeAb`, U-17). `jetzt` ist der Anfang der Anfrage;
+ * dazwischen liegen Abfragen und das Warten auf die Sperre. Nimmt jeder Weg
+ * seinen Zeitstempel erst NACH der Sperre, bestimmt die Reihenfolge der
+ * Sperre die Reihenfolge der Zeitstempel: Ein Upload ueber den alten Link,
+ * der die Sperre vor HR bekam, liegt sicher VOR der Entwertung.
+ *
+ * Nie frueher als `jetzt` (Tests mit fester Uhr).
+ */
+export function zeitpunktUnterSperre(jetzt: Date): Date {
+  return new Date(Math.max(jetzt.getTime(), Date.now()));
 }
 
 /** Sperre des Vorgangs; bei EXPIRED (auch gerade erst gesetzt) Abbruch mit 409 (EP-3). */
@@ -1557,7 +1562,7 @@ export async function fruehereLinksSperrenIn(
 ): Promise<number> {
   const r = await tx.unterlagenLink.updateMany({
     where: { nachforderungId, id: { not: neuerLinkId }, entwertetAm: null },
-    data: { entwertetAm: jetzt, entwertetGrund: "GESPERRT" },
+    data: { entwertetAm: jetzt, entwertetGrund: "GESPERRT" satisfies EntwertungGrund },
   });
   return r.count;
 }
@@ -1640,9 +1645,12 @@ async function erneutSenden(ctx: AktionsKontext, e: Aktion<"erneut-senden">): Pr
         data: { empfaenger: empfaenger.adresse, empfaengerVorgang: v.email, empfaengerAbweichend: empfaenger.abweichend },
       });
       // Sofort und VOR dem neuen Link: Die alte Adresse darf nichts mehr erreichen.
+      // Der Zeitpunkt unter der Sperre der Nachforderung, nicht `ctx.jetzt`:
+      // Er ist die Grenze „eigene Entwürfe" (U-17) — ein Upload ueber den
+      // alten Link, der die Sperre vor uns bekam, muss davor liegen.
       const r = await tx.unterlagenLink.updateMany({
         where: { nachforderungId: frisch.id, entwertetAm: null },
-        data: { entwertetAm: ctx.jetzt, entwertetGrund: "ADRESSE" },
+        data: { entwertetAm: zeitpunktUnterSperre(ctx.jetzt), entwertetGrund: "ADRESSE" satisfies EntwertungGrund },
       });
       entwertet = r.count;
     }
@@ -2886,7 +2894,6 @@ const UEBERSICHT_AUSWAHL = {
   modul: true,
   status: true,
   empfaenger: true,
-  empfaengerAbweichend: true,
   frist: true,
   nachricht: true,
   angefordertAm: true,
@@ -2962,7 +2969,6 @@ function nachforderungEingabe(z: UebersichtZeile): NachforderungEingabe {
     modul: z.modul,
     status: z.status,
     empfaenger: z.empfaenger,
-    empfaengerAbweichend: z.empfaengerAbweichend,
     frist: z.frist,
     nachricht: z.nachricht,
     angefordertAm: z.angefordertAm,

@@ -21,7 +21,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { fehlerKennung, unterlagenPositionsAktionAusfuehren } from "@/lib/unterlagen-dienst";
+import { fehlerKennung } from "@/lib/fehler-kennung";
+import { unterlagenPositionsAktionAusfuehren } from "@/lib/unterlagen-dienst";
 import { jsonKoerperPruefen, positionsAktionSchema } from "@/lib/validations/unterlagen";
 
 export async function POST(

@@ -86,6 +86,17 @@
  * mahnt dann nicht mehr; der alte Titel wird trotzdem als abgelaufen gefuehrt
  * (das Datum ist eine Tatsache). Ein abgelehnter Scan belegt auch hier nichts.
  *
+ * ## Handlungsanweisung nur, wo das Portal sie anbietet (Paket 4, Z3)
+ *
+ * Beide Vorlagen verweisen HR auf „Unterlagen nachfordern" — aber nur, wenn
+ * das fuer den Vorgang auch geht (`nachforderung_moeglich`). Weil der Lauf
+ * nicht nach dem Vorgangsstatus filtert (siehe oben), mahnt er auch bei einem
+ * EXPIRED-Vorgang und bei offenem Fragebogen; dort lehnt der Dienst die
+ * Nachforderung ab (409). Die Mail nennt dann den Grund
+ * (`nachforderung_gesperrt`, `nachforderung_hinweis`) aus derselben Regel wie
+ * die Karte (`onboardingNachforderungGesperrt`). Welche Mails hinausgehen,
+ * aendert sich dadurch nicht.
+ *
  * ## Kein Dateiname in der Mail
  *
  * `dokument_datei` traegt seit Paket 4 KEINEN Dateinamen mehr: Ein
@@ -116,6 +127,10 @@ import {
 } from "@/lib/dokument-fristen";
 import { berlinerKalendertag, formatiere, heuteInBerlin, tageSpaeter } from "@/lib/minijob-fristen";
 import { MITARBEITER_NEUTRAL, mitarbeiterName } from "@/lib/onboarding-spuren";
+import {
+  ONBOARDING_NACHFORDERUNG_GESPERRT_MAIL,
+  onboardingNachforderungGesperrt,
+} from "@/lib/unterlagen-onboarding";
 import type { EventEmailResult } from "@/lib/mailer";
 
 const MS_PER_DAY = 86400000;
@@ -261,10 +276,13 @@ export async function POST(request: NextRequest) {
             firstName: true,
             lastName: true,
             email: true,
+            // Ob „Unterlagen nachfordern" fuer den Vorgang geht (Z3, Kopfkommentar).
+            status: true,
+            submittedAt: true,
             organization: { select: { name: true } },
             // Name aus dem Fragebogen zuerst (mitarbeiterName), sonst der
-            // Name am Vorgang.
-            personalData: { select: { firstName: true, lastName: true } },
+            // Name am Vorgang; `isComplete` fuer die Nachforderung (Altfall).
+            personalData: { select: { firstName: true, lastName: true, isComplete: true } },
             // Z1: die Arten, fuer die ein ausdruecklich unbefristetes Dokument
             // vorliegt — dann mahnt der Lauf fuer diese Art nicht mehr.
             documents: {
@@ -394,6 +412,8 @@ export async function POST(request: NextRequest) {
         // fiele in `extractVariables` (mailer.ts) auf andere Payload-Felder
         // zurueck.
         const name = mitarbeiterName(doc.onboarding) ?? MITARBEITER_NEUTRAL;
+        // Z3 nur, wo das Portal die Nachforderung anbietet (Kopfkommentar).
+        const gesperrt = onboardingNachforderungGesperrt(doc.onboarding);
 
         // Die Adresse der beschaeftigten Person heisst hier bewusst
         // `mitarbeiter_email` und NICHT `email`: Der Mailer loest `{{email}}`
@@ -420,6 +440,11 @@ export async function POST(request: NextRequest) {
           tage_ueberfaellig: Math.max(0, -tage),
           dringlichkeit: ABLAUF_KATEGORIE_META[kategorie].label,
           frist_text: ampel.text,
+          // Merker als Zeichenketten ("ja"/"") — renderTemplate kennt nur
+          // „nicht leer" und keinen Negativ-Block, deshalb zwei Merker.
+          nachforderung_moeglich: gesperrt ? "" : "ja",
+          nachforderung_gesperrt: gesperrt ? "ja" : "",
+          nachforderung_hinweis: gesperrt ? ONBOARDING_NACHFORDERUNG_GESPERRT_MAIL[gesperrt] : "",
           portalLink: `${getBaseUrl()}/dashboard/${doc.onboardingId}`,
         };
 

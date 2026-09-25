@@ -31,7 +31,7 @@
  */
 import { useState } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { adresseGleich } from "@/components/unterlagen/aktionen";
+import { ADRESS_TEXTE, adresseGleich } from "@/components/unterlagen/aktionen";
 import {
   AnnahmeZuruecknehmenDialog,
   AnnehmenDialog,
@@ -122,7 +122,6 @@ function nachforderung(teil: Partial<NachforderungEingabe> = {}): NachforderungE
     modul: "ONBOARDING",
     status: "LAUFEND",
     empfaenger: "anna.beispiel@example.org",
-    empfaengerAbweichend: false,
     frist: new Date("2026-09-26T00:00:00.000Z"),
     nachricht: null,
     angefordertAm: "2026-09-12T08:00:00.000Z",
@@ -395,6 +394,7 @@ describe("Zurückweisen (EP-1, E-2)", () => {
         position={p}
         frist={a.dialog.zurueckweisenFrist}
         grenzen={a.dialog.fristGrenzen}
+        jetzt={JETZT}
         onAbbrechen={() => {}}
         onBestaetigen={onBestaetigen}
       />,
@@ -602,6 +602,25 @@ describe("Annahme zurücknehmen (E-3)", () => {
       />,
     );
     expect(folgen()).toContain("Die Nachforderung läuft danach wieder.");
+    expect(a.dialog.ruecknahmeFolge).toBeNull();
+  });
+
+  it("eingestellter Vorgang (EXPIRED): die Rückfrage nennt VORHER, dass der nächste Lauf zurückzieht (Z2)", () => {
+    const teil = { status: "ERLEDIGT", erledigtAm: "2026-09-16T08:00:00.000Z", positionen: [angenommen] };
+    const a = ansicht(teil, { vorgangEingestellt: true });
+    expect(a.dialog.ruecknahmeFolge).toBe(MELDUNGEN.RUECKNAHME_VORGANG_EINGESTELLT);
+    render(
+      <AnnahmeZuruecknehmenDialog
+        position={a.positionen[0]}
+        nachforderungErledigt={a.status === "ERLEDIGT"}
+        zusatzFolge={a.dialog.ruecknahmeFolge}
+        onAbbrechen={() => {}}
+        onBestaetigen={() => {}}
+      />,
+    );
+    expect(folgen()).toContain("Die Nachforderung läuft danach wieder.");
+    expect(folgen()).toContain("zieht der Lauf die Nachforderung zurück");
+    expect(folgen()).toContain("verworfen und nach 30 Tagen gelöscht");
   });
 });
 
@@ -609,16 +628,19 @@ describe("Frist ändern", () => {
   it("mit Wartendem: E-Mail mit neuem Link; Erinnerungssatz aus der Regel", () => {
     const a = ansicht();
     const onBestaetigen = jest.fn();
-    render(<FristAendernDialog nachforderung={a} onAbbrechen={() => {}} onBestaetigen={onBestaetigen} />);
+    render(<FristAendernDialog nachforderung={a} jetzt={JETZT} onAbbrechen={() => {}} onBestaetigen={onBestaetigen} />);
     expect(document.querySelector('[data-zeile="mail"]')?.textContent).toBe(
       "Die Person erhält eine E-Mail mit der neuen Frist und einem neuen Link.",
     );
     const feld = screen.getByLabelText("Neue Frist") as HTMLInputElement;
     // Vorschlag heute + 14 (EP-5).
     expect(feld.value).toBe(a.dialog.fristGrenzen.vorschlag);
-    expect(document.querySelector('[data-zeile="erinnerung"]')?.textContent).toBe(
-      dialogErinnerungsSatz(a.dialog.fristGrenzen.vorschlag, "2026-09-21"),
-    );
+    // Die Mail „Frist verstrichen" geht an die ANFORDERNDE HR-Kraft — nicht an
+    // „Sie", wenn eine andere HR-Kraft die Frist aendert (8.1).
+    const satz = document.querySelector('[data-zeile="erinnerung"]')?.textContent;
+    expect(satz).toBe(dialogErinnerungsSatz(a.dialog.fristGrenzen.vorschlag, "2026-09-21", "ANFORDERNDE"));
+    expect(satz).toContain("erhält die anfordernde HR-Kraft eine E-Mail");
+    expect(satz).not.toContain("erhalten Sie");
     fireEvent.click(bestaetigenKnopf("Frist ändern"));
     expect(nachforderungsBody(onBestaetigen)).toEqual({
       aktion: "frist-aendern",
@@ -627,9 +649,19 @@ describe("Frist ändern", () => {
     });
   });
 
+  it("Seite ueber Mitternacht offen: Grenzen und Pruefung nach dem Tag im Browser (keine 400 FRIST_ZU_FRUEH)", () => {
+    const a = ansicht(); // Uebersicht vom 21.09.
+    const nachMitternacht = new Date("2026-09-21T22:05:00.000Z"); // 22.09., 00:05 Uhr in Berlin
+    render(<FristAendernDialog nachforderung={a} jetzt={nachMitternacht} onAbbrechen={() => {}} onBestaetigen={() => {}} />);
+    const feld = screen.getByLabelText("Neue Frist") as HTMLInputElement;
+    expect(feld.min).toBe("2026-09-23");
+    fireEvent.change(feld, { target: { value: "2026-09-22" } });
+    expect(bestaetigenKnopf("Frist ändern").disabled).toBe(true);
+  });
+
   it("dieselbe Frist sperrt mit dem Text des Servers", () => {
     const a = ansicht();
-    render(<FristAendernDialog nachforderung={a} onAbbrechen={() => {}} onBestaetigen={() => {}} />);
+    render(<FristAendernDialog nachforderung={a} jetzt={JETZT} onAbbrechen={() => {}} onBestaetigen={() => {}} />);
     fireEvent.change(screen.getByLabelText("Neue Frist"), { target: { value: "2026-09-26" } });
     expect(bestaetigenKnopf("Frist ändern").disabled).toBe(true);
     expect(document.querySelector('[data-zeile="grund"]')?.textContent).toBe(MELDUNGEN.FRIST_UNVERAENDERT);
@@ -637,7 +669,7 @@ describe("Frist ändern", () => {
 
   it("ohne Wartendes: keine E-Mail — und kein Satz über Erinnerungen, die der Lauf nie verschickt", () => {
     const a = ansicht({ positionen: [TITEL] });
-    render(<FristAendernDialog nachforderung={a} onAbbrechen={() => {}} onBestaetigen={() => {}} />);
+    render(<FristAendernDialog nachforderung={a} jetzt={JETZT} onAbbrechen={() => {}} onBestaetigen={() => {}} />);
     expect(document.querySelector('[data-zeile="mail"]')?.textContent).toContain("sie erhält keine E-Mail");
     // Die gewaehlte Frist ist gueltig — der Satz fehlt also nur, weil nichts auf die Person wartet.
     expect(bestaetigenKnopf("Frist ändern").disabled).toBe(false);
@@ -679,6 +711,19 @@ describe("Link erneut senden (EP-16, E-5)", () => {
     });
   });
 
+  it("ungueltige Adresse: gesperrt mit Grund, bevor der Server 400 sagt — wie im Dialog „Unterlagen nachfordern…“", () => {
+    zeige();
+    fireEvent.change(adressfeld(), { target: { value: "anna.beispiel@" } });
+    expect(bestaetigenKnopf("Link erneut senden").disabled).toBe(true);
+    expect(document.querySelector('[data-zeile="grund"]')?.textContent).toBe(ADRESS_TEXTE.EMAIL_UNGUELTIG);
+    // Rot („nicht freigegeben") und Gelb („weicht ab") erst fuer eine Adresse in gueltiger Form.
+    expect(hinweis("nicht-freigegeben")).toBeNull();
+    expect(hinweis("abweichend")).toBeNull();
+    expect(adressfeld().getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(adressfeld(), { target: { value: "" } });
+    expect(document.querySelector('[data-zeile="grund"]')?.textContent).toBe(ADRESS_TEXTE.EMAIL_FEHLT);
+  });
+
   it("nicht freigegebene Adresse: rot und gesperrt", () => {
     zeige();
     fireEvent.change(adressfeld(), { target: { value: "jemand@gmail.com" } });
@@ -689,7 +734,7 @@ describe("Link erneut senden (EP-16, E-5)", () => {
   });
 
   it("zurück auf die Adresse des Vorgangs: keine Bestätigung nötig", () => {
-    const a = ansicht({ empfaenger: "privat@credo-gruppe.de", empfaengerAbweichend: true });
+    const a = ansicht({ empfaenger: "privat@credo-gruppe.de" });
     const onBestaetigen = zeige(a);
     fireEvent.change(adressfeld(), { target: { value: "Anna.Beispiel@example.org " } });
     expect(hinweis("abweichend")).toBeNull();

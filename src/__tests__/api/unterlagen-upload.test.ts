@@ -1562,6 +1562,27 @@ describe("Adresswechsel — der neue Link sieht nur die eigenen Entwuerfe", () =
     expect(res.status).toBe(201);
     expect((await res.json()).position.entwuerfe).toHaveLength(1);
   });
+
+  it("`hochgeladenAm` ist der Zeitpunkt UNTER der Sperre, nicht der Anfang der Anfrage", async () => {
+    // Die Grenze „eigene Entwürfe" vergleicht `hochgeladenAm` mit `entwertetAm`
+    // eines Adresswechsels, den HR unter derselben Zeilensperre stempelt. Mit
+    // dem Anfang der Anfrage laege ein Upload, der die Sperre VOR HR bekam,
+    // womoeglich hinter der Entwertung — und zaehlte als eigener Entwurf der
+    // neuen Adresse.
+    const { positionen } = szenario();
+    const UNTER_DER_SPERRE = Date.now() + 60_000;
+    let uhr = Date.now();
+    const jetztSpion = jest.spyOn(Date, "now").mockImplementation(() => uhr);
+    udb.vorTransaktion = () => {
+      uhr = UNTER_DER_SPERRE; // die Sperre war belegt
+    };
+    try {
+      expect((await hochladen(positionen[0].id as string, [alsDatei(PDF)])).status).toBe(201);
+    } finally {
+      jetztSpion.mockRestore();
+    }
+    expect(udb.dateien).toEqual([expect.objectContaining({ hochgeladenAm: new Date(UNTER_DER_SPERRE) })]);
+  });
 });
 
 // =============================================

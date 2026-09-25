@@ -37,7 +37,7 @@ import type { UnterlagenMeldung } from "@/components/unterlagen/aktionen";
 import { NachforderungDialog } from "@/components/unterlagen/nachforderung-dialog";
 import { NachforderungKarte, UnterlagenMeldungen } from "@/components/unterlagen/nachforderung-karte";
 import {
-  frueherEntfallen,
+  alsEntfallenVermerkt,
   nachweisStandText,
   offeneNachweiseAktion,
   warnbalkenAktion,
@@ -2251,9 +2251,11 @@ export function OffeneNachweiseKasten({
   const mitRecht = !!onNachfordern && !!unterlagen?.darfAktionen;
   const anfrage = mitRecht ? aktion.anfrage : null;
   const zurKarte = onZurNachforderung && aktion.zurNachforderung ? onZurNachforderung : null;
-  // Frueher als entfallen vermerkte Arten kreuzt kein Knopf an (dieselbe Regel
-  // wie im Dialog) — der Satz sagt das, statt „genau diese Nachweise" zuzusagen.
-  const entfallen = offen.filter((typ) => frueherEntfallen(typ, unterlagen)).length;
+  // Als entfallen vermerkte Arten kreuzt kein Knopf an — frueher entfallene
+  // nicht (dieselbe Regel wie im Dialog), in der laufenden entfallene nicht,
+  // weil sie dort schon stehen. Der Satz sagt das, statt „genau diese
+  // Nachweise" zuzusagen.
+  const entfallen = offen.filter((typ) => alsEntfallenVermerkt(typ, unterlagen)).length;
   const wegSatz = nachforderungsSatz(aktion, mitRecht, {
     aufforderung:
       entfallen === 0
@@ -2373,15 +2375,17 @@ export function verlaengerungVorauswahl(dringendeTypen: readonly string[]): stri
 /** Die Saetze von Kasten und Warnbalken zum Weg ueber „Unterlagen nachfordern" (P:1285). */
 const NACHFORDERN_SAETZE = {
   KASTEN: "Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie genau diese Nachweise hochlädt.",
-  // Frueher als entfallen vermerkte Arten kreuzt der Dialog nicht an
-  // (`frueherEntfallen`); „genau diese" stimmte dann nicht mehr.
+  // Als entfallen vermerkte Arten kreuzt kein Knopf an (`alsEntfallenVermerkt`,
+  // frueher oder in der laufenden); „genau diese" stimmte dann nicht mehr.
   KASTEN_TEILS_ENTFALLEN:
     "Mit „Unterlagen nachfordern“ schicken Sie der Person einen Link, über den sie diese Nachweise hochlädt – außer den als entfallen vermerkten; die lassen sich im Dialog bei Bedarf dazunehmen.",
   // Alle so vermerkt: Der Kasten hat keinen Knopf (nichts vorzukreuzen), der
   // Weg fuehrt ueber die Karte — ohne laufende „Unterlagen nachfordern…", mit
   // laufender „Unterlagen ergänzen…".
+  // Ohne „früheren": Auch eine in der LAUFENDEN Nachforderung entfallene Art
+  // zaehlt; die Zeile darunter nennt je Art, wann sie vermerkt wurde.
   KASTEN_ALLE_ENTFALLEN:
-    "Laut einer früheren Nachforderung sind sie als entfallen vermerkt; werden sie doch gebraucht, fordern Sie sie in der Karte „Unterlagen nachfordern“ im Reiter „Dokumente“ wieder an.",
+    "Laut Nachforderung sind sie als entfallen vermerkt; werden sie doch gebraucht, fordern Sie sie in der Karte „Unterlagen nachfordern“ im Reiter „Dokumente“ wieder an.",
   KASTEN_OHNE_RECHT: "Die Personalabteilung kann sie über „Unterlagen nachfordern“ bei der Person anfordern.",
   // „Annehmen" allein genuegt nicht: Ohne Datum verdraengt der neue Nachweis
   // den abgelaufenen nie (`nachweisLagen`, Z1 „Datum später nachtragen").
@@ -3189,7 +3193,6 @@ export function TabDocuments({
               ueber einer neuen roten. */}
           <NachforderungKarte
             uebersicht={unterlagen}
-            vorgangId={onboardingId}
             darfAktionen={canEdit}
             onAktualisiert={() => {
               onUnterlagenMeldungSchliessen();
@@ -3201,7 +3204,6 @@ export function TabDocuments({
       )}
       {canEdit && unterlagen?.darfAktionen && nachforderungDialog && (
         <NachforderungDialog
-          vorgangId={onboardingId}
           uebersicht={unterlagen}
           modus={nachforderungDialog.modus}
           vorauswahl={nachforderungDialog.vorauswahl}

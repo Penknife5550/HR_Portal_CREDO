@@ -14,11 +14,15 @@
 
 /** Laesst den naechsten fs.link-Aufruf mit diesem Code scheitern (EXDEV: anderes Volume). */
 let mockLinkFehler: string | null = null;
+/** Je fs.link-Aufruf eine Aufgabe VOR dem echten Link — z. B. „ein Entfernen raeumt den leeren Ordner ab". */
+let mockVorLink: Array<() => Promise<unknown>> = [];
 jest.mock("fs/promises", () => {
   const echt = jest.requireActual("fs/promises");
   return {
     ...echt,
-    link: (...args: [string, string]) => {
+    link: async (...args: [string, string]) => {
+      const vorher = mockVorLink.shift();
+      if (vorher) await vorher();
       if (mockLinkFehler) {
         const code = mockLinkFehler;
         mockLinkFehler = null;
@@ -67,6 +71,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  mockVorLink = [];
   cwd.mockRestore();
   jest.restoreAllMocks();
   await rm(basis, { recursive: true, force: true });
@@ -247,6 +252,41 @@ describe("Uebernahme und Ruecknahme", () => {
     expect(await vorgangsKopieLoeschen(quelle, VORGANG)).toBe("fehler");
     expect(await vorgangsKopieLoeschen(kopie, VORGANG)).toBe("geloescht");
     expect(await gibtEs(quelle)).toBe(true);
+  });
+
+  it("zurueckVerknuepfen: raeumt ein gleichzeitiges „Entfernen“ den Ordner ab, legt ein neuer Versuch ihn wieder an", async () => {
+    // Zwischen zielVerzeichnisPruefen (mkdir) und link: rmdir des leeren
+    // Ordners der Nachforderung (entwuerfeLoeschen nach dem Commit) — frueher 500.
+    const kopie = `uploads/${VORGANG}/${DATEI}.pdf`;
+    await ablegen(kopie);
+    mockVorLink = [() => rm(abs(`uploads/unterlagen/${NF}`), { recursive: true, force: true })];
+    const r = await zurueckVerknuepfen({
+      dokumentPfad: kopie,
+      vorgangId: VORGANG,
+      nachforderungId: NF,
+      dateiId: DATEI,
+      mimeType: "application/pdf",
+      sha256: sha(INHALT),
+    });
+    expect(r).toEqual({ speicherPfad: quelle, neu: true });
+    expect(await readFile(abs(quelle))).toEqual(INHALT);
+    expect(mockVorLink).toEqual([]);
+  });
+
+  it("verknuepfenInVorgang: verschwindet die QUELLE vor dem Link → DATEI_FEHLT (409), kein weiterer Versuch", async () => {
+    await ablegen(quelle);
+    mockVorLink = [() => rm(abs(quelle))];
+    await expect(
+      verknuepfenInVorgang({
+        speicherPfad: quelle,
+        nachforderungId: NF,
+        vorgangId: VORGANG,
+        dateiId: DATEI,
+        mimeType: "application/pdf",
+        sha256: sha(INHALT),
+      }),
+    ).rejects.toMatchObject({ code: "DATEI_FEHLT" });
+    expect(await gibtEs(`uploads/${VORGANG}/${DATEI}.pdf`)).toBe(false);
   });
 
   it("zurueckVerknuepfen: veraenderte Vorgangskopie → DATEI_VERAENDERT", async () => {

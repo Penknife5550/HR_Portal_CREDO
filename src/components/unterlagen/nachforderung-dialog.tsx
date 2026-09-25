@@ -55,21 +55,21 @@
  */
 
 import { useEffect, useId, useRef, useState } from "react";
-import { adresseGleich, saetze, unterlagenAktionSenden, unterlagenApiBasis } from "@/components/unterlagen/aktionen";
+import {
+  ADRESS_TEXTE,
+  adresseGleich,
+  adressFormatFehler,
+  dialogHeute,
+  saetze,
+  unterlagenAktionSenden,
+} from "@/components/unterlagen/aktionen";
 import { DialogRahmen } from "@/components/unterlagen/dialog-rahmen";
 import { empfaengerFreigegeben } from "@/lib/empfaenger-freigabe";
-import {
-  formatKalendertag,
-  formatKalendertagLang,
-  heuteInBerlin,
-  istKalendertag,
-  tageSpaeter,
-} from "@/lib/kalendertag";
+import { formatKalendertag, formatKalendertagLang, istKalendertag } from "@/lib/kalendertag";
 import {
   BEZEICHNUNG_MAX,
   dialogErinnerungsSatz,
   eingabePruefen,
-  FRIST_MIN_TAGE,
   fristGrenzen,
   fristPruefen,
   fristWochenendeHinweis,
@@ -112,8 +112,7 @@ export type ErgaenzenBody = {
 };
 
 export interface NachforderungDialogProps {
-  vorgangId: string;
-  /** `unterlagen` aus GET /api/onboarding/[id] — Auswahl und Adressen in `dialog`. */
+  /** `unterlagen` aus GET /api/onboarding/[id] — Auswahl, Adressen und `apiBasis` (nur mit Bearbeitungsrecht). */
   uebersicht: UnterlagenUebersicht;
   modus: "neu" | "ergaenzen";
   /**
@@ -159,11 +158,8 @@ const TEXTE = {
   // gibt es keine Domain-Schranke zu nennen, nur die Bestaetigung.
   AUS_DEM_VORGANG_OHNE_LISTE: "Aus dem Vorgang. Eine andere Adresse müssen Sie ausdrücklich als geprüft bestätigen.",
   EMPFAENGER_ERGAENZEN: "Die Adresse ändern Sie über „Link erneut senden“.",
-  EMAIL_FEHLT: "Bitte geben Sie eine E-Mail-Adresse an.",
-  EMAIL_UNGUELTIG: "Bitte geben Sie eine gültige E-Mail-Adresse an.",
-  NICHT_FREIGEGEBEN_KURZ: "Diese Adresse ist nicht freigegeben.",
+  ...ADRESS_TEXTE,
   DATEN_FEHLEN: "Die Auswahl der Unterlagen fehlt. Bitte laden Sie die Seite neu.",
-  KEINE_ROUTE: "Für diesen Vorgang lassen sich keine Unterlagen nachfordern.",
   BEZEICHNUNG_FEHLT: "Bitte geben Sie jeder weiteren Unterlage eine Bezeichnung oder entfernen Sie die leere Zeile.",
   FREIE_ZEILEN: "Für Unterlagen, die oben fehlen. Bitte keine Gesundheitsdaten über freie Zeilen anfordern.",
   SENSIBEL_HINWEIS: "Erscheint nur auf der Upload-Seite, nicht in der E-Mail.",
@@ -194,8 +190,6 @@ const TEXTE = {
     "Über „Link erneut senden“ in der Karte können Sie die E-Mail auch selbst noch einmal senden, bei Bedarf an eine korrigierte Adresse.",
 } as const;
 
-const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const EINGABE =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-base outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:opacity-60 sm:text-sm";
 const UEBERSCHRIFT = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
@@ -210,19 +204,13 @@ function anzahlText(n: number, weitere: boolean): string {
   return `${n} ${n === 1 ? "Unterlage" : "Unterlagen"}`;
 }
 
-/** Der heutige Tag, wie der Server ihn beim Bauen der Uebersicht sah: morgen ist die frueheste Frist (EP-5). */
-function heuteAus(grenzen: FristGrenzen): Kalendertag {
-  return tageSpaeter(grenzen.min, -FRIST_MIN_TAGE);
-}
-
 /**
  * Der Info-Satz zur Frist (KO-K3). Beim Ergaenzen bleibt die anfordernde
  * Person dieselbe (8.1): Die Meldung zum Fristablauf geht an sie, nicht an
- * „Sie", wenn eine andere HR-Kraft ergaenzt.
+ * „Sie", wenn eine andere HR-Kraft ergaenzt (`dialogErinnerungsSatz`).
  */
 function erinnerungsSatz(frist: Kalendertag, heute: Kalendertag, ergaenzen: boolean): string {
-  const satz = dialogErinnerungsSatz(frist, heute);
-  return ergaenzen ? satz.replace(/erhalten Sie eine E-Mail/g, "erhält die anfordernde HR-Kraft eine E-Mail") : satz;
+  return dialogErinnerungsSatz(frist, heute, ergaenzen ? "ANFORDERNDE" : "SIE");
 }
 
 /**
@@ -347,7 +335,6 @@ interface FreieZeile {
 // =============================================
 
 export function NachforderungDialog({
-  vorgangId,
   uebersicht,
   modus,
   vorauswahl,
@@ -361,18 +348,14 @@ export function NachforderungDialog({
   const ergaenzen = modus === "ergaenzen";
   const daten = uebersicht.dialog;
   const laufend = uebersicht.laufend;
-  // Wie die Karte: die Basis der HR-Routen vom Server, sonst die des Moduls.
-  const basis = uebersicht.apiBasis ?? unterlagenApiBasis(uebersicht.modul, vorgangId);
+  // Wie die Karte: die Basis der HR-Routen vom Server — ohne sie (kein
+  // Bearbeitungsrecht) fehlen auch die Dialogdaten, der Knopf bleibt gesperrt.
+  const basis = uebersicht.apiBasis;
 
   // Heute wie der Server (aus einer Nachforderung der Uebersicht), aber nie
-  // frueher als der Berliner Tag im Browser: Steht die Seite ueber Mitternacht
-  // offen, ist der Tag des Servers von gestern — Untergrenze und Info-Satz
-  // sagten dann eine Vorab-Erinnerung zu, die der Lauf nie verschickt (KO-K3).
-  // Kalendertage (JJJJ-MM-TT) vergleichen sich als Text.
+  // frueher als der Berliner Tag im Browser (`dialogHeute`, KO-K3).
   const serverGrenzen = (laufend ?? uebersicht.zuletztErledigt)?.dialog.fristGrenzen ?? null;
-  const browserHeute = heuteInBerlin(jetzt);
-  const serverHeute = serverGrenzen ? heuteAus(serverGrenzen) : null;
-  const heute = serverHeute && serverHeute > browserHeute ? serverHeute : browserHeute;
+  const heute = dialogHeute(serverGrenzen, jetzt);
   const grenzen = fristGrenzen(heute);
   const fristPflichtErgaenzen = ergaenzen && !!laufend?.dialog.ergaenzenFristPflicht;
 
@@ -464,13 +447,7 @@ export function NachforderungDialog({
   // Erst das Format: Rot („nicht freigegeben") und gelb („weicht ab") gelten nur
   // fuer eine Adresse, die als solche stimmt — sonst naennte das Feld eine
   // falsche Ursache, waehrend der Fuss „ungültig" sagt.
-  const formatFehler = ergaenzen
-    ? null
-    : !adresse
-      ? TEXTE.EMAIL_FEHLT
-      : !EMAIL_MUSTER.test(adresse)
-        ? TEXTE.EMAIL_UNGUELTIG
-        : null;
+  const formatFehler = ergaenzen ? null : adressFormatFehler(adresse);
   const zeigeNichtFreigegeben = !formatFehler && abweichend && !freigegeben;
   const zeigeAbweichend = !formatFehler && abweichend && freigegeben;
   const zeigeAusDemVorgang = !formatFehler && !abweichend;
@@ -541,8 +518,7 @@ export function NachforderungDialog({
 
   // ---- Warum der Knopf gesperrt ist (sichtbar, nie nur als Tooltip) ----
   let grund: string | null = null;
-  if (!daten) grund = TEXTE.DATEN_FEHLEN;
-  else if (!basis) grund = TEXTE.KEINE_ROUTE;
+  if (!daten || !basis) grund = TEXTE.DATEN_FEHLEN;
   else if (ergaenzen && (!laufend || laufend.status !== "LAUFEND")) grund = MELDUNGEN.NICHT_LAUFEND;
   else if (!ergaenzen && laufend) grund = MELDUNGEN.LAEUFT_BEREITS;
   else if (!ergaenzen && !uebersicht.anfordern.moeglich && uebersicht.anfordern.grund) {

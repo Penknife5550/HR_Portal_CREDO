@@ -98,6 +98,8 @@ import {
   UNTERLAGEN_AUDIT,
   UPLOAD_ACCEPT,
   dateiUebergang,
+  eigenerEntwurf,
+  entwuerfeAb,
   hochladenErlaubt,
   istUnterlagenModul,
   linkGueltig,
@@ -108,6 +110,8 @@ import {
   tokenFormatGueltig,
   vollstaendigMerker,
   wartetAufPerson,
+  WARTET_AUF_PERSON_STATUS,
+  type EntwertungGrund,
   type LinkPruefung,
   type OeffentlichePosition,
   type OeffentlichePositionsAntwort,
@@ -117,7 +121,8 @@ import {
   type UnterlagenModul,
 } from "@/lib/unterlagen";
 import { entwuerfeLoeschen, entwurfSpeichern } from "@/lib/unterlagen-dateien";
-import { fehlerKennung, hrVollstaendigMelden } from "@/lib/unterlagen-dienst";
+import { hrVollstaendigMelden, zeitpunktUnterSperre } from "@/lib/unterlagen-dienst";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 import { onboardingBaustein } from "@/lib/unterlagen-onboarding";
 import { gueltigBisPatchSchema, jsonKoerperPruefen, uebermittelnSchema } from "@/lib/validations/unterlagen";
 import type { z } from "zod";
@@ -417,35 +422,23 @@ async function linkStandPruefen(
 }
 
 /**
- * Ab wann ein Entwurf der Person gehoert, die JETZT einen gueltigen Link hat
- * (5.3 „nur die eigenen Entwürfe"): nach dem letzten Adresswechsel. „Erneut
- * senden" an eine neue Adresse entwertet alle aelteren Links (ADRESSE, 404) —
- * was ueber sie hochgeladen wurde, kann von der falschen Empfaengerin stammen.
- * Solche Entwuerfe sieht die Person nicht, sie kann sie weder entfernen noch
- * uebermitteln, und sie zaehlen nicht in ihre Kontingente; liegen bleiben sie
- * bis zum Aufraeumen des Laufs (30 Tage nach dem Linkende). `UnterlagenDatei`
- * kennt ihren Link nicht, die Grenze ist deshalb der Zeitpunkt der Entwertung.
+ * Die Grenze „eigene Entwürfe" (`entwuerfeAb`, unterlagen.ts — dieselbe Regel
+ * wie der Merker `entwurf_vorhanden` des Laufs). Fremde Entwuerfe sieht die
+ * Person nicht, sie kann sie weder entfernen noch uebermitteln, und sie zaehlen
+ * nicht in ihre Kontingente; liegen bleiben sie bis zum Aufraeumen des Laufs
+ * (30 Tage nach dem Linkende).
  */
 async function entwuerfeAbLaden(db: Prisma.TransactionClient, nachforderungId: string): Promise<Date | null> {
   const entwertet = await db.unterlagenLink.findMany({
-    where: { nachforderungId, entwertetGrund: "ADRESSE" },
-    select: { entwertetAm: true },
+    where: { nachforderungId, entwertetGrund: "ADRESSE" satisfies EntwertungGrund },
+    select: { entwertetAm: true, entwertetGrund: true },
   });
-  let ab: Date | null = null;
-  for (const { entwertetAm } of entwertet) {
-    if (entwertetAm && (!ab || entwertetAm > ab)) ab = entwertetAm;
-  }
-  return ab;
+  return entwuerfeAb(entwertet);
 }
 
-/** Die Entwuerfe der Person, die den Link jetzt hat (`entwuerfeAbLaden`). */
+/** `eigenerEntwurf` als Prisma-Bedingung — die Entwuerfe der Person, die den Link jetzt hat. */
 function eigeneEntwuerfeWhere(ab: Date | null): Prisma.UnterlagenDateiWhereInput {
   return ab ? { status: "ENTWURF", hochgeladenAm: { gt: ab } } : { status: "ENTWURF" };
-}
-
-/** Dieselbe Regel fuer eine schon geladene Zeile. */
-function eigenerEntwurf(d: { status: string; hochgeladenAm: Date }, ab: Date | null): boolean {
-  return d.status === "ENTWURF" && (!ab || d.hochgeladenAm > ab);
 }
 
 /** Sucht den Link NUR ueber den Hash des Tokens (5.1) und prueft ihn. */
@@ -477,7 +470,6 @@ async function sperrenUndNeuPruefen(tx: Prisma.TransactionClient, g: GueltigerLi
 // Positionen und Datenzuschnitt (5.3)
 // =============================================
 
-const OFFENE_STATUS = ["ANGEFORDERT", "ZURUECKGEWIESEN"];
 /** Aktive Dateien fuer die Kontingente: Entwurf oder eingereicht (4.3 Nr. 12). */
 const AKTIVE_DATEI_STATUS = ["ENTWURF", "EINGEREICHT"];
 
@@ -848,7 +840,10 @@ export async function unterlagenDateiHochladen(
           groesse: buffer.length,
           sha256,
           pdfHinweise,
-          hochgeladenAm: jetzt,
+          // Unter der Sperre (`zeitpunktUnterSperre`), nicht der Anfang der
+          // Anfrage: Die Grenze „eigene Entwürfe" vergleicht mit `entwertetAm`
+          // eines Adresswechsels, den HR ebenfalls unter der Sperre stempelt.
+          hochgeladenAm: zeitpunktUnterSperre(jetzt),
         },
       });
       await tx.unterlagenNachforderung.updateMany({
@@ -979,7 +974,7 @@ export async function unterlagenGueltigBisSpeichern(
     const nochErlaubt = gueltigBisPruefen(p, koerper.daten.gueltigBis, frisch, jetzt);
     if (!nochErlaubt.ok) throw new OeffentlicherAbbruch(nochErlaubt.antwort);
     const r = await tx.unterlagenPosition.updateMany({
-      where: { id: p.id, nachforderungId: frisch.kopf.id, fristpflichtig: true, status: { in: OFFENE_STATUS } },
+      where: { id: p.id, nachforderungId: frisch.kopf.id, fristpflichtig: true, status: { in: [...WARTET_AUF_PERSON_STATUS] } },
       data: { gueltigBisAngabe: nochErlaubt.datum },
     });
     if (r.count === 0) throw new OeffentlicherAbbruch(fehler(409, MELDUNGEN.UNTERLAGE_NICHT_OFFEN, "NICHT_OFFEN"));
@@ -1056,7 +1051,7 @@ export async function unterlagenUebermitteln(
       const datum = pruefeGueltigBis(roh, vorPositionen.find((x) => x.id === positionId)?.typ ?? "", jetzt);
       if (!datum.ok) throw new OeffentlicherAbbruch(fehler(400, datum.fehler));
       await tx.unterlagenPosition.updateMany({
-        where: { id: positionId, nachforderungId, fristpflichtig: true, status: { in: OFFENE_STATUS } },
+        where: { id: positionId, nachforderungId, fristpflichtig: true, status: { in: [...WARTET_AUF_PERSON_STATUS] } },
         data: { gueltigBisAngabe: datum.gueltigBis },
       });
     }
@@ -1169,6 +1164,3 @@ export async function unterlagenUebermitteln(
   }
   return { status: 200, body: { stand, uebermittelt } satisfies UebermittelnAntwort };
 }
-
-/** Fuer die Routen: nur der Fehlercode, nie die Meldung (Abschnitt 11). */
-export { fehlerKennung };

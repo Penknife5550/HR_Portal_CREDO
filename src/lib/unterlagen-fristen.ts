@@ -37,14 +37,17 @@ import {
   GUELTIG_NACH_FRIST_TAGE,
   LOESCHEN_NACH_TAGEN,
   NACHHOL_MAX_VERSUCHE,
-  NACHHOLBARE_ANLAESSE,
+  eigenerEntwurf,
+  entwuerfeAb,
   entwurfLoeschenAb,
   erinnerungFaellig,
+  istNachholAnlass,
   nachforderungLinkende,
   wartetAufPerson,
   type ErinnerungsStand,
   type Kalendertag,
   type LinkAnlass,
+  type NachholAnlass,
   type UnterlagenErinnerungsStufe,
 } from "@/lib/unterlagen";
 import { ablaufKalendertag, tageSpaeter } from "@/lib/kalendertag";
@@ -150,12 +153,8 @@ export function fristMeldungFaellig(
 // Schritt 2: eine Mail an die Person nachholen
 // =============================================
 
-/** Anlaesse, die der Lauf nachholt — Erinnerungen holt der nicht gesetzte Merker nach. */
-export type NachholAnlass = "ANFORDERUNG" | "ERGAENZUNG" | "ERNEUT" | "FRISTAENDERUNG" | "ZURUECKWEISUNG";
-
-function istNachholAnlass(anlass: string): anlass is NachholAnlass {
-  return (NACHHOLBARE_ANLAESSE as readonly string[]).includes(anlass);
-}
+/** Anlaesse, die der Lauf nachholt (`NACHHOLBARE_ANLAESSE`) — Erinnerungen holt der nicht gesetzte Merker nach. */
+export type { NachholAnlass };
 
 export interface NachholPlan {
   art: "NACHHOLEN";
@@ -181,6 +180,22 @@ export interface NachholPlan {
    * sonst blieben Links gueltig, die HR ausdruecklich sperren wollte.
    */
   fruehereSperren: boolean;
+}
+
+/**
+ * Der Link, mit dem eine Kette von Nachholversuchen begann: der juengste Link
+ * mit demselben Anlass, den nicht der Lauf nachholte (`nachholVersuche = 0`),
+ * nicht spaeter als `juengste`. Der Lauf legt je Versuch einen neuen Link mit
+ * demselben Anlass und dem Zaehler des Versuchs an (1 bis 3).
+ */
+function nachholUrsprung(links: ReadonlyArray<LaufLink>, juengste: LaufLink): LaufLink {
+  let ursprung: LaufLink | null = null;
+  for (const l of links) {
+    if (l.anlass !== juengste.anlass || l.nachholVersuche !== 0) continue;
+    if (zeit(l.createdAt) > zeit(juengste.createdAt)) continue;
+    if (!ursprung || zeit(l.createdAt) >= zeit(ursprung.createdAt)) ursprung = l;
+  }
+  return ursprung ?? juengste;
 }
 
 /**
@@ -229,8 +244,10 @@ export function personenMailNachholen(
 
   // Die Ergaenzung legt ihre Positionen im selben Augenblick an wie ihren Link
   // (unterlagen-dienst.ts: beide mit `jetzt`) — seither angeforderte, die noch
-  // warten, sind „(neu)".
-  const seit = zeit(juengste.createdAt);
+  // warten, sind „(neu)". Bezug ist der Link von HR, mit dem die Kette der
+  // Versuche begann: Ab dem zweiten Nachholversuch ist der juengste Link der
+  // des Laufs vom Vortag, und alle Positionen waeren aelter als er.
+  const seit = zeit(nachholUrsprung(stand.links, juengste).createdAt);
   const neuePositionen =
     juengste.anlass === "ERGAENZUNG"
       ? stand.positionen.filter((p) => wartetAufPerson(p.status) && zeit(p.angefordertAm) >= seit).map((p) => p.id)
@@ -266,19 +283,16 @@ export function erinnerungsAnlass(stufe: UnterlagenErinnerungsStufe): LinkAnlass
 
 /**
  * Hat die Person Dateien hochgeladen, aber noch nicht uebermittelt? Nur
- * Entwuerfe zu Positionen, die noch auf sie warten, und nur ihre EIGENEN:
- * nach dem letzten Adresswechsel hochgeladen (dieselbe Grenze wie die
- * Upload-Seite, unterlagen-upload.ts). Was ueber einen Link an die alte
- * Adresse kam, gehoert womoeglich jemand anderem — die Erinnerung an die neue
- * Adresse sagt dazu nichts.
+ * Entwuerfe zu Positionen, die noch auf sie warten, und nur ihre EIGENEN —
+ * `entwuerfeAb`/`eigenerEntwurf` aus unterlagen.ts, DIESELBE Regel wie die
+ * Upload-Seite. Was ueber einen Link an die alte Adresse kam, gehoert
+ * womoeglich jemand anderem — die Erinnerung an die neue Adresse sagt dazu
+ * nichts.
  */
 export function entwurfVorhanden(stand: Pick<LaufStand, "positionen" | "dateien" | "links">): boolean {
-  let ab = Number.NEGATIVE_INFINITY;
-  for (const l of stand.links) {
-    if (l.entwertetGrund === "ADRESSE" && alsDatum(l.entwertetAm)) ab = Math.max(ab, zeit(l.entwertetAm));
-  }
+  const ab = entwuerfeAb(stand.links);
   const wartend = new Set(stand.positionen.filter((p) => wartetAufPerson(p.status)).map((p) => p.id));
-  return stand.dateien.some((d) => d.status === "ENTWURF" && wartend.has(d.positionId) && zeit(d.hochgeladenAm) > ab);
+  return stand.dateien.some((d) => wartend.has(d.positionId) && eigenerEntwurf(d, ab));
 }
 
 // =============================================

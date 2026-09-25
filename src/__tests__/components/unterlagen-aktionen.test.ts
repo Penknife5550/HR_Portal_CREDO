@@ -19,7 +19,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { adresseGleich, saetze } from "@/components/unterlagen/aktionen";
+import { ADRESS_TEXTE, adresseGleich, adressFormatFehler, dialogHeute, saetze } from "@/components/unterlagen/aktionen";
+import { fristGrenzen } from "@/lib/unterlagen";
 
 const ORDNER = join(__dirname, "..", "..", "components", "unterlagen");
 
@@ -55,16 +56,28 @@ describe("aktionen.ts löst den Ringimport auf", () => {
     expect(karte).not.toContain("@/components/unterlagen/nachforderung-dialog");
   });
 
-  it("aktionen.ts importiert keine Komponente — nur einen Typ der Abteilungskarte und die reinen Regeln", () => {
+  it("aktionen.ts importiert keine Komponente — nur einen Typ der Abteilungskarte und reine, client-sichere Regeln", () => {
     const eigene = importe("aktionen.ts");
     for (const i of eigene.filter((x) => x.pfad.startsWith("@/components/"))) {
       expect(i).toEqual({ pfad: "@/components/abteilungsaufgaben/abteilungen-karte", nurTyp: true });
     }
-    expect(eigene.map((i) => i.pfad).filter((p) => !p.startsWith("@/components/"))).toEqual(["@/lib/unterlagen"]);
+    expect(eigene.map((i) => i.pfad).filter((p) => !p.startsWith("@/components/"))).toEqual([
+      "@/lib/constants",
+      "@/lib/kalendertag",
+      "@/lib/unterlagen",
+    ]);
   });
 
   it("die Helfer gibt es nur noch an einer Stelle", () => {
-    const helfer = ["unterlagenAntwortAuswerten", "unterlagenAktionSenden", "unterlagenApiBasis", "adresseGleich", "saetze"];
+    const helfer = [
+      "unterlagenAntwortAuswerten",
+      "unterlagenAktionSenden",
+      "adresseGleich",
+      "adressFormatFehler",
+      "dialogHeute",
+      "heuteAus",
+      "saetze",
+    ];
     for (const datei of ["nachforderung-dialog.tsx", "nachforderung-karte.tsx", "pruef-dialoge.tsx"]) {
       const quelle = readFileSync(join(ORDNER, datei), "utf8");
       for (const name of helfer) {
@@ -75,6 +88,35 @@ describe("aktionen.ts löst den Ringimport auf", () => {
         });
       }
     }
+  });
+});
+
+describe("dialogHeute (KO-K3) — derselbe Tag in allen drei Frist-Dialogen", () => {
+  // 25.09., 10:00 Uhr in Berlin, als der Server die Uebersicht baute.
+  const server = fristGrenzen("2026-09-25");
+
+  it("der Tag des Servers, solange der Browser nicht weiter ist", () => {
+    expect(dialogHeute(server, new Date("2026-09-25T21:00:00.000Z"))).toBe("2026-09-25");
+  });
+
+  it("Seite ueber Mitternacht offen: der Berliner Tag im Browser — sonst gaebe das Feld eine Frist frei, die der Server ablehnt", () => {
+    // 26.09., 00:05 Uhr in Berlin (22:05 UTC am 25.09.).
+    expect(dialogHeute(server, new Date("2026-09-25T22:05:00.000Z"))).toBe("2026-09-26");
+    expect(fristGrenzen(dialogHeute(server, new Date("2026-09-25T22:05:00.000Z"))).min).toBe("2026-09-27");
+  });
+
+  it("nie frueher als der Server (Uhr im Browser falsch gestellt) und ohne Server-Grenzen der Browser", () => {
+    expect(dialogHeute(server, new Date("2026-09-20T08:00:00.000Z"))).toBe("2026-09-25");
+    expect(dialogHeute(null, new Date("2026-09-20T08:00:00.000Z"))).toBe("2026-09-20");
+  });
+});
+
+describe("adressFormatFehler — dieselbe Pruefung in beiden Adressdialogen", () => {
+  it("leer, ohne Domain, mit Leerzeichen: Grund; eine gueltige Adresse: null", () => {
+    expect(adressFormatFehler("  ")).toBe(ADRESS_TEXTE.EMAIL_FEHLT);
+    expect(adressFormatFehler("anna.beispiel@")).toBe(ADRESS_TEXTE.EMAIL_UNGUELTIG);
+    expect(adressFormatFehler("anna beispiel@example.org")).toBe(ADRESS_TEXTE.EMAIL_UNGUELTIG);
+    expect(adressFormatFehler(" anna.beispiel@example.org ")).toBeNull();
   });
 });
 

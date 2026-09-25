@@ -32,7 +32,9 @@ import {
   aktionsTexte,
   dateiUebergang,
   dialogErinnerungsSatz,
+  eigenerEntwurf,
   eingabePruefen,
+  entwuerfeAb,
   erinnerungFaellig,
   erlaubteAktionen,
   erneutSendenSperreBis,
@@ -168,7 +170,6 @@ function nachforderung(teil: Partial<NachforderungEingabe> = {}): NachforderungE
     modul: "ONBOARDING",
     status: "LAUFEND",
     empfaenger: "anna.beispiel@example.org",
-    empfaengerAbweichend: false,
     frist: FRIST_DB,
     nachricht: null,
     angefordertAm: new Date("2026-09-14T07:00:00.000Z"),
@@ -800,6 +801,31 @@ describe("Link-Gültigkeit", () => {
   });
 });
 
+describe("„Nur die eigenen Entwürfe“ (5.3, U-17, U-32) — eine Regel fuer Upload-Seite und Lauf", () => {
+  const WECHSEL = new Date("2026-09-18T08:00:00.000Z");
+  const links = [
+    { entwertetGrund: "ADRESSE", entwertetAm: new Date("2026-09-10T08:00:00.000Z") },
+    { entwertetGrund: "ADRESSE", entwertetAm: WECHSEL },
+    // „frühere Links sperren“ verschiebt die Grenze nicht.
+    { entwertetGrund: "GESPERRT", entwertetAm: new Date("2026-09-20T08:00:00.000Z") },
+    { entwertetGrund: null, entwertetAm: null },
+  ];
+
+  it("die Grenze ist der LETZTE Adresswechsel; ohne Wechsel gibt es keine", () => {
+    expect(entwuerfeAb(links)).toEqual(WECHSEL);
+    expect(entwuerfeAb(links.slice(2))).toBeNull();
+  });
+
+  it("eigen ist nur ein Entwurf NACH der Grenze — derselbe Augenblick zaehlt nicht (sicher ist fremd)", () => {
+    const entwurf = (hochgeladenAm: Date | string) => ({ status: "ENTWURF", hochgeladenAm });
+    expect(eigenerEntwurf(entwurf(new Date(WECHSEL.getTime() + 1)), WECHSEL)).toBe(true);
+    expect(eigenerEntwurf(entwurf(WECHSEL), WECHSEL)).toBe(false);
+    expect(eigenerEntwurf(entwurf("2026-09-17T08:00:00.000Z"), WECHSEL)).toBe(false);
+    expect(eigenerEntwurf(entwurf("2026-09-17T08:00:00.000Z"), null)).toBe(true);
+    expect(eigenerEntwurf({ status: "EINGEREICHT", hochgeladenAm: new Date("2026-09-19T08:00:00.000Z") }, WECHSEL)).toBe(false);
+  });
+});
+
 describe("Tokenformat (UUID v4, Kleinbuchstaben)", () => {
   it("nimmt randomUUID() an", () => {
     for (let i = 0; i < 20; i++) expect(tokenFormatGueltig(randomUUID())).toBe(true);
@@ -916,6 +942,17 @@ describe("Frist", () => {
         "Die Frist ist verstrichen. Der Link bleibt noch bis 02.10.2026 nutzbar; eine Erinnerung geht nicht mehr hinaus.",
       );
       expect(dialogErinnerungsSatz("2026-09-01", HEUTE)).toContain("Bitte wählen Sie eine neue Frist.");
+    });
+
+    it("„Frist verstrichen“ geht an die ANFORDERNDE HR-Kraft — Ergänzen und „Frist ändern“ sagen das, nicht „Sie“ (8.1)", () => {
+      for (const frist of [tageSpaeter(HEUTE, 8), tageSpaeter(HEUTE, 3), HEUTE]) {
+        const satz = dialogErinnerungsSatz(frist, HEUTE, "ANFORDERNDE");
+        expect(satz).toContain("erhält die anfordernde HR-Kraft eine E-Mail");
+        expect(satz).not.toContain("erhalten Sie");
+        expect(satz).toBe(
+          dialogErinnerungsSatz(frist, HEUTE).replace("erhalten Sie eine E-Mail", "erhält die anfordernde HR-Kraft eine E-Mail"),
+        );
+      }
     });
   });
 
@@ -1250,11 +1287,40 @@ describe("laufWaechter", () => {
     const nachgeholt = { ...ergaenzung, createdAt: new Date("2026-09-18T05:00:00.000Z"), erstelltVonId: null };
     expect(laufWaechter(stand({ links: [...stand().links, ergaenzung, nachgeholt] }), "2026-09-19")).toBeNull();
     // Nur die gescheiterte Mail von HR im Fenster ist keine Spur des Laufs.
+    // Am 19.09. schweigt der Waechter noch (die Ergaenzung vom 18.09. kann die
+    // Frist gesetzt haben, nachdem der Lauf an dem Tag schon durch war); ab dem
+    // 20.09. muss der Lauf vom 19.09. eine Spur hinterlassen haben.
     const nurHr = stand({ links: [...stand().links, { ...ergaenzung, createdAt: new Date("2026-09-18T12:00:00.000Z") }] });
-    expect(laufWaechter(nurHr, "2026-09-19")).toEqual({ erinnerungVom: "2026-09-18", loeschungSeit: null });
+    expect(laufWaechter(nurHr, "2026-09-19")).toBeNull();
+    expect(laufWaechter(nurHr, "2026-09-20")).toEqual({ erinnerungVom: "2026-09-18", loeschungSeit: null });
     // Eine Spur des Laufs VOR dem Fenster zaehlt nicht.
     const davor = stand({ links: [...stand().links, { ...nachgeholt, createdAt: new Date("2026-09-17T05:00:00.000Z") }] });
     expect(laufWaechter(davor, "2026-09-19")).toEqual({ erinnerungVom: "2026-09-18", loeschungSeit: null });
+  });
+
+  it("kein Fehlalarm: HR rückt die Frist ins Vorab-Fenster, die Mail dazu scheitert (der Lauf kannte die Frist gestern nicht)", () => {
+    // Frist bisher weit weg; am 20.09. nach dem Lauf setzt HR sie auf den
+    // 25.09. (Fenster ab 18.09.), die Mail scheitert. Erinnert werden konnte
+    // fuer diese Frist am 18. und 19. nicht — der Lauf kannte sie nicht.
+    const fristAenderung = {
+      anlass: "FRISTAENDERUNG",
+      mailStatus: "FAILED",
+      gesendetAm: null,
+      createdAt: new Date("2026-09-20T12:00:00.000Z"),
+      erstelltVonId: "u-hr",
+    };
+    const s = stand({ links: [...stand().links, fristAenderung] });
+    expect(laufWaechter(s, "2026-09-20")).toBeNull();
+    expect(laufWaechter(s, "2026-09-21")).toBeNull();
+    // Der Lauf vom 21.09. kannte die Frist: Ohne jede Spur danach ist das wieder ein Alarm.
+    expect(laufWaechter(s, "2026-09-22")).toEqual({ erinnerungVom: "2026-09-18", loeschungSeit: null });
+    // Uebersprungen statt gescheitert — dasselbe. „Link erneut senden" setzt keine Frist: kein Schweigen.
+    expect(laufWaechter(stand({ links: [...stand().links, { ...fristAenderung, mailStatus: "SKIPPED" }] }), "2026-09-21")).toBeNull();
+    const erneut = stand({ links: [...stand().links, { ...fristAenderung, anlass: "ERNEUT" }] });
+    expect(laufWaechter(erneut, "2026-09-21")).toEqual({ erinnerungVom: "2026-09-18", loeschungSeit: null });
+    // Die Mails des Laufs selbst setzen keine Frist (sie sind ohnehin eine Spur).
+    const vomLauf = stand({ links: [...stand().links, { ...fristAenderung, erstelltVonId: null, createdAt: new Date("2026-09-17T05:00:00.000Z") }] });
+    expect(laufWaechter(vomLauf, "2026-09-21")).toEqual({ erinnerungVom: "2026-09-18", loeschungSeit: null });
   });
 
   it("kein Fehlalarm bei eingestelltem Vorgang (EXPIRED) — der Lauf verschickt dort nichts", () => {
@@ -1637,7 +1703,7 @@ describe("uebersichtBauen", () => {
       anteilZuPruefen: 1 / 3,
       text: "1 von 3 angenommen · 1 zu prüfen · 1 offen",
     });
-    expect(l.mailVerlaufText).toBe("E-Mails an die Person: Aufforderung 14.09. · Zurückweisung 16.09. · Erinnerung 19.09.");
+    expect(l.mailVerlauf.map((e) => e.text)).toEqual(["Aufforderung 14.09.", "Zurückweisung 16.09.", "Erinnerung 19.09."]);
     expect(u.kurzstand).toBe("1 von 3 angenommen · 1 zu prüfen · 1 offen · Frist 25.09.2026");
     // Positionen nach `reihenfolge`.
     expect(l.positionen.map((p) => p.id)).toEqual(["p-masern", "p-titel", "p-rv"]);

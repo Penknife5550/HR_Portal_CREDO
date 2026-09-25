@@ -659,8 +659,8 @@ ORDER BY 1;
 \echo '== NACHHER N4 · Vorlagen nach „Text auf Standard zuruecksetzen“ (erwartet: Standard Paket 4)'
 SELECT event, "isActive" AS aktiv, "updatedAt" AS gespeichert_utc, md5("bodyHtml") AS md5_html,
        CASE md5("bodyHtml")
-         WHEN 'fd5c639f873a48b5cf9cdf04c836b63e' THEN 'Standard Paket 4'
-         WHEN '3910f9e883ae64e0affd6ed8ebad11c3' THEN 'Standard Paket 4'
+         WHEN '1e7943515396bfc3f865def6668f9a49' THEN 'Standard Paket 4'
+         WHEN '0de4f4e85754eff09f53e756e4b7c444' THEN 'Standard Paket 4'
          WHEN 'd3905995937c15d7e67462cefc796a14' THEN 'ALTER STANDARD: zuruecksetzen'
          WHEN '35aa931001718762f1dae3d7a51122dd' THEN 'ALTER STANDARD: zuruecksetzen'
          ELSE 'ABWEICHEND'
@@ -688,8 +688,9 @@ ENDE_SQL
 md5sum ~/deploy-paket4/nachher-paket4.sql
 ```
 
-Erwartete Prüfsumme: `3700f065d0ca22c6a37c4d1aa6d5ae04`. Geprobt wie die VORHER-Datei (Dev-Datenbank, psql
-16.12, Exit 0, 6 Abschnitte, 0 `ERROR`).
+Erwartete Prüfsumme: `1bdbdba06d78bec2a91e76ce32ef3b2a` (neu seit der Nachbesserung: nur die zwei
+Prüfsummen in N4 sind andere). Geprobt wie die VORHER-Datei (Dev-Datenbank, psql 16.12, Exit 0,
+6 Abschnitte, 0 `ERROR`).
 
 ```bash
 sudo docker exec -i -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db \
@@ -709,8 +710,12 @@ grep -c 'ERROR' ~/deploy-paket4/nachher-ergebnis.txt
 | N5 | leer; nach der Probe in 5.4 je eine Zeile je versendeter Mail | FAILED oder SKIPPED: an Claude |
 | R1 | alles `0` | nur für einen Rückfall (Abschnitt 7) |
 
-Die Prüfsummen in V5 und N4 sind die der Code-Standards von `7bc91ec` und `0dcceb9`. Ändert die
-Fix-Runde eine der beiden Vorlagen, rechnet Claude sie vor dem Deploy neu.
+Die Prüfsummen in V5 und N4 sind die der Code-Standards von `7bc91ec` bzw. von Paket 4 nach der
+Nachbesserung der Abschlussdurchsicht (Feinplanung 18, U-37: Bedingungsblöcke
+`nachforderung_moeglich`/`nachforderung_gesperrt`, `{{dokument_typ}}` im Satz der Ablaufwarnung) —
+berechnet wie „Text auf Standard zurücksetzen“ speichert: `md5` von `bodyHtml.trim()` aus
+`DEFAULT_EMAIL_TEMPLATES`. Ändert eine spätere Fix-Runde eine der beiden Vorlagen, rechnet Claude
+sie vor dem Deploy neu (und damit auch die Prüfsumme der NACHHER-Datei oben).
 
 > **`nachher-ergebnis.txt` an Claude schicken.**
 
@@ -742,8 +747,8 @@ Variablenliste werden ersetzt; Empfängerfelder, Aktiv-Schalter und Name bleiben
 
 | Vorlage (Anzeigename) | Event | Was neu ist |
 |---|---|---|
-| Befristeter Nachweis läuft ab (HR-Erinnerung) | `dokument-ablauf-warnung` | Der Schlusssatz verweist auf „Unterlagen nachfordern“ und nennt die Annahme mit Ablaufdatum oder als „Unbefristet“. `dokument_datei` nennt Bezeichnung bzw. Art und Upload-Datum statt des Dateinamens (Variablenbeschreibung angepasst). |
-| Befristeter Nachweis ist abgelaufen (HR-Warnung) | `dokument-abgelaufen` | „… dann fordern Sie diese im Vorgang über ‚Unterlagen nachfordern‘ an; sobald Sie sie als Aufenthaltstitel mit ihrem Ablaufdatum annehmen, endet die Warnung.“ Vorher: „laden Sie diese als Nachweis hoch“ — das kann HR im Onboarding nicht. |
+| Befristeter Nachweis läuft ab (HR-Erinnerung) | `dokument-ablauf-warnung` | Der Schlusssatz verweist auf „Unterlagen nachfordern“ und nennt die Annahme mit Ablaufdatum oder als „Unbefristet“ — nur, wo das Portal die Nachforderung anbietet (`{{#nachforderung_moeglich}}`); bei einem abgelaufenen Vorgang oder offenem Fragebogen steht stattdessen der Grund (`{{nachforderung_hinweis}}`). `dokument_datei` nennt Bezeichnung bzw. Art und Upload-Datum statt des Dateinamens. Drei neue Variablen in der Liste. |
+| Befristeter Nachweis ist abgelaufen (HR-Warnung) | `dokument-abgelaufen` | „… dann fordern Sie diese im Vorgang über ‚Unterlagen nachfordern‘ an; sobald Sie sie als {{dokument_typ}} mit ihrem Ablaufdatum annehmen, endet die Warnung.“ (die gemahnte Art — Aufenthaltstitel oder Arbeitserlaubnis), ebenfalls nur mit `nachforderung_moeglich`. Vorher: „laden Sie diese als Nachweis hoch“ — das kann HR im Onboarding nicht. |
 
 1. **Fassung vergleichen:** Zeigt V5 `Standard 7bc91ec`, ist die gespeicherte Fassung der
    unveränderte alte Standard, der Reset verliert nichts. Zeigt V5 `ABWEICHEND`, gilt die
@@ -763,18 +768,22 @@ Handlungsanweisung hinaus.
    Antwortadresse“ mehr.
 2. **n8n:** Die bestehenden Läufe erreichen das Portal (6.1), `dokument-ablauf` ist nach 5.1
    aktiv (6.3 Nr. 2), und `unterlagen-fristen` läuft mindestens mit `?dryRun=1` (6.2, 6.3
-   Nr. 3). Ohne Lauf gibt es keine Erinnerungen, kein Nachholen gescheiterter Mails, keine
-   HR-Meldung „Frist verstrichen“ und **keine Löschung** nach 30 Tagen — die Upload-Seite und
-   der Dialog versprechen beides. Die Karte meldet einen
-   ausbleibenden Lauf („Der tägliche Lauf erreicht das Portal vermutlich nicht …“), aber erst
-   dann, wenn schon etwas ausgeblieben ist.
+   Nr. 3). **Der Probelauf genügt nur für die Probe mit einem Testvorgang (5.4), nicht für
+   echte Nachforderungen:** Er verschickt keine Erinnerung, holt keine gescheiterte Mail nach,
+   meldet HR keine verstrichene Frist und löscht nichts — die Upload-Seite und der Dialog
+   versprechen das aber. Eine in dieser Zeit fällige Fristtag-Erinnerung fällt endgültig aus
+   (ein verpasster Fristtag wird nicht nachgeholt), und eine fällige Vorab-Erinnerung hinterlässt
+   keine Spur, sodass die Karte „Der tägliche Lauf erreicht das Portal vermutlich nicht …“
+   meldet. **Echte Nachforderungen deshalb erst nach dem Scharfschalten (6.3 Nr. 4)** — erst
+   dann HR informieren (Nr. 5).
 3. **DSB-Text** der Upload-Seite (1.8), falls mit Platzhalter deployt wurde.
 4. **Caddy (V-9):** Zeigte 1.9 ein Zugriffsprotokoll ohne Filter auf `request>uri` und lautete
    die Entscheidung „Filter ergänzen“, ist er eingetragen und Caddy neu geladen; 1.9 noch einmal
    ausführen. Lautete sie „hinnehmen“, ist das hier vermerkt.
-5. **HR informieren:** Handbuch, Kapitel 3.7 „Unterlagen nachfordern“
-   (`docs/handbuch/handbuch.html#onboarding-unterlagen`). Besonders: Unterlagen nicht per Mail
-   annehmen, sensible Unterlagen nie über freie Zeilen anfordern, Entwürfe sieht HR nie.
+5. **HR informieren — erst, wenn `unterlagen-fristen` scharf läuft (6.3 Nr. 4):** Handbuch,
+   Kapitel 3.7 „Unterlagen nachfordern“ (`docs/handbuch/handbuch.html#onboarding-unterlagen`).
+   Besonders: Unterlagen nicht per Mail annehmen, sensible Unterlagen nie über freie Zeilen
+   anfordern, Entwürfe sieht HR nie.
 
 ### 5.3 EMPFOHLEN
 
@@ -795,9 +804,11 @@ Voraussetzung: ein Onboarding-Vorgang mit **eigener** Adresse, dessen Fragebogen
 („Unterlagen nachfordern…“ gibt es erst danach). Am besten in einer Einrichtung, die nicht vom
 Typ `KITA` ist, und mit einer Führungskraft-Adresse, die ebenfalls die eigene ist. Aufenthaltstitel
 und Masernschutz lassen sich nur anfordern, wenn sie für den Vorgang Pflicht sind: im
-Test-Fragebogen also die Angaben machen, aus denen die Pflicht folgt (Aufenthaltstitel
-erforderlich, Masernschutz nach Vorlage). Sonst stehen sie im Dialog grau mit Grund — auch das
-ist ein Ergebnis.
+Test-Fragebogen also die Angaben machen, aus denen die Pflicht folgt — Aufenthaltstitel
+erforderlich; Masernschutz: ein Geburtsdatum nach dem 31.12.1970 UND eine Einrichtung vom Typ
+Schule (Gymnasium, Gesamtschule, Grundschule, Berufskolleg). Ein Haken in der Formularvorlage
+genügt für den Masernschutz nicht, die Pflicht folgt allein aus dieser Regel. Sonst stehen sie
+im Dialog grau mit Grund — auch das ist ein Ergebnis.
 
 1. **Anfordern:** Aufenthaltstitel, Masernschutz und eine freie Zeile („Test: unterschriebenes
    Formular“, Original erforderlich), Frist in 14 Tagen. Mail prüfen: Masernschutz und
@@ -811,16 +822,19 @@ ist ein Ergebnis.
    Datei-Route setzt für PDFs die Portal-CSP (`object-src 'none'`) und für Bilder `sandbox`.
    **Zeigt ein Browser das PDF nicht an: an Claude** — dann wird die Route für PDFs auf
    `attachment` umgestellt (Code-Änderung).
-4. **Annehmen:** den Aufenthaltstitel mit einem Datum in etwa 10 Tagen — der rote Warnbalken
-   erscheint (kritisch ab 14 Tagen), die Dokumentenliste zeigt „aus Nachforderung angenommen
+4. **Annehmen:** den Aufenthaltstitel mit einem Datum in etwa 10 Tagen — der **gelbe**
+   Warnbalken „Nachweis läuft in Kürze ab“ erscheint (kritisch ab 14 Tagen; rot „⚠ Nachweis
+   abgelaufen“ erst nach dem Ablauf), die Dokumentenliste zeigt „aus Nachforderung angenommen
    am …“. Dann „Annahme zurücknehmen…“ (das Dokument verschwindet), erneut annehmen, diesmal
    „Unbefristet“ — der Warnbalken verschwindet, die Dokumentenzeile zeigt „Unbefristet“.
 5. **Zurückweisen** der freien Zeile mit Begründung: Mail mit neuem Link. Dann „Link erneut
    senden“ mit „Frühere Links sperren“ und einen alten Link aufrufen: erwartet „Dieser Link
    wurde durch einen neueren ersetzt …“ (410). Nach Ablauf der Sperrzeit von 10 Minuten noch
    einmal „Link erneut senden“, jetzt an eine **abweichende** eigene Adresse mit „Adresse
-   geprüft“ (ist die Freigabeliste gepflegt, muss ihre Domain darin stehen): Ein älterer Link
-   zeigt danach „Dieser Link ist ungültig …“ (404).
+   geprüft“ (ist die Freigabeliste gepflegt, muss ihre Domain darin stehen): Der Link aus der
+   ersten „Link erneut senden“-Mail zeigt danach „Dieser Link ist ungültig …“ (404). Die schon
+   gesperrten Links (Aufforderung, Zurückweisung) bleiben bei „… durch einen neueren ersetzt …“
+   (410) — ein Adresswechsel entwertet nur, was noch gültig war.
 6. **Zurückziehen** und den Testvorgang auf „abgelaufen“ setzen. Zum Schluss 4.2: N5 zeigt die
    versendeten Mails als SENT.
 
@@ -901,7 +915,7 @@ Die Reihenfolge (so auch in Abschnitt 4 und 5.2): anlegen vor dem Deploy,
    Antwort mit den Karten im Portal vergleichen: Stimmen geplante Erinnerungen, HR-Meldungen und
    Löschungen mit dem, was die Karten zeigen?
 4. Dann `?dryRun=1` aus der URL nehmen. **Ab jetzt verschickt der Lauf echte Mails und löscht
-   Dateien.**
+   Dateien.** Erst jetzt HR informieren und echte Nachforderungen zulassen (5.2 Nr. 2 und 5).
 
 ### 6.4 Webhooks
 

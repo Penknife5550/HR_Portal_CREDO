@@ -310,8 +310,12 @@ export function istErkannterDateityp(mimeType: unknown): mimeType is ErkannterDa
   return typeof mimeType === "string" && Object.prototype.hasOwnProperty.call(ENDUNG_FUER_DATEITYP, mimeType);
 }
 
+/**
+ * Ohne Endung: Pfad, Anzeigename und Download-Name holen sie ueber
+ * `ENDUNG_FUER_DATEITYP[mimeType]` — eine Liste, keine zweite.
+ */
 export type DateitypErgebnis =
-  | { ok: true; mimeType: ErkannterDateityp; endung: string }
+  | { ok: true; mimeType: ErkannterDateityp }
   /** `%PDF-` am Anfang, aber kein `%%EOF` am Ende: abgebrochen gespeichert oder gescannt. */
   | { ok: false; status: 400; grund: "PDF_UNVOLLSTAENDIG" }
   | { ok: false; status: 415; grund: "TYP_NICHT_ERLAUBT" };
@@ -353,16 +357,16 @@ export function erkenneDateityp(buffer: Buffer): DateitypErgebnis {
     if (!ende.includes(PDF_ENDE)) {
       return { ok: false, status: 400, grund: "PDF_UNVOLLSTAENDIG" };
     }
-    return { ok: true, mimeType: "application/pdf", endung: ".pdf" };
+    return { ok: true, mimeType: "application/pdf" };
   }
   if (beginntMit(buffer, [0xff, 0xd8, 0xff])) {
-    return { ok: true, mimeType: "image/jpeg", endung: ".jpg" };
+    return { ok: true, mimeType: "image/jpeg" };
   }
   if (beginntMit(buffer, PNG_SIGNATUR)) {
-    return { ok: true, mimeType: "image/png", endung: ".png" };
+    return { ok: true, mimeType: "image/png" };
   }
   if (beginntMit(buffer, WEBP_RIFF) && beginntMit(buffer, WEBP_WEBP, 8)) {
-    return { ok: true, mimeType: "image/webp", endung: ".webp" };
+    return { ok: true, mimeType: "image/webp" };
   }
   return { ok: false, status: 415, grund: "TYP_NICHT_ERLAUBT" };
 }

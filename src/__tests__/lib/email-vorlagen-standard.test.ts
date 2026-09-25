@@ -226,8 +226,11 @@ describe("Ablauf-Mails verweisen auf „Unterlagen nachfordern“ (Z3)", () => {
     const v = vorlage(event);
     for (const teil of [v.bodyHtml, v.bodyText]) {
       expect(teil).toContain("im Vorgang über „Unterlagen nachfordern“ an; sobald Sie");
-      expect(teil).toMatch(/annehmen, endet (die Warnung|diese Erinnerung)\./);
+      expect(teil).toMatch(/annehmen, endet (die Warnung|diese Erinnerung)\.?\{\{\/nachforderung_moeglich\}\}/);
       expect(teil).not.toContain("als Nachweis hoch");
+      // Nur, wo das Portal die Nachforderung anbietet; sonst der Hinweis mit Grund.
+      expect(teil).toContain("{{#nachforderung_moeglich}}");
+      expect(teil).toContain("{{#nachforderung_gesperrt}} {{nachforderung_hinweis}}{{/nachforderung_gesperrt}}");
     }
   });
 
@@ -248,12 +251,16 @@ describe("Ablauf-Mails verweisen auf „Unterlagen nachfordern“ (Z3)", () => {
     }
   });
 
-  it("dokument-abgelaufen: die Fiktionsbescheinigung wird nachgefordert, nicht von HR hochgeladen", () => {
+  it("dokument-abgelaufen: die Fiktionsbescheinigung wird nachgefordert, nicht von HR hochgeladen — als die gemahnte Art", () => {
+    // Der Lauf mahnt Aufenthaltstitel UND Arbeitserlaubnis; die Warnung endet
+    // nur mit einem Nachweis DERSELBEN Art. Ein fest geschriebenes
+    // „als Aufenthaltstitel" beendete die Mahnung zur Arbeitserlaubnis nie.
     const v = vorlage("dokument-abgelaufen");
     for (const teil of [v.bodyHtml, v.bodyText]) {
       expect(teil).toContain(
-        "— dann fordern Sie diese im Vorgang über „Unterlagen nachfordern“ an; sobald Sie sie als Aufenthaltstitel mit ihrem Ablaufdatum annehmen, endet die Warnung.",
+        "— dann fordern Sie diese im Vorgang über „Unterlagen nachfordern“ an; sobald Sie sie als {{dokument_typ}} mit ihrem Ablaufdatum annehmen, endet die Warnung",
       );
+      expect(teil).not.toContain("als Aufenthaltstitel mit ihrem Ablaufdatum");
     }
   });
 });

@@ -23,7 +23,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { fehlerKennung } from "@/lib/unterlagen-dienst";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 import { unterlagenFristenLauf } from "@/lib/unterlagen-lauf";
 
 /** Mindestlaenge des CRON_SECRET — ein kurzes Geheimnis ist ein Konfigurationsfehler. */

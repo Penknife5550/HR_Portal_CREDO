@@ -35,7 +35,7 @@
  */
 import { useState } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { unterlagenAntwortAuswerten, unterlagenApiBasis } from "@/components/unterlagen/aktionen";
+import { unterlagenAntwortAuswerten } from "@/components/unterlagen/aktionen";
 import { NachforderungKarte } from "@/components/unterlagen/nachforderung-karte";
 import {
   MELDUNGEN,
@@ -205,7 +205,6 @@ function nachforderung(teil: Partial<NachforderungEingabe> = {}): NachforderungE
     modul: "ONBOARDING",
     status: "LAUFEND",
     empfaenger: "anna.beispiel@example.org",
-    empfaengerAbweichend: false,
     frist: new Date("2026-09-26T00:00:00.000Z"),
     nachricht: null,
     angefordertAm: "2026-09-12T08:00:00.000Z",
@@ -246,6 +245,8 @@ function uebersicht(
     darfAktionen: opts.darfAktionen ?? true,
     dateiUrl: opts.dateiUrl ?? standardUrl,
     dialog: DIALOG,
+    // Wie der Dienst: die Basis der Routen aus dem Modul-Baustein.
+    apiBasis: BASIS,
     jetzt: JETZT,
   });
 }
@@ -256,7 +257,6 @@ function karte(u: UnterlagenUebersicht, extra: Partial<React.ComponentProps<type
   const r = render(
     <NachforderungKarte
       uebersicht={u}
-      vorgangId={VORGANG}
       darfAktionen
       onAktualisiert={onAktualisiert}
       onNachfordern={onNachfordern}
@@ -503,11 +503,11 @@ describe("Zurückgewiesene Unterlage", () => {
 // =============================================
 
 describe("Mailverlauf", () => {
-  it("„E-Mails an die Person: …“ wie vom Server", () => {
+  it("„E-Mails an die Person: …“ aus den Eintraegen des Servers", () => {
     const u = uebersicht();
     karte(u);
     const zeileMail = document.querySelector('[data-block="mailverlauf"]') as HTMLElement;
-    expect(zeileMail.textContent).toBe(u.laufend!.mailVerlaufText);
+    expect(zeileMail.textContent).toBe(`E-Mails an die Person: ${u.laufend!.mailVerlauf.map((e) => e.text).join(" · ")}`);
     expect(zeileMail.textContent).toBe(
       "E-Mails an die Person: Aufforderung 12.09. · Zurückweisung 16.09. · Erinnerung 19.09.",
     );
@@ -649,9 +649,13 @@ describe("Aktionen ausführen", () => {
     expect(document.querySelector('[data-art="fehler"]')?.textContent).toContain("Verbindungsfehler");
   });
 
-  it("die Routen ergeben sich aus dem Modul, eine eigene Basis geht vor", () => {
-    expect(unterlagenApiBasis("ONBOARDING", "abc")).toBe("/api/onboarding/abc/unterlagen");
-    expect(unterlagenApiBasis("UNBEKANNT", "abc")).toBeNull();
+  it("die Routen nennt allein der Server: ohne `apiBasis` kein Knopf (keine zweite Routentabelle im Client)", () => {
+    const u = uebersicht({ nachforderungen: [nachforderung({ positionen: [RV, TITEL, MASERN, PKV] })] });
+    karte(u);
+    expect(within(zeile("p-pkv")).queryByRole("button", { name: "Annehmen – PKV-Nachweis" })).not.toBeNull();
+    document.body.innerHTML = "";
+    karte({ ...u, apiBasis: null });
+    expect(within(zeile("p-pkv")).queryByRole("button", { name: "Annehmen – PKV-Nachweis" })).toBeNull();
   });
 });
 
@@ -884,7 +888,6 @@ function Huelle({ start, danach }: { start: UnterlagenUebersicht; danach: Unterl
   return (
     <NachforderungKarte
       uebersicht={u}
-      vorgangId={VORGANG}
       darfAktionen
       onAktualisiert={async () => setU(danach)}
       onNachfordern={() => {}}

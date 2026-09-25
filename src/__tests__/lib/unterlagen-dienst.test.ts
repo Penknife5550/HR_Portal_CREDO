@@ -99,8 +99,8 @@ import {
   type Zeile,
 } from "../hilfen/unterlagen-fake-db";
 import { ddb, ddbLeeren, neuesDokument } from "../hilfen/unterlagen-fake-db";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 import {
-  fehlerKennung,
   HR_MELDUNG_GRUENDE,
   hrMeldungGrund,
   hrMeldungOhneEmpfaenger,
@@ -1092,6 +1092,30 @@ describe("erneut-senden", () => {
     expect(r.status).toBe(201);
     expect(alt.entwertetGrund).toBe("ADRESSE");
     expect(n).toMatchObject({ empfaenger: ADRESSE, empfaengerAbweichend: false });
+  });
+
+  it("Adresswechsel: `entwertetAm` ist der Zeitpunkt UNTER der Sperre der Nachforderung, nicht der Anfang der Aktion (U-17)", async () => {
+    // Zwischen dem Klick (JETZT) und der Sperre liegen Abfragen und das Warten
+    // auf einen Upload, der die Sperre zuerst bekam und mit SEINER Zeit unter
+    // der Sperre stempelte. Die Grenze „eigene Entwürfe" muss danach liegen.
+    const n = laufend({ empfaenger: "falsch@example.org", empfaengerAbweichend: true });
+    const alt = link(n, { empfaenger: "falsch@example.org" });
+    const NACH_DER_SPERRE = JETZT.getTime() + 5_000;
+    let uhr = JETZT.getTime();
+    const jetztSpion = jest.spyOn(Date, "now").mockImplementation(() => uhr);
+    const echtSperren = fp.unterlagenNachforderung.updateMany.getMockImplementation()!;
+    fp.unterlagenNachforderung.updateMany.mockImplementationOnce(async (...args: Parameters<typeof echtSperren>) => {
+      const r = await echtSperren(...args);
+      uhr = NACH_DER_SPERRE; // die Sperre war belegt
+      return r;
+    });
+    try {
+      const r = await aktion({ aktion: "erneut-senden", nachforderungId: n.id, empfaenger: ADRESSE });
+      expect(r.status).toBe(201);
+    } finally {
+      jetztSpion.mockRestore();
+    }
+    expect(alt).toMatchObject({ entwertetGrund: "ADRESSE", entwertetAm: new Date(NACH_DER_SPERRE) });
   });
 
   it("„frühere Links sperren“ erst NACH SENT", async () => {

@@ -56,6 +56,7 @@ import {
   type Kalendertag,
 } from "@/lib/kalendertag";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
+import { wartetAufPerson, type LinkAnlass, type NachholAnlass } from "@/lib/unterlagen";
 
 // =============================================
 // Ereignisse
@@ -80,6 +81,25 @@ export const UNTERLAGEN_PERSONEN_EVENTS: readonly string[] = [
   UNTERLAGEN_EVENTS.ERINNERUNG,
   UNTERLAGEN_EVENTS.ZURUECKGEWIESEN,
 ];
+
+/**
+ * Das Ereignis der Mail an die Person zu einem Link-Anlass: die
+ * Zurueckweisung hat ihre eigene Mail, die Erinnerungen ebenso, alles andere
+ * ist eine Aufforderung (Anfordern, Ergaenzen, Frist aendern, erneut senden).
+ * Auch fuer den Abgleich mit dem Versandprotokoll (`unterlagen-lauf.ts`).
+ */
+export function personenEventFuerAnlass(
+  anlass: string,
+):
+  | typeof UNTERLAGEN_EVENTS.ANGEFORDERT
+  | typeof UNTERLAGEN_EVENTS.ERINNERUNG
+  | typeof UNTERLAGEN_EVENTS.ZURUECKGEWIESEN {
+  if (anlass === ("ZURUECKWEISUNG" satisfies LinkAnlass)) return UNTERLAGEN_EVENTS.ZURUECKGEWIESEN;
+  if (anlass === ("ERINNERUNG_VORAB" satisfies LinkAnlass) || anlass === ("ERINNERUNG_FRISTTAG" satisfies LinkAnlass)) {
+    return UNTERLAGEN_EVENTS.ERINNERUNG;
+  }
+  return UNTERLAGEN_EVENTS.ANGEFORDERT;
+}
 
 // =============================================
 // Texte
@@ -158,8 +178,12 @@ interface PersonenMailEingabe {
   nachricht: string | null;
 }
 
-/** Wozu die Aufforderung hinausgeht (Anlass des Links). */
-export type UnterlagenAufforderungAnlass = "ANFORDERUNG" | "ERGAENZUNG" | "ERNEUT" | "FRISTAENDERUNG";
+/**
+ * Wozu die Aufforderung hinausgeht (Anlass des Links): jeder nachholbare
+ * Anlass ausser der Zurueckweisung (die hat ihre eigene Mail). Abgeleitet,
+ * damit ein neuer nachholbarer Anlass hier nicht still fehlt.
+ */
+export type UnterlagenAufforderungAnlass = Exclude<NachholAnlass, "ZURUECKWEISUNG">;
 
 export interface AufforderungMailEingabe extends PersonenMailEingabe {
   anlass: UnterlagenAufforderungAnlass;
@@ -185,7 +209,7 @@ export interface ZurueckweisungMailEingabe extends PersonenMailEingabe {
 interface HrMailEingabe {
   vorgang: UnterlagenMailVorgang;
   positionen: readonly UnterlagenMailPosition[];
-  /** Fertiger Link auf den Vorgang im Portal (`<APP_URL>/dashboard/<id>`) */
+  /** Fertiger Link auf den Vorgang im Portal: `<APP_URL>` + `portalPfad` des Bausteins (Onboarding `/dashboard/<id>?tab=dokumente`) */
   portalLink: string;
   /** Wer die Nachforderung angelegt hat; null, wenn das Konto geloescht ist. */
   anfordernd: { email: string | null; name: string | null; aktiv: boolean } | null;
@@ -215,9 +239,9 @@ export type UnterlagenMailPayload = Record<string, string | number>;
 
 const merker = (wert: boolean): string => (wert ? "ja" : "");
 
-/** Wartet auf die Person: offen oder zurueckgewiesen (Feinplanung 2). */
-function wartetAufPerson(p: UnterlagenMailPosition): boolean {
-  return p.status === "ANGEFORDERT" || p.status === "ZURUECKGEWIESEN";
+/** Wartet auf die Person — DIESELBE Regel wie Karte, Lauf und Upload-Seite (`wartetAufPerson`). */
+function wartetAufIhn(p: UnterlagenMailPosition): boolean {
+  return wartetAufPerson(p.status);
 }
 
 /** Vor- und Nachname getrimmt, `mitarbeiter_name` nie leer. */
@@ -304,7 +328,7 @@ export function unterlagenlisteMailFelder(
   anzahl_unterlagen: number;
   original_erforderlich: string;
 } {
-  const wartend = positionen.filter(wartetAufPerson);
+  const wartend = positionen.filter(wartetAufIhn);
   if (!mitDetails || wartend.length === 0) {
     return {
       unterlagenliste: "",
@@ -463,7 +487,7 @@ function hrFelder(e: HrMailEingabe): UnterlagenMailPayload {
     portalLink: e.portalLink,
     anzahl_zu_pruefen: aktiv.filter((p) => p.status === "EINGEREICHT").length,
     anzahl_angenommen: aktiv.filter((p) => p.status === "ANGENOMMEN").length,
-    anzahl_offen: aktiv.filter(wartetAufPerson).length,
+    anzahl_offen: aktiv.filter(wartetAufIhn).length,
   };
 }
 

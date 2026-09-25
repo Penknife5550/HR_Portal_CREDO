@@ -14,8 +14,8 @@
  */
 
 import { NextRequest } from "next/server";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 import {
-  fehlerKennung,
   OEFFENTLICHER_SERVERFEHLER,
   oeffentlicheAntwort,
   unterlagenDateiEntfernen,

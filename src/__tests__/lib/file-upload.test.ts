@@ -257,11 +257,11 @@ const WEBP = Buffer.from([
 ]);
 
 describe("erkenneDateityp", () => {
-  it("erkennt PDF, JPEG, PNG und WebP mit Endung", () => {
-    expect(erkenneDateityp(pdf())).toEqual({ ok: true, mimeType: "application/pdf", endung: ".pdf" });
-    expect(erkenneDateityp(JPEG)).toEqual({ ok: true, mimeType: "image/jpeg", endung: ".jpg" });
-    expect(erkenneDateityp(PNG)).toEqual({ ok: true, mimeType: "image/png", endung: ".png" });
-    expect(erkenneDateityp(WEBP)).toEqual({ ok: true, mimeType: "image/webp", endung: ".webp" });
+  it("erkennt PDF, JPEG, PNG und WebP — die Endung steht nur in ENDUNG_FUER_DATEITYP", () => {
+    expect(erkenneDateityp(pdf())).toEqual({ ok: true, mimeType: "application/pdf" });
+    expect(erkenneDateityp(JPEG)).toEqual({ ok: true, mimeType: "image/jpeg" });
+    expect(erkenneDateityp(PNG)).toEqual({ ok: true, mimeType: "image/png" });
+    expect(erkenneDateityp(WEBP)).toEqual({ ok: true, mimeType: "image/webp" });
   });
 
   it("file.type zaehlt nicht: ein JPEG, das sich als PDF ausgibt, bleibt ein JPEG", async () => {
@@ -269,7 +269,7 @@ describe("erkenneDateityp", () => {
     // — die Luecke, derentwegen es diese Funktion gibt.
     const falsch = new File([JPEG], "x.pdf", { type: "application/pdf" });
     const bytes = Buffer.from(await falsch.arrayBuffer());
-    expect(erkenneDateityp(bytes)).toMatchObject({ ok: true, mimeType: "image/jpeg", endung: ".jpg" });
+    expect(erkenneDateityp(bytes)).toMatchObject({ ok: true, mimeType: "image/jpeg" });
 
     // Umgekehrt: Text mit erlaubtem file.type ist trotzdem kein Upload.
     const text = new File(["<html><script>alert(1)</script>"], "x.png", { type: "image/png" });

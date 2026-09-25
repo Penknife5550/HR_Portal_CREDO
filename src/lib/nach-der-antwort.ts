@@ -25,16 +25,7 @@
  */
 
 import { after } from "next/server";
-
-/** Nur `code ?? name` fuer die Konsole, nie die Meldung. */
-function kennung(fehler: unknown): string {
-  if (typeof fehler === "object" && fehler !== null) {
-    const { code, name } = fehler as { code?: unknown; name?: unknown };
-    if (code !== undefined && code !== null) return String(code);
-    if (typeof name === "string") return name;
-  }
-  return "unbekannt";
-}
+import { fehlerKennung } from "@/lib/fehler-kennung";
 
 /**
  * Fuehrt `aufgabe` nach dem Senden der Antwort aus. Wirft nie.
@@ -46,7 +37,7 @@ export function nachDerAntwort(aufgabe: () => Promise<unknown>, bezeichnung = "N
     try {
       await aufgabe();
     } catch (fehler) {
-      console.error(`[${bezeichnung}] fehlgeschlagen:`, kennung(fehler));
+      console.error(`[${bezeichnung}] fehlgeschlagen:`, fehlerKennung(fehler));
     }
   };
   try {

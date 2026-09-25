@@ -10,7 +10,9 @@
  * „Unterlagen nachfordern…" bzw. den Grund, warum es (noch) nicht geht.
  *
  * Die Karte rechnet NICHTS selbst: Zeilen, Pillen, Texte, erlaubte Aktionen
- * und Datei-URLs kommen fertig aus der Uebersicht des Servers
+ * und Datei-URLs kommen fertig aus der Uebersicht des Servers — nur die Zeile
+ * „E-Mails an die Person: … · …" setzt sie aus den Eintraegen von
+ * `mailVerlauf` zusammen, weil jeder Eintrag seine eigene Farbe traegt
  * (`uebersichtBauen` in src/lib/unterlagen.ts, geliefert als `unterlagen` von
  * GET /api/onboarding/[id]). So zeigen Karte, Kasten „Offene Nachweise",
  * Upload-Seite und Mail dieselben Begriffe, und die Karte bietet nur an, was
@@ -41,12 +43,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { AktionsMeldungen, PILL_FARBEN, datumUhrzeitDE } from "@/components/abteilungsaufgaben/abteilungen-karte";
-import {
-  saetze,
-  unterlagenAktionSenden,
-  unterlagenApiBasis,
-  type UnterlagenMeldung,
-} from "@/components/unterlagen/aktionen";
+import { saetze, unterlagenAktionSenden, type UnterlagenMeldung } from "@/components/unterlagen/aktionen";
 import {
   AnnahmeZuruecknehmenDialog,
   AnnehmenDialog,
@@ -85,9 +82,8 @@ import {
 export type { NachforderungDialogAnfrage };
 
 export interface NachforderungKarteProps {
-  /** `unterlagen` aus GET /api/onboarding/[id]. */
+  /** `unterlagen` aus GET /api/onboarding/[id] — mit Bearbeitungsrecht samt `apiBasis`. */
   uebersicht: UnterlagenUebersicht;
-  vorgangId: string;
   /** HR_EDIT_ROLES — ohne Recht nur lesen, ohne Datei-Links. */
   darfAktionen: boolean;
   /** Nach jeder Antwort des Servers: Vorgang neu laden (Dokumente, Kasten, Reiter). */
@@ -271,7 +267,6 @@ function balkenProzent(anteil: number): number {
 
 export function NachforderungKarte({
   uebersicht,
-  vorgangId,
   darfAktionen,
   onAktualisiert,
   onNachfordern,
@@ -292,11 +287,12 @@ export function NachforderungKarte({
   // Knopf ist waehrend der Aktion gesperrt und nach einer Annahme verschwunden.
   const fokusNachAktion = useRef<{ ausloeser: HTMLElement | null; positionId: string } | null>(null);
 
-  // Die Basis der Routen nennt der Server (`uebersicht.apiBasis`); die Tabelle
-  // des Moduls nur, wenn eine Uebersicht sie nicht traegt (wie der Dialog).
-  const basis = uebersicht.apiBasis ?? unterlagenApiBasis(uebersicht.modul, vorgangId);
+  // Die Basis der Routen nennt allein der Server (`uebersicht.apiBasis`, nur
+  // mit Bearbeitungsrecht) — keine zweite Tabelle im Client, die beim
+  // naechsten Umbau des Pfads stehen bliebe.
+  const basis = uebersicht.apiBasis;
   // Doppelt gesichert: Die Uebersicht laesst ohne Recht Aktionen und URLs weg,
-  // und die Karte zeigt ohne Recht (oder ohne bekannte Route) keinen Knopf.
+  // und die Karte zeigt ohne Recht (oder ohne Route) keinen Knopf.
   const darf = darfAktionen && uebersicht.darfAktionen && basis !== null;
 
   const { laufend, zuletztErledigt, anfordern } = uebersicht;
@@ -945,7 +941,9 @@ function OffenerDialogAnzeige({
   if (ziel.bezug === "nachforderung") {
     switch (ziel.art) {
       case "frist-aendern":
-        return <FristAendernDialog {...basis} nachforderung={nachforderung} onBestaetigen={onNachforderung} />;
+        return (
+          <FristAendernDialog {...basis} nachforderung={nachforderung} jetzt={jetzt} onBestaetigen={onNachforderung} />
+        );
       case "erneut-senden":
         return (
           <ErneutSendenDialog
@@ -981,6 +979,7 @@ function OffenerDialogAnzeige({
           position={position}
           frist={nachforderung.dialog.zurueckweisenFrist}
           grenzen={nachforderung.dialog.fristGrenzen}
+          jetzt={jetzt}
           onBestaetigen={senden}
         />
       );
@@ -992,6 +991,7 @@ function OffenerDialogAnzeige({
           {...basis}
           position={position}
           nachforderungErledigt={nachforderung.status === "ERLEDIGT"}
+          zusatzFolge={nachforderung.dialog.ruecknahmeFolge}
           onBestaetigen={senden}
         />
       );
