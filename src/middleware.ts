@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { apiZugriffVerweigern } from "@/lib/mandanten-gate";
+import { portalCsp, routeSetztEigeneCsp } from "@/lib/content-security-policy";
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
@@ -36,38 +37,16 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  // CSP: In Dev-Modus unsafe-eval erlauben (Next.js HMR benoetigt es)
-  const scriptSrc = isDev
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-    : "script-src 'self' 'unsafe-inline'";
-  const connectSrc = isDev
-    ? "connect-src 'self' ws://localhost:3000"
-    : "connect-src 'self'";
-
-  response.headers.set(
-    "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      scriptSrc,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob:",
-      connectSrc,
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "object-src 'none'",
-      // upgrade-insecure-requests nur in Produktion (blockiert localhost HTTP)
-      ...(process.env.NODE_ENV === "production" && !process.env.APP_URL?.startsWith("http://")
-        ? ["upgrade-insecure-requests"]
-        : []),
-    ].join("; ")
-  );
-
-  // =============================================
-  // Portal-Routen: Redirect zu Login wenn keine Session
-  // =============================================
   const { pathname } = request.nextUrl;
+
+  // CSP (Aufbau in src/lib/content-security-policy.ts): In Dev-Modus
+  // unsafe-eval (Next.js HMR). NICHT fuer Routen, die ihre CSP selbst setzen
+  // (Datei-Route der Nachforderung: `sandbox` fuer Bilder) — Next.js haengt
+  // einen Kopf der Route nur an, wenn die Middleware ihn nicht schon gesetzt
+  // hat. Alle uebrigen Kopfzeilen oben gelten dort weiter.
+  if (!routeSetztEigeneCsp(pathname)) {
+    response.headers.set("Content-Security-Policy", portalCsp());
+  }
 
   // =============================================
   // API-Isolation fuer Rollen mit eingeschraenktem Blick
@@ -116,6 +95,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // =============================================
+  // Portal-Routen: Redirect zu Login wenn keine Session
+  // =============================================
   const isPortalRoute = pathname.startsWith("/dashboard") ||
                         pathname.startsWith("/benutzerverwaltung") ||
                         pathname.startsWith("/vorlagen") ||

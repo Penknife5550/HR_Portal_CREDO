@@ -44,6 +44,8 @@ jest.mock("@/lib/permissions", () => {
   return { ...echt, canAccessProcess: jest.fn(echt.canAccessProcess) };
 });
 jest.mock("@/lib/auth", () => ({ getSession: () => mockGetSession() }));
+// Nur fuer die Middleware (CSP der Datei-Route): jose ist ein reines ES-Modul.
+jest.mock("jose", () => ({ jwtVerify: jest.fn() }));
 jest.mock("@/lib/mailer", () => ({
   ...jest.requireActual("@/lib/mailer"),
   sendEventEmail: (e: string, p: Record<string, unknown>, o?: { overrideTo?: string }) => mockSend(e, p, o),
@@ -79,7 +81,7 @@ import {
   udbLeeren,
   type Zeile,
 } from "../hilfen/unterlagen-fake-db";
-import { ddbLeeren } from "../hilfen/unterlagen-fake-db-pruefen";
+import { ddbLeeren } from "../hilfen/unterlagen-fake-db";
 import { POST } from "@/app/api/onboarding/[id]/unterlagen/route";
 import { POST as positionPost } from "@/app/api/onboarding/[id]/unterlagen/positionen/[positionId]/route";
 import { GET as dateiOeffnen } from "@/app/api/onboarding/[id]/unterlagen/dateien/[dateiId]/route";
@@ -92,6 +94,8 @@ import {
 } from "@/lib/unterlagen-dienst";
 import { MELDUNGEN, UNTERLAGEN_AUDIT } from "@/lib/unterlagen";
 import { canAccessProcess, type SessionPayload } from "@/lib/permissions";
+import { portalCsp } from "@/lib/content-security-policy";
+import { middleware } from "@/middleware";
 
 const echtDienst = jest.requireActual<typeof import("@/lib/unterlagen-dienst")>("@/lib/unterlagen-dienst");
 const mockAktion = unterlagenAktionAusfuehren as jest.Mock;
@@ -583,8 +587,10 @@ describe("GET …/unterlagen/dateien/[dateiId] — Datei oeffnen", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
-    // Bei PDFs (noch) keine Sandbox — erst nach der Browserprobe (Abschnitt 17).
-    expect(res.headers.get("Content-Security-Policy")).toBeNull();
+    // Bei PDFs (noch) keine Sandbox — erst nach der Browserprobe (Abschnitt 17) —,
+    // aber mindestens die CSP, die bisher die Middleware setzte.
+    expect(res.headers.get("Content-Security-Policy")).toBe(portalCsp());
+    expect(res.headers.get("Content-Security-Policy")).not.toContain("sandbox");
     // Gelesen wird ueber die Wurzel der Nachforderung.
     expect(mockDateiLesen).toHaveBeenCalledWith(d.speicherPfad, d.nachforderungId);
 
@@ -600,11 +606,10 @@ describe("GET …/unterlagen/dateien/[dateiId] — Datei oeffnen", () => {
   });
 
   /**
-   * Geprueft wird hier nur die Antwort DER ROUTE. Beim Browser kommt die
-   * `sandbox` erst an, wenn die Middleware fuer diesen Pfad keine eigene CSP
-   * setzt: Next.js (15.5, `send-response.js`) haengt einen Kopf der Route nur
-   * an, wenn die Middleware ihn nicht schon gesetzt hat. Siehe den offenen
-   * Punkt unten.
+   * Beim Browser kommt die `sandbox` nur an, wenn die Middleware fuer diesen
+   * Pfad keine eigene CSP setzt: Next.js (15.5, `send-response.js`) haengt
+   * einen Kopf der Route nur an, wenn die Middleware ihn nicht schon gesetzt
+   * hat. Das haelt der Test darunter fest.
    */
   it("die Route verlangt fuer Bilder zusaetzlich `Content-Security-Policy: sandbox`", async () => {
     const d = datei({ anzeigeName: "foto.jpg", mimeType: "image/jpeg", speicherPfad: "uploads/unterlagen/y/x.jpg" });
@@ -615,9 +620,26 @@ describe("GET …/unterlagen/dateien/[dateiId] — Datei oeffnen", () => {
     expect(res.headers.get("Content-Disposition")).toBe('inline; filename="foto.jpg"');
   });
 
-  // Offen (src/middleware.ts gehoert Schritt 5): Solange die Middleware auch
-  // fuer …/unterlagen/dateien/… ihre CSP setzt, verwirft Next.js die der Route.
-  it.todo("die Middleware setzt fuer /api/onboarding/[id]/unterlagen/dateien/[dateiId] keine eigene CSP");
+  it("die Middleware setzt fuer /api/onboarding/[id]/unterlagen/dateien/[dateiId] keine eigene CSP — die der Route kommt an", async () => {
+    const d = datei({ anzeigeName: "foto.jpg", mimeType: "image/jpeg", speicherPfad: "uploads/unterlagen/y/x.jpg" });
+    const url = `${BASIS}/api/onboarding/${VORGANG_ID}/unterlagen/dateien/${String(d.id)}`;
+    const vorher = await middleware(anfrage(url, "GET"));
+    expect(vorher.headers.get("Content-Security-Policy")).toBeNull();
+    // Die uebrigen Sicherheitskoepfe bleiben.
+    expect(vorher.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(vorher.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(vorher.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
+
+    // Next.js uebernimmt die Kopfzeilen der Route, die die Middleware nicht gesetzt hat.
+    const res = await oeffnen(String(d.id));
+    const angekommen = new Headers(res.headers);
+    vorher.headers.forEach((wert, name) => angekommen.set(name, wert));
+    expect(angekommen.get("Content-Security-Policy")).toBe("sandbox");
+
+    // Jede andere HR-Route des Vorgangs behaelt die CSP der Middleware.
+    const nebenan = await middleware(anfrage(`${BASIS}/api/onboarding/${VORGANG_ID}/unterlagen`, "GET"));
+    expect(nebenan.headers.get("Content-Security-Policy")).toBe(portalCsp());
+  });
 
   it.each([
     ["ein Entwurf (HR sieht Entwuerfe nie)", { status: "ENTWURF", uebermitteltAm: null }],
@@ -632,6 +654,34 @@ describe("GET …/unterlagen/dateien/[dateiId] — Datei oeffnen", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(mockDateiLesen).not.toHaveBeenCalled();
     expect(udb.audits).toHaveLength(0);
+  });
+
+  it("auch Antworten ohne Datei (401, 403, 404, 500) tragen die CSP des Portals — die Middleware setzt hier keine", async () => {
+    const stumm = jest.spyOn(console, "error").mockImplementation(() => {});
+    const d = datei();
+    const csp = async (res: Response, status: number) => {
+      expect(res.status).toBe(status);
+      expect(res.headers.get("Content-Security-Policy")).toBe(portalCsp());
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+    };
+    mockGetSession.mockResolvedValue(null);
+    await csp(await oeffnen(String(d.id)), 401);
+    mockGetSession.mockResolvedValue(LEITUNG);
+    await csp(await oeffnen(String(d.id)), 403);
+    mockGetSession.mockResolvedValue(HR);
+    await csp(await oeffnen("0b6c1f7e-2a3d-4c5b-9e8f-7a6b5c4d3e2f"), 404);
+    mockGetSession.mockRejectedValueOnce(Object.assign(new Error("weg"), { code: "P1001" }));
+    await csp(await oeffnen(String(d.id)), 500);
+    stumm.mockRestore();
+  });
+
+  it("ein unbekannter oder geerbter Typ geht als Download hinaus — mit der CSP des Portals, nie `inline`", async () => {
+    const d = datei({ mimeType: "toString" });
+    const res = await oeffnen(String(d.id));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("application/octet-stream");
+    expect(res.headers.get("Content-Disposition")).toBe('attachment; filename="Titel_R_ckseite.pdf"');
+    expect(res.headers.get("Content-Security-Policy")).toBe(portalCsp());
   });
 
   it("eine zurueckgewiesene, noch nicht geloeschte Datei laesst sich oeffnen", async () => {

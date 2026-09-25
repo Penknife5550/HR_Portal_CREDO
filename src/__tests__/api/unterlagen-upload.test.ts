@@ -19,10 +19,6 @@
  * Wettlauf „HR zieht zurueck, waehrend die Person hochlaedt" ueber
  * `udb.vorTransaktion` nach (N1). Dateien landen in einem eigenen Verzeichnis
  * unter os.tmpdir(); `process.cwd()` zeigt fuer die Dauer der Tests dorthin.
- *
- * Methoden, die der gemeinsame Fake nicht kennt (`unterlagenPosition.findFirst`,
- * `unterlagenDatei.create`/`findFirst`), haengt dieser Test selbst an —
- * wie es abteilungs-fake-db.ts fuer Erweiterungen vorsieht.
  */
 
 import type { EventEmailResult } from "@/lib/mailer";
@@ -81,13 +77,11 @@ import { access, mkdtemp, readdir, rm, rmdir } from "fs/promises";
 import os from "os";
 import path from "path";
 import {
-  eindeutigkeitsFehler,
   fakePrisma,
   neueDatei,
   neueNachforderung,
   neuePosition,
   neuerUnterlagenLink,
-  realmSicher,
   udb,
   udbLeeren,
   type Zeile,
@@ -103,7 +97,6 @@ import {
   OEFFENTLICHE_KOPFZEILEN,
   oeffentlicherOnboardingVorgang,
   unterlagenDateiHochladen,
-  UPLOAD_MELDUNGEN,
   type OnboardingOeffentlichZeile,
 } from "@/lib/unterlagen-upload";
 import { onboardingUnterlagenVorgang, type OnboardingUnterlagenQuelle } from "@/lib/unterlagen-onboarding";
@@ -124,28 +117,8 @@ import { heuteInBerlin, kalendertagAlsDatum, tageSpaeter } from "@/lib/kalendert
 import { hashToken } from "@/lib/token-hash";
 import { DEFAULT_VERANTWORTLICHE_STELLE } from "@/lib/dsgvo";
 
-// =============================================
-// Fake-Erweiterungen dieses Tests
-// =============================================
-
-type FakeTabelle = Record<string, jest.Mock>;
-const fp = fakePrisma as unknown as Record<string, FakeTabelle>;
-
-fp.unterlagenPosition.findFirst = jest.fn(async (args: Zeile) => {
-  udb.aufrufe.push("unterlagenPosition.findFirst");
-  return ((await fp.unterlagenPosition.findMany(args)) as Zeile[])[0] ?? null;
-});
-fp.unterlagenDatei.findFirst = jest.fn(async (args: Zeile) => {
-  udb.aufrufe.push("unterlagenDatei.findFirst");
-  return ((await fp.unterlagenDatei.findMany(args)) as Zeile[])[0] ?? null;
-});
-fp.unterlagenDatei.create = jest.fn(async ({ data }: { data: Zeile }) => {
-  udb.aufrufe.push("unterlagenDatei.create");
-  if (udb.dateien.some((d) => d.id === data.id)) throw eindeutigkeitsFehler(["id"]);
-  const d = neueDatei(data);
-  udb.dateien.push(d);
-  return realmSicher(d);
-});
+// Die Methoden der gemeinsamen Fake-Datenbank als jest.Mock (Aufrufe, einmalige Fehler).
+const fp = fakePrisma as unknown as Record<string, Record<string, jest.Mock>>;
 
 // =============================================
 // Testdaten
@@ -1004,7 +977,7 @@ describe("POST …/positionen/[positionId]/dateien — Hochladen", () => {
     const res = await hochladen(positionen[0].id as string, [alsDatei(PDF, "geheim-name.pdf")]);
     expect(res.status).toBe(500);
     pruefeKopfzeilen(res);
-    expect(await res.json()).toEqual({ error: UPLOAD_MELDUNGEN.SERVERFEHLER });
+    expect(await res.json()).toEqual({ error: MELDUNGEN.SERVERFEHLER });
     expect(await dateienAufPlatte()).toEqual([]);
     expect(log).toHaveBeenCalledWith("[API] Unterlagen hochladen fehlgeschlagen:", "P1001");
     const geloggt = JSON.stringify(log.mock.calls);
@@ -1236,7 +1209,7 @@ describe("PATCH …/positionen/[positionId] — „Gültig bis“ zwischenspeich
       roh: JSON.stringify({ gueltigBis: null, fuell: "x".repeat(MAX_JSON_BYTES) }),
     });
     expect(res.status).toBe(413);
-    expect(await res.json()).toEqual({ error: UPLOAD_MELDUNGEN.ANFRAGE_ZU_GROSS });
+    expect(await res.json()).toEqual({ error: MELDUNGEN.ANFRAGE_ZU_GROSS });
   });
 });
 

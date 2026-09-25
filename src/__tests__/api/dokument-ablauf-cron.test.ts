@@ -41,6 +41,7 @@ import { tageSpaeter } from "@/lib/minijob-fristen";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
 import { renderEventEmail } from "@/lib/mailer";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
+import { documentTypeLabel } from "@/lib/required-documents";
 
 const SECRET = "test-cron-secret-mindestens-24-zeichen";
 const MS_PER_DAY = 86400000;
@@ -696,6 +697,114 @@ describe("POST /api/cron/dokument-ablauf", () => {
       // muss in der Vorlage stehen. Ein {{...}} hier ginge an die Person.
       expect({ name, to: def!.defaultRecipients.to }).toEqual({ name, to: "" });
       expect({ name, wired: def!.wired }).toEqual({ name, wired: true });
+    }
+  });
+
+  // ---------------------------------------------------------------
+  // Paket 4: unbefristete Nachweise (Z1) und kein Dateiname in der Mail
+  // ---------------------------------------------------------------
+  it("fragt je Vorgang die ausdruecklich unbefristeten Arten mit ab — ohne abgelehnte Scans", async () => {
+    await POST(req());
+    const select = mockPrisma.document.findMany.mock.calls[0][0].select;
+    expect(select.onboarding.select.documents).toEqual({
+      where: {
+        type: { in: ["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS"] },
+        unbefristet: true,
+        status: { not: "REJECTED" },
+      },
+      select: { type: true },
+    });
+  });
+
+  it("Z1: liegt fuer Person und Art ein unbefristeter Nachweis vor, mahnt der Lauf nicht mehr", async () => {
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({
+        gueltigBis: ablaufIn(-3),
+        onboarding: { ...dokument().onboarding, documents: [{ type: "AUFENTHALTSTITEL" }] },
+      }),
+    ]);
+
+    const json = await (await POST(req())).json();
+    expect(json.erinnerungen).toBe(0);
+    expect(json.uebersprungen).toBe(1);
+    expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+    expect(merkerUpdates()).toHaveLength(0);
+    // Der alte Titel ist trotzdem abgelaufen und wird so gefuehrt.
+    expect(json.abgelaufenMarkiert).toBe(1);
+  });
+
+  it("Z1: ein unbefristeter Nachweis einer ANDEREN Art beendet die Mahnung nicht", async () => {
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({ onboarding: { ...dokument().onboarding, documents: [{ type: "ARBEITSERLAUBNIS" }] } }),
+    ]);
+    expect((await (await POST(req())).json()).erinnerungen).toBe(1);
+  });
+
+  it("`dokument_datei` traegt nie den Dateinamen, sondern eine neutrale Bezeichnung", async () => {
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({ fileName: "Titel Anna Mustermann.jpg", uploadedAt: new Date("2026-09-14T08:00:00.000Z") }),
+    ]);
+    await POST(req());
+    const payload = mockTriggerWebhooks.mock.calls[0][1];
+    expect(payload.dokument_datei).toBe("hochgeladen am 14.09.2026");
+    expect(JSON.stringify(payload)).not.toContain("Titel Anna");
+    // Die Abfrage liest den Dateinamen gar nicht erst.
+    expect(mockPrisma.document.findMany.mock.calls[0][0].select).not.toHaveProperty("fileName");
+  });
+
+  it("`dokument_datei`: auch keine frei vergebene Bezeichnung (HR-Freitext, unmaskiert im HTML) — nur Datum, sonst die Art", async () => {
+    const freitext = '<a href="https://boese.example.org">Titel Rückseite</a>';
+    mockPrisma.document.findMany.mockResolvedValue([
+      dokument({ id: "doc1", bezeichnung: freitext, uploadedAt: new Date("2026-09-13T23:30:00.000Z") }),
+      dokument({ id: "doc2", type: "ARBEITSERLAUBNIS", fileName: "erlaubnis.pdf" }),
+    ]);
+    await POST(req());
+    // 23:30 UTC ist in Berlin schon der 14.09.
+    expect(mockTriggerWebhooks.mock.calls[0][1].dokument_datei).toBe("hochgeladen am 14.09.2026");
+    expect(mockTriggerWebhooks.mock.calls[1][1].dokument_datei).toBe(documentTypeLabel("ARBEITSERLAUBNIS"));
+    for (const [, payload] of mockTriggerWebhooks.mock.calls) {
+      expect(JSON.stringify(payload)).not.toContain("boese.example.org");
+      expect(JSON.stringify(payload)).not.toContain("Rückseite");
+    }
+    // Die Abfrage liest die Bezeichnung gar nicht erst.
+    expect(mockPrisma.document.findMany.mock.calls[0][0].select).not.toHaveProperty("bezeichnung");
+  });
+
+  it("beide Vorlagen lesen sich mit der neutralen Bezeichnung (ohne Vorlagenaenderung)", () => {
+    for (const event of ["dokument-ablauf-warnung", "dokument-abgelaufen"]) {
+      const vorlage = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event)!;
+      const { rendered } = renderEventEmail(
+        {
+          subject: vorlage.subject,
+          bodyHtml: vorlage.bodyHtml,
+          bodyText: vorlage.bodyText,
+          recipientTo: "personal@example.org",
+          recipientCc: "",
+          recipientBcc: "",
+          recipientReplyTo: "",
+        },
+        event,
+        {
+          onboardingId: "onb1",
+          displayId: "2026-GYM-001",
+          mitarbeiter_name: "Max Mustermann",
+          mitarbeiter_email: "max@example.org",
+          organization: "Gymnasium",
+          dokument_typ: "Aufenthaltstitel",
+          dokument_datei: "hochgeladen am 14.09.2026",
+          gueltig_bis: "08.10.2026",
+          tage_verbleibend: 30,
+          tage_ueberfaellig: 0,
+          dringlichkeit: "Warnung",
+          frist_text: "Läuft in 30 Tagen ab (08.10.2026)",
+          portalLink: "http://localhost:3000/dashboard/onb1",
+        }
+      );
+      expect({ event, text: rendered!.text }).toEqual({
+        event,
+        text: expect.stringContaining("Aufenthaltstitel (hochgeladen am 14.09.2026)"),
+      });
+      expect(rendered!.html).toContain("hochgeladen am 14.09.2026</span>");
     }
   });
 });

@@ -8,19 +8,30 @@
  * Sitzung, EINE Dienstfunktion, Antwort 1:1. Rolle (HR_EDIT_ROLES), Mandant,
  * Bindung der Datei an den Vorgang, 404 fuer Entwuerfe, nie uebermittelte,
  * geloeschte und uebernommene Dateien (derselbe Text), die Kopfzeilen
- * (`no-store`, `Cross-Origin-Resource-Policy`, bei Bildern `sandbox`) und das
- * Protokoll stehen dort. Uebernommene Dateien liefert die Dokumentroute
- * (`/api/onboarding/[id]/documents/[docId]`).
+ * (`no-store`, `Cross-Origin-Resource-Policy`, die CSP: bei Bildern `sandbox`,
+ * sonst die des Portals) und das Protokoll stehen dort. Uebernommene Dateien
+ * liefert die Dokumentroute (`/api/onboarding/[id]/documents/[docId]`).
  *
- * Die `sandbox` der Route wirkt erst, wenn die Middleware fuer diesen Pfad
- * keine eigene CSP setzt: Next.js haengt einen Kopf der Route nur an, wenn die
- * Middleware ihn nicht schon gesetzt hat (Einzelheiten bei
- * unterlagenDateiOeffnen).
+ * Die Middleware setzt fuer diesen Pfad KEINE eigene CSP
+ * (`routeSetztEigeneCsp`, src/lib/content-security-policy.ts): Next.js haengt
+ * einen Kopf der Route nur an, wenn die Middleware ihn nicht schon gesetzt hat.
+ * Deshalb traegt hier JEDE Antwort ihre CSP selbst — auch 401, die
+ * Fehlerantworten des Dienstes und 500 (`antwortOhneDatei`), sonst stuenden
+ * sie als einzige Antworten des Portals ohne CSP da.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { portalCsp } from "@/lib/content-security-policy";
 import { fehlerKennung, unterlagenDateiOeffnen } from "@/lib/unterlagen-dienst";
+
+/** Eine JSON-Antwort ohne Datei: `no-store` und die CSP des Portals, wie sonst die Middleware. */
+function antwortOhneDatei(body: unknown, status: number, headers: Record<string, string> = {}): NextResponse {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store", ...headers, "Content-Security-Policy": portalCsp() },
+  });
+}
 
 export async function GET(
   _request: NextRequest,
@@ -28,21 +39,18 @@ export async function GET(
 ) {
   try {
     const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+    if (!session) return antwortOhneDatei({ error: "Nicht authentifiziert" }, 401);
 
     const { id, dateiId } = await params;
     const ergebnis = await unterlagenDateiOeffnen({ modul: "ONBOARDING", vorgangId: id, dateiId, session });
     if (!ergebnis.ok) {
-      return NextResponse.json(ergebnis.antwort.body, {
-        status: ergebnis.antwort.status,
-        headers: { "Cache-Control": "no-store", ...ergebnis.antwort.headers },
-      });
+      return antwortOhneDatei(ergebnis.antwort.body, ergebnis.antwort.status, ergebnis.antwort.headers);
     }
     // Buffer als Uint8Array — so nimmt NextResponse ihn an.
     return new NextResponse(new Uint8Array(ergebnis.inhalt), { status: 200, headers: ergebnis.headers });
   } catch (error) {
     // Nur der Fehlercode: Die Meldung kann Pfade tragen.
     console.error("[API] Unterlagen-Datei nicht geoeffnet:", fehlerKennung(error));
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+    return antwortOhneDatei({ error: "Interner Serverfehler" }, 500);
   }
 }

@@ -156,17 +156,6 @@ export const OEFFENTLICHE_KOPFZEILEN: Readonly<Record<string, string>> = {
 };
 
 /**
- * Texte, die `MELDUNGEN` (unterlagen.ts) nicht kennt. Nur fuer Faelle, die
- * eine echte Upload-Seite nie ausloest.
- */
-export const UPLOAD_MELDUNGEN = {
-  /** 413 auf einen JSON-Body ueber `MAX_JSON_BYTES` (Gültig bis, Übermitteln). */
-  ANFRAGE_ZU_GROSS: "Die Anfrage ist zu groß.",
-  /** 500 — die Route loggt nur den Fehlercode. */
-  SERVERFEHLER: "Interner Serverfehler",
-} as const;
-
-/**
  * Obergrenze eines JSON-Bodys (Gültig bis, Übermitteln). Ohne Middleware setzt
  * Next.js keine Grenze; ein `request.text()` laese sonst jede Groesse. 30
  * Positionen mit Datum brauchen rund 2 KiB.
@@ -184,7 +173,7 @@ export function oeffentlicheAntwort(antwort: OeffentlicheDienstAntwort): NextRes
 /** 500 der Routen — ohne jede Angabe zum Fehler. */
 export const OEFFENTLICHER_SERVERFEHLER: OeffentlicheDienstAntwort = {
   status: 500,
-  body: { error: UPLOAD_MELDUNGEN.SERVERFEHLER },
+  body: { error: MELDUNGEN.SERVERFEHLER },
 };
 
 function fehler(
@@ -665,7 +654,7 @@ async function jsonLesen<T>(
       ok: false,
       antwort:
         body.status === 413
-          ? fehler(413, UPLOAD_MELDUNGEN.ANFRAGE_ZU_GROSS)
+          ? fehler(413, MELDUNGEN.ANFRAGE_ZU_GROSS)
           : fehler(400, MELDUNGEN.UNGUELTIGE_EINGABE),
     };
   }
@@ -968,7 +957,7 @@ export async function unterlagenGueltigBisSpeichern(
 ): Promise<OeffentlicheDienstAntwort> {
   const vorab = vorpruefen(request, token);
   if (vorab) return vorab;
-  if (contentLengthZuGross(request, MAX_JSON_BYTES)) return fehler(413, UPLOAD_MELDUNGEN.ANFRAGE_ZU_GROSS);
+  if (contentLengthZuGross(request, MAX_JSON_BYTES)) return fehler(413, MELDUNGEN.ANFRAGE_ZU_GROSS);
 
   const gefunden = await linkLaden(token, heuteInBerlin(jetzt));
   if (!gefunden.ok) return gefunden.antwort;
@@ -1032,7 +1021,7 @@ export async function unterlagenUebermitteln(
 ): Promise<OeffentlicheDienstAntwort> {
   const vorab = vorpruefen(request, token);
   if (vorab) return vorab;
-  if (contentLengthZuGross(request, MAX_JSON_BYTES)) return fehler(413, UPLOAD_MELDUNGEN.ANFRAGE_ZU_GROSS);
+  if (contentLengthZuGross(request, MAX_JSON_BYTES)) return fehler(413, MELDUNGEN.ANFRAGE_ZU_GROSS);
 
   const gefunden = await linkLaden(token, heuteInBerlin(jetzt));
   if (!gefunden.ok) return gefunden.antwort;

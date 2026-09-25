@@ -52,7 +52,7 @@ import { NextRequest } from "next/server";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import { DOCX_MIME } from "@/lib/file-upload";
+import { DOCX_MIME, ENDUNG_FUER_DATEITYP, istErkannterDateityp } from "@/lib/file-upload";
 
 const VORGANG = "3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b";
 const ANDERER = "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d";
@@ -223,6 +223,26 @@ describe("Kopfzeilen", () => {
     const antwort = await laden();
     expect(antwort.headers.get("Content-Type")).toBe("application/octet-stream");
     expect(antwort.headers.get("Content-Disposition")).toBe('attachment; filename="evil.exe.bin"');
+  });
+
+  test.each(["toString", "constructor", "__proto__", "hasOwnProperty"])(
+    "ein geerbter Name wie „%s“ gilt nie als erkannter Typ (Typwaechter istErkannterDateityp)",
+    async (mimeType) => {
+      mockPrisma.document.findFirst.mockResolvedValue({ ...DOKUMENT, fileName: "x.hta", mimeType });
+      const antwort = await laden();
+      expect(antwort.status).toBe(200);
+      expect(antwort.headers.get("Content-Type")).toBe("application/octet-stream");
+      expect(antwort.headers.get("Content-Disposition")).toBe('attachment; filename="x.bin"');
+    },
+  );
+});
+
+describe("istErkannterDateityp — der gemeinsame Typwaechter", () => {
+  test("genau die aus den Bytes erkannten Typen", () => {
+    for (const typ of Object.keys(ENDUNG_FUER_DATEITYP)) expect(istErkannterDateityp(typ)).toBe(true);
+    for (const typ of ["application/msword", DOCX_MIME, "text/html", "toString", "", null, undefined, 42]) {
+      expect(istErkannterDateityp(typ)).toBe(false);
+    }
   });
 });
 

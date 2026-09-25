@@ -295,6 +295,21 @@ export const ENDUNG_FUER_DATEITYP: Readonly<Record<ErkannterDateityp, string>> =
   "image/webp": ".webp",
 };
 
+/**
+ * Ist ein GESPEICHERTER Typ (`mimeType` aus der Datenbank) einer der aus den
+ * Bytes erkannten? Der eine Typwaechter fuer alle Stellen, die danach
+ * entscheiden — Endung auf der Platte, `inline` oder Download, Endung des
+ * Download-Namens. Er folgt `ENDUNG_FUER_DATEITYP`: Ein neuer erkannter Typ
+ * braucht keine zweite Liste.
+ *
+ * Eigener Schluessel (`hasOwnProperty`), nicht `in`: Das faende auch geerbte
+ * wie `toString` — und ein Typ „toString" aus einer manipulierten Zeile gaelte
+ * sonst als erkannt.
+ */
+export function istErkannterDateityp(mimeType: unknown): mimeType is ErkannterDateityp {
+  return typeof mimeType === "string" && Object.prototype.hasOwnProperty.call(ENDUNG_FUER_DATEITYP, mimeType);
+}
+
 export type DateitypErgebnis =
   | { ok: true; mimeType: ErkannterDateityp; endung: string }
   /** `%PDF-` am Anfang, aber kein `%%EOF` am Ende: abgebrochen gespeichert oder gescannt. */

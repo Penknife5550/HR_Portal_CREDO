@@ -18,10 +18,16 @@
  *   GET  …/unterlagen/dateien/[dateiId]    → unterlagenDateiOeffnen
  *   GET  /api/onboarding/[id]              → unterlagenUebersichtLaden
  *   Upload-Seite, „Übermitteln" (Schritt 5) → hrVollstaendigMelden (nach der Antwort)
- *   Taeglicher Lauf (Schritt 7)            → personenMailSenden samt unterlagenLinkUrl
- *                                            (die Payload baut der Aufrufer),
+ *   Taeglicher Lauf (unterlagen-lauf.ts)   → unterlagenBaustein, linkAnlegen,
+ *                                            personenMailSenden samt unterlagenLinkUrl
+ *                                            (Payload ueber mailVorgang/mailPosition,
+ *                                            Merker per `merker`, untaugliche Vorlage
+ *                                            per `ohneVersand`), personenVorlagePruefen,
+ *                                            fruehereLinksSperrenIn (nachgeholtes
+ *                                            „erneut senden"),
  *                                            hrMeldungSenden (Merker per `merker`),
  *                                            hrVollstaendigMelden,
+ *                                            unterlagenLaufZurueckziehen (Z2),
  *                                            unterlagenSperreNehmen/-Freigeben
  *
  * Die Regeln (Feinplanung docs/module/onboarding/paket4-feinplanung.md):
@@ -54,7 +60,9 @@
  *   5. **Entwerten** (5.1): bei Adresswechsel sofort, in derselben Transaktion
  *      wie der neue Link (ADRESSE → 404); mit „frühere Links sperren" erst NACH
  *      SENT (GESPERRT → 410). Nie bei FAILED oder SKIPPED — ein SMTP-Timeout
- *      meldet FAILED auch bei angenommener Mail.
+ *      meldet FAILED auch bei angenommener Mail. Der Sperrwunsch steht am
+ *      neuen Link (`fruehereSperren`); holt der Lauf die Mail nach, sperrt er
+ *      nach SEINEM SENT (`fruehereLinksSperrenIn`).
  *   6. **Mail-Bremse** (5.2): hoechstens 6 Mails je Stunde und 20 je Tag an die
  *      Person, gezaehlt aus `UnterlagenLink` (von HR angelegt, `erstelltVonId`
  *      gesetzt) — das uebersteht einen Neustart. Darueber 429 mit
@@ -105,7 +113,8 @@ import { prisma } from "@/lib/db";
 import { ladeErlaubteDomains } from "@/lib/empfaenger-allowlist";
 import { empfaengerFreigegeben } from "@/lib/empfaenger-freigabe";
 import { betreffMitVerschachteltenMarkern, getEventDefinition, verboteneBetreffVariablen } from "@/lib/events";
-import { asciiFilename, ENDUNG_FUER_DATEITYP, type LoeschErgebnis } from "@/lib/file-upload";
+import { portalCsp } from "@/lib/content-security-policy";
+import { asciiFilename, istErkannterDateityp, type LoeschErgebnis } from "@/lib/file-upload";
 import { ablaufKalendertag, heuteInBerlin, kalendertagAlsDatum, type Kalendertag } from "@/lib/kalendertag";
 import { resolveEventTemplate, sendEventEmail, type EventEmailResult } from "@/lib/mailer";
 import { canAccessProcess, HR_EDIT_ROLES, type SessionPayload } from "@/lib/permissions";
@@ -120,6 +129,7 @@ import {
   erneutSendenSperreBis,
   erneutSendenStatus,
   fristPruefen,
+  istUnterlagenModul,
   laufendSchluessel,
   linkGueltigBisFuer,
   linkLebt,
@@ -203,8 +213,9 @@ export interface UnterlagenDienstAntwort {
  * Die Spalten, ueber die eine Nachforderung an ihrem Vorgang haengt — genau
  * EINE ist gesetzt, passend zu `modul` (3.1). Stufe 2 ergaenzt hier
  * offboardingId, civilServiceId, …; Typen und Auswahl ziehen von selbst mit.
+ * Exportiert fuer den taeglichen Lauf, der Nachforderungen aller Module liest.
  */
-const BEZUG_AUSWAHL = { onboardingId: true } as const satisfies Prisma.UnterlagenNachforderungSelect;
+export const BEZUG_AUSWAHL = { onboardingId: true } as const satisfies Prisma.UnterlagenNachforderungSelect;
 type BezugSpalte = keyof typeof BEZUG_AUSWAHL;
 /** Beim Anlegen: genau eine Bezugsspalte (Stufe 2: eine Union). */
 export type NachforderungsBezug = { [K in BezugSpalte]: Record<K, string> }[BezugSpalte];
@@ -346,6 +357,15 @@ const BAUSTEINE: Readonly<Record<UnterlagenModul, UnterlagenModulBaustein>> = {
   ONBOARDING: onboardingBaustein,
 };
 
+/**
+ * Der Baustein zu einem gespeicherten `modul` — `null` fuer ein unbekanntes
+ * (etwa eine Zeile aus einer spaeteren Stufe nach einem Rueckfall). Fuer den
+ * taeglichen Lauf, der Nachforderungen aller Module liest.
+ */
+export function unterlagenBaustein(modul: string): UnterlagenModulBaustein | null {
+  return istUnterlagenModul(modul) ? BAUSTEINE[modul] : null;
+}
+
 // =============================================
 // Kleine Helfer
 // =============================================
@@ -483,6 +503,13 @@ export type UnterlagenPersonenEvent =
   | typeof UNTERLAGEN_EVENTS.ERINNERUNG
   | typeof UNTERLAGEN_EVENTS.ZURUECKGEWIESEN;
 
+/**
+ * Merker des taeglichen Laufs zu einer Mail an die Person: laeuft bei SENT und
+ * SKIPPED in DERSELBEN Transaktion wie das Ergebnis am Link, bei FAILED nie
+ * (Hausregel, Abschnitt 9).
+ */
+export type PersonenMailMerker = (tx: Prisma.TransactionClient, status: "SENT" | "SKIPPED") => Promise<void>;
+
 /** Die beiden HR-Mails — ueber `triggerWebhooks`, ohne Link, Adresse und Unterlagennamen. */
 export type UnterlagenHrEvent = typeof UNTERLAGEN_EVENTS.VOLLSTAENDIG | typeof UNTERLAGEN_EVENTS.FRIST_VERSTRICHEN;
 
@@ -499,7 +526,7 @@ export type UnterlagenHrEvent = typeof UNTERLAGEN_EVENTS.VOLLSTAENDIG | typeof U
  *     Der Betreff steht 90 Tage im Versandprotokoll. Der Editor weist so einen
  *     Betreff schon ab; hier faellt auch eine am Editor vorbei gespeicherte Zeile auf.
  */
-async function personenVorlagePruefen(event: UnterlagenPersonenEvent): Promise<UnterlagenDienstAntwort | null> {
+export async function personenVorlagePruefen(event: UnterlagenPersonenEvent): Promise<UnterlagenDienstAntwort | null> {
   const name = getEventDefinition(event)?.name ?? event;
   const vorlage = await resolveEventTemplate(event);
   if (!vorlage) return fehler(409, meldungVorlage("VORLAGE_FEHLT", name), "VORLAGE_FEHLT");
@@ -568,8 +595,18 @@ async function mailBremsePruefen(
  * Aktion, VOR dem Versand, mit `mailStatus AUSSTEHEND`. Gespeichert wird nur
  * der Hash; der Klartext geht an den Aufrufer und von dort nur in die Mail.
  * `gueltigBis` = Frist + 14 (5.1).
+ *
+ * Auch der taegliche Lauf legt seine Links hierueber an — mit
+ * `erstelltVonId: null` (zaehlt nicht in die Mail-Bremse von HR, ist aber die
+ * Spur fuer den Lauf-Waechter) und beim Nachholen mit dem Zaehler
+ * `nachholVersuche` des neuen Versuchs.
+ *
+ * `fruehereSperren` steht AM Link („Link erneut senden" mit „frühere Links
+ * sperren"): Scheitert die Mail, holt der Lauf sie nach und sperrt die
+ * frueheren Links erst nach SEINEM SENT — der Wunsch von HR geht so nicht
+ * verloren (5.1).
  */
-async function linkAnlegen(
+export async function linkAnlegen(
   tx: Prisma.TransactionClient,
   opts: {
     nachforderungId: string;
@@ -578,6 +615,10 @@ async function linkAnlegen(
     frist: Kalendertag;
     erstelltVonId: string | null;
     positionId?: string | null;
+    /** Nur beim Nachholen durch den Lauf: der wievielte Versuch (Abschnitt 9, hoechstens 3). */
+    nachholVersuche?: number;
+    /** Nach SENT dieser Mail die frueheren Links sperren (erneut senden, auch nachgeholt). */
+    fruehereSperren?: boolean;
     jetzt: Date;
   },
 ): Promise<{ linkId: string; token: string }> {
@@ -591,6 +632,8 @@ async function linkAnlegen(
       positionId: opts.positionId ?? null,
       empfaenger: opts.empfaenger,
       erstelltVonId: opts.erstelltVonId,
+      ...(opts.nachholVersuche !== undefined ? { nachholVersuche: opts.nachholVersuche } : {}),
+      ...(opts.fruehereSperren === true ? { fruehereSperren: true } : {}),
       createdAt: opts.jetzt,
     },
     select: { id: true },
@@ -603,12 +646,17 @@ async function linkAnlegen(
  * AUSSTEHEND, damit nichts ein spaeteres Ergebnis ueberschreibt. Scheitert die
  * Datenbank, wird EINMAL wiederholt (N2).
  *
+ * `merker` (nur der taegliche Lauf): bei SENT und SKIPPED in DERSELBEN
+ * Transaktion wie das Ergebnis — Merker und Protokoll gehen mit dem Nachweis
+ * am Link zusammen durch oder gar nicht (Abschnitt 9). Bei FAILED nie.
+ *
  * @returns false, wenn auch der zweite Versuch scheiterte
  */
 async function linkErgebnisSpeichern(
   linkId: string,
   ergebnis: Pick<EventEmailResult, "status" | "detail" | "messageId">,
   jetzt: Date,
+  merker?: PersonenMailMerker,
 ): Promise<boolean> {
   const data: Prisma.UnterlagenLinkUpdateManyMutationInput = {
     mailStatus: ergebnis.status,
@@ -616,9 +664,17 @@ async function linkErgebnisSpeichern(
     messageId: ergebnis.status === "SENT" ? (ergebnis.messageId ?? null) : null,
     ...(ergebnis.status === "SENT" ? { gesendetAm: jetzt } : {}),
   };
+  const status = ergebnis.status;
   for (let versuch = 1; versuch <= 2; versuch++) {
     try {
-      await prisma.unterlagenLink.updateMany({ where: { id: linkId, mailStatus: "AUSSTEHEND" }, data });
+      if (merker && status !== "FAILED") {
+        await prisma.$transaction(async (tx) => {
+          await tx.unterlagenLink.updateMany({ where: { id: linkId, mailStatus: "AUSSTEHEND" }, data });
+          await merker(tx, status);
+        });
+      } else {
+        await prisma.unterlagenLink.updateMany({ where: { id: linkId, mailStatus: "AUSSTEHEND" }, data });
+      }
       return true;
     } catch (err) {
       console.error(`[Unterlagen] Ergebnis der Mail (Link ${linkId}) nicht gespeichert, Versuch ${versuch}:`, fehlerKennung(err));
@@ -638,13 +694,32 @@ async function linkErgebnisSpeichern(
  * Wirft nie. Scheitert schon die Vorbereitung (Datenbank), ging nichts hinaus:
  * Der Link steht auf FAILED, der Lauf holt nach. Ist die Mail versendet und
  * nur das Speichern scheitert, meldet das Ergebnis `nachweisFehlt` (N2).
+ *
+ * Nur fuer den taeglichen Lauf:
+ *   - `merker` laeuft bei SENT und SKIPPED in derselben Transaktion wie das
+ *     Ergebnis am Link (Erinnerung: `erinnertFuerFrist` samt Protokoll;
+ *     Nachholen: das Protokoll) — bei FAILED nie, den Fehlschlag holt der
+ *     naechste Lauf nach.
+ *   - `ohneVersand`: Die gespeicherte Vorlage taugt nicht (`personenVorlagePruefen`,
+ *     etwa `{{link}}` im Betreff — der stuende 90 Tage im Versandprotokoll).
+ *     Dann geht NICHTS hinaus; der Link steht mit diesem Grund auf SKIPPED,
+ *     sichtbar im Mailverlauf der Karte.
  */
 export async function personenMailSenden(opts: {
   event: UnterlagenPersonenEvent;
   linkId: string;
   jetzt: Date;
   vorbereiten: () => Promise<{ empfaenger: string; payload: UnterlagenMailPayload }>;
+  merker?: PersonenMailMerker;
+  ohneVersand?: string;
 }): Promise<UnterlagenMailErgebnis> {
+  if (opts.ohneVersand !== undefined) {
+    const detail = kuerzen(opts.ohneVersand);
+    const gespeichert = await linkErgebnisSpeichern(opts.linkId, { status: "SKIPPED", detail: detail ?? undefined }, opts.jetzt, opts.merker);
+    if (!gespeichert) console.error(`[Unterlagen] Uebersprungene Mail ${opts.event} (Link ${opts.linkId}) nicht gespeichert.`);
+    return { status: "SKIPPED", detail };
+  }
+
   let vorbereitet: { empfaenger: string; payload: UnterlagenMailPayload };
   try {
     vorbereitet = await opts.vorbereiten();
@@ -656,7 +731,7 @@ export async function personenMailSenden(opts: {
   }
 
   const ergebnis = await sendEventEmail(opts.event, vorbereitet.payload, { overrideTo: vorbereitet.empfaenger });
-  const gespeichert = await linkErgebnisSpeichern(opts.linkId, ergebnis, opts.jetzt);
+  const gespeichert = await linkErgebnisSpeichern(opts.linkId, ergebnis, opts.jetzt, opts.merker);
   return {
     status: ergebnis.status,
     detail: ergebnis.status === "SENT" ? null : kuerzen(ergebnis.detail),
@@ -684,7 +759,8 @@ const MAIL_AUSWAHL = {
   },
 } satisfies Prisma.UnterlagenNachforderungSelect;
 
-function mailVorgang(
+/** Der Vorgang fuer die Payload-Bausteine (unterlagen-mail.ts) — auch fuer den taeglichen Lauf. */
+export function mailVorgang(
   baustein: UnterlagenModulBaustein,
   v: UnterlagenVorgang,
   nachforderungId: string,
@@ -703,7 +779,8 @@ function mailVorgang(
   };
 }
 
-function mailPosition(
+/** Eine Position fuer die Payload-Bausteine; `neu` traegt „(neu)“ (nur Ergaenzung). Auch fuer den Lauf. */
+export function mailPosition(
   p: { id: string; bezeichnung: string; hinweis: string | null; sensibel: boolean; originalErforderlich: boolean; status: string; einreichungen: number },
   neu: ReadonlySet<string>,
 ): UnterlagenMailPosition {
@@ -808,7 +885,9 @@ export function hrMeldungOhneEmpfaenger(status: string | null | undefined, grund
  * `fristGemeldetFuer` — bedingt auf den gelesenen Fristwert, im selben Commit
  * wie das AuditLog. Er laeuft bei SENT und SKIPPED, nie bei FAILED: Den
  * Fehlschlag holt der naechste Lauf nach. Scheitert die Transaktion, bleibt
- * alles ungeschrieben (auch der Merker), und der Lauf versucht es erneut.
+ * alles ungeschrieben (auch der Merker), und der Lauf versucht es erneut —
+ * nach SENT meldet das Ergebnis dann `nachweisFehlt` (N2), damit der Lauf es
+ * als Fehler zaehlt: Die Mail ist draussen, der Merker nicht.
  *
  * Wirft nie; ein Dispatcher ohne Ergebnis zaehlt als FAILED.
  */
@@ -846,6 +925,7 @@ export async function hrMeldungSenden(opts: {
     });
   } catch (err) {
     console.error(`[Unterlagen] Ergebnis der HR-Mail ${opts.event} (${opts.nachforderungId}) nicht gespeichert:`, fehlerKennung(err));
+    if (mail.status === "SENT") return { ...mail, nachweisFehlt: true };
   }
   return mail;
 }
@@ -1462,19 +1542,36 @@ async function fristAendern(ctx: AktionsKontext, e: Aktion<"frist-aendern">): Pr
 // ---- erneut-senden ----
 
 /**
- * „frühere Links sperren" NACH SENT: alle aelteren, noch nicht entwerteten
- * Links als GESPERRT (410). Scheitert die Datenbank, wird EINMAL wiederholt,
- * wie beim Ergebnis der Mail (N2).
+ * „frühere Links sperren" (5.1): alle aelteren, noch nicht entwerteten Links
+ * der Nachforderung als GESPERRT (410) — nur NACH SENT der Mail zu
+ * `neuerLinkId`. Auch fuer den Lauf, der eine gescheiterte Mail mit diesem
+ * Wunsch nachholt (in der Transaktion seines Nachweises).
+ *
+ * @returns wie viele Links gesperrt wurden
+ */
+export async function fruehereLinksSperrenIn(
+  tx: Prisma.TransactionClient,
+  nachforderungId: string,
+  neuerLinkId: string,
+  jetzt: Date,
+): Promise<number> {
+  const r = await tx.unterlagenLink.updateMany({
+    where: { nachforderungId, id: { not: neuerLinkId }, entwertetAm: null },
+    data: { entwertetAm: jetzt, entwertetGrund: "GESPERRT" },
+  });
+  return r.count;
+}
+
+/**
+ * „frühere Links sperren" NACH SENT (HR-Aktion). Scheitert die Datenbank,
+ * wird EINMAL wiederholt, wie beim Ergebnis der Mail (N2).
  *
  * @returns false, wenn auch der zweite Versuch scheiterte
  */
 async function fruehereLinksSperren(nachforderungId: string, neuerLinkId: string, jetzt: Date): Promise<boolean> {
   for (let versuch = 1; versuch <= 2; versuch++) {
     try {
-      await prisma.unterlagenLink.updateMany({
-        where: { nachforderungId, id: { not: neuerLinkId }, entwertetAm: null },
-        data: { entwertetAm: jetzt, entwertetGrund: "GESPERRT" },
-      });
+      await fruehereLinksSperrenIn(prisma, nachforderungId, neuerLinkId, jetzt);
       return true;
     } catch (err) {
       console.error(`[Unterlagen] Frühere Links (${nachforderungId}) nicht gesperrt, Versuch ${versuch}:`, fehlerKennung(err));
@@ -1492,7 +1589,9 @@ async function fruehereLinksSperren(nachforderungId: string, neuerLinkId: string
  * des Vorgangs und „abweichend" neu setzen; alle aelteren Links in DERSELBEN
  * Transaktion als ADRESSE entwerten (404 — wer die Mail an eine falsche
  * Adresse bekam, erfaehrt nichts). „frühere Links sperren" entwertet erst
- * NACH SENT (GESPERRT, 410).
+ * NACH SENT (GESPERRT, 410); der Wunsch steht am neuen Link
+ * (`fruehereSperren`) — holt der Lauf eine gescheiterte Mail nach, sperrt er
+ * nach seinem SENT.
  *
  * Antwort 201 (SENT), 502 (FAILED), 409 (SKIPPED) — die Mail ist hier die
  * Aktion selbst (CL:244). Gespeicherte Aenderungen (neue Adresse, neuer Link)
@@ -1553,6 +1652,8 @@ async function erneutSenden(ctx: AktionsKontext, e: Aktion<"erneut-senden">): Pr
       empfaenger: empfaenger.adresse,
       frist: kalendertagVon(frisch.frist),
       erstelltVonId: ctx.session.userId,
+      // Am Link gespeichert: Scheitert die Mail, sperrt der Lauf nach seinem SENT.
+      fruehereSperren: e.fruehereSperren === true,
       jetzt: ctx.jetzt,
     });
     await tx.auditLog.create({
@@ -1658,6 +1759,57 @@ async function entwuerfeNachDemCommitLoeschen(
 // ---- zurueckziehen ----
 
 /**
+ * Der Zustandswechsel „Zurückziehen" IN der Transaktion des Aufrufers — ein
+ * Ablauf fuer HR (EP-9) und fuer den taeglichen Lauf bei einem eingestellten
+ * Vorgang (Z2). Sperre UND Wechsel in einem bedingten Schreiben: Nur wer die
+ * Nachforderung noch LAUFEND vorfindet, zieht sie zurueck. Danach die Dateien
+ * (`dateienAbraeumen`) und das Protokoll, im selben Commit. Die Entwurfsdateien
+ * loescht der Aufrufer NACH dem Commit (`entwuerfeNachDemCommitLoeschen`).
+ *
+ * @returns null, wenn die Nachforderung nicht (mehr) LAUFEND ist
+ */
+async function zurueckziehenIn(
+  tx: Prisma.TransactionClient,
+  opts: {
+    nachforderungId: string;
+    bereich: Prisma.UnterlagenNachforderungWhereInput;
+    jetzt: Date;
+    /** HR-Kraft; `null` = der taegliche Lauf (Z2). */
+    vonId: string | null;
+    protokoll: (details: Record<string, unknown>) => Prisma.AuditLogUncheckedCreateInput;
+  },
+): Promise<{ pfade: Array<string | null>; entwuerfeGeloescht: number; dateienVerworfen: number } | null> {
+  const merker = vollstaendigMerker("ZURUECKGEZOGEN", {
+    vollstaendigSeit: null,
+    vollstaendigGemeldetAm: null,
+    positionenNachher: [],
+    jetzt: opts.jetzt,
+  });
+  const r = await tx.unterlagenNachforderung.updateMany({
+    where: { id: opts.nachforderungId, ...opts.bereich, status: "LAUFEND" },
+    data: {
+      status: "ZURUECKGEZOGEN",
+      laufendSchluessel: null,
+      zurueckgezogenAm: opts.jetzt,
+      zurueckgezogenVonId: opts.vonId,
+      vollstaendigSeit: merker.vollstaendigSeit,
+      vollstaendigGemeldetAm: merker.vollstaendigGemeldetAm,
+    },
+  });
+  if (r.count === 0) return null;
+
+  const abgeraeumt = await dateienAbraeumen(tx, { nachforderungId: opts.nachforderungId, jetzt: opts.jetzt });
+  await tx.auditLog.create({
+    data: opts.protokoll({
+      nachforderungId: opts.nachforderungId,
+      entwuerfeGeloescht: abgeraeumt.entwuerfeGeloescht,
+      dateienVerworfen: abgeraeumt.dateienVerworfen,
+    }),
+  });
+  return abgeraeumt;
+}
+
+/**
  * „Zurückziehen…" (Endzustand, EP-9): keine Mail. Entwuerfe verschwinden
  * sofort, eingereichte Dateien werden VERWORFEN (`dateienAbraeumen`).
  * Positionen bleiben stehen, wie sie sind (2.2); der Merker „vollständig"
@@ -1671,39 +1823,15 @@ async function zurueckziehen(ctx: AktionsKontext, e: Aktion<"zurueckziehen">): P
   if (!uebergang.erlaubt) return fehler(409, uebergang.meldung, uebergang.grund);
 
   const ergebnis = await prisma.$transaction(async (tx) => {
-    // Sperre UND Zustandswechsel in einem bedingten Schreiben: Nur wer die
-    // Nachforderung noch LAUFEND vorfindet, zieht sie zurueck.
-    const merker = vollstaendigMerker("ZURUECKGEZOGEN", {
-      vollstaendigSeit: null,
-      vollstaendigGemeldetAm: null,
-      positionenNachher: [],
-      jetzt: ctx.jetzt,
-    });
-    const r = await tx.unterlagenNachforderung.updateMany({
-      where: { id: stand.id, ...ctx.baustein.bereichWhere(ctx.v.id), status: "LAUFEND" },
-      data: {
-        status: "ZURUECKGEZOGEN",
-        laufendSchluessel: null,
-        zurueckgezogenAm: ctx.jetzt,
-        zurueckgezogenVonId: ctx.session.userId,
-        vollstaendigSeit: merker.vollstaendigSeit,
-        vollstaendigGemeldetAm: merker.vollstaendigGemeldetAm,
-      },
-    });
-    if (r.count === 0) throw new UnterlagenAbbruch(fehler(409, MELDUNGEN.NICHT_LAUFEND, "NICHT_LAUFEND"));
-
-    const { pfade, entwuerfeGeloescht, dateienVerworfen } = await dateienAbraeumen(tx, {
+    const abgeraeumt = await zurueckziehenIn(tx, {
       nachforderungId: stand.id,
+      bereich: ctx.baustein.bereichWhere(ctx.v.id),
       jetzt: ctx.jetzt,
+      vonId: ctx.session.userId,
+      protokoll: (details) => auditDaten(ctx, UNTERLAGEN_AUDIT.ZURUECKGEZOGEN, details),
     });
-    await tx.auditLog.create({
-      data: auditDaten(ctx, UNTERLAGEN_AUDIT.ZURUECKGEZOGEN, {
-        nachforderungId: stand.id,
-        entwuerfeGeloescht,
-        dateienVerworfen,
-      }),
-    });
-    return { pfade };
+    if (!abgeraeumt) throw new UnterlagenAbbruch(fehler(409, MELDUNGEN.NICHT_LAUFEND, "NICHT_LAUFEND"));
+    return { pfade: abgeraeumt.pfade };
   });
 
   await entwuerfeNachDemCommitLoeschen(stand.id, ergebnis.pfade);
@@ -1715,6 +1843,50 @@ async function zurueckziehen(ctx: AktionsKontext, e: Aktion<"zurueckziehen">): P
       ...aktionsTexte("zurueckziehen", null),
     } satisfies NachforderungsAktionAntwort,
   };
+}
+
+/** `details.grund` im Protokoll, wenn der Lauf zurueckzieht (Z2). */
+export const LAUF_ZURUECKGEZOGEN_GRUND = "VORGANG_EXPIRED";
+
+/**
+ * Z2: Der taegliche Lauf zieht die LAUFENDE Nachforderung eines eingestellten
+ * Vorgangs (Onboarding: EXPIRED) zurueck — derselbe Ablauf wie „Zurückziehen"
+ * durch HR: Entwuerfe weg, eingereichte Dateien VERWORFEN (+30 Tage, danach
+ * loescht sie der Lauf), `laufendSchluessel` frei, KEINE Mail. Sonst liefe sie
+ * fuer immer, und ihre ungeprueften Dateien truegen nie ein `loeschenAb`.
+ * Protokoll `UNTERLAGEN_ZURUECKGEZOGEN` ohne `userId`, mit
+ * `details.grund = "VORGANG_EXPIRED"`.
+ *
+ * Unter der Prozesssperre des Vorgangs aufzurufen (der Lauf nimmt sie). Wirft
+ * bei einem Datenbankfehler — der Lauf zaehlt ihn und macht weiter.
+ *
+ * @returns null, wenn die Nachforderung nicht mehr LAUFEND war
+ */
+export async function unterlagenLaufZurueckziehen(opts: {
+  baustein: UnterlagenModulBaustein;
+  vorgangId: string;
+  nachforderungId: string;
+  jetzt: Date;
+}): Promise<{ entwuerfeGeloescht: number; dateienVerworfen: number } | null> {
+  const a = opts.baustein.audit(opts.vorgangId);
+  const abgeraeumt = await prisma.$transaction((tx) =>
+    zurueckziehenIn(tx, {
+      nachforderungId: opts.nachforderungId,
+      bereich: opts.baustein.bereichWhere(opts.vorgangId),
+      jetzt: opts.jetzt,
+      vonId: null,
+      protokoll: (details) => ({
+        userId: null,
+        processType: a.processType,
+        ...a.fk,
+        action: UNTERLAGEN_AUDIT.ZURUECKGEZOGEN,
+        details: { ...details, grund: LAUF_ZURUECKGEZOGEN_GRUND } as Prisma.InputJsonValue,
+      }),
+    }),
+  );
+  if (!abgeraeumt) return null;
+  await entwuerfeNachDemCommitLoeschen(opts.nachforderungId, abgeraeumt.pfade);
+  return { entwuerfeGeloescht: abgeraeumt.entwuerfeGeloescht, dateienVerworfen: abgeraeumt.dateienVerworfen };
 }
 
 /**
@@ -2612,11 +2784,6 @@ export type UnterlagenDateiErgebnis =
   | { ok: false; antwort: UnterlagenDienstAntwort }
   | { ok: true; inhalt: Buffer; headers: Record<string, string> };
 
-/** Nur die erkannten Typen (4.3) gehen mit ihrem Typ hinaus, alles andere als Download. */
-function erkannterTyp(mimeType: string): boolean {
-  return Object.prototype.hasOwnProperty.call(ENDUNG_FUER_DATEITYP, mimeType);
-}
-
 /**
  * HR oeffnet eine uebermittelte Datei zur Pruefung (neuer Tab, `inline`).
  *
@@ -2628,16 +2795,15 @@ function erkannterTyp(mimeType: string): boolean {
  *   Text.
  * - Gelesen wird nur unter `uploads/unterlagen/<nachforderungId>`.
  * - Kopfzeilen: Typ aus der Datenbank (erkannt aus den Bytes, nie vom
- *   Client), `no-store`, `Cross-Origin-Resource-Policy: same-origin`,
- *   `nosniff`; bei Bildern zusaetzlich `Content-Security-Policy: sandbox`
- *   (bei PDFs erst nach der Browserprobe, Abschnitt 17). Der Name laeuft
- *   ueber `asciiFilename`.
- *   ACHTUNG, CSP: Die Middleware setzt fuer `/api/onboarding/**` schon ihre
- *   eigene `Content-Security-Policy`, und Next.js (15.5) uebernimmt einen Kopf
- *   der Route nur, wenn es ihn noch nicht gibt (`send-response.js`) — die
- *   `sandbox` von hier kommt also erst an, wenn die Middleware fuer
- *   `…/unterlagen/dateien/…` keine eigene CSP mehr setzt (offen, Datei von
- *   Schritt 5). `no-store` und CORP setzt die Middleware nicht, die kommen an.
+ *   Client; Typwaechter `istErkannterDateityp`), `no-store`,
+ *   `Cross-Origin-Resource-Policy: same-origin`, `nosniff`. Die
+ *   `Content-Security-Policy` setzt diese Route SELBST — die Middleware laesst
+ *   ihre fuer genau diesen Pfad weg (`routeSetztEigeneCsp`), denn Next.js
+ *   haengt einen Kopf der Route nur an, wenn die Middleware ihn nicht schon
+ *   gesetzt hat: bei Bildern `sandbox`, bei PDFs (und als Download) dieselbe
+ *   CSP wie die Middleware (`portalCsp`) — die Sandbox kann eingebettete
+ *   PDF-Anzeigen blockieren, dort entscheidet erst die Browserprobe
+ *   (Abschnitt 15 und 17). Der Name laeuft ueber `asciiFilename`.
  * - Jedes Oeffnen steht im Protokoll (`UNTERLAGEN_DATEI_GEOEFFNET`) — mit IDs,
  *   Typ und Groesse, nie mit dem Dateinamen. Ohne Eintrag keine Datei.
  */
@@ -2689,7 +2855,7 @@ export async function unterlagenDateiOeffnen(opts: {
     }),
   });
 
-  const erkannt = erkannterTyp(datei.mimeType);
+  const erkannt = istErkannterDateityp(datei.mimeType);
   const typ = erkannt ? datei.mimeType : "application/octet-stream";
   return {
     ok: true,
@@ -2701,7 +2867,7 @@ export async function unterlagenDateiOeffnen(opts: {
       "Cache-Control": "no-store",
       "Cross-Origin-Resource-Policy": "same-origin",
       "X-Content-Type-Options": "nosniff",
-      ...(typ.startsWith("image/") ? { "Content-Security-Policy": "sandbox" } : {}),
+      "Content-Security-Policy": typ.startsWith("image/") ? "sandbox" : portalCsp(),
     },
   };
 }

@@ -1,15 +1,19 @@
 /**
  * Test-Hilfe: kleine In-Memory-Datenbank fuer „Unterlagen nachfordern" (Paket 4)
  *
- * Versteht genau die Abfrageformen von src/lib/unterlagen-dienst.ts und
- * src/lib/unterlagen-onboarding.ts: where mit Gleichheit, not/in/notIn (ueber
+ * Versteht genau die Abfrageformen von src/lib/unterlagen-dienst.ts,
+ * src/lib/unterlagen-onboarding.ts, src/lib/unterlagen-upload.ts und
+ * src/lib/unterlagen-lauf.ts: where mit Gleichheit, not/in/notIn (ueber
  * `passt` aus abteilungs-fake-db.ts), dazu gte/gt/lt/lte und den
  * Relationsfilter `nachforderung: {…}`; select-Projektion mit den
  * geschachtelten Relationen der Nachforderung (positionen → dateien,
  * entschiedenVon; links; angefordertVon); verschachteltes
- * `positionen: { create: [...] }`; bedingtes updateMany und deleteMany; die
- * drei Unique-Regeln (laufendSchluessel, (nachforderungId, typ), tokenHash) als
- * Fehler mit Code P2002 — wie Prisma.
+ * `positionen: { create: [...] }`; bedingtes updateMany und deleteMany;
+ * `orderBy` auch ueber die Relation (`{ nachforderung: { frist: "asc" } }`),
+ * `skip`/`take`; die Unique-Regeln (laufendSchluessel, (nachforderungId, typ),
+ * tokenHash, Datei-ID) als Fehler mit Code P2002 — wie Prisma. Dazu die
+ * Tabelle `document` (`ddb.dokumente`): Ziel der Uebernahme beim Annehmen,
+ * geloescht bei der Ruecknahme, gelesen vom Lauf (Waisen im Vorgangsordner).
  *
  * Was der Fake NICHT kann (Feinplanung 13): kein Rollback, keine Zeilensperre,
  * keine echte Nebenlaeufigkeit. `$transaction` ruft die Funktion mit
@@ -24,6 +28,10 @@
  *     prisma: jest.requireActual("../hilfen/unterlagen-fake-db").fakePrisma,
  *   }));
  *   import { udb, udbLeeren, fakePrisma } from "../hilfen/unterlagen-fake-db";
+ *
+ * `udbLeeren()` leert auch `ddb.dokumente`. (Bis Schritt 7 ergaenzte eine
+ * eigene Datei den Fake beim Import um `document` und die beiden findFirst;
+ * `ddbLeeren` bleibt fuer die Tests, die es schon aufrufen.)
  */
 
 import { randomUUID } from "crypto";
@@ -68,6 +76,17 @@ export const udb: {
   aufrufe: [],
   vorTransaktion: null,
 };
+
+/** Die Tabelle `document` (Onboarding) — eigenes Objekt, damit Tests `ddb.dokumente = …` setzen koennen. */
+export const ddb: {
+  /** Document-Zeilen. */
+  dokumente: Zeile[];
+} = { dokumente: [] };
+
+/** Nur die Dokumente leeren — `udbLeeren` tut das mit. */
+export function ddbLeeren(): void {
+  ddb.dokumente = [];
+}
 
 type Auswahl = { select?: Zeile; where?: Zeile; orderBy?: unknown };
 
@@ -119,6 +138,44 @@ export function passtU(zeile: Zeile, where: Zeile | undefined): boolean {
     rest[k] = bed;
   }
   return passt(zeile, rest);
+}
+
+/**
+ * `sortieren` aus abteilungs-fake-db.ts (aufsteigend; die Richtung wertet der
+ * Fake wie dort nicht aus), dazu Relationsfelder der Datei wie
+ * `{ nachforderung: { frist: "asc" } }` — so sortiert der Lauf faellige
+ * Entwuerfe nach der Frist ihrer Nachforderung.
+ */
+function sortierenU(zeilen: Zeile[], orderBy?: unknown): Zeile[] {
+  const eintraege = orderBy ? (Array.isArray(orderBy) ? orderBy : [orderBy]) : [];
+  const ueberRelation = eintraege.some((o) => {
+    const v = Object.values(o as Zeile)[0];
+    return v !== null && typeof v === "object";
+  });
+  if (!ueberRelation) return sortieren(zeilen, orderBy);
+  const schluessel = eintraege.map((o) => {
+    const [feld, v] = Object.entries(o as Zeile)[0];
+    if (feld === "nachforderung" && v !== null && typeof v === "object") {
+      const unterfeld = Object.keys(v as Zeile)[0];
+      return (z: Zeile) => wert(udb.nachforderungen.find((n) => n.id === z.nachforderungId)?.[unterfeld]);
+    }
+    return (z: Zeile) => wert(z[feld]);
+  });
+  return [...zeilen].sort((a, b) => {
+    for (const s of schluessel) {
+      const x = s(a);
+      const y = s(b);
+      if (x < y) return -1;
+      if (x > y) return 1;
+    }
+    return 0;
+  });
+}
+
+/** `skip` und `take` wie Prisma. */
+function seite(zeilen: Zeile[], args: { skip?: number; take?: number }): Zeile[] {
+  const ab = args.skip ?? 0;
+  return args.take === undefined ? zeilen.slice(ab) : zeilen.slice(ab, ab + args.take);
 }
 
 /**
@@ -301,8 +358,35 @@ export function neuerUnterlagenLink(data: Zeile): Zeile {
     nachholVersuche: 0,
     entwertetAm: null,
     entwertetGrund: null,
+    fruehereSperren: false,
     erstelltVonId: null,
     createdAt: new Date(),
+    ...data,
+  };
+}
+
+/** Document mit den Standardwerten des Schemas. */
+export function neuesDokument(data: Zeile): Zeile {
+  const jetzt = new Date();
+  return {
+    id: randomUUID(),
+    onboardingId: null,
+    type: "SONSTIGES",
+    fileName: "datei.pdf",
+    filePath: "",
+    fileSize: 0,
+    mimeType: "application/pdf",
+    status: "UPLOADED",
+    rejectionReason: null,
+    gueltigBis: null,
+    ablaufErinnertAm: null,
+    ablaufErinnertStufe: null,
+    bezeichnung: null,
+    unbefristet: false,
+    uploadedAt: jetzt,
+    reviewedAt: null,
+    reviewedById: null,
+    createdAt: jetzt,
     ...data,
   };
 }
@@ -326,7 +410,7 @@ function protokolliert<A extends unknown[], R>(name: string, fn: (...args: A) =>
   });
 }
 
-type Args = { where?: Zeile; data?: Zeile; select?: Zeile; orderBy?: unknown };
+type Args = { where?: Zeile; data?: Zeile; select?: Zeile; orderBy?: unknown; skip?: number; take?: number };
 
 export const fakePrisma: Record<string, unknown> = {
   onboardingProcess: {
@@ -376,8 +460,8 @@ export const fakePrisma: Record<string, unknown> = {
       const n = udb.nachforderungen.find((x) => passtU(x, where));
       return n ? nachforderungAusgabe(n, select) : null;
     }),
-    findMany: protokolliert("unterlagenNachforderung.findMany", async ({ where, select, orderBy }: Args) =>
-      sortieren(udb.nachforderungen.filter((n) => passtU(n, where)), orderBy).map((n) =>
+    findMany: protokolliert("unterlagenNachforderung.findMany", async ({ where, select, orderBy, skip, take }: Args) =>
+      seite(sortieren(udb.nachforderungen.filter((n) => passtU(n, where)), orderBy), { skip, take }).map((n) =>
         nachforderungAusgabe(n, select),
       ),
     ),
@@ -403,6 +487,11 @@ export const fakePrisma: Record<string, unknown> = {
     findMany: protokolliert("unterlagenPosition.findMany", async ({ where, select, orderBy }: Args) =>
       sortieren(udb.positionen.filter((p) => passtU(p, where)), orderBy).map((p) => positionAusgabe(p, select)),
     ),
+    // Der erste Treffer — dieselbe Projektion wie findMany, als EIN Aufruf in `udb.aufrufe`.
+    findFirst: protokolliert("unterlagenPosition.findFirst", async ({ where, select, orderBy }: Args) => {
+      const p = sortieren(udb.positionen.filter((x) => passtU(x, where)), orderBy)[0];
+      return p ? positionAusgabe(p, select) : null;
+    }),
     updateMany: protokolliert("unterlagenPosition.updateMany", async ({ where, data }: Args) => {
       const treffer = udb.positionen.filter((p) => passtU(p, where));
       treffer.forEach((p) => anwenden(p, data ?? {}));
@@ -410,9 +499,22 @@ export const fakePrisma: Record<string, unknown> = {
     }),
   },
   unterlagenDatei: {
-    findMany: protokolliert("unterlagenDatei.findMany", async ({ where, select, orderBy }: Args) =>
-      sortieren(udb.dateien.filter((d) => passtU(d, where)), orderBy).map((d) => dateiAusgabe(d, select)),
+    create: protokolliert("unterlagenDatei.create", async ({ data, select }: Args) => {
+      if (udb.dateien.some((d) => d.id === data?.id)) throw eindeutigkeitsFehler(["id"]);
+      const d = neueDatei(data ?? {});
+      udb.dateien.push(d);
+      return dateiAusgabe(d, select);
+    }),
+    findMany: protokolliert("unterlagenDatei.findMany", async ({ where, select, orderBy, skip, take }: Args) =>
+      seite(sortierenU(udb.dateien.filter((d) => passtU(d, where)), orderBy), { skip, take }).map((d) =>
+        dateiAusgabe(d, select),
+      ),
     ),
+    // Der erste Treffer — dieselbe Projektion wie findMany, als EIN Aufruf in `udb.aufrufe`.
+    findFirst: protokolliert("unterlagenDatei.findFirst", async ({ where, select, orderBy }: Args) => {
+      const d = sortierenU(udb.dateien.filter((x) => passtU(x, where)), orderBy)[0];
+      return d ? dateiAusgabe(d, select) : null;
+    }),
     updateMany: protokolliert("unterlagenDatei.updateMany", async ({ where, data }: Args) => {
       const treffer = udb.dateien.filter((d) => passtU(d, where));
       treffer.forEach((d) => anwenden(d, data ?? {}));
@@ -446,6 +548,25 @@ export const fakePrisma: Record<string, unknown> = {
         delete l.updatedAt;
       });
       return { count: treffer.length };
+    }),
+  },
+  document: {
+    create: protokolliert("document.create", async ({ data, select }: Args) => {
+      const d = neuesDokument(data ?? {});
+      ddb.dokumente.push(d);
+      return proj(d, select);
+    }),
+    findMany: protokolliert("document.findMany", async ({ where, select, orderBy }: Args) =>
+      sortieren(ddb.dokumente.filter((d) => passtU(d, where)), orderBy).map((d) => proj(d, select)),
+    ),
+    findFirst: protokolliert("document.findFirst", async ({ where, select }: Args) => {
+      const d = ddb.dokumente.find((x) => passtU(x, where));
+      return d ? proj(d, select) : null;
+    }),
+    deleteMany: protokolliert("document.deleteMany", async ({ where }: Args) => {
+      const vorher = ddb.dokumente.length;
+      ddb.dokumente = ddb.dokumente.filter((d) => !passtU(d, where));
+      return { count: vorher - ddb.dokumente.length };
     }),
   },
   auditLog: {
@@ -509,4 +630,5 @@ export function udbLeeren(): void {
   udb.smtp = { allowedRecipientDomains: "", replyToEmail: "" };
   udb.aufrufe = [];
   udb.vorTransaktion = null;
+  ddbLeeren();
 }

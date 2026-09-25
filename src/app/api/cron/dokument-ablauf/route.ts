@@ -77,6 +77,26 @@
  * Der Dokumentstatus wandert auf EXPIRED, damit eine gewoehnliche
  * Statusabfrage abgelaufene Nachweise findet. GESPERRT wird NICHTS
  * (Entscheidung 07.09.2026) — die Pruefung und die Entscheidung bleiben bei HR.
+ *
+ * ## Unbefristet (Paket 4, Z1)
+ *
+ * Liegt fuer Person und Art ein Dokument mit `unbefristet = true` vor (etwa die
+ * Niederlassungserlaubnis nach einem abgelaufenen Titel), ist die Art erledigt
+ * — dieselbe Regel wie `nachweisLagen` in der Vorgangsansicht. Der Lauf
+ * mahnt dann nicht mehr; der alte Titel wird trotzdem als abgelaufen gefuehrt
+ * (das Datum ist eine Tatsache). Ein abgelehnter Scan belegt auch hier nichts.
+ *
+ * ## Kein Dateiname in der Mail
+ *
+ * `dokument_datei` traegt seit Paket 4 KEINEN Dateinamen mehr: Ein
+ * angenommener Nachweis hat als `fileName` den Namen, den die Person ihrer
+ * Datei gab, und Anzeigenamen gehoeren weder in Mails noch in Webhooks
+ * (Feinplanung Abschnitt 11). Die Variable bleibt fuer bestehende Vorlagen und
+ * Webhook-Abnehmer — mit einer neutralen Bezeichnung (`dokumentBezeichnung`).
+ * Auch die frei vergebene Bezeichnung einer Unterlage (`Document.bezeichnung`,
+ * Freitext von HR) steht NICHT darin: Namen von Unterlagen gehoeren nicht in
+ * die Payload von HR-Mails, die auch an Webhooks gehen (Abschnitt 11), und
+ * `dokument_datei` wird im HTML-Teil nicht maskiert (`renderTemplate`).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -94,11 +114,25 @@ import {
   ablaufKalendertag,
   kalendertagAlsDatum,
 } from "@/lib/dokument-fristen";
-import { formatiere, heuteInBerlin, tageSpaeter } from "@/lib/minijob-fristen";
+import { berlinerKalendertag, formatiere, heuteInBerlin, tageSpaeter } from "@/lib/minijob-fristen";
 import { MITARBEITER_NEUTRAL, mitarbeiterName } from "@/lib/onboarding-spuren";
 import type { EventEmailResult } from "@/lib/mailer";
 
 const MS_PER_DAY = 86400000;
+
+/**
+ * `dokument_datei` ohne Dateinamen und ohne Freitext (Kopfkommentar): der Tag
+ * des Hochladens in deutscher Zeit — „hochgeladen am 12.09.2026". Beide
+ * Vorlagen setzen den Wert unter bzw. in Klammern hinter die Art
+ * („Aufenthaltstitel (hochgeladen am 12.09.2026)"); ohne Datum die Art
+ * selbst. Beides entsteht im Code — nichts davon kann Markup tragen.
+ */
+function dokumentBezeichnung(doc: { type: string; uploadedAt?: Date | string | null }): string {
+  const hochgeladen = doc.uploadedAt ? new Date(doc.uploadedAt) : null;
+  return hochgeladen && !Number.isNaN(hochgeladen.getTime())
+    ? `hochgeladen am ${formatiere(berlinerKalendertag(hochgeladen))}`
+    : documentTypeLabel(doc.type);
+}
 
 /**
  * Soll der Merker „zuletzt erinnert" gesetzt werden? Bei SENT und SKIPPED ja,
@@ -215,7 +249,7 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         type: true,
-        fileName: true,
+        uploadedAt: true,
         status: true,
         gueltigBis: true,
         ablaufErinnertAm: true,
@@ -231,6 +265,12 @@ export async function POST(request: NextRequest) {
             // Name aus dem Fragebogen zuerst (mitarbeiterName), sonst der
             // Name am Vorgang.
             personalData: { select: { firstName: true, lastName: true } },
+            // Z1: die Arten, fuer die ein ausdruecklich unbefristetes Dokument
+            // vorliegt — dann mahnt der Lauf fuer diese Art nicht mehr.
+            documents: {
+              where: { type: { in: typen }, unbefristet: true, status: { not: "REJECTED" } },
+              select: { type: true },
+            },
           },
         },
       },
@@ -301,6 +341,13 @@ export async function POST(request: NextRequest) {
           results.uebersprungen++;
           continue;
         }
+        // (b1) Unbefristet (Z1): Fuer Person und Art liegt ein ausdruecklich
+        //      unbefristeter Nachweis vor — er verdraengt jedes datierte
+        //      Dokument, wie in der Vorgangsansicht (`nachweisLagen`).
+        if ((doc.onboarding.documents ?? []).some((d) => d.type === doc.type)) {
+          results.uebersprungen++;
+          continue;
+        }
 
         // (b2) Zustaendigkeit belegen — VOR jeder weiteren Pruefung, siehe den
         //      Kommentar an `behandelt`. Ab hier schweigt jede weitere Zeile
@@ -362,7 +409,9 @@ export async function POST(request: NextRequest) {
           mitarbeiter_email: doc.onboarding.email,
           organization: doc.onboarding.organization.name,
           dokument_typ: documentTypeLabel(doc.type),
-          dokument_datei: doc.fileName,
+          // Nie der Dateiname (Kopfkommentar) — die Variable bleibt fuer
+          // bestehende Vorlagen und Webhook-Abnehmer.
+          dokument_datei: dokumentBezeichnung(doc),
           gueltig_bis: formatiere(tag),
           // Negativ nach dem Ablauf — die Warnvorlage nutzt diesen Wert, die
           // Ablaufvorlage `tage_ueberfaellig`. Beide Events tragen beide

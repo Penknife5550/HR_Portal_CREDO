@@ -1544,6 +1544,9 @@ model UnterlagenLink {
   nachholVersuche Int       @default(0) // Nachholen durch den Lauf, max 3
   entwertetAm     DateTime?
   entwertetGrund  String? // ADRESSE (-> 404) | GESPERRT (-> 410)
+  // "frühere Links sperren" (erneut senden): nach SENT DIESER Mail die aelteren
+  // als GESPERRT entwerten - auch wenn erst der Lauf sie nachholt
+  fruehereSperren Boolean   @default(false)
   erstelltVonId   String? // null = taeglicher Lauf; Grundlage der Mail-Bremse (5.2)
 
   createdAt DateTime @default(now())

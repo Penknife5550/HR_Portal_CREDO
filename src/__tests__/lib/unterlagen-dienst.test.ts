@@ -8,8 +8,7 @@
  * HR-Meldung „vollständig" mit bedingtem Anspruch. Teil 2 — die Entscheidungen
  * ueber eine Position: Annehmen (Uebernahme per Hardlink, echte Dateien in
  * einem Verzeichnis unter os.tmpdir()), Zurueckweisen, Entfällt, Annahme
- * zuruecknehmen; die Tabelle `document` ergaenzt
- * src/__tests__/hilfen/unterlagen-fake-db-pruefen.ts.
+ * zuruecknehmen; die Tabelle `document` kennt dieselbe Fake-Datenbank.
  *
  * Der Fake kennt kein Rollback, keine Zeilensperre und keine echte
  * Nebenlaeufigkeit (Feinplanung 13). Deshalb halten die Tests zusaetzlich die
@@ -99,7 +98,7 @@ import {
   udbLeeren,
   type Zeile,
 } from "../hilfen/unterlagen-fake-db";
-import { ddb, ddbLeeren, neuesDokument } from "../hilfen/unterlagen-fake-db-pruefen";
+import { ddb, ddbLeeren, neuesDokument } from "../hilfen/unterlagen-fake-db";
 import {
   fehlerKennung,
   HR_MELDUNG_GRUENDE,
@@ -1167,7 +1166,8 @@ describe("erneut-senden", () => {
       fruehereGesperrt: false,
     });
     expect(alt.entwertetAm).toBeNull();
-    expect(udb.links.at(-1)).toMatchObject({ mailStatus: "FAILED", entwertetAm: null });
+    // Der Wunsch steht am neuen Link — holt der Lauf die Mail nach, sperrt er nach SEINEM SENT.
+    expect(udb.links.at(-1)).toMatchObject({ mailStatus: "FAILED", entwertetAm: null, fruehereSperren: true });
 
     mockSend.mockImplementationOnce(async () => ({ status: "SKIPPED", detail: "E-Mail-Vorlage ist deaktiviert" }));
     const skipped = await aktion({ aktion: "erneut-senden", nachforderungId: n.id, fruehereSperren: true });
@@ -1626,6 +1626,8 @@ describe("hrMeldungSenden mit Merker", () => {
       throw Object.assign(new Error("weg"), { code: "P1001" });
     });
     expect(r.status).toBe("SENT");
+    // N2: versendet, aber Merker und Protokoll fehlen — der Lauf zaehlt das als Fehler.
+    expect(r.nachweisFehlt).toBe(true);
     expect(JSON.stringify(stumm.mock.calls)).toContain("P1001");
     stumm.mockRestore();
   });

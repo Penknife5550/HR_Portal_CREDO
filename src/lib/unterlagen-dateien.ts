@@ -24,13 +24,26 @@
  * Quelle. Scheitert die Transaktion, loescht er das Ziel. Was dazwischen
  * liegen bleibt, findet der taegliche Lauf als Waise.
  *
- * Wer ruft was:
- *   Zurueckziehen, „Entfällt" (Schritt 4/6)     → entwuerfeLoeschen
- *   Hochladen, Entfernen (Schritt 5)            → entwurfSpeichern, entwuerfeLoeschen
- *                                                 (auch nach einer gescheiterten Transaktion)
- *   Datei oeffnen, Annehmen (Schritt 6)         → nachforderungsDateiLesen, verknuepfenInVorgang
- *   Annahme zuruecknehmen (Schritt 6)           → zurueckVerknuepfen, vorgangsKopieLoeschen
- *   Taeglicher Lauf (Schritt 7)                 → nachforderungsWaisen, vorgangsWaisen,
+ * Wer ruft was (alle HR-Wege ueber unterlagen-dienst.ts, die oeffentlichen
+ * ueber unterlagen-upload.ts, der Lauf ueber unterlagen-lauf.ts):
+ *   Hochladen (oeffentlich)                     → entwurfSpeichern; scheitert die
+ *                                                 Transaktion: entwuerfeLoeschen
+ *   Entwurf entfernen (oeffentlich)             → entwuerfeLoeschen (nach dem Commit)
+ *   Zurueckziehen, „Entfällt" (HR)              → entwuerfeLoeschen (nach dem Commit)
+ *   Datei oeffnen (HR)                          → nachforderungsDateiLesen
+ *   Annehmen (HR)                               → verknuepfenInVorgang (liest die Quelle
+ *                                                 selbst); nach dem Commit
+ *                                                 nachforderungsDateiLoeschen (Quelle),
+ *                                                 bei Abbruch vorgangsKopieLoeschen (Ziel)
+ *   Annahme zuruecknehmen (HR)                  → zurueckVerknuepfen; nach dem Commit
+ *                                                 vorgangsKopieLoeschen (Kopie im Vorgang),
+ *                                                 bei Abbruch nachforderungsDateiLoeschen
+ *   Taeglicher Lauf                             → nachforderungsDateiLoeschen (faellige
+ *                                                 Dateien und Entwuerfe, Waisen),
+ *                                                 vorgangsKopieLoeschen (Waisen im Vorgang),
+ *                                                 entwuerfeLoeschen (Zurueckziehen, Z2),
+ *                                                 nachforderungsWaisen, vorgangsWaisen,
+ *                                                 nachforderungsOrdnerIds,
  *                                                 verwaisteNachforderungsOrdner
  */
 
@@ -42,6 +55,7 @@ import {
   deleteUploadedDirIfEmpty,
   ENDUNG_FUER_DATEITYP,
   fehlerCode,
+  istErkannterDateityp,
   pfadInWurzeln,
   sha256Hex,
   UUID_MUSTER,
@@ -85,9 +99,8 @@ function uploadsWurzel(): string {
 
 /** Die Endung (".pdf") zu einem gespeicherten Typ. Ein unbekannter Typ ist ein Fehler, keine Rueckfall-Endung. */
 function endungFuer(mimeType: string): string {
-  const endung = (ENDUNG_FUER_DATEITYP as Record<string, string | undefined>)[mimeType];
-  if (!endung) throw new Error("Unbekannter Dateityp");
-  return endung;
+  if (!istErkannterDateityp(mimeType)) throw new Error("Unbekannter Dateityp");
+  return ENDUNG_FUER_DATEITYP[mimeType];
 }
 
 // =============================================
@@ -389,6 +402,22 @@ export async function vorgangsWaisen(opts: {
     if (!opts.dokumentPfade.has(relativ)) waisen.push(relativ);
   }
   return waisen.sort();
+}
+
+/**
+ * Die IDs ALLER Nachforderungsordner unter `uploads/unterlagen/` (nur
+ * UUID-Namen, gleich welchen Alters). Der Lauf fragt damit die Datenbank:
+ * Gibt es die Nachforderung, sucht er in ihrem Ordner nach Waisen — auch bei
+ * einer erledigten oder zurueckgezogenen, denn ein Ordner besteht nur, solange
+ * dort Dateien liegen. Fehlt sie, ist der Ordner verwaist
+ * (`verwaisteNachforderungsOrdner`).
+ */
+export async function nachforderungsOrdnerIds(): Promise<string[]> {
+  const ids: string[] = [];
+  for (const e of await eintraege(path.join(uploadsWurzel(), UNTERLAGEN_ORDNER))) {
+    if (e.isDirectory() && UUID_MUSTER.test(e.name)) ids.push(e.name);
+  }
+  return ids.sort();
 }
 
 /**

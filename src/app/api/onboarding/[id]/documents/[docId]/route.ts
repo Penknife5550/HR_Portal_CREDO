@@ -15,8 +15,9 @@ import {
   asciiFilename,
   DOCX_MIME,
   ENDUNG_FUER_DATEITYP,
+  fehlerCode,
+  istErkannterDateityp,
   pfadInWurzeln,
-  type ErkannterDateityp,
 } from "@/lib/file-upload";
 import {
   ablaufKalendertag,
@@ -35,21 +36,22 @@ const VORGANG_NICHT_GEFUNDEN = "Vorgang nicht gefunden";
 /** Derselbe Text fuer unbekanntes Dokument und Dokument eines anderen Vorgangs. */
 const DOKUMENT_NICHT_GEFUNDEN = "Dokument nicht gefunden";
 
-/**
- * Die Endung des Download-Namens je gespeichertem Typ (Paket 4, 6.2). Nur
- * diese Typen nimmt das Onboarding an: die aus den Bytes erkannten
- * (`ENDUNG_FUER_DATEITYP` — Fragebogen und Nachforderung) und dazu Word, das
- * nur der Fragebogen zulaesst. Ein neuer erkannter Typ braucht hier keine
- * zweite Liste.
- */
-const ENDUNG_AUS_TYP: Readonly<Record<string, string>> = {
-  ...ENDUNG_FUER_DATEITYP,
+/** Word — nimmt nur der Fragebogen an; die uebrigen Typen kennt `ENDUNG_FUER_DATEITYP`. */
+const WORD_ENDUNGEN: Readonly<Record<string, string>> = {
   "application/msword": ".doc",
   [DOCX_MIME]: ".docx",
 };
 
-function istErkannterTyp(mimeType: string): mimeType is ErkannterDateityp {
-  return Object.prototype.hasOwnProperty.call(ENDUNG_FUER_DATEITYP, mimeType);
+/**
+ * Die Endung des Download-Namens je gespeichertem Typ (Paket 4, 6.2), `null`
+ * fuer einen unbekannten. Nur diese Typen nimmt das Onboarding an: die aus den
+ * Bytes erkannten (Typwaechter `istErkannterDateityp` — Fragebogen und
+ * Nachforderung) und dazu Word, das nur der Fragebogen zulaesst. Ein neuer
+ * erkannter Typ braucht hier keine zweite Liste.
+ */
+function endungAusTyp(mimeType: string): string | null {
+  if (istErkannterDateityp(mimeType)) return ENDUNG_FUER_DATEITYP[mimeType];
+  return Object.prototype.hasOwnProperty.call(WORD_ENDUNGEN, mimeType) ? WORD_ENDUNGEN[mimeType] : null;
 }
 
 /**
@@ -67,8 +69,8 @@ function istErkannterTyp(mimeType: string): mimeType is ErkannterDateityp {
  * JPEG/HTA-Polyglot-Datei als `.hta` auf dem Rechner von HR.
  */
 function downloadName(fileName: string, mimeType: string): string {
-  if (istErkannterTyp(mimeType)) return asciiFilename(anzeigeNameBereinigen(fileName, mimeType));
-  const endung = ENDUNG_AUS_TYP[mimeType] ?? ".bin";
+  if (istErkannterDateityp(mimeType)) return asciiFilename(anzeigeNameBereinigen(fileName, mimeType));
+  const endung = endungAusTyp(mimeType) ?? ".bin";
   const basis = (fileName.split(/[/\\]/).pop() ?? "").trim();
   const punkt = basis.lastIndexOf(".");
   let stamm = punkt >= 0 ? basis.slice(0, punkt) : basis;
@@ -142,7 +144,7 @@ export async function GET(
       ]);
     } catch (fehler) {
       // realpath wirft ENOENT, wenn die Datei fehlt — alles andere heisst „ausserhalb".
-      if ((fehler as { code?: unknown } | null)?.code === "ENOENT") {
+      if (fehlerCode(fehler) === "ENOENT") {
         console.error("Datei zum Dokument fehlt:", document.id);
         return NextResponse.json({ error: "Datei nicht gefunden auf dem Server" }, { status: 404 });
       }
@@ -209,7 +211,7 @@ export async function GET(
     // (`downloadName`), und ein unbekannter Typ geht als
     // application/octet-stream hinaus. `no-store`: Personalunterlagen gehoeren
     // in keinen Browser- oder Proxy-Cache.
-    const bekannt = Object.prototype.hasOwnProperty.call(ENDUNG_AUS_TYP, document.mimeType);
+    const bekannt = endungAusTyp(document.mimeType) !== null;
     return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {

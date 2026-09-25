@@ -17,7 +17,7 @@ jest.mock("@/lib/db", () => ({
 }));
 
 import { fakePrisma, udb, udbLeeren, type Zeile } from "../hilfen/unterlagen-fake-db";
-import { ddb, ddbLeeren, neuesDokument } from "../hilfen/unterlagen-fake-db-pruefen";
+import { ddb, ddbLeeren, neuesDokument } from "../hilfen/unterlagen-fake-db";
 import {
   ONBOARDING_KATALOG,
   ONBOARDING_NICHT_VERFUEGBAR,

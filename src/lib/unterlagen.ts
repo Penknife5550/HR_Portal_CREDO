@@ -310,6 +310,13 @@ export const MELDUNGEN = {
   ZU_VIELE_ANFRAGEN: "Zu viele Anfragen, bitte warten Sie einen Moment.",
   /** 400: kaputtes JSON, fehlende Aktion, falsche Form. */
   UNGUELTIGE_EINGABE: "Ungültige Eingabe",
+  /**
+   * 413 auf einen JSON-Body ueber der Grenze der oeffentlichen Routen (Gültig
+   * bis, Übermitteln) — eine echte Upload-Seite loest das nie aus.
+   */
+  ANFRAGE_ZU_GROSS: "Die Anfrage ist zu groß.",
+  /** 500 der oeffentlichen Routen — ohne jede Angabe zum Fehler; geloggt wird nur der Fehlercode. */
+  SERVERFEHLER: "Interner Serverfehler",
   /** 404 fuer unbekannte UND fremde Kinder — derselbe Text, damit er nichts verraet (Abschnitt 6). */
   POSITION_NICHT_GEFUNDEN: "Unterlage nicht gefunden",
   DATEI_NICHT_GEFUNDEN: "Datei nicht gefunden",
@@ -918,6 +925,18 @@ export function nachforderungLinkende(frist: Date | string): Kalendertag | null 
   return tag ? linkGueltigBisFuer(tag) : null;
 }
 
+/**
+ * Ab welchem Kalendertag der Lauf uebrig gebliebene Entwuerfe loescht:
+ * Linkende + 30 (4.5) — jeweils aus der AKTUELLEN Frist gerechnet, eine
+ * verlaengerte Frist rettet die Entwuerfe. Dieselbe Rechnung im Lauf
+ * (unterlagen-fristen.ts) und im Lauf-Waechter, damit er nie eine Loeschung
+ * anmahnt, die der Lauf noch gar nicht vorhat.
+ */
+export function entwurfLoeschenAb(frist: Date | string): Kalendertag | null {
+  const ende = nachforderungLinkende(frist);
+  return ende ? tageSpaeter(ende, LOESCHEN_NACH_TAGEN) : null;
+}
+
 /** Linkende EINES Links: min(link.gueltigBis, Frist + 14), einschliesslich (2.4). */
 export function linkende(link: { gueltigBis: Date | string }, frist: Date | string): Kalendertag | null {
   const eigen = datumsTag(link.gueltigBis);
@@ -1441,7 +1460,7 @@ export function laufWaechter(stand: WaechterStand, heute: Kalendertag): Waechter
     if (!loeschungSeit || tag < loeschungSeit) loeschungSeit = tag;
   };
   const gestern = tageSpaeter(heute, -1);
-  const entwurfFaelligAb = frist ? tageSpaeter(linkGueltigBisFuer(frist), LOESCHEN_NACH_TAGEN) : null;
+  const entwurfFaelligAb = frist ? entwurfLoeschenAb(frist) : null;
   for (const p of stand.positionen) {
     for (const d of p.dateien) {
       if (alsDatum(d.dateiGeloeschtAm)) continue;
