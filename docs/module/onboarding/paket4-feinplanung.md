@@ -1,7 +1,8 @@
 # Paket 4 „Unterlagen nachfordern“: Feinplanung Stufe 1 (Onboarding)
 
 - **Stand:** 25.09.2026
-- **Status:** **freigegeben am 25.09.2026**: „Feinplanung als Grundlage, hier umsetzen, alle Empfehlungen übernehmen“. E-1 bis E-8 sind wie empfohlen entschieden (16.1). Ergänzungen aus der Gegenprüfung bei der Umsetzung stehen in Abschnitt 18.
+- **Status:** **Stufe 1 umgesetzt (Branch `paket-4-unterlagen-nachfordern`, Stand 25.09.2026)** — nicht nach `main` gemergt, nicht deployt. Stufe 2 ist offen. Ablaufplan für den Deploy: `docs/historie/deploy-paket4-stufe1.md`; die Regeln für Änderungen stehen in CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
+- **Freigabe:** am 25.09.2026: „Feinplanung als Grundlage, hier umsetzen, alle Empfehlungen übernehmen“. E-1 bis E-8 sind wie empfohlen entschieden (16.1). Ergänzungen aus der Gegenprüfung und die Abweichungen bei der Umsetzung stehen in Abschnitt 18.
 - **Grundlage:** Änderungsplan Fassung 6 vom 24.09.2026, Abschnitt 4 „Unterlagen nachfordern“ und die Entscheidungen in Abschnitt 10 (`docs/module/onboarding/aenderungsplan-2026-09.html`). Codestand `main` = `origin/main` = `ce1888e`. Die Produktion läuft seit dem 24.09.2026 auf `7bc91ec`.
 - **Prüfung:** Der Entwurf wurde am 24.09.2026 zweimal gegengeprüft (Sicherheit und Datenschutz, Korrektheit). Alle MUSS- und SOLLTE-Befunde sind eingearbeitet. Was ich anders entschieden habe, steht in Abschnitt 17, die Zuordnung aller Befunde im Anhang.
 - **Belege:**
@@ -1406,6 +1407,68 @@ Parallel zu dieser Feinplanung ist in einer zweiten Sitzung ein eigener Bauplan 
 - **N4 · Hinweis zur Arbeitserlaubnis:** Der Text in `NACHFORDERUNG_HINWEISE` darf nicht behaupten, der Aufenthaltstitel genüge. Die Pflichtregel verlangt beide Arten (`required-documents.ts:248-250`). Steht die Erlaubnis auf dem Titel, lädt die Person dieselbe Karte zu beiden Positionen hoch, oder HR quittiert mit „Entfällt…“.
 
 **Bewusst nicht übernommen** (bleibt wie in Abschnitt 1): JPEG-Fotos immer neu kodieren, um EXIF-Daten zu entfernen, und der Elternzeit-Fix. Beides liegt außerhalb von Stufe 1. Der Elternzeit-Fix steht unter „Vorher behoben“ und kommt als eigener Commit vor Stufe 2.
+
+### Abweichungen und Ergänzungen bei der Umsetzung
+
+Stand 25.09.2026, Commits `efcd820` bis `0dcceb9` auf dem Branch `paket-4-unterlagen-nachfordern` samt Fix-Runde aus Schritt 11. Jeder Punkt ist am Code belegt. Wo ein Punkt den Abschnitten 1–17 widerspricht, gilt er. Alles Übrige ist wie geplant umgesetzt.
+
+**Datenmodell (weiterhin rein additiv)**
+
+| # | Umsetzung | Grund |
+|---|---|---|
+| U-1 | `UnterlagenNachforderung.hrMeldungStatus` und `hrMeldungDetail` halten das Ergebnis der letzten HR-Mail („vollständig“, „Frist verstrichen“). Im Detail steht nur ein Grundcode: `KEIN_EMPFAENGER`, `VORLAGE_DEAKTIVIERT`, `NICHT_VERSENDET` oder `VERSAND_FEHLGESCHLAGEN`. | Die Karte soll „HR-Meldung nicht zugestellt (kein Empfänger)“ zeigen (8.1). Das `EmailLog` kennt die Nachforderung nicht und wird nach 90 Tagen gelöscht. Der Rohtext des Mailers kann Adressen tragen. |
+| U-2 | `UnterlagenLink.fruehereSperren`: Der Wunsch „Frühere Links sperren“ steht am neuen Link. | Holt der Lauf eine gescheiterte „erneut senden“-Mail nach, sperrt er die älteren Links nach seinem eigenen SENT. Sonst ginge der Wunsch mit dem FAILED verloren (5.1). |
+
+Z1 (`Document.unbefristet`) steht oben. Das Schema-Delta ab `7bc91ec` umfasst damit vier Tabellen und zwei Spalten an `documents` (`docs/historie/deploy-paket4-stufe1.md`).
+
+**Regeln und Server**
+
+| # | Umsetzung | Grund |
+|---|---|---|
+| U-3 | Die Mail-Bremse (6 je Stunde, 20 je Tag) gilt je **Vorgang**, über alle seine Nachforderungen, nicht je Nachforderung (5.2). | Sonst begänne jedes „Zurückziehen“ plus „Anfordern“ mit leerem Kontingent. Das ist dieselbe Vervielfachung, die 5.2 für einen Schlüssel je Link ausschließt. Solange eine Nachforderung läuft, ist es dieselbe Zahl. |
+| U-4 | Jede HR-Aktion mit Mail an die Person prüft vorher die gespeicherte Vorlage (`personenVorlagePruefen`). Fehlt sie, ist sie deaktiviert, fehlt `{{link}}` im HTML-Teil oder steht ein gesperrter Platzhalter im Betreff, folgt 409 ohne jede Änderung. Der Lauf prüft einmal je Lauf und vermerkt eine untaugliche Vorlage als SKIPPED am Link, ohne zu senden. | SKIPPED holt der Lauf nie nach (8.4). Ohne die Vorprüfung liefe eine Nachforderung, von der die Person nie erfährt. Auch eine am Editor vorbei gespeicherte Zeile fällt so auf. |
+| U-5 | „Frist ändern“ mit unveränderter Frist ergibt 409 `FRIST_UNVERAENDERT` mit dem Hinweis auf „Link erneut senden“. | Sonst wäre die Friständerung ein zweiter Weg, den Link noch einmal zu schicken, ohne Sperrzeit und ohne Adresswahl. |
+| U-6 | Die Pflichtliste ohne Formularvorlage hat einen gemeinsamen Rückfall: `PFLICHT_DOKUMENTE_OHNE_VORLAGE` und `pflichtDokumenteAusVorlage` in `required-documents.ts`. `GET /api/onboarding/[id]`, der Fragebogen und der Baustein nutzen ihn. `pflichtEingabenAusVorgang` hat keinen eigenen Rückfall. | Vorher stand die Liste als Literal in der Route. Kasten, Dialog und Serverprüfung (`sensibelAnforderbar`) müssen dieselbe Pflicht sehen. |
+| U-7 | `sensibelAnforderbar` liefert `{ ok: true }` oder `{ ok: false, grund, text }`, die Texte stehen in `SENSIBEL_SPERRGRUND_TEXTE`. `organisationstyp` und `severelyDisabled` sind Pflichtschlüssel, auch wenn sie `undefined` tragen dürfen. | Der Dialog zeigt den Grund im Klartext. Ein Aufrufer, der den Organisationstyp vergäße, bekäme für das Führungszeugnis einer Kita still `ok`. So meldet schon `tsc` die Lücke. |
+| U-8 | `pdfMerkmale` erkennt zusätzlich `/EmbeddedFiles` und behandelt NUL als Trennzeichen. | Der `/Type`-Eintrag eines eingebetteten Stroms ist optional, der Namensbaum nicht. `\s` kennt NUL nicht. Beides macht den Hinweis nur häufiger, nie seltener. |
+| U-9 | Die Baustein-Schnittstelle (Abschnitt 7) hat zusätzlich `kopfDaten`, `vorgangIdAus` und `annahmePruefen`. Den Hardlink der Übernahme macht der Dienst modulneutral, nicht der Baustein. | `nachforderungAnlegen` bleibt einziger Schreiber des Kopfes. Die Prüfung beim Annehmen läuft vor jedem Schreiben. Stufe 2 muss den Dateiumzug nicht je Modul nachbauen. |
+| U-10 | Annehmen: Zod nimmt `unbefristet?: boolean` (Z1). Ohne `gueltigBis` im Body gilt `gueltigBisAngabe`, `null` heißt „Datum später nachtragen“. Datum und `unbefristet` zugleich ergeben 400, eine andere Art an einer Katalogzeile 400 `ART_NICHT_WAEHLBAR`. | Die drei Möglichkeiten aus Z1 brauchen eine eindeutige Form im Body. Die Art einer Katalogzeile steht fest, wählbar ist sie nur bei einer freien Zeile (4.4). |
+| U-11 | `erinnerungFaellig` liegt in `unterlagen.ts`, `unterlagen-fristen.ts` exportiert sie nur weiter. | Lauf-Wächter und Lauf müssen mit derselben Funktion rechnen, sonst meldete der Wächter Fehlalarm (9). |
+| U-12 | Die Übersicht in `GET /api/onboarding/[id]` trägt auch die Dialogdaten (`dialog`: Auswahl, Adressvorschläge, Fristgrenzen). Ohne Bearbeitungsrecht fehlen `dialog`, `apiBasis`, `eingestelltHinweis` und auch die Dateinamen. | Kein zweiter Request, und die Vorschläge kommen aus derselben Rechnung wie der Kasten. Die Dateinamen: strengere Lesart von SI-K4. |
+| U-13 | `nachweisStandText` erklärt im Kasten auch eine Art, die in der jüngsten erledigten Nachforderung als „Entfällt“ quittiert wurde. | Sonst stünde eine bewusst abgewählte Art im Kasten ohne Erklärung wieder als offen. |
+
+**Öffentliche API**
+
+| # | Umsetzung | Grund |
+|---|---|---|
+| U-14 | Die JSON-Bodys der öffentlichen Routen („Gültig bis“, „Übermitteln“) werden ebenfalls begrenzt gelesen, höchstens 64 KiB, darüber 413. | Die Middleware-Ausnahme hebt jede Grenze von Next.js auf, nicht nur die des Uploads (4.3). |
+| U-15 | Die öffentlichen Vorgangsdaten kommen über ein eigenes schmales `select` je Modul (`OEFFENTLICHE_MODULE` in `unterlagen-upload.ts`). | Datensparsamkeit (5.3). Stufe 2 braucht dort je Modul einen Eintrag, siehe CLAUDE.md. |
+| U-16 | Die Bremsen je Nachforderung (Hochladen 30 je 10 Minuten, übrige Schreibwege 60/min) sind eigene Limiter in `unterlagen-upload.ts`. | Schlüssel und Fenster unterscheiden sich von `linkAenderungsLimiter` der Abteilungsaufgaben. |
+| U-17 | Nach einem Adresswechsel sieht die richtige Person die Entwürfe des früheren Empfängers nicht (`entwuerfeAbLaden`). Sie kann sie weder entfernen noch übermitteln, und sie zählen nicht in ihre Kontingente. | Befund der Prüfung zu Schritt 5: Sonst übermittelte die richtige Person Dateien, die jemand anderes hochgeladen hat. |
+| U-18 | Die Middleware setzt für `/unterlagen/…` den Kopf `Referrer-Policy: no-referrer`. Das Meta-Tag der Seite bleibt die zweite Schicht. | Das Meta-Tag greift erst, wenn es geparst ist. Der Kopf gilt schon für die ersten Anfragen der Seite, der Token steht im Pfad. |
+
+**Datei-Route, Download-Route, Lauf, Mailtexte**
+
+| # | Umsetzung | Grund |
+|---|---|---|
+| U-19 | Die CSP steht im eigenen Modul `src/lib/content-security-policy.ts`. Für die Datei-Route `GET …/unterlagen/dateien/[dateiId]` setzt die Middleware keine CSP (`routeSetztEigeneCsp`), die Route setzt sie selbst: bei Bildern `sandbox`, bei PDFs `portalCsp()`. | Next.js hängt einen Kopf der Route nur an, wenn die Middleware ihn nicht schon gesetzt hat. Die `sandbox` aus 6.1 kam deshalb nie an. Die Entscheidung für PDFs bleibt bei der Browserprobe (Abschnitt 15, 17). |
+| U-20 | Download-Route (6.2): Gelesen wird nur unter `uploads/<onboardingId>` (`pfadInWurzeln`). Ein unbekannter Typ geht als `application/octet-stream` mit Endung `.bin` hinaus. Das AuditLog der Frist-Korrektur trägt keinen Dateinamen mehr. | Wurzeln je Operation (4.1). Eine Endung, die Windows ausführt, darf es nie geben. Dateinamen gehören nicht ins AuditLog (Abschnitt 11). |
+| U-21 | `dokument-ablauf`: `dokument_datei` trägt die Bezeichnung bzw. die Art und das Upload-Datum, nicht mehr den Dateinamen. Die Variablenbeschreibung beider Vorlagen ist angepasst. | Ein Dateiname gehört in keine Mail (Abschnitt 11). Übernommene Dokumente tragen den Namen, den die Person gewählt hat. |
+| U-22 | Wortlaut Z3: `dokument-abgelaufen` sagt „… dann fordern Sie diese im Vorgang über ‚Unterlagen nachfordern‘ an; sobald Sie sie als Aufenthaltstitel mit ihrem Ablaufdatum annehmen, endet die Warnung“. `dokument-ablauf-warnung` nennt zusätzlich die Annahme als „Unbefristet“ (Z1). | Eine Fiktionsbescheinigung beendet die Warnung nur, wenn HR sie als Aufenthaltstitel mit Datum annimmt. Eine Niederlassungserlaubnis beendet die Erinnerung nur über das Kennzeichen „unbefristet“. |
+| U-23 | Eine Erinnerung, die die SMTP-Bremse zurückhält, legt keinen Link an. Der Lauf-Wächter meldet sie am Folgetag als „nicht versendet“. | Gewollt: Die Erinnerung ist tatsächlich ausgeblieben. |
+| U-24 | **Kein n8n-Export im Repo.** Weder `n8n/CREDO_Unterlagen_Fristen_Workflow.json` (9, Schritt 7) noch die Adresskorrektur in den beiden bestehenden Exporten. Die Einplanung beschreibt der Deploy-Ablaufplan (Abschnitt 6 dort). Anders als „vorher … mit einplanen“ in 15 legt er `dokument-ablauf` vor dem Deploy nur inaktiv an und aktiviert ihn direkt nach dem Zurücksetzen der beiden Vorlagen (Z3), noch vor dem ersten „Anfordern“. | `.gitignore` führt `/n8n/` als „interner Stand, nie ins Repo“, und das Repo ist öffentlich. Aktiv vor dem Zurücksetzen verschickte `dokument-ablauf` noch die alte Handlungsanweisung der gespeicherten Vorlagen. Die drei alten Exporte sind noch versioniert; die beiden Reminder-Exporte rufen weiter `hr.credo-schulen.de` auf (der dritte, `CREDO_HR_Portal_Offboarding_Workflow.json`, nennt schon `hr.fes-credo.de`). Maßgeblich ist der Stand in n8n. |
+
+**Oberfläche**
+
+| # | Umsetzung | Grund |
+|---|---|---|
+| U-25 | `portalLink` der beiden HR-Mails führt auf `/dashboard/<id>?tab=dokumente` statt auf `/dashboard/<id>` (8.2). Die Detailseite versteht `?tab=` mit der internen Id oder dem deutschen Namen des Reiters (`reiterAusSuche`). | Wer die Mail „Unterlagen eingegangen“ öffnet, will prüfen. Die Karte steht im Reiter „Dokumente“, nicht in der Übersicht. |
+| U-26 | **Vorauswahl im Dialog:** `vorauswahl ≠ null` (Kasten „Offene Nachweise“, Warnbalken) legt die angekreuzten Arten genau fest; die übrigen Vorschläge stehen sichtbar, aber nicht angekreuzt darunter. `null` (Knöpfe der Karte) kreuzt die Vorschläge an, ohne die Arten, die zuletzt in einer früheren Nachforderung als „Entfällt“ quittiert wurden (`frueherEntfallen`). Dieselbe Ausnahme gilt für die Vorauswahl des Kastens. | Kasten, Warnbalken und Dialog sollen dasselbe zeigen. Eine bewusst quittierte Art soll HR bei der nächsten Nachforderung nicht ungefragt wieder anfordern; sie bleibt im Dialog sichtbar und lässt sich ankreuzen. Der Warnbalken hat einen Anlass (den Ablauf), deshalb kreuzt er nur die betroffenen Arten an. |
+| U-27 | Ist die Aufforderung nicht zugestellt (FAILED), zeigt die Oberfläche eine rote Meldung statt einer gelben Warnung. Die Nachforderung ist trotzdem gespeichert, der Lauf holt die Mail nach. | Solange die Person nichts bekommen hat, läuft die Frist ins Leere. Das muss auffallen, nicht nur informieren. |
+| U-28 | Der Dialog kennzeichnet sensible Arten mit „Vertraulich“, nicht mit der Kategorie (Gesundheitsdaten, Art. 10, Aufenthaltsstatus) wie im Mockup P:1305. | Der Baustein liefert in Stufe 1 keine Kategorie (`sensibelKategorie`). Der Dialog ordnet selbst nichts zu und bleibt modulneutral. |
+| U-29 | Eine erledigte oder zurückgezogene Nachforderung zeigt „Frist war …“ statt der Restlaufzeit. Die Rückmeldung des Dialogs „Unterlagen nachfordern…“ steht nach dem Schließen in einer Leiste über der Karte im Reiter „Dokumente“, grün nur, wenn auch die Mail an die Person hinausging. | Eine abgeschlossene Nachforderung hat keine Restlaufzeit mehr. Der Dialog schließt nach dem Speichern, das Ergebnis der Mail muss danach noch zu lesen sein. |
+| U-30 | Die Upload-Seite verkleinert große Fotos nicht im Browser. Über 9,5 MB gibt es die Meldung aus 5.5, vor dem Senden. | Stufe 1 bleibt beim festen Typ und der festen Grenze. Ob iOS HEIC in JPEG umwandelt, klärt der Handytest nach dem Deploy. |
+| U-31 | **Der Datenschutztext der Upload-Seite ist ein Platzhalter** (`UPLOAD_SEITE_TEXTE.DATENSCHUTZ`, sinngemäß der Text des Fragebogens). | Den Wortlaut (Art. 13, mit Art. 9 für Gesundheitsnachweise) liefert der DSB vor dem Deploy (Abschnitt 11, Handschritt 4 in 15). |
 
 ---
 

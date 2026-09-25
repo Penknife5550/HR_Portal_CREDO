@@ -532,7 +532,7 @@ details > div { padding: 0 14px 12px; }
     <h1>Stellenbezeichnung, paralleler Zugriff, individuelle E-Mail, Unterlagen nachfordern, Abteilungsaufgaben und offene Aufgaben</h1>
     <p class="unter">Änderungswünsche am HR-Portal: wie ich sie umsetze bzw. umsetzen würde, was sich für HR, Führungskräfte, Abteilungen und Beschäftigte ändert, mit Vorher/Nachher-Ansichten.</p>
     <div class="meta">
-      <span>Stand 24.09.2026 · Fassung 6 (Pakete 1, 1b, 5 und 2 deployt; neu: Paket 6 „Offene Aufgaben“)</span>
+      <span>Stand 25.09.2026 · Fassung 7 (Pakete 1, 1b, 5 und 2 deployt; Paket 4 Stufe 1 umgesetzt, nicht deployt)</span>
       <span>Grundlage: Quellcode auf <code style="background:rgba(255,255,255,.14);color:#fff">main</code> (53353e8), analysiert und gegengeprüft</span>
       <span>Produktion seit 24.09.2026 auf Code 7bc91ec</span>
     </div>
@@ -587,7 +587,7 @@ details > div { padding: 0 14px 12px; }
               <td><strong>4 · Unterlagen nachfordern</strong></td>
               <td>HR fordert aus jedem Vorgang (alle sechs Vorgangsarten) gezielt Unterlagen an. Die Person lädt sie über einen persönlichen Link hoch. HR prüft jede Unterlage einzeln: Angenommene landen in den Dokumenten des Vorgangs, zurückgewiesene werden automatisch neu angefordert. Mit Frist, Erinnerungen und HR-Meldungen.</td>
               <td>Vier neue Tabellen, rein additiv.</td>
-              <td class="num">19–21 Tage</td>
+              <td class="num">Stufe 1 umgesetzt,<br>nicht deployt<br>Stufe 2 offen</td>
             </tr>
             <tr>
               <td><strong>5 · Abteilungsaufgaben im Offboarding reparieren</strong> (Paket 1b)</td>
@@ -612,8 +612,8 @@ details > div { padding: 0 14px 12px; }
       </div>
 
       <div class="kasten ok">
-        <strong class="t">Stand am 24.09.2026</strong>
-        <p>Paket 1 (mit „Neuer Vorgang“), 1b, 5 und 2 sind deployt, dazu die acht Befunde der Code-Review (7bc91ec). Das Protokoll mit allen Zahlen steht in <code>docs/historie/deploy-onboarding-pakete-2026-09.md</code> („Protokoll vom 24.09.2026“). Offen sind Paket 3, das neue Paket 6 und Paket 4. Die n8n-Umstellung kommt später, so haben Sie es entschieden. <strong>Meine Empfehlung für die Reihenfolge: erst Paket 3, dann Paket 6, dann Paket 4</strong>. Die Begründung steht in Abschnitt 9, umstellen können Sie jederzeit.</p>
+        <strong class="t">Stand am 25.09.2026</strong>
+        <p>Paket 1 (mit „Neuer Vorgang“), 1b, 5 und 2 sind deployt, dazu die acht Befunde der Code-Review (7bc91ec). Das Protokoll mit allen Zahlen steht in <code>docs/historie/deploy-onboarding-pakete-2026-09.md</code> („Protokoll vom 24.09.2026“). <strong>Paket 4 Stufe 1 (Onboarding) ist umgesetzt</strong>, mit Ihrer Freigabe der Feinplanung vom 25.09. vorgezogen: auf dem Branch <code>paket-4-unterlagen-nachfordern</code>, noch nicht nach <code>main</code> gemergt und nicht deployt. Spezifikation und Abweichungen stehen in <code>docs/module/onboarding/paket4-feinplanung.md</code>, der Ablaufplan für den Deploy in <code>docs/historie/deploy-paket4-stufe1.md</code>. Offen sind Paket 3, das neue Paket 6 und Stufe 2 von Paket 4. Die n8n-Umstellung kommt später, so haben Sie es entschieden; vor dem Deploy von Paket 4 muss sie aber erledigt sein. <strong>Meine Empfehlung für die Reihenfolge: erst Paket 3, dann Paket 6, dann Stufe 2 von Paket 4</strong>. Die Begründung steht in Abschnitt 9, umstellen können Sie jederzeit.</p>
       </div>
 
       <h3>Ihre Entscheidungen vom 21., 22. und 24.09.2026</h3>
@@ -2644,19 +2644,19 @@ ORDER BY 1, 3;</pre>
           <span class="aufwand">8–8,5 Tage</span>
         </div>
         <div class="paket">
-          <div class="ph">Paket 4 · zuletzt</div>
+          <div class="ph">Paket 4 · Stufe 1 umgesetzt</div>
           <h5>Unterlagen nachfordern</h5>
-          <ul><li>Stufe 1: Onboarding komplett inkl. täglichem Lauf</li><li>Stufe 2: übrige fünf Vorgänge, Listen-Spalte</li></ul>
-          <span class="aufwand">19–21 Tage</span>
+          <ul><li>Stufe 1: Onboarding komplett inkl. täglichem Lauf — umgesetzt auf dem Branch <code>paket-4-unterlagen-nachfordern</code>, nicht gemergt, nicht deployt</li><li>Stufe 2: übrige fünf Vorgänge, Listen-Spalte — offen</li><li>Feinplanung: <code>docs/module/onboarding/paket4-feinplanung.md</code>, Deploy: <code>docs/historie/deploy-paket4-stufe1.md</code></li></ul>
+          <span class="aufwand">Stufe 2: 6,25–7,25 Tage</span>
         </div>
       </div>
-      <p>Paket 4 setzt Paket 1 voraus, weil der Fragebogen seitdem schreibgeschützt ist und die Nachforderung der einzige Weg zum Nachreichen wird. Paket 5 setzte Paket 1b voraus. Paket 3 und Paket 6 hängen weder voneinander noch von Paket 4 ab. Gemeinsam berühren sie nur die Onboarding-Detailseite, und nacheinander umgesetzt ist das unkritisch. Offen sind Paket 3 (5–6 Tage), Paket 6 (8–8,5) und Paket 4 (19–21), zusammen <strong>32–35,5 Arbeitstage</strong>. Dazu kommt das kleine Mandanten-Paket aus Abschnitt 10 mit etwa 0,5 Tagen, insgesamt also etwa 32,5–36 Tage.</p>
+      <p>Paket 4 setzt Paket 1 voraus, weil der Fragebogen seitdem schreibgeschützt ist und die Nachforderung der einzige Weg zum Nachreichen wird. Paket 5 setzte Paket 1b voraus. Paket 3 und Paket 6 hängen weder voneinander noch von Paket 4 ab. Gemeinsam berühren sie nur die Onboarding-Detailseite, und nacheinander umgesetzt ist das unkritisch. Offen sind Paket 3 (5–6 Tage), Paket 6 (8–8,5) und Paket 4 Stufe 2 (6,25–7,25), zusammen <strong>19,25–21,75 Arbeitstage</strong>. Dazu kommt das kleine Mandanten-Paket aus Abschnitt 10 mit etwa 0,5 Tagen, insgesamt also etwa 19,75–22,25 Tage.</p>
       <div class="kasten hinweis">
-        <strong class="t">Meine Empfehlung: Paket 3, dann Paket 6, dann Paket 4</strong>
+        <strong class="t">Meine Empfehlung: Paket 3, dann Paket 6, dann Paket 4 Stufe 2</strong>
         <ul>
           <li><strong>Paket 3 zuerst:</strong> Sie haben es zuerst genannt. Es ist fertig beschrieben, mit Mockups (Abschnitt 3), und hängt an nichts. Vorher sollte nur die Freigabeliste für Empfängeradressen gepflegt sein.</li>
           <li><strong>Paket 6 danach:</strong> Es ist mittelgroß und kommt ohne Schemaänderung und ohne Mail aus, der Deploy braucht also weder <code>db push</code> noch Vorlagenpflege. Es legt drei Dinge, auf denen Paket 4 aufbaut: saubere Listen-Schnittstellen mit korrektem Mandantenschnitt, das Spalten- und Pillenmuster, neben das „Unterlagen“ kommt, und den gemeinsamen Kalendertag-Helfer für Fristen. Bis die n8n-Umstellung kommt, laufen voraussichtlich auch die Erinnerungen der Abteilungsaufgaben nicht. Paket 6 macht Überfälliges bis dahin wenigstens im Portal sichtbar.</li>
-          <li><strong>Paket 4 zuletzt:</strong> Es ist mit Abstand das größte Paket und bringt Schema, fünf neue Mails und einen neuen täglichen Lauf in n8n. Die n8n-Umstellung haben Sie zurückgestellt, deshalb passt Paket 4 ohnehin erst danach.</li>
+          <li><strong>Paket 4 (Stufe 2) zuletzt:</strong> Stufe 1 mit Schema, fünf neuen Mails und dem neuen täglichen Lauf ist mit Ihrer Freigabe vom 25.09. vorgezogen und umgesetzt, aber noch nicht deployt. Vor ihrem Deploy muss die zurückgestellte n8n-Umstellung erledigt sein. Stufe 2 überträgt die Nachforderung auf die übrigen fünf Vorgangsarten und bringt die Listen-Spalte „Unterlagen“ nach dem Muster von Paket 6 (Feinplanung, E-6), passt also nach Paket 6.</li>
         </ul>
         <p>Umstellen können Sie jederzeit. Technisch hängt nur Paket 4 an Paket 1, und diese Bedingung ist erfüllt.</p>
       </div>
@@ -2838,7 +2838,7 @@ FROM department_configs ORDER BY "departmentKey";</pre>
   </main>
 
   <footer class="fuss">
-    Erstellt am 21.09.2026, Fassung 6 vom 24.09.2026 mit dem Stand nach dem Deploy und dem neuen Paket 6 (offene Aufgaben) · Grundlage: Analyse des Quellcodes auf <code>main</code> (53353e8) mit unabhängiger Gegenprüfung; die Produktion läuft seit dem 24.09.2026 auf Code 7bc91ec · Mockups zeigen den Stand von <code>main</code> bzw. den geplanten Stand. Namen, Vorgangsnummern und Adressen darin sind erfunden · Nach Ihrer Freigabe setze ich Paket für Paket um.
+    Erstellt am 21.09.2026, Fassung 7 vom 25.09.2026 mit dem Stand von Paket 4 Stufe 1 (umgesetzt auf dem Branch <code>paket-4-unterlagen-nachfordern</code>, nicht gemergt, nicht deployt) · Fassung 6 vom 24.09.2026 mit dem Stand nach dem Deploy und dem neuen Paket 6 (offene Aufgaben) · Grundlage: Analyse des Quellcodes auf <code>main</code> (53353e8) mit unabhängiger Gegenprüfung; die Produktion läuft seit dem 24.09.2026 auf Code 7bc91ec · Mockups zeigen den Stand von <code>main</code> bzw. den geplanten Stand. Namen, Vorgangsnummern und Adressen darin sind erfunden · Nach Ihrer Freigabe setze ich Paket für Paket um.
   </footer>
 </div>
 </body>
