@@ -179,7 +179,13 @@ export const config = {
      * - _next/static (statische Assets)
      * - _next/image (Bildoptimierung)
      * - favicon.ico, Bilder etc.
+     * - api/unterlagen/ (oeffentliche API von Paket 4, Unterlagen nachfordern):
+     *   Nur wenn die Middleware greift, klont Next.js den Body, schneidet ihn
+     *   bei 10 MiB ab und schreibt dabei die URL samt Token ins Log. Die Grenze
+     *   liegt dort in der Route selbst (leseBodyBegrenzt), die Kopfzeilen setzt
+     *   oeffentlicheAntwort(). Die SEITE /unterlagen/[token] bleibt hier drin
+     *   und behaelt CSP, X-Frame-Options und nosniff.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/unterlagen/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

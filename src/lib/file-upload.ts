@@ -547,8 +547,16 @@ export async function pfadInWurzeln(dateipfad: string, wurzeln: readonly string[
   throw new Error("Pfad ausserhalb der erlaubten Verzeichnisse");
 }
 
-/** Die Form jeder ID, die hier zum Verzeichnisnamen wird (`randomUUID()`, Prisma `uuid()`). */
-const UUID_MUSTER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/**
+ * Eine UUID in Kleinbuchstaben (`randomUUID()`, Prisma `uuid()`), ohne Anker —
+ * als Baustein fuer zusammengesetzte Muster wie `<uuid>.<ext>`
+ * (unterlagen-dateien.ts). Die Version wird bewusst nicht geprueft: Hier geht
+ * es nur darum, dass eine ID weder `..` noch einen Trenner tragen kann.
+ */
+export const UUID_TEIL = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+/** Die Form jeder ID, die zum Datei- oder Verzeichnisnamen wird (`randomUUID()`, Prisma `uuid()`). */
+export const UUID_MUSTER = new RegExp(`^${UUID_TEIL}$`);
 
 /**
  * Legt `<wurzel>/<id>` an und gibt den aufgeloesten Pfad zurueck — aber nur,
@@ -591,7 +599,8 @@ export async function zielVerzeichnisPruefen(wurzel: string, id: string): Promis
 /** Ergebnis eines Loeschversuchs — drei Ausgaenge, nicht zwei. */
 export type LoeschErgebnis = "geloescht" | "fehlte" | "fehler";
 
-function fehlerCode(fehler: unknown): string | undefined {
+/** Der `code` eines Dateisystemfehlers (ENOENT, EEXIST, EXDEV …), sonst undefined. */
+export function fehlerCode(fehler: unknown): string | undefined {
   return typeof fehler === "object" && fehler !== null && "code" in fehler
     ? String((fehler as { code: unknown }).code)
     : undefined;

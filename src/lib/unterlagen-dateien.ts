@@ -26,7 +26,8 @@
  *
  * Wer ruft was:
  *   Zurueckziehen, „Entfällt" (Schritt 4/6)     → entwuerfeLoeschen
- *   Hochladen, Entfernen (Schritt 5)            → entwurfSpeichern, nachforderungsDateiLoeschen
+ *   Hochladen, Entfernen (Schritt 5)            → entwurfSpeichern, entwuerfeLoeschen
+ *                                                 (auch nach einer gescheiterten Transaktion)
  *   Datei oeffnen, Annehmen (Schritt 6)         → nachforderungsDateiLesen, verknuepfenInVorgang
  *   Annahme zuruecknehmen (Schritt 6)           → zurueckVerknuepfen, vorgangsKopieLoeschen
  *   Taeglicher Lauf (Schritt 7)                 → nachforderungsWaisen, vorgangsWaisen,
@@ -40,8 +41,11 @@ import {
   dateiLoeschen,
   deleteUploadedDirIfEmpty,
   ENDUNG_FUER_DATEITYP,
+  fehlerCode,
   pfadInWurzeln,
   sha256Hex,
+  UUID_MUSTER,
+  UUID_TEIL,
   zielVerzeichnisPruefen,
   type ErkannterDateityp,
   type LoeschErgebnis,
@@ -49,14 +53,6 @@ import {
 
 /** Unterordner unter `uploads/` fuer alles, was (noch) bei einer Nachforderung liegt. */
 export const UNTERLAGEN_ORDNER = "unterlagen";
-
-/**
- * Die Form jeder ID, die hier zum Datei- oder Verzeichnisnamen wird
- * (`randomUUID()`, Prisma `uuid()`) — dieselbe wie `UUID_MUSTER` in
- * file-upload.ts (dort nicht exportiert).
- */
-const UUID_TEIL = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-const UUID_MUSTER = new RegExp(`^${UUID_TEIL}$`);
 
 /**
  * `<uuid>.<ext>` — der Speichername einer Paket-4-Datei. Die Endungen kommen
@@ -80,12 +76,6 @@ export class UnterlagenDateiFehler extends Error {
 
 function idPruefen(id: string, was: string): void {
   if (!UUID_MUSTER.test(id)) throw new Error(`Ungueltige ${was}`);
-}
-
-function fehlerCode(fehler: unknown): string | undefined {
-  return typeof fehler === "object" && fehler !== null && "code" in fehler
-    ? String((fehler as { code: unknown }).code)
-    : undefined;
 }
 
 /** `uploads/` im Arbeitsverzeichnis — bei jedem Aufruf neu, damit Tests `process.cwd()` umlenken koennen. */
@@ -139,6 +129,9 @@ export function absoluterPfad(gespeichert: string): string {
 // Entwuerfe (Hochladen, Entfernen, Zurueckziehen, „Entfällt")
 // =============================================
 
+/** Versuche, bis `entwurfSpeichern` ein ENOENT weitergibt (Ordner zwischendurch abgeraeumt). */
+const ENTWURF_SCHREIBVERSUCHE = 3;
+
 /**
  * Schreibt einen Entwurf nach `uploads/unterlagen/<nf>/<dateiId>.<ext>` und
  * liefert den relativen Pfad. Das Verzeichnis prueft `zielVerzeichnisPruefen`
@@ -147,15 +140,28 @@ export function absoluterPfad(gespeichert: string): string {
  *
  * Reihenfolge beim Hochladen (4.3 Nr. 11): erst die Datei, dann die
  * Transaktion; scheitert diese, loescht der Aufrufer die Datei wieder.
+ *
+ * Fehlt der Ordner zwischen `mkdir` und `writeFile` (ENOENT), legt ein neuer
+ * Versuch ihn wieder an: `entwuerfeLoeschen` raeumt den leer gewordenen Ordner
+ * per `rmdir` ab, und die oeffentlichen Wege derselben Nachforderung laufen
+ * ohne Prozesssperre nebeneinander (Entfernen oder ein gescheiterter Upload
+ * neben einem Upload).
  */
 export async function entwurfSpeichern(
   buffer: Buffer,
   opts: { nachforderungId: string; dateiId: string; mimeType: ErkannterDateityp },
 ): Promise<string> {
   const relativ = nachforderungsPfad(opts.nachforderungId, opts.dateiId, opts.mimeType);
-  const verzeichnis = await zielVerzeichnisPruefen(path.join(uploadsWurzel(), UNTERLAGEN_ORDNER), opts.nachforderungId);
-  await writeFile(path.join(verzeichnis, path.posix.basename(relativ)), buffer, { flag: "wx" });
-  return relativ;
+  const wurzel = path.join(uploadsWurzel(), UNTERLAGEN_ORDNER);
+  for (let versuch = 1; ; versuch++) {
+    try {
+      const verzeichnis = await zielVerzeichnisPruefen(wurzel, opts.nachforderungId);
+      await writeFile(path.join(verzeichnis, path.posix.basename(relativ)), buffer, { flag: "wx" });
+      return relativ;
+    } catch (fehler) {
+      if (fehlerCode(fehler) !== "ENOENT" || versuch >= ENTWURF_SCHREIBVERSUCHE) throw fehler;
+    }
+  }
 }
 
 /** Liest eine Datei der Nachforderung — nur unter ihrer eigenen Wurzel (wirft sonst oder bei ENOENT). */
