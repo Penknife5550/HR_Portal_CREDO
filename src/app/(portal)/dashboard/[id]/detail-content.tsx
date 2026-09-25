@@ -39,7 +39,8 @@ import { RvFristenCard } from "./rv-fristen-card";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import {
   documentTypeLabel,
-  fehlendeNachreichbareDokumente,
+  offeneNachweise,
+  pflichtEingabenAusVorgang,
 } from "@/lib/required-documents";
 import {
   ABLAUF_KATEGORIE_META,
@@ -49,10 +50,7 @@ import {
   istFristpflichtig,
   nachweisLagen,
 } from "@/lib/dokument-fristen";
-import {
-  masernschutzPflichtig,
-  nach1970GeborenAnzeige,
-} from "@/lib/masernschutz";
+import { nach1970GeborenAnzeige } from "@/lib/masernschutz";
 import { statusLabel } from "@/lib/minijob-status";
 import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 import { formatBytes } from "@/lib/format";
@@ -62,6 +60,7 @@ import {
   istHrStatus,
   mitarbeiterAbgesendet,
   mitarbeiterName,
+  nachweiseAbgegeben,
   pruefungNichtMoeglichGrund,
   vorgesetzteAbgesendet,
   vorgesetztenLinkAbgelaufen,
@@ -1965,23 +1964,6 @@ function SectionCard({ title, icon, children }: { title: string; icon: string; c
 // =============================================
 
 /**
- * HR-Status, bei denen der Fragebogen auch ohne Zeitstempel als abgegeben gilt.
- *
- * Anker ist die eigene Spur der Person (`mitarbeiterAbgesendet`:
- * `submittedAt`, Altfall `personalData.isComplete`). Die geprueften und
- * abgeschlossenen Bestandsakten stehen zusaetzlich hier, weil der Kasten unten
- * gerade fuer sie gebaut wurde.
- *
- * SUBMITTED, SUPERVISOR_PENDING und SUPERVISOR_SUBMITTED stehen hier NICHT
- * mehr: Seit Fragebogen und Modalitaeten parallel laufen, konnte der Status
- * „Vorgesetzter fertig" lauten, waehrend die Person noch in Schritt 4 sass —
- * und der Kasten mahnte bei HR Nachweise an, die die Person gerade selbst
- * hochlaedt. Ein Link-Status ohne Zeitstempel ist ein festhaengender Vorgang,
- * den die Heil-Migration (ONBOARDING_PARALLELE_SPUREN_V1) zuruecksetzt.
- */
-const ABGEGEBENE_STATUS: readonly string[] = ["REVIEWED", "COMPLETED"];
-
-/**
  * Der Kasten „Offene Nachweise" — die einzige Stelle, an der HR ueberhaupt
  * erfaehrt, dass etwas fehlt.
  *
@@ -2006,9 +1988,10 @@ const ABGEGEBENE_STATUS: readonly string[] = ["REVIEWED", "COMPLETED"];
  * Papier da ist.
  *
  * **Dieselben Funktionen wie Formular und Absendezweig** — keine zweite Regel:
- * `masernschutzPflichtig` und `fehlendeNachreichbareDokumente`. Ein Nachbau
- * liefe frueher oder spaeter auseinander, und dann mahnt HR etwas an, das
- * niemand verlangt hat.
+ * `pflichtEingabenAusVorgang` baut die Eingaben (der Absendezweig nutzt
+ * dieselbe Funktion), `offeneNachweise` rechnet daraus die Luecken. Ein
+ * Nachbau liefe frueher oder spaeter auseinander, und dann mahnt HR etwas an,
+ * das niemand verlangt hat.
  *
  * **Die zweite Haelfte: Nachweise ohne Ablaufdatum.** Der vorgangsweite
  * Warnbalken laesst diesen Fall bewusst aus (siehe `dringendeNachweisLagen`),
@@ -2024,7 +2007,9 @@ const ABGEGEBENE_STATUS: readonly string[] = ["REVIEWED", "COMPLETED"];
  * laedt die Person selbst hoch, wird im Formular je Unterlage angemahnt und
  * bekommt das Ablaufdatum dort direkt neben der Datei abgefragt. Vorher zu
  * mahnen hiesse, HR hinter jemandem hertelefonieren zu lassen, der gerade in
- * Schritt 3 sitzt.
+ * Schritt 3 sitzt. Das Tor ist `nachweiseAbgegeben` (onboarding-spuren.ts):
+ * die eigene Spur der Person, dazu REVIEWED und COMPLETED fuer Bestandsakten
+ * ohne Zeitstempel — dort steht auch, warum die Link-Status NICHT zaehlen.
  */
 export function OffeneNachweiseKasten({
   data,
@@ -2034,22 +2019,18 @@ export function OffeneNachweiseKasten({
   onZuDenDokumenten: (() => void) | null;
 }) {
   const pd = data.personalData;
-  const abgegeben =
-    mitarbeiterAbgesendet(data) || ABGEGEBENE_STATUS.includes(data.status);
+  const abgegeben = nachweiseAbgegeben(data);
 
   const offen = abgegeben
-    ? fehlendeNachreichbareDokumente({
-        required: data.requiredDocuments ?? [],
-        hasChildren: (pd?.children.length ?? 0) > 0,
-        rvEntscheidung: pd?.rvEntscheidung ?? null,
-        masernschutzPflichtig: masernschutzPflichtig({
-          geburtsdatum: pd?.birthDate,
+    ? offeneNachweise(
+        pflichtEingabenAusVorgang({
+          required: data.requiredDocuments,
+          anzahlKinder: pd?.children.length ?? 0,
           organisationstyp: data.organization.type,
+          personalData: pd,
         }),
-        aufenthaltstitelErforderlich: pd?.aufenthaltstitelErforderlich ?? null,
-        healthInsuranceType: pd?.healthInsuranceType ?? null,
-        uploadedTypes: data.documents.map((d) => d.type),
-      })
+        data.documents.map((d) => d.type),
+      )
     : [];
 
   // `nachweisLagen` gruppiert je Nachweisart und liefert `ampel: null` genau

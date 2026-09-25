@@ -28,9 +28,9 @@
  */
 import crypto from "crypto";
 import path from "path";
-import { readFile, realpath, unlink } from "fs/promises";
+import { readFile, unlink } from "fs/promises";
 import { prisma } from "@/lib/db";
-import { asciiFilename, saveUploadedFile, sha256Hex } from "@/lib/file-upload";
+import { asciiFilename, pfadInWurzeln, saveUploadedFile, sha256Hex } from "@/lib/file-upload";
 import { sendEventEmail, resolveEventTemplate, type MailAttachment } from "@/lib/mailer";
 import { renderDocx, TemplateError } from "@/lib/doc-templates";
 import { convertDocxToPdf, isGotenbergReachable } from "@/lib/gotenberg";
@@ -42,7 +42,7 @@ import {
 import { sensiblePlatzhalter, type SensiblesFeld } from "@/lib/placeholder-catalog";
 import { canAccessProcess, type SessionPayload } from "@/lib/permissions";
 import { istModulUnterstuetzt } from "@/lib/erzeugte-dokumente";
-import { escapeHtml } from "@/lib/email-layout";
+import { alsHtmlAbsaetze } from "@/lib/email-layout";
 import { empfaengerFreigegeben, ladeErlaubteDomains } from "@/lib/empfaenger-allowlist";
 // Die Antwort-Typen stehen in einer eigenen, importfreien Datei, weil der
 // Versand-Dialog ("use client") dieselben braucht und diese Datei hier prisma,
@@ -345,53 +345,10 @@ const VORLAGEN_WURZELN = [
  */
 const POOL_WURZELN = [path.join(process.cwd(), "uploads", "starterpaket")];
 
-/**
- * Loest einen Pfad auf und gibt ihn nur zurueck, wenn er WIRKLICH unterhalb
- * einer der uebergebenen Wurzeln liegt.
- *
- * Zwei Dinge, die der frueher hier stehende Vergleich (path.resolve +
- * startsWith) nicht leistet:
- *
- * 1. **Symlinks.** path.resolve normalisiert Zeichenketten, sonst nichts. Ein
- *    Link, der brav unterhalb der Wurzel liegt und auf /etc oder in die
- *    BEM-Anlagen zeigt, besteht jede Praefix-Pruefung — geprueft wird der
- *    Link, gelesen wird sein Ziel. Erst realpath macht daraus dasselbe.
- *    Aufgeloest werden muessen BEIDE Seiten: auch die Wurzel kann ein Link
- *    oder ein Bind-Mount sein (das uploads-Volume ist genau das), und dann
- *    passte sonst nichts mehr zusammen.
- *
- * 2. **Der Vergleich selbst.** startsWith kennt weder Pfadgrenzen noch die
- *    Gross-/Kleinschreibung — entwickelt wird auf Windows, gelaufen wird im
- *    Linux-Container. path.relative kennt beides: liegt das Ziel ausserhalb,
- *    ist das erste Segment "..", auf einem anderen Laufwerk ist das Ergebnis
- *    absolut. Verglichen wird das erste SEGMENT und nicht der Praefix "..",
- *    sonst wiese ein Geschwisterordner namens "..alt" faelschlich ab.
- *
- * Eine Wurzel, die es auf dieser Maschine gar nicht gibt, wird uebersprungen
- * statt zu werfen: Ob public/system-dokumente existiert, darf nicht darueber
- * entscheiden, ob eine hochgeladene Vorlage lesbar ist.
- *
- * Weil realpath auch bei einer fehlenden Datei wirft, beantwortet diese
- * Funktion zwei Fragen auf einmal — "liegt der Pfad im erlaubten Bereich" und
- * "gibt es die Datei ueberhaupt". Die Vorpruefung nutzt genau das, ohne ein
- * einziges Byte zu lesen.
- */
-async function pfadInWurzeln(dateipfad: string, wurzeln: string[]): Promise<string> {
-  const ziel = await realpath(path.resolve(dateipfad));
-  for (const wurzel of wurzeln) {
-    let aufgeloest: string;
-    try {
-      aufgeloest = await realpath(path.resolve(wurzel));
-    } catch {
-      continue;
-    }
-    const rel = path.relative(aufgeloest, ziel);
-    if (rel === "" || (rel.split(path.sep)[0] !== ".." && !path.isAbsolute(rel))) {
-      return ziel;
-    }
-  }
-  throw new Error("Pfad ausserhalb der erlaubten Verzeichnisse");
-}
+// Die Schranke selbst (`pfadInWurzeln`: realpath auf beiden Seiten, Vergleich
+// per path.relative) steht seit Paket 4 in file-upload.ts, weil die
+// Nachforderung dieselbe braucht. Begruendung dort; das Verhalten ist
+// unveraendert.
 
 /**
  * Liest eine Vorlagendatei — aus den beiden Verzeichnissen, in denen Vorlagen
@@ -427,30 +384,11 @@ async function lesePoolDokument(dateipfad: string): Promise<Buffer> {
   return readFile(await pfadInWurzeln(dateipfad, POOL_WURZELN));
 }
 
-/**
- * Macht Freitext HTML-sicher und behaelt seine Absaetze.
- *
- * Die Nachricht kommt aus einem Eingabefeld und landet unveraendert im
- * HTML-Teil der Mail. Ohne Maskierung koennte ein < im Text die Mail
- * zerlegen — und ein "<script>" waere im Postfach des Empfaengers.
- * Zeilenumbrueche werden zu <br>, damit die Absaetze erhalten bleiben.
- *
- * Maskiert wird ueber escapeHtml aus dem E-Mail-Layout: dieselben vier
- * Ersetzungen standen hier ein zweites Mal, und zwei Fassungen einer
- * Maskierung laufen frueher oder spaeter auseinander. Die Reihenfolge ist
- * dabei zwingend — erst maskieren, dann umbrechen. Andersherum machte
- * escapeHtml aus dem eingefuegten <br> ein &lt;br&gt;, und der Absatz stuende
- * als sichtbarer Text im Postfach.
- *
- * Nicht mit paragraphsToHtml aus derselben Datei zusammenlegen: die erzeugt
- * <p>-Absaetze, hier braucht es <br> innerhalb eines Absatzes. Gemeinsam ist
- * nur der Maskierungskern, und genau der wird jetzt geteilt.
- */
-export function alsHtmlAbsaetze(text: string): string {
-  return escapeHtml(text)
-    .replace(/\r\n?/g, "\n")
-    .replace(/\n/g, "<br>");
-}
+// Macht Freitext HTML-sicher und behaelt seine Absaetze (<br>). Stand bis
+// Paket 4 hier und liegt jetzt in email-layout.ts, weil die Mails der
+// Nachforderung dieselbe Funktion brauchen. Weiterhin von hier beziehbar:
+// Aufrufer und Tests muessen den Umzug nicht kennen.
+export { alsHtmlAbsaetze };
 
 /**
  * Datum in deutscher Zeit als JJJJ-MM-TT.

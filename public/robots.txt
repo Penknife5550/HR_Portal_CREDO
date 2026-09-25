@@ -5,6 +5,7 @@ User-agent: *
 Disallow: /api/
 Disallow: /fragebogen/
 Disallow: /modalitaeten/
+Disallow: /unterlagen/
 Disallow: /dashboard/
 Disallow: /benutzerverwaltung/
 Disallow: /checklisten/

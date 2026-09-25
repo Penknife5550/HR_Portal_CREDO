@@ -7,6 +7,7 @@
  * Submit-Sperre) und Server (harte Durchsetzung beim Absenden).
  */
 import type { DocumentType } from "@prisma/client";
+import { masernschutzPflichtig } from "@/lib/masernschutz";
 
 export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   ARBEITSVERTRAG: "Arbeitsvertrag",
@@ -336,6 +337,96 @@ export function fehlendeNachreichbareDokumente(
 }
 
 /**
+ * Woraus ein Vorgang seine Pflichten bezieht — die Rohdaten, wie Server und
+ * Vorgangsansicht sie ohnehin in der Hand haben.
+ *
+ * Locker typisiert wie `SpurenStand` in onboarding-spuren.ts: Der Server reicht
+ * einen Prisma-Datensatz herein (Geburtsdatum als `Date`, Enums), die
+ * Vorgangsansicht die JSON-Antwort der Detailroute (Geburtsdatum als
+ * Zeichenkette).
+ */
+export interface PflichtQuelle {
+  /**
+   * Die Pflicht-Dokumenttypen der Vorlage, so wie der Aufrufer sie hat.
+   *
+   * Der Rueckfall auf die Geburtsurkunden fuer einen Fragebogentyp OHNE
+   * Vorlage passiert beim Laden der Vorlage, nicht hier: Absendezweig und
+   * `GET /api/onboarding/[id]` schreiben `vorlage?.requiredDocuments ?? [...]`.
+   * Das ist `??` und nicht `||` — eine Vorlage mit leerer Liste bleibt leer.
+   *
+   * `null`/`undefined` heisst „keine Liste bekommen" und gilt als leere Liste.
+   * So hielt es die Vorgangsansicht (`data.requiredDocuments ?? []`); der
+   * Server liefert immer eine Liste und merkt davon nichts.
+   */
+  required: readonly string[] | null | undefined;
+  /** Eingetragene Kinder — Server `child.count`, Vorgangsansicht `children.length`. */
+  anzahlKinder: number;
+  /** `Organization.type`, entscheidet ueber den Masernschutz. */
+  organisationstyp: string | null | undefined;
+  personalData?: {
+    birthDate?: unknown;
+    rvEntscheidung?: string | null;
+    aufenthaltstitelErforderlich?: boolean | null;
+    healthInsuranceType?: string | null;
+  } | null;
+}
+
+/**
+ * Die `PflichtEingaben` eines Vorgangs — EINE Stelle fuer alle, die sie bauen.
+ *
+ * Bis Paket 4 stand dieser Block zweimal: im Absendezweig des Fragebogens
+ * (`/api/fragebogen/[token]`, POST) und im Kasten „Offene Nachweise" der
+ * Vorgangsansicht. Mit der Nachforderung kommt ein dritter Leser dazu (der
+ * Server prueft sensible Arten gegen die Pflicht, Feinplanung Abschnitt 11) —
+ * und bisher stand die Rechnung fuer den Kasten nur im Client. Drei Nachbauten
+ * laufen auseinander; dann mahnt HR etwas an, das der Server nicht verlangt.
+ *
+ * Die Regeln selbst werden NICHT nachgebaut, sondern aufgerufen:
+ * `masernschutzPflichtig` fuer den Masernschutz, alles Uebrige wertet
+ * `effektivePflichtDokumente` aus. Hier werden nur die Felder zugeordnet, und
+ * zwar mit genau den Rueckfaellen, die beide Aufrufer bisher hatten
+ * (`?? null` bei den Selbstauskuenften, fehlendes Geburtsdatum = nicht
+ * pflichtig).
+ */
+export function pflichtEingabenAusVorgang(q: PflichtQuelle): PflichtEingaben {
+  const pd = q.personalData;
+  return {
+    required: q.required ?? [],
+    hasChildren: q.anzahlKinder > 0,
+    rvEntscheidung: pd?.rvEntscheidung ?? null,
+    masernschutzPflichtig: masernschutzPflichtig({
+      geburtsdatum: pd?.birthDate,
+      organisationstyp: q.organisationstyp,
+    }),
+    aufenthaltstitelErforderlich: pd?.aufenthaltstitelErforderlich ?? null,
+    healthInsuranceType: pd?.healthInsuranceType ?? null,
+  };
+}
+
+/**
+ * Die offenen Nachweise eines Vorgangs: nachreichbare Pflichten, zu denen
+ * noch kein Dokument vorliegt.
+ *
+ * Dieselbe Rechnung wie `fehlendeNachreichbareDokumente` — bewusst, denn der
+ * Absendezweig haelt mit jener Funktion fest, was bei der Abgabe offen war.
+ * Der eigene Name steht fuer den Arbeitsvorrat danach: Kasten „Offene
+ * Nachweise" und die Vorauswahl der Nachforderung (Paket 4) lesen hier.
+ *
+ * `vorhandeneTypen` sind die Typen ALLER Dokumente des Vorgangs, gleich in
+ * welchem Status — so rechnet der Kasten seit jeher.
+ *
+ * Ob eine Luecke schon eine Luecke ist, entscheidet diese Funktion nicht:
+ * Solange die Person ihren Fragebogen noch ausfuellt, laedt sie selbst hoch.
+ * Das Tor dafuer ist `nachweiseAbgegeben` in onboarding-spuren.ts.
+ */
+export function offeneNachweise(
+  eingaben: PflichtEingaben,
+  vorhandeneTypen: readonly string[],
+): string[] {
+  return fehlendeNachreichbareDokumente({ ...eingaben, uploadedTypes: vorhandeneTypen });
+}
+
+/**
  * Der Satz, der erklaert, warum ausgerechnet dieses Dokument nicht per Haken
  * erledigt werden kann.
  *
@@ -452,3 +543,188 @@ export const NACHREICHEN_FOLGEN_HINWEIS =
   "entgegen. Über diesen Link können Sie nach dem Absenden nichts mehr " +
   "hochladen — was Sie jetzt schon zur Hand haben, laden Sie deshalb besser " +
   "oben gleich hoch.";
+
+// =============================================
+// Paket 4 „Unterlagen nachfordern"
+// (Feinplanung docs/module/onboarding/paket4-feinplanung.md, Abschnitte 10.1, 11, 18 N4)
+// =============================================
+
+/**
+ * Dokumentarten, die als vertraulich gelten (Entscheidung E-1, 25.09.2026):
+ *
+ * - `MASERNSCHUTZ` und `SB_AUSWEIS`: Gesundheitsdaten (Art. 9 DSGVO),
+ * - `FUEHRUNGSZEUGNIS`: Daten ueber Straftaten (Art. 10 DSGVO),
+ * - `AUFENTHALTSTITEL` und `ARBEITSERLAUBNIS`: Der Aufenthaltsstatus verraet
+ *   die Herkunft (siehe `effektivePflichtDokumente`, derselbe Grund fuer das
+ *   aktive Entfernen).
+ *
+ * Folgen: Sie lassen sich nur anfordern, wenn `sensibelAnforderbar` es
+ * zulaesst, eine Mail nennt sie nur neutral (E-2), und das Oeffnen eines
+ * solchen Dokuments wird protokolliert.
+ */
+export const SENSIBLE_DOKUMENTTYPEN: readonly string[] = [
+  "MASERNSCHUTZ",
+  "SB_AUSWEIS",
+  "FUEHRUNGSZEUGNIS",
+  "AUFENTHALTSTITEL",
+  "ARBEITSERLAUBNIS",
+];
+
+/**
+ * Dokumentarten, fuer die ein Scan nicht genuegt: Das unterschriebene
+ * Original gehoert zusaetzlich in die Personalakte (Entscheidung E-4). Fuer
+ * den Befreiungsantrag verlangt § 6 Abs. 1b SGB VI die Schriftform (siehe
+ * `RV_BEFREIUNG_HINWEIS`), bei den drei Vertraegen ist es die Unterschrift
+ * beider Seiten.
+ *
+ * Diese Arten tragen bei einer Nachforderung fest den Hinweis auf das
+ * Original. Ein angenommener Scan setzt KEINEN Merker „Original liegt vor" —
+ * das Papier sieht das Portal nie.
+ */
+export const SCHRIFTFORM_DOKUMENTTYPEN: readonly string[] = [
+  "ARBEITSVERTRAG",
+  "RV_BEFREIUNG",
+  "VL_VERTRAG",
+  "BAV_VERTRAG",
+];
+
+/** Warum eine vertrauliche Unterlage (noch) nicht angefordert werden darf. */
+export type SensibelSperrgrund =
+  | "FUEHRUNGSZEUGNIS_KITA"
+  | "SB_AUSWEIS_OHNE_ANGABE"
+  | "NICHT_PFLICHT";
+
+/** Die Gruende im Klartext — fuer den Dialog (ausgegraut mit Grund) und die 409. */
+export const SENSIBEL_SPERRGRUND_TEXTE: Readonly<Record<SensibelSperrgrund, string>> = {
+  FUEHRUNGSZEUGNIS_KITA:
+    "Bei Kitas vorerst gesperrt: Freie Träger der Jugendhilfe dürfen nach " +
+    "§ 72a Abs. 5 SGB VIII nur die Einsichtnahme, das Datum und das Ergebnis " +
+    "festhalten, keine Kopie. Die Klärung mit dem Datenschutzbeauftragten " +
+    "steht noch aus.",
+  SB_AUSWEIS_OHNE_ANGABE:
+    "Nur anforderbar, wenn die Person im Fragebogen eine Schwerbehinderung " +
+    "angegeben hat oder der Ausweis schon vorliegt.",
+  NICHT_PFLICHT:
+    "Vertrauliche Unterlage: nur anforderbar, wenn sie für diesen Vorgang " +
+    "Pflicht ist oder schon vorliegt.",
+};
+
+export type SensibelPruefung =
+  | { ok: true }
+  | { ok: false; grund: SensibelSperrgrund; text: string };
+
+function gesperrt(grund: SensibelSperrgrund): SensibelPruefung {
+  return { ok: false, grund, text: SENSIBEL_SPERRGRUND_TEXTE[grund] };
+}
+
+/**
+ * Darf HR diese Dokumentart bei der Person anfordern (bzw. eine angenommene
+ * Datei als diese Art ablegen)? Nicht sensible Arten immer; fuer sensible
+ * gelten die Regeln aus Entscheidung E-1:
+ *
+ * - **Fuehrungszeugnis bei Kitas: gesperrt**, auch wenn es Pflicht ist oder
+ *   schon vorliegt, bis der Datenschutzbeauftragte entschieden hat. Freie
+ *   Traeger der Jugendhilfe duerfen nach § 72a Abs. 5 SGB VIII nur
+ *   Einsichtnahme, Datum und Ergebnis erheben — keine Kopie.
+ * - **Schwerbehindertenausweis** nur, wenn er schon vorliegt oder die Person
+ *   im Fragebogen „schwerbehindert" angegeben hat (`severelyDisabled`). Die
+ *   Pflicht allein genuegt NICHT: Der Typ ist in jeder Vorlage frei anhakbar,
+ *   und `effektivePflichtDokumente` kennt fuer ihn keine Regel — sonst holte
+ *   eine angehakte Vorlage Gesundheitsdaten von allen ein.
+ * - **Alle uebrigen sensiblen Arten** nur, wenn sie fuer den Vorgang Pflicht
+ *   sind (`effektivePflichtDokumente`) oder schon als Dokument vorliegen (der
+ *   verlaengerte Nachweis).
+ *
+ * Der Server prueft das beim Anfordern, Ergaenzen und bei der Wahl der Art
+ * beim Annehmen (409); der Dialog zeigt dieselbe Antwort vorab. Freie Zeilen
+ * lassen sich nicht pruefen — dagegen hilft nur der Hinweis im Dialog.
+ *
+ * @param stand.pflicht die effektiven Pflichten des Vorgangs
+ *   (`effektivePflichtDokumente(pflichtEingabenAusVorgang(...))`)
+ * @param stand.vorhanden die Typen der Dokumente, die der Vorgang schon hat
+ * @param stand.severelyDisabled `PersonalData.severelyDisabled`
+ * @param stand.organisationstyp `Organization.type` des Vorgangs
+ *
+ * Alle vier Schluessel sind Pflicht, auch die beiden, die `undefined` tragen
+ * duerfen (wie `organisationstyp` in `PflichtQuelle`): Ein Aufrufer, der den
+ * Organisationstyp vergaesse, bekaeme fuer das Fuehrungszeugnis einer Kita
+ * still `ok` — so meldet schon tsc die Luecke.
+ */
+export function sensibelAnforderbar(
+  typ: string,
+  stand: {
+    pflicht: readonly string[];
+    vorhanden: readonly string[];
+    severelyDisabled: boolean | null | undefined;
+    organisationstyp: string | null | undefined;
+  },
+): SensibelPruefung {
+  if (!SENSIBLE_DOKUMENTTYPEN.includes(typ)) return { ok: true };
+
+  if (typ === "FUEHRUNGSZEUGNIS" && stand.organisationstyp === "KITA") {
+    return gesperrt("FUEHRUNGSZEUGNIS_KITA");
+  }
+
+  const vorhanden = stand.vorhanden.includes(typ);
+  if (typ === "SB_AUSWEIS") {
+    // Streng auf `=== true`, wie bei den Selbstauskuenften oben: `null` ist
+    // „nicht beantwortet", nicht „ja".
+    return vorhanden || stand.severelyDisabled === true
+      ? { ok: true }
+      : gesperrt("SB_AUSWEIS_OHNE_ANGABE");
+  }
+
+  return vorhanden || stand.pflicht.includes(typ) ? { ok: true } : gesperrt("NICHT_PFLICHT");
+}
+
+/**
+ * Die Hinweise je Dokumentart, wenn HR eine Unterlage NACHFORDERT — der Dialog
+ * setzt sie als Vorschlag ein, die Upload-Seite zeigt sie der Person immer.
+ *
+ * **In der Mail nur bei nicht sensiblen Arten.** Bei `SENSIBLE_DOKUMENTTYPEN`
+ * steht die Position dort nur neutral („Eine vertrauliche Unterlage …") und
+ * OHNE Hinweis (E-2, Feinplanung 8.2) — gleich, ob der Text von hier stammt
+ * oder HR ihn geaendert hat. Drei der Texte unten (Masernschutz,
+ * Aufenthaltstitel, Arbeitserlaubnis) verrieten sonst genau, was E-2 verbirgt.
+ *
+ * Eigene Texte und nicht `PFLICHT_HINWEISE`: Jene sprechen vom Absenden des
+ * Fragebogens („Sie können den Fragebogen auch ohne ihn absenden und die
+ * Unterlage nachreichen") und vom Gesundheitsamt. Beides ist nach der Abgabe
+ * falsch bzw. fehl am Platz — die Person wird hier ja gerade um die Unterlage
+ * gebeten. Ein Test haelt fest, dass kein Text „Fragebogen" oder „nachreich"
+ * enthaelt.
+ *
+ * **Arbeitserlaubnis (Regel N4):** Der Text darf nicht behaupten, der
+ * Aufenthaltstitel genuege. Die Pflichtregel verlangt beide Arten
+ * (`effektivePflichtDokumente`); steht die Erlaubnis auf dem Titel, laedt die
+ * Person dieselbe Karte zu beiden Positionen hoch — oder HR quittiert die
+ * Position mit „Entfällt…". Sonst bliebe sie offen, und Erinnerung und
+ * „Frist verstrichen" liefen weiter.
+ *
+ * Den Zusatz zum Original haengen Mail und Upload-Seite bei
+ * `SCHRIFTFORM_DOKUMENTTYPEN` selbst an; er steht hier deshalb nicht noch
+ * einmal.
+ */
+export const NACHFORDERUNG_HINWEISE: Readonly<Record<string, string>> = {
+  RV_BEFREIUNG:
+    "Für die Befreiung von der Rentenversicherungspflicht ist die Schriftform " +
+    "vorgeschrieben. Bitte laden Sie den ausgedruckten und unterschriebenen " +
+    "Antrag hoch.",
+  MASERNSCHUTZ:
+    "Bitte laden Sie nur die Seite Ihres Impfpasses mit den Masern-Impfungen " +
+    "hoch, ein ärztliches Zeugnis über Ihre Immunität oder eine ärztliche " +
+    "Bescheinigung, dass Sie nicht geimpft werden können.",
+  AUFENTHALTSTITEL:
+    "Bitte laden Sie Vorder- und Rückseite hoch und tragen Sie das " +
+    "Ablaufdatum ein. Damit erinnern wir Sie rechtzeitig vor Ablauf an die " +
+    "Verlängerung.",
+  ARBEITSERLAUBNIS:
+    "Die Erlaubnis zu arbeiten steht meist auf dem Aufenthaltstitel selbst " +
+    "(„Erwerbstätigkeit gestattet“). Haben Sie kein eigenes Blatt, laden Sie " +
+    "hier bitte die Seite Ihres Titels hoch, auf der die Erlaubnis vermerkt " +
+    "ist, auch wenn Sie dieselbe Karte schon beim Aufenthaltstitel hochladen. " +
+    "Bitte tragen Sie auch hier das Ablaufdatum ein.",
+  PKV_NACHWEIS:
+    "Bitte nur die Bescheinigung über den bestehenden Versicherungsschutz, " +
+    "keine Beitragsübersicht und nicht den Vertrag.",
+};

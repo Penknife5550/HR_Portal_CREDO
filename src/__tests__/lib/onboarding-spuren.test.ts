@@ -19,6 +19,7 @@ import {
   gesamtStatus,
   mitarbeiterAbgesendet,
   mitarbeiterName,
+  nachweiseAbgegeben,
   pruefungNichtMoeglichGrund,
   vorgesetzteAbgesendet,
   vorgesetztenLinkAbgelaufen,
@@ -172,6 +173,49 @@ describe("Schreibrechte je Link", () => {
     for (const status of ONBOARDING_STATUS) {
       expect(mitarbeiterAbgesendet({ status, submittedAt: null })).toBe(false);
       expect(vorgesetzteAbgesendet({ status, supervisorSubmittedAt: null })).toBe(false);
+    }
+  });
+});
+
+/**
+ * Das Tor des Kastens „Offene Nachweise" (Paket 4: zog aus detail-content.tsx
+ * hierher). Es muss sich genau so verhalten wie vorher — die Nachforderung
+ * baut darauf auf und sperrt EXPIRED selbst.
+ */
+describe("nachweiseAbgegeben", () => {
+  /** Das Tor, woertlich wie es bis Paket 4 in detail-content.tsx stand. */
+  const ABGEGEBENE_STATUS: readonly string[] = ["REVIEWED", "COMPLETED"];
+  const altesTor = (v: SpurenStand) =>
+    mitarbeiterAbgesendet(v) || ABGEGEBENE_STATUS.includes(v.status);
+
+  it("gleicht dem alten Tor des Kastens — ueber die ganze Matrix", () => {
+    for (const v of matrix()) {
+      expect(nachweiseAbgegeben(v)).toBe(altesTor(v));
+    }
+    // Auch der Altfall: isComplete ohne Zeitstempel.
+    for (const status of ONBOARDING_STATUS) {
+      const altfall = { status, submittedAt: null, personalData: { isComplete: true } };
+      expect(nachweiseAbgegeben(altfall)).toBe(altesTor(altfall));
+    }
+  });
+
+  it("bleibt bei EXPIRED wahr, wenn die Person abgesendet hatte", () => {
+    // HR kann EXPIRED jederzeit setzen, auch nach dem Abschluss. Die
+    // Nachforderung sperrt EXPIRED deshalb selbst (verfuegbar), das Tor nicht.
+    expect(nachweiseAbgegeben({ status: "EXPIRED", submittedAt: ZEIT })).toBe(true);
+    expect(nachweiseAbgegeben({ status: "EXPIRED", submittedAt: null, personalData: { isComplete: true } })).toBe(true);
+    expect(nachweiseAbgegeben({ status: "EXPIRED", submittedAt: null })).toBe(false);
+  });
+
+  it("gilt fuer gepruefte und abgeschlossene Bestandsakten auch ohne Zeitstempel", () => {
+    expect(nachweiseAbgegeben({ status: "REVIEWED", submittedAt: null })).toBe(true);
+    expect(nachweiseAbgegeben({ status: "COMPLETED", submittedAt: null })).toBe(true);
+  });
+
+  it("ein Link-Status allein zaehlt nicht — die Person kann noch mitten im Fragebogen sein", () => {
+    for (const status of LINK_STATUS) {
+      expect(nachweiseAbgegeben({ status, submittedAt: null, personalData: { currentStep: 4 } })).toBe(false);
+      expect(nachweiseAbgegeben({ status, submittedAt: ZEIT })).toBe(true);
     }
   });
 });

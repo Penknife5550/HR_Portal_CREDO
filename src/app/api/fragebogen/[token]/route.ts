@@ -25,10 +25,11 @@ import { tokenRateLimiter, getClientIp, getClientIpOrNull } from "@/lib/rate-lim
 import {
   computeMissingRequiredDocuments,
   fehlendeNachreichbareDokumente,
+  pflichtEingabenAusVorgang,
   RV_BEFREIUNG_HINWEIS,
   documentTypeLabel,
 } from "@/lib/required-documents";
-import { istNach1970Geboren, masernschutzPflichtig } from "@/lib/masernschutz";
+import { istNach1970Geboren } from "@/lib/masernschutz";
 import { MAX_STEP_NUMBER, SUMMARY_STEP_NUMBER } from "@/lib/fragebogen-steps";
 import { istBekannteErklaerung } from "@/lib/erklaerung-arbeitnehmer";
 import { berechnePruefsumme } from "@/lib/fragebogen-pruefsumme";
@@ -839,20 +840,17 @@ export async function POST(
    * ausgewertet, die der Fragebogen aufruft (`masernschutzPflichtig`,
    * `effektivePflichtDokumente`). Zwei Nachbauten liefen frueher oder spaeter
    * auseinander — und dann sperrt der Server etwas, wovon das Formular nichts
-   * weiss.
+   * weiss. Die Zuordnung der Felder steht deshalb in
+   * `pflichtEingabenAusVorgang`, die auch der Kasten „Offene Nachweise" der
+   * Vorgangsansicht nutzt. `requiredDocs` bringt den Rueckfall ohne Vorlage
+   * schon mit (oben).
    */
-  const pflichtEingaben = {
+  const pflichtEingaben = pflichtEingabenAusVorgang({
     required: requiredDocs,
-    hasChildren: childCount > 0,
-    rvEntscheidung: onboarding.personalData?.rvEntscheidung ?? null,
-    masernschutzPflichtig: masernschutzPflichtig({
-      geburtsdatum: onboarding.personalData?.birthDate,
-      organisationstyp: onboarding.organization.type,
-    }),
-    aufenthaltstitelErforderlich:
-      onboarding.personalData?.aufenthaltstitelErforderlich ?? null,
-    healthInsuranceType: onboarding.personalData?.healthInsuranceType ?? null,
-  };
+    anzahlKinder: childCount,
+    organisationstyp: onboarding.organization.type,
+    personalData: onboarding.personalData,
+  });
 
   // Bewusst ohne `if (requiredDocs.length > 0)`: Die Pflicht zum
   // Befreiungsantrag entsteht aus der Entscheidung des Beschaeftigten, nicht aus

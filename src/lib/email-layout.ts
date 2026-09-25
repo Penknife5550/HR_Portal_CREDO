@@ -59,6 +59,34 @@ export function escapeHtml(s: string): string {
 }
 
 /**
+ * Macht Freitext HTML-sicher und behaelt seine Absaetze.
+ *
+ * Eine Nachricht aus einem Eingabefeld landet unveraendert im HTML-Teil der
+ * Mail. Ohne Maskierung koennte ein < im Text die Mail zerlegen — und ein
+ * "<script>" waere im Postfach des Empfaengers. Zeilenumbrueche werden zu
+ * <br>, damit die Absaetze erhalten bleiben.
+ *
+ * Maskiert wird ueber escapeHtml oben: Dieselben vier Ersetzungen standen im
+ * Dokumentenpaket ein zweites Mal, und zwei Fassungen einer Maskierung laufen
+ * frueher oder spaeter auseinander. Die Reihenfolge ist dabei zwingend — erst
+ * maskieren, dann umbrechen. Andersherum machte escapeHtml aus dem eingefuegten
+ * <br> ein &lt;br&gt;, und der Absatz stuende als sichtbarer Text im Postfach.
+ *
+ * Nicht mit paragraphsToHtml zusammenlegen: Die erzeugt <p>-Absaetze, hier
+ * braucht es <br> innerhalb eines Absatzes. Gemeinsam ist nur der
+ * Maskierungskern, und genau der wird geteilt.
+ *
+ * Stand bis Paket 4 in `dokumentenpaket.ts` (das es weiter re-exportiert);
+ * die Mails der Nachforderung brauchen dieselbe Funktion, ohne Prisma und
+ * Dateisystem des Dokumentenpakets mitzuziehen.
+ */
+export function alsHtmlAbsaetze(text: string): string {
+  return escapeHtml(text)
+    .replace(/\r\n?/g, "\n")
+    .replace(/\n/g, "<br>");
+}
+
+/**
  * Rendert eine vollstaendige CREDO-CI-HTML-Mail.
  * Der bodyHtml-Parameter wird unveraendert eingebettet — der Aufrufer ist fuer
  * sauberes/escaptes HTML verantwortlich (z.B. via paragraphsToHtml).

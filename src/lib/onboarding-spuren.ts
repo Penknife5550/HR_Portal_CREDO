@@ -130,6 +130,43 @@ export function mitarbeiterAbgesendet(v: MitarbeiterSpur): boolean {
 }
 
 /**
+ * HR-Status, bei denen der Fragebogen auch ohne Zeitstempel als abgegeben gilt:
+ * die geprueften und abgeschlossenen Bestandsakten, fuer die der Kasten
+ * „Offene Nachweise" gerade gebaut wurde.
+ *
+ * SUBMITTED, SUPERVISOR_PENDING und SUPERVISOR_SUBMITTED stehen hier NICHT:
+ * Seit Fragebogen und Modalitaeten parallel laufen, konnte der Status
+ * „Vorgesetzter fertig" lauten, waehrend die Person noch in Schritt 4 sass —
+ * und der Kasten mahnte bei HR Nachweise an, die die Person gerade selbst
+ * hochlaedt. Ein Link-Status ohne Zeitstempel ist ein festhaengender Vorgang,
+ * den die Heil-Migration (ONBOARDING_PARALLELE_SPUREN_V1) zuruecksetzt.
+ *
+ * EXPIRED steht ebenfalls nicht hier. Das aendert am Ergebnis nur etwas fuer
+ * einen Vorgang, den die Person nie abgesendet hat — und dessen Nachweise
+ * mahnt niemand an.
+ */
+const NACHWEIS_HR_STATUS: readonly string[] = ["REVIEWED", "COMPLETED"];
+
+/**
+ * Sind die Nachweise der Person „abgegeben" — ab wann gilt eine fehlende
+ * Unterlage als Luecke statt als Arbeit, die die Person gerade selbst erledigt?
+ *
+ * Das Tor des Kastens „Offene Nachweise" (bis Paket 4 als `ABGEGEBENE_STATUS`
+ * in `detail-content.tsx`) und der Nachforderung (Paket 4, `verfuegbar`).
+ * Anker ist die eigene Spur (`mitarbeiterAbgesendet`), dazu REVIEWED und
+ * COMPLETED fuer Bestandsakten ohne Zeitstempel.
+ *
+ * **Bei EXPIRED bleibt die Antwort wahr**, wenn die Person abgesendet hatte:
+ * `mitarbeiterAbgesendet` haengt nie am Status, und HR kann EXPIRED jederzeit
+ * setzen, auch nach einem Abschluss. Wer eine Nachforderung bei EXPIRED
+ * sperren will, prueft den Status zusaetzlich selbst — diese Funktion bleibt
+ * das unveraenderte Tor des Kastens.
+ */
+export function nachweiseAbgegeben(v: MitarbeiterSpur): boolean {
+  return mitarbeiterAbgesendet(v) || NACHWEIS_HR_STATUS.includes(v.status);
+}
+
+/**
  * Hat die Fuehrungskraft die Einstellungsmodalitaeten selbst abgesendet?
  *
  * Anker ist `supervisorSubmittedAt`, Rueckfall `supervisorData.isComplete` —

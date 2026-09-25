@@ -1,19 +1,31 @@
 import {
   ARBEITSERLAUBNIS_HINWEIS,
   AUFENTHALTSTITEL_HINWEIS,
+  DOCUMENT_TYPE_LABELS,
   MASERNSCHUTZ_HINWEIS,
+  NACHFORDERUNG_HINWEISE,
+  NACHREICHBARE_PFLICHTEN,
   NACHREICHEN_FOLGEN_HINWEIS,
   PFLICHT_HINWEISE,
   PKV_NACHWEIS_HINWEIS,
+  SCHRIFTFORM_DOKUMENTTYPEN,
   SELECTABLE_DOCUMENT_TYPES,
+  SENSIBEL_SPERRGRUND_TEXTE,
+  SENSIBLE_DOKUMENTTYPEN,
   computeMissingRequiredDocuments,
   documentTypeLabel,
   effektivePflichtDokumente,
   fehlendeNachreichbareDokumente,
   istNachreichbar,
   nachreichbarePflichtDokumente,
+  offeneNachweise,
+  pflichtEingabenAusVorgang,
+  sensibelAnforderbar,
   sperrendePflichtDokumente,
+  type PflichtEingaben,
+  type PflichtQuelle,
 } from "@/lib/required-documents";
+import { masernschutzPflichtig } from "@/lib/masernschutz";
 
 describe("computeMissingRequiredDocuments", () => {
   it("meldet fehlende Pflichtdokumente", () => {
@@ -480,5 +492,403 @@ describe("Mehrere bedingte Pflichten gleichzeitig", () => {
       "ARBEITSERLAUBNIS",
       "PKV_NACHWEIS",
     ]);
+  });
+});
+
+// =============================================
+// Paket 4: eine Quelle fuer Kasten und Server
+// =============================================
+
+/**
+ * Die beiden Bloecke, die `pflichtEingabenAusVorgang` abloest — woertlich so,
+ * wie sie bis Paket 4 inline standen. Sie sind hier eingefroren, damit der Test
+ * gegen das alte Verhalten prueft und nicht gegen sich selbst.
+ */
+type AltPersonalData = {
+  birthDate?: unknown;
+  rvEntscheidung?: string | null;
+  aufenthaltstitelErforderlich?: boolean | null;
+  healthInsuranceType?: string | null;
+  children?: unknown[];
+} | null;
+
+/** Absendezweig, src/app/api/fragebogen/[token]/route.ts (bis Paket 4). */
+function alterServerBlock(
+  requiredDocs: string[],
+  childCount: number,
+  onboarding: { personalData: AltPersonalData; organization: { type: string | null } },
+): PflichtEingaben {
+  return {
+    required: requiredDocs,
+    hasChildren: childCount > 0,
+    rvEntscheidung: onboarding.personalData?.rvEntscheidung ?? null,
+    masernschutzPflichtig: masernschutzPflichtig({
+      geburtsdatum: onboarding.personalData?.birthDate,
+      organisationstyp: onboarding.organization.type,
+    }),
+    aufenthaltstitelErforderlich:
+      onboarding.personalData?.aufenthaltstitelErforderlich ?? null,
+    healthInsuranceType: onboarding.personalData?.healthInsuranceType ?? null,
+  };
+}
+
+/** Kasten „Offene Nachweise", detail-content.tsx (bis Paket 4). */
+function alterKasten(data: {
+  requiredDocuments?: string[] | null;
+  personalData: (AltPersonalData & { children: unknown[] }) | null;
+  organization: { type?: string | null };
+  documents: { type: string }[];
+}): string[] {
+  const pd = data.personalData;
+  return fehlendeNachreichbareDokumente({
+    required: data.requiredDocuments ?? [],
+    hasChildren: (pd?.children.length ?? 0) > 0,
+    rvEntscheidung: pd?.rvEntscheidung ?? null,
+    masernschutzPflichtig: masernschutzPflichtig({
+      geburtsdatum: pd?.birthDate,
+      organisationstyp: data.organization.type,
+    }),
+    aufenthaltstitelErforderlich: pd?.aufenthaltstitelErforderlich ?? null,
+    healthInsuranceType: pd?.healthInsuranceType ?? null,
+    uploadedTypes: data.documents.map((d) => d.type),
+  });
+}
+
+/** Alle Kombinationen, die fuer eine der Regeln einen Unterschied machen. */
+function pflichtMatrix() {
+  const faelle: {
+    required: string[] | null | undefined;
+    kinder: number;
+    orgTyp: string | null;
+    pd: (AltPersonalData & { children: unknown[] }) | null;
+    vorhanden: string[];
+  }[] = [];
+  const pds: ((AltPersonalData & { children: unknown[] }) | null)[] = [null];
+  for (const birthDate of [null, "1965-04-01", "1990-05-03", new Date("1990-05-03T00:00:00Z")]) {
+    for (const rvEntscheidung of [null, "BEFREIUNG_BEANTRAGT", "KEINE_BEFREIUNG"]) {
+      for (const aufenthaltstitelErforderlich of [null, true, false]) {
+        for (const healthInsuranceType of [null, "privat", "gesetzlich"]) {
+          pds.push({ birthDate, rvEntscheidung, aufenthaltstitelErforderlich, healthInsuranceType, children: [] });
+        }
+      }
+    }
+  }
+  for (const required of [
+    null,
+    undefined,
+    [],
+    ["GEBURTSURKUNDE_EIGEN", "GEBURTSURKUNDE_KIND"],
+    ["GEBURTSURKUNDE_EIGEN", "MASERNSCHUTZ", "AUFENTHALTSTITEL", "FUEHRUNGSZEUGNIS"],
+  ]) {
+    for (const kinder of [0, 2]) {
+      for (const orgTyp of [null, "GYMNASIUM", "KITA", "VERWALTUNG"]) {
+        for (const pd of pds) {
+          for (const vorhanden of [[], ["MASERNSCHUTZ", "PKV_NACHWEIS"], ["AUFENTHALTSTITEL"]]) {
+            faelle.push({ required, kinder, orgTyp, pd, vorhanden });
+          }
+        }
+      }
+    }
+  }
+  return faelle;
+}
+
+describe("pflichtEingabenAusVorgang", () => {
+  it("liefert fuer den Server genau den alten Block des Absendezweigs — ueber die ganze Matrix", () => {
+    let geprueft = 0;
+    for (const f of pflichtMatrix()) {
+      // Der Server hat immer eine Liste: `vorlage?.requiredDocuments ?? [...]`.
+      if (!Array.isArray(f.required)) continue;
+      const alt = alterServerBlock(f.required, f.kinder, {
+        personalData: f.pd,
+        organization: { type: f.orgTyp },
+      });
+      const neu = pflichtEingabenAusVorgang({
+        required: f.required,
+        anzahlKinder: f.kinder,
+        organisationstyp: f.orgTyp,
+        personalData: f.pd,
+      });
+      expect(neu).toEqual(alt);
+      geprueft++;
+    }
+    expect(geprueft).toBeGreaterThan(1000);
+  });
+
+  it("uebernimmt die Liste des Servers unveraendert — auch eine leere, ohne Rueckfall", () => {
+    // Der Rueckfall auf die Geburtsurkunden gehoert zum Laden der Vorlage
+    // (`??`), nicht hierher: Eine Vorlage mit leerer Liste bleibt leer.
+    const quelle: PflichtQuelle = { required: [], anzahlKinder: 1, organisationstyp: null };
+    expect(pflichtEingabenAusVorgang(quelle).required).toEqual([]);
+    const liste = ["GEBURTSURKUNDE_EIGEN"];
+    expect(pflichtEingabenAusVorgang({ ...quelle, required: liste }).required).toEqual(liste);
+  });
+
+  it("macht wie der Kasten aus einer fehlenden Liste die leere Liste", () => {
+    for (const required of [null, undefined]) {
+      expect(
+        pflichtEingabenAusVorgang({ required, anzahlKinder: 0, organisationstyp: "GYMNASIUM" }).required,
+      ).toEqual([]);
+    }
+  });
+
+  it("ohne personalData: keine Selbstauskunft, kein Masernschutz", () => {
+    expect(
+      pflichtEingabenAusVorgang({
+        required: ["GEBURTSURKUNDE_EIGEN"],
+        anzahlKinder: 0,
+        organisationstyp: "GYMNASIUM",
+        personalData: null,
+      }),
+    ).toEqual({
+      required: ["GEBURTSURKUNDE_EIGEN"],
+      hasChildren: false,
+      rvEntscheidung: null,
+      masernschutzPflichtig: false,
+      aufenthaltstitelErforderlich: null,
+      healthInsuranceType: null,
+    });
+  });
+
+  it("wertet den Masernschutz mit derselben Regel aus wie masernschutz.ts", () => {
+    const pd = { birthDate: "1990-05-03" };
+    expect(
+      pflichtEingabenAusVorgang({ required: [], anzahlKinder: 0, organisationstyp: "GYMNASIUM", personalData: pd })
+        .masernschutzPflichtig,
+    ).toBe(true);
+    // Verwaltung ist keine Gemeinschaftseinrichtung, 1965 vor der Stichtagsgrenze.
+    expect(
+      pflichtEingabenAusVorgang({ required: [], anzahlKinder: 0, organisationstyp: "VERWALTUNG", personalData: pd })
+        .masernschutzPflichtig,
+    ).toBe(false);
+    expect(
+      pflichtEingabenAusVorgang({
+        required: [],
+        anzahlKinder: 0,
+        organisationstyp: "GYMNASIUM",
+        personalData: { birthDate: "1965-04-01" },
+      }).masernschutzPflichtig,
+    ).toBe(false);
+  });
+});
+
+describe("offeneNachweise", () => {
+  it("rechnet wie der alte Kasten — ueber die ganze Matrix", () => {
+    let geprueft = 0;
+    for (const f of pflichtMatrix()) {
+      const pd = f.pd ? { ...f.pd, children: new Array(f.kinder).fill({}) } : null;
+      const data = {
+        requiredDocuments: f.required,
+        personalData: pd,
+        organization: { type: f.orgTyp },
+        documents: f.vorhanden.map((type) => ({ type })),
+      };
+      const neu = offeneNachweise(
+        pflichtEingabenAusVorgang({
+          required: data.requiredDocuments,
+          anzahlKinder: pd?.children.length ?? 0,
+          organisationstyp: data.organization.type,
+          personalData: pd,
+        }),
+        data.documents.map((d) => d.type),
+      );
+      expect(neu).toEqual(alterKasten(data));
+      geprueft++;
+    }
+    expect(geprueft).toBeGreaterThan(1000);
+  });
+
+  it("nennt nur nachreichbare Pflichten ohne Dokument", () => {
+    const eingaben = pflichtEingabenAusVorgang({
+      required: ["GEBURTSURKUNDE_EIGEN"],
+      anzahlKinder: 0,
+      organisationstyp: "GYMNASIUM",
+      personalData: {
+        birthDate: "1990-05-03",
+        rvEntscheidung: "BEFREIUNG_BEANTRAGT",
+        aufenthaltstitelErforderlich: true,
+        healthInsuranceType: "privat",
+      },
+    });
+    expect(offeneNachweise(eingaben, [])).toEqual([
+      "MASERNSCHUTZ",
+      "AUFENTHALTSTITEL",
+      "ARBEITSERLAUBNIS",
+      "PKV_NACHWEIS",
+    ]);
+    // Die Geburtsurkunde und der Befreiungsantrag sperren das Absenden — nach
+    // der Abgabe liegen sie also vor; offen koennen nur nachreichbare sein.
+    for (const typ of offeneNachweise(eingaben, [])) {
+      expect(NACHREICHBARE_PFLICHTEN).toContain(typ);
+    }
+    expect(offeneNachweise(eingaben, ["MASERNSCHUTZ", "AUFENTHALTSTITEL"])).toEqual([
+      "ARBEITSERLAUBNIS",
+      "PKV_NACHWEIS",
+    ]);
+  });
+});
+
+// =============================================
+// Paket 4: vertrauliche Arten und Schriftform (Entscheidungen E-1, E-4)
+// =============================================
+
+describe("SENSIBLE_DOKUMENTTYPEN und SCHRIFTFORM_DOKUMENTTYPEN", () => {
+  it("sensibel sind genau die fuenf aus E-1", () => {
+    expect([...SENSIBLE_DOKUMENTTYPEN].sort()).toEqual(
+      ["ARBEITSERLAUBNIS", "AUFENTHALTSTITEL", "FUEHRUNGSZEUGNIS", "MASERNSCHUTZ", "SB_AUSWEIS"],
+    );
+  });
+
+  it("Schriftform haben genau die vier aus E-4", () => {
+    expect([...SCHRIFTFORM_DOKUMENTTYPEN].sort()).toEqual(
+      ["ARBEITSVERTRAG", "BAV_VERTRAG", "RV_BEFREIUNG", "VL_VERTRAG"],
+    );
+  });
+
+  it("beide Listen nennen nur Arten, die es gibt, und ueberschneiden sich nicht", () => {
+    for (const typ of [...SENSIBLE_DOKUMENTTYPEN, ...SCHRIFTFORM_DOKUMENTTYPEN]) {
+      expect(DOCUMENT_TYPE_LABELS[typ]).toBeDefined();
+      expect(SELECTABLE_DOCUMENT_TYPES).toContain(typ);
+    }
+    expect(SENSIBLE_DOKUMENTTYPEN.filter((t) => SCHRIFTFORM_DOKUMENTTYPEN.includes(t))).toEqual([]);
+  });
+});
+
+describe("sensibelAnforderbar", () => {
+  const LEER = { pflicht: [], vorhanden: [], severelyDisabled: null, organisationstyp: "GYMNASIUM" };
+
+  it("nicht sensible Arten sind immer anforderbar", () => {
+    for (const typ of ["SV_AUSWEIS", "ARBEITSVERTRAG", "RV_BEFREIUNG", "PKV_NACHWEIS", "ZEUGNIS"]) {
+      expect(sensibelAnforderbar(typ, LEER)).toEqual({ ok: true });
+      expect(sensibelAnforderbar(typ, { ...LEER, organisationstyp: "KITA" })).toEqual({ ok: true });
+    }
+  });
+
+  it.each(["MASERNSCHUTZ", "AUFENTHALTSTITEL", "ARBEITSERLAUBNIS", "FUEHRUNGSZEUGNIS"])(
+    "%s nur als Pflicht oder wenn schon vorhanden",
+    (typ) => {
+      expect(sensibelAnforderbar(typ, LEER)).toEqual({
+        ok: false,
+        grund: "NICHT_PFLICHT",
+        text: SENSIBEL_SPERRGRUND_TEXTE.NICHT_PFLICHT,
+      });
+      expect(sensibelAnforderbar(typ, { ...LEER, pflicht: [typ] })).toEqual({ ok: true });
+      // Der verlaengerte Nachweis: Pflicht ist er nicht mehr, aber er liegt vor.
+      expect(sensibelAnforderbar(typ, { ...LEER, vorhanden: [typ] })).toEqual({ ok: true });
+      // Eine ANDERE Art in Pflicht oder Bestand hilft nicht.
+      expect(
+        sensibelAnforderbar(typ, { ...LEER, pflicht: ["SV_AUSWEIS"], vorhanden: ["ZEUGNIS"] }).ok,
+      ).toBe(false);
+    },
+  );
+
+  it("das Fuehrungszeugnis ist bei Kitas gesperrt — auch als Pflicht und wenn es vorliegt", () => {
+    const kita = { ...LEER, organisationstyp: "KITA" };
+    for (const stand of [kita, { ...kita, pflicht: ["FUEHRUNGSZEUGNIS"] }, { ...kita, vorhanden: ["FUEHRUNGSZEUGNIS"] }]) {
+      expect(sensibelAnforderbar("FUEHRUNGSZEUGNIS", stand)).toEqual({
+        ok: false,
+        grund: "FUEHRUNGSZEUGNIS_KITA",
+        text: SENSIBEL_SPERRGRUND_TEXTE.FUEHRUNGSZEUGNIS_KITA,
+      });
+    }
+    expect(SENSIBEL_SPERRGRUND_TEXTE.FUEHRUNGSZEUGNIS_KITA).toContain("§ 72a Abs. 5 SGB VIII");
+    // Die uebrigen sensiblen Arten gelten bei Kitas wie ueberall.
+    expect(sensibelAnforderbar("MASERNSCHUTZ", { ...kita, pflicht: ["MASERNSCHUTZ"] })).toEqual({ ok: true });
+  });
+
+  it("den SB-Ausweis nur mit der Angabe „schwerbehindert“ oder wenn er vorliegt — Pflicht allein genuegt nicht", () => {
+    // Der Typ ist in jeder Vorlage frei anhakbar; eine angehakte Vorlage
+    // holte sonst Gesundheitsdaten von allen ein.
+    const nurPflicht = { ...LEER, pflicht: ["SB_AUSWEIS"] };
+    expect(sensibelAnforderbar("SB_AUSWEIS", nurPflicht)).toEqual({
+      ok: false,
+      grund: "SB_AUSWEIS_OHNE_ANGABE",
+      text: SENSIBEL_SPERRGRUND_TEXTE.SB_AUSWEIS_OHNE_ANGABE,
+    });
+    expect(sensibelAnforderbar("SB_AUSWEIS", { ...LEER, severelyDisabled: false }).ok).toBe(false);
+    expect(sensibelAnforderbar("SB_AUSWEIS", { ...LEER, severelyDisabled: undefined }).ok).toBe(false);
+    expect(sensibelAnforderbar("SB_AUSWEIS", { ...LEER, severelyDisabled: true })).toEqual({ ok: true });
+    expect(sensibelAnforderbar("SB_AUSWEIS", { ...LEER, vorhanden: ["SB_AUSWEIS"] })).toEqual({ ok: true });
+  });
+
+  it("verlangt Organisationstyp und Schwerbehinderung ausdruecklich — sonst meldet tsc die Luecke", () => {
+    // Ohne organisationstyp griffe die Kita-Sperre nicht; der Schluessel ist
+    // deshalb Pflicht, auch wenn er `undefined` tragen darf.
+    const ohneTyp = { pflicht: ["FUEHRUNGSZEUGNIS"], vorhanden: [], severelyDisabled: null };
+    // @ts-expect-error — organisationstyp fehlt
+    sensibelAnforderbar("FUEHRUNGSZEUGNIS", ohneTyp);
+    const ohneAngabe = { pflicht: [], vorhanden: [], organisationstyp: "KITA" };
+    // @ts-expect-error — severelyDisabled fehlt
+    sensibelAnforderbar("SB_AUSWEIS", ohneAngabe);
+    // Ausdruecklich uebergeben ist die Kita-Sperre wirksam.
+    expect(sensibelAnforderbar("FUEHRUNGSZEUGNIS", { ...ohneTyp, organisationstyp: "KITA" }).ok).toBe(false);
+  });
+
+  it("zusammen mit den Pflichtregeln: der Aufenthaltstitel wird erst mit der Selbstauskunft anforderbar", () => {
+    const pflicht = (aufenthaltstitelErforderlich: boolean | null) =>
+      effektivePflichtDokumente(
+        pflichtEingabenAusVorgang({
+          // Auch eine Vorlage, die den Titel anhakt, macht ihn nicht zur Pflicht.
+          required: ["GEBURTSURKUNDE_EIGEN", "AUFENTHALTSTITEL"],
+          anzahlKinder: 0,
+          organisationstyp: "GYMNASIUM",
+          personalData: { aufenthaltstitelErforderlich },
+        }),
+      );
+    for (const antwort of [null, false]) {
+      expect(sensibelAnforderbar("AUFENTHALTSTITEL", { ...LEER, pflicht: pflicht(antwort) }).ok).toBe(false);
+    }
+    expect(sensibelAnforderbar("AUFENTHALTSTITEL", { ...LEER, pflicht: pflicht(true) }).ok).toBe(true);
+    expect(sensibelAnforderbar("ARBEITSERLAUBNIS", { ...LEER, pflicht: pflicht(true) }).ok).toBe(true);
+  });
+});
+
+// =============================================
+// Paket 4: Hinweise bei der Nachforderung (10.1, Regel N4)
+// =============================================
+
+describe("NACHFORDERUNG_HINWEISE", () => {
+  it("kein Text spricht vom Fragebogen, vom Nachreichen oder vom Gesundheitsamt", () => {
+    // Die Person wird nach der Abgabe um die Unterlage GEBETEN; „Sie koennen
+    // den Fragebogen auch ohne ihn absenden" ist dann falsch.
+    for (const [typ, text] of Object.entries(NACHFORDERUNG_HINWEISE)) {
+      expect({ typ, fragebogen: /fragebogen/i.test(text) }).toEqual({ typ, fragebogen: false });
+      expect({ typ, nachreich: /nachreich/i.test(text) }).toEqual({ typ, nachreich: false });
+      expect({ typ, amt: /gesundheitsamt|absenden/i.test(text) }).toEqual({ typ, amt: false });
+    }
+  });
+
+  it("gibt es fuer jede Art, die im Fragebogen einen Hinweis hat — mit eigenem Text", () => {
+    expect(Object.keys(NACHFORDERUNG_HINWEISE).sort()).toEqual(Object.keys(PFLICHT_HINWEISE).sort());
+    for (const typ of NACHREICHBARE_PFLICHTEN) {
+      expect(NACHFORDERUNG_HINWEISE[typ]).toBeTruthy();
+    }
+    for (const [typ, text] of Object.entries(NACHFORDERUNG_HINWEISE)) {
+      expect(text).not.toBe(PFLICHT_HINWEISE[typ]);
+    }
+  });
+
+  it("uebernimmt die Beispieltexte der Feinplanung", () => {
+    expect(NACHFORDERUNG_HINWEISE.MASERNSCHUTZ).toContain("Seite Ihres Impfpasses mit den Masern-Impfungen");
+    expect(NACHFORDERUNG_HINWEISE.AUFENTHALTSTITEL).toContain("Vorder- und Rückseite");
+    expect(NACHFORDERUNG_HINWEISE.AUFENTHALTSTITEL).toContain("Ablaufdatum");
+    expect(NACHFORDERUNG_HINWEISE.PKV_NACHWEIS).toContain("keine Beitragsübersicht und nicht den Vertrag");
+  });
+
+  it("Arbeitserlaubnis: behauptet nicht, der Aufenthaltstitel genuege (N4)", () => {
+    // Die Pflichtregel verlangt beide Arten. Steht die Erlaubnis auf dem Titel,
+    // laedt die Person dieselbe Karte zu dieser Position hoch.
+    const text = NACHFORDERUNG_HINWEISE.ARBEITSERLAUBNIS;
+    expect(text).not.toMatch(/genügt|reicht|nicht nötig|nicht erforderlich|entfällt|müssen .* nicht/i);
+    expect(text).toMatch(/laden Sie/);
+    expect(text).toContain("dieselbe Karte");
+  });
+
+  it("drei der Texte gehoeren zu sensiblen Arten — die Mail darf sie nicht zeigen (E-2)", () => {
+    // Haelt die Aussage im Docblock fest: Wer die Liste der Mail baut, muss
+    // bei diesen Arten den Hinweis weglassen, nicht nur das Label.
+    expect(
+      Object.keys(NACHFORDERUNG_HINWEISE).filter((t) => SENSIBLE_DOKUMENTTYPEN.includes(t)).sort(),
+    ).toEqual(["ARBEITSERLAUBNIS", "AUFENTHALTSTITEL", "MASERNSCHUTZ"]);
   });
 });
