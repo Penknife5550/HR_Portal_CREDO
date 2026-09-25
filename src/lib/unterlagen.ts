@@ -360,6 +360,9 @@ export const MELDUNGEN = {
   ZURUECKWEISEN_FRIST_NOETIG:
     "Der Link ist abgelaufen. Bitte geben Sie eine neue Frist an – sie geht mit der Zurückweisung in einer E-Mail hinaus.",
   NICHTS_OFFEN: "Keine Unterlage wartet mehr auf die Person. Eine E-Mail ist nicht nötig.",
+  /** 409 bei „Frist ändern" mit derselben Frist — der Weg für „noch einmal senden" ist „Link erneut senden". */
+  FRIST_UNVERAENDERT:
+    "Die Frist ist unverändert. Um der Person den Link noch einmal zu schicken, nutzen Sie „Link erneut senden“.",
   SPERRZEIT: `Der Link wurde vor weniger als ${SPERRZEIT_MINUTEN} Minuten gesendet. Bitte warten Sie kurz.`,
   /** 429: Mail-Bremse je Vorgang, ueber alle seine Nachforderungen (6 je Stunde, 20 je Tag). */
   MAIL_BREMSE:
@@ -370,11 +373,27 @@ export const MELDUNGEN = {
   /** 409 beim Annehmen: SHA-256 weicht ab (4.4). */
   DATEI_VERAENDERT:
     "Die Datei wurde seit dem Hochladen verändert (Prüfsumme weicht ab). Bitte weisen Sie die Unterlage zurück.",
+  /** 409 beim Annehmen: eine übermittelte Datei liegt nicht mehr auf der Platte (4.4). */
+  DATEI_FEHLT:
+    "Eine Datei dieser Unterlage liegt nicht mehr vor. Bitte weisen Sie die Unterlage zurück, damit die Person sie erneut hochlädt.",
+  /** 400 beim Annehmen einer Katalogart mit einer anderen Art: wählbar nur bei einer frei benannten Unterlage (4.4). */
+  ART_NICHT_WAEHLBAR:
+    "Die Art steht bei dieser Unterlage fest. Wählen lässt sie sich nur bei einer frei benannten Unterlage.",
+  /** 400 beim Annehmen: „Unbefristet" an einer Art ohne Ablaufdatum (Z1). */
+  UNBEFRISTET_OHNE_ABLAUFDATUM: "„Unbefristet“ lässt sich nur bei einer Unterlage mit Ablaufdatum wählen.",
+  /**
+   * 400: Datum UND „unbefristet" zugleich (Z1) — beim Annehmen und in der
+   * Frist-Korrektur (`PATCH /api/onboarding/[id]/documents/[docId]`), ein Text.
+   */
+  DATUM_UND_UNBEFRISTET: "Bitte entweder ein Ablaufdatum angeben oder „Unbefristet“ wählen, nicht beides.",
   RUECKNAHME_ZU_SPAET: `Eine Annahme lässt sich nur innerhalb von ${RUECKNAHME_MAX_TAGE} Tagen zurücknehmen.`,
   RUECKNAHME_ZURUECKGEZOGEN: "Die Nachforderung ist zurückgezogen. Die Annahme lässt sich nicht mehr zurücknehmen.",
   ANDERE_LAEUFT:
     "Für diesen Vorgang läuft inzwischen eine neuere Nachforderung. Die Annahme lässt sich deshalb nicht zurücknehmen – fordern Sie die Unterlage dort erneut an.",
   DOKUMENT_FEHLT: "Das übernommene Dokument liegt nicht mehr vor. Die Annahme lässt sich nicht zurücknehmen.",
+  /** 409 bei der Rücknahme: Die Datei im Vorgang ist nicht mehr die angenommene (Prüfsumme, 4.5). */
+  RUECKNAHME_DATEI_VERAENDERT:
+    "Die übernommene Datei wurde seit der Annahme verändert. Die Annahme lässt sich nicht zurücknehmen.",
   DATEI_UNBERUEHRT: "Diese Datei ist von der Aktion nicht betroffen.",
 
   // ---- Mails (EP-11, N2, 8.1, Abschnitt 9) ----
@@ -385,6 +404,17 @@ export const MELDUNGEN = {
   /** N2: versendet, das Ergebnis liess sich aber auch im zweiten Versuch nicht speichern. */
   MAIL_NACHWEIS_FEHLT:
     "Die E-Mail ist versendet, ihr Ergebnis konnte aber nicht gespeichert werden. Bitte nicht erneut senden.",
+  /**
+   * N2: „frühere Links sperren" liess sich nach dem Versand auch im zweiten
+   * Versuch nicht speichern. KEINE Aufforderung zu einem neuen Versuch — der
+   * einzige Weg dorthin waere eine weitere Mail mit weiterem Link.
+   */
+  SPERREN_NICHT_GESPEICHERT:
+    "Die E-Mail ist versendet. Die früheren Links ließen sich aber nicht sperren und bleiben gültig – bitte nicht erneut senden.",
+  /** `detail` einer Mail, deren Payload sich nicht bauen liess (Datenbank) — es ging nichts hinaus. */
+  MAIL_NICHT_VORBEREITET: "Die E-Mail konnte nicht vorbereitet werden.",
+  /** `detail`, wenn der Dispatcher kein Ergebnis lieferte (zaehlt als FAILED). */
+  MAIL_OHNE_ERGEBNIS: "Der Versand lieferte kein Ergebnis.",
   /** Karte: HR-Mail ohne Empfaenger (weder anfordernde Person noch HR-Postfach). */
   HR_MELDUNG_OHNE_EMPFAENGER: "HR-Meldung nicht zugestellt (kein Empfänger)",
   /** Mailverlauf nach drei gescheiterten Nachholversuchen (Abschnitt 9). */
@@ -397,6 +427,30 @@ export type MeldungSchluessel = keyof typeof MELDUNGEN;
 export function meldungLinkAbgelaufen(linkende: Kalendertag | null | undefined): string {
   if (!linkende || !istKalendertag(linkende)) return MELDUNGEN.LINK_ABGELAUFEN;
   return `Dieser Link war bis ${formatKalendertag(linkende)} gültig. Bitte wenden Sie sich an die Personalabteilung.`;
+}
+
+/**
+ * Warum die gespeicherte Vorlage einer Mail an die Person nicht taugt — der
+ * Dienst prueft das VOR jeder Anlage (409 ohne jede Aenderung).
+ */
+export type VorlageGrund = "VORLAGE_FEHLT" | "VORLAGE_DEAKTIVIERT" | "VORLAGE_OHNE_LINK" | "VORLAGE_BETREFF";
+
+/**
+ * 409-Text zu einer untauglichen Vorlage, mit ihrem Namen („Unterlagen
+ * angefordert"). Jeder Text nennt die Folge fuer die Person und den Weg zur
+ * Abhilfe (Einstellungen → E-Mail-Vorlagen).
+ */
+export function meldungVorlage(grund: VorlageGrund, name: string): string {
+  switch (grund) {
+    case "VORLAGE_FEHLT":
+      return `Für die E-Mail „${name}“ ist keine Vorlage hinterlegt. Ohne sie erhält die Person keinen Link.`;
+    case "VORLAGE_DEAKTIVIERT":
+      return `Die E-Mail-Vorlage „${name}“ ist deaktiviert. Ohne sie erhält die Person keinen Link – bitte aktivieren Sie sie unter Einstellungen → E-Mail-Vorlagen.`;
+    case "VORLAGE_OHNE_LINK":
+      return `Die E-Mail-Vorlage „${name}“ enthält den Platzhalter {{link}} nicht. Die Person bekäme keinen Link zum Hochladen – bitte ergänzen Sie ihn unter Einstellungen → E-Mail-Vorlagen.`;
+    case "VORLAGE_BETREFF":
+      return `Der Betreff der E-Mail-Vorlage „${name}“ enthält einen gesperrten Platzhalter (etwa {{link}}). Der Betreff steht 90 Tage im Versandprotokoll – bitte korrigieren Sie ihn unter Einstellungen → E-Mail-Vorlagen.`;
+  }
 }
 
 // =============================================

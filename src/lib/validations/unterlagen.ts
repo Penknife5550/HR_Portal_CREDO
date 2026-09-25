@@ -9,7 +9,8 @@
  *                                 | "annahme-zuruecknehmen", … }
  *   - gueltigBisPatchSchema     PATCH /api/unterlagen/[token]/positionen/[positionId]  (oeffentlich)
  *   - uebermittelnSchema        POST  /api/unterlagen/[token]/uebermitteln             (oeffentlich)
- *   - jsonKoerperPruefen        liest den Body-Text und prueft ihn gegen eines der Schemas
+ *   - dokumentFristPatchSchema  PATCH /api/onboarding/[id]/documents/[docId]           (Frist-Korrektur, Z1)
+ *   - jsonKoerperPruefen       liest den Body-Text und prueft ihn gegen eines der Schemas
  *
  * **Kaputtes JSON, ein leerer Body oder eine fehlende Aktion ergeben 400 —
  * nie eine Standardaktion.** Anders als bei den Abteilungsaufgaben (leerer Body
@@ -326,15 +327,42 @@ export const positionsAktionSchema = z
   )
   .superRefine((d, ctx) => {
     if (d.aktion === "annehmen" && d.unbefristet === true && d.gueltigBis) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["unbefristet"],
-        message: "Bitte entweder ein Ablaufdatum angeben oder „Unbefristet“ wählen, nicht beides.",
-      });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["unbefristet"], message: MELDUNGEN.DATUM_UND_UNBEFRISTET });
     }
   });
 
 export type PositionsAktionInput = z.infer<typeof positionsAktionSchema>;
+
+// =============================================
+// Frist-Korrektur eines Dokuments (Z1)
+// =============================================
+
+/**
+ * PATCH /api/onboarding/[id]/documents/[docId] — Ablaufdatum setzen, aendern,
+ * loeschen oder den Nachweis als unbefristet kennzeichnen (Paket 4, Z1).
+ *
+ * Hier steht nur die FORM: `unbefristet` ist ein Wahrheitswert, und ein Datum
+ * UND „unbefristet" zugleich sind ein Widerspruch (derselbe Text wie beim
+ * Annehmen). Das Datum selbst prueft weiter `pruefeGueltigBis` — dieselbe
+ * Regel wie am Magic Link (Format, Art mit Ablaufdatum, 20 Jahre). Als
+ * „Datum angegeben" gilt deshalb, was `pruefeGueltigBis` als Datum liest:
+ * ein nicht leerer Text.
+ */
+export const dokumentFristPatchSchema = z
+  .object(
+    {
+      gueltigBis: z.unknown().optional(),
+      unbefristet: z.boolean({ invalid_type_error: MELDUNGEN.UNGUELTIGE_EINGABE }).optional(),
+    },
+    KEIN_OBJEKT,
+  )
+  .superRefine((d, ctx) => {
+    if (d.unbefristet === true && typeof d.gueltigBis === "string" && d.gueltigBis.trim() !== "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["unbefristet"], message: MELDUNGEN.DATUM_UND_UNBEFRISTET });
+    }
+  });
+
+export type DokumentFristPatchInput = z.infer<typeof dokumentFristPatchSchema>;
 
 // =============================================
 // Oeffentliche Upload-Seite (Token)

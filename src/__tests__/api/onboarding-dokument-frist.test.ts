@@ -34,6 +34,9 @@
  *  4. Loeschen ist hier erlaubt (am Magic Link nicht) — und jede Aenderung
  *     hinterlaesst eine Spur, sonst waere genau das der stille Weg, die
  *     Ablaufkontrolle abzuschalten.
+ *  5. Paket 4 (4.4, Z1): Ein angenommener Nachweis (`reviewedAt` gesetzt)
+ *     kehrt aus EXPIRED nach APPROVED zurueck, nicht nach UPLOADED — und
+ *     „unbefristet" ist ein eigenes Kennzeichen, das ein Datum wieder aufhebt.
  */
 
 const mockGetSession = jest.fn();
@@ -57,6 +60,8 @@ jest.mock("@/lib/permissions", () => ({
 }));
 
 import { PATCH } from "@/app/api/onboarding/[id]/documents/[docId]/route";
+import { MELDUNGEN } from "@/lib/unterlagen";
+import { positionsAktionSchema } from "@/lib/validations/unterlagen";
 import { NextRequest } from "next/server";
 
 const HR_SESSION = {
@@ -430,5 +435,161 @@ describe("Neue Frist, neuer Zyklus", () => {
     expect(mockPrisma.auditLog.create.mock.calls[0][0].data.details).not.toHaveProperty(
       "statusVorher"
     );
+  });
+
+  /**
+   * Paket 4 (4.4): Nur das Annehmen einer nachgeforderten Unterlage schreibt
+   * `reviewedAt` — immer zusammen mit APPROVED. Laeuft ein solcher Titel ab
+   * und HR traegt den verlaengerten ein, war er geprueft und bleibt es.
+   */
+  test("ein angenommener Nachweis (reviewedAt) kehrt aus EXPIRED nach APPROVED zurueck — mit Spur", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({
+      ...ABGELAUFENER_TITEL,
+      reviewedAt: new Date("2026-06-01T10:00:00.000Z"),
+    });
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+
+    await patch({ gueltigBis: "2027-09-01" });
+
+    expect(mockPrisma.document.updateMany).toHaveBeenCalledWith({
+      where: { id: "d1", status: "EXPIRED" },
+      data: { status: "APPROVED" },
+    });
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data.details).toMatchObject({
+      statusVorher: "EXPIRED",
+      statusNachher: "APPROVED",
+    });
+  });
+
+  test("ohne reviewedAt (Fragebogen-Upload) weiter UPLOADED", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({ ...ABGELAUFENER_TITEL, reviewedAt: null });
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+
+    await patch({ gueltigBis: "2027-09-01" });
+
+    expect(mockPrisma.document.updateMany.mock.calls[0][0].data).toEqual({ status: "UPLOADED" });
+  });
+
+  test("„Unbefristet“ an einem abgelaufenen, angenommenen Titel: kein Datum ist nicht abgelaufen → APPROVED", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({
+      ...ABGELAUFENER_TITEL,
+      reviewedAt: new Date("2026-06-01T10:00:00.000Z"),
+    });
+    mockPrisma.document.updateMany.mockResolvedValue({ count: 1 });
+
+    await patch({ gueltigBis: null, unbefristet: true });
+
+    expect(mockPrisma.document.updateMany.mock.calls[0][0].data).toEqual({ status: "APPROVED" });
+    expect(mockPrisma.document.update.mock.calls[0][0].data).toMatchObject({
+      gueltigBis: null,
+      unbefristet: true,
+      ablaufErinnertAm: null,
+      ablaufErinnertStufe: null,
+    });
+  });
+});
+
+// =============================================
+// 5. Kennzeichen „unbefristet" (Paket 4, Z1)
+// =============================================
+//
+// Ein Nachweis ohne Datum verdraengte nie einen datierten derselben Art — nach
+// einer Niederlassungserlaubnis blieben Warnbalken und Erinnerungen des alten
+// Titels stehen. Das Kennzeichen macht „unbefristet" von „Frist noch nicht
+// erfasst" unterscheidbar.
+
+describe("Kennzeichen „unbefristet“ (Z1)", () => {
+  test("{ gueltigBis: null, unbefristet: true } setzt das Kennzeichen — mit Spur, ohne Dateinamen", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({
+      ...TITEL,
+      gueltigBis: new Date("2027-03-01T00:00:00.000Z"),
+      unbefristet: false,
+    });
+
+    const antwort = await patch({ gueltigBis: null, unbefristet: true });
+
+    expect(antwort.status).toBe(200);
+    expect(mockPrisma.document.update.mock.calls[0][0].data).toMatchObject({ gueltigBis: null, unbefristet: true });
+    // Die Antwort traegt das Kennzeichen, damit die Oberflaeche es nachziehen kann.
+    expect(mockPrisma.document.update.mock.calls[0][0].select).toMatchObject({ unbefristet: true });
+    const details = mockPrisma.auditLog.create.mock.calls[0][0].data.details;
+    expect(details).toMatchObject({
+      documentId: "d1",
+      vorher: "2027-03-01",
+      nachher: null,
+      unbefristetVorher: false,
+      unbefristetNachher: true,
+    });
+    // Ein angenommener Nachweis traegt als Namen den der Person — der gehoert nie ins Protokoll.
+    expect(details).not.toHaveProperty("dokumentDatei");
+    expect(JSON.stringify(details)).not.toContain("titel.pdf");
+  });
+
+  test("ein gesetztes Datum hebt das Kennzeichen wieder auf", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({ ...TITEL, gueltigBis: null, unbefristet: true });
+
+    await patch({ gueltigBis: "2028-01-31" });
+
+    expect(mockPrisma.document.update.mock.calls[0][0].data).toMatchObject({ unbefristet: false });
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data.details).toMatchObject({
+      vorher: null,
+      nachher: "2028-01-31",
+      unbefristetVorher: true,
+      unbefristetNachher: false,
+    });
+  });
+
+  test("ein leeres Datum ohne `unbefristet` heisst „Frist nicht erfasst“ — auch das hebt das Kennzeichen auf", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({ ...TITEL, gueltigBis: null, unbefristet: true });
+
+    const antwort = await patch({ gueltigBis: "" });
+
+    expect(antwort.status).toBe(200);
+    expect(mockPrisma.document.update.mock.calls[0][0].data).toMatchObject({ gueltigBis: null, unbefristet: false });
+  });
+
+  test("schon unbefristet, noch einmal unbefristet: nichts zu tun, keine Spur", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({ ...TITEL, gueltigBis: null, unbefristet: true });
+
+    const antwort = await patch({ gueltigBis: null, unbefristet: true });
+
+    expect(antwort.status).toBe(200);
+    expect(await antwort.json()).toMatchObject({ unbefristet: true });
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  test("Datum UND unbefristet zugleich → 400 — derselbe Text wie beim Annehmen, vor jedem Lesen (Zod)", async () => {
+    const antwort = await patch({ gueltigBis: "2028-01-31", unbefristet: true });
+    expect(antwort.status).toBe(400);
+    expect((await antwort.json()).error).toBe(MELDUNGEN.DATUM_UND_UNBEFRISTET);
+    expect(mockPrisma.onboardingProcess.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+    // Dieselbe Regel und derselbe Text im Schema des Annehmens.
+    const annehmen = positionsAktionSchema.safeParse({ aktion: "annehmen", gueltigBis: "2028-01-31", unbefristet: true });
+    expect(annehmen.success ? null : annehmen.error.errors[0].message).toBe(MELDUNGEN.DATUM_UND_UNBEFRISTET);
+  });
+
+  test("ein leerer Text ist kein Datum: { gueltigBis: \"\", unbefristet: true } setzt das Kennzeichen", async () => {
+    const antwort = await patch({ gueltigBis: "", unbefristet: true });
+    expect(antwort.status).toBe(200);
+    expect(mockPrisma.document.update.mock.calls[0][0].data).toMatchObject({ gueltigBis: null, unbefristet: true });
+  });
+
+  test("`unbefristet` ist kein Wahrheitswert → 400", async () => {
+    expect((await patch({ gueltigBis: null, unbefristet: "ja" })).status).toBe(400);
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
+  });
+
+  test("kein Objekt (Liste, null) → 400, nichts gelesen", async () => {
+    expect((await patch([])).status).toBe(400);
+    expect((await patch(null)).status).toBe(400);
+    expect(mockPrisma.onboardingProcess.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("„unbefristet“ an einem Typ ohne Frist → 400", async () => {
+    mockPrisma.document.findFirst.mockResolvedValue({ ...TITEL, type: "GEBURTSURKUNDE_EIGEN" });
+    expect((await patch({ gueltigBis: null, unbefristet: true })).status).toBe(400);
+    expect(mockPrisma.document.update).not.toHaveBeenCalled();
   });
 });

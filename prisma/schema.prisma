@@ -1022,7 +1022,9 @@ enum DocumentStatus {
   /// die Frist auf ein nicht abgelaufenes Datum korrigiert wird (HR-PATCH
   /// bzw. Magic Link) — dann auf UPLOADED, weil der Stand davor nicht
   /// gespeichert ist; die Pruefung liegt damit wieder bei HR, und der
-  /// Wechsel steht im AuditLog (DOKUMENT_FRIST_GEAENDERT).
+  /// Wechsel steht im AuditLog (DOKUMENT_FRIST_GEAENDERT). Ausnahme im
+  /// HR-PATCH: Traegt das Dokument reviewedAt, wird es APPROVED — reviewedAt
+  /// schreibt nur Paket 4, und zwar immer zusammen mit APPROVED.
   EXPIRED
 }
 

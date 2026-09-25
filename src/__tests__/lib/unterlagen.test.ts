@@ -54,6 +54,7 @@ import {
   loeschenAbBerechnen,
   mailWarnung,
   meldungLinkAbgelaufen,
+  meldungVorlage,
   nachforderungLinkende,
   nachforderungUebergang,
   nachweisStandText,
@@ -1996,6 +1997,56 @@ describe("Meldungen der öffentlichen Seite (5.5)", () => {
     expect(MELDUNGEN.VORGANG_NICHT_GEFUNDEN).toBe("Vorgang nicht gefunden");
     expect(MELDUNGEN.POSITION_NICHT_GEFUNDEN).toBe("Unterlage nicht gefunden");
     expect(MELDUNGEN.DATEI_NICHT_GEFUNDEN).toBe("Datei nicht gefunden");
+  });
+});
+
+describe("Meldungen des HR-Dienstes — eine Quelle (Schritt 6)", () => {
+  it("die frueher im Dienst verstreuten Texte stehen hier, im bisherigen Wortlaut", () => {
+    expect(MELDUNGEN.FRIST_UNVERAENDERT).toBe(
+      "Die Frist ist unverändert. Um der Person den Link noch einmal zu schicken, nutzen Sie „Link erneut senden“.",
+    );
+    expect(MELDUNGEN.SPERREN_NICHT_GESPEICHERT).toBe(
+      "Die E-Mail ist versendet. Die früheren Links ließen sich aber nicht sperren und bleiben gültig – bitte nicht erneut senden.",
+    );
+    expect(MELDUNGEN.MAIL_NICHT_VORBEREITET).toBe("Die E-Mail konnte nicht vorbereitet werden.");
+    expect(MELDUNGEN.MAIL_OHNE_ERGEBNIS).toBe("Der Versand lieferte kein Ergebnis.");
+  });
+
+  it("N2: „frühere Links sperren“ gescheitert — kein Aufruf zu einer weiteren Mail", () => {
+    expect(MELDUNGEN.SPERREN_NICHT_GESPEICHERT).toContain("bitte nicht erneut senden");
+    expect(MELDUNGEN.SPERREN_NICHT_GESPEICHERT).not.toMatch(/bitte (senden|versuchen) Sie/i);
+  });
+
+  it("meldungVorlage: je Grund der Name der Vorlage, die Folge fuer die Person und der Weg zur Abhilfe", () => {
+    const name = "Unterlagen angefordert";
+    expect(meldungVorlage("VORLAGE_FEHLT", name)).toBe(
+      "Für die E-Mail „Unterlagen angefordert“ ist keine Vorlage hinterlegt. Ohne sie erhält die Person keinen Link.",
+    );
+    expect(meldungVorlage("VORLAGE_DEAKTIVIERT", name)).toBe(
+      "Die E-Mail-Vorlage „Unterlagen angefordert“ ist deaktiviert. Ohne sie erhält die Person keinen Link – bitte aktivieren Sie sie unter Einstellungen → E-Mail-Vorlagen.",
+    );
+    expect(meldungVorlage("VORLAGE_OHNE_LINK", name)).toContain("{{link}}");
+    expect(meldungVorlage("VORLAGE_BETREFF", name)).toContain("90 Tage im Versandprotokoll");
+    for (const grund of ["VORLAGE_FEHLT", "VORLAGE_DEAKTIVIERT", "VORLAGE_OHNE_LINK", "VORLAGE_BETREFF"] as const) {
+      expect(meldungVorlage(grund, name)).toContain("„Unterlagen angefordert“");
+    }
+  });
+
+  it("Texte der Entscheidungen (4.4, 4.5, Z1): jeder nennt den Weg, keiner einen Dateinamen", () => {
+    expect(MELDUNGEN.DATEI_FEHLT).toContain("weisen Sie die Unterlage zurück");
+    expect(MELDUNGEN.DATEI_VERAENDERT).toContain("weisen Sie die Unterlage zurück");
+    expect(MELDUNGEN.RUECKNAHME_DATEI_VERAENDERT).toContain("nicht zurücknehmen");
+    expect(MELDUNGEN.ART_NICHT_WAEHLBAR).toContain("frei benannten Unterlage");
+    expect(MELDUNGEN.UNBEFRISTET_OHNE_ABLAUFDATUM).toBe(
+      "„Unbefristet“ lässt sich nur bei einer Unterlage mit Ablaufdatum wählen.",
+    );
+  });
+
+  it("der Dienst selbst traegt keine eigenen Nutzertexte mehr", () => {
+    const dienst = fs.readFileSync(path.join(process.cwd(), "src/lib/unterlagen-dienst.ts"), "utf8");
+    expect(dienst).not.toMatch(/^const (FRIST_UNVERAENDERT|SPERREN_NICHT_GESPEICHERT) =/m);
+    expect(dienst).not.toContain("ist keine Vorlage hinterlegt");
+    expect(dienst).not.toContain('"Die E-Mail konnte nicht vorbereitet werden."');
   });
 });
 

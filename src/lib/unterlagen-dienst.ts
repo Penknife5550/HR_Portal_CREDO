@@ -5,12 +5,17 @@
  * Aktionen auf eine Nachforderung — anfordern, ergaenzen, Frist aendern, Link
  * erneut senden, zurueckziehen —, dazu die Mails an die Person
  * (`personenMailSenden`) und an HR (`hrMeldungSenden`, `hrVollstaendigMelden`).
- * Die Entscheidungen ueber einzelne Positionen (annehmen, zurueckweisen,
- * entfaellt, Annahme zuruecknehmen) und das Oeffnen von Dateien ergaenzt
- * Schritt 6 in derselben Form (`UnterlagenDienstAntwort`, gleiche Sperren).
+ *
+ * Teil 2 (Schritt 6): die vier Entscheidungen ueber eine Position — annehmen
+ * (Uebernahme per Hardlink in den Vorgang, 4.4), zurueckweisen (genau EINE
+ * Mail, EP-1), entfaellt (EP-2), Annahme zuruecknehmen (4.5, E-3) — in
+ * derselben Form (`UnterlagenDienstAntwort`, gleiche Sperren), dazu das
+ * Oeffnen einer uebermittelten Datei durch HR.
  *
  * Wer ruft was:
  *   POST /api/onboarding/[id]/unterlagen   → unterlagenAktionAusfuehren (Konsole: fehlerKennung)
+ *   POST …/unterlagen/positionen/[positionId] → unterlagenPositionsAktionAusfuehren
+ *   GET  …/unterlagen/dateien/[dateiId]    → unterlagenDateiOeffnen
  *   GET  /api/onboarding/[id]              → unterlagenUebersichtLaden
  *   Upload-Seite, „Übermitteln" (Schritt 5) → hrVollstaendigMelden (nach der Antwort)
  *   Taeglicher Lauf (Schritt 7)            → personenMailSenden samt unterlagenLinkUrl
@@ -77,6 +82,20 @@
  *      Container; die Datenbank sichert die Zustaende trotzdem ueber die
  *      Zeilensperren, den Unique-Index `laufendSchluessel` und die Bremse aus
  *      der Datenbank.
+ *  11. **Die Datei existiert immer an mindestens einer Stelle, auf die eine
+ *      Zeile zeigt** (4.4, 4.5): Annehmen und Ruecknahme VERKNUEPFEN zuerst
+ *      (Hardlink, sonst Kopie, jeweils mit SHA-256-Vergleich), ausserhalb der
+ *      Transaktion; die Transaktion schaltet die Zeilen um; erst nach dem
+ *      Commit verschwindet die alte Stelle. Scheitert die Transaktion, wird
+ *      nur ein NEU angelegtes Ziel wieder entfernt. Geloescht wird in beiden
+ *      Faellen nur, worauf keine Zeile zeigt — die Pfade sind fest, und eine
+ *      zweite Instanz kann dieselbe Datei gerade mitbenutzen
+ *      (`unverwendeteLoeschen`). Was liegen bleibt, findet der taegliche Lauf
+ *      als Waise.
+ *  12. **Bei EXPIRED (EP-3)** bleiben Annehmen, Entfällt, Annahme
+ *      zuruecknehmen und Zurueckziehen erlaubt — sie sperren deshalb nicht den
+ *      Vorgang, sondern nur die Nachforderung. Zurueckweisen verschickt eine
+ *      Mail und sperrt den Vorgang wie jede Aktion mit Mail an die Person.
  */
 
 import { randomUUID } from "crypto";
@@ -86,6 +105,7 @@ import { prisma } from "@/lib/db";
 import { ladeErlaubteDomains } from "@/lib/empfaenger-allowlist";
 import { empfaengerFreigegeben } from "@/lib/empfaenger-freigabe";
 import { betreffMitVerschachteltenMarkern, getEventDefinition, verboteneBetreffVariablen } from "@/lib/events";
+import { asciiFilename, ENDUNG_FUER_DATEITYP, type LoeschErgebnis } from "@/lib/file-upload";
 import { ablaufKalendertag, heuteInBerlin, kalendertagAlsDatum, type Kalendertag } from "@/lib/kalendertag";
 import { resolveEventTemplate, sendEventEmail, type EventEmailResult } from "@/lib/mailer";
 import { canAccessProcess, HR_EDIT_ROLES, type SessionPayload } from "@/lib/permissions";
@@ -104,11 +124,14 @@ import {
   linkGueltigBisFuer,
   linkLebt,
   loeschenAbBerechnen,
+  meldungVorlage,
   nachforderungLinkende,
   nachforderungUebergang,
+  positionUebergang,
   uebersichtBauen,
   vollstaendigMerker,
   wartetAufPerson,
+  zurueckweisenFristPruefen,
   type AnfordernAntwort,
   type AuswahlEintrag,
   type EmpfaengerVorschlag,
@@ -116,16 +139,29 @@ import {
   type LinkAnlass,
   type NachforderungEingabe,
   type NachforderungsAktionAntwort,
+  type NachforderungStatus,
+  type PositionsAktionAntwort,
+  type PositionsKontext,
+  type UebernahmeZiel,
   type UnterlagenFehlerAntwort,
   type UnterlagenMailErgebnis,
   type UnterlagenModul,
   type UnterlagenUebersicht,
 } from "@/lib/unterlagen";
-import { entwuerfeLoeschen } from "@/lib/unterlagen-dateien";
+import {
+  entwuerfeLoeschen,
+  nachforderungsDateiLesen,
+  nachforderungsDateiLoeschen,
+  UnterlagenDateiFehler,
+  verknuepfenInVorgang,
+  vorgangsKopieLoeschen,
+  zurueckVerknuepfen,
+} from "@/lib/unterlagen-dateien";
 import {
   aufforderungMailFelder,
   UNTERLAGEN_EVENTS,
   vollstaendigMailFelder,
+  zurueckweisungMailFelder,
   type UnterlagenAufforderungAnlass,
   type UnterlagenMailPayload,
   type UnterlagenMailPosition,
@@ -133,7 +169,11 @@ import {
 } from "@/lib/unterlagen-mail";
 import { getBaseUrl } from "@/lib/url";
 import { gleicheAdresse } from "@/lib/validations/onboarding";
-import type { PositionEingabeDaten, UnterlagenAktionInput } from "@/lib/validations/unterlagen";
+import type {
+  PositionEingabeDaten,
+  PositionsAktionInput,
+  UnterlagenAktionInput,
+} from "@/lib/validations/unterlagen";
 import { triggerWebhooks } from "@/lib/webhooks";
 import {
   onboardingBaustein,
@@ -188,6 +228,57 @@ export interface UnterlagenVorgang {
   eingestellt: boolean;
 }
 
+/** Was HR beim Annehmen angibt, zusammen mit dem Stand der Position (4.4, Z1). */
+export interface AnnahmeEingabe {
+  /** Katalogart der Position; `null` = frei benannte Zeile. */
+  typ: string | null;
+  /** Beim Annehmen gewaehlte Art — nur bei einer frei benannten Zeile. */
+  dokumentTyp?: string;
+  /**
+   * `"YYYY-MM-DD"` = dieses Datum; `null` = kein Datum („Datum später
+   * nachtragen"); nicht angegeben = die Angabe der Person gilt.
+   */
+  gueltigBis?: string | null;
+  /** „Unbefristet (z. B. Niederlassungserlaubnis)" (Z1). */
+  unbefristet?: boolean;
+  /** „Gültig bis" der Person (`UnterlagenPosition.gueltigBisAngabe`). */
+  gueltigBisAngabe: Date | null;
+}
+
+/** Unter welcher Art und mit welchem Ablauf die Unterlage uebernommen wird — oder warum nicht. */
+export type AnnahmePruefung =
+  | { ok: true; art: string; gueltigBis: Date | null; unbefristet: boolean }
+  | { ok: false; status: 400 | 409; grund: string; meldung: string; hinweis?: string };
+
+/** Was der Baustein beim Annehmen JE DATEI bekommt (4.4). */
+export interface UebernahmeKontext {
+  vorgangId: string;
+  /** Art aus `annahmePruefen`. */
+  art: string;
+  /** Nur bei einer frei benannten Zeile ihr Name (`Document.bezeichnung`, EP-6), sonst null. */
+  bezeichnung: string | null;
+  gueltigBis: Date | null;
+  unbefristet: boolean;
+  datei: { id: string; anzeigeName: string; mimeType: string; groesse: number; uebermitteltAm: Date | null };
+  /** Relativer Pfad der schon verknuepften Datei im Vorgangsordner (4.4, Schritt 2). */
+  zielPfad: string;
+  /** Die HR-Kraft, die annimmt (`reviewedById`). */
+  entschiedenVonId: string;
+  jetzt: Date;
+}
+
+/**
+ * Wohin die Datei uebernommen wurde (4.4): `ziel` und `id` der Zielzeile,
+ * `neuerPfad` der Ort der Datei danach. `null` = sie bleibt bei der
+ * Nachforderung (Stufe 2, etwa „in der Karte selbst", P:1449) — dann bleibt
+ * `speicherPfad` stehen, und die Quelle wird nicht geloescht.
+ */
+export interface UebernahmeErgebnis {
+  ziel: UebernahmeZiel;
+  id: string;
+  neuerPfad: string | null;
+}
+
 /**
  * Die Schnittstelle je Vorgangsart (Abschnitt 7). Stufe 1 kennt nur
  * ONBOARDING (src/lib/unterlagen-onboarding.ts); Stufe 2 fuegt je Modul einen
@@ -220,6 +311,35 @@ export interface UnterlagenModulBaustein<V extends UnterlagenVorgang = Unterlage
   portalPfad(id: string): string;
   /** Basis der HR-Routen dieses Moduls (Datei-URLs der Karte). */
   apiBasis(id: string): string;
+  /**
+   * Annehmen, VOR jedem Schreiben (4.4, Abschnitt 11): Art und Ablauf der
+   * Uebernahme — oder 400/409 mit Grund. Katalogzeile: ihre Art; freie Zeile:
+   * die gewaehlte oder die Standardart, eine sensible nur, wenn der Vorgang sie
+   * zulaesst. Ein Datum bzw. „unbefristet" nur bei einer Art mit Ablaufdatum.
+   */
+  annahmePruefen(v: V, eingabe: AnnahmeEingabe, jetzt: Date): AnnahmePruefung;
+  /** Annehmen, IN der Transaktion, je Datei: die Zielzeile anlegen (Onboarding: ein `Document`). */
+  uebernehmen(tx: Prisma.TransactionClient, ctx: UebernahmeKontext): Promise<UebernahmeErgebnis>;
+  /**
+   * „Annahme zurücknehmen", VOR der Transaktion: die Zielzeilen samt Pfad —
+   * nur solche DIESES Vorgangs (fehlt eine, antwortet der Dienst 409).
+   */
+  uebernahmeLaden(vorgangId: string, ids: readonly string[]): Promise<Array<{ id: string; pfad: string | null }>>;
+  /**
+   * „Annahme zurücknehmen", IN der Transaktion: die Zielzeilen loeschen,
+   * gebunden an den Vorgang. Liefert, wie viele es waren — weicht die Zahl ab,
+   * bricht der Dienst mit 409 ab.
+   */
+  uebernahmeZuruecknehmen(
+    tx: Prisma.TransactionClient,
+    ctx: { vorgangId: string; ids: readonly string[] },
+  ): Promise<number>;
+  /**
+   * Vor dem Loeschen einer Kopie im Vorgangsordner (Abbruch beim Annehmen,
+   * nach der Ruecknahme): Welche dieser Pfade traegt eine Zielzeile DIESES
+   * Vorgangs (Onboarding: `Document.filePath`)? Die bleiben liegen (4.4, 4.5).
+   */
+  zielPfadeVerwendet(vorgangId: string, pfade: readonly string[]): Promise<ReadonlySet<string>>;
 }
 
 const BAUSTEINE: Readonly<Record<UnterlagenModul, UnterlagenModulBaustein>> = {
@@ -382,36 +502,16 @@ export type UnterlagenHrEvent = typeof UNTERLAGEN_EVENTS.VOLLSTAENDIG | typeof U
 async function personenVorlagePruefen(event: UnterlagenPersonenEvent): Promise<UnterlagenDienstAntwort | null> {
   const name = getEventDefinition(event)?.name ?? event;
   const vorlage = await resolveEventTemplate(event);
-  if (!vorlage) {
-    return fehler(
-      409,
-      `Für die E-Mail „${name}“ ist keine Vorlage hinterlegt. Ohne sie erhält die Person keinen Link.`,
-      "VORLAGE_FEHLT",
-    );
-  }
-  if (!vorlage.isActive) {
-    return fehler(
-      409,
-      `Die E-Mail-Vorlage „${name}“ ist deaktiviert. Ohne sie erhält die Person keinen Link – bitte aktivieren Sie sie unter Einstellungen → E-Mail-Vorlagen.`,
-      "VORLAGE_DEAKTIVIERT",
-    );
-  }
+  if (!vorlage) return fehler(409, meldungVorlage("VORLAGE_FEHLT", name), "VORLAGE_FEHLT");
+  if (!vorlage.isActive) return fehler(409, meldungVorlage("VORLAGE_DEAKTIVIERT", name), "VORLAGE_DEAKTIVIERT");
   if (!vorlage.bodyHtml.includes("{{link}}")) {
-    return fehler(
-      409,
-      `Die E-Mail-Vorlage „${name}“ enthält den Platzhalter {{link}} nicht. Die Person bekäme keinen Link zum Hochladen – bitte ergänzen Sie ihn unter Einstellungen → E-Mail-Vorlagen.`,
-      "VORLAGE_OHNE_LINK",
-    );
+    return fehler(409, meldungVorlage("VORLAGE_OHNE_LINK", name), "VORLAGE_OHNE_LINK");
   }
   if (
     verboteneBetreffVariablen(event, vorlage.subject).length > 0 ||
     betreffMitVerschachteltenMarkern(event, vorlage.subject)
   ) {
-    return fehler(
-      409,
-      `Der Betreff der E-Mail-Vorlage „${name}“ enthält einen gesperrten Platzhalter (etwa {{link}}). Der Betreff steht 90 Tage im Versandprotokoll – bitte korrigieren Sie ihn unter Einstellungen → E-Mail-Vorlagen.`,
-      "VORLAGE_BETREFF",
-    );
+    return fehler(409, meldungVorlage("VORLAGE_BETREFF", name), "VORLAGE_BETREFF");
   }
   return null;
 }
@@ -550,7 +650,7 @@ export async function personenMailSenden(opts: {
     vorbereitet = await opts.vorbereiten();
   } catch (err) {
     console.error(`[Unterlagen] Mail ${opts.event} (Link ${opts.linkId}) nicht vorbereitet:`, fehlerKennung(err));
-    const detail = "Die E-Mail konnte nicht vorbereitet werden.";
+    const detail = MELDUNGEN.MAIL_NICHT_VORBEREITET;
     await linkErgebnisSpeichern(opts.linkId, { status: "FAILED", detail }, opts.jetzt);
     return { status: "FAILED", detail };
   }
@@ -564,7 +664,7 @@ export async function personenMailSenden(opts: {
   };
 }
 
-/** Was eine Mail an die Person von der Nachforderung liest. */
+/** Was eine Mail an die Person von der Nachforderung liest (`begruendung` nur fuer die Zurueckweisung). */
 const MAIL_AUSWAHL = {
   id: true,
   frist: true,
@@ -579,6 +679,7 @@ const MAIL_AUSWAHL = {
       originalErforderlich: true,
       status: true,
       einreichungen: true,
+      begruendung: true,
     },
   },
 } satisfies Prisma.UnterlagenNachforderungSelect;
@@ -722,7 +823,7 @@ export async function hrMeldungSenden(opts: {
   const ergebnis = await triggerWebhooks(opts.event, opts.payload);
   const mail: UnterlagenMailErgebnis = ergebnis
     ? { status: ergebnis.status, detail: ergebnis.status === "SENT" ? null : kuerzen(ergebnis.detail) }
-    : { status: "FAILED", detail: "Der Versand lieferte kein Ergebnis." };
+    : { status: "FAILED", detail: MELDUNGEN.MAIL_OHNE_ERGEBNIS };
   try {
     await prisma.$transaction(async (tx) => {
       await tx.unterlagenNachforderung.updateMany({
@@ -832,7 +933,7 @@ export async function hrVollstaendigMelden(nachforderungId: string, jetzt: Date 
       });
     } catch (err) {
       console.error(`[Unterlagen] HR-Meldung „vollständig" (${n.id}) nicht vorbereitet:`, fehlerKennung(err));
-      mail = { status: "FAILED", detail: "Die E-Mail konnte nicht vorbereitet werden." };
+      mail = { status: "FAILED", detail: MELDUNGEN.MAIL_NICHT_VORBEREITET };
     }
 
     if (mail.status === "FAILED") {
@@ -923,7 +1024,7 @@ async function mailBremseOderAbbrechen(tx: Prisma.TransactionClient, ctx: Aktion
 }
 
 function auditDaten(
-  ctx: AktionsKontext,
+  ctx: Pick<AktionsKontext, "baustein" | "v" | "session">,
   action: string,
   details: Record<string, unknown>,
 ): Prisma.AuditLogUncheckedCreateInput {
@@ -1273,10 +1374,6 @@ async function ergaenzen(ctx: AktionsKontext, e: Aktion<"ergaenzen">): Promise<U
 
 // ---- frist-aendern ----
 
-/** 409, wenn sich die Frist nicht aendert — der Weg fuer „noch einmal senden" ist „Link erneut senden". */
-const FRIST_UNVERAENDERT =
-  "Die Frist ist unverändert. Um der Person den Link noch einmal zu schicken, nutzen Sie „Link erneut senden“.";
-
 /**
  * „Frist ändern…": schreibt die lebenden Links fort (5.1) und schickt eine
  * Mail mit neuem Link — nur, wenn noch etwas auf die Person wartet. Der
@@ -1292,7 +1389,7 @@ async function fristAendern(ctx: AktionsKontext, e: Aktion<"frist-aendern">): Pr
   const pruefung = fristPruefen(e.frist, ctx.heute);
   if (!pruefung.ok) return fehler(400, pruefung.meldung, pruefung.grund);
   const neueFrist = pruefung.tag;
-  if (neueFrist === kalendertagVon(stand.frist)) return fehler(409, FRIST_UNVERAENDERT, "FRIST_UNVERAENDERT");
+  if (neueFrist === kalendertagVon(stand.frist)) return fehler(409, MELDUNGEN.FRIST_UNVERAENDERT, "FRIST_UNVERAENDERT");
   if (stand.positionen.some((p) => wartetAufPerson(p.status))) {
     const vorlage = await personenVorlagePruefen(UNTERLAGEN_EVENTS.ANGEFORDERT);
     if (vorlage) return vorlage;
@@ -1305,7 +1402,7 @@ async function fristAendern(ctx: AktionsKontext, e: Aktion<"frist-aendern">): Pr
     if (!frisch) throw new UnterlagenAbbruch(fehler(404, MELDUNGEN.NACHFORDERUNG_NICHT_GEFUNDEN));
     const bisherigeFrist = kalendertagVon(frisch.frist);
     if (neueFrist === bisherigeFrist) {
-      throw new UnterlagenAbbruch(fehler(409, FRIST_UNVERAENDERT, "FRIST_UNVERAENDERT"));
+      throw new UnterlagenAbbruch(fehler(409, MELDUNGEN.FRIST_UNVERAENDERT, "FRIST_UNVERAENDERT"));
     }
     const wartet = frisch.positionen.some((p) => wartetAufPerson(p.status));
     if (wartet) await mailBremseOderAbbrechen(tx, ctx);
@@ -1363,15 +1460,6 @@ async function fristAendern(ctx: AktionsKontext, e: Aktion<"frist-aendern">): Pr
 }
 
 // ---- erneut-senden ----
-
-/**
- * Warnung, wenn „frühere Links sperren" nach dem Versand auch im zweiten
- * Versuch nicht gespeichert werden konnte. KEINE Aufforderung zu einem neuen
- * Versuch: Der einzige Weg dorthin waere „Link erneut senden" — also eine
- * weitere Mail mit weiterem Link (N2).
- */
-const SPERREN_NICHT_GESPEICHERT =
-  "Die E-Mail ist versendet. Die früheren Links ließen sich aber nicht sperren und bleiben gültig – bitte nicht erneut senden.";
 
 /**
  * „frühere Links sperren" NACH SENT: alle aelteren, noch nicht entwerteten
@@ -1488,7 +1576,7 @@ async function erneutSenden(ctx: AktionsKontext, e: Aktion<"erneut-senden">): Pr
   let sperrWarnung: string | null = null;
   if (e.fruehereSperren === true && mail.status === "SENT") {
     fruehereGesperrt = await fruehereLinksSperren(ergebnis.nachforderungId, ergebnis.linkId, ctx.jetzt);
-    if (!fruehereGesperrt) sperrWarnung = SPERREN_NICHT_GESPEICHERT;
+    if (!fruehereGesperrt) sperrWarnung = MELDUNGEN.SPERREN_NICHT_GESPEICHERT;
   }
 
   const status = erneutSendenStatus(mail);
@@ -1508,15 +1596,73 @@ async function erneutSenden(ctx: AktionsKontext, e: Aktion<"erneut-senden">): Pr
   };
 }
 
+// ---- Dateien abraeumen (Zurueckziehen, Entfällt) ----
+
+/** Konsole: wie viele Dateien nach dem Commit liegen blieben — nur IDs und Zahl, nie ein Pfad. */
+function liegenGeblieben(was: string, id: string, anzahl: number): void {
+  if (anzahl > 0) console.error(`[Unterlagen] ${anzahl} ${was} (${id}) nicht geloescht (der Lauf raeumt nach).`);
+}
+
+/**
+ * Die Dateien einer Nachforderung — oder nur einer ihrer Positionen —
+ * abraeumen, IN der Transaktion des Aufrufers (2.3, 4.5): Entwuerfe
+ * verschwinden (die Zeile hier, bedingt auf ENTWURF; die Datei danach mit
+ * `entwuerfeNachDemCommitLoeschen`) — HR hat sie nie gesehen, und sie werden
+ * auch nicht mehr sichtbar. Eingereichte Dateien werden VERWORFEN und nach 30
+ * Tagen geloescht (EP-8).
+ *
+ * Ein Ablauf fuer „Zurückziehen", „Entfällt" und das Zurueckziehen eines
+ * EXPIRED-Vorgangs durch den taeglichen Lauf (Z2, Schritt 7).
+ */
+async function dateienAbraeumen(
+  tx: Prisma.TransactionClient,
+  opts: { nachforderungId: string; positionId?: string; jetzt: Date },
+): Promise<{ pfade: Array<string | null>; entwuerfeGeloescht: number; dateienVerworfen: number }> {
+  const bereich = {
+    nachforderungId: opts.nachforderungId,
+    ...(opts.positionId !== undefined ? { positionId: opts.positionId } : {}),
+  };
+  const entwuerfe = await tx.unterlagenDatei.findMany({
+    where: { ...bereich, status: "ENTWURF" },
+    select: { id: true, speicherPfad: true },
+  });
+  const geloescht = entwuerfe.length
+    ? await tx.unterlagenDatei.deleteMany({
+        where: { id: { in: entwuerfe.map((d) => d.id) }, nachforderungId: opts.nachforderungId, status: "ENTWURF" },
+      })
+    : { count: 0 };
+  const verworfen = await tx.unterlagenDatei.updateMany({
+    where: { ...bereich, status: "EINGEREICHT" },
+    data: { status: "VERWORFEN", entschiedenAm: opts.jetzt, loeschenAb: loeschenAbBerechnen(opts.jetzt) },
+  });
+  return {
+    pfade: entwuerfe.map((d) => d.speicherPfad),
+    entwuerfeGeloescht: geloescht.count,
+    dateienVerworfen: verworfen.count,
+  };
+}
+
+/**
+ * Nach dem Commit von `dateienAbraeumen`: Die Zeilen sind weg, die Dateien
+ * folgen. Was liegen bleibt, findet der Lauf als Waise. Wirft nie.
+ */
+async function entwuerfeNachDemCommitLoeschen(
+  nachforderungId: string,
+  pfade: ReadonlyArray<string | null>,
+): Promise<void> {
+  if (pfade.length === 0) return;
+  const bilanz = await entwuerfeLoeschen(nachforderungId, pfade);
+  liegenGeblieben("Entwurfsdatei(en)", nachforderungId, bilanz.fehler);
+}
+
 // ---- zurueckziehen ----
 
 /**
  * „Zurückziehen…" (Endzustand, EP-9): keine Mail. Entwuerfe verschwinden
- * sofort — Zeile in der Transaktion, Datei nach dem Commit —, eingereichte
- * Dateien werden VERWORFEN und nach 30 Tagen geloescht (EP-8). Positionen
- * bleiben stehen, wie sie sind (2.2); der Merker „vollständig" wird geleert.
- * Auch bei einem eingestellten Vorgang erlaubt — deshalb ohne Sperre des
- * Vorgangs.
+ * sofort, eingereichte Dateien werden VERWORFEN (`dateienAbraeumen`).
+ * Positionen bleiben stehen, wie sie sind (2.2); der Merker „vollständig"
+ * wird geleert. Auch bei einem eingestellten Vorgang erlaubt — deshalb ohne
+ * Sperre des Vorgangs.
  */
 async function zurueckziehen(ctx: AktionsKontext, e: Aktion<"zurueckziehen">): Promise<UnterlagenDienstAntwort> {
   const stand = await nachforderungLaden(prisma, ctx, e.nachforderungId);
@@ -1546,35 +1692,21 @@ async function zurueckziehen(ctx: AktionsKontext, e: Aktion<"zurueckziehen">): P
     });
     if (r.count === 0) throw new UnterlagenAbbruch(fehler(409, MELDUNGEN.NICHT_LAUFEND, "NICHT_LAUFEND"));
 
-    const entwuerfe = await tx.unterlagenDatei.findMany({
-      where: { nachforderungId: stand.id, status: "ENTWURF" },
-      select: { id: true, speicherPfad: true },
-    });
-    const geloescht = entwuerfe.length
-      ? await tx.unterlagenDatei.deleteMany({
-          where: { id: { in: entwuerfe.map((d) => d.id) }, nachforderungId: stand.id, status: "ENTWURF" },
-        })
-      : { count: 0 };
-    const verworfen = await tx.unterlagenDatei.updateMany({
-      where: { nachforderungId: stand.id, status: "EINGEREICHT" },
-      data: { status: "VERWORFEN", entschiedenAm: ctx.jetzt, loeschenAb: loeschenAbBerechnen(ctx.jetzt) },
+    const { pfade, entwuerfeGeloescht, dateienVerworfen } = await dateienAbraeumen(tx, {
+      nachforderungId: stand.id,
+      jetzt: ctx.jetzt,
     });
     await tx.auditLog.create({
       data: auditDaten(ctx, UNTERLAGEN_AUDIT.ZURUECKGEZOGEN, {
         nachforderungId: stand.id,
-        entwuerfeGeloescht: geloescht.count,
-        dateienVerworfen: verworfen.count,
+        entwuerfeGeloescht,
+        dateienVerworfen,
       }),
     });
-    return { pfade: entwuerfe.map((d) => d.speicherPfad) };
+    return { pfade };
   });
 
-  // Nach dem Commit: Die Zeilen sind weg, die Dateien folgen. Was liegen
-  // bleibt, findet der Lauf als Waise.
-  const bilanz = await entwuerfeLoeschen(stand.id, ergebnis.pfade);
-  if (bilanz.fehler > 0) {
-    console.error(`[Unterlagen] ${bilanz.fehler} Entwurfsdatei(en) von ${stand.id} nicht geloescht (der Lauf raeumt nach).`);
-  }
+  await entwuerfeNachDemCommitLoeschen(stand.id, ergebnis.pfade);
   return {
     status: 200,
     body: {
@@ -1604,31 +1736,64 @@ export async function unterlagenAktionAusfuehren(opts: {
   session: SessionPayload;
   jetzt?: Date;
 }): Promise<UnterlagenDienstAntwort> {
-  const jetzt = opts.jetzt ?? new Date();
-  if (!HR_EDIT_ROLES.includes(opts.session.role)) return fehler(403, MELDUNGEN.KEINE_BERECHTIGUNG);
-
-  const baustein = BAUSTEINE[opts.modul];
-  const v = await baustein.vorgangLaden(opts.vorgangId);
-  if (!v || !(await canAccessProcess(opts.session, v.organizationId))) {
-    return fehler(404, MELDUNGEN.VORGANG_NICHT_GEFUNDEN);
-  }
-
-  if (!unterlagenSperreNehmen(baustein.modul, v.id)) return fehler(409, MELDUNGEN.AKTION_LAEUFT, "AKTION_LAEUFT");
-  const ctx: AktionsKontext = { baustein, v, session: opts.session, jetzt, heute: heuteInBerlin(jetzt) };
-  try {
+  return aktionRahmen(opts, async (ctx) => {
     const e = opts.eingabe;
     switch (e.aktion) {
       case "anfordern":
-        return await anfordern(ctx, e);
+        return anfordern(ctx, e);
       case "ergaenzen":
-        return await ergaenzen(ctx, e);
+        return ergaenzen(ctx, e);
       case "frist-aendern":
-        return await fristAendern(ctx, e);
+        return fristAendern(ctx, e);
       case "erneut-senden":
-        return await erneutSenden(ctx, e);
+        return erneutSenden(ctx, e);
       case "zurueckziehen":
-        return await zurueckziehen(ctx, e);
+        return zurueckziehen(ctx, e);
     }
+  });
+}
+
+/**
+ * Der Vorspann JEDER HR-Route des Pakets (Regel 1 im Dateikopf): 403 (nicht
+ * HR_EDIT_ROLES) → 404 (Vorgang unbekannt ODER fremder Mandant, derselbe
+ * Text). Liefert Baustein und Vorgang oder die Antwort.
+ */
+async function vorgangZugriff(opts: {
+  modul: UnterlagenModul;
+  vorgangId: string;
+  session: SessionPayload;
+}): Promise<
+  | { ok: true; baustein: UnterlagenModulBaustein; v: UnterlagenVorgang }
+  | { ok: false; antwort: UnterlagenDienstAntwort }
+> {
+  if (!HR_EDIT_ROLES.includes(opts.session.role)) {
+    return { ok: false, antwort: fehler(403, MELDUNGEN.KEINE_BERECHTIGUNG) };
+  }
+  const baustein = BAUSTEINE[opts.modul];
+  const v = await baustein.vorgangLaden(opts.vorgangId);
+  if (!v || !(await canAccessProcess(opts.session, v.organizationId))) {
+    return { ok: false, antwort: fehler(404, MELDUNGEN.VORGANG_NICHT_GEFUNDEN) };
+  }
+  return { ok: true, baustein, v };
+}
+
+/**
+ * Der Rahmen JEDER HR-Aktion: Vorspann (`vorgangZugriff`, 403 → 404) →
+ * Sperre je Vorgang (409) → die Aktion. Ein Abbruch in der Transaktion wird
+ * zu seiner Antwort.
+ */
+async function aktionRahmen(
+  opts: { modul: UnterlagenModul; vorgangId: string; session: SessionPayload; jetzt?: Date },
+  ausfuehren: (ctx: AktionsKontext) => Promise<UnterlagenDienstAntwort>,
+): Promise<UnterlagenDienstAntwort> {
+  const jetzt = opts.jetzt ?? new Date();
+  const zugriff = await vorgangZugriff(opts);
+  if (!zugriff.ok) return zugriff.antwort;
+  const { baustein, v } = zugriff;
+
+  if (!unterlagenSperreNehmen(baustein.modul, v.id)) return fehler(409, MELDUNGEN.AKTION_LAEUFT, "AKTION_LAEUFT");
+  try {
+    return await ausfuehren({ baustein, v, session: opts.session, jetzt, heute: heuteInBerlin(jetzt) });
   } catch (err) {
     if (err instanceof UnterlagenAbbruch) return err.antwort;
     // Dieselbe Art zweimal in einer Nachforderung (Unique nachforderungId+typ):
@@ -1640,6 +1805,905 @@ export async function unterlagenAktionAusfuehren(opts: {
     // Genau eine Freigabestelle — kein Rueckgabepfad darf die Sperre stehen lassen.
     unterlagenSperreFreigeben(baustein.modul, v.id);
   }
+}
+
+// =============================================
+// Entscheidungen ueber eine Position (Teil 2, Schritt 6)
+// POST /api/onboarding/[id]/unterlagen/positionen/[positionId]
+// =============================================
+
+type PositionsAktion<A extends PositionsAktionInput["aktion"]> = Extract<PositionsAktionInput, { aktion: A }>;
+
+/**
+ * Was die Entscheidungen von einer Position lesen — mit ALLEN ihren Dateien,
+ * auch Entwuerfen (Entfällt loescht sie). Nichts davon geht in eine Antwort.
+ */
+const POSITION_AUSWAHL = {
+  id: true,
+  nachforderungId: true,
+  typ: true,
+  bezeichnung: true,
+  status: true,
+  gueltigBisAngabe: true,
+  entschiedenAm: true,
+  dateien: {
+    orderBy: { hochgeladenAm: "asc" },
+    select: {
+      id: true,
+      status: true,
+      anzeigeName: true,
+      mimeType: true,
+      groesse: true,
+      sha256: true,
+      speicherPfad: true,
+      uebermitteltAm: true,
+      uebernahmeZiel: true,
+      uebernommenId: true,
+      dateiGeloeschtAm: true,
+    },
+  },
+} satisfies Prisma.UnterlagenPositionSelect;
+
+type PositionsStand = Prisma.UnterlagenPositionGetPayload<{ select: typeof POSITION_AUSWAHL }>;
+type DateiStand = PositionsStand["dateien"][number];
+
+/** Die Position — nur, wenn ihre Nachforderung zu DIESEM Vorgang gehoert (Abschnitt 6). */
+function positionLaden(
+  db: Prisma.TransactionClient,
+  ctx: AktionsKontext,
+  positionId: string,
+): Promise<PositionsStand | null> {
+  return db.unterlagenPosition.findFirst({
+    where: { id: positionId, nachforderung: ctx.baustein.bereichWhere(ctx.v.id) },
+    select: POSITION_AUSWAHL,
+  });
+}
+
+function positionsKontext(ctx: AktionsKontext, stand: { status: string }): PositionsKontext {
+  return { nachforderungStatus: stand.status, vorgangEingestellt: ctx.v.eingestellt, heute: ctx.heute };
+}
+
+function gleicheIds(a: ReadonlyArray<{ id: string }>, b: ReadonlyArray<{ id: string }>): boolean {
+  const menge = new Set(a.map((x) => x.id));
+  return menge.size === b.length && b.every((x) => menge.has(x.id));
+}
+
+/**
+ * Nach Annehmen oder Entfällt, in DERSELBEN Transaktion (2.1): Ist jetzt jede
+ * Position angenommen oder entfallen, wird die Nachforderung ERLEDIGT —
+ * `laufendSchluessel` frei, Merker „vollständig" geleert, eigener
+ * Protokolleintrag. Sonst bleibt der Merker, wie er ist (Tabelle 2.1): Eine
+ * Aktion von HR loest nie die HR-Mail aus.
+ */
+async function abschliessenWennFertig(
+  tx: Prisma.TransactionClient,
+  ctx: AktionsKontext,
+  nachforderungId: string,
+): Promise<boolean> {
+  const positionen = await tx.unterlagenPosition.findMany({ where: { nachforderungId }, select: { status: true } });
+  const abschluss = nachforderungUebergang("ABSCHLIESSEN", {
+    status: "LAUFEND",
+    vorgangEingestellt: ctx.v.eingestellt,
+    positionen,
+  });
+  if (!abschluss.erlaubt) return false;
+  const merker = vollstaendigMerker("ERLEDIGT", {
+    vollstaendigSeit: null,
+    vollstaendigGemeldetAm: null,
+    positionenNachher: positionen,
+    jetzt: ctx.jetzt,
+  });
+  const r = await tx.unterlagenNachforderung.updateMany({
+    where: { id: nachforderungId, status: "LAUFEND" },
+    data: {
+      status: "ERLEDIGT",
+      laufendSchluessel: null,
+      erledigtAm: ctx.jetzt,
+      vollstaendigSeit: merker.vollstaendigSeit,
+      vollstaendigGemeldetAm: merker.vollstaendigGemeldetAm,
+    },
+  });
+  if (r.count !== 1) throw new UnterlagenAbbruch(fehler(409, MELDUNGEN.NICHT_LAUFEND, "NICHT_LAUFEND"));
+  await tx.auditLog.create({
+    data: auditDaten(ctx, UNTERLAGEN_AUDIT.ERLEDIGT, { nachforderungId, positionen: positionen.length }),
+  });
+  return true;
+}
+
+/** Die Antwort jeder Entscheidung (Vertrag `PositionsAktionAntwort`). */
+function positionsAntwort(
+  aktion: "annehmen" | "zurueckweisen" | "entfaellt" | "annahme-zuruecknehmen",
+  daten: Omit<PositionsAktionAntwort, "meldung" | "warnung">,
+): UnterlagenDienstAntwort {
+  return {
+    status: 200,
+    body: { ...daten, ...aktionsTexte(aktion, daten.mail) } satisfies PositionsAktionAntwort,
+  };
+}
+
+/**
+ * Loescht Dateien an einem der beiden festen Orte — aber nur solche, auf die
+ * KEINE Zeile zeigt (`verwendet`). Wirft nie.
+ *
+ * Warum die Pruefung: Die Pfade sind fest (`uploads/<vorgangId>/<dateiId>.<ext>`
+ * bzw. `uploads/unterlagen/<nf>/<dateiId>.<ext>`). Nehmen zwei Instanzen
+ * dieselbe Unterlage gleichzeitig an (oder nehmen die Annahme zurueck), legt
+ * die erste das Ziel an, die zweite trifft auf EEXIST mit gleichem Hash und
+ * nutzt es mit. Gewinnt die zweite die Transaktion, zeigt IHRE Zeile auf die
+ * Datei, die die erste nach ihrem 409 als „neu angelegt" wegraeumen wollte.
+ * Ebenso nach dem Commit: Holt eine Ruecknahme die Datei gerade zurueck, liegt
+ * sie auf dem Pfad der Quelle, die das Annehmen danach loeschen will. Was hier
+ * liegen bleibt, ohne dass eine Zeile darauf zeigt, raeumt der Lauf als Waise
+ * ab (4.5). Ist unklar, ob eine Zeile zeigt (Datenbank nicht erreichbar),
+ * bleibt die Datei liegen — Liegenlassen ist der sichere Fehler.
+ */
+async function unverwendeteLoeschen(opts: {
+  was: string;
+  id: string;
+  pfade: ReadonlyArray<string>;
+  verwendet: (pfade: string[]) => Promise<ReadonlySet<string>>;
+  loeschen: (pfad: string) => Promise<LoeschErgebnis>;
+}): Promise<void> {
+  if (opts.pfade.length === 0) return;
+  let verwendet: ReadonlySet<string>;
+  try {
+    verwendet = await opts.verwendet([...opts.pfade]);
+  } catch (err) {
+    console.error(`[Unterlagen] Verweise auf ${opts.was} (${opts.id}) nicht pruefbar:`, fehlerKennung(err));
+    liegenGeblieben(opts.was, opts.id, opts.pfade.length);
+    return;
+  }
+  let fehlerAnzahl = 0;
+  for (const pfad of opts.pfade) {
+    if (verwendet.has(pfad)) continue;
+    if ((await opts.loeschen(pfad)) === "fehler") fehlerAnzahl += 1;
+  }
+  liegenGeblieben(opts.was, opts.id, fehlerAnzahl);
+}
+
+/**
+ * Loescht Kopien im Vorgangsordner (Abbruch beim Annehmen, nach der
+ * Ruecknahme), auf die keine Zielzeile des Vorgangs zeigt. Wirft nie.
+ */
+async function vorgangsKopienEntfernen(ctx: AktionsKontext, pfade: ReadonlyArray<string>): Promise<void> {
+  await unverwendeteLoeschen({
+    was: "Kopie(n) im Vorgang",
+    id: ctx.v.id,
+    pfade,
+    verwendet: (p) => ctx.baustein.zielPfadeVerwendet(ctx.v.id, p),
+    loeschen: (pfad) => vorgangsKopieLoeschen(pfad, ctx.v.id),
+  });
+}
+
+/**
+ * Loescht Dateien bei der Nachforderung (Quelle nach dem Annehmen, Abbruch
+ * der Ruecknahme), auf die keine Dateizeile zeigt. Wirft nie.
+ */
+async function nachforderungsDateienEntfernen(nachforderungId: string, pfade: ReadonlyArray<string>): Promise<void> {
+  await unverwendeteLoeschen({
+    was: "Datei(en) der Nachforderung",
+    id: nachforderungId,
+    pfade,
+    verwendet: async (p) => {
+      const zeilen = await prisma.unterlagenDatei.findMany({
+        where: { nachforderungId, speicherPfad: { in: p } },
+        select: { speicherPfad: true },
+      });
+      return new Set(zeilen.flatMap((z) => (z.speicherPfad ? [z.speicherPfad] : [])));
+    },
+    loeschen: (pfad) => nachforderungsDateiLoeschen(pfad, nachforderungId),
+  });
+}
+
+/** Eine uebermittelte, eingereichte Datei, die noch bei der Nachforderung liegt (4.4). */
+function uebernehmbar(d: DateiStand): d is DateiStand & { speicherPfad: string } {
+  return d.status === "EINGEREICHT" && !!d.uebermitteltAm && !!d.speicherPfad && !d.dateiGeloeschtAm;
+}
+
+// ---- annehmen ----
+
+/**
+ * „Annehmen" (4.4): Erst eine angenommene Unterlage wird zum Dokument des
+ * Vorgangs — je Datei eine Zielzeile (Onboarding: `Document`, APPROVED).
+ *
+ *   1. Pruefen: Uebergang, Art und Ablaufdatum (`annahmePruefen`), Dateien.
+ *   2. AUSSERHALB der Transaktion je Datei verknuepfen (Hardlink, SHA-256
+ *      gegen die Zeile; `verknuepfenInVorgang`).
+ *   3. Die Transaktion: Nachforderung sperren (LAUFEND), Position bedingt
+ *      EINGEREICHT → ANGENOMMEN (0 Treffer → 409, auch bei gleichzeitigem
+ *      Annehmen), je Datei die Zielzeile und die Dateizeile, Protokoll, bei der
+ *      letzten Entscheidung ERLEDIGT.
+ *   4. Nach dem Commit die Quelle loeschen; scheitert die Transaktion, das
+ *      neu angelegte Ziel.
+ *
+ * Auch bei einem eingestellten Vorgang erlaubt (EP-3) — ohne Sperre des
+ * Vorgangs, ohne Mail. `PersonalData.rvAntragEingangAm` setzt es nie, und die
+ * Schriftform hakt nichts ab (Abschnitt 11): Das Eingangsdatum des Originals
+ * stellt der Arbeitgeber selbst fest.
+ */
+async function annehmen(
+  ctx: AktionsKontext,
+  position: PositionsStand,
+  stand: AktionsStand,
+  e: PositionsAktion<"annehmen">,
+): Promise<UnterlagenDienstAntwort> {
+  const { baustein, v } = ctx;
+  const uebergang = positionUebergang("ANNEHMEN", position.status, positionsKontext(ctx, stand));
+  if (!uebergang.erlaubt) return fehler(409, uebergang.meldung, uebergang.grund);
+
+  const annahme = baustein.annahmePruefen(
+    v,
+    {
+      typ: position.typ,
+      dokumentTyp: e.dokumentTyp,
+      gueltigBis: e.gueltigBis,
+      unbefristet: e.unbefristet,
+      gueltigBisAngabe: position.gueltigBisAngabe,
+    },
+    ctx.jetzt,
+  );
+  if (!annahme.ok) {
+    return fehler(annahme.status, annahme.meldung, annahme.grund, annahme.hinweis ? { hinweis: annahme.hinweis } : {});
+  }
+
+  const dateien = position.dateien.filter(uebernehmbar);
+  if (dateien.length === 0) return fehler(409, MELDUNGEN.DATEI_FEHLT, "DATEI_FEHLT");
+
+  // 1. Verknuepfen, ausserhalb der Transaktion: Die Datei liegt danach an zwei
+  //    Stellen, und die Zeile zeigt weiter auf die alte.
+  const verknuepft: Array<{ datei: (typeof dateien)[number]; zielPfad: string; neu: boolean }> = [];
+  const neueZiele = () => verknuepft.filter((x) => x.neu).map((x) => x.zielPfad);
+  try {
+    for (const datei of dateien) {
+      const r = await verknuepfenInVorgang({
+        speicherPfad: datei.speicherPfad,
+        nachforderungId: stand.id,
+        vorgangId: v.id,
+        dateiId: datei.id,
+        mimeType: datei.mimeType,
+        sha256: datei.sha256,
+      });
+      verknuepft.push({ datei, ...r });
+    }
+  } catch (err) {
+    await vorgangsKopienEntfernen(ctx, neueZiele());
+    if (err instanceof UnterlagenDateiFehler) {
+      return err.code === "DATEI_VERAENDERT"
+        ? fehler(409, MELDUNGEN.DATEI_VERAENDERT, "DATEI_VERAENDERT")
+        : fehler(409, MELDUNGEN.DATEI_FEHLT, "DATEI_FEHLT");
+    }
+    throw err;
+  }
+
+  // 2. Umschalten in EINER Transaktion.
+  const nichtZuPruefen = () => new UnterlagenAbbruch(fehler(409, MELDUNGEN.NICHT_ZU_PRUEFEN, "NICHT_ZU_PRUEFEN"));
+  let ergebnis: { uebernommen: Array<UebernahmeErgebnis & { quelle: string }>; erledigt: boolean };
+  try {
+    ergebnis = await prisma.$transaction(async (tx) => {
+      await nachforderungSperrenOderAbbrechen(tx, ctx, stand.id);
+      // Bedingt: Hat ein zweiter Container dieselbe Unterlage gerade angenommen
+      // (oder HR sie entfallen lassen), trifft das hier nichts mehr.
+      const r = await tx.unterlagenPosition.updateMany({
+        where: { id: position.id, nachforderungId: stand.id, status: "EINGEREICHT" },
+        data: { status: "ANGENOMMEN", entschiedenAm: ctx.jetzt, entschiedenVonId: ctx.session.userId },
+      });
+      if (r.count !== 1) throw nichtZuPruefen();
+      // Unter der Sperre genau die Dateien, die oben verknuepft wurden.
+      const eingereicht = await tx.unterlagenDatei.findMany({
+        where: { positionId: position.id, nachforderungId: stand.id, status: "EINGEREICHT" },
+        select: { id: true },
+      });
+      if (!gleicheIds(eingereicht, dateien)) throw nichtZuPruefen();
+
+      const uebernommen: Array<UebernahmeErgebnis & { quelle: string }> = [];
+      for (const { datei, zielPfad } of verknuepft) {
+        const u = await baustein.uebernehmen(tx, {
+          vorgangId: v.id,
+          art: annahme.art,
+          bezeichnung: position.typ === null ? position.bezeichnung : null,
+          gueltigBis: annahme.gueltigBis,
+          unbefristet: annahme.unbefristet,
+          datei: {
+            id: datei.id,
+            anzeigeName: datei.anzeigeName,
+            mimeType: datei.mimeType,
+            groesse: datei.groesse,
+            uebermitteltAm: datei.uebermitteltAm,
+          },
+          zielPfad,
+          entschiedenVonId: ctx.session.userId,
+          jetzt: ctx.jetzt,
+        });
+        const d = await tx.unterlagenDatei.updateMany({
+          where: { id: datei.id, positionId: position.id, status: "EINGEREICHT" },
+          data: {
+            status: "ANGENOMMEN",
+            entschiedenAm: ctx.jetzt,
+            uebernahmeZiel: u.ziel,
+            uebernommenId: u.id,
+            uebernommenAm: ctx.jetzt,
+            // Umgezogen: Die Zeile zeigt nicht mehr auf die Quelle — ab jetzt
+            // gelten die Regeln des Moduls (P:1463). Bleibt die Datei bei der
+            // Nachforderung (Stufe 2), bleibt auch der Pfad.
+            ...(u.neuerPfad !== null ? { speicherPfad: null } : {}),
+          },
+        });
+        if (d.count !== 1) throw nichtZuPruefen();
+        uebernommen.push({ ...u, quelle: datei.speicherPfad });
+      }
+
+      await tx.auditLog.create({
+        data: auditDaten(ctx, UNTERLAGEN_AUDIT.ANGENOMMEN, {
+          nachforderungId: stand.id,
+          positionId: position.id,
+          typ: position.typ,
+          dokumentTyp: annahme.art,
+          dateien: verknuepft.map(({ datei }, i) => ({
+            dateiId: datei.id,
+            zielId: uebernommen[i].id,
+            groesse: datei.groesse,
+            mimeType: datei.mimeType,
+            sha256: datei.sha256,
+          })),
+          gueltigBis: ablaufKalendertag(annahme.gueltigBis),
+          unbefristet: annahme.unbefristet,
+        }),
+      });
+      const erledigt = await abschliessenWennFertig(tx, ctx, stand.id);
+      return { uebernommen, erledigt };
+    });
+  } catch (err) {
+    // Scheitert die Transaktion, verschwindet nur das NEU angelegte Ziel —
+    // die Quelle bleibt, und die Zeile zeigt weiter darauf. Hat eine zweite
+    // Instanz die Unterlage gerade angenommen (409 oben), zeigt IHR Dokument
+    // auf dasselbe Ziel; dann bleibt es (`vorgangsKopienEntfernen`).
+    await vorgangsKopienEntfernen(ctx, neueZiele());
+    throw err;
+  }
+
+  // 3. Erst nach dem Commit verschwindet die Quelle. Was liegen bleibt, hat
+  //    keine Zeile mehr und faellt dem Lauf als Waise zu (4.5). Eine Datei,
+  //    die bei der Nachforderung bleibt (`neuerPfad` null), bleibt ganz.
+  await nachforderungsDateienEntfernen(
+    stand.id,
+    ergebnis.uebernommen.filter((u) => u.neuerPfad !== null).map((u) => u.quelle),
+  );
+
+  return positionsAntwort("annehmen", {
+    nachforderungId: stand.id,
+    positionId: position.id,
+    positionStatus: "ANGENOMMEN",
+    nachforderungStatus: ergebnis.erledigt ? "ERLEDIGT" : "LAUFEND",
+    mail: null,
+    dokumentIds: ergebnis.uebernommen.map((u) => u.id),
+  });
+}
+
+// ---- zurueckweisen ----
+
+/**
+ * `unterlage-zurueckgewiesen` — die EINE Mail der Zurueckweisung, NACH dem
+ * Commit aus dem gespeicherten Stand gebaut. Bei einer sensiblen Position
+ * bleiben Name und Begruendung aus der Mail (E-2, `zurueckweisungMailFelder`).
+ */
+async function zurueckweisungSenden(
+  ctx: AktionsKontext,
+  opts: { nachforderungId: string; positionId: string; linkId: string; token: string },
+): Promise<UnterlagenMailErgebnis> {
+  return personenMailSenden({
+    event: UNTERLAGEN_EVENTS.ZURUECKGEWIESEN,
+    linkId: opts.linkId,
+    jetzt: ctx.jetzt,
+    vorbereiten: async () => {
+      const [stand, link] = await Promise.all([
+        prisma.unterlagenNachforderung.findUnique({ where: { id: opts.nachforderungId }, select: MAIL_AUSWAHL }),
+        prisma.unterlagenLink.findUnique({ where: { id: opts.linkId }, select: { empfaenger: true, gueltigBis: true } }),
+      ]);
+      if (!stand || !link) throw new Error("Nachforderung oder Link fehlt");
+      const position = stand.positionen.find((p) => p.id === opts.positionId);
+      if (!position) throw new Error("Position fehlt");
+      const frist = kalendertagVon(stand.frist);
+      const ohneNeu = new Set<string>();
+      return {
+        empfaenger: link.empfaenger,
+        payload: zurueckweisungMailFelder({
+          vorgang: mailVorgang(ctx.baustein, ctx.v, stand.id, frist),
+          positionen: stand.positionen.map((p) => mailPosition(p, ohneNeu)),
+          empfaenger: link.empfaenger,
+          link: unterlagenLinkUrl(opts.token),
+          linkGueltigBis: kalendertagVon(link.gueltigBis),
+          heute: ctx.heute,
+          nachricht: stand.nachricht,
+          position: mailPosition(position, ohneNeu),
+          begruendung: position.begruendung ?? "",
+        }),
+      };
+    },
+  });
+}
+
+/**
+ * „Zurückweisen…" (EP-1): Begruendung fuer die Person und genau EINE Mail.
+ *
+ * Die Frist im Dialog ist DIE Frist der Nachforderung (P:644): Eine neue wird
+ * in derselben Transaktion gesetzt, und die lebenden Links werden
+ * fortgeschrieben (5.1) — eine eigene Mail zur Friständerung gibt es nicht.
+ * Ist der Link schon tot, ist eine neue Frist Pflicht (409), sonst enthielte
+ * die Mail einen toten Link.
+ *
+ * Wie jede Aktion mit Mail an die Person: Sperre des Vorgangs (bei EXPIRED
+ * 409, auch wenn es gerade erst gesetzt wurde), dann der Nachforderung, dann
+ * die Mail-Bremse. Die Dateien werden ZURUECKGEWIESEN (+30 Tage) und tragen
+ * eine Kopie der Begruendung (Nachweis nach dem Loeschen, P:1463).
+ */
+async function zurueckweisen(
+  ctx: AktionsKontext,
+  position: PositionsStand,
+  stand: AktionsStand,
+  e: PositionsAktion<"zurueckweisen">,
+): Promise<UnterlagenDienstAntwort> {
+  const uebergang = positionUebergang("ZURUECKWEISEN", position.status, positionsKontext(ctx, stand));
+  if (!uebergang.erlaubt) return fehler(409, uebergang.meldung, uebergang.grund);
+  const vorab = zurueckweisenFristPruefen(e.frist, kalendertagVon(stand.frist), ctx.heute);
+  if (!vorab.ok) return fehler(vorab.status, vorab.meldung, vorab.grund);
+  const vorlage = await personenVorlagePruefen(UNTERLAGEN_EVENTS.ZURUECKGEWIESEN);
+  if (vorlage) return vorlage;
+
+  const ergebnis = await prisma.$transaction(async (tx) => {
+    await vorgangSperrenOderAbbrechen(tx, ctx);
+    await nachforderungSperrenOderAbbrechen(tx, ctx, stand.id);
+    await mailBremseOderAbbrechen(tx, ctx);
+
+    // Unter der Sperre frisch lesen und die Fristregel wiederholen.
+    const frisch = await nachforderungLaden(tx, ctx, stand.id);
+    if (!frisch) throw new UnterlagenAbbruch(fehler(404, MELDUNGEN.POSITION_NICHT_GEFUNDEN));
+    const bisherigeFrist = kalendertagVon(frisch.frist);
+    const pruefung = zurueckweisenFristPruefen(e.frist, bisherigeFrist, ctx.heute);
+    if (!pruefung.ok) throw new UnterlagenAbbruch(fehler(pruefung.status, pruefung.meldung, pruefung.grund));
+    const neueFrist = pruefung.frist && pruefung.frist !== bisherigeFrist ? pruefung.frist : null;
+    const frist = neueFrist ?? bisherigeFrist;
+
+    const r = await tx.unterlagenPosition.updateMany({
+      where: { id: position.id, nachforderungId: frisch.id, status: "EINGEREICHT" },
+      data: {
+        status: "ZURUECKGEWIESEN",
+        begruendung: e.begruendung,
+        entschiedenAm: ctx.jetzt,
+        entschiedenVonId: ctx.session.userId,
+      },
+    });
+    if (r.count !== 1) throw new UnterlagenAbbruch(fehler(409, MELDUNGEN.NICHT_ZU_PRUEFEN, "NICHT_ZU_PRUEFEN"));
+    const dateien = await tx.unterlagenDatei.updateMany({
+      where: { positionId: position.id, nachforderungId: frisch.id, status: "EINGEREICHT" },
+      data: {
+        status: "ZURUECKGEWIESEN",
+        entschiedenAm: ctx.jetzt,
+        begruendung: e.begruendung,
+        loeschenAb: loeschenAbBerechnen(ctx.jetzt),
+      },
+    });
+
+    const merker = vollstaendigMerker("ZURUECKGEWIESEN", {
+      vollstaendigSeit: frisch.vollstaendigSeit,
+      vollstaendigGemeldetAm: frisch.vollstaendigGemeldetAm,
+      positionenNachher: [],
+      jetzt: ctx.jetzt,
+    });
+    await tx.unterlagenNachforderung.updateMany({
+      where: { id: frisch.id, status: "LAUFEND" },
+      data: {
+        ...(neueFrist ? { frist: kalendertagAlsDatum(neueFrist) } : {}),
+        vollstaendigSeit: merker.vollstaendigSeit,
+        vollstaendigGemeldetAm: merker.vollstaendigGemeldetAm,
+      },
+    });
+    const fortgeschrieben = neueFrist
+      ? await lebendeLinksFortschreiben(tx, frisch.links, frisch.frist, neueFrist, ctx.heute)
+      : 0;
+
+    const link = await linkAnlegen(tx, {
+      nachforderungId: frisch.id,
+      anlass: "ZURUECKWEISUNG",
+      positionId: position.id,
+      empfaenger: frisch.empfaenger,
+      frist,
+      erstelltVonId: ctx.session.userId,
+      jetzt: ctx.jetzt,
+    });
+    await tx.auditLog.create({
+      data: auditDaten(ctx, UNTERLAGEN_AUDIT.ZURUECKGEWIESEN, {
+        nachforderungId: frisch.id,
+        positionId: position.id,
+        typ: position.typ,
+        linkId: link.linkId,
+        begruendungLaenge: e.begruendung.length,
+        dateienZurueckgewiesen: dateien.count,
+        ...(neueFrist ? { fristVorher: bisherigeFrist, fristNachher: neueFrist, linksFortgeschrieben: fortgeschrieben } : {}),
+      }),
+    });
+    return { nachforderungId: frisch.id, ...link };
+  });
+
+  const mail = await zurueckweisungSenden(ctx, { ...ergebnis, positionId: position.id });
+  return positionsAntwort("zurueckweisen", {
+    nachforderungId: ergebnis.nachforderungId,
+    positionId: position.id,
+    positionStatus: "ZURUECKGEWIESEN",
+    nachforderungStatus: "LAUFEND",
+    mail,
+  });
+}
+
+// ---- entfaellt ----
+
+/**
+ * „Entfällt…" (EP-2): interne Notiz, KEINE Mail. Die Position zaehlt als
+ * erledigt; rueckgaengig macht man sie ueber „Ergänzen" mit derselben Art.
+ * Ihre Dateien raeumt derselbe Ablauf ab wie beim Zurueckziehen
+ * (`dateienAbraeumen`, nur fuer diese Position): Entwuerfe verschwinden
+ * sofort, eingereichte werden VERWORFEN (+30 Tage). Entfällt die letzte
+ * offene Position, ist die Nachforderung ERLEDIGT. Auch bei EXPIRED erlaubt
+ * (EP-3).
+ */
+async function entfaellt(
+  ctx: AktionsKontext,
+  position: PositionsStand,
+  stand: AktionsStand,
+  e: PositionsAktion<"entfaellt">,
+): Promise<UnterlagenDienstAntwort> {
+  const uebergang = positionUebergang("ENTFAELLT", position.status, positionsKontext(ctx, stand));
+  if (!uebergang.erlaubt) return fehler(409, uebergang.meldung, uebergang.grund);
+
+  const ergebnis = await prisma.$transaction(async (tx) => {
+    await nachforderungSperrenOderAbbrechen(tx, ctx, stand.id);
+    const r = await tx.unterlagenPosition.updateMany({
+      where: {
+        id: position.id,
+        nachforderungId: stand.id,
+        status: { in: ["ANGEFORDERT", "ZURUECKGEWIESEN", "EINGEREICHT"] },
+      },
+      data: {
+        status: "ENTFAELLT",
+        entfaelltNotiz: e.notiz ?? null,
+        entschiedenAm: ctx.jetzt,
+        entschiedenVonId: ctx.session.userId,
+      },
+    });
+    if (r.count !== 1) throw new UnterlagenAbbruch(fehler(409, MELDUNGEN.NICHT_ENTFAELLBAR, "NICHT_ENTFAELLBAR"));
+
+    const { pfade, entwuerfeGeloescht, dateienVerworfen } = await dateienAbraeumen(tx, {
+      nachforderungId: stand.id,
+      positionId: position.id,
+      jetzt: ctx.jetzt,
+    });
+    await tx.auditLog.create({
+      data: auditDaten(ctx, UNTERLAGEN_AUDIT.ENTFAELLT, {
+        nachforderungId: stand.id,
+        positionId: position.id,
+        typ: position.typ,
+        notizLaenge: e.notiz?.length ?? 0,
+        entwuerfeGeloescht,
+        dateienVerworfen,
+      }),
+    });
+    const erledigt = await abschliessenWennFertig(tx, ctx, stand.id);
+    return { pfade, erledigt };
+  });
+
+  await entwuerfeNachDemCommitLoeschen(stand.id, ergebnis.pfade);
+  return positionsAntwort("entfaellt", {
+    nachforderungId: stand.id,
+    positionId: position.id,
+    positionStatus: "ENTFAELLT",
+    nachforderungStatus: ergebnis.erledigt ? "ERLEDIGT" : "LAUFEND",
+    mail: null,
+  });
+}
+
+// ---- annahme-zuruecknehmen ----
+
+/**
+ * „Annahme zurücknehmen" (4.5, E-3) — die Uebernahme rueckwaerts:
+ *
+ *   1. Pruefen: hoechstens 30 Tage nach der Annahme, nicht bei ZURUECKGEZOGEN,
+ *      nicht solange eine neuere Nachforderung laeuft; die Zielzeilen muessen
+ *      noch da sein (sonst 409), auch wenn sich ihr Ablaufdatum inzwischen
+ *      geaendert hat.
+ *   2. AUSSERHALB der Transaktion je Datei zurueck zur Nachforderung
+ *      verknuepfen (`zurueckVerknuepfen`, SHA-256 gegen die Zeile).
+ *   3. Die Transaktion: Kopf sperren (LAUFEND oder ERLEDIGT), Position und
+ *      Dateien bedingt zurueck auf EINGEREICHT, die Zielzeilen loeschen
+ *      (Anzahl muss stimmen), bei ERLEDIGT wieder LAUFEND samt
+ *      `laufendSchluessel` (P2002 → 409), Protokoll. Der Merker „vollständig"
+ *      bleibt (2.1): Die Ruecknahme meldet HR nichts.
+ *   4. Nach dem Commit die Vorgangskopie entfernen; scheitert die
+ *      Transaktion, die neu angelegte Datei bei der Nachforderung.
+ *
+ * Auch bei EXPIRED erlaubt (EP-3); den wieder laufenden Kopf zieht dann der
+ * taegliche Lauf zurueck (Z2).
+ */
+async function annahmeZuruecknehmen(
+  ctx: AktionsKontext,
+  position: PositionsStand,
+  stand: AktionsStand,
+): Promise<UnterlagenDienstAntwort> {
+  const { baustein, v } = ctx;
+  const andere =
+    stand.status === "ERLEDIGT"
+      ? await prisma.unterlagenNachforderung.findFirst({
+          where: { ...baustein.bereichWhere(v.id), status: "LAUFEND", id: { not: stand.id } },
+          select: { id: true },
+        })
+      : null;
+  const uebergang = positionUebergang("ANNAHME_ZURUECKNEHMEN", position.status, {
+    ...positionsKontext(ctx, stand),
+    entschiedenAm: position.entschiedenAm,
+    andereLaufend: !!andere,
+  });
+  if (!uebergang.erlaubt) return fehler(409, uebergang.meldung, uebergang.grund);
+
+  const dokumentFehlt = () => fehler(409, MELDUNGEN.DOKUMENT_FEHLT, "DOKUMENT_FEHLT");
+  const dateien = position.dateien.filter((d) => d.status === "ANGENOMMEN" && !!d.uebernahmeZiel && !!d.uebernommenId);
+  if (dateien.length === 0) return dokumentFehlt();
+  const zielIds = dateien.map((d) => d.uebernommenId as string);
+  const ziele = new Map((await baustein.uebernahmeLaden(v.id, zielIds)).map((z) => [z.id, z]));
+  if (zielIds.some((id) => !ziele.has(id))) return dokumentFehlt();
+
+  // 1. Zurueck verknuepfen, ausserhalb der Transaktion. Eine Datei, die bei
+  //    der Nachforderung geblieben ist (Stufe 2), braucht das nicht.
+  const zurueck: Array<{ datei: DateiStand; speicherPfad: string; neu: boolean; vorgangsKopie: string | null }> = [];
+  const neueDateien = () => zurueck.filter((z) => z.neu).map((z) => z.speicherPfad);
+  try {
+    for (const datei of dateien) {
+      const ziel = ziele.get(datei.uebernommenId as string);
+      if (datei.speicherPfad) {
+        zurueck.push({ datei, speicherPfad: datei.speicherPfad, neu: false, vorgangsKopie: null });
+        continue;
+      }
+      if (!ziel?.pfad) {
+        await nachforderungsDateienEntfernen(stand.id, neueDateien());
+        return dokumentFehlt();
+      }
+      const r = await zurueckVerknuepfen({
+        dokumentPfad: ziel.pfad,
+        vorgangId: v.id,
+        nachforderungId: stand.id,
+        dateiId: datei.id,
+        mimeType: datei.mimeType,
+        sha256: datei.sha256,
+      });
+      zurueck.push({ datei, ...r, vorgangsKopie: ziel.pfad });
+    }
+  } catch (err) {
+    await nachforderungsDateienEntfernen(stand.id, neueDateien());
+    if (err instanceof UnterlagenDateiFehler) {
+      return err.code === "DATEI_VERAENDERT"
+        ? fehler(409, MELDUNGEN.RUECKNAHME_DATEI_VERAENDERT, "RUECKNAHME_DATEI_VERAENDERT")
+        : dokumentFehlt();
+    }
+    throw err;
+  }
+
+  // 2. Umschalten in EINER Transaktion.
+  const nichtAngenommen = () => new UnterlagenAbbruch(fehler(409, MELDUNGEN.NICHT_ANGENOMMEN, "NICHT_ANGENOMMEN"));
+  let ergebnis: { nachforderungStatus: NachforderungStatus };
+  try {
+    ergebnis = await prisma.$transaction(async (tx) => {
+      const gesperrt = await tx.unterlagenNachforderung.updateMany({
+        where: { id: stand.id, ...baustein.bereichWhere(v.id), status: { in: ["LAUFEND", "ERLEDIGT"] } },
+        data: { updatedAt: ctx.jetzt },
+      });
+      if (gesperrt.count === 0) {
+        throw new UnterlagenAbbruch(fehler(409, MELDUNGEN.RUECKNAHME_ZURUECKGEZOGEN, "RUECKNAHME_ZURUECKGEZOGEN"));
+      }
+      const frisch = await nachforderungLaden(tx, ctx, stand.id);
+      if (!frisch) throw new UnterlagenAbbruch(fehler(404, MELDUNGEN.POSITION_NICHT_GEFUNDEN));
+
+      const r = await tx.unterlagenPosition.updateMany({
+        where: { id: position.id, nachforderungId: stand.id, status: "ANGENOMMEN" },
+        data: { status: "EINGEREICHT", entschiedenAm: null, entschiedenVonId: null },
+      });
+      if (r.count !== 1) throw nichtAngenommen();
+      for (const z of zurueck) {
+        const d = await tx.unterlagenDatei.updateMany({
+          where: { id: z.datei.id, positionId: position.id, status: "ANGENOMMEN" },
+          data: {
+            status: "EINGEREICHT",
+            speicherPfad: z.speicherPfad,
+            entschiedenAm: null,
+            uebernahmeZiel: null,
+            uebernommenId: null,
+            uebernommenAm: null,
+          },
+        });
+        if (d.count !== 1) throw nichtAngenommen();
+      }
+      const entfernt = await baustein.uebernahmeZuruecknehmen(tx, { vorgangId: v.id, ids: zielIds });
+      if (entfernt !== zielIds.length) throw new UnterlagenAbbruch(dokumentFehlt());
+
+      // ERLEDIGT → LAUFEND: Der Unique-Index `laufendSchluessel` laesst keine
+      // zweite laufende Nachforderung zu (P2002 → 409 unten).
+      let wiedereroeffnet = false;
+      if (frisch.status === "ERLEDIGT") {
+        const w = await tx.unterlagenNachforderung.updateMany({
+          where: { id: stand.id, status: "ERLEDIGT" },
+          data: { status: "LAUFEND", laufendSchluessel: laufendSchluessel(baustein.modul, v.id), erledigtAm: null },
+        });
+        wiedereroeffnet = w.count === 1;
+      }
+      await tx.auditLog.create({
+        data: auditDaten(ctx, UNTERLAGEN_AUDIT.ANNAHME_ZURUECKGENOMMEN, {
+          nachforderungId: stand.id,
+          positionId: position.id,
+          typ: position.typ,
+          dateiIds: zurueck.map((z) => z.datei.id),
+          zielIds,
+          wiedereroeffnet,
+        }),
+      });
+      return { nachforderungStatus: "LAUFEND" as const };
+    });
+  } catch (err) {
+    await nachforderungsDateienEntfernen(stand.id, neueDateien());
+    if (eindeutigkeitVerletzt(err, "laufendSchluessel")) return fehler(409, MELDUNGEN.ANDERE_LAEUFT, "ANDERE_LAEUFT");
+    throw err;
+  }
+
+  // 3. Erst nach dem Commit verschwindet die Kopie im Vorgang.
+  await vorgangsKopienEntfernen(
+    ctx,
+    zurueck.flatMap((z) => (z.vorgangsKopie ? [z.vorgangsKopie] : [])),
+  );
+  return positionsAntwort("annahme-zuruecknehmen", {
+    nachforderungId: stand.id,
+    positionId: position.id,
+    positionStatus: "EINGEREICHT",
+    nachforderungStatus: ergebnis.nachforderungStatus,
+    mail: null,
+  });
+}
+
+/**
+ * POST /api/onboarding/[id]/unterlagen/positionen/[positionId] — die vier
+ * Entscheidungen ueber eine Position. Die Route hat Sitzung und Body (Zod)
+ * schon geprueft; die Antwort geht 1:1 zurueck.
+ *
+ *   403 { error }                              nicht HR_EDIT_ROLES
+ *   404 { error: "Vorgang nicht gefunden" }    unbekannt ODER fremder Mandant
+ *   404 { error: "Unterlage nicht gefunden" }  unbekannt ODER zu einem anderen Vorgang
+ *   400 { error, grund }                       Art oder Ablaufdatum passt nicht (annehmen), Frist (zurueckweisen)
+ *   409 { error, grund }                       Sperre belegt, Uebergang nicht erlaubt, Datei fehlt oder veraendert,
+ *                                              sensible Art nicht erlaubt, 30 Tage vorbei, andere laeuft, …
+ *   429 { error, grund } + Retry-After         Mail-Bremse (zurueckweisen)
+ *   200 PositionsAktionAntwort                 sonst — beim Zurueckweisen mit `mail` (EP-11)
+ */
+export async function unterlagenPositionsAktionAusfuehren(opts: {
+  modul: UnterlagenModul;
+  vorgangId: string;
+  positionId: string;
+  eingabe: PositionsAktionInput;
+  session: SessionPayload;
+  jetzt?: Date;
+}): Promise<UnterlagenDienstAntwort> {
+  return aktionRahmen(opts, async (ctx) => {
+    const position = await positionLaden(prisma, ctx, opts.positionId);
+    const stand = position ? await nachforderungLaden(prisma, ctx, position.nachforderungId) : null;
+    if (!position || !stand) return fehler(404, MELDUNGEN.POSITION_NICHT_GEFUNDEN);
+    const e = opts.eingabe;
+    switch (e.aktion) {
+      case "annehmen":
+        return annehmen(ctx, position, stand, e);
+      case "zurueckweisen":
+        return zurueckweisen(ctx, position, stand, e);
+      case "entfaellt":
+        return entfaellt(ctx, position, stand, e);
+      case "annahme-zuruecknehmen":
+        return annahmeZuruecknehmen(ctx, position, stand);
+    }
+  });
+}
+
+// =============================================
+// Datei oeffnen (GET …/unterlagen/dateien/[dateiId], EP-10)
+// =============================================
+
+/** Ergebnis von `unterlagenDateiOeffnen`: die Fehlerantwort oder Inhalt samt Kopfzeilen. */
+export type UnterlagenDateiErgebnis =
+  | { ok: false; antwort: UnterlagenDienstAntwort }
+  | { ok: true; inhalt: Buffer; headers: Record<string, string> };
+
+/** Nur die erkannten Typen (4.3) gehen mit ihrem Typ hinaus, alles andere als Download. */
+function erkannterTyp(mimeType: string): boolean {
+  return Object.prototype.hasOwnProperty.call(ENDUNG_FUER_DATEITYP, mimeType);
+}
+
+/**
+ * HR oeffnet eine uebermittelte Datei zur Pruefung (neuer Tab, `inline`).
+ *
+ * - Nur HR_EDIT_ROLES und nur im eigenen Mandanten (404 mit demselben Text
+ *   wie „unbekannt"); die Datei haengt am Vorgang.
+ * - 404 fuer alles, was HR nicht sehen soll oder was nicht (mehr) bei der
+ *   Nachforderung liegt: Entwuerfe und nie uebermittelte Dateien (2.3),
+ *   geloeschte, uebernommene (die liefert die Dokumentroute) — immer derselbe
+ *   Text.
+ * - Gelesen wird nur unter `uploads/unterlagen/<nachforderungId>`.
+ * - Kopfzeilen: Typ aus der Datenbank (erkannt aus den Bytes, nie vom
+ *   Client), `no-store`, `Cross-Origin-Resource-Policy: same-origin`,
+ *   `nosniff`; bei Bildern zusaetzlich `Content-Security-Policy: sandbox`
+ *   (bei PDFs erst nach der Browserprobe, Abschnitt 17). Der Name laeuft
+ *   ueber `asciiFilename`.
+ *   ACHTUNG, CSP: Die Middleware setzt fuer `/api/onboarding/**` schon ihre
+ *   eigene `Content-Security-Policy`, und Next.js (15.5) uebernimmt einen Kopf
+ *   der Route nur, wenn es ihn noch nicht gibt (`send-response.js`) — die
+ *   `sandbox` von hier kommt also erst an, wenn die Middleware fuer
+ *   `…/unterlagen/dateien/…` keine eigene CSP mehr setzt (offen, Datei von
+ *   Schritt 5). `no-store` und CORP setzt die Middleware nicht, die kommen an.
+ * - Jedes Oeffnen steht im Protokoll (`UNTERLAGEN_DATEI_GEOEFFNET`) — mit IDs,
+ *   Typ und Groesse, nie mit dem Dateinamen. Ohne Eintrag keine Datei.
+ */
+export async function unterlagenDateiOeffnen(opts: {
+  modul: UnterlagenModul;
+  vorgangId: string;
+  dateiId: string;
+  session: SessionPayload;
+}): Promise<UnterlagenDateiErgebnis> {
+  const nicht = (antwort: UnterlagenDienstAntwort): UnterlagenDateiErgebnis => ({ ok: false, antwort });
+  const zugriff = await vorgangZugriff(opts);
+  if (!zugriff.ok) return nicht(zugriff.antwort);
+  const { baustein, v } = zugriff;
+
+  const datei = await prisma.unterlagenDatei.findFirst({
+    where: { id: opts.dateiId, nachforderung: baustein.bereichWhere(v.id) },
+    select: {
+      id: true,
+      nachforderungId: true,
+      positionId: true,
+      status: true,
+      anzeigeName: true,
+      mimeType: true,
+      groesse: true,
+      speicherPfad: true,
+      uebermitteltAm: true,
+      dateiGeloeschtAm: true,
+    },
+  });
+  if (!datei || datei.status === "ENTWURF" || !datei.uebermitteltAm || !datei.speicherPfad || datei.dateiGeloeschtAm) {
+    return nicht(fehler(404, MELDUNGEN.DATEI_NICHT_GEFUNDEN));
+  }
+
+  let inhalt: Buffer;
+  try {
+    inhalt = await nachforderungsDateiLesen(datei.speicherPfad, datei.nachforderungId);
+  } catch (err) {
+    console.error(`[Unterlagen] Datei ${datei.id} nicht lesbar:`, fehlerKennung(err));
+    return nicht(fehler(404, MELDUNGEN.DATEI_NICHT_GEFUNDEN));
+  }
+
+  await prisma.auditLog.create({
+    data: auditDaten({ baustein, v, session: opts.session }, UNTERLAGEN_AUDIT.DATEI_GEOEFFNET, {
+      nachforderungId: datei.nachforderungId,
+      positionId: datei.positionId,
+      dateiId: datei.id,
+      mimeType: datei.mimeType,
+      groesse: datei.groesse,
+    }),
+  });
+
+  const erkannt = erkannterTyp(datei.mimeType);
+  const typ = erkannt ? datei.mimeType : "application/octet-stream";
+  return {
+    ok: true,
+    inhalt,
+    headers: {
+      "Content-Type": typ,
+      "Content-Disposition": `${erkannt ? "inline" : "attachment"}; filename="${asciiFilename(datei.anzeigeName)}"`,
+      "Content-Length": String(inhalt.length),
+      "Cache-Control": "no-store",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "X-Content-Type-Options": "nosniff",
+      ...(typ.startsWith("image/") ? { "Content-Security-Policy": "sandbox" } : {}),
+    },
+  };
 }
 
 // =============================================

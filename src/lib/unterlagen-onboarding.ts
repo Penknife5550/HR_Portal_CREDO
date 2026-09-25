@@ -33,11 +33,20 @@
  *     Kopie —, und liest daraus nur `OnboardingUnterlagenQuelle`. Aus dem
  *     Fragebogen kommen nur die Angaben, aus denen sich die Pflichten ergeben,
  *     und der Name.
+ *   - **Uebernahme beim Annehmen (4.4):** je Datei ein `Document` des
+ *     Vorgangs, Status APPROVED (EP-7) mit `reviewedAt`/`reviewedById`, Pfad
+ *     relativ `uploads/<onboardingId>/<dateiId>.<ext>`, Name = Anzeigename
+ *     (Endung = erkannter Typ). Art: Katalogzeile ihre Art; freie Zeile die
+ *     gewaehlte, sonst SONSTIGES — eine sensible nur, wenn `sensibelAnforderbar`
+ *     sie zulaesst (Abschnitt 11), NIE still auf eine andere Art zurueck. Ein
+ *     Ablaufdatum bzw. „unbefristet" (Z1) nur bei `istFristpflichtig`, geprueft
+ *     mit `pruefeGueltigBis`. `PersonalData` (etwa `rvAntragEingangAm`) und
+ *     die Checkliste fasst die Uebernahme nie an.
  */
 
-import type { Prisma } from "@prisma/client";
+import type { DocumentType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { istFristpflichtig } from "@/lib/dokument-fristen";
+import { ablaufKalendertag, istFristpflichtig, pruefeGueltigBis } from "@/lib/dokument-fristen";
 import { nachweiseAbgegeben } from "@/lib/onboarding-spuren";
 import {
   documentTypeLabel,
@@ -52,8 +61,15 @@ import {
   sensibelAnforderbar,
   type PflichtEingaben,
 } from "@/lib/required-documents";
-import { SAMMELARTEN, type AuswahlEintrag, type EmpfaengerVorschlag } from "@/lib/unterlagen";
-import type { UnterlagenModulBaustein, UnterlagenVorgang } from "@/lib/unterlagen-dienst";
+import { MELDUNGEN, SAMMELARTEN, type AuswahlEintrag, type EmpfaengerVorschlag } from "@/lib/unterlagen";
+import type {
+  AnnahmeEingabe,
+  AnnahmePruefung,
+  UebernahmeErgebnis,
+  UebernahmeKontext,
+  UnterlagenModulBaustein,
+  UnterlagenVorgang,
+} from "@/lib/unterlagen-dienst";
 
 // =============================================
 // Vorgang laden
@@ -298,6 +314,149 @@ function auswahl(v: OnboardingUnterlagenVorgang): AuswahlEintrag[] {
 }
 
 // =============================================
+// Annehmen und Annahme zuruecknehmen (Schritt 6, 4.4 und 4.5)
+// =============================================
+
+/** Die Art, unter der eine frei benannte Zeile ohne Wahl uebernommen wird (4.4). */
+export const ONBOARDING_STANDARDART = "SONSTIGES";
+
+/**
+ * Art und Ablauf der Uebernahme (4.4, Z1) — dieselbe Pruefung vor jedem
+ * Schreiben, rein bis auf die Uhr (`jetzt`):
+ *
+ * - **Katalogzeile:** ihre Art. Eine andere Art im Body ist ein Bedienfehler
+ *   (400), keine stille Umdeutung.
+ * - **Freie Zeile:** die gewaehlte Art, sonst SONSTIGES. Nur Arten des
+ *   Katalogs (sonst 400). Eine sensible Art nur, wenn der Vorgang sie zulaesst
+ *   (`auswahl`, also `sensibelAnforderbar`) — sonst 409 mit dem Grund.
+ * - **Ablauf nur bei `istFristpflichtig`** (auch wenn eine freie Zeile eine
+ *   fristpflichtige Art bekommt): „unbefristet" → kein Datum, Kennzeichen
+ *   gesetzt; ein Datum → geprueft mit `pruefeGueltigBis` (mehr als 20 Jahre
+ *   voraus → 400; ein vergangenes Datum ist erlaubt, der Dialog warnt);
+ *   `null` („Datum später nachtragen") → weder Datum noch Kennzeichen; nicht
+ *   angegeben → die Angabe der Person. Bei anderen Arten ergibt ein Datum
+ *   oder „unbefristet" 400.
+ */
+function annahmePruefen(
+  v: OnboardingUnterlagenVorgang,
+  e: AnnahmeEingabe,
+  jetzt: Date,
+): AnnahmePruefung {
+  let art: string;
+  if (e.typ !== null) {
+    if (e.dokumentTyp !== undefined && e.dokumentTyp !== e.typ) {
+      return { ok: false, status: 400, grund: "ART_NICHT_WAEHLBAR", meldung: MELDUNGEN.ART_NICHT_WAEHLBAR };
+    }
+    art = e.typ;
+  } else {
+    art = e.dokumentTyp ?? ONBOARDING_STANDARDART;
+    if (!(SELECTABLE_DOCUMENT_TYPES as readonly string[]).includes(art)) {
+      return { ok: false, status: 400, grund: "TYP_UNBEKANNT", meldung: MELDUNGEN.TYP_UNBEKANNT };
+    }
+    const eintrag = auswahl(v).find((a) => a.typ === art);
+    if (eintrag && !eintrag.erlaubt) {
+      return {
+        ok: false,
+        status: 409,
+        grund: "ART_NICHT_UEBERNEHMBAR",
+        meldung: MELDUNGEN.ART_NICHT_UEBERNEHMBAR,
+        ...(eintrag.grund ? { hinweis: eintrag.grund } : {}),
+      };
+    }
+  }
+
+  if (!istFristpflichtig(art)) {
+    if (e.unbefristet === true) {
+      return {
+        ok: false,
+        status: 400,
+        grund: "UNBEFRISTET_OHNE_ABLAUFDATUM",
+        meldung: MELDUNGEN.UNBEFRISTET_OHNE_ABLAUFDATUM,
+      };
+    }
+    // Ein Datum an einer Art ohne Ablauf lehnt `pruefeGueltigBis` selbst ab.
+    const pruefung = pruefeGueltigBis(e.gueltigBis ?? null, art, jetzt);
+    if (!pruefung.ok) return { ok: false, status: 400, grund: "GUELTIG_BIS_UNGUELTIG", meldung: pruefung.fehler };
+    return { ok: true, art, gueltigBis: null, unbefristet: false };
+  }
+
+  if (e.unbefristet === true) return { ok: true, art, gueltigBis: null, unbefristet: true };
+  const roh = e.gueltigBis === undefined ? ablaufKalendertag(e.gueltigBisAngabe) : e.gueltigBis;
+  const pruefung = pruefeGueltigBis(roh, art, jetzt);
+  if (!pruefung.ok) return { ok: false, status: 400, grund: "GUELTIG_BIS_UNGUELTIG", meldung: pruefung.fehler };
+  return { ok: true, art, gueltigBis: pruefung.gueltigBis, unbefristet: false };
+}
+
+/**
+ * Je Datei ein `Document` (Tabelle in 4.4). `ablaufErinnert*` bleiben leer —
+ * fuer den neuen Nachweis beginnt ein neuer Zyklus. `uploadedAt` ist der
+ * Zeitpunkt, zu dem die Person die Datei uebermittelt hat.
+ */
+async function uebernehmen(tx: Prisma.TransactionClient, ctx: UebernahmeKontext): Promise<UebernahmeErgebnis> {
+  const dokument = await tx.document.create({
+    data: {
+      onboardingId: ctx.vorgangId,
+      // Geprueft in `annahmePruefen`: eine Art des Katalogs oder SONSTIGES.
+      type: ctx.art as DocumentType,
+      bezeichnung: ctx.bezeichnung,
+      fileName: ctx.datei.anzeigeName,
+      filePath: ctx.zielPfad,
+      fileSize: ctx.datei.groesse,
+      mimeType: ctx.datei.mimeType,
+      gueltigBis: ctx.gueltigBis,
+      unbefristet: ctx.unbefristet,
+      ablaufErinnertAm: null,
+      ablaufErinnertStufe: null,
+      status: "APPROVED",
+      reviewedAt: ctx.jetzt,
+      reviewedById: ctx.entschiedenVonId,
+      uploadedAt: ctx.datei.uebermitteltAm ?? ctx.jetzt,
+    },
+    select: { id: true },
+  });
+  return { ziel: "DOCUMENT", id: dokument.id, neuerPfad: ctx.zielPfad };
+}
+
+/** Die uebernommenen `Document`-Zeilen samt Pfad — nur solche DIESES Vorgangs. */
+async function uebernahmeLaden(
+  vorgangId: string,
+  ids: readonly string[],
+): Promise<Array<{ id: string; pfad: string | null }>> {
+  const dokumente = await prisma.document.findMany({
+    where: { id: { in: [...ids] }, onboardingId: vorgangId },
+    select: { id: true, filePath: true },
+  });
+  return dokumente.map((d) => ({ id: d.id, pfad: d.filePath }));
+}
+
+/**
+ * Loescht die uebernommenen `Document`-Zeilen, gebunden an den Vorgang — auch
+ * wenn HR ihr Ablaufdatum inzwischen geaendert hat (E-3). Die Anzahl prueft
+ * der Dienst.
+ */
+async function uebernahmeZuruecknehmen(
+  tx: Prisma.TransactionClient,
+  ctx: { vorgangId: string; ids: readonly string[] },
+): Promise<number> {
+  const r = await tx.document.deleteMany({ where: { id: { in: [...ctx.ids] }, onboardingId: ctx.vorgangId } });
+  return r.count;
+}
+
+/**
+ * Welche dieser Pfade im Vorgangsordner traegt noch ein `Document` DIESES
+ * Vorgangs? Der Dienst loescht eine Kopie nur, wenn keines darauf zeigt —
+ * dieselbe Frage, die der Lauf bei den Waisen stellt (4.5).
+ */
+async function zielPfadeVerwendet(vorgangId: string, pfade: readonly string[]): Promise<ReadonlySet<string>> {
+  if (pfade.length === 0) return new Set();
+  const dokumente = await prisma.document.findMany({
+    where: { onboardingId: vorgangId, filePath: { in: [...pfade] } },
+    select: { filePath: true },
+  });
+  return new Set(dokumente.map((d) => d.filePath));
+}
+
+// =============================================
 // Der Baustein
 // =============================================
 
@@ -316,4 +475,9 @@ export const onboardingBaustein: UnterlagenModulBaustein<OnboardingUnterlagenVor
   audit: (id) => ({ processType: "ONBOARDING", fk: { onboardingId: id } }),
   portalPfad: (id) => `/dashboard/${id}`,
   apiBasis: (id) => `/api/onboarding/${id}/unterlagen`,
+  annahmePruefen,
+  uebernehmen,
+  uebernahmeLaden,
+  uebernahmeZuruecknehmen,
+  zielPfadeVerwendet,
 };

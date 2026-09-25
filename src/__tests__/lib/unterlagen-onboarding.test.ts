@@ -7,7 +7,9 @@
  * Personalakte nur als zweiter Vorschlag), Auswahl (offene Nachweise
  * vorgeschlagen, SONSTIGES nie, sensibel/Schriftform/Ablaufdatum aus den
  * Listen) und die Abbildung der geladenen Zeile — auch der schon geladenen
- * Zeile der Vorgangsansicht (`onboardingVorgangAusAnsicht`).
+ * Zeile der Vorgangsansicht (`onboardingVorgangAusAnsicht`). Seit Schritt 6
+ * dazu die Uebernahme beim Annehmen (Art und Ablauf, je Datei ein `Document`)
+ * und ihre Ruecknahme.
  */
 
 jest.mock("@/lib/db", () => ({
@@ -15,15 +17,23 @@ jest.mock("@/lib/db", () => ({
 }));
 
 import { fakePrisma, udb, udbLeeren, type Zeile } from "../hilfen/unterlagen-fake-db";
+import { ddb, ddbLeeren, neuesDokument } from "../hilfen/unterlagen-fake-db-pruefen";
 import {
   ONBOARDING_KATALOG,
   ONBOARDING_NICHT_VERFUEGBAR,
+  ONBOARDING_STANDARDART,
   onboardingBaustein,
   onboardingUnterlagenVorgang,
   onboardingVorgangAusAnsicht,
   type OnboardingUnterlagenQuelle,
 } from "@/lib/unterlagen-onboarding";
-import { NACHFORDERUNG_HINWEISE, SELECTABLE_DOCUMENT_TYPES } from "@/lib/required-documents";
+import { MELDUNGEN } from "@/lib/unterlagen";
+import {
+  NACHFORDERUNG_HINWEISE,
+  SELECTABLE_DOCUMENT_TYPES,
+  SENSIBEL_SPERRGRUND_TEXTE,
+} from "@/lib/required-documents";
+import type { UebernahmeKontext } from "@/lib/unterlagen-dienst";
 import type { Prisma } from "@prisma/client";
 
 const ID = "3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b";
@@ -62,6 +72,7 @@ const abbilden = (z: Zeile, required: string[] = ["GEBURTSURKUNDE_EIGEN", "GEBUR
 
 beforeEach(() => {
   udbLeeren();
+  ddbLeeren();
 });
 
 describe("onboardingUnterlagenVorgang", () => {
@@ -244,5 +255,208 @@ describe("Laden und Sperren", () => {
     expect(onboardingBaustein.portalPfad(ID)).toBe(`/dashboard/${ID}`);
     expect(onboardingBaustein.apiBasis(ID)).toBe(`/api/onboarding/${ID}/unterlagen`);
     expect(onboardingBaustein.mitDetails(abbilden(zeile()))).toBe(true);
+  });
+});
+
+describe("annahmePruefen (4.4, Z1)", () => {
+  const JETZT = new Date("2026-09-21T08:00:00.000Z");
+  const v = () => abbilden(zeile());
+  const angabe = new Date("2028-03-31T00:00:00.000Z");
+  const pruefen = (e: Partial<Parameters<typeof onboardingBaustein.annahmePruefen>[1]>) =>
+    onboardingBaustein.annahmePruefen(v(), { typ: "AUFENTHALTSTITEL", gueltigBisAngabe: angabe, ...e }, JETZT);
+
+  it("Katalogzeile: ihre Art; ohne Angabe im Body gilt das „Gültig bis“ der Person", () => {
+    expect(pruefen({})).toEqual({
+      ok: true,
+      art: "AUFENTHALTSTITEL",
+      gueltigBis: new Date("2028-03-31T00:00:00.000Z"),
+      unbefristet: false,
+    });
+  });
+
+  it("ein Datum im Body geht vor; null heisst „Datum später nachtragen“; „unbefristet“ setzt nur das Kennzeichen", () => {
+    expect(pruefen({ gueltigBis: "2029-01-31" })).toMatchObject({
+      ok: true,
+      gueltigBis: new Date("2029-01-31T00:00:00.000Z"),
+      unbefristet: false,
+    });
+    expect(pruefen({ gueltigBis: null })).toEqual({ ok: true, art: "AUFENTHALTSTITEL", gueltigBis: null, unbefristet: false });
+    expect(pruefen({ unbefristet: true })).toEqual({ ok: true, art: "AUFENTHALTSTITEL", gueltigBis: null, unbefristet: true });
+  });
+
+  it("ein Datum mehr als 20 Jahre voraus oder kein Kalendertag → 400 mit dem Text von pruefeGueltigBis", () => {
+    const weit = pruefen({ gueltigBis: "2060-01-01" });
+    expect(weit).toMatchObject({ ok: false, status: 400, grund: "GUELTIG_BIS_UNGUELTIG" });
+    expect(weit.ok ? "" : weit.meldung).toContain("20 Jahre");
+    expect(pruefen({ gueltigBis: "2027-02-31" })).toMatchObject({ ok: false, status: 400 });
+    // Ein vergangenes Datum ist eine Tatsache, kein Fehler — der Dialog warnt.
+    expect(pruefen({ gueltigBis: "2025-01-01" })).toMatchObject({ ok: true });
+  });
+
+  it("Art ohne Ablauf: Datum oder „unbefristet“ → 400; ohne Angabe kein Datum, auch nicht aus der Angabe der Person", () => {
+    const pkv = (e: Partial<Parameters<typeof onboardingBaustein.annahmePruefen>[1]>) =>
+      onboardingBaustein.annahmePruefen(v(), { typ: "PKV_NACHWEIS", gueltigBisAngabe: angabe, ...e }, JETZT);
+    expect(pkv({})).toEqual({ ok: true, art: "PKV_NACHWEIS", gueltigBis: null, unbefristet: false });
+    expect(pkv({ gueltigBis: "2029-01-31" })).toMatchObject({ ok: false, status: 400, grund: "GUELTIG_BIS_UNGUELTIG" });
+    expect(pkv({ unbefristet: true })).toEqual({
+      ok: false,
+      status: 400,
+      grund: "UNBEFRISTET_OHNE_ABLAUFDATUM",
+      meldung: MELDUNGEN.UNBEFRISTET_OHNE_ABLAUFDATUM,
+    });
+  });
+
+  it("Katalogzeile mit einer anderen Art → 400; dieselbe Art noch einmal ist in Ordnung", () => {
+    expect(pruefen({ dokumentTyp: "SONSTIGES" })).toEqual({
+      ok: false,
+      status: 400,
+      grund: "ART_NICHT_WAEHLBAR",
+      meldung: MELDUNGEN.ART_NICHT_WAEHLBAR,
+    });
+    expect(pruefen({ dokumentTyp: "AUFENTHALTSTITEL" })).toMatchObject({ ok: true });
+  });
+
+  describe("frei benannte Zeile", () => {
+    const frei = (e: Partial<Parameters<typeof onboardingBaustein.annahmePruefen>[1]>, vorgang = v()) =>
+      onboardingBaustein.annahmePruefen(vorgang, { typ: null, gueltigBisAngabe: null, ...e }, JETZT);
+
+    it("ohne Wahl SONSTIGES — nie still eine andere Art", () => {
+      expect(ONBOARDING_STANDARDART).toBe("SONSTIGES");
+      expect(frei({})).toEqual({ ok: true, art: "SONSTIGES", gueltigBis: null, unbefristet: false });
+    });
+
+    it("jede Art des Katalogs; eine fristpflichtige bekommt ihr Datum", () => {
+      expect(frei({ dokumentTyp: "RV_BEFREIUNG" })).toMatchObject({ ok: true, art: "RV_BEFREIUNG" });
+      expect(frei({ dokumentTyp: "AUFENTHALTSTITEL", gueltigBis: "2029-01-31" })).toEqual({
+        ok: true,
+        art: "AUFENTHALTSTITEL",
+        gueltigBis: new Date("2029-01-31T00:00:00.000Z"),
+        unbefristet: false,
+      });
+    });
+
+    it("unbekannte Art → 400", () => {
+      expect(frei({ dokumentTyp: "GIBT_ES_NICHT" })).toEqual({
+        ok: false,
+        status: 400,
+        grund: "TYP_UNBEKANNT",
+        meldung: MELDUNGEN.TYP_UNBEKANNT,
+      });
+    });
+
+    it("sensible Art nur, wenn sensibelAnforderbar sie zulaesst (Abschnitt 11)", () => {
+      // Fuehrungszeugnis: nicht Pflicht, liegt nicht vor → 409 mit Grund.
+      expect(frei({ dokumentTyp: "FUEHRUNGSZEUGNIS" })).toEqual({
+        ok: false,
+        status: 409,
+        grund: "ART_NICHT_UEBERNEHMBAR",
+        meldung: MELDUNGEN.ART_NICHT_UEBERNEHMBAR,
+        hinweis: SENSIBEL_SPERRGRUND_TEXTE.NICHT_PFLICHT,
+      });
+      // SB-Ausweis nur mit der Angabe „schwerbehindert".
+      expect(frei({ dokumentTyp: "SB_AUSWEIS" })).toMatchObject({ ok: false, status: 409 });
+      const schwerbehindert = abbilden(
+        zeile({ personalData: { ...(zeile().personalData as Zeile), severelyDisabled: true } }),
+      );
+      expect(frei({ dokumentTyp: "SB_AUSWEIS" }, schwerbehindert)).toMatchObject({ ok: true, art: "SB_AUSWEIS" });
+      // Aufenthaltstitel ist hier Pflicht → erlaubt.
+      expect(frei({ dokumentTyp: "AUFENTHALTSTITEL" })).toMatchObject({ ok: true });
+    });
+  });
+});
+
+describe("uebernehmen, uebernahmeLaden, uebernahmeZuruecknehmen (4.4, 4.5)", () => {
+  const tx = fakePrisma as unknown as Prisma.TransactionClient;
+  const JETZT = new Date("2026-09-21T08:00:00.000Z");
+  const DATEI = "5d8e3f9a-4c5f-4e7d-9a0b-9c8d7e6f5a4b";
+
+  function kontext(teil: Partial<UebernahmeKontext> = {}): UebernahmeKontext {
+    return {
+      vorgangId: ID,
+      art: "AUFENTHALTSTITEL",
+      bezeichnung: null,
+      gueltigBis: new Date("2028-03-31T00:00:00.000Z"),
+      unbefristet: false,
+      datei: {
+        id: DATEI,
+        anzeigeName: "titel-vorne.jpg",
+        mimeType: "image/jpeg",
+        groesse: 12345,
+        uebermitteltAm: new Date("2026-09-20T09:00:00.000Z"),
+      },
+      zielPfad: `uploads/${ID}/${DATEI}.jpg`,
+      entschiedenVonId: "u-hr",
+      jetzt: JETZT,
+      ...teil,
+    };
+  }
+
+  it("ein Document je Datei: APPROVED, geprueft von HR, relativer Pfad, Anzeigename, neuer Erinnerungszyklus", async () => {
+    const r = await onboardingBaustein.uebernehmen(tx, kontext());
+    expect(ddb.dokumente).toHaveLength(1);
+    const d = ddb.dokumente[0];
+    expect(r).toEqual({ ziel: "DOCUMENT", id: d.id, neuerPfad: `uploads/${ID}/${DATEI}.jpg` });
+    expect(d).toMatchObject({
+      onboardingId: ID,
+      type: "AUFENTHALTSTITEL",
+      bezeichnung: null,
+      fileName: "titel-vorne.jpg",
+      filePath: `uploads/${ID}/${DATEI}.jpg`,
+      fileSize: 12345,
+      mimeType: "image/jpeg",
+      status: "APPROVED",
+      reviewedById: "u-hr",
+      unbefristet: false,
+      ablaufErinnertAm: null,
+      ablaufErinnertStufe: null,
+    });
+    expect(d.reviewedAt).toEqual(JETZT);
+    expect(d.uploadedAt).toEqual(new Date("2026-09-20T09:00:00.000Z"));
+    expect(d.gueltigBis).toEqual(new Date("2028-03-31T00:00:00.000Z"));
+    // Nichts ausser dem Document: kein Fragebogen (rvAntragEingangAm), keine Checkliste.
+    expect(udb.aufrufe).toEqual(["document.create"]);
+  });
+
+  it("freie Zeile: ihr Name als `bezeichnung`; „unbefristet“ als Kennzeichen", async () => {
+    await onboardingBaustein.uebernehmen(
+      tx,
+      kontext({ art: "SONSTIGES", bezeichnung: "Unterschriebener RV-Antrag", gueltigBis: null }),
+    );
+    await onboardingBaustein.uebernehmen(tx, kontext({ gueltigBis: null, unbefristet: true }));
+    expect(ddb.dokumente[0]).toMatchObject({ type: "SONSTIGES", bezeichnung: "Unterschriebener RV-Antrag" });
+    expect(ddb.dokumente[1]).toMatchObject({ unbefristet: true, gueltigBis: null });
+  });
+
+  it("Laden und Loeschen nur fuer Dokumente DIESES Vorgangs; die Anzahl sagt, ob alle da waren", async () => {
+    const eigen = neuesDokument({ onboardingId: ID, filePath: `uploads/${ID}/a.pdf` });
+    const fremd = neuesDokument({ onboardingId: "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d", filePath: "uploads/x/b.pdf" });
+    ddb.dokumente.push(eigen, fremd);
+
+    expect(await onboardingBaustein.uebernahmeLaden(ID, [eigen.id as string, fremd.id as string])).toEqual([
+      { id: eigen.id, pfad: `uploads/${ID}/a.pdf` },
+    ]);
+    expect(
+      await onboardingBaustein.uebernahmeZuruecknehmen(tx, { vorgangId: ID, ids: [eigen.id as string, fremd.id as string] }),
+    ).toBe(1);
+    expect(ddb.dokumente).toEqual([fremd]);
+  });
+
+  it("zielPfadeVerwendet: nur Pfade, auf die ein Document DIESES Vorgangs zeigt — leere Liste ohne Abfrage", async () => {
+    const ANDERER = "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d";
+    ddb.dokumente.push(
+      neuesDokument({ onboardingId: ID, filePath: `uploads/${ID}/a.pdf` }),
+      // Derselbe Pfad an einem anderen Vorgang zaehlt nicht (Bindung an den Vorgang).
+      neuesDokument({ onboardingId: ANDERER, filePath: `uploads/${ID}/b.pdf` }),
+    );
+    const verwendet = await onboardingBaustein.zielPfadeVerwendet(ID, [
+      `uploads/${ID}/a.pdf`,
+      `uploads/${ID}/b.pdf`,
+      `uploads/${ID}/c.pdf`,
+    ]);
+    expect([...verwendet]).toEqual([`uploads/${ID}/a.pdf`]);
+
+    udb.aufrufe = [];
+    expect([...(await onboardingBaustein.zielPfadeVerwendet(ID, []))]).toEqual([]);
+    expect(udb.aufrufe).toEqual([]);
   });
 });

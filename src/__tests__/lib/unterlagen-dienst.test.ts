@@ -1,11 +1,15 @@
 /**
- * Tests: Unterlagen nachfordern — HR-Dienst, Teil 1 (Paket 4, Schritt 4)
+ * Tests: Unterlagen nachfordern — HR-Dienst (Paket 4, Schritte 4 und 6)
  * (src/lib/unterlagen-dienst.ts mit dem Baustein src/lib/unterlagen-onboarding.ts)
  *
  * Geprueft gegen die In-Memory-Datenbank src/__tests__/hilfen/unterlagen-fake-db.ts:
- * Anfordern, Ergaenzen, Frist aendern, Link erneut senden, Zurueckziehen, die
- * Uebersicht fuer GET /api/onboarding/[id] und die HR-Meldung „vollständig"
- * mit bedingtem Anspruch.
+ * Teil 1 — Anfordern, Ergaenzen, Frist aendern, Link erneut senden,
+ * Zurueckziehen, die Uebersicht fuer GET /api/onboarding/[id] und die
+ * HR-Meldung „vollständig" mit bedingtem Anspruch. Teil 2 — die Entscheidungen
+ * ueber eine Position: Annehmen (Uebernahme per Hardlink, echte Dateien in
+ * einem Verzeichnis unter os.tmpdir()), Zurueckweisen, Entfällt, Annahme
+ * zuruecknehmen; die Tabelle `document` ergaenzt
+ * src/__tests__/hilfen/unterlagen-fake-db-pruefen.ts.
  *
  * Der Fake kennt kein Rollback, keine Zeilensperre und keine echte
  * Nebenlaeufigkeit (Feinplanung 13). Deshalb halten die Tests zusaetzlich die
@@ -57,13 +61,29 @@ jest.mock("@/lib/webhooks", () => ({
     return mockTrigger(e, p);
   },
 }));
-jest.mock("@/lib/unterlagen-dateien", () => ({
-  ...jest.requireActual("@/lib/unterlagen-dateien"),
-  entwuerfeLoeschen: (nf: string, pfade: ReadonlyArray<string | null>) => {
-    mockProtokoll("entwuerfeLoeschen");
-    return mockEntwuerfeLoeschen(nf, pfade);
-  },
-}));
+jest.mock("@/lib/unterlagen-dateien", () => {
+  const echt = jest.requireActual("@/lib/unterlagen-dateien");
+  // Die Dateihelfer laufen ECHT (Schritt 6 arbeitet auf einem Verzeichnis unter
+  // os.tmpdir()); sie tragen sich nur in die Aufrufliste ein — so ist die
+  // Reihenfolge „verknuepfen → Transaktion → alte Stelle loeschen" pruefbar.
+  const mitProtokoll =
+    <A extends unknown[], R>(name: string, fn: (...args: A) => R) =>
+    (...args: A): R => {
+      mockProtokoll(name);
+      return fn(...args);
+    };
+  return {
+    ...echt,
+    entwuerfeLoeschen: (nf: string, pfade: ReadonlyArray<string | null>) => {
+      mockProtokoll("entwuerfeLoeschen");
+      return mockEntwuerfeLoeschen(nf, pfade);
+    },
+    verknuepfenInVorgang: mitProtokoll("verknuepfenInVorgang", echt.verknuepfenInVorgang),
+    zurueckVerknuepfen: mitProtokoll("zurueckVerknuepfen", echt.zurueckVerknuepfen),
+    vorgangsKopieLoeschen: mitProtokoll("vorgangsKopieLoeschen", echt.vorgangsKopieLoeschen),
+    nachforderungsDateiLoeschen: mitProtokoll("nachforderungsDateiLoeschen", echt.nachforderungsDateiLoeschen),
+  };
+});
 jest.mock("@/lib/permissions", () => {
   const echt = jest.requireActual("@/lib/permissions");
   return { ...echt, canAccessProcess: jest.fn(echt.canAccessProcess) };
@@ -79,6 +99,7 @@ import {
   udbLeeren,
   type Zeile,
 } from "../hilfen/unterlagen-fake-db";
+import { ddb, ddbLeeren, neuesDokument } from "../hilfen/unterlagen-fake-db-pruefen";
 import {
   fehlerKennung,
   HR_MELDUNG_GRUENDE,
@@ -87,17 +108,23 @@ import {
   hrMeldungSenden,
   hrVollstaendigMelden,
   unterlagenAktionAusfuehren,
+  unterlagenPositionsAktionAusfuehren,
+  unterlagenSperreFreigeben,
+  unterlagenSperreNehmen,
   unterlagenUebersichtLaden,
 } from "@/lib/unterlagen-dienst";
 import { onboardingBaustein, ONBOARDING_NICHT_VERFUEGBAR, type OnboardingUnterlagenQuelle } from "@/lib/unterlagen-onboarding";
-import { MELDUNGEN, UNTERLAGEN_AUDIT, type UnterlagenUebersicht } from "@/lib/unterlagen";
+import { AKTION_MELDUNGEN, MELDUNGEN, UNTERLAGEN_AUDIT, type UnterlagenUebersicht } from "@/lib/unterlagen";
 import { UNTERLAGEN_EVENTS, UNTERLAGEN_PERSONEN_EVENTS } from "@/lib/unterlagen-mail";
 import { NACHFORDERUNG_HINWEISE, SENSIBEL_SPERRGRUND_TEXTE } from "@/lib/required-documents";
 import { hashToken } from "@/lib/token-hash";
 import { canAccessProcess, type SessionPayload } from "@/lib/permissions";
-import type { UnterlagenAktionInput } from "@/lib/validations/unterlagen";
+import type { PositionsAktionInput, UnterlagenAktionInput } from "@/lib/validations/unterlagen";
 import type { Prisma } from "@prisma/client";
+import { createHash, randomUUID } from "crypto";
 import fs from "fs";
+import { mkdir, mkdtemp, rm, stat, unlink, writeFile } from "fs/promises";
+import os from "os";
 import path from "path";
 
 // =============================================
@@ -259,6 +286,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   process.env.NEXT_PUBLIC_APP_URL = BASIS;
   udbLeeren();
+  ddbLeeren();
   udb.vorgaenge = [vorgang()];
   udb.users = [
     { id: "u-hr", firstName: "Erika", lastName: "Muster", email: "erika.muster@example.org", isActive: true },
@@ -1609,5 +1637,978 @@ describe("fehlerKennung (Konsole ohne Personendaten)", () => {
     expect(fehlerKennung(new TypeError(`kaputt ${ADRESSE}`))).toBe("TypeError");
     expect(fehlerKennung("Text mit Adresse")).toBe("unbekannt");
     expect(fehlerKennung(null)).toBe("unbekannt");
+  });
+});
+
+// =============================================
+// Teil 2 (Schritt 6): Entscheidungen ueber eine Position
+// =============================================
+
+const INHALT = Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n");
+const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+
+const position = (
+  positionId: string,
+  eingabe: PositionsAktionInput,
+  opts: { session?: SessionPayload; jetzt?: Date; vorgangId?: string } = {},
+) =>
+  unterlagenPositionsAktionAusfuehren({
+    modul: "ONBOARDING",
+    vorgangId: opts.vorgangId ?? VORGANG_ID,
+    positionId,
+    eingabe,
+    session: opts.session ?? HR,
+    jetzt: opts.jetzt ?? JETZT,
+  });
+
+/**
+ * Ein eigenes Arbeitsverzeichnis unter os.tmpdir() je Test: Die Dateihelfer
+ * rechnen mit `process.cwd()`. Innerhalb eines describe aufrufen.
+ */
+function mitArbeitsverzeichnis(): { abs: (relativ: string) => string } {
+  let basis = "";
+  let cwd: jest.SpyInstance | null = null;
+  beforeEach(async () => {
+    basis = await mkdtemp(path.join(os.tmpdir(), "p4-dienst-"));
+    cwd = jest.spyOn(process, "cwd").mockReturnValue(basis);
+  });
+  afterEach(async () => {
+    cwd?.mockRestore();
+    await rm(basis, { recursive: true, force: true });
+  });
+  return { abs: (relativ) => path.join(basis, ...relativ.split("/")) };
+}
+
+/**
+ * Die Fake-Datenbank kennt kein Rollback (Feinplanung 13). Wo ein Test den
+ * Stand NACH einer gescheiterten Transaktion prueft — etwa ob noch eine Zeile
+ * auf eine Datei zeigt —, bildet dies es fuer die NAECHSTE Transaktion nach:
+ * Wirft sie, stehen alle Zeilen wieder wie zu ihrem Beginn (dieselben
+ * Objekte, damit die Verweise des Tests gueltig bleiben). Was `vorTransaktion`
+ * anlegt — der Commit einer anderen Instanz —, bleibt.
+ */
+function naechsteTransaktionMitRollback(): void {
+  (fakePrisma.$transaction as jest.Mock).mockImplementationOnce(async (fn: (tx: unknown) => unknown) => {
+    // Wie der Fake selbst: protokollieren, fremden Commit einspielen.
+    udb.aufrufe.push("$transaction");
+    udb.vorTransaktion?.();
+    const listen = {
+      nachforderungen: [...udb.nachforderungen],
+      positionen: [...udb.positionen],
+      dateien: [...udb.dateien],
+      links: [...udb.links],
+      audits: [...udb.audits],
+      dokumente: [...ddb.dokumente],
+    };
+    const zeilen = [...listen.nachforderungen, ...listen.positionen, ...listen.dateien, ...listen.links, ...listen.dokumente];
+    const vorher = zeilen.map((z) => ({ ...z }));
+    try {
+      return await fn(fakePrisma);
+    } catch (err) {
+      zeilen.forEach((z, i) => {
+        for (const k of Object.keys(z)) delete z[k];
+        Object.assign(z, vorher[i]);
+      });
+      Object.assign(udb, {
+        nachforderungen: listen.nachforderungen,
+        positionen: listen.positionen,
+        dateien: listen.dateien,
+        links: listen.links,
+        audits: listen.audits,
+      });
+      ddb.dokumente = listen.dokumente;
+      throw err;
+    }
+  });
+}
+
+async function gibtEs(datei: string): Promise<boolean> {
+  try {
+    await stat(datei);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Eine Position „zu prüfen" (Aufenthaltstitel, die Person gab „gültig bis
+ * 31.03.2028" an) mit echten Dateien bei der Nachforderung.
+ */
+async function zuPruefen(
+  abs: (relativ: string) => string,
+  opts: { kopf?: Zeile; position?: Zeile; weitere?: Zeile[]; dateien?: number } = {},
+): Promise<{ n: MitId; p: MitId; dateien: MitId[] }> {
+  const n = laufend(opts.kopf ?? {}, [
+    {
+      typ: "AUFENTHALTSTITEL",
+      bezeichnung: "Aufenthaltstitel",
+      sensibel: true,
+      fristpflichtig: true,
+      status: "EINGEREICHT",
+      einreichungen: 1,
+      uebermitteltAm: vor(TAG),
+      gueltigBisAngabe: datum("2028-03-31"),
+      ...opts.position,
+    },
+    ...(opts.weitere ?? []),
+  ]);
+  const p = udb.positionen.find((x) => x.nachforderungId === n.id && x.reihenfolge === 0) as MitId;
+  const dateien: MitId[] = [];
+  for (let i = 0; i < (opts.dateien ?? 1); i++) {
+    const id = randomUUID();
+    const relativ = `uploads/unterlagen/${n.id}/${id}.pdf`;
+    await mkdir(path.dirname(abs(relativ)), { recursive: true });
+    await writeFile(abs(relativ), INHALT);
+    const d = neueDatei({
+      id,
+      nachforderungId: n.id,
+      positionId: p.id,
+      status: "EINGEREICHT",
+      anzeigeName: `titel-seite-${i + 1}.pdf`,
+      speicherPfad: relativ,
+      sha256: sha256(INHALT),
+      groesse: INHALT.length,
+      uebermitteltAm: vor(TAG),
+      einreichungNr: 1,
+    });
+    udb.dateien.push(d);
+    dateien.push(d as MitId);
+  }
+  return { n, p, dateien };
+}
+
+describe("Entscheidungen: Rechte und Bindung an den Vorgang", () => {
+  it("403 ohne Bearbeitungsrecht — nichts gelesen, nichts geschrieben", async () => {
+    laufend();
+    const r = await position(String(udb.positionen[0].id), { aktion: "entfaellt" }, { session: VORGESETZTE });
+    expect(r).toEqual({ status: 403, body: { error: MELDUNGEN.KEINE_BERECHTIGUNG } });
+    expect(udb.aufrufe).toEqual([]);
+  });
+
+  it("Position eines ANDEREN Vorgangs → 404 mit demselben Text wie eine unbekannte", async () => {
+    udb.vorgaenge.push(vorgang({ id: ANDERER_VORGANG, email: "bert@example.org" }));
+    laufend({ onboardingId: ANDERER_VORGANG, laufendSchluessel: `ONBOARDING:${ANDERER_VORGANG}` }, [
+      { typ: "PKV_NACHWEIS", status: "EINGEREICHT" },
+    ]);
+    const fremd = udb.positionen[0] as MitId;
+    const a = await position(fremd.id, { aktion: "entfaellt" });
+    const b = await position(randomUUID(), { aktion: "entfaellt" });
+    expect(a).toEqual({ status: 404, body: { error: MELDUNGEN.POSITION_NICHT_GEFUNDEN } });
+    expect(b).toEqual(a);
+    expect(fremd.status).toBe("EINGEREICHT");
+  });
+});
+
+describe("annehmen (4.4)", () => {
+  const { abs } = mitArbeitsverzeichnis();
+
+  it("Hardlink in den Vorgang, je Datei ein Document (APPROVED, relativer Pfad), die Quelle erst nach dem Commit geloescht", async () => {
+    const { n, p, dateien } = await zuPruefen(abs, { dateien: 2 });
+    const quellen = dateien.map((d) => String(d.speicherPfad));
+    const inodes = await Promise.all(quellen.map(async (q) => (await stat(abs(q), { bigint: true })).ino));
+
+    const r = await position(p.id, { aktion: "annehmen" });
+    expect(r).toEqual({
+      status: 200,
+      body: {
+        nachforderungId: n.id,
+        positionId: p.id,
+        positionStatus: "ANGENOMMEN",
+        nachforderungStatus: "ERLEDIGT",
+        mail: null,
+        meldung: AKTION_MELDUNGEN.annehmen,
+        dokumentIds: ddb.dokumente.map((d) => d.id),
+      },
+    });
+
+    expect(ddb.dokumente).toHaveLength(2);
+    for (const [i, d] of dateien.entries()) {
+      const dok = ddb.dokumente[i];
+      expect(dok).toMatchObject({
+        onboardingId: VORGANG_ID,
+        type: "AUFENTHALTSTITEL",
+        bezeichnung: null,
+        fileName: `titel-seite-${i + 1}.pdf`,
+        filePath: `uploads/${VORGANG_ID}/${d.id}.pdf`,
+        fileSize: INHALT.length,
+        mimeType: "application/pdf",
+        status: "APPROVED",
+        reviewedById: "u-hr",
+        unbefristet: false,
+        ablaufErinnertAm: null,
+        ablaufErinnertStufe: null,
+      });
+      expect(dok.reviewedAt).toEqual(JETZT);
+      expect(dok.uploadedAt).toEqual(vor(TAG));
+      // Ohne Angabe im Body gilt die Angabe der Person.
+      expect(dok.gueltigBis).toEqual(datum("2028-03-31"));
+      expect(d).toMatchObject({ status: "ANGENOMMEN", uebernahmeZiel: "DOCUMENT", uebernommenId: dok.id, speicherPfad: null });
+      expect(d.uebernommenAm).toEqual(JETZT);
+      // Hardlink: dieselbe Datei (gleicher Inode), keine Kopie — und die Quelle ist weg.
+      expect((await stat(abs(String(dok.filePath)), { bigint: true })).ino).toBe(inodes[i]);
+      expect(await gibtEs(abs(quellen[i]))).toBe(false);
+    }
+    expect(p).toMatchObject({ status: "ANGENOMMEN", entschiedenVonId: "u-hr" });
+    expect(p.entschiedenAm).toEqual(JETZT);
+    // Die letzte Entscheidung: ERLEDIGT, Unique-Schluessel frei, Merker leer.
+    expect(n).toMatchObject({ status: "ERLEDIGT", laufendSchluessel: null, vollstaendigSeit: null, vollstaendigGemeldetAm: null });
+    expect(n.erledigtAm).toEqual(JETZT);
+
+    // Protokoll: ANGENOMMEN, dann ERLEDIGT — IDs, Arten, Groessen, SHA-256, nie ein Dateiname.
+    expect(udb.audits.map((a) => a.action)).toEqual([UNTERLAGEN_AUDIT.ANGENOMMEN, UNTERLAGEN_AUDIT.ERLEDIGT]);
+    expect(udb.audits[0]).toMatchObject({
+      userId: "u-hr",
+      onboardingId: VORGANG_ID,
+      processType: "ONBOARDING",
+      details: {
+        nachforderungId: n.id,
+        positionId: p.id,
+        typ: "AUFENTHALTSTITEL",
+        dokumentTyp: "AUFENTHALTSTITEL",
+        gueltigBis: "2028-03-31",
+        unbefristet: false,
+      },
+    });
+    expect(JSON.stringify(udb.audits)).toContain(sha256(INHALT));
+    expect(JSON.stringify(udb.audits)).not.toContain("titel-seite");
+
+    // Reihenfolge: verknuepfen → Transaktion (Nachforderung, Position, Dokumente) → Quelle loeschen.
+    const trx = aufruf("$transaction");
+    expect(udb.aufrufe.lastIndexOf("verknuepfenInVorgang")).toBeLessThan(trx);
+    expect(aufruf("unterlagenNachforderung.updateMany")).toBeGreaterThan(trx);
+    expect(aufruf("unterlagenNachforderung.updateMany")).toBeLessThan(aufruf("unterlagenPosition.updateMany"));
+    expect(aufruf("unterlagenPosition.updateMany")).toBeLessThan(aufruf("document.create"));
+    expect(aufruf("nachforderungsDateiLoeschen")).toBeGreaterThan(letztesAudit());
+    // Keine Mail; weder Vorgang noch Fragebogendaten (rvAntragEingangAm) noch Checkliste.
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockTrigger).not.toHaveBeenCalled();
+    expect(udb.aufrufe.filter((a) => /^(onboardingProcess\.update|personalData|checklistItem)/.test(a))).toEqual([]);
+  });
+
+  it("nicht die letzte Entscheidung: bleibt LAUFEND, der Merker „vollständig“ bleibt (2.1)", async () => {
+    const seit = vor(MINUTE);
+    const { n, p } = await zuPruefen(abs, {
+      kopf: { vollstaendigSeit: seit, vollstaendigGemeldetAm: seit },
+      weitere: [{ typ: "PKV_NACHWEIS", bezeichnung: "PKV-Nachweis", status: "EINGEREICHT" }],
+    });
+    const r = await position(p.id, { aktion: "annehmen", gueltigBis: "2029-01-31" });
+    expect(r.body.nachforderungStatus).toBe("LAUFEND");
+    expect(n).toMatchObject({ status: "LAUFEND", laufendSchluessel: `ONBOARDING:${VORGANG_ID}` });
+    expect(n.vollstaendigSeit).toEqual(seit);
+    expect(n.vollstaendigGemeldetAm).toEqual(seit);
+    // Das Datum aus dem Body geht der Angabe der Person vor.
+    expect(ddb.dokumente[0].gueltigBis).toEqual(datum("2029-01-31"));
+    expect(udb.audits.map((a) => a.action)).toEqual([UNTERLAGEN_AUDIT.ANGENOMMEN]);
+  });
+
+  it("Z1 „Unbefristet“: Kennzeichen gesetzt, kein Datum — auch wenn die Person eines angegeben hat", async () => {
+    const { p } = await zuPruefen(abs);
+    expect((await position(p.id, { aktion: "annehmen", unbefristet: true })).status).toBe(200);
+    expect(ddb.dokumente[0]).toMatchObject({ unbefristet: true, gueltigBis: null });
+    expect(udb.audits[0].details).toMatchObject({ gueltigBis: null, unbefristet: true });
+  });
+
+  it("Z1 „Datum später nachtragen“ (null): weder Datum noch Kennzeichen", async () => {
+    const { p } = await zuPruefen(abs);
+    expect((await position(p.id, { aktion: "annehmen", gueltigBis: null })).status).toBe(200);
+    expect(ddb.dokumente[0]).toMatchObject({ unbefristet: false, gueltigBis: null });
+  });
+
+  it("Datum oder „unbefristet“ an einer Art ohne Ablauf, Datum mehr als 20 Jahre voraus → 400, nichts verknuepft", async () => {
+    const { p } = await zuPruefen(abs, {
+      position: { typ: "PKV_NACHWEIS", bezeichnung: "PKV-Nachweis", sensibel: false, fristpflichtig: false, gueltigBisAngabe: null },
+    });
+    const mitDatum = await position(p.id, { aktion: "annehmen", gueltigBis: "2029-01-31" });
+    expect(mitDatum.status).toBe(400);
+    expect(mitDatum.body.grund).toBe("GUELTIG_BIS_UNGUELTIG");
+    expect(await position(p.id, { aktion: "annehmen", unbefristet: true })).toEqual({
+      status: 400,
+      body: { error: MELDUNGEN.UNBEFRISTET_OHNE_ABLAUFDATUM, grund: "UNBEFRISTET_OHNE_ABLAUFDATUM" },
+    });
+
+    udb.nachforderungen[0].status = "ZURUECKGEZOGEN";
+    udb.nachforderungen[0].laufendSchluessel = null;
+    const titel = await zuPruefen(abs);
+    const zuWeit = await position(titel.p.id, { aktion: "annehmen", gueltigBis: "2060-01-01" });
+    expect(zuWeit.status).toBe(400);
+    expect(String(zuWeit.body.error)).toContain("20 Jahre");
+    expect(udb.aufrufe).not.toContain("verknuepfenInVorgang");
+    expect(ddb.dokumente).toHaveLength(0);
+  });
+
+  it("Katalogzeile mit einer anderen Art → 400 — keine stille Umdeutung", async () => {
+    const { p } = await zuPruefen(abs);
+    expect(await position(p.id, { aktion: "annehmen", dokumentTyp: "SONSTIGES" })).toEqual({
+      status: 400,
+      body: { error: MELDUNGEN.ART_NICHT_WAEHLBAR, grund: "ART_NICHT_WAEHLBAR" },
+    });
+  });
+
+  describe("frei benannte Zeile", () => {
+    const frei = {
+      typ: null,
+      bezeichnung: "Unterschriebener RV-Antrag",
+      sensibel: false,
+      fristpflichtig: false,
+      gueltigBisAngabe: null,
+    };
+
+    it("ohne Wahl als SONSTIGES, ihr Name als `bezeichnung` (EP-6)", async () => {
+      const { p } = await zuPruefen(abs, { position: frei });
+      expect((await position(p.id, { aktion: "annehmen" })).status).toBe(200);
+      expect(ddb.dokumente[0]).toMatchObject({
+        type: "SONSTIGES",
+        bezeichnung: "Unterschriebener RV-Antrag",
+        gueltigBis: null,
+        unbefristet: false,
+      });
+      expect(udb.audits[0].details).toMatchObject({ typ: null, dokumentTyp: "SONSTIGES" });
+      expect(JSON.stringify(udb.audits)).not.toContain("Unterschriebener");
+    });
+
+    it("mit einer fristpflichtigen Art: das Datum wird uebernommen", async () => {
+      const { p } = await zuPruefen(abs, { position: frei });
+      const r = await position(p.id, { aktion: "annehmen", dokumentTyp: "AUFENTHALTSTITEL", gueltigBis: "2029-01-31" });
+      expect(r.status).toBe(200);
+      expect(ddb.dokumente[0]).toMatchObject({ type: "AUFENTHALTSTITEL", bezeichnung: "Unterschriebener RV-Antrag" });
+      expect(ddb.dokumente[0].gueltigBis).toEqual(datum("2029-01-31"));
+    });
+
+    it("sensible Art, die der Vorgang nicht zulaesst → 409 mit Grund, nichts verknuepft", async () => {
+      const { p } = await zuPruefen(abs, { position: frei });
+      expect(await position(p.id, { aktion: "annehmen", dokumentTyp: "FUEHRUNGSZEUGNIS" })).toEqual({
+        status: 409,
+        body: {
+          error: MELDUNGEN.ART_NICHT_UEBERNEHMBAR,
+          grund: "ART_NICHT_UEBERNEHMBAR",
+          hinweis: SENSIBEL_SPERRGRUND_TEXTE.NICHT_PFLICHT,
+        },
+      });
+      expect(udb.aufrufe).not.toContain("verknuepfenInVorgang");
+      expect(p.status).toBe("EINGEREICHT");
+    });
+
+    it("unbekannte Art → 400", async () => {
+      const { p } = await zuPruefen(abs, { position: frei });
+      expect((await position(p.id, { aktion: "annehmen", dokumentTyp: "GIBT_ES_NICHT" })).body).toEqual({
+        error: MELDUNGEN.TYP_UNBEKANNT,
+        grund: "TYP_UNBEKANNT",
+      });
+    });
+  });
+
+  it("zwischen Lesen und Schreiben entschieden (etwa entfallen), kein Document zeigt aufs Ziel: 409, das neue Ziel entfernt, die Quelle bleibt", async () => {
+    const { p, dateien } = await zuPruefen(abs);
+    const quelle = abs(String(dateien[0].speicherPfad));
+    const ziel = abs(`uploads/${VORGANG_ID}/${dateien[0].id}.pdf`);
+    udb.vorTransaktion = () => {
+      p.status = "ENTFAELLT";
+    };
+    const r = await position(p.id, { aktion: "annehmen" });
+    expect(r).toEqual({ status: 409, body: { error: MELDUNGEN.NICHT_ZU_PRUEFEN, grund: "NICHT_ZU_PRUEFEN" } });
+    expect(ddb.dokumente).toHaveLength(0);
+    expect(await gibtEs(ziel)).toBe(false);
+    expect(await gibtEs(quelle)).toBe(true);
+    expect(dateien[0]).toMatchObject({ status: "EINGEREICHT", speicherPfad: String(dateien[0].speicherPfad) });
+    expect(udb.aufrufe).not.toContain("nachforderungsDateiLoeschen");
+  });
+
+  /**
+   * Zwei Container nehmen dieselbe Unterlage gleichzeitig an: Dieser legt das
+   * Ziel an (neu), der zweite trifft auf EEXIST mit gleichem Hash, gewinnt die
+   * Transaktion und legt SEIN Document auf genau diesen Pfad. Das 409 hier
+   * darf das Ziel nicht wegraeumen — sonst zeigte das angenommene Dokument ins
+   * Leere.
+   */
+  it("gleichzeitig angenommen, das Document der anderen Instanz zeigt aufs Ziel: 409, das Ziel bleibt", async () => {
+    const { p, dateien } = await zuPruefen(abs);
+    const zielRelativ = `uploads/${VORGANG_ID}/${dateien[0].id}.pdf`;
+    udb.vorTransaktion = () => {
+      p.status = "ANGENOMMEN";
+      ddb.dokumente.push(neuesDokument({ onboardingId: VORGANG_ID, filePath: zielRelativ, status: "APPROVED" }));
+    };
+    const r = await position(p.id, { aktion: "annehmen" });
+    expect(r).toEqual({ status: 409, body: { error: MELDUNGEN.NICHT_ZU_PRUEFEN, grund: "NICHT_ZU_PRUEFEN" } });
+    expect(await gibtEs(abs(zielRelativ))).toBe(true);
+    // Geprueft wurde ueber den Pfad, gebunden an den Vorgang — geloescht wurde nichts.
+    expect(fp.document.findMany).toHaveBeenCalledWith({
+      where: { onboardingId: VORGANG_ID, filePath: { in: [zielRelativ] } },
+      select: { filePath: true },
+    });
+    expect(udb.aufrufe).not.toContain("vorgangsKopieLoeschen");
+  });
+
+  it("zeigt nach dem Commit eine Dateizeile auf die Quelle (gleichzeitig zurueckgenommen), bleibt sie liegen", async () => {
+    const { p, dateien } = await zuPruefen(abs);
+    const quelle = String(dateien[0].speicherPfad);
+    // Eine zweite Instanz nimmt die Annahme sofort zurueck — ihr
+    // Zurueckverknuepfen trifft auf die noch liegende Quelle (EEXIST).
+    const umschalten = fp.unterlagenDatei.updateMany.getMockImplementation() as (a: unknown) => Promise<{ count: number }>;
+    fp.unterlagenDatei.updateMany.mockImplementationOnce(async (args: unknown) => {
+      const r = await umschalten(args);
+      Object.assign(dateien[0], { status: "EINGEREICHT", speicherPfad: quelle });
+      return r;
+    });
+    expect((await position(p.id, { aktion: "annehmen" })).status).toBe(200);
+    expect(await gibtEs(abs(quelle))).toBe(true);
+    expect(udb.aufrufe).not.toContain("nachforderungsDateiLoeschen");
+  });
+
+  it("ist nicht pruefbar, ob ein Document aufs Ziel zeigt: Das Ziel bleibt liegen (der Lauf entscheidet) — im Log nur Code und ID", async () => {
+    const stumm = jest.spyOn(console, "error").mockImplementation(() => {});
+    const { p, dateien } = await zuPruefen(abs);
+    const ziel = abs(`uploads/${VORGANG_ID}/${dateien[0].id}.pdf`);
+    fp.document.create.mockRejectedValueOnce(Object.assign(new Error("weg"), { code: "P1001" }));
+    fp.document.findMany.mockRejectedValueOnce(Object.assign(new Error(`kaputt ${ziel}`), { code: "P1017" }));
+    await expect(position(p.id, { aktion: "annehmen" })).rejects.toMatchObject({ code: "P1001" });
+    expect(await gibtEs(ziel)).toBe(true);
+    expect(udb.aufrufe).not.toContain("vorgangsKopieLoeschen");
+    const log = JSON.stringify(stumm.mock.calls);
+    expect(log).toContain("P1017");
+    expect(log).not.toContain("uploads");
+    stumm.mockRestore();
+  });
+
+  it("eine andere Aktion am selben Vorgang laeuft gerade: 409 (Sperre je Vorgang), nichts verknuepft", async () => {
+    const { p } = await zuPruefen(abs);
+    expect(unterlagenSperreNehmen("ONBOARDING", VORGANG_ID)).toBe(true);
+    try {
+      expect(await position(p.id, { aktion: "annehmen" })).toEqual({
+        status: 409,
+        body: { error: MELDUNGEN.AKTION_LAEUFT, grund: "AKTION_LAEUFT" },
+      });
+    } finally {
+      unterlagenSperreFreigeben("ONBOARDING", VORGANG_ID);
+    }
+    expect(udb.aufrufe).not.toContain("verknuepfenInVorgang");
+  });
+
+  it("scheitert die Transaktion: das neue Ziel wird entfernt, die Quelle bleibt, der Fehler geht weiter", async () => {
+    const { p, dateien } = await zuPruefen(abs);
+    const quelle = abs(String(dateien[0].speicherPfad));
+    const ziel = abs(`uploads/${VORGANG_ID}/${dateien[0].id}.pdf`);
+    fp.document.create.mockRejectedValueOnce(Object.assign(new Error("weg"), { code: "P1001" }));
+    await expect(position(p.id, { aktion: "annehmen" })).rejects.toMatchObject({ code: "P1001" });
+    expect(await gibtEs(ziel)).toBe(false);
+    expect(await gibtEs(quelle)).toBe(true);
+    // Die Sperre je Vorgang ist wieder frei.
+    expect(unterlagenSperreNehmen("ONBOARDING", VORGANG_ID)).toBe(true);
+    unterlagenSperreFreigeben("ONBOARDING", VORGANG_ID);
+  });
+
+  it("Pruefsumme weicht ab → 409 DATEI_VERAENDERT; Datei fehlt → 409 DATEI_FEHLT — nichts geschrieben", async () => {
+    const { p, dateien } = await zuPruefen(abs);
+    dateien[0].sha256 = "f".repeat(64);
+    expect(await position(p.id, { aktion: "annehmen" })).toEqual({
+      status: 409,
+      body: { error: MELDUNGEN.DATEI_VERAENDERT, grund: "DATEI_VERAENDERT" },
+    });
+    dateien[0].sha256 = sha256(INHALT);
+    await unlink(abs(String(dateien[0].speicherPfad)));
+    expect(await position(p.id, { aktion: "annehmen" })).toEqual({
+      status: 409,
+      body: { error: MELDUNGEN.DATEI_FEHLT, grund: "DATEI_FEHLT" },
+    });
+    expect(udb.aufrufe).not.toContain("$transaction");
+    expect(ddb.dokumente).toHaveLength(0);
+    expect(p.status).toBe("EINGEREICHT");
+  });
+
+  it("bei EXPIRED erlaubt (EP-3) — ohne Sperre des Vorgangs", async () => {
+    udb.vorgaenge = [vorgang({ status: "EXPIRED" })];
+    const { p } = await zuPruefen(abs);
+    expect((await position(p.id, { aktion: "annehmen" })).status).toBe(200);
+    expect(udb.aufrufe).not.toContain("onboardingProcess.updateMany");
+  });
+
+  it("eine noch offene Unterlage → 409 NICHT_ZU_PRUEFEN", async () => {
+    laufend();
+    expect((await position(String(udb.positionen[0].id), { aktion: "annehmen" })).body).toEqual({
+      error: MELDUNGEN.NICHT_ZU_PRUEFEN,
+      grund: "NICHT_ZU_PRUEFEN",
+    });
+  });
+});
+
+describe("Annahme zurücknehmen (4.5, E-3)", () => {
+  const { abs } = mitArbeitsverzeichnis();
+  const SPAETER = new Date(JETZT.getTime() + 10 * TAG);
+
+  /** Eine angenommene Unterlage — ueber den echten Weg „Annehmen". */
+  async function angenommen(opts: { weitere?: Zeile[] } = {}) {
+    const s = await zuPruefen(abs, { weitere: opts.weitere });
+    expect((await position(s.p.id, { aktion: "annehmen" })).status).toBe(200);
+    udb.aufrufe = [];
+    udb.audits = [];
+    return { ...s, dokument: ddb.dokumente[0] };
+  }
+
+  it("Document geloescht, Datei zurueck bei der Nachforderung, ERLEDIGT → LAUFEND; die Vorgangskopie erst nach dem Commit entfernt", async () => {
+    const { n, p, dateien, dokument } = await angenommen();
+    const kopie = abs(String(dokument.filePath));
+    const zurueck = `uploads/unterlagen/${n.id}/${dateien[0].id}.pdf`;
+
+    const r = await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: SPAETER });
+    expect(r).toEqual({
+      status: 200,
+      body: {
+        nachforderungId: n.id,
+        positionId: p.id,
+        positionStatus: "EINGEREICHT",
+        nachforderungStatus: "LAUFEND",
+        mail: null,
+        meldung: AKTION_MELDUNGEN["annahme-zuruecknehmen"],
+      },
+    });
+    expect(ddb.dokumente).toHaveLength(0);
+    expect(dateien[0]).toMatchObject({
+      status: "EINGEREICHT",
+      speicherPfad: zurueck,
+      uebernahmeZiel: null,
+      uebernommenId: null,
+      uebernommenAm: null,
+      entschiedenAm: null,
+    });
+    expect(await gibtEs(abs(zurueck))).toBe(true);
+    expect(await gibtEs(kopie)).toBe(false);
+    expect(p).toMatchObject({ status: "EINGEREICHT", entschiedenAm: null, entschiedenVonId: null });
+    // Wieder laufend, mit dem Unique-Schluessel; der Merker bleibt leer (2.1).
+    expect(n).toMatchObject({
+      status: "LAUFEND",
+      laufendSchluessel: `ONBOARDING:${VORGANG_ID}`,
+      erledigtAm: null,
+      vollstaendigSeit: null,
+    });
+    expect(udb.audits).toHaveLength(1);
+    expect(udb.audits[0]).toMatchObject({
+      action: UNTERLAGEN_AUDIT.ANNAHME_ZURUECKGENOMMEN,
+      userId: "u-hr",
+      details: { nachforderungId: n.id, positionId: p.id, zielIds: [dokument.id], wiedereroeffnet: true },
+    });
+    const trx = aufruf("$transaction");
+    expect(aufruf("zurueckVerknuepfen")).toBeLessThan(trx);
+    expect(aufruf("document.deleteMany")).toBeGreaterThan(trx);
+    expect(aufruf("vorgangsKopieLoeschen")).toBeGreaterThan(letztesAudit());
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockTrigger).not.toHaveBeenCalled();
+
+    // Danach laesst sie sich wieder annehmen — ein neues Dokument aus derselben Datei.
+    expect((await position(p.id, { aktion: "annehmen" }, { jetzt: SPAETER })).status).toBe(200);
+    expect(ddb.dokumente).toHaveLength(1);
+    expect(await gibtEs(abs(String(ddb.dokumente[0].filePath)))).toBe(true);
+  });
+
+  it("hoechstens 30 Tage nach der Annahme: am 31. Tag 409, am 30. noch moeglich", async () => {
+    const { p, dokument } = await angenommen();
+    const r = await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: new Date(JETZT.getTime() + 31 * TAG) });
+    expect(r).toEqual({ status: 409, body: { error: MELDUNGEN.RUECKNAHME_ZU_SPAET, grund: "RUECKNAHME_ZU_SPAET" } });
+    expect(ddb.dokumente).toEqual([dokument]);
+    expect(udb.aufrufe).not.toContain("zurueckVerknuepfen");
+    const tag30 = await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: new Date(JETZT.getTime() + 30 * TAG) });
+    expect(tag30.status).toBe(200);
+  });
+
+  it("neben einer laufenden neueren Nachforderung → 409 ANDERE_LAEUFT, ohne jede Dateiaktion", async () => {
+    const { p } = await angenommen();
+    laufend({ angefordertAm: vor(MINUTE) });
+    const r = await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: SPAETER });
+    expect(r).toEqual({ status: 409, body: { error: MELDUNGEN.ANDERE_LAEUFT, grund: "ANDERE_LAEUFT" } });
+    expect(udb.aufrufe).not.toContain("zurueckVerknuepfen");
+    expect(ddb.dokumente).toHaveLength(1);
+  });
+
+  it("nach dem Zurueckziehen → 409 (Endzustand)", async () => {
+    const { n, p } = await angenommen({ weitere: [{ typ: "PKV_NACHWEIS", bezeichnung: "PKV-Nachweis", status: "ANGEFORDERT" }] });
+    expect((await aktion({ aktion: "zurueckziehen", nachforderungId: n.id }, { jetzt: SPAETER })).status).toBe(200);
+    const r = await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: SPAETER });
+    expect(r).toEqual({
+      status: 409,
+      body: { error: MELDUNGEN.RUECKNAHME_ZURUECKGEZOGEN, grund: "RUECKNAHME_ZURUECKGEZOGEN" },
+    });
+    expect(ddb.dokumente).toHaveLength(1);
+  });
+
+  it("gewinnt eine gleichzeitig angelegte Nachforderung den Unique-Index (P2002): 409, die zurueckgeholte Datei wird wieder entfernt", async () => {
+    const { n, dateien, dokument, p } = await angenommen();
+    udb.vorTransaktion = () => {
+      laufend({ angefordertAm: new Date() });
+    };
+    // Postgres rollt die Dateizeilen zurueck — ohne das zeigte die schon
+    // umgeschaltete Zeile weiter auf die zurueckgeholte Datei, und sie bliebe.
+    naechsteTransaktionMitRollback();
+    const r = await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: SPAETER });
+    expect(r).toEqual({ status: 409, body: { error: MELDUNGEN.ANDERE_LAEUFT, grund: "ANDERE_LAEUFT" } });
+    expect(dateien[0]).toMatchObject({ status: "ANGENOMMEN", speicherPfad: null });
+    expect(await gibtEs(abs(`uploads/unterlagen/${n.id}/${dateien[0].id}.pdf`))).toBe(false);
+    // Die Kopie im Vorgang bleibt: Die Transaktion ist nicht durchgegangen.
+    expect(await gibtEs(abs(String(dokument.filePath)))).toBe(true);
+    expect(udb.aufrufe).not.toContain("vorgangsKopieLoeschen");
+  });
+
+  /**
+   * Spiegelbild zum gleichzeitigen Annehmen: Eine zweite Instanz nimmt die
+   * Annahme gerade selbst zurueck — ihr Zurueckverknuepfen traf auf EEXIST,
+   * ihre Dateizeile zeigt jetzt auf denselben Pfad bei der Nachforderung.
+   */
+  it("gleichzeitig zurueckgenommen, die Dateizeile der anderen Instanz zeigt auf die Datei: 409, die Datei bleibt", async () => {
+    const { n, p, dateien, dokument } = await angenommen();
+    const zurueck = `uploads/unterlagen/${n.id}/${dateien[0].id}.pdf`;
+    udb.vorTransaktion = () => {
+      p.status = "EINGEREICHT";
+      Object.assign(dateien[0], { status: "EINGEREICHT", speicherPfad: zurueck, uebernahmeZiel: null, uebernommenId: null });
+      ddb.dokumente = [];
+    };
+    const r = await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: SPAETER });
+    expect(r).toEqual({ status: 409, body: { error: MELDUNGEN.NICHT_ANGENOMMEN, grund: "NICHT_ANGENOMMEN" } });
+    expect(await gibtEs(abs(zurueck))).toBe(true);
+    expect(udb.aufrufe).not.toContain("nachforderungsDateiLoeschen");
+    // Die Vorgangskopie raeumt nur ab, wer die Transaktion gewonnen hat.
+    expect(await gibtEs(abs(String(dokument.filePath)))).toBe(true);
+    expect(udb.aufrufe).not.toContain("vorgangsKopieLoeschen");
+  });
+
+  it("zeigt nach dem Commit wieder ein Document auf die Vorgangskopie (erneut angenommen), bleibt sie liegen", async () => {
+    const { p, dokument } = await angenommen();
+    const kopie = String(dokument.filePath);
+    // Eine zweite Instanz nimmt die zurueckgeholte Datei sofort wieder an — ihr
+    // Verknuepfen trifft auf die noch liegende Kopie (EEXIST, gleicher Hash).
+    const loeschen = fp.document.deleteMany.getMockImplementation() as (a: unknown) => Promise<{ count: number }>;
+    fp.document.deleteMany.mockImplementationOnce(async (args: unknown) => {
+      const r = await loeschen(args);
+      ddb.dokumente.push(neuesDokument({ onboardingId: VORGANG_ID, filePath: kopie, status: "APPROVED" }));
+      return r;
+    });
+    expect((await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: SPAETER })).status).toBe(200);
+    expect(await gibtEs(abs(kopie))).toBe(true);
+    expect(udb.aufrufe).not.toContain("vorgangsKopieLoeschen");
+  });
+
+  it("in einer noch laufenden Nachforderung: bleibt LAUFEND, nichts wird wiedereroeffnet", async () => {
+    const { n, p } = await angenommen({ weitere: [{ typ: "PKV_NACHWEIS", bezeichnung: "PKV-Nachweis", status: "ANGEFORDERT" }] });
+    const r = await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: SPAETER });
+    expect(r.body).toMatchObject({ positionStatus: "EINGEREICHT", nachforderungStatus: "LAUFEND" });
+    expect(n.status).toBe("LAUFEND");
+    expect(udb.audits[0].details).toMatchObject({ wiedereroeffnet: false });
+  });
+
+  it("die Vorgangskopie wurde veraendert → 409; das Dokument ist weg → 409 DOKUMENT_FEHLT — nichts geschrieben", async () => {
+    const { p, dokument } = await angenommen();
+    await writeFile(abs(String(dokument.filePath)), Buffer.from("anders"));
+    expect(await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: SPAETER })).toEqual({
+      status: 409,
+      body: { error: MELDUNGEN.RUECKNAHME_DATEI_VERAENDERT, grund: "RUECKNAHME_DATEI_VERAENDERT" },
+    });
+    ddb.dokumente = [];
+    expect(await position(p.id, { aktion: "annahme-zuruecknehmen" }, { jetzt: SPAETER })).toEqual({
+      status: 409,
+      body: { error: MELDUNGEN.DOKUMENT_FEHLT, grund: "DOKUMENT_FEHLT" },
+    });
+    expect(udb.aufrufe).not.toContain("$transaction");
+    expect(p.status).toBe("ANGENOMMEN");
+  });
+});
+
+describe("zurueckweisen (EP-1)", () => {
+  const BEGRUENDUNG = "Bitte die aktuelle Bescheinigung <b>2026</b> hochladen.";
+
+  /** Eine uebermittelte Unterlage (PKV-Nachweis) — die Datei selbst braucht das Zurueckweisen nicht. */
+  function eingereicht(kopf: Zeile = {}, pos: Zeile = {}): { n: MitId; p: MitId; datei: Zeile } {
+    const n = laufend({ frist: datum("2026-09-25"), ...kopf }, [
+      {
+        typ: "PKV_NACHWEIS",
+        bezeichnung: "PKV-Nachweis",
+        status: "EINGEREICHT",
+        einreichungen: 1,
+        uebermitteltAm: vor(TAG),
+        ...pos,
+      },
+    ]);
+    const p = udb.positionen[0] as MitId;
+    const datei = neueDatei({
+      nachforderungId: n.id,
+      positionId: p.id,
+      status: "EINGEREICHT",
+      uebermitteltAm: vor(TAG),
+      speicherPfad: `uploads/unterlagen/${n.id}/x.pdf`,
+    });
+    udb.dateien.push(datei);
+    return { n, p, datei };
+  }
+
+  it("mit neuer Frist: genau EINE Mail; die Frist gilt fuer die ganze Nachforderung, lebende Links werden fortgeschrieben", async () => {
+    const { n, p, datei } = eingereicht({ vollstaendigSeit: vor(TAG), vollstaendigGemeldetAm: vor(TAG) });
+    const lebt = link(n, { gueltigBis: datum("2026-10-09") });
+    const tot = link(n, { gueltigBis: datum("2026-09-20"), createdAt: vor(10 * TAG), gesendetAm: vor(10 * TAG) });
+
+    const r = await position(p.id, { aktion: "zurueckweisen", begruendung: BEGRUENDUNG, frist: "2026-10-12" });
+    expect(r).toEqual({
+      status: 200,
+      body: {
+        nachforderungId: n.id,
+        positionId: p.id,
+        positionStatus: "ZURUECKGEWIESEN",
+        nachforderungStatus: "LAUFEND",
+        mail: { status: "SENT", detail: null },
+        meldung: AKTION_MELDUNGEN.zurueckweisen,
+      },
+    });
+
+    // Genau eine Mail: die Zurueckweisung — keine zusaetzliche zur Friständerung.
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockTrigger).not.toHaveBeenCalled();
+    const [mail] = mails();
+    expect(mail.event).toBe(UNTERLAGEN_EVENTS.ZURUECKGEWIESEN);
+    expect(mail.an).toBe(ADRESSE);
+    expect(mail.payload).toMatchObject({
+      frist: "12.10.2026",
+      unterlage: "PKV-Nachweis",
+      begruendung: BEGRUENDUNG,
+      einreichung_nr: 1,
+      frist_verstrichen: "",
+    });
+    expect(String(mail.payload.begruendung_html)).not.toContain("<b>");
+
+    expect(n.frist).toEqual(datum("2026-10-12"));
+    expect(n).toMatchObject({ vollstaendigSeit: null, vollstaendigGemeldetAm: null });
+    expect(lebt.gueltigBis).toEqual(datum("2026-10-26"));
+    expect(tot.gueltigBis).toEqual(datum("2026-09-20"));
+    const neu = udb.links.at(-1)!;
+    expect(neu).toMatchObject({
+      anlass: "ZURUECKWEISUNG",
+      positionId: p.id,
+      empfaenger: ADRESSE,
+      erstelltVonId: "u-hr",
+      mailStatus: "SENT",
+    });
+    expect(neu.gueltigBis).toEqual(datum("2026-10-26"));
+    expect(neu.tokenHash).toBe(hashToken(tokenAus(mail.payload)));
+
+    expect(p).toMatchObject({ status: "ZURUECKGEWIESEN", begruendung: BEGRUENDUNG, entschiedenVonId: "u-hr" });
+    // Die Datei traegt eine Kopie der Begruendung (Nachweis nach dem Loeschen) und geht nach 30 Tagen.
+    expect(datei).toMatchObject({ status: "ZURUECKGEWIESEN", begruendung: BEGRUENDUNG });
+    expect(datei.entschiedenAm).toEqual(JETZT);
+    expect(datei.loeschenAb).toEqual(new Date(JETZT.getTime() + 30 * TAG));
+
+    expect(udb.audits.at(-1)).toMatchObject({
+      action: UNTERLAGEN_AUDIT.ZURUECKGEWIESEN,
+      details: {
+        nachforderungId: n.id,
+        positionId: p.id,
+        linkId: neu.id,
+        begruendungLaenge: BEGRUENDUNG.length,
+        dateienZurueckgewiesen: 1,
+        fristVorher: "2026-09-25",
+        fristNachher: "2026-10-12",
+        linksFortgeschrieben: 1,
+      },
+    });
+    expect(JSON.stringify(udb.audits)).not.toContain("Bescheinigung");
+
+    // Reihenfolge: Vorgang, Nachforderung, Mail-Bremse — die Mail nach dem Commit.
+    const trx = aufruf("$transaction");
+    expect(aufruf("onboardingProcess.updateMany")).toBeGreaterThan(trx);
+    expect(aufruf("onboardingProcess.updateMany")).toBeLessThan(aufruf("unterlagenNachforderung.updateMany"));
+    expect(aufruf("unterlagenLink.findMany")).toBeGreaterThan(aufruf("unterlagenNachforderung.updateMany"));
+    expect(aufruf("sendEventEmail")).toBeGreaterThan(letztesAudit());
+  });
+
+  it("sensible Unterlage: Mail ohne Namen und ohne Begruendung (E-2) — beides nur auf der Upload-Seite", async () => {
+    const { p } = eingereicht({}, { typ: "AUFENTHALTSTITEL", bezeichnung: "Aufenthaltstitel", sensibel: true, fristpflichtig: true });
+    expect((await position(p.id, { aktion: "zurueckweisen", begruendung: "Rueckseite fehlt" })).status).toBe(200);
+    const [mail] = mails();
+    expect(mail.payload).toMatchObject({ unterlage: "", begruendung: "", begruendung_html: "" });
+    expect(JSON.stringify(mail.payload)).not.toContain("Aufenthaltstitel");
+    expect(JSON.stringify(mail.payload)).not.toContain("Rueckseite");
+    expect(p.begruendung).toBe("Rueckseite fehlt");
+  });
+
+  it("ohne neue Frist bleibt die bisherige — ist der Link schon tot, ist eine neue Frist Pflicht (409, nichts geschrieben)", async () => {
+    // Frist 01.09., Linkende 15.09. — heute ist der 21.09.
+    const { n, p } = eingereicht({ frist: datum("2026-09-01") });
+    expect(await position(p.id, { aktion: "zurueckweisen", begruendung: "x" })).toEqual({
+      status: 409,
+      body: { error: MELDUNGEN.ZURUECKWEISEN_FRIST_NOETIG, grund: "ZURUECKWEISEN_FRIST_NOETIG" },
+    });
+    expect(p.status).toBe("EINGEREICHT");
+    expect(udb.aufrufe).not.toContain("$transaction");
+
+    expect((await position(p.id, { aktion: "zurueckweisen", begruendung: "x", frist: "2026-10-01" })).status).toBe(200);
+    expect(n.frist).toEqual(datum("2026-10-01"));
+    expect(udb.links.at(-1)!.gueltigBis).toEqual(datum("2026-10-15"));
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("Frist ausserhalb der Grenzen → 400", async () => {
+    const { p } = eingereicht();
+    const r = await position(p.id, { aktion: "zurueckweisen", begruendung: "x", frist: "2026-09-21" });
+    expect(r).toEqual({ status: 400, body: { error: MELDUNGEN.FRIST_ZU_FRUEH, grund: "FRIST_ZU_FRUEH" } });
+  });
+
+  it("bei EXPIRED gesperrt (EP-3); EXPIRED zwischen Lesen und Schreiben → 409, nichts geschrieben, keine Mail", async () => {
+    udb.vorgaenge = [vorgang({ status: "EXPIRED" })];
+    const { p } = eingereicht();
+    expect((await position(p.id, { aktion: "zurueckweisen", begruendung: "x" })).body.grund).toBe("HR_VORGANG_EINGESTELLT");
+
+    udb.vorgaenge = [vorgang()];
+    udb.vorTransaktion = () => {
+      udb.vorgaenge[0].status = "EXPIRED";
+    };
+    expect(await position(p.id, { aktion: "zurueckweisen", begruendung: "x" })).toEqual({
+      status: 409,
+      body: { error: MELDUNGEN.HR_VORGANG_EINGESTELLT, grund: "HR_VORGANG_EINGESTELLT" },
+    });
+    expect(p.status).toBe("EINGEREICHT");
+    expect(udb.links).toHaveLength(0);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("die 7. Mail an die Person in einer Stunde → 429 mit Retry-After, nichts geschrieben", async () => {
+    const { n, p } = eingereicht();
+    for (const minuten of [50, 40, 30, 20, 10, 5]) link(n, { createdAt: vor(minuten * MINUTE), gesendetAm: vor(minuten * MINUTE) });
+    const r = await position(p.id, { aktion: "zurueckweisen", begruendung: "x" });
+    expect(r).toEqual({
+      status: 429,
+      body: { error: MELDUNGEN.MAIL_BREMSE, grund: "MAIL_BREMSE" },
+      headers: { "Retry-After": String(10 * 60) },
+    });
+    expect(p.status).toBe("EINGEREICHT");
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("Mail scheitert: 200 mit Warnung (EP-11) — die Zurueckweisung bleibt gespeichert, der Lauf holt nach", async () => {
+    mockSend.mockImplementationOnce(async () => ({ status: "FAILED", detail: "Timeout" }));
+    const { p } = eingereicht();
+    const r = await position(p.id, { aktion: "zurueckweisen", begruendung: "x" });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ mail: { status: "FAILED" }, warnung: MELDUNGEN.MAIL_NICHT_ZUGESTELLT });
+    expect(p.status).toBe("ZURUECKGEWIESEN");
+    expect(udb.links.at(-1)).toMatchObject({ anlass: "ZURUECKWEISUNG", mailStatus: "FAILED" });
+  });
+
+  it("N2: versendet, das Ergebnis laesst sich zweimal nicht speichern → 200 mit „bitte nicht erneut senden“, nie 500", async () => {
+    const stumm = jest.spyOn(console, "error").mockImplementation(() => {});
+    const { p } = eingereicht();
+    fp.unterlagenLink.updateMany
+      .mockRejectedValueOnce(Object.assign(new Error("weg"), { code: "P1001" }))
+      .mockRejectedValueOnce(Object.assign(new Error("weg"), { code: "P1001" }));
+    const r = await position(p.id, { aktion: "zurueckweisen", begruendung: "x" });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({
+      mail: { status: "SENT", nachweisFehlt: true },
+      warnung: MELDUNGEN.MAIL_NACHWEIS_FEHLT,
+    });
+    expect(JSON.stringify(stumm.mock.calls)).not.toContain(ADRESSE);
+    stumm.mockRestore();
+  });
+
+  it("gespeicherte Vorlage ohne {{link}} → 409 vor jeder Aenderung", async () => {
+    udb.emailVorlagen.push({
+      event: UNTERLAGEN_EVENTS.ZURUECKGEWIESEN,
+      subject: "Bitte erneut hochladen",
+      bodyHtml: "<p>Bitte melden Sie sich.</p>",
+      bodyText: null,
+      recipientTo: "",
+      recipientCc: "",
+      recipientBcc: "",
+      recipientReplyTo: "",
+      isActive: true,
+    });
+    const { p } = eingereicht();
+    const r = await position(p.id, { aktion: "zurueckweisen", begruendung: "x" });
+    expect(r.body.grund).toBe("VORLAGE_OHNE_LINK");
+    expect(String(r.body.error)).toContain("„Unterlage zurückgewiesen“");
+    expect(udb.aufrufe).not.toContain("$transaction");
+  });
+});
+
+describe("entfaellt (EP-2)", () => {
+  it("interne Notiz, keine Mail; Entwuerfe verschwinden (Zeile im Commit, Datei danach), eingereichte werden VERWORFEN; die letzte macht ERLEDIGT", async () => {
+    const n = laufend({ vollstaendigSeit: vor(TAG), vollstaendigGemeldetAm: vor(TAG) }, [
+      { typ: "AUFENTHALTSTITEL", bezeichnung: "Aufenthaltstitel", status: "EINGEREICHT", uebermitteltAm: vor(TAG) },
+      { typ: "PKV_NACHWEIS", bezeichnung: "PKV-Nachweis", status: "ZURUECKGEWIESEN", begruendung: "unscharf" },
+    ]);
+    const [titel, pkv] = udb.positionen as MitId[];
+    const eingereicht = neueDatei({
+      nachforderungId: n.id,
+      positionId: titel.id,
+      status: "EINGEREICHT",
+      uebermitteltAm: vor(TAG),
+      speicherPfad: `uploads/unterlagen/${n.id}/a.pdf`,
+    });
+    const alt = neueDatei({
+      nachforderungId: n.id,
+      positionId: pkv.id,
+      status: "ZURUECKGEWIESEN",
+      uebermitteltAm: vor(2 * TAG),
+      speicherPfad: `uploads/unterlagen/${n.id}/b.pdf`,
+    });
+    const entwurf = neueDatei({
+      nachforderungId: n.id,
+      positionId: pkv.id,
+      status: "ENTWURF",
+      speicherPfad: `uploads/unterlagen/${n.id}/c.pdf`,
+    });
+    udb.dateien.push(eingereicht, alt, entwurf);
+    const NOTIZ = "Liegt in der Personalakte.";
+
+    const r1 = await position(pkv.id, { aktion: "entfaellt", notiz: NOTIZ });
+    expect(r1).toEqual({
+      status: 200,
+      body: {
+        nachforderungId: n.id,
+        positionId: pkv.id,
+        positionStatus: "ENTFAELLT",
+        nachforderungStatus: "LAUFEND",
+        mail: null,
+        meldung: AKTION_MELDUNGEN.entfaellt,
+      },
+    });
+    expect(pkv).toMatchObject({ status: "ENTFAELLT", entfaelltNotiz: NOTIZ, entschiedenVonId: "u-hr" });
+    // Der Entwurf ist weg, die frueher zurueckgewiesene Datei bleibt, wie sie ist.
+    expect(udb.dateien.map((d) => d.id)).toEqual([eingereicht.id, alt.id]);
+    expect(alt.status).toBe("ZURUECKGEWIESEN");
+    expect(mockEntwuerfeLoeschen).toHaveBeenCalledWith(n.id, [`uploads/unterlagen/${n.id}/c.pdf`]);
+    expect(aufruf("unterlagenDatei.deleteMany")).toBeLessThan(letztesAudit());
+    expect(aufruf("entwuerfeLoeschen")).toBeGreaterThan(letztesAudit());
+    // Ohne Abschluss bleibt der Merker (2.1) — eine Aktion von HR meldet nie „vollständig".
+    expect(n.vollstaendigSeit).toEqual(vor(TAG));
+    expect(udb.audits.at(-1)).toMatchObject({
+      action: UNTERLAGEN_AUDIT.ENTFAELLT,
+      details: {
+        positionId: pkv.id,
+        typ: "PKV_NACHWEIS",
+        notizLaenge: NOTIZ.length,
+        entwuerfeGeloescht: 1,
+        dateienVerworfen: 0,
+      },
+    });
+    expect(JSON.stringify(udb.audits)).not.toContain("Personalakte");
+
+    const r2 = await position(titel.id, { aktion: "entfaellt" });
+    expect(r2.body).toMatchObject({ positionStatus: "ENTFAELLT", nachforderungStatus: "ERLEDIGT" });
+    expect(eingereicht).toMatchObject({ status: "VERWORFEN" });
+    expect(eingereicht.entschiedenAm).toEqual(JETZT);
+    expect(eingereicht.loeschenAb).toEqual(new Date(JETZT.getTime() + 30 * TAG));
+    expect(n).toMatchObject({ status: "ERLEDIGT", laufendSchluessel: null, vollstaendigSeit: null, vollstaendigGemeldetAm: null });
+    expect(udb.audits.slice(-2).map((a) => a.action)).toEqual([UNTERLAGEN_AUDIT.ENTFAELLT, UNTERLAGEN_AUDIT.ERLEDIGT]);
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockTrigger).not.toHaveBeenCalled();
+  });
+
+  it("bei EXPIRED erlaubt — ohne Sperre des Vorgangs; eine angenommene Unterlage → 409", async () => {
+    udb.vorgaenge = [vorgang({ status: "EXPIRED" })];
+    laufend({}, [
+      { typ: "AUFENTHALTSTITEL", status: "ANGEFORDERT" },
+      { typ: "PKV_NACHWEIS", status: "ANGENOMMEN" },
+      { typ: "SV_AUSWEIS", status: "ANGEFORDERT" },
+    ]);
+    const [offen, angenommen] = udb.positionen as MitId[];
+    expect((await position(offen.id, { aktion: "entfaellt" })).status).toBe(200);
+    expect(udb.aufrufe).not.toContain("onboardingProcess.updateMany");
+    expect((await position(angenommen.id, { aktion: "entfaellt" })).body).toEqual({
+      error: MELDUNGEN.NICHT_ENTFAELLBAR,
+      grund: "NICHT_ENTFAELLBAR",
+    });
   });
 });

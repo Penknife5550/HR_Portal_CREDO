@@ -29,7 +29,10 @@ const mockReadFile = jest.fn();
 const mockWriteFile = jest.fn();
 
 const mockPrisma = {
-  document: { findUnique: jest.fn(), create: jest.fn() },
+  // Seit Paket 4 (6.2) laedt der Onboarding-Download erst den Vorgang
+  // (Mandant) und das Dokument dann gebunden an ihn (findFirst).
+  onboardingProcess: { findUnique: jest.fn() },
+  document: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
   offboardingDocument: { findUnique: jest.fn(), create: jest.fn() },
   offboardingProcess: { findUnique: jest.fn() },
   civilServiceProcess: { findUnique: jest.fn() },
@@ -58,6 +61,9 @@ jest.mock("fs/promises", () => ({
   mkdir: jest.fn().mockResolvedValue(undefined),
   unlink: jest.fn().mockResolvedValue(undefined),
   rmdir: jest.fn().mockResolvedValue(undefined),
+  // Der Onboarding-Download prueft den Pfad seit Paket 4 (6.2) ueber
+  // pfadInWurzeln (realpath). Ohne Platte: jeder Pfad ist schon aufgeloest.
+  realpath: jest.fn(async (p: string) => p),
 }));
 
 import { GET as ONBOARDING_DOWNLOAD } from "@/app/api/onboarding/[id]/documents/[docId]/route";
@@ -128,7 +134,8 @@ beforeEach(() => {
 // =============================================
 
 async function onboardingDownload(fileName: string) {
-  mockPrisma.document.findUnique.mockResolvedValue({
+  mockPrisma.onboardingProcess.findUnique.mockResolvedValue({ id: "onb-1", organizationId: "org-1" });
+  mockPrisma.document.findFirst.mockResolvedValue({
     id: "doc-1",
     onboardingId: "onb-1",
     fileName,
