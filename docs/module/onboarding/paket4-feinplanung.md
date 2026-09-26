@@ -1,7 +1,7 @@
 # Paket 4 „Unterlagen nachfordern“: Feinplanung Stufe 1 (Onboarding)
 
 - **Stand:** 25.09.2026
-- **Status:** **Stufe 1 umgesetzt (Branch `paket-4-unterlagen-nachfordern`, Stand 25.09.2026)** — nicht nach `main` gemergt, nicht deployt. Stufe 2 ist offen. Ablaufplan für den Deploy: `docs/historie/deploy-paket4-stufe1.md`; die Regeln für Änderungen stehen in CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
+- **Status:** **Stufe 1 umgesetzt und am 26.09.2026 per Fast-Forward nach `main` gemergt und nach `origin/main` gepusht** (Code bis `3f42546`) — nicht deployt; vor dem Deploy ist eine Code-Review des ganzen Pakets empfohlen. Stufe 2 ist offen. Stand und offene Punkte: `docs/historie/paket4-stufe1-uebergabe.md`. Ablaufplan für den Deploy: `docs/historie/deploy-paket4-stufe1.md`; die Regeln für Änderungen stehen in CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
 - **Freigabe:** am 25.09.2026: „Feinplanung als Grundlage, hier umsetzen, alle Empfehlungen übernehmen“. E-1 bis E-8 sind wie empfohlen entschieden (16.1). Ergänzungen aus der Gegenprüfung und die Abweichungen bei der Umsetzung stehen in Abschnitt 18.
 - **Grundlage:** Änderungsplan Fassung 6 vom 24.09.2026, Abschnitt 4 „Unterlagen nachfordern“ und die Entscheidungen in Abschnitt 10 (`docs/module/onboarding/aenderungsplan-2026-09.html`). Codestand `main` = `origin/main` = `ce1888e`. Die Produktion läuft seit dem 24.09.2026 auf `7bc91ec`.
 - **Prüfung:** Der Entwurf wurde am 24.09.2026 zweimal gegengeprüft (Sicherheit und Datenschutz, Korrektheit). Alle MUSS- und SOLLTE-Befunde sind eingearbeitet. Was ich anders entschieden habe, steht in Abschnitt 17, die Zuordnung aller Befunde im Anhang.
@@ -1410,7 +1410,7 @@ Parallel zu dieser Feinplanung ist in einer zweiten Sitzung ein eigener Bauplan 
 
 ### Abweichungen und Ergänzungen bei der Umsetzung
 
-Stand 25.09.2026, Commits `efcd820` bis `0dcceb9` auf dem Branch `paket-4-unterlagen-nachfordern` samt Fix-Runde aus Schritt 11. Jeder Punkt ist am Code belegt. Wo ein Punkt den Abschnitten 1–17 widerspricht, gilt er. Alles Übrige ist wie geplant umgesetzt.
+Stand 25.09.2026, Commits `efcd820` bis `0dcceb9` samt Restpunkten (`b6532e2`) und Abschlussdurchsicht (`3f42546`), seit 26.09.2026 auf `main`. Jeder Punkt ist am Code belegt. Wo ein Punkt den Abschnitten 1–17 widerspricht, gilt er. Alles Übrige ist wie geplant umgesetzt.
 
 **Datenmodell (weiterhin rein additiv)**
 

@@ -4,8 +4,11 @@
 > Deploy direkt unter diesen Kopf, wie beim [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand:** Server auf `8952e1a` (Code `7bc91ec`, Deploy vom 24.09.2026).
-> **Ziel:** `main` nach dem Merge von `paket-4-unterlagen-nachfordern` (Commit beim Deploy
-> hier eintragen). Code-Commits `efcd820` bis `0dcceb9` plus Fix-Runde aus Schritt 11.
+> **Ziel:** `main` nach dem Merge von `paket-4-unterlagen-nachfordern` am 26.09.2026
+> (Fast-Forward, Code bis `3f42546`, dazu der Übergabe-Commit; ausgerollten Commit beim
+> Deploy hier eintragen). Code-Commits `efcd820` bis `0dcceb9`, `b6532e2`, `3f42546`.
+> **Vor dem Deploy:** Code-Review des ganzen Pakets (`ce1888e..main`) — Begründung in
+> [paket4-stufe1-uebergabe.md](paket4-stufe1-uebergabe.md), Abschnitt 3.
 > **Spezifikation:** `docs/module/onboarding/paket4-feinplanung.md` (Abschnitt 15 Deploy,
 > Abschnitt 18 Abweichungen). Regeln für Änderungen: CLAUDE.md, „Unterlagen nachfordern (Paket 4)“.
 
@@ -37,7 +40,10 @@ Schritt 3.4 unverändert weiter, Anhalten kostet also nichts.
 | `ce68d64` | Upload-Seite `/unterlagen/[token]` |
 | `da8f8ed` | HR-Karte und Prüf-Dialoge |
 | `0dcceb9` | Dialog „Unterlagen nachfordern…“, Einbau in die Vorgangsansicht, Kasten „Offene Nachweise“, Warnbalken |
-| Fix-Runde, Doku | Schritt 11 (Commits beim Deploy eintragen) |
+| `b6532e2` | Restpunkte aus Browserprobe und Prüfberichten (Vorauswahl, rote Meldung, `?tab=dokumente`, `aktionen.ts`) |
+| `2ef8199` | Doku: CLAUDE.md, Feinplanung, dieser Ablaufplan, Handbuch, Änderungsplan Fassung 7 |
+| `3f42546` | Abschlussdurchsicht: 30 bestätigte Befunde behoben |
+| Übergabe | `docs/historie/paket4-stufe1-uebergabe.md`, Statusangaben nach dem Merge (nur `docs/`, `CLAUDE.md`) |
 
 Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 

@@ -613,7 +613,7 @@ details > div { padding: 0 14px 12px; }
 
       <div class="kasten ok">
         <strong class="t">Stand am 25.09.2026</strong>
-        <p>Paket 1 (mit „Neuer Vorgang“), 1b, 5 und 2 sind deployt, dazu die acht Befunde der Code-Review (7bc91ec). Das Protokoll mit allen Zahlen steht in <code>docs/historie/deploy-onboarding-pakete-2026-09.md</code> („Protokoll vom 24.09.2026“). <strong>Paket 4 Stufe 1 (Onboarding) ist umgesetzt</strong>, mit Ihrer Freigabe der Feinplanung vom 25.09. vorgezogen: auf dem Branch <code>paket-4-unterlagen-nachfordern</code>, noch nicht nach <code>main</code> gemergt und nicht deployt. Spezifikation und Abweichungen stehen in <code>docs/module/onboarding/paket4-feinplanung.md</code>, der Ablaufplan für den Deploy in <code>docs/historie/deploy-paket4-stufe1.md</code>. Offen sind Paket 3, das neue Paket 6 und Stufe 2 von Paket 4. Die n8n-Umstellung kommt später, so haben Sie es entschieden; vor dem Deploy von Paket 4 muss sie aber erledigt sein. <strong>Meine Empfehlung für die Reihenfolge: erst Paket 3, dann Paket 6, dann Stufe 2 von Paket 4</strong>. Die Begründung steht in Abschnitt 9, umstellen können Sie jederzeit.</p>
+        <p>Paket 1 (mit „Neuer Vorgang“), 1b, 5 und 2 sind deployt, dazu die acht Befunde der Code-Review (7bc91ec). Das Protokoll mit allen Zahlen steht in <code>docs/historie/deploy-onboarding-pakete-2026-09.md</code> („Protokoll vom 24.09.2026“). <strong>Paket 4 Stufe 1 (Onboarding) ist umgesetzt</strong>, mit Ihrer Freigabe der Feinplanung vom 25.09. vorgezogen: am 26.09.2026 nach <code>main</code> gemergt und gepusht, noch nicht deployt (vor dem Deploy ist eine Code-Review des ganzen Pakets empfohlen, siehe <code>docs/historie/paket4-stufe1-uebergabe.md</code>). Spezifikation und Abweichungen stehen in <code>docs/module/onboarding/paket4-feinplanung.md</code>, der Ablaufplan für den Deploy in <code>docs/historie/deploy-paket4-stufe1.md</code>. Offen sind Paket 3, das neue Paket 6 und Stufe 2 von Paket 4. Die n8n-Umstellung kommt später, so haben Sie es entschieden; vor dem Deploy von Paket 4 muss sie aber erledigt sein. <strong>Meine Empfehlung für die Reihenfolge: erst Paket 3, dann Paket 6, dann Stufe 2 von Paket 4</strong>. Die Begründung steht in Abschnitt 9, umstellen können Sie jederzeit.</p>
       </div>
 
       <h3>Ihre Entscheidungen vom 21., 22. und 24.09.2026</h3>
@@ -2646,7 +2646,7 @@ ORDER BY 1, 3;</pre>
         <div class="paket">
           <div class="ph">Paket 4 · Stufe 1 umgesetzt</div>
           <h5>Unterlagen nachfordern</h5>
-          <ul><li>Stufe 1: Onboarding komplett inkl. täglichem Lauf — umgesetzt auf dem Branch <code>paket-4-unterlagen-nachfordern</code>, nicht gemergt, nicht deployt</li><li>Stufe 2: übrige fünf Vorgänge, Listen-Spalte — offen</li><li>Feinplanung: <code>docs/module/onboarding/paket4-feinplanung.md</code>, Deploy: <code>docs/historie/deploy-paket4-stufe1.md</code></li></ul>
+          <ul><li>Stufe 1: Onboarding komplett inkl. täglichem Lauf — umgesetzt, am 26.09.2026 nach <code>main</code> gemergt und gepusht, nicht deployt</li><li>Stufe 2: übrige fünf Vorgänge, Listen-Spalte — offen</li><li>Feinplanung: <code>docs/module/onboarding/paket4-feinplanung.md</code>, Deploy: <code>docs/historie/deploy-paket4-stufe1.md</code></li></ul>
           <span class="aufwand">Stufe 2: 6,25–7,25 Tage</span>
         </div>
       </div>
@@ -2838,7 +2838,7 @@ FROM department_configs ORDER BY "departmentKey";</pre>
   </main>
 
   <footer class="fuss">
-    Erstellt am 21.09.2026, Fassung 7 vom 25.09.2026 mit dem Stand von Paket 4 Stufe 1 (umgesetzt auf dem Branch <code>paket-4-unterlagen-nachfordern</code>, nicht gemergt, nicht deployt) · Fassung 6 vom 24.09.2026 mit dem Stand nach dem Deploy und dem neuen Paket 6 (offene Aufgaben) · Grundlage: Analyse des Quellcodes auf <code>main</code> (53353e8) mit unabhängiger Gegenprüfung; die Produktion läuft seit dem 24.09.2026 auf Code 7bc91ec · Mockups zeigen den Stand von <code>main</code> bzw. den geplanten Stand. Namen, Vorgangsnummern und Adressen darin sind erfunden · Nach Ihrer Freigabe setze ich Paket für Paket um.
+    Erstellt am 21.09.2026, Fassung 7 vom 25.09.2026 mit dem Stand von Paket 4 Stufe 1 (umgesetzt, am 26.09.2026 nach <code>main</code> gemergt, nicht deployt) · Fassung 6 vom 24.09.2026 mit dem Stand nach dem Deploy und dem neuen Paket 6 (offene Aufgaben) · Grundlage: Analyse des Quellcodes auf <code>main</code> (53353e8) mit unabhängiger Gegenprüfung; die Produktion läuft seit dem 24.09.2026 auf Code 7bc91ec · Mockups zeigen den Stand von <code>main</code> bzw. den geplanten Stand. Namen, Vorgangsnummern und Adressen darin sind erfunden · Nach Ihrer Freigabe setze ich Paket für Paket um.
   </footer>
 </div>
 </body>
