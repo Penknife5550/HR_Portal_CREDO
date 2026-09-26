@@ -122,6 +122,7 @@ import { canAccessProcess, HR_EDIT_ROLES, type SessionPayload } from "@/lib/perm
 import { hashToken } from "@/lib/token-hash";
 import {
   BREMSEN,
+  HR_MELDUNG_AUSSTEHEND,
   MAIL_DETAIL_MAX,
   MELDUNGEN,
   UNTERLAGEN_AUDIT,
@@ -140,6 +141,7 @@ import {
   nachforderungUebergang,
   positionUebergang,
   uebersichtBauen,
+  vollstaendigAnspruchVerwaist,
   vollstaendigMerker,
   wartetAufPerson,
   zurueckweisenFristPruefen,
@@ -418,7 +420,8 @@ function kalendertagVon(wert: Date | string): Kalendertag {
   return tag;
 }
 
-function name(u: { firstName: string; lastName: string } | null | undefined): string | null {
+/** „Vorname Nachname" eines Portal-Kontos, sonst null — auch fuer die HR-Mails des Laufs. */
+export function nutzerName(u: { firstName: string; lastName: string } | null | undefined): string | null {
   return u ? `${u.firstName} ${u.lastName}`.trim() || null : null;
 }
 
@@ -930,6 +933,7 @@ const HR_MAIL_AUSWAHL = {
   angefordertAm: true,
   vollstaendigSeit: true,
   vollstaendigGemeldetAm: true,
+  hrMeldungStatus: true,
   angefordertVon: { select: { email: true, firstName: true, lastName: true, isActive: true } },
   positionen: {
     orderBy: { reihenfolge: "asc" },
@@ -965,14 +969,25 @@ const HR_MAIL_AUSWAHL = {
 export async function hrVollstaendigMelden(nachforderungId: string, jetzt: Date = new Date()): Promise<UnterlagenMailErgebnis | null> {
   try {
     const n = await prisma.unterlagenNachforderung.findUnique({ where: { id: nachforderungId }, select: HR_MAIL_AUSWAHL });
-    if (!n || n.status !== "LAUFEND" || !n.vollstaendigSeit || n.vollstaendigGemeldetAm) return null;
+    if (!n || n.status !== "LAUFEND" || !n.vollstaendigSeit) return null;
+    // Ein Anspruch ohne Ergebnis, aelter als eine Stunde, ist verwaist (der
+    // Prozess starb zwischen Anspruch und Versand) und darf uebernommen werden.
+    if (n.vollstaendigGemeldetAm && !vollstaendigAnspruchVerwaist(n, jetzt)) return null;
     const baustein = BAUSTEINE[n.modul as UnterlagenModul];
     const vorgangId = baustein?.vorgangIdAus(n);
     if (!baustein || !vorgangId) return null;
 
+    // Bedingt auf den GELESENEN Anspruch (null oder der verwaiste Zeitstempel).
+    // AUSSTEHEND markiert „beansprucht, noch ohne Ergebnis" — hrMeldungSenden
+    // ueberschreibt es mit SENT, SKIPPED oder FAILED.
     const anspruch = await prisma.unterlagenNachforderung.updateMany({
-      where: { id: n.id, status: "LAUFEND", vollstaendigSeit: n.vollstaendigSeit, vollstaendigGemeldetAm: null },
-      data: { vollstaendigGemeldetAm: jetzt },
+      where: {
+        id: n.id,
+        status: "LAUFEND",
+        vollstaendigSeit: n.vollstaendigSeit,
+        vollstaendigGemeldetAm: n.vollstaendigGemeldetAm,
+      },
+      data: { vollstaendigGemeldetAm: jetzt, hrMeldungStatus: HR_MELDUNG_AUSSTEHEND, hrMeldungDetail: null },
     });
     if (anspruch.count === 0) return null;
 
@@ -988,7 +1003,7 @@ export async function hrVollstaendigMelden(nachforderungId: string, jetzt: Date 
         positionen: n.positionen.map((p) => mailPosition(p, new Set())),
         portalLink: `${getBaseUrl()}${baustein.portalPfad(vorgangId)}`,
         anfordernd: n.angefordertVon
-          ? { email: n.angefordertVon.email, name: name(n.angefordertVon), aktiv: n.angefordertVon.isActive }
+          ? { email: n.angefordertVon.email, name: nutzerName(n.angefordertVon), aktiv: n.angefordertVon.isActive }
           : null,
         hrPostfach: smtp?.replyToEmail ?? null,
         angefordertAm: n.angefordertAm,
@@ -2972,7 +2987,7 @@ function nachforderungEingabe(z: UebersichtZeile): NachforderungEingabe {
     frist: z.frist,
     nachricht: z.nachricht,
     angefordertAm: z.angefordertAm,
-    angefordertVonName: name(z.angefordertVon),
+    angefordertVonName: nutzerName(z.angefordertVon),
     erinnertFuerFrist: z.erinnertFuerFrist,
     erinnertStufe: z.erinnertStufe,
     erledigtAm: z.erledigtAm,
@@ -2995,7 +3010,7 @@ function nachforderungEingabe(z: UebersichtZeile): NachforderungEingabe {
       begruendung: p.begruendung,
       entfaelltNotiz: p.entfaelltNotiz,
       entschiedenAm: p.entschiedenAm,
-      entschiedenVonName: name(p.entschiedenVon),
+      entschiedenVonName: nutzerName(p.entschiedenVon),
       dateien: p.dateien,
     })),
     links: z.links,

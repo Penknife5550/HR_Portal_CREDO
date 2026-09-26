@@ -503,7 +503,8 @@ export function meldungVorlage(grund: VorlageGrund, name: string): string {
 // Hilfen
 // =============================================
 
-function alsDatum(wert: Date | string | null | undefined): Date | null {
+/** Date oder ISO-Text als Date; fehlend oder unlesbar ergibt `null`. Auch fuer unterlagen-fristen.ts. */
+export function alsDatum(wert: Date | string | null | undefined): Date | null {
   if (wert == null) return null;
   const d = wert instanceof Date ? wert : new Date(wert);
   return Number.isNaN(d.getTime()) ? null : d;
@@ -932,6 +933,34 @@ export function vollstaendigMerker(
     case "ANNAHME_ZURUECKGENOMMEN":
       return unveraendert;
   }
+}
+
+/**
+ * `hrMeldungStatus`, solange die HR-Mail „vollständig" beansprucht, aber noch
+ * ohne Ergebnis ist. Der Anspruch setzt ihn, `hrMeldungSenden` ueberschreibt
+ * ihn mit SENT, SKIPPED oder FAILED.
+ */
+export const HR_MELDUNG_AUSSTEHEND = "AUSSTEHEND";
+
+/**
+ * Ist ein Anspruch auf die HR-Mail „vollständig" verwaist? Der Anspruch
+ * (`vollstaendigGemeldetAm`) steht VOR dem Versand. Stirbt der Prozess
+ * dazwischen — `after()` waehrend eines Neustarts —, bliebe er fuer immer
+ * stehen, und niemand holte die Mail nach. Verwaist ist er, wenn er aelter als
+ * `AUSSTEHEND_NACHHOLEN_MINUTEN` ist und noch kein Ergebnis traegt
+ * (`hrMeldungStatus` = AUSSTEHEND). Dann darf ihn ein neuer Anspruch
+ * uebernehmen — bedingt auf genau diesen Zeitstempel.
+ */
+export function vollstaendigAnspruchVerwaist(
+  stand: { vollstaendigGemeldetAm: Date | string | null; hrMeldungStatus?: string | null },
+  jetzt: Date,
+): boolean {
+  const am = alsDatum(stand.vollstaendigGemeldetAm);
+  return (
+    !!am &&
+    stand.hrMeldungStatus === HR_MELDUNG_AUSSTEHEND &&
+    jetzt.getTime() - am.getTime() > AUSSTEHEND_NACHHOLEN_MINUTEN * MS_PRO_MINUTE
+  );
 }
 
 // =============================================

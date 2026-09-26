@@ -116,6 +116,7 @@ import {
   linkAnlegen,
   mailPosition,
   mailVorgang,
+  nutzerName,
   personenMailSenden,
   personenVorlagePruefen,
   unterlagenBaustein,
@@ -272,6 +273,8 @@ const LAUF_AUSWAHL = {
   fristGemeldetFuer: true,
   vollstaendigSeit: true,
   vollstaendigGemeldetAm: true,
+  // Verwaister Anspruch auf „vollständig" (AUSSTEHEND, `vollstaendigAnspruchVerwaist`).
+  hrMeldungStatus: true,
   angefordertVon: { select: { email: true, firstName: true, lastName: true, isActive: true } },
   positionen: {
     orderBy: { reihenfolge: "asc" },
@@ -797,9 +800,7 @@ async function fristMelden(c: LaufKontext, k: Kopf, n: Bearbeitung): Promise<voi
     vorgang: mailVorgang(n.baustein, v, zeile.id, frist),
     positionen: zeile.positionen.map((p) => mailPosition(p, new Set())),
     portalLink: `${getBaseUrl()}${n.baustein.portalPfad(n.vorgangId)}`,
-    anfordernd: von
-      ? { email: von.email, name: `${von.firstName} ${von.lastName}`.trim() || null, aktiv: von.isActive }
-      : null,
+    anfordernd: von ? { email: von.email, name: nutzerName(von), aktiv: von.isActive } : null,
     hrPostfach: await hrPostfach(c),
     angefordertAm: zeile.angefordertAm,
     linkGueltigBis: nachforderungLinkende(zeile.frist) ?? linkGueltigBisFuer(frist),

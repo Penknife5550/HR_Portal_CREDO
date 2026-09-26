@@ -1432,7 +1432,7 @@ model UnterlagenNachforderung {
   // Ergebnis der LETZTEN HR-Mail ("vollstaendig", "Frist verstrichen"), damit die
   // Karte "HR-Meldung nicht zugestellt (kein Empfaenger)" zeigen kann (8.1).
   // Das EmailLog wird nach 90 Tagen geloescht und kennt die Nachforderung nicht.
-  hrMeldungStatus String? // SENT | FAILED | SKIPPED
+  hrMeldungStatus String? // SENT | FAILED | SKIPPED; AUSSTEHEND = "vollständig" beansprucht, noch ohne Ergebnis
   // Nur ein Grundcode, NIE der Rohtext des Mailers (der kann Adressen tragen):
   // KEIN_EMPFAENGER | VORLAGE_DEAKTIVIERT | NICHT_VERSENDET | VERSAND_FEHLGESCHLAGEN
   hrMeldungDetail String?

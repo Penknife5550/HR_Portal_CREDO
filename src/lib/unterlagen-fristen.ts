@@ -37,12 +37,14 @@ import {
   GUELTIG_NACH_FRIST_TAGE,
   LOESCHEN_NACH_TAGEN,
   NACHHOL_MAX_VERSUCHE,
+  alsDatum,
   eigenerEntwurf,
   entwuerfeAb,
   entwurfLoeschenAb,
   erinnerungFaellig,
   istNachholAnlass,
   nachforderungLinkende,
+  vollstaendigAnspruchVerwaist,
   wartetAufPerson,
   type ErinnerungsStand,
   type Kalendertag,
@@ -100,15 +102,11 @@ export interface LaufStand extends ErinnerungsStand {
   fristGemeldetFuer: Date | string | null;
   vollstaendigSeit: Date | string | null;
   vollstaendigGemeldetAm: Date | string | null;
+  /** Ergebnis der letzten HR-Mail; AUSSTEHEND = beansprucht, noch ohne Ergebnis. */
+  hrMeldungStatus?: string | null;
   positionen: ReadonlyArray<{ id: string; status: string; angefordertAm?: Date | string | null }>;
   dateien: ReadonlyArray<LaufDatei>;
   links: ReadonlyArray<LaufLink>;
-}
-
-function alsDatum(wert: Date | string | null | undefined): Date | null {
-  if (wert == null) return null;
-  const d = wert instanceof Date ? wert : new Date(wert);
-  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function zeit(wert: Date | string | null | undefined): number {
@@ -122,13 +120,18 @@ function zeit(wert: Date | string | null | undefined): number {
 /**
  * „Vollständig eingegangen" an HR nachholen: Die Nachforderung laeuft, der
  * Merker `vollstaendigSeit` steht, gemeldet ist noch nichts (die Mail nach
- * dem Uebermitteln scheiterte oder kam nie dazu). Wer die Mail wirklich
- * schickt, entscheidet der bedingte Anspruch (Abschnitt 7).
+ * dem Uebermitteln scheiterte oder kam nie dazu) — oder der Anspruch ist
+ * verwaist (`vollstaendigAnspruchVerwaist`: Prozess starb zwischen Anspruch und
+ * Versand). Wer die Mail wirklich schickt, entscheidet der bedingte Anspruch
+ * (Abschnitt 7). Ohne `jetzt` zaehlt nur der fehlende Anspruch.
  */
 export function vollstaendigMeldungFaellig(
-  stand: Pick<LaufStand, "status" | "vollstaendigSeit" | "vollstaendigGemeldetAm">,
+  stand: Pick<LaufStand, "status" | "vollstaendigSeit" | "vollstaendigGemeldetAm" | "hrMeldungStatus">,
+  jetzt?: Date,
 ): boolean {
-  return stand.status === "LAUFEND" && !!alsDatum(stand.vollstaendigSeit) && !alsDatum(stand.vollstaendigGemeldetAm);
+  if (stand.status !== "LAUFEND" || !alsDatum(stand.vollstaendigSeit)) return false;
+  if (!alsDatum(stand.vollstaendigGemeldetAm)) return true;
+  return !!jetzt && vollstaendigAnspruchVerwaist(stand, jetzt);
 }
 
 /**
@@ -404,7 +407,7 @@ export function laufPlanen(
   const stufe = nachholen ? null : erinnerungFaellig(stand, heute);
   return {
     zurueckziehen: false,
-    vollstaendigMelden: vollstaendigMeldungFaellig(stand),
+    vollstaendigMelden: vollstaendigMeldungFaellig(stand, jetzt),
     personenMail:
       nachholen ?? (stufe ? { art: "ERINNERUNG", stufe, entwurfVorhanden: entwurfVorhanden(stand) } : null),
     fristMelden: fristMeldungFaellig(stand, heute),

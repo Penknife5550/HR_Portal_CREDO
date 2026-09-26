@@ -302,7 +302,8 @@ export function ablaufAmpel(
  * alte, befristete Titel massgeblich — ein Dokument ohne Datum verdraengt ja
  * nie eines mit Datum —, und Warnbalken wie Erinnerungen liefen bis zu 180 Tage
  * weiter. Ohne Kennzeichen ist alles wie bisher; die Lage traegt das Feld dann
- * gar nicht.
+ * gar nicht. Ein ABGELEHNTES Dokument (`status: "REJECTED"`) zaehlt dabei nicht
+ * als unbefristet — wie im Lauf `dokument-ablauf`.
  */
 export interface NachweisLage {
   typ: string;
@@ -317,6 +318,8 @@ export function nachweisLagen(
     type: string;
     gueltigBis: Date | string | null;
     unbefristet?: boolean | null;
+    /** Nur fuer das Kennzeichen „unbefristet": Ein abgelehnter Scan belegt nichts. */
+    status?: string | null;
   }[],
   jetzt: Date = new Date()
 ): NachweisLage[] {
@@ -325,7 +328,10 @@ export function nachweisLagen(
 
   for (const doc of dokumente) {
     if (!istFristpflichtig(doc.type)) continue;
-    if (doc.unbefristet === true) {
+    // Ein ABGELEHNTES Dokument erledigt die Art nicht — dieselbe Regel wie der
+    // Lauf dokument-ablauf (`status: { not: "REJECTED" }`). Sonst verschwaende
+    // der Warnbalken, waehrend der Lauf weiter „abgelaufen" mahnt.
+    if (doc.unbefristet === true && doc.status !== "REJECTED") {
       unbefristet.add(doc.type);
       // Nur, um die Reihenfolge der Arten zu halten — das Ergebnis setzt die
       // Lage unten ohnehin auf „unbefristet".
@@ -379,6 +385,8 @@ export function dringendeNachweisLagen(
     type: string;
     gueltigBis: Date | string | null;
     unbefristet?: boolean | null;
+    /** Nur fuer das Kennzeichen „unbefristet": Ein abgelehnter Scan belegt nichts. */
+    status?: string | null;
   }[],
   jetzt: Date = new Date()
 ): NachweisLage[] {

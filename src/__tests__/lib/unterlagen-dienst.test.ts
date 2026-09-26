@@ -1576,6 +1576,41 @@ describe("hrVollstaendigMelden", () => {
     expect(mockTrigger).not.toHaveBeenCalled();
   });
 
+  it("ein verwaister Anspruch (AUSSTEHEND, aelter als eine Stunde) wird uebernommen und nachgeholt", async () => {
+    // Prozess starb zwischen Anspruch und Versand (after() waehrend eines Neustarts).
+    const n = vollstaendig();
+    n.vollstaendigGemeldetAm = vor(2 * 60 * MINUTE);
+    n.hrMeldungStatus = "AUSSTEHEND";
+    const mail = await hrVollstaendigMelden(n.id, JETZT);
+    expect(mail).toEqual({ status: "SENT", detail: null });
+    expect(n.vollstaendigGemeldetAm).toEqual(JETZT);
+    expect(n.hrMeldungStatus).toBe("SENT");
+    expect(mockTrigger).toHaveBeenCalledTimes(1);
+  });
+
+  it("ein frischer Anspruch ohne Ergebnis und ein Anspruch mit Ergebnis bleiben unangetastet", async () => {
+    const n = vollstaendig();
+    n.vollstaendigGemeldetAm = vor(10 * MINUTE);
+    n.hrMeldungStatus = "AUSSTEHEND";
+    expect(await hrVollstaendigMelden(n.id, JETZT)).toBeNull();
+    n.vollstaendigGemeldetAm = vor(2 * 60 * MINUTE);
+    n.hrMeldungStatus = "SKIPPED";
+    expect(await hrVollstaendigMelden(n.id, JETZT)).toBeNull();
+    expect(mockTrigger).not.toHaveBeenCalled();
+  });
+
+  it("der Anspruch markiert sich als AUSSTEHEND, bis das Ergebnis da ist", async () => {
+    const n = vollstaendig();
+    let waehrendDesVersands: unknown;
+    mockTrigger.mockImplementationOnce(async () => {
+      waehrendDesVersands = n.hrMeldungStatus;
+      return { status: "SENT" };
+    });
+    await hrVollstaendigMelden(n.id, JETZT);
+    expect(waehrendDesVersands).toBe("AUSSTEHEND");
+    expect(n.hrMeldungStatus).toBe("SENT");
+  });
+
   it("nicht LAUFEND, schon gemeldet oder nicht vollstaendig: nichts zu tun", async () => {
     const n = laufend({ status: "ERLEDIGT", laufendSchluessel: null, vollstaendigSeit: vor(MINUTE) });
     expect(await hrVollstaendigMelden(n.id, JETZT)).toBeNull();

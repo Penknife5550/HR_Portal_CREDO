@@ -342,6 +342,22 @@ describe("Lage je Nachweisart: Kennzeichen „unbefristet“ (Paket 4, Z1)", () 
       .toHaveLength(1);
   });
 
+  it("ein ABGELEHNTES unbefristetes Dokument erledigt die Art nicht (wie der Lauf dokument-ablauf)", () => {
+    const dokumente = [
+      dok("AUFENTHALTSTITEL", ablaufIn(-40)),
+      { ...unbefristet("AUFENTHALTSTITEL"), status: "REJECTED" },
+    ];
+    const lagen = nachweisLagen(dokumente, JETZT);
+    expect(lagen).toHaveLength(1);
+    expect(lagen[0].ampel?.kategorie).toBe("ABGELAUFEN");
+    expect("unbefristet" in lagen[0]).toBe(false);
+    expect(dringendeNachweisLagen(dokumente, JETZT).map((l) => l.typ)).toEqual(["AUFENTHALTSTITEL"]);
+    // Geprueft oder hochgeladen zaehlt es weiter.
+    expect(nachweisLagen([{ ...unbefristet("AUFENTHALTSTITEL"), status: "APPROVED" }], JETZT)).toEqual([
+      { typ: "AUFENTHALTSTITEL", ampel: null, unbefristet: true },
+    ]);
+  });
+
   it("ignoriert das Kennzeichen an einer Art ohne Frist", () => {
     expect(nachweisLagen([unbefristet("MASERNSCHUTZ")], JETZT)).toEqual([]);
   });

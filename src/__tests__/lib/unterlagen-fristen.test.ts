@@ -178,6 +178,20 @@ describe("vollstaendigMeldungFaellig", () => {
     expect(vollstaendigMeldungFaellig(stand())).toBe(false);
     expect(vollstaendigMeldungFaellig(stand({ status: "ERLEDIGT", vollstaendigSeit: um10(tag(-2)) }))).toBe(false);
   });
+
+  it("holt einen verwaisten Anspruch nach (AUSSTEHEND, aelter als eine Stunde)", () => {
+    const JETZT = um10(tag(0));
+    const verwaist = stand({ vollstaendigSeit: um10(tag(-2)), vollstaendigGemeldetAm: um10(tag(-1)), hrMeldungStatus: "AUSSTEHEND" });
+    expect(vollstaendigMeldungFaellig(verwaist, JETZT)).toBe(true);
+    // Ohne Uhr zaehlt nur der fehlende Anspruch.
+    expect(vollstaendigMeldungFaellig(verwaist)).toBe(false);
+    // Mit Ergebnis ist der Anspruch erledigt.
+    expect(vollstaendigMeldungFaellig({ ...verwaist, hrMeldungStatus: "SENT" }, JETZT)).toBe(false);
+    // Ein frischer Anspruch (unter einer Stunde) kann noch laufen.
+    expect(
+      vollstaendigMeldungFaellig({ ...verwaist, vollstaendigGemeldetAm: new Date(JETZT.getTime() - STUNDE / 12) }, JETZT),
+    ).toBe(false);
+  });
 });
 
 // =============================================
