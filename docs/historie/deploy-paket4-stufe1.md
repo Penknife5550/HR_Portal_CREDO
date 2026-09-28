@@ -1,14 +1,19 @@
 # Deploy Paket 4 Stufe 1 — Unterlagen nachfordern (Ablaufplan)
 
-> **Stand:** Ablaufplan vom 25.09.2026, **noch nicht ausgeführt**. Das Protokoll kommt nach dem
-> Deploy direkt unter diesen Kopf, wie beim [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
+> **Stand:** Ablaufplan vom 25.09.2026, **noch nicht ausgeführt**. Ergänzt am 28.09.2026:
+> Code-Review erledigt (Fix-Commit `4875fba`), Prüfbefehle in 1.3, 1.4 und 1.9 überarbeitet und
+> lokal geprobt. Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
+> [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand:** Server auf `8952e1a` (Code `7bc91ec`, Deploy vom 24.09.2026).
 > **Ziel:** `main` nach dem Merge von `paket-4-unterlagen-nachfordern` am 26.09.2026
-> (Fast-Forward, Code bis `3f42546`, dazu der Übergabe-Commit; ausgerollten Commit beim
-> Deploy hier eintragen). Code-Commits `efcd820` bis `0dcceb9`, `b6532e2`, `3f42546`.
+> (Fast-Forward, Code bis `3f42546`, dazu der Übergabe-Commit), danach der Fix-Commit `4875fba`
+> aus dem Code-Review; ausgerollten Commit beim Deploy hier eintragen. Code-Commits `efcd820` bis
+> `0dcceb9`, `b6532e2`, `3f42546`, `4875fba`.
 > **Vor dem Deploy:** Code-Review des ganzen Pakets (`ce1888e..main`) — Begründung in
-> [paket4-stufe1-uebergabe.md](paket4-stufe1-uebergabe.md), Abschnitt 3.
+> [paket4-stufe1-uebergabe.md](paket4-stufe1-uebergabe.md), Abschnitt 3. **Erledigt** am
+> 26.09.2026: sechs Befunde, vier behoben (`4875fba`), zwei bewusst offen (gemeinsamer Helfer für
+> die Prüfung des `CRON_SECRET`, zweites Modul-Register der öffentlichen Upload-API).
 > **Spezifikation:** `docs/module/onboarding/paket4-feinplanung.md` (Abschnitt 15 Deploy,
 > Abschnitt 18 Abweichungen). Regeln für Änderungen: CLAUDE.md, „Unterlagen nachfordern (Paket 4)“.
 
@@ -44,6 +49,7 @@ Schritt 3.4 unverändert weiter, Anhalten kostet also nichts.
 | `2ef8199` | Doku: CLAUDE.md, Feinplanung, dieser Ablaufplan, Handbuch, Änderungsplan Fassung 7 |
 | `3f42546` | Abschlussdurchsicht: 30 bestätigte Befunde behoben |
 | Übergabe | `docs/historie/paket4-stufe1-uebergabe.md`, Statusangaben nach dem Merge (nur `docs/`, `CLAUDE.md`) |
+| `4875fba` | Code-Review: Ein verwaister Anspruch auf die HR-Meldung „vollständig“ (Prozess starb zwischen Anspruch und Versand) wird nach einer Stunde nachgeholt; ein abgelehntes „unbefristetes“ Dokument erledigt die Art in der Vorgangsansicht nicht mehr. Am Schema nur ein Kommentar |
 
 Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 
@@ -97,7 +103,7 @@ Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 | V-2 | Die beiden bestehenden n8n-Läufe rufen `hr.fes-credo.de` auf (heute `hr.credo-schulen.de`) | **Pflicht**: ohne Lauf keine Erinnerungen und keine Löschung nach 30 Tagen | 6.1 |
 | V-3 | n8n-Läufe `unterlagen-fristen` und `dokument-ablauf` angelegt (beide zunächst inaktiv); `dokument-ablauf` aktiv nach 5.1, `unterlagen-fristen` mit `?dryRun=1` nach 4.3 | **Pflicht** vor dem ersten „Anfordern“ | 6.2, 6.3 |
 | V-4 | Art.-13-Text der Upload-Seite vom DSB — **im Code steht ein Platzhalter** | **Pflicht** (Code-Änderung vor dem Merge) oder ausdrückliche Entscheidung | 1.8 |
-| V-5 | Sicherung des Volumes `uploads_data` | **Pflicht** | 3.4 |
+| V-5 | Sicherung des Volumes `uploads_data` (vorher Leseprobe) | **Pflicht** | 1.4, 3.4 |
 | V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt | Pflicht vor dem ersten „Anfordern“ | 2.3 (V4), 5.2 |
 | V-7 | `N8N_API_KEY` geprüft: Holt etwas außerhalb des Repos Dokumente über die Download-Route? | ENTSCHEIDUNG, falls gesetzt | 1.7 |
 | V-8 | Freigabeliste für abweichende Empfängeradressen | empfohlen | 5.3 |
@@ -171,40 +177,67 @@ sudo docker inspect --format '{{.Created}} {{.Image}}' hr-portal-app
 Erwartet: `app`, `db` und `gotenberg` laufen, `app` und `db` mit `(healthy)`. Das Image
 stammt vom 24.09.2026 (UTC). Bei einem anderen Datum: an Claude.
 
-### 1.3 Sicherungsverzeichnis (sonst bricht der Start ab)
+### 1.3 Sicherungsverzeichnis (V-1, sonst bricht der Start ab)
 
 ```bash
 grep -c "backups:/backups" docker-compose.yml
-stat -c '%u %U %n' backups
-sudo docker run --rm --user nextjs --entrypoint sh -v "$PWD/backups:/backups" "$(sudo docker inspect --format '{{.Image}}' hr-portal-app)" -c 'id; touch /backups/.schreibtest && rm /backups/.schreibtest && echo OK'
+sudo docker inspect --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}' hr-portal-app
+sudo docker exec hr-portal-app sh -c 'echo "DB_BACKUP_DIR=${DB_BACKUP_DIR:-/backups (Standard)}"'
+stat -c '%a %u %U %n' backups
+IMG=$(sudo docker inspect --format '{{.Image}}' hr-portal-app)
+sudo docker run --rm --user nextjs --entrypoint sh -v "$PWD/backups:/backups" "$IMG" -c 'id; touch /backups/.schreibtest && rm /backups/.schreibtest && echo OK'
+sudo docker exec hr-portal-db sh -c 'touch /backups/.schreibtest-db && rm /backups/.schreibtest-db && echo OK'
 ```
 
-| Erwartet | Wenn nicht |
-|---|---|
-| `2` (`app` und `db`) | **STOPP, an Claude.** Ohne Einhängung bricht der Entrypoint ab. |
-| `1001 … backups` (der Name ist egal, am 24.09. hieß er `n8n`) | `sudo chown 1001 backups`, Schreibtest wiederholen |
-| `uid=1001(nextjs) gid=65533(nogroup) …` und `OK` | `sudo chown 1001 backups`. Bleibt `OK` aus: **an Claude** |
+`IMG` ist das Image des laufenden Containers; die Leseprobe in 1.4 braucht es ebenfalls, also
+1.3 und 1.4 in derselben Sitzung ausführen. Die beiden Schreibtests legen je eine leere Datei an
+und löschen sie sofort wieder.
+
+| Befehl | Erwartet | Wenn nicht |
+|---|---|---|
+| `grep` | `2` (`app` und `db`) | **STOPP, an Claude.** Ohne Einhängung bricht der Entrypoint ab. |
+| `inspect` | darunter `/vol/container/HR_Portal_CREDO/backups -> /backups` | **STOPP, an Claude.** |
+| `DB_BACKUP_DIR` | `DB_BACKUP_DIR=/backups (Standard)` | anderer Wert: Der Entrypoint sichert dorthin, die Schreibtests prüfen das falsche Verzeichnis — **an Claude** |
+| `stat` | Eigentümer `1001` (der Name ist egal, am 24.09. hieß er `n8n`) mit Schreibrecht, etwa `755 1001 n8n backups` | `sudo chown 1001 backups`, Schreibtest wiederholen |
+| Schreibtest `app` | `uid=1001(nextjs) gid=65533(nogroup) …` und `OK` | `touch: … Permission denied`: `sudo chown 1001 backups`. Bleibt `OK` aus: **an Claude** |
+| Schreibtest `db` | `OK` — braucht der `pg_dump` in 3.4 (`docker exec` läuft dort als `root`) | **an Claude** |
 
 `sudo` vor `docker` ändert nichts an der Kennung im Container, und `chgrp 1001` hilft nicht
-(CLAUDE.md, „Docker / Deployment“).
+(CLAUDE.md, „Docker / Deployment“). Lokal geprobt am 28.09.2026 (App-Image, `postgres:16-alpine`):
+Verzeichnis von `root` → `Permission denied`, von `1001` → `OK`.
 
-### 1.4 Plattenplatz und Größe der Uploads
+### 1.4 Plattenplatz, Größe und Lesbarkeit der Uploads (V-5)
+
+Die Sicherung der Uploads entsteht erst in 3.4 bei angehaltenem Portal. Hier wird geprüft, ob
+sie gelingen kann: Volume gefunden, Platz reicht, alles lesbar. `IMG` stammt aus 1.3.
 
 ```bash
-df -h . "$(sudo docker info --format '{{.DockerRootDir}}')"
+df -h backups "$(sudo docker info --format '{{.DockerRootDir}}')"
 sudo docker image ls
 sudo du -sh backups
 UPLOADS_VOL=$(sudo docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/uploads"}}{{.Name}}{{end}}{{end}}' hr-portal-app)
 echo "Volume: $UPLOADS_VOL"
 sudo du -sh "$(sudo docker volume inspect --format '{{.Mountpoint}}' "$UPLOADS_VOL")"
+sudo docker run --rm --user nextjs --entrypoint sh -v "$UPLOADS_VOL:/daten:ro" "$IMG" -c 'set -o pipefail; find /daten -type f | wc -l; tar cf - -C /daten . | wc -c && echo "tar OK"'
 ```
 
-- Der Build braucht etwa so viel Platz wie das jetzige Image, dazu kommen die Sicherung der
-  Datenbank (am 24.09.: 1,56 MB) und die Sicherung der Uploads (3.4, etwa so groß wie das
-  Volume). **Faustregel:** Ist weniger frei als die doppelte Image-Größe plus die Größe des
-  Volumes: an Claude.
+- **Platz:** Die Sicherung der Uploads (3.4) landet in `backups/` und wird fast so groß wie das
+  Volume — Scans und Fotos lassen sich kaum komprimieren. Dazu kommt die Sicherung der
+  Datenbank (am 24.09.: 1,56 MB). Unter dem Docker-Verzeichnis braucht der Build etwa so viel
+  Platz wie das jetzige Image. **Faustregel:** Ist weniger frei als die doppelte Image-Größe
+  plus die Größe des Volumes: an Claude.
 - `Volume:` muss einen Namen zeigen (Compose: `uploads_data`, mit Projektpräfix). Ist die
-  Zeile leer: an Claude, dann stimmt 3.4 nicht.
+  Zeile leer (dann meldet auch das zweite `du` einen Fehler): an Claude, dann stimmt 3.4 nicht.
+- **Leseprobe** (letzter Befehl): liest das ganze Volume mit derselben Kennung (`nextjs`) und
+  demselben Image wie die Sicherung in 3.4, aber nur lesend (`:ro`) und ohne ein Archiv zu
+  schreiben. Das Portal läuft weiter, die Probe dauert je nach Größe. **Erwartet:** zwei Zahlen
+  (Dateien; Bytes ungefähr wie beim `du` darüber) und `tar OK`. **Wenn nicht:**
+  `tar: can't open …: Permission denied` ohne `tar OK` — die Sicherung in 3.4 scheiterte
+  genauso: **an Claude**. Die Fehlerzeilen nennen Pfade im Volume; darin können Dateinamen der
+  Personen stehen.
+- Lokal geprobt am 28.09.2026: busybox-`tar` im App-Image bricht bei einer unlesbaren Datei mit
+  Exit 1 ab; `tar OK` erscheint dann weder hier noch in 3.4.
+- Die **dauerhafte** Sicherung des Volumes bleibt Sache der IT (Abschnitt 8).
 
 ### 1.5 Altes Image aufheben (für den Rückfall)
 
@@ -265,29 +298,77 @@ Handschritt 5; Abschnitt 17 dort stützt die Entscheidung gegen den Token-Header
 Prüfung). Das `Caddyfile.hr-portal` im Repo belegt den Live-Stand nicht (es nennt noch den
 Container `credo-hr-app`).
 
+**Caddy finden.** Startbefehl und Einhängungen zeigen, wo das Caddyfile und etwaige Logdateien
+auf dem Host liegen:
+
 ```bash
 sudo docker ps --format '{{.Names}}\t{{.Image}}' | grep -i caddy
 CADDY=caddy   # den Namen aus der ersten Spalte der Zeile oben einsetzen
-sudo docker inspect --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}' "$CADDY"
-sudo docker exec "$CADDY" sh -c 'grep -n -E "hr\.fes-credo\.de|import|log|output|format|filter|uri|request_body|max_size" /etc/caddy/Caddyfile'
+sudo docker inspect --format '{{json .Config.Cmd}}{{println}}{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}' "$CADDY"
 ```
 
-Der letzte Befehl zeigt nur Zeilen mit diesen Stichwörtern, keine Zugangsdaten aus dem
-Caddyfile.
+Findet der erste Befehl nichts, listet dieser alle Container im Proxy-Netz:
 
-| Erwartet | Wenn nicht |
-|---|---|
-| Eine Zeile mit dem Caddy-Container | Keine Zeile: Caddy läuft nicht als Container oder heißt anders. **An Claude**, die IT nennt dann den Ort des Caddyfiles. |
-| Unter den Einhängungen eine mit dem Ziel `/etc/caddy/Caddyfile` oder `/etc/caddy` | Anderes Ziel: im letzten Befehl diesen Pfad einsetzen. |
-| Im Block `hr.fes-credo.de` **keine** `log`-Zeile (dann schreibt Caddy kein Zugriffsprotokoll) **oder** ein `log` mit `format filter`, der das Feld `request>uri` löscht oder ersetzt | `log` ohne Filter auf `request>uri`: **ENTSCHEIDUNG** (an Claude, mit der Ausgabe). Entweder vor dem ersten „Anfordern“ den Filter ergänzen und Caddy neu laden (IT, 5.2), oder ausdrücklich hinnehmen und die Aufbewahrung des Protokolls klären — heute gilt dasselbe schon für die Magic Links. |
-| — | `import`-Zeilen: die eingebundenen Dateien genauso prüfen. Ein `log` in einem Snippet, das der Block einbindet, zählt mit; ein `log` in den globalen Optionen mit an Claude schicken. |
+```bash
+sudo docker network inspect reverse_proxy --format '{{range .Containers}}{{.Name}}{{println}}{{end}}'
+```
+
+**Prüfen** (nur lesend). Es erscheinen nur der Block `hr.fes-credo.de`, die Log-Einstellungen und
+Zähler — keine Tokens und keine Zugangsdaten anderer Dienste:
+
+```bash
+sudo docker exec "$CADDY" awk '/hr\.fes-credo\.de/ && /\{/ {drin=1} drin {print NR": "$0; tiefe += gsub(/\{/, "{") - gsub(/\}/, "}"); if (tiefe <= 0) drin=0}' /etc/caddy/Caddyfile
+sudo docker exec "$CADDY" caddy adapt --config /etc/caddy/Caddyfile --pretty 2>/dev/null | awk '/"(logging|logs)": \{/ && !drin {drin=1; tiefe=0} drin {print NR": "$0; tiefe += gsub(/\{/, "{") - gsub(/\}/, "}"); if (tiefe <= 0) drin=0}'
+sudo docker logs --since 720h "$CADDY" 2>&1 | grep -E '"host": ?"hr\.fes-credo\.de"' | grep -E '"uri": ?"' | grep -oE 'http\.log\.(access|error)[a-z0-9._]*' | sort | uniq -c
+sudo docker inspect --format '{{.HostConfig.LogConfig.Type}} {{json .HostConfig.LogConfig.Config}}' "$CADDY"
+```
+
+Nennt `caddy adapt` für den Logger von `hr.fes-credo.de` einen `"filename"`, die Datei zählen
+(den Pfad aus der Ausgabe einsetzen):
+
+```bash
+sudo docker exec "$CADDY" cat /PFAD/AUS/DEM/LOGGER | grep -E '"host": ?"hr\.fes-credo\.de"' | grep -c -E '"uri": ?"'
+```
+
+| Befehl | Erwartet | Wenn nicht |
+|---|---|---|
+| `docker ps … grep caddy` | eine Zeile mit dem Caddy-Container | keine Zeile: den Befehl mit `reverse_proxy` nehmen. Läuft Caddy gar nicht als Container: **an Claude**, die IT nennt dann den Ort des Caddyfiles. |
+| `inspect … Cmd` | `--config /etc/caddy/Caddyfile` | anderer Pfad: im `awk` und in `caddy adapt` diesen einsetzen |
+| `awk` (Block) | der Block `hr.fes-credo.de { … }` mit Zeilennummern | keine Ausgabe: Der Block steht in einer eingebundenen Datei; `caddy adapt` deckt sie trotzdem ab |
+| `caddy adapt` | unter `"logs"` → `"logger_names"` **kein** `hr.fes-credo.de` (ein Eintrag unter `"skip_hosts"` ist gut), **oder** sein Logger hat unter `"logging"` ein `"format": "filter"` mit `"request\u003euri"` (so steht `request>uri` im JSON) | siehe Auswertung |
+| `docker logs … uniq -c` | keine Ausgabe, oder nur `http.log.error…` | eine Zeile `http.log.access…`: Das Zugriffsprotokoll schreibt die URI samt Token ins Container-Log. Meldung „does not support reading“: Das Log geht woandershin, siehe `LogConfig`, **an Claude** |
+| `LogConfig` | Treiber und Rotation, etwa `json-file {"max-file":"3","max-size":"10m"}` | `json-file {}`: keine Rotation, das Log bleibt liegen, bis der Container neu angelegt wird — für die Aufbewahrung in der Entscheidung (ein Standard des Docker-Dienstes stünde in `/etc/docker/daemon.json`) |
+| Datei zählen | `0` | größer 0: Die Datei hält die URIs fest — ENTSCHEIDUNG |
+
+**Auswertung.**
+
+- **In Ordnung:** `caddy adapt` zeigt für `hr.fes-credo.de` kein Zugriffsprotokoll oder eines mit
+  Filter auf `request>uri`, **und** `docker logs` zeigt keine Zeile `http.log.access…`, **und**
+  die Datei (falls vorhanden) ergibt `0`.
+- **ENTSCHEIDUNG** (an Claude, mit den Ausgaben) in allen anderen Fällen — auch bei
+  `"hr.fes-credo.de": [""]` (Zugriffsprotokoll ohne eigene Einstellung, landet ungefiltert im
+  Container-Log) und bei `"default_logger_name"` (dann werden alle Hosts protokolliert).
+  Entweder vor dem ersten „Anfordern“ den Filter ergänzen und Caddy neu laden (IT, 5.2), oder
+  ausdrücklich hinnehmen und die Aufbewahrung des Protokolls klären — heute gilt dasselbe schon
+  für die Magic Links.
+- **`caddy adapt`** zeigt den Stand der Datei samt `import`, Snippets und globalen Optionen. Wurde
+  das Caddyfile seit dem letzten Neuladen geändert, kann der laufende Stand abweichen. Die
+  Admin-API zeigt den laufenden Stand, aber nur unter `http://127.0.0.1:2019/config/` —
+  `localhost` scheitert im Container (busybox-`wget` versucht `::1`) —, und sie ist nicht überall
+  eingeschaltet.
 
 Unabhängig vom Zugriffsprotokoll schreibt Caddy Fehlerzeilen (Logger `http.log.error`, etwa ein
-502, solange die App in 3.4 steht) samt angefragter URI in sein Container-Log. Das gehört mit in
-die Entscheidung, betrifft aber nur Aufrufe während einer Störung.
+502, solange die App in 3.4 steht) samt voller URI in sein Container-Log — **auch dann, wenn das
+Zugriffsprotokoll die URI filtert** (lokal bestätigt). Das gehört mit in die Entscheidung
+(Aufbewahrung laut `LogConfig`), betrifft aber nur Aufrufe während einer Störung.
+
+**Lokal geprobt** am 28.09.2026 mit Caddy 2.11 (`caddy:2-alpine`) und einem Caddyfile mit drei
+Diensten (Zugriffsprotokoll mit Filter, ohne Filter, ohne Protokoll), das `awk` nach
+`caddy adapt` zusätzlich mit `mawk` wie unter Ubuntu. Auf dem Server nicht geprobt.
 
 Der **Pfad-Matcher für `request_body`** (10 MB für `/api/unterlagen/*`) ist dagegen nur
-EMPFOHLEN (5.3): Die Route begrenzt selbst, Caddy wäre die zweite Schicht.
+EMPFOHLEN (5.3): Die Route begrenzt selbst, Caddy wäre die zweite Schicht. Der Block aus dem
+`awk` zeigt, ob schon einer gesetzt ist.
 
 ---
 
@@ -506,9 +587,10 @@ Anweisung). `INDEX` zählt 9 Zeilen `CREATE (UNIQUE) INDEX`, `ADD CONSTRAINT` di
 Fremdschlüssel; die Primärschlüssel stehen in den `CREATE TABLE`-Blöcken.
 
 **Beleg:** Diese Zählung ergibt `prisma migrate diff --from-schema-datamodel <Schema 7bc91ec>
---to-schema-datamodel <Schema 0dcceb9> --script` (am 25.09. lokal, ohne Datenbank). Ändert die
-Fix-Runde das Schema, rechnet Claude die Zahlen vor dem Deploy neu. Auf dem Server ist der
-Befehl am 24.09. gelaufen, gegen dieses Delta nicht geprobt.
+--to-schema-datamodel <Schema 0dcceb9> --script` (am 25.09. lokal, ohne Datenbank). Nach der
+Fix-Runde des Code-Reviews (`4875fba`, am Schema nur ein Kommentar an `hrMeldungStatus`) am 28.09.
+gegen diesen Stand neu gezählt: unverändert. Auf dem Server ist der Befehl am 24.09. gelaufen,
+gegen dieses Delta nicht geprobt.
 
 **Wenn nicht:** Weicht eine Zahl ab oder kommt eine `DROP`/`RENAME`/`TYPE`-Zeile: **STOPP,
 nicht starten**, `vorschau-delta.sql` an Claude. Das Portal läuft ja noch mit dem alten
@@ -543,7 +625,9 @@ Archiv etwa so groß wie in 1.4 (komprimiert eher kleiner), die Zeilenzahl grö�
 
 **Wenn nicht:** Datenbank-Sicherung deutlich unter 1 MB oder `grep` `0`, oder kein `tar OK`:
 **STOPP.** `sudo docker compose start app` bringt das alte Portal zurück, dann an Claude.
-**Nicht geprobt:** der `tar`-Aufruf auf dem Server.
+**Auf dem Server nicht geprobt:** der `tar`-Aufruf. Lokal am 28.09.2026 geprobt (busybox-`tar`
+bricht bei einer unlesbaren Datei mit Exit 1 ab, `tar OK` bleibt dann aus); Kennung, Rechte und
+Lesbarkeit prüft vorher die Leseprobe in 1.4 mit demselben Image.
 
 ### 3.5 Starten
 
@@ -1047,11 +1131,14 @@ Leere.
 - **`N8N_API_KEY`:** ob gesetzt und wer ihn nutzt (1.7).
 - **Caddy, Live-Stand:** ob ein Zugriffsprotokoll die URI samt Token festhält, wo das
   Caddyfile liegt und welches `request_body` gilt (1.9, V-9). Das `Caddyfile.hr-portal` im Repo
-  ist veraltet. Die Befehle in 1.9 sind nicht geprobt.
+  ist veraltet. Die Befehle in 1.9 sind am 28.09.2026 lokal gegen Caddy 2.11 geprobt, auf dem
+  Server nicht.
 - **Handy und Caddy:** ob iOS HEIC in JPEG umwandelt und ob `Content-Length` über Caddy und
   HTTP/2 ankommt (die Grenze greift auch ohne den Header).
 - **Browser:** ob das Inline-PDF unter der Portal-CSP überall angezeigt wird (5.4 Nr. 3).
 - **`after()` im Standalone-Build:** Die HR-Meldung „vollständig“ geht nach der Antwort
-  hinaus; im Projekt erstmals eingesetzt. Fällt sie aus, holt der nächste Lauf sie nach.
+  hinaus; im Projekt erstmals eingesetzt. Fällt sie aus, holt der nächste Lauf sie nach — seit
+  `4875fba` auch dann, wenn der Prozess zwischen Anspruch und Versand stirbt (etwa beim Neustart).
 - **Nicht geprobt:** die VORHER-Datei gegen das Schema `7bc91ec`, die Vorschau in 3.3 gegen
-  dieses Delta auf dem Server, der `tar`-Aufruf in 3.4, Weg A und B in Abschnitt 7.
+  dieses Delta auf dem Server, der `tar`-Aufruf in 3.4 auf dem Server (lokal geprobt, dazu die
+  Leseprobe in 1.4), Weg A und B in Abschnitt 7.
