@@ -1,6 +1,7 @@
 # Paket 4 „Unterlagen nachfordern“ — Übergabe nach Stufe 1
 
-> **Stand:** 26.09.2026, zuletzt ergänzt am 29.09.2026 als Übergabe für die nächste Sitzung.
+> **Stand:** 26.09.2026, zuletzt ergänzt am Abend des 29.09.2026 als Übergabe für die nächste
+> Sitzung (Einstieg: Abschnitt 0, „Plan ab dem 30.09.2026“).
 > Stufe 1 (Onboarding) ist umgesetzt, per Fast-Forward nach `main` gemergt und nach `origin/main`
 > gepusht (bis `9cab6b4`). Danach kamen: Code-Review mit Fix (`4875fba`), Ablaufplan
 > nachgezogen (`33e420f`, `82b118f`, `8d1c558`), Datenschutzhinweise des DSB (`d774e4c`), diese
@@ -30,19 +31,27 @@ Die maßgeblichen Dokumente:
 („Voraussetzungen“) und die dort genannten Abschnitte. Die Regeln für Codeänderungen stehen in
 CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
 
-**Stand am 29.09.2026:**
+**Stand am Abend des 29.09.2026:**
 
-- **Gepusht am 29.09.2026** (Freigabe des Nutzers, Fast-Forward): `origin/main` enthält alles bis
-  einschließlich des Commits „V-6 gesetzt, `debug` aus“ (Tabelle in Abschnitt 1). Damit geht auf
-  dem Server auch Variante 1 aus Ablaufplan 2.1 (`git show origin/main:…`), die die SQL-Dateien
-  ohne Einfügen anlegt. Weitere Pushes wieder nur auf ausdrückliche Freigabe, das Repo ist
-  öffentlich.
-- Gates zuletzt grün: `lint` 0 Fehler, `tsc` 0 Fehler, 168 Suiten / 4344 Tests, Build ok.
-- Arbeitsweise, die der Nutzer vorgegeben hat: nur lokal committen, nicht pushen, nicht
-  deployen, vor dem Deploy anhalten. Die offenen Punkte der Reihe nach abarbeiten und alles
-  dokumentieren.
+- **Deploybar, sobald V-2 umgestellt ist.** Am 29.09. gegen den gepushten Stand geprüft: Seit
+  `7bc91ec` ist keine Betriebsdatei geändert (Ablaufplan 3.1 gibt nichts aus), das Schema ist seit
+  der Zählung in 3.3 unverändert, die Standardtexte der beiden `dokument-*`-Vorlagen auch (die
+  Prüfsummen in N4 gelten). V-8 und der Rest von V-9 blockieren den Deploy nicht, V-9 muss aber
+  vor der ersten echten Nachforderung stehen.
+- **Gepusht am 29.09.2026** (Freigabe des Nutzers, Fast-Forward `9cab6b4..e6fa1cf`): `origin/main`
+  enthält alles bis einschließlich „V-6 gesetzt, `debug` aus“. Damit geht auf dem Server auch
+  Variante 1 aus Ablaufplan 2.1 (`git show origin/main:…`), die die SQL-Dateien ohne Einfügen
+  anlegt. Die Doku-Commits danach sind nur lokal; weitere Pushes wieder nur auf ausdrückliche
+  Freigabe, das Repo ist öffentlich.
+- Gates vor dem Push (29.09.) grün: `tsc` 0 Fehler, `lint` 0 Fehler (die 5 alten Warnungen in
+  fremden Dateien), 168 Suiten / 4344 Tests. Build zuletzt am 29.09. ok; seitdem kein Code
+  geändert.
+- Arbeitsweise, die der Nutzer vorgegeben hat: nur lokal committen, pushen nur auf ausdrückliche
+  Freigabe, nicht ohne ihn deployen, vor dem Deploy anhalten. Die offenen Punkte der Reihe nach
+  abarbeiten und alles dokumentieren.
 - Erledigt sind V-1, V-3, V-4, V-6, V-7 und die Vorprüfung von V-5. Von V-9 ist Frage 1
   entschieden (`debug` am 29.09. abgeschaltet); `?Referrer-Policy` und die Aufbewahrung sind offen.
+  V-8 ist offen (empfohlen).
 - **V-7 erledigt (29.09.):** `N8N_API_KEY` ist auf dem Server leer, die Rolle `SERVICE` gibt es
   also nicht. `CRON_SECRET` hat 32 Zeichen, `APP_URL` stimmt, `NEXT_PUBLIC_APP_URL` ist nicht
   gesetzt (Ablaufplan 1.7, Ergebnis). Nebenbei zeigte sich, dass das Journal nur bis zum 26.09.
@@ -54,18 +63,47 @@ CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
   noch die Umstellung: HR informieren, die alten Workflows deaktivieren, 1 und 2 an einem Werktag
   vor 08:00 aktivieren, den ersten Bericht an Claude, danach die alten löschen.
 
+**Plan ab dem 30.09.2026** (mit dem Nutzer am 29.09. vereinbart):
+
+1. **V-2 umstellen (Nutzer, 30.09.):** HR informieren (Textvorschlag im Ablaufplan 6.1), in n8n
+   die alten Workflows „CREDO HR-Portal — Tägliche Erinnerungen“ und „CREDO HR-Portal —
+   Offboarding-Erinnerungen“ deaktivieren, die neuen „… Onboarding-Erinnerungen (täglich 08:00)“
+   und „… Offboarding-Erinnerungen (täglich 08:00)“ aktivieren. Vor 08:00 aktiviert, laufen sie am
+   selben Morgen; später aktiviert, am nächsten Tag um 08:00.
+2. **Nach dem ersten Lauf:** in n8n unter „Executions“ prüfen, ob beide Läufe grün sind. Ein
+   Bericht an `personalbuchhaltung@fes-minden.de` kommt nur, wenn Erinnerungen hinausgingen oder
+   etwas schiefging; war nichts fällig, gibt es keine Mail. Bericht bzw. Status an Claude (Claude
+   wertet ihn aus). Eine Fehlermail (etwa 401) nennt den Grund. Laufen beide sauber: die alten
+   Workflows löschen.
+3. **Danach der Deploy** nach dem Ablaufplan, an einem Werktag, an dem HR für die Probe 5.4
+   erreichbar ist: Abschnitt 1 (1.1, 1.2, 1.5, 1.6; 1.3 und 1.4 waren am 28.09. ohne Befund) →
+   2 (SQL VORHER, Ergebnis an Claude, Freigabe) → 3 → 4.1, 4.2 → 5.1 → Workflow 4 aktivieren →
+   4.3 → Workflow 3 mit `?dryRun=1` aktivieren (ein Klick auf „Execute workflow“ ist dabei der
+   sichere Test des Credentials) → 5.2 bis 5.4. Jede Ausgabe an Claude, Claude gibt den nächsten
+   Schritt frei.
+4. **Vor der ersten echten Nachforderung:** der Rest von V-9 (`?Referrer-Policy`, Aufbewahrung
+   bzw. Löschen mit dem DSB), 1–3 Tage Probelauf von Workflow 3, dann scharf (6.3 Nr. 4) und HR
+   informieren (5.2 Nr. 5).
+
+**Offene Fragen an den Nutzer** (am 29.09. gestellt, noch ohne Antwort):
+
+- Wurde im Caddyfile auch `?Referrer-Policy` gesetzt (Ablaufplan 1.9, Frage 2)?
+- Ergebnis der Kontrolle „keine Debug-Zeilen mehr“ (Befehl in 1.9, Stand vom 29.09.)?
+- Sollen die Dateien der UX/UI-Sitzung ins öffentliche Repo (`docs/module/ux-ui/`, dazu der Link
+  in `docs/README.md`; beides nicht committet)? Claude hat sie nicht gelesen und nicht gepusht.
+
 **Arbeitsliste** (Reihenfolge nach Abhängigkeit; Stand je Punkt in Abschnitt 4):
 
 | # | Punkt | Wer macht was | Claude kann vorbereiten |
 |---|---|---|---|
 | 1 | **V-7, dazu `CRON_SECRET`, `APP_URL` und `NEXT_PUBLIC_APP_URL` lesend prüfen** (Ablaufplan 1.7) | **Erledigt am 29.09.** — Prüfskript aus 1.7 auf dem Server gelaufen | `N8N_API_KEY` leer, Umgebung in Ordnung, keine Webhooks, keine Anfrage mit `X-API-Key` (Ergebnis in 1.7) |
-| 2 | **V-2: bestehende n8n-Läufe reparieren** (6.1): `reminders` und `offboarding-reminders` auf `https://hr.fes-credo.de/…` | Nutzer/IT in der n8n-Oberfläche. **Achtung:** Der erste Lauf nach der Korrektur verschickt alle fälligen Erinnerungen auf einmal — HR vorher informieren, an einem Werktag morgens | **Importiert 29.09.** (Ablaufplan 6.5). Offen: Umstellung (alte deaktivieren, 1 und 2 aktivieren), dann Auswertung des ersten Berichts |
+| 2 | **V-2: bestehende n8n-Läufe reparieren** (6.1): `reminders` und `offboarding-reminders` auf `https://hr.fes-credo.de/…` | Nutzer/IT in der n8n-Oberfläche. **Achtung:** Der erste Lauf nach der Korrektur verschickt alle fälligen Erinnerungen auf einmal — HR vorher informieren, an einem Werktag morgens | **Importiert 29.09.** (Ablaufplan 6.5). Umstellung für den 30.09. geplant (Plan oben), dann Auswertung des ersten Laufs |
 | 3 | **V-3: neue n8n-Läufe anlegen, zunächst inaktiv** (6.2, 6.3 Nr. 1): `unterlagen-fristen` (07:00 Europe/Berlin, `?dryRun=1`, Timeout 300 000 ms, Retry aus, Bericht bei `errors > 0` oder `nichtZugestellt > 0`) und `dokument-ablauf` (07:30) | Nutzer/IT in n8n; das Credential (`Authorization: Bearer <CRON_SECRET>`) legt der Nutzer selbst an | **Erledigt 29.09.:** Import-Dateien 3 und 4 importiert, inaktiv (Ablaufplan 6.5). Aktivieren: 3 nach 4.3, 4 nach 5.1 |
 | 4 | **V-6: Antwortadresse** (= HR-Postfach) unter Einstellungen → SMTP | **Erledigt 29.09.** (Nutzer): `personalbuchhaltung@fes-minden.de` | Kontrolle am Deploy-Tag mit V4 (Ablaufplan 2.2) |
 | 5 | **V-8: Freigabeliste** (empfohlen) unter Einstellungen → SMTP → Erlaubte Empfänger-Domains | Nutzer im Portal | Vorschlag für die Domains |
 | 6 | **V-9: Caddy-Entscheidung:** `debug` aus — **erledigt 29.09.**; offen `?Referrer-Policy` und die Aufbewahrung des Journals mit dem DSB (samt Löschen der Einträge bis 29.09.) | Nutzer/IT, DSB | Fragen, Empfehlung und der lokal geprobte Ablauf stehen in 1.9. Neu seit 29.09. (1.9, Nachträge): Das Journal reicht nur etwa dreieinhalb Tage zurück; nach dem Abschalten von `debug` blieben die letzten Einträge mit Tokens womöglich Monate liegen — Löschen mitentscheiden |
 | 7 | **DSB-Themen** (blockieren den Deploy nicht): Verarbeitungsverzeichnis, Führungszeugnis bei Kitas (in Stufe 1 gesperrt), Aufbewahrung (E-7), Art. 10 in den Datenschutzhinweisen, Aufbewahrung des Journals | Nutzer mit dem DSB | Textentwürfe auf Wunsch |
-| 8 | **Deploy** nach Ablaufplan, sobald 1–6 erledigt sind: Push (Freigabe), Vorab-Prüfungen 1.1, 1.2, 1.5, 1.6, SQL VORHER (2), Deploy (3), NACHHER (4), Handschritte (5), n8n scharf (6.3), HR informieren | Nutzer auf dem Server, Claude wertet jede Ausgabe aus | Ablauf steht. Die Zählung in 3.3 ist gegen `4875fba` nachgerechnet; neu rechnen nur, wenn sich das Schema ändert |
+| 8 | **Deploy** nach Ablaufplan, **sobald V-2 umgestellt ist** (Stand 29.09.; Push erledigt, V-8 und der Rest von V-9 blockieren nicht): Vorab-Prüfungen 1.1, 1.2, 1.5, 1.6, SQL VORHER (2), Deploy (3), NACHHER (4), Handschritte (5), n8n (6.3), HR informieren | Nutzer auf dem Server, Claude wertet jede Ausgabe aus | Ablauf steht und passt zum gepushten Stand (am 29.09. geprüft: Betriebsdateien, Schema, Vorlagen, Gates). Die Zählung in 3.3 ist gegen `4875fba` nachgerechnet; neu rechnen nur, wenn sich das Schema ändert |
 
 Server-Befehle für den Nutzer so schreiben, wie es Abschnitt 8 beschreibt (höchstens ein `*` je
 Zeile, lokal gegen die Werkzeuge proben, Diagnosezeile).
@@ -118,7 +156,8 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 | `915dbbb` | V-7 erledigt: Serverergebnis in 1.7; in 1.9 die Zählung korrigiert (Journal erst ab 26.09.) und der Nachtrag zur Aufbewahrung; Anhang B nachgezogen (nur lokal) |
 | `5d7371c` | V-2/V-3 vorbereitet: Ablaufplan 6.5 beschreibt die vier n8n-Import-Dateien (sie selbst liegen nur lokal in `n8n/`), 6.2 Bericht, Abschnitte 0 und 8 (nur lokal) |
 | `083e683` | Import in n8n geklappt: V-3 erledigt, V-2 bis auf die Umstellung (nur lokal) |
-| (dieser) | V-6 gesetzt, `debug` in Caddy abgeschaltet (V-9 Frage 1); danach alles nach `origin/main` gepusht |
+| `e6fa1cf` | V-6 gesetzt, `debug` in Caddy abgeschaltet (V-9 Frage 1); danach alles nach `origin/main` gepusht |
+| (dieser) | Abendstand 29.09.: deploybar nach V-2 (geprüft), Plan ab 30.09., offene Fragen, Textvorschlag für HR, Hinweis „ohne fällige Erinnerung keine Mail“ (nur lokal) |
 
 ---
 
@@ -126,7 +165,7 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 
 - **Je Schritt:** Ein Agent setzte um. Zwei bis vier Prüfer sahen die Änderung aus verschiedenen Blickwinkeln durch (Spezifikation, Korrektheit, Sicherheit, Passung, Bedienung). Ein Nachbesserer prüfte jeden Befund nach und behob ihn. Danach liefen die Gates: `tsc`, `lint`, die volle Jest-Suite und `next build` in einer isolierten Kopie.
 - **Abschlussdurchsicht (`3f42546`):** fünf Blickwinkel, nämlich Randfälle, CREDO-Standards, Sicherheit/Datenschutz, Konsistenz und Einfachheit. Jeder Blickwinkel bekam einen Skeptiker zur Gegenprüfung. Gemeldet wurden 38 Befunde, bestätigt 30, alle KLEIN; zu Sicherheit und Datenschutz wurde keiner bestätigt. Alle 30 sind behoben.
-- **Letzte Gates:** `tsc` 0 Fehler, `lint` 0 Fehler (5 alte Warnungen in fremden Dateien), **168 Suiten / 4338 Tests grün**, Build ok. Nach dem Code-Review-Fix `4875fba` (26.09.): **168 Suiten / 4343 Tests grün**, Build ok.
+- **Letzte Gates:** `tsc` 0 Fehler, `lint` 0 Fehler (5 alte Warnungen in fremden Dateien), **168 Suiten / 4338 Tests grün**, Build ok. Nach dem Code-Review-Fix `4875fba` (26.09.): **168 Suiten / 4343 Tests grün**, Build ok. Nach den Datenschutzhinweisen `d774e4c` (29.09.): 168 Suiten / 4344 Tests, Build ok. **Vor dem Push am 29.09.** erneut: `tsc` 0, `lint` 0 (dieselben 5 Warnungen), **168 Suiten / 4344 Tests grün**.
 - **DB-Probe gegen die Dev-DB (Schritt 4):** NULL-Unique für `laufendSchluessel`, „erst sperren, dann zählen“ mit zwei Verbindungen, bedingtes `updateMany` bei gleichzeitigem Annehmen. Alle drei sind belegt.
 - **Browserprobe am 25.09. gegen das Dev-Portal:** Der ganze Ablauf wurde durchgespielt: Anfordern → Mail → Upload (Tarn-PDF abgewiesen) → Übermitteln → HR-Mail „eingegangen“ (After-Response) → Zurückweisen (Mail ohne Name und Begründung der vertraulichen Unterlage) → erneut einreichen → Annehmen mit Artwahl (Document mit Bezeichnung, APPROVED, Hardlink, Quelle gelöscht) → erledigt (Kasten räumt ab) → Annahme zurücknehmen (läuft wieder). Die Köpfe der Datei-Route waren korrekt: `sandbox` für Bilder, Portal-CSP für PDFs, `no-store`, CORP. Die Mails liefen dabei in eine lokale SMTP-Senke, danach wurde SMTP zurückgesetzt.
 - **Nicht geprüft:**
@@ -165,7 +204,7 @@ Die Nummern sind die des Ablaufplans (Abschnitt 0 dort). Code-Review: erledigt (
 | V | Punkt | Stand | Nächster Schritt | Wer |
 |---|---|---|---|---|
 | V-1 | `./backups:/backups` eingehängt, Verzeichnis gehört 1001 | **erledigt 28.09.** — in beiden Diensten eingehängt, `775 1001 n8n`, Schreibtests in `app` und `db` `OK` | — | — |
-| V-2 | Bestehende n8n-Läufe rufen `hr.fes-credo.de` auf | **importiert 29.09.** — Import-Dateien 1 und 2 (Ablaufplan 6.5), Credentials verknüpft, inaktiv | HR informieren, alte Workflows deaktivieren, 1 und 2 aktivieren; der erste Lauf verschickt echte Mails | Nutzer, Claude wertet den ersten Bericht aus |
+| V-2 | Bestehende n8n-Läufe rufen `hr.fes-credo.de` auf | **importiert 29.09.** — Import-Dateien 1 und 2 (Ablaufplan 6.5), Credentials verknüpft, inaktiv. **Umstellung für den 30.09. geplant** (Abschnitt 0, Plan) | HR informieren, alte Workflows deaktivieren, 1 und 2 aktivieren; der erste Lauf verschickt echte Mails. Danach „Executions“ prüfen (ohne fällige Erinnerung keine Mail) | Nutzer, Claude wertet den ersten Lauf aus |
 | V-3 | n8n `unterlagen-fristen` und `dokument-ablauf` angelegt (inaktiv) | **erledigt 29.09.** — Import-Dateien 3 und 4 importiert, inaktiv | 3 nach 4.3, 4 nach 5.1 aktivieren | Nutzer, Claude |
 | V-4 | Datenschutztext der Upload-Seite | **erledigt 29.09.** (`d774e4c`) — Wortlaut des DSB, aufklappbar in der Fußzeile; Verantwortlicher aus der Mandanten-Einstellung (Standard Christlicher Schulverein Minden e.V.) | — | — |
 | V-5 | Sicherung des Volumes `uploads_data` | **Vorprüfung erledigt 28.09.** — `hr_portal_credo_uploads_data`, 94 MB, 315 Dateien, Leseprobe `tar OK`, 362 GB frei unter `/vol/container` | Die Sicherung selbst entsteht in 3.4. Das dauerhafte Backup bleibt offen (Abschnitt 8 des Ablaufplans) | IT |

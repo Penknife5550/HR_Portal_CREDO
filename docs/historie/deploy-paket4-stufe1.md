@@ -10,7 +10,8 @@
 > **V-7 erledigt** (`N8N_API_KEY` leer, Umgebung in Ordnung; Ergebnis in 1.7). Dabei zeigte sich,
 > dass das Journal nur bis zum 26.09. zurückreicht (Korrektur und Nachtrag in 1.9). Später am
 > 29.09.: die vier n8n-Workflows importiert (6.5), V-6 gesetzt (HR-Postfach
-> `personalbuchhaltung@fes-minden.de`) und `debug` in Caddy abgeschaltet (V-9, Frage 1). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
+> `personalbuchhaltung@fes-minden.de`) und `debug` in Caddy abgeschaltet (V-9, Frage 1).
+> **Deploybar, sobald V-2 umgestellt ist** (geplant für den 30.09., Abschnitt 0 „Termin“). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
 > [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand:** Server auf `8952e1a` (Code `7bc91ec`, Deploy vom 24.09.2026).
@@ -144,6 +145,11 @@ geschieht, und die Download-Route, die ab jetzt den n8n-Schlüssel abweist.
   ein Handy.
 - Kein Zeitfenster um einen n8n-Lauf nötig: `unterlagen-fristen` und `dokument-ablauf` sind bis
   6.3 nicht aktiv, und die bestehenden Läufe berührt dieser Deploy nicht.
+- **Stand am Abend des 29.09.2026:** Alle Voraussetzungen vor dem Deploy sind erfüllt bis auf
+  V-2; die Umstellung der Erinnerungs-Workflows ist für den 30.09. geplant (6.1, 6.5), der Deploy
+  folgt, sobald ihr erster Lauf sauber war. Am 29.09. gegen den gepushten Stand (`e6fa1cf`)
+  geprüft: 3.1 gibt nichts aus (keine Betriebsdatei seit `7bc91ec` geändert), das Schema ist wie in
+  3.3 gezählt, die Prüfsummen in N4 gelten, `tsc`/`lint`/Tests grün (168 Suiten, 4344 Tests).
 
 ---
 
@@ -1318,6 +1324,15 @@ beiden bestehenden und die beiden neuen Läufe, siehe 6.5.
 > die Erinnerungen der Abteilungsaufgaben. **HR vorher informieren und an einem Werktag morgens
 > scharf schalten.** V7 zeigt, ob die Läufe heute ankommen.
 
+**Textvorschlag für die Info an HR:** „Ab morgen 08:00 laufen die automatischen Erinnerungen des
+HR-Portals wieder (Fragebogen, Einstellungsmodalitäten, Aufgaben von Abteilungen). Beim ersten Lauf
+gehen alle fälligen Erinnerungen auf einmal hinaus.“
+
+Umgesetzt wird die Reparatur mit den Import-Dateien 1 und 2 (6.5): alte Workflows deaktivieren,
+neue aktivieren. **Nach dem ersten Lauf** in n8n unter „Executions“ prüfen, ob beide grün sind —
+ein Bericht per Mail kommt nur, wenn Erinnerungen hinausgingen oder etwas schiefging; war nichts
+fällig, gibt es keine Mail.
+
 Die Reparatur ist zugleich Voraussetzung für die Löschfristen nach DSGVO: die 30 Tage der
 Dateien aus Paket 4 und die 90 Tage des `EmailLog` (sonst löscht das Portal alte Einträge nur
 beim Öffnen des Versandprotokolls).
@@ -1433,9 +1448,10 @@ Outlook-Credential liegen; auf dem Server laufen `n8n-n8n-1` und `n8n-sw`):
 5. **Aktivieren in dieser Reihenfolge:**
    - **1 und 2 (V-2):** HR informieren, die alten Workflows „CREDO HR-Portal — Tägliche
      Erinnerungen“ und „CREDO HR-Portal — Offboarding-Erinnerungen“ **deaktivieren**, dann 1 und
-     2 an einem Werktag vor 08:00 aktivieren. Der Bericht vom ersten Lauf geht an Claude. Laufen
-     die neuen, die alten **löschen** — war dort das echte Secret als Klartext-Header eingetragen,
-     verschwindet es damit aus n8n.
+     2 an einem Werktag vor 08:00 aktivieren (geplant für den 30.09.2026). Nach dem ersten Lauf
+     unter „Executions“ prüfen, ob beide grün sind — ohne fällige Erinnerung kommt keine Mail.
+     Bericht bzw. Status an Claude. Laufen die neuen, die alten **löschen** — war dort das echte
+     Secret als Klartext-Header eingetragen, verschwindet es damit aus n8n.
    - **3:** nach 4.3 mit `?dryRun=1` (6.3 Nr. 3), nach 1–3 Tagen ohne (6.3 Nr. 4) — beides mit
      Claude.
    - **4:** direkt nach 5.1 (6.3 Nr. 2).
