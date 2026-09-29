@@ -1,8 +1,8 @@
 # Deploy Paket 4 Stufe 1 — Unterlagen nachfordern (Ablaufplan)
 
-> **Stand:** Ablaufplan vom 25.09.2026, **noch nicht ausgeführt**. Ergänzt am 28.09.2026:
+> **Stand:** Ablaufplan vom 25.09.2026, **noch nicht ausgeführt**. Ergänzt am 28. und 29.09.2026:
 > Code-Review erledigt (Fix-Commit `4875fba`), Prüfbefehle in 1.3, 1.4 und 1.9 überarbeitet und
-> lokal geprobt. Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
+> lokal geprobt, Serverprüfung V-1/V-5 ohne Befund, V-9 Entscheidung vertagt (1.9). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
 > [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand:** Server auf `8952e1a` (Code `7bc91ec`, Deploy vom 24.09.2026).
@@ -107,7 +107,7 @@ Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 | V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt | Pflicht vor dem ersten „Anfordern“ | 2.3 (V4), 5.2 |
 | V-7 | `N8N_API_KEY` geprüft: Holt etwas außerhalb des Repos Dokumente über die Download-Route? | ENTSCHEIDUNG, falls gesetzt | 1.7 |
 | V-8 | Freigabeliste für abweichende Empfängeradressen | empfohlen | 5.3 |
-| V-9 | Caddy: Schreibt der Server ein Zugriffsprotokoll, filtert es die URI (der Token der Upload-Seite steht im Pfad und öffnet den Zugang zu Personalunterlagen) | **Pflicht** vor dem ersten „Anfordern“; lesende Prüfung vor dem Deploy, ein `log` ohne URI-Filter ist ENTSCHEIDUNG. **Befund 29.09.:** globale Option `debug` protokolliert jede Anfrage samt URI → ENTSCHEIDUNG (1.9) | 1.9, 5.2 |
+| V-9 | Caddy: Schreibt der Server ein Zugriffsprotokoll, filtert es die URI (der Token der Upload-Seite steht im Pfad und öffnet den Zugang zu Personalunterlagen) | **Pflicht** vor dem ersten „Anfordern“; lesende Prüfung vor dem Deploy, ein `log` ohne URI-Filter ist ENTSCHEIDUNG. **Befund 29.09.:** globale Option `debug` protokolliert jede Anfrage samt URI → ENTSCHEIDUNG, **vertagt** (1.9) | 1.9, 5.2 |
 
 ### Dauer (Schätzung, nicht gemessen)
 
@@ -391,6 +391,40 @@ Zugriffsprotokoll die URI filtert** (lokal bestätigt). Das gehört mit in die E
 - **V-9 = ENTSCHEIDUNG.** Empfehlung: `debug` abschalten, im Block `hr.fes-credo.de`
   `?Referrer-Policy`, Aufbewahrung des Journals mit dem DSB klären (5.2 Nr. 4). V-1 und V-5 waren
   am Tag davor ohne Befund (Uploads-Volume 94 MB, 315 Dateien, Leseprobe `tar OK`).
+
+**Entscheidung vertagt** (29.09.2026). Offen sind drei Fragen:
+
+1. **`debug` abschalten?** Das gilt für alle Seiten hinter diesem Caddy. Bis dahin landen die
+   bestehenden Links (Fragebogen, Modalitäten, Abteilungsaufgaben) samt Token und IP-Adresse im
+   Journal. Empfehlung: ja, unabhängig vom Deploy.
+2. **Im Block `hr.fes-credo.de` `?Referrer-Policy` statt `Referrer-Policy`?** Sonst gilt auf der
+   Upload-Seite `strict-origin-when-cross-origin` statt `no-referrer`. Empfehlung: ja.
+3. **Aufbewahrung des Journals** (mit dem DSB): eine Frist für alle Logs des Hosts, etwa 14 Tage,
+   und ob die bisherigen Einträge vorzeitig gelöscht werden. Löschen trifft das ganze Journal,
+   nicht nur Caddy. Nach dem Abschalten wächst es langsamer, die alten Einträge mit Tokens blieben
+   dann eher länger liegen.
+
+Ablauf für 1 und 2, sobald entschieden (lokal mit derselben Einhängung geprobt; die Zeilennummern
+stammen vom 29.09. — vorher mit dem `awk` aus „Prüfen“ gegenprüfen):
+
+```bash
+sudo cp -p /vol/container/caddy2/config/Caddyfile /vol/container/caddy2/config/Caddyfile.vor-debug-aus
+sudo nano -l /vol/container/caddy2/config/Caddyfile
+sudo docker exec caddy_reverse_proxy grep -n -E 'debug|Referrer-Policy' /etc/caddy/Caddyfile
+sudo docker exec caddy_reverse_proxy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+sudo docker exec caddy_reverse_proxy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+sudo journalctl -t docker/caddy_reverse_proxy --since "10 min ago" -o cat | grep -c '"logger":"http.handlers.reverse_proxy"'
+```
+
+- **Bearbeiten:** Zeile 6 `debug` → `# debug`; Zeile 297 `Referrer-Policy "strict-origin-when-cross-origin"`
+  → `?Referrer-Policy "strict-origin-when-cross-origin"`.
+- **`grep` im Container:** muss `# debug` und `?Referrer-Policy` zeigen. Zeigt er den alten Stand,
+  hat der Editor eine neue Datei angelegt, und die Einzeldatei-Einhängung sieht sie nicht. Dann
+  statt `reload` `sudo docker restart caddy_reverse_proxy` — das unterbricht alle Seiten kurz.
+- **`validate`** endet mit `Valid configuration`; **`reload`** lädt ohne Unterbrechung.
+- **Zählung** nach einigen Minuten normaler Nutzung: `0`.
+- **Rückweg:** `sudo cp -p …/Caddyfile.vor-debug-aus …/Caddyfile` (schreibt in dieselbe Datei),
+  dann `reload`.
 
 **Lokal geprobt** am 28. und 29.09.2026 mit Caddy 2.11 (`caddy:2-alpine`): Caddyfile mit drei
 Diensten (Zugriffsprotokoll mit Filter, ohne Filter, ohne Protokoll), das `awk` nach `caddy adapt`
@@ -899,7 +933,7 @@ Handlungsanweisung hinaus.
    meldet. **Echte Nachforderungen deshalb erst nach dem Scharfschalten (6.3 Nr. 4)** — erst
    dann HR informieren (Nr. 5).
 3. **DSB-Text** der Upload-Seite (1.8), falls mit Platzhalter deployt wurde.
-4. **Caddy (V-9):** Befund vom 29.09. (1.9): Die globale Option `debug` lässt den Reverse-Proxy
+4. **Caddy (V-9) — Entscheidung vertagt am 29.09., Fragen und Ablauf in 1.9.** Befund: Die globale Option `debug` lässt den Reverse-Proxy
    jede Anfrage samt URI und IP-Adresse ins Journal schreiben. Vor dem ersten „Anfordern“ ist
    `debug` abgeschaltet (oder die Entscheidung „hinnehmen“ hier vermerkt), und im Block
    `hr.fes-credo.de` steht `?Referrer-Policy` statt `Referrer-Policy`; danach `caddy validate` und

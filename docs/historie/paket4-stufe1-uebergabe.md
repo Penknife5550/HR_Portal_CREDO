@@ -1,7 +1,10 @@
 # Paket 4 „Unterlagen nachfordern“ — Übergabe nach Stufe 1
 
-> **Stand:** 26.09.2026. Stufe 1 (Onboarding) ist umgesetzt und per Fast-Forward nach `main`
-> gemergt und nach `origin/main` gepusht. **Nicht deployt.** Die Produktion läuft weiter auf
+> **Stand:** 26.09.2026, ergänzt am 29.09.2026. Stufe 1 (Onboarding) ist umgesetzt und per
+> Fast-Forward nach `main` gemergt und nach `origin/main` gepusht. Seitdem: Code-Review erledigt
+> (Fix `4875fba`), Ablaufplan nachgezogen (`33e420f`, `82b118f`), Serverprüfung V-1/V-5 ohne
+> Befund, **V-9 Entscheidung vertagt** (Caddy im Debug-Modus). Diese Commits liegen **nur lokal**,
+> gepusht wird erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft weiter auf
 > Code `7bc91ec` (Deploy vom 24.09.2026).
 > **Zweck:** In einer neuen Sitzung ohne Vorwissen weitermachen können: was fertig ist, was
 > geprüft wurde, was vor dem Deploy noch fehlt und wie Stufe 2 anschließt.
@@ -53,7 +56,11 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 | `b6532e2` | Restpunkte aus Browserprobe und Prüfberichten |
 | `2ef8199` | Doku: CLAUDE.md, Feinplanung, Deploy-Ablaufplan, Handbuch, Änderungsplan Fassung 7 |
 | `3f42546` | Abschlussdurchsicht: 30 bestätigte Befunde behoben |
-| (dieser) | Übergabe und Statusangaben nach dem Merge |
+| `9cab6b4` | Übergabe und Statusangaben nach dem Merge |
+| `4875fba` | Code-Review: verwaister Anspruch der HR-Meldung „vollständig“ wird nachgeholt, abgelehntes „unbefristetes“ Dokument erledigt die Art nicht mehr, zwei Wiederverwendungen (nur lokal) |
+| `33e420f` | Ablaufplan: Prüfbefehle V-1, V-5, V-9 lokal geprobt (nur lokal) |
+| `82b118f` | Ablaufplan: Befund V-9, Caddy im Debug-Modus (nur lokal) |
+| (dieser) | V-9 als vertagte Entscheidung, Übergabe auf dem Stand vom 29.09. (nur lokal) |
 
 ---
 
@@ -61,7 +68,7 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 
 - **Je Schritt:** Ein Agent setzte um. Zwei bis vier Prüfer sahen die Änderung aus verschiedenen Blickwinkeln durch (Spezifikation, Korrektheit, Sicherheit, Passung, Bedienung). Ein Nachbesserer prüfte jeden Befund nach und behob ihn. Danach liefen die Gates: `tsc`, `lint`, die volle Jest-Suite und `next build` in einer isolierten Kopie.
 - **Abschlussdurchsicht (`3f42546`):** fünf Blickwinkel, nämlich Randfälle, CREDO-Standards, Sicherheit/Datenschutz, Konsistenz und Einfachheit. Jeder Blickwinkel bekam einen Skeptiker zur Gegenprüfung. Gemeldet wurden 38 Befunde, bestätigt 30, alle KLEIN; zu Sicherheit und Datenschutz wurde keiner bestätigt. Alle 30 sind behoben.
-- **Letzte Gates:** `tsc` 0 Fehler, `lint` 0 Fehler (5 alte Warnungen in fremden Dateien), **168 Suiten / 4338 Tests grün**, Build ok.
+- **Letzte Gates:** `tsc` 0 Fehler, `lint` 0 Fehler (5 alte Warnungen in fremden Dateien), **168 Suiten / 4338 Tests grün**, Build ok. Nach dem Code-Review-Fix `4875fba` (26.09.): **168 Suiten / 4343 Tests grün**, Build ok.
 - **DB-Probe gegen die Dev-DB (Schritt 4):** NULL-Unique für `laufendSchluessel`, „erst sperren, dann zählen“ mit zwei Verbindungen, bedingtes `updateMany` bei gleichzeitigem Annehmen. Alle drei sind belegt.
 - **Browserprobe am 25.09. gegen das Dev-Portal:** Der ganze Ablauf wurde durchgespielt: Anfordern → Mail → Upload (Tarn-PDF abgewiesen) → Übermitteln → HR-Mail „eingegangen“ (After-Response) → Zurückweisen (Mail ohne Name und Begründung der vertraulichen Unterlage) → erneut einreichen → Annehmen mit Artwahl (Document mit Bezeichnung, APPROVED, Hardlink, Quelle gelöscht) → erledigt (Kasten räumt ab) → Annahme zurücknehmen (läuft wieder). Die Köpfe der Datei-Route waren korrekt: `sandbox` für Bilder, Portal-CSP für PDFs, `no-store`, CORP. Die Mails liefen dabei in eine lokale SMTP-Senke, danach wurde SMTP zurückgesetzt.
 - **Nicht geprüft:**
@@ -74,21 +81,22 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 
 ---
 
-## 3 · Code-Review vor dem Deploy: empfohlen
+## 3 · Code-Review vor dem Deploy: erledigt
 
-Vor dem **Deploy** ist eine eigenständige Code-Review des ganzen Pakets sinnvoll. Vor dem Merge war sie nicht nötig, weil `main` nicht automatisch ausgerollt wird. Gründe:
+Am 26.09.2026 `/code-review high` über `ce1888e..main` (öffentliche Routen, Übernahme und
+Rücknahme, täglicher Lauf, Download-Route, Middleware). Sechs Befunde:
 
-1. **Die letzte Fix-Runde (`3f42546`, rund 50 Dateien) hat kein unabhängiger Prüfer mehr gesehen.** Geprüft haben sie nur ihr eigener Nachbesserer und die Gates.
-2. **Umfang und Angriffsfläche.** Rund 90 Dateien und über 40 000 Zeilen, einschließlich Tests, kommen neu hinzu. Dazu gehören eine öffentliche Upload-API außerhalb der Middleware, Token, Dateioperationen mit Hardlinks, Nachweise nach Art. 9 und 10 DSGVO und eine Verhaltensänderung an einer bestehenden Download-Route.
-3. **Hausbrauch:** Vor dem Deploy vom 24.09. gab es eine eigene Review-Runde (`7bc91ec`, acht Befunde).
-
-**Vorschlag für die nächste Sitzung:**
-- `/code-review high` über `ce1888e..main`, Schwerpunkte:
-  - öffentliche Routen und `unterlagen-upload.ts`,
-  - Übernahme und Rücknahme in `unterlagen-dienst.ts`,
-  - `unterlagen-lauf.ts`,
-  - Download-Route und Middleware.
-- Danach Fix-Commit, Gates, Push, dann Deploy nach Ablaufplan.
+- **Behoben in `4875fba`:**
+  - Die HR-Meldung „vollständig“ ging verloren, wenn der Prozess zwischen Anspruch und Versand
+    starb (`after()` während eines Neustarts). Der Anspruch trägt jetzt `hrMeldungStatus =
+    AUSSTEHEND`; nach einer Stunde ohne Ergebnis holt der Lauf die Mail nach
+    (`vollstaendigAnspruchVerwaist`).
+  - Ein abgelehntes Dokument mit „unbefristet“ erledigte die Art in der Vorgangsansicht, während
+    der Lauf `dokument-ablauf` weiter mahnte. `nachweisLagen` übergeht jetzt `REJECTED`.
+  - Zwei Wiederverwendungen (`nutzerName`, `alsDatum`).
+- **Bewusst offen:** ein gemeinsamer Helfer für die Prüfung des `CRON_SECRET` (13 Kopien in den
+  Cron-Routen) und das zweite Register `OEFFENTLICHE_MODULE` (Folgeumbau vor Stufe 2, Abschnitt 5).
+- Gates danach grün (siehe Abschnitt 2), Schema-Delta unverändert (nur ein Kommentar).
 
 ---
 
@@ -97,13 +105,15 @@ Vor dem **Deploy** ist eine eigenständige Code-Review des ganzen Pakets sinnvol
 | # | Punkt | Wer |
 |---|---|---|
 | 1 | **Datenschutztext der Upload-Seite** ist ein Platzhalter (`UPLOAD_SEITE_TEXTE.DATENSCHUTZ` in `src/components/unterlagen/upload-seite.tsx`). Wortlaut nach Art. 13 mit Art. 9 vom DSB, danach Code-Änderung. Mit dem DSB außerdem klären: Verarbeitungsverzeichnis, Führungszeugnis bei Kitas (in Stufe 1 gesperrt), Aufbewahrung (E-7) | Nutzer/DSB → Claude |
-| 2 | Code-Review (Abschnitt 3) | Claude |
+| 2 | ~~Code-Review~~ — erledigt am 26.09.2026 (`4875fba`, Abschnitt 3) | — |
 | 3 | **n8n:** die bestehenden Läufe `reminders` und `offboarding-reminders` auf `hr.fes-credo.de` umstellen (sie zeigen auf `hr.credo-schulen.de` und kommen seit über 60 Tagen nicht an), `dokument-ablauf` einplanen, neuen Lauf `unterlagen-fristen` anlegen (täglich 07:00 Europe/Berlin, Header-Auth `Bearer <CRON_SECRET>`, Timeout 300 000 ms, Retry aus, 1–3 Tage `?dryRun=1`). Ohne ihn gibt es keine Erinnerungen und keine Löschung | IT/Nutzer |
 | 4 | `SmtpConfig.replyToEmail` (= HR-Postfach, Kopie der HR-Mails, Antwortadresse) setzen; Freigabeliste pflegen (optional) | Nutzer |
-| 5 | Volume `uploads_data` sichern und dauerhaft ins Backup nehmen (der Entrypoint sichert nur die Datenbank) | IT |
+| 5 | Volume `uploads_data` sichern und dauerhaft ins Backup nehmen (der Entrypoint sichert nur die Datenbank). **Vorprüfung am 28.09. ohne Befund:** 94 MB, 315 Dateien, Leseprobe `tar OK`, 362 GB frei unter `/vol/container`; die Sicherung selbst entsteht in Schritt 3.4, das dauerhafte Backup bleibt offen | IT |
 | 6 | Lesend prüfen, ob `N8N_API_KEY` gesetzt ist. `SERVICE` bekommt an der Download-Route jetzt 403 | IT |
 | 7 | `CRON_SECRET` mit mindestens 24 Zeichen (sonst 500) | IT |
 | 8 | Nach dem Deploy: bei `dokument-ablauf-warnung` und `dokument-abgelaufen` die Fassung vergleichen und „Text auf Standard zurücksetzen“ (Z3) | Nutzer |
+| 9 | **Caddy (V-9) — Entscheidung vertagt (29.09.2026).** Caddy läuft mit der globalen Option `debug` und schreibt jede Anfrage samt URI, Token und IP-Adresse ins Journal des Hosts (30 Tage: 2204 Zeilen für `hr.fes-credo.de`; Journal 3,9 GB, Standard-Aufbewahrung). Zu entscheiden: `debug` abschalten, `?Referrer-Policy` im Block `hr.fes-credo.de`, Aufbewahrung des Journals mit dem DSB. Pflicht vor dem ersten „Anfordern“. Fragen, Empfehlung und Ablauf: Ablaufplan 1.9 | Nutzer/IT, DSB |
+| 10 | `backups`-Verzeichnis (V-1): am 28.09. geprüft, in Ordnung (gehört 1001, beide Schreibtests `OK`) | — |
 
 Details, SQL-Abfragen und die Probe nach dem Deploy stehen in `docs/historie/deploy-paket4-stufe1.md`.
 **Rückfall-Falle:** Ein älteres Image löscht per `db push --accept-data-loss` die neuen Tabellen. Fehler deshalb vorwärts beheben.
