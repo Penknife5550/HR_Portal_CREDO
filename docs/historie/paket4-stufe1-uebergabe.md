@@ -1,12 +1,11 @@
 # Paket 4 „Unterlagen nachfordern“ — Übergabe nach Stufe 1
 
-> **Stand:** 26.09.2026, ergänzt am 29.09.2026. Stufe 1 (Onboarding) ist umgesetzt und per
-> Fast-Forward nach `main` gemergt und nach `origin/main` gepusht. Seitdem: Code-Review erledigt
-> (Fix `4875fba`), Ablaufplan nachgezogen (`33e420f`, `82b118f`), Serverprüfung V-1/V-5 ohne
-> Befund, **V-9 Entscheidung vertagt** (Caddy im Debug-Modus), V-4 erledigt (Datenschutzhinweise des
-> DSB im Code). Diese Commits liegen **nur lokal**,
-> gepusht wird erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft weiter auf
-> Code `7bc91ec` (Deploy vom 24.09.2026).
+> **Stand:** 26.09.2026, zuletzt ergänzt am 29.09.2026 als Übergabe für die nächste Sitzung.
+> Stufe 1 (Onboarding) ist umgesetzt, per Fast-Forward nach `main` gemergt und nach `origin/main`
+> gepusht (bis `9cab6b4`). Seitdem **nur lokal**: Code-Review mit Fix (`4875fba`), Ablaufplan
+> nachgezogen (`33e420f`, `82b118f`, `8d1c558`), Datenschutzhinweise des DSB (`d774e4c`) und diese
+> Übergabe. Gepusht wird erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft
+> weiter auf Code `7bc91ec` (Deploy vom 24.09.2026).
 > **Zweck:** In einer neuen Sitzung ohne Vorwissen weitermachen können: was fertig ist, was
 > geprüft wurde, was vor dem Deploy noch fehlt und wie Stufe 2 anschließt.
 
@@ -19,6 +18,41 @@ Die maßgeblichen Dokumente:
 | `docs/historie/deploy-paket4-stufe1.md` | Ablaufplan für den Deploy: Voraussetzungen, lesende Prüfabfragen, Handschritte, Rückfall |
 | `docs/handbuch/handbuch.html`, Kapitel „Unterlagen nachfordern“ | Bedienung für HR |
 | `docs/module/onboarding/aenderungsplan-2026-09.html` | Gesamtplan (Fassung 7), Mockups in Abschnitt 4 |
+
+---
+
+## 0 · Nächste Sitzung: so geht es weiter
+
+**Einstieg:** diese Datei, dann im Ablaufplan `docs/historie/deploy-paket4-stufe1.md` Abschnitt 0
+(„Voraussetzungen“) und die dort genannten Abschnitte. Die Regeln für Codeänderungen stehen in
+CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
+
+**Stand am 29.09.2026:**
+
+- `main` steht **5 Commits vor `origin/main`** (`4875fba`, `33e420f`, `82b118f`, `8d1c558`,
+  `d774e4c`), dazu diese Übergabe — alles nur lokal. **Push nur auf ausdrückliche Freigabe**, das
+  Repo ist öffentlich.
+- Gates zuletzt grün: `lint` 0 Fehler, `tsc` 0 Fehler, 168 Suiten / 4344 Tests, Build ok.
+- Arbeitsweise, die der Nutzer vorgegeben hat: nur lokal committen, nicht pushen, nicht
+  deployen, vor dem Deploy anhalten. Die offenen Punkte der Reihe nach abarbeiten und alles
+  dokumentieren.
+- Erledigt sind V-1, V-4 und die Vorprüfung von V-5. V-9 ist eine vertagte Entscheidung.
+
+**Arbeitsliste** (Reihenfolge nach Abhängigkeit; Stand je Punkt in Abschnitt 4):
+
+| # | Punkt | Wer macht was | Claude kann vorbereiten |
+|---|---|---|---|
+| 1 | **V-7, dazu `CRON_SECRET` und `APP_URL` lesend prüfen** (Ablaufplan 1.7) | Nutzer auf dem Server: die drei Befehle aus 1.7, Ausgabe an Claude | Auswertung. Ist `N8N_API_KEY` gesetzt: klären, ob etwas außerhalb des Repos Dokumente über die Download-Route holt (ab dem Deploy 403 für `SERVICE`) |
+| 2 | **V-2: bestehende n8n-Läufe reparieren** (6.1): `reminders` und `offboarding-reminders` auf `https://hr.fes-credo.de/…` | Nutzer/IT in der n8n-Oberfläche. **Achtung:** Der erste Lauf nach der Korrektur verschickt alle fälligen Erinnerungen auf einmal — HR vorher informieren, an einem Werktag morgens | Prüfliste je Knoten (URL, `POST`, Header-Auth-Credential, Timeout ≥ 120 s), Auswertung der ersten Antworten |
+| 3 | **V-3: neue n8n-Läufe anlegen, zunächst inaktiv** (6.2, 6.3 Nr. 1): `unterlagen-fristen` (07:00 Europe/Berlin, `?dryRun=1`, Timeout 300 000 ms, Retry aus, Bericht bei `errors > 0` oder `nichtZugestellt > 0`) und `dokument-ablauf` (07:30) | Nutzer/IT in n8n; das Credential (`Authorization: Bearer <CRON_SECRET>`) legt der Nutzer selbst an | Workflow-JSON zum Import, ohne Secrets (Skill `n8n-superheld`). **Nicht ins Repo** — `/n8n/` steht in `.gitignore` |
+| 4 | **V-6: Antwortadresse** (= HR-Postfach) unter Einstellungen → SMTP | Nutzer im Portal | — |
+| 5 | **V-8: Freigabeliste** (empfohlen) unter Einstellungen → SMTP → Erlaubte Empfänger-Domains | Nutzer im Portal | Vorschlag für die Domains |
+| 6 | **V-9: Caddy-Entscheidung** (vertagt): `debug` aus, `?Referrer-Policy`, Aufbewahrung des Journals mit dem DSB | Nutzer/IT, DSB | Fragen, Empfehlung und der lokal geprobte Ablauf stehen in 1.9 |
+| 7 | **DSB-Themen** (blockieren den Deploy nicht): Verarbeitungsverzeichnis, Führungszeugnis bei Kitas (in Stufe 1 gesperrt), Aufbewahrung (E-7), Art. 10 in den Datenschutzhinweisen, Aufbewahrung des Journals | Nutzer mit dem DSB | Textentwürfe auf Wunsch |
+| 8 | **Deploy** nach Ablaufplan, sobald 1–6 erledigt sind: Push (Freigabe), Vorab-Prüfungen 1.1, 1.2, 1.5, 1.6, SQL VORHER (2), Deploy (3), NACHHER (4), Handschritte (5), n8n scharf (6.3), HR informieren | Nutzer auf dem Server, Claude wertet jede Ausgabe aus | Ablauf steht. Die Zählung in 3.3 ist gegen `4875fba` nachgerechnet; neu rechnen nur, wenn sich das Schema ändert |
+
+Server-Befehle für den Nutzer so schreiben, wie es Abschnitt 8 beschreibt (höchstens ein `*` je
+Zeile, lokal gegen die Werkzeuge proben, Diagnosezeile).
 
 ---
 
@@ -62,7 +96,8 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 | `33e420f` | Ablaufplan: Prüfbefehle V-1, V-5, V-9 lokal geprobt (nur lokal) |
 | `82b118f` | Ablaufplan: Befund V-9, Caddy im Debug-Modus (nur lokal) |
 | `8d1c558` | V-9 als vertagte Entscheidung, Übergabe auf dem Stand vom 29.09. (nur lokal) |
-| (dieser) | Datenschutzhinweise der Upload-Seite mit dem Wortlaut des DSB, V-4 erledigt (nur lokal) |
+| `d774e4c` | Datenschutzhinweise der Upload-Seite mit dem Wortlaut des DSB, V-4 erledigt (nur lokal) |
+| (dieser) | Übergabe für die nächste Sitzung: Arbeitsliste, Stand V-1 bis V-9, Befunde und Lehren (nur lokal) |
 
 ---
 
@@ -102,20 +137,28 @@ Rücknahme, täglicher Lauf, Download-Route, Middleware). Sechs Befunde:
 
 ---
 
-## 4 · Was vor dem Deploy fehlt
+## 4 · Voraussetzungen V-1 bis V-9 (Stand 29.09.2026)
 
-| # | Punkt | Wer |
-|---|---|---|
-| 1 | ~~Datenschutztext der Upload-Seite~~ — **erledigt am 29.09.2026** (Wortlaut des DSB im Code, aufklappbar in der Fußzeile; Verantwortlicher aus der Mandanten-Einstellung, Standard Christlicher Schulverein Minden e.V.). Mit dem DSB noch klären: Verarbeitungsverzeichnis, Führungszeugnis bei Kitas (in Stufe 1 gesperrt), Aufbewahrung (E-7) und ob Art. 10 (Führungszeugnis) in die Hinweise gehört | DSB |
-| 2 | ~~Code-Review~~ — erledigt am 26.09.2026 (`4875fba`, Abschnitt 3) | — |
-| 3 | **n8n:** die bestehenden Läufe `reminders` und `offboarding-reminders` auf `hr.fes-credo.de` umstellen (sie zeigen auf `hr.credo-schulen.de` und kommen seit über 60 Tagen nicht an), `dokument-ablauf` einplanen, neuen Lauf `unterlagen-fristen` anlegen (täglich 07:00 Europe/Berlin, Header-Auth `Bearer <CRON_SECRET>`, Timeout 300 000 ms, Retry aus, 1–3 Tage `?dryRun=1`). Ohne ihn gibt es keine Erinnerungen und keine Löschung | IT/Nutzer |
-| 4 | `SmtpConfig.replyToEmail` (= HR-Postfach, Kopie der HR-Mails, Antwortadresse) setzen; Freigabeliste pflegen (optional) | Nutzer |
-| 5 | Volume `uploads_data` sichern und dauerhaft ins Backup nehmen (der Entrypoint sichert nur die Datenbank). **Vorprüfung am 28.09. ohne Befund:** 94 MB, 315 Dateien, Leseprobe `tar OK`, 362 GB frei unter `/vol/container`; die Sicherung selbst entsteht in Schritt 3.4, das dauerhafte Backup bleibt offen | IT |
-| 6 | Lesend prüfen, ob `N8N_API_KEY` gesetzt ist. `SERVICE` bekommt an der Download-Route jetzt 403 | IT |
-| 7 | `CRON_SECRET` mit mindestens 24 Zeichen (sonst 500) | IT |
-| 8 | Nach dem Deploy: bei `dokument-ablauf-warnung` und `dokument-abgelaufen` die Fassung vergleichen und „Text auf Standard zurücksetzen“ (Z3) | Nutzer |
-| 9 | **Caddy (V-9) — Entscheidung vertagt (29.09.2026).** Caddy läuft mit der globalen Option `debug` und schreibt jede Anfrage samt URI, Token und IP-Adresse ins Journal des Hosts (30 Tage: 2204 Zeilen für `hr.fes-credo.de`; Journal 3,9 GB, Standard-Aufbewahrung). Zu entscheiden: `debug` abschalten, `?Referrer-Policy` im Block `hr.fes-credo.de`, Aufbewahrung des Journals mit dem DSB. Pflicht vor dem ersten „Anfordern“. Fragen, Empfehlung und Ablauf: Ablaufplan 1.9 | Nutzer/IT, DSB |
-| 10 | `backups`-Verzeichnis (V-1): am 28.09. geprüft, in Ordnung (gehört 1001, beide Schreibtests `OK`) | — |
+Die Nummern sind die des Ablaufplans (Abschnitt 0 dort). Code-Review: erledigt (Abschnitt 3).
+
+| V | Punkt | Stand | Nächster Schritt | Wer |
+|---|---|---|---|---|
+| V-1 | `./backups:/backups` eingehängt, Verzeichnis gehört 1001 | **erledigt 28.09.** — in beiden Diensten eingehängt, `775 1001 n8n`, Schreibtests in `app` und `db` `OK` | — | — |
+| V-2 | Bestehende n8n-Läufe rufen `hr.fes-credo.de` auf | offen | Ablaufplan 6.1; der erste Lauf verschickt echte Mails | Nutzer/IT |
+| V-3 | n8n `unterlagen-fristen` und `dokument-ablauf` angelegt (inaktiv) | offen | 6.2, 6.3 | Nutzer/IT, Claude bereitet den Workflow vor |
+| V-4 | Datenschutztext der Upload-Seite | **erledigt 29.09.** (`d774e4c`) — Wortlaut des DSB, aufklappbar in der Fußzeile; Verantwortlicher aus der Mandanten-Einstellung (Standard Christlicher Schulverein Minden e.V.) | — | — |
+| V-5 | Sicherung des Volumes `uploads_data` | **Vorprüfung erledigt 28.09.** — `hr_portal_credo_uploads_data`, 94 MB, 315 Dateien, Leseprobe `tar OK`, 362 GB frei unter `/vol/container` | Die Sicherung selbst entsteht in 3.4. Das dauerhafte Backup bleibt offen (Abschnitt 8 des Ablaufplans) | IT |
+| V-6 | Antwortadresse (= HR-Postfach) | offen | Einstellungen → SMTP | Nutzer |
+| V-7 | `N8N_API_KEY` geprüft | offen | 1.7 lesend, zusammen mit `CRON_SECRET` (≥ 24 Zeichen) und `APP_URL` | Nutzer/IT |
+| V-8 | Freigabeliste | offen (empfohlen) | Einstellungen → SMTP → Erlaubte Empfänger-Domains | Nutzer |
+| V-9 | Caddy-Zugriffsprotokoll | **Entscheidung vertagt 29.09.** — Caddy läuft mit `debug` und schreibt jede Anfrage samt URI, Token und IP-Adresse ins Journal (30 Tage: 2204 Zeilen für `hr.fes-credo.de`; Journal 3,9 GB, Standard-Aufbewahrung); der `header`-Block überschreibt das `no-referrer` der Upload-Seite | Fragen, Empfehlung und lokal geprobter Ablauf in 1.9; Pflicht vor dem ersten „Anfordern“ | Nutzer/IT, DSB |
+
+- **Mit dem DSB noch klären** (blockiert den Deploy nicht): Verarbeitungsverzeichnis,
+  Führungszeugnis bei Kitas (in Stufe 1 gesperrt), Aufbewahrung (E-7), ob Art. 10
+  (Führungszeugnis) in die Datenschutzhinweise gehört, Aufbewahrung des Journals (V-9).
+- **Nach dem Deploy:** bei `dokument-ablauf-warnung` und `dokument-abgelaufen` die Fassung
+  vergleichen und „Text auf Standard zurücksetzen“ (Z3, Ablaufplan 5.1), danach die Probe mit
+  einem Testvorgang (5.4).
 
 Details, SQL-Abfragen und die Probe nach dem Deploy stehen in `docs/historie/deploy-paket4-stufe1.md`.
 **Rückfall-Falle:** Ein älteres Image löscht per `db push --accept-data-loss` die neuen Tabellen. Fehler deshalb vorwärts beheben.
@@ -165,3 +208,62 @@ Umfang laut Plan: die übrigen fünf Vorgangsarten (Offboarding, Verbeamtung, Ve
 - Kein `CRON_SECRET` in `.env`/`.env.local`: Der Lauf antwortet lokal 500 („Konfigurationsfehler“).
 - **Build nie im Repo**, solange ein Dev-Server läuft (OneDrive sperrt `.next`). Stattdessen in einer Kopie ohne `__tests__`, mit verlinktem `node_modules`.
 - Bilder aus dem Browser-Bereich scheiterten in dieser Sitzung (Zeitüberschreitung). Seitentext und `javascript_tool` reichten zum Prüfen.
+- **29.09.2026:** Für die Browserprobe der Datenschutzhinweise wurde in `unterlagen_links` ein
+  Testlink zur laufenden Nachforderung von 2026-BK-002 angelegt und danach wieder gelöscht. Die
+  Dev-DB ist sonst unverändert. Muster für einen neuen Testlink: Token per `uuid4`, Hash
+  `encode(sha256(convert_to('<token>','UTF8')),'hex')`, `gueltigBis` = Frist + 14.
+- Der Build lief am 26. und 29.09. im Repo, jeweils ohne laufenden Dev-Server, problemlos.
+  Danach meldet Jest eine doppelte `package.json` aus `.next/standalone` — nur eine Warnung.
+- Screenshots im Browser-Bereich kommen in Handybreite teils gekachelt oder versetzt an. Das
+  ist die Vorschau, nicht die Seite. Maße und Inhalte besser per `javascript_tool` prüfen.
+
+---
+
+## 8 · Befunde und Lehren aus der Sitzung vom 26. bis 29.09.2026
+
+**Serverprüfung** (nur lesend, auf `fes-vm-ubuntudocker`). Die Skripte und Ausgaben liegen dort in
+`~/deploy-paket4/`: `pruefung-v1-v5-v9.sh`/`.txt` (28.09.) und `pruefung-v9.sh`/`.txt` (29.09.). Im
+ersten Skript ist die Zeile `CADDYFILE=$(…)` beim Kopieren beschädigt worden; seinen V-9-Teil
+nicht wiederverwenden. Die geprüften Befehle stehen im Ablaufplan 1.3, 1.4 und 1.9.
+
+**Produktionsserver, was dabei herauskam:**
+
+- Docker 29.4.1. Dateisysteme: `/vol/container` 393 GB (362 GB frei), `/var/lib/docker` 30 GB
+  (11 GB frei). Uploads-Volume `hr_portal_credo_uploads_data`.
+- Caddy: Container `caddy_reverse_proxy` (`caddy:latest`), Caddyfile auf dem Host
+  `/vol/container/caddy2/config/Caddyfile`, im Container `/etc/caddy/Caddyfile` (Einhängung der
+  einzelnen Datei, dazu das Verzeichnis als `/config`). Beim Bearbeiten den Inode erhalten (nano),
+  sonst sieht der Container die Änderung erst nach einem Neustart.
+- Caddy schreibt über den Docker-Treiber `syslog` ins **Journal** des Hosts
+  (`journalctl -t docker/caddy_reverse_proxy`), nicht nach `/var/log/syslog`. `docker logs` geht
+  trotzdem (Zwischenspeicher von Docker), reicht aber nicht sicher 30 Tage zurück.
+- **Globale Option `debug` (Zeile 6):** `http.handlers.reverse_proxy` schreibt jede Anfrage mit
+  voller URI (auch Magic-Link-Tokens), IP-Adresse und Headern (Cookie geschwärzt). Journal 3,9 GB,
+  Standard-Aufbewahrung; lesen dürfen root und die Gruppe `adm` (`syslog`, `fes-linux-adm`).
+- Der `header`-Block von `hr.fes-credo.de` setzt `Referrer-Policy` und enthält `-Server`. Caddy
+  wendet ihn deshalb erst beim Schreiben der Antwort an und überschreibt das `no-referrer` der
+  Upload-Seite; `?Referrer-Policy` behebt das (lokal geprobt).
+- Im Log viel Verkehr von Scannern (`/actuator/`, `/aws/`, `/config/` …). Das ist normal; das
+  Portal antwortet mit 404.
+
+**Lehren für die Arbeit mit dem Nutzer:**
+
+- **Befehle aus dem Chat können beim Kopieren leiden.** In einer Zeile mit zwei Sternchen
+  verschwanden beide (als Markdown-Kursivschrift gelesen). Beim Einfügen von Ausgaben in den Chat
+  gingen Zeilenumbrüche und Backslashes vor Satzzeichen verloren. Deshalb: höchstens ein `*` je
+  Zeile, nicht auf `\.` o. ä. angewiesen sein, in Skripten eine Diagnosezeile einbauen
+  (`grep -n … | cat -A`), den Nutzer um den Kopier-Knopf am Codeblock bitten, Ausgaben tolerant
+  lesen.
+- **Log-Prüfungen immer über alle Logger** (`"logger"`) zählen. Die erste Fassung zählte nur
+  `http.log.access`/`http.log.error` und meldete fälschlich Entwarnung, obwohl der Debug-Logger
+  die URIs schrieb.
+- **Server-Befehle vorher lokal proben.** Docker Desktop hat das App-Image
+  (`hr_portal_credo-main-app`, `node:22-alpine` mit busybox), `postgres:16` (Debian, bringt `mawk`
+  wie Ubuntu mit), `postgres:16-alpine` und `caddy:2-alpine`. Proben an Wegwerf-Volumes und
+  Containern, danach abräumen. `docker run` mit einem nicht vorhandenen Image lädt es ungefragt
+  herunter (so geschehen mit `alpine:3`, wieder entfernt) — vorher `docker image ls`.
+- **Werkzeuge:** Edit und Write verwandeln `\u003e` in `>`. Solche Zeichenfolgen in Dateien per
+  Python mit `chr(92)` erzeugen. Lange Python-Heredocs mit vielen Anführungszeichen scheiterten
+  einmal in Bash; zuverlässiger ist ein Skript als Datei, das ein kurzer Befehl startet. Die
+  automatische Freigabe für Shell-Befehle fiel zeitweise aus; dann erst andere Arbeit erledigen
+  und später erneut versuchen.
