@@ -4,8 +4,8 @@
 > Stufe 1 (Onboarding) ist umgesetzt, per Fast-Forward nach `main` gemergt und nach `origin/main`
 > gepusht (bis `9cab6b4`). Seitdem **nur lokal**: Code-Review mit Fix (`4875fba`), Ablaufplan
 > nachgezogen (`33e420f`, `82b118f`, `8d1c558`), Datenschutzhinweise des DSB (`d774e4c`), diese
-> Übergabe (`92e67a2`) und die Vorbereitung von V-7 (Prüfskript im Ablaufplan 1.7). Gepusht wird
-> erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft
+> Übergabe (`92e67a2`), V-7 (Prüfskript im Ablaufplan 1.7, `6ab7f40`; am 29.09. auf dem Server
+> erledigt) und dessen Ergebnis. Gepusht wird erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft
 > weiter auf Code `7bc91ec` (Deploy vom 24.09.2026).
 > **Zweck:** In einer neuen Sitzung ohne Vorwissen weitermachen können: was fertig ist, was
 > geprüft wurde, was vor dem Deploy noch fehlt und wie Stufe 2 anschließt.
@@ -30,27 +30,31 @@ CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
 
 **Stand am 29.09.2026:**
 
-- `main` steht **7 Commits vor `origin/main`** (`4875fba`, `33e420f`, `82b118f`, `8d1c558`,
-  `d774e4c`, die Übergabe `92e67a2` und die Vorbereitung von V-7) — alles nur lokal. **Push nur auf
-  ausdrückliche Freigabe**, das Repo ist öffentlich.
+- `main` steht **8 Commits vor `origin/main`** (`4875fba`, `33e420f`, `82b118f`, `8d1c558`,
+  `d774e4c`, die Übergabe `92e67a2`, V-7 vorbereitet `6ab7f40` und das Ergebnis von V-7) — alles
+  nur lokal. **Push nur auf ausdrückliche Freigabe**, das Repo ist öffentlich.
 - Gates zuletzt grün: `lint` 0 Fehler, `tsc` 0 Fehler, 168 Suiten / 4344 Tests, Build ok.
 - Arbeitsweise, die der Nutzer vorgegeben hat: nur lokal committen, nicht pushen, nicht
   deployen, vor dem Deploy anhalten. Die offenen Punkte der Reihe nach abarbeiten und alles
   dokumentieren.
-- Erledigt sind V-1, V-4 und die Vorprüfung von V-5. V-9 ist eine vertagte Entscheidung.
-- **V-7 ist vorbereitet (29.09.):** Prüfskript im Ablaufplan 1.7, lokal geprobt. Es wartet auf den
-  Lauf auf dem Server; danach wertet Claude `pruefung-v7.txt` nach der Tabelle in 1.7 aus.
+- Erledigt sind V-1, V-4, V-7 und die Vorprüfung von V-5. V-9 ist eine vertagte Entscheidung.
+- **V-7 erledigt (29.09.):** `N8N_API_KEY` ist auf dem Server leer, die Rolle `SERVICE` gibt es
+  also nicht. `CRON_SECRET` hat 32 Zeichen, `APP_URL` stimmt, `NEXT_PUBLIC_APP_URL` ist nicht
+  gesetzt (Ablaufplan 1.7, Ergebnis). Nebenbei zeigte sich, dass das Journal nur bis zum 26.09.
+  zurückreicht; das ändert die Grundlage der vertagten V-9-Entscheidung (1.9, Nachträge).
+- **Nächster Punkt: 2 (V-2).** n8n läuft auf demselben Host im Netz `reverse_proxy` (`n8n-n8n-1`,
+  dazu `n8n-sw`); zuerst klären, welche Instanz die HR-Läufe trägt.
 
 **Arbeitsliste** (Reihenfolge nach Abhängigkeit; Stand je Punkt in Abschnitt 4):
 
 | # | Punkt | Wer macht was | Claude kann vorbereiten |
 |---|---|---|---|
-| 1 | **V-7, dazu `CRON_SECRET`, `APP_URL` und `NEXT_PUBLIC_APP_URL` lesend prüfen** (Ablaufplan 1.7) | Nutzer auf dem Server: das Prüfskript aus 1.7 anlegen (Prüfsumme `f67e86e8…`), mit `sudo sh` ausführen, `pruefung-v7.txt` an Claude | **Vorbereitet am 29.09.**, lokal geprobt. Danach die Auswertung nach der Tabelle in 1.7. Ist `N8N_API_KEY` gesetzt: klären, ob etwas Dokumente über die Download-Route holt (ab dem Deploy 403 für `SERVICE`); der öffentliche Platzhalter wäre sofort zu ersetzen |
+| 1 | **V-7, dazu `CRON_SECRET`, `APP_URL` und `NEXT_PUBLIC_APP_URL` lesend prüfen** (Ablaufplan 1.7) | **Erledigt am 29.09.** — Prüfskript aus 1.7 auf dem Server gelaufen | `N8N_API_KEY` leer, Umgebung in Ordnung, keine Webhooks, keine Anfrage mit `X-API-Key` (Ergebnis in 1.7) |
 | 2 | **V-2: bestehende n8n-Läufe reparieren** (6.1): `reminders` und `offboarding-reminders` auf `https://hr.fes-credo.de/…` | Nutzer/IT in der n8n-Oberfläche. **Achtung:** Der erste Lauf nach der Korrektur verschickt alle fälligen Erinnerungen auf einmal — HR vorher informieren, an einem Werktag morgens | Prüfliste je Knoten (URL, `POST`, Header-Auth-Credential, Timeout ≥ 120 s), Auswertung der ersten Antworten |
 | 3 | **V-3: neue n8n-Läufe anlegen, zunächst inaktiv** (6.2, 6.3 Nr. 1): `unterlagen-fristen` (07:00 Europe/Berlin, `?dryRun=1`, Timeout 300 000 ms, Retry aus, Bericht bei `errors > 0` oder `nichtZugestellt > 0`) und `dokument-ablauf` (07:30) | Nutzer/IT in n8n; das Credential (`Authorization: Bearer <CRON_SECRET>`) legt der Nutzer selbst an | Workflow-JSON zum Import, ohne Secrets (Skill `n8n-superheld`). **Nicht ins Repo** — `/n8n/` steht in `.gitignore` |
 | 4 | **V-6: Antwortadresse** (= HR-Postfach) unter Einstellungen → SMTP | Nutzer im Portal | — |
 | 5 | **V-8: Freigabeliste** (empfohlen) unter Einstellungen → SMTP → Erlaubte Empfänger-Domains | Nutzer im Portal | Vorschlag für die Domains |
-| 6 | **V-9: Caddy-Entscheidung** (vertagt): `debug` aus, `?Referrer-Policy`, Aufbewahrung des Journals mit dem DSB | Nutzer/IT, DSB | Fragen, Empfehlung und der lokal geprobte Ablauf stehen in 1.9 |
+| 6 | **V-9: Caddy-Entscheidung** (vertagt): `debug` aus, `?Referrer-Policy`, Aufbewahrung des Journals mit dem DSB | Nutzer/IT, DSB | Fragen, Empfehlung und der lokal geprobte Ablauf stehen in 1.9. Neu seit 29.09. (1.9, Nachträge): Das Journal reicht nur etwa dreieinhalb Tage zurück; nach dem Abschalten von `debug` blieben die letzten Einträge mit Tokens womöglich Monate liegen — Löschen mitentscheiden |
 | 7 | **DSB-Themen** (blockieren den Deploy nicht): Verarbeitungsverzeichnis, Führungszeugnis bei Kitas (in Stufe 1 gesperrt), Aufbewahrung (E-7), Art. 10 in den Datenschutzhinweisen, Aufbewahrung des Journals | Nutzer mit dem DSB | Textentwürfe auf Wunsch |
 | 8 | **Deploy** nach Ablaufplan, sobald 1–6 erledigt sind: Push (Freigabe), Vorab-Prüfungen 1.1, 1.2, 1.5, 1.6, SQL VORHER (2), Deploy (3), NACHHER (4), Handschritte (5), n8n scharf (6.3), HR informieren | Nutzer auf dem Server, Claude wertet jede Ausgabe aus | Ablauf steht. Die Zählung in 3.3 ist gegen `4875fba` nachgerechnet; neu rechnen nur, wenn sich das Schema ändert |
 
@@ -101,7 +105,8 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 | `8d1c558` | V-9 als vertagte Entscheidung, Übergabe auf dem Stand vom 29.09. (nur lokal) |
 | `d774e4c` | Datenschutzhinweise der Upload-Seite mit dem Wortlaut des DSB, V-4 erledigt (nur lokal) |
 | `92e67a2` | Übergabe für die nächste Sitzung: Arbeitsliste, Stand V-1 bis V-9, Befunde und Lehren (nur lokal) |
-| (dieser) | V-7 vorbereitet: Prüfskript im Ablaufplan 1.7 mit Selbstprüfung, lokal geprobt; V6 der VORHER-Datei ohne Zugangsdaten aus Webhook-URLs (nur lokal) |
+| `6ab7f40` | V-7 vorbereitet: Prüfskript im Ablaufplan 1.7 mit Selbstprüfung, lokal geprobt; V6 der VORHER-Datei ohne Zugangsdaten aus Webhook-URLs (nur lokal) |
+| (dieser) | V-7 erledigt: Serverergebnis in 1.7; in 1.9 die Zählung korrigiert (Journal erst ab 26.09.) und der Nachtrag zur Aufbewahrung; Anhang B nachgezogen (nur lokal) |
 
 ---
 
@@ -153,9 +158,9 @@ Die Nummern sind die des Ablaufplans (Abschnitt 0 dort). Code-Review: erledigt (
 | V-4 | Datenschutztext der Upload-Seite | **erledigt 29.09.** (`d774e4c`) — Wortlaut des DSB, aufklappbar in der Fußzeile; Verantwortlicher aus der Mandanten-Einstellung (Standard Christlicher Schulverein Minden e.V.) | — | — |
 | V-5 | Sicherung des Volumes `uploads_data` | **Vorprüfung erledigt 28.09.** — `hr_portal_credo_uploads_data`, 94 MB, 315 Dateien, Leseprobe `tar OK`, 362 GB frei unter `/vol/container` | Die Sicherung selbst entsteht in 3.4. Das dauerhafte Backup bleibt offen (Abschnitt 8 des Ablaufplans) | IT |
 | V-6 | Antwortadresse (= HR-Postfach) | offen | Einstellungen → SMTP | Nutzer |
-| V-7 | `N8N_API_KEY` geprüft | **vorbereitet 29.09.** — Prüfskript in 1.7 (Umgebung, öffentlicher Platzhalter, `NEXT_PUBLIC_APP_URL`, Webhooks, Caddy-Journal) mit Selbstprüfung, lokal geprobt. Die drei Einzelbefehle von vorher hätten `NEXT_PUBLIC_APP_URL` (geht in `getBaseUrl()` vor) und den Platzhalter übersehen und nichts zur Nutzung gezeigt | Skript auf dem Server ausführen, `pruefung-v7.txt` an Claude | Nutzer, dann Claude |
+| V-7 | `N8N_API_KEY` geprüft | **erledigt 29.09.** — Prüfskript in 1.7 (die drei Einzelbefehle von vorher hätten `NEXT_PUBLIC_APP_URL` und den öffentlichen Platzhalter übersehen). Ergebnis: `N8N_API_KEY` leer, also keine Rolle `SERVICE`; `CRON_SECRET` 32 Zeichen ohne Leerraum; `APP_URL` = `https://hr.fes-credo.de`, `NEXT_PUBLIC_APP_URL` nicht gesetzt, `NODE_ENV` production; keine Webhooks; im Journal seit 26.09. keine Anfrage mit `X-API-Key` | — | — |
 | V-8 | Freigabeliste | offen (empfohlen) | Einstellungen → SMTP → Erlaubte Empfänger-Domains | Nutzer |
-| V-9 | Caddy-Zugriffsprotokoll | **Entscheidung vertagt 29.09.** — Caddy läuft mit `debug` und schreibt jede Anfrage samt URI, Token und IP-Adresse ins Journal (30 Tage: 2204 Zeilen für `hr.fes-credo.de`; Journal 3,9 GB, Standard-Aufbewahrung); der `header`-Block überschreibt das `no-referrer` der Upload-Seite | Fragen, Empfehlung und lokal geprobter Ablauf in 1.9; Pflicht vor dem ersten „Anfordern“ | Nutzer/IT, DSB |
+| V-9 | Caddy-Zugriffsprotokoll | **Entscheidung vertagt 29.09.** — Caddy läuft mit `debug` und schreibt jede Anfrage samt URI, Token und IP-Adresse ins Journal (seit 26.09.: 2204 Zeilen für `hr.fes-credo.de` — weiter reicht das Journal nicht zurück, weil der Debug-Modus es an die Grenze von 4 GB drückt; 3,9 GB, Standard-Aufbewahrung); der `header`-Block überschreibt das `no-referrer` der Upload-Seite | Fragen, Empfehlung und lokal geprobter Ablauf in 1.9; Pflicht vor dem ersten „Anfordern“ | Nutzer/IT, DSB |
 
 - **Mit dem DSB noch klären** (blockiert den Deploy nicht): Verarbeitungsverzeichnis,
   Führungszeugnis bei Kitas (in Stufe 1 gesperrt), Aufbewahrung (E-7), ob Art. 10
@@ -200,10 +205,12 @@ Umfang laut Plan: die übrigen fünf Vorgangsarten (Offboarding, Verbeamtung, Ve
 - **Reichweite der Rolle `SERVICE`** (gefunden bei V-7 am 29.09., unabhängig von Paket 4): Mit dem
   Wert von `N8N_API_KEY` in der Kopfzeile `X-API-Key` lädt `SERVICE` Dokumente der Verbeamtung
   (`GET /api/civil-service/[id]/documents/[docId]` prüft nur, ob eine Sitzung besteht). Außerdem
-  liest, ändert und löscht es den Mitarbeiterstamm und liest Auswertungen aller Mandanten. Nutzt
-  nichts den Schlüssel, ist Entfernen die einfachste Härtung (Ablaufplan 1.7). Sonst die
-  Download-Routen der übrigen Module auf Portal-Rollen beschränken wie die Onboarding-Route
-  (Kandidat für Stufe 2).
+  liest, ändert und löscht es den Mitarbeiterstamm und liest Auswertungen aller Mandanten. **Auf
+  dem Server ist `N8N_API_KEY` leer (29.09.)**, die Rolle ist also nicht erreichbar. Wichtig wird
+  das erst, wenn jemand den Schlüssel setzt; dann vorher die Download-Routen der übrigen Module
+  auf Portal-Rollen beschränken wie die Onboarding-Route (Kandidat für Stufe 2). Eine Fußangel
+  bleibt: `.env.example` trägt den bekannten Platzhalter `optionaler_api_key_fuer_n8n` — besser
+  ein leerer Wert wie in `.env.production.example`.
 
 ---
 
@@ -233,9 +240,10 @@ Umfang laut Plan: die übrigen fünf Vorgangsarten (Offboarding, Verbeamtung, Ve
 ## 8 · Befunde und Lehren aus der Sitzung vom 26. bis 29.09.2026
 
 **Serverprüfung** (nur lesend, auf `fes-vm-ubuntudocker`). Die Skripte und Ausgaben liegen dort in
-`~/deploy-paket4/`: `pruefung-v1-v5-v9.sh`/`.txt` (28.09.) und `pruefung-v9.sh`/`.txt` (29.09.). Im
-ersten Skript ist die Zeile `CADDYFILE=$(…)` beim Kopieren beschädigt worden; seinen V-9-Teil
-nicht wiederverwenden. Die geprüften Befehle stehen im Ablaufplan 1.3, 1.4 und 1.9.
+`~/deploy-paket4/`: `pruefung-v1-v5-v9.sh`/`.txt` (28.09.), `pruefung-v9.sh`/`.txt` (29.09.) und
+`pruefung-v7.sh`/`.txt` (29.09., V-7). Im ersten Skript ist die Zeile `CADDYFILE=$(…)` beim
+Kopieren beschädigt worden; seinen V-9-Teil nicht wiederverwenden. Die geprüften Befehle stehen im
+Ablaufplan 1.3, 1.4, 1.7 und 1.9.
 
 **Produktionsserver, was dabei herauskam:**
 
@@ -256,6 +264,14 @@ nicht wiederverwenden. Die geprüften Befehle stehen im Ablaufplan 1.3, 1.4 und 
   Upload-Seite; `?Referrer-Policy` behebt das (lokal geprobt).
 - Im Log viel Verkehr von Scannern (`/actuator/`, `/aws/`, `/config/` …). Das ist normal; das
   Portal antwortet mit 404.
+- **Journal (29.09., V-7):** Die älteste Caddy-Zeile stammt vom 26.09. 02:16 UTC. Der Debug-Modus
+  schreibt rund 2,5 Millionen Zeilen in gut drei Tagen und hält das Journal an der Grenze von
+  4 GB; vermutlich reicht deshalb das ganze Journal des Hosts nur etwa dreieinhalb Tage zurück.
+  Die Zählung „30 Tage“ vom Morgen umfasste also nur diese Zeit (Ablaufplan 1.9, Korrektur).
+- **Umgebung und Netz (29.09., V-7):** `N8N_API_KEY` leer, `CRON_SECRET` 32 Zeichen, `APP_URL`
+  richtig, `NEXT_PUBLIC_APP_URL` nicht gesetzt, keine Webhooks im Portal. Im Netz `reverse_proxy`
+  hängen elf Container, darunter `n8n-n8n-1`, `n8n-sw`, `n8n-pgadmin-1` und
+  `metabase-metabase-1`; `hr-portal-db` hängt nur im internen Netz.
 
 **Lehren für die Arbeit mit dem Nutzer:**
 

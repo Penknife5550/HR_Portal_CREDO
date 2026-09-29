@@ -6,7 +6,9 @@
 > (Datenschutzhinweise des DSB im Code, 1.8). Am 29.09. außerdem: 1.7 (V-7) als Prüfskript mit
 > Selbstprüfung, lokal geprobt (Befunde: `NEXT_PUBLIC_APP_URL` geht vor `APP_URL`, öffentlicher
 > Platzhalter für `N8N_API_KEY`, `X-API-Key` im Klartext im Caddy-Journal); V6 in Abschnitt 2 gibt
-> keine Zugangsdaten aus Webhook-URLs mehr aus. Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
+> keine Zugangsdaten aus Webhook-URLs mehr aus. Das Skript lief am selben Tag auf dem Server:
+> **V-7 erledigt** (`N8N_API_KEY` leer, Umgebung in Ordnung; Ergebnis in 1.7). Dabei zeigte sich,
+> dass das Journal nur bis zum 26.09. zurückreicht (Korrektur und Nachtrag in 1.9). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
 > [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand:** Server auf `8952e1a` (Code `7bc91ec`, Deploy vom 24.09.2026).
@@ -110,7 +112,7 @@ Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 | V-4 | Art.-13-Text der Upload-Seite vom DSB — **erledigt am 29.09.2026** (Wortlaut im Code, 1.8) | erledigt | 1.8 |
 | V-5 | Sicherung des Volumes `uploads_data` (vorher Leseprobe) | **Pflicht** | 1.4, 3.4 |
 | V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt | Pflicht vor dem ersten „Anfordern“ | 2.3 (V4), 5.2 |
-| V-7 | `N8N_API_KEY` geprüft (Prüfskript mit `CRON_SECRET`, `APP_URL`, `NEXT_PUBLIC_APP_URL`, Webhooks und Caddy-Journal): Holt etwas außerhalb des Repos Dokumente über die Download-Route? Ist der Schlüssel der öffentliche Platzhalter aus `.env.example`? | ENTSCHEIDUNG, falls gesetzt; Platzhalter: sofort handeln | 1.7 |
+| V-7 | `N8N_API_KEY` geprüft (Prüfskript mit `CRON_SECRET`, `APP_URL`, `NEXT_PUBLIC_APP_URL`, Webhooks und Caddy-Journal): Holt etwas außerhalb des Repos Dokumente über die Download-Route? Ist der Schlüssel der öffentliche Platzhalter aus `.env.example`? — **erledigt am 29.09.2026:** `N8N_API_KEY` ist leer, die Rolle `SERVICE` gibt es also nicht; `CRON_SECRET` 32 Zeichen, `APP_URL` richtig, `NEXT_PUBLIC_APP_URL` nicht gesetzt | erledigt | 1.7 |
 | V-8 | Freigabeliste für abweichende Empfängeradressen | empfohlen | 5.3 |
 | V-9 | Caddy: Schreibt der Server ein Zugriffsprotokoll, filtert es die URI (der Token der Upload-Seite steht im Pfad und öffnet den Zugang zu Personalunterlagen) | **Pflicht** vor dem ersten „Anfordern“; lesende Prüfung vor dem Deploy, ein `log` ohne URI-Filter ist ENTSCHEIDUNG. **Befund 29.09.:** globale Option `debug` protokolliert jede Anfrage samt URI → ENTSCHEIDUNG, **vertagt** (1.9) | 1.9, 5.2 |
 
@@ -475,6 +477,23 @@ sudo sh ~/deploy-paket4/pruefung-v7.sh 2>&1 | tee ~/deploy-paket4/pruefung-v7.tx
 - **Nicht geprobt:** `journalctl` selbst (Aufruf wie in 1.9, dort am 29.09. auf dem Server
   gelaufen) und die Laufzeit über das ganze Journal.
 
+**Ergebnis vom 29.09.2026** (Server, 13:27 UTC, Selbstprüfung OK, Prüfsumme wie oben) —
+**V-7 erledigt.** Das Skript lief fehlerfrei; auch `journalctl` und `awk` arbeiteten wie lokal
+geprobt.
+
+| Teil | Ergebnis | Bewertung |
+|---|---|---|
+| A | `CRON_SECRET` 32 Zeichen, davon Leerraum 0 | in Ordnung (mindestens 24) |
+| A | `N8N_API_KEY` 0 Zeichen, keine Zeile „Platzhalter“ | Leer: `getSession()` prüft dann keine Kopfzeile `X-API-Key`, die Rolle `SERVICE` gibt es nicht. Die 403 der Download-Route trifft niemanden. **V-7 erledigt, keine Entscheidung nötig.** |
+| A | `NODE_ENV=[production]`, `APP_URL=[https://hr.fes-credo.de]`, `NEXT_PUBLIC_APP_URL=[nicht gesetzt]` | in Ordnung: Die Upload-Links beginnen mit `https://hr.fes-credo.de/unterlagen/` |
+| B | keine Webhooks (`0 rows`) | INFO: Das Portal schickt überhaupt keine Webhooks. V6 in Abschnitt 2 wird leer sein, 6.4 hat keinen Anwendungsfall. |
+| C | elf Container im Netz `reverse_proxy`, darunter `n8n-n8n-1`, `n8n-sw`, `n8n-pgadmin-1`, `metabase-metabase-1` | INFO: n8n läuft auf demselben Host und erreicht das Portal auch intern (`http://hr-portal-app:3000`); welche Instanz die HR-Läufe trägt, klärt V-2. Das Portal verlässt sich nicht auf das Netz (jede Route prüft selbst), und `hr-portal-db` hängt nur im internen Netz. |
+| D | ältester Caddy-Eintrag `2026-09-26T02:16:00+00:00` | Das Journal reicht nur gut dreieinhalb Tage zurück. Teil E umfasst nur diese Zeit — bei leerem Schlüssel ohne Belang. Folgen für V-9: Korrektur und Nachtrag in 1.9. |
+| E | 2300 Zeilen für `hr.fes-credo.de`; keine Anfrage mit `X-API-Key`, keine an die Download-Route | in Ordnung, der Filter greift |
+
+Die Empfehlungen unter „Auswertung V-7“ gelten nur, falls künftig jemand einen `N8N_API_KEY`
+setzt; dann vorher die Reichweite von `SERVICE` bedenken (oben).
+
 ### 1.8 Datenschutz: Art.-13-Text der Upload-Seite
 
 **Erledigt am 29.09.2026.** Die Datenschutzhinweise der Upload-Seite tragen den Wortlaut des DSB
@@ -592,9 +611,11 @@ Zugriffsprotokoll die URI filtert** (lokal bestätigt). Das gehört mit in die E
   (im Container `/etc/caddy/Caddyfile`), Treiber `syslog` → Journal des Hosts.
 - Block `hr.fes-credo.de` ohne `log`, `request_body` 50 MB, `header` mit
   `Referrer-Policy "strict-origin-when-cross-origin"` und `-Server`.
-- **Globale Option `debug` in Zeile 6** → `"default": {"level": "DEBUG"}`. In 30 Tagen 2204 Zeilen
-  von `http.handlers.reverse_proxy` mit URI für `hr.fes-credo.de`, darunter Links mit Token
-  (`/api/fragebogen/`, `/api/modalitaeten/`); insgesamt rund 2,5 Millionen Caddy-Zeilen.
+- **Globale Option `debug` in Zeile 6** → `"default": {"level": "DEBUG"}`. Gezählt mit
+  `--since "30 days ago"`: 2204 Zeilen von `http.handlers.reverse_proxy` mit URI für
+  `hr.fes-credo.de`, darunter Links mit Token (`/api/fragebogen/`, `/api/modalitaeten/`);
+  insgesamt rund 2,5 Millionen Caddy-Zeilen. **Korrektur (29.09., 1.7 Teil D):** Das Journal
+  reicht nur bis zum 26.09. 02:16 UTC zurück — die Zählung umfasst gut drei Tage, nicht 30.
 - Journal 3,9 GB (Standard-Obergrenze 4 GB, keine eigene Aufbewahrungsregel). Lesen dürfen root
   und die Gruppe `adm` (`syslog`, `fes-linux-adm`).
 - **V-9 = ENTSCHEIDUNG.** Empfehlung: `debug` abschalten, im Block `hr.fes-credo.de`
@@ -616,9 +637,35 @@ Zugriffsprotokoll die URI filtert** (lokal bestätigt). Das gehört mit in die E
 **Nachtrag vom 29.09. (V-7):** Im Debug-Modus schwärzt Caddy nur `Cookie`, `Set-Cookie`,
 `Authorization` und `Proxy-Authorization`. Andere Kopfzeilen mit Zugangsdaten stehen im Klartext
 im Journal, etwa `X-API-Key` (n8n-Schlüssel des Portals, Webhooks mit Header-Auth). Das ist lokal
-mit Caddy 2.11.1 belegt. Ob es auf dem Server vorkommt, zeigt Teil E des Prüfskripts in 1.7.
-Falls ja, gehört zur Entscheidung: Nach dem Abschalten von `debug` die betroffenen Schlüssel
-wechseln — die alten Einträge bleiben ja im Journal.
+mit Caddy 2.11.1 belegt. Auf dem Server (Teil E des Prüfskripts in 1.7, 29.09.) gab es seit dem
+26.09. keine Anfrage mit `X-API-Key`; `N8N_API_KEY` ist leer, und Webhooks gibt es keine. Für das
+Portal ist also kein Schlüssel zu wechseln. Andere Dienste hinter demselben Caddy können
+Zugangsdaten in eigenen Kopfzeilen schicken (n8n etwa `X-N8N-API-KEY`); Teil E zählt nur
+`X-API-Key`. Auch das spricht dafür, `debug` abzuschalten.
+
+**Nachtrag vom 29.09. (Aufbewahrung, aus 1.7 Teil D):** Die ältesten Caddy-Zeilen im Journal
+stammen vom 26.09.2026 02:16 UTC. Das Journal steht an seiner Obergrenze (3,9 von 4 GB), und der
+Debug-Modus schreibt rund 2,5 Millionen Caddy-Zeilen in gut drei Tagen. Vermutlich reicht deshalb
+das **ganze** Journal des Hosts nur etwa dreieinhalb Tage zurück — auch für Anmeldungen per SSH,
+Docker und die übrigen Dienste. Für die Fragen oben heißt das:
+
+- **Zu 1:** ein weiterer Grund, `debug` abzuschalten. Die Debug-Zeilen verdrängen alle anderen
+  Logs des Hosts.
+- **Zu 3:** Heute verschwinden Einträge mit Tokens nach etwa dreieinhalb Tagen von selbst. Nach dem
+  Abschalten wächst das Journal viel langsamer, und die Einträge der letzten Tage davor blieben
+  womöglich Monate liegen. Beim Abschalten deshalb mitentscheiden, ob sie gelöscht werden
+  (`journalctl --rotate`, dann `--vacuum-time=…`; das trifft alle Logs des Hosts).
+
+Prüfen, wenn V-9 an der Reihe ist (nur lesend): der älteste Eintrag des ganzen Journals und seine
+Größe.
+
+```bash
+sudo journalctl -o short-iso | grep -m 1 -E '^[0-9]' | cut -d ' ' -f 1
+```
+
+```bash
+sudo journalctl --disk-usage
+```
 
 Ablauf für 1 und 2, sobald entschieden (lokal mit derselben Einhängung geprobt; die Zeilennummern
 stammen vom 29.09. — vorher mit dem `awk` aus „Prüfen“ gegenprüfen):
@@ -1162,10 +1209,11 @@ Handlungsanweisung hinaus.
    `no-referrer`:
    `curl -s -D - -o /dev/null https://hr.fes-credo.de/unterlagen/00000000-0000-4000-8000-000000000000 | grep -i referrer-policy`
    → `Referrer-Policy: no-referrer`. Die bisherigen Einträge im Journal (Tokens und IP-Adressen)
-   bleiben bis zur Obergrenze von 4 GB liegen — ob sie früher gelöscht werden und welche
-   Aufbewahrung künftig gilt, entscheidet ihr mit dem DSB. Hat Teil E des Prüfskripts in 1.7
-   Zeilen `X-API-Key:` gezeigt, nach dem Abschalten die betroffenen Schlüssel wechseln (in der
-   `.env` bzw. der Webhook-Konfiguration und bei jedem Abnehmer).
+   bleiben bis zur Obergrenze von 4 GB liegen. Heute sind das gut dreieinhalb Tage, nach dem
+   Abschalten womöglich Monate (1.9, Nachtrag Aufbewahrung). Ob sie früher gelöscht werden und
+   welche Aufbewahrung künftig gilt, entscheidet ihr mit dem DSB. Einen Schlüssel zu wechseln gibt
+   es für das Portal nicht: Teil E des Prüfskripts in 1.7 fand am 29.09. keine Anfrage mit
+   `X-API-Key`.
 5. **HR informieren — erst, wenn `unterlagen-fristen` scharf läuft (6.3 Nr. 4):** Handbuch,
    Kapitel 3.7 „Unterlagen nachfordern“ (`docs/handbuch/handbuch.html#onboarding-unterlagen`).
    Besonders: Unterlagen nicht per Mail annehmen, sensible Unterlagen nie über freie Zeilen
@@ -1423,14 +1471,15 @@ Leere.
 ## Anhang B · Ungeklärt
 
 - **n8n:** Live-Stand der bestehenden Läufe (URL, Timeout, Zeitplan) und ob
-  `dokument-ablauf` irgendwo eingeplant ist.
-- **`N8N_API_KEY`:** ob gesetzt, ob es der öffentliche Platzhalter ist und wer ihn nutzt (1.7). Das
-  Prüfskript ist seit 29.09.2026 lokal geprobt und wartet auf den Lauf auf dem Server. Aufrufe an
-  Caddy vorbei (etwa aus einem n8n im Netz `reverse_proxy`) sieht es nicht; dafür in n8n nachsehen.
-- **Caddy, Live-Stand:** ob ein Zugriffsprotokoll die URI samt Token festhält, wo das
-  Caddyfile liegt und welches `request_body` gilt (1.9, V-9). Das `Caddyfile.hr-portal` im Repo
-  ist veraltet. Die Befehle in 1.9 sind am 28.09.2026 lokal gegen Caddy 2.11 geprobt, auf dem
-  Server nicht.
+  `dokument-ablauf` irgendwo eingeplant ist. Bekannt seit 29.09. (1.7, Teil C): n8n läuft auf
+  demselben Host im Netz `reverse_proxy` (`n8n-n8n-1`, dazu `n8n-sw`). Welche Instanz die
+  HR-Läufe trägt, klärt V-2.
+- ~~**`N8N_API_KEY`**~~ — **geklärt am 29.09.2026:** leer (1.7, Ergebnis). Die Rolle `SERVICE` gibt
+  es damit nicht.
+- ~~**Caddy, Live-Stand**~~ — **geklärt am 29.09.2026** (1.9, Befund): Der Debug-Modus schreibt
+  jede Anfrage samt URI und Token ins Journal, das Caddyfile liegt unter
+  `/vol/container/caddy2/config/Caddyfile`, `request_body` ist 50 MB. Offen ist nur die
+  Entscheidung V-9. Das `Caddyfile.hr-portal` im Repo ist veraltet.
 - **Handy und Caddy:** ob iOS HEIC in JPEG umwandelt und ob `Content-Length` über Caddy und
   HTTP/2 ankommt (die Grenze greift auch ohne den Header).
 - **Browser:** ob das Inline-PDF unter der Portal-CSP überall angezeigt wird (5.4 Nr. 3).
