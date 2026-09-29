@@ -3,7 +3,10 @@
 > **Stand:** Ablaufplan vom 25.09.2026, **noch nicht ausgeführt**. Ergänzt am 28. und 29.09.2026:
 > Code-Review erledigt (Fix-Commit `4875fba`), Prüfbefehle in 1.3, 1.4 und 1.9 überarbeitet und
 > lokal geprobt, Serverprüfung V-1/V-5 ohne Befund, V-9 Entscheidung vertagt (1.9), V-4 erledigt
-> (Datenschutzhinweise des DSB im Code, 1.8). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
+> (Datenschutzhinweise des DSB im Code, 1.8). Am 29.09. außerdem: 1.7 (V-7) als Prüfskript mit
+> Selbstprüfung, lokal geprobt (Befunde: `NEXT_PUBLIC_APP_URL` geht vor `APP_URL`, öffentlicher
+> Platzhalter für `N8N_API_KEY`, `X-API-Key` im Klartext im Caddy-Journal); V6 in Abschnitt 2 gibt
+> keine Zugangsdaten aus Webhook-URLs mehr aus. Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
 > [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand:** Server auf `8952e1a` (Code `7bc91ec`, Deploy vom 24.09.2026).
@@ -107,7 +110,7 @@ Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 | V-4 | Art.-13-Text der Upload-Seite vom DSB — **erledigt am 29.09.2026** (Wortlaut im Code, 1.8) | erledigt | 1.8 |
 | V-5 | Sicherung des Volumes `uploads_data` (vorher Leseprobe) | **Pflicht** | 1.4, 3.4 |
 | V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt | Pflicht vor dem ersten „Anfordern“ | 2.3 (V4), 5.2 |
-| V-7 | `N8N_API_KEY` geprüft: Holt etwas außerhalb des Repos Dokumente über die Download-Route? | ENTSCHEIDUNG, falls gesetzt | 1.7 |
+| V-7 | `N8N_API_KEY` geprüft (Prüfskript mit `CRON_SECRET`, `APP_URL`, `NEXT_PUBLIC_APP_URL`, Webhooks und Caddy-Journal): Holt etwas außerhalb des Repos Dokumente über die Download-Route? Ist der Schlüssel der öffentliche Platzhalter aus `.env.example`? | ENTSCHEIDUNG, falls gesetzt; Platzhalter: sofort handeln | 1.7 |
 | V-8 | Freigabeliste für abweichende Empfängeradressen | empfohlen | 5.3 |
 | V-9 | Caddy: Schreibt der Server ein Zugriffsprotokoll, filtert es die URI (der Token der Upload-Seite steht im Pfad und öffnet den Zugang zu Personalunterlagen) | **Pflicht** vor dem ersten „Anfordern“; lesende Prüfung vor dem Deploy, ein `log` ohne URI-Filter ist ENTSCHEIDUNG. **Befund 29.09.:** globale Option `debug` protokolliert jede Anfrage samt URI → ENTSCHEIDUNG, **vertagt** (1.9) | 1.9, 5.2 |
 
@@ -259,19 +262,218 @@ sudo docker exec hr-portal-app sh -c 'npx prisma migrate diff --from-url "$DATAB
 Erwartet `0`: Die Datenbank entspricht dem Schema von `7bc91ec`. Bei `2` wurde sie außerhalb
 eines Deploys verändert, bei `1` gab es einen Fehler. In beiden Fällen: **STOPP, an Claude.**
 
-### 1.7 Umgebung (nur lesend, ohne Werte auszugeben)
+### 1.7 Umgebung und n8n-Schlüssel (V-7, nur lesend, ohne Werte auszugeben)
+
+Seit dem 29.09.2026 ein Prüfskript statt drei Einzelbefehlen. Die Vorbereitung von V-7 fand
+drei Lücken der Einzelbefehle:
+
+1. **`NEXT_PUBLIC_APP_URL` geht vor `APP_URL`.** `getBaseUrl()` (`src/lib/url.ts`) nimmt zuerst
+   `NEXT_PUBLIC_APP_URL`. Daraus entstehen die Upload-Links (`unterlagen-dienst.ts`), die Links
+   der HR-Meldungen, der Fragebogen- und Vorgesetzten-Erinnerungen und der Abteilungsaufgaben.
+   Die Einladung zum Fragebogen nimmt dagegen `APP_URL` direkt (`onboarding-einladung.ts`) — der
+   tägliche Betrieb belegt also nur `APP_URL`. Next.js liest den Wert zur Laufzeit: `.env` ist
+   vom Build-Kontext ausgeschlossen, und im Server-Code steht `process.env.NEXT_PUBLIC_APP_URL`
+   unverändert (geprüft im Docker-Image und im lokalen Build).
+2. **Ein öffentlicher Platzhalter.** `.env.example` enthält
+   `N8N_API_KEY="optionaler_api_key_fuer_n8n"`. Stammt die Server-`.env` aus dieser Vorlage statt
+   aus `.env.production.example`, kann sich jeder, der das öffentliche Repo kennt, als `SERVICE`
+   anmelden.
+3. **Wer den Schlüssel nutzt, zeigen die Einzelbefehle nicht.** Das Portal protokolliert Aufrufe
+   von `SERVICE` nicht (die alte Download-Route schreibt kein AuditLog). Die einzige Spur ist das
+   Caddy-Journal: Im Debug-Modus (1.9) hält es jede weitergeleitete Anfrage samt Kopfzeilen fest.
+   **Lokal belegt** (Caddy 2.11.1 mit `debug`): Caddy schwärzt nur `Cookie`, `Set-Cookie`,
+   `Authorization` und `Proxy-Authorization` — der Wert von **`X-API-Key` steht im Klartext** im Log.
+
+**Was `SERVICE` darf** (Kopfzeile `X-API-Key` mit dem Wert von `N8N_API_KEY`, `src/lib/auth.ts`;
+die Middleware lässt `/api/*` ohne Cookie durch, jede Route entscheidet selbst):
+
+- Onboarding-Dokumente laden: `GET /api/onboarding/[id]/documents/[docId]` prüfte bis `7bc91ec`
+  nur, ob eine Sitzung besteht — **ab diesem Deploy 403**.
+- Unverändert: Dokumente der Verbeamtung laden (`GET /api/civil-service/[id]/documents/[docId]`,
+  nur Sitzungsprüfung, rechnet ausdrücklich mit `n8n-service`), den Mitarbeiterstamm lesen, ändern
+  und löschen (`/api/employees…`), Checklistenpunkte in fünf Modulen abhaken, Auswertungen über
+  alle Mandanten (`/api/reports/*`).
+- Das Portal schickt `N8N_API_KEY` nirgends hin: Webhooks tragen eigene, verschlüsselt
+  gespeicherte Zugangsdaten (`webhook_configs`). Der Offboarding-Export im Repo
+  (`n8n/CREDO_HR_Portal_Offboarding_Workflow.json`) empfiehlt aber, **denselben Wert** als
+  Header-Auth `X-API-Key` für die n8n-Webhooks zu nehmen. Er kann also zusätzlich in einer
+  Webhook-Konfiguration des Portals und in n8n stecken.
+- Kein n8n-Export im Repo ruft Portal-Routen mit `X-API-Key` auf. Die beiden Reminder-Exporte
+  schicken `Authorization: Bearer <CRON_SECRET>`; diese Kopfzeile schwärzt Caddy.
+
+**Skript anlegen.** Den ganzen Block mit dem Kopier-Knopf ins Terminal übernehmen. Das Skript ist
+reines ASCII, ohne `*` und ohne Backslash.
 
 ```bash
-sudo docker exec hr-portal-app sh -c 'printf "CRON_SECRET Zeichen: "; printf %s "$CRON_SECRET" | wc -c'
-sudo docker exec hr-portal-app sh -c 'test -n "$N8N_API_KEY" && echo "N8N_API_KEY: gesetzt" || echo "N8N_API_KEY: leer"'
-sudo docker exec hr-portal-app printenv APP_URL
+set +H
+mkdir -p ~/deploy-paket4
+cat > ~/deploy-paket4/pruefung-v7.sh <<'ENDE_V7'
+# Paket 4 - V-7: N8N_API_KEY, CRON_SECRET, APP_URL (Ablaufplan 1.7) - nur lesend
+# Gibt keine Geheimnisse aus: nur Laengen, Vergleiche mit oeffentlichen
+# Platzhaltern, Adressen ohne Zugangsdaten und Zaehlungen.
+# Aufruf: sudo sh ~/deploy-paket4/pruefung-v7.sh 2>&1 | tee ~/deploy-paket4/pruefung-v7.txt
+# Selbstpruefung: Ein beim Kopieren veraendertes Skript bricht ab, bevor es etwas liest.
+SOLL=78e726dac4fcd59a0b0a01d69fd741a8
+IST=$(grep -v '^SOLL=' "$0" | md5sum | cut -d ' ' -f 1)
+[ "$IST" = "$SOLL" ] || { echo "STOPP: Skript beim Kopieren veraendert (Pruefsumme $IST). Nichts geprueft."; exit 1; }
+APP=hr-portal-app
+DB=hr-portal-db
+CADDY=caddy_reverse_proxy
+
+echo "== 0 - Skript unveraendert (Selbstpruefung OK)"
+md5sum "$0"
+date -Iseconds
+
+echo "== A - Umgebung im Container $APP (nur Laengen und Vergleiche)"
+docker exec "$APP" sh -c '
+printf "CRON_SECRET Zeichen: "; printf %s "$CRON_SECRET" | wc -c
+printf "CRON_SECRET davon Leerraum: "; printf %s "$CRON_SECRET" | tr -dc "[:space:]" | wc -c
+printf "N8N_API_KEY Zeichen: "; printf %s "$N8N_API_KEY" | wc -c
+if [ "$N8N_API_KEY" = "optionaler_api_key_fuer_n8n" ]; then echo "N8N_API_KEY: PLATZHALTER aus .env.example"; fi
+if [ -n "$N8N_API_KEY" ] && [ "$N8N_API_KEY" = "$CRON_SECRET" ]; then echo "N8N_API_KEY: gleicher Wert wie CRON_SECRET"; fi
+echo "NODE_ENV=[${NODE_ENV-nicht gesetzt}]"
+echo "APP_URL=[${APP_URL-nicht gesetzt}]"
+echo "NEXT_PUBLIC_APP_URL=[${NEXT_PUBLIC_APP_URL-nicht gesetzt}]"
+'
+
+echo "== B - Webhooks des Portals (Art, Kopfzeile, Ziel - ohne Zugangsdaten)"
+docker exec -i -e PGOPTIONS='-c default_transaction_read_only=on' "$DB" psql -U hrportal -d hr_portal -v ON_ERROR_STOP=1 <<'SQL'
+SELECT "authType" AS art,
+       COALESCE(NULLIF(btrim("authHeader"), ''), '-') AS kopfzeile,
+       regexp_replace(split_part(regexp_replace(url, '^https?://', ''), '/', 1), '^.+@', '') AS ziel,
+       COUNT(1) AS webhooks,
+       COUNT(1) FILTER (WHERE "isActive") AS aktiv
+FROM webhook_configs
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3;
+SQL
+
+echo "== C - Container im Netz reverse_proxy (koennten das Portal ohne Caddy erreichen)"
+docker network inspect reverse_proxy --format '{{range .Containers}}{{.Name}}{{println}}{{end}}' | LC_ALL=C sort | grep .
+
+echo "== D - Caddy-Journal: aeltester Eintrag"
+journalctl -t "docker/$CADDY" -o short-iso | grep -m 1 -E '^[0-9]' | cut -d ' ' -f 1
+
+echo "== E - Anfragen mit X-API-Key und an die Download-Route (nur Zaehlungen, dauert einige Minuten)"
+journalctl -t "docker/$CADDY" -o cat | LC_ALL=C grep -i -F -e 'x-api-key' -e '/documents/' -e 'hr.fes-credo.de' | awk '
+{
+  z = tolower($0)
+  lg = "-"; host = "-"; uri = ""; meth = "-"; st = "-"; ip = ""; ts = 0
+  if (match($0, /"ts": ?[0-9]+/)) { ts = substr($0, RSTART, RLENGTH); gsub(/[^0-9]/, "", ts); ts = ts + 0 }
+  if (match($0, /"logger": ?"[^"]+"/)) { lg = substr($0, RSTART, RLENGTH); sub(/^"logger": ?"/, "", lg); sub(/"$/, "", lg) }
+  if (match($0, /"host": ?"[^"]+"/)) { host = substr($0, RSTART, RLENGTH); sub(/^"host": ?"/, "", host); sub(/"$/, "", host) }
+  if (match($0, /"uri": ?"[^"]+"/)) { uri = substr($0, RSTART, RLENGTH); sub(/^"uri": ?"/, "", uri); sub(/"$/, "", uri) }
+  if (match($0, /"method": ?"[A-Z]+"/)) { meth = substr($0, RSTART, RLENGTH); gsub(/[^A-Z]/, "", meth) }
+  if (match($0, /"status": ?[0-9]+/)) { st = substr($0, RSTART, RLENGTH); gsub(/[^0-9]/, "", st) }
+  if (match($0, /"client_ip": ?"[^"]+"/)) { ip = substr($0, RSTART, RLENGTH); sub(/^"client_ip": ?"/, "", ip); sub(/"$/, "", ip) }
+  if (uri == "") next
+  schl = (z ~ /"x-api-key": ?[[]/)
+  keks = (z ~ /"cookie": ?[[]/)
+  kl = "oeffentlich"
+  if (ip == "") kl = "unbekannt"
+  else if (ip ~ /^(10|127)[.]/ || ip ~ /^192[.]168[.]/ || ip ~ /^172[.](1[6-9]|2[0-9]|3[01])[.]/ || ip ~ /^(::1|f[cd])/) kl = "privat"
+  pf = "/"
+  if (match(uri, "^/api/[^/?]+")) pf = substr(uri, RSTART, RLENGTH)
+  else if (match(uri, "^/[^/?]+")) pf = substr(uri, RSTART, RLENGTH)
+  if (host == "hr.fes-credo.de") hr[lg]++
+  if (schl) {
+    s = host " " meth " " pf " status=" st " ip=" kl " " lg
+    k[s]++
+    if (ts > kz[s] + 0) kz[s] = ts
+  }
+  if (uri ~ "^/api/onboarding/[^/?]+/documents/[^/?]+([?].+)?$") {
+    a = "ohne"
+    if (keks) a = "cookie"
+    if (schl) a = "x-api-key"
+    s = host " " meth " " a " status=" st " " lg
+    d[s]++
+    if (ts > dz[s] + 0) dz[s] = ts
+  }
+}
+END {
+  n = 0
+  for (x in hr) { print "hr.fes-credo.de: " hr[x] " Zeilen mit URI von " x; n++ }
+  if (n == 0) print "hr.fes-credo.de: keine Zeile mit URI - Filter pruefen"
+  n = 0
+  for (x in k) { print "X-API-Key: " k[x] " x " x " zuletzt=" kz[x]; n++ }
+  if (n == 0) print "X-API-Key: keine Anfrage"
+  n = 0
+  for (x in d) { print "Download-Route: " d[x] " x " x " zuletzt=" dz[x]; n++ }
+  if (n == 0) print "Download-Route: keine Anfrage"
+}' | LC_ALL=C sort
+
+echo "== Ende"
+ENDE_V7
+md5sum ~/deploy-paket4/pruefung-v7.sh
 ```
 
-| Erwartet | Wenn nicht |
-|---|---|
-| `CRON_SECRET Zeichen: ` 24 oder mehr | Kürzer: Der neue Lauf antwortet mit 500 (`route.ts`, Mindestlänge 24, wie `dokumente-aufbewahrung`). Neues Secret mit `openssl rand -base64 24` in `.env`, dann **alle** n8n-Credentials anpassen (auch `reminders` und `offboarding-reminders`). **An Claude**, bevor etwas geändert wird. |
-| `N8N_API_KEY: leer` | **ENTSCHEIDUNG.** Gesetzt heißt: Irgendetwas darf sich als `SERVICE` anmelden. Im Repo ruft kein Workflow die Download-Route auf, ab diesem Deploy bekäme er 403. Mit der IT klären, ob etwas außerhalb des Repos (n8n, Skripte) Dokumente herunterlädt. |
-| `https://hr.fes-credo.de` | Die Links in den Mails bauen darauf auf (`getBaseUrl`). Abweichung: **STOPP, an Claude.** |
+Erwartete Prüfsumme: `f67e86e81557baf4f9a010a9b89f69db`. Weicht sie ab: nicht ausführen, die Datei löschen
+(`rm ~/deploy-paket4/pruefung-v7.sh`) und neu anlegen. Zusätzlich prüft sich das Skript selbst
+(Zeile `SOLL=`): Ist es beim Kopieren verändert worden, meldet es
+`STOPP: Skript beim Kopieren veraendert …` und liest nichts — eine beschädigte Zeile könnte sonst
+statt der Länge den Wert eines Geheimnisses ausgeben.
+
+**Ausführen** (nur lesend; Teil E liest das Caddy-Journal und dauert einige Minuten):
+
+```bash
+sudo sh ~/deploy-paket4/pruefung-v7.sh 2>&1 | tee ~/deploy-paket4/pruefung-v7.txt
+```
+
+> **`pruefung-v7.txt` an Claude schicken.** Die Datei enthält Längen, die Adressen des Portals,
+> Namen von Webhook-Zielen und Containern und Zählungen. Sie enthält keine Geheimnisse, keine
+> Tokens und keine IP-Adressen (nur „privat“ oder „oeffentlich“).
+
+| Teil | Zeile | Erwartet | Wenn nicht |
+|---|---|---|---|
+| 0 | `Skript unveraendert (Selbstpruefung OK)` | Prüfsumme wie oben | `STOPP: …`: Skript löschen und neu anlegen |
+| A | `CRON_SECRET Zeichen:` | 24 oder mehr | Kürzer: `unterlagen-fristen` antwortet mit 500 (Mindestlänge 24 wie `dokumente-aufbewahrung`, `bem-*` und `elternzeit-fristen`, die dann schon heute mit 500 antworten). Neues Secret mit `openssl rand -base64 24` in `.env`, dann **alle** n8n-Credentials anpassen (auch `reminders` und `offboarding-reminders`). **An Claude**, bevor etwas geändert wird. |
+| A | `CRON_SECRET davon Leerraum:` | `0` | Größer 0: Leerzeichen oder Zeilenende (CR aus einer `.env` mit Windows-Zeilenenden) im Wert. Die Zeichenzahl darüber ist dann um so viel zu hoch. An Claude |
+| A | `N8N_API_KEY Zeichen:` | `0` — **dann ist V-7 erledigt** | Größer 0: Der Schlüssel ist gesetzt → „Auswertung V-7“ unten |
+| A | `N8N_API_KEY: PLATZHALTER aus .env.example` | Zeile fehlt | **Sofort an Claude, unabhängig vom Deploy.** Der Wert steht im öffentlichen Repo; damit kann sich jeder als `SERVICE` anmelden (Liste oben). Schlüssel ersetzen oder entfernen, Container neu starten. |
+| A | `N8N_API_KEY: gleicher Wert wie CRON_SECRET` | Zeile fehlt | An Claude: Beide gelten dann als ein Geheimnis. Wer das eine kennt, kennt das andere. |
+| A | `NODE_ENV=` | `[production]` | Anderer Wert: an Claude (stammt die `.env` aus `.env.example`?) |
+| A | `APP_URL=` | `[https://hr.fes-credo.de]`, ohne Schrägstrich am Ende | Abweichung: **STOPP, an Claude.** Ein Schrägstrich am Ende ergäbe `…de//unterlagen/…`. |
+| A | `NEXT_PUBLIC_APP_URL=` | `[nicht gesetzt]`, `[]` oder `[https://hr.fes-credo.de]` | Ein anderer Wert: **STOPP, an Claude.** Er ginge in `getBaseUrl()` vor `APP_URL` (Lücke 1). |
+| B | Webhooks: `art`, `kopfzeile`, `ziel` | INFO | `api_key` mit `X-API-Key`: Das Portal schickt n8n einen Schlüssel in dieser Kopfzeile. Liegt das Ziel hinter demselben Caddy, steht der Wert im Journal (Teil E zeigt dann Zeilen mit diesem Host). |
+| C | Container im Netz `reverse_proxy` | INFO | Steht dort n8n, kann es das Portal unter `http://hr-portal-app:3000` an Caddy vorbei erreichen. Solche Aufrufe sieht Teil E nicht. |
+| D | ältester Eintrag im Caddy-Journal | ein Datum | INFO: Zeitraum, den Teil E abdeckt (Journal bis 4 GB, siehe 1.9) |
+| E | `hr.fes-credo.de: … Zeilen mit URI …` | eine Zahl größer 0 | `keine Zeile mit URI - Filter pruefen`: an Claude |
+| E | `X-API-Key:` | `X-API-Key: keine Anfrage` | Zeilen: Etwas schickt diese Kopfzeile, ihr Wert steht dann im Klartext im Journal. Host, Methode, Pfad, Status, `ip=` und `zuletzt=` (Unix-Zeit der letzten Anfrage) zeigen, wer den Schlüssel wofür nutzt. |
+| E | `Download-Route:` | nur `cookie` (HR im Browser) oder `keine Anfrage` | Eine Zeile `x-api-key` mit `status=200`: Etwas lädt Onboarding-Dokumente mit dem n8n-Schlüssel und bekommt ab dem Deploy 403 → **ENTSCHEIDUNG vor dem Deploy** |
+
+**Auswertung V-7**, wenn `N8N_API_KEY` gesetzt ist:
+
+- **Genutzt für die Download-Route** (`Download-Route: … x-api-key … status=200`): Vor dem Deploy
+  klären, was dort lädt (Host, `zuletzt`) und wozu. Die Sperre ist gewollt (Nachweise nach Art. 9
+  und 10 DSGVO), der Abnehmer muss dann anders an die Dokumente kommen.
+- **Genutzt, aber nicht für die Download-Route:** Für den Deploy unkritisch. Wegen des Klartexts
+  im Journal den Schlüssel wechseln, sobald `debug` aus ist (V-9) — in der `.env` und bei jedem
+  Abnehmer.
+- **Im Journal ungenutzt:** Mit der IT in n8n nachsehen (Credentials vom Typ Header Auth mit dem
+  Namen `X-API-Key`; HTTP-Knoten auf `hr.fes-credo.de` oder `hr-portal-app`), besonders wenn
+  Teil C n8n im Netz zeigt. Nutzt ihn nichts: **Empfehlung: den Eintrag aus der `.env`
+  entfernen**, am einfachsten mit dem Deploy (3.5 startet den Container ohnehin neu). Ohne
+  Schlüssel gibt es keine Rolle `SERVICE` mehr; die Reporting-API behält ihre eigenen Schlüssel
+  (`crk_…`, Einstellungen → API-Zugang).
+- **Grenzen:** Teil E sieht nur Anfragen über Caddy und nur so weit zurück, wie das Journal reicht
+  (Teil D).
+
+**Lokal geprobt am 29.09.2026:**
+
+- Teil A im App-Image (busybox) mit drei Belegungen: Normalfall; CR am Ende, Platzhalter,
+  Schrägstrich am Ende, abweichendes `NEXT_PUBLIC_APP_URL`, `NODE_ENV=development`; Schlüssel
+  gleich Secret, leere Werte. Alle Fälle wurden erkannt.
+- Teil B gegen ein Wegwerf-`postgres:16-alpine` mit Benutzer `hrportal`: Zugangsdaten, Pfad und
+  Query der URL erscheinen nicht, ein `DELETE` scheitert an der Nur-Lesen-Sitzung.
+- Teil E mit echten Debug-Zeilen von Caddy 2.11.1 aus 13 Probe-Anfragen (`X-API-Key`, Cookie,
+  `Authorization`, Download, PATCH, Liste ohne `docId`, Webhook an einen zweiten Host): Die
+  Zählungen stimmen, mit `mawk` 1.3.4 und GNU-`grep` 3.11 (Debian wie Ubuntu) ebenso wie mit
+  busybox-`awk`. Die Ausgabe enthält kein Geheimnis.
+- Das ganze Skript unter `dash` mit Ersatz für `docker` und `journalctl`. Der Einfüge-Block ergibt
+  in `bash` die Prüfsumme oben. Drei beschädigte Kopien (ohne `| wc -c`, falscher Sollwert,
+  verändertes `awk`) brechen mit `STOPP` ab.
+- **Nicht geprobt:** `journalctl` selbst (Aufruf wie in 1.9, dort am 29.09. auf dem Server
+  gelaufen) und die Laufzeit über das ganze Journal.
 
 ### 1.8 Datenschutz: Art.-13-Text der Upload-Seite
 
@@ -411,6 +613,13 @@ Zugriffsprotokoll die URI filtert** (lokal bestätigt). Das gehört mit in die E
    nicht nur Caddy. Nach dem Abschalten wächst es langsamer, die alten Einträge mit Tokens blieben
    dann eher länger liegen.
 
+**Nachtrag vom 29.09. (V-7):** Im Debug-Modus schwärzt Caddy nur `Cookie`, `Set-Cookie`,
+`Authorization` und `Proxy-Authorization`. Andere Kopfzeilen mit Zugangsdaten stehen im Klartext
+im Journal, etwa `X-API-Key` (n8n-Schlüssel des Portals, Webhooks mit Header-Auth). Das ist lokal
+mit Caddy 2.11.1 belegt. Ob es auf dem Server vorkommt, zeigt Teil E des Prüfskripts in 1.7.
+Falls ja, gehört zur Entscheidung: Nach dem Abschalten von `debug` die betroffenen Schlüssel
+wechseln — die alten Einträge bleiben ja im Journal.
+
 Ablauf für 1 und 2, sobald entschieden (lokal mit derselben Einhängung geprobt; die Zeilennummern
 stammen vom 29.09. — vorher mit dem `awk` aus „Prüfen“ gegenprüfen):
 
@@ -452,7 +661,9 @@ benutzen für die Tabellen und Spalten von Paket 4 nur `to_regclass` bzw.
 `information_schema` — auf dem alten Schema ergibt das `NULL` bzw. `(0 rows)`, keinen Fehler.
 **Geprobt am 25.09.2026** mit psql 16.12 und `ON_ERROR_STOP=1` lesend gegen die
 Dev-Datenbank (neues Schema): Exit 0, 10 Abschnitte, 0 `ERROR`. Gegen eine Datenbank mit
-Schema `7bc91ec` ist die Datei **nicht** geprobt.
+Schema `7bc91ec` ist die Datei **nicht** geprobt. **Am 29.09.2026 geändert und erneut geprobt**
+(gleiches Ergebnis): V6 nennt vom Ziel eines Webhooks nur noch den Host. Zugangsdaten in der
+URL (`https://nutzer:passwort@host/…`) fielen vorher mit in die Ausgabe, die an Claude geht.
 
 **Nur lesend, doppelt gesichert:** Die Sitzung läuft mit
 `PGOPTIONS='-c default_transaction_read_only=on'`, und die Datei setzt in ihrer ersten
@@ -524,7 +735,8 @@ WHERE event IN ('dokument-ablauf-warnung', 'dokument-abgelaufen',
 ORDER BY event;
 
 \echo '== VORHER V6 · Webhooks auf die fuenf neuen Ereignisse und die beiden dokument-* (ohne Zugangsdaten)'
-SELECT event, name, "isActive" AS aktiv, split_part(regexp_replace(url, '^https?://', ''), '/', 1) AS host
+SELECT event, name, "isActive" AS aktiv,
+       regexp_replace(split_part(regexp_replace(url, '^https?://', ''), '/', 1), '^.+@', '') AS host
 FROM webhook_configs
 WHERE event IN ('dokument-ablauf-warnung', 'dokument-abgelaufen',
                 'unterlagen-angefordert', 'unterlagen-erinnerung', 'unterlage-zurueckgewiesen',
@@ -559,8 +771,9 @@ ENDE_SQL
 md5sum ~/deploy-paket4/vorher-paket4.sql
 ```
 
-Erwartete Prüfsumme: `c37dafdd281365d72225aca4238ebd8e`. Weicht sie ab, ist die Datei beim Übertragen verändert
-worden (Zeilenenden, Anführungszeichen): neu anlegen, nicht ausführen.
+Erwartete Prüfsumme: `3d0edc547f4b625b89a3ad1a82e44673` (seit 29.09.2026; vorher `c37dafdd…`, geändert
+hat sich nur V6). Weicht sie ab, ist die Datei beim Übertragen verändert worden (Zeilenenden,
+Anführungszeichen): neu anlegen, nicht ausführen.
 
 ### 2.2 Ausführen
 
@@ -950,7 +1163,9 @@ Handlungsanweisung hinaus.
    `curl -s -D - -o /dev/null https://hr.fes-credo.de/unterlagen/00000000-0000-4000-8000-000000000000 | grep -i referrer-policy`
    → `Referrer-Policy: no-referrer`. Die bisherigen Einträge im Journal (Tokens und IP-Adressen)
    bleiben bis zur Obergrenze von 4 GB liegen — ob sie früher gelöscht werden und welche
-   Aufbewahrung künftig gilt, entscheidet ihr mit dem DSB.
+   Aufbewahrung künftig gilt, entscheidet ihr mit dem DSB. Hat Teil E des Prüfskripts in 1.7
+   Zeilen `X-API-Key:` gezeigt, nach dem Abschalten die betroffenen Schlüssel wechseln (in der
+   `.env` bzw. der Webhook-Konfiguration und bei jedem Abnehmer).
 5. **HR informieren — erst, wenn `unterlagen-fristen` scharf läuft (6.3 Nr. 4):** Handbuch,
    Kapitel 3.7 „Unterlagen nachfordern“ (`docs/handbuch/handbuch.html#onboarding-unterlagen`).
    Besonders: Unterlagen nicht per Mail annehmen, sensible Unterlagen nie über freie Zeilen
@@ -1194,7 +1409,7 @@ Leere.
 
 | Wann | Was schicken | Weiter erst nach Antwort? |
 |---|---|---|
-| 1.1–1.9 | jede Abweichung vom Erwarteten, dazu die Ergebnisse von 1.7 und 1.9 | ja, bei STOPP und ENTSCHEIDUNG |
+| 1.1–1.9 | jede Abweichung vom Erwarteten, dazu `pruefung-v7.txt` (1.7) und die Ergebnisse von 1.9 | ja, bei STOPP und ENTSCHEIDUNG |
 | 2.2 | `vorher-ergebnis.txt`, **immer** | **ja** |
 | 3.1 | Konflikt oder Ausgabe beim `git diff` | ja |
 | 3.3 | `vorschau-delta.sql`, wenn die Zählung abweicht oder der Befehl scheitert | ja |
@@ -1209,7 +1424,9 @@ Leere.
 
 - **n8n:** Live-Stand der bestehenden Läufe (URL, Timeout, Zeitplan) und ob
   `dokument-ablauf` irgendwo eingeplant ist.
-- **`N8N_API_KEY`:** ob gesetzt und wer ihn nutzt (1.7).
+- **`N8N_API_KEY`:** ob gesetzt, ob es der öffentliche Platzhalter ist und wer ihn nutzt (1.7). Das
+  Prüfskript ist seit 29.09.2026 lokal geprobt und wartet auf den Lauf auf dem Server. Aufrufe an
+  Caddy vorbei (etwa aus einem n8n im Netz `reverse_proxy`) sieht es nicht; dafür in n8n nachsehen.
 - **Caddy, Live-Stand:** ob ein Zugriffsprotokoll die URI samt Token festhält, wo das
   Caddyfile liegt und welches `request_body` gilt (1.9, V-9). Das `Caddyfile.hr-portal` im Repo
   ist veraltet. Die Befehle in 1.9 sind am 28.09.2026 lokal gegen Caddy 2.11 geprobt, auf dem

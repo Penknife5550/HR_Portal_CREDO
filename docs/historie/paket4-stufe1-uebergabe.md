@@ -3,8 +3,9 @@
 > **Stand:** 26.09.2026, zuletzt ergänzt am 29.09.2026 als Übergabe für die nächste Sitzung.
 > Stufe 1 (Onboarding) ist umgesetzt, per Fast-Forward nach `main` gemergt und nach `origin/main`
 > gepusht (bis `9cab6b4`). Seitdem **nur lokal**: Code-Review mit Fix (`4875fba`), Ablaufplan
-> nachgezogen (`33e420f`, `82b118f`, `8d1c558`), Datenschutzhinweise des DSB (`d774e4c`) und diese
-> Übergabe. Gepusht wird erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft
+> nachgezogen (`33e420f`, `82b118f`, `8d1c558`), Datenschutzhinweise des DSB (`d774e4c`), diese
+> Übergabe (`92e67a2`) und die Vorbereitung von V-7 (Prüfskript im Ablaufplan 1.7). Gepusht wird
+> erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft
 > weiter auf Code `7bc91ec` (Deploy vom 24.09.2026).
 > **Zweck:** In einer neuen Sitzung ohne Vorwissen weitermachen können: was fertig ist, was
 > geprüft wurde, was vor dem Deploy noch fehlt und wie Stufe 2 anschließt.
@@ -29,20 +30,22 @@ CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
 
 **Stand am 29.09.2026:**
 
-- `main` steht **5 Commits vor `origin/main`** (`4875fba`, `33e420f`, `82b118f`, `8d1c558`,
-  `d774e4c`), dazu diese Übergabe — alles nur lokal. **Push nur auf ausdrückliche Freigabe**, das
-  Repo ist öffentlich.
+- `main` steht **7 Commits vor `origin/main`** (`4875fba`, `33e420f`, `82b118f`, `8d1c558`,
+  `d774e4c`, die Übergabe `92e67a2` und die Vorbereitung von V-7) — alles nur lokal. **Push nur auf
+  ausdrückliche Freigabe**, das Repo ist öffentlich.
 - Gates zuletzt grün: `lint` 0 Fehler, `tsc` 0 Fehler, 168 Suiten / 4344 Tests, Build ok.
 - Arbeitsweise, die der Nutzer vorgegeben hat: nur lokal committen, nicht pushen, nicht
   deployen, vor dem Deploy anhalten. Die offenen Punkte der Reihe nach abarbeiten und alles
   dokumentieren.
 - Erledigt sind V-1, V-4 und die Vorprüfung von V-5. V-9 ist eine vertagte Entscheidung.
+- **V-7 ist vorbereitet (29.09.):** Prüfskript im Ablaufplan 1.7, lokal geprobt. Es wartet auf den
+  Lauf auf dem Server; danach wertet Claude `pruefung-v7.txt` nach der Tabelle in 1.7 aus.
 
 **Arbeitsliste** (Reihenfolge nach Abhängigkeit; Stand je Punkt in Abschnitt 4):
 
 | # | Punkt | Wer macht was | Claude kann vorbereiten |
 |---|---|---|---|
-| 1 | **V-7, dazu `CRON_SECRET` und `APP_URL` lesend prüfen** (Ablaufplan 1.7) | Nutzer auf dem Server: die drei Befehle aus 1.7, Ausgabe an Claude | Auswertung. Ist `N8N_API_KEY` gesetzt: klären, ob etwas außerhalb des Repos Dokumente über die Download-Route holt (ab dem Deploy 403 für `SERVICE`) |
+| 1 | **V-7, dazu `CRON_SECRET`, `APP_URL` und `NEXT_PUBLIC_APP_URL` lesend prüfen** (Ablaufplan 1.7) | Nutzer auf dem Server: das Prüfskript aus 1.7 anlegen (Prüfsumme `f67e86e8…`), mit `sudo sh` ausführen, `pruefung-v7.txt` an Claude | **Vorbereitet am 29.09.**, lokal geprobt. Danach die Auswertung nach der Tabelle in 1.7. Ist `N8N_API_KEY` gesetzt: klären, ob etwas Dokumente über die Download-Route holt (ab dem Deploy 403 für `SERVICE`); der öffentliche Platzhalter wäre sofort zu ersetzen |
 | 2 | **V-2: bestehende n8n-Läufe reparieren** (6.1): `reminders` und `offboarding-reminders` auf `https://hr.fes-credo.de/…` | Nutzer/IT in der n8n-Oberfläche. **Achtung:** Der erste Lauf nach der Korrektur verschickt alle fälligen Erinnerungen auf einmal — HR vorher informieren, an einem Werktag morgens | Prüfliste je Knoten (URL, `POST`, Header-Auth-Credential, Timeout ≥ 120 s), Auswertung der ersten Antworten |
 | 3 | **V-3: neue n8n-Läufe anlegen, zunächst inaktiv** (6.2, 6.3 Nr. 1): `unterlagen-fristen` (07:00 Europe/Berlin, `?dryRun=1`, Timeout 300 000 ms, Retry aus, Bericht bei `errors > 0` oder `nichtZugestellt > 0`) und `dokument-ablauf` (07:30) | Nutzer/IT in n8n; das Credential (`Authorization: Bearer <CRON_SECRET>`) legt der Nutzer selbst an | Workflow-JSON zum Import, ohne Secrets (Skill `n8n-superheld`). **Nicht ins Repo** — `/n8n/` steht in `.gitignore` |
 | 4 | **V-6: Antwortadresse** (= HR-Postfach) unter Einstellungen → SMTP | Nutzer im Portal | — |
@@ -97,7 +100,8 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 | `82b118f` | Ablaufplan: Befund V-9, Caddy im Debug-Modus (nur lokal) |
 | `8d1c558` | V-9 als vertagte Entscheidung, Übergabe auf dem Stand vom 29.09. (nur lokal) |
 | `d774e4c` | Datenschutzhinweise der Upload-Seite mit dem Wortlaut des DSB, V-4 erledigt (nur lokal) |
-| (dieser) | Übergabe für die nächste Sitzung: Arbeitsliste, Stand V-1 bis V-9, Befunde und Lehren (nur lokal) |
+| `92e67a2` | Übergabe für die nächste Sitzung: Arbeitsliste, Stand V-1 bis V-9, Befunde und Lehren (nur lokal) |
+| (dieser) | V-7 vorbereitet: Prüfskript im Ablaufplan 1.7 mit Selbstprüfung, lokal geprobt; V6 der VORHER-Datei ohne Zugangsdaten aus Webhook-URLs (nur lokal) |
 
 ---
 
@@ -149,7 +153,7 @@ Die Nummern sind die des Ablaufplans (Abschnitt 0 dort). Code-Review: erledigt (
 | V-4 | Datenschutztext der Upload-Seite | **erledigt 29.09.** (`d774e4c`) — Wortlaut des DSB, aufklappbar in der Fußzeile; Verantwortlicher aus der Mandanten-Einstellung (Standard Christlicher Schulverein Minden e.V.) | — | — |
 | V-5 | Sicherung des Volumes `uploads_data` | **Vorprüfung erledigt 28.09.** — `hr_portal_credo_uploads_data`, 94 MB, 315 Dateien, Leseprobe `tar OK`, 362 GB frei unter `/vol/container` | Die Sicherung selbst entsteht in 3.4. Das dauerhafte Backup bleibt offen (Abschnitt 8 des Ablaufplans) | IT |
 | V-6 | Antwortadresse (= HR-Postfach) | offen | Einstellungen → SMTP | Nutzer |
-| V-7 | `N8N_API_KEY` geprüft | offen | 1.7 lesend, zusammen mit `CRON_SECRET` (≥ 24 Zeichen) und `APP_URL` | Nutzer/IT |
+| V-7 | `N8N_API_KEY` geprüft | **vorbereitet 29.09.** — Prüfskript in 1.7 (Umgebung, öffentlicher Platzhalter, `NEXT_PUBLIC_APP_URL`, Webhooks, Caddy-Journal) mit Selbstprüfung, lokal geprobt. Die drei Einzelbefehle von vorher hätten `NEXT_PUBLIC_APP_URL` (geht in `getBaseUrl()` vor) und den Platzhalter übersehen und nichts zur Nutzung gezeigt | Skript auf dem Server ausführen, `pruefung-v7.txt` an Claude | Nutzer, dann Claude |
 | V-8 | Freigabeliste | offen (empfohlen) | Einstellungen → SMTP → Erlaubte Empfänger-Domains | Nutzer |
 | V-9 | Caddy-Zugriffsprotokoll | **Entscheidung vertagt 29.09.** — Caddy läuft mit `debug` und schreibt jede Anfrage samt URI, Token und IP-Adresse ins Journal (30 Tage: 2204 Zeilen für `hr.fes-credo.de`; Journal 3,9 GB, Standard-Aufbewahrung); der `header`-Block überschreibt das `no-referrer` der Upload-Seite | Fragen, Empfehlung und lokal geprobter Ablauf in 1.9; Pflicht vor dem ersten „Anfordern“ | Nutzer/IT, DSB |
 
@@ -193,6 +197,13 @@ Umfang laut Plan: die übrigen fünf Vorgangsarten (Offboarding, Verbeamtung, Ve
 - Bekanntes Restrisiko: Scheitert nach einem SENT das Speichern **und** fehlt der Eintrag im Versandprotokoll, holt der Lauf die Mail nach. Eine doppelte Mail ist dann möglich.
 - Entfernen von EXIF-Daten, Virenscan und Verschlüsselung der Dateien sind bewusst nicht in Stufe 1 (Feinplanung 16.2).
 - Die Middleware leitet nicht angemeldete Nutzer auf `/login` um und verwirft dabei die Query. „Im Portal prüfen“ landet ohne Sitzung also nach dem Login nicht im Reiter „Dokumente“. Das gilt für alle Portal-Links und ist schon so.
+- **Reichweite der Rolle `SERVICE`** (gefunden bei V-7 am 29.09., unabhängig von Paket 4): Mit dem
+  Wert von `N8N_API_KEY` in der Kopfzeile `X-API-Key` lädt `SERVICE` Dokumente der Verbeamtung
+  (`GET /api/civil-service/[id]/documents/[docId]` prüft nur, ob eine Sitzung besteht). Außerdem
+  liest, ändert und löscht es den Mitarbeiterstamm und liest Auswertungen aller Mandanten. Nutzt
+  nichts den Schlüssel, ist Entfernen die einfachste Härtung (Ablaufplan 1.7). Sonst die
+  Download-Routen der übrigen Module auf Portal-Rollen beschränken wie die Onboarding-Route
+  (Kandidat für Stufe 2).
 
 ---
 
@@ -267,3 +278,15 @@ nicht wiederverwenden. Die geprüften Befehle stehen im Ablaufplan 1.3, 1.4 und 
   einmal in Bash; zuverlässiger ist ein Skript als Datei, das ein kurzer Befehl startet. Die
   automatische Freigabe für Shell-Befehle fiel zeitweise aus; dann erst andere Arbeit erledigen
   und später erneut versuchen.
+- **Proben am 29.09. (V-7):**
+  - PowerShell 5.1 setzt beim Weiterreichen einer Datei an `docker` ein BOM davor und zerlegt
+    verschachtelte Anführungszeichen in `-c '…'`. Zuverlässig ist Git Bash mit `< datei` bzw.
+    `-v "$(cygpath -w "$PWD"):/probe:ro"` und `MSYS_NO_PATHCONV=1`, den Probelauf selbst als Datei.
+  - Das lokale App-Image `hr_portal_credo-main-app` stammt vom 25.03.2026 und hat noch kein
+    `curl`. HTTP-Proben deshalb mit Node (`http.request`, dort lässt sich `Host` setzen).
+  - Echte Debug-Zeilen von Caddy erzeugt ein Wegwerf-Caddy (`caddy:2-alpine`, globale Option
+    `debug`, `auto_https off`) mit einer zweiten Site als Upstream. `docker logs` liefert die
+    JSON-Zeilen, die auf dem Server über den Treiber `syslog` ins Journal gehen.
+  - Server-Skripte bekommen eine Selbstprüfung (Zeile `SOLL=`, geprüft mit
+    `grep -v '^SOLL=' "$0" | md5sum`). Ein beim Kopieren beschädigtes Skript bricht ab, bevor es
+    etwas liest.
