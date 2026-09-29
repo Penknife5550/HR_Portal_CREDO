@@ -107,8 +107,8 @@ Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 | # | Voraussetzung | Art | Abschnitt |
 |---|---|---|---|
 | V-1 | `./backups:/backups` eingehängt und `sudo chown 1001 backups` gesetzt — sonst bricht der Start ab | **Pflicht** | 1.3 |
-| V-2 | Die beiden bestehenden n8n-Läufe rufen `hr.fes-credo.de` auf (heute `hr.credo-schulen.de`) — seit 29.09. als Import-Dateien 1 und 2 vorbereitet, die die alten ersetzen | **Pflicht**: ohne Lauf keine Erinnerungen und keine Löschung nach 30 Tagen | 6.1, 6.5 |
-| V-3 | n8n-Läufe `unterlagen-fristen` und `dokument-ablauf` angelegt (beide zunächst inaktiv); `dokument-ablauf` aktiv nach 5.1, `unterlagen-fristen` mit `?dryRun=1` nach 4.3 — seit 29.09. als Import-Dateien 3 und 4 vorbereitet | **Pflicht** vor dem ersten „Anfordern“ | 6.2, 6.3, 6.5 |
+| V-2 | Die beiden bestehenden n8n-Läufe rufen `hr.fes-credo.de` auf (heute `hr.credo-schulen.de`) — die Import-Dateien 1 und 2, die die alten ersetzen, sind **seit 29.09. importiert** (Credentials verknüpft, inaktiv). **Offen:** HR informieren, alte Workflows deaktivieren, 1 und 2 aktivieren | **Pflicht**: ohne Lauf keine Erinnerungen und keine Löschung nach 30 Tagen | 6.1, 6.5 |
+| V-3 | n8n-Läufe `unterlagen-fristen` und `dokument-ablauf` angelegt (beide zunächst inaktiv); `dokument-ablauf` aktiv nach 5.1, `unterlagen-fristen` mit `?dryRun=1` nach 4.3 — **erledigt am 29.09.2026:** Import-Dateien 3 und 4 importiert, Credentials verknüpft, inaktiv | erledigt (aktivieren nach 4.3 bzw. 5.1) | 6.2, 6.3, 6.5 |
 | V-4 | Art.-13-Text der Upload-Seite vom DSB — **erledigt am 29.09.2026** (Wortlaut im Code, 1.8) | erledigt | 1.8 |
 | V-5 | Sicherung des Volumes `uploads_data` (vorher Leseprobe) | **Pflicht** | 1.4, 3.4 |
 | V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt | Pflicht vor dem ersten „Anfordern“ | 2.3 (V4), 5.2 |
@@ -1430,10 +1430,15 @@ Outlook-Credential liegen; auf dem Server laufen `n8n-n8n-1` und `n8n-sw`):
 Header Auth ohne Klartext-Header, kein Secret, kein Retry, Fehlerausgang, Zeitzone, inaktiv)
 und jeder Code-Knoten mit Beispielantworten: kein Befund, Zeitüberschreitung, Verbindung
 abgelehnt, 401, 404, 409, 500, 502 mit HTML, 200 ohne `success`, Ausnahme im Code, Probelauf,
-Problemfälle, maskiertes HTML — 451 Prüfungen, alle grün. **Nicht geprüft:** der Import in eine
-echte n8n-Instanz. Die Knotenversionen (Schedule Trigger 1.2, HTTP Request 4.2, Code 2, IF 2.2,
-Microsoft Outlook 2) sind die der alten Exporte vom 28.03.; welche n8n-Version auf dem Server
-läuft, ist offen.
+Problemfälle, maskiertes HTML — 451 Prüfungen, alle grün. Die Knotenversionen (Schedule
+Trigger 1.2, HTTP Request 4.2, Code 2, IF 2.2, Microsoft Outlook 2) sind die der alten Exporte vom
+28.03.
+
+**Import am 29.09.2026:** Alle vier Dateien ließen sich in n8n importieren, beide Credentials
+(„HR-Portal Cron (Bearer)“, „n8n@fes-minden.de“) sind verknüpft, alle vier inaktiv (Rückmeldung
+des Nutzers). **Noch nicht gelaufen** ist keiner: Der erste echte Lauf von 1 und 2 (V-2) und der
+Probelauf von 3 nach dem Deploy prüfen Credential, Auswertung und Outlook-Versand zum ersten Mal
+auf dem Server.
 
 **Neu erzeugen** (etwa für andere Empfänger): Quelle in `n8n/quelle/` (ebenfalls nicht im Repo),
 `node n8n/quelle/bauen.js n8n` und danach `node n8n/quelle/testen.js n8n`.
@@ -1552,8 +1557,9 @@ Leere.
 
 - **n8n:** Live-Stand der bestehenden Läufe (URL, Timeout, Zeitplan) und ob
   `dokument-ablauf` irgendwo eingeplant ist. Bekannt seit 29.09. (1.7, Teil C): n8n läuft auf
-  demselben Host im Netz `reverse_proxy` (`n8n-n8n-1`, dazu `n8n-sw`). Welche Instanz die
-  HR-Läufe trägt, klärt V-2.
+  demselben Host im Netz `reverse_proxy` (`n8n-n8n-1`, dazu `n8n-sw`). Seit 29.09. sind die vier
+  neuen Workflows (6.5) in der Instanz mit dem Outlook-Credential importiert; die alten stehen dort
+  bis zur Umstellung noch (ob aktiv, ist offen).
 - ~~**`N8N_API_KEY`**~~ — **geklärt am 29.09.2026:** leer (1.7, Ergebnis). Die Rolle `SERVICE` gibt
   es damit nicht.
 - ~~**Caddy, Live-Stand**~~ — **geklärt am 29.09.2026** (1.9, Befund): Der Debug-Modus schreibt
