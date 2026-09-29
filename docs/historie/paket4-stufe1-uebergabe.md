@@ -5,7 +5,8 @@
 > gepusht (bis `9cab6b4`). Seitdem **nur lokal**: Code-Review mit Fix (`4875fba`), Ablaufplan
 > nachgezogen (`33e420f`, `82b118f`, `8d1c558`), Datenschutzhinweise des DSB (`d774e4c`), diese
 > Übergabe (`92e67a2`), V-7 (Prüfskript im Ablaufplan 1.7, `6ab7f40`; am 29.09. auf dem Server
-> erledigt) und dessen Ergebnis. Gepusht wird erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft
+> erledigt) und dessen Ergebnis, dazu die n8n-Import-Dateien für V-2 und V-3 (Ablaufplan 6.5; die
+> Dateien selbst liegen nur lokal in `n8n/`). Gepusht wird erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft
 > weiter auf Code `7bc91ec` (Deploy vom 24.09.2026).
 > **Zweck:** In einer neuen Sitzung ohne Vorwissen weitermachen können: was fertig ist, was
 > geprüft wurde, was vor dem Deploy noch fehlt und wie Stufe 2 anschließt.
@@ -30,9 +31,10 @@ CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
 
 **Stand am 29.09.2026:**
 
-- `main` steht **8 Commits vor `origin/main`** (`4875fba`, `33e420f`, `82b118f`, `8d1c558`,
-  `d774e4c`, die Übergabe `92e67a2`, V-7 vorbereitet `6ab7f40` und das Ergebnis von V-7) — alles
-  nur lokal. **Push nur auf ausdrückliche Freigabe**, das Repo ist öffentlich.
+- `main` steht **9 Commits vor `origin/main`** (`4875fba`, `33e420f`, `82b118f`, `8d1c558`,
+  `d774e4c`, die Übergabe `92e67a2`, V-7 vorbereitet `6ab7f40`, das Ergebnis von V-7 `915dbbb` und
+  die Doku der n8n-Import-Dateien) — alles nur lokal. **Push nur auf ausdrückliche Freigabe**, das
+  Repo ist öffentlich.
 - Gates zuletzt grün: `lint` 0 Fehler, `tsc` 0 Fehler, 168 Suiten / 4344 Tests, Build ok.
 - Arbeitsweise, die der Nutzer vorgegeben hat: nur lokal committen, nicht pushen, nicht
   deployen, vor dem Deploy anhalten. Die offenen Punkte der Reihe nach abarbeiten und alles
@@ -42,16 +44,20 @@ CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.
   also nicht. `CRON_SECRET` hat 32 Zeichen, `APP_URL` stimmt, `NEXT_PUBLIC_APP_URL` ist nicht
   gesetzt (Ablaufplan 1.7, Ergebnis). Nebenbei zeigte sich, dass das Journal nur bis zum 26.09.
   zurückreicht; das ändert die Grundlage der vertagten V-9-Entscheidung (1.9, Nachträge).
-- **Nächster Punkt: 2 (V-2).** n8n läuft auf demselben Host im Netz `reverse_proxy` (`n8n-n8n-1`,
-  dazu `n8n-sw`); zuerst klären, welche Instanz die HR-Läufe trägt.
+- **Punkte 2 und 3 (V-2, V-3): Import-Dateien liegen vor (29.09.)** — vier Workflows in `n8n/`
+  (lokal, nicht im Repo), Quelle und Tests in `n8n/quelle/`, Anleitung im Ablaufplan 6.5. Als
+  Nächstes richtet der Nutzer in n8n das Credential „HR-Portal Cron (Bearer)“ ein und importiert.
+  n8n läuft auf demselben Host (`n8n-n8n-1`, dazu `n8n-sw`); welche Instanz die HR-Läufe und das
+  Outlook-Credential trägt, ist noch offen. Den Import in eine echte n8n-Instanz hat noch niemand
+  geprobt.
 
 **Arbeitsliste** (Reihenfolge nach Abhängigkeit; Stand je Punkt in Abschnitt 4):
 
 | # | Punkt | Wer macht was | Claude kann vorbereiten |
 |---|---|---|---|
 | 1 | **V-7, dazu `CRON_SECRET`, `APP_URL` und `NEXT_PUBLIC_APP_URL` lesend prüfen** (Ablaufplan 1.7) | **Erledigt am 29.09.** — Prüfskript aus 1.7 auf dem Server gelaufen | `N8N_API_KEY` leer, Umgebung in Ordnung, keine Webhooks, keine Anfrage mit `X-API-Key` (Ergebnis in 1.7) |
-| 2 | **V-2: bestehende n8n-Läufe reparieren** (6.1): `reminders` und `offboarding-reminders` auf `https://hr.fes-credo.de/…` | Nutzer/IT in der n8n-Oberfläche. **Achtung:** Der erste Lauf nach der Korrektur verschickt alle fälligen Erinnerungen auf einmal — HR vorher informieren, an einem Werktag morgens | Prüfliste je Knoten (URL, `POST`, Header-Auth-Credential, Timeout ≥ 120 s), Auswertung der ersten Antworten |
-| 3 | **V-3: neue n8n-Läufe anlegen, zunächst inaktiv** (6.2, 6.3 Nr. 1): `unterlagen-fristen` (07:00 Europe/Berlin, `?dryRun=1`, Timeout 300 000 ms, Retry aus, Bericht bei `errors > 0` oder `nichtZugestellt > 0`) und `dokument-ablauf` (07:30) | Nutzer/IT in n8n; das Credential (`Authorization: Bearer <CRON_SECRET>`) legt der Nutzer selbst an | Workflow-JSON zum Import, ohne Secrets (Skill `n8n-superheld`). **Nicht ins Repo** — `/n8n/` steht in `.gitignore` |
+| 2 | **V-2: bestehende n8n-Läufe reparieren** (6.1): `reminders` und `offboarding-reminders` auf `https://hr.fes-credo.de/…` | Nutzer/IT in der n8n-Oberfläche. **Achtung:** Der erste Lauf nach der Korrektur verschickt alle fälligen Erinnerungen auf einmal — HR vorher informieren, an einem Werktag morgens | **Vorbereitet 29.09.:** Import-Dateien 1 und 2 ersetzen die alten Workflows (Ablaufplan 6.5). Danach Auswertung der ersten Berichte |
+| 3 | **V-3: neue n8n-Läufe anlegen, zunächst inaktiv** (6.2, 6.3 Nr. 1): `unterlagen-fristen` (07:00 Europe/Berlin, `?dryRun=1`, Timeout 300 000 ms, Retry aus, Bericht bei `errors > 0` oder `nichtZugestellt > 0`) und `dokument-ablauf` (07:30) | Nutzer/IT in n8n; das Credential (`Authorization: Bearer <CRON_SECRET>`) legt der Nutzer selbst an | **Vorbereitet 29.09.:** Import-Dateien 3 und 4 ohne Secrets, lokal in `n8n/` (Ablaufplan 6.5). **Nicht ins Repo** — `/n8n/` steht in `.gitignore` |
 | 4 | **V-6: Antwortadresse** (= HR-Postfach) unter Einstellungen → SMTP | Nutzer im Portal | — |
 | 5 | **V-8: Freigabeliste** (empfohlen) unter Einstellungen → SMTP → Erlaubte Empfänger-Domains | Nutzer im Portal | Vorschlag für die Domains |
 | 6 | **V-9: Caddy-Entscheidung** (vertagt): `debug` aus, `?Referrer-Policy`, Aufbewahrung des Journals mit dem DSB | Nutzer/IT, DSB | Fragen, Empfehlung und der lokal geprobte Ablauf stehen in 1.9. Neu seit 29.09. (1.9, Nachträge): Das Journal reicht nur etwa dreieinhalb Tage zurück; nach dem Abschalten von `debug` blieben die letzten Einträge mit Tokens womöglich Monate liegen — Löschen mitentscheiden |
@@ -106,7 +112,8 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 | `d774e4c` | Datenschutzhinweise der Upload-Seite mit dem Wortlaut des DSB, V-4 erledigt (nur lokal) |
 | `92e67a2` | Übergabe für die nächste Sitzung: Arbeitsliste, Stand V-1 bis V-9, Befunde und Lehren (nur lokal) |
 | `6ab7f40` | V-7 vorbereitet: Prüfskript im Ablaufplan 1.7 mit Selbstprüfung, lokal geprobt; V6 der VORHER-Datei ohne Zugangsdaten aus Webhook-URLs (nur lokal) |
-| (dieser) | V-7 erledigt: Serverergebnis in 1.7; in 1.9 die Zählung korrigiert (Journal erst ab 26.09.) und der Nachtrag zur Aufbewahrung; Anhang B nachgezogen (nur lokal) |
+| `915dbbb` | V-7 erledigt: Serverergebnis in 1.7; in 1.9 die Zählung korrigiert (Journal erst ab 26.09.) und der Nachtrag zur Aufbewahrung; Anhang B nachgezogen (nur lokal) |
+| (dieser) | V-2/V-3 vorbereitet: Ablaufplan 6.5 beschreibt die vier n8n-Import-Dateien (sie selbst liegen nur lokal in `n8n/`), 6.2 Bericht, Abschnitte 0 und 8 (nur lokal) |
 
 ---
 
@@ -153,8 +160,8 @@ Die Nummern sind die des Ablaufplans (Abschnitt 0 dort). Code-Review: erledigt (
 | V | Punkt | Stand | Nächster Schritt | Wer |
 |---|---|---|---|---|
 | V-1 | `./backups:/backups` eingehängt, Verzeichnis gehört 1001 | **erledigt 28.09.** — in beiden Diensten eingehängt, `775 1001 n8n`, Schreibtests in `app` und `db` `OK` | — | — |
-| V-2 | Bestehende n8n-Läufe rufen `hr.fes-credo.de` auf | offen | Ablaufplan 6.1; der erste Lauf verschickt echte Mails | Nutzer/IT |
-| V-3 | n8n `unterlagen-fristen` und `dokument-ablauf` angelegt (inaktiv) | offen | 6.2, 6.3 | Nutzer/IT, Claude bereitet den Workflow vor |
+| V-2 | Bestehende n8n-Läufe rufen `hr.fes-credo.de` auf | **vorbereitet 29.09.** — Import-Dateien 1 und 2 (Ablaufplan 6.5), lokal 451 Prüfungen grün, Import in n8n noch nicht geprobt | Credential anlegen, importieren, alte Workflows deaktivieren, HR informieren, aktivieren; der erste Lauf verschickt echte Mails | Nutzer, Claude wertet den ersten Bericht aus |
+| V-3 | n8n `unterlagen-fristen` und `dokument-ablauf` angelegt (inaktiv) | **vorbereitet 29.09.** — Import-Dateien 3 und 4 (6.5) | importieren, inaktiv lassen; 3 nach 4.3, 4 nach 5.1 aktivieren | Nutzer, Claude |
 | V-4 | Datenschutztext der Upload-Seite | **erledigt 29.09.** (`d774e4c`) — Wortlaut des DSB, aufklappbar in der Fußzeile; Verantwortlicher aus der Mandanten-Einstellung (Standard Christlicher Schulverein Minden e.V.) | — | — |
 | V-5 | Sicherung des Volumes `uploads_data` | **Vorprüfung erledigt 28.09.** — `hr_portal_credo_uploads_data`, 94 MB, 315 Dateien, Leseprobe `tar OK`, 362 GB frei unter `/vol/container` | Die Sicherung selbst entsteht in 3.4. Das dauerhafte Backup bleibt offen (Abschnitt 8 des Ablaufplans) | IT |
 | V-6 | Antwortadresse (= HR-Postfach) | offen | Einstellungen → SMTP | Nutzer |

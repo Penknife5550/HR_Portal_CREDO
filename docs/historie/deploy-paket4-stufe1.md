@@ -107,8 +107,8 @@ Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 | # | Voraussetzung | Art | Abschnitt |
 |---|---|---|---|
 | V-1 | `./backups:/backups` eingehängt und `sudo chown 1001 backups` gesetzt — sonst bricht der Start ab | **Pflicht** | 1.3 |
-| V-2 | Die beiden bestehenden n8n-Läufe rufen `hr.fes-credo.de` auf (heute `hr.credo-schulen.de`) | **Pflicht**: ohne Lauf keine Erinnerungen und keine Löschung nach 30 Tagen | 6.1 |
-| V-3 | n8n-Läufe `unterlagen-fristen` und `dokument-ablauf` angelegt (beide zunächst inaktiv); `dokument-ablauf` aktiv nach 5.1, `unterlagen-fristen` mit `?dryRun=1` nach 4.3 | **Pflicht** vor dem ersten „Anfordern“ | 6.2, 6.3 |
+| V-2 | Die beiden bestehenden n8n-Läufe rufen `hr.fes-credo.de` auf (heute `hr.credo-schulen.de`) — seit 29.09. als Import-Dateien 1 und 2 vorbereitet, die die alten ersetzen | **Pflicht**: ohne Lauf keine Erinnerungen und keine Löschung nach 30 Tagen | 6.1, 6.5 |
+| V-3 | n8n-Läufe `unterlagen-fristen` und `dokument-ablauf` angelegt (beide zunächst inaktiv); `dokument-ablauf` aktiv nach 5.1, `unterlagen-fristen` mit `?dryRun=1` nach 4.3 — seit 29.09. als Import-Dateien 3 und 4 vorbereitet | **Pflicht** vor dem ersten „Anfordern“ | 6.2, 6.3, 6.5 |
 | V-4 | Art.-13-Text der Upload-Seite vom DSB — **erledigt am 29.09.2026** (Wortlaut im Code, 1.8) | erledigt | 1.8 |
 | V-5 | Sicherung des Volumes `uploads_data` (vorher Leseprobe) | **Pflicht** | 1.4, 3.4 |
 | V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt | Pflicht vor dem ersten „Anfordern“ | 2.3 (V4), 5.2 |
@@ -1283,7 +1283,9 @@ im Dialog grau mit Grund — auch das ist ein Ergebnis.
 Stand, nie ins Repo“; das Repo ist öffentlich). Die drei alten Exporte vom 28.03. sind noch
 versioniert, zeigen aber nicht den Live-Stand; die beiden Reminder-Exporte rufen
 `hr.credo-schulen.de` auf (der dritte, `CREDO_HR_Portal_Offboarding_Workflow.json`, nennt schon
-`hr.fes-credo.de`). Maßgeblich ist, was in der n8n-Oberfläche steht.
+`hr.fes-credo.de`). Maßgeblich ist, was in der n8n-Oberfläche steht. **Seit dem 29.09.2026 liegen
+vier Import-Dateien lokal in `n8n/`** (von `.gitignore` erfasst, also nie im Repo) — für die
+beiden bestehenden und die beiden neuen Läufe, siehe 6.5.
 
 **Für alle Cron-Aufrufe gilt:** Methode `POST`, Header `Authorization: Bearer <CRON_SECRET>`
 über ein **Header-Auth-Credential** (Name `Authorization`, Wert `Bearer <CRON_SECRET>` aus der
@@ -1315,7 +1317,7 @@ beim Öffnen des Versandprotokolls).
 | Authentifizierung | Generic Credential Type → Header Auth, Credential wie oben |
 | Timeout | **300000 ms** (jede Mail kann bis zu etwa 40 s brauchen, der Lauf bremst erst nach drei Fehlern in Folge) |
 | Retry On Fail | **aus** — ein zweiter gleichzeitiger Aufruf bekäme 409, und ein wiederholter scharfer Lauf wäre bestenfalls wirkungslos |
-| Bericht | Mail an HR bzw. IT, wenn `errors > 0` **oder** `nichtZugestellt > 0`, dazu der Fehlerausgang des HTTP-Knotens (401, 409, 500, Zeitüberschreitung) |
+| Bericht | Mail an HR bzw. IT, wenn `errors`, `nichtZugestellt`, `mailUebersprungen` oder `aufgeraeumt.fehler` größer 0 ist, dazu der Fehlerausgang des HTTP-Knotens (401, 404, 409, 500, Zeitüberschreitung). **Im Probelauf jeden Morgen**, zum Vergleich mit den Karten (6.3 Nr. 3). So umgesetzt in der Import-Datei 3 (6.5) |
 
 - **Antwort** (ohne Personendaten, n8n speichert Ausführungsdaten): `success`, `heute`,
   `dryRun`, `erinnerungen.vorab`/`.fristtag`, `hrMeldungen.vollstaendigNachgeholt`/
@@ -1358,6 +1360,83 @@ Die drei Mails an die Person (`unterlagen-angefordert`, `unterlagen-erinnerung`,
 Upload-Link. Ein Webhook darauf lässt sich anlegen, feuert aber nie; die Ereignisliste zeigt
 dazu einen Hinweis. Die beiden HR-Mails feuern Webhooks zusätzlich zur Portal-Mail: Ein
 n8n-Workflow mit eigener Mail ergäbe Doppelversand (V6).
+
+### 6.5 Import-Dateien (vorbereitet am 29.09.2026)
+
+Vier Workflows zum Import, lokal in `n8n/` (nicht im Repo). Sie ersetzen die beiden bestehenden
+Läufe (V-2) und bringen die beiden neuen (V-3):
+
+| Datei | Workflow | Zeit | Aufruf | Timeout | Bericht an HR |
+|---|---|---|---|---|---|
+| `HR-Portal_1_Onboarding-Erinnerungen_0800.json` | Onboarding-Erinnerungen | 08:00 | `/api/cron/reminders` | 120 s | sobald Erinnerungen hinausgingen oder etwas nicht zugestellt wurde (auch Abteilungen: `departmentReminders`) |
+| `HR-Portal_2_Offboarding-Erinnerungen_0800.json` | Offboarding-Erinnerungen | 08:00 | `/api/cron/offboarding-reminders` | 120 s | wie 1 |
+| `HR-Portal_3_Unterlagen-Fristen_0700.json` | Unterlagen-Fristen | 07:00 | `/api/cron/unterlagen-fristen?dryRun=1` | 300 s | im Probelauf jeden Morgen, danach nur bei Problemen (6.2) |
+| `HR-Portal_4_Ablauf-Nachweise_0730.json` | Ablauf befristeter Nachweise | 07:30 | `/api/cron/dokument-ablauf` | 120 s | nur, wenn eine Erinnerung nicht ankam (`nichtZugestellt`, `mailUebersprungen`, `fehler`) |
+
+**Aufbau, in allen vier gleich:** Schedule Trigger (Zeitzone des Workflows Europe/Berlin) →
+HTTP Request (`POST` an `https://hr.fes-credo.de/…`, Header Auth mit dem Credential
+**„HR-Portal Cron (Bearer)“**, „Never Error“, Fehlerausgang für Zeitüberschreitung und
+Verbindungsfehler, kein Retry) → Code „Ergebnis auswerten“ (Empfänger nur im Block `CONFIG`,
+Standard `personalbuchhaltung@fes-minden.de` wie in den alten Workflows) → IF „Bericht senden?“ →
+Microsoft Outlook mit dem Credential **„n8n@fes-minden.de“** aus den alten Exporten,
+Antwortadresse `personalbuchhaltung@fes-minden.de`. Eine Notiz im Workflow nennt Zweck,
+Vorbereitung und Einführung. Alle vier kommen **inaktiv** an.
+
+- **Fehlermail** bei 401 (Credential passt nicht zum `CRON_SECRET`), 404 (falsche URL oder Route
+  vor dem Deploy), 409 (Lauf arbeitet noch), 500, 502–504, Zeitüberschreitung und
+  Verbindungsfehler — jeweils mit Hinweis, wo man nachsieht. Scheitert der Mailversand selbst,
+  steht die Ausführung in n8n als fehlgeschlagen.
+- **Betreff ohne Personendaten.** Der Text an HR nennt bei 1 und 2 Vorgangsnummer, Abteilung,
+  Stufe und Ergebnis, nie Adressen.
+- **Datensparsamkeit in n8n:** n8n speichert die Antworten mit der Ausführung. Bei 1 und 2
+  enthalten sie Vorgangsnummern und Adressen von Abteilungen und Führungskräften (wie bisher),
+  bei 3 und 4 keine Personendaten. Wie lange n8n Ausführungen aufhebt, regelt seine eigene
+  Bereinigung. Wer das nicht will, stellt bei 1 und 2 nach der Einführung „Save successful
+  production executions“ auf „Do not save“.
+- **Behoben gegenüber den alten Exporten:** Das Secret stand dort zusätzlich als Klartext-Header
+  im Knoten (`Bearer HIER_CRON_SECRET_EINTRAGEN`); HTTP-Fehler ließen den Workflow still
+  scheitern; `departmentReminders` wurde nicht ausgewertet (Abschnitt 8).
+
+**Einrichten, Schritt für Schritt** (in der Instanz, in der die alten Workflows und das
+Outlook-Credential liegen; auf dem Server laufen `n8n-n8n-1` und `n8n-sw`):
+
+1. **Credential anlegen:** „Credentials“ → neu → Typ **Header Auth**. Name des Credentials genau
+   `HR-Portal Cron (Bearer)`, Feld „Name“ `Authorization`, Feld „Value“ `Bearer ` (mit Leerzeichen)
+   und dahinter das `CRON_SECRET` aus der `.env` des Servers, ohne Anführungszeichen. Den Wert nie
+   in den Chat kopieren. Er steht auf dem Server in:
+   ```bash
+   sudo grep '^CRON_SECRET=' /vol/container/HR_Portal_CREDO/.env
+   ```
+2. **Importieren:** je Datei einen neuen Workflow öffnen, im Menü „⋯“ → „Import from File…“,
+   Datei wählen, **speichern**. Beim Speichern sucht n8n die Credentials über ihren Namen.
+3. **Prüfen:** Im HTTP-Knoten steht „HR-Portal Cron (Bearer)“, im Outlook-Knoten
+   „n8n@fes-minden.de“; sonst dort auswählen. Empfänger im Code-Knoten, Block `CONFIG`
+   (für technische Fehler z. B. zusätzlich die IT, mehrere Adressen mit Komma). In den
+   Workflow-Einstellungen steht die Zeitzone Europe/Berlin.
+4. **Nicht von Hand „Execute workflow“ drücken** bei 1, 2 und 4 — das verschickt echte Mails.
+   Einzige Ausnahme: 3 nach dem Deploy mit `?dryRun=1` (schickt, löscht und speichert nichts);
+   das ist zugleich der Test des Credentials.
+5. **Aktivieren in dieser Reihenfolge:**
+   - **1 und 2 (V-2):** HR informieren, die alten Workflows „CREDO HR-Portal — Tägliche
+     Erinnerungen“ und „CREDO HR-Portal — Offboarding-Erinnerungen“ **deaktivieren**, dann 1 und
+     2 an einem Werktag vor 08:00 aktivieren. Der Bericht vom ersten Lauf geht an Claude. Laufen
+     die neuen, die alten **löschen** — war dort das echte Secret als Klartext-Header eingetragen,
+     verschwindet es damit aus n8n.
+   - **3:** nach 4.3 mit `?dryRun=1` (6.3 Nr. 3), nach 1–3 Tagen ohne (6.3 Nr. 4) — beides mit
+     Claude.
+   - **4:** direkt nach 5.1 (6.3 Nr. 2).
+
+**Geprüft** (lokal, 29.09.2026): Aufbau jeder Datei (Knotennamen, Verbindungen, `POST`,
+Header Auth ohne Klartext-Header, kein Secret, kein Retry, Fehlerausgang, Zeitzone, inaktiv)
+und jeder Code-Knoten mit Beispielantworten: kein Befund, Zeitüberschreitung, Verbindung
+abgelehnt, 401, 404, 409, 500, 502 mit HTML, 200 ohne `success`, Ausnahme im Code, Probelauf,
+Problemfälle, maskiertes HTML — 451 Prüfungen, alle grün. **Nicht geprüft:** der Import in eine
+echte n8n-Instanz. Die Knotenversionen (Schedule Trigger 1.2, HTTP Request 4.2, Code 2, IF 2.2,
+Microsoft Outlook 2) sind die der alten Exporte vom 28.03.; welche n8n-Version auf dem Server
+läuft, ist offen.
+
+**Neu erzeugen** (etwa für andere Empfänger): Quelle in `n8n/quelle/` (ebenfalls nicht im Repo),
+`node n8n/quelle/bauen.js n8n` und danach `node n8n/quelle/testen.js n8n`.
 
 ---
 
@@ -1440,7 +1519,8 @@ Leere.
 ## 8 · Offene Punkte nach dem Deploy
 
 - **Dauerhafte Sicherung des Volumes `uploads_data`** (IT). 3.4 ist eine einmalige Sicherung.
-- **n8n-Bericht** für `reminders` wertet `departmentReminders` nicht aus (bekannt seit 24.09.).
+- **n8n-Bericht** für `reminders` wertet `departmentReminders` nicht aus (bekannt seit 24.09.) —
+  die Import-Datei 1 (6.5) tut es; erledigt, sobald sie die alte ersetzt hat.
 - **Datenschutz:** Verarbeitungsverzeichnis, Führungszeugnis bei Kitas, Aufbewahrung (1.8).
 - **Stufe 2:** übrige fünf Vorgangsarten, Listenspalte „Unterlagen“ (E-6),
   Pseudonymisierung (E-7).
