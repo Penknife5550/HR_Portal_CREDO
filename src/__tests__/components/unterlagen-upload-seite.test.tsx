@@ -1302,6 +1302,48 @@ describe("Balken und Fußzeile", () => {
     expect(document.querySelector('[data-fusszeile="datenschutz"]')?.textContent).toContain("Datenschutz");
     expect(document.querySelector('[data-fusszeile="einrichtung"]')?.textContent).toBe("© 2026 FES Gymnasium");
   });
+
+  it("Datenschutzhinweise (Art. 13): Wortlaut des DSB, aufklappbar, Verantwortlicher aus dem Mandanten", async () => {
+    uhrStellen();
+    await zeigeSeite();
+    const hinweise = document.querySelector('[data-fusszeile="datenschutz"]') as HTMLDetailsElement;
+    // Aufklappbar und zunaechst zu: Der Hinweis zum Link bleibt oben sichtbar.
+    expect(hinweise.tagName).toBe("DETAILS");
+    expect(hinweise.open).toBe(false);
+    expect(hinweise.querySelector("summary")?.textContent).toBe("Datenschutzhinweise");
+
+    // Verantwortlicher aus der oeffentlichen Antwort (Mandant bzw. Standard), dazu der feste Kontakt.
+    const verantwortlicher = hinweise.querySelector('[data-datenschutz="verantwortlicher"]') as HTMLElement;
+    expect(verantwortlicher.textContent).toContain(VERANTWORTLICHE_STELLE);
+    const mail = verantwortlicher.querySelector("a") as HTMLAnchorElement;
+    expect(mail.getAttribute("href")).toBe("mailto:datenschutz@fes-minden.de");
+    expect(mail.textContent).toBe("datenschutz@fes-minden.de");
+
+    const dsb = hinweise.querySelector('[data-datenschutz="dsb"]') as HTMLElement;
+    expect(dsb.textContent).toBe("DatenschutzbeauftragterHans Peter Dölle, Tel. 02132 91 11 02");
+    expect(dsb.querySelector("a")?.getAttribute("href")).toBe("tel:+492132911102");
+
+    // Alle Abschnitte in der Reihenfolge des DSB-Textes.
+    expect(Array.from(hinweise.querySelectorAll("h2")).map((h) => h.textContent)).toEqual([
+      "Verantwortlicher",
+      "Datenschutzbeauftragter",
+      "Zweck der Datenverarbeitung",
+      "Verarbeitete Daten",
+      "Rechtsgrundlage",
+      "Empfänger der Daten",
+      "Speicherdauer",
+      "Rechte der betroffenen Personen",
+      "Datensicherheit",
+    ]);
+    const text = hinweise.textContent ?? "";
+    expect(text).toContain("Art. 9 Abs. 2 DSGVO bei der Verarbeitung besonderer Kategorien personenbezogener Daten");
+    expect(text).toContain("Nachweise einer Schwerbehinderung");
+    expect(text).toContain("Beschwerde bei einer Datenschutzaufsichtsbehörde");
+    expect(hinweise.querySelectorAll("li")).toHaveLength(13);
+    // Der Platzhalter von vorher ist weg.
+    expect(text).not.toContain("§ 26 BDSG");
+    expect(text).not.toContain("wenden Sie sich bitte an die Personalabteilung");
+  });
 });
 
 // =============================================

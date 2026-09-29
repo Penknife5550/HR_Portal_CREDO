@@ -96,15 +96,139 @@ export const UPLOAD_SEITE_TEXTE = {
     "Sie haben alle angeforderten Unterlagen übermittelt. Die Personalabteilung prüft sie. Falls etwas fehlt oder nicht lesbar ist, erhalten Sie eine E-Mail.",
   LINK_PERSOENLICH: "Der Link ist persönlich, bitte nicht weiterleiten.",
   KEINE_EMAIL: "Bitte senden Sie Unterlagen nicht per E-Mail.",
-  /**
-   * PLATZHALTER — der Wortlaut (Art. 13 DSGVO, mit Art. 9 fuer
-   * Gesundheitsnachweise) kommt vom Datenschutzbeauftragten und wird vor dem
-   * Deploy ersetzt (Feinplanung 11 „Für den DSB", 15 Handschritt 4). Bis dahin
-   * steht hier sinngemaess der Text des Personalfragebogens.
-   */
-  DATENSCHUTZ:
-    "Datenschutz: Ihre Unterlagen werden ausschließlich zur Begründung und Durchführung Ihres Arbeitsverhältnisses verarbeitet (Art. 6 Abs. 1 lit. b und Art. 88 DSGVO i. V. m. § 26 BDSG) und nur der Personalabteilung zugänglich gemacht. Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung (Art. 15–18 DSGVO). Bei Fragen zum Datenschutz wenden Sie sich bitte an die Personalabteilung.",
 } as const;
+
+// =============================================
+// Datenschutzhinweise (Art. 13 DSGVO)
+// =============================================
+
+/** Ein Abschnitt der Datenschutzhinweise: Überschrift, Satz, optional eine Aufzählung. */
+export interface DatenschutzAbschnitt {
+  titel: string;
+  text: string;
+  liste?: readonly string[];
+}
+
+/**
+ * Kontakt in den Datenschutzhinweisen — Wortlaut vom Datenschutzbeauftragten,
+ * übernommen am 29.09.2026. Gilt für alle Mandanten.
+ *
+ * Den **Verantwortlichen** nennt die Seite NICHT von hier, sondern wie der
+ * Personalfragebogen aus den Datenschutz-Einstellungen des Mandanten
+ * (`verantwortlicheStelle` der öffentlichen Antwort, `formatVerantwortlicheStelle`).
+ * Ohne eigenen Eintrag ist das der Christliche Schulverein Minden e.V.,
+ * Kingsleyallee 6, 32425 Minden (`DEFAULT_VERANTWORTLICHE_STELLE` in
+ * src/lib/dsgvo.ts) — genau der Verantwortliche aus dem Text des DSB. Ein
+ * Mandant, der ein eigener Rechtsträger ist, kann dort seinen eintragen.
+ */
+export const DATENSCHUTZ_KONTAKT = {
+  UEBERSCHRIFT: "Datenschutzhinweise",
+  EMAIL: "datenschutz@fes-minden.de",
+  DSB_NAME: "Hans Peter Dölle",
+  DSB_TELEFON: "02132 91 11 02",
+  /** Anruf-Link für das Handy — dieselbe Nummer wie `DSB_TELEFON`. */
+  DSB_TELEFON_LINK: "tel:+492132911102",
+} as const;
+
+/** Die übrigen Abschnitte der Datenschutzhinweise, Wortlaut vom Datenschutzbeauftragten (29.09.2026). */
+export const DATENSCHUTZ_ABSCHNITTE: readonly DatenschutzAbschnitt[] = [
+  {
+    titel: "Zweck der Datenverarbeitung",
+    text: "Im Mitarbeiterportal können Beschäftigte Dokumente und personenbezogene Daten zur Durchführung des Beschäftigungsverhältnisses bereitstellen. Die hochgeladenen Informationen werden ausschließlich für Personalverwaltungszwecke, gesetzliche Nachweispflichten sowie zur Durchführung arbeitsrechtlicher Prozesse verwendet.",
+  },
+  {
+    titel: "Verarbeitete Daten",
+    text: "Je nach Nutzung des Portals können insbesondere folgende Daten verarbeitet werden:",
+    liste: [
+      "Stammdaten (Name, Personalnummer, Kontaktdaten)",
+      "Beschäftigungsdaten",
+      "Dokumente und Nachweise",
+      "Gesundheitsdaten, soweit diese im Rahmen gesetzlicher oder arbeitsrechtlicher Anforderungen übermittelt werden (z. B. Arbeitsunfähigkeitsbescheinigungen oder Nachweise einer Schwerbehinderung)",
+    ],
+  },
+  {
+    titel: "Rechtsgrundlage",
+    text: "Die Verarbeitung erfolgt auf Grundlage:",
+    liste: [
+      "Art. 6 Abs. 1 lit. b DSGVO (Durchführung des Beschäftigungsverhältnisses)",
+      "Art. 6 Abs. 1 lit. c DSGVO (Erfüllung gesetzlicher Pflichten)",
+      "Art. 9 Abs. 2 DSGVO bei der Verarbeitung besonderer Kategorien personenbezogener Daten, insbesondere Gesundheitsdaten",
+    ],
+  },
+  {
+    titel: "Empfänger der Daten",
+    text: "Zugriff auf die Daten erhalten ausschließlich berechtigte Personen, beispielsweise Mitarbeitende der Personalabteilung, Vorgesetzte mit entsprechender Berechtigung sowie IT-Dienstleister, soweit dies für den Betrieb des Portals erforderlich ist.",
+  },
+  {
+    titel: "Speicherdauer",
+    text: "Die Daten werden nur so lange gespeichert, wie dies für die genannten Zwecke oder aufgrund gesetzlicher Aufbewahrungspflichten erforderlich ist. Anschließend werden sie gelöscht oder anonymisiert.",
+  },
+  {
+    titel: "Rechte der betroffenen Personen",
+    text: "Mitarbeitende haben das Recht auf:",
+    liste: [
+      "Auskunft",
+      "Berichtigung",
+      "Löschung",
+      "Einschränkung der Verarbeitung",
+      "Datenübertragbarkeit",
+      "Beschwerde bei einer Datenschutzaufsichtsbehörde",
+    ],
+  },
+  {
+    titel: "Datensicherheit",
+    text: "Die Übertragung der Daten erfolgt verschlüsselt. Der Zugriff auf die Daten ist durch Rollen- und Berechtigungskonzepte geschützt. Es werden technische und organisatorische Maßnahmen zum Schutz der personenbezogenen Daten eingesetzt.",
+  },
+];
+
+/**
+ * Die Datenschutzhinweise in der Fußzeile, aufklappbar: Der Hinweis zum
+ * persönlichen Link bleibt oben sichtbar, und der lange Text schiebt sich auf
+ * dem Handy nicht vor die Unterlagen. `<details>` braucht kein JavaScript und
+ * ist per Tastatur bedienbar.
+ */
+function DatenschutzHinweise({ verantwortlicheStelle }: { verantwortlicheStelle: string }) {
+  const ueberschrift = "font-semibold text-foreground";
+  return (
+    <details data-fusszeile="datenschutz" className="rounded-lg border bg-background px-3 py-2">
+      <summary className="cursor-pointer font-medium text-foreground">{DATENSCHUTZ_KONTAKT.UEBERSCHRIFT}</summary>
+      <div className="mt-3 space-y-3">
+        <section data-datenschutz="verantwortlicher">
+          <h2 className={ueberschrift}>Verantwortlicher</h2>
+          <p>{verantwortlicheStelle}</p>
+          <p>
+            E-Mail:{" "}
+            <a className="underline underline-offset-2" href={`mailto:${DATENSCHUTZ_KONTAKT.EMAIL}`}>
+              {DATENSCHUTZ_KONTAKT.EMAIL}
+            </a>
+          </p>
+        </section>
+        <section data-datenschutz="dsb">
+          <h2 className={ueberschrift}>Datenschutzbeauftragter</h2>
+          <p>
+            {DATENSCHUTZ_KONTAKT.DSB_NAME}, Tel.{" "}
+            <a className="underline underline-offset-2" href={DATENSCHUTZ_KONTAKT.DSB_TELEFON_LINK}>
+              {DATENSCHUTZ_KONTAKT.DSB_TELEFON}
+            </a>
+          </p>
+        </section>
+        {DATENSCHUTZ_ABSCHNITTE.map((abschnitt) => (
+          <section key={abschnitt.titel}>
+            <h2 className={ueberschrift}>{abschnitt.titel}</h2>
+            <p>{abschnitt.text}</p>
+            {abschnitt.liste && (
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {abschnitt.liste.map((eintrag) => (
+                  <li key={eintrag}>{eintrag}</li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ))}
+      </div>
+    </details>
+  );
+}
 
 /** „Datei hinzufügen: Aufenthaltstitel" — sichtbares Label des Dateifelds (5.4). */
 export function dateiFeldLabel(bezeichnung: string): string {
@@ -1153,7 +1277,7 @@ export function UploadSeite({ token }: UploadSeiteProps) {
             {UPLOAD_SEITE_TEXTE.LINK_PERSOENLICH} {UPLOAD_SEITE_TEXTE.KEINE_EMAIL}
           </p>
           <p data-fusszeile="verantwortliche-stelle">Verantwortliche Stelle: {daten.verantwortlicheStelle}.</p>
-          <p data-fusszeile="datenschutz">{UPLOAD_SEITE_TEXTE.DATENSCHUTZ}</p>
+          <DatenschutzHinweise verantwortlicheStelle={daten.verantwortlicheStelle} />
           <p data-fusszeile="einrichtung">
             © {heute.slice(0, 4)}
             {einrichtung ? ` ${einrichtung}` : ""}

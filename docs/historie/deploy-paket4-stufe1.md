@@ -2,7 +2,8 @@
 
 > **Stand:** Ablaufplan vom 25.09.2026, **noch nicht ausgeführt**. Ergänzt am 28. und 29.09.2026:
 > Code-Review erledigt (Fix-Commit `4875fba`), Prüfbefehle in 1.3, 1.4 und 1.9 überarbeitet und
-> lokal geprobt, Serverprüfung V-1/V-5 ohne Befund, V-9 Entscheidung vertagt (1.9). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
+> lokal geprobt, Serverprüfung V-1/V-5 ohne Befund, V-9 Entscheidung vertagt (1.9), V-4 erledigt
+> (Datenschutzhinweise des DSB im Code, 1.8). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
 > [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand:** Server auf `8952e1a` (Code `7bc91ec`, Deploy vom 24.09.2026).
@@ -49,6 +50,7 @@ Schritt 3.4 unverändert weiter, Anhalten kostet also nichts.
 | `2ef8199` | Doku: CLAUDE.md, Feinplanung, dieser Ablaufplan, Handbuch, Änderungsplan Fassung 7 |
 | `3f42546` | Abschlussdurchsicht: 30 bestätigte Befunde behoben |
 | Übergabe | `docs/historie/paket4-stufe1-uebergabe.md`, Statusangaben nach dem Merge (nur `docs/`, `CLAUDE.md`) |
+| DSB-Text | Datenschutzhinweise der Upload-Seite mit dem Wortlaut des DSB (V-4, 29.09.2026) |
 | `4875fba` | Code-Review: Ein verwaister Anspruch auf die HR-Meldung „vollständig“ (Prozess starb zwischen Anspruch und Versand) wird nach einer Stunde nachgeholt; ein abgelehntes „unbefristetes“ Dokument erledigt die Art in der Vorgangsansicht nicht mehr. Am Schema nur ein Kommentar |
 
 Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
@@ -102,7 +104,7 @@ Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 | V-1 | `./backups:/backups` eingehängt und `sudo chown 1001 backups` gesetzt — sonst bricht der Start ab | **Pflicht** | 1.3 |
 | V-2 | Die beiden bestehenden n8n-Läufe rufen `hr.fes-credo.de` auf (heute `hr.credo-schulen.de`) | **Pflicht**: ohne Lauf keine Erinnerungen und keine Löschung nach 30 Tagen | 6.1 |
 | V-3 | n8n-Läufe `unterlagen-fristen` und `dokument-ablauf` angelegt (beide zunächst inaktiv); `dokument-ablauf` aktiv nach 5.1, `unterlagen-fristen` mit `?dryRun=1` nach 4.3 | **Pflicht** vor dem ersten „Anfordern“ | 6.2, 6.3 |
-| V-4 | Art.-13-Text der Upload-Seite vom DSB — **im Code steht ein Platzhalter** | **Pflicht** (Code-Änderung vor dem Merge) oder ausdrückliche Entscheidung | 1.8 |
+| V-4 | Art.-13-Text der Upload-Seite vom DSB — **erledigt am 29.09.2026** (Wortlaut im Code, 1.8) | erledigt | 1.8 |
 | V-5 | Sicherung des Volumes `uploads_data` (vorher Leseprobe) | **Pflicht** | 1.4, 3.4 |
 | V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt | Pflicht vor dem ersten „Anfordern“ | 2.3 (V4), 5.2 |
 | V-7 | `N8N_API_KEY` geprüft: Holt etwas außerhalb des Repos Dokumente über die Download-Route? | ENTSCHEIDUNG, falls gesetzt | 1.7 |
@@ -273,11 +275,16 @@ sudo docker exec hr-portal-app printenv APP_URL
 
 ### 1.8 Datenschutz: Art.-13-Text der Upload-Seite
 
-Der Datenschutztext der Upload-Seite ist im Code ein **Platzhalter**
-(`UPLOAD_SEITE_TEXTE.DATENSCHUTZ` in `src/components/unterlagen/upload-seite.tsx`, sinngemäß
-der Text des Fragebogens, ohne Art. 9). Der Wortlaut kommt vom DSB und muss **vor dem Merge**
-als Code-Änderung eingetragen sein. Deploy mit Platzhalter nur nach ausdrücklicher
-Entscheidung. Weitere Punkte für den DSB, die den Deploy nicht blockieren:
+**Erledigt am 29.09.2026.** Die Datenschutzhinweise der Upload-Seite tragen den Wortlaut des DSB
+(`DATENSCHUTZ_KONTAKT` und `DATENSCHUTZ_ABSCHNITTE` in `src/components/unterlagen/upload-seite.tsx`,
+aufklappbar in der Fußzeile). Den Verantwortlichen nennt die Seite wie der Fragebogen aus der
+Datenschutz-Einstellung des Mandanten; ohne eigenen Eintrag ist das der Christliche Schulverein
+Minden e.V. In der Probe nach dem Deploy (5.4) die Hinweise einmal aufklappen. Weitere Punkte für
+den DSB, die den Deploy nicht blockieren:
+
+- **Art. 10 in den Hinweisen:** Der Text nennt Art. 9 (Gesundheitsdaten), aber nicht Art. 10
+  (Führungszeugnis), obwohl die Nachforderung ein Führungszeugnis anfordern kann (außer bei Kitas).
+  Ob das ergänzt wird, entscheidet der DSB.
 
 - Eintrag im **Verarbeitungsverzeichnis** (Nachforderung von Nachweisen, auch nach Art. 9 und 10).
 - **Führungszeugnis bei Kitas:** Kopie oder nur Vermerk der Einsichtnahme (§ 72a Abs. 5 SGB
@@ -932,7 +939,7 @@ Handlungsanweisung hinaus.
    keine Spur, sodass die Karte „Der tägliche Lauf erreicht das Portal vermutlich nicht …“
    meldet. **Echte Nachforderungen deshalb erst nach dem Scharfschalten (6.3 Nr. 4)** — erst
    dann HR informieren (Nr. 5).
-3. **DSB-Text** der Upload-Seite (1.8), falls mit Platzhalter deployt wurde.
+3. ~~**DSB-Text** der Upload-Seite~~ — entfällt, der Wortlaut steht seit 29.09.2026 im Code (1.8).
 4. **Caddy (V-9) — Entscheidung vertagt am 29.09., Fragen und Ablauf in 1.9.** Befund: Die globale Option `debug` lässt den Reverse-Proxy
    jede Anfrage samt URI und IP-Adresse ins Journal schreiben. Vor dem ersten „Anfordern“ ist
    `debug` abgeschaltet (oder die Entscheidung „hinnehmen“ hier vermerkt), und im Block

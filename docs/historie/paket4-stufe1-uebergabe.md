@@ -3,7 +3,8 @@
 > **Stand:** 26.09.2026, ergänzt am 29.09.2026. Stufe 1 (Onboarding) ist umgesetzt und per
 > Fast-Forward nach `main` gemergt und nach `origin/main` gepusht. Seitdem: Code-Review erledigt
 > (Fix `4875fba`), Ablaufplan nachgezogen (`33e420f`, `82b118f`), Serverprüfung V-1/V-5 ohne
-> Befund, **V-9 Entscheidung vertagt** (Caddy im Debug-Modus). Diese Commits liegen **nur lokal**,
+> Befund, **V-9 Entscheidung vertagt** (Caddy im Debug-Modus), V-4 erledigt (Datenschutzhinweise des
+> DSB im Code). Diese Commits liegen **nur lokal**,
 > gepusht wird erst auf ausdrückliche Freigabe. **Nicht deployt.** Die Produktion läuft weiter auf
 > Code `7bc91ec` (Deploy vom 24.09.2026).
 > **Zweck:** In einer neuen Sitzung ohne Vorwissen weitermachen können: was fertig ist, was
@@ -60,7 +61,8 @@ HR fordert im Onboarding fehlende oder verlängerte Nachweise über einen persö
 | `4875fba` | Code-Review: verwaister Anspruch der HR-Meldung „vollständig“ wird nachgeholt, abgelehntes „unbefristetes“ Dokument erledigt die Art nicht mehr, zwei Wiederverwendungen (nur lokal) |
 | `33e420f` | Ablaufplan: Prüfbefehle V-1, V-5, V-9 lokal geprobt (nur lokal) |
 | `82b118f` | Ablaufplan: Befund V-9, Caddy im Debug-Modus (nur lokal) |
-| (dieser) | V-9 als vertagte Entscheidung, Übergabe auf dem Stand vom 29.09. (nur lokal) |
+| `8d1c558` | V-9 als vertagte Entscheidung, Übergabe auf dem Stand vom 29.09. (nur lokal) |
+| (dieser) | Datenschutzhinweise der Upload-Seite mit dem Wortlaut des DSB, V-4 erledigt (nur lokal) |
 
 ---
 
@@ -104,7 +106,7 @@ Rücknahme, täglicher Lauf, Download-Route, Middleware). Sechs Befunde:
 
 | # | Punkt | Wer |
 |---|---|---|
-| 1 | **Datenschutztext der Upload-Seite** ist ein Platzhalter (`UPLOAD_SEITE_TEXTE.DATENSCHUTZ` in `src/components/unterlagen/upload-seite.tsx`). Wortlaut nach Art. 13 mit Art. 9 vom DSB, danach Code-Änderung. Mit dem DSB außerdem klären: Verarbeitungsverzeichnis, Führungszeugnis bei Kitas (in Stufe 1 gesperrt), Aufbewahrung (E-7) | Nutzer/DSB → Claude |
+| 1 | ~~Datenschutztext der Upload-Seite~~ — **erledigt am 29.09.2026** (Wortlaut des DSB im Code, aufklappbar in der Fußzeile; Verantwortlicher aus der Mandanten-Einstellung, Standard Christlicher Schulverein Minden e.V.). Mit dem DSB noch klären: Verarbeitungsverzeichnis, Führungszeugnis bei Kitas (in Stufe 1 gesperrt), Aufbewahrung (E-7) und ob Art. 10 (Führungszeugnis) in die Hinweise gehört | DSB |
 | 2 | ~~Code-Review~~ — erledigt am 26.09.2026 (`4875fba`, Abschnitt 3) | — |
 | 3 | **n8n:** die bestehenden Läufe `reminders` und `offboarding-reminders` auf `hr.fes-credo.de` umstellen (sie zeigen auf `hr.credo-schulen.de` und kommen seit über 60 Tagen nicht an), `dokument-ablauf` einplanen, neuen Lauf `unterlagen-fristen` anlegen (täglich 07:00 Europe/Berlin, Header-Auth `Bearer <CRON_SECRET>`, Timeout 300 000 ms, Retry aus, 1–3 Tage `?dryRun=1`). Ohne ihn gibt es keine Erinnerungen und keine Löschung | IT/Nutzer |
 | 4 | `SmtpConfig.replyToEmail` (= HR-Postfach, Kopie der HR-Mails, Antwortadresse) setzen; Freigabeliste pflegen (optional) | Nutzer |
