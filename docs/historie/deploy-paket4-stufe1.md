@@ -107,7 +107,7 @@ Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 | V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt | Pflicht vor dem ersten „Anfordern“ | 2.3 (V4), 5.2 |
 | V-7 | `N8N_API_KEY` geprüft: Holt etwas außerhalb des Repos Dokumente über die Download-Route? | ENTSCHEIDUNG, falls gesetzt | 1.7 |
 | V-8 | Freigabeliste für abweichende Empfängeradressen | empfohlen | 5.3 |
-| V-9 | Caddy: Schreibt der Server ein Zugriffsprotokoll, filtert es die URI (der Token der Upload-Seite steht im Pfad und öffnet den Zugang zu Personalunterlagen) | **Pflicht** vor dem ersten „Anfordern“; lesende Prüfung vor dem Deploy, ein `log` ohne URI-Filter ist ENTSCHEIDUNG | 1.9, 5.2 |
+| V-9 | Caddy: Schreibt der Server ein Zugriffsprotokoll, filtert es die URI (der Token der Upload-Seite steht im Pfad und öffnet den Zugang zu Personalunterlagen) | **Pflicht** vor dem ersten „Anfordern“; lesende Prüfung vor dem Deploy, ein `log` ohne URI-Filter ist ENTSCHEIDUNG. **Befund 29.09.:** globale Option `debug` protokolliert jede Anfrage samt URI → ENTSCHEIDUNG (1.9) | 1.9, 5.2 |
 
 ### Dauer (Schätzung, nicht gemessen)
 
@@ -314,14 +314,22 @@ sudo docker network inspect reverse_proxy --format '{{range .Containers}}{{.Name
 ```
 
 **Prüfen** (nur lesend). Es erscheinen nur der Block `hr.fes-credo.de`, die Log-Einstellungen und
-Zähler — keine Tokens und keine Zugangsdaten anderer Dienste:
+Zähler — keine Tokens und keine Zugangsdaten anderer Dienste. Caddy schreibt auf diesem Server über
+den Docker-Treiber `syslog` ins **Journal des Hosts** (nicht nach `/var/log/syslog`); die Zählungen
+lesen deshalb dort und erfassen **alle** Logger, nicht nur `http.log.access` — im Debug-Modus
+schreibt `http.handlers.reverse_proxy` die URIs:
 
 ```bash
 sudo docker exec "$CADDY" awk '/hr\.fes-credo\.de/ && /\{/ {drin=1} drin {print NR": "$0; tiefe += gsub(/\{/, "{") - gsub(/\}/, "}"); if (tiefe <= 0) drin=0}' /etc/caddy/Caddyfile
 sudo docker exec "$CADDY" caddy adapt --config /etc/caddy/Caddyfile --pretty 2>/dev/null | awk '/"(logging|logs)": \{/ && !drin {drin=1; tiefe=0} drin {print NR": "$0; tiefe += gsub(/\{/, "{") - gsub(/\}/, "}"); if (tiefe <= 0) drin=0}'
-sudo docker logs --since 720h "$CADDY" 2>&1 | grep -E '"host": ?"hr\.fes-credo\.de"' | grep -E '"uri": ?"' | grep -oE 'http\.log\.(access|error)[a-z0-9._]*' | sort | uniq -c
 sudo docker inspect --format '{{.HostConfig.LogConfig.Type}} {{json .HostConfig.LogConfig.Config}}' "$CADDY"
+sudo journalctl -t "docker/$CADDY" --since "30 days ago" -o cat | grep -E '"host": ?"hr\.fes-credo\.de"' | grep -E '"uri": ?"' | grep -oE '"logger": ?"[^"]*"' | sort | uniq -c
+sudo journalctl -t "docker/$CADDY" --since "30 days ago" -o cat | grep -E '"host": ?"hr\.fes-credo\.de"' | grep -oE '"uri": ?"/(api/)?[a-z-]+/' | sort | uniq -c | sort -rn | head -n 20
+sudo journalctl --disk-usage
 ```
+
+Zeigt `LogConfig` den Treiber `json-file` oder `local`, in den beiden Zählungen
+`sudo docker logs --since 720h "$CADDY" 2>&1` statt `sudo journalctl … -o cat` nehmen.
 
 Nennt `caddy adapt` für den Logger von `hr.fes-credo.de` einen `"filename"`, die Datei zählen
 (den Pfad aus der Ausgabe einsetzen):
@@ -335,22 +343,29 @@ sudo docker exec "$CADDY" cat /PFAD/AUS/DEM/LOGGER | grep -E '"host": ?"hr\.fes-
 | `docker ps … grep caddy` | eine Zeile mit dem Caddy-Container | keine Zeile: den Befehl mit `reverse_proxy` nehmen. Läuft Caddy gar nicht als Container: **an Claude**, die IT nennt dann den Ort des Caddyfiles. |
 | `inspect … Cmd` | `--config /etc/caddy/Caddyfile` | anderer Pfad: im `awk` und in `caddy adapt` diesen einsetzen |
 | `awk` (Block) | der Block `hr.fes-credo.de { … }` mit Zeilennummern | keine Ausgabe: Der Block steht in einer eingebundenen Datei; `caddy adapt` deckt sie trotzdem ab |
-| `caddy adapt` | unter `"logs"` → `"logger_names"` **kein** `hr.fes-credo.de` (ein Eintrag unter `"skip_hosts"` ist gut), **oder** sein Logger hat unter `"logging"` ein `"format": "filter"` mit `"request\u003euri"` (so steht `request>uri` im JSON) | siehe Auswertung |
-| `docker logs … uniq -c` | keine Ausgabe, oder nur `http.log.error…` | eine Zeile `http.log.access…`: Das Zugriffsprotokoll schreibt die URI samt Token ins Container-Log. Meldung „does not support reading“: Das Log geht woandershin, siehe `LogConfig`, **an Claude** |
-| `LogConfig` | Treiber und Rotation, etwa `json-file {"max-file":"3","max-size":"10m"}` | `json-file {}`: keine Rotation, das Log bleibt liegen, bis der Container neu angelegt wird — für die Aufbewahrung in der Entscheidung (ein Standard des Docker-Dienstes stünde in `/etc/docker/daemon.json`) |
+| `caddy adapt` | unter `"logs"` → `"logger_names"` **kein** `hr.fes-credo.de` (ein Eintrag unter `"skip_hosts"` ist gut), **oder** sein Logger hat unter `"logging"` ein `"format": "filter"` mit `"request\u003euri"` (so steht `request>uri` im JSON); **und kein** `"level": "DEBUG"` | `"default": {"level": "DEBUG"}` heißt globale Option `debug`: siehe Auswertung |
+| `LogConfig` | Treiber und Rotation | `syslog`: Die Zeilen liegen im Journal des Hosts, Aufbewahrung nach journald (Standard: bis 10 % des Dateisystems, höchstens 4 GB, ohne Zeitgrenze; `--disk-usage` zeigt den Stand). `json-file {}`: keine Rotation, das Log bleibt, bis der Container neu angelegt wird. Beides gehört zur Entscheidung. |
+| Zählung je Logger | keine Ausgabe, oder nur `http.log.error…` | jede andere Zeile, etwa `http.handlers.reverse_proxy` (Debug-Modus) oder `http.log.access…`: Die URIs samt Token stehen im Log — ENTSCHEIDUNG |
+| Pfade (ohne Token) | nur zur Einordnung | Pfade wie `/fragebogen/`, `/api/fragebogen/`, `/api/modalitaeten/`, `/onboarding-tasks/` sind Links mit Token. `/actuator/`, `/aws/`, `/config/` u. ä. sind Scanner aus dem Internet, das Portal antwortet mit 404. |
 | Datei zählen | `0` | größer 0: Die Datei hält die URIs fest — ENTSCHEIDUNG |
 
 **Auswertung.**
 
 - **In Ordnung:** `caddy adapt` zeigt für `hr.fes-credo.de` kein Zugriffsprotokoll oder eines mit
-  Filter auf `request>uri`, **und** `docker logs` zeigt keine Zeile `http.log.access…`, **und**
-  die Datei (falls vorhanden) ergibt `0`.
+  Filter auf `request>uri` und kein `"level": "DEBUG"`, **und** die Zählung je Logger zeigt nichts
+  außer `http.log.error…`, **und** die Datei (falls vorhanden) ergibt `0`.
 - **ENTSCHEIDUNG** (an Claude, mit den Ausgaben) in allen anderen Fällen — auch bei
   `"hr.fes-credo.de": [""]` (Zugriffsprotokoll ohne eigene Einstellung, landet ungefiltert im
-  Container-Log) und bei `"default_logger_name"` (dann werden alle Hosts protokolliert).
-  Entweder vor dem ersten „Anfordern“ den Filter ergänzen und Caddy neu laden (IT, 5.2), oder
-  ausdrücklich hinnehmen und die Aufbewahrung des Protokolls klären — heute gilt dasselbe schon
-  für die Magic Links.
+  Log), bei `"default_logger_name"` (dann werden alle Hosts protokolliert) und bei
+  `"default": {"level": "DEBUG"}`: Mit der globalen Option `debug` schreibt
+  `http.handlers.reverse_proxy` jede weitergeleitete Anfrage samt URI, IP-Adresse und Headern
+  (das Cookie geschwärzt) — lokal nachgestellt. Entweder vor dem ersten „Anfordern“ abstellen
+  (`debug` aus bzw. Filter ergänzen, `caddy validate`, `caddy reload`; 5.2 Nr. 4), oder ausdrücklich
+  hinnehmen und die Aufbewahrung klären — heute gilt dasselbe schon für die Magic Links.
+- **`Referrer-Policy` im `header`-Block.** Enthält der Block zugleich eine Löschung wie `-Server`,
+  wendet Caddy ihn erst beim Schreiben der Antwort an und **überschreibt** das `no-referrer`, das
+  das Portal für `/unterlagen/*` setzt (lokal nachgestellt). Mit `?Referrer-Policy "…"` setzt
+  Caddy den Wert nur noch, wo das Portal keinen mitbringt. Prüfung nach dem Deploy: 5.2 Nr. 4.
 - **`caddy adapt`** zeigt den Stand der Datei samt `import`, Snippets und globalen Optionen. Wurde
   das Caddyfile seit dem letzten Neuladen geändert, kann der laufende Stand abweichen. Die
   Admin-API zeigt den laufenden Stand, aber nur unter `http://127.0.0.1:2019/config/` —
@@ -358,13 +373,30 @@ sudo docker exec "$CADDY" cat /PFAD/AUS/DEM/LOGGER | grep -E '"host": ?"hr\.fes-
   eingeschaltet.
 
 Unabhängig vom Zugriffsprotokoll schreibt Caddy Fehlerzeilen (Logger `http.log.error`, etwa ein
-502, solange die App in 3.4 steht) samt voller URI in sein Container-Log — **auch dann, wenn das
+502, solange die App in 3.4 steht) samt voller URI in sein Log — **auch dann, wenn das
 Zugriffsprotokoll die URI filtert** (lokal bestätigt). Das gehört mit in die Entscheidung
 (Aufbewahrung laut `LogConfig`), betrifft aber nur Aufrufe während einer Störung.
 
-**Lokal geprobt** am 28.09.2026 mit Caddy 2.11 (`caddy:2-alpine`) und einem Caddyfile mit drei
-Diensten (Zugriffsprotokoll mit Filter, ohne Filter, ohne Protokoll), das `awk` nach
-`caddy adapt` zusätzlich mit `mawk` wie unter Ubuntu. Auf dem Server nicht geprobt.
+**Befund vom 29.09.2026** (Server, lesend):
+
+- Container `caddy_reverse_proxy` (`caddy:latest`), Caddyfile `/vol/container/caddy2/config/Caddyfile`
+  (im Container `/etc/caddy/Caddyfile`), Treiber `syslog` → Journal des Hosts.
+- Block `hr.fes-credo.de` ohne `log`, `request_body` 50 MB, `header` mit
+  `Referrer-Policy "strict-origin-when-cross-origin"` und `-Server`.
+- **Globale Option `debug` in Zeile 6** → `"default": {"level": "DEBUG"}`. In 30 Tagen 2204 Zeilen
+  von `http.handlers.reverse_proxy` mit URI für `hr.fes-credo.de`, darunter Links mit Token
+  (`/api/fragebogen/`, `/api/modalitaeten/`); insgesamt rund 2,5 Millionen Caddy-Zeilen.
+- Journal 3,9 GB (Standard-Obergrenze 4 GB, keine eigene Aufbewahrungsregel). Lesen dürfen root
+  und die Gruppe `adm` (`syslog`, `fes-linux-adm`).
+- **V-9 = ENTSCHEIDUNG.** Empfehlung: `debug` abschalten, im Block `hr.fes-credo.de`
+  `?Referrer-Policy`, Aufbewahrung des Journals mit dem DSB klären (5.2 Nr. 4). V-1 und V-5 waren
+  am Tag davor ohne Befund (Uploads-Volume 94 MB, 315 Dateien, Leseprobe `tar OK`).
+
+**Lokal geprobt** am 28. und 29.09.2026 mit Caddy 2.11 (`caddy:2-alpine`): Caddyfile mit drei
+Diensten (Zugriffsprotokoll mit Filter, ohne Filter, ohne Protokoll), das `awk` nach `caddy adapt`
+zusätzlich mit `mawk` wie unter Ubuntu, dazu der Debug-Modus, das Überschreiben der
+`Referrer-Policy` und das Abschalten per `caddy validate`/`caddy reload`. Die Zählung im Journal
+ist auf dem Server gelaufen (29.09.).
 
 Der **Pfad-Matcher für `request_body`** (10 MB für `/api/unterlagen/*`) ist dagegen nur
 EMPFOHLEN (5.3): Die Route begrenzt selbst, Caddy wäre die zweite Schicht. Der Block aus dem
@@ -867,9 +899,17 @@ Handlungsanweisung hinaus.
    meldet. **Echte Nachforderungen deshalb erst nach dem Scharfschalten (6.3 Nr. 4)** — erst
    dann HR informieren (Nr. 5).
 3. **DSB-Text** der Upload-Seite (1.8), falls mit Platzhalter deployt wurde.
-4. **Caddy (V-9):** Zeigte 1.9 ein Zugriffsprotokoll ohne Filter auf `request>uri` und lautete
-   die Entscheidung „Filter ergänzen“, ist er eingetragen und Caddy neu geladen; 1.9 noch einmal
-   ausführen. Lautete sie „hinnehmen“, ist das hier vermerkt.
+4. **Caddy (V-9):** Befund vom 29.09. (1.9): Die globale Option `debug` lässt den Reverse-Proxy
+   jede Anfrage samt URI und IP-Adresse ins Journal schreiben. Vor dem ersten „Anfordern“ ist
+   `debug` abgeschaltet (oder die Entscheidung „hinnehmen“ hier vermerkt), und im Block
+   `hr.fes-credo.de` steht `?Referrer-Policy` statt `Referrer-Policy`; danach `caddy validate` und
+   `caddy reload`. Kontrolle: die Zählung je Logger aus 1.9 mit `--since "1 hour ago"` — keine
+   Zeile `http.handlers.reverse_proxy` mehr. Nach dem Deploy liefert die Upload-Seite
+   `no-referrer`:
+   `curl -s -D - -o /dev/null https://hr.fes-credo.de/unterlagen/00000000-0000-4000-8000-000000000000 | grep -i referrer-policy`
+   → `Referrer-Policy: no-referrer`. Die bisherigen Einträge im Journal (Tokens und IP-Adressen)
+   bleiben bis zur Obergrenze von 4 GB liegen — ob sie früher gelöscht werden und welche
+   Aufbewahrung künftig gilt, entscheidet ihr mit dem DSB.
 5. **HR informieren — erst, wenn `unterlagen-fristen` scharf läuft (6.3 Nr. 4):** Handbuch,
    Kapitel 3.7 „Unterlagen nachfordern“ (`docs/handbuch/handbuch.html#onboarding-unterlagen`).
    Besonders: Unterlagen nicht per Mail annehmen, sensible Unterlagen nie über freie Zeilen
