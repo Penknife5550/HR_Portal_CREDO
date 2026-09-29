@@ -8,7 +8,9 @@
 > Platzhalter für `N8N_API_KEY`, `X-API-Key` im Klartext im Caddy-Journal); V6 in Abschnitt 2 gibt
 > keine Zugangsdaten aus Webhook-URLs mehr aus. Das Skript lief am selben Tag auf dem Server:
 > **V-7 erledigt** (`N8N_API_KEY` leer, Umgebung in Ordnung; Ergebnis in 1.7). Dabei zeigte sich,
-> dass das Journal nur bis zum 26.09. zurückreicht (Korrektur und Nachtrag in 1.9). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
+> dass das Journal nur bis zum 26.09. zurückreicht (Korrektur und Nachtrag in 1.9). Später am
+> 29.09.: die vier n8n-Workflows importiert (6.5), V-6 gesetzt (HR-Postfach
+> `personalbuchhaltung@fes-minden.de`) und `debug` in Caddy abgeschaltet (V-9, Frage 1). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
 > [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand:** Server auf `8952e1a` (Code `7bc91ec`, Deploy vom 24.09.2026).
@@ -111,10 +113,10 @@ Vollständige Liste auf dem Server: `sudo git log --oneline 7bc91ec..HEAD`.
 | V-3 | n8n-Läufe `unterlagen-fristen` und `dokument-ablauf` angelegt (beide zunächst inaktiv); `dokument-ablauf` aktiv nach 5.1, `unterlagen-fristen` mit `?dryRun=1` nach 4.3 — **erledigt am 29.09.2026:** Import-Dateien 3 und 4 importiert, Credentials verknüpft, inaktiv | erledigt (aktivieren nach 4.3 bzw. 5.1) | 6.2, 6.3, 6.5 |
 | V-4 | Art.-13-Text der Upload-Seite vom DSB — **erledigt am 29.09.2026** (Wortlaut im Code, 1.8) | erledigt | 1.8 |
 | V-5 | Sicherung des Volumes `uploads_data` (vorher Leseprobe) | **Pflicht** | 1.4, 3.4 |
-| V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt | Pflicht vor dem ersten „Anfordern“ | 2.3 (V4), 5.2 |
+| V-6 | Antwortadresse (= HR-Postfach) in den SMTP-Einstellungen gesetzt — **erledigt am 29.09.2026** (Nutzer): `personalbuchhaltung@fes-minden.de`; Kontrolle am Deploy-Tag mit V4 (2.2) | erledigt | 2.3 (V4), 5.2 |
 | V-7 | `N8N_API_KEY` geprüft (Prüfskript mit `CRON_SECRET`, `APP_URL`, `NEXT_PUBLIC_APP_URL`, Webhooks und Caddy-Journal): Holt etwas außerhalb des Repos Dokumente über die Download-Route? Ist der Schlüssel der öffentliche Platzhalter aus `.env.example`? — **erledigt am 29.09.2026:** `N8N_API_KEY` ist leer, die Rolle `SERVICE` gibt es also nicht; `CRON_SECRET` 32 Zeichen, `APP_URL` richtig, `NEXT_PUBLIC_APP_URL` nicht gesetzt | erledigt | 1.7 |
 | V-8 | Freigabeliste für abweichende Empfängeradressen | empfohlen | 5.3 |
-| V-9 | Caddy: Schreibt der Server ein Zugriffsprotokoll, filtert es die URI (der Token der Upload-Seite steht im Pfad und öffnet den Zugang zu Personalunterlagen) | **Pflicht** vor dem ersten „Anfordern“; lesende Prüfung vor dem Deploy, ein `log` ohne URI-Filter ist ENTSCHEIDUNG. **Befund 29.09.:** globale Option `debug` protokolliert jede Anfrage samt URI → ENTSCHEIDUNG, **vertagt** (1.9) | 1.9, 5.2 |
+| V-9 | Caddy: Schreibt der Server ein Zugriffsprotokoll, filtert es die URI (der Token der Upload-Seite steht im Pfad und öffnet den Zugang zu Personalunterlagen) | **Pflicht** vor dem ersten „Anfordern“; lesende Prüfung vor dem Deploy, ein `log` ohne URI-Filter ist ENTSCHEIDUNG. **Befund 29.09.:** globale Option `debug` protokolliert jede Anfrage samt URI → ENTSCHEIDUNG, **vertagt** (1.9). **Später am 29.09. (Nutzer): `debug` abgeschaltet.** Offen: `?Referrer-Policy` und die Aufbewahrung bzw. das Löschen der Einträge bis dahin (1.9, Fragen 2 und 3) | 1.9, 5.2 |
 
 ### Dauer (Schätzung, nicht gemessen)
 
@@ -487,7 +489,7 @@ geprobt.
 | A | `N8N_API_KEY` 0 Zeichen, keine Zeile „Platzhalter“ | Leer: `getSession()` prüft dann keine Kopfzeile `X-API-Key`, die Rolle `SERVICE` gibt es nicht. Die 403 der Download-Route trifft niemanden. **V-7 erledigt, keine Entscheidung nötig.** |
 | A | `NODE_ENV=[production]`, `APP_URL=[https://hr.fes-credo.de]`, `NEXT_PUBLIC_APP_URL=[nicht gesetzt]` | in Ordnung: Die Upload-Links beginnen mit `https://hr.fes-credo.de/unterlagen/` |
 | B | keine Webhooks (`0 rows`) | INFO: Das Portal schickt überhaupt keine Webhooks. V6 in Abschnitt 2 wird leer sein, 6.4 hat keinen Anwendungsfall. |
-| C | elf Container im Netz `reverse_proxy`, darunter `n8n-n8n-1`, `n8n-sw`, `n8n-pgadmin-1`, `metabase-metabase-1` | INFO: n8n läuft auf demselben Host und erreicht das Portal auch intern (`http://hr-portal-app:3000`); welche Instanz die HR-Läufe trägt, klärt V-2. Das Portal verlässt sich nicht auf das Netz (jede Route prüft selbst), und `hr-portal-db` hängt nur im internen Netz. |
+| C | elf Container im Netz `reverse_proxy`, darunter die beiden n8n-Instanzen `n8n-n8n-1` und `n8n-sw` | INFO: n8n läuft auf demselben Host und erreicht das Portal auch intern (`http://hr-portal-app:3000`); welche Instanz die HR-Läufe trägt, klärt V-2. Das Portal verlässt sich nicht auf das Netz (jede Route prüft selbst), und `hr-portal-db` hängt nur im internen Netz. |
 | D | ältester Caddy-Eintrag `2026-09-26T02:16:00+00:00` | Das Journal reicht nur gut dreieinhalb Tage zurück. Teil E umfasst nur diese Zeit — bei leerem Schlüssel ohne Belang. Folgen für V-9: Korrektur und Nachtrag in 1.9. |
 | E | 2300 Zeilen für `hr.fes-credo.de`; keine Anfrage mit `X-API-Key`, keine an die Download-Route | in Ordnung, der Filter greift |
 
@@ -665,6 +667,17 @@ sudo journalctl -o short-iso | grep -m 1 -E '^[0-9]' | cut -d ' ' -f 1
 
 ```bash
 sudo journalctl --disk-usage
+```
+
+**Stand 29.09.2026, später am Tag (Nutzer):** Frage 1 ist entschieden — **`debug` ist
+abgeschaltet**. Offen sind Frage 2 (`?Referrer-Policy` im Block `hr.fes-credo.de`; ob sie mit
+geändert wurde, ist nicht bekannt) und Frage 3 (Aufbewahrung, dazu: Werden die Einträge vom 26.
+bis 29.09. mit Tokens gelöscht? Sie bleiben sonst womöglich Monate liegen, Nachtrag
+Aufbewahrung). Kontrolle, dass keine Debug-Zeilen mehr entstehen (nur lesend, einige Minuten nach
+dem Neuladen; erwartet `0`):
+
+```bash
+sudo journalctl -t docker/caddy_reverse_proxy --since "10 min ago" -o cat | grep -c '"logger":"http.handlers.reverse_proxy"'
 ```
 
 Ablauf für 1 und 2, sobald entschieden (lokal mit derselben Einhängung geprobt; die Zeilennummern
@@ -1185,7 +1198,8 @@ Handlungsanweisung hinaus.
 
 ### 5.2 PFLICHT vor dem ersten „Anfordern“
 
-1. **Einstellungen → SMTP → Antwortadresse** (= HR-Postfach), falls V4 `LEER` zeigte. Sie ist
+1. **Einstellungen → SMTP → Antwortadresse** (= HR-Postfach) — **erledigt am 29.09.2026**
+   (Nutzer: `personalbuchhaltung@fes-minden.de`); V4 bestätigt es am Deploy-Tag. Sie ist
    zugleich die CC der beiden HR-Mails und die Antwortadresse der Mails an die Person. Danach
    zeigt **Einstellungen → Versand-Status** keinen Hinweis „Nutzt {{hr_postfach}}, aber … keine
    Antwortadresse“ mehr.
@@ -1200,7 +1214,7 @@ Handlungsanweisung hinaus.
    meldet. **Echte Nachforderungen deshalb erst nach dem Scharfschalten (6.3 Nr. 4)** — erst
    dann HR informieren (Nr. 5).
 3. ~~**DSB-Text** der Upload-Seite~~ — entfällt, der Wortlaut steht seit 29.09.2026 im Code (1.8).
-4. **Caddy (V-9) — Entscheidung vertagt am 29.09., Fragen und Ablauf in 1.9.** Befund: Die globale Option `debug` lässt den Reverse-Proxy
+4. **Caddy (V-9) — `debug` am 29.09. abgeschaltet; `?Referrer-Policy` und Aufbewahrung offen (1.9, Stand).** Befund: Die globale Option `debug` ließ den Reverse-Proxy
    jede Anfrage samt URI und IP-Adresse ins Journal schreiben. Vor dem ersten „Anfordern“ ist
    `debug` abgeschaltet (oder die Entscheidung „hinnehmen“ hier vermerkt), und im Block
    `hr.fes-credo.de` steht `?Referrer-Policy` statt `Referrer-Policy`; danach `caddy validate` und
