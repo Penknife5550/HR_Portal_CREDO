@@ -27,6 +27,12 @@ Die maßgeblichen Dokumente:
 
 ## 0 · Nächste Sitzung: so geht es weiter
 
+> **Neu am 30.09.2026 — ersetzt den Plan unten, soweit er n8n betrifft:** Der Nutzer stellt n8n
+> nicht um (V-2 entfällt). Stattdessen startet das Portal alle Läufe selbst (Zeitplaner,
+> `docs/module/betrieb/zeitplaner-plan.md`, CLAUDE.md „Automatische Läufe“). Paket 4 wird
+> zusammen mit dem Zeitplaner deployt; „Unterlagen-Fristen“ wird dann im Portal zuerst per
+> „Probelauf jetzt“ geprüft und danach eingeschaltet (statt `?dryRun=1` in n8n).
+
 **Einstieg:** diese Datei, dann im Ablaufplan `docs/historie/deploy-paket4-stufe1.md` Abschnitt 0
 („Voraussetzungen“) und die dort genannten Abschnitte. Die Regeln für Codeänderungen stehen in
 CLAUDE.md, Abschnitt „Unterlagen nachfordern (Paket 4)“.

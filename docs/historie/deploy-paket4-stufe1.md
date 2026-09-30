@@ -1299,6 +1299,11 @@ im Dialog grau mit Grund — auch das ist ein Ergebnis.
 
 ## 6 · n8n
 
+> **Abgelöst am 30.09.2026:** Die Läufe startet das Portal selbst (Zeitplaner, Einstellungen →
+> Automatische Läufe; Plan und Einführung: `docs/module/betrieb/zeitplaner-plan.md`, Abschnitt 8).
+> V-2 und V-3 entfallen, die n8n-Workflows bleiben aus bzw. werden gelöscht. Der Deploy von Paket 4
+> geht zusammen mit dem Zeitplaner hinaus. Der Rest dieses Abschnitts ist nur noch Historie.
+
 **Im Repo liegt kein Export für den neuen Lauf** (`/n8n/` steht in `.gitignore`: „interner
 Stand, nie ins Repo“; das Repo ist öffentlich). Die drei alten Exporte vom 28.03. sind noch
 versioniert, zeigen aber nicht den Live-Stand; die beiden Reminder-Exporte rufen
