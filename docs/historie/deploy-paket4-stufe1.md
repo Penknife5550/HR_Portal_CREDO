@@ -11,7 +11,8 @@
 > dass das Journal nur bis zum 26.09. zurückreicht (Korrektur und Nachtrag in 1.9). Später am
 > 29.09.: die vier n8n-Workflows importiert (6.5), V-6 gesetzt (HR-Postfach
 > `personalbuchhaltung@fes-minden.de`) und `debug` in Caddy abgeschaltet (V-9, Frage 1).
-> **Deploybar, sobald V-2 umgestellt ist** (geplant für den 30.09., Abschnitt 0 „Termin“). Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
+> **Deploybar seit dem 30.09.2026** — V-2 entfällt, der Zeitplaner geht mit (Nachtrag unten).
+> Ziel: `origin/main` ab `c1e05ea`. Das Protokoll kommt nach dem Deploy direkt unter diesen Kopf, wie beim
 > [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand:** Server auf `8952e1a` (Code `7bc91ec`, Deploy vom 24.09.2026).
@@ -31,6 +32,22 @@ neuen täglichen Lauf. Von allein passiert nach dem Start nichts: Die erste Mail
 Person geht erst hinaus, wenn HR zum ersten Mal „Anfordern und E-Mail senden“ klickt, und
 der Lauf kommt nur, wenn n8n ihn aufruft. Der Deploy selbst ist deshalb risikoarm. Die
 eigentlichen Voraussetzungen liegen außerhalb des Codes: n8n, Datenschutz, Sicherungen.
+
+> **Nachtrag 30.09.2026 — der Zeitplaner und der Reiter „E-Mails“ gehen mit.** Drei Commits
+> nach `d05c088`: `bc0b983` (Reiter „E-Mails“ je Vorgang), `1ab9790` (Zeitplaner, Einstellungen →
+> Automatische Läufe), `c1e05ea` (Doku). Was sich an diesem Ablauf dadurch ändert — an den
+> Stellen selbst ist es ebenfalls eingetragen:
+> - **3.1:** Der vorletzte Befehl zeigt jetzt genau `.env.production.example` (nur Kommentare
+>   zu `CRON_SECRET` und `ZEITPLANER_AKTIV`). Keine neue Pflichtvariable, `.env` bleibt wie sie ist.
+> - **3.3:** andere Zahlen (zwei weitere Tabellen, zwei Spalten am Versandprotokoll).
+> - **3.6:** zusätzliche Logzeile `[Zeitplaner] Uhr gestartet (jede Minute).`
+> - **4.1:** `/api/health` meldet `zeitplaner.uhrAktiv: true`, nach spätestens einer Minute
+>   auch `letzterTakt`.
+> - **Abschnitt 6 (n8n) entfällt.** Statt 6.3 gilt `docs/module/betrieb/zeitplaner-plan.md`,
+>   Abschnitt 8: Alle elf Läufe kommen **aus** an, der Start verschickt nichts. „Ablauf
+>   befristeter Nachweise“ erst nach 5.1 einschalten, „Unterlagen-Fristen“ zuerst „Probelauf
+>   jetzt“, dann „als Probelauf“ einschalten, nach 1–3 Tagen scharf. Onboarding- und
+>   Offboarding-Erinnerungen verschicken beim ersten Lauf alles Fällige — HR vorher informieren.
 
 **Grundregel wie am 24.09.:** Wo „an Claude“ steht, wird angehalten. Das Portal läuft bis
 Schritt 3.4 unverändert weiter, Anhalten kostet also nichts.
@@ -901,8 +918,8 @@ sudo git diff --stat 7bc91ec HEAD -- docker-compose.yml Dockerfile entrypoint.sh
 sudo git status --short
 ```
 
-**Erwartet:** `git log` zeigt den Merge-Commit von Paket 4 oder einen späteren Doku-Commit; der
-vorletzte Befehl gibt **nichts** aus; `git status` zeigt wie in 1.1 nur die Sicherungen.
+**Erwartet:** `git log` zeigt `c1e05ea` oder einen späteren Doku-Commit; der
+vorletzte Befehl nennt **nur** `.env.production.example | 6 +++++-` (Kommentare, Nachtrag 30.09.); `git status` zeigt wie in 1.1 nur die Sicherungen.
 **Wenn nicht** (Konflikt, Ausgabe beim vorletzten Befehl): **STOPP, an Claude.**
 
 ### 3.2 Image bauen (das Portal läuft weiter)
@@ -926,17 +943,22 @@ grep -nE 'DROP|RENAME|ALTER COLUMN .* TYPE|SET NOT NULL' "$V" || echo "keine DRO
 **Erwartet:**
 
 ```
-ADD COLUMN      2
+ADD COLUMN      4
 ADD VALUE       0
-CREATE TABLE    4
-INDEX           9
-ADD CONSTRAINT  7
+CREATE TABLE    6
+INDEX           12
+ADD CONSTRAINT  8
 keine DROP/RENAME/TYPE-Zeile
 ```
 
-`ADD COLUMN` sind `documents."bezeichnung"` und `documents."unbefristet"` (zwei Zeilen einer
-Anweisung). `INDEX` zählt 9 Zeilen `CREATE (UNIQUE) INDEX`, `ADD CONSTRAINT` die 7
-Fremdschlüssel; die Primärschlüssel stehen in den `CREATE TABLE`-Blöcken.
+`ADD COLUMN` sind `documents."bezeichnung"` und `documents."unbefristet"` (Paket 4) sowie
+`email_logs."vorgangId"` und `email_logs."vorgangTyp"` (Reiter „E-Mails“), je zwei Zeilen einer
+Anweisung. `CREATE TABLE`: die vier `unterlagen_*` und `automatische_laeufe`,
+`automatische_lauf_protokolle`. `INDEX` zählt 12 Zeilen `CREATE (UNIQUE) INDEX`, `ADD CONSTRAINT`
+die 8 Fremdschlüssel; die Primärschlüssel stehen in den `CREATE TABLE`-Blöcken.
+
+**Nachtrag 30.09.2026:** neu gezählt gegen `c1e05ea` (Schema `7bc91ec` → `c1e05ea`, lokal ohne
+Datenbank). Die Zahlen vorher (2/0/4/9/7) galten nur für Paket 4 allein.
 
 **Beleg:** Diese Zählung ergibt `prisma migrate diff --from-schema-datamodel <Schema 7bc91ec>
 --to-schema-datamodel <Schema 0dcceb9> --script` (am 25.09. lokal, ohne Datenbank). Nach der
@@ -1004,8 +1026,13 @@ Pruefe ob Seed notwendig...
 System-Vorlage (Fuehrungszeugnis) ist aktuell.
 Datenbank bereits geseeded (… User vorhanden). Seed uebersprungen.
 Next.js Server startet auf Port 3000...
+[Zeitplaner] Uhr gestartet (jede Minute).
 ✓ Ready in …
 ```
+
+Die Zeitplaner-Zeile kann auch direkt nach `✓ Ready` stehen. Steht dort stattdessen
+`[Zeitplaner] Uhr aus (ZEITPLANER_AKTIV).`, ist in der `.env` `ZEITPLANER_AKTIV=false`
+gesetzt — an Claude.
 
 - **Warnung von `--accept-data-loss`:** voraussichtlich **keine**, denn es kommen nur neue
   Tabellen und eine Spalte mit Standardwert dazu. Eine Warnung zu einer Tabelle
@@ -1049,8 +1076,10 @@ abschreiben (Lehre 5 vom 24.09.: Sternchen gehen beim Kopieren aus dem Chat verl
 
 ## 4 · NACHHER-Prüfungen
 
-**Reihenfolge nach dem Start:** 3.8 → 4.1 → 4.2 → **5.1** → 6.3 Nr. 2 (`dokument-ablauf`
-aktivieren) → 4.3 → 6.3 Nr. 3 (`unterlagen-fristen` mit `?dryRun=1` aktivieren) → 5.2–5.4.
+**Reihenfolge nach dem Start:** 3.8 → 4.1 → 4.2 → **5.1** → „Ablauf befristeter Nachweise“
+einschalten → 4.3 → „Unterlagen-Fristen“: „Probelauf jetzt“, dann „als Probelauf“ einschalten →
+5.2–5.4. Beides unter Einstellungen → Automatische Läufe (Nachtrag 30.09.; ersetzt 6.3 Nr. 2
+und 3).
 
 ### 4.1 Health
 
@@ -1059,7 +1088,8 @@ sudo docker exec hr-portal-app curl -s http://localhost:3000/api/health
 sudo docker compose ps
 ```
 
-Erwartet `{"status":"ok"…}` und `app` mit `(healthy)`.
+Erwartet `{"status":"ok"…}` und `app` mit `(healthy)`, dazu `"zeitplaner":{"uhrAktiv":true,…}`;
+nach spätestens einer Minute erneut aufrufen, dann ist auch `letzterTakt` gesetzt.
 
 ### 4.2 SQL NACHHER (nur lesend)
 
@@ -1209,16 +1239,16 @@ Handlungsanweisung hinaus.
    zugleich die CC der beiden HR-Mails und die Antwortadresse der Mails an die Person. Danach
    zeigt **Einstellungen → Versand-Status** keinen Hinweis „Nutzt {{hr_postfach}}, aber … keine
    Antwortadresse“ mehr.
-2. **n8n:** Die bestehenden Läufe erreichen das Portal (6.1), `dokument-ablauf` ist nach 5.1
-   aktiv (6.3 Nr. 2), und `unterlagen-fristen` läuft mindestens mit `?dryRun=1` (6.2, 6.3
-   Nr. 3). **Der Probelauf genügt nur für die Probe mit einem Testvorgang (5.4), nicht für
+2. **Automatische Läufe** (seit 30.09. statt n8n): „Ablauf befristeter Nachweise“ ist nach 5.1
+   eingeschaltet, und „Unterlagen-Fristen“ läuft mindestens „als Probelauf“ (Einstellungen →
+   Automatische Läufe). **Der Probelauf genügt nur für die Probe mit einem Testvorgang (5.4), nicht für
    echte Nachforderungen:** Er verschickt keine Erinnerung, holt keine gescheiterte Mail nach,
    meldet HR keine verstrichene Frist und löscht nichts — die Upload-Seite und der Dialog
    versprechen das aber. Eine in dieser Zeit fällige Fristtag-Erinnerung fällt endgültig aus
    (ein verpasster Fristtag wird nicht nachgeholt), und eine fällige Vorab-Erinnerung hinterlässt
    keine Spur, sodass die Karte „Der tägliche Lauf erreicht das Portal vermutlich nicht …“
-   meldet. **Echte Nachforderungen deshalb erst nach dem Scharfschalten (6.3 Nr. 4)** — erst
-   dann HR informieren (Nr. 5).
+   meldet. **Echte Nachforderungen deshalb erst nach dem Scharfschalten** („als Probelauf“
+   abwählen) — erst dann HR informieren (Nr. 5).
 3. ~~**DSB-Text** der Upload-Seite~~ — entfällt, der Wortlaut steht seit 29.09.2026 im Code (1.8).
 4. **Caddy (V-9) — `debug` am 29.09. abgeschaltet; `?Referrer-Policy` und Aufbewahrung offen (1.9, Stand).** Befund: Die globale Option `debug` ließ den Reverse-Proxy
    jede Anfrage samt URI und IP-Adresse ins Journal schreiben. Vor dem ersten „Anfordern“ ist
@@ -1234,7 +1264,7 @@ Handlungsanweisung hinaus.
    welche Aufbewahrung künftig gilt, entscheidet ihr mit dem DSB. Einen Schlüssel zu wechseln gibt
    es für das Portal nicht: Teil E des Prüfskripts in 1.7 fand am 29.09. keine Anfrage mit
    `X-API-Key`.
-5. **HR informieren — erst, wenn `unterlagen-fristen` scharf läuft (6.3 Nr. 4):** Handbuch,
+5. **HR informieren — erst, wenn „Unterlagen-Fristen“ scharf läuft:** Handbuch,
    Kapitel 3.7 „Unterlagen nachfordern“ (`docs/handbuch/handbuch.html#onboarding-unterlagen`).
    Besonders: Unterlagen nicht per Mail annehmen, sensible Unterlagen nie über freie Zeilen
    anfordern, Entwürfe sieht HR nie.
