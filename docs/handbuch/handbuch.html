@@ -392,6 +392,7 @@
           <li><a href="#onboarding-checkliste">Checkliste abarbeiten und Vorgang abschließen</a></li>
           <li><a href="#onboarding-abteilungen">Aufgaben für Abteilungen</a></li>
           <li><a href="#onboarding-unterlagen">Unterlagen nachfordern</a></li>
+          <li><a href="#vorgang-mails">E-Mails zu einem Vorgang nachsehen</a></li>
         </ol>
       </li>
       <li><a href="#offboarding">Offboarding: Austritte verwalten</a></li>
@@ -421,6 +422,7 @@
           <li><a href="#verwaltung-benutzer">Benutzer verwalten</a></li>
           <li><a href="#verwaltung-mandanten">Einrichtungen (Mandanten) verwalten</a></li>
           <li><a href="#verwaltung-einstellungen">Einstellungen und E-Mail-Versand</a></li>
+          <li><a href="#verwaltung-laeufe">Automatische Läufe: Erinnerungen, Fristen und Löschungen</a></li>
           <li><a href="#verwaltung-audit">Das Protokoll (Audit-Log)</a></li>
         </ol>
       </li>
@@ -720,6 +722,7 @@
       <li><strong>Dokumente</strong> – Schreiben erstellen, versenden, fehlende Unterlagen nachfordern und Dateien ablegen.</li>
       <li><strong>Checkliste</strong> – die Aufgabenliste rund um die Einstellung.</li>
       <li><strong>Vorgesetzter</strong> – die Angaben der oder des Vorgesetzten zum Arbeitsvertrag.</li>
+      <li><strong>E-Mails</strong> – alle E-Mails, die das Portal zu diesem Vorgang verschickt hat (siehe <a href="#vorgang-mails">Kapitel 3.8</a>).</li>
     </ul>
 
     <h4>Zwei Spuren: Fragebogen und Einstellungsmodalitäten laufen nebeneinander</h4>
@@ -1031,7 +1034,7 @@
     </div>
 
     <h4>Automatische Erinnerungen</h4>
-    <p>Sie müssen nicht selbst nachfassen. Das Portal prüft einmal täglich, welche informierten Stellen noch offene Aufgaben haben, und erinnert sie: kurz bevor eine Aufgabe fällig wird, und deutlicher, sobald sie überfällig ist – dann nennt die E-Mail, wie viele Aufgaben überfällig sind und seit wie vielen Tagen die älteste. 30 Tage nach der letzten Fälligkeit hört das Portal auf zu erinnern. Stellen ohne Link erinnert es nie, ebenso wenig bei einem abgeschlossenen oder abgelaufenen Vorgang. Aufgaben ohne Fälligkeit lösen keine Erinnerung aus.</p>
+    <p>Sie müssen nicht selbst nachfassen. Das Portal prüft einmal täglich (automatischer Lauf „Onboarding-Erinnerungen", siehe <a href="#verwaltung-laeufe">Kapitel 12.4</a>), welche informierten Stellen noch offene Aufgaben haben, und erinnert sie: kurz bevor eine Aufgabe fällig wird, und deutlicher, sobald sie überfällig ist – dann nennt die E-Mail, wie viele Aufgaben überfällig sind und seit wie vielen Tagen die älteste. 30 Tage nach der letzten Fälligkeit hört das Portal auf zu erinnern. Stellen ohne Link erinnert es nie, ebenso wenig bei einem abgeschlossenen oder abgelaufenen Vorgang. Aufgaben ohne Fälligkeit lösen keine Erinnerung aus.</p>
 
     <h4>Was die Abteilung sieht</h4>
     <p>Die Abteilung öffnet den Link aus der E-Mail und landet auf der Seite <strong>Onboarding-Aufgaben: IT-Abteilung</strong>. Oben steht eine Infokarte mit dem Namen der neuen Mitarbeiterin oder des neuen Mitarbeiters, der Einrichtung, dem Vertragsbeginn und einem Countdown („Bis zum Dienstbeginn – Noch 9 Tage", am Tag davor „Morgen beginnt der Dienst", danach „Heute ist der erste Arbeitstag" bzw. „Seit 3 Tagen im Dienst"). Ist noch kein Name bekannt, steht dort „Name folgt" – nie eine E-Mail-Adresse.</p>
@@ -1169,7 +1172,7 @@
         <tr><td>Nur mit dem täglichen Lauf (morgens)</td><td>Erinnerung an die Person 7 Tage vor der Frist und am Fristtag · E-Mail „Frist verstrichen" an die HR-Kraft, die angefordert hat (in Kopie an das HR-Postfach), einmal je Frist, solange noch etwas fehlt · erneuter Versuch für E-Mails, die nicht zugestellt werden konnten (höchstens dreimal) · Löschen zurückgewiesener und nicht mehr benötigter Dateien nach 30 Tagen und nicht übermittelter Entwürfe 30 Tage nach Ablauf des Links · Zurückziehen der Nachforderung, wenn der Vorgang auf „abgelaufen" gesetzt wurde.</td></tr>
       </tbody>
     </table>
-    <p>Bleibt der tägliche Lauf aus, fehlen Erinnerungen und Löschungen. Die Karte merkt das und zeigt dann „Der tägliche Lauf erreicht das Portal vermutlich nicht … Bitte die IT informieren." Geben Sie diesen Hinweis bitte an die IT weiter.</p>
+    <p>Der tägliche Lauf heißt „Unterlagen-Fristen" und wird unter <strong>Einstellungen → Automatische Läufe</strong> eingeschaltet (siehe <a href="#verwaltung-laeufe">Kapitel 12.4</a>). Bleibt er aus, fehlen Erinnerungen und Löschungen. Die Karte merkt das und zeigt dann „Der tägliche Lauf erreicht das Portal vermutlich nicht … Bitte die IT informieren." Geben Sie diesen Hinweis bitte an die Administration weiter: Sie sieht unter „Automatische Läufe", ob der Lauf eingeschaltet ist und wann er zuletzt lief.</p>
 
     <div class="hinweis warnung">
       <span class="label">Achtung: abgelaufene Vorgänge</span>
@@ -1179,6 +1182,47 @@
     <div class="hinweis info">
       <span class="label">Die fünf E-Mails dazu</span>
       <p>In der Gruppe <strong>Unterlagen</strong> unter <strong>Einstellungen → E-Mail-Vorlagen</strong> stehen „Unterlagen angefordert", „Erinnerung: Unterlagen", „Unterlage zurückgewiesen", „Unterlagen vollständig eingegangen (HR)" und „Frist für Unterlagen verstrichen (HR)". Den Text können Sie dort ändern und mit <strong>Test senden</strong> ausprobieren. Im Betreff dürfen weder Namen von Unterlagen, Begründungen, Nachrichten noch der Link stehen – der Betreff bleibt 90 Tage im Versandprotokoll, das Portal lehnt das Speichern ab. Ist die Vorlage einer E-Mail an die Person abgeschaltet oder fehlt in ihrem Text der Link, lehnt das Portal die Aktion, die diese E-Mail verschicken würde (etwa das Anfordern), mit einer Meldung ab: Sonst bekäme die Person keine E-Mail oder eine ohne Weg zum Hochladen. Die HR-Kopie geht an die Antwortadresse aus <strong>Einstellungen → SMTP</strong> – ist dort keine eingetragen, fehlt sie.</p>
+    </div>
+
+    <h3 id="vorgang-mails">3.8 E-Mails zu einem Vorgang nachsehen</h3>
+    <p>Im Reiter <strong>E-Mails</strong> sehen Sie, welche E-Mails das Portal zu diesem Vorgang verschickt hat – und welche nicht angekommen sind. So beantworten Sie Fragen wie „Hat die Führungskraft den Link bekommen?" oder „Ist die Erinnerung rausgegangen?", ohne das ganze Versandprotokoll durchsuchen zu müssen.</p>
+    <p>Den Reiter gibt es nicht nur im Onboarding, sondern genauso in <strong>Offboarding</strong>, <strong>Verbeamtung</strong>, <strong>Vertragsende</strong>, <strong>Elternzeit</strong> und <strong>Mutterschutz</strong>.</p>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Den Reiter sehen Administrator, HR-Leitung und Sachbearbeiter. Einrichtungsleitungen und Vorgesetzte sehen ihn nicht, weil dort Adressen und Betreffzeilen stehen.</p>
+    </div>
+
+    <ol>
+      <li>Öffnen Sie den Vorgang.</li>
+      <li>Klicken Sie auf den Reiter <strong>E-Mails</strong>.</li>
+      <li>Wollen Sie nur die Probleme sehen, wählen Sie oben rechts statt „Alle" die Auswahl <strong>Nicht zugestellt</strong>.</li>
+      <li>Kam gerade eine neue E-Mail hinzu, klicken Sie auf <strong>Aktualisieren</strong>.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Sie sehen die E-Mails des Vorgangs, die neueste zuerst. Jede Zeile nennt den Zeitpunkt, die Art der E-Mail (zum Beispiel „Erinnerung Mitarbeiter (Fragebogen ausstehend)"), den Betreff und die Empfänger (An, CC, BCC).</p>
+    </div>
+
+    <p>Das farbige Etikett vorne sagt, was aus der E-Mail geworden ist:</p>
+    <table>
+      <caption>Der Stand einer E-Mail</caption>
+      <thead>
+        <tr><th scope="col">Etikett</th><th scope="col">Bedeutung</th><th scope="col">Was Sie tun</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Grün „versendet"</td><td>Der Mailserver hat die E-Mail angenommen.</td><td>Nichts. Kommt sie trotzdem nicht an, bitten Sie die Person, im Spam-Ordner nachzusehen.</td></tr>
+        <tr><td>Rot „fehlgeschlagen"</td><td>Der Versand hat nicht geklappt. Unter „Grund" steht die Meldung des Mailservers, etwa eine ungültige Adresse.</td><td>Adresse prüfen und die Aktion wiederholen, zum Beispiel den Link erneut senden. Bei technischen Meldungen an die Administration wenden.</td></tr>
+        <tr><td>Gelb „nicht versendet"</td><td>Das Portal hat bewusst nichts verschickt. Unter „Grund" steht warum, meist „E-Mail-Vorlage ist deaktiviert" oder ein fehlender Empfänger.</td><td>Die Administration kann die Vorlage unter <strong>Einstellungen → E-Mail-Vorlagen</strong> einschalten oder ergänzen.</td></tr>
+      </tbody>
+    </table>
+
+    <p>Beim Dokumentenpaket steht unter der Zeile <strong>Anhänge anzeigen</strong>. Ein Klick zeigt, welche Dateien mitgingen.</p>
+
+    <div class="hinweis info">
+      <span class="label">Gut zu wissen</span>
+      <p>Der Reiter zeigt E-Mails ab dem 30.09.2026. Ältere E-Mails und solche, die mehrere Vorgänge auf einmal betreffen (etwa die Sammelwarnung zu Verbeamtungs-Fristen), stehen nur unter <strong>Einstellungen → Versandprotokoll</strong>. Nach 90 Tagen werden die Einträge gelöscht. Der BEM-Bereich hat bewusst keinen solchen Reiter; dort gilt das eigene Kommunikationsprotokoll des Falls.</p>
     </div>
 
     <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
@@ -1225,6 +1269,7 @@
       <li><strong>Notizen</strong> – Bemerkungen festhalten.</li>
       <li><strong>Exit-Interview</strong> – die Abschluss-Befragung starten (siehe Kapitel 9).</li>
       <li><strong>Zeugnis</strong> – die Bewertung für das Arbeitszeugnis vorbereiten.</li>
+      <li><strong>E-Mails</strong> – alle E-Mails, die das Portal zu diesem Austritt verschickt hat (siehe <a href="#vorgang-mails">Kapitel 3.8</a>).</li>
     </ul>
 
     <p>Der Bearbeitungsstand durchläuft mehrere Stufen: <strong>Erfasst → Kündigungsfrist → Übergabe → Endabrechnung → Abgeschlossen</strong>. Den Stand stellen Sie über das Status-Klappmenü auf der Übersicht ein.</p>
@@ -1338,7 +1383,7 @@
     </div>
 
     <h4>Automatische Erinnerungen</h4>
-    <p>Sie müssen nicht selbst nachfassen. Das Portal prüft einmal täglich, welche informierten Abteilungen noch offene Aufgaben haben, und erinnert sie: kurz bevor eine Aufgabe fällig wird, und deutlicher, sobald sie überfällig ist – dann nennt die E-Mail, wie viele Aufgaben überfällig sind und seit wie vielen Tagen die älteste. 30 Tage nach der letzten Fälligkeit hört das Portal auf zu erinnern. Abteilungen, die noch keinen Link bekommen haben, erinnert es nie. Schlägt eine Erinnerung fehl, versucht es das Portal am nächsten Tag erneut.</p>
+    <p>Sie müssen nicht selbst nachfassen. Das Portal prüft einmal täglich (automatischer Lauf „Offboarding-Erinnerungen", siehe <a href="#verwaltung-laeufe">Kapitel 12.4</a>), welche informierten Abteilungen noch offene Aufgaben haben, und erinnert sie: kurz bevor eine Aufgabe fällig wird, und deutlicher, sobald sie überfällig ist – dann nennt die E-Mail, wie viele Aufgaben überfällig sind und seit wie vielen Tagen die älteste. 30 Tage nach der letzten Fälligkeit hört das Portal auf zu erinnern. Abteilungen, die noch keinen Link bekommen haben, erinnert es nie. Schlägt eine Erinnerung fehl, versucht es das Portal am nächsten Tag erneut.</p>
 
     <div class="hinweis">
       <span class="label">Tipp: den letzten Arbeitstag ändern</span>
@@ -2043,6 +2088,7 @@
         <tr><td><strong>Webhooks</strong></td><td>Nur ein optionaler Zusatzkanal, um andere Programme anzubinden. Für den E-Mail-Versand nicht nötig – das übernimmt SMTP.</td></tr>
         <tr><td><strong>Abteilungen</strong></td><td>Die E-Mail-Adressen der Abteilungen, die ihre Checklisten-Aufgaben per Link erhalten – zentral oder je Einrichtung (siehe „Abteilungen pflegen" unten).</td></tr>
         <tr><td><strong>API-Zugang</strong></td><td>Zugangsschlüssel für andere Programme, die Auswertungen abrufen dürfen.</td></tr>
+        <tr><td><strong>Automatische Läufe</strong></td><td>Die täglichen Erinnerungen, Fristen und Löschungen ein- und ausschalten und ihr Protokoll ansehen (siehe <a href="#verwaltung-laeufe">Kapitel 12.4</a>).</td></tr>
       </tbody>
     </table>
 
@@ -2108,7 +2154,81 @@
       <p>Die Ferienzeit steht in der Liste. Das Portal berücksichtigt sie bei der Berechnung der Elternzeit-Fristen.</p>
     </div>
 
-    <h3 id="verwaltung-audit">12.4 Das Protokoll (Audit-Log)</h3>
+    <h3 id="verwaltung-laeufe">12.4 Automatische Läufe: Erinnerungen, Fristen und Löschungen</h3>
+    <p>Vieles erledigt das Portal einmal am Tag von selbst: Es erinnert an offene Fragebögen und Aufgaben, warnt vor Fristen und löscht Daten, deren Aufbewahrungszeit abgelaufen ist. Jede dieser Aufgaben ist ein „automatischer Lauf". Unter <strong>Einstellungen → Automatische Läufe</strong> legen Sie fest, welche Läufe stattfinden und um wie viel Uhr.</p>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Die automatischen Läufe sehen und steuern nur Administrator und HR-Leitung.</p>
+    </div>
+
+    <p>Das Portal startet die Läufe selbst, ein zusätzliches Programm ist dafür nicht nötig. Alle E-Mails der Läufe gehen wie alle anderen über den normalen Versand (SMTP) und stehen im Versandprotokoll. Ganz oben im Reiter steht grün „Zeitplaner aktiv" mit dem Zeitpunkt des letzten Takts. Steht dort ein gelber Hinweis, startet das Portal gerade keine Läufe – dann bitte die IT informieren.</p>
+
+    <h4>Die elf Läufe</h4>
+    <table>
+      <caption>Die automatischen Läufe mit ihrer vorgeschlagenen Uhrzeit</caption>
+      <thead>
+        <tr><th scope="col">Lauf</th><th scope="col">Was er tut</th><th scope="col">Uhrzeit</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Wartung</strong></td><td>Löscht Einträge des Versandprotokolls und Protokolle der Läufe, die älter als 90 Tage sind. <em>Löscht endgültig.</em></td><td>03:30</td></tr>
+        <tr><td><strong>BEM-Aufbewahrung</strong></td><td>Löscht BEM-Fälle, deren Aufbewahrungsfrist abgelaufen ist. <em>Löscht endgültig.</em></td><td>03:00</td></tr>
+        <tr><td><strong>Aufbewahrung erzeugter Dokumente</strong></td><td>Löscht erzeugte Briefe, die älter als 12 Monate sind – die führende Ablage ist das DMS. <em>Löscht endgültig.</em></td><td>03:15</td></tr>
+        <tr><td><strong>Unterlagen-Fristen</strong></td><td>Erinnert Personen an angeforderte Unterlagen, meldet verstrichene Fristen, holt gescheiterte E-Mails nach und löscht zurückgewiesene Dateien nach 30 Tagen (siehe <a href="#onboarding-unterlagen">Kapitel 3.7</a>). <em>Löscht endgültig.</em></td><td>07:00</td></tr>
+        <tr><td><strong>Ablauf befristeter Nachweise</strong></td><td>Warnt HR, bevor Aufenthaltstitel und Arbeitserlaubnisse ablaufen, und meldet abgelaufene.</td><td>07:30</td></tr>
+        <tr><td><strong>Onboarding-Erinnerungen</strong></td><td>Erinnert an offene Personalfragebögen und Einstellungsmodalitäten (wöchentlich) und an offene Aufgaben der Abteilungen.</td><td>08:00</td></tr>
+        <tr><td><strong>Offboarding-Erinnerungen</strong></td><td>Erinnert Abteilungen und Führungskräfte an offene Aufgaben im Offboarding.</td><td>08:00</td></tr>
+        <tr><td><strong>Verbeamtungs-Fristen</strong></td><td>Prüft die Fristen der Verbeamtung (Amtsarzt, Unterrichtsbesuche, RV-Befreiung, BR-Genehmigung) und warnt HR.</td><td>08:15</td></tr>
+        <tr><td><strong>Vertragsende-Erinnerungen</strong></td><td>Erinnert Führungskräfte an offene Übernahme-Anfragen, gibt an HR weiter und meldet montags unbearbeitete Vorgänge.</td><td>08:15</td></tr>
+        <tr><td><strong>Elternzeit-Fristen</strong></td><td>Aktualisiert die Fristen der Elternzeit und meldet HR, wenn eine Frist dringlicher wird.</td><td>08:30</td></tr>
+        <tr><td><strong>BEM-Fristen</strong></td><td>Aktualisiert die Fristen der BEM-Fälle und erinnert die im Fall freigegebenen Beauftragten.</td><td>08:30</td></tr>
+      </tbody>
+    </table>
+    <p>Jede Karte nennt außerdem die E-Mail-Vorlagen, die der Lauf verschickt. Die Uhrzeit gilt immer in deutscher Zeit, auch bei der Umstellung auf Sommer- oder Winterzeit.</p>
+
+    <h4>Einen Lauf einschalten</h4>
+    <p>Neue Läufe kommen immer <strong>ausgeschaltet</strong> an. Schalten Sie sie einzeln ein und prüfen Sie vorher die zugehörigen E-Mail-Vorlagen: Sind sie aktiv, und steht im Feld „An" der richtige Empfänger?</p>
+    <ol>
+      <li>Öffnen Sie <strong>Einstellungen</strong> und den Reiter <strong>Automatische Läufe</strong>.</li>
+      <li>Stellen Sie in der Karte des Laufs bei Bedarf die <strong>Uhrzeit</strong> ein. Soll er nur an Werktagen laufen, setzen Sie den Haken bei <strong>nur Mo–Fr</strong>.</li>
+      <li>Klicken Sie auf <strong>Einschalten</strong> und bestätigen Sie die Rückfrage.</li>
+    </ol>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Die Karte zeigt „an" und darunter „Nächster Lauf: heute 08:00" oder „morgen 08:00". Ist die Uhrzeit heute schon vorbei, läuft er erst morgen – das Portal holt beim Einschalten nichts sofort nach.</p>
+    </div>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: der erste Lauf</span>
+      <p>Beim ersten Lauf nach dem Einschalten geht alles hinaus, was bis dahin fällig geworden ist – zum Beispiel alle offenen Erinnerungen auf einmal. Informieren Sie die Kolleginnen und Kollegen vorher, damit niemand überrascht ist.</p>
+    </div>
+
+    <p>Mit <strong>Ausschalten</strong> stoppen Sie einen Lauf sofort; das ist auch der schnellste Weg, wenn ein Lauf unerwartete E-Mails verschickt.</p>
+
+    <h4>Läufe, die löschen: erst der Probelauf</h4>
+    <p>Vier Läufe löschen endgültig – ihre Karte trägt das rote Etikett „löscht endgültig". Bevor so ein Lauf wirklich löschen darf, verlangt das Portal einen <strong>Probelauf</strong>. Ein Probelauf rechnet alles durch, versendet aber nichts, löscht nichts und ändert nichts. Er zeigt Ihnen nur, was passieren würde.</p>
+    <ol>
+      <li>Klicken Sie in der Karte auf <strong>Probelauf jetzt</strong> und bestätigen Sie.</li>
+      <li>Klicken Sie danach auf <strong>Protokoll</strong> und sehen Sie sich die Zahlen an – etwa wie viele Dateien gelöscht würden. Passt das zu Ihrer Erwartung?</li>
+      <li>Wollen Sie das erst einige Tage beobachten, setzen Sie den Haken bei <strong>als Probelauf</strong> und schalten Sie den Lauf ein. Er rechnet dann jeden Tag nur durch und schickt Ihnen einen Bericht.</li>
+      <li>Ist alles in Ordnung, nehmen Sie den Haken bei <strong>als Probelauf</strong> heraus. Ab dann löscht der Lauf wirklich.</li>
+    </ol>
+    <p>Solange noch kein Probelauf stattgefunden hat, steht in der Karte ein gelber Hinweis, und <strong>Jetzt ausführen</strong> ist gesperrt.</p>
+
+    <h4>Einen Lauf von Hand starten</h4>
+    <p>Mit <strong>Jetzt ausführen</strong> starten Sie einen Lauf sofort, unabhängig von der Uhrzeit – etwa wenn er ausgeblieben ist. Er verschickt dann echte E-Mails bzw. löscht wirklich. Läuft er gerade schon, zeigt die Karte „läuft gerade…" und die Knöpfe sind gesperrt; ein zweiter Start ist dann nicht möglich.</p>
+
+    <h4>Protokoll und Bericht</h4>
+    <p>Unter jeder Karte steht der letzte Lauf mit seinem Ergebnis: grün „ohne Befund", gelb „bitte prüfen" oder rot „fehlgeschlagen", dazu, ob er nach Zeitplan oder von Hand lief. Ein Klick auf <strong>Protokoll</strong> zeigt die letzten Läufe mit ihren Zahlen, zum Beispiel „Erinnerungen am Fristtag: 2" oder „Nicht zugestellt: 0"; rot gedruckte Zahlen verdienen einen zweiten Blick. Namen oder Adressen stehen dort bewusst nicht; die einzelnen E-Mails finden Sie im Versandprotokoll oder im Reiter „E-Mails" des Vorgangs. Das Protokoll wird nach 90 Tagen gelöscht.</p>
+    <p>Einen <strong>Bericht per E-Mail</strong> gibt es, wenn ein Lauf Probleme hatte, fehlschlug oder ein Probelauf war. Er geht an das HR-Postfach, also die Antwortadresse unter <strong>Einstellungen → SMTP</strong>, und enthält einen Link direkt zur Karte. Wer auch nach einem erfolgreichen Lauf einen Bericht möchte, setzt in der Karte den Haken bei <strong>Bericht auch, wenn Mails hinausgingen</strong>. Den Text des Berichts ändern Sie unter <strong>Einstellungen → E-Mail-Vorlagen</strong>, Vorlage „Bericht eines automatischen Laufs".</p>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: rot „ausgeblieben"</span>
+      <p>Ist ein Lauf eingeschaltet, aber zu seiner Uhrzeit nicht gelaufen, färbt sich seine Karte rot, und oben erscheint „Ausgeblieben: …". Meist war das Portal zu dieser Zeit nicht erreichbar, etwa wegen eines Neustarts. Starten Sie den Lauf mit <strong>Jetzt ausführen</strong>. Bleibt er am nächsten Tag wieder aus, informieren Sie bitte die IT.</p>
+    </div>
+
+    <h3 id="verwaltung-audit">12.5 Das Protokoll (Audit-Log)</h3>
     <p>Das Portal hält jede wichtige Aktion fest – etwa „Vorgang erstellt" oder „Status geändert". Diese lückenlose Aufzeichnung heißt „Audit-Log" (sprich: Odit-Logg) und dient der Nachvollziehbarkeit. So lässt sich jederzeit klären, wer was wann getan hat.</p>
     <ol>
       <li>Öffnen Sie <strong>Verwaltung → Audit-Log</strong>.</li>
@@ -2149,7 +2269,10 @@
     <p>Das ist kein Fehler. Ihre Rolle gibt diesen Bereich nicht frei. Brauchen Sie ihn für Ihre Arbeit, sprechen Sie mit Ihrer Administratorin oder Ihrem Administrator (siehe Kapitel 2.3).</p>
 
     <h3>Eine E-Mail wurde nicht verschickt.</h3>
-    <p>Schauen Sie unter <strong>Einstellungen → Versandprotokoll</strong> nach. Dort steht bei jeder E-Mail, ob sie verschickt wurde. Zeigt das Portal oben ein rotes Banner „SMTP ist nicht aktiv", muss zuerst der E-Mail-Versand eingerichtet werden (siehe Kapitel 12.3).</p>
+    <p>Öffnen Sie den Vorgang und dort den Reiter <strong>E-Mails</strong> (siehe <a href="#vorgang-mails">Kapitel 3.8</a>). Dort steht bei jeder E-Mail, ob sie verschickt wurde, und bei Problemen der Grund. Ältere E-Mails und Sammelmails finden Administrator und HR-Leitung unter <strong>Einstellungen → Versandprotokoll</strong>. Zeigt das Portal oben ein rotes Banner „SMTP ist nicht aktiv", muss zuerst der E-Mail-Versand eingerichtet werden (siehe Kapitel 12.3).</p>
+
+    <h3>Es kommen keine automatischen Erinnerungen.</h3>
+    <p>Erinnerungen verschickt das Portal nur, wenn der passende automatische Lauf eingeschaltet ist, etwa „Onboarding-Erinnerungen". Administrator und HR-Leitung sehen das unter <strong>Einstellungen → Automatische Läufe</strong>: Steht die Karte auf „aus", ist der Lauf nicht eingeschaltet; ist sie rot „ausgeblieben", lief er zur geplanten Zeit nicht (siehe <a href="#verwaltung-laeufe">Kapitel 12.4</a>). Läuft alles, prüfen Sie im Reiter „E-Mails" des Vorgangs, ob die Erinnerung „nicht versendet" wurde – dann ist oft die Vorlage ausgeschaltet.</p>
 
     <h3>Das Starterpaket lässt sich nicht versenden.</h3>
     <p>Wahrscheinlich wurde für diese Einrichtung noch kein Starterpaket zusammengestellt. Eine Administratorin kann das unter <strong>Mandanten → Starterpaket</strong> nachholen (siehe Kapitel 12.2).</p>
@@ -2186,6 +2309,7 @@
       </thead>
       <tbody>
         <tr><td><strong>Audit-Log</strong></td><td>Das Protokoll. Eine Liste, die festhält, wer wann was im Portal getan hat.</td></tr>
+        <tr><td><strong>Automatischer Lauf</strong></td><td>Eine Aufgabe, die das Portal einmal am Tag von selbst erledigt – zum Beispiel Erinnerungen verschicken oder alte Daten löschen. Ein- und ausgeschaltet unter Einstellungen → Automatische Läufe.</td></tr>
         <tr><td><strong>BAD</strong></td><td>Betriebsärztlicher Dienst. Die Betriebsärztin oder der Betriebsarzt.</td></tr>
         <tr><td><strong>BEM</strong></td><td>Betriebliches Eingliederungsmanagement. Unterstützung bei der Rückkehr nach längerer Krankheit.</td></tr>
         <tr><td><strong>Browser</strong></td><td>Das Programm, mit dem Sie Internetseiten öffnen, zum Beispiel Edge oder Chrome.</td></tr>
@@ -2206,6 +2330,7 @@
         <tr><td><strong>PDF</strong></td><td>Ein fertiges, unveränderbares Dokumentformat. Sieht überall gleich aus.</td></tr>
         <tr><td><strong>Pflichtfeld</strong></td><td>Ein Feld, das ausgefüllt werden muss. Oft mit einem Sternchen <code>*</code> markiert.</td></tr>
         <tr><td><strong>Platzhalter (Variable)</strong></td><td>Ein Stellvertreter in Klammern wie <code>{vorname}</code>, der durch den echten Wert ersetzt wird.</td></tr>
+        <tr><td><strong>Probelauf</strong></td><td>Ein automatischer Lauf zur Probe: Er rechnet alles durch, versendet aber nichts und löscht nichts, und zeigt nur, was passieren würde.</td></tr>
         <tr><td><strong>PSI</strong></td><td>Die interne Bezeichnung für den Verbeamtungs-Prozess.</td></tr>
         <tr><td><strong>QR-Code</strong></td><td>Ein quadratisches Strichbild, das ein Computer schnell einlesen kann.</td></tr>
         <tr><td><strong>Reiter (Tab)</strong></td><td>Eine Karteikarte zum Wechseln zwischen Bereichen einer Seite.</td></tr>
