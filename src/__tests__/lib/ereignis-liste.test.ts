@@ -95,9 +95,10 @@ describe("Ereignisliste — Kennzeichen", () => {
     expect(ereignisOptionLabel(ausgeloest)).toBe(ausgeloest.label);
   });
 
-  it("genau die sieben direkt versendeten Events tragen den Hinweis, dass Webhooks nicht feuern", () => {
-    // Vier Dokumentenpaket-Events (Anhaenge) und die drei Mails der
-    // Nachforderung an die Person (persoenlicher Upload-Link, Paket 4).
+  it("genau die acht direkt versendeten Events tragen den Hinweis, dass Webhooks nicht feuern", () => {
+    // Vier Dokumentenpaket-Events (Anhaenge), die drei Mails der
+    // Nachforderung an die Person (persoenlicher Upload-Link, Paket 4) und die
+    // BEM-Fristenerinnerung (Zeitplaner, nur an die freigegebenen Beauftragten).
     const mitHinweis = EREIGNIS_OPTIONEN.filter((o) => o.webhookHinweis).map((o) => o.value).sort();
     expect(mitHinweis).toEqual(
       [
@@ -108,6 +109,7 @@ describe("Ereignisliste — Kennzeichen", () => {
         "unterlagen-angefordert",
         "unterlagen-erinnerung",
         "unterlage-zurueckgewiesen",
+        "bem-frist-erinnerung",
       ].sort()
     );
     for (const event of mitHinweis) {
@@ -116,9 +118,10 @@ describe("Ereignisliste — Kennzeichen", () => {
     for (const event of UNTERLAGEN_PERSONEN_EVENTS) {
       expect(ereignisOption(event)!.webhookHinweis).toMatch(/persönlichen Upload-Link/);
     }
+    expect(ereignisOption("bem-frist-erinnerung")!.webhookHinweis).toMatch(/freigegebenen Beauftragten/);
   });
 
-  it("EVENTS_OHNE_WEBHOOK deckt genau Dokumentenpaket und Personen-Mails der Nachforderung ab", () => {
+  it("EVENTS_OHNE_WEBHOOK deckt genau Dokumentenpaket, Personen-Mails der Nachforderung und BEM-Fristen ab", () => {
     // dokumentenpaket.ts ruft sendEventEmail direkt (ohne Dispatcher, also ohne
     // Webhooks). Kommt dort ein Modul dazu, muss es auch hier stehen — sonst
     // verspricht der Webhook-Reiter einen Aufruf, der nie kommt. Dasselbe gilt
@@ -127,7 +130,9 @@ describe("Ereignisliste — Kennzeichen", () => {
     const quelle = fs.readFileSync(path.join(process.cwd(), "src/lib/dokumentenpaket.ts"), "utf8");
     const paketEvents = [...quelle.matchAll(/\bevent:\s*"([a-z0-9-]+)"/g)].map((m) => m[1]).sort();
     expect(paketEvents.length).toBeGreaterThanOrEqual(4);
-    expect(Object.keys(EVENTS_OHNE_WEBHOOK).sort()).toEqual([...paketEvents, ...UNTERLAGEN_PERSONEN_EVENTS].sort());
+    expect(Object.keys(EVENTS_OHNE_WEBHOOK).sort()).toEqual(
+      [...paketEvents, ...UNTERLAGEN_PERSONEN_EVENTS, "bem-frist-erinnerung"].sort(),
+    );
     for (const event of Object.keys(EVENTS_OHNE_WEBHOOK)) {
       expect(getEventDefinition(event)).toBeDefined();
     }
@@ -165,6 +170,17 @@ describe("Ereignisliste — Kennzeichen", () => {
     // Die Mail an die Person: sendEventEmail mit erzwungenem Empfaenger.
     expect(quelle).toMatch(/export async function personenMailSenden\(opts: \{\s*event: UnterlagenPersonenEvent;/);
     expect(quelle).toMatch(/sendEventEmail\(opts\.event, vorbereitet\.payload, \{ overrideTo: vorbereitet\.empfaenger \}\)/);
+  });
+
+  it("der Lauf BEM-Fristen schickt die Erinnerung nur ueber sendEventEmail mit overrideTo, nie ueber triggerWebhooks", () => {
+    // Der Hinweis in EVENTS_OHNE_WEBHOOK stimmt nur, solange der Lauf die
+    // Mail am Dispatcher vorbeischickt — und je Beauftragtem an genau diese Adresse.
+    const quelle = fs.readFileSync(path.join(process.cwd(), "src/lib/laeufe/bem-fristen.ts"), "utf8");
+    expect(quelle).toMatch(/export const BEM_FRIST_EVENT = "bem-frist-erinnerung";/);
+    expect(quelle).toContain("sendEventEmail(BEM_FRIST_EVENT, { ...payloadBasis, email: adr }, { overrideTo: adr })");
+    expect(quelle).not.toMatch(/triggerWebhooks\(/);
+    expect(quelle).not.toContain('from "@/lib/webhooks"');
+    expect(quelle).not.toMatch(/sendEmailDetailed\(/);
   });
 
   it("die HR-Mails der Nachforderung feuern Webhooks — sie tragen weder Link noch Unterlagennamen", () => {

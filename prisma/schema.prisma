@@ -1179,6 +1179,70 @@ model SystemMigration {
 }
 
 // =============================================
+// Automatische Laeufe (Zeitplaner, src/lib/zeitplaner/)
+//
+// Eine Zeile je Lauf (Erinnerungen, Fristen, Loeschungen). Das Portal legt
+// fehlende Zeilen selbst an — IMMER mit aktiv = false: Sechs der Laeufe waren
+// vor dem Zeitplaner nie eingeplant, der erste Lauf verschickt alles Faellige
+// auf einmal bzw. loescht endgueltig. Eingeschaltet wird unter Einstellungen →
+// Automatische Läufe (nur Admins).
+// =============================================
+model AutomatischerLauf {
+  /// Schluessel aus LAEUFE (src/lib/zeitplaner/katalog.ts), z.B. "unterlagen-fristen".
+  schluessel       String    @id
+  aktiv            Boolean   @default(false)
+  /// "HH:MM", deutsche Zeit (Europe/Berlin).
+  uhrzeit          String    @default("08:00")
+  nurWerktags      Boolean   @default(false)
+  /// Geplante Laeufe als Probelauf (nur, wo der Lauf es kann).
+  probelauf        Boolean   @default(false)
+  /// Bericht auch ohne Befund, sobald der Lauf etwas verschickt hat.
+  berichtBeiErfolg Boolean   @default(false)
+  /// Berliner Kalendertag "YYYY-MM-DD", fuer den der Zeitplan erledigt ist
+  /// (gelaufen — egal wodurch — oder beim Einschalten nach der Uhrzeit bewusst
+  /// auf morgen gelegt). String statt Date: Vergleich ohne Zeitzone.
+  tagErledigt      String?
+  /// Sperre: gesetzt, solange ein Lauf arbeitet; aelter als 2 h = verwaist.
+  laeuftSeit       DateTime?
+  geaendertAm      DateTime  @updatedAt
+  geaendertVonId   String?
+
+  protokolle AutomatischerLaufProtokoll[]
+
+  @@map("automatische_laeufe")
+}
+
+/// Ein einzelner Lauf. Aufbewahrung 90 Tage (Lauf „wartung“). Nur Zaehler,
+/// Schritte und Fehlercodes — keine Namen, Adressen oder Tokens.
+model AutomatischerLaufProtokoll {
+  id          String            @id @default(uuid())
+  schluessel  String
+  lauf        AutomatischerLauf @relation(fields: [schluessel], references: [schluessel], onDelete: Cascade)
+  /// "ZEITPLAN" | "HAND" | "ROUTE" (String statt Enum, vgl. Paket 4 Regel 1)
+  ausloeser   String
+  probelauf   Boolean           @default(false)
+  gestartetAm DateTime          @default(now())
+  beendetAm   DateTime?
+  /// "LAEUFT" | "OK" | "PROBLEME" | "FEHLER"
+  ergebnis    String            @default("LAEUFT")
+  /// HTTP-Status der Lauf-Funktion (200, 409, 500)
+  status      Int?
+  /// Zaehler als Liste [Bezeichnung, Wert, rot?] (fertig fuer Oberflaeche und Bericht)
+  zaehler     Json?
+  /// Einzelschritte zusammengefasst ("2 × Erinnerung · versendet"), ohne Namen
+  schritte    Json?
+  /// Nur fehlerKennung() — nie Rohtext
+  fehler      String?
+  /// Ergebnis der Berichtsmail: SENT | FAILED | SKIPPED | null (kein Bericht noetig)
+  berichtMail String?
+  benutzerId  String?
+
+  @@index([schluessel, gestartetAm])
+  @@index([gestartetAm])
+  @@map("automatische_lauf_protokolle")
+}
+
+// =============================================
 // Zentrale Vorlagenbibliothek (E0, moduluebergreifend)
 // Word-Vorlagen (.docx) mit Platzhaltern -> Ausgabe Word / PDF / Mail.
 // scope: GLOBAL (organizationId == null) oder MANDANT (organizationId gesetzt).

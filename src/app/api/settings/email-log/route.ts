@@ -3,7 +3,8 @@
  *
  * GET – Versandprotokoll (EmailLog) mit Filtern und Pagination
  *       Query: ?status=SENT|FAILED|SKIPPED&event=...&page=1
- *       Aufbewahrung: Eintraege aelter als 90 Tage werden beim Abruf entfernt.
+ *       Aufbewahrung: Eintraege aelter als 90 Tage werden beim Abruf entfernt
+ *       (emailLogAufraeumen, hoechstens einmal am Tag — primaer im Lauf „Wartung“).
  *
  * Berechtigung: SUPER_ADMIN, HR_LEITUNG
  */
@@ -11,15 +12,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { emailLogAufraeumen } from "@/lib/email-log-aufbewahrung";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 const PAGE_SIZE = 50;
-const RETENTION_DAYS = 90;
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 // Drosselung: Cleanup hoechstens 1x pro Tag und Instanz — nicht bei jedem
 // Seitenwechsel im Protokoll. Primaere Durchsetzung der Aufbewahrungsfrist
-// laeuft im taeglichen Cron (api/cron/reminders).
+// laeuft im Lauf „Wartung“ (Zeitplaner).
 let lastCleanupAt = 0;
 
 export async function GET(request: NextRequest) {
@@ -30,8 +31,7 @@ export async function GET(request: NextRequest) {
 
     if (Date.now() - lastCleanupAt > CLEANUP_INTERVAL_MS) {
       lastCleanupAt = Date.now();
-      const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
-      await prisma.emailLog.deleteMany({ where: { createdAt: { lt: cutoff } } });
+      await emailLogAufraeumen();
     }
 
     const { searchParams } = request.nextUrl;

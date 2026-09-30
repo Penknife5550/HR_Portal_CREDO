@@ -5033,6 +5033,156 @@ CREDO HR-Portal`,
       { key: "{{portalLink}}", description: "Link zum Vorgang im Portal" },
     ],
   },
+  {
+    // Lauf „BEM-Fristen“ — Text wie vorher fest im Code (src/lib/laeufe/bem-fristen.ts).
+    event: "bem-frist-erinnerung",
+    name: "BEM: Frist fällig (Beauftragte)",
+    // Betreff ohne Fallnummer: sendEventEmail schreibt ihn 90 Tage ins
+    // allgemeine Versandprotokoll, und das sehen nicht nur BEM-Beauftragte.
+    subject: "BEM: Frist(en) fällig",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">BEM</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#92400e;font-weight:bold;font-size:14px;">Frist fällig</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">BEM-Fristen: {{vorgangsnummer}}</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Im BEM-Fall {{vorgangsnummer}} sind folgende Fristen fällig oder rücken näher:
+          </p>
+          <div style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">{{fristen_liste_html}}</div>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">
+            Bitte öffnen Sie den Fall im HR-Portal, um die nächsten Schritte zu veranlassen.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#2563eb;border-radius:8px;">
+              <a href="{{portalLink}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Fall öffnen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Automatische Erinnerung des CREDO HR-Portals (BEM). Diese Nachricht enthält keine Gesundheitsdaten.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Im BEM-Fall {{vorgangsnummer}} sind folgende Fristen fällig oder rücken näher:
+
+{{fristen_liste}}
+
+Bitte öffnen Sie den Fall im HR-Portal, um die nächsten Schritte zu veranlassen.
+Fall öffnen: {{portalLink}}
+
+Automatische Erinnerung des CREDO HR-Portals (BEM). Diese Nachricht enthält keine Gesundheitsdaten.`,
+    variables: [
+      { key: "{{vorgangsnummer}}", description: "Nummer des BEM-Falls" },
+      { key: "{{fristen_liste}}", description: "Fällige Fristen als Textliste (Bezeichnung, Datum, Stufe) – nicht im Betreff" },
+      { key: "{{fristen_liste_html}}", description: "Dieselbe Liste als HTML-Aufzählung – nicht im Betreff" },
+      { key: "{{anzahl_fristen}}", description: "Anzahl der fälligen Fristen" },
+      { key: "{{portalLink}}", description: "Link zum Fall im Portal" },
+    ],
+  },
+  {
+    // Zeitplaner: Bericht eines automatischen Laufs (src/lib/zeitplaner/bericht.ts).
+    event: "automatischer-lauf-bericht",
+    name: "Bericht eines automatischen Laufs",
+    subject: "HR-Portal: {{lauf_name}} – {{#ist_probelauf}}Probelauf {{/ist_probelauf}}{{datum}}{{#hat_probleme}} – bitte prüfen{{/hat_probleme}}{{#ist_fehler}} – fehlgeschlagen{{/ist_fehler}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">Automatische Läufe</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          {{#ist_fehler}}<div style="display:inline-block;background-color:#fee2e2;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#991b1b;font-weight:bold;font-size:14px;">Lauf fehlgeschlagen</span>
+          </div>{{/ist_fehler}}{{#hat_probleme}}<div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#92400e;font-weight:bold;font-size:14px;">Bitte prüfen</span>
+          </div>{{/hat_probleme}}{{#ist_probelauf}}<div style="display:inline-block;background-color:#e0f2fe;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#075985;font-weight:bold;font-size:14px;">Probelauf</span>
+          </div>{{/ist_probelauf}}
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">{{lauf_name}}: {{ergebnis}}</h2>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 16px;">{{datum}}, {{uhrzeit}} Uhr · Auslöser: {{ausloeser}}</p>
+          {{#ist_probelauf}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Probelauf: Das Portal hat nichts versendet, nichts gelöscht und nichts gespeichert. Die Zahlen zeigen, was ein echter Lauf getan hätte.
+          </p>{{/ist_probelauf}}
+          <div style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">{{tabelle_html}}</div>
+          {{#schritte_text}}<p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Einzelschritte</p>
+          <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;white-space:pre-line;">{{schritte_text}}</p>{{/schritte_text}}
+          {{#hinweis}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">{{hinweis}}</p>{{/hinweis}}
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#2563eb;border-radius:8px;">
+              <a href="{{portalLink}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Automatische Läufe öffnen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet. Sie enthält bewusst keine Namen oder Adressen – Einzelheiten stehen im Protokoll des Laufs.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `{{lauf_name}}: {{ergebnis}}
+{{datum}}, {{uhrzeit}} Uhr · Auslöser: {{ausloeser}}
+{{#ist_probelauf}}
+Probelauf: Das Portal hat nichts versendet, nichts gelöscht und nichts gespeichert.
+{{/ist_probelauf}}
+{{tabelle_text}}
+{{#schritte_text}}
+Einzelschritte:
+{{schritte_text}}
+{{/schritte_text}}
+{{#hinweis}}
+{{hinweis}}
+{{/hinweis}}
+Automatische Läufe: {{portalLink}}
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{lauf_name}}", description: "Name des Laufs, z. B. „Unterlagen-Fristen“" },
+      { key: "{{datum}}", description: "Tag des Laufs (TT.MM.JJJJ, deutsche Zeit)" },
+      { key: "{{uhrzeit}}", description: "Startzeit des Laufs (HH:MM, deutsche Zeit)" },
+      { key: "{{ausloeser}}", description: "„Zeitplan“, „von Hand“ oder „Cron-Route“" },
+      { key: "{{ergebnis}}", description: "„ohne Befund“, „bitte prüfen“ oder „fehlgeschlagen“" },
+      { key: "{{ist_probelauf}}", description: "„ja“ im Probelauf, sonst leer" },
+      { key: "{{hat_probleme}}", description: "„ja“, wenn etwas nicht zugestellt, übersprungen oder nicht gelöscht wurde, sonst leer" },
+      { key: "{{ist_fehler}}", description: "„ja“, wenn der Lauf selbst scheiterte, sonst leer" },
+      { key: "{{tabelle_html}}", description: "Zähler des Laufs als HTML-Tabelle" },
+      { key: "{{tabelle_text}}", description: "Dieselben Zähler als Text" },
+      { key: "{{schritte_text}}", description: "Einzelschritte zusammengefasst („2 × … · versendet“), ohne Namen" },
+      { key: "{{hinweis}}", description: "Was bei Problemen zu tun ist (fester Text je Lauf)" },
+      { key: "{{hr_postfach}}", description: "HR-Postfach = Antwortadresse aus den SMTP-Einstellungen (Standard-Empfänger)" },
+      { key: "{{portalLink}}", description: "Link zu Einstellungen → Automatische Läufe" },
+    ],
+  },
 ];
 
 // =============================================

@@ -37,6 +37,11 @@ const mockPrisma = {
 const mockTriggerWebhooks = jest.fn();
 const mockAbteilungsErinnerungen = jest.fn();
 
+// Anspruch, Sperre und Protokoll des Zeitplaners sind in zeitplaner-*.test.ts
+// geprueft; hier zaehlt nur die Lauf-Funktion hinter der duennen Route.
+jest.mock("@/lib/zeitplaner/ausfuehren", () => ({
+  laufUeberRoute: (_schluessel: string, opts: unknown, funktion: (o: unknown) => unknown) => funktion(opts),
+}));
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/webhooks", () => ({ triggerWebhooks: mockTriggerWebhooks }));
 jest.mock("@/lib/url", () => ({ getBaseUrl: () => "https://hr.example" }));
@@ -469,8 +474,8 @@ describe("Abteilungs-Erinnerungen im Onboarding", () => {
       details: [],
       uebersprungen: [],
     });
-    // Das Aufraeumen des Versandprotokolls laeuft trotzdem.
-    expect(mockPrisma.emailLog.deleteMany).toHaveBeenCalled();
+    // Das Versandprotokoll raeumt seit 09/2026 der Lauf „Wartung“ auf, nicht dieser.
+    expect(mockPrisma.emailLog.deleteMany).not.toHaveBeenCalled();
     stumm.mockRestore();
   });
 });

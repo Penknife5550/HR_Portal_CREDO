@@ -41,9 +41,16 @@ import { EVENT_CATALOG, EVENT_GROUP_ORDER, type EventGroup } from "@/lib/events"
  * konfigurierte Webhook-URL weiter — deshalb ruft der Dienst sendEventEmail
  * direkt. Die beiden HR-Mails der Nachforderung (vollstaendig, Frist
  * verstrichen) laufen dagegen ueber den Dispatcher und stehen NICHT hier.
+ *
+ * Die BEM-Fristenerinnerung (dritte begruendete Ausnahme, Zeitplaner 09/2026):
+ * Empfaenger sind nur die im Fall freigegebenen Beauftragten; Fallnummer und
+ * Fristart gehoeren an keine frei konfigurierbare Webhook-URL.
  */
 const DOKUMENTENPAKET_HINWEIS =
   "Webhooks auf dieses Ereignis feuern nicht: Das Dokumentenpaket wird mit Anhängen direkt per SMTP versendet, ohne Webhook-Aufruf.";
+
+const BEM_HINWEIS =
+  "Webhooks auf dieses Ereignis feuern nicht: BEM-Fälle sind vertraulich, die Erinnerung geht nur direkt per SMTP an die im Fall freigegebenen Beauftragten.";
 
 const UNTERLAGEN_HINWEIS =
   "Webhooks auf dieses Ereignis feuern nicht: Die Mail enthält den persönlichen Upload-Link und wird deshalb direkt per SMTP versendet, ohne Webhook-Aufruf.";
@@ -56,6 +63,7 @@ export const EVENTS_OHNE_WEBHOOK: Readonly<Record<string, string>> = {
   "unterlagen-angefordert": UNTERLAGEN_HINWEIS,
   "unterlagen-erinnerung": UNTERLAGEN_HINWEIS,
   "unterlage-zurueckgewiesen": UNTERLAGEN_HINWEIS,
+  "bem-frist-erinnerung": BEM_HINWEIS,
 };
 
 export interface EreignisOption {

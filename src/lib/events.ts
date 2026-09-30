@@ -25,7 +25,9 @@ export type EventGroup =
   | "Verbeamtung"
   | "Elternzeit"
   | "Mutterschutz"
-  | "Unterlagen";
+  | "Unterlagen"
+  | "BEM"
+  | "System";
 
 export interface EventRecipientDefaults {
   to: string;
@@ -1850,6 +1852,64 @@ export const EVENT_CATALOG: EventDefinition[] = [
     wired: true,
     betreffOhne: UNTERLAGEN_BETREFF_OHNE,
   },
+  {
+    // Lauf „BEM-Fristen“ (src/lib/laeufe/bem-fristen.ts): eine Mail je Fall und
+    // freigegebenem Beauftragten, sobald eine Frist eine Stufe hoeher rutscht.
+    // Direkt ueber sendEventEmail mit overrideTo, nie ueber Webhooks
+    // (EVENTS_OHNE_WEBHOOK) — Empfaenger sind nur die im Fall freigegebenen
+    // Beauftragten, ein Verteiler in der Vorlage greift nie.
+    event: "bem-frist-erinnerung",
+    name: "BEM: Frist fällig (Beauftragte)",
+    group: "BEM",
+    recipientHint:
+      "Die im BEM-Fall freigegebenen Beauftragten — das Portal setzt die Empfänger selbst, An/CC/BCC der Vorlage werden ignoriert",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      bemFallId: "00000000-0000-0000-0000-000000000009",
+      vorgangsnummer: "BEM-2026-GYM-001",
+      displayId: "BEM-2026-GYM-001",
+      email: "bem-beauftragte@example.org",
+      anzahl_fristen: 2,
+      fristen_liste: "- Erstgespräch: fällig am 06.10.2026 (Warnung)\n- Rückmeldung Einladung: fällig am 30.09.2026 (Eskalation)",
+      fristen_liste_html:
+        "<ul><li>Erstgespräch: fällig am 06.10.2026 (Warnung)</li><li>Rückmeldung Einladung: fällig am 30.09.2026 (Eskalation)</li></ul>",
+      portalLink: BEISPIEL_LINK,
+    },
+    wired: true,
+    // Auch die Fallnummer nicht: Der Betreff steht 90 Tage im allgemeinen
+    // Versandprotokoll, das nicht nur BEM-Beauftragte sehen.
+    betreffOhne: ["fristen_liste", "fristen_liste_html", "vorgangsnummer", "displayId", "bemFallId"],
+  },
+  {
+    // Zeitplaner (src/lib/zeitplaner/): Bericht eines automatischen Laufs —
+    // nur bei Problemen, im Probelauf und wenn der Lauf scheitert. Der Payload
+    // traegt nur Zaehler und feste Texte, keine Personendaten; darum darf er
+    // ueber den Dispatcher (und damit an Webhooks).
+    event: "automatischer-lauf-bericht",
+    name: "Bericht eines automatischen Laufs",
+    group: "System",
+    recipientHint: "HR/IT intern — Standard: HR-Postfach (Antwortadresse unter SMTP)",
+    defaultRecipients: { to: "{{hr_postfach}}" },
+    samplePayload: {
+      lauf: "unterlagen-fristen",
+      lauf_name: "Unterlagen-Fristen",
+      datum: "30.09.2026",
+      uhrzeit: "07:00",
+      ausloeser: "Zeitplan",
+      ergebnis: "bitte prüfen",
+      ist_probelauf: "",
+      hat_probleme: "ja",
+      ist_fehler: "",
+      tabelle_html:
+        "<table><tr><td>Erinnerungen am Fristtag</td><td>2</td></tr><tr><td>Nicht zugestellt</td><td>1</td></tr></table>",
+      tabelle_text: "Erinnerungen am Fristtag: 2\nNicht zugestellt: 1",
+      schritte_text: "2 × Erinnerung an die Person · am Fristtag · versendet",
+      hinweis: "Nicht zugestellte Mails holt der nächste Lauf nach.",
+      portalLink: BEISPIEL_LINK,
+      hr_postfach: "hr@example.org",
+    },
+    wired: true,
+  },
 ];
 
 // =============================================
@@ -1913,4 +1973,6 @@ export const EVENT_GROUP_ORDER: EventGroup[] = [
   "Elternzeit",
   "Mutterschutz",
   "Unterlagen",
+  "BEM",
+  "System",
 ];

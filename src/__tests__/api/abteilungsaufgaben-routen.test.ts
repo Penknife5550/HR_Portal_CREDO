@@ -31,6 +31,11 @@ const mockTrigger = jest.fn(
   }),
 );
 
+// Anspruch, Sperre und Protokoll des Zeitplaners sind in zeitplaner-*.test.ts
+// geprueft; hier zaehlt nur die Lauf-Funktion hinter der duennen Route.
+jest.mock("@/lib/zeitplaner/ausfuehren", () => ({
+  laufUeberRoute: (_schluessel: string, opts: unknown, funktion: (o: unknown) => unknown) => funktion(opts),
+}));
 jest.mock("@/lib/db", () => ({
   prisma: jest.requireActual("../hilfen/abteilungs-fake-db").fakePrisma,
 }));

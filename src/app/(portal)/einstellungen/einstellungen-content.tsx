@@ -11,6 +11,11 @@
  * 5. Webhooks         – Optionaler Zusatzkanal (z.B. n8n), pro Event
  * 6. Abteilungen      – Adressen der Abteilungen, die Checklisten-Aufgaben per Link bekommen
  * 7. API-Zugang       – API-Keys fuer die Reporting-API
+ * 8. Automatische Läufe – Zeitplaner: taegliche Erinnerungen, Fristen, Loeschungen
+ *                        (src/components/zeitplaner/automatische-laeufe-tab.tsx)
+ *
+ * `?tab=laeufe&lauf=<schluessel>` oeffnet den Reiter und hebt den Lauf hervor
+ * (Link aus der Berichtsmail); die uebrigen Reiter ueber ihre `id`.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -18,6 +23,7 @@ import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import { abteilungLabel, LINK_ABTEILUNGEN } from "@/lib/constants";
 import { EVENT_GROUP_ORDER } from "@/lib/events";
+import { AutomatischeLaeufeTab } from "@/components/zeitplaner/automatische-laeufe-tab";
 import {
   EREIGNIS_GRUPPEN,
   ereignisOption,
@@ -156,13 +162,15 @@ function EreignisOptgroups() {
   );
 }
 
+const TAB_IDS = ["status", "vorlagen", "protokoll", "smtp", "webhooks", "departments", "api", "laeufe"] as const;
+type TabId = (typeof TAB_IDS)[number];
+
 // =============================================
 // Haupt-Komponente
 // =============================================
 export function EinstellungenContent({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<
-    "status" | "vorlagen" | "protokoll" | "smtp" | "webhooks" | "departments" | "api"
-  >("status");
+  const [activeTab, setActiveTab] = useState<TabId>("status");
+  const [hervorgehobenerLauf, setHervorgehobenerLauf] = useState<string | null>(null);
   const [smtpActive, setSmtpActive] = useState<boolean | null>(null);
   const lastTabRef = useRef<string>("");
 
@@ -178,6 +186,14 @@ export function EinstellungenContent({ user }: { user: User }) {
       .catch(() => setSmtpActive(null));
   }, [activeTab]);
 
+  // Einstieg ueber einen Link (?tab=…&lauf=…), etwa aus der Berichtsmail.
+  useEffect(() => {
+    const suche = new URLSearchParams(window.location.search);
+    const tab = suche.get("tab");
+    if (tab && (TAB_IDS as readonly string[]).includes(tab)) setActiveTab(tab as TabId);
+    setHervorgehobenerLauf(suche.get("lauf"));
+  }, []);
+
   const tabs = [
     { id: "status" as const, label: "Versand-Status" },
     { id: "vorlagen" as const, label: "E-Mail-Vorlagen" },
@@ -186,6 +202,7 @@ export function EinstellungenContent({ user }: { user: User }) {
     { id: "webhooks" as const, label: "Webhooks" },
     { id: "departments" as const, label: "Abteilungen" },
     { id: "api" as const, label: "API-Zugang" },
+    { id: "laeufe" as const, label: "Automatische Läufe" },
   ];
 
   return (
@@ -197,7 +214,7 @@ export function EinstellungenContent({ user }: { user: User }) {
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-foreground">Einstellungen</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            E-Mail-Versand, Vorlagen, Webhooks und Abteilungen verwalten
+            E-Mail-Versand, Vorlagen, Webhooks, Abteilungen und automatische Läufe verwalten
           </p>
         </div>
 
@@ -238,6 +255,7 @@ export function EinstellungenContent({ user }: { user: User }) {
         {activeTab === "webhooks" && <WebhooksTab />}
         {activeTab === "departments" && <DepartmentsTab />}
         {activeTab === "api" && <ApiKeysTab />}
+        {activeTab === "laeufe" && <AutomatischeLaeufeTab hervorheben={hervorgehobenerLauf} />}
       </main>
     </div>
   );
@@ -1098,8 +1116,13 @@ function StatusTab({ onConfigureSmtp }: { onConfigureSmtp: () => void }) {
             <li>Einladung zum BEM (Magic-Link „Angebot annehmen“)</li>
             <li>Einwilligungs-Links Datenschutz / Betriebsrat / SBV (automatisch nach Annahme)</li>
             <li>Bestätigung an Beschäftigte + Benachrichtigung an BEM-Beauftragte</li>
-            <li>Fristen-Erinnerungen (täglicher Cron) und Widerruf-Bestätigung</li>
+            <li>Widerruf-Bestätigung</li>
           </ul>
+          <p>
+            Ausnahme: Die <strong>Fristen-Erinnerung an die Beauftragten</strong> (Lauf „BEM-Fristen“) ist eine
+            normale Vorlage (Gruppe „BEM“ oben und unter E-Mail-Vorlagen). Sie geht nur an die im Fall
+            freigegebenen Beauftragten, nie an Webhooks, und nennt im Betreff keine Fallnummer.
+          </p>
         </div>
       </div>
     </div>
