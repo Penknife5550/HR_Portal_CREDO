@@ -15,6 +15,7 @@ import { CONTRACT_END_STATUS_LABELS } from "@/lib/constants";
 import { getContractEndCategory, CONTRACT_END_CATEGORY_META } from "@/lib/contract-end-fristen";
 import { getSignatureWarning, getKettenbefristungWarning } from "@/lib/contract-end-warnings";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { MailProtokoll } from "@/components/vorgangs-mails/mail-protokoll";
 import { FELD_BEZEICHNUNGEN } from "@/lib/formular-fehler";
 
 interface User {
@@ -81,6 +82,9 @@ const TABS = [
   { id: "overview", label: "Übersicht" },
   { id: "renewal", label: "Vertragsdaten" },
   { id: "documents", label: "Dokumente" },
+  // Mailprotokoll des Vorgangs (nur HR_EDIT_ROLES, wie die Route) — auch die
+  // Mails der Vertragsverlaengerung, sie gehoert zu diesem Vorgang.
+  { id: "mails", label: "E-Mails" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -431,7 +435,7 @@ export function ContractEndDetailContent({
 
         {/* Tabs */}
         <nav className="-mb-px flex gap-1 border-b" aria-label="Tabs">
-          {TABS.map((t) => (
+          {TABS.filter((t) => t.id !== "mails" || canEdit).map((t) => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
@@ -547,6 +551,8 @@ export function ContractEndDetailContent({
               />
             </div>
           )}
+
+          {activeTab === "mails" && canEdit && <MailProtokoll modul="contract-end" vorgangId={contractEndId} />}
         </div>
       </div>
     </div>

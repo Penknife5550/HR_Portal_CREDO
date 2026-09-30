@@ -47,6 +47,7 @@ import {
 } from "@/lib/unterlagen";
 import { ProcessWorkflowStepper } from "@/components/process-workflow-stepper";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { MailProtokoll } from "@/components/vorgangs-mails/mail-protokoll";
 import { EditPersonalDataModal } from "./edit-personal-data-modal";
 import { RvFristenCard } from "./rv-fristen-card";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
@@ -450,6 +451,8 @@ const TABS = [
   { id: "documents", label: "Dokumente", alias: "dokumente" },
   { id: "checklist", label: "Checkliste", alias: "checkliste" },
   { id: "supervisor", label: "Vorgesetzter", alias: "vorgesetzter" },
+  // Mailprotokoll des Vorgangs (nur HR_EDIT_ROLES, wie die Route).
+  { id: "mails", label: "E-Mails", alias: "emails" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -1130,7 +1133,7 @@ export function DetailContent({
       <div className="border-b bg-card">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <nav className="-mb-px flex gap-1 overflow-x-auto" aria-label="Tabs">
-            {TABS.map((tab) => {
+            {TABS.filter((tab) => tab.id !== "mails" || darfBearbeiten).map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
@@ -1299,6 +1302,7 @@ export function DetailContent({
           />
         )}
         {activeTab === "supervisor" && <TabSupervisor data={data} appUrl={appUrl} />}
+        {activeTab === "mails" && darfBearbeiten && <MailProtokoll modul="onboarding" vorgangId={onboardingId} />}
       </main>
     </div>
   );

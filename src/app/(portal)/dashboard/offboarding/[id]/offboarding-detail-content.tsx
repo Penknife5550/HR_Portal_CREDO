@@ -30,6 +30,7 @@ import { TABS } from "./types";
 import { STATUS_TRANSITIONS, formatDate, daysUntilLabel } from "./helpers";
 import { ArrowLeftIcon, ChevronDownIcon } from "./icons";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { MailProtokoll } from "@/components/vorgangs-mails/mail-protokoll";
 import type { AbteilungsAktion } from "@/lib/abteilungsaufgaben";
 import {
   abteilungsAktionSenden,
@@ -685,7 +686,7 @@ export function OffboardingDetailContent({
       <div className="border-b bg-card">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <nav className="-mb-px flex gap-1 overflow-x-auto" aria-label="Tabs">
-            {TABS.map((tab) => {
+            {TABS.filter((tab) => tab.id !== "mails" || canEdit).map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
@@ -834,6 +835,9 @@ export function OffboardingDetailContent({
             createZeugnisBewertung={createZeugnisBewertung}
           />
         )}
+
+        {/* Tab 8: E-Mails (Mailprotokoll) */}
+        {activeTab === "mails" && canEdit && <MailProtokoll modul="offboarding" vorgangId={offboardingId} />}
       </main>
     </div>
   );

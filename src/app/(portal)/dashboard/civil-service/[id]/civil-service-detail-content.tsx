@@ -22,6 +22,7 @@ import { TABS, MAIN_PHASES, SUB_PHASES_II, PHASE_ORDER } from "./types";
 import { getPhaseStatus, getMainPhaseStatus } from "./helpers";
 import { ArrowLeftIcon } from "./icons";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { MailProtokoll } from "@/components/vorgangs-mails/mail-protokoll";
 import {
   TabOverview,
   TabChecklist,
@@ -467,7 +468,7 @@ export function CivilServiceDetailContent({
         {/* ---- Tabs ---- */}
         <div className="mb-6 overflow-x-auto">
           <div className="flex gap-1 border-b border-gray-200">
-            {TABS.map((tab) => (
+            {TABS.filter((tab) => tab.id !== "mails" || HR_EDIT_ROLES.includes(user.role)).map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -548,6 +549,10 @@ export function CivilServiceDetailContent({
         )}
 
         {activeTab === "protocol" && <TabProtocol auditLog={data.auditLog || data.auditLogs || []} />}
+
+        {activeTab === "mails" && HR_EDIT_ROLES.includes(user.role) && (
+          <MailProtokoll modul="civil-service" vorgangId={processId} />
+        )}
       </main>
     </div>
   );

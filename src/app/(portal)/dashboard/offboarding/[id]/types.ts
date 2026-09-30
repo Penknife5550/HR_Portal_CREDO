@@ -242,6 +242,8 @@ export const TABS = [
   { id: "notes", label: "Notizen" },
   { id: "exit-interview", label: "Exit-Interview" },
   { id: "zeugnis", label: "Zeugnis" },
+  // Mailprotokoll des Vorgangs (nur HR_EDIT_ROLES, wie die Route).
+  { id: "mails", label: "E-Mails" },
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];

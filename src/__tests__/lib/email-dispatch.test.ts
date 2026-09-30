@@ -794,3 +794,45 @@ describe("Eingangsbestaetigung an die Person (questionnaire-confirmation-employe
     );
   });
 });
+
+describe("Vorgangsbezug im Versandprotokoll (Reiter „E-Mails“)", () => {
+  const VORGANG = "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+
+  it("schreibt Vorgangsart und -ID aus dem Payload", async () => {
+    await sendEventEmail("onboarding-created", { ...payload, onboardingId: VORGANG });
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ vorgangTyp: "ONBOARDING", vorgangId: VORGANG }),
+    });
+  });
+
+  it("auch bei SKIPPED (Vorlage deaktiviert)", async () => {
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({ ...baseTemplate, isActive: false });
+    await sendEventEmail("onboarding-created", { ...payload, onboardingId: VORGANG });
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ status: "SKIPPED", vorgangTyp: "ONBOARDING", vorgangId: VORGANG }),
+    });
+  });
+
+  it("nie beim Test-Versand", async () => {
+    await sendEventEmail("onboarding-created", { ...payload, onboardingId: VORGANG }, { isTest: true, overrideTo: "hr@example.org" });
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ isTest: true, vorgangTyp: null, vorgangId: null }),
+    });
+  });
+
+  it("die Option bezug geht vor (Dokumentenpaket)", async () => {
+    await sendEventEmail("onboarding-created", payload, {
+      bezug: { vorgangTyp: "CONTRACT_END", vorgangId: VORGANG },
+    });
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ vorgangTyp: "CONTRACT_END", vorgangId: VORGANG }),
+    });
+  });
+
+  it("ohne erkennbaren Vorgang bleibt die Zeile ohne Bezug", async () => {
+    await sendEventEmail("onboarding-created", payload);
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ vorgangTyp: null, vorgangId: null }),
+    });
+  });
+});

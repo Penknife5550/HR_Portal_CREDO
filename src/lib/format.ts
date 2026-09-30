@@ -117,6 +117,24 @@ export function formatDatumDE(wert: Date | string | null | undefined): string {
  * Gedankenstrich — das war ihr einziger Verhaltensunterschied und wird hier
  * bewusst aufgegeben.
  */
+/**
+ * Zeitpunkt als „TT.MM.JJJJ, HH:MM“ in deutscher Zeit (der Container und
+ * manche Browser laufen in UTC). Leeres oder Unlesbares ergibt "".
+ */
+export function formatZeitpunktDE(wert: Date | string | null | undefined): string {
+  if (wert == null || wert === "") return "";
+  const zeitpunkt = typeof wert === "string" ? new Date(wert) : wert;
+  if (Number.isNaN(zeitpunkt.getTime())) return "";
+  return zeitpunkt.toLocaleString("de-DE", {
+    timeZone: "Europe/Berlin",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatBytes(bytes: number | null | undefined): string {
   if (bytes === null || bytes === undefined) return "—";
   if (bytes < 1024) return `${bytes} B`;

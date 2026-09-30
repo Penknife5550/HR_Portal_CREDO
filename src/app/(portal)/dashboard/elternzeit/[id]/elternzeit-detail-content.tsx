@@ -10,6 +10,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
+import { MailProtokoll } from "@/components/vorgangs-mails/mail-protokoll";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
 import {
   AblehnungModal,
   MagicLinkModal,
@@ -176,7 +178,10 @@ export function ElternzeitDetailContent({
     | "briefe"
     | "fristen"
     | "dokumente"
+    | "mails"
   >("uebersicht");
+  // Mailprotokoll des Vorgangs (nur HR_EDIT_ROLES, wie die Route).
+  const darfMailsSehen = HR_EDIT_ROLES.includes(user.role);
   const [neueNotiz, setNeueNotiz] = useState("");
   const [magicLinkResult, setMagicLinkResult] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -698,8 +703,11 @@ export function ElternzeitDetailContent({
               "notizen",
               "briefe",
               "fristen",
+              "mails",
             ] as const
-          ).map((t) => (
+          )
+            .filter((t) => t !== "mails" || darfMailsSehen)
+            .map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -721,7 +729,9 @@ export function ElternzeitDetailContent({
                         ? `Notizen (${data.notizen.length})`
                         : t === "briefe"
                           ? "Briefe"
-                          : "Fristen"}
+                          : t === "fristen"
+                            ? "Fristen"
+                            : "E-Mails"}
             </button>
           ))}
         </div>
@@ -1255,6 +1265,8 @@ export function ElternzeitDetailContent({
             )}
           </div>
         )}
+
+        {tab === "mails" && darfMailsSehen && <MailProtokoll modul="elternzeit" vorgangId={prozessId} />}
       </div>
 
       {showSendLinkModal && (

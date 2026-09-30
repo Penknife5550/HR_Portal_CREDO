@@ -9,6 +9,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
+import { MailProtokoll } from "@/components/vorgangs-mails/mail-protokoll";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
 import {
   ProzessStepper,
   NaechsterSchrittBanner,
@@ -107,8 +109,10 @@ export function MutterschutzDetailContent({
   const [data, setData] = useState<MutterschutzData | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<
-    "uebersicht" | "checkliste" | "dokumente" | "notizen"
+    "uebersicht" | "checkliste" | "dokumente" | "notizen" | "mails"
   >("uebersicht");
+  // Mailprotokoll des Vorgangs (nur HR_EDIT_ROLES, wie die Route).
+  const darfMailsSehen = HR_EDIT_ROLES.includes(user.role);
   const [neueNotiz, setNeueNotiz] = useState("");
   const [uploadTyp, setUploadTyp] = useState<string>("SONSTIGES");
   const [uploading, setUploading] = useState(false);
@@ -325,8 +329,10 @@ export function MutterschutzDetailContent({
         {/* Tabs */}
         <div className="mb-4 flex gap-1 border-b overflow-x-auto">
           {(
-            ["uebersicht", "checkliste", "dokumente", "notizen"] as const
-          ).map((t) => (
+            ["uebersicht", "checkliste", "dokumente", "notizen", "mails"] as const
+          )
+            .filter((t) => t !== "mails" || darfMailsSehen)
+            .map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -342,7 +348,9 @@ export function MutterschutzDetailContent({
                   ? `Checkliste (${data.checklistItems.filter((i) => i.erledigtAm).length}/${data.checklistItems.length})`
                   : t === "dokumente"
                     ? `Dokumente (${data.dokumente?.length ?? 0})`
-                    : `Notizen (${data.notizen.length})`}
+                    : t === "notizen"
+                      ? `Notizen (${data.notizen.length})`
+                      : "E-Mails"}
             </button>
           ))}
         </div>
@@ -620,6 +628,8 @@ export function MutterschutzDetailContent({
             ))}
           </div>
         )}
+
+        {tab === "mails" && darfMailsSehen && <MailProtokoll modul="mutterschutz" vorgangId={prozessId} />}
       </div>
       {confirmDelete && (
         <ConfirmDeleteModal

@@ -1746,21 +1746,30 @@ model EmailTemplate {
 // E-Mail-Versandprotokoll (jeder Versandversuch)
 // =============================================
 model EmailLog {
-  id        String   @id @default(uuid())
-  event     String // Event-Name aus dem Katalog
-  recipient String   @default("") // gerenderte An-Adresse(n)
-  cc        String?
-  bcc       String?
-  subject   String   @default("")
-  status    String // "SENT" | "FAILED" | "SKIPPED"
-  detail    String? // Fehlermeldung bzw. Grund fuer SKIPPED
-  messageId String? // SMTP-Message-ID als Zustellnachweis
-  isTest    Boolean  @default(false) // Test-Versand aus den Einstellungen
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  event      String // Event-Name aus dem Katalog
+  recipient  String   @default("") // gerenderte An-Adresse(n)
+  cc         String?
+  bcc        String?
+  subject    String   @default("")
+  status     String // "SENT" | "FAILED" | "SKIPPED"
+  detail     String? // Fehlermeldung bzw. Grund fuer SKIPPED
+  messageId  String? // SMTP-Message-ID als Zustellnachweis
+  isTest     Boolean  @default(false) // Test-Versand aus den Einstellungen
+  /// Vorgang, zu dem die Mail gehoert (Reiter „E-Mails“ im Vorgang, 09/2026):
+  /// "ONBOARDING" | "OFFBOARDING" | "CIVIL_SERVICE" | "CONTRACT_END" |
+  /// "ELTERNZEIT" | "MUTTERSCHUTZ" — Werte wie AuditLog.processType. Gesetzt
+  /// aus dem Payload (vorgangBezugAusPayload, src/lib/vorgangs-mails.ts); nie
+  /// bei BEM und nie beim Test-Versand. Kein Fremdschluessel: das Protokoll
+  /// ueberlebt einen geloeschten Vorgang nicht laenger als 90 Tage ohnehin.
+  vorgangTyp String?
+  vorgangId  String?
+  createdAt  DateTime @default(now())
 
   @@index([event])
   @@index([status])
   @@index([createdAt])
+  @@index([vorgangTyp, vorgangId])
   @@map("email_logs")
 }
 

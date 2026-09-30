@@ -22,6 +22,7 @@ import { EMAIL_PATTERN } from "@/lib/constants";
 import { formatDatumDE } from "@/lib/format";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
 import { escapeHtml } from "@/lib/email-layout";
+import { vorgangBezugAusPayload, type VorgangBezug } from "@/lib/vorgangs-mails";
 
 // =============================================
 // Typen
@@ -577,10 +578,14 @@ async function writeEmailLog(entry: {
   detail?: string;
   messageId?: string;
   isTest?: boolean;
+  /** Vorgang fuer den Reiter „E-Mails“ (src/lib/vorgangs-mails.ts). */
+  bezug?: VorgangBezug | null;
 }): Promise<void> {
   try {
     await prisma.emailLog.create({
       data: {
+        vorgangTyp: entry.bezug?.vorgangTyp ?? null,
+        vorgangId: entry.bezug?.vorgangId ?? null,
         event: entry.event,
         status: entry.status,
         recipient: entry.recipient ?? "",
@@ -642,6 +647,11 @@ export async function sendEventEmail(
     attachments?: MailAttachment[];
     /** Test-Versand: alle Empfaenger durch diese Adresse ersetzen */
     overrideTo?: string;
+    /**
+     * Vorgang fuer den Reiter „E-Mails“, wenn der Payload ihn nicht traegt
+     * (Dokumentenpaket). Sonst aus dem Payload (vorgangBezugAusPayload).
+     */
+    bezug?: VorgangBezug | null;
     /** Test-Versand: ungespeicherte Editor-Felder statt der DB-Vorlage nutzen */
     templateOverride?: Partial<
       Pick<
@@ -652,6 +662,9 @@ export async function sendEventEmail(
   }
 ): Promise<EventEmailResult> {
   const isTest = options?.isTest ?? false;
+  // Vorgang der Mail fuer den Reiter „E-Mails“ — nie beim Test-Versand
+  // (Beispiel-IDs aus dem Katalog), nie bei BEM (siehe vorgangs-mails.ts).
+  const bezug = isTest ? null : (options?.bezug ?? vorgangBezugAusPayload(event, payload));
   try {
     let template = await resolveEventTemplate(event);
     if (!template && options?.templateOverride?.subject && options.templateOverride.bodyHtml) {
@@ -672,13 +685,13 @@ export async function sendEventEmail(
     }
     if (!template) {
       const detail = "Keine E-Mail-Vorlage vorhanden";
-      await writeEmailLog({ event, status: "SKIPPED", detail, isTest });
+      await writeEmailLog({ event, status: "SKIPPED", detail, isTest, bezug });
       return { status: "SKIPPED", detail };
     }
     // Test-Versand ist auch bei deaktivierter Vorlage erlaubt
     if (!template.isActive && !isTest) {
       const detail = "E-Mail-Vorlage ist deaktiviert";
-      await writeEmailLog({ event, status: "SKIPPED", detail, isTest });
+      await writeEmailLog({ event, status: "SKIPPED", detail, isTest, bezug });
       return { status: "SKIPPED", detail };
     }
 
@@ -688,7 +701,7 @@ export async function sendEventEmail(
       globalReplyTo: smtpConfig?.replyToEmail ?? "",
     });
     if (!rendered) {
-      await writeEmailLog({ event, status: "SKIPPED", detail: skipReason, isTest });
+      await writeEmailLog({ event, status: "SKIPPED", detail: skipReason, isTest, bezug });
       console.warn(`[Mailer] Event "${event}" uebersprungen: ${skipReason}`);
       return { status: "SKIPPED", detail: skipReason };
     }
@@ -719,6 +732,7 @@ export async function sendEventEmail(
         detail: attachmentNote,
         messageId: result.messageId,
         isTest,
+        bezug,
       });
       return {
         status: "SENT",
@@ -737,12 +751,13 @@ export async function sendEventEmail(
       subject: rendered.subject,
       detail: result.error,
       isTest,
+      bezug,
     });
     return { status: "FAILED", detail: result.error };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     console.error(`[Mailer] Unerwarteter Fehler beim Versand fuer "${event}":`, detail);
-    await writeEmailLog({ event, status: "FAILED", detail, isTest });
+    await writeEmailLog({ event, status: "FAILED", detail, isTest, bezug });
     return { status: "FAILED", detail };
   }
 }

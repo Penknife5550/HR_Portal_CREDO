@@ -44,6 +44,7 @@ import { canAccessProcess, type SessionPayload } from "@/lib/permissions";
 import { istModulUnterstuetzt } from "@/lib/erzeugte-dokumente";
 import { alsHtmlAbsaetze } from "@/lib/email-layout";
 import { empfaengerFreigegeben, ladeErlaubteDomains } from "@/lib/empfaenger-allowlist";
+import { bezugAusModul } from "@/lib/vorgangs-mails";
 // Die Antwort-Typen stehen in einer eigenen, importfreien Datei, weil der
 // Versand-Dialog ("use client") dieselben braucht und diese Datei hier prisma,
 // fs und node:crypto mitzieht. Siehe Kopfkommentar dort.
@@ -1056,6 +1057,9 @@ async function versendeIntern(opts: VersandOptionen): Promise<PaketErgebnis> {
       // Ein stiller Verteiler im Cc bekaeme die IBAN mit, ohne dass ihn jemand
       // bestaetigt oder der Nachweis ihn kennt.
       overrideTo: empfaenger,
+      // Reiter „E-Mails“ des Vorgangs: Der Payload traegt ausser beim
+      // Onboarding nur `refId` — der Bezug kommt deshalb aus Modul + refId.
+      bezug: bezugAusModul(opts.modul, opts.refId),
     },
   );
 
