@@ -15,10 +15,12 @@ beim Verschieben müssen Handbuch und Bildordner zusammenbleiben.
 
 ## Module
 
-### Oberfläche (UX/UI) — *Plan zur Freigabe*
+### Oberfläche (UX-Umbau „Klarer Weg") — *in Arbeit seit 01.10.2026, Branch `ux-umbau`*
 
 | Datei | Inhalt |
 |---|---|
+| [module/ux-ui/projekt-ux-umbau.md](module/ux-ui/projekt-ux-umbau.md) | **Projektstand, hier einsteigen:** Stand je Paket, Arbeitsweise, Entscheidungen (E1–E10, F1–F4), Abweichungen vom Plan, geltende Regeln, Protokoll je Arbeitstag, Branches und Commits |
+| [module/ux-ui/u0-feinplan.md](module/ux-ui/u0-feinplan.md) | **Feinplan U0 (Fundament):** Tokens, Bausteine in `src/components/ui/`, Musterseite, Tests (Kontrast, Sperrklinke, axe), Reihenfolge in sechs Tagen, Abnahme |
 | [module/ux-ui/ux-ui-plan-2026-09.html](module/ux-ui/ux-ui-plan-2026-09.html) | **UX/UI-Plan „Klarer Weg" (Fassung 3 vom 01.10.2026, ergänzt Fassung 2 vom 25.09.):** Bewertung mit Vorher/Nachher-Mockups und ehrlichen Grenzen (4 Module ohne Sichtprüfung), Designsprache (CI-Farben nur Marke/Einrichtung, Zustände funktional, eine Interaktionsfarbe Grau), Prozessleiste mit Verzweigung/Schleife/Zeitachse, Startseite auf Paket 6 aufgesetzt, Personenseite + Suche, Statusseite für Beschäftigte (mit Paket 4), E-Mails/PDFs; Vorarbeit V0, Pilot Vertragsende, Pakete U0–U10 (Kern 53–68 PT, gesamt 68–89), Entscheidungen E1–E22. Fassung 3: Neuerungen vom 30.09./01.10. (Reiter Dokumente, E-Mail-Blatt, Unterlagen anfordern, Verlauf statt Reiter „E-Mails“, automatische Läufe) aus Sicht einer neuen Kollegin, mit echten Screenshots (`module/ux-ui/screenshots/`, Skript `scripts/ux-screenshots.js`); Abschnitt 4L „LOGA-Anbindung und Stammblatt“ |
 
 ### Onboarding — *Änderungsplan zur Freigabe*

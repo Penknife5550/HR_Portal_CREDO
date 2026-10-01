@@ -79,7 +79,50 @@
   --color-status-completed: #059669;
   --color-status-expired: #ef4444;
 
-  /* Radien */
+  /* =============================================
+   * Oberflaeche „Klarer Weg" (UX-Umbau, U0)
+   *
+   * Vier Dinge, vier Farbgruppen (Entscheidung E1, 01.10.2026):
+   *   Marke        = CREDO-Linie (oben, --color-credo-*)
+   *   Einrichtung  = --color-einrichtung-* (oben)
+   *   Interaktion  = action (CI-Grau) — die EINE Farbe fuer Knoepfe und „aktiv"
+   *   Zustand      = ok / wait / critical / info — funktional, keine CI-Farben
+   *
+   * Die Zustandstoene sind gegenueber dem Plan leicht abgedunkelt, damit sie
+   * auf ihrem „-soft"-Grund AA (4,5:1) erreichen — auch auf `surface`.
+   * Gemessen in src/__tests__/lib/ui-kontrast.test.ts; wer hier einen Wert
+   * aendert, laesst den Test laufen.
+   *
+   * ink-3 ist KEIN Textton (2,8:1): nur Platzhalter, Gesperrtes, Trennzeichen.
+   *
+   * Die alten Tokens darueber bleiben, bis ihr letzter Aufrufer umgebaut ist
+   * (U3/U4). Neue Bausteine (src/components/ui/) nutzen nur diese hier.
+   * ============================================= */
+  --color-surface: #f5f5f4;
+  --color-ink: #1c1c1a;
+  --color-ink-2: #666662;
+  --color-ink-3: #9a9a95;
+  --color-hairline: rgba(0, 0, 0, 0.08);
+
+  --color-action: #575756;
+  --color-action-foreground: #ffffff;
+  --color-action-soft: rgba(87, 87, 86, 0.12);
+
+  --color-ok: #27702b;
+  --color-ok-soft: rgba(46, 125, 50, 0.13);
+  --color-wait: #a34a08;
+  --color-wait-soft: rgba(217, 119, 6, 0.14);
+  --color-critical: #b42318;
+  --color-critical-foreground: #ffffff;
+  --color-critical-soft: rgba(180, 35, 24, 0.1);
+  --color-info: #1a6494;
+  --color-info-soft: rgba(29, 111, 165, 0.12);
+  --color-neutral-soft: rgba(0, 0, 0, 0.06);
+
+  /* Schatten nur fuer Dialog und Toast — Gruppen tragen eine Haarlinie. */
+  --shadow-overlay: 0 12px 34px rgba(0, 0, 0, 0.22);
+
+  /* Radien (8 px = lg fuer Knoepfe und Felder, 12 px = xl fuer Gruppen und Dialoge) */
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
@@ -87,7 +130,16 @@
 
   /* Typografie: Montserrat (CREDO) + Arial (CI-Fallback) */
   --font-sans: "Montserrat", "Arial", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-heading: "ITC Avant Garde Gothic", "Montserrat", "Arial", system-ui, sans-serif;
+  /* Ueberschriften ebenfalls Montserrat (E7, Abweichung vom CI bestaetigt
+     01.10.2026). ITC Avant Garde stand hier, wurde aber nie mitgeliefert —
+     zu sehen war sie nur, wo sie zufaellig installiert war. */
+  --font-heading: "Montserrat", "Arial", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+/* Das Portal bleibt hell, auch wenn das Geraet auf dunkel steht (E5). Ohne
+   diese Zeile faerben Browser Formularfelder und Scrollleisten von sich aus um. */
+:root {
+  color-scheme: light;
 }
 
 @layer base {
