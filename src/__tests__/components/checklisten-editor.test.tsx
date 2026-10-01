@@ -370,8 +370,15 @@ describe("Reihenfolge", () => {
   it("die Pfeile verschieben einen Punkt, und die neue Reihenfolge wird gespeichert", async () => {
     await zeigeSeite();
     await oeffneEditor();
-    expect(pfeil("Punkt 1 nach oben").disabled).toBe(true);
-    expect(pfeil("Punkt 4 nach unten").disabled).toBe(true);
+    // Am Listenende aria-disabled, NICHT disabled: Der Knopf wandert mit dem
+    // Punkt und behielte mit `disabled` den Tastaturfokus nicht.
+    expect(pfeil("Punkt 1 nach oben").getAttribute("aria-disabled")).toBe("true");
+    expect(pfeil("Punkt 4 nach unten").getAttribute("aria-disabled")).toBe("true");
+    expect(pfeil("Punkt 1 nach oben").disabled).toBe(false);
+    await klicke(pfeil("Punkt 1 nach oben"));
+    await klicke(pfeil("Punkt 4 nach unten"));
+    expect(titel()[0]).toBe("Arbeitsvertrag erstellt");
+    expect(titel()[3]).toBe("Datenschutz-Unterweisung");
 
     await klicke(pfeil("Punkt 4 nach oben"));
     await klicke(pfeil("Punkt 3 nach oben"));
@@ -401,6 +408,60 @@ describe("Reihenfolge", () => {
       fireEvent.drop(zeilen[2], { dataTransfer });
     });
     expect(await gespeicherteIds()).toEqual(["i-2", "i-3", "i-1", "i-4"]);
+  });
+
+  it("Loslassen im Zwischenraum (auf der Einfügemarke) verschiebt ebenfalls", async () => {
+    // Befund der Durchsicht: Die Marke liegt ausserhalb der Zeile im Abstand
+    // der Liste. War nur die Zeile ein Ablageziel, tat Loslassen dort nichts.
+    await zeigeSeite();
+    await oeffneEditor();
+    const griff = document.querySelector('[data-griff="3"]') as HTMLElement;
+    const zeilen = document.querySelectorAll("[data-punkt]");
+    const liste = document.querySelector("[data-punktliste]") as HTMLElement;
+    const dataTransfer = { setData: jest.fn(), setDragImage: jest.fn(), effectAllowed: "" };
+    await act(async () => {
+      fireEvent.dragStart(griff, { dataTransfer });
+    });
+    await act(async () => {
+      fireEvent.dragOver(zeilen[1], { dataTransfer });
+    });
+    // Die Liste selbst nimmt das Ablegen an (preventDefault) …
+    const angenommen = !fireEvent.dragOver(liste, { dataTransfer });
+    expect(angenommen).toBe(true);
+    // … und legt auf der zuletzt ueberfahrenen Position ab.
+    await act(async () => {
+      fireEvent.drop(liste, { dataTransfer });
+    });
+    expect(await gespeicherteIds()).toEqual(["i-1", "i-4", "i-2", "i-3"]);
+  });
+
+  it("ohne laufendes Ziehen ist die Liste kein Ablageziel", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    const liste = document.querySelector("[data-punktliste]") as HTMLElement;
+    // fireEvent liefert false, wenn preventDefault gerufen wurde.
+    expect(fireEvent.dragOver(liste)).toBe(true);
+    await act(async () => {
+      fireEvent.drop(liste);
+    });
+    expect(await gespeicherteIds()).toEqual(["i-1", "i-2", "i-3", "i-4"]);
+  });
+
+  it("„+ Punkt darunter“ fügt an Ort und Stelle ein und übernimmt die Kategorie", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    await klicke(document.querySelector('button[aria-label="Neuen Punkt unter Punkt 1 einfügen"]') as Element);
+    expect((document.getElementById("punkt-titel-1") as HTMLInputElement).value).toBe("");
+    expect((document.getElementById("punkt-kategorie-1") as HTMLInputElement).value).toBe("Vor Arbeitsbeginn");
+    await act(async () => {
+      fireEvent.change(document.getElementById("punkt-titel-1") as HTMLInputElement, {
+        target: { value: "Personalnummer vergeben" },
+      });
+    });
+    await klicke(knopf("Aktualisieren"));
+    const rumpf = schreibend()[0].body as { items: Record<string, unknown>[] };
+    expect(rumpf.items.map((p) => p.id ?? "neu")).toEqual(["i-1", "neu", "i-2", "i-3", "i-4"]);
+    expect(rumpf.items[1]).toMatchObject({ title: "Personalnummer vergeben", orderIndex: 1 });
   });
 
   it("ein neuer Punkt lässt sich von ganz unten nach oben holen", async () => {

@@ -29,7 +29,9 @@
  *
  * REIHENFOLGE (10/2026). Neue Punkte landeten immer am Ende und liessen sich
  * nicht verschieben. Jetzt: Ziehen am Griff oder die Pfeile daneben (Tastatur,
- * Touch — natives Ziehen gibt es auf Touch-Geraeten nicht). Der Server braucht
+ * Touch — natives Ziehen gibt es auf Touch-Geraeten nicht), dazu „+ Punkt
+ * darunter" an jeder Zeile, damit ein neuer Punkt gleich an seiner Stelle
+ * entsteht. Der Server braucht
  * dafuer nichts Neues: `handleSave` schickt `orderIndex` = Position in der
  * Liste. Jeder Punkt traegt einen festen `uiKey`; mit `key={index}` behielte
  * React beim Umsortieren die Eingabefelder der alten Position.
@@ -93,7 +95,6 @@ interface NewItem {
   uiKey: string;
   title: string;
   category: string;
-  orderIndex: number;
   defaultDueDays: number | null;
   defaultAssignee: string;
   description: string;
@@ -196,13 +197,13 @@ type TabType = "onboarding" | "offboarding" | "verbeamtung";
 
 let punktZaehler = 0;
 
-// Leeres Item
-function createEmptyItem(orderIndex: number): NewItem {
+// Leeres Item. Die Reihenfolge steckt allein in der Position in der Liste —
+// ein eigenes Feld dafuer liefe beim Verschieben auseinander.
+function createEmptyItem(category = ""): NewItem {
   return {
     uiKey: `neu-${++punktZaehler}`,
     title: "",
-    category: "",
-    orderIndex,
+    category,
     defaultDueDays: null,
     defaultAssignee: "",
     description: "",
@@ -261,12 +262,13 @@ export function ChecklistenContent({ user }: { user: User }) {
 
   // Modal-State
   const [showModal, setShowModal] = useState(false);
-  const [modalData, setModalData] = useState<ModalData>({
+  // Traeger Startwert: sonst liefe createEmptyItem bei JEDEM Rendern.
+  const [modalData, setModalData] = useState<ModalData>(() => ({
     name: "",
     description: "",
     questionnaireType: "",
-    items: [createEmptyItem(0)],
-  });
+    items: [createEmptyItem()],
+  }));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -455,7 +457,7 @@ export function ChecklistenContent({ user }: { user: User }) {
       name: activeTab === "offboarding" ? "Offboarding: " : "",
       description: "",
       questionnaireType: "",
-      items: [createEmptyItem(0)],
+      items: [createEmptyItem()],
     });
     setShowModal(true);
   }
@@ -475,7 +477,6 @@ export function ChecklistenContent({ user }: { user: User }) {
         uiKey: item.id,
         title: item.title,
         category: item.category,
-        orderIndex: item.orderIndex,
         defaultDueDays: item.defaultDueDays,
         defaultAssignee: item.defaultAssignee || "",
         description: item.description || "",
@@ -490,7 +491,25 @@ export function ChecklistenContent({ user }: { user: User }) {
   function handleAddItem() {
     setModalData((prev) => ({
       ...prev,
-      items: [...prev.items, createEmptyItem(prev.items.length)],
+      items: [...prev.items, createEmptyItem()],
+    }));
+  }
+
+  // =============================================
+  // Modal: Item direkt unter einem vorhandenen einfuegen
+  //
+  // „+ Punkt hinzufügen" haengt ans Ende; in einer langen Vorlage muesste der
+  // neue Punkt danach durch die ganze Liste wandern. Hier entsteht er gleich
+  // an seiner Stelle und uebernimmt die Kategorie des Punkts darueber.
+  // =============================================
+  function handleInsertBelow(index: number) {
+    setModalData((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items.slice(0, index + 1),
+        createEmptyItem(prev.items[index]?.category ?? ""),
+        ...prev.items.slice(index + 1),
+      ],
     }));
   }
 
@@ -500,9 +519,7 @@ export function ChecklistenContent({ user }: { user: User }) {
   function handleRemoveItem(index: number) {
     setModalData((prev) => ({
       ...prev,
-      items: prev.items
-        .filter((_, i) => i !== index)
-        .map((item, i) => ({ ...item, orderIndex: i })),
+      items: prev.items.filter((_, i) => i !== index),
     }));
   }
 
@@ -528,17 +545,25 @@ export function ChecklistenContent({ user }: { user: User }) {
     }
   }
 
-  function handleDragOver(e: DragEvent<HTMLElement>, index: number) {
+  // Ablageziel ist die GANZE Liste, nicht die einzelne Zeile: Die Einfuegemarke
+  // liegt im Abstand zwischen zwei Zeilen. Waere nur die Zeile ein Ziel, taete
+  // Loslassen genau auf der Marke nichts. Die Zeile meldet nur, ueber welcher
+  // Position der Zeiger zuletzt stand.
+  function handleDragOverPunkt(index: number) {
     if (ziehIndex === null) return;
-    // Ohne preventDefault gilt die Zeile nicht als Ablageziel.
-    e.preventDefault();
     if (zielIndex !== index) setZielIndex(index);
   }
 
-  function handleDrop(e: DragEvent<HTMLElement>, index: number) {
+  function handleDragOverListe(e: DragEvent<HTMLElement>) {
+    if (ziehIndex === null) return;
+    // Ohne preventDefault gilt die Liste nicht als Ablageziel.
+    e.preventDefault();
+  }
+
+  function handleDropListe(e: DragEvent<HTMLElement>) {
     if (ziehIndex === null) return;
     e.preventDefault();
-    handleMoveItem(ziehIndex, index);
+    if (zielIndex !== null) handleMoveItem(ziehIndex, zielIndex);
     handleDragEnd();
   }
 
@@ -1282,7 +1307,12 @@ export function ChecklistenContent({ user }: { user: User }) {
                   </p>
                 )}
 
-                <div className="space-y-3">
+                <div
+                  className="space-y-3"
+                  data-punktliste
+                  onDragOver={handleDragOverListe}
+                  onDrop={handleDropListe}
+                >
                   {modalData.items.map((item, index) => {
                     const zugeordnet = item.defaultAssignee.trim();
                     // Ein Altwert, den die Auswahl nicht kennt, darf nicht still
@@ -1299,16 +1329,17 @@ export function ChecklistenContent({ user }: { user: User }) {
                       ziehIndex === null || zielIndex !== index || ziehIndex === index
                         ? ""
                         : ziehIndex < index
-                          ? "shadow-[0_3px_0_0_#575756]"
-                          : "shadow-[0_-3px_0_0_#575756]";
+                          ? "shadow-[0_3px_0_0] shadow-primary"
+                          : "shadow-[0_-3px_0_0] shadow-primary";
                     const mehrere = modalData.items.length > 1;
+                    const erster = index === 0;
+                    const letzter = index === modalData.items.length - 1;
 
                     return (
                       <div
                         key={item.uiKey}
                         data-punkt
-                        onDragOver={(e) => handleDragOver(e, index)}
-                        onDrop={(e) => handleDrop(e, index)}
+                        onDragOver={() => handleDragOverPunkt(index)}
                         className={`rounded-lg border border-border bg-muted/30 p-3 ${marke} ${
                           ziehIndex === index ? "opacity-50" : ""
                         }`}
@@ -1327,21 +1358,25 @@ export function ChecklistenContent({ user }: { user: User }) {
                                 >
                                   <GripVertical aria-hidden="true" className="h-4 w-4" />
                                 </span>
+                                {/* aria-disabled statt disabled: Der Knopf wandert
+                                    mit dem Punkt. Mit `disabled` verloere er am
+                                    Listenende den Tastaturfokus mitten im
+                                    Verschieben. */}
                                 <button
                                   type="button"
-                                  onClick={() => handleMoveItem(index, index - 1)}
-                                  disabled={index === 0}
+                                  onClick={() => !erster && handleMoveItem(index, index - 1)}
+                                  aria-disabled={erster}
                                   aria-label={`Punkt ${index + 1} nach oben`}
-                                  className="rounded p-0.5 text-muted-foreground hover:bg-accent disabled:opacity-30"
+                                  className="rounded p-0.5 text-muted-foreground hover:bg-accent aria-disabled:cursor-default aria-disabled:opacity-30 aria-disabled:hover:bg-transparent"
                                 >
                                   <ArrowUp aria-hidden="true" className="h-4 w-4" />
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleMoveItem(index, index + 1)}
-                                  disabled={index === modalData.items.length - 1}
+                                  onClick={() => !letzter && handleMoveItem(index, index + 1)}
+                                  aria-disabled={letzter}
                                   aria-label={`Punkt ${index + 1} nach unten`}
-                                  className="rounded p-0.5 text-muted-foreground hover:bg-accent disabled:opacity-30"
+                                  className="rounded p-0.5 text-muted-foreground hover:bg-accent aria-disabled:cursor-default aria-disabled:opacity-30 aria-disabled:hover:bg-transparent"
                                 >
                                   <ArrowDown aria-hidden="true" className="h-4 w-4" />
                                 </button>
@@ -1351,14 +1386,24 @@ export function ChecklistenContent({ user }: { user: User }) {
                               Punkt {index + 1}
                             </span>
                           </div>
-                          {mehrere && (
+                          <div className="flex items-center gap-3">
                             <button
-                              onClick={() => handleRemoveItem(index)}
-                              className="text-xs text-red-500 hover:text-red-700"
+                              type="button"
+                              onClick={() => handleInsertBelow(index)}
+                              aria-label={`Neuen Punkt unter Punkt ${index + 1} einfügen`}
+                              className="text-xs text-muted-foreground hover:text-foreground"
                             >
-                              Entfernen
+                              + Punkt darunter
                             </button>
-                          )}
+                            {mehrere && (
+                              <button
+                                onClick={() => handleRemoveItem(index)}
+                                className="text-xs text-red-500 hover:text-red-700"
+                              >
+                                Entfernen
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
