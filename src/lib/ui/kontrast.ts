@@ -67,9 +67,15 @@ export function leuchtdichte(farbe: Farbe): number {
 
 /**
  * Kontrastverhaeltnis 1–21 von Vordergrund auf Hintergrund. Der Hintergrund
- * darf halbtransparent sein; dann zaehlt, worauf er liegt (`untergrund`).
+ * darf halbtransparent sein; dann zaehlt, worauf er liegt, und `untergrund`
+ * (deckend) ist PFLICHT. Ohne ihn rechnete die Funktion den Ton still als
+ * deckend — `rgba(0,0,0,.06)` waere Schwarz — und ein unlesbares Paar koennte
+ * bestehen. Deshalb ein Fehler statt einer falschen Zahl.
  */
 export function kontrast(vordergrund: Farbe, hintergrund: Farbe, untergrund?: Farbe): number {
+  if (hintergrund.a < 1 && (!untergrund || untergrund.a < 1)) {
+    throw new Error("kontrast: halbtransparenter Hintergrund braucht einen deckenden Untergrund");
+  }
   const flaeche = hintergrund.a < 1 && untergrund ? aufUntergrund(hintergrund, untergrund) : hintergrund;
   const text = vordergrund.a < 1 ? aufUntergrund(vordergrund, flaeche) : vordergrund;
   const [hell, dunkel] = [leuchtdichte(text), leuchtdichte(flaeche)].sort((x, y) => y - x);

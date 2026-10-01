@@ -69,7 +69,7 @@ Plans (dort `--z-*`).
 | `card` | `#ffffff` | Gruppen, Dialoge (vorhanden, bleibt) |
 | `ink` | `#1c1c1a` | Text, Überschriften |
 | `ink-2` | `#666662` | Nebentext, Beschriftungen |
-| `ink-3` | `#9a9a95` | **nur** Platzhalter, deaktiviert, Trennzeichen – siehe Hinweis |
+| `ink-3` | `#9a9a95` | **nur** Gesperrtes, Trennzeichen, Zierde – kein Text, auch kein Platzhalter (siehe Hinweis) |
 | `hairline` | `rgba(0,0,0,.08)` | Linien zwischen Zeilen, Rand der Gruppen |
 | `action` / `action-foreground` | `#575756` / `#ffffff` | Primärknopf, aktiver Zustand, Fokusring |
 | `action-soft` | `rgba(87,87,86,.12)` | Hintergrund aktiver Elemente |
@@ -91,8 +91,9 @@ leicht abgedunkelt (jetzt 4,7–5,4:1), ebenso `ink-2` (in der neutralen Pille 4
 
 **`ink-3` ist kein Textton:** `#9a9a95` ergibt auf Weiß 2,8:1. Der Plan nutzt den Ton in den
 Mockups auch für Beschriftungen über Gruppen. Es gilt: Beschriftungen und jeder lesbare Text
-nehmen `ink-2`, `ink-3` bleibt für Platzhalter, Gesperrtes und Trennzeichen. Der Kontrasttest
-(Abschnitt 5) hält beides fest.
+nehmen `ink-2`. Das gilt auch für Platzhalter in Eingabefeldern: Sie sind nach WCAG Text
+(Befund der Durchsicht vom 01.10.2026). `ink-3` bleibt für Gesperrtes (von WCAG ausgenommen),
+Trennzeichen und Zierde.
 
 **Schrift:** `--font-heading` wird auf Montserrat gesetzt (E7). Montserrat kommt schon über
 `next/font` aus `src/app/layout.tsx`, es wird nichts nachgeladen.
@@ -176,7 +177,8 @@ werden muss. Die Sperrklinke (Abschnitt 5) verhindert bis dahin neue Aufrufe.
   bleibt unverändert): Rollen, Namen, ARIA.
 - **Kontrast** als eigener Test: axe kann in jsdom keine Farbkontraste messen (es gibt dort
   kein Layout). Der Test rechnet die Token-Paare aus 3.1 nach WCAG und verlangt 4,5:1 für
-  Text und 3:1 für Bedienelemente; `ink-3` steht dort ausdrücklich als „kein Text“.
+  Text und 3:1 für Bedienelemente; `ink-3` steht in keiner der Listen. Ein halbtransparenter
+  Hintergrund ohne Untergrund ist ein Fehler, keine falsche Zahl.
 - **Sperrklinke:** ein Test zählt im Quelltext `confirm(`, `alert(`, `toLocaleDateString` und
   fest eingetragene Hex-Farben in Klassen und vergleicht mit dem Stand vom 01.10.2026. Die
   Zahl darf sinken, nicht steigen. Wer ein Modul umbaut, senkt die Grenze im selben Commit.
@@ -186,7 +188,9 @@ werden muss. Die Sperrklinke (Abschnitt 5) verhindert bis dahin neue Aufrufe.
   | `confirm(` | 33 | 28 |
   | `alert(` | 4 | 4 |
   | `toLocaleDateString` | 74 | 47 |
-  | Hex-Farbe in einer Klasse (`[#…]`) | 181 | – |
+  | Hex-Farbe in einer Klasse (auch mitten im Wert) | 181 | – |
+  | `rgb()` in einer Klasse | 1 | – |
+  | Hex-Farbe in einem `style`-Objekt | 10 | – |
   | selbst gebaute Überlagerung (`fixed inset-0`) | 29 | 27 |
   | Inline-`<svg` | 150 | 146 |
 
@@ -213,8 +217,9 @@ Je Tag ein Commit auf `ux-klarer-weg`; `main` bleibt deploybar.
    `docs/module/ux-ui/screenshots/`.
 3. Vorher/Nachher-Screenshots von fünf bestehenden Seiten (Anmeldung, Onboarding-Liste,
    Onboarding-Detail, Einstellungen, Fragebogen) sind bis auf die Überschriften-Schrift
-   gleich. Die Überschriften ändern sich nur auf Rechnern, auf denen ITC Avant Garde
-   installiert ist, und nur an der einen Stelle, die `--font-heading` nutzt.
+   gleich. Auch die Schrift ändert sich nirgends: `--font-heading` war zwar definiert,
+   wurde aber von keiner Seite benutzt (die Aussage „einmal verwendet“ im Plan war falsch).
+   Das Token ist jetzt für die neuen Bausteine richtig gesetzt.
 4. Tastaturprobe von Hand: Dialog öffnen, Tab kreist, Escape schließt, Fokus kehrt zurück;
    Menü im Seitenkopf mit Pfeiltasten.
 

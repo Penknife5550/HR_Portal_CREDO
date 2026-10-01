@@ -59,8 +59,16 @@ describe("Rechnung", () => {
     const halb = farbeLesen("rgba(0,0,0,0.5)")!;
     const weiss = farbeLesen("#fff")!;
     expect(aufUntergrund(halb, weiss)).toEqual({ r: 127.5, g: 127.5, b: 127.5, a: 1 });
-    // Ohne Untergrund zaehlte der Ton als deckendes Schwarz — mit ihm als Grau.
+    // Auf Weiss ist der Ton ein Grau, kein Schwarz.
     expect(kontrast(weiss, halb, weiss)).toBeLessThan(kontrast(weiss, { ...halb, a: 1 }));
+  });
+
+  it("verlangt den Untergrund, statt einen halbtransparenten Ton als deckend zu rechnen", () => {
+    const halb = farbeLesen("rgba(0,0,0,0.06)")!;
+    const weiss = farbeLesen("#fff")!;
+    expect(() => kontrast(weiss, halb)).toThrow("braucht einen deckenden Untergrund");
+    expect(() => kontrast(weiss, halb, halb)).toThrow("braucht einen deckenden Untergrund");
+    expect(() => kontrast(weiss, halb, weiss)).not.toThrow();
   });
 });
 
@@ -107,10 +115,9 @@ describe("Tokens aus globals.css", () => {
     }
   });
 
-  it("ink-3 ist KEIN Textton – wer das aendert, darf ihn auch fuer Text freigeben", () => {
-    // Belegt die Regel aus globals.css und dem Feinplan: Platzhalter,
-    // Gesperrtes, Trennzeichen. Wird der Ton einmal abgedunkelt, faellt dieser
-    // Test — dann die Regel in beiden Dateien streichen.
-    expect(kontrast(token("ink-3"), token("card"))).toBeLessThan(AA_TEXT);
-  });
+  // ink-3 steht bewusst in KEINER der Listen oben: 2,8:1. Er ist kein Textton —
+  // auch nicht fuer Platzhalter, die nach WCAG Text sind (dafuer ink-2). Erlaubt
+  // nur fuer Gesperrtes (von WCAG ausgenommen), Trennzeichen und Zierde. Die
+  // Regel halten globals.css und CLAUDE.md fest; ein Test, der den schwachen
+  // Kontrast VERLANGT, fiele genau dann, wenn jemand den Ton verbessert.
 });

@@ -93,7 +93,8 @@
    * Gemessen in src/__tests__/lib/ui-kontrast.test.ts; wer hier einen Wert
    * aendert, laesst den Test laufen.
    *
-   * ink-3 ist KEIN Textton (2,8:1): nur Platzhalter, Gesperrtes, Trennzeichen.
+   * ink-3 ist KEIN Textton (2,8:1) — auch nicht fuer Platzhalter, die nach
+   * WCAG Text sind (dafuer ink-2). Nur Gesperrtes, Trennzeichen, Zierde.
    *
    * Die alten Tokens darueber bleiben, bis ihr letzter Aufrufer umgebaut ist
    * (U3/U4). Neue Bausteine (src/components/ui/) nutzen nur diese hier.

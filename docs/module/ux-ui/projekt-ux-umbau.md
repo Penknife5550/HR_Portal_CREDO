@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 01.10.2026 (U0, Tag 1)
+Letzte Änderung: 01.10.2026 (U0, Tag 1, nach der Durchsicht)
 
 ## 1. Worum es geht
 
@@ -35,8 +35,9 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 
 - **Branch:** `ux-umbau` (von `main`). Alles zum Umbau landet dort, je Arbeitstag mindestens ein
   Commit. `main` bleibt deploybar; Dinge, die nichts mit dem Umbau zu tun haben, gehen direkt
-  nach `main`, danach wird `ux-umbau` darauf nachgezogen (`git rebase main`, solange der Branch
-  nicht gepusht ist; danach `git merge main`).
+  nach `main`, danach wird `ux-umbau` mit `git merge main` nachgezogen. Kein Rebase mehr: Er
+  ändert die Commit-Kennungen, und dieses Logbuch verweist auf sie (am 01.10.2026 zweimal
+  passiert, Abschnitt 8 nennt die gültigen).
 - **Nichts wird ohne Auftrag gepusht.** Das Repository ist öffentlich.
 - **Je Paket ein Feinplan** in diesem Ordner, vor dem ersten Code: Umfang, Nicht-Umfang,
   Dateien, Tests, betroffene Mail- und Word-Vorlagen, Schema-Delta, Abnahme, Deploy.
@@ -90,7 +91,7 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 |---|---|---|---|
 | Zustandsfarben | `ok #2e7d32`, `wait #b45309`, `info #1d6fa5` | `ok #27702b`, `wait #a34a08`, `info #1a6494` | Auf ihrem `-soft`-Grund erreichten die Planwerte nur 4,0–4,6:1 (nötig 4,5:1, auch auf dem Seitengrund). Die abgedunkelten Werte liegen bei 4,7–5,4:1. `critical` blieb unverändert (5,1:1). |
 | Nebentext `ink-2` | `#6b6b67` | `#666662` | In der neutralen Pille (auf `neutral-soft`) nur 4,3:1 auf dem Seitengrund; jetzt 4,6:1. |
-| Heller Ton `ink-3` | in den Mockups auch für Beschriftungen | nur für Platzhalter, Gesperrtes, Trennzeichen | 2,8:1 auf Weiß – kein Textton. Beschriftungen nehmen `ink-2`. |
+| Heller Ton `ink-3` | in den Mockups auch für Beschriftungen | nur für Gesperrtes, Trennzeichen, Zierde | 2,8:1 auf Weiß – kein Textton. Beschriftungen und Platzhalter in Eingabefeldern nehmen `ink-2`. |
 | Umfang U0 | Aufgaben-Badge, Suchfeld, Datumsfeld, Datumsfunktion, 47 × `toLocaleDateString` ablösen | siehe F4; die Datumsfunktion gibt es schon (`formatDatumDE`), das Ablösen kommt je Modul mit U4 | Bausteine ohne Aufrufer vermeiden; das Ablösen ändert sichtbar das Verhalten (Zeitzone des Geräts → deutsche Zeit) und muss je Modul geprüft werden. |
 | U0 zusätzlich | – | Sperrklinke-Test, Kontrasttest, Musterseite | siehe Feinplan, Abschnitt 5 und 3.3 |
 | Zahlen der Altmuster | 28 `confirm()`, 47 `toLocaleDateString`, 27 Überlagerungen, 146 Inline-SVG | 33 / 74 / 29 / 150 (gemessen 01.10.2026) | Paket 3, Paket 4 und der Zeitplaner kamen nach Fassung 2 im alten Stil dazu. |
@@ -109,7 +110,7 @@ Kurzfassung; verbindlich und ausführlich in `CLAUDE.md`, Abschnitt „Oberfläc
    im selben Commit.
 3. Wer einen Farbwert ändert oder ein neues Farbpaar baut, lässt `ui-kontrast.test.ts` laufen
    bzw. trägt das Paar dort ein.
-4. `ink-3` nie für Text.
+4. `ink-3` nie für Text, auch nicht für Platzhalter in Eingabefeldern.
 5. Anrede nach E6; Portal-Texte möglichst ohne Anrede.
 
 ## 7. Protokoll
@@ -137,13 +138,35 @@ Dateien. Der laufende Entwicklungsserver liefert die neuen Tokens und `color-sch
 aus; die Schrift wird von `next/font` unter dem Namen „Montserrat“ ausgeliefert, das Token
 greift also auf jedem Rechner.
 
-**Sichtbare Änderung:** keine, bis auf die Überschriften-Schrift an der einen Stelle, die
-`--font-heading` nutzt, und nur auf Rechnern, auf denen ITC Avant Garde installiert war.
+**Sichtbare Änderung:** keine. Auch die Schrift ändert sich nirgends: `--font-heading` war
+definiert, wurde aber von keiner Seite benutzt (die Aussage „einmal verwendet“ im Plan war
+falsch; in der Durchsicht berichtigt).
 
 **Nebenbei, auf `main`:** Reihenfolge der Punkte im Checklisten-Vorlagen-Editor per Ziehen und
-Pfeilen (`226338d`). Gehört nicht zum Umbau. Im Browser noch nicht von Hand geprüft.
+Pfeilen (`226338d`, nachgebessert in `2fbc4e4`). Gehört nicht zum Umbau. Im Browser noch nicht
+von Hand geprüft.
 
 **Offen aus Schritt 0:** Paket 3 deployen; Termin für den Prototyp-Tag (V0).
+
+### 01.10.2026 – Durchsicht (Code-Review) nach Tag 1
+
+Zehn Befunde, alle behoben, bevor Tag 2 beginnt.
+
+| # | Befund | Behoben in | Wie |
+|---|---|---|---|
+| 1 | Loslassen auf der Einfügemarke (Zwischenraum) verschob nichts | `main` `2fbc4e4` | Ablageziel ist die ganze Liste; die Zeile meldet nur die Position |
+| 2 | `kontrast()` rechnete einen halbtransparenten Hintergrund ohne Untergrund als deckend | `ux-umbau` | Fehler statt falscher Zahl; Test dazu |
+| 3 | Sperrklinke übersah Hex-Farben mitten im Wert (`shadow-[0_3px_0_0_#575756]`) | `ux-umbau`, `main` `2fbc4e4` | Muster erweitert, dazu `rgb()` in Klassen und Hex in `style`; die eigene Einfügemarke nutzt jetzt `shadow-primary` |
+| 4 | `ink-3` war für Platzhalter freigegeben, die nach WCAG Text sind | `ux-umbau` | Regel verschärft (Platzhalter nehmen `ink-2`); der Test, der den schwachen Kontrast verlangte, ist gestrichen |
+| 5 | Exakte Grenzen der Sperrklinke brechen, wenn `main` nachgezogen wird | `ux-umbau` | Verfahren festgelegt: Grenzen im Merge-Commit nachstellen und hier vermerken |
+| 6 | Pfeilknopf wurde unter dem Tastaturfokus gesperrt | `main` `2fbc4e4` | `aria-disabled` statt `disabled` |
+| 7 | Neuer Punkt in langen Listen mühsam zu platzieren | `main` `2fbc4e4` | „+ Punkt darunter“ an jeder Zeile, übernimmt die Kategorie |
+| 8 | `NewItem.orderIndex` nach dem Verschieben falsch und ungenutzt | `main` `2fbc4e4` | Feld entfernt |
+| 9 | `createEmptyItem(0)` lief bei jedem Rendern | `main` `2fbc4e4` | träger Startwert |
+| 10 | Dokumentation behauptete eine Verwendung von `--font-heading`, die es nicht gibt | `ux-umbau` | Feinplan, Logbuch und Plan berichtigt; Commit-Kennungen nachgetragen |
+
+**Gelernt:** Ein Rebase von `ux-umbau` ändert die Commit-Kennungen, auf die dieses Logbuch
+verweist. Ab jetzt wird `main` gemergt (Abschnitt 3).
 
 **Als Nächstes (U0, Tag 2):** `jest-axe` einrichten; Button, Statuspille, Gruppe mit Zeile;
 Musterseite `/ui-muster` beginnen.
@@ -153,8 +176,13 @@ Musterseite `/ui-muster` beginnen.
 | Branch | Commit | Inhalt |
 |---|---|---|
 | `main` | `226338d` | Checklisten: Reihenfolge der Punkte ändern |
-| `ux-umbau` | `9259c7a` | Plan Fassung 3 mit Entscheidungen, Screenshots, Screenshot-Skript |
-| `ux-umbau` | (dieser Commit) | U0 Tag 1: Tokens, Kontrast, Sperrklinke; Feinplan; Projektstand; CLAUDE.md |
+| `main` | `2fbc4e4` | Checklisten: Befunde der Durchsicht |
+| `ux-umbau` | `37b452b` | Plan Fassung 3 mit Entscheidungen, Screenshots, Screenshot-Skript |
+| `ux-umbau` | `9e347d7` | U0 Tag 1: Tokens, Kontrast, Sperrklinke; Feinplan; Projektstand; CLAUDE.md |
+| `ux-umbau` | Folge-Commit von `9e347d7` | Befunde der Durchsicht: Kontrast, Sperrklinke, `ink-3`, Dokumentation |
+
+Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
+enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
 Nichts davon ist gepusht. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

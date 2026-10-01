@@ -15,6 +15,13 @@
  *   - weil eine Zahl GESUNKEN ist: gut — die Grenze im selben Commit auf den
  *     neuen Wert senken, damit der Gewinn gehalten wird.
  *
+ * EINE AUSNAHME: Der Test lebt nur auf dem Branch `ux-umbau`; auf `main` wird
+ * ohne ihn weitergearbeitet. Bringt ein `git merge main` dort entstandene
+ * Altmuster mit, werden die Grenzen IM MERGE-COMMIT auf den neuen Stand
+ * gesetzt (hoch oder runter) und der Vorgang im Logbuch vermerkt
+ * (docs/module/ux-ui/projekt-ux-umbau.md, Abschnitt 7). Nur dort darf eine
+ * Grenze steigen — nie in einem Commit, der selbst Oberflaeche baut.
+ *
  * Gezaehlt wird in `src/` ohne `__tests__`, in .ts und .tsx, je Vorkommen
  * (auch in Kommentaren — eine Sperrklinke muss nicht klug sein, nur stetig).
  */
@@ -61,10 +68,25 @@ const GRENZEN: { name: string; muster: RegExp; hoechstens: number; stattdessen: 
     stattdessen: "formatDatumDE aus lib/format (deutsche Zeit, TT.MM.JJJJ)",
   },
   {
-    name: "fest eingetragene Hex-Farbe in einer Klasse ([#…])",
-    muster: /\[#[0-9A-Fa-f]{3,8}\]/g,
+    // Auch MITTEN im Wert: `shadow-[0_3px_0_0_#575756]` ist genauso eine fest
+    // eingetragene Farbe wie `bg-[#575756]`. Ein Muster nur fuer `[#…]`
+    // uebersah das (Befund der Durchsicht).
+    name: "fest eingetragene Hex-Farbe in einer Klasse ([…#…])",
+    muster: /\[[^\][\s"'`]*#[0-9A-Fa-f]{3,8}(?![0-9A-Fa-f])[^\][\s"'`]*\]/g,
     hoechstens: 181,
-    stattdessen: "Tokens aus globals.css (bg-action, text-ok, …)",
+    stattdessen: "Tokens aus globals.css (bg-action, text-ok, shadow-[…] shadow-action)",
+  },
+  {
+    name: "rgb()/rgba() in einer Klasse",
+    muster: /\[[^\][\s"'`]*rgba?\([^\]\s"'`]*\]/g,
+    hoechstens: 1,
+    stattdessen: "Tokens aus globals.css",
+  },
+  {
+    name: "Hex-Farbe in einem style-Objekt",
+    muster: /style=\{\{[^}]*#[0-9A-Fa-f]{3,8}(?![0-9A-Fa-f])/g,
+    hoechstens: 10,
+    stattdessen: "Token-Klasse statt style",
   },
   {
     name: "selbst gebaute Ueberlagerung (fixed inset-0)",
