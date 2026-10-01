@@ -6,26 +6,19 @@
  * Bausteine der Oberflaeche (UX-Umbau „Klarer Weg", U0): Button, Statuspille,
  * Gruppe und Zeile.
  *
- * Geprueft werden die REGELN, die in den Kopfkommentaren der Bausteine stehen —
- * nicht ihr Aussehen. Dazu laeuft axe ueber jede Zusammenstellung (Rollen,
- * Namen, ARIA). Farbkontraste kann axe in jsdom nicht messen; die rechnet
- * ui-kontrast.test.ts.
- *
- * Umgebung wie in den uebrigen Komponententests: jsdom im Docblock, ohne
- * @testing-library/jest-dom. jest-axe wird je Datei eingebunden (kein
- * setupFilesAfterEnv), deshalb `violations` statt `toHaveNoViolations()`.
+ * Geprueft werden die REGELN aus den Kopfkommentaren der Bausteine: was ein
+ * gesperrter Knopf durchlaesst, was als leer gilt, was abgeschnitten wuerde,
+ * wie die Bereiche heissen. Dazu laeuft axe ueber jede Zusammenstellung
+ * (`axeVerstoesse` aus hilfen/axe.ts; Begruendung dort). Farbkontraste rechnet
+ * ui-kontrast.test.ts, die Musterseite prueft ui-musterseite.test.tsx.
  */
-import { createRef } from "react";
+import { createRef, type ReactNode } from "react";
 import { fireEvent, render } from "@testing-library/react";
-import { axe } from "jest-axe";
-import { Button } from "@/components/ui/button";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Button, BUTTON_FARBEN, type ButtonVariante } from "@/components/ui/button";
 import { Gruppe, Zeile } from "@/components/ui/gruppe";
-import { Statuspille, type StatusTon } from "@/components/ui/statuspille";
-
-async function verstoesse(container: Element): Promise<string[]> {
-  const ergebnis = await axe(container);
-  return ergebnis.violations.map((v) => `${v.id}: ${v.help}`);
-}
+import { STATUS_TOENE, Statuspille, type StatusTon } from "@/components/ui/statuspille";
+import { axeVerstoesse } from "../hilfen/axe";
 
 // =============================================
 // Button
@@ -65,10 +58,10 @@ describe("Button", () => {
     expect(ref.current).toBe(getByRole("button"));
   });
 
-  it("laedt: gesperrt ueber aria-disabled, bleibt fokussierbar, Klick tut nichts, Text bleibt", () => {
+  it("laedt: aria-disabled und aria-busy, fokussierbar, Text bleibt, Ladesymbol davor, nicht abgeblendet", () => {
     const klick = jest.fn();
     const { getByRole } = render(
-      <Button laedt onClick={klick}>
+      <Button laedt variante="primary" onClick={klick}>
         Wird gesendet …
       </Button>,
     );
@@ -82,6 +75,11 @@ describe("Button", () => {
     fireEvent.click(knopf);
     expect(klick).not.toHaveBeenCalled();
     expect(knopf.textContent).toBe("Wird gesendet …");
+    expect(knopf.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    // Der Text ist die Statusmeldung: volle Farben, kein Abblenden, kein Hover.
+    expect(knopf.className).not.toContain("opacity-60");
+    expect(knopf.className).not.toContain("hover:");
+    expect(knopf.className).toContain("bg-action");
   });
 
   it("laedt verhindert auch das Absenden eines Formulars", () => {
@@ -97,42 +95,175 @@ describe("Button", () => {
     expect(abgeschickt).toBe(0);
   });
 
-  it("ohne laedt stehen weder aria-disabled noch aria-busy im Markup", () => {
+  it("gesperrt: KEIN Handler laeuft – weder der einer klickbaren Zeile noch pointerdown noch keydown", () => {
+    // Befund der Durchsicht: Die Sperre sass nur im eigenen onClick. Der Klick
+    // stieg zur Zeile auf (das stopPropagation des uebersprungenen Handlers
+    // entfiel), und alle anderen Handler liefen ungebremst.
+    const zeile = jest.fn();
+    const andere = { onPointerDown: jest.fn(), onMouseDown: jest.fn(), onKeyDown: jest.fn() };
+    const eigen = jest.fn((e: { stopPropagation: () => void }) => e.stopPropagation());
+    const { getByRole, rerender } = render(
+      <div onClick={zeile} onKeyDown={zeile}>
+        <Button onClick={eigen} {...andere}>
+          Senden
+        </Button>
+      </div>,
+    );
+    const knopf = () => getByRole("button");
+    fireEvent.click(knopf());
+    expect(eigen).toHaveBeenCalledTimes(1);
+    expect(zeile).not.toHaveBeenCalled();
+
+    rerender(
+      <div onClick={zeile} onKeyDown={zeile}>
+        <Button laedt onClick={eigen} {...andere}>
+          Senden
+        </Button>
+      </div>,
+    );
+    fireEvent.click(knopf());
+    fireEvent.pointerDown(knopf());
+    fireEvent.mouseDown(knopf());
+    fireEvent.keyDown(knopf(), { key: "Enter" });
+    fireEvent.keyDown(knopf(), { key: " " });
+    expect(eigen).toHaveBeenCalledTimes(1);
+    expect(zeile).not.toHaveBeenCalled();
+    expect(andere.onPointerDown).not.toHaveBeenCalled();
+    expect(andere.onMouseDown).not.toHaveBeenCalled();
+    expect(andere.onKeyDown).not.toHaveBeenCalled();
+  });
+
+  it("gesperrt haelt Tab nicht auf", () => {
+    const aussen = jest.fn();
+    const { getByRole } = render(
+      <div onKeyDown={aussen}>
+        <Button laedt>Senden</Button>
+      </div>,
+    );
+    fireEvent.keyDown(getByRole("button"), { key: "Tab" });
+    expect(aussen).toHaveBeenCalledTimes(1);
+  });
+
+  it("ein Radix-Menue um einen gesperrten Knopf oeffnet sich nicht", () => {
+    // Radix oeffnet ueber onPointerDown und onKeyDown – nicht ueber onClick.
+    function Menue({ laedt }: { laedt: boolean }) {
+      return (
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <Button laedt={laedt}>Mehr</Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content>
+              <DropdownMenu.Item>Stornieren</DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      );
+    }
+    const { rerender } = render(<Menue laedt />);
+    // Nicht ueber die Rolle suchen: Ein offenes Radix-Menue blendet den Rest
+    // der Seite fuer Hilfstechnik aus.
+    const knopf = () => document.querySelector('[aria-haspopup="menu"]') as HTMLElement;
+    fireEvent.pointerDown(knopf(), { button: 0, ctrlKey: false });
+    fireEvent.keyDown(knopf(), { key: "Enter" });
+    fireEvent.keyDown(knopf(), { key: "ArrowDown" });
+    expect(knopf().getAttribute("aria-expanded")).toBe("false");
+    expect(knopf().getAttribute("aria-disabled")).toBe("true");
+
+    // Gegenprobe: ohne Sperre oeffnet derselbe Aufbau.
+    rerender(<Menue laedt={false} />);
+    fireEvent.keyDown(knopf(), { key: "Enter" });
+    expect(knopf().getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("der Zustand gewinnt gegen mitgegebene Attribute – auch gegen ein ausdrueckliches undefined", () => {
+    // Befund der Durchsicht: {...rest} stand hinter aria-disabled/aria-busy.
+    const { getByText } = render(
+      <>
+        <Button laedt aria-disabled={undefined} aria-busy={undefined}>
+          Eins
+        </Button>
+        <Button laedt aria-disabled={false}>
+          Zwei
+        </Button>
+      </>,
+    );
+    for (const text of ["Eins", "Zwei"]) {
+      const knopf = getByText(text).closest("button")!;
+      expect(knopf.getAttribute("aria-disabled")).toBe("true");
+      expect(knopf.getAttribute("aria-busy")).toBe("true");
+    }
+  });
+
+  it("aria-disabled vom Aufrufer sperrt wirklich – sieht nicht nur so aus", () => {
+    const klick = jest.fn();
+    let abgeschickt = 0;
+    const { getByText } = render(
+      <form onSubmit={() => (abgeschickt += 1)}>
+        <Button aria-disabled onClick={klick}>
+          Klick
+        </Button>
+        <Button type="submit" aria-disabled="true">
+          Absenden
+        </Button>
+      </form>,
+    );
+    fireEvent.click(getByText("Klick"));
+    fireEvent.click(getByText("Absenden"));
+    expect(klick).not.toHaveBeenCalled();
+    expect(abgeschickt).toBe(0);
+    // Ohne laedt: abgeblendet, aber nicht „beschaeftigt"
+    expect(getByText("Klick").className).toContain("opacity-60");
+    expect(getByText("Klick").hasAttribute("aria-busy")).toBe(false);
+    expect(getByText("Klick").querySelector("svg")).toBeNull();
+  });
+
+  it("ohne Sperre stehen weder aria-disabled noch aria-busy im Markup", () => {
     const { getByRole } = render(<Button>Normal</Button>);
     expect(getByRole("button").hasAttribute("aria-disabled")).toBe(false);
     expect(getByRole("button").hasAttribute("aria-busy")).toBe(false);
   });
 
-  it("ein echtes disabled bleibt moeglich", () => {
+  it("ein echtes disabled bleibt moeglich und nimmt dem Knopf nicht die Zeigerereignisse", () => {
+    // Mit pointer-events:none fiele der Klick auf das Element dahinter –
+    // eine klickbare Zeile wuerde navigieren.
     const klick = jest.fn();
     const { getByRole } = render(
       <Button disabled onClick={klick}>
         Gesperrt
       </Button>,
     );
-    expect((getByRole("button") as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(getByRole("button"));
+    const knopf = getByRole("button") as HTMLButtonElement;
+    expect(knopf.disabled).toBe(true);
+    fireEvent.click(knopf);
     expect(klick).not.toHaveBeenCalled();
+    expect(knopf.className).not.toContain("pointer-events-none");
+    expect(knopf.className).not.toContain("hover:");
   });
 
-  it("Varianten und Groessen nutzen nur Tokens, die Vorgabe ist sekundaer/md", () => {
+  it("jede Variante nutzt genau die Farben aus BUTTON_FARBEN; Vorgabe ist secondary/md", () => {
+    const varianten = Object.keys(BUTTON_FARBEN) as ButtonVariante[];
     const { getByText } = render(
       <>
         <Button>Vorgabe</Button>
-        <Button variante="primary">Primär</Button>
-        <Button variante="ghost" groesse="sm">
-          Klein
-        </Button>
-        <Button variante="critical">Löschen</Button>
+        {varianten.map((v) => (
+          <Button key={v} variante={v} groesse="sm">
+            {v}
+          </Button>
+        ))}
       </>,
     );
-    expect(getByText("Vorgabe").className).toContain("bg-card");
-    expect(getByText("Vorgabe").className).toContain("h-10");
-    expect(getByText("Primär").className).toContain("bg-action");
-    expect(getByText("Klein").className).toContain("h-8");
-    expect(getByText("Löschen").className).toContain("bg-critical");
-    for (const text of ["Vorgabe", "Primär", "Klein", "Löschen"]) {
-      expect(getByText(text).className).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    const klassen = (text: string) => getByText(text).className.split(" ");
+    for (const k of BUTTON_FARBEN.secondary.ruhe.split(" ")) expect(klassen("Vorgabe")).toContain(k);
+    expect(klassen("Vorgabe")).toContain("h-10");
+    for (const v of varianten) {
+      for (const k of `${BUTTON_FARBEN[v].ruhe} ${BUTTON_FARBEN[v].hover}`.split(" ")) {
+        expect(klassen(v)).toContain(k);
+      }
+      expect(klassen(v)).toContain("h-8");
+      // Rand fuer den Windows-Kontrastmodus (dort entfallen Flaechen und Schatten)
+      expect(klassen(v)).toContain("border");
+      expect(klassen(v)).toContain("border-transparent");
     }
   });
 
@@ -144,7 +275,7 @@ describe("Button", () => {
     expect(klassen).not.toContain("h-10");
   });
 
-  it("asChild: ein Verweis sieht aus wie ein Knopf, bleibt aber ein Verweis ohne type", () => {
+  it("asChild: ein Verweis sieht aus wie ein Knopf und bleibt ein Verweis ohne type", () => {
     const { getByRole, queryByRole } = render(
       <Button asChild variante="primary">
         <a href="#liste">Zur Liste</a>
@@ -157,18 +288,70 @@ describe("Button", () => {
     expect(verweis.className).toContain("bg-action");
   });
 
+  it("asChild: ein ausdruecklich gesetzter type erreicht das Kind", () => {
+    let abgeschickt = 0;
+    const { getByText } = render(
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          abgeschickt += 1;
+        }}
+      >
+        <Button asChild type="button">
+          <button>Nur klicken</button>
+        </Button>
+      </form>,
+    );
+    expect(getByText("Nur klicken").getAttribute("type")).toBe("button");
+    fireEvent.click(getByText("Nur klicken"));
+    expect(abgeschickt).toBe(0);
+  });
+
+  it("asChild + disabled: der Verweis ist gesperrt statt nur beschriftet – auch der onClick des Kindes laeuft nicht", () => {
+    // `:disabled` trifft nie einen Verweis; das Attribut waere wirkungslos.
+    const kind = jest.fn();
+    const { getByRole } = render(
+      <Button asChild disabled>
+        <a href="#ziel" onClick={kind}>
+          Bearbeiten
+        </a>
+      </Button>,
+    );
+    const verweis = getByRole("link");
+    expect(verweis.hasAttribute("disabled")).toBe(false);
+    expect(verweis.getAttribute("aria-disabled")).toBe("true");
+    expect(verweis.className).toContain("opacity-60");
+    // fireEvent liefert false, wenn der Standard (hier: der Sprung) verhindert wurde.
+    expect(fireEvent.click(verweis)).toBe(false);
+    expect(kind).not.toHaveBeenCalled();
+  });
+
+  it("asChild + laedt: der onClick des Kindes laeuft nicht", () => {
+    const kind = jest.fn();
+    const { getByRole } = render(
+      <Button asChild laedt>
+        <a href="#ziel" onClick={kind}>
+          Öffnen
+        </a>
+      </Button>,
+    );
+    expect(fireEvent.click(getByRole("link"))).toBe(false);
+    expect(kind).not.toHaveBeenCalled();
+  });
+
   it("axe findet nichts", async () => {
     const { container } = render(
       <main>
         <Button variante="primary">Primär</Button>
         <Button laedt>Wird gesendet …</Button>
         <Button disabled>Gesperrt</Button>
+        <Button aria-disabled>Gesperrt, fokussierbar</Button>
         <Button asChild>
           <a href="#liste">Verweis</a>
         </Button>
       </main>,
     );
-    expect(await verstoesse(container)).toEqual([]);
+    expect(await axeVerstoesse(container)).toEqual([]);
   });
 });
 
@@ -177,9 +360,9 @@ describe("Button", () => {
 // =============================================
 
 describe("Statuspille", () => {
-  const TOENE: StatusTon[] = ["ok", "wait", "critical", "info", "neutral"];
+  const TOENE = Object.keys(STATUS_TOENE) as StatusTon[];
 
-  it.each(TOENE)("%s: Text steht im Markup, der Punkt ist nur Zierde", (ton) => {
+  it.each(TOENE)("%s: Text steht im Markup, der Punkt ist nur Zierde, die Farben kommen aus STATUS_TOENE", (ton) => {
     const { container } = render(<Statuspille ton={ton}>Zustand</Statuspille>);
     const pille = container.firstElementChild as HTMLElement;
     expect(pille.textContent).toBe("Zustand");
@@ -187,21 +370,37 @@ describe("Statuspille", () => {
     const punkt = pille.firstElementChild as HTMLElement;
     expect(punkt.getAttribute("aria-hidden")).toBe("true");
     expect(punkt.textContent).toBe("");
+    for (const k of STATUS_TOENE[ton].split(" ")) expect(pille.className.split(" ")).toContain(k);
   });
 
-  it("jeder Ton nimmt Text- und Grundfarbe aus demselben Token-Paar", () => {
-    for (const ton of TOENE) {
-      const { container, unmount } = render(<Statuspille ton={ton}>x</Statuspille>);
-      const klassen = (container.firstElementChild as HTMLElement).className;
-      if (ton === "neutral") {
-        expect(klassen).toContain("bg-neutral-soft");
-        expect(klassen).toContain("text-ink-2");
-      } else {
-        expect(klassen).toContain(`bg-${ton}-soft`);
-        expect(klassen).toContain(`text-${ton}`);
-      }
-      unmount();
-    }
+  it.each<[string, ReactNode]>([
+    ["undefined", undefined],
+    ["null", null],
+    ["leere Zeichenkette", ""],
+    ["nur Leerraum", "   "],
+    ["false aus a && b", false],
+  ])("ohne Text (%s) zeichnet sie nichts – nie eine reine Farbpille", (_name, inhalt) => {
+    const { container } = render(<Statuspille ton="critical">{inhalt}</Statuspille>);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("langer Text bricht um, statt abgeschnitten zu werden", () => {
+    const { container } = render(
+      <Statuspille ton="wait">Wartet auf Einstellungsmodalitäten der Führungskraft</Statuspille>,
+    );
+    const pille = container.firstElementChild as HTMLElement;
+    expect(pille.className).not.toContain("whitespace-nowrap");
+    expect(pille.className).toContain("max-w-full");
+    expect((pille.lastElementChild as HTMLElement).className).toContain("wrap-anywhere");
+  });
+
+  it("data-ton laesst sich nicht ueberschreiben", () => {
+    const { container } = render(
+      <Statuspille ton="ok" {...{ "data-ton": "critical" }}>
+        Erledigt
+      </Statuspille>,
+    );
+    expect((container.firstElementChild as HTMLElement).getAttribute("data-ton")).toBe("ok");
   });
 
   it("axe findet nichts", async () => {
@@ -214,7 +413,7 @@ describe("Statuspille", () => {
         ))}
       </main>,
     );
-    expect(await verstoesse(container)).toEqual([]);
+    expect(await axeVerstoesse(container)).toEqual([]);
   });
 });
 
@@ -223,25 +422,28 @@ describe("Statuspille", () => {
 // =============================================
 
 describe("Gruppe und Zeile", () => {
-  it("die Beschriftung ist eine Ueberschrift und benennt die Gruppe", () => {
+  it("die Beschriftung ist eine h2 und benennt die Gruppe", () => {
     const { getByRole } = render(
       <Gruppe titel="Vertrag">
         <Zeile label="Beginn">01.02.2027</Zeile>
       </Gruppe>,
     );
-    const ueberschrift = getByRole("heading", { level: 3 });
+    const ueberschrift = getByRole("heading", { level: 2 });
     expect(ueberschrift.textContent).toBe("Vertrag");
-    const bereich = getByRole("region");
-    expect(bereich.getAttribute("aria-labelledby")).toBe(ueberschrift.id);
+    expect(getByRole("region").getAttribute("aria-labelledby")).toBe(ueberschrift.id);
+    // Schriftskala des Plans: 11 px, Versalien, Laufweite +6 %
+    for (const k of ["text-2xs", "uppercase", "tracking-label", "text-ink-2"]) {
+      expect(ueberschrift.className.split(" ")).toContain(k);
+    }
   });
 
   it("die Ueberschriften-Ebene ist waehlbar", () => {
     const { getByRole } = render(
-      <Gruppe titel="Person" ebene={2}>
+      <Gruppe titel="Person" ebene={3}>
         <Zeile>Inhalt</Zeile>
       </Gruppe>,
     );
-    expect(getByRole("heading", { level: 2 }).textContent).toBe("Person");
+    expect(getByRole("heading", { level: 3 }).textContent).toBe("Person");
   });
 
   it("zwei Gruppen bekommen verschiedene Kennungen", () => {
@@ -270,35 +472,68 @@ describe("Gruppe und Zeile", () => {
     expect(container.querySelector("section")?.hasAttribute("aria-labelledby")).toBe(false);
   });
 
-  it("zeigt Beschreibung und Aktion neben der Beschriftung", () => {
-    const { getByText, getByRole } = render(
-      <Gruppe titel="Vertrag" beschreibung="Angaben der Führungskraft" aktion={<Button groesse="sm">Ändern</Button>}>
+  it("die Beschreibung erscheint auch ohne Titel und ohne Aktion", () => {
+    // Befund der Durchsicht: Sie wurde dann stillschweigend verworfen.
+    const { getByText } = render(
+      <Gruppe beschreibung="Angaben der Führungskraft">
         <Zeile>Inhalt</Zeile>
       </Gruppe>,
     );
     expect(getByText("Angaben der Führungskraft")).not.toBeNull();
-    expect(getByRole("button").textContent).toBe("Ändern");
   });
 
-  it("Zeile mit label: Beschriftung und Wert; ein leerer Wert bleibt als Strich sichtbar", () => {
+  it("der Kopf ist mit und ohne Aktion gleich hoch", () => {
+    const { container } = render(
+      <>
+        <Gruppe titel="Mit" aktion={<Button groesse="sm">Ändern</Button>}>
+          <Zeile>a</Zeile>
+        </Gruppe>
+        <Gruppe titel="Ohne">
+          <Zeile>b</Zeile>
+        </Gruppe>
+      </>,
+    );
+    const koepfe = Array.from(container.querySelectorAll("section > div:first-child"));
+    expect(koepfe).toHaveLength(2);
+    for (const k of koepfe) expect(k.className.split(" ")).toContain("min-h-8");
+  });
+
+  it("ein mitgegebenes aria-labelledby={undefined} nimmt der Gruppe nicht ihren Namen; ein gesetztes gewinnt", () => {
+    const { getAllByRole } = render(
+      <>
+        <Gruppe titel="Vertrag" aria-labelledby={undefined}>
+          <Zeile>a</Zeile>
+        </Gruppe>
+        <span id="fremd">Fremder Name</span>
+        <Gruppe titel="Person" aria-labelledby="fremd">
+          <Zeile>b</Zeile>
+        </Gruppe>
+      </>,
+    );
+    const [vertrag, person] = getAllByRole("region");
+    expect(vertrag.getAttribute("aria-labelledby")).toBe(vertrag.querySelector("h2")!.id);
+    expect(person.getAttribute("aria-labelledby")).toBe("fremd");
+  });
+
+  it.each<[string, ReactNode, string]>([
+    ["Text", "Berufskolleg", "Berufskolleg"],
+    ["kein Kind", undefined, "—"],
+    ["null", null, "—"],
+    ["leere Zeichenkette", "", "—"],
+    ["nur Leerraum", "   ", "—"],
+    ["false aus a && b", false, "—"],
+    ["leere Liste", [], "—"],
+    ["Liste aus Leerem", [null, undefined, " "], "—"],
+    ["0 ist ein Wert", 0, "0"],
+    ["Element", <b key="b">fett</b>, "fett"],
+  ])("Zeile mit label, Wert %s", (_name, inhalt, erwartet) => {
     const { container } = render(
       <Gruppe titel="Person">
-        <Zeile label="Einrichtung">Berufskolleg</Zeile>
-        <Zeile label="Personalnummer" />
-        <Zeile label="Hinweis">{""}</Zeile>
-        <Zeile label="Kinder">{0}</Zeile>
+        <Zeile label="Feld">{inhalt}</Zeile>
       </Gruppe>,
     );
-    const zeilen = Array.from(container.querySelectorAll("section > div:last-child > div")).map((z) =>
-      Array.from(z.children).map((k) => k.textContent),
-    );
-    expect(zeilen).toEqual([
-      ["Einrichtung", "Berufskolleg"],
-      ["Personalnummer", "—"],
-      ["Hinweis", "—"],
-      // 0 ist ein Wert, kein leeres Feld.
-      ["Kinder", "0"],
-    ]);
+    const zeile = container.querySelector("section > div:last-child > div") as HTMLElement;
+    expect(Array.from(zeile.children).map((k) => k.textContent)).toEqual(["Feld", erwartet]);
   });
 
   it("Zeile ohne label gehoert die ganze Breite – kein Strich, keine zweite Spalte", () => {
@@ -314,6 +549,27 @@ describe("Gruppe und Zeile", () => {
     expect(zeile.textContent).toBe("Frei");
   });
 
+  it("nichts wird abgeschnitten: Wert und Beschriftung brechen um, die Gruppe hat kein overflow-hidden", () => {
+    // Befund der Durchsicht: Die Beschriftung schrumpfte nie, der Wert auf 0;
+    // eine IBAN oder ein Datum verschwand ohne Hinweis hinter der Kante.
+    const { container } = render(
+      <Gruppe titel="Bank">
+        <Zeile label="Voraussichtliches Ende der Zweckbefristung (Vertretung)">
+          DE89370400440532013000COBADEFFXXX
+        </Zeile>
+      </Gruppe>,
+    );
+    const flaeche = container.querySelector("section > div:last-child") as HTMLElement;
+    expect(flaeche.className).not.toContain("overflow-hidden");
+    const [beschriftung, wert] = Array.from(flaeche.firstElementChild!.children) as HTMLElement[];
+    for (const el of [beschriftung, wert]) {
+      expect(el.className.split(" ")).toContain("wrap-anywhere");
+      expect(el.className.split(" ")).toContain("min-w-0");
+      expect(el.className).not.toContain("shrink-0");
+    }
+    expect(beschriftung.className).toContain("max-w-[50%]");
+  });
+
   it("Beschriftungen nutzen ink-2, nie ink-3", () => {
     const { container } = render(
       <Gruppe titel="Vertrag" beschreibung="Satz">
@@ -324,11 +580,13 @@ describe("Gruppe und Zeile", () => {
     expect(container.innerHTML).not.toContain("ink-3");
   });
 
-  it("axe findet nichts", async () => {
+  it("axe findet nichts – Gruppen direkt unter dem Seitentitel", async () => {
+    // Ohne eingeschobene Zwischenueberschrift: So steht die Gruppe auf der
+    // Seite. (Eine Fixture mit <h2> davor verdeckte frueher, dass die Vorgabe
+    // h3 unter einem h1 die Ueberschriften-Reihenfolge verletzt.)
     const { container } = render(
       <main>
         <h1>Seite</h1>
-        <h2>Abschnitt</h2>
         <Gruppe titel="Vertrag" beschreibung="Angaben" aktion={<Button groesse="sm">Ändern</Button>}>
           <Zeile label="Beginn">01.02.2027</Zeile>
           <Zeile label="Personalnummer" />
@@ -340,6 +598,22 @@ describe("Gruppe und Zeile", () => {
         </Gruppe>
       </main>,
     );
-    expect(await verstoesse(container)).toEqual([]);
+    expect(await axeVerstoesse(container)).toEqual([]);
+  });
+
+  it("der axe-Lauf erkennt eine uebersprungene Ebene – der Helfer nennt Regel und Knoten", async () => {
+    // Gegenprobe: Der Lauf oben ist nicht deshalb gruen, weil axe nichts prueft.
+    const { container } = render(
+      <main>
+        <h1>Seite</h1>
+        <Gruppe titel="Zu tief" ebene={4}>
+          <Zeile>a</Zeile>
+        </Gruppe>
+      </main>,
+    );
+    const verstoesse = await axeVerstoesse(container);
+    expect(verstoesse).toHaveLength(1);
+    expect(verstoesse[0]).toContain("heading-order");
+    expect(verstoesse[0]).toContain("<h4");
   });
 });

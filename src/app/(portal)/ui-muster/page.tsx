@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { PortalHeader } from "@/components/portal-header";
 import { Button } from "@/components/ui/button";
 import { Gruppe, Zeile } from "@/components/ui/gruppe";
-import { Statuspille, type StatusTon } from "@/components/ui/statuspille";
+import { STATUS_TOENE, Statuspille, type StatusTon } from "@/components/ui/statuspille";
 
 /**
  * Musterseite der Oberflaechen-Bausteine (UX-Umbau „Klarer Weg", U0)
@@ -20,13 +20,16 @@ import { Statuspille, type StatusTon } from "@/components/ui/statuspille";
  */
 export const metadata = { title: "UI-Muster" };
 
-const TOENE: { ton: StatusTon; text: string; wofuer: string }[] = [
-  { ton: "ok", text: "Erledigt", wofuer: "abgeschlossen, eingereicht, zugestellt" },
-  { ton: "wait", text: "Wartet", wofuer: "liegt bei jemand anderem, Frist naht" },
-  { ton: "critical", text: "Überfällig", wofuer: "Frist verstrichen, Fehler, nicht zugestellt" },
-  { ton: "info", text: "Hinweis", wofuer: "zur Kenntnis, kein Handlungsbedarf" },
-  { ton: "neutral", text: "Entwurf", wofuer: "alles Übrige" },
-];
+// `satisfies Record<StatusTon, …>`: Ein neuer Ton in STATUS_TOENE, der hier
+// fehlt, ist ein Typfehler — die Musterseite zeigt immer alle.
+const TON_BEISPIELE = {
+  ok: { text: "Erledigt", wofuer: "abgeschlossen, eingereicht, zugestellt" },
+  wait: { text: "Wartet", wofuer: "liegt bei jemand anderem, Frist naht" },
+  critical: { text: "Überfällig", wofuer: "Frist verstrichen, Fehler, nicht zugestellt" },
+  info: { text: "Hinweis", wofuer: "zur Kenntnis, kein Handlungsbedarf" },
+  neutral: { text: "Entwurf", wofuer: "alles Übrige" },
+} satisfies Record<StatusTon, { text: string; wofuer: string }>;
+const TOENE = Object.keys(STATUS_TOENE) as StatusTon[];
 
 const FARBEN: { name: string; klasse: string; hinweis: string }[] = [
   { name: "surface", klasse: "bg-surface", hinweis: "Seitengrund" },
@@ -52,10 +55,10 @@ export default async function UiMusterPage() {
 
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
         <header>
-          <h1 className="font-heading text-2xl font-bold text-ink">UI-Muster</h1>
+          <h1 className="font-heading text-titel font-bold tracking-titel text-ink">UI-Muster</h1>
           <p className="mt-1 max-w-3xl text-sm text-ink-2">
             Bausteine der neuen Oberfläche („Klarer Weg“). Diese Seite wächst mit jedem Baustein; Regeln und Stand
-            stehen in <code className="rounded bg-neutral-soft px-1">docs/module/ux-ui/</code>.
+            stehen in <code className="rounded-lg bg-neutral-soft px-1">docs/module/ux-ui/</code>.
           </p>
         </header>
 
@@ -97,6 +100,7 @@ export default async function UiMusterPage() {
                 Wird gesendet …
               </Button>
               <Button disabled>Gesperrt</Button>
+              <Button aria-disabled>Gesperrt, fokussierbar</Button>
               <Button asChild>
                 <Link href="/dashboard">Als Verweis</Link>
               </Button>
@@ -105,10 +109,10 @@ export default async function UiMusterPage() {
         </Gruppe>
 
         <Gruppe titel="Statuspillen" beschreibung="Immer mit Text, nie nur Farbe.">
-          {TOENE.map(({ ton, text, wofuer }) => (
+          {TOENE.map((ton) => (
             <Zeile key={ton} className="flex items-center justify-between gap-4">
-              <Statuspille ton={ton}>{text}</Statuspille>
-              <span className="text-right text-xs text-ink-2">{wofuer}</span>
+              <Statuspille ton={ton}>{TON_BEISPIELE[ton].text}</Statuspille>
+              <span className="text-right text-xs text-ink-2">{TON_BEISPIELE[ton].wofuer}</span>
             </Zeile>
           ))}
         </Gruppe>
@@ -119,6 +123,8 @@ export default async function UiMusterPage() {
             <Zeile label="Vertragsbeginn">01.02.2027</Zeile>
             <Zeile label="Umfang">25,5 Stunden</Zeile>
             <Zeile label="Personalnummer" />
+            <Zeile label="Bankverbindung">DE89370400440532013000 · COBADEFFXXX</Zeile>
+            <Zeile label="Voraussichtliches Ende der Zweckbefristung (Vertretung)">31.07.2027</Zeile>
           </Gruppe>
 
           <Gruppe titel="Gruppe als Liste">
@@ -135,6 +141,13 @@ export default async function UiMusterPage() {
                 <span className="block text-xs text-ink-2">Vertragsende · Gesamtschule</span>
               </span>
               <Statuspille ton="critical">Frist verstrichen</Statuspille>
+            </Zeile>
+            <Zeile className="flex items-center justify-between gap-4">
+              <span>
+                <span className="block font-semibold">Langer Zustand</span>
+                <span className="block text-xs text-ink-2">bricht um, wird nie abgeschnitten</span>
+              </span>
+              <Statuspille ton="wait">Wartet auf Einstellungsmodalitäten der Führungskraft</Statuspille>
             </Zeile>
           </Gruppe>
         </div>

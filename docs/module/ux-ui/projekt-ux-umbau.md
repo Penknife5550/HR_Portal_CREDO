@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 01.10.2026 (U0, Tag 2)
+Letzte Änderung: 01.10.2026 (U0, Tag 2, nach der zweiten Durchsicht)
 
 ## 1. Worum es geht
 
@@ -25,7 +25,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | Paket | Inhalt | Stand |
 |---|---|---|
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
-| V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** |
+| V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 2 von 6 erledigt (Tokens, Button, Statuspille, Gruppe, Musterseite) |
 | U1 | Rahmen: Kopf, Breadcrumb, neue Adressen | offen |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
@@ -39,6 +39,9 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
   ändert die Commit-Kennungen, und dieses Logbuch verweist auf sie (am 01.10.2026 zweimal
   passiert, Abschnitt 8 nennt die gültigen).
 - **Nichts wird ohne Auftrag gepusht.** Das Repository ist öffentlich.
+- **Vor jedem Push `npm run pruefen`** (Typen, Lint, Tests). Es gibt weder CI noch Git-Hooks,
+  und der Docker-Build führt keine Tests aus – Sperrklinke und Kontrasttest greifen nur, wenn
+  jemand sie laufen lässt.
 - **Je Paket ein Feinplan** in diesem Ordner, vor dem ersten Code: Umfang, Nicht-Umfang,
   Dateien, Tests, betroffene Mail- und Word-Vorlagen, Schema-Delta, Abnahme, Deploy.
 - **Je Commit:** Protokoll in Abschnitt 7 ergänzen, Stand in Abschnitt 2 nachziehen,
@@ -60,7 +63,7 @@ Vollständig mit Begründung und verworfener Alternative im Plan, Abschnitt 6. H
 | E1 | Farbregel | CI-Farben nur für CREDO-Linie und Einrichtungen; Zustände aus einer funktionalen Palette; eine Interaktionsfarbe CI-Grau. CI-Freigabe erteilt. |
 | E3 | Navigation | Obere Leiste bleibt, höchstens sechs Punkte: Start · Aufgaben · Vorgänge · Personen · BEM · Verwaltung. Module eine Ebene darunter. Seitenliste im Plan, Abschnitt 4 A. |
 | E4 | Adressen | Nur der Pfad ändert sich: `/vorgaenge/<modul>/<uuid>`, BEM `/bem/<uuid>`. Die UUID bleibt. `/dashboard/…` leitet dauerhaft weiter (Middleware). |
-| E5 | Dunkler Modus | Nein. Portal fest hell (`color-scheme: light`), Tokens vorbereitet. |
+| E5 | Dunkler Modus | Nein. Portal fest hell (`color-scheme: only light`), Tokens vorbereitet. |
 | E6 | Anrede | „du“ nur hinter der Anmeldung (`src/app/(portal)/`), überall sonst „Sie“ – Link-Seiten, Anmeldeseite, **alle** E-Mails, PDFs, Briefe. Es entscheidet der Ort des Textes. Portal-Texte möglichst ohne Anrede. |
 | E7 | Schrift | Montserrat für alles; ITC Avant Garde aus dem Token gestrichen. Abweichung vom CI bestätigt; Maßgabe: überall gleiches Aussehen. |
 | E10 | Pilotmodul | Vertragsende. Onboarding folgt direkt danach. |
@@ -92,9 +95,16 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Zustandsfarben | `ok #2e7d32`, `wait #b45309`, `info #1d6fa5` | `ok #27702b`, `wait #a34a08`, `info #1a6494` | Auf ihrem `-soft`-Grund erreichten die Planwerte nur 4,0–4,6:1 (nötig 4,5:1, auch auf dem Seitengrund). Die abgedunkelten Werte liegen bei 4,7–5,4:1. `critical` blieb unverändert (5,1:1). |
 | Nebentext `ink-2` | `#6b6b67` | `#666662` | In der neutralen Pille (auf `neutral-soft`) nur 4,3:1 auf dem Seitengrund; jetzt 4,6:1. |
 | Heller Ton `ink-3` | in den Mockups auch für Beschriftungen | nur für Gesperrtes, Trennzeichen, Zierde | 2,8:1 auf Weiß – kein Textton. Beschriftungen und Platzhalter in Eingabefeldern nehmen `ink-2`. |
-| Umfang U0 | Aufgaben-Badge, Suchfeld, Datumsfeld, Datumsfunktion, 47 × `toLocaleDateString` ablösen | siehe F4; die Datumsfunktion gibt es schon (`formatDatumDE`), das Ablösen kommt je Modul mit U4 | Bausteine ohne Aufrufer vermeiden; das Ablösen ändert sichtbar das Verhalten (Zeitzone des Geräts → deutsche Zeit) und muss je Modul geprüft werden. |
-| U0 zusätzlich | – | Sperrklinke-Test, Kontrasttest, Musterseite | siehe Feinplan, Abschnitt 5 und 3.3 |
-| Zahlen der Altmuster | 28 `confirm()`, 47 `toLocaleDateString`, 27 Überlagerungen, 146 Inline-SVG | 33 / 74 / 29 / 150 (gemessen 01.10.2026) | Paket 3, Paket 4 und der Zeitplaner kamen nach Fassung 2 im alten Stil dazu. |
+| Umfang U0 | Aufgaben-Badge, Suchfeld, Datumsfeld, Datumsfunktion, `toLocaleDateString` ablösen | siehe F4; die Datumsfunktion gibt es schon (`formatDatumDE`), das Ablösen kommt je Modul mit U4 | Bausteine ohne Aufrufer vermeiden; das Ablösen ändert sichtbar das Verhalten (Zeitzone des Geräts bzw. des Containers → deutsche Zeit) und muss je Modul geprüft werden. |
+| Emojis | U0: „Emojis aus Navigation und BEM-Bannern entfernen“ | Navigation → U1, BEM-Banner → U4 (BEM) | Beides gehört zu Dateien, die diese Pakete ohnehin umbauen; U0 fasst keine bestehende Seite an. |
+| U0 zusätzlich | – | Kontrasttest, Musterseite, `cn()` mit eigenen Größen-Tokens | siehe Feinplan, Abschnitt 5 und 3.3 |
+| Sperrklinke | – (nicht im Plan) | Test auf `main`, je Datei, ohne Kommentare | Fachpakete entstehen auf `main`; nur dort verhindert sie neue Altmuster. |
+| Zahlen der Altmuster | 28 `confirm()`, 47 `toLocaleDateString`, 27 Überlagerungen, 146 Inline-SVG | 30 / 72 / 29 / 150 (gemessen 01.10.2026, ohne Kommentare, alle `.ts`/`.tsx`) | Der Plan zählte nur `.tsx`. Echter Zuwachs seit dem 24.09.: +2 `confirm()`, +2 Überlagerungen, +4 SVG, +11 Hex-Farben; `toLocaleDateString` unverändert. Die frühere Erklärung „5 neue confirm(), 27 neue toLocaleDateString“ war ein Zählartefakt. |
+| Varianten der Bausteine | – (Feinplan: `class-variance-authority`) | exportierte Tabellen (`BUTTON_FARBEN`, `STATUS_TOENE`) | Kontrasttest und Musterseite müssen Schlüssel und Klassen lesen; `cva` gäbe nur eine Funktion heraus. |
+| Hover des kritischen Knopfs | – | eigenes Flächen-Token `critical-hover` | Ein Filter (`brightness`) dunkelt auch die Schrift ab und senkt den Kontrast. |
+| `color-scheme` | E5: `light` | `only light` | `light` verhindert erzwungenes Abdunkeln nicht. |
+| Gruppentitel-Ebene | – | Vorgabe `h2` | Gruppen stehen direkt unter dem Seitentitel; `h3` verletzte die Überschriften-Reihenfolge. |
+| Prototyp-Tag | „Kein Paket außer U0 startet ohne den Prototyp-Tag“ | gilt ab dem Pilot; U1 darf vorher | U1 ändert nur den Rahmen (Kopf, Breadcrumb, Adressen) und hängt an keiner der Fragen des Prototyp-Tags (E9, E11, E13). |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
 
@@ -104,18 +114,24 @@ Kurzfassung; verbindlich und ausführlich in `CLAUDE.md`, Abschnitt „Oberfläc
 
 1. Neue Oberfläche nutzt nur die neuen Tokens (`surface`, `ink`, `action`, `ok`, `wait`,
    `critical`, `info`, …) und – sobald vorhanden – die Bausteine aus `src/components/ui/`.
-2. Kein neues `confirm()`, `alert()`, `toLocaleDateString`, keine neue Hex-Farbe in einer
-   Klasse, keine neue selbst gebaute Überlagerung, kein neues Inline-SVG. Der Test
-   `ui-sperrklinke.test.ts` hält die Zahlen fest; wer ein Altmuster entfernt, senkt die Grenze
-   im selben Commit.
-3. Wer einen Farbwert ändert oder ein neues Farbpaar baut, lässt `ui-kontrast.test.ts` laufen
-   bzw. trägt das Paar dort ein.
+2. Kein neues `confirm()`, `alert()`, `prompt()`, `toLocaleDateString`/`toLocaleTimeString`,
+   keine fest eingetragene Farbe (Hex oder Farbfunktion in einer Klasse, Hex im `style`-Objekt,
+   Tailwind-Palettenklasse), keine neue selbst gebaute Überlagerung, kein neues Inline-SVG, kein
+   `text-ink-3`. Die Sperrklinke (`ui-sperrklinke.test.ts`, elf Muster, auf `main`) hält den
+   Stand je Datei fest; wer ein Altmuster entfernt, schreibt den Stand im selben Commit neu.
+3. Farbpaare stehen als exportierte Tabelle im Baustein; der Kontrasttest liest sie von dort.
+   Kein `opacity`, kein Filter, kein `/50` in Farbklassen.
 4. `ink-3` nie für Text, auch nicht für Platzhalter in Eingabefeldern.
 5. Anrede nach E6; Portal-Texte möglichst ohne Anrede.
 6. Wer einen Baustein baut oder ändert, trägt ihn auf der Musterseite `/ui-muster` ein und
    prüft seine Regeln in `ui-bausteine.test.tsx` (mit axe).
 7. „Gesperrt, während etwas läuft“ heißt `aria-disabled`, nicht `disabled` – der Knopf
-   behält den Tastaturfokus (Button `laedt`).
+   behält den Tastaturfokus. Der `Button` sperrt dann wirklich (auch bei einem mitgegebenen
+   `aria-disabled`); wer einen rohen `<button>` so sperrt, muss den Klick selbst abfangen.
+8. Jedes Größen-Token (`--shadow-*`, `--text-*`, `--tracking-*`) wird in `src/lib/utils.ts` bei
+   tailwind-merge eingetragen.
+9. Zeilen, in denen Statuspillen stehen, bekommen keinen getönten Hover (die `-soft`-Töne sind
+   halbtransparent und nur auf Karte und Seitengrund gerechnet).
 
 ## 7. Protokoll
 
@@ -188,8 +204,9 @@ verweist. Ab jetzt wird `main` gemergt (Abschnitt 3).
 **Entscheidungen beim Bauen:**
 - Ein Testfile für alle Bausteine (`ui-bausteine.test.tsx`) statt eines je Baustein: Sie sind
   klein und werden zusammen verwendet; der axe-Lauf prüft sie auch im Zusammenspiel.
-- `critical` wird beim Überfahren dunkler (`brightness-90`), nicht heller – der Kontrast zum
-  weißen Text darf nur steigen.
+- `critical` wird beim Überfahren dunkler (`brightness-90`), nicht heller. (Berichtigt in der
+  zweiten Durchsicht: Der Filter dunkelte auch die Schrift ab, der Kontrast FIEL von 6,57 auf
+  6,08. Jetzt eigenes Flächen-Token `critical-hover`, Kontrast 8,2:1.)
 - Welcher Fachstatus welchen Ton bekommt, entscheidet nicht die Statuspille, sondern ein
   Katalog je Modul (kommt mit dem Pilot bzw. U3/U4).
 - Die Musterseite sichert sich selbst über `getSession()` ab, wie Audit-Log und
@@ -205,6 +222,47 @@ im selben Ordner der Entwicklungsserver einer anderen Sitzung läuft.
 
 **Sichtbare Änderung:** nur die neue Seite `/ui-muster`.
 
+### 01.10.2026 – Zweite Durchsicht (Code-Review „max“) nach Tag 2
+
+Zehn Prüfwinkel, 16 Gegenprüfungen, eine Schlussdurchsicht. 15 Befunde gemeldet, dazu fünf
+bestätigte Punkte über der Obergrenze. Alle behoben; zwei mit Einschränkung (siehe unten).
+
+| # | Befund | Behoben in | Wie |
+|---|---|---|---|
+| 1 | Zweiter Klick auf „nach unten“ nahm die Verschiebung zurück; nichts scrollte nach; Meldung „Punkt n“ blieb stehen | `main` `b6e1c8a` | Der Dialog rollt um die Strecke mit, die der Punkt gewandert ist; neues Titelfeld bekommt den Fokus; Meldung verschwindet bei jeder Positionsänderung |
+| 2 | Reihenfolge wirkte in Vorgängen nur innerhalb einer Kategorie | `main` `b6e1c8a` | Alle Leser sortieren `orderIndex` zuerst, Kategorie nur bei Gleichstand; Hinweistext im Editor sagt, was gilt |
+| 3 | `Button laedt` sperrte nur den eigenen `onClick` | `ux-umbau` | Sperre in der Capture-Phase; `disabled` ohne `pointer-events-none` |
+| 4 | `Zeile` und `Statuspille` schnitten lange Inhalte stumm ab | `ux-umbau` | Wert, Beschriftung und Pille brechen um; kein `overflow-hidden` |
+| 5 | Sperrklinke sperrte den eigenen Ersatz, zählte Kommentare, übersah Palettenklassen, `prompt(`, Hex nach `}` | `main` `bfb0665` | Neu gebaut: je Datei, ohne Kommentare, elf Muster, `components/ui/` bei Überlagerungen ausgenommen |
+| 6 | Marken am Listenrand außerhalb des Ablageziels; Ziel hing am Weg des Zeigers; `dragenter` nicht abgebrochen | `main` `b6e1c8a` | Liste mit Innenabstand als Ziel; Zielposition aus der Stelle des Zeigers; `dragenter` abgebrochen; Marke verschwindet beim Verlassen |
+| 7 | Ziehdaten als `text/plain`; Ziehzustand überlebte das Schließen | `main` `b6e1c8a` | Eigener Datentyp; Zustand wird beim Öffnen und nach dem Speichern zurückgesetzt |
+| 8 | Fokus fiel nach „Entfernen“ auf `body`; Name von „+ Punkt darunter“ ohne sichtbaren Text | `main` `b6e1c8a` | Fokus auf „Entfernen“ der nachgerückten Zeile; Name beginnt mit „Punkt darunter“ |
+| 9 | `{...rest}` überschrieb den Zustand; `asChild` verlor `type`, `disabled` wirkungslos | `ux-umbau` | Zustand nach `rest`; `asChild` + `disabled` wird zur Sperre; ausdrücklicher `type` erreicht das Kind |
+| 10 | `Zeile` hielt `false`/`[]` nicht für leer; `Gruppe` verwarf `beschreibung`; Pille ohne Text; `h3` unter `h1` | `ux-umbau` | Leer-Erkennung über den gerenderten Inhalt; Vorgabe `h2`; axe läuft über die echte Musterseite |
+| 11 | tailwind-merge hielt `shadow-overlay` für eine Farbe | `ux-umbau` | `extendTailwindMerge` in `utils.ts`, Test gegen `globals.css` |
+| 12 | `color-scheme: light` verhinderte erzwungenes Abdunkeln nicht | `ux-umbau` | `only light`; Kommentar berichtigt |
+| 13 | Sperrklinke nur auf `ux-umbau`; Jest läuft nie automatisch | `main` `bfb0665` | Test liegt auf `main`; `npm run pruefen`. **Einschränkung:** weiterhin kein CI und kein Hook – der Lauf bleibt ein Handschritt vor dem Push |
+| 14 | Kontrast-Absicherung schwächer als behauptet | `ux-umbau` | Paare kommen aus den Bausteinen; `laedt` blendet nicht mehr ab; `critical-hover`; `text-ink-3` in der Sperrklinke; `aufUntergrund` wirft |
+| 15 | Dokumentation widersprach Code und Historie | `ux-umbau` | Branchname, `--font-heading`, Zählung, Musterzahl, Schriftskala (jetzt als Tokens), Emojis, axe-Begründung berichtigt |
+| + | Screenshot-Skript schnitt hohe Elemente falsch, wartete 60 s ins Leere | `ux-umbau` | `el.screenshot` mit elementbezogenem Ausschnitt; Warten auf den Zustand der Karte; `klick()` wartet. **Einschränkung:** nicht ausgeführt (braucht die Anmeldung); `screenshots/automatische-laeufe.png` ist noch das alte, falsch geschnittene Bild – Marken und Bildtext im Plan passen zu genau diesem Bild und müssen beim Neuerzeugen mitziehen |
+| + | `@types/jest-axe` zog ein zweites axe-core nach und deklarierte den Matcher global | `ux-umbau` | Paket entfernt; eigene Typdatei und `axeVerstoesse()` |
+| + | Editor-Tests ließen fünf Mutanten durch | `main` `b6e1c8a` | Tests für Identität der Zeile, Zustand nach dem Schließen, Datentyp, Kategorie des Punkts darüber |
+| + | Pfeile 20 × 20 px | `main` `b6e1c8a` | 28 px Zielfläche |
+| + | Button im Windows-Kontrastmodus ohne Begrenzung | `ux-umbau` | durchsichtiger Rand |
+
+**Widerlegt:** Der Tastaturfokus geht bei „nach unten“ nicht verloren (React stellt ihn wieder
+her). Der Punkt wanderte aber aus dem Sichtbereich – das ist Befund 1.
+
+**Geändertes Verhalten, das HR bemerkt:** In Vorgängen stehen die Kategorien der Checkliste
+nicht mehr alphabetisch, sondern in der Reihenfolge der Vorlage (also „Vor Arbeitsbeginn“ vor
+„Dokumente“). Das gilt sofort auch für bestehende Vorgänge, weil nur die Sortierung beim Lesen
+geändert ist. Mail- und Word-Vorlagen sind nicht betroffen; die Aufgabenliste der
+Abteilungsmail bleibt nach Fälligkeit sortiert.
+
+**Nicht geprüft:** Verhalten im echten Browser nach den Korrekturen (Ziehen, Mitrollen,
+Musterseite) – in der Sitzung fehlt die Anmeldung; `npm run build` lief nicht, weil im selben
+Ordner der Entwicklungsserver einer anderen Sitzung läuft.
+
 **Als Nächstes (U0, Tag 3):** Dialog und Bestätigungsdialog auf Radix (mit den vier Regeln
 aus `unterlagen/dialog-rahmen.tsx`), Toast mit Anbieter im Portal-Layout.
 
@@ -217,10 +275,14 @@ aus `unterlagen/dialog-rahmen.tsx`), Toast mit Anbieter im Portal-Layout.
 | `ux-umbau` | `37b452b` | Plan Fassung 3 mit Entscheidungen, Screenshots, Screenshot-Skript |
 | `ux-umbau` | `9e347d7` | U0 Tag 1: Tokens, Kontrast, Sperrklinke; Feinplan; Projektstand; CLAUDE.md |
 | `ux-umbau` | `bd58ec5` | Befunde der Durchsicht: Kontrast, Sperrklinke, `ink-3`, Dokumentation |
-| `ux-umbau` | Folge-Commit von `bd58ec5` | U0 Tag 2: Button, Statuspille, Gruppe und Zeile, Musterseite, `jest-axe` |
+| `ux-umbau` | `924f79d` | U0 Tag 2: Button, Statuspille, Gruppe und Zeile, Musterseite, `jest-axe` |
+| `main` | `bfb0665` | Sperrklinke je Datei und ohne Kommentare; `npm run pruefen` |
+| `main` | `b6e1c8a` | Checklisten: Reihenfolge wirkt im Vorgang; Verschieben, Ziehen, Fokus |
+| `ux-umbau` | `656e80d` | Merge von `main` (Stand der Sperrklinke passte ohne Änderung) |
+| `ux-umbau` | Folge-Commit von `656e80d` | Befunde der zweiten Durchsicht an Bausteinen, Tokens, Tests, Skript, Dokumentation |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Nichts davon ist gepusht. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Stand 01.10.2026 nach der zweiten Durchsicht: noch nicht gepusht (wartet auf die Freigabe). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

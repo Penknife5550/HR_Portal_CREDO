@@ -3,11 +3,23 @@
  *
  * „Barrierefreiheit wird gemessen, nicht behauptet" (UX-Plan, Abschnitt 7).
  * axe kann Farbkontraste im Jest-Lauf nicht pruefen (jsdom hat kein Layout);
- * deshalb liest dieser Test die Tokens aus `src/app/globals.css` und rechnet
- * jedes Paar, das die Bausteine in `src/components/ui/` wirklich bilden.
+ * deshalb rechnet dieser Test die Tokens aus `src/app/globals.css`.
  *
- * Wer einen Tokenwert aendert, sieht hier sofort, ob er noch lesbar ist. Wer
- * ein neues Paar baut (neuer Ton auf neuem Grund), traegt es unten ein.
+ * EINE QUELLE: Welche Paare es gibt, steht nicht hier, sondern in den
+ * Bausteinen — `STATUS_TOENE` (statuspille.tsx) und `BUTTON_FARBEN`
+ * (button.tsx). Der Test liest deren Klassen und rechnet jedes Paar, auch die
+ * beim Ueberfahren. Ein neuer Ton oder eine neue Variante ist damit von selbst
+ * dabei; eine Hand-Liste liefe auseinander (so geschehen: das Hover-Paar des
+ * Primaerknopfs fehlte, ein nie benutztes Paar stand darin).
+ *
+ * WAS DER TEST NICHT SIEHT
+ *   - Abblenden ueber `opacity` (ein ohne `laedt` gesperrter Knopf): gilt als
+ *     inaktiv und ist von WCAG ausgenommen. `laedt` blendet deshalb NICHT ab.
+ *   - Untergruende ausser Karte und Seitengrund. Die „-soft"-Toene sind
+ *     halbtransparent; auf einem getoenten Zeilen-Hover hielte eine Pille die
+ *     4,5:1 nicht mehr (neutral: 4,1–4,4:1). Regel: Zeilen mit Pillen
+ *     bekommen keinen getoenten Hover.
+ *   - `text-ink-3`: haelt die Sperrklinke (Stand 0), nicht dieser Test.
  */
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -20,15 +32,42 @@ import {
   leuchtdichte,
   type Farbe,
 } from "@/lib/ui/kontrast";
+import { BUTTON_FARBEN, type ButtonVariante } from "@/components/ui/button";
+import { STATUS_TOENE, type StatusTon } from "@/components/ui/statuspille";
 
-const css = readFileSync(join(__dirname, "..", "..", "app", "globals.css"), "utf8");
+// Kommentare zaehlen nicht: Ein „--color-ok: #…" in einem Kommentar waere
+// sonst der erste Treffer und der Test maesse den falschen Wert.
+const css = readFileSync(join(__dirname, "..", "..", "app", "globals.css"), "utf8").replace(
+  /\/\*[\s\S]*?\*\//g,
+  "",
+);
 
 function token(name: string): Farbe {
-  const treffer = new RegExp(`--color-${name}:\\s*([^;]+);`).exec(css);
-  if (!treffer) throw new Error(`Token --color-${name} fehlt in globals.css`);
-  const farbe = farbeLesen(treffer[1]);
-  if (!farbe) throw new Error(`Token --color-${name} ist nicht lesbar: ${treffer[1]}`);
+  const treffer = [...css.matchAll(new RegExp(`--color-${name}:\\s*([^;]+);`, "g"))];
+  // Genau EINE Deklaration: Bei zweien gaelte im Browser die letzte, und der
+  // Test wuesste nicht, welche er messen soll.
+  if (treffer.length !== 1) {
+    throw new Error(`Token --color-${name}: ${treffer.length} Deklarationen in globals.css, erwartet genau eine`);
+  }
+  const farbe = farbeLesen(treffer[0][1]);
+  if (!farbe) throw new Error(`Token --color-${name} ist nicht lesbar: ${treffer[0][1]}`);
   return farbe;
+}
+
+/** Tokenname aus der ersten Klasse mit diesem Praefix (`bg-ok-soft` → `ok-soft`). */
+function farbeAus(klassen: string, praefix: "bg" | "text" | "hover:bg"): string | null {
+  const klasse = klassen.split(/\s+/).find((k) => k.startsWith(`${praefix}-`));
+  return klasse ? klasse.slice(praefix.length + 1) : null;
+}
+
+/** Die beiden Flaechen, auf denen Inhalte stehen. */
+const FLAECHEN = ["card", "surface"] as const;
+
+/** Kontrast von Text auf einem (evtl. halbtransparenten oder fehlenden) Grund ueber einer Flaeche. */
+function kontrastAuf(text: string, grund: string | null, flaeche: (typeof FLAECHEN)[number]): number {
+  return grund === null
+    ? kontrast(token(text), token(flaeche))
+    : kontrast(token(text), token(grund), token(flaeche));
 }
 
 describe("Rechnung", () => {
@@ -63,18 +102,30 @@ describe("Rechnung", () => {
     expect(kontrast(weiss, halb, weiss)).toBeLessThan(kontrast(weiss, { ...halb, a: 1 }));
   });
 
-  it("verlangt den Untergrund, statt einen halbtransparenten Ton als deckend zu rechnen", () => {
+  it("ein halbtransparenter VORDERGRUND wird auf die Flaeche gelegt", () => {
+    const halbSchwarz = farbeLesen("rgba(0,0,0,0.5)")!;
+    const weiss = farbeLesen("#fff")!;
+    const grau = farbeLesen("rgb(128,128,128)")!;
+    expect(kontrast(halbSchwarz, weiss)).toBeCloseTo(kontrast(grau, weiss), 1);
+  });
+
+  it("verlangt deckende Untergruende, statt halbtransparente als deckend zu rechnen", () => {
     const halb = farbeLesen("rgba(0,0,0,0.06)")!;
     const weiss = farbeLesen("#fff")!;
     expect(() => kontrast(weiss, halb)).toThrow("braucht einen deckenden Untergrund");
     expect(() => kontrast(weiss, halb, halb)).toThrow("braucht einen deckenden Untergrund");
     expect(() => kontrast(weiss, halb, weiss)).not.toThrow();
+    expect(() => aufUntergrund(halb, halb)).toThrow("der Untergrund muss deckend sein");
   });
 });
 
 describe("Tokens aus globals.css", () => {
-  /** Die beiden Flaechen, auf denen Inhalte stehen. */
-  const FLAECHEN = ["card", "surface"] as const;
+  it("jedes Token steht genau einmal da", () => {
+    for (const name of ["surface", "card", "ink", "ink-2", "action", "ok", "critical-hover"]) {
+      expect(() => token(name)).not.toThrow();
+    }
+    expect(() => token("gibt-es-nicht")).toThrow("0 Deklarationen");
+  });
 
   it.each(["ink", "ink-2", "action", "ok", "wait", "critical", "info"])(
     "%s ist als Text auf Karte und Seitengrund lesbar",
@@ -84,40 +135,71 @@ describe("Tokens aus globals.css", () => {
       }
     },
   );
+});
 
-  // Statuspille: Zustandston als Text auf seinem „-soft"-Grund — und die Pille
-  // steht in Gruppen (Karte) ebenso wie frei auf dem Seitengrund.
-  it.each([
-    ["ok", "ok-soft"],
-    ["wait", "wait-soft"],
-    ["critical", "critical-soft"],
-    ["info", "info-soft"],
-    ["ink-2", "neutral-soft"],
-    ["ink", "action-soft"],
-    ["ink", "neutral-soft"],
-  ])("%s auf %s erreicht AA – auf Karte und auf Seitengrund", (text, grund) => {
-    for (const flaeche of FLAECHEN) {
-      expect(kontrast(token(text), token(grund), token(flaeche))).toBeGreaterThanOrEqual(AA_TEXT);
+describe("Statuspille: jeder Ton aus STATUS_TOENE", () => {
+  const TOENE = Object.keys(STATUS_TOENE) as StatusTon[];
+
+  it("die Tabelle ist nicht leer und jeder Ton nennt Grund und Text", () => {
+    expect(TOENE.length).toBeGreaterThanOrEqual(5);
+    for (const ton of TOENE) {
+      expect(farbeAus(STATUS_TOENE[ton], "bg")).not.toBeNull();
+      expect(farbeAus(STATUS_TOENE[ton], "text")).not.toBeNull();
     }
   });
 
-  // Gefuellte Knoepfe
-  it.each([
-    ["action-foreground", "action"],
-    ["critical-foreground", "critical"],
-  ])("%s auf %s erreicht AA", (text, grund) => {
-    expect(kontrast(token(text), token(grund))).toBeGreaterThanOrEqual(AA_TEXT);
+  it.each(TOENE)("%s: Text auf Grund erreicht AA – auf Karte und auf Seitengrund", (ton) => {
+    const text = farbeAus(STATUS_TOENE[ton], "text")!;
+    const grund = farbeAus(STATUS_TOENE[ton], "bg")!;
+    for (const flaeche of FLAECHEN) {
+      expect(kontrastAuf(text, grund, flaeche)).toBeGreaterThanOrEqual(AA_TEXT);
+    }
   });
 
-  it("der Fokusring (action) hebt sich von beiden Flaechen ab", () => {
+  it("kein Ton nutzt ink-3 als Text", () => {
+    for (const ton of TOENE) expect(STATUS_TOENE[ton]).not.toMatch(/\btext-ink-3\b/);
+  });
+});
+
+describe("Button: jede Variante aus BUTTON_FARBEN, in Ruhe und beim Ueberfahren", () => {
+  const VARIANTEN = Object.keys(BUTTON_FARBEN) as ButtonVariante[];
+
+  it.each(VARIANTEN)("%s erreicht AA in Ruhe", (variante) => {
+    const { ruhe } = BUTTON_FARBEN[variante];
+    const text = farbeAus(ruhe, "text")!;
+    expect(text).not.toBeNull();
+    for (const flaeche of FLAECHEN) {
+      expect(kontrastAuf(text, farbeAus(ruhe, "bg"), flaeche)).toBeGreaterThanOrEqual(AA_TEXT);
+    }
+  });
+
+  it.each(VARIANTEN)("%s erreicht AA beim Ueberfahren – und der Kontrast faellt dabei nicht unter AA", (variante) => {
+    const { ruhe, hover } = BUTTON_FARBEN[variante];
+    const text = farbeAus(ruhe, "text")!;
+    const grundHover = farbeAus(hover, "hover:bg");
+    expect(grundHover).not.toBeNull();
+    for (const flaeche of FLAECHEN) {
+      expect(kontrastAuf(text, grundHover, flaeche)).toBeGreaterThanOrEqual(AA_TEXT);
+    }
+  });
+
+  it("critical wird beim Ueberfahren dunkler: der Kontrast zum weissen Text steigt", () => {
+    const weiss = token("critical-foreground");
+    expect(kontrast(weiss, token("critical-hover"))).toBeGreaterThan(kontrast(weiss, token("critical")));
+  });
+
+  it("kein Filter und keine Deckkraft in den Farbklassen (beides aendert den Kontrast am Test vorbei)", () => {
+    for (const variante of VARIANTEN) {
+      const { ruhe, hover } = BUTTON_FARBEN[variante];
+      expect(`${ruhe} ${hover}`).not.toMatch(/brightness|opacity|\/\d/);
+    }
+  });
+
+  it("der Fokusring (action) hebt sich von jeder Knopfflaeche und beiden Seitenflaechen ab", () => {
+    // Der Ring sitzt mit 2 px Abstand um den Knopf, steht also auf der
+    // Flaeche dahinter.
     for (const flaeche of FLAECHEN) {
       expect(kontrast(token("action"), token(flaeche))).toBeGreaterThanOrEqual(AA_BEDIENELEMENT);
     }
   });
-
-  // ink-3 steht bewusst in KEINER der Listen oben: 2,8:1. Er ist kein Textton —
-  // auch nicht fuer Platzhalter, die nach WCAG Text sind (dafuer ink-2). Erlaubt
-  // nur fuer Gesperrtes (von WCAG ausgenommen), Trennzeichen und Zierde. Die
-  // Regel halten globals.css und CLAUDE.md fest; ein Test, der den schwachen
-  // Kontrast VERLANGT, fiele genau dann, wenn jemand den Ton verbessert.
 });

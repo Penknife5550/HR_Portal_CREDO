@@ -95,6 +95,7 @@
    *
    * ink-3 ist KEIN Textton (2,8:1) — auch nicht fuer Platzhalter, die nach
    * WCAG Text sind (dafuer ink-2). Nur Gesperrtes, Trennzeichen, Zierde.
+   * `text-ink-3` steht in der Sperrklinke mit Stand 0.
    *
    * Die alten Tokens darueber bleiben, bis ihr letzter Aufrufer umgebaut ist
    * (U3/U4). Neue Bausteine (src/components/ui/) nutzen nur diese hier.
@@ -115,13 +116,28 @@
   --color-wait-soft: rgba(217, 119, 6, 0.14);
   --color-critical: #b42318;
   --color-critical-foreground: #ffffff;
+  /* Ueberfahren: dunklere FLAECHE (Weiss darauf 8,2:1). Kein Filter — der
+     dunkelte die Schrift mit ab und senkte den Kontrast. */
+  --color-critical-hover: #9a1e14;
   --color-critical-soft: rgba(180, 35, 24, 0.1);
   --color-info: #1a6494;
   --color-info-soft: rgba(29, 111, 165, 0.12);
   --color-neutral-soft: rgba(0, 0, 0, 0.06);
 
-  /* Schatten nur fuer Dialog und Toast — Gruppen tragen eine Haarlinie. */
+  /* Schatten nur fuer Dialog und Toast — Gruppen tragen eine Haarlinie.
+     Groessen-Tokens wie dieses muessen tailwind-merge genannt werden
+     (src/lib/utils.ts), sonst haelt cn() sie fuer Farben. */
   --shadow-overlay: 0 12px 34px rgba(0, 0, 0, 0.22);
+
+  /* Schriftskala des Plans (Abschnitt 3), soweit Tailwind sie nicht schon hat:
+     Seitentitel 28 px mit Laufweite -1 %, Gruppentitel 11 px mit +6 %.
+     Inhalt ist text-sm (14 px), Erlaeuterung text-xs (12 px). */
+  --text-titel: 1.75rem;
+  --text-titel--line-height: 2.125rem;
+  --tracking-titel: -0.01em;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --tracking-label: 0.06em;
 
   /* Radien (8 px = lg fuer Knoepfe und Felder, 12 px = xl fuer Gruppen und Dialoge) */
   --radius-sm: 0.25rem;
@@ -132,15 +148,22 @@
   /* Typografie: Montserrat (CREDO) + Arial (CI-Fallback) */
   --font-sans: "Montserrat", "Arial", "Segoe UI", system-ui, -apple-system, sans-serif;
   /* Ueberschriften ebenfalls Montserrat (E7, Abweichung vom CI bestaetigt
-     01.10.2026). ITC Avant Garde stand hier, wurde aber nie mitgeliefert —
-     zu sehen war sie nur, wo sie zufaellig installiert war. */
+     01.10.2026). ITC Avant Garde stand hier, wurde aber nie mitgeliefert und
+     von keinem Element benutzt (die Klasse font-heading kam nirgends vor) —
+     zu sehen war sie also nie. */
   --font-heading: "Montserrat", "Arial", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
-/* Das Portal bleibt hell, auch wenn das Geraet auf dunkel steht (E5). Ohne
-   diese Zeile faerben Browser Formularfelder und Scrollleisten von sich aus um. */
+/* Das Portal bleibt hell (E5). `only light`, nicht nur `light`:
+   - `light` haelt die Fensterleiste hell (Chrome und Edge ab 125 zeichnen sie
+     sonst dunkel, wenn das Geraet auf dunkel steht);
+   - erst `only` verbietet dem Browser das ERZWUNGENE Abdunkeln ganzer Seiten
+     (Auto Dark Theme, Dunkelmodus mancher Chromium-Ableger).
+   Grenze: Dunkelt ein Browser auch bei heller Systemeinstellung zwangsweise
+   ab, kann eine Seite das nicht abwenden. Formularfelder faerbt ohne diese
+   Zeile kein Browser um. */
 :root {
-  color-scheme: light;
+  color-scheme: only light;
 }
 
 @layer base {

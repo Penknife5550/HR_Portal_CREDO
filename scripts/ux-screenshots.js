@@ -42,38 +42,47 @@ async function warteAufText(seite, text, ms = 60000) {
   await warte(400);
 }
 
-/** Klickt den ersten Knopf mit genau diesem Text. */
+/**
+ * Klickt den ersten Knopf mit genau diesem Text — und WARTET, bis es ihn gibt
+ * und er nicht gesperrt ist. networkidle2 heisst nicht, dass React die Knoepfe
+ * schon gerendert hat; ein Klick auf einen gesperrten Knopf meldete Erfolg und
+ * oeffnete nichts.
+ */
 async function klick(seite, text) {
-  const ok = await seite.evaluate((t) => {
-    const b = [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === t);
-    if (b) b.click();
-    return Boolean(b);
-  }, text);
-  if (!ok) throw new Error(`Knopf „${text}“ nicht gefunden`);
+  const finde = (t) =>
+    [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === t && !x.disabled);
+  try {
+    await seite.waitForFunction((t) => [...document.querySelectorAll("button")].some((x) => x.textContent.trim() === t && !x.disabled), { timeout: 15000 }, text);
+  } catch {
+    throw new Error(`Knopf „${text}“ nicht gefunden oder gesperrt`);
+  }
+  const knopf = await seite.evaluateHandle(finde, text);
+  await knopf.asElement().click();
   await warte(600);
 }
 
-/** Markiert das Element, das `finde` im Browser liefert, und fotografiert es (hoechstens `maxHoehe` px). */
+/**
+ * Fotografiert das Element, das `finde` im Browser liefert (hoechstens
+ * `maxHoehe` px hoch).
+ *
+ * Bewusst IMMER `el.screenshot()`, auch fuer hohe Elemente — mit einem `clip`
+ * RELATIV zum Element. Die fruehere Fassung rechnete fuer hohe Elemente selbst
+ * einen Ausschnitt aus `boundingBox()` (Viewport-Koordinaten nach dem Rollen)
+ * und gab ihn an `page.screenshot`, das Seitenkoordinaten erwartet: Fotografiert
+ * wurde der Seitenanfang statt des Elements. Puppeteer rechnet das fuer ein
+ * Element selbst richtig um (dieselbe Lehre steht in handbuch-screenshots.js).
+ */
 async function bild(seite, name, finde, maxHoehe = 2200) {
-  const gefunden = await seite.evaluate((quelle) => {
-    // eslint-disable-next-line no-new-func
-    const el = new Function(`return (${quelle})()`)();
-    if (!el) return false;
-    el.setAttribute("data-ux-bild", "1");
-    return true;
-  }, finde.toString());
-  if (!gefunden) throw new Error(`${name}: Element nicht gefunden`);
-  const el = await seite.$('[data-ux-bild="1"]');
+  const griff = await seite.evaluateHandle(finde);
+  const el = griff.asElement();
+  if (!el) throw new Error(`${name}: Element nicht gefunden`);
   const box = await el.boundingBox();
   const datei = path.join(ZIEL, name);
   if (box.height > maxHoehe) {
-    await el.scrollIntoView();
-    const b2 = await el.boundingBox();
-    await seite.screenshot({ path: datei, clip: { x: b2.x, y: b2.y, width: b2.width, height: maxHoehe }, captureBeyondViewport: true });
+    await el.screenshot({ path: datei, clip: { x: 0, y: 0, width: box.width, height: maxHoehe } });
   } else {
     await el.screenshot({ path: datei });
   }
-  await seite.evaluate(() => document.querySelector('[data-ux-bild="1"]')?.removeAttribute("data-ux-bild"));
   console.log(`  + ${name}  (${Math.round(box.width)}x${Math.min(Math.round(box.height), maxHoehe)})`);
 }
 
@@ -99,7 +108,15 @@ async function bild(seite, name, finde, maxHoehe = 2200) {
 
   // 1. Reiter Dokumente (Onboarding) — alle Karten untereinander.
   await seite.goto(`${BASIS}/dashboard/${VORGANG}?tab=dokumente`, { waitUntil: "networkidle2" });
-  await warteAufText(seite, "Noch keine individuelle E-Mail versendet").catch(() => warteAufText(seite, "Zuletzt am"));
+  // Auf den ZUSTAND der Karte warten, nicht nacheinander auf zwei Texte: Der
+  // erste Text erscheint nie, sobald am Testvorgang eine individuelle Mail
+  // haengt — jeder Lauf wartete dann 60 s ins Leere. Geladen ist die Karte,
+  // wenn ihr Knopf nicht mehr gesperrt ist.
+  await seite.waitForFunction(
+    () => [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "E-Mail schreiben…" && !b.disabled),
+    { timeout: 60000 },
+  );
+  await warte(400);
   await bild(seite, "dokumente-reiter.png", () => document.querySelector("main"), 2400);
 
   // 2. Dialog „E-Mail schreiben“ (Paket 3), leer geoeffnet.

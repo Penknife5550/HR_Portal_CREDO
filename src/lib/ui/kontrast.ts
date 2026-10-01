@@ -45,8 +45,15 @@ export function farbeLesen(wert: string): Farbe | null {
   return null;
 }
 
-/** Legt eine (halbtransparente) Farbe auf einen deckenden Untergrund. */
+/**
+ * Legt eine (halbtransparente) Farbe auf einen DECKENDEN Untergrund. Ein
+ * halbtransparenter Untergrund ist ein Fehler: Das Ergebnis haette sonst still
+ * die Deckkraft 1, und die Zahl stimmte nicht.
+ */
 export function aufUntergrund(farbe: Farbe, untergrund: Farbe): Farbe {
+  if (untergrund.a < 1) {
+    throw new Error("aufUntergrund: der Untergrund muss deckend sein");
+  }
   const mische = (oben: number, unten: number) => oben * farbe.a + unten * (1 - farbe.a);
   return {
     r: mische(farbe.r, untergrund.r),
