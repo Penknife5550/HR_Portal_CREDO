@@ -1,7 +1,7 @@
 # U0 Fundament – Feinplan
 
 Stand 01.10.2026 · gehört zu [ux-ui-plan-2026-09.html](ux-ui-plan-2026-09.html), Abschnitt 5 (Paket U0) ·
-Branch `ux-umbau` · Status: **freigegeben am 01.10.2026** (F1–F4 wie vorgeschlagen), Tag 1 erledigt ·
+Branch `ux-umbau` · Status: **freigegeben am 01.10.2026** (F1–F4 wie vorgeschlagen), Tag 1 und 2 erledigt ·
 Stand und Protokoll: [projekt-ux-umbau.md](projekt-ux-umbau.md)
 
 ## 1. Ziel
@@ -160,7 +160,7 @@ werden muss. Die Sperrklinke (Abschnitt 5) verhindert bis dahin neue Aufrufe.
 | `src/components/ui/*.tsx` | neu (neun Dateien) |
 | `src/app/(portal)/ui-muster/page.tsx` | neu |
 | `src/app/(portal)/layout.tsx` | Toast-Anbieter einhängen (eine Zeile; die Datei gibt es schon) |
-| `src/__tests__/components/ui-*.test.tsx` | neu |
+| `src/__tests__/components/ui-bausteine.test.tsx` | neu (ein Testfile für die kleinen Bausteine; Dialog und Toast bekommen eigene) |
 | `src/__tests__/lib/ui-kontrast.test.ts`, `ui-sperrklinke.test.ts` | neu |
 | `package.json` | `jest-axe` und `@types/jest-axe` als devDependencies (F2) |
 | `CLAUDE.md` | neuer Abschnitt „Oberfläche“: Tokens, Bausteine, Regeln E1–E7 |
@@ -243,7 +243,7 @@ Empfehlung: zusammen mit U1.
 | Tag | Stand | Commit |
 |---|---|---|
 | 1 Tokens, Schrift, `color-scheme`, Kontrasttest, Sperrklinke | **erledigt 01.10.2026** | siehe [projekt-ux-umbau.md](projekt-ux-umbau.md), Abschnitt 8 |
-| 2 Button, Statuspille, Gruppe und Zeile | offen | |
+| 2 Button, Statuspille, Gruppe und Zeile, Musterseite begonnen, `jest-axe` | **erledigt 01.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 3 Dialog, Bestätigungsdialog, Toast | offen | |
 | 4 Seitenkopf, Segment | offen | |
 | 5 Skelett, Leerzustand, Musterseite, axe | offen | |

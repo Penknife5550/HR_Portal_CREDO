@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 01.10.2026 (U0, Tag 1, nach der Durchsicht)
+Letzte Änderung: 01.10.2026 (U0, Tag 2)
 
 ## 1. Worum es geht
 
@@ -26,7 +26,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 |---|---|---|
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** |
-| **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 1 von 6 erledigt |
+| **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 2 von 6 erledigt (Tokens, Button, Statuspille, Gruppe, Musterseite) |
 | U1 | Rahmen: Kopf, Breadcrumb, neue Adressen | offen |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
@@ -112,6 +112,10 @@ Kurzfassung; verbindlich und ausführlich in `CLAUDE.md`, Abschnitt „Oberfläc
    bzw. trägt das Paar dort ein.
 4. `ink-3` nie für Text, auch nicht für Platzhalter in Eingabefeldern.
 5. Anrede nach E6; Portal-Texte möglichst ohne Anrede.
+6. Wer einen Baustein baut oder ändert, trägt ihn auf der Musterseite `/ui-muster` ein und
+   prüft seine Regeln in `ui-bausteine.test.tsx` (mit axe).
+7. „Gesperrt, während etwas läuft“ heißt `aria-disabled`, nicht `disabled` – der Knopf
+   behält den Tastaturfokus (Button `laedt`).
 
 ## 7. Protokoll
 
@@ -168,8 +172,41 @@ Zehn Befunde, alle behoben, bevor Tag 2 beginnt.
 **Gelernt:** Ein Rebase von `ux-umbau` ändert die Commit-Kennungen, auf die dieses Logbuch
 verweist. Ab jetzt wird `main` gemergt (Abschnitt 3).
 
-**Als Nächstes (U0, Tag 2):** `jest-axe` einrichten; Button, Statuspille, Gruppe mit Zeile;
-Musterseite `/ui-muster` beginnen.
+### 01.10.2026 – U0, Tag 2
+
+**Code:**
+
+| Datei | Inhalt |
+|---|---|
+| `src/components/ui/button.tsx` | Varianten `primary`, `secondary` (Vorgabe), `ghost`, `critical`; Größen `md`, `sm`; `laedt` (gesperrt über `aria-disabled` + `aria-busy`, bleibt fokussierbar, Text bleibt); `asChild` für `<Link>`; Vorgabe `type="button"` |
+| `src/components/ui/statuspille.tsx` | fünf Töne (`ok`, `wait`, `critical`, `info`, `neutral`), Punkt plus Pflichttext |
+| `src/components/ui/gruppe.tsx` | `Gruppe` (Beschriftung als Überschrift, benennt den Bereich; Beschreibung; Aktion) und `Zeile` (mit `label`: Beschriftung/Wert, leerer Wert als „—“; ohne: volle Breite) |
+| `src/app/(portal)/ui-muster/page.tsx` | Musterseite: Farben, Knöpfe, Statuspillen, zwei Gruppen; nur `SUPER_ADMIN`, kein Navigationseintrag |
+| `src/__tests__/components/ui-bausteine.test.tsx` | 26 Tests zu den Regeln der drei Bausteine, je Baustein ein axe-Lauf |
+| `package.json` | `jest-axe`, `@types/jest-axe` (nur Entwicklung) |
+
+**Entscheidungen beim Bauen:**
+- Ein Testfile für alle Bausteine (`ui-bausteine.test.tsx`) statt eines je Baustein: Sie sind
+  klein und werden zusammen verwendet; der axe-Lauf prüft sie auch im Zusammenspiel.
+- `critical` wird beim Überfahren dunkler (`brightness-90`), nicht heller – der Kontrast zum
+  weißen Text darf nur steigen.
+- Welcher Fachstatus welchen Ton bekommt, entscheidet nicht die Statuspille, sondern ein
+  Katalog je Modul (kommt mit dem Pilot bzw. U3/U4).
+- Die Musterseite sichert sich selbst über `getSession()` ab, wie Audit-Log und
+  Zeugnis-Vorlagen; die Middleware bleibt unverändert.
+
+**Geprüft:** gesamte Testsuite (180 Suiten, 4.603 Tests), Typprüfung, Lint der neuen Dateien.
+Der laufende Entwicklungsserver kompiliert die Seite (ohne Anmeldung Weiterleitung zur
+Anmeldeseite) und erzeugt alle Token-Klassen der Bausteine.
+
+**Nicht geprüft:** das Aussehen der Musterseite im Browser – dafür fehlt in der Sitzung die
+Anmeldung. Bitte `/ui-muster` einmal als Super-Admin öffnen. `npm run build` lief nicht, weil
+im selben Ordner der Entwicklungsserver einer anderen Sitzung läuft.
+
+**Sichtbare Änderung:** nur die neue Seite `/ui-muster`.
+
+**Als Nächstes (U0, Tag 3):** Dialog und Bestätigungsdialog auf Radix (mit den vier Regeln
+aus `unterlagen/dialog-rahmen.tsx`), Toast mit Anbieter im Portal-Layout.
 
 ## 8. Branches und Commits
 
@@ -179,7 +216,8 @@ Musterseite `/ui-muster` beginnen.
 | `main` | `2fbc4e4` | Checklisten: Befunde der Durchsicht |
 | `ux-umbau` | `37b452b` | Plan Fassung 3 mit Entscheidungen, Screenshots, Screenshot-Skript |
 | `ux-umbau` | `9e347d7` | U0 Tag 1: Tokens, Kontrast, Sperrklinke; Feinplan; Projektstand; CLAUDE.md |
-| `ux-umbau` | Folge-Commit von `9e347d7` | Befunde der Durchsicht: Kontrast, Sperrklinke, `ink-3`, Dokumentation |
+| `ux-umbau` | `bd58ec5` | Befunde der Durchsicht: Kontrast, Sperrklinke, `ink-3`, Dokumentation |
+| `ux-umbau` | Folge-Commit von `bd58ec5` | U0 Tag 2: Button, Statuspille, Gruppe und Zeile, Musterseite, `jest-axe` |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
