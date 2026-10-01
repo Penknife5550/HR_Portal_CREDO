@@ -17,6 +17,7 @@
     "docker:down": "docker compose down",
     "docker:build": "docker compose up -d --build",
     "test": "jest",
+    "pruefen": "tsc --noEmit && next lint && jest",
     "test:watch": "jest --watch"
   },
   "dependencies": {

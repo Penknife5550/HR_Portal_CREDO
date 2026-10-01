@@ -207,7 +207,7 @@ export interface AufgabeFuerVersand {
 }
 
 /**
- * Aufgaben eines Vorgangs (sortiert nach Kategorie und Reihenfolge). Im
+ * Aufgaben eines Vorgangs (sortiert nach der Reihenfolge der Vorlage; die Kategorie entscheidet nur bei Gleichstand). Im
  * Onboarding heisst die Spalte `assignee` — sie wird hier auf
  * `assigneeDepartment` abgebildet, damit Versand und Regeln nur einen Namen
  * kennen.
@@ -217,7 +217,7 @@ export async function aufgabenLaden(
   vorgangId: string,
   nurOffen = false,
 ): Promise<AufgabeFuerVersand[]> {
-  const orderBy = [{ category: "asc" as const }, { orderIndex: "asc" as const }];
+  const orderBy = [{ orderIndex: "asc" as const }, { category: "asc" as const }];
   const offen = nurOffen ? { isCompleted: false } : {};
   if (modul === "OFFBOARDING") {
     return prisma.offboardingChecklistItem.findMany({

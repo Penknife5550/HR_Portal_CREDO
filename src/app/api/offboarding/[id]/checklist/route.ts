@@ -49,7 +49,7 @@ export async function GET(
 
     const items = await prisma.offboardingChecklistItem.findMany({
       where: { offboardingId: id },
-      orderBy: [{ category: "asc" }, { orderIndex: "asc" }],
+      orderBy: [{ orderIndex: "asc" }, { category: "asc" }],
     });
 
     return NextResponse.json({ items });

@@ -226,7 +226,7 @@ export function AufgabenSeite({
   const offeneAufgaben = useMemo(() => aufgaben.filter((a) => !a.isCompleted), [aufgaben]);
   const erledigteAufgaben = useMemo(() => aufgaben.filter((a) => a.isCompleted), [aufgaben]);
 
-  // Offene Aufgaben je Kategorie, in der Reihenfolge des Servers (Kategorie, Position).
+  // Offene Aufgaben je Kategorie, in der Reihenfolge des Servers (Position; Kategorien nach ihrem ersten Punkt).
   const offenNachKategorie = useMemo(() => {
     const gruppen = new Map<string, OeffentlicheAufgabe[]>();
     for (const a of offeneAufgaben) {
