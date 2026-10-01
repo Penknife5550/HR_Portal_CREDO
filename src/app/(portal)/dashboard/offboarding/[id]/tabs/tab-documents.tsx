@@ -8,6 +8,7 @@ import { formatBytes } from "@/lib/format";
 import { DocumentIcon, UploadCloudIcon, DownloadIcon } from "../icons";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
+import { IndividuelleMailKarte } from "@/components/individuelle-mail/individuelle-mail-karte";
 
 export function TabDocuments({
   data,
@@ -73,6 +74,9 @@ export function TabDocuments({
         beschreibung="Feste PDFs und befüllte Vorlagen gehen als Anhänge an die ausscheidende Person — vorgeschlagen wird die private Adresse, falls hinterlegt. Das Standardpaket wird unter Mandanten → Einrichtung → Dokumentenpakete gepflegt."
         onVersendet={() => setVersandZaehler((n) => n + 1)}
       />
+
+      {/* Individuelle E-Mail (Paket 3): private und dienstliche Adresse zur Wahl. */}
+      <IndividuelleMailKarte modul="OFFBOARDING" refId={offboardingId} canEdit={canEdit} />
 
       {/* Upload Area */}
       <div

@@ -8,6 +8,7 @@ import { formatBytes } from "@/lib/format";
 import { UploadIcon, DownloadIcon } from "../icons";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
+import { IndividuelleMailKarte } from "@/components/individuelle-mail/individuelle-mail-karte";
 
 // =============================================
 // PDF Export Sektion
@@ -261,6 +262,10 @@ export function TabDocuments({
           beschreibung="Feste PDFs und befüllte Vorlagen gehen als Anhänge an die Lehrkraft. Das Standardpaket wird unter Mandanten → Einrichtung → Dokumentenpakete gepflegt."
           onVersendet={() => setVersandZaehler((n) => n + 1)}
         />
+      </div>
+
+      <div className="mb-6">
+        <IndividuelleMailKarte modul="VERBEAMTUNG" refId={processId} canEdit={canEdit} />
       </div>
 
       {/* PDF Export Sektion */}

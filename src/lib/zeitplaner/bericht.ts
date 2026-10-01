@@ -354,14 +354,19 @@ const AUSWERTER: Record<LaufSchluessel, Auswerter> = {
 
   "dokumente-aufbewahrung": (b, probelauf) => {
     // Der Probelauf zaehlt nur und traegt kein `fehler`.
-    const fehler = probelauf ? 0 : b.zahl("fehler");
+    const m = b.objekt("individuelleMails");
+    const fehler = probelauf ? 0 : b.zahl("fehler") + m.zahl("fehler");
     return {
       problem: fehler > 0,
       versendet: 0,
       zaehler: probelauf
-        ? [["Würde löschen (Dokumente)", b.zahl("wuerdeLoeschen")]]
+        ? [
+            ["Würde löschen (Dokumente)", b.zahl("wuerdeLoeschen")],
+            ["Würde leeren (individuelle E-Mails)", m.zahl("wuerdeLeeren")],
+          ]
         : [
             ["Gelöscht: Dokumente / Dateien / Ordner", `${b.zahl("geloescht")} / ${b.zahl("dateienGeloescht")} / ${b.zahl("ordnerGeloescht")}`],
+            ["Geleert: individuelle E-Mails / Anhänge", `${m.zahl("geleert")} / ${m.zahl("dateienGeloescht")}`],
             ["Fehler", fehler, fehler > 0],
           ],
       schritte: [],

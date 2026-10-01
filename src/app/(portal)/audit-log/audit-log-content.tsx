@@ -13,6 +13,7 @@ import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import { ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufgaben";
 import { UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
+import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
 
 interface User {
   userId: string;
@@ -83,6 +84,8 @@ const ACTION_LABELS: Record<string, string> = {
   // gehaertete Download-Route protokolliert das Oeffnen sensibler Dokumente).
   // Eine Quelle mit dem Dienst, der die Codes schreibt (UNTERLAGEN_AUDIT).
   ...UNTERLAGEN_AUDIT_LABELS,
+  // Individuelle E-Mail aus einem Vorgang (Paket 3).
+  ...INDIVIDUELLE_MAIL_AUDIT_LABELS,
 };
 
 /**

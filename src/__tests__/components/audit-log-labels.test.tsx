@@ -109,6 +109,14 @@ describe("Protokoll-Beschriftungen", () => {
     expect(getActionLabel("DOKUMENT_ABLAUF_ERINNERT")).toBe("Ablauf-Erinnerung gesendet");
   });
 
+  test("die Codes der individuellen E-Mail (Paket 3) sind uebersetzt", () => {
+    expect(getActionLabel("INDIVIDUELLE_MAIL_SENT")).toBe("Individuelle E-Mail versendet");
+    expect(getActionLabel("INDIVIDUELLE_MAIL_NACHWEIS_FEHLGESCHLAGEN")).toBe(
+      "Individuelle E-Mail versendet, Nachweis fehlgeschlagen",
+    );
+    expect(getActionLabel("INDIVIDUELLE_MAIL_ANHANG_GEOEFFNET")).toBe("Anhang einer individuellen E-Mail geöffnet");
+  });
+
   test("ein unbekannter Code faellt auf sich selbst zurueck", () => {
     // Bewusst so: Eine erfundene Beschriftung waere schlimmer als der Code.
     expect(getActionLabel("GIBT_ES_NICHT")).toBe("GIBT_ES_NICHT");

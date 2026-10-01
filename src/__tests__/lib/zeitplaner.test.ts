@@ -309,7 +309,7 @@ describe("Auswertung", () => {
   });
 
   it("Probelauf der Loeschlaeufe verlangt kein `fehler`", () => {
-    expect(laufAuswerten("dokumente-aufbewahrung", 200, { dryRun: true, wuerdeLoeschen: 4 }, true).ergebnis).toBe("OK");
+    expect(laufAuswerten("dokumente-aufbewahrung", 200, { dryRun: true, wuerdeLoeschen: 4, individuelleMails: { wuerdeLeeren: 1 } }, true).ergebnis).toBe("OK");
   });
 
   it("berichtNoetig: Probleme, Fehler, Probelauf — Erfolg nur mit Schalter und Versand", () => {

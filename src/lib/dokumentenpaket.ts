@@ -146,6 +146,13 @@ export interface VorgangsKontext {
   /** Adressvorschlag aus dem Vorgang. Der Dialog darf ihn aendern. */
   empfaenger: string;
   /**
+   * Alle Adressen des Vorgangs, der Vorschlag zuerst — ohne Freigabeliste
+   * erlaubt. Genutzt von der individuellen E-Mail (Paket 3), die im Offboarding
+   * private UND dienstliche Adresse anbietet; das Paket selbst liest nur
+   * `empfaenger`.
+   */
+  adressen: VorgangsAdresse[];
+  /**
    * Versand aus der Zeit VOR dieser Tabelle.
    *
    * Das Onboarding hat sein Starterpaket frueher ueber
@@ -166,6 +173,25 @@ export interface VorgangsKontext {
    * entfallen, statt einen Satz ohne Datum zu hinterlassen.
    */
   zusatz?: Record<string, string>;
+}
+
+export interface VorgangsAdresse {
+  adresse: string;
+  /** z.B. „Adresse aus dem Vorgang“, „private Adresse“, „dienstliche Adresse“ */
+  bezeichnung: string;
+}
+
+/** Adressen ohne Leere und Dubletten (Gross-/Kleinschreibung egal), Reihenfolge bleibt. */
+function adressenListe(...kandidaten: [string | null | undefined, string][]): VorgangsAdresse[] {
+  const gesehen = new Set<string>();
+  const liste: VorgangsAdresse[] = [];
+  for (const [adresse, bezeichnung] of kandidaten) {
+    const a = (adresse ?? "").trim();
+    if (!a || gesehen.has(a.toLowerCase())) continue;
+    gesehen.add(a.toLowerCase());
+    liste.push({ adresse: a, bezeichnung });
+  }
+  return liste;
 }
 
 interface ModulEintrag {
@@ -214,6 +240,7 @@ const MODULE: Record<string, ModulEintrag> = {
         vorname: ob.personalData?.firstName || ob.firstName || "",
         nachname: ob.personalData?.lastName || ob.lastName || "",
         empfaenger: ob.email,
+        adressen: adressenListe([ob.email, "Adresse aus dem Vorgang"]),
         zusatz: { eintrittsdatum: anzeigeDatum(ob.supervisorData?.vertragsbeginn) },
         altversand: ob.starterPacketSentAt
           ? { am: ob.starterPacketSentAt, anzahl: ob.starterPacketSentCount }
@@ -250,6 +277,10 @@ const MODULE: Record<string, ModulEintrag> = {
         // ausscheidet, verliert das dienstliche Postfach — und genau dort
         // laegen dann Zeugnis und Bescheinigungen. Im Dialog aenderbar.
         empfaenger: off.employeePrivateEmail || off.employeeEmail,
+        adressen: adressenListe(
+          [off.employeePrivateEmail, "private Adresse"],
+          [off.employeeEmail, "dienstliche Adresse"],
+        ),
         zusatz: {
           austrittsdatum: anzeigeDatum(off.contractEndDate ?? off.lastWorkingDay),
         },
@@ -281,6 +312,7 @@ const MODULE: Record<string, ModulEintrag> = {
         vorname: cs.employeeFirstName,
         nachname: cs.employeeLastName,
         empfaenger: cs.employeeEmail,
+        adressen: adressenListe([cs.employeeEmail, "Adresse aus dem Vorgang"]),
         zusatz: {
           // Der tatsaechliche Beginn schlaegt den geplanten; steht keiner
           // fest, bleibt die Angabe leer und der Satz entfaellt.
@@ -313,6 +345,7 @@ const MODULE: Record<string, ModulEintrag> = {
         vorname: ce.employeeFirstName,
         nachname: ce.employeeLastName,
         empfaenger: ce.employeeEmail,
+        adressen: adressenListe([ce.employeeEmail, "Adresse aus dem Vorgang"]),
         zusatz: {
           vertragsende_neu: anzeigeDatum(ce.renewalData?.vertragsende),
         },
@@ -320,6 +353,17 @@ const MODULE: Record<string, ModulEintrag> = {
     },
   },
 };
+
+/**
+ * Vorgang eines der vier Module laden — ohne Zugriffspruefung (die macht der
+ * Aufrufer mit canAccessProcess). Geteilt mit der individuellen E-Mail
+ * (Paket 3), damit Adressregeln wie „private vor dienstlicher Adresse“ nur hier
+ * stehen. `null` fuer ein unbekanntes Modul oder einen unbekannten Vorgang.
+ */
+export async function vorgangsKontextLaden(modul: string, refId: string): Promise<VorgangsKontext | null> {
+  const eintrag = MODULE[modul];
+  return eintrag ? eintrag.lade(refId) : null;
+}
 
 /** Ist fuer dieses Modul ein Paketversand eingerichtet? */
 export function modulVerdrahtet(modul: string): boolean {

@@ -3,6 +3,7 @@
 import type { AuditLogEntry } from "../types";
 import { formatDateTime } from "../helpers";
 import { AUDIT_ACTION_LABELS } from "@/lib/verify-assessment";
+import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
 
 // Zusaetzliche Action-Labels für Aktionen, die nicht in AUDIT_ACTION_LABELS
 // stehen (welche bewusst auf die Verify-Page beschraenkt ist).
@@ -18,6 +19,7 @@ const EXTRA_ACTION_LABELS: Record<string, string> = {
   BOARD_DECISION_RECORDED: "Beirats-Entscheidung dokumentiert",
   VERIFY_PAGE_VIEWED: "Audit-Page aufgerufen",
   VERIFY_PAGE_NOT_FOUND: "Ungültiger Verifikations-Aufruf",
+  ...INDIVIDUELLE_MAIL_AUDIT_LABELS,
 };
 
 function actionLabel(action: string): string {

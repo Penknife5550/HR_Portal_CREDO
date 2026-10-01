@@ -87,6 +87,9 @@ jest.mock("@/components/dokumentenpaket-section", () => ({
 jest.mock("@/components/template-generation-section", () => ({
   TemplateGenerationSection: () => <section data-testid="vorlagen" />,
 }));
+jest.mock("@/components/individuelle-mail/individuelle-mail-karte", () => ({
+  IndividuelleMailKarte: () => <section data-testid="individuelle-mail" />,
+}));
 
 // Der Dialog als Attrappe: Er zeigt, womit er geoeffnet wurde, und meldet auf
 // Zuruf Erfolg, Fehler (FAILED) bzw. Warnung (SKIPPED) — so wie der echte nach

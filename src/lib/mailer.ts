@@ -452,6 +452,7 @@ const NAMENS_VARIABLEN = [
   "employeeFirstName",
   "employeeLastName",
   "angefordert_von",
+  "absender_name",
 ];
 
 /**
@@ -492,6 +493,10 @@ const FREITEXT_VARIABLEN = [
   "unterlage",
   "begruendung",
   "nachricht",
+  // Individuelle E-Mail (Paket 3): Betreff und Dateinamen tippt bzw. waehlt
+  // HR — im HTML nur maskiert, falls ein Admin sie roh in die Vorlage setzt.
+  "betreff",
+  "anhaenge_liste",
 ];
 
 /** Variablen fuer den HTML-Teil: Namen und Rohtexte maskiert, der Rest unveraendert. */

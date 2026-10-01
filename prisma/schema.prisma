@@ -120,6 +120,7 @@ model Organization {
   starterpaketDokumente StarterpaketDokument[]
   starterpaketAuswahl   StarterpaketAuswahl[]
   dokumentenVersand     DokumentenVersand[]
+  individuelleMails     IndividuelleMail[]
   contractEndProcesses  ContractEndProcess[]
 
   @@map("organizations")
@@ -1090,6 +1091,7 @@ model User {
   createdDocumentTemplates   DocumentTemplate[]
   createdGeneratedDocuments  GeneratedDocument[]
   versendeteDokumentenpakete DokumentenVersand[]
+  individuelleMails          IndividuelleMail[]
 
   // Paket 4: Unterlagen nachfordern
   angeforderteUnterlagen UnterlagenNachforderung[] @relation("UnterlagenAngefordert")
@@ -1407,6 +1409,75 @@ model DokumentenVersand {
   @@index([modul, refId])
   @@index([organizationId])
   @@map("dokumenten_versand")
+}
+
+// =============================================
+// Individuelle E-Mail aus einem Vorgang (Paket 3, 10/2026)
+//
+// Freie Nachricht mit eigenem Betreff und eigenen Anhaengen (PDF/Bilder),
+// unabhaengig vom Dokumentenpaket. Regeln: src/lib/individuelle-mail.ts (rein)
+// und src/lib/individuelle-mail-dienst.ts (Server).
+//
+// Eine Zeile entsteht NUR nach einem echten SENT (wie beim Dokumentenpaket).
+// Nach 12 Monaten loescht der Lauf „Aufbewahrung erzeugter Dokumente“ die
+// Dateien und den Nachrichtentext; Datum, Empfaenger, Betreff, Dateinamen und
+// Pruefsummen bleiben als Nachweis.
+// =============================================
+model IndividuelleMail {
+  id String @id @default(uuid())
+
+  /// ONBOARDING | OFFBOARDING | VERBEAMTUNG | VERTRAGSVERLAENGERUNG (wie DokumentenVersand)
+  modul String
+  refId String
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  /// Kennung je geoeffnetem Dialog: Ein zweiter Versuch nach Verbindungsabbruch
+  /// findet diese Zeile und schickt nicht noch einmal.
+  dialogKennung String @unique
+
+  empfaenger           String
+  empfaengerVorgang    String?
+  empfaengerAbweichend Boolean @default(false)
+
+  betreff   String
+  /// null nach Ablauf der Aufbewahrung (inhaltGeloeschtAm)
+  nachricht String?
+
+  messageId String?
+
+  sentById String?
+  sentBy   User?   @relation(fields: [sentById], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime  @default(now())
+  inhaltGeloeschtAm DateTime?
+
+  anhaenge IndividuelleMailAnhang[]
+
+  @@index([modul, refId, createdAt])
+  @@index([createdAt])
+  @@map("individuelle_mails")
+}
+
+model IndividuelleMailAnhang {
+  id     String           @id @default(uuid())
+  mailId String
+  mail   IndividuelleMail @relation(fields: [mailId], references: [id], onDelete: Cascade)
+
+  reihenfolge      Int
+  /// Bereinigter Anzeigename, Endung passt immer zum erkannten Typ.
+  dateiname        String
+  /// Aus den Bytes erkannt (PDF, JPEG, PNG, WebP), nie aus dem Browser.
+  mimeType         String
+  groesse          Int
+  sha256           String
+  /// Relativ zu uploads/: individuelle-mails/<mailId>/<id>.<ext>; null nach dem Loeschen
+  dateipfad        String?
+  dateiGeloeschtAm DateTime?
+
+  @@index([mailId])
+  @@map("individuelle_mail_anhaenge")
 }
 
 // Protokoll erzeugter Dokumente (Audit + Wiederfinden in DMS).

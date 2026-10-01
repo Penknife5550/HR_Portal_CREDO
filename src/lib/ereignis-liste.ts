@@ -45,6 +45,11 @@ import { EVENT_CATALOG, EVENT_GROUP_ORDER, type EventGroup } from "@/lib/events"
  * Die BEM-Fristenerinnerung (dritte begruendete Ausnahme, Zeitplaner 09/2026):
  * Empfaenger sind nur die im Fall freigegebenen Beauftragten; Fallnummer und
  * Fristart gehoeren an keine frei konfigurierbare Webhook-URL.
+ *
+ * Die individuelle E-Mail aus einem Vorgang (Paket 3, 10/2026): dieselbe
+ * Begruendung wie beim Dokumentenpaket — Anhaenge, die HR vom eigenen PC
+ * waehlt, und eine im Dialog gewaehlte Adresse (overrideTo). Ein Test haelt
+ * individuelle-mail-dienst.ts gegen diese Liste.
  */
 const DOKUMENTENPAKET_HINWEIS =
   "Webhooks auf dieses Ereignis feuern nicht: Das Dokumentenpaket wird mit Anhängen direkt per SMTP versendet, ohne Webhook-Aufruf.";
@@ -55,7 +60,11 @@ const BEM_HINWEIS =
 const UNTERLAGEN_HINWEIS =
   "Webhooks auf dieses Ereignis feuern nicht: Die Mail enthält den persönlichen Upload-Link und wird deshalb direkt per SMTP versendet, ohne Webhook-Aufruf.";
 
+const INDIVIDUELLE_MAIL_HINWEIS =
+  "Webhooks auf dieses Ereignis feuern nicht: Die individuelle E-Mail wird mit ihren Anhängen direkt per SMTP versendet, ohne Webhook-Aufruf.";
+
 export const EVENTS_OHNE_WEBHOOK: Readonly<Record<string, string>> = {
+  "individuelle-mail": INDIVIDUELLE_MAIL_HINWEIS,
   "onboarding-starter-packet-sent": DOKUMENTENPAKET_HINWEIS,
   "offboarding-documents-sent": DOKUMENTENPAKET_HINWEIS,
   "civil-service-documents-sent": DOKUMENTENPAKET_HINWEIS,

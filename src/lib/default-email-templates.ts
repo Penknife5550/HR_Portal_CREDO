@@ -5183,6 +5183,93 @@ CREDO HR-Portal`,
       { key: "{{portalLink}}", description: "Link zu Einstellungen → Automatische Läufe" },
     ],
   },
+
+  // =============================================
+  // Individuelle E-Mail aus einem Vorgang (Paket 3)
+  //
+  // Betreff und Text schreibt HR im Dialog; die Vorlage ist nur Rahmen,
+  // Anhangliste und Signatur. Die Anrede steht im Text von HR — die Vorlage
+  // setzt keine eigene davor, sonst stuende „Guten Tag“ zweimal da.
+  // Empfaenger ist IMMER die Adresse aus dem Dialog (overrideTo); An/CC/BCC
+  // der Vorlage gelten nicht. Antworten gehen an die Antwortadresse aus den
+  // SMTP-Einstellungen (zentrales HR-Postfach).
+  // =============================================
+  {
+    event: "individuelle-mail",
+    name: "Individuelle E-Mail aus einem Vorgang",
+    subject: "{{betreff}}",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">{{einrichtung}}</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">Personalabteilung</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px;">{{nachricht_html}}</p>
+{{#anhaenge_liste}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 8px;color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:bold;">Im Anhang ({{anhaenge_anzahl}})</p>
+              <div style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{anhaenge_liste_html}}</div>
+            </td></tr>
+          </table>
+{{/anhaenge_liste}}
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0;">
+            {{absender_name}}<br>
+            {{einrichtung}}
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese Nachricht wurde über das CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
+            &copy; CREDO Gruppe – Freie Evangelische Schulen | {{einrichtung}}
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `{{nachricht}}
+{{#anhaenge_liste}}
+Im Anhang ({{anhaenge_anzahl}}):
+{{anhaenge_liste}}
+{{/anhaenge_liste}}
+{{absender_name}}
+{{einrichtung}}
+
+Diese Nachricht wurde über das CREDO HR-Portal versendet.`,
+    variables: [
+      { key: "{{betreff}}", description: "Betreff aus dem Dialog (Standard-Betreff der Vorlage)" },
+      { key: "{{nachricht}}", description: "Text aus dem Dialog, samt Anrede und Grußformel (Textteil)" },
+      { key: "{{nachricht_html}}", description: "Derselbe Text HTML-sicher, Umbrüche als <br>" },
+      { key: "{{anhaenge_anzahl}}", description: "Zahl der Anhänge" },
+      { key: "{{anhaenge_liste}}", description: "Dateinamen der Anhänge als Liste (Textteil); leer ohne Anhang" },
+      { key: "{{anhaenge_liste_html}}", description: "Dieselbe Liste als <ul> (HTML-Teil)" },
+      { key: "{{#anhaenge_liste}}...{{/anhaenge_liste}}", description: "Block, der nur mit Anhängen erscheint" },
+      { key: "{{absender_name}}", description: "Wer versendet hat (Signatur)" },
+      { key: "{{einrichtung}}", description: "Einrichtung des Vorgangs (Kopf und Signatur)" },
+      { key: "{{vorname}}", description: "Vorname der Person" },
+      { key: "{{nachname}}", description: "Nachname der Person" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer (displayId)" },
+    ],
+  },
 ];
 
 // =============================================

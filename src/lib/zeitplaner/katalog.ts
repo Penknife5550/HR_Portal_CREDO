@@ -67,7 +67,7 @@ export const LAEUFE: readonly LaufDefinition[] = [
     schluessel: "dokumente-aufbewahrung",
     name: "Aufbewahrung erzeugter Dokumente",
     beschreibung:
-      "Löscht erzeugte Dokumente (Briefe aus Vorlagen), die älter als 12 Monate sind — die führende Ablage ist das DMS.",
+      "Löscht erzeugte Dokumente (Briefe aus Vorlagen), die älter als 12 Monate sind — die führende Ablage ist das DMS —, sowie Text und Anhänge individueller E-Mails nach 12 Monaten (der Nachweis bleibt).",
     standardUhrzeit: "03:15",
     kannProbelauf: true,
     loescht: true,

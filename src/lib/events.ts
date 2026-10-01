@@ -18,6 +18,7 @@
  */
 
 export type EventGroup =
+  | "Allgemein"
   | "Onboarding"
   | "Offboarding"
   | "Vertragsende"
@@ -1910,6 +1911,42 @@ export const EVENT_CATALOG: EventDefinition[] = [
     },
     wired: true,
   },
+  {
+    // Paket 3: freie Nachricht mit eigenem Betreff und eigenen Anhaengen aus
+    // einem Vorgang (src/lib/individuelle-mail-dienst.ts). Geht wie das
+    // Dokumentenpaket DIREKT per sendEventEmail mit overrideTo und Anhaengen,
+    // nie ueber triggerWebhooks (EVENTS_OHNE_WEBHOOK). Betreff und Text kommen
+    // aus dem Dialog; die Vorlage liefert Rahmen und Signatur.
+    event: "individuelle-mail",
+    name: "Individuelle E-Mail aus einem Vorgang",
+    group: "Allgemein",
+    recipientHint: "Person des Vorgangs (Adresse aus dem Dialog, An/CC/BCC der Vorlage gelten nicht)",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      modul: "ONBOARDING",
+      refId: "00000000-0000-0000-0000-000000000001",
+      displayId: "2026-GYM-014",
+      email: "anna.beispiel@example.org",
+      vorname: "Anna",
+      nachname: "Beispiel",
+      organization: "FES Gymnasium",
+      einrichtung: "FES Gymnasium",
+      betreff: "Ihr unterschriebener Arbeitsvertrag",
+      nachricht:
+        "Guten Tag Frau Beispiel,\n\nanbei erhalten Sie Ihren gegengezeichneten Arbeitsvertrag.\n\nFreundliche Grüße",
+      nachricht_html:
+        "Guten Tag Frau Beispiel,<br><br>anbei erhalten Sie Ihren gegengezeichneten Arbeitsvertrag.<br><br>Freundliche Grüße",
+      anhaenge_anzahl: "2",
+      anhaenge_liste: "- Arbeitsvertrag_unterschrieben.pdf\n- Stundenplan_Oktober.png",
+      anhaenge_liste_html:
+        '<ul style="margin:0;padding-left:20px;"><li>Arbeitsvertrag_unterschrieben.pdf</li><li>Stundenplan_Oktober.png</li></ul>',
+      absender_name: "Erika Muster",
+    },
+    wired: true,
+    // Der Betreff steht 90 Tage im Versandprotokoll: Nachrichtentext und
+    // Dateinamen gehoeren nicht hinein (der Betreff selbst ist {{betreff}}).
+    betreffOhne: ["nachricht", "nachricht_html", "anhaenge_liste", "anhaenge_liste_html"],
+  },
 ];
 
 // =============================================
@@ -1974,5 +2011,6 @@ export const EVENT_GROUP_ORDER: EventGroup[] = [
   "Mutterschutz",
   "Unterlagen",
   "BEM",
+  "Allgemein",
   "System",
 ];

@@ -11,6 +11,11 @@
  * Monaten deckt den Vorlauf der Vertragsende-Fristenampel (7-12 Monate) ab.
  * Trifft es doch einmal einen laufenden Vorgang, ist die Folge harmlos.
  *
+ * Seit Paket 3 (10/2026) raeumt derselbe Lauf auch die individuellen E-Mails
+ * auf: nach 12 Monaten Dateien und Nachrichtentext, der Nachweis bleibt
+ * (individuelleMailsAufraeumen in individuelle-mail-dienst.ts). Die Antwort
+ * traegt dafuer `individuelleMails` — `AUSWERTER` in zeitplaner/bericht.ts liest es.
+ *
  * Gestartet vom Zeitplaner des Portals (src/lib/zeitplaner/, Einstellungen →
  * Automatische Läufe); Handaufruf ueber die duenne Route POST /api/cron/dokumente-aufbewahrung
  * (Bearer CRON_SECRET). Probelauf (`dryRun`, Route: ?dryRun=1): nur zaehlen.
@@ -21,6 +26,7 @@ import { prisma } from "@/lib/db";
 import { deleteUploadedFile, deleteUploadedDirIfEmpty } from "@/lib/file-upload";
 import { AUFBEWAHRUNG_MONATE, aufbewahrungsGrenze } from "@/lib/erzeugte-dokumente-vorgang";
 import { laufAntwort, type LaufErgebnis, type LaufOptionen } from "@/lib/laeufe/lauf-ergebnis";
+import { individuelleMailsAufraeumen } from "@/lib/individuelle-mail-dienst";
 
 export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promise<LaufErgebnis> {
   try {
@@ -33,12 +39,14 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
     });
 
     if (dryRun) {
+      const mails = await individuelleMailsAufraeumen({ grenze, dryRun: true });
       return laufAntwort({
         success: true,
         dryRun: true,
         aufbewahrungMonate: AUFBEWAHRUNG_MONATE,
         grenze: grenze.toISOString(),
         wuerdeLoeschen: faellig.length,
+        individuelleMails: { wuerdeLeeren: mails.mails },
       });
     }
 
@@ -70,6 +78,16 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
       }
     }
 
+    // Eigener Block: Ein Fehler dort laesst die erzeugten Dokumente oben
+    // unberuehrt und umgekehrt.
+    let mails = { mails: 0, dateienGeloescht: 0, fehler: 0 };
+    try {
+      mails = await individuelleMailsAufraeumen({ grenze, dryRun: false });
+    } catch (err) {
+      console.error("[cron/dokumente-aufbewahrung] Individuelle E-Mails:", err instanceof Error ? err.name : err);
+      mails.fehler++;
+    }
+
     return laufAntwort({
       success: true,
       aufbewahrungMonate: AUFBEWAHRUNG_MONATE,
@@ -78,6 +96,7 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
       dateienGeloescht,
       ordnerGeloescht,
       fehler,
+      individuelleMails: { geleert: mails.mails, dateienGeloescht: mails.dateienGeloescht, fehler: mails.fehler },
     });
   } catch (error) {
     console.error("[cron/dokumente-aufbewahrung] Schwerer Fehler:", error);

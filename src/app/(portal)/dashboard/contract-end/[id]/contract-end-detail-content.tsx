@@ -11,6 +11,7 @@ import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
+import { IndividuelleMailKarte } from "@/components/individuelle-mail/individuelle-mail-karte";
 import { CONTRACT_END_STATUS_LABELS } from "@/lib/constants";
 import { getContractEndCategory, CONTRACT_END_CATEGORY_META } from "@/lib/contract-end-fristen";
 import { getSignatureWarning, getKettenbefristungWarning } from "@/lib/contract-end-warnings";
@@ -549,6 +550,7 @@ export function ContractEndDetailContent({
                 beschreibung="Feste PDFs und befüllte Vorlagen gehen als Anhänge an die beschäftigte Person. Das Standardpaket wird unter Mandanten → Einrichtung → Dokumentenpakete gepflegt."
                 onVersendet={() => setVersandZaehler((n) => n + 1)}
               />
+              <IndividuelleMailKarte modul="VERTRAGSVERLAENGERUNG" refId={data.id} canEdit={canEdit} />
             </div>
           )}
 

@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
+import { IndividuelleMailKarte } from "@/components/individuelle-mail/individuelle-mail-karte";
 import { CopyButton } from "@/components/copy-button";
 import {
   STATUS_LABELS,
@@ -3170,6 +3171,9 @@ export function TabDocuments({
         onOffenChange={setPaketDialogOffen}
         onVersendet={() => setVersandZaehler((n) => n + 1)}
       />
+
+      {/* Individuelle E-Mail (Paket 3) — direkt unter dem Paket, eigener Nachweis. */}
+      <IndividuelleMailKarte modul="ONBOARDING" refId={onboardingId} canEdit={canEdit} />
 
       {/* Unterlagen nachfordern (Paket 4) — nach „Dokumente versenden" und vor
           den hochgeladenen Dokumenten: Was die Karte annimmt, erscheint direkt
