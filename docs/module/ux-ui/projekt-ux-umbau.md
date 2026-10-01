@@ -279,10 +279,10 @@ aus `unterlagen/dialog-rahmen.tsx`), Toast mit Anbieter im Portal-Layout.
 | `main` | `bfb0665` | Sperrklinke je Datei und ohne Kommentare; `npm run pruefen` |
 | `main` | `b6e1c8a` | Checklisten: Reihenfolge wirkt im Vorgang; Verschieben, Ziehen, Fokus |
 | `ux-umbau` | `656e80d` | Merge von `main` (Stand der Sperrklinke passte ohne Änderung) |
-| `ux-umbau` | Folge-Commit von `656e80d` | Befunde der zweiten Durchsicht an Bausteinen, Tokens, Tests, Skript, Dokumentation |
+| `ux-umbau` | `c364f3a` | Befunde der zweiten Durchsicht an Bausteinen, Tokens, Tests, Skript, Dokumentation |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Stand 01.10.2026 nach der zweiten Durchsicht: noch nicht gepusht (wartet auf die Freigabe). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).
