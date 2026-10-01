@@ -347,6 +347,92 @@ describe("Editor", () => {
 });
 
 // =============================================
+// Reihenfolge
+// =============================================
+
+describe("Reihenfolge", () => {
+  function pfeil(label: string): HTMLButtonElement {
+    const treffer = document.querySelector(`button[aria-label="${label}"]`);
+    if (!treffer) throw new Error(`Pfeil „${label}" fehlt`);
+    return treffer as HTMLButtonElement;
+  }
+
+  const titel = () =>
+    [0, 1, 2, 3].map((i) => (document.getElementById(`punkt-titel-${i}`) as HTMLInputElement).value);
+
+  async function gespeicherteIds() {
+    await klicke(knopf("Aktualisieren"));
+    const rumpf = schreibend()[0].body as { items: { id: string; orderIndex: number }[] };
+    expect(rumpf.items.map((p) => p.orderIndex)).toEqual([0, 1, 2, 3]);
+    return rumpf.items.map((p) => p.id);
+  }
+
+  it("die Pfeile verschieben einen Punkt, und die neue Reihenfolge wird gespeichert", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    expect(pfeil("Punkt 1 nach oben").disabled).toBe(true);
+    expect(pfeil("Punkt 4 nach unten").disabled).toBe(true);
+
+    await klicke(pfeil("Punkt 4 nach oben"));
+    await klicke(pfeil("Punkt 3 nach oben"));
+    // Die Eingaben wandern mit dem Punkt, nicht mit der Position.
+    expect(titel()).toEqual([
+      "Arbeitsvertrag erstellt",
+      "Datenschutz-Unterweisung",
+      "IT-Konto anlegen",
+      "Schlüssel bestellen",
+    ]);
+    expect(await gespeicherteIds()).toEqual(["i-1", "i-4", "i-2", "i-3"]);
+  });
+
+  it("Ziehen am Griff legt den Punkt auf der Zeile ab, über der losgelassen wird", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    const griff = document.querySelector('[data-griff="0"]') as HTMLElement;
+    const zeilen = document.querySelectorAll("[data-punkt]");
+    const dataTransfer = { setData: jest.fn(), setDragImage: jest.fn(), effectAllowed: "" };
+    await act(async () => {
+      fireEvent.dragStart(griff, { dataTransfer });
+    });
+    await act(async () => {
+      fireEvent.dragOver(zeilen[2], { dataTransfer });
+    });
+    await act(async () => {
+      fireEvent.drop(zeilen[2], { dataTransfer });
+    });
+    expect(await gespeicherteIds()).toEqual(["i-2", "i-3", "i-1", "i-4"]);
+  });
+
+  it("ein neuer Punkt lässt sich von ganz unten nach oben holen", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    await klicke(knopf("+ Punkt hinzufügen"));
+    await act(async () => {
+      fireEvent.change(document.getElementById("punkt-titel-4") as HTMLInputElement, {
+        target: { value: "Postfach vorbereiten" },
+      });
+      fireEvent.change(document.getElementById("punkt-kategorie-4") as HTMLInputElement, {
+        target: { value: "Vor Arbeitsbeginn" },
+      });
+    });
+    for (const n of [5, 4, 3, 2]) await klicke(pfeil(`Punkt ${n} nach oben`));
+    await klicke(knopf("Aktualisieren"));
+    const rumpf = schreibend()[0].body as { items: Record<string, unknown>[] };
+    expect(rumpf.items[0]).toMatchObject({ title: "Postfach vorbereiten", orderIndex: 0 });
+    expect("id" in rumpf.items[0]).toBe(false);
+    expect("uiKey" in rumpf.items[0]).toBe(false);
+    expect(rumpf.items.slice(1).map((p) => p.id)).toEqual(["i-1", "i-2", "i-3", "i-4"]);
+  });
+
+  it("bei nur einem Punkt gibt es weder Griff noch Pfeile", async () => {
+    await zeigeSeite();
+    await klicke(knopf("+ Neue Checkliste"));
+    expect(document.querySelector("[data-griff]")).toBeNull();
+    expect(document.querySelector('button[aria-label="Punkt 1 nach unten"]')).toBeNull();
+  });
+});
+
+// =============================================
 // Speichern
 // =============================================
 

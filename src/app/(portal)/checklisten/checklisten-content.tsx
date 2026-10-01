@@ -26,14 +26,23 @@
  *     Vorgang (Vertragsbeginn bzw. letzter Arbeitstag plus Tage); der neue
  *     Hinweis wird in die Aufgabe kopiert und steht auf der Link-Seite und in
  *     der Mail an die Abteilung.
+ *
+ * REIHENFOLGE (10/2026). Neue Punkte landeten immer am Ende und liessen sich
+ * nicht verschieben. Jetzt: Ziehen am Griff oder die Pfeile daneben (Tastatur,
+ * Touch — natives Ziehen gibt es auf Touch-Geraeten nicht). Der Server braucht
+ * dafuer nichts Neues: `handleSave` schickt `orderIndex` = Position in der
+ * Liste. Jeder Punkt traegt einen festen `uiKey`; mit `key={index}` behielte
+ * React beim Umsortieren die Eingabefelder der alten Position.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type DragEvent } from "react";
+import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
 import { abteilungLabel, DEPARTMENT_KEYS } from "@/lib/constants";
 import { istFuehrungskraft, istLinkAbteilung } from "@/lib/abteilungsaufgaben";
 import { CHECKLISTEN_HINWEIS_MAX } from "@/lib/validations/abteilungsaufgaben";
+import { listeVerschieben } from "@/lib/liste-verschieben";
 
 // =============================================
 // Types
@@ -80,6 +89,8 @@ interface AbteilungsKonfigZeile {
 interface NewItem {
   /** Vorhandener Punkt — wird mitgeschickt, damit die ID erhalten bleibt. */
   id?: string;
+  /** Fester React-Schluessel der Zeile; geht nie an den Server. */
+  uiKey: string;
   title: string;
   category: string;
   orderIndex: number;
@@ -183,9 +194,12 @@ function isOffboardingTemplate(template: { name: string; questionnaireType?: str
 
 type TabType = "onboarding" | "offboarding" | "verbeamtung";
 
+let punktZaehler = 0;
+
 // Leeres Item
 function createEmptyItem(orderIndex: number): NewItem {
   return {
+    uiKey: `neu-${++punktZaehler}`,
     title: "",
     category: "",
     orderIndex,
@@ -255,6 +269,10 @@ export function ChecklistenContent({ user }: { user: User }) {
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Ziehen im Editor: welcher Punkt gezogen wird und ueber welchem er steht
+  const [ziehIndex, setZiehIndex] = useState<number | null>(null);
+  const [zielIndex, setZielIndex] = useState<number | null>(null);
 
   const canEdit =
     user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
@@ -454,6 +472,7 @@ export function ChecklistenContent({ user }: { user: User }) {
       items: template.items.map((item) => ({
         // Die ID geht mit hinaus — nur so behaelt der Punkt sie beim Speichern.
         id: item.id,
+        uiKey: item.id,
         title: item.title,
         category: item.category,
         orderIndex: item.orderIndex,
@@ -485,6 +504,47 @@ export function ChecklistenContent({ user }: { user: User }) {
         .filter((_, i) => i !== index)
         .map((item, i) => ({ ...item, orderIndex: i })),
     }));
+  }
+
+  // =============================================
+  // Modal: Reihenfolge aendern (Pfeile und Ziehen)
+  // =============================================
+  function handleMoveItem(von: number, nach: number) {
+    setModalData((prev) => ({
+      ...prev,
+      items: listeVerschieben(prev.items, von, nach),
+    }));
+  }
+
+  function handleDragStart(e: DragEvent<HTMLElement>, index: number) {
+    setZiehIndex(index);
+    // Firefox startet das Ziehen nur mit gesetzten Daten.
+    e.dataTransfer?.setData("text/plain", String(index));
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+    // Gezogen wird am Griff, zu sehen sein soll der ganze Punkt.
+    const karte = e.currentTarget.closest("[data-punkt]");
+    if (karte && typeof e.dataTransfer?.setDragImage === "function") {
+      e.dataTransfer.setDragImage(karte, 16, 16);
+    }
+  }
+
+  function handleDragOver(e: DragEvent<HTMLElement>, index: number) {
+    if (ziehIndex === null) return;
+    // Ohne preventDefault gilt die Zeile nicht als Ablageziel.
+    e.preventDefault();
+    if (zielIndex !== index) setZielIndex(index);
+  }
+
+  function handleDrop(e: DragEvent<HTMLElement>, index: number) {
+    if (ziehIndex === null) return;
+    e.preventDefault();
+    handleMoveItem(ziehIndex, index);
+    handleDragEnd();
+  }
+
+  function handleDragEnd() {
+    setZiehIndex(null);
+    setZielIndex(null);
   }
 
   // =============================================
@@ -1216,6 +1276,11 @@ export function ChecklistenContent({ user }: { user: User }) {
                     + Punkt hinzufügen
                   </button>
                 </div>
+                {modalData.items.length > 1 && (
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Reihenfolge ändern: Punkt am Griff ziehen oder die Pfeile nutzen.
+                  </p>
+                )}
 
                 <div className="space-y-3">
                   {modalData.items.map((item, index) => {
@@ -1227,16 +1292,66 @@ export function ChecklistenContent({ user }: { user: User }) {
                         ? zugeordnet
                         : null;
 
+                    // Einfuegemarke: Der gezogene Punkt landet AUF dieser
+                    // Position — von oben kommend also unter, von unten
+                    // kommend ueber dieser Zeile.
+                    const marke =
+                      ziehIndex === null || zielIndex !== index || ziehIndex === index
+                        ? ""
+                        : ziehIndex < index
+                          ? "shadow-[0_3px_0_0_#575756]"
+                          : "shadow-[0_-3px_0_0_#575756]";
+                    const mehrere = modalData.items.length > 1;
+
                     return (
                       <div
-                        key={index}
-                        className="rounded-lg border border-border bg-muted/30 p-3"
+                        key={item.uiKey}
+                        data-punkt
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDrop={(e) => handleDrop(e, index)}
+                        className={`rounded-lg border border-border bg-muted/30 p-3 ${marke} ${
+                          ziehIndex === index ? "opacity-50" : ""
+                        }`}
                       >
                         <div className="mb-2 flex items-center justify-between">
-                          <span className="text-xs font-medium text-muted-foreground">
-                            Punkt {index + 1}
-                          </span>
-                          {modalData.items.length > 1 && (
+                          <div className="flex items-center gap-1">
+                            {mehrere && (
+                              <>
+                                <span
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, index)}
+                                  onDragEnd={handleDragEnd}
+                                  title="Ziehen, um die Reihenfolge zu ändern"
+                                  data-griff={index}
+                                  className="cursor-grab rounded p-0.5 text-muted-foreground hover:bg-accent active:cursor-grabbing"
+                                >
+                                  <GripVertical aria-hidden="true" className="h-4 w-4" />
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveItem(index, index - 1)}
+                                  disabled={index === 0}
+                                  aria-label={`Punkt ${index + 1} nach oben`}
+                                  className="rounded p-0.5 text-muted-foreground hover:bg-accent disabled:opacity-30"
+                                >
+                                  <ArrowUp aria-hidden="true" className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveItem(index, index + 1)}
+                                  disabled={index === modalData.items.length - 1}
+                                  aria-label={`Punkt ${index + 1} nach unten`}
+                                  className="rounded p-0.5 text-muted-foreground hover:bg-accent disabled:opacity-30"
+                                >
+                                  <ArrowDown aria-hidden="true" className="h-4 w-4" />
+                                </button>
+                              </>
+                            )}
+                            <span className="ml-1 text-xs font-medium text-muted-foreground">
+                              Punkt {index + 1}
+                            </span>
+                          </div>
+                          {mehrere && (
                             <button
                               onClick={() => handleRemoveItem(index)}
                               className="text-xs text-red-500 hover:text-red-700"
