@@ -444,7 +444,7 @@ export async function onboardingAbteilungenLaden(opts: {
           relativeDueDays: true,
           completedById: true,
         },
-        orderBy: [{ category: "asc" }, { orderIndex: "asc" }],
+        orderBy: [{ orderIndex: "asc" }, { category: "asc" }],
       },
       departmentLinks: true,
     },

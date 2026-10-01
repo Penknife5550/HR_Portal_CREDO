@@ -62,7 +62,7 @@ export async function GET(
           select: { firstName: true, lastName: true },
         },
       },
-      orderBy: [{ category: "asc" }, { orderIndex: "asc" }],
+      orderBy: [{ orderIndex: "asc" }, { category: "asc" }],
     });
 
     return NextResponse.json({ data: items });

@@ -185,7 +185,7 @@ function vorgangMitInclude(v: Zeile, include: Record<string, unknown>): Zeile {
     if (k === "checklistItems") {
       r.checklistItems = sortieren(
         db.aufgaben.filter((a) => a.offboardingId === v.id),
-        [{ category: "asc" }, { orderIndex: "asc" }],
+        [{ orderIndex: "asc" }, { category: "asc" }],
       ).map((a) => structuredClone(a));
     } else if (k === "departmentLinks") {
       r.departmentLinks = db.links.filter((l) => l.offboardingId === v.id).map((l) => structuredClone(l));
@@ -211,7 +211,7 @@ function onboardingProjektion(v: Zeile, select?: Record<string, unknown>): Zeile
     const s = select.checklistItems as { select?: Zeile };
     r.checklistItems = sortieren(
       db.onboardingAufgaben.filter((a) => a.onboardingId === v.id),
-      [{ category: "asc" }, { orderIndex: "asc" }],
+      [{ orderIndex: "asc" }, { category: "asc" }],
     ).map((a) => projizieren(a, s.select));
   }
   if (select.departmentLinks) {
@@ -249,7 +249,7 @@ export const fakePrisma: Record<string, unknown> = {
             ? {
                 checklistItems: sortieren(
                   db.aufgaben.filter((a) => a.offboardingId === v.id && passt(a, aufgaben.where)),
-                  [{ category: "asc" }, { orderIndex: "asc" }],
+                  [{ orderIndex: "asc" }, { category: "asc" }],
                 ).map((a) => structuredClone(a)),
               }
             : {}),

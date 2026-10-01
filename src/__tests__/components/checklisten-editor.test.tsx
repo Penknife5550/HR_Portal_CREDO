@@ -23,7 +23,7 @@
  * Umgebung wie in einstellungen-abteilungen.test.tsx: jsdom im Docblock, ohne
  * @testing-library/jest-dom.
  */
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, createEvent, fireEvent, render } from "@testing-library/react";
 import { ChecklistenContent } from "@/app/(portal)/checklisten/checklisten-content";
 
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
@@ -360,11 +360,59 @@ describe("Reihenfolge", () => {
   const titel = () =>
     [0, 1, 2, 3].map((i) => (document.getElementById(`punkt-titel-${i}`) as HTMLInputElement).value);
 
+  const zeilen = () => Array.from(document.querySelectorAll<HTMLElement>("[data-punkt]"));
+  const liste = () => document.querySelector("[data-punktliste]") as HTMLElement;
+
   async function gespeicherteIds() {
     await klicke(knopf("Aktualisieren"));
     const rumpf = schreibend()[0].body as { items: { id: string; orderIndex: number }[] };
     expect(rumpf.items.map((p) => p.orderIndex)).toEqual([0, 1, 2, 3]);
     return rumpf.items.map((p) => p.id);
+  }
+
+  const zugDaten = () => ({ setData: jest.fn(), setDragImage: jest.fn(), effectAllowed: "", dropEffect: "" });
+
+  /**
+   * jsdom kennt kein Layout. Fuer die Rechnung „welche Marke steht an der
+   * Stelle des Zeigers" bekommen die Zeilen feste Flaechen: Zeile i liegt bei
+   * y = i*100 … i*100+88, dazwischen 12 px Abstand; die Liste reicht mit ihrem
+   * Innenabstand von -8 bis 396.
+   */
+  function flaechenSetzen() {
+    const flaeche = (top: number, bottom: number) =>
+      ({ top, bottom, left: 0, right: 600, width: 600, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    zeilen().forEach((z, i) => {
+      z.getBoundingClientRect = () => flaeche(i * 100, i * 100 + 88);
+    });
+    liste().getBoundingClientRect = () => flaeche(-8, 396);
+  }
+
+  /**
+   * Zieh-Ereignis MIT Zeigerposition. jsdom kennt kein DragEvent; die
+   * Testing Library faellt auf ein nacktes Event zurueck und verwirft
+   * clientX/clientY aus den Optionen. Deshalb werden sie am Ereignis gesetzt.
+   * Rueckgabe wie fireEvent: false, wenn preventDefault gerufen wurde.
+   */
+  function zug(
+    typ: "dragOver" | "dragLeave" | "drop",
+    ziel: Element,
+    optionen: { dataTransfer?: unknown; clientX?: number; clientY?: number } = {},
+  ): boolean {
+    const ereignis = createEvent[typ](ziel, { dataTransfer: optionen.dataTransfer });
+    Object.defineProperty(ereignis, "clientX", { value: optionen.clientX ?? 0 });
+    Object.defineProperty(ereignis, "clientY", { value: optionen.clientY ?? 0 });
+    return fireEvent(ziel, ereignis);
+  }
+
+  async function ziehe(von: number, ueber: Element, ort: { clientX?: number; clientY?: number } = {}) {
+    const dataTransfer = zugDaten();
+    await act(async () => {
+      fireEvent.dragStart(document.querySelector(`[data-griff="${von}"]`) as HTMLElement, { dataTransfer });
+    });
+    await act(async () => {
+      zug("dragOver", ueber, { dataTransfer, ...ort });
+    });
+    return dataTransfer;
   }
 
   it("die Pfeile verschieben einen Punkt, und die neue Reihenfolge wird gespeichert", async () => {
@@ -382,7 +430,6 @@ describe("Reihenfolge", () => {
 
     await klicke(pfeil("Punkt 4 nach oben"));
     await klicke(pfeil("Punkt 3 nach oben"));
-    // Die Eingaben wandern mit dem Punkt, nicht mit der Position.
     expect(titel()).toEqual([
       "Arbeitsvertrag erstellt",
       "Datenschutz-Unterweisung",
@@ -392,76 +439,164 @@ describe("Reihenfolge", () => {
     expect(await gespeicherteIds()).toEqual(["i-1", "i-4", "i-2", "i-3"]);
   });
 
+  it("die Zeile wandert als Ganzes mit – derselbe DOM-Knoten, nicht nur seine Werte", async () => {
+    // Mit `key={index}` blieben die Knoten an ihrer Position und bekaemen nur
+    // neue Werte: Fokus, Auswahl und ungespeicherte Eingaben blieben an der
+    // alten Stelle haengen.
+    await zeigeSeite();
+    await oeffneEditor();
+    const erste = zeilen()[0];
+    await klicke(pfeil("Punkt 1 nach unten"));
+    expect(zeilen()[1]).toBe(erste);
+    expect(zeilen()[0]).not.toBe(erste);
+  });
+
+  it("nach dem Verschieben rollt der Dialog um die Strecke mit, die der Punkt gewandert ist", async () => {
+    // Befund der Durchsicht: Der Punkt wanderte unter dem Zeiger weg, der
+    // zweite Klick an derselben Stelle traf den Pfeil des Nachbarn und nahm
+    // die Verschiebung zurueck.
+    await zeigeSeite();
+    await oeffneEditor();
+    const erste = zeilen()[0];
+    let oben = 120;
+    erste.getBoundingClientRect = () => ({ top: oben }) as DOMRect;
+    const rumpf = erste.closest(".overflow-y-auto") as HTMLElement;
+    rumpf.scrollTop = 40;
+    oben = 120;
+    const klick = klicke(pfeil("Punkt 1 nach unten"));
+    // Nach dem Umhaengen steht die Zeile 319 px tiefer.
+    oben = 439;
+    await klick;
+    expect(rumpf.scrollTop).toBe(40 + 319);
+  });
+
   it("Ziehen am Griff legt den Punkt auf der Zeile ab, über der losgelassen wird", async () => {
     await zeigeSeite();
     await oeffneEditor();
-    const griff = document.querySelector('[data-griff="0"]') as HTMLElement;
-    const zeilen = document.querySelectorAll("[data-punkt]");
-    const dataTransfer = { setData: jest.fn(), setDragImage: jest.fn(), effectAllowed: "" };
+    const ziel = zeilen()[2];
+    const dataTransfer = await ziehe(0, ziel);
     await act(async () => {
-      fireEvent.dragStart(griff, { dataTransfer });
-    });
-    await act(async () => {
-      fireEvent.dragOver(zeilen[2], { dataTransfer });
-    });
-    await act(async () => {
-      fireEvent.drop(zeilen[2], { dataTransfer });
+      fireEvent.drop(ziel, { dataTransfer });
     });
     expect(await gespeicherteIds()).toEqual(["i-2", "i-3", "i-1", "i-4"]);
   });
 
-  it("Loslassen im Zwischenraum (auf der Einfügemarke) verschiebt ebenfalls", async () => {
-    // Befund der Durchsicht: Die Marke liegt ausserhalb der Zeile im Abstand
-    // der Liste. War nur die Zeile ein Ablageziel, tat Loslassen dort nichts.
+  it("der Griff ist ziehbar und trägt einen eigenen Datentyp, nie text/plain", async () => {
+    // text/plain naehmen die Textfelder „Name" und „Beschreibung" von sich aus
+    // an – die Positionsnummer landete im Vorlagennamen.
     await zeigeSeite();
     await oeffneEditor();
-    const griff = document.querySelector('[data-griff="3"]') as HTMLElement;
-    const zeilen = document.querySelectorAll("[data-punkt]");
-    const liste = document.querySelector("[data-punktliste]") as HTMLElement;
-    const dataTransfer = { setData: jest.fn(), setDragImage: jest.fn(), effectAllowed: "" };
+    const griff = document.querySelector('[data-griff="1"]') as HTMLElement;
+    expect(griff.getAttribute("draggable")).toBe("true");
+    const dataTransfer = zugDaten();
     await act(async () => {
       fireEvent.dragStart(griff, { dataTransfer });
     });
-    await act(async () => {
-      fireEvent.dragOver(zeilen[1], { dataTransfer });
-    });
-    // Die Liste selbst nimmt das Ablegen an (preventDefault) …
-    const angenommen = !fireEvent.dragOver(liste, { dataTransfer });
-    expect(angenommen).toBe(true);
-    // … und legt auf der zuletzt ueberfahrenen Position ab.
-    await act(async () => {
-      fireEvent.drop(liste, { dataTransfer });
-    });
-    expect(await gespeicherteIds()).toEqual(["i-1", "i-4", "i-2", "i-3"]);
+    expect(dataTransfer.setData).toHaveBeenCalledTimes(1);
+    expect(dataTransfer.setData.mock.calls[0][0]).toBe("application/x-credo-checklistenpunkt");
+    expect(dataTransfer.effectAllowed).toBe("move");
+    expect(dataTransfer.setDragImage).toHaveBeenCalledWith(zeilen()[1], 16, 16);
   });
 
-  it("ohne laufendes Ziehen ist die Liste kein Ablageziel", async () => {
+  it("im Zwischenraum zählt die Stelle des Zeigers – unabhängig vom Weg dorthin", async () => {
+    // Befund der Durchsicht: Ziel war die zuletzt ueberfahrene Zeile. Dieselbe
+    // Luecke ergab je nach Weg verschiedene Positionen.
+    for (const umweg of [false, true]) {
+      aufrufe = [];
+      document.body.innerHTML = "";
+      await zeigeSeite();
+      await oeffneEditor();
+      flaechenSetzen();
+      const dataTransfer = await ziehe(3, zeilen()[umweg ? 0 : 2]);
+      // Luecke zwischen Zeile 2 (100–188) und Zeile 3 (200–288)
+      await act(async () => {
+        zug("dragOver", liste(), { dataTransfer, clientX: 10, clientY: 194 });
+      });
+      await act(async () => {
+        zug("drop", liste(), { dataTransfer, clientX: 10, clientY: 194 });
+      });
+      expect(await gespeicherteIds()).toEqual(["i-1", "i-2", "i-4", "i-3"]);
+    }
+  });
+
+  it("die Marken über dem ersten und unter dem letzten Punkt sind Ablageziel", async () => {
+    // Befund der Durchsicht: Beide Marken lagen ausserhalb der Liste; dort
+    // losgelassen, sprang der Punkt zurueck.
     await zeigeSeite();
     await oeffneEditor();
-    const liste = document.querySelector("[data-punktliste]") as HTMLElement;
-    // fireEvent liefert false, wenn preventDefault gerufen wurde.
-    expect(fireEvent.dragOver(liste)).toBe(true);
+    flaechenSetzen();
+    const dataTransfer = await ziehe(2, liste(), { clientX: 10, clientY: -4 });
+    expect(zeilen()[0].className).toContain("shadow-primary");
     await act(async () => {
-      fireEvent.drop(liste);
+      zug("drop", liste(), { dataTransfer, clientX: 10, clientY: -4 });
+    });
+    expect(await gespeicherteIds()).toEqual(["i-3", "i-1", "i-2", "i-4"]);
+  });
+
+  it("unter dem letzten Punkt losgelassen landet der Punkt am Ende", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    flaechenSetzen();
+    const dataTransfer = await ziehe(0, liste(), { clientX: 10, clientY: 392 });
+    await act(async () => {
+      zug("drop", liste(), { dataTransfer, clientX: 10, clientY: 392 });
+    });
+    expect(await gespeicherteIds()).toEqual(["i-2", "i-3", "i-4", "i-1"]);
+  });
+
+  it("die Liste bricht dragenter und dragover ab, aber nur während eines eigenen Ziehens", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    // fireEvent liefert false, wenn preventDefault gerufen wurde.
+    expect(fireEvent.dragEnter(liste())).toBe(true);
+    expect(fireEvent.dragOver(liste())).toBe(true);
+    await act(async () => {
+      fireEvent.drop(liste());
+    });
+
+    const dataTransfer = await ziehe(1, zeilen()[1]);
+    expect(fireEvent.dragEnter(zeilen()[2], { dataTransfer })).toBe(false);
+    expect(fireEvent.dragOver(zeilen()[2], { dataTransfer })).toBe(false);
+    expect(dataTransfer.dropEffect).toBe("move");
+    await act(async () => {
+      fireEvent.dragEnd(document.querySelector('[data-griff="1"]') as HTMLElement);
     });
     expect(await gespeicherteIds()).toEqual(["i-1", "i-2", "i-3", "i-4"]);
   });
 
-  it("„+ Punkt darunter“ fügt an Ort und Stelle ein und übernimmt die Kategorie", async () => {
+  it("verlässt der Zeiger die Liste, verschwindet die Marke", async () => {
     await zeigeSeite();
     await oeffneEditor();
-    await klicke(document.querySelector('button[aria-label="Neuen Punkt unter Punkt 1 einfügen"]') as Element);
-    expect((document.getElementById("punkt-titel-1") as HTMLInputElement).value).toBe("");
-    expect((document.getElementById("punkt-kategorie-1") as HTMLInputElement).value).toBe("Vor Arbeitsbeginn");
+    flaechenSetzen();
+    const dataTransfer = await ziehe(0, zeilen()[2]);
+    expect(zeilen()[2].className).toContain("shadow-primary");
+    // Wechsel zwischen Kindern (Zeiger weiter in der Liste) laesst sie stehen …
     await act(async () => {
-      fireEvent.change(document.getElementById("punkt-titel-1") as HTMLInputElement, {
-        target: { value: "Personalnummer vergeben" },
-      });
+      zug("dragLeave", liste(), { dataTransfer, clientX: 10, clientY: 150 });
     });
+    expect(zeilen()[2].className).toContain("shadow-primary");
+    // … das Verlassen nimmt sie weg.
+    await act(async () => {
+      zug("dragLeave", liste(), { dataTransfer, clientX: 10, clientY: 900 });
+    });
+    expect(zeilen().some((z) => z.className.includes("shadow-primary"))).toBe(false);
+  });
+
+  it("der Ziehzustand überlebt das Schließen des Dialogs nicht", async () => {
+    // Befund der Durchsicht: Schloss das Speichern den Dialog waehrend eines
+    // Ziehens, kam dragend nur am abgehaengten Griff an. Beim naechsten Oeffnen
+    // war die Zeile halbtransparent, und die Liste nahm fremdes Ablegen an.
+    await zeigeSeite();
+    await oeffneEditor();
+    await ziehe(2, zeilen()[0]);
+    expect(zeilen()[2].className).toContain("opacity-50");
     await klicke(knopf("Aktualisieren"));
-    const rumpf = schreibend()[0].body as { items: Record<string, unknown>[] };
-    expect(rumpf.items.map((p) => p.id ?? "neu")).toEqual(["i-1", "neu", "i-2", "i-3", "i-4"]);
-    expect(rumpf.items[1]).toMatchObject({ title: "Personalnummer vergeben", orderIndex: 1 });
+    expect(document.querySelector("[data-punktliste]")).toBeNull();
+
+    await oeffneEditor();
+    expect(zeilen().some((z) => z.className.includes("opacity-50"))).toBe(false);
+    expect(zeilen().some((z) => z.className.includes("shadow-primary"))).toBe(false);
+    expect(fireEvent.dragOver(liste())).toBe(true);
   });
 
   it("ein neuer Punkt lässt sich von ganz unten nach oben holen", async () => {
@@ -485,11 +620,89 @@ describe("Reihenfolge", () => {
     expect(rumpf.items.slice(1).map((p) => p.id)).toEqual(["i-1", "i-2", "i-3", "i-4"]);
   });
 
-  it("bei nur einem Punkt gibt es weder Griff noch Pfeile", async () => {
+  it("„+ Punkt darunter“ fügt an Ort und Stelle ein, übernimmt die Kategorie des Punkts darüber und setzt den Fokus ins neue Titelfeld", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    // Punkt 2 bekommt eine eigene Kategorie – sonst liesse sich „des Punkts
+    // darueber" nicht von „irgendeines Punkts" unterscheiden.
+    await act(async () => {
+      fireEvent.change(document.getElementById("punkt-kategorie-1") as HTMLInputElement, {
+        target: { value: "Erster Arbeitstag" },
+      });
+    });
+    await klicke(pfeil("Punkt darunter einfügen (unter Punkt 2)"));
+    const neuesFeld = document.getElementById("punkt-titel-2") as HTMLInputElement;
+    expect(neuesFeld.value).toBe("");
+    expect((document.getElementById("punkt-kategorie-2") as HTMLInputElement).value).toBe("Erster Arbeitstag");
+    expect(document.activeElement).toBe(neuesFeld);
+    await act(async () => {
+      fireEvent.change(neuesFeld, { target: { value: "Personalnummer vergeben" } });
+    });
+    await klicke(knopf("Aktualisieren"));
+    const rumpf = schreibend()[0].body as { items: Record<string, unknown>[] };
+    expect(rumpf.items.map((p) => p.id ?? "neu")).toEqual(["i-1", "i-2", "neu", "i-3", "i-4"]);
+    expect(rumpf.items[2]).toMatchObject({ title: "Personalnummer vergeben", category: "Erster Arbeitstag", orderIndex: 2 });
+  });
+
+  it("der Name von „+ Punkt darunter“ enthält den sichtbaren Text (WCAG 2.5.3)", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    const knoepfe = Array.from(document.querySelectorAll("button")).filter((b) =>
+      (b.textContent ?? "").includes("Punkt darunter"),
+    );
+    expect(knoepfe).toHaveLength(4);
+    for (const b of knoepfe) {
+      expect(b.getAttribute("aria-label")).toContain("Punkt darunter");
+      expect(b.getAttribute("aria-label")!.startsWith("Punkt darunter")).toBe(true);
+    }
+  });
+
+  it("nach „Entfernen“ bleibt der Fokus in der Liste – auf „Entfernen“ der nachgerückten Zeile", async () => {
+    // Befund der Durchsicht: Mit dem festen Schluessel je Zeile verschwand der
+    // fokussierte Knopf, der Fokus fiel auf <body>.
+    await zeigeSeite();
+    await oeffneEditor();
+    const entfernen = () => Array.from(document.querySelectorAll<HTMLButtonElement>("[data-entfernen]"));
+    entfernen()[1].focus();
+    await klicke(entfernen()[1]);
+    const titelDerZeilen = () => zeilen().map((z) => (z.querySelector("input") as HTMLInputElement).value);
+    expect(titelDerZeilen()).toEqual(["Arbeitsvertrag erstellt", "Schlüssel bestellen", "Datenschutz-Unterweisung"]);
+    expect(document.activeElement).toBe(entfernen()[1]);
+    expect(zeilen()[1].contains(document.activeElement)).toBe(true);
+
+    // Letzte Zeile entfernt: Fokus auf der Zeile davor.
+    await klicke(entfernen()[2]);
+    expect(document.activeElement).toBe(entfernen()[1]);
+  });
+
+  it("eine stehende Meldung „Punkt n: …“ verschwindet, sobald sich die Positionen ändern", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    await act(async () => {
+      fireEvent.change(document.getElementById("punkt-titel-2") as HTMLInputElement, { target: { value: "" } });
+    });
+    await klicke(knopf("Aktualisieren"));
+    expect(seitentext()).toContain("Punkt 3: Titel und Kategorie sind Pflichtfelder.");
+    await klicke(pfeil("Punkt 3 nach oben"));
+    expect(seitentext()).not.toContain("Punkt 3: Titel und Kategorie");
+  });
+
+  it("der Hinweis sagt, was die Reihenfolge im Vorgang bewirkt", async () => {
+    await zeigeSeite();
+    await oeffneEditor();
+    expect(seitentext()).toContain("Im Vorgang stehen die Punkte in dieser Reihenfolge, zusammengefasst je Kategorie");
+  });
+
+  it("bei nur einem Punkt gibt es weder Griff noch Pfeile – aber „+ Punkt darunter“", async () => {
     await zeigeSeite();
     await klicke(knopf("+ Neue Checkliste"));
+    // Erst pruefen, dass der Dialog wirklich offen ist – sonst bestuende die
+    // Abwesenheit auch ohne ihn.
+    expect(document.getElementById("punkt-titel-0")).not.toBeNull();
     expect(document.querySelector("[data-griff]")).toBeNull();
     expect(document.querySelector('button[aria-label="Punkt 1 nach unten"]')).toBeNull();
+    expect(document.querySelector("[data-entfernen]")).toBeNull();
+    expect(document.querySelector('button[aria-label="Punkt darunter einfügen (unter Punkt 1)"]')).not.toBeNull();
   });
 });
 

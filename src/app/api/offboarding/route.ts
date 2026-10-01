@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
         organization: true,
         exitData: true,
         checklistItems: {
-          orderBy: [{ category: "asc" }, { orderIndex: "asc" }],
+          orderBy: [{ orderIndex: "asc" }, { category: "asc" }],
         },
         returnItems: true,
         departmentLinks: true,

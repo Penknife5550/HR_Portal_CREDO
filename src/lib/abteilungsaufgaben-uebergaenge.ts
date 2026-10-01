@@ -569,7 +569,7 @@ async function linkZumToken(token: string, modul: AbteilungsModul) {
 }
 
 async function aufgabenDerAbteilung(b: LinkBereich, departmentKey: string): Promise<AufgabeOeffentlich[]> {
-  const orderBy = [{ category: "asc" as const }, { orderIndex: "asc" as const }];
+  const orderBy = [{ orderIndex: "asc" as const }, { category: "asc" as const }];
   return b.modul === "OFFBOARDING"
     ? prisma.offboardingChecklistItem.findMany({
         where: { offboardingId: b.vorgangId, assigneeDepartment: departmentKey },

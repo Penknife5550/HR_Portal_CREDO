@@ -67,7 +67,7 @@ export async function GET(
         organization: true,
         exitData: true,
         checklistItems: {
-          orderBy: [{ category: "asc" }, { orderIndex: "asc" }],
+          orderBy: [{ orderIndex: "asc" }, { category: "asc" }],
         },
         returnItems: true,
         documents: true,

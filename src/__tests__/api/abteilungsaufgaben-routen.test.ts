@@ -722,8 +722,10 @@ describe("GET /api/offboarding/[id]/checklist", () => {
     mockGetSession.mockResolvedValue(LEITUNG_FREMD);
     db.zuweisungen = [{ userId: "u-el", organizationId: "org-1" }];
     db.aufgaben = [
-      aufgabe({ title: "B", category: "Phase 2", orderIndex: 2, abteilungKommentar: "Erledigt, danke" }),
-      aufgabe({ title: "A", category: "Phase 1", orderIndex: 5 }),
+      // Die Position entscheidet, nicht die Kategorie (Reihenfolge der Vorlage):
+      // „Phase 2" mit Position 2 steht vor „Phase 1" mit Position 5.
+      aufgabe({ title: "B", category: "Phase 1", orderIndex: 5, abteilungKommentar: "Erledigt, danke" }),
+      aufgabe({ title: "A", category: "Phase 2", orderIndex: 2 }),
     ];
     const res = await laden();
     expect(res.status).toBe(200);

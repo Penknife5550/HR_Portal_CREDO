@@ -37,7 +37,14 @@
  * React beim Umsortieren die Eingabefelder der alten Position.
  */
 
-import { useEffect, useState, useCallback, type DragEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+  type DragEvent,
+} from "react";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
@@ -195,13 +202,34 @@ function isOffboardingTemplate(template: { name: string; questionnaireType?: str
 
 type TabType = "onboarding" | "offboarding" | "verbeamtung";
 
+/** Pfeilknoepfe im Editor: 28 px Zielflaeche (sie sind der Weg fuer Touch). */
+const PFEIL_KLASSEN =
+  "rounded p-1.5 text-muted-foreground hover:bg-accent aria-disabled:cursor-default aria-disabled:opacity-30 aria-disabled:hover:bg-transparent";
+
+// Schluessel neuer Punkte: Zeitanteil plus Zaehler. Der Zaehler allein finge
+// nach einem Fast Refresh (Modul neu geladen, Zustand behalten) wieder bei 1 an
+// und vergaebe einen Schluessel doppelt.
+const punktStart = Date.now().toString(36);
 let punktZaehler = 0;
+
+/**
+ * Eigener Datentyp der Ziehdaten. NICHT `text/plain`: Den naehmen die
+ * Textfelder „Name" und „Beschreibung" von sich aus an — die Positionsnummer
+ * landete beim Loslassen ueber einem Feld im Vorlagennamen.
+ */
+const ZIEH_TYP = "application/x-credo-checklistenpunkt";
+
+/** Was nach der naechsten Aenderung der Liste nachzufuehren ist. */
+type Nachfuehren =
+  | { art: "verschoben"; uiKey: string; obenVorher: number | null }
+  | { art: "eingefuegt"; uiKey: string }
+  | { art: "entfernt"; index: number };
 
 // Leeres Item. Die Reihenfolge steckt allein in der Position in der Liste —
 // ein eigenes Feld dafuer liefe beim Verschieben auseinander.
 function createEmptyItem(category = ""): NewItem {
   return {
-    uiKey: `neu-${++punktZaehler}`,
+    uiKey: `neu-${punktStart}-${++punktZaehler}`,
     title: "",
     category,
     defaultDueDays: null,
@@ -275,6 +303,11 @@ export function ChecklistenContent({ user }: { user: User }) {
   // Ziehen im Editor: welcher Punkt gezogen wird und ueber welchem er steht
   const [ziehIndex, setZiehIndex] = useState<number | null>(null);
   const [zielIndex, setZielIndex] = useState<number | null>(null);
+
+  // Nachfuehren nach Verschieben, Einfuegen, Entfernen (siehe useLayoutEffect)
+  const rumpfRef = useRef<HTMLDivElement>(null);
+  const listeRef = useRef<HTMLDivElement>(null);
+  const nachfuehren = useRef<Nachfuehren | null>(null);
 
   const canEdit =
     user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
@@ -453,6 +486,7 @@ export function ChecklistenContent({ user }: { user: User }) {
   // Modal oeffnen: Neu erstellen
   // =============================================
   function handleCreate() {
+    handleDragEnd();
     setModalData({
       name: activeTab === "offboarding" ? "Offboarding: " : "",
       description: "",
@@ -466,6 +500,7 @@ export function ChecklistenContent({ user }: { user: User }) {
   // Modal oeffnen: Bearbeiten
   // =============================================
   function handleEdit(template: ChecklistTemplate) {
+    handleDragEnd();
     setModalData({
       id: template.id,
       name: template.name,
@@ -503,13 +538,13 @@ export function ChecklistenContent({ user }: { user: User }) {
   // an seiner Stelle und uebernimmt die Kategorie des Punkts darueber.
   // =============================================
   function handleInsertBelow(index: number) {
+    const neu = createEmptyItem(modalData.items[index]?.category ?? "");
+    nachfuehren.current = { art: "eingefuegt", uiKey: neu.uiKey };
+    // Eine stehende Meldung „Punkt n: …" zeigte danach auf einen anderen Punkt.
+    setError(null);
     setModalData((prev) => ({
       ...prev,
-      items: [
-        ...prev.items.slice(0, index + 1),
-        createEmptyItem(prev.items[index]?.category ?? ""),
-        ...prev.items.slice(index + 1),
-      ],
+      items: [...prev.items.slice(0, index + 1), neu, ...prev.items.slice(index + 1)],
     }));
   }
 
@@ -517,6 +552,8 @@ export function ChecklistenContent({ user }: { user: User }) {
   // Modal: Item entfernen
   // =============================================
   function handleRemoveItem(index: number) {
+    nachfuehren.current = { art: "entfernt", index };
+    setError(null);
     setModalData((prev) => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== index),
@@ -527,43 +564,140 @@ export function ChecklistenContent({ user }: { user: User }) {
   // Modal: Reihenfolge aendern (Pfeile und Ziehen)
   // =============================================
   function handleMoveItem(von: number, nach: number) {
+    const punkt = modalData.items[von];
+    if (!punkt || von === nach || nach < 0 || nach >= modalData.items.length) return;
+    nachfuehren.current = {
+      art: "verschoben",
+      uiKey: punkt.uiKey,
+      obenVorher: zeileFinden(punkt.uiKey)?.getBoundingClientRect().top ?? null,
+    };
+    setError(null);
     setModalData((prev) => ({
       ...prev,
       items: listeVerschieben(prev.items, von, nach),
     }));
   }
 
+  function zeilen(): HTMLElement[] {
+    return Array.from(listeRef.current?.querySelectorAll<HTMLElement>("[data-punkt]") ?? []);
+  }
+
+  function zeileFinden(uiKey: string): HTMLElement | undefined {
+    return zeilen().find((z) => z.dataset.punkt === uiKey);
+  }
+
+  // =============================================
+  // Nach einer Aenderung der Liste: Sichtbereich und Fokus nachfuehren
+  //
+  // Ohne das wanderte ein verschobener Punkt unter dem Zeiger weg: Der zweite
+  // Klick an derselben Stelle traf den Pfeil des nachgerueckten Nachbarn und
+  // nahm die Verschiebung zurueck. Deshalb rollt der Dialog um genau die
+  // Strecke mit, die der Punkt gewandert ist — er bleibt unter dem Zeiger.
+  //
+  // Bewusst useLayoutEffect: React stellt nach dem Umhaengen den Fokus wieder
+  // her und setzt dabei scrollTop zurueck; erst danach haelt eine eigene
+  // Korrektur.
+  // =============================================
+  useLayoutEffect(() => {
+    const auftrag = nachfuehren.current;
+    if (!auftrag) return;
+    nachfuehren.current = null;
+
+    if (auftrag.art === "verschoben") {
+      const zeile = zeileFinden(auftrag.uiKey);
+      if (!zeile) return;
+      const rumpf = rumpfRef.current;
+      if (rumpf && auftrag.obenVorher !== null) {
+        rumpf.scrollTop += zeile.getBoundingClientRect().top - auftrag.obenVorher;
+      }
+      zeile.scrollIntoView?.({ block: "nearest" });
+      return;
+    }
+
+    if (auftrag.art === "eingefuegt") {
+      const zeile = zeileFinden(auftrag.uiKey);
+      zeile?.scrollIntoView?.({ block: "nearest" });
+      zeile?.querySelector<HTMLInputElement>("input")?.focus();
+      return;
+    }
+
+    // Entfernt: Der Knopf, der den Fokus hatte, ist weg. Ohne Nachfuehren
+    // fiele der Fokus auf <body>. Er geht auf „Entfernen" der nachgerueckten
+    // Zeile, sonst der davor, sonst auf deren erstes Feld.
+    const alle = zeilen();
+    const zeile = alle[Math.min(auftrag.index, alle.length - 1)];
+    const ziel =
+      zeile?.querySelector<HTMLElement>("[data-entfernen]") ??
+      zeile?.querySelector<HTMLElement>("input");
+    ziel?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalData.items]);
+
   function handleDragStart(e: DragEvent<HTMLElement>, index: number) {
     setZiehIndex(index);
     // Firefox startet das Ziehen nur mit gesetzten Daten.
-    e.dataTransfer?.setData("text/plain", String(index));
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData(ZIEH_TYP, String(index));
+    e.dataTransfer.effectAllowed = "move";
     // Gezogen wird am Griff, zu sehen sein soll der ganze Punkt.
     const karte = e.currentTarget.closest("[data-punkt]");
-    if (karte && typeof e.dataTransfer?.setDragImage === "function") {
-      e.dataTransfer.setDragImage(karte, 16, 16);
-    }
+    if (karte) e.dataTransfer.setDragImage(karte, 16, 16);
   }
 
-  // Ablageziel ist die GANZE Liste, nicht die einzelne Zeile: Die Einfuegemarke
-  // liegt im Abstand zwischen zwei Zeilen. Waere nur die Zeile ein Ziel, taete
-  // Loslassen genau auf der Marke nichts. Die Zeile meldet nur, ueber welcher
-  // Position der Zeiger zuletzt stand.
-  function handleDragOverPunkt(index: number) {
+  /**
+   * Zielposition aus der Stelle des Zeigers — nicht aus der zuletzt
+   * ueberfahrenen Zeile. Sonst haenge das Ergebnis vom Weg des Zeigers ab.
+   *
+   * Ueber einer Zeile: deren Position. Im Zwischenraum oder am Rand der Liste:
+   * die Position, deren Einfuegemarke an genau dieser Stelle steht.
+   */
+  function zielAusZeiger(e: DragEvent<HTMLElement>, von: number): number | null {
+    const alle = zeilen();
+    if (alle.length === 0) return null;
+    const getroffen = (e.target as HTMLElement).closest?.<HTMLElement>("[data-punkt]");
+    if (getroffen) {
+      const i = alle.indexOf(getroffen);
+      if (i >= 0) return i;
+    }
+    const darueber = alle.filter((z) => z.getBoundingClientRect().bottom <= e.clientY).length;
+    if (darueber === 0) return 0;
+    if (darueber >= alle.length) return alle.length - 1;
+    return von < darueber ? darueber - 1 : darueber;
+  }
+
+  // Ablageziel ist die GANZE Liste samt ihrem Innenabstand: Die Einfuegemarken
+  // liegen zwischen den Zeilen und — ueber dem ersten, unter dem letzten
+  // Punkt — am Rand. dragenter UND dragover werden abgebrochen; ohne das
+  // erste gilt ein neu betretenes Element in Chromium fuer einen Takt nicht
+  // als Ablageziel.
+  function handleDragEnterListe(e: DragEvent<HTMLElement>) {
     if (ziehIndex === null) return;
-    if (zielIndex !== index) setZielIndex(index);
+    e.preventDefault();
   }
 
   function handleDragOverListe(e: DragEvent<HTMLElement>) {
     if (ziehIndex === null) return;
-    // Ohne preventDefault gilt die Liste nicht als Ablageziel.
     e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const ziel = zielAusZeiger(e, ziehIndex);
+    if (ziel !== zielIndex) setZielIndex(ziel);
+  }
+
+  // Verlaesst der Zeiger die Liste, verschwindet die Marke — sie zeigte sonst
+  // eine Ablage an, die dort nicht stattfindet. (relatedTarget ist bei
+  // dragleave nicht verlaesslich; deshalb die Rechnung ueber die Flaeche.)
+  function handleDragLeaveListe(e: DragEvent<HTMLElement>) {
+    if (ziehIndex === null) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const draussen =
+      e.clientX < r.left || e.clientX >= r.right || e.clientY < r.top || e.clientY >= r.bottom;
+    if (draussen) setZielIndex(null);
   }
 
   function handleDropListe(e: DragEvent<HTMLElement>) {
     if (ziehIndex === null) return;
     e.preventDefault();
-    if (zielIndex !== null) handleMoveItem(ziehIndex, zielIndex);
+    const ziel = zielAusZeiger(e, ziehIndex);
+    if (ziel !== null) handleMoveItem(ziehIndex, ziel);
     handleDragEnd();
   }
 
@@ -671,6 +805,9 @@ export function ChecklistenContent({ user }: { user: User }) {
           : "Checkliste erfolgreich erstellt"
       );
       setShowModal(false);
+      // Ein Ziehen, das das Schliessen ueberdauert, meldet sein dragend nur
+      // noch am abgehaengten Griff — der Zustand bliebe sonst stehen.
+      handleDragEnd();
       await loadTemplates();
 
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -1199,7 +1336,7 @@ export function ChecklistenContent({ user }: { user: User }) {
             </div>
 
             {/* Modal Body */}
-            <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
+            <div ref={rumpfRef} className="max-h-[70vh] overflow-y-auto px-6 py-4">
               {/* Fehlermeldung des Servers (z.B. „Punkt 2: Die Zuständigkeit
                   „Werkstatt“ ist unbekannt – bitte in der Auswahl zuordnen.") */}
               {error && (
@@ -1303,14 +1440,21 @@ export function ChecklistenContent({ user }: { user: User }) {
                 </div>
                 {modalData.items.length > 1 && (
                   <p className="mb-2 text-xs text-muted-foreground">
-                    Reihenfolge ändern: Punkt am Griff ziehen oder die Pfeile nutzen.
+                    Reihenfolge ändern: Punkt am Griff ziehen oder die Pfeile nutzen. Im
+                    Vorgang stehen die Punkte in dieser Reihenfolge, zusammengefasst je
+                    Kategorie; die Kategorien folgen ihrem jeweils ersten Punkt.
                   </p>
                 )}
 
+                {/* -my-2 py-2: Die Liste reicht ueber die Marken am Rand hinaus,
+                    ohne dass sich der Abstand zur Umgebung aendert. */}
                 <div
-                  className="space-y-3"
+                  ref={listeRef}
+                  className="-my-2 space-y-3 py-2"
                   data-punktliste
+                  onDragEnter={handleDragEnterListe}
                   onDragOver={handleDragOverListe}
+                  onDragLeave={handleDragLeaveListe}
                   onDrop={handleDropListe}
                 >
                   {modalData.items.map((item, index) => {
@@ -1338,8 +1482,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                     return (
                       <div
                         key={item.uiKey}
-                        data-punkt
-                        onDragOver={() => handleDragOverPunkt(index)}
+                        data-punkt={item.uiKey}
                         className={`rounded-lg border border-border bg-muted/30 p-3 ${marke} ${
                           ziehIndex === index ? "opacity-50" : ""
                         }`}
@@ -1349,12 +1492,12 @@ export function ChecklistenContent({ user }: { user: User }) {
                             {mehrere && (
                               <>
                                 <span
-                                  draggable
+                                  draggable={!saving}
                                   onDragStart={(e) => handleDragStart(e, index)}
                                   onDragEnd={handleDragEnd}
                                   title="Ziehen, um die Reihenfolge zu ändern"
                                   data-griff={index}
-                                  className="cursor-grab rounded p-0.5 text-muted-foreground hover:bg-accent active:cursor-grabbing"
+                                  className="cursor-grab rounded p-1.5 text-muted-foreground hover:bg-accent active:cursor-grabbing"
                                 >
                                   <GripVertical aria-hidden="true" className="h-4 w-4" />
                                 </span>
@@ -1367,7 +1510,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                                   onClick={() => !erster && handleMoveItem(index, index - 1)}
                                   aria-disabled={erster}
                                   aria-label={`Punkt ${index + 1} nach oben`}
-                                  className="rounded p-0.5 text-muted-foreground hover:bg-accent aria-disabled:cursor-default aria-disabled:opacity-30 aria-disabled:hover:bg-transparent"
+                                  className={PFEIL_KLASSEN}
                                 >
                                   <ArrowUp aria-hidden="true" className="h-4 w-4" />
                                 </button>
@@ -1376,7 +1519,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                                   onClick={() => !letzter && handleMoveItem(index, index + 1)}
                                   aria-disabled={letzter}
                                   aria-label={`Punkt ${index + 1} nach unten`}
-                                  className="rounded p-0.5 text-muted-foreground hover:bg-accent aria-disabled:cursor-default aria-disabled:opacity-30 aria-disabled:hover:bg-transparent"
+                                  className={PFEIL_KLASSEN}
                                 >
                                   <ArrowDown aria-hidden="true" className="h-4 w-4" />
                                 </button>
@@ -1390,13 +1533,17 @@ export function ChecklistenContent({ user }: { user: User }) {
                             <button
                               type="button"
                               onClick={() => handleInsertBelow(index)}
-                              aria-label={`Neuen Punkt unter Punkt ${index + 1} einfügen`}
-                              className="text-xs text-muted-foreground hover:text-foreground"
+                              // Der Name beginnt mit dem sichtbaren Text (WCAG 2.5.3):
+                              // Sprachsteuerung findet den Knopf unter „Punkt darunter".
+                              aria-label={`Punkt darunter einfügen (unter Punkt ${index + 1})`}
+                              className="py-1 text-xs text-muted-foreground hover:text-foreground"
                             >
-                              + Punkt darunter
+                              <span aria-hidden="true">+ </span>Punkt darunter
                             </button>
                             {mehrere && (
                               <button
+                                type="button"
+                                data-entfernen
                                 onClick={() => handleRemoveItem(index)}
                                 className="text-xs text-red-500 hover:text-red-700"
                               >
