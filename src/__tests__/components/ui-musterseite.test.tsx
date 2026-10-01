@@ -13,7 +13,7 @@
  * Der Portal-Kopf ist durch seine Ueberschrift ersetzt (er zieht Router und
  * Sitzungswarnung mit); sein `<h1>` bleibt, damit die Reihenfolge stimmt.
  */
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { axeVerstoesse } from "../hilfen/axe";
 import { STATUS_TOENE } from "@/components/ui/statuspille";
 
@@ -71,7 +71,7 @@ describe("Inhalt", () => {
     const { container } = await seite();
     expect(await axeVerstoesse(container)).toEqual([]);
     const ebenen = Array.from(container.querySelectorAll("h1, h2, h3, h4")).map((h) => h.tagName);
-    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(5);
+    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(7);
     expect(ebenen).not.toContain("H3");
   });
 
@@ -94,5 +94,26 @@ describe("Inhalt", () => {
   it("nutzt ink-3 nirgends als Textfarbe", async () => {
     const { container } = await seite();
     expect(container.innerHTML).not.toMatch(/\btext-ink-3\b/);
+  });
+
+  it("zeigt Dialog und Rueckfrage: axe findet auch bei offenem Dialog nichts", async () => {
+    await seite();
+    fireEvent.click(screen.getByRole("button", { name: "Kritische Rückfrage" }));
+    expect(screen.getByRole("alertdialog", { name: "Vorgang stornieren?" })).toBeTruthy();
+    expect(await axeVerstoesse(document.body)).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dialog mit Feld" }));
+    expect(screen.getByRole("dialog", { name: "Unterlage zurückweisen" })).toBeTruthy();
+    expect(screen.getByText("Bitte eine Begründung eintragen.")).toBeTruthy();
+    expect(await axeVerstoesse(document.body)).toEqual([]);
+  });
+
+  it("zeigt jeden Ton der Meldungen als Knopf", async () => {
+    await seite();
+    for (const name of ["Erfolg", "Erfolg mit „Rückgängig“", "Fehler", "Hinweis"]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
   });
 });

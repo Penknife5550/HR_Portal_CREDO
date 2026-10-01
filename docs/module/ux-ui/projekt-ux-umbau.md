@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 01.10.2026 (U0, Tag 2, nach der zweiten Durchsicht)
+Letzte Änderung: 01.10.2026 (U0, Tag 3)
 
 ## 1. Worum es geht
 
@@ -26,7 +26,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 |---|---|---|
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
-| **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 2 von 6 erledigt (Tokens, Button, Statuspille, Gruppe, Musterseite) |
+| **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 3 von 6 erledigt (Tokens, Button, Statuspille, Gruppe, Dialog, Bestätigungsdialog, Toast, Musterseite) |
 | U1 | Rahmen: Kopf, Breadcrumb, neue Adressen | offen |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
@@ -104,6 +104,11 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Hover des kritischen Knopfs | – | eigenes Flächen-Token `critical-hover` | Ein Filter (`brightness`) dunkelt auch die Schrift ab und senkt den Kontrast. |
 | `color-scheme` | E5: `light` | `only light` | `light` verhindert erzwungenes Abdunkeln nicht. |
 | Gruppentitel-Ebene | – | Vorgabe `h2` | Gruppen stehen direkt unter dem Seitentitel; `h3` verletzte die Überschriften-Reihenfolge. |
+| Dialog: Klick daneben | – (Radix schließt dabei) | schließt nicht | Ein halb ausgefülltes Formular ginge durch einen verrutschten Klick verloren; der bestehende Rahmen (`dialog-rahmen.tsx`) schließt dort auch nicht. |
+| Dialog: Knöpfe während der Aktion | bestehender Rahmen: `disabled` | `aria-disabled` (über den `Button`) | Der Fokus fällt nicht mehr auf `body`; Regel 7. |
+| Toast mit „Rückgängig“ | Erfolg 5 s | 10 s, wenn „Rückgängig“ angeboten wird | Fünf Sekunden reichen zum Lesen, nicht zum Lesen und Entscheiden. |
+| Toast-Aufruf | `toast.ok`, `toast.fehler` | dazu `toast.hinweis`; Speicher auf Modulebene statt Hook | Aus jedem Handler rufbar; eine Meldung kurz vor einem Seitenwechsel geht nicht verloren. |
+| Schleier des Dialogs | – | eigenes Token `scrim` | Keine fest eingetragene Farbe und kein `/40` in einer Klasse. |
 | Prototyp-Tag | „Kein Paket außer U0 startet ohne den Prototyp-Tag“ | gilt ab dem Pilot; U1 darf vorher | U1 ändert nur den Rahmen (Kopf, Breadcrumb, Adressen) und hängt an keiner der Fragen des Prototyp-Tags (E9, E11, E13). |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
@@ -132,6 +137,10 @@ Kurzfassung; verbindlich und ausführlich in `CLAUDE.md`, Abschnitt „Oberfläc
    tailwind-merge eingetragen.
 9. Zeilen, in denen Statuspillen stehen, bekommen keinen getönten Hover (die `-soft`-Töne sind
    halbtransparent und nur auf Karte und Seitengrund gerechnet).
+10. Rückfragen und Meldungen kommen aus `ui/dialog.tsx` (`BestaetigungsDialog`) und
+    `ui/toast.tsx` – in neuer Oberfläche keine Browser-Rückfrage, kein Hinweisfenster und
+    keine eigene Überlagerung. Ein Fehler, zu dem etwas korrigiert werden muss, gehört in den
+    Dialog (`fehler`), nicht in einen Toast.
 
 ## 7. Protokoll
 
@@ -263,8 +272,61 @@ Abteilungsmail bleibt nach Fälligkeit sortiert.
 Musterseite) – in der Sitzung fehlt die Anmeldung; `npm run build` lief nicht, weil im selben
 Ordner der Entwicklungsserver einer anderen Sitzung läuft.
 
-**Als Nächstes (U0, Tag 3):** Dialog und Bestätigungsdialog auf Radix (mit den vier Regeln
-aus `unterlagen/dialog-rahmen.tsx`), Toast mit Anbieter im Portal-Layout.
+### 01.10.2026 – U0, Tag 3
+
+**Code:**
+
+| Datei | Inhalt |
+|---|---|
+| `src/components/ui/dialog.tsx` | `Dialog` auf Radix (gesteuert über `offen`/`onSchliessen`) und `BestaetigungsDialog` (`alertdialog`, Titel, ein Satz, zwei Knöpfe, Variante `critical`). Die vier Regeln des bestehenden Rahmens als Eigenschaften: `gesperrt`, `fehler`, `bestaetigen.sperrGrund`, `fokusZiel` |
+| `src/components/ui/toast.tsx` | `toast.ok` / `toast.fehler` / `toast.hinweis` (Speicher auf Modulebene), `ToastAnbieter` auf Radix Toast; Tabelle `TOAST_TOENE` |
+| `src/app/(portal)/layout.tsx` | `ToastAnbieter` eingehängt |
+| `src/app/globals.css` | Token `scrim` (Schleier hinter dem Dialog) |
+| `src/app/(portal)/ui-muster/dialog-muster.tsx`, `page.tsx` | Gruppen „Dialoge“ und „Meldungen“ mit gespielten Aktionen (läuft 1,5 s; die kritische Rückfrage scheitert beim ersten Versuch) |
+| `src/__tests__/components/ui-dialog.test.tsx` | 20 Tests: Aufbau, Fokus (Öffnen, Kreisen, Rückkehr, Ersatzziel), Schließen, Sperre, Fehler, Sperrgrund, axe |
+| `src/__tests__/components/ui-toast.test.tsx` | 10 Tests: Standzeiten, „Rückgängig“, leerer Text, Doppelte, Höchstzahl, axe |
+| `ui-kontrast.test.ts`, `ui-musterseite.test.tsx` | Symbolfarben der Meldungen, Schleier; axe über die Musterseite bei offenem Dialog |
+
+**Entscheidungen beim Bauen** (Abweichungen stehen in Abschnitt 5):
+- Der Dialog hat einen festen Fuß (Fehlerzeile, Sperrgrund, „Abbrechen“, Bestätigen). Der
+  Aufrufer gibt Texte und Handler, keine eigenen Knöpfe – so sitzen die vier Regeln an einer
+  Stelle.
+- Fokus beim Öffnen auf „Abbrechen“, nie auf dem bestätigenden Knopf; ein Feld mit
+  `data-autofokus` bekommt ihn stattdessen.
+- Den Auslöser merkt sich der Dialog selbst (Radix gibt den Fokus ohne eigenen
+  `Dialog.Trigger` nicht zurück).
+- Die Fehlerzeile nimmt das Farbpaar aus `STATUS_TOENE.critical`; die Meldungen stehen auf
+  `card` mit Text in `ink`, nur das Symbol trägt den Ton. Damit ist kein neues Textpaar
+  entstanden.
+- Dieselbe Meldung zweimal ersetzt die erste; höchstens vier stehen zugleich.
+- Die Texte der Musterseite nennen die Browser-Rückfrage und das Hinweisfenster nicht beim
+  Funktionsnamen – die Sperrklinke zählte sie sonst als Aufruf.
+
+**Geprüft:** `npm run pruefen` (Typen, Lint, 184 Suiten, 4.714 Tests). Mutationsprobe am
+Dialog: Der Test „Klick daneben schließt nicht“ prüfte zunächst nichts (Radix hängt seinen
+Horcher erst im nächsten Takt an) und ist berichtigt. Der laufende Entwicklungsserver
+kompiliert `/ui-muster`, erzeugt die neuen Klassen und liefert den Meldungsbereich im
+Portal-Layout aus.
+
+**Nicht geprüft:** Dialog und Meldungen im echten Browser (Tastaturprobe, Meldung über einem
+offenen Dialog, Wischen auf dem Handy) – in der Sitzung fehlt die Anmeldung. Bitte auf
+`/ui-muster` als Super-Admin: jede der drei Rückfragen öffnen, Escape während „Wird
+gesendet …“, Fokus nach dem Schließen, die vier Meldungen. `npm run build` lief nicht (der
+Entwicklungsserver einer anderen Sitzung läuft im selben Ordner).
+
+**Bekannte Grenzen:**
+- Öffnet ein Menüpunkt den Dialog (das „…“-Menü kommt an Tag 4), ist der Auslöser beim
+  Schließen verschwunden; der Fokus geht dann nur mit `fokusZiel` an eine sinnvolle Stelle.
+  Wird an Tag 4 mit dem Seitenkopf geprüft.
+- Enter in einem Feld des Dialogs löst nichts aus (die Knöpfe stehen außerhalb des Inhalts).
+  Kommt mit dem ersten Formular-Dialog des Pilots, wenn es gebraucht wird.
+- Die öffentlichen Link-Seiten haben keinen `ToastAnbieter`.
+
+**Sichtbare Änderung:** nur auf `/ui-muster`. Im Portal hängt ein leerer, unsichtbarer
+Meldungsbereich an jeder Seite (auch an der Anmeldeseite).
+
+**Als Nächstes (U0, Tag 4):** Seitenkopf mit Breadcrumb und „…“-Menü (Radix Dropdown),
+Segment-Schalter.
 
 ## 8. Branches und Commits
 
@@ -280,9 +342,11 @@ aus `unterlagen/dialog-rahmen.tsx`), Toast mit Anbieter im Portal-Layout.
 | `main` | `b6e1c8a` | Checklisten: Reihenfolge wirkt im Vorgang; Verschieben, Ziehen, Fokus |
 | `ux-umbau` | `656e80d` | Merge von `main` (Stand der Sperrklinke passte ohne Änderung) |
 | `ux-umbau` | `c364f3a` | Befunde der zweiten Durchsicht an Bausteinen, Tokens, Tests, Skript, Dokumentation |
+| `ux-umbau` | `7511540` | Logbuch: Push vom 01.10.2026 |
+| `ux-umbau` | (folgt) | U0 Tag 3: Dialog, Bestätigungsdialog, Toast, Anbieter im Portal-Layout |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Tag 3 ist noch nicht gepusht. Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

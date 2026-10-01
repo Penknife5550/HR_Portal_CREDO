@@ -7,7 +7,7 @@
  *
  * EINE QUELLE: Welche Paare es gibt, steht nicht hier, sondern in den
  * Bausteinen — `STATUS_TOENE` (statuspille.tsx) und `BUTTON_FARBEN`
- * (button.tsx). Der Test liest deren Klassen und rechnet jedes Paar, auch die
+ * (button.tsx), dazu die Symbolfarben aus `TOAST_TOENE` (toast.tsx). Der Test liest deren Klassen und rechnet jedes Paar, auch die
  * beim Ueberfahren. Ein neuer Ton oder eine neue Variante ist damit von selbst
  * dabei; eine Hand-Liste liefe auseinander (so geschehen: das Hover-Paar des
  * Primaerknopfs fehlte, ein nie benutztes Paar stand darin).
@@ -34,6 +34,7 @@ import {
 } from "@/lib/ui/kontrast";
 import { BUTTON_FARBEN, type ButtonVariante } from "@/components/ui/button";
 import { STATUS_TOENE, type StatusTon } from "@/components/ui/statuspille";
+import { TOAST_TOENE, type ToastTon } from "@/components/ui/toast";
 
 // Kommentare zaehlen nicht: Ein „--color-ok: #…" in einem Kommentar waere
 // sonst der erste Treffer und der Test maesse den falschen Wert.
@@ -121,7 +122,7 @@ describe("Rechnung", () => {
 
 describe("Tokens aus globals.css", () => {
   it("jedes Token steht genau einmal da", () => {
-    for (const name of ["surface", "card", "ink", "ink-2", "action", "ok", "critical-hover"]) {
+    for (const name of ["surface", "card", "ink", "ink-2", "action", "ok", "critical-hover", "scrim"]) {
       expect(() => token(name)).not.toThrow();
     }
     expect(() => token("gibt-es-nicht")).toThrow("0 Deklarationen");
@@ -200,6 +201,28 @@ describe("Button: jede Variante aus BUTTON_FARBEN, in Ruhe und beim Ueberfahren"
     // Flaeche dahinter.
     for (const flaeche of FLAECHEN) {
       expect(kontrast(token("action"), token(flaeche))).toBeGreaterThanOrEqual(AA_BEDIENELEMENT);
+    }
+  });
+});
+
+describe("Toast und Dialog", () => {
+  const TOENE = Object.keys(TOAST_TOENE) as ToastTon[];
+
+  it.each(TOENE)("Toast %s: das Symbol hebt sich von der Karte ab (der Text daneben ist ink)", (ton) => {
+    const farbe = farbeAus(TOAST_TOENE[ton].farbe, "text");
+    expect(farbe).not.toBeNull();
+    expect(kontrast(token(farbe!), token("card"))).toBeGreaterThanOrEqual(AA_BEDIENELEMENT);
+  });
+
+  it("nur der Fehler bleibt stehen", () => {
+    expect(TOENE.filter((ton) => TOAST_TOENE[ton].dauer === null)).toEqual(["fehler"]);
+  });
+
+  it("der Schleier hinter dem Dialog laesst die Karte klar hervortreten", () => {
+    // Die Dialogflaeche (card) gegen den abgedunkelten Seitengrund.
+    for (const flaeche of FLAECHEN) {
+      const dahinter = aufUntergrund(token("scrim"), token(flaeche));
+      expect(kontrast(token("card"), dahinter)).toBeGreaterThanOrEqual(1.5);
     }
   });
 });

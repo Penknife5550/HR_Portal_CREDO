@@ -123,6 +123,8 @@
   --color-info: #1a6494;
   --color-info-soft: rgba(29, 111, 165, 0.12);
   --color-neutral-soft: rgba(0, 0, 0, 0.06);
+  /* Schleier hinter dem Dialog — nur dort (src/components/ui/dialog.tsx). */
+  --color-scrim: rgba(0, 0, 0, 0.4);
 
   /* Schatten nur fuer Dialog und Toast — Gruppen tragen eine Haarlinie.
      Groessen-Tokens wie dieses muessen tailwind-merge genannt werden

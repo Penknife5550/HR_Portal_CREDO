@@ -5,6 +5,7 @@ import { PortalHeader } from "@/components/portal-header";
 import { Button } from "@/components/ui/button";
 import { Gruppe, Zeile } from "@/components/ui/gruppe";
 import { STATUS_TOENE, Statuspille, type StatusTon } from "@/components/ui/statuspille";
+import { DialogMuster, ToastMuster } from "./dialog-muster";
 
 /**
  * Musterseite der Oberflaechen-Bausteine (UX-Umbau „Klarer Weg", U0)
@@ -115,6 +116,24 @@ export default async function UiMusterPage() {
               <span className="text-right text-xs text-ink-2">{TON_BEISPIELE[ton].wofuer}</span>
             </Zeile>
           ))}
+        </Gruppe>
+
+        <Gruppe
+          titel="Dialoge"
+          beschreibung="Ersatz für die Rückfrage des Browsers. Während die Aktion läuft, schließt nichts; ein Fehler bleibt im Dialog."
+        >
+          <Zeile>
+            <DialogMuster />
+          </Zeile>
+        </Gruppe>
+
+        <Gruppe
+          titel="Meldungen"
+          beschreibung="Ersatz für das Hinweisfenster des Browsers. Erfolg verschwindet nach 5 Sekunden, ein Fehler bleibt stehen."
+        >
+          <Zeile>
+            <ToastMuster />
+          </Zeile>
         </Gruppe>
 
         <div className="grid gap-8 lg:grid-cols-2">

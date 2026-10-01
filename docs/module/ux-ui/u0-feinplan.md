@@ -1,7 +1,7 @@
 # U0 Fundament – Feinplan
 
 Stand 01.10.2026 · gehört zu [ux-ui-plan-2026-09.html](ux-ui-plan-2026-09.html), Abschnitt 5 (Paket U0) ·
-Branch `ux-umbau` · Status: **freigegeben am 01.10.2026** (F1–F4 wie vorgeschlagen), Tag 1 und 2 erledigt, zwei Durchsichten eingearbeitet ·
+Branch `ux-umbau` · Status: **freigegeben am 01.10.2026** (F1–F4 wie vorgeschlagen), Tag 1 bis 3 erledigt, zwei Durchsichten eingearbeitet ·
 Stand und Protokoll: [projekt-ux-umbau.md](projekt-ux-umbau.md)
 
 ## 1. Ziel
@@ -128,8 +128,8 @@ deshalb kein `class-variance-authority`, das nur eine Funktion herausgäbe (geä
 | `statuspille.tsx` | Töne `ok`, `wait`, `critical`, `info`, `neutral`; Punkt plus Text | Text ist Pflicht (ohne Text zeichnet sie nichts); langer Text bricht um; kein Einrichtungs-Farbpunkt daneben |
 | `gruppe.tsx` | `Gruppe` (weiße Fläche, Haarlinien, Beschriftung darüber, Aktion rechts) und `Zeile` (Beschriftung/Wert oder frei) | ersetzt die Kartenwände; Beschriftung als `h2` in `ink-2`; leerer Wert als „—“ (auch `false`, `[]`, Leerraum); nichts wird abgeschnitten |
 | `segment.tsx` | Umschalter mit zwei bis fünf Werten, optional Zähler | Tastatur wie Radix Tabs (Pfeiltasten); nicht für Navigation zwischen Seiten |
-| `dialog.tsx` | `Dialog` auf Radix, dazu `BestaetigungsDialog` (Titel, Satz, zwei Knöpfe, Variante `critical`) | siehe „Dialog“ unten |
-| `toast.tsx` | Radix Toast, Anbieter im Portal-Layout, Aufruf `toast.ok(…)`, `toast.fehler(…)`, optional „Rückgängig“ | Fehler bleiben stehen, bis sie geschlossen werden; Erfolg 5 s |
+| `dialog.tsx` | `Dialog` auf Radix (gesteuert: `offen`, `onSchliessen`; fester Fuß mit „Abbrechen“ und `bestaetigen`), dazu `BestaetigungsDialog` (`alertdialog`: Titel, Satz, zwei Knöpfe, Variante `critical`) | siehe „Dialog“ unten; Klick daneben schließt nicht; Fokus beim Öffnen auf „Abbrechen“ oder dem Feld mit `data-autofokus` |
+| `toast.tsx` | Radix Toast, `ToastAnbieter` im Portal-Layout, Aufruf `toast.ok(…)`, `toast.fehler(…)`, `toast.hinweis(…)`, optional „Rückgängig“ | Fehler bleiben stehen, bis sie geschlossen werden; Erfolg 5 s, mit „Rückgängig“ 10 s; ohne Text keine Meldung; Doppelte ersetzen sich, höchstens vier zugleich |
 | `skelett.tsx` | graue Zeilen als Ladezustand für Liste und Gruppe | `aria-busy`, kein Text „Lädt…“ nötig |
 | `leerzustand.tsx` | Symbol (lucide), Titel, Satz, optional ein Knopf | kein Emoji |
 | `seitenkopf.tsx` | Breadcrumb, Titel, Unterzeile, rechts Statuspille, Primärknopf und „…“-Menü (Radix Dropdown) | Breadcrumb-Einträge als Eigenschaft; Links über `next/link` |
@@ -145,7 +145,9 @@ von sich aus tut und die bleiben müssen:
 
 Entschieden: `ui/dialog.tsx` auf Radix bauen (Fokusfang, Portal, Scroll-Sperre und ARIA kommen
 dann aus einer gepflegten Bibliothek) und diese vier Regeln als Eigenschaften übernehmen
-(`gesperrt`, `fehler`, `sperrGrund`, `fokusZiel`). `dialog-rahmen.tsx` und die übrigen
+(`gesperrt`, `fehler`, `bestaetigen.sperrGrund`, `fokusZiel`; gebaut an Tag 3). Während
+`gesperrt` bleiben die Knöpfe fokussierbar (`aria-disabled` statt `disabled` wie im alten
+Rahmen). `dialog-rahmen.tsx` und die übrigen
 28 selbst gebauten Überlagerungen (`fixed inset-0`) bleiben in U0 unberührt und ziehen mit U4
 und U10 um, zusammen mit ihren Tests. Die Überlagerung des neuen Dialogs zählt die Sperrklinke
 nicht (`src/components/ui/` ist bei diesem Muster ausgenommen). Der Schatten kommt über
@@ -176,10 +178,12 @@ werden muss. Die Sperrklinke (Abschnitt 5) verhindert bis dahin neue Aufrufe.
 | Datei | Änderung |
 |---|---|
 | `src/app/globals.css` | neue Tokens, `--font-heading`, `color-scheme` |
-| `src/components/ui/*.tsx` | neu (neun Dateien geplant, drei stehen) |
+| `src/components/ui/*.tsx` | neu (neun Dateien geplant, fünf stehen) |
 | `src/app/(portal)/ui-muster/page.tsx` | neu |
 | `src/app/(portal)/layout.tsx` | Toast-Anbieter einhängen (eine Zeile; die Datei gibt es schon) |
-| `src/__tests__/components/ui-bausteine.test.tsx` | neu (ein Testfile für die kleinen Bausteine; Dialog und Toast bekommen eigene) |
+| `src/__tests__/components/ui-bausteine.test.tsx` | neu (ein Testfile für die kleinen Bausteine) |
+| `src/__tests__/components/ui-dialog.test.tsx`, `ui-toast.test.tsx` | neu (Tag 3) |
+| `src/app/(portal)/ui-muster/dialog-muster.tsx` | neu: der Teil der Musterseite mit Zustand (Dialoge, Meldungen) |
 | `src/__tests__/components/ui-musterseite.test.tsx` | neu: Zugang und axe über die echte Musterseite |
 | `src/__tests__/hilfen/axe.ts`, `jest-axe.d.ts` | neu: `axeVerstoesse()` für alle Baustein-Tests |
 | `src/__tests__/lib/ui-kontrast.test.ts`, `utils-cn.test.ts` | neu |
@@ -278,7 +282,7 @@ Empfehlung: zusammen mit U1.
 |---|---|---|
 | 1 Tokens, Schrift, `color-scheme`, Kontrasttest, Sperrklinke | **erledigt 01.10.2026** | siehe [projekt-ux-umbau.md](projekt-ux-umbau.md), Abschnitt 8 |
 | 2 Button, Statuspille, Gruppe und Zeile, Musterseite begonnen, `jest-axe` | **erledigt 01.10.2026** | siehe Logbuch, Abschnitt 8 |
-| 3 Dialog, Bestätigungsdialog, Toast | offen | |
+| 3 Dialog, Bestätigungsdialog, Toast, Anbieter im Portal-Layout, Token `scrim` | **erledigt 01.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 4 Seitenkopf, Segment | offen | |
 | 5 Skelett, Leerzustand, Musterseite, axe | offen | |
 | 6 Puffer, Screenshots | offen | |
