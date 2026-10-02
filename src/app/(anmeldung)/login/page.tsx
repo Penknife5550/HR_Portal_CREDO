@@ -21,6 +21,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    let angemeldet = false;
 
     try {
       const res = await fetch("/api/auth", {
@@ -38,11 +39,14 @@ export default function LoginPage() {
       // Volles Laden statt Wechsel im Client: Das Portal-Layout (mit dem
       // Kopf) muss mit der NEUEN Sitzung gezeichnet werden — ein vom Router
       // gemerktes Layout truege nach einem Kontowechsel den alten Namen.
+      // Der Knopf bleibt gesperrt, bis die neue Seite da ist — sonst liesse
+      // sich waehrend des Ladens ein zweites Mal anmelden.
+      angemeldet = true;
       seiteNeuLaden(vorgangslistePfad());
     } catch {
       setError("Verbindungsfehler. Bitte versuchen Sie es erneut.");
     } finally {
-      setLoading(false);
+      if (!angemeldet) setLoading(false);
     }
   }
 

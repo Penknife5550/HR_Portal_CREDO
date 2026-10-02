@@ -48,16 +48,8 @@ export const ADMIN_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"] as const;
 export const ALL_PORTAL_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER"] as const;
 export const HR_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"] as const;
 
-// =============================================
-// Rollen-Labels
-// =============================================
-export const USER_ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN: "Administrator",
-  HR_LEITUNG: "HR-Leitung",
-  HR_SACHBEARBEITER: "Sachbearbeiter",
-  EINRICHTUNGSLEITUNG: "Einrichtungsleitung",
-  VORGESETZTER: "Vorgesetzter",
-};
+// Rollennamen: `rollenName()` in src/lib/navigation.ts — die EINE Tabelle
+// (Kopf des Portals und Benutzerverwaltung).
 
 // =============================================
 // Vertragsarten

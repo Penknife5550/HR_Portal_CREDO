@@ -35,14 +35,22 @@ import { toast, ToastAnbieter } from "@/components/ui/toast";
 const nutzer = (role: string) => ({ firstName: "Erika", lastName: "Muster", role });
 
 let bemAnzahl = 0;
+/** Wie die Abmeldung ausgeht: ok, Serverfehler oder kein Netz. */
+let abmeldung: "ok" | "fehler" | "netz" = "ok";
 const abrufe: { url: string; method: string }[] = [];
 
 beforeEach(() => {
   pfad = "/vorgaenge/onboarding";
   bemAnzahl = 0;
+  abmeldung = "ok";
   abrufe.length = 0;
   global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
-    abrufe.push({ url: String(url), method: init?.method ?? "GET" });
+    const method = init?.method ?? "GET";
+    abrufe.push({ url: String(url), method });
+    if (method === "DELETE") {
+      if (abmeldung === "netz") throw new TypeError("Failed to fetch");
+      return { ok: abmeldung === "ok", json: async () => ({}) } as Response;
+    }
     return { ok: true, json: async () => ({ data: { counts: { total: bemAnzahl } } }) } as Response;
   }) as typeof fetch;
 });
@@ -104,6 +112,21 @@ describe("PortalKopf: Aufbau", () => {
     expect(await axeVerstoesse(container)).toEqual([]);
     fireEvent.click(screen.getByRole("button", { name: "Menü" }));
     expect(await axeVerstoesse(container)).toEqual([]);
+  });
+});
+
+describe("PortalKopf: Logo", () => {
+  it.each([
+    ["HR_LEITUNG", "/vorgaenge"],
+    ["VORGESETZTER", "/vorgaenge"],
+    ["BEM_BEAUFTRAGTER", "/bem"],
+  ])("fuehrt %s auf %s – nie auf eine Adresse, die die Rolle nicht oeffnen kann", async (rolle, ziel) => {
+    // Befund der vierten Durchsicht: Das Logo zeigte fuer alle auf /vorgaenge;
+    // BEM-Beauftragte leitet die Middleware dort nur um.
+    const { container } = await gezeichnet(rolle);
+    const logo = container.querySelector("header a")!;
+    expect(logo.querySelector("img")?.getAttribute("alt")).toBe("CREDO");
+    expect(logo.getAttribute("href")).toBe(ziel);
   });
 });
 
@@ -228,5 +251,25 @@ describe("PortalKopf: Abmelden", () => {
     await waitFor(() => expect(seiteNeuLaden).toHaveBeenCalledWith("/login"));
     expect(abrufe).toContainEqual({ url: "/api/auth", method: "DELETE" });
     expect(document.querySelectorAll("li[data-ton]")).toHaveLength(0);
+  });
+
+  it.each(["fehler", "netz"] as const)("scheitert das Abmelden (%s), bleibt die Seite stehen und meldet es", async (ausgang) => {
+    // Befund der vierten Durchsicht: Die Seite ging auch dann zur Anmeldung,
+    // wenn der Server die Sitzung nicht beendet hatte — sie sah abgemeldet aus,
+    // das Konto blieb am selben Rechner offen.
+    seiteNeuLaden.mockClear();
+    abmeldung = ausgang;
+    render(
+      <>
+        <PortalKopf user={nutzer("HR_LEITUNG")} />
+        <ToastAnbieter />
+      </>,
+    );
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "Abmelden" }));
+    await waitFor(() => expect(document.querySelectorAll('li[data-ton="fehler"]')).toHaveLength(1));
+    expect(document.querySelector('li[data-ton="fehler"]')!.textContent).toContain("die Sitzung besteht noch");
+    expect(seiteNeuLaden).not.toHaveBeenCalled();
+    act(() => toast.alleSchliessen());
   });
 });

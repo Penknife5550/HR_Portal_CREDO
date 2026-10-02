@@ -122,8 +122,19 @@ export function ToastAnbieter() {
   );
   const bereich = useRef<HTMLOListElement>(null);
 
-  // Beim Verlassen des Portals alles abraeumen (siehe Kopf).
-  useEffect(() => () => toast.alleSchliessen(), []);
+  // Beim Verlassen des Portals alles abraeumen (siehe Kopf) — aber erst einen
+  // Takt spaeter und nur, wenn dann KEIN Anbieter mehr haengt: Im Strict Mode
+  // der Entwicklung haengt React jede Komponente einmal zur Probe aus und
+  // sofort wieder ein; ein Abraeumen dabei loeschte Meldungen, die schon vor
+  // dem Anbieter gemeldet waren.
+  useEffect(
+    () => () => {
+      setTimeout(() => {
+        if (horcher.size === 0) toast.alleSchliessen();
+      }, 0);
+    },
+    [],
+  );
 
   // Offener Dialog = Zeit anhalten. Radix sperrt waehrenddessen das Rollen und
   // setzt dafuer `data-scroll-locked` am body; die Meldungen hoeren auf die
@@ -137,6 +148,16 @@ export function ToastAnbieter() {
     waechter.observe(document.body, { attributes: true, attributeFilter: ["data-scroll-locked"] });
     return () => waechter.disconnect();
   }, []);
+
+  // Eine Meldung, die entsteht, WAEHREND ein Dialog schon offen ist, hat das
+  // Pause-Ereignis oben nicht gehoert — also bei jeder Aenderung der Liste
+  // noch einmal sagen. (Effekte der Kinder laufen vor diesem: Die neue Meldung
+  // horcht dann schon.)
+  useEffect(() => {
+    if (liste.length > 0 && document.body.hasAttribute("data-scroll-locked")) {
+      bereich.current?.dispatchEvent(new CustomEvent("toast.viewportPause"));
+    }
+  }, [liste]);
 
   return (
     <RadixToast.Provider label="Meldung" swipeDirection="right">

@@ -13,7 +13,9 @@ jest.mock("jose", () => ({ jwtVerify: (...args: unknown[]) => jwtVerify(...args)
 
 import { NextRequest } from "next/server";
 import { middleware } from "@/middleware";
-import { aktiverPunkt, NAVIGATION, ROLLEN_NAMEN, rollenName, sichtbarePunkte } from "@/lib/navigation";
+import fs from "fs";
+import path from "path";
+import { aktiverPunkt, NAVIGATION, ROLLEN_NAMEN, rollenName, sichtbarePunkte, startAdresse } from "@/lib/navigation";
 
 const ROLLEN = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER", "BEM_BEAUFTRAGTER"];
 
@@ -88,6 +90,24 @@ describe("Der Kopf zeigt nur, was die Rolle oeffnen kann", () => {
     }
   });
 
+  it.each(ROLLEN)("%s: auch das Logo (startAdresse) fuehrt auf eine Adresse, die nicht umgeleitet wird", async (rolle) => {
+    jwtVerify.mockResolvedValue({ payload: { role: rolle } });
+    const antwort = await middleware(
+      new NextRequest(`http://localhost:3000${startAdresse(rolle)}`, { headers: { cookie: "credo_session=x" } }),
+    );
+    expect({ rolle, start: startAdresse(rolle), umgeleitet: antwort.headers.get("location") }).toEqual({
+      rolle,
+      start: startAdresse(rolle),
+      umgeleitet: null,
+    });
+  });
+
+  it("startAdresse: BEM-Beauftragte landen im BEM, alle anderen in den Vorgaengen; ohne Punkte der Einstieg", () => {
+    expect(startAdresse("BEM_BEAUFTRAGTER")).toBe("/bem");
+    for (const rolle of ROLLEN.filter((r) => r !== "BEM_BEAUFTRAGTER")) expect(startAdresse(rolle)).toBe("/vorgaenge");
+    expect(startAdresse("SERVICE")).toBe("/vorgaenge");
+  });
+
   it("Gegenprobe: /vorlagen leitet die Sachbearbeitung um – deshalb fehlt der Punkt", async () => {
     jwtVerify.mockResolvedValue({ payload: { role: "HR_SACHBEARBEITER" } });
     const antwort = await middleware(
@@ -152,5 +172,43 @@ describe("Rollenname", () => {
   it("eine unbekannte Rolle zeigt ihren Schluessel – nie den Namen einer anderen", () => {
     expect(rollenName("NEUE_ROLLE")).toBe("NEUE_ROLLE");
     expect(rollenName("constructor")).toBe("constructor");
+  });
+});
+
+describe("Waechter: der Kopf haengt nur im Layout", () => {
+  const SRC = path.join(__dirname, "..", "..");
+  const dateien = (ordner: string): string[] =>
+    fs.readdirSync(ordner, { withFileTypes: true }).flatMap((e) => {
+      const voll = path.join(ordner, e.name);
+      if (e.isDirectory()) return e.name === "__tests__" ? [] : dateien(voll);
+      return /\.(ts|tsx)$/.test(e.name) ? [voll] : [];
+    });
+  const relativ = (d: string) => path.relative(SRC, d).split(path.sep).join("/");
+
+  it("nur das Portal-Layout bindet den PortalKopf ein – keine Seite, keine Komponente", () => {
+    // Befund der vierten Durchsicht: Die Regel stand nur im Kommentar. Eine
+    // Seite mit eigenem Kopf zeigte zwei Koepfe uebereinander.
+    const nutzer = dateien(SRC)
+      .filter((d) => /rahmen\/portal-kopf["']/.test(fs.readFileSync(d, "utf8")))
+      .map(relativ);
+    expect(nutzer).toEqual(["app/(portal)/layout.tsx"]);
+    expect(fs.readFileSync(path.join(SRC, "app", "(portal)", "layout.tsx"), "utf8")).toContain("<PortalKopf ");
+  });
+
+  it("die Anmeldeseite liegt ausserhalb des Portal-Layouts, die Fragebogen-Vorschau ohne Kopf", () => {
+    const gibt = (...teile: string[]) => fs.existsSync(path.join(SRC, "app", ...teile));
+    expect(gibt("(anmeldung)", "login", "page.tsx")).toBe(true);
+    expect(gibt("(portal)", "login")).toBe(false);
+    // Die Vorschau zeigt den Fragebogen, wie ihn die Person sieht — ohne
+    // Portal-Navigation darueber. Die Adresse bleibt /vorlagen/vorschau/<id>.
+    expect(gibt("(portal-ohne-kopf)", "vorlagen", "vorschau", "[id]", "page.tsx")).toBe(true);
+    expect(gibt("(portal)", "vorlagen", "vorschau")).toBe(false);
+  });
+
+  it("es gibt genau EINE Tabelle der Rollennamen", () => {
+    const treffer = dateien(SRC)
+      .filter((d) => /ROLE_LABELS/.test(fs.readFileSync(d, "utf8")))
+      .map(relativ);
+    expect(treffer).toEqual([]);
   });
 });

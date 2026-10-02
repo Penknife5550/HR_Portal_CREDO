@@ -149,7 +149,7 @@
     "app/(portal)/mandanten/mandanten-content.tsx": 24,
     "app/(portal)/mandanten/[id]/vertragsende-config/vertragsende-config-content.tsx": 1,
     "app/(portal)/vorlagen/vorlagen-content.tsx": 30,
-    "app/(portal)/vorlagen/vorschau/[id]/page.tsx": 10,
+    "app/(portal-ohne-kopf)/vorlagen/vorschau/[id]/page.tsx": 10,
     "app/(portal)/zeugnis-vorlagen/zeugnis-vorlagen-content.tsx": 19,
     "app/bem/einwilligung/[token]/einwilligung-content.tsx": 20,
     "app/civil-service-acknowledgement/[token]/acknowledgement-form.tsx": 1,

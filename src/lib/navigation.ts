@@ -122,6 +122,16 @@ export function aktiverPunkt(pfad: string, punkte: readonly NavPunkt[] = NAVIGAT
   return bester;
 }
 
+/**
+ * Wohin das Logo fuehrt: der erste Punkt, den die Rolle sieht. Fuer externe
+ * BEM-Beauftragte ist das die BEM-Fallliste — `/vorgaenge` leitete die
+ * Middleware fuer sie nur um.
+ */
+export function startAdresse(rolle: string): string {
+  const erster = sichtbarePunkte(rolle)[0];
+  return erster?.href ?? erster?.kinder?.[0]?.href ?? VORGAENGE_PFAD;
+}
+
 /** Anzeigename je Rolle — fuer ALLE Rollen, die sich anmelden koennen. */
 export const ROLLEN_NAMEN: Record<string, string> = {
   SUPER_ADMIN: "Administration",

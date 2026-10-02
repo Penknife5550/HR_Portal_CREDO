@@ -19,6 +19,9 @@
  *     alle erreichbaren Punkte und schliesst beim Wechsel der Seite.
  *   - „Zum Inhalt springen" ist der erste Tab-Halt (sichtbar erst bei Fokus);
  *     das Ziel `#inhalt` setzt das Layout.
+ *   - Auch das Logo fuehrt nur dorthin, wo die Rolle hin darf (`startAdresse`).
+ *   - Abmelden geht erst zur Anmeldeseite, wenn der Server die Sitzung
+ *     beendet hat; scheitert das, bleibt die Seite stehen und meldet es.
  *   - Abmelden laedt die Anmeldeseite NEU (kein Wechsel im Client): Der Kopf
  *     haengt im Layout, und ein Layout zeichnet Next.js beim Seitenwechsel
  *     nicht neu — nach einem Wechsel des Kontos stuende sonst der alte Name da.
@@ -35,9 +38,8 @@ import { usePathname } from "next/navigation";
 import * as RadixMenue from "@radix-ui/react-dropdown-menu";
 import { ChevronDown, Lock, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { vorgangslistePfad } from "@/lib/adressen";
 import { seiteNeuLaden } from "@/lib/seite-laden";
-import { aktiverPunkt, rollenName, sichtbarePunkte, type NavPunkt } from "@/lib/navigation";
+import { aktiverPunkt, rollenName, sichtbarePunkte, startAdresse, type NavPunkt } from "@/lib/navigation";
 import { CredoLinie } from "@/components/credo-linie";
 import { SessionTimeoutWarning } from "@/components/session-timeout-warning";
 import { Button } from "@/components/ui/button";
@@ -117,12 +119,22 @@ export function PortalKopf({ user }: { user: PortalKopfNutzer }) {
   }, [pathname]);
 
   async function abmelden() {
+    // Zur Anmeldeseite NUR, wenn der Server die Sitzung wirklich beendet hat.
+    // Sonst saehe die Seite abgemeldet aus, waehrend das Konto am selben
+    // Rechner ohne Passwort offen bliebe.
+    let beendet = false;
     try {
-      await fetch("/api/auth", { method: "DELETE" });
-    } finally {
-      toast.alleSchliessen();
-      seiteNeuLaden("/login");
+      const antwort = await fetch("/api/auth", { method: "DELETE" });
+      beendet = antwort.ok;
+    } catch {
+      beendet = false;
     }
+    if (!beendet) {
+      toast.fehler("Abmelden fehlgeschlagen – die Sitzung besteht noch. Bitte erneut versuchen.");
+      return;
+    }
+    toast.alleSchliessen();
+    seiteNeuLaden("/login");
   }
 
   return (
@@ -138,7 +150,7 @@ export function PortalKopf({ user }: { user: PortalKopfNutzer }) {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
           <div className="flex min-w-0 items-center gap-6">
             <Link
-              href={vorgangslistePfad()}
+              href={startAdresse(user.role)}
               className="flex shrink-0 items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
             >
               <Image src="/credo_logo.svg" alt="CREDO" width={120} height={40} priority className="h-10 w-auto" />

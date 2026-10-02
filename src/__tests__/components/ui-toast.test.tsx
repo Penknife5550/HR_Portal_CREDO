@@ -7,6 +7,7 @@
  * `ui/toast.tsx` — Fehler bleiben stehen, Erfolg geht nach 5 Sekunden, mit
  * „Rückgängig" nach 10; kein Text, keine Meldung; Doppelte ersetzen sich.
  */
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import {
   TOAST_DAUER_MIT_AKTION,
@@ -74,8 +75,41 @@ describe("Toast: Sitzung und offener Dialog", () => {
     act(() => void toast.fehler("Unterlage von Maria Voth konnte nicht gespeichert werden."));
     expect(meldungen()).toHaveLength(1);
     erster.unmount();
+    // Abgeraeumt wird einen Takt nach dem Aushaengen (siehe naechster Test).
+    act(() => void jest.advanceTimersByTime(1));
     render(<ToastAnbieter />);
     expect(meldungen()).toHaveLength(0);
+  });
+
+  it("im Strict Mode (Probe-Aushaengen der Entwicklung) bleibt eine frueh gemeldete Meldung stehen", () => {
+    // Befund der vierten Durchsicht: Das Abraeumen lief auch beim simulierten
+    // Aushaengen direkt nach dem ersten Einhaengen.
+    act(() => void toast.fehler("Früh gemeldet."));
+    render(
+      <StrictMode>
+        <ToastAnbieter />
+      </StrictMode>,
+    );
+    act(() => void jest.advanceTimersByTime(50));
+    expect(screen.getByText("Früh gemeldet.")).toBeTruthy();
+  });
+
+  it("eine Meldung, die bei schon offenem Dialog entsteht, wird ebenfalls angehalten", () => {
+    // Befund der vierten Durchsicht: Die Pause wurde nur beim OEFFNEN des
+    // Dialogs gemeldet; eine spaetere Meldung lief trotzdem ab.
+    document.body.setAttribute("data-scroll-locked", "1");
+    try {
+      render(<ToastAnbieter />);
+      const pause = jest.fn();
+      document.querySelector("ol")!.addEventListener("toast.viewportPause", pause);
+      act(() => void toast.ok("Gespeichert.", { rueckgaengig: () => {} }));
+      expect(pause).toHaveBeenCalled();
+      // Die Zeit steht: weit ueber die 10 Sekunden hinaus ist die Meldung noch da.
+      warten(60_000);
+      expect(meldungen()).toHaveLength(1);
+    } finally {
+      document.body.removeAttribute("data-scroll-locked");
+    }
   });
 
   it("solange ein Dialog offen ist, haelt die Zeit an; danach laeuft sie weiter", async () => {
