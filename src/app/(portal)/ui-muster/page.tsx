@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { Inbox, SearchX } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { PortalHeader } from "@/components/portal-header";
 import { Button } from "@/components/ui/button";
 import { Gruppe, Zeile } from "@/components/ui/gruppe";
+import { Leerzustand } from "@/components/ui/leerzustand";
 import { STATUS_TOENE, Statuspille, type StatusTon } from "@/components/ui/statuspille";
-import { DialogMuster, MusterKopf, SegmentMuster, ToastMuster } from "./dialog-muster";
+import { DialogMuster, LadeMuster, MusterKopf, SegmentMuster, ToastMuster } from "./dialog-muster";
 
 /**
  * Musterseite der Oberflaechen-Bausteine (UX-Umbau „Klarer Weg", U0)
@@ -138,6 +140,32 @@ export default async function UiMusterPage() {
             <ToastMuster />
           </Zeile>
         </Gruppe>
+
+        <section aria-labelledby="muster-ladezustand" className="space-y-2">
+          <div className="px-1">
+            <h2 id="muster-ladezustand" className="font-heading text-2xs font-semibold uppercase tracking-label text-ink-2">
+              Ladezustand
+            </h2>
+            <p className="mt-0.5 text-xs text-ink-2">
+              Das Skelett hat die Form dessen, was kommt – die Seite springt nicht, wenn die Daten eintreffen.
+            </p>
+          </div>
+          <LadeMuster />
+        </section>
+
+        <div className="grid gap-8 lg:grid-cols-2">
+          <Gruppe titel="Leerzustand in einer Gruppe" beschreibung="Sagt, was leer ist und wie es weitergeht.">
+            <Leerzustand symbol={Inbox} titel="Keine offenen Aufgaben" aktion={<Button groesse="sm">Neuen Vorgang anlegen</Button>}>
+              Sobald eine Abteilung etwas zurückmeldet, steht es hier.
+            </Leerzustand>
+          </Gruppe>
+
+          <Gruppe titel="Leerzustand nach einem Filter" beschreibung="Ein eigener Text – nicht derselbe wie „es gibt noch nichts“.">
+            <Leerzustand symbol={SearchX} titel="Kein Vorgang passt zu diesem Filter" aktion={<Button groesse="sm">Filter zurücksetzen</Button>}>
+              In „Kritisch“ steht gerade nichts.
+            </Leerzustand>
+          </Gruppe>
+        </div>
 
         <div className="grid gap-8 lg:grid-cols-2">
           <Gruppe titel="Gruppe mit Beschriftung und Wert" aktion={<Button groesse="sm">Ändern</Button>}>

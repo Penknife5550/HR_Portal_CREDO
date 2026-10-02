@@ -1,7 +1,7 @@
 # U0 Fundament – Feinplan
 
 Stand 01.10.2026 · gehört zu [ux-ui-plan-2026-09.html](ux-ui-plan-2026-09.html), Abschnitt 5 (Paket U0) ·
-Branch `ux-umbau` · Status: **freigegeben am 01.10.2026** (F1–F4 wie vorgeschlagen), Tag 1 bis 4 erledigt, zwei Durchsichten eingearbeitet ·
+Branch `ux-umbau` · Status: **freigegeben am 01.10.2026** (F1–F4 wie vorgeschlagen), Tag 1 bis 5 erledigt, zwei Durchsichten eingearbeitet ·
 Stand und Protokoll: [projekt-ux-umbau.md](projekt-ux-umbau.md)
 
 ## 1. Ziel
@@ -130,8 +130,8 @@ deshalb kein `class-variance-authority`, das nur eine Funktion herausgäbe (geä
 | `segment.tsx` | Umschalter mit zwei bis fünf Werten, optional Zähler | Auswahlgruppe (`radiogroup`) mit Pfeiltasten wie bei Reitern, Auswahl folgt dem Fokus; nicht für Navigation zwischen Seiten; rollt waagerecht statt umzubrechen |
 | `dialog.tsx` | `Dialog` auf Radix (gesteuert: `offen`, `onSchliessen`; fester Fuß mit „Abbrechen“ und `bestaetigen`), dazu `BestaetigungsDialog` (`alertdialog`: Titel, Satz, zwei Knöpfe, Variante `critical`) | siehe „Dialog“ unten; Klick daneben schließt nicht; Fokus beim Öffnen auf „Abbrechen“ oder dem Feld mit `data-autofokus` |
 | `toast.tsx` | Radix Toast, `ToastAnbieter` im Portal-Layout, Aufruf `toast.ok(…)`, `toast.fehler(…)`, `toast.hinweis(…)`, optional „Rückgängig“ | Fehler bleiben stehen, bis sie geschlossen werden; Erfolg 5 s, mit „Rückgängig“ 10 s; ohne Text keine Meldung; Doppelte ersetzen sich, höchstens vier zugleich |
-| `skelett.tsx` | graue Zeilen als Ladezustand für Liste und Gruppe | `aria-busy`, kein Text „Lädt…“ nötig |
-| `leerzustand.tsx` | Symbol (lucide), Titel, Satz, optional ein Knopf | kein Emoji |
+| `skelett.tsx` | graue Zeilen als Ladezustand für Liste und Gruppe | Form und Höhe der Gruppe (nichts springt); `role="status"`, `aria-busy`, ein Satz nur für Screenreader; kein sichtbares „Lädt…“ |
+| `leerzustand.tsx` | Symbol (lucide), Titel, Satz, optional ein Knopf | kein Emoji; leer ist nicht Fehler und nicht „lädt“; „kein Treffer für den Filter“ ist ein eigener Text; Titel ist keine Überschrift |
 | `seitenkopf.tsx` | Breadcrumb, Titel, Unterzeile, Statuspille am Titel, rechts Primärknopf und „…“-Menü (Radix Dropdown) | Breadcrumb-Einträge als Eigenschaft; Links über `next/link`; Titel = `h1` und Ersatzziel für den Fokus (`SEITENTITEL_ID`); ein Menüpunkt läuft erst nach dem Schließen des Menüs |
 
 **Dialog (F1, entschieden: Radix).** Es gibt bereits einen sorgfältig gebauten Rahmen:
@@ -178,7 +178,7 @@ werden muss. Die Sperrklinke (Abschnitt 5) verhindert bis dahin neue Aufrufe.
 | Datei | Änderung |
 |---|---|
 | `src/app/globals.css` | neue Tokens, `--font-heading`, `color-scheme` |
-| `src/components/ui/*.tsx` | neu (neun Dateien geplant, sieben stehen) |
+| `src/components/ui/*.tsx` | neu (neun Dateien, alle stehen) |
 | `src/app/(portal)/ui-muster/page.tsx` | neu |
 | `src/app/(portal)/layout.tsx` | Toast-Anbieter einhängen (eine Zeile; die Datei gibt es schon) |
 | `src/__tests__/components/ui-bausteine.test.tsx` | neu (ein Testfile für die kleinen Bausteine) |
@@ -285,7 +285,7 @@ Empfehlung: zusammen mit U1.
 | 2 Button, Statuspille, Gruppe und Zeile, Musterseite begonnen, `jest-axe` | **erledigt 01.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 3 Dialog, Bestätigungsdialog, Toast, Anbieter im Portal-Layout, Token `scrim` | **erledigt 01.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 4 Seitenkopf mit Pfad und Menü, Segment-Schalter | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
-| 5 Skelett, Leerzustand, Musterseite, axe | offen | |
+| 5 Skelett, Leerzustand, Musterseite vollständig (Test), axe über die Seite | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 6 Puffer, Screenshots | offen | |
 
 Gegenüber Abschnitt 4 kam an Tag 1 eine Datei dazu: `src/lib/ui/kontrast.ts` (die Rechnung

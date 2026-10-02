@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (U0, Tag 4)
+Letzte Änderung: 02.10.2026 (U0, Tag 5)
 
 ## 1. Worum es geht
 
@@ -26,7 +26,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 |---|---|---|
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
-| **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 4 von 6 erledigt (Tokens, Button, Statuspille, Gruppe, Dialog, Bestätigungsdialog, Toast, Seitenkopf, Segment-Schalter, Musterseite) |
+| **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 5 von 6 erledigt – alle neun Bausteine stehen (Button, Statuspille, Gruppe, Dialog, Toast, Seitenkopf, Segment-Schalter, Skelett, Leerzustand), Musterseite vollständig; offen: Tag 6 (Screenshots, `npm run build`) |
 | U1 | Rahmen: Kopf, Breadcrumb, neue Adressen | offen |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
@@ -111,6 +111,7 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Schleier des Dialogs | – | eigenes Token `scrim` | Keine fest eingetragene Farbe und kein `/40` in einer Klasse. |
 | Segment-Schalter | „Tastatur wie Radix Tabs“ | eigene Auswahlgruppe (`radiogroup`), Pfeiltasten wie bei Reitern | Radix Tabs verweist jeden Reiter auf ein Inhaltsfeld (`aria-controls`); der Schalter filtert eine Liste und hat keines – axe meldete den toten Verweis. |
 | Schatten `shadow-overlay` | nur Dialog und Toast | auch das „…“-Menü des Seitenkopfs | Gilt für alles, was über der Seite schwebt. |
+| Skelett | „`aria-busy`, kein Text „Lädt…“ nötig“ | `role="status"`, `aria-busy` und EIN Satz nur für Screenreader | Ohne Text erfährt ein Screenreader nicht, dass geladen wird; sichtbar bleibt es bei den Balken. |
 | Prototyp-Tag | „Kein Paket außer U0 startet ohne den Prototyp-Tag“ | gilt ab dem Pilot; U1 darf vorher | U1 ändert nur den Rahmen (Kopf, Breadcrumb, Adressen) und hängt an keiner der Fragen des Prototyp-Tags (E9, E11, E13). |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
@@ -390,7 +391,42 @@ Klassen für die gewählte Sicht sind dort ungetestet), `npm run build`.
 
 **Sichtbare Änderung:** nur auf `/ui-muster`.
 
-**Als Nächstes (U0, Tag 5):** Skelett, Leerzustand; Musterseite vollständig; axe über alles.
+### 02.10.2026 – U0, Tag 5
+
+**Code:**
+
+| Datei | Inhalt |
+|---|---|
+| `src/components/ui/skelett.tsx` | `Skelett`: Ladezustand in der Form von `Gruppe`/`Zeile` (`art` `liste` oder `gruppe`, `zeilen`, `mitTitel`, `label`) |
+| `src/components/ui/leerzustand.tsx` | `Leerzustand`: Symbol (lucide), Titel, ein Satz, höchstens ein Knopf; `mitFlaeche` für den Einsatz außerhalb einer Gruppe |
+| `src/app/(portal)/ui-muster/` | Abschnitt „Ladezustand“ (Knopf schaltet zwischen Skelett und Inhalt um) und zwei Leerzustände („es gibt noch nichts“, „kein Treffer für den Filter“) |
+| `ui-bausteine.test.tsx` | 9 neue Tests zu Skelett und Leerzustand |
+| `ui-musterseite.test.tsx` | Ladezustand und Leerzustand auf der echten Seite; neuer Test „Vollständigkeit“: Jede Datei in `src/components/ui/` muss von der Musterseite eingebunden sein |
+
+**Entscheidungen beim Bauen:**
+- Das Skelett übernimmt Fläche, Haarlinien und Abstände der Gruppe wörtlich (ein Test
+  vergleicht die Klassen). Die Balken sitzen in Kästen mit der Zeilenhöhe des Textes – der
+  erste Wurf war je Zeile 2 px zu niedrig, die Seite sprang beim Umschalten um 6 px. Jetzt
+  gemessen: Skelett und Inhalt 182 px (Liste) und 134 px (Gruppe), jeweils gleich.
+- Die Breiten der Balken wechseln nach festem Muster, nicht zufällig (Server und Browser
+  zeichnen dasselbe). Sie pulsieren nur, wenn das System Bewegung erlaubt.
+- Der Titel des Leerzustands ist keine Überschrift: Er steht in einer Gruppe, deren Titel
+  den Bereich schon benennt.
+- Skelett und Leerzustand sind keine Client-Komponenten; sie lassen sich aus
+  Server-Komponenten samt Symbol einbinden.
+- „Musterseite vollständig“ hält jetzt ein Test fest, nicht die Erinnerung (Regel 6).
+
+**Geprüft:** `npm run pruefen` (Typen, Lint, 185 Suiten, 4.745 Tests). Im Browser auf
+`/ui-muster`: Skelett in beiden Formen, Umschalten auf den Inhalt ohne Sprung (Höhen
+gemessen), beide Leerzustände.
+
+**Nicht geprüft:** „Bewegung reduzieren“ im System, `npm run build`.
+
+**Sichtbare Änderung:** nur auf `/ui-muster`.
+
+**Als Nächstes (U0, Tag 6):** `npm run build`; Screenshots der Musterseite in 1440, 1366×768
+und 390 px; Vorher/Nachher von fünf bestehenden Seiten (Abnahme, Feinplan Abschnitt 7);
+danach Feinplan U1.
 
 ## 8. Branches und Commits
 
@@ -409,10 +445,11 @@ Klassen für die gewählte Sicht sind dort ungetestet), `npm run build`.
 | `ux-umbau` | `7511540` | Logbuch: Push vom 01.10.2026 |
 | `ux-umbau` | `9153727` | U0 Tag 3: Dialog, Bestätigungsdialog, Toast, Anbieter im Portal-Layout |
 | `ux-umbau` | `1097424` | Browserprobe zu Tag 3: Meldungen springen nicht mehr, Abstand auf der Musterseite |
-| `ux-umbau` | (folgt) | U0 Tag 4: Seitenkopf mit Pfad und Menü, Segment-Schalter |
+| `ux-umbau` | `17a2f3d` | U0 Tag 4: Seitenkopf mit Pfad und Menü, Segment-Schalter |
+| `ux-umbau` | (folgt) | U0 Tag 5: Skelett, Leerzustand, Musterseite vollständig |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Tag 3 und 4 sind noch nicht gepusht. Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Tag 3 bis 5 sind noch nicht gepusht. Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

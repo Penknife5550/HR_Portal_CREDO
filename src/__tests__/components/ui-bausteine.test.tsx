@@ -16,7 +16,10 @@ import { createRef, type ReactNode } from "react";
 import { fireEvent, render } from "@testing-library/react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button, BUTTON_FARBEN, type ButtonVariante } from "@/components/ui/button";
+import { Inbox } from "lucide-react";
 import { Gruppe, Zeile } from "@/components/ui/gruppe";
+import { Leerzustand } from "@/components/ui/leerzustand";
+import { Skelett } from "@/components/ui/skelett";
 import { STATUS_TOENE, Statuspille, type StatusTon } from "@/components/ui/statuspille";
 import { axeVerstoesse } from "../hilfen/axe";
 
@@ -615,5 +618,120 @@ describe("Gruppe und Zeile", () => {
     expect(verstoesse).toHaveLength(1);
     expect(verstoesse[0]).toContain("heading-order");
     expect(verstoesse[0]).toContain("<h4");
+  });
+});
+
+// =============================================
+// Skelett
+// =============================================
+
+describe("Skelett", () => {
+  it("meldet Screenreadern EINEN Satz; die Balken sind Zierde", async () => {
+    const { container, getByRole } = render(
+      <main>
+        <h1>Seite</h1>
+        <Skelett zeilen={4} label="Vorgänge werden geladen" />
+      </main>,
+    );
+    const bereich = getByRole("status");
+    expect(bereich.getAttribute("aria-busy")).toBe("true");
+    expect(bereich.textContent).toBe("Vorgänge werden geladen");
+    // Alles ausser dem Satz ist verborgen.
+    for (const kind of Array.from(bereich.children)) {
+      if (kind.textContent === "") expect(kind.getAttribute("aria-hidden")).toBe("true");
+    }
+    expect(await axeVerstoesse(container)).toEqual([]);
+  });
+
+  it("zeichnet so viele Zeilen wie verlangt – mindestens eine, Vorgabe drei", () => {
+    const zeilen = (el: HTMLElement) => el.querySelector("[aria-hidden].divide-y")!.children.length;
+    expect(zeilen(render(<Skelett />).container)).toBe(3);
+    expect(zeilen(render(<Skelett zeilen={7} />).container)).toBe(7);
+    expect(zeilen(render(<Skelett zeilen={0} />).container)).toBe(1);
+    expect(zeilen(render(<Skelett zeilen={2.9} />).container)).toBe(2);
+  });
+
+  it("hat die Form der Gruppe: dieselbe Flaeche, Haarlinien und Zeilenabstaende", () => {
+    const skelett = render(<Skelett art="gruppe" />).container.querySelector("[aria-hidden].divide-y")!;
+    const gruppe = render(
+      <Gruppe>
+        <Zeile label="a">b</Zeile>
+      </Gruppe>,
+    ).container.querySelector(".divide-y")!;
+    expect(skelett.className).toBe(gruppe.className);
+    for (const k of ["px-4", "py-3"]) {
+      expect(skelett.firstElementChild!.className).toContain(k);
+      expect(gruppe.firstElementChild!.className).toContain(k);
+    }
+  });
+
+  it("liste und gruppe unterscheiden sich; mitTitel haelt den Platz des Gruppentitels frei", () => {
+    const liste = render(<Skelett art="liste" />).container;
+    const gruppe = render(<Skelett art="gruppe" mitTitel />).container;
+    expect(liste.querySelector('[data-skelett="liste"] .rounded-full')).not.toBeNull();
+    expect(gruppe.querySelector('[data-skelett="gruppe"] .rounded-full')).toBeNull();
+    expect(liste.querySelector(".min-h-8")).toBeNull();
+    expect(gruppe.querySelector(".min-h-8")).not.toBeNull();
+  });
+
+  it("pulsiert nur, wenn Bewegung erlaubt ist, und zeichnet jedes Mal dasselbe", () => {
+    const a = render(<Skelett zeilen={5} />).container.innerHTML;
+    const b = render(<Skelett zeilen={5} />).container.innerHTML;
+    expect(a).toBe(b);
+    expect(a).toContain("motion-safe:animate-pulse");
+    expect(a).not.toMatch(/[\s"]animate-pulse/);
+  });
+});
+
+// =============================================
+// Leerzustand
+// =============================================
+
+describe("Leerzustand", () => {
+  it("zeigt Titel, Satz und Knopf; das Symbol ist Zierde, der Titel keine Ueberschrift", async () => {
+    const { container, getByText, getByRole, queryByRole } = render(
+      <main>
+        <h1>Seite</h1>
+        <Gruppe titel="Aufgaben">
+          <Leerzustand symbol={Inbox} titel="Keine offenen Aufgaben" aktion={<Button>Neuen Vorgang anlegen</Button>}>
+            Sobald eine Abteilung etwas zurückmeldet, steht es hier.
+          </Leerzustand>
+        </Gruppe>
+      </main>,
+    );
+    expect(getByText("Keine offenen Aufgaben").tagName).toBe("P");
+    expect(queryByRole("heading", { name: "Keine offenen Aufgaben" })).toBeNull();
+    expect(getByText("Sobald eine Abteilung etwas zurückmeldet, steht es hier.")).toBeTruthy();
+    expect(getByRole("button", { name: "Neuen Vorgang anlegen" })).toBeTruthy();
+    expect(container.querySelector("[data-leerzustand] svg")!.closest("[aria-hidden]")).not.toBeNull();
+    expect(await axeVerstoesse(container)).toEqual([]);
+  });
+
+  it("ohne Satz und ohne Knopf bleibt nur der Titel", () => {
+    const { container } = render(<Leerzustand symbol={Inbox} titel="Keine Dokumente" />);
+    const bereich = container.querySelector("[data-leerzustand]")!;
+    expect(bereich.querySelectorAll("p")).toHaveLength(1);
+    expect(bereich.querySelector("button")).toBeNull();
+  });
+
+  it("mitFlaeche gibt die weisse Flaeche der Gruppe; Klassen und Attribute erreichen den Bereich", () => {
+    const { container } = render(<Leerzustand symbol={Inbox} titel="Leer" mitFlaeche className="py-4" data-test="x" />);
+    const bereich = container.querySelector("[data-leerzustand]")!;
+    expect(bereich.className).toContain("bg-card");
+    expect(bereich.className).toContain("py-4");
+    expect(bereich.className).not.toContain("py-10");
+    expect(bereich.getAttribute("data-test")).toBe("x");
+    const ohne = render(<Leerzustand symbol={Inbox} titel="Leer" />).container.querySelector("[data-leerzustand]")!;
+    expect(ohne.className).not.toContain("bg-card");
+  });
+
+  it("nutzt ink-3 nirgends als Textfarbe und kein Emoji", () => {
+    const { container } = render(
+      <Leerzustand symbol={Inbox} titel="Keine offenen Aufgaben">
+        Satz
+      </Leerzustand>,
+    );
+    expect(container.innerHTML).not.toMatch(/\btext-ink-3\b/);
+    expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 });

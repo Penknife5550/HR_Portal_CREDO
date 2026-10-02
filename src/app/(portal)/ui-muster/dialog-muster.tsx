@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Musterseite, Teil „Dialoge und Meldungen" — die Bausteine mit Zustand
- * (die Seite selbst ist eine Server-Komponente).
+ * Musterseite, die Teile mit Zustand — Kopf mit Menue, Segment-Schalter,
+ * Dialoge, Meldungen, Ladezustand (die Seite selbst ist eine
+ * Server-Komponente).
  *
  * Die Aktionen sind gespielt: Ein Zeitgeber ersetzt den Server, damit sich
  * „gesperrt, waehrend die Aktion laeuft" und „Fehler bleibt im Dialog" von Hand
@@ -12,8 +13,10 @@ import { useRef, useState } from "react";
 import { Download, History, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BestaetigungsDialog, Dialog } from "@/components/ui/dialog";
+import { Gruppe, Zeile } from "@/components/ui/gruppe";
 import { Segment } from "@/components/ui/segment";
 import { Seitenkopf, SEITENTITEL_ID } from "@/components/ui/seitenkopf";
+import { Skelett } from "@/components/ui/skelett";
 import { Statuspille } from "@/components/ui/statuspille";
 import { toast } from "@/components/ui/toast";
 
@@ -210,6 +213,52 @@ export function SegmentMuster() {
           { wert: "probleme", text: "Probleme" },
         ]}
       />
+    </div>
+  );
+}
+
+/**
+ * Skelett und Inhalt im Wechsel: Der Knopf schaltet um, damit sich pruefen
+ * laesst, dass beim Eintreffen der Daten nichts springt.
+ */
+export function LadeMuster() {
+  const [laedt, setLaedt] = useState(true);
+
+  return (
+    <div className="space-y-3">
+      <Button groesse="sm" aria-pressed={laedt} onClick={() => setLaedt((l) => !l)}>
+        {laedt ? "Inhalt zeigen" : "Ladezustand zeigen"}
+      </Button>
+      <div className="grid items-start gap-8 lg:grid-cols-2">
+        {laedt ? (
+          <Skelett art="liste" zeilen={3} label="Vorgänge werden geladen" />
+        ) : (
+          <Gruppe aria-label="Vorgänge">
+            {[
+              ["Muster, Maria", "Onboarding · Berufskolleg", "Wartet"],
+              ["Beispiel, Jonas", "Vertragsende · Gesamtschule", "Wartet"],
+              ["Probe, Lea", "Verbeamtung · Gymnasium", "Wartet"],
+            ].map(([name, unterzeile, zustand]) => (
+              <Zeile key={name} className="flex items-center justify-between gap-4">
+                <span>
+                  <span className="block font-semibold">{name}</span>
+                  <span className="block text-xs text-ink-2">{unterzeile}</span>
+                </span>
+                <Statuspille ton="wait">{zustand}</Statuspille>
+              </Zeile>
+            ))}
+          </Gruppe>
+        )}
+        {laedt ? (
+          <Skelett art="gruppe" zeilen={3} label="Vertragsdaten werden geladen" />
+        ) : (
+          <Gruppe aria-label="Vertragsdaten">
+            <Zeile label="Einrichtung">Berufskolleg</Zeile>
+            <Zeile label="Vertragsbeginn">01.02.2027</Zeile>
+            <Zeile label="Umfang">25,5 Stunden</Zeile>
+          </Gruppe>
+        )}
+      </div>
     </div>
   );
 }

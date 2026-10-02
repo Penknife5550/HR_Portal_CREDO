@@ -13,6 +13,8 @@
  * Der Portal-Kopf ist durch seine Ueberschrift ersetzt (er zieht Router und
  * Sitzungswarnung mit); sein `<h1>` bleibt, damit die Reihenfolge stimmt.
  */
+import { readdirSync, readFileSync } from "fs";
+import { join } from "path";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { axeVerstoesse } from "../hilfen/axe";
 import { STATUS_TOENE } from "@/components/ui/statuspille";
@@ -71,7 +73,7 @@ describe("Inhalt", () => {
     const { container } = await seite();
     expect(await axeVerstoesse(container)).toEqual([]);
     const ebenen = Array.from(container.querySelectorAll("h1, h2, h3, h4")).map((h) => h.tagName);
-    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(8);
+    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(11);
     expect(ebenen).not.toContain("H3");
   });
 
@@ -132,5 +134,32 @@ describe("Inhalt", () => {
     expect(screen.getByRole("radiogroup", { name: "Art der Einträge" })).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: "Kritisch 3" }));
     expect(screen.getByText("3 Vorgänge in „Kritisch“")).toBeTruthy();
+  });
+  it("zeigt Ladezustand und Leerzustand; axe findet auch nach dem Umschalten nichts", async () => {
+    const { container } = await seite();
+    expect(container.querySelector('[data-skelett="liste"]')).not.toBeNull();
+    expect(container.querySelector('[data-skelett="gruppe"]')).not.toBeNull();
+    expect(container.querySelectorAll("[data-leerzustand]")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Inhalt zeigen" }));
+    expect(container.querySelector("[data-skelett]")).toBeNull();
+    expect(screen.getByText("Probe, Lea")).toBeTruthy();
+    expect(await axeVerstoesse(container)).toEqual([]);
+  });
+});
+
+describe("Vollstaendigkeit", () => {
+  it("jeder Baustein aus src/components/ui/ steht auf der Musterseite", () => {
+    // Regel: Wer einen Baustein baut, traegt ihn auf der Musterseite ein.
+    const wurzel = join(__dirname, "..", "..");
+    const bausteine = readdirSync(join(wurzel, "components", "ui"))
+      .filter((d) => d.endsWith(".tsx"))
+      .map((d) => d.replace(/\.tsx$/, ""));
+    const ordner = join(wurzel, "app", "(portal)", "ui-muster");
+    const quelltext = readdirSync(ordner)
+      .map((d) => readFileSync(join(ordner, d), "utf8"))
+      .join("\n");
+    expect(bausteine.length).toBeGreaterThanOrEqual(9);
+    const fehlt = bausteine.filter((b) => !quelltext.includes(`from "@/components/ui/${b}"`));
+    expect(fehlt).toEqual([]);
   });
 });
