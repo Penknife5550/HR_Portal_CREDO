@@ -134,4 +134,31 @@ describe("POST /api/contract-end/[id]/reminder", () => {
       }),
     );
   });
+
+  // Die Route liest den Token (fuer die Mail), gibt ihn aber nicht zurueck.
+  it("die Antwort trägt nur die beiden Erinnerungsfelder, keinen supervisorToken", async () => {
+    mockPrisma.contractEndProcess.findUnique
+      .mockResolvedValueOnce(vorgang())
+      .mockResolvedValueOnce({
+        lastSupervisorReminderAt: new Date("2026-10-02T08:00:00.000Z"),
+        supervisorReminderCount: 1,
+      });
+
+    const res = await POST(req(), { params: params() });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+
+    expect(json).toEqual({
+      ok: true,
+      lastSupervisorReminderAt: "2026-10-02T08:00:00.000Z",
+      supervisorReminderCount: 1,
+    });
+    expect(json).not.toHaveProperty("supervisorToken");
+    expect(JSON.stringify(json)).not.toContain("token-abc");
+    // Der zweite Lesezugriff waehlt ausdruecklich nur diese beiden Felder
+    expect(mockPrisma.contractEndProcess.findUnique).toHaveBeenLastCalledWith({
+      where: { id: "ce1" },
+      select: { lastSupervisorReminderAt: true, supervisorReminderCount: true },
+    });
+  });
 });
