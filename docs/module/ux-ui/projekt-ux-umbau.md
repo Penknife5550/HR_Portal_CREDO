@@ -11,7 +11,14 @@ Letzte Änderung: 02.10.2026 (Übergabe nach U1; nächster Schritt: Feinplan Pil
 **Wo wir stehen:** U0 (Fundament) und U1 (Rahmen) sind gebaut, abgenommen und gepusht
 (`origin/ux-umbau`). Nichts davon ist deployt. Vier Durchsichten, alle Befunde behoben.
 
-**Nächste Aufgabe:** den **Feinplan für den Pilot Vertragsende** schreiben
+**Stand 02.10.2026, später:** Der Feinplan ist **freigegeben**
+([pilot-feinplan.md](pilot-feinplan.md), F1–F9 entschieden, Kurzform in Abschnitt 4).
+**Nächste Aufgabe:** Tag 1 und 2 des Feinplans (reine Regeln `ProzessStand` + Adapter,
+Bausteine Prozessleiste und Reiter auf der Musterseite) – das darf vor dem Prototyp-Tag
+laufen (F9). Die Seite selbst (ab Tag 3) erst nach V0. Der folgende Text ist die
+ursprüngliche Übergabe.
+
+**Nächste Aufgabe (erledigt als Entwurf):** den **Feinplan für den Pilot Vertragsende** schreiben
 (`docs/module/ux-ui/pilot-feinplan.md`) – Umfang, Nicht-Umfang, Dateien, Tests, betroffene
 Mail- und Word-Vorlagen, Schema-Delta, Abnahme, Deploy, Fragen vor dem Bau. **Kein Code vor
 der Freigabe des Feinplans.**
@@ -69,7 +76,8 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 |---|---|
 | [ux-ui-plan-2026-09.html](ux-ui-plan-2026-09.html) | Der Plan (Fassung 3): Bewertung, Zielbild mit Mockups, Pakete, Entscheidungen, Leitplanken |
 | [u0-feinplan.md](u0-feinplan.md) | Feinplan U0 (gebaut und abgenommen) |
-| [u1-feinplan.md](u1-feinplan.md) | Feinplan des laufenden Pakets U1 (freigegeben 02.10.2026) |
+| [u1-feinplan.md](u1-feinplan.md) | Feinplan U1 (gebaut und abgenommen) |
+| [pilot-feinplan.md](pilot-feinplan.md) | Feinplan Pilot Vertragsende (freigegeben 02.10.2026) |
 | `projekt-ux-umbau.md` (diese Datei) | Stand, Protokoll, Abweichungen |
 | `CLAUDE.md`, Abschnitt „Oberfläche (UX-Umbau)“ | Die Regeln, die beim Programmieren gelten |
 | [screenshots/](screenshots/) | Vorher-Bilder (erzeugt von `scripts/ux-screenshots.js`) und die Musterseite in drei Breiten (`ui-muster-*.png`, erzeugt von `scripts/ux-abnahme.js`) |
@@ -82,7 +90,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan als Nächstes** (Abschnitt 0); Bau erst nach Freigabe und nach dem Prototyp-Tag (V0) |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); Tag 1–2 (Regeln, Bausteine) als Nächstes, die Seite erst nach dem Prototyp-Tag (V0) |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -139,6 +147,20 @@ Vollständig mit Begründung und verworfener Alternative im Plan, Abschnitt 6. H
 | U1-F2 | Modulnamen in der Adresse | `onboarding`, `offboarding`, `vertragsende`, `verbeamtung`, `elternzeit`, `mutterschutz` – dauerhaft. Die Anzeigenamen (E11) bleiben offen. |
 | U1-F3 | „Formulare“ bei der Sachbearbeitung | Punkt ausblenden – der Kopf zeigt nur, was die Rolle öffnen kann. Keine Berechtigung ändert sich. |
 | U1-F4 | Dateien der Module | bleiben unter `dashboard/` liegen, ziehen mit U4 um. |
+
+### Zum Feinplan Pilot Vertragsende (02.10.2026)
+
+| # | Thema | Entschieden |
+|---|---|---|
+| P-F1 | Vorschau-Schalter | Cookie im Browser, kein Schema-Delta; Vorgabe alte Ansicht. |
+| P-F2 | Stornieren | „Vorgang stornieren …“ als kritischer Menüpunkt, nur `HR_EDIT_ROLES`, mit Rückfrage. |
+| P-F3 | Abschließen nach „keine Übernahme“ | Ja. Die Rückfrage beim Anlegen sagt, dass ein neuer Offboarding-Vorgang gestartet wird; Verweis zum Offboarding auch im Abschluss-Dialog. Kein „keine Übernahme“ ohne Offboarding. |
+| P-F4 | Überschrittenes Vertragsende | kritische Zeile in „Jetzt dran“; Ampel-Funktion unverändert. |
+| P-F5 | Rückmeldungen | `mailto:` an `personalbuchhaltung@fes-minden.de`. |
+| P-F6 | Klebende Leiste, Kompaktmodus | erst mit Onboarding; im Pilot nur messen (1366×768). |
+| P-F7 | `VALID_TRANSITIONS` | in eine reine Datei verschieben, Route und Test lesen dieselbe Tabelle. |
+| P-F8 | Statustexte der Pille | sagen, wer dran ist; Liste zeigt bis U3 die alten Texte. Endgültig nach V0. |
+| P-F9 | Reihenfolge mit V0 | Tag 1–2 vorher, die Seite danach. |
 
 ### Noch offen
 
@@ -789,6 +811,29 @@ ein echter n8n-Ablauf mit `portalLink`; Windows-Kontrastmodus.
 
 **Als Nächstes:** Push nach Freigabe; Deploy von U0 + U1 mit Ankündigung; danach der
 Prototyp-Tag (V0) als Voraussetzung für den Pilot Vertragsende (U2 + U4).
+
+### 02.10.2026 – Feinplan Pilot Vertragsende (Entwurf)
+
+[pilot-feinplan.md](pilot-feinplan.md) geschrieben, **nicht freigegeben, kein Code**. Gelesen
+dafür: Plan (Abschnitte 4 D, 5, 6, 7), die Detailseite (910 Zeilen), die fünf Routen des
+Moduls, Frist- und Warnregeln, Ereignisse, Stand der Sperrklinke.
+
+**Kern des Entwurfs:** Prozessleiste als Baustein mit reinem Datenmodell `ProzessStand` (nur
+die Zustände, die Vertragsende braucht) und einem Adapter je Modul; drei weitere Bausteine,
+die fehlen (Reiter, Hinweis, Textfeld); neue Ansicht neben der Seiten-Datei, alte bleibt
+unverändert; Vorschau-Schalter als Cookie (kein Schema-Delta); keine Mail- und keine
+Word-Vorlage betroffen; sieben Tage.
+
+**Befunde am Modul** (Feinplan, Abschnitt 9): `VERTRAG_ERSTELLT` setzt kein Code; Stornieren
+gibt es nur in der Route; nach „keine Übernahme“ fehlt der Knopf zum Abschließen; „Anfrage
+erneut senden“ setzt ohne Rückfrage zurück; ein überschrittenes Vertragsende zeigt keine Ampel.
+
+**Nachtrag, selber Tag: freigegeben.** Alle neun Fragen entschieden (Abschnitt 4, P-F1 bis
+P-F9). Ursprünglich offen waren:
+
+**Offen:** Fragen F1–F9 (Schalter, Stornieren, Abschließen im Ablehnungsstrang, Hinweis bei
+überschrittenem Vertragsende, Rückmelde-Adresse, klebende Leiste, Export der Statusübergänge,
+Statustexte, Reihenfolge mit V0). Nicht committet.
 
 ## 8. Branches und Commits
 
