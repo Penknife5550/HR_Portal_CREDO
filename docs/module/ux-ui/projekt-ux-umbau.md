@@ -1,10 +1,63 @@
 # UX-Umbau „Klarer Weg“ – Projektstand
 
-**Hier einsteigen.** Diese Datei ist das Logbuch des Projekts: Stand, Entscheidungen, Regeln,
+**Hier einsteigen.** Für die nächste Sitzung: zuerst Abschnitt 0 (Übergabe). Diese Datei ist das Logbuch des Projekts: Stand, Entscheidungen, Regeln,
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (U1, Tag 3 – Abnahme)
+Letzte Änderung: 02.10.2026 (Übergabe nach U1; nächster Schritt: Feinplan Pilot Vertragsende)
+
+## 0. Übergabe (Stand 02.10.2026, abends)
+
+**Wo wir stehen:** U0 (Fundament) und U1 (Rahmen) sind gebaut, abgenommen und gepusht
+(`origin/ux-umbau`). Nichts davon ist deployt. Vier Durchsichten, alle Befunde behoben.
+
+**Nächste Aufgabe:** den **Feinplan für den Pilot Vertragsende** schreiben
+(`docs/module/ux-ui/pilot-feinplan.md`) – Umfang, Nicht-Umfang, Dateien, Tests, betroffene
+Mail- und Word-Vorlagen, Schema-Delta, Abnahme, Deploy, Fragen vor dem Bau. **Kein Code vor
+der Freigabe des Feinplans.**
+
+**Was der Pilot laut Plan ist** (`ux-ui-plan-2026-09.html`, Abschnitt 5 und Entscheidung E10):
+ein senkrechter Schnitt durch EIN Modul – die Prozessleiste (U2) und die neue Detailseite
+(U4) für Vertragsende, dazu ein **Vorschau-Schalter je Benutzer** (alte und neue Ansicht
+nebeneinander, bis das Personalbüro zwei Wochen damit gearbeitet hat). Vertragsende wurde
+gewählt, weil es eine Verzweigung hat (Verlängerung oder Austritt).
+
+**Was vor dem Schreiben zu lesen ist:**
+
+| Was | Wo |
+|---|---|
+| Plan: Prozessleiste (Abschnitt D), Detailseite, Pakete U2 und U4, Pilot, Vorschau-Schalter, E10 | `ux-ui-plan-2026-09.html` |
+| Regeln der Oberfläche, Bausteine, Adressen, Kopf | `CLAUDE.md`, Abschnitt „Oberfläche (UX-Umbau)“ |
+| Muster eines Feinplans | `u0-feinplan.md`, `u1-feinplan.md` |
+| Das Modul heute | `src/app/(portal)/dashboard/contract-end/[id]/contract-end-detail-content.tsx` (910 Zeilen, eine Datei), Liste: `contract-end-dashboard-new.tsx`, `contract-end-config.tsx`; Seite: `src/app/(portal)/vorgaenge/vertragsende/[id]/page.tsx` |
+| Fachlichkeit des Moduls | `docs/module/vertragsende/` (`vertragsende-prozess.html`, `vertragsende-implementierung.md`, `vertragsende-phase2-plan.md`) |
+| Schnittstellen, Läufe, Mails des Moduls | `src/app/api/contract-end/`, `src/lib/laeufe/vertragsende-erinnerungen.ts`, Ereignisse `contract-end-*` in `src/lib/events.ts` |
+
+**Was der Feinplan klären muss (offene Entscheidungen):**
+
+- **Prototyp-Tag (V0)** mit dem Personalbüro ist laut Plan die Voraussetzung für den Pilot
+  und beantwortet E9 (Dichte der Listen), E11 (Anzeigenamen der Module), E13 (Textbausteine).
+  Der Termin steht noch nicht. Der Feinplan kann vorher entstehen, muss aber sagen, was ohne
+  V0 nur angenommen ist.
+- **Vorschau-Schalter:** Wo wird die Wahl gespeichert (Benutzerkonto = Schema-Delta, oder
+  nur im Browser)? Wer darf umschalten? Was ist die Vorgabe?
+- **Zuschnitt:** Was vom Vertragsende gehört in den Pilot (Detailseite, Prozessleiste), was
+  bleibt alt (Liste – die baut U3 um; bei 390 px ist sie heute breiter als das Fenster)?
+- **Dateien:** Mit dem Pilot ziehen die Dateien des Moduls aus `(portal)/dashboard/` um
+  (U1-F4) – wohin genau?
+- **Hauptüberschrift:** Die Detailseite von Vertragsende hat seit U1 keine `h1`; der
+  `Seitenkopf` bringt sie.
+- **Anrede:** Portal-Texte des Moduls auf „du“ bzw. ohne Anrede (E6).
+- **Fachstatus → Ton der Statuspille:** Katalog des Moduls (wer wartet, was ist kritisch).
+
+**Offen beim Projektverantwortlichen** (unabhängig vom Feinplan): Deploy von U0 + U1 mit
+Ankündigung an das Personalbüro; Termin Prototyp-Tag; Deploy von `main` (Checklisten,
+Paket 3).
+
+**Werkzeuge, die es schon gibt:** `scripts/ux-abnahme.js` (Bilder, Bildvergleich),
+`scripts/ux-abnahme-u1.js` (Rollen, An-/Abmelden, Tastatur im Browser),
+`scripts/dev-passwort-neu.js` (Passwort eines Dev-Kontos neu setzen), Musterseite
+`/ui-muster`.
 
 ## 1. Worum es geht
 
@@ -29,7 +82,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan als Nächstes** (Abschnitt 0); Bau erst nach Freigabe und nach dem Prototyp-Tag (V0) |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
