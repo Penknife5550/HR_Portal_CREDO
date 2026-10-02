@@ -5,7 +5,7 @@ import { PortalHeader } from "@/components/portal-header";
 import { Button } from "@/components/ui/button";
 import { Gruppe, Zeile } from "@/components/ui/gruppe";
 import { STATUS_TOENE, Statuspille, type StatusTon } from "@/components/ui/statuspille";
-import { DialogMuster, ToastMuster } from "./dialog-muster";
+import { DialogMuster, MusterKopf, SegmentMuster, ToastMuster } from "./dialog-muster";
 
 /**
  * Musterseite der Oberflaechen-Bausteine (UX-Umbau „Klarer Weg", U0)
@@ -55,13 +55,7 @@ export default async function UiMusterPage() {
       <PortalHeader user={session} />
 
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
-        <header>
-          <h1 className="font-heading text-titel font-bold tracking-titel text-ink">UI-Muster</h1>
-          <p className="mt-1 max-w-3xl text-sm text-ink-2">
-            Bausteine der neuen Oberfläche („Klarer Weg“). Diese Seite wächst mit jedem Baustein; Regeln und Stand
-            stehen in <code className="rounded-lg bg-neutral-soft px-1">docs/module/ux-ui/</code>.
-          </p>
-        </header>
+        <MusterKopf />
 
         <Gruppe titel="Farben" beschreibung="Vier Gruppen, nie vermischt: Marke, Einrichtung, Interaktion, Zustand.">
           <Zeile>
@@ -116,6 +110,15 @@ export default async function UiMusterPage() {
               <span className="text-right text-xs text-ink-2">{TON_BEISPIELE[ton].wofuer}</span>
             </Zeile>
           ))}
+        </Gruppe>
+
+        <Gruppe
+          titel="Segment-Schalter"
+          beschreibung="Wählt eine Sicht derselben Liste. Pfeiltasten wechseln; die Zahl gehört zum Namen der Sicht."
+        >
+          <Zeile>
+            <SegmentMuster />
+          </Zeile>
         </Gruppe>
 
         <Gruppe

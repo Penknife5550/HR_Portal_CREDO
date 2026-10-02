@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (U0, Tag 3, nach der Browserprobe)
+Letzte Änderung: 02.10.2026 (U0, Tag 4)
 
 ## 1. Worum es geht
 
@@ -26,7 +26,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 |---|---|---|
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
-| **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 3 von 6 erledigt (Tokens, Button, Statuspille, Gruppe, Dialog, Bestätigungsdialog, Toast, Musterseite) |
+| **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 4 von 6 erledigt (Tokens, Button, Statuspille, Gruppe, Dialog, Bestätigungsdialog, Toast, Seitenkopf, Segment-Schalter, Musterseite) |
 | U1 | Rahmen: Kopf, Breadcrumb, neue Adressen | offen |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
@@ -109,6 +109,8 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Toast mit „Rückgängig“ | Erfolg 5 s | 10 s, wenn „Rückgängig“ angeboten wird | Fünf Sekunden reichen zum Lesen, nicht zum Lesen und Entscheiden. |
 | Toast-Aufruf | `toast.ok`, `toast.fehler` | dazu `toast.hinweis`; Speicher auf Modulebene statt Hook | Aus jedem Handler rufbar; eine Meldung kurz vor einem Seitenwechsel geht nicht verloren. |
 | Schleier des Dialogs | – | eigenes Token `scrim` | Keine fest eingetragene Farbe und kein `/40` in einer Klasse. |
+| Segment-Schalter | „Tastatur wie Radix Tabs“ | eigene Auswahlgruppe (`radiogroup`), Pfeiltasten wie bei Reitern | Radix Tabs verweist jeden Reiter auf ein Inhaltsfeld (`aria-controls`); der Schalter filtert eine Liste und hat keines – axe meldete den toten Verweis. |
+| Schatten `shadow-overlay` | nur Dialog und Toast | auch das „…“-Menü des Seitenkopfs | Gilt für alles, was über der Seite schwebt. |
 | Prototyp-Tag | „Kein Paket außer U0 startet ohne den Prototyp-Tag“ | gilt ab dem Pilot; U1 darf vorher | U1 ändert nur den Rahmen (Kopf, Breadcrumb, Adressen) und hängt an keiner der Fragen des Prototyp-Tags (E9, E11, E13). |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
@@ -342,8 +344,53 @@ Nicht geprobt: einfache Rückfrage, Meldungen „Erfolg“ und „Hinweis“, Kr
 Hand, Wischen auf dem Handy. Das Passwort aus `.env` passt zu keinem Konto der
 Entwicklungsdatenbank; dafür gibt es `scripts/dev-passwort-neu.js`.
 
-**Als Nächstes (U0, Tag 4):** Seitenkopf mit Breadcrumb und „…“-Menü (Radix Dropdown),
-Segment-Schalter.
+### 02.10.2026 – U0, Tag 4
+
+**Code:**
+
+| Datei | Inhalt |
+|---|---|
+| `src/components/ui/seitenkopf.tsx` | `Seitenkopf`: Pfad (Breadcrumb als Eigenschaft, letzter Eintrag = Seite), Titel als `h1` mit `SEITENTITEL_ID` und `tabIndex={-1}`, Unterzeile, Zustand, Primärknopf, „…“-Menü auf Radix Dropdown (`MenuePunkt`: Aktion oder Verweis, `kritisch`, `gesperrt`, Symbol); Tabelle `MENUE_FARBEN` |
+| `src/components/ui/segment.tsx` | `Segment`: Auswahlgruppe mit zwei bis fünf Sichten, optional Zähler; Pfeiltasten, Pos1, Ende; Tabelle `SEGMENT_FARBEN` |
+| `src/app/(portal)/ui-muster/` | Der Kopf der Musterseite IST jetzt der Seitenkopf (mit Menü und einer Rückfrage aus dem Menü); neue Gruppe „Segment-Schalter“ |
+| `src/__tests__/components/ui-seitenkopf.test.tsx` | 15 Tests: Pfad, Titel als Ersatzziel, Menü (Reihenfolge der Ereignisse, Escape, gesperrter Punkt, Dialog aus dem Menü), Segment (Gruppe, Tastatur, Zähler), axe |
+| `ui-kontrast.test.ts`, `ui-musterseite.test.tsx` | Paare aus `SEGMENT_FARBEN` und `MENUE_FARBEN`; Kopf und Segment auf der echten Seite |
+
+**Entscheidungen beim Bauen** (Abweichungen stehen in Abschnitt 5):
+- **Die Grenze von Tag 3 ist gelöst:** Ein Menüpunkt läuft erst, NACHDEM das Menü geschlossen
+  ist und der Fokus wieder auf dem „…“-Knopf liegt (`onCloseAutoFocus`, dann ein Takt). Ein
+  daraus geöffneter Dialog merkt sich so den „…“-Knopf und gibt den Fokus dorthin zurück. Im
+  Test und im Browser belegt.
+- Der Titel ist zugleich das Ersatzziel für den Fokus (`<Dialog fokusZiel={SEITENTITEL_ID}>`).
+- Der Kopf liest nichts aus der Adresse (E4); der letzte Pfadeintrag ist nie ein Verweis,
+  auch wenn er ein `href` trägt.
+- Ein gesperrter Menüpunkt bleibt sichtbar und wird abgeblendet (wie der gesperrte Knopf).
+  `text-ink-3` kam dafür nicht in Frage – die Sperrklinke hält die Klasse auf Stand 0.
+- Der Segment-Schalter rollt auf schmalen Bildschirmen waagerecht; der Fokusring liegt innen,
+  damit ihn der Rollbereich nicht abschneidet. Ein Klick auf die gewählte Sicht meldet nichts.
+- axe meldet für das offene Menü `region` (es hängt in einem Portal außerhalb von `main`).
+  Das ist eine Empfehlung, kein WCAG-Kriterium; der Test lässt genau diese Regel beim offenen
+  Menü aus und prüft das Menü selbst zusätzlich.
+
+**Geprüft:** `npm run pruefen` (Typen, Lint, 185 Suiten, 4.734 Tests). Im Browser auf
+`/ui-muster` (1104 px und 375 px): Kopf mit Pfad, Zustand, Primärknopf und Menü; Menü öffnet,
+kritischer und gesperrter Punkt sind erkennbar; „Rückfrage aus dem Menü …“ öffnet den Dialog,
+Escape schließt, Fokus liegt danach auf „Weitere Aktionen“; Segment wechselt die Sicht. Bei
+375 px rutschen die Aktionen unter den Titel, der Segment-Schalter rollt (405 px Inhalt in
+311 px), die Seite selbst wird nicht breiter.
+
+**Nicht geprüft:** Pfeiltasten im Menü und im Segment von Hand, Windows-Kontrastmodus (die
+Klassen für die gewählte Sicht sind dort ungetestet), `npm run build`.
+
+**Bekannte Grenzen:**
+- Menüpunkte ohne Symbol stehen neben solchen mit Symbol nicht in einer Flucht – in einem
+  Menü entweder alle mit oder alle ohne Symbol.
+- Die Seite hat mit dem alten Portal-Kopf zwei `h1` („HR-Portal“ und den Seitentitel). Das
+  bestand schon vorher und fällt mit U1, wenn der Portal-Kopf neu gebaut wird.
+
+**Sichtbare Änderung:** nur auf `/ui-muster`.
+
+**Als Nächstes (U0, Tag 5):** Skelett, Leerzustand; Musterseite vollständig; axe über alles.
 
 ## 8. Branches und Commits
 
@@ -361,10 +408,11 @@ Segment-Schalter.
 | `ux-umbau` | `c364f3a` | Befunde der zweiten Durchsicht an Bausteinen, Tokens, Tests, Skript, Dokumentation |
 | `ux-umbau` | `7511540` | Logbuch: Push vom 01.10.2026 |
 | `ux-umbau` | `9153727` | U0 Tag 3: Dialog, Bestätigungsdialog, Toast, Anbieter im Portal-Layout |
-| `ux-umbau` | (folgt) | Browserprobe zu Tag 3: Meldungen springen nicht mehr, Abstand auf der Musterseite |
+| `ux-umbau` | `1097424` | Browserprobe zu Tag 3: Meldungen springen nicht mehr, Abstand auf der Musterseite |
+| `ux-umbau` | (folgt) | U0 Tag 4: Seitenkopf mit Pfad und Menü, Segment-Schalter |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Tag 3 ist noch nicht gepusht. Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Tag 3 und 4 sind noch nicht gepusht. Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

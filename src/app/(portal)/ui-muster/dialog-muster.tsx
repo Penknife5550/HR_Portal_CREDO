@@ -9,8 +9,12 @@
  * pruefen lassen (Escape, Tab, Fokus zurueck).
  */
 import { useRef, useState } from "react";
+import { Download, History, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BestaetigungsDialog, Dialog } from "@/components/ui/dialog";
+import { Segment } from "@/components/ui/segment";
+import { Seitenkopf, SEITENTITEL_ID } from "@/components/ui/seitenkopf";
+import { Statuspille } from "@/components/ui/statuspille";
 import { toast } from "@/components/ui/toast";
 
 type Offen = null | "rueckfrage" | "kritisch" | "formular";
@@ -124,6 +128,88 @@ export function ToastMuster() {
       </Button>
       <Button onClick={() => toast.fehler("Speichern fehlgeschlagen. Bitte erneut versuchen.")}>Fehler</Button>
       <Button onClick={() => toast.hinweis("Die Liste wurde aktualisiert.")}>Hinweis</Button>
+    </div>
+  );
+}
+
+/**
+ * Der Kopf der Musterseite IST das Muster des Seitenkopfs: Pfad, Titel,
+ * Unterzeile, Zustand, ein Primaerknopf und das „…"-Menue. Der Menuepunkt
+ * „Rückfrage aus dem Menü …" zeigt, dass der Fokus nach dem Schliessen auf dem
+ * „…"-Knopf landet.
+ */
+export function MusterKopf() {
+  const [rueckfrage, setRueckfrage] = useState(false);
+
+  return (
+    <>
+      <Seitenkopf
+        pfad={[{ text: "Verwaltung", href: "/einstellungen" }, { text: "Oberfläche" }, { text: "UI-Muster" }]}
+        titel="UI-Muster"
+        unterzeile="Bausteine der neuen Oberfläche („Klarer Weg“) · wächst mit jedem Baustein · Regeln und Stand in docs/module/ux-ui/"
+        status={<Statuspille ton="info">U0 in Arbeit</Statuspille>}
+        aktion={
+          <Button variante="primary" onClick={() => toast.hinweis("Der Primärknopf des Seitenkopfs.")}>
+            Primäraktion
+          </Button>
+        }
+        menue={[
+          { text: "Verlauf anzeigen", symbol: History, onWaehlen: () => toast.hinweis("Verlauf gewählt.") },
+          { text: "Zur Startseite", href: "/dashboard" },
+          { text: "Als PDF exportieren", symbol: Download, gesperrt: true },
+          { text: "Rückfrage aus dem Menü …", symbol: XCircle, kritisch: true, onWaehlen: () => setRueckfrage(true) },
+        ]}
+      />
+      <BestaetigungsDialog
+        offen={rueckfrage}
+        onAbbrechen={() => setRueckfrage(false)}
+        onBestaetigen={() => {
+          setRueckfrage(false);
+          toast.ok("Bestätigt.");
+        }}
+        titel="Aus dem Menü geöffnet"
+        bestaetigenText="Bestätigen"
+        variante="critical"
+        fokusZiel={SEITENTITEL_ID}
+      >
+        Nach dem Schließen liegt der Fokus wieder auf dem „…“-Knopf.
+      </BestaetigungsDialog>
+    </>
+  );
+}
+
+type Sicht = "alle" | "kritisch" | "hr" | "andere";
+
+const SICHTEN: { wert: Sicht; text: string; zahl: number }[] = [
+  { wert: "alle", text: "Alle", zahl: 24 },
+  { wert: "kritisch", text: "Kritisch", zahl: 3 },
+  { wert: "hr", text: "Bei HR", zahl: 9 },
+  { wert: "andere", text: "Bei anderen", zahl: 12 },
+];
+
+export function SegmentMuster() {
+  const [sicht, setSicht] = useState<Sicht>("alle");
+  const [art, setArt] = useState<"alle" | "mails" | "probleme">("alle");
+  const gewaehlt = SICHTEN.find((s) => s.wert === sicht)!;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <Segment label="Sicht" wert={sicht} onWechsel={setSicht} optionen={SICHTEN} />
+        <span className="text-xs text-ink-2" aria-live="polite">
+          {gewaehlt.zahl} Vorgänge in „{gewaehlt.text}“
+        </span>
+      </div>
+      <Segment
+        label="Art der Einträge"
+        wert={art}
+        onWechsel={setArt}
+        optionen={[
+          { wert: "alle", text: "Alle" },
+          { wert: "mails", text: "E-Mails" },
+          { wert: "probleme", text: "Probleme" },
+        ]}
+      />
     </div>
   );
 }

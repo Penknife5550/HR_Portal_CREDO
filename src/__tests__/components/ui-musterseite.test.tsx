@@ -71,7 +71,7 @@ describe("Inhalt", () => {
     const { container } = await seite();
     expect(await axeVerstoesse(container)).toEqual([]);
     const ebenen = Array.from(container.querySelectorAll("h1, h2, h3, h4")).map((h) => h.tagName);
-    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(7);
+    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(8);
     expect(ebenen).not.toContain("H3");
   });
 
@@ -115,5 +115,22 @@ describe("Inhalt", () => {
     for (const name of ["Erfolg", "Erfolg mit „Rückgängig“", "Fehler", "Hinweis"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
+  });
+
+  it("der Kopf der Seite ist der Seitenkopf: Pfad, Titel, Zustand, Primaerknopf, Menue", async () => {
+    await seite();
+    expect(screen.getByRole("navigation", { name: "Pfad" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "UI-Muster" })).toBeTruthy();
+    expect(screen.getByText("U0 in Arbeit")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Primäraktion" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Weitere Aktionen" })).toBeTruthy();
+  });
+
+  it("zeigt den Segment-Schalter mit und ohne Zaehler", async () => {
+    await seite();
+    expect(screen.getByRole("radiogroup", { name: "Sicht" })).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "Art der Einträge" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "Kritisch 3" }));
+    expect(screen.getByText("3 Vorgänge in „Kritisch“")).toBeTruthy();
   });
 });

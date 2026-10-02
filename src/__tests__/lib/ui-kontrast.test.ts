@@ -33,6 +33,8 @@ import {
   type Farbe,
 } from "@/lib/ui/kontrast";
 import { BUTTON_FARBEN, type ButtonVariante } from "@/components/ui/button";
+import { SEGMENT_FARBEN } from "@/components/ui/segment";
+import { MENUE_FARBEN } from "@/components/ui/seitenkopf";
 import { STATUS_TOENE, type StatusTon } from "@/components/ui/statuspille";
 import { TOAST_TOENE, type ToastTon } from "@/components/ui/toast";
 
@@ -56,7 +58,10 @@ function token(name: string): Farbe {
 }
 
 /** Tokenname aus der ersten Klasse mit diesem Praefix (`bg-ok-soft` → `ok-soft`). */
-function farbeAus(klassen: string, praefix: "bg" | "text" | "hover:bg"): string | null {
+function farbeAus(
+  klassen: string,
+  praefix: "bg" | "text" | "hover:bg" | "data-[highlighted]:bg",
+): string | null {
   const klasse = klassen.split(/\s+/).find((k) => k.startsWith(`${praefix}-`));
   return klasse ? klasse.slice(praefix.length + 1) : null;
 }
@@ -224,5 +229,28 @@ describe("Toast und Dialog", () => {
       const dahinter = aufUntergrund(token("scrim"), token(flaeche));
       expect(kontrast(token("card"), dahinter)).toBeGreaterThanOrEqual(1.5);
     }
+  });
+});
+
+describe("Segment-Schalter und Menue des Seitenkopfs", () => {
+  it("Segment: nicht gewaehlte Sicht auf dem Grund des Schalters, gewaehlte auf ihrer Flaeche", () => {
+    const grund = farbeAus(SEGMENT_FARBEN.grund, "bg")!;
+    const ruhe = farbeAus(SEGMENT_FARBEN.ruhe, "text")!;
+    const aktivText = farbeAus(SEGMENT_FARBEN.aktiv, "text")!;
+    const aktivGrund = farbeAus(SEGMENT_FARBEN.aktiv, "bg")!;
+    for (const flaeche of FLAECHEN) {
+      expect(kontrastAuf(ruhe, grund, flaeche)).toBeGreaterThanOrEqual(AA_TEXT);
+      // Die gewaehlte Flaeche ist deckend; sie liegt auf dem Grund des Schalters.
+      expect(kontrast(token(aktivText), token(aktivGrund))).toBeGreaterThanOrEqual(AA_TEXT);
+    }
+  });
+
+  it.each(["normal", "kritisch"] as const)("Menue %s: Text in Ruhe und hervorgehoben (auf der Karte)", (art) => {
+    const { ruhe, hervor } = MENUE_FARBEN[art];
+    const text = farbeAus(ruhe, "text")!;
+    const grund = farbeAus(hervor, "data-[highlighted]:bg");
+    expect(grund).not.toBeNull();
+    expect(kontrast(token(text), token("card"))).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(kontrastAuf(text, grund, "card")).toBeGreaterThanOrEqual(AA_TEXT);
   });
 });
