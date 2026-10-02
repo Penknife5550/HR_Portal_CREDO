@@ -472,7 +472,7 @@ const UNTERLAGEN_BEISPIEL_HR = {
   mitarbeiter_name: "Anna Beispiel",
   // Wie der Dienst ihn baut: `getBaseUrl()` + `portalPfad` des Bausteins,
   // also mit dem Reiter „Dokumente" (U-25; ein Test haelt beide gleich).
-  portalLink: "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000014?tab=dokumente",
+  portalLink: "https://hr.fes-credo.de/vorgaenge/onboarding/00000000-0000-0000-0000-000000000014?tab=dokumente",
 };
 
 /**
@@ -833,7 +833,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
       dringlichkeit: "Warnung",
       frist_text: "Läuft in 42 Tagen ab (20.10.2026)",
       portalLink:
-        "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000001",
+        "https://hr.fes-credo.de/vorgaenge/onboarding/00000000-0000-0000-0000-000000000001",
       nachforderung_moeglich: "ja",
       nachforderung_gesperrt: "",
       nachforderung_hinweis: "",
@@ -861,7 +861,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
       dringlichkeit: "Abgelaufen",
       frist_text: "Abgelaufen seit 7 Tagen (01.09.2026)",
       portalLink:
-        "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000001",
+        "https://hr.fes-credo.de/vorgaenge/onboarding/00000000-0000-0000-0000-000000000001",
       nachforderung_moeglich: "ja",
       nachforderung_gesperrt: "",
       nachforderung_hinweis: "",
@@ -1218,17 +1218,17 @@ export const EVENT_CATALOG: EventDefinition[] = [
       anzahl_vorwarnung: 1,
       warnungen_liste:
         "- [Überfällig] PSI-2026-GYM-001 · Max Mustermann: BR-Genehmigung überfällig. BR-Antrag eingereicht am 02.06.2026, 8-Wochen-Frist abgelaufen. (Frist: 28.07.2026)\n" +
-        "  https://hr.fes-credo.de/dashboard/civil-service/00000000-0000-0000-0000-000000000003\n" +
+        "  https://hr.fes-credo.de/vorgaenge/verbeamtung/00000000-0000-0000-0000-000000000003\n" +
         "- [Vorwarnung] PSI-2026-GYM-002 · Erika Beispiel: 2. Beurteilung steht an (T+9 Monate erreicht). (Frist: 01.11.2026)\n" +
-        "  https://hr.fes-credo.de/dashboard/civil-service/00000000-0000-0000-0000-000000000004",
+        "  https://hr.fes-credo.de/vorgaenge/verbeamtung/00000000-0000-0000-0000-000000000004",
       warnungen_liste_html:
         '<ul style="margin:0;padding:0 0 0 18px;color:#374151;font-size:14px;line-height:1.5;">' +
         '<li style="margin:0 0 10px;"><strong style="color:#991b1b;">Überfällig</strong> · ' +
-        '<a href="https://hr.fes-credo.de/dashboard/civil-service/00000000-0000-0000-0000-000000000003" style="color:#575756;">PSI-2026-GYM-001</a> · Max Mustermann<br>' +
+        '<a href="https://hr.fes-credo.de/vorgaenge/verbeamtung/00000000-0000-0000-0000-000000000003" style="color:#575756;">PSI-2026-GYM-001</a> · Max Mustermann<br>' +
         '<span style="color:#374151;">BR-Genehmigung überfällig. BR-Antrag eingereicht am 02.06.2026, 8-Wochen-Frist abgelaufen.</span><br>' +
         '<span style="color:#6b7280;font-size:12px;">Frist: 28.07.2026</span></li>' +
         '<li style="margin:0 0 10px;"><strong style="color:#1e40af;">Vorwarnung</strong> · ' +
-        '<a href="https://hr.fes-credo.de/dashboard/civil-service/00000000-0000-0000-0000-000000000004" style="color:#575756;">PSI-2026-GYM-002</a> · Erika Beispiel<br>' +
+        '<a href="https://hr.fes-credo.de/vorgaenge/verbeamtung/00000000-0000-0000-0000-000000000004" style="color:#575756;">PSI-2026-GYM-002</a> · Erika Beispiel<br>' +
         '<span style="color:#374151;">2. Beurteilung steht an (T+9 Monate erreicht).</span><br>' +
         '<span style="color:#6b7280;font-size:12px;">Frist: 01.11.2026</span></li></ul>',
       weitere_warnungen: "",
@@ -1713,7 +1713,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
       anzahl_erinnerungen: 3,
       tage_offen: 21,
       dringlichkeit: "Kritisch",
-      portalLink: "https://hr.fes-credo.de/dashboard/contract-end/00000000-0000-0000-0000-000000000007",
+      portalLink: "https://hr.fes-credo.de/vorgaenge/vertragsende/00000000-0000-0000-0000-000000000007",
     },
     wired: true,
   },
@@ -1730,7 +1730,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
         "VE-2026-GYM-001 · Max Mustermann · FES Minden · Vertragsende 31.12.2026 (Kritisch)\nVE-2026-GES-004 · Erika Musterfrau · Gesamtschule · Vertragsende 28.02.2027 (Warnung)",
       liste_html:
         "<li>VE-2026-GYM-001 · Max Mustermann · FES Minden · Vertragsende 31.12.2026 (Kritisch)</li><li>VE-2026-GES-004 · Erika Musterfrau · Gesamtschule · Vertragsende 28.02.2027 (Warnung)</li>",
-      portalLink: "https://hr.fes-credo.de/dashboard?tab=contract-end",
+      portalLink: "https://hr.fes-credo.de/vorgaenge/vertragsende",
     },
     wired: true,
   },

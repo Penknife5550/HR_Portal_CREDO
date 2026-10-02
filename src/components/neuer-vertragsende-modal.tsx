@@ -6,6 +6,7 @@
  * Vertragsbeginn (optional), Personalnummer (optional). POST /api/contract-end.
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { useState, useEffect } from "react";
 
 interface Organization {
@@ -159,7 +160,7 @@ export function NeuerVertragsendeModal({ open, onClose, onCreated }: NeuerVertra
                 </div>
               </div>
               <a
-                href={`/dashboard/contract-end/${result.id}`}
+                href={vorgangPfad("vertragsende", result.id)}
                 className="block rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-primary-foreground hover:bg-primary/90"
               >
                 Vorgang öffnen

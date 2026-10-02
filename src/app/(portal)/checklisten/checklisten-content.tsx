@@ -37,6 +37,7 @@
  * React beim Umsortieren die Eingabefelder der alten Position.
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import {
   useEffect,
   useLayoutEffect,
@@ -996,7 +997,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                   Die Punkte können in der Detail-Ansicht jedes Verbeamtungsvorgangs bearbeitet werden.
                   Gatekeeper-Punkte (🔒) müssen erledigt sein bevor die nächste Phase beginnt.
                 </p>
-                <Link href="/dashboard?tab=civil-service"
+                <Link href={vorgangslistePfad("verbeamtung")}
                   className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
                   Zum Verbeamtungs-Dashboard →
                 </Link>

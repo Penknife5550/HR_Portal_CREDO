@@ -23,6 +23,7 @@
  * getBaseUrl() zu rufen.
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { escapeHtml } from "@/lib/email-layout";
 import { formatDatumDE } from "@/lib/format";
 
@@ -112,7 +113,7 @@ export function fristenMailFelder(
 
   const hoechste = sortiert[0]?.severity;
   const portalLink = (w: FristWarnung) =>
-    basis ? `${basis}/dashboard/civil-service/${encodeURIComponent(w.processId)}` : "";
+    basis ? `${basis}${vorgangPfad("verbeamtung", w.processId)}` : "";
 
   // Klartext: eine Zeile je Hinweis, der Link (falls vorhanden) eingerueckt
   // darunter — lange Zeilen bricht jedes Mailprogramm anders um.

@@ -15,6 +15,7 @@
  * Sonst gaebe es den Vorgang, aber niemand saehe seine Links.
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
@@ -478,7 +479,7 @@ export function NeuerVorgangModal({
               Schließen
             </button>
             <Link
-              href={`/dashboard/${result.id}`}
+              href={vorgangPfad("onboarding", result.id)}
               onClick={handleClose}
               className="rounded-lg bg-primary px-6 py-2.5 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >

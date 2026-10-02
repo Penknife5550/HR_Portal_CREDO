@@ -5,6 +5,7 @@
  * Tabs: Übersicht (Stammdaten + Entscheidung A/B) | Vertragsdaten | Dokumente.
  */
 
+import { vorgangPfad, vorgangslistePfad } from "@/lib/adressen";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -305,7 +306,7 @@ export function ContractEndDetailContent({
         <div className="mx-auto max-w-3xl px-4 py-12 text-center">
           <p className="text-sm text-destructive">{loadError || "Vorgang nicht gefunden."}</p>
           <button
-            onClick={() => router.push("/dashboard?tab=contract-end")}
+            onClick={() => router.push(vorgangslistePfad("vertragsende"))}
             className="mt-4 rounded-md border border-border px-4 py-2 text-sm hover:bg-accent"
           >
             Zurück zur Übersicht
@@ -339,7 +340,7 @@ export function ContractEndDetailContent({
         <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => router.push("/dashboard?tab=contract-end")}
+              onClick={() => router.push(vorgangslistePfad("vertragsende"))}
               className="rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               ← Zurück
@@ -643,7 +644,7 @@ function Entscheidung({
           </button>
           {data.offboarding && (
             <Link
-              href={`/dashboard/offboarding/${data.offboarding.id}`}
+              href={vorgangPfad("offboarding", data.offboarding.id)}
               className="inline-flex rounded-lg bg-credo-rot px-4 py-2 text-sm font-semibold text-white hover:bg-credo-rot/90"
             >
               Zum Offboarding {data.offboarding.displayId} (inkl. Zeugnis) →

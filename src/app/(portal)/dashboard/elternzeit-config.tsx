@@ -2,6 +2,7 @@
  * Elternzeit Dashboard – Konfiguration für ProcessDashboard
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import type { ProcessDashboardConfig } from "@/components/process-dashboard/types";
 
 const ELTERNZEIT_STATUS_LABELS: Record<
@@ -52,7 +53,7 @@ const PERSONALGRUPPE_LABELS: Record<string, string> = {
 
 export const elternzeitDashboardConfig: ProcessDashboardConfig = {
   apiEndpoint: "/api/elternzeit",
-  detailUrlPrefix: "/dashboard/elternzeit",
+  detailUrlPrefix: vorgangslistePfad("elternzeit"),
   title: "Elternzeit",
   createButtonLabel: "Neue Elternzeit",
   searchPlaceholder: "Name, E-Mail oder Vorgangs-ID...",

@@ -29,6 +29,7 @@
  * freigegebenen internen Beauftragten.
  */
 
+import { bemPfad } from "@/lib/adressen";
 import { prisma } from "@/lib/db";
 import { getBaseUrl } from "@/lib/url";
 import { syncBemFristen, berechneSeverity } from "@/lib/bem-fristen";
@@ -136,7 +137,7 @@ export async function bemFristenLauf(opts: LaufOptionen = {}): Promise<LaufErgeb
         anzahl_fristen: zeilen.length,
         fristen_liste: zeilen.map((z) => `- ${z}`).join("\n"),
         fristen_liste_html: `<ul>${zeilen.map((z) => `<li>${escapeHtml(z)}</li>`).join("")}</ul>`,
-        portalLink: `${baseUrl}/dashboard/bem/${fallId}`,
+        portalLink: `${baseUrl}${bemPfad(fallId)}`,
       };
 
       // Eine eigene Mail PRO Empfaenger — so sieht niemand die Adressen der

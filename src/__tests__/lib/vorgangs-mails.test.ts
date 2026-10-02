@@ -73,7 +73,7 @@ describe("bezugAusModul (Dokumentenpaket)", () => {
     expect(quelle).toContain("bezug: bezugAusModul(opts.modul, opts.refId)");
   });
 
-  it("jedes URL-Segment hat eine Detailseite unter /dashboard", () => {
+  it("jedes URL-Segment der Schnittstelle hat eine Detailseite, die das Protokoll einbindet", () => {
     const seite: Record<string, string> = {
       onboarding: "src/app/(portal)/dashboard/[id]/detail-content.tsx",
       offboarding: "src/app/(portal)/dashboard/offboarding/[id]/offboarding-detail-content.tsx",

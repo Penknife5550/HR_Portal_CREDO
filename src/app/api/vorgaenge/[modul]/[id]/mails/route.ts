@@ -6,7 +6,7 @@
  * Regeln und Zeilenaufbau: src/lib/vorgangs-mails.ts.
  *
  * `modul`: onboarding | offboarding | civil-service | contract-end |
- * elternzeit | mutterschutz (wie die Pfade unter /dashboard). BEM gibt es hier
+ * elternzeit | mutterschutz (die englischen Modulnamen der Schnittstellen; die Seiten heissen anders, src/lib/adressen.ts). BEM gibt es hier
  * bewusst nicht (versiegelte Akte, eigenes Kommunikationsprotokoll im Fall).
  *
  * Berechtigung: HR_EDIT_ROLES (Empfaengeradressen und Fehlertexte des

@@ -27,6 +27,7 @@
  *    versendet wurde.
  */
 
+import { vorgangPfad, vorgangslistePfad } from "@/lib/adressen";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { getBaseUrl } from "@/lib/url";
@@ -130,7 +131,7 @@ export async function vertragsendeErinnerungenLauf(opts: LaufOptionen = {}): Pro
             anzahl_erinnerungen: anzahlErinnerungen,
             tage_offen: tageOffen,
             dringlichkeit: CONTRACT_END_CATEGORY_META[kategorie].label,
-            portalLink: `${getBaseUrl()}/dashboard/contract-end/${ce.id}`,
+            portalLink: `${getBaseUrl()}${vorgangPfad("vertragsende", ce.id)}`,
           });
 
           // Einmal-Marker NUR setzen, wenn die Mail wirklich raus ist —
@@ -209,7 +210,7 @@ export async function vertragsendeErinnerungenLauf(opts: LaufOptionen = {}): Pro
               liste_text: kritische.map(zeile).join("\n"),
               // Namen/Traeger stammen aus DokuBit — fuer den HTML-Teil escapen
               liste_html: kritische.map((k) => `<li>${escapeHtml(zeile(k))}</li>`).join(""),
-              portalLink: `${getBaseUrl()}/dashboard`,
+              portalLink: `${getBaseUrl()}${vorgangslistePfad("vertragsende")}`,
             });
             results.unbearbeitetHinweis = kritische.length;
           }

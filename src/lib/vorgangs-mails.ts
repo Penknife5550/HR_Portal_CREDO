@@ -102,7 +102,7 @@ export function vorgangBezugAusPayload(event: string, payload: Record<string, un
 // Module (URL-Segment der Route ↔ Vorgangsart)
 // ---------------------------------------------
 
-/** URL-Segment in /api/vorgaenge/[modul]/[id]/mails — wie die Pfade unter /dashboard. */
+/** URL-Segment in /api/vorgaenge/[modul]/[id]/mails — die englischen Modulnamen der Schnittstellen (nicht die der Seiten, src/lib/adressen.ts). */
 export const VORGANGS_MODULE: Readonly<Record<string, VorgangTyp>> = {
   onboarding: "ONBOARDING",
   offboarding: "OFFBOARDING",

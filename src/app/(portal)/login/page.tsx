@@ -5,6 +5,7 @@
  * E-Mail + Passwort Authentifizierung für das HR-Team
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -35,7 +36,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(vorgangslistePfad());
     } catch {
       setError("Verbindungsfehler. Bitte versuchen Sie es erneut.");
     } finally {

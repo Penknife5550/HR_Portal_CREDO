@@ -64,7 +64,7 @@ describe("Zugang", () => {
     "%s wird weggeleitet – nur SUPER_ADMIN sieht die Seite",
     async (rolle) => {
       sitzung = { role: rolle };
-      await expect(UiMusterPage()).rejects.toThrow("REDIRECT:/dashboard");
+      await expect(UiMusterPage()).rejects.toThrow("REDIRECT:/vorgaenge");
     },
   );
 });
@@ -96,7 +96,7 @@ describe("Inhalt", () => {
     expect(container.querySelector('button[aria-busy="true"]')).not.toBeNull();
     expect(container.querySelector("button[disabled]")).not.toBeNull();
     expect(container.querySelector('button[aria-disabled="true"]:not([aria-busy])')).not.toBeNull();
-    expect(container.querySelector('a[href="/dashboard"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/vorgaenge"]')).not.toBeNull();
   });
 
   it("nutzt ink-3 nirgends als Textfarbe", async () => {

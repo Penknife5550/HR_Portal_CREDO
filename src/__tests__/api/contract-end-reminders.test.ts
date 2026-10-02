@@ -186,7 +186,7 @@ describe("POST /api/cron/contract-end-reminders", () => {
         // inkl. der soeben versendeten Erinnerung (DB-Zaehler ist bereits 4)
         anzahl_erinnerungen: 4,
         supervisorEmail: "leitung@example.org",
-        portalLink: expect.stringContaining("/dashboard/contract-end/ce1"),
+        portalLink: expect.stringContaining("/vorgaenge/vertragsende/ce1"),
       }),
     );
     expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledWith(

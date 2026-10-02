@@ -1,3 +1,4 @@
+import { vorgangslistePfad } from "@/lib/adressen";
 import Link from "next/link";
 import { Inbox, SearchX } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -50,7 +51,7 @@ const FARBEN: { name: string; klasse: string; hinweis: string }[] = [
 export default async function UiMusterPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role !== "SUPER_ADMIN") redirect("/dashboard");
+  if (session.role !== "SUPER_ADMIN") redirect(vorgangslistePfad());
 
   return (
     <div className="min-h-screen bg-surface">
@@ -99,7 +100,7 @@ export default async function UiMusterPage() {
               <Button disabled>Gesperrt</Button>
               <Button aria-disabled>Gesperrt, fokussierbar</Button>
               <Button asChild>
-                <Link href="/dashboard">Als Verweis</Link>
+                <Link href={vorgangslistePfad()}>Als Verweis</Link>
               </Button>
             </div>
           </Zeile>

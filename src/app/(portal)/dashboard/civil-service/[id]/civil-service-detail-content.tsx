@@ -7,6 +7,7 @@
  * CREDO Corporate Design, Apple-like UX.
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -334,7 +335,7 @@ export function CivilServiceDetailContent({
               {error || "Vorgang nicht gefunden."}
             </p>
             <button
-              onClick={() => router.push("/dashboard?tab=civil-service")}
+              onClick={() => router.push(vorgangslistePfad("verbeamtung"))}
               className="mt-4 text-sm text-credo-blau hover:underline"
             >
               Zurück zur Übersicht
@@ -392,7 +393,7 @@ export function CivilServiceDetailContent({
         {/* ---- Top Bar ---- */}
         <div className="mb-6">
           <Link
-            href="/dashboard?tab=civil-service"
+            href={vorgangslistePfad("verbeamtung")}
             className="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
           >
             <ArrowLeftIcon className="h-4 w-4" />

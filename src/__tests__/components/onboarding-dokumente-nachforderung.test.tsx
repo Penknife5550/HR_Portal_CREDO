@@ -13,7 +13,7 @@
  *  1. Reiter „Dokumente": die Pille der laufenden Nachforderung (mit Namen,
  *     neben der Anzahl der Dokumente); `?tab=dokumente` oeffnet den Reiter,
  *     ohne die Reiterwahl danach zu stoeren (so kommt `portalLink` der
- *     HR-Mails an: `/dashboard/<id>?tab=dokumente`, Modul-Baustein `portalPfad`).
+ *     HR-Mails an: `/vorgaenge/onboarding/<id>?tab=dokumente`, Modul-Baustein `portalPfad`).
  *  2. Die Karte steht nach „Dokumente versenden" und vor den hochgeladenen
  *     Dokumenten; der Dialog oeffnet dort mit Name · Vorgangsnummer und einem
  *     Fokusziel, seine Meldung steht ueber der Karte — rot bei nicht
@@ -74,7 +74,7 @@ jest.mock("next/link", () => ({
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
-  usePathname: () => "/dashboard/onb-1",
+  usePathname: () => "/vorgaenge/onboarding/onb-1",
 }));
 
 // Nachbarn mit eigenem Netzverkehr — fuer die Verdrahtung ohne Belang.
@@ -428,7 +428,7 @@ describe("Reiter „Dokumente“", () => {
   });
 
   it("?tab=dokumente öffnet den Reiter mit der Karte", async () => {
-    window.history.replaceState(null, "", `/dashboard/${VORGANG}?tab=dokumente`);
+    window.history.replaceState(null, "", `/vorgaenge/onboarding/${VORGANG}?tab=dokumente`);
     fetchMit(vorgang());
     await seite();
     expect(reiter("documents").getAttribute("aria-current")).toBe("page");

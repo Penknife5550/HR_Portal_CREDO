@@ -7,6 +7,7 @@
  * Nutzt die bestehende PortalHeader-Komponente und CREDO Corporate Design.
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -478,7 +479,7 @@ const REITER_AUS_SUCHE: ReadonlyMap<string, TabId> = new Map<string, TabId>(
  *
  * Gesetzt wird der Parameter von `portalLink` der HR-Mails zu „Unterlagen
  * nachfordern": Der Modul-Baustein (`portalPfad`) zeigt auf
- * `/dashboard/<id>?tab=dokumente` — „Im Portal prüfen" landet so gleich bei
+ * den Vorgang mit `?tab=dokumente` — „Im Portal prüfen" landet so gleich bei
  * der Karte, nicht in der „Übersicht" (Schritt 11, Abweichung von
  * Feinplanung 8.2).
  */
@@ -1018,7 +1019,7 @@ export function DetailContent({
             <p className="mb-2 text-lg font-semibold text-foreground">Fehler</p>
             <p className="mb-4 text-sm text-muted-foreground">{error || "Vorgang nicht gefunden"}</p>
             <button
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push(vorgangslistePfad("onboarding"))}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Zurück zum Dashboard
@@ -1041,7 +1042,7 @@ export function DetailContent({
           {/* Row 1: Back + ID + Status + Type */}
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push(vorgangslistePfad("onboarding"))}
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <ArrowLeftIcon className="h-4 w-4" />

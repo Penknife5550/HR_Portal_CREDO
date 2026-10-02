@@ -113,6 +113,7 @@
  * `dokument_datei` wird im HTML-Teil nicht maskiert (`renderTemplate`).
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { getBaseUrl } from "@/lib/url";
@@ -432,7 +433,7 @@ export async function dokumentAblaufLauf(opts: LaufOptionen = {}): Promise<LaufE
           nachforderung_moeglich: gesperrt ? "" : "ja",
           nachforderung_gesperrt: gesperrt ? "ja" : "",
           nachforderung_hinweis: gesperrt ? ONBOARDING_NACHFORDERUNG_GESPERRT_MAIL[gesperrt] : "",
-          portalLink: `${getBaseUrl()}/dashboard/${doc.onboardingId}`,
+          portalLink: `${getBaseUrl()}${vorgangPfad("onboarding", doc.onboardingId)}`,
         };
 
         // SMTP primaer ueber den Dispatcher — kein direktes sendEventEmail.

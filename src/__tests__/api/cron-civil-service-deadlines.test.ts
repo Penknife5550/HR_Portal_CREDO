@@ -199,7 +199,7 @@ describe("API /api/cron/civil-service-deadlines POST", () => {
       expect(zeilen[0]).toMatch(/^- \[Überfällig\] PSI-2026-FES-002 · Bernd Beispiel: BR-Genehmigung überfällig\. BR-Antrag eingereicht am \d{2}\.\d{2}\.\d{4}/);
       expect(payload.warnungen_liste).toContain("[Vorwarnung] PSI-2026-FES-001 · Anna <Lehrerin>");
       expect(payload.warnungen_liste_html).toContain("Anna &lt;Lehrerin&gt;");
-      expect(payload.warnungen_liste_html).toContain("/dashboard/civil-service/psi-b");
+      expect(payload.warnungen_liste_html).toContain("/vorgaenge/verbeamtung/psi-b");
     });
 
     it("sollte truncated=true setzen wenn mehr als 50 Warnungen", async () => {

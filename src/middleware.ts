@@ -11,8 +11,22 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { apiZugriffVerweigern } from "@/lib/mandanten-gate";
 import { portalCsp, routeSetztEigeneCsp } from "@/lib/content-security-policy";
+import { alteAdresse, bemPfad, istBemPortalPfad, istVorgaengePfad, vorgangslistePfad } from "@/lib/adressen";
 
 export async function middleware(request: NextRequest) {
+  // =============================================
+  // Alte Adressen leiten dauerhaft auf die neuen (U1, E4).
+  //
+  // VOR allem anderen und ohne Sitzung: Die Uebersetzung braucht weder
+  // Datenbank noch Anmeldung, und das Ziel prueft die Sitzung selbst. 308 statt
+  // 301: dauerhaft, und die Methode der Anfrage bleibt erhalten. Die Regeln
+  // stehen in src/lib/adressen.ts.
+  // =============================================
+  const neueAdresse = alteAdresse(request.nextUrl.pathname, request.nextUrl.search);
+  if (neueAdresse !== null) {
+    return NextResponse.redirect(new URL(neueAdresse, request.url), 308);
+  }
+
   const response = NextResponse.next();
   const isDev = process.env.NODE_ENV !== "production";
 
@@ -108,7 +122,10 @@ export async function middleware(request: NextRequest) {
   // =============================================
   // Portal-Routen: Redirect zu Login wenn keine Session
   // =============================================
-  const isPortalRoute = pathname.startsWith("/dashboard") ||
+  // `/bem/einwilligung/…` ist die oeffentliche Einwilligungsseite und liegt
+  // unter demselben Anfang wie das BEM-Modul — istBemPortalPfad nimmt sie aus.
+  const isPortalRoute = istVorgaengePfad(pathname) ||
+                        istBemPortalPfad(pathname) ||
                         pathname.startsWith("/benutzerverwaltung") ||
                         pathname.startsWith("/vorlagen") ||
                         pathname.startsWith("/brief-vorlagen") ||
@@ -135,12 +152,12 @@ export async function middleware(request: NextRequest) {
       });
 
       // Externe BEM-Beauftragte (E7) sehen AUSSCHLIESSLICH das BEM-Modul.
-      // Jeder andere Portal-Pfad wird auf /dashboard/bem umgeleitet.
+      // Jeder andere Portal-Pfad wird auf die BEM-Fallliste umgeleitet.
       if (
         (payload.role as string) === "BEM_BEAUFTRAGTER" &&
-        !pathname.startsWith("/dashboard/bem")
+        !istBemPortalPfad(pathname)
       ) {
-        return NextResponse.redirect(new URL("/dashboard/bem", request.url));
+        return NextResponse.redirect(new URL(bemPfad(), request.url));
       }
 
       // Admin-Routen nur für SUPER_ADMIN und HR_LEITUNG
@@ -150,7 +167,7 @@ export async function middleware(request: NextRequest) {
         const role = payload.role as string;
         const adminRoles = ["SUPER_ADMIN", "HR_LEITUNG"];
         if (!adminRoles.includes(role)) {
-          return NextResponse.redirect(new URL("/dashboard", request.url));
+          return NextResponse.redirect(new URL(vorgangslistePfad(), request.url));
         }
       }
     } catch {

@@ -257,9 +257,9 @@ describe("Laden und Sperren", () => {
     // Die HR-Mails landen im Reiter „Dokumente" bei der Karte (Schritt 11,
     // Abweichung von Feinplanung 8.2) — den Parameter liest `reiterAusSuche`
     // der Vorgangsansicht (belegt in onboarding-dokumente-nachforderung.test.tsx).
-    expect(onboardingBaustein.portalPfad(ID)).toBe(`/dashboard/${ID}?tab=dokumente`);
+    expect(onboardingBaustein.portalPfad(ID)).toBe(`/vorgaenge/onboarding/${ID}?tab=dokumente`);
     const url = new URL(onboardingBaustein.portalPfad(ID), "https://hr.fes-credo.de");
-    expect(url.pathname).toBe(`/dashboard/${ID}`);
+    expect(url.pathname).toBe(`/vorgaenge/onboarding/${ID}`);
     expect(url.searchParams.get("tab")).toBe("dokumente");
     expect(onboardingBaustein.apiBasis(ID)).toBe(`/api/onboarding/${ID}/unterlagen`);
     expect(onboardingBaustein.mitDetails(abbilden(zeile()))).toBe(true);

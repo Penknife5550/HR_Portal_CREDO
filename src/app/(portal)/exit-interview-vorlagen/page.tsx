@@ -1,3 +1,4 @@
+import { vorgangslistePfad } from "@/lib/adressen";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { ExitInterviewVorlagenContent } from "./exit-interview-vorlagen-content";
@@ -16,7 +17,7 @@ export default async function ExitInterviewVorlagenPage() {
 
   // Nur SUPER_ADMIN und HR_LEITUNG duerfen Exit-Interview-Vorlagen verwalten
   if (session.role !== "SUPER_ADMIN" && session.role !== "HR_LEITUNG") {
-    redirect("/dashboard");
+    redirect(vorgangslistePfad());
   }
 
   return <ExitInterviewVorlagenContent user={session} />;

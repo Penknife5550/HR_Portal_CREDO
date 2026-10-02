@@ -5,6 +5,7 @@
  * (Onboarding, Offboarding, Verbeamtung, etc.)
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import type { ReactNode } from "react";
 
 /** Definition einer einzelnen Tabellenspalte */
@@ -39,7 +40,7 @@ export interface ProcessRow {
 export interface ProcessDashboardConfig {
   /** API-Endpunkt für Datenabruf, z.B. "/api/offboarding" */
   apiEndpoint: string;
-  /** URL-Praefix für Detail-Seiten, z.B. "/dashboard/offboarding" */
+  /** URL-Praefix für Detail-Seiten, z.B. vorgangslistePfad("offboarding") */
   detailUrlPrefix: string;
   /** Seitentitel, z.B. "Offboarding-Vorgaenge" */
   title: string;

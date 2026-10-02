@@ -8,6 +8,7 @@
  * Pagination, kollabierbare JSON-Details.
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
@@ -150,7 +151,7 @@ function ProcessLink({ entry }: { entry: AuditLogEntry }) {
   if (entry.offboardingId) {
     return (
       <Link
-        href={`/dashboard/offboarding/${entry.offboardingId}`}
+        href={vorgangPfad("offboarding", entry.offboardingId)}
         className="text-xs text-primary hover:underline"
       >
         Offboarding
@@ -160,7 +161,7 @@ function ProcessLink({ entry }: { entry: AuditLogEntry }) {
   if (entry.onboardingId) {
     return (
       <Link
-        href={`/dashboard/${entry.onboardingId}`}
+        href={vorgangPfad("onboarding", entry.onboardingId)}
         className="text-xs text-primary hover:underline"
       >
         Onboarding

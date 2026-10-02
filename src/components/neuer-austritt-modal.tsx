@@ -13,6 +13,7 @@
  * hier im Formular.
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { EXIT_TYPE_LABELS } from "@/lib/constants";
@@ -238,7 +239,7 @@ export function NeuerAustrittModal({
               </div>
 
               <Link
-                href={`/dashboard/offboarding/${result.offboardingId}`}
+                href={vorgangPfad("offboarding", result.offboardingId)}
                 className="block rounded-lg border border-border px-4 py-3 text-center text-sm font-medium text-foreground transition-colors hover:bg-accent"
               >
                 Vorgang öffnen

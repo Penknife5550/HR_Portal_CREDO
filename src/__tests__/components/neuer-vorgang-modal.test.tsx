@@ -353,7 +353,7 @@ describe("Erfolgsansicht", () => {
     expect(screen.queryByRole("alert")).toBeNull();
 
     const zumVorgang = screen.getByRole("link", { name: "Zum Vorgang" }) as HTMLAnchorElement;
-    expect(zumVorgang.getAttribute("href")).toBe("/dashboard/vorgang-1");
+    expect(zumVorgang.getAttribute("href")).toBe("/vorgaenge/onboarding/vorgang-1");
   });
 
   it("warnt je Link, wenn die Mail nicht hinausging (FAILED, SKIPPED)", async () => {

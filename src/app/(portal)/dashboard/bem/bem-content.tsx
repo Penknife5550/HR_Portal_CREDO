@@ -1,5 +1,6 @@
 "use client";
 
+import { BEM_STATISTIK_PFAD, bemPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
@@ -174,7 +175,7 @@ export function BemContent({ user }: { user: User }) {
           <div className="flex flex-wrap items-center gap-2">
             {canViewStats && (
               <Link
-                href="/dashboard/bem/statistik"
+                href={BEM_STATISTIK_PFAD}
                 className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
               >
                 📊 Statistik / IKS-Report
@@ -220,7 +221,7 @@ export function BemContent({ user }: { user: User }) {
                 return (
                   <li key={`${h.fallId}-${i}`}>
                     <Link
-                      href={`/dashboard/bem/${h.fallId}`}
+                      href={bemPfad(h.fallId)}
                       className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-credo-rot/5"
                     >
                       <span>
@@ -330,7 +331,7 @@ export function BemContent({ user }: { user: User }) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link
-                        href={`/dashboard/bem/${f.id}`}
+                        href={bemPfad(f.id)}
                         className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                       >
                         Öffnen

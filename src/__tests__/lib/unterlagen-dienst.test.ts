@@ -1518,7 +1518,7 @@ describe("hrVollstaendigMelden", () => {
       angefordert_von: "Erika Muster",
       mitarbeiter_name: "Anna Beispiel",
       // „Im Portal prüfen" landet im Reiter „Dokumente" bei der Karte.
-      portalLink: `${BASIS}/dashboard/${VORGANG_ID}?tab=dokumente`,
+      portalLink: `${BASIS}/vorgaenge/onboarding/${VORGANG_ID}?tab=dokumente`,
       anzahl_zu_pruefen: 1,
       erneut_eingereicht: "ja",
     });

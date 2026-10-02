@@ -6,6 +6,7 @@
  * Schritt 2: Beteiligte erfassen (SL, Amtsarzt, Beirat)
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { useState, useEffect } from "react";
 
 interface Organization {
@@ -220,7 +221,7 @@ export function NeueVerbeamtungModal({ open, onClose, onCreated }: NeueVerbeamtu
                 </div>
               )}
 
-              <a href={`/dashboard/civil-service/${result.id}`}
+              <a href={vorgangPfad("verbeamtung", result.id)}
                 className="block rounded-lg border border-border px-4 py-3 text-center text-sm font-medium text-foreground transition-colors hover:bg-accent">
                 Vorgang oeffnen
               </a>

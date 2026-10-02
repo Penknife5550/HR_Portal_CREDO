@@ -9,6 +9,7 @@
  * „gesperrt, waehrend die Aktion laeuft" und „Fehler bleibt im Dialog" von Hand
  * pruefen lassen (Escape, Tab, Fokus zurueck).
  */
+import { vorgangslistePfad } from "@/lib/adressen";
 import { useRef, useState } from "react";
 import { Download, History, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -158,7 +159,7 @@ export function MusterKopf() {
         }
         menue={[
           { text: "Verlauf anzeigen", symbol: History, onWaehlen: () => toast.hinweis("Verlauf gewählt.") },
-          { text: "Zur Startseite", href: "/dashboard" },
+          { text: "Zur Startseite", href: vorgangslistePfad() },
           { text: "Als PDF exportieren", symbol: Download, gesperrt: true },
           { text: "Rückfrage aus dem Menü …", symbol: XCircle, kritisch: true, onWaehlen: () => setRueckfrage(true) },
         ]}

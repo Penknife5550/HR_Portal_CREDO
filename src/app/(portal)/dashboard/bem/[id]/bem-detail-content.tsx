@@ -1,5 +1,6 @@
 "use client";
 
+import { bemPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PortalHeader } from "@/components/portal-header";
@@ -628,7 +629,7 @@ export function BemDetailContent({
             {error || "Fall nicht gefunden."}
           </div>
           <Link
-            href="/dashboard/bem"
+            href={bemPfad()}
             className="mt-4 inline-block text-sm text-credo-blau hover:underline"
           >
             ← Zurück zur Übersicht
@@ -648,7 +649,7 @@ export function BemDetailContent({
       <PortalHeader user={user} />
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Link
-          href="/dashboard/bem"
+          href={bemPfad()}
           className="mb-4 inline-block text-sm text-credo-blau hover:underline"
         >
           ← Zurück zur Übersicht

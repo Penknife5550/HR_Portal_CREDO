@@ -4,13 +4,14 @@
  * Vertragsende, exakt nach der n8n-Staffelung.
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import type { ProcessDashboardConfig } from "@/components/process-dashboard/types";
 import { CONTRACT_END_STATUS_LABELS } from "@/lib/constants";
 import { getContractEndCategory, CONTRACT_END_CATEGORY_META } from "@/lib/contract-end-fristen";
 
 export const contractEndDashboardConfig: ProcessDashboardConfig = {
   apiEndpoint: "/api/contract-end",
-  detailUrlPrefix: "/dashboard/contract-end",
+  detailUrlPrefix: vorgangslistePfad("vertragsende"),
   title: "Vertragsende-Vorgänge",
   createButtonLabel: "Neuer Vorgang",
   searchPlaceholder: "Name, E-Mail oder Vorgangs-ID...",

@@ -7,6 +7,7 @@
  * Nutzt die bestehende PortalHeader-Komponente und CREDO Corporate Design.
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PortalHeader } from "@/components/portal-header";
@@ -564,7 +565,7 @@ export function OffboardingDetailContent({
             <p className="mb-2 text-lg font-semibold text-foreground">Fehler</p>
             <p className="mb-4 text-sm text-muted-foreground">{error || "Vorgang nicht gefunden"}</p>
             <button
-              onClick={() => router.push("/dashboard?tab=offboarding")}
+              onClick={() => router.push(vorgangslistePfad("offboarding"))}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Zurück zum Dashboard
@@ -589,7 +590,7 @@ export function OffboardingDetailContent({
           {/* Row 1: Back + ID + Status + ExitType + Status-Dropdown */}
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => router.push("/dashboard?tab=offboarding")}
+              onClick={() => router.push(vorgangslistePfad("offboarding"))}
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <ArrowLeftIcon className="h-4 w-4" />

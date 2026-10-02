@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (Feinplan U1 freigegeben)
+Letzte Änderung: 02.10.2026 (U1, Tag 1)
 
 ## 1. Worum es geht
 
@@ -28,7 +28,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
-| U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **Feinplan freigegeben** (02.10.2026); Bau offen, drei Tage: Adressen → Kopf → Reiter, Mails, Abnahme |
+| U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **in Arbeit**, Tag 1 von 3 erledigt (neue Adressen, Weiterleitung, alle Verweise); offen: Kopf (Tag 2), Abnahme (Tag 3) |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
@@ -522,6 +522,71 @@ vor dem Pilot ausschließt.
 `/vorgaenge` und `/bem`, Weiterleitung in der Middleware, alle Verweise umstellen,
 Wächter-Test.
 
+### 02.10.2026 – U1, Tag 1 (Adressen)
+
+**Code:**
+
+| Datei | Inhalt |
+|---|---|
+| `src/lib/adressen.ts` | neu, rein: `vorgangPfad`, `vorgangslistePfad`, `bemPfad`, `BEM_STATISTIK_PFAD`, `alteAdresse` (Übersetzung jeder alten Adresse), `istBemPortalPfad`, `istVorgaengePfad`, `unter` |
+| `src/app/(portal)/vorgaenge/…` | neu: `page.tsx` (leitet auf die Onboarding-Liste), `[modul]/page.tsx` (Liste mit Reitern), sechs dünne `<modul>/[id]/page.tsx` |
+| `src/app/(portal)/bem/…` | neu: `page.tsx`, `[id]/page.tsx`, `statistik/page.tsx` |
+| `src/app/(portal)/dashboard/**/page.tsx` | entfernt (10 Dateien); die 48 übrigen Dateien der Module bleiben dort |
+| `src/middleware.ts` | alte Adresse → 308 auf die neue, vor allem anderen; Sitzungsprüfung für `/vorgaenge` und `/bem` (ohne `/bem/einwilligung`); BEM-Beauftragte nur `/bem…` |
+| 43 Dateien unter `src/app/(portal)/` und `src/components/` | Verweise (`href`, `router.push`, `redirect`) über `adressen.ts` |
+| `src/lib/laeufe/bem-fristen.ts`, `dokument-ablauf.ts`, `vertragsende-erinnerungen.ts`, `src/lib/psi-fristen-mail.ts`, `src/lib/unterlagen-onboarding.ts` | `portalLink` der Mails über `adressen.ts` |
+| `src/lib/events.ts` | Beispiel-Adressen der Vorschau |
+| `src/components/portal-header.tsx` | nur die neuen Adressen und ein Aktiv-Vergleich auf ganze Pfadteile – die Datei entfällt an Tag 2 |
+| `src/__tests__/lib/adressen.test.ts` | neu, 50 Tests: Adressen bauen, jede alte Adresse, Middleware, drei Wächter |
+| 14 bestehende Testdateien | erwarten die neuen Adressen |
+| `scripts/ux-abnahme.js` | neue Adressen |
+
+**Vorgezogen von Tag 3:** Die Modul-Reiter der Vorgangsliste sind schon echte Adressen
+(`/vorgaenge/<modul>`), tragen `aria-current="page"` und rollen waagerecht – die Liste
+brauchte ohnehin eine neue Seiten-Datei.
+
+**Entscheidungen beim Bauen:**
+- Sechs feste Ordner `vorgaenge/<modul>/[id]/` statt eines `vorgaenge/[modul]/[id]/`: Eine
+  gemeinsame Seite hätte alle sechs Detailansichten in ein Paket gezogen. Ein Wächter-Test
+  hält die Ordner gegen `VORGANGS_MODULE`.
+- Die Weiterleitung steht ganz vorn in der Middleware und fragt keine Sitzung ab; das Ziel
+  prüft sie selbst.
+- Modulnamen aus `?tab=` und aus dem Pfad werden nur über eigene Einträge der Tabelle
+  aufgelöst (`Object.hasOwn`) – `?tab=constructor` erfindet keine Adresse.
+- `vorgangPfad` und `bemPfad` kodieren die Kennung (`encodeURIComponent`).
+- Der Wächter sucht `/dashboard` als ganzen Pfadteil; erlaubt bleiben die Schnittstelle
+  `/api/dashboard/…` und der Ordner `(portal)/dashboard/`.
+
+**Geändertes Verhalten:**
+- Alle Verweise im Portal und in **neuen** E-Mails zeigen auf die neuen Adressen; alte
+  Adressen leiten weiter.
+- Die Sammelmail `contract-end-unbearbeitet` verwies bisher auf die Onboarding-Liste
+  (`/dashboard`); jetzt auf die Vertragsende-Liste (`/vorgaenge/vertragsende`) – so stand es
+  schon im Beispiel der Vorlagen-Vorschau.
+- „Dashboard“ im alten Kopf ist nicht mehr markiert, wenn man im BEM ist (Nebenwirkung der
+  neuen Adressen; der Kopf selbst kommt an Tag 2).
+
+**Mail-Ereignisse mit neuer Adresse im `portalLink`** (Texte unverändert, niemand muss eine
+Vorlage zurücksetzen): `bem-frist-erinnerung`, `dokument-ablauf-warnung`,
+`dokument-abgelaufen`, `contract-end-eskalation`, `contract-end-unbearbeitet`,
+`psi-deadline-warning` (Liste der Vorgänge), `unterlagen-vollstaendig`,
+`unterlagen-frist-verstrichen`. Webhook-Abnehmer bekommen dieselbe neue Adresse.
+
+**Geprüft:** `npm run pruefen` (Typen, Lint, 186 Suiten, 4.795 Tests). Im Browser
+(angemeldet): `/dashboard?tab=contract-end` → `/vorgaenge/vertragsende` mit markiertem Reiter;
+`/dashboard/<id>?tab=dokumente` → `/vorgaenge/onboarding/<id>?tab=dokumente`;
+`/dashboard/bem` → `/bem`; `/vorgaenge` → `/vorgaenge/onboarding`; `/vorgaenge/gibt-es-nicht`
+zeigt „Seite nicht gefunden“.
+
+**Nicht geprüft:** die übrigen fünf Detailseiten und die BEM-Statistik im Browser (nur über
+Typprüfung und Wächter-Test); Anmeldung als BEM-Beauftragte (nur im Middleware-Test);
+`npm run build`; `scripts/ux-screenshots.js` und `handbuch-screenshots.js` nennen noch die
+alten Adressen (funktionieren über die Weiterleitung, Umstellung an Tag 3).
+
+**Als Nächstes (U1, Tag 2):** `src/lib/navigation.ts`, `PortalKopf` im Layout, Anmeldeseite
+in eigene Gruppe, Kopf aus 29 Seiten entfernen, „Formulare“ für die Sachbearbeitung
+ausblenden.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -544,10 +609,11 @@ Wächter-Test.
 | `ux-umbau` | `c5afbc0` | Zeitgrenze des Musterseiten-Tests (axe über die ganze Seite) |
 | `ux-umbau` | `7778752` | U0 Tag 6: Abnahme, Screenshots, `scripts/ux-abnahme.js`, Umbruch in Pille und Zeile |
 | `ux-umbau` | `c66f451` | Feinplan U1 (Entwurf) |
-| `ux-umbau` | (folgt) | Feinplan U1 freigegeben (F1–F4) |
+| `ux-umbau` | `44ea9e3` | Feinplan U1 freigegeben (F1–F4) |
+| `ux-umbau` | (folgt) | U1 Tag 1: neue Adressen, Weiterleitung, Verweise über `adressen.ts` |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Tag 3 bis 6 sind noch nicht gepusht. Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). U0 Tag 3 bis 6 und U1 sind noch nicht gepusht. Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

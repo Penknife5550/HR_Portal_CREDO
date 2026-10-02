@@ -126,8 +126,8 @@ describe("apiZugriffVerweigern", () => {
     // Eine Seite ohne Daten ist harmlos; die Daten holt sie ueber die APIs,
     // und dort greift das Gate. Die Portal-/Admin-Logik der Middleware bleibt
     // unberuehrt.
-    expect(apiZugriffVerweigern(EINRICHTUNG, "/dashboard")).toBe(false);
-    expect(apiZugriffVerweigern(EINRICHTUNG, "/dashboard/abc-123")).toBe(false);
+    expect(apiZugriffVerweigern(EINRICHTUNG, "/vorgaenge")).toBe(false);
+    expect(apiZugriffVerweigern(EINRICHTUNG, "/vorgaenge/onboarding/abc-123")).toBe(false);
     expect(apiZugriffVerweigern(EINRICHTUNG, "/login")).toBe(false);
   });
 

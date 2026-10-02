@@ -137,7 +137,9 @@ zeigen. Sie jetzt zu verschieben hieße: Jede Änderung, die auf `main` an einem
 (Paket 4 Stufe 2, Paket 6), müsste beim Nachziehen von Hand umgelegt werden. Deshalb in U1:
 
 - Unter `src/app/(portal)/vorgaenge/…` und `src/app/(portal)/bem/…` entstehen **dünne
-  Seiten-Dateien** (je rund 10 Zeilen), die den vorhandenen Inhalt einbinden.
+  Seiten-Dateien** (je rund 10 Zeilen), die den vorhandenen Inhalt einbinden. Je Modul ein
+  fester Ordner (`vorgaenge/onboarding/[id]/` …), nicht ein gemeinsamer – sonst lüde jede
+  Detailseite den Code aller sechs.
 - Die alten `page.tsx` unter `dashboard/` entfallen (sonst gäbe es jede Seite zweimal); ihr
   Inhalt zieht in die neue Seiten-Datei.
 - Die Modul-Dateien ziehen erst mit dem Umbau ihres Moduls um (U4), wenn sie ohnehin geteilt
@@ -274,6 +276,6 @@ mit (zwei neue Tabellen) – das ist getrennt zu entscheiden.
 
 | Tag | Stand | Commit |
 |---|---|---|
-| 1 Adressen, Weiterleitung, Verweise | offen | |
+| 1 Adressen, Weiterleitung, Verweise (dazu vorgezogen: Modul-Reiter) | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 2 Kopf, Layout, Anmeldeseite | offen | |
 | 3 Reiter, Mails, Abnahme | offen | |

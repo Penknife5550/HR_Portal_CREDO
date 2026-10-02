@@ -7,6 +7,7 @@
  * Filtern, Sortierung, Pagination und Aktionen.
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -29,7 +30,7 @@ import {
 
 // Die beiden Diagramme kommen nach, statt im Einstiegs-Bundle mitzureisen.
 //
-// recharts wiegt rund 145 kB und war fest in die Seite gelinkt: /dashboard
+// recharts wiegt rund 145 kB und war fest in die Seite gelinkt: Die Vorgangsliste
 // lieferte 261 kB First-Load-JS -- den ersten Bildschirm nach dem Login.
 // Gebraucht werden die Diagramme aber erst, wenn die Kennzahlen geladen sind,
 // und sie stehen weit unten auf der Seite.
@@ -499,7 +500,7 @@ export function DashboardContent({ user }: { user: User }) {
                       <tr
                         key={ob.id}
                         className="cursor-pointer transition-colors hover:bg-muted/50"
-                        onClick={() => router.push(`/dashboard/${ob.id}`)}
+                        onClick={() => router.push(vorgangPfad("onboarding", ob.id))}
                       >
                         <td className="px-4 py-3">
                           {ob.displayId ? (

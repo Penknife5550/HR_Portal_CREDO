@@ -47,8 +47,8 @@ const BREITEN = [
 
 const SEITEN = [
   { name: "anmeldung", pfad: "/login", ohneAnmeldung: true },
-  { name: "onboarding-liste", pfad: "/dashboard" },
-  { name: "onboarding-detail", pfad: `/dashboard/${VORGANG}` },
+  { name: "onboarding-liste", pfad: "/vorgaenge/onboarding" },
+  { name: "onboarding-detail", pfad: `/vorgaenge/onboarding/${VORGANG}` },
   { name: "einstellungen", pfad: "/einstellungen" },
   // Ohne gueltigen Link: die Hinweisseite des Fragebogens. Ein echter Link
   // wuerde beim Oeffnen den Vorgang veraendern.

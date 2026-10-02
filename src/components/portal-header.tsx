@@ -9,6 +9,7 @@
  * - Verwaltung (Dropdown: Benutzer, Mandanten, Einstellungen)
  */
 
+import { BEM_PFAD, VORGAENGE_PFAD, unter } from "@/lib/adressen";
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -40,7 +41,7 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     label: "Dashboard",
-    href: "/dashboard",
+    href: VORGAENGE_PFAD,
     roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER"],
   },
   {
@@ -48,7 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
     // zeigt aber nur Faelle mit aktiver Freigabe (bemFilter) — sonst leer.
     // BEM_BEAUFTRAGTER (E7) sieht NUR diesen Punkt (in keiner anderen Gruppe).
     label: "🔒 BEM",
-    href: "/dashboard/bem",
+    href: BEM_PFAD,
     roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER", "BEM_BEAUFTRAGTER"],
   },
   {
@@ -200,7 +201,7 @@ export function PortalHeader({ user }: { user: User }) {
       <header className="border-b bg-card shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="flex items-center gap-3">
+            <Link href={VORGAENGE_PFAD} className="flex items-center gap-3">
               <Image
                 src="/credo_logo.svg"
                 alt="CREDO"
@@ -221,7 +222,7 @@ export function PortalHeader({ user }: { user: User }) {
               {visibleGroups.map((group) => {
                 // Direkter Link (kein Dropdown)
                 if (group.href) {
-                  const isActive = pathname.startsWith(group.href);
+                  const isActive = unter(pathname, group.href);
                   return (
                     <Link
                       key={group.href}
@@ -233,7 +234,7 @@ export function PortalHeader({ user }: { user: User }) {
                       }`}
                     >
                       {group.label}
-                      {group.href === "/dashboard/bem" && bemCount > 0 && (
+                      {group.href === BEM_PFAD && bemCount > 0 && (
                         <span
                           className="ml-1.5 inline-block rounded-full bg-credo-rot px-1.5 py-0.5 text-xs font-bold leading-none text-white"
                           title={`${bemCount} Fristen mit Handlungsbedarf`}
