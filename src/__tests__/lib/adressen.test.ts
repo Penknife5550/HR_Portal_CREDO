@@ -287,6 +287,9 @@ describe("Waechter", () => {
       .map((n) => path.join(SRC, "..", "scripts", n));
     for (const d of [...dateien(SRC), ...skripte]) {
       if (relativ(d) === "lib/adressen.ts") continue;
+      // Das Abnahme-Skript ruft die alten Adressen ABSICHTLICH auf (es prueft
+      // die Weiterleitung im Browser).
+      if (path.basename(d) === "ux-abnahme-u1.js") continue;
       fs.readFileSync(d, "utf8")
         .split("\n")
         .forEach((zeile, i) => {

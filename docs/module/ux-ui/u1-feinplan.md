@@ -1,7 +1,7 @@
 # U1 Rahmen – Feinplan
 
 Stand 02.10.2026 · gehört zu [ux-ui-plan-2026-09.html](ux-ui-plan-2026-09.html), Abschnitt 5 (Paket U1) und 4 A (Seitenliste) ·
-Branch `ux-umbau` · Status: **freigegeben am 02.10.2026** (F1–F4 wie vorgeschlagen, Abschnitt 9) ·
+Branch `ux-umbau` · Status: **gebaut und abgenommen am 02.10.2026** (freigegeben mit F1–F4, Abschnitt 9) ·
 Stand und Protokoll: [projekt-ux-umbau.md](projekt-ux-umbau.md)
 
 ## 1. Ziel
@@ -157,6 +157,13 @@ der gewählte trägt `aria-current="page"`, und die Reihe rollt unter 640 px waa
 umzubrechen. Aussehen sonst unverändert – die Listen selbst baut U3 um. Ein unbekannter
 Modulname in der Adresse zeigt die „Seite nicht gefunden“ des Portals.
 
+### 3.4 Seiten ohne Kopf
+
+Die Fragebogen-Vorschau (`/vorlagen/vorschau/<id>`) zeigt den Fragebogen so, wie ihn die
+Person über ihren Link sieht – ohne Portal-Navigation. Sie liegt deshalb in
+`src/app/(portal-ohne-kopf)/` (Adresse und Zugang unverändert). Nachgetragen am 02.10.2026
+nach der vierten Durchsicht.
+
 ## 4. Betroffene Dateien
 
 | Datei | Änderung |
@@ -278,4 +285,4 @@ mit (zwei neue Tabellen) – das ist getrennt zu entscheiden.
 |---|---|---|
 | 1 Adressen, Weiterleitung, Verweise (dazu vorgezogen: Modul-Reiter) | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 2 Kopf, Layout, Anmeldeseite, Hauptüberschriften | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
-| 3 Reiter, Mails, Abnahme | offen | |
+| 3 Abnahme im Browser (Rollen, An-/Abmelden, Tastatur, Adressen), Bilder, Build | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 7 und 8 |

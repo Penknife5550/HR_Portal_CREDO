@@ -13,10 +13,11 @@
  *       „vorher/nachher“: einmal vor, einmal nach der Aenderung aufrufen, je in
  *       einen eigenen Ordner.
  *
- *   vergleich <ordnerA> <ordnerB>
+ *   vergleich <ordnerA> <ordnerB> [kopfhoeheA]
  *       Vergleicht gleichnamige PNGs Bildpunkt fuer Bildpunkt und nennt je
  *       Datei die Zahl der abweichenden Punkte. Ende mit Code 1, wenn etwas
- *       abweicht.
+ *       abweicht. Mit `kopfhoeheA` nur unterhalb des Kopfs (fuer Pakete, die
+ *       den Kopf aendern — U1: alter Kopf 72 px).
  *
  * VORAUSSETZUNGEN (muster, seiten)
  *   1. Entwicklungsserver laeuft (npm run dev, Dev-DB auf 5433).
@@ -166,8 +167,13 @@ async function seiten(ziel) {
   }
 }
 
-function vergleich(a, b) {
-  if (!a || !b) throw new Error("Aufruf: node scripts/ux-abnahme.js vergleich <ordnerA> <ordnerB>");
+function vergleich(a, b, kopfA) {
+  if (!a || !b) throw new Error("Aufruf: node scripts/ux-abnahme.js vergleich <ordnerA> <ordnerB> [kopfhoeheA]");
+  // Mit `kopfhoeheA` (Hoehe des Kopfs in den Bildern von A, in px) wird nur
+  // der Bereich UNTERHALB des Kopfs verglichen: Ist der Kopf in B hoeher oder
+  // niedriger, sind die Bilder verschieden hoch und der Inhalt verschoben. Die
+  // Verschiebung ist der Hoehenunterschied der beiden Bilder.
+  const kopf = kopfA ? Number(kopfA) : null;
   const { PNG } = require("pngjs");
   const dateien = fs.readdirSync(a).filter((d) => d.endsWith(".png"));
   if (dateien.length === 0) throw new Error(`Keine PNGs in ${a}`);
@@ -181,28 +187,43 @@ function vergleich(a, b) {
     }
     const x = PNG.sync.read(fs.readFileSync(path.join(a, d)));
     const y = PNG.sync.read(fs.readFileSync(pb));
-    if (x.width !== y.width || x.height !== y.height) {
+    const versatz = x.height - y.height;
+    if (x.width !== y.width || (versatz !== 0 && kopf === null)) {
       console.log(`${d}: Groesse ${x.width}×${x.height} gegen ${y.width}×${y.height}`);
+      abweichend += 1;
+      continue;
+    }
+    // Ohne Hoehenunterschied das ganze Bild; sonst ab dem Kopf, B um den
+    // Unterschied verschoben.
+    const abA = versatz !== 0 ? kopf : 0;
+    const abB = abA - versatz;
+    if (abB < 0) {
+      console.log(`${d}: Kopfhoehe ${kopf} passt nicht zum Hoehenunterschied ${versatz}`);
       abweichend += 1;
       continue;
     }
     let punkte = 0;
     let oben = Infinity;
     let unten = -1;
-    for (let i = 0; i < x.data.length; i += 4) {
-      if (
-        x.data[i] !== y.data[i] ||
-        x.data[i + 1] !== y.data[i + 1] ||
-        x.data[i + 2] !== y.data[i + 2] ||
-        x.data[i + 3] !== y.data[i + 3]
-      ) {
-        punkte += 1;
-        const zeile = Math.floor(i / 4 / x.width);
-        if (zeile < oben) oben = zeile;
-        if (zeile > unten) unten = zeile;
+    for (let zeile = abA; zeile < x.height; zeile++) {
+      const ia = zeile * x.width * 4;
+      const ib = (zeile - abA + abB) * y.width * 4;
+      for (let k = 0; k < x.width * 4; k += 4) {
+        if (
+          x.data[ia + k] !== y.data[ib + k] ||
+          x.data[ia + k + 1] !== y.data[ib + k + 1] ||
+          x.data[ia + k + 2] !== y.data[ib + k + 2] ||
+          x.data[ia + k + 3] !== y.data[ib + k + 3]
+        ) {
+          punkte += 1;
+          if (zeile < oben) oben = zeile;
+          if (zeile > unten) unten = zeile;
+        }
       }
     }
-    if (punkte === 0) console.log(`${d}: gleich (${x.width}×${x.height})`);
+    if (punkte === 0 && versatz !== 0) {
+      console.log(`${d}: unterhalb des Kopfs gleich (Kopf ${kopf} → ${abB} px, Seite ${x.height} → ${y.height} px)`);
+    } else if (punkte === 0) console.log(`${d}: gleich (${x.width}×${x.height})`);
     else {
       console.log(`${d}: ${punkte} Bildpunkte weichen ab, Zeilen ${oben}–${unten}`);
       abweichend += 1;
@@ -212,10 +233,10 @@ function vergleich(a, b) {
 }
 
 (async () => {
-  const [aufgabe, a, b] = process.argv.slice(2);
+  const [aufgabe, a, b, c] = process.argv.slice(2);
   if (aufgabe === "muster") await muster(a || path.join(__dirname, "..", "docs", "module", "ux-ui", "screenshots"));
   else if (aufgabe === "seiten") await seiten(a);
-  else if (aufgabe === "vergleich") vergleich(a, b);
+  else if (aufgabe === "vergleich") vergleich(a, b, c);
   else {
     console.error("Aufruf: node scripts/ux-abnahme.js muster [ziel] | seiten <ziel> | vergleich <a> <b>");
     process.exit(1);

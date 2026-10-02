@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (U1, Tag 2)
+Letzte Änderung: 02.10.2026 (U1, Tag 3 – Abnahme)
 
 ## 1. Worum es geht
 
@@ -28,7 +28,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
-| U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **in Arbeit**, Tag 2 von 3 erledigt (neue Adressen, Weiterleitung, neuer Kopf im Layout); offen: Abnahme (Tag 3) |
+| U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Offen: Push, Deploy zusammen mit U0, Ankündigung an das Personalbüro |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
@@ -127,6 +127,8 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Rollennamen | „Rollenname aus `permissions.ts`“ | Tabelle `ROLLEN_NAMEN` in `src/lib/navigation.ts` | `permissions.ts` zieht die Datenbank mit und darf nicht in den Browser; der Kopf ist eine Client-Komponente. |
 | Hauptüberschrift | – (Feinplan: „HR-Portal“ ist keine `h1` mehr) | neun Verwaltungsseiten: Seitentitel von `h2` zu `h1`; Vorgangslisten: unsichtbare `h1` | Ohne die `h1` des Kopfs hätten diese Seiten gar keine mehr gehabt. Aussehen unverändert. |
 | An- und Abmelden | – | volles Laden der Seite statt Wechsel im Client (`seiteNeuLaden`) | Der Kopf hängt im Layout; ein gemerktes Layout zeigte nach einem Kontowechsel Namen und Punkte des alten Kontos. |
+| Fragebogen-Vorschau | – | eigene Ordnergruppe `(portal-ohne-kopf)`, Adresse unverändert | Die Vorschau zeigt den Fragebogen, wie ihn die Person sieht; über das Layout hätte sie den Portal-Kopf bekommen. |
+| Rollennamen der Benutzerverwaltung | Feinplan: Zusammenführen mit U6 | schon jetzt aus `rollenName()` | Befund der vierten Durchsicht; sonst hieße dieselbe Person im Kopf „Führungskraft“ und in der Liste „Vorgesetzter“. |
 | Prototyp-Tag | „Kein Paket außer U0 startet ohne den Prototyp-Tag“ | gilt ab dem Pilot; U1 darf vorher | U1 ändert nur den Rahmen (Kopf, Breadcrumb, Adressen) und hängt an keiner der Fragen des Prototyp-Tags (E9, E11, E13). |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
@@ -670,6 +672,71 @@ Aussehen als Bild (das Browser-Fenster war verdeckt, Bilder kamen nicht zustande
 fünf Seiten (nur der Kopf darf abweichen), je Rolle anmelden, An-/Abmelden, Tastatur,
 `npm run build`; HR-Handbücher bleiben bis U4 beim alten Kopf.
 
+### 02.10.2026 – Vierte Durchsicht (Code-Review „high“) nach U1 Tag 2
+
+Umfang: die Korrekturen der dritten Durchsicht und U1 Tag 2. Acht Befunde, alle behoben
+(`fed608d`), zu jedem außer der Anmeldeseite ein Test.
+
+| # | Befund | Wie behoben |
+|---|---|---|
+| 1 | „Abmelden“ ging auch dann zur Anmeldeseite, wenn der Server die Sitzung nicht beendet hatte | erst bei Erfolg; sonst bleibt die Seite stehen und meldet „die Sitzung besteht noch“ |
+| 2 | Die Fragebogen-Vorschau bekam über das Layout den Portal-Kopf | eigene Gruppe `src/app/(portal-ohne-kopf)/`, Adresse und Zugang unverändert (Entscheidung des Projektverantwortlichen vom 02.10.2026) |
+| 3 | Eine Meldung, die bei schon offenem Dialog entsteht, lief trotz der Pause ab | Pause wird bei jeder Änderung der Liste erneut gemeldet |
+| 4 | Früh gemeldete Meldungen gingen im Strict Mode der Entwicklung verloren | Abräumen einen Takt nach dem Aushängen und nur, wenn kein Anbieter mehr hängt |
+| 5 | Anmeldeknopf während des Neuladens wieder klickbar | bleibt nach Erfolg gesperrt |
+| 6 | Das Logo führte BEM-Beauftragte auf `/vorgaenge` (wird umgeleitet) | `startAdresse(rolle)`: der erste Punkt, den die Rolle sieht |
+| 7 | Zweite (und eine dritte, unbenutzte) Tabelle der Rollennamen | Benutzerverwaltung nutzt `rollenName()`; `USER_ROLE_LABELS` entfernt; Wächter-Test |
+| 8 | Kein Test für „der Kopf hängt nur im Layout“ | Wächter in `navigation.test.ts` |
+
+**Geändertes Verhalten:** Die Benutzerverwaltung nennt die Rollen jetzt wie der Kopf:
+„Administration“ statt „Super Admin“, „HR-Sachbearbeitung“ statt „Sachbearbeiter“,
+„Führungskraft“ statt „Vorgesetzter“. Eine unbekannte Rolle zeigt ihren Schlüssel, nicht mehr
+„Sachbearbeiter“.
+
+### 02.10.2026 – U1, Tag 3 (Abnahme)
+
+**Abnahme nach Feinplan, Abschnitt 7:**
+
+| # | Punkt | Ergebnis |
+|---|---|---|
+| 1 | `npm run pruefen`, `npm run build` | beide grün (188 Suiten, 4.869 Tests) |
+| 2 | Alte Adressen landen auf den neuen | im Browser: `/dashboard`, `/dashboard?tab=contract-end`, `/dashboard/bem`, dazu (Tag 1) ein Vorgang mit `?tab=dokumente`; alle Zeilen der Tabelle im Test |
+| 3 | Bildvergleich bei 1440 px, nur der Kopf darf abweichen | Anmeldung und Fragebogen: gleich. Onboarding-Detail: unterhalb des Kopfs gleich (Kopf 72 → 67 px, Seite 5 px kürzer). Einstellungen: unterhalb des Kopfs gleich bis auf 4 Zeilen direkt darunter – der Schatten des alten Kopfs, den der neue nicht hat – und drei einzelne Bildpunkte. **Onboarding-Liste: nicht bildgleich** (siehe unten). |
+| 4 | Kopf in drei Breiten | `screenshots/u1-kopf-1440.png`, `-1366.png`, `-390.png`, `-390-menue.png` |
+| 5 | Je Rolle angemeldet | alle sechs Rollen im Browser: sichtbare Punkte, Rollenname, Ziel des Logos und Landeseite stimmen; Sachbearbeitung wird von `/vorlagen` weitergeleitet, BEM-Beauftragte von `/vorgaenge` ins BEM |
+| 6 | Tastatur | Sprunglink ist der erste Tab-Halt und führt zu `#inhalt`; Menü öffnet mit Enter, Pfeil bewegt den Fokus, Escape schließt und gibt den Fokus zurück |
+| 7 | An- und Abmelden | nach dem Anmelden steht der Kopf sofort da; nach dem Abmelden Anmeldeseite ohne Kopf, `/vorgaenge` führt zur Anmeldung |
+
+Dazu: die Fragebogen-Vorschau hat keinen Portal-Kopf; je Seite genau eine `h1` (geprüft
+auf `/checklisten`); die Mindesthöhe der Seite ist um die 67 px des Kopfs gekürzt.
+
+**Onboarding-Liste, nicht bildgleich:** Abweichend sind die beiden Diagramme (wie schon bei
+U0 mal klein, mal groß gezeichnet) und in der Tabelle darunter die Lage der Spalten um einen
+Bildpunkt. Die Vorher-Aufnahme stammt vom Vormittag; eine frische vom Stand vor U1 gibt es
+nicht mehr, weil die Seiten umgezogen sind. Vermutete Ursache: geänderte Daten der
+Entwicklungsdatenbank (die Spaltenbreite der Tabelle richtet sich nach dem Inhalt). Nicht
+abschließend geklärt; am Aufbau der Liste hat U1 nichts geändert außer den Reitern.
+
+**Neue Skripte:** `scripts/ux-abnahme-u1.js` (Rollen, An-/Abmelden, Tastatur, Adressen,
+Bilder des Kopfs – setzt dafür nacheinander die Rolle des Testkontos und stellt
+`SUPER_ADMIN` wieder her; nur lokal und nur für `@beispiel.invalid`).
+`scripts/ux-abnahme.js vergleich` kann jetzt unterhalb des Kopfs vergleichen (dritter
+Parameter: Höhe des alten Kopfs).
+
+**Bei der Abnahme gefunden:**
+- Die Vertragsende-Liste ist bei 390 px breiter als das Fenster (Filterzeile, Tabelle). Das
+  liegt an der alten Liste, nicht am Kopf (der Kopf ist genau 390 px breit); U3 baut die
+  Listen um.
+
+**Nicht geprüft:** die HR-Handbücher (zeigen weiter den alten Kopf, Neubebilderung mit U4);
+ein echter n8n-Ablauf mit `portalLink`; Windows-Kontrastmodus.
+
+**Damit ist U1 gebaut.** Sichtbar für das Personalbüro: neuer Kopf, „Vorgänge“ statt
+„Dashboard“, neue Adressen (alte leiten weiter), richtige Rollennamen.
+
+**Als Nächstes:** Push nach Freigabe; Deploy von U0 + U1 mit Ankündigung; danach der
+Prototyp-Tag (V0) als Voraussetzung für den Pilot Vertragsende (U2 + U4).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -695,7 +762,9 @@ fünf Seiten (nur der Kopf darf abweichen), je Rolle anmelden, An-/Abmelden, Tas
 | `ux-umbau` | `44ea9e3` | Feinplan U1 freigegeben (F1–F4) |
 | `ux-umbau` | `bbaa2c4` | U1 Tag 1: neue Adressen, Weiterleitung, Verweise über `adressen.ts` |
 | `ux-umbau` | `8874a30` | Befunde der dritten Durchsicht |
-| `ux-umbau` | (folgt) | U1 Tag 2: ein Kopf im Layout, Navigationstabelle, Anmeldeseite in eigener Gruppe |
+| `ux-umbau` | `96d7720` | U1 Tag 2: ein Kopf im Layout, Navigationstabelle, Anmeldeseite in eigener Gruppe |
+| `ux-umbau` | `fed608d` | Befunde der vierten Durchsicht |
+| `ux-umbau` | (folgt) | U1 Tag 3: Abnahme, Bilder des Kopfs, `scripts/ux-abnahme-u1.js` |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
