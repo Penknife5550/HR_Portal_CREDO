@@ -14,7 +14,11 @@
  *   - Kein Einrichtungs-Farbpunkt daneben: Gelb, Gruen, Rot und Blau der
  *     CREDO-Linie sind zugleich Einrichtungsfarben und stuenden sonst neben
  *     einem Zustand in aehnlicher Farbe.
- *   - Langer Text bricht um; er wird nie abgeschnitten.
+ *   - Langer Text bricht um; er wird nie abgeschnitten. Umgebrochen wird
+ *     ZWISCHEN den Woertern (`wrap-break-word`): Neben einem breiten
+ *     Nachbarn schrumpft die Pille nur bis zu ihrem laengsten Wort. Mitten
+ *     im Wort („Überfälli-g") bricht sie erst, wenn das Wort allein nicht
+ *     in die Zeile passt.
  *
  * `STATUS_TOENE` ist die EINE Quelle der Toene und ihrer Farbpaare: Der Typ,
  * die Musterseite, die Baustein-Tests und der Kontrasttest lesen von hier. Ein
@@ -65,7 +69,7 @@ export function Statuspille({ ton, className, children, ...rest }: StatuspillePr
     >
       {/* 5 px von oben: Mitte der ersten Zeile (16 px), auch wenn der Text umbricht */}
       <span aria-hidden="true" className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
-      <span className="min-w-0 wrap-anywhere">{children}</span>
+      <span className="min-w-0 wrap-break-word">{children}</span>
     </span>
   );
 }

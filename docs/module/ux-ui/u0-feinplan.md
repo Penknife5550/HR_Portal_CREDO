@@ -1,7 +1,7 @@
 # U0 Fundament – Feinplan
 
 Stand 01.10.2026 · gehört zu [ux-ui-plan-2026-09.html](ux-ui-plan-2026-09.html), Abschnitt 5 (Paket U0) ·
-Branch `ux-umbau` · Status: **freigegeben am 01.10.2026** (F1–F4 wie vorgeschlagen), Tag 1 bis 5 erledigt, zwei Durchsichten eingearbeitet ·
+Branch `ux-umbau` · Status: **freigegeben am 01.10.2026** (F1–F4 wie vorgeschlagen), **gebaut und abgenommen am 02.10.2026** (Tag 1 bis 6; offen nur die Tastaturprobe von Hand), zwei Durchsichten eingearbeitet ·
 Stand und Protokoll: [projekt-ux-umbau.md](projekt-ux-umbau.md)
 
 ## 1. Ziel
@@ -125,7 +125,7 @@ deshalb kein `class-variance-authority`, das nur eine Funktion herausgäbe (geä
 | Datei | Inhalt | Regeln |
 |---|---|---|
 | `button.tsx` | Varianten `primary`, `secondary`, `ghost`, `critical`; Größen `md`, `sm`; Zustand `laedt` | Standard `type="button"`; gesperrt (bei `laedt`, `aria-disabled`, als Verweis bei `disabled`) läuft KEIN Handler – Sperre in der Capture-Phase; `laedt` zeigt Ladesymbol und Text in vollen Farben; mit `asChild` (Radix Slot) auch als `<Link>` |
-| `statuspille.tsx` | Töne `ok`, `wait`, `critical`, `info`, `neutral`; Punkt plus Text | Text ist Pflicht (ohne Text zeichnet sie nichts); langer Text bricht um; kein Einrichtungs-Farbpunkt daneben |
+| `statuspille.tsx` | Töne `ok`, `wait`, `critical`, `info`, `neutral`; Punkt plus Text | Text ist Pflicht (ohne Text zeichnet sie nichts); langer Text bricht zwischen den Wörtern um; kein Einrichtungs-Farbpunkt daneben |
 | `gruppe.tsx` | `Gruppe` (weiße Fläche, Haarlinien, Beschriftung darüber, Aktion rechts) und `Zeile` (Beschriftung/Wert oder frei) | ersetzt die Kartenwände; Beschriftung als `h2` in `ink-2`; leerer Wert als „—“ (auch `false`, `[]`, Leerraum); nichts wird abgeschnitten |
 | `segment.tsx` | Umschalter mit zwei bis fünf Werten, optional Zähler | Auswahlgruppe (`radiogroup`) mit Pfeiltasten wie bei Reitern, Auswahl folgt dem Fokus; nicht für Navigation zwischen Seiten; rollt waagerecht statt umzubrechen |
 | `dialog.tsx` | `Dialog` auf Radix (gesteuert: `offen`, `onSchliessen`; fester Fuß mit „Abbrechen“ und `bestaetigen`), dazu `BestaetigungsDialog` (`alertdialog`: Titel, Satz, zwei Knöpfe, Variante `critical`) | siehe „Dialog“ unten; Klick daneben schließt nicht; Fokus beim Öffnen auf „Abbrechen“ oder dem Feld mit `data-autofokus` |
@@ -286,7 +286,7 @@ Empfehlung: zusammen mit U1.
 | 3 Dialog, Bestätigungsdialog, Toast, Anbieter im Portal-Layout, Token `scrim` | **erledigt 01.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 4 Seitenkopf mit Pfad und Menü, Segment-Schalter | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 5 Skelett, Leerzustand, Musterseite vollständig (Test), axe über die Seite | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
-| 6 Puffer, Screenshots | offen | |
+| 6 Abnahme: Build, Screenshots der Musterseite, Vorher/Nachher von fünf Seiten (bildgleich), `scripts/ux-abnahme.js` | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 7 und 8 |
 
 Gegenüber Abschnitt 4 kam an Tag 1 eine Datei dazu: `src/lib/ui/kontrast.ts` (die Rechnung
 des Kontrasttests, rein und client-sicher). Der Abschnitt „Oberfläche“ in `CLAUDE.md` wurde

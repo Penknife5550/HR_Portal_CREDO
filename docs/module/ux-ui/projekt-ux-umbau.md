@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (U0, Tag 5)
+Letzte Änderung: 02.10.2026 (U0, Tag 6 – Abnahme)
 
 ## 1. Worum es geht
 
@@ -18,7 +18,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | [u0-feinplan.md](u0-feinplan.md) | Feinplan des laufenden Pakets U0 |
 | `projekt-ux-umbau.md` (diese Datei) | Stand, Protokoll, Abweichungen |
 | `CLAUDE.md`, Abschnitt „Oberfläche (UX-Umbau)“ | Die Regeln, die beim Programmieren gelten |
-| [screenshots/](screenshots/) | Vorher-Bilder; erzeugt von `scripts/ux-screenshots.js` |
+| [screenshots/](screenshots/) | Vorher-Bilder (erzeugt von `scripts/ux-screenshots.js`) und die Musterseite in drei Breiten (`ui-muster-*.png`, erzeugt von `scripts/ux-abnahme.js`) |
 
 ## 2. Stand auf einen Blick
 
@@ -26,7 +26,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 |---|---|---|
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
-| **U0** | Tokens und Basis-Bausteine | **in Arbeit**, Tag 5 von 6 erledigt – alle neun Bausteine stehen (Button, Statuspille, Gruppe, Dialog, Toast, Seitenkopf, Segment-Schalter, Skelett, Leerzustand), Musterseite vollständig; offen: Tag 6 (Screenshots, `npm run build`) |
+| **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: Kopf, Breadcrumb, neue Adressen | offen |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
@@ -434,9 +434,51 @@ Nachforderung, beide „Exceeded timeout“); sie sind unverändert und ohne Las
 
 **Sichtbare Änderung:** nur auf `/ui-muster`.
 
-**Als Nächstes (U0, Tag 6):** `npm run build`; Screenshots der Musterseite in 1440, 1366×768
-und 390 px; Vorher/Nachher von fünf bestehenden Seiten (Abnahme, Feinplan Abschnitt 7);
-danach Feinplan U1.
+### 02.10.2026 – U0, Tag 6 (Abnahme)
+
+**Abnahme nach Feinplan, Abschnitt 7:**
+
+| # | Punkt | Ergebnis |
+|---|---|---|
+| 1 | `npm run pruefen`, `npm run build` | beide grün. Der Build lief zum ersten Mal (vorher belegte immer ein fremder Entwicklungsserver den Ordner); `/ui-muster` 31,6 kB. |
+| 2 | Musterseite zeigt alle Bausteine; Screenshots in drei Breiten | `screenshots/ui-muster-1440.png`, `-1366.png`, `-390.png` (ganze Seite). Bei keiner Breite ist die Seite breiter als das Fenster. |
+| 3 | Fünf bestehende Seiten vorher/nachher gleich | Anmeldung, Onboarding-Liste, Onboarding-Detail, Einstellungen, Fragebogen (Hinweisseite ohne gültigen Link): **Bildpunkt für Bildpunkt gleich** bei 1440 px. Verfahren unten. |
+| 4 | Tastaturprobe von Hand | offen – Dialog, Menü und Segment sind per Test und im Browser per Skript geprüft, aber nicht von einem Menschen mit der Tastatur. |
+
+**Verfahren zu Punkt 3** (`scripts/ux-abnahme.js`, neu): Außerhalb der neuen Bausteine und der
+Musterseite unterscheidet sich `ux-umbau` von `main` in genau drei Dateien, die bestehende
+Seiten erreichen – `globals.css`, `(portal)/layout.tsx`, `lib/utils.ts`. Für „vorher“ wurden
+diese drei im laufenden Entwicklungsserver kurz auf den Stand von `main` gesetzt
+(`git checkout main -- …`), fotografiert und zurückgesetzt. Gegenprobe: Eine absichtliche
+Änderung (`letter-spacing` am `body`) meldet der Vergleich auf allen fünf Seiten.
+Einschränkung: Die beiden Diagramme der Onboarding-Liste zeichnet der Browser ohne Fenster
+mal klein, mal groß – auch bei zwei Aufnahmen DESSELBEN Stands. Das Paar „vorher“ gegen die
+zweite Nachher-Aufnahme ist vollständig gleich; wo es abweicht, liegt die Abweichung allein
+im Diagrammbereich. Die Bilder der bestehenden Seiten liegen nicht im Repository (Namen aus
+der Entwicklungsdatenbank).
+
+**Bei der Abnahme gefunden und behoben:**
+- Bei 390 px brach die Statuspille „Überfällig“ mitten im Wort um („Überfälli-g“), ebenso die
+  Beschriftung „Bankverbindung“. Pille und Beschriftung brechen jetzt zwischen den Wörtern
+  (`wrap-break-word`); der Wert einer Zeile weicht weiter an jeder Stelle aus. Tests angepasst.
+
+**Neues Skript `scripts/ux-abnahme.js`:** `muster` (Musterseite in drei Breiten), `seiten`
+(fünf bestehende Seiten), `vergleich` (Bildpunkte zweier Ordner). Drei Lehren stehen im
+Skript: erst warten, bis die nachgeladenen Daten stehen; dann auf die Diagramme; erst dann
+Bewegung einfrieren. Für spätere Pakete wiederverwendbar. Braucht `puppeteer-core`
+(`npm install --no-save`, steht nicht in `package.json`).
+
+**Anmeldung für die Aufnahmen:** Testkonto `claude-test-admin@beispiel.invalid` der
+Entwicklungsdatenbank; sein Passwort wurde dafür mit `scripts/dev-passwort-neu.js` mehrfach
+neu gesetzt und nirgends gespeichert.
+
+**Geprüft:** `npm run pruefen` nach der Umbruch-Korrektur; Build; Bilder gesichtet.
+
+**Damit ist U0 gebaut.** Nichts davon ist für das Personalbüro sichtbar (nur `/ui-muster`).
+
+**Als Nächstes:** Tastaturprobe von Hand; Push nach Freigabe; Feinplan U1 (Rahmen: Kopf,
+Breadcrumb, neue Adressen) – vor dem ersten Code. Optional vorher ein Code-Review über Tag 3
+bis 6.
 
 ## 8. Branches und Commits
 
@@ -457,10 +499,11 @@ danach Feinplan U1.
 | `ux-umbau` | `1097424` | Browserprobe zu Tag 3: Meldungen springen nicht mehr, Abstand auf der Musterseite |
 | `ux-umbau` | `17a2f3d` | U0 Tag 4: Seitenkopf mit Pfad und Menü, Segment-Schalter |
 | `ux-umbau` | `8e530b0` | U0 Tag 5: Skelett, Leerzustand, Musterseite vollständig |
-| `ux-umbau` | (folgt) | Zeitgrenze des Musterseiten-Tests (axe über die ganze Seite) |
+| `ux-umbau` | `c5afbc0` | Zeitgrenze des Musterseiten-Tests (axe über die ganze Seite) |
+| `ux-umbau` | (folgt) | U0 Tag 6: Abnahme, Screenshots, `scripts/ux-abnahme.js`, Umbruch in Pille und Zeile |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Tag 3 bis 5 sind noch nicht gepusht. Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht am 01.10.2026 nach Freigabe: `main` bis `b6e1c8a`, `ux-umbau` bis `c364f3a` (neuer Branch auf `origin`). Tag 3 bis 6 sind noch nicht gepusht. Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

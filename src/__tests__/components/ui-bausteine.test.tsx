@@ -394,7 +394,10 @@ describe("Statuspille", () => {
     const pille = container.firstElementChild as HTMLElement;
     expect(pille.className).not.toContain("whitespace-nowrap");
     expect(pille.className).toContain("max-w-full");
-    expect((pille.lastElementChild as HTMLElement).className).toContain("wrap-anywhere");
+    // Zwischen den Woertern: `wrap-anywhere` liesse die Pille neben einem
+    // breiten Nachbarn bis auf einen Buchstaben schrumpfen („Überfälli-g").
+    expect((pille.lastElementChild as HTMLElement).className).toContain("wrap-break-word");
+    expect((pille.lastElementChild as HTMLElement).className).not.toContain("wrap-anywhere");
   });
 
   it("data-ton laesst sich nicht ueberschreiben", () => {
@@ -565,11 +568,13 @@ describe("Gruppe und Zeile", () => {
     const flaeche = container.querySelector("section > div:last-child") as HTMLElement;
     expect(flaeche.className).not.toContain("overflow-hidden");
     const [beschriftung, wert] = Array.from(flaeche.firstElementChild!.children) as HTMLElement[];
-    for (const el of [beschriftung, wert]) {
-      expect(el.className.split(" ")).toContain("wrap-anywhere");
-      expect(el.className.split(" ")).toContain("min-w-0");
-      expect(el.className).not.toContain("shrink-0");
-    }
+    for (const el of [beschriftung, wert]) expect(el.className).not.toContain("shrink-0");
+    // Der Wert weicht aus (bricht notfalls an jeder Stelle), die Beschriftung
+    // bricht zwischen den Woertern und nimmt hoechstens die halbe Breite —
+    // sonst stuende bei 390 px „Bankverbin-dung".
+    expect(wert.className.split(" ")).toEqual(expect.arrayContaining(["wrap-anywhere", "min-w-0"]));
+    expect(beschriftung.className.split(" ")).toEqual(expect.arrayContaining(["wrap-break-word", "max-w-[50%]"]));
+    expect(beschriftung.className.split(" ")).not.toContain("min-w-0");
     expect(beschriftung.className).toContain("max-w-[50%]");
   });
 

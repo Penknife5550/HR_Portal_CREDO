@@ -28,7 +28,9 @@
  *     `{bedingung && wert}`, eine leere Liste und reiner Leerraum. Ein
  *     Element, das selbst nichts zeichnet, erkennt die Zeile nicht.
  *   - Nichts wird abgeschnitten: Lange Werte (IBAN, E-Mail, Dateiname) und
- *     lange Beschriftungen brechen um. Die Gruppe schneidet NICHT ab
+ *     lange Beschriftungen brechen um — die Beschriftung zwischen den
+ *     Woertern (sie schrumpft nur bis zu ihrem laengsten Wort, hoechstens
+ *     auf die halbe Breite), der Wert notfalls an jeder Stelle. Die Gruppe schneidet NICHT ab
  *     (kein `overflow-hidden`). Zeilen haben deshalb keinen eigenen
  *     Hintergrund bis an den Rand.
  */
@@ -103,7 +105,7 @@ export function Zeile({ label, className, children, ...rest }: ZeileProps) {
 
   return (
     <div className={cn("flex items-baseline justify-between gap-4 px-4 py-3 text-sm", className)} {...rest}>
-      <span className="max-w-[50%] min-w-0 text-ink-2 wrap-anywhere">{label}</span>
+      <span className="max-w-[50%] text-ink-2 wrap-break-word">{label}</span>
       <span className="min-w-0 text-right font-medium text-ink wrap-anywhere">
         {istLeererInhalt(children) ? "—" : children}
       </span>
