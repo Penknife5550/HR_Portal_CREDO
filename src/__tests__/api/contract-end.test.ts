@@ -193,8 +193,10 @@ describe("API /api/contract-end GET (Liste)", () => {
     return new NextRequest("http://localhost:3000/api/contract-end");
   }
 
-  // Auch die nur lesenden Rollen bekommen die Liste — gerade ihnen darf der
-  // Schluessel des Magic-Links nicht in die Hand fallen.
+  // Die Route laesst alle PORTAL_ROLES zu, also auch die nur lesenden. Heute
+  // sperrt die Middleware diese beiden Rollen noch fuer alle Schnittstellen
+  // (Mandanten-Gate, src/lib/mandanten-gate.ts) — die Antwort muss aber schon
+  // stimmen, bevor die Route dort freigegeben wird.
   it.each(["HR_LEITUNG", "EINRICHTUNGSLEITUNG", "VORGESETZTER"])(
     "200 für %s: keine Zeile trägt supervisorToken",
     async (role) => {

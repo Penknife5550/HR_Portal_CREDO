@@ -14,13 +14,13 @@ const mockPrisma = {
 const mockTriggerWebhooks = jest.fn();
 
 /** Steht fuer den Schluessel des Magic-Links — darf in keiner Antwort auftauchen. */
-const GEHEIM = "geheimer-magic-link-token";
-const ABLAUF = new Date("2026-11-01T00:00:00.000Z");
+const mockToken = "geheimer-magic-link-token";
+const mockAblauf = new Date("2026-11-01T00:00:00.000Z");
 
 jest.mock("@/lib/auth", () => ({
   getSession: mockGetSession,
-  generateToken: () => "geheimer-magic-link-token",
-  getTokenExpiryDate: () => new Date("2026-11-01T00:00:00.000Z"),
+  generateToken: () => mockToken,
+  getTokenExpiryDate: () => mockAblauf,
 }));
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/permissions", () => ({
@@ -62,8 +62,8 @@ describe("POST /api/contract-end/[id]/supervisor-link", () => {
       ...vorgang,
       status: "ANFRAGE_VORGESETZTER",
       supervisorEmail: "leitung@example.org",
-      supervisorToken: GEHEIM,
-      supervisorTokenExpiresAt: ABLAUF,
+      supervisorToken: mockToken,
+      supervisorTokenExpiresAt: mockAblauf,
     });
     mockPrisma.contractRenewalData.upsert.mockResolvedValue({});
     mockPrisma.auditLog.create.mockResolvedValue({});
@@ -88,12 +88,12 @@ describe("POST /api/contract-end/[id]/supervisor-link", () => {
 
     expect(json).not.toHaveProperty("supervisorToken");
     expect(json).not.toHaveProperty("formularLink");
-    expect(JSON.stringify(json)).not.toContain(GEHEIM);
+    expect(JSON.stringify(json)).not.toContain(mockToken);
     expect(json).toEqual({
       id: "ce1",
       supervisorEmail: "leitung@example.org",
       employeeName: "Max Mustermann",
-      supervisorTokenExpiresAt: ABLAUF.toISOString(),
+      supervisorTokenExpiresAt: mockAblauf.toISOString(),
     });
   });
 
@@ -105,7 +105,7 @@ describe("POST /api/contract-end/[id]/supervisor-link", () => {
         where: { id: "ce1" },
         data: expect.objectContaining({
           supervisorEmail: "leitung@example.org",
-          supervisorToken: GEHEIM,
+          supervisorToken: mockToken,
           status: "ANFRAGE_VORGESETZTER",
         }),
       }),
@@ -114,7 +114,7 @@ describe("POST /api/contract-end/[id]/supervisor-link", () => {
       "contract-end-supervisor-link",
       expect.objectContaining({
         supervisorEmail: "leitung@example.org",
-        formularLink: expect.stringContaining(`/vertrag-formular/${GEHEIM}`),
+        formularLink: expect.stringContaining(`/vertrag-formular/${mockToken}`),
       }),
     );
   });

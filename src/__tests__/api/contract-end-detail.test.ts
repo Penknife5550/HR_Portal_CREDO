@@ -86,7 +86,8 @@ describe("GET /api/contract-end/[id]", () => {
     expect(JSON.stringify(await res.json())).not.toContain(GEHEIM);
   });
 
-  // Die Route ist fuer alle PORTAL_ROLES offen, also auch fuer die nur lesenden.
+  // Die Route laesst alle PORTAL_ROLES zu, also auch die nur lesenden (die
+  // heute noch am Mandanten-Gate der Middleware scheitern, src/lib/mandanten-gate.ts).
   it.each(["HR_LEITUNG", "EINRICHTUNGSLEITUNG", "VORGESETZTER"])(
     "200 für %s: Vorgang ohne supervisorToken",
     async (role) => {
