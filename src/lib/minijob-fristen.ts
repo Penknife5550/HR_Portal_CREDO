@@ -603,8 +603,44 @@ export interface Fristampel {
   text: string;
 }
 
+/** Tage vom Jahresanfang bis zum Monatsersten, ohne Schalttag (Januar = Index 0). */
+const TAGE_VOR_MONAT = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
+/**
+ * Die laufende Nummer eines Tages (01.01.0000 = 1), ohne Date und ohne Zeitzone.
+ *
+ * Direkt gerechnet statt Monat fuer Monat aufsummiert: Die fruehere Schleife
+ * lief je Datum ueber alle Monate seit dem Jahr 0 (rund 24.000 Durchlaeufe) und
+ * kostete unter Jest etwa 5 ms je Datum — Tests, die ein paar hundert Abstaende
+ * brauchen, liefen dadurch Sekunden bis Minuten.
+ *
+ * Das Ergebnis ist dasselbe wie das der Schleife, auch fuer Zeichenketten, die
+ * das Muster annimmt, die aber kein Kalendertag sind: Ein Monat ueber 12 laeuft
+ * ins Folgejahr, ein Tag ueber das Monatsende in den Folgemonat.
+ */
+function tageszahl(tag: Kalendertag): number {
+  const [j, m, d] = zerlege(tag);
+  // Wie in `monateSpaeter`. Nie negativ: „0000-00-…" zaehlt wie der Januar.
+  const monate = Math.max(0, j * 12 + (m - 1));
+  const jahr = Math.floor(monate / 12);
+  const monat = monate % 12; // 0 = Januar
+  // Schaltjahre VOR `jahr`, das Jahr 0 eingeschlossen.
+  const v = jahr - 1;
+  const schalttage = Math.floor(v / 4) - Math.floor(v / 100) + Math.floor(v / 400) + 1;
+  const schalttagImJahr = monat >= 2 && istSchaltjahr(jahr) ? 1 : 0;
+  return jahr * 365 + schalttage + TAGE_VOR_MONAT[monat] + schalttagImJahr + d;
+}
+
 /** Abstand in Tagen zwischen zwei Kalendertagen (b minus a). */
 export function tageZwischen(a: Kalendertag, b: Kalendertag): number {
+  return tageszahl(b) - tageszahl(a);
+}
+
+/**
+ * VORUEBERGEHEND: die bisherige Fassung, nur fuer den Vergleich in
+ * `tage-zwischen-vergleich.test.ts`. Wird mit dem Vergleich wieder entfernt.
+ */
+export function tageZwischenAlt(a: Kalendertag, b: Kalendertag): number {
   const alsZahl = (t: Kalendertag) => {
     const [j, m, d] = zerlege(t);
     // Tage seit einem festen Bezugspunkt, ohne Date und ohne Zeitzone.
