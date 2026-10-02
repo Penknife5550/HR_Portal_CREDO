@@ -13,7 +13,7 @@ Letzte Änderung: 02.10.2026 (Übergabe nach U1; nächster Schritt: Feinplan Pil
 
 **Stand 02.10.2026, später:** Der Feinplan ist **freigegeben**
 ([pilot-feinplan.md](pilot-feinplan.md), F1–F9 entschieden, Kurzform in Abschnitt 4).
-Tag 1 (reine Regeln `ProzessStand` + Adapter) ist gebaut. **Nächste Aufgabe:** Tag 2 –
+Tag 1 (reine Regeln `ProzessStand` + Adapter) ist gebaut und durchgesehen (fünfte Durchsicht, acht Befunde behoben). **Nächste Aufgabe:** Tag 2 –
 Bausteine Prozessleiste und Reiter auf der Musterseite; das darf vor dem Prototyp-Tag
 laufen (F9). Die Seite selbst (ab Tag 3) erst nach V0. Der folgende Text ist die
 ursprüngliche Übergabe.
@@ -90,7 +90,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) gebaut**, Tag 2 (Bausteine) als Nächstes, die Seite erst nach dem Prototyp-Tag (V0) |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) gebaut und durchgesehen**, Tag 2 (Bausteine) als Nächstes, die Seite erst nach dem Prototyp-Tag (V0) |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -866,6 +866,56 @@ Datensatz zurück, also auch `supervisorToken` (den Magic-Link der Führungskraf
 
 **Als Nächstes:** Tag 2 – Bausteine Prozessleiste und Reiter auf der Musterseite.
 
+### 02.10.2026 – Fünfte Durchsicht (Code-Review „high“) nach Pilot Tag 1
+
+Umfang: Tag 1 des Pilots (`9d6baf4`). Acht Befunde, alle behoben, zu jedem ein Test. Die
+Befunde waren nicht gegengeprüft (Stufe „high“ ohne Verifikationslauf); jeder hat sich beim
+Beheben bestätigt.
+
+| # | Befund | Wie behoben |
+|---|---|---|
+| 1 | Am Tag des Vertragsendes selbst fehlte die kritische Hervorhebung – die Ampel meldet an diesem Tag schon „außerhalb“, der Tag davor und der Tag danach waren kritisch | „heute“ zählt wie „überschritten“ als kritisch; Test über die Tage +3 bis −3 und zu zwei Uhrzeiten des letzten Tages |
+| 2 | Die Pille sagte „Wartet auf Führungskraft“ über einem „Jetzt dran“, das HR zum Senden auffordert (Link abgelaufen oder nie verschickt) | Pille, aktiver Schritt und „Jetzt dran“ lesen EINE Lage (`lageVon`): Pille „Anfrage offen“ bzw. „Link abgelaufen“, der Schritt „Anfrage“ ist wieder aktiv |
+| 3 | „… 2× erinnert, zuletzt “ ohne Datum, wenn der Zeitpunkt der letzten Erinnerung fehlt | Ein fehlendes oder unlesbares Datum fällt samt seinem Vorwort weg |
+| 4 | Die Gegenprobe prüfte drei Routen gegen KOPIEN ihrer Statuslisten | Listen in `src/lib/contract-end-status.ts`; `/nicht-uebernehmen`, `/supervisor-link` und `/reminder` lesen sie von dort (freigegeben am 02.10.2026, Inhalt unverändert) |
+| 5 | Die Gegenprobe kannte keine Lage mit schon verknüpftem Offboarding | 400 Lagen: Status × Stand der Anfrage × Offboarding × vier Nebenlagen; der Adapter bietet kein zweites Offboarding an, sondern führt zum vorhandenen |
+| 6 | Der Schritt „Offboarding“ sprang in den Reiter Dokumente | Nur der Schritt „Vertrag“ trägt einen Reiter |
+| 7 | Eigene Liste der Pillen-Töne neben der des Bausteins | Typ `StatusTon` aus `statuspille.tsx` (nur als Typ eingebunden) |
+| 8 | Ein Test sortierte ein geteiltes Feld an Ort und Stelle | Kopie sortieren |
+
+**Verschieben der Listen, abgesichert:** Zuerst je Route ein Test, der ausgeschrieben
+festhält, was sie tut (welcher Status angenommen, welcher abgelehnt wird) – grün gegen die
+unveränderten Routen, dann verschoben, wieder grün. Für `/supervisor-link` des Vertragsendes
+gab es bisher gar keinen Test (`supervisor-link.test.ts` prüft die Route des Onboardings);
+neu ist `contract-end-supervisor-link.test.ts`.
+
+**Über die Befunde hinaus:**
+
+- Bei abgelaufenem Link ist jetzt auch der **Schritt** „Anfrage“ wieder aktiv, nicht nur die
+  Pille anders – sonst stünde in der Leiste „Rückmeldung · Führungskraft“ über einem „Jetzt
+  dran“ bei HR. Ein Test hält über alle Lagen: Ton `wait` genau dann, wenn die Führungskraft
+  dran ist; der aktive Schritt liegt bei dem, der dran ist.
+- `VertragsendeStand.supervisorTokenExpiresAt` ist Pflichtfeld: Ein fehlender Wert zählt als
+  abgelaufen; eine Liste, die das Feld nicht mitlädt, zeigte sonst jede offene Anfrage als
+  abgelaufen.
+- **`tageZwischen` ist unter Jest rund hundertmal langsamer als im Betrieb** (gemessen: 11 ms
+  gegen 0,12 ms je Aufruf – die Funktion zählt jeden Monat seit dem Jahr 0, und Jest bremst
+  solche Schleifen). Die erste Fassung der Gegenprobe lief damit über drei Minuten. Jetzt
+  wird jede Lage einmal gerechnet (`PROBEN`): die Datei braucht allein rund 12 s, im
+  Gesamtlauf rund 30 s. An der Hilfsfunktion selbst ist nichts geändert (gemeinsamer Code,
+  gehört nach `main`).
+
+**Geprüft:** `npm run pruefen` grün (190 Suiten, 4.936 Tests; keine neue Lint-Warnung). Kein
+Build und keine Browserprobe: Der Adapter hat noch keinen Aufrufer in einer Seite, und die
+drei Routen verhalten sich unverändert (ihre Tests).
+
+**Nicht angefasst:** Dasselbe Statuspaar „Anfrage offen“ steht weiter im Formular der
+Führungskraft (`api/vertrag-formular/[token]`) und im Erinnerungslauf; beide lesen die
+gemeinsame Liste noch nicht. `GET /api/contract-end` und `GET /api/contract-end/[id]` geben
+weiter `supervisorToken` an alle `PORTAL_ROLES` zurück (siehe Tag 1).
+
+**Als Nächstes:** Tag 2 – Bausteine Prozessleiste und Reiter auf der Musterseite.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -894,9 +944,13 @@ Datensatz zurück, also auch `supervisorToken` (den Magic-Link der Führungskraf
 | `ux-umbau` | `96d7720` | U1 Tag 2: ein Kopf im Layout, Navigationstabelle, Anmeldeseite in eigener Gruppe |
 | `ux-umbau` | `fed608d` | Befunde der vierten Durchsicht |
 | `ux-umbau` | `9f9ceac` | U1 Tag 3: Abnahme, Bilder des Kopfs, `scripts/ux-abnahme-u1.js` |
+| `ux-umbau` | `fbac12d` | Logbuch: Push vom 02.10.2026, Kennung nachgetragen |
+| `ux-umbau` | `ea65ba9` | Übergabe nach U1 |
+| `ux-umbau` | `f87fb38` | Feinplan Pilot Vertragsende, freigegeben (F1–F9) |
+| `ux-umbau` | `9d6baf4` | Pilot Tag 1: Prozess-Stand, Adapter Vertragsende, Statusübergänge in eigener Datei |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Seit dem Push dazugekommen und NICHT gepusht: Feinplan des Pilots (`f87fb38`), Pilot Tag 1 (`9d6baf4`) und die Korrekturen der fünften Durchsicht. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

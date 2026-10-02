@@ -5,13 +5,13 @@
  * (jede Funktion nimmt `jetzt` entgegen). Hier steht, was die neue Detailseite
  * ueber einen Vorgang SAGT — Schritte der Prozessleiste, „Jetzt dran",
  * Statuspille, Menue. Was der Vorgang DARF, entscheiden unveraendert die
- * Routen (`src/lib/contract-end-status.ts`, `/supervisor-link`, `/reminder`,
- * `/nicht-uebernehmen`); der Test haelt beides gegeneinander.
+ * Routen; ihre Statuslisten liegen in `src/lib/contract-end-status.ts`, und der
+ * Test haelt beides gegeneinander.
  *
  * Fuenf Schritte: Angelegt · Anfrage · Rueckmeldung · Vertrag ODER Offboarding
  * · Abschluss.
  *
- * Vier Regeln:
+ * Fuenf Regeln:
  *   1. Ein vergangener Schritt ist nur „erledigt", wenn es einen BELEG gibt
  *      (Zeitstempel bzw. das verknuepfte Offboarding) — sonst „uebersprungen".
  *      Legt HR das Offboarding ohne Anfrage an, wurden Anfrage und Rueckmeldung
@@ -25,10 +25,18 @@
  *   4. Tage werden in BERLINER KALENDERTAGEN gezaehlt: Am Tag des Vertragsendes
  *      heisst es „heute", ueberschritten ist es erst am Tag danach. OB die
  *      Entfristungswarnung greift, entscheidet weiter `getSignatureWarning`.
+ *   5. WER DRAN IST, sagen Pille, aktiver Schritt und „Jetzt dran" aus EINER
+ *      Lage (`lageVon`), nicht jeder fuer sich aus dem Status. Der Status
+ *      „Anfrage beim Vorgesetzten" allein sagt nicht, ob die Fuehrungskraft
+ *      ueberhaupt antworten KANN: Ging nie eine Anfrage hinaus oder ist ihr Link
+ *      abgelaufen, ist HR dran und der Schritt „Anfrage" wieder aktiv — der
+ *      Erinnerungslauf ueberspringt solche Vorgaenge, sie blieben sonst liegen.
  *
- * Feinplan: docs/module/ux-ui/pilot-feinplan.md, Abschnitte 3.2, 3.3, 3.5.
+ * Feinplan: docs/module/ux-ui/pilot-feinplan.md, Abschnitte 3.2, 3.3, 3.5, 11.
  */
 
+// Nur der TYP: `STATUS_TOENE` im Baustein ist die eine Quelle der Toene.
+import type { StatusTon } from "@/components/ui/statuspille";
 import { getContractEndCategory } from "@/lib/contract-end-fristen";
 import { getSignatureWarning } from "@/lib/contract-end-warnings";
 import { formatDatumDE } from "@/lib/format";
@@ -50,7 +58,12 @@ export interface VertragsendeStand {
   createdAt?: string | null;
   supervisorEmail: string | null;
   supervisorLinkSentAt: string | null;
-  supervisorTokenExpiresAt?: string | null;
+  /**
+   * Pflichtfeld, bewusst nicht optional: Ein fehlender Wert zaehlt als
+   * abgelaufener Link. Wer den Vorgang mit schmalerer Auswahl laedt (Listen),
+   * muss dieses Feld mitladen — sonst hiesse jede offene Anfrage „abgelaufen".
+   */
+  supervisorTokenExpiresAt: string | null;
   supervisorRespondedAt: string | null;
   lastSupervisorReminderAt: string | null;
   supervisorReminderCount: number;
@@ -76,16 +89,24 @@ export type VertragsendeAktion =
 // Kataloge
 // =============================================
 
-export type PillenTon = "ok" | "wait" | "critical" | "info" | "neutral";
+/** Text und Ton einer Statuspille. */
+export interface PillenAngabe {
+  text: string;
+  ton: StatusTon;
+}
 
 /**
  * Fachstatus → Text und Ton der Statuspille.
  *
  * wait = wartet auf jemand anderen · info = HR ist dran · ok = erledigt ·
  * neutral = beendet ohne Ergebnis. `critical` vergibt nur die
- * Entfristungswarnung (`vertragsendePille`).
+ * Entfristungswarnung.
+ *
+ * Der Katalog ist die Vorgabe je Status; die Pille eines Vorgangs kommt aus
+ * `vertragsendePille` (Regel 5: Bei den beiden Anfrage-Status entscheidet die
+ * Lage, nicht der Status allein).
  */
-export const VERTRAGSENDE_PILLE: Record<string, { text: string; ton: PillenTon }> = {
+export const VERTRAGSENDE_PILLE: Record<string, PillenAngabe> = {
   ANGELEGT: { text: "Anfrage offen", ton: "info" },
   ANFRAGE_VORGESETZTER: { text: "Wartet auf Führungskraft", ton: "wait" },
   ENTSCHEIDUNG_UEBERNAHME: { text: "Wartet auf Führungskraft", ton: "wait" },
@@ -98,8 +119,11 @@ export const VERTRAGSENDE_PILLE: Record<string, { text: string; ton: PillenTon }
   STORNIERT: { text: "Storniert", ton: "neutral" },
 };
 
+/** Die Anfrage ging hinaus, ihr Link gilt aber nicht mehr — HR ist dran. */
+export const VERTRAGSENDE_PILLE_LINK_ABGELAUFEN: PillenAngabe = { text: "Link abgelaufen", ton: "info" };
+
 /** Stand der Mitarbeitervertretung → Text und Ton. `null`/unbekannt = „offen". */
-export const MAV_PILLE: Record<string, { text: string; ton: PillenTon }> = {
+export const MAV_PILLE: Record<string, PillenAngabe> = {
   NICHT_ERFORDERLICH: { text: "Nicht erforderlich", ton: "neutral" },
   AUSSTEHEND: { text: "Ausstehend", ton: "wait" },
   ANGEHOERT: { text: "Angehört", ton: "ok" },
@@ -143,11 +167,20 @@ function entfristungsWarnung(stand: VertragsendeStand, jetzt: Date): boolean {
 }
 
 // =============================================
-// Zweig und Phase
+// Lage: Zweig, Phase, Link
 // =============================================
 
 type Zweig = "offen" | "uebernahme" | "keine";
 type Phase = "anfrage" | "rueckmeldung" | "vollzug" | "abschluss" | "ende" | "unbekannt";
+
+/** Woraus Schritte, „Jetzt dran", Menue und Pille gemeinsam lesen (Regel 5). */
+interface Lage {
+  /** Was als Naechstes geschehen muss. */
+  phase: Phase;
+  zweig: Zweig;
+  /** Eine Anfrage ging hinaus, ihr Link gilt aber nicht mehr: Sie ist neu zu stellen. */
+  linkAbgelaufen: boolean;
+}
 
 function zweigVon(stand: VertragsendeStand): Zweig {
   switch (stand.status) {
@@ -170,43 +203,51 @@ function zweigVon(stand: VertragsendeStand): Zweig {
   }
 }
 
-function phaseVon(stand: VertragsendeStand): Phase {
-  switch (stand.status) {
-    case "ANGELEGT":
-      return "anfrage";
-    case "ANFRAGE_VORGESETZTER":
-    case "ENTSCHEIDUNG_UEBERNAHME":
-      // Auf eine Rueckmeldung warten kann nur, wem eine Anfrage zugegangen ist.
-      // Ohne Adresse oder Versandzeitpunkt (Altbestand ENTSCHEIDUNG_UEBERNAHME,
-      // Status per Hand-PATCH gesetzt) ist die Anfrage erst noch zu stellen —
-      // `/reminder` lehnte dort ab (409).
-      return stand.supervisorEmail && stand.supervisorLinkSentAt ? "rueckmeldung" : "anfrage";
-    case "RUECKMELDUNG_UEBERNAHME":
-    case "VERTRAG_ERSTELLT":
-    case "RUECKMELDUNG_KEINE_UEBERNAHME":
-      return "vollzug";
-    case "VERTRAG_UNTERSCHRIEBEN":
-    case "ENTSCHEIDUNG_KEINE_UEBERNAHME":
-      return "abschluss";
-    case "ABGESCHLOSSEN":
-    case "STORNIERT":
-      return "ende";
-    default:
-      return "unbekannt";
-  }
-}
-
-const mavOffen = (stand: VertragsendeStand) => !stand.mavStatus || stand.mavStatus === "AUSSTEHEND";
-
 /**
- * Der Link der Fuehrungskraft ist abgelaufen — die Route `/reminder` lehnt dann
- * ab (409). Wie dort gilt ein fehlendes Ablaufdatum als abgelaufen.
+ * Der Link der Fuehrungskraft gilt nicht mehr. Wie in den Routen (`/reminder`,
+ * Formular) und im Erinnerungslauf zaehlt ein fehlendes Ablaufdatum als
+ * abgelaufen.
  */
-function linkAbgelaufen(stand: VertragsendeStand, jetzt: Date): boolean {
+function linkUngueltig(stand: VertragsendeStand, jetzt: Date): boolean {
   if (!stand.supervisorTokenExpiresAt) return true;
   const ablauf = new Date(stand.supervisorTokenExpiresAt);
   return Number.isNaN(ablauf.getTime()) || ablauf.getTime() < jetzt.getTime();
 }
+
+function lageVon(stand: VertragsendeStand, jetzt: Date): Lage {
+  const zweig = zweigVon(stand);
+  const lage = (phase: Phase, linkAbgelaufen = false): Lage => ({ phase, zweig, linkAbgelaufen });
+
+  switch (stand.status) {
+    case "ANGELEGT":
+      return lage("anfrage");
+    case "ANFRAGE_VORGESETZTER":
+    case "ENTSCHEIDUNG_UEBERNAHME": {
+      // Auf eine Rueckmeldung warten kann nur, wem eine Anfrage zugegangen ist
+      // und wessen Link noch gilt. Ohne Adresse oder Versandzeitpunkt
+      // (Altbestand ENTSCHEIDUNG_UEBERNAHME, Status per Hand-PATCH gesetzt) und
+      // bei abgelaufenem Link ist die Anfrage (neu) zu stellen — `/reminder`
+      // lehnt in beiden Faellen ab (409), das Formular ebenso.
+      const zugestellt = Boolean(stand.supervisorEmail && stand.supervisorLinkSentAt);
+      if (!zugestellt) return lage("anfrage");
+      return linkUngueltig(stand, jetzt) ? lage("anfrage", true) : lage("rueckmeldung");
+    }
+    case "RUECKMELDUNG_UEBERNAHME":
+    case "VERTRAG_ERSTELLT":
+    case "RUECKMELDUNG_KEINE_UEBERNAHME":
+      return lage("vollzug");
+    case "VERTRAG_UNTERSCHRIEBEN":
+    case "ENTSCHEIDUNG_KEINE_UEBERNAHME":
+      return lage("abschluss");
+    case "ABGESCHLOSSEN":
+    case "STORNIERT":
+      return lage("ende");
+    default:
+      return lage("unbekannt");
+  }
+}
+
+const mavOffen = (stand: VertragsendeStand) => !stand.mavStatus || stand.mavStatus === "AUSSTEHEND";
 
 // =============================================
 // Schritte
@@ -215,7 +256,7 @@ function linkAbgelaufen(stand: VertragsendeStand, jetzt: Date): boolean {
 const REIHENFOLGE = ["angelegt", "anfrage", "rueckmeldung", "vollzug", "abschluss"] as const;
 type SchrittKey = (typeof REIHENFOLGE)[number];
 
-function schritteBauen(stand: VertragsendeStand, phase: Phase, zweig: Zweig): ProzessSchritt[] {
+function schritteBauen(stand: VertragsendeStand, { phase, zweig, linkAbgelaufen }: Lage): ProzessSchritt[] {
   const beleg: Record<SchrittKey, boolean> = {
     angelegt: true,
     anfrage: Boolean(stand.supervisorLinkSentAt),
@@ -252,6 +293,7 @@ function schritteBauen(stand: VertragsendeStand, phase: Phase, zweig: Zweig): Pr
       status: status.anfrage,
       zustaendig: "HR",
       datum: datumWenn("anfrage", stand.supervisorLinkSentAt),
+      notiz: status.anfrage === "aktiv" && linkAbgelaufen ? "Link abgelaufen" : undefined,
     },
     {
       key: "rueckmeldung",
@@ -273,7 +315,9 @@ function schritteBauen(stand: VertragsendeStand, phase: Phase, zweig: Zweig): Pr
       zustaendig: "HR",
       datum: zweig === "uebernahme" ? datumWenn("vollzug", stand.contractSignedReturnedAt) : undefined,
       notiz: zweig === "keine" && stand.offboarding ? stand.offboarding.displayId : undefined,
-      reiter: zweig === "offen" ? undefined : "dokumente",
+      // Nur der Vertrag entsteht im Reiter Dokumente. Das Offboarding ist ein
+      // eigener Vorgang — dorthin fuehrt die Handlung „zum-offboarding", kein Reiter.
+      reiter: zweig === "uebernahme" ? "dokumente" : undefined,
     },
     {
       key: "abschluss",
@@ -306,8 +350,10 @@ function fristVon(
   // Nach dem Vollzug (Vertrag unterschrieben, Offboarding angelegt) ist das
   // Vertragsende keine Frist mehr, die jemand halten muesste.
   if (phase === "abschluss") return {};
-  // Ueberschritten, waehrend noch nichts entschieden oder vollzogen ist (P-F4).
-  if (tage < 0) return { frist: text, dringlichkeit: "critical" };
+  // Heute oder ueberschritten, waehrend noch nichts entschieden oder vollzogen
+  // ist (P-F4). Die Ampel hilft hier nicht: Sie rechnet ab dem Zeitpunkt des
+  // Vertragsendes (Mitternacht) und meldet schon am letzten Tag „AUSSERHALB".
+  if (tage <= 0) return { frist: text, dringlichkeit: "critical" };
 
   const stufe = getContractEndCategory(new Date(stand.contractEndDate), jetzt);
   if (stufe === "KRITISCH") return { frist: text, dringlichkeit: "critical" };
@@ -315,35 +361,29 @@ function fristVon(
   return { frist: text };
 }
 
+/**
+ * „Anfrage vom 22.05.2026 an … · 2× erinnert, zuletzt 31.05.2026". Ein Datum,
+ * das fehlt oder sich nicht lesen laesst, faellt samt seinem Vorwort weg —
+ * kein „zuletzt " ohne Datum.
+ */
 function erinnerungsText(stand: VertragsendeStand): string {
-  const anfrage = stand.supervisorLinkSentAt ? `Anfrage vom ${formatDatumDE(stand.supervisorLinkSentAt)}` : "Anfrage";
+  const vom = formatDatumDE(stand.supervisorLinkSentAt);
+  const anfrage = vom ? `Anfrage vom ${vom}` : "Anfrage";
   const an = stand.supervisorEmail ? ` an ${stand.supervisorEmail}` : "";
+  const zuletzt = formatDatumDE(stand.lastSupervisorReminderAt);
   const erinnert =
     stand.supervisorReminderCount > 0
-      ? `${stand.supervisorReminderCount}× erinnert, zuletzt ${formatDatumDE(stand.lastSupervisorReminderAt)}`
+      ? `${stand.supervisorReminderCount}× erinnert${zuletzt ? `, zuletzt ${zuletzt}` : ""}`
       : "noch nicht erinnert";
   return `${anfrage}${an} · ${erinnert}`;
 }
 
-function jetztDranBauen(
-  stand: VertragsendeStand,
-  phase: Phase,
-  zweig: Zweig,
-  jetzt: Date,
-): JetztDran<VertragsendeAktion> | null {
-  const frist = fristVon(stand, phase, jetzt);
+function jetztDranBauen(stand: VertragsendeStand, lage: Lage, jetzt: Date): JetztDran<VertragsendeAktion> | null {
+  const frist = fristVon(stand, lage.phase, jetzt);
 
-  switch (phase) {
+  switch (lage.phase) {
     case "anfrage":
-      return {
-        satz: "Anfrage an die Führungskraft senden",
-        bei: "HR",
-        unterzeile: "Die Führungskraft entscheidet über die Weiterbeschäftigung und erfasst bei Übernahme die Vertragsdaten.",
-        aktion: "anfrage-senden",
-        ...frist,
-      };
-    case "rueckmeldung":
-      if (linkAbgelaufen(stand, jetzt)) {
+      if (lage.linkAbgelaufen) {
         return {
           satz: "Link der Führungskraft ist abgelaufen – Anfrage neu senden",
           bei: "HR",
@@ -353,6 +393,14 @@ function jetztDranBauen(
         };
       }
       return {
+        satz: "Anfrage an die Führungskraft senden",
+        bei: "HR",
+        unterzeile: "Die Führungskraft entscheidet über die Weiterbeschäftigung und erfasst bei Übernahme die Vertragsdaten.",
+        aktion: "anfrage-senden",
+        ...frist,
+      };
+    case "rueckmeldung":
+      return {
         satz: "Wartet auf die Rückmeldung der Führungskraft",
         bei: "FUEHRUNGSKRAFT",
         unterzeile: erinnerungsText(stand),
@@ -360,7 +408,13 @@ function jetztDranBauen(
         ...frist,
       };
     case "vollzug":
-      if (zweig === "keine") {
+      if (lage.zweig === "keine") {
+        // Ein Offboarding gibt es je Vorgang nur einmal; `/nicht-uebernehmen`
+        // lehnt ein zweites ab (409). Haengt schon eines am Vorgang (nur durch
+        // einen Handeingriff erreichbar), fuehrt der Knopf dorthin.
+        if (stand.offboarding) {
+          return { satz: "Offboarding ist bereits angelegt", bei: "HR", aktion: "zum-offboarding", ...frist };
+        }
         return {
           satz: "Ablehnung bestätigen und Offboarding anlegen",
           bei: "HR",
@@ -378,7 +432,7 @@ function jetztDranBauen(
         ...frist,
       };
     case "abschluss":
-      if (zweig === "keine") {
+      if (lage.zweig === "keine") {
         return {
           satz: "Auslaufmitteilung erstellen, Zeugnis über das Offboarding",
           bei: "HR",
@@ -409,12 +463,11 @@ function jetztDranBauen(
 
 /** Der Stand der Prozessleiste fuer einen Vertragsende-Vorgang. */
 export function vertragsendeProzessStand(stand: VertragsendeStand, jetzt: Date): ProzessStand<VertragsendeAktion> {
-  const phase = phaseVon(stand);
-  const zweig = zweigVon(stand);
+  const lage = lageVon(stand, jetzt);
   return {
     modus: "schritte",
-    schritte: schritteBauen(stand, phase, zweig),
-    jetztDran: jetztDranBauen(stand, phase, zweig, jetzt),
+    schritte: schritteBauen(stand, lage),
+    jetztDran: jetztDranBauen(stand, lage, jetzt),
     ...(stand.status === "ABGESCHLOSSEN" ? { ende: "abgeschlossen" as const } : {}),
     ...(stand.status === "STORNIERT" ? { ende: "abgebrochen" as const } : {}),
   };
@@ -427,29 +480,33 @@ export function vertragsendeProzessStand(stand: VertragsendeStand, jetzt: Date):
  * einmal — jede Handlung hat genau einen Ort.
  */
 export function vertragsendeMenue(stand: VertragsendeStand, jetzt: Date): VertragsendeAktion[] {
-  const phase = phaseVon(stand);
-  const zweig = zweigVon(stand);
-  switch (phase) {
-    case "anfrage":
-      return ["offboarding-anlegen", "stornieren"];
-    case "rueckmeldung":
-      return linkAbgelaufen(stand, jetzt)
-        ? ["offboarding-anlegen", "stornieren"]
-        : ["anfrage-neu-senden", "offboarding-anlegen", "stornieren"];
-    case "vollzug":
-      return zweig === "uebernahme" ? ["abschliessen", "stornieren"] : ["stornieren"];
-    case "abschluss":
-      return zweig === "keine" ? ["abschliessen", "stornieren"] : ["stornieren"];
-    default:
-      return [];
-  }
+  const { phase, zweig } = lageVon(stand, jetzt);
+  const punkte = ((): VertragsendeAktion[] => {
+    switch (phase) {
+      case "anfrage":
+        return ["offboarding-anlegen", "stornieren"];
+      case "rueckmeldung":
+        return ["anfrage-neu-senden", "offboarding-anlegen", "stornieren"];
+      case "vollzug":
+        return zweig === "uebernahme" ? ["abschliessen", "stornieren"] : ["stornieren"];
+      case "abschluss":
+        return zweig === "keine" ? ["abschliessen", "stornieren"] : ["stornieren"];
+      default:
+        return [];
+    }
+  })();
+  // Ein Offboarding gibt es je Vorgang nur einmal (siehe `jetztDranBauen`).
+  return punkte.filter((aktion) => aktion !== "offboarding-anlegen" || !stand.offboarding);
 }
 
 /**
  * Die EINE Statuspille des Seitenkopfs. Greift die Entfristungswarnung,
- * ersetzt sie die Pille des Status.
+ * ersetzt sie die Pille des Status. Sonst gilt der Katalog — ausser in den
+ * beiden Anfrage-Status, wenn die Fuehrungskraft gar nicht antworten kann
+ * (Regel 5): „Wartet auf Führungskraft" stuende dann ueber einem „Jetzt dran",
+ * das HR zum Senden auffordert.
  */
-export function vertragsendePille(stand: VertragsendeStand, jetzt: Date): { text: string; ton: PillenTon } {
+export function vertragsendePille(stand: VertragsendeStand, jetzt: Date): PillenAngabe {
   if (entfristungsWarnung(stand, jetzt)) {
     const tage = tageBisVertragsende(stand.contractEndDate, jetzt);
     return {
@@ -457,6 +514,9 @@ export function vertragsendePille(stand: VertragsendeStand, jetzt: Date): { text
       ton: "critical",
     };
   }
+  const lage = lageVon(stand, jetzt);
+  if (lage.linkAbgelaufen) return VERTRAGSENDE_PILLE_LINK_ABGELAUFEN;
+  if (lage.phase === "anfrage") return VERTRAGSENDE_PILLE.ANGELEGT;
   // Unbekannter Status: den Rohwert zeigen statt einen falschen Namen zu erfinden.
   return VERTRAGSENDE_PILLE[stand.status] ?? { text: stand.status, ton: "neutral" };
 }

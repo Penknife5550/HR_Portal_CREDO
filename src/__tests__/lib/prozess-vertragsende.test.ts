@@ -4,21 +4,29 @@
  */
 
 import { CONTRACT_END_STATUS_LABELS } from "@/lib/constants";
-import { CONTRACT_END_UEBERGAENGE } from "@/lib/contract-end-status";
-import { schrittKurzform } from "@/lib/prozess/prozess-stand";
+import {
+  CONTRACT_END_ANFRAGE_GESPERRT,
+  CONTRACT_END_ANFRAGE_OFFEN,
+  CONTRACT_END_OFFBOARDING_AUS,
+  CONTRACT_END_UEBERGAENGE,
+} from "@/lib/contract-end-status";
+import { schrittKurzform, type ProzessStand } from "@/lib/prozess/prozess-stand";
 import {
   MAV_PILLE,
   VERTRAGSENDE_PILLE,
+  VERTRAGSENDE_PILLE_LINK_ABGELAUFEN,
   tageBisVertragsende,
   vertragsendeMenue,
   vertragsendePille,
   vertragsendeProzessStand,
+  type PillenAngabe,
   type VertragsendeAktion,
   type VertragsendeStand,
 } from "@/lib/prozess/vertragsende";
 
 const JETZT = new Date("2026-06-01T10:00:00Z");
 const tag = (versatz: number) => new Date(Date.UTC(2026, 5, 1 + versatz)).toISOString();
+const ADRESSE = "leitung@beispiel.invalid";
 
 function stand(teil: Partial<VertragsendeStand> = {}): VertragsendeStand {
   return {
@@ -43,7 +51,7 @@ function stand(teil: Partial<VertragsendeStand> = {}): VertragsendeStand {
 const angefragt = (teil: Partial<VertragsendeStand> = {}) =>
   stand({
     status: "ANFRAGE_VORGESETZTER",
-    supervisorEmail: "leitung@beispiel.invalid",
+    supervisorEmail: ADRESSE,
     supervisorLinkSentAt: tag(-10),
     supervisorTokenExpiresAt: tag(20),
     ...teil,
@@ -57,20 +65,86 @@ const abgelehnt = (teil: Partial<VertragsendeStand> = {}) =>
     supervisorRespondedAt: tag(-3),
     ...teil,
   });
+const keineUebernahme = (teil: Partial<VertragsendeStand> = {}) =>
+  stand({ status: "ENTSCHEIDUNG_KEINE_UEBERNAHME", decision: "KEINE_UEBERNAHME", ...teil });
 const OFFBOARDING = { id: "off-1", displayId: "OFF-2026-GYM-003" };
 
-const zustaende = (s: VertragsendeStand) =>
-  Object.fromEntries(vertragsendeProzessStand(s, JETZT).schritte.map((x) => [x.key, x.status]));
-const schritt = (s: VertragsendeStand, key: string) =>
-  vertragsendeProzessStand(s, JETZT).schritte.find((x) => x.key === key)!;
+const prozess = (s: VertragsendeStand) => vertragsendeProzessStand(s, JETZT);
+const zustaende = (s: VertragsendeStand) => Object.fromEntries(prozess(s).schritte.map((x) => [x.key, x.status]));
+const schritt = (s: VertragsendeStand, key: string) => prozess(s).schritte.find((x) => x.key === key)!;
+const dran = (s: VertragsendeStand) => prozess(s).jetztDran!;
 
 const ALLE_STATUS = Object.keys(CONTRACT_END_UEBERGAENGE);
 
+/**
+ * Alle Kombinationen, die in der Datenbank stehen koennen — auch solche, die
+ * keine Route erzeugt, sondern nur ein Handeingriff (Offboarding an einem
+ * Vorgang im Status ANGELEGT, Entscheidung passt nicht zum Status …). Die
+ * Seite darf auch dort nichts anbieten, was die Route ablehnt.
+ *
+ * Voll gekreuzt ist, woran die Routen ihre Entscheidung haengen: Status, Stand
+ * der Anfrage, Offboarding. Was sonst in die Aussagen einfliesst (Entscheidung,
+ * Unterschrift, Naehe des Vertragsendes), kommt als vier Nebenlagen dazu.
+ */
+const ANFRAGEN: Partial<VertragsendeStand>[] = [
+  {}, // nie angefragt
+  { supervisorEmail: ADRESSE }, // Adresse eingetragen, nichts verschickt
+  { supervisorEmail: ADRESSE, supervisorLinkSentAt: tag(-10), supervisorTokenExpiresAt: tag(20) }, // Link gilt
+  { supervisorEmail: ADRESSE, supervisorLinkSentAt: tag(-40), supervisorTokenExpiresAt: tag(-1) }, // abgelaufen
+  { supervisorEmail: ADRESSE, supervisorLinkSentAt: tag(-10), supervisorTokenExpiresAt: null }, // ohne Ablaufdatum
+];
+const NEBENLAGEN: Partial<VertragsendeStand>[] = [
+  { decision: "OFFEN", contractSignedReturnedAt: null, contractEndDate: tag(300) }, // nichts entschieden, Ende fern
+  { decision: "UEBERNAHME", contractSignedReturnedAt: null, contractEndDate: tag(10) }, // Fenster der Entfristungswarnung
+  { decision: "UEBERNAHME", contractSignedReturnedAt: tag(-1), contractEndDate: tag(-3) }, // unterschrieben, Ende vorbei
+  { decision: "KEINE_UEBERNAHME", contractSignedReturnedAt: null, contractEndDate: tag(-3) }, // abgelehnt, Ende vorbei
+];
+const LAGEN: VertragsendeStand[] = ALLE_STATUS.flatMap((status) =>
+  ANFRAGEN.flatMap((anfrage) =>
+    [null, OFFBOARDING].flatMap((offboarding) =>
+      NEBENLAGEN.map((neben) => stand({ status, offboarding, ...anfrage, ...neben })),
+    ),
+  ),
+);
+
+/** Die Lage in einer Zeile — damit eine gescheiterte Erwartung sagt, WO sie scheitert. */
+const kurz = (s: VertragsendeStand) =>
+  `${s.status} / ${s.decision} / Anfrage ${s.supervisorLinkSentAt ? "verschickt" : "nie"}, Link bis ${
+    s.supervisorTokenExpiresAt ?? "—"
+  } / Offboarding ${s.offboarding ? "ja" : "nein"} / unterschrieben ${s.contractSignedReturnedAt ? "ja" : "nein"} / Ende ${s.contractEndDate}`;
+
+/**
+ * Je Lage EINMAL gerechnet: Der Adapter zaehlt Kalendertage ueber
+ * `tageZwischen`, und das kostet unter Jest rund 10 ms je Aufruf (ausserhalb
+ * 0,1 ms). Rechnete jeder Test jede Lage selbst, liefe diese Datei Minuten.
+ */
+interface Probe {
+  s: VertragsendeStand;
+  lage: string;
+  p: ProzessStand<VertragsendeAktion>;
+  menue: VertragsendeAktion[];
+  pille: PillenAngabe;
+  /** „Jetzt dran" (Haupt- und Nebenhandlung) samt Menue. */
+  angeboten: VertragsendeAktion[];
+}
+let PROBEN: Probe[] = [];
+beforeAll(() => {
+  PROBEN = LAGEN.map((s) => {
+    const p = prozess(s);
+    const menue = vertragsendeMenue(s, JETZT);
+    const angeboten = [p.jetztDran?.aktion, p.jetztDran?.nebenAktion, ...menue].filter(
+      (a): a is VertragsendeAktion => Boolean(a),
+    );
+    return { s, lage: kurz(s), p, menue, pille: vertragsendePille(s, JETZT), angeboten };
+  });
+}, 120_000);
+
 describe("Kataloge", () => {
   it("kennen jeden Status des Moduls", () => {
-    expect(ALLE_STATUS.sort()).toEqual(Object.keys(CONTRACT_END_STATUS_LABELS).sort());
-    expect(Object.keys(VERTRAGSENDE_PILLE).sort()).toEqual(ALLE_STATUS.sort());
-    for (const eintrag of [...Object.values(VERTRAGSENDE_PILLE), ...Object.values(MAV_PILLE)]) {
+    expect([...ALLE_STATUS].sort()).toEqual(Object.keys(CONTRACT_END_STATUS_LABELS).sort());
+    expect(Object.keys(VERTRAGSENDE_PILLE).sort()).toEqual([...ALLE_STATUS].sort());
+    const alle = [...Object.values(VERTRAGSENDE_PILLE), ...Object.values(MAV_PILLE), VERTRAGSENDE_PILLE_LINK_ABGELAUFEN];
+    for (const eintrag of alle) {
       expect(eintrag.text.trim()).not.toBe("");
     }
   });
@@ -78,15 +152,14 @@ describe("Kataloge", () => {
   it("unbekannter Status: Rohwert in der Pille, keine Handlung", () => {
     const s = stand({ status: "NEU_ERFUNDEN" });
     expect(vertragsendePille(s, JETZT)).toEqual({ text: "NEU_ERFUNDEN", ton: "neutral" });
-    expect(vertragsendeProzessStand(s, JETZT).jetztDran).toBeNull();
+    expect(prozess(s).jetztDran).toBeNull();
     expect(vertragsendeMenue(s, JETZT)).toEqual([]);
   });
 });
 
 describe("Schritte", () => {
   it("immer dieselben fünf, höchstens einer aktiv", () => {
-    for (const status of ALLE_STATUS) {
-      const p = vertragsendeProzessStand(stand({ status }), JETZT);
+    for (const { p } of PROBEN) {
       expect(p.schritte.map((x) => x.key)).toEqual(["angelegt", "anfrage", "rueckmeldung", "vollzug", "abschluss"]);
       expect(p.schritte.filter((x) => x.status === "aktiv").length).toBeLessThanOrEqual(1);
       expect(p.schritte[0].status).toBe("erledigt");
@@ -102,7 +175,7 @@ describe("Schritte", () => {
       abschluss: "kommend",
     });
     expect(schritt(stand(), "vollzug").titel).toBe("Vertrag oder Offboarding");
-    expect(schritt(stand(), "vollzug").reiter).toBeUndefined();
+    expect(schritt(stand(), "anfrage").notiz).toBeUndefined();
   });
 
   it("ANFRAGE_VORGESETZTER: Rückmeldung aktiv, bei der Führungskraft", () => {
@@ -111,17 +184,24 @@ describe("Schritte", () => {
     expect(schritt(angefragt(), "anfrage").datum).toBe(tag(-10));
   });
 
+  it("abgelaufener Link: Die Anfrage ist wieder dran — die Führungskraft kann nicht mehr antworten", () => {
+    for (const ablauf of [tag(-1), null]) {
+      const s = angefragt({ supervisorTokenExpiresAt: ablauf });
+      expect(zustaende(s)).toMatchObject({ anfrage: "aktiv", rueckmeldung: "kommend" });
+      expect(schritt(s, "anfrage")).toMatchObject({ zustaendig: "HR", notiz: "Link abgelaufen" });
+      expect(schrittKurzform(prozess(s))).toBe("Schritt 2 von 5 · Anfrage");
+    }
+  });
+
   it("Übernahme: gewählter Weg in der Linie, der andere als Hinweis", () => {
     const s = uebernahme();
     expect(zustaende(s)).toMatchObject({ rueckmeldung: "erledigt", vollzug: "aktiv", abschluss: "kommend" });
     expect(schritt(s, "rueckmeldung")).toMatchObject({ notiz: "Übernahme", sonst: "sonst: Offboarding" });
-    expect(schritt(s, "vollzug")).toMatchObject({ titel: "Vertrag", reiter: "dokumente" });
+    expect(schritt(s, "vollzug").titel).toBe("Vertrag");
   });
 
   it("VERTRAG_ERSTELLT zählt wie RUECKMELDUNG_UEBERNAHME (kein Code setzt den Status)", () => {
-    const a = vertragsendeProzessStand(uebernahme(), JETZT);
-    const b = vertragsendeProzessStand(uebernahme({ status: "VERTRAG_ERSTELLT" }), JETZT);
-    expect(b).toEqual(a);
+    expect(prozess(uebernahme({ status: "VERTRAG_ERSTELLT" }))).toEqual(prozess(uebernahme()));
   });
 
   it("VERTRAG_UNTERSCHRIEBEN: Vertrag erledigt mit Datum, Abschluss aktiv", () => {
@@ -137,8 +217,20 @@ describe("Schritte", () => {
     expect(schritt(s, "vollzug").titel).toBe("Offboarding");
   });
 
+  it("nur der Schritt „Vertrag“ führt in den Reiter Dokumente — das Offboarding ist ein eigener Vorgang", () => {
+    expect(schritt(uebernahme(), "vollzug").reiter).toBe("dokumente");
+    expect(schritt(stand(), "vollzug").reiter).toBeUndefined();
+    expect(schritt(abgelehnt(), "vollzug").reiter).toBeUndefined();
+    expect(schritt(keineUebernahme({ offboarding: OFFBOARDING }), "vollzug").reiter).toBeUndefined();
+    for (const { p } of PROBEN) {
+      for (const x of p.schritte) {
+        if (x.reiter) expect({ key: x.key, titel: x.titel }).toEqual({ key: "vollzug", titel: "Vertrag" });
+      }
+    }
+  });
+
   it("Offboarding ohne Anfrage: Anfrage und Rückmeldung übersprungen, nicht erledigt", () => {
-    const s = stand({ status: "ENTSCHEIDUNG_KEINE_UEBERNAHME", decision: "KEINE_UEBERNAHME", offboarding: OFFBOARDING });
+    const s = keineUebernahme({ offboarding: OFFBOARDING });
     expect(zustaende(s)).toEqual({
       angelegt: "erledigt",
       anfrage: "uebersprungen",
@@ -161,7 +253,7 @@ describe("Schritte", () => {
 
   it("ABGESCHLOSSEN: Ende, Schritte ohne Beleg übersprungen", () => {
     const voll = uebernahme({ status: "ABGESCHLOSSEN", contractSignedReturnedAt: tag(-2), completedAt: tag(-1) });
-    const p = vertragsendeProzessStand(voll, JETZT);
+    const p = prozess(voll);
     expect(p.ende).toBe("abgeschlossen");
     expect(p.jetztDran).toBeNull();
     expect(p.schritte.every((x) => x.status === "erledigt")).toBe(true);
@@ -178,7 +270,7 @@ describe("Schritte", () => {
   });
 
   it("STORNIERT: abgebrochen; Erreichtes erledigt, der Rest kommend", () => {
-    const p = vertragsendeProzessStand(angefragt({ status: "STORNIERT" }), JETZT);
+    const p = prozess(angefragt({ status: "STORNIERT" }));
     expect(p.ende).toBe("abgebrochen");
     expect(p.jetztDran).toBeNull();
     expect(Object.fromEntries(p.schritte.map((x) => [x.key, x.status]))).toEqual({
@@ -201,14 +293,11 @@ describe("Schritte", () => {
   });
 
   it("ANFRAGE_VORGESETZTER ohne zugestellte Anfrage (Status von Hand gesetzt): Anfrage ist dran, nicht „Erinnern“", () => {
-    const s = stand({ status: "ANFRAGE_VORGESETZTER" });
-    expect(zustaende(s)).toMatchObject({ anfrage: "aktiv", rueckmeldung: "kommend" });
-    expect(vertragsendeProzessStand(s, JETZT).jetztDran).toMatchObject({ bei: "HR", aktion: "anfrage-senden" });
-  });
-
-  it("Link ohne Ablaufdatum gilt als abgelaufen (wie in der Route)", () => {
-    const s = angefragt({ supervisorTokenExpiresAt: null });
-    expect(vertragsendeProzessStand(s, JETZT).jetztDran).toMatchObject({ aktion: "anfrage-neu-senden" });
+    for (const s of [stand({ status: "ANFRAGE_VORGESETZTER" }), stand({ status: "ANFRAGE_VORGESETZTER", supervisorEmail: ADRESSE })]) {
+      expect(zustaende(s)).toMatchObject({ anfrage: "aktiv", rueckmeldung: "kommend" });
+      expect(schritt(s, "anfrage").notiz).toBeUndefined();
+      expect(prozess(s).jetztDran).toMatchObject({ bei: "HR", aktion: "anfrage-senden" });
+    }
   });
 
   it("„MAV offen“ steht am Abschluss, sobald entschieden ist — und nur solange der Stand fehlt", () => {
@@ -219,15 +308,13 @@ describe("Schritte", () => {
   });
 
   it("Kurzform für schmale Bildschirme", () => {
-    expect(schrittKurzform(vertragsendeProzessStand(uebernahme(), JETZT))).toBe("Schritt 4 von 5 · Vertrag");
-    expect(schrittKurzform(vertragsendeProzessStand(stand({ status: "ABGESCHLOSSEN" }), JETZT))).toBe("Abgeschlossen");
-    expect(schrittKurzform(vertragsendeProzessStand(stand({ status: "STORNIERT" }), JETZT))).toBe("Abgebrochen");
+    expect(schrittKurzform(prozess(uebernahme()))).toBe("Schritt 4 von 5 · Vertrag");
+    expect(schrittKurzform(prozess(stand({ status: "ABGESCHLOSSEN" })))).toBe("Abgeschlossen");
+    expect(schrittKurzform(prozess(stand({ status: "STORNIERT" })))).toBe("Abgebrochen");
   });
 });
 
 describe("Jetzt dran", () => {
-  const dran = (s: VertragsendeStand) => vertragsendeProzessStand(s, JETZT).jetztDran!;
-
   it("je Status die eine Handlung", () => {
     expect(dran(stand())).toMatchObject({ bei: "HR", aktion: "anfrage-senden" });
     expect(dran(angefragt())).toMatchObject({ bei: "FUEHRUNGSKRAFT", aktion: "erinnern" });
@@ -236,30 +323,61 @@ describe("Jetzt dran", () => {
       aktion: "abschliessen",
     });
     expect(dran(abgelehnt())).toMatchObject({ bei: "HR", aktion: "offboarding-anlegen" });
-    expect(
-      dran(stand({ status: "ENTSCHEIDUNG_KEINE_UEBERNAHME", decision: "KEINE_UEBERNAHME", offboarding: OFFBOARDING })),
-    ).toMatchObject({ aktion: "zum-offboarding", nebenAktion: "dokumente" });
+    expect(dran(keineUebernahme({ offboarding: OFFBOARDING }))).toMatchObject({
+      aktion: "zum-offboarding",
+      nebenAktion: "dokumente",
+    });
   });
 
   it("keine Übernahme ohne verknüpftes Offboarding: kein Verweis ins Leere", () => {
-    const d = dran(stand({ status: "ENTSCHEIDUNG_KEINE_UEBERNAHME", decision: "KEINE_UEBERNAHME" }));
+    const d = dran(keineUebernahme());
     expect(d.aktion).toBe("dokumente");
     expect(d.nebenAktion).toBeUndefined();
   });
 
+  it("Ablehnung mit schon verknüpftem Offboarding: kein zweites anlegen (die Route lehnte ab), sondern dorthin", () => {
+    const d = dran(abgelehnt({ offboarding: OFFBOARDING }));
+    expect(d).toMatchObject({ satz: "Offboarding ist bereits angelegt", bei: "HR", aktion: "zum-offboarding" });
+    expect(d.nebenAktion).toBeUndefined();
+  });
+
   it("wartend: nennt Anfrage, Adresse und Erinnerungen", () => {
-    expect(dran(angefragt()).unterzeile).toBe(
-      "Anfrage vom 22.05.2026 an leitung@beispiel.invalid · noch nicht erinnert",
-    );
+    expect(dran(angefragt()).unterzeile).toBe("Anfrage vom 22.05.2026 an leitung@beispiel.invalid · noch nicht erinnert");
     expect(dran(angefragt({ supervisorReminderCount: 2, lastSupervisorReminderAt: tag(-1) })).unterzeile).toBe(
       "Anfrage vom 22.05.2026 an leitung@beispiel.invalid · 2× erinnert, zuletzt 31.05.2026",
     );
   });
 
+  it("fehlt ein Datum, fällt es samt seinem Vorwort weg — kein „zuletzt “ ohne Datum", () => {
+    expect(dran(angefragt({ supervisorReminderCount: 2, lastSupervisorReminderAt: null })).unterzeile).toBe(
+      "Anfrage vom 22.05.2026 an leitung@beispiel.invalid · 2× erinnert",
+    );
+    expect(dran(angefragt({ supervisorReminderCount: 1, lastSupervisorReminderAt: "kein Datum" })).unterzeile).toBe(
+      "Anfrage vom 22.05.2026 an leitung@beispiel.invalid · 1× erinnert",
+    );
+    expect(dran(angefragt({ supervisorLinkSentAt: "kein Datum" })).unterzeile).toBe(
+      "Anfrage an leitung@beispiel.invalid · noch nicht erinnert",
+    );
+    for (const { p } of PROBEN) {
+      for (const text of [p.jetztDran?.unterzeile, p.jetztDran?.frist]) {
+        if (text !== undefined) expect(text).toBe(text.trim());
+      }
+    }
+  });
+
   it("abgelaufener Link: statt „Erinnern“ (die Route lehnt ab) „Anfrage neu senden“, bei HR", () => {
-    const s = angefragt({ supervisorTokenExpiresAt: tag(-1) });
-    expect(dran(s)).toMatchObject({ bei: "HR", aktion: "anfrage-neu-senden" });
-    expect(vertragsendeMenue(s, JETZT)).not.toContain("anfrage-neu-senden");
+    const s = angefragt({ supervisorTokenExpiresAt: tag(-1), supervisorReminderCount: 3, lastSupervisorReminderAt: tag(-5) });
+    expect(dran(s)).toMatchObject({
+      satz: "Link der Führungskraft ist abgelaufen – Anfrage neu senden",
+      bei: "HR",
+      aktion: "anfrage-neu-senden",
+      unterzeile: "Anfrage vom 22.05.2026 an leitung@beispiel.invalid · 3× erinnert, zuletzt 27.05.2026",
+    });
+    expect(vertragsendeMenue(s, JETZT)).toEqual(["offboarding-anlegen", "stornieren"]);
+  });
+
+  it("Link ohne Ablaufdatum gilt als abgelaufen (wie in der Route)", () => {
+    expect(dran(angefragt({ supervisorTokenExpiresAt: null }))).toMatchObject({ aktion: "anfrage-neu-senden" });
   });
 
   it("Abschluss nach Übernahme nennt einen offenen MAV-Stand, sperrt aber nicht", () => {
@@ -271,8 +389,6 @@ describe("Jetzt dran", () => {
 });
 
 describe("Frist", () => {
-  const dran = (s: VertragsendeStand) => vertragsendeProzessStand(s, JETZT).jetztDran!;
-
   it("zählt Berliner Kalendertage: am Tag des Vertragsendes „heute“, überschritten erst danach", () => {
     expect(tageBisVertragsende(tag(0), JETZT)).toBe(0);
     expect(tageBisVertragsende(tag(-1), JETZT)).toBe(-1);
@@ -292,6 +408,22 @@ describe("Frist", () => {
     expect(fern.dringlichkeit).toBeUndefined();
   });
 
+  it("die letzten Tage sind lückenlos kritisch — auch der Tag des Vertragsendes selbst", () => {
+    // Die Ampel meldet am letzten Tag schon „AUSSERHALB“ (sie rechnet bis
+    // Mitternacht davor); ohne eigene Regel fiele genau dieser Tag heraus.
+    for (const s of [stand(), angefragt(), abgelehnt()]) {
+      for (let versatz = 3; versatz >= -3; versatz--) {
+        const d = dran({ ...s, contractEndDate: tag(versatz) });
+        expect({ versatz, dringlichkeit: d.dringlichkeit }).toEqual({ versatz, dringlichkeit: "critical" });
+      }
+    }
+    // … zu jeder Uhrzeit des letzten Tages (Berlin: 00:30 und 23:30 am 1. Juni)
+    for (const uhr of ["2026-05-31T22:30:00Z", "2026-06-01T21:30:00Z"]) {
+      const d = vertragsendeProzessStand(stand({ contractEndDate: tag(0) }), new Date(uhr)).jetztDran!;
+      expect(d).toMatchObject({ frist: "Vertragsende 01.06.2026 · heute", dringlichkeit: "critical" });
+    }
+  });
+
   it("überschrittenes Vertragsende bei offenem Vorgang ist kritisch (die Ampel allein zeigte nichts)", () => {
     for (const s of [stand(), angefragt(), abgelehnt()]) {
       const d = dran({ ...s, contractEndDate: tag(-3) });
@@ -304,12 +436,8 @@ describe("Frist", () => {
   it("nach dem Vollzug ist das Vertragsende keine Frist mehr", () => {
     const fertig = [
       uebernahme({ status: "VERTRAG_UNTERSCHRIEBEN", contractSignedReturnedAt: tag(-9), contractEndDate: tag(-3) }),
-      stand({
-        status: "ENTSCHEIDUNG_KEINE_UEBERNAHME",
-        decision: "KEINE_UEBERNAHME",
-        offboarding: OFFBOARDING,
-        contractEndDate: tag(-3),
-      }),
+      keineUebernahme({ offboarding: OFFBOARDING, contractEndDate: tag(-3) }),
+      keineUebernahme({ offboarding: OFFBOARDING, contractEndDate: tag(0) }),
     ];
     for (const s of fertig) {
       expect(dran(s).frist).toBeUndefined();
@@ -329,6 +457,9 @@ describe("Frist", () => {
     });
     expect(vertragsendePille(knapp, JETZT)).toEqual({ text: "Entfristungsrisiko · in 10 Tagen", ton: "critical" });
 
+    const heute = uebernahme({ contractEndDate: tag(0) });
+    expect(vertragsendePille(heute, JETZT)).toEqual({ text: "Entfristungsrisiko · heute", ton: "critical" });
+
     const drueber = uebernahme({ contractEndDate: tag(-2) });
     expect(vertragsendePille(drueber, JETZT).text).toBe("Entfristungsrisiko · seit 2 Tagen überschritten");
 
@@ -342,57 +473,106 @@ describe("Frist", () => {
   });
 });
 
+describe("Statuspille", () => {
+  it("folgt dem Katalog, solange der Status sagt, wer dran ist", () => {
+    expect(vertragsendePille(stand(), JETZT)).toEqual({ text: "Anfrage offen", ton: "info" });
+    expect(vertragsendePille(angefragt(), JETZT)).toEqual({ text: "Wartet auf Führungskraft", ton: "wait" });
+    expect(vertragsendePille(abgelehnt(), JETZT)).toEqual({ text: "Abgelehnt · Offboarding offen", ton: "info" });
+    expect(vertragsendePille(keineUebernahme(), JETZT)).toEqual({ text: "Keine Übernahme", ton: "neutral" });
+    expect(vertragsendePille(stand({ status: "ABGESCHLOSSEN" }), JETZT)).toEqual({ text: "Abgeschlossen", ton: "ok" });
+    expect(vertragsendePille(stand({ status: "STORNIERT" }), JETZT)).toEqual({ text: "Storniert", ton: "neutral" });
+  });
+
+  it("sagt nicht „Wartet auf Führungskraft“, wenn die Führungskraft gar nicht antworten kann", () => {
+    for (const status of ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"]) {
+      // nie eine Anfrage verschickt
+      expect(vertragsendePille(stand({ status }), JETZT)).toEqual({ text: "Anfrage offen", ton: "info" });
+      expect(vertragsendePille(stand({ status, supervisorEmail: ADRESSE }), JETZT)).toEqual({
+        text: "Anfrage offen",
+        ton: "info",
+      });
+      // Link abgelaufen bzw. ohne Ablaufdatum
+      for (const ablauf of [tag(-1), null]) {
+        expect(vertragsendePille(angefragt({ status, supervisorTokenExpiresAt: ablauf }), JETZT)).toEqual({
+          text: "Link abgelaufen",
+          ton: "info",
+        });
+      }
+      // Link gilt
+      expect(vertragsendePille(angefragt({ status }), JETZT)).toEqual({ text: "Wartet auf Führungskraft", ton: "wait" });
+    }
+  });
+});
+
 describe("Menü", () => {
   it("je Status; „Stornieren“ immer zuletzt, nach dem Ende nichts", () => {
     expect(vertragsendeMenue(stand(), JETZT)).toEqual(["offboarding-anlegen", "stornieren"]);
     expect(vertragsendeMenue(angefragt(), JETZT)).toEqual(["anfrage-neu-senden", "offboarding-anlegen", "stornieren"]);
     expect(vertragsendeMenue(uebernahme(), JETZT)).toEqual(["abschliessen", "stornieren"]);
     expect(vertragsendeMenue(abgelehnt(), JETZT)).toEqual(["stornieren"]);
-    expect(
-      vertragsendeMenue(stand({ status: "ENTSCHEIDUNG_KEINE_UEBERNAHME", decision: "KEINE_UEBERNAHME" }), JETZT),
-    ).toEqual(["abschliessen", "stornieren"]);
+    expect(vertragsendeMenue(keineUebernahme(), JETZT)).toEqual(["abschliessen", "stornieren"]);
     expect(vertragsendeMenue(stand({ status: "ABGESCHLOSSEN" }), JETZT)).toEqual([]);
     expect(vertragsendeMenue(stand({ status: "STORNIERT" }), JETZT)).toEqual([]);
   });
 
-  it("keine Handlung steht zugleich in „Jetzt dran“ und im Menü", () => {
-    for (const status of ALLE_STATUS) {
-      for (const s of [stand({ status }), angefragt({ status }), angefragt({ status, supervisorTokenExpiresAt: tag(-1) })]) {
-        const d = vertragsendeProzessStand(s, JETZT).jetztDran;
-        const menue = vertragsendeMenue(s, JETZT);
-        if (d?.aktion) expect(menue).not.toContain(d.aktion);
-        if (d?.nebenAktion) expect(menue).not.toContain(d.nebenAktion);
-        expect(new Set(menue).size).toBe(menue.length);
+  it("bietet kein zweites Offboarding an", () => {
+    expect(vertragsendeMenue(stand({ offboarding: OFFBOARDING }), JETZT)).toEqual(["stornieren"]);
+    expect(vertragsendeMenue(angefragt({ offboarding: OFFBOARDING }), JETZT)).toEqual(["anfrage-neu-senden", "stornieren"]);
+  });
+});
+
+/**
+ * Was in JEDER Lage gilt — auch in denen, die nur ein Handeingriff erzeugt.
+ */
+describe("Über alle Lagen", () => {
+  it("deckt jeden Status ab — und jede Lage ist gerechnet", () => {
+    expect(new Set(LAGEN.map((s) => s.status))).toEqual(new Set(ALLE_STATUS));
+    expect(LAGEN).toHaveLength(ALLE_STATUS.length * ANFRAGEN.length * 2 * NEBENLAGEN.length);
+    expect(PROBEN).toHaveLength(LAGEN.length);
+  });
+
+  it("keine Handlung steht zugleich in „Jetzt dran“ und im Menü; „Stornieren“ steht zuletzt", () => {
+    for (const { lage, p, menue } of PROBEN) {
+      const d = p.jetztDran;
+      const doppelt = menue.filter((a) => a === d?.aktion || a === d?.nebenAktion);
+      expect({ lage, doppelt }).toEqual({ lage, doppelt: [] });
+      expect(new Set(menue).size).toBe(menue.length);
+      if (menue.includes("stornieren")) expect(menue[menue.length - 1]).toBe("stornieren");
+      if (d?.aktion) expect(d.aktion).not.toBe(d.nebenAktion);
+    }
+  });
+
+  it("wer dran ist, sagen Pille, aktiver Schritt und „Jetzt dran“ übereinstimmend", () => {
+    const ZUSTAENDIG = { HR: "HR", FUEHRUNGSKRAFT: "Führungskraft" } as const;
+    for (const { lage, p, pille } of PROBEN) {
+      const aktiv = p.schritte.filter((x) => x.status === "aktiv");
+
+      // Ohne „Jetzt dran“ ist kein Schritt aktiv — und umgekehrt.
+      expect({ lage, aktiv: aktiv.length }).toEqual({ lage, aktiv: p.jetztDran ? 1 : 0 });
+      // Der aktive Schritt liegt bei dem, der dran ist.
+      if (p.jetztDran) {
+        expect({ lage, zustaendig: aktiv[0].zustaendig }).toEqual({ lage, zustaendig: ZUSTAENDIG[p.jetztDran.bei] });
       }
+      // „wait“ heisst: Es wartet auf jemand anderen — genau dann, wenn die Führungskraft dran ist.
+      expect({ lage, wartet: pille.ton === "wait" }).toEqual({ lage, wartet: p.jetztDran?.bei === "FUEHRUNGSKRAFT" });
     }
   });
 });
 
 /**
- * Gegenprobe: Die Seite bietet nur an, was die Route auch annimmt.
+ * Gegenprobe: Die Seite bietet nur an, was die Route auch annimmt — in jeder
+ * Lage.
  *
- * PATCH-Uebergaenge kommen aus derselben Tabelle wie in der Route
- * (`CONTRACT_END_UEBERGAENGE`). Die Listen der drei eigenen Routen sind hier
- * GESPIEGELT — wer sie dort aendert, aendert sie hier:
- *   - /nicht-uebernehmen: `status: { in: [...] }` im bedingten updateMany
- *   - /supervisor-link:   die Liste der gesperrten Status (400)
- *   - /reminder:          offene Anfrage, sonst 409
+ * Die Statuslisten sind DIESELBEN, die die Routen lesen
+ * (`src/lib/contract-end-status.ts`); wer dort einen Status streicht, sieht
+ * hier, welche Handlung die Seite dann zu Unrecht anboete. Zwei Bedingungen
+ * pruefen die Routen ausserhalb der Listen, sie sind hier nachgebildet:
+ *   - /nicht-uebernehmen: 409, wenn schon ein Offboarding verknuepft ist
+ *   - /reminder: 409, wenn nie eine Anfrage hinausging oder ihr Link abgelaufen
+ *     ist (den Token selbst sieht der Adapter nicht und soll ihn nicht sehen)
  */
 describe("Gegenprobe gegen die Routen", () => {
-  const NICHT_UEBERNEHMEN_AUS = [
-    "ANGELEGT",
-    "ANFRAGE_VORGESETZTER",
-    "ENTSCHEIDUNG_UEBERNAHME",
-    "RUECKMELDUNG_KEINE_UEBERNAHME",
-  ];
-  const ANFRAGE_GESPERRT_IN = [
-    "ENTSCHEIDUNG_KEINE_UEBERNAHME",
-    "VERTRAG_ERSTELLT",
-    "VERTRAG_UNTERSCHRIEBEN",
-    "ABGESCHLOSSEN",
-    "STORNIERT",
-  ];
-  const ERINNERN_IN = ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"];
+  const einer = (liste: readonly string[], status: string) => liste.includes(status);
 
   function erlaubt(aktion: VertragsendeAktion, s: VertragsendeStand): boolean {
     const nach = (ziel: string) => (CONTRACT_END_UEBERGAENGE[s.status] ?? []).includes(ziel);
@@ -404,13 +584,13 @@ describe("Gegenprobe gegen die Routen", () => {
       case "vertrag-erfassen":
         return nach("VERTRAG_UNTERSCHRIEBEN");
       case "offboarding-anlegen":
-        return NICHT_UEBERNEHMEN_AUS.includes(s.status) && !s.offboarding;
+        return einer(CONTRACT_END_OFFBOARDING_AUS, s.status) && !s.offboarding;
       case "anfrage-senden":
       case "anfrage-neu-senden":
-        return !ANFRAGE_GESPERRT_IN.includes(s.status);
+        return !einer(CONTRACT_END_ANFRAGE_GESPERRT, s.status);
       case "erinnern":
         return (
-          ERINNERN_IN.includes(s.status) &&
+          einer(CONTRACT_END_ANFRAGE_OFFEN, s.status) &&
           Boolean(s.supervisorEmail && s.supervisorLinkSentAt) &&
           Boolean(s.supervisorTokenExpiresAt && new Date(s.supervisorTokenExpiresAt) >= JETZT)
         );
@@ -422,22 +602,33 @@ describe("Gegenprobe gegen die Routen", () => {
   }
 
   it("jede angebotene Handlung nimmt die zuständige Route an", () => {
-    for (const status of ALLE_STATUS) {
-      const faelle = [
-        stand({ status }),
-        angefragt({ status }),
-        angefragt({ status, supervisorTokenExpiresAt: tag(-1) }),
-        angefragt({ status, offboarding: status === "ENTSCHEIDUNG_KEINE_UEBERNAHME" ? OFFBOARDING : null }),
-      ];
-      for (const s of faelle) {
-        const d = vertragsendeProzessStand(s, JETZT).jetztDran;
-        const angeboten = [d?.aktion, d?.nebenAktion, ...vertragsendeMenue(s, JETZT)].filter(
-          (a): a is VertragsendeAktion => Boolean(a),
-        );
-        for (const aktion of angeboten) {
-          expect({ status, aktion, erlaubt: erlaubt(aktion, s) }).toEqual({ status, aktion, erlaubt: true });
-        }
-      }
+    for (const { s, lage, angeboten } of PROBEN) {
+      const abgelehnte = angeboten.filter((aktion) => !erlaubt(aktion, s));
+      expect({ lage, abgelehnte }).toEqual({ lage, abgelehnte: [] });
+    }
+  });
+
+  it("die Gegenprobe ist nicht leer: Jede Handlung kommt in mindestens einer Lage vor", () => {
+    const vorgekommen = new Set(PROBEN.flatMap((probe) => probe.angeboten));
+    const alle: VertragsendeAktion[] = [
+      "anfrage-senden",
+      "erinnern",
+      "anfrage-neu-senden",
+      "offboarding-anlegen",
+      "vertrag-erfassen",
+      "dokumente",
+      "zum-offboarding",
+      "abschliessen",
+      "stornieren",
+    ];
+    expect([...vorgekommen].sort()).toEqual([...alle].sort());
+  });
+
+  it("solange ein Vorgang läuft, gibt es einen Weg hinaus", () => {
+    // Kein offener Vorgang ohne jede Handlung: Sonst bliebe er für immer in der Liste.
+    for (const { s, lage, angeboten } of PROBEN) {
+      const offen = (CONTRACT_END_UEBERGAENGE[s.status] ?? []).length > 0;
+      expect({ lage, hatHandlung: angeboten.length > 0 }).toEqual({ lage, hatHandlung: offen });
     }
   });
 });

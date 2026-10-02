@@ -102,6 +102,24 @@ describe("Strang B: nicht-uebernehmen", () => {
     );
   });
 
+  // Die Statusliste liegt in src/lib/contract-end-status.ts (dieselbe liest der
+  // Test des Prozess-Adapters). Hier steht sie ausgeschrieben: Wer sie aendert,
+  // aendert bewusst, aus welchen Status HR das Offboarding anlegen darf.
+  it("beansprucht den Vorgang nur aus den vier Status von Strang B und nur ohne Offboarding", async () => {
+    mockPrisma.contractEndProcess.findUnique.mockResolvedValue(ceBase);
+    mockPrisma.contractEndProcess.updateMany.mockResolvedValue({ count: 0 });
+    await POST(req(), { params: params() });
+
+    expect(mockPrisma.contractEndProcess.updateMany).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.contractEndProcess.updateMany.mock.calls[0][0].where).toEqual({
+      id: "ce1",
+      offboardingId: null,
+      status: {
+        in: ["ANGELEGT", "ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME", "RUECKMELDUNG_KEINE_UEBERNAHME"],
+      },
+    });
+  });
+
   // Paket 1b: Die Fuehrungskraft des Vertragsendes bekommt im Offboarding die
   // Aufgaben mit der Zustaendigkeit "Führungskraft".
   describe("Führungskraft aus dem Vertragsende", () => {

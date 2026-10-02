@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { generateToken, getTokenExpiryDate, getSession } from "@/lib/auth";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
+import { CONTRACT_END_ANFRAGE_GESPERRT } from "@/lib/contract-end-status";
 
 const bodySchema = z.object({
   supervisorEmail: z.string().email("Ungültige E-Mail-Adresse"),
@@ -52,15 +53,9 @@ export async function POST(
         { status: 403 }
       );
     }
-    if (
-      [
-        "ENTSCHEIDUNG_KEINE_UEBERNAHME",
-        "VERTRAG_ERSTELLT",
-        "VERTRAG_UNTERSCHRIEBEN",
-        "ABGESCHLOSSEN",
-        "STORNIERT",
-      ].includes(contractEnd.status)
-    ) {
+    // Liste in src/lib/contract-end-status.ts (dieselbe liest der Test des
+    // Prozess-Adapters).
+    if (CONTRACT_END_ANFRAGE_GESPERRT.includes(contractEnd.status)) {
       return NextResponse.json(
         {
           error: `Vorgang im Status "${contractEnd.status}" — eine Vorgesetzten-Anfrage ist nicht mehr moeglich.`,

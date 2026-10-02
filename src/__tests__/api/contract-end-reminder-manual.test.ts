@@ -90,6 +90,25 @@ describe("POST /api/contract-end/[id]/reminder", () => {
     expect(mockTriggerWebhooks).not.toHaveBeenCalled();
   });
 
+  // Die Statusliste liegt in src/lib/contract-end-status.ts (dieselbe liest der
+  // Test des Prozess-Adapters). Hier steht ausgeschrieben, was die Route tut.
+  it.each([
+    ["ANGELEGT", 409],
+    ["ANFRAGE_VORGESETZTER", 200],
+    ["ENTSCHEIDUNG_UEBERNAHME", 200],
+    ["RUECKMELDUNG_UEBERNAHME", 409],
+    ["RUECKMELDUNG_KEINE_UEBERNAHME", 409],
+    ["VERTRAG_ERSTELLT", 409],
+    ["VERTRAG_UNTERSCHRIEBEN", 409],
+    ["ENTSCHEIDUNG_KEINE_UEBERNAHME", 409],
+    ["ABGESCHLOSSEN", 409],
+    ["STORNIERT", 409],
+  ])("Status %s: erinnert nur bei offener Anfrage (%i)", async (status, erwartet) => {
+    mockPrisma.contractEndProcess.findUnique.mockResolvedValue(vorgang({ status }));
+    expect((await POST(req(), { params: params() })).status).toBe(erwartet);
+    expect(mockTriggerWebhooks).toHaveBeenCalledTimes(erwartet === 200 ? 1 : 0);
+  });
+
   it("409 wenn noch keine Anfrage versendet wurde", async () => {
     mockPrisma.contractEndProcess.findUnique.mockResolvedValue(
       vorgang({ supervisorEmail: null, supervisorToken: null, supervisorLinkSentAt: null }),

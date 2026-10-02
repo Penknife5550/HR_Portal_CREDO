@@ -493,6 +493,30 @@ Pilot nichts.
   abgelaufen, ist „Anfrage neu senden“ dran (die Route `/reminder` lehnt in beiden Fällen ab).
 - Nach dem Vollzug (Vertrag unterschrieben bzw. Offboarding angelegt) zeigt „Jetzt dran“
   keine Frist mehr.
-- Die Listen der drei eigenen Routen (`/nicht-uebernehmen`, `/supervisor-link`, `/reminder`)
-  sind im Test gespiegelt, nicht exportiert – P-F7 erlaubte nur das Verschieben von
-  `VALID_TRANSITIONS`.
+- ~~Die Listen der drei eigenen Routen sind im Test gespiegelt, nicht exportiert.~~ Überholt
+  durch die Durchsicht, siehe unten.
+
+**Nach der Durchsicht von Tag 1 geändert** (02.10.2026, acht Befunde, alle behoben; Einzelheiten
+im Logbuch):
+
+- **Wer dran ist, kommt aus einer Lage, nicht aus dem Status.** Steht der Vorgang auf „Anfrage
+  beim Vorgesetzten“, kann die Führungskraft aber gar nicht antworten (nie eine Anfrage
+  verschickt, oder ihr Link ist abgelaufen), ist HR dran: Der Schritt „Anfrage“ ist wieder
+  aktiv (bei abgelaufenem Link mit der Notiz „Link abgelaufen“), und die Pille heißt „Anfrage
+  offen“ bzw. **„Link abgelaufen“** statt „Wartet auf Führungskraft“. Das ergänzt den Katalog
+  aus 3.5 um einen Eintrag und die Tabelle aus 3.3 um eine Zeile. Der Erinnerungslauf
+  überspringt solche Vorgänge – ohne diese Anzeige blieben sie unbemerkt liegen.
+- **Der Tag des Vertragsendes ist kritisch.** Die Ampel meldet an diesem Tag schon
+  „außerhalb“; „Jetzt dran“ zeigt „heute“ jetzt mit kritischer Hervorhebung, wie den Tag davor
+  und danach.
+- **Kein zweites Offboarding.** Hängt schon eines am Vorgang, bietet die Seite „Offboarding
+  anlegen“ nicht an (die Route lehnte ab), sondern führt dorthin.
+- **Nur der Schritt „Vertrag“ springt in den Reiter Dokumente.** Der Schritt „Offboarding“
+  ist kein Knopf; zum Offboarding führt die Handlung in „Jetzt dran“.
+- **Statuslisten aller vier HR-Routen in `src/lib/contract-end-status.ts`** (Erweiterung von
+  P-F7, freigegeben am 02.10.2026): Die Routen `/nicht-uebernehmen`, `/supervisor-link` und
+  `/reminder` lesen ihre Liste von dort, Inhalt unverändert; die Gegenprobe prüft gegen
+  dieselben Listen und in jeder Kombination von Status, Stand der Anfrage und Offboarding.
+  Für die Route `/supervisor-link` des Vertragsendes gab es bisher keinen Test – er ist neu.
+  Dasselbe Statuspaar „Anfrage offen“ steht weiter im Formular der Führungskraft und im
+  Erinnerungslauf; beide lesen die gemeinsame Liste noch nicht (nicht angefasst).
