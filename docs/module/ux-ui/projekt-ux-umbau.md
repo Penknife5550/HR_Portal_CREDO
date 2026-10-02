@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (U0, Tag 6 – Abnahme)
+Letzte Änderung: 02.10.2026 (Feinplan U1 im Entwurf)
 
 ## 1. Worum es geht
 
@@ -15,7 +15,8 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | Dokument | Wofür |
 |---|---|
 | [ux-ui-plan-2026-09.html](ux-ui-plan-2026-09.html) | Der Plan (Fassung 3): Bewertung, Zielbild mit Mockups, Pakete, Entscheidungen, Leitplanken |
-| [u0-feinplan.md](u0-feinplan.md) | Feinplan des laufenden Pakets U0 |
+| [u0-feinplan.md](u0-feinplan.md) | Feinplan U0 (gebaut und abgenommen) |
+| [u1-feinplan.md](u1-feinplan.md) | Feinplan des nächsten Pakets U1 (Entwurf, wartet auf Freigabe) |
 | `projekt-ux-umbau.md` (diese Datei) | Stand, Protokoll, Abweichungen |
 | `CLAUDE.md`, Abschnitt „Oberfläche (UX-Umbau)“ | Die Regeln, die beim Programmieren gelten |
 | [screenshots/](screenshots/) | Vorher-Bilder (erzeugt von `scripts/ux-screenshots.js`) und die Musterseite in drei Breiten (`ui-muster-*.png`, erzeugt von `scripts/ux-abnahme.js`) |
@@ -27,7 +28,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
-| U1 | Rahmen: Kopf, Breadcrumb, neue Adressen | offen |
+| U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **Feinplan im Entwurf** (02.10.2026), vier Fragen offen (F1–F4 im Feinplan) |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
@@ -480,6 +481,32 @@ neu gesetzt und nirgends gespeichert.
 Breadcrumb, neue Adressen) – vor dem ersten Code. Optional vorher ein Code-Review über Tag 3
 bis 6.
 
+### 02.10.2026 – Feinplan U1 (Entwurf)
+
+Die Tastaturprobe zu U0 hat der Projektverantwortliche am 02.10.2026 auf `/ui-muster`
+gemacht („funktioniert jetzt“ – die Seite hing zuvor kurz, während der Entwicklungsserver neu
+übersetzte).
+
+`u1-feinplan.md` geschrieben, nach einer Bestandsaufnahme im Code:
+- Der Kopf wird heute von 29 Seiten einzeln eingebunden; „Dashboard“ ist auch im BEM markiert;
+  der Rollenname kennt nur drei Rollen (Einrichtungsleitung und Führungskraft heißen
+  „Sachbearbeiter“); zwei `h1` je Seite.
+- 57 Dateien nennen `/dashboard…` (17 × `redirect`, 9 × `router.push`, 30 × `href`, dazu
+  fünf Stellen, die `portalLink` für Mails bauen).
+- `/bem/einwilligung` ist eine öffentliche Seite und liegt schon heute unter `/bem` – die
+  neue BEM-Adresse darf sie weder schützen noch umleiten.
+- Die Anmeldeseite liegt in derselben Layout-Gruppe wie das Portal; für einen Kopf im Layout
+  muss sie in eine eigene Gruppe (Adresse bleibt).
+- Nebenbefund: „Formulare“ steht bei der Sachbearbeitung im Menü, die Middleware lässt sie
+  aber nicht auf `/vorlagen` (Frage F3).
+
+**Vorschlag zum Zuschnitt (weicht vom Plan ab, Frage F1):** U1 ändert nur Kopf und Adressen.
+Seitenkopf-Baustein auf den Seiten, einheitliche Breite und Suche kommen mit den
+Modul-Paketen bzw. nach dem Pilot – sonst würde U1 jedes Modul anfassen, was die Leitplanke
+vor dem Pilot ausschließt.
+
+**Offen:** Freigabe des Feinplans (F1–F4). Kein Code vor der Freigabe.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -500,7 +527,8 @@ bis 6.
 | `ux-umbau` | `17a2f3d` | U0 Tag 4: Seitenkopf mit Pfad und Menü, Segment-Schalter |
 | `ux-umbau` | `8e530b0` | U0 Tag 5: Skelett, Leerzustand, Musterseite vollständig |
 | `ux-umbau` | `c5afbc0` | Zeitgrenze des Musterseiten-Tests (axe über die ganze Seite) |
-| `ux-umbau` | (folgt) | U0 Tag 6: Abnahme, Screenshots, `scripts/ux-abnahme.js`, Umbruch in Pille und Zeile |
+| `ux-umbau` | `7778752` | U0 Tag 6: Abnahme, Screenshots, `scripts/ux-abnahme.js`, Umbruch in Pille und Zeile |
+| `ux-umbau` | (folgt) | Feinplan U1 (Entwurf) |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
