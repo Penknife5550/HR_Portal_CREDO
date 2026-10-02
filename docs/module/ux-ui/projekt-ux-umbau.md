@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 01.10.2026 (U0, Tag 3)
+Letzte Änderung: 02.10.2026 (U0, Tag 3, nach der Browserprobe)
 
 ## 1. Worum es geht
 
@@ -325,6 +325,23 @@ Entwicklungsserver einer anderen Sitzung läuft im selben Ordner).
 **Sichtbare Änderung:** nur auf `/ui-muster`. Im Portal hängt ein leerer, unsichtbarer
 Meldungsbereich an jeder Seite (auch an der Anmeldeseite).
 
+### 02.10.2026 – Browserprobe zu Tag 3
+
+Auf `/ui-muster` (eigener Entwicklungsserver, als Super-Admin) durchgeklickt: kritische
+Rückfrage (Fokus auf „Abbrechen“, Escape während „Wird storniert …“ wirkungslos, Fehlerzeile
+bekommt den Fokus, zweiter Versuch schließt, Fokus zurück auf den Auslöser, Meldung mit
+„Rückgängig“), Fehler- und Erfolgsmeldungen (Erfolg verschwindet, Fehler bleibt), Dialog mit
+Feld (Fokus im Feld, Sperrgrund als Text). Zwei Schönheitsfehler behoben:
+
+- Die Meldungen sprangen beim Öffnen eines Dialogs um die Breite der Bildlaufleiste nach
+  rechts. Der Abstand rechts rechnet jetzt `--removed-body-scroll-bar-size` mit (setzt Radix,
+  solange der Dialog das Rollen sperrt). Gemessen: rechte Kante vorher und nachher gleich.
+- Musterseite: Die Beschriftung „Begründung“ klebte am Fokusrahmen des Feldes.
+
+Nicht geprobt: einfache Rückfrage, Meldungen „Erfolg“ und „Hinweis“, Kreisen mit Tab von
+Hand, Wischen auf dem Handy. Das Passwort aus `.env` passt zu keinem Konto der
+Entwicklungsdatenbank; dafür gibt es `scripts/dev-passwort-neu.js`.
+
 **Als Nächstes (U0, Tag 4):** Seitenkopf mit Breadcrumb und „…“-Menü (Radix Dropdown),
 Segment-Schalter.
 
@@ -343,7 +360,8 @@ Segment-Schalter.
 | `ux-umbau` | `656e80d` | Merge von `main` (Stand der Sperrklinke passte ohne Änderung) |
 | `ux-umbau` | `c364f3a` | Befunde der zweiten Durchsicht an Bausteinen, Tokens, Tests, Skript, Dokumentation |
 | `ux-umbau` | `7511540` | Logbuch: Push vom 01.10.2026 |
-| `ux-umbau` | (folgt) | U0 Tag 3: Dialog, Bestätigungsdialog, Toast, Anbieter im Portal-Layout |
+| `ux-umbau` | `9153727` | U0 Tag 3: Dialog, Bestätigungsdialog, Toast, Anbieter im Portal-Layout |
+| `ux-umbau` | (folgt) | Browserprobe zu Tag 3: Meldungen springen nicht mehr, Abstand auf der Musterseite |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.

@@ -96,8 +96,8 @@ export function DialogMuster() {
           sperrGrund: grund.trim() ? null : "Bitte eine Begründung eintragen.",
         }}
       >
-        <label className="block space-y-1">
-          <span className="text-xs font-semibold text-ink-2">Begründung</span>
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-semibold text-ink-2">Begründung</span>
           <textarea
             data-autofokus
             rows={3}

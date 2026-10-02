@@ -151,10 +151,13 @@ export function ToastAnbieter() {
         );
       })}
       {/* Ueber dem Dialog (z-50). `pointer-events-auto`: Ein offener Dialog
-          nimmt dem `body` die Zeigerereignisse. */}
+          nimmt dem `body` die Zeigerereignisse. Der Abstand rechts rechnet die
+          Bildlaufleiste mit, die ein offener Dialog entfernt (Radix setzt dafuer
+          `--removed-body-scroll-bar-size`) — sonst spraengen die Meldungen beim
+          Oeffnen um deren Breite nach rechts. */}
       <RadixToast.Viewport
         label="Meldungen ({hotkey})"
-        className="pointer-events-auto fixed right-4 bottom-4 z-60 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 outline-none"
+        className="pointer-events-auto fixed right-[calc(1rem+var(--removed-body-scroll-bar-size,0px))] bottom-4 z-60 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 outline-none"
       />
     </RadixToast.Provider>
   );
