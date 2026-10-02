@@ -66,6 +66,44 @@ describe("Toast: Standzeit", () => {
   });
 });
 
+describe("Toast: Sitzung und offener Dialog", () => {
+  it("beim Aushaengen des Anbieters (Abmelden) verschwinden alle Meldungen – auch Fehler", () => {
+    // Befund der Durchsicht: Der Speicher ueberlebte das Abmelden, eine
+    // Fehlermeldung stand danach fuer die naechste Person da.
+    const erster = render(<ToastAnbieter />);
+    act(() => void toast.fehler("Unterlage von Maria Voth konnte nicht gespeichert werden."));
+    expect(meldungen()).toHaveLength(1);
+    erster.unmount();
+    render(<ToastAnbieter />);
+    expect(meldungen()).toHaveLength(0);
+  });
+
+  it("solange ein Dialog offen ist, haelt die Zeit an; danach laeuft sie weiter", async () => {
+    // Befund der Durchsicht: Der Fokusfang des Dialogs laesst die Tastatur
+    // nicht an die Meldung — „Rückgängig" lief ab, ohne erreichbar zu sein.
+    jest.useRealTimers();
+    render(<ToastAnbieter />);
+    const pause = jest.fn();
+    const weiter = jest.fn();
+    const bereich = document.querySelector("ol")!;
+    bereich.addEventListener("toast.viewportPause", pause);
+    bereich.addEventListener("toast.viewportResume", weiter);
+    const warteAuf = async (f: jest.Mock) => {
+      for (let i = 0; i < 50 && f.mock.calls.length === 0; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 10))));
+    };
+
+    // So sperrt Radix das Rollen, waehrend ein Dialog offen ist.
+    act(() => document.body.setAttribute("data-scroll-locked", "1"));
+    await warteAuf(pause);
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(weiter).not.toHaveBeenCalled();
+
+    act(() => document.body.removeAttribute("data-scroll-locked"));
+    await warteAuf(weiter);
+    expect(weiter).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("Toast: Inhalt", () => {
   it("Rückgängig ruft die Funktion und schliesst die Meldung", () => {
     const zurueck = jest.fn();
@@ -74,6 +112,16 @@ describe("Toast: Inhalt", () => {
     fireEvent.click(screen.getByRole("button", { name: "Rückgängig" }));
     expect(zurueck).toHaveBeenCalledTimes(1);
     expect(meldungen()).toHaveLength(0);
+  });
+
+  it("Rückgängig bekommt kein Klick-Ereignis als Argument", () => {
+    // Befund der Durchsicht: `onClick={rueckgaengig}` reichte das MouseEvent
+    // durch — eine Funktion mit Vorgabewert bekam es als ersten Parameter.
+    const argumente: unknown[][] = [];
+    render(<ToastAnbieter />);
+    act(() => void toast.ok("Aufgabe erledigt.", { rueckgaengig: (...a: unknown[]) => void argumente.push(a) }));
+    fireEvent.click(screen.getByRole("button", { name: "Rückgängig" }));
+    expect(argumente).toEqual([[]]);
   });
 
   it("ohne Text entsteht keine Meldung", () => {

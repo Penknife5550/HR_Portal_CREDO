@@ -639,7 +639,9 @@ describe("Skelett", () => {
       </main>,
     );
     const bereich = getByRole("status");
-    expect(bereich.getAttribute("aria-busy")).toBe("true");
+    // Befund der Durchsicht: `aria-busy` haelt die Ansage zurueck, bis es
+    // `false` wird — das Skelett wird aber entfernt, nie umgeschaltet.
+    expect(bereich.hasAttribute("aria-busy")).toBe(false);
     expect(bereich.textContent).toBe("Vorgänge werden geladen");
     // Alles ausser dem Satz ist verborgen.
     for (const kind of Array.from(bereich.children)) {

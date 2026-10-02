@@ -28,10 +28,18 @@
  *     (`src/app/(portal)/layout.tsx`). Die oeffentlichen Link-Seiten haben
  *     keinen; dort bliebe eine Meldung unsichtbar (Warnung in der Konsole der
  *     Entwicklungsumgebung).
+ *   - Meldungen gehoeren zur Sitzung: Verlaesst jemand das Portal (Abmelden,
+ *     abgelaufene Sitzung), raeumt der Anbieter beim Aushaengen alles ab. Eine
+ *     stehengebliebene Fehlermeldung mit einem Namen darin stuende sonst fuer
+ *     die naechste Person am selben Rechner da.
+ *   - Solange ein Dialog offen ist, haelt die Zeit ALLER Meldungen an: Der
+ *     Fokusfang des Dialogs laesst die Tastatur nicht an die Meldung, „Rück-
+ *     gängig" liefe sonst ab, ohne dass man es erreichen konnte. Nach dem
+ *     Schliessen laeuft die Zeit weiter.
  *   - Farben: Flaeche `card`, Text `ink`, nur das Symbol traegt den Ton
  *     (`TOAST_TOENE`; der Kontrasttest liest die Tabelle).
  */
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import * as RadixToast from "@radix-ui/react-toast";
 import { AlertCircle, CheckCircle2, Info, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -112,6 +120,23 @@ export function ToastAnbieter() {
     () => meldungen,
     () => LEER,
   );
+  const bereich = useRef<HTMLOListElement>(null);
+
+  // Beim Verlassen des Portals alles abraeumen (siehe Kopf).
+  useEffect(() => () => toast.alleSchliessen(), []);
+
+  // Offener Dialog = Zeit anhalten. Radix sperrt waehrenddessen das Rollen und
+  // setzt dafuer `data-scroll-locked` am body; die Meldungen hoeren auf die
+  // Ereignisse `toast.viewportPause`/`-Resume` ihres Bereichs.
+  useEffect(() => {
+    const melden = () => {
+      const gesperrt = document.body.hasAttribute("data-scroll-locked");
+      bereich.current?.dispatchEvent(new CustomEvent(gesperrt ? "toast.viewportPause" : "toast.viewportResume"));
+    };
+    const waechter = new MutationObserver(melden);
+    waechter.observe(document.body, { attributes: true, attributeFilter: ["data-scroll-locked"] });
+    return () => waechter.disconnect();
+  }, []);
 
   return (
     <RadixToast.Provider label="Meldung" swipeDirection="right">
@@ -137,7 +162,7 @@ export function ToastAnbieter() {
             </RadixToast.Description>
             {m.rueckgaengig && (
               <RadixToast.Action altText="Rückgängig machen" asChild>
-                <Button groesse="sm" onClick={m.rueckgaengig} className="shrink-0">
+                <Button groesse="sm" onClick={() => m.rueckgaengig?.()} className="shrink-0">
                   Rückgängig
                 </Button>
               </RadixToast.Action>
@@ -156,6 +181,7 @@ export function ToastAnbieter() {
           `--removed-body-scroll-bar-size`) — sonst spraengen die Meldungen beim
           Oeffnen um deren Breite nach rechts. */}
       <RadixToast.Viewport
+        ref={bereich}
         label="Meldungen ({hotkey})"
         className="pointer-events-auto fixed right-[calc(1rem+var(--removed-body-scroll-bar-size,0px))] bottom-4 z-60 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 outline-none"
       />

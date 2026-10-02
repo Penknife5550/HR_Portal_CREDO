@@ -83,6 +83,31 @@ describe("Dialog: Aufbau", () => {
     expect(await axeVerstoesse(document.body)).toEqual([]);
   });
 
+  it("die Beschreibung darf Absaetze und Listen enthalten – sie steht in einem div, nicht in einem p", () => {
+    // Befund der Durchsicht: Radix zeichnet die Beschreibung als `<p>`; ein
+    // Absatz darin waere ungueltiges HTML.
+    render(
+      <Dialog
+        offen
+        onSchliessen={() => {}}
+        titel="Titel"
+        beschreibung={
+          <>
+            <p>Satz eins.</p>
+            <ul>
+              <li>Punkt</li>
+            </ul>
+          </>
+        }
+      />,
+    );
+    const dialog = screen.getByRole("dialog");
+    const beschreibung = document.getElementById(dialog.getAttribute("aria-describedby")!)!;
+    expect(beschreibung.tagName).toBe("DIV");
+    expect(beschreibung.querySelector("p")?.textContent).toBe("Satz eins.");
+    expect(beschreibung.querySelector("li")?.textContent).toBe("Punkt");
+  });
+
   it("geschlossen zeichnet er nichts", () => {
     render(<Dialog offen={false} onSchliessen={() => {}} titel="Titel" />);
     expect(screen.queryByRole("dialog")).toBeNull();

@@ -5,7 +5,7 @@
  * Process-Dashboard, angepasst für Verbeamtungsvorgaenge.
  */
 
-import { vorgangslistePfad } from "@/lib/adressen";
+import { vorgangPfad } from "@/lib/adressen";
 import type { ProcessDashboardConfig, ProcessRow } from "@/components/process-dashboard/types";
 import { CIVIL_SERVICE_STATUS_LABELS, CIVIL_SERVICE_STEP_LABELS } from "@/lib/constants";
 
@@ -13,7 +13,7 @@ export const civilServiceDashboardConfig: ProcessDashboardConfig = {
   apiEndpoint: "/api/civil-service",
   exportEndpoint: "/api/civil-service/export",
   analyticsEndpoint: "/api/civil-service/analytics",
-  detailUrlPrefix: vorgangslistePfad("verbeamtung"),
+  detailPfad: (id) => vorgangPfad("verbeamtung", id),
   title: "Verbeamtung",
   createButtonLabel: "Neue Verbeamtung",
   searchPlaceholder: "Name, E-Mail oder Vorgangs-ID...",

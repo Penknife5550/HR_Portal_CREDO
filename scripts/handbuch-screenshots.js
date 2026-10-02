@@ -157,7 +157,7 @@ async function klickText(seite, tag, text, sekunden = 15) {
 
   // --- 2. Dokumente-Reiter des Vorgangs ---
   console.log("\n2) Dokumente-Reiter");
-  await seite.goto(`${BASIS}/dashboard/${VORGANG}`, { waitUntil: "networkidle2" });
+  await seite.goto(`${BASIS}/vorgaenge/onboarding/${VORGANG}`, { waitUntil: "networkidle2" });
   await warte(2000);
   await klickText(seite, "button", "Dokumente");
   await warte(3000);

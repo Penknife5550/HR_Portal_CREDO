@@ -31,7 +31,8 @@
  *     „…"-Knopf ist: Ein Dialog merkt sich beim Oeffnen, wer den Fokus hatte —
  *     waere das noch der Menuepunkt, gaebe es beim Schliessen kein Ziel mehr.
  *   - Ein kritischer Punkt (`kritisch`) steht am Ende und ist rot; ein
- *     gesperrter bleibt sichtbar (abgeblendet), statt zu verschwinden.
+ *     gesperrter bleibt sichtbar (abgeblendet), statt zu verschwinden — und
+ *     ist dann auch mit `href` kein Verweis mehr.
  *   - Der Kopf selbst zeigt keinen Zustand ohne Text: `status` ist eine
  *     `Statuspille`.
  *   - Nichts wird abgeschnitten: Langer Titel und lange Unterzeile brechen um,
@@ -174,8 +175,11 @@ export function Seitenkopf({ pfad, titel, unterzeile, status, aktion, menue, cla
                         </>
                       );
                       const klassen = cn(PUNKT, farben.ruhe, farben.hervor);
-                      return punkt.href ? (
-                        <RadixMenue.Item key={`${index}-${punkt.text}`} asChild disabled={punkt.gesperrt} className={klassen}>
+                      // Ein gesperrter Punkt wird NIE als Verweis gezeichnet: Radix
+                      // sperrt nur seine eigene Auswahl, der Klick auf ein `<a>`
+                      // darunter oeffnete die Seite trotzdem.
+                      return punkt.href && !punkt.gesperrt ? (
+                        <RadixMenue.Item key={`${index}-${punkt.text}`} asChild className={klassen}>
                           <Link href={punkt.href}>{inhalt}</Link>
                         </RadixMenue.Item>
                       ) : (

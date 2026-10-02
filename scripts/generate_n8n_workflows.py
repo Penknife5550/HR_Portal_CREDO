@@ -545,7 +545,7 @@ const html = renderCredoMail({
     { label: 'Eingereicht am', value: formatDateTime(data.submittedAt) },
     { label: 'Vorgangs-ID', value: data.displayId },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/${data.onboardingId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/onboarding/${data.onboardingId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -582,7 +582,7 @@ const html = renderCredoMail({
     { label: 'Mandant', value: data.organizationName },
     { label: 'Eingereicht am', value: formatDateTime(data.submittedAt) },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/${data.onboardingId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/onboarding/${data.onboardingId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -635,7 +635,7 @@ const html = renderCredoMail({
     { label: 'Letzter Arbeitstag', value: formatDate(data.lastWorkingDay) },
     { label: 'Vorgangs-ID', value: data.displayId },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -672,7 +672,7 @@ const html = renderCredoMail({
     { label: 'Abteilung', value: data.departmentName },
     { label: 'Abgeschlossen am', value: formatDateTime(data.completedAt) },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -689,7 +689,7 @@ const html = renderCredoMail({
     { label: 'Abteilung', value: data.departmentName },
     { label: 'Abgeschlossen am', value: formatDateTime(data.completedAt) },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -742,7 +742,7 @@ const html = renderCredoMail({
     { label: 'Abgeschlossen am', value: formatDateTime(data.completedAt) },
     { label: 'Vorgangs-ID', value: data.displayId },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -773,7 +773,7 @@ const html = renderCredoMail({
     { label: 'Mandant', value: data.organizationName },
     { label: 'Eingereicht am', value: formatDateTime(data.submittedAt) },
   ],
-  cta: { text: 'Im HR-Portal anzeigen', url: `${APP_BASE_URL}/dashboard/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal anzeigen', url: `${APP_BASE_URL}/vorgaenge/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -808,7 +808,7 @@ const html = renderCredoMail({
     { label: 'Bewertet von', value: data.recipientName },
     { label: 'Eingereicht am', value: formatDateTime(data.submittedAt) },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/offboarding/${data.offboardingId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -826,7 +826,7 @@ const html = renderCredoMail({
     { label: 'Vorgangs-ID', value: data.displayId },
     { label: 'Geplanter Beginn', value: formatDate(data.targetStartDate) },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/civil-service/${data.civilServiceId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/verbeamtung/${data.civilServiceId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -868,7 +868,7 @@ const html = renderCredoMail({
     { label: 'Erfuellt Anforderungen', value: data.meetsRequirementsManual === true ? 'Ja' : (data.meetsRequirementsManual === false ? 'Nein' : '—') },
     { label: 'Eingereicht am', value: formatDateTime(data.submittedAt) },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/civil-service/${data.civilServiceId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/verbeamtung/${data.civilServiceId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -906,7 +906,7 @@ const html = renderCredoMail({
     { label: 'Quittiert am', value: formatDateTime(data.acknowledgedAt) },
     { label: 'Gegenaeusserung', value: data.hasRebuttal ? 'Ja' : 'Nein' },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/civil-service/${data.civilServiceId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/verbeamtung/${data.civilServiceId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -925,7 +925,7 @@ const html = renderCredoMail({
     { label: 'Archiviert am', value: formatDateTime(data.archivedAt) },
     { label: 'Hatte Gegenaeusserung', value: data.hadRebuttal ? 'Ja' : 'Nein' },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/civil-service/${data.civilServiceId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/verbeamtung/${data.civilServiceId || ''}`, color: COLORS.blau },
   footerNote: 'Der Workflow-Schritt "In Personalakte aufgenommen" ist abgeschlossen (Schritt 9).',
 });
 """,
@@ -944,7 +944,7 @@ const html = renderCredoMail({
     { label: 'Vorgangs-ID', value: data.displayId },
     { label: 'Abgeschlossen am', value: formatDateTime(data.completedAt) },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/civil-service/${data.civilServiceId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/verbeamtung/${data.civilServiceId || ''}`, color: COLORS.blau },
 });
 """,
 
@@ -963,7 +963,7 @@ const html = renderCredoMail({
     { label: 'Faellig bis', value: formatDate(data.deadline) },
     { label: 'Hinweis', value: data.warningType },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/civil-service/${data.civilServiceId || ''}`, color: COLORS.rot },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/verbeamtung/${data.civilServiceId || ''}`, color: COLORS.rot },
 });
 """,
 
@@ -981,7 +981,7 @@ const html = renderCredoMail({
     { label: 'Probezeit-Ende', value: formatDate(data.probationEndDate) },
     { label: 'Abgeschlossen am', value: formatDateTime(data.completedAt) },
   ],
-  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/dashboard/civil-service/${data.civilServiceId || ''}`, color: COLORS.blau },
+  cta: { text: 'Im HR-Portal oeffnen', url: `${APP_BASE_URL}/vorgaenge/verbeamtung/${data.civilServiceId || ''}`, color: COLORS.blau },
 });
 """,
 

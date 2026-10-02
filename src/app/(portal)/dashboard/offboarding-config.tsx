@@ -5,7 +5,7 @@
  * Process-Dashboard, angepasst für Offboarding-Vorgaenge.
  */
 
-import { vorgangslistePfad } from "@/lib/adressen";
+import { vorgangPfad } from "@/lib/adressen";
 import type { ProcessDashboardConfig, ProcessRow } from "@/components/process-dashboard/types";
 import { OFFBOARDING_STATUS_LABELS, EXIT_TYPE_LABELS } from "@/lib/constants";
 
@@ -26,7 +26,7 @@ export const offboardingDashboardConfig: ProcessDashboardConfig = {
   apiEndpoint: "/api/offboarding",
   exportEndpoint: "/api/offboarding/export",
   analyticsEndpoint: "/api/offboarding/analytics",
-  detailUrlPrefix: vorgangslistePfad("offboarding"),
+  detailPfad: (id) => vorgangPfad("offboarding", id),
   title: "Offboarding-Vorgänge",
   createButtonLabel: "Neuer Austritt",
   searchPlaceholder: "Name, E-Mail oder Vorgangs-ID...",

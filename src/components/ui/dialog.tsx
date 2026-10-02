@@ -182,8 +182,10 @@ export function Dialog({
                   {titel}
                 </RadixDialog.Title>
                 {beschreibung && (
-                  <RadixDialog.Description className="mt-1 text-sm text-ink-2 wrap-anywhere">
-                    {beschreibung}
+                  // `div` statt des `<p>` von Radix: Die Beschreibung darf
+                  // Absaetze und Listen enthalten, ein `<p>` in `<p>` nicht.
+                  <RadixDialog.Description asChild>
+                    <div className="mt-1 text-sm text-ink-2 wrap-anywhere">{beschreibung}</div>
                   </RadixDialog.Description>
                 )}
               </div>

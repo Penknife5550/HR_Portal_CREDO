@@ -16,7 +16,9 @@
  *     rechts. `mitTitel` haelt den Platz des Gruppentitels frei.
  *   - Screenreader bekommen EINEN Satz (`label`, Vorgabe „Inhalt wird
  *     geladen"), die Balken selbst sind Zierde (`aria-hidden`). Der Bereich
- *     ist `role="status"` mit `aria-busy`.
+ *     ist `role="status"` — bewusst OHNE `aria-busy`: Das Attribut haelt die
+ *     Ansage zurueck, bis es `false` wird, und das Skelett wird entfernt, nie
+ *     umgeschaltet; der Satz wuerde nie gesagt.
  *   - Kein sichtbarer Text „Lädt …" — der Platzhalter sagt es schon.
  *   - Die Balken pulsieren; wer im System „Bewegung reduzieren" gewaehlt hat,
  *     sieht sie ruhig.
@@ -57,7 +59,7 @@ export function Skelett({
   const anzahl = Math.max(1, Math.floor(zeilen));
 
   return (
-    <div {...rest} role="status" aria-busy="true" data-skelett={art} className={cn("space-y-2", className)}>
+    <div {...rest} role="status" data-skelett={art} className={cn("space-y-2", className)}>
       <span className="sr-only">{label}</span>
       {mitTitel && (
         <div aria-hidden="true" className="flex min-h-8 items-end px-1">

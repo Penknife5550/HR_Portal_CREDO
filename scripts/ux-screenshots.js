@@ -107,7 +107,7 @@ async function bild(seite, name, finde, maxHoehe = 2200) {
   if (status !== 200) throw new Error(`Anmeldung fehlgeschlagen (${status})`);
 
   // 1. Reiter Dokumente (Onboarding) — alle Karten untereinander.
-  await seite.goto(`${BASIS}/dashboard/${VORGANG}?tab=dokumente`, { waitUntil: "networkidle2" });
+  await seite.goto(`${BASIS}/vorgaenge/onboarding/${VORGANG}?tab=dokumente`, { waitUntil: "networkidle2" });
   // Auf den ZUSTAND der Karte warten, nicht nacheinander auf zwei Texte: Der
   // erste Text erscheint nie, sobald am Testvorgang eine individuelle Mail
   // haengt — jeder Lauf wartete dann 60 s ins Leere. Geladen ist die Karte,
@@ -136,7 +136,7 @@ async function bild(seite, name, finde, maxHoehe = 2200) {
   await warte(500);
 
   // 4. Reiter „E-Mails“ (Mailprotokoll je Vorgang).
-  await seite.goto(`${BASIS}/dashboard/${VORGANG}?tab=mails`, { waitUntil: "networkidle2" });
+  await seite.goto(`${BASIS}/vorgaenge/onboarding/${VORGANG}?tab=mails`, { waitUntil: "networkidle2" });
   await warteAufText(seite, "E-Mails zu diesem Vorgang");
   await warteAufText(seite, "Aktualisieren");
   await seite.waitForFunction(() => !document.body.innerText.includes("Lädt…"), { timeout: 30000 });

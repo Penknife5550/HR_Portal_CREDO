@@ -40,8 +40,8 @@ export interface ProcessRow {
 export interface ProcessDashboardConfig {
   /** API-Endpunkt für Datenabruf, z.B. "/api/offboarding" */
   apiEndpoint: string;
-  /** URL-Praefix für Detail-Seiten, z.B. vorgangslistePfad("offboarding") */
-  detailUrlPrefix: string;
+  /** Adresse eines Vorgangs — immer ueber `vorgangPfad` (src/lib/adressen.ts) */
+  detailPfad: (id: string) => string;
   /** Seitentitel, z.B. "Offboarding-Vorgaenge" */
   title: string;
   /** Button-Label für neuen Vorgang, z.B. "Neuer Austritt" */

@@ -167,6 +167,21 @@ describe("Seitenkopf: Menue", () => {
     expect(aktion).not.toHaveBeenCalled();
   });
 
+  it("ein gesperrter Punkt mit Adresse ist kein Verweis – ein Klick oeffnete sonst die Seite", async () => {
+    // Befund der Durchsicht: Radix sperrt nur seine eigene Auswahl, nicht das
+    // `<a>` darunter.
+    mitMenue([
+      { text: "Zur Liste", href: "/vorgaenge", gesperrt: true },
+      { text: "Zum BEM", href: "/bem" },
+    ]);
+    await menueOeffnen();
+    const gesperrt = screen.getByRole("menuitem", { name: "Zur Liste" });
+    expect(gesperrt.tagName).not.toBe("A");
+    expect(gesperrt.getAttribute("href")).toBeNull();
+    expect(gesperrt.getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("menuitem", { name: "Zum BEM" }).getAttribute("href")).toBe("/bem");
+  });
+
   it("ein Dialog aus dem Menue gibt den Fokus beim Schliessen an den „…“-Knopf zurueck", async () => {
     function Seite() {
       const [offen, setOffen] = useState(false);

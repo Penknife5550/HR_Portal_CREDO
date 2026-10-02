@@ -279,7 +279,13 @@ describe("Waechter", () => {
     // Erlaubt bleiben: die Schnittstelle `/api/dashboard/…` und der ORDNER
     // `(portal)/dashboard/`, in dem die Dateien der Module bis U4 liegen.
     const treffer: string[] = [];
-    for (const d of dateien(SRC)) {
+    // Auch die Skripte (Screenshots, n8n-Bausteine): Sie liefen sonst nur noch
+    // ueber die Weiterleitung.
+    const skripte = fs
+      .readdirSync(path.join(SRC, "..", "scripts"))
+      .filter((n) => /\.(js|ts|py)$/.test(n))
+      .map((n) => path.join(SRC, "..", "scripts", n));
+    for (const d of [...dateien(SRC), ...skripte]) {
       if (relativ(d) === "lib/adressen.ts") continue;
       fs.readFileSync(d, "utf8")
         .split("\n")
