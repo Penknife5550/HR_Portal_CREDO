@@ -4,13 +4,12 @@
  * Detail-Ansicht eines Offboarding-Vorgangs (Vollbild-Seite)
  *
  * Tabs: Uebersicht | Checkliste | Rueckgaben | Dokumente | Notizen | Exit-Interview | Zeugnis
- * Nutzt die bestehende PortalHeader-Komponente und CREDO Corporate Design.
+ * Der Kopf kommt aus dem Portal-Layout; nutzt das CREDO Corporate Design.
  */
 
 import { vorgangslistePfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { PortalHeader } from "@/components/portal-header";
 import {
   OFFBOARDING_STATUS_LABELS,
   EXIT_TYPE_LABELS,
@@ -545,7 +544,6 @@ export function OffboardingDetailContent({
   if (loading) {
     return (
       <div className="min-h-screen bg-muted">
-        <PortalHeader user={user} />
         <div className="flex min-h-[60vh] items-center justify-center">
           <div className="text-center">
             <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-border border-t-credo-gruen" />
@@ -559,7 +557,6 @@ export function OffboardingDetailContent({
   if (error || !data) {
     return (
       <div className="min-h-screen bg-muted">
-        <PortalHeader user={user} />
         <div className="flex min-h-[60vh] items-center justify-center">
           <div className="text-center">
             <p className="mb-2 text-lg font-semibold text-foreground">Fehler</p>
@@ -580,7 +577,6 @@ export function OffboardingDetailContent({
 
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       {/* ============================================= */}
       {/* Top Bar: Back + ID + Status + Exit Type       */}

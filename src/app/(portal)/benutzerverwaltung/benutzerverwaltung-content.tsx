@@ -8,7 +8,6 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { PortalHeader } from "@/components/portal-header";
 
 interface User {
   userId: string;
@@ -206,7 +205,6 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Erfolgsmeldung */}
@@ -226,9 +224,9 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">
+            <h1 className="text-2xl font-bold text-foreground">
               Benutzerverwaltung
-            </h2>
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               HR-Portal Benutzer verwalten
             </p>

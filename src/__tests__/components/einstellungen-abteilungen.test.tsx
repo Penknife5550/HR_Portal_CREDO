@@ -22,7 +22,7 @@ import { DepartmentsTab } from "@/app/(portal)/einstellungen/einstellungen-conte
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// Die Datei zieht ueber PortalHeader den App-Router mit; der Tab selbst braucht ihn nicht.
+// Die Datei zieht den App-Router mit; der Tab selbst braucht ihn nicht.
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }),
   usePathname: () => "/einstellungen",

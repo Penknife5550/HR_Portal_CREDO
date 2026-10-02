@@ -48,7 +48,6 @@ import {
 } from "react";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { abteilungLabel, DEPARTMENT_KEYS } from "@/lib/constants";
 import { istFuehrungskraft, istLinkAbteilung } from "@/lib/abteilungsaufgaben";
 import { CHECKLISTEN_HINWEIS_MAX } from "@/lib/validations/abteilungsaufgaben";
@@ -899,15 +898,14 @@ export function ChecklistenContent({ user }: { user: User }) {
   // =============================================
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Seitentitel */}
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">
+            <h1 className="text-2xl font-bold text-foreground">
               Checklisten-Vorlagen
-            </h2>
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Erstellen und verwalten Sie Checklisten für Onboarding und Offboarding
             </p>

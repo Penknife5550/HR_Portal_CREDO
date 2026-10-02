@@ -11,7 +11,6 @@
 import { vorgangPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufgaben";
 import { UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
 import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
@@ -232,12 +231,11 @@ export function AuditLogContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-7xl px-4 py-8">
         {/* Header */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground">Audit-Log</h2>
+          <h1 className="text-2xl font-bold text-foreground">Audit-Log</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Protokoll aller Systemaktivitäten
           </p>

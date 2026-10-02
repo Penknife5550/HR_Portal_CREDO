@@ -10,7 +10,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, Save, X } from "lucide-react";
-import { PortalHeader } from "@/components/portal-header";
 import { ConfirmDeleteModal } from "@/components/elternzeit/elternzeit-modals";
 
 interface User {
@@ -135,7 +134,6 @@ export function SchulferienContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-5xl px-4 py-8">
         <div className="mb-6">

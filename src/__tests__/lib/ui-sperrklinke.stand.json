@@ -268,7 +268,6 @@
     "components/neuer-austritt-modal.tsx": 2,
     "components/neuer-vertragsende-modal.tsx": 1,
     "components/neuer-vorgang-modal.tsx": 3,
-    "components/portal-header.tsx": 2,
     "components/process-dashboard/process-dashboard.tsx": 5,
     "components/process-workflow-stepper.tsx": 1,
     "components/session-timeout-warning.tsx": 1,

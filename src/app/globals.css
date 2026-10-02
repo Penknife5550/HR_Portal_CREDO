@@ -218,3 +218,19 @@
 input, select, textarea {
   -webkit-autofill: none;
 }
+
+/* =============================================
+ * Portal-Rahmen (UX-Umbau U1)
+ *
+ * Der Kopf haengt seit U1 im Layout, nicht mehr in jeder Seite. Die Seiten
+ * fuellen mit `min-h-screen` weiter das ganze Fenster — zusammen mit dem Kopf
+ * darueber waere jede Seite um dessen Hoehe zu hoch und bekaeme eine
+ * Bildlaufleiste. Deshalb zieht der Rahmen die Hoehe des Kopfs ab: 4rem
+ * (`h-16` in portal-kopf.tsx) plus 3 px CREDO-Linie. Entfaellt, sobald die
+ * Seiten mit ihrem Modul umgebaut sind (U4/U6) und kein `min-h-screen` mehr
+ * tragen. Ausserhalb von `@layer`, damit die Regel die Tailwind-Klasse
+ * schlaegt.
+ * ============================================= */
+.portal-inhalt .min-h-screen {
+  min-height: calc(100vh - 4rem - 3px);
+}

@@ -6,13 +6,12 @@
  */
 
 import { vorgangslistePfad } from "@/lib/adressen";
+import { seiteNeuLaden } from "@/lib/seite-laden";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -36,7 +35,10 @@ export default function LoginPage() {
         return;
       }
 
-      router.push(vorgangslistePfad());
+      // Volles Laden statt Wechsel im Client: Das Portal-Layout (mit dem
+      // Kopf) muss mit der NEUEN Sitzung gezeichnet werden — ein vom Router
+      // gemerktes Layout truege nach einem Kontowechsel den alten Namen.
+      seiteNeuLaden(vorgangslistePfad());
     } catch {
       setError("Verbindungsfehler. Bitte versuchen Sie es erneut.");
     } finally {

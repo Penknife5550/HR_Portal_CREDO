@@ -9,7 +9,6 @@ import { vorgangPfad, vorgangslistePfad } from "@/lib/adressen";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
 import { IndividuelleMailKarte } from "@/components/individuelle-mail/individuelle-mail-karte";
@@ -291,7 +290,6 @@ export function ContractEndDetailContent({
   if (loading) {
     return (
       <div>
-        <PortalHeader user={user} />
         <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
           Wird geladen…
         </div>
@@ -302,7 +300,6 @@ export function ContractEndDetailContent({
   if (loadError || !data) {
     return (
       <div>
-        <PortalHeader user={user} />
         <div className="mx-auto max-w-3xl px-4 py-12 text-center">
           <p className="text-sm text-destructive">{loadError || "Vorgang nicht gefunden."}</p>
           <button
@@ -333,7 +330,6 @@ export function ContractEndDetailContent({
 
   return (
     <div>
-      <PortalHeader user={user} />
 
       {/* Header-Leiste */}
       <div className="border-b bg-card">

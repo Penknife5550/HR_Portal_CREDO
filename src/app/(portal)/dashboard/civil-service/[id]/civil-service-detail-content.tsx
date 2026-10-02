@@ -11,7 +11,6 @@ import { vorgangslistePfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import {
   CIVIL_SERVICE_STATUS_LABELS,
   CIVIL_SERVICE_STEP_LABELS,
@@ -313,7 +312,6 @@ export function CivilServiceDetailContent({
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50">
-        <PortalHeader user={user} />
         <div className="flex items-center justify-center py-32">
           <div className="flex flex-col items-center gap-3">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-credo-blau border-t-transparent" />
@@ -328,7 +326,6 @@ export function CivilServiceDetailContent({
   if (error || !data) {
     return (
       <div className="min-h-screen bg-gray-50/50">
-        <PortalHeader user={user} />
         <div className="mx-auto max-w-3xl px-6 py-20 text-center">
           <div className="rounded-2xl border border-red-100 bg-red-50 p-8">
             <p className="text-credo-rot font-medium">
@@ -374,7 +371,6 @@ export function CivilServiceDetailContent({
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      <PortalHeader user={user} />
 
       {/* Action feedback toast */}
       {(actionError || actionSuccess) && (

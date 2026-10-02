@@ -10,8 +10,8 @@
  * Gruppe bestand frueher nur, weil seine Fixture eine Zwischenueberschrift
  * einschob, die die Seite nicht hatte: `heading-order`.)
  *
- * Der Portal-Kopf ist durch seine Ueberschrift ersetzt (er zieht Router und
- * Sitzungswarnung mit); sein `<h1>` bleibt, damit die Reihenfolge stimmt.
+ * Der Portal-Kopf haengt seit U1 im Layout und gehoert nicht zur Seite; die
+ * einzige `<h1>` ist der Titel des Seitenkopfs.
  */
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
@@ -26,13 +26,6 @@ let sitzung: { role: string } | null = null;
 
 jest.mock("next/navigation", () => ({ redirect: (ziel: string) => redirect(ziel) }));
 jest.mock("@/lib/auth", () => ({ getSession: async () => sitzung }));
-jest.mock("@/components/portal-header", () => ({
-  PortalHeader: () => (
-    <header>
-      <h1>HR-Portal</h1>
-    </header>
-  ),
-}));
 jest.mock("next/link", () => ({
   __esModule: true,
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -81,6 +74,7 @@ describe("Inhalt", () => {
     const ebenen = Array.from(container.querySelectorAll("h1, h2, h3, h4")).map((h) => h.tagName);
     expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(11);
     expect(ebenen).not.toContain("H3");
+    expect(ebenen.filter((e) => e === "H1")).toHaveLength(1);
   });
 
   it("zeigt jeden Ton aus STATUS_TOENE", async () => {

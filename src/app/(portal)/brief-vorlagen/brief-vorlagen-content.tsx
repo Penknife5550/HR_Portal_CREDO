@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { PortalHeader } from "@/components/portal-header";
 import { VariablenKatalog } from "@/components/variablen-katalog";
 import { AVAILABLE_MODULES, moduleLabel } from "@/lib/placeholder-catalog";
 import { formatBytes } from "@/lib/format";
@@ -153,7 +152,6 @@ export function BriefVorlagenContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">

@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (U1, Tag 1)
+Letzte Änderung: 02.10.2026 (U1, Tag 2)
 
 ## 1. Worum es geht
 
@@ -28,7 +28,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
-| U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **in Arbeit**, Tag 1 von 3 erledigt (neue Adressen, Weiterleitung, alle Verweise); offen: Kopf (Tag 2), Abnahme (Tag 3) |
+| U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **in Arbeit**, Tag 2 von 3 erledigt (neue Adressen, Weiterleitung, neuer Kopf im Layout); offen: Abnahme (Tag 3) |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
@@ -124,6 +124,9 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Skelett | „`aria-busy`, kein Text „Lädt…“ nötig“ | `role="status"`, `aria-busy` und EIN Satz nur für Screenreader | Ohne Text erfährt ein Screenreader nicht, dass geladen wird; sichtbar bleibt es bei den Balken. |
 | Umfang U1 | Kopf, Breadcrumb, Breite `6xl` überall, Suche (Strg+K) | nur Kopf und Adressen (U1-F1) | Seitenkopf und Breite ändern jede einzelne Seite – das ist der Umbau des Moduls und steht vor dem Pilot nicht an; die Suche hängt an allen sieben Modulen. |
 | Ordner der Module | – (E4 nennt nur die Adressen) | Dateien bleiben unter `dashboard/`, neue Adressen über dünne Seiten-Dateien (U1-F4) | Sonst muss jede Änderung von `main` beim Nachziehen von Hand umgelegt werden. |
+| Rollennamen | „Rollenname aus `permissions.ts`“ | Tabelle `ROLLEN_NAMEN` in `src/lib/navigation.ts` | `permissions.ts` zieht die Datenbank mit und darf nicht in den Browser; der Kopf ist eine Client-Komponente. |
+| Hauptüberschrift | – (Feinplan: „HR-Portal“ ist keine `h1` mehr) | neun Verwaltungsseiten: Seitentitel von `h2` zu `h1`; Vorgangslisten: unsichtbare `h1` | Ohne die `h1` des Kopfs hätten diese Seiten gar keine mehr gehabt. Aussehen unverändert. |
+| An- und Abmelden | – | volles Laden der Seite statt Wechsel im Client (`seiteNeuLaden`) | Der Kopf hängt im Layout; ein gemerktes Layout zeigte nach einem Kontowechsel Namen und Punkte des alten Kontos. |
 | Prototyp-Tag | „Kein Paket außer U0 startet ohne den Prototyp-Tag“ | gilt ab dem Pilot; U1 darf vorher | U1 ändert nur den Rahmen (Kopf, Breadcrumb, Adressen) und hängt an keiner der Fragen des Prototyp-Tags (E9, E11, E13). |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
@@ -587,6 +590,86 @@ alten Adressen (funktionieren über die Weiterleitung, Umstellung an Tag 3).
 in eigene Gruppe, Kopf aus 29 Seiten entfernen, „Formulare“ für die Sachbearbeitung
 ausblenden.
 
+### 02.10.2026 – Dritte Durchsicht (Code-Review „high“) nach U1 Tag 1
+
+Umfang: alles Ungepushte (U0 Tag 3 bis 6, U1 Tag 1). Zehn Befunde, alle behoben.
+
+| # | Befund | Wie behoben |
+|---|---|---|
+| 1 | Gesperrter Menüpunkt mit Adresse navigierte trotzdem | wird nicht mehr als Verweis gezeichnet |
+| 2 | Fehlermeldungen überlebten das Abmelden (Speicher auf Modulebene) | Anbieter räumt beim Aushängen ab; „Abmelden“ räumt zusätzlich ab |
+| 3 | Alter Kopf: „BEM“ im Handy-Menü auch auf `/bem-vorlagen` markiert | entfällt mit dem neuen Kopf (eine Aktiv-Regel, ganze Pfadteile) |
+| 4 | Meldung bei offenem Dialog mit der Tastatur nicht erreichbar | die Zeit aller Meldungen hält an, solange ein Dialog offen ist |
+| 5 | `aria-busy` am Skelett hielt die Ansage zurück | entfernt |
+| 6 | Dialog-Beschreibung in einem `<p>`: Absätze/Listen darin ungültig | `div` |
+| 7 | „Rückgängig“ bekam das Klick-Ereignis als Argument | Aufruf ohne Argument |
+| 8 | `robots.txt` kannte `/vorgaenge/` und `/bem/` nicht | ergänzt |
+| 9 | Listen bauten Vorgangsadressen selbst (`detailUrlPrefix` + Kennung) | `detailPfad: (id) => vorgangPfad(…)` |
+| 10 | Skripte mit alten Adressen; Wächter sah `scripts/` nicht | vier Skripte umgestellt (auch die n8n-Generatoren), Wächter liest `scripts/` mit |
+
+Zu jedem Befund außer 3 und 8 gibt es einen Test. Commit `8874a30`.
+
+### 02.10.2026 – U1, Tag 2 (Kopf)
+
+**Code:**
+
+| Datei | Inhalt |
+|---|---|
+| `src/lib/navigation.ts` | neu, rein: `NAVIGATION` (Punkte, Adressen, Rollen), `sichtbarePunkte`, `aktiverPunkt`, `ROLLEN_NAMEN`, `rollenName` |
+| `src/components/rahmen/portal-kopf.tsx` | neu: `PortalKopf` auf den neuen Tokens, Menüs auf Radix, Symbole aus lucide, Sprunglink, Handy-Menü, BEM-Zähler; Tabelle `KOPF_FARBEN` |
+| `src/components/portal-header.tsx` | entfernt |
+| `src/app/(portal)/layout.tsx` | liest die Sitzung, bindet den Kopf einmal ein, `#inhalt` als Ziel des Sprunglinks |
+| `src/app/(anmeldung)/login/` | Anmeldeseite in eigener Gruppe ohne Kopf (Adresse bleibt `/login`) |
+| 28 Dateien unter `src/app/(portal)/` | Einbindung des Kopfs entfernt (40 Stellen) |
+| `src/lib/seite-laden.ts` | neu: `seiteNeuLaden` – volles Laden beim An- und Abmelden |
+| `src/app/globals.css` | `.portal-inhalt .min-h-screen` zieht die Höhe des Kopfs ab |
+| neun Verwaltungs- und Vorlagenseiten | Seitentitel `h2` → `h1` (gleiche Klassen, gleiches Aussehen) |
+| `vorgaenge/[modul]/page.tsx` | unsichtbare `h1` „Vorgänge: <Modul>“ |
+| `navigation.test.ts`, `portal-kopf.test.tsx` | neu (38 und 14 Tests) |
+| `ui-kontrast.test.ts` | Farbpaare des Kopfs |
+| `ui-sperrklinke.stand.json` | zwei Inline-SVG weniger (148) |
+
+**Sichtbare Änderungen – auf JEDER Seite hinter der Anmeldung:**
+- Neuer Kopf: schmaler (`6xl`), ruhiger, aktiver Punkt hellgrau hinterlegt statt dunkel
+  gefüllt. „Dashboard“ heißt „Vorgänge“. Schloss-Symbol statt Emoji am BEM.
+- Rollenname oben rechts für alle Rollen: Administration, HR-Leitung, HR-Sachbearbeitung,
+  Einrichtungsleitung, Führungskraft, BEM-Beauftragte:r. Vorher: „Administrator“,
+  „HR-Leitung“, sonst immer „Sachbearbeiter“.
+- Sachbearbeitung: Im Menü „Vorlagen“ steht nur noch „Brief-Vorlagen“ („Formulare“ führte
+  ohnehin zurück zur Liste, U1-F3).
+- Am Handy: Menüknopf mit einer Liste statt einer Reihe kleiner Knöpfe.
+- Nach dem An- und Abmelden lädt die Seite einmal ganz neu.
+
+**Entscheidungen beim Bauen** (Abweichungen stehen in Abschnitt 5):
+- Der Kopf zeigt nur, was die Rolle öffnen kann: `navigation.test.ts` ruft die echte
+  Middleware für jeden sichtbaren Punkt jeder Rolle auf.
+- Die Seiten tragen weiter `min-h-screen`. Mit dem Kopf darüber wäre jede Seite um dessen
+  Höhe zu hoch gewesen; eine Regel in `globals.css` zieht 4 rem + 3 px ab. Gemessen: Kopf
+  67 px, Mindesthöhe 653 px bei 720 px Fenster. Entfällt mit dem Umbau der Seiten.
+- Ohne Sitzung zeichnet das Layout keinen Kopf; die Seiten leiten selbst zur Anmeldung.
+- Die Sitzungswarnung hängt jetzt einmal im Layout statt in jeder Seite.
+
+**Geprüft:** `npm run pruefen` (Typen, Lint, 188 Suiten, 4.852 Tests). Im Browser (als
+Super-Admin): Kopf auf Vorgangsliste, Einstellungen, BEM-Vorlagen, Checklisten; Menü
+„Verwaltung“ zeigt fünf Punkte, auf `/bem-vorlagen` ist „BEM-Vorlagen“ aktiv und „BEM“
+nicht; je Seite genau eine `h1`; keine zusätzliche Bildlaufleiste.
+
+**Nicht geprüft:** An- und Abmelden im Browser (nur im Test – ich melde das Konto des
+Projektverantwortlichen nicht ab); die übrigen fünf Rollen im Browser; Handy-Menü und
+Aussehen als Bild (das Browser-Fenster war verdeckt, Bilder kamen nicht zustande);
+`npm run build`. Alles Teil der Abnahme an Tag 3.
+
+**Bekannte Grenzen:**
+- Die Detailseiten von Onboarding, Offboarding und Vertragsende haben keine `h1` mehr (ihr
+  Titel ist keine Überschrift). Vertragsende bekommt sie mit dem Pilot, die anderen mit U4.
+- Kopf (`6xl`) und Seiteninhalt (`4xl` bis `7xl`) fluchten nicht – wie bisher, nur anders.
+- `ROLE_LABELS` der Benutzerverwaltung nennt die Rollen noch anders („Super Admin“,
+  „Sachbearbeiter“, „Vorgesetzter“); zusammengeführt wird das mit U6.
+
+**Als Nächstes (U1, Tag 3):** Abnahme – Bilder des Kopfs in drei Breiten, Vergleich der
+fünf Seiten (nur der Kopf darf abweichen), je Rolle anmelden, An-/Abmelden, Tastatur,
+`npm run build`; HR-Handbücher bleiben bis U4 beim alten Kopf.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -610,7 +693,9 @@ ausblenden.
 | `ux-umbau` | `7778752` | U0 Tag 6: Abnahme, Screenshots, `scripts/ux-abnahme.js`, Umbruch in Pille und Zeile |
 | `ux-umbau` | `c66f451` | Feinplan U1 (Entwurf) |
 | `ux-umbau` | `44ea9e3` | Feinplan U1 freigegeben (F1–F4) |
-| `ux-umbau` | (folgt) | U1 Tag 1: neue Adressen, Weiterleitung, Verweise über `adressen.ts` |
+| `ux-umbau` | `bbaa2c4` | U1 Tag 1: neue Adressen, Weiterleitung, Verweise über `adressen.ts` |
+| `ux-umbau` | `8874a30` | Befunde der dritten Durchsicht |
+| `ux-umbau` | (folgt) | U1 Tag 2: ein Kopf im Layout, Navigationstabelle, Anmeldeseite in eigener Gruppe |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.

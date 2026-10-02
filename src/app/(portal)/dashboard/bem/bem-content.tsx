@@ -3,7 +3,6 @@
 import { BEM_STATISTIK_PFAD, bemPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 
 interface User {
   userId: string;
@@ -160,7 +159,6 @@ export function BemContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">

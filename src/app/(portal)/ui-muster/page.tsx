@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Inbox, SearchX } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { PortalHeader } from "@/components/portal-header";
 import { Button } from "@/components/ui/button";
 import { Gruppe, Zeile } from "@/components/ui/gruppe";
 import { Leerzustand } from "@/components/ui/leerzustand";
@@ -55,7 +54,6 @@ export default async function UiMusterPage() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <PortalHeader user={session} />
 
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
         <MusterKopf />

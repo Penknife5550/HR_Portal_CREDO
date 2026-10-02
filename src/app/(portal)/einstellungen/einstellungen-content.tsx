@@ -20,7 +20,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { abteilungLabel, LINK_ABTEILUNGEN } from "@/lib/constants";
 import { EVENT_GROUP_ORDER } from "@/lib/events";
 import { AutomatischeLaeufeTab } from "@/components/zeitplaner/automatische-laeufe-tab";
@@ -207,12 +206,11 @@ export function EinstellungenContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Seitenheader */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground">Einstellungen</h2>
+          <h1 className="text-2xl font-bold text-foreground">Einstellungen</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             E-Mail-Versand, Vorlagen, Webhooks, Abteilungen und automatische Läufe verwalten
           </p>

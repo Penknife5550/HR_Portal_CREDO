@@ -78,9 +78,6 @@ jest.mock("next/navigation", () => ({
 }));
 
 // Nachbarn mit eigenem Netzverkehr — fuer die Verdrahtung ohne Belang.
-jest.mock("@/components/portal-header", () => ({
-  PortalHeader: () => <header data-testid="portal-header" />,
-}));
 jest.mock("@/components/dokumentenpaket-section", () => ({
   DokumentenpaketSection: () => <section data-testid="dokumentenpaket">Dokumente versenden</section>,
 }));

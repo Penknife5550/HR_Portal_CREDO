@@ -35,6 +35,7 @@ import {
 import { BUTTON_FARBEN, type ButtonVariante } from "@/components/ui/button";
 import { SEGMENT_FARBEN } from "@/components/ui/segment";
 import { MENUE_FARBEN } from "@/components/ui/seitenkopf";
+import { KOPF_FARBEN } from "@/components/rahmen/portal-kopf";
 import { STATUS_TOENE, type StatusTon } from "@/components/ui/statuspille";
 import { TOAST_TOENE, type ToastTon } from "@/components/ui/toast";
 
@@ -252,5 +253,26 @@ describe("Segment-Schalter und Menue des Seitenkopfs", () => {
     expect(grund).not.toBeNull();
     expect(kontrast(token(text), token("card"))).toBeGreaterThanOrEqual(AA_TEXT);
     expect(kontrastAuf(text, grund, "card")).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+});
+
+describe("Kopf des Portals", () => {
+  // Der Kopf steht auf `card`.
+  it("Punkt in Ruhe, beim Ueberfahren und aktiv", () => {
+    const ruhe = farbeAus(KOPF_FARBEN.ruhe, "text")!;
+    const hoverGrund = farbeAus(KOPF_FARBEN.hover, "hover:bg")!;
+    const aktivText = farbeAus(KOPF_FARBEN.aktiv, "text")!;
+    const aktivGrund = farbeAus(KOPF_FARBEN.aktiv, "bg")!;
+    expect(kontrast(token(ruhe), token("card"))).toBeGreaterThanOrEqual(AA_TEXT);
+    // Beim Ueberfahren wird der Text `ink` (steht in KOPF_FARBEN.hover).
+    expect(KOPF_FARBEN.hover).toContain("hover:text-ink");
+    expect(kontrastAuf("ink", hoverGrund, "card")).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(kontrastAuf(aktivText, aktivGrund, "card")).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
+  it("der BEM-Zaehler: Zahl auf seiner Flaeche", () => {
+    const text = farbeAus(KOPF_FARBEN.zaehler, "text")!;
+    const grund = farbeAus(KOPF_FARBEN.zaehler, "bg")!;
+    expect(kontrast(token(text), token(grund))).toBeGreaterThanOrEqual(AA_TEXT);
   });
 });

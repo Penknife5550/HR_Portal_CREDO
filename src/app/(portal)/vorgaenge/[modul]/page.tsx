@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { istVorgangsModul, vorgangslistePfad, VORGANGS_MODULE, VORGANGS_MODUL_NAMEN } from "@/lib/adressen";
-import { PortalHeader } from "@/components/portal-header";
 import { DashboardContent } from "@/app/(portal)/dashboard/dashboard-content";
 import { OffboardingDashboardContent } from "@/app/(portal)/dashboard/offboarding-dashboard-new";
 import { ContractEndDashboardContent } from "@/app/(portal)/dashboard/contract-end-dashboard-new";
@@ -30,8 +29,10 @@ export default async function VorgangslistePage({ params }: { params: Promise<{ 
 
   return (
     <div>
-      {/* Portal Header */}
-      <PortalHeader user={session} />
+
+      {/* Die Listen tragen nur Zwischenueberschriften; bis U3 sie umbaut, gibt
+          diese (unsichtbare) Hauptueberschrift der Seite ihren Namen. */}
+      <h1 className="sr-only">Vorgänge: {VORGANGS_MODUL_NAMEN[modul]}</h1>
 
       {/* Reiter der Module — am Handy waagerecht rollend statt umbrechend */}
       <div className="border-b bg-card">

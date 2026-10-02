@@ -226,7 +226,7 @@ const MUSTER: Muster[] = [
     schluessel: "svg",
     name: "Inline-<svg",
     zaehle: perRegex(/<svg\b/g),
-    gesamt: 150,
+    gesamt: 148,
     stattdessen: "Symbol aus lucide-react",
   },
   {

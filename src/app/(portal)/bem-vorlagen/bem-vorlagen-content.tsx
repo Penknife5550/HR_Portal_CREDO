@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { PortalHeader } from "@/components/portal-header";
 
 interface User {
   userId: string;
@@ -134,7 +133,6 @@ export function BemVorlagenContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <PortalHeader user={user} />
       <main className="mx-auto max-w-4xl px-4 py-8">
         <h1 className="text-2xl font-bold text-foreground">BEM-Vorlagen & Einstellungen</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">

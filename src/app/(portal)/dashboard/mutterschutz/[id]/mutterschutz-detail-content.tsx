@@ -9,7 +9,6 @@
 import { vorgangPfad, vorgangslistePfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { MailProtokoll } from "@/components/vorgangs-mails/mail-protokoll";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import {
@@ -245,7 +244,6 @@ export function MutterschutzDetailContent({
   if (loading || !data) {
     return (
       <div>
-        <PortalHeader user={user} />
         <div className="p-8 text-center text-sm text-muted-foreground">
           Lade…
         </div>
@@ -255,7 +253,6 @@ export function MutterschutzDetailContent({
 
   return (
     <div>
-      <PortalHeader user={user} />
       <div className="mx-auto max-w-5xl p-4">
         <div className="mb-4">
           <Link

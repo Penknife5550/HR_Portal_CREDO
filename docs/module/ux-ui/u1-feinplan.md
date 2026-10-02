@@ -75,9 +75,9 @@ Der Kopf trägt eine `h1` „HR-Portal“, jede Seite hat damit zwei Hauptübers
 | Aktiv | genau ein Punkt ist markiert (`aria-current="page"`), entschieden über den längsten passenden Adressanfang. Markierung: `action-soft` mit Text `ink` – nicht mehr die volle dunkle Fläche. |
 | BEM | Schloss aus `lucide-react` statt Emoji; der Zähler „Fristen mit Handlungsbedarf“ bleibt, als Zahl mit sichtbarem Text für Screenreader. |
 | Menüs | Radix Dropdown (Escape, Pfeiltasten, Fokus zurück) – dieselbe Technik wie das „…“-Menü des Seitenkopfs. |
-| Rollenname | aus einer Tabelle für **alle** Rollen (`ROLLEN_NAMEN`, neben den Rollen in `permissions.ts`); eine unbekannte Rolle zeigt ihren Schlüssel, nie „Sachbearbeiter“. |
+| Rollenname | aus einer Tabelle für **alle** Rollen (`ROLLEN_NAMEN` in `navigation.ts` – nicht in `permissions.ts`, das die Datenbank mitzieht); eine unbekannte Rolle zeigt ihren Schlüssel, nie „Sachbearbeiter“. |
 | Handy | unter 768 px ein Menüknopf (`aria-expanded`), darunter alle erreichbaren Punkte als Liste. |
-| Überschrift | „HR-Portal“ ist keine `h1` mehr; die Hauptüberschrift gehört der Seite. |
+| Überschrift | „HR-Portal“ ist keine `h1` mehr; die Hauptüberschrift gehört der Seite. Neun Verwaltungsseiten hatten keine eigene: ihr Seitentitel ist jetzt `h1` (Aussehen gleich); die Vorgangslisten tragen eine unsichtbare. |
 | Breite | `max-w-6xl` (heute `7xl`) – die Breite, auf die alle Seiten mit ihrem Paket gehen. |
 | Sprunglink | „Zum Inhalt springen“ als erster Tab-Halt (sichtbar erst bei Fokus). |
 | Unverändert | CREDO-Linie unter dem Kopf, Sitzungswarnung, „Abmelden“. |
@@ -277,5 +277,5 @@ mit (zwei neue Tabellen) – das ist getrennt zu entscheiden.
 | Tag | Stand | Commit |
 |---|---|---|
 | 1 Adressen, Weiterleitung, Verweise (dazu vorgezogen: Modul-Reiter) | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
-| 2 Kopf, Layout, Anmeldeseite | offen | |
+| 2 Kopf, Layout, Anmeldeseite, Hauptüberschriften | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 3 Reiter, Mails, Abnahme | offen | |

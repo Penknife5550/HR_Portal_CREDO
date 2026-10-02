@@ -10,7 +10,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Save, CheckCircle2, AlertCircle, ShieldCheck } from "lucide-react";
-import { PortalHeader } from "@/components/portal-header";
 import {
   DEFAULT_VERANTWORTLICHE_STELLE,
   formatVerantwortlicheStelle,
@@ -107,7 +106,6 @@ export function DsgvoConfigContent({
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6">
