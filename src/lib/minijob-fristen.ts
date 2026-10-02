@@ -611,12 +611,13 @@ const TAGE_VOR_MONAT = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
  *
  * Direkt gerechnet statt Monat fuer Monat aufsummiert: Die fruehere Schleife
  * lief je Datum ueber alle Monate seit dem Jahr 0 (rund 24.000 Durchlaeufe) und
- * kostete unter Jest etwa 5 ms je Datum — Tests, die ein paar hundert Abstaende
- * brauchen, liefen dadurch Sekunden bis Minuten.
+ * kostete unter Jest rund 10 ms je Abstand — Tests, die ein paar hundert
+ * Abstaende brauchen, liefen dadurch Sekunden bis Minuten.
  *
- * Das Ergebnis ist dasselbe wie das der Schleife, auch fuer Zeichenketten, die
- * das Muster annimmt, die aber kein Kalendertag sind: Ein Monat ueber 12 laeuft
- * ins Folgejahr, ein Tag ueber das Monatsende in den Folgemonat.
+ * Das Ergebnis ist dasselbe wie das der Schleife (beim Umbau 10/2026 ueber den
+ * ganzen Bereich des Musters verglichen), auch fuer Zeichenketten, die das
+ * Muster annimmt, die aber kein Kalendertag sind: Ein Monat ueber 12 laeuft ins
+ * Folgejahr, ein Tag ueber das Monatsende in den Folgemonat.
  */
 function tageszahl(tag: Kalendertag): number {
   const [j, m, d] = zerlege(tag);
@@ -634,26 +635,6 @@ function tageszahl(tag: Kalendertag): number {
 /** Abstand in Tagen zwischen zwei Kalendertagen (b minus a). */
 export function tageZwischen(a: Kalendertag, b: Kalendertag): number {
   return tageszahl(b) - tageszahl(a);
-}
-
-/**
- * VORUEBERGEHEND: die bisherige Fassung, nur fuer den Vergleich in
- * `tage-zwischen-vergleich.test.ts`. Wird mit dem Vergleich wieder entfernt.
- */
-export function tageZwischenAlt(a: Kalendertag, b: Kalendertag): number {
-  const alsZahl = (t: Kalendertag) => {
-    const [j, m, d] = zerlege(t);
-    // Tage seit einem festen Bezugspunkt, ohne Date und ohne Zeitzone.
-    const monateGesamt = j * 12 + (m - 1);
-    let tage = d;
-    for (let i = 0; i < monateGesamt; i++) {
-      const jj = Math.floor(i / 12);
-      const mm = (i % 12) + 1;
-      tage += tageImMonat(jj, mm);
-    }
-    return tage;
-  };
-  return alsZahl(b) - alsZahl(a);
 }
 
 /**
