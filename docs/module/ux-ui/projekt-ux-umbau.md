@@ -13,8 +13,8 @@ Letzte Änderung: 02.10.2026 (Übergabe nach U1; nächster Schritt: Feinplan Pil
 
 **Stand 02.10.2026, später:** Der Feinplan ist **freigegeben**
 ([pilot-feinplan.md](pilot-feinplan.md), F1–F9 entschieden, Kurzform in Abschnitt 4).
-**Nächste Aufgabe:** Tag 1 und 2 des Feinplans (reine Regeln `ProzessStand` + Adapter,
-Bausteine Prozessleiste und Reiter auf der Musterseite) – das darf vor dem Prototyp-Tag
+Tag 1 (reine Regeln `ProzessStand` + Adapter) ist gebaut. **Nächste Aufgabe:** Tag 2 –
+Bausteine Prozessleiste und Reiter auf der Musterseite; das darf vor dem Prototyp-Tag
 laufen (F9). Die Seite selbst (ab Tag 3) erst nach V0. Der folgende Text ist die
 ursprüngliche Übergabe.
 
@@ -90,7 +90,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); Tag 1–2 (Regeln, Bausteine) als Nächstes, die Seite erst nach dem Prototyp-Tag (V0) |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) gebaut**, Tag 2 (Bausteine) als Nächstes, die Seite erst nach dem Prototyp-Tag (V0) |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -834,6 +834,37 @@ P-F9). Ursprünglich offen waren:
 **Offen:** Fragen F1–F9 (Schalter, Stornieren, Abschließen im Ablehnungsstrang, Hinweis bei
 überschrittenem Vertragsende, Rückmelde-Adresse, klebende Leiste, Export der Statusübergänge,
 Statustexte, Reihenfolge mit V0). Nicht committet.
+
+### 02.10.2026 – Pilot, Tag 1 (Regeln)
+
+**Gebaut** (noch nichts sichtbar):
+
+- `src/lib/prozess/prozess-stand.ts` – Datenmodell der Prozessleiste (`ProzessSchritt`,
+  `JetztDran`, `ProzessStand`, `schrittKurzform`).
+- `src/lib/prozess/vertragsende.ts` – Adapter (`vertragsendeProzessStand`,
+  `vertragsendeMenue`, `vertragsendePille`), Kataloge `VERTRAGSENDE_PILLE` und `MAV_PILLE`.
+- `src/lib/contract-end-status.ts` – die Tabelle der Statusübergänge, aus der Route
+  `api/contract-end/[id]` hierher verschoben (P-F7); Inhalt unverändert, die Route liest sie
+  von dort.
+- `src/__tests__/lib/prozess-vertragsende.test.ts` – 31 Tests, darunter die Gegenprobe:
+  Jede angebotene Handlung nimmt die zuständige Route auch an.
+
+**Von der Gegenprobe gefunden:** Der erste Entwurf bot „Erinnerung senden“ auch an, wenn der
+Vorgang auf „Anfrage beim Vorgesetzten“ steht, ohne dass je eine Anfrage verschickt wurde;
+die Route hätte mit 409 abgelehnt. Jetzt ist dann „Anfrage senden“ dran, bei abgelaufenem
+Link „Anfrage neu senden“.
+
+**Präzisierungen gegenüber dem Feinplan:** dort in Abschnitt 11 (Frist als eigenes Feld,
+Berliner Kalendertage, eigenes Menü, gespiegelte Routenlisten).
+
+**Geprüft:** `npm run pruefen` grün (189 Suiten, 4.900 Tests). Kein Build – es gibt noch
+keinen Aufrufer in einer Seite.
+
+**Außerdem aufgefallen, nicht angefasst:** `GET /api/contract-end/[id]` gibt den ganzen
+Datensatz zurück, also auch `supervisorToken` (den Magic-Link der Führungskraft) – an alle
+`PORTAL_ROLES`, auch an lesende Rollen. Gehört nicht zum Umbau; eigener Punkt für `main`.
+
+**Als Nächstes:** Tag 2 – Bausteine Prozessleiste und Reiter auf der Musterseite.
 
 ## 8. Branches und Commits
 

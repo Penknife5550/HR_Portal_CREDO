@@ -13,25 +13,11 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { updateContractEndSchema } from "@/lib/validations/contract-end";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
+import { CONTRACT_END_UEBERGAENGE } from "@/lib/contract-end-status";
 
-// Gueltige Status-Uebergaenge
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  ANGELEGT: ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_KEINE_UEBERNAHME", "STORNIERT"],
-  ANFRAGE_VORGESETZTER: [
-    "RUECKMELDUNG_UEBERNAHME",
-    "RUECKMELDUNG_KEINE_UEBERNAHME",
-    "ENTSCHEIDUNG_KEINE_UEBERNAHME",
-    "STORNIERT",
-  ],
-  RUECKMELDUNG_UEBERNAHME: ["VERTRAG_ERSTELLT", "VERTRAG_UNTERSCHRIEBEN", "ABGESCHLOSSEN", "STORNIERT"],
-  RUECKMELDUNG_KEINE_UEBERNAHME: ["ENTSCHEIDUNG_KEINE_UEBERNAHME", "STORNIERT"],
-  ENTSCHEIDUNG_UEBERNAHME: ["VERTRAG_ERSTELLT", "ENTSCHEIDUNG_KEINE_UEBERNAHME", "STORNIERT"],
-  VERTRAG_ERSTELLT: ["VERTRAG_UNTERSCHRIEBEN", "ABGESCHLOSSEN", "STORNIERT"],
-  VERTRAG_UNTERSCHRIEBEN: ["ABGESCHLOSSEN", "STORNIERT"],
-  ENTSCHEIDUNG_KEINE_UEBERNAHME: ["ABGESCHLOSSEN", "STORNIERT"],
-  ABGESCHLOSSEN: [],
-  STORNIERT: [],
-};
+// Gueltige Status-Uebergaenge: src/lib/contract-end-status.ts (dieselbe Tabelle
+// liest der Test des Prozess-Adapters).
+const VALID_TRANSITIONS = CONTRACT_END_UEBERGAENGE;
 
 // =============================================
 // GET /api/contract-end/:id

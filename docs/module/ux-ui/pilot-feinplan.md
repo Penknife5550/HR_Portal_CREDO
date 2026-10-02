@@ -468,3 +468,31 @@ Pilot nichts.
 | F7 | **`VALID_TRANSITIONS` aus der Route exportieren** (in eine reine Datei `src/lib/contract-end-status.ts`), damit Adapter-Test und Route dieselbe Tabelle lesen? Das verschiebt eine Konstante, ändert kein Verhalten – ist aber ein Eingriff in eine Routen-Datei. | Ja. Sonst prüft der Test gegen eine Kopie, die auseinanderlaufen kann. |
 | F8 | **Statustexte der Pille** (3.5) sagen, wer dran ist („Wartet auf Führungskraft“), statt den Fachstatus zu wiederholen („Anfrage beim Vorgesetzten“). Liste und alte Ansicht zeigen bis U3 weiter die alten Texte – dieselbe Sache heißt zwei Wochen lang zweierlei. In Ordnung? | Ja; in der Ankündigung erwähnen. Endgültig nach dem Prototyp-Tag. |
 | F9 | **Reihenfolge mit V0:** Der Feinplan lässt sich jetzt freigeben; gebaut wird laut Leitplanke erst nach dem Prototyp-Tag. Sollen Tag 1 und 2 (reine Regeln und Bausteine auf der Musterseite – nichts davon sieht das Personalbüro) schon vorher laufen? | Ja für Tag 1–2, nein für die Seite. Die Texte aus 3.3 sind genau das, was der Prototyp-Tag prüfen soll; die Musterseite mit der Leiste taugt dort als Klick-Dummy. |
+
+## 11. Fortschritt
+
+| Tag | Stand | Commit |
+|---|---|---|
+| 1 Regeln: `ProzessStand`, Adapter, Kataloge, Statustabelle in eigener Datei | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
+| 2 Bausteine Prozessleiste und Reiter | offen | |
+| 3–7 Seite, Schalter, Abnahme | offen – erst nach dem Prototyp-Tag (V0) | |
+
+**Beim Bau von Tag 1 genauer gefasst** (gegenüber 3.2 und 3.3):
+
+- `JetztDran` trägt die Frist als eigenes Feld (`frist`, dazu `dringlichkeit`), getrennt von
+  der `unterzeile` – im Zustand „wartet auf die Führungskraft“ braucht die Seite beides.
+- Die Menüpunkte liefert eine eigene Funktion `vertragsendeMenue()`; keine Handlung steht
+  zugleich in „Jetzt dran“ und im Menü (Test).
+- **Tage in Berliner Kalendertagen:** Am Tag des Vertragsendes steht „heute“, überschritten
+  ist es erst am Tag danach. Ob die Entfristungswarnung greift, entscheidet unverändert
+  `getSignatureWarning`; nur die angezeigte Zahl wird neu gezählt (die alte Seite zeigt am
+  letzten Tag schon „überschritten“).
+- **„Erinnern“ nur mit zugestellter, gültiger Anfrage** – gefunden von der Gegenprobe gegen
+  die Routen: Steht der Vorgang auf „Anfrage beim Vorgesetzten“, ohne dass je eine Anfrage
+  verschickt wurde (Status von Hand gesetzt), ist „Anfrage senden“ dran. Ist der Link
+  abgelaufen, ist „Anfrage neu senden“ dran (die Route `/reminder` lehnt in beiden Fällen ab).
+- Nach dem Vollzug (Vertrag unterschrieben bzw. Offboarding angelegt) zeigt „Jetzt dran“
+  keine Frist mehr.
+- Die Listen der drei eigenen Routen (`/nicht-uebernehmen`, `/supervisor-link`, `/reminder`)
+  sind im Test gespiegelt, nicht exportiert – P-F7 erlaubte nur das Verschieben von
+  `VALID_TRANSITIONS`.
