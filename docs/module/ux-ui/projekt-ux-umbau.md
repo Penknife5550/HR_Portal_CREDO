@@ -422,6 +422,16 @@ gemessen), beide Leerzustände.
 
 **Nicht geprüft:** „Bewegung reduzieren“ im System, `npm run build`.
 
+**Nachtrag (Commit danach):** Der Commit von Tag 5 ging hinaus, obwohl der letzte Gesamtlauf
+rot war – die Befehle waren mit `;` statt `&&` verkettet. Ursache der roten Tests: Der
+axe-Lauf über die ganze Musterseite braucht im vollen Lauf länger als die 5 s Vorgabe (der
+Rechner war zusätzlich mit dem Entwicklungsserver belegt, der Gesamtlauf dauerte 80–110 s
+statt 40 s); ein Test lief in die Zeitgrenze und riss den nächsten mit („Axe is already
+running“). `ui-musterseite.test.tsx` hat jetzt 30 s Zeitgrenze. Danach zweimal in Folge
+grün (185 Suiten, 4.745 Tests). In den roten Läufen fielen unter derselben Last auch zwei
+Tests auf, die nichts mit dem Umbau zu tun haben (PDF-Export der Checkliste, Waisen der
+Nachforderung, beide „Exceeded timeout“); sie sind unverändert und ohne Last grün.
+
 **Sichtbare Änderung:** nur auf `/ui-muster`.
 
 **Als Nächstes (U0, Tag 6):** `npm run build`; Screenshots der Musterseite in 1440, 1366×768
@@ -446,7 +456,8 @@ danach Feinplan U1.
 | `ux-umbau` | `9153727` | U0 Tag 3: Dialog, Bestätigungsdialog, Toast, Anbieter im Portal-Layout |
 | `ux-umbau` | `1097424` | Browserprobe zu Tag 3: Meldungen springen nicht mehr, Abstand auf der Musterseite |
 | `ux-umbau` | `17a2f3d` | U0 Tag 4: Seitenkopf mit Pfad und Menü, Segment-Schalter |
-| `ux-umbau` | (folgt) | U0 Tag 5: Skelett, Leerzustand, Musterseite vollständig |
+| `ux-umbau` | `8e530b0` | U0 Tag 5: Skelett, Leerzustand, Musterseite vollständig |
+| `ux-umbau` | (folgt) | Zeitgrenze des Musterseiten-Tests (axe über die ganze Seite) |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.

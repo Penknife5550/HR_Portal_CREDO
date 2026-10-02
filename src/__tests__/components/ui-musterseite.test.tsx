@@ -44,6 +44,12 @@ jest.mock("next/link", () => ({
 
 import UiMusterPage from "@/app/(portal)/ui-muster/page";
 
+// axe ueber die GANZE Seite dauert je Lauf rund eine Sekunde, im vollen
+// Testlauf (alle Kerne belegt) ein Vielfaches. Mit der Vorgabe von 5 s lief
+// ein Test in die Zeitgrenze — und riss den naechsten mit („Axe is already
+// running"), weil sein Lauf noch arbeitete.
+jest.setTimeout(30_000);
+
 beforeEach(() => {
   redirect.mockClear();
 });
