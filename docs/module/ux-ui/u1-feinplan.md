@@ -1,7 +1,7 @@
 # U1 Rahmen – Feinplan
 
 Stand 02.10.2026 · gehört zu [ux-ui-plan-2026-09.html](ux-ui-plan-2026-09.html), Abschnitt 5 (Paket U1) und 4 A (Seitenliste) ·
-Branch `ux-umbau` · Status: **Entwurf, wartet auf Freigabe** (Fragen in Abschnitt 9) ·
+Branch `ux-umbau` · Status: **freigegeben am 02.10.2026** (F1–F4 wie vorgeschlagen, Abschnitt 9) ·
 Stand und Protokoll: [projekt-ux-umbau.md](projekt-ux-umbau.md)
 
 ## 1. Ziel
@@ -34,9 +34,9 @@ Grundlage sind die Entscheidungen vom 01.10.2026:
    und rollen am Handy waagerecht – Zwischenlösung bis U3.
 4. **Tests** (Abschnitt 5).
 
-### Bewusst nicht in U1 (Abweichung vom Paket im Plan – Frage F1)
+### Bewusst nicht in U1 (Abweichung vom Paket im Plan – entschieden mit F1)
 
-| Laut Plan in U1 | Vorschlag | Grund |
+| Laut Plan in U1 | Kommt mit | Grund |
 |---|---|---|
 | Seitenkopf-Baustein (Breadcrumb, Titel) auf allen Detail- und Verwaltungsseiten | je Modul mit dessen Paket: Vertragsende im Pilot, die übrigen mit U4, Verwaltung mit U6 | Der Seitenkopf ersetzt den Kopfbereich jeder einzelnen Seite – das IST der Umbau des Moduls. Die Leitplanke sagt: Kein Modul außer dem Pilot wird umgestellt, bevor das Personalbüro zwei Wochen mit dem Pilot gearbeitet hat. |
 | Inhaltsbreite überall `6xl` | je Modul mit dessen Paket; in U1 bekommt nur der Kopf `6xl` | Heute stehen die Seiten auf vier Breiten (3 × `4xl`, 16 × `5xl`, 10 × `6xl`, 7 × `7xl`). Breiter oder schmaler ändert Raster und Tabellen jeder Seite sichtbar und muss je Seite angesehen werden. |
@@ -70,7 +70,7 @@ Der Kopf trägt eine `h1` „HR-Portal“, jede Seite hat damit zwei Hauptübers
 | Teil | Regel |
 |---|---|
 | Einbindung | einmal in `src/app/(portal)/layout.tsx`. Die Seiten binden nichts mehr ein. |
-| Punkte | **Vorgänge** · **BEM** · **Vorlagen** ▾ · **Verwaltung** ▾ – Reihenfolge und Unterpunkte wie heute, nur „Dashboard“ heißt „Vorgänge“. Rollen je Punkt unverändert. |
+| Punkte | **Vorgänge** · **BEM** · **Vorlagen** ▾ · **Verwaltung** ▾ – Reihenfolge und Unterpunkte wie heute, nur „Dashboard“ heißt „Vorgänge“. Rollen je Punkt unverändert, mit einer Ausnahme (F3): „Formulare“ sieht die Sachbearbeitung nicht mehr – die Middleware lässt sie ohnehin nicht auf `/vorlagen`. Der Kopf zeigt nur, was die Rolle öffnen kann; ein Test hält die Tabelle gegen die Regeln der Middleware. |
 | Eine Quelle | Die Punkte stehen als Tabelle in `src/lib/navigation.ts` (rein, getestet): Text, Adresse, Rollen, „aktiv bei“. Kopf, Handy-Menü und Tests lesen dieselbe Tabelle. |
 | Aktiv | genau ein Punkt ist markiert (`aria-current="page"`), entschieden über den längsten passenden Adressanfang. Markierung: `action-soft` mit Text `ink` – nicht mehr die volle dunkle Fläche. |
 | BEM | Schloss aus `lucide-react` statt Emoji; der Zähler „Fristen mit Handlungsbedarf“ bleibt, als Zahl mit sichtbarem Text für Screenreader. |
@@ -110,7 +110,7 @@ wird er nicht gebraucht.
 
 Alles hinter dem Fragezeichen bleibt erhalten (`?tab=dokumente` → `?tab=dokumente`); nur
 `?tab=<modul>` an der Liste wird zum Pfad. Die Modulnamen in der Adresse sind deutsch
-(Frage F2) – sie sind danach dauerhaft, jede spätere Umbenennung bräuchte eine weitere
+(entschieden mit F2) – sie sind danach dauerhaft, jede spätere Umbenennung bräuchte eine weitere
 Weiterleitung.
 
 **Wo die Regeln liegen**
@@ -207,7 +207,7 @@ Kopf in den Bildern nicht mehr.
   erhalten; unbekannter Modulname; `/dashboard/<uuid>` gegen `/dashboard/offboarding`
   (ein Modulname ist keine Kennung); `/bem/einwilligung` wird nie übersetzt und nie
   geschützt; die neue Adresse wird nicht noch einmal übersetzt (keine Schleife).
-- **`navigation.test.ts`**: je Rolle die sichtbaren Punkte (alle sieben Rollen); genau ein
+- **`navigation.test.ts`**: je Rolle die sichtbaren Punkte (alle sieben Rollen); kein Punkt, den die Middleware für die Rolle umleitet (F3); genau ein
   aktiver Punkt für jede Portal-Adresse – insbesondere `/bem` markiert nur BEM;
   BEM-Beauftragte sehen nur BEM; jede Rolle hat einen Namen.
 - **`portal-kopf.test.tsx`** (jsdom, axe): Menü öffnet und schließt mit der Tastatur;
@@ -261,14 +261,14 @@ ein n8n-Ablauf, der `portalLink` weiterreicht (falls einer läuft).
 Ein Deploy von `main` bringt unabhängig davon weiterhin die Checklisten-Änderung und Paket 3
 mit (zwei neue Tabellen) – das ist getrennt zu entscheiden.
 
-## 9. Fragen vor dem Bau
+## 9. Fragen vor dem Bau – entschieden am 02.10.2026
 
-| # | Frage | Vorschlag |
+| # | Frage | Entschieden |
 |---|---|---|
-| F1 | Zuschnitt: Seitenkopf auf allen Seiten, einheitliche Breite und Suche erst mit den Modul-Paketen (Abschnitt 2)? | Ja. U1 ändert nur Kopf und Adressen. |
-| F2 | Modulnamen in der Adresse: `onboarding`, `offboarding`, `vertragsende`, `verbeamtung`, `elternzeit`, `mutterschutz`? Sie sind danach dauerhaft. Die Anzeigenamen der Module (E11) bleiben davon unberührt offen. | Ja. |
-| F3 | Der Punkt „Formulare“ steht heute auch bei der Sachbearbeitung im Menü, die Middleware leitet sie beim Klick aber zur Vorgangsliste zurück (`/vorlagen` ist nur für HR-Leitung und Super-Admin freigegeben; „Brief-Vorlagen“ ist erreichbar). Soll der Kopf (a) nur zeigen, was erreichbar ist, oder (b) die Sachbearbeitung die Formulare öffnen dürfen? | (a) – U1 ändert keine Berechtigung. (b) wäre eine fachliche Änderung und gehörte nach `main`. |
-| F4 | Dateien der Module bleiben unter `dashboard/` liegen und ziehen erst mit U4 um (3.2)? | Ja – sonst wird jedes Nachziehen von `main` zur Handarbeit. |
+| F1 | Zuschnitt: Seitenkopf auf allen Seiten, einheitliche Breite und Suche erst mit den Modul-Paketen (Abschnitt 2)? | Nur Kopf und Adressen. Seitenkopf und Breite je Modul mit dessen Paket, Suche nach dem Pilot. |
+| F2 | Modulnamen in der Adresse: `onboarding`, `offboarding`, `vertragsende`, `verbeamtung`, `elternzeit`, `mutterschutz`? Sie sind danach dauerhaft. Die Anzeigenamen der Module (E11) bleiben davon unberührt offen. | Ja, genau diese sechs. |
+| F3 | Der Punkt „Formulare“ steht heute auch bei der Sachbearbeitung im Menü, die Middleware leitet sie beim Klick aber zur Vorgangsliste zurück (`/vorlagen` ist nur für HR-Leitung und Super-Admin freigegeben; „Brief-Vorlagen“ ist erreichbar). Soll der Kopf (a) nur zeigen, was erreichbar ist, oder (b) die Sachbearbeitung die Formulare öffnen dürfen? | (a) Punkt ausblenden. Keine Berechtigung ändert sich. |
+| F4 | Dateien der Module bleiben unter `dashboard/` liegen und ziehen erst mit U4 um (3.2)? | Ja, liegen lassen. |
 
 ## 10. Fortschritt
 

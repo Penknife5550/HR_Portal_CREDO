@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (Feinplan U1 im Entwurf)
+Letzte Änderung: 02.10.2026 (Feinplan U1 freigegeben)
 
 ## 1. Worum es geht
 
@@ -16,7 +16,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 |---|---|
 | [ux-ui-plan-2026-09.html](ux-ui-plan-2026-09.html) | Der Plan (Fassung 3): Bewertung, Zielbild mit Mockups, Pakete, Entscheidungen, Leitplanken |
 | [u0-feinplan.md](u0-feinplan.md) | Feinplan U0 (gebaut und abgenommen) |
-| [u1-feinplan.md](u1-feinplan.md) | Feinplan des nächsten Pakets U1 (Entwurf, wartet auf Freigabe) |
+| [u1-feinplan.md](u1-feinplan.md) | Feinplan des laufenden Pakets U1 (freigegeben 02.10.2026) |
 | `projekt-ux-umbau.md` (diese Datei) | Stand, Protokoll, Abweichungen |
 | `CLAUDE.md`, Abschnitt „Oberfläche (UX-Umbau)“ | Die Regeln, die beim Programmieren gelten |
 | [screenshots/](screenshots/) | Vorher-Bilder (erzeugt von `scripts/ux-screenshots.js`) und die Musterseite in drei Breiten (`ui-muster-*.png`, erzeugt von `scripts/ux-abnahme.js`) |
@@ -28,7 +28,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
-| U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **Feinplan im Entwurf** (02.10.2026), vier Fragen offen (F1–F4 im Feinplan) |
+| U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **Feinplan freigegeben** (02.10.2026); Bau offen, drei Tage: Adressen → Kopf → Reiter, Mails, Abnahme |
 | Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | offen |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
@@ -78,6 +78,15 @@ Vollständig mit Begründung und verworfener Alternative im Plan, Abschnitt 6. H
 | F3 | Musterseite | `/ui-muster`, auch in Produktion, nur `SUPER_ADMIN`, ohne Navigationseintrag. |
 | F4 | Zuschnitt U0 | Aufgaben-Badge → Paket 6, Suchfeld → U1, Datumsfeld → erstes Formular, das es braucht. |
 
+### Zum Feinplan U1 (02.10.2026)
+
+| # | Thema | Entschieden |
+|---|---|---|
+| U1-F1 | Zuschnitt | U1 ändert nur Kopf und Adressen. Seitenkopf-Baustein und einheitliche Breite je Modul mit dessen Paket (Vertragsende im Pilot, übrige U4, Verwaltung U6); Suche nach dem Pilot. |
+| U1-F2 | Modulnamen in der Adresse | `onboarding`, `offboarding`, `vertragsende`, `verbeamtung`, `elternzeit`, `mutterschutz` – dauerhaft. Die Anzeigenamen (E11) bleiben offen. |
+| U1-F3 | „Formulare“ bei der Sachbearbeitung | Punkt ausblenden – der Kopf zeigt nur, was die Rolle öffnen kann. Keine Berechtigung ändert sich. |
+| U1-F4 | Dateien der Module | bleiben unter `dashboard/` liegen, ziehen mit U4 um. |
+
 ### Noch offen
 
 | # | Thema | Gebraucht vor |
@@ -113,6 +122,8 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Segment-Schalter | „Tastatur wie Radix Tabs“ | eigene Auswahlgruppe (`radiogroup`), Pfeiltasten wie bei Reitern | Radix Tabs verweist jeden Reiter auf ein Inhaltsfeld (`aria-controls`); der Schalter filtert eine Liste und hat keines – axe meldete den toten Verweis. |
 | Schatten `shadow-overlay` | nur Dialog und Toast | auch das „…“-Menü des Seitenkopfs | Gilt für alles, was über der Seite schwebt. |
 | Skelett | „`aria-busy`, kein Text „Lädt…“ nötig“ | `role="status"`, `aria-busy` und EIN Satz nur für Screenreader | Ohne Text erfährt ein Screenreader nicht, dass geladen wird; sichtbar bleibt es bei den Balken. |
+| Umfang U1 | Kopf, Breadcrumb, Breite `6xl` überall, Suche (Strg+K) | nur Kopf und Adressen (U1-F1) | Seitenkopf und Breite ändern jede einzelne Seite – das ist der Umbau des Moduls und steht vor dem Pilot nicht an; die Suche hängt an allen sieben Modulen. |
+| Ordner der Module | – (E4 nennt nur die Adressen) | Dateien bleiben unter `dashboard/`, neue Adressen über dünne Seiten-Dateien (U1-F4) | Sonst muss jede Änderung von `main` beim Nachziehen von Hand umgelegt werden. |
 | Prototyp-Tag | „Kein Paket außer U0 startet ohne den Prototyp-Tag“ | gilt ab dem Pilot; U1 darf vorher | U1 ändert nur den Rahmen (Kopf, Breadcrumb, Adressen) und hängt an keiner der Fragen des Prototyp-Tags (E9, E11, E13). |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
@@ -505,7 +516,11 @@ Seitenkopf-Baustein auf den Seiten, einheitliche Breite und Suche kommen mit den
 Modul-Paketen bzw. nach dem Pilot – sonst würde U1 jedes Modul anfassen, was die Leitplanke
 vor dem Pilot ausschließt.
 
-**Offen:** Freigabe des Feinplans (F1–F4). Kein Code vor der Freigabe.
+**Freigegeben am 02.10.2026:** F1–F4 wie vorgeschlagen (Abschnitt 4, „Zum Feinplan U1“).
+
+**Als Nächstes (U1, Tag 1):** `src/lib/adressen.ts` mit Tests, dünne Seiten unter
+`/vorgaenge` und `/bem`, Weiterleitung in der Middleware, alle Verweise umstellen,
+Wächter-Test.
 
 ## 8. Branches und Commits
 
@@ -528,7 +543,8 @@ vor dem Pilot ausschließt.
 | `ux-umbau` | `8e530b0` | U0 Tag 5: Skelett, Leerzustand, Musterseite vollständig |
 | `ux-umbau` | `c5afbc0` | Zeitgrenze des Musterseiten-Tests (axe über die ganze Seite) |
 | `ux-umbau` | `7778752` | U0 Tag 6: Abnahme, Screenshots, `scripts/ux-abnahme.js`, Umbruch in Pille und Zeile |
-| `ux-umbau` | (folgt) | Feinplan U1 (Entwurf) |
+| `ux-umbau` | `c66f451` | Feinplan U1 (Entwurf) |
+| `ux-umbau` | (folgt) | Feinplan U1 freigegeben (F1–F4) |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
