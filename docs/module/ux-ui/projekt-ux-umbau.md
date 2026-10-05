@@ -4,68 +4,131 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 02.10.2026 (Übergabe nach U1; nächster Schritt: Feinplan Pilot Vertragsende)
+Letzte Änderung: 05.10.2026 (Übergabe nach Pilot Tag 2; alles gepusht)
 
-## 0. Übergabe (Stand 02.10.2026, abends)
+## 0. Übergabe (Stand 05.10.2026)
 
-**Wo wir stehen:** U0 (Fundament) und U1 (Rahmen) sind gebaut, abgenommen und gepusht
-(`origin/ux-umbau`). Nichts davon ist deployt. Vier Durchsichten, alle Befunde behoben.
+### 0.1 Wo wir stehen
 
-**Stand 02.10.2026, später:** Der Feinplan ist **freigegeben**
-([pilot-feinplan.md](pilot-feinplan.md), F1–F9 entschieden, Kurzform in Abschnitt 4).
-Tag 1 (Regeln) und Tag 2 (Bausteine Prozessleiste und Reiter auf der Musterseite) sind gebaut und
-durchgesehen. **Nächste Aufgabe:** der Prototyp-Tag (V0) – die Musterseite `/ui-muster` zeigt
-die Prozessleiste in acht Lagen des Vertragsendes und taugt dort als Klick-Dummy. Die Seite
-selbst (ab Tag 3: Bausteine Hinweis und Textfeld, Detailseite) erst nach V0. Der folgende Text ist die
-ursprüngliche Übergabe.
+- **U0** (Tokens, neun Bausteine, Musterseite) und **U1** (ein Kopf, neue Adressen) sind gebaut,
+  abgenommen und gepusht. **Nichts vom Umbau ist deployt.**
+- **Pilot Vertragsende:** Feinplan [pilot-feinplan.md](pilot-feinplan.md) am 02.10.2026
+  freigegeben (Fragen F1–F9, Kurzform in Abschnitt 4 als P-F1 bis P-F9). Gebaut sind:
+  - **Tag 1 – Regeln** (`src/lib/prozess/prozess-stand.ts`, `src/lib/prozess/vertragsende.ts`,
+    `src/lib/contract-end-status.ts`): Datenmodell der Prozessleiste, Adapter Vertragsende
+    (Schritte, „Jetzt dran“, Menü, Statuspille), Statuslisten aller HR-Routen an einer Stelle.
+  - **Tag 2 – Bausteine** (`src/components/ui/prozessleiste.tsx`, `src/components/ui/reiter.tsx`)
+    auf der Musterseite `/ui-muster` – die Prozessleiste dort in acht echten Lagen des
+    Vertragsendes (Klick-Dummy für den Prototyp-Tag).
+  - Sechs Durchsichten insgesamt, alle bestätigten Befunde behoben.
+- **Gepusht am 05.10.2026:** `origin/ux-umbau` bis einschließlich des Logbuch-Commits vom
+  05.10.2026 (nach `61b817f`). Typen, Lint und alle Tests grün (192 Suiten, 5.043 Tests –
+  geprüft ohne die fremden Arbeitskopien unter `.claude/`, siehe 0.3).
+- **Noch NICHT gebaut:** die Detailseite selbst (Feinplan Tag 3–7: Bausteine Hinweis und
+  Textfeld, neue Ansicht, Dialoge, Vorschau-Schalter, Abnahme). Laut Leitplanke erst NACH dem
+  Prototyp-Tag (V0).
 
-**Nächste Aufgabe (erledigt als Entwurf):** den **Feinplan für den Pilot Vertragsende** schreiben
-(`docs/module/ux-ui/pilot-feinplan.md`) – Umfang, Nicht-Umfang, Dateien, Tests, betroffene
-Mail- und Word-Vorlagen, Schema-Delta, Abnahme, Deploy, Fragen vor dem Bau. **Kein Code vor
-der Freigabe des Feinplans.**
+### 0.2 Erste Schritte der neuen Sitzung (in dieser Reihenfolge)
 
-**Was der Pilot laut Plan ist** (`ux-ui-plan-2026-09.html`, Abschnitt 5 und Entscheidung E10):
-ein senkrechter Schnitt durch EIN Modul – die Prozessleiste (U2) und die neue Detailseite
-(U4) für Vertragsende, dazu ein **Vorschau-Schalter je Benutzer** (alte und neue Ansicht
-nebeneinander, bis das Personalbüro zwei Wochen damit gearbeitet hat). Vertragsende wurde
-gewählt, weil es eine Verzweigung hat (Verlängerung oder Austritt).
+1. **Stand prüfen:** `git switch ux-umbau`, `git status`, `git log --oneline -6`,
+   `git fetch` und `git rev-list --left-right --count origin/ux-umbau...HEAD` (erwartet `0 0`).
+   Uncommittet sind nur `docs/README.md` (LOGA-Abschnitt) und `docs/module/loga/` – eigener
+   Strang, NICHT in UX-Commits aufnehmen.
+2. **`main` nachziehen** (`git merge main`, nicht rebasen). Auf `main` liegen seit dem Abzweig
+   zwei Commits zum Vertragsende: `6982015` und `3f6d3b0` – der Token der Führungskraft
+   (`supervisorToken`) steht nicht mehr in den Antworten der HR-Routen (neu:
+   `src/lib/contract-end-antwort.ts`). **Konflikte sind sicher**, beide Seiten haben dieselben
+   Dateien angefasst:
+   - `src/app/api/contract-end/[id]/route.ts`, `…/[id]/nicht-uebernehmen/route.ts`,
+     `…/[id]/supervisor-link/route.ts` – BEIDES behalten: unsere Statuslisten aus
+     `contract-end-status.ts` UND deren Antwort ohne Token.
+   - `src/__tests__/api/contract-end-nicht-uebernehmen.test.ts`,
+     `…/contract-end-reminder-manual.test.ts` – beide Ergänzungen behalten.
+   - `src/__tests__/api/contract-end-supervisor-link.test.ts` – von BEIDEN Seiten neu angelegt
+     (add/add): zu einer Datei zusammenführen (unsere Fälle: welcher Status gesperrt ist;
+     deren Fälle: kein Token in der Antwort).
+   - Danach prüfen: `supervisorTokenExpiresAt` muss in der Antwort von
+     `GET /api/contract-end/[id]` bleiben (Pflichtfeld des Adapters). Logbuch-Eintrag „Merge von
+     `main`“ wie am 01.10.2026.
+3. **`tageZwischen`:** Auf dem lokalen Branch `perf/tagezwischen-direkte-rechnung` (`099680d`,
+   nicht gepusht, nicht in `main`) rechnet die Funktion ohne Monatsschleife (Jest-Gesamtlauf laut
+   jener Sitzung 64 s → 30 s). Erst nach `main` bringen (Entscheidung des
+   Projektverantwortlichen), dann hierher mergen und die Hinweise „kostet unter Jest rund
+   10 ms“ streichen: Kommentar über `PROBEN` in `src/__tests__/lib/prozess-vertragsende.test.ts`,
+   Kommentar über `LAGEN` in `src/app/(portal)/ui-muster/prozessleiste-muster.tsx`, CLAUDE.md
+   (Punkt „Prozess-Stand“).
+4. **Arbeitskopien aufräumen:** Unter `.claude/worktrees/` liegen zwei (`bold-heisenberg-a615cf`,
+   `nervous-ritchie-2bbb51`) aus den Nebenaufgaben. Wenn deren Sitzungen fertig sind:
+   `git worktree list`, dann `git worktree remove <pfad>`. Solange sie liegen, siehe 0.3.
 
-**Was vor dem Schreiben zu lesen ist:**
+### 0.3 Prüfen, solange fremde Arbeitskopien unter `.claude/` liegen
 
-| Was | Wo |
+`npm run pruefen` nimmt sie mit (`tsconfig.json` schließt nur `node_modules` aus, Jest kennt
+keine Ausnahme) – dreifache Laufzeit und fremde Fehler. Dann so prüfen:
+
+```bash
+printf '{ "extends": "./tsconfig.json", "exclude": ["node_modules", ".claude"] }\n' > tsconfig.pruefen.tmp.json && npx tsc --noEmit -p tsconfig.pruefen.tmp.json; rm -f tsconfig.pruefen.tmp.json
+```
+
+```bash
+npx next lint && npx jest --testPathIgnorePatterns ".claude"
+```
+
+Dauerhaft lösen (auf `main`): `.claude` in `tsconfig.json` (`exclude`) und in
+`jest.config.ts` (`testPathIgnorePatterns`, `modulePathIgnorePatterns`) aufnehmen.
+
+### 0.4 Nächste Aufgabe: der Prototyp-Tag (V0)
+
+Termin setzt der Projektverantwortliche mit dem Personalbüro. Vorbereitet ist die Musterseite
+`/ui-muster` (nur `SUPER_ADMIN`): Prozessleiste in acht Lagen, Reiter, alle Bausteine. Am
+Prototyp-Tag zu klären:
+
+| Frage | Woher |
 |---|---|
-| Plan: Prozessleiste (Abschnitt D), Detailseite, Pakete U2 und U4, Pilot, Vorschau-Schalter, E10 | `ux-ui-plan-2026-09.html` |
-| Regeln der Oberfläche, Bausteine, Adressen, Kopf | `CLAUDE.md`, Abschnitt „Oberfläche (UX-Umbau)“ |
-| Muster eines Feinplans | `u0-feinplan.md`, `u1-feinplan.md` |
-| Das Modul heute | `src/app/(portal)/dashboard/contract-end/[id]/contract-end-detail-content.tsx` (910 Zeilen, eine Datei), Liste: `contract-end-dashboard-new.tsx`, `contract-end-config.tsx`; Seite: `src/app/(portal)/vorgaenge/vertragsende/[id]/page.tsx` |
-| Fachlichkeit des Moduls | `docs/module/vertragsende/` (`vertragsende-prozess.html`, `vertragsende-implementierung.md`, `vertragsende-phase2-plan.md`) |
-| Schnittstellen, Läufe, Mails des Moduls | `src/app/api/contract-end/`, `src/lib/laeufe/vertragsende-erinnerungen.ts`, Ereignisse `contract-end-*` in `src/lib/events.ts` |
+| Texte von „Jetzt dran“ je Status, Statuspillen („Wartet auf Führungskraft“ …) | Feinplan 3.3 und 3.5 – alles dort nur angenommen |
+| Was am Handy von den Schritten sichtbar sein soll (heute nur Punkte und „Schritt 4 von 5 · Vertrag“) | Feinplan 11, offen 1 |
+| Ob ein klickbarer Schritt ein sichtbares Zeichen braucht | Feinplan 11, offen 2 |
+| „sonst: Offboarding“ nach dem Abschluss weiter zeigen? | Feinplan 11, offen 3 |
+| E9 Dichte der Listen, E11 Anzeigenamen der Module, E13 Textbausteine | Plan, Abschnitt 6 |
 
-**Was der Feinplan klären muss (offene Entscheidungen):**
+Ergebnisse in Abschnitt 4 (Entscheidungen) und im Feinplan festhalten, danach Tag 3.
 
-- **Prototyp-Tag (V0)** mit dem Personalbüro ist laut Plan die Voraussetzung für den Pilot
-  und beantwortet E9 (Dichte der Listen), E11 (Anzeigenamen der Module), E13 (Textbausteine).
-  Der Termin steht noch nicht. Der Feinplan kann vorher entstehen, muss aber sagen, was ohne
-  V0 nur angenommen ist.
-- **Vorschau-Schalter:** Wo wird die Wahl gespeichert (Benutzerkonto = Schema-Delta, oder
-  nur im Browser)? Wer darf umschalten? Was ist die Vorgabe?
-- **Zuschnitt:** Was vom Vertragsende gehört in den Pilot (Detailseite, Prozessleiste), was
-  bleibt alt (Liste – die baut U3 um; bei 390 px ist sie heute breiter als das Fenster)?
-- **Dateien:** Mit dem Pilot ziehen die Dateien des Moduls aus `(portal)/dashboard/` um
-  (U1-F4) – wohin genau?
-- **Hauptüberschrift:** Die Detailseite von Vertragsende hat seit U1 keine `h1`; der
-  `Seitenkopf` bringt sie.
-- **Anrede:** Portal-Texte des Moduls auf „du“ bzw. ohne Anrede (E6).
-- **Fachstatus → Ton der Statuspille:** Katalog des Moduls (wer wartet, was ist kritisch).
+### 0.5 Danach: Tag 3 bis 7 (Feinplan, Abschnitt 6)
 
-**Offen beim Projektverantwortlichen** (unabhängig vom Feinplan): Deploy von U0 + U1 mit
-Ankündigung an das Personalbüro; Termin Prototyp-Tag; Deploy von `main` (Checklisten,
-Paket 3).
+Tag 3 Bausteine **Hinweis** und **Textfeld** (Feinplan 3.1), neue Ansicht lesend (Kopf, Leiste,
+Hinweise, Reiter Übersicht); Tag 4 Handlungen und Dialoge, Reiter Vertragsdaten/Dokumente/
+E-Mails, `?tab=`; Tag 5 Vorschau-Schalter (Cookie `ansicht-vertragsende=neu`, P-F1), Testdaten,
+Seitentest; Tag 6–7 Abnahme, Durchsicht, Dokumentation. Dateien der neuen Ansicht neben
+`src/app/(portal)/vorgaenge/vertragsende/[id]/page.tsx` (Feinplan 3.7); die alte Ansicht bleibt
+unverändert, bis der Schalter entfällt. Entschieden und einzubauen: „Vorgang stornieren …“ im
+Menü (P-F2), „Abschließen …“ auch nach „keine Übernahme“ mit Verweis zum Offboarding (P-F3),
+Hinweis bei überschrittenem Vertragsende (P-F4, im Adapter schon drin), Rückmeldung per
+`mailto:personalbuchhaltung@fes-minden.de` (P-F5).
 
-**Werkzeuge, die es schon gibt:** `scripts/ux-abnahme.js` (Bilder, Bildvergleich),
-`scripts/ux-abnahme-u1.js` (Rollen, An-/Abmelden, Tastatur im Browser),
-`scripts/dev-passwort-neu.js` (Passwort eines Dev-Kontos neu setzen), Musterseite
-`/ui-muster`.
+### 0.6 Werkzeuge und Fallen
+
+- **Anmelden im Browser für Abnahmen:** Testkonto `claude-test-admin@beispiel.invalid`
+  (`SUPER_ADMIN`, nur Dev-DB auf Port 5433). Passwort NIE ausgeben: in einer Zeile mit
+  `node scripts/dev-passwort-neu.js claude-test-admin@beispiel.invalid` erzeugen, per `grep`
+  in eine Shell-Variable, direkt an `DEV_EMAIL=… DEV_PASSWORT="$PW" node scripts/ux-abnahme.js
+  muster` übergeben. Dev-Server über die Startkonfiguration `credo-hr-dev`.
+- **Abnahme-Skripte:** `scripts/ux-abnahme.js` (`muster` – drei Breiten nach `screenshots/`,
+  `seiten`, `vergleich`), `scripts/ux-abnahme-u1.js` (Rollen, An-/Abmelden, Tastatur).
+  `puppeteer-core` ist installiert; `forced-colors` lässt sich damit NICHT nachstellen.
+- **Radix Tabs** wählt bei `mousedown`, nicht bei `click` – Tests spielen die ganze Folge einer
+  Maustaste (`klick()` in `ui-reiter.test.tsx`).
+- **Farbtabellen:** Tokens nur über `src/__tests__/hilfen/farb-tokens.ts`; jede neue Tabelle
+  `…_FARBEN` braucht eine Rechnung (Wächter in `ui-kontrast.test.ts`) UND einen Test, dass das
+  Markup sie benutzt.
+- **Arbeitsabläufe mit Agenten** (Ultracode): danach IMMER `git status`, `git log`,
+  `git rev-list … origin/ux-umbau...HEAD` prüfen – Agenten dürfen nicht committen oder pushen.
+- Lange Python-Heredocs mit Backticks scheitern in der Bash: Skript in den Scratchpad schreiben.
+
+### 0.7 Offen beim Projektverantwortlichen
+
+Deploy von U0 + U1 (mit Ankündigung an das Personalbüro; Pilot-Teile sind noch nicht
+sichtbar); Termin Prototyp-Tag; Deploy von `main` (Token-Fix Vertragsende, Checklisten,
+Paket 3 mit zwei neuen Tabellen); Entscheidung über `perf/tagezwischen-direkte-rechnung`.
 
 ## 1. Worum es geht
 
@@ -89,9 +152,9 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 |---|---|---|
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
-| **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
+| **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Gepusht am 02.10.2026. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut und durchgesehen**; die Seite (ab Tag 3) erst nach dem Prototyp-Tag (V0) |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); die Seite (ab Tag 3) erst nach dem Prototyp-Tag (V0) |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -990,6 +1053,13 @@ Geprüft wurde deshalb ohne diesen Ordner. Nicht geändert; gehört nach `main`.
 **Als Nächstes:** Prototyp-Tag (V0) mit der Musterseite; danach Tag 3 (Bausteine Hinweis und
 Textfeld, Detailseite lesend).
 
+### 05.10.2026 – Push und Übergabe
+
+Vor dem Push geprüft: Typen, Lint, alle Tests grün (192 Suiten, 5.043 Tests; ohne
+`.claude/`, siehe 0.3). Gepusht: `ux-umbau` mit Feinplan, Tag 1, fünfter Durchsicht, Tag 2 und
+diesem Logbuch-Eintrag. Abschnitt 0 für die nächste Sitzung neu geschrieben (Merge von `main`
+mit sicheren Konflikten, `tageZwischen`-Branch, Arbeitskopien, Prototyp-Tag, Tag 3–7).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1023,9 +1093,10 @@ Textfeld, Detailseite lesend).
 | `ux-umbau` | `f87fb38` | Feinplan Pilot Vertragsende, freigegeben (F1–F9) |
 | `ux-umbau` | `9d6baf4` | Pilot Tag 1: Prozess-Stand, Adapter Vertragsende, Statusübergänge in eigener Datei |
 | `ux-umbau` | `5975909` | Befunde der fünften Durchsicht; Statuslisten der HR-Routen in `contract-end-status.ts` |
+| `ux-umbau` | `61b817f` | Pilot Tag 2: Bausteine Prozessleiste und Reiter, Musterseite, Token-Leser, Befunde der sechsten Durchsicht |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Seit dem Push dazugekommen und NICHT gepusht: Feinplan des Pilots (`f87fb38`), Pilot Tag 1 (`9d6baf4`), die Korrekturen der fünften Durchsicht (`5975909`) und Pilot Tag 2. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).
