@@ -1,10 +1,17 @@
 /**
- * Tests fuer /api/contract-end (POST – Anlage + displayId-Format)
+ * Tests fuer /api/contract-end (POST – Anlage + displayId-Format,
+ * GET – Liste; beide Antworten ohne den Schluessel des Magic-Links)
  */
 
 const mockGetSession = jest.fn();
 const mockPrisma = {
-  contractEndProcess: { findUnique: jest.fn(), count: jest.fn(), create: jest.fn() },
+  contractEndProcess: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    groupBy: jest.fn(),
+    count: jest.fn(),
+    create: jest.fn(),
+  },
   organization: { findUnique: jest.fn() },
   auditLog: { create: jest.fn() },
   $transaction: jest.fn(),
@@ -22,7 +29,7 @@ jest.mock("@/lib/permissions", () => ({
   orgFilter: jest.fn().mockResolvedValue({}),
 }));
 
-import { POST } from "@/app/api/contract-end/route";
+import { GET, POST } from "@/app/api/contract-end/route";
 import { NextRequest } from "next/server";
 
 function createRequest(body?: Record<string, unknown>): NextRequest {
@@ -40,6 +47,9 @@ const validBody = {
   organizationId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   contractEndDate: "2026-12-31",
 };
+
+/** Steht fuer den Schluessel des Magic-Links — darf in keiner Antwort auftauchen. */
+const GEHEIM = "geheimer-magic-link-token";
 
 const mockOrg = {
   id: validBody.organizationId,
@@ -114,4 +124,103 @@ describe("API /api/contract-end POST", () => {
     expect(createCall.data.displayId).toMatch(/^VE-\d{4}-[A-Z0-9]+-\d{3}$/);
     expect(mockTriggerWebhooks).toHaveBeenCalledWith("contract-end-created", expect.any(Object));
   });
+
+  it("201: die Antwort trägt den Vorgang ohne supervisorToken", async () => {
+    mockPrisma.organization.findUnique.mockResolvedValue(mockOrg);
+    mockPrisma.contractEndProcess.count.mockResolvedValue(0);
+    const created = {
+      id: "ce1",
+      displayId: "VE-2026-GYM-001",
+      employeeFirstName: "Max",
+      employeeLastName: "Mustermann",
+      employeeEmail: validBody.employeeEmail,
+      contractEndDate: new Date("2026-12-31"),
+      organization: mockOrg,
+    };
+    mockPrisma.contractEndProcess.findUnique
+      .mockResolvedValueOnce(null)
+      // Bei einer Neuanlage ist der Token leer — der Test legt bewusst einen
+      // Wert hinein: Die Antwort darf das Feld nie tragen, gleich was drinsteht.
+      .mockResolvedValueOnce({ ...created, supervisorToken: GEHEIM, supervisorTokenExpiresAt: null });
+    mockPrisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof mockPrisma) => Promise<unknown>) => fn(mockPrisma),
+    );
+    mockPrisma.contractEndProcess.create.mockResolvedValue(created);
+    mockPrisma.auditLog.create.mockResolvedValue({});
+    mockTriggerWebhooks.mockResolvedValue(undefined);
+
+    const res = await POST(createRequest(validBody));
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.id).toBe("ce1");
+    expect(json).not.toHaveProperty("supervisorToken");
+    expect(JSON.stringify(json)).not.toContain(GEHEIM);
+  });
+});
+
+describe("API /api/contract-end GET (Liste)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCanAccessProcess.mockResolvedValue(true);
+    mockPrisma.contractEndProcess.count.mockResolvedValue(2);
+    mockPrisma.contractEndProcess.groupBy.mockResolvedValue([
+      { status: "ANFRAGE_VORGESETZTER", _count: { status: 1 } },
+      { status: "ANGELEGT", _count: { status: 1 } },
+    ]);
+    mockPrisma.contractEndProcess.findMany.mockResolvedValue([
+      {
+        id: "ce1",
+        displayId: "VE-2026-GYM-001",
+        status: "ANFRAGE_VORGESETZTER",
+        supervisorEmail: "leitung@example.org",
+        supervisorToken: GEHEIM,
+        supervisorTokenExpiresAt: new Date("2026-11-01T00:00:00.000Z"),
+        organization: mockOrg,
+      },
+      {
+        id: "ce2",
+        displayId: "VE-2026-GYM-002",
+        status: "ANGELEGT",
+        supervisorEmail: null,
+        supervisorToken: null,
+        supervisorTokenExpiresAt: null,
+        organization: mockOrg,
+      },
+    ]);
+  });
+
+  function listRequest(): NextRequest {
+    return new NextRequest("http://localhost:3000/api/contract-end");
+  }
+
+  // Die Route laesst alle PORTAL_ROLES zu, also auch die nur lesenden. Heute
+  // sperrt die Middleware diese beiden Rollen noch fuer alle Schnittstellen
+  // (Mandanten-Gate, src/lib/mandanten-gate.ts) — die Antwort muss aber schon
+  // stimmen, bevor die Route dort freigegeben wird.
+  it.each(["HR_LEITUNG", "EINRICHTUNGSLEITUNG", "VORGESETZTER"])(
+    "200 für %s: keine Zeile trägt supervisorToken",
+    async (role) => {
+      mockGetSession.mockResolvedValue({ userId: "u1", role });
+
+      const res = await GET(listRequest());
+      expect(res.status).toBe(200);
+      const json = await res.json();
+
+      expect(json.total).toBe(2);
+      expect(json.data).toHaveLength(2);
+      for (const zeile of json.data) {
+        expect(zeile).not.toHaveProperty("supervisorToken");
+      }
+      expect(JSON.stringify(json)).not.toContain(GEHEIM);
+      // Der Rest der Zeile bleibt, wie er war
+      expect(json.data[0]).toMatchObject({
+        id: "ce1",
+        displayId: "VE-2026-GYM-001",
+        supervisorEmail: "leitung@example.org",
+        supervisorTokenExpiresAt: "2026-11-01T00:00:00.000Z",
+        organization: { name: "CREDO Gymnasium" },
+      });
+      expect(json.statusCounts).toEqual({ ANFRAGE_VORGESETZTER: 1, ANGELEGT: 1 });
+    },
+  );
 });

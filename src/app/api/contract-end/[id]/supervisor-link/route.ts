@@ -128,11 +128,13 @@ export async function POST(
       tokenExpiresAt: supervisorTokenExpiresAt.toISOString(),
     });
 
+    // Der Link (und damit der Token) geht NUR per Mail an die Fuehrungskraft,
+    // nicht in die Antwort an HR — wer ihn kennt, entscheidet in ihrem Namen
+    // (src/lib/contract-end-antwort.ts). Die Oberflaeche liest ihn nicht.
     return NextResponse.json(
       {
         id: updated.id,
         supervisorEmail,
-        formularLink,
         employeeName,
         supervisorTokenExpiresAt,
       },

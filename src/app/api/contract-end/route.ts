@@ -19,6 +19,7 @@ import {
   canAccessProcess,
 } from "@/lib/permissions";
 import { createContractEndProcess } from "@/lib/contract-end";
+import { ohneVorgesetztenToken } from "@/lib/contract-end-antwort";
 
 // =============================================
 // GET /api/contract-end – Alle Vorgaenge auflisten
@@ -103,7 +104,8 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      data: items,
+      // Jede Zeile ohne den Schluessel des Magic-Links
+      data: items.map(ohneVorgesetztenToken),
       total,
       page,
       limit,
@@ -174,7 +176,7 @@ export async function POST(request: NextRequest) {
       include: { organization: true, renewalData: true },
     });
 
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(result ? ohneVorgesetztenToken(result) : result, { status: 201 });
   } catch (error) {
     console.error("Fehler beim Anlegen des Vertragsende-Vorgangs:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });

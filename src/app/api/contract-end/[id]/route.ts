@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { updateContractEndSchema } from "@/lib/validations/contract-end";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
+import { ohneVorgesetztenToken } from "@/lib/contract-end-antwort";
 import { CONTRACT_END_UEBERGAENGE } from "@/lib/contract-end-status";
 
 // Gueltige Status-Uebergaenge: src/lib/contract-end-status.ts (dieselbe Tabelle
@@ -57,7 +58,9 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(contractEnd);
+    // Ohne den Schluessel des Magic-Links — das Ablaufdatum
+    // (supervisorTokenExpiresAt) bleibt, die Oberflaeche braucht es.
+    return NextResponse.json(ohneVorgesetztenToken(contractEnd));
   } catch (error) {
     console.error("Fehler beim Laden des Vertragsende-Vorgangs:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
@@ -194,7 +197,7 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json(ohneVorgesetztenToken(updated));
   } catch (error) {
     console.error("Fehler beim Aktualisieren des Vertragsende-Vorgangs:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });

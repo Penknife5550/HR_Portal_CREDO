@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 05.10.2026 (Übergabe nach Pilot Tag 2; alles gepusht)
+Letzte Änderung: 05.10.2026 (Merge von `main` mit dem Token-Fix Vertragsende; nicht gepusht)
 
 ## 0. Übergabe (Stand 05.10.2026)
 
@@ -34,7 +34,8 @@ Letzte Änderung: 05.10.2026 (Übergabe nach Pilot Tag 2; alles gepusht)
    `git fetch` und `git rev-list --left-right --count origin/ux-umbau...HEAD` (erwartet `0 0`).
    Uncommittet sind nur `docs/README.md` (LOGA-Abschnitt) und `docs/module/loga/` – eigener
    Strang, NICHT in UX-Commits aufnehmen.
-2. **`main` nachziehen** (`git merge main`, nicht rebasen). Auf `main` liegen seit dem Abzweig
+2. **Erledigt am 05.10.2026** (Protokoll „Merge von `main`“ in Abschnitt 7).
+   **`main` nachziehen** (`git merge main`, nicht rebasen). Auf `main` liegen seit dem Abzweig
    zwei Commits zum Vertragsende: `6982015` und `3f6d3b0` – der Token der Führungskraft
    (`supervisorToken`) steht nicht mehr in den Antworten der HR-Routen (neu:
    `src/lib/contract-end-antwort.ts`). **Konflikte sind sicher**, beide Seiten haben dieselben
@@ -1059,6 +1060,32 @@ Vor dem Push geprüft: Typen, Lint, alle Tests grün (192 Suiten, 5.043 Tests; o
 `.claude/`, siehe 0.3). Gepusht: `ux-umbau` mit Feinplan, Tag 1, fünfter Durchsicht, Tag 2 und
 diesem Logbuch-Eintrag. Abschnitt 0 für die nächste Sitzung neu geschrieben (Merge von `main`
 mit sicheren Konflikten, `tageZwischen`-Branch, Arbeitskopien, Prototyp-Tag, Tag 3–7).
+
+### 05.10.2026 – Merge von `main` (Token-Fix Vertragsende)
+
+`git merge main` holt `6982015` und `3f6d3b0`: Der Token der Führungskraft (`supervisorToken`)
+steht in keiner Antwort der HR-Routen mehr (`src/lib/contract-end-antwort.ts`,
+`ohneVorgesetztenToken`), dazu die Tests `contract-end-detail.test.ts` und
+`contract-end-antwort.test.ts`. Statt der angekündigten sechs Konflikte waren es vier; die Route
+`supervisor-link` und der Test `contract-end-reminder-manual` hat Git selbst zusammengeführt.
+
+| Datei | Konflikt | Lösung |
+|---|---|---|
+| `api/contract-end/[id]/route.ts` | Importzeile | beide: `ohneVorgesetztenToken` (main) und `CONTRACT_END_UEBERGAENGE` (wir) |
+| `api/contract-end/[id]/nicht-uebernehmen/route.ts` | Importzeile | beide: `ohneVorgesetztenToken` und `CONTRACT_END_OFFBOARDING_AUS` |
+| `contract-end-nicht-uebernehmen.test.ts` | zwei neue Testfälle an derselben Stelle | beide hintereinander (Statusliste; kein Token in der Antwort) |
+| `contract-end-supervisor-link.test.ts` | beide Seiten neu angelegt (add/add) | Fassung von `main` als Grundlage, unsere Fälle (Rechte und Mandant, gesperrte und mögliche Status, Listen decken alle Status ab) unverändert dazu; Token-Attrappe einheitlich die von `main` (`geheimer-magic-link-token`, Ablauf 01.11.2026) |
+
+Gegenprobe: Gegenüber `main` bleiben in den Routen nur unsere Statuslisten übrig, gegenüber
+`ux-umbau` nur die Änderungen von `main`; kein Testfall einer Seite fehlt.
+`supervisorTokenExpiresAt` steht weiter in der Antwort von `GET /api/contract-end/[id]`
+(`contract-end-detail.test.ts` prüft es; der Adapter braucht es). Keine Oberfläche des
+Vertragsendes liest `supervisorToken`. Typen, Lint und alle Tests grün (194 Suiten, `main`
+bringt zwei neue; ohne `.claude/`, siehe 0.3). Die Sperrklinke brauchte keinen neuen Stand.
+
+**Falle beim Prüfen:** `npx jest --testPathIgnorePatterns ".claude" <muster>` nimmt die Muster
+dahinter als weitere AUSNAHMEN – es läuft dann alles außer den gesuchten Tests. Mit
+Gleichheitszeichen und `--` schreiben: `npx jest --testPathIgnorePatterns=".claude" -- <muster>`.
 
 ## 8. Branches und Commits
 

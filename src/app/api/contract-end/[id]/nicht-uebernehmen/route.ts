@@ -17,6 +17,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
 import { createOffboardingProcess } from "@/lib/offboarding";
+import { ohneVorgesetztenToken } from "@/lib/contract-end-antwort";
 import { CONTRACT_END_OFFBOARDING_AUS } from "@/lib/contract-end-status";
 
 export async function POST(
@@ -151,7 +152,7 @@ export async function POST(
 
     return NextResponse.json(
       {
-        contractEnd: updated,
+        contractEnd: ohneVorgesetztenToken(updated),
         offboarding: { id: offboarding.id, displayId: offboarding.displayId },
       },
       { status: 201 }

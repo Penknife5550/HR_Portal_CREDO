@@ -120,6 +120,46 @@ describe("Strang B: nicht-uebernehmen", () => {
     });
   });
 
+  // Der Schluessel des Magic-Links der Fuehrungskraft gehoert in keine Antwort
+  // an HR — auch dann nicht, wenn die Anfrage vor der Entscheidung schon lief.
+  it("201: contractEnd in der Antwort trägt keinen supervisorToken", async () => {
+    const geheim = "geheimer-magic-link-token";
+    mockPrisma.contractEndProcess.findUnique.mockResolvedValue({
+      ...ceBase,
+      supervisorEmail: "leitung@example.org",
+      supervisorToken: geheim,
+    });
+    mockPrisma.contractEndProcess.updateMany.mockResolvedValue({ count: 1 });
+    mockCreateOffboarding.mockResolvedValue({ id: "off1", displayId: "OFF-2026-GYM-004" });
+    mockPrisma.contractEndProcess.update.mockResolvedValue({
+      ...ceBase,
+      status: "ENTSCHEIDUNG_KEINE_UEBERNAHME",
+      offboardingId: "off1",
+      supervisorEmail: "leitung@example.org",
+      supervisorToken: geheim,
+      supervisorTokenExpiresAt: new Date("2026-11-01T00:00:00.000Z"),
+      offboarding: { id: "off1", displayId: "OFF-2026-GYM-004", status: "INITIATED" },
+    });
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    const res = await POST(req(), { params: params() });
+    expect(res.status).toBe(201);
+    const json = await res.json();
+
+    expect(json.contractEnd).not.toHaveProperty("supervisorToken");
+    expect(JSON.stringify(json)).not.toContain(geheim);
+    // Der Rest der Antwort bleibt, wie er war
+    expect(json.contractEnd).toMatchObject({
+      id: "ce1",
+      status: "ENTSCHEIDUNG_KEINE_UEBERNAHME",
+      offboardingId: "off1",
+      supervisorEmail: "leitung@example.org",
+      supervisorTokenExpiresAt: "2026-11-01T00:00:00.000Z",
+      offboarding: { id: "off1", displayId: "OFF-2026-GYM-004", status: "INITIATED" },
+    });
+    expect(json.offboarding).toEqual({ id: "off1", displayId: "OFF-2026-GYM-004" });
+  });
+
   // Paket 1b: Die Fuehrungskraft des Vertragsendes bekommt im Offboarding die
   // Aufgaben mit der Zustaendigkeit "Führungskraft".
   describe("Führungskraft aus dem Vertragsende", () => {
