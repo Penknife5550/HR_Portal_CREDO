@@ -15,7 +15,7 @@
  */
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { axeVerstoesse } from "../hilfen/axe";
 import { STATUS_TOENE } from "@/components/ui/statuspille";
 
@@ -72,7 +72,8 @@ describe("Inhalt", () => {
     const { container } = await seite();
     expect(await axeVerstoesse(container)).toEqual([]);
     const ebenen = Array.from(container.querySelectorAll("h1, h2, h3, h4")).map((h) => h.tagName);
-    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(11);
+    // 11 aus U0, dazu Prozessleiste, Reiter und die Gruppe im gewaehlten Reiter.
+    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(14);
     expect(ebenen).not.toContain("H3");
     expect(ebenen.filter((e) => e === "H1")).toHaveLength(1);
   });
@@ -135,6 +136,47 @@ describe("Inhalt", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Kritisch 3" }));
     expect(screen.getByText("3 Vorgänge in „Kritisch“")).toBeTruthy();
   });
+
+  it("zeigt die Prozessleiste in ihren Lagen: jeder Zustand eines Schritts, „Jetzt dran“, Dringlichkeit, beide Enden", async () => {
+    const { container } = await seite();
+    const leisten = Array.from(container.querySelectorAll("[data-prozessleiste]"));
+    expect(leisten.length).toBeGreaterThanOrEqual(8);
+    // Jede Leiste ist eine eigene, benannte Liste.
+    const namen = screen.getAllByRole("list").map((l) => l.getAttribute("aria-label")).filter((n) => n?.startsWith("Ablauf"));
+    expect(new Set(namen).size).toBe(leisten.length);
+
+    const zustaende = new Set(Array.from(container.querySelectorAll("[data-prozessleiste] li")).map((li) => li.getAttribute("data-status")));
+    expect([...zustaende].sort()).toEqual(["aktiv", "erledigt", "kommend", "uebersprungen"]);
+    expect(container.querySelectorAll("[data-jetzt-dran]").length).toBeGreaterThanOrEqual(6);
+    expect(container.querySelector('[data-ende="abgeschlossen"]')).not.toBeNull();
+    expect(container.querySelector('[data-ende="abgebrochen"]')).not.toBeNull();
+    // Bei wem es liegt – beide Seiten kommen vor.
+    expect(screen.getAllByText("Jetzt dran · HR").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Jetzt dran · Führungskraft").length).toBeGreaterThan(0);
+    // Dringlichkeit als Pille mit Wort, nicht nur als Farbe.
+    expect(within(leisten[1] as HTMLElement).getByText("Frist naht")).toBeTruthy();
+    expect(screen.getAllByText("Kritisch").length).toBeGreaterThan(0);
+    // Ein Schritt mit Reiter ist ein Knopf.
+    expect(screen.getAllByRole("button", { name: /^Vertrag \(/ }).length).toBeGreaterThan(0);
+  });
+
+  it("zeigt die Reiter mit Zaehler; der Wechsel tauscht den Inhalt, axe findet danach nichts", async () => {
+    const { container } = await seite();
+    const leiste = screen.getByRole("tablist", { name: "Bereiche des Vorgangs" });
+    expect(within(leiste).getAllByRole("tab").map((r) => r.textContent)).toEqual([
+      "Übersicht",
+      "Vertragsdaten",
+      "Dokumente1",
+      "E-Mails0",
+    ]);
+    expect(screen.getByText("Gewählt: Übersicht")).toBeTruthy();
+    // Radix waehlt bei `mousedown`, nicht bei `click`.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Dokumente 1" }));
+    expect(screen.getByText("Gewählt: Dokumente")).toBeTruthy();
+    expect(screen.getByText("Verlängerungsvertrag")).toBeTruthy();
+    expect(await axeVerstoesse(container)).toEqual([]);
+  });
+
   it("zeigt Ladezustand und Leerzustand; axe findet auch nach dem Umschalten nichts", async () => {
     const { container } = await seite();
     expect(container.querySelector('[data-skelett="liste"]')).not.toBeNull();

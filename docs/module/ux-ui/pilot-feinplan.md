@@ -474,7 +474,7 @@ Pilot nichts.
 | Tag | Stand | Commit |
 |---|---|---|
 | 1 Regeln: `ProzessStand`, Adapter, Kataloge, Statustabelle in eigener Datei | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
-| 2 Bausteine Prozessleiste und Reiter | offen | |
+| 2 Bausteine Prozessleiste und Reiter, Musterseite, Kontrast | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 3–7 Seite, Schalter, Abnahme | offen – erst nach dem Prototyp-Tag (V0) | |
 
 **Beim Bau von Tag 1 genauer gefasst** (gegenüber 3.2 und 3.3):
@@ -520,3 +520,26 @@ im Logbuch):
   Für die Route `/supervisor-link` des Vertragsendes gab es bisher keinen Test – er ist neu.
   Dasselbe Statuspaar „Anfrage offen“ steht weiter im Formular der Führungskraft und im
   Erinnerungslauf; beide lesen die gemeinsame Liste noch nicht (nicht angefasst).
+
+**Tag 2 – wie gebaut** (Einzelheiten und Befunde der Durchsicht im Logbuch):
+
+- **Prozessleiste** wie in 3.1, mit diesen Festlegungen: Die Linie ist grün, soweit der Ablauf
+  sie hinter sich hat – auch über übersprungene Schritte hinweg. Die Kurzform unter 640 px
+  steht nur bei laufendem Ablauf (am Ende sagt es der Kasten). Ein kommender Schritt in einem
+  beendeten Ablauf heißt für Screenreader „nicht erreicht“. Dringlichkeit steht als Pille mit
+  Wort („Kritisch“, „Frist naht“) neben der Frist.
+- **Reiter** als `Reiter` + `ReiterInhalt` (Inhalte stehen in der Seite, nicht in der
+  Eintragsliste). Der gewählte Reiter wird am Handy in den sichtbaren Teil der Leiste geholt.
+- **Musterseite:** acht Lagen der Prozessleiste aus dem echten Adapter mit festem Datum –
+  das ist der Klick-Dummy für den Prototyp-Tag (P-F9). Je Lage steht darunter, was im
+  „…“-Menü des Seitenkopfs läge.
+- **Offen für den Prototyp-Tag** (nicht entschieden, bewusst nicht gebaut):
+  1. Unter 640 px (und bei starker Vergrößerung am Laptop) sehen Sehende von den Schritten
+     nur Punkte und „Schritt 4 von 5 · Vertrag“; Zuständigkeit, Notiz („MAV offen“), Datum
+     und der andere Weg sind dann nur für Screenreader da. So steht es in 3.1 und im Mockup
+     des Plans; die Angaben stehen auf der Detailseite zusätzlich im Reiter Übersicht.
+     Alternative: die Unterzeile des aktiven Schritts in die Kurzform nehmen.
+  2. Ein klickbarer Schritt („Vertrag“ → Reiter Dokumente) zeigt das nur beim Überfahren und
+     am Fokusring – auf dem Handy gibt es kein sichtbares Zeichen dafür.
+  3. Nach dem Abschluss steht an der Rückmeldung weiter „sonst: Offboarding“ (der nicht
+     gewählte Weg). Frage an den Adapter, ob das nach dem Ende noch gezeigt werden soll.

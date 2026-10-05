@@ -13,9 +13,10 @@ Letzte Änderung: 02.10.2026 (Übergabe nach U1; nächster Schritt: Feinplan Pil
 
 **Stand 02.10.2026, später:** Der Feinplan ist **freigegeben**
 ([pilot-feinplan.md](pilot-feinplan.md), F1–F9 entschieden, Kurzform in Abschnitt 4).
-Tag 1 (reine Regeln `ProzessStand` + Adapter) ist gebaut und durchgesehen (fünfte Durchsicht, acht Befunde behoben). **Nächste Aufgabe:** Tag 2 –
-Bausteine Prozessleiste und Reiter auf der Musterseite; das darf vor dem Prototyp-Tag
-laufen (F9). Die Seite selbst (ab Tag 3) erst nach V0. Der folgende Text ist die
+Tag 1 (Regeln) und Tag 2 (Bausteine Prozessleiste und Reiter auf der Musterseite) sind gebaut und
+durchgesehen. **Nächste Aufgabe:** der Prototyp-Tag (V0) – die Musterseite `/ui-muster` zeigt
+die Prozessleiste in acht Lagen des Vertragsendes und taugt dort als Klick-Dummy. Die Seite
+selbst (ab Tag 3: Bausteine Hinweis und Textfeld, Detailseite) erst nach V0. Der folgende Text ist die
 ursprüngliche Übergabe.
 
 **Nächste Aufgabe (erledigt als Entwurf):** den **Feinplan für den Pilot Vertragsende** schreiben
@@ -90,7 +91,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Push, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) gebaut und durchgesehen**, Tag 2 (Bausteine) als Nächstes, die Seite erst nach dem Prototyp-Tag (V0) |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut und durchgesehen**; die Seite (ab Tag 3) erst nach dem Prototyp-Tag (V0) |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -205,6 +206,10 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Fragebogen-Vorschau | – | eigene Ordnergruppe `(portal-ohne-kopf)`, Adresse unverändert | Die Vorschau zeigt den Fragebogen, wie ihn die Person sieht; über das Layout hätte sie den Portal-Kopf bekommen. |
 | Rollennamen der Benutzerverwaltung | Feinplan: Zusammenführen mit U6 | schon jetzt aus `rollenName()` | Befund der vierten Durchsicht; sonst hieße dieselbe Person im Kopf „Führungskraft“ und in der Liste „Vorgesetzter“. |
 | Prototyp-Tag | „Kein Paket außer U0 startet ohne den Prototyp-Tag“ | gilt ab dem Pilot; U1 darf vorher | U1 ändert nur den Rahmen (Kopf, Breadcrumb, Adressen) und hängt an keiner der Fragen des Prototyp-Tags (E9, E11, E13). |
+| Prototyp-Tag, Pilot | wie oben | Tag 1–2 des Pilots (Regeln, Bausteine auf der Musterseite) vor V0, die Seite danach (P-F9) | Nichts davon sieht das Personalbüro; die Musterseite mit der Leiste ist der Klick-Dummy für V0. |
+| Prozessleiste: kompakt und klebend | „Sticky mit Kompaktmodus beim Scrollen und unter 640 px“ | unter 640 px kompakt, aber nicht klebend (P-F6) | Die Seiten des Vertragsendes sind kurz; der Nutzen zeigt sich erst im Onboarding. |
+| Prozessleiste: Zustände | erledigt, aktiv, parallel, kommend, blockiert, übersprungen, verzweigt, Schleife, abgebrochen/pausiert, Zeitachse | erledigt, aktiv, kommend, übersprungen, verzweigt (als Hinweis am Schritt), Ende abgeschlossen/abgebrochen | Nur was Vertragsende braucht; der Rest kommt mit dem Modul, das ihn braucht. |
+| Reiter | – (Feinplan: Radix Tabs) | Radix Tabs, aber: ein Klick meldet einmal, Tab-Halt folgt der Auswahl, Bild-auf/-ab rollen die Seite | Radix meldet je Klick zweimal, merkt sich den zuletzt fokussierten Reiter und belegt Bild-auf/-ab – alle drei stören, sobald die Seite den Reiter in der Adresse führt. |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
 
@@ -916,6 +921,75 @@ weiter `supervisorToken` an alle `PORTAL_ROLES` zurück (siehe Tag 1).
 
 **Als Nächstes:** Tag 2 – Bausteine Prozessleiste und Reiter auf der Musterseite.
 
+### 02.10.2026 – Pilot, Tag 2 (Bausteine Prozessleiste und Reiter)
+
+**Gebaut:**
+
+- `src/components/ui/prozessleiste.tsx` – zeichnet einen `ProzessStand`: Schritte als Punkte
+  auf einer Linie, darunter „Jetzt dran“ mit Satz, bei wem, Unterzeile, Frist (dringend: Pille
+  mit Wort) und den Knöpfen der Seite; am Ende „Abgeschlossen“ bzw. „Abgebrochen“.
+- `src/components/ui/reiter.tsx` – `Reiter` und `ReiterInhalt` (Radix Tabs), gesteuert.
+- Muster-Dateien `prozessleiste-muster.tsx` (acht Lagen aus dem echten Vertragsende-Adapter,
+  festes Datum 26.09.2026) und `reiter-muster.tsx`; beide in `/ui-muster` eingebunden.
+- `prozess-stand.ts`: `BEI_NAME` und `ENDE_NAME` (der Baustein führt keine Namen selbst);
+  `schrittKurzform` liest `ENDE_NAME`.
+- Tests `ui-prozessleiste.test.tsx` (72) und `ui-reiter.test.tsx` (32), Musterseiten-Test
+  um beide erweitert; gemeinsamer Token-Leser `src/__tests__/hilfen/farb-tokens.ts` (vorher
+  dreimal dieselbe Funktion) und ein Wächter: keine Farbtabelle eines Bausteins ohne Rechnung.
+
+**Wie gebaut:** als Arbeitsablauf mit neun Agenten – je Baustein ein Erbauer und drei
+Gutachter (Barrierefreiheit, Hausregeln, Korrektheit und Tests), danach ein Agent, der jeden
+Befund zu widerlegen versuchte. Musterseite, Kontrasttest, Korrekturen und Dokumentation
+danach von Hand. Git-Stand nach dem Lauf kontrolliert: nichts committet, nichts gepusht, nur
+die erlaubten Dateien.
+
+**Sechste Durchsicht (im Arbeitsablauf):** 17 Befunde, nach Gegenprüfung 8 eigenständige
+bestätigt – alle behoben, je mit Test; die neuen Tests per Gegenprobe geprüft (Baustein
+verfälscht → Test rot).
+
+| # | Befund | Wie behoben |
+|---|---|---|
+| 1 | Reiter: Ein Mausklick rief `onWechsel` zweimal, sobald die Seite den neuen Wert nicht sofort zurückgibt (Reiter in der Adresse) – zwei Navigationen je Klick | Merker für das laufende Ereignis; der Test verlangt genau einen Aufruf, auch bei abgelehntem und verspätet übernommenem Wechsel |
+| 2 | Reiter: Nach einem Wechsel von außen blieb der Tab-Halt auf dem zuletzt fokussierten Reiter – Umschalt+Tab aus dem Inhalt schaltete ungefragt zurück | `tabIndex` hängt an der Auswahl |
+| 3 | Reiter: Bild-auf/Bild-ab sprangen zum ersten/letzten Reiter und schalteten den Inhalt um, statt die Seite zu rollen | Die beiden Tasten gehen nicht mehr an Radix |
+| 4 | Prozessleiste: `ol` ohne `role="list"` – Safari mit VoiceOver sagt eine Liste ohne Zeichen nicht als Liste an („3 von 5“ entfiele) | `role="list"` |
+| 5 | Prozessleiste: „übersprungen“ hing unter 640 px allein am gestrichelten Rand in `ink-3` (2,8:1) | Rand in `ink-2`; Kontrasttest für diesen Rand |
+| 6 | Prozessleiste: Der Test hielt nur Punkt und Linie gegen die Farbtabelle – eine fest eingetragene Farbe an Frist oder Unterzeile wäre am Kontrasttest vorbeigelaufen | Test: keine Farbklasse am Markup vorbei an `PROZESS_FARBEN`; je Text sein Eintrag |
+| 7 | Die Wörter für das Ende standen zweimal (`ENDE_NAME` und fest in `schrittKurzform`) | `schrittKurzform` liest `ENDE_NAME` |
+| 8 | Musterseite: Im Beispiel „Link abgelaufen“ lag die Anfrage drei Wochen vor dem Anlegen | Anlagedatum des Beispiels berichtigt |
+
+Widerlegt bzw. keine Mängel, aber offene Entscheidungen (stehen im Feinplan, Abschnitt 11):
+was Sehende unter 640 px von den Schritten noch sehen; kein sichtbares Zeichen für einen
+klickbaren Schritt am Handy; „sonst: Offboarding“ nach dem Abschluss.
+
+**Abnahme im Browser** (Chrome über `puppeteer-core`, Testkonto der Entwicklungsdatenbank):
+
+| Punkt | Ergebnis |
+|---|---|
+| Musterseite in 1440, 1366×768 und 390 px | Bilder neu: `screenshots/ui-muster-*.png`; in keiner Breite ist die Seite breiter als das Fenster |
+| Prozessleiste bei 1440, 700 und 390 px | alle acht Lagen angesehen; Titel brechen um, nichts abgeschnitten; bei 390 px Punkte und Kurzform, Knöpfe unter dem Text |
+| Höhe der Leiste bei 1440 px | 147 px (beendet) bis 249 px (mit „sonst“ und Frist) |
+| Reiter mit der Tastatur | Pfeil rechts, Ende: Auswahl folgt dem Fokus; Bild-auf rollt die Seite (3198 → 2411 px), die Auswahl bleibt; Tab führt in den Inhalt, Umschalt+Tab zurück auf den gewählten Reiter |
+| Reiter mit der Maus | ein Klick, ein Wechsel |
+| Reiter bei 390 px | die Leiste rollt (421 px Inhalt in 358 px) |
+| Schritt als Knopf | per Tab erreichbar, sichtbarer Fokusring (2 px), Enter und Klick melden den Reiter; Tab-Reihenfolge Schritt → Hauptknopf → Nebenknopf |
+| Konsole | keine Fehler |
+
+**Nicht geprüft:** Windows-Kontrastmodus (ließ sich in dieser Chrome-Steuerung nicht
+nachstellen; die Klassen dafür stehen in beiden Bausteinen und sind getestet, gesehen hat sie
+niemand), echter Screenreader, Safari.
+
+**Geprüft:** Typen, Lint, alle Tests grün (192 Suiten, 5.043 Tests; keine neue Lint-Warnung).
+Kein Build.
+
+**Aufgefallen:** Solange unter `.claude/worktrees/` Arbeitskopien anderer Sitzungen liegen
+(am 02.10. zwei: Token der Führungskraft, `tageZwischen`), nimmt `npm run pruefen` deren
+Dateien mit – `tsconfig.json` schließt nur `node_modules` aus, Jest hat keine Ausnahme.
+Geprüft wurde deshalb ohne diesen Ordner. Nicht geändert; gehört nach `main`.
+
+**Als Nächstes:** Prototyp-Tag (V0) mit der Musterseite; danach Tag 3 (Bausteine Hinweis und
+Textfeld, Detailseite lesend).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -948,9 +1022,10 @@ weiter `supervisorToken` an alle `PORTAL_ROLES` zurück (siehe Tag 1).
 | `ux-umbau` | `ea65ba9` | Übergabe nach U1 |
 | `ux-umbau` | `f87fb38` | Feinplan Pilot Vertragsende, freigegeben (F1–F9) |
 | `ux-umbau` | `9d6baf4` | Pilot Tag 1: Prozess-Stand, Adapter Vertragsende, Statusübergänge in eigener Datei |
+| `ux-umbau` | `5975909` | Befunde der fünften Durchsicht; Statuslisten der HR-Routen in `contract-end-status.ts` |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Seit dem Push dazugekommen und NICHT gepusht: Feinplan des Pilots (`f87fb38`), Pilot Tag 1 (`9d6baf4`) und die Korrekturen der fünften Durchsicht. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Seit dem Push dazugekommen und NICHT gepusht: Feinplan des Pilots (`f87fb38`), Pilot Tag 1 (`9d6baf4`), die Korrekturen der fünften Durchsicht (`5975909`) und Pilot Tag 2. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

@@ -8,6 +8,8 @@ import { Gruppe, Zeile } from "@/components/ui/gruppe";
 import { Leerzustand } from "@/components/ui/leerzustand";
 import { STATUS_TOENE, Statuspille, type StatusTon } from "@/components/ui/statuspille";
 import { DialogMuster, LadeMuster, MusterKopf, SegmentMuster, ToastMuster } from "./dialog-muster";
+import { ProzessleisteMuster } from "./prozessleiste-muster";
+import { ReiterMuster } from "./reiter-muster";
 
 /**
  * Musterseite der Oberflaechen-Bausteine (UX-Umbau „Klarer Weg", U0)
@@ -139,6 +141,35 @@ export default async function UiMusterPage() {
             <ToastMuster />
           </Zeile>
         </Gruppe>
+
+        {/* Die Prozessleiste ist selbst eine Karte, die Reiter bringen ihre
+            Gruppen mit — beide stehen deshalb wie der Ladezustand direkt auf
+            dem Seitengrund, nicht in einer Gruppe (sonst Karte in Karte). */}
+        <section aria-labelledby="muster-prozessleiste" className="space-y-2">
+          <div className="px-1">
+            <h2 id="muster-prozessleiste" className="font-heading text-2xs font-semibold uppercase tracking-label text-ink-2">
+              Prozessleiste
+            </h2>
+            <p className="mt-0.5 text-xs text-ink-2">
+              Wo der Vorgang steht, bei wem er liegt und die eine Handlung. Die Lagen kommen aus dem Vertragsende; die
+              Leiste selbst kennt kein Modul.
+            </p>
+          </div>
+          <ProzessleisteMuster />
+        </section>
+
+        <section aria-labelledby="muster-reiter" className="space-y-2">
+          <div className="px-1">
+            <h2 id="muster-reiter" className="font-heading text-2xs font-semibold uppercase tracking-label text-ink-2">
+              Reiter
+            </h2>
+            <p className="mt-0.5 text-xs text-ink-2">
+              Teilen eine Seite in Bereiche mit eigenem Inhalt. Pfeiltasten wechseln; die Zahl gehört zum Namen des
+              Reiters.
+            </p>
+          </div>
+          <ReiterMuster />
+        </section>
 
         <section aria-labelledby="muster-ladezustand" className="space-y-2">
           <div className="px-1">

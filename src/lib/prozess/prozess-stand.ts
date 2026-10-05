@@ -36,6 +36,16 @@ export interface ProzessSchritt {
 
 export type JetztDranBei = "HR" | "FUEHRUNGSKRAFT";
 
+/**
+ * Anzeigename dessen, bei dem der naechste Schritt liegt. Die EINE Tabelle
+ * dafuer: Die Prozessleiste liest sie heute, Listen und Startseite spaeter —
+ * der Baustein selbst kennt keine Namen.
+ */
+export const BEI_NAME: Record<JetztDranBei, string> = {
+  HR: "HR",
+  FUEHRUNGSKRAFT: "Führungskraft",
+};
+
 export interface JetztDran<Aktion extends string = string> {
   /** Was als Naechstes geschieht, als ein Satz ohne Punkt. */
   satz: string;
@@ -61,6 +71,15 @@ export interface ProzessStand<Aktion extends string = string> {
 }
 
 /**
+ * Das Ende eines Ablaufs als Wort — die EINE Tabelle dafuer: Der Kasten der
+ * Prozessleiste liest sie, `schrittKurzform` ebenfalls.
+ */
+export const ENDE_NAME: Record<NonNullable<ProzessStand["ende"]>, string> = {
+  abgeschlossen: "Abgeschlossen",
+  abgebrochen: "Abgebrochen",
+};
+
+/**
  * „Schritt 4 von 5 · Vertrag" — die Kurzform der Leiste fuer schmale
  * Bildschirme und spaeter fuer Listen. Ohne aktiven Schritt das Ende
  * („Abgeschlossen", „Abgebrochen") oder "".
@@ -70,7 +89,5 @@ export function schrittKurzform(stand: ProzessStand): string {
   if (index >= 0) {
     return `Schritt ${index + 1} von ${stand.schritte.length} · ${stand.schritte[index].titel}`;
   }
-  if (stand.ende === "abgeschlossen") return "Abgeschlossen";
-  if (stand.ende === "abgebrochen") return "Abgebrochen";
-  return "";
+  return stand.ende ? ENDE_NAME[stand.ende] : "";
 }

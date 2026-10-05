@@ -12,6 +12,11 @@
  * dabei; eine Hand-Liste liefe auseinander (so geschehen: das Hover-Paar des
  * Primaerknopfs fehlte, ein nie benutztes Paar stand darin).
  *
+ * `PROZESS_FARBEN` und `REITER_FARBEN` rechnen die Tests ihrer Bausteine
+ * (ui-prozessleiste.test.tsx, ui-reiter.test.tsx) mit denselben Tokens
+ * (`hilfen/farb-tokens.ts`). Der Waechter am Ende haelt fest, dass JEDE
+ * Farbtabelle eines Bausteins in einem Kontrasttest vorkommt.
+ *
  * WAS DER TEST NICHT SIEHT
  *   - Abblenden ueber `opacity` (ein ohne `laedt` gesperrter Knopf): gilt als
  *     inaktiv und ist von WCAG ausgenommen. `laedt` blendet deshalb NICHT ab.
@@ -21,42 +26,16 @@
  *     bekommen keinen getoenten Hover.
  *   - `text-ink-3`: haelt die Sperrklinke (Stand 0), nicht dieser Test.
  */
-import { readFileSync } from "fs";
+import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import {
-  AA_BEDIENELEMENT,
-  AA_TEXT,
-  aufUntergrund,
-  farbeLesen,
-  kontrast,
-  leuchtdichte,
-  type Farbe,
-} from "@/lib/ui/kontrast";
+import { AA_BEDIENELEMENT, AA_TEXT, aufUntergrund, farbeLesen, kontrast, leuchtdichte } from "@/lib/ui/kontrast";
+import { FLAECHEN, token } from "../hilfen/farb-tokens";
 import { BUTTON_FARBEN, type ButtonVariante } from "@/components/ui/button";
 import { SEGMENT_FARBEN } from "@/components/ui/segment";
 import { MENUE_FARBEN } from "@/components/ui/seitenkopf";
 import { KOPF_FARBEN } from "@/components/rahmen/portal-kopf";
 import { STATUS_TOENE, type StatusTon } from "@/components/ui/statuspille";
 import { TOAST_TOENE, type ToastTon } from "@/components/ui/toast";
-
-// Kommentare zaehlen nicht: Ein „--color-ok: #…" in einem Kommentar waere
-// sonst der erste Treffer und der Test maesse den falschen Wert.
-const css = readFileSync(join(__dirname, "..", "..", "app", "globals.css"), "utf8").replace(
-  /\/\*[\s\S]*?\*\//g,
-  "",
-);
-
-function token(name: string): Farbe {
-  const treffer = [...css.matchAll(new RegExp(`--color-${name}:\\s*([^;]+);`, "g"))];
-  // Genau EINE Deklaration: Bei zweien gaelte im Browser die letzte, und der
-  // Test wuesste nicht, welche er messen soll.
-  if (treffer.length !== 1) {
-    throw new Error(`Token --color-${name}: ${treffer.length} Deklarationen in globals.css, erwartet genau eine`);
-  }
-  const farbe = farbeLesen(treffer[0][1]);
-  if (!farbe) throw new Error(`Token --color-${name} ist nicht lesbar: ${treffer[0][1]}`);
-  return farbe;
-}
 
 /** Tokenname aus der ersten Klasse mit diesem Praefix (`bg-ok-soft` → `ok-soft`). */
 function farbeAus(
@@ -66,9 +45,6 @@ function farbeAus(
   const klasse = klassen.split(/\s+/).find((k) => k.startsWith(`${praefix}-`));
   return klasse ? klasse.slice(praefix.length + 1) : null;
 }
-
-/** Die beiden Flaechen, auf denen Inhalte stehen. */
-const FLAECHEN = ["card", "surface"] as const;
 
 /** Kontrast von Text auf einem (evtl. halbtransparenten oder fehlenden) Grund ueber einer Flaeche. */
 function kontrastAuf(text: string, grund: string | null, flaeche: (typeof FLAECHEN)[number]): number {
@@ -274,5 +250,32 @@ describe("Kopf des Portals", () => {
     const text = farbeAus(KOPF_FARBEN.zaehler, "text")!;
     const grund = farbeAus(KOPF_FARBEN.zaehler, "bg")!;
     expect(kontrast(token(text), token(grund))).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+});
+
+describe("Waechter: keine Farbtabelle ohne Rechnung", () => {
+  it("jede exportierte Farbtabelle eines Bausteins wird in einem Kontrasttest gelesen", () => {
+    // Eine Tabelle, die niemand rechnet, ist nur eine Behauptung. Gesucht wird
+    // jedes `export const …_FARBEN`/`…_TOENE` unter src/components/ui/ und im
+    // Kopf des Portals; sein Name muss in einer der Testdateien stehen, die mit
+    // den Tokens aus `hilfen/farb-tokens.ts` rechnen.
+    const wurzel = join(__dirname, "..", "..");
+    const bausteine = [
+      ...readdirSync(join(wurzel, "components", "ui")).map((d) => join(wurzel, "components", "ui", d)),
+      join(wurzel, "components", "rahmen", "portal-kopf.tsx"),
+    ].filter((d) => d.endsWith(".tsx"));
+    const tabellen = bausteine.flatMap((datei) =>
+      [...readFileSync(datei, "utf8").matchAll(/export const ([A-Z_]+_(?:FARBEN|TOENE))\b/g)].map((t) => t[1]),
+    );
+    expect(tabellen.length).toBeGreaterThanOrEqual(8);
+
+    const tests = [
+      __filename,
+      join(wurzel, "__tests__", "components", "ui-prozessleiste.test.tsx"),
+      join(wurzel, "__tests__", "components", "ui-reiter.test.tsx"),
+    ];
+    for (const datei of tests) expect(readFileSync(datei, "utf8")).toContain("hilfen/farb-tokens");
+    const gerechnet = tests.map((datei) => readFileSync(datei, "utf8")).join("\n");
+    expect(tabellen.filter((name) => !gerechnet.includes(name))).toEqual([]);
   });
 });
