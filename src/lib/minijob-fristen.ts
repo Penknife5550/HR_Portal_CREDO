@@ -603,21 +603,38 @@ export interface Fristampel {
   text: string;
 }
 
+/** Tage vom Jahresanfang bis zum Monatsersten, ohne Schalttag (Januar = Index 0). */
+const TAGE_VOR_MONAT = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
+/**
+ * Die laufende Nummer eines Tages (01.01.0000 = 1), ohne Date und ohne Zeitzone.
+ *
+ * Direkt gerechnet statt Monat fuer Monat aufsummiert: Die fruehere Schleife
+ * lief je Datum ueber alle Monate seit dem Jahr 0 (rund 24.000 Durchlaeufe) und
+ * kostete unter Jest rund 10 ms je Abstand — Tests, die ein paar hundert
+ * Abstaende brauchen, liefen dadurch Sekunden bis Minuten.
+ *
+ * Das Ergebnis ist dasselbe wie das der Schleife (beim Umbau 10/2026 ueber den
+ * ganzen Bereich des Musters verglichen), auch fuer Zeichenketten, die das
+ * Muster annimmt, die aber kein Kalendertag sind: Ein Monat ueber 12 laeuft ins
+ * Folgejahr, ein Tag ueber das Monatsende in den Folgemonat.
+ */
+function tageszahl(tag: Kalendertag): number {
+  const [j, m, d] = zerlege(tag);
+  // Wie in `monateSpaeter`. Nie negativ: „0000-00-…" zaehlt wie der Januar.
+  const monate = Math.max(0, j * 12 + (m - 1));
+  const jahr = Math.floor(monate / 12);
+  const monat = monate % 12; // 0 = Januar
+  // Schaltjahre VOR `jahr`, das Jahr 0 eingeschlossen.
+  const v = jahr - 1;
+  const schalttage = Math.floor(v / 4) - Math.floor(v / 100) + Math.floor(v / 400) + 1;
+  const schalttagImJahr = monat >= 2 && istSchaltjahr(jahr) ? 1 : 0;
+  return jahr * 365 + schalttage + TAGE_VOR_MONAT[monat] + schalttagImJahr + d;
+}
+
 /** Abstand in Tagen zwischen zwei Kalendertagen (b minus a). */
 export function tageZwischen(a: Kalendertag, b: Kalendertag): number {
-  const alsZahl = (t: Kalendertag) => {
-    const [j, m, d] = zerlege(t);
-    // Tage seit einem festen Bezugspunkt, ohne Date und ohne Zeitzone.
-    const monateGesamt = j * 12 + (m - 1);
-    let tage = d;
-    for (let i = 0; i < monateGesamt; i++) {
-      const jj = Math.floor(i / 12);
-      const mm = (i % 12) + 1;
-      tage += tageImMonat(jj, mm);
-    }
-    return tage;
-  };
-  return alsZahl(b) - alsZahl(a);
+  return tageszahl(b) - tageszahl(a);
 }
 
 /**
