@@ -482,3 +482,142 @@ describe("Mandantenpruefung der Resolver", () => {
     expect(res.data.vorname).toBe("Lena");
   });
 });
+
+// =============================================
+// Vertragsverlaengerung: {betriebsstaette}
+//
+// Das Formular der Fuehrungskraft speichert die Betriebsstaette als Auswahl
+// (`betriebsstaetteOrgId`); der Freitext `betriebsstaette` bleibt dabei leer und
+// traegt nur Altbestand. Bis 10/2026 las der Resolver nur den Freitext — der
+// Platzhalter blieb in jedem neuen Schreiben "___".
+// =============================================
+describe("Vertragsverlaengerung: Betriebsstaette", () => {
+  const ORG_ID = "7c1e2d3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f";
+  /** Nur die Abfrage nach dem Namen der Betriebsstaette, nicht die des Briefkopfs. */
+  const NAMENSABFRAGE = { where: { id: ORG_ID }, select: { name: true } };
+
+  const vorgang = (renewalData: Record<string, unknown> | null, organizationId = "org1") => ({
+    displayId: "VE-2026-GYM-001",
+    employeeFirstName: "Lena",
+    employeeLastName: "Bergmann",
+    employeePersonalNr: null,
+    contractEndDate: new Date("2026-12-31T00:00:00.000Z"),
+    organizationId,
+    currentPosition: null,
+    currentEntgeltgruppe: null,
+    currentStufe: null,
+    currentWochenstunden: null,
+    dokubitDaten: null,
+    renewalData,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCanAccessProcess.mockResolvedValue(true);
+    mockFindUser.mockResolvedValue(null);
+    // Briefkopf (Mandant des Vorgangs) und Betriebsstaette sind verschiedene
+    // Mandanten — so faellt auf, wenn der falsche Name im Platzhalter landet.
+    mockFindOrg.mockImplementation(async ({ where }: { where: { id: string } }) =>
+      where.id === ORG_ID
+        ? { name: "Gesamtschule Minden" }
+        : {
+            name: "Gymnasium",
+            shortName: "GYM",
+            mandantNumber: "712",
+            dsgvoVerantwortlicheName: null,
+            dsgvoVerantwortlicheStrasse: null,
+            dsgvoVerantwortlichePlz: null,
+            dsgvoVerantwortlicheOrt: null,
+          },
+    );
+  });
+
+  it("gewählte Betriebsstätte: Name dieses Mandanten, nicht der des Vorgangs", async () => {
+    mockFindContractEnd.mockResolvedValue(
+      vorgang({ betriebsstaetteOrgId: ORG_ID, betriebsstaette: null }),
+    );
+
+    const { data } = await getResolver("VERTRAGSVERLAENGERUNG")(ctx({ refId: "ce1" }));
+
+    expect(mockFindOrg).toHaveBeenCalledWith(NAMENSABFRAGE);
+    expect(data.betriebsstaette).toBe("Gesamtschule Minden");
+    expect(data.mandant).toBe("Gymnasium");
+    // Exakter Assert auf das select: Der Mock liefert renewalData unabhaengig
+    // davon — ein vergessenes `betriebsstaetteOrgId: true` fiele sonst nicht auf.
+    expect(mockFindContractEnd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          renewalData: {
+            select: expect.objectContaining({ betriebsstaette: true, betriebsstaetteOrgId: true }),
+          },
+        }),
+      }),
+    );
+  });
+
+  it("Auswahl und Freitext gesetzt: die Auswahl gewinnt", async () => {
+    mockFindContractEnd.mockResolvedValue(
+      vorgang({ betriebsstaetteOrgId: ORG_ID, betriebsstaette: "Minden, alter Standort" }),
+    );
+
+    const { data } = await getResolver("VERTRAGSVERLAENGERUNG")(ctx({ refId: "ce1" }));
+
+    expect(data.betriebsstaette).toBe("Gesamtschule Minden");
+  });
+
+  it.each([null, ""])(
+    "ohne Auswahl (%p): Freitext aus dem Altbestand, keine Abfrage",
+    async (betriebsstaetteOrgId) => {
+      mockFindContractEnd.mockResolvedValue(
+        vorgang({ betriebsstaetteOrgId, betriebsstaette: "Minden, Hauptstandort" }),
+      );
+
+      const { data } = await getResolver("VERTRAGSVERLAENGERUNG")(ctx({ refId: "ce1" }));
+
+      expect(data.betriebsstaette).toBe("Minden, Hauptstandort");
+      expect(mockFindOrg).not.toHaveBeenCalledWith(
+        expect.objectContaining({ select: { name: true } }),
+      );
+    },
+  );
+
+  it("Betriebsstätte inzwischen gelöscht: Freitext, sonst bleibt der Platzhalter ungesetzt (\"___\")", async () => {
+    mockFindOrg.mockImplementation(async ({ where }: { where: { id: string } }) =>
+      where.id === ORG_ID ? null : { name: "Gymnasium", mandantNumber: "712" },
+    );
+
+    mockFindContractEnd.mockResolvedValue(
+      vorgang({ betriebsstaetteOrgId: ORG_ID, betriebsstaette: "Minden, Hauptstandort" }),
+    );
+    const mitFreitext = await getResolver("VERTRAGSVERLAENGERUNG")(ctx({ refId: "ce1" }));
+    expect(mitFreitext.data.betriebsstaette).toBe("Minden, Hauptstandort");
+
+    mockFindContractEnd.mockResolvedValue(
+      vorgang({ betriebsstaetteOrgId: ORG_ID, betriebsstaette: null }),
+    );
+    const ohne = await getResolver("VERTRAGSVERLAENGERUNG")(ctx({ refId: "ce1" }));
+    expect("betriebsstaette" in ohne.data).toBe(false);
+  });
+
+  it("ohne Vertragsdaten: weder Abfrage noch Platzhalter", async () => {
+    mockFindContractEnd.mockResolvedValue(vorgang(null));
+
+    const { data } = await getResolver("VERTRAGSVERLAENGERUNG")(ctx({ refId: "ce1" }));
+
+    expect("betriebsstaette" in data).toBe(false);
+    expect(mockFindOrg).not.toHaveBeenCalledWith(NAMENSABFRAGE);
+  });
+
+  it("fremder Mandant: die Betriebsstätte wird gar nicht erst nachgeschlagen", async () => {
+    mockFindContractEnd.mockResolvedValue(
+      vorgang({ betriebsstaetteOrgId: ORG_ID, betriebsstaette: null }, "fremde-org"),
+    );
+    mockCanAccessProcess.mockResolvedValue(false);
+
+    const { data } = await getResolver("VERTRAGSVERLAENGERUNG")(ctx({ refId: "ce1" }));
+
+    expect(mockCanAccessProcess).toHaveBeenCalledWith(session, "fremde-org");
+    expect(data.betriebsstaette).toBeUndefined();
+    expect(mockFindOrg).not.toHaveBeenCalledWith(NAMENSABFRAGE);
+  });
+});

@@ -1,13 +1,15 @@
 /**
  * Tests fuer /api/contract-end/[id] (GET – Einzelvorgang, PATCH – Aktualisieren)
  * Kern: Die Antwort traegt den Vorgang OHNE supervisorToken (Schluessel des
- * Magic-Links der Fuehrungskraft), das Ablaufdatum bleibt.
+ * Magic-Links der Fuehrungskraft), das Ablaufdatum bleibt. Dazu traegt GET den
+ * Namen der im Formular gewaehlten Betriebsstaette (`betriebsstaetteName`).
  */
 
 const mockGetSession = jest.fn();
 const mockCanAccessProcess = jest.fn();
 const mockPrisma = {
   contractEndProcess: { findUnique: jest.fn(), update: jest.fn() },
+  organization: { findUnique: jest.fn() },
   auditLog: { create: jest.fn() },
 };
 
@@ -120,6 +122,70 @@ describe("GET /api/contract-end/[id]", () => {
       offboarding: null,
       auditLogs: [],
     });
+    // Ohne Vertragsdaten gibt es nichts nachzuschlagen.
+    expect(mockPrisma.organization.findUnique).not.toHaveBeenCalled();
+  });
+
+  describe("Betriebsstätte der Vertragsdaten", () => {
+    const ORG_ID = "7c1e2d3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f";
+    /** Vertragsdaten, wie das Formular der Führungskraft sie speichert: Auswahl als Id, Freitext leer. */
+    const vertragsdaten = (teil: Record<string, unknown> = {}) => ({
+      id: "rd1",
+      contractEndId: "ce1",
+      vertragsbeginn: new Date("2026-12-01T00:00:00.000Z"),
+      entgeltgruppe: "E 9b",
+      betriebsstaette: null,
+      betriebsstaetteOrgId: ORG_ID,
+      isComplete: true,
+      ...teil,
+    });
+
+    it("mit gewählter Betriebsstätte: ihr Name als renewalData.betriebsstaetteName, die übrigen Felder bleiben", async () => {
+      mockPrisma.contractEndProcess.findUnique.mockResolvedValue(
+        vorgang({ offboarding: null, auditLogs: [], renewalData: vertragsdaten() }),
+      );
+      mockPrisma.organization.findUnique.mockResolvedValue({ name: "Gesamtschule Minden" });
+
+      const res = await GET(getRequest(), { params: params() });
+      expect(res.status).toBe(200);
+      const json = await res.json();
+
+      expect(mockPrisma.organization.findUnique).toHaveBeenCalledWith({ where: { id: ORG_ID }, select: { name: true } });
+      expect(json.renewalData).toEqual({
+        id: "rd1",
+        contractEndId: "ce1",
+        vertragsbeginn: "2026-12-01T00:00:00.000Z",
+        entgeltgruppe: "E 9b",
+        betriebsstaette: null,
+        betriebsstaetteOrgId: ORG_ID,
+        isComplete: true,
+        betriebsstaetteName: "Gesamtschule Minden",
+      });
+      // Der Schluessel des Links bleibt trotzdem draussen.
+      expect(json).not.toHaveProperty("supervisorToken");
+      expect(JSON.stringify(json)).not.toContain(GEHEIM);
+    });
+
+    it("ohne gewählte Betriebsstätte: betriebsstaetteName null, keine Abfrage; der Freitext (Altbestand) bleibt", async () => {
+      for (const betriebsstaetteOrgId of [null, ""]) {
+        mockPrisma.organization.findUnique.mockClear();
+        mockPrisma.contractEndProcess.findUnique.mockResolvedValue(
+          vorgang({ offboarding: null, auditLogs: [], renewalData: vertragsdaten({ betriebsstaetteOrgId, betriebsstaette: "Minden" }) }),
+        );
+        const json = await (await GET(getRequest(), { params: params() })).json();
+        expect(json.renewalData).toMatchObject({ betriebsstaette: "Minden", betriebsstaetteName: null });
+        expect(mockPrisma.organization.findUnique).not.toHaveBeenCalled();
+      }
+    });
+
+    it("Betriebsstätte inzwischen gelöscht: betriebsstaetteName null", async () => {
+      mockPrisma.contractEndProcess.findUnique.mockResolvedValue(
+        vorgang({ offboarding: null, auditLogs: [], renewalData: vertragsdaten() }),
+      );
+      mockPrisma.organization.findUnique.mockResolvedValue(null);
+      const json = await (await GET(getRequest(), { params: params() })).json();
+      expect(json.renewalData.betriebsstaetteName).toBeNull();
+    });
   });
 });
 
@@ -154,7 +220,8 @@ describe("PATCH /api/contract-end/[id]", () => {
       supervisorTokenExpiresAt: ABLAUF,
     });
 
-    // Am Schreiben aendert sich nichts
+    // Am Schreiben aendert sich nichts, und PATCH schlaegt keine Betriebsstaette nach
+    expect(mockPrisma.organization.findUnique).not.toHaveBeenCalled();
     expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "ce1" },

@@ -36,7 +36,10 @@ interface RenewalData {
   entgeltgruppe: string | null;
   stufe: string | null;
   stellenbeschreibung: string | null;
+  /** Freitext, nur Altbestand — das Formular speichert die Auswahl als Mandant. */
   betriebsstaette: string | null;
+  /** Name des im Formular gewaehlten Mandanten (GET /api/contract-end/[id]). */
+  betriebsstaetteName?: string | null;
   urlaubstageProJahr: number | null;
   zusatzvereinbarungen: string | null;
   isComplete: boolean;
@@ -809,7 +812,7 @@ function RenewalView({ data }: { data: ContractEndData }) {
         <Row label="Entgeltgruppe" value={rd.entgeltgruppe || "—"} />
         <Row label="Stufe" value={rd.stufe || "—"} />
         <Row label="Urlaubstage / Jahr" value={rd.urlaubstageProJahr != null ? String(rd.urlaubstageProJahr) : "—"} />
-        <Row label="Betriebsstätte" value={rd.betriebsstaette || "—"} />
+        <Row label="Betriebsstätte" value={rd.betriebsstaetteName || rd.betriebsstaette || "—"} />
       </dl>
       {rd.stellenbeschreibung && (
         <div className="mt-3 border-t border-border/50 pt-3 text-sm">
