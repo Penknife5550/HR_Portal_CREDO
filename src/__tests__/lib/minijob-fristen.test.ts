@@ -130,6 +130,85 @@ describe("Kalenderarithmetik", () => {
   });
 });
 
+describe("Abstand zweier Tage — direkte Rechnung", () => {
+  // `tageZwischen` summierte frueher Monat fuer Monat ab dem Jahr 0 auf und
+  // rechnet seit 10/2026 direkt. Beim Umbau lief die neue Rechnung gegen die
+  // alte: jeder Tag von 1990 bis 2100, Stichproben von Paaren und jede
+  // Zeichenkette, die das Muster annimmt (Jahre 0000–9999) — ohne Abweichung.
+  // Die Erwartungswerte hier stammen aus keiner der beiden Rechnungen, sondern
+  // sind mit `Date.UTC` gegengerechnet.
+
+  it("kennt die Schaltjahrregel an den Jahrhundertgrenzen", () => {
+    expect(tageZwischen("1900-02-28", "1900-03-01")).toBe(1); // durch 100, nicht durch 400
+    expect(tageZwischen("2000-02-28", "2000-03-01")).toBe(2); // durch 400
+    expect(tageZwischen("2100-02-28", "2100-03-01")).toBe(1);
+    expect(tageZwischen("2024-02-28", "2024-03-01")).toBe(2);
+    expect(tageZwischen("1900-01-01", "1901-01-01")).toBe(365);
+    expect(tageZwischen("2000-01-01", "2001-01-01")).toBe(366);
+    expect(tageZwischen("2100-01-01", "2101-01-01")).toBe(365);
+  });
+
+  it("trägt Jahres- und Jahrhundertwechsel", () => {
+    expect(tageZwischen("1899-12-31", "1900-01-01")).toBe(1);
+    expect(tageZwischen("1999-12-31", "2000-01-01")).toBe(1);
+    expect(tageZwischen("2099-12-31", "2100-01-01")).toBe(1);
+    expect(tageZwischen("1900-01-01", "2000-01-01")).toBe(36524);
+    expect(tageZwischen("2000-01-01", "2100-01-01")).toBe(36525);
+    expect(tageZwischen("2000-01-01", "2400-01-01")).toBe(146097); // ein voller 400-Jahre-Zyklus
+    expect(tageZwischen("0001-01-01", "2026-10-02")).toBe(739890);
+  });
+
+  it("liefert rückwärts denselben Abstand mit umgekehrtem Vorzeichen", () => {
+    expect(tageZwischen("2026-10-02", "2027-07-29")).toBe(300);
+    expect(tageZwischen("2027-07-29", "2026-10-02")).toBe(-300);
+    expect(tageZwischen("2026-10-02", "2000-02-29")).toBe(-9712);
+    expect(tageZwischen("2026-10-02", "1900-01-01")).toBe(-46295);
+    expect(tageZwischen("2026-10-02", "2100-12-31")).toBe(27118);
+  });
+
+  it("wächst von 1990 bis 2100 mit jedem Tag um genau eins", () => {
+    // Die Tage liefert `tageSpaeter` — eine eigene Rechnung, die Monat fuer
+    // Monat geht und mit der Tageszahl nichts teilt. Der Wochentag laeuft mit.
+    const anfang = "1990-01-01"; // ein Montag
+    const letzter = 40541; // so viele Tage spaeter ist der 31.12.2100
+    const falsch: string[] = [];
+    let tag = anfang;
+    for (let n = 0; n <= letzter; n++) {
+      const stimmt =
+        tageZwischen(anfang, tag) === n &&
+        tageZwischen(tag, anfang) === -n &&
+        wochentagVon(tag) === (1 + n) % 7;
+      if (!stimmt) falsch.push(tag);
+      if (n < letzter) tag = tageSpaeter(tag, 1);
+    }
+    expect(falsch).toEqual([]);
+    expect(tag).toBe("2100-12-31");
+  });
+
+  it("rechnet den Wochentag auch an den Rändern richtig", () => {
+    expect(wochentagVon("1900-01-01")).toBe(1); // Montag
+    expect(wochentagVon("2000-01-01")).toBe(6); // Samstag
+    expect(wochentagVon("2000-02-29")).toBe(2); // Dienstag
+    expect(wochentagVon("2100-01-01")).toBe(5); // Freitag
+    expect(wochentagVon("2100-12-31")).toBe(5); // Freitag
+  });
+
+  it("prüft das Datum nicht und rechnet bei Überlauf weiter wie bisher", () => {
+    // Wer hier einen 30.02. hineingibt, bekommt keinen Fehler, sondern den
+    // 02.03. Ob ein Wert ein Kalendertag ist, klaert `istKalendertag` vorher.
+    expect(tageZwischen("2026-02-01", "2026-02-30")).toBe(29);
+    expect(tageZwischen("2026-03-02", "2026-02-30")).toBe(0);
+    expect(tageZwischen("2027-01-01", "2026-13-01")).toBe(0);
+    expect(tageZwischen("2025-12-01", "2026-00-01")).toBe(0);
+  });
+
+  it("wirft bei allem, was nicht JJJJ-MM-TT ist", () => {
+    expect(() => tageZwischen("2026-10-02", "morgen")).toThrow("Kein gültiges Datum");
+    expect(() => tageZwischen("02.10.2026", "2026-10-02")).toThrow("Kein gültiges Datum");
+    expect(() => tageZwischen("2026-10-02", "2026-10-02T00:00:00Z")).toThrow("Kein gültiges Datum");
+  });
+});
+
 describe("Wirkung der Befreiung — Regelfall", () => {
   it("nimmt den Ersten des Eingangsmonats", () => {
     const r = wirkungBefreiung("2026-08-27", "2026-01-01");
