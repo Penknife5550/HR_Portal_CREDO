@@ -24,9 +24,12 @@ Letzte Änderung: 05.10.2026 (Merge von `main` mit dem Token-Fix Vertragsende; n
 - **Gepusht am 05.10.2026:** `origin/ux-umbau` bis einschließlich des Logbuch-Commits vom
   05.10.2026 (nach `61b817f`). Typen, Lint und alle Tests grün (192 Suiten, 5.043 Tests –
   geprüft ohne die fremden Arbeitskopien unter `.claude/`, siehe 0.3).
-- **Noch NICHT gebaut:** die Detailseite selbst (Feinplan Tag 3–7: Bausteine Hinweis und
-  Textfeld, neue Ansicht, Dialoge, Vorschau-Schalter, Abnahme). Laut Leitplanke erst NACH dem
-  Prototyp-Tag (V0).
+- **Tag 3, erster Teil (06.10.2026, vor V0 vorgezogen):** Bausteine **Hinweis** und
+  **Textfeld** auf der Musterseite (`src/components/ui/hinweis.tsx`, `textfeld.tsx`). Sie hängen
+  an keiner Frage des Prototyp-Tags.
+- **Noch NICHT gebaut:** die Detailseite selbst (Feinplan Tag 3 Rest bis 7: neue Ansicht,
+  Dialoge, Vorschau-Schalter, Abnahme). Laut Leitplanke erst NACH dem Prototyp-Tag (V0).
+- **Seit 06.10.2026 auch in Docker anzusehen** (lokal, `http://localhost:3100`), siehe 0.6.
 
 ### 0.2 Erste Schritte der neuen Sitzung (in dieser Reihenfolge)
 
@@ -51,14 +54,19 @@ Letzte Änderung: 05.10.2026 (Merge von `main` mit dem Token-Fix Vertragsende; n
    - Danach prüfen: `supervisorTokenExpiresAt` muss in der Antwort von
      `GET /api/contract-end/[id]` bleiben (Pflichtfeld des Adapters). Logbuch-Eintrag „Merge von
      `main`“ wie am 01.10.2026.
-3. **`tageZwischen`:** Auf dem lokalen Branch `perf/tagezwischen-direkte-rechnung` (`099680d`,
+3. **Erledigt am 06.10.2026** (Protokoll „`tageZwischen` nach `main`“).
+   **`tageZwischen`:** Auf dem lokalen Branch `perf/tagezwischen-direkte-rechnung` (`099680d`,
    nicht gepusht, nicht in `main`) rechnet die Funktion ohne Monatsschleife (Jest-Gesamtlauf laut
    jener Sitzung 64 s → 30 s). Erst nach `main` bringen (Entscheidung des
    Projektverantwortlichen), dann hierher mergen und die Hinweise „kostet unter Jest rund
    10 ms“ streichen: Kommentar über `PROBEN` in `src/__tests__/lib/prozess-vertragsende.test.ts`,
    Kommentar über `LAGEN` in `src/app/(portal)/ui-muster/prozessleiste-muster.tsx`, CLAUDE.md
    (Punkt „Prozess-Stand“).
-4. **Arbeitskopien aufräumen:** Unter `.claude/worktrees/` liegen zwei (`bold-heisenberg-a615cf`,
+4. **Teils erledigt am 06.10.2026:** `nervous-ritchie-2bbb51` ist aus `git worktree list`
+   entfernt, der Ordner ließ sich aber nicht löschen (Windows: „Permission denied“ – vermutlich
+   noch eine offene Sitzung); `bold-heisenberg-a615cf` liegt noch (sauber, Stand `3f6d3b0`).
+   Beide Ordner löschen, wenn ihre Sitzungen geschlossen sind.
+   **Arbeitskopien aufräumen:** Unter `.claude/worktrees/` liegen zwei (`bold-heisenberg-a615cf`,
    `nervous-ritchie-2bbb51`) aus den Nebenaufgaben. Wenn deren Sitzungen fertig sind:
    `git worktree list`, dann `git worktree remove <pfad>`. Solange sie liegen, siehe 0.3.
 
@@ -96,7 +104,7 @@ Ergebnisse in Abschnitt 4 (Entscheidungen) und im Feinplan festhalten, danach Ta
 
 ### 0.5 Danach: Tag 3 bis 7 (Feinplan, Abschnitt 6)
 
-Tag 3 Bausteine **Hinweis** und **Textfeld** (Feinplan 3.1), neue Ansicht lesend (Kopf, Leiste,
+Tag 3 ~~Bausteine **Hinweis** und **Textfeld** (Feinplan 3.1)~~ (erledigt 06.10.2026), neue Ansicht lesend (Kopf, Leiste,
 Hinweise, Reiter Übersicht); Tag 4 Handlungen und Dialoge, Reiter Vertragsdaten/Dokumente/
 E-Mails, `?tab=`; Tag 5 Vorschau-Schalter (Cookie `ansicht-vertragsende=neu`, P-F1), Testdaten,
 Seitentest; Tag 6–7 Abnahme, Durchsicht, Dokumentation. Dateien der neuen Ansicht neben
@@ -121,6 +129,18 @@ Hinweis bei überschrittenem Vertragsende (P-F4, im Adapter schon drin), Rückme
 - **Farbtabellen:** Tokens nur über `src/__tests__/hilfen/farb-tokens.ts`; jede neue Tabelle
   `…_FARBEN` braucht eine Rechnung (Wächter in `ui-kontrast.test.ts`) UND einen Test, dass das
   Markup sie benutzt.
+- **Lokal in Docker ansehen** (06.10.2026): eigener Stapel `hr-portal-lokal` (Container
+  `hr-portal-lokal-app`, `-db`, `-gotenberg`), Adresse `http://localhost:3100`, Datenbank als
+  KOPIE der Dev-Datenbank (`pg_dump` aus `credo-hr-db-dev`, Konten und Testvorgänge wie dort),
+  Uploads hineinkopiert. Gebaut aus `git archive HEAD` – also nur Committetes, keine fremden
+  Arbeitskopien unter `.claude/`. `ZEITPLANER_AKTIV=false`; eigenes `JWT_SECRET` (das der
+  Dev-`.env` enthält „dev_secret“, daran bricht der Entrypoint ab), `ENCRYPTION_KEY` aus der
+  Dev-`.env` (sonst ließen sich die kopierten Daten nicht entschlüsseln), `BEM_ENCRYPTION_KEY`
+  neu (BEM-Freitexte der Kopie sind deshalb nicht lesbar). Achtung: Die kopierte
+  SMTP-Einstellung gilt – Handlungen, die Mails schicken, schicken echte Mails.
+  Compose-Datei und Env-Datei lagen im Scratchpad der Sitzung vom 06.10.2026, nicht im Repo.
+  In Git Bash vor `docker exec … /app/…` `MSYS_NO_PATHCONV=1` setzen (sonst wird der Pfad zu
+  `C:/Program Files/Git/app/…`).
 - **Arbeitsabläufe mit Agenten** (Ultracode): danach IMMER `git status`, `git log`,
   `git rev-list … origin/ux-umbau...HEAD` prüfen – Agenten dürfen nicht committen oder pushen.
 - Lange Python-Heredocs mit Backticks scheitern in der Bash: Skript in den Scratchpad schreiben.
@@ -155,7 +175,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Gepusht am 02.10.2026. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); die Seite (ab Tag 3) erst nach dem Prototyp-Tag (V0) |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); **Tag 3, erster Teil (Bausteine Hinweis und Textfeld) gebaut** (06.10.2026, vor V0 vorgezogen); die Seite erst nach dem Prototyp-Tag (V0) |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -274,6 +294,10 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Prozessleiste: kompakt und klebend | „Sticky mit Kompaktmodus beim Scrollen und unter 640 px“ | unter 640 px kompakt, aber nicht klebend (P-F6) | Die Seiten des Vertragsendes sind kurz; der Nutzen zeigt sich erst im Onboarding. |
 | Prozessleiste: Zustände | erledigt, aktiv, parallel, kommend, blockiert, übersprungen, verzweigt, Schleife, abgebrochen/pausiert, Zeitachse | erledigt, aktiv, kommend, übersprungen, verzweigt (als Hinweis am Schritt), Ende abgeschlossen/abgebrochen | Nur was Vertragsende braucht; der Rest kommt mit dem Modul, das ihn braucht. |
 | Reiter | – (Feinplan: Radix Tabs) | Radix Tabs, aber: ein Klick meldet einmal, Tab-Halt folgt der Auswahl, Bild-auf/-ab rollen die Seite | Radix meldet je Klick zweimal, merkt sich den zuletzt fokussierten Reiter und belegt Bild-auf/-ab – alle drei stören, sobald die Seite den Reiter in der Adresse führt. |
+| Prototyp-Tag, Pilot Tag 3 | Tag 3 (Bausteine und Seite) nach V0 | Bausteine Hinweis und Textfeld schon vor V0 (Entscheidung 06.10.2026) | Sie hängen an keiner Frage des Prototyp-Tags; die Seite bleibt dahinter. |
+| Hinweis: wann angesagt | „`role="alert"` nur, wenn der Hinweis NACH dem Laden neu erscheint“ | ausdrücklich über `ansagen` (nur bei `critical`) | Ob ein Hinweis neu ist, weiß nur die Seite; ein Baustein, der es aus dem ersten Zeichnen erriete, läge beim Wechsel des Reiters falsch. |
+| Hinweis: Textfarbe | – | `ink` für Titel und Text | `ink-2` erreicht auf `critical-soft` über dem Seitengrund nur 4,49:1 (gerechnet in `ui-kontrast.test.ts`). |
+| Tests von Hinweis und Textfeld | „Regeln in `ui-bausteine.test.tsx`“ | eigene Datei `ui-hinweis-textfeld.test.tsx` | Wie Prozessleiste und Reiter; `ui-bausteine.test.tsx` hat schon 744 Zeilen. |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
 
@@ -1087,6 +1111,46 @@ bringt zwei neue; ohne `.claude/`, siehe 0.3). Die Sperrklinke brauchte keinen n
 dahinter als weitere AUSNAHMEN – es läuft dann alles außer den gesuchten Tests. Mit
 Gleichheitszeichen und `--` schreiben: `npx jest --testPathIgnorePatterns=".claude" -- <muster>`.
 
+### 06.10.2026 – `tageZwischen` nach `main`, Merge nach `ux-umbau`
+
+Entscheidung des Projektverantwortlichen: der Branch `perf/tagezwischen-direkte-rechnung`
+(`232579e`, `099680d`) kommt nach `main`. Merge-Commit `aea163a` auf `main` (konfliktfrei –
+der Branch berührt nur `minijob-fristen.ts` und dessen Test, `main` seit dem Abzweig nur
+Vertragsende-Routen), danach `git merge main` in `ux-umbau` (`984fbee`). Der
+Jest-Gesamtlauf dauert jetzt rund 34 s statt 100 s. Die Hinweise „kostet unter Jest rund
+10 ms je Aufruf“ sind gestrichen (Kommentare über `PROBEN` in `prozess-vertragsende.test.ts`
+und über `LAGEN` in `prozessleiste-muster.tsx`, Punkt „Prozess-Stand“ in CLAUDE.md); das
+einmalige Rechnen der Lagen bleibt, jetzt begründet damit, dass alle Tests dieselben Stände
+prüfen. Der Branch ist gelöscht (in `main` enthalten). Arbeitskopien: siehe 0.2, Punkt 4.
+
+### 06.10.2026 – Pilot, Tag 3, erster Teil (Bausteine Hinweis und Textfeld)
+
+Der Prototyp-Tag hat noch nicht stattgefunden. Entscheidung des Projektverantwortlichen: die
+beiden Bausteine, die nicht an seinen Fragen hängen, schon jetzt bauen; an der Seite nichts.
+
+- **`src/components/ui/hinweis.tsx`** – Kasten für eine Aussage über der Arbeit; Töne
+  `critical`/`wait`/`info` aus `HINWEIS_TOENE` (Fläche, Text, Symbolfarbe, Standardsymbol:
+  `AlertCircle`, `Clock`, `Info`); Titel Pflicht; höchstens ein Knopf; `ansagen` nur bei
+  `critical` (dann `role="alert"`, sonst Bereich mit Überschrift); `ebene` wie bei der `Gruppe`.
+- **`src/components/ui/textfeld.tsx`** – Beschriftung sichtbar und Pflicht; `hilfe`, `fehler`
+  über `aria-describedby` (Reihenfolge Hilfe, Fehler, eigene des Aufrufers); `aria-invalid`
+  und roter Rand nur bei nicht leerem Fehler; Typen `text`/`email`/`tel`/`url`; Farben aus
+  `TEXTFELD_FARBEN`.
+- **Musterseite:** Abschnitt „Hinweise“ (je Ton ein Beispiel aus dem Vertragsende, dazu
+  „Speichern versuchen“ → angesagter Hinweis mit „Erneut versuchen“) und Gruppe „Textfeld“
+  (Prüfung beim Absenden, stehender Fehler, Platzhalter, gesperrt). Die Titel der Hinweise
+  sind `h3`; der Musterseiten-Test verlangte bisher „keine `h3`“ und prüft jetzt die
+  eigentliche Regel: keine Ebene übersprungen.
+- **Tests:** `ui-hinweis-textfeld.test.tsx` (27 Fälle, axe in jeder Zusammenstellung, Markup
+  benutzt die Tabellen); `ui-kontrast.test.ts` rechnet beide Tabellen (Text 4,5:1 auf der
+  getönten Fläche über Karte und Seitengrund, Symbole und Ränder 3:1, gesperrtes Feld) und
+  hält fest, dass `ink-2` auf den Hinweis-Flächen zu schwach wäre.
+- Typen, Lint, alle Tests grün (195 Suiten, 5.116 Tests, 35 s; ohne `.claude/`, siehe 0.3).
+  Die Sperrklinke brauchte keinen neuen Stand.
+
+**Lokal in Docker:** Auf Wunsch des Projektverantwortlichen läuft `ux-umbau` als eigener
+Docker-Stapel unter `http://localhost:3100`; Aufbau und Fallen in 0.6.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1121,9 +1185,14 @@ Gleichheitszeichen und `--` schreiben: `npx jest --testPathIgnorePatterns=".clau
 | `ux-umbau` | `9d6baf4` | Pilot Tag 1: Prozess-Stand, Adapter Vertragsende, Statusübergänge in eigener Datei |
 | `ux-umbau` | `5975909` | Befunde der fünften Durchsicht; Statuslisten der HR-Routen in `contract-end-status.ts` |
 | `ux-umbau` | `61b817f` | Pilot Tag 2: Bausteine Prozessleiste und Reiter, Musterseite, Token-Leser, Befunde der sechsten Durchsicht |
+| `ux-umbau` | `fc487e5` | Übergabe nach Pilot Tag 2 |
+| `main` | `6982015`, `3f6d3b0` | Vertragsende: `supervisorToken` nicht mehr in den Antworten der HR-Routen; Sperrklinke |
+| `ux-umbau` | `9edb97f` | Merge von `main` (Token-Fix Vertragsende) |
+| `main` | `aea163a` | Merge von `perf/tagezwischen-direkte-rechnung` (`232579e`, `099680d`) |
+| `ux-umbau` | `984fbee` | Merge von `main` (`tageZwischen`) |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

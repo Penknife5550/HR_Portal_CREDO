@@ -10,6 +10,8 @@ import { STATUS_TOENE, Statuspille, type StatusTon } from "@/components/ui/statu
 import { DialogMuster, LadeMuster, MusterKopf, SegmentMuster, ToastMuster } from "./dialog-muster";
 import { ProzessleisteMuster } from "./prozessleiste-muster";
 import { ReiterMuster } from "./reiter-muster";
+import { HinweisMuster } from "./hinweis-muster";
+import { TextfeldMuster } from "./textfeld-muster";
 
 /**
  * Musterseite der Oberflaechen-Bausteine (UX-Umbau „Klarer Weg", U0)
@@ -113,6 +115,27 @@ export default async function UiMusterPage() {
               <span className="text-right text-xs text-ink-2">{TON_BEISPIELE[ton].wofuer}</span>
             </Zeile>
           ))}
+        </Gruppe>
+
+        <section aria-labelledby="muster-hinweise" className="space-y-2">
+          <div className="px-1">
+            <h2 id="muster-hinweise" className="font-heading text-2xs font-semibold uppercase tracking-label text-ink-2">
+              Hinweise
+            </h2>
+            <p className="mt-0.5 text-xs text-ink-2">
+              Eine Aussage, die über der Arbeit stehen muss: kritisch, Achtung oder zur Kenntnis. Höchstens ein Knopf.
+            </p>
+          </div>
+          <HinweisMuster />
+        </section>
+
+        <Gruppe
+          titel="Textfeld"
+          beschreibung="Beschriftung immer sichtbar; Hilfe und Fehler hängen am Feld und werden mit vorgelesen."
+        >
+          <Zeile>
+            <TextfeldMuster />
+          </Zeile>
         </Gruppe>
 
         <Gruppe

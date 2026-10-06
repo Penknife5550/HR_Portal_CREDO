@@ -7,7 +7,8 @@
  *
  * EINE QUELLE: Welche Paare es gibt, steht nicht hier, sondern in den
  * Bausteinen — `STATUS_TOENE` (statuspille.tsx) und `BUTTON_FARBEN`
- * (button.tsx), dazu die Symbolfarben aus `TOAST_TOENE` (toast.tsx). Der Test liest deren Klassen und rechnet jedes Paar, auch die
+ * (button.tsx), dazu die Symbolfarben aus `TOAST_TOENE` (toast.tsx), `HINWEIS_TOENE`
+ * (hinweis.tsx) und `TEXTFELD_FARBEN` (textfeld.tsx). Der Test liest deren Klassen und rechnet jedes Paar, auch die
  * beim Ueberfahren. Ein neuer Ton oder eine neue Variante ist damit von selbst
  * dabei; eine Hand-Liste liefe auseinander (so geschehen: das Hover-Paar des
  * Primaerknopfs fehlte, ein nie benutztes Paar stand darin).
@@ -36,11 +37,13 @@ import { MENUE_FARBEN } from "@/components/ui/seitenkopf";
 import { KOPF_FARBEN } from "@/components/rahmen/portal-kopf";
 import { STATUS_TOENE, type StatusTon } from "@/components/ui/statuspille";
 import { TOAST_TOENE, type ToastTon } from "@/components/ui/toast";
+import { HINWEIS_TOENE, type HinweisTon } from "@/components/ui/hinweis";
+import { TEXTFELD_FARBEN } from "@/components/ui/textfeld";
 
 /** Tokenname aus der ersten Klasse mit diesem Praefix (`bg-ok-soft` → `ok-soft`). */
 function farbeAus(
   klassen: string,
-  praefix: "bg" | "text" | "hover:bg" | "data-[highlighted]:bg",
+  praefix: "bg" | "text" | "hover:bg" | "data-[highlighted]:bg" | "border" | "placeholder:text" | "disabled:bg" | "disabled:text",
 ): string | null {
   const klasse = klassen.split(/\s+/).find((k) => k.startsWith(`${praefix}-`));
   return klasse ? klasse.slice(praefix.length + 1) : null;
@@ -206,6 +209,76 @@ describe("Toast und Dialog", () => {
       const dahinter = aufUntergrund(token("scrim"), token(flaeche));
       expect(kontrast(token("card"), dahinter)).toBeGreaterThanOrEqual(1.5);
     }
+  });
+});
+
+describe("Hinweis: jeder Ton aus HINWEIS_TOENE", () => {
+  const TOENE = Object.keys(HINWEIS_TOENE) as HinweisTon[];
+
+  it("drei Toene, keiner davon ok (Erledigtes braucht keinen Kasten)", () => {
+    expect(TOENE.sort()).toEqual(["critical", "info", "wait"]);
+  });
+
+  it.each(TOENE)("%s: Text auf der getoenten Flaeche erreicht AA – auf Karte und auf Seitengrund", (ton) => {
+    const text = farbeAus(HINWEIS_TOENE[ton].text, "text")!;
+    const grund = farbeAus(HINWEIS_TOENE[ton].flaeche, "bg")!;
+    expect(text).not.toBeNull();
+    expect(grund).not.toBeNull();
+    for (const flaeche of FLAECHEN) {
+      expect(kontrastAuf(text, grund, flaeche)).toBeGreaterThanOrEqual(AA_TEXT);
+    }
+  });
+
+  it.each(TOENE)("%s: das Symbol hebt sich von der getoenten Flaeche ab", (ton) => {
+    const symbol = farbeAus(HINWEIS_TOENE[ton].symbol, "text")!;
+    const grund = farbeAus(HINWEIS_TOENE[ton].flaeche, "bg")!;
+    for (const flaeche of FLAECHEN) {
+      expect(kontrastAuf(symbol, grund, flaeche)).toBeGreaterThanOrEqual(AA_BEDIENELEMENT);
+    }
+  });
+
+  it("ink-2 waere als Text zu schwach (deshalb ink) – die Rechnung haelt die Begruendung im Kommentar fest", () => {
+    const schwaechster = Math.min(
+      ...TOENE.flatMap((ton) =>
+        FLAECHEN.map((flaeche) => kontrastAuf("ink-2", farbeAus(HINWEIS_TOENE[ton].flaeche, "bg"), flaeche)),
+      ),
+    );
+    expect(schwaechster).toBeLessThan(AA_TEXT);
+  });
+});
+
+describe("Textfeld: jede Klasse aus TEXTFELD_FARBEN", () => {
+  const F = TEXTFELD_FARBEN;
+
+  it.each(["beschriftung", "hilfe", "fehler"] as const)("%s ist als Text auf Karte und Seitengrund lesbar", (teil) => {
+    const text = farbeAus(F[teil], "text")!;
+    expect(text).not.toBeNull();
+    for (const flaeche of FLAECHEN) expect(kontrast(token(text), token(flaeche))).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
+  it("Eingabe und Platzhalter auf dem Feld erreichen AA", () => {
+    const grund = farbeAus(F.feld, "bg")!;
+    expect(kontrast(token(farbeAus(F.feld, "text")!), token(grund))).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(kontrast(token(farbeAus(F.feld, "placeholder:text")!), token(grund))).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
+  it("der Rand – in Ruhe und mit Fehler – hebt sich vom Feld und von beiden Flaechen ab (3:1)", () => {
+    for (const rand of [farbeAus(F.feld, "border")!, farbeAus(F.fehlerRand, "border")!]) {
+      for (const flaeche of [farbeAus(F.feld, "bg")!, ...FLAECHEN]) {
+        expect(kontrast(token(rand), token(flaeche))).toBeGreaterThanOrEqual(AA_BEDIENELEMENT);
+      }
+    }
+  });
+
+  it("ein gesperrtes Feld bleibt lesbar", () => {
+    const grund = farbeAus(F.gesperrt, "disabled:bg")!;
+    const text = farbeAus(F.gesperrt, "disabled:text")!;
+    expect(kontrast(token(text), token(grund))).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
+  it("kein ink-3, kein Filter, keine Deckkraft", () => {
+    const alle = Object.values(F).join(" ");
+    expect(alle).not.toMatch(/\bink-3\b|brightness|opacity|\/\d/);
   });
 });
 

@@ -139,9 +139,8 @@ const BEISPIELE: { name: string; vorgang: VertragsendeStand }[] = [
 ];
 
 /**
- * EINMAL beim Laden des Moduls gerechnet, nicht bei jedem Zeichnen: Der Adapter
- * zaehlt Kalendertage ueber `tageZwischen`, und das kostet unter Jest rund
- * 10 ms je Aufruf.
+ * EINMAL beim Laden des Moduls gerechnet, nicht bei jedem Zeichnen: Die Lagen
+ * haengen nur am festen `JETZT`, nie an einer Eingabe der Seite.
  */
 const LAGEN = BEISPIELE.map((beispiel) => ({
   name: beispiel.name,

@@ -114,9 +114,8 @@ const kurz = (s: VertragsendeStand) =>
   } / Offboarding ${s.offboarding ? "ja" : "nein"} / unterschrieben ${s.contractSignedReturnedAt ? "ja" : "nein"} / Ende ${s.contractEndDate}`;
 
 /**
- * Je Lage EINMAL gerechnet: Der Adapter zaehlt Kalendertage ueber
- * `tageZwischen`, und das kostet unter Jest rund 10 ms je Aufruf (ausserhalb
- * 0,1 ms). Rechnete jeder Test jede Lage selbst, liefe diese Datei Minuten.
+ * Je Lage EINMAL gerechnet und von allen Tests gelesen: So pruefen alle Tests
+ * genau dieselben Staende, und eine neue Lage steht an einer Stelle.
  */
 interface Probe {
   s: VertragsendeStand;

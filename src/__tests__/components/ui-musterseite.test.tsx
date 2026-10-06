@@ -72,10 +72,15 @@ describe("Inhalt", () => {
     const { container } = await seite();
     expect(await axeVerstoesse(container)).toEqual([]);
     const ebenen = Array.from(container.querySelectorAll("h1, h2, h3, h4")).map((h) => h.tagName);
-    // 11 aus U0, dazu Prozessleiste, Reiter und die Gruppe im gewaehlten Reiter.
-    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(14);
-    expect(ebenen).not.toContain("H3");
+    // 11 aus U0, dazu Prozessleiste, Reiter und die Gruppe im gewaehlten Reiter,
+    // Hinweise und Textfeld.
+    expect(ebenen.filter((e) => e === "H2").length).toBeGreaterThanOrEqual(16);
     expect(ebenen.filter((e) => e === "H1")).toHaveLength(1);
+    // Keine Ebene uebersprungen: h3 nur unter einer h2 (die Titel der Hinweise).
+    const zahlen = ebenen.map((e) => Number(e.slice(1)));
+    zahlen.forEach((ebene, i) => {
+      if (i > 0) expect(ebene).toBeLessThanOrEqual(zahlen[i - 1] + 1);
+    });
   });
 
   it("zeigt jeden Ton aus STATUS_TOENE", async () => {

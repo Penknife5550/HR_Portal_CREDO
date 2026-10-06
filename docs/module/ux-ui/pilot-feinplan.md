@@ -475,7 +475,18 @@ Pilot nichts.
 |---|---|---|
 | 1 Regeln: `ProzessStand`, Adapter, Kataloge, Statustabelle in eigener Datei | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 2 Bausteine Prozessleiste und Reiter, Musterseite, Kontrast | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
-| 3–7 Seite, Schalter, Abnahme | offen – erst nach dem Prototyp-Tag (V0) | |
+| 3, erster Teil: Bausteine Hinweis und Textfeld, Musterseite, Kontrast | **erledigt 06.10.2026** – vor V0 vorgezogen (Entscheidung 06.10.2026) | siehe Logbuch, Abschnitt 8 |
+| 3 Rest bis 7: Seite, Schalter, Abnahme | offen – erst nach dem Prototyp-Tag (V0) | |
+
+**Beim Bau von Tag 3 (Bausteine) genauer gefasst** (gegenüber 3.1):
+
+- **Hinweis:** Ob er angesagt wird, entscheidet die Seite über `ansagen` (nur bei `critical`
+  wirksam) – der Baustein rät nicht, ob er „neu“ ist. Ohne Titel zeichnet er nichts. Jeder
+  Ton hat ein eigenes Standardsymbol; Text in `ink`, weil `ink-2` auf `critical-soft` über
+  dem Seitengrund unter 4,5:1 fällt.
+- **Textfeld:** nur `text`, `email`, `tel`, `url`; Reihenfolge der Beschreibung Hilfe →
+  Fehler → eigene `aria-describedby`; Rand `ink-2` (3:1); `className` an die Hülle.
+- Tests in eigener Datei `ui-hinweis-textfeld.test.tsx` statt in `ui-bausteine.test.tsx`.
 
 **Beim Bau von Tag 1 genauer gefasst** (gegenüber 3.2 und 3.3):
 
