@@ -367,6 +367,7 @@ const vertragsverlaengerungResolver: PlaceholderResolver = async (ctx) => {
           wochenstunden: true, entgeltgruppe: true, stufe: true,
           urlaubstageProJahr: true, probezeitMonate: true,
           stellenbeschreibung: true, betriebsstaette: true,
+          betriebsstaetteOrgId: true,
         },
       },
     },
@@ -417,7 +418,20 @@ const vertragsverlaengerungResolver: PlaceholderResolver = async (ctx) => {
   if (rd?.urlaubstageProJahr != null) set("urlaubstage", rd.urlaubstageProJahr);
   if (rd?.probezeitMonate != null) set("probezeit_monate", rd.probezeitMonate);
   set("stellenbeschreibung", rd?.stellenbeschreibung);
-  set("betriebsstaette", rd?.betriebsstaette);
+
+  // Das Formular der Fuehrungskraft speichert die Betriebsstaette als Auswahl
+  // (`betriebsstaetteOrgId`, Organization.id); der Freitext `betriebsstaette`
+  // traegt nur Altbestand. Dieselbe Aufloesung wie GET /api/contract-end/[id]
+  // (`betriebsstaetteName`): gewaehlter Mandant vor Freitext. Die Auswahl
+  // umfasst alle aktiven Mandanten, die neue Betriebsstaette darf also ein
+  // anderer Mandant sein als der des Vorgangs — geprueft ist oben der Vorgang.
+  const betriebsstaetteOrg = rd?.betriebsstaetteOrgId
+    ? await prisma.organization.findUnique({
+        where: { id: rd.betriebsstaetteOrgId },
+        select: { name: true },
+      })
+    : null;
+  set("betriebsstaette", betriebsstaetteOrg?.name ?? rd?.betriebsstaette);
 
   // Aktueller (auslaufender) Vertrag — typisierte n8n-Felder
   set("aktuelle_position", ce.currentPosition);
