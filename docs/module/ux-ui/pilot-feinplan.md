@@ -476,7 +476,31 @@ Pilot nichts.
 | 1 Regeln: `ProzessStand`, Adapter, Kataloge, Statustabelle in eigener Datei | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 2 Bausteine Prozessleiste und Reiter, Musterseite, Kontrast | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 3, erster Teil: Bausteine Hinweis und Textfeld, Musterseite, Kontrast | **erledigt 06.10.2026** – vor V0 vorgezogen (Entscheidung 06.10.2026) | siehe Logbuch, Abschnitt 8 |
-| 3 Rest bis 7: Seite, Schalter, Abnahme | offen – erst nach dem Prototyp-Tag (V0) | |
+| 3 Rest bis 5: Seite (Kopf, Leiste, Hinweise, Reiter), Handlungen und Dialoge, `?tab=`, Vorschau-Schalter, Testdaten, Seitentest | **erledigt 06./07.10.2026** – vor V0 gebaut (Entscheidung 06.10.2026: der Prototyp-Tag läuft mit der echten Seite in Docker); Durchsicht in vier Blickwinkeln und Codereview, alle Befunde behoben | siehe Logbuch, Abschnitt 8 |
+| 6–7: Abnahme (Bilder je Lage in drei Breiten, Rollen, Tastatur, ein Vorgang ganz durch beide Stränge, Vergleich alt/neu), Ankündigungstext | offen – nach dem Prototyp-Tag (die Texte können sich dort noch ändern) | |
+
+**Beim Bau von Tag 3 Rest bis 5 genauer gefasst** (gegenüber 3.4 bis 3.8; Einzelheiten im Logbuch):
+
+- **Dateien wie 3.7**, dazu `aufrufe.ts` (die Aufrufe der alten Ansicht als Tabelle) und
+  `src/lib/prozess/vertragsende-hinweise.ts` (die Hinweise aus 3.4 als reine Funktion).
+- **Hinweise:** Die Vorstand-Warnung greift nur bei entschiedener Übernahme und laufendem
+  Vorgang (das Formular speichert den Vermerk schon beim Zwischenspeichern; bei späterer
+  Ablehnung bliebe ein `false` stehen). Die Kettenbefristung nur bei laufendem Vorgang.
+- **„Anfrage neu senden“** sagt NICHT, dass begonnene Eingaben verloren gehen (so stand es in
+  der alten Ansicht und in 3.4): `/supervisor-link` legt die Vertragsdaten per `upsert`
+  unverändert an, das Formular füllt sie wieder vor. Zurückgesetzt werden Erinnerungen und der
+  Vorstand-Vermerk; der alte Link wird ungültig – bei schon abgelaufenem Link heißt es
+  „ist bereits abgelaufen“.
+- **Gesperrt statt veraltet:** Nach jeder Handlung sind Knöpfe und Menü gesperrt, bis der neue
+  Stand da ist; scheitert das Neuladen, bleiben sie gesperrt, und ein Hinweis bietet „Neu
+  laden“ an.
+- **Reiter:** Startwert aus der Adresse des Browsers (`useSearchParams`), nicht als Eigenschaft
+  der Seite; Wechsel per `replaceState`.
+- **Betriebsstätte:** `GET /api/contract-end/[id]` liefert additiv `betriebsstaetteName`
+  (Abweichung von „alle Routen unverändert“, Abschnitt 4: nur ein zusätzliches Feld der
+  Antwort, keine Logik).
+- **Neuer Baustein `Textverweis`** (Verweis im Text, intern über `next/link`, extern `<a>`).
+- **Testdaten:** `scripts/vertragsende-testdaten.js`, zehn Lagen (VE-…-T01 bis T10).
 
 **Beim Bau von Tag 3 (Bausteine) genauer gefasst** (gegenüber 3.1):
 

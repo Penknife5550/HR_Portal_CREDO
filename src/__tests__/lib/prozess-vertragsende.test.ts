@@ -13,8 +13,11 @@ import {
 import { schrittKurzform, type ProzessStand } from "@/lib/prozess/prozess-stand";
 import {
   MAV_PILLE,
+  MAV_PILLE_OFFEN,
   VERTRAGSENDE_PILLE,
   VERTRAGSENDE_PILLE_LINK_ABGELAUFEN,
+  fuehrungskraftKannAntworten,
+  mavOffen,
   tageBisVertragsende,
   vertragsendeMenue,
   vertragsendePille,
@@ -142,9 +145,35 @@ describe("Kataloge", () => {
   it("kennen jeden Status des Moduls", () => {
     expect([...ALLE_STATUS].sort()).toEqual(Object.keys(CONTRACT_END_STATUS_LABELS).sort());
     expect(Object.keys(VERTRAGSENDE_PILLE).sort()).toEqual([...ALLE_STATUS].sort());
-    const alle = [...Object.values(VERTRAGSENDE_PILLE), ...Object.values(MAV_PILLE), VERTRAGSENDE_PILLE_LINK_ABGELAUFEN];
+    const alle = [
+      ...Object.values(VERTRAGSENDE_PILLE),
+      ...Object.values(MAV_PILLE),
+      VERTRAGSENDE_PILLE_LINK_ABGELAUFEN,
+      MAV_PILLE_OFFEN,
+    ];
     for (const eintrag of alle) {
       expect(eintrag.text.trim()).not.toBe("");
+    }
+  });
+
+  it("MAV offen: ohne Stand und „Ausstehend“ — die vier gesetzten Stände nicht", () => {
+    expect(mavOffen({ mavStatus: null })).toBe(true);
+    expect(mavOffen({ mavStatus: "" })).toBe(true);
+    expect(mavOffen({ mavStatus: "AUSSTEHEND" })).toBe(true);
+    const gesetzt = Object.keys(MAV_PILLE).filter((s) => s !== "AUSSTEHEND");
+    expect(gesetzt.sort()).toEqual(["ANGEHOERT", "NICHT_ERFORDERLICH", "WIDERSPRUCH", "ZUGESTIMMT"]);
+    for (const mavStatus of gesetzt) expect({ mavStatus, offen: mavOffen({ mavStatus }) }).toEqual({ mavStatus, offen: false });
+  });
+
+  it("MAV offen: Leiste und „Jetzt dran“ folgen mavOffen; die Pille „Offen“ wartet wie „Ausstehend“", () => {
+    // Die Pille „Offen“ wartet auf jemand anderen, wie „Ausstehend“.
+    expect(MAV_PILLE_OFFEN).toEqual({ text: "Offen", ton: "wait" });
+    expect(MAV_PILLE_OFFEN.ton).toBe(MAV_PILLE.AUSSTEHEND.ton);
+    for (const mavStatus of [null, "AUSSTEHEND", "ZUGESTIMMT", "NICHT_ERFORDERLICH"]) {
+      const s = uebernahme({ status: "VERTRAG_UNTERSCHRIEBEN", contractSignedReturnedAt: tag(-1), mavStatus });
+      const notiz = schritt(s, "abschluss").notiz === "MAV offen";
+      const unterzeile = dran(s).unterzeile === "Mitarbeitervertretung: Stand noch offen";
+      expect({ mavStatus, notiz, unterzeile }).toEqual({ mavStatus, notiz: mavOffen(s), unterzeile: mavOffen(s) });
     }
   });
 
@@ -517,6 +546,44 @@ describe("Menü", () => {
   it("bietet kein zweites Offboarding an", () => {
     expect(vertragsendeMenue(stand({ offboarding: OFFBOARDING }), JETZT)).toEqual(["stornieren"]);
     expect(vertragsendeMenue(angefragt({ offboarding: OFFBOARDING }), JETZT)).toEqual(["anfrage-neu-senden", "stornieren"]);
+  });
+});
+
+describe("Kann die Führungskraft antworten?", () => {
+  // Die Dialoge sagen „Der Link wird ungültig“ nur dann (`dialoge.tsx`).
+  it("ja, solange die Anfrage zugestellt ist und ihr Link gilt", () => {
+    expect(fuehrungskraftKannAntworten(angefragt(), JETZT)).toBe(true);
+    // Altstatus mit zugestellter Anfrage wie ANFRAGE_VORGESETZTER
+    expect(fuehrungskraftKannAntworten(angefragt({ status: "ENTSCHEIDUNG_UEBERNAHME" }), JETZT)).toBe(true);
+    // Der Link gilt bis zu seinem Ablauf, nicht nur bis Mitternacht davor
+    expect(fuehrungskraftKannAntworten(angefragt({ supervisorTokenExpiresAt: JETZT.toISOString() }), JETZT)).toBe(true);
+  });
+
+  it("nein vor der Anfrage, ohne Versand, mit abgelaufenem Link, nach der Rückmeldung und im Endstatus", () => {
+    const FAELLE: [string, VertragsendeStand][] = [
+      ["ANGELEGT", stand()],
+      ["ANGELEGT mit Adresse", stand({ supervisorEmail: ADRESSE })],
+      ["Status gesetzt, nie verschickt", stand({ status: "ANFRAGE_VORGESETZTER", supervisorEmail: ADRESSE })],
+      ["Link abgelaufen", angefragt({ supervisorTokenExpiresAt: tag(-1) })],
+      ["Link ohne Ablaufdatum", angefragt({ supervisorTokenExpiresAt: null })],
+      ["Rückmeldung Übernahme", uebernahme()],
+      ["Rückmeldung keine Übernahme", abgelehnt()],
+      ["Keine Übernahme", keineUebernahme({ offboarding: OFFBOARDING })],
+      ["ABGESCHLOSSEN (Link galt noch)", angefragt({ status: "ABGESCHLOSSEN" })],
+      ["STORNIERT (Link galt noch)", angefragt({ status: "STORNIERT" })],
+    ];
+    for (const [lage, s] of FAELLE) {
+      expect({ lage, kann: fuehrungskraftKannAntworten(s, JETZT) }).toEqual({ lage, kann: false });
+    }
+  });
+
+  it("in jeder Lage genau dann, wenn „Jetzt dran“ bei der Führungskraft liegt", () => {
+    for (const { s, lage, p } of PROBEN) {
+      expect({ lage, kann: fuehrungskraftKannAntworten(s, JETZT) }).toEqual({
+        lage,
+        kann: p.jetztDran?.bei === "FUEHRUNGSKRAFT",
+      });
+    }
   });
 });
 

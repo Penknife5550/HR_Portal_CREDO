@@ -58,9 +58,24 @@ export async function GET(
       );
     }
 
+    // Das Formular der Fuehrungskraft speichert die gewaehlte Betriebsstaette
+    // als `betriebsstaetteOrgId` (Organization.id); das Freitextfeld
+    // `betriebsstaette` traegt nur Altbestand. Den Namen gibt es deshalb hier
+    // dazu (`betriebsstaetteName`, sonst null) — zusaetzlich, kein Feld faellt weg.
+    const orgId = contractEnd.renewalData?.betriebsstaetteOrgId;
+    const betriebsstaette = orgId
+      ? await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } })
+      : null;
+    const antwort = contractEnd.renewalData
+      ? {
+          ...contractEnd,
+          renewalData: { ...contractEnd.renewalData, betriebsstaetteName: betriebsstaette?.name ?? null },
+        }
+      : contractEnd;
+
     // Ohne den Schluessel des Magic-Links — das Ablaufdatum
     // (supervisorTokenExpiresAt) bleibt, die Oberflaeche braucht es.
-    return NextResponse.json(ohneVorgesetztenToken(contractEnd));
+    return NextResponse.json(ohneVorgesetztenToken(antwort));
   } catch (error) {
     console.error("Fehler beim Laden des Vertragsende-Vorgangs:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });

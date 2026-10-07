@@ -38,7 +38,7 @@ Portal-Direktzugriff. Fristen-Ampel **KRITISCH 1–2 / WARNUNG 3–6 / BEOBACHTE
 | Events / Mail | `src/lib/events.ts` (Gruppe „Vertragsende"); `src/lib/default-email-templates.ts` (`contract-end-supervisor-link`, `contract-end-created`) — **SMTP** über `triggerWebhooks`→`sendEventEmail` |
 | UI Liste | `src/app/(portal)/dashboard/contract-end-config.tsx` + `contract-end-dashboard-new.tsx` + Tab in `dashboard/page.tsx`; Labels in `src/lib/constants.ts` |
 | UI Anlegen | `src/components/neuer-vertragsende-modal.tsx` |
-| UI Detail | `src/app/(portal)/dashboard/contract-end/[id]/page.tsx` + `contract-end-detail-content.tsx` (Weiche A/B, Tabs Übersicht/Vertragsdaten/Dokumente) |
+| UI Detail | Seite `src/app/(portal)/vorgaenge/vertragsende/[id]/page.tsx` (seit U1; Weiche alte/neue Ansicht über den Cookie `ansicht-vertragsende`, UX-Pilot). Alte Ansicht: `src/app/(portal)/dashboard/contract-end/[id]/contract-end-detail-content.tsx` (Tabs Übersicht/Vertragsdaten/Dokumente/E-Mails, Vorgabe). Neue Ansicht (Vorschau): `detail.tsx`, `reiter-*.tsx`, `dialoge.tsx`, `typen.ts`, `aufrufe.ts` neben der Seite – Prozessleiste aus `src/lib/prozess/vertragsende.ts`, Hinweise aus `src/lib/prozess/vertragsende-hinweise.ts`; Regeln in CLAUDE.md, Abschnitt „Oberfläche“, und `docs/module/ux-ui/pilot-feinplan.md` |
 | UI Formular (öffentlich) | `src/app/vertrag-formular/[token]/page.tsx` |
 | Tests | `src/__tests__/api/contract-end.test.ts`, `contract-end-nicht-uebernehmen.test.ts`, `src/__tests__/lib/contract-end-fristen.test.ts` |
 

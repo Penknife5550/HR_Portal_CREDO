@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Gruppe, Zeile } from "@/components/ui/gruppe";
 import { Leerzustand } from "@/components/ui/leerzustand";
 import { STATUS_TOENE, Statuspille, type StatusTon } from "@/components/ui/statuspille";
+import { Textverweis } from "@/components/ui/textverweis";
 import { DialogMuster, LadeMuster, MusterKopf, SegmentMuster, ToastMuster } from "./dialog-muster";
 import { ProzessleisteMuster } from "./prozessleiste-muster";
 import { ReiterMuster } from "./reiter-muster";
@@ -105,6 +106,16 @@ export default async function UiMusterPage() {
                 <Link href={vorgangslistePfad()}>Als Verweis</Link>
               </Button>
             </div>
+          </Zeile>
+        </Gruppe>
+
+        <Gruppe titel="Textverweise" beschreibung="Ein Verweis führt woandershin, ein Knopf handelt.">
+          <Zeile>
+            <p className="text-ink">
+              Intern über den Router: <Textverweis href={vorgangslistePfad("vertragsende")}>Zur Liste Vertragsende</Textverweis>.
+              Extern als einfacher Verweis:{" "}
+              <Textverweis href="mailto:name@beispiel.invalid?subject=R%C3%BCckmeldung">Rückmeldung geben</Textverweis>.
+            </p>
           </Zeile>
         </Gruppe>
 

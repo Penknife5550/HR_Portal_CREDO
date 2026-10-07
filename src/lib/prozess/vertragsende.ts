@@ -122,7 +122,7 @@ export const VERTRAGSENDE_PILLE: Record<string, PillenAngabe> = {
 /** Die Anfrage ging hinaus, ihr Link gilt aber nicht mehr — HR ist dran. */
 export const VERTRAGSENDE_PILLE_LINK_ABGELAUFEN: PillenAngabe = { text: "Link abgelaufen", ton: "info" };
 
-/** Stand der Mitarbeitervertretung → Text und Ton. `null`/unbekannt = „offen". */
+/** Stand der Mitarbeitervertretung → Text und Ton. `null`/unbekannt = `MAV_PILLE_OFFEN`. */
 export const MAV_PILLE: Record<string, PillenAngabe> = {
   NICHT_ERFORDERLICH: { text: "Nicht erforderlich", ton: "neutral" },
   AUSSTEHEND: { text: "Ausstehend", ton: "wait" },
@@ -130,6 +130,18 @@ export const MAV_PILLE: Record<string, PillenAngabe> = {
   ZUGESTIMMT: { text: "Zugestimmt", ton: "ok" },
   WIDERSPRUCH: { text: "Widerspruch", ton: "critical" },
 };
+
+/** Kein Stand der Mitarbeitervertretung vermerkt — wie die Notiz „MAV offen" der Leiste. */
+export const MAV_PILLE_OFFEN: PillenAngabe = { text: "Offen", ton: "wait" };
+
+/**
+ * Ist der Stand der Mitarbeitervertretung noch offen? Kein Stand oder
+ * „Ausstehend". Die EINE Fassung fuer Leiste („MAV offen"), „Jetzt dran" und
+ * die Rueckfrage „Vorgang abschließen?" — ein Hinweis, keine Sperre (Regel 3).
+ */
+export function mavOffen(stand: Pick<VertragsendeStand, "mavStatus">): boolean {
+  return !stand.mavStatus || stand.mavStatus === "AUSSTEHEND";
+}
 
 const ENDSTATUS = ["ABGESCHLOSSEN", "STORNIERT"];
 
@@ -147,7 +159,8 @@ export function tageBisVertragsende(contractEndDate: string, jetzt: Date): numbe
   return tageZwischen(berlinerKalendertag(jetzt), berlinerKalendertag(ende));
 }
 
-function tageText(tage: number): string {
+/** „heute", „morgen", „in 5 Tagen", „seit 3 Tagen überschritten" — eine Fassung für Leiste, Pille und Hinweise. */
+export function tageText(tage: number): string {
   if (tage === 0) return "heute";
   if (tage === 1) return "morgen";
   if (tage > 1) return `in ${tage} Tagen`;
@@ -155,7 +168,7 @@ function tageText(tage: number): string {
 }
 
 /** Greift die Entfristungswarnung (§ 15 Abs. 5 TzBfG)? Dieselbe Regel wie auf der alten Seite. */
-function entfristungsWarnung(stand: VertragsendeStand, jetzt: Date): boolean {
+export function entfristungsWarnung(stand: VertragsendeStand, jetzt: Date): boolean {
   const warnung = getSignatureWarning({
     decision: stand.decision,
     status: stand.status,
@@ -246,8 +259,6 @@ function lageVon(stand: VertragsendeStand, jetzt: Date): Lage {
       return lage("unbekannt");
   }
 }
-
-const mavOffen = (stand: VertragsendeStand) => !stand.mavStatus || stand.mavStatus === "AUSSTEHEND";
 
 // =============================================
 // Schritte
@@ -497,6 +508,16 @@ export function vertragsendeMenue(stand: VertragsendeStand, jetzt: Date): Vertra
   })();
   // Ein Offboarding gibt es je Vorgang nur einmal (siehe `jetztDranBauen`).
   return punkte.filter((aktion) => aktion !== "offboarding-anlegen" || !stand.offboarding);
+}
+
+/**
+ * Kann die Fuehrungskraft gerade antworten? Nur in der Lage „Rueckmeldung"
+ * (Regel 5): Die Anfrage ging hinaus, und ihr Link gilt noch. Die Dialoge
+ * sagen „Der Link wird ungueltig" nur dann — ein schon abgelaufener Link
+ * wird durch nichts mehr ungueltig.
+ */
+export function fuehrungskraftKannAntworten(stand: VertragsendeStand, jetzt: Date): boolean {
+  return lageVon(stand, jetzt).phase === "rueckmeldung";
 }
 
 /**

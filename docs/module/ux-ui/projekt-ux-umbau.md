@@ -6,7 +6,7 @@ Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Co
 
 Letzte Änderung: 05.10.2026 (Merge von `main` mit dem Token-Fix Vertragsende; nicht gepusht)
 
-## 0. Übergabe (Stand 05.10.2026)
+## 0. Übergabe (Stand 07.10.2026)
 
 ### 0.1 Wo wir stehen
 
@@ -27,8 +27,14 @@ Letzte Änderung: 05.10.2026 (Merge von `main` mit dem Token-Fix Vertragsende; n
 - **Tag 3, erster Teil (06.10.2026, vor V0 vorgezogen):** Bausteine **Hinweis** und
   **Textfeld** auf der Musterseite (`src/components/ui/hinweis.tsx`, `textfeld.tsx`). Sie hängen
   an keiner Frage des Prototyp-Tags.
-- **Noch NICHT gebaut:** die Detailseite selbst (Feinplan Tag 3 Rest bis 7: neue Ansicht,
-  Dialoge, Vorschau-Schalter, Abnahme). Laut Leitplanke erst NACH dem Prototyp-Tag (V0).
+- **Tag 3 Rest bis 5 (06./07.10.2026, VOR V0 gebaut – Entscheidung des
+  Projektverantwortlichen, damit der Prototyp-Tag mit der echten Seite läuft):** neue
+  Detailansicht Vertragsende (Kopf, Prozessleiste, Hinweise, vier Reiter, sieben Dialoge),
+  Vorschau-Schalter (Cookie, Vorgabe alt), Testdaten-Skript, Baustein `Textverweis`. Siebte
+  Durchsicht (vier Blickwinkel, jeder Befund gegengeprüft) und ein Codereview – alle
+  bestätigten Befunde behoben. Protokoll in Abschnitt 7 („Pilot, Tag 3 Rest bis 5“).
+- **Noch NICHT gemacht:** Feinplan Tag 6–7 (Abnahme mit Bildern je Lage, Rollen, Tastatur,
+  ein Vorgang ganz durch beide Stränge, Ankündigungstext) – nach dem Prototyp-Tag.
 - **Seit 06.10.2026 auch in Docker anzusehen** (lokal, `http://localhost:3100`), siehe 0.6.
 
 ### 0.2 Erste Schritte der neuen Sitzung (in dieser Reihenfolge)
@@ -62,7 +68,13 @@ Letzte Änderung: 05.10.2026 (Merge von `main` mit dem Token-Fix Vertragsende; n
    10 ms“ streichen: Kommentar über `PROBEN` in `src/__tests__/lib/prozess-vertragsende.test.ts`,
    Kommentar über `LAGEN` in `src/app/(portal)/ui-muster/prozessleiste-muster.tsx`, CLAUDE.md
    (Punkt „Prozess-Stand“).
-4. **Teils erledigt am 06.10.2026:** `nervous-ritchie-2bbb51` ist aus `git worktree list`
+4. **Arbeitskopien, Stand 07.10.2026:** `bold-heisenberg-a615cf` (sauber, `3f6d3b0`),
+   `competent-turing-c6caae` (Nebenaufgabe „Betriebsstätte auflösen“, `b7c8532`, wartet auf
+   Freigabe für `main`) und `nervous-leavitt-c5af8e` (Nebenaufgabe „Vertragsende-Routen:
+   Versandergebnis und Anfragesperre“). Prüfen weiter nach 0.3. Kommt `b7c8532` nach `main`,
+   beim nächsten `git merge main` auf Konflikte in `src/app/api/contract-end/[id]/route.ts`
+   achten (dort liefert `ux-umbau` schon `betriebsstaetteName`).
+   **Teils erledigt am 06.10.2026:** `nervous-ritchie-2bbb51` ist aus `git worktree list`
    entfernt, der Ordner ließ sich aber nicht löschen (Windows: „Permission denied“ – vermutlich
    noch eine offene Sitzung); `bold-heisenberg-a615cf` liegt noch (sauber, Stand `3f6d3b0`).
    Beide Ordner löschen, wenn ihre Sitzungen geschlossen sind.
@@ -88,9 +100,13 @@ Dauerhaft lösen (auf `main`): `.claude` in `tsconfig.json` (`exclude`) und in
 
 ### 0.4 Nächste Aufgabe: der Prototyp-Tag (V0)
 
-Termin setzt der Projektverantwortliche mit dem Personalbüro. Vorbereitet ist die Musterseite
-`/ui-muster` (nur `SUPER_ADMIN`): Prozessleiste in acht Lagen, Reiter, alle Bausteine. Am
-Prototyp-Tag zu klären:
+Termin setzt der Projektverantwortliche mit dem Personalbüro. Vorbereitet sind die Musterseite
+`/ui-muster` (nur `SUPER_ADMIN`) und – seit 07.10.2026 – die **echte neue Seite** im lokalen
+Docker-Stapel (0.6): Schalter „Neue Ansicht ausprobieren“ auf einer Vertragsende-Seite,
+Testvorgänge in jeder Lage über `scripts/vertragsende-testdaten.js` (VE-…-T01 bis T10). Dazu
+zu klären, was beim Bau auffiel: Bei drei Hinweisen (z. B. T04) stehen die Reiter bei
+1366×768 unter dem sichtbaren Bereich; das Entfristungsrisiko steht dann dreimal (Pille,
+„Jetzt dran“, Hinweis). Am Prototyp-Tag zu klären:
 
 | Frage | Woher |
 |---|---|
@@ -100,9 +116,17 @@ Prototyp-Tag zu klären:
 | „sonst: Offboarding“ nach dem Abschluss weiter zeigen? | Feinplan 11, offen 3 |
 | E9 Dichte der Listen, E11 Anzeigenamen der Module, E13 Textbausteine | Plan, Abschnitt 6 |
 
-Ergebnisse in Abschnitt 4 (Entscheidungen) und im Feinplan festhalten, danach Tag 3.
+Ergebnisse in Abschnitt 4 (Entscheidungen) und im Feinplan festhalten, Texte im Adapter
+(`src/lib/prozess/vertragsende.ts`), in den Hinweisen und in `dialoge.tsx` nachziehen, danach
+Tag 6–7.
 
-### 0.5 Danach: Tag 3 bis 7 (Feinplan, Abschnitt 6)
+### 0.5 Danach: Tag 6 bis 7 (Feinplan, Abschnitt 6 und 7)
+
+Tag 3 bis 5 sind gebaut (siehe 0.1). Offen: die Abnahme nach Feinplan Abschnitt 7 (Bilder je
+Lage in drei Breiten, Höhe von Kopf/Leiste/Reiter bei 1366×768, ein Vorgang durch beide
+Stränge mit Vergleich des Audit-Protokolls, Rollen, Tastatur, Vergleich der alten Ansicht
+bildgleich bis auf die Schalterzeile), `npm run build`, Ankündigungstext, Deploy mit U0 + U1.
+Ursprünglicher Plan zur Erinnerung:
 
 Tag 3 ~~Bausteine **Hinweis** und **Textfeld** (Feinplan 3.1)~~ (erledigt 06.10.2026), neue Ansicht lesend (Kopf, Leiste,
 Hinweise, Reiter Übersicht); Tag 4 Handlungen und Dialoge, Reiter Vertragsdaten/Dokumente/
@@ -141,14 +165,20 @@ Hinweis bei überschrittenem Vertragsende (P-F4, im Adapter schon drin), Rückme
   Compose-Datei und Env-Datei lagen im Scratchpad der Sitzung vom 06.10.2026, nicht im Repo.
   In Git Bash vor `docker exec … /app/…` `MSYS_NO_PATHCONV=1` setzen (sonst wird der Pfad zu
   `C:/Program Files/Git/app/…`).
+- **Testdaten Vertragsende:** `node scripts/vertragsende-testdaten.js [--mandant <Nr>]` gegen die
+  Dev-DB (Port 5433). Für den Docker-Stapel steht der Aufruf im Kopf des Skripts (Datei in den
+  Container kopieren, `TESTDATEN_HOST_ERLAUBT=db`). Es löscht nur T-Vorgänge mit
+  `@beispiel.invalid` (Fassung vom 07.10.2026; die erste Fassung löschte alle
+  `@beispiel.invalid`-Vorgänge – siehe Protokoll).
 - **Arbeitsabläufe mit Agenten** (Ultracode): danach IMMER `git status`, `git log`,
   `git rev-list … origin/ux-umbau...HEAD` prüfen – Agenten dürfen nicht committen oder pushen.
 - Lange Python-Heredocs mit Backticks scheitern in der Bash: Skript in den Scratchpad schreiben.
 
 ### 0.7 Offen beim Projektverantwortlichen
 
-Deploy von U0 + U1 (mit Ankündigung an das Personalbüro; Pilot-Teile sind noch nicht
-sichtbar); Termin Prototyp-Tag; Deploy von `main` (Token-Fix Vertragsende, Checklisten,
+Deploy von U0 + U1 (mit Ankündigung an das Personalbüro; der Pilot ist gebaut, aber noch nicht
+abgenommen – mit ausgeliefert stünde nur die Zeile „Neue Ansicht ausprobieren“ da);
+Termin Prototyp-Tag; Freigabe der Nebenaufgaben (Betriebsstätte `b7c8532`, Vertragsende-Routen); Deploy von `main` (Token-Fix Vertragsende, Checklisten,
 Paket 3 mit zwei neuen Tabellen); Entscheidung über `perf/tagezwischen-direkte-rechnung`.
 
 ## 1. Worum es geht
@@ -175,7 +205,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Gepusht am 02.10.2026. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); **Tag 3, erster Teil (Bausteine Hinweis und Textfeld) gebaut** (06.10.2026, vor V0 vorgezogen); die Seite erst nach dem Prototyp-Tag (V0) |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); **Tag 3, erster Teil (Bausteine Hinweis und Textfeld) gebaut** (06.10.2026, vor V0 vorgezogen); **Tag 3 Rest bis 5 gebaut, durchgesehen und gepusht** (07.10.2026: Seite, Dialoge, Schalter, Testdaten – vor V0 auf Wunsch des Projektverantwortlichen); offen: Tag 6–7 (Abnahme) nach dem Prototyp-Tag |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -247,6 +277,13 @@ Vollständig mit Begründung und verworfener Alternative im Plan, Abschnitt 6. H
 | P-F8 | Statustexte der Pille | sagen, wer dran ist; Liste zeigt bis U3 die alten Texte. Endgültig nach V0. |
 | P-F9 | Reihenfolge mit V0 | Tag 1–2 vorher, die Seite danach. |
 
+### Am 06./07.10.2026
+
+| # | Thema | Entschieden |
+|---|---|---|
+| P-F9b | Seite vor dem Prototyp-Tag | Ja (Projektverantwortlicher, 06.10.2026, nachdem er die Bausteine in Docker gesehen hatte): Tag 3 Rest bis 5 jetzt bauen, hinter dem Schalter; der Prototyp-Tag läuft dann mit der echten Seite in Docker statt mit der Musterseite. Abnahme (Tag 6–7) erst danach. |
+| – | Gelöschte Testvorgänge | Zurückholen (07.10.2026, „alles beheben“): die sieben Testvorgänge VE-2026-GYM-001 bis -007 aus der Docker-Kopie wieder in die Dev-Datenbank. |
+
 ### Noch offen
 
 | # | Thema | Gebraucht vor |
@@ -298,6 +335,15 @@ Jede Stelle, an der die Umsetzung bewusst anders ist als der Plan, mit Grund.
 | Hinweis: wann angesagt | „`role="alert"` nur, wenn der Hinweis NACH dem Laden neu erscheint“ | ausdrücklich über `ansagen` (nur bei `critical`) | Ob ein Hinweis neu ist, weiß nur die Seite; ein Baustein, der es aus dem ersten Zeichnen erriete, läge beim Wechsel des Reiters falsch. |
 | Hinweis: Textfarbe | – | `ink` für Titel und Text | `ink-2` erreicht auf `critical-soft` über dem Seitengrund nur 4,49:1 (gerechnet in `ui-kontrast.test.ts`). |
 | Tests von Hinweis und Textfeld | „Regeln in `ui-bausteine.test.tsx`“ | eigene Datei `ui-hinweis-textfeld.test.tsx` | Wie Prozessleiste und Reiter; `ui-bausteine.test.tsx` hat schon 744 Zeilen. |
+| Pilot Tag 3 Rest bis 5 | „Die Seite nach dem Prototyp-Tag“ (P-F9) | vor V0 gebaut (P-F9b) | Entscheidung des Projektverantwortlichen: Der Prototyp-Tag gewinnt, wenn das Personalbüro die echte Seite klickt. Die Texte stehen an wenigen Stellen (Adapter, Hinweise, Dialoge) und lassen sich danach billig ändern. |
+| Vorstand-Hinweis | Feinplan 3.4: greift bei `vorstandAbgestimmt === false` | nur bei entschiedener Übernahme und laufendem Vorgang | Das Formular speichert den Vermerk schon beim Zwischenspeichern; lehnt die Führungskraft danach ab, stand sonst eine kritische Warnung über einer Ablehnung (Befund der siebten Durchsicht). Nach Abschluss/Storno ist „vor der Vertragserstellung klären“ keine Aufgabe mehr. |
+| Kettenbefristung | Feinplan 3.4: immer, wenn die Regel greift | nur bei laufendem Vorgang | Die Grenze betrifft die nächste Befristung; nach Abschluss oder Storno ist nichts mehr zu tun. |
+| „Anfrage neu senden“ | Feinplan 3.4 und alte Ansicht: „verwirft begonnene Eingaben der Führungskraft“ | sagt das NICHT | Falsch: `/supervisor-link` legt die Vertragsdaten per `upsert` unverändert an, das Formular füllt sie wieder vor. Zurückgesetzt werden Erinnerungen und der Vorstand-Vermerk. |
+| Routen unverändert | Feinplan 4: „alle Routen unter `src/app/api/contract-end/` nicht geändert“ | `GET /api/contract-end/[id]` liefert additiv `renewalData.betriebsstaetteName` | Das Formular speichert die Betriebsstätte als Auswahl (`betriebsstaetteOrgId`); die Ansicht zeigte sonst immer „—“. Nur ein Feld mehr in der Antwort, keine Logik. Die alte Ansicht und der Platzhalter-Resolver haben denselben Fehler (Nebenaufgabe, `b7c8532`). |
+| Startreiter | Feinplan 3.4: „Reiter in der Adresse“ | Startwert aus `useSearchParams` in der Ansicht, nicht als Eigenschaft der Seite | Eine Eigenschaft der Seite kennt nur die Adresse des Server-Aufrufs; nach einem Wechsel und Zurück/Vor stünde der alte Reiter da. |
+| Handlungen nach einer Handlung | – | gesperrt (`aria-disabled`), bis der neue Stand da ist; nach gescheitertem Neuladen gesperrt mit Hinweis „Die Ansicht ist nicht aktuell“ | Auf dem alten Stand schickte ein zweiter Klick z. B. eine zweite Anfrage (Codereview). |
+| Neuer Baustein | – | `Textverweis` (`src/components/ui/textverweis.tsx`) | Die Klassen eines Textverweises standen doppelt (Dialog, Schalter) und liefen auseinander (Codereview). |
+| Testdaten-Skript | Feinplan Tag 5: „Testdaten je Status (Skript)“ | `scripts/vertragsende-testdaten.js`, zehn Lagen inkl. abgelaufenem Link, Entfristungsrisiko, DokuBit-Änderung | Lage 10 (DokuBit-Merker bei „Angelegt“) kommt im Betrieb so nicht vor; sie zeigt Hinweis und Überschreitung zusammen. |
 
 Die Mockups im Plan zeigen weiter die ursprünglichen Farbwerte; maßgeblich ist `globals.css`.
 
@@ -1151,6 +1197,86 @@ beiden Bausteine, die nicht an seinen Fragen hängen, schon jetzt bauen; an der 
 **Lokal in Docker:** Auf Wunsch des Projektverantwortlichen läuft `ux-umbau` als eigener
 Docker-Stapel unter `http://localhost:3100`; Aufbau und Fallen in 0.6.
 
+### 06./07.10.2026 – Pilot, Tag 3 Rest bis 5 (Seite, Dialoge, Schalter, Testdaten)
+
+Der Projektverantwortliche hat die Bausteine in Docker angesehen und entschieden, die Seite
+schon vor dem Prototyp-Tag zu bauen (P-F9b, Abschnitt 4). Vorgehen: die gemeinsamen
+Grundlagen von Hand (`typen.ts`, `aufrufe.ts`, `src/lib/ansicht.ts`,
+`src/lib/prozess/vertragsende-hinweise.ts`; im Adapter `tageText` und `entfristungsWarnung`
+exportiert), dann ein Arbeitsablauf mit fünf Agenten (Ansicht; Schalter samt Seite;
+Regeltests; Testdaten-Skript; danach Seitentest), dann Durchsicht und Codereview.
+
+**Gebaut** (Einzelheiten und Regeln in CLAUDE.md, Abschnitt „Oberfläche“, Punkt „Neue
+Detailseite Vertragsende …“):
+- Seitenkopf mit Pfad, Name als `h1`, Unterzeile, EINER Pille, Menü „…“; Prozessleiste mit
+  „Jetzt dran“ und den Knöpfen; Hinweise über allen Reitern; Reiter Übersicht (Person und
+  Vertrag, Führungskraft, Mitarbeitervertretung mit „Stand setzen …“, Offboarding),
+  Vertragsdaten (Leerzustand), Dokumente (bestehende Karten), E-Mails (nur `HR_EDIT_ROLES`).
+- Sieben Dialoge: Anfrage senden, Anfrage neu senden, Offboarding anlegen, Vertrag erfassen,
+  Abschließen (nennt offene Punkte, sperrt nicht), Stornieren (P-F2), Stand der
+  Mitarbeitervertretung (Auswahl statt vier sofort speichernder Knöpfe). „Erinnerung senden“
+  ohne Rückfrage.
+- Laden mit Skelett, Ladefehler als angesagter Hinweis mit „Zur Liste“; nach einer Handlung
+  stilles Neuladen.
+- Vorschau-Schalter als schmale Zeile über beiden Ansichten; die alte Ansicht ist unverändert.
+- `scripts/vertragsende-testdaten.js` mit zehn Lagen; in der Dev-Datenbank angelegt
+  (Mandant 712: VE-2026-GSH-T01 bis T10, OFF-2026-GSH-T07).
+- Neue Tests: `vertragsende-detail.test.tsx` (Seitentest mit axe, je Lage, Rechte, jeder
+  Dialog gegen die Aufruf-Tabelle, Fokus, Reiter, Laden), `vertragsende-ansicht-schalter.test.tsx`,
+  `vertragsende-hinweise.test.ts`, `ansicht.test.ts`, `vertragsende-seite-regeln.test.ts`
+  (u. a. Gegenprobe der Aufrufe gegen den Quelltext der alten Ansicht), `ui-textverweis.test.tsx`;
+  erweitert: `prozess-vertragsende.test.ts`, `contract-end-detail.test.ts`.
+
+**Befund beim Bau:** Die alte Ansicht (und der Feinplan) sagten bei „Anfrage erneut senden“,
+begonnene Eingaben der Führungskraft würden zurückgesetzt – stimmt nicht (siehe Abschnitt 5).
+Zwei Agenten fanden unabhängig einen Fehler in `reiterAusSuche` (`?tab=constructor` traf
+`Object.prototype`) – behoben mit `Object.hasOwn`.
+
+**Siebte Durchsicht** (06.10.2026, vier Blickwinkel – Fachlogik, Barrierefreiheit, Hausregeln,
+Zustände –, je ein Skeptiker): 20 Befunde, 13 bestätigt (drei davon derselbe), alle behoben
+und von einem weiteren Agenten mit Gegenprobe nachgeprüft: Vorstand-Hinweis ohne Übernahme;
+„Link wird ungültig“ bei schon abgelaufenem Link (neu im Adapter:
+`fuehrungskraftKannAntworten`); Formatfehler der Adresse nicht angesagt; Überschriften
+sprangen in Dokumente/E-Mails von `h1` auf `h3`; Test zum verschwundenen Auslöser prüfte den
+falschen Weg; Betriebsstätte immer „—“ (Route additiv); Reiter nach Zurück/Vor falsch;
+veralteter Stand nach gescheitertem Neuladen bedienbar; Menü während der Erinnerung bedienbar;
+Kettenbefristung nach dem Ende (Kommentar und Test). Verworfen u. a.: „Mail gesendet“, obwohl
+die Routen das Versandergebnis verwerfen (bestehende Lücke der Routen → Nebenaufgabe).
+
+**Codereview** (07.10.2026, Stufe „xhigh“): 13 Befunde. 12 behoben und nachgeprüft:
+Handlungen während des stillen Neuladens auf altem Stand bedienbar (→ `beschaeftigt`); Dialog
+verschwand abrupt bei Ladefehler; Fokus-Merker blieb nach wirkungslosem Laden stehen (→
+`ladeStand`); Formatfehler doppelt und bei Wiederholung nicht angesagt (→ `flushSync`);
+`<Suspense>` um die Ansicht; Testdaten-Skript löschte alle `@beispiel.invalid`-Vorgänge
+(→ nur T-Nummern) und ließ abhängige Zeilen liegen (→ mitgelöscht, Dateien nur unter zwei
+Wurzeln); Statuspaar statt `CONTRACT_END_ANFRAGE_OFFEN`; „MAV offen“ dreifach (→ `mavOffen`,
+`MAV_PILLE_OFFEN` im Adapter); Anzeigename doppelt (→ `anzeigeName`); Textverweis-Klassen
+doppelt (→ Baustein `Textverweis`); falscher Kommentar zu `Secure`. Nicht geändert: die
+Tageszahl beim Entfristungsrisiko (Kalendertage, die Regel selbst in Millisekunden) – die Seite
+nennt die 30-Tage-Grenze nirgends, die Zahl ist der tatsächliche Abstand.
+
+**Testdaten gelöscht und zurückgeholt:** Der erste Lauf des Testdaten-Skripts (06.10.2026)
+löschte – wie damals vorgegeben – alle Vertragsende-Vorgänge mit `@beispiel.invalid`, darunter
+sieben ältere Testvorgänge der Modulentwicklung vom 19.06.2026 (VE-2026-GYM-001 bis -007)
+samt 24 Protokolleinträgen und 6 Vertragsdaten. Am 07.10.2026 aus der Docker-Kopie (Stand vor
+dem Lauf) in einer Transaktion zurückgespielt (Spalten beider Datenbanken vorher verglichen);
+die Verknüpfungen zu OFF-2026-GYM-001 und -002 stimmen wieder.
+
+**Nebenaufgaben** (eigene Sitzungen, Abschnitt 0.2 Punkt 4): Betriebsstätte im
+Platzhalter-Resolver und in der alten Ansicht (`b7c8532`, wartet auf Freigabe für `main`);
+Vertragsende-Routen: Versandergebnis melden, neue Anfrage nach Übernahme-Rückmeldung sperren.
+
+**Mail- und Word-Vorlagen:** keine betroffen. Geprüft: `contract-end-created`,
+`contract-end-supervisor-link`, `contract-end-supervisor-reminder`, `contract-end-eskalation`,
+`contract-end-unbearbeitet`, die Paketmail der Vertragsverlängerung, `individuelle-mail` – kein
+Text und kein Payload-Feld ändert sich; Word-Vorlagen des Moduls `VERTRAGSVERLAENGERUNG`
+unverändert (der Platzhalter `{betriebsstaette}` hat denselben Fehler wie die alte Ansicht –
+Nebenaufgabe). Niemand muss „auf Standard zurücksetzen“. Kein Schema-Delta.
+
+**Geprüft:** Typen, Lint, alle Tests grün (siehe Commit); Browserprobe im Dev-Server in
+1366×768 und 375 px (kein waagerechtes Rollen, Skelett, Daten, Hinweise, keine
+Konsolenfehler). Die Sperrklinke brauchte keinen neuen Stand.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1190,9 +1316,10 @@ Docker-Stapel unter `http://localhost:3100`; Aufbau und Fallen in 0.6.
 | `ux-umbau` | `9edb97f` | Merge von `main` (Token-Fix Vertragsende) |
 | `main` | `aea163a` | Merge von `perf/tagezwischen-direkte-rechnung` (`232579e`, `099680d`) |
 | `ux-umbau` | `984fbee` | Merge von `main` (`tageZwischen`) |
+| `ux-umbau` | `c09908d` | Pilot Tag 3, erster Teil: Bausteine Hinweis und Textfeld |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).
