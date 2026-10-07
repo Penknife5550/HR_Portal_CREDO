@@ -1326,6 +1326,24 @@ die Vorbereitung des Prototyp-Tags gewählt. Arbeitsablauf mit drei Agenten:
 
 **Mail- und Word-Vorlagen:** keine betroffen (nur Skripte und Dokumentation).
 
+### 07.10.2026 – Merge von `main` (Nebenaufgaben Vertragsende)
+
+`git merge main` holt die beiden Nebenaufgaben aus eigenen Sitzungen: `b7c8532` (Betriebsstätte
+aus der Auswahl des Formulars – Platzhalter-Resolver und alte Ansicht; die GET-Route wortgleich
+mit `ux-umbau`, deshalb dort ohne Konflikt) und `6e0e2ce` (Versandergebnis beachten: Anfrage
+und Erinnerung antworten bei nicht zugestellter Mail 502/409 mit fertiger Meldung und
+`mailStatus`; keine neue Anfrage nach der Antwort der Führungskraft), Merge `4da68f1`.
+
+| Datei | Konflikt | Lösung |
+|---|---|---|
+| `api/contract-end/[id]/reminder/route.ts` | Importzeile | beide: `CONTRACT_END_ANFRAGE_OFFEN` (wir) und die Versand-Helfer (main) |
+| `api/contract-end/[id]/supervisor-link/route.ts` | Importe; `main` hatte die Sperrliste als lokale Kopie in der Route | Liste bleibt in `src/lib/contract-end-status.ts` und bekommt `RUECKMELDUNG_UEBERNAHME`/`RUECKMELDUNG_KEINE_UEBERNAHME` dazu (so im Commit von `main` vorgesehen); lokale Kopie gestrichen; `SCHON_GEANTWORTET` und die Meldungen aus `main` bleiben |
+| `contract-end-supervisor-link.test.ts` | Kopf, Vorgang, Listen, Mocks | Fassung von `main`; unsere Fälle (Rechte, gesperrte/mögliche Status) auf das bedingte `updateMany` umgestellt (`where` mit `notIn` der gemeinsamen Liste) |
+
+Gegenprobe: Adapter-Test (`prozess-vertragsende.test.ts`) und Seitentest der neuen Ansicht
+unverändert grün – der Adapter bot „Anfrage neu senden“ nach der Rückmeldung nie an. Alle
+Vertragsende-Tests grün (16 Suiten, 377 Tests), Typen grün.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |

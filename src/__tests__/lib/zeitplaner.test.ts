@@ -295,6 +295,41 @@ describe("Auswertung", () => {
     expect(a.ergebnis).toBe("PROBLEME");
   });
 
+  it("Vertragsende: nicht zugestellte und übersprungene Erinnerungen sind ein Problem, versendet zählt nur echte", () => {
+    const antwort = {
+      reminders: 1,
+      erinnerungenNichtZugestellt: 2,
+      erinnerungenUebersprungen: 0,
+      eskalationen: 0,
+      unbearbeitetHinweis: 0,
+      skipped: 4,
+      errors: 0,
+    };
+    const a = laufAuswerten("contract-end-reminders", 200, antwort, false);
+    expect(a.ergebnis).toBe("PROBLEME");
+    expect(a.versendet).toBe(1);
+    expect(a.zaehler).toContainEqual(["Erinnerungen nicht zugestellt", 2, true]);
+    expect(a.hinweis).toMatch(/nächste Lauf erneut/);
+
+    const ueber = laufAuswerten(
+      "contract-end-reminders",
+      200,
+      { ...antwort, erinnerungenNichtZugestellt: 0, erinnerungenUebersprungen: 1 },
+      false,
+    );
+    expect(ueber.ergebnis).toBe("PROBLEME");
+    expect(ueber.hinweis).toMatch(/Erinnerung Vorgesetzter/);
+
+    const ok = laufAuswerten(
+      "contract-end-reminders",
+      200,
+      { ...antwort, erinnerungenNichtZugestellt: 0 },
+      false,
+    );
+    expect(ok.ergebnis).toBe("OK");
+    expect(ok.hinweis).toBeNull();
+  });
+
   it("fehlende Felder in der Antwort werden laut statt still 0 (Problem + Feldnamen)", () => {
     // Etwa wenn jemand `errors` in einem Lauf umbenennt.
     const a = laufAuswerten("offboarding-reminders", 200, { remindersProcessed: 2, details: [], uebersprungen: [] }, false);

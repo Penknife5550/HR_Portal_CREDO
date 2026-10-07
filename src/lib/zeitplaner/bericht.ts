@@ -266,18 +266,31 @@ const AUSWERTER: Record<LaufSchluessel, Auswerter> = {
 
   "contract-end-reminders": (b) => {
     const fehler = b.zahl("errors");
+    const nicht = b.zahl("erinnerungenNichtZugestellt");
+    const ueber = b.zahl("erinnerungenUebersprungen");
+    const hinweise = [
+      nicht > 0
+        ? "Nicht zugestellte Erinnerungen versucht der nächste Lauf erneut – Grund im Versandprotokoll (Einstellungen → E-Mail-Versand)."
+        : null,
+      ueber > 0
+        ? "Übersprungen heißt: Die Erinnerung ging an niemanden. Die Vorlage „Erinnerung Vorgesetzter (Vertragsende-Anfrage offen)“ prüfen: aktiv und mit An-Feld?"
+        : null,
+      fehler > 0 ? "Fehler stehen im Log des Portals (sudo docker compose logs app)." : null,
+    ].filter((h): h is string => h !== null);
     return {
-      problem: fehler > 0,
+      problem: nicht + ueber + fehler > 0,
       versendet: b.zahl("reminders") + b.zahl("eskalationen") + b.zahl("unbearbeitetHinweis"),
       zaehler: [
         ["Erinnerungen an Führungskräfte", b.zahl("reminders")],
+        ["Erinnerungen nicht zugestellt", nicht, nicht > 0],
+        ["Erinnerungen übersprungen (Vorlage oder Empfänger)", ueber, ueber > 0],
         ["Eskalationen an HR", b.zahl("eskalationen")],
         ["Hinweise „unbearbeitet“ (montags)", b.zahl("unbearbeitetHinweis")],
-        ["Übersprungen", b.zahl("skipped")],
+        ["Ohne Erinnerung (nicht fällig oder Link abgelaufen)", b.zahl("skipped")],
         ["Fehler", fehler, fehler > 0],
       ],
       schritte: [],
-      hinweis: fehler > 0 ? "Fehler stehen im Log des Portals (sudo docker compose logs app)." : null,
+      hinweis: hinweise.length > 0 ? hinweise.join(" ") : null,
     };
   },
 

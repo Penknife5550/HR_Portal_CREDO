@@ -7,6 +7,11 @@
  * erzeugt und keine begonnene Bearbeitung zurueckgesetzt.
  *
  * Kein Intervall-Zwang wie im Cron: der Klick ist eine bewusste HR-Entscheidung.
+ *
+ * Die Mail IST hier die Aktion: Ging sie nicht hinaus, antwortet die Route
+ * 502 (Mailserver) bzw. 409 (Vorlage aus, kein Empfaenger) mit fertiger
+ * Meldung und `mailStatus` — nie 200, sonst meldete die Oberflaeche
+ * „gesendet". Gezaehlt wird dann nichts (`sendSupervisorReminder`).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,6 +20,7 @@ import { getSession } from "@/lib/auth";
 import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { sendSupervisorReminder } from "@/lib/contract-end-reminder";
 import { CONTRACT_END_ANFRAGE_OFFEN } from "@/lib/contract-end-status";
+import { erinnerungNichtZugestelltMeldung, statusNichtZugestellt } from "@/lib/contract-end-versand";
 
 export async function POST(
   _request: NextRequest,
@@ -69,13 +75,19 @@ export async function POST(
       );
     }
 
-    await sendSupervisorReminder(ce, new Date(), { manuell: true });
+    const { versand, gezaehlt } = await sendSupervisorReminder(ce, new Date(), { manuell: true });
+    if (!gezaehlt) {
+      return NextResponse.json(
+        { error: erinnerungNichtZugestelltMeldung(versand), mailStatus: versand.status },
+        { status: statusNichtZugestellt(versand) },
+      );
+    }
 
     const updated = await prisma.contractEndProcess.findUnique({
       where: { id },
       select: { lastSupervisorReminderAt: true, supervisorReminderCount: true },
     });
-    return NextResponse.json({ ok: true, ...updated });
+    return NextResponse.json({ ok: true, mailStatus: versand.status, ...updated });
   } catch (error) {
     console.error("[API] Vertragsende-Erinnerung fehlgeschlagen:", error);
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });

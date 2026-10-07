@@ -53,9 +53,14 @@ export const CONTRACT_END_OFFBOARDING_AUS: readonly ContractEndStatus[] = [
 
 /**
  * `/supervisor-link` (Strang A): In diesen Status ist keine (neue) Anfrage an
- * die Fuehrungskraft mehr moeglich (400).
+ * die Fuehrungskraft mehr moeglich (400). Die ersten beiden seit 10/2026: Die
+ * Fuehrungskraft hat schon geantwortet — eine neue Anfrage loeschte still
+ * Entscheidung, Begruendung und Vorstand-Vermerk, und nach „Ja" bliebe das
+ * Formular trotzdem gesperrt (`renewalData.isComplete`).
  */
 export const CONTRACT_END_ANFRAGE_GESPERRT: readonly ContractEndStatus[] = [
+  "RUECKMELDUNG_UEBERNAHME",
+  "RUECKMELDUNG_KEINE_UEBERNAHME",
   "ENTSCHEIDUNG_KEINE_UEBERNAHME",
   "VERTRAG_ERSTELLT",
   "VERTRAG_UNTERSCHRIEBEN",

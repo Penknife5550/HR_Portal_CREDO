@@ -18,10 +18,17 @@
  * Vor der ersten Erinnerung muss die Anfrage mindestens das Intervall her sein
  * (Referenz: lastSupervisorReminderAt, sonst supervisorLinkSentAt).
  *
+ * Gezaehlt wird nur eine Erinnerung, die hinausging (`sendSupervisorReminder`):
+ * FAILED zaehlt nichts und laeuft morgen erneut (`erinnerungenNichtZugestellt`),
+ * SKIPPED merkt sich nur den Tag (`erinnerungenUebersprungen`). Beides meldet
+ * der Bericht des Zeitplaners als Problem.
+ *
  * Zusaetzlich:
  *  - ESKALATION an HR (Event contract-end-eskalation), wenn zum
  *    Erinnerungszeitpunkt bereits >= 3 Erinnerungen ohne Antwort liefen —
  *    genau EINMAL je Anfrage (escalatedAt; Reset bei "Anfrage erneut senden").
+ *    Nur im selben Lauf wie eine gezaehlte Erinnerung — sonst stuende in der
+ *    Mail eine Erinnerung mehr, als hinausging.
  *  - MONTAGS-DIGEST an HR (Event contract-end-unbearbeitet): kritische/
  *    Warnung-Vorgaenge im Status ANGELEGT, fuer die noch keine Anfrage
  *    versendet wurde.
@@ -66,7 +73,15 @@ function istMontagInBerlin(d: Date): boolean {
 
 export async function vertragsendeErinnerungenLauf(opts: LaufOptionen = {}): Promise<LaufErgebnis> {
   const now = opts.jetzt ?? new Date();
-  const results = { reminders: 0, eskalationen: 0, unbearbeitetHinweis: 0, skipped: 0, errors: 0 };
+  const results = {
+    reminders: 0,
+    erinnerungenNichtZugestellt: 0,
+    erinnerungenUebersprungen: 0,
+    eskalationen: 0,
+    unbearbeitetHinweis: 0,
+    skipped: 0,
+    errors: 0,
+  };
 
   try {
     // Offene Vorgesetzten-Anfragen (neuer Prozess: ANFRAGE_VORGESETZTER;
@@ -106,7 +121,12 @@ export async function vertragsendeErinnerungenLauf(opts: LaufOptionen = {}): Pro
 
         // Versand + Zaehler + Audit im gemeinsamen Helfer (auch vom manuellen
         // "Erinnerung senden"-Button genutzt)
-        await sendSupervisorReminder(ce, now);
+        const { versand, gezaehlt } = await sendSupervisorReminder(ce, now);
+        if (!gezaehlt) {
+          if (versand.status === "FAILED") results.erinnerungenNichtZugestellt++;
+          else results.erinnerungenUebersprungen++;
+          continue;
+        }
 
         results.reminders++;
 
