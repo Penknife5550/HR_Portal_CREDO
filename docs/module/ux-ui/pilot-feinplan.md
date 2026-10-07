@@ -391,7 +391,7 @@ kosten je einen halben Tag zusätzlich. Je Tag ein Commit auf `ux-umbau`.
 2. Ohne Cookie ist die Vertragsende-Seite bildgleich mit dem Stand vor dem Pilot – bis auf
    die Zeile des Schalters (`scripts/ux-abnahme.js vergleich`).
 3. Neue Ansicht in 1440, 1366×768 und 390 px für je einen Vorgang in jedem der acht
-   erreichbaren Zustände; Bilder in `screenshots/pilot-*.png`. Bei 1366×768 wird gemessen,
+   erreichbaren Zustände; Bilder in `screenshots/pilot/pilot-*.jpg` (JPEG, gebaut 07.10.2026). Bei 1366×768 wird gemessen,
    wie viel Höhe Kopf, Leiste und Reiter belegen (Ziel des Plans: höchstens ein Drittel).
 4. Ein Vorgang einmal ganz durch beide Stränge geklickt (Dev-Datenbank, Port 5433): Anfrage,
    Erinnerung, Formular der Führungskraft, Vertrag erfassen, Abschluss; Ablehnung, Offboarding.
@@ -477,7 +477,30 @@ Pilot nichts.
 | 2 Bausteine Prozessleiste und Reiter, Musterseite, Kontrast | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 3, erster Teil: Bausteine Hinweis und Textfeld, Musterseite, Kontrast | **erledigt 06.10.2026** – vor V0 vorgezogen (Entscheidung 06.10.2026) | siehe Logbuch, Abschnitt 8 |
 | 3 Rest bis 5: Seite (Kopf, Leiste, Hinweise, Reiter), Handlungen und Dialoge, `?tab=`, Vorschau-Schalter, Testdaten, Seitentest | **erledigt 06./07.10.2026** – vor V0 gebaut (Entscheidung 06.10.2026: der Prototyp-Tag läuft mit der echten Seite in Docker); Durchsicht in vier Blickwinkeln und Codereview, alle Befunde behoben | siehe Logbuch, Abschnitt 8 |
-| 6–7: Abnahme (Bilder je Lage in drei Breiten, Rollen, Tastatur, ein Vorgang ganz durch beide Stränge, Vergleich alt/neu), Ankündigungstext | offen – nach dem Prototyp-Tag (die Texte können sich dort noch ändern) | |
+| 6–7, technischer Teil: Bilder je Lage in drei Breiten mit Höhenmessung (`ux-abnahme.js vertragsende`), Rollen, Tastatur, beide Stränge mit Protokollvergleich, Schalter (`ux-abnahme-pilot.js`, 154 Prüfungen) | **erledigt 07.10.2026** – vor V0; Ergebnisse im Logbuch | siehe Logbuch, Abschnitt 8 |
+| 6–7, Rest: Bilder nach den Textänderungen des Prototyp-Tags erneuern, Vergleich alte Ansicht bildgleich (`vergleich`), Durchsicht, Ankündigungstext | offen – nach dem Prototyp-Tag | |
+
+**Technische Abnahme vom 07.10.2026 – was sie ergab** (Einzelheiten im Logbuch):
+
+- **Höhe bei 1366×768:** Die Reiterleiste beginnt bei 466–886 px (61–115 % der Höhe), das
+  Ziel des Plans (ein Drittel, 256 px) erreicht keine Lage. Portal-Kopf 67, Schalterzeile 49,
+  Seitenkopf 114, Prozessleiste mit „Jetzt dran“ 233 (mit umbrechender Schrittzeile 273),
+  Reiterleiste 65 px; Hinweise je 94–114 px (T04 mit drei: 318 px). Zum Vergleich: In der
+  alten Ansicht beginnen die Reiter bei rund 290 px. Entscheidung am Prototyp-Tag
+  (Leitfaden, Frage 16) – im Pilot wird laut P-F6 nur gemessen.
+- **Rollen:** Einrichtungsleitung und Führungskraft sehen die Seite (alt wie neu) gar nicht:
+  Das Mandanten-Gate der Middleware (`src/lib/mandanten-gate.ts`) antwortet auf
+  `GET /api/contract-end/[id]` mit 403, auch beim eigenen Mandanten. 3.8 („sehen in beiden
+  Ansichten nur Lesendes“) stimmt deshalb heute nicht; die Ansicht selbst ist für sie richtig
+  nur lesend (mit simulierter Antwort geprüft). Die Freigabe ist eine offene Entscheidung des
+  Codereviews vom 01.09.2026 (Gate), nicht des Pilots.
+- **Beide Stränge** über die neue Ansicht: Status und Protokolleinträge je Schritt genau wie
+  von den Routen erwartet (SUPERVISOR_LINK_CREATED, SUPERVISOR_REMINDER_SENT,
+  SUPERVISOR_DECISION_UEBERNAHME, STATUS_CHANGED, CONTRACT_END_NO_RENEWAL …).
+- **Nebenbefunde (alter Bestand, nicht geändert):** Die Erinnerung von Hand wird ohne Konto
+  protokolliert (`contract-end-reminder.ts`); Mails ohne aktiven Mailserver stehen als FAILED
+  statt SKIPPED im Versandprotokoll; die alte Ansicht zählt die Tage bis zum Vertragsende einen
+  Tag anders (Millisekunden gegen Kalendertage).
 
 **Beim Bau von Tag 3 Rest bis 5 genauer gefasst** (gegenüber 3.4 bis 3.8; Einzelheiten im Logbuch):
 

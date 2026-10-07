@@ -36,7 +36,8 @@
  *
  * Aufruf (im Projektverzeichnis, Dev-Datenbank aus .env.local):
  *   node scripts/vertragsende-testdaten.js                 erster aktiver Mandant (nach Nummer)
- *   node scripts/vertragsende-testdaten.js --mandant 737   bestimmter Mandant (LOGA-Mandantennummer)
+ *   node scripts/vertragsende-testdaten.js --mandant 712   bestimmter Mandant (LOGA-Mandantennummer; die Testlagen
+ *                                                         im Logbuch und im Leitfaden liegen unter 712)
  *
  * Schutz: DATABASE_URL kommt aus der Umgebung, sonst aus .env.local, sonst aus
  * .env (wie scripts/dev-passwort-neu.js). Erlaubt sind nur die Hosts localhost
@@ -47,7 +48,7 @@
  * im Projektverzeichnis:
  *   export MSYS_NO_PATHCONV=1
  *   docker cp scripts/vertragsende-testdaten.js hr-portal-lokal-app:/app/vertragsende-testdaten.js
- *   docker exec -w /app -e TESTDATEN_HOST_ERLAUBT=db hr-portal-lokal-app node vertragsende-testdaten.js --mandant 737
+ *   docker exec -w /app -e TESTDATEN_HOST_ERLAUBT=db hr-portal-lokal-app node vertragsende-testdaten.js --mandant 712
  *   docker exec -u root hr-portal-lokal-app rm /app/vertragsende-testdaten.js
  * Die Datei muss unter /app liegen, damit `@prisma/client` aus /app/node_modules
  * gefunden wird; DATABASE_URL bringt der Container selbst mit.

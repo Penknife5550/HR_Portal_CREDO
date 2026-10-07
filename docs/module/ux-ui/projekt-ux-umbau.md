@@ -103,7 +103,9 @@ Dauerhaft lösen (auf `main`): `.claude` in `tsconfig.json` (`exclude`) und in
 Termin setzt der Projektverantwortliche mit dem Personalbüro. Vorbereitet sind die Musterseite
 `/ui-muster` (nur `SUPER_ADMIN`) und – seit 07.10.2026 – die **echte neue Seite** im lokalen
 Docker-Stapel (0.6): Schalter „Neue Ansicht ausprobieren“ auf einer Vertragsende-Seite,
-Testvorgänge in jeder Lage über `scripts/vertragsende-testdaten.js` (VE-…-T01 bis T10). Dazu
+Testvorgänge in jeder Lage über `scripts/vertragsende-testdaten.js` (VE-…-T01 bis T10).
+**Leitfaden für den Termin: [prototyp-tag-leitfaden.md](prototyp-tag-leitfaden.md)** (Ablauf,
+sieben Aufgaben alt/neu, 20 Fragen, Beobachtungsbogen, Bilder als Ersatz). Dazu
 zu klären, was beim Bau auffiel: Bei drei Hinweisen (z. B. T04) stehen die Reiter bei
 1366×768 unter dem sichtbaren Bereich; das Entfristungsrisiko steht dann dreimal (Pille,
 „Jetzt dran“, Hinweis). Am Prototyp-Tag zu klären:
@@ -160,8 +162,10 @@ Hinweis bei überschrittenem Vertragsende (P-F4, im Adapter schon drin), Rückme
   Arbeitskopien unter `.claude/`. `ZEITPLANER_AKTIV=false`; eigenes `JWT_SECRET` (das der
   Dev-`.env` enthält „dev_secret“, daran bricht der Entrypoint ab), `ENCRYPTION_KEY` aus der
   Dev-`.env` (sonst ließen sich die kopierten Daten nicht entschlüsseln), `BEM_ENCRYPTION_KEY`
-  neu (BEM-Freitexte der Kopie sind deshalb nicht lesbar). Achtung: Die kopierte
-  SMTP-Einstellung gilt – Handlungen, die Mails schicken, schicken echte Mails.
+  neu (BEM-Freitexte der Kopie sind deshalb nicht lesbar). Mails: Die kopierte
+  SMTP-Einstellung ist leer und inaktiv (`smtp_config.isActive = false`, geprüft am
+  07.10.2026, in Dev UND Docker) – Handlungen, die Mails schicken, enden als SKIPPED im
+  Versandprotokoll; es geht nichts hinaus. Wer dort einen Mailserver einträgt, ändert das.
   Compose-Datei und Env-Datei lagen im Scratchpad der Sitzung vom 06.10.2026, nicht im Repo.
   In Git Bash vor `docker exec … /app/…` `MSYS_NO_PATHCONV=1` setzen (sonst wird der Pfad zu
   `C:/Program Files/Git/app/…`).
@@ -193,6 +197,8 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | [u0-feinplan.md](u0-feinplan.md) | Feinplan U0 (gebaut und abgenommen) |
 | [u1-feinplan.md](u1-feinplan.md) | Feinplan U1 (gebaut und abgenommen) |
 | [pilot-feinplan.md](pilot-feinplan.md) | Feinplan Pilot Vertragsende (freigegeben 02.10.2026) |
+| [prototyp-tag-leitfaden.md](prototyp-tag-leitfaden.md) | Leitfaden für den Prototyp-Tag (V0) mit dem Personalbüro |
+| [screenshots/pilot/](screenshots/pilot/) | Die zehn Testlagen der neuen Vertragsende-Ansicht in drei Breiten, dazu T04 alt (`scripts/ux-abnahme.js vertragsende`) |
 | `projekt-ux-umbau.md` (diese Datei) | Stand, Protokoll, Abweichungen |
 | `CLAUDE.md`, Abschnitt „Oberfläche (UX-Umbau)“ | Die Regeln, die beim Programmieren gelten |
 | [screenshots/](screenshots/) | Vorher-Bilder (erzeugt von `scripts/ux-screenshots.js`) und die Musterseite in drei Breiten (`ui-muster-*.png`, erzeugt von `scripts/ux-abnahme.js`) |
@@ -1277,6 +1283,49 @@ Nebenaufgabe). Niemand muss „auf Standard zurücksetzen“. Kein Schema-Delta.
 1366×768 und 375 px (kein waagerechtes Rollen, Skelett, Daten, Hinweise, keine
 Konsolenfehler). Die Sperrklinke brauchte keinen neuen Stand.
 
+### 07.10.2026 – Prototyp-Tag vorbereitet, technische Abnahme
+
+Der Projektverantwortliche hat die neue Seite in Docker angesehen („sieht sehr gut aus“) und
+die Vorbereitung des Prototyp-Tags gewählt. Arbeitsablauf mit drei Agenten:
+
+- **Bilder** (`scripts/ux-abnahme.js`, neuer Modus `vertragsende`): T01–T10 in 1440 (ganze
+  Seite), 1366×768 (sichtbar und ganz) und 390 px, dazu T04 in der alten Ansicht – 42 JPEGs in
+  `screenshots/pilot/`. Alle 30 Aufrufe der neuen Ansicht: genau eine `h1`, keine
+  Konsolenfehler, kein waagerechtes Rollen. **Messung bei 1366×768:** Reiterleiste bei
+  466–886 px (61–115 %), Ziel ein Drittel (256 px) in keiner Lage erreicht – Portal-Kopf 67,
+  Schalter 49, Seitenkopf 114, Prozessleiste 233 (273 mit umbrechender Schrittzeile),
+  Reiterleiste 65, Hinweise 94–318 px. Alte Ansicht: Reiter bei rund 290 px. Weitere
+  Beobachtungen (alle als Fragen in den Leitfaden): Entfristungsrisiko viermal auf dem ersten
+  Bildschirm (T04); die Pille wiegt uneinheitlich (T10 überschritten blau, T04 Risiko rot);
+  Schrittzeile „Rückmeldung“ bricht um; am Handy steht „…“ allein in einer Zeile, „E-Mails“ nur
+  als „E-M“ sichtbar; Ende eines stornierten Vorgangs ohne Datum; Vorstand-Hinweis bleibt nach
+  erfasstem Vertrag stehen; Pille „Storniert“, Leiste „Abgebrochen“.
+- **Leitfaden** [prototyp-tag-leitfaden.md](prototyp-tag-leitfaden.md): Vorbereitung
+  (Docker, Testdaten, Anmeldung, Schalter), Ablauf (90 min; erst neue, dann alte Ansicht als
+  Ausgangswert), sieben Aufgaben, 20 Fragen, Beobachtungsbogen, Hinweise für die Moderation,
+  Bilder als Ersatz.
+- **Technische Abnahme** (`scripts/ux-abnahme-pilot.js`, neu): zweimal 154 von 154 Prüfungen.
+  Rollen (HR-Leitung und Sachbearbeitung mit Knöpfen, Menü, „Stand setzen …“, Reiter E-Mails);
+  Tastatur (Sprunglink, Pfad, Menü, Leiste, Reiter mit Pfeiltasten und `?tab=`, Dialog mit
+  Fokus auf „Abbrechen“ und zurück); beide Stränge über die neue Ansicht – Anfrage, Erinnerung,
+  Formular der Führungskraft (über die öffentliche Route), Vertrag erfassen, MAV-Stand,
+  Abschluss; Ablehnung, Offboarding, Abschluss; Stornieren – Status und Protokolleinträge je
+  Schritt genau wie von den Routen erwartet; Schalter hin und zurück, zweiter Browser bleibt
+  alt. Rolle, Mandantenzuweisung und Testdaten danach zurückgesetzt (geprüft).
+- **Befunde der Abnahme** (alter Bestand, nicht geändert): Einrichtungsleitung und
+  Führungskraft sehen die Vertragsende-Seite – alt wie neu – gar nicht, auch nicht beim eigenen
+  Mandanten (Mandanten-Gate der Middleware, 403 vor `canAccessProcess`); Feinplan 3.8 hatte
+  „nur Lesendes“ angenommen – offene Entscheidung zur Freigabe des Gates (Codereview
+  01.09.2026). Die Erinnerung von Hand wird ohne Konto protokolliert. Ohne aktiven Mailserver
+  stehen Mails als FAILED (nicht SKIPPED) im Versandprotokoll – am Prototyp-Tag rote Zeilen im
+  Reiter E-Mails (im Leitfaden angesagt). Der Vorschau-Schalter hat zwei Tab-Halte vor dem Pfad
+  (nur im Pilot).
+- Kopf des Testdaten-Skripts: Docker-Aufruf auf Mandant 712 angeglichen (wie Logbuch und
+  Leitfaden). Logbuch 0.6: Der Mailserver ist in Dev und Docker inaktiv (vorher stand dort
+  fälschlich, es gingen echte Mails hinaus).
+
+**Mail- und Word-Vorlagen:** keine betroffen (nur Skripte und Dokumentation).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1317,9 +1366,10 @@ Konsolenfehler). Die Sperrklinke brauchte keinen neuen Stand.
 | `main` | `aea163a` | Merge von `perf/tagezwischen-direkte-rechnung` (`232579e`, `099680d`) |
 | `ux-umbau` | `984fbee` | Merge von `main` (`tageZwischen`) |
 | `ux-umbau` | `c09908d` | Pilot Tag 3, erster Teil: Bausteine Hinweis und Textfeld |
+| `ux-umbau` | `fc33b53` | Pilot Tag 3 Rest bis 5: neue Detailseite Vertragsende, Dialoge, Schalter, Testdaten, Textverweis; siebte Durchsicht und Codereview |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“ (`fc33b53`) und danach der Commit „Prototyp-Tag vorbereitet“. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

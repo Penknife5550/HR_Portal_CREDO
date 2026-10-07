@@ -19,7 +19,26 @@
  *       abweicht. Mit `kopfhoeheA` nur unterhalb des Kopfs (fuer Pakete, die
  *       den Kopf aendern — U1: alter Kopf 72 px).
  *
- * VORAUSSETZUNGEN (muster, seiten)
+ *   vertragsende [zielordner]
+ *       Pilot Vertragsende (Feinplan Abschnitt 7, Punkt 3): die NEUE
+ *       Detailseite (Cookie `ansicht-vertragsende=neu`) fuer die Testvorgaenge
+ *       VE-<Jahr>-<Kuerzel>-T01 … T10 aus scripts/vertragsende-testdaten.js.
+ *       Je Vorgang JPEG (Qualitaet 80): 1440×900 ganze Seite
+ *       (`pilot-t01-1440.jpg`), 1366×768 sichtbarer Bereich (`…-1366.jpg`)
+ *       und ganze Seite (`…-1366-ganz.jpg`), 390×844 ganze Seite
+ *       (`…-390.jpg`). Fuer T04 dazu die ALTE Ansicht (ohne Cookie) in 1440
+ *       (ganze Seite) und 1366 (sichtbar): `pilot-t04-alt-….jpg`.
+ *       Gemessen wird bei 1366×768, wie weit Kopf, Schalterzeile, Seitenkopf,
+ *       Prozessleiste und Hinweise bis zur Unterkante der Reiterleiste
+ *       reichen (Ziel des Plans: hoechstens ein Drittel = 256 px). Geprueft
+ *       je Lage und Breite: genau eine h1, keine Konsolenfehler, bei 390 px
+ *       kein waagerechtes Rollen. Ende mit Code 1, wenn eine Pruefung
+ *       scheitert. Vorgabe: docs/module/ux-ui/screenshots/pilot/.
+ *       Die Testvorgaenge sind erfunden; Fristen haengen am Tag des Anlegens —
+ *       vorher `node scripts/vertragsende-testdaten.js --mandant <nr>` laufen
+ *       lassen, sonst stimmen „Jetzt dran“ und Ampel nicht mehr.
+ *
+ * VORAUSSETZUNGEN (muster, seiten, vertragsende)
  *   1. Entwicklungsserver laeuft (npm run dev, Dev-DB auf 5433).
  *   2. npm install --no-save puppeteer-core   (nutzt den vorhandenen Chrome)
  *   3. Ein SUPER_ADMIN der Dev-Datenbank; Passwort ueber
@@ -167,6 +186,203 @@ async function seiten(ziel) {
   }
 }
 
+// =============================================
+// Pilot Vertragsende
+// =============================================
+
+/** Vom Testdaten-Skript angelegte Vorgaenge: `VE-<Jahr>-<Kuerzel>-T<NN>` (scripts/vertragsende-testdaten.js). */
+const TEST_VERTRAGSENDE = /^VE-\d{4}-.+-T(\d{2})$/;
+/** Ziel des Plans: Kopf, Leiste und Reiter hoechstens ein Drittel von 768 px. */
+const DRITTEL_1366 = 256;
+/** Der Vorgang, dessen ALTE Ansicht zum Vergleich mit abgelegt wird. */
+const VERGLEICH_ALT = "T04";
+
+/**
+ * Setzt oder loescht den Cookie der Ansicht — so wie der Schalter der Seite
+ * (`ansichtCookieZeile`, src/lib/ansicht.ts: „alt" loescht den Cookie).
+ */
+async function ansichtSetzen(seite, neu) {
+  await seite.evaluate((zeile) => {
+    document.cookie = zeile;
+  }, neu ? "ansicht-vertragsende=neu; Max-Age=31536000; Path=/; SameSite=Lax" : "ansicht-vertragsende=; Max-Age=0; Path=/; SameSite=Lax");
+}
+
+/** Die Testvorgaenge T01 … T10 ueber die Liste der Schnittstelle, nach Nummer sortiert. */
+async function testvorgaengeFinden(seite) {
+  const antwort = await seite.evaluate(async () => {
+    const alle = [];
+    for (let nr = 1; nr <= 20; nr++) {
+      const res = await fetch(`/api/contract-end?search=${encodeURIComponent("-T")}&limit=200&page=${nr}`);
+      if (!res.ok) return { status: res.status };
+      const json = await res.json();
+      alle.push(...json.data.map((v) => ({ id: v.id, displayId: v.displayId })));
+      if (nr >= json.totalPages) break;
+    }
+    return { alle };
+  });
+  if (!antwort.alle) throw new Error(`Liste Vertragsende nicht lesbar (${antwort.status}).`);
+  const jeNummer = new Map();
+  for (const v of antwort.alle) {
+    const treffer = TEST_VERTRAGSENDE.exec(v.displayId ?? "");
+    if (!treffer) continue;
+    const kurz = `T${treffer[1]}`;
+    if (jeNummer.has(kurz)) console.log(`ACHTUNG: ${kurz} gibt es mehrfach — genommen wird ${jeNummer.get(kurz).displayId}.`);
+    else jeNummer.set(kurz, { ...v, kurz });
+  }
+  if (jeNummer.size === 0) {
+    throw new Error("Keine Testvorgaenge VE-…-T<NN> gefunden. Erst: node scripts/vertragsende-testdaten.js --mandant <nr>");
+  }
+  return [...jeNummer.values()].sort((x, y) => x.kurz.localeCompare(y.kurz));
+}
+
+/**
+ * Was je Lage und Breite gemessen und geprueft wird. Nur Zahlen und die Texte
+ * der Bausteine (Pille, Titel der Hinweise) — die Namen der Testpersonen
+ * gehoeren nicht in die Ausgabe. Lagen in px ab Seitenanfang.
+ */
+function seiteLesen(seite) {
+  return seite.evaluate(() => {
+    const unten = (el) => (el ? Math.round(el.getBoundingClientRect().bottom + window.scrollY) : null);
+    const oben = (el) => (el ? Math.round(el.getBoundingClientRect().top + window.scrollY) : null);
+    const leiste = document.querySelector("[data-prozessleiste]");
+    const reiter = document.querySelector('[role="tablist"]');
+    const titel = document.getElementById("seitentitel");
+    // Erster `header` = Portal-Kopf (layout.tsx); der Seitenkopf ist der `header` um die h1.
+    const portalKopf = document.querySelector("header");
+    const seitenkopf = titel ? titel.closest("header") : null;
+    const schalter = document.querySelector('aside[aria-label="Ansicht dieser Seite"]');
+    // Hinweise zwischen Leiste und Reiterleiste (nicht die in einem Reiter).
+    const hinweise =
+      leiste && reiter
+        ? [...document.querySelectorAll("main section[data-ton]")].filter(
+            (h) => oben(h) >= unten(leiste) && unten(h) <= oben(reiter),
+          )
+        : [];
+    const reiterUnten = unten(reiter);
+    return {
+      h1: document.querySelectorAll("h1").length,
+      breite: document.documentElement.scrollWidth,
+      fenster: window.innerWidth,
+      kopf: unten(portalKopf),
+      schalter: unten(schalter),
+      seitenkopf: unten(seitenkopf),
+      leiste: unten(leiste),
+      hinweise: hinweise.length,
+      hinweisTitel: hinweise.map((h) => h.querySelector("h2, h3, h4")?.textContent.trim() ?? ""),
+      reiter: reiterUnten,
+      // Rechnerisch ohne Hinweise: Die Reiterleiste rueckte um den Block der
+      // Hinweise samt einem Abstand nach oben (vom ersten Hinweis bis zur Leiste).
+      reiterOhneHinweise:
+        hinweise.length > 0 && reiterUnten !== null ? reiterUnten - (oben(reiter) - oben(hinweise[0])) : reiterUnten,
+      pille: seitenkopf?.querySelector("[data-ton]")?.textContent.trim() ?? null,
+      jetztDran: Boolean(document.querySelector("[data-jetzt-dran]")),
+      ende: document.querySelector("[data-ende]")?.getAttribute("data-ende") ?? null,
+    };
+  });
+}
+
+async function vertragsende(ziel) {
+  fs.mkdirSync(ziel, { recursive: true });
+  const browser = await browserStarten();
+  const befunde = [];
+  const messungen = [];
+  try {
+    const seite = await browser.newPage();
+    // Konsolenfehler je Aufruf: vor jedem `goto` geleert.
+    let konsole = [];
+    seite.on("console", (m) => {
+      if (m.type() === "error") konsole.push(m.text().slice(0, 300));
+    });
+    seite.on("pageerror", (e) => konsole.push(`Skriptfehler: ${String(e.message).slice(0, 300)}`));
+
+    await seite.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+    await anmelden(seite);
+    const vorgaenge = await testvorgaengeFinden(seite);
+    await ansichtSetzen(seite, true);
+
+    const oeffnen = async (vorgang, breite, neu) => {
+      await seite.setViewport({ width: breite.width, height: breite.height, deviceScaleFactor: 1 });
+      konsole = [];
+      await seite.goto(`${BASIS}/vorgaenge/vertragsende/${vorgang.id}`, { waitUntil: "networkidle2" });
+      if (neu) {
+        await seite.waitForSelector("[data-prozessleiste]", { timeout: 60000 });
+      } else {
+        // Die alte Ansicht hat keine Leiste; sie ist da, wenn die Nummer steht.
+        await seite
+          .waitForFunction((nr) => document.body.innerText.includes(nr), { timeout: 60000 }, vorgang.displayId)
+          .catch(() => console.log(`ACHTUNG: ${vorgang.kurz} alt — Nummer nicht gefunden, Bild trotzdem.`));
+      }
+      await ruhig(seite);
+      await seite.evaluate(() => window.scrollTo(0, 0));
+    };
+    const bild = (name, ganz) =>
+      seite.screenshot({ path: path.join(ziel, name), type: "jpeg", quality: 80, fullPage: ganz });
+    const pruefen = (kurz, breite, gelesen) => {
+      if (gelesen.h1 !== 1) befunde.push(`${kurz} ${breite}: ${gelesen.h1} h1 statt genau einer`);
+      if (konsole.length > 0) befunde.push(`${kurz} ${breite}: ${konsole.length} Konsolenfehler — ${konsole.join(" | ")}`);
+      if (gelesen.breite > gelesen.fenster) {
+        befunde.push(`${kurz} ${breite}: waagerechtes Rollen (Seite ${gelesen.breite} px, Fenster ${gelesen.fenster} px)`);
+      }
+    };
+
+    for (const vorgang of vorgaenge) {
+      const klein = vorgang.kurz.toLowerCase();
+      for (const b of BREITEN) {
+        await oeffnen(vorgang, b, true);
+        const gelesen = await seiteLesen(seite);
+        pruefen(vorgang.kurz, b.name, gelesen);
+        if (b.name === "1366") {
+          messungen.push({ kurz: vorgang.kurz, ...gelesen });
+          await bild(`pilot-${klein}-1366.jpg`, false);
+          await bild(`pilot-${klein}-1366-ganz.jpg`, true);
+        } else {
+          await bild(`pilot-${klein}-${b.name}.jpg`, true);
+        }
+      }
+      console.log(`${vorgang.kurz}  ${vorgang.displayId}  Bilder in 1440, 1366 (sichtbar, ganz), 390`);
+    }
+
+    // Die ALTE Ansicht eines Vorgangs zum Vergleich am Prototyp-Tag.
+    const alt = vorgaenge.find((v) => v.kurz === VERGLEICH_ALT);
+    if (alt) {
+      await ansichtSetzen(seite, false);
+      for (const b of BREITEN.filter((x) => x.name !== "390")) {
+        await oeffnen(alt, b, false);
+        await bild(`pilot-${alt.kurz.toLowerCase()}-alt-${b.name}.jpg`, b.name === "1440");
+      }
+      console.log(`${alt.kurz}  alte Ansicht in 1440 (ganz) und 1366 (sichtbar)`);
+    } else {
+      befunde.push(`${VERGLEICH_ALT} fehlt — keine Bilder der alten Ansicht`);
+    }
+  } finally {
+    await browser.close();
+  }
+
+  // Messung bei 1366×768: Unterkante je Band in px ab Seitenanfang.
+  const zelle = (wert, breite) => String(wert ?? "—").padStart(breite);
+  const anteil = (px) => (px === null ? "   —" : `${String(Math.round((px / 768) * 100)).padStart(3)} %`);
+  console.log("\nMessung 1366×768 — Unterkante in px (Ziel: Reiterleiste <= 256 px = ein Drittel)");
+  console.log("Lage  Kopf  Schalter  Seitenkopf  Leiste  Hinw.  Reiter  Anteil  ohne Hinw.  Anteil  Pille / Hinweise");
+  for (const m of messungen) {
+    console.log(
+      `${m.kurz}  ${zelle(m.kopf, 4)}  ${zelle(m.schalter, 8)}  ${zelle(m.seitenkopf, 10)}  ${zelle(m.leiste, 6)}  ` +
+        `${zelle(m.hinweise, 5)}  ${zelle(m.reiter, 6)}  ${anteil(m.reiter)}  ${zelle(m.reiterOhneHinweise, 10)}  ` +
+        `${anteil(m.reiterOhneHinweise)}  ${m.pille ?? "—"}${m.ende ? ` · Ende ${m.ende}` : ""}` +
+        `${m.hinweisTitel.length > 0 ? ` / ${m.hinweisTitel.join(" · ")}` : ""}`,
+    );
+  }
+  const ueber = messungen.filter((m) => m.reiter === null || m.reiter > DRITTEL_1366).map((m) => m.kurz);
+  console.log(
+    ueber.length === 0
+      ? "Alle Lagen innerhalb eines Drittels."
+      : `Ueber einem Drittel (Unterkante der Reiterleiste tiefer als 256 px): ${ueber.join(", ")}`,
+  );
+
+  console.log(befunde.length === 0 ? "\nPruefungen: genau eine h1, keine Konsolenfehler, kein waagerechtes Rollen — alles in Ordnung." : "\nPruefungen — Abweichungen:");
+  for (const b of befunde) console.log(`  ${b}`);
+  if (befunde.length > 0) process.exitCode = 1;
+}
+
 function vergleich(a, b, kopfA) {
   if (!a || !b) throw new Error("Aufruf: node scripts/ux-abnahme.js vergleich <ordnerA> <ordnerB> [kopfhoeheA]");
   // Mit `kopfhoeheA` (Hoehe des Kopfs in den Bildern von A, in px) wird nur
@@ -237,8 +453,12 @@ function vergleich(a, b, kopfA) {
   if (aufgabe === "muster") await muster(a || path.join(__dirname, "..", "docs", "module", "ux-ui", "screenshots"));
   else if (aufgabe === "seiten") await seiten(a);
   else if (aufgabe === "vergleich") vergleich(a, b, c);
-  else {
-    console.error("Aufruf: node scripts/ux-abnahme.js muster [ziel] | seiten <ziel> | vergleich <a> <b>");
+  else if (aufgabe === "vertragsende") {
+    await vertragsende(a || path.join(__dirname, "..", "docs", "module", "ux-ui", "screenshots", "pilot"));
+  } else {
+    console.error(
+      "Aufruf: node scripts/ux-abnahme.js muster [ziel] | seiten <ziel> | vergleich <a> <b> | vertragsende [ziel]",
+    );
     process.exit(1);
   }
 })().catch((e) => {
