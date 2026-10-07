@@ -3,6 +3,8 @@
  * POST /api/contract-end/[id]/reminder
  * Kern: Auth/Scope, Status-/Voraussetzungs-Guards, abgelaufener Token,
  * Happy Path via gemeinsamem Helfer (Event + Zaehler + Audit).
+ * Seit 10/2026: Ging die Mail nicht hinaus, antwortet die Route 502 (FAILED)
+ * bzw. 409 (SKIPPED) mit Meldung und `mailStatus` — und zaehlt nichts.
  */
 
 const mockGetSession = jest.fn();
@@ -10,6 +12,7 @@ const mockCanAccessProcess = jest.fn();
 const mockPrisma = {
   contractEndProcess: { findUnique: jest.fn(), update: jest.fn() },
   auditLog: { create: jest.fn() },
+  webhookConfig: { count: jest.fn() },
 };
 const mockTriggerWebhooks = jest.fn();
 
@@ -63,7 +66,8 @@ describe("POST /api/contract-end/[id]/reminder", () => {
     mockPrisma.contractEndProcess.findUnique.mockResolvedValue(vorgang());
     mockPrisma.contractEndProcess.update.mockResolvedValue({});
     mockPrisma.auditLog.create.mockResolvedValue({});
-    mockTriggerWebhooks.mockResolvedValue(undefined);
+    mockPrisma.webhookConfig.count.mockResolvedValue(0);
+    mockTriggerWebhooks.mockResolvedValue({ status: "SENT", recipient: "leitung@example.org" });
   });
 
   it("401 ohne Session, 403 ohne HR-Rolle, 403 ohne Org-Scope", async () => {
@@ -129,7 +133,7 @@ describe("POST /api/contract-end/[id]/reminder", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           action: "SUPERVISOR_REMINDER_SENT",
-          details: expect.objectContaining({ manuell: true }),
+          details: expect.objectContaining({ manuell: true, versand: "SENT" }),
         }),
       }),
     );
@@ -150,6 +154,7 @@ describe("POST /api/contract-end/[id]/reminder", () => {
 
     expect(json).toEqual({
       ok: true,
+      mailStatus: "SENT",
       lastSupervisorReminderAt: "2026-10-02T08:00:00.000Z",
       supervisorReminderCount: 1,
     });
@@ -160,5 +165,47 @@ describe("POST /api/contract-end/[id]/reminder", () => {
       where: { id: "ce1" },
       select: { lastSupervisorReminderAt: true, supervisorReminderCount: true },
     });
+  });
+
+  // ---------- Gesendet ist nur, was hinausging ----------
+
+  it("502 bei gescheitertem Versand: Meldung mit Grund, nichts gezählt, kein Verlauf", async () => {
+    mockTriggerWebhooks.mockResolvedValue({ status: "FAILED", detail: "connect ECONNREFUSED" });
+
+    const res = await POST(req(), { params: params() });
+    expect(res.status).toBe(502);
+    const json = await res.json();
+    expect(json.mailStatus).toBe("FAILED");
+    expect(json.error).toContain("konnte nicht versendet werden: connect ECONNREFUSED");
+    expect(json.error).toContain("nicht gezählt");
+    expect(JSON.stringify(json)).not.toContain("token-abc");
+    expect(mockPrisma.contractEndProcess.update).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("409 bei deaktivierter Vorlage: nichts gezählt, auch kein Zeitstempel (nur der Lauf merkt sich den Tag)", async () => {
+    mockTriggerWebhooks.mockResolvedValue({ status: "SKIPPED", detail: "E-Mail-Vorlage ist deaktiviert" });
+
+    const res = await POST(req(), { params: params() });
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.mailStatus).toBe("SKIPPED");
+    expect(json.error).toContain("Vorlage deaktiviert");
+    expect(mockPrisma.contractEndProcess.update).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("200 mit WEBHOOK, wenn die Vorlage aus ist und ein aktiver Webhook das Event übernimmt", async () => {
+    mockTriggerWebhooks.mockResolvedValue({ status: "SKIPPED", detail: "E-Mail-Vorlage ist deaktiviert" });
+    mockPrisma.webhookConfig.count.mockResolvedValue(1);
+
+    const res = await POST(req(), { params: params() });
+    expect(res.status).toBe(200);
+    expect((await res.json()).mailStatus).toBe("WEBHOOK");
+    expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ supervisorReminderCount: { increment: 1 } }),
+      }),
+    );
   });
 });

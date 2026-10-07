@@ -75,3 +75,49 @@ npm run dev            # Dev-Server (nutzt .env.local -> DB 5433)
 Test-Admin für die lokale Verifikation: `scripts/create-test-admin.ts`
 (`npx tsx scripts/create-test-admin.ts` / `--delete`; gitignored). Der frühere Docker-Dev-
 Container läuft aus einem separaten, veralteten Downloads-Klon und ist nicht der Branch-Code.
+
+## 6. Versand an die Führungskraft und Sperre nach der Antwort (10/2026)
+
+Zwei Befunde aus der Durchsicht des UX-Pilots vom 06.10.2026, behoben auf `main`.
+
+**Gesendet ist nur, was hinausging.** `triggerWebhooks` meldet SENT, FAILED oder SKIPPED;
+Anfrage und Erinnerung haben das Ergebnis früher verworfen (Oberfläche „gesendet“, Zähler
+stieg, nach drei gescheiterten Erinnerungen falsche Eskalation an HR). Bewertung in
+`src/lib/contract-end-versand.ts` (`versandBewerten`, dieselbe Regel wie bei den
+Abteilungsaufgaben: SKIPPED wegen deaktivierter Vorlage zählt nur mit aktivem Webhook als
+zugestellt).
+
+| Weg | Zugestellt (SENT/WEBHOOK) | Gescheitert (FAILED) | Übersprungen (SKIPPED) |
+|---|---|---|---|
+| `POST …/supervisor-link` | 201, `mailStatus` | 502 + Meldung, „nicht zugestellt“ (s. u.) | 409 + Meldung, „nicht zugestellt“ (s. u.) |
+| `POST …/reminder` (Knopf) | 200, Zähler +1, Verlauf | 502 + Meldung, nichts gezählt | 409 + Meldung, nichts gezählt |
+| Täglicher Lauf | `reminders`, Zähler +1 | `erinnerungenNichtZugestellt`, morgen erneut | `erinnerungenUebersprungen`, nur `lastSupervisorReminderAt` (sonst täglich), Zähler bleibt |
+
+- „Nicht zugestellt“ = `supervisorLinkSentAt = null`: keine Erinnerungen zu einem Link, den
+  niemand hat; die alte Ansicht zeigt das rot und bietet wieder „Anfrage senden“ an. War es
+  die erste Anfrage, geht auch der Status zurück auf `ANGELEGT` (Liste stimmt, Montags-Hinweis
+  „unbearbeitet“ greift). Zurückgestellt wird nur für den eigenen Token
+  (`updateMany … supervisorToken`).
+- Eskaliert wird nur im selben Lauf wie eine gezählte Erinnerung.
+- Der Bericht des Zeitplaners meldet beide neuen Zähler als Problem (`bericht.ts`).
+- Mail-Texte unverändert: `contract-end-supervisor-link`, `contract-end-supervisor-reminder`,
+  `contract-end-eskalation`. Keine Word-Vorlage betroffen.
+
+**Nach der Antwort der Führungskraft keine neue Anfrage.** `RUECKMELDUNG_UEBERNAHME` und
+`RUECKMELDUNG_KEINE_UEBERNAHME` stehen in der Sperrliste von `/supervisor-link` (400,
+„bereits geantwortet – bitte Seite neu laden“). Vorher setzte eine neue Anfrage Entscheidung,
+Begründung und Vorstand-Abstimmung zurück, nach „Ja“ blieb das Formular aber gesperrt
+(`renewalData.isComplete`) — ein Link ohne Handlung, und der Vertrag konnte schon erzeugt sein.
+Keine Ansicht bot den Knopf dort an; auslösbar war es aus einem veralteten Browserfenster.
+Der Statuswechsel läuft jetzt in EINER Transaktion mit bedingtem `updateMany` (Status nicht
+gesperrt): Antwortet die Führungskraft zwischen Prüfen und Speichern, gewinnt ihre Antwort (409).
+Eine falsche Antwort korrigierbar zu machen wäre ein eigener Knopf mit Rückfrage (nicht gebaut).
+
+**Für `ux-umbau` beim nächsten „`main` nachziehen“:** Konflikt in
+`src/app/api/contract-end/[id]/supervisor-link/route.ts` und im Test dazu sicher. Dort steht
+die Sperrliste in `src/lib/contract-end-status.ts` (`CONTRACT_END_ANFRAGE_GESPERRT`): die
+beiden `RUECKMELDUNG_*` dort aufnehmen, den Import behalten, die lokale Liste aus `main`
+streichen; im Test von `MOEGLICH` nach `GESPERRT` verschieben. Die Gegenprobe in
+`src/__tests__/lib/prozess-vertragsende.test.ts` prüft dann, dass die neue Ansicht die Anfrage
+dort nicht anbietet. Die neue Ansicht kann `mailStatus` lesen; Fehlerantworten (502/409) tragen
+die fertige Meldung in `error`.

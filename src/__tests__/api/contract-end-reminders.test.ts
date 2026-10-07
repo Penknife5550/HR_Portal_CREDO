@@ -15,6 +15,7 @@ const mockPrisma = {
   contractEndProcess: { findMany: jest.fn(), update: jest.fn() },
   auditLog: { create: jest.fn() },
   emailLog: { findFirst: jest.fn() },
+  webhookConfig: { count: jest.fn() },
   $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
 };
 const mockTriggerWebhooks = jest.fn();
@@ -84,6 +85,7 @@ describe("POST /api/cron/contract-end-reminders", () => {
     mockPrisma.contractEndProcess.update.mockResolvedValue({});
     mockPrisma.auditLog.create.mockResolvedValue({});
     mockPrisma.emailLog.findFirst.mockResolvedValue(null);
+    mockPrisma.webhookConfig.count.mockResolvedValue(0);
     mockTriggerWebhooks.mockResolvedValue({ status: "SENT" });
   });
 
@@ -254,6 +256,59 @@ describe("POST /api/cron/contract-end-reminders", () => {
     expect(json.eskalationen).toBe(0);
     expect(json.skipped).toBe(1);
     expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+  });
+
+  // ---------- Gezaehlt wird nur, was hinausging (10/2026) ----------
+
+  it("gescheiterte Erinnerung: nichts gezählt, kein Zeitstempel (morgen erneut), keine Eskalation", async () => {
+    mockPrisma.contractEndProcess.findMany.mockResolvedValue([
+      vorgang({ supervisorReminderCount: 3, escalatedAt: null }),
+    ]);
+    mockTriggerWebhooks.mockResolvedValue({ status: "FAILED", detail: "SMTP-Timeout" });
+
+    const json = await (await POST(req())).json();
+    expect(json.reminders).toBe(0);
+    expect(json.erinnerungenNichtZugestellt).toBe(1);
+    expect(json.erinnerungenUebersprungen).toBe(0);
+    expect(json.eskalationen).toBe(0);
+    expect(mockPrisma.contractEndProcess.update).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    expect(mockTriggerWebhooks).not.toHaveBeenCalledWith("contract-end-eskalation", expect.anything());
+  });
+
+  it("übersprungene Erinnerung (Vorlage aus): nur der Tag gemerkt, Zähler bleibt, keine Eskalation", async () => {
+    mockPrisma.contractEndProcess.findMany.mockResolvedValue([
+      vorgang({ supervisorReminderCount: 3, escalatedAt: null }),
+    ]);
+    mockTriggerWebhooks.mockResolvedValue({ status: "SKIPPED", detail: "E-Mail-Vorlage ist deaktiviert" });
+
+    const json = await (await POST(req())).json();
+    expect(json.reminders).toBe(0);
+    expect(json.erinnerungenUebersprungen).toBe(1);
+    expect(json.erinnerungenNichtZugestellt).toBe(0);
+    expect(json.eskalationen).toBe(0);
+    expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledWith({
+      where: { id: "ce1" },
+      data: { lastSupervisorReminderAt: expect.any(Date) },
+    });
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    expect(mockTriggerWebhooks).not.toHaveBeenCalledWith("contract-end-eskalation", expect.anything());
+  });
+
+  it("Vorlage aus, aber ein aktiver Webhook übernimmt: zählt als Erinnerung", async () => {
+    mockPrisma.contractEndProcess.findMany.mockResolvedValue([vorgang()]);
+    mockTriggerWebhooks.mockResolvedValue({ status: "SKIPPED", detail: "E-Mail-Vorlage ist deaktiviert" });
+    mockPrisma.webhookConfig.count.mockResolvedValue(1);
+
+    const json = await (await POST(req())).json();
+    expect(json.reminders).toBe(1);
+    expect(json.erinnerungenUebersprungen).toBe(0);
+    expect(mockPrisma.contractEndProcess.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ supervisorReminderCount: { increment: 1 } }),
+      }),
+    );
   });
 });
 

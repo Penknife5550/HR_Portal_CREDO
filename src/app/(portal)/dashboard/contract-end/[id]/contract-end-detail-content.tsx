@@ -164,6 +164,9 @@ export function ContractEndDetailContent({
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         setActionError(j.error || "Link konnte nicht versendet werden.");
+        // Ging nur die Mail nicht hinaus (502/409 mit mailStatus), ist der neue
+        // Link trotzdem gespeichert — die Karte zeigt dann „nicht zugestellt".
+        if (j.mailStatus) await loadData();
         return;
       }
       await loadData();
@@ -722,8 +725,12 @@ function Entscheidung({
   }
 
   // ANGELEGT / ANFRAGE_VORGESETZTER (+ Alt ENTSCHEIDUNG_UEBERNAHME): Anfrage an die Fuehrungskraft
-  const anfrageGesendet =
+  const anfrageOffen =
     ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"].includes(data.status) && Boolean(data.supervisorEmail);
+  // Ging die Mail der Anfrage nicht hinaus, setzt /supervisor-link
+  // supervisorLinkSentAt zurueck: Die Fuehrungskraft hat keinen Link.
+  const nichtZugestellt = anfrageOffen && data.status === "ANFRAGE_VORGESETZTER" && !data.supervisorLinkSentAt;
+  const anfrageGesendet = anfrageOffen && !nichtZugestellt;
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border-2 border-credo-gruen/40 bg-credo-gruen/5 p-5">
@@ -754,6 +761,11 @@ function Entscheidung({
           </div>
         ) : (
           <div className="space-y-2">
+            {nichtZugestellt && (
+              <p className="text-sm text-credo-rot">
+                Bei der Führungskraft ist keine Anfrage angekommen – die E-Mail an <strong>{data.supervisorEmail}</strong> wurde nicht versendet (Grund im Reiter „E-Mails“). Bitte erneut senden.
+              </p>
+            )}
             <input
               type="email"
               value={supervisorEmail}
