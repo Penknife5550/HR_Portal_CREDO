@@ -4,9 +4,9 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 08.10.2026 (neue Ansicht am Versandergebnis angeschlossen; Leitfaden und technische Abnahme für die Testumgebung ohne Mailserver)
+Letzte Änderung: 08.10.2026 abends (Übergabe vor einem Neustart: Versandergebnis angeschlossen, Codereview behoben, nächste Schritte in 0.2)
 
-## 0. Übergabe (Stand 08.10.2026)
+## 0. Übergabe (Stand 08.10.2026, abends)
 
 ### 0.1 Wo wir stehen
 
@@ -21,9 +21,11 @@ Letzte Änderung: 08.10.2026 (neue Ansicht am Versandergebnis angeschlossen; Lei
     auf der Musterseite `/ui-muster` – die Prozessleiste dort in acht echten Lagen des
     Vertragsendes (Klick-Dummy für den Prototyp-Tag).
   - Sechs Durchsichten insgesamt, alle bestätigten Befunde behoben.
-- **Gepusht am 05.10.2026:** `origin/ux-umbau` bis einschließlich des Logbuch-Commits vom
-  05.10.2026 (nach `61b817f`). Typen, Lint und alle Tests grün (192 Suiten, 5.043 Tests –
-  geprüft ohne die fremden Arbeitskopien unter `.claude/`, siehe 0.3).
+- **Gepusht bis 08.10.2026:** `origin/ux-umbau` bis einschließlich des Übergabe-Commits vom
+  08.10.2026 abends (nach `a56e4a1`). Typen, Lint und alle Tests grün (202 Suiten, 5.370 Tests –
+  geprüft ohne die fremden Arbeitskopien unter `.claude/`, siehe 0.3); technische Abnahme
+  213/213. **Nichts davon ist deployt** – weder der Umbau noch der Stand von `main` seit
+  30.09.2026 (siehe 0.2, Punkt 3a).
 - **Tag 3, erster Teil (06.10.2026, vor V0 vorgezogen):** Bausteine **Hinweis** und
   **Textfeld** auf der Musterseite (`src/components/ui/hinweis.tsx`, `textfeld.tsx`). Sie hängen
   an keiner Frage des Prototyp-Tags.
@@ -45,48 +47,63 @@ Letzte Änderung: 08.10.2026 (neue Ansicht am Versandergebnis angeschlossen; Lei
 
 ### 0.2 Erste Schritte der neuen Sitzung (in dieser Reihenfolge)
 
-1. **Stand prüfen:** `git switch ux-umbau`, `git status`, `git log --oneline -6`,
-   `git fetch` und `git rev-list --left-right --count origin/ux-umbau...HEAD` (erwartet `0 0`).
+Frühere Schritte (Merge von `main` am 05.10., `tageZwischen` am 06.10., Nebenaufgaben am
+07.10.) sind erledigt und stehen im Protokoll (Abschnitt 7).
+
+1. **Stand prüfen:** `git switch ux-umbau`, `git status`, `git log --oneline -4`,
+   `git fetch` und `git rev-list --left-right --count origin/ux-umbau...HEAD` (erwartet `0 0`;
+   HEAD = Übergabe-Commit vom 08.10.2026 abends, davor `a56e4a1`, `5dd1f16`, `2325435`).
    Uncommittet sind nur `docs/README.md` (LOGA-Abschnitt) und `docs/module/loga/` – eigener
    Strang, NICHT in UX-Commits aufnehmen.
-2. **Erledigt am 05.10.2026** (Protokoll „Merge von `main`“ in Abschnitt 7).
-   **`main` nachziehen** (`git merge main`, nicht rebasen). Auf `main` liegen seit dem Abzweig
-   zwei Commits zum Vertragsende: `6982015` und `3f6d3b0` – der Token der Führungskraft
-   (`supervisorToken`) steht nicht mehr in den Antworten der HR-Routen (neu:
-   `src/lib/contract-end-antwort.ts`). **Konflikte sind sicher**, beide Seiten haben dieselben
-   Dateien angefasst:
-   - `src/app/api/contract-end/[id]/route.ts`, `…/[id]/nicht-uebernehmen/route.ts`,
-     `…/[id]/supervisor-link/route.ts` – BEIDES behalten: unsere Statuslisten aus
-     `contract-end-status.ts` UND deren Antwort ohne Token.
-   - `src/__tests__/api/contract-end-nicht-uebernehmen.test.ts`,
-     `…/contract-end-reminder-manual.test.ts` – beide Ergänzungen behalten.
-   - `src/__tests__/api/contract-end-supervisor-link.test.ts` – von BEIDEN Seiten neu angelegt
-     (add/add): zu einer Datei zusammenführen (unsere Fälle: welcher Status gesperrt ist;
-     deren Fälle: kein Token in der Antwort).
-   - Danach prüfen: `supervisorTokenExpiresAt` muss in der Antwort von
-     `GET /api/contract-end/[id]` bleiben (Pflichtfeld des Adapters). Logbuch-Eintrag „Merge von
-     `main`“ wie am 01.10.2026.
-3. **Erledigt am 06.10.2026** (Protokoll „`tageZwischen` nach `main`“).
-   **`tageZwischen`:** Auf dem lokalen Branch `perf/tagezwischen-direkte-rechnung` (`099680d`,
-   nicht gepusht, nicht in `main`) rechnet die Funktion ohne Monatsschleife (Jest-Gesamtlauf laut
-   jener Sitzung 64 s → 30 s). Erst nach `main` bringen (Entscheidung des
-   Projektverantwortlichen), dann hierher mergen und die Hinweise „kostet unter Jest rund
-   10 ms“ streichen: Kommentar über `PROBEN` in `src/__tests__/lib/prozess-vertragsende.test.ts`,
-   Kommentar über `LAGEN` in `src/app/(portal)/ui-muster/prozessleiste-muster.tsx`, CLAUDE.md
-   (Punkt „Prozess-Stand“).
-4. **Arbeitskopien, Stand 07.10.2026:** `bold-heisenberg-a615cf` (sauber, `3f6d3b0`),
-   `competent-turing-c6caae` (Nebenaufgabe „Betriebsstätte auflösen“, `b7c8532`, wartet auf
-   Freigabe für `main`) und `nervous-leavitt-c5af8e` (Nebenaufgabe „Vertragsende-Routen:
-   Versandergebnis und Anfragesperre“). Prüfen weiter nach 0.3. Kommt `b7c8532` nach `main`,
-   beim nächsten `git merge main` auf Konflikte in `src/app/api/contract-end/[id]/route.ts`
-   achten (dort liefert `ux-umbau` schon `betriebsstaetteName`).
-   **Teils erledigt am 06.10.2026:** `nervous-ritchie-2bbb51` ist aus `git worktree list`
-   entfernt, der Ordner ließ sich aber nicht löschen (Windows: „Permission denied“ – vermutlich
-   noch eine offene Sitzung); `bold-heisenberg-a615cf` liegt noch (sauber, Stand `3f6d3b0`).
-   Beide Ordner löschen, wenn ihre Sitzungen geschlossen sind.
-   **Arbeitskopien aufräumen:** Unter `.claude/worktrees/` liegen zwei (`bold-heisenberg-a615cf`,
-   `nervous-ritchie-2bbb51`) aus den Nebenaufgaben. Wenn deren Sitzungen fertig sind:
-   `git worktree list`, dann `git worktree remove <pfad>`. Solange sie liegen, siehe 0.3.
+2. **Docker-Stapel `hr-portal-lokal` nach einem Neustart des Rechners von Hand starten** – er
+   startet nicht von selbst (`restart: "no"`): Docker Desktop → „Containers“ →
+   `hr-portal-lokal` starten (oder
+   `docker start hr-portal-lokal-db hr-portal-lokal-gotenberg hr-portal-lokal-app`), dann
+   `curl -s -o /dev/null -w "%{http_code}" http://localhost:3100/api/health` → `200`. Er läuft
+   mit dem Stand `a56e4a1`; die Testvorgänge T01–T10 sind vom 08.10.2026 – ihre Fristen
+   rechnen vom Tag des Einspielens, also vor dem Prototyp-Tag neu einspielen (Leitfaden,
+   Abschnitt 2, Schritt 3). Compose- und Env-Datei sowie die Anmeldedaten (`anmeldung.txt`)
+   liegen bewusst NICHT im Repository (Geheimnisse); wo, steht im Gedächtnis der Sitzung.
+   Gehen sie verloren: nach 0.6 neu aufsetzen.
+3. **Offen – Antwort des Projektverantwortlichen steht aus.** Am 08.10.2026 vorgeschlagen
+   (Reihenfolge: a, dann b; c bei Gelegenheit):
+   a) **Server-Update mit dem Stand von `main` (empfohlen, zuerst):** Schritt-für-Schritt-
+      Anleitung schreiben, nach dem Muster von `docs/historie/deploy-paket4-stufe1.md` und
+      `docs/historie/deploy-onboarding-pakete-2026-09.md`; ausführen tut der
+      Projektverantwortliche auf dem Server (`/vol/container/HR_Portal_CREDO`). Zuletzt
+      deployt: `f6d3daf` (30.09.2026). Seitdem auf `origin/main` (12 Commits ohne Merges):
+      `6e0e2ce` Vertragsende: Versandergebnis beachten, keine neue Anfrage nach der Antwort;
+      `b7c8532` Betriebsstätte aus der Auswahl des Formulars; `232579e`/`099680d`
+      `tageZwischen` ohne Schleife; `6982015`/`3f6d3b0` Link-Schlüssel der Führungskraft nicht
+      mehr in den Antworten (**Sicherheit – der wichtigste Grund für das Update**);
+      `226338d`/`2fbc4e4`/`b6e1c8a` Checklisten: Reihenfolge der Punkte; `bfb0665` Sperrklinke
+      (nur Test); `da5c743` Paket 3 „Individuelle E-Mail“; `1c0967b` Handbuch.
+      **Schema:** +2 Tabellen (`individuelle_mails`, `individuelle_mail_anhaenge`, rein additiv);
+      die Sicherung vor dem Abgleich macht der Entrypoint (der Ordner `backups` muss uid 1001
+      gehören, sonst bricht der Start ab – siehe CLAUDE.md; bei den Deploys im September lief
+      es). **Betriebsdateien** (Dockerfile, Compose, Entrypoint,
+      `.env`-Vorlage) unverändert. **Mailvorlagen:** neu nur `individuelle-mail` (Gruppe
+      „Allgemein“) – beim Schreiben prüfen, ob sie ohne Zeile in der Datenbank greift oder
+      angelegt werden muss (wie die Vorlagen bei Paket 4); die neuen Meldungen von `6e0e2ce`
+      stehen in den Routen, nicht in Vorlagen. **Nach dem Deploy:** Freigabeliste
+      (`allowedRecipientDomains`) pflegen und den Lauf „Aufbewahrung erzeugter Dokumente“
+      einschalten (sonst löscht Paket 3 nie). Befehle für den Server mit höchstens einem `*` je
+      Zeile (gingen beim Kopieren verloren). `ux-umbau` wird dabei NICHT deployt.
+   b) **Prototyp-Tag (V0):** Termin setzt der Projektverantwortliche mit dem Personalbüro.
+      Vorher eine Probe: Leitfaden Abschnitt 2, Schritte 1–4, und die sieben Aufgaben einmal
+      selbst (etwa 20 Minuten). Danach Bogen und Antworten in die nächste Sitzung geben →
+      Texte nachziehen (Leitfaden Abschnitt 7) → Tag 6–7 (0.5) → Deploy von U0, U1 und Pilot mit
+      Ankündigung.
+   c) **Zwei offene Entscheidungen:** Sollen Einrichtungsleitung und Führungskraft
+      Vertragsende-Vorgänge lesen dürfen (heute sperrt sie das Mandanten-Gate aus, alte wie
+      neue Ansicht)? Soll die Seite nach einer gescheiterten ERSTEN Anfrage einen eigenen
+      Hinweis zeigen (heute nur die Meldung im Dialog, danach wieder „Anfrage offen“)?
+4. **Arbeitskopien unter `.claude/worktrees/`:** `bold-heisenberg-a615cf` (`3f6d3b0`),
+   `competent-turing-c6caae` (`b7c8532`), `nervous-leavitt-c5af8e` (`4da68f1`) – ihre
+   Nebenaufgaben sind alle in `main` und hier gemergt. Dazu der Ordner
+   `nervous-ritchie-2bbb51` (schon aus `git worktree list` entfernt, ließ sich nicht löschen).
+   Wenn deren Sitzungen geschlossen sind: `git worktree remove <pfad>` bzw. Ordner löschen.
+   Solange sie liegen, prüfen nach 0.3.
 
 ### 0.3 Prüfen, solange fremde Arbeitskopien unter `.claude/` liegen
 
@@ -190,10 +207,12 @@ Hinweis bei überschrittenem Vertragsende (P-F4, im Adapter schon drin), Rückme
 
 ### 0.7 Offen beim Projektverantwortlichen
 
-Deploy von U0 + U1 (mit Ankündigung an das Personalbüro; der Pilot ist gebaut, aber noch nicht
-abgenommen – mit ausgeliefert stünde nur die Zeile „Neue Ansicht ausprobieren“ da);
-Termin Prototyp-Tag; Freigabe der Nebenaufgaben (Betriebsstätte `b7c8532`, Vertragsende-Routen); Deploy von `main` (Token-Fix Vertragsende, Checklisten,
-Paket 3 mit zwei neuen Tabellen); Entscheidung über `perf/tagezwischen-direkte-rechnung`.
+Antwort auf den Vorschlag vom 08.10.2026 (0.2, Punkt 3): Server-Update von `main` (Anleitung
+schreibe ich, ausführen auf dem Server), Termin Prototyp-Tag, die zwei Entscheidungen aus 0.2,
+Punkt 3c. Danach: Deploy von U0 + U1 + Pilot (nach Prototyp-Tag und Tag 6–7, mit Ankündigung
+an das Personalbüro). Erledigt: Freigabe der Nebenaufgaben (in `main` seit 07.10.2026),
+`perf/tagezwischen-direkte-rechnung` (in `main` seit 06.10.2026), Testumgebung ohne
+Mailserver („so machen wie im Plan“, 08.10.2026).
 
 ## 1. Worum es geht
 
@@ -221,7 +240,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Gepusht am 02.10.2026. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); **Tag 3, erster Teil (Bausteine Hinweis und Textfeld) gebaut** (06.10.2026, vor V0 vorgezogen); **Tag 3 Rest bis 5 gebaut, durchgesehen und gepusht** (07.10.2026: Seite, Dialoge, Schalter, Testdaten – vor V0 auf Wunsch des Projektverantwortlichen); offen: Tag 6–7 (Abnahme) nach dem Prototyp-Tag |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); **Tag 3, erster Teil (Bausteine Hinweis und Textfeld) gebaut** (06.10.2026, vor V0 vorgezogen); **Tag 3 Rest bis 5 gebaut, durchgesehen und gepusht** (07.10.2026: Seite, Dialoge, Schalter, Testdaten – vor V0 auf Wunsch des Projektverantwortlichen); **Prototyp-Tag vorbereitet** (07.10.2026); **Versandergebnis angeschlossen, Codereview behoben** (08.10.2026, Testumgebung bleibt ohne Mailserver); offen: Prototyp-Tag, danach Tag 6–7 (Abnahme) |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -1488,9 +1507,10 @@ die Oberfläche liest das Ergebnis).
 | `main` | `b7c8532`, `6e0e2ce`, `4da68f1` | Vertragsende: Betriebsstätte aus der Auswahl des Formulars; Versandergebnis beachten, keine neue Anfrage nach der Antwort |
 | `ux-umbau` | `2325435` | Merge von `main` (Nebenaufgaben Vertragsende) |
 | `ux-umbau` | `5dd1f16` | Versandergebnis angeschlossen (Lage „nicht zugestellt“, Dialog, Meldungen), Leitfaden und technische Abnahme ohne Mailserver |
+| `ux-umbau` | `a56e4a1` | Befunde des Codereviews: „nicht zugestellt“ nur mit erzeugtem Link, Skript, Aufräumen |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“ (`fc33b53`) und danach der Commit „Prototyp-Tag vorbereitet“. Am 08.10.2026 gepusht (Auftrag „so machen wie im Plan“): der Merge `2325435` und der Commit „Versandergebnis angeschlossen“ (`5dd1f16`), danach die Befunde des Codereviews. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“ (`fc33b53`) und danach der Commit „Prototyp-Tag vorbereitet“. Am 08.10.2026 gepusht (Auftrag „so machen wie im Plan“): der Merge `2325435` und der Commit „Versandergebnis angeschlossen“ (`5dd1f16`), danach die Befunde des Codereviews (`a56e4a1`) und die Übergabe vor dem Neustart. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).
