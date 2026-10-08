@@ -12,10 +12,13 @@ import {
 } from "@/lib/contract-end-status";
 import { schrittKurzform, type ProzessStand } from "@/lib/prozess/prozess-stand";
 import {
+  ANFRAGE_NICHT_ZUGESTELLT_ZEILE,
   MAV_PILLE,
   MAV_PILLE_OFFEN,
   VERTRAGSENDE_PILLE,
   VERTRAGSENDE_PILLE_LINK_ABGELAUFEN,
+  VERTRAGSENDE_PILLE_NICHT_ZUGESTELLT,
+  anfrageNichtZugestellt,
   fuehrungskraftKannAntworten,
   mavOffen,
   tageBisVertragsende,
@@ -91,7 +94,11 @@ const ALLE_STATUS = Object.keys(CONTRACT_END_UEBERGAENGE);
  */
 const ANFRAGEN: Partial<VertragsendeStand>[] = [
   {}, // nie angefragt
-  { supervisorEmail: ADRESSE }, // Adresse eingetragen, nichts verschickt
+  // Adresse eingetragen, nichts verschickt — in einem Anfrage-Status: nicht zugestellt
+  { supervisorEmail: ADRESSE },
+  // Anfrage gescheitert (`/supervisor-link`, Mail nicht hinaus): neuer Link
+  // gespeichert, aber nie zugestellt; Versandzeitpunkt zurueck auf null
+  { supervisorEmail: ADRESSE, supervisorLinkSentAt: null, supervisorTokenExpiresAt: tag(30) },
   { supervisorEmail: ADRESSE, supervisorLinkSentAt: tag(-10), supervisorTokenExpiresAt: tag(20) }, // Link gilt
   { supervisorEmail: ADRESSE, supervisorLinkSentAt: tag(-40), supervisorTokenExpiresAt: tag(-1) }, // abgelaufen
   { supervisorEmail: ADRESSE, supervisorLinkSentAt: tag(-10), supervisorTokenExpiresAt: null }, // ohne Ablaufdatum
@@ -112,7 +119,7 @@ const LAGEN: VertragsendeStand[] = ALLE_STATUS.flatMap((status) =>
 
 /** Die Lage in einer Zeile — damit eine gescheiterte Erwartung sagt, WO sie scheitert. */
 const kurz = (s: VertragsendeStand) =>
-  `${s.status} / ${s.decision} / Anfrage ${s.supervisorLinkSentAt ? "verschickt" : "nie"}, Link bis ${
+  `${s.status} / ${s.decision} / Adresse ${s.supervisorEmail ? "ja" : "nein"}, Anfrage ${s.supervisorLinkSentAt ? "verschickt" : "nie"}, Link bis ${
     s.supervisorTokenExpiresAt ?? "—"
   } / Offboarding ${s.offboarding ? "ja" : "nein"} / unterschrieben ${s.contractSignedReturnedAt ? "ja" : "nein"} / Ende ${s.contractEndDate}`;
 
@@ -149,6 +156,8 @@ describe("Kataloge", () => {
       ...Object.values(VERTRAGSENDE_PILLE),
       ...Object.values(MAV_PILLE),
       VERTRAGSENDE_PILLE_LINK_ABGELAUFEN,
+      VERTRAGSENDE_PILLE_NICHT_ZUGESTELLT,
+      ANFRAGE_NICHT_ZUGESTELLT_ZEILE,
       MAV_PILLE_OFFEN,
     ];
     for (const eintrag of alle) {
@@ -320,11 +329,25 @@ describe("Schritte", () => {
     });
   });
 
-  it("ANFRAGE_VORGESETZTER ohne zugestellte Anfrage (Status von Hand gesetzt): Anfrage ist dran, nicht „Erinnern“", () => {
-    for (const s of [stand({ status: "ANFRAGE_VORGESETZTER" }), stand({ status: "ANFRAGE_VORGESETZTER", supervisorEmail: ADRESSE })]) {
+  it("ANFRAGE_VORGESETZTER ohne Adresse (Status von Hand gesetzt): Anfrage ist dran wie bei ANGELEGT, nicht „Erinnern“", () => {
+    for (const status of ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"]) {
+      const s = stand({ status });
       expect(zustaende(s)).toMatchObject({ anfrage: "aktiv", rueckmeldung: "kommend" });
       expect(schritt(s, "anfrage").notiz).toBeUndefined();
-      expect(prozess(s).jetztDran).toMatchObject({ bei: "HR", aktion: "anfrage-senden" });
+      expect(dran(s)).toEqual(dran(stand()));
+      expect(anfrageNichtZugestellt(s, JETZT)).toBe(false);
+    }
+  });
+
+  it("ANFRAGE_VORGESETZTER mit Adresse, ohne Versandzeitpunkt: Anfrage aktiv mit Notiz „nicht zugestellt“", () => {
+    for (const status of ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"]) {
+      for (const ablauf of [null, tag(30), tag(-1)]) {
+        const s = stand({ status, supervisorEmail: ADRESSE, supervisorTokenExpiresAt: ablauf });
+        expect(zustaende(s)).toMatchObject({ anfrage: "aktiv", rueckmeldung: "kommend" });
+        expect(schritt(s, "anfrage")).toMatchObject({ zustaendig: "HR", notiz: "nicht zugestellt" });
+        expect(schritt(s, "anfrage").datum).toBeUndefined();
+        expect(schrittKurzform(prozess(s))).toBe("Schritt 2 von 5 · Anfrage");
+      }
     }
   });
 
@@ -406,6 +429,22 @@ describe("Jetzt dran", () => {
 
   it("Link ohne Ablaufdatum gilt als abgelaufen (wie in der Route)", () => {
     expect(dran(angefragt({ supervisorTokenExpiresAt: null }))).toMatchObject({ aktion: "anfrage-neu-senden" });
+  });
+
+  it("Anfrage nicht zugestellt: „erneut senden“ bei HR, die Unterzeile nennt die Adresse", () => {
+    // So hinterlaesst `/supervisor-link` eine Anfrage, deren Mail nicht hinausging.
+    const s = angefragt({ supervisorLinkSentAt: null, supervisorTokenExpiresAt: tag(30) });
+    expect(dran(s)).toMatchObject({
+      satz: "Anfrage wurde nicht zugestellt – erneut senden",
+      bei: "HR",
+      unterzeile: "Die E-Mail an leitung@beispiel.invalid ging nicht hinaus; die Führungskraft hat keinen gültigen Link.",
+      aktion: "anfrage-senden",
+      frist: "Vertragsende 28.03.2027 · in 300 Tagen",
+    });
+    expect(dran(s).nebenAktion).toBeUndefined();
+    expect(vertragsendeMenue(s, JETZT)).toEqual(["offboarding-anlegen", "stornieren"]);
+    // Die Frist gilt wie in jeder Anfrage-Lage.
+    expect(dran({ ...s, contractEndDate: tag(0) })).toMatchObject({ dringlichkeit: "critical" });
   });
 
   it("Abschluss nach Übernahme nennt einen offenen MAV-Stand, sperrt aber nicht", () => {
@@ -513,12 +552,15 @@ describe("Statuspille", () => {
 
   it("sagt nicht „Wartet auf Führungskraft“, wenn die Führungskraft gar nicht antworten kann", () => {
     for (const status of ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"]) {
-      // nie eine Anfrage verschickt
+      // nie eine Anfrage verschickt, keine Adresse
       expect(vertragsendePille(stand({ status }), JETZT)).toEqual({ text: "Anfrage offen", ton: "info" });
-      expect(vertragsendePille(stand({ status, supervisorEmail: ADRESSE }), JETZT)).toEqual({
-        text: "Anfrage offen",
-        ton: "info",
-      });
+      // Adresse, aber kein Versandzeitpunkt: Die Mail ging nicht hinaus
+      for (const ablauf of [null, tag(30)]) {
+        expect(vertragsendePille(stand({ status, supervisorEmail: ADRESSE, supervisorTokenExpiresAt: ablauf }), JETZT)).toEqual({
+          text: "Anfrage nicht zugestellt",
+          ton: "info",
+        });
+      }
       // Link abgelaufen bzw. ohne Ablaufdatum
       for (const ablauf of [tag(-1), null]) {
         expect(vertragsendePille(angefragt({ status, supervisorTokenExpiresAt: ablauf }), JETZT)).toEqual({
@@ -563,7 +605,12 @@ describe("Kann die Führungskraft antworten?", () => {
     const FAELLE: [string, VertragsendeStand][] = [
       ["ANGELEGT", stand()],
       ["ANGELEGT mit Adresse", stand({ supervisorEmail: ADRESSE })],
-      ["Status gesetzt, nie verschickt", stand({ status: "ANFRAGE_VORGESETZTER", supervisorEmail: ADRESSE })],
+      ["Status gesetzt, ohne Adresse", stand({ status: "ANFRAGE_VORGESETZTER" })],
+      ["Anfrage nicht zugestellt", stand({ status: "ANFRAGE_VORGESETZTER", supervisorEmail: ADRESSE })],
+      [
+        "Anfrage nicht zugestellt, neuer Link gespeichert",
+        angefragt({ supervisorLinkSentAt: null, supervisorTokenExpiresAt: tag(30) }),
+      ],
       ["Link abgelaufen", angefragt({ supervisorTokenExpiresAt: tag(-1) })],
       ["Link ohne Ablaufdatum", angefragt({ supervisorTokenExpiresAt: null })],
       ["Rückmeldung Übernahme", uebernahme()],
@@ -622,6 +669,33 @@ describe("Über alle Lagen", () => {
       // „wait“ heisst: Es wartet auf jemand anderen — genau dann, wenn die Führungskraft dran ist.
       expect({ lage, wartet: pille.ton === "wait" }).toEqual({ lage, wartet: p.jetztDran?.bei === "FUEHRUNGSKRAFT" });
     }
+  });
+
+  it("„nicht zugestellt“ genau bei Anfrage-Status mit Adresse ohne Versandzeitpunkt – dann sagen Pille, Schritt und „Jetzt dran“ dasselbe", () => {
+    const vorkommen = { ja: 0, nein: 0 };
+    for (const { s, lage, p, pille } of PROBEN) {
+      const erwartet =
+        (CONTRACT_END_ANFRAGE_OFFEN as readonly string[]).includes(s.status) &&
+        Boolean(s.supervisorEmail) &&
+        !s.supervisorLinkSentAt;
+      const ist = anfrageNichtZugestellt(s, JETZT);
+      expect({ lage, ist }).toEqual({ lage, ist: erwartet });
+      vorkommen[ist ? "ja" : "nein"] += 1;
+
+      const notiz = p.schritte.find((x) => x.key === "anfrage")!.notiz === "nicht zugestellt";
+      const satz = p.jetztDran?.satz === "Anfrage wurde nicht zugestellt – erneut senden";
+      // Die Entfristungswarnung ersetzte jede Pille — sie greift aber nur nach einer
+      // Rückmeldung, nie in einem Anfrage-Status.
+      const pilleSagtEs = pille.text === VERTRAGSENDE_PILLE_NICHT_ZUGESTELLT.text;
+      expect({ lage, notiz, satz, pilleSagtEs }).toEqual({ lage, notiz: ist, satz: ist, pilleSagtEs: ist });
+      if (ist) {
+        expect({ lage, dran: p.jetztDran }).toMatchObject({ lage, dran: { bei: "HR", aktion: "anfrage-senden" } });
+        expect({ lage, ton: pille.ton }).toEqual({ lage, ton: "info" });
+      }
+    }
+    // Beide Seiten kommen vor — sonst prueft der Test nichts.
+    expect(vorkommen.ja).toBeGreaterThan(0);
+    expect(vorkommen.nein).toBeGreaterThan(0);
   });
 });
 

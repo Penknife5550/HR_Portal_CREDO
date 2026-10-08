@@ -18,7 +18,12 @@ import { vorgangPfad } from "@/lib/adressen";
 import { OFFBOARDING_STATUS_LABELS } from "@/lib/constants";
 import { CONTRACT_END_ANFRAGE_OFFEN } from "@/lib/contract-end-status";
 import { formatDatumDE } from "@/lib/format";
-import { MAV_PILLE, MAV_PILLE_OFFEN } from "@/lib/prozess/vertragsende";
+import {
+  ANFRAGE_NICHT_ZUGESTELLT_ZEILE,
+  MAV_PILLE,
+  MAV_PILLE_OFFEN,
+  anfrageNichtZugestellt,
+} from "@/lib/prozess/vertragsende";
 import type { VertragsendeDetail } from "./typen";
 
 /** Befristungsart aus DokuBit → Text. Unbekannte Werte erscheinen roh. */
@@ -118,12 +123,26 @@ function vorstandText(vorgang: VertragsendeDetail): string {
   return vermerk ? `Ja – ${vermerk}` : "Ja";
 }
 
+/**
+ * Ging die Mail der Anfrage nicht hinaus (Lage des Adapters, dieselbe wie
+ * Pille und „Jetzt dran"), steht bei „Anfrage vom" der Zustand statt eines
+ * leeren Datums — als Pille mit Wort, nicht nur als Farbe. „Link gültig bis"
+ * entfaellt dann: Der neue Link steht zwar in der Datenbank, die
+ * Fuehrungskraft hat ihn aber nie bekommen („Jetzt dran" sagt genau das).
+ */
 function Fuehrungskraft({ vorgang, jetzt }: { vorgang: VertragsendeDetail; jetzt: Date }) {
-  const gueltigBis = linkGueltigBis(vorgang, jetzt);
+  const nichtZugestellt = anfrageNichtZugestellt(vorgang, jetzt);
+  const gueltigBis = nichtZugestellt ? null : linkGueltigBis(vorgang, jetzt);
   return (
     <Gruppe titel="Führungskraft">
       <Zeile label="E-Mail">{vorgang.supervisorEmail ?? ""}</Zeile>
-      <Zeile label="Anfrage vom">{formatDatumDE(vorgang.supervisorLinkSentAt)}</Zeile>
+      <Zeile label="Anfrage vom">
+        {nichtZugestellt ? (
+          <Statuspille ton={ANFRAGE_NICHT_ZUGESTELLT_ZEILE.ton}>{ANFRAGE_NICHT_ZUGESTELLT_ZEILE.text}</Statuspille>
+        ) : (
+          formatDatumDE(vorgang.supervisorLinkSentAt)
+        )}
+      </Zeile>
       {gueltigBis && <Zeile label="Link gültig bis">{gueltigBis}</Zeile>}
       <Zeile label="Rückmeldung vom">{formatDatumDE(vorgang.supervisorRespondedAt)}</Zeile>
       <Zeile label="Erinnerungen">{erinnerungen(vorgang)}</Zeile>

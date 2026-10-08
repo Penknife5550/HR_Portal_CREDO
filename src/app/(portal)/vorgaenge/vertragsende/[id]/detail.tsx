@@ -30,6 +30,14 @@
  *     seinen Ausloeser zurueckgibt, nicht auf `body` faellt —, und ein Dialog
  *     geht nicht auf. Frei bleiben nur reine Verweise („Zu den Dokumenten",
  *     „Zum Offboarding"): Sie aendern nichts.
+ *   - Ging die Mail nicht hinaus (Antwort mit `mailStatus`, siehe
+ *     `aufrufe.ts`), hat die Route trotzdem gespeichert. Die Erinnerung meldet
+ *     den Fehler der Route und laedt neu wie nach jedem Versuch; der Dialog
+ *     „Anfrage senden" bleibt offen, und die Seite laedt dahinter still neu
+ *     (`dialogGeaendert`) — `beschaeftigt` erst, wenn der Dialog vor dem Ende
+ *     dieses Ladens schliesst (`dialogAbbrechen`). Ein Webhook statt
+ *     der Portal-Mail steht in der Meldung (`anfrageMeldung`,
+ *     `erinnerungMeldung`).
  *   - Laden: beim ersten Mal ein Skelett, danach — nach jeder Handlung — still
  *     im Hintergrund: Die alten Daten bleiben stehen, bis die neuen da sind.
  *     Eine veraltete Antwort (zwei Ladevorgaenge kurz nacheinander) wird
@@ -77,7 +85,7 @@ import {
   type VertragsendeAktion,
 } from "@/lib/prozess/vertragsende";
 import { vertragsendeHinweise } from "@/lib/prozess/vertragsende-hinweise";
-import { aufrufen, vertragsendeAufruf } from "./aufrufe";
+import { aufrufen, erinnerungMeldung, vertragsendeAufruf } from "./aufrufe";
 import { VertragsendeDialog, type DialogArt } from "./dialoge";
 import { ReiterDokumente } from "./reiter-dokumente";
 import { ReiterUebersicht } from "./reiter-uebersicht";
@@ -137,8 +145,14 @@ export function VertragsendeDetailAnsicht({ vorgangId, darfBearbeiten }: Vertrag
   const [reiter, setReiter] = useState<ReiterWert>(() => reiterAusSuche(suche.get("tab"), darfBearbeiten));
   const [dialog, setDialog] = useState<DialogZustand | null>(null);
   const [erinnertGerade, setErinnertGerade] = useState(false);
-  // Nach einer Dialog-Handlung, bis das stille Neuladen fertig ist.
-  const [aktualisiert, setAktualisiert] = useState(false);
+  // Ladevorgaenge nach einer Dialog-Handlung, auf deren Stand die Seite noch
+  // wartet. Ein Zaehler, kein Merker: Zwei koennen sich ueberlappen (siehe
+  // `dialogAbbrechen`), und das Ende des einen gaebe die Seite sonst frei,
+  // waehrend das andere noch laeuft.
+  const [wartetAufStand, setWartetAufStand] = useState(0);
+  const aktualisiert = wartetAufStand > 0;
+  // Das stille Laden nach einem Fehlschlag MIT `mailStatus`, solange es laeuft.
+  const stillesLaden = useRef<Promise<void> | null>(null);
   const [neuLaedt, setNeuLaedt] = useState(false);
   // Zaehlt die abgeschlossenen Ladevorgaenge (Erfolg UND Fehler, ohne die
   // verworfenen) — der Takt der Fokuspruefung, siehe unten.
@@ -250,13 +264,51 @@ export function VertragsendeDetailAnsicht({ vorgangId, darfBearbeiten }: Vertrag
     setDialog((d) => ({ art, offen: true, nr: (d?.nr ?? 0) + 1 }));
   };
   const dialogSchliessen = () => setDialog((d) => (d ? { ...d, offen: false } : d));
+  /** Bis `laden` fertig ist, ist die Seite `beschaeftigt` (sofort, auch fuer den Waechter). */
+  const bisZumStand = (laden: Promise<void>) => {
+    handelnGesperrt.current = true;
+    setWartetAufStand((n) => n + 1);
+    void laden.finally(() => setWartetAufStand((n) => n - 1));
+  };
+  /**
+   * „Abbrechen", Escape, Kreuz. Laeuft noch das stille Laden nach einem
+   * Fehlschlag (`dialogGeaendert`), wartet die Seite darauf — sonst liesse sie
+   * kurz Handlungen auf dem alten Stand zu (z. B. „Erinnerung senden" zu
+   * einem Link, den es nicht mehr gibt).
+   */
+  const dialogAbbrechen = () => {
+    dialogSchliessen();
+    if (stillesLaden.current) bisZumStand(stillesLaden.current);
+  };
   /** Der Aufruf des Dialogs ist gelungen: schliessen, melden, und bis zum neuen Stand `beschaeftigt`. */
   const dialogErledigt = (meldung: string) => {
     dialogSchliessen();
     toast.ok(meldung);
-    handelnGesperrt.current = true;
-    setAktualisiert(true);
-    void neuLaden().finally(() => setAktualisiert(false));
+    bisZumStand(neuLaden());
+  };
+  /**
+   * Der Aufruf des Dialogs ist gescheitert, hat aber gespeichert (die Anfrage
+   * ging nicht hinaus, der neue Link steht trotzdem in der Datenbank, ein
+   * frueherer ist tot): still neu laden, der Dialog bleibt OFFEN.
+   *
+   * Ohne `beschaeftigt`, solange der Dialog offen ist: Er liest es nicht, und
+   * ein zweiter Versuch darin muss gehen. Gelingt der, wartet die Seite ueber
+   * `dialogErledigt` auf ihr eigenes Laden; das juengere Laden gewinnt ohnehin
+   * (`ladeNr`). Schliesst HR den Dialog vorher, wartet die Seite auf DIESES
+   * Laden (`dialogAbbrechen`). `neuLaden` setzt den Fokus-Merker: Bei offenem
+   * Dialog liegt der Fokus darin (auf der Fehlermeldung), die Pruefung tut
+   * dann nichts; schliesst der Dialog vor dem neuen Stand und verschwindet
+   * sein Ausloeser damit, bekommt der Seitentitel den Fokus — wie nach einem
+   * Erfolg. Scheitert das Neuladen, bleibt der Dialog offen (er haengt am
+   * Recht, nicht an `handlungenFrei`); ein neuer Versuch darin geht an die
+   * Route, die den Stand selbst prueft.
+   */
+  const dialogGeaendert = () => {
+    const laden = neuLaden();
+    stillesLaden.current = laden;
+    void laden.finally(() => {
+      if (stillesLaden.current === laden) stillesLaden.current = null;
+    });
   };
 
   async function erinnern() {
@@ -264,7 +316,9 @@ export function VertragsendeDetailAnsicht({ vorgangId, darfBearbeiten }: Vertrag
     handelnGesperrt.current = true;
     setErinnertGerade(true);
     const ergebnis = await aufrufen(vertragsendeAufruf("erinnern", vorgangId));
-    if (ergebnis.ok) toast.ok("Erinnerung an die Führungskraft gesendet.");
+    // Ging die Mail nicht hinaus (Fehler mit `mailStatus`), steht der Grund im
+    // Text der Route; gezaehlt hat sie nichts. Neu geladen wird in jedem Fall.
+    if (ergebnis.ok) toast.ok(erinnerungMeldung(ergebnis.mailStatus));
     else toast.fehler(ergebnis.fehler);
     // Der Knopf bleibt gesperrt, bis der neue Stand da ist — sonst ginge mit
     // einem zweiten Klick eine zweite Erinnerung hinaus.
@@ -495,8 +549,9 @@ export function VertragsendeDetailAnsicht({ vorgangId, darfBearbeiten }: Vertrag
           offen={dialog.offen}
           vorgang={vorgang}
           jetzt={jetzt}
-          onSchliessen={dialogSchliessen}
+          onSchliessen={dialogAbbrechen}
           onErledigt={dialogErledigt}
+          onGeaendert={dialogGeaendert}
         />
       )}
     </main>

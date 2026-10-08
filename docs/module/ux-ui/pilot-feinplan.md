@@ -477,8 +477,28 @@ Pilot nichts.
 | 2 Bausteine Prozessleiste und Reiter, Musterseite, Kontrast | **erledigt 02.10.2026** | siehe Logbuch, Abschnitt 8 |
 | 3, erster Teil: Bausteine Hinweis und Textfeld, Musterseite, Kontrast | **erledigt 06.10.2026** – vor V0 vorgezogen (Entscheidung 06.10.2026) | siehe Logbuch, Abschnitt 8 |
 | 3 Rest bis 5: Seite (Kopf, Leiste, Hinweise, Reiter), Handlungen und Dialoge, `?tab=`, Vorschau-Schalter, Testdaten, Seitentest | **erledigt 06./07.10.2026** – vor V0 gebaut (Entscheidung 06.10.2026: der Prototyp-Tag läuft mit der echten Seite in Docker); Durchsicht in vier Blickwinkeln und Codereview, alle Befunde behoben | siehe Logbuch, Abschnitt 8 |
-| 6–7, technischer Teil: Bilder je Lage in drei Breiten mit Höhenmessung (`ux-abnahme.js vertragsende`), Rollen, Tastatur, beide Stränge mit Protokollvergleich, Schalter (`ux-abnahme-pilot.js`, 154 Prüfungen) | **erledigt 07.10.2026** – vor V0; Ergebnisse im Logbuch | siehe Logbuch, Abschnitt 8 |
+| 6–7, technischer Teil: Bilder je Lage in drei Breiten mit Höhenmessung (`ux-abnahme.js vertragsende`), Rollen, Tastatur, beide Stränge mit Protokollvergleich, Schalter (`ux-abnahme-pilot.js`, 154 Prüfungen; seit 08.10.2026 ohne Mailserver 213) | **erledigt 07.10.2026** – vor V0; Ergebnisse im Logbuch | siehe Logbuch, Abschnitt 8 |
+| Anschluss an das Versandergebnis der Routen (kam mit dem Merge von `main` am 07.10.2026): Lage „nicht zugestellt“, Meldungen je `mailStatus`, Dialog bleibt bei Fehlschlag offen, technische Abnahme ohne Mailserver | **erledigt 08.10.2026** – zwei Prüfungen durch Agenten, Befunde behoben | siehe Logbuch, Abschnitt 8 |
 | 6–7, Rest: Bilder nach den Textänderungen des Prototyp-Tags erneuern, Vergleich alte Ansicht bildgleich (`vergleich`), Durchsicht, Ankündigungstext | offen – nach dem Prototyp-Tag | |
+
+**Versandergebnis, 08.10.2026** (Einzelheiten im Logbuch): Seit `6e0e2ce` (auf `main`) melden
+`/supervisor-link` und `/reminder`, ob die Mail hinausging (`mailStatus`); vorher meldete die
+Seite „gesendet“, auch wenn nichts hinausging. Die neue Ansicht zeigt das jetzt:
+
+- **Neue Lage „nicht zugestellt“** im Adapter (Ergänzung zu 3.3 und zu „„Erinnern“ nur mit
+  zugestellter, gültiger Anfrage“ unten): Status „Anfrage beim Vorgesetzten“ (oder Alt
+  „Entscheidung Übernahme“) MIT Adresse, aber ohne Versandzeitpunkt. HR ist dran, Pille
+  „Anfrage nicht zugestellt“ (`info`), „Jetzt dran“ „Anfrage wurde nicht zugestellt – erneut
+  senden“, im Reiter Übersicht „Nicht zugestellt“ statt „Link gültig bis“. Ohne Adresse bleibt
+  es „Anfrage senden“. Scheitert die erste Anfrage, steht der Vorgang wieder auf „Angelegt“ –
+  ohne eigenen Hinweis (wie die alte Ansicht).
+- **Dialog:** Geht die Anfrage nicht hinaus, bleibt er mit der Meldung der Route offen, die
+  Seite lädt dahinter neu; die Rückfrage sagt dann „der bisherige gilt bereits nicht mehr“.
+- **Meldungen:** „an den Webhook weitergegeben“, wenn statt der Portal-Mail ein Webhook
+  übernahm – nie „gesendet“.
+- **Testumgebung ohne Mailserver** (so geplant): Anfrage und Erinnerung scheitern dort immer.
+  Der Prototyp-Tag prüft genau diese Meldung (Leitfaden, Aufgaben 4 und 5, Frage 21); die
+  technische Abnahme stellt die Zustellung für den Weiterweg in der Datenbank nach.
 
 **Technische Abnahme vom 07.10.2026 – was sie ergab** (Einzelheiten im Logbuch):
 

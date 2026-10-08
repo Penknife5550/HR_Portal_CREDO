@@ -197,6 +197,15 @@ const ANFRAGE: Partial<VertragsendeDetail> = {
   supervisorTokenExpiresAt: "2026-06-05T08:00:00.000Z",
 };
 const ANFRAGE_ABGELAUFEN: Partial<VertragsendeDetail> = { ...ANFRAGE, supervisorTokenExpiresAt: "2026-05-29T08:00:00.000Z" };
+/**
+ * So hinterlaesst `/supervisor-link` eine Anfrage, deren Mail nicht hinausging:
+ * neuer Link gespeichert (neues Ablaufdatum), Versandzeitpunkt zurueck auf null.
+ */
+const NICHT_ZUGESTELLT: Partial<VertragsendeDetail> = {
+  ...ANFRAGE,
+  supervisorLinkSentAt: null,
+  supervisorTokenExpiresAt: "2026-06-15T10:00:00.000Z",
+};
 const UEBERNAHME: Partial<VertragsendeDetail> = {
   ...ANFRAGE,
   status: "RUECKMELDUNG_UEBERNAHME",
@@ -283,8 +292,12 @@ beforeEach(() => {
     });
     let antwort: Antwort;
     if (method === "GET" && url === VORGANG_URL) {
+      // Der Stand im Moment der Anfrage, wie bei einem echten Server: Haelt
+      // die Probe das Laden an, kommt trotzdem DIESER Stand zurueck — so
+      // unterscheiden sich zwei ueberlappende Ladevorgaenge.
+      const stand = server.ladeAntwort ?? { status: 200, body: server.vorgang };
       if (server.ladenWartet) await server.ladenWartet;
-      antwort = server.ladeAntwort ?? { status: 200, body: server.vorgang };
+      antwort = stand;
     } else {
       const eintrag = server.antworten.get(`${method} ${url}`);
       antwort =
@@ -404,6 +417,14 @@ const LAGEN: LageFall[] = [
     pille: "Link abgelaufen",
     aktion: "anfrage-neu-senden",
     menue: ["offboarding-anlegen", "stornieren"],
+  },
+  {
+    lage: "Anfrage nicht zugestellt",
+    teil: NICHT_ZUGESTELLT,
+    pille: "Anfrage nicht zugestellt",
+    aktion: "anfrage-senden",
+    menue: ["offboarding-anlegen", "stornieren"],
+    axe: true,
   },
   {
     lage: "Rückmeldung Übernahme",
@@ -1106,6 +1127,244 @@ describe("Dialoge: Fehler, Fokus, Texte", () => {
     expect(angehoert).toBeChecked();
     await waitFor(() => expect(document.activeElement).toBe(angehoert));
     expect(await axeVerstoesse(document.body)).toEqual([]);
+  });
+});
+
+// =============================================
+// Versandergebnis: nicht zugestellt, Webhook
+// =============================================
+
+/**
+ * `/supervisor-link` und `/reminder` melden seit 10/2026, ob die Mail
+ * hinausging (`mailStatus`, src/lib/contract-end-versand.ts). Nicht zugestellt
+ * heisst bei der Anfrage: 502/409 MIT gespeichertem neuen Link — die Seite
+ * muss neu laden, der Dialog bleibt offen.
+ */
+describe("Versandergebnis", () => {
+  const MELDUNG_FAILED =
+    "Die Anfrage an die Führungskraft konnte nicht versendet werden: Zeitüberschreitung. Die Anfrage gilt als nicht gesendet. Der zuvor versendete Link gilt nicht mehr. Bitte senden Sie die Anfrage später erneut.";
+  const beschreibungVon = (dialog: HTMLElement) =>
+    document.getElementById(dialog.getAttribute("aria-describedby") ?? "")?.textContent ?? "";
+
+  it("Anfrage nicht zugestellt (502 mit mailStatus): Meldung im Dialog, Dialog offen und bedienbar, die Seite lädt dahinter neu – ein neuer Versuch im selben Dialog geht", async () => {
+    await seite(ANFRAGE);
+    const fall = DIALOGE[1];
+    const { dialog } = await dialogOeffnen(fall);
+    const beschreibung = beschreibungVon(dialog);
+    expect(beschreibung).toContain("der bisherige wird ungültig");
+
+    server.antworten.set(`POST ${VORGANG_URL}/supervisor-link`, {
+      status: 502,
+      body: { error: MELDUNG_FAILED, mailStatus: "FAILED" },
+    });
+    server.vorgang = vorgang(NICHT_ZUGESTELLT);
+    // Das Neuladen haelt an: So zeigt sich, dass der Dialog WAEHRENDDESSEN bedienbar bleibt.
+    const laden = aufgeschoben();
+    server.ladenWartet = laden.versprechen;
+    fireEvent.click(within(dialog).getByRole("button", { name: fall.bestaetigen }));
+
+    const alarm = await within(dialog).findByRole("alert");
+    expect(alarm).toHaveTextContent(MELDUNG_FAILED);
+    await waitFor(() => expect(document.activeElement).toBe(alarm));
+    // Zugleich mit der Meldung sagt die Rueckfrage, was die Route sagt: Der
+    // bisherige Link gilt schon nicht mehr (ein neuer Versuch ersetzt den
+    // nie zugestellten, nicht den alten).
+    const nachFehlschlag = beschreibungVon(dialog);
+    expect(nachFehlschlag).toContain("der bisherige gilt bereits nicht mehr");
+    expect(nachFehlschlag).not.toContain("wird ungültig");
+    // Die Seite laedt dahinter neu — der Dialog bleibt offen, nichts ist gesperrt.
+    await waitFor(() => expect(ladeAufrufe()).toHaveLength(2));
+    expect(screen.getByRole("alertdialog", { name: fall.titel })).toBe(dialog);
+    for (const name of [fall.bestaetigen, "Abbrechen", "Dialog schließen"]) {
+      expect({ name, gesperrt: within(dialog).getByRole("button", { name }).getAttribute("aria-disabled") }).toEqual({
+        name,
+        gesperrt: null,
+      });
+    }
+    expect(toastOk).not.toHaveBeenCalled();
+    expect(toastFehler).not.toHaveBeenCalled();
+
+    // Der neue Stand ist da: hinter dem Dialog „nicht zugestellt“, der Dialog
+    // unveraendert offen, Fokus und Text nicht gesprungen.
+    await act(async () => laden.einloesen());
+    await waitFor(() => expect(within(kopf()).getByText("Anfrage nicht zugestellt")).toBeInTheDocument());
+    expect(screen.getByRole("alertdialog", { name: fall.titel })).toBe(dialog);
+    expect(document.activeElement).toBe(within(dialog).getByRole("alert"));
+    // Der neue Stand („nicht zugestellt") laesst den Text nicht noch einmal springen.
+    expect(beschreibungVon(dialog)).toBe(nachFehlschlag);
+    expect(within(dialog).getByLabelText("E-Mail der Führungskraft")).toHaveValue("fuehrung@example.org");
+    expect(schreibAufrufe()).toHaveLength(1);
+    expect(toastOk).not.toHaveBeenCalled();
+
+    // Neuer Versuch im selben Dialog — diesmal geht die Mail hinaus.
+    server.antworten.set(`POST ${VORGANG_URL}/supervisor-link`, {
+      status: 201,
+      body: { id: ID, supervisorEmail: "fuehrung@example.org", mailStatus: "SENT" },
+    });
+    server.vorgang = vorgang(NEUE_ANFRAGE);
+    fireEvent.click(within(dialog).getByRole("button", { name: fall.bestaetigen }));
+    await waitFor(() => expect(toastOk).toHaveBeenCalledWith("Neue Anfrage an fuehrung@example.org gesendet."));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await waitFor(() => expect(ladeAufrufe()).toHaveLength(3));
+    await waitFor(() => expect(within(kopf()).getByText("Wartet auf Führungskraft")).toBeInTheDocument());
+    expect(schreibAufrufe()).toHaveLength(2);
+    expect(toastOk).toHaveBeenCalledTimes(1);
+    expect(toastFehler).not.toHaveBeenCalled();
+  });
+
+  it("ein neuer Versuch, während die Seite noch neu lädt, geht auch – kommt die ältere Antwort zuletzt, bleibt der jüngere Stand", async () => {
+    await seite(ANGELEGT);
+    const fall = DIALOGE[0];
+    const { dialog } = await dialogOeffnen(fall);
+    fall.eingabe?.(dialog);
+    server.antworten.set(`POST ${VORGANG_URL}/supervisor-link`, {
+      status: 409,
+      body: { error: "Die Anfrage an die Führungskraft wurde nicht versendet: Vorlage deaktiviert.", mailStatus: "SKIPPED" },
+    });
+    // Erste Anfrage gescheitert: Status zurueck auf ANGELEGT, Adresse bleibt.
+    server.vorgang = vorgang({ supervisorEmail: "fuehrung@example.org", supervisorTokenExpiresAt: "2026-06-15T10:00:00.000Z" });
+    const ladenAlt = aufgeschoben();
+    server.ladenWartet = ladenAlt.versprechen;
+    fireEvent.click(within(dialog).getByRole("button", { name: fall.bestaetigen }));
+    await within(dialog).findByRole("alert");
+    await waitFor(() => expect(ladeAufrufe()).toHaveLength(2));
+
+    server.antworten.set(`POST ${VORGANG_URL}/supervisor-link`, fall.antwort);
+    server.vorgang = vorgang(fall.nachher);
+    const ladenNeu = aufgeschoben();
+    server.ladenWartet = ladenNeu.versprechen;
+    fireEvent.click(within(dialog).getByRole("button", { name: fall.bestaetigen }));
+    await waitFor(() => expect(toastOk).toHaveBeenCalledWith(fall.meldung));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(ladeAufrufe()).toHaveLength(3));
+
+    // Erst kommt der Stand nach dem ZWEITEN Versuch; die Seite ist bis dahin
+    // gesperrt und danach frei.
+    await act(async () => ladenNeu.einloesen());
+    expect(await screen.findByRole("button", { name: "Erinnerung senden" })).not.toHaveAttribute("aria-disabled");
+    expect(within(kopf()).getByText("Wartet auf Führungskraft")).toBeInTheDocument();
+
+    // Dann die aeltere Antwort (Stand nach dem ersten, gescheiterten Versuch):
+    // Sie wird verworfen und setzt die Seite nicht zurueck.
+    await act(async () => ladenAlt.einloesen());
+    expect(within(kopf()).getByText("Wartet auf Führungskraft")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Anfrage senden …" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Erinnerung senden" })).not.toHaveAttribute("aria-disabled");
+    expect(schreibAufrufe()).toHaveLength(2);
+  });
+
+  it("schließt der Dialog nach dem Fehlschlag vor dem neuen Stand, ist die Seite bis dahin gesperrt", async () => {
+    await seite(ANFRAGE);
+    const fall = DIALOGE[1];
+    const { ausloeser, dialog } = await dialogOeffnen(fall);
+    server.antworten.set(`POST ${VORGANG_URL}/supervisor-link`, {
+      status: 502,
+      body: { error: MELDUNG_FAILED, mailStatus: "FAILED" },
+    });
+    server.vorgang = vorgang(NICHT_ZUGESTELLT);
+    const laden = aufgeschoben();
+    server.ladenWartet = laden.versprechen;
+    fireEvent.click(within(dialog).getByRole("button", { name: fall.bestaetigen }));
+    await within(dialog).findByRole("alert");
+    await waitFor(() => expect(ladeAufrufe()).toHaveLength(2));
+
+    // Abbrechen, waehrend der neue Stand noch laedt: Die Seite zeigt den alten
+    // Stand — „Erinnerung senden" zu einem Link, den es nicht mehr gibt.
+    fireEvent.click(within(dialog).getByRole("button", { name: "Abbrechen" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(ausloeser));
+    const erinnern = screen.getByRole("button", { name: "Erinnerung senden" });
+    expect(erinnern).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(erinnern);
+    expect(schreibAufrufe()).toHaveLength(1);
+
+    // Der neue Stand ist da: „nicht zugestellt", der Knopf dazu frei.
+    await act(async () => laden.einloesen());
+    await waitFor(() => expect(within(kopf()).getByText("Anfrage nicht zugestellt")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Erinnerung senden" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Anfrage senden …" })).not.toHaveAttribute("aria-disabled");
+    expect(schreibAufrufe()).toHaveLength(1);
+  });
+
+  it("Anfrage über den Webhook (201 mit mailStatus WEBHOOK): die Meldung sagt das, nicht „gesendet“", async () => {
+    await seite(ANGELEGT);
+    const fall = DIALOGE[0];
+    const { dialog } = await dialogOeffnen(fall);
+    fall.eingabe?.(dialog);
+    server.antworten.set(`POST ${VORGANG_URL}/supervisor-link`, {
+      status: 201,
+      body: { id: ID, supervisorEmail: "fuehrung@example.org", mailStatus: "WEBHOOK" },
+    });
+    server.vorgang = vorgang(fall.nachher);
+    fireEvent.click(within(dialog).getByRole("button", { name: fall.bestaetigen }));
+    await waitFor(() =>
+      expect(toastOk).toHaveBeenCalledWith(
+        "Anfrage für fuehrung@example.org an den Webhook weitergegeben (die E-Mail-Vorlage im Portal ist ausgeschaltet).",
+      ),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(ladeAufrufe()).toHaveLength(2));
+    expect(toastOk).toHaveBeenCalledTimes(1);
+  });
+
+  it("Erinnerung nicht zugestellt (409 mit mailStatus SKIPPED): Fehlermeldung der Route, die Seite lädt neu", async () => {
+    await seite(ANFRAGE);
+    const meldung = "Die Erinnerung wurde nicht versendet: Vorlage deaktiviert. Sie wurde nicht gezählt.";
+    server.antworten.set(`POST ${VORGANG_URL}/reminder`, { status: 409, body: { error: meldung, mailStatus: "SKIPPED" } });
+    fireEvent.click(screen.getByRole("button", { name: "Erinnerung senden" }));
+    await waitFor(() => expect(toastFehler).toHaveBeenCalledWith(meldung));
+    await waitFor(() => expect(ladeAufrufe()).toHaveLength(2));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Erinnerung senden" })).not.toHaveAttribute("aria-disabled"));
+    expect(toastOk).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Erinnerung über den Webhook (200 mit mailStatus WEBHOOK): eigener Satz; SENT wie bisher", async () => {
+    await seite(ANFRAGE);
+    server.antworten.set(`POST ${VORGANG_URL}/reminder`, { status: 200, body: { ok: true, mailStatus: "WEBHOOK" } });
+    fireEvent.click(screen.getByRole("button", { name: "Erinnerung senden" }));
+    await waitFor(() =>
+      expect(toastOk).toHaveBeenCalledWith(
+        "Erinnerung an den Webhook weitergegeben (die E-Mail-Vorlage im Portal ist ausgeschaltet).",
+      ),
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Erinnerung senden" })).not.toHaveAttribute("aria-disabled"));
+
+    server.antworten.set(`POST ${VORGANG_URL}/reminder`, { status: 200, body: { ok: true, mailStatus: "SENT" } });
+    fireEvent.click(screen.getByRole("button", { name: "Erinnerung senden" }));
+    await waitFor(() => expect(toastOk).toHaveBeenLastCalledWith("Erinnerung an die Führungskraft gesendet."));
+    expect(toastFehler).not.toHaveBeenCalled();
+  });
+
+  it("Lage „nicht zugestellt“: Pille, „Jetzt dran“ mit Adresse, Knopf „Anfrage senden …“, Übersicht „Nicht zugestellt“ ohne „Link gültig bis“", async () => {
+    await seite(NICHT_ZUGESTELLT);
+    expect(within(kopf()).getByText("Anfrage nicht zugestellt")).toBeInTheDocument();
+
+    const kasten = jetztDran()!;
+    expect(kasten).toHaveTextContent("Anfrage wurde nicht zugestellt – erneut senden");
+    expect(kasten).toHaveTextContent(
+      "Die E-Mail an fuehrung@example.org ging nicht hinaus; die Führungskraft hat keinen gültigen Link.",
+    );
+    expect(handlungenInJetztDran()).toEqual(["Anfrage senden …"]);
+    // Der Schritt „Anfrage“ sagt es auch.
+    expect(screen.getByRole("list", { name: "Ablauf" })).toHaveTextContent("HR · nicht zugestellt");
+
+    const fk = screen.getByRole("region", { name: "Führungskraft" });
+    const anfrageVom = within(fk).getByText("Anfrage vom").parentElement!;
+    expect(anfrageVom).toHaveTextContent("Nicht zugestellt");
+    expect(within(fk).queryByText("Link gültig bis")).toBeNull();
+    expect(await axeVerstoesse(document.body)).toEqual([]);
+
+    // Der Knopf oeffnet die Anfrage mit der bisherigen Adresse im Feld.
+    const { dialog } = await dialogOeffnen({
+      ausloeser: { knopf: "Anfrage senden …" },
+      rolle: "dialog",
+      titel: "Anfrage an die Führungskraft senden",
+    });
+    const feld = within(dialog).getByLabelText("E-Mail der Führungskraft");
+    expect(feld).toHaveValue("fuehrung@example.org");
+    await waitFor(() => expect(document.activeElement).toBe(feld));
+    expect(schreibAufrufe()).toEqual([]);
   });
 });
 

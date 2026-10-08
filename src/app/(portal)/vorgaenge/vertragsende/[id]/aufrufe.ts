@@ -9,6 +9,14 @@
  *
  * `aufrufen` wirft nie: Es liefert entweder die Antwort oder den Fehlertext
  * der Route (sonst einen festen Ersatztext), damit der Dialog ihn zeigen kann.
+ *
+ * Versandergebnis (seit 10/2026): `/supervisor-link` und `/reminder` nennen in
+ * ihrer Antwort `mailStatus` — bei Erfolg SENT oder WEBHOOK (Vorlage im Portal
+ * aus, ein aktiver Webhook uebernimmt), bei 502/409 FAILED bzw. SKIPPED.
+ * `aufrufen` reicht ihn in BEIDEN Ergebnissen durch, wenn die Antwort einen
+ * hat. Ein Fehler MIT `mailStatus` heisst: Die Route hat gespeichert, nur die
+ * Mail ging nicht hinaus (bei der Anfrage: neuer Link gespeichert, ein
+ * frueherer tot) — die Seite muss dann neu laden.
  */
 
 export type AufrufArt =
@@ -66,9 +74,22 @@ export function vertragsendeAufruf(art: AufrufArt, id: string, werte: AufrufWert
   }
 }
 
-export type AufrufErgebnis = { ok: true; daten: unknown } | { ok: false; fehler: string };
+/**
+ * Ergebnis eines Aufrufs. `mailStatus` nur, wenn die Antwort einen nennt
+ * (siehe Kopf) — sonst fehlt das Feld ganz.
+ */
+export type AufrufErgebnis =
+  | { ok: true; daten: unknown; mailStatus?: string }
+  | { ok: false; fehler: string; mailStatus?: string };
 
 export const VERBINDUNGSFEHLER = "Verbindungsfehler. Bitte erneut versuchen.";
+
+/** `mailStatus` einer Antwort als Text, sonst `undefined` — die Antworten sind `unknown`. */
+export function mailStatusAus(daten: unknown): string | undefined {
+  if (!daten || typeof daten !== "object" || Array.isArray(daten)) return undefined;
+  const wert = (daten as { mailStatus?: unknown }).mailStatus;
+  return typeof wert === "string" && wert.trim() !== "" ? wert.trim() : undefined;
+}
 
 export async function aufrufen(aufruf: Aufruf): Promise<AufrufErgebnis> {
   try {
@@ -79,15 +100,43 @@ export async function aufrufen(aufruf: Aufruf): Promise<AufrufErgebnis> {
         : {}),
     });
     const daten: unknown = await res.json().catch(() => null);
+    const mailStatus = mailStatusAus(daten);
+    const mitStatus = mailStatus ? { mailStatus } : {};
     if (!res.ok) {
       const fehler =
         daten && typeof daten === "object" && typeof (daten as { error?: unknown }).error === "string"
           ? (daten as { error: string }).error
           : aufruf.ersatzFehler;
-      return { ok: false, fehler: fehler || aufruf.ersatzFehler };
+      return { ok: false, fehler: fehler || aufruf.ersatzFehler, ...mitStatus };
     }
-    return { ok: true, daten };
+    return { ok: true, daten, ...mitStatus };
   } catch {
     return { ok: false, fehler: VERBINDUNGSFEHLER };
   }
+}
+
+// =============================================
+// Meldungen nach erfolgreichem Versand
+// =============================================
+
+/** Zusatz, wenn ein Webhook statt der Portal-Mail die Nachricht uebernahm. */
+const WEBHOOK_ZUSATZ = "(die E-Mail-Vorlage im Portal ist ausgeschaltet)";
+
+/**
+ * Meldung nach „Anfrage senden" bzw. „Anfrage neu senden". WEBHOOK: Das Portal
+ * hat keine Mail geschickt, sondern das Ereignis an den Webhook gegeben — das
+ * sagt die Meldung, statt „gesendet" zu behaupten. SENT, fehlend (aelterer
+ * Server) oder unbekannt: wie bisher.
+ */
+export function anfrageMeldung(an: string, neu: boolean, mailStatus: string | undefined): string {
+  if (mailStatus === "WEBHOOK") {
+    return `${neu ? "Neue Anfrage" : "Anfrage"} für ${an} an den Webhook weitergegeben ${WEBHOOK_ZUSATZ}.`;
+  }
+  return neu ? `Neue Anfrage an ${an} gesendet.` : `Anfrage an ${an} gesendet.`;
+}
+
+/** Meldung nach „Erinnerung senden" — dieselbe Regel wie `anfrageMeldung`. */
+export function erinnerungMeldung(mailStatus: string | undefined): string {
+  if (mailStatus === "WEBHOOK") return `Erinnerung an den Webhook weitergegeben ${WEBHOOK_ZUSATZ}.`;
+  return "Erinnerung an die Führungskraft gesendet.";
 }

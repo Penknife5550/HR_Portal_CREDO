@@ -4,9 +4,9 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 05.10.2026 (Merge von `main` mit dem Token-Fix Vertragsende; nicht gepusht)
+Letzte Änderung: 08.10.2026 (neue Ansicht am Versandergebnis angeschlossen; Leitfaden und technische Abnahme für die Testumgebung ohne Mailserver)
 
-## 0. Übergabe (Stand 07.10.2026)
+## 0. Übergabe (Stand 08.10.2026)
 
 ### 0.1 Wo wir stehen
 
@@ -33,6 +33,12 @@ Letzte Änderung: 05.10.2026 (Merge von `main` mit dem Token-Fix Vertragsende; n
   Vorschau-Schalter (Cookie, Vorgabe alt), Testdaten-Skript, Baustein `Textverweis`. Siebte
   Durchsicht (vier Blickwinkel, jeder Befund gegengeprüft) und ein Codereview – alle
   bestätigten Befunde behoben. Protokoll in Abschnitt 7 („Pilot, Tag 3 Rest bis 5“).
+- **Versandergebnis angeschlossen (07./08.10.2026):** Mit dem Merge von `main` (`2325435`)
+  melden Anfrage und Erinnerung, ob die Mail hinausging. Die neue Ansicht zeigt das: Lage
+  „Anfrage nicht zugestellt“, der Dialog bleibt bei einem Fehlschlag offen, „an den Webhook
+  weitergegeben“ statt „gesendet“. Die Testumgebung (Dev und Docker) hat bewusst keinen
+  Mailserver – Anfrage und Erinnerung scheitern dort immer; Leitfaden und technische Abnahme
+  sind darauf umgestellt. Protokoll in Abschnitt 7 („Versandergebnis angeschlossen“).
 - **Noch NICHT gemacht:** Feinplan Tag 6–7 (Abnahme mit Bildern je Lage, Rollen, Tastatur,
   ein Vorgang ganz durch beide Stränge, Ankündigungstext) – nach dem Prototyp-Tag.
 - **Seit 06.10.2026 auch in Docker anzusehen** (lokal, `http://localhost:3100`), siehe 0.6.
@@ -105,7 +111,7 @@ Termin setzt der Projektverantwortliche mit dem Personalbüro. Vorbereitet sind 
 Docker-Stapel (0.6): Schalter „Neue Ansicht ausprobieren“ auf einer Vertragsende-Seite,
 Testvorgänge in jeder Lage über `scripts/vertragsende-testdaten.js` (VE-…-T01 bis T10).
 **Leitfaden für den Termin: [prototyp-tag-leitfaden.md](prototyp-tag-leitfaden.md)** (Ablauf,
-sieben Aufgaben alt/neu, 20 Fragen, Beobachtungsbogen, Bilder als Ersatz). Dazu
+sieben Aufgaben alt/neu, 21 Fragen, Beobachtungsbogen, Bilder als Ersatz). Dazu
 zu klären, was beim Bau auffiel: Bei drei Hinweisen (z. B. T04) stehen die Reiter bei
 1366×768 unter dem sichtbaren Bereich; das Entfristungsrisiko steht dann dreimal (Pille,
 „Jetzt dran“, Hinweis). Am Prototyp-Tag zu klären:
@@ -164,8 +170,12 @@ Hinweis bei überschrittenem Vertragsende (P-F4, im Adapter schon drin), Rückme
   Dev-`.env` (sonst ließen sich die kopierten Daten nicht entschlüsseln), `BEM_ENCRYPTION_KEY`
   neu (BEM-Freitexte der Kopie sind deshalb nicht lesbar). Mails: Die kopierte
   SMTP-Einstellung ist leer und inaktiv (`smtp_config.isActive = false`, geprüft am
-  07.10.2026, in Dev UND Docker) – Handlungen, die Mails schicken, enden als SKIPPED im
-  Versandprotokoll; es geht nichts hinaus. Wer dort einen Mailserver einträgt, ändert das.
+  07.10.2026, in Dev UND Docker) – Handlungen, die Mails schicken, enden als FAILED („SMTP
+  ist nicht konfiguriert …“) im Versandprotokoll; es geht nichts hinaus. Seit dem Merge vom
+  07.10.2026 melden Anfrage und Erinnerung das auch auf der Seite (502, „konnte nicht
+  versendet werden“); die erste Anfrage setzt den Vorgang dabei auf „Angelegt“ zurück. So
+  gewollt (Leitfaden: „kein Mailserver“). Wer dort einen Mailserver einträgt, ändert das – und
+  `scripts/ux-abnahme-pilot.js` bricht dann ab.
   Compose-Datei und Env-Datei lagen im Scratchpad der Sitzung vom 06.10.2026, nicht im Repo.
   In Git Bash vor `docker exec … /app/…` `MSYS_NO_PATHCONV=1` setzen (sonst wird der Pfad zu
   `C:/Program Files/Git/app/…`).
@@ -1344,6 +1354,76 @@ Gegenprobe: Adapter-Test (`prozess-vertragsende.test.ts`) und Seitentest der neu
 unverändert grün – der Adapter bot „Anfrage neu senden“ nach der Rückmeldung nie an. Alle
 Vertragsende-Tests grün (16 Suiten, 377 Tests), Typen grün.
 
+### 07./08.10.2026 – Versandergebnis angeschlossen, Testumgebung ohne Mailserver
+
+Auftrag des Projektverantwortlichen: „main holen und anschließen“, danach „so machen wie im
+Plan“ – die Testumgebung bleibt OHNE Mailserver (Leitfaden: „Es geht keine Mail hinaus“).
+Folge des Merges: Ohne Mailserver scheitern Anfrage und Erinnerung jetzt mit 502 („SMTP ist
+nicht konfiguriert …“) statt „gesendet“ zu melden. Die erste Anfrage setzt den Vorgang dabei
+auf „Angelegt“ zurück; eine neue Anfrage lässt ihn auf „Anfrage beim Vorgesetzten“ ohne
+Versandzeitpunkt – mit neuem, nie zugestelltem Link, der frühere ist tot.
+
+Gebaut (Arbeitsablauf mit Erbauer und Gegenprüfer, danach eigene Nacharbeit):
+
+- **`aufrufe.ts`:** `aufrufen` reicht `mailStatus` in beiden Ergebnissen durch
+  (`mailStatusAus`); `anfrageMeldung`/`erinnerungMeldung` sagen bei WEBHOOK „an den Webhook
+  weitergegeben (die E-Mail-Vorlage im Portal ist ausgeschaltet)“, sonst wie bisher.
+- **Adapter** (`src/lib/prozess/vertragsende.ts`): neue Lage „nicht zugestellt“ –
+  Status „Anfrage beim Vorgesetzten“ oder Alt „Entscheidung Übernahme“ MIT Adresse, ohne
+  `supervisorLinkSentAt` (dieselbe Bedingung wie die alte Ansicht, dort nur für den ersten
+  Status). Schritt „Anfrage“ aktiv mit Notiz „nicht zugestellt“, Pille „Anfrage nicht
+  zugestellt“ (`info`, HR ist dran), „Jetzt dran“ „Anfrage wurde nicht zugestellt – erneut
+  senden“ mit der Adresse in der Unterzeile und `anfrage-senden`. Exporte
+  `anfrageNichtZugestellt`, `VERTRAGSENDE_PILLE_NICHT_ZUGESTELLT`,
+  `ANFRAGE_NICHT_ZUGESTELLT_ZEILE`. Die Gegenprobe gegen die Routen (alle `PROBEN`) bleibt grün.
+- **Dialog „Anfrage senden“/„Anfrage neu senden“:** Fehler MIT `mailStatus` → Meldung der
+  Route im Dialog, Dialog bleibt offen und bedienbar, die Seite lädt dahinter still neu
+  (`onGeaendert` → `dialogGeaendert`). Ab diesem Fehlschlag sagt die Rückfrage „der bisherige
+  gilt bereits nicht mehr“ (Befund des Gegenprüfers: vorher stand für den zweiten Versuch
+  weiter „wird ungültig“).
+- **Seite:** Schließt HR den Dialog, bevor das stille Laden fertig ist, wartet die Seite
+  darauf (`dialogAbbrechen`; Befund des Gegenprüfers: der alte Stand war kurz bedienbar, etwa
+  „Erinnerung senden“ zu einem toten Link). `aktualisiert` ist dafür ein Zähler
+  (`wartetAufStand`) statt eines Merkers – zwei Ladevorgänge können sich überlappen.
+  Erinnerung: Fehler als `toast.fehler` mit der Meldung der Route, WEBHOOK mit eigenem Satz.
+- **Reiter Übersicht:** „Anfrage vom“ zeigt in dieser Lage die Pille „Nicht zugestellt“
+  (`critical`) und kein „Link gültig bis“ (das Datum gehörte zu einem nie zugestellten Link).
+- **Tests:** Seitentest (Fehlschlag mit offenem Dialog, zweiter Versuch, Webhook, Erinnerung
+  nicht zugestellt, Lage „nicht zugestellt“ mit axe, Abbrechen vor dem neuen Stand), Adapter-
+  und Aufruf-Tests. Der Testserver liefert jetzt den Stand vom Moment der Anfrage; der Test
+  „jüngerer Stand gewinnt“ lässt die ältere Antwort zuletzt ankommen (Befund des Gegenprüfers:
+  vorher lieferten beide Ladevorgänge denselben Stand und bewiesen nichts). Gegenproben: Ohne
+  die Änderungen scheitern die neuen Tests (12 von 130 bzw. der Abbrechen-Test).
+- **Leitfaden** (Stand 08.10.2026): Aufgaben 4 und 5 prüfen jetzt die Fehlermeldung (Weg,
+  Beobachten, Moderation, alte Ansicht), neue Zeile „T03 nach Aufgabe 5“ in der Texttabelle,
+  neue Frage 21 („Reicht die Meldung, wenn eine Mail nicht hinausgeht?“), Hinweis „gesendet,
+  obwohl nichts hinausgeht“ ersetzt.
+- **Technische Abnahme** (`scripts/ux-abnahme-pilot.js`, Arbeitsablauf mit Erbauer und
+  Gegenprüfer): umgestellt auf die Testumgebung ohne Mailserver – **213 von 213 Prüfungen**
+  (ein Lauf, Exit 0). Strang C prüft jetzt die gescheiterte erste Anfrage (Meldung im Dialog,
+  Status zurück auf „Angelegt“), die gescheiterte neue Anfrage (Lage „nicht zugestellt“: Pille,
+  „Jetzt dran“, Zeile „Anfrage vom“, Rückfrage „gilt bereits nicht mehr“; der vorher zugestellte
+  Link antwortet im Formular mit 410) und die gescheiterte Erinnerung (Fehlermeldung, nichts
+  gezählt, kein Protokolleintrag). Damit der Strang weiterläuft, **stellt das Skript die
+  Zustellung nach**: nur am T01-Vorgang des Laufs (id, T-Nummer, Testadresse, gespeicherter
+  Link, nicht zugestellt – sonst 0 Treffer und Prüfung rot) setzt es Status „Anfrage beim
+  Vorgesetzten“ und den Versandzeitpunkt, also das, was die Route bei zugestellter Mail stehen
+  ließe. Die Gegenprobe in der alten Ansicht läuft dieselben Schritte (auch „Anfrage erneut
+  senden“, das die alte Ansicht ohne Rückfrage anbietet); verglichen werden AuditLog, Aufrufe
+  und jetzt auch die Antworten der Routen. Neu geprüft: im Versandprotokoll von T01 genau drei
+  FAILED-Zeilen „SMTP ist nicht konfiguriert“ je Strang, kein SENT; Netzfehler des Browsers nur
+  die drei erwarteten 502. Die Abbruchprüfungen (Mailserver aktiv, Webhook eingetragen, nicht
+  lokal, kein Testkonto) und das Zurücksetzen am Ende sind unverändert.
+
+Bewusst offen gelassen (Entscheidung möglich, nicht verlangt): Scheitert die ERSTE Anfrage,
+zeigt die Seite keinen eigenen Hinweis (der Vorgang steht wieder auf „Angelegt“, die Adresse
+ist gemerkt – wie in der alten Ansicht). Die Unterzeile „nicht zugestellt“ verweist nicht auf
+den Reiter „E-Mails“ (den sehen nicht alle Rollen). Im Menü heißt der Offboarding-Punkt in
+dieser Lage „Ohne Anfrage: Offboarding anlegen …“ (es gibt keine gültige Anfrage).
+
+**Mail- und Word-Vorlagen:** keine betroffen (die Routen und ihre Mails sind unverändert; nur
+die Oberfläche liest das Ergebnis).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1385,9 +1465,12 @@ Vertragsende-Tests grün (16 Suiten, 377 Tests), Typen grün.
 | `ux-umbau` | `984fbee` | Merge von `main` (`tageZwischen`) |
 | `ux-umbau` | `c09908d` | Pilot Tag 3, erster Teil: Bausteine Hinweis und Textfeld |
 | `ux-umbau` | `fc33b53` | Pilot Tag 3 Rest bis 5: neue Detailseite Vertragsende, Dialoge, Schalter, Testdaten, Textverweis; siebte Durchsicht und Codereview |
+| `ux-umbau` | `978c8da` | Prototyp-Tag vorbereitet: Leitfaden, Bilder der Testlagen, technische Abnahme |
+| `main` | `b7c8532`, `6e0e2ce`, `4da68f1` | Vertragsende: Betriebsstätte aus der Auswahl des Formulars; Versandergebnis beachten, keine neue Anfrage nach der Antwort |
+| `ux-umbau` | `2325435` | Merge von `main` (Nebenaufgaben Vertragsende) |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“ (`fc33b53`) und danach der Commit „Prototyp-Tag vorbereitet“. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“ (`fc33b53`) und danach der Commit „Prototyp-Tag vorbereitet“. Am 08.10.2026 gepusht (Auftrag „so machen wie im Plan“): der Merge `2325435` und der Commit „Versandergebnis angeschlossen“. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

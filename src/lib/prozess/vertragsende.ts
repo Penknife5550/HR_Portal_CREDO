@@ -31,6 +31,16 @@
  *      ueberhaupt antworten KANN: Ging nie eine Anfrage hinaus oder ist ihr Link
  *      abgelaufen, ist HR dran und der Schritt „Anfrage" wieder aktiv — der
  *      Erinnerungslauf ueberspringt solche Vorgaenge, sie blieben sonst liegen.
+ *      Drei Faelle, an Adresse und Versandzeitpunkt unterschieden:
+ *        - ohne Adresse (Status per Hand-PATCH gesetzt, Altbestand): „Anfrage
+ *          senden" wie bei ANGELEGT;
+ *        - MIT Adresse, aber ohne Versandzeitpunkt: „nicht zugestellt". So
+ *          hinterlaesst `/supervisor-link` einen Vorgang, dessen Mail nicht
+ *          hinausging (seit 10/2026: neuer Link gespeichert, ein frueherer
+ *          damit tot, `supervisorLinkSentAt` zurueck auf null), und so liest es
+ *          auch die alte Ansicht. Eigener Satz, eigene Pille, Notiz am Schritt —
+ *          sonst stuende dort „Anfrage senden" ohne ein Wort, warum;
+ *        - mit Versandzeitpunkt, aber abgelaufenem Link: „Anfrage neu senden".
  *
  * Feinplan: docs/module/ux-ui/pilot-feinplan.md, Abschnitte 3.2, 3.3, 3.5, 11.
  */
@@ -122,6 +132,17 @@ export const VERTRAGSENDE_PILLE: Record<string, PillenAngabe> = {
 /** Die Anfrage ging hinaus, ihr Link gilt aber nicht mehr — HR ist dran. */
 export const VERTRAGSENDE_PILLE_LINK_ABGELAUFEN: PillenAngabe = { text: "Link abgelaufen", ton: "info" };
 
+/** Die Mail der Anfrage ging nicht hinaus (Regel 5) — HR ist dran, nicht die Fuehrungskraft. */
+export const VERTRAGSENDE_PILLE_NICHT_ZUGESTELLT: PillenAngabe = { text: "Anfrage nicht zugestellt", ton: "info" };
+
+/**
+ * Zeile „Anfrage vom" der Uebersicht, wenn die Mail der Anfrage nicht
+ * hinausging: ein Zustand (Wort und Ton), kein Datum. `critical`, weil hier
+ * etwas gescheitert ist — die Pille im Kopf bleibt `info` (sie sagt, wer dran
+ * ist).
+ */
+export const ANFRAGE_NICHT_ZUGESTELLT_ZEILE: PillenAngabe = { text: "Nicht zugestellt", ton: "critical" };
+
 /** Stand der Mitarbeitervertretung → Text und Ton. `null`/unbekannt = `MAV_PILLE_OFFEN`. */
 export const MAV_PILLE: Record<string, PillenAngabe> = {
   NICHT_ERFORDERLICH: { text: "Nicht erforderlich", ton: "neutral" },
@@ -193,7 +214,14 @@ interface Lage {
   zweig: Zweig;
   /** Eine Anfrage ging hinaus, ihr Link gilt aber nicht mehr: Sie ist neu zu stellen. */
   linkAbgelaufen: boolean;
+  /**
+   * Die Anfrage ist gestellt (Anfrage-Status mit Adresse), ihre Mail ging aber
+   * nicht hinaus (kein Versandzeitpunkt): Sie ist erneut zu senden (Regel 5).
+   */
+  nichtZugestellt: boolean;
 }
+
+type LageMerker = Partial<Pick<Lage, "linkAbgelaufen" | "nichtZugestellt">>;
 
 function zweigVon(stand: VertragsendeStand): Zweig {
   switch (stand.status) {
@@ -229,7 +257,12 @@ function linkUngueltig(stand: VertragsendeStand, jetzt: Date): boolean {
 
 function lageVon(stand: VertragsendeStand, jetzt: Date): Lage {
   const zweig = zweigVon(stand);
-  const lage = (phase: Phase, linkAbgelaufen = false): Lage => ({ phase, zweig, linkAbgelaufen });
+  const lage = (phase: Phase, merker: LageMerker = {}): Lage => ({
+    phase,
+    zweig,
+    linkAbgelaufen: merker.linkAbgelaufen ?? false,
+    nichtZugestellt: merker.nichtZugestellt ?? false,
+  });
 
   switch (stand.status) {
     case "ANGELEGT":
@@ -237,13 +270,16 @@ function lageVon(stand: VertragsendeStand, jetzt: Date): Lage {
     case "ANFRAGE_VORGESETZTER":
     case "ENTSCHEIDUNG_UEBERNAHME": {
       // Auf eine Rueckmeldung warten kann nur, wem eine Anfrage zugegangen ist
-      // und wessen Link noch gilt. Ohne Adresse oder Versandzeitpunkt
-      // (Altbestand ENTSCHEIDUNG_UEBERNAHME, Status per Hand-PATCH gesetzt) und
-      // bei abgelaufenem Link ist die Anfrage (neu) zu stellen — `/reminder`
-      // lehnt in beiden Faellen ab (409), das Formular ebenso.
-      const zugestellt = Boolean(stand.supervisorEmail && stand.supervisorLinkSentAt);
-      if (!zugestellt) return lage("anfrage");
-      return linkUngueltig(stand, jetzt) ? lage("anfrage", true) : lage("rueckmeldung");
+      // und wessen Link noch gilt. Sonst ist die Anfrage (neu) zu stellen —
+      // `/reminder` lehnt dann ab (409), das Formular ebenso. Welcher der drei
+      // Faelle, sagen Adresse und Versandzeitpunkt (Regel 5):
+      // ohne Adresse (Status per Hand-PATCH gesetzt, Altbestand) wie ANGELEGT …
+      if (!stand.supervisorEmail) return lage("anfrage");
+      // … mit Adresse, aber ohne Versandzeitpunkt: Die Mail ging nicht hinaus
+      // (`/supervisor-link` setzt den Zeitpunkt dann zurueck) …
+      if (!stand.supervisorLinkSentAt) return lage("anfrage", { nichtZugestellt: true });
+      // … zugestellt, aber der Link gilt nicht mehr.
+      return linkUngueltig(stand, jetzt) ? lage("anfrage", { linkAbgelaufen: true }) : lage("rueckmeldung");
     }
     case "RUECKMELDUNG_UEBERNAHME":
     case "VERTRAG_ERSTELLT":
@@ -267,7 +303,7 @@ function lageVon(stand: VertragsendeStand, jetzt: Date): Lage {
 const REIHENFOLGE = ["angelegt", "anfrage", "rueckmeldung", "vollzug", "abschluss"] as const;
 type SchrittKey = (typeof REIHENFOLGE)[number];
 
-function schritteBauen(stand: VertragsendeStand, { phase, zweig, linkAbgelaufen }: Lage): ProzessSchritt[] {
+function schritteBauen(stand: VertragsendeStand, { phase, zweig, linkAbgelaufen, nichtZugestellt }: Lage): ProzessSchritt[] {
   const beleg: Record<SchrittKey, boolean> = {
     angelegt: true,
     anfrage: Boolean(stand.supervisorLinkSentAt),
@@ -304,7 +340,14 @@ function schritteBauen(stand: VertragsendeStand, { phase, zweig, linkAbgelaufen 
       status: status.anfrage,
       zustaendig: "HR",
       datum: datumWenn("anfrage", stand.supervisorLinkSentAt),
-      notiz: status.anfrage === "aktiv" && linkAbgelaufen ? "Link abgelaufen" : undefined,
+      notiz:
+        status.anfrage !== "aktiv"
+          ? undefined
+          : linkAbgelaufen
+            ? "Link abgelaufen"
+            : nichtZugestellt
+              ? "nicht zugestellt"
+              : undefined,
     },
     {
       key: "rueckmeldung",
@@ -400,6 +443,19 @@ function jetztDranBauen(stand: VertragsendeStand, lage: Lage, jetzt: Date): Jetz
           bei: "HR",
           unterzeile: erinnerungsText(stand),
           aktion: "anfrage-neu-senden",
+          ...frist,
+        };
+      }
+      if (lage.nichtZugestellt) {
+        // „anfrage-senden", nicht „anfrage-neu-senden": Einen Link, der gueltig
+        // wuerde, hat die Fuehrungskraft nicht — der Dialog fragt nichts zurueck,
+        // die Adresse steht schon im Feld.
+        const an = stand.supervisorEmail ? ` an ${stand.supervisorEmail}` : "";
+        return {
+          satz: "Anfrage wurde nicht zugestellt – erneut senden",
+          bei: "HR",
+          unterzeile: `Die E-Mail${an} ging nicht hinaus; die Führungskraft hat keinen gültigen Link.`,
+          aktion: "anfrage-senden",
           ...frist,
         };
       }
@@ -521,6 +577,15 @@ export function fuehrungskraftKannAntworten(stand: VertragsendeStand, jetzt: Dat
 }
 
 /**
+ * Ging die Mail der Anfrage nicht hinaus (Regel 5)? Dieselbe Lage wie Pille,
+ * Leiste und „Jetzt dran" — die Uebersicht zeigt dann bei „Anfrage vom" den
+ * Zustand statt eines Datums und keinen „Link gültig bis".
+ */
+export function anfrageNichtZugestellt(stand: VertragsendeStand, jetzt: Date): boolean {
+  return lageVon(stand, jetzt).nichtZugestellt;
+}
+
+/**
  * Die EINE Statuspille des Seitenkopfs. Greift die Entfristungswarnung,
  * ersetzt sie die Pille des Status. Sonst gilt der Katalog — ausser in den
  * beiden Anfrage-Status, wenn die Fuehrungskraft gar nicht antworten kann
@@ -537,6 +602,7 @@ export function vertragsendePille(stand: VertragsendeStand, jetzt: Date): Pillen
   }
   const lage = lageVon(stand, jetzt);
   if (lage.linkAbgelaufen) return VERTRAGSENDE_PILLE_LINK_ABGELAUFEN;
+  if (lage.nichtZugestellt) return VERTRAGSENDE_PILLE_NICHT_ZUGESTELLT;
   if (lage.phase === "anfrage") return VERTRAGSENDE_PILLE.ANGELEGT;
   // Unbekannter Status: den Rohwert zeigen statt einen falschen Namen zu erfinden.
   return VERTRAGSENDE_PILLE[stand.status] ?? { text: stand.status, ton: "neutral" };

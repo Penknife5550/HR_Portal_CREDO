@@ -1,6 +1,6 @@
 # Prototyp-Tag (V0) – Leitfaden: neue Ansicht Vertragsende
 
-Stand 07.10.2026 · für den Projektverantwortlichen und das Personalbüro · gehört zu
+Stand 08.10.2026 · für den Projektverantwortlichen und das Personalbüro · gehört zu
 [projekt-ux-umbau.md](projekt-ux-umbau.md) (Abschnitt 0.4) und [pilot-feinplan.md](pilot-feinplan.md)
 (Abschnitte 3.3 bis 3.8, 7, 8 und 11)
 
@@ -32,7 +32,8 @@ Drei Regeln für die Moderation:
 - **Nicht erklären, nicht zeigen.** Auf Fragen mit einer Gegenfrage antworten („Was würden Sie
   erwarten?“). Erst nach etwa zwei Minuten Hängen helfen – und das notieren.
 - **Nichts kann kaputtgehen.** Erfundene Vorgänge in einer lokalen Kopie, kein Mailserver: Es
-  geht keine Mail hinaus.
+  geht keine Mail hinaus. Darum scheitert jeder Versand (Anfrage, Erinnerung) mit einer
+  Fehlermeldung – so gewollt; Aufgaben 4 und 5 prüfen genau diese Meldung (Abschnitt 4).
 
 ## 2. Vorbereitung
 
@@ -96,15 +97,19 @@ beim Auswerten zu bedenken.
 ## 4. Aufgaben
 
 Jede Aufgabe beginnt in der Liste der Vertragsenden. Aufgabe vorlesen (Karte hinlegen),
-Stoppuhr starten, stoppen, wenn die Antwort gegeben ist bzw. die Erfolgsmeldung unten erscheint.
-Aufgaben 1–3 ändern nichts; 4–7 ändern Testdaten – deshalb wird zwischen den Durchgängen und am
-Ende neu eingespielt. Die Spalte „Weg neu“ ist nur für die Moderation; die Knopfnamen nie
-vorlesen.
+Stoppuhr starten, stoppen, wenn die Antwort gegeben ist bzw. die Meldung erscheint (unten rechts
+oder im Fenster). Aufgaben 1–3 ändern nichts; 4–7 ändern Testdaten – deshalb wird zwischen den
+Durchgängen und am Ende neu eingespielt. Die Spalte „Weg neu“ ist nur für die Moderation; die
+Knopfnamen nie vorlesen.
 
-**„Gesendet“, obwohl nichts hinausgeht:** In der Testumgebung ist kein Mailserver eingerichtet.
-Die Seite meldet trotzdem „Anfrage an … gesendet.“ – das Portal wertet das Ergebnis des
-Versands an dieser Stelle nicht aus (bekannte Lücke, eigene Nebenaufgabe). Am Termin nicht
-darauf eingehen, aber notieren, wenn es auffällt.
+**Anfrage und Erinnerung scheitern – gewollt:** In der Testumgebung ist bewusst kein
+Mailserver eingerichtet (es geht nichts hinaus). Seit dem Stand vom 08.10. sagt das Portal das
+ehrlich: Statt „gesendet“ meldet es „… konnte nicht versendet werden: SMTP ist nicht konfiguriert
+…“. Im Betrieb geschieht genau das, wenn der Mailserver ausfällt. Aufgaben 4 und 5 prüfen
+deshalb, ob die Meldung verstanden wird und ob klar ist, was als Nächstes zu tun ist. Vorher
+nicht ankündigen. Kommt die Meldung, ein bis zwei Minuten beobachten („Was würden Sie jetzt
+tun?“), die Antwort notieren, dann auflösen: „Hier gibt es absichtlich keinen Mailserver; im
+Betrieb geht die Mail hinaus.“
 
 ### Aufgabe 1 – Wer ist dran? (liest nur)
 
@@ -143,10 +148,11 @@ darauf eingehen, aber notieren, wenn es auffällt.
 |---|---|
 | Ausgangslage | T01 Anna Testmann: frisch angelegt, noch keine Anfrage, keine Adresse der Führungskraft |
 | Aufgabe | „Bei Frau Testmann ist noch nichts passiert. Ihre Führungskraft soll entscheiden, ob es weitergeht. Die Adresse steht auf dem Zettel.“ |
-| Weg neu | „Anfrage senden …“ → Fenster „Anfrage an die Führungskraft senden“, Feld „E-Mail der Führungskraft“ → „Anfrage senden“ → Meldung „Anfrage an … gesendet.“ Danach Pille „Wartet auf Führungskraft“. |
-| Beobachten | Klicks bis zur Meldung. Ein Tippfehler ohne „@“ ergibt „Das ist keine E-Mail-Adresse.“ – wird der Fehler verstanden? Erkennt sie danach, dass jetzt die Führungskraft dran ist? |
+| Weg neu | „Anfrage senden …“ → Fenster „Anfrage an die Führungskraft senden“, Feld „E-Mail der Führungskraft“ → „Anfrage senden“ → im Fenster die Meldung „Die Anfrage an die Führungskraft konnte nicht versendet werden: SMTP ist nicht konfiguriert … Die Anfrage gilt als nicht gesendet. Bitte senden Sie die Anfrage später erneut.“ (Stoppuhr stoppen). Das Fenster bleibt offen → „Abbrechen“. Dahinter steht wieder „Anfrage offen“ mit „Anfrage an die Führungskraft senden“; die Adresse ist gemerkt und beim nächsten Öffnen vorbelegt. |
+| Beobachten | Klicks bis zur Meldung. Liest sie die Meldung ganz? Versteht sie, dass nichts hinausging und die Anfrage nicht als gesendet gilt? Was würde sie jetzt tun (später erneut senden, die IT fragen, die Führungskraft anrufen)? Was macht sie mit dem Teil „Bitte unter Einstellungen → SMTP … eintragen, ‚aktiv‘ setzen …“ – Hilfe oder nur Technik? Ein Tippfehler ohne „@“ ergibt „Das ist keine E-Mail-Adresse.“ – wird der Fehler verstanden? |
+| Moderation | Die Meldung ist erwartet (siehe oben, „Anfrage und Erinnerung scheitern – gewollt“). Erst nach ihrer Antwort auflösen. |
 | Wichtig | Nur die Adresse vom Zettel – nie eine echte, auch wenn nichts hinausgeht. |
-| Alt | Feld in der Karte „Anfrage an die Führungskraft“ und „Anfrage an Vorgesetzten senden →“ (ohne Rückfrage); wieder an T01 (nach dem Neueinspielen frisch) |
+| Alt | Feld in der Karte „Anfrage an die Führungskraft“ und „Anfrage an Vorgesetzten senden →“ (ohne Rückfrage) → dieselbe Meldung als rote Zeile oben über den Reitern; die Karte steht danach unverändert da. Wieder an T01 (nach dem Neueinspielen frisch). |
 
 ### Aufgabe 5 – Führungskräfte, die nicht antworten (ändert Daten)
 
@@ -154,9 +160,10 @@ darauf eingehen, aber notieren, wenn es auffällt.
 |---|---|
 | Ausgangslage | T02 Ben Testberg (Link gültig) und T03 Clara Testfeld (Link abgelaufen), wie in Aufgabe 1 |
 | Aufgabe | „Die Führungskräfte von Herrn Testberg und von Frau Testfeld haben sich noch nicht gemeldet. Kümmern Sie sich darum.“ |
-| Weg neu | T02: „Erinnerung senden“ – ohne Rückfrage, Meldung „Erinnerung an die Führungskraft gesendet.“, darunter jetzt „2× erinnert“. T03: „Anfrage neu senden …“ → Rückfrage „Anfrage neu senden?“ (Adresse vorbelegt, Text sagt: der bisherige Link ist bereits abgelaufen, Erinnerungen beginnen von vorn, der Vermerk zur Abstimmung mit Vorstand oder Geschäftsführung wird zurückgesetzt) → „Anfrage neu senden“ → „Neue Anfrage an … gesendet.“ |
-| Beobachten | Unterscheidet sie die beiden Fälle (erinnern / neu senden)? Liest sie den Text der Rückfrage, versteht sie ihn? Vermisst sie bei der Erinnerung eine Rückfrage, oder ist „sofort“ richtig? Sucht sie im Menü „…“? |
-| Alt | T02: „Erinnerung senden“ (Meldung „Erinnerung an die Führungskraft versendet.“ verschwindet nach 6 Sekunden). T03: Wer „Erinnerung senden“ nimmt, bekommt den Fehler „Der Formular-Link ist abgelaufen. Bitte „Anfrage erneut senden“ nutzen …“; dann „Anfrage erneut senden“ – ohne Rückfrage. Den Umweg über den Fehler mitzählen. |
+| Weg neu | T02: „Erinnerung senden“ – ohne Rückfrage → Fehlermeldung unten rechts „Die Erinnerung konnte nicht versendet werden: SMTP ist nicht konfiguriert … Sie wurde nicht gezählt – bitte später erneut versuchen.“ (bleibt stehen, bis sie geschlossen wird); weiter „1× erinnert“. T03: „Anfrage neu senden …“ → Rückfrage „Anfrage neu senden?“ (Adresse vorbelegt, Text sagt: der bisherige Link ist bereits abgelaufen, Erinnerungen beginnen von vorn, der Vermerk zur Abstimmung mit Vorstand oder Geschäftsführung wird zurückgesetzt) → „Anfrage neu senden“ → im Fenster „Die Anfrage an die Führungskraft konnte nicht versendet werden: … Der zuvor versendete Link gilt nicht mehr. …“; der Text oben heißt jetzt „der bisherige gilt bereits nicht mehr“. „Abbrechen“ → Pille „Anfrage nicht zugestellt“, „Jetzt dran · HR“ mit „Anfrage wurde nicht zugestellt – erneut senden“ und dem Knopf „Anfrage senden …“; im Reiter „Übersicht“ steht bei „Anfrage vom“ die Pille „Nicht zugestellt“. |
+| Beobachten | Unterscheidet sie die beiden Fälle (erinnern / neu senden)? Liest sie den Text der Rückfrage, versteht sie ihn? Bemerkt sie die Fehlermeldung der Erinnerung unten rechts? Versteht sie bei T03 nach dem Abbrechen die neue Pille „Anfrage nicht zugestellt“ – und dass die Führungskraft jetzt gar keinen gültigen Link mehr hat? Vermisst sie bei der Erinnerung eine Rückfrage, oder ist „sofort“ richtig? Sucht sie im Menü „…“? |
+| Moderation | Wie bei Aufgabe 4: Die Meldungen sind erwartet, erst nach ihrer Antwort auflösen. Danach Frage 21 (Abschnitt 5) stellen, solange die Meldung frisch ist. |
+| Alt | T02: „Erinnerung senden“ → dieselbe Meldung als rote Zeile oben. T03: Wer „Erinnerung senden“ nimmt, bekommt den Fehler „Der Formular-Link ist abgelaufen. Bitte „Anfrage erneut senden“ nutzen …“; dann „Anfrage erneut senden“ – ohne Rückfrage → rote Zeile „… konnte nicht versendet werden …“; die Karte sagt danach „Bei der Führungskraft ist keine Anfrage angekommen – die E-Mail an … wurde nicht versendet (Grund im Reiter „E-Mails“). Bitte erneut senden.“ Den Umweg über den Fehler mitzählen. |
 
 ### Aufgabe 6 – Vertrag zurück, Vorgang beenden (ändert Daten)
 
@@ -197,6 +204,7 @@ Text der Liste und der alten Ansicht).
 | T08 Hannes Testwald | Abgeschlossen | Abgeschlossen | – (Leiste endet mit „Abgeschlossen“) |
 | T09 Ida Teststein | Storniert | Storniert | – (Leiste endet mit „Abgebrochen“) |
 | T10 Jonas Testbrink | Anfrage offen | Angelegt | Anfrage an die Führungskraft senden |
+| T03 nach Aufgabe 5 (Anfrage ging nicht hinaus) | Anfrage nicht zugestellt | Anfrage beim Vorgesetzten | Anfrage wurde nicht zugestellt – erneut senden |
 
 | # | Frage | Warum wir fragen | Antwort |
 |---|---|---|---|
@@ -220,6 +228,7 @@ Text der Liste und der alten Ansicht).
 | 18 | Bei T04 und T06 bricht die Zeile unter „Rückmeldung“ in der Leiste um (Zuständigkeit, Ergebnis, Datum). Reicht dort weniger, z. B. ohne Datum (es steht in der Übersicht)? | beim Fotografieren aufgefallen | |
 | 19 | Am Handy steht der Knopf „…“ allein in einer Zeile, und von „E-Mails“ ist in der Reiterleiste nur „E-M“ zu sehen. Fällt das auf, merkt man, dass die Leiste rollt? | beim Fotografieren aufgefallen (`pilot-t04-390.jpg`) | |
 | 20 | Bei T09 (storniert) endet die Leiste ohne Datum und ohne Namen; die nicht erreichten Schritte sehen aus wie kommende. Braucht es „storniert am … von …“? | beim Fotografieren aufgefallen (`pilot-t09-1366.jpg`) | |
+| 21 | Wenn eine Mail nicht hinausgeht (Aufgaben 4 und 5): Reicht die Meldung, um zu wissen, was zu tun ist? Was soll statt „SMTP ist nicht konfiguriert … ‚aktiv‘ setzen und ‚Verbindung testen‘“ dastehen? Wen würden Sie informieren? (direkt nach Aufgabe 5 stellen) | Versandergebnis seit 08.10. sichtbar; Plan U10: Gründe in Alltagssprache statt Text des Mailservers | |
 
 **Für die Moderation:** Beim Vergleich alt/neu zählt die alte Ansicht bei T04 „in 19 Tagen“,
 die neue „in 20 Tagen“. Die neue zählt Kalendertage in deutscher Zeit (richtig), die alte
@@ -232,9 +241,8 @@ Zwei weitere Dinge vorher ansagen, damit sie nicht für Fehler der neuen Ansicht
 
 - **Rote Zeilen im Reiter „E-Mails“:** In der Testumgebung ist kein Mailserver eingetragen.
   Jede Mail (Anfrage, Erinnerung) erscheint dort deshalb als „FAILED“ mit dem Grund „SMTP ist
-  nicht konfiguriert …“. Es geht nichts hinaus – das ist gewollt. Die Meldung oben („Anfrage an
-  … gesendet“) sagt trotzdem „gesendet“; das ist eine bekannte Lücke der Routen, an der eine
-  eigene Aufgabe arbeitet.
+  nicht konfiguriert …“. Es geht nichts hinaus – das ist gewollt. Seit dem 08.10. sagt die Seite
+  das auch selbst („… konnte nicht versendet werden“, Aufgaben 4 und 5).
 - **Einrichtungsleitung und Führungskräfte** sehen die Seite heute gar nicht (auch nicht die
   alte), sondern nur „Keine Berechtigung“ – die Mandanten-Sperre lässt sie nicht an die Daten.
   Wenn am Termin jemand fragt, was eine Schulleitung sieht: Das ist eine eigene, offene

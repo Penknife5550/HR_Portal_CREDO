@@ -14,7 +14,10 @@ import path from "path";
 
 import {
   VERBINDUNGSFEHLER,
+  anfrageMeldung,
   aufrufen,
+  erinnerungMeldung,
+  mailStatusAus,
   vertragsendeAufruf,
   type AufrufArt,
   type AufrufWerte,
@@ -611,6 +614,48 @@ describe("aufrufen", () => {
     expect(VERBINDUNGSFEHLER).not.toMatch(/\b(Sie|du)\b/);
   });
 
+  // Versandergebnis: `/supervisor-link` und `/reminder` nennen `mailStatus`
+  // (src/lib/contract-end-versand.ts) — bei Erfolg wie bei Fehlschlag.
+  it("mailStatus der Antwort geht in beide Ergebnisse — bei Erfolg und bei Fehler", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      json: async () => ({ id: ID, supervisorEmail: "fuehrung@example.org", mailStatus: "WEBHOOK" }),
+    });
+    await expect(aufrufen(vertragsendeAufruf("anfrage-senden", ID, WERTE))).resolves.toEqual({
+      ok: true,
+      daten: { id: ID, supervisorEmail: "fuehrung@example.org", mailStatus: "WEBHOOK" },
+      mailStatus: "WEBHOOK",
+    });
+
+    for (const [status, mailStatus] of [
+      [502, "FAILED"],
+      [409, "SKIPPED"],
+    ] as const) {
+      fetchMock.mockResolvedValueOnce({ ok: false, status, json: async () => ({ error: "Nicht zugestellt.", mailStatus }) });
+      await expect(aufrufen(vertragsendeAufruf("anfrage-senden", ID, WERTE))).resolves.toEqual({
+        ok: false,
+        fehler: "Nicht zugestellt.",
+        mailStatus,
+      });
+    }
+    // Auch ohne Fehlertext der Route: Ersatztext UND mailStatus.
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({ mailStatus: "FAILED" }) });
+    const erinnern = vertragsendeAufruf("erinnern", ID);
+    await expect(aufrufen(erinnern)).resolves.toEqual({ ok: false, fehler: erinnern.ersatzFehler, mailStatus: "FAILED" });
+  });
+
+  it("ohne mailStatus fehlt das Feld ganz — nicht als undefined", async () => {
+    fetchMock.mockResolvedValueOnce(antwort(true, { ok: true }));
+    const ok = await aufrufen(vertragsendeAufruf("erinnern", ID));
+    expect(Object.keys(ok).sort()).toEqual(["daten", "ok"]);
+    fetchMock.mockResolvedValueOnce(antwort(false, { error: "Ungültige E-Mail-Adresse" }));
+    const fehler = await aufrufen(vertragsendeAufruf("anfrage-senden", ID, WERTE));
+    expect(Object.keys(fehler).sort()).toEqual(["fehler", "ok"]);
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    expect(Object.keys(await aufrufen(vertragsendeAufruf("erinnern", ID))).sort()).toEqual(["fehler", "ok"]);
+  });
+
   it("schickt Adresse und Methode; Content-Type und Körper nur, wenn die Art einen Körper hat", async () => {
     for (const art of ARTEN) {
       fetchMock.mockReset();
@@ -627,6 +672,57 @@ describe("aufrufen", () => {
       } else {
         expect({ art, schluessel: Object.keys(init).sort() }).toEqual({ art, schluessel: ["method"] });
       }
+    }
+  });
+});
+
+// =============================================
+// Versandergebnis: mailStatus und Meldungen
+// =============================================
+
+describe("Versandergebnis", () => {
+  it("mailStatusAus: nur ein nicht leerer Text aus einem Objekt, sonst undefined", () => {
+    expect(mailStatusAus({ mailStatus: "SENT" })).toBe("SENT");
+    expect(mailStatusAus({ mailStatus: " WEBHOOK " })).toBe("WEBHOOK");
+    expect(mailStatusAus({ error: "x", mailStatus: "FAILED" })).toBe("FAILED");
+    for (const daten of [null, undefined, "SENT", 0, [], [{ mailStatus: "SENT" }], {}, { mailStatus: "" }, { mailStatus: "  " }, { mailStatus: 1 }, { mailStatus: null }]) {
+      expect({ daten, status: mailStatusAus(daten) }).toEqual({ daten, status: undefined });
+    }
+  });
+
+  it("Anfrage: SENT, fehlend (älterer Server) oder unbekannt – wie bisher „gesendet“", () => {
+    for (const status of ["SENT", undefined, "UNBEKANNT"]) {
+      expect(anfrageMeldung("fuehrung@example.org", false, status)).toBe("Anfrage an fuehrung@example.org gesendet.");
+      expect(anfrageMeldung("fuehrung@example.org", true, status)).toBe("Neue Anfrage an fuehrung@example.org gesendet.");
+    }
+  });
+
+  it("Anfrage über den Webhook: sagt nicht „gesendet“, sondern wohin sie ging und warum", () => {
+    expect(anfrageMeldung("fuehrung@example.org", false, "WEBHOOK")).toBe(
+      "Anfrage für fuehrung@example.org an den Webhook weitergegeben (die E-Mail-Vorlage im Portal ist ausgeschaltet).",
+    );
+    expect(anfrageMeldung("fuehrung@example.org", true, "WEBHOOK")).toBe(
+      "Neue Anfrage für fuehrung@example.org an den Webhook weitergegeben (die E-Mail-Vorlage im Portal ist ausgeschaltet).",
+    );
+  });
+
+  it("Erinnerung: SENT/fehlend wie bisher, WEBHOOK mit eigenem Satz", () => {
+    expect(erinnerungMeldung("SENT")).toBe("Erinnerung an die Führungskraft gesendet.");
+    expect(erinnerungMeldung(undefined)).toBe("Erinnerung an die Führungskraft gesendet.");
+    expect(erinnerungMeldung("WEBHOOK")).toBe(
+      "Erinnerung an den Webhook weitergegeben (die E-Mail-Vorlage im Portal ist ausgeschaltet).",
+    );
+  });
+
+  it("Sprache der Meldungen: keine Anrede, ein Satz mit Punkt", () => {
+    const meldungen = [
+      ...[false, true].flatMap((neu) => ["SENT", "WEBHOOK", undefined].map((s) => anfrageMeldung("a@b.de", neu, s))),
+      ...["SENT", "WEBHOOK", undefined].map((s) => erinnerungMeldung(s)),
+    ];
+    for (const meldung of meldungen) {
+      expect(meldung).not.toMatch(/\b(Sie|Ihr|Ihre|du|dein|deine)\b/);
+      expect(meldung).toMatch(/\.$/);
+      expect(meldung).toBe(meldung.trim());
     }
   });
 });

@@ -14,7 +14,16 @@
  *     alte Ansicht). Waehrend er laeuft, ist der Dialog gesperrt; ein Fehler
  *     der Route steht im Dialog, und der Dialog bleibt offen. Erst ein Erfolg
  *     schliesst ihn (`onErledigt` mit dem Satz fuer die Meldung — die Seite
- *     schliesst, meldet und laedt neu). Auch ein Formatfehler der Adresse geht
+ *     schliesst, meldet und laedt neu). Ein Fehler MIT `mailStatus` (die
+ *     Anfrage ging nicht hinaus, der neue Link ist trotzdem gespeichert, ein
+ *     frueherer tot) laesst den Dialog ebenso offen, aber die Seite laedt
+ *     dahinter still neu (`onGeaendert`) — sonst zeigte sie einen Stand, den
+ *     es nicht mehr gibt. Ein neuer Versuch im selben Dialog geht. Was die
+ *     Rueckfrage ueber den bisherigen Link sagt, haengt am Stand beim Oeffnen
+ *     und aendert sich nur EINMAL, zugleich mit der Meldung: auf „gilt bereits
+ *     nicht mehr" — nicht mit dem neu geladenen Vorgang, waehrend die Meldung
+ *     gelesen wird. Bei Erfolg nennt die Meldung, ob ein Webhook statt der Portal-Mail
+ *     uebernahm (`anfrageMeldung`). Auch ein Formatfehler der Adresse geht
  *     an den Dialog (`fehler`): Nur so bekommt er den Fokus und wird angesagt,
  *     auch nach Enter im Feld. Sichtbar steht er nur DORT; das Feld traegt
  *     `aria-invalid`, aber keinen zweiten Fehlertext. Der Dialog sagt nur
@@ -41,7 +50,7 @@ import { Textverweis } from "@/components/ui/textverweis";
 import { vorgangPfad } from "@/lib/adressen";
 import { formatDatumDE } from "@/lib/format";
 import { fuehrungskraftKannAntworten, mavOffen } from "@/lib/prozess/vertragsende";
-import { aufrufen, vertragsendeAufruf, type Aufruf } from "./aufrufe";
+import { anfrageMeldung, aufrufen, vertragsendeAufruf, type Aufruf } from "./aufrufe";
 import { MAV_AUSWAHL, anzeigeName, type VertragsendeDetail } from "./typen";
 
 export type DialogArt =
@@ -63,6 +72,12 @@ export interface VertragsendeDialogProps {
   onSchliessen: () => void;
   /** Der Aufruf ist gelungen: Die Seite schliesst, meldet `meldung` und laedt neu. */
   onErledigt: (meldung: string) => void;
+  /**
+   * Der Aufruf ist gescheitert, die Route hat aber gespeichert (Fehler mit
+   * `mailStatus`): Die Seite laedt still neu — ohne den Dialog zu schliessen
+   * und ohne sich zu sperren.
+   */
+  onGeaendert: () => void;
 }
 
 /** Der eine Dialog zur gewaehlten Handlung. */
@@ -86,13 +101,16 @@ export function VertragsendeDialog(props: VertragsendeDialogProps) {
  * Fuehrt einen Aufruf aus und haelt Sperre und Fehler des Dialogs. Ein
  * zweiter Aufruf, waehrend der erste laeuft, faellt still weg (der Knopf ist
  * dann ohnehin gesperrt; der Merker faengt auch ein Enter im Feld ab).
+ * Ein Fehler mit `mailStatus` meldet zusaetzlich `onGeaendert` (siehe Kopf).
  */
-function useAusfuehren(onErledigt: (meldung: string) => void) {
+function useAusfuehren(onErledigt: (meldung: string) => void, onGeaendert: () => void) {
   const [gesperrt, setGesperrt] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+  // Ein Versuch dieses Dialogs hat gespeichert, ohne dass die Mail hinausging.
+  const [gespeichertOhneMail, setGespeichertOhneMail] = useState(false);
   const laeuft = useRef(false);
 
-  async function ausfuehren(aufruf: Aufruf, meldung: (daten: unknown) => string) {
+  async function ausfuehren(aufruf: Aufruf, meldung: (daten: unknown, mailStatus: string | undefined) => string) {
     if (laeuft.current) return;
     laeuft.current = true;
     setGesperrt(true);
@@ -102,14 +120,23 @@ function useAusfuehren(onErledigt: (meldung: string) => void) {
     const ergebnis = await aufrufen(aufruf);
     laeuft.current = false;
     setGesperrt(false);
-    if (ergebnis.ok) onErledigt(meldung(ergebnis.daten));
-    else setFehler(ergebnis.fehler);
+    if (ergebnis.ok) {
+      onErledigt(meldung(ergebnis.daten, ergebnis.mailStatus));
+      return;
+    }
+    setFehler(ergebnis.fehler);
+    // Gespeichert, nur die Mail ging nicht hinaus: Der Stand hinter dem
+    // Dialog stimmt nicht mehr. Der Dialog bleibt offen und bedienbar.
+    if (ergebnis.mailStatus) {
+      setGespeichertOhneMail(true);
+      onGeaendert();
+    }
   }
 
   /** Ein Fehler der Route gilt nicht mehr (etwa, weil ein neuer Versuch schon vorher scheitert). */
   const fehlerLeeren = () => setFehler(null);
 
-  return { gesperrt, fehler, ausfuehren, fehlerLeeren };
+  return { gesperrt, fehler, ausfuehren, fehlerLeeren, gespeichertOhneMail };
 }
 
 /** Ein Feld einer Antwort als Text, sonst `null` — die Antworten sind `unknown`. */
@@ -129,14 +156,33 @@ const ADRESS_FORMATFEHLER = "Das ist keine E-Mail-Adresse.";
 // Anfrage senden / neu senden
 // =============================================
 
-function AnfrageDialog({ offen, vorgang, jetzt, onSchliessen, onErledigt, neu }: VertragsendeDialogProps & { neu: boolean }) {
-  const { gesperrt, fehler, ausfuehren, fehlerLeeren } = useAusfuehren(onErledigt);
+function AnfrageDialog({
+  offen,
+  vorgang,
+  jetzt,
+  onSchliessen,
+  onErledigt,
+  onGeaendert,
+  neu,
+}: VertragsendeDialogProps & { neu: boolean }) {
+  const { gesperrt, fehler, ausfuehren, fehlerLeeren, gespeichertOhneMail } = useAusfuehren(onErledigt, onGeaendert);
   const [adresse, setAdresse] = useState(vorgang.supervisorEmail ?? "");
   const [adressFehler, setAdressFehler] = useState("");
   const wert = adresse.trim();
   // „Neu senden" gibt es mit gueltigem Link (Menue) und mit abgelaufenem
-  // („Jetzt dran"); nur im ersten Fall wird der bisherige ungueltig.
-  const linkGilt = fuehrungskraftKannAntworten(vorgang, jetzt);
+  // („Jetzt dran"); nur im ersten Fall wird der bisherige ungueltig. Stand
+  // beim Oeffnen, NICHT aus dem neu geladenen Vorgang: Geht die Anfrage nicht
+  // hinaus, laedt die Seite dahinter neu (`onGeaendert`), und der Text
+  // spraenge sonst auf „bereits abgelaufen" — falsch, der bisherige Link ist
+  // ersetzt, nicht abgelaufen. Stattdessen sagt der Text ab diesem
+  // Fehlschlag, was die Meldung der Route darunter sagt: Der bisherige gilt
+  // schon nicht mehr (`gespeichertOhneMail`, zugleich mit der Meldung).
+  const [linkGilt] = useState(() => fuehrungskraftKannAntworten(vorgang, jetzt));
+  const bisherigerLink = gespeichertOhneMail
+    ? "der bisherige gilt bereits nicht mehr"
+    : linkGilt
+      ? "der bisherige wird ungültig"
+      : "der bisherige ist bereits abgelaufen";
 
   function senden(e?: FormEvent) {
     e?.preventDefault();
@@ -157,10 +203,9 @@ function AnfrageDialog({ offen, vorgang, jetzt, onSchliessen, onErledigt, neu }:
       setAdressFehler(ADRESS_FORMATFEHLER);
       return;
     }
-    void ausfuehren(vertragsendeAufruf("anfrage-senden", vorgang.id, { supervisorEmail: wert }), (daten) => {
-      const an = textFeld(daten, "supervisorEmail") ?? wert;
-      return neu ? `Neue Anfrage an ${an} gesendet.` : `Anfrage an ${an} gesendet.`;
-    });
+    void ausfuehren(vertragsendeAufruf("anfrage-senden", vorgang.id, { supervisorEmail: wert }), (daten, mailStatus) =>
+      anfrageMeldung(textFeld(daten, "supervisorEmail") ?? wert, neu, mailStatus),
+    );
   }
 
   return (
@@ -176,7 +221,7 @@ function AnfrageDialog({ offen, vorgang, jetzt, onSchliessen, onErledigt, neu }:
             // zurück"): `/supervisor-link` legt die Vertragsdaten per `upsert`
             // ohne Aenderung an, das Formular fuellt sie wieder vor. Zurueck
             // auf null gehen Erinnerungen und die Vorstand-Abstimmung.
-            `Die Führungskraft bekommt einen neuen Link; ${linkGilt ? "der bisherige wird ungültig" : "der bisherige ist bereits abgelaufen"}. Erinnerungen beginnen von vorn, und der Vermerk zur Abstimmung mit Vorstand oder Geschäftsführung wird zurückgesetzt. Die übrigen bereits gespeicherten Eingaben im Formular bleiben erhalten.`
+            `Die Führungskraft bekommt einen neuen Link; ${bisherigerLink}. Erinnerungen beginnen von vorn, und der Vermerk zur Abstimmung mit Vorstand oder Geschäftsführung wird zurückgesetzt. Die übrigen bereits gespeicherten Eingaben im Formular bleiben erhalten.`
           : "Die Führungskraft bekommt per E-Mail einen Link zum Formular. Darin entscheidet sie über die Weiterbeschäftigung und erfasst bei einer Übernahme die Vertragsdaten."
       }
       gesperrt={gesperrt}
@@ -219,8 +264,16 @@ function AnfrageDialog({ offen, vorgang, jetzt, onSchliessen, onErledigt, neu }:
 
 type RueckfrageArt = "offboarding-anlegen" | "vertrag-erfassen" | "abschliessen" | "stornieren";
 
-function RueckfrageDialog({ art, offen, vorgang, jetzt, onSchliessen, onErledigt }: VertragsendeDialogProps & { art: RueckfrageArt }) {
-  const { gesperrt, fehler, ausfuehren } = useAusfuehren(onErledigt);
+function RueckfrageDialog({
+  art,
+  offen,
+  vorgang,
+  jetzt,
+  onSchliessen,
+  onErledigt,
+  onGeaendert,
+}: VertragsendeDialogProps & { art: RueckfrageArt }) {
+  const { gesperrt, fehler, ausfuehren } = useAusfuehren(onErledigt, onGeaendert);
   const gemeinsam = {
     offen,
     onAbbrechen: onSchliessen,
@@ -344,8 +397,8 @@ function RueckfrageDialog({ art, offen, vorgang, jetzt, onSchliessen, onErledigt
 // Stand der Mitarbeitervertretung
 // =============================================
 
-function MavDialog({ offen, vorgang, onSchliessen, onErledigt }: VertragsendeDialogProps) {
-  const { gesperrt, fehler, ausfuehren } = useAusfuehren(onErledigt);
+function MavDialog({ offen, vorgang, onSchliessen, onErledigt, onGeaendert }: VertragsendeDialogProps) {
+  const { gesperrt, fehler, ausfuehren } = useAusfuehren(onErledigt, onGeaendert);
   const gruppenName = useId();
   // „Ausstehend" steht nicht zur Wahl (setzt niemand von Hand) — dann ohne Vorauswahl.
   const vorwahl = MAV_AUSWAHL.find((o) => o.wert === vorgang.mavStatus)?.wert ?? "";
