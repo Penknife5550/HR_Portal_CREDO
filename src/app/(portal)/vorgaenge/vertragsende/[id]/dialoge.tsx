@@ -50,7 +50,7 @@ import { Textverweis } from "@/components/ui/textverweis";
 import { vorgangPfad } from "@/lib/adressen";
 import { formatDatumDE } from "@/lib/format";
 import { fuehrungskraftKannAntworten, mavOffen } from "@/lib/prozess/vertragsende";
-import { anfrageMeldung, aufrufen, vertragsendeAufruf, type Aufruf } from "./aufrufe";
+import { anfrageMeldung, aufrufen, textFeld, vertragsendeAufruf, type Aufruf } from "./aufrufe";
 import { MAV_AUSWAHL, anzeigeName, type VertragsendeDetail } from "./typen";
 
 export type DialogArt =
@@ -106,8 +106,6 @@ export function VertragsendeDialog(props: VertragsendeDialogProps) {
 function useAusfuehren(onErledigt: (meldung: string) => void, onGeaendert: () => void) {
   const [gesperrt, setGesperrt] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  // Ein Versuch dieses Dialogs hat gespeichert, ohne dass die Mail hinausging.
-  const [gespeichertOhneMail, setGespeichertOhneMail] = useState(false);
   const laeuft = useRef(false);
 
   async function ausfuehren(aufruf: Aufruf, meldung: (daten: unknown, mailStatus: string | undefined) => string) {
@@ -127,26 +125,15 @@ function useAusfuehren(onErledigt: (meldung: string) => void, onGeaendert: () =>
     setFehler(ergebnis.fehler);
     // Gespeichert, nur die Mail ging nicht hinaus: Der Stand hinter dem
     // Dialog stimmt nicht mehr. Der Dialog bleibt offen und bedienbar.
-    if (ergebnis.mailStatus) {
-      setGespeichertOhneMail(true);
-      onGeaendert();
-    }
+    // Im selben Takt wie `setFehler`, damit ein Dialog, der dazu etwas
+    // anzeigt, zugleich mit der Meldung zeichnet.
+    if (ergebnis.mailStatus) onGeaendert();
   }
 
   /** Ein Fehler der Route gilt nicht mehr (etwa, weil ein neuer Versuch schon vorher scheitert). */
   const fehlerLeeren = () => setFehler(null);
 
-  return { gesperrt, fehler, ausfuehren, fehlerLeeren, gespeichertOhneMail };
-}
-
-/** Ein Feld einer Antwort als Text, sonst `null` — die Antworten sind `unknown`. */
-function textFeld(daten: unknown, ...pfad: string[]): string | null {
-  let wert: unknown = daten;
-  for (const schluessel of pfad) {
-    if (!wert || typeof wert !== "object") return null;
-    wert = (wert as Record<string, unknown>)[schluessel];
-  }
-  return typeof wert === "string" && wert.trim() !== "" ? wert : null;
+  return { gesperrt, fehler, ausfuehren, fehlerLeeren };
 }
 
 /** Der Formatfehler der Adresse (nur das Offensichtliche, siehe `senden`). */
@@ -165,7 +152,13 @@ function AnfrageDialog({
   onGeaendert,
   neu,
 }: VertragsendeDialogProps & { neu: boolean }) {
-  const { gesperrt, fehler, ausfuehren, fehlerLeeren, gespeichertOhneMail } = useAusfuehren(onErledigt, onGeaendert);
+  // Ein Versuch dieses Dialogs hat gespeichert, ohne dass die Mail hinausging
+  // (nur hier gelesen: nur die Anfrage kennt dieses Ergebnis).
+  const [gespeichertOhneMail, setGespeichertOhneMail] = useState(false);
+  const { gesperrt, fehler, ausfuehren, fehlerLeeren } = useAusfuehren(onErledigt, () => {
+    setGespeichertOhneMail(true);
+    onGeaendert();
+  });
   const [adresse, setAdresse] = useState(vorgang.supervisorEmail ?? "");
   const [adressFehler, setAdressFehler] = useState("");
   const wert = adresse.trim();

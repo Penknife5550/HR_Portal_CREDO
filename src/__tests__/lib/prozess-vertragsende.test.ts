@@ -94,7 +94,7 @@ const ALLE_STATUS = Object.keys(CONTRACT_END_UEBERGAENGE);
  */
 const ANFRAGEN: Partial<VertragsendeStand>[] = [
   {}, // nie angefragt
-  // Adresse eingetragen, nichts verschickt — in einem Anfrage-Status: nicht zugestellt
+  // Adresse eingetragen, nie ein Link erzeugt (Hand-PATCH) — kein Versandversuch
   { supervisorEmail: ADRESSE },
   // Anfrage gescheitert (`/supervisor-link`, Mail nicht hinaus): neuer Link
   // gespeichert, aber nie zugestellt; Versandzeitpunkt zurueck auf null
@@ -339,9 +339,22 @@ describe("Schritte", () => {
     }
   });
 
-  it("ANFRAGE_VORGESETZTER mit Adresse, ohne Versandzeitpunkt: Anfrage aktiv mit Notiz „nicht zugestellt“", () => {
+  it("ANFRAGE_VORGESETZTER mit Adresse, aber ohne je erzeugten Link (Hand-PATCH): „Anfrage senden“, NICHT „nicht zugestellt“", () => {
+    // Ein Versand wurde nie versucht — „Die E-Mail ging nicht hinaus" waere falsch.
     for (const status of ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"]) {
-      for (const ablauf of [null, tag(30), tag(-1)]) {
+      const s = stand({ status, supervisorEmail: ADRESSE, supervisorTokenExpiresAt: null });
+      expect(zustaende(s)).toMatchObject({ anfrage: "aktiv", rueckmeldung: "kommend" });
+      expect(schritt(s, "anfrage").notiz).toBeUndefined();
+      expect(dran(s)).toMatchObject({ satz: "Anfrage an die Führungskraft senden", bei: "HR", aktion: "anfrage-senden" });
+      expect(vertragsendePille(s, JETZT)).toEqual({ text: "Anfrage offen", ton: "info" });
+      expect(anfrageNichtZugestellt(s, JETZT)).toBe(false);
+    }
+  });
+
+  it("ANFRAGE_VORGESETZTER mit Adresse und erzeugtem Link, ohne Versandzeitpunkt: Anfrage aktiv mit Notiz „nicht zugestellt“", () => {
+    for (const status of ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"]) {
+      // Auch ein inzwischen abgelaufener Link: Die Mail dazu ging nie hinaus.
+      for (const ablauf of [tag(30), tag(-1)]) {
         const s = stand({ status, supervisorEmail: ADRESSE, supervisorTokenExpiresAt: ablauf });
         expect(zustaende(s)).toMatchObject({ anfrage: "aktiv", rueckmeldung: "kommend" });
         expect(schritt(s, "anfrage")).toMatchObject({ zustaendig: "HR", notiz: "nicht zugestellt" });
@@ -554,8 +567,10 @@ describe("Statuspille", () => {
     for (const status of ["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"]) {
       // nie eine Anfrage verschickt, keine Adresse
       expect(vertragsendePille(stand({ status }), JETZT)).toEqual({ text: "Anfrage offen", ton: "info" });
-      // Adresse, aber kein Versandzeitpunkt: Die Mail ging nicht hinaus
-      for (const ablauf of [null, tag(30)]) {
+      // Adresse, aber nie ein Link erzeugt (Hand-PATCH): kein Versandversuch
+      expect(vertragsendePille(stand({ status, supervisorEmail: ADRESSE }), JETZT)).toEqual({ text: "Anfrage offen", ton: "info" });
+      // Adresse und Link, aber kein Versandzeitpunkt: Die Mail ging nicht hinaus
+      for (const ablauf of [tag(30), tag(-1)]) {
         expect(vertragsendePille(stand({ status, supervisorEmail: ADRESSE, supervisorTokenExpiresAt: ablauf }), JETZT)).toEqual({
           text: "Anfrage nicht zugestellt",
           ton: "info",
@@ -606,7 +621,7 @@ describe("Kann die Führungskraft antworten?", () => {
       ["ANGELEGT", stand()],
       ["ANGELEGT mit Adresse", stand({ supervisorEmail: ADRESSE })],
       ["Status gesetzt, ohne Adresse", stand({ status: "ANFRAGE_VORGESETZTER" })],
-      ["Anfrage nicht zugestellt", stand({ status: "ANFRAGE_VORGESETZTER", supervisorEmail: ADRESSE })],
+      ["Status und Adresse von Hand, nie ein Link", stand({ status: "ANFRAGE_VORGESETZTER", supervisorEmail: ADRESSE })],
       [
         "Anfrage nicht zugestellt, neuer Link gespeichert",
         angefragt({ supervisorLinkSentAt: null, supervisorTokenExpiresAt: tag(30) }),
@@ -671,12 +686,13 @@ describe("Über alle Lagen", () => {
     }
   });
 
-  it("„nicht zugestellt“ genau bei Anfrage-Status mit Adresse ohne Versandzeitpunkt – dann sagen Pille, Schritt und „Jetzt dran“ dasselbe", () => {
+  it("„nicht zugestellt“ genau bei Anfrage-Status mit Adresse und erzeugtem Link ohne Versandzeitpunkt – dann sagen Pille, Schritt und „Jetzt dran“ dasselbe", () => {
     const vorkommen = { ja: 0, nein: 0 };
     for (const { s, lage, p, pille } of PROBEN) {
       const erwartet =
         (CONTRACT_END_ANFRAGE_OFFEN as readonly string[]).includes(s.status) &&
         Boolean(s.supervisorEmail) &&
+        Boolean(s.supervisorTokenExpiresAt) &&
         !s.supervisorLinkSentAt;
       const ist = anfrageNichtZugestellt(s, JETZT);
       expect({ lage, ist }).toEqual({ lage, ist: erwartet });

@@ -487,7 +487,8 @@ Seite „gesendet“, auch wenn nichts hinausging. Die neue Ansicht zeigt das je
 
 - **Neue Lage „nicht zugestellt“** im Adapter (Ergänzung zu 3.3 und zu „„Erinnern“ nur mit
   zugestellter, gültiger Anfrage“ unten): Status „Anfrage beim Vorgesetzten“ (oder Alt
-  „Entscheidung Übernahme“) MIT Adresse, aber ohne Versandzeitpunkt. HR ist dran, Pille
+  „Entscheidung Übernahme“) MIT Adresse und erzeugtem Link, aber ohne Versandzeitpunkt
+  (ohne Link – Hand-PATCH – wurde nie etwas versendet: dann „Anfrage senden“). HR ist dran, Pille
   „Anfrage nicht zugestellt“ (`info`), „Jetzt dran“ „Anfrage wurde nicht zugestellt – erneut
   senden“, im Reiter Übersicht „Nicht zugestellt“ statt „Link gültig bis“. Ohne Adresse bleibt
   es „Anfrage senden“. Scheitert die erste Anfrage, steht der Vorgang wieder auf „Angelegt“ –

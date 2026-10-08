@@ -84,11 +84,19 @@ export type AufrufErgebnis =
 
 export const VERBINDUNGSFEHLER = "Verbindungsfehler. Bitte erneut versuchen.";
 
-/** `mailStatus` einer Antwort als Text, sonst `undefined` — die Antworten sind `unknown`. */
+/** Ein Feld einer Antwort als nicht leerer Text, sonst `null` — die Antworten sind `unknown`. */
+export function textFeld(daten: unknown, ...pfad: string[]): string | null {
+  let wert: unknown = daten;
+  for (const schluessel of pfad) {
+    if (!wert || typeof wert !== "object" || Array.isArray(wert)) return null;
+    wert = (wert as Record<string, unknown>)[schluessel];
+  }
+  return typeof wert === "string" && wert.trim() !== "" ? wert : null;
+}
+
+/** `mailStatus` einer Antwort als Text, sonst `undefined`. */
 export function mailStatusAus(daten: unknown): string | undefined {
-  if (!daten || typeof daten !== "object" || Array.isArray(daten)) return undefined;
-  const wert = (daten as { mailStatus?: unknown }).mailStatus;
-  return typeof wert === "string" && wert.trim() !== "" ? wert.trim() : undefined;
+  return textFeld(daten, "mailStatus")?.trim() ?? undefined;
 }
 
 export async function aufrufen(aufruf: Aufruf): Promise<AufrufErgebnis> {

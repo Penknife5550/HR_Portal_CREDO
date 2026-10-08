@@ -1369,9 +1369,10 @@ Gebaut (Arbeitsablauf mit Erbauer und Gegenprüfer, danach eigene Nacharbeit):
   (`mailStatusAus`); `anfrageMeldung`/`erinnerungMeldung` sagen bei WEBHOOK „an den Webhook
   weitergegeben (die E-Mail-Vorlage im Portal ist ausgeschaltet)“, sonst wie bisher.
 - **Adapter** (`src/lib/prozess/vertragsende.ts`): neue Lage „nicht zugestellt“ –
-  Status „Anfrage beim Vorgesetzten“ oder Alt „Entscheidung Übernahme“ MIT Adresse, ohne
-  `supervisorLinkSentAt` (dieselbe Bedingung wie die alte Ansicht, dort nur für den ersten
-  Status). Schritt „Anfrage“ aktiv mit Notiz „nicht zugestellt“, Pille „Anfrage nicht
+  Status „Anfrage beim Vorgesetzten“ oder Alt „Entscheidung Übernahme“ MIT Adresse und
+  erzeugtem Link (`supervisorTokenExpiresAt`), ohne `supervisorLinkSentAt` (die alte Ansicht
+  prüft nur Adresse und Versandzeitpunkt, und nur für den ersten Status; den Link verlangt
+  erst das Codereview, siehe unten). Schritt „Anfrage“ aktiv mit Notiz „nicht zugestellt“, Pille „Anfrage nicht
   zugestellt“ (`info`, HR ist dran), „Jetzt dran“ „Anfrage wurde nicht zugestellt – erneut
   senden“ mit der Adresse in der Unterzeile und `anfrage-senden`. Exporte
   `anfrageNichtZugestellt`, `VERTRAGSENDE_PILLE_NICHT_ZUGESTELLT`,
@@ -1421,6 +1422,24 @@ ist gemerkt – wie in der alten Ansicht). Die Unterzeile „nicht zugestellt“
 den Reiter „E-Mails“ (den sehen nicht alle Rollen). Im Menü heißt der Offboarding-Punkt in
 dieser Lage „Ohne Anfrage: Offboarding anlegen …“ (es gibt keine gültige Anfrage).
 
+**Codereview** (08.10.2026, Stufe „xhigh“, über `5dd1f16`): 7 Befunde, auf Wunsch des
+Projektverantwortlichen alle behoben:
+
+1. **„Nicht zugestellt“ ohne Versandversuch:** Setzt jemand Status und Adresse von Hand
+   (`PATCH`, erlaubt), ohne je eine Anfrage zu senden, behauptete die Seite „Die E-Mail an …
+   ging nicht hinaus“. Jetzt verlangt die Lage einen erzeugten Link (`supervisorTokenExpiresAt`
+   – `/supervisor-link` lässt ihn nach dem Fehlschlag stehen); ohne Link „Anfrage senden“.
+2. Adapter-Test für genau diesen Fall; die Kreuzprobe über alle Lagen rechnet den Link mit.
+3. Abnahme-Skript: Vor „Erinnerung senden“ schließt es stehende Fehlermeldungen und nimmt nur
+   eine Meldung mit dem Anfang der Route an (vorher genügte „Erinnerung“ irgendwo im Text).
+4. Abnahme-Skript, Gegenprobe F: prüft jetzt auch Konsolenfehler der alten Ansicht (wie C).
+5. `dialoge.tsx`: Der Merker „gespeichert ohne Mail“ lebt nur noch im Anfrage-Dialog (vorher in
+   jedem Dialog geführt, aber nur dort gelesen).
+6. Adapter: toter Zweig für eine fehlende Adresse in „nicht zugestellt“ entfernt (die Lage gibt
+   es nur mit Adresse).
+7. `textFeld` (Feld einer Antwort als Text) liegt jetzt einmal in `aufrufe.ts`; `mailStatusAus`
+   baut darauf auf, `dialoge.tsx` importiert es.
+
 **Mail- und Word-Vorlagen:** keine betroffen (die Routen und ihre Mails sind unverändert; nur
 die Oberfläche liest das Ergebnis).
 
@@ -1468,9 +1487,10 @@ die Oberfläche liest das Ergebnis).
 | `ux-umbau` | `978c8da` | Prototyp-Tag vorbereitet: Leitfaden, Bilder der Testlagen, technische Abnahme |
 | `main` | `b7c8532`, `6e0e2ce`, `4da68f1` | Vertragsende: Betriebsstätte aus der Auswahl des Formulars; Versandergebnis beachten, keine neue Anfrage nach der Antwort |
 | `ux-umbau` | `2325435` | Merge von `main` (Nebenaufgaben Vertragsende) |
+| `ux-umbau` | `5dd1f16` | Versandergebnis angeschlossen (Lage „nicht zugestellt“, Dialog, Meldungen), Leitfaden und technische Abnahme ohne Mailserver |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
-Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“ (`fc33b53`) und danach der Commit „Prototyp-Tag vorbereitet“. Am 08.10.2026 gepusht (Auftrag „so machen wie im Plan“): der Merge `2325435` und der Commit „Versandergebnis angeschlossen“. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
+Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“ (`fc33b53`) und danach der Commit „Prototyp-Tag vorbereitet“. Am 08.10.2026 gepusht (Auftrag „so machen wie im Plan“): der Merge `2325435` und der Commit „Versandergebnis angeschlossen“ (`5dd1f16`), danach die Befunde des Codereviews. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).

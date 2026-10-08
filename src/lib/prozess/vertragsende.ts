@@ -31,10 +31,12 @@
  *      ueberhaupt antworten KANN: Ging nie eine Anfrage hinaus oder ist ihr Link
  *      abgelaufen, ist HR dran und der Schritt „Anfrage" wieder aktiv — der
  *      Erinnerungslauf ueberspringt solche Vorgaenge, sie blieben sonst liegen.
- *      Drei Faelle, an Adresse und Versandzeitpunkt unterschieden:
- *        - ohne Adresse (Status per Hand-PATCH gesetzt, Altbestand): „Anfrage
- *          senden" wie bei ANGELEGT;
- *        - MIT Adresse, aber ohne Versandzeitpunkt: „nicht zugestellt". So
+ *      Drei Faelle, an Adresse, Link und Versandzeitpunkt unterschieden:
+ *        - ohne Adresse, oder mit Adresse, aber ohne je erzeugten Link (Status
+ *          und Adresse per Hand-PATCH gesetzt, Altbestand): „Anfrage senden"
+ *          wie bei ANGELEGT — ein Versand wurde nie versucht;
+ *        - MIT Adresse und erzeugtem Link (Ablaufdatum), aber ohne
+ *          Versandzeitpunkt: „nicht zugestellt". So
  *          hinterlaesst `/supervisor-link` einen Vorgang, dessen Mail nicht
  *          hinausging (seit 10/2026: neuer Link gespeichert, ein frueherer
  *          damit tot, `supervisorLinkSentAt` zurueck auf null), und so liest es
@@ -215,8 +217,9 @@ interface Lage {
   /** Eine Anfrage ging hinaus, ihr Link gilt aber nicht mehr: Sie ist neu zu stellen. */
   linkAbgelaufen: boolean;
   /**
-   * Die Anfrage ist gestellt (Anfrage-Status mit Adresse), ihre Mail ging aber
-   * nicht hinaus (kein Versandzeitpunkt): Sie ist erneut zu senden (Regel 5).
+   * Die Anfrage ist gestellt (Anfrage-Status mit Adresse und erzeugtem Link),
+   * ihre Mail ging aber nicht hinaus (kein Versandzeitpunkt): Sie ist erneut
+   * zu senden (Regel 5). Immer mit Adresse.
    */
   nichtZugestellt: boolean;
 }
@@ -275,9 +278,14 @@ function lageVon(stand: VertragsendeStand, jetzt: Date): Lage {
       // Faelle, sagen Adresse und Versandzeitpunkt (Regel 5):
       // ohne Adresse (Status per Hand-PATCH gesetzt, Altbestand) wie ANGELEGT …
       if (!stand.supervisorEmail) return lage("anfrage");
-      // … mit Adresse, aber ohne Versandzeitpunkt: Die Mail ging nicht hinaus
-      // (`/supervisor-link` setzt den Zeitpunkt dann zurueck) …
-      if (!stand.supervisorLinkSentAt) return lage("anfrage", { nichtZugestellt: true });
+      if (!stand.supervisorLinkSentAt) {
+        // … mit Adresse, aber ohne Versandzeitpunkt: Nur mit erzeugtem Link
+        // (Ablaufdatum) ging ein Versand schief — `/supervisor-link` setzt
+        // dann nur den Zeitpunkt zurueck, Link und Ablaufdatum bleiben. Ohne
+        // Link (Adresse und Status per Hand-PATCH) wurde nie etwas versucht:
+        // wie ANGELEGT, sonst behauptete die Seite einen gescheiterten Versand.
+        return stand.supervisorTokenExpiresAt ? lage("anfrage", { nichtZugestellt: true }) : lage("anfrage");
+      }
       // … zugestellt, aber der Link gilt nicht mehr.
       return linkUngueltig(stand, jetzt) ? lage("anfrage", { linkAbgelaufen: true }) : lage("rueckmeldung");
     }
@@ -449,12 +457,12 @@ function jetztDranBauen(stand: VertragsendeStand, lage: Lage, jetzt: Date): Jetz
       if (lage.nichtZugestellt) {
         // „anfrage-senden", nicht „anfrage-neu-senden": Einen Link, der gueltig
         // wuerde, hat die Fuehrungskraft nicht — der Dialog fragt nichts zurueck,
-        // die Adresse steht schon im Feld.
-        const an = stand.supervisorEmail ? ` an ${stand.supervisorEmail}` : "";
+        // die Adresse steht schon im Feld. Eine Adresse gibt es hier immer:
+        // `lageVon` setzt `nichtZugestellt` nur mit ihr.
         return {
           satz: "Anfrage wurde nicht zugestellt – erneut senden",
           bei: "HR",
-          unterzeile: `Die E-Mail${an} ging nicht hinaus; die Führungskraft hat keinen gültigen Link.`,
+          unterzeile: `Die E-Mail an ${stand.supervisorEmail} ging nicht hinaus; die Führungskraft hat keinen gültigen Link.`,
           aktion: "anfrage-senden",
           ...frist,
         };

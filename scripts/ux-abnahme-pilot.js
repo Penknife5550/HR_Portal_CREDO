@@ -1310,9 +1310,13 @@ async function bis(bedingung, beschreibung, ms = 20000) {
       sollStatus: "ANFRAGE_VORGESETZTER",
       sollFeld: (d) => d.supervisorReminderCount === 0 && d.gesendet,
       ausfuehren: async () => {
+        // Stehende Fehlermeldungen vorher schliessen (sie bleiben, bis man sie
+        // schliesst) und nur eine Meldung mit dem Anfang der Route annehmen —
+        // sonst laese das Skript womoeglich eine aeltere.
+        await fehlerMeldungenSchliessen(sb);
         const ab = sb.verlauf.length;
         await (await knopf(sb, "Erinnerung senden", "[data-jetzt-dran]")).click();
-        const m = await meldungMitTon(sb, /Erinnerung/);
+        const m = await meldungMitTon(sb, new RegExp(`^${ERINNERUNG_OHNE_SMTP.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
         pruefe(
           "T01 Erinnerung: Fehlermeldung mit dem Text der Route, keine Erfolgsmeldung",
           { ton: m?.ton ?? null, beginn: m ? m.text.slice(0, ERINNERUNG_OHNE_SMTP.length) : null, erfolg: await erfolgsMeldungen(sb) },
@@ -1461,6 +1465,8 @@ async function bis(bedingung, beschreibung, ms = 20000) {
     sb.fenster.length = 0;
     // Die alte Ansicht hat kein `main`; ihr Inhalt steht im Ziel des Sprunglinks.
     const altKnopf = (text) => knopf(sb, text, "#inhalt");
+    // Wie in C: Konsolen- und Netzfehler nur dieses Strangs.
+    sb.konsole.length = 0;
     sb.netzFehler.length = 0;
     sb.verlauf.length = 0;
     const a01 = t.T01;
@@ -1592,7 +1598,11 @@ async function bis(bedingung, beschreibung, ms = 20000) {
       ausfuehren: async () => (await altKnopf("Offboarding anlegen →")).click().then(() => "zu"),
     });
     pruefe("alt: drei Rückfragen per window.confirm (Vertrag, Abschluss, Offboarding; „erneut senden“ fragt nicht)", sb.fenster, ["confirm", "confirm", "confirm"]);
-    pruefe("alt: Netzfehler nur die drei 502 ohne Mailserver", sb.netzFehler, NETZ_OHNE_SMTP);
+    pruefe(
+      "alt: keine Konsolenfehler, Netzfehler nur die drei 502 ohne Mailserver",
+      { konsole: sb.konsole, netz: sb.netzFehler },
+      { konsole: [], netz: NETZ_OHNE_SMTP },
+    );
     const bilanzAlt = await mailBilanz([a01.id, a06.id, ...eigeneOffboardings]);
     pruefe("alt: keine Mail hinausgegangen (kein SENT; FAILED nur „SMTP ist nicht konfiguriert …“)", { gesendet: bilanzAlt.gesendet, andererFehler: bilanzAlt.andererFehler }, { gesendet: 0, andererFehler: 0 });
     pruefe("alt: T01 Versandprotokoll — je Versuch eine Zeile FAILED „SMTP ist nicht konfiguriert …“", await mailZeilen(a01.id), ERWARTET_MAILS_T01);
