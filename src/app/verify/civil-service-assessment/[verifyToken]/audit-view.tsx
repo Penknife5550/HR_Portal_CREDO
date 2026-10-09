@@ -10,6 +10,7 @@
 import { BeurteilungStatusStepper } from "@/components/beurteilung-status-stepper";
 import { CredoLinie } from "@/components/credo-linie";
 import { deriveBeurteilungStatus } from "@/lib/beurteilung-status";
+import { formatDatumDE, formatZeitpunktDE } from "@/lib/format";
 import {
   BRL_SCALE_LABELS,
   SCHULNOTEN_SCALE_LABELS,
@@ -46,32 +47,16 @@ interface Snapshot {
   categories: SnapshotCategory[];
 }
 
+// Deutsche Zeit, nicht die des Servers: Die Seite rendert im Container (UTC).
+// Ohne Zeitzone stuende jede Uhrzeit 1–2 Stunden zu frueh, und ein Zeitpunkt
+// kurz nach Mitternacht fiele auf einen anderen Tag als im Beurteilungs-PDF,
+// dessen QR-Code hierher fuehrt (pdf-export.ts rechnet ebenfalls in Berlin).
 function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+  return formatZeitpunktDE(iso) || "—";
 }
 
 function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
+  return formatDatumDE(iso) || "—";
 }
 
 export function AuditView({ data }: { data: VerifyAssessmentData }) {

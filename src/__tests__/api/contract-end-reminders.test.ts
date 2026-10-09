@@ -122,6 +122,19 @@ describe("POST /api/cron/contract-end-reminders", () => {
     );
   });
 
+  it("nennt das Vertragsende als TT.MM.JJJJ in deutscher Zeit", async () => {
+    // Die Tagesdaten liegen als UTC-Mitternacht in der Datenbank. Frueher
+    // toLocaleDateString("de-DE") ohne Optionen und ohne Zeitzone: "9.10.2026".
+    mockPrisma.contractEndProcess.findMany.mockResolvedValue([
+      vorgang({ contractEndDate: new Date("2026-10-09T00:00:00.000Z") }),
+    ]);
+    await POST(req());
+    expect(mockTriggerWebhooks).toHaveBeenCalledWith(
+      "contract-end-supervisor-reminder",
+      expect.objectContaining({ vertragsende: "09.10.2026" }),
+    );
+  });
+
   it("ueberspringt, wenn die letzte Erinnerung juenger als das Intervall ist", async () => {
     mockPrisma.contractEndProcess.findMany.mockResolvedValue([
       vorgang({ lastSupervisorReminderAt: new Date(Date.now() - 1 * MS_PER_DAY) }),

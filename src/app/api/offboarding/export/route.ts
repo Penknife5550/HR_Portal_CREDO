@@ -9,6 +9,8 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { csvZelle } from "@/lib/csv";
 import { getSession } from "@/lib/auth";
+import { formatDatumDE } from "@/lib/format";
+import { heuteInBerlin } from "@/lib/kalendertag";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"];
 
@@ -44,13 +46,9 @@ const STATUS_LABELS: Record<string, string> = {
  */
 const escapeCsvField = csvZelle;
 
+/** Kalendertag in deutscher Zeit (der Container laeuft in UTC); leer → "". */
 function formatDate(date: Date | null | undefined): string {
-  if (!date) return "";
-  return date.toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatDatumDE(date);
 }
 
 export async function GET(request: NextRequest) {
@@ -164,7 +162,7 @@ export async function GET(request: NextRequest) {
     return new Response(csvContent, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="offboarding-export-${new Date().toISOString().split("T")[0]}.csv"`,
+        "Content-Disposition": `attachment; filename="offboarding-export-${heuteInBerlin()}.csv"`,
       },
     });
   } catch (error) {

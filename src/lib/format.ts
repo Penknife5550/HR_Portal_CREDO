@@ -84,6 +84,33 @@ export function formatDatumDE(wert: Date | string | null | undefined): string {
 }
 
 /**
+ * Zeitpunkt als „TT.MM.JJJJ, HH:MM“ in deutscher Zeit (der Container und
+ * manche Browser laufen in UTC). Leeres oder Unlesbares ergibt "".
+ *
+ * `{ sekunden: true }` haengt die Sekunden an („TT.MM.JJJJ, HH:MM:SS“) — fuer
+ * Zeitpunkte, die etwas belegen: die Erklaerung im Personalfragebogen-PDF
+ * (Unterschriftsersatz) und das Protokoll im BEM-Gesamtexport. Ein „Uhr“
+ * haengt der Aufrufer selbst an, wo er es braucht.
+ */
+export function formatZeitpunktDE(
+  wert: Date | string | null | undefined,
+  optionen: { sekunden?: boolean } = {},
+): string {
+  if (wert == null || wert === "") return "";
+  const zeitpunkt = typeof wert === "string" ? new Date(wert) : wert;
+  if (Number.isNaN(zeitpunkt.getTime())) return "";
+  return zeitpunkt.toLocaleString("de-DE", {
+    timeZone: "Europe/Berlin",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(optionen.sekunden ? { second: "2-digit" } : {}),
+  });
+}
+
+/**
  * Dateigroesse als B / KB / MB — deutsch lokalisiert.
  *
  * Diese Funktion ist die gemeinsame Heimat fuer acht ueber die Oberflaeche
@@ -117,24 +144,6 @@ export function formatDatumDE(wert: Date | string | null | undefined): string {
  * Gedankenstrich — das war ihr einziger Verhaltensunterschied und wird hier
  * bewusst aufgegeben.
  */
-/**
- * Zeitpunkt als „TT.MM.JJJJ, HH:MM“ in deutscher Zeit (der Container und
- * manche Browser laufen in UTC). Leeres oder Unlesbares ergibt "".
- */
-export function formatZeitpunktDE(wert: Date | string | null | undefined): string {
-  if (wert == null || wert === "") return "";
-  const zeitpunkt = typeof wert === "string" ? new Date(wert) : wert;
-  if (Number.isNaN(zeitpunkt.getTime())) return "";
-  return zeitpunkt.toLocaleString("de-DE", {
-    timeZone: "Europe/Berlin",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export function formatBytes(bytes: number | null | undefined): string {
   if (bytes === null || bytes === undefined) return "—";
   if (bytes < 1024) return `${bytes} B`;

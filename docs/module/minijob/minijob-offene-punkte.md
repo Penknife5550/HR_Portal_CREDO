@@ -122,6 +122,8 @@ Der in CLAUDE.md unter den normalen Server-Befehlen aufgeführte Seed-Befehl (no
 
 <sub>prisma/seed.ts:238-252; CLAUDE.md, Abschnitt 'Docker-Befehle auf dem Server'</sub>
 
+> **Hinweis (10/2026): erledigt.** Der Seed legt nur noch an, was fehlt, und ändert oder löscht nichts Bestehendes (Wächter `src/__tests__/lib/seed-schutz.test.ts`); CLAUDE.md führt den Befehl nicht mehr unter den Server-Befehlen.
+
 ### Wieder geöffnete Altvorgänge bekommen den neuen Fragebogen nicht
 
 *Technische Schuld*

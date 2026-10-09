@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { heuteInBerlin } from "@/lib/kalendertag";
 import {
   generateOnboardingPDF,
   type OnboardingExportContext,
@@ -289,7 +290,9 @@ export async function GET(
 
     const pdfBuffer = await generateOnboardingPDF(ctx, type as OnboardingExportType);
 
-    const dateStr = new Date().toISOString().slice(0, 10);
+    // Berliner Tag wie „Exportiert“ im PDF — toISOString() waere UTC, zwischen
+    // 0 und 2 Uhr deutscher Zeit hiesse die Datei sonst nach dem Vortag.
+    const dateStr = heuteInBerlin();
     const name = process.lastName || process.email.split("@")[0];
     const typeName = type === "gesamtakte" ? "Gesamtakte"
       : type === "fragebogen" ? "Fragebogen"

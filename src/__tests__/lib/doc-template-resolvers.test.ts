@@ -621,3 +621,64 @@ describe("Vertragsverlaengerung: Betriebsstaette", () => {
     expect(mockFindOrg).not.toHaveBeenCalledWith(NAMENSABFRAGE);
   });
 });
+
+describe("Datum in deutscher Zeit (der Container laeuft in UTC)", () => {
+  // Der Testlauf rechnet wie der Container in UTC (jest.config.ts, geprueft in
+  // format.test.ts). Die alte Fassung (toLocaleDateString und getFullYear
+  // ohne Zeitzone) lieferte hier den Vortag bzw. das alte Jahr.
+  /** Stellt nur die Uhr; Mikrotasks der gemockten Abfragen laufen weiter. */
+  const uhrStellen = (iso: string) =>
+    jest.useFakeTimers({
+      now: new Date(iso),
+      doNotFake: ["nextTick", "setImmediate", "queueMicrotask"],
+    });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCanAccessProcess.mockResolvedValue(true);
+    mockFindOrg.mockResolvedValue(null);
+    mockFindUser.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("{datum}: ein Brief kurz nach Mitternacht traegt den neuen Tag, nicht den Vortag", async () => {
+    // 22:30 UTC ist in der Sommerzeit 00:30 Uhr am 09.10.
+    uhrStellen("2026-10-08T22:30:00.000Z");
+
+    const { data } = await getResolver("ALLGEMEIN")({ session });
+
+    expect(data.datum).toBe("09.10.2026");
+    expect(data.jahr).toBe("2026");
+  });
+
+  it("{jahr} folgt demselben Kalendertag — in der ersten Stunde des Jahres das neue", async () => {
+    // Winterzeit: 23:30 UTC am 31.12. ist 00:30 Uhr am 01.01.
+    uhrStellen("2026-12-31T23:30:00.000Z");
+
+    const { data } = await getResolver("ALLGEMEIN")({ session });
+
+    expect(data.datum).toBe("01.01.2027");
+    expect(data.jahr).toBe("2027");
+  });
+
+  it("Datumsfelder eines Vorgangs nehmen den Berliner Kalendertag", async () => {
+    // Ein Zeitpunkt kurz nach Mitternacht deutscher Zeit (hier 00:30 Uhr am
+    // 01.09.) fiel mit der Serverzeit auf den 31.08.
+    mockFindOnboarding.mockResolvedValue({
+      displayId: "2026-GYM-002",
+      email: "max@example.org",
+      firstName: "Max",
+      lastName: "Mustermann",
+      organizationId: "org1",
+      personalData: { firstName: "Max", lastName: "Mustermann" },
+      supervisorData: { vertragsbeginn: new Date("2026-08-31T22:30:00.000Z") },
+    });
+
+    const { data } = await getResolver("ONBOARDING")(ctx({ placeholders: ["eintrittsdatum"] }));
+
+    expect(data.eintrittsdatum).toBe("01.09.2026");
+  });
+});

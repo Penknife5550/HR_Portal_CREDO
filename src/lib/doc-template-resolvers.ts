@@ -29,6 +29,7 @@ import {
   ZEUGNIS_JOB_GROUP_LABELS,
   CIVIL_SERVICE_STATUS_LABELS,
 } from "@/lib/constants";
+import { formatDatumDE } from "@/lib/format";
 
 export interface ResolverContext {
   organizationId?: string | null;
@@ -74,12 +75,13 @@ export {
   getPlaceholderCatalog,
 } from "@/lib/placeholder-catalog";
 
+/**
+ * Heutiges Datum als TT.MM.JJJJ in deutscher Zeit. Der Container laeuft in
+ * UTC — mit der Serverzeit trug ein Brief zwischen 0 und 2 Uhr das Datum von
+ * gestern.
+ */
 function todayDe(): string {
-  return new Date().toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatDatumDE(new Date());
 }
 
 /**
@@ -95,10 +97,13 @@ export async function commonPlaceholders(
   organizationId?: string | null,
   userId?: string | null,
 ): Promise<Record<string, unknown>> {
-  const now = new Date();
+  const datum = todayDe();
   const base: Record<string, unknown> = {
-    datum: todayDe(),
-    jahr: String(now.getFullYear()),
+    datum,
+    // Das Jahr aus demselben Berliner Kalendertag: getFullYear() rechnet im
+    // Container in UTC, in der ersten Stunde des Jahres stuende sonst das
+    // alte Jahr neben dem neuen Datum.
+    jahr: datum.slice(-4),
   };
 
   let org: {
@@ -173,18 +178,15 @@ const allgemeinResolver: PlaceholderResolver = async (ctx) => {
 
 function deDateOnb(d: Date | null | undefined): string | undefined {
   if (!d) return undefined;
-  const datum = new Date(d);
-  // Ein Invalid-Date-Objekt ist truthy — ohne diese Pruefung liefert
-  // toLocaleDateString woertlich "Invalid Date", und genau das stuende dann im
-  // erzeugten Schreiben. Die Aufrufer geben teils Werte aus untypisierten
-  // Json-Feldern herein (dokubitDaten, prerequisites aus dem oeffentlichen
-  // Antragsformular), die kein gueltiges Datum sein muessen.
-  if (Number.isNaN(datum.getTime())) return undefined;
-  return datum.toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  // Ein Invalid-Date-Objekt ist truthy — formatDatumDE liefert dafuer "",
+  // hier undefined, damit nie "Invalid Date" im erzeugten Schreiben steht. Die
+  // Aufrufer geben teils Werte aus untypisierten Json-Feldern herein
+  // (dokubitDaten, prerequisites aus dem oeffentlichen Antragsformular), die
+  // kein gueltiges Datum sein muessen; `new Date(d)` faengt auch einen
+  // Zeichenketten- oder Zahlenwert ab, der trotz des Typs hier ankommt.
+  // Kalendertag in deutscher Zeit: Zeitstempel wie submittedAt fielen mit der
+  // Serverzeit (UTC) kurz nach Mitternacht auf den Vortag.
+  return formatDatumDE(new Date(d)) || undefined;
 }
 
 /**

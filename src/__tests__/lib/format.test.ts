@@ -10,7 +10,7 @@
  * irgendetwas fehlschlaegt.
  */
 
-import { formatBytes, formatDatumDE, formatEmployeeName } from "@/lib/format";
+import { formatBytes, formatDatumDE, formatEmployeeName, formatZeitpunktDE } from "@/lib/format";
 
 describe("formatBytes", () => {
   describe("fehlende Angabe gegen leere Datei", () => {
@@ -149,5 +149,55 @@ describe("formatDatumDE", () => {
     expect(formatDatumDE("   ")).toBe("");
     expect(formatDatumDE("demnaechst")).toBe("");
     expect(formatDatumDE(new Date("kaputt"))).toBe("");
+  });
+});
+
+describe("Testumgebung rechnet in UTC wie der Container", () => {
+  // jest.config.ts setzt TZ=UTC. Ohne das rechnete der Testlauf auf dem
+  // Entwicklerrechner in Europe/Berlin, und alle Faelle „kurz nach
+  // Mitternacht deutscher Zeit“ hier und in doc-template-resolvers.test.ts
+  // bestuenden auch mit Code, der die Serverzeit nimmt. Faellt dieser Test,
+  // pruefen die anderen nichts mehr.
+  it("Ortszeit des Testprozesses ist UTC", () => {
+    expect(new Date("2026-07-01T12:00:00.000Z").getTimezoneOffset()).toBe(0);
+    expect(new Date("2026-10-08T22:30:00.000Z").toLocaleDateString("de-DE")).toBe("8.10.2026");
+  });
+});
+
+describe("formatZeitpunktDE", () => {
+  // Die Faelle liegen bewusst kurz nach Mitternacht deutscher Zeit: Dort
+  // liefert die Serverzeit (der Container laeuft in UTC) noch den Vortag und
+  // eine bis zwei Stunden zu wenig. Der Testlauf rechnet selbst in UTC (siehe
+  // oben) — ein formatZeitpunktDE ohne timeZone fiele hier also auf.
+
+  it("formatiert ohne Sekunden als TT.MM.JJJJ, HH:MM in deutscher Zeit", () => {
+    expect(formatZeitpunktDE("2026-10-08T22:30:05.000Z")).toBe("09.10.2026, 00:30");
+  });
+
+  it("haengt mit { sekunden: true } die Sekunden an — Sommerzeit", () => {
+    // 22:30:05 UTC ist in der Sommerzeit 00:30:05 des Folgetags.
+    expect(formatZeitpunktDE("2026-10-08T22:30:05.000Z", { sekunden: true })).toBe(
+      "09.10.2026, 00:30:05",
+    );
+    expect(formatZeitpunktDE(new Date("2026-10-08T22:30:05.000Z"), { sekunden: true })).toBe(
+      "09.10.2026, 00:30:05",
+    );
+  });
+
+  it("haengt mit { sekunden: true } die Sekunden an — Winterzeit", () => {
+    // Eine Stunde Versatz; hier wechselt sogar das Jahr.
+    expect(formatZeitpunktDE("2026-12-31T23:05:09.000Z", { sekunden: true })).toBe(
+      "01.01.2027, 00:05:09",
+    );
+    expect(formatZeitpunktDE("2026-01-15T07:00:00.000Z", { sekunden: true })).toBe(
+      "15.01.2026, 08:00:00",
+    );
+  });
+
+  it("liefert fuer Leeres und Unlesbares einen leeren Text — mit und ohne Sekunden", () => {
+    for (const wert of [null, undefined, "", "kaputt", new Date("kaputt")]) {
+      expect(formatZeitpunktDE(wert)).toBe("");
+      expect(formatZeitpunktDE(wert, { sekunden: true })).toBe("");
+    }
   });
 });

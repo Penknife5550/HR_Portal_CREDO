@@ -183,7 +183,7 @@ const MUSTER: Muster[] = [
     schluessel: "datum",
     name: "toLocaleDateString / toLocaleTimeString",
     zaehle: perRegex(/\.toLocale(?:Date|Time)String\(/g),
-    gesamt: 72,
+    gesamt: 51,
     stattdessen: "formatDatumDE aus lib/format (deutsche Zeit, TT.MM.JJJJ)",
   },
   {

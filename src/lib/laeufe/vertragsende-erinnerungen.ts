@@ -39,6 +39,7 @@ import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { getBaseUrl } from "@/lib/url";
 import { escapeHtml } from "@/lib/email-layout";
+import { formatDatumDE } from "@/lib/format";
 import { sendSupervisorReminder } from "@/lib/contract-end-reminder";
 import {
   getContractEndCategory,
@@ -146,7 +147,7 @@ export async function vertragsendeErinnerungenLauf(opts: LaufOptionen = {}): Pro
             supervisorEmail: ce.supervisorEmail,
             einrichtung: ce.organization.name,
             organization: ce.organization.name,
-            vertragsende: new Date(ce.contractEndDate).toLocaleDateString("de-DE"),
+            vertragsende: formatDatumDE(ce.contractEndDate),
             contractEndDate: new Date(ce.contractEndDate).toISOString(),
             anzahl_erinnerungen: anzahlErinnerungen,
             tage_offen: tageOffen,
@@ -224,7 +225,7 @@ export async function vertragsendeErinnerungenLauf(opts: LaufOptionen = {}): Pro
 
           if (kritische.length > 0) {
             const zeile = ({ ce, kategorie }: (typeof kritische)[number]) =>
-              `${ce.displayId} · ${ce.employeeFirstName} ${ce.employeeLastName} · ${ce.organization.name} · Vertragsende ${new Date(ce.contractEndDate).toLocaleDateString("de-DE")} (${CONTRACT_END_CATEGORY_META[kategorie].label})`;
+              `${ce.displayId} · ${ce.employeeFirstName} ${ce.employeeLastName} · ${ce.organization.name} · Vertragsende ${formatDatumDE(ce.contractEndDate)} (${CONTRACT_END_CATEGORY_META[kategorie].label})`;
             await triggerWebhooks("contract-end-unbearbeitet", {
               anzahl: kritische.length,
               liste_text: kritische.map(zeile).join("\n"),

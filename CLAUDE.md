@@ -27,7 +27,7 @@ npm run lint         # ESLint
 npm run test         # Jest-Tests
 npm run pruefen      # Typen + Lint + Tests — vor JEDEM Push (es gibt weder CI noch Git-Hooks)
 npm run db:push      # Schema synchronisieren (kein Migrations-Ordner)
-npm run db:seed      # Seed (tsx prisma/seed.ts)
+npm run db:seed      # Seed (tsx prisma/seed.ts) — legt nur an, was fehlt, aendert nie Bestehendes
 npm run db:studio    # Prisma Studio
 npm run db:generate  # Prisma Client generieren
 ```
@@ -65,14 +65,11 @@ sudo docker compose logs -f app
 # DB-Schema synchronisieren
 sudo docker exec hr-portal-app npx prisma db push --skip-generate
 
-# Seed ausfuehren (kompiliertes JS im Container!)
-sudo docker exec hr-portal-app node prisma/seed.js
-
 # Health-Check
 sudo docker exec hr-portal-app curl -s http://localhost:3000/api/health
 ```
 
-**Wichtig:** Im Docker-Container ist `tsx` NICHT verfuegbar. Das Seed-Script wird beim Build zu JS kompiliert (`prisma/seed.js`). Immer `node prisma/seed.js` statt `npx prisma db seed` verwenden.
+**Seed: auf dem Server nicht noetig — und nie von Hand ausfuehren.** Der Entrypoint ruft `prisma/seed-check.js`, und der startet den Seed (`prisma/seed.js`, beim Build mit esbuild aus `prisma/seed.ts` gebuendelt — im Container gibt es kein `tsx`) von selbst, solange die Datenbank noch keinen Benutzer hat. Der Seed legt **nur an, was fehlt**, und aendert oder loescht nie Bestehendes (seit 10/2026, Waechter `src/__tests__/lib/seed-schutz.test.ts`). Folgenlos ist ein Handaufruf auf einer gefuellten Datenbank trotzdem nicht: Er bringt keine neuen Vorlagenstaende, legt aber wieder an, was unter seinem Schluessel fehlt — auch was HR bewusst geloescht oder umbenannt hat (eine geloeschte Offboarding-Checkliste gaebe das Offboarding danach wieder jedem neuen Austritt mit, eine umbenannte globale Beurteilungsvorlage stuende unter altem Namen ein zweites Mal da). Zwei Faelle schliesst der Seed selbst aus: Ein Konto legt er nur in einer Datenbank ohne Benutzer an (sonst kaeme nach geaenderter Admin-Adresse ein zweites SUPER_ADMIN-Konto), eine Standard-Beurteilungsvorlage nur, solange es keine globale Standardvorlage gibt. Mandantennamen und Vorlagen pflegt HR in der Oberflaeche; Aenderungen am Bestand gehoeren als einmalige Datenmigration nach `prisma/seed-check.js` (Abschnitt „Einmalige Datenmigrationen“). Frueher ueberschrieb jeder Seed-Lauf gepflegte Mandantennamen, Fragebogen- und Checklisten-Vorlagen und loeschte Exit-Interview-, Zeugnis- und Beurteilungsvorlagen samt Formulierungen — aeltere Anleitungen, die `node prisma/seed.js` auf dem Server nennen, sind ueberholt.
 
 ### Entrypoint (`entrypoint.sh`)
 
@@ -81,7 +78,7 @@ Beim Container-Start passiert automatisch:
 2. **Schema-Vergleich** (`prisma migrate diff --exit-code`) — nur wenn es einen Unterschied gibt, geht es weiter mit 3.
 3. **Sicherung** (`pg_dump` nach `/backups/vor-schema-abgleich-<Zeitstempel>.sql`) — schlaegt sie fehl, **bricht der Start ab**
 4. `prisma db push --skip-generate --accept-data-loss` (Schema synchronisieren)
-5. Seed-Check (`prisma/seed-check.js`) — System-Vorlagen sicherstellen, **einmalige Datenmigrationen** ausfuehren, Admin-User anlegen falls noch keiner existiert
+5. Seed-Check (`prisma/seed-check.js`) — System-Vorlagen sicherstellen, **einmalige Datenmigrationen** ausfuehren, den Seed (`prisma/seed.js`: Mandanten, Admin-User, Standardvorlagen) ausfuehren, falls noch kein Benutzer existiert
 6. Next.js Server starten (`node server.js`)
 
 **Warum die Sicherung den Start blockieren darf.** `db push` laeuft mit
@@ -176,6 +173,7 @@ src/
 - **Links:** Innerhalb der App immer `<Link>` von `next/link` statt `<a>` verwenden
 - **Prisma:** Kein Migrations-Ordner — Schema wird mit `prisma db push` synchronisiert
 - **Vorgangsnummern** (`{Praefix}-{Jahr}-{Kuerzel}-{Nr}`): Jahr und Zaehlbereich IMMER aus `vorgangsjahrInBerlin` (`src/lib/vorgangsjahr.ts`), nie `new Date().getFullYear()`/`new Date(jahr, 0, 1)` — der Container laeuft in UTC, in der ersten Stunde des Jahres bekaeme ein Vorgang sonst die Jahreszahl des alten. Gilt fuer Onboarding, Offboarding, Verbeamtung, Vertragsende, BEM, Mutterschutz und Elternzeit.
+- **Datum und Uhrzeit im Server-Code nur in deutscher Zeit** (`formatDatumDE`, `formatZeitpunktDE` — mit `{ sekunden: true }` fuer Belege — aus `src/lib/format.ts`; Kalendertage aus `src/lib/kalendertag.ts`). Der Container laeuft in UTC: `toLocale…String` ohne `timeZone` schrieb Uhrzeiten 1–2 Stunden zu frueh und datierte Briefe zwischen 0 und 2 Uhr auf gestern. Der Waechter `src/__tests__/lib/zeitzone-waechter.test.ts` verlangt in `src/lib`, `src/app/api` und `src/app/verify` bei jedem `toLocale…String`-Aufruf ein `timeZone` (Zahlen stehen dort in `ZAHLEN`). **Jest rechnet in UTC** (`process.env.TZ` in `jest.config.ts`), wie der Container — sonst bestuenden Zeitzonen-Tests auf dem Entwicklerrechner auch mit falschem Code.
 - **Sperrklinke gegen Altmuster der Oberflaeche** (`src/__tests__/lib/ui-sperrklinke.test.ts`, Stand in `ui-sperrklinke.stand.json`): `confirm(`, `alert(`, `prompt(`, `toLocaleDateString`/`toLocaleTimeString`, fest eingetragene Farben (Hex oder Farbfunktion in einer Klasse, Hex im `style`-Objekt, Tailwind-Palettenklassen wie `bg-green-100`), `fixed inset-0` und Inline-`<svg` duerfen JE DATEI nur weniger werden (gezaehlt ohne Kommentare). Mehr als im Stand: den Ersatz nehmen (`unterlagen/dialog-rahmen.tsx` bzw. die Bausteine des UX-Umbaus, `formatDatumDE`, Farb-Token, `lucide-react`), nicht den Stand anheben. Weniger: `SPERRKLINKE_STAND=schreiben npx jest ui-sperrklinke` und die Summe `gesamt` im Test nachziehen.
 - **API-Handler:** Zentrale Wrapper in `src/lib/api-handler.ts` (mit Auth + Error-Handling)
 - **Validierung:** Zod-Schemas in `src/lib/validations/`

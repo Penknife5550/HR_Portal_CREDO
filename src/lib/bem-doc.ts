@@ -12,14 +12,11 @@
 
 import { prisma } from "@/lib/db";
 import { commonPlaceholders } from "@/lib/doc-template-resolvers";
+import { formatDatumDE } from "@/lib/format";
 
+/** Kalendertag in deutscher Zeit (der Container laeuft in UTC); leer → undefined. */
 function deDate(d: Date | null): string | undefined {
-  if (!d) return undefined;
-  return d.toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatDatumDE(d) || undefined;
 }
 
 export interface BemResolveResult {

@@ -10,6 +10,7 @@
 
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
+import { formatDatumDE } from "@/lib/format";
 
 // CREDO Corporate Design (KEINE Farbverlaeufe)
 const COLORS = {
@@ -59,13 +60,10 @@ export interface ElternzeitPdfContext {
   genehmigungVon: string;
 }
 
+/** Kalendertag in deutscher Zeit (der Container laeuft in UTC); leer/unlesbar → „—“. */
 function formatDate(d: Date | null): string {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatDatumDE(new Date(d)) || "—";
 }
 
 function buildQRContent(ctx: ElternzeitPdfContext): string {

@@ -16,6 +16,7 @@ import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 import { EXPORT_ROLES } from "@/lib/permissions";
 import { getBefristungsartLabel } from "@/lib/constants";
+import { formatDatumDE } from "@/lib/format";
 import {
   aufteilungText,
   kostenstellenAnzeige,
@@ -181,7 +182,9 @@ export async function GET(
         pd?.firstName || "",
         pd?.lastName || "",
         pd?.birthName || "",
-        pd?.birthDate ? new Date(pd.birthDate).toLocaleDateString("de-DE") : "",
+        // Daten als TT.MM.JJJJ in deutscher Zeit (formatDatumDE) — der
+        // Container laeuft in UTC; leer bleibt leer.
+        formatDatumDE(pd?.birthDate),
         pd?.birthPlace || "",
         pd?.birthCountry || "",
         pd?.nationality || "",
@@ -207,13 +210,9 @@ export async function GET(
         pd?.parentStatus ? "Ja" : "Nein",
         pd?.severelyDisabled ? "Ja" : "Nein",
         pd?.disabilityDegree?.toString() || "",
-        sd?.vertragsbeginn
-          ? new Date(sd.vertragsbeginn).toLocaleDateString("de-DE")
-          : "",
+        formatDatumDE(sd?.vertragsbeginn),
         sd?.befristet ? "Ja" : "Nein",
-        sd?.vertragsende
-          ? new Date(sd.vertragsende).toLocaleDateString("de-DE")
-          : "",
+        formatDatumDE(sd?.vertragsende),
         sd?.vollzeit ? "Ja" : "Nein",
         sd?.wochenstunden?.toString() || "",
         sd?.verguetungsmodell || "",
@@ -225,9 +224,7 @@ export async function GET(
         // Reihenfolge muss zu den fuenf angehaengten Kopfzeilen passen
         sd?.befristet ? getBefristungsartLabel(sd.befristungsart) || "" : "",
         einzeilig(sd?.befristungZweck || ""),
-        sd?.vertragsendeVoraussichtlich
-          ? new Date(sd.vertragsendeVoraussichtlich).toLocaleDateString("de-DE")
-          : "",
+        formatDatumDE(sd?.vertragsendeVoraussichtlich),
         aufteilungText(kostenstellen.zeilen),
         einzeilig(kostenstellen.bemerkung || ""),
       ];
