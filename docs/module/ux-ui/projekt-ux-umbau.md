@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 08.10.2026 abends (Übergabe vor einem Neustart: Versandergebnis angeschlossen, Codereview behoben, nächste Schritte in 0.2)
+Letzte Änderung: 09.10.2026 (Bestandsaufnahme; vier Fehler auf `main` behoben, Deploy-Anleitung für `main`, Merge `96cbf6a` – siehe 0.2 Punkt 3a und Protokoll)
 
 ## 0. Übergabe (Stand 08.10.2026, abends)
 
@@ -67,6 +67,12 @@ Frühere Schritte (Merge von `main` am 05.10., `tageZwischen` am 06.10., Nebenau
    Gehen sie verloren: nach 0.6 neu aufsetzen.
 3. **Offen – Antwort des Projektverantwortlichen steht aus.** Am 08.10.2026 vorgeschlagen
    (Reihenfolge: a, dann b; c bei Gelegenheit):
+   **Stand 09.10.2026:** a) ist entschieden („Fehler beheben, dann Anleitung“). Auf `main`
+   liegen vier Fehlerbehebungen (`7c09755`, `e25e071`, `75d8277`, `a2e2e64`) und die Anleitung
+   **`docs/historie/deploy-main-2026-10.md`** (`9089b69`); `ux-umbau` hat `main` gemergt
+   (`96cbf6a`). **Offen:** Freigabe zum Push von `main` und `ux-umbau`, danach führt der
+   Projektverantwortliche die Anleitung auf dem Server aus (Protokoll an Claude). Der Text
+   unten ist der Vorschlag vom 08.10.
    a) **Server-Update mit dem Stand von `main` (empfohlen, zuerst):** Schritt-für-Schritt-
       Anleitung schreiben, nach dem Muster von `docs/historie/deploy-paket4-stufe1.md` und
       `docs/historie/deploy-onboarding-pakete-2026-09.md`; ausführen tut der
@@ -1462,6 +1468,39 @@ Projektverantwortlichen alle behoben:
 **Mail- und Word-Vorlagen:** keine betroffen (die Routen und ihre Mails sind unverändert; nur
 die Oberfläche liest das Ergebnis).
 
+### 09.10.2026 – Bestandsaufnahme, Fehler auf `main`, Deploy-Anleitung, Merge von `main`
+
+Auftrag des Projektverantwortlichen: „Check, was offen ist und wo wir weitermachen müssen“.
+Bestandsaufnahme aller Stränge als Arbeitsablauf (sieben Prüfer gegen Code und Git, ein
+Vollständigkeits-Kritiker; 36 offene Punkte). Vier davon waren Fehler im laufenden Portal; auf
+die Empfehlung hin („Fehler beheben, dann Anleitung“) direkt auf `main` behoben – sie haben
+nichts mit dem Umbau zu tun (Arbeitskopie außerhalb des Projektordners, Branch
+`fix/live-fehler-2026-10`, per Fast-Forward nach `main`; je Fehler Erbauer, zwei Gegenprüfer,
+Nachbesserung):
+
+- `7c09755` **Seed:** legt nur noch an, was fehlt. Vorher überschrieb jeder Lauf von
+  `node prisma/seed.js` gepflegte Mandantennamen und Vorlagen und löschte Checklisten-Punkte,
+  Exit-Interview-, Zeugnis- und Beurteilungsvorlagen; CLAUDE.md nannte den Befehl als
+  Server-Befehl. Wächter `seed-schutz.test.ts`.
+- `e25e071` **Zeitzone:** Datum und Uhrzeit im Server-Code in deutscher Zeit
+  (`formatDatumDE`/`formatZeitpunktDE`, neu `{ sekunden: true }`). **Jest rechnet seitdem in
+  UTC** (`jest.config.ts`) – vor dem Merge geprüft: `ux-umbau` bestand auch mit `TZ=UTC` alle
+  5.370 Tests. Wächter `zeitzone-waechter.test.ts` (in `src/lib`, `src/app/api`, `src/app/verify`).
+- `75d8277` **Verbeamtung:** Reiter Dokumente ordnet nach `documentType` zu (las `d.type`).
+- `a2e2e64` **Elternzeit:** Upload der Person ersetzt nur ihre eigene Geburtsurkunde.
+- `9089b69` **Deploy-Anleitung** `docs/historie/deploy-main-2026-10.md` (f6d3daf → `main`,
+  Arbeitsablauf mit Schreiber und drei Gegenprüfern).
+
+Merge `96cbf6a` (`main` → `ux-umbau`): ohne Konflikt, auch der Stand der Sperrklinke passte.
+Danach Typen, Lint und **206 Suiten / 5.408 Tests** grün (ohne `.claude/`). An der neuen
+Vertragsende-Ansicht ändert sich nichts. Nicht gepusht – wartet auf die Freigabe.
+
+**Mail- und Word-Vorlagen:** Kein Vorlagentext geändert. Nur eingesetzte Datumswerte haben jetzt
+eine führende Null (`{{vertragsende}}` in `contract-end-supervisor-reminder` und
+`contract-end-eskalation`, Liste in `contract-end-unbearbeitet`; fest im Code: BEM-Einladung,
+SMTP-Testmail); Word-Platzhalter `{datum}`/`{jahr}` und alle Datumsplatzhalter rechnen den
+Berliner Kalendertag. Neue Vorlage nur `individuelle-mail` (Paket 3, Code-Default).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1508,6 +1547,10 @@ die Oberfläche liest das Ergebnis).
 | `ux-umbau` | `2325435` | Merge von `main` (Nebenaufgaben Vertragsende) |
 | `ux-umbau` | `5dd1f16` | Versandergebnis angeschlossen (Lage „nicht zugestellt“, Dialog, Meldungen), Leitfaden und technische Abnahme ohne Mailserver |
 | `ux-umbau` | `a56e4a1` | Befunde des Codereviews: „nicht zugestellt“ nur mit erzeugtem Link, Skript, Aufräumen |
+| `ux-umbau` | `d703ac0` | Übergabe vor Neustart (Stand 08.10. abends) |
+| `main` | `7c09755`, `e25e071`, `75d8277`, `a2e2e64` | Fehler im laufenden Portal: Seed nur anlegen; Zeitzone im Server-Code (Jest in UTC); Verbeamtung Dokumente; Elternzeit Geburtsurkunde |
+| `main` | `9089b69` | Deploy-Anleitung `docs/historie/deploy-main-2026-10.md` |
+| `ux-umbau` | `96cbf6a` | Merge von `main` (Fehlerbehebungen, Deploy-Anleitung) |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
