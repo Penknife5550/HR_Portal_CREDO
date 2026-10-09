@@ -5,7 +5,8 @@
  *        KEINE Authentifizierung — Token-basiert.
  *        Single-Use Token-Schutz greift erst beim Absenden des Antrags;
  *        hier darf der Mitarbeiter mehrfach hochladen (z.B. falsche Datei
- *        ersetzen). Doppelte Uploads ersetzen das vorhandene Dokument.
+ *        ersetzen). Ein erneuter Upload ersetzt nur die eigenen frueheren
+ *        Uploads ueber den Link — eine von HR hochgeladene Geburtsurkunde bleibt.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,6 +16,15 @@ import { prisma } from "@/lib/db";
 import { sanitizeFilename, saveUploadedFile, validateUpload } from "@/lib/file-upload";
 import { hashToken } from "@/lib/token-hash";
 import { getClientIpOrNull } from "@/lib/rate-limit";
+
+/**
+ * `hochgeladenVon` der Uploads ueber den Link der Person (HR-Uploads tragen den
+ * Namen der HR-Kraft). Der Wert steht seit dem ersten Stand des Moduls so in der
+ * Datenbank und ist zugleich das Merkmal, an dem der Upload seine eigenen
+ * frueheren Dateien erkennt — aendert er sich, ersetzt ein neuer Upload die
+ * bestehenden Zeilen der Person nicht mehr.
+ */
+const HOCHGELADEN_VON_PERSON = "Mitarbeiter (Magic Link)";
 
 export async function POST(
   request: NextRequest,
@@ -59,7 +69,7 @@ export async function POST(
       );
     }
 
-    // Bestehende Geburtsurkunde ersetzen (Mitarbeiter darf korrigieren).
+    // Eigene fruehere Geburtsurkunde ersetzen (Mitarbeiter darf korrigieren).
     // Wichtig: NEUE Datei zuerst speichern, dann in Transaktion DB-Eintraege
     // tauschen, ALTE Dateien erst nach erfolgreichem Commit löschen.
     // Verhindert Datenverlust falls zwischen Delete und Save ein Crash passiert.
@@ -74,8 +84,19 @@ export async function POST(
     let dokument;
     try {
       dokument = await prisma.$transaction(async (tx) => {
+        // Nur Zeilen, die die Person selbst ueber den Link hochgeladen hat. Eine
+        // Geburtsurkunde von HR (Reiter Dokumente) loeschte der Upload frueher
+        // still mit — samt Datei. Zeilen OHNE `hochgeladenVon` bleiben ebenfalls
+        // stehen: Beide Schreiber setzen das Feld seit jeher, eine Zeile ohne
+        // stammt aus einem Handeingriff unbekannter Herkunft. Eine zu viel
+        // behaltene Datei kann HR im Reiter Dokumente loeschen, eine zu viel
+        // geloeschte ist unwiederbringlich weg (`= Wert` trifft in SQL kein NULL).
         const existing = await tx.elternzeitDokument.findMany({
-          where: { elternzeitId: ez.id, dokumentTyp: "GEBURTSURKUNDE" },
+          where: {
+            elternzeitId: ez.id,
+            dokumentTyp: "GEBURTSURKUNDE",
+            hochgeladenVon: HOCHGELADEN_VON_PERSON,
+          },
         });
         for (const old of existing) {
           filesToCleanup.push(old.dateipfad);
@@ -91,7 +112,7 @@ export async function POST(
             mimeType: file.type,
             fileSize: file.size,
             generiert: false,
-            hochgeladenVon: "Mitarbeiter (Magic Link)",
+            hochgeladenVon: HOCHGELADEN_VON_PERSON,
           },
         });
 
