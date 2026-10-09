@@ -117,6 +117,10 @@ Ort/Datum, Unterschrift & Praxisstempel bleiben für die Ärztin/den Arzt frei.
 `upsert` mit `update: { name }` → ein erneuter Seed-Lauf korrigiert auch den Bestand.
 Branding „Powered by helex.it" im Footer bleibt unverändert (bewusst).
 
+> **Hinweis (10/2026):** Überholt. Der Seed legt seitdem nur an, was fehlt, und ändert
+> vorhandene Mandanten nicht mehr — ein Seed-Lauf korrigiert den Bestand also nicht.
+> Mandantennamen pflegt HR in der Mandantenverwaltung (CLAUDE.md, „Docker-Befehle auf dem Server“).
+
 ---
 
 ## P9 — Pflicht-Dokumente konfigurierbar + Submit-Enforcement
@@ -138,6 +142,12 @@ Branding „Powered by helex.it" im Footer bleibt unverändert (bewusst).
 1. `prisma db push` — neue Felder (in Produktion automatisch via `entrypoint.sh`).
 2. `node prisma/seed.js` (Container) bzw. `npm run db:seed` (lokal) — korrigiert HELEX.IT GmbH.
 3. *Optional:* `node scripts/migrate-umlaute-templates.mjs --apply` — Umlaute in Alt-Snapshots.
+
+> **Hinweis (10/2026):** Schritt 2 ist überholt — nicht mehr ausführen. Bis dahin hätte
+> `node prisma/seed.js` auf dem Server auch gepflegte Vorlagen und Checklisten überschrieben;
+> seitdem legt der Seed nur an, was fehlt, und ändert nichts Bestehendes, korrigiert also auch
+> keinen Mandantennamen mehr. Mandantennamen pflegt HR in der Mandantenverwaltung. Auf dem
+> Server ist der Seed nie nötig: Der Entrypoint startet ihn selbst, solange es keinen Benutzer gibt.
 
 ---
 

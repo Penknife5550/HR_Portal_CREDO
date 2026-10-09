@@ -2607,6 +2607,8 @@ services:
   Regel 10).
 - CLAUDE.md führt `node prisma/seed.js` noch als normalen Server-Befehl. Der Eintrag
   sollte als „nur für eine frische Datenbank“ gekennzeichnet werden.
+  *Hinweis (10/2026): erledigt — der Befehl steht nicht mehr unter den Server-Befehlen, und
+  der Seed legt nur noch an, was fehlt (ändert und löscht nichts Bestehendes).*
 
 **Von früher noch offen, nicht an diesen Deploy gebunden:**
 - Rest der SMTP-Gegenproben vom 07.09. (Protokoll :131-137).

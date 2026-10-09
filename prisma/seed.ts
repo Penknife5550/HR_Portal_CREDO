@@ -1,8 +1,35 @@
 /**
  * CREDO HR-Portal – Datenbank Seed Script
  *
- * Erstellt die 16 Mandanten der CREDO Gruppe und
- * einen initialen Admin-User für Dimitri.
+ * Legt die Grunddaten einer frischen Installation an: die 16 Mandanten der
+ * CREDO Gruppe, den initialen Admin-User, Formular-, Checklisten-,
+ * Exit-Interview-, Zeugnis- und Beurteilungsvorlagen und die zentralen
+ * Abteilungs-Platzhalter.
+ *
+ * REGEL: NUR ANLEGEN, WAS FEHLT. Eine vorhandene Zeile wird nie geaendert und
+ * nie geloescht — kein update/delete, jedes upsert mit `update: {}`. Auf einer
+ * leeren Datenbank entsteht genau derselbe Stand wie frueher. Auf einer
+ * gefuellten meldet jeder Bereich, was „vorhanden, unverändert" bleibt, legt
+ * aber an, was unter seinem Schluessel fehlt — auch, was HR bewusst geloescht
+ * oder umbenannt hat (eine geloeschte Offboarding-Checkliste kaeme zurueck).
+ * Folgenlos ist ein Lauf dort also nicht.
+ *
+ * WARUM: HR pflegt all diese Daten in der Oberflaeche (Mandantenverwaltung,
+ * Formular- und Checklisten-Vorlagen, Exit-Interview, Zeugnis- und
+ * Beurteilungsvorlagen samt Formulierungen). Bis 10/2026 setzte jeder Lauf sie
+ * auf den Stand dieser Datei zurueck: Mandantennamen und Fragebogen-Schritte
+ * ueberschrieben, Checklisten-Punkte geloescht und neu angelegt
+ * (`ChecklistItem.templateItemId` laufender Vorgaenge zeigte danach ins
+ * Leere), Exit-Interview-, Zeugnis- und Beurteilungsvorlagen geloescht und neu
+ * erzeugt — mit ihnen alles, was HR daran gepflegt hatte.
+ *
+ * Auf dem Server deshalb NIE von Hand ausfuehren — er braucht es auch nicht:
+ * Der Entrypoint ruft `prisma/seed-check.js`, und der startet `prisma/seed.js`
+ * (diese Datei, beim Build mit esbuild gebuendelt) nur, solange es noch keinen
+ * Benutzer gibt.
+ * Wer bestehende Vorlagen aendern muss, schreibt eine einmalige
+ * Datenmigration in `prisma/seed-check.js` (Merker `SystemMigration`), nicht
+ * hierher. `src/__tests__/lib/seed-schutz.test.ts` haelt die Regel fest.
  */
 
 import { PrismaClient, OrganizationType, UserRole, QuestionnaireType, ExitInterviewQuestionType, ZeugnisJobGroup } from "@prisma/client";
@@ -31,6 +58,56 @@ type SeedVorlagenPunkt = {
   defaultAssignee: string;
   description?: string;
 };
+
+/** Eine Checklisten-Vorlage im Seed (ohne Punkte). */
+type SeedCheckliste = {
+  id: string;
+  name: string;
+  description: string;
+  questionnaireType: QuestionnaireType | null;
+};
+
+function vorhandenMelden(bereich: string, bezeichnung: string) {
+  console.log(`  ⏭️  ${bereich} vorhanden, unverändert: ${bezeichnung}`);
+}
+
+function bilanzMelden(bereich: string, angelegt: number, gesamt: number) {
+  console.log(`\n📋 ${bereich}: ${angelegt} von ${gesamt} neu angelegt, vorhandene unverändert.\n`);
+}
+
+/**
+ * Legt eine Checklisten-Vorlage samt Punkten an — nur, wenn es sie noch nicht
+ * gibt. Punkte einer vorhandenen Vorlage fasst der Seed nie an: Laufende
+ * Vorgaenge zeigen ueber `ChecklistItem.templateItemId` auf sie.
+ *
+ * Als vorhanden gilt auch eine Vorlage, die ihren Platz schon einnimmt: gleicher
+ * Name (so sucht das Offboarding, `src/lib/offboarding.ts`) oder gleicher
+ * Fragebogentyp (so sucht `POST /api/onboarding`). Sonst holte ein Lauf eine
+ * Vorlage zurueck, die HR geloescht und durch eine eigene ersetzt hat, und beide
+ * stuenden zur Wahl. Punkte und Vorlage entstehen in EINEM Aufruf — eine halb
+ * angelegte Vorlage galte beim naechsten Lauf als vorhanden.
+ */
+async function checklisteAnlegen(vorlage: SeedCheckliste, punkte: SeedVorlagenPunkt[]): Promise<boolean> {
+  const vorhanden = await prisma.checklistTemplate.findFirst({
+    where: {
+      OR: [
+        { id: vorlage.id },
+        { name: vorlage.name },
+        ...(vorlage.questionnaireType ? [{ questionnaireType: vorlage.questionnaireType }] : []),
+      ],
+    },
+    select: { name: true },
+  });
+  if (vorhanden) {
+    vorhandenMelden("Checkliste", vorhanden.name);
+    return false;
+  }
+  await prisma.checklistTemplate.create({
+    data: { ...vorlage, isActive: true, items: { create: punkte } },
+  });
+  console.log(`  ✅ Checkliste: ${vorlage.name} (${punkte.length} Punkte)`);
+  return true;
+}
 
 async function main() {
   console.log("🏫 Seeding CREDO HR-Portal Datenbank...\n");
@@ -138,43 +215,65 @@ async function main() {
     },
   ];
 
+  // Name, Kuerzel und Typ pflegt HR in der Mandantenverwaltung — ein
+  // vorhandener Mandant bleibt, wie er ist.
+  let mandantenAngelegt = 0;
   for (const org of organizations) {
-    await prisma.organization.upsert({
+    const vorhanden = await prisma.organization.findUnique({
       where: { mandantNumber: org.mandantNumber },
-      update: { name: org.name, shortName: org.shortName, type: org.type },
-      create: org,
+      select: { name: true },
     });
+    if (vorhanden) {
+      vorhandenMelden("Mandant", `${org.mandantNumber} - ${vorhanden.name}`);
+      continue;
+    }
+    await prisma.organization.create({ data: org });
+    mandantenAngelegt++;
     console.log(`  ✅ ${org.mandantNumber} - ${org.name} (${org.shortName})`);
   }
 
-  console.log(`\n📋 ${organizations.length} Mandanten angelegt/aktualisiert.\n`);
+  bilanzMelden("Mandanten", mandantenAngelegt, organizations.length);
 
   // =============================================
   // 2. Admin-User (Dimitri)
   // =============================================
-  // Sicheres Zufallspasswort generieren (NICHT das schwache "admin2026"!)
-  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(16).toString("hex");
+  // Nur in einer Datenbank ohne jeden Benutzer — dieselbe Regel wie
+  // `prisma/seed-check.js`. Eine Pruefung je Adresse legte nach einer
+  // geaenderten Admin-Adresse (Benutzerverwaltung) ein zweites SUPER_ADMIN-Konto
+  // an, samt Passwort in der Konsole. Vorher pruefen statt upsert: Bei einem
+  // vorhandenen Konto stuende sonst ein Passwort im Kasten unten, das nie
+  // gesetzt wurde.
+  const adminEmail = "dimitri@credo-gruppe.de";
+  const vorhandeneBenutzer = await prisma.user.count();
 
-  const adminUser = await prisma.user.upsert({
-    where: { email: "dimitri@credo-gruppe.de" },
-    update: {},
-    create: {
-      email: "dimitri@credo-gruppe.de",
-      passwordHash: hashSync(initialPassword, 12),
-      firstName: "Dimitri",
-      lastName: "Riesen",
-      role: UserRole.SUPER_ADMIN,
-    },
-  });
+  if (vorhandeneBenutzer > 0) {
+    vorhandenMelden(
+      "Benutzer",
+      `${vorhandeneBenutzer} Konto/Konten — kein Admin-User angelegt, Passwörter nicht geändert\n`,
+    );
+  } else {
+    // Sicheres Zufallspasswort generieren (NICHT das schwache "admin2026"!)
+    const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(16).toString("hex");
 
-  console.log(
-    `👤 Admin-User angelegt: ${adminUser.firstName} ${adminUser.lastName} (${adminUser.email})`
-  );
-  console.log(`   Rolle: ${adminUser.role}`);
-  console.log(`\n   ╔══════════════════════════════════════════════╗`);
-  console.log(`   ║  INITIALES PASSWORT: ${initialPassword}`);
-  console.log(`   ║  BITTE SOFORT AENDERN!`);
-  console.log(`   ╚══════════════════════════════════════════════╝\n`);
+    const adminUser = await prisma.user.create({
+      data: {
+        email: adminEmail,
+        passwordHash: hashSync(initialPassword, 12),
+        firstName: "Dimitri",
+        lastName: "Riesen",
+        role: UserRole.SUPER_ADMIN,
+      },
+    });
+
+    console.log(
+      `👤 Admin-User angelegt: ${adminUser.firstName} ${adminUser.lastName} (${adminUser.email})`
+    );
+    console.log(`   Rolle: ${adminUser.role}`);
+    console.log(`\n   ╔══════════════════════════════════════════════╗`);
+    console.log(`   ║  INITIALES PASSWORT: ${initialPassword}`);
+    console.log(`   ║  BITTE SOFORT AENDERN!`);
+    console.log(`   ╚══════════════════════════════════════════════╝\n`);
+  }
 
   // =============================================
   // 3. Formularvorlagen (Default-Templates je QuestionnaireType)
@@ -275,24 +374,29 @@ async function main() {
     },
   ];
 
+  // Eine vorhandene Vorlage bleibt, wie HR sie im Vorlagen-Editor eingestellt
+  // hat. Neue Schritte oder Felder fuer Bestaende bringt eine einmalige
+  // Migration in prisma/seed-check.js (z.B. FORMTEMPLATE_MASERNSCHUTZ_V1).
+  let formularvorlagenAngelegt = 0;
   for (const tmpl of formTemplates) {
+    const vorhanden = await prisma.formTemplate.findUnique({
+      where: { questionnaireType: tmpl.questionnaireType },
+      select: { name: true },
+    });
+    if (vorhanden) {
+      vorhandenMelden("Vorlage", `${vorhanden.name} (${tmpl.questionnaireType})`);
+      continue;
+    }
     // stepsConfig ist eine Json-Spalte. StepFieldConfig ist ein Interface mit
     // optionalem `fields` und damit fuer Prismas InputJsonValue nicht direkt
     // zuweisbar — der Umweg ueber `object` ist hier der uebliche Weg.
     const stepsConfig = tmpl.stepsConfig as unknown as object;
-    await prisma.formTemplate.upsert({
-      where: { questionnaireType: tmpl.questionnaireType },
-      update: {
-        name: tmpl.name,
-        description: tmpl.description,
-        stepsConfig,
-      },
-      create: { ...tmpl, stepsConfig },
-    });
+    await prisma.formTemplate.create({ data: { ...tmpl, stepsConfig } });
+    formularvorlagenAngelegt++;
     console.log(`  ✅ Vorlage: ${tmpl.name} (${tmpl.questionnaireType})`);
   }
 
-  console.log(`\n📋 ${formTemplates.length} Formularvorlagen angelegt/aktualisiert.\n`);
+  bilanzMelden("Formularvorlagen", formularvorlagenAngelegt, formTemplates.length);
 
   // =============================================
   // 4. Checklisten-Vorlagen (Standard-Checklisten für Onboarding)
@@ -310,34 +414,13 @@ async function main() {
   //
   // Die Punkte, Tagesangaben und Hinweise folgen dem Vorschlag
   // „Standard-Einstellung (TV-L)" aus dem Aenderungsplan (Paket 5). In der
-  // Produktion sind die Vorlagen Daten von HR — der Seed laeuft dort nicht.
+  // Produktion sind die Vorlagen Daten von HR — der Seed legt sie nur an, wenn
+  // sie fehlen (`checklisteAnlegen`).
   // BUCHHALTUNG bekommt bewusst keinen Standardpunkt (Gehalt laeuft ueber
   // LOGA/HR, Datensparsamkeit).
   console.log("📋 Checklisten-Vorlagen anlegen...\n");
 
   // Checkliste 1: Standard-Einstellung (TV-L)
-  const standardChecklist = await prisma.checklistTemplate.upsert({
-    where: { id: "seed-checklist-standard" },
-    update: {
-      name: "Standard-Einstellung (TV-L)",
-      description: "Standard-Checkliste für Einstellungen nach TV-L",
-      questionnaireType: QuestionnaireType.STANDARD,
-      isActive: true,
-    },
-    create: {
-      id: "seed-checklist-standard",
-      name: "Standard-Einstellung (TV-L)",
-      description: "Standard-Checkliste für Einstellungen nach TV-L",
-      questionnaireType: QuestionnaireType.STANDARD,
-      isActive: true,
-    },
-  });
-
-  // Items für Standard-Checkliste löschen und neu anlegen
-  await prisma.checklistTemplateItem.deleteMany({
-    where: { templateId: standardChecklist.id },
-  });
-
   const standardItems: SeedVorlagenPunkt[] = [
     // Kategorie: Vor Arbeitsbeginn
     { title: "Arbeitsvertrag erstellt und versendet", category: "Vor Arbeitsbeginn", orderIndex: 0, defaultDueDays: -14, defaultAssignee: "HR" },
@@ -385,40 +468,7 @@ async function main() {
     { title: "Feedbackgespräch nach sechs Wochen", category: "Einarbeitung", orderIndex: 18, defaultDueDays: 42, defaultAssignee: "VORGESETZTER" },
   ];
 
-  for (const item of standardItems) {
-    await prisma.checklistTemplateItem.create({
-      data: {
-        templateId: standardChecklist.id,
-        ...item,
-      },
-    });
-  }
-
-  console.log(`  ✅ Checkliste: ${standardChecklist.name} (${standardItems.length} Punkte)`);
-
   // Checkliste 2: Minijob-Einstellung
-  const minijobChecklist = await prisma.checklistTemplate.upsert({
-    where: { id: "seed-checklist-minijob" },
-    update: {
-      name: "Minijob-Einstellung",
-      description: "Vereinfachte Checkliste für Minijob-Einstellungen",
-      questionnaireType: QuestionnaireType.MINIJOB,
-      isActive: true,
-    },
-    create: {
-      id: "seed-checklist-minijob",
-      name: "Minijob-Einstellung",
-      description: "Vereinfachte Checkliste für Minijob-Einstellungen",
-      questionnaireType: QuestionnaireType.MINIJOB,
-      isActive: true,
-    },
-  });
-
-  // Items für Minijob-Checkliste löschen und neu anlegen
-  await prisma.checklistTemplateItem.deleteMany({
-    where: { templateId: minijobChecklist.id },
-  });
-
   const minijobItems: SeedVorlagenPunkt[] = [
     // Kategorie: Vor Arbeitsbeginn
     { title: "Arbeitsvertrag erstellt", category: "Vor Arbeitsbeginn", orderIndex: 0, defaultDueDays: -7, defaultAssignee: "HR" },
@@ -435,18 +485,33 @@ async function main() {
     { title: "Daten in LOGA erfasst", category: "Dokumente", orderIndex: 4, defaultDueDays: 7, defaultAssignee: "HR" },
   ];
 
-  for (const item of minijobItems) {
-    await prisma.checklistTemplateItem.create({
-      data: {
-        templateId: minijobChecklist.id,
-        ...item,
+  const onboardingChecklisten: { vorlage: SeedCheckliste; punkte: SeedVorlagenPunkt[] }[] = [
+    {
+      vorlage: {
+        id: "seed-checklist-standard",
+        name: "Standard-Einstellung (TV-L)",
+        description: "Standard-Checkliste für Einstellungen nach TV-L",
+        questionnaireType: QuestionnaireType.STANDARD,
       },
-    });
+      punkte: standardItems,
+    },
+    {
+      vorlage: {
+        id: "seed-checklist-minijob",
+        name: "Minijob-Einstellung",
+        description: "Vereinfachte Checkliste für Minijob-Einstellungen",
+        questionnaireType: QuestionnaireType.MINIJOB,
+      },
+      punkte: minijobItems,
+    },
+  ];
+
+  let checklistenAngelegt = 0;
+  for (const { vorlage, punkte } of onboardingChecklisten) {
+    if (await checklisteAnlegen(vorlage, punkte)) checklistenAngelegt++;
   }
 
-  console.log(`  ✅ Checkliste: ${minijobChecklist.name} (${minijobItems.length} Punkte)`);
-
-  console.log(`\n📋 2 Checklisten-Vorlagen angelegt/aktualisiert.\n`);
+  bilanzMelden("Checklisten-Vorlagen", checklistenAngelegt, onboardingChecklisten.length);
 
   // =============================================
   // 5. Offboarding Checklisten-Vorlagen
@@ -454,28 +519,7 @@ async function main() {
   console.log("📋 Offboarding Checklisten-Vorlagen anlegen...\n");
 
   // 5a) Standard-Offboarding (18 Items)
-  const offboardingStandard = await prisma.checklistTemplate.upsert({
-    where: { id: "seed-offboarding-standard" },
-    update: {
-      name: "Offboarding: Standard-Offboarding",
-      description: "Standard-Checkliste für alle Offboarding-Prozesse",
-      questionnaireType: null,
-      isActive: true,
-    },
-    create: {
-      id: "seed-offboarding-standard",
-      name: "Offboarding: Standard-Offboarding",
-      description: "Standard-Checkliste für alle Offboarding-Prozesse",
-      questionnaireType: null,
-      isActive: true,
-    },
-  });
-
-  await prisma.checklistTemplateItem.deleteMany({
-    where: { templateId: offboardingStandard.id },
-  });
-
-  const offboardingStandardItems = [
+  const offboardingStandardItems: SeedVorlagenPunkt[] = [
     // Phase 1: Sofort (Tag der Kuendigung)
     { title: "Kuendigungsbestaetigung erstellen", category: "Phase 1: Sofort", orderIndex: 0, defaultDueDays: -30, defaultAssignee: "HR" },
     { title: "Kuendigungsfrist berechnen und pruefen", category: "Phase 1: Sofort", orderIndex: 1, defaultDueDays: -30, defaultAssignee: "HR" },
@@ -502,37 +546,8 @@ async function main() {
     { title: "SV-Abmeldung durchfuehren", category: "Phase 6: Nach Austritt", orderIndex: 17, defaultDueDays: 42, defaultAssignee: "HR" },
   ];
 
-  for (const item of offboardingStandardItems) {
-    await prisma.checklistTemplateItem.create({
-      data: { templateId: offboardingStandard.id, ...item },
-    });
-  }
-
-  console.log(`  ✅ Checkliste: ${offboardingStandard.name} (${offboardingStandardItems.length} Punkte)`);
-
   // 5b) Bildungseinrichtung-Offboarding (22 Items = Standard + 4 Extra)
-  const offboardingBildung = await prisma.checklistTemplate.upsert({
-    where: { id: "seed-offboarding-bildung" },
-    update: {
-      name: "Offboarding: Bildungseinrichtung",
-      description: "Erweiterte Checkliste für Bildungseinrichtungen (Schulen, KiTas)",
-      questionnaireType: null,
-      isActive: true,
-    },
-    create: {
-      id: "seed-offboarding-bildung",
-      name: "Offboarding: Bildungseinrichtung",
-      description: "Erweiterte Checkliste für Bildungseinrichtungen (Schulen, KiTas)",
-      questionnaireType: null,
-      isActive: true,
-    },
-  });
-
-  await prisma.checklistTemplateItem.deleteMany({
-    where: { templateId: offboardingBildung.id },
-  });
-
-  const offboardingBildungItems = [
+  const offboardingBildungItems: SeedVorlagenPunkt[] = [
     // Alle Standard-Items uebernehmen
     ...offboardingStandardItems,
     // Zusaetzliche Bildungseinrichtungs-Items
@@ -542,37 +557,8 @@ async function main() {
     { title: "Vertretungsregelung für Betreuungsgruppen sicherstellen", category: "Phase 2: Erste Woche", orderIndex: 21, defaultDueDays: -21, defaultAssignee: "VORGESETZTER" },
   ];
 
-  for (const item of offboardingBildungItems) {
-    await prisma.checklistTemplateItem.create({
-      data: { templateId: offboardingBildung.id, ...item },
-    });
-  }
-
-  console.log(`  ✅ Checkliste: ${offboardingBildung.name} (${offboardingBildungItems.length} Punkte)`);
-
   // 5c) Beamten-Offboarding (15 Items)
-  const offboardingBeamte = await prisma.checklistTemplate.upsert({
-    where: { id: "seed-offboarding-beamte" },
-    update: {
-      name: "Offboarding: Beamte",
-      description: "Checkliste für Beamten-Entlassung / Versetzung",
-      questionnaireType: null,
-      isActive: true,
-    },
-    create: {
-      id: "seed-offboarding-beamte",
-      name: "Offboarding: Beamte",
-      description: "Checkliste für Beamten-Entlassung / Versetzung",
-      questionnaireType: null,
-      isActive: true,
-    },
-  });
-
-  await prisma.checklistTemplateItem.deleteMany({
-    where: { templateId: offboardingBeamte.id },
-  });
-
-  const offboardingBeamteItems = [
+  const offboardingBeamteItems: SeedVorlagenPunkt[] = [
     // Phase 1: Sofort
     { title: "Entlassungsantrag / Versetzungsverfuegung pruefen", category: "Phase 1: Sofort", orderIndex: 0, defaultDueDays: -30, defaultAssignee: "HR" },
     { title: "Dienstherr über Entlassung informieren", category: "Phase 1: Sofort", orderIndex: 1, defaultDueDays: -30, defaultAssignee: "HR" },
@@ -596,37 +582,8 @@ async function main() {
     { title: "Entlassungsurkunde ausstellen", category: "Phase 6: Nach Austritt", orderIndex: 14, defaultDueDays: 14, defaultAssignee: "HR" },
   ];
 
-  for (const item of offboardingBeamteItems) {
-    await prisma.checklistTemplateItem.create({
-      data: { templateId: offboardingBeamte.id, ...item },
-    });
-  }
-
-  console.log(`  ✅ Checkliste: ${offboardingBeamte.name} (${offboardingBeamteItems.length} Punkte)`);
-
   // 5d) Minijob-Offboarding (10 Items)
-  const offboardingMinijob = await prisma.checklistTemplate.upsert({
-    where: { id: "seed-offboarding-minijob" },
-    update: {
-      name: "Offboarding: Minijob",
-      description: "Vereinfachte Checkliste für Minijob-Austritte",
-      questionnaireType: null,
-      isActive: true,
-    },
-    create: {
-      id: "seed-offboarding-minijob",
-      name: "Offboarding: Minijob",
-      description: "Vereinfachte Checkliste für Minijob-Austritte",
-      questionnaireType: null,
-      isActive: true,
-    },
-  });
-
-  await prisma.checklistTemplateItem.deleteMany({
-    where: { templateId: offboardingMinijob.id },
-  });
-
-  const offboardingMinijobItems = [
+  const offboardingMinijobItems: SeedVorlagenPunkt[] = [
     // Phase 1: Sofort
     { title: "Kuendigungsbestaetigung erstellen", category: "Phase 1: Sofort", orderIndex: 0, defaultDueDays: -14, defaultAssignee: "HR" },
     { title: "Kuendigungsfrist pruefen", category: "Phase 1: Sofort", orderIndex: 1, defaultDueDays: -14, defaultAssignee: "HR" },
@@ -643,15 +600,52 @@ async function main() {
     { title: "Minijob-Zentrale Abmeldung", category: "Phase 4: Nach Austritt", orderIndex: 9, defaultDueDays: 14, defaultAssignee: "HR" },
   ];
 
-  for (const item of offboardingMinijobItems) {
-    await prisma.checklistTemplateItem.create({
-      data: { templateId: offboardingMinijob.id, ...item },
-    });
+  // Das Offboarding sucht seine Vorlage ueber den Namen (src/lib/offboarding.ts).
+  const offboardingChecklisten: { vorlage: SeedCheckliste; punkte: SeedVorlagenPunkt[] }[] = [
+    {
+      vorlage: {
+        id: "seed-offboarding-standard",
+        name: "Offboarding: Standard-Offboarding",
+        description: "Standard-Checkliste für alle Offboarding-Prozesse",
+        questionnaireType: null,
+      },
+      punkte: offboardingStandardItems,
+    },
+    {
+      vorlage: {
+        id: "seed-offboarding-bildung",
+        name: "Offboarding: Bildungseinrichtung",
+        description: "Erweiterte Checkliste für Bildungseinrichtungen (Schulen, KiTas)",
+        questionnaireType: null,
+      },
+      punkte: offboardingBildungItems,
+    },
+    {
+      vorlage: {
+        id: "seed-offboarding-beamte",
+        name: "Offboarding: Beamte",
+        description: "Checkliste für Beamten-Entlassung / Versetzung",
+        questionnaireType: null,
+      },
+      punkte: offboardingBeamteItems,
+    },
+    {
+      vorlage: {
+        id: "seed-offboarding-minijob",
+        name: "Offboarding: Minijob",
+        description: "Vereinfachte Checkliste für Minijob-Austritte",
+        questionnaireType: null,
+      },
+      punkte: offboardingMinijobItems,
+    },
+  ];
+
+  let offboardingChecklistenAngelegt = 0;
+  for (const { vorlage, punkte } of offboardingChecklisten) {
+    if (await checklisteAnlegen(vorlage, punkte)) offboardingChecklistenAngelegt++;
   }
 
-  console.log(`  ✅ Checkliste: ${offboardingMinijob.name} (${offboardingMinijobItems.length} Punkte)`);
-
-  console.log(`\n📋 4 Offboarding Checklisten-Vorlagen angelegt/aktualisiert.\n`);
+  bilanzMelden("Offboarding Checklisten-Vorlagen", offboardingChecklistenAngelegt, offboardingChecklisten.length);
 
   // =============================================
   // 6. Standard-Abteilungs-Konfigurationen (zentral, ohne Mandant)
@@ -719,19 +713,7 @@ async function main() {
   // =============================================
   console.log("📋 Phase 2: Exit-Interview Template anlegen...\n");
 
-  try {
-    // Delete existing default template categories/questions via cascade
-    const existingExitTemplate = await prisma.exitInterviewTemplate.findFirst({
-      where: { name: "Standard Exit-Interview" },
-    });
-
-    if (existingExitTemplate) {
-      await prisma.exitInterviewTemplate.delete({
-        where: { id: existingExitTemplate.id },
-      });
-      console.log("  🔄 Bestehendes Exit-Interview Template entfernt (wird neu angelegt).");
-    }
-
+  async function exitInterviewVorlageAnlegen() {
     const exitTemplate = await prisma.exitInterviewTemplate.create({
       data: {
         name: "Standard Exit-Interview",
@@ -957,6 +939,18 @@ async function main() {
     });
 
     console.log(`  ✅ Exit-Interview Template: ${exitTemplate.name} (9 Kategorien, 26 Fragen)`);
+  }
+
+  // Nur, wenn es noch GAR KEINE Exit-Interview-Vorlage gibt — nicht je Name:
+  // Hat HR die Standardvorlage umbenannt, stuende sonst eine zweite mit
+  // `isDefault` daneben. Fragen und Kategorien pflegt HR in der Oberflaeche.
+  try {
+    const vorhandeneExitVorlagen = await prisma.exitInterviewTemplate.count();
+    if (vorhandeneExitVorlagen > 0) {
+      vorhandenMelden("Exit-Interview-Vorlage", `${vorhandeneExitVorlagen} Vorlage(n)`);
+    } else {
+      await exitInterviewVorlageAnlegen();
+    }
   } catch (error) {
     console.error("  ⚠️ Exit-Interview Template konnte nicht angelegt werden:", error);
   }
@@ -1204,17 +1198,19 @@ async function main() {
     },
   ];
 
+  // Je Berufsgruppe nur, wenn es fuer sie noch keine Vorlage gibt. Kategorien,
+  // Kriterien und Formulierungen pflegt HR in der Oberflaeche — frueher loeschte
+  // jeder Lauf die Vorlage samt allem daran (Cascade) und legte sie neu an.
+  let zeugnisVorlagenAngelegt = 0;
   for (const tmpl of zeugnisTemplates) {
     try {
-      // Delete existing template for this job group (cascade deletes categories, criteria, formulierungen)
-      const existingZeugnis = await prisma.zeugnisBewertungTemplate.findFirst({
+      const vorhanden = await prisma.zeugnisBewertungTemplate.findFirst({
         where: { jobGroup: tmpl.jobGroup },
+        select: { name: true },
       });
-
-      if (existingZeugnis) {
-        await prisma.zeugnisBewertungTemplate.delete({
-          where: { id: existingZeugnis.id },
-        });
+      if (vorhanden) {
+        vorhandenMelden("Zeugnis Template", `${vorhanden.name} (${tmpl.jobGroup})`);
+        continue;
       }
 
       const created = await prisma.zeugnisBewertungTemplate.create({
@@ -1242,13 +1238,14 @@ async function main() {
       });
 
       const criteriaCount = tmpl.categories.reduce((sum, cat) => sum + cat.criteria.length, 0);
+      zeugnisVorlagenAngelegt++;
       console.log(`  ✅ Zeugnis Template: ${created.name} (${tmpl.categories.length} Kategorien, ${criteriaCount} Kriterien, 6 Formulierungen)`);
     } catch (error) {
       console.error(`  ⚠️ Zeugnis Template ${tmpl.name} konnte nicht angelegt werden:`, error);
     }
   }
 
-  console.log(`\n📋 Phase 2: ${zeugnisTemplates.length} Zeugnis-Bewertungsbogen Templates angelegt/aktualisiert.\n`);
+  bilanzMelden("Phase 2: Zeugnis-Bewertungsbogen Templates", zeugnisVorlagenAngelegt, zeugnisTemplates.length);
 
   // =============================================
   // Section 8b: Beurteilungs-Vorlagen (BRL NRW + CREDO Legacy)
@@ -1258,15 +1255,26 @@ async function main() {
   // =============================================
   console.log("\n📋 Phase 4: Beurteilungs-Vorlagen anlegen...\n");
 
+  // Je Name nur, wenn es noch keine globale Vorlage dieses Namens gibt — eine
+  // vorhandene bleibt samt Kategorien und Kriterien, wie HR sie gepflegt hat.
+  // Eine Standardvorlage (`isDefault`) zusaetzlich nur, solange es keine globale
+  // Standardvorlage gibt: Hat HR sie umbenannt oder eine andere zum Standard
+  // gemacht, gaebe es sonst zwei — die Oberflaeche haelt je Bereich genau eine,
+  // und die Verbeamtung waehlt den globalen Standard per findFirst ohne
+  // Reihenfolge (`/api/civil-service/[id]/assessments`).
+  let beurteilungsVorlagenAngelegt = 0;
   for (const tmpl of ALL_DEFAULT_BEURTEILUNG_TEMPLATES) {
     try {
-      // Existierende globale Vorlage mit demselben Namen löschen (idempotent)
-      const existing = await prisma.beurteilungTemplate.findFirst({
-        where: { name: tmpl.name, organizationId: null },
+      const vorhanden = await prisma.beurteilungTemplate.findFirst({
+        where: {
+          organizationId: null,
+          OR: [{ name: tmpl.name }, ...(tmpl.isDefault ? [{ isDefault: true }] : [])],
+        },
+        select: { name: true },
       });
-
-      if (existing) {
-        await prisma.beurteilungTemplate.delete({ where: { id: existing.id } });
+      if (vorhanden) {
+        vorhandenMelden("Beurteilungs-Vorlage", vorhanden.name);
+        continue;
       }
 
       const created = await prisma.beurteilungTemplate.create({
@@ -1305,6 +1313,7 @@ async function main() {
         0,
       );
       const defaultBadge = tmpl.isDefault ? " [DEFAULT]" : "";
+      beurteilungsVorlagenAngelegt++;
       console.log(
         `  ✅ Beurteilungs-Vorlage: ${created.name}${defaultBadge} (${tmpl.scaleType}, ${tmpl.categories.length} Kategorien, ${criteriaCount} Kriterien)`,
       );
@@ -1316,8 +1325,10 @@ async function main() {
     }
   }
 
-  console.log(
-    `\n📋 Phase 4: ${ALL_DEFAULT_BEURTEILUNG_TEMPLATES.length} Beurteilungs-Vorlagen angelegt/aktualisiert.\n`,
+  bilanzMelden(
+    "Phase 4: Beurteilungs-Vorlagen",
+    beurteilungsVorlagenAngelegt,
+    ALL_DEFAULT_BEURTEILUNG_TEMPLATES.length,
   );
 
   // =============================================

@@ -27,7 +27,7 @@ npm run lint         # ESLint
 npm run test         # Jest-Tests
 npm run pruefen      # Typen + Lint + Tests — vor JEDEM Push (es gibt weder CI noch Git-Hooks)
 npm run db:push      # Schema synchronisieren (kein Migrations-Ordner)
-npm run db:seed      # Seed (tsx prisma/seed.ts)
+npm run db:seed      # Seed (tsx prisma/seed.ts) — legt nur an, was fehlt, aendert nie Bestehendes
 npm run db:studio    # Prisma Studio
 npm run db:generate  # Prisma Client generieren
 ```
@@ -65,14 +65,11 @@ sudo docker compose logs -f app
 # DB-Schema synchronisieren
 sudo docker exec hr-portal-app npx prisma db push --skip-generate
 
-# Seed ausfuehren (kompiliertes JS im Container!)
-sudo docker exec hr-portal-app node prisma/seed.js
-
 # Health-Check
 sudo docker exec hr-portal-app curl -s http://localhost:3000/api/health
 ```
 
-**Wichtig:** Im Docker-Container ist `tsx` NICHT verfuegbar. Das Seed-Script wird beim Build zu JS kompiliert (`prisma/seed.js`). Immer `node prisma/seed.js` statt `npx prisma db seed` verwenden.
+**Seed: auf dem Server nicht noetig — und nie von Hand ausfuehren.** Der Entrypoint ruft `prisma/seed-check.js`, und der startet den Seed (`prisma/seed.js`, beim Build mit esbuild aus `prisma/seed.ts` gebuendelt — im Container gibt es kein `tsx`) von selbst, solange die Datenbank noch keinen Benutzer hat. Der Seed legt **nur an, was fehlt**, und aendert oder loescht nie Bestehendes (seit 10/2026, Waechter `src/__tests__/lib/seed-schutz.test.ts`). Folgenlos ist ein Handaufruf auf einer gefuellten Datenbank trotzdem nicht: Er bringt keine neuen Vorlagenstaende, legt aber wieder an, was unter seinem Schluessel fehlt — auch was HR bewusst geloescht oder umbenannt hat (eine geloeschte Offboarding-Checkliste gaebe das Offboarding danach wieder jedem neuen Austritt mit, eine umbenannte globale Beurteilungsvorlage stuende unter altem Namen ein zweites Mal da). Zwei Faelle schliesst der Seed selbst aus: Ein Konto legt er nur in einer Datenbank ohne Benutzer an (sonst kaeme nach geaenderter Admin-Adresse ein zweites SUPER_ADMIN-Konto), eine Standard-Beurteilungsvorlage nur, solange es keine globale Standardvorlage gibt. Mandantennamen und Vorlagen pflegt HR in der Oberflaeche; Aenderungen am Bestand gehoeren als einmalige Datenmigration nach `prisma/seed-check.js` (Abschnitt „Einmalige Datenmigrationen“). Frueher ueberschrieb jeder Seed-Lauf gepflegte Mandantennamen, Fragebogen- und Checklisten-Vorlagen und loeschte Exit-Interview-, Zeugnis- und Beurteilungsvorlagen samt Formulierungen — aeltere Anleitungen, die `node prisma/seed.js` auf dem Server nennen, sind ueberholt.
 
 ### Entrypoint (`entrypoint.sh`)
 
@@ -81,7 +78,7 @@ Beim Container-Start passiert automatisch:
 2. **Schema-Vergleich** (`prisma migrate diff --exit-code`) — nur wenn es einen Unterschied gibt, geht es weiter mit 3.
 3. **Sicherung** (`pg_dump` nach `/backups/vor-schema-abgleich-<Zeitstempel>.sql`) — schlaegt sie fehl, **bricht der Start ab**
 4. `prisma db push --skip-generate --accept-data-loss` (Schema synchronisieren)
-5. Seed-Check (`prisma/seed-check.js`) — System-Vorlagen sicherstellen, **einmalige Datenmigrationen** ausfuehren, Admin-User anlegen falls noch keiner existiert
+5. Seed-Check (`prisma/seed-check.js`) — System-Vorlagen sicherstellen, **einmalige Datenmigrationen** ausfuehren, den Seed (`prisma/seed.js`: Mandanten, Admin-User, Standardvorlagen) ausfuehren, falls noch kein Benutzer existiert
 6. Next.js Server starten (`node server.js`)
 
 **Warum die Sicherung den Start blockieren darf.** `db push` laeuft mit
