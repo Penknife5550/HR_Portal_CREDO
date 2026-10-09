@@ -500,6 +500,12 @@ Rat `npm audit fix` (nicht ausführen) und `npm notice …` zu einer neuen npm-V
 Netzwerk-Meldung wie `ETIMEDOUT`, `ENOTFOUND`, `ECONNRESET` oder `registry.npmjs.org`. Das Portal
 läuft weiter; ein zweiter Versuch später schadet nicht.
 
+**Eine Ausnahme ohne STOPP:** Steht im Fehler „An error occurred in `next/font`“ (dazu „Failed to
+fetch `Montserrat` from Google Fonts“ oder „Cannot read properties of null“), war Google Fonts
+beim Bauen kurz nicht richtig erreichbar – der Build lädt die Schrift jedes Mal neu. Am 09.10.2026
+lokal genau so passiert; der zweite Versuch kurz danach lief durch. Den Befehl oben also einfach
+noch einmal ausführen. Erst wenn er ein zweites Mal so endet: STOPP, Ausgabe an Claude.
+
 ### 3.4 Vorschau: Was `db push` gleich tun wird (nur lesend)
 
 Der Befehl startet das **neue** Image einmal kurz ohne Entrypoint und vergleicht seine
