@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 09.10.2026 (Bestandsaufnahme; vier Fehler auf `main` behoben, Deploy-Anleitung für `main`, Merge `96cbf6a` – siehe 0.2 Punkt 3a und Protokoll)
+Letzte Änderung: 09.10.2026 (Bestandsaufnahme; vier Fehler auf `main` behoben, Deploy-Anleitung für `main`, Merge `96cbf6a`; Prototyp-Tag vorbereitet: Docker neu gebaut, Leitfaden gegen den Code geprüft – siehe 0.2 und Protokoll)
 
 ## 0. Übergabe (Stand 08.10.2026, abends)
 
@@ -60,9 +60,11 @@ Frühere Schritte (Merge von `main` am 05.10., `tageZwischen` am 06.10., Nebenau
    `hr-portal-lokal` starten (oder
    `docker start hr-portal-lokal-db hr-portal-lokal-gotenberg hr-portal-lokal-app`), dann
    `curl -s -o /dev/null -w "%{http_code}" http://localhost:3100/api/health` → `200`. Er läuft
-   mit dem Stand `a56e4a1`; die Testvorgänge T01–T10 sind vom 08.10.2026 – ihre Fristen
-   rechnen vom Tag des Einspielens, also vor dem Prototyp-Tag neu einspielen (Leitfaden,
-   Abschnitt 2, Schritt 3). Compose- und Env-Datei sowie die Anmeldedaten (`anmeldung.txt`)
+   seit 09.10.2026 mit dem Stand `8b7b994` (neu gebaut; das alte Abbild heißt
+   `hr-portal-lokal-app:a56e4a1`); die Testvorgänge T01–T10 sind vom 09.10.2026 – ihre Fristen
+   rechnen vom Tag des Einspielens, also am Termintag neu einspielen (Leitfaden, Abschnitt 2,
+   Schritt 3). Scheitert ein Neubau an `next/font` (Google Fonts kurz nicht erreichbar), den
+   Bau einfach wiederholen. Compose- und Env-Datei sowie die Anmeldedaten (`anmeldung.txt`)
    liegen bewusst NICHT im Repository (Geheimnisse); wo, steht im Gedächtnis der Sitzung.
    Gehen sie verloren: nach 0.6 neu aufsetzen.
 3. **Offen – Antwort des Projektverantwortlichen steht aus.** Am 08.10.2026 vorgeschlagen
@@ -1501,6 +1503,39 @@ eine führende Null (`{{vertragsende}}` in `contract-end-supervisor-reminder` un
 SMTP-Testmail); Word-Platzhalter `{datum}`/`{jahr}` und alle Datumsplatzhalter rechnen den
 Berliner Kalendertag. Neue Vorlage nur `individuelle-mail` (Paket 3, Code-Default).
 
+### 09.10.2026 – Prototyp-Tag vorbereitet (Docker neu, Leitfaden geprüft)
+
+Auftrag des Projektverantwortlichen: „Bereite den Prototyp-Tag vor, starte die lokale
+Docker-Umgebung“.
+
+- **Docker-Stapel `hr-portal-lokal` neu gebaut** aus `git archive HEAD` (`8b7b994`); das alte
+  Abbild bleibt als `hr-portal-lokal-app:a56e4a1`. Der erste Bau scheiterte an `next/font`
+  (Google Fonts lieferte beim Bauen keine brauchbare Antwort; vom Rechner aus kam die Schrift
+  einwandfrei, `layout.tsx` unverändert) – der zweite Versuch lief durch. Daraus ein Hinweis in
+  der Server-Anleitung (`8c1ef05` auf `main`, Merge `a4d6e7b`): einmal wiederholen, erst beim
+  zweiten Fehlschlag STOPP. Start: Schema deckungsgleich, Seed übersprungen, Zeitplaner aus,
+  `/api/health` 200; `gotenberg` von Hand gestartet (die App hängt nicht von ihm ab).
+- **Testvorgänge** T01–T10 nach Leitfaden, Abschnitt 2, Schritt 3, eingespielt (Fristen ab
+  09.10.2026; am Termintag erneut).
+- **Alle zehn Lagen im Docker-Stapel** mit `scripts/ux-abnahme.js vertragsende`
+  (`BASIS=http://localhost:3100`, Testkonto mit neuem Passwort nur in der Docker-Kopie, nicht
+  ausgegeben): genau eine `h1`, keine Konsolenfehler, bei 390 px kein waagerechtes Rollen; die
+  42 Bilder in `screenshots/pilot/` neu (Stand `8b7b994`). Messung bei 1366 × 768 unverändert
+  (Reiter bei 466–886 px, Ziel 256 px).
+- **Leitfaden gegen den Code geprüft** (Arbeitsablauf: drei Prüfer je Teil, je ein
+  Gegenprüfer; neun Befunde bestätigt, keiner verworfen, keiner macht eine Aufgabe
+  undurchführbar) und berichtigt: beim freien Umschauen „Erinnerung senden“ nicht klicken
+  lassen (sendet ohne Fenster und nähme Aufgabe 5 vorweg); die rote Fehlerzeile der ALTEN
+  Ansicht verschwindet nach 6 Sekunden (Stoppuhr); T10 zeigt in der Liste schon „Abgelaufen“,
+  die alte Detailseite den DokuBit-Kasten; T02 zeigt zusätzlich „Person hat weitere
+  Einstellungen“; Knopf und Schritt „Vertrag“ wechseln den Reiter, ohne die Seite zu rollen;
+  im Reiter „E-Mails“ heißt es „fehlgeschlagen“, nicht „FAILED“; Abschnitt 7 nennt
+  `src/lib/contract-end-versand.ts` für die Meldungen zu Frage 21; Abschnitt 8 sagt, dass die
+  Bilder nur den Ausgangszustand zeigen. Dieselben Korrekturen auf der Leitfaden-Seite
+  (Artifact, Version 3, Bilder vom 09.10.).
+
+**Mail- und Word-Vorlagen:** keine betroffen.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1551,6 +1586,9 @@ Berliner Kalendertag. Neue Vorlage nur `individuelle-mail` (Paket 3, Code-Defaul
 | `main` | `7c09755`, `e25e071`, `75d8277`, `a2e2e64` | Fehler im laufenden Portal: Seed nur anlegen; Zeitzone im Server-Code (Jest in UTC); Verbeamtung Dokumente; Elternzeit Geburtsurkunde |
 | `main` | `9089b69` | Deploy-Anleitung `docs/historie/deploy-main-2026-10.md` |
 | `ux-umbau` | `96cbf6a` | Merge von `main` (Fehlerbehebungen, Deploy-Anleitung) |
+| `ux-umbau` | `8b7b994` | Logbuch: Bestandsaufnahme, Fehler auf `main`, Merge |
+| `main` | `8c1ef05` | Deploy-Anleitung: Hinweis bei vorübergehendem `next/font`-Fehler |
+| `ux-umbau` | `a4d6e7b` | Merge von `main` (Hinweis `next/font`) |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.

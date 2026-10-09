@@ -1,6 +1,6 @@
 # Prototyp-Tag (V0) – Leitfaden: neue Ansicht Vertragsende
 
-Stand 08.10.2026 · für den Projektverantwortlichen und das Personalbüro · gehört zu
+Stand 09.10.2026 (gegen den Code geprüft; Docker-Stapel neu gebaut) · für den Projektverantwortlichen und das Personalbüro · gehört zu
 [projekt-ux-umbau.md](projekt-ux-umbau.md) (Abschnitt 0.4) und [pilot-feinplan.md](pilot-feinplan.md)
 (Abschnitte 3.3 bis 3.8, 7, 8 und 11)
 
@@ -82,7 +82,7 @@ findet ihren Vorgang nicht mehr – über die Liste neu öffnen.
 | Zeit | Dauer | Was | Hinweis |
 |---|---|---|---|
 | 0:00 | 5 min | Begrüßung | Ziel (Abschnitt 1), „wir prüfen die Seite“, laut denken, nichts kann kaputtgehen |
-| 0:05 | 10 min | Freies Umschauen in der **neuen** Ansicht, ohne Erklärung | Start: Liste → Herr Testberg (T02). „Schauen Sie sich um. Was sehen Sie, was würden Sie hier tun?“ Fenster dürfen geöffnet, aber nicht bestätigt werden („Abbrechen“). Ersten Eindruck wörtlich notieren. |
+| 0:05 | 10 min | Freies Umschauen in der **neuen** Ansicht, ohne Erklärung | Start: Liste → Herr Testberg (T02). „Schauen Sie sich um. Was sehen Sie, was würden Sie hier tun?“ Fenster dürfen geöffnet, aber nicht bestätigt werden („Abbrechen“). **Vorher sagen:** Knöpfe, die auf „…“ enden, öffnen ein Fenster und dürfen geklickt werden; „Erinnerung senden“ bitte nicht – er öffnet kein Fenster, sondern versucht sofort zu senden und zeigt die Fehlermeldung, die Aufgabe 5 unbefangen prüfen soll. Wird er doch geklickt: notieren (Aufgabe 5 bei T02 ist dann nicht mehr unbefangen, im Reiter „E-Mails“ steht eine Zeile mehr). Ersten Eindruck wörtlich notieren. |
 | 0:15 | 25 min | **Durchgang 1:** Aufgaben 1–7 in der neuen Ansicht | Zeit und Klicks je Aufgabe |
 | 0:40 | 5 min | Pause; Testdaten neu einspielen (Abschnitt 2, Schritt 3); auf einer Vorgangsseite **„Zur bisherigen Ansicht“** | |
 | 0:45 | 15 min | **Durchgang 2:** Aufgaben 1–7 kurz in der alten Ansicht | Ausgangswert für die Erfolgsmaße |
@@ -100,7 +100,9 @@ Jede Aufgabe beginnt in der Liste der Vertragsenden. Aufgabe vorlesen (Karte hin
 Stoppuhr starten, stoppen, wenn die Antwort gegeben ist bzw. die Meldung erscheint (unten rechts
 oder im Fenster). Aufgaben 1–3 ändern nichts; 4–7 ändern Testdaten – deshalb wird zwischen den
 Durchgängen und am Ende neu eingespielt. Die Spalte „Weg neu“ ist nur für die Moderation; die
-Knopfnamen nie vorlesen.
+Knopfnamen nie vorlesen. **Alte Ansicht:** Ihre rote Fehlerzeile über den Reitern verschwindet
+nach 6 Sekunden von selbst – die Stoppuhr dort beim Erscheinen der Zeile stoppen und notieren,
+ob die Person sie in dieser Zeit gelesen hat.
 
 **Anfrage und Erinnerung scheitern – gewollt:** In der Testumgebung ist bewusst kein
 Mailserver eingerichtet (es geht nichts hinaus). Seit dem Stand vom 08.10. sagt das Portal das
@@ -117,9 +119,9 @@ Betrieb geht die Mail hinaus.“
 |---|---|
 | Ausgangslage | T02 Ben Testberg: Anfrage läuft, Link gültig, einmal erinnert. T03 Clara Testfeld: Anfrage ging hinaus, Link seit gestern abgelaufen, zweimal erinnert. |
 | Aufgabe | „Öffnen Sie die Vorgänge von Herrn Testberg und Frau Testfeld. Bei wem liegt die Sache gerade, und was muss als Nächstes passieren?“ |
-| Weg neu | T02: Pille „Wartet auf Führungskraft“, Kasten „Jetzt dran · Führungskraft“ mit „Wartet auf die Rückmeldung der Führungskraft“ (darunter Anfrage vom …, „1× erinnert“). T03: Pille „Link abgelaufen“, „Jetzt dran · HR“ mit „Link der Führungskraft ist abgelaufen – Anfrage neu senden“; der Schritt „Anfrage“ ist wieder aktiv, Notiz „Link abgelaufen“. |
+| Weg neu | T02: Pille „Wartet auf Führungskraft“, Kasten „Jetzt dran · Führungskraft“ mit „Wartet auf die Rückmeldung der Führungskraft“ (darunter Anfrage vom …, „1× erinnert“); über den Reitern zusätzlich der Hinweis „Person hat weitere Einstellungen“ (gehört nicht zur Frage). T03: Pille „Link abgelaufen“, „Jetzt dran · HR“ mit „Link der Führungskraft ist abgelaufen – Anfrage neu senden“; der Schritt „Anfrage“ ist wieder aktiv, Notiz „Link abgelaufen“. |
 | Beobachten | Liest sie die Pille, die Schritte oder den Kasten? Erkennt sie den Unterschied zwischen beiden ohne Hilfe? Was liest sie aus „Jetzt dran · HR“? |
-| Alt | Beide sehen gleich aus: Status „Anfrage beim Vorgesetzten“, „… wartet auf Rückmeldung“. Dass der Link von Frau Testfeld abgelaufen ist, steht nirgends. Notieren, ob und woran sie es erkennt. |
+| Alt | Status „Anfrage beim Vorgesetzten“ und „… wartet auf Rückmeldung“ sind bei beiden gleich. Dass der Link von Frau Testfeld abgelaufen ist, steht nirgends. Unterschiede gibt es nur in der Erinnerungszahl (1× bzw. 2×) und darin, dass nur T02 den Kasten „Person hat weitere Einstellungen“ zeigt (in alt und neu) – beides gilt nicht als Hinweis auf den Link. Notieren, ob und woran sie es erkennt. |
 
 ### Aufgabe 2 – Was ist dringend? (liest nur)
 
@@ -128,9 +130,9 @@ Betrieb geht die Mail hinaus.“
 | Ausgangslage | T04 David Testhaus: Führungskraft will übernehmen, Vertrag noch nicht zurück, Vertragsende in 20 Tagen (am Tag des Einspielens), nicht mit Vorstand abgestimmt, bisher 24 Monate sachgrundlos befristet und einmal verlängert. T10 Jonas Testbrink: nur angelegt, Vertragsende seit 3 Tagen überschritten, Datum kam geändert aus DokuBit. |
 | Aufgabe | „Bei Herrn Testhaus und bei Herrn Testbrink: Gibt es etwas, das Sie sofort klären müssten? Was genau?“ |
 | Weg neu | T04: Pille „Entfristungsrisiko · in 20 Tagen“; in „Jetzt dran“ die Frist mit „Kritisch“; drei Hinweise: „Entfristungsrisiko (§ 15 Abs. 5 TzBfG)“, „Nicht mit Vorstand oder Geschäftsführung abgestimmt“, „Hinweis zur Befristung (§ 14 TzBfG)“. T10: Pille „Anfrage offen“; in „Jetzt dran“ „Vertragsende … · seit 3 Tagen überschritten“ mit „Kritisch“; Hinweis „Vertragsende von DokuBit geändert (…)“. |
-| Beobachten | Liest sie alle drei Hinweise? Scrollt sie – und merkt sie, dass bei 1366 × 768 die Reiter unter dem Bildrand liegen? Wirkt das dreifache Entfristungsrisiko hilfreich oder doppelt? Fällt bei T10 die Überschreitung auf, obwohl die Pille nur „Anfrage offen“ sagt? |
+| Beobachten | Liest sie alle drei Hinweise? Scrollt sie – und merkt sie, dass bei 1366 × 768 die Reiter unter dem Bildrand liegen? Wirkt das dreifache Entfristungsrisiko hilfreich oder doppelt? Fällt bei T10 die Überschreitung auf, obwohl die Pille nur „Anfrage offen“ sagt? Die Liste zeigt bei T10 in beiden Durchgängen schon die rote Marke „Abgelaufen“ neben dem Vertragsende – notieren, ob sie die Überschreitung in der Liste oder erst auf der Seite bemerkt; für den Vergleich alt/neu zählt nur die Detailseite. |
 | Moderation | Der DokuBit-Text („… schon weit fortgeschritten …“) passt nicht zu T10 – diese Lage ist künstlich. Nicht über den Text sprechen, nur über die Überschreitung. |
-| Alt | T04: Warnungen nur im Reiter „Übersicht“ (die Vorstand-Warnung zusätzlich im Reiter „Dokumente“). T10: keine Ampel, nichts Auffälliges – das überschrittene Vertragsende zeigt die alte Seite nicht. |
+| Alt | T04: Warnungen nur im Reiter „Übersicht“ (die Vorstand-Warnung zusätzlich im Reiter „Dokumente“). T10: keine Ampel. Im Reiter „Übersicht“ steht der gelbe Kasten „Vertragsende von DokuBit geändert (…)“ mit demselben unpassenden Text wie in der neuen Ansicht; dass das Vertragsende überschritten ist, zeigt die Detailseite selbst nicht (nur die Liste, siehe „Beobachten“). |
 
 ### Aufgabe 3 – Wo entsteht der Vertrag? (zeigen, nichts erzeugen)
 
@@ -139,7 +141,7 @@ Betrieb geht die Mail hinaus.“
 | Ausgangslage | T04 David Testhaus wie in Aufgabe 2 |
 | Aufgabe | „Für Herrn Testhaus muss der Verlängerungsvertrag geschrieben werden. Zeigen Sie, wo Sie ihn im Portal erstellen würden. Bitte nichts erzeugen.“ |
 | Weg neu | Drei Wege: Knopf „Zu den Dokumenten“ in „Jetzt dran“, Klick auf den Schritt „Vertrag“ in der Leiste, oder Reiter „Dokumente“. Ziel ist die Karte „Dokumente erstellen“. In der Testumgebung sind keine Vertragsvorlagen hinterlegt; die Karte sagt das nur – fürs Finden reicht es. |
-| Beobachten | Welchen Weg nimmt sie? Probiert sie den Schritt „Vertrag“ (man sieht ihm nicht an, dass er klickbar ist)? Muss sie dafür scrollen? |
+| Beobachten | Welchen Weg nimmt sie? Probiert sie den Schritt „Vertrag“ (man sieht ihm nicht an, dass er klickbar ist)? Muss sie dafür scrollen? Knopf und Schritt wechseln nur den Reiter, die Seite rollt nicht mit – bei 1366 × 768 liegen die Reiter von T04 unter dem Fensterrand, nach dem Klick ist also zunächst keine Änderung zu sehen. Notieren, ob sie den Klick für wirkungslos hält und erneut klickt (zählt als Klick) oder von selbst nach unten rollt. |
 | Alt | „Zu den Dokumenten →“ in der grünen Karte oder Reiter „Dokumente“ |
 
 ### Aufgabe 4 – Anfrage stellen (ändert Daten)
@@ -152,7 +154,7 @@ Betrieb geht die Mail hinaus.“
 | Beobachten | Klicks bis zur Meldung. Liest sie die Meldung ganz? Versteht sie, dass nichts hinausging und die Anfrage nicht als gesendet gilt? Was würde sie jetzt tun (später erneut senden, die IT fragen, die Führungskraft anrufen)? Was macht sie mit dem Teil „Bitte unter Einstellungen → SMTP … eintragen, ‚aktiv‘ setzen …“ – Hilfe oder nur Technik? Ein Tippfehler ohne „@“ ergibt „Das ist keine E-Mail-Adresse.“ – wird der Fehler verstanden? |
 | Moderation | Die Meldung ist erwartet (siehe oben, „Anfrage und Erinnerung scheitern – gewollt“). Erst nach ihrer Antwort auflösen. |
 | Wichtig | Nur die Adresse vom Zettel – nie eine echte, auch wenn nichts hinausgeht. |
-| Alt | Feld in der Karte „Anfrage an die Führungskraft“ und „Anfrage an Vorgesetzten senden →“ (ohne Rückfrage) → dieselbe Meldung als rote Zeile oben über den Reitern; die Karte steht danach unverändert da. Wieder an T01 (nach dem Neueinspielen frisch). |
+| Alt | Feld in der Karte „Anfrage an die Führungskraft“ und „Anfrage an Vorgesetzten senden →“ (ohne Rückfrage) → dieselbe Meldung als rote Zeile oben über den Reitern; sie verschwindet nach 6 Sekunden von selbst, danach steht die Karte unverändert da (kein Hinweis mehr, dass nichts hinausging). Wieder an T01 (nach dem Neueinspielen frisch). |
 
 ### Aufgabe 5 – Führungskräfte, die nicht antworten (ändert Daten)
 
@@ -163,7 +165,7 @@ Betrieb geht die Mail hinaus.“
 | Weg neu | T02: „Erinnerung senden“ – ohne Rückfrage → Fehlermeldung unten rechts „Die Erinnerung konnte nicht versendet werden: SMTP ist nicht konfiguriert … Sie wurde nicht gezählt – bitte später erneut versuchen.“ (bleibt stehen, bis sie geschlossen wird); weiter „1× erinnert“. T03: „Anfrage neu senden …“ → Rückfrage „Anfrage neu senden?“ (Adresse vorbelegt, Text sagt: der bisherige Link ist bereits abgelaufen, Erinnerungen beginnen von vorn, der Vermerk zur Abstimmung mit Vorstand oder Geschäftsführung wird zurückgesetzt) → „Anfrage neu senden“ → im Fenster „Die Anfrage an die Führungskraft konnte nicht versendet werden: … Der zuvor versendete Link gilt nicht mehr. …“; der Text oben heißt jetzt „der bisherige gilt bereits nicht mehr“. „Abbrechen“ → Pille „Anfrage nicht zugestellt“, „Jetzt dran · HR“ mit „Anfrage wurde nicht zugestellt – erneut senden“ und dem Knopf „Anfrage senden …“; im Reiter „Übersicht“ steht bei „Anfrage vom“ die Pille „Nicht zugestellt“. |
 | Beobachten | Unterscheidet sie die beiden Fälle (erinnern / neu senden)? Liest sie den Text der Rückfrage, versteht sie ihn? Bemerkt sie die Fehlermeldung der Erinnerung unten rechts? Versteht sie bei T03 nach dem Abbrechen die neue Pille „Anfrage nicht zugestellt“ – und dass die Führungskraft jetzt gar keinen gültigen Link mehr hat? Vermisst sie bei der Erinnerung eine Rückfrage, oder ist „sofort“ richtig? Sucht sie im Menü „…“? |
 | Moderation | Wie bei Aufgabe 4: Die Meldungen sind erwartet, erst nach ihrer Antwort auflösen. Danach Frage 21 (Abschnitt 5) stellen, solange die Meldung frisch ist. |
-| Alt | T02: „Erinnerung senden“ → dieselbe Meldung als rote Zeile oben. T03: Wer „Erinnerung senden“ nimmt, bekommt den Fehler „Der Formular-Link ist abgelaufen. Bitte „Anfrage erneut senden“ nutzen …“; dann „Anfrage erneut senden“ – ohne Rückfrage → rote Zeile „… konnte nicht versendet werden …“; die Karte sagt danach „Bei der Führungskraft ist keine Anfrage angekommen – die E-Mail an … wurde nicht versendet (Grund im Reiter „E-Mails“). Bitte erneut senden.“ Den Umweg über den Fehler mitzählen. |
+| Alt | T02: „Erinnerung senden“ → dieselbe Meldung als rote Zeile oben, nach 6 Sekunden wieder weg. T03: Wer „Erinnerung senden“ nimmt, bekommt den Fehler „Der Formular-Link ist abgelaufen. Bitte „Anfrage erneut senden“ nutzen …“ (ebenfalls nur 6 Sekunden); dann „Anfrage erneut senden“ – ohne Rückfrage → rote Zeile „… konnte nicht versendet werden …“ (6 Sekunden); dauerhaft sagt die Karte danach „Bei der Führungskraft ist keine Anfrage angekommen – die E-Mail an … wurde nicht versendet (Grund im Reiter „E-Mails“). Bitte erneut senden.“ Den Umweg über den Fehler mitzählen. |
 
 ### Aufgabe 6 – Vertrag zurück, Vorgang beenden (ändert Daten)
 
@@ -223,7 +225,7 @@ Text der Liste und der alten Ansicht).
 | 13 | Modulnamen: „Onboarding“/„Offboarding“ bleiben; Dialogtitel „Neues Onboarding“/„Neues Offboarding“ statt „Neuer Vorgang“/„Neuer Austritt“? „Vertragsende“ als Name passt? | E11 (Anzeigenamen der Module) | |
 | 14 | Individuelle E-Mail: Für welche drei bis fünf Anlässe wünschen Sie Textbausteine (Beispiele: Vertrag zurück, Rückfrage zu Unterlagen, Terminbestätigung)? | E13 – die Anlässe soll der Prototyp-Tag benennen | |
 | 15 | Ihre zehn häufigsten Aufgaben im Portal – über alle Module? | Plan, V0: Grundlage der Erfolgsmaße („Klicks je Top-Aufgabe“) | |
-| 16 | Auf einem Bildschirm mit 1366 × 768 beginnen die Reiter erst nach 61 bis 84 % der Höhe (bei T04 sogar unterhalb des Fensters). Der Plan wollte höchstens ein Drittel. Stört das Rollen? Was darf kleiner werden: der Seitenkopf, die Prozessleiste, „Jetzt dran“, die Hinweise? | Messung vom 07.10.2026 (Bilder `pilot-tNN-1366.jpg`); P-F6: im Pilot nur messen | |
+| 16 | Auf einem Bildschirm mit 1366 × 768 beginnen die Reiter erst nach 61 bis 84 % der Höhe (bei T04 sogar unterhalb des Fensters). Der Plan wollte höchstens ein Drittel. Stört das Rollen? Was darf kleiner werden: der Seitenkopf, die Prozessleiste, „Jetzt dran“, die Hinweise? | Messung vom 07.10.2026, am 09.10. im Docker-Stapel mit denselben Werten wiederholt (Bilder `pilot-tNN-1366.jpg`); P-F6: im Pilot nur messen | |
 | 17 | Bei T10 ist das Vertragsende seit drei Tagen überschritten, die Pille sagt trotzdem nur „Anfrage offen“ (blau). Bei T04 sind noch 20 Tage Zeit, die Pille ist rot („Entfristungsrisiko“). Soll die Pille sagen, wer dran ist – oder das Dringendste? | beim Fotografieren aufgefallen | |
 | 18 | Bei T04 und T06 bricht die Zeile unter „Rückmeldung“ in der Leiste um (Zuständigkeit, Ergebnis, Datum). Reicht dort weniger, z. B. ohne Datum (es steht in der Übersicht)? | beim Fotografieren aufgefallen | |
 | 19 | Am Handy steht der Knopf „…“ allein in einer Zeile, und von „E-Mails“ ist in der Reiterleiste nur „E-M“ zu sehen. Fällt das auf, merkt man, dass die Leiste rollt? | beim Fotografieren aufgefallen (`pilot-t04-390.jpg`) | |
@@ -239,9 +241,10 @@ nicht zur Lage.
 
 Zwei weitere Dinge vorher ansagen, damit sie nicht für Fehler der neuen Ansicht gehalten werden:
 
-- **Rote Zeilen im Reiter „E-Mails“:** In der Testumgebung ist kein Mailserver eingetragen.
-  Jede Mail (Anfrage, Erinnerung) erscheint dort deshalb als „FAILED“ mit dem Grund „SMTP ist
-  nicht konfiguriert …“. Es geht nichts hinaus – das ist gewollt. Seit dem 08.10. sagt die Seite
+- **Rote Marken im Reiter „E-Mails“:** In der Testumgebung ist kein Mailserver eingetragen.
+  Jede Mail (Anfrage, Erinnerung) steht dort deshalb mit der roten Pille „fehlgeschlagen“ und
+  der Zeile „Grund: SMTP ist nicht konfiguriert oder nicht aktiviert …“ (rote Schrift); die
+  Auswahl „Nicht zugestellt“ zählt sie. Es geht nichts hinaus – das ist gewollt. Seit dem 08.10. sagt die Seite
   das auch selbst („… konnte nicht versendet werden“, Aufgaben 4 und 5).
 - **Einrichtungsleitung und Führungskräfte** sehen die Seite heute gar nicht (auch nicht die
   alte), sondern nur „Keine Berechtigung“ – die Mandanten-Sperre lässt sie nicht an die Daten.
@@ -291,7 +294,12 @@ Am besten / am schlimmsten (Abschluss):
    Hinweise in `src/lib/prozess/vertragsende-hinweise.ts`, Rückfragen in
    `src/app/(portal)/vorgaenge/vertragsende/[id]/dialoge.tsx`, Knopftexte in `typen.ts`
    daneben (`AKTION_TEXT`). Das Wort „Abgebrochen“ am Ende der Leiste steht in
-   `src/lib/prozess/prozess-stand.ts` und gilt später für alle Module.
+   `src/lib/prozess/prozess-stand.ts` und gilt später für alle Module. Die Meldung, wenn eine
+   Mail nicht hinausging (Frage 21), baut die Route in `src/lib/contract-end-versand.ts`
+   (`anfrageNichtZugestelltMeldung`, `erinnerungNichtZugestelltMeldung`; gilt auch für die alte
+   Ansicht); den Grund liefert der Mailer (`src/lib/mailer.ts`) für alle Module – ihn in
+   Alltagssprache zu fassen ist laut Plan U10, nicht Teil des Pilots. Erfolgs- und
+   Webhook-Meldungen stehen in `aufrufe.ts` (`anfrageMeldung`, `erinnerungMeldung`).
 5. **Messwerte** (Klicks und Zeit je Aufgabe, alt und neu) ins Protokoll des Logbuchs: Sie sind
    der Ausgangswert der Erfolgsmaße (Feinplan 8 – Klicks je Top-Aufgabe, Rückfragen „Wo finde
    ich …“).
@@ -307,10 +315,15 @@ Am besten / am schlimmsten (Abschluss):
 ## 8. Bilder (Ersatz, falls Docker nicht läuft)
 
 Die Bilder zeigen die neue Ansicht je Testvorgang und entstehen mit
-`node scripts/ux-abnahme.js vertragsende` (Dev-Server, Testdaten vom selben Tag) im Ordner
-[screenshots/pilot/](screenshots/pilot/). Vor dem Termin prüfen, ob er gefüllt ist. Ohne Docker
-die Aufgaben als „Wohin würden Sie klicken?“ am Bild stellen; Klicks und Zeiten sind dann nicht
-messbar, nur der Weg. „1366“ ist der sichtbare Bereich eines Schul-Laptops, „1366 ganz“ die
+`node scripts/ux-abnahme.js vertragsende` (Dev-Server oder mit `BASIS=http://localhost:3100`
+gegen den Docker-Stapel, Testdaten vom selben Tag) im Ordner
+[screenshots/pilot/](screenshots/pilot/). Stand der Bilder: 09.10.2026, aufgenommen im
+Docker-Stapel mit dem Stand `8b7b994`. Sie zeigen je Testvorgang nur die Seite im Ausgangszustand
+(Reiter „Übersicht“) – kein geöffnetes Menü, kein Fenster, keine Meldung, keinen Stand nach einer
+Handlung. Ohne Docker deshalb je Aufgabe nur den ersten Klick fragen („Wohin würden Sie
+klicken?“); Klicks und Zeiten sind dann nicht messbar. Die Meldungen der Aufgaben 4 und 5, die
+Lage „Anfrage nicht zugestellt“ (letzte Zeile der Tabelle in Abschnitt 5) und Frage 21 nur
+mündlich stellen, mit dem Wortlaut aus Abschnitt 4. „1366“ ist der sichtbare Bereich eines Schul-Laptops, „1366 ganz“ die
 ganze Seite, „390“ ein Handy.
 
 | Testvorgang | Lage | 1440 | 1366 | 1366 ganz | 390 |
