@@ -217,25 +217,40 @@ export function TabDocuments({
   const [versandZaehler, setVersandZaehler] = useState(0);
 
   const docTypeEntries = Object.entries(CIVIL_SERVICE_DOC_TYPES);
+  const bekannteTypen = new Set(Object.keys(CIVIL_SERVICE_DOC_TYPES));
+
+  // Die Detailroute liefert die Zeilen ungefiltert, also auch per Soft Delete
+  // entfernte — deren Download antwortet 404, sie gehoeren nicht in die Anzeige.
+  const sichtbareDokumente = documents.filter((d) => d.status !== "DELETED");
+
+  // Die Spalte heisst `documentType`, nicht `type`. Unter `type` fand der
+  // Vergleich nie etwas: Jeder Typ stand auf "Ausstehend", jede Datei unter
+  // "Weitere Dokumente". Die Route liefert die neuesten zuerst, die erste Datei
+  // eines Typs ist also der letzte Upload. Die uebrigen bleiben in der Karte
+  // erreichbar — der Upload nimmt je Aufruf eine Datei, ein mehrseitiger
+  // Nachweis kommt also auch seitenweise als Bilder unter demselben Typ.
+  const dateienZu = (type: string) => sichtbareDokumente.filter((d) => d.documentType === type);
+  const getDocFile = (type: string): DocumentData | undefined => dateienZu(type)[0];
 
   const getDocStatus = (type: string) => {
-    const doc = documents.find((d) => d.type === type);
+    const doc = getDocFile(type);
     if (!doc)
       return { status: "missing" as const, label: "Ausstehend", color: "text-gray-400", bgColor: "bg-gray-50" };
-    if (doc.expiresAt && new Date(doc.expiresAt) < new Date()) {
+    // EXPIRED setzt der taegliche Lauf (Amtsarzt-Gueltigkeit); bis dahin traegt
+    // das Ablaufdatum allein.
+    if (doc.status === "EXPIRED" || (doc.expiresAt && new Date(doc.expiresAt) < new Date())) {
       return { status: "expired" as const, label: "Abgelaufen", color: "text-orange-600", bgColor: "bg-orange-50" };
     }
     return { status: "uploaded" as const, label: "Vorhanden", color: "text-credo-gruen", bgColor: "bg-credo-gruen/5" };
   };
 
-  const getDocFile = (type: string) => documents.find((d) => d.type === type);
-
-  // Alles, was zu keinem der bekannten Typen gehoert. Solange der Upload den
-  // Typ unter dem falschen Feldnamen schickte, landete JEDES Dokument als
-  // SONSTIGES — und war damit nirgends sichtbar, obwohl die Datei gespeichert
-  // war. Ohne diesen Griff blieben die Altbestaende unauffindbar.
-  const sonstigeDokumente = documents.filter(
-    (d) => !(d.type in CIVIL_SERVICE_DOC_TYPES),
+  // Alles, was zu keinem der bekannten Typen gehoert (SONSTIGES). Solange der
+  // Upload den Typ unter dem falschen Feldnamen schickte, landete JEDES
+  // Dokument als SONSTIGES — ohne diesen Griff blieben diese Altbestaende
+  // unauffindbar. Der Upload speichert den Typ in Grossbuchstaben, genau wie
+  // die Schluessel von CIVIL_SERVICE_DOC_TYPES.
+  const sonstigeDokumente = sichtbareDokumente.filter(
+    (d) => !bekannteTypen.has(d.documentType),
   );
 
   return (
@@ -286,7 +301,9 @@ export function TabDocuments({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {docTypeEntries.map(([typeKey, typeLabel]) => {
           const ds = getDocStatus(typeKey);
-          const docFile = getDocFile(typeKey);
+          const dateien = dateienZu(typeKey);
+          const docFile: DocumentData | undefined = dateien[0];
+          const fruehereDateien = dateien.slice(1);
           const isAmtsarzt = typeKey.startsWith("AMTSARZT");
 
           return (
@@ -304,7 +321,7 @@ export function TabDocuments({
 
               {docFile && (
                 <div className="mb-2 text-xs text-gray-500">
-                  <p className="truncate">{docFile.fileName}</p>
+                  <p className="truncate">{docFile.fileName ?? docFile.documentName}</p>
                   <p>{formatBytes(docFile.fileSize)} &middot; {formatDate(docFile.uploadedAt)}</p>
                 </div>
               )}
@@ -339,6 +356,36 @@ export function TabDocuments({
                   </a>
                 )}
               </div>
+
+              {fruehereDateien.length > 0 && (
+                <div className="mt-3 border-t border-border pt-2">
+                  <p className="mb-1 text-[11px] font-semibold text-muted-foreground">
+                    {fruehereDateien.length === 1
+                      ? "1 frühere Datei"
+                      : `${fruehereDateien.length} frühere Dateien`}
+                  </p>
+                  <ul className="space-y-1">
+                    {fruehereDateien.map((doc) => {
+                      const name = doc.fileName ?? doc.documentName;
+                      return (
+                        <li key={doc.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="min-w-0 flex-1 truncate">
+                            {name} &middot; {formatDate(doc.uploadedAt)}
+                          </span>
+                          <a
+                            href={`/api/civil-service/${processId}/documents/${doc.id}`}
+                            className="shrink-0 font-medium text-foreground underline"
+                            aria-label={`${name} laden`}
+                            download
+                          >
+                            Laden
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
             </div>
           );
         })}
@@ -362,7 +409,7 @@ export function TabDocuments({
                 className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-800">{doc.fileName}</p>
+                  <p className="truncate text-sm font-medium text-gray-800">{doc.fileName ?? doc.documentName}</p>
                   <p className="text-[11px] text-gray-500">
                     {formatDate(doc.uploadedAt)} &middot; {formatBytes(doc.fileSize)}
                   </p>

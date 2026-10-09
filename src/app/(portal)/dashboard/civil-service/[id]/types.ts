@@ -118,15 +118,27 @@ export interface AssessmentData {
   submittedAt: string | null;
 }
 
+// Eine Zeile CivilServiceDocument, wie GET /api/civil-service/[id] sie roh
+// liefert (include documents, neueste zuerst). Hier standen frueher `type`
+// sowie fileName, fileSize und uploadedAt als Pflichtfelder — die Spalte heisst
+// aber `documentType`, und die Dateifelder sind im Modell nullbar. TypeScript
+// hat das nicht gemerkt: Der Reiter Dokumente verglich `d.type`, fand nie
+// etwas, zeigte jeden Typ als "Ausstehend" und jede Datei unter "Weitere
+// Dokumente".
 export interface DocumentData {
   id: string;
-  type: string;
-  fileName: string;
-  fileSize: number;
+  /** Schluessel aus CIVIL_SERVICE_DOC_TYPES oder SONSTIGES — der Upload speichert ihn in Grossbuchstaben. */
+  documentType: string;
+  documentName: string;
+  step: string | null;
+  fileName: string | null;
+  fileSize: number | null;
   mimeType: string | null;
+  /** PENDING | UPLOADED | APPROVED | EXPIRED (Fristen-Lauf) | GENERATED | DELETED (Soft Delete) */
   status: string;
-  uploadedAt: string;
+  uploadedAt: string | null;
   expiresAt: string | null;
+  createdAt: string;
 }
 
 export interface AuditLogEntry {
