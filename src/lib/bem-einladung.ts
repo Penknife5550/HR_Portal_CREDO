@@ -16,6 +16,7 @@ import { sendEmailDetailed } from "@/lib/mailer";
 import { renderCredoEmail, paragraphsToHtml } from "@/lib/email-layout";
 import { logBemAudit, logBemKommunikation, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { getBemEinwilligungstext } from "@/lib/bem-vorlagen";
+import { formatDatumDE } from "@/lib/format";
 
 export interface SendLinkFall {
   id: string;
@@ -98,7 +99,7 @@ export async function sendBemEinwilligungLink(params: {
     intro: `Guten Tag ${name},`,
     bodyHtml: paragraphsToHtml(body),
     button: { label: "Jetzt online bestätigen", url: magicUrl },
-    fussnote: `Dieser Link ist bis zum ${tokenExpiry.toLocaleDateString("de-DE")} gültig. Die Teilnahme ist freiwillig.`,
+    fussnote: `Dieser Link ist bis zum ${formatDatumDE(tokenExpiry)} gültig. Die Teilnahme ist freiwillig.`,
     appUrl: baseUrl,
   });
 

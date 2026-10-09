@@ -21,6 +21,7 @@ import { triggerWebhooks } from "@/lib/webhooks";
 import { versandBewerten } from "@/lib/contract-end-versand";
 import type { LinkVersandErgebnis } from "@/lib/abteilungsaufgaben";
 import { getBaseUrl } from "@/lib/url";
+import { formatDatumDE } from "@/lib/format";
 import {
   getContractEndCategory,
   CONTRACT_END_CATEGORY_META,
@@ -64,7 +65,7 @@ export async function sendSupervisorReminder(
     (now.getTime() - new Date(ce.supervisorLinkSentAt!).getTime()) / MS_PER_DAY,
   );
   const link = `${getBaseUrl()}/vertrag-formular/${ce.supervisorToken}`;
-  const vertragsende = new Date(ce.contractEndDate).toLocaleDateString("de-DE");
+  const vertragsende = formatDatumDE(ce.contractEndDate);
 
   // SMTP primaer (Event), Webhooks zusaetzlich — wirft nie
   const ergebnis = await triggerWebhooks("contract-end-supervisor-reminder", {

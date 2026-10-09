@@ -31,16 +31,15 @@ import { asciiFilename, saveUploadedFile, sha256Hex } from "@/lib/file-upload";
 import { sendEmail } from "@/lib/mailer";
 import type { DeckblattMeta } from "@/lib/pdf-deckblatt";
 import { getClientIpOrNull } from "@/lib/rate-limit";
+import { formatDatumDE } from "@/lib/format";
+import { heuteInBerlin } from "@/lib/kalendertag";
 
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
+/** Heutiges Datum in deutscher Zeit — der Container laeuft in UTC. */
 function todayDe(): string {
-  return new Date().toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatDatumDE(new Date());
 }
 
 /**
@@ -206,7 +205,9 @@ export const POST = apiHandler<GenerateInput>(
     };
 
     const baseName = slugify(template.name);
-    const dateStr = new Date().toISOString().slice(0, 10);
+    // Berliner Tag wie {datum} und „Erstellt am“ — toISOString() waere UTC, zwischen
+    // 0 und 2 Uhr deutscher Zeit hiesse die Datei sonst nach dem Vortag.
+    const dateStr = heuteInBerlin();
     const wantPdf = body.format === "pdf" || body.format === "mail";
 
     const result = await generateFromTemplate(templateBuffer, data, {

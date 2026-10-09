@@ -20,6 +20,7 @@ import { statusLabel } from "@/lib/minijob-status";
 import { rvEntscheidungLabel } from "@/lib/minijob-rentenversicherung";
 import { ART_LABELS, KATEGORIE_LABELS } from "@/lib/validations/beschaeftigungs-angaben";
 import { FELD_BEZEICHNUNGEN } from "@/lib/formular-fehler";
+import { formatDatumDE, formatZeitpunktDE } from "@/lib/format";
 import {
   anteilText,
   kostenstellenAnzeige,
@@ -215,24 +216,19 @@ const C = {
   lightGray: "#E5E5E5", white: "#FFFFFF", black: "#000000",
 };
 
+/** Kalendertag in deutscher Zeit (der Container laeuft in UTC); leer/unlesbar → „—“. */
 function fmt(d: string | null): string {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return formatDatumDE(d) || "—";
 }
 
 /**
  * Datum **mit Uhrzeit**. Fuer die Erklaerung reicht das blosse Datum nicht: Der
- * Zeitpunkt ist Teil des Unterschriftsersatzes.
+ * Zeitpunkt ist Teil des Unterschriftsersatzes — deshalb in deutscher Zeit;
+ * mit der Serverzeit (UTC) stand er ein bis zwei Stunden zu frueh im PDF.
  */
 function fmtZeit(d: string | null | undefined): string {
-  if (!d) return "—";
-  const datum = new Date(d);
-  if (Number.isNaN(datum.getTime())) return "—";
-  return `${datum.toLocaleDateString("de-DE")}, ${datum.toLocaleTimeString("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })} Uhr`;
+  const zeitpunkt = formatZeitpunktDE(d, { sekunden: true });
+  return zeitpunkt ? `${zeitpunkt} Uhr` : "—";
 }
 
 function yn(v: boolean | null): string {
@@ -754,9 +750,9 @@ async function addDokumentePages(doc: PDFKit.PDFDocument, ctx: OnboardingExportC
     doc.font("Helvetica").fontSize(8).fillColor(C.gray).text(fmt(d.uploadedAt), 480, y, { width: 80 });
 
     // Die Frist als eigene Zeile — und nur, wenn eine erfasst ist. Der Text
-    // kommt aus der Ampel und nicht aus fmt(): Die Spalte ist @db.Date, steht
-    // also auf Mitternacht UTC, und toLocaleDateString rechnet in die Ortszeit
-    // des Prozesses. Ohne diese Zeile ist der Ablauf im Papierexport ueberhaupt
+    // kommt aus der Ampel und nicht aus fmt(): Sie liest die Spalte (@db.Date)
+    // als Kalendertag und nennt neben dem Datum, wie lange die Frist noch
+    // laeuft. Ohne diese Zeile ist der Ablauf im Papierexport ueberhaupt
     // nicht zu sehen.
     if (d.gueltigBis) {
       const ampel = ablaufAmpel(d.gueltigBis);

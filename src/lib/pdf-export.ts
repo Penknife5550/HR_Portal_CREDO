@@ -15,6 +15,7 @@ import {
   buildVerifyHash,
 } from "@/lib/verify-assessment";
 import { REFERENZ_LABELS_ASCII as REFERENZ_LABELS } from "@/lib/referenz-labels";
+import { formatDatumDE } from "@/lib/format";
 
 // =============================================
 // Typen
@@ -159,13 +160,9 @@ const COLORS = {
 // Hilfsfunktionen
 // =============================================
 
+/** Kalendertag in deutscher Zeit (der Container laeuft in UTC); leer/unlesbar → „—“. */
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatDatumDE(dateStr) || "—";
 }
 
 const ASSIGNEE_LABELS: Record<string, string> = {

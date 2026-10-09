@@ -18,12 +18,15 @@ import { ABLAGE_LABELS } from "@/lib/bem-aktentrennung";
 import { buildBemGesamtExportPdf, type BemExportInput } from "@/lib/bem-export";
 import { logBemAudit, BEM_AUDIT_ACTIONS } from "@/lib/bem-audit";
 import { getClientIpOrNull } from "@/lib/rate-limit";
+import { formatDatumDE, formatZeitpunktDE } from "@/lib/format";
 
+// Datum und Zeitpunkt in deutscher Zeit — der Container laeuft in UTC, ein
+// Eintrag kurz nach Mitternacht stuende sonst mit dem Vortag in der Akte.
 function de(d: Date | null): string | null {
-  return d ? d.toLocaleDateString("de-DE") : null;
+  return formatDatumDE(d) || null;
 }
 function deTime(d: Date): string {
-  return d.toLocaleString("de-DE");
+  return formatZeitpunktDE(d, { sekunden: true });
 }
 
 const TYP_LABELS: Record<string, string> = {
@@ -246,7 +249,7 @@ export async function GET(
         person: a.user ? `${a.user.firstName} ${a.user.lastName}` : "System/Extern",
         ip: a.ipAddress,
       })),
-      erstelltAm: new Date().toLocaleString("de-DE"),
+      erstelltAm: deTime(new Date()),
       erstelltVon: `${session.firstName} ${session.lastName}`.trim(),
     };
 

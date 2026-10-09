@@ -1,5 +1,20 @@
 import type { Config } from "jest";
 
+// Die Tests rechnen in UTC — wie der Container, in dem der Server-Code laeuft
+// (kein TZ in Dockerfile/Compose). Auf dem Entwicklerrechner (Europe/Berlin)
+// bestuenden Zeitzonen-Tests sonst auch mit Code, der die Serverzeit nimmt:
+// Ein Zeitpunkt kurz nach Mitternacht deutscher Zeit ("2026-10-08T22:30Z")
+// ergibt dort mit `toLocaleDateString()` ohne `timeZone` zufaellig richtig den
+// 09.10., im Container aber den 08.10. Und `npm run pruefen` auf diesem Rechner
+// ist die einzige Pruefung vor dem Push (weder CI noch Git-Hooks).
+//
+// Gesetzt hier, weil Jest diese Datei im Hauptprozess liest, BEVOR es die
+// Worker startet: Sie erben die Umgebung. Ein `process.env.TZ` in einer
+// Testdatei wirkt nicht (Jest gibt jeder Datei eine Kopie von `process.env`).
+// Node uebernimmt die Zuweisung auch im laufenden Prozess (`--runInBand`).
+// Dass es greift, prueft `format.test.ts` („Testumgebung rechnet in UTC“).
+process.env.TZ = "UTC";
+
 const config: Config = {
   // KEIN `preset: "ts-jest"`. Das Preset besteht ausschliesslich aus einem
   // einzigen Transform-Eintrag `"^.+\\.tsx?$": ["ts-jest", {}]` — und genau der

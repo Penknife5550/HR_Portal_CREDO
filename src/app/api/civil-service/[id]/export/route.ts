@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { heuteInBerlin } from "@/lib/kalendertag";
 import { generateExportPDF, type ExportContext, type ExportType } from "@/lib/pdf-export";
 
 const exportLimiter = createRateLimiter("civil-service-export", { maxRequests: 10, windowMs: 60_000 });
@@ -192,7 +193,9 @@ export async function GET(
     const pdfBuffer = await generateExportPDF(ctx, type as ExportType, nr);
 
     // Dateiname
-    const dateStr = new Date().toISOString().slice(0, 10);
+    // Berliner Tag wie „Exportiert am“ im PDF — toISOString() waere UTC, zwischen
+    // 0 und 2 Uhr deutscher Zeit hiesse die Datei sonst nach dem Vortag.
+    const dateStr = heuteInBerlin();
     const typeName = type === "gesamtakte" ? "Gesamtakte"
       : type === "antrag" ? "Antrag"
       : type === "beurteilung" ? `Beurteilung_${nr}`

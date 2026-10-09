@@ -19,7 +19,7 @@ import { decrypt, isEncryptionConfigured } from "@/lib/encryption";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { getEventDefinition } from "@/lib/events";
 import { EMAIL_PATTERN } from "@/lib/constants";
-import { formatDatumDE } from "@/lib/format";
+import { formatDatumDE, formatZeitpunktDE } from "@/lib/format";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
 import { escapeHtml } from "@/lib/email-layout";
 import { vorgangBezugAusPayload, type VorgangBezug } from "@/lib/vorgangs-mails";
@@ -183,7 +183,7 @@ export async function testSmtpConnection(testEmail: string): Promise<SmtpTestRes
         <div style="font-family: Arial, sans-serif; padding: 24px;">
           <h2 style="color: #1a1a2e;">✅ SMTP-Verbindungstest erfolgreich</h2>
           <p>Die SMTP-Konfiguration des CREDO HR-Portals funktioniert korrekt.</p>
-          <p style="color: #666; font-size: 12px;">Gesendet am: ${new Date().toLocaleString("de-DE")}</p>
+          <p style="color: #666; font-size: 12px;">Gesendet am: ${formatZeitpunktDE(new Date(), { sekunden: true })}</p>
         </div>
       `,
       text: "CREDO HR-Portal SMTP-Test: Die Verbindung funktioniert korrekt.",

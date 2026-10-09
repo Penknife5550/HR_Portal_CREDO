@@ -26,6 +26,8 @@ import { dokumentGenerierenSchema } from "@/lib/validations/bem";
 import type { DeckblattMeta } from "@/lib/pdf-deckblatt";
 import type { BemDokumentTyp } from "@prisma/client";
 import { getClientIpOrNull } from "@/lib/rate-limit";
+import { formatDatumDE } from "@/lib/format";
+import { heuteInBerlin } from "@/lib/kalendertag";
 
 /**
  * Basisname der abgelegten Datei.
@@ -119,7 +121,7 @@ export async function POST(
       mandantNumber: resolved.mandantNumber ?? undefined,
       refId: id,
       empfaenger: resolved.empfaenger,
-      erstelltAm: new Date().toLocaleDateString("de-DE"),
+      erstelltAm: formatDatumDE(new Date()),
       erstelltVon: `${session.firstName} ${session.lastName}`.trim(),
     };
 
@@ -143,7 +145,9 @@ export async function POST(
     }
 
     const genId = crypto.randomUUID();
-    const dateStr = new Date().toISOString().slice(0, 10);
+    // Berliner Tag wie {datum} und „Erstellt am“ — toISOString() waere UTC, zwischen
+    // 0 und 2 Uhr deutscher Zeit hiesse die Datei sonst nach dem Vortag.
+    const dateStr = heuteInBerlin();
     const base = `${slug(template.name)}_${dateStr}`;
     const subdir = `bem/${id}/dokumente/${genId}`;
 
