@@ -49,6 +49,7 @@ export function TabOverview({
   setEditingValue,
   handleFieldSave,
   onNavigateTab,
+  hrReiterSichtbar = true,
 }: {
   data: OffboardingData;
   editingField: string | null;
@@ -58,6 +59,11 @@ export function TabOverview({
   setEditingValue: (v: string) => void;
   handleFieldSave: (field: string, value: string) => void;
   onNavigateTab?: (tab: string) => void;
+  /**
+   * Gibt es die Reiter „Exit-Interview" und „Zeugnis"? Nur mit HR_EDIT_ROLES
+   * (wie ihre Routen) — sonst fuehrt kein Knopf dorthin.
+   */
+  hrReiterSichtbar?: boolean;
 }) {
   const ed = data.exitData;
 
@@ -189,7 +195,7 @@ export function TabOverview({
       info: hasExitInterview
         ? (exitInterviewDone ? undefined : "Exit-Interview wurde erstellt — wartet auf Einreichung")
         : "Kein Exit-Interview erstellt — kann im Exit-Interview-Tab angelegt werden",
-      actions: !step4Done && onNavigateTab ? [
+      actions: !step4Done && onNavigateTab && hrReiterSichtbar ? [
         { label: "Zum Exit-Interview-Tab", onClick: () => onNavigateTab("exit-interview"), variant: "secondary" as const },
       ] : undefined,
     },
@@ -201,7 +207,7 @@ export function TabOverview({
       info: zeugnisDone ? undefined
         : zeugnisStatus === "IN_PROGRESS" ? "Zeugnis in Bearbeitung"
         : "Zeugnis-Bewertung noch ausstehend — kann im Zeugnis-Tab gestartet werden",
-      actions: !step5Done && onNavigateTab ? [
+      actions: !step5Done && onNavigateTab && hrReiterSichtbar ? [
         { label: "Zum Zeugnis-Tab", onClick: () => onNavigateTab("zeugnis"), variant: "secondary" as const },
       ] : undefined,
     },

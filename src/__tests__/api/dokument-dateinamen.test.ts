@@ -33,12 +33,16 @@ const mockPrisma = {
   // (Mandant) und das Dokument dann gebunden an ihn (findFirst).
   onboardingProcess: { findUnique: jest.fn() },
   document: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
-  offboardingDocument: { findUnique: jest.fn(), create: jest.fn() },
+  // Seit 10/2026 laedt auch der Offboarding-Download das Dokument gebunden
+  // an den Vorgang (findFirst), und der Upload legt Zeile und Protokoll in
+  // EINER Transaktion an.
+  offboardingDocument: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
   offboardingProcess: { findUnique: jest.fn() },
   civilServiceProcess: { findUnique: jest.fn() },
   civilServiceDocument: { create: jest.fn() },
   civilServiceChecklistItem: { findMany: jest.fn(), update: jest.fn() },
   auditLog: { create: jest.fn() },
+  $transaction: jest.fn(),
 };
 
 jest.mock("@/lib/auth", () => ({
@@ -120,7 +124,8 @@ beforeEach(() => {
     id: "vb-1",
     status: "IN_BEARBEITUNG",
   });
-  mockPrisma.offboardingProcess.findUnique.mockResolvedValue({ id: "off-1" });
+  mockPrisma.offboardingProcess.findUnique.mockResolvedValue({ id: "off-1", organizationId: "org-1" });
+  mockPrisma.$transaction.mockImplementation(async (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma));
   mockPrisma.civilServiceChecklistItem.findMany.mockResolvedValue([]);
   mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -149,7 +154,7 @@ async function onboardingDownload(fileName: string) {
 }
 
 async function offboardingDownload(fileName: string) {
-  mockPrisma.offboardingDocument.findUnique.mockResolvedValue({
+  mockPrisma.offboardingDocument.findFirst.mockResolvedValue({
     id: "doc-1",
     offboardingId: "off-1",
     fileName,

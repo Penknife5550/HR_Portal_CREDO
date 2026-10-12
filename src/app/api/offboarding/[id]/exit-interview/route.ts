@@ -4,63 +4,65 @@
  * POST - Exit-Interview für ein Offboarding erstellen
  * GET  - Exit-Interview eines Offboardings abrufen
  *
- * Berechtigung: Authentifizierter Benutzer
+ * Berechtigung: HR_EDIT_ROLES in beiden Methoden. Das Exit-Interview ist eine
+ * vertrauliche Befragung — die Antworten betreffen oft genau die
+ * Fuehrungskraft, und die Antwort traegt den Token des Magic Links, mit dem
+ * sich der Fragebogen im Namen der Person ausfuellen liesse. Deshalb weder
+ * PORTAL_ROLES (Fuehrungskraft, Einrichtungsleitung) noch der n8n-Schluessel
+ * (SERVICE).
+ *
+ * Mandant per canAccessProcess: unbekannt und fremd = dieselbe 404. Im
+ * AuditLog steht keine Adresse der Person — die steht in der Zeile selbst.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
+import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { apiHandler } from "@/lib/api-handler";
+import { prisma } from "@/lib/db";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { nichtGefunden, offboardingZugaenglich } from "@/lib/offboarding-zugriff";
+
+const LOG_LABEL = "Offboarding/Exit-Interview";
 
 const EXIT_INTERVIEW_DELAY_DAYS = 7;
 const EXIT_INTERVIEW_TOKEN_VALIDITY_DAYS = 30;
 
+const SCHON_VORHANDEN = "Für diesen Vorgang gibt es bereits ein Exit-Interview.";
+
 // =============================================
 // POST /api/offboarding/[id]/exit-interview
 // =============================================
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+export const POST = apiHandler(
+  { roles: HR_EDIT_ROLES, logLabel: LOG_LABEL },
+  async ({ params, session }) => {
+    const id = params.id;
+    if (!(await offboardingZugaenglich(session!, id))) return nichtGefunden();
 
-    const { id } = await params;
-
-    // Offboarding laden
     const offboarding = await prisma.offboardingProcess.findUnique({
       where: { id },
       select: {
         id: true,
         employeePrivateEmail: true,
-        employeeFirstName: true,
-        employeeLastName: true,
         lastWorkingDay: true,
       },
     });
-
-    if (!offboarding) {
-      return NextResponse.json({ error: "Offboarding-Vorgang nicht gefunden" }, { status: 404 });
-    }
+    if (!offboarding) return nichtGefunden();
 
     if (!offboarding.employeePrivateEmail) {
       return NextResponse.json(
-        { error: "Keine private E-Mail-Adresse des Mitarbeiters hinterlegt. Bitte zuerst die private E-Mail im Offboarding erfassen." },
-        { status: 400 }
+        { error: "Keine private E-Mail-Adresse hinterlegt. Bitte zuerst die private E-Mail im Tab Übersicht erfassen." },
+        { status: 409 }
       );
     }
 
     // Pruefen ob bereits ein Exit-Interview existiert
     const existing = await prisma.exitInterview.findUnique({
       where: { offboardingId: id },
+      select: { id: true },
     });
-
     if (existing) {
-      return NextResponse.json(
-        { error: "Es existiert bereits ein Exit-Interview für dieses Offboarding" },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: SCHON_VORHANDEN }, { status: 409 });
     }
 
     // Standard-Template laden (isDefault=true, isActive=true)
@@ -80,8 +82,8 @@ export async function POST(
 
     if (!template) {
       return NextResponse.json(
-        { error: "Kein aktives Standard-Template für Exit-Interviews gefunden" },
-        { status: 404 }
+        { error: "Es gibt keine aktive Standardvorlage für Exit-Interviews (Vorlagen → Exit-Interview)." },
+        { status: 409 }
       );
     }
 
@@ -116,66 +118,58 @@ export async function POST(
     const sendAfterDate = new Date(lastWorkingDay.getTime() + EXIT_INTERVIEW_DELAY_DAYS * 24 * 60 * 60 * 1000);
     const tokenExpiresAt = new Date(sendAfterDate.getTime() + EXIT_INTERVIEW_TOKEN_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
 
-    // Exit-Interview erstellen
-    const exitInterview = await prisma.exitInterview.create({
-      data: {
-        offboardingId: id,
-        token,
-        tokenExpiresAt,
-        sendAfterDate,
-        recipientEmail: offboarding.employeePrivateEmail,
-        status: "SCHEDULED",
-        templateSnapshot,
-        employeeRole: null,
-      },
-    });
-
-    // AuditLog schreiben
-    await prisma.auditLog.create({
-      data: {
-        userId: session.userId,
-        offboardingId: id,
-        processType: "OFFBOARDING",
-        action: "EXIT_INTERVIEW_CREATED",
-        details: {
-          exitInterviewId: exitInterview.id,
-          templateName: template.name,
-          templateVersion: template.version,
-          recipientEmail: offboarding.employeePrivateEmail,
-          sendAfterDate: sendAfterDate.toISOString(),
-        },
-      },
-    });
+    // Exit-Interview und Protokoll in EINER Transaktion. Zwei gleichzeitige
+    // Klicks scheitern am Unique-Index auf offboardingId (P2002) → 409.
+    let exitInterview;
+    try {
+      exitInterview = await prisma.$transaction(async (tx) => {
+        const neu = await tx.exitInterview.create({
+          data: {
+            offboardingId: id,
+            token,
+            tokenExpiresAt,
+            sendAfterDate,
+            recipientEmail: offboarding.employeePrivateEmail!,
+            status: "SCHEDULED",
+            templateSnapshot,
+            employeeRole: null,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            userId: session!.userId,
+            offboardingId: id,
+            processType: "OFFBOARDING",
+            action: "EXIT_INTERVIEW_CREATED",
+            details: {
+              exitInterviewId: neu.id,
+              templateName: template.name,
+              templateVersion: template.version,
+              sendAfterDate: sendAfterDate.toISOString(),
+            },
+          },
+        });
+        return neu;
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        return NextResponse.json({ error: SCHON_VORHANDEN }, { status: 409 });
+      }
+      throw e;
+    }
 
     return NextResponse.json({ data: exitInterview }, { status: 201 });
-  } catch (error) {
-    console.error("[API] Exit-Interview erstellen fehlgeschlagen:", error);
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
-}
+);
 
 // =============================================
 // GET /api/offboarding/[id]/exit-interview
 // =============================================
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
-
-    const { id } = await params;
-
-    // Pruefen ob Offboarding existiert
-    const offboarding = await prisma.offboardingProcess.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!offboarding) {
-      return NextResponse.json({ error: "Offboarding-Vorgang nicht gefunden" }, { status: 404 });
-    }
+export const GET = apiHandler(
+  { roles: HR_EDIT_ROLES, logLabel: LOG_LABEL },
+  async ({ params, session }) => {
+    const id = params.id;
+    if (!(await offboardingZugaenglich(session!, id))) return nichtGefunden();
 
     const exitInterview = await prisma.exitInterview.findUnique({
       where: { offboardingId: id },
@@ -197,8 +191,5 @@ export async function GET(
         responsesCount: exitInterview._count.responses,
       },
     });
-  } catch (error) {
-    console.error("[API] Exit-Interview laden fehlgeschlagen:", error);
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
-}
+);

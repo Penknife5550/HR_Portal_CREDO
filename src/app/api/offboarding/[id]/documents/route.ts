@@ -1,16 +1,26 @@
 /**
  * API: /api/offboarding/:id/documents
  *
- * GET  – Alle Offboarding-Dokumente auflisten
- * POST – Dokument hochladen (Multipart FormData)
+ * GET  – Alle Offboarding-Dokumente auflisten (PORTAL_ROLES — dieselbe Sicht
+ *        wie GET /api/offboarding/:id, das die Liste ohnehin mitliefert)
+ * POST – Dokument hochladen, Multipart FormData (HR_EDIT_ROLES)
+ *
+ * Mandant per canAccessProcess: unbekannt und fremd = dieselbe 404. Der
+ * n8n-Schluessel (SERVICE) bekommt 403. Das Hochladen schreibt
+ * `DOCUMENT_UPLOADED` im selben Commit wie die Dokumentzeile — ohne Dateinamen
+ * (der traegt oft den Namen der Person), nur ID, Art, Groesse und Typ.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
-import { sanitizeFilename } from "@/lib/file-upload";
-import { writeFile, mkdir } from "fs/promises";
+import { NextResponse } from "next/server";
+import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
+import { apiHandler } from "@/lib/api-handler";
+import { prisma } from "@/lib/db";
+import { sanitizeFilename } from "@/lib/file-upload";
+import { HR_EDIT_ROLES, PORTAL_ROLES } from "@/lib/permissions";
+import { nichtGefunden, offboardingZugaenglich } from "@/lib/offboarding-zugriff";
+
+const LOG_LABEL = "Offboarding/Dokumente";
 
 // Erlaubte Dateitypen
 const ALLOWED_MIME_TYPES = [
@@ -51,125 +61,83 @@ const VALID_OFFBOARDING_DOC_TYPES = [
   "SONSTIGES",
 ];
 
+function fehler(text: string, status = 400) {
+  return NextResponse.json({ error: text }, { status });
+}
+
 // =============================================
 // GET /api/offboarding/:id/documents
 // =============================================
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
-    }
+export const GET = apiHandler(
+  { roles: PORTAL_ROLES, logLabel: LOG_LABEL },
+  async ({ params, session }) => {
+    if (!(await offboardingZugaenglich(session!, params.id))) return nichtGefunden();
 
-    const { id } = await params;
-
-    const offboarding = await prisma.offboardingProcess.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!offboarding) {
-      return NextResponse.json(
-        { error: "Offboarding-Vorgang nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
+    // Ohne `filePath`: Der Speicherort geht niemanden ausserhalb des Servers an.
     const documents = await prisma.offboardingDocument.findMany({
-      where: { offboardingId: id },
+      where: { offboardingId: params.id },
+      select: {
+        id: true,
+        offboardingId: true,
+        type: true,
+        fileName: true,
+        fileSize: true,
+        mimeType: true,
+        status: true,
+        uploadedAt: true,
+        uploadedById: true,
+        reviewedAt: true,
+        reviewedById: true,
+      },
       orderBy: { uploadedAt: "desc" },
     });
 
     return NextResponse.json({ documents });
-  } catch (error) {
-    console.error("Fehler beim Laden der Dokumente:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
   }
-}
+);
 
 // =============================================
 // POST /api/offboarding/:id/documents
 // =============================================
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
+export const POST = apiHandler(
+  { roles: HR_EDIT_ROLES, logLabel: LOG_LABEL },
+  async ({ request, params, session }) => {
+    const id = params.id;
+    if (!(await offboardingZugaenglich(session!, id))) return nichtGefunden();
+
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return fehler("Die Datei konnte nicht gelesen werden. Erlaubt sind Dateien bis 10 MB.");
     }
+    const file = formData.get("file");
+    const docType = formData.get("type");
 
-    const { id } = await params;
-
-    // Pruefen ob Offboarding existiert
-    const offboarding = await prisma.offboardingProcess.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!offboarding) {
-      return NextResponse.json(
-        { error: "Offboarding-Vorgang nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const docType = (formData.get("type") as string) || "SONSTIGES";
-
-    if (!file) {
-      return NextResponse.json(
-        { error: "Keine Datei ausgewaehlt." },
-        { status: 400 }
-      );
+    if (!file || typeof file === "string") {
+      return fehler("Keine Datei ausgewählt.");
     }
 
     // Dokumenttyp validieren
-    const upperDocType = docType.toUpperCase();
+    const upperDocType = (typeof docType === "string" && docType ? docType : "SONSTIGES").toUpperCase();
     if (!VALID_OFFBOARDING_DOC_TYPES.includes(upperDocType)) {
-      return NextResponse.json(
-        { error: `Ungültiger Dokumenttyp. Erlaubt: ${VALID_OFFBOARDING_DOC_TYPES.join(", ")}` },
-        { status: 400 }
-      );
+      return fehler("Unbekannte Dokumentart.");
     }
 
     // Dateigroesse pruefen
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "Datei ist zu gross. Maximal 10 MB erlaubt." },
-        { status: 400 }
-      );
+      return fehler("Die Datei ist zu groß. Erlaubt sind höchstens 10 MB.");
     }
 
     // MIME-Type pruefen
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Dateityp nicht erlaubt. Erlaubt sind: PDF, JPG, PNG, WebP." },
-        { status: 400 }
-      );
+      return fehler("Dateityp nicht erlaubt. Erlaubt sind PDF, JPG, PNG und WebP.");
     }
 
     // Dateiinhalt lesen und Magic Bytes pruefen
     const buffer = Buffer.from(await file.arrayBuffer());
     if (!validateMagicBytes(buffer, file.type)) {
-      return NextResponse.json(
-        { error: "Dateiinhalt stimmt nicht mit dem angegebenen Dateityp überein." },
-        { status: 400 }
-      );
+      return fehler("Der Dateiinhalt passt nicht zum Dateityp.");
     }
 
     // Upload-Verzeichnis erstellen
@@ -207,29 +175,50 @@ export async function POST(
     const fileName = sanitizeFilename(path.basename(file.name) || "upload");
     const filePath = path.join(uploadDir, fileName);
 
-    // Path-Traversal-Schutz
-    const resolvedPath = path.resolve(filePath);
-    if (!resolvedPath.startsWith(uploadBaseDir)) {
-      return NextResponse.json(
-        { error: "Ungültiger Dateiname." },
-        { status: 400 }
-      );
+    // Path-Traversal-Schutz: nur im Ordner DIESES Vorgangs.
+    if (!path.resolve(filePath).startsWith(uploadDir + path.sep)) {
+      return fehler("Ungültiger Dateiname.");
     }
 
     await writeFile(filePath, buffer);
 
-    // Dokument in DB speichern
-    const document = await prisma.offboardingDocument.create({
-      data: {
-        offboardingId: id,
-        type: upperDocType as never,
-        fileName: file.name,
-        filePath: `uploads/offboarding/${id}/${fileName}`,
-        fileSize: buffer.length,
-        mimeType: file.type,
-        uploadedById: session.userId,
-      },
-    });
+    // Dokumentzeile und Protokoll in EINER Transaktion. Scheitert sie, wird
+    // die gerade geschriebene Datei wieder entfernt — sonst laege sie ohne
+    // Zeile auf der Platte.
+    let document;
+    try {
+      document = await prisma.$transaction(async (tx) => {
+        const neu = await tx.offboardingDocument.create({
+          data: {
+            offboardingId: id,
+            type: upperDocType as never,
+            fileName: file.name,
+            filePath: `uploads/offboarding/${id}/${fileName}`,
+            fileSize: buffer.length,
+            mimeType: file.type,
+            uploadedById: session!.userId,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            offboardingId: id,
+            userId: session!.userId,
+            processType: "OFFBOARDING",
+            action: "DOCUMENT_UPLOADED",
+            details: {
+              documentId: neu.id,
+              dokumentTyp: upperDocType,
+              groesse: buffer.length,
+              mimeType: file.type,
+            },
+          },
+        });
+        return neu;
+      });
+    } catch (dbFehler) {
+      await unlink(filePath).catch(() => undefined);
+      throw dbFehler;
+    }
 
     return NextResponse.json(
       {
@@ -241,11 +230,5 @@ export async function POST(
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("Fehler beim Dokumenten-Upload:", error);
-    return NextResponse.json(
-      { error: "Fehler beim Hochladen der Datei." },
-      { status: 500 }
-    );
   }
-}
+);

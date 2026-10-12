@@ -247,3 +247,11 @@ export const TABS = [
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];
+
+/**
+ * Reiter nur mit HR_EDIT_ROLES — wie ihre Routen: das Mailprotokoll, das
+ * Exit-Interview (vertrauliche Befragung; die Antwort traegt den Magic Link
+ * der Person) und die Zeugnis-Bewertung (die Antwort traegt den
+ * Bewertungslink der Fuehrungskraft).
+ */
+export const NUR_HR_TABS: ReadonlySet<TabId> = new Set<TabId>(["exit-interview", "zeugnis", "mails"]);

@@ -33,7 +33,7 @@ export function TabDocuments({
   handleFileDrop: (e: React.DragEvent) => void;
   dragOver: boolean;
   setDragOver: (v: boolean) => void;
-  /** Darf die angemeldete Person Dokumente erzeugen? */
+  /** Darf die angemeldete Person Dokumente erzeugen und hochladen? */
   canEdit: boolean;
 }) {
   // Ein Paketversand legt fuer jede mitgeschickte Vorlage ein Dokument an. Die
@@ -78,46 +78,48 @@ export function TabDocuments({
       {/* Individuelle E-Mail (Paket 3): private und dienstliche Adresse zur Wahl. */}
       <IndividuelleMailKarte modul="OFFBOARDING" refId={offboardingId} canEdit={canEdit} />
 
-      {/* Upload Area */}
-      <div
-        className={`rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
-          dragOver
-            ? "border-credo-gruen bg-credo-gruen/5"
-            : "border-border bg-card hover:border-credo-gruen/30"
-        }`}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleFileDrop}
-      >
-        <UploadCloudIcon className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
-        <p className="mb-2 text-sm font-medium text-foreground">
-          {uploadingDoc ? "Wird hochgeladen..." : "Datei hier ablegen oder auswählen"}
-        </p>
-        <div className="flex items-center justify-center gap-3">
-          <select autoComplete="off"
-            value={docType}
-            onChange={(e) => setDocType(e.target.value)}
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-credo-blau"
-          >
-            {Object.entries(OFFBOARDING_DOC_TYPE_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingDoc}
-            className="rounded-md bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
-          >
-            Datei auswählen
-          </button>
-          <input autoComplete="off"
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={handleFileSelect}
-          />
+      {/* Upload Area — nur mit HR_EDIT_ROLES, wie POST …/documents. */}
+      {canEdit && (
+        <div
+          className={`rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+            dragOver
+              ? "border-credo-gruen bg-credo-gruen/5"
+              : "border-border bg-card hover:border-credo-gruen/30"
+          }`}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleFileDrop}
+        >
+          <UploadCloudIcon className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
+          <p className="mb-2 text-sm font-medium text-foreground">
+            {uploadingDoc ? "Wird hochgeladen..." : "Datei hier ablegen oder auswählen"}
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <select autoComplete="off"
+              value={docType}
+              onChange={(e) => setDocType(e.target.value)}
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-credo-blau"
+            >
+              {Object.entries(OFFBOARDING_DOC_TYPE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingDoc}
+              className="rounded-md bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95 disabled:opacity-50"
+            >
+              Datei auswählen
+            </button>
+            <input autoComplete="off"
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Document List */}
       {data.documents.length > 0 ? (
@@ -182,7 +184,9 @@ export function TabDocuments({
           <DocumentIcon className="mb-3 h-12 w-12 text-border" />
           <p className="mb-1 text-base font-medium text-foreground">Keine Dokumente</p>
           <p className="text-sm text-muted-foreground">
-            Laden Sie Dokumente über den Upload-Bereich oben hoch.
+            {canEdit
+              ? "Laden Sie Dokumente über den Upload-Bereich oben hoch."
+              : "Zu diesem Vorgang wurden noch keine Dokumente hochgeladen."}
           </p>
         </div>
       )}

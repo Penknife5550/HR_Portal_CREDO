@@ -109,6 +109,17 @@ describe("Protokoll-Beschriftungen", () => {
     expect(getActionLabel("DOKUMENT_ABLAUF_ERINNERT")).toBe("Ablauf-Erinnerung gesendet");
   });
 
+  test("die Codes von Exit-Interview und Zeugnis-Bewertung (Offboarding) sind uebersetzt", () => {
+    // Geschrieben von /api/offboarding/:id/exit-interview[/send] und
+    // …/zeugnis-bewertung[/hr-review]; standen bis 10/2026 roh im Protokoll.
+    expect(getActionLabel("EXIT_INTERVIEW_CREATED")).toBe("Exit-Interview erstellt");
+    expect(getActionLabel("EXIT_INTERVIEW_INVITED")).toBe("Exit-Interview-Einladung versendet");
+    expect(getActionLabel("ZEUGNIS_BEWERTUNG_CREATED")).toBe("Zeugnis-Bewertung angelegt");
+    expect(getActionLabel("ZEUGNIS_BEWERTUNG_HR_REVIEWED")).toBe("Zeugnis-Bewertung von HR geprüft");
+    expect(getActionLabel("ZEUGNIS_BEWERTUNG_FINALIZED")).toBe("Zeugnis-Bewertung abgeschlossen");
+    expect(getActionLabel("DOCUMENT_UPLOADED")).toBe("Dokument hochgeladen");
+  });
+
   test("die Codes der individuellen E-Mail (Paket 3) sind uebersetzt", () => {
     expect(getActionLabel("INDIVIDUELLE_MAIL_SENT")).toBe("Individuelle E-Mail versendet");
     expect(getActionLabel("INDIVIDUELLE_MAIL_NACHWEIS_FEHLGESCHLAGEN")).toBe(
