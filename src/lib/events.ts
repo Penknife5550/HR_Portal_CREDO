@@ -572,6 +572,8 @@ export const EVENT_CATALOG: EventDefinition[] = [
     defaultRecipients: { to: "{{supervisorEmail}}" },
     // Kein Feld `email`: Der Name der Person faellt nie auf ihre Adresse
     // zurueck (vorgesetztenLinkMailFelder in src/lib/onboarding-einladung.ts).
+    // `ausstattung_angeboten`: Merker "ja"/"" — das Formular zeigt den Schritt
+    // „Ausstattung & Zugänge“ (Regel 2, SupervisorData.mitAusstattung).
     samplePayload: {
       onboardingId: "00000000-0000-0000-0000-000000000001",
       displayId: "2026-GYM-001",
@@ -582,6 +584,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
       organization: "FES Minden",
       mandantNumber: "01",
       supervisorTokenExpiresAt: "2026-07-15T12:00:00.000Z",
+      ausstattung_angeboten: "ja",
     },
     wired: true,
   },
@@ -593,6 +596,8 @@ export const EVENT_CATALOG: EventDefinition[] = [
     defaultRecipients: { to: "" },
     // Die beiden Merker schliessen einander aus (Paket 2): Entweder liegt der
     // Fragebogen schon vor („bereit zur Prüfung") oder er steht noch aus.
+    // `ausstattung_kurz` (Paket A2): nur gezaehlt, nie Bemerkungstexte; ""
+    // ohne Wahl bzw. ohne den Schritt im Formular.
     samplePayload: {
       onboardingId: "00000000-0000-0000-0000-000000000001",
       displayId: "2026-GYM-001",
@@ -602,6 +607,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
       organization: "FES Minden",
       fragebogen_eingereicht: "",
       fragebogen_offen: "ja",
+      ausstattung_kurz: "6 Positionen für 3 Stellen",
     },
     wired: true,
   },

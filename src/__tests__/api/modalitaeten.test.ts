@@ -21,7 +21,16 @@ const mockPrisma = {
     findUnique: jest.fn(),
   },
   auditLog: { create: jest.fn() },
-  organization: { findMany: jest.fn() },
+  organization: { findMany: jest.fn(), findUnique: jest.fn() },
+  // Schritt „Ausstattung & Zugänge" (Paket A2, src/lib/ausstattung-dienst.ts):
+  // Katalog und Wahl der Fuehrungskraft. Die Faelle hier tragen keinen Merker
+  // `mitAusstattung` — die Route darf diese Tabellen dann gar nicht anfassen
+  // (eigene Suite: modalitaeten-ausstattung.test.ts).
+  ausstattungsPosition: { findMany: jest.fn() },
+  ausstattungsAusblendung: { findMany: jest.fn() },
+  departmentConfig: { findMany: jest.fn() },
+  onboardingAusstattung: { findMany: jest.fn(), deleteMany: jest.fn(), createMany: jest.fn() },
+  onboardingStellenHinweis: { findMany: jest.fn(), deleteMany: jest.fn(), createMany: jest.fn() },
   // Die PUT-Route speichert Kopf und Zeilen in EINER interaktiven
   // Transaktion. Der Mock reicht sich selbst als `tx` durch — geprueft wird
   // hier, WAS geschrieben wird, nicht dass Postgres es atomar tut.
@@ -129,6 +138,11 @@ beforeEach(() => {
   mockPrisma.onboardingProcess.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(standNachAbgabe());
   mockPrisma.auditLog.create.mockResolvedValue({});
+  mockPrisma.ausstattungsPosition.findMany.mockResolvedValue([]);
+  mockPrisma.ausstattungsAusblendung.findMany.mockResolvedValue([]);
+  mockPrisma.departmentConfig.findMany.mockResolvedValue([]);
+  mockPrisma.onboardingAusstattung.findMany.mockResolvedValue([]);
+  mockPrisma.onboardingStellenHinweis.findMany.mockResolvedValue([]);
   mockPrisma.$transaction.mockImplementation((arg: unknown) =>
     typeof arg === "function"
       ? (arg as (tx: typeof mockPrisma) => unknown)(mockPrisma)
@@ -441,6 +455,47 @@ describe("PUT – Kostenstellen-Aufteilung", () => {
   });
 });
 
+describe("PUT – ohne Schritt „Ausstattung & Zugänge“ (kein Merker)", () => {
+  /** Alle Aufrufe an die Tabellen des Ausstattungsschritts. */
+  function ausstattungsAufrufe(): number {
+    return [
+      mockPrisma.ausstattungsPosition.findMany,
+      mockPrisma.onboardingAusstattung.findMany,
+      mockPrisma.onboardingAusstattung.deleteMany,
+      mockPrisma.onboardingAusstattung.createMany,
+      mockPrisma.onboardingStellenHinweis.findMany,
+      mockPrisma.onboardingStellenHinweis.deleteMany,
+      mockPrisma.onboardingStellenHinweis.createMany,
+    ].reduce((n, fn) => n + fn.mock.calls.length, 0);
+  }
+
+  it("ein Aufruf ohne Ausstattung fasst die neuen Tabellen nicht an und sperrt den Vorgang nicht", async () => {
+    const res = await PUT(req("PUT", STEP1), { params: params() });
+
+    expect(res.status).toBe(200);
+    expect(ausstattungsAufrufe()).toBe(0);
+    expect(mockPrisma.onboardingProcess.updateMany).not.toHaveBeenCalled();
+    // `ausstattungGespeichertAm` setzt nur der Ausstattungsschritt.
+    expect(mockPrisma.supervisorData.update).not.toHaveBeenCalled();
+  });
+
+  it("Ausstattung ohne Merker: 400, nichts gespeichert", async () => {
+    const res = await PUT(req("PUT", { ausstattung: [], currentStep: 4 }), { params: params() });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Ausstattung ist für dieses Formular nicht vorgesehen." });
+    expect(mockPrisma.supervisorData.upsert).not.toHaveBeenCalled();
+    expect(ausstattungsAufrufe()).toBe(0);
+  });
+
+  it("kappt currentStep auf den letzten der fuenf Schritte (F21) statt abzuweisen", async () => {
+    const res = await PUT(req("PUT", { wochenstunden: 30, currentStep: 7 }), { params: params() });
+
+    expect(res.status).toBe(200);
+    expect(savedData()).toEqual({ wochenstunden: 30, currentStep: 4 });
+  });
+});
+
 describe("POST – Absenden", () => {
   it("blockiert eine kalendermaessige Befristung ohne Vertragsende", async () => {
     mockValidate.mockResolvedValue(
@@ -728,5 +783,11 @@ describe("GET – Anzeige fuer die Fuehrungskraft", () => {
   it("meldet keine Abgabe, solange die Fuehrungskraft nicht abgesendet hat", async () => {
     mockValidate.mockResolvedValue(vorgang({ status: "SUPERVISOR_PENDING" }));
     expect((await laden()).vorgesetzteAbgesendet).toBe(false);
+  });
+
+  it("ohne Merker mitAusstattung: ausstattung null, ohne den Katalog zu lesen", async () => {
+    mockValidate.mockResolvedValue(vorgang({ supervisorData: { currentStep: 2, mitAusstattung: false } }));
+    expect((await laden()).ausstattung).toBeNull();
+    expect(mockPrisma.ausstattungsPosition.findMany).not.toHaveBeenCalled();
   });
 });

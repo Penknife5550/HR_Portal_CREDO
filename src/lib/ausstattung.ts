@@ -15,7 +15,7 @@
  * src/__tests__/lib/ausstattung-schema.test.ts haelt sie gegen die Kommentare
  * in prisma/schema.prisma und gegen die Enums des generierten Clients.
  *
- * Stand S5: Konstanten und Typen, dazu die Katalogregeln (positionPruefen,
+ * Stand S9: Konstanten und Typen, dazu die Katalogregeln (positionPruefen,
  * positionGiltAm, positionenFuer, formularGruppen, adressLuecken,
  * aehnlicheVorlagenpunkte, aufgabenTitel), die Vorschlaege fuer den
  * Anfangsbestand, die Meldungen des Katalogs, die Rechnungen der
@@ -24,15 +24,30 @@
  * und ihre Anzeige (katalogZeilen, katalogHinweise, vorschlaegeVorschau —
  * Reiter src/components/ausstattung/katalog-tab.tsx rechnet nichts selbst),
  * dazu die Regeln des Arbeitsorts am Vorgang (arbeitsortSpeicherwert,
- * arbeitsortSperrGrund; Server src/lib/onboarding-arbeitsort.ts).
- * Die Funktionen fuer Aufgaben, Faelligkeit, Nachtrag und Uebersicht kommen mit
- * den folgenden Schritten. Den Server-Teil des Katalogs (Laden, Schreiben,
+ * arbeitsortSperrGrund; Server src/lib/onboarding-arbeitsort.ts) und das
+ * Formular der Fuehrungskraft (momentaufnahme, bemerkungQuelleNach,
+ * wahlPruefen, fuehrungskraftSicht; Server src/lib/ausstattung-dienst.ts) samt
+ * seinem Formularschritt (formularStartStand, formularEingabe,
+ * formularKurzform, sichtNachSpeichern; Oberflaeche
+ * src/components/ausstattung/ausstattung-schritt.tsx und
+ * ausstattung-zusammenfassung.tsx). Dazu seit S10 die Sicht von HR (Stand der
+ * Karte `ausstattungsZustand`, `ausstattungsGruppen`,
+ * `ausstattungsUebersichtBauen` — erste Fassung ohne Aufgaben und Aktionen —,
+ * die Herkunftstexte `bemerkungLabel`/`hinweisLabel` und die Kurzform der
+ * HR-Mail `ausstattungKurz`; Server src/lib/ausstattung-dienst.ts, Karte
+ * src/components/ausstattung/modalitaeten-ausstattung-karte.tsx, PDF
+ * src/lib/pdf-export-onboarding.ts). Die Funktionen fuer Aufgaben,
+ * Faelligkeit, Nachtrag und die Aktionen der Uebersicht kommen mit den
+ * folgenden Schritten. Den Server-Teil des Katalogs (Laden, Schreiben,
  * Protokoll, Ausschnitt je Vorgang) traegt src/lib/ausstattung-katalog.ts.
  *
  * Importrichtung: Diese Datei nutzt die reinen Regeln aus abteilungsaufgaben.ts
  * (Empfaenger, Reihenfolge der Stellen, Schluesselform). abteilungsaufgaben.ts
  * importiert deshalb NICHTS von hier — sonst entstuende ein Kreis, und eine
  * Konstante, die beim Laden des Moduls gelesen wird, waere `undefined`.
+ * Ausserdem nur noch zwei Dateien ohne eigene Importe: onboarding-spuren.ts
+ * (ob die Modalitaeten eingereicht sind — dieselbe Regel wie ueberall) und
+ * format.ts (Datum in deutscher Zeit).
  */
 
 import {
@@ -50,6 +65,8 @@ import {
   type AbteilungsKonfig,
   type VorlagenPunkt,
 } from "@/lib/abteilungsaufgaben";
+import { formatDatumDE } from "@/lib/format";
+import { vorgesetzteAbgesendet } from "@/lib/onboarding-spuren";
 
 // =============================================
 // Wertlisten (Zustaende sind Zeichenketten, keine Enums)
@@ -390,6 +407,41 @@ export const MELDUNGEN = {
     "Der Vorgang ist geprüft, abgeschlossen oder abgelaufen – der Arbeitsort lässt sich nicht mehr ändern.",
   ARBEITSORT_UNVERAENDERT: "Der Arbeitsort ist unverändert.",
   ARBEITSORT_GESPEICHERT: "Arbeitsort gespeichert.",
+  // ---- Formular der Führungskraft (S8; öffentliche Link-Seite, daher „Sie“) ----
+  /** PUT mit `ausstattung`/`hinweise`, obwohl der Vorgang den Merker `mitAusstattung` nicht traegt (Regel 2). */
+  AUSSTATTUNG_NICHT_VORGESEHEN: "Ausstattung ist für dieses Formular nicht vorgesehen.",
+  // Zod (Form der Felder)
+  WAHL_POSITION_UNGUELTIG: "Ungültige Position. Bitte laden Sie die Seite neu.",
+  WAHL_GEWAEHLT_UNGUELTIG: "Ungültige Auswahl. Bitte laden Sie die Seite neu.",
+  WAHL_ZU_VIELE: `Es lassen sich höchstens ${GRENZEN.wahlJeVorgang} Positionen übermitteln.`,
+  HINWEISE_ZU_VIELE: `Es lassen sich höchstens ${GRENZEN.hinweiseJeVorgang} Hinweise übermitteln.`,
+  BEMERKUNG_ZU_LANG: `Die Bemerkung darf höchstens ${GRENZEN.bemerkung} Zeichen lang sein.`,
+  ANGABE_ZU_LANG: `Die Angabe darf höchstens ${GRENZEN.angabe} Zeichen lang sein.`,
+  ANGABE_EINZEILIG: "Die Angabe darf keinen Zeilenumbruch und keine Steuerzeichen enthalten.",
+  HINWEIS_ZU_LANG: `Der Hinweis darf höchstens ${GRENZEN.hinweis} Zeichen lang sein.`,
+  // wahlPruefen (Inhalt gegen den Katalogausschnitt dieses Vorgangs, Regel 4)
+  WAHL_POSITION_UNBEKANNT:
+    "Eine gewählte Position gehört nicht (mehr) zu diesem Formular. Bitte laden Sie die Seite neu.",
+  WAHL_POSITION_DOPPELT: "Eine Position wurde mehrfach übermittelt. Bitte laden Sie die Seite neu.",
+  WAHL_OPTION_UNBEKANNT:
+    "Eine gewählte Option gehört nicht (mehr) zu dieser Position. Bitte laden Sie die Seite neu.",
+  WAHL_NICHT_GEWAEHLT: "Eine Position wurde ohne Auswahl übermittelt. Bitte laden Sie die Seite neu.",
+  WAHL_ANGABE_FEHLT: "Eine Angabe wurde ohne Inhalt übermittelt. Bitte laden Sie die Seite neu.",
+  WAHL_PASST_NICHT: "Die übermittelte Auswahl passt nicht zur Art der Position. Bitte laden Sie die Seite neu.",
+  WAHL_OHNE_BEMERKUNG: "Zu dieser Position gibt es kein Bemerkungsfeld. Bitte laden Sie die Seite neu.",
+  HINWEIS_STELLE_UNBEKANNT:
+    "Ein Hinweis richtet sich an eine Stelle, die dieses Formular nicht anbietet. Bitte laden Sie die Seite neu.",
+  HINWEIS_DOPPELT: "Für jede Stelle gibt es nur ein Hinweisfeld. Bitte laden Sie die Seite neu.",
+  // ---- HR liest mit (S10): Sätze der Übersicht (Feinplan 1.6, Zustandsregel) ----
+  UEBERSICHT_ABGESCHLOSSEN: "Der Vorgang ist abgeschlossen – nur noch lesbar.",
+  UEBERSICHT_ENTWURF_MIT_SCHRITT: "Ohne Einstellungsmodalitäten kann nichts an die Stellen gehen.",
+  UEBERSICHT_ENTWURF_OHNE_SCHRITT:
+    "Das Formular der Führungskraft enthält diesen Schritt nicht. Nach der Abgabe kann die Personalabteilung Positionen ergänzen.",
+  /** Leer, solange die Führungskraft den Schritt hat, aber noch nichts gespeichert ist. */
+  UEBERSICHT_NOCH_NICHTS: "Die Führungskraft hat noch nichts ausgewählt.",
+  /** Leer nach der Abgabe, obwohl das Formular den Schritt zeigte. */
+  UEBERSICHT_NICHTS_ANGEFORDERT: "Die Führungskraft hat keine Ausstattung angefordert.",
+  UEBERSICHT_LEER: "Keine Positionen und keine Hinweise an Stellen.",
 } as const;
 
 // =============================================
@@ -500,6 +552,35 @@ export interface FormularPosition {
     max: number;
     sichtbarFuer: { departmentKey: string; stelleName: string }[];
   } | null;
+  /**
+   * Nur in `fuehrungskraftSicht`: Die Position steht nicht mehr im Katalog
+   * dieses Vorgangs (ausgeschaltet, ausgeblendet, Stelle ohne Adresse) oder
+   * nicht mehr in dieser Form (`imKatalogGeaendert`), wohl aber in der schon
+   * gespeicherten Wahl der Fuehrungskraft — gebaut aus der Momentaufnahme,
+   * damit sie die Wahl sieht und abwaehlen kann (Regel 4).
+   */
+  nichtMehrImKatalog?: boolean;
+  /**
+   * Nur zusammen mit `nichtMehrImKatalog`: Der Katalog fuehrt die Position
+   * noch, aber seit dem Speichern mit anderer Art, Stelle oder Bezeichnung.
+   * Gezeigt (und abgegeben) wird die gespeicherte Form; die geaenderte steht
+   * erst zur Wahl, wenn diese entfernt ist und das Formular neu geladen wird.
+   */
+  imKatalogGeaendert?: boolean;
+  /**
+   * Nur in `fuehrungskraftSicht`, nur bei Auswahl-Positionen: die Optionen in
+   * `optionen`, die allein aus der gespeicherten Wahl stammen (der Katalog
+   * kennt sie nicht mehr). Bei einer Position `nichtMehrImKatalog` sind es
+   * alle. Waehlt die Fuehrungskraft eine davon ab und speichert, bietet der
+   * Server sie nicht mehr an (`sichtNachSpeichern`).
+   */
+  optionenNichtMehrImKatalog?: string[];
+  /**
+   * Nur in `fuehrungskraftSicht`: Das Bemerkungsfeld steht nur noch, weil
+   * schon eine Bemerkung gespeichert ist — der Katalog bietet keins mehr an.
+   * Ohne Bemerkung gespeichert, faellt es weg (`sichtNachSpeichern`).
+   */
+  bemerkungNurGespeichert?: boolean;
 }
 
 /** Die Positionen einer Stelle im Formular („Diese Angaben erhält die IT.“). */
@@ -956,6 +1037,1193 @@ export function aufgabenTitel(
   const basis = (zeile.aufgabeTitel ?? "").trim() || `${zeile.bezeichnung.trim()} bereitstellen`;
   const opt = option.trim();
   return zeile.art === "AUSWAHL" && opt ? `${basis}: ${opt}` : basis;
+}
+
+// =============================================
+// Formular der Fuehrungskraft: Momentaufnahme, Pruefung, Sicht (Feinplan S8)
+// =============================================
+//
+// Der Modalitaeten-Link ist ein Inhaber-Token ohne Anmeldung. Was die
+// Fuehrungskraft waehlt, prueft der Server deshalb gegen den Katalogausschnitt
+// GENAU DIESES Vorgangs (Regel 4) — plus ihre eigene, schon gespeicherte Wahl:
+// Eine Position, die die Verwaltung inzwischen ausgeschaltet hat, bleibt
+// waehlbar, solange sie in der eigenen Wahl steht (Momentaufnahme), ebenso eine
+// Option, die der Katalog nicht mehr kennt. Hat die Verwaltung an einer schon
+// gewaehlten Position geaendert, was die Fuehrungskraft sieht (Art, Stelle,
+// Bezeichnung), gilt die eigene Zeile genauso: Formular, Zusammenfassung und
+// HR-Ansicht zeigen dann dieselbe gespeicherte Momentaufnahme — das Absenden
+// frischt sie nicht auf. Sicht (GET) und Pruefung (PUT) bauen das Angebot aus
+// derselben Funktion, damit das Formular nie etwas zeigt, das der Server
+// danach abweist.
+
+/** Hinweis im Formular (E-A26): Nach dem Absenden aendert nur noch die Personalabteilung. */
+export const AENDERUNGEN_NACH_ABGABE_HINWEIS =
+  "Änderungen nach dem Absenden teilen Sie bitte der Personalabteilung mit.";
+
+/**
+ * Die Momentaufnahme einer Position im Vorgang (Regel 4): Was mit der Wahl in
+ * `OnboardingAusstattung` kopiert wird, damit spaetere Katalogaenderungen
+ * keinen laufenden Vorgang veraendern.
+ */
+export interface AusstattungsMomentaufnahme {
+  positionId: string | null;
+  departmentKey: string;
+  art: string;
+  angabeSchluessel: string | null;
+  bezeichnung: string;
+  /** Grundtitel der Aufgabe (ohne Option); bei einer Angabe leer — sie wird keine Aufgabe. */
+  aufgabeTitel: string;
+  hinweisStelle: string | null;
+  relativeDueDays: number | null;
+  sichtbarFuer: string[];
+  ausgabeKennung: string | null;
+  rueckgabeKategorie: string | null;
+  beiAustritt: string | null;
+  /** orderIndex der Position beim Speichern. */
+  reihenfolge: number;
+}
+
+/**
+ * Momentaufnahme aus einer Katalogposition. Der Aufgabentitel wird als
+ * Grundtitel gespeichert (`aufgabenTitel` ohne Option, also auch der Standard
+ * „<Bezeichnung> bereitstellen“), damit eine spaetere Aenderung am Katalog den
+ * Titel einer Aufgabe nicht mehr verschiebt. Eine Angabe wird keine Aufgabe:
+ * ohne Titel, ohne Faelligkeit. Die Stufe-2-Felder kommen wie sie sind (bis A4
+ * `null`).
+ */
+export function momentaufnahme(p: KatalogPosition): AusstattungsMomentaufnahme {
+  const angabe = p.art === "ANGABE";
+  return {
+    positionId: p.id,
+    departmentKey: p.departmentKey,
+    art: p.art,
+    angabeSchluessel: angabe ? p.angabeSchluessel : null,
+    bezeichnung: p.bezeichnung,
+    aufgabeTitel: angabe ? "" : aufgabenTitel(p, ""),
+    hinweisStelle: leer(p.hinweisStelle) ? null : p.hinweisStelle,
+    relativeDueDays: angabe ? null : p.defaultDueDays,
+    sichtbarFuer: angabe ? [...p.sichtbarFuer] : [],
+    ausgabeKennung: p.ausgabeKennung ?? null,
+    rueckgabeKategorie: p.rueckgabeKategorie ?? null,
+    beiAustritt: p.beiAustritt ?? null,
+    reihenfolge: p.orderIndex,
+  };
+}
+
+/**
+ * Herkunft einer Bemerkung nach dem Schreiben (Regel 8). Nur aufrufen, wenn
+ * ein nicht leerer Text gesetzt oder geaendert wird — ein geleertes Feld hat
+ * keine Herkunft (`null`), ein unveraenderter Text behaelt seine.
+ *
+ *   - Die Fuehrungskraft schreibt: FUEHRUNGSKRAFT. Sie ersetzt ihre Zeilen
+ *     ganz, und vor ihrer Abgabe schreibt HR nicht (E-A11).
+ *   - HR aendert einen Text der Fuehrungskraft (FUEHRUNGSKRAFT oder BEIDE): BEIDE.
+ *   - HR schreibt einen neuen Text oder aendert seinen eigenen: HR.
+ *
+ * Dieselbe Regel gilt fuer `OnboardingStellenHinweis.quelle` (Feinplan 1.10).
+ */
+export function bemerkungQuelleNach(
+  alt: string | null | undefined,
+  schreiber: AusstattungsQuelle,
+): BemerkungQuelle {
+  if (schreiber === "FUEHRUNGSKRAFT") return "FUEHRUNGSKRAFT";
+  return alt === "FUEHRUNGSKRAFT" || alt === "BEIDE" ? "BEIDE" : "HR";
+}
+
+/**
+ * Eine Wahl, wie der Modalitaeten-PUT sie annimmt (`modalitaetenAusstattungSchema`)
+ * und die Sicht sie zurueckgibt: Ja/Nein mit `gewaehlt: true`, Auswahl mit den
+ * gewaehlten Optionen, Angabe mit Text. Nicht Gewaehltes kommt gar nicht vor.
+ */
+export interface AusstattungsWahlEingabe {
+  positionId: string;
+  gewaehlt?: true;
+  auswahl?: string[];
+  angabe?: string;
+  bemerkung?: string;
+}
+
+/** „Weitere Hinweise an …“ je Stelle; ein leerer Text heisst „kein Hinweis“. */
+export interface StellenHinweisEingabe {
+  departmentKey: string;
+  hinweis: string;
+}
+
+/**
+ * Was der PUT zur Ausstattung mitschickt. Ein fehlendes Feld laesst den
+ * gespeicherten Stand stehen, ein leeres Array leert ihn (wie bei den
+ * Kostenstellen: „dazu sage ich nichts“ ist nicht „keine mehr“).
+ */
+export interface FuehrungskraftEingabe {
+  ausstattung?: ReadonlyArray<AusstattungsWahlEingabe>;
+  hinweise?: ReadonlyArray<StellenHinweisEingabe>;
+}
+
+/** Eine schon gespeicherte eigene Zeile der Fuehrungskraft (`OnboardingAusstattung`, quelle FUEHRUNGSKRAFT). */
+export interface BestehendeWahl extends AusstattungsMomentaufnahme {
+  auswahl: readonly string[];
+  angabe: string | null;
+  bemerkung: string | null;
+  gestrichenAm?: Date | string | null;
+}
+
+/** Die eigene, schon gespeicherte Wahl der Fuehrungskraft: Zeilen und Hinweise (nur quelle FUEHRUNGSKRAFT). */
+export interface BestehendeFuehrungskraftWahl {
+  zeilen: ReadonlyArray<BestehendeWahl>;
+  hinweise: ReadonlyArray<{ departmentKey: string; text: string }>;
+}
+
+/** Eine gepruefte Zeile: Momentaufnahme plus Wahl, fertig zum Anlegen. */
+export interface GepruefteWahl extends AusstattungsMomentaufnahme {
+  positionId: string;
+  auswahl: string[];
+  angabe: string | null;
+  bemerkung: string | null;
+}
+
+export type WahlPruefung =
+  | {
+      ok: true;
+      /** `undefined`: Der Aufruf sagt zu den Positionen nichts — nichts ersetzen. */
+      zeilen?: GepruefteWahl[];
+      /** `undefined`: nichts ersetzen. Leere Hinweise fallen weg (sie werden keine Zeile). */
+      hinweise?: { departmentKey: string; text: string }[];
+    }
+  | { ok: false; fehler: string };
+
+/** Was eine Position der Fuehrungskraft anbietet — Katalog oder eigene Momentaufnahme. */
+interface Angebot {
+  basis: AusstattungsMomentaufnahme;
+  /**
+   * Die Katalogposition, wenn das Angebot aus dem Katalog kommt; `null`, wenn
+   * es nur noch aus der eigenen Wahl kommt (nicht mehr im Ausschnitt oder dort
+   * in anderer Form, `imKatalogGeaendert`).
+   */
+  position: KatalogPosition | null;
+  /** Die Position, wie der Ausschnitt sie heute fuehrt — auch, wenn das Angebot aus der eigenen Zeile kommt. */
+  imAusschnitt: KatalogPosition | null;
+  bestehend: BestehendeWahl | null;
+  /** AUSWAHL: Optionen des Katalogs, dahinter die der eigenen Wahl, die der Katalog nicht mehr kennt. */
+  optionen: string[];
+  bemerkungErlaubt: boolean;
+}
+
+/**
+ * Weicht die gespeicherte Momentaufnahme einer eigenen Zeile in dem ab, was
+ * die Fuehrungskraft von der Position sieht — Art, Stelle, Bezeichnung oder
+ * das Feld einer Angabe? Dann hat die Verwaltung die Position nach dem
+ * Speichern geaendert. Gespeichert (und mit dem Absenden abgegeben) ist die
+ * alte Form; das Angebot kommt deshalb aus der Zeile, nicht aus dem Katalog —
+ * sonst zeigten Formular und Zusammenfassung die neue Form, HR-Karte, PDF und
+ * spaeter die Aufgaben aber die alte. Was sie nicht sieht (Hinweis fuer die
+ * Stelle, Faelligkeit, Aufgabentitel, „sichtbar für“, Optionen), frischt
+ * weiter jedes Speichern aus dem Katalog auf.
+ */
+function imKatalogGeaendert(zeile: BestehendeWahl, basis: AusstattungsMomentaufnahme): boolean {
+  return (
+    zeile.art !== basis.art ||
+    zeile.departmentKey !== basis.departmentKey ||
+    zeile.bezeichnung !== basis.bezeichnung ||
+    (zeile.angabeSchluessel ?? null) !== basis.angabeSchluessel
+  );
+}
+
+/**
+ * Das Angebot an die Fuehrungskraft — EINE Rechnung fuer Sicht und Pruefung:
+ *
+ *   - jede Position des Ausschnitts (Momentaufnahme aus dem Katalog); eine
+ *     Option aus der eigenen Wahl, die der Katalog nicht mehr kennt, bleibt
+ *     waehlbar; ein Bemerkungsfeld gibt es, wenn der Katalog es anbietet oder
+ *     schon eine Bemerkung gespeichert ist (sonst stuende sie unsichtbar da);
+ *   - jede eigene, nicht gestrichene Zeile, deren Position nicht mehr im
+ *     Ausschnitt steht ODER dort in anderer Form (`imKatalogGeaendert`):
+ *     Momentaufnahme aus der Zeile, Optionen = ihre Wahl. Ein Bemerkungsfeld
+ *     nach derselben Regel — wo der Ausschnitt fuer diese Position eins
+ *     anbietet oder schon eine Bemerkung gespeichert ist; fuehrt er die
+ *     Position gar nicht mehr, also nur mit gespeicherter Bemerkung. Sonst
+ *     entstuende ein Freitextfeld, das die Verwaltung bewusst nicht wollte
+ *     (Datensparsamkeit, S8).
+ *     Solange die Zeile so besteht, bietet das Formular die neue Form nicht an
+ *     (eine Position je Vorgang); nach dem Abwaehlen steht sie beim naechsten
+ *     Oeffnen zur Wahl;
+ *   - die Stellen: die der Positionen und die der eigenen, nicht leeren
+ *     Hinweise (so bleibt ein Hinweis an eine Stelle, deren Positionen der
+ *     Katalog nicht mehr anbietet, sichtbar und loeschbar) — in der Reihenfolge
+ *     der Abteilungskarte. Nie MITARBEITER oder VORGESETZTER.
+ */
+function fuehrungskraftAngebot(
+  positionen: ReadonlyArray<KatalogPosition>,
+  bestehend: BestehendeFuehrungskraftWahl,
+): { angebote: Map<string, Angebot>; stellen: string[] } {
+  const eigene = new Map<string, BestehendeWahl>();
+  for (const z of bestehend.zeilen) {
+    if (z.positionId && !z.gestrichenAm) eigene.set(z.positionId, z);
+  }
+  const imAusschnitt = new Map(positionen.map((p) => [p.id, p]));
+  const angebote = new Map<string, Angebot>();
+  for (const p of positionen) {
+    const zeile = eigene.get(p.id) ?? null;
+    const basis = momentaufnahme(p);
+    // In anderer Form gespeichert: Das Angebot kommt aus der Zeile (Schleife unten,
+    // dieselben Bedingungen — sonst fiele die Position ganz weg).
+    if (zeile && istAusstattungsArt(zeile.art) && !istNichtErlaubteStelle(zeile.departmentKey) && imKatalogGeaendert(zeile, basis)) {
+      continue;
+    }
+    const optionen = p.art === "AUSWAHL" ? [...p.optionen] : [];
+    if (p.art === "AUSWAHL" && zeile) {
+      for (const o of zeile.auswahl) if (!optionen.includes(o)) optionen.push(o);
+    }
+    angebote.set(p.id, {
+      basis,
+      position: p,
+      imAusschnitt: p,
+      bestehend: zeile,
+      optionen,
+      bemerkungErlaubt: p.art !== "ANGABE" && (p.bemerkungAnbieten || !leer(zeile?.bemerkung)),
+    });
+  }
+  for (const [positionId, zeile] of eigene) {
+    if (angebote.has(positionId) || !istAusstattungsArt(zeile.art) || istNichtErlaubteStelle(zeile.departmentKey)) {
+      continue;
+    }
+    const katalog = imAusschnitt.get(positionId) ?? null;
+    angebote.set(positionId, {
+      basis: {
+        positionId,
+        departmentKey: zeile.departmentKey,
+        art: zeile.art,
+        angabeSchluessel: zeile.angabeSchluessel,
+        bezeichnung: zeile.bezeichnung,
+        aufgabeTitel: zeile.aufgabeTitel,
+        hinweisStelle: zeile.hinweisStelle,
+        relativeDueDays: zeile.relativeDueDays,
+        sichtbarFuer: [...zeile.sichtbarFuer],
+        ausgabeKennung: zeile.ausgabeKennung,
+        rueckgabeKategorie: zeile.rueckgabeKategorie,
+        beiAustritt: zeile.beiAustritt,
+        reihenfolge: zeile.reihenfolge,
+      },
+      position: null,
+      imAusschnitt: katalog,
+      bestehend: zeile,
+      optionen: zeile.art === "AUSWAHL" ? [...zeile.auswahl] : [],
+      bemerkungErlaubt: zeile.art !== "ANGABE" && (!!katalog?.bemerkungAnbieten || !leer(zeile.bemerkung)),
+    });
+  }
+  const schluessel = [
+    ...[...angebote.values()].map((a) => a.basis.departmentKey),
+    ...bestehend.hinweise.filter((h) => !leer(h.text)).map((h) => h.departmentKey),
+  ].filter((k) => !istNichtErlaubteStelle(k));
+  const rang = stellenRang(schluessel);
+  const stellen = [...new Set(schluessel)].sort((a, b) => (rang.get(a) ?? 0) - (rang.get(b) ?? 0));
+  return { angebote, stellen };
+}
+
+/** Nicht leerer Text (getrimmt) oder `null`. */
+function textOderNull(text: string | null | undefined): string | null {
+  const t = (text ?? "").trim();
+  return t === "" ? null : t;
+}
+
+/**
+ * Prueft die Wahl aus dem Modalitaeten-PUT gegen das Angebot dieses Vorgangs
+ * (Regel 4) und liefert die Zeilen samt Momentaufnahme zum Anlegen.
+ *
+ *   - Jede Position stammt aus dem Ausschnitt ODER aus der eigenen Wahl
+ *     (Momentaufnahme, wenn sie inzwischen ausgeschaltet oder in Art, Stelle
+ *     bzw. Bezeichnung geaendert ist); sonst 400. Jede Position hoechstens
+ *     einmal.
+ *   - Ja/Nein nur mit `gewaehlt: true`; Auswahl nur mit mindestens einer
+ *     Option, jede aus dem Katalog bzw. aus der eigenen Wahl (Doppelte fallen
+ *     weg, Reihenfolge wie im Katalog); Angabe nur mit Text, hoechstens so lang
+ *     wie ihr Eintrag in ANGABEN_KATALOG, ohne Bemerkung. Felder, die zur Art
+ *     nicht passen, sind ein Fehler — nie still verworfen.
+ *   - Eine Bemerkung nur, wo das Formular ein Feld zeigt: wo der Katalog es
+ *     fuer diese Position anbietet oder schon eine Bemerkung gespeichert ist.
+ *   - Hinweise nur fuer Stellen des Angebots, je Stelle einer; ein leerer Text
+ *     ist „kein Hinweis“ und wird keine Zeile.
+ *
+ * Die Momentaufnahme kommt aus dem Katalog, solange die Position im Ausschnitt
+ * steht und die eigene Zeile dort in derselben Form gespeichert ist (vor der
+ * Abgabe ist nichts verschickt, der neueste Stand gilt fuer alles, was die
+ * Fuehrungskraft nicht sieht), sonst aus der eigenen Zeile.
+ */
+export function wahlPruefen(
+  eingabe: FuehrungskraftEingabe,
+  ausschnitt: ReadonlyArray<KatalogPosition>,
+  bestehend: BestehendeFuehrungskraftWahl,
+): WahlPruefung {
+  const { angebote, stellen } = fuehrungskraftAngebot(ausschnitt, bestehend);
+
+  let zeilen: GepruefteWahl[] | undefined;
+  if (eingabe.ausstattung !== undefined) {
+    zeilen = [];
+    const gesehen = new Set<string>();
+    for (const w of eingabe.ausstattung) {
+      const angebot = angebote.get(w.positionId);
+      if (!angebot) return { ok: false, fehler: MELDUNGEN.WAHL_POSITION_UNBEKANNT };
+      if (gesehen.has(w.positionId)) return { ok: false, fehler: MELDUNGEN.WAHL_POSITION_DOPPELT };
+      gesehen.add(w.positionId);
+
+      const art = angebot.basis.art;
+      const auswahl = [...new Set(w.auswahl ?? [])];
+      const angabe = textOderNull(w.angabe);
+      const bemerkung = textOderNull(w.bemerkung);
+      if (bemerkung && !angebot.bemerkungErlaubt) return { ok: false, fehler: MELDUNGEN.WAHL_OHNE_BEMERKUNG };
+
+      if (art === "JA_NEIN") {
+        if (auswahl.length > 0 || angabe) return { ok: false, fehler: MELDUNGEN.WAHL_PASST_NICHT };
+        if (w.gewaehlt !== true) return { ok: false, fehler: MELDUNGEN.WAHL_NICHT_GEWAEHLT };
+      } else if (art === "AUSWAHL") {
+        if (w.gewaehlt !== undefined || angabe) return { ok: false, fehler: MELDUNGEN.WAHL_PASST_NICHT };
+        if (auswahl.length === 0) return { ok: false, fehler: MELDUNGEN.WAHL_NICHT_GEWAEHLT };
+        if (auswahl.some((o) => !angebot.optionen.includes(o))) {
+          return { ok: false, fehler: MELDUNGEN.WAHL_OPTION_UNBEKANNT };
+        }
+        auswahl.sort((a, b) => angebot.optionen.indexOf(a) - angebot.optionen.indexOf(b));
+      } else if (art === "ANGABE") {
+        if (w.gewaehlt !== undefined || auswahl.length > 0) return { ok: false, fehler: MELDUNGEN.WAHL_PASST_NICHT };
+        if (!angabe) return { ok: false, fehler: MELDUNGEN.WAHL_ANGABE_FEHLT };
+        const definition = istAngabeSchluessel(angebot.basis.angabeSchluessel)
+          ? ANGABEN_KATALOG[angebot.basis.angabeSchluessel]
+          : null;
+        const max = definition?.max ?? GRENZEN.angabe;
+        if (angabe.length > max) {
+          return {
+            ok: false,
+            fehler: `Die Angabe „${definition?.label ?? angebot.basis.bezeichnung}“ darf höchstens ${max} Zeichen lang sein.`,
+          };
+        }
+      } else {
+        return { ok: false, fehler: MELDUNGEN.WAHL_POSITION_UNBEKANNT };
+      }
+
+      zeilen.push({
+        ...angebot.basis,
+        positionId: w.positionId,
+        sichtbarFuer: [...angebot.basis.sichtbarFuer],
+        auswahl: art === "AUSWAHL" ? auswahl : [],
+        angabe: art === "ANGABE" ? angabe : null,
+        bemerkung,
+      });
+    }
+  }
+
+  let hinweise: { departmentKey: string; text: string }[] | undefined;
+  if (eingabe.hinweise !== undefined) {
+    hinweise = [];
+    const gesehen = new Set<string>();
+    for (const h of eingabe.hinweise) {
+      const key = h.departmentKey.trim();
+      if (!stellen.includes(key)) return { ok: false, fehler: MELDUNGEN.HINWEIS_STELLE_UNBEKANNT };
+      if (gesehen.has(key)) return { ok: false, fehler: MELDUNGEN.HINWEIS_DOPPELT };
+      gesehen.add(key);
+      const text = textOderNull(h.hinweis);
+      if (text) hinweise.push({ departmentKey: key, text });
+    }
+  }
+
+  return { ok: true, zeilen, hinweise };
+}
+
+/**
+ * Was das Formular der Fuehrungskraft zum Schritt „Ausstattung & Zugänge“
+ * bekommt (GET /api/modalitaeten/[token], Feld `ausstattung`). Ohne interne
+ * Felder (Regel 7: kein `hinweisStelle`, keine Faelligkeit, keine A4-Felder)
+ * und ohne alles, was HR ergaenzt hat.
+ */
+export interface FuehrungskraftSicht {
+  /** Positionen je Stelle; dazu Stellen, an die nur noch ein eigener Hinweis geht (ohne Positionen). */
+  gruppen: FormularGruppe[];
+  /** Die eigene gespeicherte Wahl, in der Form des PUT. */
+  wahl: AusstattungsWahlEingabe[];
+  /** Die eigenen gespeicherten Hinweise (nur nicht leere). */
+  hinweise: StellenHinweisEingabe[];
+  /**
+   * Vorauswahl des Katalogs anwenden? Nur, solange die Fuehrungskraft den
+   * Schritt nie gespeichert hat (`ausstattungGespeichertAm == null`, F9) —
+   * sonst hiesse „alles abgewaehlt“ beim naechsten Oeffnen wieder „vorausgewaehlt“.
+   */
+  vorausgewaehltAnwenden: boolean;
+  /** Steht unter jedem Bemerkungs- und Hinweisfeld. */
+  bemerkungHinweis: string;
+  /** E-A26: Aenderungen nach dem Absenden gehen an die Personalabteilung. */
+  aenderungenHinweis: string;
+}
+
+/**
+ * Baut die Sicht der Fuehrungskraft aus dem Katalogausschnitt des Vorgangs und
+ * ihrer eigenen Wahl (nur quelle FUEHRUNGSKRAFT — was HR ergaenzt, sieht sie
+ * nie). Dasselbe Angebot wie `wahlPruefen`: Eine eigene Wahl, die der Katalog
+ * nicht mehr anbietet, steht mit `nichtMehrImKatalog` in ihrer Gruppe; ebenso
+ * eine, deren Position die Verwaltung seit dem Speichern in Art, Stelle oder
+ * Bezeichnung geaendert hat — in der gespeicherten Form und unter der
+ * gespeicherten Stelle, die neue Form fehlt dann. Eine Option, die der Katalog
+ * nicht mehr kennt, steht hinter den uebrigen.
+ *
+ * `wahl` ist damit genau der gespeicherte Stand: Die Zusammenfassung vor dem
+ * Absenden (`formularKurzform`) zeigt, was abgegeben wird und was HR in Karte
+ * und PDF sieht — auch, wenn die Fuehrungskraft den Schritt seit der
+ * Katalogaenderung nicht mehr gespeichert hat.
+ */
+export function fuehrungskraftSicht(opts: {
+  positionen: ReadonlyArray<KatalogPosition>;
+  stellenNamen: Readonly<Record<string, string>>;
+  bestehend: BestehendeFuehrungskraftWahl;
+  ausstattungGespeichert: boolean;
+}): FuehrungskraftSicht {
+  const { angebote, stellen } = fuehrungskraftAngebot(opts.positionen, opts.bestehend);
+  const name = (key: string) => (hatEigenen(opts.stellenNamen, key) && opts.stellenNamen[key]) || abteilungLabel(key);
+  const ausKatalog = new Map(formularGruppen(opts.positionen, opts.stellenNamen).map((g) => [g.departmentKey, g]));
+
+  const gruppen: FormularGruppe[] = stellen.map((key) => {
+    const gruppe = ausKatalog.get(key);
+    const positionen: FormularPosition[] = [];
+    for (const fp of gruppe?.positionen ?? []) {
+      const angebot = angebote.get(fp.id);
+      // In anderer Form gespeichert: Die Position steht unten aus der eigenen Zeile.
+      if (!angebot?.position) continue;
+      // `fp.optionen` sind die des Katalogs; was das Angebot darueber hinaus
+      // kennt, stammt nur aus der eigenen Wahl. Ebenso das Bemerkungsfeld, das
+      // nur wegen einer gespeicherten Bemerkung steht.
+      const nurGewaehlt = fp.art === "AUSWAHL" ? angebot.optionen.filter((o) => !fp.optionen.includes(o)) : [];
+      positionen.push({
+        ...fp,
+        optionen: fp.art === "AUSWAHL" ? [...angebot.optionen] : fp.optionen,
+        bemerkungAnbieten: angebot.bemerkungErlaubt,
+        ...(nurGewaehlt.length > 0 ? { optionenNichtMehrImKatalog: nurGewaehlt } : {}),
+        ...(angebot.bemerkungErlaubt && !fp.bemerkungAnbieten ? { bemerkungNurGespeichert: true } : {}),
+      });
+    }
+    const nurNochEigene = [...angebote.values()]
+      .filter((a) => !a.position && a.basis.departmentKey === key)
+      .sort((a, b) => a.basis.reihenfolge - b.basis.reihenfolge || a.basis.bezeichnung.localeCompare(b.basis.bezeichnung, "de"));
+    for (const a of nurNochEigene) {
+      const angabe =
+        a.basis.art === "ANGABE" && istAngabeSchluessel(a.basis.angabeSchluessel)
+          ? ANGABEN_KATALOG[a.basis.angabeSchluessel]
+          : null;
+      // Bietet der Ausschnitt fuer diese Position noch ein Bemerkungsfeld an,
+      // gilt es samt Platzhalter; sonst steht es nur wegen einer gespeicherten
+      // Bemerkung und faellt mit ihr weg (`sichtNachSpeichern`).
+      const katalogFeld = a.bemerkungErlaubt && !!a.imAusschnitt?.bemerkungAnbieten;
+      positionen.push({
+        id: a.basis.positionId ?? "",
+        departmentKey: key,
+        art: a.basis.art,
+        bezeichnung: a.basis.bezeichnung,
+        hinweisFuehrungskraft: null,
+        optionen: a.basis.art === "AUSWAHL" ? [...a.optionen] : [],
+        vorausgewaehlt: false,
+        vorausgewaehlteOptionen: [],
+        bemerkungAnbieten: a.bemerkungErlaubt,
+        bemerkungPlatzhalter: katalogFeld ? (a.imAusschnitt?.bemerkungPlatzhalter ?? null) : null,
+        ...(a.bemerkungErlaubt && !katalogFeld ? { bemerkungNurGespeichert: true } : {}),
+        angabe: angabe
+          ? {
+              platzhalter: angabe.platzhalter,
+              hilfe: angabe.hilfe,
+              max: angabe.max,
+              sichtbarFuer: a.basis.sichtbarFuer.map((k) => ({ departmentKey: k, stelleName: name(k) })),
+            }
+          : null,
+        nichtMehrImKatalog: true,
+        ...(a.imAusschnitt ? { imKatalogGeaendert: true } : {}),
+        ...(a.basis.art === "AUSWAHL" && a.optionen.length > 0 ? { optionenNichtMehrImKatalog: [...a.optionen] } : {}),
+      });
+    }
+    return { departmentKey: key, stelleName: gruppe?.stelleName ?? name(key), positionen };
+  });
+
+  // Die gespeicherte Wahl, Zeile fuer Zeile: Eine Zeile, deren Art der Katalog
+  // geaendert hat, steht oben aus der eigenen Momentaufnahme — `basis.art` ist
+  // dann ihre eigene. Nur eine Zeile mit unbekannter Art faellt weg.
+  const wahl: AusstattungsWahlEingabe[] = [];
+  for (const gruppe of gruppen) {
+    for (const fp of gruppe.positionen) {
+      const angebot = angebote.get(fp.id);
+      const zeile = angebot?.bestehend;
+      if (!angebot || !zeile || zeile.art !== angebot.basis.art) continue;
+      const bemerkung = angebot.bemerkungErlaubt ? textOderNull(zeile.bemerkung) : null;
+      const mitBemerkung = bemerkung ? { bemerkung } : {};
+      if (zeile.art === "JA_NEIN") {
+        wahl.push({ positionId: fp.id, gewaehlt: true, ...mitBemerkung });
+      } else if (zeile.art === "AUSWAHL") {
+        const auswahl = zeile.auswahl.filter((o) => angebot.optionen.includes(o));
+        if (auswahl.length > 0) wahl.push({ positionId: fp.id, auswahl, ...mitBemerkung });
+      } else if (zeile.art === "ANGABE") {
+        const angabe = textOderNull(zeile.angabe);
+        if (angabe) wahl.push({ positionId: fp.id, angabe });
+      }
+    }
+  }
+
+  const hinweise: StellenHinweisEingabe[] = [];
+  for (const key of stellen) {
+    const h = opts.bestehend.hinweise.find((x) => x.departmentKey === key);
+    const text = textOderNull(h?.text);
+    if (text) hinweise.push({ departmentKey: key, hinweis: text });
+  }
+
+  return {
+    gruppen,
+    wahl,
+    hinweise,
+    vorausgewaehltAnwenden: !opts.ausstattungGespeichert,
+    bemerkungHinweis: BEMERKUNG_HINWEIS,
+    aenderungenHinweis: AENDERUNGEN_NACH_ABGABE_HINWEIS,
+  };
+}
+
+// =============================================
+// Formularschritt der Fuehrungskraft (S9): Zustand, Body, Kurzform
+// =============================================
+//
+// Die Oberflaeche (src/components/ausstattung/ausstattung-schritt.tsx und
+// ausstattung-zusammenfassung.tsx) rechnet nichts selbst: Startzustand, Body
+// des PUT, Kurzform der Zusammenfassung und der Stand nach dem Speichern stehen
+// hier. Der Body hat genau die Form, die `wahlPruefen` annimmt (Gegenprobe im
+// Test) — nicht Gewaehltes fehlt ganz, eine Bemerkung nur, wo das Formular ein
+// Feld zeigt, Hinweise nur nicht leer.
+
+/**
+ * Was im Formular zu einer Position eingestellt ist. Auch eine abgewaehlte
+ * Position behaelt ihre Bemerkung, solange die Seite steht: Ab- und wieder
+ * Anhaken verliert nichts. Gesendet wird sie nur mit der Wahl (`formularEingabe`).
+ */
+export interface FormularPositionStand {
+  /** Nur Ja/Nein. */
+  gewaehlt: boolean;
+  /** Nur Auswahl; der Body ordnet sie nach den Optionen der Position. */
+  auswahl: string[];
+  /** Nur Angabe. */
+  angabe: string;
+  bemerkung: string;
+}
+
+/** Der Zustand des Schritts „Ausstattung & Zugänge“ im Formular. */
+export interface FormularStand {
+  /** Je Positions-ID. */
+  positionen: Record<string, FormularPositionStand>;
+  /** Je Stelle der Text von „Weitere Hinweise an …“. */
+  hinweise: Record<string, string>;
+}
+
+/** Der Stand einer Position — eine Position ohne Eintrag ist nicht gewaehlt. */
+export function formularPositionStand(stand: FormularStand, positionId: string): FormularPositionStand {
+  return hatEigenen(stand.positionen, positionId)
+    ? stand.positionen[positionId]
+    : { gewaehlt: false, auswahl: [], angabe: "", bemerkung: "" };
+}
+
+/** Der Text von „Weitere Hinweise an …“ einer Stelle ("" = keiner). */
+export function formularHinweis(stand: FormularStand, departmentKey: string): string {
+  return hatEigenen(stand.hinweise, departmentKey) ? stand.hinweise[departmentKey] : "";
+}
+
+/**
+ * Startzustand des Schritts: die gespeicherte eigene Wahl. Die Vorauswahl des
+ * Katalogs (`vorausgewaehlt`, `vorausgewaehlteOptionen`) gilt nur, solange der
+ * Schritt nie gespeichert wurde (`vorausgewaehltAnwenden`, F9) — sonst hiesse
+ * „alles abgewaehlt“ beim naechsten Oeffnen wieder „vorausgewaehlt“.
+ */
+export function formularStartStand(sicht: FuehrungskraftSicht): FormularStand {
+  const wahl = new Map(sicht.wahl.map((w) => [w.positionId, w]));
+  const positionen: Record<string, FormularPositionStand> = {};
+  for (const gruppe of sicht.gruppen) {
+    for (const p of gruppe.positionen) {
+      const w = wahl.get(p.id);
+      if (w) {
+        positionen[p.id] = {
+          gewaehlt: w.gewaehlt === true,
+          auswahl: [...(w.auswahl ?? [])],
+          angabe: w.angabe ?? "",
+          bemerkung: w.bemerkung ?? "",
+        };
+      } else {
+        const vorauswahl = sicht.vorausgewaehltAnwenden;
+        positionen[p.id] = {
+          gewaehlt: vorauswahl && p.art === "JA_NEIN" && p.vorausgewaehlt,
+          auswahl: vorauswahl && p.art === "AUSWAHL" ? [...p.vorausgewaehlteOptionen] : [],
+          angabe: "",
+          bemerkung: "",
+        };
+      }
+    }
+  }
+  const hinweise: Record<string, string> = {};
+  for (const h of sicht.hinweise) hinweise[h.departmentKey] = h.hinweis;
+  return { positionen, hinweise };
+}
+
+/**
+ * Der Body des PUT beim „Weiter“ (`{ ausstattung, hinweise }`, R3: immer, auch
+ * leer — „Weiter“ ist in diesem Schritt nie gesperrt):
+ *
+ *   - Ja/Nein nur angehakt, als `{ positionId, gewaehlt: true }`;
+ *   - Auswahl nur mit mindestens einer Option, in der Reihenfolge der Position;
+ *   - Angabe nur mit Text (getrimmt), nie mit Bemerkung;
+ *   - eine Bemerkung nur, wo das Formular ein Feld zeigt (`bemerkungAnbieten`)
+ *     und sie nicht leer ist;
+ *   - Hinweise nur nicht leer, je Stelle der Sicht.
+ *
+ * Beide Listen sind immer gesetzt: Ein leeres Array leert den gespeicherten
+ * Stand (alles abgewaehlt), so wie die Fuehrungskraft es auf dem Schirm hat.
+ */
+export function formularEingabe(
+  sicht: FuehrungskraftSicht,
+  stand: FormularStand,
+): { ausstattung: AusstattungsWahlEingabe[]; hinweise: StellenHinweisEingabe[] } {
+  const ausstattung: AusstattungsWahlEingabe[] = [];
+  for (const gruppe of sicht.gruppen) {
+    for (const p of gruppe.positionen) {
+      const s = formularPositionStand(stand, p.id);
+      const bemerkung = p.bemerkungAnbieten ? s.bemerkung.trim() : "";
+      const mitBemerkung = bemerkung ? { bemerkung } : {};
+      if (p.art === "JA_NEIN") {
+        if (s.gewaehlt) ausstattung.push({ positionId: p.id, gewaehlt: true, ...mitBemerkung });
+      } else if (p.art === "AUSWAHL") {
+        const auswahl = p.optionen.filter((o) => s.auswahl.includes(o));
+        if (auswahl.length > 0) ausstattung.push({ positionId: p.id, auswahl, ...mitBemerkung });
+      } else if (p.art === "ANGABE") {
+        const angabe = s.angabe.trim();
+        if (angabe) ausstattung.push({ positionId: p.id, angabe });
+      }
+    }
+  }
+  const hinweise: StellenHinweisEingabe[] = [];
+  for (const gruppe of sicht.gruppen) {
+    const text = formularHinweis(stand, gruppe.departmentKey).trim();
+    if (text) hinweise.push({ departmentKey: gruppe.departmentKey, hinweis: text });
+  }
+  return { ausstattung, hinweise };
+}
+
+/** Teil der Kurzform fuer eine Stelle, an die ein Hinweis geht (sein Text steht im Schritt davor). */
+export const KURZFORM_HINWEIS = "Weitere Hinweise";
+
+/** Die Zusammenfassung des Schritts (Mockup 6.2). */
+export interface FormularKurzform {
+  /** Je Stelle mit Wahl oder Hinweis eine Zeile, in der Reihenfolge des Formulars. */
+  stellen: { departmentKey: string; stelleName: string; text: string }[];
+  /** Zahl der Bemerkungen — ihr Text steht im Schritt davor. */
+  bemerkungen: number;
+}
+
+/**
+ * Kurzform je Stelle fuer die Zusammenfassung vor dem Absenden, aus der
+ * gespeicherten Wahl (`sicht.wahl` — nach dem „Weiter“ fortgeschrieben ueber
+ * `sichtNachSpeichern`): Ja/Nein mit Bezeichnung, Auswahl als „Schlüssel (4)“,
+ * Angabe als „Unterrichtsfächer: Chemie, Sport“, dazu „Weitere Hinweise“, wenn
+ * ein Hinweis an die Stelle geht. Bemerkungen nur gezaehlt. Bezeichnung, Art
+ * und Stelle stammen aus der Sicht — fuer eine seit dem Speichern geaenderte
+ * Position also aus der gespeicherten Momentaufnahme (`fuehrungskraftSicht`):
+ * Die Zusammenfassung zeigt, was abgegeben wird.
+ */
+export function formularKurzform(sicht: FuehrungskraftSicht): FormularKurzform {
+  const wahl = new Map(sicht.wahl.map((w) => [w.positionId, w]));
+  const mitHinweis = new Set(sicht.hinweise.filter((h) => !leer(h.hinweis)).map((h) => h.departmentKey));
+  const stellen: FormularKurzform["stellen"] = [];
+  let bemerkungen = 0;
+  for (const gruppe of sicht.gruppen) {
+    const teile: string[] = [];
+    for (const p of gruppe.positionen) {
+      const w = wahl.get(p.id);
+      if (!w) continue;
+      const vorher = teile.length;
+      const optionen = w.auswahl?.length ?? 0;
+      const angabeText = (w.angabe ?? "").trim();
+      if (p.art === "JA_NEIN" && w.gewaehlt === true) teile.push(p.bezeichnung);
+      else if (p.art === "AUSWAHL" && optionen > 0) teile.push(`${p.bezeichnung} (${optionen})`);
+      else if (p.art === "ANGABE" && angabeText) teile.push(`${p.bezeichnung}: ${angabeText}`);
+      if (teile.length > vorher && !leer(w.bemerkung)) bemerkungen += 1;
+    }
+    if (mitHinweis.has(gruppe.departmentKey)) teile.push(KURZFORM_HINWEIS);
+    if (teile.length > 0) {
+      stellen.push({ departmentKey: gruppe.departmentKey, stelleName: gruppe.stelleName, text: teile.join(" · ") });
+    }
+  }
+  return { stellen, bemerkungen };
+}
+
+/**
+ * Die Sicht nach einem erfolgreichen „Weiter“ fortschreiben, ohne sie neu zu
+ * laden: Die gespeicherte Wahl ist jetzt der gesendete Body, und die Vorauswahl
+ * gilt nicht mehr (F9). Dazu faellt weg, was der Server ab jetzt nicht mehr
+ * anbietet (`fuehrungskraftAngebot`), damit ein „Zurück“ nichts zeigt, das der
+ * naechste PUT abweist:
+ *
+ *   - eine Position `nichtMehrImKatalog`, die nicht mehr gewaehlt ist (auch
+ *     eine `imKatalogGeaendert` — ihre geaenderte Form liefert erst der
+ *     naechste GET, die Sicht hier kennt sie nicht);
+ *   - eine Option, die nur aus der alten Wahl stammte und nicht mehr gewaehlt ist;
+ *   - ein Bemerkungsfeld, das nur wegen einer gespeicherten Bemerkung stand,
+ *     wenn keine mehr gespeichert ist;
+ *   - eine Stelle ohne Position, deren Hinweis geleert wurde.
+ *
+ * Ein fehlendes Feld der Eingabe laesst den Stand dazu unveraendert (wie im PUT).
+ */
+export function sichtNachSpeichern(sicht: FuehrungskraftSicht, eingabe: FuehrungskraftEingabe): FuehrungskraftSicht {
+  if (eingabe.ausstattung === undefined && eingabe.hinweise === undefined) return sicht;
+
+  const wahlListe: AusstattungsWahlEingabe[] = eingabe.ausstattung
+    ? eingabe.ausstattung.map((w) => ({ ...w, ...(w.auswahl ? { auswahl: [...w.auswahl] } : {}) }))
+    : sicht.wahl;
+  const hinweisListe: StellenHinweisEingabe[] = eingabe.hinweise
+    ? eingabe.hinweise
+        .filter((h) => !leer(h.hinweis))
+        .map((h) => ({ departmentKey: h.departmentKey, hinweis: h.hinweis.trim() }))
+    : sicht.hinweise;
+  const wahl = new Map(wahlListe.map((w) => [w.positionId, w]));
+  const hinweisStellen = new Set(hinweisListe.map((h) => h.departmentKey));
+
+  const gruppen: FormularGruppe[] = [];
+  for (const gruppe of sicht.gruppen) {
+    const positionen: FormularPosition[] = [];
+    for (const p of gruppe.positionen) {
+      if (!eingabe.ausstattung) {
+        positionen.push(p);
+        continue;
+      }
+      const w = wahl.get(p.id);
+      if (p.nichtMehrImKatalog && !w) continue;
+      const { optionenNichtMehrImKatalog: alteOptionen, bemerkungNurGespeichert, ...rest } = p;
+      const neu: FormularPosition = rest;
+      if (alteOptionen) {
+        const bleiben = alteOptionen.filter((o) => w?.auswahl?.includes(o) ?? false);
+        neu.optionen = p.optionen.filter((o) => !alteOptionen.includes(o) || bleiben.includes(o));
+        if (bleiben.length > 0) neu.optionenNichtMehrImKatalog = bleiben;
+      }
+      if (bemerkungNurGespeichert) {
+        if (leer(w?.bemerkung)) neu.bemerkungAnbieten = false;
+        else neu.bemerkungNurGespeichert = true;
+      }
+      positionen.push(neu);
+    }
+    if (positionen.length > 0 || hinweisStellen.has(gruppe.departmentKey)) gruppen.push({ ...gruppe, positionen });
+  }
+
+  return { ...sicht, gruppen, wahl: wahlListe, hinweise: hinweisListe, vorausgewaehltAnwenden: false };
+}
+
+// =============================================
+// HR liest mit (S10): Kurzform der HR-Mail, Zustand und Uebersicht der Karte
+// =============================================
+//
+// Was die Fuehrungskraft gewaehlt hat, sieht HR an drei Stellen: in der Mail
+// `supervisor-completed` nur gezaehlt (`ausstattungKurz`, ohne Bemerkungen),
+// im Reiter „Vorgesetzter“ als fuenfte Karte und im PDF der Modalitaeten
+// (beide aus `ausstattungsGruppen`, nur lesend). Die Karte im Reiter
+// Checkliste (S15/S16) baut auf derselben Uebersicht auf und bekommt dort
+// Aufgabenstand und Aktionen.
+
+/** Endstatus des Vorgangs: Die Ausstattung ist nur noch lesbar (Regel 13). REVIEWED laeuft noch. */
+export const AUSSTATTUNG_ENDSTATUS = ["COMPLETED", "EXPIRED"] as const;
+
+/** „A“, „A und B“, „A, B und C“. */
+export function namenAufzaehlen(namen: ReadonlyArray<string>): string {
+  if (namen.length <= 1) return namen[0] ?? "";
+  return `${namen.slice(0, -1).join(", ")} und ${namen[namen.length - 1]}`;
+}
+
+/**
+ * Die Kurzform fuer die HR-Mail `supervisor-completed` (`{{ausstattung_kurz}}`,
+ * Plan Abschnitt 9): „6 Positionen für 3 Stellen“. Gezaehlt werden die nicht
+ * gestrichenen Ja/Nein- und Auswahl-Zeilen (eine je Position, nicht je
+ * Option); die Stellen kommen aus diesen Zeilen und aus den nicht leeren
+ * Hinweisen. Angaben zaehlen nicht (sie werden keine Aufgabe). Nur Hinweise:
+ * „Hinweise an 2 Stellen“. Nichts gewaehlt: "" (der Block in der Vorlage
+ * entfaellt). Nie ein Bemerkungs- oder Hinweistext — die Mail geht an ein
+ * HR-Postfach mit Webhook-Weg.
+ */
+export function ausstattungKurz(
+  zeilen: ReadonlyArray<{ art: string; departmentKey: string; gestrichenAm?: Date | string | null }>,
+  hinweise: ReadonlyArray<{ departmentKey: string; text: string | null }>,
+): string {
+  const positionen = zeilen.filter((z) => !z.gestrichenAm && (z.art === "JA_NEIN" || z.art === "AUSWAHL"));
+  const stellen = new Set([
+    ...positionen.map((z) => z.departmentKey),
+    ...hinweise.filter((h) => !leer(h.text)).map((h) => h.departmentKey),
+  ]);
+  if (stellen.size === 0) return "";
+  const fuer = mitAnzahl(stellen.size, "Stelle", "Stellen");
+  if (positionen.length === 0) return `${stellen.size === 1 ? "Hinweis" : "Hinweise"} an ${fuer}`;
+  return `${mitAnzahl(positionen.length, "Position", "Positionen")} für ${fuer}`;
+}
+
+function herkunftText(wort: string, quelle: string | null | undefined): string {
+  if (quelle === "HR") return `${wort} der Personalabteilung`;
+  if (quelle === "BEIDE") return `${wort} der Führungskraft, ergänzt durch die Personalabteilung`;
+  return `${wort} der Führungskraft`;
+}
+
+/**
+ * Beschriftung einer Bemerkung nach ihrer Herkunft (Regel 8): „Bemerkung der
+ * Führungskraft“, „… der Personalabteilung“, „… der Führungskraft, ergänzt
+ * durch die Personalabteilung“. Ohne bekannte Herkunft die der Fuehrungskraft.
+ */
+export function bemerkungLabel(quelle: string | null | undefined): string {
+  return herkunftText("Bemerkung", quelle);
+}
+
+/** Dasselbe fuer „Weitere Hinweise an …“ (`OnboardingStellenHinweis.quelle`). */
+export function hinweisLabel(quelle: string | null | undefined): string {
+  return herkunftText("Hinweis", quelle);
+}
+
+export type AusstattungsZustand = "ENTWURF" | "BEARBEITBAR" | "NUR_LESEN";
+
+/** Was die Zustandsregel ueber den Vorgang wissen muss (Prisma-Zeile oder JSON der Detailroute). */
+export interface UebersichtVorgangStand {
+  status: string;
+  supervisorSubmittedAt?: Date | string | null;
+  supervisorData?: { isComplete?: boolean | null; mitAusstattung?: boolean | null } | null;
+}
+
+/**
+ * Die Zustandsregel der Karte (Feinplan 1.6) — EINE Stelle fuer Karte und
+ * Server:
+ *
+ *   - NUR_LESEN: Status COMPLETED oder EXPIRED (Satz „… nur noch lesbar.“)
+ *     oder die Rolle darf nicht bearbeiten (kein Satz).
+ *   - ENTWURF: Modalitaeten nicht eingereicht (`vorgesetzteAbgesendet`). Der
+ *     Satz haengt am Merker: mit Schritt „Ohne Einstellungsmodalitäten …“,
+ *     sonst „Das Formular der Führungskraft enthält diesen Schritt nicht …“.
+ *   - BEARBEITBAR: eingereicht, Status nicht final, Rolle darf bearbeiten —
+ *     UNABHAENGIG von `mitAusstattung`. Der Merker steuert nur das Formular
+ *     der Fuehrungskraft (Regel 2), nie die Karte: Nach der Abgabe ergaenzt HR
+ *     auch Vorgaenge ohne den Schritt (Bestand, falscher Fragebogentyp).
+ */
+export function ausstattungsZustand(
+  v: UebersichtVorgangStand,
+  darfBearbeiten: boolean,
+): { zustand: AusstattungsZustand; satz: string | null } {
+  if ((AUSSTATTUNG_ENDSTATUS as readonly string[]).includes(v.status)) {
+    return { zustand: "NUR_LESEN", satz: MELDUNGEN.UEBERSICHT_ABGESCHLOSSEN };
+  }
+  if (!darfBearbeiten) return { zustand: "NUR_LESEN", satz: null };
+  if (!vorgesetzteAbgesendet(v)) {
+    return {
+      zustand: "ENTWURF",
+      satz:
+        v.supervisorData?.mitAusstattung === true
+          ? MELDUNGEN.UEBERSICHT_ENTWURF_MIT_SCHRITT
+          : MELDUNGEN.UEBERSICHT_ENTWURF_OHNE_SCHRITT,
+    };
+  }
+  return { zustand: "BEARBEITBAR", satz: null };
+}
+
+/** Eine Zeile von `OnboardingAusstattung`, wie Uebersicht und PDF sie lesen. */
+export interface UebersichtZeileDaten {
+  id: string;
+  positionId: string | null;
+  departmentKey: string;
+  art: string;
+  angabeSchluessel: string | null;
+  bezeichnung: string;
+  sichtbarFuer: readonly string[];
+  reihenfolge: number;
+  auswahl: readonly string[];
+  angabe: string | null;
+  bemerkung: string | null;
+  bemerkungQuelle: string | null;
+  quelle: string;
+  erfasstVonId?: string | null;
+  gestrichenAm?: Date | string | null;
+  createdAt?: Date | string | null;
+}
+
+/** Ein „Weitere Hinweise an …“ (`OnboardingStellenHinweis`), wie Uebersicht und PDF ihn lesen. */
+export interface UebersichtHinweisDaten {
+  departmentKey: string;
+  text: string;
+  quelle: string;
+  checklistItemId?: string | null;
+  gesehenAm?: Date | string | null;
+}
+
+/** Wer eine Zeile ergaenzt hat (HR-Konto, `erfasstVonId`). */
+export interface Erfasser {
+  firstName: string | null;
+  lastName: string | null;
+}
+
+/** Stand einer Aufgabe zu einer Zeile (je Option eine). Kommt mit S15; bis dahin leer. */
+export interface AusstattungsAufgabeStand {
+  option: string;
+  checklistItemId: string;
+  titel: string;
+  status: "offen" | "erledigt" | "entfaellt";
+  faelligAm: string | null;
+  eilt: boolean;
+  erledigtAm: string | null;
+}
+
+/** Eine Zeile der Uebersicht (Karte im Reiter „Vorgesetzter“, spaeter Reiter Checkliste). */
+export interface AusstattungsZeile {
+  id: string;
+  positionId: string | null;
+  art: string;
+  bezeichnung: string;
+  quelle: AusstattungsQuelle;
+  /** Nur bei quelle HR: „ergänzt von HR (A. Peters), 19.01.2027“. */
+  erfasst: string | null;
+  /** Nur Auswahl: die gewaehlten Optionen in der gespeicherten Reihenfolge. */
+  auswahl: string[];
+  bemerkung: { text: string; label: string } | null;
+  /**
+   * Nur Angabe mit Inhalt. `sichtbarFuer`: Anzeigenamen ALLER Stellen, die die
+   * Angabe sehen — die eigene zuerst, dann die freigegebenen (Mockup 6.3:
+   * „sehen Facility Management und IT-Abteilung“).
+   */
+  angabe: { label: string; wert: string; sichtbarFuer: string[] } | null;
+  gestrichen: boolean;
+  /** Die Position steht im Katalog dieses Vorgangs nicht mehr (ausgeschaltet, ausgeblendet, ohne Adresse). */
+  nichtMehrImKatalog: boolean;
+  /** Kommt mit S12 (Regel 14); bis dahin `null`. */
+  vorlaufWarnung: string | null;
+  /** Kommt mit S15; bis dahin leer. */
+  aufgaben: AusstattungsAufgabeStand[];
+  /** Kommt mit S15; bis dahin alles aus. */
+  aktionen: { aendern: boolean; streichen: boolean; sperrGrund: string | null };
+}
+
+export interface AusstattungsHinweis {
+  text: string;
+  /** „Hinweis der Führungskraft“ usw. (`hinweisLabel`). */
+  quelleLabel: string;
+  /** HR hat ihn zur Kenntnis genommen (`gesehenAm`). */
+  gesehen: boolean;
+  checklistItemId: string | null;
+  /** Kommen mit S15; bis dahin leer. */
+  status: "offen" | "erledigt" | "entfaellt" | null;
+  faelligAm: string | null;
+  eilt: boolean;
+  aktionen: { aendern: boolean; sperrGrund: string | null };
+}
+
+export interface AusstattungsGruppe {
+  departmentKey: string;
+  stelleName: string;
+  /** Die Stelle hat am Arbeitsort keine aktive Adresse (HR nie). */
+  adresseFehlt: boolean;
+  zeilen: AusstattungsZeile[];
+  hinweis: AusstattungsHinweis | null;
+}
+
+/** Eine Katalogposition, die HR noch ergaenzen kann (nur im Zustand BEARBEITBAR). */
+export interface AusstattungsHinzufuegbar {
+  positionId: string;
+  bezeichnung: string;
+  art: string;
+  departmentKey: string;
+  optionen: string[];
+}
+
+/**
+ * Die Uebersicht fuer HR (Feinplan 1.6), fertig fuer die Karte — sie rechnet
+ * nichts selbst. Erste Fassung (S10): Gruppen, Zeilen, Hinweise, Angaben,
+ * Zustand und Saetze; Aufgabenstand und Aktionen kommen mit S15.
+ */
+export interface AusstattungsUebersicht {
+  zustand: AusstattungsZustand;
+  /** Satz der Zustandsregel (1.6), z. B. „Ohne Einstellungsmodalitäten kann nichts an die Stellen gehen.“ */
+  satz: string | null;
+  /** „Angefordert von der Führungskraft mit den Einstellungsmodalitäten (14.01.2027).“ — nur mit eingereichter Wahl. */
+  einleitung: string | null;
+  /** Satz, wenn es keine Gruppe gibt (sonst `null`). */
+  leer: string | null;
+  /** `supervisorSubmittedAt` als ISO-Zeitpunkt. */
+  angefordertAm: string | null;
+  /** Merker des Formulars (Regel 2) — nur zur Anzeige, der Zustand haengt nicht daran. */
+  mitAusstattung: boolean;
+  gruppen: AusstattungsGruppe[];
+  /** Katalogpositionen, die HR ergaenzen kann; leer ausser im Zustand BEARBEITBAR. */
+  hinzufuegbar: AusstattungsHinzufuegbar[];
+  /** Rolle in HR_EDIT_ROLES. */
+  darfBearbeiten: boolean;
+}
+
+function alsIso(wert: Date | string | null | undefined): string | null {
+  if (!wert) return null;
+  return wert instanceof Date ? wert.toISOString() : wert;
+}
+
+/** „A. Peters“; ohne Nachnamen der Vorname, ohne beides "". */
+function kurzName(e: Erfasser | undefined): string {
+  const vor = (e?.firstName ?? "").trim();
+  const nach = (e?.lastName ?? "").trim();
+  if (vor && nach) return `${vor.charAt(0)}. ${nach}`;
+  return nach || vor;
+}
+
+/**
+ * Die Gruppen je Stelle — fuer die Karte (ueber `ausstattungsUebersichtBauen`)
+ * und fuer das PDF der Modalitaeten, damit beide dieselben Zeilen in derselben
+ * Reihenfolge mit denselben Beschriftungen zeigen.
+ *
+ *   - Stellen in der Reihenfolge der Abteilungskarte, HR dahinter; eine Gruppe
+ *     je Stelle mit Zeilen oder nicht leerem Hinweis.
+ *   - Zeilen nach `reihenfolge` (orderIndex der Position beim Speichern), dann
+ *     Bezeichnung. Gestrichene bleiben mit `gestrichen` stehen.
+ *   - Bemerkung nur bei Ja/Nein und Auswahl, mit Beschriftung nach Herkunft;
+ *     Angabe nur mit Inhalt, Label aus ANGABEN_KATALOG.
+ *   - „nicht mehr im Katalog“ nur, wenn der Aufrufer den Katalog dieses
+ *     Vorgangs kennt (`imKatalog`), sonst nie.
+ */
+export function ausstattungsGruppen(opts: {
+  zeilen: ReadonlyArray<UebersichtZeileDaten>;
+  hinweise: ReadonlyArray<UebersichtHinweisDaten>;
+  stelleName: (departmentKey: string) => string;
+  adresseFehlt?: (departmentKey: string) => boolean;
+  /** IDs der Positionen, die der Katalog dem Vorgang heute anbietet; `null`/fehlend = unbekannt. */
+  imKatalog?: ReadonlySet<string> | null;
+  erfasser?: Readonly<Record<string, Erfasser>>;
+}): AusstattungsGruppe[] {
+  const hinweise = opts.hinweise.filter((h) => !leer(h.text) && !istNichtErlaubteStelle(h.departmentKey));
+  const zeilen = opts.zeilen.filter((z) => !istNichtErlaubteStelle(z.departmentKey));
+  const schluessel = [...zeilen.map((z) => z.departmentKey), ...hinweise.map((h) => h.departmentKey)];
+  const rang = stellenRang(schluessel);
+  const stellen = [...new Set(schluessel)].sort((a, b) => (rang.get(a) ?? 0) - (rang.get(b) ?? 0));
+
+  return stellen.map((key) => {
+    const eigene = zeilen
+      .filter((z) => z.departmentKey === key)
+      .sort((a, b) => a.reihenfolge - b.reihenfolge || a.bezeichnung.localeCompare(b.bezeichnung, "de"));
+    const h = hinweise.find((x) => x.departmentKey === key);
+    return {
+      departmentKey: key,
+      stelleName: opts.stelleName(key),
+      adresseFehlt: key !== DEPARTMENT_KEYS.HR && (opts.adresseFehlt?.(key) ?? false),
+      zeilen: eigene.map((z): AusstattungsZeile => {
+        const quelle: AusstattungsQuelle = z.quelle === "HR" ? "HR" : "FUEHRUNGSKRAFT";
+        const bemerkung = z.art === "ANGABE" ? null : textOderNull(z.bemerkung);
+        const wert = z.art === "ANGABE" ? textOderNull(z.angabe) : null;
+        const definition = istAngabeSchluessel(z.angabeSchluessel) ? ANGABEN_KATALOG[z.angabeSchluessel] : null;
+        const datum = formatDatumDE(z.createdAt);
+        const wer = kurzName(z.erfasstVonId ? opts.erfasser?.[z.erfasstVonId] : undefined);
+        return {
+          id: z.id,
+          positionId: z.positionId,
+          art: z.art,
+          bezeichnung: z.bezeichnung,
+          quelle,
+          erfasst:
+            quelle === "HR" ? `ergänzt von HR${wer ? ` (${wer})` : ""}${datum ? `, ${datum}` : ""}` : null,
+          auswahl: z.art === "AUSWAHL" ? [...z.auswahl] : [],
+          bemerkung: bemerkung ? { text: bemerkung, label: bemerkungLabel(z.bemerkungQuelle ?? z.quelle) } : null,
+          angabe: wert
+            ? {
+                label: definition?.label ?? z.bezeichnung,
+                wert,
+                sichtbarFuer: [key, ...z.sichtbarFuer.filter((k) => k !== key)].map((k) => opts.stelleName(k)),
+              }
+            : null,
+          gestrichen: z.gestrichenAm != null,
+          nichtMehrImKatalog: !!z.positionId && !!opts.imKatalog && !opts.imKatalog.has(z.positionId),
+          vorlaufWarnung: null,
+          aufgaben: [],
+          aktionen: { aendern: false, streichen: false, sperrGrund: null },
+        };
+      }),
+      hinweis: h
+        ? {
+            text: h.text.trim(),
+            quelleLabel: hinweisLabel(h.quelle),
+            gesehen: h.gesehenAm != null,
+            checklistItemId: h.checklistItemId ?? null,
+            status: null,
+            faelligAm: null,
+            eilt: false,
+            aktionen: { aendern: false, sperrGrund: null },
+          }
+        : null,
+    };
+  });
+}
+
+/**
+ * Baut die Uebersicht fuer HR (Feinplan 1.6, erste Fassung S10): Zustand und
+ * Satz nach `ausstattungsZustand`, Gruppen nach `ausstattungsGruppen` mit
+ * Stellen-Namen und Adresse am wirksamen Arbeitsort (`empfaengerAufloesen`,
+ * dieselbe Regel wie der Versand), dazu `hinzufuegbar` (nur BEARBEITBAR):
+ * der Katalogausschnitt dieses Vorgangs ohne die schon gewaehlten, nicht
+ * gestrichenen Positionen.
+ *
+ * `katalog` ist der Ausschnitt (`katalogAusschnittLaden`); `null` heisst
+ * „nicht geladen“ — dann ist nichts hinzufuegbar und keine Zeile „nicht mehr
+ * im Katalog“.
+ */
+export function ausstattungsUebersichtBauen(opts: {
+  vorgang: UebersichtVorgangStand;
+  darfBearbeiten: boolean;
+  zeilen: ReadonlyArray<UebersichtZeileDaten>;
+  hinweise: ReadonlyArray<UebersichtHinweisDaten>;
+  /** Wirksamer Arbeitsort (`onboardingEmpfaengerEinrichtung`). */
+  arbeitsortId: string;
+  konfigs: ReadonlyArray<AbteilungsKonfig>;
+  katalog: ReadonlyArray<KatalogPosition> | null;
+  erfasser?: Readonly<Record<string, Erfasser>>;
+}): AusstattungsUebersicht {
+  const { zustand, satz } = ausstattungsZustand(opts.vorgang, opts.darfBearbeiten);
+  const eingereicht = vorgesetzteAbgesendet(opts.vorgang);
+  const mitAusstattung = opts.vorgang.supervisorData?.mitAusstattung === true;
+
+  const empfaenger = (key: string) =>
+    empfaengerAufloesen({ departmentKey: key, organizationId: opts.arbeitsortId, konfigs: opts.konfigs, fuehrungskraft: null });
+  const gruppen = ausstattungsGruppen({
+    zeilen: opts.zeilen,
+    hinweise: opts.hinweise,
+    stelleName: (key) => (key === DEPARTMENT_KEYS.HR ? abteilungLabel(key) : empfaenger(key).departmentName),
+    adresseFehlt: (key) => key !== DEPARTMENT_KEYS.HR && !empfaenger(key).ok,
+    imKatalog: opts.katalog ? new Set(opts.katalog.map((p) => p.id)) : null,
+    erfasser: opts.erfasser,
+  });
+
+  const gewaehlt = new Set(
+    opts.zeilen.filter((z) => z.positionId && !z.gestrichenAm).map((z) => z.positionId as string),
+  );
+  const hinzufuegbar: AusstattungsHinzufuegbar[] =
+    zustand === "BEARBEITBAR" && opts.katalog
+      ? opts.katalog
+          .filter((p) => !gewaehlt.has(p.id))
+          .map((p) => ({
+            positionId: p.id,
+            bezeichnung: p.bezeichnung,
+            art: p.art,
+            departmentKey: p.departmentKey,
+            optionen: p.art === "AUSWAHL" ? [...p.optionen] : [],
+          }))
+      : [];
+
+  const angefordertAm = alsIso(opts.vorgang.supervisorSubmittedAt);
+  const vonFuehrungskraft =
+    opts.zeilen.some((z) => z.quelle === "FUEHRUNGSKRAFT") ||
+    opts.hinweise.some((h) => h.quelle !== "HR" && !leer(h.text));
+  const datum = formatDatumDE(angefordertAm);
+  const einleitung =
+    eingereicht && vonFuehrungskraft
+      ? `Angefordert von der Führungskraft mit den Einstellungsmodalitäten${datum ? ` (${datum})` : ""}.`
+      : null;
+
+  let leerSatz: string | null = null;
+  if (gruppen.length === 0) {
+    if (zustand === "ENTWURF") leerSatz = mitAusstattung ? MELDUNGEN.UEBERSICHT_NOCH_NICHTS : null;
+    else leerSatz = eingereicht && mitAusstattung ? MELDUNGEN.UEBERSICHT_NICHTS_ANGEFORDERT : MELDUNGEN.UEBERSICHT_LEER;
+  }
+
+  return {
+    zustand,
+    satz,
+    einleitung,
+    leer: leerSatz,
+    angefordertAm,
+    mitAusstattung,
+    gruppen,
+    hinzufuegbar,
+    darfBearbeiten: opts.darfBearbeiten,
+  };
 }
 
 // =============================================

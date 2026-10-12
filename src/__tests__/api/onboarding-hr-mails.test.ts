@@ -14,6 +14,10 @@
  * Zweiter Schwerpunkt: `{{mitarbeiter_name}}` faellt in `extractVariables`
  * zuletzt auf `payload.email` zurueck. Ohne ausdruecklich gesetztes Feld
  * stuende die PRIVATE Adresse der Person im Betreff der HR-Mail.
+ *
+ * Dritter Schwerpunkt (Paket A2, Feinplan S10): `ausstattung_kurz` in
+ * `supervisor-completed` — nur gezaehlt, nie Bemerkungstexte, und die Mail
+ * geht auch dann hinaus, wenn das Laden der Kurzform scheitert.
  */
 
 const mockPrisma = {
@@ -30,6 +34,10 @@ const mockPrisma = {
     update: jest.fn(),
   },
   auditLog: { create: jest.fn() },
+  // Paket A2: Kurzform der Ausstattung fuer `supervisor-completed`
+  // (ausstattungKurzLaden, nur mit Merker `mitAusstattung`).
+  onboardingAusstattung: { findMany: jest.fn() },
+  onboardingStellenHinweis: { findMany: jest.fn() },
   $transaction: jest.fn(),
 };
 const mockMagicToken = jest.fn();
@@ -62,6 +70,9 @@ jest.mock("@/lib/encryption", () => ({
 import { POST as FRAGEBOGEN_POST } from "@/app/api/fragebogen/[token]/route";
 import { POST as MODALITAETEN_POST } from "@/app/api/modalitaeten/[token]/route";
 import { AKTUELLE_ERKLAERUNG } from "@/lib/erklaerung-arbeitnehmer";
+import { renderEventEmail } from "@/lib/mailer";
+import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
+import { EVENT_CATALOG } from "@/lib/events";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
 import { NextRequest } from "next/server";
 
@@ -199,6 +210,8 @@ beforeEach(() => {
   mockPrisma.onboardingProcess.update.mockResolvedValue({});
   mockPrisma.onboardingProcess.findUnique.mockResolvedValue(null);
   mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(standNachFragebogen());
+  mockPrisma.onboardingAusstattung.findMany.mockResolvedValue([]);
+  mockPrisma.onboardingStellenHinweis.findMany.mockResolvedValue([]);
   // Die Transaktions-Rueckrufe laufen echt, gegen dieselben Mocks — und ihr
   // Rueckgabewert traegt den `StatusAbgleich` nach draussen.
   mockPrisma.$transaction.mockImplementation((arg: unknown) =>
@@ -538,5 +551,103 @@ describe("Modalitaeten abgesendet — Merker fuer die Gegenspur", () => {
     expect(res.status).toBe(500);
     expect(mockN8n).not.toHaveBeenCalled();
     fehler.mockRestore();
+  });
+});
+
+describe("Modalitaeten abgesendet — Ausstattung in Kurzform (Paket A2)", () => {
+  const MIT_AUSSTATTUNG = { isComplete: false, befristet: false, kostenstellen: [], mitAusstattung: true };
+
+  beforeEach(() => {
+    mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(standNachModalitaeten());
+  });
+
+  async function absenden() {
+    const res = await MODALITAETEN_POST(req(`/api/modalitaeten/${SUP_TOKEN}`, {}), {
+      params: params(SUP_TOKEN)(),
+    });
+    expect(res.status).toBe(200);
+  }
+
+  it("zaehlt Positionen und Stellen — ohne jeden Bemerkungs- oder Hinweistext", async () => {
+    mockSupervisorToken.mockResolvedValue(modalitaetenToken({ supervisorData: MIT_AUSSTATTUNG }));
+    mockPrisma.onboardingAusstattung.findMany.mockResolvedValue([
+      { art: "JA_NEIN", departmentKey: "IT", gestrichenAm: null },
+      { art: "AUSWAHL", departmentKey: "FACILITY", gestrichenAm: null },
+      { art: "ANGABE", departmentKey: "FACILITY", gestrichenAm: null },
+    ]);
+    mockPrisma.onboardingStellenHinweis.findMany.mockResolvedValue([
+      { departmentKey: "VERWALTUNG", text: "Fach bitte neben Frau Müller" },
+    ]);
+
+    await absenden();
+
+    const p = payload("supervisor-completed")!;
+    expect(p.ausstattung_kurz).toBe("2 Positionen für 3 Stellen");
+    expect(JSON.stringify(p)).not.toContain("Müller");
+    // gelesen wird nur, was gezaehlt wird — nie die Texte der Zeilen
+    const auswahl = mockPrisma.onboardingAusstattung.findMany.mock.calls[0][0];
+    expect(auswahl).toEqual({
+      where: { onboardingId: "ob1" },
+      select: { art: true, departmentKey: true, gestrichenAm: true },
+    });
+  });
+
+  it("ohne Merker `mitAusstattung` leer — und ohne Abfrage", async () => {
+    await absenden();
+
+    expect(payload("supervisor-completed")?.ausstattung_kurz).toBe("");
+    expect(mockPrisma.onboardingAusstattung.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.onboardingStellenHinweis.findMany).not.toHaveBeenCalled();
+  });
+
+  it("Laden scheitert → die Mail geht trotzdem, das Feld bleibt leer", async () => {
+    mockSupervisorToken.mockResolvedValue(modalitaetenToken({ supervisorData: MIT_AUSSTATTUNG }));
+    mockPrisma.onboardingAusstattung.findMany.mockRejectedValue(new Error("Verbindung verloren"));
+    const fehler = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await absenden();
+
+    const p = payload("supervisor-completed")!;
+    expect(p.ausstattung_kurz).toBe("");
+    expect(p.fragebogen_offen).toBe("ja");
+    expect(fehler).toHaveBeenCalled();
+    fehler.mockRestore();
+  });
+
+  it("die Payload hat genau die Felder des Katalogbeispiels", async () => {
+    await absenden();
+
+    const def = EVENT_CATALOG.find((d) => d.event === "supervisor-completed")!;
+    expect(Object.keys(payload("supervisor-completed")!).sort()).toEqual(Object.keys(def.samplePayload).sort());
+  });
+
+  it("Vorlage: Zeile „Ausstattung: …“ nur mit Kurzform, kein roher Marker", () => {
+    const vorlage = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === "supervisor-completed")!;
+    const rendern = (kurz: string) =>
+      renderEventEmail(
+        { ...vorlage, recipientTo: "", recipientCc: "", recipientBcc: "", recipientReplyTo: "" },
+        "supervisor-completed",
+        {
+          displayId: "2026-GYM-042",
+          mitarbeiter_name: "Anna Beispiel",
+          organization: "Berufskolleg",
+          fragebogen_eingereicht: "",
+          fragebogen_offen: "ja",
+          ausstattung_kurz: kurz,
+        },
+        { overrideTo: "hr@example.org" },
+      ).rendered!;
+
+    const mit = rendern("6 Positionen für 3 Stellen");
+    expect(mit.html).toContain("Ausstattung: 6 Positionen für 3 Stellen");
+    expect(mit.text).toContain("Ausstattung: 6 Positionen für 3 Stellen");
+    expect(mit.subject).not.toContain("Ausstattung");
+
+    const ohne = rendern("");
+    expect(ohne.html).not.toContain("Ausstattung:");
+    expect(ohne.text).not.toContain("Ausstattung:");
+    for (const mail of [mit, ohne]) {
+      for (const teil of [mail.subject, mail.html, mail.text ?? ""]) expect(teil).not.toMatch(/\{\{/);
+    }
   });
 });

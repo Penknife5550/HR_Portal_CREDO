@@ -271,6 +271,10 @@ CREDO Gruppe – Freie Evangelische Schulen
               <p style="margin:0;color:#374151;font-size:14px;line-height:1.9;">› Stellenbezeichnung (wird in den Arbeitsvertrag übernommen)<br>› Vertragsbeginn, ggf. Befristung<br>› Arbeitszeit (Wochenstunden)<br>› Vergütung (Entgeltgruppe/Stufe oder Festgehalt)</p>
             </td></tr>
           </table>
+          {{#ausstattung_angeboten}}
+          <!-- Ausstattung & Zugaenge (nur, wenn das Formular den Schritt zeigt) -->
+          <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 24px;">Im Formular können Sie auch angeben, was zum Arbeitsbeginn bereitstehen soll.</p>
+          {{/ausstattung_angeboten}}
 
           <!-- So geht es weiter -->
           <p style="color:#2d2d2d;font-size:14px;font-weight:bold;margin:0 0 6px;">So geht es weiter</p>
@@ -312,7 +316,9 @@ Diese Eckdaten werden abgefragt:
 - Arbeitszeit (Wochenstunden)
 - Vergütung (Entgeltgruppe/Stufe oder Festgehalt)
 
-So geht es weiter: Nach dem Absenden übernimmt die Personalabteilung alles Weitere.
+{{#ausstattung_angeboten}}Im Formular können Sie auch angeben, was zum Arbeitsbeginn bereitstehen soll.
+
+{{/ausstattung_angeboten}}So geht es weiter: Nach dem Absenden übernimmt die Personalabteilung alles Weitere.
 
 Bei Rückfragen erreichen Sie uns unter personalbuchhaltung@fes-minden.de.
 
@@ -332,6 +338,11 @@ CREDO Gruppe – Freie Evangelische Schulen
         description: "Ablaufdatum des Links (für den Block {{#ablaufdatum}}…{{/ablaufdatum}})",
       },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+      {
+        key: "{{ausstattung_angeboten}}",
+        description:
+          "„ja“, wenn das Formular den Schritt „Ausstattung & Zugänge“ zeigt, sonst leer (für den Block {{#ausstattung_angeboten}}…{{/ausstattung_angeboten}})",
+      },
     ],
   },
 
@@ -960,6 +971,7 @@ CREDO HR-Portal`,
               </table>
             </td></tr>
           </table>
+          {{#ausstattung_kurz}}<p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 20px;">Ausstattung: {{ausstattung_kurz}}</p>{{/ausstattung_kurz}}
           {{#fragebogen_eingereicht}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
             <tr><td style="background-color:#eef6e3;border-left:3px solid #41671a;border-radius:6px;padding:14px 18px;">
               <p style="margin:0;color:#41671a;font-size:14px;line-height:1.6;">
@@ -993,7 +1005,8 @@ Die Einstellungsmodalitäten für {{mitarbeiter_name}} wurden von der Führungsk
 Vorgang: {{vorgangsnummer}}
 Mitarbeiter: {{mitarbeiter_name}}
 Einrichtung: {{einrichtung}}
-{{#fragebogen_eingereicht}}
+{{#ausstattung_kurz}}Ausstattung: {{ausstattung_kurz}}
+{{/ausstattung_kurz}}{{#fragebogen_eingereicht}}
 Der Personalfragebogen liegt bereits vor. Der Vorgang ist bereit zur Prüfung.
 {{/fragebogen_eingereicht}}{{#fragebogen_offen}}
 Der Personalfragebogen steht noch aus. Der Vorgang ist prüfbar, sobald er eingegangen ist.
@@ -1018,6 +1031,11 @@ CREDO HR-Portal`,
         key: "{{fragebogen_offen}}",
         description:
           "„ja“, solange der Personalfragebogen aussteht (für {{#fragebogen_offen}}…{{/fragebogen_offen}})",
+      },
+      {
+        key: "{{ausstattung_kurz}}",
+        description:
+          "Ausstattung & Zugänge in Kurzform, z. B. „6 Positionen für 3 Stellen“ – nur Zahlen, nie Bemerkungen; leer, wenn nichts gewählt ist (für den Block {{#ausstattung_kurz}}…{{/ausstattung_kurz}})",
       },
     ],
   },

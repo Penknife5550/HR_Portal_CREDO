@@ -1813,6 +1813,80 @@ async function migriereOnboardingAbteilungsaufgaben(prisma) {
   }
 }
 
+// =============================================
+// Einmalige Datenmigration: Merker „mitAusstattung" im Bestand
+// (Ausstattung & Zugaenge, Regel 2; Feinplan 1.9)
+// =============================================
+const SUPERVISOR_MIT_AUSSTATTUNG_MARKER = "SUPERVISOR_MIT_AUSSTATTUNG_V1";
+
+/**
+ * Was die Migration schreibt — rein und ohne Datenbank, damit ein Test die
+ * Regel halten kann.
+ *
+ * WARUM es sie gibt: `SupervisorData.mitAusstattung` entscheidet, ob das
+ * Formular der Fuehrungskraft den Schritt „Ausstattung & Zugänge" zeigt.
+ * Gesetzt wird er, sobald der Modalitaeten-Link entsteht
+ * (`vorgesetztenLinkSetzen` in src/lib/onboarding-einladung.ts); ein spaeteres
+ * Erneuern setzt ihn nur, solange er leer ist und `currentStep` 0 ist. Ohne
+ * Migration hiesse „leer" zugleich „Altfall" und „noch nicht entschieden" —
+ * und ein erneuerter Link setzte bei einem Altvorgang, dessen Formular nie
+ * gespeichert wurde, den Schritt nachtraeglich ein. Der gesamte Bestand vor A2
+ * hat den Schritt nie gesehen, also `false`.
+ *
+ * Die Regel ist bewusst eng: NUR leere Merker (`null`). Ein `true` oder
+ * `false`, das ein neuer Link schon gesetzt hat, bleibt stehen. Ein Index
+ * (`currentStep`) wird nicht angefasst — die Schrittliste ohne Ausstattung ist
+ * die bisherige, ein laufendes Formular springt also nicht.
+ *
+ * `ohneMerker` ist die vorher gezaehlte Zahl der leeren Merker; sie steht als
+ * Nachweis in `details`.
+ */
+function planeMitAusstattung(ohneMerker) {
+  return {
+    where: { mitAusstattung: null },
+    data: { mitAusstattung: false },
+    details: { aufFalseGesetzt: ohneMerker },
+  };
+}
+
+/**
+ * Setzt den Merker im Bestand auf `false` (Plan: `planeMitAusstattung`).
+ *
+ * Laeuft nach dem Schema-Abgleich (`db push` legt die Spalte leer an) und vor
+ * dem Serverstart (entrypoint.sh), also ohne gleichzeitig entstehende Links —
+ * die vorher gezaehlte Zahl ist die geschriebene.
+ *
+ * Idempotenz: Merker in `system_migrations`, geschrieben in DERSELBEN
+ * (Array-)Transaktion wie das Update — entweder beides oder nichts. Ein
+ * zweiter Lauf beruehrte nur Zeilen, die seit dem Deploy ohne Merker
+ * entstanden sind (sie gelten ohnehin als false); der Merker verhindert ihn
+ * trotzdem, so ist es Hausstandard. Auf einer leeren Datenbank wird er
+ * ebenfalls gesetzt (0 Zeilen). Fehler werden geloggt und brechen den Start
+ * nicht ab: Ohne Merker laeuft die Migration beim naechsten Start erneut; bis
+ * dahin gilt `null` ueberall als `false`, nur das Nachsetzen beim Erneuern
+ * eines nie gespeicherten Altformulars ist dann noch moeglich.
+ */
+async function migriereMitAusstattung(prisma) {
+  try {
+    if (await migrationErledigt(prisma, SUPERVISOR_MIT_AUSSTATTUNG_MARKER)) return;
+
+    const ohneMerker = await prisma.supervisorData.count({ where: { mitAusstattung: null } });
+    const plan = planeMitAusstattung(ohneMerker);
+
+    const [ergebnis] = await prisma.$transaction([
+      prisma.supervisorData.updateMany({ where: plan.where, data: plan.data }),
+      markiereMigration(prisma, SUPERVISOR_MIT_AUSSTATTUNG_MARKER, plan.details),
+    ]);
+
+    console.log(
+      "Ausstattung & Zugaenge (" + SUPERVISOR_MIT_AUSSTATTUNG_MARKER + "): " +
+        ergebnis.count + " Modalitaeten-Datensaetze ohne Merker auf false gesetzt.",
+    );
+  } catch (error) {
+    console.error("Migration " + SUPERVISOR_MIT_AUSSTATTUNG_MARKER + " fehlgeschlagen:", error.message);
+  }
+}
+
 async function main() {
   const prisma = new PrismaClient();
   try {
@@ -1832,6 +1906,9 @@ async function main() {
     // Auf einer frischen Datenbank (Seed folgt unten) setzt sie nur den
     // Merker — deshalb legt prisma/seed.ts die Vorlagen schon mit Schluesseln an.
     await migriereOnboardingAbteilungsaufgaben(prisma);
+    // Ausstattung & Zugaenge (A2, Regel 2): Bestand ohne Merker der
+    // Schrittliste auf false — nach dem Schema-Abgleich, vor dem Seed.
+    await migriereMitAusstattung(prisma);
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {
@@ -1899,4 +1976,7 @@ module.exports = {
   abteilungAusZustaendigkeitJs,
   istOffboardingVorlagenNameJs,
   planeOnboardingAbteilungsaufgaben,
+  SUPERVISOR_MIT_AUSSTATTUNG_MARKER,
+  planeMitAusstattung,
+  migriereMitAusstattung,
 };

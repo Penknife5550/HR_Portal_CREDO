@@ -16,6 +16,8 @@ import {
   FELD_BEZEICHNUNGEN,
   STANDARD_FEHLERMELDUNG,
 } from "@/lib/formular-fehler";
+import { GRENZEN } from "@/lib/ausstattung";
+import { modalitaetenAusstattungSchema } from "@/lib/validations/ausstattung";
 
 /**
  * Ausschnitt aus den beiden Server-Schemata (fragebogen/[token]/route.ts und
@@ -471,6 +473,48 @@ describe("FELD_BEZEICHNUNGEN", () => {
     // Variablenkatalog lesen den Begriff von hier. Steht hier wieder der alte
     // Begriff, laeuft er an ALLEN diesen Stellen gleichzeitig zurueck.
     expect(FELD_BEZEICHNUNGEN.stellenbeschreibung).toBe("Stellenbezeichnung");
+  });
+});
+
+describe("fehlerMeldung — Ausstattung & Zugänge (Paket A2)", () => {
+  it("kennt die Felder des Ausstattungsschritts", () => {
+    expect(FELD_BEZEICHNUNGEN).toMatchObject({
+      ausstattung: "Ausstattung & Zugänge",
+      hinweise: "Weitere Hinweise an die Stellen",
+      positionId: "Position",
+      auswahl: "Auswahl",
+      angabe: "Angabe",
+      bemerkung: "Bemerkung",
+      departmentKey: "Stelle",
+      hinweis: "Hinweis an die Stelle",
+    });
+    // `bezeichnung` bleibt die Kostenstelle — der Ausstattungsweg hat kein solches Feld.
+    expect(FELD_BEZEICHNUNGEN.bezeichnung).toBe("Kostenstelle");
+  });
+
+  it("uebersetzt eine Serverabweisung aus modalitaetenAusstattungSchema mit Feld, Eintrag und Grenze", () => {
+    const geprueft = modalitaetenAusstattungSchema.safeParse({
+      ausstattung: [
+        { positionId: "11111111-1111-4111-8111-111111111111", gewaehlt: true },
+        { positionId: "22222222-2222-4222-8222-222222222222", gewaehlt: true, bemerkung: "x".repeat(GRENZEN.bemerkung + 1) },
+      ],
+    });
+    if (geprueft.success) throw new Error("Die Eingabe war unerwartet gültig.");
+
+    expect(fehlerMeldung({ error: "Validierungsfehler", details: geprueft.error.issues })).toBe(
+      `Ausstattung & Zugänge, Eintrag 2, Bemerkung: Die Bemerkung darf höchstens ${GRENZEN.bemerkung} Zeichen lang sein.`,
+    );
+  });
+
+  it("uebersetzt einen zu langen Hinweis an eine Stelle", () => {
+    const geprueft = modalitaetenAusstattungSchema.safeParse({
+      hinweise: [{ departmentKey: "IT", hinweis: "x".repeat(GRENZEN.hinweis + 1) }],
+    });
+    if (geprueft.success) throw new Error("Die Eingabe war unerwartet gültig.");
+
+    expect(fehlerMeldung({ error: "Validierungsfehler", details: geprueft.error.issues })).toBe(
+      `Weitere Hinweise an die Stellen, Eintrag 1, Hinweis an die Stelle: Der Hinweis darf höchstens ${GRENZEN.hinweis} Zeichen lang sein.`,
+    );
   });
 });
 

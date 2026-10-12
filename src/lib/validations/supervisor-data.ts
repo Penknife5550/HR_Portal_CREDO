@@ -7,6 +7,9 @@
  * 3. Vergütung
  * 4. Zusaetzliche Angaben
  * 5. Zusammenfassung
+ *
+ * Mit dem Merker `SupervisorData.mitAusstattung` kommt vor der Zusammenfassung
+ * der Schritt „Ausstattung & Zugänge" hinzu (6 Schritte, `supSchritte`).
  */
 
 import { z } from "zod";
@@ -256,34 +259,95 @@ export type SupStep4Data = z.infer<typeof supStep4Schema>;
 // =============================================
 // Step-Konfiguration
 // =============================================
+
+/** Fester Schluessel je Schritt — die Weiche des Formulars liest ihn, nie die Nummer. */
+export type SupSchrittKey =
+  | "stelle"
+  | "arbeitszeit"
+  | "verguetung"
+  | "zusatz"
+  | "ausstattung"
+  | "zusammenfassung";
+
+/** Ein Schritt des Modalitaeten-Formulars, wie ihn `supSchritte` liefert. */
+export interface SupSchritt {
+  key: SupSchrittKey;
+  title: string;
+  description: string;
+}
+
+/**
+ * Die Grundliste: fuenf Schritte, so wie jedes Formular OHNE den Schritt
+ * „Ausstattung & Zugänge" aussieht.
+ *
+ * `number` bleibt fuer Bestandsleser stehen, wird aber nicht mehr gelesen:
+ * Mit dem Ausstattungsschritt steht die Zusammenfassung an sechster Stelle,
+ * traegt hier aber weiter die 5. Die Anzeigenummer ist immer `Index + 1` in
+ * der Liste aus `supSchritte`.
+ */
 export const SUP_STEP_CONFIG = [
   {
+    key: "stelle",
     number: 1,
     title: "Stelle & Vertrag",
     // Sichtbarer Untertitel der Formularkarte — deshalb mit echtem Umlaut.
     description: `Betriebsstätte, ${FELD_BEZEICHNUNGEN.stellenbeschreibung}, Vertragsdaten`,
   },
   {
+    key: "arbeitszeit",
     number: 2,
     title: "Arbeitszeit & Arbeitgeber",
     description: "Umfang, Haupt-/Nebenarbeitgeber, Vertragsart",
   },
   {
+    key: "verguetung",
     number: 3,
     title: "Vergütung",
     description: "Entgeltgruppe, Zulagen, Sonderzahlungen",
   },
   {
+    key: "zusatz",
     number: 4,
     title: "Zusätzliche Angaben",
     description: "Kostenstelle, Probezeit, Urlaub, Masernschutz",
   },
   {
+    key: "zusammenfassung",
     number: 5,
     title: "Zusammenfassung",
     description: "Prüfen und Absenden",
   },
-] as const;
+] as const satisfies readonly (SupSchritt & { number: number })[];
+
+/**
+ * Der Schritt „Ausstattung & Zugänge" (Paket A2). Er steht nur im Formular,
+ * wenn der Vorgang den Merker `SupervisorData.mitAusstattung` traegt — gesetzt
+ * beim Erzeugen des Vorgesetzten-Links (R2), nie aus dem Katalog nachgelesen.
+ */
+export const SUP_SCHRITT_AUSSTATTUNG = {
+  key: "ausstattung",
+  title: "Ausstattung & Zugänge",
+  description: "Was zum Arbeitsbeginn bereitstehen soll",
+} as const satisfies SupSchritt;
+
+/** Mit Merker: der neue Schritt direkt VOR der Zusammenfassung (Index 4, Zusammenfassung Index 5). */
+const SUP_SCHRITTE_MIT_AUSSTATTUNG: readonly SupSchritt[] = [
+  ...SUP_STEP_CONFIG.slice(0, -1),
+  SUP_SCHRITT_AUSSTATTUNG,
+  SUP_STEP_CONFIG[SUP_STEP_CONFIG.length - 1],
+];
+
+/**
+ * Die Schrittliste eines Formulars — die EINZIGE Quelle fuer Formular,
+ * Stepper, Karte „Vorgesetzten-Link" und Dashboard-Liste.
+ *
+ * Nur `true` schaltet den Ausstattungsschritt ein. `false`, `null` (Bestand vor
+ * der Migration) und ein fehlender Wert ergeben die Grundliste mit fuenf
+ * Schritten — ein Vorgang ohne Merker sieht also genau aus wie bisher.
+ */
+export function supSchritte(mitAusstattung?: boolean | null): readonly SupSchritt[] {
+  return mitAusstattung === true ? SUP_SCHRITTE_MIT_AUSSTATTUNG : SUP_STEP_CONFIG;
+}
 
 // =============================================
 // Fortschritt der Modalitaeten (fuer die HR-Ansicht)
@@ -317,11 +381,16 @@ export interface ModalitaetenFortschritt {
  *
  * Alles ausserhalb der Strecke wird gekappt: Ein Bestandswert jenseits des
  * letzten Schritts (frueherer Zaehlweise) ergaebe sonst „Schritt 10 von 5".
+ *
+ * Zahl und Titel kommen aus `supSchritte(mitAusstattung)`: Mit Merker hat das
+ * Formular sechs Schritte, und HR muss dieselbe Zahl sehen wie die
+ * Fuehrungskraft. Ohne Merker (`false`/`null`/fehlend) bleibt es bei fuenf.
  */
 export function modalitaetenFortschritt(
-  sd?: { currentStep?: number | null } | null,
+  sd?: { currentStep?: number | null; mitAusstattung?: boolean | null } | null,
 ): ModalitaetenFortschritt {
-  const total = SUP_STEP_CONFIG.length;
+  const schritte = supSchritte(sd?.mitAusstattung);
+  const total = schritte.length;
   const roh = sd?.currentStep;
   const index =
     typeof roh === "number" && Number.isFinite(roh) && roh > 0 ? Math.trunc(roh) : 0;
@@ -329,7 +398,7 @@ export function modalitaetenFortschritt(
   return {
     position,
     total,
-    titel: SUP_STEP_CONFIG[position - 1].title,
+    titel: schritte[position - 1].title,
     begonnen: index > 0,
   };
 }

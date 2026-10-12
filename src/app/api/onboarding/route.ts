@@ -14,6 +14,7 @@ import { abteilungAusZustaendigkeit, MELDUNGEN } from "@/lib/abteilungsaufgaben"
 import { fuehrungskraftAdresseFreigegeben } from "@/lib/abteilungsaufgaben-dienst";
 import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
 import { arbeitsortSpeicherwert } from "@/lib/ausstattung";
+import { ausstattungAngebotenIn } from "@/lib/ausstattung-katalog";
 import {
   canAccessProcess,
   canEditProcess,
@@ -301,6 +302,8 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
 
           // Frische Zeile, noch kein Link: Das bedingte UPDATE trifft immer,
           // `statusAbgleichen` ergibt INVITED -> INVITED und schreibt nichts.
+          // Der Merker der Schrittliste (Ausstattung & Zugaenge, Regel 2) kommt
+          // aus dem Katalog am Arbeitsort — in DIESER Transaktion.
           const link = supervisorEmail
             ? await vorgesetztenLinkSetzen(tx, {
                 id: onboarding.id,
@@ -309,6 +312,13 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
                 bisherigeEmail: null,
                 userId: session.userId,
                 organizationName: org.name,
+                arbeitsortId: arbeitsortGespeichert,
+                ausstattungAngeboten: await ausstattungAngebotenIn(tx, {
+                  organizationId: org.id,
+                  arbeitsortId: arbeitsortGespeichert,
+                  questionnaireType,
+                  processType,
+                }),
               })
             : null;
 
@@ -340,13 +350,16 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
       link && supervisorEmail
         ? triggerWebhooks(
             "supervisor-link-created",
-            vorgesetztenLinkMailFelder({
-              ...onboarding,
-              supervisorEmail,
-              supervisorToken: link.supervisorToken,
-              supervisorTokenExpiresAt: link.supervisorTokenExpiresAt,
-              organization: org,
-            }),
+            vorgesetztenLinkMailFelder(
+              {
+                ...onboarding,
+                supervisorEmail,
+                supervisorToken: link.supervisorToken,
+                supervisorTokenExpiresAt: link.supervisorTokenExpiresAt,
+                organization: org,
+              },
+              { ausstattungAngeboten: link.mitAusstattung },
+            ),
           )
         : null,
     ]);
@@ -470,8 +483,10 @@ export async function GET(request: NextRequest) {
               currentStep: true,
             },
           },
+          // `mitAusstattung`: Die Spalte „Modalitäten" zeigt sonst bei einem
+          // Formular mit Ausstattungsschritt „von 5" statt „von 6".
           supervisorData: {
-            select: { isComplete: true, currentStep: true },
+            select: { isComplete: true, currentStep: true, mitAusstattung: true },
           },
           _count: {
             select: { notes: true },

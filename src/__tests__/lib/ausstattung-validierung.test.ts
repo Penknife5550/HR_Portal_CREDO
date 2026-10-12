@@ -6,6 +6,11 @@
  * (ausstattung.test.ts). Kernfall von S2: Die Stufe-2-Felder
  * (ausgabeKennung, rueckgabeKategorie, beiAustritt) und vorschlagSchluessel
  * kommen im geparsten Ergebnis nie an — weder beim Anlegen noch beim Aendern.
+ *
+ * Dazu (S8) die Form des Schritts „Ausstattung & Zugänge“ im Modalitaeten-PUT
+ * (`modalitaetenAusstattungSchema`); ob Position und Option zum Vorgang
+ * gehoeren, prueft wahlPruefen (ausstattung.test.ts), die Grenzen gegen GRENZEN
+ * haelt supervisor-grenzen.test.ts.
  */
 
 import {
@@ -24,6 +29,7 @@ import {
   freitextNormalisieren,
   katalogPositionAenderungSchema,
   katalogPositionSchema,
+  modalitaetenAusstattungSchema,
 } from "@/lib/validations/ausstattung";
 import { onboardingAnlegenSchema } from "@/lib/validations/onboarding";
 
@@ -495,5 +501,80 @@ describe("onboardingAnlegenSchema: arbeitsortId (S5)", () => {
         MELDUNGEN.ARBEITSORT_UNGUELTIG,
       );
     }
+  });
+});
+
+// =============================================
+// Formular der Fuehrungskraft (S8)
+// =============================================
+
+describe("modalitaetenAusstattungSchema (PUT /api/modalitaeten/[token])", () => {
+  const ID = "11111111-1111-4111-8111-111111111111";
+
+  it("beide Felder freiwillig; unbekannte Felder fallen weg, auch in den Eintraegen", () => {
+    expect(modalitaetenAusstattungSchema.parse({})).toEqual({});
+    expect(
+      modalitaetenAusstattungSchema.parse({
+        ausstattung: [{ positionId: ID, gewaehlt: true, quelle: "HR", hinweisStelle: "x" }],
+        hinweise: [{ departmentKey: "IT", hinweis: "a", quelle: "HR" }],
+        fremd: 1,
+      }),
+    ).toEqual({ ausstattung: [{ positionId: ID, gewaehlt: true }], hinweise: [{ departmentKey: "IT", hinweis: "a" }] });
+  });
+
+  it("Freitexte werden vor der Laengenpruefung auf \\n normalisiert und getrimmt", () => {
+    const geparst = modalitaetenAusstattungSchema.parse({
+      ausstattung: [{ positionId: ID, gewaehlt: true, bemerkung: "  Mit Stift\r\nund Hülle  " }],
+      hinweise: [{ departmentKey: " IT ", hinweis: "Zeile 1\r\nZeile 2" }],
+    });
+    expect(geparst.ausstattung?.[0].bemerkung).toBe("Mit Stift\nund Hülle");
+    expect(geparst.hinweise?.[0]).toEqual({ departmentKey: "IT", hinweis: "Zeile 1\nZeile 2" });
+    // \r\n zaehlt als ein Zeichen: genau die Grenze mit Zeilenumbruechen geht,
+    // obwohl der Rohtext laenger ist; ein Zeichen mehr nicht.
+    const umbrueche = Math.floor((GRENZEN.bemerkung - 1) / 2);
+    const genau = "x" + "\r\nx".repeat(umbrueche) + "x".repeat(GRENZEN.bemerkung - 1 - 2 * umbrueche);
+    expect(genau.replace(/\r\n/g, "\n")).toHaveLength(GRENZEN.bemerkung);
+    expect(genau.length).toBeGreaterThan(GRENZEN.bemerkung);
+    const bemerkung = (text: string) => ({ ausstattung: [{ positionId: ID, gewaehlt: true, bemerkung: text }] });
+    expect(modalitaetenAusstattungSchema.safeParse(bemerkung(genau)).success).toBe(true);
+    expect(fehler(modalitaetenAusstattungSchema.safeParse(bemerkung(`${genau}x`)))).toBe(MELDUNGEN.BEMERKUNG_ZU_LANG);
+  });
+
+  it("Steuerzeichen: in Bemerkung und Hinweis nur \\n und \\t; die Angabe ist einzeilig", () => {
+    expect(fehler(modalitaetenAusstattungSchema.safeParse({ ausstattung: [{ positionId: ID, bemerkung: "a\u0000b" }] }))).toBe(
+      MELDUNGEN.STEUERZEICHEN,
+    );
+    expect(fehler(modalitaetenAusstattungSchema.safeParse({ hinweise: [{ departmentKey: "IT", hinweis: "a\u0007b" }] }))).toBe(
+      MELDUNGEN.STEUERZEICHEN,
+    );
+    expect(fehler(modalitaetenAusstattungSchema.safeParse({ ausstattung: [{ positionId: ID, angabe: "Chemie\nSport" }] }))).toBe(
+      MELDUNGEN.ANGABE_EINZEILIG,
+    );
+    expect(modalitaetenAusstattungSchema.safeParse({ ausstattung: [{ positionId: ID, angabe: "Raum <2.14>" }] }).success).toBe(true);
+  });
+
+  it("positionId muss eine UUID sein; gewaehlt nur true", () => {
+    expect(fehler(modalitaetenAusstattungSchema.safeParse({ ausstattung: [{ positionId: "pos-1", gewaehlt: true }] }))).toBe(
+      MELDUNGEN.WAHL_POSITION_UNGUELTIG,
+    );
+    expect(fehler(modalitaetenAusstattungSchema.safeParse({ ausstattung: [{ gewaehlt: true }] }))).toBe(
+      MELDUNGEN.WAHL_POSITION_UNGUELTIG,
+    );
+    expect(fehler(modalitaetenAusstattungSchema.safeParse({ ausstattung: [{ positionId: ID, gewaehlt: false }] }))).toBe(
+      MELDUNGEN.WAHL_GEWAEHLT_UNGUELTIG,
+    );
+  });
+
+  it("Stelle eines Hinweises hat die Form eines Abteilungsschluessels; ob sie erlaubt ist, prueft wahlPruefen", () => {
+    expect(modalitaetenAusstattungSchema.safeParse({ hinweise: [{ departmentKey: "it-support", hinweis: "a" }] }).success).toBe(false);
+    expect(modalitaetenAusstattungSchema.safeParse({ hinweise: [{ departmentKey: "MITARBEITER", hinweis: "a" }] }).success).toBe(true);
+  });
+
+  it("falscher Typ: deutsche Meldung statt 500", () => {
+    expect(modalitaetenAusstattungSchema.safeParse({ ausstattung: "alles" }).success).toBe(false);
+    expect(modalitaetenAusstattungSchema.safeParse({ ausstattung: [7] }).success).toBe(false);
+    expect(fehler(modalitaetenAusstattungSchema.safeParse({ ausstattung: [{ positionId: ID, auswahl: "Haupteingang" }] }))).toBe(
+      "Ungültige Eingabe",
+    );
   });
 });

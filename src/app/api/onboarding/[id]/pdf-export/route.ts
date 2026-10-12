@@ -19,6 +19,11 @@ import {
   type OnboardingExportContext,
   type OnboardingExportType,
 } from "@/lib/pdf-export-onboarding";
+import {
+  UEBERSICHT_HINWEIS_AUSWAHL,
+  UEBERSICHT_ZEILEN_AUSWAHL,
+  UEBERSICHT_ZEILEN_ORDNUNG,
+} from "@/lib/ausstattung-dienst";
 
 const VALID_TYPES = ["gesamtakte", "fragebogen", "modalitaeten", "dokumente", "checkliste"];
 const exportLimiter = createRateLimiter("onboarding-export", { maxRequests: 10, windowMs: 60_000 });
@@ -81,6 +86,12 @@ export async function GET(
             completedBy: { select: { firstName: true, lastName: true } },
           },
         },
+        // Ausstattung & Zugaenge (Paket A2): Abschnitt im PDF der
+        // Modalitaeten, samt Bemerkungen — diesen Export erzeugen nur
+        // HR-Rollen (oben). Dieselbe Auswahl wie die Karte im Reiter
+        // „Vorgesetzter“ (ausstattungUebersichtLaden).
+        ausstattung: { select: UEBERSICHT_ZEILEN_AUSWAHL, orderBy: UEBERSICHT_ZEILEN_ORDNUNG },
+        stellenHinweise: { select: UEBERSICHT_HINWEIS_AUSWAHL },
       },
     });
 
@@ -289,6 +300,11 @@ export async function GET(
         dueDate: c.dueDate?.toISOString() || null,
       })),
       abteilungsNamen,
+      // `?? []`: Aeltere Testgerueste liefern die Relationen nicht mit.
+      ausstattung: {
+        zeilen: process.ausstattung ?? [],
+        hinweise: process.stellenHinweise ?? [],
+      },
     };
 
     const pdfBuffer = await generateOnboardingPDF(ctx, type as OnboardingExportType);

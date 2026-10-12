@@ -57,6 +57,12 @@ jest.mock("@/lib/encryption", () => ({ decrypt: (v: string) => v }));
 jest.mock("@/lib/abteilungsaufgaben-onboarding", () => ({
   onboardingAbteilungsUebersichtLaden: jest.fn(async () => ({})),
 }));
+// Ebenso „Ausstattung & Zugänge" (Paket A2, eigene Suite
+// onboarding-ausstattung-lesen.test.ts): Die unterlagen-fake-db kennt die
+// Tabellen nicht, und der Vorgang wird weiter genau einmal geladen.
+jest.mock("@/lib/ausstattung-dienst", () => ({
+  ausstattungUebersichtLaden: jest.fn(async () => null),
+}));
 jest.mock("@/lib/fragebogen-fortschritt", () => ({
   ladeVorlagenKonfigurationen: jest.fn(async () => new Map()),
   fortschrittFuerVorgang: jest.fn(() => null),

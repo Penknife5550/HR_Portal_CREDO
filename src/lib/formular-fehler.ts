@@ -208,6 +208,21 @@ export const FELD_BEZEICHNUNGEN: Record<string, string> = {
   zeiterfassung: "Zeiterfassung",
   zusatzvereinbarungen: "Zusatzvereinbarungen",
 
+  // --- Einstellungsmodalitaeten: Ausstattung & Zugaenge (Paket A2) ---
+  // `ausstattung` und `hinweise` sind die Listenpfade, die uebrigen die Felder
+  // INNERHALB eines Eintrags (modalitaetenAusstattungSchema). Bewusst kein
+  // Feld `bezeichnung` im Ausstattungsweg: Der Schluessel steht oben schon fuer
+  // die Kostenstelle (die Tabelle ist flach).
+  ausstattung: "Ausstattung & Zugänge",
+  hinweise: "Weitere Hinweise an die Stellen",
+  positionId: "Position",
+  gewaehlt: "Auswahl",
+  auswahl: "Auswahl",
+  angabe: "Angabe",
+  bemerkung: "Bemerkung",
+  departmentKey: "Stelle",
+  hinweis: "Hinweis an die Stelle",
+
   // --- beide Formulare ---
   currentStep: "Formularschritt",
 };

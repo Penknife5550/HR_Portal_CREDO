@@ -21,6 +21,9 @@
  *   7. ARBEITSORT (E-A10) — optional, ohne UUID-Pruefung; unbekannt oder fremd
  *      = 404 mit dem Text der Einrichtung, gleich der Einrichtung = null,
  *      abweichend gespeichert. Der Mandant bleibt organizationId.
+ *   8. MERKER mitAusstattung (Regel 2) — mit dem Link entsteht die Zeile der
+ *      Modalitaeten samt Merker aus dem Katalog AM ARBEITSORT, gelesen in
+ *      derselben Transaktion; die Einladung traegt ihn als "ja"/"".
  */
 
 // Die Links werden aus APP_URL gebaut — fest, damit die Erwartungen unten
@@ -39,8 +42,14 @@ const mockTx = {
     findUniqueOrThrow: jest.fn(),
     update: jest.fn(),
   },
-  supervisorData: { upsert: jest.fn() },
+  supervisorData: { upsert: jest.fn(), updateMany: jest.fn() },
   auditLog: { create: jest.fn() },
+  // Katalog „Ausstattung & Zugänge“ — gelesen in DERSELBEN Transaktion wie der
+  // Link (Merker mitAusstattung, Regel 2). Standard: leerer Katalog.
+  ausstattungsPosition: { findMany: jest.fn() },
+  organization: { findUnique: jest.fn() },
+  ausstattungsAusblendung: { findMany: jest.fn() },
+  departmentConfig: { findMany: jest.fn() },
 };
 const mockPrisma = {
   organization: { findUnique: jest.fn() },
@@ -194,7 +203,17 @@ beforeEach(() => {
   mockTx.onboardingProcess.updateMany.mockResolvedValue({ count: 1 });
   mockTx.onboardingProcess.findUniqueOrThrow.mockResolvedValue(frischerStand());
   mockTx.onboardingProcess.update.mockResolvedValue({});
-  mockTx.supervisorData.upsert.mockResolvedValue({});
+  // Frische Zeile: Prisma liefert, was `create` angelegt hat.
+  mockTx.supervisorData.upsert.mockImplementation(
+    async ({ create }: { create: { mitAusstattung?: boolean } }) => ({
+      mitAusstattung: create.mitAusstattung ?? null,
+      currentStep: 0,
+    }),
+  );
+  mockTx.supervisorData.updateMany.mockResolvedValue({ count: 1 });
+  mockTx.ausstattungsPosition.findMany.mockResolvedValue([]);
+  mockTx.ausstattungsAusblendung.findMany.mockResolvedValue([]);
+  mockTx.departmentConfig.findMany.mockResolvedValue([]);
   mockTx.auditLog.create.mockResolvedValue({});
   mockPrisma.userOrgAssignment.findUnique.mockResolvedValue(null);
   // Leere Liste = keine Einschraenkung (Auslieferungszustand).
@@ -527,6 +546,8 @@ describe("Anlegen mit Fuehrungskraft", () => {
       supervisorToken: null,
       supervisorSubmittedAt: null,
       status: { notIn: ["REVIEWED", "COMPLETED", "EXPIRED"] },
+      // Der Arbeitsort, aus dem der Merker stammt (hier: wie Einrichtung).
+      arbeitsortId: null,
     });
     expect(arg.data).toMatchObject({
       supervisorEmail: LEITUNG,
@@ -537,10 +558,12 @@ describe("Anlegen mit Fuehrungskraft", () => {
     // Anker der ersten Vorgesetzten-Erinnerung (Cron).
     expect(arg.data.supervisorLinkSentAt).toBeInstanceOf(Date);
     expect(arg.data.status).toBeUndefined();
+    // Leerer Katalog: Die Zeile entsteht mit dem Merker false (Regel 2).
     expect(mockTx.supervisorData.upsert).toHaveBeenCalledWith({
       where: { onboardingId: "ob-neu" },
       update: {},
-      create: { onboardingId: "ob-neu" },
+      create: { onboardingId: "ob-neu", mitAusstattung: false },
+      select: { mitAusstattung: true, currentStep: true },
     });
   });
 
@@ -621,6 +644,7 @@ describe("Anlegen mit Fuehrungskraft", () => {
       organization: "FES Gymnasium",
       mandantNumber: "10",
       supervisorTokenExpiresAt: "2026-10-29T10:00:00.000Z",
+      ausstattung_angeboten: "",
     });
   });
 
@@ -798,6 +822,94 @@ describe("Arbeitsort (E-A10)", () => {
 
     expect((await anlegen({ arbeitsortId: "org2" })).status).toBe(201);
     expect(angelegteDaten().arbeitsortId).toBe("org2");
+  });
+});
+
+describe("Merker mitAusstattung beim Anlegen mit Fuehrungskraft (Regel 2)", () => {
+  const ORT = { id: "org2", name: "FES Grundschule Nord" };
+  const ARTEN: Record<string, string> = { org1: "GYMNASIUM", org2: "GRUNDSCHULE" };
+
+  /** Aktive Position der Stelle HR (braucht keine Adresse), nur fuer Grundschulen. */
+  const NUR_GRUNDSCHULE = {
+    id: "pos-jobticket",
+    departmentKey: "HR",
+    organizationId: null,
+    einrichtungsarten: ["GRUNDSCHULE"],
+    art: "JA_NEIN",
+    angabeSchluessel: null,
+    bezeichnung: "Jobticket",
+    hinweisFuehrungskraft: null,
+    hinweisStelle: null,
+    optionen: [],
+    vorausgewaehlt: false,
+    vorausgewaehlteOptionen: [],
+    bemerkungAnbieten: true,
+    bemerkungPlatzhalter: null,
+    aufgabeTitel: null,
+    defaultDueDays: null,
+    personengruppen: [],
+    sichtbarFuer: [],
+    entgeltrelevant: true,
+    ausgabeKennung: null,
+    rueckgabeKategorie: null,
+    beiAustritt: null,
+    vorschlagSchluessel: null,
+    isActive: true,
+    orderIndex: 0,
+  };
+
+  beforeEach(() => {
+    mockPrisma.organization.findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) => [ORG, ORT].find((z) => z.id === where.id) ?? null,
+    );
+    mockTx.ausstattungsPosition.findMany.mockResolvedValue([NUR_GRUNDSCHULE]);
+    mockTx.organization.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) =>
+      ARTEN[where.id] ? { type: ARTEN[where.id] } : null,
+    );
+  });
+
+  it("angeboten am Arbeitsort: Zeile mit Merker true, Einladung mit ausstattung_angeboten \"ja\"", async () => {
+    const res = await anlegen({ supervisorEmail: LEITUNG, arbeitsortId: "org2" });
+
+    expect(res.status).toBe(201);
+    expect(mockTx.supervisorData.upsert.mock.calls[0][0].create).toEqual({
+      onboardingId: "ob-neu",
+      mitAusstattung: true,
+    });
+    expect(mailAn("supervisor-link-created").ausstattung_angeboten).toBe("ja");
+    // Die Einrichtungsart kommt vom Arbeitsort — gelesen ueber den Transaktions-Client.
+    expect(mockTx.organization.findUnique).toHaveBeenCalledWith({ where: { id: "org2" }, select: { type: true } });
+    // Erst der Katalog, dann der Link — und die Sperre traegt denselben
+    // Arbeitsort, aus dem der Merker stammt (der gerade angelegte).
+    expect(mockTx.ausstattungsPosition.findMany.mock.invocationCallOrder[0]).toBeLessThan(
+      mockTx.onboardingProcess.updateMany.mock.invocationCallOrder[0],
+    );
+    expect(mockTx.onboardingProcess.updateMany.mock.calls[0][0].where.arbeitsortId).toBe("org2");
+  });
+
+  it("nicht angeboten an der Einrichtung (Gymnasium): Merker false, Einladung ohne den Satz", async () => {
+    const res = await anlegen({ supervisorEmail: LEITUNG });
+
+    expect(res.status).toBe(201);
+    expect(mockTx.supervisorData.upsert.mock.calls[0][0].create).toEqual({
+      onboardingId: "ob-neu",
+      mitAusstattung: false,
+    });
+    expect(mailAn("supervisor-link-created").ausstattung_angeboten).toBe("");
+  });
+
+  it("ausserhalb von EINSTELLUNG: Merker false, ohne den Katalog zu lesen", async () => {
+    const res = await anlegen({ supervisorEmail: LEITUNG, arbeitsortId: "org2", processType: "VERTRAGSAENDERUNG" });
+
+    expect(res.status).toBe(201);
+    expect(mockTx.ausstattungsPosition.findMany).not.toHaveBeenCalled();
+    expect(mockTx.supervisorData.upsert.mock.calls[0][0].create.mitAusstattung).toBe(false);
+  });
+
+  it("ohne Fuehrungskraft entsteht kein Link — und der Katalog wird nicht gelesen", async () => {
+    expect((await anlegen({ arbeitsortId: "org2" })).status).toBe(201);
+    expect(mockTx.ausstattungsPosition.findMany).not.toHaveBeenCalled();
+    expect(mockTx.supervisorData.upsert).not.toHaveBeenCalled();
   });
 });
 

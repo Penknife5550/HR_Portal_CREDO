@@ -5,6 +5,7 @@
  *   - katalogPositionAenderungSchema  PATCH /api/settings/ausstattung/[id]
  *   - ausblendungSchema               PUT   /api/settings/ausstattung/[id]/ausblendung
  *   - arbeitsortSchema                PATCH /api/onboarding/[id]/arbeitsort
+ *   - modalitaetenAusstattungSchema   PUT   /api/modalitaeten/[token] (Schritt „Ausstattung & Zugänge“)
  *
  * Zod prueft nur die FORM der Felder (Typ, Laenge, Wertlisten, Zeichen). Die
  * Felder gegeneinander prueft `positionPruefen` (src/lib/ausstattung.ts) — beim
@@ -339,3 +340,84 @@ export const arbeitsortSchema = z
   .strip();
 
 export type ArbeitsortInput = z.infer<typeof arbeitsortSchema>;
+
+// =============================================
+// Formular der Fuehrungskraft (PUT /api/modalitaeten/[token], Feinplan S8)
+// =============================================
+
+/** Einzeilig ohne Steuerzeichen (auch ohne Zeilenumbruch); spitze Klammern erlaubt — die Angabe steht nie im Betreff. */
+const OHNE_STEUERZEICHEN = /^[^\p{Cc}]*$/u;
+
+/** Mehrzeiliger Freitext (Bemerkung, Hinweis): normalisiert, Laenge nach GRENZEN, ohne Steuerzeichen ausser \t und \n. */
+function freitextFeld(max: number, zuLang: string) {
+  return z.preprocess(
+    normalisiert,
+    z
+      .string(FALSCHER_TYP)
+      .max(max, zuLang)
+      .refine((t) => !STEUERZEICHEN_MEHRZEILIG.test(t), MELDUNGEN.STEUERZEICHEN),
+  );
+}
+
+/**
+ * Eine Wahl der Fuehrungskraft. Zod prueft nur die Form (UUID, Laengen aus
+ * GRENZEN, Zeichen); ob Position und Option zu DIESEM Vorgang gehoeren und die
+ * Felder zur Art passen, prueft `wahlPruefen` gegen den Katalogausschnitt
+ * (ausstattung.ts) — in der Transaktion des PUT.
+ *
+ *   positionId   UUID einer Katalogposition
+ *   gewaehlt     nur `true` (Ja/Nein); nicht Gewaehltes wird gar nicht geschickt
+ *   auswahl      Optionen (Auswahl), hoechstens GRENZEN.optionen, je hoechstens GRENZEN.option Zeichen
+ *   angabe       Text (Angabe), einzeilig, hoechstens GRENZEN.angabe
+ *   bemerkung    mehrzeilig, hoechstens GRENZEN.bemerkung
+ */
+const wahlSchema = z
+  .object(
+    {
+      positionId: z
+        .string({ required_error: MELDUNGEN.WAHL_POSITION_UNGUELTIG, invalid_type_error: MELDUNGEN.WAHL_POSITION_UNGUELTIG })
+        .trim()
+        .uuid(MELDUNGEN.WAHL_POSITION_UNGUELTIG),
+      gewaehlt: z.literal(true, { errorMap: () => ({ message: MELDUNGEN.WAHL_GEWAEHLT_UNGUELTIG }) }).optional(),
+      auswahl: z.array(optionFeld, FALSCHER_TYP).max(GRENZEN.optionen, MELDUNGEN.OPTIONEN_ZU_VIELE).optional(),
+      angabe: z
+        .preprocess(
+          normalisiert,
+          z.string(FALSCHER_TYP).max(GRENZEN.angabe, MELDUNGEN.ANGABE_ZU_LANG).regex(OHNE_STEUERZEICHEN, MELDUNGEN.ANGABE_EINZEILIG),
+        )
+        .optional(),
+      bemerkung: freitextFeld(GRENZEN.bemerkung, MELDUNGEN.BEMERKUNG_ZU_LANG).optional(),
+    },
+    KEIN_OBJEKT,
+  )
+  .strip();
+
+/** „Weitere Hinweise an …“: Schluessel der Stelle und Text (leer = kein Hinweis). */
+const stellenHinweisSchema = z
+  .object(
+    {
+      departmentKey: schluesselFeld,
+      hinweis: freitextFeld(GRENZEN.hinweis, MELDUNGEN.HINWEIS_ZU_LANG),
+    },
+    KEIN_OBJEKT,
+  )
+  .strip();
+
+/**
+ * Der Schritt „Ausstattung & Zugänge“ im Modalitaeten-PUT. Die Route bindet es
+ * in `modalitaetenFieldsSchema` ein (`.merge`); beide Felder sind freiwillig —
+ * fehlt eines, bleibt der gespeicherte Stand, ein leeres Array leert ihn. Sie
+ * stehen NICHT in `ALLOWED_FIELDS` der Route: Die Wahl liegt in eigenen
+ * Tabellen, nicht an `SupervisorData`.
+ */
+export const modalitaetenAusstattungSchema = z
+  .object({
+    ausstattung: z.array(wahlSchema, FALSCHER_TYP).max(GRENZEN.wahlJeVorgang, MELDUNGEN.WAHL_ZU_VIELE).optional(),
+    hinweise: z
+      .array(stellenHinweisSchema, FALSCHER_TYP)
+      .max(GRENZEN.hinweiseJeVorgang, MELDUNGEN.HINWEISE_ZU_VIELE)
+      .optional(),
+  })
+  .strip();
+
+export type ModalitaetenAusstattungInput = z.infer<typeof modalitaetenAusstattungSchema>;

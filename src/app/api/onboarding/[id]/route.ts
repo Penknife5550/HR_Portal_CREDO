@@ -5,7 +5,9 @@
  *         Abteilungsuebersicht (Karte „Aufgaben für Abteilungen", Stepper,
  *         Urheber der Haekchen, Faelligkeiten) aus
  *         onboardingAbteilungsUebersichtLaden und die Nachforderungen von
- *         Unterlagen (`unterlagen`, Paket 4) aus unterlagenUebersichtLaden
+ *         Unterlagen (`unterlagen`, Paket 4) aus unterlagenUebersichtLaden,
+ *         dazu Ausstattung & Zugaenge (`ausstattung`, Paket A2) aus
+ *         ausstattungUebersichtLaden — nur fuer HR_EDIT_ROLES, sonst `null`
  * PATCH – Status aendern
  *
  * Mandant: Ein Vorgang eines fremden Mandanten bekommt in BEIDEN Methoden
@@ -24,6 +26,7 @@ import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
 import { onboardingAbteilungsUebersichtLaden } from "@/lib/abteilungsaufgaben-onboarding";
 import { pflichtDokumenteAusVorlage } from "@/lib/required-documents";
 import { unterlagenUebersichtLaden } from "@/lib/unterlagen-dienst";
+import { ausstattungUebersichtLaden } from "@/lib/ausstattung-dienst";
 import {
   ladeVorlagenKonfigurationen,
   fortschrittFuerVorgang,
@@ -164,6 +167,11 @@ export async function GET(
       fragebogenFortschritt: fortschrittFuerVorgang(onboarding, vorlagen),
       ...(await onboardingAbteilungsUebersichtLaden(onboarding)),
       ...(await unterlagenUebersichtLaden(onboarding, session, { requiredDocuments })),
+      // Ausstattung & Zugaenge (Paket A2): Bemerkungen, Angaben und Hinweise
+      // der Fuehrungskraft sieht nur HR (Regel 16) — fuer alle anderen
+      // PORTAL_ROLES `null`, ohne Abfrage. Die Tabellen stehen deshalb NICHT
+      // im `include` oben (`...safeOnboarding` gaebe sie an alle weiter).
+      ausstattung: await ausstattungUebersichtLaden(onboarding, session),
     });
   } catch (error) {
     console.error("Fehler beim Laden des Vorgangs:", error);

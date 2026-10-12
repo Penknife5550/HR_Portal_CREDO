@@ -534,6 +534,43 @@ describe("GET /api/onboarding/[id]", () => {
     expect(body.fragebogenFortschritt).toBeDefined();
   });
 
+  it("legt „Ausstattung & Zugänge“ über den Vorgang — nur für HR (Paket A2, über die Fake-DB)", async () => {
+    db.ausstattungZeilen = [
+      {
+        id: "aus-1",
+        onboardingId: "onb-1",
+        positionId: "pos-ipad",
+        departmentKey: "IT",
+        art: "JA_NEIN",
+        angabeSchluessel: null,
+        bezeichnung: "Dienst-iPad",
+        sichtbarFuer: [],
+        reihenfolge: 0,
+        auswahl: [],
+        angabe: null,
+        bemerkung: "Mit Stift",
+        bemerkungQuelle: "FUEHRUNGSKRAFT",
+        quelle: "FUEHRUNGSKRAFT",
+        erfasstVonId: null,
+        gestrichenAm: null,
+        createdAt: new Date(),
+      },
+    ];
+    const body = await (await get()).json();
+    expect(body.ausstattung).toMatchObject({ zustand: "BEARBEITBAR" });
+    expect(body.ausstattung.gruppen[0]).toMatchObject({ departmentKey: "IT", stelleName: "IT-Abteilung" });
+    expect(body.ausstattung.gruppen[0].zeilen[0].bemerkung.text).toBe("Mit Stift");
+
+    // Vorgesetzte mit Zuweisung zur Einrichtung: darf den Vorgang sehen, die Ausstattung nicht
+    db.zuweisungen = [{ userId: VORGESETZTE.userId, organizationId: "org-1" }];
+    mockGetSession.mockResolvedValue(VORGESETZTE);
+    const res = await get();
+    expect(res.status).toBe(200);
+    const fremd = await res.json();
+    expect(fremd.ausstattung).toBeNull();
+    expect(JSON.stringify(fremd)).not.toContain("Mit Stift");
+  });
+
   it("meldet die fehlenden Modalitäten als Sperre und verschweigt das Bezugsdatum", async () => {
     db.onboardingVorgaenge = [
       vorgang({ status: "IN_PROGRESS", supervisorSubmittedAt: null, supervisorData: { isComplete: false } }),

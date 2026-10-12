@@ -911,3 +911,56 @@ describe("onboardingKurzschritte", () => {
     expect([...aktuell]).toEqual([5]);
   });
 });
+
+// =============================================
+// Paket A2: Merker `mitAusstattung` (sechs statt fuenf Schritte)
+// =============================================
+
+describe("Modalitaeten-Fortschritt mit Merker `mitAusstattung`", () => {
+  const mitLink = {
+    supervisorToken: "tok-sv",
+    supervisorEmail: "leitung@example.org",
+    supervisorTokenExpiresAt: "2026-10-20T12:00:00.000Z",
+  };
+
+  it("Stepper: dieselbe Zahl wie im Formular der Fuehrungskraft („von 6“)", () => {
+    const step = finde(
+      schritte(
+        stand({
+          ...mitLink,
+          supervisorData: { isComplete: false, currentStep: 4, mitAusstattung: true },
+        }),
+        { modalitaetenLink: "https://hr.fes-credo.de/modalitaeten/tok-sv" },
+      ),
+      "modalitaeten",
+    );
+    expect(step.info).toBe(
+      "Modalitäten in Bearbeitung — Schritt 5 von 6 · Ausstattung & Zugänge · leitung@example.org",
+    );
+  });
+
+  it("Chip im Kopf: „Schritt 5 von 6“", () => {
+    const [, chip] = spurenChips(
+      stand({
+        ...mitLink,
+        supervisorData: { isComplete: false, currentStep: 4, mitAusstattung: true },
+      }),
+      JETZT,
+    );
+    expect(chip.text).toBe("Modalitäten: Schritt 5 von 6");
+    expect(chip.kurz).toBe("Schritt 5 von 6");
+  });
+
+  it("ohne Merker (false/null) bleibt alles wie bisher: „von 5“", () => {
+    for (const mitAusstattung of [false, null]) {
+      const s = stand({
+        ...mitLink,
+        supervisorData: { isComplete: false, currentStep: 4, mitAusstattung },
+      });
+      expect(finde(schritte(s), "modalitaeten").info).toBe(
+        "Modalitäten in Bearbeitung — Schritt 5 von 5 · Zusammenfassung · leitung@example.org",
+      );
+      expect(spurenChips(s, JETZT)[1].text).toBe("Modalitäten: Schritt 5 von 5");
+    }
+  });
+});

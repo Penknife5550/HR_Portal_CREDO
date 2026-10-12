@@ -4,6 +4,13 @@
  * GET  /api/modalitaeten/:token  → Lade Vorgesetzten-Daten + MA-Info
  * PUT  /api/modalitaeten/:token  → Speichere/Aktualisiere Daten (Auto-Save)
  * POST /api/modalitaeten/:token  → Modalitaeten endgültig absenden
+ *
+ * Schritt „Ausstattung & Zugänge" (Paket A2, nur mit Merker
+ * `SupervisorData.mitAusstattung`): GET liefert `ausstattung` (Katalog-
+ * ausschnitt und eigene Wahl, sonst `null`), PUT nimmt `ausstattung` und
+ * `hinweise` — Laden, Pruefen und Schreiben in src/lib/ausstattung-dienst.ts.
+ * POST gibt der HR-Mail `supervisor-completed` die Kurzform mit
+ * (`ausstattung_kurz`, „6 Positionen für 3 Stellen“, ohne Bemerkungstexte).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,12 +28,20 @@ import { faelligkeitenSetzen } from "@/lib/abteilungsaufgaben-onboarding";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
-import { BEFRISTUNGSARTEN } from "@/lib/validations/supervisor-data";
+import { BEFRISTUNGSARTEN, supSchritte } from "@/lib/validations/supervisor-data";
 import {
   kostenstellenListeSchema,
   summenFehler,
   zuDatensatz,
 } from "@/lib/validations/kostenstellen";
+import { modalitaetenAusstattungSchema } from "@/lib/validations/ausstattung";
+import { MELDUNGEN as AUSSTATTUNG_MELDUNGEN } from "@/lib/ausstattung";
+import {
+  AusstattungsWahlUngueltig,
+  ausstattungKurzLaden,
+  fuehrungskraftSichtLaden,
+  fuehrungskraftWahlSpeichernIn,
+} from "@/lib/ausstattung-dienst";
 
 // =============================================
 // Zod-Schema für Modalitaeten-Validierung (serverseitig)
@@ -80,7 +95,25 @@ const modalitaetenFieldsSchema = z.object({
   zeiterfassung: z.boolean().optional(),
   zusatzvereinbarungen: z.string().max(5000).optional(),
   currentStep: z.number().min(1).max(10).optional(),
-}).strip();
+  // Schritt „Ausstattung & Zugänge" (Paket A2): `ausstattung` und `hinweise`,
+  // Grenzen aus GRENZEN (src/lib/ausstattung.ts). Ohne `.merge` fielen beide
+  // wegen `.strip()` STILL aus dem Aufruf. Sie stehen bewusst NICHT in
+  // ALLOWED_FIELDS — die Wahl liegt in eigenen Tabellen.
+}).merge(modalitaetenAusstattungSchema).strip();
+
+/**
+ * Die eigene Spur ist schon abgegeben (oder der Link gehoert inzwischen einer
+ * anderen Adresse, oder HR hat den Vorgang geprueft): Ein zweiter Absender
+ * war schneller (zweiter Tab, Retry nach Timeout), oder der PUT mit
+ * Ausstattung kam nach der Abgabe an.
+ *
+ * Eigene Klasse, weil die Beanspruchung bzw. Sperre INNERHALB der Transaktion
+ * passiert: Der einzige Weg, eine begonnene Transaktion zurueckzurollen, ist
+ * eine Ausnahme. Der Aufrufer antwortet 409.
+ */
+class BereitsEingereicht extends Error {}
+
+const BEREITS_EINGEREICHT = "Die Einstellungsmodalitäten wurden bereits eingereicht.";
 
 // =============================================
 // GET – Modalitaeten-Daten laden
@@ -119,6 +152,12 @@ export async function GET(
     select: { id: true, mandantNumber: true, name: true, shortName: true, type: true },
   });
 
+  // Schritt „Ausstattung & Zugänge" (Paket A2): Katalogausschnitt dieses
+  // Vorgangs und die EIGENE Wahl der Fuehrungskraft — nur mit dem Merker
+  // `mitAusstattung` und solange sie noch schreiben darf, sonst `null`. Liest
+  // nur; ob der Schritt erscheint, sagt allein der Merker (supSchritte).
+  const ausstattung = await fuehrungskraftSichtLaden(onboarding);
+
   return NextResponse.json({
     onboardingId: onboarding.id,
     // Frueher standen hier zusaetzlich `email` und als Namensersatz ebenfalls
@@ -144,6 +183,7 @@ export async function GET(
     // INVITED/IN_PROGRESS (er folgt dann der Fragebogen-Spur), und die Seite
     // zeigte sonst wieder das Formular.
     vorgesetzteAbgesendet: vorgesetzteAbgesendet(onboarding),
+    ausstattung,
   });
 }
 
@@ -186,7 +226,7 @@ export async function PUT(
     );
   }
 
-  const { currentStep, ...data } = parsed.data;
+  const { currentStep, ausstattung, hinweise, ...data } = parsed.data;
 
   // Whitelist erlaubter Felder (Mass-Assignment-Schutz)
   const ALLOWED_FIELDS = new Set([
@@ -282,8 +322,24 @@ export async function PUT(
     }
   }
 
+  // F21: `currentStep` ist ein 0-basierter Index in die Schrittliste DIESES
+  // Formulars (`supSchritte`, nach dem Merker `mitAusstattung`). Ein Wert
+  // jenseits des letzten Schritts wird gekappt statt abgewiesen — ein 400
+  // brachte ein laufendes Formular nur ins Stolpern.
+  const mitAusstattung = onboarding.supervisorData?.mitAusstattung === true;
   if (typeof currentStep === "number") {
-    updateData.currentStep = currentStep;
+    updateData.currentStep = Math.min(currentStep, supSchritte(mitAusstattung).length - 1);
+  }
+
+  // Ausstattung nur mit Merker (Regel 2): Ohne ihn zeigt das Formular den
+  // Schritt nicht, und die Wahl ginge an keinen Katalog, den die
+  // Fuehrungskraft je gesehen hat.
+  const ausstattungKommt = ausstattung !== undefined || hinweise !== undefined;
+  if (ausstattungKommt && !mitAusstattung) {
+    return NextResponse.json(
+      { error: AUSSTATTUNG_MELDUNGEN.AUSSTATTUNG_NICHT_VORGESEHEN },
+      { status: 400 }
+    );
   }
 
   /**
@@ -352,46 +408,79 @@ export async function PUT(
   // Interaktive Transaktion statt eines Arrays von Operationen: Die id des
   // Upserts wird fuer die Zeilen gebraucht, und beim ersten Speichern gibt es
   // sie vorher noch nicht.
-  await prisma.$transaction(async (tx) => {
-    const gespeichert = await tx.supervisorData.upsert({
-      where: { onboardingId: onboarding.id },
-      create: {
-        onboardingId: onboarding.id,
-        ...updateData,
-      },
-      update: updateData,
-    });
+  const jetzt = new Date();
+  try {
+    await prisma.$transaction(async (tx) => {
+      /**
+       * Wettlauf PUT gegen POST: Kommt die Ausstattung mit, sperrt der PUT
+       * ZUERST den Vorgang — bedingt auf die noch offene eigene Spur, denselben
+       * Token und keinen HR-Status, wie die Beanspruchung im POST. Hat ein
+       * zweiter Tab inzwischen abgesendet, schreibt dieser PUT nichts mehr
+       * (409): Nach der Abgabe entstehen aus der Wahl Aufgaben, und ab da
+       * bearbeitet nur noch HR (Regel 5).
+       */
+      if (ausstattungKommt) {
+        const gesperrt = await tx.onboardingProcess.updateMany({
+          where: {
+            id: onboarding.id,
+            supervisorToken: token,
+            supervisorSubmittedAt: null,
+            status: { notIn: [...HR_STATUS] },
+          },
+          data: { updatedAt: jetzt },
+        });
+        if (gesperrt.count === 0) throw new BereitsEingereicht();
+      }
 
-    if (!Array.isArray(zeilen)) return;
-
-    // Ersetzen statt Abgleichen: Die Zeilen haben keine stabile Kennung im
-    // Formular, und die Reihenfolge ist Teil der Angabe.
-    await tx.supervisorKostenstelle.deleteMany({
-      where: { supervisorDataId: gespeichert.id },
-    });
-    if (zeilen.length > 0) {
-      await tx.supervisorKostenstelle.createMany({
-        data: zeilen.map((zeile, index) =>
-          zuDatensatz(zeile, gespeichert.id, index)
-        ),
+      const gespeichert = await tx.supervisorData.upsert({
+        where: { onboardingId: onboarding.id },
+        create: {
+          onboardingId: onboarding.id,
+          ...updateData,
+        },
+        update: updateData,
       });
-    }
-  });
 
-  return NextResponse.json({ success: true, currentStep });
+      if (Array.isArray(zeilen)) {
+        // Ersetzen statt Abgleichen: Die Zeilen haben keine stabile Kennung im
+        // Formular, und die Reihenfolge ist Teil der Angabe.
+        await tx.supervisorKostenstelle.deleteMany({
+          where: { supervisorDataId: gespeichert.id },
+        });
+        if (zeilen.length > 0) {
+          await tx.supervisorKostenstelle.createMany({
+            data: zeilen.map((zeile, index) =>
+              zuDatensatz(zeile, gespeichert.id, index)
+            ),
+          });
+        }
+      }
+
+      // Die Wahl der Fuehrungskraft: gegen den Katalogausschnitt GENAU
+      // dieses Vorgangs geprueft (fremde Position oder Option → 400, Rollback),
+      // ersetzt werden nur ihre eigenen Zeilen und Hinweise.
+      if (ausstattungKommt) {
+        await fuehrungskraftWahlSpeichernIn(tx, onboarding, { ausstattung, hinweise }, jetzt);
+      }
+    });
+  } catch (error) {
+    if (error instanceof BereitsEingereicht) {
+      return NextResponse.json({ error: BEREITS_EINGEREICHT }, { status: 409 });
+    }
+    if (error instanceof AusstattungsWahlUngueltig) {
+      return NextResponse.json({ error: error.meldung }, { status: 400 });
+    }
+    throw error;
+  }
+
+  return NextResponse.json({ success: true, currentStep: updateData.currentStep ?? currentStep });
 }
 
 // =============================================
 // POST – Modalitaeten endgültig absenden
 // =============================================
-/**
- * Ein zweiter Absender war schneller (zweiter Tab, Retry nach Timeout).
- *
- * Eigene Klasse, weil die Beanspruchung INNERHALB der Transaktion passiert:
- * Der einzige Weg, eine begonnene Transaktion zurueckzurollen, ist eine
- * Ausnahme. Der Aufrufer antwortet 409.
- */
-class BereitsEingereicht extends Error {}
+// (Ein zweiter Absender war schneller: `BereitsEingereicht`, oben bei den
+// Schemata — der PUT mit Ausstattung nutzt dieselbe Klasse.)
 
 export async function POST(
   request: NextRequest,
@@ -532,10 +621,7 @@ export async function POST(
     });
   } catch (error) {
     if (error instanceof BereitsEingereicht) {
-      return NextResponse.json(
-        { error: "Die Einstellungsmodalitäten wurden bereits eingereicht." },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: BEREITS_EINGEREICHT }, { status: 409 });
     }
     console.error("[Modalitaeten] Absenden fehlgeschlagen:", error);
     return NextResponse.json(
@@ -576,6 +662,18 @@ export async function POST(
   // Die Rueckfallrichtung ist bewusst asymmetrisch: Ohne `abgleich` gilt
   // „Fragebogen offen" — nie eine unbelegte „bereit zur Prüfung"-Aussage.
   const bereit = abgleich?.nach === "SUPERVISOR_SUBMITTED";
+
+  // Ausstattung & Zugaenge (Paket A2): nur gezaehlt, nie mit Bemerkungs- oder
+  // Hinweistext — die Mail geht an ein HR-Postfach und auch an Webhooks.
+  // Eigenes try/catch: Die Mail darf an der Kurzform nie scheitern; ohne sie
+  // bleibt das Feld leer und die Zeile in der Vorlage entfaellt.
+  let ausstattungKurzText = "";
+  try {
+    ausstattungKurzText = await ausstattungKurzLaden(onboarding);
+  } catch (err) {
+    console.error("[Modalitaeten] Kurzform der Ausstattung fuer die HR-Mail nicht ladbar:", err);
+  }
+
   await triggerN8nWebhook("supervisor-completed", {
     onboardingId: onboarding.id,
     displayId: onboarding.displayId || onboarding.id.substring(0, 8).toUpperCase(),
@@ -589,6 +687,8 @@ export async function POST(
     organization: onboarding.organization.name,
     fragebogen_eingereicht: bereit ? "ja" : "",
     fragebogen_offen: bereit ? "" : "ja",
+    // "" = nichts gewaehlt bzw. kein Schritt im Formular (Block entfaellt)
+    ausstattung_kurz: ausstattungKurzText,
   });
 
   return NextResponse.json({

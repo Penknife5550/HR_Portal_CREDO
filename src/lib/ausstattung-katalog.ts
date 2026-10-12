@@ -14,7 +14,8 @@
  * Dazu `katalogAusschnittLaden`: die Positionen, die EIN Vorgang anbietet
  * (Arbeitsort, Einrichtungsart, Personengruppe, Vorgangsart, Adresse der
  * Stelle) — fuer das Formular der Fuehrungskraft (S8), den Merker
- * `mitAusstattung` (S7) und „Hinzufügen“ in der HR-Karte (S15).
+ * `mitAusstattung` (S7, ueber `ausstattungAngebotenIn`) und „Hinzufügen“ in
+ * der HR-Karte (S15).
  *
  * Die Regeln selbst stehen rein in src/lib/ausstattung.ts (positionPruefen,
  * positionenFuer, adressLuecken, aehnlicheVorlagenpunkte, freigabeWarnungen,
@@ -600,4 +601,25 @@ export async function katalogAusschnittLaden(db: Db, vorgang: AusschnittVorgang)
     ]),
   );
   return { arbeitsortId, positionen, stellenNamen };
+}
+
+/**
+ * Bietet das Formular der Fuehrungskraft den Schritt „Ausstattung & Zugänge“
+ * an? (Regel 1 + 2, S7) — genau dann, wenn `katalogAusschnittLaden` fuer
+ * diesen Vorgang mindestens eine Position liefert.
+ *
+ * Aufrufer sind die beiden Stellen, die den Modalitaeten-Link erzeugen
+ * (POST /api/onboarding und /supervisor-link); sie rechnen es IN DERSELBEN
+ * Transaktion wie `vorgesetztenLinkSetzen`, das daraus den Merker
+ * `SupervisorData.mitAusstattung` setzt. Den Katalog liest danach niemand mehr
+ * fuer die Schrittliste — Formular, Fortschritt und HR-Ansicht lesen nur den
+ * Merker, sonst spraenge ein halb ausgefuelltes Formular.
+ *
+ * Die Einrichtungsart des Arbeitsorts laedt der Ausschnitt selbst (eine
+ * Abfrage, nur wenn der Katalog aktive Positionen hat); der Aufrufer reicht nur
+ * die Skalare des Vorgangs durch.
+ */
+export async function ausstattungAngebotenIn(db: Db, vorgang: AusschnittVorgang): Promise<boolean> {
+  const { positionen } = await katalogAusschnittLaden(db, vorgang);
+  return positionen.length > 0;
 }

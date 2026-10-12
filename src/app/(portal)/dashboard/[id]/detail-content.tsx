@@ -96,7 +96,8 @@ import {
   summeText,
 } from "@/lib/kostenstellen-anzeige";
 import { ArbeitsortFeld, ArbeitsortKopf } from "@/components/ausstattung/arbeitsort-feld";
-import { arbeitsortSperrGrund } from "@/lib/ausstattung";
+import { ModalitaetenAusstattungKarte } from "@/components/ausstattung/modalitaeten-ausstattung-karte";
+import { arbeitsortSperrGrund, type AusstattungsUebersicht } from "@/lib/ausstattung";
 
 // =============================================
 // Types
@@ -380,6 +381,12 @@ export interface DetailData {
   supervisorData: {
     isComplete: boolean;
     currentStep: number;
+    /**
+     * Merker „Schritt Ausstattung & Zugänge im Formular" (Paket A2). Fortschritt
+     * und Schrittzahl nur ueber `modalitaetenFortschritt`, das ihn liest;
+     * `null`/fehlend = fuenf Schritte wie bisher.
+     */
+    mitAusstattung?: boolean | null;
     betriebsstaette: string | null;
     stellenbeschreibung: string | null;
     vertragsbeginn: string | null;
@@ -449,6 +456,13 @@ export interface DetailData {
    * die Route es nicht liefert.
    */
   unterlagen?: UnterlagenUebersicht;
+  /**
+   * „Ausstattung & Zugänge“ (Paket A2) — fertig aus `ausstattungUebersichtLaden`
+   * (src/lib/ausstattung.ts, `ausstattungsUebersichtBauen`). Nur fuer
+   * HR_EDIT_ROLES, sonst `null` (Regel 16). Fehlt, solange die Route es nicht
+   * liefert.
+   */
+  ausstattung?: AusstattungsUebersicht | null;
 }
 
 // =============================================
@@ -1314,7 +1328,9 @@ export function DetailContent({
             setAbteilungenDialogOffen={setAbteilungenDialogOffen}
           />
         )}
-        {activeTab === "supervisor" && <TabSupervisor data={data} appUrl={appUrl} />}
+        {activeTab === "supervisor" && (
+          <TabSupervisor data={data} appUrl={appUrl} onZurCheckliste={() => setActiveTab("checklist")} />
+        )}
         {activeTab === "mails" && darfBearbeiten && <MailProtokoll modul="onboarding" vorgangId={onboardingId} />}
       </main>
     </div>
@@ -3729,7 +3745,20 @@ function ModalitaetenLinkLeiste({
   );
 }
 
-function TabSupervisor({ data, appUrl }: { data: DetailData; appUrl: string }) {
+/**
+ * Reiter „Vorgesetzter“. Exportiert fuer den Verdrahtungstest der fuenften
+ * Karte „Ausstattung & Zugänge“ (modalitaeten-ausstattung-karte.test.tsx).
+ */
+export function TabSupervisor({
+  data,
+  appUrl,
+  onZurCheckliste,
+}: {
+  data: DetailData;
+  appUrl: string;
+  /** Verweis der Karte „Ausstattung & Zugänge“ auf den Reiter Checkliste. */
+  onZurCheckliste: () => void;
+}) {
   const sd = data.supervisorData;
   const modalitaetenLink = data.supervisorToken ? `${appUrl}/modalitaeten/${data.supervisorToken}` : null;
   const abgelaufenAm =
@@ -3845,6 +3874,9 @@ function TabSupervisor({ data, appUrl }: { data: DetailData; appUrl: string }) {
           </div>
         )}
       </Card>
+
+      {/* Sektion 5: Ausstattung & Zugaenge (Paket A2) — nur lesend, nur HR */}
+      <ModalitaetenAusstattungKarte uebersicht={data.ausstattung} onZurCheckliste={onZurCheckliste} />
     </div>
   );
 }

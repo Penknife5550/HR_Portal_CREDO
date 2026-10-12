@@ -5,9 +5,14 @@
  *
  * Der Vorgesetzte füllt hier die Vertragsdaten, Vergütung
  * und Arbeitgeber-Zuordnung für den neuen Mitarbeiter aus.
+ *
+ * Schrittliste aus `supSchritte(supervisorData.mitAusstattung)`: mit Merker
+ * kommt vor der Zusammenfassung der Schritt „Ausstattung & Zugänge" hinzu
+ * (Paket A2, src/components/ausstattung/ausstattung-schritt.tsx). Die Weiche
+ * liest `schritt.key`, die Anzeigenummer ist `Index + 1` — nie eine feste Zahl.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { CredoLinie } from "@/components/credo-linie";
@@ -42,12 +47,20 @@ import {
   supStep2Schema,
   supStep3Schema,
   supStep4Schema,
-  SUP_STEP_CONFIG,
+  SUP_SCHRITT_AUSSTATTUNG,
+  supSchritte,
   type SupStep1Data,
   type SupStep2Data,
   type SupStep3Data,
   type SupStep4Data,
 } from "@/lib/validations/supervisor-data";
+import {
+  sichtNachSpeichern,
+  type FuehrungskraftEingabe,
+  type FuehrungskraftSicht,
+} from "@/lib/ausstattung";
+import { AusstattungSchritt } from "@/components/ausstattung/ausstattung-schritt";
+import { AusstattungZusammenfassung } from "@/components/ausstattung/ausstattung-zusammenfassung";
 
 interface OrgOption {
   id: string;
@@ -71,7 +84,26 @@ interface ModalitaetenData {
    * Testfixtures es nicht tragen — fehlt es, bleibt das Formular sichtbar.
    */
   vorgesetzteAbgesendet?: boolean;
+  /**
+   * Schritt „Ausstattung & Zugänge" (Paket A2): Katalogausschnitt und eigene
+   * Wahl, nur mit dem Merker `supervisorData.mitAusstattung` und solange das
+   * Formular beschreibbar ist, sonst `null`. Optional, weil aeltere Antworten
+   * und Testfixtures es nicht tragen. Ob der Schritt ERSCHEINT, sagt allein der
+   * Merker (`supSchritte`), nie dieses Feld.
+   */
+  ausstattung?: FuehrungskraftSicht | null;
 }
+
+/**
+ * Platzhalter der „Zusätzlichen Vereinbarungen" (Schritt 4). „Dienstwagen"
+ * steht nicht mehr darin (E-A24: entgeltrelevante Positionen gehen nur an HR);
+ * mit dem Ausstattungsschritt verweist er auf ihn, damit Wünsche zur
+ * Ausstattung nicht wieder im Freitext landen, den nur HR liest.
+ */
+const ZUSATZ_PLATZHALTER = {
+  mitAusstattung: `z. B. besondere Regelungen (Ausstattung bitte im Schritt „${SUP_SCHRITT_AUSSTATTUNG.title}“)`,
+  ohneAusstattung: "z. B. besondere Regelungen",
+} as const;
 
 /** ISO-Datum aus der API ("2026-08-31T00:00:00.000Z") auf das Format von <input type="date"> kuerzen. */
 function dateInputValue(v: unknown): string {
@@ -348,6 +380,10 @@ export default function ModalitaetenPage() {
   const [saveError, setSaveError] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  // Sicht des Schritts „Ausstattung & Zugänge" — nach jedem „Weiter" dort mit
+  // der gespeicherten Wahl fortgeschrieben (`sichtNachSpeichern`), damit
+  // „Zurück" und die Zusammenfassung den gespeicherten Stand zeigen.
+  const [ausstattung, setAusstattung] = useState<FuehrungskraftSicht | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -359,9 +395,17 @@ export default function ModalitaetenPage() {
       }
       const result = await res.json();
       setPageData(result);
+      setAusstattung(result.ausstattung ?? null);
       if (result.supervisorData) {
         setFormData(mitKostenstellenRueckfall(result.supervisorData));
-        setCurrentStep(result.supervisorData.currentStep || 0);
+        // `currentStep` ist ein Index in die Schrittliste DIESES Formulars
+        // (Merker `mitAusstattung`, Regel 2). Ein Wert jenseits des letzten
+        // Schritts wird gekappt — sonst fehlte der Weiche jeder Schritt.
+        const letzter = supSchritte(result.supervisorData.mitAusstattung === true).length - 1;
+        const gespeichert = Number(result.supervisorData.currentStep);
+        setCurrentStep(
+          Number.isFinite(gespeichert) ? Math.min(Math.max(0, Math.trunc(gespeichert)), letzter) : 0,
+        );
       }
     } catch {
       setError("Verbindungsfehler.");
@@ -427,6 +471,24 @@ export default function ModalitaetenPage() {
     const nextStep = currentStep + 1;
     const saved = await saveStepData(stepData, nextStep);
     if (saved) {
+      setCurrentStep(nextStep);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  /**
+   * „Weiter" im Schritt „Ausstattung & Zugänge": Die Wahl geht nicht in
+   * `formData` (sie gehoert nicht an SupervisorData, sondern in eigene
+   * Tabellen), sondern als `{ ausstattung, hinweise }` in den PUT. Erst nach
+   * dem Speichern wird die Sicht fortgeschrieben — scheitert der PUT (400 bei
+   * einer inzwischen fremden Position), bleibt der Schritt mit der Meldung
+   * stehen.
+   */
+  const handleAusstattungNext = async (eingabe: FuehrungskraftEingabe) => {
+    const nextStep = currentStep + 1;
+    const saved = await saveStepData({ ...eingabe }, nextStep);
+    if (saved) {
+      setAusstattung((alt) => (alt ? sichtNachSpeichern(alt, eingabe) : alt));
       setCurrentStep(nextStep);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -529,7 +591,14 @@ export default function ModalitaetenPage() {
 
   if (!pageData) return null;
 
-  const progress = ((currentStep + 1) / SUP_STEP_CONFIG.length) * 100;
+  // Die Schrittliste DIESES Formulars: mit Merker `mitAusstattung` sechs
+  // Schritte, sonst fuenf wie bisher (Regel 2: nur der Merker, nie der
+  // Katalog). Weiche, Kopf und Schrittleiste lesen den `key` bzw. den Index —
+  // nie eine feste Nummer.
+  const mitAusstattung = pageData.supervisorData?.mitAusstattung === true;
+  const schritte = supSchritte(mitAusstattung);
+  const schritt = schritte[Math.min(currentStep, schritte.length - 1)];
+  const progress = ((currentStep + 1) / schritte.length) * 100;
 
   const stepProps = {
     data: formData,
@@ -567,7 +636,7 @@ export default function ModalitaetenPage() {
               <span className="text-xs text-green-600">{saveMsg}</span>
             )}
             <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-              Schritt {currentStep + 1} / {SUP_STEP_CONFIG.length}
+              Schritt {currentStep + 1} / {schritte.length}
             </span>
           </div>
         </div>
@@ -580,14 +649,17 @@ export default function ModalitaetenPage() {
       {/* Step Navigation */}
       <nav className="border-b bg-card">
         <div className="mx-auto max-w-3xl px-4 py-2">
-          <div className="flex gap-1">
-            {SUP_STEP_CONFIG.map((step, idx) => {
+          {/* `flex-wrap`: Mit dem Ausstattungsschritt sind es sechs Knoepfe —
+              mit Titel passen sie nicht mehr in eine Zeile der Spalte, die Seite
+              rollte sonst waagerecht. Fuenf Schritte stehen wie bisher in einer. */}
+          <div className="flex flex-wrap gap-1">
+            {schritte.map((step, idx) => {
               const isActive = idx === currentStep;
               const isDone = idx < currentStep;
               const isFuture = idx > currentStep;
               return (
                 <button
-                  key={step.number}
+                  key={step.key}
                   onClick={() => isDone && setCurrentStep(idx)}
                   disabled={isFuture}
                   className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -601,7 +673,7 @@ export default function ModalitaetenPage() {
                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
-                    ) : step.number}
+                    ) : idx + 1}
                   </span>
                   <span className="hidden md:inline">{step.title}</span>
                 </button>
@@ -623,15 +695,30 @@ export default function ModalitaetenPage() {
         )}
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
           <div className="border-b bg-muted/50 px-6 py-4">
-            <h2 className="text-lg font-bold text-foreground">{SUP_STEP_CONFIG[currentStep].title}</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">{SUP_STEP_CONFIG[currentStep].description}</p>
+            <h2 className="text-lg font-bold text-foreground">{schritt.title}</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">{schritt.description}</p>
           </div>
           <div className="p-6">
-            {currentStep === 0 && <SupStep1 {...stepProps} />}
-            {currentStep === 1 && <SupStep2 {...stepProps} />}
-            {currentStep === 2 && <SupStep3 {...stepProps} />}
-            {currentStep === 3 && <SupStep4 {...stepProps} />}
-            {currentStep === 4 && (
+            {schritt.key === "stelle" && <SupStep1 {...stepProps} />}
+            {schritt.key === "arbeitszeit" && <SupStep2 {...stepProps} />}
+            {schritt.key === "verguetung" && <SupStep3 {...stepProps} />}
+            {schritt.key === "zusatz" && (
+              <SupStep4
+                {...stepProps}
+                zusatzPlatzhalter={
+                  mitAusstattung ? ZUSATZ_PLATZHALTER.mitAusstattung : ZUSATZ_PLATZHALTER.ohneAusstattung
+                }
+              />
+            )}
+            {schritt.key === "ausstattung" && (
+              <AusstattungSchritt
+                sicht={ausstattung}
+                saving={saving}
+                onBack={handleBack}
+                onNext={handleAusstattungNext}
+              />
+            )}
+            {schritt.key === "zusammenfassung" && (
               <SupStep5Summary
                 data={formData}
                 onBack={handleBack}
@@ -639,6 +726,14 @@ export default function ModalitaetenPage() {
                 onSubmit={() => setShowConfirmDialog(true)}
                 organizations={pageData.organizations}
                 employeeName={pageData.employeeName}
+                ausstattungKarte={
+                  mitAusstattung ? (
+                    <AusstattungZusammenfassung
+                      nummer={schritte.findIndex((s) => s.key === "ausstattung") + 1}
+                      sicht={ausstattung}
+                    />
+                  ) : null
+                }
               />
             )}
           </div>
@@ -1268,12 +1363,15 @@ function SupStep4({
   onNext,
   onBack,
   saving,
+  zusatzPlatzhalter,
 }: {
   data: Record<string, unknown>;
   onNext: (d: Record<string, unknown>) => void;
   onBack: () => void;
   saving: boolean;
   organizations: OrgOption[];
+  /** Platzhalter der Zusatzvereinbarungen (ZUSATZ_PLATZHALTER, je nach Ausstattungsschritt). */
+  zusatzPlatzhalter: string;
 }) {
   const probezeitStart = (data.probezeit as boolean) ?? true;
 
@@ -1661,7 +1759,7 @@ function SupStep4({
 
       <div className="space-y-2">
         <label className="text-sm font-medium text-foreground">Zusätzliche Vereinbarungen / Bemerkungen</label>
-        <textarea {...register("zusatzvereinbarungen")} rows={4} maxLength={MAX_LAENGE.zusatzvereinbarungen} placeholder="z.B. besondere Regelungen, Dienstwagen, etc." className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
+        <textarea {...register("zusatzvereinbarungen")} rows={4} maxLength={MAX_LAENGE.zusatzvereinbarungen} placeholder={zusatzPlatzhalter} className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring" />
         <ZeichenZaehler wert={zusatzvereinbarungen} max={MAX_LAENGE.zusatzvereinbarungen} />
         {errors.zusatzvereinbarungen && <p className="text-xs text-destructive">{errors.zusatzvereinbarungen.message}</p>}
       </div>
@@ -1703,6 +1801,7 @@ function SupStep5Summary({
   onSubmit,
   organizations,
   employeeName,
+  ausstattungKarte,
 }: {
   data: Record<string, unknown>;
   onBack: () => void;
@@ -1710,6 +1809,8 @@ function SupStep5Summary({
   onSubmit: () => void;
   organizations: OrgOption[];
   employeeName: string;
+  /** Karte „5. Ausstattung & Zugänge" (AusstattungZusammenfassung), nur mit Merker; sonst `null`. */
+  ausstattungKarte: ReactNode;
 }) {
   const str = (v: unknown): string => (v ? String(v) : "—");
   const dateDe = (v: unknown): string => {
@@ -1843,6 +1944,8 @@ function SupStep5Summary({
           {!!data.zusatzvereinbarungen && <div className="flex justify-between"><span className="text-muted-foreground">Zusatzvereinbarungen</span><span className="font-medium max-w-[60%] text-right">{str(data.zusatzvereinbarungen)}</span></div>}
         </div>
       </div>
+
+      {ausstattungKarte}
 
       <div className="flex justify-between pt-4">
         <button type="button" onClick={onBack} className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent">Zurück</button>

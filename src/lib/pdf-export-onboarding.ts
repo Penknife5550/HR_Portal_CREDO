@@ -26,6 +26,14 @@ import {
   kostenstellenAnzeige,
   summeText,
 } from "@/lib/kostenstellen-anzeige";
+import {
+  AUSSTATTUNG_KATEGORIE,
+  ausstattungsGruppen,
+  namenAufzaehlen,
+  type AusstattungsZeile,
+  type UebersichtHinweisDaten,
+  type UebersichtZeileDaten,
+} from "@/lib/ausstattung";
 
 // =============================================
 // Typen
@@ -54,6 +62,17 @@ export interface OnboardingExportContext {
    * bleibt es beim bisherigen Verhalten.
    */
   abteilungsNamen?: Record<string, string>;
+  /**
+   * Ausstattung & Zugaenge (Paket A2): Zeilen und Hinweise des Vorgangs, wie
+   * `src/lib/ausstattung-dienst.ts` sie auswaehlt (`UEBERSICHT_ZEILEN_AUSWAHL`).
+   * Gedruckt im PDF der Modalitaeten samt Bemerkungen — den Export erzeugen
+   * nur HR-Rollen. Fehlt das Feld oder ist nichts gewaehlt, entfaellt der
+   * Abschnitt.
+   */
+  ausstattung?: {
+    zeilen: UebersichtZeileDaten[];
+    hinweise: UebersichtHinweisDaten[];
+  };
 }
 
 interface PersonalDataExport {
@@ -338,6 +357,17 @@ function dataRow(doc: PDFKit.PDFDocument, label: string, value: string, y: numbe
   const labelEnde = doc.y;
   doc.font("Helvetica").fontSize(9).fillColor(C.black).text(value, 225, y, { width: 340 });
   return Math.max(labelEnde, doc.y, y + 14) + 4;
+}
+
+/**
+ * Wie hoch `dataRow` wird — dieselbe Schrift, dieselben Breiten, dieselbe
+ * Mindesthoehe und derselbe Abstand. Zum Reservieren vor dem Setzen langer
+ * Freitexte (Seitenwechsel mit Kopfzeile statt des automatischen Umbruchs von
+ * pdfkit mitten im Text).
+ */
+function dataRowHoehe(doc: PDFKit.PDFDocument, label: string, value: string): number {
+  doc.font("Helvetica").fontSize(9);
+  return Math.max(doc.heightOfString(label, { width: 170 }), doc.heightOfString(value, { width: 340 }), 14) + 4;
 }
 
 // =============================================
@@ -708,6 +738,78 @@ async function addModalitaetenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExpo
   if (sd.probezeitMonate) y = dataRow(doc, "Probezeit (Monate)", str(sd.probezeitMonate), y);
   if (sd.zusatzvereinbarungen) {
     y = dataRow(doc, "Zusatzvereinbarungen", str(sd.zusatzvereinbarungen), y);
+  }
+
+  ausstattungAbschnitt(doc, ctx);
+}
+
+/** Der Wert einer Ausstattungszeile in der rechten Spalte. */
+function ausstattungsWert(z: AusstattungsZeile): string {
+  let wert: string;
+  if (z.art === "ANGABE") {
+    wert = z.angabe
+      ? z.angabe.sichtbarFuer.length > 1
+        ? `${z.angabe.wert} (sehen ${namenAufzaehlen(z.angabe.sichtbarFuer)})`
+        : z.angabe.wert
+      : "—";
+  } else if (z.art === "AUSWAHL") {
+    wert = z.auswahl.length > 0 ? z.auswahl.join(", ") : "—";
+  } else {
+    wert = "Ja";
+  }
+  if (z.gestrichen) wert += " (gestrichen)";
+  if (z.erfasst) wert += ` – ${z.erfasst}`;
+  return wert;
+}
+
+/**
+ * Abschnitt „Ausstattung & Zugänge“ im PDF der Modalitaeten (Paket A2): je
+ * Stelle die gewaehlten Positionen, ihre Bemerkungen mit Herkunft und der
+ * Hinweis an die Stelle. Gruppen, Reihenfolge und Beschriftungen aus
+ * `ausstattungsGruppen` — dieselben wie in der Karte im Reiter
+ * „Vorgesetzter“. Die Stellen heissen wie in der Checkliste
+ * (`abteilungsNamen`, sonst `abteilungLabel`). Ohne Zeilen und Hinweise kein
+ * Abschnitt.
+ */
+function ausstattungAbschnitt(doc: PDFKit.PDFDocument, ctx: OnboardingExportContext): void {
+  const daten = ctx.ausstattung;
+  if (!daten) return;
+  const gruppen = ausstattungsGruppen({
+    zeilen: daten.zeilen,
+    hinweise: daten.hinweise,
+    stelleName: (key) => ctx.abteilungsNamen?.[key] ?? abteilungLabel(key),
+  });
+  if (gruppen.length === 0) return;
+
+  const titel = "Modalitaeten";
+  // Seitenwechsel mit Blick auf die laufende Zeile `y` (checkBreak sieht nur
+  // doc.y, das nach einem Wert nicht am Ende der Zeile steht).
+  const platz = (y: number, noetig: number): number => {
+    if (y + noetig <= 720) return y;
+    doc.addPage();
+    pageHeader(doc, ctx, titel);
+    return 55;
+  };
+  // Eine Zeile mit ihrer ECHTEN Hoehe: Bemerkung (bis 500 Zeichen) und Hinweis
+  // (bis 1000) laufen ueber viele Zeilen. Mit einer festen Reserve begaenne ein
+  // langer Text kurz vor dem Seitenende, pdfkit braeche ihn dann selbst auf
+  // eine neue Seite um — ohne Kopfzeile, und die naechste Zeile legte gleich
+  // noch eine an.
+  const zeileSetzen = (y: number, label: string, wert: string): number =>
+    dataRow(doc, label, wert, platz(y, dataRowHoehe(doc, label, wert)));
+
+  checkBreak(doc, 80, ctx, titel);
+  let y = section(doc, AUSSTATTUNG_KATEGORIE);
+  for (const gruppe of gruppen) {
+    y = platz(y, 40);
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(C.black).text(gruppe.stelleName, 50, y, { width: 515 });
+    y = doc.y + 4;
+    for (const zeile of gruppe.zeilen) {
+      y = zeileSetzen(y, zeile.angabe?.label ?? zeile.bezeichnung, ausstattungsWert(zeile));
+      if (zeile.bemerkung) y = zeileSetzen(y, zeile.bemerkung.label, zeile.bemerkung.text);
+    }
+    if (gruppe.hinweis) y = zeileSetzen(y, gruppe.hinweis.quelleLabel, gruppe.hinweis.text);
+    y += 4;
   }
 }
 

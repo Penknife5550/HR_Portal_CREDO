@@ -63,7 +63,16 @@ export interface SchritteStand {
   completedAt: string | null;
   fragebogenFortschritt: FragebogenFortschritt;
   personalData: { isComplete: boolean; currentStep: number } | null;
-  supervisorData: { isComplete: boolean; currentStep: number } | null;
+  /**
+   * `mitAusstattung` (Paket A2) entscheidet, ob das Formular der Fuehrungskraft
+   * fuenf oder sechs Schritte hat — `modalitaetenFortschritt` liest es mit.
+   * Fehlt es oder ist es `null`/`false`, bleibt es bei fuenf Schritten.
+   */
+  supervisorData: {
+    isComplete: boolean;
+    currentStep: number;
+    mitAusstattung?: boolean | null;
+  } | null;
   /** Nur die Anzahl wird gebraucht — ein Array erfuellt das. */
   documents: { length: number };
   checklistItems: {

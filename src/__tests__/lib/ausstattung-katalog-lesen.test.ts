@@ -5,13 +5,21 @@
  * Positionen, die EIN Vorgang anbietet — gefiltert am WIRKSAMEN Arbeitsort
  * (E-A10), nicht an der Einrichtung des Vorgangs: Einrichtungsart, eigene
  * Positionen, Ausblendung und Adresse der Stelle kommen alle vom Arbeitsort.
- * Eigener `mockPrisma` (als `db` uebergeben), weil spaetere Routen-Tests die
- * Funktion nur mocken. `ausstattungAngebotenIn` kommt mit S7 hierher.
+ * Eigener `mockPrisma` (als `db` uebergeben), weil die Routen-Tests
+ * (supervisor-link.test.ts) beide Funktionen nur mocken.
+ *
+ * `ausstattungAngebotenIn` (S7): der Merker `mitAusstattung`, den die beiden
+ * Link-Wege in ihrer Transaktion setzen (Regel 2) — dieselben Faelle am
+ * Arbeitsort ≠ Einrichtung, jeweils als Ja/Nein.
  */
 
 jest.mock("@/lib/db", () => ({ prisma: {} }));
 
-import { katalogAusschnittLaden, type AusschnittVorgang } from "@/lib/ausstattung-katalog";
+import {
+  ausstattungAngebotenIn,
+  katalogAusschnittLaden,
+  type AusschnittVorgang,
+} from "@/lib/ausstattung-katalog";
 import type { Prisma } from "@prisma/client";
 
 const GYM = "org-gym";
@@ -187,5 +195,77 @@ describe("katalogAusschnittLaden", () => {
     const ausschnitt = await katalogAusschnittLaden(db, { ...AM_KITA, arbeitsortId: "org-weg" });
     expect(ausschnitt.arbeitsortId).toBe("org-weg");
     expect(ids(ausschnitt)).toEqual(["alle"]);
+  });
+});
+
+describe("ausstattungAngebotenIn (Merker mitAusstattung, Regel 2)", () => {
+  /** Ohne abweichenden Arbeitsort: Einrichtung GYM. */
+  const AM_GYM: AusschnittVorgang = { ...AM_KITA, arbeitsortId: null };
+
+  it("leerer Ausschnitt (leerer Katalog) → false — mit einer einzigen Abfrage", async () => {
+    expect(await ausstattungAngebotenIn(db, AM_KITA)).toBe(false);
+    expect(mockDb.ausstattungsPosition.findMany).toHaveBeenCalledTimes(1);
+    expect(mockDb.organization.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("processType ≠ EINSTELLUNG → false, ohne den Katalog zu lesen", async () => {
+    mockDb.ausstattungsPosition.findMany.mockResolvedValue([position()]);
+    for (const processType of ["VERBEAMTUNG", "VERTRAGSAENDERUNG", "KUENDIGUNG"]) {
+      expect(await ausstattungAngebotenIn(db, { ...AM_KITA, processType })).toBe(false);
+    }
+    expect(mockDb.ausstattungsPosition.findMany).not.toHaveBeenCalled();
+    // Gegenprobe: bei EINSTELLUNG dieselbe Position.
+    expect(await ausstattungAngebotenIn(db, AM_KITA)).toBe(true);
+  });
+
+  it("die Einrichtungsart kommt vom Arbeitsort, nicht von der Einrichtung", async () => {
+    mockDb.ausstattungsPosition.findMany.mockResolvedValue([position({ id: "nur-gym", einrichtungsarten: ["GYMNASIUM"] })]);
+    expect(await ausstattungAngebotenIn(db, AM_KITA)).toBe(false);
+    expect(mockDb.organization.findUnique).toHaveBeenCalledWith({ where: { id: KITA }, select: { type: true } });
+    expect(await ausstattungAngebotenIn(db, AM_GYM)).toBe(true);
+  });
+
+  it("eigene Positionen des Arbeitsorts ja, die der Einrichtung nein", async () => {
+    mockDb.ausstattungsPosition.findMany.mockResolvedValue([position({ id: "eigene-gym", organizationId: GYM })]);
+    expect(await ausstattungAngebotenIn(db, AM_KITA)).toBe(false);
+
+    mockDb.ausstattungsPosition.findMany.mockResolvedValue([position({ id: "eigene-kita", organizationId: KITA })]);
+    expect(await ausstattungAngebotenIn(db, AM_KITA)).toBe(true);
+  });
+
+  it("die Ausblendung am Arbeitsort wirkt, die an der Einrichtung nicht", async () => {
+    mockDb.ausstattungsPosition.findMany.mockResolvedValue([position({ id: "a" })]);
+    // Der Mock beachtet das WHERE: Ausblendungen je Einrichtung.
+    const ausgeblendet: Record<string, string[]> = { [KITA]: ["a"], [GYM]: [] };
+    mockDb.ausstattungsAusblendung.findMany.mockImplementation(
+      async ({ where }: { where: { organizationId: string } }) =>
+        (ausgeblendet[where.organizationId] ?? []).map((positionId) => ({ positionId, organizationId: where.organizationId })),
+    );
+    expect(await ausstattungAngebotenIn(db, AM_KITA)).toBe(false);
+    expect(await ausstattungAngebotenIn(db, AM_GYM)).toBe(true);
+
+    // Ausgeblendet nur an der Einrichtung, nicht am Arbeitsort: angeboten.
+    ausgeblendet[KITA] = [];
+    ausgeblendet[GYM] = ["a"];
+    expect(await ausstattungAngebotenIn(db, AM_KITA)).toBe(true);
+  });
+
+  it("die Adresse der Stelle wird am Arbeitsort aufgeloest: ohne Adresse dort nicht angeboten, HR immer", async () => {
+    mockDb.ausstattungsPosition.findMany.mockResolvedValue([
+      position({ id: "spind", departmentKey: "FACILITY", bezeichnung: "Spind" }),
+    ]);
+    // FACILITY hat nur am Gymnasium (Einrichtung) eine Adresse, nicht an der Kita.
+    mockDb.departmentConfig.findMany.mockResolvedValue([
+      konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister GYM", organizationId: GYM }),
+    ]);
+    expect(await ausstattungAngebotenIn(db, AM_KITA)).toBe(false);
+    expect(await ausstattungAngebotenIn(db, AM_GYM)).toBe(true);
+
+    // HR braucht keine Adresse — auch am Arbeitsort ohne jede Konfiguration.
+    mockDb.ausstattungsPosition.findMany.mockResolvedValue([
+      position({ id: "jobticket", departmentKey: "HR", bezeichnung: "Jobticket", entgeltrelevant: true }),
+    ]);
+    mockDb.departmentConfig.findMany.mockResolvedValue([]);
+    expect(await ausstattungAngebotenIn(db, AM_KITA)).toBe(true);
   });
 });

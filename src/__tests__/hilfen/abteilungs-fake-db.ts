@@ -17,6 +17,18 @@
  * `onboardingAufgaben` (ChecklistItem, Zustaendigkeit in `assignee`). Die
  * Links beider Module liegen in `links` (offboardingId ODER onboardingId).
  *
+ * Ausstattung & Zugaenge (Paket A2/A3, seit S10): `ausstattungZeilen`
+ * (OnboardingAusstattung), `ausstattungAufgaben` (OnboardingAusstattungAufgabe,
+ * Schluessel `ausstattungId_option`), `stellenHinweise`
+ * (OnboardingStellenHinweis, Schluessel `onboardingId_departmentKey`),
+ * `ausstattungAenderungen` (OnboardingAusstattungAenderung), dazu der Katalog
+ * (`ausstattungsPositionen`, `ausstattungsAusblendungen`, nur lesend) und
+ * `checklistItem.create/delete/deleteMany`. Leer als Vorgabe — bestehende
+ * Faelle bleiben unveraendert. Eindeutigkeit wie im Schema (P2002) und die
+ * Kaskaden (Aufgabe geloescht → Verknuepfung weg, Hinweis behaelt die Zeile
+ * mit `checklistItemId: null`; Zeile geloescht → Verknuepfungen weg) bildet
+ * der Fake nach. `smtpConfig` liefert `replyToEmail` aus `db.replyToEmail`.
+ *
  * Einbinden (Pfad relativ zur Testdatei):
  *
  *   import { db, fakePrisma, dbLeeren } from "../hilfen/abteilungs-fake-db";
@@ -49,6 +61,20 @@ export const db: {
   onboardingVorgaenge: Zeile[];
   /** Paket 5: ChecklistItem-Zeilen (Onboarding). */
   onboardingAufgaben: Zeile[];
+  /** Paket A2: OnboardingAusstattung-Zeilen. */
+  ausstattungZeilen: Zeile[];
+  /** Paket A3: OnboardingAusstattungAufgabe (Verknuepfung Zeile/Option → ChecklistItem). */
+  ausstattungAufgaben: Zeile[];
+  /** Paket A2: OnboardingStellenHinweis-Zeilen. */
+  stellenHinweise: Zeile[];
+  /** Paket A3: OnboardingAusstattungAenderung (Nachtragsliste). */
+  ausstattungAenderungen: Zeile[];
+  /** Paket A1: Katalog (AusstattungsPosition), nur lesend. */
+  ausstattungsPositionen: Zeile[];
+  /** Paket A1: AusstattungsAusblendung, nur lesend. */
+  ausstattungsAusblendungen: Zeile[];
+  /** SmtpConfig.replyToEmail (HR-Postfach). */
+  replyToEmail: string | null;
 } = {
   vorgaenge: [],
   aufgaben: [],
@@ -61,6 +87,13 @@ export const db: {
   zuweisungen: [],
   onboardingVorgaenge: [],
   onboardingAufgaben: [],
+  ausstattungZeilen: [],
+  ausstattungAufgaben: [],
+  stellenHinweise: [],
+  ausstattungAenderungen: [],
+  ausstattungsPositionen: [],
+  ausstattungsAusblendungen: [],
+  replyToEmail: null,
 };
 
 let idZaehler = 0;
@@ -87,6 +120,11 @@ export function passt(zeile: Zeile, where: Record<string, unknown> | undefined):
     if (k === "onboardingId_departmentKey") {
       const b = bed as { onboardingId: string; departmentKey: string };
       if (zeile.onboardingId !== b.onboardingId || zeile.departmentKey !== b.departmentKey) return false;
+      continue;
+    }
+    if (k === "ausstattungId_option") {
+      const b = bed as { ausstattungId: string; option: string };
+      if (zeile.ausstattungId !== b.ausstattungId || zeile.option !== b.option) return false;
       continue;
     }
     if (k === "userId_organizationId") return false;
@@ -219,6 +257,245 @@ function onboardingProjektion(v: Zeile, select?: Record<string, unknown>): Zeile
   }
   return r;
 }
+
+// =============================================
+// Ausstattung & Zugaenge (seit S10): Tabellen samt Eindeutigkeit und Kaskaden
+// =============================================
+
+/** Wie Prisma bei einer verletzten Eindeutigkeit (P2002). */
+function eindeutigkeitVerletzt(felder: string): Error {
+  return Object.assign(new Error(`Unique constraint failed on the fields: (${felder})`), { code: "P2002" });
+}
+
+/** Wie Prisma, wenn die Zeile zu update/delete fehlt (P2025). */
+function zeileFehlt(): Error {
+  return Object.assign(new Error("Record not found."), { code: "P2025" });
+}
+
+/** Neue ChecklistItem-Zeile (Onboarding) mit den Standardwerten des Schemas. */
+export function neueOnboardingAufgabe(data: Zeile): Zeile {
+  return {
+    id: `i-${naechsteId()}`,
+    templateItemId: null,
+    title: "",
+    description: null,
+    category: "",
+    orderIndex: 0,
+    assignee: null,
+    relativeDueDays: null,
+    isCompleted: false,
+    completedAt: null,
+    completedById: null,
+    dueDate: null,
+    notes: null,
+    abteilungKommentar: null,
+    abteilungKommentarAm: null,
+    herkunft: null,
+    eilt: false,
+    entfaelltAm: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neue OnboardingAusstattung-Zeile mit den Standardwerten des Schemas. */
+export function neueAusstattungsZeile(data: Zeile): Zeile {
+  return {
+    id: `aus-${naechsteId()}`,
+    positionId: null,
+    angabeSchluessel: null,
+    aufgabeTitel: "",
+    hinweisStelle: null,
+    relativeDueDays: null,
+    sichtbarFuer: [],
+    ausgabeKennung: null,
+    rueckgabeKategorie: null,
+    beiAustritt: null,
+    reihenfolge: 0,
+    auswahl: [],
+    angabe: null,
+    bemerkung: null,
+    bemerkungQuelle: null,
+    erfasstVonId: null,
+    gestrichenAm: null,
+    inhaltGeleertAm: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neuer OnboardingStellenHinweis mit den Standardwerten des Schemas. */
+export function neuerStellenHinweis(data: Zeile): Zeile {
+  return {
+    checklistItemId: null,
+    gesehenAm: null,
+    inhaltGeleertAm: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neue OnboardingAusstattungAufgabe (Verknuepfung) mit den Standardwerten des Schemas. */
+function neueAusstattungsAufgabe(data: Zeile): Zeile {
+  return { option: "", createdAt: new Date(), ...data };
+}
+
+/** Neue OnboardingAusstattungAenderung mit den Standardwerten des Schemas. */
+function neueAusstattungsAenderung(data: Zeile): Zeile {
+  return { id: `aen-${naechsteId()}`, erfasstAm: new Date(), gesendetAm: null, ...data };
+}
+
+/**
+ * Eine Tabelle mit den Methoden, die die Ausstattung braucht:
+ * findMany/findUnique/findFirst/count/create/createMany/update/updateMany/
+ * delete/deleteMany. `pruefen` wirft P2002, `nachLoeschen` bildet Kaskaden
+ * nach. Die Zeilen liest sie bei jedem Aufruf frisch aus `db` (dbLeeren
+ * ersetzt die Arrays).
+ */
+function tabelle(opts: {
+  zeilen: () => Zeile[];
+  ersetzen: (zeilen: Zeile[]) => void;
+  neu: (data: Zeile) => Zeile;
+  pruefen?: (kandidat: Zeile, ohne?: Zeile) => void;
+  nachLoeschen?: (geloescht: Zeile[]) => void;
+}) {
+  const finden = (where: Zeile) => opts.zeilen().find((x) => passt(x, where));
+  const loeschen = (treffer: Zeile[]) => {
+    opts.ersetzen(opts.zeilen().filter((x) => !treffer.includes(x)));
+    opts.nachLoeschen?.(treffer);
+  };
+  return {
+    findMany: jest.fn(async (args: { where?: Zeile; select?: Zeile; orderBy?: unknown } = {}) =>
+      sortieren(opts.zeilen().filter((x) => passt(x, args.where)), args.orderBy).map((x) => projizieren(x, args.select)),
+    ),
+    findUnique: jest.fn(async ({ where, select }: { where: Zeile; select?: Zeile }) => {
+      const x = finden(where);
+      return x ? projizieren(x, select) : null;
+    }),
+    findFirst: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) => {
+      const x = opts.zeilen().find((z) => passt(z, where));
+      return x ? projizieren(x, select) : null;
+    }),
+    count: jest.fn(async ({ where }: { where?: Zeile } = {}) => opts.zeilen().filter((x) => passt(x, where)).length),
+    create: jest.fn(async ({ data, select }: { data: Zeile; select?: Zeile }) => {
+      const x = opts.neu(data);
+      opts.pruefen?.(x);
+      opts.zeilen().push(x);
+      return projizieren(x, select);
+    }),
+    createMany: jest.fn(async ({ data }: { data: Zeile[] | Zeile }) => {
+      const liste = Array.isArray(data) ? data : [data];
+      for (const d of liste) {
+        const x = opts.neu(d);
+        opts.pruefen?.(x);
+        opts.zeilen().push(x);
+      }
+      return { count: liste.length };
+    }),
+    update: jest.fn(async ({ where, data, select }: { where: Zeile; data: Zeile; select?: Zeile }) => {
+      const x = finden(where);
+      if (!x) throw zeileFehlt();
+      const kandidat = { ...x };
+      anwenden(kandidat, data);
+      opts.pruefen?.(kandidat, x);
+      anwenden(x, data);
+      return projizieren(x, select);
+    }),
+    updateMany: jest.fn(async ({ where, data }: { where?: Zeile; data: Zeile }) => {
+      const treffer = opts.zeilen().filter((x) => passt(x, where));
+      treffer.forEach((x) => anwenden(x, data));
+      return { count: treffer.length };
+    }),
+    delete: jest.fn(async ({ where }: { where: Zeile }) => {
+      const x = finden(where);
+      if (!x) throw zeileFehlt();
+      loeschen([x]);
+      return structuredClone(x);
+    }),
+    deleteMany: jest.fn(async ({ where }: { where?: Zeile } = {}) => {
+      const treffer = opts.zeilen().filter((x) => passt(x, where));
+      loeschen(treffer);
+      return { count: treffer.length };
+    }),
+  };
+}
+
+/** Kaskaden beim Loeschen von ChecklistItems: Verknuepfung weg, Hinweis behaelt die Zeile (SetNull). */
+function aufgabenGeloescht(geloescht: Zeile[]): void {
+  const ids = new Set(geloescht.map((a) => a.id));
+  db.ausstattungAufgaben = db.ausstattungAufgaben.filter((v) => !ids.has(v.checklistItemId));
+  for (const h of db.stellenHinweise) if (ids.has(h.checklistItemId)) h.checklistItemId = null;
+}
+
+const ausstattungsTabellen = {
+  onboardingAusstattung: tabelle({
+    zeilen: () => db.ausstattungZeilen,
+    ersetzen: (z) => (db.ausstattungZeilen = z),
+    neu: neueAusstattungsZeile,
+    // @@unique([onboardingId, positionId]) — NULL kollidiert nicht (Postgres)
+    pruefen: (x, ohne) => {
+      if (x.positionId == null) return;
+      const doppelt = db.ausstattungZeilen.some(
+        (z) => z !== ohne && z.onboardingId === x.onboardingId && z.positionId === x.positionId,
+      );
+      if (doppelt) throw eindeutigkeitVerletzt("onboardingId,positionId");
+    },
+    nachLoeschen: (geloescht) => {
+      const ids = new Set(geloescht.map((z) => z.id));
+      db.ausstattungAufgaben = db.ausstattungAufgaben.filter((v) => !ids.has(v.ausstattungId));
+    },
+  }),
+  onboardingAusstattungAufgabe: tabelle({
+    zeilen: () => db.ausstattungAufgaben,
+    ersetzen: (z) => (db.ausstattungAufgaben = z),
+    neu: neueAusstattungsAufgabe,
+    // @@id([ausstattungId, option]) und checklistItemId @unique
+    pruefen: (x, ohne) => {
+      for (const v of db.ausstattungAufgaben) {
+        if (v === ohne) continue;
+        if (v.ausstattungId === x.ausstattungId && v.option === x.option) {
+          throw eindeutigkeitVerletzt("ausstattungId,option");
+        }
+        if (v.checklistItemId === x.checklistItemId) throw eindeutigkeitVerletzt("checklistItemId");
+      }
+    },
+  }),
+  onboardingStellenHinweis: tabelle({
+    zeilen: () => db.stellenHinweise,
+    ersetzen: (z) => (db.stellenHinweise = z),
+    neu: neuerStellenHinweis,
+    // @@id([onboardingId, departmentKey]) und checklistItemId @unique
+    pruefen: (x, ohne) => {
+      for (const h of db.stellenHinweise) {
+        if (h === ohne) continue;
+        if (h.onboardingId === x.onboardingId && h.departmentKey === x.departmentKey) {
+          throw eindeutigkeitVerletzt("onboardingId,departmentKey");
+        }
+        if (x.checklistItemId != null && h.checklistItemId === x.checklistItemId) {
+          throw eindeutigkeitVerletzt("checklistItemId");
+        }
+      }
+    },
+  }),
+  onboardingAusstattungAenderung: tabelle({
+    zeilen: () => db.ausstattungAenderungen,
+    ersetzen: (z) => (db.ausstattungAenderungen = z),
+    neu: neueAusstattungsAenderung,
+  }),
+  ausstattungsPosition: {
+    findMany: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) =>
+      db.ausstattungsPositionen.filter((x) => passt(x, where)).map((x) => projizieren(x, select)),
+    ),
+  },
+  ausstattungsAusblendung: {
+    findMany: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) =>
+      db.ausstattungsAusblendungen.filter((x) => passt(x, where)).map((x) => projizieren(x, select)),
+    ),
+  },
+};
 
 export const fakePrisma: Record<string, unknown> = {
   offboardingProcess: {
@@ -389,7 +666,28 @@ export const fakePrisma: Record<string, unknown> = {
       treffer.forEach((a) => anwenden(a, data));
       return { count: treffer.length };
     }),
+    // Seit S10 (fuer A3): Ausstattungsaufgaben anlegen und loeschen, mit den
+    // Kaskaden des Schemas (aufgabenGeloescht).
+    create: jest.fn(async ({ data, select }: { data: Zeile; select?: Zeile }) => {
+      const a = neueOnboardingAufgabe(data);
+      db.onboardingAufgaben.push(a);
+      return projizieren(a, select);
+    }),
+    delete: jest.fn(async ({ where }: { where: Zeile }) => {
+      const a = db.onboardingAufgaben.find((x) => passt(x, where));
+      if (!a) throw zeileFehlt();
+      db.onboardingAufgaben = db.onboardingAufgaben.filter((x) => x !== a);
+      aufgabenGeloescht([a]);
+      return structuredClone(a);
+    }),
+    deleteMany: jest.fn(async ({ where }: { where?: Zeile } = {}) => {
+      const treffer = db.onboardingAufgaben.filter((a) => passt(a, where));
+      db.onboardingAufgaben = db.onboardingAufgaben.filter((a) => !treffer.includes(a));
+      aufgabenGeloescht(treffer);
+      return { count: treffer.length };
+    }),
   },
+  ...ausstattungsTabellen,
   departmentConfig: {
     findMany: jest.fn(async () => db.konfigs.map((k) => structuredClone(k))),
   },
@@ -407,7 +705,7 @@ export const fakePrisma: Record<string, unknown> = {
     findUnique: jest.fn(async ({ where }: { where: Zeile }) => db.users.find((u) => passt(u, where)) ?? null),
   },
   smtpConfig: {
-    findUnique: jest.fn(async () => ({ allowedRecipientDomains: db.domains })),
+    findUnique: jest.fn(async () => ({ allowedRecipientDomains: db.domains, replyToEmail: db.replyToEmail })),
   },
   userOrgAssignment: {
     findUnique: jest.fn(async ({ where }: { where: { userId_organizationId: Zeile } }) =>
@@ -434,4 +732,11 @@ export function dbLeeren(): void {
   db.zuweisungen = [];
   db.onboardingVorgaenge = [];
   db.onboardingAufgaben = [];
+  db.ausstattungZeilen = [];
+  db.ausstattungAufgaben = [];
+  db.stellenHinweise = [];
+  db.ausstattungAenderungen = [];
+  db.ausstattungsPositionen = [];
+  db.ausstattungsAusblendungen = [];
+  db.replyToEmail = null;
 }
