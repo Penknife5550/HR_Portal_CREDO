@@ -20,6 +20,7 @@ beim Verschieben müssen Handbuch und Bildordner zusammenbleiben.
 | Datei | Inhalt |
 |---|---|
 | [module/onboarding/aenderungsplan-2026-09.html](module/onboarding/aenderungsplan-2026-09.html) | **Plan (Fassung 4 vom 22.09.2026; Paket 1 umgesetzt, Rest offen):** Stellenbezeichnung statt Stellenbeschreibung, Fragebogen und Modalitäten parallel (Fix für festhängende Vorgänge), individuelle E-Mail mit Anhang in vier Modulen, Unterlagen nachfordern in allen sechs Vorgangsarten, Reparatur der Abteilungsaufgaben im Offboarding (Paket 1b) und Abteilungsaufgaben im Onboarding (Paket 5). Mit Vorher/Nachher-Mockups, Entscheidungen, Deploy-Prüfungen |
+| [module/onboarding/ausstattung-zugaenge-plan.html](module/onboarding/ausstattung-zugaenge-plan.html) | **Plan „Ausstattung & Zugänge“ (12.10.2026, Entscheidungen E-A1–E-A39 getroffen):** Führungskraft wählt in den Modalitäten Schlüssel, Geräte, Zugänge aus einem Katalog je Stelle und Einrichtung, mit Bemerkung; jede Wahl (je Option) wird eine Abteilungsaufgabe; Stufe 2 Ausgabe je Stück und Rücknahme/Sperren im Offboarding. Prozesslandschaft, Prozesskette mit RACI und Kennzahlen, Vorher/Nachher-Mockups, Regeln, Datenmodell, Lückenprüfung, Pakete A0–A4 |
 
 ### Minijob-Checkliste 2026 — *AP 1 und AP 2 umgesetzt, Phase 1 läuft*
 

@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ausstattung und Zugänge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+/* Bewusst einheitlich hell: Das Dokument zeigt die helle Portal-Oberfläche 1:1 (wie die übrigen Pläne in docs/). */
+*, *::before, *::after { box-sizing: border-box; }
+:root {
+  color-scheme: light;
+  --grau: #575756; --hellgrau: #DADADA;
+  --text: #2b2b2b; --text2: #62625f; --text3: #8a8a86;
+  --gelb: #FBC900; --gruen: #6BAA24; --rot: #E2001A; --blau: #009AC6;
+  --linie: #dcdcd8; --grund: #f2f2ef; --papier: #fff; --code-bg: #f1f1ee;
+  /* Portal heute (src/app/globals.css, alte Tokens der Seiten) */
+  --ui-bg: #fafafa; --ui-border: #e5e5e5; --ui-fg: #1a1a1a; --ui-muted: #737373; --ui-primary: #575756;
+  --neu-rand: #6BAA24; --neu-bg: rgba(107,170,36,.07);
+}
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--grund); color: var(--text); font-family: "Montserrat", Arial, "Segoe UI", system-ui, sans-serif; font-size: 15px; line-height: 1.55; padding-block: 0 48px; padding-inline: 16px; }
+.blatt { max-width: 1160px; margin: 0 auto; background: var(--papier); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.kopf { padding: 28px 40px 22px; border-bottom: 1px solid var(--linie); }
+.credo-linie { display: flex; height: 4px; width: 100%; }
+.credo-linie span:first-child { flex: 1; background: var(--hellgrau); }
+.credo-linie span { flex: .125; } .credo-linie .g { background: var(--gelb); } .credo-linie .gr { background: var(--gruen); } .credo-linie .r { background: var(--rot); } .credo-linie .b { background: var(--blau); }
+.marke { font-weight: 700; letter-spacing: .12em; font-size: 20px; color: var(--grau); }
+.eyebrow { text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 600; color: var(--text3); }
+h1 { font-size: 30px; line-height: 1.2; margin: 10px 0 6px; font-weight: 700; text-wrap: balance; }
+h2 { font-size: 22px; margin: 0 0 12px; font-weight: 700; text-wrap: balance; padding-top: 6px; }
+h3 { font-size: 16.5px; margin: 24px 0 8px; font-weight: 600; }
+h4 { font-size: 13.5px; margin: 14px 0 6px; font-weight: 600; color: var(--text2); }
+p { margin: 0 0 12px; max-width: 76ch; }
+ul, ol { margin: 0 0 12px; padding-left: 22px; max-width: 80ch; } li { margin-bottom: 5px; }
+main { padding: 8px 40px 30px; }
+section.abschnitt { padding: 26px 0 8px; border-top: 1px solid var(--linie); }
+section.abschnitt:first-of-type { border-top: 0; }
+.nr { display: inline-block; min-width: 30px; color: var(--blau); font-weight: 700; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--text2); margin-top: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 8px 0 16px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--linie); }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); font-weight: 600; }
+.tab-wrap { overflow-x: auto; }
+code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
+.kasten { border: 1px solid var(--linie); border-left: 4px solid var(--blau); background: #f7fbfd; padding: 12px 16px; margin: 14px 0; border-radius: 0 8px 8px 0; }
+.kasten.gruen { border-left-color: var(--gruen); background: #f6faf1; }
+.kasten.gelb { border-left-color: var(--gelb); background: #fffbea; }
+.kasten.rot { border-left-color: var(--rot); background: #fff5f5; }
+.kasten p:last-child, .kasten ul:last-child { margin-bottom: 0; }
+.neu { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #fff; background: var(--gruen); border-radius: 4px; padding: 1px 6px; vertical-align: middle; margin-left: 6px; }
+.prinzipien { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 14px 0 6px; }
+.prinzip { border: 1px solid var(--linie); border-radius: 10px; padding: 14px 16px; background: #fbfbfa; }
+.prinzip b { display: block; margin-bottom: 4px; font-size: 14px; }
+.prinzip span { font-size: 13px; color: var(--text2); }
+.inhalt { columns: 2; column-gap: 32px; font-size: 14px; padding-left: 0; list-style: none; }
+.inhalt li { break-inside: avoid; }
+.inhalt a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--linie); }
+.inhalt a:hover { border-bottom-color: var(--blau); }
+
+/* ===== Ablauf ===== */
+.ablauf { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 16px 0; }
+.ablauf > div { border: 1px solid var(--linie); border-radius: 10px; padding: 12px 12px 10px; background: #fbfbfa; position: relative; }
+.ablauf > div:not(:last-child)::after { content: "→"; position: absolute; right: -11px; top: 38%; color: var(--text3); font-weight: 700; background: #fff; }
+.ablauf b { display: block; font-size: 13.5px; margin-bottom: 2px; }
+.ablauf .wer { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--blau); font-weight: 700; }
+.ablauf span { font-size: 12.5px; color: var(--text2); display: block; }
+.ablauf .stufe2 { border-style: dashed; }
+.ablauf .stufe2 .wer { color: var(--text3); }
+
+
+/* ===== Grafiken (Prozesslandschaft, Prozesskette) ===== */
+.grafik { margin: 14px 0 18px; }
+.grafik svg { width: 100%; height: auto; display: block; border: 1px solid var(--linie); border-radius: 10px; background: #fff; }
+.grafik figcaption { font-size: 12.5px; color: var(--text2); margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.lg { display: inline-flex; align-items: center; gap: 6px; }
+.lg i { display: inline-block; width: 22px; height: 13px; border-radius: 3px; }
+.lg-alt { background: #fff; border: 1.2px solid #a3a3a0; }
+.lg-gea { background: #fff; border: 1.2px solid #a3a3a0; box-shadow: inset 4px 0 0 #6BAA24; }
+.lg-neu { background: #eef6e6; border: 2px solid #6BAA24; }
+.lg-st2 { background: #fff; border: 2px dashed #6BAA24; }
+@media (max-width: 860px) { .grafik { overflow-x: auto; } .grafik svg { min-width: 760px; } }
+
+
+/* ===== Steckbrief, RACI, Fragen ===== */
+table.raci td:not(:first-child), table.raci th:not(:first-child) { text-align: center; }
+table.raci td { font-weight: 600; }
+table.fragen td:first-child { white-space: nowrap; font-weight: 700; color: var(--blau); }
+table.fragen td:nth-child(3) { background: #f6faf1; }
+ul.zwei-spalten { columns: 2; column-gap: 32px; max-width: none; font-size: 14px; }
+ul.zwei-spalten li { break-inside: avoid; }
+@media (max-width: 860px) { ul.zwei-spalten { columns: 1; } }
+
+/* Optionszeilen in der Ausstattungskarte */
+.optionen { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.opt { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 9.5px; border-left: 2px solid #e5e5e5; padding: 1px 0 1px 6px; }
+
+/* ===== Vorher / Nachher ===== */
+.vn { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 14px 0 8px; align-items: start; }
+.vn > div { min-width: 0; }
+.vn-label { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.vn-label.vorher { color: var(--text3); } .vn-label.nachher { color: var(--gruen); }
+.vn-label i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; }
+.legende { font-size: 12.5px; color: var(--text2); margin: 6px 0 14px; }
+.legende .muster { display: inline-block; width: 22px; height: 12px; border: 2px dashed var(--neu-rand); background: var(--neu-bg); border-radius: 3px; vertical-align: middle; margin-right: 6px; }
+.unter { font-size: 12.5px; color: var(--text2); margin: 6px 0 0; }
+.unter b { color: var(--text); }
+
+/* ===== Mockup-Rahmen (Portal heute) ===== */
+.m { border: 1px solid #cfcfcb; border-radius: 10px; overflow: hidden; background: var(--ui-bg); font-size: 10.5px; line-height: 1.4; color: var(--ui-fg); position: relative; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.m-bar { background: #e9e9e6; height: 20px; display: flex; align-items: center; gap: 5px; padding: 0 9px; border-bottom: 1px solid #d5d5d1; }
+.m-bar i { width: 8px; height: 8px; border-radius: 50%; background: #c9c9c5; display: inline-block; }
+.m-bar span { margin-left: 8px; font-size: 9px; color: #7d7d79; background: #f6f6f4; border-radius: 4px; padding: 1px 8px; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.m-linie { display: flex; height: 3px; } .m-linie span:first-child { flex: 1; background: var(--hellgrau); } .m-linie span { flex: .125; }
+.m-linie .g { background: var(--gelb); } .m-linie .gr { background: var(--gruen); } .m-linie .r { background: var(--rot); } .m-linie .b { background: var(--blau); }
+.m-hdr { background: #fff; display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--ui-border); }
+.m-hdr .logo { font-weight: 700; letter-spacing: .1em; font-size: 12px; color: var(--grau); }
+.m-hdr .sub { font-size: 8.5px; color: var(--ui-muted); line-height: 1.2; }
+.m-hdr .sub b { display: block; font-size: 10px; color: var(--ui-fg); }
+.m-tabs { background: #fff; border-bottom: 1px solid var(--ui-border); display: flex; gap: 14px; padding: 0 12px; overflow: hidden; }
+.m-tabs span { padding: 7px 2px; color: var(--ui-muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.m-tabs span.on { color: var(--ui-fg); border-color: var(--ui-primary); font-weight: 600; }
+.m-body { padding: 10px 12px; }
+.card { background: #fff; border: 1px solid var(--ui-border); border-radius: 8px; padding: 9px 11px; margin-bottom: 8px; }
+.card h5 { margin: 0 0 2px; font-size: 11px; display: flex; align-items: center; gap: 6px; }
+.card .lead { color: var(--ui-muted); font-size: 9.5px; margin: 0 0 7px; }
+.btn { border-radius: 6px; padding: 3px 9px; font-weight: 600; white-space: nowrap; display: inline-block; font-size: 9.5px; }
+.btn.pri { background: var(--ui-primary); color: #fff; } .btn.sec { border: 1px solid var(--ui-border); background: #fff; }
+.btn.aus { background: #d4d4d1; color: #fff; }
+.pill { display: inline-block; border-radius: 999px; padding: 1px 7px; font-size: 8.5px; font-weight: 600; white-space: nowrap; }
+.pill.gelb { background: #fef3c7; color: #92400e; } .pill.blau { background: #dbeafe; color: #1e40af; } .pill.rot { background: #fee2e2; color: #b91c1c; } .pill.gruen { background: #dcfce7; color: #166534; } .pill.grau { background: #f1f1ef; color: #555; }
+.zeile { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0f0ee; }
+.zeile:last-child { border-bottom: 0; }
+.zeile .t { flex: 1; min-width: 0; }
+.card .zeile .t > b { display: block; }
+.neu-teil + small { margin-top: 6px; }
+.zeile .t small { display: block; color: var(--ui-muted); font-size: 9px; }
+.box { width: 11px; height: 11px; border: 1.5px solid #a3a3a0; border-radius: 3px; flex: none; margin-top: 1px; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; color: #fff; }
+.box.an { background: var(--ui-primary); border-color: var(--ui-primary); }
+.box.an::after { content: "✓"; }
+.kat { font-size: 8.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ui-muted); font-weight: 700; margin: 8px 0 2px; }
+.feld { margin-bottom: 7px; }
+.feld label { display: block; font-weight: 600; font-size: 9.5px; margin-bottom: 2px; }
+.feld .inp { border: 1px solid #d4d4d1; border-radius: 6px; padding: 4px 7px; background: #fff; color: var(--ui-fg); min-height: 20px; }
+.feld .inp.leer { color: #a3a3a0; }
+.feld .inp.gross { min-height: 38px; }
+.feld small { display: block; color: var(--ui-muted); font-size: 8.5px; margin-top: 2px; }
+.zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { border: 1px solid #d4d4d1; border-radius: 999px; padding: 2px 8px; background: #fff; font-size: 9px; }
+.chip.an { background: var(--ui-primary); color: #fff; border-color: var(--ui-primary); }
+/* Schrittleiste der Modalitäten: Pillen (page.tsx 581-612) */
+.stepper { display: flex; gap: 3px; align-items: center; margin: -10px -12px 9px; padding: 5px 12px; background: #fff; border-bottom: 1px solid var(--ui-border); overflow: hidden; }
+.stepper .s { display: inline-flex; align-items: center; gap: 4px; font-size: 8.5px; font-weight: 600; white-space: nowrap; border-radius: 5px; padding: 3px 6px; color: var(--ui-muted); opacity: .5; }
+.stepper .s i { width: 13px; height: 13px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 7.5px; font-weight: 700; background: #ececea; }
+.stepper .s.fertig { background: #dcfce7; color: #166534; opacity: 1; }
+.stepper .s.fertig i { background: #16a34a; color: #fff; }
+.stepper .s.akt { background: var(--ui-primary); color: #fff; opacity: 1; }
+.stepper .s.akt i { background: #fff; color: var(--ui-primary); }
+.stepper .strich { display: none; }
+.balken { height: 3px; background: #ececea; } .balken i { display: block; height: 100%; background: var(--ui-primary); }
+.fuss { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ui-border); padding-top: 8px; margin-top: 4px; }
+.fuss small { color: var(--ui-muted); font-size: 8.5px; }
+.stelle-kopf { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 4px; }
+.stelle-kopf b { font-size: 10.5px; }
+.stelle-kopf small { color: var(--ui-muted); font-size: 8.5px; }
+.bem { margin: 3px 0 2px 19px; }
+.bem .inp { border: 1px solid #d4d4d1; border-radius: 6px; padding: 4px 7px; background: #fff; min-height: 26px; font-size: 9.5px; }
+.bem small { display: block; color: var(--ui-muted); font-size: 8.5px; margin-top: 2px; }
+.zitat { background: #f6f6f4; border-left: 3px solid #c9c9c5; border-radius: 0 5px 5px 0; padding: 4px 7px; margin-top: 3px; font-size: 9.5px; }
+.zitat b { font-size: 8.5px; color: var(--ui-muted); display: block; text-transform: uppercase; letter-spacing: .05em; }
+.neu-teil { outline: 2px dashed var(--neu-rand); outline-offset: 2px; background-image: linear-gradient(var(--neu-bg), var(--neu-bg)); border-radius: 6px; position: relative; }
+.neu-teil > .neu-marke { position: absolute; top: -9px; right: 8px; background: var(--gruen); color: #fff; font-size: 7.5px; font-weight: 700; letter-spacing: .08em; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; }
+.dialog-schleier { background: rgba(30,30,28,.35); padding: 18px 14px; }
+.dialog { background: #fff; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.2); padding: 12px 14px; }
+.dialog h6 { font-size: 12px; margin: 0 0 6px; }
+.mail { background: #f3f4f6; padding: 10px; }
+.mail .blatt-m { background: #fff; border-radius: 6px; border: 1px solid #e5e7eb; overflow: hidden; }
+.mail .mk { background: #575756; color: #fff; padding: 8px 12px; font-weight: 700; font-size: 11px; }
+.mail .mi { padding: 9px 12px; }
+.mail .betreff { font-size: 9px; color: var(--ui-muted); padding: 0 2px 6px; }
+.mail .betreff b { color: var(--ui-fg); }
+.mail .kasten-m { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 7px 9px; margin: 6px 0; }
+.mail .knopf { display: inline-block; background: #575756; color: #fff; border-radius: 6px; padding: 5px 12px; font-weight: 600; margin: 6px 0; }
+.tbl { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--ui-border); font-size: 9.5px; margin: 0; }
+.tbl th { font-size: 8px; text-transform: uppercase; letter-spacing: .05em; color: #777; padding: 5px 7px; background: #fafafa; border-bottom: 1px solid var(--ui-border); }
+.tbl td { padding: 5px 7px; border-bottom: 1px solid #efefed; vertical-align: top; }
+.tbl td small { display: block; color: var(--ui-muted); font-size: 8.5px; }
+.ent { border: 1px solid var(--linie); border-radius: 10px; padding: 12px 16px; margin: 10px 0; }
+.ent b.frage { display: block; margin-bottom: 4px; }
+.ent .empf { color: #3d6d10; font-weight: 600; }
+@media (max-width: 860px) {
+  .vn { grid-template-columns: 1fr; }
+  .ablauf { grid-template-columns: 1fr; }
+  .ablauf > div:not(:last-child)::after { content: "↓"; right: 50%; top: auto; bottom: -14px; }
+  main, .kopf { padding-inline: 18px; }
+  .inhalt { columns: 1; }
+}
+</style>
+</head>
+<body>
+<div class="blatt">
+<div class="credo-linie"><span></span><span class="g"></span><span class="gr"></span><span class="r"></span><span class="b"></span></div>
+<header class="kopf">
+  <div class="marke">CREDO</div>
+  <div class="eyebrow">HR-Portal · Onboarding · Plan</div>
+  <h1>Ausstattung und Zugänge zum Arbeitsbeginn</h1>
+  <p>Die Führungskraft wählt bei den Einstellungsmodalitäten an, was die neue Person zum Start braucht, etwa Schlüssel, iPad, Telefon oder Zugänge, und schreibt zu jeder Position eine Bemerkung dazu. Daraus werden Aufgaben für die zuständigen Stellen. Welche Positionen es gibt, pflegt die Verwaltung je Stelle und je Einrichtung.</p>
+  <div class="meta"><span>Stand: 12.10.2026</span><span>Status: Entscheidungen E-A1 bis E-A39 getroffen (12.10.2026), Umsetzung nicht beauftragt</span><span>Baut auf: Paket 5 (Abteilungsaufgaben im Onboarding)</span></div>
+</header>
+<main>
+
+<section class="abschnitt">
+<h2>Inhalt</h2>
+<ul class="inhalt">
+  <li><a href="#ausgangslage">1 · Ausgangslage</a></li>
+  <li><a href="#idee">2 · Die Idee in einem Bild</a></li>
+  <li><a href="#landschaft">3 · Einordnung: Prozesslandschaft</a></li>
+  <li><a href="#kette">4 · Prozesskette</a></li>
+  <li><a href="#katalog">5 · Der Katalog: was es gibt, für wen</a></li>
+  <li><a href="#mockups">6 · Vorher und nachher</a></li>
+  <li><a href="#regeln">7 · Regeln</a></li>
+  <li><a href="#datenmodell">8 · Datenmodell</a></li>
+  <li><a href="#vorlagen">9 · Betroffene E-Mail- und Word-Vorlagen</a></li>
+  <li><a href="#datenschutz">10 · Datenschutz und Mitbestimmung</a></li>
+  <li><a href="#stufen">11 · Pakete und Reihenfolge</a></li>
+  <li><a href="#entscheidungen">12 · Entscheidungen</a></li>
+  <li><a href="#luecken">13 · Was noch fehlte</a></li>
+  <li><a href="#risiken">14 · Risiken und Stolpersteine</a></li>
+</ul>
+</section>
+
+<section class="abschnitt" id="ausgangslage">
+<h2><span class="nr">1</span>Ausgangslage</h2>
+<p><b>Heute legt die Checklisten-Vorlage fest, welche Aufgaben eine Stelle bekommt, und zwar für jede Einstellung gleich.</b> Die Vorlage „Standard-Einstellung“ gibt der IT zum Beispiel immer „IT-Zugang einrichten“. Ob die Person ein iPad, ein Telefon oder den Schlüssel zum Chemieraum braucht, steht nirgends in einer Form, mit der eine Stelle arbeiten kann.</p>
+<ul>
+  <li><b>Die Führungskraft</b> kann solche Wünsche heute nur in das Freitextfeld „Zusätzliche Vereinbarungen / Bemerkungen“ (Schritt 4 der Modalitäten) schreiben. Der Platzhalter dort lautet „z.B. besondere Regelungen, Dienstwagen, etc.“. <b>Das liest nur HR:</b> im Reiter „Vorgesetzter“, Karte „Weitere Angaben“, und im PDF- und JSON-Export. Am 12.10.2026 im Code geprüft: Das Feld steht in keiner Abfrage und keiner Payload des Abteilungswegs, weder auf der Link-Seite noch in den vier Abteilungs-Mails noch im Hinweis einer Aufgabe. Auch eine Vorlagenänderung hilft nicht. Ein <code>{{zusatzvereinbarungen}}</code> in der Mailvorlage bliebe wörtlich stehen, weil der Renderer nur Werte aus der Payload kennt. Den Hinweis einer Aufgabe kopiert der Code beim Anlegen des Vorgangs aus der Vorlage, also bevor es Modalitäten gibt, und ersetzt darin keine Platzhalter. Zur Stelle kommt der Text nur, wenn HR ihn von Hand weitergibt.</li>
+  <li><b>Die Stellen</b> (IT, Gebäudewirtschaft, Verwaltung) sehen über ihren Link die Grunddaten der Person und je Stelle höchstens drei feste Zusatzangaben: Stellenbezeichnung, Betriebsstätte, Adresse der Führungskraft (<code>ONBOARDING_ZUSATZFELDER</code> in <code>src/lib/abteilungsaufgaben.ts</code>). Neue Angaben gibt es nur über eine Code-Änderung.</li>
+  <li><b>Was ausgegeben wurde,</b> vermerkt niemand. Beim Austritt tippt HR die Rückgaben (<code>ReturnItem</code>) von Hand ein und weiß nicht sicher, was die Person überhaupt hat.</li>
+</ul>
+<p><b>Ziel:</b> Eine Mechanik für alle Stellen, kein Sonderfeld je Abteilung. Die Verwaltung pflegt, was es gibt. Die Führungskraft wählt an, was die Person braucht, und schreibt eine Bemerkung dazu. Die zuständige Stelle bekommt genau das als Aufgabe.</p>
+
+<div class="prinzipien">
+  <div class="prinzip"><b>Ein Katalog für alle Stellen</b><span>Schlüssel, iPads, Telefone, Zugänge, Kopierkarten: dieselbe Mechanik für IT, Gebäudewirtschaft, Verwaltung und selbst angelegte Stellen.</span></div>
+  <div class="prinzip"><b>Freiwillig</b><span>Ohne Katalog bleibt alles wie heute, der neue Schritt erscheint dann gar nicht. Jede Position ist für die Führungskraft eine Kann-Angabe.</span></div>
+  <div class="prinzip"><b>Passend zur Einrichtung</b><span>Die Schlüssel des Gymnasiums erscheinen nicht in der Kita. Positionen gelten zentral oder je Einrichtung und lassen sich auf Personengruppen beschränken.</span></div>
+  <div class="prinzip"><b>Jede Wahl wird eine Aufgabe</b><span>Link, Mail, Erinnerung, Abhaken und Kommentar aus Paket 5 tragen das Ganze. Neu sind nur Katalog, Auswahl und Bemerkung.</span></div>
+  <div class="prinzip"><b>Bemerkung zu jeder Position</b><span>„Mit Stift und Hülle“, „Apparat im Lehrerzimmer reicht“: Wer etwas anhakt, kann sofort dazuschreiben, was genau gebraucht wird. Dazu ein freier Hinweis je Stelle.</span></div>
+  <div class="prinzip"><b>Jede Stelle sieht nur ihres</b><span>Die IT sieht die IT-Positionen samt Bemerkungen, nicht die Schlüssel. Angaben aus dem Personalfragebogen gehen weiter an niemanden.</span></div>
+</div>
+</section>
+
+<section class="abschnitt" id="idee">
+<h2><span class="nr">2</span>Die Idee in einem Bild</h2>
+<div class="ablauf">
+  <div><span class="wer">Verwaltung · einmalig</span><b>Katalog pflegen</b><span>Je Stelle die Positionen: „Dienst-iPad“, „Schlüssel“ mit den Räumen der Einrichtung, „Zugänge“.</span></div>
+  <div><span class="wer">Führungskraft · Modalitäten</span><b>Anwählen</b><span>Neuer Schritt „Ausstattung &amp; Zugänge“: anhaken, Räume wählen, Bemerkung schreiben.</span></div>
+  <div><span class="wer">HR · Portal</span><b>Prüfen und ergänzen</b><span>Karte „Ausstattung &amp; Zugänge“ im Vorgang: sehen, ergänzen, streichen, auch ohne Modalitäten.</span></div>
+  <div><span class="wer">HR · ein Klick</span><b>Abteilungen informieren</b><span>Wie heute. Jede Wahl ist jetzt eine eigene Aufgabe der Stelle, mit Bemerkung.</span></div>
+  <div><span class="wer">Stelle · Link</span><b>Bereitstellen und abhaken</b><span>Die IT hakt „Dienst-iPad bereitstellen“ ab und schreibt HR bei Bedarf einen Kommentar.</span></div>
+  <div class="stufe2"><span class="wer">Stufe 2</span><b>Ausgabe merken</b><span>Beim Abhaken die Inventar- oder Schlüsselnummer eintragen. Das Offboarding schlägt daraus die Rückgaben vor.</span></div>
+</div>
+<p class="unter">Die Schritte 4 und 5 gibt es schon (Paket 5). Neu sind der Katalog, die Auswahl der Führungskraft, die Karte für HR und der Weg „Auswahl → Aufgabe“.</p>
+</section>
+
+<section class="abschnitt" id="landschaft">
+<h2><span class="nr">3</span>Einordnung: Prozesslandschaft</h2>
+<p>Das Portal bildet den Beschäftigungszyklus ab: Eintritt, Beschäftigung, Austritt. „Ausstattung &amp; Zugänge“ ist kein weiterer Vorgang neben den anderen. Es ist ein <b>Unterstützungsprozess, der den ganzen Zyklus begleitet</b>: Ausgabe beim Eintritt, Bestand während der Beschäftigung, Rückgabe und Sperren beim Austritt. Er nutzt vorhandene Bausteine (Abteilungsaufgaben, Mailversand, täglicher Lauf) und bringt einen neuen Katalog mit.</p>
+<figure class="grafik">
+<svg viewBox="0 0 1100 560" role="img" aria-labelledby="pl-titel pl-text" xmlns="http://www.w3.org/2000/svg">
+<title id="pl-titel">Prozesslandschaft des HR-Portals mit dem neuen Prozess Ausstattung und Zugänge</title>
+<desc id="pl-text">Drei Ebenen: Führungsprozesse oben, Kernprozesse Eintritt, Beschäftigung begleiten und Austritt in der Mitte, Unterstützungsprozesse unten. Ein grünes Band „Ausstattung und Zugänge“ läuft unter allen drei Kernprozessen durch und ist mit Abteilungsaufgaben, Katalogen, Mailversand und automatischen Läufen verbunden.</desc>
+<defs>
+  <marker id="pl-pfeil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#575756"/></marker>
+  <marker id="pl-pfeil-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f8a17"/></marker>
+</defs>
+<style>
+  .pl-ebene { font: 700 11px Montserrat, Arial, sans-serif; letter-spacing: .08em; fill: #8a8a86; }
+  .pl-t { font: 600 11.5px Montserrat, Arial, sans-serif; fill: #2b2b2b; }
+  .pl-s { font: 400 10px Montserrat, Arial, sans-serif; fill: #62625f; }
+  .pl-w { font: 400 10px Montserrat, Arial, sans-serif; fill: #f0f0ee; }
+  .pl-neu-t { font: 700 12px Montserrat, Arial, sans-serif; fill: #2f5a0c; }
+  .pl-neu-s { font: 500 10px Montserrat, Arial, sans-serif; fill: #3d6d10; }
+  .pl-chev-t { font: 700 14px Montserrat, Arial, sans-serif; fill: #fff; }
+</style>
+<!-- Fuehrungsprozesse -->
+<rect x="0" y="0" width="1100" height="104" rx="10" fill="#f6f6f4"/>
+<text x="16" y="22" class="pl-ebene">FÜHRUNGSPROZESSE</text>
+<rect x="140" y="34" width="290" height="56" rx="8" fill="#fff" stroke="#c9c9c5"/>
+<text x="154" y="56" class="pl-t">Personal steuern</text><text x="154" y="74" class="pl-s">Auswertungen, Reporting-API, BEM-Statistik</text>
+<rect x="445" y="34" width="290" height="56" rx="8" fill="#fff" stroke="#c9c9c5"/>
+<text x="459" y="56" class="pl-t">Datenschutz &amp; IKS</text><text x="459" y="74" class="pl-s">Protokolle, Datenzuschnitt, Aufbewahrung</text>
+<rect x="750" y="34" width="330" height="56" rx="8" fill="#fff" stroke="#c9c9c5"/>
+<text x="764" y="56" class="pl-t">Regelwerk pflegen</text><text x="764" y="74" class="pl-s">Mail-, Word-, Checklisten-Vorlagen, Freigabelisten</text>
+
+<!-- Kernprozesse -->
+<rect x="0" y="118" width="1100" height="232" rx="10" fill="#fbfbfa" stroke="#e5e5e2"/>
+<text x="16" y="140" class="pl-ebene">KERNPROZESSE</text>
+<rect x="14" y="170" width="104" height="70" rx="8" fill="#fff" stroke="#c9c9c5"/>
+<text x="24" y="200" class="pl-t">Einstellung</text><text x="24" y="216" class="pl-t">beschlossen</text>
+<line x1="118" y1="205" x2="136" y2="205" stroke="#575756" stroke-width="1.5" marker-end="url(#pl-pfeil)"/>
+<path d="M140,160 L410,160 L440,205 L410,250 L140,250 Z" fill="#575756"/>
+<text x="158" y="184" class="pl-chev-t">Eintritt</text>
+<text x="158" y="204" class="pl-w">Onboarding: Fragebogen ·</text>
+<text x="158" y="218" class="pl-w">Modalitäten · Prüfung ·</text>
+<text x="158" y="232" class="pl-w">Checkliste · Minijob</text>
+<path d="M448,160 L748,160 L778,205 L748,250 L448,250 L478,205 Z" fill="#7a7a78"/>
+<text x="492" y="184" class="pl-chev-t">Beschäftigung begleiten</text>
+<text x="492" y="204" class="pl-w">Vertragsende/-verlängerung ·</text>
+<text x="492" y="218" class="pl-w">Verbeamtung · Mutterschutz ·</text>
+<text x="492" y="232" class="pl-w">Elternzeit · BEM · Ruhestand (geplant)</text>
+<path d="M786,160 L960,160 L990,205 L960,250 L786,250 L816,205 Z" fill="#575756"/>
+<text x="830" y="184" class="pl-chev-t">Austritt</text>
+<text x="830" y="204" class="pl-w">Offboarding · Rückgaben ·</text>
+<text x="830" y="218" class="pl-w">Exit-Interview · Zeugnis</text>
+<line x1="992" y1="205" x2="1006" y2="205" stroke="#575756" stroke-width="1.5" marker-end="url(#pl-pfeil)"/>
+<rect x="1008" y="170" width="82" height="70" rx="8" fill="#fff" stroke="#c9c9c5"/>
+<text x="1016" y="196" class="pl-t">Austritt</text><text x="1016" y="212" class="pl-t">abge-</text><text x="1016" y="228" class="pl-t">schlossen</text>
+
+<!-- NEU: Band Ausstattung & Zugaenge -->
+<rect x="140" y="266" width="850" height="70" rx="10" fill="#eef6e6" stroke="#6BAA24" stroke-width="2"/>
+<text x="156" y="288" class="pl-neu-t">NEU · Ausstattung &amp; Zugänge</text>
+<rect x="156" y="296" width="268" height="30" rx="6" fill="#fff" stroke="#6BAA24"/>
+<text x="166" y="315" class="pl-neu-s">Ausgabe: wählen, bereitstellen (A1–A3)</text>
+<rect x="476" y="296" width="284" height="30" rx="6" fill="#fff" stroke="#6BAA24" stroke-dasharray="5 3"/>
+<text x="486" y="315" class="pl-neu-s">Bestand: wer hat was (Ausgabevermerk, A4)</text>
+<rect x="800" y="296" width="178" height="30" rx="6" fill="#fff" stroke="#6BAA24" stroke-dasharray="5 3"/>
+<text x="810" y="315" class="pl-neu-s">Rückgabe &amp; Sperren (A4)</text>
+<line x1="424" y1="311" x2="472" y2="311" stroke="#4f8a17" stroke-width="1.5" marker-end="url(#pl-pfeil-g)"/>
+<line x1="760" y1="311" x2="796" y2="311" stroke="#4f8a17" stroke-width="1.5" marker-end="url(#pl-pfeil-g)"/>
+
+<!-- Unterstuetzungsprozesse -->
+<rect x="0" y="364" width="1100" height="196" rx="10" fill="#f6f6f4"/>
+<text x="16" y="386" class="pl-ebene">UNTERSTÜTZUNGSPROZESSE</text>
+<rect x="140" y="400" width="200" height="56" rx="8" fill="#fff" stroke="#6BAA24" stroke-width="2"/>
+<text x="152" y="422" class="pl-t">Abteilungsaufgaben</text><text x="152" y="440" class="pl-s">Link, Mail, Erinnerung, Abhaken</text>
+<rect x="352" y="400" width="200" height="56" rx="8" fill="#fff" stroke="#6BAA24" stroke-width="2"/>
+<text x="364" y="420" class="pl-t">Stammdaten &amp; Kataloge</text><text x="364" y="436" class="pl-s">Mandanten, Abteilungen,</text><text x="364" y="449" class="pl-s" style="fill:#3d6d10;font-weight:700">NEU: Ausstattungskatalog</text>
+<rect x="564" y="400" width="200" height="56" rx="8" fill="#fff" stroke="#6BAA24" stroke-width="2"/>
+<text x="576" y="422" class="pl-t">E-Mail-Versand</text><text x="576" y="440" class="pl-s">SMTP, Vorlagen, Webhooks</text>
+<rect x="776" y="400" width="200" height="56" rx="8" fill="#fff" stroke="#6BAA24" stroke-width="2"/>
+<text x="788" y="422" class="pl-t">Automatische Läufe</text><text x="788" y="440" class="pl-s">Zeitplaner, Erinnerungen</text>
+<rect x="140" y="470" width="200" height="56" rx="8" fill="#fff" stroke="#c9c9c5"/>
+<text x="152" y="492" class="pl-t">Dokumente</text><text x="152" y="510" class="pl-s">Dokumentenpaket, Brief-Vorlagen</text>
+<rect x="352" y="470" width="200" height="56" rx="8" fill="#fff" stroke="#c9c9c5"/>
+<text x="364" y="492" class="pl-t">Unterlagen nachfordern</text><text x="364" y="510" class="pl-s">Upload-Link, Prüfung</text>
+<rect x="564" y="470" width="200" height="56" rx="8" fill="#fff" stroke="#c9c9c5"/>
+<text x="576" y="492" class="pl-t">Individuelle E-Mail</text><text x="576" y="510" class="pl-s">aus dem Vorgang</text>
+<rect x="776" y="470" width="200" height="56" rx="8" fill="#fff" stroke="#c9c9c5"/>
+<text x="788" y="492" class="pl-t">LOGA</text><text x="788" y="510" class="pl-s">CSV-Export, Anbindung geplant</text>
+<!-- Verbindungen Band -> Unterstuetzung -->
+<g stroke="#6BAA24" stroke-width="1.5" stroke-dasharray="3 3" fill="none">
+  <path d="M240,336 L240,398"/><path d="M452,336 L452,398"/><path d="M664,336 L664,398"/><path d="M876,336 L876,398"/>
+</g>
+</svg>
+<figcaption>Grün umrandet: was „Ausstattung &amp; Zugänge“ neu bringt oder mitnutzt. Gestrichelt umrandet: Stufe 2 (Paket A4). Die gestrichelten Linien zeigen, welche Unterstützungsprozesse der neue Prozess nutzt.</figcaption>
+</figure>
+</section>
+
+<section class="abschnitt" id="kette">
+<h2><span class="nr">4</span>Prozesskette</h2>
+<p>Der bestehende Onboarding- und Offboarding-Ablauf mit den neuen Schritten darin. Die Spalten folgen den Phasen des Vorgangs, die Zeilen den Beteiligten. Durchgezogene Pfeile sind der Ablauf, gepunktete Pfeile ein Informationsfluss.</p>
+<figure class="grafik">
+<svg viewBox="0 0 1100 760" role="img" aria-labelledby="pk-titel pk-text" xmlns="http://www.w3.org/2000/svg">
+<title id="pk-titel">Prozesskette Ausstattung und Zugänge im Onboarding und Offboarding</title>
+<desc id="pk-text">Schwimmbahnen für Verwaltung, HR, Führungskraft, zuständige Stelle, neue Person und Portal über sieben Phasen von der Vorbereitung bis zum Austritt. Neue Schritte sind grün, Stufe-2-Schritte grün gestrichelt, bestehende grau.</desc>
+<defs>
+  <marker id="pk-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#575756"/></marker>
+  <marker id="pk-pg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f8a17"/></marker>
+</defs>
+<style>
+  .pk-ph { font: 700 10.5px Montserrat, Arial, sans-serif; fill: #575756; }
+  .pk-lane { font: 700 10.5px Montserrat, Arial, sans-serif; fill: #2b2b2b; }
+  .pk-lane2 { font: 400 9px Montserrat, Arial, sans-serif; fill: #62625f; }
+  .pk-t { font: 600 10.5px Montserrat, Arial, sans-serif; fill: #2b2b2b; }
+  .pk-s { font: 400 9.5px Montserrat, Arial, sans-serif; fill: #4a4a48; }
+  .pk-lab { font: 500 9px Montserrat, Arial, sans-serif; fill: #62625f; }
+  .alt { fill: #fff; stroke: #a3a3a0; stroke-width: 1.2; }
+  .neu { fill: #eef6e6; stroke: #6BAA24; stroke-width: 2; }
+  .st2 { fill: #fff; stroke: #6BAA24; stroke-width: 2; stroke-dasharray: 6 3; }
+  .gea { fill: #fff; stroke: #a3a3a0; stroke-width: 1.2; }
+  .fl { stroke: #575756; stroke-width: 1.4; fill: none; marker-end: url(#pk-p); }
+  .flg { stroke: #4f8a17; stroke-width: 1.6; fill: none; marker-end: url(#pk-pg); }
+  .inf { stroke: #8a8a86; stroke-width: 1.2; fill: none; stroke-dasharray: 2 3; marker-end: url(#pk-p); }
+</style>
+<!-- Bahnen -->
+<rect x="0" y="34" width="1100" height="80" fill="#fafaf8"/>
+<rect x="0" y="114" width="1100" height="180" fill="#fff"/>
+<rect x="0" y="294" width="1100" height="120" fill="#fafaf8"/>
+<rect x="0" y="414" width="1100" height="120" fill="#fff"/>
+<rect x="0" y="534" width="1100" height="80" fill="#fafaf8"/>
+<rect x="0" y="614" width="1100" height="146" fill="#fff"/>
+<g stroke="#dcdcd8" stroke-width="1">
+  <line x1="0" y1="34" x2="1100" y2="34"/><line x1="0" y1="114" x2="1100" y2="114"/><line x1="0" y1="294" x2="1100" y2="294"/>
+  <line x1="0" y1="414" x2="1100" y2="414"/><line x1="0" y1="534" x2="1100" y2="534"/><line x1="0" y1="614" x2="1100" y2="614"/><line x1="0" y1="759" x2="1100" y2="759"/>
+  <line x1="110" y1="0" x2="110" y2="760"/>
+</g>
+<g stroke="#e8e8e5" stroke-width="1" stroke-dasharray="3 4">
+  <line x1="251" y1="34" x2="251" y2="760"/><line x1="392" y1="34" x2="392" y2="760"/><line x1="533" y1="34" x2="533" y2="760"/>
+  <line x1="674" y1="34" x2="674" y2="760"/><line x1="815" y1="34" x2="815" y2="760"/><line x1="956" y1="34" x2="956" y2="760"/>
+</g>
+<!-- Phasen -->
+<text x="120" y="22" class="pk-ph">① Vorbereitung</text>
+<text x="261" y="22" class="pk-ph">② Anlegen</text>
+<text x="402" y="22" class="pk-ph">③ Modalitäten</text>
+<text x="543" y="22" class="pk-ph">④ Prüfen, informieren</text>
+<text x="684" y="22" class="pk-ph">⑤ Bereitstellen</text>
+<text x="825" y="22" class="pk-ph">⑥ Dienstbeginn</text>
+<text x="966" y="22" class="pk-ph">⑦ Austritt</text>
+<!-- Bahnnamen -->
+<text x="10" y="70" class="pk-lane">Verwaltung</text><text x="10" y="84" class="pk-lane2">(Admin-Rollen)</text>
+<text x="10" y="200" class="pk-lane">HR</text><text x="10" y="214" class="pk-lane2">Personal-</text><text x="10" y="226" class="pk-lane2">sachbearbeitung</text>
+<text x="10" y="350" class="pk-lane">Führungs-</text><text x="10" y="364" class="pk-lane">kraft</text>
+<text x="10" y="466" class="pk-lane">Zuständige</text><text x="10" y="480" class="pk-lane">Stelle</text><text x="10" y="494" class="pk-lane2">IT · Gebäude ·</text><text x="10" y="506" class="pk-lane2">Verwaltung</text>
+<text x="10" y="570" class="pk-lane">Neue Person</text>
+<text x="10" y="680" class="pk-lane">Portal</text><text x="10" y="694" class="pk-lane2">(automatisch)</text>
+
+<!-- B1 Katalog -->
+<rect x="118" y="51" width="125" height="46" rx="7" class="neu"/>
+<text x="126" y="68" class="pk-t">Katalog pflegen</text><text x="126" y="81" class="pk-s">zentral und je</text><text x="126" y="92" class="pk-s">Einrichtung</text>
+<!-- B2 Vorgang anlegen -->
+<rect x="259" y="126" width="125" height="46" rx="7" class="alt"/>
+<text x="267" y="143" class="pk-t">Vorgang anlegen</text><text x="267" y="156" class="pk-s">Einladung und</text><text x="267" y="167" class="pk-s">Modalitäten-Link</text>
+<!-- B3 Fragebogen -->
+<rect x="259" y="551" width="125" height="46" rx="7" class="alt"/>
+<text x="267" y="568" class="pk-t">Personalfragebogen</text><text x="267" y="581" class="pk-s">eigene Spur, parallel</text><text x="267" y="592" class="pk-s">zu den Modalitäten</text>
+<!-- B4 Modalitaeten 1-4 -->
+<rect x="400" y="304" width="125" height="46" rx="7" class="alt"/>
+<text x="408" y="321" class="pk-t">Modalitäten</text><text x="408" y="334" class="pk-s">Schritte 1–4,</text><text x="408" y="345" class="pk-s">wie bisher</text>
+<!-- B5 Ausstattung waehlen -->
+<rect x="400" y="360" width="125" height="46" rx="7" class="neu"/>
+<text x="408" y="377" class="pk-t">Ausstattung wählen</text><text x="408" y="390" class="pk-s">anhaken, Bemerkung,</text><text x="408" y="401" class="pk-s">Hinweise · absenden</text>
+<!-- B6 Merker -->
+<rect x="400" y="678" width="125" height="46" rx="7" class="neu"/>
+<text x="408" y="695" class="pk-t">Schrittliste festlegen</text><text x="408" y="708" class="pk-s">Merker beim ersten</text><text x="408" y="719" class="pk-s">Öffnen des Links</text>
+<!-- B7 Aufgaben anlegen -->
+<rect x="541" y="622" width="125" height="46" rx="7" class="neu"/>
+<text x="549" y="639" class="pk-t">Aufgaben anlegen</text><text x="549" y="652" class="pk-s">je Wahl bzw. Option</text><text x="549" y="663" class="pk-s">eine; Fälligkeiten</text>
+<!-- B8 Daten pruefen -->
+<rect x="541" y="126" width="125" height="46" rx="7" class="alt"/>
+<text x="549" y="143" class="pk-t">Daten prüfen</text><text x="549" y="156" class="pk-s">wenn Fragebogen und</text><text x="549" y="167" class="pk-s">Modalitäten da sind</text>
+<!-- B9 Ausstattung pruefen -->
+<rect x="541" y="182" width="125" height="46" rx="7" class="neu"/>
+<text x="549" y="199" class="pk-t">Ausstattung prüfen</text><text x="549" y="212" class="pk-s">ergänzen, ändern,</text><text x="549" y="223" class="pk-s">streichen (Karte)</text>
+<!-- B10 Abteilungen informieren -->
+<rect x="541" y="238" width="125" height="46" rx="7" class="alt"/>
+<text x="549" y="255" class="pk-t">Abteilungen</text><text x="549" y="268" class="pk-t">informieren</text><text x="549" y="279" class="pk-s">ein Knopf, wie heute</text>
+<!-- B11 Mail -->
+<rect x="682" y="622" width="125" height="46" rx="7" class="gea"/><rect x="682" y="622" width="5" height="46" rx="2" fill="#6BAA24"/>
+<text x="693" y="639" class="pk-t">Mail und Link</text><text x="693" y="652" class="pk-s">je Stelle, jetzt mit</text><text x="693" y="663" class="pk-s">Bemerkungen</text>
+<!-- B12 Erinnerungen -->
+<rect x="682" y="678" width="125" height="46" rx="7" class="alt"/>
+<text x="690" y="695" class="pk-t">Erinnerungen</text><text x="690" y="708" class="pk-s">täglicher Lauf,</text><text x="690" y="719" class="pk-s">je offene Aufgabe</text>
+<!-- B13 Bereitstellen -->
+<rect x="682" y="424" width="125" height="46" rx="7" class="gea"/><rect x="682" y="424" width="5" height="46" rx="2" fill="#6BAA24"/>
+<text x="693" y="441" class="pk-t">Bereitstellen</text><text x="693" y="454" class="pk-s">je Position abhaken,</text><text x="693" y="465" class="pk-s">Kommentar an HR</text>
+<!-- B15 Entscheidung -->
+<path d="M744,138 L790,160 L744,182 L698,160 Z" fill="#fff" stroke="#575756" stroke-width="1.2"/>
+<text x="744" y="157" text-anchor="middle" class="pk-s">nach Info</text><text x="744" y="168" text-anchor="middle" class="pk-s">geändert?</text>
+<!-- B16 Nachtrag -->
+<rect x="682" y="238" width="125" height="46" rx="7" class="neu"/>
+<text x="690" y="255" class="pk-t">Nachtrag senden</text><text x="690" y="268" class="pk-s">Knopf, gleicher Link,</text><text x="690" y="279" class="pk-s">Mail mit Änderungen</text>
+<!-- B14 Ausgabe vermerken -->
+<rect x="823" y="424" width="125" height="46" rx="7" class="st2"/>
+<text x="831" y="441" class="pk-t">Ausgabe vermerken</text><text x="831" y="454" class="pk-s">Inventar- oder</text><text x="831" y="465" class="pk-s">Schlüsselnummer</text>
+<!-- B17 Person erhaelt -->
+<rect x="823" y="551" width="125" height="46" rx="7" class="alt"/>
+<text x="831" y="568" class="pk-t">Erhält Ausstattung</text><text x="831" y="581" class="pk-s">am ersten Tag;</text><text x="831" y="592" class="pk-s">A4: Übergabe quittieren</text>
+<!-- B18 Abschluss -->
+<rect x="823" y="182" width="125" height="46" rx="7" class="alt"/>
+<text x="831" y="199" class="pk-t">Abschließen</text><text x="831" y="212" class="pk-s">Checkliste und Vorgang,</text><text x="831" y="223" class="pk-s">wie bisher</text>
+<!-- B19 Offboarding anlegen -->
+<rect x="964" y="126" width="125" height="46" rx="7" class="alt"/>
+<text x="972" y="143" class="pk-t">Offboarding</text><text x="972" y="156" class="pk-t">anlegen</text><text x="972" y="167" class="pk-s">Austritt erfassen</text>
+<!-- B20 Rueckgaben vorschlagen -->
+<rect x="964" y="622" width="125" height="46" rx="7" class="st2"/>
+<text x="972" y="639" class="pk-t">Rückgaben</text><text x="972" y="652" class="pk-t">vorschlagen</text><text x="972" y="663" class="pk-s">aus Ausgabevermerken</text>
+<!-- B21 Ruecknahme Stelle -->
+<rect x="964" y="424" width="125" height="46" rx="7" class="st2"/>
+<text x="972" y="441" class="pk-t">Rücknahme, Sperren</text><text x="972" y="454" class="pk-s">Aufgabe der Stelle</text><text x="972" y="465" class="pk-s">zum letzten Arbeitstag</text>
+<!-- B22 Rueckgaben bestaetigen -->
+<rect x="964" y="238" width="125" height="46" rx="7" class="alt"/>
+<text x="972" y="255" class="pk-t">Rückgaben</text><text x="972" y="268" class="pk-t">bestätigen</text><text x="972" y="279" class="pk-s">Reiter „Rückgaben“</text>
+
+<!-- Pfeile -->
+<path d="M243,74 L388,74 L388,383 L398,383" class="inf"/><text x="296" y="68" class="pk-lab">Katalog</text>
+<path d="M384,149 L462,149 L462,302" class="fl"/>
+<path d="M321,172 L321,549" class="fl"/>
+<path d="M462,350 L462,358" class="fl"/>
+<path d="M400,327 L396,327 L396,701 L398,701" class="inf"/><text x="330" y="672" class="pk-lab">erstes Öffnen</text>
+<path d="M525,383 L537,383 L537,149 L539,149" class="fl"/>
+<path d="M537,383 L537,645 L539,645" class="flg"/><text x="470" y="616" class="pk-lab" style="fill:#3d6d10">nach Abgabe</text>
+<path d="M384,574 L470,574 L470,520 L529,520 L529,162 L539,162" class="inf"/>
+<path d="M603,172 L603,180" class="fl"/>
+<path d="M603,228 L603,236" class="fl"/>
+<path d="M666,261 L670,261 L670,645 L680,645" class="fl"/>
+<path d="M744,622 L744,472" class="fl"/>
+<path d="M744,668 L744,676" class="inf"/>
+<path d="M807,700 L812,700 L812,460 L809,460" class="inf"/>
+<path d="M666,205 L690,205 L690,160 L696,160" class="inf"/><text x="676" y="132" class="pk-lab">Änderung</text>
+<path d="M744,182 L744,236" class="flg"/><text x="750" y="222" class="pk-lab">ja</text>
+<path d="M807,261 L818,261 L818,612 L790,612 L790,620" class="flg"/>
+<path d="M807,440 L821,440" class="fl"/>
+<path d="M885,424 L885,230" class="fl"/><text x="890" y="330" class="pk-lab">alle erledigt</text>
+<path d="M885,470 L885,549" class="fl"/>
+<path d="M948,205 L956,205 L956,149 L962,149" class="inf"/><text x="905" y="122" class="pk-lab">später</text>
+<path d="M1089,149 L1095,149 L1095,645 L1091,645" class="flg"/>
+<path d="M1026,622 L1026,472" class="flg"/>
+<path d="M1026,424 L1026,286" class="fl"/>
+</svg>
+<figcaption>
+  <span class="lg"><i class="lg-alt"></i>bestehend</span>
+  <span class="lg"><i class="lg-gea"></i>bestehend, erweitert</span>
+  <span class="lg"><i class="lg-neu"></i>neu (A1–A3)</span>
+  <span class="lg"><i class="lg-st2"></i>neu, Stufe 2 (A4)</span>
+  <span class="lg">Durchgezogen: Ablauf · gepunktet: Information</span>
+</figcaption>
+</figure>
+<h3>Prozesssteckbrief</h3>
+<div class="tab-wrap"><table>
+<tbody>
+<tr><th style="width:190px">Prozess</th><td>Ausstattung &amp; Zugänge bereitstellen und zurücknehmen (Unterstützungsprozess zu Eintritt und Austritt)</td></tr>
+<tr><th>Prozesseigner</th><td>HR-Leitung. Den Katalog pflegen die Admin-Rollen (E-A3); den Inhalt liefern die Stellen (E-A38).</td></tr>
+<tr><th>Zweck</th><td>Die neue Person hat am ersten Tag, was sie braucht, und beim Austritt kommt alles zurück und jeder Zugang ist gesperrt.</td></tr>
+<tr><th>Auslöser</th><td>Abgabe der Einstellungsmodalitäten mit mindestens einer Wahl; beim Austritt das Anlegen des Offboardings (A4).</td></tr>
+<tr><th>Ergebnis</th><td>Alle Ausstattungsaufgaben bis zum Dienstbeginn erledigt; ab A4 jede Ausgabe mit Übergabedatum und Kennung, beim Austritt zurück, verloren gemeldet oder gesperrt.</td></tr>
+<tr><th>Häufigkeit</th><td>je Einstellung; Katalogpflege jährlich vor Schuljahresbeginn und bei Bedarf</td></tr>
+<tr><th>Soll-Durchlaufzeit</th><td>Information der Stellen spätestens 14 Tage vor Dienstbeginn; Bereitstellung bis zum Dienstbeginn; Rückgabe bis zum letzten Arbeitstag</td></tr>
+<tr><th>Systeme</th><td>HR-Portal (Formular, Karte, Link-Seite, Mail, täglicher Lauf); führend für Bestände bleiben Geräteverwaltung der IT und Schließplan (E-A36)</td></tr>
+</tbody></table></div>
+
+<h3>Schritte, Ausnahmen und Eskalation</h3>
+<div class="tab-wrap"><table>
+<thead><tr><th>Nr.</th><th>Schritt</th><th>Verantwortlich</th><th>Ergebnis</th><th>Ausnahme · was dann</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Katalog pflegen</td><td>Admin-Rolle</td><td>aktive Positionen je Stelle, Einrichtung, Personengruppe</td><td>Stelle ohne Adresse in einer Einrichtung → Position erscheint dort nicht, Katalogseite zeigt die Lücke rot</td></tr>
+<tr><td>2</td><td>Vorgang anlegen, Modalitäten-Link erzeugen</td><td>HR</td><td>Merker „Schritt Ausstattung ja/nein“ steht fest</td><td>falscher Arbeitsort → HR korrigiert, solange der Link nicht erzeugt ist (E-A10)</td></tr>
+<tr><td>3</td><td>Ausstattung wählen und absenden</td><td>Führungskraft</td><td>Auswahl mit Bemerkungen, Hinweise an Stellen</td><td>nichts gewählt → keine Aufgaben, Vorgang läuft wie heute</td></tr>
+<tr><td>4</td><td>Aufgaben anlegen, Fälligkeiten setzen</td><td>Portal</td><td>je Wahl (bzw. Option) eine Aufgabe</td><td>Fehler nach der Abgabe → jede Kartenaktion und der tägliche Lauf holen nach</td></tr>
+<tr><td>5</td><td>Ausstattung prüfen und ergänzen</td><td>HR</td><td>gesichtete Bemerkungen, übernommene Hinweise</td><td>Bemerkung mit Gesundheitsbezug → HR kürzt auf das Benötigte</td></tr>
+<tr><td>6</td><td>Abteilungen informieren</td><td>HR (Knopf)</td><td>Mail und Link je Stelle</td><td>Stelle bis 7 Tage vor der Fälligkeit nicht informiert → Zeile rot (Wächter)</td></tr>
+<tr><td>7</td><td>Bereitstellen und abhaken</td><td>zuständige Stelle</td><td>erledigte Aufgaben, Kommentar an HR</td><td>„geht nicht“ / „kommt später“ → Kommentar geht per Mail ans HR-Postfach (E-A17); überfällig → Erinnerung nach Stufen; am Werktag vor Dienstbeginn Sammelmail an HR (E-A18)</td></tr>
+<tr><td>8</td><td>Nachtrag senden</td><td>HR (Knopf)</td><td>Stelle kennt Neu, Geändert, Entfällt</td><td>Nachtrag vergessen → Zeile rot (Wächter)</td></tr>
+<tr><td>9</td><td>Übergabe vermerken und quittieren (A4)</td><td>Stelle, Person quittiert</td><td>Ausgabe je Stück mit Kennung und Datum</td><td>Übergabe erst nach Abschluss des Onboardings → HR trägt nach</td></tr>
+<tr><td>10</td><td>Vorgang abschließen</td><td>HR</td><td>Onboarding COMPLETED</td><td>offene Ausstattung → nur mit Bestätigung (E-A19); Absage vor Dienstbeginn → Absage-Mail an informierte Stellen (E-A20)</td></tr>
+<tr><td>11</td><td>Rücknahme und Sperren (A4)</td><td>ausgebende Stelle</td><td>Rückgabe mit Zustand, Zugänge gesperrt</td><td>Schlüssel fehlt → Aufgabe für die Gebäudewirtschaft; Person bleibt in anderer Beschäftigung → Zustand „verbleibt“ (E-A35)</td></tr>
+<tr><td>12</td><td>Rückgaben bestätigen, Offboarding abschließen</td><td>HR</td><td>Offboarding COMPLETED</td><td>offene Rückgaben → Abschluss mit Warnung, nicht gesperrt (E-A33)</td></tr>
+</tbody></table></div>
+
+<h3>Zuständigkeiten (RACI)</h3>
+<p class="unter" style="margin-bottom:6px">R = führt aus · A = verantwortet · C = wird gefragt · I = wird informiert</p>
+<div class="tab-wrap"><table class="raci">
+<thead><tr><th>Tätigkeit</th><th>Admin-Rolle</th><th>HR</th><th>Führungskraft</th><th>Stelle</th><th>Neue Person</th><th>Einrichtungsleitung</th></tr></thead>
+<tbody>
+<tr><td>Katalog pflegen</td><td>R/A</td><td>I</td><td>–</td><td>C</td><td>–</td><td>C</td></tr>
+<tr><td>Ausstattung wählen</td><td>–</td><td>A</td><td>R</td><td>–</td><td>–</td><td>–</td></tr>
+<tr><td>Ausstattung prüfen, ergänzen</td><td>–</td><td>R/A</td><td>C</td><td>–</td><td>–</td><td>–</td></tr>
+<tr><td>Abteilungen informieren, Nachtrag</td><td>–</td><td>R/A</td><td>–</td><td>I</td><td>–</td><td>–</td></tr>
+<tr><td>Bereitstellen, abhaken</td><td>–</td><td>I</td><td>–</td><td>R/A</td><td>–</td><td>–</td></tr>
+<tr><td>Eskalation offener Aufgaben</td><td>–</td><td>R/A</td><td>I</td><td>C</td><td>–</td><td>–</td></tr>
+<tr><td>Erster Tag: Übergabe (A4: quittieren)</td><td>–</td><td>A</td><td>I</td><td>R</td><td>C</td><td>–</td></tr>
+<tr><td>Rücknahme, Sperren (A4)</td><td>–</td><td>A</td><td>I</td><td>R</td><td>C</td><td>–</td></tr>
+<tr><td>Rückgaben bestätigen, abschließen</td><td>–</td><td>R/A</td><td>–</td><td>C</td><td>–</td><td>–</td></tr>
+</tbody></table></div>
+
+<h3>Kennzahlen</h3>
+<div class="tab-wrap"><table>
+<thead><tr><th>Kennzahl</th><th>Berechnung</th><th>Ziel</th></tr></thead>
+<tbody>
+<tr><td>Bereitstellung zum Dienstbeginn</td><td>Ausstattungsaufgaben mit <code>completedAt</code> bis Vertragsbeginn ÷ alle Ausstattungsaufgaben</td><td>≥ 90 %</td></tr>
+<tr><td>Vorlauf der Stellen</td><td>Tage zwischen Information der Stelle und Vertragsbeginn (Median)</td><td>≥ 14 Tage</td></tr>
+<tr><td>Nachträge</td><td>Vorgänge mit mindestens einem Nachtrag ÷ Vorgänge mit Ausstattung</td><td>sinkend; hoch heißt: Katalog oder Formular unklar</td></tr>
+<tr><td>Rückgabe zum Austritt (A4)</td><td>Ausgaben mit Zustand ZURUECK bis letzter Arbeitstag + 14 Tage ÷ alle Ausgaben der Austritte</td><td>100 %</td></tr>
+<tr><td>Offene Sperren (A4)</td><td>Sperraufgaben, die am letzten Arbeitstag noch offen sind</td><td>0</td></tr>
+</tbody></table></div>
+<p class="unter">Die Zahlen lassen sich aus vorhandenen Zeitstempeln rechnen. Eine Auswertung im Portal ist nicht Teil von A1 bis A4; für den Pilot reicht eine Abfrage.</p>
+
+<h3>Schnittstellen</h3>
+<ul>
+  <li><b>Vorgelagert:</b> „Neuer Vorgang“ (Einrichtung, Personengruppe, Arbeitsort, Führungskraft) und die Einstellungsmodalitäten (Vertragsbeginn, Auswahl).</li>
+  <li><b>Nachgelagert:</b> Offboarding (Rückgaben, Abteilungsaufgaben zum Sperren), ab A4 über „Einstellung zuordnen …“; Vertragsende → Offboarding wie heute.</li>
+  <li><b>Außerhalb des Portals:</b> Bestellung bei Lieferanten, Geräteverwaltung der IT, Schließplan. Das Portal löst die Arbeit aus und hält das Ergebnis fest, ersetzt diese Systeme aber nicht.</li>
+</ul>
+</section>
+
+<section class="abschnitt" id="katalog">
+<h2><span class="nr">5</span>Der Katalog: was es gibt, für wen</h2>
+<h3>Drei Arten von Positionen</h3>
+<div class="tab-wrap"><table>
+<thead><tr><th>Art</th><th>So sieht es die Führungskraft</th><th>Beispiele</th><th>Was daraus wird</th></tr></thead>
+<tbody>
+<tr><td><b>Ja/Nein</b></td><td>Häkchen. Ist es gesetzt, klappt das Bemerkungsfeld auf.</td><td>Dienst-iPad, Dienst-Laptop, Telefon mit Durchwahl, Kopierkarte, Parkplatz</td><td>Eine <b>Aufgabe</b> der Stelle, z. B. „Dienst-iPad bereitstellen“, mit der Bemerkung als Hinweis</td></tr>
+<tr><td><b>Auswahl</b></td><td>Mehrere Optionen aus einer Liste (Chips). Ist mindestens eine gewählt, klappt das Bemerkungsfeld auf.</td><td>Schlüssel (Haupteingang, Lehrerzimmer, Fachraum Chemie, Sporthalle …), Zugänge (Dienst-E-Mail, Schulportal, WebUntis …)</td><td>Je gewählter Option eine <b>Aufgabe</b>, z. B. „Schlüssel ausgeben: Haupteingang“ und „Schlüssel ausgeben: Fachraum Chemie“ (E-A12)</td></tr>
+<tr><td><b>Angabe</b></td><td>Ein kurzes Textfeld</td><td>Unterrichtsfächer, gewünschte Durchwahl, Raum des Arbeitsplatzes</td><td><b>Keine Aufgabe</b>, sondern eine Information im Block „Angaben zur Stelle“. Sie darf für mehrere Stellen sichtbar sein (Unterrichtsfächer: Gebäudewirtschaft und IT).</td></tr>
+</tbody></table></div>
+<p>Zusätzlich hat jede Stelle ein freies Feld <b>„Weitere Hinweise an die IT“</b> (bzw. an die jeweilige Stelle) für alles, was der Katalog nicht kennt. Es steht ebenfalls im Block „Angaben zur Stelle“.</p>
+
+<h3>Was eine Katalogposition festlegt</h3>
+<div class="tab-wrap"><table>
+<thead><tr><th>Eigenschaft</th><th>Bedeutung</th><th>Beispiel</th></tr></thead>
+<tbody>
+<tr><td>Stelle</td><td>Wer die Aufgabe bekommt. Ein Abteilungsschlüssel wie in den Checklisten (IT, FACILITY, VERWALTUNG, eigene; auch HR = Aufgabe im Portal, ohne Link).</td><td>IT</td></tr>
+<tr><td>Bezeichnung</td><td>Was die Führungskraft liest</td><td>Dienst-iPad (Lernmittel)</td></tr>
+<tr><td>Hinweis für die Führungskraft</td><td>Ein Satz unter der Position im Formular (optional)</td><td>„Für Lehrkräfte mit eigenem Unterricht.“</td></tr>
+<tr><td>Hinweis für die Stelle</td><td>Arbeitsanweisung, steht an jeder Aufgabe auf Link-Seite und in der Mail (optional)</td><td>„Erst nach Verpflichtung auf Vertraulichkeit freischalten.“</td></tr>
+<tr><td>Optionen</td><td>Nur bei „Auswahl“: die Liste</td><td>Haupteingang · Lehrerzimmer · Fachraum Chemie · Sporthalle</td></tr>
+<tr><td>Bemerkung anbieten</td><td>Ob das Bemerkungsfeld aufklappt (Standard: ja), mit eigenem Platzhalter</td><td>„z. B. Stift, Hülle, benötigte Apps“</td></tr>
+<tr><td>Aufgabentitel</td><td>Titel der Aufgabe für die Stelle (Standard: „{Bezeichnung} bereitstellen“); bei Auswahl-Positionen mit „: Option“ dahinter</td><td>Dienst-iPad einrichten und übergeben · Schlüssel ausgeben: Haupteingang</td></tr>
+<tr><td>Fälligkeit</td><td>Tage relativ zum Vertragsbeginn, wie in den Checklisten (−5 = fünf Tage vorher)</td><td>−5</td></tr>
+<tr><td>Gilt für</td><td>Zentral (alle Einrichtungen) oder eine Einrichtung; dazu optional Personengruppen (leer = alle)</td><td>Gymnasium · nur Angestellte und Beamte</td></tr>
+<tr><td>Vorausgewählt</td><td>Ist beim Öffnen schon angehakt. Sparsam einsetzen, sonst wird es blind übernommen.</td><td>Dienst-E-Mail-Konto</td></tr>
+<tr><td>Aktiv, Reihenfolge</td><td>Ausblenden statt löschen; Position in der Liste</td><td>—</td></tr>
+<tr><td><i>Stufe 2:</i> Ausgabe abfragen</td><td>Welche Kennung die Stelle beim Abhaken eintragen kann</td><td>Inventarnummer · Schlüsselnummer</td></tr>
+</tbody></table></div>
+
+<h3>Wovon abhängt, was die Führungskraft sieht</h3>
+<ol>
+  <li><b>Arbeitsort des Vorgangs</b> (E-A10, Vorgabe: Einrichtung des Vorgangs). Angezeigt werden die zentralen Positionen, die der Einrichtungsart (z. B. alle Kitas) und die der Einrichtung. Eine Einrichtung kann eine zentrale Position für sich <b>ausblenden</b> (die Kita gibt keine iPads aus). Das ist dieselbe Logik wie bei den Abteilungsadressen: Einrichtung vor zentral.</li>
+  <li><b>Personengruppe des Vorgangs</b> (Fragebogen-Typ: Angestellte, Beamte, Kita-Personal, Minijob, Ehrenamt). Eine Position mit Einschränkung erscheint nur bei passenden Vorgängen. Feiner als diese fünf Gruppen unterscheidet das Portal heute nicht. Lehrkraft und Sekretariat sind beide „Angestellte“. Das ist in Ordnung, weil die Führungskraft ohnehin nur anhakt, was zutrifft. Entschieden: Die fünf Gruppen reichen (E-A4).</li>
+  <li><b>Gibt es danach keine einzige Position,</b> fehlt der Schritt im Formular ganz. Die Führungskraft sieht dann fünf Schritte wie heute.</li>
+</ol>
+
+<h3>Vorschlag für den Anfangsbestand</h3>
+<p>Der Seed legt <b>keinen</b> Katalog an (dann bliebe alles wie heute, bis jemand ihn pflegt). Die Einstellungsseite bietet stattdessen „Vorschläge übernehmen“ an. Damit kommen diese Positionen ausgeschaltet in den Katalog, und die Verwaltung schaltet ein, was passt:</p>
+<div class="tab-wrap"><table>
+<thead><tr><th>Stelle</th><th>Ja/Nein</th><th>Auswahl</th><th>Angabe</th></tr></thead>
+<tbody>
+<tr><td>IT</td><td>Dienst-Laptop/PC · Dienst-iPad (Lernmittel) · Telefon mit Durchwahl</td><td>Zugänge: Dienst-E-Mail · Schulportal · WebUntis · Schulverwaltung · Drucker-PIN</td><td>Gewünschte Durchwahl</td></tr>
+<tr><td>Gebäudewirtschaft</td><td>Transponder/Chip · Parkplatz · Spind</td><td>Schlüssel: Räume <b>je Einrichtung</b></td><td>Unterrichtsfächer (auch für die IT sichtbar)</td></tr>
+<tr><td>Verwaltung / Sekretariat</td><td>Fach im Lehrerzimmer · Kopierkarte · Türschild · Dienstausweis</td><td>—</td><td>—</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="abschnitt" id="mockups">
+<h2><span class="nr">6</span>Vorher und nachher</h2>
+<p>Links steht jeweils die Oberfläche, wie sie heute im Code steht, rechts dieselbe Stelle nach dem Umbau. Die Mockups nehmen die heutige Optik der jeweiligen Seite auf. Der UX-Umbau („Klarer Weg“) zieht die Seiten später mit ihrem Modul um, und Erweiterungen alter Seiten bleiben bis dahin bei deren Optik.</p>
+<p class="legende"><span class="muster"></span>Neu oder geändert. Beispielperson: <b>Lena Brandt</b>, Lehrkraft für Chemie und Sport am Gymnasium, Vertragsbeginn 01.02.2027 (fiktiv).</p>
+
+<h3>6.1 · Modalitäten-Formular der Führungskraft: neuer Schritt</h3>
+<div class="vn">
+<div>
+<div class="vn-label vorher"><i></i>Vorher · Schritt 4 von 5, unteres Ende</div>
+<div class="m">
+  <div class="m-bar"><i></i><i></i><i></i><span>hr.fes-credo.de/modalitaeten/…</span></div>
+  <div class="m-hdr"><span class="logo">CREDO</span><span class="sub"><b>Einstellungsmodalitäten</b>für Lena Brandt · Gymnasium Minden</span><span style="margin-left:auto" class="pill grau">Schritt 4 / 5</span></div>
+  <div class="balken"><i style="width:80%"></i></div>
+  <div class="m-linie"><span></span><span class="g"></span><span class="gr"></span><span class="r"></span><span class="b"></span></div>
+  <div class="m-body" style="padding-bottom:4px">
+    <div class="stepper">
+      <span class="s fertig"><i>✓</i>Stelle</span><span class="strich"></span>
+      <span class="s fertig"><i>✓</i>Arbeitszeit</span><span class="strich"></span>
+      <span class="s fertig"><i>✓</i>Vergütung</span><span class="strich"></span>
+      <span class="s akt"><i>4</i>Zusätzliche Angaben</span><span class="strich"></span>
+      <span class="s"><i>5</i>Zusammenfassung</span>
+    </div>
+    <div class="card">
+      <h5>Zusätzliche Angaben</h5>
+      <p class="lead">Kostenstelle, Probezeit, Urlaub, Masernschutz</p>
+      <div class="kat">… Kostenstellen, Probezeit, Urlaubstage …</div>
+      <div class="zeile"><span class="box"></span><div class="t">Masernschutz erforderlich</div></div>
+      <div class="zeile"><span class="box an"></span><div class="t">Zeiterfassung erforderlich</div></div>
+      <div class="feld" style="margin-top:6px"><label>Zusätzliche Vereinbarungen / Bemerkungen</label><div class="inp gross">Bitte iPad mit Stift, Schlüssel für Chemie und Sporthalle, Telefon im Lehrerzimmer reicht.</div><small>Platzhalter heute: „z.B. besondere Regelungen, Dienstwagen, etc.“ · 0 / 5000 Zeichen</small></div>
+      <div class="fuss"><span class="btn sec">Zurück</span><span class="btn pri">Weiter</span></div>
+    </div>
+  </div>
+</div>
+<p class="unter">Ausstattungswünsche landen, wenn überhaupt, im Freitext. Den liest nur HR. Die IT erfährt davon nur, wenn HR es weitergibt.</p>
+</div>
+<div>
+<div class="vn-label nachher"><i></i>Nachher · neuer Schritt 5 von 6</div>
+<div class="m">
+  <div class="m-bar"><i></i><i></i><i></i><span>hr.fes-credo.de/modalitaeten/…</span></div>
+  <div class="m-hdr"><span class="logo">CREDO</span><span class="sub"><b>Einstellungsmodalitäten</b>für Lena Brandt · Gymnasium Minden</span><span style="margin-left:auto" class="pill grau">Schritt 5 / 6</span></div>
+  <div class="balken"><i style="width:83%"></i></div>
+  <div class="m-linie"><span></span><span class="g"></span><span class="gr"></span><span class="r"></span><span class="b"></span></div>
+  <div class="m-body" style="padding-bottom:4px">
+    <div class="stepper">
+      <span class="s fertig"><i>✓</i>Stelle</span><span class="strich"></span>
+      <span class="s fertig"><i>✓</i>Arbeitszeit</span><span class="strich"></span>
+      <span class="s fertig"><i>✓</i>Vergütung</span><span class="strich"></span>
+      <span class="s fertig"><i>✓</i>Zusätzl.</span><span class="strich"></span>
+      <span class="s akt neu-teil"><i>5</i>Ausstattung</span><span class="strich"></span>
+      <span class="s"><i>6</i>Zusammenf.</span>
+    </div>
+    <div class="card neu-teil"><span class="neu-marke">neu</span>
+      <h5>Ausstattung &amp; Zugänge</h5>
+      <p class="lead">Was zum Arbeitsbeginn bereitstehen soll. Jede Auswahl geht als Aufgabe an die zuständige Stelle, zusammen mit Ihrer Bemerkung. Alle Angaben sind freiwillig.</p>
+
+      <div class="stelle-kopf"><b>IT</b><small>Diese Angaben erhält die IT.</small></div>
+      <div class="zeile"><span class="box an"></span><div class="t">Dienst-iPad (Lernmittel)<small>Für Lehrkräfte mit eigenem Unterricht.</small>
+        <div class="bem" style="margin-left:0"><div class="inp">Mit Stift und Hülle, Apps: WebUntis, Explain Everything</div><small>Bemerkung an die IT (optional)</small></div></div></div>
+      <div class="zeile"><span class="box"></span><div class="t">Dienst-Laptop / PC</div></div>
+      <div class="zeile"><span class="box an"></span><div class="t">Telefon mit Durchwahl
+        <div class="bem" style="margin-left:0"><div class="inp">Apparat im Lehrerzimmer reicht, keine eigene Nummer nötig</div></div></div></div>
+      <div class="zeile"><span class="box an"></span><div class="t">Zugänge
+        <div class="chips" style="margin-top:3px"><span class="chip an">Dienst-E-Mail</span><span class="chip an">Schulportal</span><span class="chip an">WebUntis</span><span class="chip">Schulverwaltung</span><span class="chip">Drucker-PIN</span></div></div></div>
+      <div class="feld" style="margin-top:4px"><label>Weitere Hinweise an die IT</label><div class="inp leer">z. B. Wünsche, die oben nicht vorkommen</div></div>
+
+      <div class="stelle-kopf" style="margin-top:8px"><b>Gebäude &amp; Schlüssel</b><small>Diese Angaben erhält die Gebäudewirtschaft.</small></div>
+      <div class="zeile"><span class="box an"></span><div class="t">Schlüssel
+        <div class="chips" style="margin-top:3px"><span class="chip an">Haupteingang</span><span class="chip an">Lehrerzimmer</span><span class="chip an">Fachraum Chemie</span><span class="chip">Chemie-Sammlung</span><span class="chip an">Sporthalle</span><span class="chip">Musikraum</span></div>
+        <div class="bem" style="margin-left:0"><div class="inp">Sammlung erst nach der Sicherheitsunterweisung</div></div></div></div>
+      <div class="feld" style="margin-top:4px"><label>Unterrichtsfächer</label><div class="inp">Chemie, Sport</div><small>Hilft bei der Zuordnung von Fachräumen. Sehen Gebäudewirtschaft und IT.</small></div>
+
+      <div class="stelle-kopf" style="margin-top:8px"><b>Verwaltung / Sekretariat</b></div>
+      <div class="zeile"><span class="box an"></span><div class="t">Fach im Lehrerzimmer</div></div>
+      <div class="zeile"><span class="box"></span><div class="t">Kopierkarte</div></div>
+
+      <p class="lead" style="margin:6px 0 0">Keine Angaben zu Gesundheit, Schwangerschaft, Behinderung oder Religion und keine Bewertungen der Person. Schreiben Sie, was gebraucht wird, nicht warum.</p>
+      <div class="fuss"><span class="btn sec">Zurück</span><span class="btn pri">Weiter</span></div>
+    </div>
+  </div>
+</div>
+<p class="unter">Gruppiert nach Stelle, damit klar ist, wer die Bemerkung liest. Die Bemerkung klappt erst nach dem Anhaken auf. Gibt es für den Vorgang keine Position, fehlt der Schritt ganz.</p>
+</div>
+</div>
+
+<h3>6.2 · Zusammenfassung vor dem Absenden</h3>
+<div class="vn">
+<div>
+<div class="vn-label vorher"><i></i>Vorher · Schritt 5 von 5</div>
+<div class="m"><div class="m-body">
+  <div class="card" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">Bitte prüfen Sie alle Angaben für <b>Lena Brandt</b> sorgfältig.</div>
+  <div class="card"><h5>1. Stelle &amp; Vertrag</h5><div class="zeile"><span class="t" style="color:var(--ui-muted)">Betriebsstätte</span><b>Gymnasium Minden</b></div></div>
+  <div class="card"><h5>2. Arbeitszeit &amp; Arbeitgeber</h5><div class="zeile"><span class="t" style="color:var(--ui-muted)">Vollzeit</span><b>Ja</b></div></div>
+  <div class="card"><h5>3. Vergütung</h5><div class="zeile"><span class="t" style="color:var(--ui-muted)">Modell</span><b>TV-L</b></div></div>
+  <div class="card"><h5>4. Zusätzliche Angaben</h5><div class="zeile"><span class="t" style="color:var(--ui-muted)">Zusatzvereinbarungen</span><b style="max-width:60%;text-align:right">Bitte iPad mit Stift, Schlüssel für Chemie …</b></div></div>
+  <div class="fuss"><span class="btn sec">Zurück</span><span class="btn" style="background:#6BAA24;color:#fff">Verbindlich absenden</span></div>
+</div></div>
+</div>
+<div>
+<div class="vn-label nachher"><i></i>Nachher · Schritt 6 von 6</div>
+<div class="m"><div class="m-body">
+  <div class="card" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">Bitte prüfen Sie alle Angaben für <b>Lena Brandt</b> sorgfältig.</div>
+  <div class="card"><h5>1. Stelle &amp; Vertrag</h5><div class="zeile"><span class="t" style="color:var(--ui-muted)">…</span></div></div>
+  <div class="card"><h5>4. Zusätzliche Angaben</h5><div class="zeile"><span class="t" style="color:var(--ui-muted)">…</span></div></div>
+  <div class="card neu-teil"><span class="neu-marke">neu</span><h5>5. Ausstattung &amp; Zugänge</h5>
+    <div class="zeile"><span class="t" style="color:var(--ui-muted)">IT</span><b style="max-width:62%;text-align:right">Dienst-iPad · Telefon mit Durchwahl · Zugänge (3)</b></div>
+    <div class="zeile"><span class="t" style="color:var(--ui-muted)">Gebäude &amp; Schlüssel</span><b style="max-width:62%;text-align:right">Schlüssel (4) · Unterrichtsfächer: Chemie, Sport</b></div>
+    <div class="zeile"><span class="t" style="color:var(--ui-muted)">Verwaltung</span><b style="max-width:62%;text-align:right">Fach im Lehrerzimmer</b></div>
+    <div class="zeile"><span class="t" style="color:var(--ui-muted)">Bemerkungen</span><b>3</b></div>
+  </div>
+  <div class="fuss"><span class="btn sec">Zurück</span><span class="btn" style="background:#6BAA24;color:#fff">Verbindlich absenden</span></div>
+</div></div>
+<p class="unter">Kurzform je Stelle. Die Bemerkungen sind gezählt, ihr Text steht im Schritt davor.</p>
+</div>
+</div>
+
+<h3>6.3 · Onboarding-Vorgang im Portal, Reiter „Checkliste“</h3>
+<div class="vn">
+<div>
+<div class="vn-label vorher"><i></i>Vorher · Fortschritt, Abteilungen, Aufgaben</div>
+<div class="m">
+  <div class="m-bar"><i></i><i></i><i></i><span>hr.fes-credo.de/vorgaenge/onboarding/…?tab=checkliste</span></div>
+  <div class="m-tabs"><span>Übersicht</span><span>Fragebogen-Daten</span><span>Dokumente</span><span class="on">Checkliste <span class="pill grau">2/9</span></span><span>Vorgesetzter</span><span>E-Mails</span></div>
+  <div class="m-body">
+    <div class="card"><h5>Fortschritt <span style="margin-left:auto;font-size:13px">22%</span></h5><p class="lead">2 von 9 Aufgaben erledigt</p><div class="balken" style="height:5px;border-radius:3px"><i style="width:22%;background:var(--gruen);border-radius:3px"></i></div></div>
+    <div class="card"><h5><span style="color:var(--gruen)">•</span> Aufgaben für Abteilungen <span class="btn" style="margin-left:auto;background:var(--gruen);color:#fff">Abteilungen informieren…</span></h5>
+      <p class="lead">Aufgaben mit zuständiger Abteilung erhält die Abteilung per Link, ohne Anmeldung. Fälligkeiten richten sich nach dem Vertragsbeginn (01.02.2027).</p>
+      <div class="zeile"><span class="pill blau">IT-Abteilung</span><div class="t">it@fes-minden.de · 2 Aufgaben, nächste fällig 25.01.2027</div><span class="pill grau">Noch nicht informiert</span></div>
+      <div class="zeile"><span class="pill blau">Facility Management</span><div class="t">hausmeister@fes-minden.de · 1 Aufgabe</div><span class="pill grau">Noch nicht informiert</span></div>
+    </div>
+    <div class="kat">— IT-Einrichtung —</div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>IT-Zugang einrichten</b><small>Konto in der Schulverwaltung und in Microsoft 365 anlegen</small><span class="pill blau">IT-Abteilung</span> <small style="display:inline">Fällig: 25.01.2027</small></div></div></div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Arbeitsplatz-PC bereitstellen</b><span class="pill blau">IT-Abteilung</span> <small style="display:inline">Fällig: 29.01.2027</small></div></div></div>
+    <div class="kat">— Vor Arbeitsbeginn —</div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Schlüssel bereitlegen</b><span class="pill blau">Facility Management</span> <small style="display:inline">Fällig: 29.01.2027</small></div></div></div>
+  </div>
+</div>
+<p class="unter">Die Aufgaben stehen fest in der Vorlage, für jede Einstellung gleich. Welche Schlüssel, ob ein iPad: das weiß die Stelle nicht.</p>
+</div>
+<div>
+<div class="vn-label nachher"><i></i>Nachher · neue Karte, Aufgaben aus der Auswahl</div>
+<div class="m">
+  <div class="m-bar"><i></i><i></i><i></i><span>hr.fes-credo.de/vorgaenge/onboarding/…?tab=checkliste</span></div>
+  <div class="m-tabs"><span>Übersicht</span><span>Fragebogen-Daten</span><span>Dokumente</span><span class="on">Checkliste <span class="pill grau">4/20</span></span><span>Vorgesetzter</span><span>E-Mails</span></div>
+  <div class="m-body">
+    <div class="card"><h5>Fortschritt <span style="margin-left:auto;font-size:13px">20%</span></h5><p class="lead">4 von 20 Aufgaben erledigt</p><div class="balken" style="height:5px;border-radius:3px"><i style="width:20%;background:var(--gruen);border-radius:3px"></i></div></div>
+    <div class="card neu-teil"><span class="neu-marke">neu</span><h5><span style="color:var(--gruen)">•</span> Ausstattung &amp; Zugänge <span class="btn sec" style="margin-left:auto">Position hinzufügen…</span></h5>
+      <p class="lead">Angefordert von der Führungskraft mit den Einstellungsmodalitäten (14.01.2027). Jede Position ist eine Aufgabe der zuständigen Stelle, bei Schlüsseln und Zugängen jede gewählte Option.</p>
+      <div class="stelle-kopf"><span class="pill blau">IT-Abteilung</span></div>
+      <div class="zeile"><div class="t"><b>Dienst-iPad (Lernmittel)</b><div class="zitat"><b>Bemerkung</b>Mit Stift und Hülle, Apps: WebUntis, Explain Everything</div></div><span class="pill gelb">offen · fällig 27.01.</span><span class="btn sec">Bearbeiten</span></div>
+      <div class="zeile"><div class="t"><b>Telefon mit Durchwahl</b><div class="zitat"><b>Bemerkung</b>Apparat im Lehrerzimmer reicht, keine eigene Nummer nötig</div></div><span class="pill gelb">offen</span><span class="btn sec">Bearbeiten</span></div>
+      <div class="zeile"><div class="t"><b>Zugänge</b><div class="optionen"><span class="opt">Dienst-E-Mail<span class="pill gruen">erledigt 20.01.</span></span><span class="opt">Schulportal<span class="pill gruen">erledigt 20.01.</span></span><span class="opt">WebUntis<span class="pill gelb">offen · fällig 25.01.</span></span></div></div><span class="btn sec">Bearbeiten</span></div>
+      <div class="zeile"><div class="t"><b>Dienst-Laptop / PC</b><small>ergänzt von HR (A. Peters), 19.01.2027</small></div><span class="pill gelb">offen</span><span class="btn sec">Bearbeiten</span></div>
+      <div class="stelle-kopf" style="margin-top:6px"><span class="pill blau">Facility Management</span></div>
+      <div class="zeile"><div class="t"><b>Schlüssel</b><div class="zitat"><b>Bemerkung</b>Sammlung erst nach der Sicherheitsunterweisung</div><div class="optionen"><span class="opt">Haupteingang<span class="pill gelb">offen · fällig 29.01.</span></span><span class="opt">Lehrerzimmer<span class="pill gelb">offen · fällig 29.01.</span></span><span class="opt">Fachraum Chemie<span class="pill gelb">offen · fällig 29.01.</span></span><span class="opt">Sporthalle<span class="pill gelb">offen · fällig 29.01.</span></span></div></div><span class="btn sec">Bearbeiten</span></div>
+      <div class="zeile"><div class="t"><b>Angabe: Unterrichtsfächer</b><small>Chemie, Sport · sehen Facility Management und IT-Abteilung</small></div></div>
+      <div class="stelle-kopf" style="margin-top:6px"><span class="pill blau">Verwaltung / Sekretariat</span></div>
+      <div class="zeile"><div class="t"><b>Fach im Lehrerzimmer</b></div><span class="pill gelb">offen</span><span class="btn sec">Bearbeiten</span></div>
+    </div>
+    <div class="card"><h5><span style="color:var(--gruen)">•</span> Aufgaben für Abteilungen <span class="btn sec" style="margin-left:auto">Weitere Abteilungen informieren (1)</span></h5>
+      <div class="zeile"><span class="pill blau">IT-Abteilung</span><div class="t">it@fes-minden.de · 8 Aufgaben, 6 offen<div class="neu-teil" style="margin-top:4px;padding:3px 6px;background:#fffbea;color:#78350f"><span class="neu-marke">neu</span>Nach der Information geändert: „Dienst-Laptop / PC“ hinzugefügt. Die IT erfährt davon erst mit „Nachtrag senden“.</div></div><span class="pill blau">Geöffnet (2×)</span><span class="btn sec neu-teil">Nachtrag senden</span></div>
+      <div class="zeile"><span class="pill blau">Facility Management</span><div class="t">hausmeister@fes-minden.de · 5 Aufgaben</div><span class="pill gelb">Informiert am 15.01.2027</span></div>
+    </div>
+    <div class="kat neu-teil" style="padding:1px 4px">— Ausstattung &amp; Zugänge —</div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Dienst-iPad bereitstellen</b><small>Bemerkung der Führungskraft: Mit Stift und Hülle, Apps: WebUntis, Explain Everything</small><span class="pill blau">IT-Abteilung</span> <small style="display:inline">Fällig: 27.01.2027</small></div></div></div>
+    <div class="card"><div class="zeile"><span class="box an"></span><div class="t"><b style="text-decoration:line-through;color:var(--ui-muted)">Zugang einrichten: Dienst-E-Mail</b><small>erledigt von IT-Abteilung (Link) am 20.01.2027</small><span class="pill blau">IT-Abteilung</span></div></div></div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Schlüssel ausgeben: Haupteingang</b><small>Bemerkung der Führungskraft: Sammlung erst nach der Sicherheitsunterweisung</small><span class="pill blau">Facility Management</span> <small style="display:inline">Fällig: 29.01.2027</small></div></div></div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Schlüssel ausgeben: Fachraum Chemie</b><small>Bemerkung der Führungskraft: Sammlung erst nach der Sicherheitsunterweisung</small><span class="pill blau">Facility Management</span> <small style="display:inline">Fällig: 29.01.2027</small></div></div></div>
+    <p class="lead" style="margin:0 0 6px;color:var(--ui-muted)">… und 7 weitere in dieser Kategorie (Telefon, Laptop, WebUntis, Schulportal, Lehrerzimmer, Sporthalle, Fach)</p>
+    <div class="kat">— IT-Einrichtung · Vor Arbeitsbeginn (wie bisher) —</div>
+  </div>
+</div>
+<p class="unter">Die Vorlagen-Aufgaben bleiben. Aus jeder Wahl kommt eine Aufgabe in der Kategorie „Ausstattung &amp; Zugänge“ dazu, bei Schlüsseln und Zugängen eine je gewählter Option: vier Schlüssel sind vier Aufgaben, jede einzeln abhakbar. Gesendet wird weiter nur über die Karte „Aufgaben für Abteilungen“, nachträgliche Änderungen über „Nachtrag senden“.</p>
+</div>
+</div>
+<div class="kasten gelb"><p><b>Doppelte Aufgaben vermeiden.</b> Steht in der Vorlage schon „Schlüssel bereitlegen“, liefe sie neben „Schlüssel ausgeben“ her. Mit dem Katalog sollte die Verwaltung solche pauschalen Vorlagenpunkte streichen oder umformulieren („Schließberechtigung im System anlegen“). Die Einstellungsseite des Katalogs weist auf Vorlagenpunkte derselben Stelle hin, deren Titel nach der Katalogposition klingen.</p></div>
+
+<h3>6.4 · Dialog „Abteilungen informieren“</h3>
+<div class="vn">
+<div>
+<div class="vn-label vorher"><i></i>Vorher</div>
+<div class="m"><div class="dialog-schleier"><div class="dialog">
+  <h6>Abteilungen informieren</h6>
+  <p class="lead" style="color:var(--ui-muted);margin:0 0 8px">Folgende Stellen erhalten eine E-Mail mit einem Link zu ihren Aufgaben. Der Link funktioniert ohne Anmeldung und ist gültig bis 03.03.2027.</p>
+  <div class="card" style="background:#fafafa"><b>IT-Abteilung – it@fes-minden.de</b><small style="display:block;color:var(--ui-muted)">• IT-Zugang einrichten – fällig 25.01.2027<br>• Arbeitsplatz-PC bereitstellen – fällig 29.01.2027</small></div>
+  <div class="card" style="background:#fafafa"><b>Facility Management – hausmeister@fes-minden.de</b><small style="display:block;color:var(--ui-muted)">• Schlüssel bereitlegen – fällig 29.01.2027</small></div>
+  <div class="card" style="background:#f6f6f4"><b style="font-size:9.5px">Was die Empfänger sehen</b><small style="display:block;color:var(--ui-muted)">Name, Einrichtung, Vorgangsnummer und Vertragsbeginn sowie ihre eigenen Aufgaben.<br>IT-Abteilung zusätzlich: Stellenbezeichnung, Betriebsstätte, Adresse der Führungskraft<br>Facility Management zusätzlich: Betriebsstätte, Adresse der Führungskraft<br>Keine Angaben aus dem Personalfragebogen.</small></div>
+  <div class="fuss"><span></span><span><span class="btn sec">Abbrechen</span> <span class="btn" style="background:var(--gruen);color:#fff">2 E-Mails senden</span></span></div>
+</div></div></div>
+</div>
+<div>
+<div class="vn-label nachher"><i></i>Nachher</div>
+<div class="m"><div class="dialog-schleier"><div class="dialog">
+  <h6>Abteilungen informieren</h6>
+  <p class="lead" style="color:var(--ui-muted);margin:0 0 8px">Folgende Stellen erhalten eine E-Mail mit einem Link zu ihren Aufgaben. Der Link funktioniert ohne Anmeldung und ist gültig bis 03.03.2027.</p>
+  <div class="card" style="background:#fafafa"><b>IT-Abteilung – it@fes-minden.de</b><small style="display:block;color:var(--ui-muted)">• IT-Zugang einrichten – fällig 25.01.2027<br>• Zugang einrichten: Dienst-E-Mail – fällig 25.01.2027<br>• Zugang einrichten: Schulportal – fällig 25.01.2027<br>…und 4 weitere</small><span class="neu-teil" style="display:inline-block;margin-top:3px;padding:1px 5px;font-size:9px"><span class="neu-marke">neu</span>davon 5 aus „Ausstattung &amp; Zugänge“, 2 mit Bemerkung</span></div>
+  <div class="card" style="background:#fafafa"><b>Facility Management – hausmeister@fes-minden.de</b><small style="display:block;color:var(--ui-muted)">• Schlüssel bereitlegen – fällig 29.01.2027<br>• Schlüssel ausgeben: Haupteingang – fällig 29.01.2027<br>• Schlüssel ausgeben: Lehrerzimmer – fällig 29.01.2027<br>…und 2 weitere</small></div>
+  <div class="card" style="background:#f6f6f4"><b style="font-size:9.5px">Was die Empfänger sehen</b><small style="display:block;color:var(--ui-muted)">Name, Einrichtung, Vorgangsnummer und Vertragsbeginn sowie ihre eigenen Aufgaben.<br>IT-Abteilung zusätzlich: Stellenbezeichnung, Betriebsstätte, Adresse der Führungskraft<br><span class="neu-teil" style="display:inline-block;padding:1px 4px;margin:2px 0">Zu ihren Aufgaben: die Bemerkungen der Führungskraft. Dazu die Angaben „Unterrichtsfächer“ (IT-Abteilung, Facility Management) und der Hinweis an die eigene Stelle.</span><br>Keine Angaben aus dem Personalfragebogen.</small></div>
+  <div class="fuss"><span></span><span><span class="btn sec">Abbrechen</span> <span class="btn" style="background:var(--gruen);color:#fff">2 E-Mails senden</span></span></div>
+</div></div></div>
+<p class="unter">Die Vorschau zeigt wie heute höchstens drei Aufgaben je Stelle; Schlüssel und Zugänge erscheinen einzeln. Neu ist nur eine Zeile je Stelle und ein Satz bei „Was die Empfänger sehen“. Beide kommen aus derselben Tabelle wie Mail und Link-Seite.</p>
+</div>
+</div>
+
+<h3>6.5 · Link-Seite der Stelle (hier: IT)</h3>
+<div class="vn">
+<div>
+<div class="vn-label vorher"><i></i>Vorher</div>
+<div class="m">
+  <div class="m-bar"><i></i><i></i><i></i><span>hr.fes-credo.de/onboarding-tasks/…</span></div>
+  <div class="m-hdr"><span class="logo">CREDO</span><span class="sub"><b>HR-Portal</b>Onboarding</span><span style="margin-left:auto" class="pill grau">0 / 2 erledigt</span></div>
+  <div class="m-linie"><span></span><span class="g"></span><span class="gr"></span><span class="r"></span><span class="b"></span></div>
+  <div class="m-body">
+    <div style="font-size:13px;font-weight:700;margin:2px 0 6px">Onboarding-Aufgaben: IT-Abteilung</div>
+    <div class="card"><div class="zwei" style="grid-template-columns:1fr 1fr 1fr"><div><small style="color:var(--ui-muted)">Neue Mitarbeiterin / neuer Mitarbeiter</small><br><b>Lena Brandt</b></div><div><small style="color:var(--ui-muted)">Einrichtung</small><br><b>Gymnasium Minden</b></div><div><small style="color:var(--ui-muted)">Vertragsbeginn</small><br><b>01.02.2027</b></div></div>
+      <div style="border-top:1px solid #eee;margin-top:6px;padding-top:5px"><b style="font-size:9px">Nur für IT-Abteilung</b><div class="zwei" style="grid-template-columns:1fr 1fr 1fr"><div><small style="color:var(--ui-muted)">Stellenbezeichnung</small><br>Lehrkraft für Chemie und Sport</div><div><small style="color:var(--ui-muted)">Betriebsstätte</small><br>Gymnasium Minden</div><div><small style="color:var(--ui-muted)">Ansprechpartner (Führungskraft)</small><br>schulleitung@…</div></div></div></div>
+    <b style="font-size:10px">Offene Aufgaben (2)</b>
+    <div class="kat">IT-Einrichtung</div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>IT-Zugang einrichten</b><small>Konto in der Schulverwaltung und in Microsoft 365 anlegen</small><small style="color:var(--blau)">Kommentar hinzufügen</small></div><span class="pill blau">Fällig 25.01.2027</span></div></div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Arbeitsplatz-PC bereitstellen</b><small style="color:var(--blau)">Kommentar hinzufügen</small></div><span class="pill blau">Fällig 29.01.2027</span></div></div>
+  </div>
+</div>
+</div>
+<div>
+<div class="vn-label nachher"><i></i>Nachher</div>
+<div class="m">
+  <div class="m-bar"><i></i><i></i><i></i><span>hr.fes-credo.de/onboarding-tasks/…</span></div>
+  <div class="m-hdr"><span class="logo">CREDO</span><span class="sub"><b>HR-Portal</b>Onboarding</span><span style="margin-left:auto" class="pill grau">2 / 8 erledigt</span></div>
+  <div class="m-linie"><span></span><span class="g"></span><span class="gr"></span><span class="r"></span><span class="b"></span></div>
+  <div class="m-body">
+    <div style="font-size:13px;font-weight:700;margin:2px 0 6px">Onboarding-Aufgaben: IT-Abteilung</div>
+    <div class="card"><div class="zwei" style="grid-template-columns:1fr 1fr 1fr"><div><small style="color:var(--ui-muted)">Neue Mitarbeiterin / neuer Mitarbeiter</small><br><b>Lena Brandt</b></div><div><small style="color:var(--ui-muted)">Einrichtung</small><br><b>Gymnasium Minden</b></div><div><small style="color:var(--ui-muted)">Vertragsbeginn</small><br><b>01.02.2027</b></div></div>
+      <div style="border-top:1px solid #eee;margin-top:6px;padding-top:5px"><b style="font-size:9px">Nur für IT-Abteilung</b><div class="zwei" style="grid-template-columns:1fr 1fr 1fr"><div><small style="color:var(--ui-muted)">Stellenbezeichnung</small><br>Lehrkraft für Chemie und Sport</div><div><small style="color:var(--ui-muted)">Betriebsstätte</small><br>Gymnasium Minden</div><div><small style="color:var(--ui-muted)">Ansprechpartner (Führungskraft)</small><br>schulleitung@…</div></div>
+      <div class="neu-teil" style="margin-top:5px;padding:4px 6px"><span class="neu-marke">neu</span><div class="zwei"><div><small style="color:var(--ui-muted)">Unterrichtsfächer</small><br>Chemie, Sport</div><div><small style="color:var(--ui-muted)">Hinweis der Führungskraft an die IT</small><br>—</div></div></div></div></div>
+    <b style="font-size:10px">Offene Aufgaben (6)</b>
+    <div class="kat neu-teil" style="padding:1px 4px">Ausstattung &amp; Zugänge</div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Dienst-iPad bereitstellen</b><div class="zitat neu-teil"><b>Bemerkung der Führungskraft</b>Mit Stift und Hülle, Apps: WebUntis, Explain Everything</div>
+      <div class="neu-teil" style="margin-top:6px;padding:3px 5px;outline-style:dotted"><span class="neu-marke">Stufe 2</span><div class="feld" style="margin:0"><label style="font-weight:500">Übergabe vermerken: Inventarnummer und Datum (optional)</label><div class="inp leer">z. B. FES-IPAD-0412 · 28.01.2027</div></div></div>
+      <small style="color:var(--blau)">Kommentar hinzufügen</small></div><span class="pill blau">Fällig 27.01.2027</span></div></div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Zugang einrichten: WebUntis</b><small>Erst nach Verpflichtung auf Vertraulichkeit freischalten.</small><small style="color:var(--blau)">Kommentar hinzufügen</small></div><span class="pill blau">Fällig 25.01.2027</span></div></div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Telefon mit Durchwahl bereitstellen</b><div class="zitat neu-teil"><b>Bemerkung der Führungskraft</b>Apparat im Lehrerzimmer reicht, keine eigene Nummer nötig</div><small style="color:var(--blau)">Kommentar hinzufügen</small></div></div></div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>Dienst-Laptop / PC bereitstellen</b><small style="color:var(--blau)">Kommentar hinzufügen</small></div></div></div>
+    <div class="kat">IT-Einrichtung</div>
+    <div class="card"><div class="zeile"><span class="box"></span><div class="t"><b>IT-Zugang einrichten</b><small>Konto in der Schulverwaltung und in Microsoft 365 anlegen</small></div><span class="pill blau">Fällig 25.01.2027</span></div></div>
+  </div>
+</div>
+<p class="unter">Jeder Zugang ist eine eigene Aufgabe; „Dienst-E-Mail“ und „Schulportal“ sind schon erledigt und stehen unten unter „Erledigte Aufgaben“. Die Bemerkung steht als eigener Kasten an der Aufgabe, getrennt vom festen Hinweis für die Stelle aus dem Katalog („Erst nach Verpflichtung …“). Die Stelle sieht nur ihre eigenen Positionen.</p>
+</div>
+</div>
+
+<h3>6.6 · E-Mail an die Stelle (<code>onboarding-department-assigned</code>)</h3>
+<div class="vn">
+<div>
+<div class="vn-label vorher"><i></i>Vorher</div>
+<div class="m"><div class="mail">
+  <div class="betreff">Betreff: <b>Onboarding-Aufgaben für IT-Abteilung: Dienstbeginn 01.02.2027 (Gymnasium Minden)</b></div>
+  <div class="blatt-m"><div class="mk" style="background:#1a1a2e">CREDO HR-Portal<br><span style="font-weight:400;font-size:9px;color:#a0a0c0">Gymnasium Minden</span></div>
+  <div class="mi">
+    <span class="pill blau">Neue Aufgaben</span>
+    <p style="margin:6px 0"><b style="font-size:11px">Aufgaben zum Dienstbeginn</b></p>
+    <p style="margin:0 0 4px">Guten Tag, bitte bereiten Sie den Dienstbeginn für <b>Lena Brandt</b> am 01.02.2027 in Gymnasium Minden vor. Folgende Aufgaben sind für Sie vorgesehen (zuständig: IT-Abteilung):</p>
+    <ul style="margin:0 0 4px;padding-left:16px"><li>IT-Zugang einrichten – fällig 25.01.2027<br><span style="color:#6b7280">Konto in der Schulverwaltung und in Microsoft 365 anlegen</span></li><li>Arbeitsplatz-PC bereitstellen – fällig 29.01.2027</li></ul>
+    <div class="kasten-m"><small style="color:#6b7280">Vertragsbeginn</small> 01.02.2027 · <small style="color:#6b7280">Vorgangsnummer</small> 2027-GYM-007<br><small style="color:#6b7280">Stellenbezeichnung</small> Lehrkraft für Chemie und Sport</div>
+    <span class="knopf" style="background:#2563eb">Aufgaben öffnen und abhaken →</span>
+  </div></div>
+</div></div>
+</div>
+<div>
+<div class="vn-label nachher"><i></i>Nachher</div>
+<div class="m"><div class="mail">
+  <div class="betreff">Betreff: <b>Onboarding-Aufgaben für IT-Abteilung: Dienstbeginn 01.02.2027 (Gymnasium Minden)</b> <small>(unverändert, ohne Bemerkungen)</small></div>
+  <div class="blatt-m"><div class="mk" style="background:#1a1a2e">CREDO HR-Portal<br><span style="font-weight:400;font-size:9px;color:#a0a0c0">Gymnasium Minden</span></div>
+  <div class="mi">
+    <span class="pill blau">Neue Aufgaben</span>
+    <p style="margin:6px 0"><b style="font-size:11px">Aufgaben zum Dienstbeginn</b></p>
+    <p style="margin:0 0 4px">Guten Tag, bitte bereiten Sie den Dienstbeginn für <b>Lena Brandt</b> am 01.02.2027 in Gymnasium Minden vor. Folgende Aufgaben sind für Sie vorgesehen (zuständig: IT-Abteilung):</p>
+    <ul style="margin:0 0 4px;padding-left:16px"><li>IT-Zugang einrichten – fällig 25.01.2027<br><span style="color:#6b7280">Konto in der Schulverwaltung und in Microsoft 365 anlegen</span></li>
+      <li class="neu-teil" style="padding:2px 4px;margin:3px 0">Zugang einrichten: Dienst-E-Mail – fällig 25.01.2027<br><span style="color:#6b7280">Erst nach Verpflichtung auf Vertraulichkeit freischalten.</span></li>
+      <li class="neu-teil" style="padding:2px 4px;margin:3px 0">Zugang einrichten: Schulportal – fällig 25.01.2027</li>
+      <li class="neu-teil" style="padding:2px 4px;margin:3px 0">Zugang einrichten: WebUntis – fällig 25.01.2027</li>
+      <li class="neu-teil" style="padding:2px 4px;margin:3px 0">Dienst-iPad bereitstellen – fällig 27.01.2027<br><span style="color:#6b7280">Bemerkung der Führungskraft: Mit Stift und Hülle, Apps: WebUntis, Explain Everything</span></li>
+      <li>… (insgesamt 7)</li></ul>
+    <div class="kasten-m"><small style="color:#6b7280">Vertragsbeginn</small> 01.02.2027 · <small style="color:#6b7280">Vorgangsnummer</small> 2027-GYM-007<br><small style="color:#6b7280">Stellenbezeichnung</small> Lehrkraft für Chemie und Sport<br><span class="neu-teil" style="display:inline-block;padding:1px 4px;margin-top:2px"><small style="color:#6b7280">Unterrichtsfächer</small> Chemie, Sport</span></div>
+    <div class="neu-teil" style="padding:3px 5px;margin:4px 0;color:#92400e"><span class="neu-marke">nachtrag</span>Nur beim Nachtrag: „Ihre Aufgaben wurden seit der letzten Nachricht ergänzt oder geändert. Neu: Dienst-Laptop / PC.“</div>
+    <span class="knopf" style="background:#2563eb">Aufgaben öffnen und abhaken →</span>
+  </div></div>
+</div></div>
+<p class="unter">Die Aufgabenliste baut der Code schon heute aus allen offenen Aufgaben der Stelle. Neu sind eine Zeile je gewähltem Zugang, die Zeile „Bemerkung der Führungskraft“, die Angaben im Infokasten und der Nachtrags-Satz. Sortiert ist wie heute nach Fälligkeit. Betreff unverändert.</p>
+</div>
+</div>
+
+<h3>6.7 · Einstellungen: der Katalog</h3>
+<div class="vn">
+<div>
+<div class="vn-label vorher"><i></i>Vorher · Einstellungen → Abteilungen</div>
+<div class="m">
+  <div class="m-bar"><i></i><i></i><i></i><span>hr.fes-credo.de/einstellungen</span></div>
+  <div class="m-body">
+    <div style="font-size:13px;font-weight:700">Einstellungen</div>
+    <p class="lead" style="color:var(--ui-muted);margin:0 0 6px">E-Mail-Versand, Vorlagen, Webhooks, Abteilungen und automatische Läufe verwalten</p>
+    <div class="m-tabs" style="border:1px solid var(--ui-border);border-radius:6px;margin-bottom:8px;gap:6px;padding:2px"><span>E-Mail</span><span>Vorlagen</span><span>Webhooks</span><span class="on" style="background:var(--ui-primary);color:#fff;border-radius:4px;padding:3px 6px;border:0">Abteilungen</span><span>API-Zugang</span><span>Automatische Läufe</span></div>
+    <div class="zeile" style="border:0"><div class="t" style="color:var(--ui-muted)">Abteilungen, die ihre Aufgaben aus den Onboarding- und Offboarding-Checklisten per Link erhalten – ohne Anmeldung im Portal.</div><span class="btn pri">+ Abteilung hinzufügen</span></div>
+    <table class="tbl"><thead><tr><th>Abteilung</th><th>Schlüssel</th><th>E-Mail</th><th>Gilt für</th><th>Verwendet in</th><th>Status</th></tr></thead><tbody>
+      <tr><td><b>IT-Support FES</b></td><td><code>IT</code></td><td>it@fes-minden.de</td><td><span class="pill blau">Zentral</span></td><td>5 Aufgaben in 3 Vorlagen</td><td><span class="pill gruen">Aktiv</span></td></tr>
+      <tr><td><b>Hausmeister Gymnasium</b></td><td><code>FACILITY</code></td><td>hausmeister@…</td><td>Gymnasium Minden</td><td>2 Aufgaben in 2 Vorlagen</td><td><span class="pill gruen">Aktiv</span></td></tr>
+      <tr><td><b>Sekretariat</b></td><td><code>VERWALTUNG</code></td><td>sekretariat@…</td><td><span class="pill blau">Zentral</span></td><td>3 Aufgaben in 2 Vorlagen</td><td><span class="pill gruen">Aktiv</span></td></tr>
+    </tbody></table>
+  </div>
+</div>
+<p class="unter">Hier stehen nur Adressen. Was eine Stelle bereitstellt, steht als fester Punkt in den Checklisten-Vorlagen, und die gelten für alle Einrichtungen gleich.</p>
+</div>
+<div>
+<div class="vn-label nachher"><i></i>Nachher · neuer Reiter „Ausstattung &amp; Zugänge“</div>
+<div class="m">
+  <div class="m-bar"><i></i><i></i><i></i><span>hr.fes-credo.de/einstellungen?tab=ausstattung</span></div>
+  <div class="m-body">
+    <div style="font-size:13px;font-weight:700">Einstellungen</div>
+    <div class="m-tabs" style="border:1px solid var(--ui-border);border-radius:6px;margin:6px 0 8px;gap:6px;padding:2px"><span>E-Mail</span><span>Vorlagen</span><span>Abteilungen</span><span class="on neu-teil" style="background:var(--ui-primary);color:#fff;border-radius:4px;padding:3px 6px;border:0">Ausstattung &amp; Zugänge</span><span>Automatische Läufe</span></div>
+    <div class="neu-teil" style="padding:6px">
+    <span class="neu-marke">neu</span>
+    <div class="zeile" style="border:0;align-items:center"><div class="t" style="color:var(--ui-muted)">Was Führungskräfte bei den Einstellungsmodalitäten anwählen können. Jede Wahl wird eine Aufgabe der Stelle.</div><span class="btn sec">Vorschläge übernehmen…</span><span class="btn pri">+ Position</span></div>
+    <div class="zwei" style="margin-bottom:6px"><div class="feld" style="margin:0"><label>Stelle</label><div class="inp">Alle Stellen</div></div><div class="feld" style="margin:0"><label>Einrichtung</label><div class="inp">Gymnasium Minden (mit zentralen)</div></div></div>
+    <table class="tbl"><thead><tr><th>Position</th><th>Art</th><th>Stelle</th><th>Gilt für</th><th>Fällig</th><th>Status</th></tr></thead><tbody>
+      <tr><td><b>Dienst-iPad (Lernmittel)</b><small>Bemerkung: „Stift, Hülle, Apps“ · nur Angestellte, Beamte</small></td><td>Ja/Nein</td><td>IT</td><td><span class="pill blau">Zentral</span></td><td>−5</td><td><span class="pill gruen">Aktiv</span></td></tr>
+      <tr><td><b>Zugänge</b><small>5 Optionen · „Dienst-E-Mail“ vorausgewählt</small></td><td>Auswahl</td><td>IT</td><td><span class="pill blau">Zentral</span></td><td>−7</td><td><span class="pill gruen">Aktiv</span></td></tr>
+      <tr><td><b>Schlüssel</b><small>Haupteingang · Lehrerzimmer · Fachraum Chemie · Chemie-Sammlung · Sporthalle · Musikraum</small></td><td>Auswahl</td><td>FACILITY</td><td>Gymnasium Minden</td><td>−3</td><td><span class="pill gruen">Aktiv</span></td></tr>
+      <tr><td><b>Unterrichtsfächer</b><small>sehen: FACILITY, IT · nur Angestellte, Beamte</small></td><td>Angabe</td><td>FACILITY</td><td><span class="pill blau">Zentral</span></td><td>—</td><td><span class="pill gruen">Aktiv</span></td></tr>
+      <tr><td><b>Kopierkarte</b><small>für Gymnasium Minden ausgeblendet</small></td><td>Ja/Nein</td><td>VERWALTUNG</td><td><span class="pill blau">Zentral</span></td><td>0</td><td><span class="pill grau">Ausgeblendet hier</span></td></tr>
+    </tbody></table>
+    <div class="card" style="margin-top:8px"><h5>Position „Schlüssel“ bearbeiten</h5>
+      <div class="zwei"><div class="feld"><label>Bezeichnung *</label><div class="inp">Schlüssel</div></div><div class="feld"><label>Art</label><div class="inp">Auswahl (mehrere)</div></div></div>
+      <div class="feld"><label>Optionen (eine je Zeile)</label><div class="inp gross">Haupteingang<br>Lehrerzimmer<br>Fachraum Chemie …</div></div>
+      <div class="zwei"><div class="feld"><label>Aufgabe für die Stelle</label><div class="inp">Schlüssel ausgeben</div></div><div class="feld"><label>Fällig (Tage)</label><div class="inp">−3</div><small>relativ zum Vertragsbeginn</small></div></div>
+      <div class="zeile" style="border:0"><span class="box an"></span><div class="t">Bemerkung anbieten<small>Platzhalter: „z. B. Einschränkungen, Ausgabe erst nach Unterweisung“</small></div></div>
+      <div class="zwei"><div class="feld"><label>Gilt für Personengruppen</label><div class="chips"><span class="chip an">Angestellte</span><span class="chip an">Beamte</span><span class="chip">Kita</span><span class="chip an">Minijob</span><span class="chip">Ehrenamt</span></div></div><div class="feld"><label>Stufe 2: Ausgabe abfragen</label><div class="inp">Schlüsselnummer</div></div></div>
+    </div>
+    </div>
+  </div>
+</div>
+<p class="unter">Eigener Reiter neben „Abteilungen“, nur für Admin-Rollen wie dort. Zentrale Positionen gelten überall, eine Einrichtung ergänzt eigene (Schlüssel, Räume) oder blendet zentrale aus.</p>
+</div>
+</div>
+
+<h3>6.8 · Stufe 2: Rückgaben im Offboarding</h3>
+<div class="vn">
+<div>
+<div class="vn-label vorher"><i></i>Vorher · Reiter „Rückgaben“, leer</div>
+<div class="m"><div class="m-body">
+  <div class="zeile" style="border:0;align-items:center"><div class="t"><b>Noch keine Rückgaben erfasst</b></div><span class="btn" style="background:var(--gruen);color:#fff">Gegenstand hinzufügen</span></div>
+  <div class="card" style="border-style:dashed;text-align:center;color:var(--ui-muted)"><b style="color:var(--ui-fg)">Keine Rückgaben</b><br>Es wurden noch keine Gegenstände zur Rückgabe erfasst.</div>
+  <p class="lead" style="color:var(--ui-muted)">HR tippt jeden Gegenstand von Hand ein und muss wissen, was die Person je bekommen hat.</p>
+</div></div>
+</div>
+<div>
+<div class="vn-label nachher"><i></i>Nachher · aus dem Onboarding vorgeschlagen</div>
+<div class="m"><div class="m-body">
+  <div class="zeile" style="border:0;align-items:center"><div class="t"><b>1 von 4 Gegenständen zurückgegeben</b></div><span class="btn" style="background:var(--gruen);color:#fff">Gegenstand hinzufügen</span></div>
+  <div class="neu-teil" style="padding:4px 6px;margin-bottom:6px"><span class="neu-marke">Stufe 2</span>Laut Portal ausgegeben (Einstellung 2027-GYM-007, von HR zugeordnet): 4 Gegenstände.</div>
+  <table class="tbl"><thead><tr><th>Kategorie</th><th>Gegenstand</th><th>Seriennummer</th><th>Status</th></tr></thead><tbody>
+    <tr><td><span class="pill grau">IT-Hardware</span></td><td>Dienst-iPad (Lernmittel)<small>übergeben 28.01.2027 · IT-Abteilung</small></td><td><code>FES-IPAD-0412</code></td><td><span class="pill rot">Ausstehend</span></td></tr>
+    <tr><td><span class="pill grau">Schlüssel &amp; Zugangskarten</span></td><td>Schlüssel Haupteingang<small>übergeben 30.01.2027 · Facility Management</small></td><td><code>GS-114</code></td><td><span class="pill gruen">Zurück</span></td></tr>
+    <tr><td><span class="pill grau">Schlüssel &amp; Zugangskarten</span></td><td>Schlüssel Fachraum Chemie<small>übergeben 30.01.2027 · Facility Management</small></td><td><code>GS-201</code></td><td><span class="pill rot">Ausstehend</span></td></tr>
+    <tr><td><span class="pill grau">IT-Hardware</span></td><td>Dienst-Laptop / PC<small>übergeben 01.02.2027 · IT-Abteilung</small></td><td><code>NB-2231</code></td><td><span class="pill rot">Ausstehend</span></td></tr>
+  </tbody></table>
+  <div class="neu-teil" style="padding:4px 6px;margin-top:8px"><span class="neu-marke">Stufe 2</span>Sperraufgaben an die IT-Abteilung zum letzten Arbeitstag, über ihren Offboarding-Link: Dienst-E-Mail, Schulportal, WebUntis.</div>
+</div></div>
+<p class="unter">Eine Zeile je Stück (E-A12, E-A30). Gegenstände kommen als Rückgabezeilen, Zugänge und Transponder als Sperraufgabe der ausgebenden Stelle, die auch die Rücknahme bestätigt (E-A32). Voraussetzung: HR hat dem Austritt die Einstellung zugeordnet (E-A31). „Laut Portal“: Was vor der Einführung ausgegeben wurde, fehlt hier, und die Anzeige sagt das (E-A36).</p>
+</div>
+</div>
+<div class="kasten rot"><p><b>Nebenbefund beim Lesen des Codes:</b> Der Reiter „Rückgaben“ im Offboarding ruft heute <code>/api/offboarding/[id]/returns</code> auf. Die Route heißt aber <code>/return-items</code>, deshalb scheitern „Gegenstand hinzufügen“ und „Rückgabe“ bestätigen mit 404. Die Route prüft außerdem weder Rolle noch Mandant. Das ist unabhängig von diesem Plan und als eigene Aufgabe abgelegt. Stufe 2 setzt die Reparatur voraus.</p></div>
+</section>
+
+<section class="abschnitt" id="regeln">
+<h2><span class="nr">7</span>Regeln</h2>
+<p>Nach dem Muster der übrigen Pakete: Was hier steht, soll später als Abschnitt in CLAUDE.md stehen und von Tests gehalten werden. Die Klammern verweisen auf die Entscheidung, aus der eine Regel folgt (Abschnitte 12 und 13).</p>
+<ol>
+  <li><b>Leerer Katalog heißt: keine Änderung.</b> Der Schritt „Ausstattung &amp; Zugänge“ erscheint nur, wenn für den Vorgang mindestens eine aktive Position übrig bleibt. Gefiltert wird nach Arbeitsort (E-A10, Vorgabe: Einrichtung des Vorgangs), Einrichtungsart, Personengruppe und Vorgangsart, nur bei EINSTELLUNG. Positionen, deren Stelle am Arbeitsort keine aktive Adresse hat, fehlen im Formular; die Stelle HR ist davon ausgenommen. Neue Positionen und „Vorschläge übernehmen“ legen alles <b>ausgeschaltet</b> an.</li>
+  <li><b>Die Schrittliste steht fest, sobald der Modalitäten-Link entsteht.</b> <code>vorgesetztenLinkSetzen</code> setzt den Merker <code>SupervisorData.mitAusstattung</code> beim Anlegen der Zeile; ein späteres Erneuern ändert ihn nur, solange er leer ist und <code>currentStep</code> 0 ist. Dieselbe Transaktion gibt der Einladungsmail <code>ausstattung_angeboten</code> mit. Bestehende Zeilen setzt eine einmalige Datenmigration (<code>SystemMigration</code> in <code>prisma/seed-check.js</code>) auf <code>false</code>, damit „leer“ nie zugleich „Altfall“ und „noch nicht geöffnet“ heißt. Der GET des Formulars bleibt schreibfrei. Formular, „Schritt x von y“ in der HR-Ansicht und <code>modalitaetenFortschritt()</code> lesen nur den Merker, nie den Katalog; sonst spränge ein halb ausgefülltes Formular, weil <code>currentStep</code> ein Index ist.</li>
+  <li><b>Alles freiwillig.</b> Keine Position verlangt eine Antwort (E-A5). „Weiter“ ist in diesem Schritt nie gesperrt.</li>
+  <li><b>Momentaufnahme, vom Server geprüft.</b> Mit der Wahl werden Bezeichnung, Stelle, Art, Aufgabentitel, Fälligkeit (<code>relativeDueDays</code>), Hinweis für die Stelle, „sichtbar für“, Ausgabekennung, Rückgabekategorie und Verhalten beim Austritt in den Vorgang kopiert. Bei Auswahl-Positionen trägt jede Aufgabe ihre Option im Titel („Schlüssel ausgeben: Haupteingang“); Optionen stammen nur aus dem Katalog, nie aus Freitext. Der Modalitäten-PUT ist öffentlich (nur Token) und prüft deshalb jede Wahl gegen den Katalogausschnitt genau dieses Vorgangs: Eine fremde oder unbekannte Position oder Option ergibt 400. Spätere Katalogänderungen ändern keinen laufenden Vorgang; eine inzwischen ausgeschaltete Position bleibt mit „nicht mehr im Katalog“ stehen.</li>
+  <li><b>Wer wann schreibt</b> (E-A11). Bis zur Abgabe gehört die Auswahl allein der Führungskraft. Gespeichert wird wie in den übrigen Schritten bei „Weiter“ (PUT, eine Transaktion), und ersetzt werden nur Zeilen mit <code>quelle = FUEHRUNGSKRAFT</code>. Die Karte für HR ist bis zur Abgabe nur lesbar. Ohne eingereichte Modalitäten bleibt sie lesend mit dem Satz „Ohne Einstellungsmodalitäten kann nichts an die Stellen gehen.“ Nach der Abgabe bearbeitet HR (<code>HR_EDIT_ROLES</code>). Die Führungskraft sieht nie, was HR ergänzt hat.</li>
+  <li><b>Aus jeder Wahl wird eine Aufgabe</b> (E-A2; bei Auswahl-Positionen je Option, E-A12). Die Aufgaben entstehen nach dem Commit der Modalitäten-Abgabe in <b>einer</b> Transaktion. Sie sperrt den Vorgang und beansprucht jede Zeile bedingt (<code>updateMany … WHERE checklistItemId IS NULL</code>, erst dann anlegen). In derselben Transaktion laufen danach <code>faelligkeitenSetzen</code> und <code>linkStatusNeuBerechnenIn</code>. Scheitert das, wird es nur geloggt; jede Aktion der Karte und der tägliche Lauf (Abschnitt 3 von <code>/api/cron/reminders</code>) holen es nach. Kategorie „Ausstattung &amp; Zugänge“, <code>orderIndex</code> unterhalb aller Vorlagenpunkte, damit die Aufgaben oben stehen.</li>
+  <li><b>Angaben und Hinweise.</b> Angaben wie „Unterrichtsfächer“ (Art „Angabe“, nur aus der festen Liste im Code, E-A13) und der Hinweis je Stelle stehen im Block „Nur für …“ der Link-Seite und im Infokasten der Mail, nur für die eigene Stelle und die Stellen unter „sichtbar für“. Ein ausgefüllter Hinweis erzeugt zusätzlich eine Aufgabe „Hinweis der Führungskraft beachten“ (E-A14), sonst bekäme eine Stelle, die nur einen Hinweis hat, weder Link noch Mail. In der Karte steht jeder Hinweis mit „Als Position übernehmen …“ und „Zur Kenntnis genommen“.</li>
+  <li><b>Bemerkung und Hinweis getrennt.</b> Die Bemerkung gehört zur Position und wird über die Verknüpfung angezeigt; ändert HR sie, stimmt die Aufgabe sofort. Beschriftet wird sie nach Herkunft (<code>bemerkungQuelle</code>): „Bemerkung der Führungskraft“, „… der Personalabteilung“ oder „… der Führungskraft, ergänzt durch die Personalabteilung“. Der Katalog kennt zwei Hinweise: <code>hinweisFuehrungskraft</code> (nur im Formular) und <code>hinweisStelle</code> (wird in <code>description</code> der Aufgabe kopiert, wie bei den Checklisten-Vorlagen).</li>
+  <li><b>Ändern und Streichen.</b> Ist die Aufgabe offen, darf HR die Position ändern oder streichen. Vor der ersten Information der Stelle verschwindet sie ganz. Danach setzt Streichen <code>gestrichenAm</code>: Die Zeile bleibt, die Link-Seite zeigt „entfällt“ (E-A21), der Kommentar der Stelle bleibt erhalten. Ist die Aufgabe erledigt, ist die Position gesperrt, bis die Aufgabe wieder geöffnet wird. Jede Änderung über die Karte ruft in derselben Transaktion <code>linkStatusNeuBerechnenIn</code> für die alte und die neue Stelle auf; eine neue Aufgabe für eine schon fertige Stelle öffnet deren Link wieder (Erinnerung und Nachtrag möglich). Zuständigkeit und Fälligkeit ändern sich nur über die Karte. Der Checklisten-PATCH weist <code>assignee</code> für verknüpfte Aufgaben mit 409 ab („Zuständigkeit in der Karte ‚Ausstattung &amp; Zugänge‘ ändern“).</li>
+  <li><b>Nachtrag nur per Knopf</b> (E-A7). Jede HR-Änderung nach der Information einer Stelle schreibt in derselben Transaktion einen Eintrag in die Änderungsliste dieser Stelle (<code>NEU</code>, <code>GEAENDERT</code>, <code>ENTFAELLT</code>; bei einem Stellenwechsel für beide Stellen). Es zählen nur Inhaltsfelder (Titel, Auswahl, Bemerkung, Hinweis, Angabe, Stelle), nie Verknüpfung oder Ausgabevermerk. Ist die Liste nicht leer, zeigt die Abteilungskarte „Nachtrag senden“. Die Aktion <code>nachtrag</code> gibt es nur im Onboarding; im Offboarding antwortet sie mit 400. Sie hat eine eigene Vorprüfung und sendet auch dann, wenn nur „Entfällt“ zu melden ist und keine Aufgabe mehr offen ist. Gleicher Token, 10 Minuten Sperrzeit wie „Erneut senden“. Geleert wird die Liste nur bei SENT oder WEBHOOK.</li>
+  <li><b>Stellen.</b> Positionen gibt es für alle Link-Stellen (IT, VERWALTUNG, FACILITY, BUCHHALTUNG, DSB, eigene) und für HR (dann eine Aufgabe im Portal, ohne Link). Nicht für MITARBEITER und VORGESETZTER: Die Führungskraft füllt das Formular selbst aus. Positionen mit Bedeutung für Entgelt oder Vertrag (Dienstwagen, Jobticket, Diensthandy mit Privatnutzung) erlaubt der Katalog nur mit der Stelle HR (E-A24). Die Katalogseite rechnet Adresslücken je Einrichtung aus (Position × Einrichtung).</li>
+  <li><b>Sperrreihenfolge</b> Vorgang → Links → Aufgaben → Ausstattung, wie bei den Abteilungsaufgaben. Jede HR-Änderung sperrt zuerst den Vorgang.</li>
+  <li><b>Endstatus.</b> Bei COMPLETED und EXPIRED ist die Karte nur noch lesbar. „Vorgang abschließen“ mit offenen Ausstattungsaufgaben verlangt eine Bestätigung, die diese Aufgaben nennt; ohne sie antwortet der Server mit 409 (E-A19). Nach einer Absage (EXPIRED) kann HR die schon informierten Stellen per Knopf benachrichtigen (E-A20); Rückbau-Aufgaben kommen mit A4.</li>
+  <li><b>Kurzfristige Einstellungen.</b> Für Ausstattungsaufgaben setzt <code>faelligkeitenSetzen</code> die Fälligkeit auf frühestens den Berliner Kalendertag des Versands und kennzeichnet sie als „Eilt“. Die erste Erinnerung ist dann keine Eskalation. Die Karte warnt vor dem Versand, wenn der Vertragsbeginn näher liegt als der Vorlauf einer Position: „bis Dienstbeginn voraussichtlich nicht verfügbar – Übergangslösung klären“.</li>
+  <li><b>Wächter.</b> Die Zeile einer Stelle in der Abteilungskarte wird rot, wenn die Modalitäten da sind, die Stelle nicht informiert ist und die früheste Fälligkeit ihrer offenen Aufgaben weniger als 7 Tage entfernt oder schon vorbei ist („Früheste Fälligkeit 25.01. – Stelle noch nicht informiert“). Dasselbe gilt für einen offenen Nachtrag. Die Regel steht rein in <code>abteilungsaufgaben.ts</code>. Dazu kommt die Sammelmail an HR am Werktag vor Dienstbeginn (E-A18).</li>
+  <li><b>Rollen</b> (E-A23). Bemerkungen, Hinweise und Angaben sehen im Portal nur <code>HR_EDIT_ROLES</code>, außerhalb nur die jeweilige Stelle über ihren Link. Ausstattungsaufgaben hakt im Portal nur <code>HR_EDIT_ROLES</code> ab, nie der n8n-Schlüssel (<code>SERVICE</code>). Wer später Detailrouten für mandantenbeschränkte Rollen öffnet, filtert diese Felder heraus; ein Test hält das.</li>
+  <li><b>Betreff und Payload.</b> <code>betreffOhne</code> für <code>onboarding-department-assigned</code>, <code>-reminder</code> und <code>onboarding-task-completed</code>: <code>aufgabenliste</code>, <code>aufgabenliste_html</code>, <code>angaben</code>, <code>angaben_html</code>, <code>nachtrag_liste</code>, <code>nachtrag_liste_html</code>, <code>link</code>, <code>magicLink</code>, ab A4 <code>ausgabe_vermerk</code>. Der PUT der Vorlagen weist das mit 400 ab. Die neuen Rohfelder stehen in <code>FREITEXT_VARIABLEN</code>. Freitext (Bemerkung, Angabe, Hinweis) steht nie im Aufgabentitel, weil der Titel im Betreff von <code>onboarding-task-completed</code> erscheint. Freie HR-Positionen haben höchstens 120 Zeichen.</li>
+  <li><b>Katalogänderungen werden protokolliert</b> (AuditLog mit vorher/nachher je Feld, ohne Personendaten).</li>
+  <li><b>Gebaut wird auf <code>main</code>, in der Optik der jeweiligen Seite.</b> Auf <code>main</code> gibt es die Bausteine des UX-Umbaus (<code>src/components/ui/</code>) und die Adressen <code>/vorgaenge/…</code> noch nicht. Die Mockups zeigen die Adressen des Umbau-Branches; auf <code>main</code> heißt die Seite <code>/dashboard/[id]?tab=checklist</code>. Neue Dateien haben in der Sperrklinke Stand 0. Rückfragen laufen deshalb über <code>unterlagen/dialog-rahmen.tsx</code>, Symbole kommen aus <code>lucide-react</code>, Datumsangaben aus <code>formatDatumDE</code>, Farben nur aus den alten Tokens der Seite. Der Umzug auf die Bausteine kommt mit U4.</li>
+  <li><b>Reiter Checkliste ohne Vorlage.</b> Ausstattungs- und Abteilungskarte stehen vor dem Leerzustand „Keine Checkliste“, damit Vorgänge ohne Checklisten-Vorlage sie trotzdem zeigen.</li>
+</ol>
+<div class="kasten"><p><b>Was sich nicht ändert:</b> die Regeln aus Paket 5 (Token nur einmal, Nachweis nur bei echtem Versand, Versand erst nach eingereichten Modalitäten, Erinnerungen im bestehenden Lauf), der Personalfragebogen (keine seiner Angaben geht an eine Stelle), die Checklisten-Vorlagen und das Offboarding bis Stufe 2.</p></div>
+</section>
+
+<section class="abschnitt" id="datenmodell">
+<h2><span class="nr">8</span>Datenmodell</h2>
+<p>Alle Änderungen kommen nur hinzu, nichts wird umbenannt. Der Schema-Abgleich beim Containerstart ist damit ungefährlich. Zustände sind Zeichenketten, keine Enums, weil <code>db push --accept-data-loss</code> einen umbenannten Enum-Wert still ausspielte.</p>
+<h3>Stufe 1 (A1 bis A3)</h3>
+<pre>// Katalog
+model AusstattungsPosition {
+  id                    String   @id @default(uuid())
+  departmentKey         String               // Stelle; nicht MITARBEITER/VORGESETZTER
+  organizationId        String?              // null = zentral
+  einrichtungsarten     String[]             // OrganizationType-Werte, leer = alle (z. B. alle Kitas)
+  art                   String               // "JA_NEIN" | "AUSWAHL" | "ANGABE"
+  angabeSchluessel      String?              // nur ANGABE: Wert aus der festen Liste im Code (E-A13)
+  bezeichnung           String               // max. 120
+  hinweisFuehrungskraft String?              // nur im Formular, max. 300
+  hinweisStelle         String?              // wird description der Aufgabe, max. 500
+  optionen              String[]             // nur AUSWAHL, hoechstens 40 je max. 80
+  bemerkungAnbieten     Boolean  @default(true)
+  bemerkungPlatzhalter  String?
+  aufgabeTitel          String?              // Standard: "&lt;Bezeichnung&gt; bereitstellen"
+  defaultDueDays        Int?                 // relativ zum Vertragsbeginn = Vorlauf
+  personengruppen       String[]             // QuestionnaireType-Werte, leer = alle
+  sichtbarFuer          String[]             // nur ANGABE: weitere Stellen
+  vorausgewaehlt        Boolean  @default(false)
+  ausgabeKennung        String?              // A4: "Inventarnummer", "Schluesselnummer"
+  rueckgabeKategorie    String?              // A4: Wert aus ReturnCategory
+  beiAustritt           String?              // A4: "RUECKGABE" | "SPERREN" | "NICHTS"
+  isActive              Boolean  @default(false)  // neu = aus
+  orderIndex            Int      @default(0)
+  @@map("ausstattungs_positionen")
+}
+
+model AusstattungsAusblendung {                // Einrichtung blendet zentrale Position aus
+  positionId     String
+  organizationId String
+  @@id([positionId, organizationId])
+  @@map("ausstattungs_ausblendungen")
+}
+
+// Je Vorgang
+model OnboardingAusstattung {
+  id                 String    @id @default(uuid())
+  onboardingId       String                     // Cascade
+  positionId         String?                    // SetNull; null = freie Position von HR
+  departmentKey      String                     // --- Momentaufnahme ---
+  art                String
+  bezeichnung        String
+  aufgabeTitel       String
+  hinweisStelle      String?
+  relativeDueDays    Int?
+  sichtbarFuer       String[]
+  ausgabeKennung     String?
+  rueckgabeKategorie String?
+  beiAustritt        String?
+  auswahl            String[]                   // AUSWAHL: gewaehlte Optionen, je Option eine Aufgabe
+  angabe             String?                    // ANGABE, max. 300
+  bemerkung          String?                    // max. 500
+  bemerkungQuelle    String?                    // "FUEHRUNGSKRAFT" | "HR" | "BEIDE"
+  quelle             String                     // "FUEHRUNGSKRAFT" | "HR"
+  erfasstVonId       String?
+  gestrichenAm       DateTime?                  // Streichen nach der Information (Regel 9)
+  inhaltGeleertAm    DateTime?                  // Loeschfrist (E-A22)
+  @@unique([onboardingId, positionId])
+  @@map("onboarding_ausstattung")
+}
+
+model OnboardingAusstattungAufgabe {          // eine Aufgabe je Position bzw. je Option (E-A12)
+  ausstattungId   String                      // Cascade
+  option          String   @default("")       // "" = ganze Position (kein NULL im Schluessel)
+  checklistItemId String   @unique            // die erzeugte Aufgabe
+  @@id([ausstattungId, option])
+  @@map("onboarding_ausstattung_aufgaben")
+}
+
+model OnboardingStellenHinweis {              // "Weitere Hinweise an die IT"
+  onboardingId    String
+  departmentKey   String
+  text            String                      // max. 1000
+  quelle          String
+  checklistItemId String?  @unique            // Aufgabe "Hinweis beachten" (E-A14)
+  gesehenAm       DateTime?                   // HR: uebernommen oder zur Kenntnis
+  inhaltGeleertAm DateTime?
+  @@id([onboardingId, departmentKey])
+  @@map("onboarding_stellen_hinweise")
+}
+
+model OnboardingAusstattungAenderung {        // Nachtragsliste je Stelle (Regel 10)
+  id            String   @id @default(uuid())
+  onboardingId  String
+  departmentKey String
+  art           String                      // "NEU" | "GEAENDERT" | "ENTFAELLT"
+  titel         String
+  erfasstAm     DateTime @default(now())
+  gesendetAm    DateTime?                   // gesetzt bei SENT/WEBHOOK des Nachtrags
+  @@index([onboardingId, departmentKey])
+  @@map("onboarding_ausstattung_aenderungen")
+}
+
+// Ergaenzungen
+model SupervisorData    { … mitAusstattung Boolean? }  // Regel 2; Bestand per Migration false
+model OnboardingProcess { … arbeitsortId   String? }   // E-A10; null = Einrichtung des Vorgangs</pre>
+
+<h3>Stufe 2 (A4), Entwurf</h3>
+<p>Folgt aus E-A30 und E-A31. Der Bestand lebt länger als der Onboarding-Vorgang. Er hängt deshalb nicht per Cascade am Onboarding, und jede Zeile steht für ein einzelnes Stück.</p>
+<pre>model Ausgabe {                              // eine Zeile je Stueck (je Schluessel, je Geraet)
+  id                String    @id @default(uuid())
+  employeeId        String?                    // Personalakte, sobald verknuepft
+  onboardingId      String?                    // Herkunft, OHNE Cascade
+  organizationId    String                     // Einrichtung, der das Stueck gehoert
+  departmentKey     String                     // ausgebende Stelle
+  bezeichnung       String
+  kennung           String?                    // Inventar-/Schluesselnummer
+  rueckgabeKategorie String
+  beiAustritt       String                     // "RUECKGABE" | "SPERREN"
+  quelle            String                     // "AUFGABE" | "HR"
+  checklistItemId   String?
+  uebergebenAm      DateTime?                  // getrennt vom Abhaken
+  uebergebenDurch   String?
+  zustand           String                     // AUSGEGEBEN | ZURUECK | BESCHAEDIGT | FEHLT | VERBLEIBT | ENTFAELLT | ERSETZT
+  ersetztDurchId    String?
+  loeschenAb        DateTime?                  // E-A37
+  @@map("ausgaben")
+}
+model ReturnItem { … ausgabeId String? @@unique([offboardingId, ausgabeId]) }   // Rueckfluss, keine Doppelten</pre>
+
+<h3>Wo die Regeln liegen sollen</h3>
+<ul>
+  <li><b>Rein, client-sicher, ohne Uhr</b> (wie <code>abteilungsaufgaben.ts</code>): <code>src/lib/ausstattung.ts</code> mit Arten, Grenzen, der festen Liste der Angaben, <code>positionenFuer(katalog, { arbeitsort, einrichtungsart, questionnaireType, processType, empfaengerLage })</code>, <code>aufgabenAus(ausstattung)</code>, <code>angabenFuer(departmentKey, …)</code>, <code>nachtragListe</code>, <code>eiltFaelligkeit</code>, <code>MELDUNGEN</code>, Audit-Schlüssel. Der Wächter (Regel 15) steht in <code>abteilungsaufgaben.ts</code>. Zod in <code>src/lib/validations/ausstattung.ts</code>.</li>
+  <li><b>Server:</b> <code>src/lib/ausstattung-dienst.ts</code> (Katalog, Auswahl aus dem Formular speichern und prüfen, Aufgaben anlegen und nachholen, HR-Bearbeitung, Nachtragsliste).</li>
+  <li><b>Routen</b> (dünn): <code>/api/settings/ausstattung[/id]</code> (<code>adminHandler</code>), <code>GET|POST /api/onboarding/[id]/ausstattung</code> (<code>HR_EDIT_ROLES</code>, Mandant per <code>canAccessProcess</code>, unbekannt oder fremd = 404 mit gleichem Text). Der Modalitäten-GET liefert den Katalogausschnitt mit, der Modalitäten-PUT nimmt <code>ausstattung</code> und <code>hinweise</code> an.</li>
+  <li><b>Anschlüsse an Paket 5:</b> <code>aufgabenlisteMailFelder</code> bekommt die Bemerkungszeile und „Eilt“. Der Zusatzblock der Link-Seite bekommt die Angaben (zusätzlich zu den drei festen Feldern aus <code>ONBOARDING_ZUSATZFELDER</code>, die bleiben). <code>sichtbarkeitsHinweis</code> bekommt den neuen Satz. Neue Aktion <code>nachtrag</code> nur im Onboarding-Dienst. <code>linkStatusNeuBerechnenIn</code> wird von jedem Schreibweg der Karte gerufen.</li>
+  <li><b>Oberfläche:</b> <code>src/components/ausstattung/</code> (Karte, Bearbeiten-Dialog, Formularschritt). Der Formularschritt ist eine eigene Komponente, die <code>page.tsx</code> der Modalitäten nur einbindet. Die Seite hat heute 1860 Zeilen und eine fest verdrahtete Weiche <code>currentStep === 0 … 4</code>; die Weiche wird dabei auf die Schrittliste umgestellt.</li>
+</ul>
+</section>
+
+<section class="abschnitt" id="vorlagen">
+<h2><span class="nr">9</span>Betroffene E-Mail- und Word-Vorlagen</h2>
+<p>Gespeicherte Vorlagen in der Datenbank überschreiben die Code-Vorgaben vollständig. Nach dem Deploy braucht jede geänderte Vorlage <b>„Text auf Standard zurücksetzen“</b> (Einstellungen → Vorlagen), sonst fehlen die neuen Blöcke. Neue Ereignisse brauchen einen Eintrag im Ereigniskatalog <code>src/lib/events.ts</code> (ein Test erzwingt das) und eine Vorlage in <code>default-email-templates.ts</code>.</p>
+<h3>Bestehende Vorlagen</h3>
+<div class="tab-wrap"><table>
+<thead><tr><th>Vorlage</th><th>Änderung</th><th>Zurücksetzen nötig?</th></tr></thead>
+<tbody>
+<tr><td><code>onboarding-department-assigned</code> (an die Stelle)</td><td>Bemerkung und „Eilt“ stehen automatisch in der Aufgabenliste (der Code baut <code>{{aufgabenliste_html}}</code>). <b>Neu in der Vorlage:</b> Block <code>{{#angaben_html}}</code> im Infokasten (Unterrichtsfächer, Hinweis an die Stelle), Block <code>{{#nachtrag}}</code> mit den Listen „Neu“, „Geändert“ und „Entfällt“ (<code>{{nachtrag_liste_html}}</code>), beides auch im Textteil, dazu die Variablenliste. <code>betreffOhne</code> neu (Regel 17).</td><td><b>Ja</b>, für Angaben und Nachtrag. Die Bemerkungen kommen auch ohne.</td></tr>
+<tr><td><code>onboarding-department-reminder</code> (Erinnerung an die Stelle)</td><td>Bemerkung und „Eilt“ stehen automatisch in der Aufgabenliste. <code>betreffOhne</code> neu. Sonst keine Änderung (Angaben stehen bewusst nur in der ersten Mail).</td><td>Nein</td></tr>
+<tr><td><code>onboarding-task-completed</code> (an HR)</td><td><b>A3:</b> An-Feld setzen (HR-Postfach; die Payload bekommt dafür <code>hr_postfach</code> wie die HR-Mails aus Paket 4) und auch reine Kommentare der Stelle melden (E-A17); <code>betreffOhne</code> neu, weil der Betreff <code>{{aufgabe}}</code> nennt. <b>A4:</b> Zeile „Übergeben: {{ausgabe_vermerk}}“.</td><td><b>Ja</b> (An-Feld)</td></tr>
+<tr><td><code>onboarding-department-completed</code></td><td>Keine</td><td>Nein</td></tr>
+<tr><td><code>supervisor-link-created</code> (Einladung an die Führungskraft)</td><td>Satz im Block <code>{{#ausstattung_angeboten}}</code>: „Im Formular können Sie auch angeben, was zum Arbeitsbeginn bereitstehen soll.“ Der Merker kommt aus derselben Transaktion wie der Link (Regel 2).</td><td>Ja</td></tr>
+<tr><td><code>supervisor-completed</code> (an HR)</td><td>Zeile „Ausstattung: 6 Positionen für 3 Stellen“ (<code>{{ausstattung_kurz}}</code>, ohne Bemerkungstexte).</td><td>Ja</td></tr>
+<tr><td><code>offboarding-department-assigned</code> (A4, an die Stelle)</td><td>Die Rücknahme- und Sperraufgaben stehen automatisch in der Aufgabenliste. Optional ein Satz „Laut Portal ausgegeben: …“ (E-A36: Portal ist Gedächtnisstütze).</td><td>Erst mit A4</td></tr>
+<tr><td>Erinnerung an die Führungskraft, Fragebogen-Mails, übrige Offboarding-Mails</td><td>Keine</td><td>Nein</td></tr>
+</tbody></table></div>
+<h3>Neue Ereignisse</h3>
+<div class="tab-wrap"><table>
+<thead><tr><th>Ereignis</th><th>An</th><th>Inhalt</th><th>Paket</th></tr></thead>
+<tbody>
+<tr><td><code>onboarding-ausstattung-offen</code></td><td>HR-Postfach</td><td>Sammelmail am Werktag vor Dienstbeginn mit allen noch offenen Ausstattungsaufgaben des Vorgangs, nur Titel und Stelle, ohne Bemerkungen (E-A18). Läuft im bestehenden Lauf „Erinnerungen“.</td><td>A3</td></tr>
+<tr><td><code>onboarding-department-abgesagt</code></td><td>informierte Stellen</td><td>Absage nach EXPIRED, per Knopf: ohne Link, mit den schon erledigten Positionen („bitte Zugänge löschen, Ausgegebenes zurücknehmen“) (E-A20). <code>betreffOhne</code> wie Regel 17.</td><td>A3</td></tr>
+</tbody></table></div>
+<p><b>Webhooks:</b> Die Mails an die Stellen laufen heute über <code>triggerWebhooks</code>, die Payload trägt den Link selbst und damit den Zugang zur Aufgabenseite. Dazu kämen Bemerkungen, Angaben und ab A4 Inventar- und Schlüsselnummern. Entschieden (E-A16): Die Onboarding-Abteilungsereignisse gehen nur noch per Mail, nicht mehr an Webhooks (<code>EVENTS_OHNE_WEBHOOK</code>, eigene begründete Ausnahme wie beim Dokumentenpaket). Dann entfällt auch die Sonderregel „SKIPPED bei aktivem Webhook zählt als zugestellt“ für diese Ereignisse. Vorher eingetragene n8n-Webhooks auf diese Ereignisse prüfen.</p>
+<p><b>Word, PDF, Exporte:</b></p>
+<ul>
+  <li><b>PDF-Export der Modalitäten</b> (<code>pdf-export-onboarding.ts</code>, Reiter „Vorgesetzter“): neuer Abschnitt „Ausstattung &amp; Zugänge“. Der Reiter „Vorgesetzter“ zeigt dieselben Angaben als fünfte Karte, nur lesend, mit Verweis auf die Karte im Reiter Checkliste.</li>
+  <li><b>Brief-Vorlage für die neue Person</b> (E-A25): Platzhalter <code>{ausstattung_liste}</code> im Onboarding-Katalog (<code>placeholder-catalog.ts</code>, Resolver ohne Bemerkungen) für ein Schreiben „Was Sie am ersten Tag erhalten“ im Dokumentenpaket. Erstzugänge (Passwörter) gehen nie über das Portal.</li>
+  <li><b>A4: Übergabe- und Rückgabeprotokoll</b> als Word-Vorlage (E-A34), gefüllt aus den Ausgaben der Person; die ausgebende Stelle holt die Unterschrift ein, HR lädt sie hoch.</li>
+</ul>
+</section>
+
+<section class="abschnitt" id="datenschutz">
+<h2><span class="nr">10</span>Datenschutz und Mitbestimmung</h2>
+<ul>
+  <li><b>Bemerkungen sind Freitext.</b> Wer „höhenverstellbarer Tisch wegen Bandscheibenvorfall“ schreibt, schickt Gesundheitsdaten (Art. 9 DSGVO) an die Gebäudewirtschaft. Naheliegend sind auch Schwangerschaft („erst nach Gefährdungsbeurteilung in die Chemie-Sammlung“), Schwerbehinderung („Parkplatz nah am Eingang wegen GdB“) und Urteile über die Person („Generalschlüssel erst nach der Probezeit“). Unter jedem Bemerkungsfeld, auch im Bearbeiten-Dialog von HR, steht deshalb: „Keine Angaben zu Gesundheit, Schwangerschaft, Behinderung oder Religion und keine Bewertungen der Person. Schreiben Sie, was gebraucht wird, nicht warum.“ Technisch verhindern lässt es sich nicht; HR sichtet die Bemerkungen in der Karte vor dem Versand.</li>
+  <li><b>Nie im Betreff, nie an Webhooks</b> (Regel 17, E-A16), im HTML maskiert, im AuditLog nur Längen und Katalogschlüssel.</li>
+  <li><b>Datenzuschnitt unverändert streng:</b> jede Stelle nur ihre Positionen, Bemerkungen und die für sie freigegebenen Angaben. Weiterhin nichts aus dem Personalfragebogen, keine private Adresse der Person. Angaben kommen nur aus einer festen Liste im Code (E-A13), damit der Katalog kein neuer Kanal für beliebige Fragen wird.</li>
+  <li><b>Unterrichtsfächer</b> sind keine besondere Kategorie. Am Rand: Das Fach Religion lässt auf eine Konfession schließen. An einer evangelischen Schule ist das wenig heikel, sollte aber im Gespräch mit dem DSB einmal genannt werden.</li>
+  <li><b>Stellen in eigenen Gesellschaften.</b> Werden IT oder Gebäudewirtschaft von eigenen Mandanten-Gesellschaften erbracht (HELEX.IT GmbH, FES Objekt Service GmbH), gehen Bemerkungen und ab A4 das Ausgabenverzeichnis an eine andere juristische Person. Rechtsgrundlage klären: Auftragsverarbeitung oder gemeinsame Verantwortung.</li>
+  <li><b>Löschfristen.</b> Onboarding-Vorgänge werden heute nie gelöscht. Bemerkungen, Angaben und Hinweise werden deshalb 6 Monate nach Abschluss oder Abbruch geleert (E-A22, Lauf „Aufbewahrung“, Zeile bleibt als Nachweis). Ausgaben aus A4: 6 Monate nach bestätigter Rückgabe, bei fehlender Rückgabe 3 Jahre ab Jahresende (E-A37). Beide Fristen bestätigt der DSB.</li>
+  <li><b>DSB vor A1</b> (E-A15), nicht erst vor A3: Angabe-Art, Löschfristen und Gesellschaften bestimmen das Datenmodell. Danach Eintrag im Verzeichnis der Verarbeitungstätigkeiten.</li>
+  <li><b>Mitarbeitervertretung</b> (E-A15): vor dem Einschalten von A3 informieren; vor A4 förmlich beteiligen, weil dann Geräte und Schlüssel einzelnen Personen nachweisbar zugeordnet und Übergaben quittiert werden. Am besten gebündelt in einer Dienstvereinbarung zum HR-Portal.</li>
+</ul>
+</section>
+
+<section class="abschnitt" id="stufen">
+<h2><span class="nr">11</span>Pakete und Reihenfolge</h2>
+<div class="tab-wrap"><table>
+<thead><tr><th>Paket</th><th>Inhalt</th><th>Umfang</th></tr></thead>
+<tbody>
+<tr><td><b>A0 Klärung</b></td><td>Gespräch mit dem DSB (Liste der Angaben, Löschfristen, Gesellschaften), Information der MAV, Katalogpflege organisieren (E-A38), Sonderfälle beim Arbeitsort sammeln (Förderverein, Objekt Service, Nebenarbeitgeber)</td><td>klein, aber vor dem ersten Code</td></tr>
+<tr><td><b>A1 Katalog</b></td><td>Modelle, reine Regeln, Zod, Routen, Reiter „Ausstattung &amp; Zugänge“ in den Einstellungen, „Vorschläge übernehmen“, Einrichtungsarten, Warnungen (Adresslücken je Einrichtung, ähnlicher Vorlagenpunkt), Protokoll der Katalogänderungen, Arbeitsort am Vorgang (E-A10), Tests</td><td>mittel</td></tr>
+<tr><td><b>A2 Formular</b></td><td>Merker <code>mitAusstattung</code> beim Erzeugen des Links samt Migration, neuer Schritt im Modalitäten-Formular, Serverprüfung gegen den Katalog, Zusammenfassung, Umstellung der Schrittweiche, <code>modalitaetenFortschritt</code> mit Merker, Reiter „Vorgesetzter“ (lesend), PDF-Export, Einladungsmail, Tests der Grenzen (Client gegen Server)</td><td>mittel</td></tr>
+<tr><td><b>A3 Aufgaben</b></td><td>Auswahl → Aufgabe(n), Karte im Reiter Checkliste samt Bearbeiten-Dialog, Bemerkung und Angaben auf Link-Seite und in den Mails, Nachtragsliste und „Nachtrag senden“, Wächter, Sammelmail, Absage-Knopf, Abschluss mit Rückfrage, PATCH-Sperre, Rollen, Betreff-Sperren, Webhook-Ausnahme, Löschlauf, Mailvorlagen, Abschnitt in CLAUDE.md</td><td>groß</td></tr>
+<tr><td><b>A4 Stufe 2</b></td><td>Tabelle <code>Ausgabe</code> je Stück, Übergabe vermerken (getrennt vom Abhaken, nachtragbar), Zuordnung „Einstellung zuordnen …“ im Offboarding, Rücknahme- und Sperraufgaben der ausgebenden Stellen über ihren Offboarding-Link, Rückgabezeilen mit Zuständen, Übergabe- und Rückgabeprotokoll, Löschfristen. Setzt die Reparatur der Rückgaben-Route voraus (läuft als eigene Aufgabe).</td><td>groß</td></tr>
+</tbody></table></div>
+<p><b>Empfehlung:</b> A1 bis A3 auf einem Branch von <code>main</code> bauen und <b>zusammen</b> ausliefern. A1 allein zeigt nichts, A2 ohne A3 sammelt Wünsche, die nirgends ankommen. Nach dem Deploy ist der Katalog leer, also ändert sich für niemanden etwas, bis die Verwaltung die ersten Positionen einschaltet. A4 ist beschlossen (E-A9) und folgt direkt nach A1 bis A3.</p>
+<p><b>Pilot:</b> eine Einrichtung, etwa das Gymnasium, mit IT und Schlüsseln, für die Einstellungen zum Halbjahr. Erfolgskriterien vorher festlegen: Bereitstellungsquote zum Dienstbeginn (Kennzahlen in Abschnitt 4), keine Bemerkung mit Art.-9-Bezug, Rückmeldung von IT und Hausmeister nach vier Wochen. Danach Einrichtung für Einrichtung ausrollen, „Gilt für“ einer Position lässt sich jederzeit erweitern.</p>
+<p><b>Handbuch und Einführung:</b> je eine Seite für HR (Karte, Nachtrag, Absage), Führungskräfte (neuer Schritt, was nicht in Bemerkungen gehört) und Stellen (Link-Seite, Rückmeldung „geht nicht“) in <code>docs/handbuch/</code>; eine kurze Einweisung der Hausmeister und der IT vor dem Pilot.</p>
+<p>Die betroffenen Seiten (Modalitäten-Formular, Reiter Checkliste, Einstellungen) baut der UX-Umbau später ohnehin um. Die Logik gehört deshalb in die reinen Dateien, damit der Umbau nur die Oberfläche tauscht.</p>
+</section>
+
+<section class="abschnitt" id="entscheidungen">
+<h2><span class="nr">12</span>Entscheidungen</h2>
+<p>Am 12.10.2026 getroffen. Die 30 Fragen aus der Lückenprüfung (E-A10 bis E-A39) wurden am selben Tag „alle wie empfohlen“ entschieden; sie stehen mit Begründung in Abschnitt <a href="#luecken">„Was noch fehlte“</a>.</p>
+<div class="tab-wrap"><table>
+<thead><tr><th>Nr.</th><th>Frage</th><th>Entschieden</th><th>Folge für den Plan</th></tr></thead>
+<tbody>
+<tr><td>E-A1</td><td>Name der Funktion</td><td><b>„Ausstattung &amp; Zugänge“</b></td><td>Name in Formular, Karte, Einstellungen, Mails</td></tr>
+<tr><td>E-A2</td><td>Eigene Aufgabe je Wahl oder nur Infoblock?</td><td><b>Variante A: jede Wahl eine eigene Aufgabe</b></td><td>Begründung des Nutzers: Stufe 2 braucht die einzelne Aufgabe, an ihr hängt der Ausgabevermerk. Folgefrage zu Auswahl-Positionen: E-A12</td></tr>
+<tr><td>E-A3</td><td>Wer pflegt den Katalog?</td><td><b>Nur Admin-Rollen</b></td><td>Routen über <code>adminHandler</code>, wie Einstellungen → Abteilungen</td></tr>
+<tr><td>E-A4</td><td>Reichen die fünf Personengruppen?</td><td><b>Ja</b></td><td>Kein neues Feld „Tätigkeitsbereich“; Filter über <code>questionnaireType</code></td></tr>
+<tr><td>E-A5</td><td>Pflichtangaben?</td><td><b>Nein</b></td><td>Regel 3: alles freiwillig, „Weiter“ nie gesperrt</td></tr>
+<tr><td>E-A6</td><td>Wann entstehen die Aufgaben?</td><td><b>Nach der Abgabe der Modalitäten</b></td><td>Regel 6</td></tr>
+<tr><td>E-A7</td><td>Nachtrag automatisch oder per Knopf?</td><td><b>Per Knopf</b></td><td>Regel 10, Aktion „Nachtrag senden“</td></tr>
+<tr><td>E-A8</td><td>Eigene Positionen der Führungskraft?</td><td><b>Nein</b></td><td>Sie nutzt „Weitere Hinweise an …“; freie Positionen legt nur HR an</td></tr>
+<tr><td>E-A9</td><td>Stufe 2 (Ausgabevermerk, Rückgaben)?</td><td><b>Ja</b></td><td>Paket A4 ist fest eingeplant; seine Voraussetzungen stehen in <a href="#luecken">„Was noch fehlte“</a></td></tr>
+<tr><td>E-A10 – E-A39</td><td>30 Fragen aus der Lückenprüfung</td><td><b>alle wie empfohlen</b></td><td>Abschnitt 13; eingearbeitet in Regeln, Datenmodell, Vorlagen, Pakete und Mockups (je Option eine Aufgabe)</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="abschnitt" id="luecken">
+<h2><span class="nr">13</span>Was noch fehlte</h2>
+<p>Am 12.10.2026 haben fünf Prüfer den Plan gegen den Code und den Alltag gelesen: fachlich (Schulen und Kitas), technisch, Datenschutz und Mitbestimmung, Prozess und Organisation, Stufe 2. Eine Gegenprobe je Prüfer hat jede Meldung am Code nachgeprüft und alles verworfen, was schon im Plan stand oder im Code widerlegt war. Übrig blieben 95 Meldungen, viele davon aus mehreren Blickwinkeln. Zusammengefasst:</p>
+<ul>
+  <li><b>20 technische Klarstellungen</b> ohne Entscheidung sind eingearbeitet (Regeln 1–20, Datenmodell, Vorlagen).</li>
+  <li><b>30 Fragen</b> (E-A10 bis E-A39) mit Empfehlung, am 12.10.2026 alle wie empfohlen entschieden.</li>
+</ul>
+<div class="kasten gelb"><p><b>Die größte Lücke:</b> Bei CREDO fallen Arbeitgeber und Arbeitsort oft auseinander. Ein Förderverein beschäftigt OGS-Kräfte an einer Grundschule, die Objekt Service GmbH stellt Hausmeister für mehrere Häuser, und die Modalitäten kennen Haupt- und Nebenarbeitgeber. Filtert der Katalog nach der Einrichtung des Vorgangs, sieht die Führungskraft die falschen Schlüssel, und die Aufgabe geht an den falschen Hausmeister. Entschieden (E-A10): HR legt am Vorgang einen Arbeitsort fest, der Katalog und Empfänger aller Abteilungsaufgaben bestimmt.</p></div>
+
+<h3>Vor A1</h3>
+<div class="tab-wrap"><table class="fragen">
+<thead><tr><th>Nr.</th><th>Frage</th><th>Entschieden (wie empfohlen)</th></tr></thead>
+<tbody>
+<tr><td>E-A10</td><td><b>Arbeitsort.</b> Soll HR am Vorgang einen Arbeitsort (Einrichtung) festlegen, der Katalog und Empfänger <i>aller</i> Abteilungsaufgaben des Vorgangs bestimmt? Ein zweiter Standort (Nebenarbeitgeber) läuft in Stufe 1 von Hand.</td><td><b>Ja.</b> Vorgabe ist die Einrichtung des Vorgangs; änderbar, bis der Modalitäten-Link erzeugt ist. Auch die Vorlagenaufgaben gehen dann an den Hausmeister des Arbeitsorts, sonst gäbe es zwei FACILITY-Stellen, aber nur einen Link.</td></tr>
+<tr><td>E-A11</td><td><b>HR bearbeitet erst nach der Abgabe.</b> Vorgänge ohne eingereichte Modalitäten (z. B. Ehrenamt ohne Link) bekommen in Stufe 1 keine Ausstattung.</td><td><b>Ja.</b> Ohne Modalitäten gibt es keinen Vertragsbeginn und keinen Versand (Entscheidung vom 22.09.2026). HR-Positionen dort kämen nie an, und vor der Abgabe kollidierten sie mit dem Speichern der Führungskraft. Wer Ausstattung braucht, bekommt einen Modalitäten-Link.</td></tr>
+<tr><td>E-A12</td><td><b>Auswahl-Positionen.</b> Wird jede gewählte Option (jeder Schlüssel, jeder Zugang) eine eigene Aufgabe?</td><td><b>Ja.</b> Passt zu E-A2: Teilerledigung, einzelne Ausgabe und Rückgabe je Schlüssel. Die Mockups 6.3 bis 6.6 zeigen das.</td></tr>
+<tr><td>E-A13</td><td><b>Angaben nur aus fester Liste.</b> Sollen Positionen der Art „Angabe“ nur aus einer festen Liste im Code kommen (Unterrichtsfächer, Durchwahl, Raum), Ja/Nein und Auswahl bleiben frei pflegbar?</td><td><b>Ja.</b> Sonst wird der Katalog ein Kanal für beliebige Fragen an die Führungskraft, deren Antworten an Stellen gehen. Jede Katalogänderung wird protokolliert (Regel 18).</td></tr>
+<tr><td>E-A14</td><td><b>Hinweis an eine Stelle wird eine Aufgabe.</b> Erzeugt „Weitere Hinweise an die IT“ eine Aufgabe „Hinweis der Führungskraft beachten“?</td><td><b>Ja.</b> Ohne Aufgabe bekommt eine Stelle, die nur einen Hinweis hat, weder Link noch Mail. HR kann den Hinweis außerdem als Position übernehmen.</td></tr>
+<tr><td>E-A15</td><td><b>DSB und MAV.</b> DSB schon vor A1 statt vor A3; MAV vor A3 informieren und vor A4 förmlich beteiligen?</td><td><b>Ja.</b> Angabe-Art, Löschfristen und die Gesellschaften HELEX.IT und Objekt Service bestimmen das Datenmodell. A4 ordnet Geräte und Schlüssel Personen nachweisbar zu.</td></tr>
+</tbody></table></div>
+
+<h3>Für A2 und A3</h3>
+<div class="tab-wrap"><table class="fragen">
+<thead><tr><th>Nr.</th><th>Frage</th><th>Entschieden (wie empfohlen)</th></tr></thead>
+<tbody>
+<tr><td>E-A16</td><td><b>Webhooks.</b> Gehen die Onboarding-Abteilungsereignisse nur noch per Mail statt zusätzlich an Webhooks?</td><td><b>Ja.</b> Die Payload trägt den Link samt Zugang zur Aufgabenseite, dazu Bemerkungen und ab A4 Kennungen. n8n wird seit dem Zeitplaner dafür nicht mehr gebraucht.</td></tr>
+<tr><td>E-A17</td><td><b>Rückmeldung der Stelle.</b> Kommt jeder Kommentar einer Stelle („geht nicht“, „kommt am 03.02.“) per Mail beim HR-Postfach an?</td><td><b>Ja</b>, über das An-Feld von <code>onboarding-task-completed</code>. Einen eigenen Zustand „Problem gemeldet“ erst nach dem Pilot entscheiden.</td></tr>
+<tr><td>E-A18</td><td><b>Eskalation.</b> Bekommt HR am Werktag vor Dienstbeginn eine Sammelmail mit allen noch offenen Ausstattungsaufgaben?</td><td><b>Ja</b>, an das HR-Postfach, ohne Bemerkungstexte, die Führungskraft nicht in CC. Dazu der Wächter in der Karte (Regel 15).</td></tr>
+<tr><td>E-A19</td><td><b>Abschluss.</b> Geht „Vorgang abschließen“ bei offenen Ausstattungsaufgaben nur nach einer Rückfrage, die sie nennt?</td><td><b>Ja</b>, ohne Bestätigung antwortet der Server mit 409. Sonst frieren die Aufgaben ein, und die Stelle kann nicht mehr abhaken.</td></tr>
+<tr><td>E-A20</td><td><b>Absage.</b> Kann HR nach einer Absage (EXPIRED) die schon informierten Stellen per Knopf benachrichtigen?</td><td><b>Ja</b>, per Knopf wie E-A7, nie automatisch. Mail ohne Link, mit den schon erledigten Positionen (Zugänge löschen, Ausgegebenes zurücknehmen).</td></tr>
+<tr><td>E-A21</td><td><b>Gestrichene Position.</b> Bleibt eine Position, über die die Stelle schon informiert ist, nach dem Streichen als „entfällt“ sichtbar?</td><td><b>Ja.</b> Damit die Stelle eine laufende Bestellung stoppen kann und ihr Kommentar nicht verloren geht.</td></tr>
+<tr><td>E-A22</td><td><b>Löschfrist Freitexte.</b> Werden Bemerkungen, Angaben und Hinweise 6 Monate nach Abschluss oder Abbruch geleert?</td><td><b>Ja</b>, Frist mit dem DSB abstimmen. Onboarding-Vorgänge werden heute nie gelöscht.</td></tr>
+<tr><td>E-A23</td><td><b>Rollen.</b> Sehen nur HR-Bearbeiter die Bemerkungen, und hakt im Portal nur HR Ausstattungsaufgaben ab (nicht der n8n-Schlüssel)? Schulleitungen mit Portalzugang später nur lesend?</td><td><b>Ja</b> zu allem; Nachmeldungen der Schulleitung nach der Abgabe per Mail an HR.</td></tr>
+<tr><td>E-A24</td><td><b>Kosten und Entgelt.</b> Gilt die Wahl der Führungskraft nach der Prüfung durch HR als genehmigter Bedarf? Dürfen entgelt- oder vertragsrelevante Positionen (Dienstwagen, Jobticket, Diensthandy mit Privatnutzung) nur an die Stelle HR gehen?</td><td><b>Ja</b> zu beidem. Kostenpflichtiges nur in den Katalog, wenn es für die Personengruppe grundsätzlich vorgesehen ist. Den Platzhalter der „Zusätzlichen Vereinbarungen“ („Dienstwagen“) anpassen.</td></tr>
+<tr><td>E-A25</td><td><b>Neue Person.</b> Erfährt sie vor Dienstbeginn, was für sie bereitsteht?</td><td><b>Ja</b>, über eine Brief-Vorlage mit <code>{ausstattung_liste}</code> im Dokumentenpaket, keine neue Mail. Erstzugänge (Passwörter) nie über das Portal.</td></tr>
+<tr><td>E-A26</td><td><b>Rückmeldung an die Führungskraft,</b> sobald alles bereitsteht?</td><td><b>Zunächst nein.</b> Nach dem Pilot entscheiden; bis dahin der Hinweis im Formular, dass Änderungswünsche an das HR-Postfach gehen.</td></tr>
+<tr><td>E-A27</td><td><b>Stellen-Adressen</b> außerhalb der Freigabeliste: warnen oder sperren?</td><td><b>Nur warnen</b> (Einstellungen → Abteilungen und Katalogseite).</td></tr>
+<tr><td>E-A28</td><td><b>Zugänge vor der Verpflichtung auf Vertraulichkeit.</b> Reichen ein fester Hinweis und die sichtbare Herkunft?</td><td><b>Ja</b>, Hinweis „erst nach Verpflichtung auf Vertraulichkeit freischalten“ im Hinweis für die Stelle; keine technische Kopplung an die DSB-Aufgabe.</td></tr>
+<tr><td>E-A29</td><td><b>Verschobener Dienstbeginn</b> nach der Abgabe: passt HR die Fälligkeiten von Hand an?</td><td><b>Ja</b> für A3; ein Katalogfeld „Vorlauf“ mit Warnung erst nach dem Pilot.</td></tr>
+</tbody></table></div>
+
+<h3>Für A4 (Stufe 2)</h3>
+<div class="tab-wrap"><table class="fragen">
+<thead><tr><th>Nr.</th><th>Frage</th><th>Entschieden (wie empfohlen)</th></tr></thead>
+<tbody>
+<tr><td>E-A30</td><td><b>Ausgaben je Stück an der Person.</b> Eigene Tabelle mit einer Zeile je Schlüssel bzw. Gerät, mit Zustand und Übergabedatum (getrennt vom Abhaken), die HR auch nach Abschluss des Onboardings ergänzen und tauschen kann, statt eines Textfelds an der Onboarding-Position?</td><td><b>Ja.</b> Ersatzgeräte, verlorene Schlüssel und Wiedereinstellungen gehen sonst nicht. Das Datenmodell steht in Abschnitt 8 als Entwurf.</td></tr>
+<tr><td>E-A31</td><td><b>Zuordnung Austritt ↔ Einstellung.</b> Über das vorhandene, bisher nie gefüllte Feld <code>onboardingId</code> am Offboarding, mit Knopf „Einstellung zuordnen …“ und Vorschlägen (gleiche E-Mail, Name, Einrichtung), die HR bestätigt?</td><td><b>Ja</b>, nie über einen stillen Namensabgleich. Die Bindung an die Personalakte (<code>Employee</code>) kommt mit der LOGA-Anbindung; die Regel aus dem UX-Plan (Personalnummer, sonst E-Mail und Geburtsdatum, sonst Vorschlag) gilt dann.</td></tr>
+<tr><td>E-A32</td><td><b>Rücknahme und Sperren durch die Stelle.</b> Bekommt beim Austritt die ausgebende Stelle je Ausgabe eine Aufgabe (zurücknehmen bzw. Zugang sperren) über ihren Offboarding-Link, und bestätigt sie dort?</td><td><b>Ja.</b> HR bestätigt nur HR-Positionen und Stellen ohne Adresse. Gegenstände stehen zusätzlich als Rückgabezeile im Reiter „Rückgaben“. Die pauschalen Sperrpunkte der Offboarding-Vorlagen dann umformulieren.</td></tr>
+<tr><td>E-A33</td><td><b>Zustände der Rückgabe.</b> „zurück“, „beschädigt“, „fehlt“, „verbleibt“, „entfällt“; darf ein Offboarding mit offenen Rückgaben abgeschlossen werden?</td><td><b>Ja</b> zu den Zuständen; Abschluss mit Warnung, nicht gesperrt; „fehlt“ bei einem Schlüssel erzeugt eine Aufgabe für die Gebäudewirtschaft.</td></tr>
+<tr><td>E-A34</td><td><b>Übergabe- und Rückgabeprotokoll.</b> Pflicht für Schlüssel und Geräte?</td><td><b>Ja.</b> Word-Vorlage aus dem Portal; die ausgebende Stelle holt die Unterschrift ein, HR lädt sie hoch. Eine Rückgabeliste per Mail an die Person später.</td></tr>
+<tr><td>E-A35</td><td><b>Mehrere Beschäftigungen, Versetzung.</b> Was wird vorgeschlagen, wenn nur eine von mehreren Beschäftigungen endet?</td><td>Nur Ausgaben der Einrichtung des Austritts; zentrale Ausgaben (Dienst-E-Mail, iPad) nur als Hinweis, solange eine andere Beschäftigung läuft; bei Versetzung Zustand „verbleibt“.</td></tr>
+<tr><td>E-A36</td><td><b>Führendes System und Altbestand.</b> Ist das Portal Gedächtnisstütze neben Geräteverwaltung und Schließplan, ohne Nacherfassung der heutigen Belegschaft? Kommen Änderungen während der Beschäftigung (Tausch, neue Funktion) erst später?</td><td><b>Ja.</b> Der Vorschlag beim Austritt heißt „laut Portal ausgegeben“ und unterscheidet: nichts ausgegeben, nichts erfasst, Ausgabe vor Einführung des Portals. Spätere Ausgaben werden eine eigene Aktion am Bestand der Person.</td></tr>
+<tr><td>E-A37</td><td><b>Löschfrist Ausgaben.</b> 6 Monate nach bestätigter Rückgabe, bei fehlender Rückgabe 3 Jahre ab Jahresende (Verjährung)?</td><td><b>Ja</b>, Fristen mit dem DSB bestätigen.</td></tr>
+</tbody></table></div>
+
+<h3>Organisation</h3>
+<div class="tab-wrap"><table class="fragen">
+<thead><tr><th>Nr.</th><th>Frage</th><th>Entschieden (wie empfohlen)</th></tr></thead>
+<tbody>
+<tr><td>E-A38</td><td><b>Wer liefert den Inhalt des Katalogs</b>, und wie oft wird er geprüft?</td><td>IT für Geräte und Zugänge, Hausmeister je Einrichtung für Räume und Schlüssel, Bestätigung durch die Einrichtungsleitung, Eintrag durch die Admin-Rolle; Prüfung jährlich vor Schuljahresbeginn.</td></tr>
+<tr><td>E-A39</td><td><b>Private Endgeräte (BYOD).</b> Eigene Position in den Vorschlägen?</td><td><b>Ja</b>, ausgeschaltet, damit jede Einrichtung selbst entscheidet.</td></tr>
+</tbody></table></div>
+
+<h3>Ohne Entscheidung eingearbeitet</h3>
+<ul class="zwei-spalten">
+  <li>Merker der Schrittliste beim Erzeugen des Links statt beim ersten Öffnen, Altbestand per Migration (Regel 2)</li>
+  <li>Serverprüfung der Auswahl gegen den Katalog des Vorgangs (Regel 4)</li>
+  <li>Momentaufnahme vollständig: Fälligkeit, Hinweis für die Stelle, Kennung, Rückgabekategorie (Regel 4, Abschnitt 8)</li>
+  <li>Zwei Hinweise im Katalog: für die Führungskraft und für die Stelle (Regel 8)</li>
+  <li>Bemerkung nach Herkunft beschriftet, nicht immer „der Führungskraft“ (Regel 8)</li>
+  <li>Aufgaben in einer Transaktion mit bedingtem Anspruch, Nachholen auch im täglichen Lauf (Regel 6)</li>
+  <li>Neue Aufgabe für eine fertige Stelle öffnet deren Link wieder (Regel 9)</li>
+  <li>Checklisten-PATCH sperrt das Umhängen von Ausstattungsaufgaben (Regel 9)</li>
+  <li>Nachtrag über eine Änderungsliste statt Änderungszeit; „Entfällt“ wird gemeldet; nur im Onboarding (Regel 10)</li>
+  <li>Positionen ohne Adresse am Arbeitsort fehlen im Formular; Adresslücken je Einrichtung (Regeln 1, 11)</li>
+  <li>Nur bei Neueinstellungen, nicht bei Vertragsänderung (Regel 1)</li>
+  <li>Einrichtungsarten im Katalog (alle Kitas, alle Grundschulen) (Abschnitt 8)</li>
+  <li>Kurzfristige Einstellungen: „Eilt“ statt Eskalation (Regel 14)</li>
+  <li>Wächter für nicht informierte Stellen und offene Nachträge (Regel 15)</li>
+  <li>Betreff-Sperren auch für Aufgabenliste und Link (Regel 17)</li>
+  <li>Kein Freitext im Aufgabentitel, Optionen nur aus dem Katalog, freie Positionen höchstens 120 Zeichen (Regeln 4, 17)</li>
+  <li>Hinweistext unter Bemerkungen erweitert (Abschnitt 10, Mockup 6.1)</li>
+  <li>Bauen auf <code>main</code> mit Sperrklinke und alten Tokens (Regel 19)</li>
+  <li>Karten vor dem Leerzustand des Reiters Checkliste (Regel 20)</li>
+  <li>Rückgabe verweist auf die Ausgabe, keine Doppelten, CANCELLED gibt frei (Abschnitt 8)</li>
+</ul>
+<h3>Bewusst später</h3>
+<ul>
+  <li><b>Häuser ohne Hausmeister:</b> geht schon heute über eine eigene Stelle oder VERWALTUNG als Empfänger der Schlüssel; keine Sonderlogik.</li>
+  <li><b>Sammelbedarf zum Schuljahresbeginn</b> (viele Einstellungen zugleich, Ferien): erst nach dem Pilot, falls Stellen eine Übersicht über mehrere Vorgänge brauchen.</li>
+  <li><b>Dienstkleidung mit Größen:</b> Größen kennt nur die Person, und Angaben aus dem Fragebogen gehen an keine Stelle. Bleibt außerhalb des Portals.</li>
+  <li><b>Kennzahlen im Portal:</b> für den Pilot reicht eine Abfrage (Abschnitt 4).</li>
+</ul>
+</section>
+
+<section class="abschnitt" id="risiken">
+<h2><span class="nr">14</span>Risiken und Stolpersteine</h2>
+<ul>
+  <li><b>Schrittzählung.</b> <code>currentStep</code> ist ein Index, die Zusammenfassung hängt fest an Index 4, und der Test <code>modalitaeten-fortschritt.test.ts</code> erwartet „Schritt 5 von 5“. Regel 2 (Merker beim ersten Öffnen) verhindert, dass laufende Formulare springen. Alle Anzeigestellen des Fortschritts (Stepper, Karte „Vorgesetzten-Link“, Dashboard-Liste) müssen den Merker lesen.</li>
+  <li><b>Doppelte Aufgaben</b> zwischen Vorlage („Schlüssel bereitlegen“) und Katalog („Schlüssel ausgeben“). Die Katalogseite warnt; aufräumen muss die Verwaltung.</li>
+  <li><b>Pflege je Einrichtung.</b> Die Schlüsselliste lebt nur, wenn sie jemand aktuell hält. Organisatorisch klären, wer die Raumliste liefert (z. B. die Hausmeister an die Verwaltung).</li>
+  <li><b>Falscher Fragebogentyp.</b> Der Typ ist nach dem Anlegen nicht mehr änderbar. Ein falsch angelegter Vorgang zeigt deshalb die falschen Positionen. HR kann über die Karte ergänzen.</li>
+  <li><b>Vorlagen in der Datenbank.</b> Ohne „Text auf Standard zurücksetzen“ fehlen Angaben und Nachtrag in der Mail an die Stelle, ohne Fehlermeldung.</li>
+  <li><b>Checklisten-Vorlagen sind global</b> und werden je Fragebogentyp gewählt (bei mehreren aktiven nimmt der Code irgendeine). Der Katalog löst genau den Teil, der je Einrichtung verschieden ist. Die Vorlagen selbst bleiben, wie sie sind.</li>
+  <li><b>Webhooks</b> bekommen heute schon den Link der Stelle mit, künftig auch Bemerkungen und Kennungen. Deshalb E-A16; eingetragene n8n-Webhooks vor A3 prüfen.</li>
+  <li><b>Arbeitsort</b> (E-A10). Bis A1 ausgeliefert ist, gehen Aufgaben von Förderverein-, Objekt-Service- und Nebenarbeitgeber-Kräften an den Hausmeister der Einrichtung des Vorgangs. Das betrifft heute schon die Paket-5-Aufgaben; HR leitet in diesen Fällen von Hand weiter.</li>
+  <li><b>Umfang von A3.</b> Mit den Ergänzungen ist A3 das größte Paket. Der Pilot an einer Einrichtung fängt Fehler ab, bevor alle 16 Mandanten sie sehen.</li>
+  <li><b>Prozesslokale Sperren</b> gelten wie in Paket 5 nur bei einem Container. Für A1 bis A3 kommt keine neue hinzu.</li>
+</ul>
+</section>
+
+</main>
+</div>
+</body>
+</html>
