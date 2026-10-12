@@ -9,6 +9,8 @@
 import { z } from "zod";
 import { ONBOARDING_STATUS } from "@/lib/onboarding-spuren";
 import { GRENZE } from "@/lib/validations/personal-data";
+import { MELDUNGEN as AUSSTATTUNG_MELDUNGEN } from "@/lib/ausstattung";
+import { idFeld } from "@/lib/validations/ausstattung";
 
 /** RFC 5321: Eine Adresse ist hoechstens 254 Zeichen lang. */
 const MAX_EMAIL_LAENGE = 254;
@@ -78,6 +80,8 @@ const OHNE_KLAMMERN_STEUERZEICHEN = /^[^<>\p{Cc}]*$/u;
 
 const MELDUNG_EMAIL = "Bitte geben Sie die E-Mail-Adresse der neuen Person an.";
 const MELDUNG_EINRICHTUNG = "Bitte wählen Sie eine Einrichtung aus.";
+/** Dieselbe Meldung wie im PATCH …/arbeitsort (arbeitsortSchema). */
+const MELDUNG_ARBEITSORT = AUSSTATTUNG_MELDUNGEN.ARBEITSORT_UNGUELTIG;
 
 const namensFeld = (feld: "firstName" | "lastName", wort: "Vorname" | "Nachname") =>
   z.preprocess(
@@ -103,7 +107,10 @@ const namensFeld = (feld: "firstName" | "lastName", wort: "Vorname" | "Nachname"
  *
  * `organizationId` bewusst ohne `.uuid()`: Eine unbekannte ID ist ein 404
  * (so erwarten es auch die Handskripte test-runner.mjs / test-api.ps1), keine
- * Formatfrage.
+ * Formatfrage. Dasselbe gilt fuer `arbeitsortId` (E-A10, optional): die
+ * Einrichtung, an der die Person arbeitet, wenn das nicht der Arbeitgeber ist.
+ * Leer heisst „wie Einrichtung“; ob es sie gibt und ob die Sitzung sie sehen
+ * darf, prueft die Route (404 „Organisation nicht gefunden“).
  *
  * Ein ungueltiger `processType` ist seitdem ein 400. Frueher fiel die Route
  * still auf EINSTELLUNG zurueck, und ein falscher `questionnaireType` endete
@@ -136,6 +143,9 @@ export const onboardingAnlegenSchema = z
     firstName: namensFeld("firstName", "Vorname"),
     lastName: namensFeld("lastName", "Nachname"),
     supervisorEmail: z.preprocess(leerAlsFehlend, fuehrungskraftEmail.optional()),
+    // Form wie im PATCH …/arbeitsort (idFeld: Laenge, keine Steuerzeichen — ein
+    // NUL-Zeichen endete sonst als 500 in Postgres), bewusst ohne `.uuid()`.
+    arbeitsortId: z.preprocess(leerAlsFehlend, idFeld(MELDUNG_ARBEITSORT).optional()),
   })
   .refine((d) => !d.supervisorEmail || !gleicheAdresse(d.supervisorEmail, d.email), {
     message: MELDUNG_EIGENE_ADRESSE,

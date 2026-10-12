@@ -4,10 +4,16 @@
  * Modal: Neuen Onboarding-Vorgang anlegen
  *
  * Felder: E-Mail, Vorname/Nachname (optional), Einrichtung (Mandant),
- * Vorgangsart, Fragebogentyp und — nur fuer HR_EDIT_ROLES — die E-Mail der
- * Fuehrungskraft. Ist sie eingetragen, erzeugt POST /api/onboarding in
- * derselben Transaktion auch den Link zu den Einstellungsmodalitaeten; beide
- * Spuren laufen parallel (src/lib/onboarding-spuren.ts).
+ * Arbeitsort (optional, E-A10), Vorgangsart, Fragebogentyp und — nur fuer
+ * HR_EDIT_ROLES — die E-Mail der Fuehrungskraft. Ist sie eingetragen, erzeugt
+ * POST /api/onboarding in derselben Transaktion auch den Link zu den
+ * Einstellungsmodalitaeten; beide Spuren laufen parallel
+ * (src/lib/onboarding-spuren.ts).
+ *
+ * Arbeitsort: Vorgabe „wie Einrichtung“, angeboten werden nur aktive
+ * Einrichtungen. `arbeitsortId` geht nur hinaus, wenn er gesetzt ist und von
+ * der Einrichtung abweicht — sonst bleibt der Rumpf wie bisher (der Server
+ * speichert „gleich der Einrichtung“ ohnehin als null).
  *
  * Die Erfolgsansicht meldet je Link, ob die Einladung hinausging. Scheitert
  * eine Mail, ist der Vorgang trotzdem angelegt — HR gibt den Link dann selbst
@@ -26,6 +32,8 @@ interface Organization {
   name: string;
   shortName: string | null;
   type: string;
+  /** Fehlt das Feld (aeltere Antwort), gilt die Einrichtung als aktiv. */
+  isActive?: boolean;
 }
 
 /** Ergebnis des Mailversands je Einladung; `null` = kein Ergebnis vom Dispatcher. */
@@ -74,6 +82,8 @@ export function NeuerVorgangModal({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [organizationId, setOrganizationId] = useState("");
+  // "" = wie Einrichtung (E-A10)
+  const [arbeitsortId, setArbeitsortId] = useState("");
   const [processType, setProcessType] = useState("EINSTELLUNG");
   const [questionnaireType, setQuestionnaireType] = useState("STANDARD");
   const [supervisorEmail, setSupervisorEmail] = useState("");
@@ -106,6 +116,7 @@ export function NeuerVorgangModal({
     setFirstName("");
     setLastName("");
     setOrganizationId("");
+    setArbeitsortId("");
     setProcessType("EINSTELLUNG");
     setQuestionnaireType("STANDARD");
     setSupervisorEmail("");
@@ -156,6 +167,7 @@ export function NeuerVorgangModal({
     if (vorname) body.firstName = vorname;
     if (nachname) body.lastName = nachname;
     if (darfVorgesetztenLink && fuehrungskraft) body.supervisorEmail = fuehrungskraft;
+    if (arbeitsortId && arbeitsortId !== organizationId) body.arbeitsortId = arbeitsortId;
 
     try {
       const res = await fetch("/api/onboarding", {
@@ -182,6 +194,10 @@ export function NeuerVorgangModal({
   };
 
   if (!open) return null;
+
+  // Arbeitsort: nur aktive Einrichtungen (eine stillgelegte bekommt keine
+  // neuen Vorgaenge mehr), die gewaehlte bleibt aber sichtbar.
+  const arbeitsorte = organizations.filter((org) => org.isActive !== false || org.id === arbeitsortId);
 
   return (
     <div
@@ -379,6 +395,31 @@ export function NeuerVorgangModal({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="neuer-vorgang-arbeitsort" className={labelClass}>
+                  Arbeitsort <span className="font-normal text-muted-foreground">(optional)</span>
+                </label>
+                <select
+                  id="neuer-vorgang-arbeitsort"
+                  value={arbeitsortId}
+                  onChange={(e) => setArbeitsortId(e.target.value)}
+                  aria-describedby="neuer-vorgang-arbeitsort-hinweis"
+                  className={inputClass}
+                >
+                  <option value="">Wie Einrichtung</option>
+                  {arbeitsorte.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name} ({org.mandantNumber})
+                    </option>
+                  ))}
+                </select>
+                <p id="neuer-vorgang-arbeitsort-hinweis" className="text-xs text-muted-foreground">
+                  Nur nötig, wenn die Person nicht in der Einrichtung arbeitet, die sie anstellt –
+                  etwa eine OGS-Kraft des Fördervereins an einer Grundschule. Die Aufgaben für
+                  Abteilungen (Hausmeister, IT, Verwaltung) gehen dann an den Arbeitsort.
+                </p>
               </div>
 
               <div className="space-y-2">

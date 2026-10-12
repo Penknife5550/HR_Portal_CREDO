@@ -9,6 +9,12 @@
  * zweiter Versand) und die Payloads der Mails — besonders die
  * Datensparsamkeit: Was die Abteilung nicht sehen darf, steht auch nicht im
  * Payload.
+ *
+ * Arbeitsort (E-A10, Feinplan S5, letzter Block): Die Empfaenger ALLER
+ * Abteilungsaufgaben — auch der aus der Checklisten-Vorlage — werden am
+ * Arbeitsort aufgeloest; die Mandantenpruefung bleibt an organizationId. Die
+ * Fake-DB kennt `arbeitsortId` nicht eigens: Fehlt das Feld an der Zeile, gilt
+ * die Einrichtung.
  */
 
 type MailErgebnis = { status: "SENT" | "FAILED" | "SKIPPED"; detail?: string; recipient?: string } | null;
@@ -703,5 +709,114 @@ describe("onboardingErinnerungenSenden", () => {
     expect(e.uebersprungen[0]).toMatchObject({ onboardingId: "onb-1", departmentKey: "IT", grund: "ADRESSE_GEAENDERT" });
     expect(linkVon("IT")).toMatchObject({ lastSendStatus: "SKIPPED", token: "tok-it" });
     expect(mockTrigger).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================
+// Arbeitsort (E-A10, Feinplan S5)
+// =============================================
+
+describe("Arbeitsort: Empfaenger am Arbeitsort, Mandant bleibt die Einrichtung", () => {
+  const HAUSMEISTER_ZENTRAL = "hausmeister@example.org";
+  const HAUSMEISTER_GYM = "hausmeister.gym@example.org";
+  const HAUSMEISTER_GS = "hausmeister.gs@example.org";
+
+  beforeEach(() => {
+    // Foerderverein-Fall: Arbeitgeber org-1, die Person arbeitet an der
+    // Grundschule org-2. Die Aufgabe stammt aus der Checklisten-VORLAGE.
+    db.onboardingVorgaenge = [vorgang({ arbeitsortId: "org-2" })];
+    db.konfigs = [
+      konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister", email: HAUSMEISTER_ZENTRAL }),
+      konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister Gymnasium", email: HAUSMEISTER_GYM, organizationId: "org-1" }),
+      konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", email: HAUSMEISTER_GS, organizationId: "org-2" }),
+    ];
+    db.onboardingAufgaben = [
+      aufgabe({ title: "Schlüssel ausgeben", assignee: "FACILITY", templateItemId: "ti-1", relativeDueDays: -3 }),
+    ];
+  });
+
+  it("die Vorlagenaufgabe geht an die Stelle des Arbeitsorts — Link, Mail und Name", async () => {
+    const r = await aktion(undefined);
+
+    expect(r.status).toBe(201);
+    expect(linkVon("FACILITY")).toMatchObject({
+      email: HAUSMEISTER_GS,
+      departmentName: "Hausmeister Grundschule",
+      onboardingId: "onb-1",
+      sentAt: JETZT,
+    });
+    const [payload] = mails("onboarding-department-assigned");
+    expect(payload).toMatchObject({ email: HAUSMEISTER_GS, abteilung: "Hausmeister Grundschule" });
+    // Die Einrichtung im Mailtext bleibt der Arbeitgeber (Mandant).
+    expect(payload.einrichtung).toBe("FES Minden");
+    expect(JSON.stringify(mockTrigger.mock.calls)).not.toContain(HAUSMEISTER_GYM);
+  });
+
+  it("ohne Eintrag am Arbeitsort gilt der zentrale — nie der der Einrichtung", async () => {
+    db.konfigs = db.konfigs.filter((k) => k.organizationId !== "org-2");
+
+    await aktion(undefined);
+
+    expect(linkVon("FACILITY").email).toBe(HAUSMEISTER_ZENTRAL);
+  });
+
+  it("ohne Arbeitsort bleibt alles bei der Einrichtung (Bestand)", async () => {
+    db.onboardingVorgaenge = [vorgang()];
+
+    await aktion(undefined);
+
+    expect(linkVon("FACILITY").email).toBe(HAUSMEISTER_GYM);
+  });
+
+  it("Karte und Dialog (GET /abteilungen) zeigen den Empfaenger am Arbeitsort", async () => {
+    const r = await onboardingAbteilungenLaden({ onboardingId: "onb-1", session: HR, jetzt: JETZT });
+
+    expect(r.status).toBe(200);
+    const [zeile] = (r.body.abteilungen as { zeilen: Zeile[] }).zeilen;
+    expect(zeile).toMatchObject({ departmentKey: "FACILITY", email: HAUSMEISTER_GS, informierbar: true });
+  });
+
+  it("der taegliche Lauf erinnert am Arbeitsort — die Adresse der Einrichtung gilt dort als geaendert", async () => {
+    db.onboardingAufgaben = [aufgabe({ title: "Schlüssel ausgeben", assignee: "FACILITY", dueDate: tage(-2) })];
+    db.links = [
+      link({ departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", email: HAUSMEISTER_GS, token: "tok-fac" }),
+    ];
+
+    const e = await onboardingErinnerungenSenden(JETZT);
+    expect(e.remindersProcessed).toBe(1);
+    expect(mails("onboarding-department-reminder")[0]).toMatchObject({ email: HAUSMEISTER_GS });
+
+    mockTrigger.mockClear();
+    db.links = [
+      link({ departmentKey: "FACILITY", departmentName: "Hausmeister Gymnasium", email: HAUSMEISTER_GYM, token: "tok-fac" }),
+    ];
+    const e2 = await onboardingErinnerungenSenden(JETZT);
+    expect(e2.remindersProcessed).toBe(0);
+    expect(e2.uebersprungen[0]).toMatchObject({ departmentKey: "FACILITY", grund: "ADRESSE_GEAENDERT" });
+    expect(mockTrigger).not.toHaveBeenCalled();
+  });
+
+  it("Mandantenpruefung bleibt an organizationId: Zuordnung NUR zum Arbeitsort genuegt nicht", async () => {
+    const leitung: SessionPayload = { ...HR, userId: "u-leitung", role: "EINRICHTUNGSLEITUNG" };
+    db.zuweisungen = [{ userId: "u-leitung", organizationId: "org-2" }];
+
+    expect(await onboardingAbteilungenLaden({ onboardingId: "onb-1", session: leitung, jetzt: JETZT })).toEqual({
+      status: 404,
+      body: { error: MELDUNGEN.ONBOARDING_VORGANG_NICHT_GEFUNDEN },
+    });
+    const portal = await onboardingAufgabeImPortalAendern({
+      onboardingId: "onb-1",
+      itemId: db.onboardingAufgaben[0].id as string,
+      rohBody: { notes: "Notiz" },
+      session: leitung,
+      jetzt: JETZT,
+    });
+    expect(portal).toEqual({ status: 404, body: { error: MELDUNGEN.ONBOARDING_VORGANG_NICHT_GEFUNDEN } });
+
+    // Mit Zuordnung zum Arbeitgeber dagegen schon — der Arbeitsort spielt dafuer keine Rolle.
+    db.zuweisungen = [{ userId: "u-leitung", organizationId: "org-1" }];
+    const ok = await onboardingAbteilungenLaden({ onboardingId: "onb-1", session: leitung, jetzt: JETZT });
+    expect(ok.status).toBe(200);
+    expect((ok.body.abteilungen as { zeilen: Zeile[] }).zeilen[0].email).toBe(HAUSMEISTER_GS);
   });
 });

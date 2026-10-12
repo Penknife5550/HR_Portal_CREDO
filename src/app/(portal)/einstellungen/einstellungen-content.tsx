@@ -10,8 +10,11 @@
  * 4. SMTP             – Primaerer Versandkanal konfigurieren und testen
  * 5. Webhooks         – Optionaler Zusatzkanal (z.B. n8n), pro Event
  * 6. Abteilungen      – Adressen der Abteilungen, die Checklisten-Aufgaben per Link bekommen
- * 7. API-Zugang       – API-Keys fuer die Reporting-API
- * 8. Automatische Läufe – Zeitplaner: taegliche Erinnerungen, Fristen, Loeschungen
+ *                       (je Zeile der Hinweis „außerhalb der Freigabeliste“, E-A27: nur warnen)
+ * 7. Ausstattung & Zugänge – Katalog, aus dem Fuehrungskraefte im Modalitaeten-Formular
+ *                       waehlen (src/components/ausstattung/katalog-tab.tsx)
+ * 8. API-Zugang       – API-Keys fuer die Reporting-API
+ * 9. Automatische Läufe – Zeitplaner: taegliche Erinnerungen, Fristen, Loeschungen
  *                        (src/components/zeitplaner/automatische-laeufe-tab.tsx)
  *
  * `?tab=laeufe&lauf=<schluessel>` oeffnet den Reiter und hebt den Lauf hervor
@@ -24,6 +27,7 @@ import { PortalHeader } from "@/components/portal-header";
 import { abteilungLabel, LINK_ABTEILUNGEN } from "@/lib/constants";
 import { EVENT_GROUP_ORDER } from "@/lib/events";
 import { AutomatischeLaeufeTab } from "@/components/zeitplaner/automatische-laeufe-tab";
+import { AusstattungKatalogTab } from "@/components/ausstattung/katalog-tab";
 import {
   EREIGNIS_GRUPPEN,
   ereignisOption,
@@ -107,6 +111,8 @@ interface DepartmentConfig {
   label: string;
   /** Altbestand HR/MITARBEITER/VORGESETZTER: wird nie angeschrieben */
   reserviert: boolean;
+  /** Domain der Adresse steht nicht auf der Freigabeliste (E-A27: nur ein Hinweis, Aufgaben gehen trotzdem hin). */
+  ausserhalbFreigabe?: boolean;
 }
 
 /** „5 Aufgaben in 3 Vorlagen" je Schlüssel (GET …/departments, `verwendung`). */
@@ -162,7 +168,17 @@ function EreignisOptgroups() {
   );
 }
 
-const TAB_IDS = ["status", "vorlagen", "protokoll", "smtp", "webhooks", "departments", "api", "laeufe"] as const;
+const TAB_IDS = [
+  "status",
+  "vorlagen",
+  "protokoll",
+  "smtp",
+  "webhooks",
+  "departments",
+  "ausstattung",
+  "api",
+  "laeufe",
+] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 // =============================================
@@ -201,6 +217,7 @@ export function EinstellungenContent({ user }: { user: User }) {
     { id: "smtp" as const, label: "SMTP" },
     { id: "webhooks" as const, label: "Webhooks" },
     { id: "departments" as const, label: "Abteilungen" },
+    { id: "ausstattung" as const, label: "Ausstattung & Zugänge" },
     { id: "api" as const, label: "API-Zugang" },
     { id: "laeufe" as const, label: "Automatische Läufe" },
   ];
@@ -214,7 +231,7 @@ export function EinstellungenContent({ user }: { user: User }) {
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-foreground">Einstellungen</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            E-Mail-Versand, Vorlagen, Webhooks, Abteilungen und automatische Läufe verwalten
+            E-Mail-Versand, Vorlagen, Webhooks, Abteilungen, Ausstattung und automatische Läufe verwalten
           </p>
         </div>
 
@@ -231,7 +248,7 @@ export function EinstellungenContent({ user }: { user: User }) {
         )}
 
         {/* Tab-Navigation */}
-        <div className="mb-6 flex gap-1 rounded-lg border bg-card p-1">
+        <div className="mb-6 flex flex-wrap gap-1 rounded-lg border bg-card p-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -254,6 +271,7 @@ export function EinstellungenContent({ user }: { user: User }) {
         {activeTab === "smtp" && <SmtpTab />}
         {activeTab === "webhooks" && <WebhooksTab />}
         {activeTab === "departments" && <DepartmentsTab />}
+        {activeTab === "ausstattung" && <AusstattungKatalogTab />}
         {activeTab === "api" && <ApiKeysTab />}
         {activeTab === "laeufe" && <AutomatischeLaeufeTab hervorheben={hervorgehobenerLauf} />}
       </main>
@@ -2659,6 +2677,12 @@ export function DepartmentsTab() {
                           />
                         ) : (
                           <span className="break-all text-foreground">{dept.email}</span>
+                        )}
+                        {/* E-A27: nur warnen — Aufgaben gehen trotzdem an diese Adresse. */}
+                        {dept.ausserhalbFreigabe && !bearbeiten && (
+                          <p className="mt-1 max-w-xs text-xs text-credo-rot" data-hinweis="ausserhalb-freigabe">
+                            Außerhalb der Freigabeliste – Aufgaben gehen trotzdem an diese Adresse.
+                          </p>
                         )}
                       </td>
 

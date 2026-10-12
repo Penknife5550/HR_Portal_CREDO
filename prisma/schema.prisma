@@ -101,27 +101,36 @@ model Organization {
   hatBetriebsrat                 Boolean @default(false)
   hatSchwerbehindertenvertretung Boolean @default(false)
 
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  onboardings           OnboardingProcess[]
-  offboardings          OffboardingProcess[]
-  departmentConfigs     DepartmentConfig[]
-  employments           Employment[]
-  userAssignments       UserOrgAssignment[]
-  civilServiceProcesses CivilServiceProcess[]
-  beurteilungTemplates  BeurteilungTemplate[]
-  mutterschutzProzesse  MutterschutzProzess[]
-  elternzeitProzesse    ElternzeitProzess[]
-  documentTemplates     DocumentTemplate[]
-  generatedDocuments    GeneratedDocument[]
-  bemFaelle             BemFall[]
-  bemAnsprechpartner    BemAnsprechpartner[]
-  bemVorlagen           BemVorlage[]
-  starterpaketDokumente StarterpaketDokument[]
-  starterpaketAuswahl   StarterpaketAuswahl[]
-  dokumentenVersand     DokumentenVersand[]
-  individuelleMails     IndividuelleMail[]
-  contractEndProcesses  ContractEndProcess[]
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+  // Benannt, seit OnboardingProcess zwei Relationen hierher hat (Einrichtung =
+  // Arbeitgeber/Mandant, Arbeitsort). Relationsnamen kennt nur Prisma — der
+  // Fremdschluessel heisst weiter onboarding_processes_organizationId_fkey.
+  onboardings               OnboardingProcess[]       @relation("OnboardingEinrichtung")
+  // Ausstattung & Zugaenge (A1): Vorgaenge, deren Arbeitsort diese Einrichtung ist.
+  onboardingArbeitsorte     OnboardingProcess[]       @relation("OnboardingArbeitsort")
+  offboardings              OffboardingProcess[]
+  departmentConfigs         DepartmentConfig[]
+  employments               Employment[]
+  userAssignments           UserOrgAssignment[]
+  civilServiceProcesses     CivilServiceProcess[]
+  beurteilungTemplates      BeurteilungTemplate[]
+  mutterschutzProzesse      MutterschutzProzess[]
+  elternzeitProzesse        ElternzeitProzess[]
+  documentTemplates         DocumentTemplate[]
+  generatedDocuments        GeneratedDocument[]
+  bemFaelle                 BemFall[]
+  bemAnsprechpartner        BemAnsprechpartner[]
+  bemVorlagen               BemVorlage[]
+  starterpaketDokumente     StarterpaketDokument[]
+  starterpaketAuswahl       StarterpaketAuswahl[]
+  dokumentenVersand         DokumentenVersand[]
+  individuelleMails         IndividuelleMail[]
+  contractEndProcesses      ContractEndProcess[]
+  // Ausstattung & Zugaenge (A1): eigene Katalogpositionen der Einrichtung und
+  // ausgeblendete zentrale Positionen.
+  ausstattungsPositionen    AusstattungsPosition[]
+  ausstattungsAusblendungen AusstattungsAusblendung[]
 
   @@map("organizations")
 }
@@ -235,11 +244,20 @@ enum OrganizationType {
 // Onboarding-Vorgang (ein Vorgang pro Einstellung)
 // =============================================
 model OnboardingProcess {
-  id               String       @id @default(uuid())
-  displayId        String?      @unique // z.B. "2026-GYM-001"
+  id               String        @id @default(uuid())
+  displayId        String?       @unique // z.B. "2026-GYM-001"
   sequentialNumber Int? // Laufende Nummer fuer displayId
+  // Einrichtung = Arbeitgeber/Mandant: Zugriff (canAccessProcess), Listen,
+  // Unterlagen, Mailfeld `einrichtung`. Der Relationsname ist neu (A1), der
+  // Fremdschluessel in der Datenbank bleibt derselbe.
   organizationId   String
-  organization     Organization @relation(fields: [organizationId], references: [id])
+  organization     Organization  @relation("OnboardingEinrichtung", fields: [organizationId], references: [id])
+  // Ausstattung & Zugaenge (A1, E-A10): Arbeitsort, falls er von der Einrichtung
+  // abweicht. null = Einrichtung des Vorgangs (gleicher Wert wird als null
+  // gespeichert). Bestimmt Empfaenger ALLER Onboarding-Abteilungsaufgaben und den
+  // Katalogausschnitt, nie den Zugriff.
+  arbeitsortId     String?
+  arbeitsort       Organization? @relation("OnboardingArbeitsort", fields: [arbeitsortId], references: [id], onDelete: SetNull)
 
   // Neuer Mitarbeiter
   email     String
@@ -292,10 +310,17 @@ model OnboardingProcess {
   reviewedById          String?
   reviewedBy            User?     @relation("ReviewedBy", fields: [reviewedById], references: [id])
   completedAt           DateTime?
+  // Ausstattung & Zugaenge (F12): Zeitpunkt des Abbruchs (Status-PATCH auf
+  // EXPIRED). Anker der Loeschfrist der Freitexte (E-A22); das AuditLog wird
+  // aufgeraeumt und taugt dafuer nicht.
+  expiredAt             DateTime?
 
   // Erinnerungen
   lastEmployeeReminderAt   DateTime? // Letzte Erinnerung an Mitarbeiter
   lastSupervisorReminderAt DateTime? // Letzte Erinnerung an Vorgesetzten
+  // Ausstattung & Zugaenge (F12, E-A18): Merker der Sammelmail an HR am Werktag
+  // vor Dienstbeginn. Bedingt beansprucht (null -> jetzt), bei FAILED zurueck auf null.
+  ausstattungSammelmailAm  DateTime?
 
   // Starterpaket-Versand (Nachweis + Resend-Anzeige)
   starterPacketSentAt    DateTime?
@@ -312,12 +337,18 @@ model OnboardingProcess {
   departmentLinks           OffboardingDepartmentLink[]
   // Paket 4: Nachforderungen von Unterlagen (nur die Gegenrichtung, keine Spalte).
   unterlagenNachforderungen UnterlagenNachforderung[]
+  // Ausstattung & Zugaenge (A2/A3): Wahl der Fuehrungskraft und Ergaenzungen
+  // von HR, Hinweise je Stelle, Nachtragsliste (nur die Gegenrichtung).
+  ausstattung               OnboardingAusstattung[]
+  stellenHinweise           OnboardingStellenHinweis[]
+  ausstattungAenderungen    OnboardingAusstattungAenderung[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([organizationId])
+  @@index([arbeitsortId])
   @@index([email])
   @@index([displayId])
   @@map("onboarding_processes")
@@ -838,6 +869,17 @@ model SupervisorData {
   // -- Meta --
   currentStep Int     @default(0)
   isComplete  Boolean @default(false)
+
+  // -- Ausstattung & Zugaenge (A2) --
+  // Regel 2: Die Schrittliste steht fest, sobald der Modalitaeten-Link entsteht
+  // (vorgesetztenLinkSetzen). true = Schritt "Ausstattung & Zugaenge" im
+  // Formular. Bestand setzt die Migration SUPERVISOR_MIT_AUSSTATTUNG_V1 auf
+  // false; null gilt ueberall als false. Formular, Fortschritt und HR-Ansicht
+  // lesen nur diesen Merker, nie den Katalog.
+  mitAusstattung           Boolean?
+  // F9: erster Speicherstand der Wahl. Solange null, wendet das Formular die
+  // Vorauswahl des Katalogs an ("keine Wahl" hiesse sonst auch "bewusst abgewaehlt").
+  ausstattungGespeichertAm DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1793,11 +1835,180 @@ model ChecklistItem {
   abteilungKommentar   String?
   abteilungKommentarAm DateTime?
 
+  // Ausstattung & Zugaenge (A3):
+  // F3: Herkunft als flache Spalte (Sperren, Abschluss, Sammelmail ohne
+  // Relationsfilter). herkunft: null = Vorlage | "AUSSTATTUNG" | "HINWEIS"
+  herkunft           String?
+  // Regel 14: Faelligkeit wurde auf den Tag des Versands angehoben. Einmal gesetzt.
+  eilt               Boolean                       @default(false)
+  // F2: gestrichen. Dann zugleich isCompleted = true samt completedAt/
+  // completedById, damit jeder Zaehler ohne Wissen um "entfaellt" sie nicht
+  // als offen fuehrt; die Anzeige liest dieses Feld.
+  entfaelltAm        DateTime?
+  // Gegenrichtungen (keine Spalte): Verknuepfung zur Wahl bzw. zum Hinweis.
+  ausstattungAufgabe OnboardingAusstattungAufgabe?
+  stellenHinweis     OnboardingStellenHinweis?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([onboardingId])
   @@map("checklist_items")
+}
+
+// =============================================
+// Ausstattung & Zugaenge (Pakete A1 bis A3, Stufe 1)
+//
+// Katalog in Einstellungen → Ausstattung & Zugaenge; die Fuehrungskraft waehlt
+// im Modalitaeten-Formular, HR ergaenzt nach der Abgabe, aus jeder Wahl wird
+// eine Checklisten-Aufgabe der zustaendigen Stelle (je Option eine).
+// Plan: docs/module/onboarding/ausstattung-zugaenge-plan.html, Feinplan:
+// docs/module/onboarding/ausstattung-feinplan.md (1.2).
+//
+// Zustaende sind Zeichenketten, KEINE Enums: `db push --accept-data-loss`
+// spielte einen umbenannten Enum-Wert still aus. Die Wertlisten stehen in den
+// Kommentaren und als Konstanten in src/lib/ausstattung.ts; ein Test haelt
+// beide gleich (src/__tests__/lib/ausstattung-schema.test.ts).
+// =============================================
+
+// ---------- Katalog (A1) ----------
+// art: "JA_NEIN" | "AUSWAHL" | "ANGABE"
+model AusstattungsPosition {
+  id                      String        @id @default(uuid())
+  departmentKey           String // Stelle; nie MITARBEITER/VORGESETZTER
+  organizationId          String? // null = zentral
+  organization            Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  einrichtungsarten       String[]      @default([]) // OrganizationType-Werte; nur zentral; leer = alle
+  art                     String
+  angabeSchluessel        String? // nur ANGABE: Schluessel aus ANGABEN_KATALOG (E-A13)
+  bezeichnung             String // max. 120; bei ANGABE = Label aus ANGABEN_KATALOG
+  hinweisFuehrungskraft   String? // max. 300, nur im Formular
+  hinweisStelle           String? // max. 500, wird ChecklistItem.description
+  optionen                String[]      @default([]) // nur AUSWAHL: 1..40, je max. 80
+  vorausgewaehlt          Boolean       @default(false) // nur JA_NEIN
+  vorausgewaehlteOptionen String[]      @default([]) // nur AUSWAHL, Teilmenge von optionen (F8)
+  bemerkungAnbieten       Boolean       @default(true)
+  bemerkungPlatzhalter    String? // max. 120
+  aufgabeTitel            String? // max. 120; Standard "<Bezeichnung> bereitstellen"
+  defaultDueDays          Int? // relativ zum Vertragsbeginn; bei ANGABE immer null
+  personengruppen         String[]      @default([]) // QuestionnaireType-Werte; leer = alle
+  sichtbarFuer            String[]      @default([]) // nur ANGABE: weitere Stellen
+  entgeltrelevant         Boolean       @default(false) // F10: dann nur Stelle HR
+  ausgabeKennung          String? // A4
+  rueckgabeKategorie      String? // A4: ReturnCategory-Wert
+  beiAustritt             String? // A4: "RUECKGABE" | "SPERREN" | "NICHTS"
+  vorschlagSchluessel     String?       @unique // F11: nur "Vorschlaege uebernehmen" schreibt ihn
+  isActive                Boolean       @default(false) // neu = aus
+  orderIndex              Int           @default(0)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  ausblendungen AusstattungsAusblendung[]
+  auswahlen     OnboardingAusstattung[]
+
+  @@index([organizationId])
+  @@index([departmentKey])
+  @@map("ausstattungs_positionen")
+}
+
+// Einrichtung blendet eine ZENTRALE Position fuer sich aus.
+model AusstattungsAusblendung {
+  positionId     String
+  position       AusstattungsPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime             @default(now())
+
+  @@id([positionId, organizationId])
+  @@map("ausstattungs_ausblendungen")
+}
+
+// ---------- Je Vorgang (A2/A3) ----------
+// quelle: "FUEHRUNGSKRAFT" | "HR"; bemerkungQuelle: "FUEHRUNGSKRAFT" | "HR" | "BEIDE"
+model OnboardingAusstattung {
+  id                 String                @id @default(uuid())
+  onboardingId       String
+  onboarding         OnboardingProcess     @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  positionId         String? // null = freie Position von HR
+  position           AusstattungsPosition? @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  // --- Momentaufnahme (Regel 4) ---
+  departmentKey      String
+  art                String
+  angabeSchluessel   String?
+  bezeichnung        String
+  aufgabeTitel       String
+  hinweisStelle      String?
+  relativeDueDays    Int?
+  sichtbarFuer       String[]              @default([])
+  ausgabeKennung     String?
+  rueckgabeKategorie String?
+  beiAustritt        String?
+  reihenfolge        Int                   @default(0) // orderIndex der Position beim Speichern
+  // --- Wahl ---
+  auswahl            String[]              @default([]) // AUSWAHL: je Option eine Aufgabe (E-A12)
+  angabe             String? // ANGABE, max. 300
+  bemerkung          String? // max. 500
+  bemerkungQuelle    String?
+  quelle             String
+  erfasstVonId       String? // HR-Konto bei quelle HR (kein FK, Anzeige ueber Lookup)
+  gestrichenAm       DateTime? // Regel 9: ganze Position nach der Information gestrichen
+  inhaltGeleertAm    DateTime? // E-A22
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  aufgaben OnboardingAusstattungAufgabe[]
+
+  @@unique([onboardingId, positionId])
+  @@index([onboardingId])
+  @@map("onboarding_ausstattung")
+}
+
+// Eine Aufgabe je Position bzw. je Option (E-A12). Doppelte Anlage faengt der
+// Primaerschluessel ab (F4).
+model OnboardingAusstattungAufgabe {
+  ausstattungId   String
+  ausstattung     OnboardingAusstattung @relation(fields: [ausstattungId], references: [id], onDelete: Cascade)
+  option          String                @default("") // "" = ganze Position (kein NULL im Schluessel)
+  checklistItemId String                @unique
+  checklistItem   ChecklistItem         @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+  createdAt       DateTime              @default(now())
+
+  @@id([ausstattungId, option])
+  @@map("onboarding_ausstattung_aufgaben")
+}
+
+// "Weitere Hinweise an die IT" (bzw. an die jeweilige Stelle), E-A14.
+model OnboardingStellenHinweis {
+  onboardingId    String
+  onboarding      OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  departmentKey   String
+  text            String // max. 1000; "" nach Leerung (E-A22) oder Entfernen durch HR
+  quelle          String // "FUEHRUNGSKRAFT" | "HR" (von HR neu angelegt) | "BEIDE" (FK-Text, von HR geaendert)
+  checklistItemId String?           @unique // Aufgabe "Hinweis der Fuehrungskraft beachten"
+  checklistItem   ChecklistItem?    @relation(fields: [checklistItemId], references: [id], onDelete: SetNull)
+  gesehenAm       DateTime? // HR: uebernommen oder zur Kenntnis genommen
+  inhaltGeleertAm DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@id([onboardingId, departmentKey])
+  @@map("onboarding_stellen_hinweise")
+}
+
+// Nachtragsliste je Stelle (Regel 10).
+// art: "NEU" | "GEAENDERT" | "ENTFAELLT"
+model OnboardingAusstattungAenderung {
+  id            String            @id @default(uuid())
+  onboardingId  String
+  onboarding    OnboardingProcess @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  departmentKey String
+  art           String
+  titel         String // nur Katalog-/Aufgabentitel, nie Freitext
+  erfasstAm     DateTime          @default(now())
+  gesendetAm    DateTime? // bei SENT der Zuweisungsmail (F7)
+
+  @@index([onboardingId, departmentKey, gesendetAm])
+  @@map("onboarding_ausstattung_aenderungen")
 }
 
 // =============================================
@@ -2302,6 +2513,10 @@ model OffboardingDepartmentLink {
 
   allTasksComplete Boolean   @default(false)
   completedAt      DateTime?
+
+  // Ausstattung & Zugaenge (F13, E-A20): Absage nach EXPIRED gesendet (nur
+  // Onboarding-Zeilen). Gesetzt bei SENT; danach bietet die Karte keine Absage mehr an.
+  abgesagtAm DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

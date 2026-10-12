@@ -14,6 +14,8 @@
  *   - checklistenPunktSchema,
  *     checklistenVorlageSchema,
  *     checklistenFehlerMeldung      Checklisten-Vorlagen (/api/checklisten…, Paket 5)
+ *   - schluesselFeld                Form eines Abteilungsschluessels (auch Katalog
+ *                                   „Ausstattung & Zugänge", validations/ausstattung.ts)
  *
  * Alle Meldungen deutsch; die Routen geben `error.errors[0].message` als
  * `{ error }` mit 400 zurueck (Muster der uebrigen Routen).
@@ -61,7 +63,13 @@ export function meldungReservierterSchluessel(schluessel: string): string {
   return `Der Schlüssel „${schluessel}“ ist reserviert: ${RESERVIERT_BEGRUENDUNG[schluessel] ?? "Er kann nicht angelegt werden."}`;
 }
 
-const schluesselFeld = z
+/**
+ * Abteilungsschluessel: getrimmt, Pflicht, Form nach ABTEILUNGS_SCHLUESSEL_MUSTER.
+ * Ob er bekannt oder reserviert ist, pruefen die Aufrufer selbst. Exportiert
+ * fuer den Katalog „Ausstattung & Zugänge" (validations/ausstattung.ts), damit
+ * es fuer die Stelle einer Position keine zweite Fassung der Regel gibt.
+ */
+export const schluesselFeld = z
   .string({ required_error: "Bitte einen Schlüssel angeben.", invalid_type_error: "Bitte einen Schlüssel angeben." })
   .trim()
   .min(1, "Bitte einen Schlüssel angeben.")

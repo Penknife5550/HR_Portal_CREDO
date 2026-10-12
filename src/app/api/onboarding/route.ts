@@ -13,6 +13,7 @@ import { triggerWebhooks } from "@/lib/webhooks";
 import { abteilungAusZustaendigkeit, MELDUNGEN } from "@/lib/abteilungsaufgaben";
 import { fuehrungskraftAdresseFreigegeben } from "@/lib/abteilungsaufgaben-dienst";
 import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
+import { arbeitsortSpeicherwert } from "@/lib/ausstattung";
 import {
   canAccessProcess,
   canEditProcess,
@@ -128,6 +129,7 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
       firstName,
       lastName,
       supervisorEmail,
+      arbeitsortId,
     } = body;
 
     // Dieselbe Regel wie in /supervisor-link: Wer den Link spaeter nicht
@@ -152,6 +154,27 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
         { error: "Organisation nicht gefunden" },
         { status: 404 }
       );
+    }
+
+    // Arbeitsort (E-A10): die Einrichtung, an der die Person arbeitet, wenn
+    // das nicht der Arbeitgeber ist. Er bestimmt nur, an wen die
+    // Abteilungsaufgaben gehen und welchen Katalog die Fuehrungskraft sieht —
+    // der Mandant (Zugriff, Listen, Unterlagen) bleibt `organizationId`.
+    // Dieselbe Pruefung wie fuer die Einrichtung: unbekannt ODER fremd = 404
+    // mit demselben Text. Gleich der Einrichtung (oder leer) wird `null`
+    // gespeichert, also „wie Einrichtung“.
+    const arbeitsortGespeichert = arbeitsortSpeicherwert(org.id, arbeitsortId);
+    if (arbeitsortGespeichert) {
+      const ort = await prisma.organization.findUnique({
+        where: { id: arbeitsortGespeichert },
+        select: { id: true },
+      });
+      if (!ort || !(await canAccessProcess(session, ort.id))) {
+        return NextResponse.json(
+          { error: "Organisation nicht gefunden" },
+          { status: 404 }
+        );
+      }
     }
 
     // Fuehrungskraft: An die frei eingetippte Adresse geht gleich ein Link zu
@@ -232,6 +255,7 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
             data: {
               email,
               organizationId: org.id,
+              arbeitsortId: arbeitsortGespeichert,
               processType,
               questionnaireType,
               token,
@@ -264,6 +288,8 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
               details: {
                 email,
                 organization: org.name,
+                // ID des abweichenden Arbeitsorts, sonst null („wie Einrichtung“).
+                arbeitsortId: arbeitsortGespeichert,
                 questionnaireType,
                 // Der Name im Reiter „Persönliche Daten" sieht aus wie eine
                 // Angabe der Person — hier steht, dass HR ihn vorbelegt hat.

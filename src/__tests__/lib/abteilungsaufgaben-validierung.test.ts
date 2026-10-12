@@ -12,6 +12,7 @@ import {
   fuehrungskraftAnlageFelder,
   meldungReservierterSchluessel,
   portalAufgabePatchSchema,
+  schluesselFeld,
 } from "@/lib/validations/abteilungsaufgaben";
 
 function fehler(ergebnis: { success: boolean; error?: { errors: { message: string }[] } }): string | undefined {
@@ -134,6 +135,22 @@ describe("abteilungConfigUpdateSchema", () => {
     });
     expect(abteilungConfigUpdateSchema.safeParse({}).success).toBe(false);
     expect(abteilungConfigUpdateSchema.safeParse({ email: 42 }).success).toBe(false);
+  });
+});
+
+describe("schluesselFeld (exportiert fuer den Katalog, Verhalten unveraendert)", () => {
+  it("trimmt und verlangt die Schluesselform", () => {
+    expect(schluesselFeld.parse(" IT ")).toBe("IT");
+    expect(schluesselFeld.parse("EMPFANG_2")).toBe("EMPFANG_2");
+    expect(fehler(schluesselFeld.safeParse(""))).toBe("Bitte einen Schlüssel angeben.");
+    expect(fehler(schluesselFeld.safeParse(undefined))).toBe("Bitte einen Schlüssel angeben.");
+    expect(fehler(schluesselFeld.safeParse(42))).toBe("Bitte einen Schlüssel angeben.");
+    expect(fehler(schluesselFeld.safeParse("it"))).toMatch(/nur Großbuchstaben, Ziffern und _/);
+  });
+
+  it("prueft weder reservierte noch bekannte Schluessel (das tun die Aufrufer)", () => {
+    expect(schluesselFeld.parse("VORGESETZTER")).toBe("VORGESETZTER");
+    expect(schluesselFeld.parse("HR")).toBe("HR");
   });
 });
 

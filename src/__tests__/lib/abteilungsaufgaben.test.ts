@@ -44,6 +44,7 @@ import {
   kommentarMailFelder,
   linkAnzeige,
   meldungNachweisFehlt,
+  onboardingEmpfaengerEinrichtung,
   sperrzeitBis,
   stufeBerechnen,
   stufenMailFelder,
@@ -859,5 +860,40 @@ describe("abteilungKonfigDto / meldungNachweisFehlt", () => {
     expect(meldungNachweisFehlt(["IT-Abteilung", "Buchhaltung"])).toBe(
       "Achtung: Die E-Mail an IT-Abteilung, Buchhaltung ist versendet, das Ergebnis konnte aber nicht gespeichert werden. Die Übersicht zeigt den Versand deshalb nicht – bitte nicht erneut senden.",
     );
+  });
+});
+
+describe("onboardingEmpfaengerEinrichtung (E-A10)", () => {
+  it("der Arbeitsort bestimmt die Empfaenger, sonst die Einrichtung des Vorgangs", () => {
+    expect(onboardingEmpfaengerEinrichtung({ arbeitsortId: "org-gs", organizationId: "org-foerderverein" })).toBe(
+      "org-gs",
+    );
+    expect(onboardingEmpfaengerEinrichtung({ arbeitsortId: null, organizationId: "org-gym" })).toBe("org-gym");
+    expect(onboardingEmpfaengerEinrichtung({ organizationId: "org-gym" })).toBe("org-gym");
+    expect(onboardingEmpfaengerEinrichtung({ arbeitsortId: "", organizationId: "org-gym" })).toBe("org-gym");
+  });
+
+  it("mit empfaengerAufloesen: der Eintrag des Arbeitsorts vor dem zentralen", () => {
+    const konfigs = [
+      konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", email: "hm-gs@example.org", organizationId: "org-gs" }),
+      konfig({ departmentKey: "FACILITY", departmentName: "Facility zentral", email: "facility@example.org", organizationId: null }),
+    ];
+    const vorgang = { arbeitsortId: "org-gs", organizationId: "org-foerderverein" };
+    expect(
+      empfaengerAufloesen({
+        departmentKey: "FACILITY",
+        organizationId: onboardingEmpfaengerEinrichtung(vorgang),
+        konfigs,
+        fuehrungskraft: null,
+      }),
+    ).toMatchObject({ ok: true, email: "hm-gs@example.org", quelle: "EINRICHTUNG" });
+    expect(
+      empfaengerAufloesen({
+        departmentKey: "FACILITY",
+        organizationId: onboardingEmpfaengerEinrichtung({ ...vorgang, arbeitsortId: null }),
+        konfigs,
+        fuehrungskraft: null,
+      }),
+    ).toMatchObject({ ok: true, email: "facility@example.org", quelle: "ZENTRAL" });
   });
 });

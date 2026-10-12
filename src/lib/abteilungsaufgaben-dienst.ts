@@ -345,6 +345,13 @@ async function protokollieren(
  */
 export interface VersandModul extends LinkBereich {
   displayId: string;
+  /**
+   * Einrichtung, an der die Empfaenger aufgeloest werden (empfaengerFuer).
+   * Offboarding: die Einrichtung des Vorgangs. Onboarding: der Arbeitsort,
+   * sonst die Einrichtung (E-A10, onboardingEmpfaengerEinrichtung). NIE fuer
+   * eine Zugriffspruefung — der Mandant ist immer die Einrichtung des
+   * Vorgangs (canAccessProcess mit dessen organizationId).
+   */
   organizationId: string;
   fuehrungskraft: FuehrungskraftDaten;
   /** Gemeinsamer Teil JEDES Payloads (offboardingMailFelder bzw. onboardingAbteilungsMailFelder). */

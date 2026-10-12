@@ -13,6 +13,7 @@ import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { heuteInBerlin } from "@/lib/kalendertag";
+import { onboardingEmpfaengerEinrichtung } from "@/lib/abteilungsaufgaben";
 import {
   generateOnboardingPDF,
   type OnboardingExportContext,
@@ -110,11 +111,13 @@ export async function GET(
     // Scheitert die Abfrage, bleibt es dabei — ein Export darf daran nicht
     // scheitern.
     // Eine Abteilung kann je Einrichtung einen eigenen Namen tragen; die
-    // Zeile der Einrichtung dieses Vorgangs sticht die allgemeine.
+    // Zeile der Einrichtung dieses Vorgangs sticht die allgemeine — im
+    // Onboarding die des ARBEITSORTS (E-A10): Dort gehen die Aufgaben hin,
+    // also heisst die Stelle im PDF wie in Karte und Mail.
     const abteilungsNamen: Record<string, string> = {};
     try {
       const konfigs = await prisma.departmentConfig.findMany({
-        where: { OR: [{ organizationId: null }, { organizationId: process.organizationId }] },
+        where: { OR: [{ organizationId: null }, { organizationId: onboardingEmpfaengerEinrichtung(process) }] },
         select: { departmentKey: true, departmentName: true, organizationId: true },
         orderBy: { organizationId: "asc" },
       });

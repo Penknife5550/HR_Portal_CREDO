@@ -31,7 +31,15 @@
  *     Modalitaeten-Link), also muss nichts nachgerechnet werden.
  *   - Empfaenger: VORGESETZTER an OnboardingProcess.supervisorEmail (die
  *     Adresse, die den Modalitaeten-Link bekam), alle anderen an
- *     DepartmentConfig (Einrichtung vor zentral). HR/MITARBEITER nie.
+ *     DepartmentConfig (Eintrag des ARBEITSORTS vor zentral, E-A10:
+ *     `onboardingEmpfaengerEinrichtung` = arbeitsortId ?? organizationId).
+ *     Das gilt fuer Vorlagen- und Ausstattungsaufgaben gleich — sonst gaebe es
+ *     zwei FACILITY-Stellen, aber nur einen Link. HR/MITARBEITER nie.
+ *   - Mandant bleibt `organizationId`: Jedes canAccessProcess hier und in
+ *     abteilungsaufgaben-uebergaenge.ts prueft den Arbeitgeber, nie den
+ *     Arbeitsort. Der Arbeitsort steckt nur in `VersandModul.organizationId`
+ *     und in der Uebersicht (abteilungsZeilenBauen) — beide loesen damit
+ *     ausschliesslich Empfaenger auf.
  *   - COMPLETED: Link nur lesend, keine Erinnerung, kein Versand (409).
  *     EXPIRED: Link 410 „Dieser Vorgang ist nicht mehr aktiv …", kein Versand.
  *     Offene Abteilungsaufgaben blockieren den Abschluss NICHT.
@@ -53,6 +61,7 @@ import {
   erledigtVonBestimmen,
   faelligkeitAus,
   linkAnzeige,
+  onboardingEmpfaengerEinrichtung,
   onboardingVersandSperre,
   zusatzWerte,
   type AbteilungsUebersichtDaten,
@@ -97,6 +106,8 @@ export const ONBOARDING_VERSAND_AUSWAHL = {
   id: true,
   displayId: true,
   organizationId: true,
+  // Arbeitsort (E-A10): Empfaenger am Arbeitsort, null = Einrichtung.
+  arbeitsortId: true,
   status: true,
   firstName: true,
   lastName: true,
@@ -127,7 +138,10 @@ function onboardingVersandModul(v: OnboardingVorgangFuerVersand): VersandModul {
     modul: "ONBOARDING",
     vorgangId: v.id,
     displayId: v.displayId || v.id.substring(0, 8),
-    organizationId: v.organizationId,
+    // Nur fuer die Empfaenger (empfaengerFuer im Versandkern): der Arbeitsort,
+    // sonst die Einrichtung (E-A10). Der Mandant wurde vorher am Arbeitgeber
+    // geprueft (canAccessProcess mit v.organizationId).
+    organizationId: onboardingEmpfaengerEinrichtung(v),
     fuehrungskraft: onboardingFuehrungskraft(v),
     mailFelder: onboardingAbteilungsMailFelder(v),
     zusatzFelder: (key) =>
@@ -299,6 +313,8 @@ export async function onboardingAbteilungsAktionAusfuehren(opts: {
 export interface OnboardingUebersichtVorgang {
   id: string;
   organizationId: string;
+  /** Arbeitsort (E-A10); fehlt oder null = Einrichtung. Nur fuer die Empfaenger. */
+  arbeitsortId?: string | null;
   status: string;
   supervisorEmail?: string | null;
   supervisorSubmittedAt?: Date | null;
@@ -369,7 +385,8 @@ export async function onboardingAbteilungsUebersichtLaden<
     })),
     links: vorgang.departmentLinks,
     konfigs,
-    organizationId: vorgang.organizationId,
+    // Empfaenger am Arbeitsort (E-A10) — dieselbe Einrichtung wie im Versand.
+    organizationId: onboardingEmpfaengerEinrichtung(vorgang),
     fuehrungskraft,
     vorgangAbgeschlossen: abgeschlossen,
     gesperrt: !!gesperrt,
@@ -429,6 +446,7 @@ export async function onboardingAbteilungenLaden(opts: {
     select: {
       id: true,
       organizationId: true,
+      arbeitsortId: true,
       status: true,
       supervisorEmail: true,
       supervisorSubmittedAt: true,

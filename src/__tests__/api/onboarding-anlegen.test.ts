@@ -18,6 +18,9 @@
  *      Jahr und Zaehlbereich in deutscher Zeit (`vorgangsjahrInBerlin`).
  *   6. FREIGABELISTE — eine Fuehrungskraft ausserhalb der freigegebenen Domains
  *      ergibt 409, bevor irgendetwas geschrieben oder gemailt wird.
+ *   7. ARBEITSORT (E-A10) — optional, ohne UUID-Pruefung; unbekannt oder fremd
+ *      = 404 mit dem Text der Einrichtung, gleich der Einrichtung = null,
+ *      abweichend gespeichert. Der Mandant bleibt organizationId.
  */
 
 // Die Links werden aus APP_URL gebaut — fest, damit die Erwartungen unten
@@ -284,6 +287,9 @@ describe("Eingabe", () => {
     ],
     ["Fragebogentyp ungueltig", { questionnaireType: "PRAKTIKUM" }, "Ungültiger Fragebogentyp."],
     ["Vorgangsart ungueltig", { processType: "ABORDNUNG" }, "Ungültige Vorgangsart."],
+    ["Arbeitsort kein Text", { arbeitsortId: 42 }, "Ungültiger Arbeitsort."],
+    // Ein NUL-Zeichen liesse Postgres in findUnique scheitern (22021) — 400 statt 500.
+    ["Arbeitsort mit NUL-Zeichen", { arbeitsortId: "\u0000" }, "Ungültiger Arbeitsort."],
   ])("weist ab: %s", async (_fall, teil, meldung) => {
     const res = await anlegen(teil);
     expect(res.status).toBe(400);
@@ -697,6 +703,101 @@ describe("Freigabeliste der Fuehrungskraft", () => {
     });
     expect((await anlegen()).status).toBe(201);
     expect(mockPrisma.smtpConfig.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe("Arbeitsort (E-A10)", () => {
+  const ORT = { id: "org2", name: "FES Grundschule Nord" };
+
+  /** Einrichtungen nach ID — die Route fragt Einrichtung und Arbeitsort getrennt ab. */
+  function einrichtungen(...zeilen: Array<{ id: string }>) {
+    mockPrisma.organization.findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) => zeilen.find((z) => z.id === where.id) ?? null,
+    );
+  }
+
+  /** Einrichtungsleitung, zugeordnet genau diesen Einrichtungen. */
+  function einrichtungsleitung(...zugeordnet: string[]) {
+    mockSession.mockResolvedValue({ ...HR, role: "EINRICHTUNGSLEITUNG" });
+    mockPrisma.userOrgAssignment.findUnique.mockImplementation(
+      async ({ where }: { where: { userId_organizationId: { organizationId: string } } }) =>
+        zugeordnet.includes(where.userId_organizationId.organizationId)
+          ? { userId: "u1", organizationId: where.userId_organizationId.organizationId }
+          : null,
+    );
+  }
+
+  it("speichert ohne Angabe null — und fragt keinen Arbeitsort ab", async () => {
+    expect((await anlegen()).status).toBe(201);
+    expect(angelegteDaten().arbeitsortId).toBeNull();
+    expect(mockPrisma.organization.findUnique).toHaveBeenCalledTimes(1);
+    expect(mockTx.auditLog.create.mock.calls[0][0].data.details.arbeitsortId).toBeNull();
+  });
+
+  it("speichert null, wenn der Arbeitsort die Einrichtung ist", async () => {
+    expect((await anlegen({ arbeitsortId: "org1" })).status).toBe(201);
+    expect(angelegteDaten().arbeitsortId).toBeNull();
+    expect(mockPrisma.organization.findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  it("speichert einen abweichenden Arbeitsort — der Mandant bleibt die Einrichtung", async () => {
+    einrichtungen(ORG, ORT);
+
+    const res = await anlegen({ arbeitsortId: " org2 " });
+
+    expect(res.status).toBe(201);
+    expect(angelegteDaten()).toMatchObject({ organizationId: "org1", arbeitsortId: "org2" });
+    expect(mockPrisma.organization.findUnique).toHaveBeenLastCalledWith({
+      where: { id: "org2" },
+      select: { id: true },
+    });
+    const protokoll = mockTx.auditLog.create.mock.calls[0][0].data;
+    expect(protokoll.details).toMatchObject({ organization: "FES Gymnasium", arbeitsortId: "org2" });
+    // Die Vorgangsnummer kommt weiter aus dem Kuerzel der Einrichtung.
+    expect(angelegteDaten().displayId).toBe(NUMMER);
+  });
+
+  it("antwortet 404 fuer einen unbekannten, nicht UUID-foermigen Arbeitsort (kein 400) — nichts angelegt", async () => {
+    einrichtungen(ORG);
+
+    const res = await anlegen({ arbeitsortId: "org-2" });
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe("Organisation nicht gefunden");
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockWebhook).not.toHaveBeenCalled();
+  });
+
+  it("antwortet 404 mit demselben Text fuer einen fremden Arbeitsort", async () => {
+    einrichtungen(ORG, ORT);
+    einrichtungsleitung("org1");
+
+    const res = await anlegen({ arbeitsortId: "org2" });
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe("Organisation nicht gefunden");
+    expect(mockPrisma.userOrgAssignment.findUnique).toHaveBeenCalledWith({
+      where: { userId_organizationId: { userId: "u1", organizationId: "org2" } },
+    });
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("prueft den Mandanten an der Einrichtung — ein zugeordneter Arbeitsort allein genuegt nicht", async () => {
+    einrichtungen(ORG, ORT);
+    einrichtungsleitung("org2");
+
+    const res = await anlegen({ arbeitsortId: "org2" });
+
+    expect(res.status).toBe(404);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("laesst die Einrichtungsleitung mit Zuordnung zu beiden anlegen", async () => {
+    einrichtungen(ORG, ORT);
+    einrichtungsleitung("org1", "org2");
+
+    expect((await anlegen({ arbeitsortId: "org2" })).status).toBe(201);
+    expect(angelegteDaten().arbeitsortId).toBe("org2");
   });
 });
 

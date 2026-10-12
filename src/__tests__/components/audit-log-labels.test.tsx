@@ -13,8 +13,10 @@
  * React-Module mitzieht.
  */
 import { getActionLabel } from "@/app/(portal)/audit-log/audit-log-content";
-import { ABTEILUNGS_AUDIT } from "@/lib/abteilungsaufgaben";
+import { ABTEILUNGS_AUDIT, ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufgaben";
 import { UNTERLAGEN_AUDIT, UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
+import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
+import { AUSSTATTUNG_AUDIT, AUSSTATTUNG_AUDIT_LABELS } from "@/lib/ausstattung";
 
 describe("Protokoll-Beschriftungen", () => {
   // Paket 1b: Die Abteilungsaufgaben schreiben neue Codes (ABTEILUNGS_AUDIT).
@@ -115,6 +117,30 @@ describe("Protokoll-Beschriftungen", () => {
       "Individuelle E-Mail versendet, Nachweis fehlgeschlagen",
     );
     expect(getActionLabel("INDIVIDUELLE_MAIL_ANHANG_GEOEFFNET")).toBe("Anhang einer individuellen E-Mail geöffnet");
+  });
+
+  // Ausstattung & Zugaenge (Feinplan 1.15, Schritt S1): dieselbe Regel – jeder
+  // Code aus AUSSTATTUNG_AUDIT steht uebersetzt im Protokoll.
+  test.each(Object.entries(AUSSTATTUNG_AUDIT))(
+    "Ausstattung & Zugänge: %s ist übersetzt",
+    (_schluessel, code) => {
+      expect(getActionLabel(code)).toBe(AUSSTATTUNG_AUDIT_LABELS[code]);
+      expect(getActionLabel(code)).not.toBe(code);
+    },
+  );
+
+  test("die Ausstattungs-Beschriftungen ueberschreiben keinen bestehenden Code", () => {
+    // Per Spread angehaengt: Ein gleichnamiger Schluessel ersetzte die aeltere
+    // Beschriftung still.
+    const bestehend = [
+      ...Object.keys(ABTEILUNGS_AUDIT_LABELS),
+      ...Object.keys(UNTERLAGEN_AUDIT_LABELS),
+      ...Object.keys(INDIVIDUELLE_MAIL_AUDIT_LABELS),
+    ];
+    for (const code of Object.keys(AUSSTATTUNG_AUDIT_LABELS)) {
+      expect(bestehend).not.toContain(code);
+    }
+    expect(getActionLabel("STATUS_CHANGED")).toBe("Status geändert");
   });
 
   test("ein unbekannter Code faellt auf sich selbst zurueck", () => {

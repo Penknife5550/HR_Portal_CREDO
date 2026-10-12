@@ -14,6 +14,7 @@ import { PortalHeader } from "@/components/portal-header";
 import { ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufgaben";
 import { UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
 import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
+import { AUSSTATTUNG_AUDIT_LABELS } from "@/lib/ausstattung";
 
 interface User {
   userId: string;
@@ -86,6 +87,10 @@ const ACTION_LABELS: Record<string, string> = {
   ...UNTERLAGEN_AUDIT_LABELS,
   // Individuelle E-Mail aus einem Vorgang (Paket 3).
   ...INDIVIDUELLE_MAIL_AUDIT_LABELS,
+  // Ausstattung & Zugaenge (A1 bis A3): Katalogpflege (processType SYSTEM),
+  // Arbeitsort, Aufgaben, HR-Ergaenzungen, Hinweise, Sammelmail, Loeschfrist.
+  // Eine Quelle mit den Diensten, die die Codes schreiben (AUSSTATTUNG_AUDIT).
+  ...AUSSTATTUNG_AUDIT_LABELS,
 };
 
 /**

@@ -1751,6 +1751,23 @@ export function onboardingVersandSperre(v: {
   return null;
 }
 
+/**
+ * Einrichtung, deren Adressen (Einstellungen → Abteilungen) die Aufgaben eines
+ * Onboarding-Vorgangs bekommen: der Arbeitsort, sonst die Einrichtung des
+ * Vorgangs (E-A10, `arbeitsortId ?? organizationId`). Gilt fuer ALLE
+ * Abteilungsaufgaben des Vorgangs, auch fuer die aus der Checklisten-Vorlage —
+ * sonst gaebe es zwei FACILITY-Stellen, aber nur einen Link. Der Mandant
+ * (`canAccessProcess`, Listenfilter, Unterlagen) bleibt `organizationId`.
+ * Ein leerer Arbeitsort ("") zaehlt wie keiner. Das Offboarding kennt keinen
+ * Arbeitsort.
+ */
+export function onboardingEmpfaengerEinrichtung(v: {
+  arbeitsortId?: string | null;
+  organizationId: string;
+}): string {
+  return v.arbeitsortId || v.organizationId;
+}
+
 /** Endstatus: keine Aktion, keine Erinnerung, Link nur lesend bzw. 410. */
 export const ONBOARDING_ENDSTATUS = ["COMPLETED", "EXPIRED"] as const;
 

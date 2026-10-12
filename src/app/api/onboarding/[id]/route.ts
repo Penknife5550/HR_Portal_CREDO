@@ -55,6 +55,9 @@ export async function GET(
       where: { id },
       include: {
         organization: true,
+        // Arbeitsort (E-A10): Kopfzeile und Karte „Person“ der Detailseite.
+        // `null` = wie Einrichtung. Zugriff prueft weiter organizationId.
+        arbeitsort: { select: { id: true, name: true, type: true } },
         personalData: { include: { children: true } },
         // Ohne dieses `include` zeigt die Vorgangsansicht bei einem neuen
         // Vorgang gar keine Kostenstelle und bei einem migrierten den

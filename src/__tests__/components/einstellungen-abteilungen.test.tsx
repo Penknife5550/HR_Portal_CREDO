@@ -63,6 +63,7 @@ const LISTE = {
       organizationId: ORG.id,
       organization: ORG,
       label: "Verwaltung / Sekretariat",
+      ausserhalbFreigabe: true,
     }),
     abteilung({
       id: "d-alt",
@@ -166,6 +167,21 @@ describe("Tabelle", () => {
       "Wird nicht mehr verwendet – Aufgaben für Vorgesetzte gehen an die Führungskraft des Vorgangs.",
     );
     expect(alt.textContent).not.toContain("4 Aufgaben");
+  });
+
+  it("Hinweis „außerhalb der Freigabeliste“ nur an der betroffenen Zeile (E-A27: nur warnen)", async () => {
+    await zeigeTab();
+    const hinweis = (key: string) => zeile(key).querySelector('[data-hinweis="ausserhalb-freigabe"]');
+    expect(hinweis("VERWALTUNG")?.textContent).toBe(
+      "Außerhalb der Freigabeliste – Aufgaben gehen trotzdem an diese Adresse.",
+    );
+    // Nur Token-Farben, keine Palette (Sperrklinke).
+    expect(hinweis("VERWALTUNG")?.className).toContain("text-credo-rot");
+    expect(hinweis("IT")).toBeNull();
+    expect(hinweis("BUCHHALTUNG")).toBeNull();
+    // Beim Bearbeiten der Zeile steht er nicht neben dem Eingabefeld.
+    await klicke(knopfIn(zeile("VERWALTUNG"), "Bearbeiten"));
+    expect(hinweis("VERWALTUNG")).toBeNull();
   });
 
   it("Warnbanner je Vorlage ohne aktive Adresse", async () => {

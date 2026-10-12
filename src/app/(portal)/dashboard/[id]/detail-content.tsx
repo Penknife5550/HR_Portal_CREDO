@@ -95,6 +95,8 @@ import {
   kostenstellenAnzeige,
   summeText,
 } from "@/lib/kostenstellen-anzeige";
+import { ArbeitsortFeld, ArbeitsortKopf } from "@/components/ausstattung/arbeitsort-feld";
+import { arbeitsortSperrGrund } from "@/lib/ausstattung";
 
 // =============================================
 // Types
@@ -277,6 +279,14 @@ export interface DetailData {
      */
     type?: string | null;
   };
+  /**
+   * Arbeitsort (E-A10, per Spread aus GET /api/onboarding/[id]): die
+   * Einrichtung, an der die Person arbeitet, wenn das nicht der Arbeitgeber
+   * ist. `null` = wie Einrichtung. Bestimmt die Empfaenger der Aufgaben fuer
+   * Abteilungen; der Mandant bleibt `organization`.
+   */
+  arbeitsortId: string | null;
+  arbeitsort: { id: string; name: string; type: string } | null;
   personalData: {
     firstName: string | null;
     lastName: string | null;
@@ -1122,6 +1132,7 @@ export function DetailContent({
             <span>
               {data.organization.name} ({data.organization.mandantNumber})
             </span>
+            <ArbeitsortKopf arbeitsort={data.arbeitsort} />
             <span className="text-border">&middot;</span>
             <span>Eingeladen am {formatDate(data.invitedAt)}</span>
           </div>
@@ -1250,6 +1261,7 @@ export function DetailContent({
             }}
             onboardingId={onboardingId}
             darfBearbeiten={HR_EDIT_ROLES.includes(user.role)}
+            onArbeitsortGeaendert={() => loadData(true)}
           />
         )}
         {activeTab === "questionnaire" && (
@@ -1333,6 +1345,7 @@ export function TabOverview({
   oeffnePaketDialog,
   oeffneAbteilungenDialog,
   darfBearbeiten,
+  onArbeitsortGeaendert,
 }: {
   data: DetailData;
   appUrl: string;
@@ -1359,6 +1372,8 @@ export function TabOverview({
    * lehnen mit 403 ab; ein Knopf, der nur diesen Fehler erzeugt, ist keiner.
    */
   darfBearbeiten: boolean;
+  /** Nach „Arbeitsort ändern…“: Vorgang neu laden. Ohne (etwa im Test) bleibt die Anzeige stehen. */
+  onArbeitsortGeaendert?: () => void | Promise<void>;
 }) {
   const fragebogenLink = `${appUrl}/fragebogen/${data.token}`;
   const modalitaetenLink = data.supervisorToken
@@ -1425,6 +1440,22 @@ export function TabOverview({
             <FieldRow
               label="Einrichtung"
               value={`${data.organization.name} (${data.organization.mandantNumber})`}
+            />
+            {/* Arbeitsort (E-A10): aenderbar nur mit Bearbeitungsrecht, solange
+                der Modalitaeten-Link nicht erzeugt ist und kein HR-Status
+                vorliegt — dieselbe Regel wie PATCH …/arbeitsort. */}
+            <ArbeitsortFeld
+              onboardingId={onboardingId}
+              einrichtung={data.organization}
+              arbeitsort={data.arbeitsort}
+              aenderbar={
+                darfBearbeiten &&
+                !arbeitsortSperrGrund({
+                  linkErzeugt: !!data.supervisorToken,
+                  hrStatus: istHrStatus(data.status),
+                })
+              }
+              onGeaendert={onArbeitsortGeaendert ?? (() => {})}
             />
             <FieldRow label="Eingeladen am" value={formatDate(data.invitedAt)} />
             {data.submittedAt && <FieldRow label="Eingereicht am" value={formatDate(data.submittedAt)} />}
