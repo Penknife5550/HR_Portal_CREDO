@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ReturnCategory } from "@prisma/client";
 import {
   fuehrungskraftAenderungFelder,
   fuehrungskraftAnlageFelder,
@@ -82,3 +83,61 @@ export const updateOffboardingSchema = z.object({
   // Vor dem .refine, sonst zaehlte ein Aufruf nur mit diesen Feldern als leer.
   ...fuehrungskraftAenderungFelder,
 }).refine(data => Object.keys(data).length > 0, "Mindestens ein Feld erforderlich");
+
+// =============================================
+// Rueckgaben (Reiter „Rückgaben“, /api/offboarding/:id/return-items)
+// =============================================
+
+/** Kategorien des Prisma-Enums `ReturnCategory`; `satisfies` prueft jeden Wert. */
+export const RUECKGABE_KATEGORIEN = [
+  "IT_HARDWARE",
+  "SCHLUESSEL",
+  "FAHRZEUG",
+  "DOKUMENTE",
+  "KLEIDUNG",
+  "SPEICHERMEDIEN",
+  "SONSTIGES",
+] as const satisfies readonly ReturnCategory[];
+
+/**
+ * Freitext eines Gegenstands: getrimmt, leer = null (die Spalten sind
+ * nullable). `undefined` bleibt `undefined` — im PATCH heisst das "unveraendert".
+ */
+function optionalerText(max: number, feld: string) {
+  return z
+    .string({ invalid_type_error: `${feld} muss ein Text sein` })
+    .trim()
+    .max(max, `${feld} darf höchstens ${max} Zeichen lang sein`)
+    .nullable()
+    .optional()
+    .transform((v) => (v === "" ? null : v));
+}
+
+const GEGENSTAND_FEHLT = "Bitte den Gegenstand angeben";
+
+export const rueckgabeAnlegenSchema = z.object({
+  category: z.enum(RUECKGABE_KATEGORIEN, {
+    errorMap: () => ({ message: "Bitte eine gültige Kategorie wählen" }),
+  }),
+  itemName: z
+    .string({ required_error: GEGENSTAND_FEHLT, invalid_type_error: GEGENSTAND_FEHLT })
+    .trim()
+    .min(1, GEGENSTAND_FEHLT)
+    .max(200, "Der Gegenstand darf höchstens 200 Zeichen lang sein"),
+  serialNumber: optionalerText(100, "Die Seriennummer"),
+  notes: optionalerText(1000, "Die Notiz"),
+});
+
+const GEGENSTAND_ID_FEHLT = "Rückgabe-Gegenstand fehlt";
+
+/** PATCH: `itemId` im Body (so wie die Route es seit jeher erwartet). */
+export const rueckgabeAendernSchema = z.object({
+  itemId: z
+    .string({ required_error: GEGENSTAND_ID_FEHLT, invalid_type_error: GEGENSTAND_ID_FEHLT })
+    .min(1, GEGENSTAND_ID_FEHLT)
+    .max(100, GEGENSTAND_ID_FEHLT),
+  isReturned: z.boolean({ invalid_type_error: "Rückgabe muss ja oder nein sein" }).optional(),
+  condition: optionalerText(200, "Der Zustand"),
+  notes: optionalerText(1000, "Die Notiz"),
+  serialNumber: optionalerText(100, "Die Seriennummer"),
+});

@@ -72,7 +72,10 @@ const ACTION_LABELS: Record<string, string> = {
   // (`details.quelle`), Erinnerung des naechtlichen Laufs.
   DOKUMENT_FRIST_GEAENDERT: "Ablaufdatum geändert",
   DOKUMENT_ABLAUF_ERINNERT: "Ablauf-Erinnerung gesendet",
+  // Reiter „Rückgaben“ im Offboarding (/api/offboarding/:id/return-items)
+  RETURN_ITEM_CREATED: "Rückgabe-Gegenstand erfasst",
   RETURN_ITEM_UPDATED: "Rückgabe aktualisiert",
+  RETURN_ITEM_DELETED: "Rückgabe-Gegenstand gelöscht",
   DEPARTMENT_FEEDBACK_SUBMITTED: "Abteilungs-Feedback eingereicht",
   // Abteilungsaufgaben (Paket 1b): Informieren, Erinnern, Link erneuern,
   // Abhaken und Kommentieren ueber den Link, Einstellungen → Abteilungen.

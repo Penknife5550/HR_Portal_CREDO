@@ -14,6 +14,7 @@ export function TabReturns({
   setNewReturn,
   addReturnItem,
   savingReturn,
+  canEdit,
 }: {
   returnItems: ReturnItemData[];
   confirmReturn: (id: string) => void;
@@ -23,6 +24,8 @@ export function TabReturns({
   setNewReturn: (v: { category: string; itemName: string; serialNumber: string; notes: string }) => void;
   addReturnItem: () => void;
   savingReturn: boolean;
+  /** Erfassen und Bestaetigen nur mit HR_EDIT_ROLES (so prueft es die Route). */
+  canEdit: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -34,17 +37,19 @@ export function TabReturns({
             : "Noch keine Rückgaben erfasst"
           }
         </p>
-        <button
-          onClick={() => setShowAddReturn(!showAddReturn)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
-        >
-          <PlusIcon className="h-4 w-4" />
-          Gegenstand hinzufügen
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => setShowAddReturn(!showAddReturn)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-credo-gruen px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Gegenstand hinzufügen
+          </button>
+        )}
       </div>
 
       {/* Add Return Inline Form */}
-      {showAddReturn && (
+      {canEdit && showAddReturn && (
         <div className="rounded-xl border border-credo-gruen/30 bg-credo-gruen/5 p-5">
           <h4 className="mb-3 text-sm font-bold text-foreground">Neuen Gegenstand erfassen</h4>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -121,7 +126,7 @@ export function TabReturns({
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Zustand</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Notiz</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground">Aktion</th>
+                {canEdit && <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground">Aktion</th>}
               </tr>
             </thead>
             <tbody>
@@ -152,23 +157,25 @@ export function TabReturns({
                   <td className="max-w-[200px] truncate px-4 py-3 text-xs text-muted-foreground" title={item.notes || ""}>
                     {item.notes || "\u2014"}
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    {!item.isReturned && (
-                      <button
-                        onClick={() => confirmReturn(item.id)}
-                        className="inline-flex items-center gap-1 rounded-md bg-credo-gruen px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
-                      >
-                        <CheckIcon className="h-3 w-3" />
-                        Rückgabe
-                      </button>
-                    )}
-                  </td>
+                  {canEdit && (
+                    <td className="px-4 py-3 text-right">
+                      {!item.isReturned && (
+                        <button
+                          onClick={() => confirmReturn(item.id)}
+                          className="inline-flex items-center gap-1 rounded-md bg-credo-gruen px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-[#5a9420] active:scale-95"
+                        >
+                          <CheckIcon className="h-3 w-3" />
+                          Rückgabe
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ) : !showAddReturn ? (
+      ) : !(canEdit && showAddReturn) ? (
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card py-16">
           <svg className="mb-4 h-16 w-16 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />

@@ -383,22 +383,24 @@ export function OffboardingDetailContent({
   };
 
   // ---- Return item actions ----
+  // Eine Route fuer alle Schreibwege (`itemId` im Body), Antwort `{ item }`.
   const addReturnItem = async () => {
     if (!newReturn.itemName.trim()) return;
     setSavingReturn(true);
     try {
-      const res = await fetch(`/api/offboarding/${offboardingId}/returns`, {
+      const res = await fetch(`/api/offboarding/${offboardingId}/return-items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newReturn),
       });
       if (res.ok) {
-        const result = await res.json();
-        setReturnItems((prev) => [...prev, result.data || result]);
+        const result: { item: ReturnItemData } = await res.json();
+        setReturnItems((prev) => [...prev, result.item]);
         setNewReturn({ category: "IT_HARDWARE", itemName: "", serialNumber: "", notes: "" });
         setShowAddReturn(false);
       } else {
-        setActionError("Rückgabe-Gegenstand konnte nicht angelegt werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Rückgabe-Gegenstand konnte nicht angelegt werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Anlegen des Gegenstands.");
@@ -410,16 +412,20 @@ export function OffboardingDetailContent({
   const confirmReturn = async (itemId: string) => {
     if (!window.confirm("Rückgabe des Gegenstands bestätigen?")) return;
     try {
-      const res = await fetch(`/api/offboarding/${offboardingId}/returns/${itemId}`, {
+      // Zeitpunkt und Person setzt der Server.
+      const res = await fetch(`/api/offboarding/${offboardingId}/return-items`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isReturned: true, returnedAt: new Date().toISOString() }),
+        body: JSON.stringify({ itemId, isReturned: true }),
       });
       if (res.ok) {
-        const updated = await res.json();
-        setReturnItems((prev) => prev.map((item) => (item.id === itemId ? (updated.data || updated) : item)));
+        const result: { item: ReturnItemData } = await res.json();
+        setReturnItems((prev) => prev.map((item) => (item.id === itemId ? result.item : item)));
       } else {
-        setActionError("Rückgabe konnte nicht bestätigt werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Rückgabe konnte nicht bestätigt werden.");
+        // Gleichzeitig geaendert oder geloescht: den Stand des Servers zeigen.
+        if (res.status === 409 || res.status === 404) void loadData(true);
       }
     } catch {
       setActionError("Verbindungsfehler bei Rückgabe-Bestätigung.");
@@ -778,6 +784,7 @@ export function OffboardingDetailContent({
             setNewReturn={setNewReturn}
             addReturnItem={addReturnItem}
             savingReturn={savingReturn}
+            canEdit={canEdit}
           />
         )}
 
