@@ -4,11 +4,70 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 09.10.2026 (Bestandsaufnahme; vier Fehler auf `main` behoben, Deploy-Anleitung für `main`, Merge `96cbf6a`; Prototyp-Tag vorbereitet: Docker neu gebaut, Leitfaden gegen den Code geprüft – siehe 0.2 und Protokoll)
+Letzte Änderung: 12.10.2026 (Übergabe vor einem Neustart – **0.0 zuerst lesen**; davor 09.10.: Bestandsaufnahme, vier Fehler auf `main`, Deploy-Anleitung, Prototyp-Tag vorbereitet)
 
-## 0. Übergabe (Stand 08.10.2026, abends)
+## 0. Übergabe (Stand 12.10.2026)
 
-### 0.1 Wo wir stehen
+### 0.0 Hier anfangen (12.10.2026, vor einem Neustart des Rechners)
+
+Die Abschnitte 0.1 bis 0.7 stammen vom 08.10.2026 und sind in Teilen überholt; was neuer ist,
+steht hier. Nichts ist deployt – weder `main` seit `f6d3daf` (30.09.2026) noch der Umbau.
+
+**Git (geprüft am 12.10.2026):** `origin/ux-umbau` = `e8e4571` (danach nur der Commit mit
+dieser Übergabe), `origin/main` = `8c1ef05`, beide ohne Abweichung zum lokalen Stand.
+Uncommittet bleiben nur `docs/README.md` (LOGA-Abschnitt) und `docs/module/loga/` – eigener
+Strang, nie in UX- oder `main`-Commits aufnehmen.
+
+**Schritt 1 – Server-Update von `main` (der Projektverantwortliche will deployen):**
+
+- Anleitung: [`docs/historie/deploy-main-2026-10.md`](../../historie/deploy-main-2026-10.md)
+  (`f6d3daf` → `main`; Schema +2 Tabellen, Soll der Vorschau 0/0/2/4/3; kein SQL für Vorlagen;
+  Betriebsdateien unverändert außer `package.json`, also `npm ci` ohne Zwischenspeicher).
+- Vorgehen in vier Etappen, nach jeder schickt er die Ausgaben, Claude prüft und gibt die
+  nächste: **A** Abschnitte 1–2 (nur lesen, altes Image etikettieren) · **B** Abschnitt 3
+  (holen, bauen, Schema-Vorschau) · **C** Abschnitt 4 (anhalten, sichern, starten – wenige
+  Minuten Ausfall) · **D** Abschnitte 5–6 (prüfen, Probe-Mail, Handschritte).
+- **Stand:** Etappe A wurde am 09.10.2026 im Chat ausgegeben (alle Befehle von 1.0 bis 2.2,
+  je einer pro Kasten). **Es kamen noch keine Ausgaben zurück.** In der nächsten Sitzung zuerst
+  fragen, ob auf dem Server schon etwas ausgeführt wurde (harmlos wären nur Abschnitt 1 und
+  2.1/2.2), dann Etappe A erneut geben bzw. die Ausgaben prüfen.
+- Zeitfenster laut Anleitung: Dienstag bis Freitag 10–12 Uhr, **nicht montags gegen 9 Uhr**
+  (n8n-Flow „Email-Vertragsende-Personal 3.0“), nicht 07:00–08:45, nicht nachts; HR kurz
+  vorher Bescheid geben. Die Liste der E-Mail-Endungen für 6.1 darf später kommen.
+- Bekannt und in der Anleitung: Scheitert der Build an `next/font` (Google Fonts kurz nicht
+  erreichbar, am 09.10. lokal passiert), einmal wiederholen.
+- **Nach dem Deploy (Claude):** Protokoll unter den Kopf von `deploy-main-2026-10.md`; den nie
+  protokollierten Deploy vom 30.09.2026 im Kopf von `deploy-paket4-stufe1.md` nachtragen
+  (Angaben vom Projektverantwortlichen); „noch nicht deployt“ für Paket 4 in `CLAUDE.md` und
+  Paket 3 berichtigen; danach `git merge main` in `ux-umbau` mit Logbuch.
+- Während Etappe A beantwortet 1.8 nebenbei, ob die **automatischen Läufe** seit dem 30.09.
+  aus sind (dann gehen keine Erinnerungen hinaus) – das Ergebnis dem Projektverantwortlichen
+  erklären; Einschalten ist ein eigener Schritt (Reihenfolge und Probelauf-Pflicht in CLAUDE.md,
+  „Automatische Läufe“).
+
+**Schritt 2 – Prototyp-Tag (V0):** vorbereitet am 09.10.2026 (Protokoll Abschnitt 7,
+„Prototyp-Tag vorbereitet“). Der Docker-Stapel `hr-portal-lokal` läuft mit `8b7b994`
+(`http://localhost:3100`; nach einem Neustart in Docker Desktop von Hand starten), Leitfaden
+[prototyp-tag-leitfaden.md](prototyp-tag-leitfaden.md) und die Leitfaden-Seite (Artifact,
+Version 3) sind gegen den Code geprüft. Offen beim Projektverantwortlichen: Termin, Probe am
+Vortag, am Termintag Testdaten neu einspielen (Abschnitt 2, Schritt 3). Danach: Bogen und
+Antworten in die Sitzung → Texte nachziehen → Tag 6–7 (0.5) → Deploy U0 + U1 + Pilot.
+
+**Schritt 3 – übrige offene Punkte:** Die Bestandsaufnahme vom 09.10.2026 (36 Punkte über alle
+Stränge, mit Beleg und Zuständigkeit) steht im Gedächtnis der Sitzung, nicht im Repository – sie
+nennt auch noch offene Schwachstellen. Die wichtigsten beim Projektverantwortlichen: laufende
+Sicherung von Datenbank und `uploads_data` mit der IT klären; n8n aufräumen, aber den
+Vertragsende-Flow behalten; Minijob #1 (Minderjährige) und #3 (RV-Korrektur) entscheiden;
+Mandantentrennung vor dem ersten Zugang einer Einrichtungsleitung (Weg C plus Schreibweg für
+`UserOrgAssignment`, den es noch nicht gibt).
+
+**Aufräumen, wenn es wieder geht:** `git worktree prune` (Reste `.git/worktrees/hr-fix` und
+`nervous-ritchie-2bbb51` ließen sich wegen „Permission denied“ nicht löschen – OneDrive);
+die drei Arbeitskopien `bold-heisenberg-a615cf`, `competent-turing-c6caae`,
+`nervous-leavitt-c5af8e` unter `.claude/worktrees/` sind vollständig in `main`. Prüfen
+weiter nach 0.3.
+
+### 0.1 Wo wir stehen (08.10.2026)
 
 - **U0** (Tokens, neun Bausteine, Musterseite) und **U1** (ein Kopf, neue Adressen) sind gebaut,
   abgenommen und gepusht. **Nichts vom Umbau ist deployt.**
@@ -1536,6 +1595,13 @@ Docker-Umgebung“.
 
 **Mail- und Word-Vorlagen:** keine betroffen.
 
+### 09./12.10.2026 – Deploy von `main` begonnen, Übergabe vor Neustart
+
+Der Projektverantwortliche will `main` deployen („das passt nun alles“). Vorgehen in vier
+Etappen festgelegt (A–D, siehe 0.0), Etappe A (Abschnitte 1–2 der Anleitung) am 09.10. im Chat
+ausgegeben; bis zur Übergabe am 12.10. kamen keine Ausgaben zurück. Abschnitt 0.0 neu
+geschrieben; sonst keine Änderung am Code.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1589,6 +1655,7 @@ Docker-Umgebung“.
 | `ux-umbau` | `8b7b994` | Logbuch: Bestandsaufnahme, Fehler auf `main`, Merge |
 | `main` | `8c1ef05` | Deploy-Anleitung: Hinweis bei vorübergehendem `next/font`-Fehler |
 | `ux-umbau` | `a4d6e7b` | Merge von `main` (Hinweis `next/font`) |
+| `ux-umbau` | `e8e4571` | Prototyp-Tag vorbereitet: Docker neu gebaut, Leitfaden gegen den Code geprüft, Bilder neu |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
