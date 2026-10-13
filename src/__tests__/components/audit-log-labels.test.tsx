@@ -147,6 +147,13 @@ describe("Protokoll-Beschriftungen", () => {
     expect(getActionLabel("STATUS_CHANGED")).toBe("Status geändert");
   });
 
+  test("die Codes des Reiters „Rückgaben“ (Offboarding) sind uebersetzt", () => {
+    // Schreibt /api/offboarding/:id/return-items (Anlegen, Bestaetigen, Loeschen).
+    expect(getActionLabel("RETURN_ITEM_CREATED")).toBe("Rückgabe-Gegenstand erfasst");
+    expect(getActionLabel("RETURN_ITEM_UPDATED")).toBe("Rückgabe aktualisiert");
+    expect(getActionLabel("RETURN_ITEM_DELETED")).toBe("Rückgabe-Gegenstand gelöscht");
+  });
+
   test("ein unbekannter Code faellt auf sich selbst zurueck", () => {
     // Bewusst so: Eine erfundene Beschriftung waere schlimmer als der Code.
     expect(getActionLabel("GIBT_ES_NICHT")).toBe("GIBT_ES_NICHT");
