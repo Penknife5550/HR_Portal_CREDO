@@ -1498,3 +1498,27 @@ Kein Punkt wurde in der Sache verworfen. Verworfen bzw. anders gelöst wurden nu
 - **Alternative „:482 auf den Beanspruchungsaufruf filtern“ (`modalitaeten.test.ts`):** Nicht gewählt, weil der Adapter-Mock die Erwartung unverändert lässt und den Aufruf des Nachholens selbst prüfbar macht.
 - **Optionale Versandprüfung des Betreffs analog `personenVorlagePruefen`:** Nicht gebaut, weil Vorlagen nur `ADMIN_ROLES` über den PUT ändern, der prüft; der ungeprüfte Altbestand wird einmal per Handgriff vor dem Deploy gesichtet (Abschnitt 3).
 - **`arbeitsort: { select: { type: true } }` in `VORGANG_INCLUDE`:** Nicht übernommen, weil `ausstattungAngebotenIn` die Art des Arbeitsorts in derselben Transaktion selbst lädt (die vom Einwand ausdrücklich zugelassene Alternative); `VORGANG_INCLUDE` bleibt unverändert.
+
+---
+
+## 7. Browserprobe A1 bis A3 (13.10.2026)
+
+Gegen die eigene Datenbank `hr_portal_ausstattung` und den Dev-Server des Worktrees (Port 3200), mit einem Testkonto nur in dieser Datenbank. Ohne SMTP-Konfiguration und ohne Webhooks (vorher geprüft), es ging also nichts hinaus. Weil die Browser-Ansicht nicht zeichnete, wurden die Handlungen über dieselben Schnittstellen ausgelöst, die die Knöpfe rufen, und die Oberfläche am gerenderten Seitentext geprüft; die beiden öffentlichen Seiten zusätzlich als Screenshot (`screenshots/ausstattung/`).
+
+| Prüfpunkt | Ergebnis |
+|---|---|
+| Katalog: „Vorschläge übernehmen“ | 15 Positionen, alle ausgeschaltet |
+| Katalog: Warnungen | Adresslücke „Verwaltung / Sekretariat“ an 16 Einrichtungen; drei Vorlagenpunkte „klingen nach“ Katalogpositionen |
+| Katalog: Position nur für das Gymnasium | „Gilt für: Gymnasium“, im Formular nur dort |
+| Merker beim Erzeugen des Links | `mitAusstattung = true`, Formular mit 6 Schritten |
+| Formularschritt | nach Stellen gruppiert, „Diese Angaben erhält …“, Vorauswahl „Dienst-E-Mail“, Hinweistext, Anrede Sie (Screenshot `formular-schritt-ausstattung.png`) |
+| Serverprüfung | fremde Option „Generalschlüssel“ → 400; `currentStep: 9` → gekappt auf 5 |
+| Aufgaben nach der Abgabe | 11 Aufgaben: je Option eine (3 Zugänge, 4 Schlüssel), iPad, Telefon, Fach, Hinweis-Aufgabe; Fälligkeiten ab Vertragsbeginn 02.11.2026 richtig (26.10./28.10./30.10./01.11.) |
+| HR-Karte im Reiter Checkliste | Positionen je Stelle, Optionen mit eigenem Stand, Bemerkung nach Herkunft, Hinweis mit „Als Position übernehmen…“/„Zur Kenntnis genommen“ |
+| Abteilungen informieren ohne SMTP | 502, Links angelegt, `lastSendStatus = FAILED` |
+| Link-Seite IT | nur eigene Aufgaben, Bemerkungen, Hinweis für die Stelle, Unterrichtsfächer (sichtbar für IT), Hinweis der Führungskraft (Screenshot `link-seite-it.png`) |
+| Datenzuschnitt | Gebäudewirtschaft ohne IT-Hinweis und IT-Bemerkungen, mit eigener Bemerkung und Unterrichtsfächern; Verwaltung ohne fremde Inhalte; private Adresse der Person nirgends |
+
+Nebenbefund außerhalb des Pakets (schon auf `main`): Die Meldung „Es wurde niemand informiert …“ hängt an Fehlertexte, die selbst mit Punkt enden, einen weiteren an („…testen'.. Sekretariat“, `abteilungsaufgaben.ts`, Versandbericht).
+
+Nicht geprüft: Klickwege im Browser (durch Komponententests abgedeckt), Nachtrag nach echter Zustellung, Absage, Sammelmail und Löschlauf mit echten Zeitabständen (durch Unit- und Fake-DB-Tests abgedeckt).
