@@ -80,6 +80,21 @@
  *      AUFGABE_ERLEDIGT, Rollback.
  *  13. Protokoll nur mit IDs, Schluesseln, Katalog- bzw. Aufgabentiteln und
  *      Laengen — nie Bemerkung, Angabe oder Hinweis im Wortlaut.
+ *
+ * Ausgaben (A4, S24; Feinplan A4 G5, G7, G19, G28):
+ *  14. Die Uebersicht laedt fuer Aufgaben, deren Zeile beim Austritt
+ *      zurueckkommt oder gesperrt wird (`beiAustritt` RUECKGABE/SPERREN), die
+ *      Ausgaben in EINER Abfrage, dazu ihre Austrittsbezuege (Bindung, G28;
+ *      Vorgangsnummer nur bei Zugriff) und – sobald ein aktives Stueck
+ *      zurueckkommt – das juengste UEBERGABEPROTOKOLL (G19). Ohne solche
+ *      Zeilen (A4 nicht eingeschaltet, G27) keine Abfrage und keine neuen
+ *      Felder an den Aufgaben. Die Aktionen dazu stehen in
+ *      src/lib/ausgaben-dienst.ts.
+ *  15. Regel 9 der Karte gilt auch fuer Ausgaben (G5): Eine Option bzw.
+ *      Position mit aktiver Ausgabe (AUSGEGEBEN, VERBLEIBT) laesst sich weder
+ *      abwaehlen noch streichen, ihre Stelle nicht wechseln → 409
+ *      AUSGABE_VORHANDEN. Gelesen NACH der Vorgangssperre (jeder Anleger einer
+ *      Ausgabe sperrt zuerst den Vorgang).
  */
 
 import type { Prisma } from "@prisma/client";
@@ -108,7 +123,17 @@ import {
   aufgabeWiederAufnehmenIn,
 } from "@/lib/ausstattung-aufgaben";
 import { katalogAusschnittLaden, type AusschnittVorgang } from "@/lib/ausstattung-katalog";
-import { ausgabenAngeboten } from "@/lib/ausgaben";
+import {
+  AUSGABE_AKTIV,
+  ausgabeMoeglich,
+  ausgabenAngeboten,
+  ausgabenAnzeigeBauen,
+  ausgabenMitRueckgabe,
+  protokollAnzeige,
+  protokollStand,
+  type ProtokollAnzeige,
+} from "@/lib/ausgaben";
+import { ausgabenZuAufgabenLaden, austrittsBezuegeLaden } from "@/lib/ausgaben-daten";
 import {
   ANGABEN_KATALOG,
   GRENZEN,
@@ -371,6 +396,18 @@ const KONFIG_AUSWAHL = {
   isActive: true,
 } as const satisfies Prisma.DepartmentConfigSelect;
 
+/**
+ * Die Felder einer Zeile, die die Karte liest: die der Uebersicht und – seit
+ * S24 (A4) – die drei Felder, nach denen sich eine Uebergabe richtet. Bewusst
+ * NICHT in `UEBERSICHT_ZEILEN_AUSWAHL` (das PDF liest sie nicht).
+ */
+const KARTE_ZEILEN_AUSWAHL = {
+  ...UEBERSICHT_ZEILEN_AUSWAHL,
+  beiAustritt: true,
+  rueckgabeKategorie: true,
+  ausgabeKennung: true,
+} as const satisfies Prisma.OnboardingAusstattungSelect;
+
 /** Die Felder einer Ausstattungs- oder Hinweis-Aufgabe, die die Karte liest (`UebersichtAufgabeDaten`). */
 const KARTE_AUFGABEN_AUSWAHL = {
   id: true,
@@ -380,6 +417,8 @@ const KARTE_AUFGABEN_AUSWAHL = {
   dueDate: true,
   eilt: true,
   entfaelltAm: true,
+  // A4 (G20): nach Ablauf der Frist geloescht — grauer Satz statt „Übergabe nicht vermerkt“.
+  ausgabenGeloeschtAm: true,
 } as const satisfies Prisma.ChecklistItemSelect;
 
 /**
@@ -430,11 +469,11 @@ export async function ausstattungKurzLaden(vorgang: {
  */
 export async function ausstattungUebersichtLaden(
   onboarding: UebersichtVorgang,
-  session: { role: string },
+  session: SessionPayload,
   jetzt: Date = new Date(),
 ): Promise<AusstattungsUebersicht | null> {
   if (!HR_EDIT_ROLES.includes(session.role)) return null;
-  return uebersichtBauen(prisma, onboarding, jetzt);
+  return uebersichtBauen(prisma, onboarding, jetzt, session);
 }
 
 /**
@@ -451,14 +490,23 @@ export async function ausstattungUebersichtLaden(
  *   - seit S15 Verknuepfungen und Aufgaben (nur mit Zeilen bzw. verknuepften
  *     Hinweisen) — fuer Aufgabenstand, Aktionen und Vorlauf-Warnung;
  *   - die Namen der HR-Konten hinter „ergänzt von HR (…)“, nur wenn es solche
- *     Zeilen gibt.
+ *     Zeilen gibt;
+ *   - seit S24 (A4, Regel 14 oben) die Ausgaben der Aufgaben, deren Zeile beim
+ *     Austritt zurueckkommt oder gesperrt wird, ihre Austrittsbezuege
+ *     (Vorgangsnummer nur mit `session` und Zugriff) und das juengste
+ *     unterschriebene Uebergabeprotokoll.
  */
-async function uebersichtBauen(db: Db, onboarding: UebersichtVorgang, jetzt: Date): Promise<AusstattungsUebersicht> {
+async function uebersichtBauen(
+  db: Db,
+  onboarding: UebersichtVorgang,
+  jetzt: Date,
+  session: SessionPayload | null = null,
+): Promise<AusstattungsUebersicht> {
   const onboardingId = onboarding.id;
   const { zustand } = ausstattungsZustand(onboarding, true);
   const zeilen = await db.onboardingAusstattung.findMany({
     where: { onboardingId },
-    select: UEBERSICHT_ZEILEN_AUSWAHL,
+    select: KARTE_ZEILEN_AUSWAHL,
     orderBy: UEBERSICHT_ZEILEN_ORDNUNG,
   });
   const hinweise = await db.onboardingStellenHinweis.findMany({
@@ -501,6 +549,8 @@ async function uebersichtBauen(db: Db, onboarding: UebersichtVorgang, jetzt: Dat
     for (const k of konten) erfasser[k.id] = { firstName: k.firstName, lastName: k.lastName };
   }
 
+  const ausgaben = await kartenAusgabenLaden(db, onboardingId, { zeilen, verknuepfungen, aufgaben, session });
+
   return ausstattungsUebersichtBauen({
     vorgang: onboarding,
     darfBearbeiten: true,
@@ -513,7 +563,73 @@ async function uebersichtBauen(db: Db, onboarding: UebersichtVorgang, jetzt: Dat
     aufgaben,
     verknuepfungen,
     jetzt,
+    ausgabenJeAufgabe: ausgaben.jeAufgabe,
+    protokoll: ausgaben.protokoll,
   });
+}
+
+/**
+ * Die Ausgaben der Karte (A4, S24): nur fuer Aufgaben, deren Zeile beim
+ * Austritt zurueckkommt oder gesperrt wird (auch gestrichene – fruehere
+ * Stuecke bleiben sichtbar). Ohne solche Aufgaben keine Abfrage (A4 aus, G27).
+ * Eine Abfrage fuer die Ausgaben, eine fuer ihre Austrittsbezuege (nur mit
+ * Ausgaben), eine fuer das juengste UEBERGABEPROTOKOLL (nur, wenn ein aktives
+ * Stueck zurueckkommt, G19). Nur fuer HR – der Aufrufer hat die Rolle geprueft
+ * (`darfBearbeiten` der Ausgaben = HR_EDIT_ROLES, unabhaengig vom Endstatus, G7).
+ */
+async function kartenAusgabenLaden(
+  db: Db,
+  onboardingId: string,
+  d: {
+    zeilen: ReadonlyArray<{
+      id: string;
+      art: string;
+      beiAustritt: string | null;
+      gestrichenAm: Date | null;
+      ausgabeKennung: string | null;
+      rueckgabeKategorie: string | null;
+    }>;
+    verknuepfungen: ReadonlyArray<{ ausstattungId: string; checklistItemId: string }>;
+    aufgaben: ReadonlyArray<{ id: string; isCompleted: boolean; entfaelltAm: Date | null; ausgabenGeloeschtAm: Date | null }>;
+    session: SessionPayload | null;
+  },
+): Promise<{ jeAufgabe: ReturnType<typeof ausgabenAnzeigeBauen>; protokoll: ProtokollAnzeige | null }> {
+  const relevant = new Set(
+    d.zeilen
+      .filter((z) => ausgabeMoeglich({ art: z.art, beiAustritt: z.beiAustritt, gestrichenAm: null }))
+      .map((z) => z.id),
+  );
+  const aufgabenIds = d.verknuepfungen.filter((v) => relevant.has(v.ausstattungId)).map((v) => v.checklistItemId);
+  if (aufgabenIds.length === 0) return { jeAufgabe: {}, protokoll: null };
+
+  const ausgaben = await ausgabenZuAufgabenLaden(db, aufgabenIds);
+  const bezuege = await austrittsBezuegeLaden(
+    db,
+    ausgaben.map((a) => a.id),
+    { session: d.session },
+  );
+  const jeAufgabe = ausgabenAnzeigeBauen({
+    zeilen: d.zeilen,
+    verknuepfungen: d.verknuepfungen,
+    aufgaben: d.aufgaben,
+    ausgaben: ausgaben.map((a) => ({ ...a, bezuege: bezuege.get(a.id) ?? [] })),
+    darfBearbeiten: true,
+  });
+
+  const mitRueckgabe = ausgabenMitRueckgabe(ausgaben);
+  if (mitRueckgabe === 0) return { jeAufgabe, protokoll: null };
+  const dokument = await db.document.findFirst({
+    where: { onboardingId, type: "UEBERGABEPROTOKOLL" },
+    orderBy: { uploadedAt: "desc" },
+    select: { uploadedAt: true },
+  });
+  return {
+    jeAufgabe,
+    protokoll: protokollAnzeige(
+      "UEBERGABE",
+      protokollStand({ ausgabenMitRueckgabe: mitRueckgabe, dokumente: dokument ? [dokument] : [] }),
+    ),
+  };
 }
 
 // =============================================
@@ -563,7 +679,7 @@ export async function ausstattungKarteLaden(opts: {
   if (!HR_EDIT_ROLES.includes(opts.session.role)) return KEINE_BERECHTIGUNG;
   const vorgang = await karteVorgangLaden(opts.onboardingId, opts.session);
   if (!vorgang) return nichtGefunden();
-  return { status: 200, body: { data: await uebersichtBauen(prisma, vorgang, opts.jetzt ?? new Date()) } };
+  return { status: 200, body: { data: await uebersichtBauen(prisma, vorgang, opts.jetzt ?? new Date(), opts.session) } };
 }
 
 /** Eine Abweisung IN der Transaktion: wirft (Rollback), die Antwort geht unveraendert hinaus. */
@@ -641,15 +757,18 @@ const ZEILE_KARTE_AUSWAHL = {
   bemerkungQuelle: true,
   quelle: true,
   gestrichenAm: true,
+  // A4 (G5): nur Zeilen mit RUECKGABE/SPERREN koennen Ausgaben tragen.
+  beiAustritt: true,
 } as const satisfies Prisma.OnboardingAusstattungSelect;
 
 type KarteZeile = Prisma.OnboardingAusstattungGetPayload<{ select: typeof ZEILE_KARTE_AUSWAHL }>;
 
-/** Eine Aufgabe einer Zeile mit ihrem Zustand (F2). */
+/** Eine Aufgabe einer Zeile mit ihrem Zustand (F2) und – seit S24 – ob eine aktive Ausgabe an ihr haengt (G5). */
 interface ZeilenAufgabe {
   option: string;
   checklistItemId: string;
   status: AufgabenStatus;
+  mitAusgabe: boolean;
 }
 
 /**
@@ -669,10 +788,21 @@ async function zeileLadenIn(tx: Db, onboardingId: string, ausstattungId: string)
   return z;
 }
 
-/** Die Aufgaben einer Zeile (je Option eine, auch entfallene) — gelesen nach den Sperren. */
-async function zeilenAufgabenLadenIn(tx: Db, onboardingId: string, ausstattungId: string): Promise<ZeilenAufgabe[]> {
+/**
+ * Die Aufgaben einer Zeile (je Option eine, auch entfallene) — gelesen nach
+ * den Sperren. Seit S24 (A4, G5) je Aufgabe `mitAusgabe`: eine aktive Ausgabe
+ * (AUSGEGEBEN, VERBLEIBT) haengt an ihr. Nur Zeilen mit RUECKGABE/SPERREN
+ * koennen Ausgaben tragen (`beiAustritt` steht in der Momentaufnahme fest) —
+ * fuer alle anderen keine Abfrage. Jeder Anleger einer Ausgabe sperrt zuerst
+ * den Vorgang; nach der Vorgangssperre des Aufrufers ist der Stand also fest.
+ */
+async function zeilenAufgabenLadenIn(
+  tx: Db,
+  onboardingId: string,
+  zeile: { id: string; art: string; beiAustritt: string | null },
+): Promise<ZeilenAufgabe[]> {
   const verknuepfungen = await tx.onboardingAusstattungAufgabe.findMany({
-    where: { ausstattungId },
+    where: { ausstattungId: zeile.id },
     select: { option: true, checklistItemId: true },
   });
   if (verknuepfungen.length === 0) return [];
@@ -680,10 +810,18 @@ async function zeilenAufgabenLadenIn(tx: Db, onboardingId: string, ausstattungId
     where: { onboardingId, id: { in: verknuepfungen.map((v) => v.checklistItemId) } },
     select: { id: true, isCompleted: true, entfaelltAm: true },
   });
+  const mitAusgabe = new Set<string>();
+  if (ausgabeMoeglich({ art: zeile.art, beiAustritt: zeile.beiAustritt, gestrichenAm: null })) {
+    for (const a of await ausgabenZuAufgabenLaden(tx, items.map((i) => i.id))) {
+      if (a.checklistItemId && (AUSGABE_AKTIV as readonly string[]).includes(a.zustand)) mitAusgabe.add(a.checklistItemId);
+    }
+  }
   const itemZu = new Map(items.map((i) => [i.id, i]));
   return verknuepfungen.flatMap((v) => {
     const i = itemZu.get(v.checklistItemId);
-    return i ? [{ option: v.option, checklistItemId: i.id, status: aufgabenStatus(i) }] : [];
+    return i
+      ? [{ option: v.option, checklistItemId: i.id, status: aufgabenStatus(i), mitAusgabe: mitAusgabe.has(i.id) }]
+      : [];
   });
 }
 
@@ -837,7 +975,7 @@ function freieMomentaufnahme(frei: FreiePosition): AusstattungsMomentaufnahme {
  *   409 { error, grund: "MODALITAETEN_FEHLEN" }    Modalitaeten nicht eingereicht (E-A11)
  *   409 { error, grund: "VERSAND_LAEUFT" }         Versandsperre belegt (F6)
  *   404 { error }                                  Zeile bzw. Hinweis gibt es in diesem Vorgang nicht
- *   409 { error, grund: "AUFGABE_ERLEDIGT" | "GESTRICHEN" | "OHNE_OFFENE_AUFGABE" | "BEREITS_VORHANDEN" }
+ *   409 { error, grund: "AUFGABE_ERLEDIGT" | "GESTRICHEN" | "OHNE_OFFENE_AUFGABE" | "BEREITS_VORHANDEN" | "AUSGABE_VORHANDEN" }
  *   200 { data: AusstattungsUebersicht, meldung }
  */
 export async function ausstattungAktionAusfuehren(opts: {
@@ -892,7 +1030,7 @@ export async function ausstattungAktionAusfuehren(opts: {
   }
 
   const meldung = ergebnis.geschrieben > 0 ? `${ergebnis.meldung} ${MELDUNGEN.KARTE_NACHTRAG_FOLGT}` : ergebnis.meldung;
-  return { status: 200, body: { data: await uebersichtBauen(prisma, vorgang, jetzt), meldung } };
+  return { status: 200, body: { data: await uebersichtBauen(prisma, vorgang, jetzt, opts.session), meldung } };
 }
 
 /**
@@ -1069,7 +1207,7 @@ async function wiederAufnehmenIn(
 ): Promise<KarteErgebnis> {
   const stellen = zeilenStellen(z);
   await linksSperrenIn(k.tx, k.bereich, stellen);
-  const aufgaben = await zeilenAufgabenLadenIn(k.tx, k.vorgang.id, z.id);
+  const aufgaben = await zeilenAufgabenLadenIn(k.tx, k.vorgang.id, z);
   const wahl = wahlFuerArt(z, e, waehlbareOptionen(katalogOptionen, z, aufgaben));
   const informiert = await informierteStellenIn(k.tx, k.vorgang.id, stellen);
 
@@ -1138,7 +1276,7 @@ async function aendernIn(k: KarteKontext, a: AendernEingabe): Promise<KarteErgeb
   let neueAuswahl: string[] | undefined;
   if (a.auswahl !== undefined) {
     if (z.art !== "AUSWAHL") abweisen(400, MELDUNGEN.KARTE_PASST_NICHT_ZUR_ART);
-    const vorab = await zeilenAufgabenLadenIn(k.tx, onboardingId, z.id);
+    const vorab = await zeilenAufgabenLadenIn(k.tx, onboardingId, z);
     const optionen = waehlbareOptionen(await katalogOptionenIn(k.tx, k.vorgang, z.positionId), z, vorab);
     neueAuswahl = auswahlPruefen(a.auswahl, optionen);
   }
@@ -1177,7 +1315,7 @@ async function aendernIn(k: KarteKontext, a: AendernEingabe): Promise<KarteErgeb
   const nachherStellen = zeilenStellen({ departmentKey: stelle, art: z.art, sichtbarFuer });
   const stellen = [...new Set([...zeilenStellen(z), ...nachherStellen])];
   await linksSperrenIn(k.tx, k.bereich, stellen);
-  const aufgaben = await zeilenAufgabenLadenIn(k.tx, onboardingId, z.id);
+  const aufgaben = await zeilenAufgabenLadenIn(k.tx, onboardingId, z);
   const grund = aenderungPruefen(z, aufgaben, {
     abwaehlen,
     hinzu,
@@ -1294,7 +1432,7 @@ async function streichenIn(k: KarteKontext, ausstattungId: string): Promise<Kart
   if (z.gestrichenAm != null) grundAbweisen("GESTRICHEN");
   const stellen = zeilenStellen(z);
   await linksSperrenIn(k.tx, k.bereich, stellen);
-  const aufgaben = await zeilenAufgabenLadenIn(k.tx, onboardingId, z.id);
+  const aufgaben = await zeilenAufgabenLadenIn(k.tx, onboardingId, z);
   const grund = aenderungPruefen(z, aufgaben, { streichen: true });
   if (grund) grundAbweisen(grund);
   const informiert = await informierteStellenIn(k.tx, onboardingId, stellen);

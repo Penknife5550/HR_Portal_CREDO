@@ -832,6 +832,26 @@ describe("Absage an die Stellen (Onboarding, E-A20)", () => {
     expect(block()).toBeNull();
     expect(knopf(ABSAGE_TEXTE.knopf)).toBeNull();
   });
+
+  // A4, S27 (G10): Die Absage nennt die Ausgaben; die Ruecknahme vermerkt HR in der Karte.
+  it.each([
+    ["offen", OFFEN, true],
+    ["alle gesendet", { moeglich: false, stellen: [], gesendetAm: "2027-07-18T08:00:00.000Z" }, true],
+    ["ohne Bearbeitungsrecht", OFFEN, false],
+  ] as const)("nennt, wo HR die Rücknahme vermerkt (%s)", (_name, stand, darfAktionen) => {
+    expect(ABSAGE_TEXTE.rueckbau).toBe("Ausgegebenes vermerken Sie nach der Rücknahme in der Karte (‚zurückgenommen‘).");
+    karte(abgelaufen({ ...stand, stellen: [...stand.stellen] }), { darfAktionen });
+    expect(block()!.querySelector('[data-zeile="absage-rueckbau"]')?.textContent).toBe(ABSAGE_TEXTE.rueckbau);
+  });
+
+  it("Satz und Rückfrage sagen, dass die Mail auch die laut Portal ausgegebenen Stücke nennt", async () => {
+    karte(abgelaufen(OFFEN));
+    expect(block()!.textContent).toContain("und dem, was sie laut Portal ausgegeben haben.");
+    await act(async () => {
+      fireEvent.click(knopf(ABSAGE_TEXTE.knopf)!);
+    });
+    expect(screen.getByRole("dialog").textContent).toContain("und was sie laut Portal ausgegeben hat");
+  });
 });
 
 // =============================================

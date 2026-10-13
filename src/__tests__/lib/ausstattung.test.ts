@@ -212,6 +212,7 @@ import {
   type AngabenHinweis,
   type AngabenZeile,
 } from "@/lib/ausstattung";
+import type { AusgabenAufgabeAnzeige, ProtokollAnzeige } from "@/lib/ausgaben";
 
 // =============================================
 // Testdaten
@@ -4057,8 +4058,11 @@ describe("Reinheit der Datei", () => {
     // Monate mit Monatsende) — alle vier selbst ohne jeden Import, also ebenso
     // rein — und vorgangsjahr (Beginn eines Berliner Tages), das nur
     // minijob-fristen importiert. Alles fuer die Loeschfrist (freitextGrenze).
+    // Seit S24 (A4) ausgaben.ts — NUR als Typ (Feinplan A4, 1.3; der Kreis-
+    // Test in ausgaben.test.ts verbietet einen Wert-Import).
     expect(importe.sort()).toEqual([
       "@/lib/abteilungsaufgaben",
+      "@/lib/ausgaben",
       "@/lib/constants",
       "@/lib/email-layout",
       "@/lib/format",
@@ -4142,6 +4146,26 @@ describe("aenderungPruefen (Regel 9 als Matrix)", () => {
     for (const [, wunsch] of AENDERUNGEN) {
       expect(aenderungPruefen({ art: "JA_NEIN", gestrichenAm: new Date() }, [], wunsch)).toBe("GESTRICHEN");
     }
+  });
+
+  it("A4 (G5): eine aktive Ausgabe sperrt Streichen, Stellenwechsel und das Abwählen IHRER Option", () => {
+    const aufgaben = [
+      { option: "A", status: "offen" as const, mitAusgabe: true },
+      { option: "B", status: "offen" as const, mitAusgabe: false },
+    ];
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { streichen: true })).toBe("AUSGABE_VORHANDEN");
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { stelle: true })).toBe("AUSGABE_VORHANDEN");
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { abwaehlen: ["A"] })).toBe("AUSGABE_VORHANDEN");
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { abwaehlen: ["B"] })).toBeNull();
+    // Bemerkung, Angabe, Hinzufuegen und Faelligkeit bleiben frei.
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { bemerkung: true, hinzu: ["C"], faelligkeiten: ["A"] })).toBeNull();
+    // Eine erledigte Aufgabe nennt die Antwort zuerst.
+    expect(
+      aenderungPruefen({ art: "JA_NEIN" }, [{ option: "", status: "erledigt", mitAusgabe: true }], { streichen: true }),
+    ).toBe("AUFGABE_ERLEDIGT");
+    // Ohne Merker (Altbestand der Aufrufer) wie bisher.
+    expect(aenderungPruefen({ art: "AUSWAHL" }, [{ option: "A", status: "offen" }], { streichen: true })).toBeNull();
+    expect(aenderungsGrundText("AUSGABE_VORHANDEN")).toBe(MELDUNGEN.AUSGABE_VORHANDEN);
   });
 
   it("Fälligkeit nur an einer offenen Aufgabe", () => {
@@ -4568,6 +4592,85 @@ describe("ausstattungsUebersichtBauen mit Aufgabenstand (S15)", () => {
     const u = bauen();
     expect(JSON.parse(JSON.stringify(u))).toEqual(u);
     expect(JSON.stringify(u)).not.toContain("relativeDueDays");
+  });
+
+  describe("A4 (S24): Ausgaben je Aufgabe, Sperre nach G5, Protokollzeile", () => {
+    const stueck = (aktiv: boolean) => ({
+      id: aktiv ? "a-aktiv" : "a-zurueck",
+      zustand: aktiv ? "AUSGEGEBEN" : "ZURUECK",
+      zustandLabel: aktiv ? "ausgegeben" : "zurück",
+      aktiv,
+      kennung: "FES-IPAD-0412",
+      kennungLabel: "Inventarnummer",
+      uebergebenAm: "2027-01-28",
+      quelle: "LINK",
+      text: "übergeben 28.01.2027 · FES-IPAD-0412 · über den Link",
+      gebunden: false,
+      aktionen: { korrigieren: aktiv, tauschen: aktiv, zurueckgenommen: aktiv, entfernen: aktiv },
+      sperrGrund: null,
+    });
+    const anzeige = (aktiv: boolean): AusgabenAufgabeAnzeige => ({
+      ausgabeMoeglich: true,
+      ausgabeArt: "RUECKGABE",
+      kennungLabel: "Inventarnummer",
+      schluessel: false,
+      ausgaben: [stueck(aktiv)],
+      ausgabenHinweis: null,
+      vermerken: true,
+    });
+    const PROTOKOLL: ProtokollAnzeige = {
+      art: "UEBERGABE",
+      noetig: true,
+      hochgeladenAm: null,
+      text: "Unterschriebenes Übergabeprotokoll: fehlt",
+    };
+    function mitAusgaben(aktiv: boolean, teil: { vorgang?: UebersichtVorgangStand; darfBearbeiten?: boolean } = {}) {
+      return ausstattungsUebersichtBauen({
+        vorgang: teil.vorgang ?? vorgang(),
+        darfBearbeiten: teil.darfBearbeiten ?? true,
+        zeilen,
+        hinweise: [],
+        arbeitsortId: GYM,
+        konfigs: [konfig({}), konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister" })],
+        katalog: [position({ id: "pos-1" }), position({ id: "pos-2", bezeichnung: "Telefon mit Durchwahl" }), auswahl()],
+        aufgaben,
+        verknuepfungen,
+        jetzt: JETZT,
+        ausgabenJeAufgabe: { "i-ipad": anzeige(aktiv) },
+        protokoll: PROTOKOLL,
+      });
+    }
+
+    it("die Ausgaben hängen an IHRER Aufgabe; andere Aufgaben bekommen keine Felder", () => {
+      const u = mitAusgaben(true);
+      expect(zeile(u, "z-ipad").aufgaben[0]).toMatchObject({ checklistItemId: "i-ipad", ...anzeige(true) });
+      expect(zeile(u, "z-schl").aufgaben[0]).not.toHaveProperty("ausgaben");
+      expect(u.protokoll).toEqual(PROTOKOLL);
+      expect(u.ausgabenBearbeitbar).toBe(true);
+    });
+
+    it("eine aktive Ausgabe sperrt Streichen mit eigenem Sperrgrund (G5); eine zurückgenommene nicht", () => {
+      expect(zeile(mitAusgaben(true), "z-ipad").aktionen).toEqual({
+        aendern: true,
+        streichen: false,
+        sperrGrund: MELDUNGEN.AUSGABE_VORHANDEN,
+      });
+      expect(zeile(mitAusgaben(false), "z-ipad").aktionen).toEqual({ aendern: true, streichen: true, sperrGrund: null });
+    });
+
+    it("`ausgabenBearbeitbar` folgt dem Recht, nicht dem Zustand (G7): auch bei COMPLETED", () => {
+      const u = mitAusgaben(true, { vorgang: vorgang("COMPLETED") });
+      expect(u.zustand).toBe("NUR_LESEN");
+      expect(u.ausgabenBearbeitbar).toBe(true);
+      expect(mitAusgaben(true, { darfBearbeiten: false }).ausgabenBearbeitbar).toBe(false);
+    });
+
+    it("ohne Ausgaben-Eingabe: keine Felder an den Aufgaben, Protokoll `null`", () => {
+      const u = bauen();
+      expect(zeile(u, "z-ipad").aufgaben[0]).not.toHaveProperty("ausgabeMoeglich");
+      expect(u.protokoll).toBeNull();
+      expect(u.ausgabenBearbeitbar).toBe(true);
+    });
   });
 });
 

@@ -99,10 +99,12 @@ import { ArbeitsortFeld, ArbeitsortKopf } from "@/components/ausstattung/arbeits
 import { ModalitaetenAusstattungKarte } from "@/components/ausstattung/modalitaeten-ausstattung-karte";
 import {
   AusstattungKarte,
+  ausgabenAktionSenden,
   ausstattungAktionSenden,
   type AusstattungAktionsAusgang,
 } from "@/components/ausstattung/ausstattung-karte";
 import type { AusstattungAktionBody } from "@/components/ausstattung/ausstattung-dialoge";
+import type { AusgabenAktionBody } from "@/components/ausgaben/ausgaben-dialoge";
 import { AufgabeZusatz, EntfaelltHaken, istEntfallen } from "@/components/ausstattung/aufgabe-zusatz";
 import { AbschlussDialog, abschlussSenden } from "@/components/ausstattung/abschluss-dialog";
 import {
@@ -1035,6 +1037,14 @@ export function DetailContent({
     return ausgang;
   };
 
+  // Ausgaben an den Ausstattungsaufgaben (A4, G7): eigene Route, auch nach
+  // Abschluss und Absage; danach ebenso leise neu laden.
+  const ausgabenAktion = async (body: AusgabenAktionBody): Promise<AusstattungAktionsAusgang> => {
+    const ausgang = await ausgabenAktionSenden(onboardingId, body);
+    if (ausgang.status !== null) await loadData(true);
+    return ausgang;
+  };
+
   // ---- Unterlagen nachfordern (Paket 4) ----
   const darfBearbeiten = HR_EDIT_ROLES.includes(user.role);
 
@@ -1400,6 +1410,7 @@ export function DetailContent({
             ausstattung={data.ausstattung}
             darfAusstattungBearbeiten={darfBearbeiten}
             onAusstattungAktion={ausstattungAktion}
+            onAusgabenAktion={ausgabenAktion}
           />
         )}
         {activeTab === "supervisor" && (
@@ -3499,6 +3510,7 @@ export function TabChecklist({
   ausstattung,
   darfAusstattungBearbeiten = false,
   onAusstattungAktion,
+  onAusgabenAktion,
 }: {
   checklistItems: ChecklistItemData[];
   togglingItems: Set<string>;
@@ -3531,6 +3543,8 @@ export function TabChecklist({
   darfAusstattungBearbeiten?: boolean;
   /** Fuehrt eine Aktion der Karte aus (senden, neu laden). */
   onAusstattungAktion?: (body: AusstattungAktionBody) => Promise<AusstattungAktionsAusgang>;
+  /** Fuehrt eine Ausgaben-Aktion der Karte aus (A4: senden, neu laden). */
+  onAusgabenAktion?: (body: AusgabenAktionBody) => Promise<AusstattungAktionsAusgang>;
 }) {
   const karten = (
     <>
@@ -3540,6 +3554,7 @@ export function TabChecklist({
           uebersicht={ausstattung}
           darfBearbeiten={darfAusstattungBearbeiten}
           onAktion={onAusstattungAktion}
+          onAusgabenAktion={onAusgabenAktion}
         />
       )}
 

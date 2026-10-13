@@ -35,6 +35,15 @@
  * Im Offboarding fehlen alle diese Felder; die Seite sieht dort aus wie zuvor
  * (auch „100 %“ ohne Aufgabe — `checklistFortschritt` gaebe 0 %, `data.modul`
  * unterscheidet).
+ *
+ * Stufe 2 (Feinplan A4, G6, 1.8): An Ausstattungsaufgaben, deren Position
+ * beim Austritt zurueckkommt bzw. gesperrt wird, liefert der Server `ausgabe`.
+ * Darunter steht dann der Block „Übergabe vermerken“
+ * (src/components/ausgaben/ausgabe-vermerk.tsx) — getrennt vom Abhaken, mit
+ * eigenem Aufruf (`ausgabeSenden`: POST bzw. DELETE unter
+ * `${apiBasis}/${token}/${id}/ausgaben`). Nicht bei „nur lesen“ und nicht an
+ * einer entfallenen Aufgabe. Ohne `ausgabe` (Offboarding, A4 nicht
+ * eingeschaltet) bleibt die Seite unveraendert.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -58,6 +67,8 @@ import {
   EiltKennzeichen,
   EntfaelltKennzeichen,
 } from "@/components/ausstattung/link-seite-teile";
+import { AusgabeVermerk, type VermerkEingabe } from "@/components/ausgaben/ausgabe-vermerk";
+import type { LinkAusgabe } from "@/lib/ausgaben";
 
 // =============================================
 // Typen (Form wie GET /api/offboarding-tasks/[token])
@@ -85,6 +96,12 @@ export interface OeffentlicheAufgabe {
   eilt?: boolean;
   /** Nur Onboarding: von der Personalabteilung gestrichen (R9, E-A21) — kein Abhaken mehr. */
   entfaellt?: boolean;
+  /**
+   * Nur Onboarding, Stufe 2 (A4, G6): „Übergabe vermerken“ an einer
+   * Ausstattungsaufgabe, deren Position beim Austritt zurueckkommt bzw.
+   * gesperrt wird. Fehlt an allen uebrigen Aufgaben ganz.
+   */
+  ausgabe?: LinkAusgabe;
 }
 
 export interface AufgabenSeitenDaten {
@@ -329,6 +346,71 @@ export function AufgabenSeite({
   };
 
   /**
+   * „Übergabe vermerken“ (Stufe 2, A4): POST bzw. DELETE unter
+   * `${apiBasis}/${token}/${id}/ausgaben` — ein eigener Aufruf neben dem PATCH
+   * der Aufgabe (ein Vermerk hakt nichts ab). Uebernimmt den frischen Stand
+   * `ausgabe` des Servers. Ein Fehler wirft mit dem Text des Servers (der
+   * Block zeigt ihn); was er fuer die ganze Seite heisst (Link ungueltig, nur
+   * lesen, inzwischen entfallen), zieht `ausgabeFehlerFolgen` nach.
+   */
+  const ausgabeSenden = async (
+    aufgabeId: string,
+    anfrage: { method: "POST" | "DELETE"; pfad?: string; body?: unknown },
+  ) => {
+    let res: Response;
+    try {
+      res = await fetch(
+        `${apiBasis}/${encodeURIComponent(token)}/${encodeURIComponent(aufgabeId)}/ausgaben${anfrage.pfad ?? ""}`,
+        anfrage.body === undefined
+          ? { method: anfrage.method }
+          : {
+              method: anfrage.method,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(anfrage.body),
+            },
+      );
+    } catch {
+      throw new SpeicherFehler(FEHLER_VERBINDUNG, 0);
+    }
+    const antwort = (await res.json().catch(() => null)) as {
+      data?: { ausgabe?: LinkAusgabe | null };
+      error?: string;
+      grund?: string;
+    } | null;
+    if (!res.ok) {
+      const fehler = new SpeicherFehler(antwort?.error || FEHLER_SPEICHERN, res.status);
+      ausgabeFehlerFolgen(fehler, aufgabeId, antwort?.grund);
+      throw fehler;
+    }
+    const ausgabe = antwort?.data?.ausgabe ?? undefined;
+    setAufgaben((prev) => prev.map((a) => (a.id === aufgabeId ? { ...a, ausgabe } : a)));
+  };
+
+  /**
+   * Folgen eines Fehlers beim Vermerken fuer die ganze Seite: abgebrochen/
+   * abgelaufen bzw. ungueltig → Fehlerseite; abgeschlossen → nur lesen;
+   * inzwischen gestrichen (409 `AUFGABE_ENTFAELLT`) → die Aufgabe als
+   * entfallen zeigen. In den beiden letzten Faellen verschwindet der Block —
+   * die Meldung steht dann oben auf der Seite.
+   */
+  const ausgabeFehlerFolgen = (err: SpeicherFehler, aufgabeId: string, grund: string | undefined) => {
+    if (err.status === 410 || (err.status === 404 && err.message === MELDUNGEN.LINK_UNGUELTIG)) {
+      setFehler(err.message);
+      return;
+    }
+    if (err.status === 409 && err.message === MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN) {
+      setReadOnly(true);
+      setMeldung(err.message);
+    }
+    if (err.status === 409 && grund === "AUFGABE_ENTFAELLT") {
+      setAufgaben((prev) =>
+        prev.map((a) => (a.id === aufgabeId ? { ...a, isCompleted: true, entfaellt: true } : a)),
+      );
+      setMeldung(err.message);
+    }
+  };
+
+  /**
    * Fehler des Servers: abgeschlossen → nur lesen, abgebrochen/abgelaufen →
    * Fehlerseite, inzwischen gestrichen (409 „entfällt“) → die Aufgabe als
    * entfallen zeigen, ohne die Seite neu zu laden (jeder GET zaehlt als
@@ -503,12 +585,17 @@ export function AufgabenSeite({
     const feldId = `kommentar-${aufgabe.id}`;
     const hinweisId = `kommentar-hinweis-${aufgabe.id}`;
 
+    // Eine erledigte Aufgabe wird nur am Titel gedaempft (grau, durchgestrichen)
+    // und am Haken erkannt – nie per `opacity` am ganzen Eintrag: Die
+    // Durchsichtigkeit erbten sonst alle Kinder, und Beschriftungen, Fehlertexte
+    // und Knoepfe darunter (etwa „Übergabe vermerken“, das gerade nach dem
+    // Abhaken gebraucht wird) fielen unter 4,5:1 (WCAG AA).
     return (
       <li
         key={aufgabe.id}
         className={`rounded-xl border bg-card shadow-sm transition-all duration-300 ${
           animiert ? "ring-2 ring-green-400 ring-offset-2" : ""
-        } ${aufgabe.isCompleted ? "opacity-80" : ""}`}
+        }`}
         data-aufgabe={aufgabe.id}
       >
         <div className="flex items-start gap-3 p-4 sm:gap-4 sm:p-5">
@@ -583,6 +670,22 @@ export function AufgabenSeite({
 
             {/* Bemerkung zur Position (Onboarding) — eigener Kasten, getrennt vom Katalog-Hinweis. */}
             <BemerkungKasten bemerkung={aufgabe.bemerkung} />
+
+            {/* Übergabe vermerken (Onboarding, Stufe 2) — getrennt vom Abhaken. */}
+            {aufgabe.ausgabe && !readOnly && !entfaellt && (
+              <AusgabeVermerk
+                aufgabeId={aufgabe.id}
+                ausgabe={aufgabe.ausgabe}
+                erledigt={aufgabe.isCompleted}
+                gesperrt={laeuft}
+                onVermerken={(stuecke: VermerkEingabe[]) =>
+                  ausgabeSenden(aufgabe.id, { method: "POST", body: { stuecke } })
+                }
+                onEntfernen={(ausgabeId) =>
+                  ausgabeSenden(aufgabe.id, { method: "DELETE", pfad: `/${encodeURIComponent(ausgabeId)}` })
+                }
+              />
+            )}
 
             {entfaellt && (
               <p className="mt-1.5 text-xs text-muted-foreground" data-entfaellt-text>

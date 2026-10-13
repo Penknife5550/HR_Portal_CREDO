@@ -225,6 +225,10 @@ describe("PUT /api/settings/email-templates/[id] — Betreff der Onboarding-Abte
     ["onboarding-task-completed", "Aufgabe {{aufgabe}}: {{kommentar_text}}", "{{kommentar_text}}"],
     ["onboarding-task-completed", "{{#kommentar}}Mit Kommentar: {{/kommentar}}{{aufgabe}}", "{{kommentar}}"],
     ["onboarding-task-completed", "Liste {{aufgabenliste}}", "{{aufgabenliste}}"],
+    // A4, S25 (G9): Der Uebergabevermerk traegt Kennungen der Stelle.
+    ["onboarding-task-completed", "{{aufgabe}} übergeben: {{ausgabe_vermerk}}", "{{ausgabe_vermerk}}"],
+    ["onboarding-task-completed", "{{#ausgabe_vermerk}}Mit Übergabe {{/ausgabe_vermerk}}{{aufgabe}}", "{{ausgabe_vermerk}}"],
+    ["onboarding-task-completed", "Übergabe {{ausgabe_vermerk_html}}", "{{ausgabe_vermerk_html}}"],
     // S18 (E-A18): Liste und Portal-Link der Sammelmail.
     ["onboarding-ausstattung-offen", "Offen: {{offene_liste}}", "{{offene_liste}}"],
     ["onboarding-ausstattung-offen", "Offen {{offene_liste_html}}", "{{offene_liste_html}}"],
@@ -233,6 +237,9 @@ describe("PUT /api/settings/email-templates/[id] — Betreff der Onboarding-Abte
     ["onboarding-department-abgesagt", "Absage: {{erledigte_liste}}", "{{erledigte_liste}}"],
     ["onboarding-department-abgesagt", "Absage {{erledigte_liste_html}}", "{{erledigte_liste_html}}"],
     ["onboarding-department-abgesagt", "Absage {{link}}", "{{link}}"],
+    // A4, S27 (G10): die ausgegebenen Stuecke samt Kennung.
+    ["onboarding-department-abgesagt", "Absage – zurücknehmen: {{ausgaben_liste}}", "{{ausgaben_liste}}"],
+    ["onboarding-department-abgesagt", "{{#hat_ausgaben}}{{ausgaben_liste_html}}{{/hat_ausgaben}}", "{{ausgaben_liste_html}}"],
   ])("%s: %s ergibt 400", async (event, subject, genannt) => {
     const res = await PUT(req(vorlage({ event, subject })), params("t1"));
 

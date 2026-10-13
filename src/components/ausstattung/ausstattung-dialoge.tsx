@@ -52,6 +52,7 @@ import {
   aufgabenStandText,
   hinweisAenderungPruefen,
   istAusstattungsArt,
+  pruefbareAufgaben,
   type AenderungsWunsch,
   type AusstattungsHinweis,
   type AusstattungsHinzufuegbar,
@@ -795,9 +796,27 @@ export function bearbeitenGrund(zeile: AusstattungsZeile, departmentKey: string,
     return MELDUNGEN.KARTE_DATUM_UNGUELTIG;
   }
   const { wunsch, geaendert } = bearbeitenAenderung(zeile, departmentKey, f);
-  const regel = aenderungPruefen({ art: zeile.art }, zeile.aufgaben, wunsch);
+  // `pruefbareAufgaben`: dieselbe Abbildung wie die Aktionen der Zeile — mit
+  // `mitAusgabe` aus den aktiven Stuecken (A4, G5), auch an offenen Aufgaben.
+  const regel = aenderungPruefen({ art: zeile.art }, pruefbareAufgaben(zeile.aufgaben), wunsch);
   if (regel) return aenderungsGrundText(regel);
   return geaendert ? null : DIALOG_TEXTE.KEINE_AENDERUNG;
+}
+
+/**
+ * Optionen, deren Kaestchen fest bleibt (Regel 9), mit kurzem Grund: eine
+ * erledigte Aufgabe (ihr Stand) bzw. — nach G5 (A4) — eine Aufgabe mit
+ * aktivem Stueck, auch wenn sie noch offen ist (`AUSGABE_VORHANDEN`).
+ * Dieselbe Reihenfolge wie `aenderungPruefen`: erledigt zuerst.
+ */
+export function festeOptionen(aufgaben: AusstattungsZeile["aufgaben"]): Record<string, string> {
+  const fest: Record<string, string> = {};
+  const pruefbar = pruefbareAufgaben(aufgaben);
+  aufgaben.forEach((a, i) => {
+    if (a.status === "erledigt") fest[a.option] = aufgabenStandText(a);
+    else if (pruefbar[i].mitAusgabe && !(a.option in fest)) fest[a.option] = aenderungsGrundText("AUSGABE_VORHANDEN");
+  });
+  return fest;
 }
 
 export interface BearbeitenDialogProps {
@@ -828,9 +847,8 @@ export function BearbeitenDialog({
   const setze = (teil: Partial<BearbeitenFormular>) => setF((alt) => ({ ...alt, ...teil }));
   const grund = bearbeitenGrund(zeile, departmentKey, f);
   const offene = zeile.aufgaben.filter((a) => a.status === "offen");
-  // Eine Option mit erledigter Aufgabe laesst sich nicht abwaehlen (Regel 9) — das Kaestchen bleibt fest.
-  const fest: Record<string, string> = {};
-  for (const a of zeile.aufgaben) if (a.status === "erledigt") fest[a.option] = aufgabenStandText(a);
+  // Eine Option mit erledigter Aufgabe oder aktivem Stueck laesst sich nicht abwaehlen (Regel 9, G5) — das Kaestchen bleibt fest.
+  const fest = festeOptionen(zeile.aufgaben);
   const art = istAusstattungsArt(zeile.art) ? ART_NAMEN[zeile.art] : zeile.art;
 
   return (

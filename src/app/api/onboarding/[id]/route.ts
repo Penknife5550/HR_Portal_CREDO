@@ -12,7 +12,10 @@
  *         COMPLETED mit offenen Ausstattungs- oder Hinweis-Aufgaben nur mit
  *         `bestaetigt: true`, sonst 409 `{ error, grund: "AUSSTATTUNG_OFFEN",
  *         offen: [{ titel, stelle }] }` (E-A19); EXPIRED setzt `expiredAt`
- *         (F12, Grundlage der Loeschfrist E-A22)
+ *         (F12, Grundlage der Loeschfrist E-A22) und — seit Paket A4 (G10) —
+ *         in derselben Transaktion die Loeschfrist der noch ausgegebenen
+ *         Stuecke ohne Austrittsbezug (`ausgabenFristBeiAbsageIn`, Protokoll
+ *         `ausgabenMitFrist`)
  *
  * Mandant: Ein Vorgang eines fremden Mandanten bekommt in BEIDEN Methoden
  * dieselbe 404 mit demselben Text wie ein unbekannter.
@@ -37,6 +40,7 @@ import {
 import { pflichtDokumenteAusVorlage } from "@/lib/required-documents";
 import { unterlagenUebersichtLaden } from "@/lib/unterlagen-dienst";
 import { ausstattungUebersichtLaden } from "@/lib/ausstattung-dienst";
+import { ausgabenFristBeiAbsageIn } from "@/lib/ausgaben-schreiben";
 import {
   ladeVorlagenKonfigurationen,
   fortschrittFuerVorgang,
@@ -355,6 +359,19 @@ export async function PATCH(
           offeneAusstattung = offen.length;
         }
 
+        // A4, G10: Mit der Absage bekommt jedes noch ausgegebene Stueck ohne
+        // Austrittsbezug die Loeschfrist „drei Jahre ab Ende des Jahres von
+        // `expiredAt`“ — sonst bliebe ein nie als zurueckgenommen vermerktes
+        // Stueck unbegrenzt mit Kennung gespeichert (E-A37). NACH dem
+        // bedingten Update: Es sperrt den Vorgang (G24: Vorgang → Ausgaben),
+        // und jeder Onboarding-Schreiber von Ausgaben sperrt ihn zuerst.
+        // Im selben Commit wie Status und Protokoll; ohne Ausgaben nur eine
+        // Zaehlung.
+        let ausgabenMitFrist = 0;
+        if (status === "EXPIRED") {
+          ausgabenMitFrist = await ausgabenFristBeiAbsageIn(tx, { onboardingId: id, vorgangEingestelltAm: jetzt });
+        }
+
         await tx.auditLog.create({
           data: {
             onboardingId: id,
@@ -365,6 +382,8 @@ export async function PATCH(
               to: status,
               // Mit Bestaetigung abgeschlossen: wie viele Ausstattungsaufgaben offen blieben.
               ...(offeneAusstattung > 0 ? { offeneAusstattung } : {}),
+              // Absage (G10): wie viele ausgegebene Stuecke eine Loeschfrist bekamen — nur die Zahl.
+              ...(ausgabenMitFrist > 0 ? { ausgabenMitFrist } : {}),
             },
           },
         });

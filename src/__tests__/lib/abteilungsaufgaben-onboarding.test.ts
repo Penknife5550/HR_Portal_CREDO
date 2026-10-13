@@ -35,6 +35,9 @@
  * EXPIRED, nur informierte Stellen, an `link.email` (F16), mit den erledigten
  * Aufgaben ohne Entfallene (F17), ohne Link-Felder, `abgesagtAm` nur bei SENT
  * (F13), zweiter Klick 409 BEREITS_ABGESAGT, und ihr Stand in der Uebersicht.
+ * Seit A4, S27 (G10): Die Absage nennt je Stelle die noch ausgegebenen Stuecke
+ * (`ausgaben_liste*`, `hat_ausgaben`) — nur die eigenen, ohne Link-Felder,
+ * Positivliste der Payload.
  */
 
 type MailErgebnis = { status: "SENT" | "FAILED" | "SKIPPED"; detail?: string; recipient?: string } | null;
@@ -54,6 +57,7 @@ import {
   dbLeeren,
   fakePrisma,
   naechsteId,
+  neueAusgabe,
   neueAusstattungsZeile,
   neuerLink,
   type Zeile,
@@ -1768,6 +1772,136 @@ describe("Absage nach EXPIRED (E-A20)", () => {
     expect(JSON.stringify([it, fm])).not.toContain("anna.privat@example.org");
     // Facility hat noch nichts erledigt: Merker leer, Liste leer.
     expect(fm).toMatchObject({ erledigte_liste: "", erledigte_liste_html: "", anzahl_erledigt: 0, hat_erledigte: "" });
+  });
+
+  // ---------------------------------------------
+  // A4, S27 (G10): Die Absage nennt die Ausgaben der Stelle.
+  // ---------------------------------------------
+
+  /** Ein Stueck, das eine Stelle laut Portal ausgegeben hat (Fake-DB-Zeile). */
+  function ausgabe(teil: Zeile): Zeile {
+    return neueAusgabe({
+      onboardingId: "onb-1",
+      checklistItemId: "i-laptop",
+      organizationId: "org-1",
+      departmentKey: "IT",
+      bezeichnung: "Dienst-Laptop/PC",
+      kennungLabel: "Inventarnummer",
+      kennung: "FES-NB-0412",
+      rueckgabeKategorie: "IT_HARDWARE",
+      beiAustritt: "RUECKGABE",
+      quelle: "LINK",
+      uebergebenAm: new Date("2026-09-18T00:00:00.000Z"),
+      ...teil,
+    });
+  }
+
+  it("mit Ausgaben: jede Stelle liest nur ihre eigenen, noch ausgegebenen Stücke samt Kennung", async () => {
+    db.ausgaben = [
+      ausgabe({}),
+      // Zugang (SPERREN) ohne Kennung: „eingerichtet“, frueher uebergeben → zuerst.
+      ausgabe({
+        bezeichnung: "Zugänge: Dienst-E-Mail",
+        kennung: null,
+        kennungLabel: null,
+        rueckgabeKategorie: null,
+        beiAustritt: "SPERREN",
+        uebergebenAm: new Date("2026-09-16T00:00:00.000Z"),
+      }),
+      // Schon zurueckgenommen — gehoert nicht in die Absage.
+      ausgabe({ kennung: "FES-NB-0001", zustand: "ZURUECK" }),
+      // Bestand aus einem abgeschlossenen Austritt (VERBLEIBT) ist noch ausgegeben.
+      ausgabe({ bezeichnung: "Dienst-iPad (Lernmittel)", kennung: "FES-IPAD-7", zustand: "VERBLEIBT", quelle: "HR" }),
+      // Die Gebaeudewirtschaft: ein Schluessel mit „&“ (maskiert im HTML).
+      ausgabe({
+        checklistItemId: "i-schluessel",
+        departmentKey: "FACILITY",
+        bezeichnung: "Schlüssel: Haupteingang",
+        kennungLabel: "Schlüsselnummer",
+        kennung: "S-12 & 13",
+        rueckgabeKategorie: "SCHLUESSEL",
+      }),
+      // Die nie informierte Verwaltung bekommt keine Absage — auch nicht ihrer Stuecke wegen.
+      ausgabe({ departmentKey: "VERWALTUNG", bezeichnung: "Kopierkarte", kennung: "K-1" }),
+      // Ein anderer Vorgang: nie.
+      ausgabe({ onboardingId: "onb-2", kennung: "FREMD-1" }),
+    ];
+
+    const r = await absage();
+
+    expect(r.status).toBe(201);
+    const [it, fm] = mails(EVENT);
+    expect(it).toMatchObject({
+      departmentKey: "IT",
+      ausgaben_liste:
+        "Zugänge: Dienst-E-Mail · eingerichtet 16.09.2026\n" +
+        "Dienst-Laptop/PC · FES-NB-0412 · übergeben 18.09.2026\n" +
+        "Dienst-iPad (Lernmittel) · FES-IPAD-7 · übergeben 18.09.2026",
+      ausgaben_liste_html:
+        "Zugänge: Dienst-E-Mail · eingerichtet 16.09.2026<br>" +
+        "Dienst-Laptop/PC · FES-NB-0412 · übergeben 18.09.2026<br>" +
+        "Dienst-iPad (Lernmittel) · FES-IPAD-7 · übergeben 18.09.2026",
+      hat_ausgaben: "ja",
+    });
+    expect(fm).toMatchObject({
+      departmentKey: "FACILITY",
+      ausgaben_liste: "Schlüssel: Haupteingang · S-12 & 13 · übergeben 18.09.2026",
+      ausgaben_liste_html: "Schlüssel: Haupteingang · S-12 &amp; 13 · übergeben 18.09.2026",
+      hat_ausgaben: "ja",
+    });
+    // Nur die eigenen Stuecke: keine fremde Kennung, kein zurueckgenommenes Stueck.
+    expect(JSON.stringify(it)).not.toMatch(/S-12|FES-NB-0001|K-1|FREMD-1/);
+    expect(JSON.stringify(fm)).not.toMatch(/FES-NB|FES-IPAD|K-1|FREMD-1/);
+    // Die Absage aendert an den Ausgaben nichts (die Frist setzt der Statuswechsel, G10).
+    expect(db.ausgaben.map((a) => a.zustand)).toEqual([
+      "AUSGEGEBEN",
+      "AUSGEGEBEN",
+      "ZURUECK",
+      "VERBLEIBT",
+      "AUSGEGEBEN",
+      "AUSGEGEBEN",
+      "AUSGEGEBEN",
+    ]);
+    // Kein Protokolleintrag mit Kennungen.
+    expect(JSON.stringify(absageAudits())).not.toMatch(/FES-NB|S-12/);
+  });
+
+  it("ohne Ausgaben: die drei Felder stehen trotzdem da, leer", async () => {
+    await absage();
+    for (const p of mails(EVENT)) {
+      expect(p).toMatchObject({ ausgaben_liste: "", ausgaben_liste_html: "", hat_ausgaben: "" });
+    }
+  });
+
+  it("Positivliste der Payload: nichts ausser diesen Schlüsseln — ohne Link-Felder, ohne Token", async () => {
+    db.ausgaben = [ausgabe({})];
+    await absage();
+
+    const erlaubt = new Set([
+      "onboardingId", "displayId", "vorname", "nachname", "mitarbeiter_name", "employeeName",
+      "organization", "organizationName", "einrichtung", "mandantNumber", "contractStartDate", "vertragsbeginn",
+      "arbeitsort", "departmentKey", "departmentName", "abteilung", "email",
+      "erledigte_liste", "erledigte_liste_html", "anzahl_erledigt", "hat_erledigte",
+      // A4, S27 (G10): die noch ausgegebenen Stuecke der Stelle.
+      "ausgaben_liste", "ausgaben_liste_html", "hat_ausgaben",
+      "ist_fuehrungskraft",
+    ]);
+    expect(mails(EVENT)).toHaveLength(2);
+    for (const p of mails(EVENT)) {
+      expect(Object.keys(p).filter((k) => !erlaubt.has(k))).toEqual([]);
+      expect(JSON.stringify(p)).not.toContain("anna.privat@example.org");
+    }
+  });
+
+  it("der zweite Klick fragt die Ausgaben nicht mehr ab", async () => {
+    expect((await absage()).status).toBe(201);
+    const findMany = (fakePrisma.ausgabe as { findMany: jest.Mock }).findMany;
+    findMany.mockClear();
+
+    const zweiter = await absage(new Date(JETZT.getTime() + 60_000));
+
+    expect(zweiter.status).toBe(409);
+    expect(findMany).not.toHaveBeenCalled();
   });
 
   it("`abgesagtAm` nur bei SENT — FAILED laesst einen neuen Versuch zu, der nur die fehlende Stelle anschreibt", async () => {

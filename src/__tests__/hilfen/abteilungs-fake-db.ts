@@ -29,6 +29,18 @@
  * mit `checklistItemId: null`; Zeile geloescht → Verknuepfungen weg) bildet
  * der Fake nach. `smtpConfig` liefert `replyToEmail` aus `db.replyToEmail`.
  *
+ * Ausstattung & Zugaenge, Stufe 2 (Paket A4, seit S24): `ausgaben` (Ausgabe,
+ * eine Zeile je Stueck) mit `ersetztDurchId @unique` und SetNull beim Loeschen,
+ * dazu `checklistItem.findFirst` und `ausstattungsPosition.findUnique`. Die
+ * Austrittsbezuege (`returnItem`, Offboarding-Aufgaben mit `ausgabeId`) kennt
+ * der Fake noch nicht – Tests, die sie brauchen, geben
+ * `austrittsBezuegeLaden` einen eigenen Mock (S29 haengt `returnItem` an).
+ * Seit S25 liest `offboardingProcess.findMany` auch Austritte per ID ohne
+ * Statusfilter (`where: { id: { in } }`): Die Link-Seite fragt die Bindung
+ * ueber `linkAusgabenLaden` selbst ab, dort greift kein Modul-Mock. Eine
+ * Offboarding-Aufgabe mit `ausgabeId` und `herkunft` in `aufgaben` ergibt den
+ * Bezug; `returnItem.findMany` haengt die Testdatei an (bis S29).
+ *
  * Einbinden (Pfad relativ zur Testdatei):
  *
  *   import { db, fakePrisma, dbLeeren } from "../hilfen/abteilungs-fake-db";
@@ -73,6 +85,8 @@ export const db: {
   ausstattungsPositionen: Zeile[];
   /** Paket A1: AusstattungsAusblendung, nur lesend. */
   ausstattungsAusblendungen: Zeile[];
+  /** Paket A4 (S24): Ausgabe-Zeilen (eine je Stueck). */
+  ausgaben: Zeile[];
   /** SmtpConfig.replyToEmail (HR-Postfach). */
   replyToEmail: string | null;
 } = {
@@ -93,6 +107,7 @@ export const db: {
   ausstattungAenderungen: [],
   ausstattungsPositionen: [],
   ausstattungsAusblendungen: [],
+  ausgaben: [],
   replyToEmail: null,
 };
 
@@ -293,6 +308,29 @@ export function neueOnboardingAufgabe(data: Zeile): Zeile {
     herkunft: null,
     eilt: false,
     entfaelltAm: null,
+    ausgabenGeloeschtAm: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neue Ausgabe (A4) mit den Standardwerten des Schemas. */
+export function neueAusgabe(data: Zeile): Zeile {
+  return {
+    id: `ag-${naechsteId()}`,
+    employeeId: null,
+    onboardingId: null,
+    checklistItemId: null,
+    zentral: false,
+    kennungLabel: null,
+    kennung: null,
+    rueckgabeKategorie: null,
+    erfasstVonId: null,
+    zustand: "AUSGEGEBEN",
+    zustandAm: new Date(),
+    ersetztDurchId: null,
+    loeschenAb: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...data,
@@ -489,7 +527,29 @@ const ausstattungsTabellen = {
     findMany: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) =>
       db.ausstattungsPositionen.filter((x) => passt(x, where)).map((x) => projizieren(x, select)),
     ),
+    // Seit S24 (A4): Ist die Position zentral? (`vermerkZielLadenIn`)
+    findUnique: jest.fn(async ({ where, select }: { where: Zeile; select?: Zeile }) => {
+      const x = db.ausstattungsPositionen.find((p) => passt(p, where));
+      return x ? projizieren(x, select) : null;
+    }),
   },
+  // Seit S24 (A4): Ausgaben. ersetztDurchId @unique; beim Loeschen zeigt eine
+  // Vorgaengerin nicht mehr ins Leere (SetNull, Relation „AusgabeTausch“).
+  ausgabe: tabelle({
+    zeilen: () => db.ausgaben,
+    ersetzen: (z) => (db.ausgaben = z),
+    neu: neueAusgabe,
+    pruefen: (x, ohne) => {
+      if (x.ersetztDurchId == null) return;
+      if (db.ausgaben.some((a) => a !== ohne && a.ersetztDurchId === x.ersetztDurchId)) {
+        throw eindeutigkeitVerletzt("ersetztDurchId");
+      }
+    },
+    nachLoeschen: (geloescht) => {
+      const ids = new Set(geloescht.map((a) => a.id));
+      for (const a of db.ausgaben) if (ids.has(a.ersetztDurchId)) a.ersetztDurchId = null;
+    },
+  }),
   ausstattungsAusblendung: {
     findMany: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) =>
       db.ausstattungsAusblendungen.filter((x) => passt(x, where)).map((x) => projizieren(x, select)),
@@ -507,6 +567,9 @@ export const fakePrisma: Record<string, unknown> = {
       },
     ),
     findMany: jest.fn(async ({ where, select }: { where: Record<string, Zeile>; select: Record<string, Zeile> }) => {
+      // Seit S25 (A4): Austritte per ID ohne Statusfilter (`austrittsBezuegeLaden`
+      // auf der Link-Seite) – einfache Bedingungen, flache Projektion.
+      if (!where.status) return db.vorgaenge.filter((v) => passt(v, where)).map((v) => projizieren(v, select));
       const status = where.status as { notIn: string[] };
       const links = select.departmentLinks as { where: Zeile } | undefined;
       const aufgaben = select.checklistItems as { where: Zeile } | undefined;
@@ -655,6 +718,11 @@ export const fakePrisma: Record<string, unknown> = {
       },
     ),
     count: jest.fn(async ({ where }: { where: Zeile }) => db.onboardingAufgaben.filter((a) => passt(a, where)).length),
+    // Seit S24 (A4): die Aufgabe eines Vermerks (`vermerkZielLadenIn`).
+    findFirst: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) => {
+      const a = db.onboardingAufgaben.find((x) => passt(x, where));
+      return a ? projizieren(a, select) : null;
+    }),
     update: jest.fn(async ({ where, data }: { where: Zeile; data: Zeile }) => {
       const a = db.onboardingAufgaben.find((x) => passt(x, where));
       if (!a) throw new Error("Onboarding-Aufgabe fehlt");
@@ -738,5 +806,6 @@ export function dbLeeren(): void {
   db.ausstattungAenderungen = [];
   db.ausstattungsPositionen = [];
   db.ausstattungsAusblendungen = [];
+  db.ausgaben = [];
   db.replyToEmail = null;
 }

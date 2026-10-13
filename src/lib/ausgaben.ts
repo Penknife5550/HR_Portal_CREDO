@@ -24,7 +24,19 @@
  * Listen. Zod liegt in src/lib/validations/ausgaben.ts. Seit S23 die Rechnung
  * von „Rückgabe-Vorgaben übernehmen …“ (`rueckgabeVorgabenPlan`, Meldungen,
  * `A4_WEBHOOK_EREIGNISSE`; Server `rueckgabeVorgabenUebernehmen` in
- * src/lib/ausstattung-katalog.ts).
+ * src/lib/ausstattung-katalog.ts). Seit S24 das Ziel eines Vermerks
+ * (`vermerkZielGrund`, `ausgabeBasis`, `vermerkStuecke`), der Tausch
+ * (`tauschZustand`, `ersatzBasis`) und die Anzeige der Karte je Aufgabe
+ * (`ausgabenAnzeigeBauen`, `protokollAnzeige`); Server:
+ * src/lib/ausgaben-schreiben.ts (einziger Schreiber, G3),
+ * src/lib/ausgaben-daten.ts (Lesen) und src/lib/ausgaben-dienst.ts (Karte).
+ * Seit S25 das Feld `ausgabe` der Link-Seite (`linkAusgabeBauen`,
+ * `linkStueckText`); Server: src/lib/abteilungsaufgaben-uebergaenge.ts
+ * (`oeffentlicheAusgabeVermerken`, `oeffentlicheAusgabeEntfernen`).
+ * Seit S27 die Frist bei der Absage der Einstellung (`absageFrist`, G10);
+ * Server: `ausgabenFristBeiAbsageIn` (ausgaben-schreiben.ts) im EXPIRED-Zweig
+ * von PATCH /api/onboarding/[id], die Liste der Absage-Mail
+ * (`ausgabenListeMailFelder`) in src/lib/abteilungsaufgaben-dienst.ts.
  *
  * Importrichtung (G1): Diese Datei darf Werte aus ausstattung.ts,
  * abteilungsaufgaben.ts, constants.ts, format.ts, kalendertag.ts,
@@ -40,8 +52,14 @@
  * das Jahr kommt aus `vorgangsjahrInBerlin` – der Container laeuft in UTC.
  */
 
-import { AUSSTATTUNG_KATEGORIE, GRENZEN, ORDER_BASIS, type BeiAustritt } from "@/lib/ausstattung";
-import { abteilungsReihenfolge, istLinkAbteilung } from "@/lib/abteilungsaufgaben";
+import {
+  AUSSTATTUNG_KATEGORIE,
+  GRENZEN,
+  MELDUNGEN as AUSSTATTUNG_MELDUNGEN,
+  ORDER_BASIS,
+  type BeiAustritt,
+} from "@/lib/ausstattung";
+import { abteilungsReihenfolge, empfaengerEinrichtung, istLinkAbteilung } from "@/lib/abteilungsaufgaben";
 import { DEPARTMENT_KEYS, abteilungLabel, type RueckgabeKategorie } from "@/lib/constants";
 import { escapeHtml } from "@/lib/email-layout";
 import {
@@ -383,6 +401,16 @@ function anzahl(n: number, eins: string, viele: string): string {
   return `${n} ${n === 1 ? eins : viele}`;
 }
 
+/** „Einrichtung“ bei einem Zugang (SPERREN, G4), sonst „Übergabe“ – Meldungen und Hinweise der Karte. */
+function vermerkWort(beiAustritt: string | null | undefined): string {
+  return beiAustritt === "SPERREN" ? "Einrichtung" : "Übergabe";
+}
+
+/** „Einrichtungsvermerk“ bzw. „Übergabevermerk“ (wie die Titel der Dialoge). */
+function vermerkNomen(beiAustritt: string | null | undefined): string {
+  return beiAustritt === "SPERREN" ? "Einrichtungsvermerk" : "Übergabevermerk";
+}
+
 /**
  * Kopfzeile je Lage. Drei unterscheidbare Leeranzeigen (E-A36): „keine
  * Einstellung“, „vor der Einfuehrung“ und „nichts ausgegeben“ – dazu „nichts
@@ -424,8 +452,23 @@ export const GEDAECHTNISSTUETZE =
  */
 export const MELDUNGEN_AUSGABEN = {
   // ---- Fehler: Vermerk, Karte, Link-Seite ----
-  /** 409 (G5): Regel 9 der Karte – abwählen, streichen, Stelle wechseln. */
-  AUSGABE_VORHANDEN: "Für diese Position ist eine Ausgabe vermerkt – erst die Ausgabe entfernen oder zurücknehmen.",
+  /**
+   * 409 (G5): Regel 9 der Karte – abwählen, streichen, Stelle wechseln. Der
+   * Text steht in `MELDUNGEN` von ausstattung.ts (`aenderungsGrundText` liest
+   * ihn dort; ausstattung.ts darf von hier nur Typen importieren) – eine Quelle.
+   */
+  AUSGABE_VORHANDEN: AUSSTATTUNG_MELDUNGEN.AUSGABE_VORHANDEN,
+  /** 404: unbekannte Ausgabe oder eine Ausgabe eines anderen Vorgangs (derselbe Text). */
+  AUSGABE_NICHT_GEFUNDEN: "Ausgabe nicht gefunden",
+  /** 400: Ein Zugang (SPERREN) kommt nur als „gesperrt“ (ZURUECK) zurueck – nie beschaedigt oder fehlend (1.2). */
+  ZUGANG_NUR_GESPERRT: "Ein Zugang lässt sich nur als „gesperrt“ vermerken – „beschädigt“ und „fehlt“ gelten für Gegenstände.",
+  /**
+   * 400 (G7, 1.2): Getauscht werden nur Gegenstaende (RUECKGABE). Ein Tausch
+   * „verloren“ setzte einen Zugang auf FEHLT – den Zustand, den „zurückgenommen“
+   * fuer Zugaenge ausschliesst (`ZUGANG_NUR_GESPERRT`).
+   */
+  ZUGANG_KEIN_TAUSCH:
+    "Ein Zugang lässt sich nicht tauschen – den bisherigen als „gesperrt“ vermerken und den neuen über „Einrichtung vermerken“ eintragen.",
   /**
    * 409 (G7, G28): Das Stueck ist an einen Austritt gebunden und aendert sich
    * nur dort. Die Vorgangsnummer nur, wenn HR den Austritt oeffnen darf.
@@ -437,7 +480,7 @@ export const MELDUNGEN_AUSGABEN = {
   /** 409 KEINE_AUSGABE: Die Position kommt beim Austritt weder zurueck noch wird sie gesperrt (G4). */
   KEINE_AUSGABE: "Zu dieser Aufgabe lässt sich keine Übergabe vermerken.",
   /** 409 AUFGABE_ENTFAELLT. */
-  AUFGABE_ENTFAELLT: "Die Aufgabe ist entfallen – eine Übergabe lässt sich nicht mehr vermerken.",
+  AUFGABE_ENTFAELLT: "Die Aufgabe ist entfallen – es lässt sich nichts mehr vermerken.",
   /** 409 NICHT_AUSGEGEBEN: Korrigieren, Tauschen, Zuruecknehmen nur an einem aktiven Stueck. */
   NICHT_AUSGEGEBEN: "Das Stück ist nicht mehr ausgegeben – die Änderung passt nicht zu seinem Stand.",
   /** 409 (G6): Die Stelle entfernt nur eigene, noch ausgegebene Vermerke ohne Austritt. */
@@ -447,8 +490,9 @@ export const MELDUNGEN_AUSGABEN = {
   KEIN_STUECK: "Bitte mindestens ein Stück angeben.",
   ZU_VIELE_STUECKE: `Je Vermerk lassen sich höchstens ${AUSGABE_GRENZEN.stueckJeVermerk} Stück erfassen.`,
   ZU_VIELE_AKTIVE: `An einer Aufgabe stehen höchstens ${AUSGABE_GRENZEN.aktiveJeAufgabe} ausgegebene Stücke.`,
-  DATUM_IN_ZUKUNFT: "Das Übergabedatum liegt in der Zukunft.",
-  DATUM_ZU_FRUEH: `Das Übergabedatum liegt mehr als ${AUSGABE_GRENZEN.rueckwirkendTage} Tage vor dem Anlegen des Vorgangs.`,
+  // Datum ohne „Übergabe“: Dieselbe Pruefung gilt fuer das Einrichtungsdatum eines Zugangs (G4).
+  DATUM_IN_ZUKUNFT: "Das Datum liegt in der Zukunft.",
+  DATUM_ZU_FRUEH: `Das Datum liegt mehr als ${AUSGABE_GRENZEN.rueckwirkendTage} Tage vor dem Anlegen des Vorgangs.`,
   DATUM_UNGUELTIG: "Datum im Format JJJJ-MM-TT erforderlich.",
   KENNUNG_ZU_LANG: `Die Kennung darf höchstens ${AUSGABE_GRENZEN.kennung} Zeichen lang sein.`,
   KENNUNG_UNGUELTIG: "Die Kennung darf keine spitzen Klammern (< >), keine Zeilenumbrüche und keine Steuerzeichen enthalten.",
@@ -457,7 +501,7 @@ export const MELDUNGEN_AUSGABEN = {
   AUFGABE_ID_UNGUELTIG: "Ungültige Aufgabe.",
   EINSTELLUNG_ID_UNGUELTIG: "Ungültige Einstellung.",
   /** `korrigieren` ohne Kennung und ohne Datum. */
-  KORREKTUR_LEER: "Bitte Kennung oder Übergabedatum angeben.",
+  KORREKTUR_LEER: "Bitte Kennung oder Datum angeben.",
   /** `tauschen` ohne bzw. mit unbekanntem Grund (G7: Pflicht). */
   TAUSCH_GRUND_FEHLT: "Bitte den Grund des Tauschs wählen: defekt oder verloren.",
   ZUSTAND_UNBEKANNT: "Unbekannter Zustand.",
@@ -482,6 +526,22 @@ export const MELDUNGEN_AUSGABEN = {
   RUECKGABEN_OFFEN: (n: number): string =>
     `${n === 1 ? "1 Rückgabe oder Sperre ist" : `${n} Rückgaben oder Sperren sind`} noch offen. Der Austritt lässt sich trotzdem abschließen – bitte bestätigen.`,
   VORGESCHLAGEN_NICHT_LOESCHEN: "Eine vorgeschlagene Rückgabe lässt sich nicht löschen – stattdessen „entfällt“ wählen.",
+  // ---- Erfolg (`meldung` der Karte, POST /api/onboarding/[id]/ausgaben) ----
+  // `art` = `beiAustritt` des Stuecks: Ein Zugang (SPERREN) wird eingerichtet
+  // und gesperrt, nicht uebergeben und zurueckgenommen (G4) – dieselben Woerter
+  // wie Knopf und Dialog („Einrichtung vermerken…“, „Sperrung vermerken“).
+  VERMERKT: (n: number, art?: string | null): string =>
+    n === 1 ? `${vermerkWort(art)} vermerkt.` : `${vermerkWort(art)} vermerkt (${n} Stück).`,
+  KORRIGIERT: (art?: string | null): string => `${vermerkNomen(art)} korrigiert.`,
+  KEINE_AENDERUNG: "Keine Änderung.",
+  GETAUSCHT: (grund: TauschGrund): string =>
+    grund === "VERLOREN"
+      ? "Getauscht – das alte Stück ist als fehlend vermerkt."
+      : "Getauscht – das alte Stück ist als ersetzt vermerkt.",
+  /** `zustand` schon als Wort („zurück“, „beschädigt zurück“, „fehlt“); ein Zugang heisst „Sperrung vermerkt.“ */
+  ZURUECKGENOMMEN: (zustand: string, art?: string | null): string =>
+    art === "SPERREN" ? "Sperrung vermerkt." : `Rücknahme vermerkt: ${zustand}.`,
+  ENTFERNT: (art?: string | null): string => `${vermerkNomen(art)} entfernt.`,
   // ---- Hinweise ----
   /** G7: verlorener Schluessel ohne Austritt – keine Aufgabe, nur dieser Satz in Dialog und `meldung`. */
   GEBAEUDEWIRTSCHAFT_INFORMIEREN: "Bitte die Gebäudewirtschaft wegen der Schließung informieren.",
@@ -489,8 +549,12 @@ export const MELDUNGEN_AUSGABEN = {
   AUSGABEN_GELOESCHT: "Ausgaben nach Ablauf der Aufbewahrungsfrist gelöscht",
   /** Karte (gelb): erledigte Ausstattungsaufgabe ohne jede Ausgabe und ohne Loeschmerker. */
   UEBERGABE_NICHT_VERMERKT: "Übergabe nicht vermerkt",
+  /** Dasselbe an einem Zugang (SPERREN, G4: „eingerichtet am“). */
+  EINRICHTUNG_NICHT_VERMERKT: "Einrichtung nicht vermerkt",
   /** Link-Seite der Stelle (1.8): nach dem Abhaken ohne Vermerk. */
   UEBERGABE_NOCH_NICHT_VERMERKT: "Übergabe noch nicht vermerkt",
+  /** Dasselbe an einem Zugang. */
+  EINRICHTUNG_NOCH_NICHT_VERMERKT: "Einrichtung noch nicht vermerkt",
   /** G12: Abteilungskarte und Stepper, solange keine Einstellung zugeordnet ist. */
   ZUORDNUNG_EMPFOHLEN: "Einstellung zuordnen, bevor Sie die Abteilungen informieren",
   /** Stuecke, die gerade ein anderer Austritt bindet (G28) – ohne Kennung, Nummer nur bei Zugriff. */
@@ -635,6 +699,16 @@ function kalendertagVon(wert: Date | string | null | undefined): Kalendertag | n
   return Number.isNaN(wert.getTime()) ? null : berlinerKalendertag(wert);
 }
 
+/**
+ * Der Kalendertag einer Ausgabe-Spalte (`uebergebenAm` als `@db.Date`) bzw.
+ * eines Zeitpunkts – dieselbe Lesart wie Karte, Mail und Protokoll-Listen
+ * (`kalendertagVon`). Der Dienst vergleicht damit z. B. ein korrigiertes
+ * Uebergabedatum mit dem gespeicherten.
+ */
+export function ausgabeKalendertag(wert: Date | string | null | undefined): Kalendertag | null {
+  return kalendertagVon(wert);
+}
+
 /** „TT.MM.JJJJ“; ohne Wert "" (Listen- und Mailfelder sind nie „—“). */
 function tagText(wert: Date | string | null | undefined): string {
   const tag = kalendertagVon(wert);
@@ -770,6 +844,195 @@ export function vermerkPruefen(
   return null;
 }
 
+/**
+ * Die Stuecke eines Vermerks, fertig zum Schreiben: Kennung `null` statt
+ * fehlend, ohne Datum der heutige Berliner Tag (G4: „Vorgabe heute“).
+ */
+export function vermerkStuecke(
+  stuecke: ReadonlyArray<VermerkStueck>,
+  heute: Kalendertag,
+): { kennung: string | null; uebergebenAm: Kalendertag }[] {
+  return stuecke.map((s) => ({
+    kennung: s.kennung?.trim() || null,
+    uebergebenAm: s.uebergebenAm ?? heute,
+  }));
+}
+
+// =============================================
+// Ziel eines Vermerks und die neue Ausgabe (G2, G4; seit S24)
+// =============================================
+
+/**
+ * Was ein Vermerk ueber seine Aufgabe weiss – gelesen NACH der Sperre des
+ * Vorgangs (`vermerkZielLadenIn`, src/lib/ausgaben-daten.ts), fuer die
+ * Karte (S24) und den Link der Stelle (S25) dieselbe Form.
+ *
+ *   - `zeile`: die Zeile der Ausstattung hinter der Aufgabe (ueber
+ *     `OnboardingAusstattungAufgabe`); `null` bei einer Aufgabe ohne
+ *     Verknuepfung (Vorlagenpunkt, Hinweis-Aufgabe).
+ *   - `option`: "" = ganze Position, sonst die Option der Aufgabe.
+ *   - `position`: die Katalogposition der Zeile; `null` bei einer freien
+ *     Position von HR oder einer inzwischen geloeschten.
+ */
+export interface VermerkZiel {
+  aufgabe: {
+    id: string;
+    assignee: string | null;
+    herkunft: string | null;
+    entfaelltAm: Date | string | null;
+  };
+  zeile: {
+    id: string;
+    positionId: string | null;
+    departmentKey: string;
+    art: string;
+    bezeichnung: string;
+    ausgabeKennung: string | null;
+    rueckgabeKategorie: string | null;
+    beiAustritt: string | null;
+    gestrichenAm: Date | string | null;
+  } | null;
+  option: string;
+  position: { organizationId: string | null } | null;
+}
+
+/** Warum an dieser Aufgabe kein Vermerk geht (409, der Text steht unter demselben Schluessel in MELDUNGEN_AUSGABEN). */
+export type VermerkZielGrund = "KEINE_AUSGABE" | "AUFGABE_ENTFAELLT";
+
+/**
+ * Darf an dieser Aufgabe eine Uebergabe vermerkt werden (G4)? `null` = ja.
+ *
+ *   - KEINE_AUSGABE: keine Ausstattungsaufgabe (`herkunft` AUSSTATTUNG mit
+ *     Zeile) oder die Zeile kommt beim Austritt weder zurueck noch wird sie
+ *     gesperrt (`beiAustritt` NICHTS bzw. leer, Angabe).
+ *   - AUFGABE_ENTFAELLT: die Aufgabe ist entfallen bzw. die Position
+ *     gestrichen. Eine offene Aufgabe geht (getrennt vom Abhaken, E-A30).
+ *
+ * Erst KEINE_AUSGABE: Einer Position ohne Rueckgabe hilft auch keine
+ * Wiederaufnahme.
+ */
+export function vermerkZielGrund(ziel: Pick<VermerkZiel, "aufgabe" | "zeile">): VermerkZielGrund | null {
+  const z = ziel.zeile;
+  if (
+    !z ||
+    ziel.aufgabe.herkunft !== "AUSSTATTUNG" ||
+    !ausgabeMoeglich({ art: z.art, beiAustritt: z.beiAustritt, gestrichenAm: null })
+  ) {
+    return "KEINE_AUSGABE";
+  }
+  if (ziel.aufgabe.entfaelltAm || z.gestrichenAm) return "AUFGABE_ENTFAELLT";
+  return null;
+}
+
+/**
+ * Die festen Felder einer neuen Ausgabe (Schema `Ausgabe`, G2) – alles ausser
+ * Kennung, Datum und Zustand, die je Stueck bzw. vom Schreiber kommen.
+ */
+export interface NeueAusgabe {
+  /** Herkunft (Einstellung); `null` nur, wenn sie geloescht wurde. */
+  onboardingId: string | null;
+  /** Ausstattungsaufgabe, an der vermerkt wurde. */
+  checklistItemId: string | null;
+  /** Einrichtung, der das Stueck gehoert: die Empfaenger-Einrichtung der Einstellung (Arbeitsort, sonst Einrichtung). */
+  organizationId: string;
+  /** Die Position galt beim Vermerk zentral (E-A35). */
+  zentral: boolean;
+  /** Ausgebende Stelle. */
+  departmentKey: string;
+  /** „Schlüssel: Haupteingang“ – nie Freitext (`ausgabeBezeichnung`). */
+  bezeichnung: string;
+  /** Momentaufnahme `ausgabeKennung` („Inventarnummer“); `null` = „Kennung“. */
+  kennungLabel: string | null;
+  /** Nur bei RUECKGABE. */
+  rueckgabeKategorie: string | null;
+  beiAustritt: AusgabeBeiAustritt;
+  quelle: AusgabeQuelle;
+  /** HR-Konto bei `quelle` HR, sonst `null` (auf dem Link-Weg gibt es keine Person, G2). */
+  erfasstVonId: string | null;
+}
+
+/**
+ * Die neue Ausgabe zu einem Vermerk (G2), nachdem `vermerkZielGrund` `null`
+ * ergab (sonst wirft die Funktion – ein Programmfehler, kein Fall fuer die
+ * Antwort):
+ *
+ *   - `organizationId` = `empfaengerEinrichtung(vorgang)` – dieselbe Regel wie
+ *     die Empfaenger der Abteilungsaufgaben (Arbeitsort, sonst Einrichtung);
+ *   - `zentral` = die Katalogposition hat keine Einrichtung (eine freie
+ *     Position von HR bzw. eine geloeschte Katalogposition: nicht zentral);
+ *   - `departmentKey` = die Stelle der Aufgabe (sonst die der Zeile);
+ *   - `bezeichnung` aus Zeile und Option (`ausgabeBezeichnung`);
+ *   - `rueckgabeKategorie` nur bei RUECKGABE, `erfasstVonId` nur bei HR.
+ */
+export function ausgabeBasis(
+  ziel: VermerkZiel,
+  ctx: {
+    vorgang: { id: string; organizationId: string; arbeitsortId?: string | null };
+    quelle: AusgabeQuelle;
+    erfasstVonId: string | null;
+  },
+): NeueAusgabe {
+  const z = ziel.zeile;
+  if (!z || !enthalten(AUSGABE_BEI_AUSTRITT, z.beiAustritt)) {
+    throw new Error("ausgabeBasis: Die Aufgabe erlaubt keinen Vermerk (vorher vermerkZielGrund pruefen).");
+  }
+  return {
+    onboardingId: ctx.vorgang.id,
+    checklistItemId: ziel.aufgabe.id,
+    organizationId: empfaengerEinrichtung(ctx.vorgang),
+    zentral: ziel.position !== null && ziel.position.organizationId === null,
+    departmentKey: ziel.aufgabe.assignee?.trim() || z.departmentKey,
+    bezeichnung: ausgabeBezeichnung(z, ziel.option),
+    kennungLabel: z.ausgabeKennung?.trim() || null,
+    rueckgabeKategorie: z.beiAustritt === "RUECKGABE" ? z.rueckgabeKategorie?.trim() || null : null,
+    beiAustritt: z.beiAustritt,
+    quelle: ctx.quelle,
+    erfasstVonId: ctx.quelle === "HR" ? ctx.erfasstVonId : null,
+  };
+}
+
+/** Der Zustand der alten Ausgabe nach einem Tausch (G7): DEFEKT → ERSETZT (6 Monate), VERLOREN → FEHLT (3 Jahre ab Jahresende). */
+export function tauschZustand(grund: TauschGrund): "ERSETZT" | "FEHLT" {
+  return grund === "VERLOREN" ? "FEHLT" : "ERSETZT";
+}
+
+/**
+ * Die feste Seite der Ersatz-Ausgabe eines Tauschs (G7): dieselbe Aufgabe,
+ * Einrichtung, Stelle, Bezeichnung, Beschriftung, Kategorie und Art wie die
+ * alte – vermerkt von HR. Kennung und Datum bringt der Dialog.
+ */
+export function ersatzBasis(
+  alt: {
+    onboardingId: string | null;
+    checklistItemId: string | null;
+    organizationId: string;
+    zentral: boolean;
+    departmentKey: string;
+    bezeichnung: string;
+    kennungLabel: string | null;
+    rueckgabeKategorie: string | null;
+    beiAustritt: string;
+  },
+  ctx: { erfasstVonId: string | null },
+): NeueAusgabe {
+  if (!enthalten(AUSGABE_BEI_AUSTRITT, alt.beiAustritt)) {
+    throw new Error(`ersatzBasis: unbekanntes beiAustritt "${alt.beiAustritt}"`);
+  }
+  return {
+    onboardingId: alt.onboardingId,
+    checklistItemId: alt.checklistItemId,
+    organizationId: alt.organizationId,
+    zentral: alt.zentral,
+    departmentKey: alt.departmentKey,
+    bezeichnung: alt.bezeichnung,
+    kennungLabel: alt.kennungLabel,
+    rueckgabeKategorie: alt.rueckgabeKategorie,
+    beiAustritt: alt.beiAustritt,
+    quelle: "HR",
+    erfasstVonId: ctx.erfasstVonId,
+  };
+}
+
 // =============================================
 // Zustandswechsel und Loeschfrist (G3, G20, E-A37)
 // =============================================
@@ -824,7 +1087,8 @@ export function ausgabeLoeschenAb(opts: {
       return dreiJahreAbJahresende(opts.zustandAm);
     case "AUSGEGEBEN": {
       const anker = [opts.austrittAbgeschlossenAm, opts.vorgangEingestelltAm]
-        .filter((d): d is Date => d instanceof Date && !Number.isNaN(d.getTime()))
+        .map(gueltigerZeitpunkt)
+        .filter((d): d is Date => d !== null)
         .sort((a, b) => b.getTime() - a.getTime())[0];
       return anker ? dreiJahreAbJahresende(anker) : null;
     }
@@ -832,6 +1096,18 @@ export function ausgabeLoeschenAb(opts: {
       // VERBLEIBT – und alles, was kein bekannter Zustand ist: nie von selbst loeschen.
       return null;
   }
+}
+
+/**
+ * Ein gueltiger Zeitpunkt als Date dieses Realms, sonst `null`. Bewusst ohne
+ * `instanceof Date`: Ein Date aus einem anderen Realm (etwa nach
+ * `structuredClone`) fiele dort still durch, und der Anker der Frist ginge
+ * verloren – ein Stueck bliebe ohne Fehler unbegrenzt gespeichert.
+ */
+function gueltigerZeitpunkt(d: Date | null | undefined): Date | null {
+  if (d === null || d === undefined || Object.prototype.toString.call(d) !== "[object Date]") return null;
+  const ms = d.getTime();
+  return Number.isNaN(ms) ? null : new Date(ms);
 }
 
 /** Was jeder Zustandswechsel an einer Ausgabe schreibt (G3). */
@@ -916,6 +1192,33 @@ export function perLinkEntfernbar(ausgabe: { quelle: string; zustand: string }, 
   return ausgabe.quelle === "LINK" && ausgabe.zustand === "AUSGEGEBEN" && !gebunden;
 }
 
+/**
+ * Die Loeschfrist, die die Absage der Einstellung einem Stueck gibt (G10,
+ * `ausgabenFristBeiAbsageIn`): fuer ein aktives Stueck, das kein Austritt
+ * bindet (G28), `ausgabeLoeschenAb` mit `vorgangEingestelltAm` – drei Jahre ab
+ * Ende des Berliner Jahres der Absage (`expiredAt`). `null` heisst: nichts
+ * schreiben –
+ *
+ *   - nicht mehr aktiv: Ein Endzustand (ZURUECK, FEHLT, ERSETZT …) behaelt
+ *     seine Frist;
+ *   - gebunden: Das Stueck fuehrt sein Austritt (dessen Abschluss setzt die
+ *     Frist, G18);
+ *   - ohne Frist nach G20: VERBLEIBT bleibt Bestand der Person.
+ *
+ * Der Zustand aendert sich nicht (1.2: „AUSGEGEBEN → AUSGEGEBEN mit Frist“).
+ * Vermerkt HR danach die Ruecknahme, gilt die kuerzere Frist des neuen
+ * Zustands (`ausgabeZustandDaten`).
+ */
+export function absageFrist(
+  ausgabe: { zustand: string; zustandAm: Date },
+  bezuege: ReadonlyArray<AustrittsBezug>,
+  vorgangEingestelltAm: Date,
+): Date | null {
+  if (!enthalten(AUSGABE_AKTIV, ausgabe.zustand)) return null;
+  if (bindenderAustritt(ausgabe, bezuege)) return null;
+  return ausgabeLoeschenAb({ zustand: ausgabe.zustand, zustandAm: ausgabe.zustandAm, vorgangEingestelltAm });
+}
+
 // =============================================
 // Unterschriebenes Protokoll (G19, E-A34)
 // =============================================
@@ -954,6 +1257,36 @@ export function protokollText(art: ProtokollArt, stand: ProtokollStand): string 
   return stand.hochgeladenAm
     ? MELDUNGEN_AUSGABEN.PROTOKOLL_HOCHGELADEN(art, tagText(stand.hochgeladenAm))
     : MELDUNGEN_AUSGABEN.PROTOKOLL_FEHLT(art);
+}
+
+/** Die Zeile der Karte bzw. des Reiters als JSON (G19) – die Oberflaeche rechnet nichts. */
+export interface ProtokollAnzeige {
+  art: ProtokollArt;
+  /** Es gibt aktive Ausgaben mit RUECKGABE (Karte) bzw. Rueckgaben mit `ausgabeId` (Reiter). */
+  noetig: boolean;
+  /** Hochladezeitpunkt des juengsten Dokuments als ISO-Zeitpunkt, sonst `null`. */
+  hochgeladenAm: string | null;
+  /** „Unterschriebenes Übergabeprotokoll: fehlt“ bzw. „… hochgeladen am TT.MM.JJJJ“; `null`, solange nicht noetig. */
+  text: string | null;
+}
+
+/** `protokollStand` samt Text fuer Karte und Reiter (G19). */
+export function protokollAnzeige(art: ProtokollArt, stand: ProtokollStand): ProtokollAnzeige {
+  return {
+    art,
+    noetig: stand.noetig,
+    hochgeladenAm: stand.hochgeladenAm ? stand.hochgeladenAm.toISOString() : null,
+    text: protokollText(art, stand),
+  };
+}
+
+/**
+ * Aktive Ausgaben mit RUECKGABE (Gegenstaende, die zurueckkommen) – ab einer
+ * zeigt die Karte die Zeile zum unterschriebenen Uebergabeprotokoll (G19).
+ * Zugaenge (SPERREN) und Zurueckgenommenes zaehlen nicht.
+ */
+export function ausgabenMitRueckgabe(ausgaben: ReadonlyArray<{ zustand: string; beiAustritt: string }>): number {
+  return ausgaben.filter((a) => a.beiAustritt === "RUECKGABE" && enthalten(AUSGABE_AKTIV, a.zustand)).length;
 }
 
 // =============================================
@@ -1752,7 +2085,10 @@ const KEINE_AKTIONEN: Readonly<AusgabeAktionen> = Object.freeze({
  *     dem Zustand dahinter („· ersetzt“).
  *   - Aktionen nur mit Bearbeitungsrecht (`darfBearbeiten` = HR_EDIT_ROLES, auch
  *     bei COMPLETED/EXPIRED) und nur an aktiven Stuecken: AUSGEGEBEN alle vier,
- *     VERBLEIBT ohne „entfernen“. Gebunden an einen Austritt (G28, ausser
+ *     VERBLEIBT ohne „entfernen“; „tauschen“ nur an einem Gegenstand
+ *     (RUECKGABE) – ein Zugang wird gesperrt und neu eingerichtet, nie als
+ *     „verloren“ getauscht (der Dienst antwortet sonst 400
+ *     `ZUGANG_KEIN_TAUSCH`). Gebunden an einen Austritt (G28, ausser
  *     `austrittId`): keine, dafuer `sperrGrund` – mit Vorgangsnummer nur, wenn
  *     der Bezug sie traegt (Zugriff auf den Austritt). Ohne Recht keine Aktion
  *     und kein Sperrgrund; die Anzeige bleibt.
@@ -1781,7 +2117,7 @@ export function ausgabenZeile(
     } else {
       aktionen = {
         korrigieren: true,
-        tauschen: true,
+        tauschen: stand.beiAustritt === "RUECKGABE",
         zurueckgenommen: true,
         entfernen: stand.zustand === "AUSGEGEBEN",
       };
@@ -1819,7 +2155,7 @@ export function ausgabenZeile(
 
 /** Was die Karte je Ausstattungsaufgabe unter den Stuecken zeigt. */
 export interface AusgabenJeAufgabe {
-  /** Gelb: „Übergabe nicht vermerkt“; grau: „Ausgaben nach Ablauf der Aufbewahrungsfrist gelöscht“. */
+  /** Gelb: „Übergabe nicht vermerkt“ (Zugang: „Einrichtung …“); grau: „Ausgaben nach Ablauf der Aufbewahrungsfrist gelöscht“. */
   hinweis: { text: string; ton: "gelb" | "grau" } | null;
   /** „Übergabe vermerken …“ anbieten. */
   vermerken: boolean;
@@ -1832,7 +2168,8 @@ export interface AusgabenJeAufgabe {
  *   - mit `ausgabenGeloeschtAm`: grauer Satz „Ausgaben nach Ablauf der
  *     Aufbewahrungsfrist gelöscht“, KEINE Aufforderung;
  *   - sonst, wenn die Aufgabe erledigt (nicht entfallen) ist und gar keine
- *     Ausgabe hat: gelb „Übergabe nicht vermerkt“.
+ *     Ausgabe hat: gelb „Übergabe nicht vermerkt“ – bei einem Zugang
+ *     (`art` SPERREN) „Einrichtung nicht vermerkt“, wie Knopf und Link-Seite.
  *
  * „Vermerken“ ist eine gewoehnliche Aktion: mit Recht, nicht entfallen und
  * weniger als `aktiveJeAufgabe` aktive Stuecke – auch nach der Loeschung.
@@ -1840,7 +2177,7 @@ export interface AusgabenJeAufgabe {
 export function ausgabenJeAufgabe(
   aufgabe: { isCompleted: boolean; entfaelltAm?: Date | string | null; ausgabenGeloeschtAm?: Date | string | null },
   ausgaben: ReadonlyArray<{ zustand: string }>,
-  ctx: { ausgabeMoeglich: boolean; darfBearbeiten: boolean },
+  ctx: { ausgabeMoeglich: boolean; darfBearbeiten: boolean; art?: string | null },
 ): AusgabenJeAufgabe {
   if (!ctx.ausgabeMoeglich) return { hinweis: null, vermerken: false };
   const entfaellt = !!aufgabe.entfaelltAm;
@@ -1850,13 +2187,202 @@ export function ausgabenJeAufgabe(
     if (aufgabe.ausgabenGeloeschtAm) {
       hinweis = { text: MELDUNGEN_AUSGABEN.AUSGABEN_GELOESCHT, ton: "grau" };
     } else if (ausgaben.length === 0 && aufgabe.isCompleted && !entfaellt) {
-      hinweis = { text: MELDUNGEN_AUSGABEN.UEBERGABE_NICHT_VERMERKT, ton: "gelb" };
+      const text =
+        ctx.art === "SPERREN" ? MELDUNGEN_AUSGABEN.EINRICHTUNG_NICHT_VERMERKT : MELDUNGEN_AUSGABEN.UEBERGABE_NICHT_VERMERKT;
+      hinweis = { text, ton: "gelb" };
     }
   }
   return {
     hinweis,
     vermerken: ctx.darfBearbeiten && !entfaellt && aktive < AUSGABE_GRENZEN.aktiveJeAufgabe,
   };
+}
+
+/**
+ * Was die Karte „Ausstattung & Zugänge“ je Ausstattungsaufgabe zu Ausgaben
+ * zeigt (seit S24) – fertig, die Oberflaeche rechnet nichts. Haengt in
+ * `AusstattungsAufgabeStand` (ausstattung.ts liest den Typ nur).
+ */
+export interface AusgabenAufgabeAnzeige {
+  /** „Übergabe vermerken“ grundsaetzlich moeglich (`ausgabeMoeglich`, G4): nicht gestrichen. */
+  ausgabeMoeglich: boolean;
+  /** RUECKGABE (Gegenstand) oder SPERREN (Zugang: „eingerichtet“, zurueck nur als „gesperrt“). */
+  ausgabeArt: AusgabeBeiAustritt;
+  /** Beschriftung der Kennung im Dialog: Momentaufnahme `ausgabeKennung`, sonst „Kennung“. */
+  kennungLabel: string;
+  /** Schluessel bzw. Transponder (Kategorie SCHLUESSEL): „verloren“ und „fehlt“ zeigen den Hinweis zur Gebaeudewirtschaft (G7). */
+  schluessel: boolean;
+  /** Die Stuecke dieser Aufgabe (`ausgabenZeile`), aktive und fruehere, in der Reihenfolge der Abfrage. */
+  ausgaben: AusgabeStand[];
+  /** `ausgabenJeAufgabe`: gelb „Übergabe nicht vermerkt“ bzw. grau „Ausgaben … gelöscht“. */
+  ausgabenHinweis: AusgabenJeAufgabe["hinweis"];
+  /** „Übergabe vermerken …“ anbieten (`ausgabenJeAufgabe`). */
+  vermerken: boolean;
+}
+
+/**
+ * Die Ausgaben der Karte je Ausstattungsaufgabe (G7, G20, G28), Schluessel =
+ * `checklistItemId`. Eine Aufgabe steht nur darin, wenn ihre Zeile beim
+ * Austritt zurueckkommt oder gesperrt wird (`beiAustritt` RUECKGABE/SPERREN,
+ * keine Angabe) – auch gestrichen, damit fruehere Stuecke sichtbar bleiben.
+ * Ohne `beiAustritt` (A4 nicht eingeschaltet, G27) ist das Ergebnis leer und
+ * die Karte unveraendert.
+ *
+ * `ausgaben` tragen ihre Austrittsbezuege (`bezuege`, nach `austrittsBezuegeLaden`)
+ * – daraus Bindung und Sperrgrund (`ausgabenZeile`). `darfBearbeiten` =
+ * HR_EDIT_ROLES, unabhaengig vom Endstatus des Vorgangs (G7).
+ */
+export function ausgabenAnzeigeBauen(opts: {
+  zeilen: ReadonlyArray<{
+    id: string;
+    art: string;
+    beiAustritt?: string | null;
+    gestrichenAm?: Date | string | null;
+    ausgabeKennung?: string | null;
+    rueckgabeKategorie?: string | null;
+  }>;
+  verknuepfungen: ReadonlyArray<{ ausstattungId: string; checklistItemId: string }>;
+  aufgaben: ReadonlyArray<{
+    id: string;
+    isCompleted: boolean;
+    entfaelltAm?: Date | string | null;
+    ausgabenGeloeschtAm?: Date | string | null;
+  }>;
+  ausgaben: ReadonlyArray<AusgabeZeilenDaten & { checklistItemId: string | null }>;
+  darfBearbeiten: boolean;
+}): Record<string, AusgabenAufgabeAnzeige> {
+  const zeileNachId = new Map(opts.zeilen.map((z) => [z.id, z]));
+  const aufgabeNachId = new Map(opts.aufgaben.map((a) => [a.id, a]));
+  const ergebnis: Record<string, AusgabenAufgabeAnzeige> = {};
+  for (const v of opts.verknuepfungen) {
+    const zeile = zeileNachId.get(v.ausstattungId);
+    const aufgabe = aufgabeNachId.get(v.checklistItemId);
+    if (!zeile || !aufgabe || zeile.art === "ANGABE" || !enthalten(AUSGABE_BEI_AUSTRITT, zeile.beiAustritt)) continue;
+    const moeglich = ausgabeMoeglich({ art: zeile.art, beiAustritt: zeile.beiAustritt, gestrichenAm: zeile.gestrichenAm });
+    const eigene = opts.ausgaben.filter((a) => a.checklistItemId === aufgabe.id);
+    const jeAufgabe = ausgabenJeAufgabe(aufgabe, eigene, {
+      ausgabeMoeglich: moeglich,
+      darfBearbeiten: opts.darfBearbeiten,
+      art: zeile.beiAustritt,
+    });
+    ergebnis[aufgabe.id] = {
+      ausgabeMoeglich: moeglich,
+      ausgabeArt: zeile.beiAustritt,
+      kennungLabel: zeile.ausgabeKennung?.trim() || KENNUNG_LABEL_STANDARD,
+      schluessel: zeile.beiAustritt === "RUECKGABE" && zeile.rueckgabeKategorie === "SCHLUESSEL",
+      ausgaben: eigene.map((a) => ausgabenZeile(a, { darfBearbeiten: opts.darfBearbeiten })),
+      ausgabenHinweis: jeAufgabe.hinweis,
+      vermerken: jeAufgabe.vermerken,
+    };
+  }
+  return ergebnis;
+}
+
+// =============================================
+// Link-Seite der ausgebenden Stelle (G6, Feinplan 1.6; seit S25)
+// =============================================
+
+/** Ein Stueck auf der Link-Seite der Stelle (Onboarding, Feinplan 1.6). */
+export interface LinkAusgabeStueck {
+  id: string;
+  kennung: string | null;
+  /** Kalendertag der Uebergabe bzw. Einrichtung (`YYYY-MM-DD`). */
+  uebergebenAm: Kalendertag | null;
+  /** Eigener Link-Vermerk, noch AUSGEGEBEN und an keinen Austritt gebunden (`perLinkEntfernbar`, G6). */
+  entfernbar: boolean;
+}
+
+/**
+ * Feld `ausgabe` einer Aufgabe auf der Link-Seite (Onboarding, Feinplan 1.6) –
+ * fertig, die Seite rechnet nichts:
+ *
+ *   moeglich      „Übergabe vermerken“ geht jetzt: Aufgabe nicht entfallen und
+ *                 weniger als `aktiveJeAufgabe` noch ausgegebene Stuecke
+ *                 (dieselben Regeln, mit denen der Server antwortet)
+ *   kennungLabel  Beschriftung der Kennung (Momentaufnahme `ausgabeKennung`,
+ *                 sonst „Kennung“)
+ *   art           RUECKGABE (Gegenstand: „übergeben“) oder SPERREN (Zugang:
+ *                 „eingerichtet“)
+ *   stuecke       die noch ausgegebenen Stuecke DIESER Stelle (AUSGEGEBEN,
+ *                 VERBLEIBT) – auch von HR vermerkte, die aber nie entfernbar sind
+ */
+export interface LinkAusgabe {
+  moeglich: boolean;
+  kennungLabel: string;
+  art: AusgabeBeiAustritt;
+  stuecke: LinkAusgabeStueck[];
+}
+
+/**
+ * Das Feld `ausgabe` einer Aufgabe auf der Link-Seite der Stelle (G6, G21) –
+ * `null` heisst: Der Schluessel fehlt an der Aufgabe GANZ. Nur an einer
+ * Ausstattungsaufgabe (`herkunft` AUSSTATTUNG) DIESER Stelle, deren Zeile
+ * ebenfalls dieser Stelle gehoert (Muster `bemerkungFuerStelle`: nach einem
+ * Stellenwechsel bleibt die entfallene Aufgabe bei der alten Stelle, die Zeile
+ * gilt der neuen) und beim Austritt zurueckkommt bzw. gesperrt wird
+ * (`ausgabeMoeglich`: RUECKGABE/SPERREN, keine Angabe, nicht gestrichen). Ohne
+ * `beiAustritt` im Katalog (A4 aus, G27) ist es also nie gesetzt.
+ *
+ * Die Kennung sieht nur die ausgebende Stelle: Stuecke mit anderem
+ * `departmentKey` fallen weg. `entfernbar` nach `perLinkEntfernbar` mit der
+ * Bindung aus `bezuege` (G28; der Aufrufer liest sie fuer eigene
+ * Link-Vermerke im Zustand AUSGEGEBEN).
+ */
+export function linkAusgabeBauen(opts: {
+  departmentKey: string;
+  aufgabe: { assignee: string | null; herkunft: string | null; entfaelltAm?: Date | string | null };
+  zeile:
+    | {
+        departmentKey: string;
+        art: string;
+        beiAustritt?: string | null;
+        ausgabeKennung?: string | null;
+        gestrichenAm?: Date | string | null;
+      }
+    | null
+    | undefined;
+  /** Alle Ausgaben dieser Aufgabe (jeder Zustand, jede Stelle). */
+  ausgaben: ReadonlyArray<{
+    id: string;
+    departmentKey: string;
+    zustand: string;
+    quelle: string;
+    kennung: string | null;
+    uebergebenAm: Date | string | null;
+    bezuege?: ReadonlyArray<AustrittsBezug>;
+  }>;
+}): LinkAusgabe | null {
+  const key = opts.departmentKey;
+  const z = opts.zeile;
+  if (!z || opts.aufgabe.herkunft !== "AUSSTATTUNG" || opts.aufgabe.assignee !== key || z.departmentKey !== key) {
+    return null;
+  }
+  if (!enthalten(AUSGABE_BEI_AUSTRITT, z.beiAustritt)) return null;
+  if (!ausgabeMoeglich({ art: z.art, beiAustritt: z.beiAustritt, gestrichenAm: z.gestrichenAm })) return null;
+
+  const aktive = opts.ausgaben.filter((a) => enthalten(AUSGABE_AKTIV, a.zustand));
+  return {
+    moeglich: !opts.aufgabe.entfaelltAm && aktive.length < AUSGABE_GRENZEN.aktiveJeAufgabe,
+    kennungLabel: z.ausgabeKennung?.trim() || KENNUNG_LABEL_STANDARD,
+    art: z.beiAustritt,
+    stuecke: aktive
+      .filter((a) => a.departmentKey === key)
+      .map((a) => ({
+        id: a.id,
+        kennung: a.kennung?.trim() || null,
+        uebergebenAm: kalendertagVon(a.uebergebenAm),
+        entfernbar: perLinkEntfernbar(a, bindenderAustritt(a, a.bezuege ?? []) !== null),
+      })),
+  };
+}
+
+/**
+ * Eine Zeile eines Stuecks auf der Link-Seite: „FES-IPAD-0412 · übergeben
+ * 28.01.2027“, ohne Kennung nur „übergeben …“, bei einem Zugang
+ * „eingerichtet …“ – dieselbe Form wie die Zeile in der Mail an HR (G9).
+ */
+export function linkStueckText(stueck: Pick<LinkAusgabeStueck, "kennung" | "uebergebenAm">, art: string): string {
+  return stueckZeile([], { kennung: stueck.kennung, uebergebenAm: stueck.uebergebenAm, beiAustritt: art });
 }
 
 // =============================================

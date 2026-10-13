@@ -9,6 +9,11 @@
  *       PATCH /api/offboarding-tasks/[token]/[itemId] → oeffentlicheAufgabeAendern
  *       GET   /api/onboarding-tasks/[token]           → oeffentlicheOnboardingAufgabenLaden
  *       PATCH /api/onboarding-tasks/[token]/[itemId]  → oeffentlicheOnboardingAufgabeAendern
+ *       POST  /api/onboarding-tasks/[token]/[itemId]/ausgaben             → oeffentlicheAusgabeVermerken
+ *       DELETE /api/onboarding-tasks/[token]/[itemId]/ausgaben/[ausgabeId] → oeffentlicheAusgabeEntfernen
+ *     (Ausstattung & Zugaenge, Stufe 2, Feinplan A4 G6: „Übergabe vermerken“
+ *     getrennt vom Abhaken; geschrieben wird `ausgaben` nur ueber
+ *     src/lib/ausgaben-schreiben.ts, G3)
  *   - HR im Portal:
  *       PATCH /api/offboarding/[id]/checklist/[itemId] → aufgabeImPortalAendern
  *       PATCH /api/onboarding/[id]/checklist/[itemId]  → onboardingAufgabeImPortalAendern
@@ -88,6 +93,30 @@ import {
   type AngabenFuerStelle,
 } from "@/lib/ausstattung";
 import { angabenJeStelleLaden, ausstattungZuAufgabenLaden, bemerkungFuerStelle } from "@/lib/ausstattung-daten";
+import {
+  AUSGABEN_AUDIT,
+  MELDUNGEN_AUSGABEN,
+  ausgabeBasis,
+  ausgabeVermerkMailFelder,
+  bindenderAustritt,
+  perLinkEntfernbar,
+  vermerkPruefen,
+  vermerkStuecke,
+  vermerkZielGrund,
+  type LinkAusgabe,
+  type VermerkZiel,
+} from "@/lib/ausgaben";
+import { ausgabeEntfernenIn, ausgabenAnlegenIn, ausgabenSperrenIn } from "@/lib/ausgaben-schreiben";
+import {
+  aktiveAusgabenZaehlen,
+  ausgabeLaden,
+  ausgabenZuAufgabenLaden,
+  austrittsBezuegeLaden,
+  linkAusgabenLaden,
+  vermerkZielLadenIn,
+} from "@/lib/ausgaben-daten";
+import { berlinerKalendertag } from "@/lib/kalendertag";
+import { vermerkSchema } from "@/lib/validations/ausgaben";
 
 // =============================================
 // Anfragebremse je Link
@@ -437,6 +466,13 @@ async function hrPostfachLaden(): Promise<string> {
  * Abhaken ODER ein neuer Kommentar; dazu `ist_erledigt`, `nur_kommentar` und
  * `meldung_kurz` (erledigtMeldungFelder). Die Payload des Offboardings bleibt
  * Byte fuer Byte gleich.
+ *
+ * Onboarding, Stufe 2 (A4, G9): `ausgabe_vermerk` (Rohtext, nur Textteil) und
+ * `ausgabe_vermerk_html` (maskiert) – die noch ausgegebenen Stuecke DIESER
+ * Aufgabe, NACH dem Commit frisch gelesen; ohne Stueck beide "". Ein Vermerk
+ * allein loest diese Mail nie aus (kein dritter Anlass). Die Kennung ist
+ * Freitext der Stelle: nie im Betreff (`betreffOhne`), das Ereignis ist
+ * webhookfrei (EVENTS_OHNE_WEBHOOK).
  */
 async function aufgabeErledigtMelden(opts: {
   bereich: LinkBereich;
@@ -457,6 +493,7 @@ async function aufgabeErledigtMelden(opts: {
       ? {
           hr_postfach: await hrPostfachLaden(),
           ...erledigtMeldungFelder(opts.anlass ?? "ERLEDIGT", opts.item.abteilungKommentar),
+          ...ausgabeVermerkMailFelder(await ausgabenZuAufgabenLaden(prisma, [opts.item.id])),
         }
       : {};
   await triggerWebhooks(MAIL_EVENTS[opts.bereich.modul].erledigt, {
@@ -548,11 +585,20 @@ type AufgabeOeffentlichBasis = Prisma.OffboardingChecklistItemGetPayload<{ selec
  *   eilt       Frist auf den Tag des Versands angehoben (Regel 14)
  *   entfaellt  von HR gestrichen (R9, E-A21) — nur noch Kommentar moeglich
  * `herkunft` und `entfaelltAm` selbst gehen nicht hinaus.
+ *
+ * Stufe 2 (A4, G6, Feinplan 1.6): dazu `ausgabe` – `{ moeglich, kennungLabel,
+ * art, stuecke: [{ id, kennung, uebergebenAm, entfernbar }] }` –, NUR an
+ * Ausstattungsaufgaben dieser Stelle, deren Zeile ebenfalls dieser Stelle
+ * gehoert und beim Austritt zurueckkommt bzw. gesperrt wird
+ * (`linkAusgabeBauen`). An allen uebrigen Aufgaben fehlt der Schluessel GANZ
+ * (die gepinnten Schluessellisten der Link-Seite bleiben gueltig). Die
+ * Kennung sieht nur die ausgebende Stelle (G21).
  */
 type AufgabeOeffentlich = AufgabeOeffentlichBasis & {
   bemerkung?: { text: string; label: string } | null;
   eilt?: boolean;
   entfaellt?: boolean;
+  ausgabe?: LinkAusgabe;
 };
 
 /** Onboarding: dazu, was Bemerkung, „Eilt“ und „entfällt“ braucht (nur intern, siehe oben). */
@@ -719,12 +765,30 @@ async function aufgabenDerAbteilung(b: LinkBereich, departmentKey: string): Prom
     prisma,
     roh.filter((a) => a.herkunft != null).map((a) => a.id),
   );
-  return roh.map(({ herkunft: _herkunft, eilt, entfaelltAm, ...a }) => ({
-    ...a,
-    bemerkung: bemerkungFuerStelle(zuAusstattung.get(a.id), departmentKey),
-    eilt: eilt === true,
-    entfaellt: entfaelltAm != null,
-  }));
+  // Stufe 2 (A4, G6): Uebergabe vermerken – nur, wo die Zeile beim Austritt
+  // zurueckkommt bzw. gesperrt wird; ohne `beiAustritt` (A4 aus) keine
+  // Ausgaben-Abfrage. Die Abfrage oben filtert `assignee` = diese Stelle.
+  const ausgaben = await linkAusgabenLaden(
+    prisma,
+    departmentKey,
+    roh.map((a) => ({
+      id: a.id,
+      assignee: departmentKey,
+      herkunft: a.herkunft,
+      entfaelltAm: a.entfaelltAm,
+      ausstattungId: zuAusstattung.get(a.id)?.ausstattungId ?? null,
+    })),
+  );
+  return roh.map(({ herkunft: _herkunft, eilt, entfaelltAm, ...a }) => {
+    const ausgabe = ausgaben.get(a.id);
+    return {
+      ...a,
+      bemerkung: bemerkungFuerStelle(zuAusstattung.get(a.id), departmentKey),
+      eilt: eilt === true,
+      entfaellt: entfaelltAm != null,
+      ...(ausgabe ? { ausgabe } : {}),
+    };
+  });
 }
 
 /**
@@ -833,6 +897,70 @@ export async function oeffentlicheOnboardingAufgabenLaden(
 }
 
 // =============================================
+// Oeffentliche Seite: Pruefungen vor jedem Schreiben
+// =============================================
+
+type LinkGefunden = NonNullable<Awaited<ReturnType<typeof linkZumToken>>>;
+
+/**
+ * Was jeder schreibende Weg ueber den Link VOR dem Body prueft, in fester
+ * Reihenfolge (Feinplan A4, 1.6): 404 Token (auch der Token des anderen
+ * Moduls) → 410 Vorgang abgebrochen bzw. nicht mehr aktiv → 410 Link
+ * abgelaufen → 409 nur lesen (abgeschlossen) → 429 Bremse je Link. Die
+ * IP-Bremse prueft die Route davor (vor dem Token-Lookup).
+ */
+async function linkFuerAenderung(
+  modul: AbteilungsModul,
+  token: string,
+  jetzt: Date,
+): Promise<{ antwort: DienstAntwort } | { gefunden: LinkGefunden }> {
+  const gefunden = await linkZumToken(token, modul);
+  if (!gefunden) return { antwort: { status: 404, body: { error: MELDUNGEN.LINK_UNGUELTIG } } };
+  const { link, vorgang } = gefunden;
+  if (vorgang.gesperrtMeldung) return { antwort: { status: 410, body: { error: vorgang.gesperrtMeldung } } };
+  if (link.expiresAt.getTime() < jetzt.getTime()) {
+    return { antwort: { status: 410, body: { error: MELDUNGEN.LINK_ABGELAUFEN } } };
+  }
+  if (vorgang.readOnly) {
+    return { antwort: { status: 409, body: { error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN } } };
+  }
+  if (!linkAenderungsLimiter.check(link.id).allowed) {
+    return { antwort: { status: 429, body: { error: MELDUNGEN.ZU_VIELE_ANFRAGEN } } };
+  }
+  return { gefunden };
+}
+
+/** Endstatus, den ein Onboarding-Vorgang inzwischen hat (die Sperre traf ihn nicht). */
+type OnboardingBeendet = "EXPIRED" | "COMPLETED";
+
+/**
+ * Nur Onboarding (E-A19): sperrt den Vorgang bis zum Commit, bedingt auf
+ * „laufend“ — erster Schritt jedes Link-Wegs, Reihenfolge Vorgang → Links →
+ * Aufgaben → Ausgaben wie Karte und Nachholen (G24). `null` = gesperrt; sonst
+ * der Endstatus, den der Vorgang inzwischen hat (dann wird nichts geschrieben).
+ */
+async function onboardingLaufendSperrenIn(
+  tx: Prisma.TransactionClient,
+  vorgangId: string,
+  jetzt: Date,
+): Promise<OnboardingBeendet | null> {
+  const gesperrt = await tx.onboardingProcess.updateMany({
+    where: { id: vorgangId, status: { notIn: [...ONBOARDING_ENDSTATUS] } },
+    data: { updatedAt: jetzt },
+  });
+  if (gesperrt.count > 0) return null;
+  const stand = await tx.onboardingProcess.findUnique({ where: { id: vorgangId }, select: { status: true } });
+  return stand?.status === "EXPIRED" ? "EXPIRED" : "COMPLETED";
+}
+
+/** Inzwischen beendet: dieselben Antworten wie die Pruefung vor der Transaktion (410 bzw. 409). */
+function beendetAntwort(beendet: OnboardingBeendet): DienstAntwort {
+  return beendet === "EXPIRED"
+    ? { status: 410, body: { error: MELDUNGEN.VORGANG_NICHT_MEHR_AKTIV } }
+    : { status: 409, body: { error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN } };
+}
+
+// =============================================
 // Oeffentliche Seite: abhaken / kommentieren
 // =============================================
 
@@ -843,20 +971,10 @@ async function oeffentlichAendern(
   rohBody: unknown,
   jetzt: Date,
 ): Promise<DienstAntwort> {
-  const gefunden = await linkZumToken(token, modul);
-  if (!gefunden) return { status: 404, body: { error: MELDUNGEN.LINK_UNGUELTIG } };
-  const { link, vorgang } = gefunden;
+  const geprueft = await linkFuerAenderung(modul, token, jetzt);
+  if ("antwort" in geprueft) return geprueft.antwort;
+  const { link, vorgang } = geprueft.gefunden;
   const bereich = vorgang.bereich;
-  if (vorgang.gesperrtMeldung) return { status: 410, body: { error: vorgang.gesperrtMeldung } };
-  if (link.expiresAt.getTime() < jetzt.getTime()) {
-    return { status: 410, body: { error: MELDUNGEN.LINK_ABGELAUFEN } };
-  }
-  if (vorgang.readOnly) {
-    return { status: 409, body: { error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN } };
-  }
-  if (!linkAenderungsLimiter.check(link.id).allowed) {
-    return { status: 429, body: { error: MELDUNGEN.ZU_VIELE_ANFRAGEN } };
-  }
 
   const parsed = aufgabeLinkPatchSchema.safeParse(rohBody);
   if (!parsed.success) {
@@ -903,18 +1021,8 @@ async function oeffentlichAendern(
     //    stuende ohne Rueckfrage mit offener Aufgabe auf COMPLETED — die die
     //    Stelle dann nicht mehr abhaken koennte (Link nur lesbar).
     if (bereich.modul === "ONBOARDING") {
-      const gesperrt = await tx.onboardingProcess.updateMany({
-        where: { id: bereich.vorgangId, status: { notIn: [...ONBOARDING_ENDSTATUS] } },
-        data: { updatedAt: jetzt },
-      });
-      if (gesperrt.count === 0) {
-        const stand = await tx.onboardingProcess.findUnique({
-          where: { id: bereich.vorgangId },
-          select: { status: true },
-        });
-        const beendet = stand?.status === "EXPIRED" ? ("EXPIRED" as const) : ("COMPLETED" as const);
-        return { ...nichts, fremd: false, entfallen: false, beendet };
-      }
+      const beendet = await onboardingLaufendSperrenIn(tx, bereich.vorgangId, jetzt);
+      if (beendet) return { ...nichts, fremd: false, entfallen: false, beendet };
     }
 
     // 1. Sperren (Link-Zeile), 2. Aufgabe aendern, 3. Status neu berechnen.
@@ -983,11 +1091,17 @@ async function oeffentlichAendern(
         },
       });
     }
-    return { umgeschaltet, uebergaenge, fremd: false, entfallen: false, kommentarGeaendert, beendet: null };
+    return {
+      umgeschaltet,
+      uebergaenge,
+      fremd: false,
+      entfallen: false,
+      kommentarGeaendert,
+      beendet: null as OnboardingBeendet | null,
+    };
   });
   // Inzwischen beendet (nur Onboarding): dieselben Antworten wie vor der Transaktion.
-  if (beendet === "EXPIRED") return { status: 410, body: { error: MELDUNGEN.VORGANG_NICHT_MEHR_AKTIV } };
-  if (beendet) return { status: 409, body: { error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN } };
+  if (beendet) return beendetAntwort(beendet);
   if (fremd) return { status: 404, body: { error: MELDUNGEN.AUFGABE_NICHT_GEFUNDEN } };
   if (entfallen) {
     return { status: 409, body: { error: MELDUNGEN.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" satisfies Grund } };
@@ -1094,6 +1208,231 @@ export async function oeffentlicheOnboardingAufgabeAendern(
   jetzt: Date = new Date(),
 ): Promise<DienstAntwort> {
   return oeffentlichAendern("ONBOARDING", token, itemId, rohBody, jetzt);
+}
+
+// =============================================
+// Oeffentliche Seite: Uebergabe vermerken (Onboarding, Stufe 2 – A4, G6)
+// =============================================
+
+/** Eine Abweisung IN der Transaktion: wirft (vor jedem Schreiben), die Antwort geht unveraendert hinaus. */
+class LinkAbgewiesen extends Error {
+  constructor(readonly antwort: DienstAntwort) {
+    super(String(antwort.body.error ?? "abgewiesen"));
+    this.name = "LinkAbgewiesen";
+  }
+}
+
+function linkAbweisen(antwort: DienstAntwort): never {
+  throw new LinkAbgewiesen(antwort);
+}
+
+/**
+ * Ziel eines Vermerks ueber den Link: eine Ausstattungsaufgabe DIESES
+ * Vorgangs und DIESER Stelle, deren Zeile ebenfalls der Stelle gehoert (sonst
+ * 404 wie eine fremde Aufgabe – dieselbe Regel wie `linkAusgabeBauen`), mit
+ * Uebergabe und nicht entfallen (`vermerkZielGrund`, sonst 409). Vor der
+ * Transaktion als Vorpruefung und NACH der Sperre des Vorgangs noch einmal:
+ * Streicht HR die Aufgabe oder wechselt die Stelle, sperrt die Karte zuerst
+ * denselben Vorgang.
+ */
+async function linkVermerkZiel(
+  db: Prisma.TransactionClient,
+  vorgangId: string,
+  itemId: string,
+  departmentKey: string,
+): Promise<{ antwort: DienstAntwort } | { ziel: VermerkZiel }> {
+  const ziel = await vermerkZielLadenIn(db, vorgangId, itemId);
+  if (!ziel || ziel.aufgabe.assignee !== departmentKey || (ziel.zeile && ziel.zeile.departmentKey !== departmentKey)) {
+    return { antwort: { status: 404, body: { error: MELDUNGEN.AUFGABE_NICHT_GEFUNDEN } } };
+  }
+  const grund = vermerkZielGrund(ziel);
+  if (grund) return { antwort: { status: 409, body: { error: MELDUNGEN_AUSGABEN[grund], grund } } };
+  return { ziel };
+}
+
+/** Frischer Stand der Aufgabe nach dem Commit: ihr Feld `ausgabe` wie beim GET (oder null). */
+async function linkAusgabeFrisch(departmentKey: string, vorgangId: string, itemId: string): Promise<LinkAusgabe | null> {
+  const aufgaben = await aufgabenDerAbteilung({ modul: "ONBOARDING", vorgangId }, departmentKey);
+  return aufgaben.find((a) => a.id === itemId)?.ausgabe ?? null;
+}
+
+/**
+ * POST /api/onboarding-tasks/[token]/[itemId]/ausgaben — die Stelle vermerkt
+ * ueber ihren Link eine Uebergabe (bei einem Zugang die Einrichtung), getrennt
+ * vom Abhaken (E-A30, G6). Body `vermerkSchema`: `{ stuecke: [{ kennung?,
+ * uebergebenAm? }] }`, 1 bis 10 Stueck; ohne Datum gilt der heutige Berliner
+ * Tag. `rohBody` = geparstes JSON, kaputtes JSON gibt die Route als
+ * `undefined` weiter (→ 400). Reihenfolge der Antworten:
+ *
+ *   404 { error: "Ungültiger Link" }                     unbekannt oder Offboarding-Token
+ *   410 { error: "Dieser Vorgang ist nicht mehr aktiv. …" } EXPIRED
+ *   410 { error: "Dieser Link ist abgelaufen." }
+ *   409 { error: "Dieser Vorgang ist abgeschlossen. …" }  COMPLETED (danach traegt HR nach, G7)
+ *   429 { error: "Zu viele Anfragen. …" }                je Link
+ *   400 { error }                                         Schema
+ *   404 { error: "Aufgabe nicht gefunden" }              fremde Aufgabe, andere Stelle
+ *   409 { error, grund: "KEINE_AUSGABE" | "AUFGABE_ENTFAELLT" }
+ *   400 { error }                                         Datum, Grenze aktiver Stuecke (`vermerkPruefen`)
+ *   201 { data: { ausgabe } }                             frischer Stand der Aufgabe
+ *
+ * Transaktion (Feinplan 1.7): Vorgang bedingt auf „laufend“ sperren (sonst
+ * 410/409 wie oben, nichts geschrieben) → Aufgabe und Zeile erneut lesen →
+ * aktive Stuecke zaehlen, `vermerkPruefen` → `ausgabenAnlegenIn` (Einrichtung
+ * = Arbeitsort, sonst Einrichtung des Vorgangs; `zentral` = Katalogposition
+ * ohne Einrichtung; `quelle` LINK, ohne Person) – der Schreiber setzt die
+ * Loeschmerker von Einstellung und Aufgabe zurueck – → AuditLog
+ * `AUSGABE_VERMERKT` (ohne Kennung, nur `mitKennung`). KEINE Mail: Ein Vermerk
+ * allein meldet HR nichts (G9); er steht in der naechsten Erledigt-Meldung.
+ */
+export async function oeffentlicheAusgabeVermerken(
+  token: string,
+  itemId: string,
+  rohBody: unknown,
+  jetzt: Date = new Date(),
+): Promise<DienstAntwort> {
+  const geprueft = await linkFuerAenderung("ONBOARDING", token, jetzt);
+  if ("antwort" in geprueft) return geprueft.antwort;
+  const { link, vorgang } = geprueft.gefunden;
+  const vorgangId = vorgang.bereich.vorgangId;
+  const departmentKey = link.departmentKey;
+
+  const parsed = vermerkSchema.safeParse(rohBody);
+  if (!parsed.success) {
+    return { status: 400, body: { error: parsed.error.errors[0]?.message ?? MELDUNGEN.UNGUELTIGE_EINGABE } };
+  }
+
+  const vorab = await linkVermerkZiel(prisma, vorgangId, itemId, departmentKey);
+  if ("antwort" in vorab) return vorab.antwort;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const beendet = await onboardingLaufendSperrenIn(tx, vorgangId, jetzt);
+      if (beendet) linkAbweisen(beendetAntwort(beendet));
+      const geprueftIn = await linkVermerkZiel(tx, vorgangId, itemId, departmentKey);
+      if ("antwort" in geprueftIn) linkAbweisen(geprueftIn.antwort);
+      const { ziel } = geprueftIn;
+
+      const stand = await tx.onboardingProcess.findUnique({
+        where: { id: vorgangId },
+        select: { organizationId: true, arbeitsortId: true, createdAt: true },
+      });
+      if (!stand) linkAbweisen({ status: 404, body: { error: MELDUNGEN.LINK_UNGUELTIG } });
+      const heute = berlinerKalendertag(jetzt);
+      const aktiv = await aktiveAusgabenZaehlen(tx, ziel.aufgabe.id);
+      const grund = vermerkPruefen(parsed.data, { heute, vorgangAngelegt: stand.createdAt, aktiv });
+      if (grund) linkAbweisen({ status: 400, body: { error: MELDUNGEN_AUSGABEN[grund] } });
+
+      const basis = ausgabeBasis(ziel, {
+        vorgang: { id: vorgangId, organizationId: stand.organizationId, arbeitsortId: stand.arbeitsortId },
+        quelle: "LINK",
+        erfasstVonId: null,
+      });
+      const stuecke = vermerkStuecke(parsed.data.stuecke, heute);
+      const ids = await ausgabenAnlegenIn(tx, basis, stuecke, jetzt);
+      await tx.auditLog.create({
+        data: {
+          userId: null,
+          onboardingId: vorgangId,
+          processType: "ONBOARDING",
+          action: AUSGABEN_AUDIT.AUSGABE_VERMERKT,
+          // Nie die Kennung – nur, ob eine angegeben wurde (G22).
+          details: {
+            checklistItemId: ziel.aufgabe.id,
+            departmentKey: basis.departmentKey,
+            anzahl: ids.length,
+            mitKennung: stuecke.some((s) => s.kennung !== null),
+            ueber: "LINK",
+            linkId: link.id,
+            ausgabeIds: ids,
+          },
+        },
+      });
+    });
+  } catch (err) {
+    if (err instanceof LinkAbgewiesen) return err.antwort;
+    throw err;
+  }
+
+  return { status: 201, body: { data: { ausgabe: await linkAusgabeFrisch(departmentKey, vorgangId, itemId) } } };
+}
+
+/**
+ * DELETE /api/onboarding-tasks/[token]/[itemId]/ausgaben/[ausgabeId] — die
+ * Stelle entfernt einen irrtuemlichen EIGENEN Vermerk (G6). Dieselben
+ * Pruefungen wie beim Vermerken (ohne Body), dazu:
+ *
+ *   404 { error: "Ausgabe nicht gefunden" }   unbekannt, andere Aufgabe, andere Stelle, anderer Vorgang
+ *   409 { error, grund: "ENTFERNEN_NICHT_MOEGLICH" }
+ *        von HR vermerkt (`quelle` ≠ LINK), nicht mehr AUSGEGEBEN oder an einen
+ *        Austritt gebunden (G28) – das aendert nur HR bzw. der Austritt
+ *   200 { data: { ausgabe } }                  frischer Stand der Aufgabe
+ *
+ * Transaktion: Vorgang sperren → Aufgabe erneut pruefen → Ausgabe sperren
+ * (`ausgabenSperrenIn`, G24) und NACH der Sperre frisch lesen samt
+ * Austrittsbezug → bedingt loeschen (`ausgabeEntfernenIn` mit `nurQuelle`
+ * LINK) → AuditLog `AUSGABE_ENTFERNT`. Keine Mail.
+ */
+export async function oeffentlicheAusgabeEntfernen(
+  token: string,
+  itemId: string,
+  ausgabeId: string,
+  jetzt: Date = new Date(),
+): Promise<DienstAntwort> {
+  const geprueft = await linkFuerAenderung("ONBOARDING", token, jetzt);
+  if ("antwort" in geprueft) return geprueft.antwort;
+  const { link, vorgang } = geprueft.gefunden;
+  const vorgangId = vorgang.bereich.vorgangId;
+  const departmentKey = link.departmentKey;
+
+  const nichtGefunden: DienstAntwort = { status: 404, body: { error: MELDUNGEN_AUSGABEN.AUSGABE_NICHT_GEFUNDEN } };
+  const eigene = (a: { checklistItemId: string | null; departmentKey: string } | null) =>
+    !!a && a.checklistItemId === itemId && a.departmentKey === departmentKey;
+
+  const vorab = await linkVermerkZiel(prisma, vorgangId, itemId, departmentKey);
+  if ("antwort" in vorab) return vorab.antwort;
+  if (!eigene(await ausgabeLaden(prisma, vorgangId, ausgabeId))) return nichtGefunden;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const beendet = await onboardingLaufendSperrenIn(tx, vorgangId, jetzt);
+      if (beendet) linkAbweisen(beendetAntwort(beendet));
+      const geprueftIn = await linkVermerkZiel(tx, vorgangId, itemId, departmentKey);
+      if ("antwort" in geprueftIn) linkAbweisen(geprueftIn.antwort);
+
+      await ausgabenSperrenIn(tx, [ausgabeId], jetzt);
+      const a = await ausgabeLaden(tx, vorgangId, ausgabeId);
+      if (!a || !eigene(a)) linkAbweisen(nichtGefunden);
+      const bezuege = await austrittsBezuegeLaden(tx, [a.id]);
+      const gebunden = bindenderAustritt(a, bezuege.get(a.id) ?? []) !== null;
+      const nichtMoeglich: DienstAntwort = {
+        status: 409,
+        body: { error: MELDUNGEN_AUSGABEN.ENTFERNEN_NICHT_MOEGLICH, grund: "ENTFERNEN_NICHT_MOEGLICH" },
+      };
+      if (!perLinkEntfernbar(a, gebunden)) linkAbweisen(nichtMoeglich);
+      if (!(await ausgabeEntfernenIn(tx, a.id, { nurQuelle: "LINK" }))) linkAbweisen(nichtMoeglich);
+
+      await tx.auditLog.create({
+        data: {
+          userId: null,
+          onboardingId: vorgangId,
+          processType: "ONBOARDING",
+          action: AUSGABEN_AUDIT.AUSGABE_ENTFERNT,
+          details: {
+            ausgabeId: a.id,
+            ueber: "LINK",
+            checklistItemId: itemId,
+            departmentKey,
+            linkId: link.id,
+          },
+        },
+      });
+    });
+  } catch (err) {
+    if (err instanceof LinkAbgewiesen) return err.antwort;
+    throw err;
+  }
+
+  return { status: 200, body: { data: { ausgabe: await linkAusgabeFrisch(departmentKey, vorgangId, itemId) } } };
 }
 
 // =============================================

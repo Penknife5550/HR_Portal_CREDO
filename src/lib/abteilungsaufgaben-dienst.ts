@@ -34,7 +34,9 @@
  * und Aktion ganz. Ebenso nur im Onboarding: die Absage nach EXPIRED (E-A20,
  * `absage`) — eine Mail ohne Link an jede informierte Stelle (an die Adresse,
  * die informiert wurde, F16: `absageEmpfaenger`) mit ihren erledigten
- * Aufgaben (F17), einmal je Stelle (`abgesagtAm`, F13, nur bei SENT).
+ * Aufgaben (F17) und — seit A4 (G10) — den Stuecken, die sie laut Portal
+ * noch ausgegeben hat (`VersandModul.absageAusgabenLaden`), einmal je Stelle
+ * (`abgesagtAm`, F13, nur bei SENT).
  *
  * Ablauf eines Versands je Abteilung (Nachweis nur nach echtem Versand):
  *   1. Link anlegen bzw. anpassen (Token nur beim Anlegen oder bei
@@ -135,6 +137,7 @@ import {
   linksSperren,
   type LinkBereich,
 } from "@/lib/abteilungsaufgaben-uebergaenge";
+import { ausgabenListeMailFelder, type MailStueck } from "@/lib/ausgaben";
 
 // =============================================
 // Konstanten
@@ -472,7 +475,19 @@ export interface VersandModul extends LinkBereich {
    * Zuweisungsmail die offenen Eintraege ihrer Stelle mit (F7).
    */
   nachtraegeLaden?: () => Promise<ReadonlyMap<string, OffeneAenderungen>>;
+  /**
+   * Nur Onboarding (Ausstattung & Zugaenge, Stufe 2 – A4, G10): laedt die noch
+   * ausgegebenen Stuecke (AUSGEGEBEN, VERBLEIBT) je ausgebender Stelle
+   * (`aktiveAusgabenJeStelleLaden`) fuer die Absage-Mail. Gelesen nur von der
+   * Aktion `absage` und nur, wenn eine Stelle noch eine Absage bekommt. Die
+   * Felder `ausgaben_liste*`/`hat_ausgaben` stehen in der Absage immer (ohne
+   * Stueck bzw. ohne Lader ""); die Absage gibt es nur im Onboarding.
+   */
+  absageAusgabenLaden?: () => Promise<ReadonlyMap<string, ReadonlyArray<AbsageStueck>>>;
 }
+
+/** Ein Stueck der Absage-Liste (`ausgabenListeMailFelder`). */
+export type AbsageStueck = MailStueck & { bezeichnung: string };
 
 function offboardingVersandModul(vorgang: VorgangFuerVersand): VersandModul {
   return {
@@ -1206,12 +1221,21 @@ async function nachtrag(ctx: VersandKontext, key: string, userId: string): Promi
  * OHNE Link-Felder (`link`, `magicLink`, `token`, `expiresAt`): Der Vorgang
  * ist abgelaufen, der Link antwortet ohnehin 410 — und eine Absage braucht
  * keinen Zugang.
+ *
+ * Seit A4 (G10) dazu die noch ausgegebenen Stuecke DIESER Stelle
+ * (`ausgaben_liste` roh fuer den Textteil, `ausgaben_liste_html` maskiert,
+ * Merker `hat_ausgaben` "ja"/"") samt Kennung — damit die Stelle weiss, was
+ * zurueckzunehmen bzw. zu sperren ist. Neue Aufgaben gibt es dafuer nicht:
+ * Der Link antwortet 410, die Ruecknahme vermerkt HR in der Karte. Das
+ * Ereignis ist webhookfrei (EVENTS_OHNE_WEBHOOK), die Listen stehen nie im
+ * Betreff (`betreffOhne`).
  */
 function absagePayload(
   ctx: VersandKontext,
   link: OffboardingDepartmentLink,
   erledigte: ReadonlyArray<AufgabeFuerVersand>,
   email: string,
+  ausgaben: ReadonlyArray<AbsageStueck>,
 ): Record<string, unknown> {
   return {
     ...ctx.modul.mailFelder,
@@ -1220,6 +1244,7 @@ function absagePayload(
     abteilung: link.departmentName,
     email,
     ...erledigteListeMailFelder(erledigte),
+    ...ausgabenListeMailFelder(ausgaben),
     ist_fuehrungskraft: istFuehrungskraft(link.departmentKey) ? "ja" : "",
   };
 }
@@ -1236,7 +1261,10 @@ function absagePayload(
  *     bekam. Nie die heute in Einstellungen → Abteilungen aufgeloeste. Bericht
  *     und Protokoll nennen dieselbe Adresse.
  *   - Die Mail nennt alle erledigten, nicht entfallenen Aufgaben der Stelle,
- *     aus der Vorlage wie aus der Ausstattung (F17) — zum Zurueckbauen.
+ *     aus der Vorlage wie aus der Ausstattung (F17) — zum Zurueckbauen —,
+ *     seit A4 (G10) dazu die noch ausgegebenen Stuecke der Stelle samt
+ *     Kennung (`VersandModul.absageAusgabenLaden`, EINE Abfrage, nur wenn
+ *     eine Stelle noch eine Absage bekommt).
  *   - `abgesagtAm` NUR bei SENT (`ergebnisSpeichern`: scheitert die Datenbank
  *     danach, Warnung statt 500). FAILED und SKIPPED lassen einen neuen Versuch
  *     zu; eine WEBHOOK-Zustellung gibt es nicht (EVENTS_OHNE_WEBHOOK).
@@ -1258,6 +1286,12 @@ async function absage(ctx: VersandKontext, userId: string): Promise<VersandBeric
   };
   const erledigtJeStelle = new Map<string, number>();
   let versucht = false;
+  // A4 (G10): die noch ausgegebenen Stuecke je Stelle — nur, wenn noch eine
+  // Stelle eine Absage bekommt (der zweite Klick fragt nichts ab).
+  const ausgabenJeStelle =
+    ctx.modul.absageAusgabenLaden && informiert.some(absageOffen)
+      ? await ctx.modul.absageAusgabenLaden()
+      : new Map<string, ReadonlyArray<AbsageStueck>>();
 
   for (const link of informiert.sort((a, b) => rang(a.departmentKey) - rang(b.departmentKey))) {
     const key = link.departmentKey;
@@ -1268,7 +1302,10 @@ async function absage(ctx: VersandKontext, userId: string): Promise<VersandBeric
     }
     const erledigte = aufgabenVon(ctx, key).filter((a) => a.isCompleted && a.entfaellt !== true);
     erledigtJeStelle.set(key, erledigte.length);
-    const ergebnis = await triggerWebhooks(event, absagePayload(ctx, link, erledigte, empfaenger));
+    const ergebnis = await triggerWebhooks(
+      event,
+      absagePayload(ctx, link, erledigte, empfaenger, ausgabenJeStelle.get(key) ?? []),
+    );
     // Kein Webhook kann zustellen (EVENTS_OHNE_WEBHOOK): SKIPPED bleibt SKIPPED.
     const v = versandStatusAusErgebnis(ergebnis, false);
     versucht = true;

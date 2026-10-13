@@ -19,6 +19,19 @@
  * kann sie fuer das reine Durchreichen ersetzen, die uebrigen laufen durch den
  * echten Dienst gegen die In-Memory-Datenbank
  * (src/__tests__/hilfen/abteilungs-fake-db.ts).
+ *
+ * Stufe 2 (Feinplan A4, S25, G6): „Übergabe vermerken“ ueber den Link
+ *
+ *   POST   /api/onboarding-tasks/[token]/[itemId]/ausgaben
+ *   DELETE /api/onboarding-tasks/[token]/[itemId]/ausgaben/[ausgabeId]
+ *
+ * und das Feld `ausgabe` auf der Link-Seite: nur an Ausstattungsaufgaben mit
+ * Uebergabe der eigenen Stelle (sonst fehlt der Schluessel ganz), die Kennung
+ * nie fuer eine fremde Stelle, Entfernen nur eigener, freier Link-Vermerke.
+ * Die Bindung an einen Austritt (G28) liest die Link-Seite selbst: Eine
+ * Offboarding-Aufgabe mit `ausgabeId` in `db.aufgaben` ergibt den Bezug,
+ * Rueckgabe-Zeilen kennt der Fake erst ab S29 (`returnItem.findMany` haengt
+ * diese Datei an, immer leer).
  */
 
 type MailErgebnis = { status: "SENT" | "FAILED" | "SKIPPED"; detail?: string; recipient?: string } | null;
@@ -42,6 +55,8 @@ jest.mock("@/lib/abteilungsaufgaben-uebergaenge", () => {
     ...echt,
     oeffentlicheOnboardingAufgabenLaden: jest.fn(echt.oeffentlicheOnboardingAufgabenLaden),
     oeffentlicheOnboardingAufgabeAendern: jest.fn(echt.oeffentlicheOnboardingAufgabeAendern),
+    oeffentlicheAusgabeVermerken: jest.fn(echt.oeffentlicheAusgabeVermerken),
+    oeffentlicheAusgabeEntfernen: jest.fn(echt.oeffentlicheAusgabeEntfernen),
   };
 });
 
@@ -51,6 +66,7 @@ import {
   dbLeeren,
   fakePrisma,
   naechsteId,
+  neueAusgabe,
   neueAusstattungsZeile,
   neuerLink,
   neuerStellenHinweis,
@@ -58,20 +74,30 @@ import {
 } from "../hilfen/abteilungs-fake-db";
 import { GET as aufgabenLaden } from "@/app/api/onboarding-tasks/[token]/route";
 import { PATCH as aufgabeAendern } from "@/app/api/onboarding-tasks/[token]/[itemId]/route";
+import { POST as ausgabeVermerken } from "@/app/api/onboarding-tasks/[token]/[itemId]/ausgaben/route";
+import { DELETE as ausgabeEntfernen } from "@/app/api/onboarding-tasks/[token]/[itemId]/ausgaben/[ausgabeId]/route";
 import {
+  oeffentlicheAusgabeEntfernen,
+  oeffentlicheAusgabeVermerken,
   oeffentlicheOnboardingAufgabeAendern,
   oeffentlicheOnboardingAufgabenLaden,
 } from "@/lib/abteilungsaufgaben-uebergaenge";
 import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { AUSGABE_GRENZEN, AUSGABEN_AUDIT, MELDUNGEN_AUSGABEN } from "@/lib/ausgaben";
+import { heuteInBerlin, tageSpaeter } from "@/lib/kalendertag";
 
 const echtUebergaenge = jest.requireActual<typeof import("@/lib/abteilungsaufgaben-uebergaenge")>(
   "@/lib/abteilungsaufgaben-uebergaenge",
 );
 const mockLaden = oeffentlicheOnboardingAufgabenLaden as jest.Mock;
 const mockAendern = oeffentlicheOnboardingAufgabeAendern as jest.Mock;
+const mockVermerken = oeffentlicheAusgabeVermerken as jest.Mock;
+const mockEntfernen = oeffentlicheAusgabeEntfernen as jest.Mock;
 
 type FakeTabelle = Record<string, jest.Mock>;
 const fp = fakePrisma as unknown as Record<string, FakeTabelle>;
+// Rueckgabe-Zeilen mit `ausgabeId` kennt der Fake erst ab S29 – hier immer leer.
+fp.returnItem = { findMany: jest.fn(async () => []) };
 
 // =============================================
 // Testdaten
@@ -211,6 +237,10 @@ beforeEach(() => {
   mockLaden.mockImplementation(echtUebergaenge.oeffentlicheOnboardingAufgabenLaden);
   mockAendern.mockReset();
   mockAendern.mockImplementation(echtUebergaenge.oeffentlicheOnboardingAufgabeAendern);
+  mockVermerken.mockReset();
+  mockVermerken.mockImplementation(echtUebergaenge.oeffentlicheAusgabeVermerken);
+  mockEntfernen.mockReset();
+  mockEntfernen.mockImplementation(echtUebergaenge.oeffentlicheAusgabeEntfernen);
 });
 
 afterAll(() => {
@@ -796,6 +826,544 @@ describe("PATCH /api/onboarding-tasks/[token]/[itemId]", () => {
           expect.objectContaining({ where: { id: itemId, isCompleted: false, entfaelltAm: null } }),
         );
       });
+    });
+  });
+});
+
+// =============================================
+// Stufe 2 (A4, S25): Übergabe vermerken über den Link der Stelle (G6)
+// =============================================
+
+describe("Übergabe vermerken über den Link (A4, G6)", () => {
+  const GESTERN = tageSpaeter(heuteInBerlin(), -1);
+  const KENNUNG = "FES-IPAD-0412";
+  const GELOESCHT = new Date("2026-01-02T03:00:00.000Z");
+
+  const vermerken = (token: string, itemId: string, opts: Parameters<typeof anfrage>[2] = {}) =>
+    ausgabeVermerken(
+      anfrage(`${BASIS}/api/onboarding-tasks/${token}/${itemId}/ausgaben`, "POST", { ip: neueIp(), ...opts }),
+      { params: Promise.resolve({ token, itemId }) },
+    );
+  const entfernen = (token: string, itemId: string, ausgabeId: string, ip = neueIp()) =>
+    ausgabeEntfernen(
+      anfrage(`${BASIS}/api/onboarding-tasks/${token}/${itemId}/ausgaben/${ausgabeId}`, "DELETE", { ip }),
+      { params: Promise.resolve({ token, itemId, ausgabeId }) },
+    );
+  const laden = async (token: string) =>
+    (
+      await (
+        await aufgabenLaden(anfrage(`${BASIS}/api/onboarding-tasks/${token}`, "GET", { ip: neueIp() }), {
+          params: Promise.resolve({ token }),
+        })
+      ).json()
+    ).data;
+
+  /** Eine Ausgabe der Stelle IT am iPad (Standard: eigener Link-Vermerk, noch ausgegeben). */
+  function ausgabe(teil: Zeile = {}): Zeile {
+    return neueAusgabe({
+      onboardingId: "onb-1",
+      checklistItemId: "i-ipad",
+      organizationId: "org-1",
+      departmentKey: "IT",
+      bezeichnung: "Dienst-iPad (Lernmittel)",
+      kennungLabel: "Inventarnummer",
+      kennung: KENNUNG,
+      rueckgabeKategorie: "IT_HARDWARE",
+      beiAustritt: "RUECKGABE",
+      quelle: "LINK",
+      uebergebenAm: new Date(`${GESTERN}T00:00:00.000Z`),
+      ...teil,
+    });
+  }
+
+  /** Ein laufender Austritt, der die Ausgabe `ag-1` ueber eine Ruecknahmeaufgabe bezieht (G28). */
+  function austrittBindet(status = "HANDOVER_PHASE"): void {
+    db.vorgaenge = [{ id: "off-9", status, displayId: "OFF-2027-GYM-009", organizationId: "org-1" }];
+    db.aufgaben = [{ id: "oa-1", offboardingId: "off-9", ausgabeId: "ag-1", herkunft: "AUSGABE" }];
+  }
+
+  /**
+   * Bestand: IT hat ein iPad (Rueckgabe, zentrale Position), einen Zugang
+   * (Sperren), einen Parkplatz (nichts beim Austritt) und einen
+   * Vorlagenpunkt; die Verwaltung einen Schluessel. Merker „gelöscht“ an
+   * Vorgang und iPad-Aufgabe gesetzt (ein neuer Vermerk setzt sie zurueck).
+   */
+  beforeEach(() => {
+    db.onboardingVorgaenge = [
+      vorgang({ createdAt: new Date(Date.now() - 20 * TAG), arbeitsortId: null, ausgabenGeloeschtAm: GELOESCHT }),
+    ];
+    db.links = [
+      link(),
+      link({ departmentKey: "VERWALTUNG", departmentName: "Verwaltung", email: "vw@example.org", token: "tok-vw" }),
+    ];
+    db.ausstattungsPositionen = [
+      { id: "pos-ipad", organizationId: null },
+      { id: "pos-zugang", organizationId: "org-1" },
+    ];
+    const zeile = (teil: Zeile) =>
+      neueAusstattungsZeile({ onboardingId: "onb-1", art: "JA_NEIN", quelle: "FUEHRUNGSKRAFT", ...teil });
+    db.ausstattungZeilen = [
+      zeile({
+        id: "aus-ipad",
+        positionId: "pos-ipad",
+        departmentKey: "IT",
+        bezeichnung: "Dienst-iPad (Lernmittel)",
+        beiAustritt: "RUECKGABE",
+        rueckgabeKategorie: "IT_HARDWARE",
+        ausgabeKennung: "Inventarnummer",
+      }),
+      zeile({ id: "aus-zugang", positionId: "pos-zugang", departmentKey: "IT", bezeichnung: "Zugänge", beiAustritt: "SPERREN" }),
+      zeile({ id: "aus-park", departmentKey: "IT", bezeichnung: "Parkplatz", beiAustritt: "NICHTS" }),
+      zeile({
+        id: "aus-schl",
+        departmentKey: "VERWALTUNG",
+        art: "AUSWAHL",
+        bezeichnung: "Schlüssel",
+        auswahl: ["Haupteingang"],
+        beiAustritt: "RUECKGABE",
+        rueckgabeKategorie: "SCHLUESSEL",
+        ausgabeKennung: "Schlüsselnummer",
+      }),
+    ];
+    const ausstattung = (teil: Zeile) =>
+      aufgabe({ category: "Ausstattung & Zugänge", herkunft: "AUSSTATTUNG", ausgabenGeloeschtAm: null, ...teil });
+    db.onboardingAufgaben = [
+      ausstattung({ id: "i-ipad", title: "Dienst-iPad (Lernmittel) bereitstellen", ausgabenGeloeschtAm: GELOESCHT }),
+      ausstattung({ id: "i-zugang", title: "Zugänge bereitstellen" }),
+      ausstattung({ id: "i-park", title: "Parkplatz bereitstellen" }),
+      ausstattung({ id: "i-schl", title: "Schlüssel ausgeben: Haupteingang", assignee: "VERWALTUNG" }),
+      aufgabe({ id: "i-vorlage", title: "Benutzerkonto anlegen", ausgabenGeloeschtAm: null }),
+    ];
+    db.ausstattungAufgaben = [
+      { ausstattungId: "aus-ipad", option: "", checklistItemId: "i-ipad", createdAt: new Date() },
+      { ausstattungId: "aus-zugang", option: "", checklistItemId: "i-zugang", createdAt: new Date() },
+      { ausstattungId: "aus-park", option: "", checklistItemId: "i-park", createdAt: new Date() },
+      { ausstattungId: "aus-schl", option: "Haupteingang", checklistItemId: "i-schl", createdAt: new Date() },
+    ];
+  });
+
+  // ---- Routen: was sie SELBST tun ----
+
+  describe("Routen", () => {
+    it("POST: 429 durch die IP-Bremse VOR dem Dienst (21. Aufruf derselben IP)", async () => {
+      mockVermerken.mockResolvedValue({ status: 404, body: { error: MELDUNGEN.LINK_UNGUELTIG } });
+      const ip = neueIp();
+      for (let i = 0; i < 20; i++) {
+        expect((await vermerken(`geraten-${i}`, "i-1", { ip, body: { stuecke: [{}] } })).status).toBe(404);
+      }
+      const res = await vermerken("geraten-21", "i-1", { ip, body: { stuecke: [{}] } });
+      expect(res.status).toBe(429);
+      expect(await res.json()).toEqual({ error: MELDUNGEN.ZU_VIELE_ANFRAGEN });
+      // Der Dienst — und damit der Token-Lookup — lief beim 21. Aufruf nicht mehr.
+      expect(mockVermerken).toHaveBeenCalledTimes(20);
+    });
+
+    it("DELETE: 429 durch die IP-Bremse VOR dem Dienst", async () => {
+      mockEntfernen.mockResolvedValue({ status: 404, body: { error: MELDUNGEN.LINK_UNGUELTIG } });
+      const ip = neueIp();
+      for (let i = 0; i < 20; i++) expect((await entfernen(`geraten-${i}`, "i-1", "ag-1", ip)).status).toBe(404);
+      expect((await entfernen("geraten-21", "i-1", "ag-1", ip)).status).toBe(429);
+      expect(mockEntfernen).toHaveBeenCalledTimes(20);
+    });
+
+    it("POST: kaputtes JSON → Dienst mit undefined → 400, nichts geschrieben", async () => {
+      const res = await vermerken("tok-it", "i-ipad", { roh: "{kaputt", headers: { "Content-Type": "application/json" } });
+      expect(mockVermerken).toHaveBeenCalledWith("tok-it", "i-ipad", undefined);
+      expect(res.status).toBe(400);
+      expect(db.ausgaben).toEqual([]);
+    });
+
+    it("reichen Status und Body des Dienstes 1:1 weiter; 500 bei einer Ausnahme", async () => {
+      const body = { data: { ausgabe: null } };
+      mockVermerken.mockResolvedValue({ status: 201, body });
+      const res = await vermerken("tok-x", "i-1", { body: { stuecke: [{ kennung: KENNUNG }] } });
+      expect(res.status).toBe(201);
+      expect(await res.json()).toEqual(body);
+      expect(mockVermerken).toHaveBeenCalledWith("tok-x", "i-1", { stuecke: [{ kennung: KENNUNG }] });
+
+      mockEntfernen.mockResolvedValue({ status: 200, body });
+      expect((await entfernen("tok-x", "i-1", "ag-9")).status).toBe(200);
+      expect(mockEntfernen).toHaveBeenCalledWith("tok-x", "i-1", "ag-9");
+
+      const stumm = jest.spyOn(console, "error").mockImplementation(() => {});
+      mockVermerken.mockRejectedValue(new Error("DB weg"));
+      const kaputt = await vermerken("tok-x", "i-1", { body: { stuecke: [{}] } });
+      expect(kaputt.status).toBe(500);
+      expect(await kaputt.json()).toEqual({ error: "Interner Serverfehler" });
+      mockEntfernen.mockRejectedValue(new Error("DB weg"));
+      expect((await entfernen("tok-x", "i-1", "ag-9")).status).toBe(500);
+      stumm.mockRestore();
+    });
+  });
+
+  // ---- Vermerken mit dem echten Dienst ----
+
+  describe("Vermerken", () => {
+    it("201 mit frischem Stand: Quelle LINK ohne Person, zentrale Position, Protokoll ohne Kennung, keine Mail", async () => {
+      const res = await vermerken("tok-it", "i-ipad", {
+        body: { stuecke: [{ kennung: `  ${KENNUNG}  `, uebergebenAm: GESTERN }, {}] },
+      });
+      expect(res.status).toBe(201);
+      const { data } = await res.json();
+      expect(data.ausgabe).toEqual({
+        moeglich: true,
+        kennungLabel: "Inventarnummer",
+        art: "RUECKGABE",
+        stuecke: [
+          { id: expect.any(String), kennung: KENNUNG, uebergebenAm: GESTERN, entfernbar: true },
+          { id: expect.any(String), kennung: null, uebergebenAm: heuteInBerlin(), entfernbar: true },
+        ],
+      });
+
+      expect(db.ausgaben).toHaveLength(2);
+      for (const a of db.ausgaben) {
+        expect(a).toMatchObject({
+          onboardingId: "onb-1",
+          checklistItemId: "i-ipad",
+          organizationId: "org-1",
+          zentral: true,
+          departmentKey: "IT",
+          bezeichnung: "Dienst-iPad (Lernmittel)",
+          kennungLabel: "Inventarnummer",
+          rueckgabeKategorie: "IT_HARDWARE",
+          beiAustritt: "RUECKGABE",
+          quelle: "LINK",
+          erfasstVonId: null,
+          zustand: "AUSGEGEBEN",
+          loeschenAb: null,
+        });
+      }
+      // Getrennt vom Abhaken (E-A30): die Aufgabe bleibt offen.
+      expect(db.onboardingAufgaben.find((a) => a.id === "i-ipad")?.isCompleted).toBe(false);
+      // Ein neuer Vermerk hebt „Ausgaben … gelöscht“ auf (1.11).
+      expect(db.onboardingVorgaenge[0].ausgabenGeloeschtAm).toBeNull();
+      expect(db.onboardingAufgaben.find((a) => a.id === "i-ipad")?.ausgabenGeloeschtAm).toBeNull();
+
+      expect(db.audits).toEqual([
+        expect.objectContaining({
+          userId: null,
+          onboardingId: "onb-1",
+          processType: "ONBOARDING",
+          action: AUSGABEN_AUDIT.AUSGABE_VERMERKT,
+          details: expect.objectContaining({
+            checklistItemId: "i-ipad",
+            departmentKey: "IT",
+            anzahl: 2,
+            mitKennung: true,
+            ueber: "LINK",
+            linkId: db.links[0].id,
+          }),
+        }),
+      ]);
+      expect(JSON.stringify(db.audits)).not.toContain(KENNUNG);
+      // Ein Vermerk allein meldet HR nichts (G9).
+      expect(mockTrigger).not.toHaveBeenCalled();
+    });
+
+    it("die Einrichtung der Ausgabe ist der Arbeitsort, sonst die Einrichtung (G2); ein Zugang wird genauso vermerkt", async () => {
+      db.onboardingVorgaenge = [vorgang({ arbeitsortId: "org-foev", arbeitsort: { name: "Förderverein" } })];
+      const res = await vermerken("tok-it", "i-zugang", { body: { stuecke: [{}] } });
+      expect(res.status).toBe(201);
+      expect((await res.json()).data.ausgabe).toMatchObject({ art: "SPERREN", kennungLabel: "Kennung" });
+      expect(db.ausgaben[0]).toMatchObject({
+        organizationId: "org-foev",
+        zentral: false,
+        beiAustritt: "SPERREN",
+        rueckgabeKategorie: null,
+        kennung: null,
+      });
+      expect(db.audits[0]).toMatchObject({ details: expect.objectContaining({ mitKennung: false }) });
+    });
+
+    it.each([
+      ["„nichts“ beim Austritt", "i-park"],
+      ["ein Vorlagenpunkt", "i-vorlage"],
+    ])("409 KEINE_AUSGABE: %s — nichts geschrieben", async (_fall, itemId) => {
+      const res = await vermerken("tok-it", itemId, { body: { stuecke: [{ kennung: KENNUNG }] } });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: MELDUNGEN_AUSGABEN.KEINE_AUSGABE, grund: "KEINE_AUSGABE" });
+      expect(db.ausgaben).toEqual([]);
+      expect(db.audits).toEqual([]);
+    });
+
+    it("409 AUFGABE_ENTFAELLT an einer entfallenen Aufgabe", async () => {
+      Object.assign(db.onboardingAufgaben.find((a) => a.id === "i-ipad")!, {
+        isCompleted: true,
+        completedAt: new Date(),
+        entfaelltAm: new Date(),
+      });
+      const res = await vermerken("tok-it", "i-ipad", { body: { stuecke: [{}] } });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: MELDUNGEN_AUSGABEN.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" });
+      expect(db.ausgaben).toEqual([]);
+    });
+
+    it("404 für die Aufgabe einer anderen Stelle, eine unbekannte Aufgabe und eine Zeile einer anderen Stelle", async () => {
+      for (const itemId of ["i-schl", "gibt-es-nicht"]) {
+        const res = await vermerken("tok-it", itemId, { body: { stuecke: [{}] } });
+        expect({ itemId, status: res.status }).toEqual({ itemId, status: 404 });
+        expect(await res.json()).toEqual({ error: MELDUNGEN.AUFGABE_NICHT_GEFUNDEN });
+      }
+      // Gehoert die Zeile inzwischen einer anderen Stelle (Stellenwechsel), ebenso.
+      db.ausstattungZeilen.find((z) => z.id === "aus-ipad")!.departmentKey = "VERWALTUNG";
+      expect((await vermerken("tok-it", "i-ipad", { body: { stuecke: [{}] } })).status).toBe(404);
+      expect(db.ausgaben).toEqual([]);
+    });
+
+    it("410 bei EXPIRED und abgelaufenem Link, 409 bei COMPLETED — nichts geschrieben", async () => {
+      db.onboardingVorgaenge = [vorgang({ status: "EXPIRED" })];
+      const abgesagt = await vermerken("tok-it", "i-ipad", { body: { stuecke: [{}] } });
+      expect(abgesagt.status).toBe(410);
+      expect(await abgesagt.json()).toEqual({ error: MELDUNGEN.VORGANG_NICHT_MEHR_AKTIV });
+
+      db.onboardingVorgaenge = [vorgang({ status: "COMPLETED" })];
+      const abgeschlossen = await vermerken("tok-it", "i-ipad", { body: { stuecke: [{}] } });
+      expect(abgeschlossen.status).toBe(409);
+      expect(await abgeschlossen.json()).toEqual({ error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN });
+
+      db.onboardingVorgaenge = [vorgang()];
+      db.links[0].expiresAt = new Date(Date.now() - TAG);
+      const abgelaufen = await vermerken("tok-it", "i-ipad", { body: { stuecke: [{}] } });
+      expect(abgelaufen.status).toBe(410);
+      expect(await abgelaufen.json()).toEqual({ error: MELDUNGEN.LINK_ABGELAUFEN });
+
+      expect(db.ausgaben).toEqual([]);
+      expect(db.audits).toEqual([]);
+    });
+
+    it("Wettlauf: nach der Vorprüfung abgeschlossen → 409 aus der Sperre, nichts geschrieben", async () => {
+      const sperren = fp.onboardingProcess.updateMany;
+      const echt = sperren.getMockImplementation()!;
+      sperren.mockImplementationOnce(async (args: unknown) => {
+        db.onboardingVorgaenge[0].status = "COMPLETED";
+        return echt(args);
+      });
+      const res = await vermerken("tok-it", "i-ipad", { body: { stuecke: [{ kennung: KENNUNG }] } });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN });
+      expect(db.ausgaben).toEqual([]);
+      expect(db.audits).toEqual([]);
+    });
+
+    it("400: Datum morgen, elf Stück, Kennung mit spitzen Klammern, Grenze aktiver Stücke je Aufgabe", async () => {
+      const morgen = await vermerken("tok-it", "i-ipad", {
+        body: { stuecke: [{ uebergebenAm: tageSpaeter(heuteInBerlin(), 1) }] },
+      });
+      expect(morgen.status).toBe(400);
+      expect(await morgen.json()).toEqual({ error: MELDUNGEN_AUSGABEN.DATUM_IN_ZUKUNFT });
+
+      const elf = await vermerken("tok-it", "i-ipad", { body: { stuecke: Array.from({ length: 11 }, () => ({})) } });
+      expect(elf.status).toBe(400);
+      expect(await elf.json()).toEqual({ error: MELDUNGEN_AUSGABEN.ZU_VIELE_STUECKE });
+
+      const klammern = await vermerken("tok-it", "i-ipad", { body: { stuecke: [{ kennung: "<b>1</b>" }] } });
+      expect(klammern.status).toBe(400);
+      expect(await klammern.json()).toEqual({ error: MELDUNGEN_AUSGABEN.KENNUNG_UNGUELTIG });
+      expect(db.ausgaben).toEqual([]);
+
+      db.ausgaben = Array.from({ length: AUSGABE_GRENZEN.aktiveJeAufgabe }, () => ausgabe({ quelle: "HR" }));
+      const voll = await vermerken("tok-it", "i-ipad", { body: { stuecke: [{}] } });
+      expect(voll.status).toBe(400);
+      expect(await voll.json()).toEqual({ error: MELDUNGEN_AUSGABEN.ZU_VIELE_AKTIVE });
+      expect(db.ausgaben).toHaveLength(AUSGABE_GRENZEN.aktiveJeAufgabe);
+    });
+
+    it("weist einen Offboarding-Token mit „Ungültiger Link“ ab", async () => {
+      offboardingMitLink();
+      const res = await vermerken("tok-off", "i-ipad", { body: { stuecke: [{}] } });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: MELDUNGEN.LINK_UNGUELTIG });
+      expect(db.ausgaben).toEqual([]);
+    });
+  });
+
+  // ---- Feld `ausgabe` auf der Link-Seite ----
+
+  describe("Feld `ausgabe` auf der Link-Seite (Datenzuschnitt, 1.6)", () => {
+    it("nur an Ausstattungsaufgaben mit Übergabe der eigenen Stelle — sonst fehlt der Schlüssel ganz", async () => {
+      db.ausgaben = [ausgabe({ id: "ag-link" }), ausgabe({ id: "ag-hr", quelle: "HR", kennung: null })];
+      const data = await laden("tok-it");
+      const nach = (id: string) => data.aufgaben.find((a: Zeile) => a.id === id);
+      expect(nach("i-ipad").ausgabe).toEqual({
+        moeglich: true,
+        kennungLabel: "Inventarnummer",
+        art: "RUECKGABE",
+        stuecke: [
+          { id: "ag-link", kennung: KENNUNG, uebergebenAm: GESTERN, entfernbar: true },
+          // Von HR vermerkt: sichtbar, aber nicht entfernbar.
+          { id: "ag-hr", kennung: null, uebergebenAm: GESTERN, entfernbar: false },
+        ],
+      });
+      expect(nach("i-zugang").ausgabe).toEqual({ moeglich: true, kennungLabel: "Kennung", art: "SPERREN", stuecke: [] });
+      for (const id of ["i-park", "i-vorlage"]) expect(nach(id)).not.toHaveProperty("ausgabe");
+      // Die gepinnte Schluesselliste gilt fuer jede Aufgabe ohne Uebergabe weiter.
+      expect(Object.keys(nach("i-vorlage")).sort()).toEqual(
+        [
+          "abteilungKommentar",
+          "abteilungKommentarAm",
+          "bemerkung",
+          "category",
+          "completedAt",
+          "description",
+          "dueDate",
+          "eilt",
+          "entfaellt",
+          "id",
+          "isCompleted",
+          "orderIndex",
+          "title",
+        ].sort(),
+      );
+    });
+
+    it("ohne „Beim Austritt“ (A4 aus, G27): kein Feld und keine Abfrage der Ausgaben", async () => {
+      for (const z of db.ausstattungZeilen) z.beiAustritt = null;
+      const data = await laden("tok-it");
+      expect(data.aufgaben.some((a: Zeile) => "ausgabe" in a)).toBe(false);
+      expect(fp.ausgabe.findMany).not.toHaveBeenCalled();
+    });
+
+    it("eine fremde Stelle sieht die Kennung nicht — nur ihre eigenen Stücke", async () => {
+      db.ausgaben = [
+        ausgabe(),
+        ausgabe({
+          id: "ag-schl",
+          checklistItemId: "i-schl",
+          departmentKey: "VERWALTUNG",
+          kennung: "S-17",
+          kennungLabel: "Schlüsselnummer",
+        }),
+      ];
+      const data = await laden("tok-vw");
+      expect(data.aufgaben.map((a: Zeile) => a.id)).toEqual(["i-schl"]);
+      expect(data.aufgaben[0].ausgabe).toMatchObject({
+        kennungLabel: "Schlüsselnummer",
+        stuecke: [{ id: "ag-schl", kennung: "S-17", entfernbar: true }],
+      });
+      expect(JSON.stringify(data)).not.toContain(KENNUNG);
+    });
+
+    it("an einen laufenden Austritt gebunden (G28): sichtbar, aber nicht entfernbar — ohne Vorgangsnummer", async () => {
+      db.ausgaben = [ausgabe({ id: "ag-1" })];
+      austrittBindet();
+      const data = await laden("tok-it");
+      const ipad = data.aufgaben.find((a: Zeile) => a.id === "i-ipad");
+      expect(ipad.ausgabe.stuecke).toEqual([{ id: "ag-1", kennung: KENNUNG, uebergebenAm: GESTERN, entfernbar: false }]);
+      expect(JSON.stringify(data)).not.toContain("OFF-2027-GYM-009");
+    });
+
+    it("die Antwort des PATCH (Abhaken) trägt dasselbe Feld", async () => {
+      db.ausgaben = [ausgabe({ id: "ag-1" })];
+      const res = await aufgabeAendern(
+        anfrage(`${BASIS}/api/onboarding-tasks/tok-it/i-ipad`, "PATCH", { ip: neueIp(), body: { isCompleted: true } }),
+        { params: Promise.resolve({ token: "tok-it", itemId: "i-ipad" }) },
+      );
+      expect(res.status).toBe(200);
+      const { data } = await res.json();
+      expect(data.aufgabe.ausgabe.stuecke.map((s: Zeile) => s.id)).toEqual(["ag-1"]);
+    });
+  });
+
+  // ---- Entfernen ----
+
+  describe("Entfernen", () => {
+    it("entfernt den eigenen Link-Vermerk: 200 mit frischem Stand, Protokoll, keine Mail", async () => {
+      db.ausgaben = [ausgabe({ id: "ag-1" }), ausgabe({ id: "ag-2", kennung: "FES-IPAD-0413" })];
+      const res = await entfernen("tok-it", "i-ipad", "ag-1");
+      expect(res.status).toBe(200);
+      const { data } = await res.json();
+      expect(data.ausgabe.stuecke.map((s: Zeile) => s.id)).toEqual(["ag-2"]);
+      expect(db.ausgaben.map((a) => a.id)).toEqual(["ag-2"]);
+      expect(db.audits).toEqual([
+        expect.objectContaining({
+          userId: null,
+          onboardingId: "onb-1",
+          action: AUSGABEN_AUDIT.AUSGABE_ENTFERNT,
+          details: expect.objectContaining({
+            ausgabeId: "ag-1",
+            ueber: "LINK",
+            checklistItemId: "i-ipad",
+            departmentKey: "IT",
+          }),
+        }),
+      ]);
+      expect(JSON.stringify(db.audits)).not.toContain(KENNUNG);
+      expect(mockTrigger).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["von HR vermerkt", { quelle: "HR" }],
+      ["nicht mehr ausgegeben (zurück)", { zustand: "ZURUECK" }],
+      ["verbleibt bei der Person", { zustand: "VERBLEIBT" }],
+    ])("409 ENTFERNEN_NICHT_MOEGLICH: %s — die Ausgabe bleibt", async (_fall, teil) => {
+      db.ausgaben = [ausgabe({ id: "ag-1", ...teil })];
+      const res = await entfernen("tok-it", "i-ipad", "ag-1");
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({
+        error: MELDUNGEN_AUSGABEN.ENTFERNEN_NICHT_MOEGLICH,
+        grund: "ENTFERNEN_NICHT_MOEGLICH",
+      });
+      expect(db.ausgaben).toHaveLength(1);
+      expect(db.audits).toEqual([]);
+    });
+
+    it("409 bei Bindung an einen laufenden Austritt, frei nach dessen Abbruch (G28)", async () => {
+      db.ausgaben = [ausgabe({ id: "ag-1" })];
+      austrittBindet();
+      const gebunden = await entfernen("tok-it", "i-ipad", "ag-1");
+      expect(gebunden.status).toBe(409);
+      expect((await gebunden.json()).grund).toBe("ENTFERNEN_NICHT_MOEGLICH");
+      expect(db.ausgaben).toHaveLength(1);
+
+      db.vorgaenge[0].status = "CANCELLED";
+      expect((await entfernen("tok-it", "i-ipad", "ag-1")).status).toBe(200);
+      expect(db.ausgaben).toEqual([]);
+    });
+
+    it("die Bindung wird NACH der Sperre der Ausgabe gelesen (G24)", async () => {
+      db.ausgaben = [ausgabe({ id: "ag-1" })];
+      // Zwischen Vorpruefung und Sperre bindet ein Austritt das Stueck.
+      const sperren = fp.ausgabe.updateMany;
+      const echt = sperren.getMockImplementation()!;
+      sperren.mockImplementationOnce(async (args: unknown) => {
+        austrittBindet();
+        return echt(args);
+      });
+      const res = await entfernen("tok-it", "i-ipad", "ag-1");
+      expect(res.status).toBe(409);
+      expect(db.ausgaben).toHaveLength(1);
+      const reihenfolge = [
+        fp.onboardingProcess.updateMany.mock.invocationCallOrder[0],
+        fp.ausgabe.updateMany.mock.invocationCallOrder[0],
+        fp.offboardingChecklistItem.findMany.mock.invocationCallOrder[0],
+      ];
+      expect(reihenfolge).toEqual([...reihenfolge].sort((a, b) => a - b));
+    });
+
+    it("404 für eine unbekannte Ausgabe, eine Ausgabe einer anderen Aufgabe oder Stelle", async () => {
+      db.ausgaben = [
+        ausgabe({ id: "ag-zugang", checklistItemId: "i-zugang" }),
+        ausgabe({ id: "ag-schl", checklistItemId: "i-schl", departmentKey: "VERWALTUNG" }),
+      ];
+      for (const ausgabeId of ["gibt-es-nicht", "ag-zugang", "ag-schl"]) {
+        const res = await entfernen("tok-it", "i-ipad", ausgabeId);
+        expect({ ausgabeId, status: res.status }).toEqual({ ausgabeId, status: 404 });
+        expect(await res.json()).toEqual({ error: MELDUNGEN_AUSGABEN.AUSGABE_NICHT_GEFUNDEN });
+      }
+      // Die Aufgabe einer anderen Stelle ist schon vorher unbekannt.
+      const fremd = await entfernen("tok-it", "i-schl", "ag-schl");
+      expect(fremd.status).toBe(404);
+      expect(await fremd.json()).toEqual({ error: MELDUNGEN.AUFGABE_NICHT_GEFUNDEN });
+      expect(db.ausgaben).toHaveLength(2);
+    });
+
+    it("409 bei COMPLETED, 410 bei EXPIRED — nichts entfernt", async () => {
+      db.ausgaben = [ausgabe({ id: "ag-1" })];
+      db.onboardingVorgaenge = [vorgang({ status: "COMPLETED" })];
+      expect((await entfernen("tok-it", "i-ipad", "ag-1")).status).toBe(409);
+      db.onboardingVorgaenge = [vorgang({ status: "EXPIRED" })];
+      expect((await entfernen("tok-it", "i-ipad", "ag-1")).status).toBe(410);
+      expect(db.ausgaben).toHaveLength(1);
     });
   });
 });

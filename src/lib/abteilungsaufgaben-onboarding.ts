@@ -58,7 +58,8 @@
  *     EXPIRED: Link 410 „Dieser Vorgang ist nicht mehr aktiv …", kein Versand
  *     — einzige Ausnahme ist die Absage (E-A20): Per Knopf erfahren die schon
  *     informierten Stellen davon, einmal je Stelle, an die informierte Adresse,
- *     ohne Link, mit ihren erledigten Aufgaben (Aktion `absage`, nur bei
+ *     ohne Link, mit ihren erledigten Aufgaben und (A4, G10) den Stuecken, die
+ *     sie laut Portal noch ausgegeben haben (Aktion `absage`, nur bei
  *     EXPIRED, sonst 409 `NICHT_ABGESAGT`; nie automatisch).
  *     Offene Abteilungsaufgaben blockieren den Abschluss nicht – Ausnahme
  *     (E-A19): offene Ausstattungs- und Hinweis-Aufgaben verlangen eine
@@ -107,6 +108,7 @@ import {
   linkStatusNeuBerechnenIn,
   type LinkBereich,
 } from "@/lib/abteilungsaufgaben-uebergaenge";
+import { aktiveAusgabenJeStelleLaden } from "@/lib/ausgaben-daten";
 import {
   onboardingAbteilungsAktionSchema,
   type AbteilungsAktionInput,
@@ -198,6 +200,9 @@ function onboardingVersandModul(v: OnboardingVorgangFuerVersand): VersandModul {
     // Regel 10, F7: die offene Aenderungsliste je Stelle — Aktion „nachtrag“
     // und jede Zuweisungsmail nehmen sie mit.
     nachtraegeLaden: () => offeneAenderungenLaden(prisma, v.id),
+    // A4 (G10): die noch ausgegebenen Stuecke je Stelle — nur die Absage
+    // liest sie (jede Stelle ihre eigenen, samt Kennung).
+    absageAusgabenLaden: () => aktiveAusgabenJeStelleLaden(prisma, v.id),
   };
 }
 
@@ -311,9 +316,14 @@ export async function faelligkeitenSetzen(
  * EXPIRED) oder unbekannt ist. Erster Schritt jedes Anlegers von
  * Ausstattungsaufgaben (F4): Zwei Anleger laufen damit nacheinander, und der
  * zweite liest den Stand erst nach dem Commit des ersten. `auch` laesst
- * einzelne Endstatus zu (heute von keinem Aufrufer genutzt: Die Absage nach
- * EXPIRED braucht keine Sperre, EXPIRED ist endgueltig, und ihr Merker
- * `abgesagtAm` haengt am Link).
+ * einzelne Endstatus zu. Die Absage nach EXPIRED braucht keine Sperre (EXPIRED
+ * ist endgueltig, ihr Merker `abgesagtAm` haengt am Link). Seit A4 (S24)
+ * nutzt `auch` die Karte der Ausgaben (src/lib/ausgaben-dienst.ts,
+ * `auch: ["COMPLETED", "EXPIRED"]`): HR traegt Uebergaben nach und tauscht
+ * auch nach Abschluss und Absage (G7) – die Sperre ordnet sie trotzdem hinter
+ * jeden anderen Anleger einer Ausgabe derselben Einstellung (G24). `false`
+ * heisst dann nur noch „unbekannt“. Spaeter (S28) sperrt die Zuordnung eines
+ * Austritts die Einstellung mit `auch: ["COMPLETED"]`.
  */
 export async function vorgangSperrenIn(
   tx: Prisma.TransactionClient,
@@ -675,7 +685,8 @@ export async function onboardingAbteilungsAktionAusfuehren(opts: {
  * jede andere Aktion (ein Doppelklick schickt nicht zweimal, bevor
  * `abgesagtAm` steht). Kein Nachholen, keine Faelligkeiten: Bei EXPIRED
  * entsteht nichts Neues. Der Kontext laedt weder Angaben noch Aenderungsliste
- * — die Absage traegt keines von beiden.
+ * — die Absage traegt keines von beiden. Die noch ausgegebenen Stuecke je
+ * Stelle (A4, G10) liest die Aktion selbst ueber `absageAusgabenLaden`.
  */
 async function absageAusfuehren(
   vorgang: OnboardingVorgangFuerVersand,

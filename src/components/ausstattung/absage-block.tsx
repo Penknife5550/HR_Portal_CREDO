@@ -13,6 +13,9 @@
  *     Er oeffnet eine Rueckfrage (DialogRahmen); erst „Absage senden“ ruft die
  *     Aktion `absage`. Nie automatisch (E-A20, wie „Nachtrag senden“).
  *   - Danach (alle haben sie): nur die Zeile „Absage … gesendet“.
+ *   - Immer (A4, G10): der Satz, dass HR Ausgegebenes nach der Ruecknahme in
+ *     der Karte vermerkt (‚zurückgenommen‘) — die Absage-Mail nennt die
+ *     Ausgaben der Stelle, Aufgaben dafuer gibt es nicht.
  *
  * Der Block rechnet nichts: Stellen, Datum und Moeglichkeit kommen fertig vom
  * Server, das Ergebnis der Aktion zeigt die Karte in ihrer Meldungsleiste.
@@ -30,7 +33,11 @@ import { formatDatumDE } from "@/lib/format";
 export const ABSAGE_TEXTE = {
   titel: "Absage an die Stellen",
   satz:
-    "Informierte Stellen erfahren von der Absage nur per Knopf: eine E-Mail ohne Link an die Adresse, an die sie informiert wurden – mit den Aufgaben, die sie schon erledigt haben.",
+    "Informierte Stellen erfahren von der Absage nur per Knopf: eine E-Mail ohne Link an die Adresse, an die sie informiert wurden – mit den Aufgaben, die sie schon erledigt haben, und dem, was sie laut Portal ausgegeben haben.",
+  // A4 (G10): Die Absage nennt die Ausgaben, die Ruecknahme selbst vermerkt HR
+  // in der Karte „Ausstattung & Zugänge“ (Aktion „Zurückgenommen…“) — neue
+  // Aufgaben gibt es dafuer nicht, der Link antwortet 410.
+  rueckbau: "Ausgegebenes vermerken Sie nach der Rücknahme in der Karte (‚zurückgenommen‘).",
   offen: (stellen: ReadonlyArray<string>) => `Noch ohne Absage: ${stellen.join(", ")}.`,
   zuletzt: (datum: string) => `Zuletzt gesendet am ${datum}.`,
   alleGesendet: (datum: string) =>
@@ -40,7 +47,7 @@ export const ABSAGE_TEXTE = {
   knopf: "Stellen über die Absage informieren…",
   dialogTitel: "Stellen über die Absage informieren?",
   dialogSatz:
-    "Jede Stelle erhält eine E-Mail ohne Link an die Adresse, an die sie informiert wurde. Sie nennt die Aufgaben, die die Stelle schon erledigt hat, damit Zugänge gelöscht und Ausgegebenes zurückgenommen werden kann.",
+    "Jede Stelle erhält eine E-Mail ohne Link an die Adresse, an die sie informiert wurde. Sie nennt die Aufgaben, die die Stelle schon erledigt hat, und was sie laut Portal ausgegeben hat, damit Zugänge gelöscht und Ausgegebenes zurückgenommen werden kann.",
   dialogEinmal: "Jede Stelle erhält die Absage nur einmal.",
   empfaenger: "Empfänger",
   senden: (anzahl: number) => (anzahl === 1 ? "Absage senden" : `${anzahl} Absagen senden`),
@@ -99,6 +106,7 @@ export function AbsageBlock({ absage, darfAktionen, sendet, gesperrt, onSenden, 
           {ABSAGE_TEXTE.alleGesendet(datum)}
         </p>
       )}
+      <p data-zeile="absage-rueckbau">{ABSAGE_TEXTE.rueckbau}</p>
       {zeigeKnopf && (
         <button
           type="button"

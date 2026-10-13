@@ -212,9 +212,17 @@ const ONBOARDING_ABTEILUNG_BETREFF_OHNE = [
 /**
  * Die HR-Meldung `onboarding-task-completed` sperrt dazu den Kommentar der
  * Stelle (F19): Seit E-A17 geht sie auch allein wegen eines Kommentars hinaus,
- * und der ist Freitext der Stelle.
+ * und der ist Freitext der Stelle. Seit Stufe 2 (A4, G9) ebenso den
+ * Uebergabevermerk – die Kennung (Inventar-, Schluessel-, Chipnummer) tippt
+ * die Stelle, und Betreffzeilen stehen 90 Tage im Versandprotokoll.
  */
-const ONBOARDING_ERLEDIGT_BETREFF_OHNE = [...ONBOARDING_ABTEILUNG_BETREFF_OHNE, "kommentar", "kommentar_text"];
+const ONBOARDING_ERLEDIGT_BETREFF_OHNE = [
+  ...ONBOARDING_ABTEILUNG_BETREFF_OHNE,
+  "kommentar",
+  "kommentar_text",
+  "ausgabe_vermerk",
+  "ausgabe_vermerk_html",
+];
 
 /** HR-Postfach (SmtpConfig.replyToEmail) in den Beispielen der HR-Mails des Onboardings. */
 const ONBOARDING_HR_POSTFACH = "personal@example.org";
@@ -360,6 +368,33 @@ const ONBOARDING_ABSAGE_ERLEDIGT = {
     "</ul>",
   anzahl_erledigt: 2,
   hat_erledigte: "ja",
+};
+
+/**
+ * Absage, Stufe 2 (A4, G10): Bis zur Absage hatte die IT laut Portal den
+ * Zugang eingerichtet und das Notebook uebergeben (Vermerke ueber ihren
+ * Link) — die Absage nennt beide Stuecke samt Kennung, damit die IT sie
+ * zuruecknimmt bzw. sperrt. Als Daten abgeschrieben:
+ * src/__tests__/api/onboarding-abteilungs-mails.test.ts legt genau diese
+ * Ausgaben an und vergleicht die echte Payload mit dem Beispiel.
+ */
+export const ONBOARDING_ABSAGE_BEISPIEL_AUSGABEN: {
+  bezeichnung: string;
+  kennung: string | null;
+  uebergebenAm: string;
+  beiAustritt: string;
+}[] = [
+  { bezeichnung: "Zugänge: Dienst-E-Mail", kennung: null, uebergebenAm: "2026-09-25", beiAustritt: "SPERREN" },
+  { bezeichnung: "Dienst-Laptop/PC", kennung: "FES-NB-0412", uebergebenAm: "2026-09-28", beiAustritt: "RUECKGABE" },
+];
+
+/** ausgabenListeMailFelder(ONBOARDING_ABSAGE_BEISPIEL_AUSGABEN), abgeschrieben. */
+const ONBOARDING_ABSAGE_AUSGABEN = {
+  ausgaben_liste:
+    "Zugänge: Dienst-E-Mail · eingerichtet 25.09.2026\n" + "Dienst-Laptop/PC · FES-NB-0412 · übergeben 28.09.2026",
+  ausgaben_liste_html:
+    "Zugänge: Dienst-E-Mail · eingerichtet 25.09.2026<br>" + "Dienst-Laptop/PC · FES-NB-0412 · übergeben 28.09.2026",
+  hat_ausgaben: "ja",
 };
 
 /**
@@ -925,6 +960,11 @@ export const EVENT_CATALOG: EventDefinition[] = [
     // fuer den Betreff („erledigt“, „erledigt, mit Kommentar“, „kommentiert“).
     // `kommentar` ist schon maskiert (fuer das HTML), `kommentar_text` der
     // Rohtext (nur Textteil); beide nie im Betreff (F19).
+    // Stufe 2 (A4, G9): `ausgabe_vermerk` (Rohtext, Zeilen „FES-IPAD-0412 ·
+    // übergeben 28.01.2027“, nur Textteil) und `ausgabe_vermerk_html`
+    // (maskiert, mit <br>) – die noch ausgegebenen Stuecke der Aufgabe, nach
+    // dem Commit frisch gelesen; ohne Stueck beide "". Ein Vermerk allein loest
+    // die Mail nie aus. Beide nie im Betreff.
     event: "onboarding-task-completed",
     name: "Onboarding-Aufgabe erledigt",
     group: "Onboarding",
@@ -945,6 +985,11 @@ export const EVENT_CATALOG: EventDefinition[] = [
       ist_erledigt: "ja",
       nur_kommentar: "",
       meldung_kurz: "erledigt, mit Kommentar",
+      // A4 (G9): Die Beispielaufgabe „Benutzerkonto …“ ist ein Vorlagenpunkt
+      // ohne Uebergabe – wie im echten Ablauf beide "" (der Block faellt weg).
+      // Wie eine Zeile aussieht, haelt onboarding-abteilungs-mails.test.ts fest.
+      ausgabe_vermerk: "",
+      ausgabe_vermerk_html: "",
     },
     wired: true,
     betreffOhne: ONBOARDING_ERLEDIGT_BETREFF_OHNE,
@@ -975,6 +1020,12 @@ export const EVENT_CATALOG: EventDefinition[] = [
     // ohne Link, Token und Gueltigkeit: Der Vorgang ist abgelaufen, der Link
     // antwortet 410. Nicht an Webhooks (EVENTS_OHNE_WEBHOOK, F18); die Liste
     // nie im Betreff.
+    // Stufe 2 (A4, G10): dazu die Stuecke, die die Stelle laut Portal noch
+    // ausgegeben hat (AUSGEGEBEN, VERBLEIBT), samt Kennung — `ausgaben_liste`
+    // (Rohtext, nur Textteil), `ausgaben_liste_html` (maskiert, mit <br>) und
+    // der Merker `hat_ausgaben` ("ja"/""); ohne Stueck alle drei "". Neue
+    // Aufgaben gibt es dafuer nicht (der Link antwortet 410), die Ruecknahme
+    // vermerkt HR in der Karte. Beide Listen nie im Betreff (Kennungen).
     event: "onboarding-department-abgesagt",
     name: "Onboarding: Absage an Abteilung",
     group: "Onboarding",
@@ -985,10 +1036,17 @@ export const EVENT_CATALOG: EventDefinition[] = [
       ...ONBOARDING_ABTEILUNG_IT,
       email: "it@example.org",
       ...ONBOARDING_ABSAGE_ERLEDIGT,
+      ...ONBOARDING_ABSAGE_AUSGABEN,
       ist_fuehrungskraft: "",
     },
     wired: true,
-    betreffOhne: [...ONBOARDING_ABTEILUNG_BETREFF_OHNE, "erledigte_liste", "erledigte_liste_html"],
+    betreffOhne: [
+      ...ONBOARDING_ABTEILUNG_BETREFF_OHNE,
+      "erledigte_liste",
+      "erledigte_liste_html",
+      "ausgaben_liste",
+      "ausgaben_liste_html",
+    ],
   },
   {
     // Paket A3 (E-A18): Lauf „Onboarding-Erinnerungen“, Abschnitt 4

@@ -238,6 +238,19 @@ describe("Event-Katalog — HR-Mails der Ausstattung (Paket A3, S18)", () => {
     ]);
   });
 
+  // A4, S25 (G9): Der Uebergabevermerk traegt Kennungen, die die Stelle tippt.
+  it("die Erledigt-Meldung traegt den Uebergabevermerk flach und sperrt ihn im Betreff", () => {
+    const def = getEventDefinition("onboarding-task-completed")!;
+    expect(def.betreffOhne).toEqual(expect.arrayContaining(["ausgabe_vermerk", "ausgabe_vermerk_html"]));
+    // Im Beispiel ohne Vermerk (Vorlagenpunkt) – als Zeichenkette, nie fehlend.
+    expect(def.samplePayload).toMatchObject({ ausgabe_vermerk: "", ausgabe_vermerk_html: "" });
+    expect(
+      verboteneBetreffVariablen("onboarding-task-completed", "{{aufgabe}}: {{ausgabe_vermerk}} {{ausgabe_vermerk_html}}"),
+    ).toEqual(["ausgabe_vermerk", "ausgabe_vermerk_html"]);
+    const vorlage = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === "onboarding-task-completed")!;
+    expect(verboteneBetreffVariablen("onboarding-task-completed", vorlage.subject)).toEqual([]);
+  });
+
   it("die Sammelmail sperrt Liste und Portal-Link im Betreff und nennt keine Bemerkung", () => {
     const def = getEventDefinition("onboarding-ausstattung-offen")!;
     expect([...(def.betreffOhne ?? [])].sort()).toEqual(["offene_liste", "offene_liste_html", "portalLink"]);
@@ -289,5 +302,19 @@ describe("Event-Katalog — Absage an die Stellen (Paket A3, S19)", () => {
     expect(vorlage.bodyHtml).not.toMatch(/\{\{(link|magicLink)\}\}/);
     expect(verboteneBetreffVariablen(EVENT, vorlage.subject)).toEqual([]);
     expect(verboteneBetreffVariablen(EVENT, "Absage {{erledigte_liste}}")).toEqual(["erledigte_liste"]);
+  });
+
+  // A4, S27 (G10): Die Absage nennt die noch ausgegebenen Stuecke samt Kennung.
+  it("das Beispiel traegt die Ausgaben der Stelle; beide Listen sind im Betreff gesperrt", () => {
+    const def = getEventDefinition(EVENT)!;
+    expect(def.samplePayload).toMatchObject({ hat_ausgaben: "ja" });
+    expect(String(def.samplePayload.ausgaben_liste)).toContain("FES-NB-0412");
+    expect(def.betreffOhne).toEqual(expect.arrayContaining(["ausgaben_liste", "ausgaben_liste_html"]));
+    expect(verboteneBetreffVariablen(EVENT, "Absage: {{ausgaben_liste}} {{ausgaben_liste_html}}")).toEqual([
+      "ausgaben_liste",
+      "ausgaben_liste_html",
+    ]);
+    // Der Merker allein verraet keine Kennung und bleibt erlaubt.
+    expect(verboteneBetreffVariablen(EVENT, "Absage{{#hat_ausgaben}} – bitte zurücknehmen{{/hat_ausgaben}}")).toEqual([]);
   });
 });

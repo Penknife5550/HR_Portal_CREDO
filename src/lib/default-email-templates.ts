@@ -1533,6 +1533,13 @@ CREDO HR-Portal`,
   // Aufgabenliste nie im Betreff (betreffOhne, F19).
   // {{kommentar}} ist schon maskiert (Zeilenumbrueche als <br>),
   // {{kommentar_text}} ist der Rohtext und steht NUR im Textteil.
+  // Stufe 2 (A4, G9): Zeile „Vermerkt“ im flachen Block {{#ausgabe_vermerk}}
+  // (artneutral: der Wert sagt selbst „übergeben …“ bzw. bei einem Zugang
+  // „eingerichtet …“)
+  // – im HTML {{ausgabe_vermerk_html}} (maskiert), im Text {{ausgabe_vermerk}}
+  // (roh); ohne Vermerk faellt die Zeile weg. Beide nie im Betreff
+  // (betreffOhne). Nach dem Deploy: „Text auf Standard zurücksetzen“, sonst
+  // fehlt nur die Zeile.
   // =============================================
   {
     event: "onboarding-task-completed",
@@ -1576,6 +1583,10 @@ CREDO HR-Portal`,
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Gemeldet über</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{erledigt_ueber}}</p>
             </td></tr>{{/nur_kommentar}}
+            {{#ausgabe_vermerk}}<tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vermerkt</p>
+              <p style="margin:0;color:#374151;font-size:14px;line-height:1.5;">{{ausgabe_vermerk_html}}</p>
+            </td></tr>{{/ausgabe_vermerk}}
             <tr><td style="padding:0 16px 16px;">
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vertragsbeginn</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{vertragsbeginn}}</p>
@@ -1615,7 +1626,8 @@ CREDO HR-Portal`,
 Zuständigkeit: {{abteilung}}
 {{#ist_erledigt}}Erledigt über: {{erledigt_ueber}}
 {{/ist_erledigt}}{{#nur_kommentar}}Gemeldet über: {{erledigt_ueber}}
-{{/nur_kommentar}}Vertragsbeginn: {{vertragsbeginn}}
+{{/nur_kommentar}}{{#ausgabe_vermerk}}Vermerkt: {{ausgabe_vermerk}}
+{{/ausgabe_vermerk}}Vertragsbeginn: {{vertragsbeginn}}
 Vorgangsnummer: {{vorgangsnummer}}
 Noch offen im Vorgang: {{offene_aufgaben}} Aufgabe(n)
 {{#kommentar_text}}
@@ -1632,6 +1644,8 @@ CREDO HR-Portal`,
       { key: "{{erledigt_ueber}}", description: "„Link der Abteilung“ bzw. „Link der Führungskraft“" },
       { key: "{{kommentar}}", description: "Kommentar der Abteilung für den HTML-Teil, bereits maskiert (Zeilenumbrüche als <br>); leer ohne Kommentar (für {{#kommentar}}…{{/kommentar}}) – nie im Betreff" },
       { key: "{{kommentar_text}}", description: "Kommentar der Abteilung als Rohtext – nur für den Textteil (im HTML-Teil wird er maskiert), nie im Betreff" },
+      { key: "{{ausgabe_vermerk}}", description: "Vermerk der Stelle (Übergabe bzw. Einrichtung) als Rohtext, je noch ausgegebenem Stück eine Zeile („FES-IPAD-0412 · übergeben 28.01.2027“, bei einem Zugang „eingerichtet …“); leer ohne Vermerk (für {{#ausgabe_vermerk}}…{{/ausgabe_vermerk}}) – nur für den Textteil, nie im Betreff" },
+      { key: "{{ausgabe_vermerk_html}}", description: "Vermerk der Stelle für den HTML-Teil, bereits maskiert (Zeilenumbrüche als <br>) – nie im Betreff" },
       { key: "{{hr_postfach}}", description: "HR-Postfach (Antwortadresse in den SMTP-Einstellungen) – Standard-Empfänger" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{vertragsbeginn}}", description: "Vertragsbeginn / Dienstbeginn (TT.MM.JJJJ)" },
@@ -1719,7 +1733,11 @@ CREDO HR-Portal`,
   // abgelaufen, der Link antwortet 410. Wie die uebrigen Onboarding-Vorlagen
   // steht {{abteilung}} nur in Klammern, {{mitarbeiter_name}} nur nach „für“
   // (Akkusativ — die neutrale Bezeichnung lautet „den neuen Mitarbeiter“).
-  // Nur flache Bloecke ({{#hat_erledigte}}, {{#arbeitsort}}).
+  // Seit Stufe 2 (A4, G10) dazu die Stuecke, die die Stelle laut Portal noch
+  // ausgegeben hat ({{ausgaben_liste_html}} fertig und maskiert,
+  // {{ausgaben_liste}} roh nur im Textteil, Kennungen nie im Betreff); neue
+  // Aufgaben gibt es dafuer nicht, die Ruecknahme vermerkt HR in der Karte.
+  // Nur flache Bloecke ({{#hat_erledigte}}, {{#hat_ausgaben}}, {{#arbeitsort}}).
   // =============================================
   {
     event: "onboarding-department-abgesagt",
@@ -1751,6 +1769,10 @@ CREDO HR-Portal`,
             Folgendes hatten Sie bereits erledigt. Bitte machen Sie es rückgängig – etwa Zugänge löschen oder sperren und Ausgegebenes zurücknehmen:
           </p>
           {{erledigte_liste_html}}{{/hat_erledigte}}
+          {{#hat_ausgaben}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
+            Laut Portal ausgegeben – bitte zurücknehmen bzw. sperren:
+          </p>
+          <p style="margin:0 0 16px;padding:12px 16px;background-color:#f9fafb;border-radius:8px;color:#374151;font-size:14px;line-height:1.6;">{{ausgaben_liste_html}}</p>{{/hat_ausgaben}}
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
             Für noch offene Aufgaben ist nichts mehr zu tun.
           </p>
@@ -1786,7 +1808,11 @@ das Onboarding für {{mitarbeiter_name}} in {{einrichtung}}{{#arbeitsort}} (Arbe
 Folgendes hatten Sie bereits erledigt. Bitte machen Sie es rückgängig – etwa Zugänge löschen oder sperren und Ausgegebenes zurücknehmen:
 
 {{erledigte_liste}}
-{{/hat_erledigte}}
+{{/hat_erledigte}}{{#hat_ausgaben}}
+Laut Portal ausgegeben – bitte zurücknehmen bzw. sperren:
+
+{{ausgaben_liste}}
+{{/hat_ausgaben}}
 Für noch offene Aufgaben ist nichts mehr zu tun.
 
 Vorgang: {{einrichtung}} · {{vorgangsnummer}}
@@ -1808,6 +1834,9 @@ CREDO HR-Portal`,
       { key: "{{erledigte_liste_html}}", description: "Dieselben Aufgaben als HTML-Liste, bereits maskiert – für den HTML-Teil, nie im Betreff" },
       { key: "{{anzahl_erledigt}}", description: "Anzahl der schon erledigten Aufgaben dieser Stelle" },
       { key: "{{hat_erledigte}}", description: "„ja“, wenn die Stelle schon etwas erledigt hat, sonst leer (für {{#hat_erledigte}}…{{/hat_erledigte}})" },
+      { key: "{{ausgaben_liste}}", description: "Was die Stelle laut Portal noch ausgegeben bzw. eingerichtet hat, als Klartext, eine Zeile je Stück („Dienst-Laptop/PC · FES-NB-0412 · übergeben 28.09.2026“) – für den Textteil, nie im Betreff" },
+      { key: "{{ausgaben_liste_html}}", description: "Dieselben Stücke für den HTML-Teil, bereits maskiert (Zeilenumbrüche als <br>) – nie im Betreff" },
+      { key: "{{hat_ausgaben}}", description: "„ja“, wenn die Stelle laut Portal noch etwas ausgegeben hat, sonst leer (für {{#hat_ausgaben}}…{{/hat_ausgaben}})" },
       { key: "{{email}}", description: "Adresse, an die die Stelle informiert wurde (Empfänger)" },
       { key: "{{ist_fuehrungskraft}}", description: "„ja“, wenn die Absage an die Führungskraft geht, sonst leer" },
     ],

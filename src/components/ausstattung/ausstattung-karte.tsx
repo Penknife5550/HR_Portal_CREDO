@@ -32,6 +32,17 @@
  * Vorgang neu laden — die Checkliste aendert sich mit). `ausstattungAktionSenden`
  * ist der Aufruf der Route dafuer.
  *
+ * Seit A4 (Feinplan S26, G7) je Option bzw. ganzer Position die Ausgaben
+ * (src/components/ausgaben/ausgaben-zeile.tsx) und je Vorgang die Zeile zum
+ * unterschriebenen Uebergabeprotokoll (G19). Ihre Aktionen — vermerken,
+ * korrigieren, tauschen, zurueckgenommen, entfernen (ausgaben-dialoge.tsx) —
+ * gehen ueber eine EIGENE Route (`ausgabenAktionSenden`, POST …/ausgaben) und
+ * eine eigene Aktion der Seite (`onAusgabenAktion`). Sie stehen auch im Zustand
+ * NUR_LESEN (abgeschlossen, abgesagt), solange `ausgabenBearbeitbar` gilt: HR
+ * traegt nach und tauscht nach dem Abschluss. Ohne „Beim Austritt“ im Katalog
+ * (A4 aus, G27) tragen die Aufgaben keine Ausgabe-Felder — die Karte bleibt
+ * dann wie vorher.
+ *
  * Optik der uebrigen Karten des Reiters, nur Farb-Tokens und lucide-react
  * (neue Datei, Stand 0 in der Sperrklinke); Rueckfragen ueber
  * `unterlagen/dialog-rahmen.tsx`.
@@ -48,6 +59,18 @@ import {
   StreichenDialog,
   type AusstattungAktionBody,
 } from "@/components/ausstattung/ausstattung-dialoge";
+import {
+  AusgabenDialog,
+  type AusgabenAktionBody,
+  type AusgabenDialogAnfrage,
+} from "@/components/ausgaben/ausgaben-dialoge";
+import {
+  AUSGABEN_ZEILE_TEXTE,
+  AusgabenZeile,
+  ProtokollZeile,
+  hatAusgabenFelder,
+} from "@/components/ausgaben/ausgaben-zeile";
+import { ausgabeBezeichnung } from "@/lib/ausgaben";
 import {
   AUSSTATTUNG_KATEGORIE,
   aufgabenStandText,
@@ -116,9 +139,26 @@ export async function ausstattungAktionSenden(
   onboardingId: string,
   body: AusstattungAktionBody,
 ): Promise<AusstattungAktionsAusgang> {
+  return aktionSenden(`/api/onboarding/${encodeURIComponent(onboardingId)}/ausstattung`, body);
+}
+
+/**
+ * POST /api/onboarding/[id]/ausgaben (A4, G7) mit dem Body eines
+ * Ausgaben-Dialogs — dieselbe Auswertung wie `ausstattungAktionSenden`: Erfolg
+ * `meldung` (etwa „Bitte die Gebäudewirtschaft wegen der Schließung
+ * informieren.“), sonst `error` des Servers.
+ */
+export async function ausgabenAktionSenden(
+  onboardingId: string,
+  body: AusgabenAktionBody,
+): Promise<AusstattungAktionsAusgang> {
+  return aktionSenden(`/api/onboarding/${encodeURIComponent(onboardingId)}/ausgaben`, body);
+}
+
+async function aktionSenden(url: string, body: unknown): Promise<AusstattungAktionsAusgang> {
   let res: Response;
   try {
-    res = await fetch(`/api/onboarding/${encodeURIComponent(onboardingId)}/ausstattung`, {
+    res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -170,12 +210,25 @@ interface ZeilenProps {
   gruppe: AusstattungsGruppe;
   zeigeTexte: boolean;
   bearbeitbar: boolean;
+  /** A4 (G7): Aktionen der Ausgaben — unabhaengig vom Zustand der Karte. */
+  ausgabenBearbeitbar: boolean;
   sendet: boolean;
   onBearbeiten: () => void;
   onStreichen: () => void;
+  onAusgabe: (anfrage: AusgabenDialogAnfrage) => void;
 }
 
-function Zeile({ zeile, gruppe, zeigeTexte, bearbeitbar, sendet, onBearbeiten, onStreichen }: ZeilenProps) {
+function Zeile({
+  zeile,
+  gruppe,
+  zeigeTexte,
+  bearbeitbar,
+  ausgabenBearbeitbar,
+  sendet,
+  onBearbeiten,
+  onStreichen,
+  onAusgabe,
+}: ZeilenProps) {
   const sperrId = useId();
   const titel = zeile.art === "ANGABE" ? `Angabe: ${zeile.angabe?.label ?? zeile.bezeichnung}` : zeile.bezeichnung;
   const einzel = zeile.art === "AUSWAHL" ? null : (zeile.aufgaben.find((a) => a.option === "") ?? null);
@@ -250,14 +303,36 @@ function Zeile({ zeile, gruppe, zeigeTexte, bearbeitbar, sendet, onBearbeiten, o
           )}
         </div>
       </div>
+      {einzel && (
+        <AusgabenZeile
+          aufgabe={einzel}
+          bezug={ausgabeBezeichnung(zeile, "")}
+          stelleName={gruppe.stelleName}
+          bearbeitbar={ausgabenBearbeitbar}
+          sendet={sendet}
+          onDialog={onAusgabe}
+        />
+      )}
       {optionen.length > 0 && (
         <ul className="mt-2 space-y-1 border-l-2 border-border pl-3" aria-label={`Optionen ${zeile.bezeichnung} (${gruppe.stelleName})`}>
           {optionen.map((o) => (
-            <li key={o.option} className="flex flex-wrap items-center justify-between gap-2 text-sm" data-option={o.option}>
-              <span className={o.aufgabe?.status === "entfaellt" ? "text-muted-foreground line-through" : "text-foreground"}>
-                {o.option}
-              </span>
-              {o.aufgabe && <StandPille aufgabe={o.aufgabe} />}
+            <li key={o.option} className="text-sm" data-option={o.option}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className={o.aufgabe?.status === "entfaellt" ? "text-muted-foreground line-through" : "text-foreground"}>
+                  {o.option}
+                </span>
+                {o.aufgabe && <StandPille aufgabe={o.aufgabe} />}
+              </div>
+              {o.aufgabe && (
+                <AusgabenZeile
+                  aufgabe={o.aufgabe}
+                  bezug={ausgabeBezeichnung(zeile, o.option)}
+                  stelleName={gruppe.stelleName}
+                  bearbeitbar={ausgabenBearbeitbar}
+                  sendet={sendet}
+                  onDialog={onAusgabe}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -343,7 +418,8 @@ type OffenerDialog =
   | { art: "bearbeiten"; gruppe: AusstattungsGruppe; zeile: AusstattungsZeile }
   | { art: "streichen"; gruppe: AusstattungsGruppe; zeile: AusstattungsZeile }
   | { art: "hinweis"; gruppe: AusstattungsGruppe | null; hinweis: AusstattungsHinweis | null }
-  | { art: "hinweis-entfernen"; gruppe: AusstattungsGruppe };
+  | { art: "hinweis-entfernen"; gruppe: AusstattungsGruppe }
+  | { art: "ausgabe"; anfrage: AusgabenDialogAnfrage };
 
 export interface AusstattungKarteProps {
   /** Aus GET /api/onboarding/[id]; `null`/fehlend (keine HR-Rolle) = keine Karte. */
@@ -352,9 +428,14 @@ export interface AusstattungKarteProps {
   darfBearbeiten?: boolean;
   /** Fuehrt eine Aktion aus (senden, dann neu laden). Ohne sie bleibt die Karte lesend. */
   onAktion?: (body: AusstattungAktionBody) => Promise<AusstattungAktionsAusgang>;
+  /**
+   * A4 (G7): fuehrt eine Ausgaben-Aktion aus (POST …/ausgaben, dann neu laden).
+   * Ohne sie bietet die Karte an den Ausgaben keine Aktion an.
+   */
+  onAusgabenAktion?: (body: AusgabenAktionBody) => Promise<AusstattungAktionsAusgang>;
 }
 
-export function AusstattungKarte({ uebersicht, darfBearbeiten = false, onAktion }: AusstattungKarteProps) {
+export function AusstattungKarte({ uebersicht, darfBearbeiten = false, onAktion, onAusgabenAktion }: AusstattungKarteProps) {
   const [dialog, setDialog] = useState<OffenerDialog | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<{ art: "ok" | "fehler"; text: string } | null>(null);
@@ -366,6 +447,8 @@ export function AusstattungKarte({ uebersicht, darfBearbeiten = false, onAktion 
 
   const recht = darfBearbeiten && uebersicht.darfBearbeiten;
   const bearbeitbar = recht && uebersicht.zustand === "BEARBEITBAR" && !!onAktion;
+  // A4 (G7): HR traegt Ausgaben auch nach Abschluss und Absage nach — nicht am Zustand der Karte.
+  const ausgabenBearbeitbar = recht && uebersicht.ausgabenBearbeitbar === true && !!onAusgabenAktion;
   const stellenOhneHinweis = uebersicht.stellen.filter(
     (s) => !uebersicht.gruppen.some((g) => g.departmentKey === s.departmentKey && g.hinweis),
   );
@@ -381,14 +464,19 @@ export function AusstattungKarte({ uebersicht, darfBearbeiten = false, onAktion 
     setDialog(null);
   };
 
-  const senden = async (body: AusstattungAktionBody, imDialog: boolean) => {
-    if (!onAktion || laeuftRef.current) return;
+  // Eine Ausfuehrung fuer beide Routen (Karte und Ausgaben): dieselbe Sperre,
+  // dieselbe Meldung, derselbe Umgang mit dem offenen Dialog.
+  const ausfuehren = async (
+    aufruf: (() => Promise<AusstattungAktionsAusgang>) | null,
+    imDialog: boolean,
+  ) => {
+    if (!aufruf || laeuftRef.current) return;
     laeuftRef.current = true;
     setSendet(true);
     setFehler(null);
     if (!imDialog) setMeldung(null);
     try {
-      const ausgang = await onAktion(body);
+      const ausgang = await aufruf();
       if (ausgang.ok) {
         setDialog(null);
         setMeldung({ art: "ok", text: ausgang.meldung });
@@ -407,7 +495,12 @@ export function AusstattungKarte({ uebersicht, darfBearbeiten = false, onAktion 
       setSendet(false);
     }
   };
+  const senden = (body: AusstattungAktionBody, imDialog: boolean) =>
+    ausfuehren(onAktion ? () => onAktion(body) : null, imDialog);
   const ausDialog = (body: AusstattungAktionBody) => void senden(body, true);
+  const ausgabeAusDialog = (body: AusgabenAktionBody) =>
+    void ausfuehren(onAusgabenAktion ? () => onAusgabenAktion(body) : null, true);
+  const ausgabeOeffnen = (anfrage: AusgabenDialogAnfrage) => oeffnen({ art: "ausgabe", anfrage });
   const dialogProps = {
     sendet,
     fehler,
@@ -472,6 +565,11 @@ export function AusstattungKarte({ uebersicht, darfBearbeiten = false, onAktion 
       )}
 
       {uebersicht.satz && <p className="mb-3 text-sm text-muted-foreground">{uebersicht.satz}</p>}
+      {ausgabenBearbeitbar && uebersicht.zustand === "NUR_LESEN" && hatAusgabenFelder(uebersicht) && (
+        <p className="-mt-2 mb-3 text-sm text-muted-foreground" data-satz="ausgaben">
+          {AUSGABEN_ZEILE_TEXTE.nachAbschluss}
+        </p>
+      )}
       {uebersicht.gruppen.length > 0 && (
         <p className="mb-3 text-xs text-muted-foreground">
           {[uebersicht.einleitung, AUSSTATTUNG_KARTE_TEXTE.erklaerung].filter(Boolean).join(" ")}
@@ -502,9 +600,11 @@ export function AusstattungKarte({ uebersicht, darfBearbeiten = false, onAktion 
                       gruppe={gruppe}
                       zeigeTexte={recht}
                       bearbeitbar={bearbeitbar}
+                      ausgabenBearbeitbar={ausgabenBearbeitbar}
                       sendet={sendet}
                       onBearbeiten={() => oeffnen({ art: "bearbeiten", gruppe, zeile })}
                       onStreichen={() => oeffnen({ art: "streichen", gruppe, zeile })}
+                      onAusgabe={ausgabeOeffnen}
                     />
                   ))}
                 </ul>
@@ -527,6 +627,8 @@ export function AusstattungKarte({ uebersicht, darfBearbeiten = false, onAktion 
       ) : (
         uebersicht.leer && <p className="text-sm text-muted-foreground">{uebersicht.leer}</p>
       )}
+
+      <ProtokollZeile protokoll={uebersicht.protokoll} />
 
       {dialog?.art === "hinzufuegen" && (
         <HinzufuegenDialog hinzufuegbar={uebersicht.hinzufuegbar} stellen={uebersicht.stellen} {...dialogProps} />
@@ -574,6 +676,9 @@ export function AusstattungKarte({ uebersicht, darfBearbeiten = false, onAktion 
           stelleName={dialog.gruppe.stelleName}
           {...dialogProps}
         />
+      )}
+      {dialog?.art === "ausgabe" && (
+        <AusgabenDialog anfrage={dialog.anfrage} {...dialogProps} onSenden={ausgabeAusDialog} />
       )}
     </section>
   );

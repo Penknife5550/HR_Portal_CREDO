@@ -228,6 +228,8 @@ describe("Onboarding-Abteilungsvorlagen: flache Bedingungsbloecke (Paket A3)", (
     "onboarding-department-completed",
     // S18 (E-A18): die Sammelmail an HR haelt dieselbe Regel ein.
     "onboarding-ausstattung-offen",
+    // A4, S27 (G10): die Absage mit ihren Bloecken {{#hat_erledigte}} und {{#hat_ausgaben}}.
+    "onboarding-department-abgesagt",
   ];
   const vorlage = (event: string) => DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event)!;
 
@@ -310,6 +312,53 @@ describe("Onboarding-Abteilungsvorlagen: flache Bedingungsbloecke (Paket A3)", (
     const variablen = erledigt.variables?.map((v) => v.key) ?? [];
     expect(variablen).toEqual(
       expect.arrayContaining(["{{meldung_kurz}}", "{{ist_erledigt}}", "{{nur_kommentar}}", "{{hr_postfach}}"]),
+    );
+  });
+
+  // A4, S25 (G9): Der Uebergabevermerk steht flach in einer eigenen Zeile
+  // „Vermerkt“ – artneutral (der Wert sagt „übergeben …“ bzw. bei einem Zugang
+  // „eingerichtet …“), im HTML maskiert, im Text roh, nie im Betreff.
+  it("die Erledigt-Meldung traegt den Uebergabevermerk flach im Block {{#ausgabe_vermerk}}", () => {
+    const erledigt = vorlage("onboarding-task-completed");
+    expect(erledigt.bodyHtml).toMatch(
+      /\{\{#ausgabe_vermerk\}\}[\s\S]*Vermerkt[\s\S]*\{\{ausgabe_vermerk_html\}\}[\s\S]*?\{\{\/ausgabe_vermerk\}\}/,
+    );
+    expect(erledigt.bodyText).toContain("{{#ausgabe_vermerk}}Vermerkt: {{ausgabe_vermerk}}\n{{/ausgabe_vermerk}}");
+    // Nie „Übergeben: eingerichtet …“ bei einem Zugang.
+    expect(erledigt.bodyHtml).not.toContain("Übergeben");
+    expect(erledigt.bodyText).not.toContain("Übergeben");
+    // Rohtext nie ins HTML, das maskierte Feld nie in den Text, beides nie in den Betreff.
+    expect(erledigt.bodyHtml).not.toMatch(/\{\{ausgabe_vermerk\}\}/);
+    expect(erledigt.bodyText).not.toContain("ausgabe_vermerk_html");
+    expect(erledigt.subject).not.toContain("ausgabe_vermerk");
+    const variablen = erledigt.variables?.map((v) => v.key) ?? [];
+    expect(variablen).toEqual(expect.arrayContaining(["{{ausgabe_vermerk}}", "{{ausgabe_vermerk_html}}"]));
+  });
+
+  // A4, S27 (G10): Die Absage nennt die noch ausgegebenen Stuecke flach im
+  // Block {{#hat_ausgaben}} — im HTML maskiert, im Text roh, nie im Betreff.
+  it("die Absage traegt die Ausgaben flach im Block {{#hat_ausgaben}}", () => {
+    const absage = vorlage("onboarding-department-abgesagt");
+    const SATZ = "Laut Portal ausgegeben – bitte zurücknehmen bzw. sperren:";
+    expect(absage.bodyHtml).toMatch(
+      /\{\{#hat_ausgaben\}\}[\s\S]*Laut Portal ausgegeben – bitte zurücknehmen bzw\. sperren:[\s\S]*\{\{ausgaben_liste_html\}\}[\s\S]*?\{\{\/hat_ausgaben\}\}/,
+    );
+    expect(absage.bodyText).toContain(`{{#hat_ausgaben}}\n${SATZ}\n\n{{ausgaben_liste}}\n{{/hat_ausgaben}}`);
+    // Nach den erledigten Aufgaben, vor „Für noch offene Aufgaben …“.
+    for (const teil of [absage.bodyHtml, absage.bodyText ?? ""]) {
+      const erledigt = teil.indexOf("{{/hat_erledigte}}");
+      const ausgaben = teil.indexOf("{{#hat_ausgaben}}");
+      expect(erledigt).toBeGreaterThan(-1);
+      expect(ausgaben).toBeGreaterThan(erledigt);
+      expect(teil.indexOf("Für noch offene Aufgaben")).toBeGreaterThan(ausgaben);
+    }
+    // Rohtext nie ins HTML, das maskierte Feld nie in den Text, beides nie in den Betreff.
+    expect(absage.bodyHtml).not.toMatch(/\{\{ausgaben_liste\}\}/);
+    expect(absage.bodyText).not.toContain("ausgaben_liste_html");
+    expect(absage.subject).not.toContain("ausgaben");
+    const variablen = absage.variables?.map((v) => v.key) ?? [];
+    expect(variablen).toEqual(
+      expect.arrayContaining(["{{ausgaben_liste}}", "{{ausgaben_liste_html}}", "{{hat_ausgaben}}"]),
     );
   });
 

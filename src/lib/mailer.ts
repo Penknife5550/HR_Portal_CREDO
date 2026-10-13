@@ -513,6 +513,14 @@ const FREITEXT_VARIABLEN = [
   // Aufgaben, bei einer freien Position von HR frei getippt. Im HTML steht
   // `erledigte_liste_html` (schon maskiert, deshalb NICHT hier).
   "erledigte_liste",
+  // Uebergabevermerk (Paket A4, G9): Kennungen der Stuecke, von der Stelle
+  // ueber ihren Link getippt. Im HTML steht `ausgabe_vermerk_html` (schon
+  // maskiert, deshalb NICHT hier).
+  "ausgabe_vermerk",
+  // Absage an die Stellen (Paket A4, G10): Bezeichnungen und Kennungen der
+  // noch ausgegebenen Stuecke (Kennung von der Stelle bzw. HR getippt). Im
+  // HTML steht `ausgaben_liste_html` (schon maskiert, deshalb NICHT hier).
+  "ausgaben_liste",
 ];
 
 /** Variablen fuer den HTML-Teil: Namen und Rohtexte maskiert, der Rest unveraendert. */

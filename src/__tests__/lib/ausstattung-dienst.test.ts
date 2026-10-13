@@ -15,7 +15,8 @@
  * Freitext. Seit S23 (A4): der Merker `ausgabenAngeboten` beim Speichern des
  * Schritts (`fuehrungskraftWahlSpeichernIn`) und bei der Abgabe
  * (`ausgabenAngebotenBeiAbgabeIn`) sowie „Beim Austritt“ an einer freien
- * Position.
+ * Position. Seit S24 (A4, G5): Abwaehlen, Streichen und Stellenwechsel mit
+ * aktiver Ausgabe → 409 AUSGABE_VORHANDEN.
  *
  * Der Fake rollt bei einer Ausnahme NICHT zurueck — Abweisungen werden
  * deshalb daran geprueft, dass VOR dem ersten Schreiben abgewiesen wird. Die
@@ -32,6 +33,7 @@ import {
   db,
   dbLeeren,
   fakePrisma,
+  neueAusgabe,
   neueAusstattungsZeile,
   neueOnboardingAufgabe,
   neuerLink,
@@ -1063,6 +1065,95 @@ describe("A4: „Beim Austritt“ an der freien Position (G8)", () => {
     const r = await aktion({ aktion: "hinzufuegen", frei: { departmentKey: "IT", bezeichnung: "Tablet", beiAustritt: "RUECKGABE" } });
     expect(r).toEqual({ status: 400, body: { error: MELDUNGEN.RUECKGABEKATEGORIE_FEHLT } });
     expect(db.ausstattungZeilen).toEqual([]);
+  });
+});
+
+describe("A4: eine aktive Ausgabe sperrt Regel 9 (G5)", () => {
+  // Die Uebersicht fragt nach Austrittsbezuegen und dem Protokoll – beides kennt der Fake nicht (S29, S34).
+  beforeEach(() => {
+    fp.returnItem = { findMany: jest.fn(async () => []) };
+    fp.document = { findFirst: jest.fn(async () => null) };
+  });
+
+  /** Eine Ausgabe an der Aufgabe mit diesem Titel (Zustand nach Wahl). */
+  function ausgabeAn(titel: string, teil: Zeile = {}): Zeile {
+    const a = aufgabe(titel)!;
+    return neueAusgabe({
+      onboardingId: "onb-1",
+      checklistItemId: a.id,
+      organizationId: "org-1",
+      departmentKey: a.assignee,
+      bezeichnung: titel,
+      beiAustritt: "RUECKGABE",
+      quelle: "LINK",
+      uebergebenAm: tag("2026-09-30"),
+      ...teil,
+    });
+  }
+
+  const VORHANDEN = { status: 409, body: { error: MELDUNGEN.AUSGABE_VORHANDEN, grund: "AUSGABE_VORHANDEN" } };
+
+  it("Streichen vor der Information → 409 AUSGABE_VORHANDEN: Zeile, Aufgabe und Ausgabe bleiben", async () => {
+    db.ausstattungZeilen = [ipad({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE" })];
+    await nachgeholt();
+    db.ausgaben = [ausgabeAn("Dienst-iPad (Lernmittel) bereitstellen")];
+
+    expect(await aktion({ aktion: "streichen", ausstattungId: "aus-ipad" })).toEqual(VORHANDEN);
+    expect(db.ausstattungZeilen).toHaveLength(1);
+    expect(ausstattungsAufgaben()).toHaveLength(1);
+    expect(db.ausgaben).toHaveLength(1);
+    // Gelesen NACH der Vorgangssperre.
+    expect(fp.onboardingProcess.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      fp.ausgabe.findMany.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("Abwählen der Option mit Ausgabe → 409; eine andere Option lässt sich abwählen", async () => {
+    db.ausstattungZeilen = [schluessel({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "SCHLUESSEL" })];
+    await nachgeholt();
+    db.ausgaben = [ausgabeAn("Schlüssel ausgeben: Haupteingang", { zustand: "VERBLEIBT" })];
+
+    expect(await aktion({ aktion: "aendern", ausstattungId: "aus-schluessel", auswahl: ["Lehrerzimmer"] })).toEqual(VORHANDEN);
+    expect(db.ausstattungZeilen[0].auswahl).toEqual(["Haupteingang", "Lehrerzimmer"]);
+
+    const r = await aktion({ aktion: "aendern", ausstattungId: "aus-schluessel", auswahl: ["Haupteingang"] });
+    expect(r.status).toBe(200);
+    expect(ausstattungsAufgaben().map((a) => a.title)).toEqual(["Schlüssel ausgeben: Haupteingang"]);
+  });
+
+  it("Stellenwechsel mit Ausgabe → 409; die Bemerkung lässt sich weiter ändern", async () => {
+    db.ausstattungZeilen = [ipad({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE" })];
+    await nachgeholt();
+    db.ausgaben = [ausgabeAn("Dienst-iPad (Lernmittel) bereitstellen")];
+
+    expect(await aktion({ aktion: "aendern", ausstattungId: "aus-ipad", departmentKey: "FACILITY" })).toEqual(VORHANDEN);
+    expect(db.ausstattungZeilen[0].departmentKey).toBe("IT");
+    expect((await aktion({ aktion: "aendern", ausstattungId: "aus-ipad", bemerkung: "Mit Hülle" })).status).toBe(200);
+  });
+
+  it("nur zurückgenommene Ausgaben sperren nicht; die Karte nennt den Sperrgrund nur bei einer aktiven", async () => {
+    db.ausstattungZeilen = [ipad({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE" })];
+    await nachgeholt();
+    db.ausgaben = [ausgabeAn("Dienst-iPad (Lernmittel) bereitstellen")];
+
+    const mit = (await ausstattungKarteLaden({ onboardingId: "onb-1", session: HR, jetzt: JETZT })).body as {
+      data: AusstattungsUebersicht;
+    };
+    expect(mit.data.gruppen[0].zeilen[0].aktionen).toEqual({
+      aendern: true,
+      streichen: false,
+      sperrGrund: MELDUNGEN.AUSGABE_VORHANDEN,
+    });
+
+    db.ausgaben[0].zustand = "ZURUECK";
+    expect((await aktion({ aktion: "streichen", ausstattungId: "aus-ipad" })).status).toBe(200);
+  });
+
+  it("Zeilen ohne `beiAustritt` fragen keine Ausgaben ab (A4 aus, G27)", async () => {
+    db.ausstattungZeilen = [ipad()];
+    await nachgeholt();
+    expect((await aktion({ aktion: "streichen", ausstattungId: "aus-ipad" })).status).toBe(200);
+    expect(fp.ausgabe.findMany).not.toHaveBeenCalled();
   });
 });
 

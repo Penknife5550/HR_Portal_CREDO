@@ -113,6 +113,9 @@ import { formatDatumDE } from "@/lib/format";
 import { heuteInBerlin, monateSpaeter } from "@/lib/minijob-fristen";
 import { vorgesetzteAbgesendet } from "@/lib/onboarding-spuren";
 import { beginnDesBerlinerTages } from "@/lib/vorgangsjahr";
+// A4 (G1): aus ausgaben.ts NUR Typen — ausgaben.ts liest Werte von hier, ein
+// Wert-Import ergaebe einen Kreis (Test „Reinheit der Datei“ in ausgaben.test.ts).
+import type { AusgabenAufgabeAnzeige, ProtokollAnzeige } from "@/lib/ausgaben";
 
 // =============================================
 // Wertlisten (Zustaende sind Zeichenketten, keine Enums)
@@ -554,6 +557,13 @@ export const MELDUNGEN = {
     "Die Position ist gestrichen. Eine Position aus dem Katalog lässt sich über „Position hinzufügen…“ wieder aufnehmen.",
   /** 409 OHNE_OFFENE_AUFGABE: Fälligkeit nur an einer offenen Aufgabe. */
   OHNE_OFFENE_AUFGABE: "Dazu gibt es keine offene Aufgabe – die Fälligkeit lässt sich nicht ändern.",
+  /**
+   * 409 AUSGABE_VORHANDEN (A4, G5): An einer Aufgabe der Position haengt eine
+   * aktive Ausgabe (AUSGEGEBEN, VERBLEIBT) — Abwaehlen, Streichen und
+   * Stellenwechsel nehmen ihr sonst den Bezug. `MELDUNGEN_AUSGABEN` in
+   * ausgaben.ts liest denselben Text (eine Quelle).
+   */
+  AUSGABE_VORHANDEN: "Für diese Position ist eine Ausgabe vermerkt – erst die Ausgabe entfernen oder zurücknehmen.",
   /** 409 BEREITS_VORHANDEN: Die Position steht schon in diesem Vorgang. */
   POSITION_BEREITS_GEWAEHLT: "Diese Position ist schon gewählt. Bitte sie bearbeiten statt erneut hinzufügen.",
   /** 400: Die Position gehört nicht zum Katalogausschnitt dieses Vorgangs. */
@@ -2208,8 +2218,17 @@ export interface Erfasser {
 /** Zustand einer Ausstattungs- oder Hinweis-Aufgabe (F2: „entfällt“ ist erledigt, zaehlt aber nie als erledigt). */
 export type AufgabenStatus = "offen" | "erledigt" | "entfaellt";
 
-/** Stand einer Aufgabe zu einer Zeile (je Option eine; seit S15 in der Uebersicht, im PDF leer). */
-export interface AusstattungsAufgabeStand {
+/**
+ * Stand einer Aufgabe zu einer Zeile (je Option eine; seit S15 in der
+ * Uebersicht, im PDF leer).
+ *
+ * Seit S24 (A4, G7) die Ausgaben der Aufgabe (`AusgabenAufgabeAnzeige` aus
+ * ausgaben.ts: `ausgabeMoeglich`, `ausgaben`, Hinweis, „Vermerken“, Art,
+ * Beschriftung, Schluessel) — nur an Aufgaben, deren Zeile beim Austritt
+ * zurueckkommt oder gesperrt wird, und nur in der Sicht von HR. Fehlen die
+ * Felder, gibt es dort keine Uebergabe (deshalb optional).
+ */
+export interface AusstattungsAufgabeStand extends Partial<AusgabenAufgabeAnzeige> {
   /** "" = ganze Position, sonst die Option. */
   option: string;
   checklistItemId: string;
@@ -2339,6 +2358,17 @@ export interface AusstattungsUebersicht {
   stellen: AusstattungsStelle[];
   /** Rolle in HR_EDIT_ROLES. */
   darfBearbeiten: boolean;
+  /**
+   * A4 (G7): Ausgaben vermerken, korrigieren, tauschen, zuruecknehmen und
+   * entfernen — mit HR_EDIT_ROLES, UNABHAENGIG vom Zustand der Karte (auch
+   * NUR_LESEN bei COMPLETED und EXPIRED). Optional fuer Altbestand der Tests.
+   */
+  ausgabenBearbeitbar?: boolean;
+  /**
+   * A4 (G19): „Unterschriebenes Übergabeprotokoll: fehlt / hochgeladen am …“,
+   * sobald der Vorgang aktive Ausgaben mit RUECKGABE hat; sonst `null`.
+   */
+  protokoll?: ProtokollAnzeige | null;
 }
 
 function alsIso(wert: Date | string | null | undefined): string | null {
@@ -2461,6 +2491,12 @@ export function ausstattungsGruppen(opts: {
  * „nicht geladen“ — dann ist nichts hinzufuegbar und keine Zeile „nicht mehr
  * im Katalog“. Ohne `jetzt` gibt es keine Vorlauf-Warnung (die Datei kennt
  * keine Uhr).
+ *
+ * Seit S24 (A4): `ausgabenJeAufgabe` (gebaut von `ausgabenAnzeigeBauen` in
+ * ausgaben.ts — diese Datei liest von dort nur Typen) haengt die Ausgaben an
+ * die Aufgaben; eine aktive Ausgabe sperrt Streichen, Abwaehlen und
+ * Stellenwechsel (G5, `aenderungPruefen`). `ausgabenBearbeitbar` folgt dem
+ * Bearbeitungsrecht, nicht dem Zustand (G7); `protokoll` reicht durch (G19).
  */
 export function ausstattungsUebersichtBauen(opts: {
   vorgang: UebersichtVorgangStand;
@@ -2478,6 +2514,10 @@ export function ausstattungsUebersichtBauen(opts: {
   verknuepfungen?: ReadonlyArray<UebersichtVerknuepfung>;
   /** Seit S15: Zeitpunkt fuer die Vorlauf-Warnung. */
   jetzt?: Date;
+  /** Seit S24 (A4): Ausgaben je Ausstattungsaufgabe (Schluessel `checklistItemId`); fehlt = ohne Ausgabe-Felder. */
+  ausgabenJeAufgabe?: Readonly<Record<string, AusgabenAufgabeAnzeige>>;
+  /** Seit S24 (A4, G19): Zeile zum unterschriebenen Uebergabeprotokoll; fehlt = `null`. */
+  protokoll?: ProtokollAnzeige | null;
 }): AusstattungsUebersicht {
   const { zustand, satz } = ausstattungsZustand(opts.vorgang, opts.darfBearbeiten);
   const eingereicht = vorgesetzteAbgesendet(opts.vorgang);
@@ -2504,6 +2544,7 @@ export function ausstattungsUebersichtBauen(opts: {
       verknuepfungen: opts.verknuepfungen ?? [],
       vertragsbeginn: eingereicht ? (opts.vorgang.supervisorData?.vertragsbeginn ?? null) : null,
       jetzt: opts.jetzt ?? null,
+      ausgabenJeAufgabe: opts.ausgabenJeAufgabe ?? null,
     },
   );
   const stellen: AusstattungsStelle[] =
@@ -2554,6 +2595,8 @@ export function ausstattungsUebersichtBauen(opts: {
     hinzufuegbar,
     stellen,
     darfBearbeiten: opts.darfBearbeiten,
+    ausgabenBearbeitbar: opts.darfBearbeiten,
+    protokoll: opts.protokoll ?? null,
   };
 }
 
@@ -2579,11 +2622,16 @@ export function aufgabenStatus(a: { isCompleted: boolean; entfaelltAm?: Date | s
   return a.isCompleted ? "erledigt" : "offen";
 }
 
-/** Die Aufgaben einer Zeile, Option fuer Option: die gewaehlten in ihrer Reihenfolge, dahinter die uebrigen (entfallene). */
+/**
+ * Die Aufgaben einer Zeile, Option fuer Option: die gewaehlten in ihrer
+ * Reihenfolge, dahinter die uebrigen (entfallene). Seit S24 (A4) je Aufgabe
+ * die Ausgaben aus `ausgabenJeAufgabe`, wenn sie dort steht.
+ */
 function zeilenAufgaben(
   zeile: Pick<UebersichtZeileDaten, "auswahl">,
   verknuepfungen: ReadonlyArray<UebersichtVerknuepfung>,
   aufgabeZu: ReadonlyMap<string, UebersichtAufgabeDaten>,
+  ausgabenJeAufgabe: Readonly<Record<string, AusgabenAufgabeAnzeige>> | null = null,
 ): AusstattungsAufgabeStand[] {
   const rang = (option: string) => {
     const i = zeile.auswahl.indexOf(option);
@@ -2594,6 +2642,10 @@ function zeilenAufgaben(
       const a = aufgabeZu.get(v.checklistItemId);
       if (!a) return [];
       const status = aufgabenStatus(a);
+      const ausgaben =
+        ausgabenJeAufgabe && Object.prototype.hasOwnProperty.call(ausgabenJeAufgabe, a.id)
+          ? ausgabenJeAufgabe[a.id]
+          : null;
       return [
         {
           option: v.option,
@@ -2603,27 +2655,57 @@ function zeilenAufgaben(
           faelligAm: alsIso(a.dueDate),
           eilt: a.eilt === true,
           erledigtAm: status === "erledigt" ? alsIso(a.completedAt) : null,
+          ...(ausgaben ?? {}),
         },
       ];
     })
     .sort((x, y) => rang(x.option) - rang(y.option) || x.option.localeCompare(y.option, "de"));
 }
 
-/** Aktionen einer Zeile nach Regel 9 — dieselbe Pruefung wie der Server (`aenderungPruefen`). */
+/**
+ * Die Aufgaben einer Zeile der Karte so, wie `aenderungPruefen` sie liest:
+ * `mitAusgabe` = an der Aufgabe steht ein aktives Stueck (`ausgaben[].aktiv`,
+ * AUSGEGEBEN oder VERBLEIBT; A4, G5) – auch an einer noch OFFENEN Aufgabe
+ * (G4: vermerkt wird getrennt vom Abhaken). Eine Abbildung fuer die Aktionen
+ * der Zeile (`zeilenAktionen`) und den Dialog „Bearbeiten…“
+ * (`bearbeitenGrund`), damit beide dieselbe Pruefung rechnen wie der Server.
+ */
+export function pruefbareAufgaben(
+  aufgaben: ReadonlyArray<{ option: string; status: AufgabenStatus; ausgaben?: ReadonlyArray<{ aktiv: boolean }> }>,
+): Array<{ option: string; status: AufgabenStatus; mitAusgabe: boolean }> {
+  return aufgaben.map((a) => ({
+    option: a.option,
+    status: a.status,
+    mitAusgabe: (a.ausgaben ?? []).some((s) => s.aktiv),
+  }));
+}
+
+/**
+ * Aktionen einer Zeile nach Regel 9 — dieselbe Pruefung wie der Server
+ * (`aenderungPruefen`). Seit S24 (A4, G5) sperrt auch eine aktive Ausgabe an
+ * einer Aufgabe (`ausgaben[].aktiv`) Streichen und Stellenwechsel; der
+ * Sperrgrund nennt dann sie.
+ */
 function zeilenAktionen(
   zeile: { art: string; gestrichen: boolean },
-  aufgaben: ReadonlyArray<{ option: string; status: AufgabenStatus }>,
+  aufgaben: ReadonlyArray<{ option: string; status: AufgabenStatus; ausgaben?: ReadonlyArray<{ aktiv: boolean }> }>,
 ): AusstattungsZeile["aktionen"] {
   if (zeile.gestrichen) return { aendern: false, streichen: false, sperrGrund: MELDUNGEN.POSITION_GESTRICHEN };
   const stand = { art: zeile.art, gestrichenAm: null };
-  const streichen = aenderungPruefen(stand, aufgaben, { streichen: true }) === null;
+  const pruefbar = pruefbareAufgaben(aufgaben);
+  const streichGrund = aenderungPruefen(stand, pruefbar, { streichen: true });
+  const streichen = streichGrund === null;
   // Eine Auswahl laesst sich immer ergaenzen, eine Angabe hat keine Aufgabe —
   // beides ist immer „Bearbeiten“; ein Ja/Nein nur, solange Bemerkung oder Stelle aenderbar sind.
   const aendern =
     zeile.art !== "JA_NEIN" ||
-    aenderungPruefen(stand, aufgaben, { bemerkung: true }) === null ||
-    aenderungPruefen(stand, aufgaben, { stelle: true }) === null;
-  return { aendern, streichen, sperrGrund: streichen && aendern ? null : MELDUNGEN.AUFGABE_ERLEDIGT };
+    aenderungPruefen(stand, pruefbar, { bemerkung: true }) === null ||
+    aenderungPruefen(stand, pruefbar, { stelle: true }) === null;
+  return {
+    aendern,
+    streichen,
+    sperrGrund: streichen && aendern ? null : aenderungsGrundText(streichGrund ?? "AUFGABE_ERLEDIGT"),
+  };
 }
 
 /**
@@ -2641,6 +2723,8 @@ function karteAnreichern(
     verknuepfungen: ReadonlyArray<UebersichtVerknuepfung>;
     vertragsbeginn: Date | string | null;
     jetzt: Date | null;
+    /** Seit S24 (A4): Ausgaben je Aufgabe (`ausgabenAnzeigeBauen`); `null` = ohne. */
+    ausgabenJeAufgabe?: Readonly<Record<string, AusgabenAufgabeAnzeige>> | null;
   },
 ): AusstattungsGruppe[] {
   const aufgabeZu = new Map(k.aufgaben.map((a) => [a.id, a]));
@@ -2653,7 +2737,9 @@ function karteAnreichern(
     ...g,
     zeilen: g.zeilen.map((z) => {
       const daten = datenZu.get(z.id);
-      const aufgaben = daten ? zeilenAufgaben(daten, verknuepftZu.get(z.id) ?? [], aufgabeZu) : [];
+      const aufgaben = daten
+        ? zeilenAufgaben(daten, verknuepftZu.get(z.id) ?? [], aufgabeZu, k.ausgabenJeAufgabe ?? null)
+        : [];
       const katalog = z.positionId ? katalogZu.get(z.positionId) : undefined;
       const optionen =
         z.art === "AUSWAHL"
@@ -2713,8 +2799,11 @@ function hinweisAnreichern(
 // src/lib/ausstattung-dienst.ts (`ausstattungAktionAusfuehren`), Schreiben in
 // fremder Transaktion src/lib/ausstattung-aufgaben.ts.
 
-/** Warum eine Aenderung abgewiesen wird (409, `grund` der Antwort). */
-export type AenderungsGrund = "AUFGABE_ERLEDIGT" | "GESTRICHEN" | "OHNE_OFFENE_AUFGABE";
+/**
+ * Warum eine Aenderung abgewiesen wird (409, `grund` der Antwort). Seit S24
+ * (A4, G5) auch AUSGABE_VORHANDEN: An der Aufgabe haengt eine aktive Ausgabe.
+ */
+export type AenderungsGrund = "AUFGABE_ERLEDIGT" | "GESTRICHEN" | "OHNE_OFFENE_AUFGABE" | "AUSGABE_VORHANDEN";
 
 /** Text zu einem `AenderungsGrund` (Antwort des Servers und Sperrgrund der Karte). */
 export function aenderungsGrundText(grund: AenderungsGrund): string {
@@ -2725,6 +2814,8 @@ export function aenderungsGrundText(grund: AenderungsGrund): string {
       return MELDUNGEN.POSITION_GESTRICHEN;
     case "OHNE_OFFENE_AUFGABE":
       return MELDUNGEN.OHNE_OFFENE_AUFGABE;
+    case "AUSGABE_VORHANDEN":
+      return MELDUNGEN.AUSGABE_VORHANDEN;
     default: {
       const unbekannt: never = grund;
       return String(unbekannt);
@@ -2766,12 +2857,19 @@ export interface AenderungsWunsch {
  *   - Optionen hinzufuegen geht immer (auch eine frueher abgewaehlte, F23).
  *   - Faelligkeit nur an einer offenen Aufgabe: erledigt → AUFGABE_ERLEDIGT,
  *     sonst (entfallen, noch keine) → OHNE_OFFENE_AUFGABE.
+ *   - Seit S24 (A4, G5): Haengt an einer Aufgabe eine aktive Ausgabe
+ *     (`mitAusgabe`: AUSGEGEBEN oder VERBLEIBT), lassen sich weder die ganze
+ *     Position streichen noch ihre Stelle wechseln noch die Option dieser
+ *     Aufgabe abwaehlen → AUSGABE_VORHANDEN (nach AUFGABE_ERLEDIGT geprueft:
+ *     ist beides der Fall, nennt die Antwort die erledigte Aufgabe). Vor der
+ *     Information der Stelle loeschte „Streichen“ die Aufgabe, und die Ausgabe
+ *     verloere ihren Bezug.
  *
  * Entfallene Aufgaben zaehlen nie als erledigt.
  */
 export function aenderungPruefen(
   zeile: { art: string; gestrichenAm?: Date | string | null },
-  aufgaben: ReadonlyArray<{ option: string; status: AufgabenStatus }>,
+  aufgaben: ReadonlyArray<{ option: string; status: AufgabenStatus; mitAusgabe?: boolean }>,
   aenderung: AenderungsWunsch,
 ): AenderungsGrund | null {
   if (zeile.gestrichenAm != null) return "GESTRICHEN";
@@ -2779,6 +2877,11 @@ export function aenderungPruefen(
   if ((aenderung.streichen || aenderung.stelle) && erledigt) return "AUFGABE_ERLEDIGT";
   for (const option of aenderung.abwaehlen ?? []) {
     if (aufgaben.some((a) => a.option === option && a.status === "erledigt")) return "AUFGABE_ERLEDIGT";
+  }
+  const mitAusgabe = aufgaben.some((a) => a.mitAusgabe === true);
+  if ((aenderung.streichen || aenderung.stelle) && mitAusgabe) return "AUSGABE_VORHANDEN";
+  for (const option of aenderung.abwaehlen ?? []) {
+    if (aufgaben.some((a) => a.option === option && a.mitAusgabe === true)) return "AUSGABE_VORHANDEN";
   }
   if (aenderung.bemerkung) {
     const zaehlend = aufgaben.filter((a) => a.status !== "entfaellt");

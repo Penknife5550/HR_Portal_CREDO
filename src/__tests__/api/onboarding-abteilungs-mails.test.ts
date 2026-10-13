@@ -34,6 +34,16 @@
  * Feinplan S19 (E-A20): die Absage onboarding-department-abgesagt — echte
  * Payload = Katalogbeispiel, erledigte Aufgaben maskiert im HTML und roh im
  * Text, kein Link in keinem Teil, ohne erledigte Aufgaben kein Rueckbau-Absatz.
+ *
+ * Feinplan A4, S25 (G9): onboarding-task-completed traegt den
+ * Uebergabevermerk der Aufgabe (`ausgabe_vermerk` roh im Text,
+ * `ausgabe_vermerk_html` maskiert im HTML), nach dem Commit frisch gelesen;
+ * ein Vermerk allein schickt keine Mail; beide Felder nie im Betreff.
+ *
+ * Feinplan A4, S27 (G10): Die Absage nennt die noch ausgegebenen Stuecke der
+ * Stelle (`ausgaben_liste` roh im Text, `ausgaben_liste_html` maskiert im
+ * HTML, Merker `hat_ausgaben`) — echte Payload = Katalogbeispiel, ohne
+ * Ausgaben kein Absatz, beide Listen nie im Betreff.
  */
 
 type MailErgebnis = { status: "SENT" | "FAILED" | "SKIPPED"; detail?: string; recipient?: string };
@@ -47,7 +57,9 @@ jest.mock("@/lib/webhooks", () => ({ triggerWebhooks: mockTriggerWebhooks }));
 import {
   db,
   dbLeeren,
+  fakePrisma,
   naechsteId,
+  neueAusgabe,
   neueAusstattungsZeile,
   neuerLink,
   neuerStellenHinweis,
@@ -57,6 +69,7 @@ import { renderEventEmail } from "@/lib/mailer";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import {
   EVENT_CATALOG,
+  ONBOARDING_ABSAGE_BEISPIEL_AUSGABEN,
   ONBOARDING_ABSAGE_BEISPIEL_ERLEDIGT,
   ONBOARDING_ABTEILUNG_BEISPIEL_ANGABEN,
   ONBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN,
@@ -64,6 +77,7 @@ import {
 } from "@/lib/events";
 import { HINWEIS_AUFGABE_BESCHREIBUNG, HINWEIS_AUFGABE_TITEL, angabenFuer, angabenMailFelder } from "@/lib/ausstattung";
 import { onboardingAbteilungsMailFelder } from "@/lib/onboarding-abteilung-mail";
+import { ausgabenListeMailFelder } from "@/lib/ausgaben";
 import {
   aufgabenlisteMailFelder,
   erledigteListeMailFelder,
@@ -78,10 +92,15 @@ import {
 } from "@/lib/abteilungsaufgaben-onboarding";
 import {
   erledigtMeldungFelder,
+  oeffentlicheAusgabeVermerken,
   oeffentlicheOnboardingAufgabeAendern,
   onboardingAufgabeImPortalAendern,
 } from "@/lib/abteilungsaufgaben-uebergaenge";
 import type { SessionPayload } from "@/lib/permissions";
+
+// Rueckgabe-Zeilen mit `ausgabeId` kennt der Fake erst ab S29 (Bindung eines
+// Link-Vermerks auf der Link-Seite, G28) – hier immer leer.
+(fakePrisma as Record<string, unknown>).returnItem = { findMany: jest.fn(async () => []) };
 
 // =============================================
 // Testdaten — die Geschichte aus dem Katalog (src/lib/events.ts)
@@ -195,6 +214,50 @@ function beispielAngaben(): Zeile[] {
       ...a,
     }),
   );
+}
+
+/**
+ * Die Ausgaben der IT aus dem Katalog-Beispiel der Absage (A4, G10) als
+ * Datenbankzeilen — `uebergebenAm` als `@db.Date` (Mitternacht UTC). Dazu ein
+ * schon zurueckgenommenes Stueck und eines der Gebaeudewirtschaft: Beide
+ * gehoeren nicht in die Absage an die IT.
+ */
+function beispielAusgaben(): Zeile[] {
+  const zeilen = ONBOARDING_ABSAGE_BEISPIEL_AUSGABEN.map((a, i) =>
+    neueAusgabe({
+      id: `ag-beispiel-${i}`,
+      onboardingId: VORGANG_ID,
+      organizationId: ORG_ID,
+      departmentKey: "IT",
+      quelle: "LINK",
+      ...a,
+      uebergebenAm: new Date(`${a.uebergebenAm}T00:00:00.000Z`),
+    }),
+  );
+  return [
+    ...zeilen,
+    neueAusgabe({
+      onboardingId: VORGANG_ID,
+      organizationId: ORG_ID,
+      departmentKey: "IT",
+      bezeichnung: "Dienst-iPad (Lernmittel)",
+      kennung: "FES-IPAD-0001",
+      beiAustritt: "RUECKGABE",
+      quelle: "HR",
+      uebergebenAm: new Date("2026-09-24T00:00:00.000Z"),
+      zustand: "ZURUECK",
+    }),
+    neueAusgabe({
+      onboardingId: VORGANG_ID,
+      organizationId: ORG_ID,
+      departmentKey: "FACILITY",
+      bezeichnung: "Schlüssel: Haupteingang",
+      kennung: "S-12",
+      beiAustritt: "RUECKGABE",
+      quelle: "LINK",
+      uebergebenAm: new Date("2026-09-24T00:00:00.000Z"),
+    }),
+  ];
 }
 
 function konfig(teil: Zeile = {}): Zeile {
@@ -1200,6 +1263,209 @@ describe("onboarding-task-completed", () => {
 });
 
 // =============================================
+// onboarding-task-completed — Übergabevermerk (Stufe 2, A4, G9)
+// =============================================
+
+describe("onboarding-task-completed — Übergabevermerk (A4, S25, G9)", () => {
+  const IPAD = "i-ipad";
+  const ZUGANG = "i-zugang";
+
+  beforeEach(() => {
+    db.onboardingVorgaenge = [vorgang({ createdAt: new Date("2026-09-01T08:00:00.000Z"), arbeitsortId: null })];
+    db.konfigs = [konfig()];
+    db.ausstattungZeilen = [
+      neueAusstattungsZeile({
+        id: "aus-ipad",
+        onboardingId: VORGANG_ID,
+        departmentKey: "IT",
+        art: "JA_NEIN",
+        bezeichnung: "Dienst-iPad (Lernmittel)",
+        quelle: "FUEHRUNGSKRAFT",
+        beiAustritt: "RUECKGABE",
+        rueckgabeKategorie: "IT_HARDWARE",
+        ausgabeKennung: "Inventarnummer",
+      }),
+      neueAusstattungsZeile({
+        id: "aus-zugang",
+        onboardingId: VORGANG_ID,
+        departmentKey: "IT",
+        art: "JA_NEIN",
+        bezeichnung: "Zugänge",
+        quelle: "FUEHRUNGSKRAFT",
+        beiAustritt: "SPERREN",
+      }),
+    ];
+    db.onboardingAufgaben = [
+      ...beispielAufgaben(),
+      aufgabe({
+        id: IPAD,
+        title: "Dienst-iPad (Lernmittel) bereitstellen",
+        category: "Ausstattung & Zugänge",
+        herkunft: "AUSSTATTUNG",
+        ausgabenGeloeschtAm: null,
+      }),
+      aufgabe({
+        id: ZUGANG,
+        title: "Zugänge bereitstellen",
+        category: "Ausstattung & Zugänge",
+        herkunft: "AUSSTATTUNG",
+        ausgabenGeloeschtAm: null,
+      }),
+    ];
+    db.ausstattungAufgaben = [
+      { ausstattungId: "aus-ipad", option: "", checklistItemId: IPAD, createdAt: new Date() },
+      { ausstattungId: "aus-zugang", option: "", checklistItemId: ZUGANG, createdAt: new Date() },
+    ];
+    db.links = [itLink()];
+    db.replyToEmail = "personal@example.org";
+  });
+
+  const perLink = (itemId: string, body: unknown, jetzt = T_ERLEDIGT) =>
+    oeffentlicheOnboardingAufgabeAendern("tok-it", itemId, body, jetzt);
+  const spaeter = (minuten: number) => new Date(T_ERLEDIGT.getTime() + minuten * MINUTE);
+
+  /** Eine Ausgabe am iPad (Standard: Link-Vermerk der IT, noch ausgegeben, 27.09.2026). */
+  function ausgabe(teil: Zeile = {}): Zeile {
+    return neueAusgabe({
+      onboardingId: VORGANG_ID,
+      checklistItemId: IPAD,
+      organizationId: ORG_ID,
+      departmentKey: "IT",
+      bezeichnung: "Dienst-iPad (Lernmittel)",
+      kennungLabel: "Inventarnummer",
+      beiAustritt: "RUECKGABE",
+      rueckgabeKategorie: "IT_HARDWARE",
+      quelle: "LINK",
+      uebergebenAm: new Date("2026-09-27T00:00:00.000Z"),
+      ...teil,
+    });
+  }
+
+  it("ein Vermerk allein schickt keine Mail; der Vermerk vor dem Abhaken steht als Zeile in der Mail", async () => {
+    const v = await oeffentlicheAusgabeVermerken(
+      "tok-it",
+      IPAD,
+      {
+        stuecke: [
+          { kennung: "FES-IPAD-0412", uebergebenAm: "2026-09-27" },
+          { kennung: "FES-STIFT-07", uebergebenAm: "2026-09-28" },
+        ],
+      },
+      T_ERLEDIGT,
+    );
+    expect(v.status).toBe(201);
+    expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+
+    expect((await perLink(IPAD, { isCompleted: true }, spaeter(1))).status).toBe(200);
+    const payload = payloadVon("onboarding-task-completed");
+    expect(payload).toMatchObject({
+      ausgabe_vermerk: "FES-IPAD-0412 · übergeben 27.09.2026\nFES-STIFT-07 · übergeben 28.09.2026",
+      ausgabe_vermerk_html: "FES-IPAD-0412 · übergeben 27.09.2026<br>FES-STIFT-07 · übergeben 28.09.2026",
+      ist_erledigt: "ja",
+    });
+    // Dieselbe Form wie das Katalogbeispiel (Positivliste der Felder).
+    expect(schluessel(payload)).toEqual(schluessel(beispiel("onboarding-task-completed")));
+    expect(JSON.stringify(payload)).not.toContain(PRIVATE_ADRESSE);
+
+    const mail = pruefeVollstaendig("onboarding-task-completed", payload);
+    expect(mail.subject).toBe("Onboarding-Aufgabe erledigt: Dienst-iPad (Lernmittel) bereitstellen (IT-Abteilung)");
+    // Die Kennung steht nie im Betreff (G9).
+    expect(mail.subject).not.toContain("FES-");
+    expect(mail.text).toContain(
+      "Vermerkt: FES-IPAD-0412 · übergeben 27.09.2026\nFES-STIFT-07 · übergeben 28.09.2026\nVertragsbeginn: 01.10.2026",
+    );
+    // Beschriftung artneutral: Der Wert sagt selbst „übergeben“ bzw. bei einem Zugang „eingerichtet“.
+    expect(mail.html).toContain(">Vermerkt</p>");
+    expect(mail.html).not.toContain(">Übergeben</p>");
+    expect(mail.html).toContain("FES-IPAD-0412 · übergeben 27.09.2026<br>FES-STIFT-07 · übergeben 28.09.2026");
+  });
+
+  it("nur noch ausgegebene Stücke; „&“ der Kennung im HTML maskiert, im Text roh; ein Zugang heißt „eingerichtet“", async () => {
+    db.ausgaben = [
+      ausgabe({ kennung: "A&B-1" }),
+      ausgabe({ kennung: "ALT-1", zustand: "ERSETZT" }),
+      ausgabe({ kennung: "ZURUECK-1", zustand: "ZURUECK" }),
+    ];
+    await perLink(IPAD, { isCompleted: true });
+    const payload = payloadVon("onboarding-task-completed");
+    expect(payload).toMatchObject({
+      ausgabe_vermerk: "A&B-1 · übergeben 27.09.2026",
+      ausgabe_vermerk_html: "A&amp;B-1 · übergeben 27.09.2026",
+    });
+    const mail = pruefeVollstaendig("onboarding-task-completed", payload);
+    expect(mail.html).toContain("A&amp;B-1 · übergeben 27.09.2026");
+    expect(mail.html).not.toContain("&amp;amp;");
+    expect(mail.text).toContain("Vermerkt: A&B-1 · übergeben 27.09.2026");
+    for (const teil of [mail.html, mail.text ?? ""]) {
+      expect(teil).not.toContain("ALT-1");
+      expect(teil).not.toContain("ZURUECK-1");
+    }
+
+    jest.clearAllMocks();
+    db.ausgaben.push(ausgabe({ checklistItemId: ZUGANG, beiAustritt: "SPERREN", kennung: null, rueckgabeKategorie: null }));
+    await perLink(ZUGANG, { isCompleted: true }, spaeter(1));
+    const zugang = payloadVon("onboarding-task-completed");
+    expect(zugang).toMatchObject({ ausgabe_vermerk: "eingerichtet 27.09.2026" });
+    // Ein Zugang wird nicht „übergeben“: nirgends „Übergeben: eingerichtet …“.
+    const zugangMail = pruefeVollstaendig("onboarding-task-completed", zugang);
+    expect(zugangMail.text).toContain("Vermerkt: eingerichtet 27.09.2026");
+    for (const teil of [zugangMail.html, zugangMail.text ?? ""]) expect(teil).not.toContain("Übergeben");
+  });
+
+  it("ohne Vermerk: beide Felder leer und keine Zeile „Vermerkt“ (kein verwaister Marker)", async () => {
+    await perLink(IPAD, { isCompleted: true });
+    const payload = payloadVon("onboarding-task-completed");
+    expect(payload).toMatchObject({ ausgabe_vermerk: "", ausgabe_vermerk_html: "" });
+    const mail = pruefeVollstaendig("onboarding-task-completed", payload);
+    for (const teil of [mail.subject, mail.html, mail.text ?? ""]) expect(teil).not.toContain("Vermerkt");
+  });
+
+  it("auch die Meldung zu einem Kommentar trägt den Vermerk; ein Vermerk nach dem Abhaken meldet nichts", async () => {
+    db.ausgaben = [ausgabe({ kennung: "FES-IPAD-0412" })];
+    await perLink(IPAD, { isCompleted: true });
+    expect(payloadsVon("onboarding-task-completed")).toHaveLength(1);
+
+    // Nachgetragen: ein zweites Stueck – keine Mail (kein dritter Anlass).
+    const v = await oeffentlicheAusgabeVermerken(
+      "tok-it",
+      IPAD,
+      { stuecke: [{ kennung: "FES-STIFT-07", uebergebenAm: "2026-09-28" }] },
+      spaeter(1),
+    );
+    expect(v.status).toBe(201);
+    expect(payloadsVon("onboarding-task-completed")).toHaveLength(1);
+
+    // Ein Kommentar danach meldet HR – mit beiden Stuecken, frisch gelesen.
+    await perLink(IPAD, { comment: "Hülle kommt nach." }, spaeter(2));
+    const mails = payloadsVon("onboarding-task-completed");
+    expect(mails).toHaveLength(2);
+    expect(mails[1]).toMatchObject({
+      meldung_kurz: "kommentiert",
+      ausgabe_vermerk: "FES-IPAD-0412 · übergeben 27.09.2026\nFES-STIFT-07 · übergeben 28.09.2026",
+    });
+    pruefeVollstaendig("onboarding-task-completed", mails[1]);
+  });
+
+  it("ein Admin setzt {{ausgabe_vermerk}} ins HTML: daraus wird kein Markup (FREITEXT_VARIABLEN); Textteil roh", () => {
+    const { rendered } = renderEventEmail(
+      {
+        subject: "Betreff",
+        bodyHtml: "<div>{{ausgabe_vermerk}}</div>{{ausgabe_vermerk_html}}",
+        bodyText: "{{ausgabe_vermerk}}",
+        ...LEERE_EMPFAENGER,
+      },
+      "onboarding-task-completed",
+      { ausgabe_vermerk: "A&B <1>", ausgabe_vermerk_html: "A&amp;B &lt;1&gt;" },
+      { overrideTo: "hr@example.org" },
+    );
+    expect(rendered!.html).toBe("<div>A&amp;B &lt;1&gt;</div>A&amp;B &lt;1&gt;");
+    expect(rendered!.html).not.toContain("&amp;amp;");
+    expect(rendered!.text).toBe("A&B <1>");
+  });
+});
+
+
+// =============================================
 // onboarding-department-completed
 // =============================================
 
@@ -1266,6 +1532,8 @@ describe("onboarding-department-abgesagt (Absage nach EXPIRED)", () => {
   });
 
   it("echte Payload = Beispiel aus dem Katalog; Liste maskiert im HTML, roh im Text — ohne Link", async () => {
+    // A4 (G10): die Stuecke aus dem Beispiel — Zugang eingerichtet, Notebook uebergeben.
+    db.ausgaben = beispielAusgaben();
     const r = await aktion({ aktion: "absage" }, T_ABSAGE);
     expect(r.status).toBe(201);
 
@@ -1280,15 +1548,26 @@ describe("onboarding-department-abgesagt (Absage nach EXPIRED)", () => {
     expect(mail.text).toContain(
       "Folgendes hatten Sie bereits erledigt. Bitte machen Sie es rückgängig – etwa Zugänge löschen oder sperren und Ausgegebenes zurücknehmen:\n\n- Benutzerkonto und E-Mail-Adresse anlegen\n- Notebook & Zubehör bereitstellen",
     );
+    // A4 (G10): die Ausgaben der Stelle, nach den erledigten Aufgaben.
+    expect(mail.text).toContain(
+      "- Notebook & Zubehör bereitstellen\n\nLaut Portal ausgegeben – bitte zurücknehmen bzw. sperren:\n\n" +
+        "Zugänge: Dienst-E-Mail · eingerichtet 25.09.2026\nDienst-Laptop/PC · FES-NB-0412 · übergeben 28.09.2026\n\n" +
+        "Für noch offene Aufgaben ist nichts mehr zu tun.",
+    );
+    expect(mail.html).toContain("Laut Portal ausgegeben – bitte zurücknehmen bzw. sperren:");
+    expect(mail.html).toContain(
+      "Zugänge: Dienst-E-Mail · eingerichtet 25.09.2026<br>Dienst-Laptop/PC · FES-NB-0412 · übergeben 28.09.2026</p>",
+    );
     expect(mail.text).toContain("Geplanter Dienstbeginn: 01.10.2026");
     expect(mail.html).toContain('<li style="margin:0 0 4px;">Notebook &amp; Zubehör bereitstellen</li>');
     expect(mail.html).not.toContain("&amp;amp;");
-    // Kein Link, kein Token — in keinem Teil.
+    // Kein Link, kein Token — in keinem Teil; die Kennung nie im Betreff.
     for (const teil of [mail.subject, mail.html, mail.text ?? ""]) {
       expect(teil).not.toContain("tok-it");
       expect(teil).not.toContain("onboarding-tasks");
       expect(teil).not.toContain("href=");
     }
+    expect(mail.subject).not.toContain("FES-NB-0412");
     // Die offene WLAN-Aufgabe steht nicht in der Liste.
     expect(mail.text).not.toContain("WLAN");
   });
@@ -1303,6 +1582,29 @@ describe("onboarding-department-abgesagt (Absage nach EXPIRED)", () => {
     expect(mail.text).not.toContain("Folgendes hatten Sie bereits erledigt");
     expect(mail.html).not.toContain("<ul");
     expect(mail.text).toContain("Für noch offene Aufgaben ist nichts mehr zu tun.");
+  });
+
+  it("ohne Ausgaben (A4 aus oder nichts vermerkt): kein Ausgaben-Absatz, keine verwaisten Marker", async () => {
+    await aktion({ aktion: "absage" }, T_ABSAGE);
+
+    const payload = payloadVon(EVENT);
+    expect(payload).toMatchObject({ ausgaben_liste: "", ausgaben_liste_html: "", hat_ausgaben: "" });
+    const mail = pruefeVollstaendig(EVENT, payload);
+    for (const teil of [mail.html, mail.text ?? ""]) expect(teil).not.toContain("Laut Portal ausgegeben");
+    // Der Text sieht aus wie vor A4.
+    expect(mail.text).toContain("- Notebook & Zubehör bereitstellen\n\nFür noch offene Aufgaben ist nichts mehr zu tun.");
+  });
+
+  it("nur Ausgaben, nichts erledigt: der Ausgaben-Absatz steht allein", async () => {
+    db.onboardingAufgaben = beispielAufgaben();
+    db.ausgaben = beispielAusgaben();
+    await aktion({ aktion: "absage" }, T_ABSAGE);
+
+    const mail = pruefeVollstaendig(EVENT, payloadVon(EVENT));
+    expect(mail.text).not.toContain("Folgendes hatten Sie bereits erledigt");
+    expect(mail.text).toContain(
+      "ist nicht mehr aktiv.\n\nLaut Portal ausgegeben – bitte zurücknehmen bzw. sperren:\n\n",
+    );
   });
 
   it("Arbeitsort (F15): weicht er ab, nennt ihn der Satz", async () => {
@@ -1385,6 +1687,9 @@ describe("Beispiel-Payload (Testversand) der Absage", () => {
     expect(beispiel(EVENT)).toMatchObject(echt);
     expect(beispiel(EVENT)).toMatchObject(erledigteListeMailFelder(ONBOARDING_ABSAGE_BEISPIEL_ERLEDIGT));
     expect(ONBOARDING_ABSAGE_BEISPIEL_ERLEDIGT.map((a) => a.title)).toEqual([KONTO.title, NOTEBOOK.title]);
+    // A4 (G10): Liste der Ausgaben = ausgabenListeMailFelder(Beispiel), abgeschrieben.
+    expect(beispiel(EVENT)).toMatchObject(ausgabenListeMailFelder(ONBOARDING_ABSAGE_BEISPIEL_AUSGABEN));
+    expect(beispiel(EVENT)).toMatchObject({ hat_ausgaben: "ja" });
   });
 
   it("ohne Link-Felder und ohne fremde Adressen; Liste und Link nie im Betreff", () => {
@@ -1410,8 +1715,36 @@ describe("Beispiel-Payload (Testversand) der Absage", () => {
         "magicLink",
         "erledigte_liste",
         "erledigte_liste_html",
+        // A4, S27 (G10): Kennungen der ausgegebenen Stuecke.
+        "ausgaben_liste",
+        "ausgaben_liste_html",
       ].sort(),
     );
+  });
+});
+
+describe("Mailer — ausgaben_liste (A4, S27) im HTML maskiert, ausgaben_liste_html nicht doppelt", () => {
+  it("ein Admin setzt {{ausgaben_liste}} ins HTML: daraus wird kein Markup; Textteil roh", () => {
+    const felder = ausgabenListeMailFelder([
+      { bezeichnung: "Schlüssel: <b>Keller</b>", kennung: "S-1 & 2", uebergebenAm: "2026-09-28", beiAustritt: "RUECKGABE" },
+    ]);
+    const { rendered } = renderEventEmail(
+      {
+        subject: "Betreff",
+        bodyHtml: "<div>{{ausgaben_liste}}</div><p>{{ausgaben_liste_html}}</p>",
+        bodyText: "{{ausgaben_liste}}",
+        ...LEERE_EMPFAENGER,
+      },
+      "onboarding-department-abgesagt",
+      felder,
+      { overrideTo: "hr@example.org" },
+    );
+    expect(rendered!.html).toContain(
+      "<div>Schlüssel: &lt;b&gt;Keller&lt;/b&gt; · S-1 &amp; 2 · übergeben 28.09.2026</div>",
+    );
+    expect(rendered!.html).toContain("<p>Schlüssel: &lt;b&gt;Keller&lt;/b&gt; · S-1 &amp; 2 · übergeben 28.09.2026</p>");
+    expect(rendered!.html).not.toContain("&amp;amp;");
+    expect(rendered!.text).toBe("Schlüssel: <b>Keller</b> · S-1 & 2 · übergeben 28.09.2026");
   });
 });
 
@@ -1551,6 +1884,9 @@ describe("Beispiel-Payloads (Testversand) der vier Onboarding-Abteilungsmails", 
         "magicLink",
         "kommentar",
         "kommentar_text",
+        // A4 (G9): der Uebergabevermerk – Kennungen tippt die Stelle.
+        "ausgabe_vermerk",
+        "ausgabe_vermerk_html",
       ].sort(),
     );
     // Der Standard-Betreff haelt sich daran.
