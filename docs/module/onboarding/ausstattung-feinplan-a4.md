@@ -1307,3 +1307,25 @@ Das Ergebnis kommt als eigener Abschnitt hierher, mit Screenshots wie die Browse
   - Restfrage 8: Paket-4-Nachweise bleiben über den Fragebogen-Link sichtbar und löschbar.
 - **DSB und MAV vor dem Einschalten:** Fragen 1, 2 und 7 aus Abschnitt 6, die förmliche MAV-Beteiligung (E-A15). Den Wortlaut der Sperrpunkt-Hinweise (Frage 6) bestätigt die Personalabteilung im Pilot.
 - **Zusammenführung mit `ux-umbau`:** die Konflikte in `tab-returns.tsx`, `tab-overview.tsx` und `offboarding-detail-content.tsx` im Logbuch des Umbaus vermerken (Abschnitt 5). `ausstattungPortalLink` bleibt die einzige Stelle mit `/dashboard`.
+
+---
+
+## 9. Ablaufprobe gegen die Testdatenbank (13.10.2026)
+
+Gegen `hr_portal_ausstattung` und den Dev-Server des Worktrees (Port 3200), ohne Mailserver und ohne Webhooks (vom Skript vor dem ersten Schreiben geprüft). Skript: `scripts/ausstattung-probe-a4.js` (`node --env-file=.env scripts/ausstattung-probe-a4.js [--screenshots]`; bricht ab, wenn Server oder Datenbank nicht lokal sind, die Datenbank nicht `hr_portal_ausstattung` heißt oder SMTP/Webhooks aktiv sind). Ergebnis: **106 von 107 Prüfpunkten OK, kein Fehler im Anwendungscode.**
+
+| Schritt | Geprüft |
+|---|---|
+| Rückgabe-Vorgaben | 13 Positionen übernommen, Wiederholung folgenlos, Werte je Vorschlag richtig |
+| Onboarding | Merker der Schrittliste, Formular, Abgabe, Momentaufnahme „Beim Austritt“, Aufgaben je Option |
+| Übergabe vermerken | über die Link-Seiten von IT und Gebäudewirtschaft (fremde Aufgabe 404), Zustand AUSGEGEBEN, Kennung in keinem Titel, keiner Beschreibung und keinem Protokoll |
+| HR-Karte | Ausgaben mit Aktionen, Kennung mit `<` → 400, Korrektur |
+| Offboarding | Vorschlag „stark“ (E-Mail, Name, Einrichtung) ohne Adresse, Zuordnung, Rücknahmeaufgaben ohne Kennung bei der ausgebenden Stelle, Rückgaben mit Kennung, „ohne Übergabevermerk“ für einen abgehakten Zugang |
+| Zustände | Schlüssel „fehlt“ → Folgeaufgabe „Schließung prüfen“, Frist 1.1.2030; iPad im Portal ohne Zustand abgehakt → „zurück“, Frist 13.04.2027 |
+| Abschluss | ohne Bestätigung 409 mit der offenen Folgeaufgabe, nichts geschrieben; mit Bestätigung 200 |
+| Querprüfung | keine Kennung in AuditLog und Betreffzeilen, keine Mail zugestellt |
+| Löschfrist (von Hand nachgeholt, lokales `CRON_SECRET`) | Probelauf zählt 2 fällige Stücke und löscht nichts; echter Lauf löscht beide, leert die Seriennummer der Rückgabe, löst `ausgabeId` und setzt `ausgabenGeloeschtAm` an der Ausstattungsaufgabe |
+
+Screenshots: `screenshots/ausstattung/a4-onboarding-link-it.png` (iPad mit Übergabevermerk), `screenshots/ausstattung/a4-offboarding-link-facility.png` (Folgeaufgabe „Schließung prüfen“ nur lesend, Rücknahme mit Zuständen).
+
+Beobachtungen ohne Handlungsbedarf: Der Vorlagenpunkt „Physische Zugaenge entziehen (Schlüssel, Karten)“ trägt im Titel kein Umlaut-ä; der Titel ist zugleich Schlüssel der Migration `OFFBOARDING_SPERRPUNKTE_V1` und bleibt deshalb. Die Links in API-Antworten folgen `APP_URL`.
