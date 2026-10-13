@@ -13,8 +13,12 @@
  *     Bemerkung.
  * Gilt für (zentral mit Einrichtungsarten oder eine Einrichtung),
  * Personengruppen als Chips, „entgeltrelevant“ (nur Stelle HR), Reihenfolge.
- * Die Stufe-2-Felder (Ausgabekennung, Rückgabekategorie, Verhalten beim
- * Austritt) zeigt der Dialog bewusst NICHT — sie schreibt bis A4 niemand.
+ * Seit S23 (Paket A4, G8) daneben die Feldgruppe „Beim Austritt“ (nicht
+ * festgelegt / Zurückgeben / Sperren / Nichts), bei „Zurückgeben“ die
+ * Rückgabekategorie (Pflicht) und bei „Zurückgeben“ oder „Sperren“ die
+ * Beschriftung der Kennung — nicht bei einer Angabe. Wer hier „Zurückgeben“
+ * oder „Sperren“ setzt, schaltet die Erfassung der Übergabe für die Position
+ * ein (G27); der Satz dazu steht unter der Feldgruppe.
  *
  * Gesendet wird immer das ganze Formular (`entwurfAusFormular`): Was zur Art
  * nicht passt, geht leer hinaus, getippte Werte bleiben aber im Formular, bis
@@ -41,11 +45,14 @@ import {
   ANGABEN_KATALOG,
   ART_NAMEN,
   AUSSTATTUNG_ARTEN,
+  BEI_AUSTRITT,
+  BEI_AUSTRITT_NAMEN,
   EINRICHTUNGSARTEN,
   GRENZEN,
   MELDUNGEN,
   PERSONENGRUPPEN,
   REIHENFOLGE_MAX,
+  RUECKGABE_KATEGORIE_AUSWAHL,
   istAngabeSchluessel,
   istAusstattungsArt,
   positionPruefen,
@@ -87,6 +94,12 @@ export interface PositionFormular {
   personengruppen: string[];
   sichtbarFuer: string[];
   entgeltrelevant: boolean;
+  /** A4: "" = nicht festgelegt, sonst ein Wert aus BEI_AUSTRITT. */
+  beiAustritt: string;
+  /** A4: "" = keine; zählt nur bei „Zurückgeben“. */
+  rueckgabeKategorie: string;
+  /** A4: Beschriftung der Kennung; zählt nur bei „Zurückgeben“ oder „Sperren“. */
+  ausgabeKennung: string;
   orderIndex: string;
 }
 
@@ -111,6 +124,9 @@ export function leeresFormular(vorgaben: { departmentKey?: string } = {}): Posit
     personengruppen: [],
     sichtbarFuer: [],
     entgeltrelevant: false,
+    beiAustritt: "",
+    rueckgabeKategorie: "",
+    ausgabeKennung: "",
     orderIndex: "0",
   };
 }
@@ -136,6 +152,9 @@ export function formularAusPosition(p: KatalogPosition): PositionFormular {
     personengruppen: [...p.personengruppen],
     sichtbarFuer: [...p.sichtbarFuer],
     entgeltrelevant: p.entgeltrelevant,
+    beiAustritt: p.beiAustritt ?? "",
+    rueckgabeKategorie: p.rueckgabeKategorie ?? "",
+    ausgabeKennung: p.ausgabeKennung ?? "",
     orderIndex: String(p.orderIndex),
   };
 }
@@ -169,11 +188,15 @@ function textOderNull(text: string): string | null {
  * hinaus (Optionen nur bei Auswahl, „vorausgewählt“ nur bei Ja/Nein, Angabe
  * mit dem Label der festen Liste und ohne Aufgabe, Fälligkeit, Bemerkung und
  * Hinweis für die Stelle). Einrichtungsarten nur bei zentralen Positionen,
- * „Sichtbar auch für“ ohne die eigene Stelle.
+ * „Sichtbar auch für“ ohne die eigene Stelle. „Beim Austritt“ nie bei einer
+ * Angabe, die Rückgabekategorie nur bei „Zurückgeben“, die Beschriftung der
+ * Kennung nur bei „Zurückgeben“ oder „Sperren“.
  */
 export function entwurfAusFormular(f: PositionFormular): PositionBody {
   const angabe = f.art === "ANGABE";
   const auswahl = f.art === "AUSWAHL";
+  const beiAustritt = angabe || f.beiAustritt === "" ? null : f.beiAustritt;
+  const mitKennung = beiAustritt === "RUECKGABE" || beiAustritt === "SPERREN";
   const optionen = auswahl ? optionenAusText(f.optionenText) : [];
   const departmentKey = f.departmentKey.trim();
   const organizationId = f.organizationId || null;
@@ -202,6 +225,9 @@ export function entwurfAusFormular(f: PositionFormular): PositionBody {
     personengruppen: [...f.personengruppen],
     sichtbarFuer: angabe ? f.sichtbarFuer.filter((k) => k !== departmentKey) : [],
     entgeltrelevant: f.entgeltrelevant,
+    beiAustritt,
+    rueckgabeKategorie: beiAustritt === "RUECKGABE" && f.rueckgabeKategorie ? f.rueckgabeKategorie : null,
+    ausgabeKennung: mitKennung ? textOderNull(f.ausgabeKennung) : null,
     orderIndex: ganzzahlAusText(f.orderIndex) ?? 0,
   };
 }
@@ -229,6 +255,15 @@ const EINGABE =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:opacity-60";
 const LABEL = "mb-1 block text-sm font-medium text-foreground";
 const HILFE = "mt-1 text-xs text-muted-foreground";
+
+/** Unter der Feldgruppe „Beim Austritt“ (A4); der zweite Teil ist der Satz aus G27. */
+export const BEI_AUSTRITT_HILFE = `„Zurückgeben“ (Gegenstände, Schlüssel) bzw. „Sperren“ (Zugänge) schaltet für diese Position die Erfassung der Übergabe ein; beim Austritt bekommt die Stelle dann eine Rücknahme- bzw. Sperraufgabe. ${MELDUNGEN.AUSGABE_EINSCHALTEN_HINWEIS}`;
+
+/** Die Wahl „Beim Austritt“: "" = nicht festgelegt, dann die Werte aus BEI_AUSTRITT. */
+const AUSTRITT_WAHL: ReadonlyArray<{ wert: string; name: string }> = [
+  { wert: "", name: "Nicht festgelegt" },
+  ...BEI_AUSTRITT.map((wert) => ({ wert, name: BEI_AUSTRITT_NAMEN[wert] })),
+];
 
 const ART_HILFE: Readonly<Record<AusstattungsArt, string>> = {
   JA_NEIN: "Die Führungskraft hakt an; daraus wird eine Aufgabe der Stelle.",
@@ -729,6 +764,82 @@ export function PositionDialog({
         sendet={sendet}
         idBasis={id}
       />
+
+      {/* ===== Beim Austritt (A4, G8 und G27) — nicht bei einer Angabe ===== */}
+      {!angabe && (
+        <fieldset data-feld="beim-austritt" aria-describedby={`${id}-austritt-hilfe`} className="space-y-3">
+          <legend className={LABEL}>Beim Austritt</legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-foreground">
+            {AUSTRITT_WAHL.map((o) => (
+              <label key={o.wert || "leer"} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={`${id}-austritt`}
+                  value={o.wert}
+                  checked={f.beiAustritt === o.wert}
+                  disabled={sendet}
+                  onChange={() => setze({ beiAustritt: o.wert })}
+                />
+                {o.name}
+              </label>
+            ))}
+          </div>
+          <p id={`${id}-austritt-hilfe`} className={HILFE}>
+            {BEI_AUSTRITT_HILFE}
+          </p>
+          {(f.beiAustritt === "RUECKGABE" || f.beiAustritt === "SPERREN") && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {f.beiAustritt === "RUECKGABE" && (
+                <div>
+                  <label htmlFor={`${id}-kategorie`} className={LABEL}>
+                    Rückgabekategorie
+                    <Pflicht />
+                  </label>
+                  <select
+                    id={`${id}-kategorie`}
+                    value={f.rueckgabeKategorie}
+                    disabled={sendet}
+                    required
+                    aria-required="true"
+                    aria-describedby={`${id}-kategorie-hilfe`}
+                    onChange={(e) => setze({ rueckgabeKategorie: e.target.value })}
+                    className={EINGABE}
+                  >
+                    <option value="">Bitte wählen…</option>
+                    {RUECKGABE_KATEGORIE_AUSWAHL.map((k) => (
+                      <option key={k.wert} value={k.wert}>
+                        {k.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p id={`${id}-kategorie-hilfe`} className={HILFE}>
+                    So steht der Gegenstand im Reiter „Rückgaben“ des Austritts.
+                  </p>
+                </div>
+              )}
+              <div>
+                <label htmlFor={`${id}-kennung`} className={LABEL}>
+                  Kennung abfragen (Beschriftung)
+                </label>
+                <input
+                  id={`${id}-kennung`}
+                  type="text"
+                  value={f.ausgabeKennung}
+                  maxLength={GRENZEN.ausgabeKennung}
+                  disabled={sendet}
+                  aria-describedby={`${id}-kennung-hilfe`}
+                  onChange={(e) => setze({ ausgabeKennung: e.target.value })}
+                  placeholder="z. B. Inventarnummer"
+                  className={EINGABE}
+                />
+                <p id={`${id}-kennung-hilfe`} className={HILFE}>
+                  Name des Felds, in das die Stelle bei der Übergabe die Nummer einträgt. Leer = „Kennung“.
+                </p>
+              </div>
+            </div>
+          )}
+        </fieldset>
+      )}
 
       {/* ===== Entgelt und Reihenfolge ===== */}
       <label className="flex items-start gap-2 text-sm text-foreground">

@@ -450,6 +450,31 @@ describe("PUT – Schritt „Ausstattung & Zugänge“", () => {
     const gespeichert = mockPrisma.supervisorData.update.mock.calls[0][0];
     expect(gespeichert.where).toEqual({ onboardingId: "ob1" });
     expect(gespeichert.data.ausstattungGespeichertAm).toBeInstanceOf(Date);
+    // A4 (E-A36): Der Katalog fuehrt hier keine Position mit „Beim Austritt“.
+    expect(gespeichert.data.ausgabenAngeboten).toBe(false);
+  });
+
+  it("A4 (E-A36): Merker ausgabenAngeboten aus dem gelesenen Ausschnitt — auch, wenn die Position nicht gewaehlt ist", async () => {
+    mockPrisma.ausstattungsPosition.findMany.mockResolvedValue([
+      KATALOG[0],
+      { ...KATALOG[1], beiAustritt: "RUECKGABE", rueckgabeKategorie: "SCHLUESSEL", ausgabeKennung: "Schlüsselnummer" },
+      KATALOG[2],
+    ]);
+    const res = await put({ ausstattung: [{ positionId: IPAD, gewaehlt: true }], currentStep: 5 });
+    expect(res.status).toBe(200);
+    expect(mockPrisma.supervisorData.update.mock.calls[0][0].data).toEqual({
+      ausstattungGespeichertAm: expect.any(Date),
+      ausgabenAngeboten: true,
+    });
+    // Eine Angabe zaehlt nie (sie wird nicht ausgegeben), NICHTS ebenso wenig.
+    jest.clearAllMocks();
+    mockPrisma.ausstattungsPosition.findMany.mockResolvedValue([
+      { ...KATALOG[0], beiAustritt: "NICHTS" },
+      KATALOG[1],
+      KATALOG[2],
+    ]);
+    await put({ ausstattung: [], currentStep: 5 });
+    expect(mockPrisma.supervisorData.update.mock.calls[0][0].data.ausgabenAngeboten).toBe(false);
   });
 
   it("sperrt zuerst den Vorgang bedingt — dann SupervisorData, Katalog, Ersetzen, Merker", async () => {
@@ -548,9 +573,10 @@ describe("PUT – Schritt „Ausstattung & Zugänge“", () => {
     // `hinweise` kam nicht mit: Die Hinweise bleiben, wie sie sind.
     expect(mockPrisma.onboardingStellenHinweis.deleteMany).not.toHaveBeenCalled();
     // „Alles abgewaehlt“ ist gespeichert — die Vorauswahl gilt danach nicht mehr.
+    // Dazu (A4, E-A36) der Merker aus dem Ausschnitt.
     expect(mockPrisma.supervisorData.update).toHaveBeenCalledWith({
       where: { onboardingId: "ob1" },
-      data: { ausstattungGespeichertAm: expect.any(Date) },
+      data: { ausstattungGespeichertAm: expect.any(Date), ausgabenAngeboten: false },
     });
 
     jest.clearAllMocks();

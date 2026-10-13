@@ -1601,6 +1601,17 @@ export function waechterHinweis(opts: {
   }`;
 }
 
+/**
+ * Ausstattung & Zugaenge, Stufe 2 (A4, G14, nur Offboarding): Hinweis einer
+ * Zeile, wenn nach der Information neue Aufgaben dazugekommen sind
+ * (Ruecknahme- und Sperraufgaben aus „Einstellung zuordnen …“). Einen Nachtrag
+ * gibt es im Offboarding nicht; „Erneut senden“ schickt die Liste mit
+ * demselben Link (ausser bei neuer Adresse).
+ */
+export function nachInfoNeuText(anzahl: number): string {
+  return `${anzahl === 1 ? "1 Aufgabe" : `${anzahl} Aufgaben`} nach der Information hinzugekommen – bitte „Erneut senden“`;
+}
+
 /** Eigenschaft ohne Prototyp-Kette (ein Schluessel wie „constructor“ traefe sonst Object.prototype). */
 function eigenerEintrag<T>(tabelle: Readonly<Record<string, T>> | undefined, key: string): T | undefined {
   return tabelle && Object.prototype.hasOwnProperty.call(tabelle, key) ? tabelle[key] : undefined;
@@ -1650,6 +1661,14 @@ function ausstattungZaehler(
  *     `nachtragGesperrt` — gesetzt fuer JEDE Zeile, sobald die Option da ist.
  *   - `waechter` (Regel 15): `waechterHinweis` je Zeile; trifft er zu, steht
  *     sein Text vorn im Hinweis der Zeile und `anzeige.hinweisTon` ist "rot".
+ *
+ * Ausstattung & Zugaenge, Stufe 2 (Paket A4, G14, nur Offboarding — fehlt die
+ * Option, bleibt jede Zeile Byte fuer Byte wie bisher):
+ *   - `nachInfoNeu`: je Stelle die Zahl der offenen Aufgaben, die nach der
+ *     Information dazukamen (`createdAt > lastSentAt ?? sentAt`, rechnet der
+ *     Dienst). Ab 1, mit zugestelltem Link und bei laufendem Vorgang, steht
+ *     `nachInfoNeuText` im Hinweis der Zeile — gelb, wenn es keinen anderen
+ *     Hinweis gibt, sonst hinter ihm und in dessen Farbe.
  */
 export function abteilungsZeilenBauen(opts: {
   aufgaben: ReadonlyArray<AufgabeFuerZeile>;
@@ -1666,6 +1685,8 @@ export function abteilungsZeilenBauen(opts: {
   waechter?: boolean;
   /** Regel 10 (Onboarding): offene, zusammengefasste Aenderungsliste je Stelle. */
   nachtraege?: Readonly<Record<string, NachtragListe>>;
+  /** A4 (Offboarding): offene Aufgaben je Stelle, die nach der Information dazukamen. */
+  nachInfoNeu?: Readonly<Record<string, number>>;
 }): {
   zeilen: AbteilungsZeile[];
   informierbar: number;
@@ -1769,6 +1790,16 @@ export function abteilungsZeilenBauen(opts: {
       if (text) {
         anzeige = { ...anzeige, hinweis: anzeige.hinweis ? `${text} · ${anzeige.hinweis}` : text, hinweisTon: "rot" };
       }
+    }
+
+    // A4 (Offboarding): nach der Information hinzugekommene Aufgaben — kein
+    // Nachtrag, sondern „Erneut senden“ mit demselben Link.
+    const neuNachInfo = eigenerEintrag(opts.nachInfoNeu, key) ?? 0;
+    if (neuNachInfo > 0 && link && alsDatum(link.sentAt) && !opts.vorgangAbgeschlossen) {
+      const text = nachInfoNeuText(neuNachInfo);
+      anzeige = anzeige.hinweis
+        ? { ...anzeige, hinweis: `${anzeige.hinweis} · ${text}` }
+        : { ...anzeige, hinweis: text, hinweisTon: "gelb" };
     }
 
     return {
@@ -2222,20 +2253,24 @@ export function onboardingVersandSperre(v: {
 
 /**
  * Einrichtung, deren Adressen (Einstellungen → Abteilungen) die Aufgaben eines
- * Onboarding-Vorgangs bekommen: der Arbeitsort, sonst die Einrichtung des
- * Vorgangs (E-A10, `arbeitsortId ?? organizationId`). Gilt fuer ALLE
- * Abteilungsaufgaben des Vorgangs, auch fuer die aus der Checklisten-Vorlage —
- * sonst gaebe es zwei FACILITY-Stellen, aber nur einen Link. Der Mandant
- * (`canAccessProcess`, Listenfilter, Unterlagen) bleibt `organizationId`.
- * Ein leerer Arbeitsort ("") zaehlt wie keiner. Das Offboarding kennt keinen
- * Arbeitsort.
+ * Vorgangs bekommen: der Arbeitsort, sonst die Einrichtung des Vorgangs
+ * (`arbeitsortId ?? organizationId`). Gilt fuer ALLE Abteilungsaufgaben des
+ * Vorgangs, auch fuer die aus der Checklisten-Vorlage — sonst gaebe es zwei
+ * FACILITY-Stellen, aber nur einen Link. Der Mandant (`canAccessProcess`,
+ * Listenfilter, Unterlagen, Mailfeld `einrichtung`) bleibt `organizationId`.
+ * Ein leerer Arbeitsort ("") zaehlt wie keiner.
+ *
+ *   - Onboarding (E-A10): Arbeitsort aus dem Anlegen bzw. der Karte.
+ *   - Offboarding (seit A4, G12): Arbeitsort, den die Zuordnung einer
+ *     Einstellung derselben Einrichtung uebernimmt, solange keine Stelle
+ *     informiert ist; ohne Zuordnung `null`, also wie bisher die Einrichtung.
  */
-export function onboardingEmpfaengerEinrichtung(v: {
-  arbeitsortId?: string | null;
-  organizationId: string;
-}): string {
+export function empfaengerEinrichtung(v: { arbeitsortId?: string | null; organizationId: string }): string {
   return v.arbeitsortId || v.organizationId;
 }
+
+/** Der Name aus A1–A3 – dieselbe Funktion (`empfaengerEinrichtung`), fuer die bestehenden Aufrufer. */
+export const onboardingEmpfaengerEinrichtung = empfaengerEinrichtung;
 
 /** Endstatus: keine Aktion, keine Erinnerung, Link nur lesend bzw. 410. */
 export const ONBOARDING_ENDSTATUS = ["COMPLETED", "EXPIRED"] as const;

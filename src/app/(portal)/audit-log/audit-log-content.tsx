@@ -15,6 +15,7 @@ import { ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufgaben";
 import { UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
 import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
 import { AUSSTATTUNG_AUDIT_LABELS } from "@/lib/ausstattung";
+import { AUSGABEN_AUDIT_LABELS } from "@/lib/ausgaben";
 
 interface User {
   userId: string;
@@ -101,6 +102,9 @@ const ACTION_LABELS: Record<string, string> = {
   // Arbeitsort, Aufgaben, HR-Ergaenzungen, Hinweise, Sammelmail, Loeschfrist.
   // Eine Quelle mit den Diensten, die die Codes schreiben (AUSSTATTUNG_AUDIT).
   ...AUSSTATTUNG_AUDIT_LABELS,
+  // Ausstattung & Zugaenge, Stufe 2 (A4): Ausgaben je Stueck, Zuordnung von
+  // Austritt und Einstellung, Rueckgaben, Loeschfrist (AUSGABEN_AUDIT).
+  ...AUSGABEN_AUDIT_LABELS,
 };
 
 /**

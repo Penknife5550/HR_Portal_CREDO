@@ -67,7 +67,11 @@
  * S20 die Loeschfrist der Freitexte (`freitextGrenze`, E-A22; geleert im Lauf
  * „Aufbewahrung erzeugter Dokumente“ ueber src/lib/ausstattung-lauf.ts) und
  * der Brief-Platzhalter `{ausstattung_liste}` (`ausstattungListe`, E-A25;
- * Resolver in src/lib/doc-template-resolvers.ts). Den Server-Teil des
+ * Resolver in src/lib/doc-template-resolvers.ts). Seit S23 (Paket A4) sind
+ * die Katalogfelder `beiAustritt`, `rueckgabeKategorie` und `ausgabeKennung`
+ * pflegbar (`ausgabeFelderPruefen` in `positionPruefen`, Positivliste
+ * `KATALOG_FELDER`, Anzeige `beiAustrittText`); die Vorgaben dafuer und alle
+ * uebrigen A4-Regeln stehen in src/lib/ausgaben.ts. Den Server-Teil des
  * Katalogs (Laden, Schreiben, Protokoll, Ausschnitt je Vorgang) traegt
  * src/lib/ausstattung-katalog.ts.
  *
@@ -88,6 +92,8 @@ import {
   DEPARTMENT_KEYS,
   LINK_ABTEILUNGEN,
   RESERVIERTE_ABTEILUNGSSCHLUESSEL,
+  RETURN_CATEGORY_LABELS,
+  RUECKGABE_KATEGORIEN,
   abteilungLabel,
 } from "@/lib/constants";
 import {
@@ -140,11 +146,29 @@ export const AUFGABEN_HERKUNFT = ["AUSSTATTUNG", "HINWEIS"] as const;
 export type AufgabenHerkunft = (typeof AUFGABEN_HERKUNFT)[number];
 
 /**
- * Stufe 2 (A4): was beim Austritt mit dem Ausgegebenen geschieht. A1 bis A3
- * legen nur die Spalte an; geschrieben wird sie erst mit A4.
+ * Stufe 2 (A4): was beim Austritt mit dem Ausgegebenen geschieht. Seit S23
+ * pflegbar (Positionsdialog, „Rückgabe-Vorgaben übernehmen …“). Leer heisst
+ * „nicht festgelegt“ und bietet wie NICHTS keine Uebergabe an (G4, G27); nur
+ * eine leere Position bekommt die Vorgaben (`rueckgabeVorgabenPlan`).
  */
 export const BEI_AUSTRITT = ["RUECKGABE", "SPERREN", "NICHTS"] as const;
 export type BeiAustritt = (typeof BEI_AUSTRITT)[number];
+
+/** Anzeige im Positionsdialog und in der Kartenansicht („Beim Austritt: Zurückgeben“). */
+export const BEI_AUSTRITT_NAMEN: Readonly<Record<BeiAustritt, string>> = {
+  RUECKGABE: "Zurückgeben",
+  SPERREN: "Sperren",
+  NICHTS: "Nichts",
+};
+
+/**
+ * Die waehlbaren Rueckgabekategorien (A4) mit Anzeigenamen, in der Reihenfolge
+ * von RUECKGABE_KATEGORIEN — fuer die Auswahl im Positionsdialog und in
+ * „Position hinzufügen…“ der Karte (eine Quelle: constants.ts).
+ */
+export const RUECKGABE_KATEGORIE_AUSWAHL: ReadonlyArray<{ wert: string; name: string }> = RUECKGABE_KATEGORIEN.map(
+  (wert) => ({ wert, name: RETURN_CATEGORY_LABELS[wert] ?? wert }),
+);
 
 // =============================================
 // Grenzen und feste Werte
@@ -173,6 +197,8 @@ export const GRENZEN = {
   wahlJeVorgang: 200,
   hinweiseJeVorgang: 30,
   faelligTage: 365,
+  /** Beschriftung der Kennung („Inventarnummer“, A4); `AUSGABE_GRENZEN.kennungLabel` liest dieselbe Zahl. */
+  ausgabeKennung: 40,
 } as const;
 
 /**
@@ -336,6 +362,8 @@ export const AUSSTATTUNG_AUDIT = {
   POSITION_GELOESCHT: "AUSSTATTUNG_POSITION_GELOESCHT",
   AUSBLENDUNG_GEAENDERT: "AUSSTATTUNG_AUSBLENDUNG_GEAENDERT",
   VORSCHLAEGE_UEBERNOMMEN: "AUSSTATTUNG_VORSCHLAEGE_UEBERNOMMEN",
+  /** A4 (G27): IDs, Vorschlagsschluessel, Anzahl — nie Werte von Hand. */
+  RUECKGABE_VORGABEN_UEBERNOMMEN: "AUSSTATTUNG_RUECKGABE_VORGABEN_UEBERNOMMEN",
   // Vorgang
   ARBEITSORT_GEAENDERT: "ONBOARDING_ARBEITSORT_GEAENDERT",
   AUFGABEN_ANGELEGT: "AUSSTATTUNG_AUFGABEN_ANGELEGT",
@@ -358,6 +386,7 @@ export const AUSSTATTUNG_AUDIT_LABELS: Readonly<Record<AusstattungAuditCode, str
   [AUSSTATTUNG_AUDIT.POSITION_GELOESCHT]: "Ausstattungsposition gelöscht",
   [AUSSTATTUNG_AUDIT.AUSBLENDUNG_GEAENDERT]: "Ausstattungsposition für Einrichtung ein-/ausgeblendet",
   [AUSSTATTUNG_AUDIT.VORSCHLAEGE_UEBERNOMMEN]: "Ausstattungs-Vorschläge übernommen",
+  [AUSSTATTUNG_AUDIT.RUECKGABE_VORGABEN_UEBERNOMMEN]: "Rückgabe-Vorgaben in den Katalog übernommen",
   [AUSSTATTUNG_AUDIT.ARBEITSORT_GEAENDERT]: "Arbeitsort geändert",
   [AUSSTATTUNG_AUDIT.AUFGABEN_ANGELEGT]: "Ausstattungsaufgaben angelegt",
   [AUSSTATTUNG_AUDIT.FAELLIGKEIT_ANGEHOBEN]: "Fälligkeit von Ausstattungsaufgaben angehoben",
@@ -421,6 +450,22 @@ export const MELDUNGEN = {
   HINWEIS_STELLE_ZU_LANG: `Der Hinweis für die Stelle darf höchstens ${GRENZEN.hinweisStelle} Zeichen lang sein.`,
   PLATZHALTER_ZU_LANG: `Der Platzhalter der Bemerkung darf höchstens ${GRENZEN.bemerkungPlatzhalter} Zeichen lang sein.`,
   AUFGABENTITEL_ZU_LANG: `Der Aufgabentitel darf höchstens ${GRENZEN.aufgabeTitel} Zeichen lang sein.`,
+  // ---- „Beim Austritt“ (A4, G8; `ausgabeFelderPruefen`) ----
+  AUSTRITT_NICHT_BEI_ANGABE:
+    "Eine Angabe wird nicht ausgegeben: „Beim Austritt“, Rückgabekategorie und Kennung bleiben leer.",
+  BEI_AUSTRITT_UNBEKANNT: "Bitte bei „Beim Austritt“ Zurückgeben, Sperren oder Nichts wählen.",
+  RUECKGABEKATEGORIE_FEHLT: "Bei „Zurückgeben“ bitte eine Rückgabekategorie wählen.",
+  RUECKGABEKATEGORIE_UNBEKANNT: "Unbekannte Rückgabekategorie.",
+  RUECKGABEKATEGORIE_NUR_RUECKGABE: "Eine Rückgabekategorie gibt es nur bei „Zurückgeben“.",
+  KENNUNG_NUR_AUSGABE: "„Kennung abfragen“ gibt es nur bei „Zurückgeben“ oder „Sperren“.",
+  KENNUNG_LABEL_ZU_LANG: `Die Beschriftung der Kennung darf höchstens ${GRENZEN.ausgabeKennung} Zeichen lang sein.`,
+  /**
+   * G27: steht bei der Feldgruppe „Beim Austritt“ im Positionsdialog und in der
+   * Rueckfrage von „Rückgabe-Vorgaben übernehmen …“ — wer RUECKGABE oder
+   * SPERREN setzt, schaltet A4 fuer diese Position ein.
+   */
+  AUSGABE_EINSCHALTEN_HINWEIS:
+    "Danach bieten Link-Seite und Karte Übergaben an. Erst nach der Beteiligung der MAV und der Bestätigung der Löschfristen durch den DSB.",
   // ---- nur Zod (Form der Felder) ----
   REIHENFOLGE_UNGUELTIG: `Die Reihenfolge muss eine ganze Zahl von 0 bis ${REIHENFOLGE_MAX} sein.`,
   OHNE_KLAMMERN:
@@ -585,6 +630,16 @@ export interface PositionEntwurf {
   sichtbarFuer: readonly string[];
   /** F10: dann nur Stelle HR. */
   entgeltrelevant: boolean;
+  /**
+   * A4 (G8): was beim Austritt geschieht — BEI_AUSTRITT oder leer (nicht
+   * festgelegt). Optional, weil Vorschlaege und aeltere Testdaten das Feld
+   * nicht tragen; fehlend heisst leer. Nie bei einer Angabe.
+   */
+  beiAustritt?: string | null;
+  /** Nur bei RUECKGABE, dort Pflicht: ein Wert aus RUECKGABE_KATEGORIEN. */
+  rueckgabeKategorie?: string | null;
+  /** Beschriftung der Kennung („Inventarnummer“), nur bei RUECKGABE oder SPERREN, hoechstens GRENZEN.ausgabeKennung. */
+  ausgabeKennung?: string | null;
 }
 
 /** Eine gespeicherte Katalogposition (Zeile von AusstattungsPosition). */
@@ -593,9 +648,6 @@ export interface KatalogPosition extends PositionEntwurf {
   isActive: boolean;
   orderIndex: number;
   vorschlagSchluessel?: string | null;
-  ausgabeKennung?: string | null;
-  rueckgabeKategorie?: string | null;
-  beiAustritt?: string | null;
 }
 
 /** Eine Einrichtung blendet eine zentrale Position fuer sich aus (AusstattungsAusblendung). */
@@ -815,6 +867,72 @@ function optionenPruefen(optionen: readonly string[], vorausgewaehlt: readonly s
   return null;
 }
 
+/** Ein Wert aus BEI_AUSTRITT? */
+export function istBeiAustritt(wert: string | null | undefined): wert is BeiAustritt {
+  return !!wert && (BEI_AUSTRITT as readonly string[]).includes(wert);
+}
+
+/**
+ * Die A4-Felder einer Position gegeneinander (G8) — dieselbe Regel fuer die
+ * Katalogposition (`positionPruefen`) und die freie Position von HR in der
+ * Karte (Zod `freiePositionSchema`, Dialog „Position hinzufügen…“):
+ *
+ *   - Angabe: alle drei leer (sie wird keine Aufgabe, also nie ausgegeben).
+ *   - `beiAustritt` aus BEI_AUSTRITT oder leer („nicht festgelegt“).
+ *   - RUECKGABE verlangt eine `rueckgabeKategorie` aus RUECKGABE_KATEGORIEN;
+ *     sonst bleibt sie leer.
+ *   - `ausgabeKennung` (Beschriftung, hoechstens GRENZEN.ausgabeKennung) nur
+ *     bei RUECKGABE oder SPERREN.
+ *
+ * Leer heisst `null`, `undefined` oder nur Leerzeichen. Zeichen prueft Zod.
+ */
+export function ausgabeFelderPruefen(p: {
+  art: string;
+  beiAustritt?: string | null;
+  rueckgabeKategorie?: string | null;
+  ausgabeKennung?: string | null;
+}): string | null {
+  const beiAustritt = leer(p.beiAustritt) ? null : (p.beiAustritt as string);
+  const kategorie = leer(p.rueckgabeKategorie) ? null : (p.rueckgabeKategorie as string);
+  const kennung = leer(p.ausgabeKennung) ? null : (p.ausgabeKennung as string);
+  if (p.art === "ANGABE") {
+    return beiAustritt !== null || kategorie !== null || kennung !== null ? MELDUNGEN.AUSTRITT_NICHT_BEI_ANGABE : null;
+  }
+  if (beiAustritt !== null && !istBeiAustritt(beiAustritt)) return MELDUNGEN.BEI_AUSTRITT_UNBEKANNT;
+  if (beiAustritt === "RUECKGABE") {
+    if (kategorie === null) return MELDUNGEN.RUECKGABEKATEGORIE_FEHLT;
+    if (!(RUECKGABE_KATEGORIEN as readonly string[]).includes(kategorie)) return MELDUNGEN.RUECKGABEKATEGORIE_UNBEKANNT;
+  } else if (kategorie !== null) {
+    return MELDUNGEN.RUECKGABEKATEGORIE_NUR_RUECKGABE;
+  }
+  if (kennung !== null) {
+    if (beiAustritt !== "RUECKGABE" && beiAustritt !== "SPERREN") return MELDUNGEN.KENNUNG_NUR_AUSGABE;
+    if (laenger(kennung, GRENZEN.ausgabeKennung)) return MELDUNGEN.KENNUNG_LABEL_ZU_LANG;
+  }
+  return null;
+}
+
+/**
+ * Kurzform der A4-Felder fuer Katalogseite und Dialoge: „zurückgeben
+ * (IT-Hardware), Kennung „Inventarnummer““, „sperren“, „nichts“ — `null`,
+ * solange nichts festgelegt ist. Nur Katalogwerte, nie Freitext einer Person.
+ */
+export function beiAustrittText(p: {
+  beiAustritt?: string | null;
+  rueckgabeKategorie?: string | null;
+  ausgabeKennung?: string | null;
+}): string | null {
+  if (!istBeiAustritt(p.beiAustritt)) return null;
+  let text = BEI_AUSTRITT_NAMEN[p.beiAustritt].toLocaleLowerCase("de");
+  const kategorie = p.rueckgabeKategorie?.trim();
+  if (p.beiAustritt === "RUECKGABE" && kategorie) {
+    text += ` (${hatEigenen(RETURN_CATEGORY_LABELS, kategorie) ? RETURN_CATEGORY_LABELS[kategorie] : kategorie})`;
+  }
+  const kennung = p.ausgabeKennung?.trim();
+  if (p.beiAustritt !== "NICHTS" && kennung) text += `, Kennung „${kennung}“`;
+  return text;
+}
+
 /**
  * Prueft die Felder einer Katalogposition gegeneinander. Dialog und Server
  * rufen dieselbe Funktion (der Server beim Anlegen auf dem geparsten Body, beim
@@ -830,6 +948,9 @@ function optionenPruefen(optionen: readonly string[], vorausgewaehlt: readonly s
  *     Label; keine Faelligkeit, kein Aufgabentitel, kein Bemerkungsfeld (eine
  *     Angabe wird keine Aufgabe). `sichtbarFuer` nur hier, nur Link-Stellen,
  *     ohne die eigene.
+ *   - „Beim Austritt“ (A4, G8): `ausgabeFelderPruefen` — bei einer Angabe
+ *     alles leer, RUECKGABE mit Rueckgabekategorie, Kennung nur bei
+ *     RUECKGABE/SPERREN.
  *   - `einrichtungsarten` nur bei zentralen Positionen; Werte, Personengruppen,
  *     Faelligkeit (±365) und Laengen nach GRENZEN.
  *
@@ -865,6 +986,10 @@ export function positionPruefen(p: PositionEntwurf): string | null {
     if (!leer(p.angabeSchluessel)) return MELDUNGEN.ANGABE_SCHLUESSEL_NUR_ANGABE;
     if (p.sichtbarFuer.length > 0) return MELDUNGEN.SICHTBAR_NUR_ANGABE;
   }
+
+  // ---- Beim Austritt (A4, G8) ----
+  const austritt = ausgabeFelderPruefen(p);
+  if (austritt) return austritt;
 
   // ---- Sichtbar fuer (gibt es nach dem Block oben nur bei ANGABE) ----
   const sichtbar = new Set<string>();
@@ -1189,8 +1314,9 @@ export interface AusstattungsMomentaufnahme {
  * Grundtitel gespeichert (`aufgabenTitel` ohne Option, also auch der Standard
  * „<Bezeichnung> bereitstellen“), damit eine spaetere Aenderung am Katalog den
  * Titel einer Aufgabe nicht mehr verschiebt. Eine Angabe wird keine Aufgabe:
- * ohne Titel, ohne Faelligkeit. Die Stufe-2-Felder kommen wie sie sind (bis A4
- * `null`).
+ * ohne Titel, ohne Faelligkeit. Die A4-Felder (`ausgabeKennung`,
+ * `rueckgabeKategorie`, `beiAustritt`) kommen wie sie sind, fehlend als `null`
+ * — sie entscheiden spaeter, ob die Stelle eine Uebergabe vermerken kann (G4).
  */
 export function momentaufnahme(p: KatalogPosition): AusstattungsMomentaufnahme {
   const angabe = p.art === "ANGABE";
@@ -3669,7 +3795,11 @@ function angabeVorschlag(
  * „Vorschläge übernehmen“ (Einstellungen → Ausstattung & Zugänge): alle zentral,
  * ohne Faelligkeit und – wie jede neue Position – ausgeschaltet (Regel 1). Die
  * Verwaltung schaltet ein, was passt, und traegt Fristen und die Raeume ihrer
- * Einrichtung selbst ein. Der Seed legt keinen Katalog an.
+ * Einrichtung selbst ein. Der Seed legt keinen Katalog an. Bewusst OHNE
+ * A4-Werte (G27): Die Vorgaben fuer „Beim Austritt“ stehen getrennt als
+ * RUECKGABE_VORGABEN in ausgaben.ts und kommen nur ueber „Rückgabe-Vorgaben
+ * übernehmen …“ an die Positionen — sonst schaltete der Pilot von A1 bis A3
+ * die Erfassung der Uebergaben schon ein.
  */
 export const VORSCHLAEGE: ReadonlyArray<Readonly<Vorschlag>> = [
   // ---- IT ----
@@ -3761,11 +3891,13 @@ export const VORSCHLAEGE: ReadonlyArray<Readonly<Vorschlag>> = [
 
 /**
  * Die Felder einer Katalogposition, die Anlegen, Aendern und Protokoll kennen —
- * die Positivliste der Einstellungsrouten. Bewusst NICHT dabei: die Stufe-2-
- * Felder (`ausgabeKennung`, `rueckgabeKategorie`, `beiAustritt`) und
- * `vorschlagSchluessel` (schreibt nur „Vorschläge übernehmen“), dazu ID und
- * Zeitstempel. Deckt sich mit den Feldern von `katalogPositionSchema` plus
- * `isActive` (ausstattung-validierung.test.ts haelt das).
+ * die Positivliste der Einstellungsrouten. Seit S23 (A4, G8) gehoeren die
+ * Felder „Beim Austritt“ (`beiAustritt`, `rueckgabeKategorie`,
+ * `ausgabeKennung`) dazu: Wer sie im Positionsdialog setzt, schaltet A4 fuer
+ * die Position ein (G27). Bewusst NICHT dabei: `vorschlagSchluessel` (schreibt
+ * nur „Vorschläge übernehmen“), dazu ID und Zeitstempel. Deckt sich mit den
+ * Feldern von `katalogPositionSchema` plus `isActive`
+ * (ausstattung-validierung.test.ts haelt das).
  */
 export const KATALOG_FELDER = [
   "departmentKey",
@@ -3786,13 +3918,17 @@ export const KATALOG_FELDER = [
   "personengruppen",
   "sichtbarFuer",
   "entgeltrelevant",
+  "beiAustritt",
+  "rueckgabeKategorie",
+  "ausgabeKennung",
   "orderIndex",
   "isActive",
 ] as const satisfies ReadonlyArray<keyof KatalogPosition>;
 
 export type KatalogFeld = (typeof KATALOG_FELDER)[number];
 export type KatalogWerte = Pick<KatalogPosition, KatalogFeld>;
-export type KatalogWert = KatalogWerte[KatalogFeld];
+/** Ein Wert der Positivliste; ein fehlendes A4-Feld zaehlt als `null`. */
+export type KatalogWert = Exclude<KatalogWerte[KatalogFeld], undefined>;
 
 /**
  * Ein Feld vorher und nachher (Protokoll `AUSSTATTUNG_POSITION_GEAENDERT`,
@@ -3817,7 +3953,9 @@ function gleicherWert(a: KatalogWert | undefined, b: KatalogWert | undefined): b
  * Nur die Felder der Positivliste, Listen kopiert — fuer das Protokoll beim
  * Anlegen und Loeschen (`nachher` bzw. `vorher`) und als Grundlage der
  * Schreibdaten. Eine Zeile aus der Datenbank traegt mehr (ID, Zeitstempel,
- * Stufe-2-Felder); die bleiben draussen.
+ * `vorschlagSchluessel`); das bleibt draussen. Ein fehlendes A4-Feld (etwa
+ * an einem Vorschlag) wird `null` — so steht es immer in Protokoll und
+ * Schreibdaten.
  */
 export function katalogWerte(p: KatalogWerte): KatalogWerte {
   return {
@@ -3839,6 +3977,9 @@ export function katalogWerte(p: KatalogWerte): KatalogWerte {
     personengruppen: [...p.personengruppen],
     sichtbarFuer: [...p.sichtbarFuer],
     entgeltrelevant: p.entgeltrelevant,
+    beiAustritt: p.beiAustritt ?? null,
+    rueckgabeKategorie: p.rueckgabeKategorie ?? null,
+    ausgabeKennung: p.ausgabeKennung ?? null,
     orderIndex: p.orderIndex,
     isActive: p.isActive,
   };
@@ -3861,7 +4002,7 @@ export function katalogAenderungen(
     const neu = aenderung[feld];
     if (neu === undefined || gleicherWert(bisher[feld], neu)) continue;
     daten[feld] = neu;
-    aenderungen[feld] = { von: bisher[feld], nach: neu };
+    aenderungen[feld] = { von: bisher[feld] ?? null, nach: neu };
   }
   return { daten: daten as Partial<KatalogWerte>, aenderungen };
 }
@@ -4142,6 +4283,9 @@ function zeilenDetails(
     if (!leer(p.aufgabeTitel)) d.push(`Aufgabe: „${p.aufgabeTitel}“`);
     if (!p.bemerkungAnbieten) d.push("ohne Bemerkung");
     else if (!leer(p.bemerkungPlatzhalter)) d.push(`Bemerkung: „${p.bemerkungPlatzhalter}“`);
+    // A4 (S23): nur, wenn festgelegt — „nicht festgelegt“ ist der Normalfall vor dem Einschalten.
+    const austritt = beiAustrittText(p);
+    if (austritt) d.push(`beim Austritt: ${austritt}`);
   }
   if (p.einrichtungsarten.length > 0) {
     d.push(`nur ${p.einrichtungsarten.map((a) => wertName(EINRICHTUNGSARTEN, a)).join(", ")}`);

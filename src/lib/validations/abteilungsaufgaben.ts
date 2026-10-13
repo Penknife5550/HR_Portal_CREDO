@@ -6,7 +6,10 @@
  *                                   Form; seit Paket A3 zusaetzlich `nachtrag` und `absage`)
  *   - aufgabeLinkPatchSchema        PATCH /api/offboarding-tasks/[token]/[itemId]  (oeffentlich)
  *                                   PATCH /api/onboarding-tasks/[token]/[itemId]   (oeffentlich, Paket 5)
- *   - portalAufgabePatchSchema      PATCH /api/offboarding/[id]/checklist/[itemId]
+ *   - offboardingAufgabeLinkPatchSchema  dieselben Felder plus `zustand` (A4, G15) — loest
+ *                                   aufgabeLinkPatchSchema fuer den Offboarding-Link ab, sobald
+ *                                   `oeffentlichAendern` das Schema nach Modul waehlt (S30)
+ *   - portalAufgabePatchSchema      PATCH /api/offboarding/[id]/checklist/[itemId] (seit A4 mit `zustand`)
  *   - onboardingPortalAufgabePatchSchema  PATCH /api/onboarding/[id]/checklist/[itemId] (Paket 5)
  *   - abteilungConfigSchema         POST  /api/settings/departments
  *   - abteilungConfigUpdateSchema   PATCH /api/settings/departments/[id]
@@ -25,6 +28,7 @@
 import { z } from "zod";
 import { RESERVIERTE_ABTEILUNGSSCHLUESSEL, PORTAL_ZUSTAENDIGE } from "@/lib/constants";
 import { ABTEILUNGS_SCHLUESSEL_MUSTER, KOMMENTAR_MAX, MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { MELDUNGEN_AUSGABEN, RUECKGABE_ZUSTAENDE, RUECKGABE_ZUSTAENDE_STELLE } from "@/lib/ausgaben";
 
 /** RFC 5321: Eine Adresse ist hoechstens 254 Zeichen lang. */
 const MAX_EMAIL_LAENGE = 254;
@@ -33,8 +37,10 @@ const MAX_EMAIL_LAENGE = 254;
  * Keine spitzen Klammern und keine Steuerzeichen (auch CR/LF) — dieselbe Regel
  * wie fuer Namen in validations/onboarding.ts. Abteilungs- und
  * Fuehrungskraft-Namen landen in Mails, im HTML-Teil ohne Maskierung.
+ * Exportiert seit A4 fuer die Kennung einer Ausgabe (validations/ausgaben.ts),
+ * damit es keine zweite Fassung der Regel gibt.
  */
-const OHNE_KLAMMERN_STEUERZEICHEN = /^[^<>\p{Cc}]*$/u;
+export const OHNE_KLAMMERN_STEUERZEICHEN = /^[^<>\p{Cc}]*$/u;
 
 /**
  * Kein JSON-Objekt (leerer oder kaputter Body, den die Route als `undefined`
@@ -165,24 +171,57 @@ export type AbteilungsAktionInput = z.infer<typeof onboardingAbteilungsAktionSch
  * Mindestens eins von beidem muss eine Aenderung tragen. `notes` (die interne
  * HR-Notiz) nimmt das Schema gar nicht erst an — zod wirft unbekannte Felder weg.
  */
+const aufgabeLinkFelder = {
+  isCompleted: z.boolean({ invalid_type_error: "isCompleted muss wahr oder falsch sein." }).optional(),
+  comment: z
+    .string({ invalid_type_error: "Der Kommentar muss ein Text sein." })
+    .trim()
+    .max(KOMMENTAR_MAX, `Der Kommentar darf höchstens ${KOMMENTAR_MAX} Zeichen lang sein.`)
+    .nullable()
+    .optional(),
+};
+
+const STATUS_ODER_KOMMENTAR = {
+  pruefen: (d: { isCompleted?: boolean; comment?: string | null }) =>
+    d.isCompleted !== undefined || (d.comment !== undefined && d.comment !== null),
+  meldung: { message: "Bitte Status oder Kommentar angeben." },
+};
+
+/**
+ * Bleibt fuer den ONBOARDING-Link unveraendert (ein mitgeschickter `zustand`
+ * faellt still weg). Der Offboarding-Link bekommt mit A4
+ * `offboardingAufgabeLinkPatchSchema` (`oeffentlichAendern` waehlt nach Modul).
+ */
 export const aufgabeLinkPatchSchema = z
+  .object(aufgabeLinkFelder, KEIN_OBJEKT)
+  .refine(STATUS_ODER_KOMMENTAR.pruefen, STATUS_ODER_KOMMENTAR.meldung);
+
+export type AufgabeLinkPatchInput = z.infer<typeof aufgabeLinkPatchSchema>;
+
+/**
+ * Link der Stelle im OFFBOARDING (Ausstattung & Zugaenge, A4, G15): dieselben
+ * Felder plus `zustand` (ZURUECK, BESCHAEDIGT, FEHLT – mehr waehlt die Stelle
+ * nicht, 1.2). Ein Zustand heisst „erledigt“ und kommt deshalb nur mit
+ * `isCompleted: true`. `isCompleted: true` OHNE Zustand bleibt gueltig: An
+ * einer Ruecknahmeaufgabe heisst das ZURUECK (Dienst, G15); ob ein Zustand an
+ * der Aufgabe ueberhaupt passt, prueft ebenfalls der Dienst (400).
+ */
+export const offboardingAufgabeLinkPatchSchema = z
   .object(
     {
-      isCompleted: z.boolean({ invalid_type_error: "isCompleted muss wahr oder falsch sein." }).optional(),
-      comment: z
-        .string({ invalid_type_error: "Der Kommentar muss ein Text sein." })
-        .trim()
-        .max(KOMMENTAR_MAX, `Der Kommentar darf höchstens ${KOMMENTAR_MAX} Zeichen lang sein.`)
-        .nullable()
+      ...aufgabeLinkFelder,
+      zustand: z
+        .enum(RUECKGABE_ZUSTAENDE_STELLE, { errorMap: () => ({ message: MELDUNGEN_AUSGABEN.ZUSTAND_UNBEKANNT }) })
         .optional(),
     },
     KEIN_OBJEKT,
   )
-  .refine((d) => d.isCompleted !== undefined || (d.comment !== undefined && d.comment !== null), {
-    message: "Bitte Status oder Kommentar angeben.",
+  .refine(STATUS_ODER_KOMMENTAR.pruefen, STATUS_ODER_KOMMENTAR.meldung)
+  .refine((d) => d.zustand === undefined || d.isCompleted === true, {
+    message: MELDUNGEN_AUSGABEN.ZUSTAND_NUR_ERLEDIGT,
   });
 
-export type AufgabeLinkPatchInput = z.infer<typeof aufgabeLinkPatchSchema>;
+export type OffboardingAufgabeLinkPatchInput = z.infer<typeof offboardingAufgabeLinkPatchSchema>;
 
 // =============================================
 // PATCH /api/offboarding/[id]/checklist/[itemId] (Portal)
@@ -196,11 +235,19 @@ export type AufgabeLinkPatchInput = z.infer<typeof aufgabeLinkPatchSchema>;
  *   assigneeDepartment  Schluessel (Form wie oben) oder null = keine Zustaendigkeit.
  *                       Ob der Schluessel BEKANNT ist, prueft der Dienst
  *                       (Konstanten + Einstellungen → Abteilungen).
+ *   zustand             seit A4 (G15): Rueckgabezustand einer Ruecknahmeaufgabe,
+ *                       alle fuenf (HR). Allein gueltig (Zustandswechsel an einer
+ *                       schon erledigten Aufgabe, etwa ZURUECK → FEHLT), aber nie
+ *                       zusammen mit `isCompleted: false` – ein Zustand heisst
+ *                       „erledigt“. Ob er an der Aufgabe passt, prueft der Dienst.
  */
 export const portalAufgabePatchSchema = z
   .object(
     {
       isCompleted: z.boolean({ invalid_type_error: "isCompleted muss wahr oder falsch sein." }).optional(),
+      zustand: z
+        .enum(RUECKGABE_ZUSTAENDE, { errorMap: () => ({ message: MELDUNGEN_AUSGABEN.ZUSTAND_UNBEKANNT }) })
+        .optional(),
       notes: z
         .string({ invalid_type_error: "Die Notiz muss ein Text sein." })
         .max(2000, "Die Notiz darf höchstens 2000 Zeichen lang sein.")
@@ -220,9 +267,16 @@ export const portalAufgabePatchSchema = z
     KEIN_OBJEKT,
   )
   .refine(
-    (d) => d.isCompleted !== undefined || d.notes !== undefined || d.assigneeDepartment !== undefined,
+    (d) =>
+      d.isCompleted !== undefined ||
+      d.notes !== undefined ||
+      d.assigneeDepartment !== undefined ||
+      d.zustand !== undefined,
     { message: "Mindestens ein Feld erforderlich." },
-  );
+  )
+  .refine((d) => d.zustand === undefined || d.isCompleted !== false, {
+    message: MELDUNGEN_AUSGABEN.ZUSTAND_NUR_ERLEDIGT,
+  });
 
 export type PortalAufgabePatchInput = z.infer<typeof portalAufgabePatchSchema>;
 

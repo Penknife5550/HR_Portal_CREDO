@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { ReturnCategory } from "@prisma/client";
+import { RUECKGABE_KATEGORIEN } from "@/lib/constants";
+import { MELDUNGEN_AUSGABEN, RUECKGABE_ZUSTAENDE } from "@/lib/ausgaben";
 import {
   fuehrungskraftAenderungFelder,
   fuehrungskraftAnlageFelder,
@@ -94,22 +95,25 @@ export const updateOffboardingSchema = z.object({
   // Fuehrungskraft (Paket 1b): undefined = unveraendert, "" oder null = loeschen.
   // Vor dem .refine, sonst zaehlte ein Aufruf nur mit diesen Feldern als leer.
   ...fuehrungskraftAenderungFelder,
-}).refine(data => Object.keys(data).length > 0, "Mindestens ein Feld erforderlich");
+  // Ausstattung & Zugaenge (A4, G18): Abschluss trotz offener Rueckgaben
+  // bestaetigt. Ohne ihn antwortet der COMPLETED-Zweig mit 409
+  // RUECKGABEN_OFFEN, solange etwas offen ist; sonst ohne Wirkung.
+  bestaetigt: z.boolean({ invalid_type_error: "bestaetigt muss wahr oder falsch sein." }).optional(),
+  // `bestaetigt` allein ist keine Aenderung (wie `stand` im Katalog-PATCH):
+  // Sonst liefe `{ bestaetigt: true }` mit leerem Update durch und
+  // hinterliesse ein inhaltsleeres „Offboarding aktualisiert“ (A1–A3: 400).
+}).refine(data => Object.keys(data).some((feld) => feld !== "bestaetigt"), "Mindestens ein Feld erforderlich");
 
 // =============================================
 // Rueckgaben (Reiter „Rückgaben“, /api/offboarding/:id/return-items)
 // =============================================
 
-/** Kategorien des Prisma-Enums `ReturnCategory`; `satisfies` prueft jeden Wert. */
-export const RUECKGABE_KATEGORIEN = [
-  "IT_HARDWARE",
-  "SCHLUESSEL",
-  "FAHRZEUG",
-  "DOKUMENTE",
-  "KLEIDUNG",
-  "SPEICHERMEDIEN",
-  "SONSTIGES",
-] as const satisfies readonly ReturnCategory[];
+/**
+ * Kategorien des Prisma-Enums `ReturnCategory`. Seit A4 in src/lib/constants.ts
+ * (auch die reinen Regeln der Ausgaben lesen sie); hier unveraendert
+ * weitergereicht, Name und Typ bleiben.
+ */
+export { RUECKGABE_KATEGORIEN };
 
 /**
  * Freitext eines Gegenstands: getrimmt, leer = null (die Spalten sind
@@ -142,14 +146,31 @@ export const rueckgabeAnlegenSchema = z.object({
 
 const GEGENSTAND_ID_FEHLT = "Rückgabe-Gegenstand fehlt";
 
-/** PATCH: `itemId` im Body (so wie die Route es seit jeher erwartet). */
-export const rueckgabeAendernSchema = z.object({
-  itemId: z
-    .string({ required_error: GEGENSTAND_ID_FEHLT, invalid_type_error: GEGENSTAND_ID_FEHLT })
-    .min(1, GEGENSTAND_ID_FEHLT)
-    .max(100, GEGENSTAND_ID_FEHLT),
-  isReturned: z.boolean({ invalid_type_error: "Rückgabe muss ja oder nein sein" }).optional(),
-  condition: optionalerText(200, "Der Zustand"),
-  notes: optionalerText(1000, "Die Notiz"),
-  serialNumber: optionalerText(100, "Die Seriennummer"),
-});
+/**
+ * PATCH: `itemId` im Body (so wie die Route es seit jeher erwartet).
+ *
+ * Seit A4 (G15, G16) zusaetzlich `zustand`: einer der fuenf Rueckgabezustaende
+ * oder `null` (= wieder offen). Die Altform `isReturned` bleibt gueltig
+ * (`true` = ZURUECK, `false` = offen), aber nie zusammen mit `zustand` – zwei
+ * Aussagen ueber dasselbe koennen sich widersprechen. Die 100 Zeichen fuer
+ * `serialNumber` gelten fuer von HR erfasste Zeilen; an Zeilen mit `ausgabeId`
+ * prueft der Dienst zusaetzlich `kennungSchema` (validations/ausgaben.ts, 400).
+ */
+export const rueckgabeAendernSchema = z
+  .object({
+    itemId: z
+      .string({ required_error: GEGENSTAND_ID_FEHLT, invalid_type_error: GEGENSTAND_ID_FEHLT })
+      .min(1, GEGENSTAND_ID_FEHLT)
+      .max(100, GEGENSTAND_ID_FEHLT),
+    isReturned: z.boolean({ invalid_type_error: "Rückgabe muss ja oder nein sein" }).optional(),
+    zustand: z
+      .enum(RUECKGABE_ZUSTAENDE, { errorMap: () => ({ message: MELDUNGEN_AUSGABEN.ZUSTAND_UNBEKANNT }) })
+      .nullable()
+      .optional(),
+    condition: optionalerText(200, "Der Zustand"),
+    notes: optionalerText(1000, "Die Notiz"),
+    serialNumber: optionalerText(100, "Die Seriennummer"),
+  })
+  .refine((d) => d.isReturned === undefined || d.zustand === undefined, {
+    message: MELDUNGEN_AUSGABEN.ZUSTAND_UND_RUECKGABE,
+  });

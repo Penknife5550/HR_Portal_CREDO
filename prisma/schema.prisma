@@ -109,7 +109,13 @@ model Organization {
   onboardings               OnboardingProcess[]       @relation("OnboardingEinrichtung")
   // Ausstattung & Zugaenge (A1): Vorgaenge, deren Arbeitsort diese Einrichtung ist.
   onboardingArbeitsorte     OnboardingProcess[]       @relation("OnboardingArbeitsort")
-  offboardings              OffboardingProcess[]
+  // Benannt seit A4 (zweite Relation Arbeitsort am Austritt). Der Feldname
+  // bleibt (`_count`-Leser), der Fremdschluessel heisst weiter
+  // offboarding_processes_organizationId_fkey.
+  offboardings              OffboardingProcess[]      @relation("OffboardingEinrichtung")
+  // Ausstattung & Zugaenge (A4, G12): Austritte, deren Arbeitsort diese
+  // Einrichtung ist (bei der Zuordnung aus der Einstellung uebernommen).
+  offboardingArbeitsorte    OffboardingProcess[]      @relation("OffboardingArbeitsort")
   departmentConfigs         DepartmentConfig[]
   employments               Employment[]
   userAssignments           UserOrgAssignment[]
@@ -131,6 +137,8 @@ model Organization {
   // ausgeblendete zentrale Positionen.
   ausstattungsPositionen    AusstattungsPosition[]
   ausstattungsAusblendungen AusstattungsAusblendung[]
+  // Ausstattung & Zugaenge (A4, E-A30): Stuecke, die dieser Einrichtung gehoeren.
+  ausgaben                  Ausgabe[]
 
   @@map("organizations")
 }
@@ -168,6 +176,9 @@ model Employee {
   elternzeitProzesse    ElternzeitProzess[]   @relation("EmployeeElternzeit")
   bemFaelle             BemFall[]             @relation("EmployeeBem")
   contractEndProcesses  ContractEndProcess[]  @relation("EmployeeContractEnds")
+  // Ausstattung & Zugaenge (A4): Bestand der Person. Bis zur LOGA-Anbindung
+  // schreibt niemand Ausgabe.employeeId (E-A31).
+  ausgaben              Ausgabe[]
 
   @@index([personalNumber])
   @@index([lastName, firstName])
@@ -321,6 +332,10 @@ model OnboardingProcess {
   // Ausstattung & Zugaenge (F12, E-A18): Merker der Sammelmail an HR am Werktag
   // vor Dienstbeginn. Bedingt beansprucht (null -> jetzt), bei FAILED zurueck auf null.
   ausstattungSammelmailAm  DateTime?
+  // Ausstattung & Zugaenge (A4, G20): Ausgaben dieser Einstellung nach Ablauf
+  // der Frist geloescht. Danach faellt das Uebergabeprotokoll (hochgeladen und
+  // erzeugt); ein neuer Vermerk setzt zurueck.
+  ausgabenGeloeschtAm      DateTime?
 
   // Starterpaket-Versand (Nachweis + Resend-Anzeige)
   starterPacketSentAt    DateTime?
@@ -342,6 +357,11 @@ model OnboardingProcess {
   ausstattung               OnboardingAusstattung[]
   stellenHinweise           OnboardingStellenHinweis[]
   ausstattungAenderungen    OnboardingAusstattungAenderung[]
+  // Ausstattung & Zugaenge (A4): Austritte, denen HR diese Einstellung
+  // zugeordnet hat (E-A31, mehrere moeglich), und die hier vermerkten Ausgaben
+  // (Herkunft OHNE Cascade, E-A30). Nur die Gegenrichtungen, keine Spalten.
+  austritte                 OffboardingProcess[]             @relation("OffboardingEinstellung")
+  ausgaben                  Ausgabe[]                        @relation("OnboardingAusgaben")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -880,6 +900,10 @@ model SupervisorData {
   // F9: erster Speicherstand der Wahl. Solange null, wendet das Formular die
   // Vorauswahl des Katalogs an ("keine Wahl" hiesse sonst auch "bewusst abgewaehlt").
   ausstattungGespeichertAm DateTime?
+  // A4: Katalogausschnitt enthielt eine Position mit RUECKGABE/SPERREN; gesetzt
+  // mit der Momentaufnahme; null = Altfall oder ohne Ausstattungsschritt
+  // (E-A36, rueckgabeLage in src/lib/ausgaben.ts).
+  ausgabenAngeboten        Boolean?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1040,6 +1064,10 @@ enum DocumentType {
   // Gegenstueck zu KK_BESCHEINIGUNG fuer privat Versicherte.
   PKV_NACHWEIS
   SONSTIGES
+  // Ausstattung & Zugaenge (A4, E-A34): unterschriebenes Uebergabeprotokoll,
+  // laedt nur HR hoch. Bewusst NICHT in SELECTABLE_DOCUMENT_TYPES
+  // (src/lib/required-documents.ts): Die Person sieht es im Fragebogen nie.
+  UEBERGABEPROTOKOLL
 }
 
 enum DocumentStatus {
@@ -1849,6 +1877,14 @@ model ChecklistItem {
   ausstattungAufgabe OnboardingAusstattungAufgabe?
   stellenHinweis     OnboardingStellenHinweis?
 
+  // Ausstattung & Zugaenge (A4):
+  // Gegenrichtung (keine Spalte): an dieser Ausstattungsaufgabe vermerkte Ausgaben.
+  ausgaben            Ausgabe[]
+  // A4: Ausgaben dieser Ausstattungsaufgabe nach Ablauf der Frist geloescht; ein
+  // neuer Vermerk setzt zurueck (G20). Ohne den Merker forderte die Karte nach
+  // der Loeschung wieder "Uebergabe vermerken".
+  ausgabenGeloeschtAm DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2009,6 +2045,62 @@ model OnboardingAusstattungAenderung {
 
   @@index([onboardingId, departmentKey, gesendetAm])
   @@map("onboarding_ausstattung_aenderungen")
+}
+
+// =============================================
+// Ausstattung & Zugaenge, Stufe 2 (Paket A4)
+//
+// Was ausgegeben wurde, steht je Stueck in `ausgaben`; der Austritt schlaegt
+// daraus Ruecknahme- und Sperraufgaben vor. Feinplan:
+// docs/module/onboarding/ausstattung-feinplan-a4.md (Abschnitt 2). Die
+// Wertlisten stehen als Konstanten in src/lib/ausgaben.ts; derselbe Test wie
+// oben haelt sie gegen diese Kommentare.
+// =============================================
+
+// ---------- Ausgaben je Stueck (A4, E-A30) ----------
+// Der Bestand lebt laenger als der Onboarding-Vorgang: KEIN Cascade an der
+// Herkunft. Einziger Schreiber: src/lib/ausgaben-schreiben.ts (G3).
+// zustand: "AUSGEGEBEN" | "ZURUECK" | "BESCHAEDIGT" | "FEHLT" | "VERBLEIBT" | "ENTFAELLT" | "ERSETZT"
+// beiAustritt: "RUECKGABE" | "SPERREN"
+// quelle: "LINK" | "HR"
+model Ausgabe {
+  id                 String             @id @default(uuid())
+  employeeId         String? // Personalakte; bleibt bis zur LOGA-Anbindung leer (E-A31)
+  employee           Employee?          @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  onboardingId       String? // Herkunft, OHNE Cascade
+  onboarding         OnboardingProcess? @relation("OnboardingAusgaben", fields: [onboardingId], references: [id], onDelete: SetNull)
+  checklistItemId    String? // Ausstattungsaufgabe, an der vermerkt wurde
+  checklistItem      ChecklistItem?     @relation(fields: [checklistItemId], references: [id], onDelete: SetNull)
+  organizationId     String // Einrichtung, der das Stueck gehoert (Empfaenger-Einrichtung der Einstellung)
+  organization       Organization       @relation(fields: [organizationId], references: [id])
+  zentral            Boolean            @default(false) // Position galt zentral (E-A35)
+  departmentKey      String // ausgebende Stelle
+  bezeichnung        String // "Schluessel: Haupteingang"; max. 200, nie Freitext
+  kennungLabel       String? // Momentaufnahme ausgabeKennung, max. 40
+  kennung            String? // max. 60
+  rueckgabeKategorie String? // ReturnCategory-Wert, nur bei RUECKGABE
+  beiAustritt        String
+  quelle             String
+  erfasstVonId       String? // HR-Konto bei quelle HR (kein FK)
+  uebergebenAm       DateTime           @db.Date
+  zustand            String             @default("AUSGEGEBEN")
+  zustandAm          DateTime           @default(now())
+  ersetztDurchId     String?            @unique
+  ersetztDurch       Ausgabe?           @relation("AusgabeTausch", fields: [ersetztDurchId], references: [id], onDelete: SetNull)
+  ersetzt            Ausgabe?           @relation("AusgabeTausch")
+  loeschenAb         DateTime? // E-A37, gesetzt mit jedem Zustandswechsel (ausgabeZustandDaten)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  rueckgaben          ReturnItem[]
+  offboardingAufgaben OffboardingChecklistItem[]
+
+  @@index([onboardingId])
+  @@index([employeeId])
+  @@index([checklistItemId])
+  @@index([organizationId])
+  @@index([loeschenAb])
+  @@map("ausgaben")
 }
 
 // =============================================
@@ -2221,8 +2313,17 @@ model OffboardingProcess {
   displayId        String @unique // z.B. "OFF-2026-GYM-001"
   sequentialNumber Int // Laufende Nummer fuer displayId
 
+  // Einrichtung = Arbeitgeber/Mandant: Zugriff, Listen, Mailfeld `einrichtung`.
+  // Der Relationsname ist neu (A4), der Fremdschluessel in der Datenbank bleibt
+  // offboarding_processes_organizationId_fkey (kein onDelete hier).
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization  @relation("OffboardingEinrichtung", fields: [organizationId], references: [id])
+  // Ausstattung & Zugaenge (A4, G12): Arbeitsort, bei der Zuordnung einer
+  // Einstellung derselben Einrichtung uebernommen, solange keine Stelle
+  // informiert ist. Empfaenger ALLER Offboarding-Abteilungsaufgaben ist
+  // `arbeitsortId ?? organizationId`; nie der Zugriff.
+  arbeitsortId   String?
+  arbeitsort     Organization? @relation("OffboardingArbeitsort", fields: [arbeitsortId], references: [id], onDelete: SetNull)
 
   // Mitarbeiter-Daten (inline, für Abwärtskompatibilität)
   employeeEmail        String
@@ -2235,8 +2336,17 @@ model OffboardingProcess {
   employeeId String?
   employee   Employee? @relation("EmployeeOffboardings", fields: [employeeId], references: [id])
 
-  // Link zum Onboarding (optional)
-  onboardingId String?
+  // Link zum Onboarding (optional). Seit A4 mit Fremdschluessel: die von HR
+  // bestaetigte Einstellung (E-A31, nie ueber einen stillen Namensabgleich).
+  // Mehrere Austritte je Einstellung sind moeglich, deshalb kein @unique.
+  onboardingId          String?
+  onboarding            OnboardingProcess? @relation("OffboardingEinstellung", fields: [onboardingId], references: [id], onDelete: SetNull)
+  // A4 (G13): "Person bleibt in einer anderen Beschaeftigung" – zentrale
+  // Ausgaben stehen dann nur als Hinweis da. null = nie zugeordnet.
+  weitereBeschaeftigung Boolean?
+  // A4 (G20): Ausgaben dieses Austritts nach Ablauf der Frist geloescht; danach
+  // faellt das Rueckgabeprotokoll (hochgeladen und erzeugt).
+  ausgabenGeloeschtAm   DateTime?
 
   // Austrittsgrund
   exitType   ExitType
@@ -2290,6 +2400,8 @@ model OffboardingProcess {
   @@index([status])
   @@index([organizationId])
   @@index([displayId])
+  @@index([onboardingId])
+  @@index([arbeitsortId])
   @@map("offboarding_processes")
 }
 
@@ -2368,10 +2480,23 @@ model OffboardingChecklistItem {
   abteilungKommentar   String?
   abteilungKommentarAm DateTime?
 
+  // Ausstattung & Zugaenge (A4, G14/G17): Ruecknahme-, Sperr- und Folgeaufgabe
+  // zu genau einer Ausgabe. Titel und Beschreibung tragen NIE die Kennung.
+  // herkunft: null = Vorlage | "AUSGABE" | "AUSGABE_FEHLT"
+  herkunft  String?
+  ausgabeId String?
+  ausgabe   Ausgabe? @relation(fields: [ausgabeId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // NULL zaehlt als verschieden: Vorlagenpunkte (ausgabeId null) kollidieren nie.
+  // Je Austritt und Ausgabe hoechstens EINE Folgeaufgabe: Ein erneutes FEHLT
+  // oeffnet die erledigte wieder, statt eine zweite anzulegen (G17,
+  // folgeAufgabeSchritt in src/lib/ausgaben.ts).
+  @@unique([offboardingId, ausgabeId, herkunft])
   @@index([offboardingId])
+  @@index([ausgabeId])
   @@map("offboarding_checklist_items")
 }
 
@@ -2393,9 +2518,20 @@ model ReturnItem {
   condition    String?
   notes        String?
 
+  // Ausstattung & Zugaenge (A4, G15/G16): Zustand der Rueckgabe und die
+  // Ausgabe, aus der die Zeile vorgeschlagen wurde (null = von HR erfasst).
+  // zustand: null = offen | "ZURUECK" | "BESCHAEDIGT" | "FEHLT" | "VERBLEIBT" | "ENTFAELLT"; isReturned folgt (G16)
+  zustand   String?
+  ausgabeId String?
+  ausgabe   Ausgabe? @relation(fields: [ausgabeId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([offboardingId, ausgabeId])
+  // Suche je Ausgabe (Austrittsbezug, G28; SetNull beim Loeschen der Ausgabe) –
+  // der Unique-Index oben beginnt mit offboardingId und hilft dabei nicht.
+  @@index([ausgabeId])
   @@map("return_items")
 }
 

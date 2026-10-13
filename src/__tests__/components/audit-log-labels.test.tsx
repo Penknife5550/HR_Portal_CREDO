@@ -17,6 +17,7 @@ import { ABTEILUNGS_AUDIT, ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufga
 import { UNTERLAGEN_AUDIT, UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
 import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
 import { AUSSTATTUNG_AUDIT, AUSSTATTUNG_AUDIT_LABELS } from "@/lib/ausstattung";
+import { AUSGABEN_AUDIT, AUSGABEN_AUDIT_LABELS } from "@/lib/ausgaben";
 
 describe("Protokoll-Beschriftungen", () => {
   // Paket 1b: Die Abteilungsaufgaben schreiben neue Codes (ABTEILUNGS_AUDIT).
@@ -155,6 +156,40 @@ describe("Protokoll-Beschriftungen", () => {
     for (const code of Object.keys(AUSSTATTUNG_AUDIT_LABELS)) {
       expect(bestehend).not.toContain(code);
     }
+    expect(getActionLabel("STATUS_CHANGED")).toBe("Status geändert");
+  });
+
+  // Ausstattung & Zugaenge, Stufe 2 (Feinplan A4, 1.10, Schritt S21): dieselbe
+  // Regel – jeder Code aus AUSGABEN_AUDIT steht uebersetzt im Protokoll.
+  test.each(Object.entries(AUSGABEN_AUDIT))(
+    "Ausgaben (A4): %s ist übersetzt",
+    (_schluessel, code) => {
+      expect(getActionLabel(code)).toBe(AUSGABEN_AUDIT_LABELS[code]);
+      expect(getActionLabel(code)).not.toBe(code);
+    },
+  );
+
+  test("jede Ausgaben-Beschriftung hat einen Code, und keine ueberschreibt einen bestehenden", () => {
+    // Gegenrichtung wie bei den Unterlagen: Eine Beschriftung ohne Code waere
+    // ein Tippfehler im Schluessel.
+    expect(Object.keys(AUSGABEN_AUDIT_LABELS).sort()).toEqual([...new Set(Object.values(AUSGABEN_AUDIT))].sort());
+    // Per Spread angehaengt: Ein gleichnamiger Schluessel ersetzte die aeltere
+    // Beschriftung still.
+    const bestehend = [
+      ...Object.keys(ABTEILUNGS_AUDIT_LABELS),
+      ...Object.keys(UNTERLAGEN_AUDIT_LABELS),
+      ...Object.keys(INDIVIDUELLE_MAIL_AUDIT_LABELS),
+      ...Object.keys(AUSSTATTUNG_AUDIT_LABELS),
+      "RETURN_ITEM_CREATED",
+      "RETURN_ITEM_UPDATED",
+      "RETURN_ITEM_DELETED",
+      "STATUS_CHANGED",
+      "DOCUMENT_UPLOADED",
+    ];
+    for (const code of Object.keys(AUSGABEN_AUDIT_LABELS)) {
+      expect(bestehend).not.toContain(code);
+    }
+    expect(getActionLabel("RETURN_ITEM_UPDATED")).toBe("Rückgabe aktualisiert");
     expect(getActionLabel("STATUS_CHANGED")).toBe("Status geändert");
   });
 

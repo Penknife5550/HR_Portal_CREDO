@@ -67,13 +67,18 @@
  * Brief-Platzhalter {ausstattung_liste} (ausstattungListe — ohne Bemerkungen,
  * Angaben und Gestrichenes, Reihenfolge wie im Formular).
  *
+ * Feinplan A4, S23: die Katalogfelder „Beim Austritt“ — ausgabeFelderPruefen
+ * als Matrix (auch ueber positionPruefen), beiAustrittText, die Unterzeile der
+ * Katalogseite, die Positivliste samt Protokoll (katalogWerte,
+ * katalogAenderungen) und die Momentaufnahme mit den A4-Werten.
+ *
  * Ohne Datenbank und ohne Uhr. Die Schema-Kommentare haelt
  * ausstattung-schema.test.ts, die Zod-Schemas ausstattung-validierung.test.ts.
  */
 
 import fs from "fs";
 import path from "path";
-import { DEPARTMENT_LABELS } from "@/lib/constants";
+import { DEPARTMENT_LABELS, RETURN_CATEGORY_LABELS, RUECKGABE_KATEGORIEN } from "@/lib/constants";
 import { WAECHTER_TAGE as WAECHTER_TAGE_ABTEILUNGEN, type AbteilungsKonfig } from "@/lib/abteilungsaufgaben";
 import {
   FREITEXT_AUFBEWAHRUNG_MONATE,
@@ -112,6 +117,12 @@ import {
   ANGABEN_KATALOG,
   ART_NAMEN,
   AUSSTATTUNG_ARTEN,
+  BEI_AUSTRITT,
+  BEI_AUSTRITT_NAMEN,
+  RUECKGABE_KATEGORIE_AUSWAHL,
+  ausgabeFelderPruefen,
+  beiAustrittText,
+  istBeiAustritt,
   AUSSTATTUNG_QUELLEN,
   BEMERKUNG_HINWEIS,
   BEMERKUNG_QUELLEN,
@@ -428,6 +439,83 @@ describe("positionPruefen", () => {
     });
   });
 
+  describe("Beim Austritt (A4, G8)", () => {
+    const rueckgabe = { beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE", ausgabeKennung: "Inventarnummer" };
+
+    it("gueltig: leer, NICHTS, SPERREN mit und ohne Kennung, RUECKGABE mit Kategorie und Kennung", () => {
+      expect(positionPruefen(position())).toBeNull();
+      expect(positionPruefen(position({ beiAustritt: "NICHTS" }))).toBeNull();
+      expect(positionPruefen(position({ beiAustritt: "SPERREN" }))).toBeNull();
+      expect(positionPruefen(auswahl({ beiAustritt: "SPERREN", ausgabeKennung: "Benutzername" }))).toBeNull();
+      expect(positionPruefen(position(rueckgabe))).toBeNull();
+      expect(positionPruefen(auswahl({ ...rueckgabe, rueckgabeKategorie: "SCHLUESSEL", ausgabeKennung: null }))).toBeNull();
+      // Leerzeichen zaehlen als leer.
+      expect(positionPruefen(position({ beiAustritt: " ", rueckgabeKategorie: "", ausgabeKennung: "  " }))).toBeNull();
+    });
+
+    it.each([
+      ["ANGABE mit beiAustritt", angabe({ beiAustritt: "NICHTS" }), MELDUNGEN.AUSTRITT_NICHT_BEI_ANGABE],
+      ["ANGABE mit Kategorie", angabe({ rueckgabeKategorie: "IT_HARDWARE" }), MELDUNGEN.AUSTRITT_NICHT_BEI_ANGABE],
+      ["ANGABE mit Kennung", angabe({ ausgabeKennung: "Nr." }), MELDUNGEN.AUSTRITT_NICHT_BEI_ANGABE],
+      ["unbekannter Wert", position({ beiAustritt: "BEHALTEN" }), MELDUNGEN.BEI_AUSTRITT_UNBEKANNT],
+      ["RUECKGABE ohne Kategorie", position({ beiAustritt: "RUECKGABE" }), MELDUNGEN.RUECKGABEKATEGORIE_FEHLT],
+      ["RUECKGABE mit alter Testkategorie", position({ ...rueckgabe, rueckgabeKategorie: "IT_GERAET" }), MELDUNGEN.RUECKGABEKATEGORIE_UNBEKANNT],
+      ["Kategorie bei SPERREN", position({ beiAustritt: "SPERREN", rueckgabeKategorie: "SCHLUESSEL" }), MELDUNGEN.RUECKGABEKATEGORIE_NUR_RUECKGABE],
+      ["Kategorie ohne beiAustritt", position({ rueckgabeKategorie: "SCHLUESSEL" }), MELDUNGEN.RUECKGABEKATEGORIE_NUR_RUECKGABE],
+      ["Kennung bei NICHTS", position({ beiAustritt: "NICHTS", ausgabeKennung: "Nr." }), MELDUNGEN.KENNUNG_NUR_AUSGABE],
+      ["Kennung ohne beiAustritt", position({ ausgabeKennung: "Nr." }), MELDUNGEN.KENNUNG_NUR_AUSGABE],
+      [
+        "Kennung zu lang",
+        position({ ...rueckgabe, ausgabeKennung: "x".repeat(GRENZEN.ausgabeKennung + 1) }),
+        MELDUNGEN.KENNUNG_LABEL_ZU_LANG,
+      ],
+    ])("%s → Fehler", (_name, p, meldung) => {
+      expect(positionPruefen(p)).toBe(meldung);
+      expect(ausgabeFelderPruefen(p)).toBe(meldung);
+    });
+
+    it("Kennung bis GRENZEN.ausgabeKennung Zeichen; jede ReturnCategory ist eine Kategorie", () => {
+      expect(positionPruefen(position({ ...rueckgabe, ausgabeKennung: "x".repeat(GRENZEN.ausgabeKennung) }))).toBeNull();
+      for (const kategorie of RUECKGABE_KATEGORIEN) {
+        expect(positionPruefen(position({ ...rueckgabe, rueckgabeKategorie: kategorie }))).toBeNull();
+      }
+    });
+
+    it("eine Angabe ohne A4-Werte bleibt gueltig; die A4-Pruefung kommt nach den Regeln der Art", () => {
+      expect(positionPruefen(angabe())).toBeNull();
+      // Die Art-Regel meldet sich zuerst — eine kaputte Angabe bleibt eine kaputte Angabe.
+      expect(positionPruefen(angabe({ angabeSchluessel: "RELIGION", beiAustritt: "RUECKGABE" }))).toBe(
+        MELDUNGEN.ANGABE_UNBEKANNT,
+      );
+    });
+
+    it("istBeiAustritt und die Namen kennen genau BEI_AUSTRITT", () => {
+      for (const w of BEI_AUSTRITT) expect(istBeiAustritt(w)).toBe(true);
+      for (const w of ["", null, undefined, "rueckgabe", "toString"]) expect(istBeiAustritt(w)).toBe(false);
+      expect(Object.keys(BEI_AUSTRITT_NAMEN).sort()).toEqual([...BEI_AUSTRITT].sort());
+    });
+
+    it("RUECKGABE_KATEGORIE_AUSWAHL: jede ReturnCategory mit ihrem Namen, in derselben Reihenfolge", () => {
+      expect(RUECKGABE_KATEGORIE_AUSWAHL.map((k) => k.wert)).toEqual([...RUECKGABE_KATEGORIEN]);
+      for (const k of RUECKGABE_KATEGORIE_AUSWAHL) expect(k.name).toBe(RETURN_CATEGORY_LABELS[k.wert]);
+    });
+
+    it("beiAustrittText: Kurzform fuer Katalogseite und Dialoge, null solange nichts festgelegt ist", () => {
+      expect(beiAustrittText({})).toBeNull();
+      expect(beiAustrittText({ beiAustritt: null })).toBeNull();
+      expect(beiAustrittText({ beiAustritt: "BEHALTEN" })).toBeNull();
+      expect(beiAustrittText({ beiAustritt: "NICHTS" })).toBe("nichts");
+      expect(beiAustrittText({ beiAustritt: "SPERREN" })).toBe("sperren");
+      expect(beiAustrittText({ beiAustritt: "SPERREN", ausgabeKennung: "Benutzername" })).toBe(
+        "sperren, Kennung „Benutzername“",
+      );
+      expect(beiAustrittText(rueckgabe)).toBe("zurückgeben (IT-Hardware), Kennung „Inventarnummer“");
+      expect(beiAustrittText({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "SCHLUESSEL" })).toBe(
+        "zurückgeben (Schlüssel & Zugangskarten)",
+      );
+    });
+  });
+
   describe("Sichtbar fuer", () => {
     it("nur bei einer Angabe", () => {
       expect(positionPruefen(position({ sichtbarFuer: ["FACILITY"] }))).toBe(MELDUNGEN.SICHTBAR_NUR_ANGABE);
@@ -649,7 +737,7 @@ describe("formularGruppen", () => {
   const intern = {
     hinweisStelle: "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
     ausgabeKennung: "Inventarnummer",
-    rueckgabeKategorie: "IT",
+    rueckgabeKategorie: "IT_HARDWARE",
     beiAustritt: "RUECKGABE",
     entgeltrelevant: false,
     vorschlagSchluessel: "IT_ZUGAENGE",
@@ -1119,7 +1207,7 @@ describe("nachStelleSortiert", () => {
 });
 
 describe("katalogWerte", () => {
-  it("nimmt genau die Felder der Positivliste, ohne ID, Stufe-2-Felder und vorschlagSchluessel", () => {
+  it("nimmt genau die Felder der Positivliste — seit S23 mit den A4-Feldern —, ohne ID und vorschlagSchluessel", () => {
     const zeile = {
       ...auswahl(),
       vorschlagSchluessel: "FACILITY_SCHLUESSEL",
@@ -1130,7 +1218,21 @@ describe("katalogWerte", () => {
     };
     const werte = katalogWerte(zeile);
     expect(Object.keys(werte).sort()).toEqual([...KATALOG_FELDER].sort());
-    expect(werte).toMatchObject({ departmentKey: "FACILITY", art: "AUSWAHL", isActive: true, orderIndex: 0 });
+    expect(werte).toMatchObject({
+      departmentKey: "FACILITY",
+      art: "AUSWAHL",
+      isActive: true,
+      orderIndex: 0,
+      beiAustritt: "RUECKGABE",
+      rueckgabeKategorie: "SCHLUESSEL",
+      ausgabeKennung: "Schlüsselnummer",
+    });
+    expect(werte).not.toHaveProperty("vorschlagSchluessel");
+  });
+
+  it("ein fehlendes A4-Feld (Vorschlag, aeltere Testdaten) wird null", () => {
+    const werte = katalogWerte(auswahl());
+    expect(werte).toMatchObject({ beiAustritt: null, rueckgabeKategorie: null, ausgabeKennung: null });
   });
 
   it("kopiert die Listen (keine geteilte Liste mit der Zeile)", () => {
@@ -1196,10 +1298,29 @@ describe("katalogAenderungen", () => {
   });
 
   it("Felder ausserhalb der Positivliste werden uebergangen", () => {
-    const aenderung = { vorschlagSchluessel: "X", ausgabeKennung: "Inventarnummer", id: "fremd" } as unknown as Parameters<
+    const aenderung = { vorschlagSchluessel: "X", id: "fremd", createdAt: new Date() } as unknown as Parameters<
       typeof katalogAenderungen
     >[1];
     expect(katalogAenderungen(bisher, aenderung)).toEqual({ daten: {}, aenderungen: {} });
+  });
+
+  it("A4-Felder (S23): Aenderung mit von/nach; ein fehlender bisheriger Wert zaehlt als null", () => {
+    const { daten, aenderungen } = katalogAenderungen(bisher, {
+      beiAustritt: "RUECKGABE",
+      rueckgabeKategorie: "SCHLUESSEL",
+      ausgabeKennung: null,
+    });
+    expect(daten).toEqual({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "SCHLUESSEL" });
+    expect(aenderungen).toEqual({
+      beiAustritt: { von: null, nach: "RUECKGABE" },
+      rueckgabeKategorie: { von: null, nach: "SCHLUESSEL" },
+    });
+    // Zuruecksetzen auf „nicht festgelegt“ ist eine Aenderung.
+    const gesetzt = { ...bisher, beiAustritt: "SPERREN", ausgabeKennung: "Benutzername" };
+    expect(katalogAenderungen(gesetzt, { beiAustritt: null, ausgabeKennung: null }).aenderungen).toEqual({
+      beiAustritt: { von: "SPERREN", nach: null },
+      ausgabeKennung: { von: "Benutzername", nach: null },
+    });
   });
 });
 
@@ -1491,6 +1612,25 @@ describe("Katalogseite (S4)", () => {
       expect(zeile(zeilen, "p-garderobe").details).toEqual(["ohne Bemerkung"]);
     });
 
+    it("A4 (S23): „beim Austritt: …“ in der kleinen Zeile, nur wenn festgelegt", () => {
+      const schluessel = eintrag(
+        auswahl({
+          id: "p-a4",
+          beiAustritt: "RUECKGABE",
+          rueckgabeKategorie: "SCHLUESSEL",
+          ausgabeKennung: "Schlüsselnummer",
+          aufgabeTitel: null,
+        }),
+      );
+      const zugang = eintrag(position({ id: "p-a4-zugang", beiAustritt: "SPERREN", bemerkungAnbieten: false }));
+      const zeilen = katalogZeilen(daten([schluessel, zugang, IPAD]), ALLE);
+      expect(zeile(zeilen, "p-a4").details).toContain(
+        "beim Austritt: zurückgeben (Schlüssel & Zugangskarten), Kennung „Schlüsselnummer“",
+      );
+      expect(zeile(zeilen, "p-a4-zugang").details).toEqual(["ohne Bemerkung", "beim Austritt: sperren"]);
+      expect(zeile(zeilen, "p-ipad").details.join(" ")).not.toContain("beim Austritt");
+    });
+
     it("Filter Stelle zeigt nur deren Positionen", () => {
       expect(ids(katalogZeilen(daten(), { stelle: "FACILITY", einrichtungId: "" })).sort()).toEqual([
         "p-faecher",
@@ -1731,10 +1871,17 @@ describe("momentaufnahme", () => {
     expect(m).toMatchObject({ art: "ANGABE", angabeSchluessel: "UNTERRICHTSFAECHER", aufgabeTitel: "", relativeDueDays: null, sichtbarFuer: ["IT"] });
   });
 
-  it("ein leerer Hinweis fuer die Stelle wird null; die Stufe-2-Felder kommen wie sie sind", () => {
-    const m = momentaufnahme(position({ hinweisStelle: "   ", ausgabeKennung: "INV-1" }));
+  it("ein leerer Hinweis fuer die Stelle wird null; die A4-Felder kommen wie sie sind (S23)", () => {
+    const m = momentaufnahme(
+      position({ hinweisStelle: "   ", beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE", ausgabeKennung: "Inventarnummer" }),
+    );
     expect(m.hinweisStelle).toBeNull();
-    expect(m.ausgabeKennung).toBe("INV-1");
+    expect(m).toMatchObject({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE", ausgabeKennung: "Inventarnummer" });
+    expect(momentaufnahme(auswahl({ beiAustritt: "SPERREN" }))).toMatchObject({
+      beiAustritt: "SPERREN",
+      rueckgabeKategorie: null,
+      ausgabeKennung: null,
+    });
   });
 
   it("die Listen sind Kopien (keine geteilte Referenz mit dem Katalog)", () => {

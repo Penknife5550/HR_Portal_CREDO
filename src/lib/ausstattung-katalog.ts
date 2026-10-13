@@ -10,6 +10,7 @@
  *   positionLoeschen       DELETE /api/settings/ausstattung/[id]
  *   ausblendungSetzen      PUT    /api/settings/ausstattung/[id]/ausblendung
  *   vorschlaegeUebernehmen POST   /api/settings/ausstattung/vorschlaege
+ *   rueckgabeVorgabenUebernehmen POST /api/settings/ausstattung/rueckgabe-vorgaben (A4, G27)
  *
  * Dazu `katalogAusschnittLaden`: die Positionen, die EIN Vorgang anbietet
  * (Arbeitsort, Einrichtungsart, Personengruppe, Vorgangsart, Adresse der
@@ -25,10 +26,19 @@
  * Regeln, die beim Aendern gelten muessen:
  *   1. Neue Positionen sind AUS — beim Anlegen und bei „Vorschläge übernehmen“
  *      (Regel 1). `isActive` kennt nur der PATCH.
- *   2. Geschrieben wird nur die Positivliste `KATALOG_FELDER`. Stufe-2-Felder
- *      und `vorschlagSchluessel` verwirft schon Zod; `vorschlagSchluessel`
- *      setzt allein `vorschlaegeUebernehmen` (F11, `createMany` mit
- *      `skipDuplicates` — Doppelklick und zwei Tabs bleiben folgenlos).
+ *   2. Geschrieben wird nur die Positivliste `KATALOG_FELDER` — seit S23 mit
+ *      den A4-Feldern „Beim Austritt“ (G8). `vorschlagSchluessel` verwirft
+ *      schon Zod; ihn setzt allein `vorschlaegeUebernehmen` (F11,
+ *      `createMany` mit `skipDuplicates` — Doppelklick und zwei Tabs bleiben
+ *      folgenlos), und zwar IMMER ohne A4-Werte (G27).
+ *   8. A4 schaltet nur eine bewusste Handlung ein (G27): von Hand im
+ *      Positionsdialog oder `rueckgabeVorgabenUebernehmen` — diese setzt die
+ *      Vorgaben (RUECKGABE_VORGABEN in ausgaben.ts) NUR an Positionen mit
+ *      `vorschlagSchluessel` und leerem `beiAustritt`, je Position bedingt
+ *      (`beiAustritt: null` im WHERE), in EINER Transaktion samt Protokoll.
+ *      Wiederholbar; von HR gesetzte Werte bleiben. Aktive Webhooks auf die
+ *      Offboarding-Abteilungsereignisse meldet die Antwort als `hinweis`
+ *      (G21), ohne zu sperren.
  *   3. Jede Aenderung wird protokolliert (Regel 18), im selben Commit,
  *      `processType: "SYSTEM"`: Anlegen mit `nachher`, Loeschen mit `vorher`,
  *      Aendern mit `aenderungen { feld: { von, nach } }` — nur Felder, die sich
@@ -94,6 +104,12 @@ import {
   type KatalogWarnungen,
   type KatalogWerte,
 } from "@/lib/ausstattung";
+import {
+  A4_WEBHOOK_EREIGNISSE,
+  MELDUNGEN_AUSGABEN,
+  rueckgabeVorgabenPlan,
+  type VorgabenEintrag,
+} from "@/lib/ausgaben";
 import type {
   AusblendungInput,
   KatalogPositionAenderungInput,
@@ -493,7 +509,8 @@ export async function ausblendungSetzen(
 
 /**
  * Legt die Vorschlaege (VORSCHLAEGE in ausstattung.ts) an, die noch fehlen —
- * ausgeschaltet, zentral, ohne Faelligkeit. `vorschlagSchluessel @unique` +
+ * ausgeschaltet, zentral, ohne Faelligkeit und ohne A4-Werte (G27: „Beim
+ * Austritt“ bleibt leer, bis `rueckgabeVorgabenUebernehmen` laeuft). `vorschlagSchluessel @unique` +
  * `skipDuplicates` machen den Aufruf wiederholbar (F11): Der zweite legt
  * nichts an. Protokolliert wird nur, wenn etwas angelegt wurde — mit ID,
  * Schluessel, Stelle und Titel JEDER angelegten Position (Regel 18): Nach
@@ -530,6 +547,101 @@ export async function vorschlaegeUebernehmen(opts: Schreiber): Promise<DienstAnt
   });
   const vorhanden = daten.length - angelegt;
   return { status: 200, body: { angelegt, vorhanden, meldung: vorschlaegeMeldung(angelegt, vorhanden) } };
+}
+
+// =============================================
+// POST: Rueckgabe-Vorgaben uebernehmen (A4, G27)
+// =============================================
+
+/**
+ * Zaehlt aktive Webhooks auf die Offboarding-Abteilungsereignisse (G21). Eine
+ * gescheiterte Abfrage zaehlt 0 — der Hinweis ist eine Hilfe, keine Sperre,
+ * und die Aenderung ist dann schon geschrieben.
+ */
+async function offboardingWebhooksAktiv(): Promise<number> {
+  try {
+    return await prisma.webhookConfig.count({
+      where: { event: { in: [...A4_WEBHOOK_EREIGNISSE] }, isActive: true },
+    });
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * „Rückgabe-Vorgaben übernehmen …“ (Einstellungen → Ausstattung & Zugänge,
+ * nur ADMIN_ROLES über `adminHandler`): setzt `beiAustritt`,
+ * `rueckgabeKategorie` und `ausgabeKennung` aus RUECKGABE_VORGABEN an den
+ * vorhandenen Positionen aus „Vorschläge übernehmen“, die noch keinen Wert
+ * für „Beim Austritt“ haben und keine Angabe sind (`rueckgabeVorgabenPlan`).
+ * Je Position ein bedingtes `updateMany` (`beiAustritt: null` UND „keine
+ * Angabe“ im WHERE — bei READ COMMITTED prueft das UPDATE die neueste
+ * Zeilenfassung): Hat jemand die Position zwischen Lesen und Schreiben selbst
+ * gesetzt oder zur Angabe gemacht, bleibt sie, wie sie ist (G8: eine Angabe
+ * traegt nie RUECKGABE/SPERREN). Solche Positionen liest die Aktion danach
+ * neu und ordnet sie mit derselben Regel ein, damit die Meldung den
+ * richtigen Grund nennt; eine inzwischen geloeschte zaehlt nicht. Protokoll
+ * `AUSSTATTUNG_RUECKGABE_VORGABEN_UEBERNOMMEN` mit IDs, Schluesseln und
+ * Anzahl im selben Commit — nur, wenn etwas gesetzt wurde. Antwort 200
+ * `{ gesetzt, uebersprungen, meldung, hinweis? }`; `hinweis` bei aktiven
+ * Offboarding-Webhooks (G21), ohne zu sperren.
+ */
+export async function rueckgabeVorgabenUebernehmen(opts: Schreiber): Promise<DienstAntwort> {
+  const auswahl = {
+    id: true,
+    art: true,
+    bezeichnung: true,
+    departmentKey: true,
+    vorschlagSchluessel: true,
+    beiAustritt: true,
+  } as const;
+  const ergebnis = await prisma.$transaction(async (tx) => {
+    const positionen = await tx.ausstattungsPosition.findMany({
+      where: { vorschlagSchluessel: { not: null } },
+      select: auswahl,
+      orderBy: { vorschlagSchluessel: "asc" },
+    });
+    const plan = rueckgabeVorgabenPlan(positionen);
+    const gesetzt: VorgabenEintrag[] = [];
+    const verfehlt: string[] = [];
+    for (const e of plan.setzen) {
+      const { count } = await tx.ausstattungsPosition.updateMany({
+        where: { id: e.id, beiAustritt: null, art: { not: "ANGABE" } },
+        data: {
+          beiAustritt: e.vorgabe.beiAustritt,
+          rueckgabeKategorie: e.vorgabe.rueckgabeKategorie,
+          ausgabeKennung: e.vorgabe.ausgabeKennung,
+        },
+      });
+      if (count > 0) gesetzt.push(e);
+      else verfehlt.push(e.id);
+    }
+    let uebersprungen = plan.uebersprungen;
+    if (verfehlt.length > 0) {
+      const geaendert = await tx.ausstattungsPosition.findMany({ where: { id: { in: verfehlt } }, select: auswahl });
+      uebersprungen = [...uebersprungen, ...rueckgabeVorgabenPlan(geaendert).uebersprungen];
+    }
+    const angaben = uebersprungen.filter((e) => e.grund === "ANGABE").length;
+    if (gesetzt.length > 0) {
+      await protokoll(tx, opts, AUSSTATTUNG_AUDIT.RUECKGABE_VORGABEN_UEBERNOMMEN, {
+        anzahl: gesetzt.length,
+        uebersprungen: uebersprungen.length,
+        // Die Werte selbst folgen aus dem Schluessel (RUECKGABE_VORGABEN).
+        positionen: gesetzt.map((e) => ({ positionId: e.id, vorschlagSchluessel: e.vorschlagSchluessel })),
+      });
+    }
+    return { gesetzt: gesetzt.length, mitWert: uebersprungen.length - angaben, angaben };
+  });
+  const webhooks = await offboardingWebhooksAktiv();
+  return {
+    status: 200,
+    body: {
+      gesetzt: ergebnis.gesetzt,
+      uebersprungen: ergebnis.mitWert + ergebnis.angaben,
+      meldung: MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_ERGEBNIS(ergebnis.gesetzt, ergebnis.mitWert, ergebnis.angaben),
+      ...(webhooks > 0 && { hinweis: MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_WEBHOOKS(webhooks) }),
+    },
+  };
 }
 
 // =============================================

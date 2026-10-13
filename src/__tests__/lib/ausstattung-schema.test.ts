@@ -38,7 +38,22 @@ import {
   ORDER_BASIS,
   PERSONENGRUPPEN,
 } from "@/lib/ausstattung";
-import { RESERVIERTE_ABTEILUNGSSCHLUESSEL } from "@/lib/constants";
+import {
+  AUSGABE_AKTIV,
+  AUSGABE_BEI_AUSTRITT,
+  AUSGABE_GRENZEN,
+  AUSGABE_QUELLEN,
+  AUSGABE_ZUSTAENDE,
+  OFFBOARDING_AUFGABEN_HERKUNFT,
+  RUECKGABE_ZUSTAENDE,
+  RUECKGABE_ZUSTAENDE_STELLE,
+} from "@/lib/ausgaben";
+import {
+  RESERVIERTE_ABTEILUNGSSCHLUESSEL,
+  RETURN_CATEGORY_LABELS,
+  RUECKGABE_KATEGORIEN,
+} from "@/lib/constants";
+import { RUECKGABE_KATEGORIEN as RUECKGABE_KATEGORIEN_ZOD } from "@/lib/validations/offboarding";
 
 // =============================================
 // Hilfen zum Lesen des Schemas
@@ -105,6 +120,13 @@ function maxImKommentar(modell: string, feld: string): number {
   return Number(m[1]);
 }
 
+/** Alle Kommentarzeilen innerhalb eines Modells. */
+function modellKommentare(name: string): string {
+  return modellZeilen(name)
+    .filter((z) => z.trim().startsWith("//"))
+    .join("\n");
+}
+
 const NEUE_MODELLE = [
   "AusstattungsPosition",
   "AusstattungsAusblendung",
@@ -112,6 +134,8 @@ const NEUE_MODELLE = [
   "OnboardingAusstattungAufgabe",
   "OnboardingStellenHinweis",
   "OnboardingAusstattungAenderung",
+  // A4 (Feinplan A4, Abschnitt 2)
+  "Ausgabe",
 ];
 
 // =============================================
@@ -152,6 +176,32 @@ describe("Wertlisten: Schemakommentar = Konstante", () => {
     expect(werte(teil)).toEqual([...AUFGABEN_HERKUNFT]);
   });
 
+  // ---- A4 (Feinplan A4, Abschnitt 2; Konstanten in src/lib/ausgaben.ts) ----
+
+  it("Ausgabe.zustand, .beiAustritt und .quelle (A4)", () => {
+    const kopf = kopfKommentar("Ausgabe");
+    expect(werte(abschnitt(kopf, "zustand"))).toEqual([...AUSGABE_ZUSTAENDE]);
+    expect(werte(abschnitt(kopf, "beiAustritt"))).toEqual([...AUSGABE_BEI_AUSTRITT]);
+    expect(werte(abschnitt(kopf, "quelle"))).toEqual([...AUSGABE_QUELLEN]);
+  });
+
+  it("der Standardzustand einer neuen Ausgabe ist AUSGEGEBEN, und der ist aktiv (A4)", () => {
+    expect(feldZeile("Ausgabe", "zustand")).toContain('@default("AUSGEGEBEN")');
+    expect(AUSGABE_AKTIV as readonly string[]).toContain("AUSGEGEBEN");
+  });
+
+  it("ReturnItem.zustand (null = offen steht nicht in der Liste) (A4)", () => {
+    const teil = abschnitt(modellKommentare("ReturnItem"), "zustand");
+    expect(teil).toContain("null = offen");
+    expect(werte(teil)).toEqual([...RUECKGABE_ZUSTAENDE]);
+  });
+
+  it("OffboardingChecklistItem.herkunft (null = Vorlage steht nicht in der Liste) (A4)", () => {
+    const teil = abschnitt(modellKommentare("OffboardingChecklistItem"), "herkunft");
+    expect(teil).toContain("null = Vorlage");
+    expect(werte(teil)).toEqual([...OFFBOARDING_AUFGABEN_HERKUNFT]);
+  });
+
   it("die Kommentare verweisen auf die Quellen der uebrigen Werte", () => {
     expect(feldKommentar("AusstattungsPosition", "angabeSchluessel")).toContain("ANGABEN_KATALOG");
     expect(feldKommentar("AusstattungsPosition", "einrichtungsarten")).toContain("OrganizationType-Werte");
@@ -175,6 +225,9 @@ describe("Grenzen: Schemakommentar = GRENZEN", () => {
     ["OnboardingAusstattung", "angabe", GRENZEN.angabe],
     ["OnboardingAusstattung", "bemerkung", GRENZEN.bemerkung],
     ["OnboardingStellenHinweis", "text", GRENZEN.hinweis],
+    // A4
+    ["Ausgabe", "kennung", AUSGABE_GRENZEN.kennung],
+    ["Ausgabe", "kennungLabel", AUSGABE_GRENZEN.kennungLabel],
   ] as const)("%s.%s: max. %i", (modell, feld, grenze) => {
     expect(maxImKommentar(modell, feld)).toBe(grenze);
   });
@@ -231,6 +284,17 @@ describe("Form des Schemas", () => {
       ["ChecklistItem", "eilt"],
       ["ChecklistItem", "entfaelltAm"],
       ["OffboardingDepartmentLink", "abgesagtAm"],
+      // A4
+      ["OnboardingProcess", "ausgabenGeloeschtAm"],
+      ["SupervisorData", "ausgabenAngeboten"],
+      ["ChecklistItem", "ausgabenGeloeschtAm"],
+      ["OffboardingProcess", "arbeitsortId"],
+      ["OffboardingProcess", "weitereBeschaeftigung"],
+      ["OffboardingProcess", "ausgabenGeloeschtAm"],
+      ["OffboardingChecklistItem", "herkunft"],
+      ["OffboardingChecklistItem", "ausgabeId"],
+      ["ReturnItem", "zustand"],
+      ["ReturnItem", "ausgabeId"],
     ];
     for (const [modell, feld] of neu) {
       const zeile = feldZeile(modell, feld);
@@ -239,6 +303,93 @@ describe("Form des Schemas", () => {
         `${modell}.${feld}: true`,
       );
     }
+  });
+
+  it("A4: die Merker und neuen Spalten an bestehenden Modellen sind nullbar (null = Altfall)", () => {
+    // Strenger als oben: Ein Standardwert genuegt hier nicht. `ausgabenAngeboten`
+    // null = Altfall bzw. ohne Ausstattungsschritt (rueckgabeLage),
+    // `weitereBeschaeftigung` null = nie zugeordnet, `ausgabenGeloeschtAm` null =
+    // nichts geloescht.
+    const neu: [string, string, string][] = [
+      ["ChecklistItem", "ausgabenGeloeschtAm", "DateTime?"],
+      ["SupervisorData", "ausgabenAngeboten", "Boolean?"],
+      ["OffboardingProcess", "weitereBeschaeftigung", "Boolean?"],
+      ["OffboardingProcess", "ausgabenGeloeschtAm", "DateTime?"],
+      ["OnboardingProcess", "ausgabenGeloeschtAm", "DateTime?"],
+      ["OffboardingProcess", "arbeitsortId", "String?"],
+      ["OffboardingChecklistItem", "herkunft", "String?"],
+      ["OffboardingChecklistItem", "ausgabeId", "String?"],
+      ["ReturnItem", "zustand", "String?"],
+      ["ReturnItem", "ausgabeId", "String?"],
+    ];
+    for (const [modell, feld, typ] of neu) {
+      const zeile = feldZeile(modell, feld);
+      expect(`${modell}.${feld}: ${zeile.trim().split(/\s+/)[1]}`).toBe(`${modell}.${feld}: ${typ}`);
+      expect(zeile).not.toContain("@default(");
+    }
+  });
+
+  it("A4: Bestand lebt laenger als der Vorgang – SetNull statt Cascade (E-A30)", () => {
+    // Zeilentest: An diesen Relationen haengt die Loeschfrist (E-A37). Ein
+    // Cascade loeschte mit dem Vorgang auch den Nachweis bzw. die Rueckgabe.
+    expect(feldZeile("Ausgabe", "onboarding")).toContain(
+      '@relation("OnboardingAusgaben", fields: [onboardingId], references: [id], onDelete: SetNull)',
+    );
+    expect(feldZeile("ReturnItem", "ausgabe")).toContain(
+      "@relation(fields: [ausgabeId], references: [id], onDelete: SetNull)",
+    );
+    expect(feldZeile("OffboardingChecklistItem", "ausgabe")).toContain(
+      "@relation(fields: [ausgabeId], references: [id], onDelete: SetNull)",
+    );
+    for (const feld of ["employee", "checklistItem", "ersetztDurch"]) {
+      expect(`${feld}: ${feldZeile("Ausgabe", feld)}`).toMatch(/onDelete: SetNull/);
+    }
+    // Kein Cascade irgendwo im Modell Ausgabe.
+    expect(modellZeilen("Ausgabe").join("\n")).not.toMatch(/onDelete: Cascade/);
+  });
+
+  it("A4: Uebergabedatum ist ein Kalendertag (@db.Date), Pflicht", () => {
+    expect(feldZeile("Ausgabe", "uebergebenAm")).toMatch(/\sDateTime\s+@db\.Date/);
+  });
+
+  it("A4: Austritt ↔ Einstellung und Arbeitsort am Austritt (G11, G12)", () => {
+    expect(feldZeile("OffboardingProcess", "onboardingId")).toMatch(/\sString\?/);
+    expect(feldZeile("OffboardingProcess", "onboarding")).toContain(
+      '@relation("OffboardingEinstellung", fields: [onboardingId], references: [id], onDelete: SetNull)',
+    );
+    expect(feldZeile("OnboardingProcess", "austritte")).toContain('@relation("OffboardingEinstellung")');
+    expect(feldZeile("OffboardingProcess", "arbeitsort")).toContain(
+      '@relation("OffboardingArbeitsort", fields: [arbeitsortId], references: [id], onDelete: SetNull)',
+    );
+    expect(feldZeile("Organization", "offboardingArbeitsorte")).toContain('@relation("OffboardingArbeitsort")');
+    // Mehrere Austritte je Einstellung bleiben moeglich (abgebrochener plus neuer,
+    // Versetzung plus spaeterer Austritt): kein @unique an onboardingId.
+    expect(feldZeile("OffboardingProcess", "onboardingId")).not.toContain("@unique");
+    const kopf = modellZeilen("OffboardingProcess").map((z) => z.trim());
+    expect(kopf).toContain("@@index([onboardingId])");
+    expect(kopf).toContain("@@index([arbeitsortId])");
+  });
+
+  it("A4: die Einrichtungs-Relation des Austritts ist nur benannt, ihr Fremdschluessel bleibt", () => {
+    const zeile = feldZeile("OffboardingProcess", "organization");
+    expect(zeile).toContain('@relation("OffboardingEinrichtung", fields: [organizationId], references: [id])');
+    // Ein onDelete hier aenderte offboarding_processes_organizationId_fkey.
+    expect(zeile).not.toContain("onDelete");
+    // Feldname unveraendert: die `_count`-Leser von Organization.offboardings bleiben gueltig.
+    expect(feldZeile("Organization", "offboardings")).toContain('@relation("OffboardingEinrichtung")');
+  });
+
+  it("A4: je Ausgabe hoechstens eine Aufgabe je Herkunft und eine Rueckgabe je Austritt", () => {
+    expect(modellZeilen("OffboardingChecklistItem").map((z) => z.trim())).toContain(
+      "@@unique([offboardingId, ausgabeId, herkunft])",
+    );
+    expect(modellZeilen("ReturnItem").map((z) => z.trim())).toContain("@@unique([offboardingId, ausgabeId])");
+    // Ersatz zeigt auf genau eine neue Ausgabe.
+    expect(feldZeile("Ausgabe", "ersetztDurchId")).toContain("@unique");
+  });
+
+  it("A4: DocumentType kennt UEBERGABEPROTOKOLL", () => {
+    expect(Object.values($Enums.DocumentType)).toContain("UEBERGABEPROTOKOLL");
   });
 
   it("die Verknuepfung Aufgabe ↔ Wahl hat Primaerschluessel (ausstattungId, option) (F4)", () => {
@@ -268,6 +419,34 @@ describe("Personengruppen und Einrichtungsarten", () => {
       for (const label of labels) expect(label.trim()).not.toBe("");
       expect(new Set(labels).size).toBe(labels.length);
     }
+  });
+});
+
+// =============================================
+// A4: Wertlisten untereinander und gegen die Enums (Feinplan A4, 1.3)
+// =============================================
+
+describe("A4: Wertlisten der Ausgaben", () => {
+  it("AUSGABE_BEI_AUSTRITT ist BEI_AUSTRITT ohne NICHTS", () => {
+    expect([...AUSGABE_BEI_AUSTRITT]).toEqual(BEI_AUSTRITT.filter((w) => w !== "NICHTS"));
+  });
+
+  it("AUSGABE_AKTIV, RUECKGABE_ZUSTAENDE und RUECKGABE_ZUSTAENDE_STELLE sind Teilmengen", () => {
+    for (const z of AUSGABE_AKTIV) expect(AUSGABE_ZUSTAENDE as readonly string[]).toContain(z);
+    for (const z of RUECKGABE_ZUSTAENDE) expect(AUSGABE_ZUSTAENDE as readonly string[]).toContain(z);
+    for (const z of RUECKGABE_ZUSTAENDE_STELLE) expect(RUECKGABE_ZUSTAENDE as readonly string[]).toContain(z);
+    // Eine Rueckgabe ist nie ausgegeben oder ersetzt: offen heisst `null`.
+    expect(RUECKGABE_ZUSTAENDE as readonly string[]).not.toContain("AUSGEGEBEN");
+    expect(RUECKGABE_ZUSTAENDE as readonly string[]).not.toContain("ERSETZT");
+  });
+
+  it("RUECKGABE_KATEGORIEN hat genau die Werte von ReturnCategory, mit Beschriftung", () => {
+    expect([...RUECKGABE_KATEGORIEN].sort()).toEqual(Object.values($Enums.ReturnCategory).sort());
+    expect(Object.keys(RETURN_CATEGORY_LABELS).sort()).toEqual([...RUECKGABE_KATEGORIEN].sort());
+  });
+
+  it("validations/offboarding.ts reicht dieselbe Konstante weiter (Name und Werte bleiben)", () => {
+    expect(RUECKGABE_KATEGORIEN_ZOD).toBe(RUECKGABE_KATEGORIEN);
   });
 });
 

@@ -691,6 +691,51 @@ describe("Position hinzufügen", () => {
     ]);
   });
 
+  it("frei mit „Beim Austritt“ (A4, S23): Zurückgeben verlangt die Kategorie; der Body trägt beides", async () => {
+    const { onAktion } = karte();
+    await klick(knopf(kartenEl()!, AUSSTATTUNG_KARTE_TEXTE.hinzufuegen));
+    const d = dialog();
+    fireEvent.click(within(d).getByRole("radio", { name: "Freie Position" }));
+    fireEvent.change(within(d).getByLabelText(/^Stelle/), { target: { value: "IT" } });
+    fireEvent.change(within(d).getByLabelText(/^Bezeichnung/), { target: { value: "Dokumentenkamera" } });
+    const austritt = within(d).getByLabelText(/^Beim Austritt/) as HTMLSelectElement;
+    expect(austritt.value).toBe("");
+    // Der Satz aus G27 haengt am Feld.
+    expect(document.getElementById(austritt.getAttribute("aria-describedby") ?? "")?.textContent).toContain(
+      MELDUNGEN.AUSGABE_EINSCHALTEN_HINWEIS,
+    );
+    expect(within(d).queryByLabelText(/^Rückgabekategorie/)).toBeNull();
+    fireEvent.change(austritt, { target: { value: "RUECKGABE" } });
+    expect(d.querySelector('[data-zeile="grund"]')?.textContent).toBe(MELDUNGEN.RUECKGABEKATEGORIE_FEHLT);
+    fireEvent.change(within(d).getByLabelText(/^Rückgabekategorie/), { target: { value: "IT_HARDWARE" } });
+    expect(d.querySelector('[data-zeile="grund"]')).toBeNull();
+    await klick(within(d).getByRole("button", { name: "Hinzufügen" }));
+    expect(bodies(onAktion)).toEqual([
+      {
+        aktion: "hinzufuegen",
+        frei: { departmentKey: "IT", bezeichnung: "Dokumentenkamera", beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE" },
+      },
+    ]);
+    const geparst = ausstattungAktionSchema.safeParse(bodies(onAktion)[0]);
+    expect(geparst.success ? null : geparst.error.errors[0]?.message).toBeNull();
+  });
+
+  it("frei mit „Sperren“: ohne Kategorie, eine früher gewählte Kategorie geht nicht mit", () => {
+    const u = uebersicht();
+    const frei = {
+      ...hinzufuegenStart(u.hinzufuegbar, "IT"),
+      quelle: "frei" as const,
+      freiBezeichnung: "VPN",
+      freiBeiAustritt: "SPERREN",
+      freiKategorie: "IT_HARDWARE",
+    };
+    expect(hinzufuegenGrund(frei, u.hinzufuegbar)).toBeNull();
+    expect(hinzufuegenBody(frei, u.hinzufuegbar)).toEqual({
+      aktion: "hinzufuegen",
+      frei: { departmentKey: "IT", bezeichnung: "VPN", beiAustritt: "SPERREN" },
+    });
+  });
+
   it("reine Regeln: Grenzen vor dem Senden", () => {
     const u = uebersicht();
     const frei = { ...hinzufuegenStart(u.hinzufuegbar, "IT"), quelle: "frei" as const };

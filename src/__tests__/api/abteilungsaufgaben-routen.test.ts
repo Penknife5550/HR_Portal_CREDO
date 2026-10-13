@@ -890,6 +890,16 @@ describe("PATCH /api/offboarding/[id]", () => {
     expect((await aendern({ exitReason: "neu" })).status).toBe(403);
   });
 
+  it("nur `bestaetigt` (A4, G18) ist keine Änderung → 400 wie vor A4, kein Update, kein leeres Protokoll", async () => {
+    for (const bestaetigt of [true, false]) {
+      const res = await aendern({ bestaetigt });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Mindestens ein Feld erforderlich" });
+    }
+    expect(fp.offboardingProcess.update).not.toHaveBeenCalled();
+    expect(db.audits).toHaveLength(0);
+  });
+
   describe("letzter Arbeitstag", () => {
     let offenIt: Zeile;
     let erledigt: Zeile;

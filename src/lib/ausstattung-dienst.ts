@@ -6,6 +6,7 @@
  *
  *   fuehrungskraftSichtLaden      GET /api/modalitaeten/[token] (Feld `ausstattung`)
  *   fuehrungskraftWahlSpeichernIn PUT /api/modalitaeten/[token] (in der Transaktion der Route)
+ *   ausgabenAngebotenBeiAbgabeIn  POST /api/modalitaeten/[token] (Merker E-A36, in der Transaktion der Abgabe)
  *   ausstattungKurzLaden          POST /api/modalitaeten/[token] (HR-Mail, `{{ausstattung_kurz}}`)
  *   ausstattungUebersichtLaden    GET /api/onboarding/[id] (Feld `ausstattung`, nur HR_EDIT_ROLES)
  *   ausstattungKarteLaden         GET /api/onboarding/[id]/ausstattung (nur HR_EDIT_ROLES)
@@ -37,7 +38,10 @@
  *      danach). Ein fehlendes Feld laesst den Stand stehen, `[]` leert ihn.
  *   5. `ausstattungGespeichertAm` wird bei jedem Speichern des Schritts
  *      gesetzt (F9): Ab dann gilt die Vorauswahl des Katalogs nicht mehr —
- *      „alles abgewaehlt“ bleibt abgewaehlt.
+ *      „alles abgewaehlt“ bleibt abgewaehlt. Im selben Update der Merker
+ *      `ausgabenAngeboten` (E-A36, A4) aus dem gelesenen Ausschnitt; hat die
+ *      Fuehrungskraft nie gespeichert, setzt ihn die Abgabe
+ *      (`ausgabenAngebotenBeiAbgabeIn`).
  *   6. Der GET schreibt nichts.
  *   7. Die Sicht von HR (`ausstattungUebersichtLaden`) bekommt nur, wer in
  *      HR_EDIT_ROLES steht — fuer alle anderen `null`, OHNE die Datenbank zu
@@ -104,6 +108,7 @@ import {
   aufgabeWiederAufnehmenIn,
 } from "@/lib/ausstattung-aufgaben";
 import { katalogAusschnittLaden, type AusschnittVorgang } from "@/lib/ausstattung-katalog";
+import { ausgabenAngeboten } from "@/lib/ausgaben";
 import {
   ANGABEN_KATALOG,
   GRENZEN,
@@ -278,8 +283,39 @@ export async function fuehrungskraftWahlSpeichernIn(
     }
   }
 
-  await tx.supervisorData.update({ where: { onboardingId }, data: { ausstattungGespeichertAm: jetzt } });
+  // E-A36: Merker fuer den Reiter „Rückgaben“ aus dem Ausschnitt, den diese
+  // Transaktion ohnehin gelesen hat — bei jedem Speichern neu.
+  await tx.supervisorData.update({
+    where: { onboardingId },
+    data: { ausstattungGespeichertAm: jetzt, ausgabenAngeboten: ausgabenAngeboten(ausschnitt.positionen) },
+  });
   return { zeilen: pruefung.zeilen?.length ?? null, hinweise: pruefung.hinweise?.length ?? null };
+}
+
+/**
+ * Merker `SupervisorData.ausgabenAngeboten` bei der Abgabe der Modalitaeten
+ * (POST /api/modalitaeten/[token], in deren Transaktion): Hat die
+ * Fuehrungskraft den Schritt nie gespeichert (Vorauswahl uebernommen), steht er
+ * noch auf `null` — dann hier aus dem Katalogausschnitt des Vorgangs. Nur mit
+ * `mitAusstattung` (ohne den Schritt bleibt er `null`: Altfall bzw. kein
+ * Ausstattungsschritt, `rueckgabeLage` liest daraus VOR_EINFUEHRUNG), nur
+ * bedingt auf `null` — ein gespeicherter Wert bleibt. Ohne Abfrage, wenn
+ * nichts zu tun ist.
+ */
+export async function ausgabenAngebotenBeiAbgabeIn(
+  tx: Db,
+  vorgang: AusschnittVorgang & {
+    id: string;
+    supervisorData?: { mitAusstattung?: boolean | null; ausgabenAngeboten?: boolean | null } | null;
+  },
+): Promise<void> {
+  const sd = vorgang.supervisorData;
+  if (sd?.mitAusstattung !== true || (sd.ausgabenAngeboten !== null && sd.ausgabenAngeboten !== undefined)) return;
+  const { positionen } = await katalogAusschnittLaden(tx, vorgang);
+  await tx.supervisorData.updateMany({
+    where: { onboardingId: vorgang.id, ausgabenAngeboten: null },
+    data: { ausgabenAngeboten: ausgabenAngeboten(positionen) },
+  });
 }
 
 // =============================================
@@ -765,12 +801,13 @@ function faelligkeitVonHand(tag: string | null): Prisma.ChecklistItemUpdateManyM
     : { dueDate: new Date(`${tag}T00:00:00.000Z`), eilt: false };
 }
 
-/** Die Momentaufnahme einer freien Position von HR (immer Ja/Nein, ohne Hinweis fuer die Stelle, ans Ende sortiert). */
-function freieMomentaufnahme(frei: {
-  departmentKey: string;
-  bezeichnung: string;
-  relativeDueDays?: number | null;
-}): AusstattungsMomentaufnahme {
+/**
+ * Die Momentaufnahme einer freien Position von HR (immer Ja/Nein, ohne Hinweis
+ * fuer die Stelle, ans Ende sortiert). Seit S23 (A4, G8) mit „Beim Austritt“
+ * und Rueckgabekategorie aus dem Dialog (Zod hat sie gegeneinander geprueft);
+ * eine Kennungsbeschriftung gibt es fuer freie Positionen nicht.
+ */
+function freieMomentaufnahme(frei: FreiePosition): AusstattungsMomentaufnahme {
   return {
     positionId: null,
     departmentKey: frei.departmentKey,
@@ -782,8 +819,8 @@ function freieMomentaufnahme(frei: {
     relativeDueDays: frei.relativeDueDays ?? null,
     sichtbarFuer: [],
     ausgabeKennung: null,
-    rueckgabeKategorie: null,
-    beiAustritt: null,
+    rueckgabeKategorie: frei.beiAustritt === "RUECKGABE" ? (frei.rueckgabeKategorie ?? null) : null,
+    beiAustritt: frei.beiAustritt ?? null,
     reihenfolge: REIHENFOLGE_MAX,
   };
 }
@@ -933,9 +970,18 @@ async function aktionSchreibenIn(k: KarteKontext, aktion: AusstattungAktionInput
 
 // ---- Hinzufuegen (Katalog oder frei) und Wiederaufnahme (F23) ----
 
+/** Eine freie Position, wie `ausstattungAktionSchema` sie liefert. */
+type FreiePosition = {
+  departmentKey: string;
+  bezeichnung: string;
+  relativeDueDays?: number | null;
+  beiAustritt?: string | null;
+  rueckgabeKategorie?: string | null;
+};
+
 type HinzufuegenEingabe = {
   positionId?: string;
-  frei?: { departmentKey: string; bezeichnung: string; relativeDueDays?: number | null };
+  frei?: FreiePosition;
   auswahl?: string[];
   angabe?: string;
   bemerkung?: string;

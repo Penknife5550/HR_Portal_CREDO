@@ -24,6 +24,10 @@
  *  7. Vorschläge übernehmen: Vorschau mit „schon im Katalog“ und
  *     Pflegehinweis, Meldung des Servers.
  *  8. Die reinen Helfer des Dialogs und die Importe (client-sicher).
+ * 10. A4 (S23): die Feldgruppe „Beim Austritt“ im Dialog (Rückgabekategorie,
+ *     Beschriftung der Kennung, Satz aus G27, Grund aus positionPruefen) und
+ *     „Rückgabe-Vorgaben übernehmen …“ mit Rückfrage zu MAV und DSB, Vorschau
+ *     und Webhook-Hinweis des Servers.
  *  9. Barrierefreiheit: Fokus nach Zeilenaktionen, Namen der Zeilenknoepfe
  *     (beginnen mit dem sichtbaren Text), Pflichtfelder und Hilfetexte des
  *     Dialogs.
@@ -42,6 +46,7 @@ import {
   leeresFormular,
   optionenAusText,
 } from "@/components/ausstattung/position-dialog";
+import { MELDUNGEN_AUSGABEN } from "@/lib/ausgaben";
 import {
   MELDUNGEN,
   VORSCHLAEGE,
@@ -431,8 +436,11 @@ describe("Dialog „Neue Position“", () => {
     const anlegen = within(d).getByRole("button", { name: "Anlegen" }) as HTMLButtonElement;
     expect(anlegen.disabled).toBe(true);
     expect(grund()).toBe(MELDUNGEN.STELLE_FEHLT);
-    // Die Stufe-2-Felder zeigt der Dialog nicht.
-    expect(d.textContent).not.toMatch(/Ausgabe abfragen|Rückgabe|Austritt/);
+    // A4 (S23): die Feldgruppe „Beim Austritt“, zunächst „Nicht festgelegt“, ohne Kategorie und Kennung.
+    const austritt = d.querySelector('[data-feld="beim-austritt"]') as HTMLElement;
+    expect((within(austritt).getByRole("radio", { name: "Nicht festgelegt" }) as HTMLInputElement).checked).toBe(true);
+    expect(within(d).queryByLabelText(/^Rückgabekategorie/)).toBeNull();
+    expect(within(d).queryByLabelText(/^Kennung abfragen/)).toBeNull();
 
     aendere(within(d).getByLabelText(/^Stelle/), "IT");
     expect(grund()).toBe(MELDUNGEN.BEZEICHNUNG_FEHLT);
@@ -468,6 +476,9 @@ describe("Dialog „Neue Position“", () => {
           personengruppen: ["BEAMTE"],
           sichtbarFuer: [],
           entgeltrelevant: false,
+          beiAustritt: null,
+          rueckgabeKategorie: null,
+          ausgabeKennung: null,
           orderIndex: 0,
         },
       },
@@ -475,6 +486,49 @@ describe("Dialog „Neue Position“", () => {
     pruefeBody(schreibend()[0].body);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(seitentext()).toContain("Position „Dienst-Laptop/PC“ angelegt – ausgeschaltet.");
+  });
+
+  it("A4 (S23): „Beim Austritt“ — Zurückgeben verlangt die Kategorie, Kennung nur bei Zurückgeben/Sperren, Satz aus G27", async () => {
+    const d = await oeffne();
+    aendere(within(d).getByLabelText(/^Stelle/), "FACILITY");
+    aendere(within(d).getByLabelText(/^Bezeichnung/), "Schlüssel Haupteingang");
+    const austritt = d.querySelector('[data-feld="beim-austritt"]') as HTMLElement;
+    // Der Satz aus G27 hängt an der Feldgruppe.
+    const hilfe = document.getElementById(austritt.getAttribute("aria-describedby") ?? "");
+    expect(hilfe?.textContent).toContain(MELDUNGEN.AUSGABE_EINSCHALTEN_HINWEIS);
+
+    await klicke(within(austritt).getByRole("radio", { name: "Zurückgeben" }));
+    expect(grund()).toBe(MELDUNGEN.RUECKGABEKATEGORIE_FEHLT);
+    const kategorie = within(d).getByLabelText(/^Rückgabekategorie/) as HTMLSelectElement;
+    expect(kategorie.required).toBe(true);
+    expect([...kategorie.options].map((o) => o.value)).toContain("SCHLUESSEL");
+    aendere(kategorie, "SCHLUESSEL");
+    aendere(within(d).getByLabelText(/^Kennung abfragen/), " Schlüsselnummer ");
+    expect(grund()).toBeNull();
+
+    schreibAntwort = { ok: true, koerper: { data: position({ id: "neu", bezeichnung: "Schlüssel Haupteingang" }) } };
+    await klicke(within(d).getByRole("button", { name: "Anlegen" }));
+    const body = schreibend()[0].body;
+    expect(body).toMatchObject({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "SCHLUESSEL", ausgabeKennung: "Schlüsselnummer" });
+    pruefeBody(body);
+  });
+
+  it("A4 (S23): Sperren ohne Kategorie; „Nichts“ und Angabe schicken Kategorie und Kennung leer", async () => {
+    const d = await oeffne();
+    aendere(within(d).getByLabelText(/^Stelle/), "IT");
+    aendere(within(d).getByLabelText(/^Bezeichnung/), "Zugang WebUntis");
+    const austritt = d.querySelector('[data-feld="beim-austritt"]') as HTMLElement;
+    await klicke(within(austritt).getByRole("radio", { name: "Zurückgeben" }));
+    aendere(within(d).getByLabelText(/^Rückgabekategorie/), "IT_HARDWARE");
+    aendere(within(d).getByLabelText(/^Kennung abfragen/), "Benutzername");
+    await klicke(within(austritt).getByRole("radio", { name: "Sperren" }));
+    // Bei „Sperren“ gibt es keine Kategorie; die getippte bleibt im Formular, geht aber leer hinaus.
+    expect(within(d).queryByLabelText(/^Rückgabekategorie/)).toBeNull();
+    expect(grund()).toBeNull();
+    await klicke(within(austritt).getByRole("radio", { name: "Nichts" }));
+    expect(within(d).queryByLabelText(/^Kennung abfragen/)).toBeNull();
+    aendere(within(d).getByLabelText(/^Art$/), "ANGABE");
+    expect(d.querySelector('[data-feld="beim-austritt"]')).toBeNull();
   });
 
   it("Auswahl: Optionen eine je Zeile, Vorauswahl als Chips, „entgeltrelevant“ nur mit HR", async () => {
@@ -727,6 +781,113 @@ describe("Löschen", () => {
 // =============================================
 // 7. Vorschläge
 // =============================================
+
+describe("Rückgabe-Vorgaben übernehmen (A4, G27)", () => {
+  async function oeffne() {
+    await zeigeTab();
+    await klicke(screen.getByText("Rückgabe-Vorgaben übernehmen …"));
+    return dialog();
+  }
+
+  it("Rückfrage mit dem Satz zu MAV und DSB, Vorschau je Position; meldet den Satz des Servers", async () => {
+    daten = katalog([
+      IPAD,
+      position({ id: "p-laptop", bezeichnung: "Dienst-Laptop/PC", vorschlagSchluessel: "IT_LAPTOP", beiAustritt: "NICHTS" }),
+      ZUGAENGE,
+    ]);
+    const d = await oeffne();
+    expect(d.textContent).toContain("Rückgabe-Vorgaben übernehmen?");
+    expect(d.textContent).toContain(MELDUNGEN.AUSGABE_EINSCHALTEN_HINWEIS);
+    expect(d.querySelector('[data-vorgaben="setzen"] li[data-vorgabe="IT_IPAD"]')?.textContent).toContain(
+      "beim Austritt: zurückgeben (IT-Hardware), Kennung „Inventarnummer“",
+    );
+    expect(d.querySelector('[data-vorgaben="uebersprungen"] li[data-vorgabe="IT_LAPTOP"]')?.textContent).toContain(
+      "hat schon einen Wert",
+    );
+    // Ohne Vorschlagsschlüssel kommt eine Position nicht vor.
+    expect(d.textContent).not.toContain("Zugänge");
+
+    const meldung = MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_ERGEBNIS(1, 1);
+    schreibAntwort = { ok: true, koerper: { gesetzt: 1, uebersprungen: 1, meldung } };
+    const vorher = ladeAufrufe();
+    await klicke(within(d).getByRole("button", { name: "Vorgaben übernehmen" }));
+    expect(schreibend()).toEqual([{ url: "/api/settings/ausstattung/rueckgabe-vorgaben", method: "POST", body: null }]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(seitentext()).toContain(meldung);
+    expect(document.querySelector("[data-meldung-hinweis]")).toBeNull();
+    expect(ladeAufrufe()).toBe(vorher + 1);
+  });
+
+  it("eine inzwischen zur Angabe gewordene Vorschlagsposition heißt „Angabe“, nicht „hat schon einen Wert“", async () => {
+    daten = katalog([
+      IPAD,
+      position({
+        id: "p-tel",
+        art: "ANGABE",
+        angabeSchluessel: "DURCHWAHL",
+        bezeichnung: "Durchwahl",
+        bemerkungAnbieten: false,
+        defaultDueDays: null,
+        vorschlagSchluessel: "IT_TELEFON",
+      }),
+    ]);
+    const d = await oeffne();
+    const zeileTel = d.querySelector('[data-vorgaben="uebersprungen"] li[data-vorgabe="IT_TELEFON"]');
+    expect(zeileTel?.getAttribute("data-grund")).toBe("ANGABE");
+    expect(zeileTel?.textContent).toContain(MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_UEBERSPRUNGEN.ANGABE);
+    expect(zeileTel?.textContent).not.toContain("Wert");
+    expect(grund()).toBeNull();
+    await klicke(within(d).getByRole("button", { name: "Abbrechen" }));
+
+    // Nur noch die Angabe: gesperrt, und der Grund behauptet keinen Wert.
+    daten = katalog([daten.positionen[1]]);
+    await zeigeTab();
+    await klicke(screen.getAllByText("Rückgabe-Vorgaben übernehmen …").at(-1)!);
+    expect(grund()).toBe(MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_NICHTS_ZU_TUN);
+    expect(grund()).not.toContain("Wert");
+  });
+
+  it("der Webhook-Hinweis des Servers steht unter der Meldung und bleibt stehen (kein Ablauf-Timer)", async () => {
+    // Die Meldung verschwindet sonst nach 5 s (Erfolg) bzw. 9 s (Fehler) per setTimeout.
+    const ablauf = (spy: jest.SpyInstance) => spy.mock.calls.filter(([, ms]) => ms === 5000 || ms === 9000).length;
+    const spy = jest.spyOn(globalThis, "setTimeout");
+    try {
+      await oeffne();
+      const hinweis = MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_WEBHOOKS(1);
+      schreibAntwort = { ok: true, koerper: { gesetzt: 1, uebersprungen: 0, meldung: "Übernommen.", hinweis } };
+      spy.mockClear();
+      await klicke(within(dialog()).getByRole("button", { name: "Vorgaben übernehmen" }));
+      expect(seitentext()).toContain("Übernommen.");
+      expect(document.querySelector("[data-meldung-hinweis]")?.textContent).toBe(hinweis);
+      expect(ablauf(spy)).toBe(0);
+
+      // Gegenprobe: ohne Hinweis läuft die Meldung wie bisher ab.
+      await klicke(screen.getByText("Rückgabe-Vorgaben übernehmen …"));
+      schreibAntwort = { ok: true, koerper: { gesetzt: 0, uebersprungen: 1, meldung: "Nichts geändert." } };
+      spy.mockClear();
+      await klicke(within(dialog()).getByRole("button", { name: "Vorgaben übernehmen" }));
+      expect(document.querySelector("[data-meldung-hinweis]")).toBeNull();
+      expect(ablauf(spy)).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("nichts zu tun: gesperrt mit Grund; Fehler des Servers bleibt im Dialog", async () => {
+    daten = katalog([position({ id: "p-laptop", bezeichnung: "Laptop", vorschlagSchluessel: "IT_LAPTOP", beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE" })]);
+    await oeffne();
+    expect(grund()).toBe(MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_NICHTS_ZU_TUN);
+    await klicke(within(dialog()).getByRole("button", { name: "Abbrechen" }));
+
+    daten = katalog();
+    await zeigeTab();
+    await klicke(screen.getAllByText("Rückgabe-Vorgaben übernehmen …").at(-1)!);
+    expect(grund()).toBeNull();
+    schreibAntwort = { ok: false, koerper: { error: "Interner Serverfehler" } };
+    await klicke(within(dialog()).getByRole("button", { name: "Vorgaben übernehmen" }));
+    expect(dialog().querySelector('[data-zeile="fehler"]')?.textContent).toBe("Interner Serverfehler");
+  });
+});
 
 describe("Vorschläge übernehmen", () => {
   it("zeigt die Vorschau mit „schon im Katalog“ und meldet den Satz des Servers", async () => {
@@ -1002,6 +1163,8 @@ describe("Importe (client-sicher)", () => {
         "react",
         "lucide-react",
         "@/lib/ausstattung",
+        // S23: die reinen Regeln von A4 (Rechnung der Rückgabe-Vorgaben, Meldungen) — ohne Prisma.
+        "@/lib/ausgaben",
         "@/components/unterlagen/dialog-rahmen",
         "@/components/ausstattung/position-dialog",
       ];

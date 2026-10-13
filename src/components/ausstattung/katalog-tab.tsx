@@ -14,8 +14,12 @@
  *     und dem Knopf „Hier einblenden“.
  *   - Warnungen über der Liste (Adresslücken je Stelle, ähnliche
  *     Vorlagenpunkte, Adressen außerhalb der Freigabeliste) und je Zeile.
- *   - „Vorschläge übernehmen…“, „+ Position“, Bearbeiten und Löschen über
- *     DialogRahmen (Rückfragen nie über `confirm`); bei einem Fehler des
+ *   - „Vorschläge übernehmen…“, „Rückgabe-Vorgaben übernehmen …“ (A4, G27:
+ *     setzt „Beim Austritt“ nur an Vorschlagspositionen ohne Wert, mit
+ *     Rückfrage zu MAV und DSB; ein Webhook-Hinweis des Servers bleibt
+ *     stehen, bis die nächste Meldung kommt), „+ Position“, Bearbeiten und
+ *     Löschen über DialogRahmen (Rückfragen nie über `confirm`); bei einem
+ *     Fehler des
  *     Servers bleibt der Dialog offen und zeigt dessen Text. Ausnahme: Ist
  *     die Position inzwischen woanders geändert oder gelöscht worden (409
  *     `INZWISCHEN_GEAENDERT`, 404), schließt der Dialog, die Liste lädt neu
@@ -43,8 +47,10 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { TriangleAlert } from "lucide-react";
 import { DialogRahmen } from "@/components/unterlagen/dialog-rahmen";
 import { PositionDialog, type PositionBody } from "@/components/ausstattung/position-dialog";
+import { MELDUNGEN_AUSGABEN, rueckgabeVorgabenPlan } from "@/lib/ausgaben";
 import {
   MELDUNGEN,
+  beiAustrittText,
   katalogHinweise,
   katalogZeilen,
   vorschlaegeVorschau,
@@ -168,7 +174,15 @@ function Warnungen({ liste, klein = false }: { liste: KatalogWarnung[]; klein?: 
 type DialogZustand =
   | { art: "position"; position: KatalogEintrag | null }
   | { art: "loeschen"; position: KatalogEintrag }
-  | { art: "vorschlaege" };
+  | { art: "vorschlaege" }
+  | { art: "rueckgabeVorgaben" };
+
+/** Meldung über der Liste; `hinweis` (Webhooks, G21) steht darunter und verschwindet nicht von selbst. */
+interface Meldung {
+  art: "ok" | "fehler";
+  text: string;
+  hinweis?: string;
+}
 
 // =============================================
 // Der Reiter
@@ -179,7 +193,7 @@ export function AusstattungKatalogTab() {
   const [laden, setLaden] = useState(true);
   const [ladefehler, setLadefehler] = useState(false);
   const [filter, setFilter] = useState<KatalogFilter>(LEERER_FILTER);
-  const [meldung, setMeldung] = useState<{ art: "ok" | "fehler"; text: string } | null>(null);
+  const [meldung, setMeldung] = useState<Meldung | null>(null);
   /** Zeile mit laufender Anfrage — deren Knöpfe sind gesperrt (Doppelklick). */
   const [busyId, setBusyId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogZustand | null>(null);
@@ -203,7 +217,8 @@ export function AusstattungKatalogTab() {
   }, [load]);
 
   useEffect(() => {
-    if (!meldung) return;
+    // Ein Hinweis auf aktive Webhooks soll gelesen werden — er bleibt stehen.
+    if (!meldung || meldung.hinweis) return;
     const t = setTimeout(() => setMeldung(null), meldung.art === "ok" ? 5000 : 9000);
     return () => clearTimeout(t);
   }, [meldung]);
@@ -228,7 +243,7 @@ export function AusstattungKatalogTab() {
    * einen Knopf, der gleich verschwindet. Bis dahin bleibt der Dialog im
    * Zustand „Wird gesendet…“ (kein zweiter Klick auf den alten Stand).
    */
-  async function neuLadenUndSchliessen(meldungDanach: { art: "ok" | "fehler"; text: string }) {
+  async function neuLadenUndSchliessen(meldungDanach: Meldung) {
     await load();
     setDialogSendet(false);
     setDialogFehler(null);
@@ -295,6 +310,20 @@ export function AusstattungKatalogTab() {
     }
     const text = typeof antwort.daten.meldung === "string" ? antwort.daten.meldung : "Vorschläge übernommen.";
     await neuLadenUndSchliessen({ art: "ok", text });
+  }
+
+  async function rueckgabeVorgabenUebernehmen() {
+    setDialogSendet(true);
+    setDialogFehler(null);
+    const antwort = await anfrage(`${API}/rueckgabe-vorgaben`, { method: "POST" });
+    if (!antwort.ok) {
+      setDialogSendet(false);
+      setDialogFehler(fehlerText(antwort, "Die Rückgabe-Vorgaben konnten nicht übernommen werden."));
+      return;
+    }
+    const text = typeof antwort.daten.meldung === "string" ? antwort.daten.meldung : "Rückgabe-Vorgaben übernommen.";
+    const hinweis = typeof antwort.daten.hinweis === "string" && antwort.daten.hinweis.trim() ? antwort.daten.hinweis : undefined;
+    await neuLadenUndSchliessen({ art: "ok", text, ...(hinweis && { hinweis }) });
   }
 
   // ---- Aktionen in der Zeile ----
@@ -405,6 +434,7 @@ export function AusstattungKatalogTab() {
   const ort = daten.einrichtungen.find((e) => e.id === filter.einrichtungId) ?? null;
   const positionNach = (id: string) => daten.positionen.find((p) => p.id === id) ?? null;
   const vorschau = vorschlaegeVorschau(daten.positionen, daten.stellen);
+  const vorgaben = rueckgabeVorgabenPlan(daten.positionen);
   const gefiltert = filter.stelle !== "" || filter.einrichtungId !== "";
 
   return (
@@ -418,6 +448,11 @@ export function AusstattungKatalogTab() {
           }`}
         >
           {meldung.text}
+          {meldung.hinweis && (
+            <p className="mt-1" data-meldung-hinweis>
+              {meldung.hinweis}
+            </p>
+          )}
         </div>
       )}
       {ladefehler && (
@@ -434,6 +469,9 @@ export function AusstattungKatalogTab() {
         <div className="flex flex-wrap gap-2">
           <button type="button" className={KNOPF_NEBEN} onClick={() => dialogOeffnen({ art: "vorschlaege" })}>
             Vorschläge übernehmen…
+          </button>
+          <button type="button" className={KNOPF_NEBEN} onClick={() => dialogOeffnen({ art: "rueckgabeVorgaben" })}>
+            Rückgabe-Vorgaben übernehmen …
           </button>
           <button
             type="button"
@@ -711,6 +749,50 @@ export function AusstattungKatalogTab() {
               </div>
             ))}
           </div>
+        </DialogRahmen>
+      )}
+
+      {dialog?.art === "rueckgabeVorgaben" && (
+        <DialogRahmen
+          titel="Rückgabe-Vorgaben übernehmen?"
+          untertitel="„Beim Austritt“ für die Positionen aus den Vorschlägen"
+          name="ausstattung-rueckgabe-vorgaben"
+          sendet={dialogSendet}
+          fehler={dialogFehler}
+          fokusZiel={TITEL_ID}
+          onAbbrechen={dialogSchliessen}
+          bestaetigen={{
+            text: "Vorgaben übernehmen",
+            onClick: () => void rueckgabeVorgabenUebernehmen(),
+            grund: vorgaben.setzen.length === 0 ? MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_NICHTS_ZU_TUN : null,
+            farbe: "blau",
+          }}
+        >
+          <p className="text-foreground">
+            Setzt „Beim Austritt“, Rückgabekategorie und die Beschriftung der Kennung an den Positionen aus „Vorschläge
+            übernehmen…“, die dafür noch keinen Wert haben. Von Hand gesetzte Werte bleiben, wie sie sind.
+          </p>
+          <Warnungen liste={[{ ton: "gelb", text: MELDUNGEN.AUSGABE_EINSCHALTEN_HINWEIS }]} />
+          {vorgaben.setzen.length > 0 && (
+            <ul className="space-y-0.5" data-vorgaben="setzen">
+              {vorgaben.setzen.map((e) => (
+                <li key={e.id} data-vorgabe={e.vorschlagSchluessel} className="text-foreground">
+                  {e.bezeichnung}{" "}
+                  <span className="text-xs text-muted-foreground">– beim Austritt: {beiAustrittText(e.vorgabe)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {vorgaben.uebersprungen.length > 0 && (
+            <ul className="space-y-0.5" data-vorgaben="uebersprungen">
+              {vorgaben.uebersprungen.map((e) => (
+                <li key={e.id} data-vorgabe={e.vorschlagSchluessel} data-grund={e.grund} className="text-muted-foreground">
+                  {e.bezeichnung}{" "}
+                  <span className="text-xs">– {MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_UEBERSPRUNGEN[e.grund]}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </DialogRahmen>
       )}
     </div>

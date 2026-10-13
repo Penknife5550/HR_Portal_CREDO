@@ -28,9 +28,17 @@ export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   ARBEITSERLAUBNIS: "Arbeitserlaubnis / Zusatzblatt",
   PKV_NACHWEIS: "Nachweis private Krankenversicherung",
   SONSTIGES: "Sonstiges Dokument",
+  // Ausstattung & Zugaenge (A4, E-A34): laedt nur HR hoch. Bewusst NICHT in
+  // SELECTABLE_DOCUMENT_TYPES – kein Pflichtdokument des Fragebogens, und die
+  // Person sieht es dort nie.
+  UEBERGABEPROTOKOLL: "Übergabeprotokoll Ausstattung",
 };
 
-/** Alle waehlbaren Dokumenttypen fuer die Vorlagen-Konfiguration. */
+/**
+ * Alle waehlbaren Dokumenttypen fuer die Vorlagen-Konfiguration — zugleich die
+ * Positivliste der Vorlagen-Route (`requiredDocuments`). Seit A4 fehlt hier
+ * genau ein Wert des Enums: `UEBERGABEPROTOKOLL` (nur HR, nie im Fragebogen).
+ */
 export const SELECTABLE_DOCUMENT_TYPES: DocumentType[] = [
   "GEBURTSURKUNDE_EIGEN",
   "GEBURTSURKUNDE_KIND",
@@ -48,9 +56,8 @@ export const SELECTABLE_DOCUMENT_TYPES: DocumentType[] = [
   "ARBEITSVERTRAG",
   // Die drei Neuen sind auch REGELBASIERT (die Selbstauskunft zum
   // Aufenthaltstitel bzw. die Versicherungsart erzeugt sie). Sie stehen hier
-  // trotzdem, weil sonst niemand sie im Vorlagen-Editor sehen kann — und weil
-  // VALID_DOCUMENT_TYPES in der Vorlagen-Route aus DOCUMENT_TYPE_LABELS
-  // gebildet wird, waeren sie ohnehin speicherbar, nur nicht anklickbar.
+  // trotzdem, weil sonst niemand sie im Vorlagen-Editor sehen kann (die
+  // Vorlagen-Route nimmt seit A4 nur noch Typen aus dieser Liste an).
   "AUFENTHALTSTITEL",
   "ARBEITSERLAUBNIS",
   "PKV_NACHWEIS",

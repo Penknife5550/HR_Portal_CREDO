@@ -5,14 +5,17 @@
  *   PATCH/DELETE /api/settings/ausstattung/[id]
  *   PUT        /api/settings/ausstattung/[id]/ausblendung
  *   POST       /api/settings/ausstattung/vorschlaege
+ *   POST       /api/settings/ausstattung/rueckgabe-vorgaben (A4, S23)
  *
  * Gemocktes Prisma (Geruest wie settings-departments.test.ts), damit die
  * Aufrufe selbst pruefbar sind: Anlegen immer ausgeschaltet, nur die
- * Positivliste wird geschrieben (nie A4-Felder oder vorschlagSchluessel ueber
- * POST/PATCH), nur echte Aenderungen werden geschrieben und protokolliert
- * (von/nach je Feld), Loeschen in Verwendung 409, Ausblenden nur fuer zentrale
- * Positionen, „Vorschläge übernehmen“ ist wiederholbar, die Warnungen werden
- * auf dem Server gerechnet.
+ * Positivliste wird geschrieben (seit S23 samt A4-Feldern „Beim Austritt“, nie
+ * vorschlagSchluessel ueber POST/PATCH), nur echte Aenderungen werden
+ * geschrieben und protokolliert (von/nach je Feld), Loeschen in Verwendung
+ * 409, Ausblenden nur fuer zentrale Positionen, „Vorschläge übernehmen“ ist
+ * wiederholbar und legt nie A4-Werte an (G27), „Rückgabe-Vorgaben übernehmen
+ * …“ setzt sie nur an Vorschlagspositionen ohne Wert und meldet aktive
+ * Offboarding-Webhooks (G21), die Warnungen werden auf dem Server gerechnet.
  */
 
 const mockGetSession = jest.fn();
@@ -24,6 +27,7 @@ const mockPrisma = {
     update: jest.fn(),
     delete: jest.fn(),
     createManyAndReturn: jest.fn(),
+    updateMany: jest.fn(),
   },
   ausstattungsAusblendung: { createMany: jest.fn(), deleteMany: jest.fn() },
   onboardingAusstattung: { count: jest.fn() },
@@ -31,6 +35,7 @@ const mockPrisma = {
   departmentConfig: { findMany: jest.fn() },
   checklistTemplateItem: { findMany: jest.fn() },
   smtpConfig: { findUnique: jest.fn() },
+  webhookConfig: { count: jest.fn() },
   auditLog: { create: jest.fn() },
   // Interaktive Transaktion: tx ist dasselbe Mock-Objekt (Umsetzung im beforeEach).
   $transaction: jest.fn(),
@@ -44,7 +49,9 @@ import { GET, POST } from "@/app/api/settings/ausstattung/route";
 import { PATCH, DELETE } from "@/app/api/settings/ausstattung/[id]/route";
 import { PUT } from "@/app/api/settings/ausstattung/[id]/ausblendung/route";
 import { POST as VORSCHLAEGE_POST } from "@/app/api/settings/ausstattung/vorschlaege/route";
+import { POST as VORGABEN_POST } from "@/app/api/settings/ausstattung/rueckgabe-vorgaben/route";
 import { AUSSTATTUNG_AUDIT, KATALOG_FELDER, MELDUNGEN, VORSCHLAEGE } from "@/lib/ausstattung";
+import { A4_WEBHOOK_EREIGNISSE, MELDUNGEN_AUSGABEN, RUECKGABE_VORGABEN } from "@/lib/ausgaben";
 
 // =============================================
 // Fixtures
@@ -113,12 +120,13 @@ async function antwort(res: Response) {
 }
 
 const NEU_IPAD = { departmentKey: "IT", art: "JA_NEIN", bezeichnung: "Dienst-iPad (Lernmittel)", defaultDueDays: -5 };
-const STUFE2_UND_VORSCHLAG = {
+/** Die A4-Felder „Beim Austritt“ (seit S23 pflegbar) — gueltige Werte. */
+const A4 = {
   ausgabeKennung: "Inventarnummer",
-  rueckgabeKategorie: "IT_GERAET",
+  rueckgabeKategorie: "IT_HARDWARE",
   beiAustritt: "RUECKGABE",
-  vorschlagSchluessel: "IT_IPAD",
 };
+const STUFE2_UND_VORSCHLAG = { ...A4, vorschlagSchluessel: "IT_IPAD" };
 
 const audits = () => mockPrisma.auditLog.create.mock.calls.map((c) => c[0].data);
 
@@ -169,6 +177,8 @@ beforeEach(() => {
   mockPrisma.departmentConfig.findMany.mockResolvedValue([]);
   mockPrisma.checklistTemplateItem.findMany.mockResolvedValue([]);
   mockPrisma.smtpConfig.findUnique.mockResolvedValue(null);
+  mockPrisma.webhookConfig.count.mockResolvedValue(0);
+  mockPrisma.ausstattungsPosition.updateMany.mockResolvedValue({ count: 0 });
   mockPrisma.auditLog.create.mockResolvedValue({});
 });
 
@@ -227,11 +237,12 @@ describe("POST /api/settings/ausstattung", () => {
     expect(body.data).not.toHaveProperty("_count");
   });
 
-  it("schreibt genau die Positivliste — nie A4-Felder oder vorschlagSchluessel", async () => {
+  it("schreibt genau die Positivliste — samt A4-Feldern (S23), nie vorschlagSchluessel", async () => {
     await POST(anfrage("POST", { ...NEU_IPAD, ...STUFE2_UND_VORSCHLAG }), OHNE_PARAMS);
     const { data, include } = mockPrisma.ausstattungsPosition.create.mock.calls[0][0];
     expect(Object.keys(data).sort()).toEqual([...KATALOG_FELDER].sort());
-    for (const feld of Object.keys(STUFE2_UND_VORSCHLAG)) expect(data).not.toHaveProperty(feld);
+    expect(data).toMatchObject(A4);
+    expect(data).not.toHaveProperty("vorschlagSchluessel");
     expect(include).toEqual({
       ausblendungen: { select: { organizationId: true }, orderBy: { organizationId: "asc" } },
       _count: { select: { auswahlen: true } },
@@ -279,6 +290,27 @@ describe("POST /api/settings/ausstattung", () => {
     });
     expect(mockPrisma.ausstattungsPosition.create).not.toHaveBeenCalled();
     expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("A4 ohne Angabe: Felder leer (null), auch im Protokoll", async () => {
+    await POST(anfrage("POST", NEU_IPAD), OHNE_PARAMS);
+    const { data } = mockPrisma.ausstattungsPosition.create.mock.calls[0][0];
+    expect(data).toMatchObject({ beiAustritt: null, rueckgabeKategorie: null, ausgabeKennung: null });
+    expect(audits()[0].details.nachher).toMatchObject({ beiAustritt: null, rueckgabeKategorie: null, ausgabeKennung: null });
+  });
+
+  it.each([
+    [{ ...NEU_IPAD, beiAustritt: "RUECKGABE" }, MELDUNGEN.RUECKGABEKATEGORIE_FEHLT],
+    [{ ...NEU_IPAD, beiAustritt: "NICHTS", ausgabeKennung: "Nr." }, MELDUNGEN.KENNUNG_NUR_AUSGABE],
+    [{ ...NEU_IPAD, beiAustritt: "SPERREN", rueckgabeKategorie: "IT_HARDWARE" }, MELDUNGEN.RUECKGABEKATEGORIE_NUR_RUECKGABE],
+    [
+      { departmentKey: "IT", art: "ANGABE", angabeSchluessel: "DURCHWAHL", bezeichnung: "Gewünschte Durchwahl", beiAustritt: "SPERREN" },
+      MELDUNGEN.AUSTRITT_NICHT_BEI_ANGABE,
+    ],
+    [{ ...NEU_IPAD, rueckgabeKategorie: "IT_GERAET" }, MELDUNGEN.RUECKGABEKATEGORIE_UNBEKANNT],
+  ])("A4-Felder: 400 aus positionPruefen bzw. Zod (%#), nichts angelegt", async (eingabe, meldung) => {
+    expect(await antwort(await POST(anfrage("POST", eingabe), OHNE_PARAMS))).toEqual({ status: 400, body: { error: meldung } });
+    expect(mockPrisma.ausstattungsPosition.create).not.toHaveBeenCalled();
   });
 
   it("entgeltrelevant mit Stelle HR ist erlaubt", async () => {
@@ -437,13 +469,40 @@ describe("PATCH /api/settings/ausstattung/[id]", () => {
     ]);
   });
 
-  it("A4-Felder und vorschlagSchluessel werden nie geschrieben", async () => {
-    const nur = await antwort(await PATCH(anfrage("PATCH", STUFE2_UND_VORSCHLAG), mitId("pos-s")));
+  it("vorschlagSchluessel wird nie geschrieben; die A4-Felder schon, mit von/nach im Protokoll (S23)", async () => {
+    const nur = await antwort(await PATCH(anfrage("PATCH", { vorschlagSchluessel: "IT_IPAD" }), mitId("pos-s")));
     expect(nur).toEqual({ status: 400, body: { error: MELDUNGEN.MINDESTENS_EIN_FELD } });
 
-    await PATCH(anfrage("PATCH", { ...STUFE2_UND_VORSCHLAG, isActive: true }), mitId("pos-s"));
-    expect(mockPrisma.ausstattungsPosition.update.mock.calls[0][0].data).toEqual({ isActive: true });
-    expect(audits()[0].details.aenderungen).toEqual({ isActive: { von: false, nach: true } });
+    const res = await PATCH(
+      anfrage("PATCH", { ...STUFE2_UND_VORSCHLAG, rueckgabeKategorie: "SCHLUESSEL", ausgabeKennung: "Schlüsselnummer" }),
+      mitId("pos-s"),
+    );
+    expect(res.status).toBe(200);
+    expect(mockPrisma.ausstattungsPosition.update.mock.calls[0][0].data).toEqual({
+      beiAustritt: "RUECKGABE",
+      rueckgabeKategorie: "SCHLUESSEL",
+      ausgabeKennung: "Schlüsselnummer",
+    });
+    expect(audits()[0].details.aenderungen).toEqual({
+      beiAustritt: { von: null, nach: "RUECKGABE" },
+      rueckgabeKategorie: { von: null, nach: "SCHLUESSEL" },
+      ausgabeKennung: { von: null, nach: "Schlüsselnummer" },
+    });
+  });
+
+  it("A4 im PATCH: positionPruefen auf gespeicherter Zeile + Aenderung (400)", async () => {
+    mockPrisma.ausstattungsPosition.findUnique.mockResolvedValue({
+      ...schluessel(),
+      beiAustritt: "RUECKGABE",
+      rueckgabeKategorie: "SCHLUESSEL",
+    });
+    // Nur „Sperren“ — die gespeicherte Kategorie bliebe stehen.
+    expect(await antwort(await PATCH(anfrage("PATCH", { beiAustritt: "SPERREN" }), mitId("pos-s")))).toEqual({
+      status: 400,
+      body: { error: MELDUNGEN.RUECKGABEKATEGORIE_NUR_RUECKGABE },
+    });
+    // Mit geleerter Kategorie gueltig.
+    expect((await PATCH(anfrage("PATCH", { beiAustritt: "SPERREN", rueckgabeKategorie: null }), mitId("pos-s"))).status).toBe(200);
   });
 
   it("positionPruefen laeuft auf gespeicherter Zeile + Aenderung (400)", async () => {
@@ -792,6 +851,17 @@ describe("POST /api/settings/ausstattung/vorschlaege", () => {
     ]);
   });
 
+  it("G27: setzt nach A4 weiterhin KEIN beiAustritt — alle angelegten Positionen ohne A4-Werte", async () => {
+    await VORSCHLAEGE_POST(anfrage("POST"), OHNE_PARAMS);
+    const { data } = mockPrisma.ausstattungsPosition.createManyAndReturn.mock.calls[0][0];
+    for (const d of data) {
+      expect(`${d.vorschlagSchluessel}: ${d.beiAustritt} ${d.rueckgabeKategorie} ${d.ausgabeKennung}`).toBe(
+        `${d.vorschlagSchluessel}: null null null`,
+      );
+    }
+    expect(mockPrisma.ausstattungsPosition.updateMany).not.toHaveBeenCalled();
+  });
+
   it("zweimal: der zweite Aufruf legt nichts an (angelegt 0) und protokolliert nichts", async () => {
     await VORSCHLAEGE_POST(anfrage("POST"), OHNE_PARAMS);
     const zweiter = await antwort(await VORSCHLAEGE_POST(anfrage("POST"), OHNE_PARAMS));
@@ -829,6 +899,194 @@ describe("POST /api/settings/ausstattung/vorschlaege", () => {
     const geschrieben = data.find((d: { vorschlagSchluessel: string }) => d.vorschlagSchluessel === "IT_ZUGAENGE");
     expect(geschrieben.optionen).toEqual(zugaenge?.optionen);
     expect(geschrieben.optionen).not.toBe(zugaenge?.optionen);
+  });
+});
+
+// =============================================
+// POST …/rueckgabe-vorgaben (A4, G27, G21)
+// =============================================
+
+describe("POST /api/settings/ausstattung/rueckgabe-vorgaben", () => {
+  /**
+   * Der Katalog „in der Datenbank“: findMany liest ihn (alle mit
+   * Vorschlagsschluessel bzw. die IDs aus `id.in`), updateMany schreibt
+   * bedingt auf beiAustritt null und „keine Angabe“ (`art.not`).
+   */
+  let positionen: Record<string, unknown>[];
+
+  const pos = (id: string, teil: Record<string, unknown> = {}) =>
+    zeile({ id, bezeichnung: `Position ${id}`, beiAustritt: null, vorschlagSchluessel: null, ...teil });
+
+  type VorgabenWhere = { id: string; beiAustritt: null; art?: { not: string } };
+  const bedingtSchreiben = async ({ where, data }: { where: VorgabenWhere; data: Record<string, unknown> }) => {
+    const p = positionen.find(
+      (x) => x.id === where.id && x.beiAustritt === null && (where.art === undefined || x.art !== where.art.not),
+    );
+    if (!p) return { count: 0 };
+    Object.assign(p, data);
+    return { count: 1 };
+  };
+
+  beforeEach(() => {
+    positionen = [
+      pos("p-ipad", { vorschlagSchluessel: "IT_IPAD" }),
+      pos("p-zugaenge", { vorschlagSchluessel: "IT_ZUGAENGE", art: "AUSWAHL", optionen: ["Dienst-E-Mail"] }),
+      // Von HR gesetzt — bleibt.
+      pos("p-laptop", { vorschlagSchluessel: "IT_LAPTOP", beiAustritt: "NICHTS" }),
+      // Von HR angelegt — ohne Vorschlagsschluessel nie.
+      pos("p-eigen"),
+      // Angabe: keine Vorgabe.
+      pos("p-durchwahl", { vorschlagSchluessel: "IT_DURCHWAHL", art: "ANGABE" }),
+    ];
+    mockPrisma.ausstattungsPosition.findMany.mockImplementation(
+      async ({ where }: { where?: { vorschlagSchluessel?: unknown; id?: { in: string[] } } }) =>
+        positionen
+          .filter((p) => !where?.vorschlagSchluessel || p.vorschlagSchluessel !== null)
+          .filter((p) => !where?.id || where.id.in.includes(p.id as string))
+          .map((p) => ({ ...p })),
+    );
+    mockPrisma.ausstattungsPosition.updateMany.mockImplementation(bedingtSchreiben);
+  });
+
+  it("HR_SACHBEARBEITER 403 und ohne Anmeldung 401 — ohne Datenbankzugriff", async () => {
+    mockGetSession.mockResolvedValue(HR_SACHBEARBEITER);
+    expect(await antwort(await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS))).toEqual({
+      status: 403,
+      body: { error: "Keine Berechtigung" },
+    });
+    mockGetSession.mockResolvedValue(null);
+    expect((await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS)).status).toBe(401);
+    expect(mockPrisma.ausstattungsPosition.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.ausstattungsPosition.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("setzt nur an Positionen mit vorschlagSchluessel und leerem beiAustritt, je Position bedingt, mit Protokoll", async () => {
+    const { status, body } = await antwort(await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS));
+    expect(status).toBe(200);
+    expect(body).toEqual({ gesetzt: 2, uebersprungen: 1, meldung: MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_ERGEBNIS(2, 1) });
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.ausstattungsPosition.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { vorschlagSchluessel: { not: null } } }),
+    );
+    // Bedingt auf leeres beiAustritt UND „keine Angabe“ (G8): Wird die Position
+    // zwischen Lesen und Schreiben zur Angabe, schreibt das UPDATE nichts.
+    expect(mockPrisma.ausstattungsPosition.updateMany.mock.calls.map((c) => c[0])).toEqual([
+      { where: { id: "p-ipad", beiAustritt: null, art: { not: "ANGABE" } }, data: { ...RUECKGABE_VORGABEN.IT_IPAD } },
+      {
+        where: { id: "p-zugaenge", beiAustritt: null, art: { not: "ANGABE" } },
+        data: { ...RUECKGABE_VORGABEN.IT_ZUGAENGE },
+      },
+    ]);
+    // Ohne verfehltes Update kein zweites Lesen.
+    expect(mockPrisma.ausstattungsPosition.findMany).toHaveBeenCalledTimes(1);
+    expect(positionen.find((p) => p.id === "p-laptop")).toMatchObject({ beiAustritt: "NICHTS", rueckgabeKategorie: null });
+    expect(positionen.find((p) => p.id === "p-eigen")).toMatchObject({ beiAustritt: null });
+    expect(audits()).toEqual([
+      {
+        userId: "u-hrl",
+        processType: "SYSTEM",
+        action: AUSSTATTUNG_AUDIT.RUECKGABE_VORGABEN_UEBERNOMMEN,
+        details: {
+          anzahl: 2,
+          uebersprungen: 1,
+          positionen: [
+            { positionId: "p-ipad", vorschlagSchluessel: "IT_IPAD" },
+            { positionId: "p-zugaenge", vorschlagSchluessel: "IT_ZUGAENGE" },
+          ],
+        },
+      },
+    ]);
+    // Kein Hinweis ohne aktive Webhooks; gefragt wird nach den Offboarding-Abteilungsereignissen.
+    expect(mockPrisma.webhookConfig.count).toHaveBeenCalledWith({
+      where: { event: { in: [...A4_WEBHOOK_EREIGNISSE] }, isActive: true },
+    });
+  });
+
+  it("wiederholbar: der zweite Aufruf ändert nichts und protokolliert nichts", async () => {
+    await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS);
+    jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockPrisma));
+    mockPrisma.webhookConfig.count.mockResolvedValue(0);
+    mockPrisma.auditLog.create.mockResolvedValue({});
+    const { body } = await antwort(await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS));
+    expect(body).toEqual({ gesetzt: 0, uebersprungen: 3, meldung: MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_ERGEBNIS(0, 3) });
+    expect(mockPrisma.ausstattungsPosition.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("setzt HR die Position zwischen Lesen und Schreiben selbst, bleibt ihr Wert (bedingtes Update, count 0)", async () => {
+    mockPrisma.ausstattungsPosition.updateMany.mockImplementationOnce(async (args: Parameters<typeof bedingtSchreiben>[0]) => {
+      // Ein gleichzeitiger PATCH hat committet, bevor das UPDATE die Zeile erreicht.
+      Object.assign(positionen.find((p) => p.id === "p-ipad")!, { beiAustritt: "NICHTS" });
+      return bedingtSchreiben(args);
+    });
+    const { body } = await antwort(await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS));
+    expect(body).toEqual({ gesetzt: 1, uebersprungen: 2, meldung: MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_ERGEBNIS(1, 2) });
+    expect(positionen.find((p) => p.id === "p-ipad")).toMatchObject({ beiAustritt: "NICHTS", rueckgabeKategorie: null });
+    expect(audits()[0].details).toMatchObject({
+      uebersprungen: 2,
+      positionen: [{ positionId: "p-zugaenge", vorschlagSchluessel: "IT_ZUGAENGE" }],
+    });
+    // Nur die verfehlte Position wird neu gelesen, um den Grund zu kennen.
+    expect(mockPrisma.ausstattungsPosition.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { id: { in: ["p-ipad"] } } }),
+    );
+  });
+
+  it("wird die Position zwischen Lesen und Schreiben zur Angabe, bekommt sie nichts (G8) — Meldung mit dem richtigen Grund", async () => {
+    mockPrisma.ausstattungsPosition.updateMany.mockImplementationOnce(async (args: Parameters<typeof bedingtSchreiben>[0]) => {
+      // Ein gleichzeitiger PATCH macht aus dem iPad die Angabe „Durchwahl“ (beiAustritt bleibt leer).
+      Object.assign(positionen.find((p) => p.id === "p-ipad")!, {
+        art: "ANGABE",
+        angabeSchluessel: "DURCHWAHL",
+        bezeichnung: "Durchwahl",
+      });
+      return bedingtSchreiben(args);
+    });
+    const { status, body } = await antwort(await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS));
+    expect(status).toBe(200);
+    expect(body).toEqual({ gesetzt: 1, uebersprungen: 2, meldung: MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_ERGEBNIS(1, 1, 1) });
+    expect(body.meldung).toContain("1 Position ist eine Angabe und bekommt keine Vorgabe.");
+    // Die Angabe traegt weiter keines der drei A4-Felder (positionPruefen bliebe gruen).
+    expect(positionen.find((p) => p.id === "p-ipad")).toMatchObject({
+      art: "ANGABE",
+      beiAustritt: null,
+      rueckgabeKategorie: null,
+      ausgabeKennung: null,
+    });
+    expect(audits()[0].details.positionen).toEqual([{ positionId: "p-zugaenge", vorschlagSchluessel: "IT_ZUGAENGE" }]);
+  });
+
+  it("schon im Katalog eine Angabe mit Vorschlagsschluessel: Grund „Angabe“, nicht „hat schon einen Wert“", async () => {
+    positionen = [pos("p-tel", { vorschlagSchluessel: "IT_TELEFON", art: "ANGABE", bezeichnung: "Durchwahl" })];
+    const { body } = await antwort(await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS));
+    expect(body).toEqual({ gesetzt: 0, uebersprungen: 1, meldung: MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_ERGEBNIS(0, 0, 1) });
+    expect(body.meldung).not.toContain("Wert");
+    expect(mockPrisma.ausstattungsPosition.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("ohne Vorschlagspositionen: 200, nichts geschrieben, kein Protokoll", async () => {
+    positionen = [pos("p-eigen")];
+    const { status, body } = await antwort(await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS));
+    expect(status).toBe(200);
+    expect(body).toEqual({ gesetzt: 0, uebersprungen: 0, meldung: MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_ERGEBNIS(0, 0) });
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("G21: `hinweis` nur bei aktiven Offboarding-Webhooks — gesetzt wird trotzdem", async () => {
+    mockPrisma.webhookConfig.count.mockResolvedValue(2);
+    const { status, body } = await antwort(await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS));
+    expect(status).toBe(200);
+    expect(body.gesetzt).toBe(2);
+    expect(body.hinweis).toBe(MELDUNGEN_AUSGABEN.RUECKGABE_VORGABEN_WEBHOOKS(2));
+
+    // Eine kaputte Abfrage sperrt nichts und erfindet keinen Hinweis.
+    mockPrisma.webhookConfig.count.mockRejectedValue(new Error("DB weg"));
+    const zweiter = await antwort(await VORGABEN_POST(anfrage("POST"), OHNE_PARAMS));
+    expect(zweiter.status).toBe(200);
+    expect(zweiter.body).not.toHaveProperty("hinweis");
   });
 });
 

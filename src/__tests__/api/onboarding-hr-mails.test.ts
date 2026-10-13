@@ -25,7 +25,8 @@ const mockPrisma = {
   document: { findMany: jest.fn() },
   child: { count: jest.fn() },
   personalData: { findUnique: jest.fn(), update: jest.fn() },
-  supervisorData: { upsert: jest.fn(), update: jest.fn() },
+  // updateMany (A4, S23): Merker `ausgabenAngeboten` bei der Abgabe, nur mit `mitAusstattung`.
+  supervisorData: { upsert: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
   supervisorKostenstelle: { deleteMany: jest.fn(), createMany: jest.fn() },
   onboardingProcess: {
     updateMany: jest.fn(),
@@ -213,6 +214,7 @@ beforeEach(() => {
   });
   mockPrisma.personalData.update.mockResolvedValue({});
   mockPrisma.supervisorData.update.mockResolvedValue({});
+  mockPrisma.supervisorData.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.auditLog.create.mockResolvedValue({});
   mockPrisma.onboardingProcess.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.onboardingProcess.update.mockResolvedValue({});

@@ -41,6 +41,7 @@ import { modalitaetenAusstattungSchema } from "@/lib/validations/ausstattung";
 import { MELDUNGEN as AUSSTATTUNG_MELDUNGEN } from "@/lib/ausstattung";
 import {
   AusstattungsWahlUngueltig,
+  ausgabenAngebotenBeiAbgabeIn,
   ausstattungKurzLaden,
   fuehrungskraftSichtLaden,
   fuehrungskraftWahlSpeichernIn,
@@ -575,7 +576,8 @@ export async function POST(
    *      Commit. `supervisorToken: token` gehoert ins WHERE: Hat HR den Link
    *      inzwischen an eine andere Adresse neu vergeben, darf der alte Link
    *      im Fenster zwischen Pruefung und Schreiben nicht mehr absenden.
-   *   2. `isComplete` setzen (Altfall-Merker, den Detailansicht und Export lesen).
+   *   2. `isComplete` setzen (Altfall-Merker, den Detailansicht und Export lesen),
+   *      dazu der Merker `ausgabenAngeboten` (A4), falls er noch fehlt.
    *   3. `statusAbgleichen`: liest den Vorgang NACH der Sperre neu. Ist der
    *      Fragebogen offen, bleibt der Status INVITED/IN_PROGRESS; ist er da,
    *      wird er SUPERVISOR_SUBMITTED („Bereit zur Prüfung").
@@ -605,6 +607,11 @@ export async function POST(
         where: { onboardingId: onboarding.id },
         data: { isComplete: true },
       });
+
+      // A4 (E-A36): Merker `ausgabenAngeboten`, falls die Fuehrungskraft den
+      // Schritt „Ausstattung & Zugänge" nie gespeichert hat (nur mit Merker
+      // `mitAusstattung`, nur solange er `null` ist).
+      await ausgabenAngebotenBeiAbgabeIn(tx, onboarding);
 
       const ergebnis = await statusAbgleichen(tx, onboarding.id);
 

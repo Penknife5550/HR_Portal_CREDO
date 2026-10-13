@@ -14,14 +14,15 @@
  * gespeicherten Zeile zusammengefuehrten Stand. Dieselbe Funktion laeuft im
  * Dialog, bevor er sendet. Alle Meldungen stehen in `MELDUNGEN` dort.
  *
- * Bewusst NICHT im Schema: die Stufe-2-Felder `ausgabeKennung`,
- * `rueckgabeKategorie` und `beiAustritt` (schreibt bis A4 niemand, die
- * Momentaufnahme kopiert `null`) und `vorschlagSchluessel` (schreibt nur
- * „Vorschläge übernehmen“). Zod verwirft sie (`.strip()`), sie kommen also nie
- * im geparsten Ergebnis an — sonst faende A4 ungepruefte Werte vor, und ein
- * Vorschlagsschluessel liesse sich ueber POST/PATCH verbiegen. `isActive`
- * kennt nur das Aenderungs-Schema: Eine neue Position ist immer ausgeschaltet
- * (Regel 1).
+ * Seit S23 (Paket A4, G8) im Schema: die Felder „Beim Austritt“
+ * (`beiAustritt` aus BEI_AUSTRITT, `rueckgabeKategorie` aus
+ * RUECKGABE_KATEGORIEN, `ausgabeKennung` einzeilig, hoechstens
+ * GRENZEN.ausgabeKennung) — leer heisst `null`; ob sie zueinander und zur Art
+ * passen, prueft `ausgabeFelderPruefen` in `positionPruefen`. Bewusst NICHT im
+ * Schema: `vorschlagSchluessel` (schreibt nur „Vorschläge übernehmen“). Zod
+ * verwirft ihn (`.strip()`), er kommt also nie im geparsten Ergebnis an — sonst
+ * liesse er sich ueber POST/PATCH verbiegen. `isActive` kennt nur das
+ * Aenderungs-Schema: Eine neue Position ist immer ausgeschaltet (Regel 1).
  *
  * Freitexte werden vor der Laengenpruefung auf \n normalisiert und getrimmt
  * (Browser schicken Formularfelder mit \r\n; der Zaehler im Dialog zaehlt \n).
@@ -42,15 +43,18 @@ import { MELDUNGEN as ABTEILUNGS_MELDUNGEN } from "@/lib/abteilungsaufgaben";
 import {
   ANGABE_SCHLUESSEL,
   AUSSTATTUNG_ARTEN,
+  BEI_AUSTRITT,
   EINRICHTUNGSARTEN,
   GRENZEN,
   MELDUNGEN,
   PERSONENGRUPPEN,
   REIHENFOLGE_MAX,
+  ausgabeFelderPruefen,
   istNichtErlaubteStelle,
   type Einrichtungsart,
   type Personengruppe,
 } from "@/lib/ausstattung";
+import { RUECKGABE_KATEGORIEN } from "@/lib/constants";
 import { schluesselFeld, tagesdatumGueltig } from "@/lib/validations/abteilungsaufgaben";
 
 /** Keine spitzen Klammern und kein Steuerzeichen (auch kein CR/LF) — einzeilige Texte. */
@@ -168,6 +172,18 @@ const personengruppeFeld = z.enum(PERSONENGRUPPEN_WERTE, {
 
 const optionFeld = einzeiligerText(GRENZEN.option, MELDUNGEN.OPTION_LEER, MELDUNGEN.OPTION_ZU_LANG);
 
+/** „Beim Austritt“ (A4): ein Wert aus BEI_AUSTRITT oder leer (= `null`). */
+const beiAustrittFeld = z.preprocess(
+  leerAlsNull,
+  z.enum(BEI_AUSTRITT, { errorMap: () => ({ message: MELDUNGEN.BEI_AUSTRITT_UNBEKANNT }) }).nullable(),
+);
+
+/** Rueckgabekategorie (A4): ein Wert aus RUECKGABE_KATEGORIEN (ReturnCategory) oder leer (= `null`). */
+const rueckgabeKategorieFeld = z.preprocess(
+  leerAlsNull,
+  z.enum(RUECKGABE_KATEGORIEN, { errorMap: () => ({ message: MELDUNGEN.RUECKGABEKATEGORIE_UNBEKANNT }) }).nullable(),
+);
+
 /** Faelligkeit in Tagen relativ zum Vertragsbeginn: ganze Zahl −365…365 oder null (leer = null). */
 const faelligTageFeld = z.preprocess(
   (v) => (v === undefined || v === null || v === "" ? null : v),
@@ -184,8 +200,8 @@ const faelligTageFeld = z.preprocess(
 // =============================================
 
 /**
- * Die Felder einer Position aus Feinplan 1.2 — ohne A4-Felder,
- * `vorschlagSchluessel` und `isActive` (siehe Kopf).
+ * Die Felder einer Position aus Feinplan 1.2, seit S23 mit den A4-Feldern —
+ * ohne `vorschlagSchluessel` und `isActive` (siehe Kopf).
  *
  *   departmentKey       Abteilungsschluessel (schluesselFeld); ob er erlaubt ist, prueft positionPruefen
  *   organizationId      leer/null = zentral; Form `idFeld`; ob es die Einrichtung gibt, prueft der Dienst (400)
@@ -203,6 +219,9 @@ const faelligTageFeld = z.preprocess(
  *   personengruppen     QuestionnaireType-Werte, Doppelte fallen weg
  *   sichtbarFuer        Abteilungsschluessel, Doppelte fallen weg
  *   entgeltrelevant     Standard false
+ *   beiAustritt         RUECKGABE | SPERREN | NICHTS, leer = null (A4)
+ *   rueckgabeKategorie  ReturnCategory-Wert, leer = null; nur bei RUECKGABE (positionPruefen)
+ *   ausgabeKennung      Beschriftung der Kennung, einzeilig, ≤ 40, leer = null; nur bei RUECKGABE/SPERREN
  *   orderIndex          ganze Zahl 0…REIHENFOLGE_MAX, Standard 0
  */
 const katalogPositionFelder = {
@@ -236,6 +255,9 @@ const katalogPositionFelder = {
   ).transform(ohneDoppelte),
   sichtbarFuer: liste(schluesselFeld, MAX_SICHTBAR_FUER, MELDUNGEN.SICHTBAR_ZU_VIELE).transform(ohneDoppelte),
   entgeltrelevant: z.boolean(FALSCHER_TYP).default(false),
+  beiAustritt: beiAustrittFeld,
+  rueckgabeKategorie: rueckgabeKategorieFeld,
+  ausgabeKennung: optionalerEinzeiligerText(GRENZEN.ausgabeKennung, MELDUNGEN.KENNUNG_LABEL_ZU_LANG),
   orderIndex: z
     .number({ invalid_type_error: MELDUNGEN.REIHENFOLGE_UNGUELTIG })
     .int(MELDUNGEN.REIHENFOLGE_UNGUELTIG)
@@ -263,8 +285,8 @@ export type KatalogPositionInput = z.infer<typeof katalogPositionSchema>;
  * Aenderung einer Position (PATCH): jedes Feld freiwillig, dazu `isActive`
  * (Ein-/Ausschalten). `undefined` = unveraendert; Leerwerte (`""`, `null`)
  * leeren ein freiwilliges Feld. Standardwerte gelten hier NICHT — ein
- * fehlendes Feld bleibt fehlend. Mindestens ein Feld; A4-Felder und
- * `vorschlagSchluessel` allein zaehlen nicht, sie fallen vorher weg.
+ * fehlendes Feld bleibt fehlend. Mindestens ein Feld (auch ein A4-Feld allein
+ * zaehlt); `vorschlagSchluessel` allein zaehlt nicht, er faellt vorher weg.
  *
  * `stand` ist kein Feld der Position, sondern ihr `updatedAt`, wie der Dialog
  * „Bearbeiten“ ihn beim Oeffnen geladen hat (ISO-Zeitstempel). Der Dialog
@@ -456,7 +478,10 @@ const karteAuswahlFeld = z.array(optionFeld, FALSCHER_TYP).max(GRENZEN.optionen,
 /**
  * Freie Position von HR: immer Ja/Nein (E-A13: keine freien Angaben), ohne
  * Hinweis fuer die Stelle (der landete in `description` und damit bei
- * PORTAL_ROLES), Bezeichnung hoechstens GRENZEN.freieBezeichnung.
+ * PORTAL_ROLES), Bezeichnung hoechstens GRENZEN.freieBezeichnung. Seit S23
+ * (A4, G8) optional „Beim Austritt“ und die Rueckgabekategorie — ohne
+ * Kennungsbeschriftung (die Stelle sieht dann „Kennung“); zueinander prueft
+ * sie `ausgabeFelderPruefen`, dieselbe Regel wie im Katalog.
  */
 const freiePositionSchema = z
   .object(
@@ -464,10 +489,16 @@ const freiePositionSchema = z
       departmentKey: karteStelleFeld,
       bezeichnung: einzeiligerText(GRENZEN.freieBezeichnung, MELDUNGEN.BEZEICHNUNG_FEHLT, MELDUNGEN.KARTE_FREI_ZU_LANG),
       relativeDueDays: faelligTageFeld.optional(),
+      beiAustritt: beiAustrittFeld.optional(),
+      rueckgabeKategorie: rueckgabeKategorieFeld.optional(),
     },
     KEIN_OBJEKT,
   )
-  .strip();
+  .strip()
+  .superRefine((f, ctx) => {
+    const fehler = ausgabeFelderPruefen({ art: "JA_NEIN", ...f });
+    if (fehler) ctx.addIssue({ code: z.ZodIssueCode.custom, message: fehler });
+  });
 
 const karteIdFeld = idFeld(MELDUNGEN.KARTE_ID_UNGUELTIG);
 

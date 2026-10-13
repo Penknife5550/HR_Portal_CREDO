@@ -3,9 +3,12 @@
  * (src/lib/validations/ausstattung.ts, Feinplan 1.4 und S2)
  *
  * Zod prueft die Form; die Felder gegeneinander prueft positionPruefen
- * (ausstattung.test.ts). Kernfall von S2: Die Stufe-2-Felder
- * (ausgabeKennung, rueckgabeKategorie, beiAustritt) und vorschlagSchluessel
- * kommen im geparsten Ergebnis nie an — weder beim Anlegen noch beim Aendern.
+ * (ausstattung.test.ts). Kernfall von S2: vorschlagSchluessel kommt im
+ * geparsten Ergebnis nie an — weder beim Anlegen noch beim Aendern. Seit S23
+ * (A4, G8) sind die Felder „Beim Austritt“ (beiAustritt, rueckgabeKategorie,
+ * ausgabeKennung) pflegbar: Form aus den Wertlisten, leer = null; die Regel
+ * gegeneinander (`ausgabeFelderPruefen`) gilt auch fuer die freie Position der
+ * Karte.
  *
  * Dazu (S8) die Form des Schritts „Ausstattung & Zugänge“ im Modalitaeten-PUT
  * (`modalitaetenAusstattungSchema`); ob Position und Option zum Vorgang
@@ -27,6 +30,7 @@ import {
   positionPruefen,
   type PositionEntwurf,
 } from "@/lib/ausstattung";
+import { RUECKGABE_KATEGORIEN } from "@/lib/constants";
 import {
   ID_MAX,
   arbeitsortSchema,
@@ -45,12 +49,13 @@ function fehler(ergebnis: { success: boolean; error?: { errors: { message: strin
 
 const MINIMAL = { departmentKey: "IT", art: "JA_NEIN", bezeichnung: "Dienst-iPad (Lernmittel)" };
 
-const STUFE2_UND_VORSCHLAG = {
+/** Die A4-Felder „Beim Austritt“ (seit S23 pflegbar, G8) — gueltige Werte. */
+const A4 = {
   ausgabeKennung: "Inventarnummer",
-  rueckgabeKategorie: "IT_GERAET",
+  rueckgabeKategorie: "IT_HARDWARE",
   beiAustritt: "RUECKGABE",
-  vorschlagSchluessel: "IT_IPAD",
 };
+const STUFE2_UND_VORSCHLAG = { ...A4, vorschlagSchluessel: "IT_IPAD" };
 
 // =============================================
 // Anlegen (POST)
@@ -78,6 +83,9 @@ describe("katalogPositionSchema", () => {
       personengruppen: [],
       sichtbarFuer: [],
       entgeltrelevant: false,
+      beiAustritt: null,
+      rueckgabeKategorie: null,
+      ausgabeKennung: null,
       orderIndex: 0,
     });
     // Typpruefung: das geparste Ergebnis passt ohne Umweg in positionPruefen
@@ -85,9 +93,50 @@ describe("katalogPositionSchema", () => {
     expect(positionPruefen(entwurf)).toBeNull();
   });
 
-  it("A4-Felder und vorschlagSchluessel im Body kommen nicht im geparsten Ergebnis an", () => {
+  it("vorschlagSchluessel im Body kommt nicht im geparsten Ergebnis an; die A4-Felder kommen an (S23)", () => {
     const geparst = katalogPositionSchema.parse({ ...MINIMAL, ...STUFE2_UND_VORSCHLAG });
-    for (const feld of Object.keys(STUFE2_UND_VORSCHLAG)) expect(geparst).not.toHaveProperty(feld);
+    expect(geparst).not.toHaveProperty("vorschlagSchluessel");
+    expect(geparst).toMatchObject(A4);
+    expect(positionPruefen(geparst)).toBeNull();
+  });
+
+  it("A4-Felder: Werte nur aus den Wertlisten, leer = null, Kennung einzeilig und hoechstens 40 Zeichen", () => {
+    for (const beiAustritt of ["RUECKGABE", "SPERREN", "NICHTS"]) {
+      expect(katalogPositionSchema.parse({ ...MINIMAL, beiAustritt }).beiAustritt).toBe(beiAustritt);
+    }
+    for (const kategorie of RUECKGABE_KATEGORIEN) {
+      expect(katalogPositionSchema.parse({ ...MINIMAL, rueckgabeKategorie: kategorie }).rueckgabeKategorie).toBe(kategorie);
+    }
+    expect(fehler(katalogPositionSchema.safeParse({ ...MINIMAL, beiAustritt: "BEHALTEN" }))).toBe(
+      MELDUNGEN.BEI_AUSTRITT_UNBEKANNT,
+    );
+    // Der alte Testwert „IT_GERAET“ ist keine ReturnCategory.
+    expect(fehler(katalogPositionSchema.safeParse({ ...MINIMAL, rueckgabeKategorie: "IT_GERAET" }))).toBe(
+      MELDUNGEN.RUECKGABEKATEGORIE_UNBEKANNT,
+    );
+    expect(katalogPositionSchema.parse({ ...MINIMAL, beiAustritt: "", rueckgabeKategorie: "  ", ausgabeKennung: " " })).toMatchObject({
+      beiAustritt: null,
+      rueckgabeKategorie: null,
+      ausgabeKennung: null,
+    });
+    expect(katalogPositionSchema.parse({ ...MINIMAL, ausgabeKennung: "  Inventarnummer " }).ausgabeKennung).toBe("Inventarnummer");
+    expect(
+      katalogPositionSchema.parse({ ...MINIMAL, ausgabeKennung: "x".repeat(GRENZEN.ausgabeKennung) }).ausgabeKennung,
+    ).toHaveLength(GRENZEN.ausgabeKennung);
+    expect(fehler(katalogPositionSchema.safeParse({ ...MINIMAL, ausgabeKennung: "x".repeat(GRENZEN.ausgabeKennung + 1) }))).toBe(
+      MELDUNGEN.KENNUNG_LABEL_ZU_LANG,
+    );
+    for (const ausgabeKennung of ["<b>Nr</b>", "Nr\nzwei", "Nr\u0000"]) {
+      expect(fehler(katalogPositionSchema.safeParse({ ...MINIMAL, ausgabeKennung }))).toBe(MELDUNGEN.OHNE_KLAMMERN);
+    }
+    expect(fehler(katalogPositionSchema.safeParse({ ...MINIMAL, beiAustritt: 3 }))).toBe(MELDUNGEN.BEI_AUSTRITT_UNBEKANNT);
+  });
+
+  it("A4-Felder gegeneinander prueft positionPruefen, nicht Zod", () => {
+    const ohneKategorie = katalogPositionSchema.parse({ ...MINIMAL, beiAustritt: "RUECKGABE" });
+    expect(positionPruefen(ohneKategorie)).toBe(MELDUNGEN.RUECKGABEKATEGORIE_FEHLT);
+    const kennungBeiNichts = katalogPositionSchema.parse({ ...MINIMAL, beiAustritt: "NICHTS", ausgabeKennung: "Nr." });
+    expect(positionPruefen(kennungBeiNichts)).toBe(MELDUNGEN.KENNUNG_NUR_AUSGABE);
   });
 
   it("isActive wird beim Anlegen ignoriert (neue Positionen sind aus, Regel 1)", () => {
@@ -284,7 +333,9 @@ describe("katalogPositionSchema", () => {
       const geparst = katalogPositionSchema.parse(v);
       // Der Pflegehinweis ist kein Katalogfeld (nur Vorschau „Vorschläge übernehmen“) und faellt weg.
       const { vorschlagSchluessel, pflegeHinweis: _pflege, ...ohneSchluessel } = v;
-      expect({ vorschlagSchluessel, ...geparst }).toEqual({ vorschlagSchluessel, ...ohneSchluessel });
+      // Die Vorschlaege tragen keine A4-Werte (G27) — geparst stehen sie leer da.
+      const ohneA4 = { beiAustritt: null, rueckgabeKategorie: null, ausgabeKennung: null };
+      expect({ vorschlagSchluessel, ...geparst }).toEqual({ vorschlagSchluessel, ...ohneA4, ...ohneSchluessel });
       expect(positionPruefen(geparst)).toBeNull();
     }
   });
@@ -309,14 +360,22 @@ describe("katalogPositionSchema", () => {
 // =============================================
 
 describe("katalogPositionAenderungSchema", () => {
-  it("A4-Felder und vorschlagSchluessel im Body kommen nicht im geparsten Ergebnis an", () => {
+  it("vorschlagSchluessel im Body kommt nicht im geparsten Ergebnis an; die A4-Felder kommen an (S23)", () => {
     expect(katalogPositionAenderungSchema.parse({ bezeichnung: "Neu", ...STUFE2_UND_VORSCHLAG })).toEqual({
       bezeichnung: "Neu",
+      ...A4,
     });
   });
 
-  it("nur A4-Felder oder vorschlagSchluessel zaehlen nicht als Aenderung", () => {
-    expect(fehler(katalogPositionAenderungSchema.safeParse(STUFE2_UND_VORSCHLAG))).toBe(MELDUNGEN.MINDESTENS_EIN_FELD);
+  it("ein A4-Feld allein zaehlt als Aenderung, vorschlagSchluessel allein nicht; leer heisst null", () => {
+    expect(katalogPositionAenderungSchema.parse({ beiAustritt: "SPERREN" })).toEqual({ beiAustritt: "SPERREN" });
+    expect(katalogPositionAenderungSchema.parse({ beiAustritt: "", ausgabeKennung: null })).toEqual({
+      beiAustritt: null,
+      ausgabeKennung: null,
+    });
+    expect(fehler(katalogPositionAenderungSchema.safeParse({ vorschlagSchluessel: "IT_IPAD" }))).toBe(
+      MELDUNGEN.MINDESTENS_EIN_FELD,
+    );
     expect(fehler(katalogPositionAenderungSchema.safeParse({}))).toBe(MELDUNGEN.MINDESTENS_EIN_FELD);
   });
 
@@ -416,10 +475,9 @@ describe("KATALOG_FELDER", () => {
     expect(Object.keys(alle).sort()).toEqual([...KATALOG_FELDER].sort());
   });
 
-  it("A4-Felder und vorschlagSchluessel stehen nicht darin", () => {
-    for (const feld of Object.keys(STUFE2_UND_VORSCHLAG)) {
-      expect(KATALOG_FELDER as readonly string[]).not.toContain(feld);
-    }
+  it("die A4-Felder stehen darin (S23, G8), vorschlagSchluessel nicht", () => {
+    for (const feld of Object.keys(A4)) expect(KATALOG_FELDER as readonly string[]).toContain(feld);
+    expect(KATALOG_FELDER as readonly string[]).not.toContain("vorschlagSchluessel");
   });
 });
 
@@ -634,6 +692,31 @@ describe("ausstattungAktionSchema (HR-Karte, S15)", () => {
     expect(fehler(ausstattungAktionSchema.safeParse({ aktion: "aendern", ausstattungId: "z-1" }))).toBe(
       MELDUNGEN.MINDESTENS_EIN_FELD,
     );
+  });
+
+  it("freie Position (A4): optional „Beim Austritt“ und Rückgabekategorie, gegeneinander geprüft; keine Kennungsbeschriftung", () => {
+    const frei = (teil: Record<string, unknown>) =>
+      ausstattungAktionSchema.safeParse({ aktion: "hinzufuegen", frei: { departmentKey: "IT", bezeichnung: "Tablet", ...teil } });
+    const ok = frei({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE", ausgabeKennung: "Inventarnummer" });
+    expect(ok.success && ok.data.aktion === "hinzufuegen" && ok.data.frei).toEqual({
+      departmentKey: "IT",
+      bezeichnung: "Tablet",
+      beiAustritt: "RUECKGABE",
+      rueckgabeKategorie: "IT_HARDWARE",
+    });
+    expect(frei({ beiAustritt: "SPERREN" }).success).toBe(true);
+    expect(frei({ beiAustritt: "" }).success).toBe(true);
+    expect(fehler(frei({ beiAustritt: "RUECKGABE" }))).toBe(MELDUNGEN.RUECKGABEKATEGORIE_FEHLT);
+    expect(fehler(frei({ beiAustritt: "SPERREN", rueckgabeKategorie: "SCHLUESSEL" }))).toBe(
+      MELDUNGEN.RUECKGABEKATEGORIE_NUR_RUECKGABE,
+    );
+    expect(fehler(frei({ beiAustritt: "ABGEBEN" }))).toBe(MELDUNGEN.BEI_AUSTRITT_UNBEKANNT);
+    // Ohne die Felder wie bisher.
+    const ohne = frei({});
+    expect(ohne.success && ohne.data.aktion === "hinzufuegen" && ohne.data.frei).toEqual({
+      departmentKey: "IT",
+      bezeichnung: "Tablet",
+    });
   });
 
   it("freie Position: Bezeichnung einzeilig, höchstens GRENZEN.freieBezeichnung; Fälligkeit ±365", () => {

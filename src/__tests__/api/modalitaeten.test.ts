@@ -7,7 +7,8 @@
  */
 
 const mockPrisma = {
-  supervisorData: { upsert: jest.fn(), update: jest.fn() },
+  // updateMany: Merker `ausgabenAngeboten` bei der Abgabe (A4, nur mit `mitAusstattung`).
+  supervisorData: { upsert: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
   supervisorKostenstelle: { deleteMany: jest.fn(), createMany: jest.fn() },
   // updateMany: Beanspruchung der eigenen Spur (`supervisorSubmittedAt`).
   // findUniqueOrThrow + update: `statusAbgleichen` danach.
@@ -138,6 +139,7 @@ beforeEach(() => {
   // eine interaktive Transaktion und nicht ein Array von Operationen.
   mockPrisma.supervisorData.upsert.mockResolvedValue({ id: "sd1" });
   mockPrisma.supervisorData.update.mockResolvedValue({});
+  mockPrisma.supervisorData.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.supervisorKostenstelle.deleteMany.mockResolvedValue({ count: 0 });
   mockPrisma.supervisorKostenstelle.createMany.mockResolvedValue({ count: 0 });
   mockPrisma.onboardingProcess.update.mockResolvedValue({});
@@ -756,6 +758,90 @@ describe("POST – parallele Spuren", () => {
 
     expect(res.status).toBe(500);
     fehler.mockRestore();
+  });
+});
+
+/**
+ * A4 (E-A36): Hat die Fuehrungskraft den Schritt „Ausstattung & Zugänge“ nie
+ * gespeichert (Vorauswahl uebernommen), setzt die Abgabe den Merker
+ * `ausgabenAngeboten` aus dem Katalogausschnitt — in ihrer Transaktion, nur
+ * mit `mitAusstattung`, nur solange er `null` ist.
+ */
+describe("POST – Merker ausgabenAngeboten (A4)", () => {
+  const VORGANG = { organizationId: "org-1", arbeitsortId: null, questionnaireType: "STANDARD", processType: "EINSTELLUNG" };
+  const MIT_SCHRITT = { befristet: false, kostenstellen: [], mitAusstattung: true, ausgabenAngeboten: null };
+
+  /** Eine Katalogposition der Stelle HR (braucht keine Adresse). */
+  function position(teil: Record<string, unknown>) {
+    return {
+      id: "pos-1",
+      departmentKey: "HR",
+      organizationId: null,
+      einrichtungsarten: [],
+      art: "JA_NEIN",
+      angabeSchluessel: null,
+      bezeichnung: "Dienstwagen",
+      personengruppen: [],
+      sichtbarFuer: [],
+      isActive: true,
+      orderIndex: 0,
+      beiAustritt: null,
+      ...teil,
+    };
+  }
+
+  function mitVorgang(supervisorData: Record<string, unknown>) {
+    const v = onboarding(supervisorData);
+    return { ...v, onboarding: { ...v.onboarding, ...VORGANG } };
+  }
+
+  beforeEach(() => {
+    mockPrisma.organization.findUnique.mockResolvedValue({ type: "VERWALTUNG" });
+  });
+
+  it("ohne den Schritt (kein Merker mitAusstattung): kein Katalog, kein Merker", async () => {
+    mockValidate.mockResolvedValue(mitVorgang({ befristet: false, kostenstellen: [] }));
+    const res = await POST(req("POST", {}), { params: params() });
+    expect(res.status).toBe(200);
+    expect(mockPrisma.supervisorData.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.ausstattungsPosition.findMany).not.toHaveBeenCalled();
+  });
+
+  it("mit Schritt und Merker null: aus dem Ausschnitt, bedingt auf null, nach isComplete und vor dem Statusabgleich", async () => {
+    mockValidate.mockResolvedValue(mitVorgang(MIT_SCHRITT));
+    mockPrisma.ausstattungsPosition.findMany.mockResolvedValue([
+      position({ beiAustritt: "RUECKGABE", rueckgabeKategorie: "FAHRZEUG" }),
+    ]);
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.supervisorData.updateMany).toHaveBeenCalledWith({
+      where: { onboardingId: "ob1", ausgabenAngeboten: null },
+      data: { ausgabenAngeboten: true },
+    });
+    const isComplete = mockPrisma.supervisorData.update.mock.invocationCallOrder[0];
+    const merker = mockPrisma.supervisorData.updateMany.mock.invocationCallOrder[0];
+    const abgleich = mockPrisma.onboardingProcess.findUniqueOrThrow.mock.invocationCallOrder[0];
+    expect(isComplete).toBeLessThan(merker);
+    expect(merker).toBeLessThan(abgleich);
+  });
+
+  it("Katalog ohne Position mit RUECKGABE/SPERREN: false (nach der Einfuehrung nichts angeboten)", async () => {
+    mockValidate.mockResolvedValue(mitVorgang(MIT_SCHRITT));
+    mockPrisma.ausstattungsPosition.findMany.mockResolvedValue([position({ beiAustritt: "NICHTS" }), position({ id: "pos-2" })]);
+    await POST(req("POST", {}), { params: params() });
+    expect(mockPrisma.supervisorData.updateMany).toHaveBeenCalledWith({
+      where: { onboardingId: "ob1", ausgabenAngeboten: null },
+      data: { ausgabenAngeboten: false },
+    });
+  });
+
+  it("schon gespeichert (Schritt gespeichert): bleibt, ohne Katalogabfrage", async () => {
+    mockValidate.mockResolvedValue(mitVorgang({ ...MIT_SCHRITT, ausgabenAngeboten: false }));
+    await POST(req("POST", {}), { params: params() });
+    expect(mockPrisma.supervisorData.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.ausstattungsPosition.findMany).not.toHaveBeenCalled();
   });
 });
 

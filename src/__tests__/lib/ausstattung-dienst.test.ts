@@ -12,7 +12,10 @@
  * (mit Tagesangabe neue Faelligkeit wie F23, ohne sie Anhebung beim Versand
  * an die neue Stelle, F22), Faelligkeit von Hand ohne „Eilt“ (R14), Herkunft
  * der Bemerkung (Regel 8), die Hinweise (E-A14, F20) und ein Protokoll ohne
- * Freitext.
+ * Freitext. Seit S23 (A4): der Merker `ausgabenAngeboten` beim Speichern des
+ * Schritts (`fuehrungskraftWahlSpeichernIn`) und bei der Abgabe
+ * (`ausgabenAngebotenBeiAbgabeIn`) sowie „Beim Austritt“ an einer freien
+ * Position.
  *
  * Der Fake rollt bei einer Ausnahme NICHT zurueck — Abweisungen werden
  * deshalb daran geprueft, dass VOR dem ersten Schreiben abgewiesen wird. Die
@@ -35,7 +38,12 @@ import {
   neuerStellenHinweis,
   type Zeile,
 } from "../hilfen/abteilungs-fake-db";
-import { ausstattungAktionAusfuehren, ausstattungKarteLaden } from "@/lib/ausstattung-dienst";
+import {
+  ausgabenAngebotenBeiAbgabeIn,
+  ausstattungAktionAusfuehren,
+  ausstattungKarteLaden,
+  fuehrungskraftWahlSpeichernIn,
+} from "@/lib/ausstattung-dienst";
 import { onboardingAusstattungNachholenIn } from "@/lib/abteilungsaufgaben-onboarding";
 import { versandSperreFreigeben, versandSperreNehmen } from "@/lib/abteilungsaufgaben-dienst";
 import { oeffentlicheOnboardingAufgabenLaden } from "@/lib/abteilungsaufgaben-uebergaenge";
@@ -55,6 +63,8 @@ const tx = fakePrisma as unknown as Prisma.TransactionClient;
 
 // Der Katalogausschnitt liest die Einrichtungsart des Arbeitsorts.
 fp.organization = { findUnique: jest.fn(async () => ({ type: "GYMNASIUM" })) };
+// SupervisorData kennt der Fake nicht — fuer den Merker `ausgabenAngeboten` (S23) genuegt ein Spion.
+fp.supervisorData = { update: jest.fn(async () => ({})), updateMany: jest.fn(async () => ({ count: 1 })) };
 
 const JETZT = new Date("2026-09-22T08:00:00.000Z");
 const BEGINN = new Date("2026-10-01T00:00:00.000Z");
@@ -967,6 +977,94 @@ describe("Hinweise", () => {
 // =============================================
 // Protokoll und Karte laden
 // =============================================
+
+// =============================================
+// A4 (S23): Merker ausgabenAngeboten, „Beim Austritt“ an der freien Position
+// =============================================
+
+describe("A4: Merker ausgabenAngeboten (E-A36)", () => {
+  const FORMULAR_VORGANG = {
+    id: "onb-1",
+    organizationId: "org-1",
+    arbeitsortId: null,
+    questionnaireType: "STANDARD",
+    processType: "EINSTELLUNG",
+  };
+
+  it("Speichern des Schritts: true, sobald der Ausschnitt eine Position mit RUECKGABE oder SPERREN führt", async () => {
+    db.ausstattungsPositionen.find((p) => p.id === "pos-laptop")!.beiAustritt = "RUECKGABE";
+    db.ausstattungsPositionen.find((p) => p.id === "pos-laptop")!.rueckgabeKategorie = "IT_HARDWARE";
+    // Gewaehlt ist nur das iPad — es zaehlt, was angeboten war.
+    await fuehrungskraftWahlSpeichernIn(tx, FORMULAR_VORGANG, { ausstattung: [{ positionId: "pos-ipad", gewaehlt: true }] }, JETZT);
+    expect(fp.supervisorData.update).toHaveBeenCalledWith({
+      where: { onboardingId: "onb-1" },
+      data: { ausstattungGespeichertAm: JETZT, ausgabenAngeboten: true },
+    });
+  });
+
+  it("Speichern des Schritts: false ohne solche Position (NICHTS, leer, Angabe zählen nicht)", async () => {
+    db.ausstattungsPositionen.find((p) => p.id === "pos-laptop")!.beiAustritt = "NICHTS";
+    await fuehrungskraftWahlSpeichernIn(tx, FORMULAR_VORGANG, { ausstattung: [] }, JETZT);
+    expect(fp.supervisorData.update).toHaveBeenCalledWith({
+      where: { onboardingId: "onb-1" },
+      data: { ausstattungGespeichertAm: JETZT, ausgabenAngeboten: false },
+    });
+  });
+
+  it("ohne Eingabe zur Ausstattung: nichts geschrieben, auch kein Merker", async () => {
+    await fuehrungskraftWahlSpeichernIn(tx, FORMULAR_VORGANG, {}, JETZT);
+    expect(fp.supervisorData.update).not.toHaveBeenCalled();
+  });
+
+  it("Abgabe: nur mit mitAusstattung und nur solange der Merker null ist — sonst ohne Abfrage", async () => {
+    db.ausstattungsPositionen.find((p) => p.id === "pos-ipad")!.beiAustritt = "SPERREN";
+    // Ohne den Schritt bleibt er null.
+    for (const supervisorData of [null, { mitAusstattung: false, ausgabenAngeboten: null }, { mitAusstattung: null }]) {
+      await ausgabenAngebotenBeiAbgabeIn(tx, { ...FORMULAR_VORGANG, supervisorData });
+    }
+    // Schon gesetzt (der Schritt wurde gespeichert): bleibt.
+    await ausgabenAngebotenBeiAbgabeIn(tx, { ...FORMULAR_VORGANG, supervisorData: { mitAusstattung: true, ausgabenAngeboten: false } });
+    expect(fp.supervisorData.updateMany).not.toHaveBeenCalled();
+    expect(fp.ausstattungsPosition.findMany).not.toHaveBeenCalled();
+
+    await ausgabenAngebotenBeiAbgabeIn(tx, { ...FORMULAR_VORGANG, supervisorData: { mitAusstattung: true, ausgabenAngeboten: null } });
+    expect(fp.supervisorData.updateMany).toHaveBeenCalledWith({
+      where: { onboardingId: "onb-1", ausgabenAngeboten: null },
+      data: { ausgabenAngeboten: true },
+    });
+  });
+});
+
+describe("A4: „Beim Austritt“ an der freien Position (G8)", () => {
+  it("frei mit RUECKGABE und Kategorie: die Momentaufnahme trägt beides, ohne Kennungsbeschriftung", async () => {
+    const r = await aktion({
+      aktion: "hinzufuegen",
+      frei: { departmentKey: "IT", bezeichnung: "Dokumentenkamera", beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE" },
+    });
+    expect(r.status).toBe(200);
+    expect(db.ausstattungZeilen[0]).toMatchObject({
+      positionId: null,
+      beiAustritt: "RUECKGABE",
+      rueckgabeKategorie: "IT_HARDWARE",
+      ausgabeKennung: null,
+    });
+  });
+
+  it("frei mit SPERREN; ohne Angabe bleibt alles leer wie bisher", async () => {
+    await aktion({ aktion: "hinzufuegen", frei: { departmentKey: "IT", bezeichnung: "VPN-Zugang", beiAustritt: "SPERREN" } });
+    await aktion({ aktion: "hinzufuegen", frei: { departmentKey: "IT", bezeichnung: "Headset" } });
+    expect(db.ausstattungZeilen.map((z) => [z.bezeichnung, z.beiAustritt, z.rueckgabeKategorie])).toEqual([
+      ["VPN-Zugang", "SPERREN", null],
+      ["Headset", null, null],
+    ]);
+  });
+
+  it("RUECKGABE ohne Kategorie → 400 aus derselben Regel wie im Katalog, nichts geschrieben", async () => {
+    const r = await aktion({ aktion: "hinzufuegen", frei: { departmentKey: "IT", bezeichnung: "Tablet", beiAustritt: "RUECKGABE" } });
+    expect(r).toEqual({ status: 400, body: { error: MELDUNGEN.RUECKGABEKATEGORIE_FEHLT } });
+    expect(db.ausstattungZeilen).toEqual([]);
+  });
+});
 
 describe("Protokoll und Karte", () => {
   it("das Protokoll nennt IDs, Schlüssel, Titel und Längen — nie Bemerkung, Angabe oder Hinweis", async () => {

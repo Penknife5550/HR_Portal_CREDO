@@ -7,8 +7,10 @@
  *
  *   HinzufuegenDialog       „Position hinzufügen…“: aus dem Katalog dieses
  *                           Vorgangs (`hinzufuegbar`) oder frei (Ja/Nein,
- *                           hoechstens 120 Zeichen); dieselbe Maske fuer
- *                           „Als Position übernehmen…“ eines Hinweises
+ *                           hoechstens 120 Zeichen, seit S23 optional „Beim
+ *                           Austritt“ samt Rückgabekategorie, A4); dieselbe
+ *                           Maske fuer „Als Position übernehmen…“ eines
+ *                           Hinweises
  *   BearbeitenDialog        Auswahl, Angabe, Bemerkung, Stelle und Faelligkeit
  *                           je offener Aufgabe (Option)
  *   StreichenDialog         Rueckfrage „… entfällt für die Stelle“
@@ -38,10 +40,14 @@ import { ablaufKalendertag, istKalendertag } from "@/lib/kalendertag";
 import {
   ART_NAMEN,
   AUSSTATTUNG_KATEGORIE,
+  BEI_AUSTRITT,
+  BEI_AUSTRITT_NAMEN,
   BEMERKUNG_HINWEIS,
   GRENZEN,
   MELDUNGEN,
+  RUECKGABE_KATEGORIE_AUSWAHL,
   aenderungPruefen,
+  ausgabeFelderPruefen,
   aenderungsGrundText,
   aufgabenStandText,
   hinweisAenderungPruefen,
@@ -57,11 +63,17 @@ import {
 // Body der Aktionen (POST /api/onboarding/[id]/ausstattung)
 // =============================================
 
-/** Eine freie Position von HR — immer Ja/Nein, ohne Hinweis fuer die Stelle (E-A13). */
+/**
+ * Eine freie Position von HR — immer Ja/Nein, ohne Hinweis fuer die Stelle
+ * (E-A13). „Beim Austritt“ und die Rueckgabekategorie (A4, G8) nur, wenn
+ * gewaehlt; eine Kennungsbeschriftung gibt es hier nicht.
+ */
 export interface FreiePositionBody {
   departmentKey: string;
   bezeichnung: string;
   relativeDueDays?: number | null;
+  beiAustritt?: string;
+  rueckgabeKategorie?: string;
 }
 
 /** Was eine Hinzufuegen- bzw. Uebernehmen-Aktion an Wahl mitschickt (nur, was zur Art passt). */
@@ -103,6 +115,8 @@ export const DIALOG_TEXTE = {
   FAELLIG_TAGE_HILFE:
     "Tage relativ zum Vertragsbeginn, negativ = vorher (z. B. −7). Leer = ohne Fälligkeit. Liegt der Tag schon zurück, gilt heute.",
   FAELLIGKEIT_HILFE: "Leer = ohne Fälligkeit. Die Stelle erfährt eine neue Fälligkeit mit der nächsten E-Mail.",
+  /** A4 (G27): unter „Beim Austritt“ einer freien Position. */
+  BEI_AUSTRITT_HILFE: `„Zurückgeben“ bzw. „Sperren“ schaltet für diese Position die Erfassung der Übergabe ein. ${MELDUNGEN.AUSGABE_EINSCHALTEN_HINWEIS}`,
 } as const;
 
 // =============================================
@@ -309,6 +323,10 @@ export interface HinzufuegenFormular {
   freiBezeichnung: string;
   /** Tage relativ zum Vertragsbeginn, "" = ohne Faelligkeit. */
   freiTage: string;
+  /** A4: "" = nicht festgelegt, sonst ein Wert aus BEI_AUSTRITT. */
+  freiBeiAustritt: string;
+  /** A4: Rueckgabekategorie, zaehlt nur bei „Zurückgeben“. */
+  freiKategorie: string;
 }
 
 /** Startwerte: aus dem Katalog, solange er etwas anbietet; die Stelle einer freien Position vorbelegt (Hinweis). */
@@ -325,6 +343,8 @@ export function hinzufuegenStart(
     freiStelle: vorgabeStelle,
     freiBezeichnung: "",
     freiTage: "",
+    freiBeiAustritt: "",
+    freiKategorie: "",
   };
 }
 
@@ -360,9 +380,21 @@ export function hinzufuegenGrund(
     if (tage !== null && (!Number.isInteger(tage) || Math.abs(tage) > GRENZEN.faelligTage)) {
       return MELDUNGEN.FAELLIG_UNGUELTIG;
     }
+    // A4: dieselbe Regel wie Zod (`freiePositionSchema`) und Katalog.
+    const austritt = ausgabeFelderPruefen({ art: "JA_NEIN", ...freiAustritt(f) });
+    if (austritt) return austritt;
   }
   if (bemerkung.length > GRENZEN.bemerkung) return MELDUNGEN.BEMERKUNG_ZU_LANG;
   return null;
+}
+
+/** „Beim Austritt“ einer freien Position: nur Gewaehltes, die Kategorie nur bei „Zurückgeben“. */
+function freiAustritt(f: HinzufuegenFormular): { beiAustritt?: string; rueckgabeKategorie?: string } {
+  if (!f.freiBeiAustritt) return {};
+  return {
+    beiAustritt: f.freiBeiAustritt,
+    ...(f.freiBeiAustritt === "RUECKGABE" && f.freiKategorie ? { rueckgabeKategorie: f.freiKategorie } : {}),
+  };
 }
 
 /**
@@ -389,6 +421,7 @@ export function hinzufuegenBody(
       departmentKey: f.freiStelle,
       bezeichnung: f.freiBezeichnung.trim(),
       ...(tage !== null ? { relativeDueDays: tage } : {}),
+      ...freiAustritt(f),
     };
     if (bemerkung) wahl.bemerkung = bemerkung;
   }
@@ -595,6 +628,55 @@ export function HinzufuegenDialog({
               {DIALOG_TEXTE.FAELLIG_TAGE_HILFE}
             </p>
           </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor={`${id}-austritt`} className={LABEL}>
+                Beim Austritt
+              </label>
+              <select
+                id={`${id}-austritt`}
+                value={f.freiBeiAustritt}
+                disabled={sendet}
+                aria-describedby={`${id}-austritt-hilfe`}
+                onChange={(e) => setze({ freiBeiAustritt: e.target.value })}
+                className={EINGABE}
+              >
+                <option value="">Nicht festgelegt</option>
+                {BEI_AUSTRITT.map((w) => (
+                  <option key={w} value={w}>
+                    {BEI_AUSTRITT_NAMEN[w]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {f.freiBeiAustritt === "RUECKGABE" && (
+              <div>
+                <label htmlFor={`${id}-kategorie`} className={LABEL}>
+                  Rückgabekategorie
+                  <Pflicht />
+                </label>
+                <select
+                  id={`${id}-kategorie`}
+                  value={f.freiKategorie}
+                  disabled={sendet}
+                  required
+                  aria-required="true"
+                  onChange={(e) => setze({ freiKategorie: e.target.value })}
+                  className={EINGABE}
+                >
+                  <option value="">Bitte wählen…</option>
+                  {RUECKGABE_KATEGORIE_AUSWAHL.map((k) => (
+                    <option key={k.wert} value={k.wert}>
+                      {k.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          <p id={`${id}-austritt-hilfe`} className={HILFE}>
+            {DIALOG_TEXTE.BEI_AUSTRITT_HILFE}
+          </p>
         </>
       )}
 

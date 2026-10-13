@@ -54,6 +54,8 @@ import {
   nachtragAnzahl,
   nachtragZeilenText,
   NACHTRAG_TITEL_MAX,
+  empfaengerEinrichtung,
+  nachInfoNeuText,
   onboardingEmpfaengerEinrichtung,
   waechterHinweis,
   WAECHTER_TAGE,
@@ -1219,6 +1221,93 @@ describe("abteilungsZeilenBauen mit Nachtrag und Waechter (nur Onboarding)", () 
         hinweisTon: "rot",
       },
     });
+  });
+});
+
+// =============================================
+// Ausstattung & Zugaenge, Stufe 2 (Paket A4, S22): nach der Information
+// hinzugekommene Aufgaben (nur Offboarding) und der Empfaenger am Arbeitsort
+// =============================================
+
+describe("abteilungsZeilenBauen mit nachInfoNeu (A4, G14, nur Offboarding)", () => {
+  /** Informiert vor acht Tagen — keine Sperrzeit. */
+  const linkIt: LinkFuerZeile = {
+    ...linkStand({ sentAt: tage(-8), lastSentAt: tage(-8) }),
+    id: "l-it",
+    departmentKey: "IT",
+    departmentName: "IT-Abteilung",
+    email: "it@example.org",
+    token: "tok-it",
+    zugestelltAn: "it@example.org",
+  };
+
+  function bauen(teil: Partial<Parameters<typeof abteilungsZeilenBauen>[0]> = {}) {
+    return abteilungsZeilenBauen({
+      aufgaben: [
+        { assigneeDepartment: "IT", isCompleted: false, dueDate: new Date("2027-07-31T00:00:00Z") },
+        { assigneeDepartment: "FACILITY", isCompleted: false, dueDate: null },
+      ],
+      links: [linkIt],
+      konfigs: [konfig({}), konfig({ departmentKey: "FACILITY", departmentName: "Facility Management", email: "fm@example.org" })],
+      organizationId: "org-1",
+      fuehrungskraft: null,
+      vorgangAbgeschlossen: false,
+      linkUrl: (t) => `https://hr.example.org/offboarding-tasks/${t}`,
+      jetzt: JETZT,
+      ...teil,
+    });
+  }
+
+  it("ohne das Feld (und mit leerem Feld) dieselbe Ausgabe wie bisher", () => {
+    const bisher = bauen();
+    expect(bauen({ nachInfoNeu: {} })).toEqual(bisher);
+    expect(bauen({ nachInfoNeu: { IT: 0 } })).toEqual(bisher);
+    expect(bisher.zeilen[0].anzeige).toEqual({
+      status: "INFORMIERT",
+      text: "Informiert am 12.07.2027",
+      farbe: "gelb",
+      zusatz: expect.any(String),
+      hinweis: null,
+    });
+  });
+
+  it("gelber Hinweis an der informierten Stelle, Einzahl und Mehrzahl", () => {
+    const [it] = bauen({ nachInfoNeu: { IT: 2 } }).zeilen;
+    expect(it.anzeige.hinweis).toBe("2 Aufgaben nach der Information hinzugekommen – bitte „Erneut senden“");
+    expect(it.anzeige.hinweisTon).toBe("gelb");
+    expect(nachInfoNeuText(1)).toBe("1 Aufgabe nach der Information hinzugekommen – bitte „Erneut senden“");
+    // Die Aktionen bleiben, wie sie sind: „Erneut senden“ schickt denselben Link.
+    expect(it.aktionen).toEqual(bauen().zeilen[0].aktionen);
+  });
+
+  it("ein bestehender Hinweis bleibt vorn und behaelt seine Farbe", () => {
+    const [it] = bauen({
+      konfigs: [konfig({ email: "it-neu@example.org" })],
+      nachInfoNeu: { IT: 1 },
+    }).zeilen;
+    expect(it.anzeige.hinweis).toMatch(
+      /^Adresse geändert \(jetzt it-neu@example\.org\).* · 1 Aufgabe nach der Information hinzugekommen – bitte „Erneut senden“$/,
+    );
+    expect(it.anzeige).not.toHaveProperty("hinweisTon");
+  });
+
+  it("kein Hinweis ohne zugestellten Link, bei nicht informierter Stelle oder abgeschlossenem Vorgang", () => {
+    expect(bauen({ links: [{ ...linkIt, sentAt: null, lastSentAt: null }], nachInfoNeu: { IT: 2 } }).zeilen[0].anzeige.hinweis).toBeNull();
+    const facility = bauen({ nachInfoNeu: { FACILITY: 1 } }).zeilen.find((z) => z.departmentKey === "FACILITY")!;
+    expect(facility.anzeige.hinweis).toBeNull();
+    expect(bauen({ vorgangAbgeschlossen: true, nachInfoNeu: { IT: 2 } }).zeilen[0].anzeige.hinweis).toBeNull();
+  });
+});
+
+describe("empfaengerEinrichtung (G12) – der alte Name bleibt", () => {
+  it("dieselbe Funktion unter beiden Namen", () => {
+    expect(onboardingEmpfaengerEinrichtung).toBe(empfaengerEinrichtung);
+  });
+
+  it("Offboarding: Arbeitsort aus der Zuordnung, sonst wie bisher die Einrichtung", () => {
+    expect(empfaengerEinrichtung({ arbeitsortId: "org-gs", organizationId: "org-foerderverein" })).toBe("org-gs");
+    expect(empfaengerEinrichtung({ arbeitsortId: null, organizationId: "org-gym" })).toBe("org-gym");
+    expect(empfaengerEinrichtung({ organizationId: "org-gym" })).toBe("org-gym");
   });
 });
 

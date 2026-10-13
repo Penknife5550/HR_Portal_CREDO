@@ -5,6 +5,9 @@
  * Validierungsfunktionen und andere wiederverwendbare Werte.
  */
 
+// Nur ein Typ: wird beim Uebersetzen entfernt, die Datei bleibt client-sicher.
+import type { ReturnCategory } from "@prisma/client";
+
 // =============================================
 // Status-Labels (Dashboard + Detail-Seite)
 // =============================================
@@ -217,6 +220,25 @@ export function labelOderRohwert(
 // =============================================
 // Rueckgabe-Kategorie-Labels
 // =============================================
+
+/**
+ * Kategorien des Prisma-Enums `ReturnCategory`; `satisfies` prueft jeden Wert.
+ * Seit A4 (Ausstattung & Zugaenge) hier statt in validations/offboarding.ts —
+ * dort weiter re-exportiert —, damit auch die reinen Regeln (src/lib/ausgaben.ts)
+ * sie ohne Zod lesen. Literaltypen bleiben erhalten (`as const`), anders als
+ * bei `Object.keys(RETURN_CATEGORY_LABELS)`.
+ */
+export const RUECKGABE_KATEGORIEN = [
+  "IT_HARDWARE",
+  "SCHLUESSEL",
+  "FAHRZEUG",
+  "DOKUMENTE",
+  "KLEIDUNG",
+  "SPEICHERMEDIEN",
+  "SONSTIGES",
+] as const satisfies readonly ReturnCategory[];
+export type RueckgabeKategorie = (typeof RUECKGABE_KATEGORIEN)[number];
+
 export const RETURN_CATEGORY_LABELS: Record<string, string> = {
   IT_HARDWARE: "IT-Hardware",
   SCHLUESSEL: "Schlüssel & Zugangskarten",
