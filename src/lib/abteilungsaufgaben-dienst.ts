@@ -17,6 +17,16 @@
  *                                                 fuehrungskraftAdresseFreigegeben
  *   POST /api/offboarding                       → fuehrungskraftAdresseFreigegeben
  *   POST /api/cron/offboarding-reminders        → erinnerungenSenden
+ *   POST /api/offboarding/[id]/einstellung      → versandSperreNehmen(offboardingVersandBereich)
+ *                                                 (A4, G26; src/lib/offboarding-ausgaben.ts)
+ *
+ * Empfaenger im Offboarding (seit A4, G12): der Arbeitsort am Austritt, sonst
+ * die Einrichtung (`empfaengerEinrichtung`) — in Versand, Erinnerung,
+ * Uebersicht und Karte; Mandant und Mailfeld `einrichtung` bleiben
+ * `organizationId`. Seit S29 (G14) nennt die Uebersicht je Stelle die
+ * Aufgaben, die nach der Information dazukamen (`nachInfoNeuZaehlen`:
+ * Ruecknahme- und Sperraufgaben aus „Einstellung zuordnen …“) — einen
+ * Nachtrag gibt es im Offboarding nicht, „Erneut senden“ nimmt sie mit.
  *
  * MODULKERN (Paket 5). Was je Modul verschieden ist, steckt in einem
  * `VersandModul` (Vorgang, Fuehrungskraft, gemeinsame Mailfelder, Zusatzfelder
@@ -79,6 +89,7 @@ import {
   berichtMeldung,
   eiltDeckeln,
   empfaengerAufloesen,
+  empfaengerEinrichtung,
   erinnerungsMerkerSetzen,
   erinnerungsStufe,
   erledigteListeMailFelder,
@@ -91,6 +102,7 @@ import {
   istLinkAbteilung,
   linkAnzeige,
   meldungNachweisFehlt,
+  nachInfoNeuZaehlen,
   nachtragAnzahl,
   sperrzeitBis,
   stufeBerechnen,
@@ -201,11 +213,17 @@ export function modulLinkUrl(modul: AbteilungsModul, token: string): string {
   return MODUL_KONFIG[modul].linkUrl(token);
 }
 
-/** Felder des Vorgangs, die Versand und Mails brauchen. */
+/**
+ * Felder des Vorgangs, die Versand und Mails brauchen. `arbeitsortId` (A4,
+ * G12): Empfaenger der Aufgaben ist der Arbeitsort am Austritt, sonst die
+ * Einrichtung (`empfaengerEinrichtung`); das Mailfeld `einrichtung` und der
+ * Mandant bleiben `organizationId`.
+ */
 const VORGANG_AUSWAHL = {
   id: true,
   displayId: true,
   organizationId: true,
+  arbeitsortId: true,
   status: true,
   employeeFirstName: true,
   employeeLastName: true,
@@ -444,11 +462,13 @@ async function protokollieren(
 export interface VersandModul extends LinkBereich {
   displayId: string;
   /**
-   * Einrichtung, an der die Empfaenger aufgeloest werden (empfaengerFuer).
-   * Offboarding: die Einrichtung des Vorgangs. Onboarding: der Arbeitsort,
-   * sonst die Einrichtung (E-A10, onboardingEmpfaengerEinrichtung). NIE fuer
-   * eine Zugriffspruefung — der Mandant ist immer die Einrichtung des
-   * Vorgangs (canAccessProcess mit dessen organizationId).
+   * Einrichtung, an der die Empfaenger aufgeloest werden (empfaengerFuer):
+   * in BEIDEN Modulen der Arbeitsort, sonst die Einrichtung des Vorgangs
+   * (`empfaengerEinrichtung`; Onboarding E-A10, Offboarding seit A4 G12 —
+   * dort setzt ihn nur die Zuordnung einer Einstellung derselben Einrichtung,
+   * solange keine Stelle informiert ist). NIE fuer eine Zugriffspruefung —
+   * der Mandant ist immer die Einrichtung des Vorgangs (canAccessProcess mit
+   * dessen organizationId).
    */
   organizationId: string;
   fuehrungskraft: FuehrungskraftDaten;
@@ -489,12 +509,24 @@ export interface VersandModul extends LinkBereich {
 /** Ein Stueck der Absage-Liste (`ausgabenListeMailFelder`). */
 export type AbsageStueck = MailStueck & { bezeichnung: string };
 
+/**
+ * Der Bereich eines Austritts fuer Link-Tabelle und Versandsperre
+ * (`versandSperreNehmen`). Die schreibenden Aktionen am Austritt aus
+ * src/lib/offboarding-ausgaben.ts (Einstellung zuordnen, loesen …) nehmen
+ * damit DIESELBE Sperre wie „Abteilungen informieren“ und der taegliche Lauf
+ * (A4, G26) — sonst pruefte die Zuordnung „keine Stelle informiert“, waehrend
+ * gerade an die Stellen der alten Einrichtung geschrieben wird.
+ */
+export function offboardingVersandBereich(offboardingId: string): LinkBereich {
+  return { modul: "OFFBOARDING", vorgangId: offboardingId };
+}
+
 function offboardingVersandModul(vorgang: VorgangFuerVersand): VersandModul {
   return {
-    modul: "OFFBOARDING",
-    vorgangId: vorgang.id,
+    ...offboardingVersandBereich(vorgang.id),
     displayId: vorgang.displayId,
-    organizationId: vorgang.organizationId,
+    // A4 (G12): Arbeitsort am Austritt, sonst die Einrichtung.
+    organizationId: empfaengerEinrichtung(vorgang),
     fuehrungskraft: fuehrungskraftErmitteln(vorgang),
     mailFelder: offboardingMailFelder(vorgang),
     zusatzFelder: () => ({}),
@@ -1453,6 +1485,8 @@ export async function abteilungsAktionAusfuehren(opts: {
 export interface UebersichtVorgang extends FuehrungskraftQuellen {
   id: string;
   organizationId: string;
+  /** Arbeitsort am Austritt (A4, G12): Empfaenger der Karte; fehlt bzw. null = Einrichtung. */
+  arbeitsortId?: string | null;
   status: string;
   lastWorkingDay: Date;
   checklistItems: ReadonlyArray<{
@@ -1463,6 +1497,11 @@ export interface UebersichtVorgang extends FuehrungskraftQuellen {
     isCompleted: boolean;
     dueDate: Date | null;
     completedById: string | null;
+    /**
+     * A4 (G14): Anlage der Aufgabe – fuer „n Aufgaben nach der Information
+     * hinzugekommen“ (`nachInfoNeuZaehlen`); fehlt = zaehlt nie als neu.
+     */
+    createdAt?: Date | null;
   }>;
   departmentLinks: ReadonlyArray<OffboardingDepartmentLink>;
 }
@@ -1518,11 +1557,16 @@ export async function abteilungsUebersichtLaden<
     aufgaben: vorgang.checklistItems,
     links: vorgang.departmentLinks,
     konfigs,
-    organizationId: vorgang.organizationId,
+    // A4 (G12): dieselbe Einrichtung wie beim Versand (Arbeitsort, sonst Einrichtung).
+    organizationId: empfaengerEinrichtung(vorgang),
     fuehrungskraft,
     vorgangAbgeschlossen: abgeschlossen,
     linkUrl: abteilungsAufgabenLink,
     jetzt,
+    // A4 (G14): Ruecknahme- und Sperraufgaben aus „Einstellung zuordnen …“
+    // kommen nach der Information dazu – kein Nachtrag im Offboarding, die
+    // Zeile sagt „… bitte „Erneut senden““ (gleicher Token).
+    nachInfoNeu: nachInfoNeuZaehlen(vorgang.checklistItems, vorgang.departmentLinks),
   });
 
   const abteilungsNamen = Object.fromEntries(zeilen.map((z) => [z.departmentKey, z.departmentName]));

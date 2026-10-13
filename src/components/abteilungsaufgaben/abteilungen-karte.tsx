@@ -48,6 +48,7 @@ import {
 } from "@/lib/abteilungsaufgaben";
 import { AbteilungenDialog } from "@/components/abteilungsaufgaben/abteilungen-dialog";
 import { NachtragHinweis, WaechterHinweis } from "@/components/ausstattung/nachtrag-hinweis";
+import { ZuordnungEmpfohlenHinweis } from "@/components/ausgaben/einstellung-zuordnen-dialog";
 import { AbsageBlock } from "@/components/ausstattung/absage-block";
 import { formatDatumDE } from "@/lib/format";
 
@@ -106,6 +107,14 @@ export interface AbteilungenKarteProps {
   setDialogOffen?: (offen: boolean) => void;
   /** Nur fuer Tests: Bezugszeit fuer die Sperre „Bitte kurz warten". */
   jetzt?: Date;
+  /**
+   * Offboarding, Ausstattung & Zugaenge Stufe 2 (A4, S32, G12): Hinweis
+   * „Einstellung zuordnen, bevor Sie die Abteilungen informieren“ samt Knopf –
+   * nur mit `empfohlen` (`rueckgaben.zuordnungEmpfohlen` der Detailroute, die
+   * nur HR_EDIT_ROLES bekommen) und nur, wenn die Karte handeln darf. Ohne die
+   * Eigenschaft bleibt die Karte unveraendert.
+   */
+  zuordnung?: { empfohlen: boolean; onZuordnen?: () => void } | null;
 }
 
 /**
@@ -311,6 +320,7 @@ export function AbteilungenKarte({
   dialogOffen,
   setDialogOffen,
   jetzt,
+  zuordnung = null,
 }: AbteilungenKarteProps) {
   const [laeuft, setLaeuft] = useState<string | null>(null);
   // Ref zusaetzlich zum Zustand: Zwei Klicks vor dem naechsten Rendern
@@ -391,6 +401,13 @@ export function AbteilungenKarte({
           </button>
         )}
       </div>
+
+      {/* Offboarding, Stufe 2 (G12): erst die Einstellung zuordnen, dann informieren. */}
+      {zuordnung?.empfohlen && !nurLesen && (
+        <div className="mb-3">
+          <ZuordnungEmpfohlenHinweis onZuordnen={zuordnung.onZuordnen} gesperrt={laeuft !== null} />
+        </div>
+      )}
 
       {/* Voraussetzung fehlt (Onboarding): Grund im Klartext, nicht nur ein
           grauer Knopf. Die Zeilen darunter bleiben als Vorschau stehen. */}

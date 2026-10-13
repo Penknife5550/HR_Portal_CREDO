@@ -30,6 +30,10 @@
  *   - der Magic Link zeigt auf /offboarding-tasks/<token>,
  *   - der Beispiel-Payload im Katalog (Testversand) ist genau das, was der
  *     Dienst baut.
+ *
+ * Seit A4 (S29) dazu der Waechter G21: Mit Ruecknahme- und Sperraufgaben aus
+ * „Einstellung zuordnen …“ traegt keine Offboarding-Payload die Kennung eines
+ * Stuecks (zuordnen, informieren, erinnern, abhaken, Abteilung fertig).
  */
 
 const mockGetSession = jest.fn();
@@ -47,7 +51,16 @@ jest.mock("@/lib/encryption", () => ({
 }));
 
 import { NextRequest } from "next/server";
-import { db, dbLeeren, fakePrisma, naechsteId, neuerLink, type Zeile } from "../hilfen/abteilungs-fake-db";
+import {
+  db,
+  dbLeeren,
+  fakePrisma,
+  naechsteId,
+  neueAusgabe,
+  neueOffboardingAufgabe,
+  neuerLink,
+  type Zeile,
+} from "../hilfen/abteilungs-fake-db";
 import { renderEventEmail } from "@/lib/mailer";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import {
@@ -65,6 +78,7 @@ import {
 } from "@/lib/abteilungsaufgaben";
 import { abteilungsAktionAusfuehren, erinnerungenSenden } from "@/lib/abteilungsaufgaben-dienst";
 import { aufgabeImPortalAendern, oeffentlicheAufgabeAendern } from "@/lib/abteilungsaufgaben-uebergaenge";
+import { einstellungAktionAusfuehren } from "@/lib/offboarding-ausgaben";
 import type { SessionPayload } from "@/lib/permissions";
 import { PATCH as patchVorgang } from "@/app/api/offboarding/[id]/route";
 
@@ -476,6 +490,21 @@ describe("offboarding-department-assigned (abteilungsAktionAusfuehren)", () => {
     expect(mail.text).toContain("Letzter Arbeitstag: 31.08.2026");
     expect(mail.text).toContain("Vorgangsnummer: OFF-2026-GYM-001");
     expect(mail.text).toContain(`Aufgaben öffnen und abhaken: ${BASIS}/offboarding-tasks/${token}`);
+  });
+
+  it("Arbeitsort am Austritt (A4, G12): nur die Adresse wechselt auf die Stelle am Arbeitsort – sonst derselbe Beispiel-Payload", async () => {
+    db.vorgaenge = [vorgang({ arbeitsortId: "org-gs" })];
+    db.konfigs = [konfig(), konfig({ email: "it-gs@example.org", organizationId: "org-gs" })];
+    const r = await aktion(undefined, T_INFORMIERT);
+    expect(r.status).toBe(201);
+
+    const payload = payloadVon("offboarding-department-assigned");
+    expect(payload.email).toBe("it-gs@example.org");
+    // Mandant und Mailfeld `einrichtung` bleiben die Einrichtung des Austritts.
+    expect(payload.einrichtung).toBe(beispiel("offboarding-department-assigned").einrichtung);
+    expect(ohneLinkFelder({ ...payload, email: "it@example.org" })).toEqual(
+      ohneLinkFelder(beispiel("offboarding-department-assigned")),
+    );
   });
 
   it("Erneut senden: Satz „erneut gesendet, Link unverändert“ — bei der Erstmail fehlt er", async () => {
@@ -1027,6 +1056,133 @@ describe("Beispiel-Payloads (Testversand) der reparierten Vorlagen", () => {
       });
       expect({ level, badge: mail.html.includes(badge) }).toEqual({ level, badge: true });
       expect(mail.subject.startsWith("Dringend – ")).toBe(level === "ESCALATION");
+    }
+  });
+});
+
+// =============================================
+// Waechter (A4, G21): die Kennung eines Stuecks geht in keine Offboarding-Payload
+// =============================================
+
+/**
+ * Seit A4 (S29) legt „Einstellung zuordnen …“ Ruecknahme- und Sperraufgaben
+ * an (src/lib/offboarding-ausgaben.ts). Die Offboarding-Abteilungsereignisse
+ * bleiben webhookfaehig und ihre Payload Byte fuer Byte gleich – die Kennung
+ * (Inventar-, Schluessel-, Chipnummer) darf deshalb weder ueber den Titel noch
+ * ueber die Beschreibung einer Aufgabe hineingeraten. Getrieben wird der ECHTE
+ * Ablauf: zuordnen, informieren, erinnern (Knopf und Lauf), abhaken (Link und
+ * Portal), Abteilung fertig.
+ */
+describe("Wächter (A4, G21): Kennung nie in einer Offboarding-Payload", () => {
+  const KENNUNG = "KENNUNG-0412";
+  const EINSTELLUNG_ID = "onb-waechter";
+
+  const ausgabe = (teil: Zeile) =>
+    neueAusgabe({
+      onboardingId: EINSTELLUNG_ID,
+      organizationId: ORG.id,
+      zentral: false,
+      quelle: "LINK",
+      beiAustritt: "RUECKGABE",
+      uebergebenAm: new Date("2026-02-02T00:00:00.000Z"),
+      zustandAm: new Date("2026-02-02T10:00:00.000Z"),
+      ...teil,
+    });
+
+  beforeEach(() => {
+    db.vorgaenge = [vorgang({ onboardingId: null, arbeitsortId: null, weitereBeschaeftigung: null })];
+    db.konfigs = [
+      konfig(),
+      konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister", email: "fm@example.org" }),
+    ];
+    db.onboardingVorgaenge = [
+      {
+        id: EINSTELLUNG_ID,
+        displayId: "2026-GYM-003",
+        organizationId: ORG.id,
+        arbeitsortId: null,
+        processType: "EINSTELLUNG",
+        status: "COMPLETED",
+        email: "max.mustermann@example.org",
+        firstName: "Max",
+        lastName: "Mustermann",
+        personalData: null,
+        supervisorData: { vertragsbeginn: new Date("2026-02-01T00:00:00.000Z"), ausgabenAngeboten: true },
+      },
+    ];
+    db.ausgaben = [
+      ausgabe({ id: "ag-ipad", departmentKey: "IT", bezeichnung: "Dienst-iPad (Lernmittel)", kennung: KENNUNG, rueckgabeKategorie: "IT_HARDWARE" }),
+      ausgabe({ id: "ag-zugang", departmentKey: "IT", bezeichnung: "Zugänge (Portal, E-Mail)", beiAustritt: "SPERREN", kennung: `${KENNUNG}-Z` }),
+      ausgabe({ id: "ag-schl", departmentKey: "FACILITY", bezeichnung: "Schlüssel: Haupteingang", kennung: `${KENNUNG}-S`, rueckgabeKategorie: "SCHLUESSEL" }),
+    ];
+    // Die Anlage-Route braucht diese Datei nicht – hier legt der echte Dienst Aufgaben an.
+    fp.offboardingChecklistItem.createMany.mockImplementation(async ({ data }: { data: Zeile[] }) => {
+      for (const d of data) db.aufgaben.push(neueOffboardingAufgabe(d));
+      return { count: data.length };
+    });
+    fp.organization = { findMany: jest.fn(async () => [{ id: ORG.id, name: ORG.name }]) };
+  });
+
+  afterEach(() => {
+    fp.offboardingChecklistItem.createMany.mockImplementation(async () => ({ count: 0 }));
+  });
+
+  const aufgabeZu = (ausgabeId: string) => db.aufgaben.find((a) => a.ausgabeId === ausgabeId) as Zeile;
+
+  it("zuordnen, informieren, erinnern (Knopf und Lauf), abhaken (Link und Portal): keine Payload trägt die Kennung", async () => {
+    const z = await einstellungAktionAusfuehren({
+      offboardingId: VORGANG_ID,
+      rohBody: { aktion: "zuordnen", onboardingId: EINSTELLUNG_ID },
+      session: SESSION,
+      jetzt: new Date(T_INFORMIERT.getTime() - 24 * 60 * MINUTE),
+    });
+    expect(z.status).toBe(200);
+    expect(db.aufgaben.map((a) => a.title)).toEqual([
+      "Dienst-iPad (Lernmittel) zurücknehmen",
+      "Zugänge (Portal, E-Mail) sperren",
+      "Schlüssel: Haupteingang zurücknehmen",
+    ]);
+    // Die Kennung steht in der Rueckgabe-Zeile (Reiter, Link-Seite der Stelle) – nur dort.
+    expect(db.rueckgaben.map((r) => r.serialNumber)).toEqual([KENNUNG, `${KENNUNG}-S`]);
+
+    expect((await aktion(undefined, T_INFORMIERT)).status).toBe(201);
+    expect(
+      (await aktion({ aktion: "erinnern", departmentKey: "IT" }, new Date(T_INFORMIERT.getTime() + 11 * MINUTE))).status,
+    ).toBe(201);
+    await erinnerungenSenden(T_ERINNERT);
+
+    const token = linkVon("IT").token as string;
+    expect((await oeffentlicheAufgabeAendern(token, aufgabeZu("ag-ipad").id as string, { isCompleted: true, comment: "zurück" }, T_ERLEDIGT)).status).toBe(200);
+    expect(
+      (
+        await aufgabeImPortalAendern({
+          offboardingId: VORGANG_ID,
+          itemId: aufgabeZu("ag-schl").id as string,
+          rohBody: { isCompleted: true },
+          session: SESSION,
+          jetzt: T_ERLEDIGT,
+        })
+      ).status,
+    ).toBe(200);
+    // Letzte IT-Aufgabe ueber den Link: die Abteilung ist fertig.
+    expect((await oeffentlicheAufgabeAendern(token, aufgabeZu("ag-zugang").id as string, { isCompleted: true }, T_FERTIG)).status).toBe(200);
+
+    // Alle vier Abteilungsereignisse sind gelaufen – und die Aufgaben stehen darin.
+    const ereignisse = mockTriggerWebhooks.mock.calls.map((c) => c[0]);
+    expect(ereignisse).toEqual(
+      expect.arrayContaining([
+        "offboarding-department-assigned",
+        "offboarding-reminder",
+        "offboarding-task-completed",
+        "offboarding-department-completed",
+      ]),
+    );
+    expect(payloadsVon("offboarding-reminder").length).toBeGreaterThanOrEqual(2);
+    expect(String(payloadsVon("offboarding-department-assigned")[0].aufgabenliste)).toContain(
+      "Dienst-iPad (Lernmittel) zurücknehmen",
+    );
+    for (const [event, payload] of mockTriggerWebhooks.mock.calls) {
+      expect({ event, kennung: JSON.stringify(payload).includes(KENNUNG) }).toEqual({ event, kennung: false });
     }
   });
 });

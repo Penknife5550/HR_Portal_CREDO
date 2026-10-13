@@ -322,8 +322,10 @@ export async function faelligkeitenSetzen(
  * `auch: ["COMPLETED", "EXPIRED"]`): HR traegt Uebergaben nach und tauscht
  * auch nach Abschluss und Absage (G7) – die Sperre ordnet sie trotzdem hinter
  * jeden anderen Anleger einer Ausgabe derselben Einstellung (G24). `false`
- * heisst dann nur noch „unbekannt“. Spaeter (S28) sperrt die Zuordnung eines
- * Austritts die Einstellung mit `auch: ["COMPLETED"]`.
+ * heisst dann nur noch „unbekannt“. Seit S28 sperrt die Zuordnung eines
+ * Austritts die Einstellung mit `auch: ["COMPLETED"]` – NACH dem Austritt
+ * (G24, src/lib/offboarding-ausgaben.ts); `false` heisst dort „abgesagt“
+ * (EXPIRED) und ergibt 409 EINSTELLUNG_ABGESAGT.
  */
 export async function vorgangSperrenIn(
   tx: Prisma.TransactionClient,

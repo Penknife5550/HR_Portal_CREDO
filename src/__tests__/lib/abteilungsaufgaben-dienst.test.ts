@@ -1213,6 +1213,153 @@ describe("abteilungsUebersichtLaden", () => {
   });
 });
 
+// =============================================
+// Arbeitsort am Austritt (A4, G12)
+// =============================================
+
+/**
+ * Seit A4 (S28) uebernimmt die Zuordnung einer Einstellung derselben
+ * Einrichtung deren Arbeitsort an den Austritt (`arbeitsortId`). Empfaenger
+ * ALLER Offboarding-Abteilungsaufgaben ist dann der Eintrag am Arbeitsort
+ * (`empfaengerEinrichtung` = `arbeitsortId ?? organizationId`) – in Versand,
+ * Erinnerung, Uebersicht und Karte. Mandant und Mailfeld `einrichtung` bleiben
+ * die Einrichtung. Ohne `arbeitsortId` ist alles wie bisher.
+ */
+describe("Empfänger am Arbeitsort des Austritts (A4, G12)", () => {
+  beforeEach(() => {
+    // Foerderverein (Mandant org-1) und Grundschule (Arbeitsort org-gs) haben je
+    // eine eigene Gebaeudewirtschaft; die IT ist zentral.
+    db.konfigs = [
+      konfig(),
+      konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister Förderverein", email: "fm-fv@example.org", organizationId: "org-1" }),
+      konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", email: "fm-gs@example.org", organizationId: "org-gs" }),
+    ];
+    db.aufgaben = [
+      aufgabe({ title: "Schlüssel einsammeln", assigneeDepartment: "FACILITY" }),
+      aufgabe({ title: "IT-Zugänge sperren", assigneeDepartment: "IT" }),
+    ];
+  });
+
+  it("informieren: mit arbeitsortId an die Stelle am Arbeitsort, das Mailfeld `einrichtung` bleibt die Einrichtung", async () => {
+    db.vorgaenge = [vorgang({ arbeitsortId: "org-gs" })];
+    const r = await aktion(undefined);
+    expect(r.status).toBe(201);
+    expect(linkVon("FACILITY")).toMatchObject({ email: "fm-gs@example.org", departmentName: "Hausmeister Grundschule" });
+    // zentrale Stelle ohne Eintrag am Arbeitsort: weiter der zentrale
+    expect(linkVon("IT")).toMatchObject({ email: "it@example.org" });
+    const [payload] = mails("offboarding-department-assigned").filter((p) => p.departmentKey === "FACILITY");
+    expect(payload).toMatchObject({ email: "fm-gs@example.org", einrichtung: "FES Minden" });
+  });
+
+  it("ohne arbeitsortId unveraendert die Stelle der Einrichtung", async () => {
+    const r = await aktion(undefined);
+    expect(r.status).toBe(201);
+    expect(linkVon("FACILITY")).toMatchObject({ email: "fm-fv@example.org", departmentName: "Hausmeister Förderverein" });
+  });
+
+  it("Erinnerung (Lauf) loest die Adresse am Arbeitsort auf – ein Link an die Einrichtung gilt dann als geaendert", async () => {
+    db.vorgaenge = [vorgang({ arbeitsortId: "org-gs" })];
+    db.aufgaben = [aufgabe({ title: "Schlüssel einsammeln", assigneeDepartment: "FACILITY", dueDate: tage(-4) })];
+    db.links = [link({ departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", email: "fm-gs@example.org", token: "tok-fm" })];
+    const e = await erinnerungenSenden(JETZT);
+    expect(e.details).toEqual([expect.objectContaining({ departmentKey: "FACILITY", email: "fm-gs@example.org", status: "SENT" })]);
+
+    // Derselbe Link, aber der Austritt hat keinen Arbeitsort (mehr): Die Adresse
+    // der Einrichtung weicht ab – keine Mail, kein neuer Token.
+    jest.clearAllMocks();
+    db.vorgaenge = [vorgang({ arbeitsortId: null })];
+    db.links = [link({ departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", email: "fm-gs@example.org", token: "tok-fm" })];
+    const zweite = await erinnerungenSenden(JETZT);
+    expect(mockTrigger).not.toHaveBeenCalled();
+    expect(zweite.uebersprungen).toEqual([expect.objectContaining({ departmentKey: "FACILITY", grund: "ADRESSE_GEAENDERT" })]);
+    expect(linkVon("FACILITY").token).toBe("tok-fm");
+  });
+
+  it("Uebersicht und Karte zeigen die Stelle am Arbeitsort; ohne arbeitsortId die der Einrichtung", async () => {
+    const basis = {
+      id: "off-1",
+      organizationId: "org-1",
+      status: "HANDOVER_PHASE",
+      lastWorkingDay: new Date("2027-07-31T00:00:00Z"),
+      supervisorEmail: null,
+      supervisorName: null,
+      zeugnisBewertung: null,
+      contractEnd: null,
+      checklistItems: [{ id: "a", assigneeDepartment: "FACILITY", isCompleted: false, dueDate: null, completedById: null }],
+      departmentLinks: [],
+    };
+    const mitOrt = await abteilungsUebersichtLaden({ ...basis, arbeitsortId: "org-gs" }, JETZT);
+    expect(mitOrt.abteilungen.zeilen).toEqual([
+      expect.objectContaining({ departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", email: "fm-gs@example.org" }),
+    ]);
+    const ohne = await abteilungsUebersichtLaden(basis, JETZT);
+    expect(ohne.abteilungen.zeilen).toEqual([
+      expect.objectContaining({ departmentKey: "FACILITY", departmentName: "Hausmeister Förderverein", email: "fm-fv@example.org" }),
+    ]);
+  });
+});
+
+// =============================================
+// Nach der Information hinzugekommen (A4, S29, G14)
+// =============================================
+
+/**
+ * „Einstellung zuordnen …“ legt Ruecknahme- und Sperraufgaben auch fuer schon
+ * informierte Stellen an. Einen Nachtrag gibt es im Offboarding nicht: Die
+ * Uebersicht zaehlt je Stelle die offenen Aufgaben mit `createdAt` nach
+ * `lastSentAt ?? sentAt` (`nachInfoNeuZaehlen`), und die Zeile sagt „… bitte
+ * „Erneut senden““.
+ */
+describe("abteilungsUebersichtLaden: nach der Information hinzugekommen (A4, S29)", () => {
+  const informiert = tage(-10);
+  const basis = (checklistItems: Zeile[], departmentLinks: Zeile[]) => ({
+    id: "off-1",
+    organizationId: "org-1",
+    status: "HANDOVER_PHASE",
+    lastWorkingDay: new Date("2027-07-31T00:00:00Z"),
+    supervisorEmail: null,
+    supervisorName: null,
+    zeugnisBewertung: null,
+    contractEnd: null,
+    checklistItems: checklistItems as never[],
+    departmentLinks: departmentLinks as never[],
+  });
+
+  it("zwei offene Rücknahmeaufgaben nach der Information: gelber Hinweis an der Zeile der Stelle", async () => {
+    const u = await abteilungsUebersichtLaden(
+      basis(
+        [
+          { ...aufgabe({ title: "Konto sperren" }), createdAt: tage(-20) },
+          { ...aufgabe({ title: "Dienst-iPad (Lernmittel) zurücknehmen", herkunft: "AUSGABE" }), createdAt: tage(-2) },
+          { ...aufgabe({ title: "Zugänge sperren", herkunft: "AUSGABE" }), createdAt: tage(-1) },
+        ],
+        [link({ sentAt: informiert, lastSentAt: informiert })],
+      ),
+      JETZT,
+    );
+    expect(u.abteilungen.zeilen[0].anzeige).toMatchObject({
+      hinweis: "2 Aufgaben nach der Information hinzugekommen – bitte „Erneut senden“",
+      hinweisTon: "gelb",
+    });
+  });
+
+  it("ohne Anlagezeit bzw. nach „Erneut senden“: dieselbe Zeile wie bisher", async () => {
+    const ohneZeit = await abteilungsUebersichtLaden(
+      basis([aufgabe({ title: "Konto sperren" })], [link({ sentAt: informiert, lastSentAt: informiert })]),
+      JETZT,
+    );
+    expect(ohneZeit.abteilungen.zeilen[0].anzeige.hinweis).toBeNull();
+    const erneut = await abteilungsUebersichtLaden(
+      basis(
+        [{ ...aufgabe({ title: "Zugänge sperren", herkunft: "AUSGABE" }), createdAt: tage(-2) }],
+        [link({ sentAt: informiert, lastSentAt: tage(-1) })],
+      ),
+      JETZT,
+    );
+    expect(erneut.abteilungen.zeilen[0].anzeige.hinweis).toBeNull();
+  });
+});
+
 describe("Führungskraft", () => {
   it("Vorgang vor Zeugnis-Bewertung vor Vertragsende", () => {
     expect(

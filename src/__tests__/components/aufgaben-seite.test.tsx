@@ -28,13 +28,25 @@
  *     Stufe 2 (A4, S25): der Block „Übergabe vermerken“ nur mit `ausgabe`,
  *     nicht bei „nur lesen“ und nicht an einer entfallenen Aufgabe; POST bzw.
  *     DELETE unter …/ausgaben, getrennt vom Abhaken; Fehlertext des Servers.
+ *  7. Offboarding, Stufe 2 (A4, S32): Rücknahme mit drei Knöpfen statt des
+ *     Hakens („Zurückerhalten“, „Beschädigt zurückerhalten“, „Fehlt“ →
+ *     `{ isCompleted: true, zustand }`), Sperraufgabe mit Haken, Kennung
+ *     sichtbar; die Folgeaufgabe zeigt die Kennung nur lesend mit normalem
+ *     Haken; kommt eine Aufgabe für diese Stelle hinzu, lädt die Seite neu.
  */
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import OffboardingTasksPage from "@/app/offboarding-tasks/[token]/page";
 import OnboardingTasksPage from "@/app/onboarding-tasks/[token]/page";
 import type { AufgabenSeitenDaten, OeffentlicheAufgabe } from "@/components/abteilungsaufgaben/aufgaben-seite";
 import { MELDUNGEN as MELDUNGEN_ABT } from "@/lib/abteilungsaufgaben";
-import { MELDUNGEN_AUSGABEN, type LinkAusgabe } from "@/lib/ausgaben";
+import {
+  MELDUNGEN_AUSGABEN,
+  RUECKNAHME_AUSWAHL,
+  type LinkAusgabe,
+  type OffboardingFolgeAusgabe,
+  type OffboardingLinkAusgabe,
+} from "@/lib/ausgaben";
+import { RUECKNAHME_TEXTE } from "@/components/ausgaben/ruecknahme-auswahl";
 
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -1162,5 +1174,205 @@ describe("Onboarding-Seite", () => {
       expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Link nicht gültig");
       expect(seitentext()).toContain(MELDUNGEN_ABT.VORGANG_NICHT_MEHR_AKTIV);
     });
+  });
+});
+
+// =============================================
+// 7. Offboarding, Stufe 2: Rücknahme, Sperre, „Schließung prüfen“ (A4, S32)
+// =============================================
+
+describe("Rücknahme auf der Link-Seite (Offboarding, Ausstattung & Zugänge Stufe 2)", () => {
+  const RUECKNAHME: OffboardingLinkAusgabe = {
+    art: "RUECKGABE",
+    kennungLabel: "Inventarnummer",
+    kennung: "FES-IPAD-0412",
+    uebergebenAm: "2027-01-28",
+    zustand: null,
+    zustandLabel: "offen",
+    auswahl: RUECKNAHME_AUSWAHL,
+  };
+  const SPERRE: OffboardingLinkAusgabe = {
+    art: "SPERREN",
+    kennungLabel: "Kennung",
+    kennung: null,
+    uebergebenAm: "2027-01-28",
+    zustand: null,
+    zustandLabel: "offen",
+    auswahl: [],
+  };
+  const FOLGE: OffboardingFolgeAusgabe = { art: "RUECKGABE", kennungLabel: "Schlüsselnummer", kennung: "GS-114", zustandLabel: "fehlt" };
+
+  const R1 = aufgabe({ id: "r1", title: "Dienst-iPad (Lernmittel) zurücknehmen", category: "Ausstattung & Zugänge", ausgabe: RUECKNAHME });
+  const S1 = aufgabe({ id: "s1", title: "Zugänge (Portal, E-Mail) sperren", category: "Ausstattung & Zugänge", ausgabe: SPERRE });
+  const F1 = aufgabe({ id: "f1", title: "Schließung prüfen: Schlüssel: Haupteingang", category: "Ausstattung & Zugänge", ausgabe: FOLGE });
+
+  const ZUSTAND_WORT: Record<string, string> = { ZURUECK: "zurück", BESCHAEDIGT: "beschädigt zurück", FEHLT: "fehlt" };
+
+  function mitAufgaben(aufgaben: OeffentlicheAufgabe[], teil: Partial<AufgabenSeitenDaten> = {}) {
+    getAntwort = { status: 200, body: { data: seitenDaten({ aufgaben, ...teil }) } };
+  }
+
+  /** PATCH-Antwort wie der Server: die Aufgabe mit dem gewaehlten Zustand, dazu der Fortschritt. */
+  function zustandAntwort(extraGesamt = 0) {
+    patchAntwort = (a) => {
+      const basis = aufgabeAusAnfrage(a);
+      const zustand = typeof a.body?.zustand === "string" ? a.body.zustand : null;
+      const ausgabe =
+        basis.ausgabe && "auswahl" in basis.ausgabe && zustand
+          ? {
+              ...basis.ausgabe,
+              zustand: zustand as OffboardingLinkAusgabe["zustand"],
+              zustandLabel: ZUSTAND_WORT[zustand] ?? zustand,
+            }
+          : basis.ausgabe;
+      const alle = (getAntwort.body as { data: AufgabenSeitenDaten }).data.aufgaben;
+      return {
+        status: 200,
+        body: {
+          data: {
+            aufgabe: { ...basis, ausgabe },
+            fortschritt: { gesamt: alle.length + extraGesamt, erledigt: 1, prozent: 50 },
+          },
+        },
+      };
+    };
+  }
+
+  const ruecknahme = (id: string) => karteVon(id).querySelector("[data-ruecknahme]") as HTMLElement | null;
+
+  it("Rücknahme: Kennung und Übergabe sichtbar, statt des Hakens „Zurückerhalten“, „Beschädigt zurückerhalten“, „Fehlt“", async () => {
+    uhrStellen();
+    mitAufgaben([R1, A1]);
+    await zeigeSeite();
+    const k = karteVon("r1");
+    expect(within(k).queryByRole("button", { name: "Als erledigt markieren" })).toBeNull();
+    expect(k.querySelector("[data-ohne-haken]")).not.toBeNull();
+    expect(ruecknahme("r1")!.querySelector("[data-ruecknahme-stueck]")?.textContent).toBe(
+      "Inventarnummer: FES-IPAD-0412 · übergeben 28.01.2027",
+    );
+    const gruppe = within(k).getByRole("group", { name: RUECKNAHME_TEXTE.gruppe });
+    expect(within(gruppe).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Zurückerhalten",
+      "Beschädigt zurückerhalten",
+      "Fehlt",
+    ]);
+    // Die uebrigen Aufgaben behalten ihren Haken und kennen kein `ausgabe`.
+    expect(within(karteVon("a1")).getByRole("button", { name: "Als erledigt markieren" })).not.toBeNull();
+    expect(karteVon("a1").querySelector("[data-ruecknahme]")).toBeNull();
+  });
+
+  it("„Fehlt“ schickt { isCompleted: true, zustand: FEHLT } an den PATCH der Aufgabe; danach erledigt mit Zustand und „Als offen markieren“", async () => {
+    uhrStellen();
+    mitAufgaben([R1, A1]);
+    zustandAntwort();
+    await zeigeSeite();
+    await act(async () => {
+      fireEvent.click(within(karteVon("r1")).getByRole("button", { name: "Fehlt" }));
+    });
+    expect(patches()).toEqual([
+      { url: "/api/offboarding-tasks/tok-it/r1", method: "PATCH", body: { isCompleted: true, zustand: "FEHLT" } },
+    ]);
+    expect(seitentext()).toContain("Erledigte Aufgaben (1)");
+    const k = karteVon("r1");
+    expect(k.querySelector("[data-ruecknahme-zustand]")?.textContent).toBe("Zustand: fehlt");
+    expect(within(k).getByRole("button", { name: "Als offen markieren" })).not.toBeNull();
+    expect(within(k).getByRole("button", { name: "Fehlt" }).getAttribute("aria-pressed")).toBe("true");
+    // Ohne neue Aufgabe kein zweites Laden (jeder GET zaehlt als „geöffnet“).
+    expect(anfragen.filter((a) => a.method === "GET")).toHaveLength(1);
+  });
+
+  it("an einer erledigten Rücknahme wechselt ein anderer Knopf nur den Zustand", async () => {
+    uhrStellen();
+    mitAufgaben([
+      aufgabe({
+        ...R1,
+        isCompleted: true,
+        completedAt: "2027-07-18T08:00:00.000Z",
+        ausgabe: { ...RUECKNAHME, zustand: "ZURUECK", zustandLabel: "zurück" },
+      }),
+    ]);
+    zustandAntwort();
+    await zeigeSeite();
+    await act(async () => {
+      fireEvent.click(within(karteVon("r1")).getByRole("button", { name: "Beschädigt zurückerhalten" }));
+    });
+    expect(patches().map((p) => p.body)).toEqual([{ isCompleted: true, zustand: "BESCHAEDIGT" }]);
+    expect(karteVon("r1").querySelector("[data-ruecknahme-zustand]")?.textContent).toBe("Zustand: beschädigt zurück");
+  });
+
+  it("„Fehlt“ legt für diese Stelle eine Aufgabe an: die Seite lädt einmal neu und zeigt sie", async () => {
+    uhrStellen();
+    mitAufgaben([R1]);
+    zustandAntwort(1);
+    await zeigeSeite();
+    getAntwort = { status: 200, body: { data: seitenDaten({ aufgaben: [{ ...R1, isCompleted: true }, F1] }) } };
+    await act(async () => {
+      fireEvent.click(within(karteVon("r1")).getByRole("button", { name: "Fehlt" }));
+    });
+    expect(anfragen.filter((a) => a.method === "GET")).toHaveLength(2);
+    expect(karteVon("f1")).not.toBeNull();
+  });
+
+  it("Sperraufgabe: der Haken bleibt („Als gesperrt markieren“), keine Knöpfe; der Haken schickt nur { isCompleted: true }", async () => {
+    uhrStellen();
+    mitAufgaben([S1]);
+    await zeigeSeite();
+    const k = karteVon("s1");
+    expect(within(k).queryByRole("group", { name: RUECKNAHME_TEXTE.gruppe })).toBeNull();
+    expect(ruecknahme("s1")!.querySelector("[data-ruecknahme-stueck]")?.textContent).toBe("eingerichtet 28.01.2027");
+    await act(async () => {
+      fireEvent.click(within(k).getByRole("button", { name: RUECKNAHME_TEXTE.gesperrtHaken }));
+    });
+    expect(patches().map((p) => p.body)).toEqual([{ isCompleted: true }]);
+  });
+
+  it("Folgeaufgabe „Schließung prüfen“: Kennung nur lesend, „Zustand: fehlt“, normaler Haken", async () => {
+    uhrStellen();
+    mitAufgaben([F1], { abteilung: { key: "FACILITY", name: "Facility Management" } });
+    await zeigeSeite();
+    const k = karteVon("f1");
+    expect(ruecknahme("f1")?.getAttribute("data-ruecknahme")).toBe("FOLGE");
+    expect(ruecknahme("f1")!.querySelector("[data-ruecknahme-stueck]")?.textContent).toBe("Schlüsselnummer: GS-114");
+    expect(k.querySelector("[data-ruecknahme-zustand]")?.textContent).toBe("Zustand: fehlt");
+    expect(within(k).queryByRole("group")).toBeNull();
+    expect(within(k).getByRole("button", { name: "Als erledigt markieren" })).not.toBeNull();
+  });
+
+  it("nur lesen: keine Knöpfe, die Kennung bleibt sichtbar – und der Stand steht als Text da („Zustand: offen“, Review A4c)", async () => {
+    uhrStellen();
+    mitAufgaben([R1], { readOnly: true });
+    await zeigeSeite();
+    const k = karteVon("r1");
+    expect(within(k).queryByRole("group", { name: RUECKNAHME_TEXTE.gruppe })).toBeNull();
+    expect(k.textContent).toContain("FES-IPAD-0412");
+    // Weder Haken noch Knöpfe tragen den Stand – also der Text, auch für Screenreader.
+    expect(k.querySelector("[data-ohne-haken]")).not.toBeNull();
+    expect(k.querySelector("[data-ruecknahme-zustand]")?.textContent).toBe("Zustand: offen");
+    expect(k.textContent).not.toContain(RUECKNAHME_TEXTE.hilfe);
+  });
+
+  it("offen mit Knöpfen: kein doppelter Stand, darunter der neutrale Hinweis (nennt auch „fehlt“)", async () => {
+    uhrStellen();
+    mitAufgaben([R1]);
+    await zeigeSeite();
+    const k = karteVon("r1");
+    expect(k.querySelector("[data-ruecknahme-zustand]")).toBeNull();
+    expect(k.textContent).toContain(RUECKNAHME_TEXTE.hilfe);
+    expect(RUECKNAHME_TEXTE.hilfe).toBe("Bitte wählen Sie: zurückerhalten, beschädigt zurückerhalten oder fehlt.");
+  });
+
+  it("Fehler des Servers (409): Meldung oben, die Aufgabe bleibt offen", async () => {
+    uhrStellen();
+    mitAufgaben([R1]);
+    await zeigeSeite();
+    patchAntwort = () => ({
+      status: 409,
+      body: { error: MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT(null), grund: "AUSGABE_IM_AUSTRITT" },
+    });
+    await act(async () => {
+      fireEvent.click(within(karteVon("r1")).getByRole("button", { name: "Zurückerhalten" }));
+    });
+    expect(screen.getByRole("alert").textContent).toBe(MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT(null));
+    expect(seitentext()).toContain("Offene Aufgaben (1)");
   });
 });

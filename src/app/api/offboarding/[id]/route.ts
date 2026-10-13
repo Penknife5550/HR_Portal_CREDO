@@ -3,8 +3,24 @@
  *
  * GET   – Einzelnen Offboarding-Vorgang mit allen Details abrufen, dazu die
  *         Abteilungsuebersicht (Karte "Aufgaben für Abteilungen", Urheber der
- *         Haekchen, wirksame Fuehrungskraft) aus abteilungsUebersichtLaden
- * PATCH – Vorgang aktualisieren (Status, Termine, Fuehrungskraft etc.)
+ *         Haekchen, wirksame Fuehrungskraft) aus abteilungsUebersichtLaden und
+ *         seit A4 (S28) das Feld `rueckgaben` (Reiter „Rückgaben“: zugeordnete
+ *         Einstellung, Lage, Hinweis „Einstellung zuordnen …“; seit S29 auch
+ *         Tabelle, Sperraufgaben, Vorschlag, Rueckfrage „Lösen …“, Stepper und
+ *         Rueckgabeprotokoll) aus rueckgabenUebersichtLaden — nur fuer
+ *         HR_EDIT_ROLES, sonst `null` ohne eine Abfrage (G23). Die hier schon
+ *         geladenen Listen (Rueckgaben, Aufgaben, Links, Dokumente) nimmt der
+ *         Dienst mit, statt sie erneut zu lesen.
+ * PATCH – Vorgang aktualisieren (Status, Termine, Fuehrungskraft etc.).
+ *         Seit A4 (S31, G18) der Abschluss mit Warnung: COMPLETED laeuft in
+ *         EINER Transaktion – Sperre per bedingtem `updateMany` auf den
+ *         gelesenen Status (0 Treffer → 409 INZWISCHEN_GEAENDERT), Zaehlung der
+ *         offenen Rueckgaben (`offeneRueckgabenZaehlenIn`), ohne `bestaetigt`
+ *         und mit offenen Stuecken 409 `{ error, grund: "RUECKGABEN_OFFEN",
+ *         offen: [{ titel, stelle }] }` samt Rollback, erst DANACH der
+ *         `exitData`-Upsert, das Update, ein neuer letzter Arbeitstag und die
+ *         Loeschfrist der offen gebliebenen Ausgaben
+ *         (`offeneAusgabenAbschliessenIn`); Protokoll `offeneRueckgaben`
  *
  * Mandant: Ein Vorgang eines fremden Mandanten bekommt in BEIDEN Methoden
  * dieselbe 404 mit demselben Text wie ein unbekannter.
@@ -26,6 +42,9 @@ import {
   fuehrungskraftAdresseFreigegeben,
   letztenArbeitstagSperren,
 } from "@/lib/abteilungsaufgaben-dienst";
+import { offeneRueckgabenZaehlenIn, rueckgabenUebersichtLaden } from "@/lib/offboarding-ausgaben";
+import { offeneAusgabenAbschliessenIn } from "@/lib/ausgaben-schreiben";
+import { MELDUNGEN_AUSGABEN, type OffeneRueckgabe } from "@/lib/ausgaben";
 
 /** Gleicher Text fuer "gibt es nicht" und "fremder Mandant". */
 const NICHT_GEFUNDEN = "Vorgang nicht gefunden";
@@ -112,9 +131,14 @@ export async function GET(
     // `anzeige`, checklistItems bekommen `erledigtVon`, dazu `abteilungen`
     // (Quelle der Karte, auch nicht informierte und uebersprungene
     // Abteilungen) und `fuehrungskraft` (wirksame Adresse samt Quelle).
+    //
+    // `rueckgaben` (A4, G23): Einstellung, Lage und Vorschlaege nur fuer
+    // HR_EDIT_ROLES — Einrichtungsleitung und Fuehrungskraft bekommen `null`,
+    // und es wird dafuer nichts abgefragt.
     return NextResponse.json({
       ...offboarding,
       ...(await abteilungsUebersichtLaden(offboarding)),
+      rueckgaben: await rueckgabenUebersichtLaden(offboarding, session),
     });
   } catch (error) {
     console.error("Fehler beim Laden des Offboarding-Vorgangs:", error);
@@ -128,6 +152,96 @@ export async function GET(
 // =============================================
 // PATCH /api/offboarding/:id – Vorgang aktualisieren
 // =============================================
+
+/**
+ * Abschluss (G18): Zwischen dem Lesen und der Sperre hat sich der Status
+ * bewegt. Eigene Klasse, weil nur eine Ausnahme die Transaktion zurueckrollt.
+ */
+class AustrittGeaendert extends Error {}
+
+/**
+ * Abschluss ohne Bestaetigung, obwohl Rueckgaben, Sperr- oder Folgeaufgaben
+ * offen sind (G18, E-A33: Abschluss mit Warnung, nicht gesperrt). Die
+ * Ausnahme rollt die Sperre zurueck und traegt die gezaehlte Liste hinaus.
+ */
+class RueckgabenOffen extends Error {
+  constructor(readonly offen: OffeneRueckgabe[]) {
+    super("RUECKGABEN_OFFEN");
+  }
+}
+
+/** Erlaubte Felder der Austrittsdaten (`exitData`) und ihre Art. */
+const EXIT_FELDER: Record<string, "float" | "string" | "boolean" | "date"> = {
+  remainingVacationDays: "float",
+  vacationPayout: "float",
+  overtimeHours: "float",
+  overtimePayout: "float",
+  severancePay: "string",
+  certificateType: "string",
+  certificateStatus: "string",
+  svDeregistrationDone: "boolean",
+  svDeregistrationDate: "date",
+  employmentCertDone: "boolean",
+  employmentCertDate: "date",
+  nonCompeteClause: "boolean",
+  knowledgeTransferPlan: "boolean",
+  successorName: "string",
+  handoverDocComplete: "boolean",
+  employmentType: "string",
+  tarifvertrag: "string",
+  entgeltgruppe: "string",
+  isBefristet: "boolean",
+};
+
+/**
+ * Die Austrittsdaten aus dem Body, fertig fuer den Upsert (Abfindung
+ * verschluesselt); `null`, wenn nichts zu schreiben ist. Schreibt selbst
+ * nichts – geschrieben wird je nach Zweig vor jeder Transaktion bzw. beim
+ * Abschluss erst nach Sperre und Zaehlung (G18).
+ */
+function exitDatenFelder(bodyExitData: Record<string, unknown> | undefined): Record<string, unknown> | null {
+  if (!bodyExitData || typeof bodyExitData !== "object") return null;
+  const exitFields: Record<string, unknown> = {};
+  for (const [key, type] of Object.entries(EXIT_FELDER)) {
+    const value = bodyExitData[key];
+    if (value === undefined) continue;
+
+    switch (type) {
+      case "float":
+        if (value !== null && typeof value === "number") {
+          exitFields[key] = value;
+        } else if (value === null) {
+          exitFields[key] = null;
+        }
+        break;
+      case "boolean":
+        if (typeof value === "boolean") {
+          exitFields[key] = value;
+        }
+        break;
+      case "date":
+        if (value !== null && value !== "") {
+          exitFields[key] = new Date(value as string | number);
+        } else if (value === null) {
+          exitFields[key] = null;
+        }
+        break;
+      case "string":
+        if (value !== null) {
+          exitFields[key] = String(value);
+        } else {
+          exitFields[key] = null;
+        }
+        break;
+    }
+  }
+
+  // Abfindungsbetrag verschluesseln
+  if (exitFields.severancePay && typeof exitFields.severancePay === "string") {
+    exitFields.severancePay = encrypt(exitFields.severancePay as string);
+  }
+  return Object.keys(exitFields).length > 0 ? exitFields : null;
+}
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -167,10 +281,9 @@ export async function PATCH(
       exitData: exitDataFromBody,
       supervisorEmail,
       supervisorName,
+      bestaetigt,
     } = parsed.data;
-
-    // Use parsed exitData but also keep original body reference for exitData processing
-    const bodyExitData = exitDataFromBody;
+    const jetzt = new Date();
 
     // Vorgang pruefen — mit den Adressen der Fuehrungskraft, die das Portal
     // schon kennt (Zeugnis-Bewertung, Vertragsende): Sie sind fuer die
@@ -258,86 +371,34 @@ export async function PATCH(
       updateData.noticePeriodEnd = new Date(noticePeriodEnd);
     if (noticeDate) updateData.noticeDate = new Date(noticeDate);
 
-    // Bei COMPLETED: completedAt setzen
+    // Bei COMPLETED: completedAt setzen – zugleich der Anker der Loeschfrist
+    // offen gebliebener Ausgaben (G18).
     if (status === "COMPLETED") {
-      updateData.completedAt = new Date();
+      updateData.completedAt = jetzt;
     }
 
-    // ExitData upsert (erstellen wenn nicht vorhanden)
-    if (bodyExitData && typeof bodyExitData === "object") {
-      const exitFields: Record<string, unknown> = {};
-      const allowedExitFields: Record<string, string> = {
-        remainingVacationDays: "float",
-        vacationPayout: "float",
-        overtimeHours: "float",
-        overtimePayout: "float",
-        severancePay: "string",
-        certificateType: "string",
-        certificateStatus: "string",
-        svDeregistrationDone: "boolean",
-        svDeregistrationDate: "date",
-        employmentCertDone: "boolean",
-        employmentCertDate: "date",
-        nonCompeteClause: "boolean",
-        knowledgeTransferPlan: "boolean",
-        successorName: "string",
-        handoverDocComplete: "boolean",
-        employmentType: "string",
-        tarifvertrag: "string",
-        entgeltgruppe: "string",
-        isBefristet: "boolean",
-      };
-
-      for (const [key, type] of Object.entries(allowedExitFields)) {
-        const value = bodyExitData[key];
-        if (value === undefined) continue;
-
-        switch (type) {
-          case "float":
-            if (value !== null && typeof value === "number") {
-              exitFields[key] = value;
-            } else if (value === null) {
-              exitFields[key] = null;
-            }
-            break;
-          case "boolean":
-            if (typeof value === "boolean") {
-              exitFields[key] = value;
-            }
-            break;
-          case "date":
-            if (value !== null && value !== "") {
-              exitFields[key] = new Date(value as string | number);
-            } else if (value === null) {
-              exitFields[key] = null;
-            }
-            break;
-          case "string":
-            if (value !== null) {
-              exitFields[key] = String(value);
-            } else {
-              exitFields[key] = null;
-            }
-            break;
-        }
-      }
-
-      // Abfindungsbetrag verschluesseln
-      if (exitFields.severancePay && typeof exitFields.severancePay === "string") {
-        exitFields.severancePay = encrypt(exitFields.severancePay as string);
-      }
-
-      if (Object.keys(exitFields).length > 0) {
-        await prisma.offboardingExitData.upsert({
-          where: { offboardingId: id },
-          create: {
-            offboardingId: id,
-            ...exitFields,
-          },
-          update: exitFields,
-        });
-      }
-    }
+    const exitFields = exitDatenFelder(exitDataFromBody);
+    const exitDataSchreiben = (db: Prisma.TransactionClient, felder: Record<string, unknown>) =>
+      db.offboardingExitData.upsert({
+        where: { offboardingId: id },
+        create: {
+          offboardingId: id,
+          ...felder,
+        },
+        update: felder,
+      });
+    const aktualisieren = (db: Prisma.TransactionClient) =>
+      db.offboardingProcess.update({
+        where: { id },
+        data: updateData,
+        include: { organization: true },
+      });
+    type Ergebnis = {
+      updated: Awaited<ReturnType<typeof aktualisieren>>;
+      verschiebung: Awaited<ReturnType<typeof faelligkeitenVerschieben>> | null;
+      alterTag: Date | null;
+      offeneRueckgaben: number;
+    };
 
     // Letzter Arbeitstag im Body: Die offenen Faelligkeiten ruecken um dieselbe
     // Spanne mit, Links, die vor dem neuen "gültig bis" abliefen, werden
@@ -349,31 +410,88 @@ export async function PATCH(
     // (Doppel-Enter, zwei HR-Konten) laesen dort beide noch den alten Tag, und
     // der zweite verschoebe die Faelligkeiten ein zweites Mal. Deshalb auch
     // bei scheinbar gleichem Tag durch die Transaktion — der Stand von oben
-    // kann schon veraltet sein. Ohne lastWorkingDay bleibt es beim einfachen
-    // update wie bisher.
-    const { updated, verschiebung, alterTag } = neuerLetzterTag
-      ? await prisma.$transaction(async (tx) => {
-          const alt = (await letztenArbeitstagSperren(tx, id)) ?? existing.lastWorkingDay;
-          const u = await tx.offboardingProcess.update({
-            where: { id },
-            data: updateData,
-            include: { organization: true },
+    // kann schon veraltet sein. Ohne lastWorkingDay und ohne Abschluss bleibt
+    // es beim einfachen update wie bisher.
+    //
+    // Abschluss (A4, G18): COMPLETED laeuft IMMER in einer Transaktion, in
+    // dieser Reihenfolge –
+    //   1. ein neuer letzter Arbeitstag: `letztenArbeitstagSperren` zuerst;
+    //   2. Sperre per bedingtem `updateMany` auf den GELESENEN Status – 0
+    //      Treffer → 409 (ein zweiter Abschluss oder ein Abbruch kam
+    //      dazwischen);
+    //   3. offene Rueckgaben zaehlen, Stueck fuer Stueck. Jeder Weg, der eine
+    //      Rueckgabe-Zeile oder Ausgabe-Aufgabe umschaltet (Link, Portal,
+    //      Reiter), sperrt den Austritt zuerst – ohne diese Sperre rutschte
+    //      ein „wieder öffnen“ zwischen Zaehlen und Commit durch;
+    //   4. ohne `bestaetigt` und mit offenen Stuecken: Ausnahme, Rollback, 409
+    //      (Abschluss mit Warnung, nicht gesperrt);
+    //   5. erst JETZT `exitData` – nach einer Rueckfrage ist nichts geschrieben
+    //      (bei allen anderen PATCHes steht der Upsert wie bisher davor);
+    //   6. das Update, die Faelligkeiten, dann die Loeschfrist der offen
+    //      gebliebenen Ausgaben (G24: Austritt → Links → Aufgaben → Ausgaben).
+    if (exitFields && status !== "COMPLETED") {
+      await exitDataSchreiben(prisma, exitFields);
+    }
+
+    let ergebnis: Ergebnis;
+    if (status === "COMPLETED") {
+      try {
+        ergebnis = await prisma.$transaction(async (tx): Promise<Ergebnis> => {
+          const alt = neuerLetzterTag
+            ? ((await letztenArbeitstagSperren(tx, id)) ?? existing.lastWorkingDay)
+            : null;
+          const gesperrt = await tx.offboardingProcess.updateMany({
+            where: { id, status: existing.status },
+            data: { updatedAt: jetzt },
           });
+          if (gesperrt.count === 0) throw new AustrittGeaendert();
+
+          const offen = await offeneRueckgabenZaehlenIn(tx, id);
+          if (offen.length > 0 && bestaetigt !== true) throw new RueckgabenOffen(offen);
+
+          if (exitFields) await exitDataSchreiben(tx, exitFields);
+          const u = await aktualisieren(tx);
           const f =
-            alt.getTime() !== neuerLetzterTag.getTime()
+            alt && neuerLetzterTag && alt.getTime() !== neuerLetzterTag.getTime()
               ? await faelligkeitenVerschieben(tx, id, alt, neuerLetzterTag)
               : null;
-          return { updated: u, verschiebung: f, alterTag: alt };
-        })
-      : {
-          updated: await prisma.offboardingProcess.update({
-            where: { id },
-            data: updateData,
-            include: { organization: true },
-          }),
-          verschiebung: null,
-          alterTag: null,
-        };
+          await offeneAusgabenAbschliessenIn(tx, { offboardingId: id, abgeschlossenAm: jetzt, userId: session.userId });
+          return { updated: u, verschiebung: f, alterTag: alt, offeneRueckgaben: offen.length };
+        });
+      } catch (error) {
+        if (error instanceof RueckgabenOffen) {
+          // Titel und Stelle wie im Reiter – nie Kennung, Notiz oder Zustandstext.
+          return NextResponse.json(
+            {
+              error: MELDUNGEN_AUSGABEN.RUECKGABEN_OFFEN(error.offen.length),
+              grund: "RUECKGABEN_OFFEN",
+              offen: error.offen,
+            },
+            { status: 409 },
+          );
+        }
+        if (error instanceof AustrittGeaendert) {
+          return NextResponse.json(
+            { error: MELDUNGEN_AUSGABEN.INZWISCHEN_GEAENDERT, grund: "INZWISCHEN_GEAENDERT" },
+            { status: 409 },
+          );
+        }
+        throw error;
+      }
+    } else if (neuerLetzterTag) {
+      ergebnis = await prisma.$transaction(async (tx): Promise<Ergebnis> => {
+        const alt = (await letztenArbeitstagSperren(tx, id)) ?? existing.lastWorkingDay;
+        const u = await aktualisieren(tx);
+        const f =
+          alt.getTime() !== neuerLetzterTag.getTime()
+            ? await faelligkeitenVerschieben(tx, id, alt, neuerLetzterTag)
+            : null;
+        return { updated: u, verschiebung: f, alterTag: alt, offeneRueckgaben: 0 };
+      });
+    } else {
+      ergebnis = { updated: await aktualisieren(prisma), verschiebung: null, alterTag: null, offeneRueckgaben: 0 };
+    }
+    const { updated, verschiebung, alterTag, offeneRueckgaben } = ergebnis;
 
     // Audit-Log
     const auditDetails: Record<string, unknown> = {};
@@ -443,6 +561,11 @@ export async function PATCH(
       auditDetails.lastWorkingDayFrom = alterTag.toISOString().slice(0, 10);
       auditDetails.faelligkeitenVerschoben = verschiebung.verschoben;
       auditDetails.linksVerlaengert = verschiebung.verlaengert;
+    }
+    // Abschluss mit Bestaetigung (G18): wie viele Rueckgaben, Sperr- und
+    // Folgeaufgaben offen blieben – nur die Zahl, nie Titel oder Kennung.
+    if (offeneRueckgaben > 0) {
+      auditDetails.offeneRueckgaben = offeneRueckgaben;
     }
 
     await prisma.auditLog.create({

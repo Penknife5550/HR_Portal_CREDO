@@ -7,7 +7,8 @@ import {
   erledigtText,
   type AktionsMeldung,
 } from "@/components/abteilungsaufgaben/abteilungen-karte";
-import type { AbteilungenData, ChecklistItemData } from "../types";
+import { AusgabeAufgabeZusatz } from "@/components/ausgaben/rueckgaben-karte";
+import type { AbteilungenData, ChecklistItemData, ReturnItemData } from "../types";
 import {
   formatDate,
   CHECKLIST_PHASE_LABELS,
@@ -40,6 +41,10 @@ export function TabChecklist({
   abteilungsMeldung,
   onAbteilungsMeldungSchliessen,
   onFuehrungskraftEintragen,
+  returnItems = [],
+  onZumReiterRueckgaben,
+  zuordnungEmpfohlen = false,
+  onZuordnen,
 }: {
   checklistItems: ChecklistItemData[];
   togglingItems: Set<string>;
@@ -59,6 +64,19 @@ export function TabChecklist({
   abteilungsMeldung?: AktionsMeldung | null;
   onAbteilungsMeldungSchliessen?: () => void;
   onFuehrungskraftEintragen?: () => void;
+  /**
+   * Ausstattung & Zugaenge Stufe 2 (A4, S32): die Rueckgaben des Vorgangs –
+   * an einer Ruecknahmeaufgabe steht ihr Zustand als Text, dazu der Verweis
+   * auf den Reiter „Rückgaben“ (`onZumReiterRueckgaben`). Den Haken an
+   * Aufgaben mit `herkunft` (Ruecknahme, Sperre, „Schließung prüfen“) gibt es
+   * nur mit `darfAbteilungsAktionen` (= HR_EDIT_ROLES, wie der Server prueft);
+   * er heisst an einem Gegenstand „zurück“ (G15).
+   */
+  returnItems?: ReturnItemData[];
+  onZumReiterRueckgaben?: () => void;
+  /** Hinweis „Einstellung zuordnen, bevor Sie die Abteilungen informieren“ in der Abteilungskarte (G12). */
+  zuordnungEmpfohlen?: boolean;
+  onZuordnen?: () => void;
 }) {
   if (checklistItems.length === 0) {
     return (
@@ -128,6 +146,7 @@ export function TabChecklist({
           onFuehrungskraftEintragen={onFuehrungskraftEintragen}
           meldung={abteilungsMeldung}
           onMeldungSchliessen={onAbteilungsMeldungSchliessen}
+          zuordnung={zuordnungEmpfohlen ? { empfohlen: true, onZuordnen } : null}
         />
       )}
 
@@ -159,6 +178,8 @@ export function TabChecklist({
                 .map((item) => {
                   const name = item.assigneeDepartment ? abteilungsName(item.assigneeDepartment) : null;
                   const erledigt = item.isCompleted ? erledigtText(item) : "";
+                  // Ruecknahme-, Sperr- und Folgeaufgaben (A4): Haken nur mit Bearbeitungsrecht.
+                  const ohneHaken = !!item.herkunft && !darfAbteilungsAktionen;
                   return (
                     <div
                       key={item.id}
@@ -167,6 +188,17 @@ export function TabChecklist({
                     >
                       <div className="flex items-start gap-3 p-4">
                         {/* Checkbox */}
+                        {ohneHaken ? (
+                          <span
+                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 ${
+                              item.isCompleted ? "border-credo-gruen bg-credo-gruen" : "border-border"
+                            }`}
+                            data-ohne-haken
+                          >
+                            {item.isCompleted && <CheckIcon className="h-3.5 w-3.5 text-white" />}
+                            <span className="sr-only">{item.isCompleted ? "erledigt" : "offen"}</span>
+                          </span>
+                        ) : (
                         <button
                           type="button"
                           onClick={() => toggleChecklistItem(item.id, item.isCompleted)}
@@ -181,6 +213,7 @@ export function TabChecklist({
                         >
                           {item.isCompleted && <CheckIcon className="h-3.5 w-3.5 text-white" />}
                         </button>
+                        )}
 
                         {/* Content */}
                         <div className="min-w-0 flex-1">
@@ -240,6 +273,13 @@ export function TabChecklist({
                               </span>
                             )}
                           </div>
+
+                          {/* Ruecknahmeaufgabe (A4): Zustand als Text, Wahl im Reiter Rückgaben. */}
+                          <AusgabeAufgabeZusatz
+                            aufgabe={item}
+                            returnItems={returnItems}
+                            onZumReiter={onZumReiterRueckgaben}
+                          />
 
                           {/* Kommentar der Abteilung (ueber ihren Link) — React maskiert */}
                           {item.abteilungKommentar && (

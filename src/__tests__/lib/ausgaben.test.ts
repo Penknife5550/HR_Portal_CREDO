@@ -17,6 +17,19 @@
  * (`protokollAnzeige`, `ausgabenMitRueckgabe`) und die Meldungen der Karte.
  * S25: das Feld `ausgabe` der Link-Seite (`linkAusgabeBauen`) und die Zeile
  * eines Stuecks dort (`linkStueckText`).
+ * S28: Zuordnung Austritt ↔ Einstellung – Anzeige und Suche, Hinweis vor dem
+ * Informieren, Vorbelegung des Merkers, Arbeitsort am Austritt (G12) und die
+ * Kopfzeile des Reiters aus dem Bestand (`rueckgabeLageAnzeige`).
+ * S29: Uebernahme in den Austritt (`rueckgabeEntwurf`, `uebernahmePlan`), die
+ * Anzeige von Vorschlag, Sperraufgaben und Tabelle im Reiter
+ * (`ausgabeKurz`, `rueckgabeVorschlagAnzeige`, `sperraufgabenZeilen`,
+ * `rueckgabeZeilenBauen`), „Lösen …“ (`loesenGesperrt`, `loesenStand`), die
+ * neuen Meldungen und der Merker in der Query der Vorschau.
+ * S30: Zielzustand eines Hakens bzw. einer Wahl (`rueckgabeZiel`,
+ * `rueckgabeZielAusEingabe`, `zustandFehler`), der Plan des Gleichlaufs
+ * (`ausgabeNachZiel`, `gleichlaufPlan`), die Bindung aus Sicht des Austritts
+ * (`gleichlaufGesperrt`) und das Feld `ausgabe` der Offboarding-Link-Seite
+ * (`offboardingLinkAusgabeBauen`, `RUECKNAHME_AUSWAHL`).
  */
 
 import fs from "fs";
@@ -32,6 +45,7 @@ import {
   AUSGABE_ZUSTAENDE,
   AUSGABE_ZUSTAND_LABELS,
   AUSGABEN_AUDIT,
+  EINSTELLUNG_OHNE_NUMMER,
   AUSGABEN_AUDIT_LABELS,
   FOLGE_ORDER_INDEX,
   FOLGE_STELLE,
@@ -43,15 +57,22 @@ import {
   RUECKGABE_LAGEN,
   RUECKGABE_VORGABEN,
   RUECKGABE_ZUSTAENDE,
+  RUECKNAHME_AUSWAHL,
   RUECKNAHME_TEXTE,
   TAUSCH_GRUENDE,
   VORSCHLAG_GRUENDE,
   absageFrist,
+  abschlussFrist,
+  arbeitsortBeiZuordnung,
+  arbeitsortText,
+  austrittLaeuft,
   ausgabeBasis,
   ausgabeBezeichnung,
   ausgabeKalendertag,
+  ausgabeKurz,
   ausgabeLoeschenAb,
   ausgabeMoeglich,
+  ausgabeNachZiel,
   ausgabeVermerkMailFelder,
   ausgabeZustandDaten,
   ausgabeZustandLabel,
@@ -61,18 +82,30 @@ import {
   ausgabenListeMailFelder,
   ausgabenMitRueckgabe,
   ausgabenZeile,
+  abgeloesteAustritte,
+  bezugBindet,
   bindenderAustritt,
   bindetAusgabe,
   brauchtFolgeStelle,
+  einstellungAnzeige,
+  einstellungsTreffer,
   ersatzBasis,
   folgeAufgabe,
   folgeAufgabeNoetig,
   folgeAufgabeSchritt,
+  gleichlaufGesperrt,
+  gleichlaufPlan,
+  gleichlaufSperreText,
+  informierteStellen,
   lageText,
   linkAusgabeBauen,
   linkStueckText,
+  loesenGesperrt,
+  loesenStand,
   namensSchluessel,
+  offboardingLinkAusgabeBauen,
   offeneRueckgaben,
+  rueckgabenFortschritt,
   ohneVermerk,
   perLinkEntfernbar,
   protokollAnzeige,
@@ -80,22 +113,35 @@ import {
   protokollStellen,
   protokollText,
   rueckgabeDaten,
+  rueckgabeEntwurf,
   rueckgabeLage,
+  rueckgabeLageAnzeige,
   rueckgabeOffen,
   rueckgabeVorgabenPlan,
   rueckgabeVorschlag,
+  rueckgabeVorschlagAnzeige,
   rueckgabeZeileText,
+  rueckgabeZeilenBauen,
+  rueckgabeZiel,
+  rueckgabeZielAusEingabe,
   rueckgabeZustand,
   rueckgabenSchritt,
   ruecknahmeAufgabe,
+  sperraufgabenZeilen,
   tauschZustand,
+  uebernahmePlan,
   vermerkPruefen,
   vermerkStuecke,
   vermerkZielGrund,
+  weitereBeschaeftigungVorbelegung,
+  zuordnungEmpfohlen,
   zuordnungsVorschlaege,
+  zustandFehler,
   type AusgabeBezug,
+  type AusgabeKurzDaten,
   type AusgabeZeilenDaten,
   type BestandAufgabe,
+  type EinstellungsBestand,
   type EinstellungsKandidat,
   type LageStand,
   type LageTextWerte,
@@ -519,6 +565,18 @@ describe("MELDUNGEN_AUSGABEN", () => {
     );
   });
 
+  it("Zuordnung (S28): Fehler und Erfolg, mit und ohne Arbeitsort", () => {
+    expect(MELDUNGEN_AUSGABEN.EINSTELLUNG_NICHT_GEFUNDEN).toBe("Einstellung nicht gefunden");
+    expect(MELDUNGEN_AUSGABEN.KEINE_ZUORDNUNG).toBe("Diesem Austritt ist keine Einstellung zugeordnet.");
+    expect(MELDUNGEN_AUSGABEN.ZUGEORDNET("2027-GS-004", null)).toBe("Einstellung 2027-GS-004 zugeordnet.");
+    expect(MELDUNGEN_AUSGABEN.ZUGEORDNET("2027-GS-004", "FES Grundschule")).toBe(
+      "Einstellung 2027-GS-004 zugeordnet. Arbeitsort FES Grundschule übernommen.",
+    );
+    expect(MELDUNGEN_AUSGABEN.GELOEST("2027-GS-004", null)).toBe("Zuordnung der Einstellung 2027-GS-004 gelöst.");
+    expect(MELDUNGEN_AUSGABEN.GELOEST("2027-GS-004", "ZURUECKGESETZT")).toContain("Arbeitsort am Austritt ist wieder leer");
+    expect(MELDUNGEN_AUSGABEN.GELOEST("2027-GS-004", "BLEIBT")).toContain("schon eine Stelle informiert");
+  });
+
   it("kein Text ist leer", () => {
     for (const [schluessel, wert] of Object.entries(MELDUNGEN_AUSGABEN)) {
       if (typeof wert === "string") expect(`${schluessel}: ${wert.trim() === ""}`).toBe(`${schluessel}: false`);
@@ -747,6 +805,65 @@ describe("bindetAusgabe / bindenderAustritt / perLinkEntfernbar (G28, G6)", () =
   });
 });
 
+describe("bezugBindet / abgeloesteAustritte (G28: Stand beim Austritt, Review A4c)", () => {
+  it("ohne eigenen Stand und ohne Ablösung genau wie bindetAusgabe", () => {
+    for (const status of ["INITIATED", "FINAL_SETTLEMENT", "COMPLETED", "CANCELLED"]) {
+      for (const zustand of AUSGABE_ZUSTAENDE) {
+        expect(`${status}/${zustand}: ${bezugBindet({ offboardingId: "off-1", status }, zustand)}`).toBe(
+          `${status}/${zustand}: ${bindetAusgabe(status, zustand)}`,
+        );
+      }
+    }
+  });
+
+  it("abgeschlossen: gemessen am eigenen Stand – mit „verbleibt“ freigegeben bleibt frei, auch wenn das Stück später umgeschaltet wird", () => {
+    // A setzte VERBLEIBT, B übernahm und setzte ZURUECK: A bindet NICHT wieder.
+    const a = { offboardingId: "off-a", status: "COMPLETED", eigenerStand: "VERBLEIBT" as const };
+    for (const zustand of AUSGABE_ZUSTAENDE) expect({ zustand, bindet: bezugBindet(a, zustand) }).toEqual({ zustand, bindet: false });
+    // Eigener Stand ZURUECK: bindet (späte Korrektur im Reiter), auch wenn das Stück heute anders steht.
+    expect(bezugBindet({ offboardingId: "off-a", status: "COMPLETED", eigenerStand: "ZURUECK" }, "VERBLEIBT")).toBe(true);
+  });
+
+  it("abgeschlossen und von einem späteren Austritt abgelöst: bindet nie (Zugang ohne Rückgabe-Zeile)", () => {
+    for (const zustand of AUSGABE_ZUSTAENDE) {
+      expect(bezugBindet({ offboardingId: "off-a", status: "COMPLETED", abgeloest: true }, zustand)).toBe(false);
+    }
+  });
+
+  it("laufend bindet immer, abgebrochen nie – unabhängig von Stand und Ablösung", () => {
+    const zusatz = { eigenerStand: "VERBLEIBT" as const, abgeloest: true };
+    expect(bezugBindet({ offboardingId: "off-a", status: "HANDOVER_PHASE", ...zusatz }, "ZURUECK")).toBe(true);
+    expect(bezugBindet({ offboardingId: "off-a", status: "CANCELLED", eigenerStand: "ZURUECK" }, "ZURUECK")).toBe(false);
+  });
+
+  it("bindenderAustritt: der abgeschlossene frühere bindet nicht wieder, sobald der spätere das Stück umschaltet", () => {
+    const bezuege = [
+      { offboardingId: "off-a", status: "COMPLETED", displayId: "OFF-A", eigenerStand: "VERBLEIBT" as const, abgeloest: true },
+      { offboardingId: "off-b", status: "HANDOVER_PHASE", displayId: "OFF-B" },
+    ];
+    // Aus Sicht von B (eigener Austritt ausgenommen): frei – nach ZURUECK, FEHLT und wieder offen.
+    for (const zustand of ["AUSGEGEBEN", "ZURUECK", "FEHLT", "BESCHAEDIGT", "ENTFAELLT"]) {
+      expect({ zustand, bindend: bindenderAustritt({ zustand }, bezuege, "off-b") }).toEqual({ zustand, bindend: null });
+    }
+    // Aus Sicht der Karte bindet B.
+    expect(bindenderAustritt({ zustand: "ZURUECK" }, bezuege)?.offboardingId).toBe("off-b");
+  });
+
+  it("abgeloesteAustritte: jeder, nach dem ein anderer das Stück bezogen hat; unbekannte Zeitpunkte zählen nicht", () => {
+    const seit = new Map<string, number | null>([
+      ["off-a", 1000],
+      ["off-b", 2000],
+      ["off-c", 3000],
+    ]);
+    expect([...abgeloesteAustritte(seit)].sort()).toEqual(["off-a", "off-b"]);
+    expect([...abgeloesteAustritte(new Map([["off-a", 1000]]))]).toEqual([]);
+    // Gleicher Zeitpunkt: keiner ist später.
+    expect([...abgeloesteAustritte(new Map([["off-a", 1000], ["off-b", 1000]]))]).toEqual([]);
+    // Ohne Zeitpunkt lässt sich nichts vergleichen.
+    expect([...abgeloesteAustritte(new Map<string, number | null>([["off-a", null], ["off-b", 2000]]))]).toEqual([]);
+  });
+});
+
 describe("absageFrist (G10, S27)", () => {
   const zustandAm = utc("2027-02-01T09:00:00Z");
   // Absage am 31.12.2027 23:30 Berlin (22:30 UTC) bzw. am 01.01.2028 00:30 Berlin.
@@ -790,6 +907,84 @@ describe("absageFrist (G10, S27)", () => {
     expect(absageFrist({ zustand: "VERBLEIBT", zustandAm }, frei, ABSAGE_2027)).toBeNull();
     // Unbekannter Zustand: nichts schreiben.
     expect(absageFrist({ zustand: "UNBEKANNT", zustandAm }, [], ABSAGE_2027)).toBeNull();
+  });
+});
+
+describe("abschlussFrist (G18, S31)", () => {
+  const zustandAm = utc("2027-02-01T09:00:00Z");
+  // Abschluss am 31.12.2027 23:30 Berlin (22:30 UTC) bzw. am 01.01.2028 00:30 Berlin.
+  const ABSCHLUSS_2027 = utc("2027-12-31T22:30:00Z");
+  const ABSCHLUSS_2028 = utc("2027-12-31T23:30:00Z");
+  const SELBST = { id: "off-1", abgeschlossenAm: ABSCHLUSS_2027 };
+  const eigenerBezug = [{ offboardingId: "off-1", status: "COMPLETED", displayId: null }];
+
+  it("AUSGEGEBEN: drei Jahre ab Ende des BERLINER Jahres des Abschlusses – dieselbe Rechnung wie ausgabeLoeschenAb", () => {
+    expect(abschlussFrist({ zustand: "AUSGEGEBEN", zustandAm }, eigenerBezug, SELBST)?.toISOString()).toBe(
+      "2030-12-31T23:00:00.000Z",
+    );
+    expect(
+      abschlussFrist({ zustand: "AUSGEGEBEN", zustandAm }, eigenerBezug, { id: "off-1", abgeschlossenAm: ABSCHLUSS_2028 })
+        ?.toISOString(),
+    ).toBe("2031-12-31T23:00:00.000Z");
+    expect(abschlussFrist({ zustand: "AUSGEGEBEN", zustandAm, loeschenAb: null }, [], SELBST)).toEqual(
+      ausgabeLoeschenAb({ zustand: "AUSGEGEBEN", zustandAm, austrittAbgeschlossenAm: ABSCHLUSS_2027 }),
+    );
+  });
+
+  it("nur AUSGEGEBEN – Endzustände behalten ihre Frist, VERBLEIBT bleibt ohne (G20)", () => {
+    for (const zustand of AUSGABE_ZUSTAENDE.filter((z) => z !== "AUSGEGEBEN")) {
+      expect({ zustand, frist: abschlussFrist({ zustand, zustandAm }, eigenerBezug, SELBST) }).toEqual({
+        zustand,
+        frist: null,
+      });
+    }
+    expect(abschlussFrist({ zustand: "UNBEKANNT", zustandAm }, [], SELBST)).toBeNull();
+  });
+
+  it("ein ANDERER laufender Austritt bezieht das Stück: keine Frist – dessen Abschluss setzt sie", () => {
+    for (const status of ["INITIATED", "NOTICE_PERIOD", "HANDOVER_PHASE", "FINAL_SETTLEMENT"]) {
+      const bezuege = [...eigenerBezug, { offboardingId: "off-2", status, displayId: null }];
+      expect({ status, frist: abschlussFrist({ zustand: "AUSGEGEBEN", zustandAm }, bezuege, SELBST) }).toEqual({
+        status,
+        frist: null,
+      });
+    }
+  });
+
+  it("ein anderer abgeschlossener oder abgebrochener Austritt hält nicht ab (VERBLEIBT früher freigegeben)", () => {
+    for (const status of ["COMPLETED", "CANCELLED"]) {
+      const bezuege = [{ offboardingId: "off-alt", status, displayId: null }, ...eigenerBezug];
+      expect(abschlussFrist({ zustand: "AUSGEGEBEN", zustandAm }, bezuege, SELBST)?.toISOString()).toBe(
+        "2030-12-31T23:00:00.000Z",
+      );
+    }
+    // Der eigene Austritt zählt nie als „anderer laufender“ – auch wenn er noch als laufend gelesen wird.
+    const nochLaufend = [{ offboardingId: "off-1", status: "FINAL_SETTLEMENT", displayId: null }];
+    expect(abschlussFrist({ zustand: "AUSGEGEBEN", zustandAm }, nochLaufend, SELBST)).not.toBeNull();
+  });
+
+  it("VERBLEIBT offen IN DIESEM Austritt (unverändert übernommen): dieselbe Frist – der Aufrufer setzt AUSGEGEBEN (Review A4c)", () => {
+    const frist = abschlussFrist({ zustand: "VERBLEIBT", zustandAm, hierOffen: true }, eigenerBezug, SELBST);
+    expect(frist?.toISOString()).toBe("2030-12-31T23:00:00.000Z");
+    expect(frist).toEqual(ausgabeLoeschenAb({ zustand: "AUSGEGEBEN", zustandAm, austrittAbgeschlossenAm: ABSCHLUSS_2027 }));
+    // Hier gesetztes VERBLEIBT (Zeile erledigt): frei, ohne Frist.
+    expect(abschlussFrist({ zustand: "VERBLEIBT", zustandAm, hierOffen: false }, eigenerBezug, SELBST)).toBeNull();
+    // Ein früherer, abgelöster Austritt hält nicht ab; ein anderer laufender schon.
+    const frueher = [{ offboardingId: "off-alt", status: "COMPLETED", eigenerStand: "VERBLEIBT" as const, abgeloest: true }];
+    expect(abschlussFrist({ zustand: "VERBLEIBT", zustandAm, hierOffen: true }, [...frueher, ...eigenerBezug], SELBST)).not.toBeNull();
+    const laufend = [{ offboardingId: "off-2", status: "HANDOVER_PHASE" }];
+    expect(abschlussFrist({ zustand: "VERBLEIBT", zustandAm, hierOffen: true }, [...laufend, ...eigenerBezug], SELBST)).toBeNull();
+  });
+
+  it("eine vorhandene Frist wird nie vorgezogen, eine frühere verlängert", () => {
+    const spaeter = utc("2031-12-31T23:00:00.000Z");
+    const frueher = utc("2029-12-31T23:00:00.000Z");
+    const gleich = utc("2030-12-31T23:00:00.000Z");
+    expect(abschlussFrist({ zustand: "AUSGEGEBEN", zustandAm, loeschenAb: spaeter }, [], SELBST)).toBeNull();
+    expect(abschlussFrist({ zustand: "AUSGEGEBEN", zustandAm, loeschenAb: gleich }, [], SELBST)).toBeNull();
+    expect(abschlussFrist({ zustand: "AUSGEGEBEN", zustandAm, loeschenAb: frueher }, [], SELBST)?.toISOString()).toBe(
+      "2030-12-31T23:00:00.000Z",
+    );
   });
 });
 
@@ -1223,6 +1418,168 @@ describe("zuordnungsVorschlaege (E-A31)", () => {
     ]);
     expect(v.name).toBe("Anna Schmidt");
   });
+
+  it("ein Vorschlag ist die Anzeige der Einstellung plus Stufe und Begruendung (S28)", () => {
+    const k = kandidat({ id: "1", email: "anna.s@example.org", arbeitsortId: "org-gs-ort" });
+    const [v] = zuordnungsVorschlaege(austritt, [k]);
+    const { stufe, gruende, ...anzeige } = v;
+    expect(stufe).toBe("STARK");
+    expect(gruende).toHaveLength(1);
+    expect(anzeige).toEqual(einstellungAnzeige(k));
+  });
+});
+
+describe("einstellungAnzeige / einstellungsTreffer (S28, Suche im Dialog)", () => {
+  const kandidat = (teil: Partial<EinstellungsKandidat> & { id: string }): EinstellungsKandidat => ({
+    displayId: `2027-GYM-${teil.id}`,
+    organizationId: "org-gym",
+    email: "anna.s@example.org",
+    firstName: "Anna",
+    lastName: "Schmidt",
+    personalData: { emailPrivate: "privat@example.org", birthName: "Wagner" },
+    supervisorData: { vertragsbeginn: utc("2027-01-31T23:00:00Z") },
+    ...teil,
+  });
+
+  it("Anzeige ohne Adressen; Vertragsbeginn als Berliner Kalendertag", () => {
+    const a = einstellungAnzeige(kandidat({ id: "1", arbeitsortId: "org-gs" }));
+    expect(a).toEqual({
+      onboardingId: "1",
+      displayId: "2027-GYM-1",
+      name: "Anna Schmidt",
+      organizationId: "org-gym",
+      arbeitsortId: "org-gs",
+      // 31.01.2027 23:00 UTC = 01.02.2027 00:00 Berlin
+      vertragsbeginn: "2027-02-01",
+    });
+    expect(JSON.stringify(a)).not.toMatch(/@/);
+  });
+
+  it("ohne Nummer, Arbeitsort, Namen und Beginn: null bzw. Leertext; Name aus dem Fragebogen", () => {
+    expect(
+      einstellungAnzeige({
+        id: "2",
+        organizationId: "org-gym",
+        firstName: "  ",
+        lastName: null,
+        personalData: { firstName: "Berta", lastName: "Meier" },
+        supervisorData: null,
+      }),
+    ).toEqual({ onboardingId: "2", displayId: null, name: "Berta Meier", organizationId: "org-gym", arbeitsortId: null, vertragsbeginn: null });
+  });
+
+  it("Treffer: neuester Vertragsbeginn zuerst, ohne Datum zuletzt, hoechstens AUSGABE_GRENZEN.suche, ohne Stufe", () => {
+    const vb = (tag: string | null) => ({ vertragsbeginn: tag ? utc(`${tag}T00:00:00Z`) : null });
+    const treffer = einstellungsTreffer([
+      kandidat({ id: "a", supervisorData: vb("2026-08-01") }),
+      kandidat({ id: "b", supervisorData: vb(null) }),
+      kandidat({ id: "c", supervisorData: vb("2027-08-01") }),
+    ]);
+    expect(treffer.map((t) => t.onboardingId)).toEqual(["c", "a", "b"]);
+    expect(treffer[0]).not.toHaveProperty("stufe");
+    expect(JSON.stringify(treffer)).not.toMatch(/@/);
+
+    const viele = Array.from({ length: AUSGABE_GRENZEN.suche + 5 }, (_, i) => kandidat({ id: `k${String(i).padStart(2, "0")}` }));
+    expect(einstellungsTreffer(viele)).toHaveLength(AUSGABE_GRENZEN.suche);
+  });
+});
+
+describe("austrittLaeuft / zuordnungEmpfohlen / weitereBeschaeftigungVorbelegung (G11, G12, G13)", () => {
+  it("laufend heisst weder COMPLETED noch CANCELLED", () => {
+    for (const s of ["INITIATED", "NOTICE_PERIOD", "HANDOVER_PHASE", "FINAL_SETTLEMENT"]) expect(austrittLaeuft(s)).toBe(true);
+    expect(austrittLaeuft("COMPLETED")).toBe(false);
+    expect(austrittLaeuft("CANCELLED")).toBe(false);
+  });
+
+  it("Hinweis nur ohne Zuordnung, bei laufendem Austritt und mit STARK- bzw. MITTEL-Vorschlag", () => {
+    const basis = { zugeordnet: false, austrittStatus: "INITIATED" };
+    expect(zuordnungEmpfohlen({ ...basis, vorschlaege: [{ stufe: "STARK" }] })).toBe(true);
+    expect(zuordnungEmpfohlen({ ...basis, vorschlaege: [{ stufe: "SCHWACH" }, { stufe: "MITTEL" }] })).toBe(true);
+    // Nur schwache Vorschlaege bzw. keine: kein Hinweis
+    expect(zuordnungEmpfohlen({ ...basis, vorschlaege: [{ stufe: "SCHWACH" }] })).toBe(false);
+    expect(zuordnungEmpfohlen({ ...basis, vorschlaege: [] })).toBe(false);
+    // Schon zugeordnet bzw. nicht mehr laufend: kein Hinweis
+    expect(zuordnungEmpfohlen({ ...basis, zugeordnet: true, vorschlaege: [{ stufe: "STARK" }] })).toBe(false);
+    for (const s of ["COMPLETED", "CANCELLED"]) {
+      expect(zuordnungEmpfohlen({ ...basis, austrittStatus: s, vorschlaege: [{ stufe: "STARK" }] })).toBe(false);
+    }
+  });
+
+  it("Merker „Person bleibt in einer anderen Beschäftigung“: vorbelegt nur bei Versetzung", () => {
+    expect(weitereBeschaeftigungVorbelegung("VERSETZUNG")).toBe(true);
+    for (const t of ["KUENDIGUNG_ARBEITNEHMER", "BEFRISTUNGSENDE", "RENTE_PENSION", null, undefined]) {
+      expect(weitereBeschaeftigungVorbelegung(t)).toBe(false);
+    }
+  });
+});
+
+describe("informierteStellen / arbeitsortBeiZuordnung / arbeitsortText (G12)", () => {
+  const austritt = { organizationId: "org-foerderverein" };
+  const ogs = { organizationId: "org-foerderverein", arbeitsortId: "org-gs" };
+
+  it("informiert heisst sentAt ?? lastSentAt; ein nie zugestellter Link zaehlt nicht", () => {
+    expect(
+      informierteStellen([
+        { sentAt: utc("2027-07-01T08:00:00Z"), lastSentAt: null },
+        // nach gescheitertem „Link erneuern“: sentAt wieder null, aeltere Mail bleibt
+        { sentAt: null, lastSentAt: utc("2027-06-01T08:00:00Z") },
+        { sentAt: null, lastSentAt: null },
+        { sentAt: "kein Datum" },
+        {},
+      ]),
+    ).toBe(2);
+    expect(informierteStellen([])).toBe(0);
+  });
+
+  it("gleiche Einrichtung, Arbeitsort vorhanden, niemand informiert: uebernommen", () => {
+    expect(arbeitsortBeiZuordnung({ austritt, einstellung: ogs, links: [] })).toEqual({
+      arbeitsortId: "org-gs",
+      grund: "UEBERNOMMEN",
+    });
+    // Ein nie zugestellter Link (FAILED) haelt die Uebernahme nicht auf.
+    expect(arbeitsortBeiZuordnung({ austritt, einstellung: ogs, links: [{ sentAt: null, lastSentAt: null }] }).grund).toBe(
+      "UEBERNOMMEN",
+    );
+  });
+
+  it("eine Stelle schon informiert (auch nur lastSentAt): nicht uebernommen", () => {
+    for (const link of [{ sentAt: utc("2027-07-01T08:00:00Z") }, { sentAt: null, lastSentAt: utc("2027-07-01T08:00:00Z") }]) {
+      expect(arbeitsortBeiZuordnung({ austritt, einstellung: ogs, links: [link] })).toEqual({
+        arbeitsortId: null,
+        grund: "STELLE_INFORMIERT",
+      });
+    }
+  });
+
+  it("Einstellung an einer anderen Einrichtung: nie uebernommen – auch ohne informierte Stelle", () => {
+    expect(
+      arbeitsortBeiZuordnung({ austritt: { organizationId: "org-gym" }, einstellung: ogs, links: [] }),
+    ).toEqual({ arbeitsortId: null, grund: "ANDERE_EINRICHTUNG" });
+  });
+
+  it("ohne Arbeitsort (bzw. gleich der Einrichtung des Austritts): nichts zu uebernehmen, vor allen anderen Gruenden", () => {
+    for (const einstellung of [
+      { organizationId: "org-gym", arbeitsortId: null },
+      { organizationId: "org-gym", arbeitsortId: "" },
+      { organizationId: "org-gym" },
+      { organizationId: "org-x", arbeitsortId: "org-foerderverein" },
+    ]) {
+      expect(arbeitsortBeiZuordnung({ austritt, einstellung, links: [{ sentAt: utc("2027-07-01T08:00:00Z") }] })).toEqual({
+        arbeitsortId: null,
+        grund: "OHNE_ARBEITSORT",
+      });
+    }
+  });
+
+  it("der Dialog sagt, was mit dem Arbeitsort geschieht – auch, wenn er leer bleibt", () => {
+    expect(arbeitsortText("UEBERNOMMEN", "FES Grundschule")).toBe(
+      "Arbeitsort FES Grundschule wird übernommen: Die Aufgaben dieses Austritts gehen an die Stellen dort.",
+    );
+    expect(arbeitsortText("STELLE_INFORMIERT", "FES Grundschule")).toContain("schon eine Stelle informiert");
+    expect(arbeitsortText("ANDERE_EINRICHTUNG", null)).toContain("anderen Einrichtung");
+    expect(arbeitsortText("UEBERNOMMEN", null)).toContain("Arbeitsort der Einstellung wird übernommen");
+    expect(arbeitsortText("OHNE_ARBEITSORT", "FES Grundschule")).toBeNull();
+  });
 });
 
 // =============================================
@@ -1427,6 +1784,85 @@ describe("lageText / rueckgabenSchritt (E-A36)", () => {
   });
 });
 
+describe("rueckgabeLageAnzeige (E-A36, S28: Kopfzeile aus dem Bestand)", () => {
+  const aufgabe = (id: string, ausstattungId: string | null, teil: Partial<BestandAufgabe> = {}): BestandAufgabe => ({
+    id,
+    title: `Aufgabe ${id}`,
+    isCompleted: true,
+    completedAt: utc("2027-01-28T10:00:00Z"),
+    entfaelltAm: null,
+    ausgabenGeloeschtAm: null,
+    ausstattungId,
+    ...teil,
+  });
+  const bestand = (teil: Partial<EinstellungsBestand> = {}): EinstellungsBestand => ({
+    displayId: "2027-GS-004",
+    ausgabenAngeboten: true,
+    zeilen: [
+      { id: "z-ipad", art: "JA_NEIN", beiAustritt: "RUECKGABE" },
+      { id: "z-zugang", art: "AUSWAHL", beiAustritt: "SPERREN" },
+    ],
+    aufgaben: [],
+    ausgaben: [],
+    ...teil,
+  });
+
+  it("ohne Einstellung: KEINE_EINSTELLUNG, keine Nummer, nichts ohne Vermerk", () => {
+    const a = rueckgabeLageAnzeige(null);
+    expect(a.stand).toEqual({ lage: "KEINE_EINSTELLUNG", nr: "", gegenstaende: 0, zugaenge: 0, ohneVermerk: 0 });
+    expect(a.text).toBe(LAGE_TEXTE.KEINE_EINSTELLUNG(a.stand));
+    expect(a.zusatz).toBeNull();
+    expect(a.ohneVermerk).toEqual([]);
+  });
+
+  it("AUSGABEN zaehlt nur, was noch bei der Person ist – getrennt nach Gegenstand und Zugang", () => {
+    const a = rueckgabeLageAnzeige(
+      bestand({
+        ausgaben: [
+          { checklistItemId: "t1", zustand: "AUSGEGEBEN", beiAustritt: "RUECKGABE" },
+          { checklistItemId: "t1", zustand: "VERBLEIBT", beiAustritt: "RUECKGABE" },
+          { checklistItemId: "t1", zustand: "ERSETZT", beiAustritt: "RUECKGABE" },
+          { checklistItemId: "t2", zustand: "AUSGEGEBEN", beiAustritt: "SPERREN" },
+          { checklistItemId: "t2", zustand: "ZURUECK", beiAustritt: "SPERREN" },
+        ],
+      }),
+    );
+    expect(a.stand).toMatchObject({ lage: "AUSGABEN", nr: "2027-GS-004", gegenstaende: 2, zugaenge: 1 });
+    expect(a.text).toBe(
+      "Laut Portal ausgegeben (Einstellung 2027-GS-004, von HR zugeordnet): 2 Gegenstände, 1 Zugang.",
+    );
+    expect(a.zusatz).toBeNull();
+  });
+
+  it("AUSGABEN mit daneben geloeschten Ausgaben: Zusatzzeile; GELOESCHT ohne Ausgabe", () => {
+    const geloescht = aufgabe("t9", "z-ipad", { ausgabenGeloeschtAm: utc("2027-09-01T02:00:00Z") });
+    const mit = rueckgabeLageAnzeige(
+      bestand({ aufgaben: [geloescht], ausgaben: [{ checklistItemId: "t1", zustand: "AUSGEGEBEN", beiAustritt: "RUECKGABE" }] }),
+    );
+    expect(mit.stand.lage).toBe("AUSGABEN");
+    expect(mit.zusatz).toBe(LAGE_WEITERE_GELOESCHT);
+    const ohne = rueckgabeLageAnzeige(bestand({ aufgaben: [geloescht] }));
+    expect(ohne.stand.lage).toBe("GELOESCHT");
+    expect(ohne.zusatz).toBeNull();
+  });
+
+  it("NICHTS_ERFASST nennt die Aufgaben ohne Vermerk; NICHTS_AUSGEGEBEN und VOR_EINFUEHRUNG nach Merker und Zeilen", () => {
+    const erfasst = rueckgabeLageAnzeige(bestand({ aufgaben: [aufgabe("t1", "z-ipad"), aufgabe("t2", "z-zugang")] }));
+    expect(erfasst.stand).toMatchObject({ lage: "NICHTS_ERFASST", ohneVermerk: 2 });
+    expect(erfasst.ohneVermerk.map((o) => o.checklistItemId)).toEqual(["t1", "t2"]);
+    expect(erfasst.text).toContain(": 2 Aufgaben.");
+
+    expect(rueckgabeLageAnzeige(bestand()).stand.lage).toBe("NICHTS_AUSGEGEBEN");
+    expect(rueckgabeLageAnzeige(bestand({ zeilen: [], ausgabenAngeboten: null })).stand.lage).toBe("VOR_EINFUEHRUNG");
+  });
+
+  it("ohne Vorgangsnummer (Altbestand) steht ein lesbarer Platzhalter da", () => {
+    const a = rueckgabeLageAnzeige(bestand({ displayId: null, zeilen: [], ausgabenAngeboten: false }));
+    expect(a.stand.nr).toBe(EINSTELLUNG_OHNE_NUMMER);
+    expect(a.text).toContain(`Einstellung ${EINSTELLUNG_OHNE_NUMMER}`);
+  });
+});
+
 // =============================================
 // Abschluss: offene Rueckgaben (E-A33, G18)
 // =============================================
@@ -1471,6 +1907,44 @@ describe("offeneRueckgaben (E-A33)", () => {
       stellenNamen: {},
     });
     expect(offen).toEqual([{ titel: "Laptop", stelle: "IT-Abteilung" }]);
+  });
+});
+
+describe("rueckgabenFortschritt (Stepper „Rückgaben einsammeln“, Review A4c)", () => {
+  const RUECKGABEN = [
+    { id: "r-1", itemName: "Dienst-iPad (Lernmittel)", ausgabeId: "a-ipad", zustand: null, isReturned: false },
+    { id: "r-2", itemName: "Schlüssel: Haupteingang", ausgabeId: "a-key", zustand: "FEHLT", isReturned: false },
+    { id: "r-3", itemName: "Laptop", ausgabeId: "a-laptop", zustand: "ZURUECK", isReturned: true },
+    { id: "r-4", itemName: "Parkausweis", ausgabeId: null, zustand: null, isReturned: false },
+    { id: "r-5", itemName: "Alter Schlüssel", ausgabeId: null, zustand: null, isReturned: true },
+  ];
+  const AUFGABEN = [
+    { id: "t-1", title: "Dienst-iPad (Lernmittel) zurücknehmen", isCompleted: false, herkunft: "AUSGABE", ausgabeId: "a-ipad", assigneeDepartment: "IT" },
+    { id: "t-2", title: "Schlüssel: Haupteingang zurücknehmen", isCompleted: true, herkunft: "AUSGABE", ausgabeId: "a-key", assigneeDepartment: "FACILITY" },
+    { id: "t-3", title: "Schließung prüfen: Schlüssel: Haupteingang", isCompleted: false, herkunft: "AUSGABE_FEHLT", ausgabeId: "a-key", assigneeDepartment: "FACILITY" },
+    { id: "t-4", title: "Zugänge: WebUntis sperren", isCompleted: false, herkunft: "AUSGABE", ausgabeId: "a-webuntis", assigneeDepartment: "IT" },
+    { id: "t-5", title: "Zugänge: Schulportal sperren", isCompleted: true, herkunft: "AUSGABE", ausgabeId: "a-portal", assigneeDepartment: "IT" },
+    { id: "t-6", title: "Laptop zurücknehmen", isCompleted: true, herkunft: "AUSGABE", ausgabeId: "a-laptop", assigneeDepartment: "IT" },
+    { id: "t-7", title: "Vorlagenpunkt", isCompleted: false, herkunft: null, ausgabeId: null, assigneeDepartment: "IT" },
+  ];
+
+  it("in denselben Stücken wie offeneRueckgaben: gesamt − erledigt = Zahl der offenen", () => {
+    const f = rueckgabenFortschritt({ rueckgaben: RUECKGABEN, aufgaben: AUFGABEN });
+    // Stücke: iPad, Schlüssel (samt Folgeaufgabe), Laptop, Parkausweis, alter Schlüssel, WebUntis, Schulportal.
+    expect(f).toEqual({ erledigt: 3, gesamt: 7 });
+    expect(f.gesamt - f.erledigt).toBe(offeneRueckgaben({ rueckgaben: RUECKGABEN, aufgaben: AUFGABEN, stellenNamen: {} }).length);
+  });
+
+  it("alle Rückgabe-Zeilen erledigt, eine Sperraufgabe offen: nie „voll“", () => {
+    const f = rueckgabenFortschritt({
+      rueckgaben: [{ id: "r-1", ausgabeId: "a-1", zustand: "ZURUECK", isReturned: true }],
+      aufgaben: [
+        { id: "t-1", isCompleted: true, herkunft: "AUSGABE", ausgabeId: "a-1" },
+        { id: "t-2", isCompleted: false, herkunft: "AUSGABE", ausgabeId: "a-zugang" },
+      ],
+    });
+    expect(f).toEqual({ erledigt: 1, gesamt: 2 });
+    expect(rueckgabenFortschritt({ rueckgaben: [], aufgaben: [] })).toEqual({ erledigt: 0, gesamt: 0 });
   });
 });
 
@@ -2439,5 +2913,760 @@ describe("Offboarding-Schemata (G15, G16, G18)", () => {
     }
     expect(zodFehler(updateOffboardingSchema.safeParse({}))).toBe("Mindestens ein Feld erforderlich");
     expect(updateOffboardingSchema.safeParse({ exitReason: "Umzug", bestaetigt: true }).success).toBe(true);
+  });
+});
+
+// =============================================
+// S29 – Uebernahme in den Austritt und Reiter „Rückgaben“ (G13, G14)
+// =============================================
+
+describe("rueckgabeEntwurf (G14)", () => {
+  const basis = { id: "ag-1", bezeichnung: "Dienst-iPad (Lernmittel)", beiAustritt: "RUECKGABE" };
+
+  it("Gegenstand: Kategorie, Bezeichnung, Kennung als Seriennummer – offen", () => {
+    expect(rueckgabeEntwurf({ ...basis, kennung: " FES-IPAD-0412 ", rueckgabeKategorie: "IT_HARDWARE" })).toEqual({
+      category: "IT_HARDWARE",
+      itemName: "Dienst-iPad (Lernmittel)",
+      serialNumber: "FES-IPAD-0412",
+      ausgabeId: "ag-1",
+    });
+  });
+
+  it("ohne bzw. mit unbekannter Kategorie SONSTIGES; leere Kennung null", () => {
+    expect(rueckgabeEntwurf({ ...basis, rueckgabeKategorie: null, kennung: "" })).toMatchObject({
+      category: "SONSTIGES",
+      serialNumber: null,
+    });
+    expect(rueckgabeEntwurf({ ...basis, rueckgabeKategorie: "WEG" })?.category).toBe("SONSTIGES");
+    for (const k of RUECKGABE_KATEGORIEN) expect(rueckgabeEntwurf({ ...basis, rueckgabeKategorie: k })?.category).toBe(k);
+  });
+
+  it("ein Zugang (SPERREN) bekommt keine Rückgabe-Zeile", () => {
+    expect(rueckgabeEntwurf({ ...basis, beiAustritt: "SPERREN", kennung: "konto.x" })).toBeNull();
+  });
+});
+
+describe("uebernahmePlan (G14, Feinplan 1.7 Schritt 3.7)", () => {
+  const HEUTE = "2027-07-20";
+  const stueck = (id: string, teil: Record<string, unknown> = {}) => ({
+    id,
+    bezeichnung: `Stück ${id}`,
+    beiAustritt: "RUECKGABE",
+    departmentKey: "IT",
+    kennung: `K-${id}`,
+    rueckgabeKategorie: "IT_HARDWARE",
+    ...teil,
+  });
+  const plan = (
+    ausgaben: ReturnType<typeof stueck>[],
+    vorhanden = { aufgaben: [] as string[], rueckgaben: [] as string[] },
+    startIndex = 0,
+  ) =>
+    uebernahmePlan({
+      ausgaben,
+      vorhanden,
+      letzterArbeitstag: new Date("2027-07-31T00:00:00.000Z"),
+      heute: HEUTE,
+      startIndex,
+    });
+
+  it("je Gegenstand Aufgabe und Rückgabe, je Zugang nur die Aufgabe; Stellen einmal, in Reihenfolge", () => {
+    const p = plan([stueck("a"), stueck("b", { beiAustritt: "SPERREN", departmentKey: "VERWALTUNG" }), stueck("c")]);
+    expect(p.aufgaben.map((a) => [a.ausgabeId, a.title, a.orderIndex])).toEqual([
+      ["a", "Stück a zurücknehmen", ORDER_BASIS],
+      ["b", "Stück b sperren", ORDER_BASIS + 1],
+      ["c", "Stück c zurücknehmen", ORDER_BASIS + 2],
+    ]);
+    expect(p.rueckgaben.map((r) => r.ausgabeId)).toEqual(["a", "c"]);
+    expect(p.stellen).toEqual(["IT", "VERWALTUNG"]);
+    expect({ r: p.rueckgabenNeu, s: p.sperraufgabenNeu }).toEqual({ r: 2, s: 1 });
+    // Kennung nie im Titel oder in der Beschreibung (G14).
+    expect(JSON.stringify(p.aufgaben)).not.toContain("K-");
+    expect(p.aufgaben[0].dueDate.toISOString()).toBe("2027-07-31T00:00:00.000Z");
+  });
+
+  it("nur, was fehlt: vorhandene Aufgabe bzw. Rückgabe wird nicht wieder angelegt; `startIndex` reiht dahinter", () => {
+    const p = plan([stueck("a"), stueck("b"), stueck("c")], { aufgaben: ["a", "b"], rueckgaben: ["a"] }, 2);
+    expect(p.aufgaben.map((a) => [a.ausgabeId, a.orderIndex])).toEqual([["c", ORDER_BASIS + 2]]);
+    // b hat seine Aufgabe, aber keine Rueckgabe-Zeile: nur die fehlt.
+    expect(p.rueckgaben.map((r) => r.ausgabeId)).toEqual(["b", "c"]);
+    expect(p.stellen).toEqual(["IT"]);
+    expect({ r: p.rueckgabenNeu, s: p.sperraufgabenNeu }).toEqual({ r: 2, s: 0 });
+  });
+
+  it("alles schon da: leerer Plan; doppelte Stücke und solche ohne RUECKGABE/SPERREN fallen weg", () => {
+    expect(plan([stueck("a")], { aufgaben: ["a"], rueckgaben: ["a"] })).toEqual({
+      aufgaben: [],
+      rueckgaben: [],
+      stellen: [],
+      rueckgabenNeu: 0,
+      sperraufgabenNeu: 0,
+    });
+    const p = plan([stueck("a"), stueck("a"), stueck("n", { beiAustritt: "NICHTS" })]);
+    expect(p.aufgaben.map((a) => a.ausgabeId)).toEqual(["a"]);
+  });
+});
+
+describe("ausgabeKurz / rueckgabeVorschlagAnzeige (Vorschau und Hinweise, E-A35)", () => {
+  const stellen = { IT: "IT-Abteilung" };
+  const orte = { "org-gym": "FES Gymnasium" };
+  const a = (
+    id: string,
+    teil: Partial<AusgabeKurzDaten & VorschlagAusgabe> = {},
+  ): AusgabeKurzDaten & VorschlagAusgabe => ({
+    id,
+    bezeichnung: `Stück ${id}`,
+    beiAustritt: "RUECKGABE",
+    kennung: `K-${id}`,
+    kennungLabel: "Inventarnummer",
+    departmentKey: "IT",
+    organizationId: "org-gym",
+    zentral: false,
+    zustand: "AUSGEGEBEN",
+    uebergebenAm: new Date("2027-01-28T00:00:00.000Z"),
+    ...teil,
+  });
+
+  it("Bezeichnung, Kennung, Stelle, Einrichtung und „übergeben … · Stelle“; ohne Datum nur die Stelle", () => {
+    expect(ausgabeKurz(a("x"), { stellenNamen: stellen, einrichtungen: orte })).toEqual({
+      ausgabeId: "x",
+      bezeichnung: "Stück x",
+      art: "RUECKGABE",
+      kennung: "K-x",
+      kennungLabel: "Inventarnummer",
+      departmentKey: "IT",
+      stelle: "IT-Abteilung",
+      zentral: false,
+      einrichtung: "FES Gymnasium",
+      text: "übergeben 28.01.2027 · IT-Abteilung",
+    });
+    const zugang = ausgabeKurz(
+      a("z", {
+        beiAustritt: "SPERREN",
+        kennung: null,
+        kennungLabel: null,
+        departmentKey: "FACILITY",
+        organizationId: "org-x",
+        uebergebenAm: null,
+      }),
+      { stellenNamen: stellen, einrichtungen: orte },
+    );
+    expect(zugang).toMatchObject({
+      kennung: null,
+      kennungLabel: "Kennung",
+      stelle: "Facility Management",
+      einrichtung: null,
+      text: "Facility Management",
+    });
+    expect(ausgabeKurz(a("e", { beiAustritt: "SPERREN" }), { stellenNamen: stellen, einrichtungen: orte }).text).toBe(
+      "eingerichtet 28.01.2027 · IT-Abteilung",
+    );
+  });
+
+  it("trennt Gegenstände und Zugänge, lässt Übernommenes weg und nennt fremde Austritte ohne Kennung", () => {
+    const ergebnis = {
+      vorschlag: [a("g1"), a("z1", { beiAustritt: "SPERREN" }), a("g2")],
+      hinweisZentral: [a("h1", { zentral: true })],
+      hinweisAndereEinrichtung: [a("h2", { organizationId: "org-gs" })],
+      schonImAustritt: [{ offboardingId: "off-2", displayId: null, anzahl: 2 }],
+    };
+    const anzeige = rueckgabeVorschlagAnzeige(ergebnis, {
+      stellenNamen: stellen,
+      einrichtungen: orte,
+      uebernommen: ["g2", "h1"],
+    });
+    expect(anzeige.rueckgaben.map((x) => x.ausgabeId)).toEqual(["g1"]);
+    expect(anzeige.sperraufgaben.map((x) => x.ausgabeId)).toEqual(["z1"]);
+    expect(anzeige.hinweisZentral).toEqual([]);
+    expect(anzeige.hinweisAndereEinrichtung.map((x) => [x.ausgabeId, x.einrichtung])).toEqual([["h2", null]]);
+    expect(anzeige.schonImAustritt).toEqual([
+      { offboardingId: "off-2", displayId: null, anzahl: 2, text: "2 Stücke laufen in einem anderen Austritt." },
+    ]);
+  });
+});
+
+describe("sperraufgabenZeilen (Mockup 6.8)", () => {
+  const aufgabe = (teil: Record<string, unknown>) => ({
+    title: "x sperren",
+    isCompleted: false,
+    herkunft: "AUSGABE" as string | null,
+    ausgabeId: null as string | null,
+    assigneeDepartment: "IT" as string | null,
+    ...teil,
+  });
+
+  it("je Stelle eine Zeile: nur Ausgabe-Aufgaben ohne Rückgabe-Zeile; gesperrte mit Vermerk; Personalabteilung im Portal, zuletzt", () => {
+    const zeilen = sperraufgabenZeilen({
+      aufgaben: [
+        aufgabe({ ausgabeId: "z1" }),
+        aufgabe({ ausgabeId: "z2", isCompleted: true }),
+        // Gegenstand (hat eine Rueckgabe-Zeile) – keine Sperraufgabe
+        aufgabe({ title: "iPad zurücknehmen", ausgabeId: "g1" }),
+        aufgabe({ title: "Dienstwagen sperren", ausgabeId: "z3", assigneeDepartment: "HR" }),
+        // Folgeaufgabe und Vorlagenpunkt zaehlen nicht
+        aufgabe({ title: "Schließung prüfen: Schlüssel", herkunft: "AUSGABE_FEHLT", ausgabeId: "g1" }),
+        aufgabe({ title: "Konto sperren", herkunft: null }),
+      ],
+      rueckgaben: [{ ausgabeId: "g1" }, { ausgabeId: null }],
+      ausgaben: [
+        { id: "z1", bezeichnung: "Zugänge: Schulportal" },
+        { id: "z2", bezeichnung: "Zugänge: WebUntis" },
+      ],
+      stellenNamen: { IT: "IT-Abteilung" },
+    });
+    expect(zeilen.map((z) => [z.departmentKey, z.offen, z.text])).toEqual([
+      [
+        "IT",
+        1,
+        "Sperraufgaben zum letzten Arbeitstag – IT-Abteilung, über den Offboarding-Link: Zugänge: Schulportal und Zugänge: WebUntis (gesperrt)",
+      ],
+      // Ausgabe nach Ablauf der Frist geloescht: dann der Aufgabentitel.
+      ["HR", 1, "Sperraufgaben zum letzten Arbeitstag – Personalabteilung, im Portal: Dienstwagen sperren"],
+    ]);
+    expect(zeilen[0].zugaenge).toEqual([
+      { titel: "Zugänge: Schulportal", erledigt: false },
+      { titel: "Zugänge: WebUntis", erledigt: true },
+    ]);
+  });
+
+  it("ohne Sperraufgabe keine Zeile", () => {
+    expect(sperraufgabenZeilen({ aufgaben: [], rueckgaben: [], ausgaben: [], stellenNamen: {} })).toEqual([]);
+  });
+});
+
+describe("rueckgabeZeilenBauen (Reiter „Rückgaben“, G15)", () => {
+  const ausgabe: AusgabeZeilenDaten & { departmentKey: string } = {
+    id: "ag-ipad",
+    zustand: "AUSGEGEBEN",
+    beiAustritt: "RUECKGABE",
+    kennung: "FES-IPAD-0412",
+    kennungLabel: "Inventarnummer",
+    uebergebenAm: new Date("2027-01-28T00:00:00.000Z"),
+    quelle: "LINK",
+    departmentKey: "IT",
+    bezuege: [{ offboardingId: "off-1", status: "HANDOVER_PHASE" }],
+  };
+  const rueckgabe = (teil: Record<string, unknown> = {}) => ({
+    id: "r-1",
+    category: "IT_HARDWARE",
+    itemName: "Dienst-iPad (Lernmittel)",
+    serialNumber: "FES-IPAD-0412" as string | null,
+    zustand: null as string | null,
+    isReturned: false,
+    returnedAt: null as Date | null,
+    ausgabeId: "ag-ipad" as string | null,
+    ...teil,
+  });
+  const bauen = (
+    rueckgaben: ReturnType<typeof rueckgabe>[],
+    darfBearbeiten = true,
+    ausgaben = [ausgabe],
+    austrittStatus?: string,
+  ) =>
+    rueckgabeZeilenBauen({
+      rueckgaben,
+      aufgaben: [{ herkunft: "AUSGABE", ausgabeId: "ag-ipad", assigneeDepartment: "IT" }],
+      ausgaben,
+      stellenNamen: { IT: "IT-Abteilung" },
+      austrittId: "off-1",
+      darfBearbeiten,
+      austrittStatus,
+    });
+
+  it("vorgeschlagene Zeile: Stelle und Übergabe, Kennung korrigierbar (eigener Austritt), nicht löschbar", () => {
+    expect(bauen([rueckgabe()])[0]).toEqual({
+      id: "r-1",
+      category: "IT_HARDWARE",
+      kategorieLabel: "IT-Hardware",
+      itemName: "Dienst-iPad (Lernmittel)",
+      serialNumber: "FES-IPAD-0412",
+      kennungLabel: "Inventarnummer",
+      zustand: null,
+      zustandLabel: "offen",
+      offen: true,
+      returnedAt: null,
+      condition: null,
+      notes: null,
+      vorgeschlagen: true,
+      ausgabeId: "ag-ipad",
+      departmentKey: "IT",
+      stelle: "IT-Abteilung",
+      uebergabe: "übergeben 28.01.2027 · IT-Abteilung",
+      sperrGrund: null,
+      aktionen: { korrigieren: true, loeschen: false },
+      zustandWaehlbar: true,
+      zustandSperrGrund: null,
+      folgeBeiFehlt: false,
+    });
+  });
+
+  it("bindet ein anderer laufender Austritt das Stück: keine Korrektur, Sperrgrund ohne Kennung", () => {
+    const gebunden = {
+      ...ausgabe,
+      bezuege: [{ offboardingId: "off-2", status: "INITIATED", displayId: "OFF-2027-GYM-0002" }],
+    };
+    const z = bauen([rueckgabe()], true, [gebunden])[0];
+    expect(z.aktionen).toEqual({ korrigieren: false, loeschen: false });
+    expect(z.sperrGrund).toBe(MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT("OFF-2027-GYM-0002"));
+    // S32: Auch den Zustand waehlt dieser Reiter dann nicht – der Server antwortete 409.
+    expect(z.zustandWaehlbar).toBe(false);
+    expect(z.zustandSperrGrund).toBe(MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT("OFF-2027-GYM-0002"));
+  });
+
+  it("S32: abgeschlossener Austritt – ein offen gebliebenes Stück nimmt die späte Rückgabe an, ein mit „verbleibt“ freigegebenes nicht (Kennung bleibt korrigierbar)", () => {
+    const abgeschlossen = (zustand: string) => ({
+      ...ausgabe,
+      zustand,
+      bezuege: [{ offboardingId: "off-1", status: "COMPLETED" }],
+    });
+    const offen = bauen([rueckgabe()], true, [abgeschlossen("AUSGEGEBEN")], "COMPLETED")[0];
+    expect(offen).toMatchObject({ zustandWaehlbar: true, zustandSperrGrund: null });
+
+    const frei = bauen([rueckgabe({ zustand: "VERBLEIBT" })], true, [abgeschlossen("VERBLEIBT")], "COMPLETED")[0];
+    expect(frei.zustandWaehlbar).toBe(false);
+    expect(frei.zustandSperrGrund).toBe(MELDUNGEN_AUSGABEN.AUSGABE_FREIGEGEBEN);
+    expect(frei.aktionen.korrigieren).toBe(true);
+
+    // Laufend (oder ohne Status) bindet der Austritt auch ein VERBLEIBT-Stück noch selbst.
+    const laufend = bauen([rueckgabe({ zustand: "VERBLEIBT" })], true, [{ ...ausgabe, zustand: "VERBLEIBT" }])[0];
+    expect(laufend.zustandWaehlbar).toBe(true);
+  });
+
+  it("S32: „fehlt“ legt nur an einer Zeile aus der Einstellung mit Kategorie SCHLUESSEL eine Folgeaufgabe an", () => {
+    const [schluessel, hand] = bauen([
+      rueckgabe({ category: "SCHLUESSEL" }),
+      rueckgabe({ id: "r-2", category: "SCHLUESSEL", ausgabeId: null }),
+    ]);
+    expect(schluessel.folgeBeiFehlt).toBe(true);
+    expect(hand.folgeBeiFehlt).toBe(false);
+    expect(bauen([rueckgabe()])[0].folgeBeiFehlt).toBe(false);
+  });
+
+  it("von HR erfasste Zeile: Personalabteilung, ohne Übergabe, korrigier- und löschbar; Altbestand `isReturned` = zurück", () => {
+    const [z] = bauen([
+      rueckgabe({ ausgabeId: null, serialNumber: null, isReturned: true, returnedAt: new Date("2027-07-29T08:00:00.000Z") }),
+    ]);
+    expect(z).toMatchObject({
+      vorgeschlagen: false,
+      departmentKey: "HR",
+      stelle: "Personalabteilung",
+      uebergabe: null,
+      kennungLabel: "Kennung",
+      zustand: "ZURUECK",
+      zustandLabel: "zurück",
+      offen: false,
+      returnedAt: "2027-07-29T08:00:00.000Z",
+      aktionen: { korrigieren: true, loeschen: true },
+    });
+  });
+
+  it("ohne Bearbeitungsrecht (abgebrochener Austritt): keine Aktionen; Zustand FEHLT mit Wort", () => {
+    const [vorgeschlagen, hand] = bauen(
+      [rueckgabe({ zustand: "FEHLT" }), rueckgabe({ id: "r-2", ausgabeId: null })],
+      false,
+    );
+    expect(vorgeschlagen.aktionen).toEqual({ korrigieren: false, loeschen: false });
+    expect(vorgeschlagen.zustandLabel).toBe("fehlt");
+    expect(hand.aktionen).toEqual({ korrigieren: false, loeschen: false });
+    // Ohne Recht auch kein Zustand – und kein Sperrgrund (nichts, was HR erklaert werden muesste).
+    expect([vorgeschlagen.zustandWaehlbar, hand.zustandWaehlbar]).toEqual([false, false]);
+    expect(vorgeschlagen.zustandSperrGrund).toBeNull();
+  });
+});
+
+describe("loesenGesperrt / loesenStand (G11)", () => {
+  const aufgaben = [
+    { herkunft: "AUSGABE", isCompleted: false, assigneeDepartment: "IT" },
+    { herkunft: "AUSGABE", isCompleted: false, assigneeDepartment: "FACILITY" },
+    { herkunft: null, isCompleted: true, assigneeDepartment: "IT" },
+  ];
+  const rueckgaben = [
+    { ausgabeId: "ag-1", zustand: null, isReturned: false },
+    { ausgabeId: null, zustand: "ZURUECK", isReturned: true },
+  ];
+
+  it("frei, solange nichts Vorgeschlagenes erledigt ist – Vorlagenpunkte und Handzeilen zählen nicht", () => {
+    expect(loesenGesperrt({ aufgaben, rueckgaben })).toBe(false);
+  });
+
+  it("gesperrt bei erledigter Ausgabe- oder Folgeaufgabe bzw. vorgeschlagener Rückgabe mit Zustand (auch Altbestand)", () => {
+    expect(loesenGesperrt({ aufgaben: [{ herkunft: "AUSGABE_FEHLT", isCompleted: true }], rueckgaben: [] })).toBe(true);
+    expect(
+      loesenGesperrt({ aufgaben: [], rueckgaben: [{ ausgabeId: "ag-1", zustand: "VERBLEIBT", isReturned: false }] }),
+    ).toBe(true);
+    expect(loesenGesperrt({ aufgaben: [], rueckgaben: [{ ausgabeId: "ag-1", zustand: null, isReturned: true }] })).toBe(true);
+  });
+
+  it("Rückfrage nennt die Aufgaben und nur die informierten Stellen dieser Aufgaben", () => {
+    const stand = loesenStand({
+      aufgaben,
+      rueckgaben,
+      links: [
+        { departmentKey: "IT", sentAt: new Date("2027-07-01T08:00:00.000Z") },
+        { departmentKey: "FACILITY", sentAt: null, lastSentAt: null },
+        { departmentKey: "VERWALTUNG", sentAt: new Date("2027-07-01T08:00:00.000Z") },
+      ],
+    });
+    expect(stand).toEqual({
+      aufgaben: 2,
+      informierteStellen: 1,
+      rueckfrage: MELDUNGEN_AUSGABEN.LOESEN_RUECKFRAGE(2, 1),
+      sperrGrund: null,
+    });
+    expect(
+      loesenStand({
+        aufgaben: [{ herkunft: "AUSGABE", isCompleted: true, assigneeDepartment: "IT" }],
+        rueckgaben: [],
+        links: [],
+      }).sperrGrund,
+    ).toBe(MELDUNGEN_AUSGABEN.LOESEN_GESPERRT);
+  });
+});
+
+describe("Meldungen der Rückgaben im Offboarding (S29)", () => {
+  it("UEBERNOMMEN: nur die Teile mit Zahl, ohne neue Zeile leer", () => {
+    expect(MELDUNGEN_AUSGABEN.UEBERNOMMEN(3, 1)).toBe("3 Rückgaben und 1 Sperraufgabe übernommen.");
+    expect(MELDUNGEN_AUSGABEN.UEBERNOMMEN(1, 0)).toBe("1 Rückgabe übernommen.");
+    expect(MELDUNGEN_AUSGABEN.UEBERNOMMEN(0, 2)).toBe("2 Sperraufgaben übernommen.");
+    expect(MELDUNGEN_AUSGABEN.UEBERNOMMEN(0, 0)).toBe("");
+  });
+
+  it("Herausgefallen, als ausgegeben übernommen, übersprungen, Merker – Einzahl und Mehrzahl", () => {
+    expect(MELDUNGEN_AUSGABEN.HERAUSGEFALLEN(1)).toBe("1 Stück hat sich inzwischen geändert und wurde nicht übernommen.");
+    expect(MELDUNGEN_AUSGABEN.HERAUSGEFALLEN(2)).toBe(
+      "2 Stücke haben sich inzwischen geändert und wurden nicht übernommen.",
+    );
+    expect(MELDUNGEN_AUSGABEN.ALS_AUSGEGEBEN_UEBERNOMMEN(1)).toBe("1 Aufgabe als ausgegeben übernommen.");
+    expect(MELDUNGEN_AUSGABEN.ALS_AUSGEGEBEN_UEBERNOMMEN(3)).toBe("3 Aufgaben als ausgegeben übernommen.");
+    expect(MELDUNGEN_AUSGABEN.OHNE_VERMERK_UEBERSPRUNGEN(2)).toMatch(/^2 Aufgaben haben inzwischen einen Vermerk/);
+    expect(MELDUNGEN_AUSGABEN.MERKER_GESPEICHERT(true)).toContain("bleibt in einer anderen Beschäftigung");
+    expect(MELDUNGEN_AUSGABEN.MERKER_GESPEICHERT(false)).toContain("in keiner anderen Beschäftigung");
+  });
+
+  it("Sperraufgaben-Zeile ohne Artikel vor dem Namen der Stelle; Portal-Fehler", () => {
+    expect(MELDUNGEN_AUSGABEN.SPERRAUFGABEN("IT-Abteilung", "A und B", true)).toBe(
+      "Sperraufgaben zum letzten Arbeitstag – IT-Abteilung, über den Offboarding-Link: A und B",
+    );
+    expect(MELDUNGEN_AUSGABEN.SPERRAUFGABEN("Personalabteilung", "A", false)).toContain(", im Portal: A");
+    expect(MELDUNGEN_AUSGABEN.PORTAL_NUR_HR).toBe("Rücknahme- und Sperraufgaben bearbeitet nur die Personalabteilung.");
+    expect(MELDUNGEN_AUSGABEN.STELLE_FEST).toContain("ausgebende Stelle");
+  });
+});
+
+describe("einstellungSucheSchema: Merker der Vorschau (S29)", () => {
+  it('"true"/"false" werden Wahrheitswerte, leer = nicht angegeben, anderes = 400', () => {
+    expect(einstellungSucheSchema.parse({ vorschau: "onb-1", weitereBeschaeftigung: "true" })).toEqual({
+      vorschau: "onb-1",
+      weitereBeschaeftigung: true,
+    });
+    expect(einstellungSucheSchema.parse({ weitereBeschaeftigung: "false" })).toEqual({ weitereBeschaeftigung: false });
+    expect(einstellungSucheSchema.parse({ weitereBeschaeftigung: "" })).toEqual({});
+    expect(einstellungSucheSchema.safeParse({ weitereBeschaeftigung: "ja" }).success).toBe(false);
+  });
+});
+
+// =============================================
+// S30: Zustaende und Gleichlauf (G15 bis G17)
+// =============================================
+
+describe("rueckgabeZiel (G15: Haken und Wahl an Link und Portal)", () => {
+  it.each([
+    // [warErledigt, isCompleted, zustand, Ziel]
+    [false, true, undefined, "ZURUECK"], // abhaken ohne Zustand = ZURUECK
+    [false, true, "FEHLT", "FEHLT"],
+    [false, undefined, "BESCHAEDIGT", "BESCHAEDIGT"], // Portal: ein Zustand allein haket ab
+    [true, true, "FEHLT", "FEHLT"], // reiner Wechsel an einer erledigten Aufgabe
+    [true, undefined, "ZURUECK", "ZURUECK"],
+    [true, false, undefined, null], // wieder oeffnen
+    [true, true, undefined, undefined], // zweites „erledigt“: nichts
+    [false, false, undefined, undefined], // „offen“ an einer offenen: nichts
+    [false, undefined, undefined, undefined], // nur Kommentar oder Notiz
+  ] as const)("erledigt=%s, isCompleted=%s, zustand=%s → %s", (warErledigt, isCompleted, zustand, ziel) => {
+    expect(rueckgabeZiel({ warErledigt, isCompleted, zustand })).toBe(ziel);
+  });
+});
+
+describe("rueckgabeZielAusEingabe (G16: Reiter, Altform `isReturned`)", () => {
+  it("`zustand` gilt (auch `null` = offen), sonst `isReturned` (true = ZURUECK, false = offen), sonst nichts", () => {
+    expect(rueckgabeZielAusEingabe({ zustand: "VERBLEIBT" })).toBe("VERBLEIBT");
+    expect(rueckgabeZielAusEingabe({ zustand: null })).toBeNull();
+    expect(rueckgabeZielAusEingabe({ isReturned: true })).toBe("ZURUECK");
+    expect(rueckgabeZielAusEingabe({ isReturned: false })).toBeNull();
+    expect(rueckgabeZielAusEingabe({})).toBeUndefined();
+  });
+});
+
+describe("zustandFehler (G15, 1.2)", () => {
+  it("ohne Zustand nie; ohne Gegenstand (Vorlage, Folgeaufgabe) immer ZUSTAND_NICHT_MOEGLICH", () => {
+    expect(zustandFehler({ art: null, zustand: undefined, weg: "LINK" })).toBeNull();
+    expect(zustandFehler({ art: null, zustand: null, weg: "HR" })).toBeNull();
+    for (const weg of ["LINK", "HR"] as const) {
+      expect(zustandFehler({ art: null, zustand: "ZURUECK", weg })).toBe("ZUSTAND_NICHT_MOEGLICH");
+    }
+  });
+
+  it("Gegenstand: jeder Zustand; Zugang über den Link nie, im Portal nur gesperrt, verbleibt, entfällt", () => {
+    for (const zustand of RUECKGABE_ZUSTAENDE) {
+      expect(zustandFehler({ art: "RUECKGABE", zustand, weg: "HR" })).toBeNull();
+      expect(zustandFehler({ art: "RUECKGABE", zustand, weg: "LINK" })).toBeNull();
+      expect(zustandFehler({ art: "SPERREN", zustand, weg: "LINK" })).toBe("ZUSTAND_NICHT_MOEGLICH");
+    }
+    expect(zustandFehler({ art: "SPERREN", zustand: "ZURUECK", weg: "HR" })).toBeNull();
+    expect(zustandFehler({ art: "SPERREN", zustand: "VERBLEIBT", weg: "HR" })).toBeNull();
+    expect(zustandFehler({ art: "SPERREN", zustand: "ENTFAELLT", weg: "HR" })).toBeNull();
+    expect(zustandFehler({ art: "SPERREN", zustand: "BESCHAEDIGT", weg: "HR" })).toBe("ZUGANG_NUR_GESPERRT");
+    expect(zustandFehler({ art: "SPERREN", zustand: "FEHLT", weg: "HR" })).toBe("ZUGANG_NUR_GESPERRT");
+  });
+});
+
+describe("ausgabeNachZiel / gleichlaufPlan (G15: drei Zeilen, ein Stand)", () => {
+  it("„offen“ heißt aktiv: ein aktives Stück bleibt (auch VERBLEIBT aus einem früheren Austritt), sonst AUSGEGEBEN", () => {
+    expect(ausgabeNachZiel(null, "AUSGEGEBEN")).toBe("AUSGEGEBEN");
+    expect(ausgabeNachZiel(null, "VERBLEIBT")).toBe("VERBLEIBT");
+    expect(ausgabeNachZiel(null, "FEHLT")).toBe("AUSGEGEBEN");
+    expect(ausgabeNachZiel("FEHLT", "AUSGEGEBEN")).toBe("FEHLT");
+  });
+
+  it("Wiederöffnen nach einem HIER gesetzten „verbleibt“ setzt AUSGEGEBEN (G15, Review A4c)", () => {
+    expect(ausgabeNachZiel(null, "VERBLEIBT", true)).toBe("AUSGEGEBEN");
+    expect(ausgabeNachZiel(null, "VERBLEIBT", false)).toBe("VERBLEIBT");
+    // Reiter: „verbleibt“, dann „offen“ – die Zeile trug den Zustand, also AUSGEGEBEN.
+    expect(
+      gleichlaufPlan({
+        ziel: null,
+        ausgabe: { zustand: "VERBLEIBT" },
+        aufgabe: { isCompleted: true },
+        rueckgabe: { zustand: "VERBLEIBT", isReturned: false },
+      }),
+    ).toEqual({ moeglich: true, ausgabe: "AUSGEGEBEN", rueckgabe: null, aufgabeErledigt: false, nach: "AUSGEGEBEN" });
+    // Link-Weg (Aufgabe schon geschaltet, Zugang ohne Zeile): der Stand vorher kommt ausdrücklich mit.
+    expect(
+      gleichlaufPlan({ ziel: null, ausgabe: { zustand: "VERBLEIBT" }, aufgabe: null, rueckgabe: null, warErledigt: true }),
+    ).toMatchObject({ ausgabe: "AUSGEGEBEN", nach: "AUSGEGEBEN" });
+    expect(gleichlaufPlan({ ziel: null, ausgabe: { zustand: "VERBLEIBT" }, aufgabe: null, rueckgabe: null })).toMatchObject({
+      ausgabe: null,
+      nach: "VERBLEIBT",
+    });
+  });
+
+  it("abhaken: Ausgabe, Rückgabe und Aufgabe folgen – nur, was sich ändert", () => {
+    expect(
+      gleichlaufPlan({
+        ziel: "ZURUECK",
+        ausgabe: { zustand: "AUSGEGEBEN" },
+        aufgabe: { isCompleted: false },
+        rueckgabe: { zustand: null, isReturned: false },
+      }),
+    ).toEqual({ moeglich: true, ausgabe: "ZURUECK", rueckgabe: "ZURUECK", aufgabeErledigt: true, nach: "ZURUECK" });
+    // Der Link-Weg schaltet die Aufgabe selbst (`aufgabe: null`); ein Zugang hat keine Rueckgabe-Zeile.
+    expect(gleichlaufPlan({ ziel: "ZURUECK", ausgabe: { zustand: "VERBLEIBT" }, aufgabe: null, rueckgabe: null })).toEqual({
+      moeglich: true,
+      ausgabe: "ZURUECK",
+      rueckgabe: undefined,
+      aufgabeErledigt: undefined,
+      nach: "ZURUECK",
+    });
+  });
+
+  it("wieder öffnen: AUSGEGEBEN, Rückgabe ohne Zustand, Aufgabe offen; schon offen = nichts", () => {
+    expect(
+      gleichlaufPlan({
+        ziel: null,
+        ausgabe: { zustand: "FEHLT" },
+        aufgabe: { isCompleted: true },
+        rueckgabe: { zustand: "FEHLT", isReturned: false },
+      }),
+    ).toEqual({ moeglich: true, ausgabe: "AUSGEGEBEN", rueckgabe: null, aufgabeErledigt: false, nach: "AUSGEGEBEN" });
+    expect(
+      gleichlaufPlan({
+        ziel: null,
+        ausgabe: { zustand: "VERBLEIBT" },
+        aufgabe: { isCompleted: false },
+        rueckgabe: { zustand: null, isReturned: false },
+      }),
+    ).toEqual({ moeglich: true, ausgabe: null, rueckgabe: undefined, aufgabeErledigt: undefined, nach: "VERBLEIBT" });
+  });
+
+  it("Altbestand (`isReturned` ohne Zustand) gilt als ZURUECK; ERSETZT ist endgültig", () => {
+    expect(
+      gleichlaufPlan({
+        ziel: "ZURUECK",
+        ausgabe: { zustand: "ZURUECK" },
+        aufgabe: { isCompleted: true },
+        rueckgabe: { zustand: null, isReturned: true },
+      }),
+    ).toEqual({ moeglich: true, ausgabe: null, rueckgabe: undefined, aufgabeErledigt: undefined, nach: "ZURUECK" });
+    expect(
+      gleichlaufPlan({ ziel: "ZURUECK", ausgabe: { zustand: "ERSETZT" }, aufgabe: null, rueckgabe: null }).moeglich,
+    ).toBe(false);
+    expect(gleichlaufPlan({ ziel: null, ausgabe: { zustand: "ERSETZT" }, aufgabe: null, rueckgabe: null }).moeglich).toBe(
+      false,
+    );
+  });
+});
+
+describe("gleichlaufGesperrt / gleichlaufSperreText (G28 aus Sicht des Austritts)", () => {
+  const A = { id: "off-a", status: "HANDOVER_PHASE" };
+  const bezug = (offboardingId: string, status: string, displayId: string | null = null) => ({ offboardingId, status, displayId });
+
+  it("laufend: frei; ein anderer laufender Austritt bindet: AUSGABE_IM_AUSTRITT (Nummer nur mit Zugriff)", () => {
+    expect(gleichlaufGesperrt({ zustand: "AUSGEGEBEN" }, [bezug("off-a", A.status)], A)).toBeNull();
+    const sperre = gleichlaufGesperrt({ zustand: "VERBLEIBT" }, [bezug("off-a", A.status), bezug("off-b", "INITIATED", "OFF-2027-GYM-020")], A);
+    expect(sperre).toEqual({ grund: "AUSGABE_IM_AUSTRITT", displayId: "OFF-2027-GYM-020" });
+    expect(gleichlaufSperreText(sperre!)).toBe(MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT("OFF-2027-GYM-020"));
+    expect(
+      gleichlaufSperreText(gleichlaufGesperrt({ zustand: "AUSGEGEBEN" }, [bezug("off-b", "INITIATED")], A)!),
+    ).toBe(MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT(null));
+    // Ein abgebrochener Austritt bindet nie.
+    expect(gleichlaufGesperrt({ zustand: "AUSGEGEBEN" }, [bezug("off-b", "CANCELLED", "OFF-X")], A)).toBeNull();
+  });
+
+  it("abgeschlossen: die späte Rückgabe eines offenen Stücks geht; mit „verbleibt“ freigegeben nicht", () => {
+    const fertig = { id: "off-a", status: "COMPLETED" };
+    expect(gleichlaufGesperrt({ zustand: "AUSGEGEBEN" }, [bezug("off-a", "COMPLETED")], fertig)).toBeNull();
+    expect(gleichlaufGesperrt({ zustand: "FEHLT" }, [bezug("off-a", "COMPLETED")], fertig)).toBeNull();
+    const frei = gleichlaufGesperrt({ zustand: "VERBLEIBT" }, [bezug("off-a", "COMPLETED")], fertig);
+    expect(frei).toEqual({ grund: "AUSGABE_FREIGEGEBEN" });
+    expect(gleichlaufSperreText(frei!)).toBe(MELDUNGEN_AUSGABEN.AUSGABE_FREIGEGEBEN);
+  });
+
+  it("A mit „verbleibt“ abgeschlossen, B hat übernommen: B darf auch nach dem ersten Wechsel weiter ändern, A nicht (Review A4c)", () => {
+    const B = { id: "off-b", status: "HANDOVER_PHASE" };
+    const bezuege = [
+      { offboardingId: "off-a", status: "COMPLETED", displayId: "OFF-A", eigenerStand: "VERBLEIBT" as const, abgeloest: true },
+      { offboardingId: "off-b", status: B.status, displayId: "OFF-B" },
+    ];
+    for (const zustand of ["VERBLEIBT", "ZURUECK", "BESCHAEDIGT", "FEHLT", "ENTFAELLT", "AUSGEGEBEN"]) {
+      expect({ zustand, sperre: gleichlaufGesperrt({ zustand }, bezuege, B) }).toEqual({ zustand, sperre: null });
+    }
+    // A: B bindet (laufend) – und nach dem Abschluss von B mit ZURUECK bleibt A abgelöst.
+    expect(gleichlaufGesperrt({ zustand: "ZURUECK" }, bezuege, { id: "off-a", status: "COMPLETED" })).toEqual({
+      grund: "AUSGABE_IM_AUSTRITT",
+      displayId: "OFF-B",
+    });
+    const bFertig = [bezuege[0], { ...bezuege[1], status: "COMPLETED", eigenerStand: "ZURUECK" as const }];
+    expect(gleichlaufGesperrt({ zustand: "ZURUECK" }, bFertig, { id: "off-b", status: "COMPLETED" })).toBeNull();
+    expect(gleichlaufGesperrt({ zustand: "ZURUECK" }, bFertig, { id: "off-a", status: "COMPLETED" })).toEqual({
+      grund: "AUSGABE_IM_AUSTRITT",
+      displayId: "OFF-B",
+    });
+  });
+});
+
+describe("offboardingLinkAusgabeBauen / RUECKNAHME_AUSWAHL (Offboarding-Link-Seite, G15, G17, G21)", () => {
+  const IPAD = {
+    departmentKey: "IT",
+    beiAustritt: "RUECKGABE",
+    kennung: "FES-IPAD-0412",
+    kennungLabel: "Inventarnummer",
+    uebergebenAm: new Date("2027-01-28T00:00:00.000Z"),
+    zustand: "AUSGEGEBEN",
+  };
+  const ruecknahme = (teil: Record<string, unknown> = {}) => ({
+    herkunft: "AUSGABE",
+    assigneeDepartment: "IT",
+    isCompleted: false,
+    ...teil,
+  });
+
+  it("die drei Knöpfe der Stelle – mehr wählt sie nicht", () => {
+    expect(RUECKNAHME_AUSWAHL.map((k) => k.zustand)).toEqual(["ZURUECK", "BESCHAEDIGT", "FEHLT"]);
+    expect(RUECKNAHME_AUSWAHL.map((k) => k.label)).toEqual(["Zurückerhalten", "Beschädigt zurückerhalten", "Fehlt"]);
+  });
+
+  it("Rücknahme der ausgebenden Stelle: Kennung, Übergabetag, Zustand aus der Rückgabe-Zeile, drei Knöpfe", () => {
+    expect(
+      offboardingLinkAusgabeBauen({
+        departmentKey: "IT",
+        aufgabe: ruecknahme(),
+        ausgabe: IPAD,
+        rueckgabe: { zustand: null, isReturned: false },
+      }),
+    ).toEqual({
+      art: "RUECKGABE",
+      kennungLabel: "Inventarnummer",
+      kennung: "FES-IPAD-0412",
+      uebergebenAm: "2027-01-28",
+      zustand: null,
+      zustandLabel: "offen",
+      auswahl: RUECKNAHME_AUSWAHL,
+    });
+    // Stand beim Austritt: Ein spaeterer Austritt fuehrt das Stueck weiter, hier steht weiter „verbleibt“.
+    expect(
+      offboardingLinkAusgabeBauen({
+        departmentKey: "IT",
+        aufgabe: ruecknahme({ isCompleted: true }),
+        ausgabe: { ...IPAD, zustand: "ZURUECK" },
+        rueckgabe: { zustand: "VERBLEIBT", isReturned: false },
+      }),
+    ).toMatchObject({ zustand: "VERBLEIBT", zustandLabel: "verbleibt" });
+    // Altbestand ohne Zustand, aber zurueckgegeben.
+    expect(
+      offboardingLinkAusgabeBauen({
+        departmentKey: "IT",
+        aufgabe: ruecknahme({ isCompleted: true }),
+        ausgabe: IPAD,
+        rueckgabe: { zustand: null, isReturned: true },
+      }),
+    ).toMatchObject({ zustand: "ZURUECK", zustandLabel: "zurück" });
+  });
+
+  it("Zugang: Zustand aus Aufgabe und Ausgabe („gesperrt“), keine Knöpfe; ohne Kennung „Kennung“", () => {
+    const zugang = { ...IPAD, beiAustritt: "SPERREN", kennung: null, kennungLabel: null };
+    expect(offboardingLinkAusgabeBauen({ departmentKey: "IT", aufgabe: ruecknahme(), ausgabe: zugang })).toMatchObject({
+      art: "SPERREN",
+      kennungLabel: "Kennung",
+      kennung: null,
+      zustand: null,
+      zustandLabel: "offen",
+      auswahl: [],
+    });
+    expect(
+      offboardingLinkAusgabeBauen({ departmentKey: "IT", aufgabe: ruecknahme({ isCompleted: true }), ausgabe: { ...zugang, zustand: "ZURUECK" } }),
+    ).toMatchObject({ zustand: "ZURUECK", zustandLabel: "gesperrt" });
+  });
+
+  it("Folgeaufgabe: nur die Gebäudewirtschaft, nur lesend – ohne Übergabetag, Zustand und Knöpfe", () => {
+    const schluessel = { ...IPAD, departmentKey: "VERWALTUNG", kennung: "GS-114", kennungLabel: "Schlüsselnummer", zustand: "FEHLT" };
+    const folge = { herkunft: "AUSGABE_FEHLT", assigneeDepartment: "FACILITY", isCompleted: false };
+    expect(offboardingLinkAusgabeBauen({ departmentKey: "FACILITY", aufgabe: folge, ausgabe: schluessel })).toEqual({
+      art: "RUECKGABE",
+      kennungLabel: "Schlüsselnummer",
+      kennung: "GS-114",
+      zustandLabel: "fehlt",
+    });
+  });
+
+  it("sonst fehlt das Feld ganz: fremde Stelle, Vorlagenaufgabe, ohne Ausgabe, Ausgabe einer anderen Stelle", () => {
+    expect(offboardingLinkAusgabeBauen({ departmentKey: "FACILITY", aufgabe: ruecknahme(), ausgabe: IPAD })).toBeNull();
+    expect(
+      offboardingLinkAusgabeBauen({ departmentKey: "IT", aufgabe: ruecknahme({ herkunft: null }), ausgabe: IPAD }),
+    ).toBeNull();
+    expect(offboardingLinkAusgabeBauen({ departmentKey: "IT", aufgabe: ruecknahme(), ausgabe: null })).toBeNull();
+    expect(
+      offboardingLinkAusgabeBauen({ departmentKey: "IT", aufgabe: ruecknahme(), ausgabe: { ...IPAD, departmentKey: "VERWALTUNG" } }),
+    ).toBeNull();
+    // Die Folgeaufgabe sieht keine andere Stelle als die Gebaeudewirtschaft.
+    expect(
+      offboardingLinkAusgabeBauen({
+        departmentKey: "IT",
+        aufgabe: { herkunft: "AUSGABE_FEHLT", assigneeDepartment: "IT", isCompleted: false },
+        ausgabe: IPAD,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("Meldungen der Zustände (S30)", () => {
+  it("feste Texte; die Link-Seite liest ZUSTAND_NICHT_MOEGLICH und STUECK_INZWISCHEN_GEAENDERT mit (neutral)", () => {
+    expect(MELDUNGEN_AUSGABEN.ZUSTAND_NICHT_MOEGLICH).toBe("Einen Rückgabezustand gibt es nur bei der Rücknahme eines Gegenstands.");
+    expect(MELDUNGEN_AUSGABEN.STUECK_INZWISCHEN_GEAENDERT).toBe("Das Stück wurde inzwischen geändert. Bitte die Seite neu laden.");
+    expect(MELDUNGEN_AUSGABEN.GEGENSTAND_NICHT_GEFUNDEN).toBe("Rückgabe-Gegenstand nicht gefunden");
+    expect(MELDUNGEN_AUSGABEN.RUECKGABE_INZWISCHEN_GEAENDERT).toContain("Bitte die Seite neu laden");
+    expect(MELDUNGEN_AUSGABEN.RUECKGABEN_ABGEBROCHEN).toContain("abgebrochen");
+    expect(MELDUNGEN_AUSGABEN.AUSGABE_FREIGEGEBEN).toContain("„Ausstattung & Zugänge“");
+    for (const text of [MELDUNGEN_AUSGABEN.ZUSTAND_NICHT_MOEGLICH, MELDUNGEN_AUSGABEN.STUECK_INZWISCHEN_GEAENDERT]) {
+      expect(text).not.toMatch(/\b(du|dein)\b/i);
+    }
   });
 });

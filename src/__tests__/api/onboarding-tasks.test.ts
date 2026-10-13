@@ -676,6 +676,19 @@ describe("PATCH /api/onboarding-tasks/[token]/[itemId]", () => {
       expect(db.onboardingAufgaben[0].abteilungKommentar).toBeNull();
     });
 
+    // A4, S30: Den Rueckgabezustand nimmt nur der Offboarding-Link an – das
+    // Onboarding-Schema bleibt unveraendert und laesst `zustand` still fallen.
+    it("ein mitgeschickter Rückgabezustand ändert im Onboarding nichts – abhaken wie bisher", async () => {
+      const res = await aendern("tok-it", itemId, { body: { isCompleted: true, zustand: "FEHLT" } });
+      expect(res.status).toBe(200);
+      expect(db.onboardingAufgaben[0]).toMatchObject({ isCompleted: true });
+      expect(db.onboardingAufgaben[0]).not.toHaveProperty("zustand");
+      expect(db.ausgaben).toEqual([]);
+      const nurZustand = await aendern("tok-it", itemId, { body: { zustand: "FEHLT" } });
+      expect(nurZustand.status).toBe(400);
+      expect(await nurZustand.json()).toEqual({ error: "Bitte Status oder Kommentar angeben." });
+    });
+
     it("meldet „erledigt“ genau einmal — der zweite Klick ist 200 ohne Mail", async () => {
       const erste = await aendern("tok-it", itemId, { body: { isCompleted: true } });
       expect(erste.status).toBe(200);

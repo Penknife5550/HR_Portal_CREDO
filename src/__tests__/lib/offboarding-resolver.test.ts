@@ -226,6 +226,47 @@ describe("Offboarding-Resolver — Rueckgaben", () => {
     expect(data.rueckgaben_offen_anzahl).toBe("2");
   });
 
+  // A4, S30 (G16, 1.9): „offen“ heisst ohne Zustand; `rueckgaben_liste`
+  // nennt jede Zeile mit Zustand samt Zustandswort.
+  it("offen = ohne Zustand; die Liste nennt jeden Zustand mit seinem Wort – kein Stück fällt aus beiden Listen", async () => {
+    const am = new Date("2026-06-28T00:00:00.000Z");
+    const zeile = (itemName: string, teil: Record<string, unknown>) => ({
+      category: "IT_HARDWARE",
+      itemName,
+      serialNumber: null,
+      isReturned: false,
+      returnedAt: null,
+      zustand: null,
+      ...teil,
+    });
+    const alle = [
+      zeile("A Notebook", { serialNumber: "NB-77", zustand: "ZURUECK", isReturned: true, returnedAt: am }),
+      zeile("B Tablet", { zustand: "BESCHAEDIGT", isReturned: true, returnedAt: am }),
+      zeile("C Schlüssel", { serialNumber: "GS-114", zustand: "FEHLT" }),
+      zeile("D Diensthandy", { zustand: "VERBLEIBT" }),
+      zeile("E Kopierkarte", { zustand: "ENTFAELLT" }),
+      zeile("F Monitor", {}),
+      // Altbestand: zurueckgegeben, ohne Zustand
+      zeile("G Dockingstation", { isReturned: true, returnedAt: am }),
+    ];
+    findOff.mockResolvedValue(vorgang({ returnItems: alle }));
+    const { data } = await loese();
+    const liste = String(data.rueckgaben_liste).split("\n");
+    const offen = String(data.rueckgaben_offen_liste).split("\n");
+    expect(liste).toEqual([
+      "A Notebook (NB-77) — zurueck am 28.06.2026",
+      "B Tablet — beschädigt zurück am 28.06.2026",
+      "C Schlüssel (GS-114) — fehlt",
+      "D Diensthandy — verbleibt",
+      "E Kopierkarte — entfällt",
+      "G Dockingstation — zurueck am 28.06.2026",
+    ]);
+    expect(offen).toEqual(["F Monitor"]);
+    expect(data.rueckgaben_offen_anzahl).toBe("1");
+    // Jede Zeile steht in genau einer der beiden Listen.
+    expect(liste.length + offen.length).toBe(alle.length);
+  });
+
   it("setzt die Listen gar nicht, wenn es nichts zu melden gibt", async () => {
     // Dann faellt eine Rueckgabe-Bestaetigung mit "___" auf, statt still leer
     // zu bleiben.

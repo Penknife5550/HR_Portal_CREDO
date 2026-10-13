@@ -236,6 +236,9 @@ export type EinstellungAktionInput = z.infer<typeof einstellungAktionSchema>;
  *   q         Suche ueber Vorgangsnummer oder Nachname, getrimmt,
  *             `sucheMinZeichen` bis `sucheMaxZeichen`; leer = keine Suche
  *   vorschau  ID einer Einstellung – der Rueckgabe-Vorschlag vor der Bestaetigung
+ *   weitereBeschaeftigung  "true"/"false" (seit S29): der Merker, mit dem die
+ *             Vorschau rechnet – so, wie HR ihn im Dialog gerade gesetzt hat;
+ *             fehlt = gespeicherter Merker bzw. Vorbelegung (G13)
  */
 export const einstellungSucheSchema = z
   .object(
@@ -253,6 +256,12 @@ export const einstellungSucheSchema = z
         (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
         einstellungIdFeld.optional(),
       ),
+      weitereBeschaeftigung: z.preprocess((v) => {
+        if (typeof v !== "string") return v;
+        const t = v.trim();
+        if (t === "") return undefined;
+        return t === "true" ? true : t === "false" ? false : t;
+      }, weitereBeschaeftigungFeld.optional()),
     },
     KEIN_OBJEKT,
   )

@@ -11,6 +11,7 @@ import { csvZelle } from "@/lib/csv";
 import { getSession } from "@/lib/auth";
 import { formatDatumDE } from "@/lib/format";
 import { heuteInBerlin } from "@/lib/kalendertag";
+import { rueckgabeOffen } from "@/lib/ausgaben";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"];
 
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
           select: { isCompleted: true },
         },
         returnItems: {
-          select: { isReturned: true },
+          select: { isReturned: true, zustand: true },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -130,7 +131,8 @@ export async function GET(request: NextRequest) {
     const rows = offboardings.map((o) => {
       const checklistCompleted = o.checklistItems.filter((i) => i.isCompleted).length;
       const checklistTotal = o.checklistItems.length;
-      const returnReturned = o.returnItems.filter((i) => i.isReturned).length;
+      // „Erledigt“ statt „zurückgegeben“ (A4, G16): auch „fehlt“, „verbleibt“, „entfällt“.
+      const returnReturned = o.returnItems.filter((i) => !rueckgabeOffen(i)).length;
       const returnTotal = o.returnItems.length;
 
       return [

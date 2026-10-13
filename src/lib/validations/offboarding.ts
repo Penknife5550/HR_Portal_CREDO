@@ -174,3 +174,5 @@ export const rueckgabeAendernSchema = z
   .refine((d) => d.isReturned === undefined || d.zustand === undefined, {
     message: MELDUNGEN_AUSGABEN.ZUSTAND_UND_RUECKGABE,
   });
+
+export type RueckgabeAendernInput = z.infer<typeof rueckgabeAendernSchema>;

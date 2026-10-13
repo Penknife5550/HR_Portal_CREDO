@@ -1,6 +1,9 @@
 /**
  * Rolle und Mandant an den Unterrouten von /api/offboarding/:id —
- * Notizen, Dokumente, Exit-Interview, Zeugnis-Bewertung (Befund 12.10.2026).
+ * Notizen, Dokumente, Exit-Interview, Zeugnis-Bewertung (Befund 12.10.2026),
+ * seit A4 (S28) auch „Einstellung zuordnen“ (/einstellung: nur HR_EDIT_ROLES,
+ * fremder Mandant = dieselbe 404; die Fachlogik prueft
+ * src/__tests__/api/offboarding-einstellung.test.ts).
  *
  * Bis 10/2026 pruefte keine dieser acht Routen mehr als die Anmeldung: Der
  * n8n-Schluessel (`getSession` liefert SERVICE bei passendem X-API-Key) konnte
@@ -29,7 +32,10 @@ const mockUnlink = jest.fn();
 const mockRealpath = jest.fn();
 
 const mockPrisma = {
-  offboardingProcess: { findUnique: jest.fn() },
+  offboardingProcess: { findUnique: jest.fn(), updateMany: jest.fn() },
+  // A4 (S28): Kandidaten und Namen fuer „Einstellung zuordnen“
+  onboardingProcess: { findUnique: jest.fn(), findMany: jest.fn() },
+  organization: { findMany: jest.fn() },
   userOrgAssignment: { findUnique: jest.fn() },
   offboardingNote: {
     findMany: jest.fn(),
@@ -53,7 +59,10 @@ jest.mock("@/lib/auth", () => ({ getSession: mockGetSession }));
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/webhooks", () => ({ triggerWebhooks: (...a: unknown[]) => mockTriggerWebhooks(...a) }));
 jest.mock("@/lib/url", () => ({ getBaseUrl: () => "https://hr.example.org" }));
+// Echt bis auf die Freigabeliste: /einstellung nimmt die Versandsperre des
+// Austritts aus diesem Modul (A4, G26).
 jest.mock("@/lib/abteilungsaufgaben-dienst", () => ({
+  ...jest.requireActual("@/lib/abteilungsaufgaben-dienst"),
   fuehrungskraftAdresseFreigegeben: (...a: unknown[]) => mockFreigegeben(...a),
 }));
 // canAccessProcess bleibt die echte Funktion; einzelne Tests erzwingen
@@ -84,6 +93,7 @@ import * as exitInterview from "@/app/api/offboarding/[id]/exit-interview/route"
 import * as exitSenden from "@/app/api/offboarding/[id]/exit-interview/send/route";
 import * as zeugnis from "@/app/api/offboarding/[id]/zeugnis-bewertung/route";
 import * as hrReview from "@/app/api/offboarding/[id]/zeugnis-bewertung/hr-review/route";
+import * as einstellung from "@/app/api/offboarding/[id]/einstellung/route";
 
 const { canAccessProcess: echtesCanAccessProcess } = jest.requireActual("@/lib/permissions");
 
@@ -202,6 +212,9 @@ const zeugnisAnlegen = (body: unknown = { supervisorEmail: "neu@einrichtung.exam
   zeugnis.POST(json("POST", `${BASIS}/zeugnis-bewertung`, body), ctx());
 const hrPruefen = (body: unknown = { ratings: [{ snapshotCriterionId: "k-2", hrOverrideGrade: 1 }], finalize: true }) =>
   hrReview.PUT(json("PUT", `${BASIS}/zeugnis-bewertung/hr-review`, body), ctx());
+const einstellungLesen = () => einstellung.GET(new NextRequest(`${BASIS}/einstellung?q=Muster`), ctx());
+const einstellungAendern = (body: unknown = { aktion: "loesen" }) =>
+  einstellung.POST(json("POST", `${BASIS}/einstellung`, body), ctx());
 
 /** Jeder Endpunkt mit der Rollengruppe, die ihn aufrufen darf. */
 const ENDPUNKTE: [string, () => Promise<Response>, readonly string[]][] = [
@@ -218,6 +231,8 @@ const ENDPUNKTE: [string, () => Promise<Response>, readonly string[]][] = [
   ["GET zeugnis-bewertung", zeugnisLesen, HR_EDIT_ROLES],
   ["POST zeugnis-bewertung", () => zeugnisAnlegen(), HR_EDIT_ROLES],
   ["PUT zeugnis-bewertung/hr-review", () => hrPruefen(), ADMIN_ROLES],
+  ["GET einstellung", einstellungLesen, HR_EDIT_ROLES],
+  ["POST einstellung", () => einstellungAendern(), HR_EDIT_ROLES],
 ];
 
 /** Was ein abgewiesener Aufruf NICHT anfassen darf. */
@@ -232,6 +247,7 @@ function nichtsGeschrieben() {
     mockPrisma.zeugnisBewertung.create,
     mockPrisma.zeugnisBewertung.updateMany,
     mockPrisma.zeugnisBewertungRating.update,
+    mockPrisma.offboardingProcess.updateMany,
     mockPrisma.auditLog.create,
     mockWriteFile,
     mockTriggerWebhooks,
@@ -249,6 +265,8 @@ function nichtsGelesen() {
     mockPrisma.offboardingDocument.findFirst,
     mockPrisma.exitInterview.findUnique,
     mockPrisma.zeugnisBewertung.findUnique,
+    mockPrisma.onboardingProcess.findUnique,
+    mockPrisma.onboardingProcess.findMany,
     mockReadFile,
   ]) {
     expect(m).not.toHaveBeenCalled();
@@ -288,6 +306,11 @@ function standardMocks() {
   mockPrisma.zeugnisBewertung.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.zeugnisBewertungTemplate.findFirst.mockResolvedValue(ZB_VORLAGE);
   mockPrisma.zeugnisBewertungRating.update.mockResolvedValue({});
+
+  mockPrisma.onboardingProcess.findUnique.mockResolvedValue(null);
+  mockPrisma.onboardingProcess.findMany.mockResolvedValue([]);
+  mockPrisma.organization.findMany.mockResolvedValue([]);
+  mockPrisma.offboardingProcess.updateMany.mockResolvedValue({ count: 1 });
 
   mockPrisma.auditLog.create.mockResolvedValue({});
   mockPrisma.$transaction.mockImplementation(async (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma));

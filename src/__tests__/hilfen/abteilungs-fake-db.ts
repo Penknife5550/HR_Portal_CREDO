@@ -39,7 +39,24 @@
  * Statusfilter (`where: { id: { in } }`): Die Link-Seite fragt die Bindung
  * ueber `linkAusgabenLaden` selbst ab, dort greift kein Modul-Mock. Eine
  * Offboarding-Aufgabe mit `ausgabeId` und `herkunft` in `aufgaben` ergibt den
- * Bezug; `returnItem.findMany` haengt die Testdatei an (bis S29).
+ * Bezug.
+ *
+ * Seit S29 (A4, Rueckgaben im Offboarding): Tabelle `rueckgaben` (ReturnItem,
+ * `@@unique([offboardingId, ausgabeId])`, NULL kollidiert nicht) als
+ * `returnItem` mit allen Methoden von `tabelle`; die Offboarding-Aufgaben
+ * kennen `herkunft`/`ausgabeId` (`neueOffboardingAufgabe`, Standardwerte des
+ * Schemas) samt `@@unique([offboardingId, ausgabeId, herkunft])` und dazu
+ * `create`, `createMany` und `deleteMany`. `createMany` versteht
+ * `skipDuplicates` (Doppelte fallen still weg, `count` zaehlt nur neue) –
+ * ohne das wirft eine verletzte Eindeutigkeit P2002 wie Prisma. Das `include`
+ * am Vorgang liefert `returnItems` aus der Tabelle; `offboardingDocument`
+ * liefert leere Listen (Dokumente fuehrt der Fake nicht). Tests, die
+ * `returnItem` frueher selbst angehaengt haben, duerfen es weiter ersetzen.
+ *
+ * Seit S30 (A4, Gleichlauf): `offboardingChecklistItem.findFirst` (Ruecknahme-
+ * bzw. Folgeaufgabe einer Ausgabe). Die Austrittssperre des Link- und
+ * Portal-Wegs (`updateMany` mit `status: { notIn }` bzw. `{ not }`) versteht
+ * `offboardingProcess.updateMany` schon.
  *
  * Einbinden (Pfad relativ zur Testdatei):
  *
@@ -87,6 +104,8 @@ export const db: {
   ausstattungsAusblendungen: Zeile[];
   /** Paket A4 (S24): Ausgabe-Zeilen (eine je Stueck). */
   ausgaben: Zeile[];
+  /** Paket A4 (S29): ReturnItem-Zeilen (Rueckgaben im Offboarding). */
+  rueckgaben: Zeile[];
   /** SmtpConfig.replyToEmail (HR-Postfach). */
   replyToEmail: string | null;
 } = {
@@ -108,6 +127,7 @@ export const db: {
   ausstattungsPositionen: [],
   ausstattungsAusblendungen: [],
   ausgaben: [],
+  rueckgaben: [],
   replyToEmail: null,
 };
 
@@ -242,7 +262,10 @@ function vorgangMitInclude(v: Zeile, include: Record<string, unknown>): Zeile {
       ).map((a) => structuredClone(a));
     } else if (k === "departmentLinks") {
       r.departmentLinks = db.links.filter((l) => l.offboardingId === v.id).map((l) => structuredClone(l));
-    } else if (["returnItems", "documents", "notes", "auditLogs"].includes(k)) {
+    } else if (k === "returnItems") {
+      // Seit S29: aus der Tabelle (Rueckgaben im Offboarding).
+      r.returnItems = db.rueckgaben.filter((x) => x.offboardingId === v.id).map((x) => structuredClone(x));
+    } else if (["documents", "notes", "auditLogs"].includes(k)) {
       r[k] = [];
     } else {
       r[k] = structuredClone(v[k] ?? null);
@@ -337,6 +360,57 @@ export function neueAusgabe(data: Zeile): Zeile {
   };
 }
 
+/** Neue OffboardingChecklistItem-Zeile mit den Standardwerten des Schemas (seit S29 mit `herkunft`/`ausgabeId`). */
+export function neueOffboardingAufgabe(data: Zeile): Zeile {
+  return {
+    id: `oi-${naechsteId()}`,
+    title: "",
+    category: "",
+    orderIndex: 0,
+    description: null,
+    assigneeDepartment: null,
+    isCompleted: false,
+    completedAt: null,
+    completedById: null,
+    dueDate: null,
+    notes: null,
+    abteilungKommentar: null,
+    abteilungKommentarAm: null,
+    herkunft: null,
+    ausgabeId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neue ReturnItem-Zeile (S29) mit den Standardwerten des Schemas. */
+export function neueRueckgabe(data: Zeile): Zeile {
+  return {
+    id: `ri-${naechsteId()}`,
+    serialNumber: null,
+    isReturned: false,
+    returnedAt: null,
+    returnedToId: null,
+    condition: null,
+    notes: null,
+    zustand: null,
+    ausgabeId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** @@unique([offboardingId, ausgabeId, herkunft]) – NULL kollidiert nicht (Postgres). */
+function offboardingAufgabePruefen(x: Zeile, ohne?: Zeile): void {
+  if (x.ausgabeId == null || x.herkunft == null) return;
+  const doppelt = db.aufgaben.some(
+    (a) => a !== ohne && a.offboardingId === x.offboardingId && a.ausgabeId === x.ausgabeId && a.herkunft === x.herkunft,
+  );
+  if (doppelt) throw eindeutigkeitVerletzt("offboardingId,ausgabeId,herkunft");
+}
+
 /** Neue OnboardingAusstattung-Zeile mit den Standardwerten des Schemas. */
 export function neueAusstattungsZeile(data: Zeile): Zeile {
   return {
@@ -424,14 +498,22 @@ function tabelle(opts: {
       opts.zeilen().push(x);
       return projizieren(x, select);
     }),
-    createMany: jest.fn(async ({ data }: { data: Zeile[] | Zeile }) => {
+    // Seit S29: `skipDuplicates` laesst Doppelte (P2002) still weg, `count` zaehlt nur neue.
+    createMany: jest.fn(async ({ data, skipDuplicates }: { data: Zeile[] | Zeile; skipDuplicates?: boolean }) => {
       const liste = Array.isArray(data) ? data : [data];
+      let count = 0;
       for (const d of liste) {
         const x = opts.neu(d);
-        opts.pruefen?.(x);
+        try {
+          opts.pruefen?.(x);
+        } catch (err) {
+          if (skipDuplicates && (err as { code?: string }).code === "P2002") continue;
+          throw err;
+        }
         opts.zeilen().push(x);
+        count += 1;
       }
-      return { count: liste.length };
+      return { count };
     }),
     update: jest.fn(async ({ where, data, select }: { where: Zeile; data: Zeile; select?: Zeile }) => {
       const x = finden(where);
@@ -555,7 +637,31 @@ const ausstattungsTabellen = {
       db.ausstattungsAusblendungen.filter((x) => passt(x, where)).map((x) => projizieren(x, select)),
     ),
   },
+  // Seit S29 (A4): Rueckgaben im Offboarding. @@unique([offboardingId, ausgabeId]).
+  returnItem: tabelle({
+    zeilen: () => db.rueckgaben,
+    ersetzen: (z) => (db.rueckgaben = z),
+    neu: neueRueckgabe,
+    pruefen: (x, ohne) => {
+      if (x.ausgabeId == null) return;
+      if (db.rueckgaben.some((r) => r !== ohne && r.offboardingId === x.offboardingId && r.ausgabeId === x.ausgabeId)) {
+        throw eindeutigkeitVerletzt("offboardingId,ausgabeId");
+      }
+    },
+  }),
+  // Seit S29: Dokumente fuehrt der Fake nicht (Rueckgabeprotokoll im Reiter „Rückgaben“).
+  offboardingDocument: {
+    findMany: jest.fn(async (): Promise<Zeile[]> => []),
+  },
 };
+
+/** Seit S29: Offboarding-Aufgaben anlegen und loeschen (Ruecknahme- und Sperraufgaben), mit dem Unique-Index. */
+const offboardingAufgabenAnlage = tabelle({
+  zeilen: () => db.aufgaben,
+  ersetzen: (z) => (db.aufgaben = z),
+  neu: neueOffboardingAufgabe,
+  pruefen: offboardingAufgabePruefen,
+});
 
 export const fakePrisma: Record<string, unknown> = {
   offboardingProcess: {
@@ -608,6 +714,8 @@ export const fakePrisma: Record<string, unknown> = {
       treffer.forEach((v) => anwenden(v, data));
       return { count: treffer.length };
     }),
+    // Seit S29 (A4): andere laufende Austritte derselben Einstellung (EINSTELLUNG_VERGEBEN).
+    count: jest.fn(async ({ where }: { where?: Zeile } = {}) => db.vorgaenge.filter((v) => passt(v, where)).length),
   },
   offboardingChecklistItem: {
     findMany: jest.fn(async ({ where, select, orderBy }: { where: Zeile; select?: Zeile; orderBy?: unknown }) =>
@@ -629,6 +737,12 @@ export const fakePrisma: Record<string, unknown> = {
       treffer.forEach((a) => anwenden(a, data));
       return { count: treffer.length };
     }),
+    // Seit S29 (A4): Ruecknahme-, Sperr- und Folgeaufgaben.
+    create: offboardingAufgabenAnlage.create,
+    createMany: offboardingAufgabenAnlage.createMany,
+    deleteMany: offboardingAufgabenAnlage.deleteMany,
+    // Seit S30 (A4): Ruecknahme- bzw. Folgeaufgabe einer Ausgabe im Gleichlauf.
+    findFirst: offboardingAufgabenAnlage.findFirst,
   },
   offboardingDepartmentLink: {
     findMany: jest.fn(async ({ where, select }: { where: Zeile; select?: Zeile }) =>
@@ -807,5 +921,6 @@ export function dbLeeren(): void {
   db.ausstattungsPositionen = [];
   db.ausstattungsAusblendungen = [];
   db.ausgaben = [];
+  db.rueckgaben = [];
   db.replyToEmail = null;
 }

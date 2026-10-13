@@ -1,7 +1,9 @@
 "use client";
 
-import { EXIT_TYPE_LABELS, abteilungLabel } from "@/lib/constants";
+import { EXIT_TYPE_LABELS, RETURN_CATEGORY_LABELS, abteilungLabel } from "@/lib/constants";
 import type { AnzeigeStatus } from "@/lib/abteilungsaufgaben";
+import { MELDUNGEN_AUSGABEN, rueckgabeOffen } from "@/lib/ausgaben";
+import { ZUORDNEN_TEXTE } from "@/components/ausgaben/einstellung-zuordnen-dialog";
 import {
   PILL_FARBEN,
   aufgabenText,
@@ -20,7 +22,7 @@ import {
   EditableFieldRow,
 } from "../shared-components";
 import { PencilIcon } from "../icons";
-import { ProcessWorkflowStepper, type WorkflowStep } from "@/components/process-workflow-stepper";
+import { ProcessWorkflowStepper, type WorkflowAction, type WorkflowStep } from "@/components/process-workflow-stepper";
 
 /** Kurz-Status je Abteilung im Stepper (Schritt 2). */
 export const ABTEILUNG_KURZSTATUS: Record<AnzeigeStatus, string> = {
@@ -50,6 +52,7 @@ export function TabOverview({
   handleFieldSave,
   onNavigateTab,
   hrReiterSichtbar = true,
+  onZuordnen,
 }: {
   data: OffboardingData;
   editingField: string | null;
@@ -64,6 +67,11 @@ export function TabOverview({
    * (wie ihre Routen) — sonst fuehrt kein Knopf dorthin.
    */
   hrReiterSichtbar?: boolean;
+  /**
+   * Oeffnet den Dialog „Einstellung zuordnen …“ (A4, S32, G12) – als Knopf am
+   * Schritt „Rückgaben einsammeln“, solange `rueckgaben.zuordnungEmpfohlen`.
+   */
+  onZuordnen?: () => void;
 }) {
   const ed = data.exitData;
 
@@ -72,9 +80,16 @@ export function TabOverview({
   const checklistDone = data.checklistItems.filter((i) => i.isCompleted).length;
   const checklistAllDone = checklistTotal > 0 && checklistDone === checklistTotal;
 
+  // Rueckgaben (A4, G16): gezaehlt wird „erledigt“ (ein Zustand ist gesetzt –
+  // auch „fehlt“, „verbleibt“, „entfällt“), nicht nur „zurückgegeben“.
   const returnTotal = data.returnItems.length;
-  const returnDone = data.returnItems.filter((i) => i.isReturned).length;
+  const returnDone = data.returnItems.filter((i) => !rueckgabeOffen(i)).length;
   const returnsAllDone = returnTotal > 0 && returnDone === returnTotal;
+  // Mit `rueckgaben` (nur HR_EDIT_ROLES, S32) kommen Stand und Text vom Server
+  // (`rueckgaben.schritt`, E-A36); der Hinweis „Einstellung zuordnen, bevor
+  // Sie die Abteilungen informieren“ (G12) haelt den Schritt offen.
+  const rueckgaben = data.rueckgaben ?? null;
+  const zuordnungEmpfohlen = rueckgaben?.zuordnungEmpfohlen === true;
 
   // Schritt 2 aus den Zeilen der Karte „Aufgaben für Abteilungen": eine Zeile
   // je Link-Zustaendigkeit, auch nicht informierte und uebersprungene. Fertig
@@ -110,10 +125,24 @@ export function TabOverview({
 
   const step1Done = true; // Vorgang ist erfasst
   const step2Done = deptTotal > 0 ? deptDone === deptTotal : checklistAllDone;
-  const step3Done = returnsAllDone || returnTotal === 0;
+  const step3Done = rueckgaben
+    ? rueckgaben.schritt.erledigt && !zuordnungEmpfohlen
+    : returnsAllDone || returnTotal === 0;
   const step4Done = exitInterviewDone || !hasExitInterview;
   const step5Done = zeugnisDone;
   const step6Done = svDone && certDone;
+
+  // Schritt 3: erst „Einstellung zuordnen …“ (G12, nur mit Hinweis), dann der Weg zum Reiter.
+  const rueckgabenAktionen: WorkflowAction[] = step3Done
+    ? []
+    : [
+        ...(zuordnungEmpfohlen && onZuordnen
+          ? [{ label: ZUORDNEN_TEXTE.knopf, onClick: onZuordnen, variant: "primary" as const }]
+          : []),
+        ...(onNavigateTab
+          ? [{ label: "Zum Rückgaben-Tab", onClick: () => onNavigateTab("returns"), variant: "secondary" as const }]
+          : []),
+      ];
 
   function calcStatus(done: boolean, prevDone: boolean): "completed" | "active" | "upcoming" {
     if (done || isCompleted) return "completed";
@@ -174,18 +203,39 @@ export function TabOverview({
       title: "Rückgaben einsammeln",
       description: "Hardware, Schlüssel, Fahrzeuge und Dokumente zurückfordern",
       status: calcStatus(step3Done, step1Done),
-      progress: returnTotal > 0 ? { done: returnDone, total: returnTotal } : undefined,
-      items: returnTotal > 0 ? data.returnItems.filter((i) => !i.isReturned).slice(0, 5).map((i) => ({
+      // Mit `rueckgaben` aus derselben Quelle wie Liste und Stand (Stueck fuer
+      // Stueck, auch Sperr- und Folgeaufgaben) – sonst stuende „4/4“ neben
+      // einer offenen Sperraufgabe.
+      progress: rueckgaben
+        ? (rueckgaben.fortschritt.gesamt > 0
+            ? { done: rueckgaben.fortschritt.erledigt, total: rueckgaben.fortschritt.gesamt }
+            : undefined)
+        : returnTotal > 0 ? { done: returnDone, total: returnTotal } : undefined,
+      // Stueck fuer Stueck, was offen ist: mit `rueckgaben` dieselbe Liste wie
+      // die Rueckfrage beim Abschluss (Rueckgaben, Sperr- und Folgeaufgaben,
+      // samt Stelle); sonst die offenen Rueckgaben mit dem Namen der
+      // Kategorie (nie der Rohwert).
+      items: rueckgaben
+        ? (rueckgaben.offen.length > 0
+            ? rueckgaben.offen.slice(0, 5).map((o, i) => ({
+                id: `offen-${i}`,
+                title: o.titel,
+                isCompleted: false,
+                assignee: o.stelle,
+                assigneeColor: "bg-muted text-foreground",
+              }))
+            : undefined)
+        : returnTotal > 0 ? data.returnItems.filter((i) => rueckgabeOffen(i)).slice(0, 5).map((i) => ({
         id: i.id,
         title: i.itemName,
         isCompleted: false,
-        assignee: i.category,
-        assigneeColor: "bg-orange-100 text-orange-700",
+        assignee: RETURN_CATEGORY_LABELS[i.category] ?? i.category,
+        assigneeColor: "bg-muted text-foreground",
       })) : undefined,
-      info: returnTotal === 0 ? "Keine Rückgaben erfasst — erfasse sie im Rückgaben-Tab" : undefined,
-      actions: !step3Done && onNavigateTab ? [
-        { label: "Zum Rückgaben-Tab", onClick: () => onNavigateTab("returns"), variant: "secondary" as const },
-      ] : undefined,
+      info: rueckgaben
+        ? (zuordnungEmpfohlen ? MELDUNGEN_AUSGABEN.ZUORDNUNG_EMPFOHLEN : rueckgaben.schritt.text)
+        : returnTotal === 0 ? "Keine Rückgaben erfasst — erfasse sie im Rückgaben-Tab" : undefined,
+      actions: rueckgabenAktionen.length > 0 ? rueckgabenAktionen : undefined,
     },
     {
       key: "exit-interview",

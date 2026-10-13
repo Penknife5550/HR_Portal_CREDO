@@ -31,6 +31,7 @@ import {
 } from "@/lib/constants";
 import { formatDatumDE } from "@/lib/format";
 import { ausstattungListe } from "@/lib/ausstattung";
+import { rueckgabeOffen, rueckgabeZeileText } from "@/lib/ausgaben";
 
 export interface ResolverContext {
   organizationId?: string | null;
@@ -573,7 +574,7 @@ const offboardingResolver: PlaceholderResolver = async (ctx) => {
         },
       },
       returnItems: {
-        select: { category: true, itemName: true, serialNumber: true, isReturned: true, returnedAt: true },
+        select: { category: true, itemName: true, serialNumber: true, isReturned: true, returnedAt: true, zustand: true },
       },
     },
   });
@@ -679,28 +680,26 @@ const offboardingResolver: PlaceholderResolver = async (ctx) => {
   // linebreaks: true, Umbrueche kommen also im Word an. Ein Schleifen-Konstrukt
   // kennen weder der Editor noch PlaceholderDef. ReturnItem hat kein
   // orderIndex, deshalb explizit sortieren.
+  //
+  // Seit A4 (G16, 1.9): „offen“ heisst ohne Zustand (`rueckgabeOffen`), und
+  // `rueckgaben_liste` nennt JEDE Zeile mit Zustand samt Zustandswort
+  // (`rueckgabeZeileText`: „— zurueck am …“ unveraendert fuer ZURUECK und
+  // Altbestand, „— beschädigt zurück am …“, „— fehlt“, „— verbleibt“,
+  // „— entfällt“). Sonst fielen FEHLT, VERBLEIBT und ENTFAELLT aus BEIDEN
+  // Listen, und eine Rueckgabebestaetigung verschwiege den fehlenden
+  // Schluessel. Jede Zeile steht in genau einer der beiden Listen.
   const sortiert = [...off.returnItems].sort(
     (a, b) =>
       String(a.category).localeCompare(String(b.category)) ||
       a.itemName.localeCompare(b.itemName),
   );
-  const bezeichnung = (i: (typeof sortiert)[number]): string =>
-    i.serialNumber ? `${i.itemName} (${i.serialNumber})` : i.itemName;
-  const zurueck = sortiert.filter((i) => i.isReturned);
-  const offen = sortiert.filter((i) => !i.isReturned);
-  if (zurueck.length > 0) {
-    set(
-      "rueckgaben_liste",
-      zurueck
-        .map((i) => {
-          const am = deDateOnb(i.returnedAt);
-          return am ? `${bezeichnung(i)} — zurueck am ${am}` : bezeichnung(i);
-        })
-        .join("\n"),
-    );
+  const mitZustand = sortiert.filter((i) => !rueckgabeOffen(i));
+  const offen = sortiert.filter((i) => rueckgabeOffen(i));
+  if (mitZustand.length > 0) {
+    set("rueckgaben_liste", mitZustand.map((i) => rueckgabeZeileText(i)).join("\n"));
   }
   if (offen.length > 0) {
-    set("rueckgaben_offen_liste", offen.map(bezeichnung).join("\n"));
+    set("rueckgaben_offen_liste", offen.map((i) => rueckgabeZeileText(i)).join("\n"));
     set("rueckgaben_offen_anzahl", String(offen.length));
   }
 

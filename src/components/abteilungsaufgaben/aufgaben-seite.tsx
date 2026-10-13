@@ -44,6 +44,20 @@
  * `${apiBasis}/${token}/${id}/ausgaben`). Nicht bei „nur lesen“ und nicht an
  * einer entfallenen Aufgabe. Ohne `ausgabe` (Offboarding, A4 nicht
  * eingeschaltet) bleibt die Seite unveraendert.
+ *
+ * Offboarding, Stufe 2 (Feinplan A4, S32, 1.6, 1.8, G15, G17): An den
+ * Ruecknahme- und Sperraufgaben der ausgebenden Stelle und an der Folgeaufgabe
+ * „Schließung prüfen“ der Gebaeudewirtschaft liefert der Server `ausgabe`
+ * (Kennung, Zustand). Darunter steht dann der Block
+ * src/components/ausgaben/ruecknahme-auswahl.tsx: An einem Gegenstand ersetzen
+ * die drei Knoepfe „Zurückerhalten“, „Beschädigt zurückerhalten“, „Fehlt“ den
+ * Haken der offenen Aufgabe – sie schicken `{ isCompleted: true, zustand }`
+ * an denselben PATCH (an einer erledigten wechseln sie nur den Zustand);
+ * „Wieder öffnen“ bleibt der Haken. Ein Zugang behaelt den Haken („Als
+ * gesperrt markieren“), die Folgeaufgabe zeigt die Kennung nur lesend. Legt
+ * „Fehlt“ eine Folgeaufgabe fuer DIESE Stelle an (die Gebaeudewirtschaft gab
+ * den Schluessel selbst aus), zaehlt der Server eine Aufgabe mehr – dann laedt
+ * die Seite einmal neu, damit die neue Aufgabe erscheint.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -68,7 +82,15 @@ import {
   EntfaelltKennzeichen,
 } from "@/components/ausstattung/link-seite-teile";
 import { AusgabeVermerk, type VermerkEingabe } from "@/components/ausgaben/ausgabe-vermerk";
-import type { LinkAusgabe } from "@/lib/ausgaben";
+import {
+  RUECKNAHME_TEXTE,
+  RuecknahmeAuswahl,
+  knoepfeStattHaken,
+  offboardingAusgabe,
+  zugangMitHaken,
+  type AufgabenAusgabe,
+} from "@/components/ausgaben/ruecknahme-auswahl";
+import type { LinkAusgabe, RueckgabeZustandStelle } from "@/lib/ausgaben";
 
 // =============================================
 // Typen (Form wie GET /api/offboarding-tasks/[token])
@@ -97,11 +119,13 @@ export interface OeffentlicheAufgabe {
   /** Nur Onboarding: von der Personalabteilung gestrichen (R9, E-A21) — kein Abhaken mehr. */
   entfaellt?: boolean;
   /**
-   * Nur Onboarding, Stufe 2 (A4, G6): „Übergabe vermerken“ an einer
+   * Stufe 2 (A4). Onboarding (G6): „Übergabe vermerken“ an einer
    * Ausstattungsaufgabe, deren Position beim Austritt zurueckkommt bzw.
-   * gesperrt wird. Fehlt an allen uebrigen Aufgaben ganz.
+   * gesperrt wird (`LinkAusgabe`). Offboarding (S30/S32, G15, G17): Kennung
+   * und Rueckgabezustand an Ruecknahme-, Sperr- und Folgeaufgaben. Fehlt an
+   * allen uebrigen Aufgaben ganz.
    */
-  ausgabe?: LinkAusgabe;
+  ausgabe?: AufgabenAusgabe;
 }
 
 export interface AufgabenSeitenDaten {
@@ -324,8 +348,11 @@ export function AufgabenSeite({
     });
   };
 
-  /** PATCH einer Aufgabe; uebernimmt die Antwort des Servers. */
-  const aendern = async (id: string, body: { isCompleted?: boolean; comment?: string }) => {
+  /** PATCH einer Aufgabe; uebernimmt die Antwort des Servers und gibt sie zurueck. */
+  const aendern = async (
+    id: string,
+    body: { isCompleted?: boolean; comment?: string; zustand?: RueckgabeZustandStelle },
+  ): Promise<{ fortschritt?: { gesamt?: number } } | null> => {
     let res: Response;
     try {
       res = await fetch(`${apiBasis}/${encodeURIComponent(token)}/${encodeURIComponent(id)}`, {
@@ -337,12 +364,13 @@ export function AufgabenSeite({
       throw new SpeicherFehler(FEHLER_VERBINDUNG, 0);
     }
     const antwort = (await res.json().catch(() => null)) as {
-      data?: { aufgabe?: OeffentlicheAufgabe };
+      data?: { aufgabe?: OeffentlicheAufgabe; fortschritt?: { gesamt?: number } };
       error?: string;
     } | null;
     if (!res.ok) throw new SpeicherFehler(antwort?.error || FEHLER_SPEICHERN, res.status);
     const aufgabe = antwort?.data?.aufgabe;
     if (aufgabe) setAufgaben((prev) => prev.map((a) => (a.id === aufgabe.id ? aufgabe : a)));
+    return antwort?.data ?? null;
   };
 
   /**
@@ -474,6 +502,45 @@ export function AufgabenSeite({
     }
   };
 
+  /**
+   * Ruecknahme eines Gegenstands (Offboarding, Stufe 2): „Zurückerhalten“,
+   * „Beschädigt zurückerhalten“ oder „Fehlt“ – derselbe PATCH wie der Haken,
+   * mit `zustand`. Einen getippten Kommentar nimmt er mit wie das Abhaken.
+   * Kommt dadurch fuer diese Stelle eine Aufgabe hinzu (Folgeaufgabe
+   * „Schließung prüfen“), laedt die Seite einmal neu.
+   */
+  const zustandWaehlen = async (aufgabe: OeffentlicheAufgabe, zustand: RueckgabeZustandStelle) => {
+    if (readOnly || aufgabe.entfaellt || speichert.has(aufgabe.id)) return;
+    const warOffen = !aufgabe.isCompleted;
+    const body: { isCompleted: true; zustand: RueckgabeZustandStelle; comment?: string } = { isCompleted: true, zustand };
+    const entwurf = entwuerfe[aufgabe.id];
+    if (entwurf !== undefined && editorOffen.has(aufgabe.id)) body.comment = entwurf.trim();
+    setzeSpeichert(aufgabe.id, true);
+    setMeldung(null);
+    try {
+      const antwort = await aendern(aufgabe.id, body);
+      if (body.comment !== undefined) editorSchliessen(aufgabe.id);
+      if (warOffen) {
+        setGeradeErledigt((prev) => new Set(prev).add(aufgabe.id));
+        setTimeout(
+          () =>
+            setGeradeErledigt((prev) => {
+              const next = new Set(prev);
+              next.delete(aufgabe.id);
+              return next;
+            }),
+          1200,
+        );
+      }
+      const gesamt = antwort?.fortschritt?.gesamt;
+      if (daten?.modul !== "ONBOARDING" && typeof gesamt === "number" && gesamt !== aufgaben.length) void laden();
+    } catch (err) {
+      fehlerZeigen(err, aufgabe.id);
+    } finally {
+      setzeSpeichert(aufgabe.id, false);
+    }
+  };
+
   const kommentarSpeichern = async (aufgabe: OeffentlicheAufgabe) => {
     const entwurf = entwuerfe[aufgabe.id];
     if (readOnly || entwurf === undefined || speichert.has(aufgabe.id)) return;
@@ -584,6 +651,11 @@ export function AufgabenSeite({
     const kommentarGeaendert = entwurf !== undefined && entwurf.trim() !== gespeichert;
     const feldId = `kommentar-${aufgabe.id}`;
     const hinweisId = `kommentar-hinweis-${aufgabe.id}`;
+    // Offboarding, Stufe 2: Ruecknahme (Knoepfe statt Haken, solange offen), Zugang, Folgeaufgabe.
+    const ruecknahme = offboardingAusgabe(aufgabe.ausgabe);
+    const ohneHaken = knoepfeStattHaken(aufgabe.ausgabe) && !aufgabe.isCompleted;
+    const onboardingAusgabe: LinkAusgabe | null =
+      aufgabe.ausgabe && "stuecke" in aufgabe.ausgabe ? aufgabe.ausgabe : null;
 
     // Eine erledigte Aufgabe wird nur am Titel gedaempft (grau, durchgestrichen)
     // und am Haken erkannt – nie per `opacity` am ganzen Eintrag: Die
@@ -599,6 +671,10 @@ export function AufgabenSeite({
         data-aufgabe={aufgabe.id}
       >
         <div className="flex items-start gap-3 p-4 sm:gap-4 sm:p-5">
+          {ohneHaken ? (
+            // Statt des Hakens die drei Knoepfe darunter; der Platz bleibt, damit die Titel fluchten.
+            <span className="mt-0.5 h-7 w-7 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" data-ohne-haken />
+          ) : (
           <button
             type="button"
             onClick={() => umschalten(aufgabe)}
@@ -608,7 +684,9 @@ export function AufgabenSeite({
                 ? "Entfällt – kann nicht abgehakt werden"
                 : aufgabe.isCompleted
                   ? "Als offen markieren"
-                  : "Als erledigt markieren"
+                  : zugangMitHaken(aufgabe.ausgabe)
+                    ? RUECKNAHME_TEXTE.gesperrtHaken
+                    : "Als erledigt markieren"
             }
             aria-pressed={entfaellt ? undefined : aufgabe.isCompleted}
             className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 transition-all duration-300 sm:h-6 sm:w-6 sm:rounded-md ${
@@ -631,6 +709,7 @@ export function AufgabenSeite({
               )
             )}
           </button>
+          )}
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -672,10 +751,10 @@ export function AufgabenSeite({
             <BemerkungKasten bemerkung={aufgabe.bemerkung} />
 
             {/* Übergabe vermerken (Onboarding, Stufe 2) — getrennt vom Abhaken. */}
-            {aufgabe.ausgabe && !readOnly && !entfaellt && (
+            {onboardingAusgabe && !readOnly && !entfaellt && (
               <AusgabeVermerk
                 aufgabeId={aufgabe.id}
-                ausgabe={aufgabe.ausgabe}
+                ausgabe={onboardingAusgabe}
                 erledigt={aufgabe.isCompleted}
                 gesperrt={laeuft}
                 onVermerken={(stuecke: VermerkEingabe[]) =>
@@ -684,6 +763,17 @@ export function AufgabenSeite({
                 onEntfernen={(ausgabeId) =>
                   ausgabeSenden(aufgabe.id, { method: "DELETE", pfad: `/${encodeURIComponent(ausgabeId)}` })
                 }
+              />
+            )}
+
+            {/* Rücknahme, Sperre bzw. „Schließung prüfen“ (Offboarding, Stufe 2) — Kennung und Zustand. */}
+            {ruecknahme && (
+              <RuecknahmeAuswahl
+                ausgabe={ruecknahme}
+                erledigt={aufgabe.isCompleted}
+                readOnly={readOnly}
+                gesperrt={laeuft}
+                onWahl={(zustand) => void zustandWaehlen(aufgabe, zustand)}
               />
             )}
 

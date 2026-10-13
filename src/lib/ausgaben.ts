@@ -37,6 +37,30 @@
  * Server: `ausgabenFristBeiAbsageIn` (ausgaben-schreiben.ts) im EXPIRED-Zweig
  * von PATCH /api/onboarding/[id], die Liste der Absage-Mail
  * (`ausgabenListeMailFelder`) in src/lib/abteilungsaufgaben-dienst.ts.
+ * Seit S28 die Zuordnung Austritt ↔ Einstellung: Anzeige und Suche
+ * (`einstellungAnzeige`, `einstellungsTreffer`), der Hinweis vor dem
+ * Informieren (`zuordnungEmpfohlen`), die Vorbelegung des Merkers
+ * (`weitereBeschaeftigungVorbelegung`), der Arbeitsort am Austritt
+ * (`arbeitsortBeiZuordnung`, `arbeitsortText`, `informierteStellen`, G12) und
+ * die Kopfzeile des Reiters aus dem Bestand der Einstellung
+ * (`rueckgabeLageAnzeige`); Server: src/lib/offboarding-ausgaben.ts.
+ * Seit S30 der Gleichlauf von Ausgabe, Aufgabe und Rueckgabe-Zeile (G15 bis
+ * G17): Zielzustand eines Hakens bzw. einer Wahl (`rueckgabeZiel`,
+ * `rueckgabeZielAusEingabe`, `zustandFehler`), der Plan des Gleichlaufs
+ * (`gleichlaufPlan`, `ausgabeNachZiel`), die Bindung aus Sicht des Austritts
+ * (`gleichlaufGesperrt`) und das Feld `ausgabe` der Offboarding-Link-Seite
+ * (`offboardingLinkAusgabeBauen`, `RUECKNAHME_AUSWAHL`); Server:
+ * `ausgabeGleichlaufIn` (ausgaben-schreiben.ts) auf allen drei Wegen.
+ * Seit S31 die Frist beim Abschluss des Austritts fuer offen gebliebene
+ * Stuecke (`abschlussFrist`, G18); Server: `offeneAusgabenAbschliessenIn`
+ * (ausgaben-schreiben.ts) und `offeneRueckgabenZaehlenIn`
+ * (offboarding-ausgaben.ts) im COMPLETED-Zweig von PATCH /api/offboarding/[id].
+ * Seit der Durchsicht von A4c: die Bindung eines abgeschlossenen Austritts am
+ * Stand beim Austritt (`bezugBindet`, `abgeloesteAustritte` – der juengste
+ * Bezug gilt), Wiederoeffnen nach „verbleibt“ = AUSGEGEBEN (`ausgabeNachZiel`
+ * mit `warErledigt`), ein offen uebernommenes VERBLEIBT beim Abschluss
+ * (`abschlussFrist` mit `hierOffen`) und der Fortschritt des Steppers
+ * (`rueckgabenFortschritt`).
  *
  * Importrichtung (G1): Diese Datei darf Werte aus ausstattung.ts,
  * abteilungsaufgaben.ts, constants.ts, format.ts, kalendertag.ts,
@@ -60,7 +84,13 @@ import {
   type BeiAustritt,
 } from "@/lib/ausstattung";
 import { abteilungsReihenfolge, empfaengerEinrichtung, istLinkAbteilung } from "@/lib/abteilungsaufgaben";
-import { DEPARTMENT_KEYS, abteilungLabel, type RueckgabeKategorie } from "@/lib/constants";
+import {
+  DEPARTMENT_KEYS,
+  RETURN_CATEGORY_LABELS,
+  RUECKGABE_KATEGORIEN,
+  abteilungLabel,
+  type RueckgabeKategorie,
+} from "@/lib/constants";
 import { escapeHtml } from "@/lib/email-layout";
 import {
   berlinerKalendertag,
@@ -513,6 +543,14 @@ export const MELDUNGEN_AUSGABEN = {
   AUSGABEN_AUSWAHL: "Bitte höchstens 200 Ausgaben wählen.",
   SUCHE_ZU_LANG: `Höchstens ${AUSGABE_GRENZEN.sucheMaxZeichen} Zeichen`,
   // ---- Fehler: Zuordnung und Rueckgaben (Offboarding) ----
+  /**
+   * 404 (G11, G23): Einstellung unbekannt, aus einem fremden Mandanten oder
+   * keine Einstellung (`processType` ≠ EINSTELLUNG) – derselbe Text, damit die
+   * Antwort nichts verraet.
+   */
+  EINSTELLUNG_NICHT_GEFUNDEN: "Einstellung nicht gefunden",
+  /** 409 KEINE_ZUORDNUNG: „Lösen …“ an einem Austritt ohne zugeordnete Einstellung. */
+  KEINE_ZUORDNUNG: "Diesem Austritt ist keine Einstellung zugeordnet.",
   BEREITS_ZUGEORDNET: "Diesem Austritt ist schon eine Einstellung zugeordnet.",
   EINSTELLUNG_VERGEBEN: "Diese Einstellung ist schon einem laufenden Austritt zugeordnet.",
   EINSTELLUNG_ABGESAGT: "Diese Einstellung wurde abgesagt und lässt sich nicht zuordnen.",
@@ -526,6 +564,28 @@ export const MELDUNGEN_AUSGABEN = {
   RUECKGABEN_OFFEN: (n: number): string =>
     `${n === 1 ? "1 Rückgabe oder Sperre ist" : `${n} Rückgaben oder Sperren sind`} noch offen. Der Austritt lässt sich trotzdem abschließen – bitte bestätigen.`,
   VORGESCHLAGEN_NICHT_LOESCHEN: "Eine vorgeschlagene Rückgabe lässt sich nicht löschen – stattdessen „entfällt“ wählen.",
+  // ---- Fehler: Zustaende und Gleichlauf (S30, G15 bis G17) ----
+  /**
+   * 400 (G15, 1.2): ein Rueckgabezustand an einer Aufgabe ohne Gegenstand –
+   * Vorlagenaufgabe, Folgeaufgabe „Schließung prüfen“, ueber den Link auch an
+   * einer Sperraufgabe (die hat ihren Haken). Neutral, die Link-Seite zeigt ihn auch.
+   */
+  ZUSTAND_NICHT_MOEGLICH: "Einen Rückgabezustand gibt es nur bei der Rücknahme eines Gegenstands.",
+  /**
+   * 409 (G28): Ein abgeschlossener Austritt hat ein Stueck mit „verbleibt“
+   * freigegeben – es lebt in der Karte der Einstellung bzw. im naechsten
+   * Austritt weiter, nicht mehr hier.
+   */
+  AUSGABE_FREIGEGEBEN:
+    "Das Stück verbleibt bei der Person und wurde mit dem Abschluss dieses Austritts freigegeben – Änderungen daran gehen über die Karte „Ausstattung & Zugänge“ der Einstellung bzw. den nächsten Austritt.",
+  /** 409: Das Stueck hat sich zwischen Lesen und Schreiben bewegt (bedingtes Update ohne Treffer). */
+  STUECK_INZWISCHEN_GEAENDERT: "Das Stück wurde inzwischen geändert. Bitte die Seite neu laden.",
+  /** 404 (Reiter „Rückgaben“): unbekannt oder aus einem anderen Vorgang – derselbe Text. */
+  GEGENSTAND_NICHT_GEFUNDEN: "Rückgabe-Gegenstand nicht gefunden",
+  /** 409 (Reiter „Rückgaben“): Zustand inzwischen geaendert bzw. Zeile geloescht (bedingtes Update). */
+  RUECKGABE_INZWISCHEN_GEAENDERT: "Der Gegenstand wurde inzwischen geändert oder gelöscht. Bitte die Seite neu laden.",
+  /** 409 (Reiter „Rückgaben“): Austritt abgebrochen (CANCELLED). */
+  RUECKGABEN_ABGEBROCHEN: "Der Vorgang wurde abgebrochen. Die Rückgaben lassen sich nicht mehr ändern.",
   // ---- Erfolg (`meldung` der Karte, POST /api/onboarding/[id]/ausgaben) ----
   // `art` = `beiAustritt` des Stuecks: Ein Zugang (SPERREN) wird eingerichtet
   // und gesperrt, nicht uebergeben und zurueckgenommen (G4) – dieselben Woerter
@@ -542,6 +602,70 @@ export const MELDUNGEN_AUSGABEN = {
   ZURUECKGENOMMEN: (zustand: string, art?: string | null): string =>
     art === "SPERREN" ? "Sperrung vermerkt." : `Rücknahme vermerkt: ${zustand}.`,
   ENTFERNT: (art?: string | null): string => `${vermerkNomen(art)} entfernt.`,
+  // ---- Erfolg: Zuordnung am Austritt (`meldung`, POST /api/offboarding/[id]/einstellung) ----
+  /** `nr` = Vorgangsnummer der Einstellung; `arbeitsort` = Name des uebernommenen Arbeitsorts (G12), sonst null. */
+  ZUGEORDNET: (nr: string, arbeitsort: string | null): string =>
+    `Einstellung ${nr} zugeordnet.${arbeitsort ? ` Arbeitsort ${arbeitsort} übernommen.` : ""}`,
+  /**
+   * `arbeitsort`: ZURUECKGESETZT = der uebernommene Arbeitsort ist wieder leer;
+   * BLEIBT = er bleibt, weil schon eine Stelle informiert ist (G12); null = es
+   * gab keinen.
+   */
+  GELOEST: (nr: string, arbeitsort: "ZURUECKGESETZT" | "BLEIBT" | null): string =>
+    `Zuordnung der Einstellung ${nr} gelöst.` +
+    (arbeitsort === "ZURUECKGESETZT"
+      ? " Der Arbeitsort am Austritt ist wieder leer."
+      : arbeitsort === "BLEIBT"
+        ? " Der Arbeitsort am Austritt bleibt, weil schon eine Stelle informiert ist."
+        : ""),
+  // ---- Erfolg: Rueckgaben aus der Einstellung (S29, G13, G14; `meldung`) ----
+  /**
+   * Was eine Uebernahme neu angelegt hat: „2 Rückgaben und 1 Sperraufgabe
+   * übernommen.“ – ohne neue Zeile "" (der Aufrufer nennt dann `NICHTS_NEU`
+   * bzw. nur die Zuordnung).
+   */
+  UEBERNOMMEN: (rueckgaben: number, sperraufgaben: number): string => {
+    const teile = [
+      rueckgaben > 0 ? anzahl(rueckgaben, "Rückgabe", "Rückgaben") : "",
+      sperraufgaben > 0 ? anzahl(sperraufgaben, "Sperraufgabe", "Sperraufgaben") : "",
+    ].filter((t) => t !== "");
+    return teile.length > 0 ? `${teile.join(" und ")} übernommen.` : "";
+  },
+  /** „Rückgaben aktualisieren“ ohne neue Zeile. */
+  NICHTS_NEU: "Keine neuen Rückgaben oder Sperraufgaben – alles war schon übernommen.",
+  /**
+   * Zwischen Vorschlag und Sperre geaendert (zurueckgenommen, getauscht, in
+   * einem anderen Austritt): faellt still heraus und wird nur gezaehlt
+   * (Feinplan 1.7, Schritt 3.6).
+   */
+  HERAUSGEFALLEN: (n: number): string =>
+    n === 1
+      ? "1 Stück hat sich inzwischen geändert und wurde nicht übernommen."
+      : `${n} Stücke haben sich inzwischen geändert und wurden nicht übernommen.`,
+  /** „Als ausgegeben übernehmen“ (G13): so viele Aufgaben bekamen eine Ausgabe (`quelle` HR). */
+  ALS_AUSGEGEBEN_UEBERNOMMEN: (n: number): string => `${anzahl(n, "Aufgabe", "Aufgaben")} als ausgegeben übernommen.`,
+  /** … und so viele haben inzwischen einen Vermerk, sind entfallen oder gehoeren nicht (mehr) dazu. */
+  OHNE_VERMERK_UEBERSPRUNGEN: (n: number): string =>
+    n === 1
+      ? "1 Aufgabe hat inzwischen einen Vermerk oder ist entfallen und wurde übersprungen."
+      : `${n} Aufgaben haben inzwischen einen Vermerk oder sind entfallen und wurden übersprungen.`,
+  /** Merker „Person bleibt in einer anderen Beschäftigung“ geaendert (`aktualisieren`, G13). */
+  MERKER_GESPEICHERT: (wert: boolean): string =>
+    wert
+      ? "Gespeichert: Die Person bleibt in einer anderen Beschäftigung."
+      : "Gespeichert: Die Person bleibt in keiner anderen Beschäftigung.",
+  // ---- Fehler: Ruecknahme- und Sperraufgaben im Portal (G14) ----
+  /** 403: Aufgaben mit `herkunft` (Ausgabe, Folgeaufgabe) haken im Portal nur HR_EDIT_ROLES ab – nie SERVICE. */
+  PORTAL_NUR_HR: "Rücknahme- und Sperraufgaben bearbeitet nur die Personalabteilung.",
+  /** 409: `assigneeDepartment` im Body einer solchen Aufgabe – die Stelle ist die ausgebende. */
+  STELLE_FEST: "Die Stelle einer Rücknahme- oder Sperraufgabe ist die ausgebende Stelle und lässt sich nicht ändern.",
+  // ---- Reiter „Rückgaben“ (Mockup 6.8) ----
+  /**
+   * Zeile „Sperraufgaben …“ je Stelle – ohne Artikel vor dem frei gepflegten
+   * Namen der Stelle; `liste` schon aufgezaehlt, nie mit Kennung.
+   */
+  SPERRAUFGABEN: (stelle: string, liste: string, perLink: boolean): string =>
+    `Sperraufgaben zum letzten Arbeitstag – ${stelle}, ${perLink ? "über den Offboarding-Link" : "im Portal"}: ${liste}`,
   // ---- Hinweise ----
   /** G7: verlorener Schluessel ohne Austritt – keine Aufgabe, nur dieser Satz in Dialog und `meldung`. */
   GEBAEUDEWIRTSCHAFT_INFORMIEREN: "Bitte die Gebäudewirtschaft wegen der Schließung informieren.",
@@ -1144,6 +1268,19 @@ export interface AustrittsBezug {
   status: string;
   /** Vorgangsnummer – NUR, wenn die Sitzung den Austritt oeffnen darf (canAccessProcess), sonst null. */
   displayId?: string | null;
+  /**
+   * Der Stand DIESES Austritts: der Zustand seiner eigenen Rueckgabe-Zeile zu
+   * der Ausgabe (`rueckgabeZustand`). Fehlt bei offener Zeile und an einem
+   * Zugang (SPERREN hat keine Zeile) – dann zaehlt der Zustand der Ausgabe
+   * (`bezugBindet`).
+   */
+  eigenerStand?: RueckgabeZustand;
+  /**
+   * Ein SPAETERER Austritt bezieht die Ausgabe ebenfalls (seine erste Zeile zu
+   * ihr ist juenger): Der juengste Bezug gilt (`bezugBindet`). Fehlt = nein
+   * bzw. nicht bekannt.
+   */
+  abgeloest?: boolean;
 }
 
 /** Ein Bezug samt der Ausgabe, auf die er sich bezieht (Listenform fuer mehrere Ausgaben). */
@@ -1170,16 +1307,54 @@ export function bindetAusgabe(austrittStatus: string, ausgabeZustand: string): b
 }
 
 /**
- * Der Austritt, an den die Ausgabe gebunden ist – ausser `ausser` (der eigene
- * Austritt im Reiter „Rückgaben“). `null` = frei. Die Bezuege liest der
- * Aufrufer NACH der Sperre der Ausgabe (G24).
+ * Bindet DIESER Bezug die Ausgabe (G28)? `bindetAusgabe`, aber ein
+ * abgeschlossener Austritt wird am eigenen Stand beim Austritt gemessen, nicht
+ * am Zustand, den die Ausgabe heute hat:
+ *
+ *   - ein spaeterer Austritt bezieht das Stueck ebenfalls (`abgeloest`): nie.
+ *     Uebernehmen konnte er es nur, nachdem dieser es freigegeben hatte
+ *     (VERBLEIBT) – der juengste Bezug gilt. So bindet ein frueherer Austritt
+ *     das Stueck nicht wieder, sobald der spaetere es zum ersten Mal umschaltet
+ *     (ZURUECK, FEHLT …); sonst endete dort jede weitere Aenderung in 409
+ *     AUSGABE_IM_AUSTRITT mit der Nummer des frueheren;
+ *   - sonst der Zustand der eigenen Rueckgabe-Zeile (`eigenerStand`), bei
+ *     offener Zeile bzw. an einem Zugang der Zustand der Ausgabe.
+ *
+ * Laufend und abgebrochen wie `bindetAusgabe`.
+ */
+export function bezugBindet(bezug: AustrittsBezug, ausgabeZustand: string): boolean {
+  if (bezug.status !== "COMPLETED") return bindetAusgabe(bezug.status, ausgabeZustand);
+  if (bezug.abgeloest === true) return false;
+  return bindetAusgabe(bezug.status, bezug.eigenerStand ?? ausgabeZustand);
+}
+
+/**
+ * Der Austritt, an den die Ausgabe gebunden ist (`bezugBindet`) – ausser
+ * `ausser` (der eigene Austritt im Reiter „Rückgaben“). `null` = frei. Die
+ * Bezuege liest der Aufrufer NACH der Sperre der Ausgabe (G24).
  */
 export function bindenderAustritt<B extends AustrittsBezug>(
   ausgabe: { zustand: string },
   bezuege: ReadonlyArray<B>,
   ausser?: string | null,
 ): B | null {
-  return bezuege.find((b) => b.offboardingId !== ausser && bindetAusgabe(b.status, ausgabe.zustand)) ?? null;
+  return bezuege.find((b) => b.offboardingId !== ausser && bezugBindet(b, ausgabe.zustand)) ?? null;
+}
+
+/**
+ * Wer bezieht die Ausgabe zuletzt (G28, `abgeloest`)? Je Austritt der
+ * Zeitpunkt seiner ERSTEN Zeile zu ihr (Aufgabe oder Rueckgabe – der Moment
+ * der Uebernahme); abgeloest ist jeder Austritt, nach dem ein anderer sie
+ * bezogen hat. Ohne Zeitpunkt (`null`) laesst sich nichts vergleichen: dann
+ * abgeloest = nein. Antwort: die abgeloesten Austritte.
+ */
+export function abgeloesteAustritte(seit: ReadonlyMap<string, number | null>): Set<string> {
+  const bekannt = [...seit].filter((e): e is [string, number] => e[1] !== null);
+  const abgeloest = new Set<string>();
+  for (const [id, zeit] of bekannt) {
+    if (bekannt.some(([anderer, z]) => anderer !== id && z > zeit)) abgeloest.add(id);
+  }
+  return abgeloest;
 }
 
 /**
@@ -1217,6 +1392,57 @@ export function absageFrist(
   if (!enthalten(AUSGABE_AKTIV, ausgabe.zustand)) return null;
   if (bindenderAustritt(ausgabe, bezuege)) return null;
   return ausgabeLoeschenAb({ zustand: ausgabe.zustand, zustandAm: ausgabe.zustandAm, vorgangEingestelltAm });
+}
+
+/**
+ * Die Loeschfrist, die der Abschluss eines Austritts einem dort OFFEN
+ * gebliebenen Stueck gibt (G18, S31, `offeneAusgabenAbschliessenIn`):
+ * `ausgabeLoeschenAb` fuer AUSGEGEBEN mit `austrittAbgeschlossenAm` – drei
+ * Jahre ab Ende des Berliner Jahres des Abschlusses (G20). Offen heisst:
+ *
+ *   - AUSGEGEBEN: Der Zustand bleibt (1.2: „AUSGEGEBEN → AUSGEGEBEN mit
+ *     Frist“);
+ *   - VERBLEIBT mit offener Zeile bzw. Aufgabe IN DIESEM Austritt
+ *     (`hierOffen`): ein Stueck, das ein frueherer Austritt mit „verbleibt“
+ *     freigab und das dieser unveraendert uebernommen hat. Der Aufrufer setzt
+ *     es mit dieser Frist auf AUSGEGEBEN (1.2: „VERBLEIBT → AUSGEGEBEN mit
+ *     Frist“) – sonst gaebe der Abschluss es frei, die Zeile stuende fuer immer
+ *     auf „offen“, kein Austritt nahme die spaete Rueckgabe auf, und die
+ *     Kennung bliebe unbegrenzt gespeichert (gegen G18, G20).
+ *
+ * Das Stueck bleibt danach an den abgeschlossenen Austritt gebunden (G28),
+ * dessen Reiter die spaete Rueckgabe aufnimmt. `null` heisst: nichts
+ * schreiben –
+ *
+ *   - nicht offen: Ein Endzustand (ZURUECK, FEHLT, ENTFAELLT …) behaelt seine
+ *     Frist, ein hier gesetztes VERBLEIBT bleibt ohne (Bestand der Person, mit
+ *     dem Abschluss freigegeben);
+ *   - ein ANDERER, laufender Austritt bezieht das Stueck: Den fuehrt dieser
+ *     (nur nach einem Admin-Abschluss eines schon abgeschlossenen oder
+ *     abgebrochenen Austritts denkbar) – sein eigener Abschluss setzt die
+ *     Frist. Ein anderer abgeschlossener Austritt haelt nicht ab: Er hat das
+ *     Stueck mit VERBLEIBT freigegeben, bevor dieser es uebernahm (`abgeloest`,
+ *     `bezugBindet`);
+ *   - die vorhandene Frist liegt nicht frueher (etwa aus dem Abschluss eines
+ *     spaeteren Austritts): geloescht wird nie frueher, als eine der Regeln
+ *     verlangt.
+ */
+export function abschlussFrist(
+  ausgabe: { zustand: string; zustandAm: Date; loeschenAb?: Date | null; hierOffen?: boolean },
+  bezuege: ReadonlyArray<AustrittsBezug>,
+  austritt: { id: string; abgeschlossenAm: Date },
+): Date | null {
+  const offenVerbleibt = ausgabe.zustand === "VERBLEIBT" && ausgabe.hierOffen === true;
+  if (ausgabe.zustand !== "AUSGEGEBEN" && !offenVerbleibt) return null;
+  if (bezuege.some((b) => b.offboardingId !== austritt.id && austrittLaeuft(b.status))) return null;
+  const frist = ausgabeLoeschenAb({
+    zustand: "AUSGEGEBEN",
+    zustandAm: ausgabe.zustandAm,
+    austrittAbgeschlossenAm: austritt.abgeschlossenAm,
+  });
+  if (!frist) return null;
+  const vorhanden = gueltigerZeitpunkt(ausgabe.loeschenAb);
+  return vorhanden && vorhanden.getTime() >= frist.getTime() ? null : frist;
 }
 
 // =============================================
@@ -1527,6 +1753,195 @@ export function folgeAufgabeSchritt(opts: {
 }
 
 // =============================================
+// Gleichlauf: ein Stueck, drei Zeilen, ein Stand (G15, G16; seit S30)
+// =============================================
+
+/**
+ * Welchen Rueckgabezustand eine Aenderung an einer Ruecknahme- oder
+ * Sperraufgabe meint (G15) – fuer den Link der Stelle und den Portal-PATCH
+ * dieselbe Regel:
+ *
+ *   - ein Zustand im Body gilt immer (er heisst „erledigt“ – auch als reiner
+ *     Wechsel an einer schon erledigten Aufgabe, etwa ZURUECK → FEHLT);
+ *   - abhaken OHNE Zustand (`isCompleted: true` an einer offenen Aufgabe)
+ *     heisst ZURUECK, bei einem Zugang „gesperrt“ – so bleibt der Haken im
+ *     Reiter Checkliste gueltig (`toggleChecklistItem` schickt nur
+ *     `{ isCompleted }`);
+ *   - wieder oeffnen (`isCompleted: false` an einer erledigten) heisst offen
+ *     (`null`);
+ *   - sonst – ein zweites „erledigt“, „offen“ an einer offenen Aufgabe, nur
+ *     Kommentar oder Notiz – `undefined`: nichts zu tun.
+ *
+ * `warErledigt` ist der Stand der Aufgabe NACH der Sperre des Austritts.
+ */
+export function rueckgabeZiel(opts: {
+  warErledigt: boolean;
+  isCompleted?: boolean;
+  zustand?: RueckgabeZustand;
+}): RueckgabeZustand | null | undefined {
+  if (opts.zustand !== undefined) return opts.zustand;
+  if (opts.isCompleted === true && !opts.warErledigt) return "ZURUECK";
+  if (opts.isCompleted === false && opts.warErledigt) return null;
+  return undefined;
+}
+
+/**
+ * Der Zielzustand aus dem Body des Reiters „Rückgaben“ (G16): `zustand`
+ * (`null` = wieder offen) oder die Altform `isReturned` (`true` = ZURUECK,
+ * `false` = offen; beides zugleich weist das Schema ab). `undefined` = der
+ * Body sagt nichts zum Zustand.
+ */
+export function rueckgabeZielAusEingabe(eingabe: {
+  zustand?: RueckgabeZustand | null;
+  isReturned?: boolean;
+}): RueckgabeZustand | null | undefined {
+  if (eingabe.zustand !== undefined) return eingabe.zustand;
+  if (eingabe.isReturned !== undefined) return eingabe.isReturned ? "ZURUECK" : null;
+  return undefined;
+}
+
+/** Warum ein Rueckgabezustand an dieser Aufgabe nicht geht (400). */
+export type ZustandFehler = "ZUSTAND_NICHT_MOEGLICH" | "ZUGANG_NUR_GESPERRT";
+
+/**
+ * Passt ein Rueckgabezustand zu dieser Aufgabe (G15, 1.2)? `art` ist
+ * `beiAustritt` der Ausgabe hinter einer Ruecknahme- bzw. Sperraufgabe,
+ * `null` heisst: keine Ausgabe (Vorlagenaufgabe, Folgeaufgabe „Schließung
+ * prüfen“, Ausgabe nach Ablauf der Frist geloescht).
+ *
+ *   - ohne Ausgabe nie (`ZUSTAND_NICHT_MOEGLICH`) – die Folgeaufgabe hat den
+ *     normalen Haken (G17);
+ *   - die Stelle ueber ihren Link nur an einem Gegenstand (RUECKGABE; welche
+ *     drei Zustaende, sagt das Schema) – ein Zugang hat seinen Haken
+ *     („gesperrt“);
+ *   - HR im Portal am Gegenstand alle fuenf, an einem Zugang ZURUECK
+ *     („gesperrt“), VERBLEIBT und ENTFAELLT; „beschädigt“ und „fehlt“ gelten
+ *     nur fuer Gegenstaende (`ZUGANG_NUR_GESPERRT`, dieselbe Regel wie
+ *     `zurueckgenommen` in der Karte).
+ *
+ * Ohne Zustand im Body nie ein Fehler.
+ */
+export function zustandFehler(opts: {
+  art: string | null | undefined;
+  zustand: string | null | undefined;
+  weg: "LINK" | "HR";
+}): ZustandFehler | null {
+  if (opts.zustand === undefined || opts.zustand === null) return null;
+  if (opts.art === "RUECKGABE") return null;
+  if (opts.art === "SPERREN" && opts.weg === "HR") {
+    return opts.zustand === "BESCHAEDIGT" || opts.zustand === "FEHLT" ? "ZUGANG_NUR_GESPERRT" : null;
+  }
+  return "ZUSTAND_NICHT_MOEGLICH";
+}
+
+/**
+ * Der Zustand der Ausgabe zu einem Rueckgabezustand (G15): ein gesetzter
+ * Zustand gilt 1:1. „Offen“ (`null`) heisst aktiv:
+ *
+ *   - war das Stueck in DIESEM Austritt erledigt (`warErledigt`: Aufgabe
+ *     erledigt bzw. Rueckgabe-Zeile mit Zustand – der Zustand wurde also hier
+ *     gesetzt), wird es AUSGEGEBEN: Wiederoeffnen setzt AUSGEGEBEN, auch nach
+ *     „verbleibt“ (1.2). Sonst bliebe ein hier gesetztes VERBLEIBT neben einer
+ *     offenen Zeile stehen, und der Abschluss gaebe es ohne Frist frei;
+ *   - sonst bleibt ein schon aktives Stueck, wie es ist – ein VERBLEIBT, das
+ *     dieser Austritt unveraendert aus einem frueheren uebernommen hat (G28);
+ *     alles andere wird AUSGEGEBEN.
+ */
+export function ausgabeNachZiel(ziel: RueckgabeZustand | null, alt: string, warErledigt = false): string {
+  if (ziel !== null) return ziel;
+  return !warErledigt && enthalten(AUSGABE_AKTIV, alt) ? alt : "AUSGEGEBEN";
+}
+
+/** Was der Gleichlauf an Ausgabe, Aufgabe und Rueckgabe-Zeile schreibt (`gleichlaufPlan`). */
+export interface GleichlaufPlan {
+  /** Geht der Wechsel? Ein ERSETZT-Stueck ist endgueltig (1.2). */
+  moeglich: boolean;
+  /** Neuer Zustand der Ausgabe; `null` = bleibt. */
+  ausgabe: AusgabeZustand | null;
+  /** Neuer Zustand der Rueckgabe-Zeile (`null` = offen); `undefined` = bleibt bzw. es gibt keine. */
+  rueckgabe: RueckgabeZustand | null | undefined;
+  /** Aufgabe erledigt (`true`) bzw. offen (`false`); `undefined` = bleibt bzw. der Aufrufer schaltet sie. */
+  aufgabeErledigt: boolean | undefined;
+  /** Zustand der Ausgabe danach – fuer die Folgeaufgabe (`folgeAufgabeSchritt`). */
+  nach: string;
+}
+
+/**
+ * Ein Stueck, drei Zeilen, ein Stand (G15): Was zu einem Zielzustand an der
+ * Ausgabe, an der Ruecknahme- bzw. Sperraufgabe und an der Rueckgabe-Zeile
+ * zu schreiben ist – nur, was sich wirklich aendert. „Offen“ heisst auf allen
+ * drei Zeilen dasselbe: Rueckgabe ohne Zustand, Aufgabe offen, Ausgabe aktiv.
+ * Ein Zustand heisst: Aufgabe erledigt, Rueckgabe und Ausgabe mit diesem
+ * Zustand (`isReturned` folgt, `rueckgabeDaten`). `aufgabe: null` = der
+ * Aufrufer schaltet sie selbst (Link-Weg) bzw. es gibt keine; `rueckgabe:
+ * null` = keine Zeile (Zugang). `warErledigt`: Stand DIESES Austritts vor
+ * dem Wechsel (`ausgabeNachZiel`); ohne Angabe aus Aufgabe und Zeile
+ * abgeleitet – der Link-Weg, der die Aufgabe schon geschaltet hat, gibt ihn
+ * ausdruecklich mit.
+ */
+export function gleichlaufPlan(opts: {
+  ziel: RueckgabeZustand | null;
+  ausgabe: { zustand: string };
+  aufgabe: { isCompleted: boolean } | null;
+  rueckgabe: RueckgabeStand | null;
+  warErledigt?: boolean;
+}): GleichlaufPlan {
+  const alt = opts.ausgabe.zustand;
+  const warErledigt =
+    opts.warErledigt ??
+    ((!!opts.rueckgabe && rueckgabeZustand(opts.rueckgabe) !== null) || opts.aufgabe?.isCompleted === true);
+  const nach = ausgabeNachZiel(opts.ziel, alt, warErledigt);
+  const ausgabe = nach === alt ? null : (nach as AusgabeZustand);
+  const rueckgabe = opts.rueckgabe && rueckgabeZustand(opts.rueckgabe) !== opts.ziel ? opts.ziel : undefined;
+  const erledigt = opts.ziel !== null;
+  const aufgabeErledigt = opts.aufgabe && opts.aufgabe.isCompleted !== erledigt ? erledigt : undefined;
+  return { moeglich: ausgabe === null || alt !== "ERSETZT", ausgabe, rueckgabe, aufgabeErledigt, nach };
+}
+
+/** Warum DIESER Austritt das Stueck nicht aendern darf (409, G28). */
+export type GleichlaufSperre =
+  | { grund: "AUSGABE_IM_AUSTRITT"; displayId: string | null }
+  | { grund: "AUSGABE_FREIGEGEBEN" };
+
+/**
+ * Darf der Austritt `austritt` die Ausgabe aendern (G15, G28)? Gelesen NACH
+ * der Sperre der Ausgabe:
+ *
+ *   - ein ANDERER Austritt bindet sie (`bezugBindet`): nein –
+ *     `AUSGABE_IM_AUSTRITT` (die Vorgangsnummer nur, wenn der Bezug sie
+ *     traegt, also mit Zugriff);
+ *   - dieser Austritt bindet sie selbst nicht mehr (abgeschlossen mit
+ *     „verbleibt“ – mit dem Abschluss freigegeben – bzw. ein spaeterer
+ *     Austritt fuehrt das Stueck weiter): nein – `AUSGABE_FREIGEGEBEN`;
+ *   - sonst ja (`null`): ein laufender Austritt immer, ein abgeschlossener
+ *     fuer alles ausser VERBLEIBT – so nimmt sein Reiter die spaete Rueckgabe
+ *     eines offen gebliebenen Stuecks auf.
+ *
+ * Gemessen wird dieser Austritt an seinem eigenen Stand (der Bezug mit seiner
+ * `offboardingId`, `bezugBindet`); ohne eigenen Bezug am Zustand der Ausgabe.
+ */
+export function gleichlaufGesperrt(
+  ausgabe: { zustand: string },
+  bezuege: ReadonlyArray<AustrittsBezug>,
+  austritt: { id: string; status: string },
+): GleichlaufSperre | null {
+  const bindend = bindenderAustritt(ausgabe, bezuege, austritt.id);
+  if (bindend) return { grund: "AUSGABE_IM_AUSTRITT", displayId: bindend.displayId ?? null };
+  const eigen = bezuege.find((b) => b.offboardingId === austritt.id);
+  if (!bezugBindet({ ...eigen, offboardingId: austritt.id, status: austritt.status }, ausgabe.zustand)) {
+    return { grund: "AUSGABE_FREIGEGEBEN" };
+  }
+  return null;
+}
+
+/** Der Text einer `GleichlaufSperre` (409). */
+export function gleichlaufSperreText(sperre: GleichlaufSperre): string {
+  return sperre.grund === "AUSGABE_IM_AUSTRITT"
+    ? MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT(sperre.displayId)
+    : MELDUNGEN_AUSGABEN.AUSGABE_FREIGEGEBEN;
+}
+
+// =============================================
 // Zuordnung Austritt ↔ Einstellung (E-A31, G11)
 // =============================================
 
@@ -1597,8 +2012,11 @@ export interface EinstellungsKandidat {
   supervisorData?: { vertragsbeginn?: Date | string | null } | null;
 }
 
-/** Ein Vorschlag fuer den Dialog „Einstellung zuordnen …“ – ohne Adressen. */
-export interface ZuordnungsVorschlag {
+/**
+ * Eine Einstellung, wie Dialog und Reiter „Rückgaben“ sie zeigen – ohne
+ * Adressen (die Kandidatenabfrage liest sie nur fuer die Bewertung).
+ */
+export interface EinstellungsAnzeige {
   onboardingId: string;
   displayId: string | null;
   /** „Vorname Nachname“ der Einstellung (Vorgang, sonst Personalfragebogen). */
@@ -1606,8 +2024,47 @@ export interface ZuordnungsVorschlag {
   organizationId: string;
   arbeitsortId: string | null;
   vertragsbeginn: Kalendertag | null;
+}
+
+/** Ein Vorschlag fuer den Dialog „Einstellung zuordnen …“ – ohne Adressen. */
+export interface ZuordnungsVorschlag extends EinstellungsAnzeige {
   stufe: VorschlagStufe;
   gruende: { schluessel: VorschlagGrund; text: string }[];
+}
+
+/**
+ * Die Anzeige einer Einstellung (S28): Name vom Vorgang, sonst aus dem
+ * Personalfragebogen; Vertragsbeginn als Berliner Kalendertag. Nie eine
+ * Adresse – `email` und `personalData.emailPrivate` bleiben in der Bewertung.
+ */
+export function einstellungAnzeige(k: EinstellungsKandidat): EinstellungsAnzeige {
+  const pd = k.personalData ?? null;
+  const vor = (k.firstName ?? "").trim() || (pd?.firstName ?? "").trim();
+  const nach = (k.lastName ?? "").trim() || (pd?.lastName ?? "").trim();
+  return {
+    onboardingId: k.id,
+    displayId: k.displayId ?? null,
+    name: [vor, nach].filter((t) => t !== "").join(" "),
+    organizationId: k.organizationId,
+    arbeitsortId: k.arbeitsortId ?? null,
+    vertragsbeginn: kalendertagVon(k.supervisorData?.vertragsbeginn),
+  };
+}
+
+/** Neuester Vertragsbeginn zuerst, ohne Datum zuletzt, bei Gleichstand nach ID (stabil). */
+function nachVertragsbeginn(a: EinstellungsAnzeige, b: EinstellungsAnzeige): number {
+  return (b.vertragsbeginn ?? "").localeCompare(a.vertragsbeginn ?? "") || a.onboardingId.localeCompare(b.onboardingId);
+}
+
+/**
+ * Treffer der Suche im Dialog „Einstellung zuordnen …“ (G11: Vorgangsnummer
+ * oder Nachname, ab `sucheMinZeichen` Zeichen) – ohne Stufe und ohne
+ * Begruendung, nur angezeigt. Die Abfrage hat Mandant, Typ, Status und
+ * Bindung schon gefiltert. Neuester Vertragsbeginn zuerst, hoechstens
+ * `AUSGABE_GRENZEN.suche`.
+ */
+export function einstellungsTreffer(kandidaten: ReadonlyArray<EinstellungsKandidat>): EinstellungsAnzeige[] {
+  return kandidaten.map(einstellungAnzeige).sort(nachVertragsbeginn).slice(0, AUSGABE_GRENZEN.suche);
 }
 
 /**
@@ -1666,28 +2123,116 @@ export function zuordnungsVorschlaege(
     if (einrichtung) gruende.push("EINRICHTUNG");
     if (arbeitsort) gruende.push("ARBEITSORT");
 
-    const vor = (k.firstName ?? "").trim() || (pd?.firstName ?? "").trim();
-    const nach = (k.lastName ?? "").trim() || (pd?.lastName ?? "").trim();
     vorschlaege.push({
-      onboardingId: k.id,
-      displayId: k.displayId ?? null,
-      name: [vor, nach].filter((t) => t !== "").join(" "),
-      organizationId: k.organizationId,
-      arbeitsortId: k.arbeitsortId ?? null,
-      vertragsbeginn: kalendertagVon(k.supervisorData?.vertragsbeginn),
+      ...einstellungAnzeige(k),
       stufe,
       gruende: gruende.map((g) => ({ schluessel: g, text: VORSCHLAG_GRUENDE[g] })),
     });
   }
 
   return vorschlaege
-    .sort(
-      (a, b) =>
-        VORSCHLAG_STUFEN.indexOf(a.stufe) - VORSCHLAG_STUFEN.indexOf(b.stufe) ||
-        (b.vertragsbeginn ?? "").localeCompare(a.vertragsbeginn ?? "") ||
-        a.onboardingId.localeCompare(b.onboardingId),
-    )
+    .sort((a, b) => VORSCHLAG_STUFEN.indexOf(a.stufe) - VORSCHLAG_STUFEN.indexOf(b.stufe) || nachVertragsbeginn(a, b))
     .slice(0, AUSGABE_GRENZEN.kandidaten);
+}
+
+/** Laeuft der Austritt (weder COMPLETED noch CANCELLED)? Nur dann laesst sich die Zuordnung aendern (G11). */
+export function austrittLaeuft(status: string): boolean {
+  return status !== "COMPLETED" && status !== "CANCELLED";
+}
+
+/**
+ * Hinweis „Einstellung zuordnen, bevor Sie die Abteilungen informieren“ (G12):
+ * nur ohne Zuordnung, bei laufendem Austritt und mit mindestens einem STARKEN
+ * oder MITTLEREN Vorschlag – ein nur schwacher (Nachname) ist kein Grund, HR
+ * vor dem Informieren aufzuhalten.
+ */
+export function zuordnungEmpfohlen(opts: {
+  zugeordnet: boolean;
+  austrittStatus: string;
+  vorschlaege: ReadonlyArray<{ stufe: VorschlagStufe }>;
+}): boolean {
+  if (opts.zugeordnet || !austrittLaeuft(opts.austrittStatus)) return false;
+  return opts.vorschlaege.some((v) => v.stufe === "STARK" || v.stufe === "MITTEL");
+}
+
+/**
+ * Vorbelegung des Merkers „Person bleibt in einer anderen Beschäftigung“
+ * (G13): bei einer Versetzung ja, sonst nein. HR aendert ihn im Dialog.
+ */
+export function weitereBeschaeftigungVorbelegung(exitType: string | null | undefined): boolean {
+  return exitType === "VERSETZUNG";
+}
+
+/**
+ * Wie viele Stellen eines Vorgangs sind informiert? Eine Stelle gilt als
+ * informiert, sobald sie eine Aufgaben-Mail bekommen hat (`sentAt ??
+ * lastSentAt` – nach einem gescheiterten „Link erneuern“ steht `sentAt` wieder
+ * auf null, die Stelle hat aber eine aeltere Mail). Grundlage fuer den
+ * Arbeitsort am Austritt (G12) und die Rueckfrage vor „Lösen …“.
+ */
+export function informierteStellen(
+  links: ReadonlyArray<{ sentAt?: Date | string | null; lastSentAt?: Date | string | null }>,
+): number {
+  return links.filter((l) => {
+    const t = l.sentAt ?? l.lastSentAt ?? null;
+    return t !== null && !Number.isNaN(new Date(t).getTime());
+  }).length;
+}
+
+/** Warum der Arbeitsort der Einstellung (nicht) an den Austritt geht (G12). */
+export type ArbeitsortGrund = "UEBERNOMMEN" | "OHNE_ARBEITSORT" | "ANDERE_EINRICHTUNG" | "STELLE_INFORMIERT";
+
+export interface ArbeitsortEntscheidung {
+  /** Der Wert fuer `OffboardingProcess.arbeitsortId` – nur bei UEBERNOMMEN gesetzt, sonst bleibt die Spalte, wie sie ist. */
+  arbeitsortId: string | null;
+  grund: ArbeitsortGrund;
+}
+
+/**
+ * Uebernimmt die Zuordnung den Arbeitsort der Einstellung (G12)? Nur, wenn
+ *
+ *   - die Einstellung einen Arbeitsort hat (sonst bleibt alles wie bisher),
+ *   - ihre Einrichtung die des Austritts ist – ein Austritt an Einrichtung Y
+ *     bekommt nie den Arbeitsort einer Einstellung an X (Zweitbeschaeftigung
+ *     ist nicht die OGS-Kraft des Foerdervereins mit Arbeitsort Grundschule),
+ *   - noch keine Stelle des Austritts informiert ist (`informierteStellen`;
+ *     der Server prueft das unter der Versandsperre des Austritts, G26) – sonst
+ *     gingen die uebrigen Aufgaben an andere Stellen als die schon versandten.
+ *
+ * Die Pruefreihenfolge bestimmt den Grund, den der Dialog nennt. Der Mandant
+ * (`organizationId`) aendert sich nie.
+ */
+export function arbeitsortBeiZuordnung(opts: {
+  austritt: { organizationId: string };
+  einstellung: { organizationId: string; arbeitsortId?: string | null };
+  links: ReadonlyArray<{ sentAt?: Date | string | null; lastSentAt?: Date | string | null }>;
+}): ArbeitsortEntscheidung {
+  const ort = opts.einstellung.arbeitsortId?.trim() || null;
+  if (!ort || ort === opts.austritt.organizationId) return { arbeitsortId: null, grund: "OHNE_ARBEITSORT" };
+  if (opts.einstellung.organizationId !== opts.austritt.organizationId) {
+    return { arbeitsortId: null, grund: "ANDERE_EINRICHTUNG" };
+  }
+  if (informierteStellen(opts.links) > 0) return { arbeitsortId: null, grund: "STELLE_INFORMIERT" };
+  return { arbeitsortId: ort, grund: "UEBERNOMMEN" };
+}
+
+/**
+ * Satz des Dialogs zum Arbeitsort (G12: „Sonst bleibt er leer, und der Dialog
+ * sagt das.“). `name` = Name des Arbeitsorts der Einstellung. Ohne Arbeitsort
+ * kein Satz.
+ */
+export function arbeitsortText(grund: ArbeitsortGrund, name: string | null): string | null {
+  const ort = name?.trim() || "der Einstellung";
+  switch (grund) {
+    case "UEBERNOMMEN":
+      return `Arbeitsort ${ort} wird übernommen: Die Aufgaben dieses Austritts gehen an die Stellen dort.`;
+    case "ANDERE_EINRICHTUNG":
+      return "Der Arbeitsort der Einstellung wird nicht übernommen: Sie gehört zu einer anderen Einrichtung als der Austritt.";
+    case "STELLE_INFORMIERT":
+      return `Der Arbeitsort ${ort} wird nicht übernommen, weil schon eine Stelle informiert ist – die Aufgaben gehen weiter an die Stellen der Einrichtung des Austritts.`;
+    case "OHNE_ARBEITSORT":
+      return null;
+  }
 }
 
 // =============================================
@@ -1876,6 +2421,67 @@ export function lageText(stand: LageStand): string {
   return LAGE_TEXTE[stand.lage](stand);
 }
 
+/** Platzhalter fuer `{nr}`, wenn die Einstellung keine Vorgangsnummer hat (Altbestand). */
+export const EINSTELLUNG_OHNE_NUMMER = "ohne Vorgangsnummer";
+
+/**
+ * Was die Lage von der zugeordneten Einstellung liest – geladen von
+ * `bestandDerEinstellungLaden` (ausgaben-daten.ts): Zeilen der Ausstattung,
+ * Ausstattungsaufgaben samt Loeschmerker, ALLE Ausgaben (jeder Zustand) und
+ * der Merker `SupervisorData.ausgabenAngeboten`.
+ */
+export interface EinstellungsBestand {
+  displayId: string | null;
+  ausgabenAngeboten: boolean | null;
+  zeilen: ReadonlyArray<BestandZeile>;
+  aufgaben: ReadonlyArray<BestandAufgabe>;
+  ausgaben: ReadonlyArray<{ checklistItemId: string | null; zustand: string; beiAustritt: string }>;
+}
+
+/** Kopfzeile des Reiters „Rückgaben“ – fertig, die Oberflaeche rechnet nichts. */
+export interface LageAnzeige {
+  stand: LageStand;
+  /** `LAGE_TEXTE` zur Lage. */
+  text: string;
+  /** `LAGE_WEITERE_GELOESCHT` bei Lage AUSGABEN, wenn daneben Ausgaben nach Ablauf der Frist geloescht wurden; sonst null. */
+  zusatz: string | null;
+  /** Erledigte Ausstattungsaufgaben ohne Uebergabevermerk (`ohneVermerk`). */
+  ohneVermerk: OhneVermerkEintrag[];
+}
+
+/**
+ * Lage und Kopfzeile aus dem Bestand der zugeordneten Einstellung (E-A36;
+ * ohne Einstellung `null` → KEINE_EINSTELLUNG). Gegenstaende und Zugaenge
+ * zaehlen nur, was noch bei der Person ist (`AUSGABE_AKTIV`); die Lage
+ * AUSGABEN gilt schon mit einer Ausgabe in jedem Zustand (`rueckgabeLage`).
+ */
+export function rueckgabeLageAnzeige(bestand: EinstellungsBestand | null): LageAnzeige {
+  const ohne = bestand ? ohneVermerk(bestand.aufgaben, bestand.zeilen, bestand.ausgaben) : [];
+  const geloeschteAufgaben = bestand ? bestand.aufgaben.filter((a) => !!a.ausgabenGeloeschtAm).length : 0;
+  const lage = rueckgabeLage({
+    einstellung: bestand,
+    zeilen: bestand?.zeilen ?? [],
+    ausgaben: bestand?.ausgaben ?? [],
+    ohneVermerk: ohne,
+    ausgabenAngeboten: bestand?.ausgabenAngeboten ?? null,
+    geloeschteAufgaben,
+  });
+  const aktiv = (bestand?.ausgaben ?? []).filter((a) => enthalten(AUSGABE_AKTIV, a.zustand));
+  const stand: LageStand = {
+    lage,
+    nr: bestand ? bestand.displayId?.trim() || EINSTELLUNG_OHNE_NUMMER : "",
+    gegenstaende: aktiv.filter((a) => a.beiAustritt === "RUECKGABE").length,
+    zugaenge: aktiv.filter((a) => a.beiAustritt === "SPERREN").length,
+    ohneVermerk: ohne.length,
+  };
+  return {
+    stand,
+    text: lageText(stand),
+    zusatz: lage === "AUSGABEN" && geloeschteAufgaben > 0 ? LAGE_WEITERE_GELOESCHT : null,
+    ohneVermerk: ohne,
+  };
+}
+
 /**
  * Schritt „Rückgaben einsammeln“ im Stepper (E-A36): erledigt, wenn nichts
  * offen ist (`offeneRueckgaben` bzw. ihre Anzahl); der Text kommt aus
@@ -1949,6 +2555,484 @@ export function offeneRueckgaben(opts: {
     offen.push({ titel: a.title, stelle: stelle(a.assigneeDepartment) });
   }
   return offen;
+}
+
+/** Fortschritt „Rückgaben einsammeln“ – in denselben Stuecken wie `offeneRueckgaben`. */
+export interface RueckgabenFortschritt {
+  erledigt: number;
+  gesamt: number;
+}
+
+/**
+ * Der Fortschritt des Stepper-Schritts „Rückgaben einsammeln“ aus DERSELBEN
+ * Quelle wie Liste und Stand (`offeneRueckgaben`, `rueckgabenSchritt`): je
+ * Stueck eine Einheit – eine Rueckgabe-Zeile, eine Sperraufgabe (Herkunft
+ * AUSGABE ohne Rueckgabe-Zeile) bzw. eine Folgeaufgabe, je Ausgabe nur
+ * einmal; offen ist ein Stueck, solange irgendeine seiner Zeilen offen ist.
+ * So steht nie „4/4“ neben einer offenen Sperraufgabe: `gesamt − erledigt`
+ * ist genau die Zahl der offenen Stuecke.
+ */
+export function rueckgabenFortschritt(opts: {
+  rueckgaben: ReadonlyArray<RueckgabeStand & { id: string; ausgabeId?: string | null }>;
+  aufgaben: ReadonlyArray<{ id: string; isCompleted: boolean; herkunft?: string | null; ausgabeId?: string | null }>;
+}): RueckgabenFortschritt {
+  const mitRueckgabe = new Set(opts.rueckgaben.map((r) => r.ausgabeId).filter((id): id is string => !!id));
+  const offen = new Map<string, boolean>();
+  const merken = (schluessel: string, istOffen: boolean) => {
+    offen.set(schluessel, (offen.get(schluessel) ?? false) || istOffen);
+  };
+  for (const r of opts.rueckgaben) merken(r.ausgabeId ? `a:${r.ausgabeId}` : `r:${r.id}`, rueckgabeOffen(r));
+  for (const a of opts.aufgaben) {
+    const sperren = a.herkunft === "AUSGABE" && !(a.ausgabeId && mitRueckgabe.has(a.ausgabeId));
+    if (!sperren && a.herkunft !== "AUSGABE_FEHLT") continue;
+    merken(a.ausgabeId ? `a:${a.ausgabeId}` : `t:${a.id}`, !a.isCompleted);
+  }
+  const gesamt = offen.size;
+  return { erledigt: gesamt - [...offen.values()].filter(Boolean).length, gesamt };
+}
+
+// =============================================
+// Uebernahme in den Austritt und Reiter „Rückgaben“ (G13, G14; seit S29)
+// =============================================
+
+/** „A“, „A und B“, „A, B und C“. */
+function aufzaehlen(teile: ReadonlyArray<string>): string {
+  if (teile.length <= 1) return teile[0] ?? "";
+  return `${teile.slice(0, -1).join(", ")} und ${teile[teile.length - 1]}`;
+}
+
+/** Eine neue `ReturnItem` zu einer Ausgabe (G14) – fertig fuer `createMany` (die Spalte `offboardingId` setzt der Dienst). */
+export interface RueckgabeEntwurf {
+  category: RueckgabeKategorie;
+  itemName: string;
+  serialNumber: string | null;
+  ausgabeId: string;
+}
+
+/**
+ * Die Rueckgabe-Zeile zu einer Ausgabe (G14) – nur bei RUECKGABE; ein Zugang
+ * (SPERREN) bekommt allein seine Sperraufgabe (`null`). `category` aus
+ * `rueckgabeKategorie`, sonst SONSTIGES; `itemName` = Bezeichnung (nie
+ * Freitext); `serialNumber` = Kennung – sie steht im Reiter, auf der
+ * Link-Seite der ausgebenden Stelle und im Protokoll, nie im Titel einer
+ * Aufgabe (G21). Die Zeile ist offen (ohne Zustand): Die Uebernahme aendert
+ * den Zustand der Ausgabe nicht, AUSGEGEBEN und VERBLEIBT passen beide zu
+ * einer offenen Rueckgabe (G13).
+ */
+export function rueckgabeEntwurf(ausgabe: {
+  id: string;
+  bezeichnung: string;
+  beiAustritt: string;
+  kennung?: string | null;
+  rueckgabeKategorie?: string | null;
+}): RueckgabeEntwurf | null {
+  if (ausgabe.beiAustritt !== "RUECKGABE") return null;
+  return {
+    category: enthalten(RUECKGABE_KATEGORIEN, ausgabe.rueckgabeKategorie) ? ausgabe.rueckgabeKategorie : "SONSTIGES",
+    itemName: ausgabe.bezeichnung,
+    serialNumber: ausgabe.kennung?.trim() || null,
+    ausgabeId: ausgabe.id,
+  };
+}
+
+/** Was die Uebernahme anlegt (`uebernahmePlan`). */
+export interface UebernahmePlan {
+  /** Ruecknahme- (RUECKGABE) bzw. Sperraufgaben (SPERREN), je Ausgabe hoechstens eine. */
+  aufgaben: AufgabenEntwurf[];
+  /** Rueckgabe-Zeilen, nur fuer Gegenstaende. */
+  rueckgaben: RueckgabeEntwurf[];
+  /** Stellen mit neuen Aufgaben – deren Links verlaengert und neu berechnet werden. */
+  stellen: string[];
+  /** Neue Rueckgabe-Zeilen (Protokoll, Meldung). */
+  rueckgabenNeu: number;
+  /** Neue Sperraufgaben (Zugaenge). */
+  sperraufgabenNeu: number;
+}
+
+/**
+ * Was die Uebernahme dieser Ausgaben in den Austritt anlegt (G14, Feinplan
+ * 1.7, Schritt 3.7): je Ausgabe die Ruecknahme- bzw. Sperraufgabe
+ * (`ruecknahmeAufgabe`) und bei RUECKGABE die Rueckgabe-Zeile
+ * (`rueckgabeEntwurf`) – nur, was dem Austritt noch fehlt (`vorhanden`: IDs
+ * der Ausgaben mit Aufgabe bzw. Rueckgabe-Zeile). „Rückgaben aktualisieren“
+ * legt damit nie etwas doppelt an; der Unique-Index bleibt das Netz
+ * (`skipDuplicates`). `startIndex` = Zahl der schon vorhandenen
+ * Ausgabe-Aufgaben – neue stehen dahinter, alle vor den Vorlagenpunkten.
+ * Ausgaben ohne RUECKGABE/SPERREN fallen weg.
+ */
+export function uebernahmePlan(opts: {
+  ausgaben: ReadonlyArray<AusgabeFuerAufgabe & { kennung?: string | null; rueckgabeKategorie?: string | null }>;
+  vorhanden: { aufgaben: ReadonlyArray<string>; rueckgaben: ReadonlyArray<string> };
+  letzterArbeitstag: Date | string | null | undefined;
+  heute: Kalendertag;
+  startIndex: number;
+}): UebernahmePlan {
+  const mitAufgabe = new Set(opts.vorhanden.aufgaben);
+  const mitRueckgabe = new Set(opts.vorhanden.rueckgaben);
+  const plan: UebernahmePlan = { aufgaben: [], rueckgaben: [], stellen: [], rueckgabenNeu: 0, sperraufgabenNeu: 0 };
+  const gesehen = new Set<string>();
+  let index = Math.max(0, Math.trunc(opts.startIndex));
+  for (const a of opts.ausgaben) {
+    if (gesehen.has(a.id) || !enthalten(AUSGABE_BEI_AUSTRITT, a.beiAustritt)) continue;
+    gesehen.add(a.id);
+    if (!mitAufgabe.has(a.id)) {
+      plan.aufgaben.push(ruecknahmeAufgabe(a, { letzterArbeitstag: opts.letzterArbeitstag, heute: opts.heute, index }));
+      index += 1;
+      if (!plan.stellen.includes(a.departmentKey)) plan.stellen.push(a.departmentKey);
+      if (a.beiAustritt === "SPERREN") plan.sperraufgabenNeu += 1;
+    }
+    const zeile = mitRueckgabe.has(a.id) ? null : rueckgabeEntwurf(a);
+    if (zeile) {
+      plan.rueckgaben.push(zeile);
+      plan.rueckgabenNeu += 1;
+    }
+  }
+  return plan;
+}
+
+/** Ein Stueck kurz – fuer die Vorschau im Dialog und die Hinweise im Reiter (HR; ohne Aktionen). */
+export interface AusgabeKurz {
+  ausgabeId: string;
+  bezeichnung: string;
+  /** RUECKGABE (Gegenstand) oder SPERREN (Zugang). */
+  art: string;
+  kennung: string | null;
+  kennungLabel: string;
+  departmentKey: string;
+  /** Name der ausgebenden Stelle (gepflegt, sonst Label). */
+  stelle: string;
+  zentral: boolean;
+  /** Name der Einrichtung, der das Stueck gehoert; `null`, wenn unbekannt. */
+  einrichtung: string | null;
+  /** „übergeben 28.01.2027 · IT-Abteilung“ bzw. „eingerichtet …“. */
+  text: string;
+}
+
+/** Was `ausgabeKurz` von einer Ausgabe liest. */
+export interface AusgabeKurzDaten {
+  id: string;
+  bezeichnung: string;
+  beiAustritt: string;
+  kennung?: string | null;
+  kennungLabel?: string | null;
+  departmentKey: string;
+  organizationId: string;
+  zentral: boolean;
+  uebergebenAm: Date | string | null;
+}
+
+/** „übergeben 28.01.2027 · IT-Abteilung“ (ohne Datum nur die Stelle). */
+function uebergabeText(a: { beiAustritt: string; uebergebenAm: Date | string | null }, stelle: string): string {
+  const tag = tagText(a.uebergebenAm);
+  return [tag ? `${uebergabeWort(a.beiAustritt)} ${tag}` : "", stelle].filter((t) => t !== "").join(" · ");
+}
+
+/** Ein Stueck kurz (Vorschau, Hinweise): Bezeichnung, Kennung, Stelle, Einrichtung, Uebergabe. */
+export function ausgabeKurz(
+  a: AusgabeKurzDaten,
+  ctx: { stellenNamen: Readonly<Record<string, string>>; einrichtungen: Readonly<Record<string, string>> },
+): AusgabeKurz {
+  const stelle = stelleName(a.departmentKey, ctx.stellenNamen);
+  const einrichtung = Object.prototype.hasOwnProperty.call(ctx.einrichtungen, a.organizationId)
+    ? ctx.einrichtungen[a.organizationId]?.trim() || null
+    : null;
+  return {
+    ausgabeId: a.id,
+    bezeichnung: a.bezeichnung,
+    art: a.beiAustritt,
+    kennung: a.kennung?.trim() || null,
+    kennungLabel: a.kennungLabel?.trim() || KENNUNG_LABEL_STANDARD,
+    departmentKey: a.departmentKey,
+    stelle,
+    zentral: a.zentral,
+    einrichtung,
+    text: uebergabeText(a, stelle),
+  };
+}
+
+/** Der Rueckgabe-Vorschlag fuer Dialog und Reiter – fertig, die Oberflaeche rechnet nichts. */
+export interface RueckgabeVorschlagAnzeige {
+  /** Werden uebernommen: Gegenstaende (Rueckgabe-Zeile und Ruecknahmeaufgabe). */
+  rueckgaben: AusgabeKurz[];
+  /** Werden uebernommen: Zugaenge (nur Sperraufgabe). */
+  sperraufgaben: AusgabeKurz[];
+  /** Nur Hinweis: zentral, die Person bleibt in einer anderen Beschaeftigung – einzeln uebernehmbar. */
+  hinweisZentral: AusgabeKurz[];
+  /** Nur Hinweis: Stueck einer anderen Einrichtung – einzeln uebernehmbar. */
+  hinweisAndereEinrichtung: AusgabeKurz[];
+  /** Stuecke, die gerade ein anderer Austritt bindet – ohne Kennung, Nummer nur mit Zugriff. */
+  schonImAustritt: { offboardingId: string; displayId: string | null; anzahl: number; text: string }[];
+}
+
+/**
+ * `rueckgabeVorschlag` fuer Dialog und Reiter (E-A35): die vorgeschlagenen
+ * Stuecke getrennt nach Gegenstand und Zugang, die Hinweise und die Zeile
+ * `SCHON_IM_AUSTRITT` je Austritt. `uebernommen` (Reiter): IDs der Ausgaben,
+ * die DIESER Austritt schon hat – sie fehlen in allen Listen; was dann noch
+ * unter `rueckgaben`/`sperraufgaben` steht, holt „Rückgaben aktualisieren“.
+ */
+export function rueckgabeVorschlagAnzeige<T extends AusgabeKurzDaten & VorschlagAusgabe>(
+  ergebnis: RueckgabeVorschlagErgebnis<T>,
+  ctx: {
+    stellenNamen: Readonly<Record<string, string>>;
+    einrichtungen: Readonly<Record<string, string>>;
+    uebernommen?: ReadonlyArray<string>;
+  },
+): RueckgabeVorschlagAnzeige {
+  const schon = new Set(ctx.uebernommen ?? []);
+  const kurz = (liste: ReadonlyArray<T>) => liste.filter((a) => !schon.has(a.id)).map((a) => ausgabeKurz(a, ctx));
+  const vorschlag = kurz(ergebnis.vorschlag);
+  return {
+    rueckgaben: vorschlag.filter((a) => a.art === "RUECKGABE"),
+    sperraufgaben: vorschlag.filter((a) => a.art === "SPERREN"),
+    hinweisZentral: kurz(ergebnis.hinweisZentral),
+    hinweisAndereEinrichtung: kurz(ergebnis.hinweisAndereEinrichtung),
+    schonImAustritt: ergebnis.schonImAustritt.map((s) => ({
+      ...s,
+      text: MELDUNGEN_AUSGABEN.SCHON_IM_AUSTRITT(s.anzahl, s.displayId),
+    })),
+  };
+}
+
+/** Eine Zeile „Sperraufgaben …“ je Stelle (Reiter, Mockup 6.8). */
+export interface SperraufgabenZeile {
+  departmentKey: string;
+  stelle: string;
+  /** Die Zugaenge (Bezeichnung, nie Kennung) und ob gesperrt. */
+  zugaenge: { titel: string; erledigt: boolean }[];
+  offen: number;
+  text: string;
+}
+
+/**
+ * Die Sperraufgaben des Austritts je Stelle (Mockup 6.8): Aufgaben mit
+ * `herkunft` AUSGABE OHNE Rueckgabe-Zeile (dieselbe Abgrenzung wie
+ * `offeneRueckgaben`). Name des Zugangs aus der Ausgabe, sonst der
+ * Aufgabentitel; HR (ohne Link) „im Portal“, sonst „über den
+ * Offboarding-Link“. Erledigte stehen mit „(gesperrt)“ da. Stellen in der
+ * Reihenfolge der Abteilungskarte, die Personalabteilung zuletzt.
+ */
+export function sperraufgabenZeilen(opts: {
+  aufgaben: ReadonlyArray<{
+    title: string;
+    isCompleted: boolean;
+    herkunft?: string | null;
+    ausgabeId?: string | null;
+    assigneeDepartment?: string | null;
+  }>;
+  rueckgaben: ReadonlyArray<{ ausgabeId?: string | null }>;
+  ausgaben: ReadonlyArray<{ id: string; bezeichnung: string }>;
+  stellenNamen: Readonly<Record<string, string>>;
+}): SperraufgabenZeile[] {
+  const mitRueckgabe = new Set(opts.rueckgaben.map((r) => r.ausgabeId).filter((id): id is string => !!id));
+  const bezeichnung = new Map(opts.ausgaben.map((a) => [a.id, a.bezeichnung]));
+  const jeStelle = new Map<string, { titel: string; erledigt: boolean }[]>();
+  for (const a of opts.aufgaben) {
+    if (a.herkunft !== "AUSGABE" || (a.ausgabeId && mitRueckgabe.has(a.ausgabeId))) continue;
+    const key = a.assigneeDepartment?.trim() || DEPARTMENT_KEYS.HR;
+    const liste = jeStelle.get(key) ?? [];
+    liste.push({ titel: (a.ausgabeId && bezeichnung.get(a.ausgabeId)) || a.title, erledigt: a.isCompleted });
+    jeStelle.set(key, liste);
+  }
+  return stellenReihenfolge(jeStelle.keys()).map((key) => {
+    const zugaenge = jeStelle.get(key) ?? [];
+    const stelle = stelleName(key, opts.stellenNamen);
+    const liste = aufzaehlen(zugaenge.map((z) => (z.erledigt ? `${z.titel} (${AUSGABE_GESPERRT_LABEL})` : z.titel)));
+    return {
+      departmentKey: key,
+      stelle,
+      zugaenge,
+      offen: zugaenge.filter((z) => !z.erledigt).length,
+      text: MELDUNGEN_AUSGABEN.SPERRAUFGABEN(stelle, liste, istLinkAbteilung(key)),
+    };
+  });
+}
+
+/** Anzeige einer offenen Rueckgabe-Zeile (Zustand leer). */
+export const RUECKGABE_OFFEN_LABEL = "offen";
+
+/** Eine Zeile der Tabelle im Reiter „Rückgaben“ – fertig, die Oberflaeche rechnet nichts. */
+export interface RueckgabeZeile {
+  id: string;
+  category: string;
+  kategorieLabel: string;
+  itemName: string;
+  serialNumber: string | null;
+  /** Beschriftung der Kennung: Momentaufnahme der Ausgabe, sonst „Kennung“. */
+  kennungLabel: string;
+  /** `rueckgabeZustand` (Altbestand mit `isReturned` = ZURUECK); `null` = offen. */
+  zustand: RueckgabeZustand | null;
+  zustandLabel: string;
+  offen: boolean;
+  returnedAt: string | null;
+  condition: string | null;
+  notes: string | null;
+  /** Aus der Einstellung vorgeschlagen (`ausgabeId`): nicht loeschbar, stattdessen „entfällt“ (G15). */
+  vorgeschlagen: boolean;
+  ausgabeId: string | null;
+  departmentKey: string;
+  /** Ausgebende Stelle; von HR erfasste Zeilen gehoeren der Personalabteilung. */
+  stelle: string;
+  /** „übergeben 28.01.2027 · IT-Abteilung“ – nur an vorgeschlagenen Zeilen mit Ausgabe. */
+  uebergabe: string | null;
+  /** Warum die Kennung hier nicht korrigierbar ist (ein anderer Austritt bindet das Stueck), sonst null. */
+  sperrGrund: string | null;
+  aktionen: { korrigieren: boolean; loeschen: boolean };
+  /**
+   * Den Zustand im Reiter waehlen (S32): mit Bearbeitungsrecht (nicht
+   * CANCELLED) – an einer Zeile aus der Einstellung nur, solange DIESER
+   * Austritt das Stueck aendern darf (`gleichlaufGesperrt`, G28). Sonst
+   * antwortete der Server 409 (AUSGABE_IM_AUSTRITT bzw. AUSGABE_FREIGEGEBEN).
+   */
+  zustandWaehlbar: boolean;
+  /** Warum der Zustand hier nicht waehlbar ist, obwohl HR bearbeiten darf; sonst null. */
+  zustandSperrGrund: string | null;
+  /** „fehlt“ legt die Folgeaufgabe „Schließung prüfen“ an (G17): Zeile aus der Einstellung, Kategorie SCHLUESSEL. */
+  folgeBeiFehlt: boolean;
+}
+
+function iso(wert: Date | string | null | undefined): string | null {
+  if (wert === null || wert === undefined) return null;
+  const d = typeof wert === "string" ? new Date(wert) : wert;
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/**
+ * Die Zeilen der Tabelle im Reiter „Rückgaben“ (Mockup 6.8): Kategorie,
+ * Gegenstand, Kennung, Zustand, Stelle und Uebergabe. Eine vorgeschlagene
+ * Zeile (`ausgabeId`) nennt die ausgebende Stelle (Ruecknahmeaufgabe, sonst
+ * Ausgabe) und „übergeben … · Stelle“; korrigieren laesst sich die Kennung
+ * nach `ausgabenZeile` mit `austrittId` (nur Gegenstaende, nicht gebunden an
+ * einen anderen Austritt), loeschen nie (G15). Von HR erfasste Zeilen:
+ * Personalabteilung, korrigieren und loeschen mit Bearbeitungsrecht.
+ *
+ * Seit S32 (Oberflaeche) zusaetzlich, ob der Reiter den Zustand waehlen laesst
+ * (`zustandWaehlbar`): mit Bearbeitungsrecht, an einer Zeile aus der
+ * Einstellung nur ohne `gleichlaufGesperrt` – ein anderer Austritt bindet das
+ * Stueck, oder ein abgeschlossener Austritt (`austrittStatus` COMPLETED) hat
+ * es mit „verbleibt“ freigegeben (G28). Die Kennung bleibt dort nach
+ * `ausgabenZeile` korrigierbar. Ohne `austrittStatus` gilt der Austritt als
+ * laufend.
+ */
+export function rueckgabeZeilenBauen(opts: {
+  rueckgaben: ReadonlyArray<{
+    id: string;
+    category: string;
+    itemName: string;
+    serialNumber?: string | null;
+    zustand?: string | null;
+    isReturned: boolean;
+    returnedAt?: Date | string | null;
+    condition?: string | null;
+    notes?: string | null;
+    ausgabeId?: string | null;
+  }>;
+  aufgaben: ReadonlyArray<{ herkunft?: string | null; ausgabeId?: string | null; assigneeDepartment?: string | null }>;
+  ausgaben: ReadonlyArray<AusgabeZeilenDaten & { departmentKey: string }>;
+  stellenNamen: Readonly<Record<string, string>>;
+  austrittId: string;
+  darfBearbeiten: boolean;
+  /** OffboardingStatus des Austritts (fuer „mit dem Abschluss freigegeben“, G28); fehlt = laufend. */
+  austrittStatus?: string | null;
+}): RueckgabeZeile[] {
+  const ausgabeNachId = new Map(opts.ausgaben.map((a) => [a.id, a]));
+  const austritt = { id: opts.austrittId, status: opts.austrittStatus?.trim() || "INITIATED" };
+  const stelleDerAufgabe = new Map<string, string>();
+  for (const a of opts.aufgaben) {
+    if (a.herkunft === "AUSGABE" && a.ausgabeId && a.assigneeDepartment && !stelleDerAufgabe.has(a.ausgabeId)) {
+      stelleDerAufgabe.set(a.ausgabeId, a.assigneeDepartment);
+    }
+  }
+  return opts.rueckgaben.map((r) => {
+    const ausgabe = r.ausgabeId ? (ausgabeNachId.get(r.ausgabeId) ?? null) : null;
+    const key =
+      (r.ausgabeId ? stelleDerAufgabe.get(r.ausgabeId) : undefined) || ausgabe?.departmentKey || DEPARTMENT_KEYS.HR;
+    const stelle = stelleName(key, opts.stellenNamen);
+    const zustand = rueckgabeZustand(r);
+    let korrigieren = opts.darfBearbeiten && !r.ausgabeId;
+    let sperrGrund: string | null = null;
+    let zustandSperrGrund: string | null = null;
+    if (ausgabe) {
+      const stand = ausgabenZeile(ausgabe, { darfBearbeiten: opts.darfBearbeiten, austrittId: opts.austrittId });
+      korrigieren = stand.aktionen.korrigieren;
+      sperrGrund = stand.sperrGrund;
+      const sperre = opts.darfBearbeiten ? gleichlaufGesperrt(ausgabe, ausgabe.bezuege ?? [], austritt) : null;
+      zustandSperrGrund = sperre ? gleichlaufSperreText(sperre) : null;
+    }
+    return {
+      id: r.id,
+      category: r.category,
+      kategorieLabel: RETURN_CATEGORY_LABELS[r.category] ?? r.category,
+      itemName: r.itemName,
+      serialNumber: r.serialNumber?.trim() || null,
+      kennungLabel: ausgabe?.kennungLabel?.trim() || KENNUNG_LABEL_STANDARD,
+      zustand,
+      zustandLabel: zustand ? AUSGABE_ZUSTAND_LABELS[zustand] : RUECKGABE_OFFEN_LABEL,
+      offen: zustand === null,
+      returnedAt: iso(r.returnedAt),
+      condition: r.condition?.trim() || null,
+      notes: r.notes?.trim() || null,
+      vorgeschlagen: !!r.ausgabeId,
+      ausgabeId: r.ausgabeId ?? null,
+      departmentKey: key,
+      stelle,
+      uebergabe: ausgabe ? uebergabeText(ausgabe, stelle) : null,
+      sperrGrund,
+      aktionen: { korrigieren, loeschen: opts.darfBearbeiten && !r.ausgabeId },
+      zustandWaehlbar: opts.darfBearbeiten && zustandSperrGrund === null,
+      zustandSperrGrund,
+      folgeBeiFehlt: !!r.ausgabeId && r.category === "SCHLUESSEL",
+    };
+  });
+}
+
+/**
+ * „Lösen …“ ist gesperrt (G11, Feinplan 1.7), sobald eine Ruecknahme-,
+ * Sperr- oder Folgeaufgabe erledigt ist oder eine vorgeschlagene Rueckgabe
+ * (`ausgabeId`) einen Zustand hat (auch Altbestand mit `isReturned`) – sonst
+ * verloere der Austritt einen bestaetigten Stand. Dieselbe Regel prueft der
+ * Server nach der Sperre des Austritts.
+ */
+export function loesenGesperrt(opts: {
+  aufgaben: ReadonlyArray<{ herkunft?: string | null; isCompleted: boolean }>;
+  rueckgaben: ReadonlyArray<RueckgabeStand & { ausgabeId?: string | null }>;
+}): boolean {
+  return (
+    opts.aufgaben.some((a) => enthalten(OFFBOARDING_AUFGABEN_HERKUNFT, a.herkunft) && a.isCompleted) ||
+    opts.rueckgaben.some((r) => !!r.ausgabeId && !rueckgabeOffen(r))
+  );
+}
+
+/** Was die Rueckfrage vor „Lösen …“ nennt (G11, `LOESEN_RUECKFRAGE`). */
+export interface LoesenStand {
+  /** Ruecknahme-, Sperr- und Folgeaufgaben, die geloescht wuerden. */
+  aufgaben: number;
+  /** Davon betroffene Stellen, die schon informiert sind – ihre Link-Seite verliert die Aufgaben. */
+  informierteStellen: number;
+  rueckfrage: string;
+  /** `LOESEN_GESPERRT`, wenn „Lösen …“ nicht mehr geht; sonst null. */
+  sperrGrund: string | null;
+}
+
+/**
+ * Stand fuer die Rueckfrage vor „Lösen …“: Zahl der Aufgaben mit `herkunft`
+ * und wie viele ihrer Stellen schon informiert sind (`informierteStellen` je
+ * Link); `sperrGrund` nach `loesenGesperrt`.
+ */
+export function loesenStand(opts: {
+  aufgaben: ReadonlyArray<{ herkunft?: string | null; isCompleted: boolean; assigneeDepartment?: string | null }>;
+  rueckgaben: ReadonlyArray<RueckgabeStand & { ausgabeId?: string | null }>;
+  links: ReadonlyArray<{ departmentKey: string; sentAt?: Date | string | null; lastSentAt?: Date | string | null }>;
+}): LoesenStand {
+  const ausgabeAufgaben = opts.aufgaben.filter((a) => enthalten(OFFBOARDING_AUFGABEN_HERKUNFT, a.herkunft));
+  const stellen = new Set(ausgabeAufgaben.map((a) => a.assigneeDepartment).filter((k): k is string => !!k));
+  const informiert = informierteStellen(opts.links.filter((l) => stellen.has(l.departmentKey)));
+  return {
+    aufgaben: ausgabeAufgaben.length,
+    informierteStellen: informiert,
+    rueckfrage: MELDUNGEN_AUSGABEN.LOESEN_RUECKFRAGE(ausgabeAufgaben.length, informiert),
+    sperrGrund: loesenGesperrt(opts) ? MELDUNGEN_AUSGABEN.LOESEN_GESPERRT : null,
+  };
 }
 
 // =============================================
@@ -2383,6 +3467,119 @@ export function linkAusgabeBauen(opts: {
  */
 export function linkStueckText(stueck: Pick<LinkAusgabeStueck, "kennung" | "uebergebenAm">, art: string): string {
   return stueckZeile([], { kennung: stueck.kennung, uebergebenAm: stueck.uebergebenAm, beiAustritt: art });
+}
+
+// =============================================
+// Link-Seite der Stelle im Offboarding (G15, G17, Feinplan 1.6; seit S30)
+// =============================================
+
+/**
+ * Die drei Knoepfe einer Ruecknahmeaufgabe auf der Link-Seite (1.8,
+ * `ruecknahme-auswahl.tsx`) – statt des Hakens. Mehr waehlt die Stelle nicht
+ * (`RUECKGABE_ZUSTAENDE_STELLE`); „verbleibt“ und „entfällt“ setzt nur HR.
+ */
+export const RUECKNAHME_AUSWAHL: ReadonlyArray<{ zustand: RueckgabeZustandStelle; label: string }> = [
+  { zustand: "ZURUECK", label: "Zurückerhalten" },
+  { zustand: "BESCHAEDIGT", label: "Beschädigt zurückerhalten" },
+  { zustand: "FEHLT", label: "Fehlt" },
+];
+
+/**
+ * Feld `ausgabe` an einer Ruecknahme- (RUECKGABE) bzw. Sperraufgabe (SPERREN)
+ * der ausgebenden Stelle auf ihrer Offboarding-Link-Seite (Feinplan 1.6):
+ *
+ *   art           RUECKGABE (Gegenstand) oder SPERREN (Zugang)
+ *   kennungLabel  Beschriftung der Kennung (Momentaufnahme, sonst „Kennung“)
+ *   kennung       die Kennung – damit die Stelle das Stueck findet (G21)
+ *   uebergebenAm  Kalendertag der Uebergabe bzw. Einrichtung
+ *   zustand       Rueckgabezustand in DIESEM Austritt (`null` = offen)
+ *   zustandLabel  „offen“, „zurück“, „gesperrt“, „fehlt“ …
+ *   auswahl       die drei Knoepfe (`RUECKNAHME_AUSWAHL`); an einem Zugang
+ *                 leer – er hat den Haken („Gesperrt“)
+ */
+export interface OffboardingLinkAusgabe {
+  art: AusgabeBeiAustritt;
+  kennungLabel: string;
+  kennung: string | null;
+  uebergebenAm: Kalendertag | null;
+  zustand: RueckgabeZustand | null;
+  zustandLabel: string;
+  auswahl: ReadonlyArray<{ zustand: RueckgabeZustandStelle; label: string }>;
+}
+
+/**
+ * Feld `ausgabe` an der Folgeaufgabe „Schließung prüfen“ der
+ * Gebaeudewirtschaft (G17) – NUR lesend, ohne `auswahl`: Die Folgeaufgabe hat
+ * den normalen Haken. Die Kennung braucht die Gebaeudewirtschaft fuer den
+ * Zylindertausch bzw. die Sperre im Schliesssystem; sie steht nie im Titel.
+ */
+export interface OffboardingFolgeAusgabe {
+  art: AusgabeBeiAustritt;
+  kennungLabel: string;
+  kennung: string | null;
+  zustandLabel: string;
+}
+
+/**
+ * Das Feld `ausgabe` einer Aufgabe auf der Offboarding-Link-Seite einer Stelle
+ * (G15, G17, G21; Feinplan 1.6) – `null` heisst: Der Schluessel fehlt an der
+ * Aufgabe GANZ (die gepinnten Schluessellisten der Link-Seite bleiben gueltig).
+ *
+ *   - Ruecknahme- bzw. Sperraufgabe (`herkunft` AUSGABE): nur, wenn Aufgabe UND
+ *     Ausgabe dieser Stelle gehoeren – die ausgebende Stelle sieht die Kennung
+ *     nur an ihrer eigenen Aufgabe. Der Zustand kommt bei einem Gegenstand aus
+ *     der Rueckgabe-Zeile DIESES Austritts (`rueckgabeZustand`: Stand beim
+ *     Austritt, auch nachdem ein spaeterer Austritt das Stueck weiterfuehrt),
+ *     sonst aus der erledigten Aufgabe und der Ausgabe (abgehakt = ZURUECK).
+ *   - Folgeaufgabe (`herkunft` AUSGABE_FEHLT): nur fuer die Gebaeudewirtschaft
+ *     (`FOLGE_STELLE`), nur lesend (`OffboardingFolgeAusgabe`, „fehlt“).
+ *   - alles andere: `null`.
+ */
+export function offboardingLinkAusgabeBauen(opts: {
+  departmentKey: string;
+  aufgabe: { herkunft?: string | null; assigneeDepartment?: string | null; isCompleted: boolean };
+  ausgabe:
+    | {
+        departmentKey: string;
+        beiAustritt: string;
+        kennung: string | null;
+        kennungLabel?: string | null;
+        uebergebenAm: Date | string | null;
+        zustand: string;
+      }
+    | null
+    | undefined;
+  rueckgabe?: RueckgabeStand | null;
+}): OffboardingLinkAusgabe | OffboardingFolgeAusgabe | null {
+  const { departmentKey: key, aufgabe, ausgabe } = opts;
+  if (!ausgabe || aufgabe.assigneeDepartment !== key || !enthalten(AUSGABE_BEI_AUSTRITT, ausgabe.beiAustritt)) return null;
+  const art = ausgabe.beiAustritt;
+  const kennungLabel = ausgabe.kennungLabel?.trim() || KENNUNG_LABEL_STANDARD;
+  const kennung = ausgabe.kennung?.trim() || null;
+
+  if (aufgabe.herkunft === "AUSGABE_FEHLT") {
+    if (key !== FOLGE_STELLE) return null;
+    return { art, kennungLabel, kennung, zustandLabel: AUSGABE_ZUSTAND_LABELS.FEHLT };
+  }
+  if (aufgabe.herkunft !== "AUSGABE" || ausgabe.departmentKey !== key) return null;
+
+  let zustand: RueckgabeZustand | null;
+  if (art === "RUECKGABE" && opts.rueckgabe) {
+    zustand = rueckgabeZustand(opts.rueckgabe);
+  } else if (!aufgabe.isCompleted) {
+    zustand = null;
+  } else {
+    zustand = enthalten(RUECKGABE_ZUSTAENDE, ausgabe.zustand) ? ausgabe.zustand : "ZURUECK";
+  }
+  return {
+    art,
+    kennungLabel,
+    kennung,
+    uebergebenAm: kalendertagVon(ausgabe.uebergebenAm),
+    zustand,
+    zustandLabel: zustand ? ausgabeZustandLabel(zustand, art) : RUECKGABE_OFFEN_LABEL,
+    auswahl: art === "RUECKGABE" ? RUECKNAHME_AUSWAHL : [],
+  };
 }
 
 // =============================================

@@ -18,6 +18,11 @@
  * gegen einen eigenen kleinen mockPrisma (`mockBezugDb`). Der Fake rollt bei
  * einer Ausnahme nicht zurueck – Abweisungen werden daran geprueft, dass VOR
  * dem ersten Schreiben abgewiesen wird.
+ *
+ * Seit S29 kennt die Fake-DB Rueckgaben und Ausgabe-Aufgaben des Austritts:
+ * Der Fall „echter Ablauf“ leitet `mockBezugDb` auf sie um und laesst die
+ * Zuordnung eines zweiten Austritts (src/lib/offboarding-ausgaben.ts) echt
+ * schreiben – danach antwortet die Karte 409 AUSGABE_IM_AUSTRITT.
  */
 
 const mockBezugDb = {
@@ -51,12 +56,15 @@ import {
   fakePrisma,
   neueAusgabe,
   neueAusstattungsZeile,
+  neueOffboardingAufgabe,
   neueOnboardingAufgabe,
+  neueRueckgabe,
   passt,
   projizieren,
   type Zeile,
 } from "../hilfen/abteilungs-fake-db";
 import { ausgabenAktionAusfuehren } from "@/lib/ausgaben-dienst";
+import { einstellungAktionAusfuehren } from "@/lib/offboarding-ausgaben";
 import { austrittsBezuegeLaden } from "@/lib/ausgaben-daten";
 import { ausstattungKarteLaden } from "@/lib/ausstattung-dienst";
 import { MELDUNGEN as ABTEILUNGS_MELDUNGEN } from "@/lib/abteilungsaufgaben";
@@ -70,8 +78,12 @@ const echtRechte = jest.requireActual<typeof import("@/lib/permissions")>("@/lib
 const echtDaten = jest.requireActual<typeof import("@/lib/ausgaben-daten")>("@/lib/ausgaben-daten");
 const mockZugriff = canAccessProcess as jest.Mock;
 
-// Der Katalogausschnitt der Uebersicht liest die Einrichtungsart des Arbeitsorts.
-fp.organization = { findUnique: jest.fn(async () => ({ type: "GYMNASIUM" })) };
+// Der Katalogausschnitt der Uebersicht liest die Einrichtungsart des Arbeitsorts;
+// der Reiter „Rückgaben“ (S29) die Namen der Einrichtungen.
+fp.organization = {
+  findUnique: jest.fn(async () => ({ type: "GYMNASIUM" })),
+  findMany: jest.fn(async () => [{ id: "org-1", name: "FES Gymnasium" }]),
+};
 // Das juengste UEBERGABEPROTOKOLL (G19) – Dokumente kennt der Fake nicht.
 let mockDokumente: Zeile[] = [];
 fp.document = {
@@ -888,6 +900,66 @@ describe("Bindung an einen Austritt (G28)", () => {
     expect(JSON.stringify(r.body)).not.toContain("OFF-2027-FV-0001");
   });
 
+  it("echter Ablauf (S29): VERBLEIBT aus dem abgeschlossenen ersten Austritt lässt sich korrigieren; übernimmt sie ein zweiter, laufender Austritt, ergibt dieselbe Aktion 409", async () => {
+    // Die Bezuege liest der Dienst hier aus der Fake-DB – also aus genau dem,
+    // was die Uebernahme des zweiten Austritts wirklich schreibt.
+    mockBezugDb.offboardingChecklistItem.findMany.mockImplementation((args: unknown) => fp.offboardingChecklistItem.findMany(args));
+    mockBezugDb.returnItem.findMany.mockImplementation((args: unknown) => fp.returnItem.findMany(args));
+    mockBezugDb.offboardingProcess.findMany.mockImplementation((args: unknown) => fp.offboardingProcess.findMany(args));
+    const austritt = (teil: Zeile): Zeile => ({
+      displayId: "OFF-2027-GYM-0001",
+      organizationId: "org-1",
+      arbeitsortId: null,
+      status: "INITIATED",
+      exitType: "VERSETZUNG",
+      lastWorkingDay: tag("2027-03-31"),
+      onboardingId: null,
+      weitereBeschaeftigung: null,
+      employeeFirstName: "Mia",
+      employeeLastName: "Muster",
+      employeeEmail: "mia@example.org",
+      employeePrivateEmail: null,
+      ...teil,
+    });
+    db.ausgaben = [ausgabe({ zustand: "VERBLEIBT" })];
+    // Erster Austritt (Versetzung) ist abgeschlossen: das iPad verbleibt.
+    db.vorgaenge = [
+      austritt({ id: "off-1", status: "COMPLETED", onboardingId: "onb-1", weitereBeschaeftigung: true }),
+      austritt({ id: "off-2", displayId: "OFF-2027-GYM-0002", exitType: "KUENDIGUNG_ARBEITNEHMER" }),
+    ];
+    db.aufgaben = [
+      neueOffboardingAufgabe({ offboardingId: "off-1", title: "Dienst-iPad (Lernmittel) zurücknehmen", assigneeDepartment: "IT", herkunft: "AUSGABE", ausgabeId: "ag-ipad", isCompleted: true }),
+    ];
+    db.rueckgaben = [
+      neueRueckgabe({ offboardingId: "off-1", category: "IT_HARDWARE", itemName: "Dienst-iPad (Lernmittel)", ausgabeId: "ag-ipad", zustand: "VERBLEIBT" }),
+    ];
+
+    // 1. Frei (G28: VERBLEIBT gibt mit dem Abschluss frei) – die Karte korrigiert.
+    expect((await aktion({ aktion: "korrigieren", ausgabeId: "ag-ipad", kennung: "NEU-1" })).status).toBe(200);
+
+    // 2. Der zweite Austritt ordnet dieselbe Einstellung zu – der echte Dienst legt Aufgabe und Rueckgabe an.
+    const z = await einstellungAktionAusfuehren({
+      offboardingId: "off-2",
+      rohBody: { aktion: "zuordnen", onboardingId: "onb-1" },
+      session: HR,
+      jetzt: JETZT,
+    });
+    expect(z.status).toBe(200);
+    expect(db.aufgaben.filter((a) => a.offboardingId === "off-2").map((a) => a.ausgabeId)).toEqual(["ag-ipad"]);
+    expect(db.rueckgaben.filter((r) => r.offboardingId === "off-2")).toEqual([
+      expect.objectContaining({ ausgabeId: "ag-ipad", serialNumber: "NEU-1", zustand: null }),
+    ]);
+    expect(ausgabeMit("ag-ipad")?.zustand).toBe("VERBLEIBT");
+
+    // 3. Dieselbe Aktion der Karte: jetzt bindet der laufende zweite Austritt.
+    const r = await aktion({ aktion: "korrigieren", ausgabeId: "ag-ipad", kennung: "NEU-2" });
+    expect(r).toEqual({
+      status: 409,
+      body: { error: MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT("OFF-2027-GYM-0002"), grund: "AUSGABE_IM_AUSTRITT" },
+    });
+    expect(ausgabeMit("ag-ipad")?.kennung).toBe("NEU-1");
+  });
+
   it("die Karte zeigt den Sperrgrund an der gebundenen Ausgabe", async () => {
     db.ausgaben = [ausgabe()];
     austrittBezieht("ag-ipad", { id: "off-1", status: "INITIATED", displayId: "OFF-2027-GYM-0003" });
@@ -995,6 +1067,37 @@ describe("austrittsBezuegeLaden (G28)", () => {
     expect((await echtDaten.austrittsBezuegeLaden(dbMock, ["ag-1"])).get("ag-1")?.[0].displayId).toBeNull();
     mockZugriff.mockImplementation(async (_s: SessionPayload, org: string) => org !== "org-fremd");
     expect((await echtDaten.austrittsBezuegeLaden(dbMock, ["ag-1"], { session: HR })).get("ag-1")?.[0].displayId).toBeNull();
+  });
+
+  it("je Bezug der eigene Stand (Rückgabe-Zeile mit Zustand) und `abgeloest`, wenn ein späterer Austritt das Stück bezieht (Review A4c)", async () => {
+    const frueh = new Date("2027-06-01T08:00:00.000Z");
+    const spaet = new Date("2027-07-16T08:00:00.000Z");
+    bezugsDaten.austritte.push(
+      { id: "off-a", status: "COMPLETED", displayId: "OFF-A", organizationId: "org-1" },
+      { id: "off-b", status: "HANDOVER_PHASE", displayId: "OFF-B", organizationId: "org-1" },
+    );
+    // A gab das Stück mit „verbleibt“ frei, B übernahm es später (offene Zeile).
+    bezugsDaten.rueckgaben.push(
+      { ausgabeId: "ag-1", offboardingId: "off-a", zustand: "VERBLEIBT", isReturned: false, createdAt: frueh },
+      { ausgabeId: "ag-1", offboardingId: "off-b", zustand: null, isReturned: false, createdAt: spaet },
+    );
+    bezugsDaten.aufgaben.push(
+      { ausgabeId: "ag-1", offboardingId: "off-a", herkunft: "AUSGABE", createdAt: frueh },
+      { ausgabeId: "ag-1", offboardingId: "off-b", herkunft: "AUSGABE", createdAt: spaet },
+      // Ein Zugang ohne Zeile: nur die Reihenfolge der Aufgaben.
+      { ausgabeId: "ag-2", offboardingId: "off-a", herkunft: "AUSGABE", createdAt: frueh },
+      { ausgabeId: "ag-2", offboardingId: "off-b", herkunft: "AUSGABE", createdAt: spaet },
+    );
+
+    const bezuege = await echtDaten.austrittsBezuegeLaden(dbMock, ["ag-1", "ag-2"], { session: HR });
+    expect(bezuege.get("ag-1")).toEqual([
+      { offboardingId: "off-a", status: "COMPLETED", displayId: "OFF-A", eigenerStand: "VERBLEIBT", abgeloest: true },
+      { offboardingId: "off-b", status: "HANDOVER_PHASE", displayId: "OFF-B" },
+    ]);
+    expect(bezuege.get("ag-2")).toEqual([
+      { offboardingId: "off-a", status: "COMPLETED", displayId: "OFF-A", abgeloest: true },
+      { offboardingId: "off-b", status: "HANDOVER_PHASE", displayId: "OFF-B" },
+    ]);
   });
 
   it("ohne Ausgaben keine Abfrage", async () => {

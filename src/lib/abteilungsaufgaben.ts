@@ -1612,6 +1612,36 @@ export function nachInfoNeuText(anzahl: number): string {
   return `${anzahl === 1 ? "1 Aufgabe" : `${anzahl} Aufgaben`} nach der Information hinzugekommen – bitte „Erneut senden“`;
 }
 
+/**
+ * A4 (G14, nur Offboarding; Eingabe von `abteilungsZeilenBauen({ nachInfoNeu })`):
+ * je Stelle die OFFENEN Aufgaben, die nach der letzten Mail an sie angelegt
+ * wurden – `createdAt` spaeter als `lastSentAt ?? sentAt` ihres Links. Ohne
+ * Link, ohne Versand oder ohne `createdAt` zaehlt nichts; Stellen ohne neue
+ * Aufgabe fehlen im Ergebnis. „Erneut senden“ setzt `lastSentAt` und nimmt
+ * die Aufgaben damit wieder heraus.
+ */
+export function nachInfoNeuZaehlen(
+  aufgaben: ReadonlyArray<{
+    assigneeDepartment: string | null;
+    isCompleted: boolean;
+    createdAt?: Date | string | null;
+  }>,
+  links: ReadonlyArray<{ departmentKey: string; sentAt?: Date | string | null; lastSentAt?: Date | string | null }>,
+): Record<string, number> {
+  const ergebnis: Record<string, number> = {};
+  for (const link of links) {
+    const informiert = alsDatum(link.lastSentAt) ?? alsDatum(link.sentAt);
+    if (!informiert) continue;
+    const neu = aufgaben.filter((a) => {
+      if (a.isCompleted || a.assigneeDepartment !== link.departmentKey) return false;
+      const angelegt = alsDatum(a.createdAt);
+      return !!angelegt && angelegt.getTime() > informiert.getTime();
+    }).length;
+    if (neu > 0) ergebnis[link.departmentKey] = neu;
+  }
+  return ergebnis;
+}
+
 /** Eigenschaft ohne Prototyp-Kette (ein Schluessel wie „constructor“ traefe sonst Object.prototype). */
 function eigenerEintrag<T>(tabelle: Readonly<Record<string, T>> | undefined, key: string): T | undefined {
   return tabelle && Object.prototype.hasOwnProperty.call(tabelle, key) ? tabelle[key] : undefined;

@@ -43,6 +43,22 @@
  * Wie bei statusAbgleichen (onboarding-status-abgleich.ts) ist die
  * Aufrufreihenfolge mit Mocks getestet, nicht das Sperrverhalten von Postgres.
  *
+ * AUSTRITTSSPERRE (Ausstattung & Zugaenge, Stufe 2 – A4, S30, G15 bis G18):
+ * An Ruecknahme-, Sperr- und Folgeaufgaben (`herkunft` ≠ null) sperrt der
+ * Link-Weg im Offboarding ZUERST den Austritt, bedingt auf „nicht COMPLETED,
+ * nicht CANCELLED“ (Muster A3, E-A19), danach erst Links und Aufgabe. Der
+ * Abschluss (COMPLETED-Zweig von PATCH /api/offboarding/[id], S31) zaehlt die
+ * offenen Rueckgaben nach SEINEM bedingten Update derselben Zeile – so wartet
+ * er auf diesen Haken bzw. dieser PATCH auf den Abschluss und findet ihn
+ * danach (0 Treffer → 409 nur lesen bzw. 410). Sonst rutschte ein „wieder
+ * öffnen“ zwischen Zaehlen und Commit durch. Auch der Portal-PATCH sperrt den
+ * Austritt (bedingt auf „nicht CANCELLED“), sobald er an einer solchen Aufgabe
+ * Status oder Rueckgabezustand aendert. Die Ausgabe fuehrt: Aufgabe und
+ * Rueckgabe-Zeile folgen in derselben Transaktion (`ausgabeGleichlaufIn`,
+ * src/lib/ausgaben-schreiben.ts), die Folgeaufgabe „Schließung prüfen“ samt
+ * Sperre des FACILITY-Links vor den Aufgaben (G17, `brauchtFolgeStelle`).
+ * Reihenfolge ueberall: Austritt → Links → Aufgaben → Ausgabe → Rueckgabe-Zeile (G24).
+ *
  * Mails gehen NACH dem Commit hinaus und nur bei einem echten Wechsel:
  *   - *-task-completed (an HR): Aufgabe offen → erledigt ueber den Link. Im
  *     Offboarding-Portal nur fuer Aufgaben einer Link-Abteilung (das eigene
@@ -83,6 +99,7 @@ import {
 } from "@/lib/abteilungsaufgaben";
 import {
   aufgabeLinkPatchSchema,
+  offboardingAufgabeLinkPatchSchema,
   onboardingPortalAufgabePatchSchema,
   portalAufgabePatchSchema,
 } from "@/lib/validations/abteilungsaufgaben";
@@ -95,24 +112,44 @@ import {
 import { angabenJeStelleLaden, ausstattungZuAufgabenLaden, bemerkungFuerStelle } from "@/lib/ausstattung-daten";
 import {
   AUSGABEN_AUDIT,
+  FOLGE_STELLE,
   MELDUNGEN_AUSGABEN,
   ausgabeBasis,
+  ausgabeNachZiel,
   ausgabeVermerkMailFelder,
   bindenderAustritt,
+  brauchtFolgeStelle,
+  gleichlaufSperreText,
   perLinkEntfernbar,
+  rueckgabeZiel,
   vermerkPruefen,
   vermerkStuecke,
   vermerkZielGrund,
+  zustandFehler,
+  type GleichlaufSperre,
   type LinkAusgabe,
+  type OffboardingFolgeAusgabe,
+  type OffboardingLinkAusgabe,
+  type RueckgabeZustand,
   type VermerkZiel,
 } from "@/lib/ausgaben";
-import { ausgabeEntfernenIn, ausgabenAnlegenIn, ausgabenSperrenIn } from "@/lib/ausgaben-schreiben";
+import {
+  AusgabeKonflikt,
+  ausgabeEntfernenIn,
+  ausgabeGleichlaufIn,
+  ausgabeImAustrittSperrenIn,
+  ausgabenAnlegenIn,
+  ausgabenSperrenIn,
+  type GleichlaufErgebnis,
+} from "@/lib/ausgaben-schreiben";
 import {
   aktiveAusgabenZaehlen,
   ausgabeLaden,
+  ausgabenNachIdLaden,
   ausgabenZuAufgabenLaden,
   austrittsBezuegeLaden,
   linkAusgabenLaden,
+  offboardingLinkAusgabenLaden,
   vermerkZielLadenIn,
 } from "@/lib/ausgaben-daten";
 import { berlinerKalendertag } from "@/lib/kalendertag";
@@ -593,12 +630,20 @@ type AufgabeOeffentlichBasis = Prisma.OffboardingChecklistItemGetPayload<{ selec
  * (`linkAusgabeBauen`). An allen uebrigen Aufgaben fehlt der Schluessel GANZ
  * (die gepinnten Schluessellisten der Link-Seite bleiben gueltig). Die
  * Kennung sieht nur die ausgebende Stelle (G21).
+ *
+ * Im Offboarding (S30, G15, G17, Feinplan 1.6) heisst das Feld ebenso
+ * `ausgabe`: an den Ruecknahme- und Sperraufgaben der ausgebenden Stelle
+ * `{ art, kennungLabel, kennung, uebergebenAm, zustand, zustandLabel,
+ * auswahl }` (`OffboardingLinkAusgabe`), an der Folgeaufgabe „Schließung
+ * prüfen“ der Gebaeudewirtschaft nur lesend `{ art, kennungLabel, kennung,
+ * zustandLabel }` (`OffboardingFolgeAusgabe`). `herkunft` und `ausgabeId`
+ * gehen nicht hinaus; an allen uebrigen Aufgaben fehlt der Schluessel ganz.
  */
 type AufgabeOeffentlich = AufgabeOeffentlichBasis & {
   bemerkung?: { text: string; label: string } | null;
   eilt?: boolean;
   entfaellt?: boolean;
-  ausgabe?: LinkAusgabe;
+  ausgabe?: LinkAusgabe | OffboardingLinkAusgabe | OffboardingFolgeAusgabe;
 };
 
 /** Onboarding: dazu, was Bemerkung, „Eilt“ und „entfällt“ braucht (nur intern, siehe oben). */
@@ -746,10 +791,22 @@ async function linkZumToken(token: string, modul: AbteilungsModul) {
 async function aufgabenDerAbteilung(b: LinkBereich, departmentKey: string): Promise<AufgabeOeffentlich[]> {
   const orderBy = [{ orderIndex: "asc" as const }, { category: "asc" as const }];
   if (b.modul === "OFFBOARDING") {
-    return prisma.offboardingChecklistItem.findMany({
+    const rohOff = await prisma.offboardingChecklistItem.findMany({
       where: { offboardingId: b.vorgangId, assigneeDepartment: departmentKey },
       orderBy,
-      select: AUFGABE_OEFFENTLICH,
+      select: { ...AUFGABE_OEFFENTLICH, herkunft: true, ausgabeId: true },
+    });
+    // Stufe 2 (A4, S30): Kennung und Rueckgabezustand an den Aufgaben, die
+    // ein Stueck betreffen – ohne solche Aufgaben keine weitere Abfrage.
+    const ausgaben = await offboardingLinkAusgabenLaden(
+      prisma,
+      b.vorgangId,
+      departmentKey,
+      rohOff.map((a) => ({ ...a, assigneeDepartment: departmentKey })),
+    );
+    return rohOff.map(({ herkunft: _herkunft, ausgabeId: _ausgabeId, ...a }) => {
+      const ausgabe = ausgaben.get(a.id);
+      return ausgabe ? { ...a, ausgabe } : a;
     });
   }
   const roh = await prisma.checklistItem.findMany({
@@ -953,11 +1010,120 @@ async function onboardingLaufendSperrenIn(
   return stand?.status === "EXPIRED" ? "EXPIRED" : "COMPLETED";
 }
 
+/** Endstatus, den ein Austritt inzwischen hat (wie OFFBOARDING_ENDSTATUS im Dienst – der Kern liest den Dienst nicht). */
+type AustrittBeendet = "COMPLETED" | "CANCELLED";
+const AUSTRITT_ENDSTATUS: readonly AustrittBeendet[] = ["COMPLETED", "CANCELLED"];
+
+/**
+ * Nur Offboarding, nur an Ruecknahme-, Sperr- und Folgeaufgaben (A4, S30,
+ * G18 – Begruendung im Kopf der Datei): sperrt den Austritt bis zum Commit,
+ * bedingt auf „laufend“ (nicht COMPLETED, nicht CANCELLED) – erster Schritt
+ * des Link-Wegs, Reihenfolge Austritt → Links → Aufgaben → Ausgabe (G24).
+ * `null` = gesperrt; sonst der Endstatus, den der Austritt inzwischen hat
+ * (dann wird nichts geschrieben).
+ */
+async function austrittLaufendSperrenIn(
+  tx: Prisma.TransactionClient,
+  offboardingId: string,
+  jetzt: Date,
+): Promise<AustrittBeendet | null> {
+  const gesperrt = await tx.offboardingProcess.updateMany({
+    where: { id: offboardingId, status: { notIn: [...AUSTRITT_ENDSTATUS] } },
+    data: { updatedAt: jetzt },
+  });
+  if (gesperrt.count > 0) return null;
+  const stand = await tx.offboardingProcess.findUnique({ where: { id: offboardingId }, select: { status: true } });
+  return stand?.status === "COMPLETED" ? "COMPLETED" : "CANCELLED";
+}
+
 /** Inzwischen beendet: dieselben Antworten wie die Pruefung vor der Transaktion (410 bzw. 409). */
-function beendetAntwort(beendet: OnboardingBeendet): DienstAntwort {
-  return beendet === "EXPIRED"
-    ? { status: 410, body: { error: MELDUNGEN.VORGANG_NICHT_MEHR_AKTIV } }
-    : { status: 409, body: { error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN } };
+function beendetAntwort(beendet: OnboardingBeendet | AustrittBeendet): DienstAntwort {
+  if (beendet === "EXPIRED") return { status: 410, body: { error: MELDUNGEN.VORGANG_NICHT_MEHR_AKTIV } };
+  if (beendet === "CANCELLED") return { status: 410, body: { error: MELDUNGEN.VORGANG_ABGEBROCHEN } };
+  return { status: 409, body: { error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN } };
+}
+
+// =============================================
+// Abweisung in einer Transaktion
+// =============================================
+
+/** Eine Abweisung IN der Transaktion: wirft (Rollback), die Antwort geht unveraendert hinaus. */
+class Abgewiesen extends Error {
+  constructor(readonly antwort: DienstAntwort) {
+    super(String(antwort.body.error ?? "abgewiesen"));
+    this.name = "Abgewiesen";
+  }
+}
+
+function abweisenMit(antwort: DienstAntwort): never {
+  throw new Abgewiesen(antwort);
+}
+
+/**
+ * Fuehrt die Transaktion aus; eine Abweisung (`Abgewiesen`) bzw. ein
+ * `AusgabeKonflikt` aus dem Gleichlauf wird zur Antwort – der Rollback ist
+ * dann geschehen.
+ */
+async function abweisbar<T>(
+  fn: () => Promise<T>,
+): Promise<{ ok: true; wert: T } | { ok: false; antwort: DienstAntwort }> {
+  try {
+    return { ok: true, wert: await fn() };
+  } catch (err) {
+    if (err instanceof Abgewiesen) return { ok: false, antwort: err.antwort };
+    if (err instanceof AusgabeKonflikt) {
+      return { ok: false, antwort: { status: 409, body: { error: MELDUNGEN_AUSGABEN[err.grund], grund: err.grund } } };
+    }
+    throw err;
+  }
+}
+
+/** 409 einer `GleichlaufSperre` (G28): ein anderer Austritt bindet das Stueck bzw. es ist freigegeben. */
+function gleichlaufSperreAntwort(sperre: GleichlaufSperre): DienstAntwort {
+  return { status: 409, body: { error: gleichlaufSperreText(sperre), grund: sperre.grund } };
+}
+
+/**
+ * Was eine Ruecknahme-, Sperr- bzw. Folgeaufgabe ueber ihre Ausgabe wissen
+ * muss, VOR der Transaktion gelesen (`beiAustritt` und Kategorie aendern
+ * sich nie): `art` = `beiAustritt` (RUECKGABE/SPERREN) oder `null`, wenn die
+ * Aufgabe kein Stueck fuehrt – Vorlagenaufgabe, Folgeaufgabe (normaler
+ * Haken, G17) oder eine Ausgabe, die nach Ablauf der Frist geloescht ist.
+ */
+async function ausgabeDerAufgabe(aufgabe: {
+  herkunft?: string | null;
+  ausgabeId?: string | null;
+}): Promise<{ id: string; art: string } | null> {
+  if (aufgabe.herkunft !== "AUSGABE" || !aufgabe.ausgabeId) return null;
+  const [a] = await ausgabenNachIdLaden(prisma, [aufgabe.ausgabeId]);
+  return a ? { id: a.id, art: a.beiAustritt } : null;
+}
+
+/**
+ * Der Zielzustand nach der Sperre des Austritts (`rueckgabeZiel` mit dem
+ * frisch gelesenen Stand der Aufgabe) und ob der FACILITY-Link vorab
+ * mitzusperren ist (`brauchtFolgeStelle`, G17 – Links vor Aufgaben, G24). Die
+ * Ausgabe liest er ohne eigene Sperre: Unter der Sperre des Austritts aendert
+ * sie kein anderer Weg (jeder Offboarding-Weg sperrt zuerst den Austritt, die
+ * Karte der Einstellung aendert ein gebundenes Stueck nicht, G28).
+ */
+async function gleichlaufVorbereitenIn(
+  tx: Prisma.TransactionClient,
+  opts: { itemId: string; ausgabeId: string; isCompleted?: boolean; zustand?: RueckgabeZustand },
+): Promise<{ ziel: RueckgabeZustand | null | undefined; folgeStelle: boolean; warErledigt: boolean }> {
+  const aufgabe = await tx.offboardingChecklistItem.findUnique({
+    where: { id: opts.itemId },
+    select: { isCompleted: true },
+  });
+  const warErledigt = aufgabe?.isCompleted === true;
+  const ziel = rueckgabeZiel({ warErledigt, isCompleted: opts.isCompleted, zustand: opts.zustand });
+  if (ziel === undefined) return { ziel, folgeStelle: false, warErledigt };
+  const [a] = await ausgabenNachIdLaden(tx, [opts.ausgabeId]);
+  return {
+    ziel,
+    folgeStelle: !!a && brauchtFolgeStelle(a, a.zustand, ausgabeNachZiel(ziel, a.zustand, warErledigt)),
+    warErledigt,
+  };
 }
 
 // =============================================
@@ -976,31 +1142,57 @@ async function oeffentlichAendern(
   const { link, vorgang } = geprueft.gefunden;
   const bereich = vorgang.bereich;
 
-  const parsed = aufgabeLinkPatchSchema.safeParse(rohBody);
+  // Das Onboarding-Schema bleibt unveraendert (ein `zustand` faellt dort still
+  // weg); der Offboarding-Link nimmt seit A4 (S30, G15) den Rueckgabezustand an.
+  const offboardingParsed = modul === "OFFBOARDING" ? offboardingAufgabeLinkPatchSchema.safeParse(rohBody) : null;
+  const parsed = offboardingParsed ?? aufgabeLinkPatchSchema.safeParse(rohBody);
   if (!parsed.success) {
     return { status: 400, body: { error: parsed.error.errors[0]?.message ?? MELDUNGEN.UNGUELTIGE_EINGABE } };
   }
   const { isCompleted, comment } = parsed.data;
+  const zustand: RueckgabeZustand | undefined = offboardingParsed?.success ? offboardingParsed.data.zustand : undefined;
 
   const item =
     modul === "OFFBOARDING"
       ? await prisma.offboardingChecklistItem
           .findUnique({
             where: { id: itemId },
-            select: { id: true, offboardingId: true, assigneeDepartment: true, title: true },
+            select: { id: true, offboardingId: true, assigneeDepartment: true, title: true, herkunft: true, ausgabeId: true },
           })
           .then((a) =>
-            a ? { id: a.id, vorgangId: a.offboardingId, departmentKey: a.assigneeDepartment, title: a.title } : null,
+            a
+              ? {
+                  id: a.id,
+                  vorgangId: a.offboardingId,
+                  departmentKey: a.assigneeDepartment,
+                  title: a.title,
+                  herkunft: a.herkunft ?? null,
+                  ausgabeId: a.ausgabeId ?? null,
+                }
+              : null,
           )
       : await prisma.checklistItem
           .findUnique({
             where: { id: itemId },
             select: { id: true, onboardingId: true, assignee: true, title: true },
           })
-          .then((a) => (a ? { id: a.id, vorgangId: a.onboardingId, departmentKey: a.assignee, title: a.title } : null));
+          .then((a) =>
+            a
+              ? { id: a.id, vorgangId: a.onboardingId, departmentKey: a.assignee, title: a.title, herkunft: null, ausgabeId: null }
+              : null,
+          );
   if (!item || item.vorgangId !== bereich.vorgangId || item.departmentKey !== link.departmentKey) {
     return { status: 404, body: { error: MELDUNGEN.AUFGABE_NICHT_GEFUNDEN } };
   }
+
+  // Offboarding, Stufe 2 (A4, S30, G15): Ein Rueckgabezustand passt nur an
+  // die Ruecknahmeaufgabe eines Gegenstands – an einer Vorlagenaufgabe, einer
+  // Sperraufgabe (Haken „gesperrt“) und an der Folgeaufgabe ist er 400.
+  const stueck = modul === "OFFBOARDING" ? await ausgabeDerAufgabe(item) : null;
+  const zustandGrund = zustandFehler({ art: stueck?.art ?? null, zustand, weg: "LINK" });
+  if (zustandGrund) return { status: 400, body: { error: MELDUNGEN_AUSGABEN[zustandGrund] } };
+  // Austrittssperre fuer jede Aufgabe mit `herkunft` (Kopf der Datei, G18).
+  const austrittSperren = modul === "OFFBOARDING" && item.herkunft != null;
 
   const auditBasis = {
     itemId: item.id,
@@ -1010,7 +1202,7 @@ async function oeffentlichAendern(
   };
 
   const nichts = { umgeschaltet: false, uebergaenge: [] as LinkUebergang[], kommentarGeaendert: false };
-  const { umgeschaltet, uebergaenge, fremd, entfallen, kommentarGeaendert, beendet } = await prisma.$transaction(async (tx) => {
+  const ergebnis = await abweisbar(() => prisma.$transaction(async (tx) => {
     // 0. Nur Onboarding (E-A19): ZUERST den Vorgang sperren, bedingt auf
     //    „laufend“ — Reihenfolge Vorgang → Link → Aufgabe wie Karte und
     //    Nachholen. Der Abschluss (Status-PATCH) zaehlt die offenen
@@ -1023,10 +1215,23 @@ async function oeffentlichAendern(
     if (bereich.modul === "ONBOARDING") {
       const beendet = await onboardingLaufendSperrenIn(tx, bereich.vorgangId, jetzt);
       if (beendet) return { ...nichts, fremd: false, entfallen: false, beendet };
+    } else if (austrittSperren) {
+      // Offboarding, Ruecknahme-, Sperr- und Folgeaufgaben (A4, S30, G18):
+      // erst der Austritt, bedingt auf „laufend“ – Begruendung im Kopf der Datei.
+      const beendet = await austrittLaufendSperrenIn(tx, bereich.vorgangId, jetzt);
+      if (beendet) return { ...nichts, fremd: false, entfallen: false, beendet };
     }
 
+    // Stufe 2 (A4, S30, G15): Zielzustand des Stuecks nach der Sperre des
+    // Austritts; setzt oder verlaesst ein Schluessel FEHLT (G17), sperrt dieser
+    // Weg den Link der Gebaeudewirtschaft gleich mit (Links vor Aufgaben, G24).
+    const vorbereitet =
+      stueck && isCompleted !== undefined
+        ? await gleichlaufVorbereitenIn(tx, { itemId: item.id, ausgabeId: stueck.id, isCompleted, zustand })
+        : { ziel: undefined, folgeStelle: false, warErledigt: false };
+
     // 1. Sperren (Link-Zeile), 2. Aufgabe aendern, 3. Status neu berechnen.
-    await linksSperrenIn(tx, bereich, [link.departmentKey]);
+    await linksSperrenIn(tx, bereich, [link.departmentKey, vorbereitet.folgeStelle ? FOLGE_STELLE : null]);
 
     // Nach der Sperre erneut pruefen: Hat HR die Aufgabe inzwischen einer
     // anderen Abteilung zugeordnet (der Portal-PATCH sperrt dieselbe Zeile und
@@ -1044,6 +1249,17 @@ async function oeffentlichAendern(
       return { ...nichts, fremd: false, entfallen: true, beendet: null };
     }
 
+    // Ausgabe sperren und Bindung pruefen (G28) – vor jedem Schreiben. Bindet
+    // ein anderer Austritt das Stueck, aendert dieser Link nichts (409).
+    if (stueck && vorbereitet.ziel !== undefined) {
+      const { sperre } = await ausgabeImAustrittSperrenIn(tx, {
+        offboardingId: bereich.vorgangId,
+        ausgabeId: stueck.id,
+        jetzt,
+      });
+      if (sperre) abweisenMit(gleichlaufSperreAntwort(sperre));
+    }
+
     let umgeschaltet = false;
     if (isCompleted !== undefined) {
       umgeschaltet = await aufgabeUmschaltenPerLink(tx, { itemId: item.id, erledigt: isCompleted, jetzt, modul });
@@ -1057,6 +1273,23 @@ async function oeffentlichAendern(
           },
         });
       }
+    }
+
+    // Gleichlauf (G15): Die Ausgabe fuehrt, die Rueckgabe-Zeile folgt, die
+    // Folgeaufgabe entsteht bzw. oeffnet oder verschwindet (G17). Die Aufgabe
+    // hat dieser Weg oben selbst geschaltet. Abhaken ohne Zustand = ZURUECK.
+    let gleichlauf: GleichlaufErgebnis | null = null;
+    if (stueck && vorbereitet.ziel !== undefined) {
+      gleichlauf = await ausgabeGleichlaufIn(tx, {
+        offboardingId: bereich.vorgangId,
+        ausgabeId: stueck.id,
+        zustand: vorbereitet.ziel,
+        jetzt,
+        userId: null,
+        aufgabeSchonGeschaltet: true,
+        aufgabeWarErledigt: vorbereitet.warErledigt,
+        ueber: "LINK",
+      });
     }
 
     // E-A17: ein neuer, nicht leerer Kommentar (ein geloeschter zaehlt nicht).
@@ -1077,9 +1310,11 @@ async function oeffentlichAendern(
       }
     }
 
-    const uebergaenge = umgeschaltet
-      ? await linkStatusNeuBerechnenIn(tx, bereich, [link.departmentKey], jetzt)
-      : [];
+    // Abteilungsstatus: die eigene Stelle nach einem Wechsel, dazu die
+    // Gebaeudewirtschaft, wenn sich ihre Folgeaufgabe bewegt hat (G17).
+    const neuBerechnen = [...(umgeschaltet ? [link.departmentKey] : []), ...(gleichlauf?.stellen ?? [])];
+    const uebergaenge =
+      neuBerechnen.length > 0 ? await linkStatusNeuBerechnenIn(tx, bereich, neuBerechnen, jetzt) : [];
     for (const u of uebergaenge) {
       if (!u.uebergang) continue;
       await tx.auditLog.create({
@@ -1097,10 +1332,12 @@ async function oeffentlichAendern(
       fremd: false,
       entfallen: false,
       kommentarGeaendert,
-      beendet: null as OnboardingBeendet | null,
+      beendet: null as OnboardingBeendet | AustrittBeendet | null,
     };
-  });
-  // Inzwischen beendet (nur Onboarding): dieselben Antworten wie vor der Transaktion.
+  }));
+  if (!ergebnis.ok) return ergebnis.antwort;
+  const { umgeschaltet, uebergaenge, fremd, entfallen, kommentarGeaendert, beendet } = ergebnis.wert;
+  // Inzwischen beendet: dieselben Antworten wie vor der Transaktion.
   if (beendet) return beendetAntwort(beendet);
   if (fremd) return { status: 404, body: { error: MELDUNGEN.AUFGABE_NICHT_GEFUNDEN } };
   if (entfallen) {
@@ -1166,10 +1403,25 @@ async function oeffentlichAendern(
  *   410 { error: "Dieser Link ist abgelaufen." }
  *   409 { error: "Dieser Vorgang ist abgeschlossen. Änderungen …" }   COMPLETED
  *   429 { error: "Zu viele Anfragen. Bitte warten Sie einen Moment." } je Link
- *   400 { error: <Meldung des Schemas> }
+ *   400 { error: <Meldung des Schemas> }   (`offboardingAufgabeLinkPatchSchema`)
  *   404 { error: "Aufgabe nicht gefunden" }  fremde Aufgabe oder andere Abteilung
+ *   400 { error }                            `zustand` an einer Aufgabe ohne Gegenstand (A4, S30)
+ *   410/409 wie oben                         inzwischen abgebrochen/abgeschlossen (Austrittssperre)
+ *   409 { error, grund }                     AUSGABE_IM_AUSTRITT | AUSGABE_FREIGEGEBEN |
+ *                                            NICHT_AUSGEGEBEN | STUECK_INZWISCHEN_GEAENDERT
  *   200 { data: { aufgabe, fortschritt, allTasksComplete } }
  * Ein zweites "erledigt" auf eine erledigte Aufgabe ist 200 ohne Mail.
+ *
+ * Ruecknahme- und Sperraufgaben (Stufe 2, A4, S30, G15 bis G17): Body
+ * `{ isCompleted: true, zustand?: "ZURUECK" | "BESCHAEDIGT" | "FEHLT" }` bzw.
+ * `{ isCompleted: false }` (wieder oeffnen). An einem Gegenstand heisst
+ * abhaken ohne Zustand ZURUECK, an einem Zugang „gesperrt“; ein Zustand an
+ * einer schon erledigten Aufgabe ist ein reiner Wechsel (ohne Mail). Ausgabe,
+ * Aufgabe und Rueckgabe-Zeile laufen gleich (`ausgabeGleichlaufIn`), ein
+ * fehlender Schluessel oeffnet die Folgeaufgabe der Gebaeudewirtschaft. Die
+ * Mails und ihre Payloads bleiben unveraendert (G21): `*-task-completed` nur
+ * beim Wechsel offen → erledigt, `*-department-completed` nur fuer die Stelle
+ * dieses Links.
  */
 export async function oeffentlicheAufgabeAendern(
   token: string,
@@ -1214,18 +1466,6 @@ export async function oeffentlicheOnboardingAufgabeAendern(
 // Oeffentliche Seite: Uebergabe vermerken (Onboarding, Stufe 2 – A4, G6)
 // =============================================
 
-/** Eine Abweisung IN der Transaktion: wirft (vor jedem Schreiben), die Antwort geht unveraendert hinaus. */
-class LinkAbgewiesen extends Error {
-  constructor(readonly antwort: DienstAntwort) {
-    super(String(antwort.body.error ?? "abgewiesen"));
-    this.name = "LinkAbgewiesen";
-  }
-}
-
-function linkAbweisen(antwort: DienstAntwort): never {
-  throw new LinkAbgewiesen(antwort);
-}
-
 /**
  * Ziel eines Vermerks ueber den Link: eine Ausstattungsaufgabe DIESES
  * Vorgangs und DIESER Stelle, deren Zeile ebenfalls der Stelle gehoert (sonst
@@ -1253,7 +1493,9 @@ async function linkVermerkZiel(
 /** Frischer Stand der Aufgabe nach dem Commit: ihr Feld `ausgabe` wie beim GET (oder null). */
 async function linkAusgabeFrisch(departmentKey: string, vorgangId: string, itemId: string): Promise<LinkAusgabe | null> {
   const aufgaben = await aufgabenDerAbteilung({ modul: "ONBOARDING", vorgangId }, departmentKey);
-  return aufgaben.find((a) => a.id === itemId)?.ausgabe ?? null;
+  const ausgabe = aufgaben.find((a) => a.id === itemId)?.ausgabe;
+  // Im Onboarding steht hier immer die Form der Onboarding-Link-Seite (mit `stuecke`).
+  return ausgabe && "stuecke" in ausgabe ? ausgabe : null;
 }
 
 /**
@@ -1307,20 +1549,20 @@ export async function oeffentlicheAusgabeVermerken(
   try {
     await prisma.$transaction(async (tx) => {
       const beendet = await onboardingLaufendSperrenIn(tx, vorgangId, jetzt);
-      if (beendet) linkAbweisen(beendetAntwort(beendet));
+      if (beendet) abweisenMit(beendetAntwort(beendet));
       const geprueftIn = await linkVermerkZiel(tx, vorgangId, itemId, departmentKey);
-      if ("antwort" in geprueftIn) linkAbweisen(geprueftIn.antwort);
+      if ("antwort" in geprueftIn) abweisenMit(geprueftIn.antwort);
       const { ziel } = geprueftIn;
 
       const stand = await tx.onboardingProcess.findUnique({
         where: { id: vorgangId },
         select: { organizationId: true, arbeitsortId: true, createdAt: true },
       });
-      if (!stand) linkAbweisen({ status: 404, body: { error: MELDUNGEN.LINK_UNGUELTIG } });
+      if (!stand) abweisenMit({ status: 404, body: { error: MELDUNGEN.LINK_UNGUELTIG } });
       const heute = berlinerKalendertag(jetzt);
       const aktiv = await aktiveAusgabenZaehlen(tx, ziel.aufgabe.id);
       const grund = vermerkPruefen(parsed.data, { heute, vorgangAngelegt: stand.createdAt, aktiv });
-      if (grund) linkAbweisen({ status: 400, body: { error: MELDUNGEN_AUSGABEN[grund] } });
+      if (grund) abweisenMit({ status: 400, body: { error: MELDUNGEN_AUSGABEN[grund] } });
 
       const basis = ausgabeBasis(ziel, {
         vorgang: { id: vorgangId, organizationId: stand.organizationId, arbeitsortId: stand.arbeitsortId },
@@ -1349,7 +1591,7 @@ export async function oeffentlicheAusgabeVermerken(
       });
     });
   } catch (err) {
-    if (err instanceof LinkAbgewiesen) return err.antwort;
+    if (err instanceof Abgewiesen) return err.antwort;
     throw err;
   }
 
@@ -1395,21 +1637,21 @@ export async function oeffentlicheAusgabeEntfernen(
   try {
     await prisma.$transaction(async (tx) => {
       const beendet = await onboardingLaufendSperrenIn(tx, vorgangId, jetzt);
-      if (beendet) linkAbweisen(beendetAntwort(beendet));
+      if (beendet) abweisenMit(beendetAntwort(beendet));
       const geprueftIn = await linkVermerkZiel(tx, vorgangId, itemId, departmentKey);
-      if ("antwort" in geprueftIn) linkAbweisen(geprueftIn.antwort);
+      if ("antwort" in geprueftIn) abweisenMit(geprueftIn.antwort);
 
       await ausgabenSperrenIn(tx, [ausgabeId], jetzt);
       const a = await ausgabeLaden(tx, vorgangId, ausgabeId);
-      if (!a || !eigene(a)) linkAbweisen(nichtGefunden);
+      if (!a || !eigene(a)) abweisenMit(nichtGefunden);
       const bezuege = await austrittsBezuegeLaden(tx, [a.id]);
       const gebunden = bindenderAustritt(a, bezuege.get(a.id) ?? []) !== null;
       const nichtMoeglich: DienstAntwort = {
         status: 409,
         body: { error: MELDUNGEN_AUSGABEN.ENTFERNEN_NICHT_MOEGLICH, grund: "ENTFERNEN_NICHT_MOEGLICH" },
       };
-      if (!perLinkEntfernbar(a, gebunden)) linkAbweisen(nichtMoeglich);
-      if (!(await ausgabeEntfernenIn(tx, a.id, { nurQuelle: "LINK" }))) linkAbweisen(nichtMoeglich);
+      if (!perLinkEntfernbar(a, gebunden)) abweisenMit(nichtMoeglich);
+      if (!(await ausgabeEntfernenIn(tx, a.id, { nurQuelle: "LINK" }))) abweisenMit(nichtMoeglich);
 
       await tx.auditLog.create({
         data: {
@@ -1428,7 +1670,7 @@ export async function oeffentlicheAusgabeEntfernen(
       });
     });
   } catch (err) {
-    if (err instanceof LinkAbgewiesen) return err.antwort;
+    if (err instanceof Abgewiesen) return err.antwort;
     throw err;
   }
 
@@ -1454,6 +1696,29 @@ export async function oeffentlicheAusgabeEntfernen(
  * Link-Abteilung und nur bei offenem Vorgang; eine Bestaetigung an die
  * Abteilung geht aus dem Portal nie hinaus. Die interne Notiz (`notes`) darf
  * auch bei abgebrochenem Vorgang geaendert werden.
+ *
+ * Ausstattung & Zugaenge, Stufe 2 (A4, G14) — fuer Aufgaben mit `herkunft`
+ * (Ruecknahme-, Sperr- und Folgeaufgaben aus src/lib/offboarding-ausgaben.ts):
+ *   403 { error: "Rücknahme- und Sperraufgaben bearbeitet nur die Personalabteilung." }
+ *        Rolle nicht HR_EDIT_ROLES (sperrt SERVICE, VORGESETZTER, EINRICHTUNGSLEITUNG)
+ *   409 { error: "Die Stelle einer Rücknahme- oder Sperraufgabe …" }
+ *        `assigneeDepartment` im Body – die Stelle ist die ausgebende
+ * Vorlagenaufgaben (`herkunft` null) bleiben unveraendert.
+ *
+ * Seit S30 (G15 bis G17) `zustand` (alle fuenf Rueckgabezustaende):
+ *   400 { error }   `zustand` an einer Aufgabe ohne Gegenstand (Vorlage, Folgeaufgabe)
+ *                   bzw. „beschädigt“/„fehlt“ an einem Zugang
+ *   409 { error }   CANCELLED – auch bei einem reinen Zustandswechsel
+ *   409 { error, grund }  AUSGABE_IM_AUSTRITT | AUSGABE_FREIGEGEBEN | NICHT_AUSGEGEBEN |
+ *                   STUECK_INZWISCHEN_GEAENDERT
+ * Abhaken ohne Zustand heisst an einem Gegenstand ZURUECK (der Haken im Reiter
+ * Checkliste schickt nur `{ isCompleted }`), an einem Zugang „gesperrt“; ein
+ * Zustand an einer schon erledigten Aufgabe ist ein reiner Wechsel (etwa
+ * ZURUECK → FEHLT). Aendert der PATCH Status oder Zustand einer solchen
+ * Aufgabe, sperrt er zuerst den Austritt (bedingt auf „nicht CANCELLED“), dann
+ * die Links (eigene Stelle, FACILITY wenn `brauchtFolgeStelle`), dann die
+ * Ausgabe samt Bindung (G28) – und laesst Aufgabe, Ausgabe, Rueckgabe-Zeile
+ * und Folgeaufgabe ueber `ausgabeGleichlaufIn` gleichlaufen.
  */
 export async function aufgabeImPortalAendern(opts: {
   offboardingId: string;
@@ -1494,6 +1759,18 @@ export async function aufgabeImPortalAendern(opts: {
     return { status: 404, body: { error: MELDUNGEN.EINTRAG_NICHT_GEFUNDEN } };
   }
 
+  // Ruecknahme-, Sperr- und Folgeaufgaben (A4, G14): nur HR, und die Stelle
+  // ist die ausgebende – sie aendert sich hier nie (auch nicht auf denselben
+  // Wert; wie die Ausstattungsaufgaben im Onboarding).
+  if (vorher.herkunft != null) {
+    if (!HR_EDIT_ROLES.includes(opts.session.role)) {
+      return { status: 403, body: { error: MELDUNGEN_AUSGABEN.PORTAL_NUR_HR } };
+    }
+    if (eingabe.assigneeDepartment !== undefined) {
+      return { status: 409, body: { error: MELDUNGEN_AUSGABEN.STELLE_FEST } };
+    }
+  }
+
   const neuerSchluessel = eingabe.assigneeDepartment; // undefined = unveraendert, null = keiner
   if (typeof neuerSchluessel === "string" && neuerSchluessel !== vorher.assigneeDepartment) {
     const konfig = await prisma.departmentConfig.findMany({ select: { departmentKey: true } });
@@ -1502,19 +1779,77 @@ export async function aufgabeImPortalAendern(opts: {
     }
   }
 
-  const statusWechsel = eingabe.isCompleted !== undefined && eingabe.isCompleted !== vorher.isCompleted;
+  // Rueckgabezustand (A4, S30, G15): nur an der Ruecknahme- bzw. Sperraufgabe
+  // eines Stuecks, an einem Zugang nur „gesperrt“, „verbleibt“, „entfällt“.
+  const stueck = await ausgabeDerAufgabe(vorher);
+  const zustandGrund = zustandFehler({ art: stueck?.art ?? null, zustand: eingabe.zustand, weg: "HR" });
+  if (zustandGrund) return { status: 400, body: { error: MELDUNGEN_AUSGABEN[zustandGrund] } };
+
+  // An einer Aufgabe mit Stueck entscheidet der Zielzustand (`rueckgabeZiel`),
+  // ob sich etwas aendert – auch ein reiner Zustandswechsel an einer
+  // erledigten Aufgabe; unter der Sperre des Austritts wird er neu gerechnet.
+  const statusWechsel = stueck
+    ? rueckgabeZiel({ warErledigt: vorher.isCompleted, isCompleted: eingabe.isCompleted, zustand: eingabe.zustand }) !==
+      undefined
+    : eingabe.isCompleted !== undefined && eingabe.isCompleted !== vorher.isCompleted;
   const zustaendigWechsel = neuerSchluessel !== undefined && neuerSchluessel !== vorher.assigneeDepartment;
-  if (vorgang.status === "CANCELLED" && (statusWechsel || zustaendigWechsel)) {
+  // Seit S30 zaehlt auch der Zustand: Sonst ginge ein reiner Zustandswechsel
+  // an einer erledigten Ausgabe-Aufgabe eines abgebrochenen Austritts durch.
+  const zustandWechsel = eingabe.zustand !== undefined;
+  if (vorgang.status === "CANCELLED" && (statusWechsel || zustaendigWechsel || zustandWechsel)) {
     return { status: 409, body: { error: MELDUNGEN.CHECKLISTE_ABGEBROCHEN } };
   }
 
-  const schluessel = [vorher.assigneeDepartment, zustaendigWechsel ? neuerSchluessel : null];
+  const schluessel: (string | null)[] = [vorher.assigneeDepartment, zustaendigWechsel ? (neuerSchluessel ?? null) : null];
 
-  const { umgeschaltet } = await prisma.$transaction(async (tx) => {
-    await linksSperrenIn(tx, bereich, schluessel);
+  const ergebnis = await abweisbar(() => prisma.$transaction(async (tx) => {
+    // Austrittssperre (A4, S30, G18): an Aufgaben mit `herkunft`, sobald sich
+    // Status oder Zustand aendern soll – bedingt auf „nicht CANCELLED“. Eine
+    // Notiz allein bleibt auch am abgebrochenen Austritt moeglich.
+    if (vorher.herkunft != null && statusWechsel) {
+      const gesperrt = await tx.offboardingProcess.updateMany({
+        where: { id: vorgang.id, status: { not: "CANCELLED" } },
+        data: { updatedAt: jetzt },
+      });
+      if (gesperrt.count === 0) abweisenMit({ status: 409, body: { error: MELDUNGEN.CHECKLISTE_ABGEBROCHEN } });
+    }
+    // Zielzustand nach der Sperre, FACILITY-Link vorab (G17, G24).
+    const vorbereitet =
+      stueck && statusWechsel
+        ? await gleichlaufVorbereitenIn(tx, {
+            itemId: vorher.id,
+            ausgabeId: stueck.id,
+            isCompleted: eingabe.isCompleted,
+            zustand: eingabe.zustand,
+          })
+        : { ziel: undefined, folgeStelle: false, warErledigt: false };
+    await linksSperrenIn(tx, bereich, [...schluessel, vorbereitet.folgeStelle ? FOLGE_STELLE : null]);
 
     let umgeschaltet = false;
-    if (statusWechsel) {
+    let gleichlauf: GleichlaufErgebnis | null = null;
+    if (stueck) {
+      // Ausgabe sperren, Bindung pruefen (G28), dann der Gleichlauf – er
+      // schaltet auch die Aufgabe (erledigt mit `completedById` = HR).
+      if (vorbereitet.ziel !== undefined) {
+        const { sperre } = await ausgabeImAustrittSperrenIn(tx, {
+          offboardingId: vorgang.id,
+          ausgabeId: stueck.id,
+          jetzt,
+          session: opts.session,
+        });
+        if (sperre) abweisenMit(gleichlaufSperreAntwort(sperre));
+        gleichlauf = await ausgabeGleichlaufIn(tx, {
+          offboardingId: vorgang.id,
+          ausgabeId: stueck.id,
+          zustand: vorbereitet.ziel,
+          jetzt,
+          userId: opts.session.userId,
+          aufgabeSchonGeschaltet: false,
+          ueber: "PORTAL",
+        });
+        umgeschaltet = gleichlauf.aufgabeUmgeschaltet;
+      }
+    } else if (statusWechsel) {
       const r = await tx.offboardingChecklistItem.updateMany({
         where: { id: vorher.id, isCompleted: vorher.isCompleted },
         data: eingabe.isCompleted
@@ -1531,8 +1866,9 @@ export async function aufgabeImPortalAendern(opts: {
       await tx.offboardingChecklistItem.update({ where: { id: vorher.id }, data: rest });
     }
 
-    if (umgeschaltet || zustaendigWechsel) {
-      const uebergaenge = await linkStatusNeuBerechnenIn(tx, bereich, schluessel, jetzt);
+    const folgeStellen = gleichlauf?.stellen ?? [];
+    if (umgeschaltet || zustaendigWechsel || folgeStellen.length > 0) {
+      const uebergaenge = await linkStatusNeuBerechnenIn(tx, bereich, [...schluessel, ...folgeStellen], jetzt);
       for (const u of uebergaenge) {
         if (!u.uebergang) continue;
         await tx.auditLog.create({
@@ -1549,7 +1885,9 @@ export async function aufgabeImPortalAendern(opts: {
     }
 
     const details: Record<string, unknown> = { itemId: vorher.id, title: vorher.title };
-    if (umgeschaltet) details.isCompleted = { von: vorher.isCompleted, nach: eingabe.isCompleted };
+    // An einer Aufgabe mit Stueck kann auch ein Zustand allein abhaken (`isCompleted` fehlt dann im Body).
+    const nachErledigt = gleichlauf ? vorbereitet.ziel !== null : eingabe.isCompleted;
+    if (umgeschaltet) details.isCompleted = { von: !nachErledigt, nach: nachErledigt };
     if (zustaendigWechsel) details.assigneeDepartment = { von: vorher.assigneeDepartment, nach: neuerSchluessel ?? null };
     if (eingabe.notes !== undefined) details.notizGeaendert = true;
     if (umgeschaltet || zustaendigWechsel || eingabe.notes !== undefined) {
@@ -1564,7 +1902,9 @@ export async function aufgabeImPortalAendern(opts: {
       });
     }
     return { umgeschaltet };
-  });
+  }));
+  if (!ergebnis.ok) return ergebnis.antwort;
+  const { umgeschaltet } = ergebnis.wert;
 
   const nachher = await prisma.offboardingChecklistItem.findUnique({ where: { id: vorher.id } });
   if (!nachher) return { status: 404, body: { error: MELDUNGEN.EINTRAG_NICHT_GEFUNDEN } };

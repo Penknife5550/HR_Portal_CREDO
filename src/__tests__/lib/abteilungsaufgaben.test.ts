@@ -56,6 +56,7 @@ import {
   NACHTRAG_TITEL_MAX,
   empfaengerEinrichtung,
   nachInfoNeuText,
+  nachInfoNeuZaehlen,
   onboardingEmpfaengerEinrichtung,
   waechterHinweis,
   WAECHTER_TAGE,
@@ -1296,6 +1297,44 @@ describe("abteilungsZeilenBauen mit nachInfoNeu (A4, G14, nur Offboarding)", () 
     const facility = bauen({ nachInfoNeu: { FACILITY: 1 } }).zeilen.find((z) => z.departmentKey === "FACILITY")!;
     expect(facility.anzeige.hinweis).toBeNull();
     expect(bauen({ vorgangAbgeschlossen: true, nachInfoNeu: { IT: 2 } }).zeilen[0].anzeige.hinweis).toBeNull();
+  });
+});
+
+describe("nachInfoNeuZaehlen (A4, S29: Eingabe von nachInfoNeu)", () => {
+  const informiert = new Date("2027-07-12T08:00:00.000Z");
+  const aufgabe = (teil: { assigneeDepartment?: string | null; isCompleted?: boolean; createdAt?: Date | string | null }) => ({
+    assigneeDepartment: "IT",
+    isCompleted: false,
+    createdAt: new Date("2027-07-18T08:00:00.000Z"),
+    ...teil,
+  });
+
+  it("zaehlt offene Aufgaben der Stelle, die nach `lastSentAt ?? sentAt` angelegt wurden", () => {
+    expect(
+      nachInfoNeuZaehlen(
+        [
+          aufgabe({}),
+          aufgabe({ createdAt: "2027-07-19T08:00:00.000Z" }),
+          // vor der Information, erledigt, andere Stelle, ohne Anlagezeit
+          aufgabe({ createdAt: new Date("2027-07-01T08:00:00.000Z") }),
+          aufgabe({ isCompleted: true }),
+          aufgabe({ assigneeDepartment: "FACILITY" }),
+          aufgabe({ createdAt: null }),
+        ],
+        [{ departmentKey: "IT", sentAt: informiert, lastSentAt: informiert }],
+      ),
+    ).toEqual({ IT: 2 });
+  });
+
+  it("„Erneut senden“ (lastSentAt danach) nimmt sie heraus; nur lastSentAt (sentAt nach gescheitertem Erneuern leer) zaehlt als informiert", () => {
+    const spaeter = new Date("2027-07-20T08:00:00.000Z");
+    expect(nachInfoNeuZaehlen([aufgabe({})], [{ departmentKey: "IT", sentAt: informiert, lastSentAt: spaeter }])).toEqual({});
+    expect(nachInfoNeuZaehlen([aufgabe({})], [{ departmentKey: "IT", sentAt: null, lastSentAt: informiert }])).toEqual({ IT: 1 });
+  });
+
+  it("ohne Link oder ohne Versand nichts – die Stelle bekommt alles mit der ersten Mail", () => {
+    expect(nachInfoNeuZaehlen([aufgabe({})], [])).toEqual({});
+    expect(nachInfoNeuZaehlen([aufgabe({})], [{ departmentKey: "IT", sentAt: null, lastSentAt: null }])).toEqual({});
   });
 });
 

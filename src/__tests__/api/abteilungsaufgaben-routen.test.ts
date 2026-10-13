@@ -71,7 +71,16 @@ jest.mock("@/lib/abteilungsaufgaben-uebergaenge", () => {
 });
 
 import { NextRequest } from "next/server";
-import { db, dbLeeren, fakePrisma, naechsteId, neuerLink, type Zeile } from "../hilfen/abteilungs-fake-db";
+import {
+  db,
+  dbLeeren,
+  fakePrisma,
+  naechsteId,
+  neueAusgabe,
+  neueRueckgabe,
+  neuerLink,
+  type Zeile,
+} from "../hilfen/abteilungs-fake-db";
 import * as abteilungsLinksRoute from "@/app/api/offboarding/[id]/department-links/route";
 import { GET as aufgabenPerLinkLaden } from "@/app/api/offboarding-tasks/[token]/route";
 import { PATCH as aufgabePerLinkAendern } from "@/app/api/offboarding-tasks/[token]/[itemId]/route";
@@ -88,6 +97,7 @@ import {
 } from "@/lib/abteilungsaufgaben-uebergaenge";
 import { canAccessProcess, type SessionPayload } from "@/lib/permissions";
 import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { MELDUNGEN_AUSGABEN } from "@/lib/ausgaben";
 
 // =============================================
 // Echte Funktionen hinter den Huellen
@@ -707,6 +717,304 @@ describe("PATCH /api/offboarding/[id]/checklist/[itemId]", () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: MELDUNGEN.VORGANG_NICHT_GEFUNDEN });
     expect(db.aufgaben[0].isCompleted).toBe(false);
+  });
+
+  // Ausstattung & Zugaenge, Stufe 2 (A4, G14): Ruecknahme-, Sperr- und
+  // Folgeaufgaben (`herkunft`) aendert im Portal nur HR, und ihre Stelle ist
+  // die ausgebende – Vorlagenaufgaben bleiben, wie sie sind.
+  describe("Rücknahme- und Sperraufgaben (A4, S29)", () => {
+    const SERVICE: SessionPayload = {
+      userId: "u-svc",
+      email: "n8n@example.org",
+      role: "SERVICE",
+      firstName: "n8n",
+      lastName: "Schlüssel",
+    };
+    const ausgabeAufgabe = (teil: Zeile = {}) =>
+      aufgabe({
+        title: "Dienst-iPad (Lernmittel) zurücknehmen",
+        category: "Ausstattung & Zugänge",
+        herkunft: "AUSGABE",
+        ausgabeId: "ag-ipad",
+        ...teil,
+      });
+
+    it.each([
+      ["SERVICE", SERVICE],
+      ["EINRICHTUNGSLEITUNG", LEITUNG_FREMD],
+    ])("%s: Ausgabe-Aufgabe → 403 (auch die Folgeaufgabe), eine Vorlagenaufgabe bleibt änderbar", async (_rolle, sitzung) => {
+      const a = ausgabeAufgabe();
+      const folge = ausgabeAufgabe({ title: "Schließung prüfen: Schlüssel", assigneeDepartment: "FACILITY", herkunft: "AUSGABE_FEHLT", ausgabeId: "ag-schl" });
+      const vorlage = aufgabe({ title: "Konto sperren" });
+      db.aufgaben = [a, folge, vorlage];
+      // Zugang zur Einrichtung – sonst endete es schon an der Mandantenpruefung (404).
+      db.zuweisungen = [{ userId: sitzung.userId, organizationId: "org-1" }];
+      mockGetSession.mockResolvedValue(sitzung);
+
+      for (const item of [a, folge]) {
+        const res = await aendern(item.id as string, { body: { isCompleted: true } });
+        expect(res.status).toBe(403);
+        expect(await res.json()).toEqual({ error: "Rücknahme- und Sperraufgaben bearbeitet nur die Personalabteilung." });
+        const notiz = await aendern(item.id as string, { body: { notes: "intern" } });
+        expect(notiz.status).toBe(403);
+      }
+      expect(db.aufgaben[0]).toMatchObject({ isCompleted: false, completedById: null, notes: null });
+
+      const ok = await aendern(vorlage.id as string, { body: { isCompleted: true } });
+      expect(ok.status).toBe(200);
+      expect(db.aufgaben[2].isCompleted).toBe(true);
+    });
+
+    it("`assigneeDepartment` im Body → 409, auch mit demselben Wert – nichts geschrieben", async () => {
+      const a = ausgabeAufgabe();
+      db.aufgaben = [a];
+      for (const body of [{ assigneeDepartment: "FACILITY" }, { assigneeDepartment: "IT", isCompleted: true }, { assigneeDepartment: null }]) {
+        const res = await aendern(a.id as string, { body });
+        expect(res.status).toBe(409);
+        expect(await res.json()).toEqual({
+          error: "Die Stelle einer Rücknahme- oder Sperraufgabe ist die ausgebende Stelle und lässt sich nicht ändern.",
+        });
+      }
+      expect(db.aufgaben[0]).toMatchObject({ assigneeDepartment: "IT", isCompleted: false });
+      expect(db.audits).toEqual([]);
+    });
+
+    it("HR hakt eine Ausgabe-Aufgabe ab wie jede andere; eine Vorlagenaufgabe wechselt die Stelle wie bisher", async () => {
+      const a = ausgabeAufgabe();
+      const vorlage = aufgabe({ title: "Konto sperren" });
+      db.aufgaben = [a, vorlage];
+      const res = await aendern(a.id as string, { body: { isCompleted: true } });
+      expect(res.status).toBe(200);
+      expect((await res.json()).item).toMatchObject({ isCompleted: true, completedById: "u-hr" });
+
+      const wechsel = await aendern(vorlage.id as string, { body: { assigneeDepartment: "FACILITY" } });
+      expect(wechsel.status).toBe(200);
+      expect(db.aufgaben[1].assigneeDepartment).toBe("FACILITY");
+    });
+  });
+});
+
+// =============================================
+// Rueckgabezustand ueber Link und Portal (A4, S30, G15 bis G17)
+// =============================================
+
+/**
+ * Ein Austritt mit drei Stuecken aus der Einstellung: das iPad der IT, ein
+ * Schluessel, den das Sekretariat ausgab und der fehlt (Folgeaufgabe an die
+ * Gebaeudewirtschaft), daneben je eine Vorlagenaufgabe der IT und der
+ * Gebaeudewirtschaft. Den Gleichlauf selbst (drei Wege, ein Stand) prueft
+ * offboarding-ausgaben.test.ts; hier geht es um das, was die Routen der
+ * Link-Seite und des Portals davon zeigen und wann sie abweisen.
+ */
+describe("Rückgabezustand über Link und Portal (A4, S30)", () => {
+  const laden = (token: string) =>
+    aufgabenPerLinkLaden(anfrage(`${BASIS}/api/offboarding-tasks/${token}`, "GET", { ip: neueIp() }), {
+      params: Promise.resolve({ token }),
+    });
+  const perLink = (token: string, itemId: string, body: unknown) =>
+    aufgabePerLinkAendern(anfrage(`${BASIS}/api/offboarding-tasks/${token}/${itemId}`, "PATCH", { ip: neueIp(), body }), {
+      params: Promise.resolve({ token, itemId }),
+    });
+  const imPortal = (itemId: string, body: unknown) =>
+    checklistenPunktAendern(anfrage(`${BASIS}/api/offboarding/off-1/checklist/${itemId}`, "PATCH", { body }), {
+      params: Promise.resolve({ id: "off-1", itemId }),
+    });
+
+  const ausgabe = (teil: Zeile) =>
+    neueAusgabe({
+      onboardingId: "onb-1",
+      organizationId: "org-1",
+      quelle: "LINK",
+      beiAustritt: "RUECKGABE",
+      uebergebenAm: new Date("2027-01-28T00:00:00.000Z"),
+      ...teil,
+    });
+
+  let ipad: Zeile;
+  let schluessel: Zeile;
+  let folge: Zeile;
+  let vorlageIt: Zeile;
+  let vorlageFm: Zeile;
+
+  beforeEach(() => {
+    db.vorgaenge = [vorgang({ onboardingId: "onb-1" })];
+    db.konfigs = [
+      konfig(),
+      konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister", email: "fm@example.org" }),
+      konfig({ departmentKey: "VERWALTUNG", departmentName: "Sekretariat", email: "sek@example.org" }),
+    ];
+    db.links = [
+      link({ token: "tok-it" }),
+      link({ departmentKey: "FACILITY", departmentName: "Hausmeister", email: "fm@example.org", token: "tok-fm" }),
+      link({ departmentKey: "VERWALTUNG", departmentName: "Sekretariat", email: "sek@example.org", token: "tok-vw" }),
+    ];
+    db.ausgaben = [
+      ausgabe({
+        id: "ag-ipad",
+        departmentKey: "IT",
+        bezeichnung: "Dienst-iPad (Lernmittel)",
+        kennungLabel: "Inventarnummer",
+        kennung: "FES-IPAD-0412",
+        rueckgabeKategorie: "IT_HARDWARE",
+      }),
+      ausgabe({
+        id: "ag-schl",
+        departmentKey: "VERWALTUNG",
+        bezeichnung: "Schlüssel: Haupteingang",
+        kennungLabel: "Schlüsselnummer",
+        kennung: "GS-114",
+        rueckgabeKategorie: "SCHLUESSEL",
+        zustand: "FEHLT",
+      }),
+    ];
+    ipad = aufgabe({ title: "Dienst-iPad (Lernmittel) zurücknehmen", category: "Ausstattung & Zugänge", herkunft: "AUSGABE", ausgabeId: "ag-ipad" });
+    schluessel = aufgabe({
+      title: "Schlüssel: Haupteingang zurücknehmen",
+      category: "Ausstattung & Zugänge",
+      assigneeDepartment: "VERWALTUNG",
+      herkunft: "AUSGABE",
+      ausgabeId: "ag-schl",
+      isCompleted: true,
+    });
+    folge = aufgabe({
+      title: "Schließung prüfen: Schlüssel: Haupteingang",
+      category: "Ausstattung & Zugänge",
+      assigneeDepartment: "FACILITY",
+      herkunft: "AUSGABE_FEHLT",
+      ausgabeId: "ag-schl",
+    });
+    vorlageIt = aufgabe({ title: "Konto sperren", herkunft: null, ausgabeId: null });
+    vorlageFm = aufgabe({ title: "Büroschlüssel einsammeln", assigneeDepartment: "FACILITY", herkunft: null, ausgabeId: null });
+    db.aufgaben = [ipad, schluessel, folge, vorlageIt, vorlageFm];
+    db.rueckgaben = [
+      neueRueckgabe({ offboardingId: "off-1", category: "IT_HARDWARE", itemName: "Dienst-iPad (Lernmittel)", serialNumber: "FES-IPAD-0412", ausgabeId: "ag-ipad" }),
+      neueRueckgabe({ offboardingId: "off-1", category: "SCHLUESSEL", itemName: "Schlüssel: Haupteingang", serialNumber: "GS-114", ausgabeId: "ag-schl", zustand: "FEHLT" }),
+    ];
+  });
+
+  const VORLAGE_SCHLUESSEL = [
+    "abteilungKommentar",
+    "abteilungKommentarAm",
+    "category",
+    "completedAt",
+    "description",
+    "dueDate",
+    "id",
+    "isCompleted",
+    "orderIndex",
+    "title",
+  ].sort();
+
+  it("die ausgebende Stelle sieht die Kennung nur an ihrer eigenen Aufgabe, die Gebäudewirtschaft nur lesend an der Folgeaufgabe – sonst fehlt `ausgabe` ganz", async () => {
+    const it_ = (await (await laden("tok-it")).json()).data;
+    const vw = (await (await laden("tok-vw")).json()).data;
+    const fm = (await (await laden("tok-fm")).json()).data;
+    const nach = (liste: Zeile[], id: unknown) => liste.find((a) => a.id === id) as Zeile;
+
+    expect(nach(it_.aufgaben, ipad.id).ausgabe).toMatchObject({
+      art: "RUECKGABE",
+      kennung: "FES-IPAD-0412",
+      zustand: null,
+      zustandLabel: "offen",
+      auswahl: [
+        { zustand: "ZURUECK", label: "Zurückerhalten" },
+        { zustand: "BESCHAEDIGT", label: "Beschädigt zurückerhalten" },
+        { zustand: "FEHLT", label: "Fehlt" },
+      ],
+    });
+    expect(nach(vw.aufgaben, schluessel.id).ausgabe).toMatchObject({
+      kennungLabel: "Schlüsselnummer",
+      kennung: "GS-114",
+      zustand: "FEHLT",
+      zustandLabel: "fehlt",
+    });
+    // Folgeaufgabe: nur lesend, ohne Knoepfe – sie hat den normalen Haken.
+    expect(nach(fm.aufgaben, folge.id).ausgabe).toEqual({
+      art: "RUECKGABE",
+      kennungLabel: "Schlüsselnummer",
+      kennung: "GS-114",
+      zustandLabel: "fehlt",
+    });
+    // Die gepinnten Schluessel der Vorlagenaufgaben bleiben, `herkunft`/`ausgabeId` gehen nirgends hinaus.
+    expect(Object.keys(nach(it_.aufgaben, vorlageIt.id)).sort()).toEqual(VORLAGE_SCHLUESSEL);
+    expect(Object.keys(nach(fm.aufgaben, vorlageFm.id)).sort()).toEqual(VORLAGE_SCHLUESSEL);
+    for (const a of [...it_.aufgaben, ...vw.aufgaben, ...fm.aufgaben]) {
+      expect(a).not.toHaveProperty("herkunft");
+      expect(a).not.toHaveProperty("ausgabeId");
+    }
+    // Die IT sieht die Schluesselnummer nie, das Sekretariat die iPad-Nummer nie.
+    expect(JSON.stringify(it_)).not.toContain("GS-114");
+    expect(JSON.stringify(vw)).not.toContain("FES-IPAD-0412");
+    expect(JSON.stringify(fm)).not.toContain("FES-IPAD-0412");
+  });
+
+  it("Link: `zustand` an einer Vorlagenaufgabe bzw. an der Folgeaufgabe → 400, nichts geschrieben", async () => {
+    let res = await perLink("tok-it", vorlageIt.id as string, { isCompleted: true, zustand: "FEHLT" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: MELDUNGEN_AUSGABEN.ZUSTAND_NICHT_MOEGLICH });
+    res = await perLink("tok-fm", folge.id as string, { isCompleted: true, zustand: "ZURUECK" });
+    expect(res.status).toBe(400);
+    expect(db.aufgaben.every((a) => a === schluessel || !a.isCompleted)).toBe(true);
+    expect(db.audits).toEqual([]);
+  });
+
+  it("Link: eine Ruecknahme mit „beschädigt“ – Antwort mit Zustand, Mail an HR wie bisher (Payload ohne Kennung)", async () => {
+    const res = await perLink("tok-it", ipad.id as string, { isCompleted: true, zustand: "BESCHAEDIGT" });
+    expect(res.status).toBe(200);
+    const { data } = await res.json();
+    expect(data.aufgabe.ausgabe).toMatchObject({ zustand: "BESCHAEDIGT", zustandLabel: "beschädigt zurück" });
+    expect(db.ausgaben.find((a) => a.id === "ag-ipad")).toMatchObject({ zustand: "BESCHAEDIGT" });
+    const mails = mockTrigger.mock.calls.filter((c) => c[0] === "offboarding-task-completed");
+    expect(mails).toHaveLength(1);
+    expect(JSON.stringify(mails[0][1])).not.toContain("FES-IPAD-0412");
+  });
+
+  it("Link-PATCH einer Ausgabe-Aufgabe nach COMPLETED → 409 aus der Austrittssperre (Abschluss kam nach der Vorprüfung), nichts geschrieben", async () => {
+    db.vorgaenge = [vorgang({ onboardingId: "onb-1", status: "COMPLETED" })];
+    const echt = fp.offboardingDepartmentLink.findUnique.getMockImplementation()!;
+    // Die Vorpruefung liest den Austritt noch laufend …
+    fp.offboardingDepartmentLink.findUnique.mockImplementationOnce(async (args: unknown) => {
+      const r = (await echt(args)) as Zeile | null;
+      return r?.offboarding ? { ...r, offboarding: { ...(r.offboarding as Zeile), status: "HANDOVER_PHASE" } } : r;
+    });
+    const res = await perLink("tok-it", ipad.id as string, { isCompleted: true, zustand: "ZURUECK" });
+    // … die Sperre des Austritts findet ihn abgeschlossen.
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN });
+    expect(db.aufgaben.find((a) => a.id === ipad.id)).toMatchObject({ isCompleted: false });
+    expect(db.ausgaben.find((a) => a.id === "ag-ipad")).toMatchObject({ zustand: "AUSGEGEBEN" });
+    expect(db.rueckgaben[0]).toMatchObject({ zustand: null, isReturned: false });
+    expect(db.audits).toEqual([]);
+    expect(fp.offboardingProcess.updateMany).toHaveBeenCalledWith({
+      where: { id: "off-1", status: { notIn: ["COMPLETED", "CANCELLED"] } },
+      data: { updatedAt: expect.any(Date) },
+    });
+  });
+
+  it("Portal-PATCH mit reinem Zustandswechsel an einer erledigten Ausgabe-Aufgabe eines CANCELLED-Austritts → 409", async () => {
+    db.vorgaenge = [vorgang({ onboardingId: "onb-1", status: "CANCELLED" })];
+    const res = await imPortal(schluessel.id as string, { zustand: "ZURUECK" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: MELDUNGEN.CHECKLISTE_ABGEBROCHEN });
+    expect(db.ausgaben.find((a) => a.id === "ag-schl")).toMatchObject({ zustand: "FEHLT" });
+    expect(db.rueckgaben[1]).toMatchObject({ zustand: "FEHLT" });
+    expect(db.audits).toEqual([]);
+    // Eine Notiz bleibt auch am abgebrochenen Austritt moeglich (wie bisher).
+    const notiz = await imPortal(schluessel.id as string, { notes: "Schließung beauftragt" });
+    expect(notiz.status).toBe(200);
+  });
+
+  it("Portal: `zustand` an einer Vorlagenaufgabe → 400; Portal-Zustand am Gegenstand gleicht Ausgabe und Rückgabe an", async () => {
+    let res = await imPortal(vorlageIt.id as string, { zustand: "ZURUECK" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: MELDUNGEN_AUSGABEN.ZUSTAND_NICHT_MOEGLICH });
+
+    // FEHLT → ZURUECK: die offene Folgeaufgabe verschwindet, die Gebaeudewirtschaft ist fertig.
+    res = await imPortal(schluessel.id as string, { zustand: "ZURUECK" });
+    expect(res.status).toBe(200);
+    expect(db.ausgaben.find((a) => a.id === "ag-schl")).toMatchObject({ zustand: "ZURUECK" });
+    expect(db.rueckgaben[1]).toMatchObject({ zustand: "ZURUECK", isReturned: true });
+    expect(db.aufgaben.some((a) => a.id === folge.id)).toBe(false);
   });
 });
 

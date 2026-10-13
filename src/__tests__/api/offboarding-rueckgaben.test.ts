@@ -6,11 +6,19 @@
  * prüfte weder Rolle noch Mandant. Hier: Rollen (Lesen PORTAL_ROLES, Schreiben
  * HR_EDIT_ROLES), fremder Mandant = dieselbe 404 wie unbekannt, Anlegen,
  * Bestätigen, Löschen, AuditLog im selben Commit.
+ *
+ * Seit A4 (S30, G15, G16) ist der PATCH duenn um `rueckgabeAendern`
+ * (src/lib/offboarding-ausgaben.ts): `zustand` neben der Altform `isReturned`,
+ * bedingt auf `zustand` UND `isReturned`, Austrittssperre (bedingt auf „nicht
+ * CANCELLED“), 409 beim abgebrochenen Austritt, Kennungsschema an Zeilen aus
+ * der Einstellung; DELETE weist vorgeschlagene Zeilen ab. Der Gleichlauf an
+ * Zeilen mit Ausgabe ist in offboarding-ausgaben.test.ts geprueft (eigene
+ * In-Memory-Datenbank).
  */
 
 const mockGetSession = jest.fn();
 const mockPrisma = {
-  offboardingProcess: { findUnique: jest.fn() },
+  offboardingProcess: { findUnique: jest.fn(), updateMany: jest.fn() },
   userOrgAssignment: { findUnique: jest.fn() },
   returnItem: {
     findMany: jest.fn(),
@@ -75,6 +83,7 @@ const aendern = (body: unknown) => PATCH(anfrage("PATCH", body), kontext());
 const loeschen = (query: string, body?: unknown) => DELETE(anfrage("DELETE", body, query), kontext());
 
 function nichtsGeschrieben() {
+  expect(mockPrisma.offboardingProcess.updateMany).not.toHaveBeenCalled();
   expect(mockPrisma.returnItem.create).not.toHaveBeenCalled();
   expect(mockPrisma.returnItem.updateMany).not.toHaveBeenCalled();
   expect(mockPrisma.returnItem.deleteMany).not.toHaveBeenCalled();
@@ -85,7 +94,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGetSession.mockResolvedValue(HR);
   mockCanAccessProcess.mockImplementation((...a: unknown[]) => echtesCanAccessProcess(...a));
-  mockPrisma.offboardingProcess.findUnique.mockResolvedValue({ organizationId: "org-1" });
+  mockPrisma.offboardingProcess.findUnique.mockResolvedValue({ organizationId: "org-1", status: "HANDOVER_PHASE" });
+  mockPrisma.offboardingProcess.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.userOrgAssignment.findUnique.mockResolvedValue(null);
   mockPrisma.returnItem.findMany.mockResolvedValue([GEGENSTAND]);
   mockPrisma.returnItem.findFirst.mockResolvedValue(GEGENSTAND);
@@ -229,9 +239,12 @@ describe("Bestätigen", () => {
       where: { id: ITEM_ID, offboardingId: ID },
     });
     const aufruf = mockPrisma.returnItem.updateMany.mock.calls[0][0];
-    // Bedingt auf den gelesenen Stand (gleichzeitige Bestaetigung → 409)
-    expect(aufruf.where).toEqual({ id: ITEM_ID, offboardingId: ID, isReturned: false });
+    // Bedingt auf den gelesenen Stand (gleichzeitige Bestaetigung → 409) –
+    // seit A4 auch auf den Zustand (G16).
+    expect(aufruf.where).toEqual({ id: ITEM_ID, offboardingId: ID, isReturned: false, zustand: null });
     expect(aufruf.data.isReturned).toBe(true);
+    // Die Altform `isReturned: true` heisst ZURUECK (G16).
+    expect(aufruf.data.zustand).toBe("ZURUECK");
     expect(aufruf.data.returnedToId).toBe(HR.userId);
     expect(aufruf.data.returnedAt).toBeInstanceOf(Date);
     expect(aufruf.data.returnedAt.getFullYear()).not.toBe(1999);
@@ -247,6 +260,7 @@ describe("Bestätigen", () => {
           category: "IT_HARDWARE",
           geaenderteFelder: ["isReturned"],
           isReturned: true,
+          zustand: "ZURUECK",
         },
       },
     });
@@ -298,6 +312,122 @@ describe("Bestätigen", () => {
   });
 });
 
+// =============================================
+// Rueckgabezustand (A4, S30, G15, G16)
+// =============================================
+
+describe("Zustand (A4, S30)", () => {
+  it("„fehlt“ an einer von HR erfassten Zeile: Zustand gesetzt, `isReturned` bleibt falsch, Protokoll mit Zustand", async () => {
+    const res = await aendern({ itemId: ITEM_ID, zustand: "FEHLT" });
+    expect(res.status).toBe(200);
+    const aufruf = mockPrisma.returnItem.updateMany.mock.calls[0][0];
+    expect(aufruf.where).toEqual({ id: ITEM_ID, offboardingId: ID, isReturned: false, zustand: null });
+    expect(aufruf.data).toEqual({ zustand: "FEHLT", isReturned: false, returnedAt: null, returnedToId: null });
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data.details).toEqual({
+      returnItemId: ITEM_ID,
+      category: "IT_HARDWARE",
+      geaenderteFelder: ["zustand"],
+      zustand: "FEHLT",
+      isReturned: false,
+    });
+  });
+
+  it("„beschädigt“ zählt als zurückgegeben (G16); `zustand: null` und `isReturned: false` öffnen wieder", async () => {
+    await aendern({ itemId: ITEM_ID, zustand: "BESCHAEDIGT" });
+    expect(mockPrisma.returnItem.updateMany.mock.calls[0][0].data).toMatchObject({
+      zustand: "BESCHAEDIGT",
+      isReturned: true,
+      returnedToId: HR.userId,
+    });
+
+    const fehlt = { ...GEGENSTAND, zustand: "FEHLT" };
+    for (const body of [{ zustand: null }, { isReturned: false }]) {
+      jest.clearAllMocks();
+      mockPrisma.returnItem.findFirst.mockResolvedValue(fehlt);
+      mockPrisma.returnItem.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.offboardingProcess.updateMany.mockResolvedValue({ count: 1 });
+      const res = await aendern({ itemId: ITEM_ID, ...body });
+      expect(res.status).toBe(200);
+      const aufruf = mockPrisma.returnItem.updateMany.mock.calls[0][0];
+      expect(aufruf.where).toEqual({ id: ITEM_ID, offboardingId: ID, isReturned: false, zustand: "FEHLT" });
+      expect(aufruf.data).toEqual({ zustand: null, isReturned: false, returnedAt: null, returnedToId: null });
+    }
+  });
+
+  it("Altbestand (`isReturned` ohne Zustand) gilt als ZURUECK – „zurück“ ein zweites Mal ändert nichts", async () => {
+    mockPrisma.returnItem.findFirst.mockResolvedValue({ ...GEGENSTAND, isReturned: true, zustand: null });
+    const res = await aendern({ itemId: ITEM_ID, zustand: "ZURUECK" });
+    expect(res.status).toBe(200);
+    nichtsGeschrieben();
+  });
+
+  it("zwei Zustandswechsel auf demselben gelesenen Stand: der zweite ist 409 (bedingt auf den Zustand)", async () => {
+    mockPrisma.returnItem.updateMany.mockResolvedValue({ count: 0 });
+    const res = await aendern({ itemId: ITEM_ID, zustand: "ENTFAELLT" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Der Gegenstand wurde inzwischen geändert oder gelöscht. Bitte die Seite neu laden." });
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("der Austritt wird zuerst gesperrt (bedingt auf „nicht CANCELLED“), dann die Zeile geschrieben", async () => {
+    await aendern({ itemId: ITEM_ID, zustand: "VERBLEIBT" });
+    expect(mockPrisma.offboardingProcess.updateMany).toHaveBeenCalledWith({
+      where: { id: ID, status: { not: "CANCELLED" } },
+      data: { updatedAt: expect.any(Date) },
+    });
+    expect(mockPrisma.offboardingProcess.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPrisma.returnItem.updateMany.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("abgebrochener Austritt → 409, nichts geschrieben – auch wenn der Abbruch erst unter der Sperre ankommt", async () => {
+    mockPrisma.offboardingProcess.findUnique.mockResolvedValue({ organizationId: "org-1", status: "CANCELLED" });
+    let res = await aendern({ itemId: ITEM_ID, zustand: "ZURUECK" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Der Vorgang wurde abgebrochen. Die Rückgaben lassen sich nicht mehr ändern." });
+    nichtsGeschrieben();
+
+    mockPrisma.offboardingProcess.findUnique
+      .mockResolvedValueOnce({ organizationId: "org-1", status: "HANDOVER_PHASE" })
+      .mockResolvedValueOnce({ status: "CANCELLED" });
+    mockPrisma.offboardingProcess.updateMany.mockResolvedValue({ count: 0 });
+    res = await aendern({ itemId: ITEM_ID, notes: "Rücksprache" });
+    expect(res.status).toBe(409);
+    expect(mockPrisma.returnItem.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("`zustand` und `isReturned` zugleich bzw. ein unbekannter Zustand → 400", async () => {
+    let res = await aendern({ itemId: ITEM_ID, zustand: "FEHLT", isReturned: true });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("Bitte entweder „zurückgegeben“ oder einen Zustand angeben, nicht beides.");
+    res = await aendern({ itemId: ITEM_ID, zustand: "VERSCHOLLEN" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("Unbekannter Zustand.");
+    nichtsGeschrieben();
+  });
+
+  it("Kennung einer Zeile aus der Einstellung: spitze Klammern, Zeilenumbruch oder über 60 Zeichen → 400; an einer HR-Zeile gelten die 100 Zeichen", async () => {
+    mockPrisma.returnItem.findFirst.mockResolvedValue({ ...GEGENSTAND, ausgabeId: "ag-ipad", serialNumber: "FES-IPAD-0412" });
+    for (const [serialNumber, meldung] of [
+      ["<b>FES</b>", "Die Kennung darf keine spitzen Klammern (< >), keine Zeilenumbrüche und keine Steuerzeichen enthalten."],
+      ["FES\nIPAD", "Die Kennung darf keine spitzen Klammern (< >), keine Zeilenumbrüche und keine Steuerzeichen enthalten."],
+      ["X".repeat(61), "Die Kennung darf höchstens 60 Zeichen lang sein."],
+    ]) {
+      const res = await aendern({ itemId: ITEM_ID, serialNumber });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe(meldung);
+    }
+    nichtsGeschrieben();
+
+    // Manuelle Zeile: 80 Zeichen sind erlaubt (bis 100 wie bisher).
+    mockPrisma.returnItem.findFirst.mockResolvedValue(GEGENSTAND);
+    const res = await aendern({ itemId: ITEM_ID, serialNumber: "S".repeat(80) });
+    expect(res.status).toBe(200);
+    expect(mockPrisma.returnItem.updateMany.mock.calls[0][0].data).toEqual({ serialNumber: "S".repeat(80) });
+  });
+});
+
 describe("Löschen", () => {
   it("löscht per Query-Parameter und protokolliert", async () => {
     const res = await loeschen(`?itemId=${ITEM_ID}`);
@@ -321,6 +451,17 @@ describe("Löschen", () => {
     expect((await loeschen("")).status).toBe(400);
     mockPrisma.returnItem.findFirst.mockResolvedValue(null);
     expect((await loeschen("?itemId=fremd")).status).toBe(404);
+    nichtsGeschrieben();
+  });
+
+  it("eine aus der Einstellung vorgeschlagene Zeile (`ausgabeId`) lässt sich nicht löschen → 409 (A4, G15)", async () => {
+    mockPrisma.returnItem.findFirst.mockResolvedValue({ ...GEGENSTAND, ausgabeId: "ag-ipad" });
+    const res = await loeschen(`?itemId=${ITEM_ID}`);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Eine vorgeschlagene Rückgabe lässt sich nicht löschen – stattdessen „entfällt“ wählen.",
+      grund: "VORGESCHLAGEN_NICHT_LOESCHEN",
+    });
     nichtsGeschrieben();
   });
 });
