@@ -26,7 +26,7 @@ import type {
   ZeugnisBewertungData,
   TabId,
 } from "./types";
-import { TABS } from "./types";
+import { NUR_HR_TABS, TABS } from "./types";
 import { STATUS_TRANSITIONS, formatDate, daysUntilLabel } from "./helpers";
 import { ArrowLeftIcon, ChevronDownIcon } from "./icons";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
@@ -189,9 +189,14 @@ export function OffboardingDetailContent({
 
   useEffect(() => {
     loadData();
-    loadExitInterview();
-    loadZeugnisBewertung();
-  }, [loadData, loadExitInterview, loadZeugnisBewertung]);
+    // Exit-Interview und Zeugnis-Bewertung liefern ihre Routen nur an
+    // HR_EDIT_ROLES (Magic Links in der Antwort) — ohne das Recht gibt es
+    // auch die Reiter nicht (NUR_HR_TABS).
+    if (canEdit) {
+      loadExitInterview();
+      loadZeugnisBewertung();
+    }
+  }, [loadData, loadExitInterview, loadZeugnisBewertung, canEdit]);
 
   // ---- Status change ----
   const handleStatusChange = async (newStatus: string) => {
@@ -282,7 +287,8 @@ export function OffboardingDetailContent({
         setNotes((prev) => [result.data || result, ...prev]);
         setNewNote("");
       } else {
-        setActionError("Notiz konnte nicht gespeichert werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Notiz konnte nicht gespeichert werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Speichern der Notiz.");
@@ -305,7 +311,8 @@ export function OffboardingDetailContent({
         setEditingNoteId(null);
         setEditingNoteText("");
       } else {
-        setActionError("Notiz konnte nicht aktualisiert werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Notiz konnte nicht aktualisiert werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Aktualisieren der Notiz.");
@@ -321,7 +328,8 @@ export function OffboardingDetailContent({
       if (res.ok) {
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
       } else {
-        setActionError("Notiz konnte nicht gelöscht werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Notiz konnte nicht gelöscht werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Löschen der Notiz.");
@@ -446,7 +454,9 @@ export function OffboardingDetailContent({
       if (res.ok) {
         await loadData();
       } else {
-        setActionError("Dokument konnte nicht hochgeladen werden.");
+        // Den Text des Servers zeigen (zu groß, falscher Typ, …).
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Dokument konnte nicht hochgeladen werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Dokument-Upload.");
@@ -492,8 +502,8 @@ export function OffboardingDetailContent({
       if (res.ok) {
         await loadExitInterview();
       } else {
-        const err = await res.json();
-        setActionError(err.error || "Exit-Interview konnte nicht erstellt werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Exit-Interview konnte nicht erstellt werden.");
       }
     } catch {
       setActionError("Verbindungsfehler.");
@@ -505,8 +515,19 @@ export function OffboardingDetailContent({
   const sendExitInterviewLink = async () => {
     try {
       const res = await fetch(`/api/offboarding/${offboardingId}/exit-interview/send`, { method: "POST" });
-      if (res.ok) await loadExitInterview();
-      else setActionError("Link konnte nicht gesendet werden.");
+      if (res.ok) {
+        const result: { mailStatus?: string | null } = await res.json().catch(() => ({}));
+        // SKIPPED: Die Mailvorlage ist aus oder hat keinen Empfänger — dann
+        // ging keine E-Mail hinaus (allenfalls ein Webhook).
+        if (result.mailStatus === "SKIPPED") {
+          setActionError("Die Einladung wurde nicht per E-Mail versendet: Die Mailvorlage „Exit-Interview: Einladung“ ist deaktiviert oder hat keinen Empfänger.");
+        }
+        await loadExitInterview();
+      } else {
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Link konnte nicht gesendet werden.");
+        if (res.status === 409) await loadExitInterview();
+      }
     } catch {
       setActionError("Verbindungsfehler.");
     }
@@ -523,8 +544,10 @@ export function OffboardingDetailContent({
       if (res.ok) {
         await loadZeugnisBewertung();
       } else {
-        const err = await res.json();
-        setActionError(err.error || "Zeugnis-Bewertung konnte nicht erstellt werden.");
+        // Etwa 409 „Die Adresse der Führungskraft liegt in keiner freigegebenen
+        // Domain …" — den Text des Servers zeigen.
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Zeugnis-Bewertung konnte nicht erstellt werden.");
       }
     } catch {
       setActionError("Verbindungsfehler.");
@@ -692,7 +715,7 @@ export function OffboardingDetailContent({
       <div className="border-b bg-card">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <nav className="-mb-px flex gap-1 overflow-x-auto" aria-label="Tabs">
-            {TABS.filter((tab) => tab.id !== "mails" || canEdit).map((tab) => {
+            {TABS.filter((tab) => canEdit || !NUR_HR_TABS.has(tab.id)).map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
@@ -747,6 +770,7 @@ export function OffboardingDetailContent({
             setEditingValue={setEditingValue}
             handleFieldSave={handleFieldSave}
             onNavigateTab={(tab) => setActiveTab(tab as TabId)}
+            hrReiterSichtbar={canEdit}
           />
         )}
 
@@ -824,7 +848,7 @@ export function OffboardingDetailContent({
         )}
 
         {/* Tab 6: Exit-Interview */}
-        {activeTab === "exit-interview" && (
+        {activeTab === "exit-interview" && canEdit && (
           <TabExitInterview
             exitInterview={exitInterview}
             creatingExitInterview={creatingExitInterview}
@@ -835,7 +859,7 @@ export function OffboardingDetailContent({
         )}
 
         {/* Tab 7: Zeugnis */}
-        {activeTab === "zeugnis" && (
+        {activeTab === "zeugnis" && canEdit && (
           <TabZeugnis
             zeugnisBewertung={zeugnisBewertung}
             creatingZeugnis={creatingZeugnis}

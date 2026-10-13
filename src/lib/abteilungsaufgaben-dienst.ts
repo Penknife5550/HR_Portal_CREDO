@@ -356,8 +356,10 @@ export function fuehrungskraftErmitteln(v: FuehrungskraftQuellen): Fuehrungskraf
  * Bewertung, Vertragsende), sind immer erlaubt — die Pruefung gilt der FREI
  * EINGETIPPTEN Adresse. Aufrufer: POST /api/offboarding und PATCH
  * /api/offboarding/[id], seit der Durchsicht 09/2026 auch POST /api/onboarding
- * (Anlage mit Fuehrungskraft) und POST /api/onboarding/[id]/supervisor-link —
- * jeweils VOR dem Speichern und vor jeder Mail; nein = 409 mit
+ * (Anlage mit Fuehrungskraft) und POST /api/onboarding/[id]/supervisor-link,
+ * seit 10/2026 POST /api/offboarding/[id]/zeugnis-bewertung (deren Adresse
+ * ist Quelle „ZEUGNIS" in `fuehrungskraftErmitteln`) — jeweils VOR dem
+ * Speichern und vor jeder Mail; nein = 409 mit
  * MELDUNGEN.FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN.
  */
 export async function fuehrungskraftAdresseFreigegeben(

@@ -3,14 +3,28 @@
  *
  * PUT - HR prueft und passt die Zeugnis-Bewertung an
  *
- * Berechtigung: SUPER_ADMIN, HR_LEITUNG
+ * Berechtigung: ADMIN_ROLES (SUPER_ADMIN, HR_LEITUNG) — unveraendert. Mandant
+ * per canAccessProcess: unbekannt und fremd = dieselbe 404.
+ *
+ * Geprueft wird erst, wenn die Fuehrungskraft eingereicht hat (SUBMITTED oder
+ * HR_REVIEW): Der Bewertungslink nimmt nur INVITED/IN_PROGRESS an — ein
+ * HR-Review davor haette ihn still beendet. Der ganze Body wird VOR dem ersten
+ * Schreiben geprueft (frueher brach die Schleife nach halb geschriebenen
+ * Noten mit 404 ab), Noten, Bewertung und AuditLog gehen in EINER Transaktion,
+ * bedingt auf den gelesenen Status — zwei gleichzeitige Finalisierungen
+ * schreiben nicht zweimal.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { z } from "zod";
+import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { ADMIN_ROLES } from "@/lib/permissions";
+import { nichtGefunden, offboardingZugaenglich } from "@/lib/offboarding-zugriff";
+import { zeugnisHrReviewSchema } from "@/lib/validations/zeugnis";
 
-const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
+/** Erst nach der Einreichung durch die Fuehrungskraft pruefbar. */
+const PRUEFBARE_STATUS = ["SUBMITTED", "HR_REVIEW"] as const;
 
 // Typ für den Template-Snapshot
 interface SnapshotCriterion {
@@ -72,28 +86,11 @@ function calculateOverallGrade(
 // =============================================
 // PUT /api/offboarding/[id]/zeugnis-bewertung/hr-review
 // =============================================
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
-
-    if (!ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json(
-        { error: "Keine Berechtigung. Nur SUPER_ADMIN und HR_LEITUNG duerfen HR-Reviews durchfuehren." },
-        { status: 403 }
-      );
-    }
-
-    const { id } = await params;
-
-    // Body validieren
-    const body = await request.json().catch(() => null);
-    if (!body) {
-      return NextResponse.json({ error: "Ungültiger Request-Body" }, { status: 400 });
-    }
+export const PUT = apiHandler<z.infer<typeof zeugnisHrReviewSchema>>(
+  { roles: ADMIN_ROLES, bodySchema: zeugnisHrReviewSchema, logLabel: "Offboarding/Zeugnis-HR-Review" },
+  async ({ params, session, body }) => {
+    const id = params.id;
+    if (!(await offboardingZugaenglich(session!, id))) return nichtGefunden();
 
     const { ratings, hrNotes, finalize } = body;
 
@@ -102,119 +99,111 @@ export async function PUT(
       where: { offboardingId: id },
       include: { ratings: true },
     });
-
     if (!bewertung) {
-      return NextResponse.json({ error: "Keine Zeugnis-Bewertung für dieses Offboarding gefunden" }, { status: 404 });
+      return nichtGefunden("Für diesen Vorgang gibt es noch keine Zeugnis-Bewertung.");
     }
 
     if (bewertung.status === "FINALIZED") {
-      return NextResponse.json({ error: "Diese Bewertung wurde bereits finalisiert" }, { status: 409 });
+      return NextResponse.json({ error: "Diese Bewertung ist bereits abgeschlossen." }, { status: 409 });
+    }
+    if (!(PRUEFBARE_STATUS as readonly string[]).includes(bewertung.status)) {
+      return NextResponse.json(
+        { error: "Die Führungskraft hat die Bewertung noch nicht eingereicht." },
+        { status: 409 }
+      );
     }
 
-    // HR-Override Ratings aktualisieren
-    if (ratings && Array.isArray(ratings)) {
-      for (const r of ratings) {
-        if (!r.snapshotCriterionId) continue;
-
-        // Pruefen ob Rating existiert
-        const existingRating = bewertung.ratings.find(
-          (er) => er.snapshotCriterionId === r.snapshotCriterionId
+    // Erst alles pruefen, dann schreiben: Jede Note muss zu einem Kriterium
+    // DIESER Bewertung gehoeren.
+    const aenderungen: { ratingId: string; hrOverrideGrade: number | null; hrOverrideReason: string | null }[] = [];
+    for (const r of ratings ?? []) {
+      const vorhanden = bewertung.ratings.find((er) => er.snapshotCriterionId === r.snapshotCriterionId);
+      if (!vorhanden) {
+        return NextResponse.json(
+          { error: "Mindestens eine Note gehört zu keinem Kriterium dieser Bewertung." },
+          { status: 400 }
         );
-
-        if (!existingRating) {
-          return NextResponse.json(
-            { error: `Kein Rating für Kriterium "${r.snapshotCriterionId}" gefunden` },
-            { status: 404 }
-          );
-        }
-
-        if (r.hrOverrideGrade !== undefined && r.hrOverrideGrade !== null) {
-          if (r.hrOverrideGrade < 1 || r.hrOverrideGrade > 6) {
-            return NextResponse.json(
-              { error: "hrOverrideGrade muss zwischen 1 und 6 liegen" },
-              { status: 400 }
-            );
-          }
-        }
-
-        await prisma.zeugnisBewertungRating.update({
-          where: { id: existingRating.id },
-          data: {
-            hrOverrideGrade: r.hrOverrideGrade ?? null,
-            hrOverrideReason: r.hrOverrideReason ?? null,
-          },
-        });
       }
+      aenderungen.push({
+        ratingId: vorhanden.id,
+        hrOverrideGrade: r.hrOverrideGrade ?? null,
+        hrOverrideReason: r.hrOverrideReason ?? null,
+      });
     }
 
-    // Alle Ratings neu laden für Neuberechnung
-    const updatedRatings = await prisma.zeugnisBewertungRating.findMany({
-      where: { zeugnisBewertungId: bewertung.id },
-    });
-
+    // Gesamtnote aus dem kuenftigen Stand
     const ratingsMap = new Map(
-      updatedRatings.map((r) => [
-        r.snapshotCriterionId,
-        { grade: r.grade, hrOverrideGrade: r.hrOverrideGrade },
-      ])
+      bewertung.ratings.map((r) => {
+        const neu = aenderungen.find((a) => a.ratingId === r.id);
+        return [
+          r.snapshotCriterionId,
+          { grade: r.grade, hrOverrideGrade: neu ? neu.hrOverrideGrade : r.hrOverrideGrade },
+        ];
+      })
     );
-
     const gradeResult = calculateOverallGrade(
       bewertung.templateSnapshot as unknown as TemplateSnapshot,
       ratingsMap
     );
 
-    // Update-Daten zusammenstellen
-    const updateData: Record<string, unknown> = {
-      hrReviewedAt: new Date(),
-      hrReviewedById: session.userId,
-      overallGrade: gradeResult?.overallGrade ?? null,
-      overallGradeRounded: gradeResult?.overallGradeRounded ?? null,
-    };
-
-    if (hrNotes !== undefined) {
-      updateData.hrNotes = hrNotes;
-    }
-
-    if (!finalize) {
-      updateData.status = "HR_REVIEW";
-    }
-
-    if (finalize) {
-      updateData.status = "FINALIZED";
-      updateData.finalizedAt = new Date();
-      updateData.finalizedById = session.userId;
-    }
-
-    const updated = await prisma.zeugnisBewertung.update({
-      where: { id: bewertung.id },
-      data: updateData,
-      include: {
-        ratings: true,
-        hrReviewedBy: { select: { id: true, firstName: true, lastName: true } },
-        finalizedBy: { select: { id: true, firstName: true, lastName: true } },
-      },
-    });
-
-    // AuditLog schreiben
-    await prisma.auditLog.create({
-      data: {
-        userId: session.userId,
-        offboardingId: id,
-        processType: "OFFBOARDING",
-        action: finalize ? "ZEUGNIS_BEWERTUNG_FINALIZED" : "ZEUGNIS_BEWERTUNG_HR_REVIEWED",
-        details: {
-          zeugnisBewertungId: bewertung.id,
-          overallGrade: gradeResult?.overallGrade,
-          overallGradeRounded: gradeResult?.overallGradeRounded,
-          finalized: !!finalize,
+    const jetzt = new Date();
+    const updated = await prisma.$transaction(async (tx) => {
+      // Bedingt auf den gelesenen Status: Eine gleichzeitige Finalisierung
+      // gewinnt, diese schreibt dann nichts.
+      const { count } = await tx.zeugnisBewertung.updateMany({
+        where: { id: bewertung.id, status: bewertung.status },
+        data: {
+          hrReviewedAt: jetzt,
+          hrReviewedById: session!.userId,
+          overallGrade: gradeResult?.overallGrade ?? null,
+          overallGradeRounded: gradeResult?.overallGradeRounded ?? null,
+          ...(hrNotes !== undefined ? { hrNotes } : {}),
+          ...(finalize
+            ? { status: "FINALIZED" as const, finalizedAt: jetzt, finalizedById: session!.userId }
+            : { status: "HR_REVIEW" as const }),
         },
-      },
+      });
+      if (count === 0) return null;
+
+      for (const a of aenderungen) {
+        await tx.zeugnisBewertungRating.update({
+          where: { id: a.ratingId },
+          data: { hrOverrideGrade: a.hrOverrideGrade, hrOverrideReason: a.hrOverrideReason },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: session!.userId,
+          offboardingId: id,
+          processType: "OFFBOARDING",
+          action: finalize ? "ZEUGNIS_BEWERTUNG_FINALIZED" : "ZEUGNIS_BEWERTUNG_HR_REVIEWED",
+          details: {
+            zeugnisBewertungId: bewertung.id,
+            overallGrade: gradeResult?.overallGrade ?? null,
+            overallGradeRounded: gradeResult?.overallGradeRounded ?? null,
+            geaenderteNoten: aenderungen.length,
+            finalized: !!finalize,
+          },
+        },
+      });
+
+      return tx.zeugnisBewertung.findUnique({
+        where: { id: bewertung.id },
+        include: {
+          ratings: true,
+          hrReviewedBy: { select: { id: true, firstName: true, lastName: true } },
+          finalizedBy: { select: { id: true, firstName: true, lastName: true } },
+        },
+      });
     });
 
+    if (!updated) {
+      return NextResponse.json(
+        { error: "Die Bewertung wurde inzwischen geändert. Bitte die Seite neu laden." },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ data: updated });
-  } catch (error) {
-    console.error("[API] Zeugnis-Bewertung HR-Review fehlgeschlagen:", error);
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
-}
+);

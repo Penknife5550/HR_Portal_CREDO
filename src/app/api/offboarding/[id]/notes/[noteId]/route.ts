@@ -1,180 +1,131 @@
 /**
  * API: /api/offboarding/:id/notes/:noteId
  *
- * PATCH  – Notiz bearbeiten
- * DELETE – Notiz löschen
+ * PATCH  – Notiz bearbeiten (PORTAL_ROLES, nur wer sie angelegt hat)
+ * DELETE – Notiz löschen (PORTAL_ROLES, nur wer sie angelegt hat)
+ *
+ * Mandant per canAccessProcess: unbekannt und fremd = dieselbe 404. Eine
+ * Notiz aus einem anderen Vorgang bekommt dieselbe 404 wie eine unbekannte.
+ * Eine fremde Notiz im eigenen Vorgang = 403 — die Person sieht sie ja.
+ * Geschrieben wird bedingt auf Vorgang UND Urheber; im AuditLog steht nur die
+ * Laenge, nie der Text.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { z } from "zod";
+import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { PORTAL_ROLES, type SessionPayload } from "@/lib/permissions";
+import { nichtGefunden, offboardingZugaenglich } from "@/lib/offboarding-zugriff";
+import { offboardingNotizSchema } from "@/lib/validations/offboarding";
+
+const LOG_LABEL = "Offboarding/Notizen";
+
+/** Gleicher Text fuer „gibt es nicht" und „gehoert zu einem anderen Vorgang". */
+const NOTIZ_NICHT_GEFUNDEN = "Notiz nicht gefunden";
+
+type Pruefung =
+  | { ok: true; note: { id: string; content: string } }
+  | { ok: false; antwort: NextResponse };
+
+/** Vorgang zugaenglich, Notiz in diesem Vorgang, von dieser Person angelegt? */
+async function eigeneNotizLaden(
+  session: SessionPayload,
+  id: string,
+  noteId: string,
+  verb: "bearbeiten" | "löschen"
+): Promise<Pruefung> {
+  if (!(await offboardingZugaenglich(session, id))) return { ok: false, antwort: nichtGefunden() };
+
+  const note = await prisma.offboardingNote.findFirst({
+    where: { id: noteId, offboardingId: id },
+    select: { id: true, content: true, createdById: true },
+  });
+  if (!note) return { ok: false, antwort: nichtGefunden(NOTIZ_NICHT_GEFUNDEN) };
+
+  if (note.createdById !== session.userId) {
+    return {
+      ok: false,
+      antwort: NextResponse.json(
+        { error: `Nur wer die Notiz angelegt hat, kann sie ${verb}.` },
+        { status: 403 }
+      ),
+    };
+  }
+  return { ok: true, note };
+}
 
 // =============================================
 // PATCH /api/offboarding/:id/notes/:noteId – Notiz bearbeiten
 // =============================================
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; noteId: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
-    }
+export const PATCH = apiHandler<z.infer<typeof offboardingNotizSchema>>(
+  { roles: PORTAL_ROLES, bodySchema: offboardingNotizSchema, logLabel: LOG_LABEL },
+  async ({ params, session, body }) => {
+    const pruefung = await eigeneNotizLaden(session!, params.id, params.noteId, "bearbeiten");
+    if (!pruefung.ok) return pruefung.antwort;
 
-    const { id, noteId } = await params;
-    const body = await request.json();
-    const { content } = body;
-
-    // Validierung
-    if (!content || typeof content !== "string" || content.trim().length === 0) {
-      return NextResponse.json(
-        { error: "content ist ein Pflichtfeld" },
-        { status: 400 }
-      );
-    }
-
-    // Pruefen ob Offboarding existiert
-    const offboarding = await prisma.offboardingProcess.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (!offboarding) {
-      return NextResponse.json(
-        { error: "Vorgang nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    // Notiz pruefen (muss zum Offboarding gehoeren)
-    const existingNote = await prisma.offboardingNote.findUnique({
-      where: { id: noteId },
-    });
-    if (!existingNote || existingNote.offboardingId !== id) {
-      return NextResponse.json(
-        { error: "Notiz nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    // Nur der Ersteller darf die Notiz bearbeiten
-    if (existingNote.createdById !== session.userId) {
-      return NextResponse.json(
-        { error: "Nur der Ersteller kann diese Notiz bearbeiten" },
-        { status: 403 }
-      );
-    }
-
-    const updated = await prisma.offboardingNote.update({
-      where: { id: noteId },
-      data: { content: content.trim() },
-      include: {
-        createdBy: {
-          select: { firstName: true, lastName: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.offboardingNote.updateMany({
+        where: { id: pruefung.note.id, offboardingId: params.id, createdById: session!.userId },
+        data: { content: body.content },
+      });
+      if (count === 0) return null;
+      await tx.auditLog.create({
+        data: {
+          offboardingId: params.id,
+          userId: session!.userId,
+          processType: "OFFBOARDING",
+          action: "NOTE_UPDATED",
+          details: {
+            noteId: pruefung.note.id,
+            laengeVorher: pruefung.note.content.length,
+            laenge: body.content.length,
+          },
         },
-      },
-    });
-
-    // Audit-Log
-    await prisma.auditLog.create({
-      data: {
-        offboardingId: id,
-        userId: session.userId,
-        processType: "OFFBOARDING",
-        action: "NOTE_UPDATED",
-        details: {
-          noteId,
-          contentPreview: content.trim().substring(0, 100),
+      });
+      return tx.offboardingNote.findUnique({
+        where: { id: pruefung.note.id },
+        include: {
+          createdBy: {
+            select: { firstName: true, lastName: true },
+          },
         },
-      },
+      });
     });
 
+    // Zwischen Lesen und Schreiben geloescht.
+    if (!updated) return nichtGefunden(NOTIZ_NICHT_GEFUNDEN);
     return NextResponse.json({ data: updated });
-  } catch (error) {
-    console.error("Fehler beim Bearbeiten der Offboarding-Notiz:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
   }
-}
+);
 
 // =============================================
 // DELETE /api/offboarding/:id/notes/:noteId – Notiz löschen
 // =============================================
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string; noteId: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
-    }
+export const DELETE = apiHandler(
+  { roles: PORTAL_ROLES, logLabel: LOG_LABEL },
+  async ({ params, session }) => {
+    const pruefung = await eigeneNotizLaden(session!, params.id, params.noteId, "löschen");
+    if (!pruefung.ok) return pruefung.antwort;
 
-    const { id, noteId } = await params;
-
-    // Pruefen ob Offboarding existiert
-    const offboarding = await prisma.offboardingProcess.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (!offboarding) {
-      return NextResponse.json(
-        { error: "Vorgang nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    // Notiz pruefen (muss zum Offboarding gehoeren)
-    const existingNote = await prisma.offboardingNote.findUnique({
-      where: { id: noteId },
-    });
-    if (!existingNote || existingNote.offboardingId !== id) {
-      return NextResponse.json(
-        { error: "Notiz nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    // Nur der Ersteller darf die Notiz löschen
-    if (existingNote.createdById !== session.userId) {
-      return NextResponse.json(
-        { error: "Nur der Ersteller kann diese Notiz löschen" },
-        { status: 403 }
-      );
-    }
-
-    await prisma.offboardingNote.delete({
-      where: { id: noteId },
-    });
-
-    // Audit-Log
-    await prisma.auditLog.create({
-      data: {
-        offboardingId: id,
-        userId: session.userId,
-        processType: "OFFBOARDING",
-        action: "NOTE_DELETED",
-        details: {
-          noteId,
-          contentPreview: existingNote.content.substring(0, 100),
+    const geloescht = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.offboardingNote.deleteMany({
+        where: { id: pruefung.note.id, offboardingId: params.id, createdById: session!.userId },
+      });
+      if (count === 0) return false;
+      await tx.auditLog.create({
+        data: {
+          offboardingId: params.id,
+          userId: session!.userId,
+          processType: "OFFBOARDING",
+          action: "NOTE_DELETED",
+          details: { noteId: pruefung.note.id, laenge: pruefung.note.content.length },
         },
-      },
+      });
+      return true;
     });
 
+    if (!geloescht) return nichtGefunden(NOTIZ_NICHT_GEFUNDEN);
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Fehler beim Löschen der Offboarding-Notiz:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
   }
-}
+);

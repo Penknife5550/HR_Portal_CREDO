@@ -62,6 +62,13 @@ const ACTION_LABELS: Record<string, string> = {
   EXIT_INTERVIEW_SENT: "Exit-Interview versendet",
   ZEUGNIS_CREATED: "Zeugnis-Bewertung erstellt",
   ZEUGNIS_UPDATED: "Zeugnis-Bewertung aktualisiert",
+  // Die Codes, die die Offboarding-Routen tatsaechlich schreiben
+  // (/api/offboarding/:id/exit-interview/send, …/zeugnis-bewertung[/hr-review]).
+  // Die beiden Zeilen darueber bleiben fuer Alteintraege stehen.
+  EXIT_INTERVIEW_INVITED: "Exit-Interview-Einladung versendet",
+  ZEUGNIS_BEWERTUNG_CREATED: "Zeugnis-Bewertung angelegt",
+  ZEUGNIS_BEWERTUNG_HR_REVIEWED: "Zeugnis-Bewertung von HR geprüft",
+  ZEUGNIS_BEWERTUNG_FINALIZED: "Zeugnis-Bewertung abgeschlossen",
   ONBOARDING_CREATED: "Onboarding erstellt",
   OFFBOARDING_CREATED: "Offboarding erstellt",
   QUESTIONNAIRE_SUBMITTED: "Fragebogen eingereicht",

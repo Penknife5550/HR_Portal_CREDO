@@ -4,34 +4,47 @@
  * POST - Zeugnis-Bewertung für ein Offboarding erstellen (Magic Link generieren)
  * GET  - Zeugnis-Bewertung eines Offboardings abrufen
  *
- * Berechtigung: Authentifizierter Benutzer
+ * Berechtigung: HR_EDIT_ROLES in beiden Methoden. Die Antwort traegt den Token
+ * des Bewertungslinks — wer ihn hat, kann im Namen der Fuehrungskraft Noten
+ * abgeben. Deshalb weder PORTAL_ROLES noch der n8n-Schluessel (SERVICE).
+ * Mandant per canAccessProcess: unbekannt und fremd = dieselbe 404.
+ *
+ * Die hier eingetragene Adresse ist zugleich eine Quelle der Fuehrungskraft
+ * fuer die Abteilungsaufgaben (`fuehrungskraftErmitteln`, Quelle „ZEUGNIS"):
+ * Ohne eigene Adresse am Vorgang bekommt sie die Aufgaben mit der
+ * Zustaendigkeit „Führungskraft" per Link. Eine frei eingetippte Adresse muss
+ * deshalb wie im Tab Übersicht in einer freigegebenen Domain liegen
+ * (`fuehrungskraftAdresseFreigegeben`), sonst 409 — vor jedem Schreiben.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
-import { createZeugnisBewertungSchema } from "@/lib/validations/zeugnis";
+import { Prisma } from "@prisma/client";
+import { NextResponse } from "next/server";
+import type { z } from "zod";
 import crypto from "crypto";
+import { apiHandler } from "@/lib/api-handler";
+import { prisma } from "@/lib/db";
+import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { fuehrungskraftAdresseFreigegeben } from "@/lib/abteilungsaufgaben-dienst";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { nichtGefunden, offboardingZugaenglich } from "@/lib/offboarding-zugriff";
+import { createZeugnisBewertungSchema } from "@/lib/validations/zeugnis";
+
+const LOG_LABEL = "Offboarding/Zeugnis-Bewertung";
 
 const ZEUGNIS_TOKEN_VALIDITY_DAYS = 90;
-const VALID_JOB_GROUPS = ["LEHRKRAFT", "ERZIEHER", "VERWALTUNG", "SCHULLEITUNG", "SONSTIGES"] as const;
-type JobGroup = (typeof VALID_JOB_GROUPS)[number];
+
+const SCHON_VORHANDEN = "Für diesen Vorgang gibt es bereits eine Zeugnis-Bewertung.";
 
 // =============================================
 // GET /api/offboarding/[id]/zeugnis-bewertung
 // =============================================
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
-
-    const { id } = await params;
+export const GET = apiHandler(
+  { roles: HR_EDIT_ROLES, logLabel: LOG_LABEL },
+  async ({ params, session }) => {
+    if (!(await offboardingZugaenglich(session!, params.id))) return nichtGefunden();
 
     const bewertung = await prisma.zeugnisBewertung.findUnique({
-      where: { offboardingId: id },
+      where: { offboardingId: params.id },
       include: {
         ratings: true,
         hrReviewedBy: { select: { id: true, firstName: true, lastName: true } },
@@ -40,65 +53,57 @@ export async function GET(
     });
 
     if (!bewertung) {
-      return NextResponse.json({ error: "Keine Zeugnis-Bewertung für dieses Offboarding gefunden" }, { status: 404 });
+      return nichtGefunden("Für diesen Vorgang gibt es noch keine Zeugnis-Bewertung.");
     }
 
     return NextResponse.json({ data: bewertung });
-  } catch (error) {
-    console.error("[API] Zeugnis-Bewertung laden fehlgeschlagen:", error);
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
-}
+);
 
 // =============================================
 // POST /api/offboarding/[id]/zeugnis-bewertung
 // =============================================
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+export const POST = apiHandler<z.infer<typeof createZeugnisBewertungSchema>>(
+  { roles: HR_EDIT_ROLES, bodySchema: createZeugnisBewertungSchema, logLabel: LOG_LABEL },
+  async ({ params, session, body }) => {
+    const id = params.id;
+    if (!(await offboardingZugaenglich(session!, id))) return nichtGefunden();
 
-    const { id } = await params;
+    const supervisorEmail = body.supervisorEmail.trim();
+    const { jobGroup } = body;
 
-    // Body validieren
-    const body = await request.json().catch(() => null);
-    const parsed = createZeugnisBewertungSchema.safeParse(body);
-    if (!parsed.success) {
-      const firstError = parsed.error.errors[0];
-      return NextResponse.json({ error: firstError.message }, { status: 400 });
-    }
-
-    const { supervisorEmail, supervisorName, jobGroup } = parsed.data;
-
-    // Offboarding pruefen
     const offboarding = await prisma.offboardingProcess.findUnique({
       where: { id },
-      select: { id: true },
+      select: {
+        supervisorEmail: true,
+        contractEnd: { select: { supervisorEmail: true } },
+      },
     });
-
-    if (!offboarding) {
-      return NextResponse.json({ error: "Offboarding-Vorgang nicht gefunden" }, { status: 404 });
-    }
+    if (!offboarding) return nichtGefunden();
 
     // Pruefen ob bereits eine Bewertung existiert
     const existing = await prisma.zeugnisBewertung.findUnique({
       where: { offboardingId: id },
+      select: { id: true },
     });
-
     if (existing) {
-      return NextResponse.json(
-        { error: "Fuer dieses Offboarding existiert bereits eine Zeugnis-Bewertung" },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: SCHON_VORHANDEN }, { status: 409 });
+    }
+
+    // Freigabeliste wie im Tab Übersicht (Kopfkommentar). Bekannte Adressen
+    // (Fuehrungskraft am Vorgang, Vertragsende) sind immer erlaubt.
+    const freigegeben = await fuehrungskraftAdresseFreigegeben(supervisorEmail, [
+      offboarding.supervisorEmail,
+      offboarding.contractEnd?.supervisorEmail,
+    ]);
+    if (!freigegeben) {
+      return NextResponse.json({ error: MELDUNGEN.FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN }, { status: 409 });
     }
 
     // Template für die jobGroup laden
     const template = await prisma.zeugnisBewertungTemplate.findFirst({
       where: {
-        jobGroup: jobGroup as JobGroup,
+        jobGroup,
         isActive: true,
       },
       include: {
@@ -116,8 +121,8 @@ export async function POST(
 
     if (!template) {
       return NextResponse.json(
-        { error: `Kein aktives Template für die Berufsgruppe "${jobGroup}" gefunden` },
-        { status: 404 }
+        { error: "Für diese Berufsgruppe gibt es keine aktive Vorlage (Vorlagen → Zeugnis-Bewertung)." },
+        { status: 409 }
       );
     }
 
@@ -153,41 +158,48 @@ export async function POST(
     const token = crypto.randomUUID();
     const tokenExpiresAt = new Date(Date.now() + ZEUGNIS_TOKEN_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
 
-    // ZeugnisBewertung erstellen
-    const bewertung = await prisma.zeugnisBewertung.create({
-      data: {
-        offboardingId: id,
-        supervisorEmail: supervisorEmail.trim(),
-        supervisorName: supervisorName?.trim() || null,
-        jobGroup: jobGroup as JobGroup,
-        templateSnapshot,
-        token,
-        tokenExpiresAt,
-        status: "INVITED",
-        sentAt: new Date(),
-      },
-    });
-
-    // AuditLog schreiben
-    await prisma.auditLog.create({
-      data: {
-        userId: session.userId,
-        offboardingId: id,
-        processType: "OFFBOARDING",
-        action: "ZEUGNIS_BEWERTUNG_CREATED",
-        details: {
-          zeugnisBewertungId: bewertung.id,
-          jobGroup,
-          supervisorEmail: supervisorEmail.trim(),
-          templateId: template.id,
-          templateName: template.name,
-        },
-      },
-    });
+    // Bewertung und Protokoll in EINER Transaktion. Zwei gleichzeitige Klicks
+    // scheitern am Unique-Index auf offboardingId (P2002) → 409.
+    let bewertung;
+    try {
+      bewertung = await prisma.$transaction(async (tx) => {
+        const neu = await tx.zeugnisBewertung.create({
+          data: {
+            offboardingId: id,
+            supervisorEmail,
+            supervisorName: body.supervisorName?.trim() || null,
+            jobGroup,
+            templateSnapshot,
+            token,
+            tokenExpiresAt,
+            status: "INVITED",
+            sentAt: new Date(),
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            userId: session!.userId,
+            offboardingId: id,
+            processType: "OFFBOARDING",
+            action: "ZEUGNIS_BEWERTUNG_CREATED",
+            details: {
+              zeugnisBewertungId: neu.id,
+              jobGroup,
+              supervisorEmail,
+              templateId: template.id,
+              templateName: template.name,
+            },
+          },
+        });
+        return neu;
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        return NextResponse.json({ error: SCHON_VORHANDEN }, { status: 409 });
+      }
+      throw e;
+    }
 
     return NextResponse.json({ data: bewertung }, { status: 201 });
-  } catch (error) {
-    console.error("[API] Zeugnis-Bewertung erstellen fehlgeschlagen:", error);
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
-}
+);

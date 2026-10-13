@@ -53,6 +53,18 @@ export const createOffboardingSchema = z.object({
   ...fuehrungskraftAnlageFelder,
 });
 
+/**
+ * Notiz im Reiter „Notizen" (/api/offboarding/:id/notes, Anlegen und
+ * Bearbeiten). Getrimmt — eine Notiz nur aus Leerzeichen ist leer.
+ */
+export const offboardingNotizSchema = z.object({
+  content: z
+    .string({ required_error: "Die Notiz darf nicht leer sein.", invalid_type_error: "Die Notiz darf nicht leer sein." })
+    .trim()
+    .min(1, "Die Notiz darf nicht leer sein.")
+    .max(5000, "Eine Notiz darf höchstens 5000 Zeichen lang sein."),
+});
+
 export const updateOffboardingSchema = z.object({
   status: z.string().optional(),
   employeeFirstName: z.string().min(1).max(100).optional(),
