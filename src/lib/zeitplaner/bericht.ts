@@ -390,7 +390,11 @@ const AUSWERTER: Record<LaufSchluessel, Auswerter> = {
     // Ausstattung & Zugaenge (E-A22): Bemerkungen, Angaben und Hinweise nach
     // sechs Monaten — nur Anzahlen, nie Inhalte oder Vorgaenge.
     const a = b.objekt("ausstattung");
-    const fehler = probelauf ? 0 : b.zahl("fehler") + m.zahl("fehler") + a.zahl("fehler");
+    // Ausgaben aus „Ausstattung & Zugänge“ (E-A37, A4): geloescht nach Ablauf
+    // der Frist samt Kopien und Protokollen. „Ohne Frist, älter als drei
+    // Jahre“ ist nur eine Zahl, kein Befund (Feinplan A4, 1.11 Schritt 6).
+    const g = b.objekt("ausgaben");
+    const fehler = probelauf ? 0 : b.zahl("fehler") + m.zahl("fehler") + a.zahl("fehler") + g.zahl("fehler");
     return {
       problem: fehler > 0,
       versendet: 0,
@@ -399,11 +403,19 @@ const AUSWERTER: Record<LaufSchluessel, Auswerter> = {
             ["Würde löschen (Dokumente)", b.zahl("wuerdeLoeschen")],
             ["Würde leeren (individuelle E-Mails)", m.zahl("wuerdeLeeren")],
             ["Würde leeren (Ausstattung: Bemerkungen, Angaben, Hinweise)", a.zahl("wuerdeLeeren")],
+            ["Würde löschen (Ausgaben nach Ablauf der Frist)", g.zahl("wuerdeLoeschen")],
+            ["Ausgaben ohne Löschfrist, älter als drei Jahre", g.zahl("ohneFristAelterDreiJahre")],
           ]
         : [
             ["Gelöscht: Dokumente / Dateien / Ordner", `${b.zahl("geloescht")} / ${b.zahl("dateienGeloescht")} / ${b.zahl("ordnerGeloescht")}`],
             ["Geleert: individuelle E-Mails / Anhänge", `${m.zahl("geleert")} / ${m.zahl("dateienGeloescht")}`],
             ["Geleert: Ausstattung – Positionen / Hinweise", `${a.zahl("geleert")} / ${a.zahl("hinweiseGeleert")}`],
+            ["Gelöscht: Ausgaben / Rückgaben geleert", `${g.zahl("geloescht")} / ${g.zahl("rueckgabenGeleert")}`],
+            [
+              "Gelöscht: Übergabe- und Rückgabeprotokolle – hochgeladen / erzeugt",
+              `${g.zahl("protokolleGeloescht")} / ${g.zahl("erzeugteProtokolleGeloescht")}`,
+            ],
+            ["Ausgaben ohne Löschfrist, älter als drei Jahre", g.zahl("ohneFristAelterDreiJahre")],
             ["Fehler", fehler, fehler > 0],
           ],
       schritte: [],

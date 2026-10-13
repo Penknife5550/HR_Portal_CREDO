@@ -7,58 +7,216 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
+// =============================================
+// System-Vorlagen (Brief-Vorlagen mit isSystem = true)
+// =============================================
+
 /**
- * Idempotentes Seeding der System-Dokumentvorlagen (z.B. Fuehrungszeugnis-Antrag).
- * Die Quelldatei liegt als committetes Asset unter public/system-dokumente/ und
- * wird ins Prod-Image kopiert (Dockerfile COPY public). Bei Inhaltsaenderung
- * (Hash) wird der Eintrag aktualisiert. Platzhalter sind bekannt (feste Vorlage),
- * daher keine docx-Parsing-Abhaengigkeit noetig.
- * Nicht-kritisch: Fehler werden geloggt, brechen den Start NICHT ab.
+ * Die System-Vorlagen, die der Seed-Check bei jedem Start sicherstellt. Die
+ * Quelldateien liegen als committete Assets unter public/system-dokumente/ und
+ * kommen mit `COPY public` ins Prod-Image. Die Platzhalter stehen hier fest
+ * (keine docx-Abhaengigkeit im Container); src/__tests__/lib/system-
+ * vorlagen.test.ts haelt sie gegen `extractPlaceholders` der Datei.
+ *
+ * Suchschluessel ist `{ isSystem: true, modul, originalName }` – NICHT der Name:
+ * Den pflegt HR in Brief-Vorlagen, und der alte Seed legte nach einer
+ * Umbenennung ein Duplikat an. Das MODUL einer System-Vorlage ist fest:
+ * `PATCH /api/brief-vorlagen/[id]` weist eine Aenderung mit 409 ab, der
+ * Bearbeiten-Dialog sperrt das Feld (`systemVorlageModulGesperrt` in
+ * src/lib/brief-vorlagen-filter.ts). Sonst faende der Seed die umgestellte
+ * Zeile nicht mehr und legte eine zweite an, und der Loeschlauf der Protokolle
+ * (`PROTOKOLL_SYSTEM_VORLAGEN`) faende ihre erzeugten Dokumente nicht mehr.
+ * Die beiden Ausstattungsprotokolle erzeugt
+ * scripts/system-vorlagen/ausstattungsprotokolle.js (A4, G19).
+ *
+ * `aktivBeiAnlage` gilt NUR beim Anlegen; danach gehoert der Schalter HR. Das
+ * Uebergabeprotokoll kommt ausgeschaltet (Einschalten mit dem Pilot, nach MAV
+ * und DSB), das Rueckgabeprotokoll eingeschaltet. Auch `description` schreibt
+ * der Seed nur beim Anlegen – sie steht in Brief-Vorlagen vor HR, deshalb ohne
+ * interne Paketnamen (Test).
  */
-async function ensureSystemDocumentTemplates(prisma) {
-  try {
-    const assetPath = path.join(
-      process.cwd(),
-      "public",
-      "system-dokumente",
-      "fuehrungszeugnis-antrag.docx",
-    );
-    if (!fs.existsSync(assetPath)) {
-      console.log("System-Vorlage (Fuehrungszeugnis) Asset fehlt — uebersprungen.");
-      return;
-    }
-    const buf = fs.readFileSync(assetPath);
-    const hash = crypto.createHash("sha256").update(buf).digest("hex");
-    const name = "Aufforderung erweitertes Führungszeugnis";
-    const data = {
-      name,
-      description:
-        "Anschreiben an die Lehrkraft (§ 30a BZRG) — editierbare System-Vorlage",
-      modul: "ONBOARDING",
-      dateipfad: assetPath,
-      originalName: "Fuehrungszeugnis-Antrag.docx",
-      fileSize: buf.length,
-      hash,
-      platzhalter: ["anrede", "vorname", "nachname", "strasse", "plz", "ort"],
-      isSystem: true,
-      organizationId: null,
-      isActive: true,
+const SYSTEM_VORLAGEN = [
+  {
+    datei: "fuehrungszeugnis-antrag.docx",
+    name: "Aufforderung erweitertes Führungszeugnis",
+    description: "Anschreiben an die Lehrkraft (§ 30a BZRG) — editierbare System-Vorlage",
+    modul: "ONBOARDING",
+    originalName: "Fuehrungszeugnis-Antrag.docx",
+    platzhalter: ["anrede", "vorname", "nachname", "strasse", "plz", "ort"],
+    aktivBeiAnlage: true,
+  },
+  {
+    datei: "uebergabeprotokoll-ausstattung.docx",
+    name: "Übergabeprotokoll Ausstattung",
+    description:
+      "Eine Seite je ausgebender Stelle mit den vermerkten Ausgaben und Unterschriftszeilen — System-Vorlage (Ausstattung & Zugänge)",
+    modul: "ONBOARDING",
+    originalName: "Uebergabeprotokoll-Ausstattung.docx",
+    platzhalter: [
+      "ausgabe_gegenstand",
+      "ausgabe_kennung",
+      "ausgabe_stelle",
+      "ausgabe_uebergeben_am",
+      "ausgaben_je_stelle",
+      "eintrittsdatum",
+      "gegenstaende",
+      "mandant",
+      "nachname",
+      "vorgangsnummer",
+      "vorname",
+    ],
+    aktivBeiAnlage: false,
+  },
+  {
+    datei: "rueckgabeprotokoll-ausstattung.docx",
+    name: "Rückgabeprotokoll Ausstattung",
+    description:
+      "Eine Seite je zuständiger Stelle mit den Rückgaben und ihrem Zustand (offene leer zum Ausfüllen) — System-Vorlage (Ausstattung & Zugänge)",
+    modul: "OFFBOARDING",
+    originalName: "Rueckgabeprotokoll-Ausstattung.docx",
+    platzhalter: [
+      "gegenstaende",
+      "letzter_arbeitstag",
+      "mandant",
+      "nachname",
+      "rueckgabe_am",
+      "rueckgabe_gegenstand",
+      "rueckgabe_kennung",
+      "rueckgabe_stelle",
+      "rueckgabe_zustand",
+      "rueckgaben_je_stelle",
+      "vorgangsnummer",
+      "vorname",
+    ],
+    aktivBeiAnlage: true,
+  },
+];
+
+/** Pfad des Assets einer System-Vorlage (wie bisher absolut gespeichert). */
+function systemVorlagenPfad(vorlage) {
+  return path.join(process.cwd(), "public", "system-dokumente", vorlage.datei);
+}
+
+/** Gleiche Platzhalter, unabhaengig von der Reihenfolge? */
+function gleichePlatzhalter(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  const x = [...a].map(String).sort();
+  const y = [...b].map(String).sort();
+  return x.every((w, i) => w === y[i]);
+}
+
+/**
+ * Was der Seed-Check mit EINER System-Vorlage tut (rein, ohne Datenbank).
+ *
+ * @param vorlage    Eintrag aus SYSTEM_VORLAGEN
+ * @param vorhandene Zeilen mit `{ isSystem: true, modul, originalName }`, die
+ *                   aelteste zuerst (`orderBy: { createdAt: "asc" }`), je mit
+ *                   `isActive`
+ * @param asset      `{ pfad, hash, groesse }` der Datei
+ * @returns `{ aktion: "ANLEGEN" | "AKTUALISIEREN" | "AKTUELL", id?, data?, duplikate }`
+ *
+ * Aktualisiert wird die AELTESTE EINGESCHALTETE Zeile (ohne eingeschaltete die
+ * aelteste), und nur Datei, Hash, Groesse und Platzhalter – Name, Beschreibung,
+ * Aktiv-Schalter und Mandant pflegt HR (der alte Seed schaltete eine
+ * abgeschaltete Vorlage wieder ein). Warum die eingeschaltete: Brief-Vorlagen
+ * kennt kein Loeschen, ein Duplikat bereinigt HR also durch Deaktivieren
+ * (Review A4d). Ginge der neue Stand an die aelteste Zeile, obwohl HR gerade
+ * diese abgeschaltet hat, veraltete die Vorlage, mit der HR arbeitet, still.
+ *
+ * `duplikate` zaehlt nur WEITERE eingeschaltete Zeilen: Ein deaktiviertes
+ * Duplikat ist bereinigt und loest keine Warnung mehr aus – sonst stuende sie
+ * bei jedem Start im Protokoll, und HR koennte nichts dagegen tun. Die uebrigen
+ * Zeilen bleiben unberuehrt; geloescht wird nichts. Ein fehlendes `isActive`
+ * gilt als eingeschaltet (das Verhalten vor Review A4d).
+ */
+function planeSystemVorlage(vorlage, vorhandene, asset) {
+  const eingeschaltet = vorhandene.filter((zeile) => zeile.isActive !== false);
+  const duplikate = Math.max(0, eingeschaltet.length - 1);
+  const datei = {
+    dateipfad: asset.pfad,
+    fileSize: asset.groesse,
+    hash: asset.hash,
+    platzhalter: vorlage.platzhalter,
+  };
+  if (vorhandene.length === 0) {
+    return {
+      aktion: "ANLEGEN",
+      duplikate,
+      data: {
+        name: vorlage.name,
+        description: vorlage.description,
+        modul: vorlage.modul,
+        originalName: vorlage.originalName,
+        ...datei,
+        isSystem: true,
+        organizationId: null,
+        isActive: vorlage.aktivBeiAnlage,
+      },
     };
-    const existing = await prisma.documentTemplate.findFirst({
-      where: { name, modul: "ONBOARDING" },
-      select: { id: true, hash: true, dateipfad: true },
-    });
-    if (!existing) {
-      await prisma.documentTemplate.create({ data });
-      console.log("System-Vorlage (Fuehrungszeugnis) angelegt.");
-    } else if (existing.hash !== hash || existing.dateipfad !== assetPath) {
-      await prisma.documentTemplate.update({ where: { id: existing.id }, data });
-      console.log("System-Vorlage (Fuehrungszeugnis) aktualisiert.");
-    } else {
-      console.log("System-Vorlage (Fuehrungszeugnis) ist aktuell.");
+  }
+  const ziel = eingeschaltet[0] ?? vorhandene[0];
+  const aktuell =
+    ziel.hash === asset.hash &&
+    ziel.dateipfad === asset.pfad &&
+    gleichePlatzhalter(ziel.platzhalter, vorlage.platzhalter);
+  if (aktuell) return { aktion: "AKTUELL", id: ziel.id, duplikate };
+  return { aktion: "AKTUALISIEREN", id: ziel.id, duplikate, data: datei };
+}
+
+/**
+ * Idempotentes Seeding der System-Dokumentvorlagen (SYSTEM_VORLAGEN). Je
+ * Vorlage: Asset lesen, Zeilen zum Suchschluessel lesen (`findMany`, die
+ * aelteste zuerst), anlegen, aktualisieren oder nichts tun
+ * (`planeSystemVorlage`). Mehr als eine EINGESCHALTETE Zeile: Warnung
+ * „Duplikat der System-Vorlage … – bitte in Brief-Vorlagen bereinigen“ im
+ * Protokoll, nichts wird geloescht. Bereinigen heisst dort: alle bis auf eine
+ * deaktivieren.
+ * Nicht-kritisch: Fehler werden je Vorlage geloggt, brechen weder die anderen
+ * Vorlagen noch den Start ab.
+ */
+async function ensureSystemDocumentTemplates(prisma, vorlagen = SYSTEM_VORLAGEN) {
+  for (const vorlage of vorlagen) {
+    try {
+      const pfad = systemVorlagenPfad(vorlage);
+      if (!fs.existsSync(pfad)) {
+        console.log("System-Vorlage (" + vorlage.name + ") Asset fehlt — uebersprungen.");
+        continue;
+      }
+      const buf = fs.readFileSync(pfad);
+      const hash = crypto.createHash("sha256").update(buf).digest("hex");
+      const vorhandene = await prisma.documentTemplate.findMany({
+        where: { isSystem: true, modul: vorlage.modul, originalName: vorlage.originalName },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, hash: true, dateipfad: true, platzhalter: true, isActive: true },
+      });
+      const plan = planeSystemVorlage(vorlage, vorhandene, { pfad, hash, groesse: buf.length });
+      if (plan.duplikate > 0) {
+        console.warn(
+          "Duplikat der System-Vorlage " +
+            vorlage.name +
+            " (" +
+            vorlage.modul +
+            ", " +
+            vorlage.originalName +
+            "): " +
+            plan.duplikate +
+            " weitere eingeschaltete Zeile(n) – bitte in Brief-Vorlagen bereinigen (alle bis auf eine deaktivieren). Aktualisiert wird nur die aelteste eingeschaltete.",
+        );
+      }
+      if (plan.aktion === "ANLEGEN") {
+        await prisma.documentTemplate.create({ data: plan.data });
+        console.log(
+          "System-Vorlage (" + vorlage.name + ") angelegt" + (plan.data.isActive ? "." : " (ausgeschaltet)."),
+        );
+      } else if (plan.aktion === "AKTUALISIEREN") {
+        await prisma.documentTemplate.update({ where: { id: plan.id }, data: plan.data });
+        console.log("System-Vorlage (" + vorlage.name + ") aktualisiert.");
+      } else {
+        console.log("System-Vorlage (" + vorlage.name + ") ist aktuell.");
+      }
+    } catch (error) {
+      console.error("System-Vorlage-Seed Fehler (nicht kritisch, " + vorlage.name + "):", error.message);
     }
-  } catch (error) {
-    console.error("System-Vorlage-Seed Fehler (nicht kritisch):", error.message);
   }
 }
 
@@ -1887,6 +2045,168 @@ async function migriereMitAusstattung(prisma) {
   }
 }
 
+// =============================================
+// Einmalige Datenmigration: Hinweis an den pauschalen Sperrpunkten der
+// Offboarding-Vorlagen (Ausstattung & Zugaenge, A4; Feinplan G25, E-A32)
+// =============================================
+const OFFBOARDING_SPERRPUNKTE_MARKER = "OFFBOARDING_SPERRPUNKTE_V1";
+
+/*
+ * JS-Kopie von SPERRPUNKT_HINWEIS und SPERRPUNKT_HINWEISE
+ * (src/lib/offboarding-sperrpunkte.ts) — im Container gibt es kein tsx. Der Test
+ * src/__tests__/lib/offboarding-sperrpunkte-migration.test.ts haelt beide
+ * Fassungen gleich; wer den Wortlaut oder einen Titel dort aendert, aendert ihn
+ * hier mit (der Test sagt es).
+ */
+const SPERRPUNKT_HINWEIS_JS =
+  "Gemeint ist alles, was nicht als eigene Aufgabe unter „Ausstattung & Zugänge“ steht – " +
+  "was das Portal als ausgegeben kennt, bekommt eine eigene Rücknahme- bzw. Sperraufgabe.";
+
+const SPERRPUNKT_HINWEISE_JS = Object.freeze({
+  // Standard-Offboarding und Bildungseinrichtung
+  "Rueckgabe aller Arbeitsmittel": SPERRPUNKT_HINWEIS_JS,
+  "IT-Zugaenge zur Sperrung vorbereiten": SPERRPUNKT_HINWEIS_JS,
+  "IT-Zugaenge und E-Mail-Konto sperren": SPERRPUNKT_HINWEIS_JS,
+  "Physische Zugaenge entziehen (Schlüssel, Karten)": SPERRPUNKT_HINWEIS_JS,
+  // Beamte
+  "Rueckgabe Dienstausweis und Arbeitsmittel": SPERRPUNKT_HINWEIS_JS,
+  "IT-Zugaenge und Dienstmail sperren": SPERRPUNKT_HINWEIS_JS,
+  "Physische Zugaenge entziehen": SPERRPUNKT_HINWEIS_JS,
+  // Minijob
+  "Arbeitsmittel zurueckgeben": SPERRPUNKT_HINWEIS_JS,
+  "IT-Zugaenge sperren (falls vorhanden)": SPERRPUNKT_HINWEIS_JS,
+  "Schlüssel / Zugangskarten einziehen": SPERRPUNKT_HINWEIS_JS,
+});
+
+/** Wie `sperrpunktHinweis` in src/lib/offboarding-sperrpunkte.ts. */
+function sperrpunktHinweisJs(vorlagenName, punkt) {
+  if (!istOffboardingVorlagenNameJs(vorlagenName)) return null;
+  const titel = punkt.title == null ? "" : String(punkt.title);
+  if (!Object.prototype.hasOwnProperty.call(SPERRPUNKT_HINWEISE_JS, titel)) return null;
+  const beschreibung = punkt.description == null ? "" : String(punkt.description);
+  if (beschreibung.trim() !== "") return null;
+  return SPERRPUNKT_HINWEISE_JS[titel];
+}
+
+/**
+ * Plant die Migration — rein und ohne Datenbank, damit ein Test sie halten kann.
+ *
+ * Eingabe:
+ *   vorlagen        [{ id, name }]                              Checklisten-Vorlagen
+ *   vorlagenPunkte  [{ id, templateId, title, description }]    Kandidaten
+ *
+ * Einen Hinweis bekommt ein Punkt nur, wenn
+ *   - seine Vorlage eine Offboarding-Vorlage ist (Name beginnt mit „Offboarding:"),
+ *   - sein Titel EXAKT in SPERRPUNKT_HINWEISE_JS steht (ein geaenderter Titel
+ *     heisst: HR hat ihn gepflegt) und
+ *   - seine Beschreibung leer ist (null, "" oder nur Leerraum).
+ * Der Titel bleibt immer. Gezaehlt wird, was trotz passenden Titels stehen
+ * bleibt: `mitBeschreibung` (in einer Offboarding-Vorlage, aber schon mit
+ * Hinweis) und `andereVorlage` (gleicher Titel ausserhalb einer
+ * Offboarding-Vorlage bzw. Vorlage unbekannt).
+ *
+ * Von Bauart idempotent: Nach einem Lauf tragen die Punkte ihren Hinweis, ein
+ * zweiter plant nichts mehr.
+ */
+function planeOffboardingSperrpunkte({ vorlagen, vorlagenPunkte }) {
+  const nameNachId = new Map((vorlagen || []).map((v) => [v.id, v.name]));
+  const punkte = [];
+  let mitBeschreibung = 0;
+  let andereVorlage = 0;
+  for (const p of vorlagenPunkte || []) {
+    const titel = p.title == null ? "" : String(p.title);
+    if (!Object.prototype.hasOwnProperty.call(SPERRPUNKT_HINWEISE_JS, titel)) continue;
+    const vorlagenName = nameNachId.get(p.templateId);
+    if (!istOffboardingVorlagenNameJs(vorlagenName)) {
+      andereVorlage++;
+      continue;
+    }
+    const hinweis = sperrpunktHinweisJs(vorlagenName, p);
+    if (hinweis === null) {
+      mitBeschreibung++;
+      continue;
+    }
+    punkte.push({
+      id: p.id,
+      templateId: p.templateId,
+      title: titel,
+      // Der gelesene Wert steht im WHERE — und ist der Rueckweg.
+      von: p.description == null ? null : p.description,
+      nach: hinweis,
+    });
+  }
+  return { punkte, mitBeschreibung, andereVorlage };
+}
+
+/**
+ * Traegt den Hinweis an den pauschalen Sperrpunkten der Offboarding-Vorlagen
+ * nach (Plan: `planeOffboardingSperrpunkte`).
+ *
+ * WARUM: Seit A4 bekommt die ausgebende Stelle beim Austritt je Stueck, das das
+ * Portal als ausgegeben kennt, eine eigene Ruecknahme- bzw. Sperraufgabe.
+ * Daneben stehen die pauschalen Punkte („Rueckgabe aller Arbeitsmittel",
+ * „IT-Zugaenge sperren" …). Ihre Titel bleiben (Betreffzeilen, Statistiken,
+ * Warnung „ähnlicher Vorlagenpunkt"); der Hinweis sagt der Stelle, was gemeint
+ * ist. Nur Vorlagenpunkte — laufende Vorgaenge behalten ihre Kopie.
+ *
+ * Laeuft vor dem Seed: Auf einer frischen Datenbank findet sie nichts und setzt
+ * nur ihren Merker — prisma/seed.ts legt die Vorlagen dann schon mit Hinweis an
+ * (`mitSperrpunktHinweisen`).
+ *
+ * Idempotenz: Merker in `system_migrations`, geschrieben in DERSELBEN
+ * (Array-)Transaktion wie die Updates — entweder alles oder nichts. Jedes
+ * Update traegt Titel und gelesene Beschreibung im WHERE und schreibt nur
+ * `description`. Fehler werden geloggt und brechen den Start nicht ab; ohne
+ * Merker laeuft die Migration beim naechsten Start erneut (bis dahin fehlt nur
+ * der Hinweis).
+ */
+async function migriereOffboardingSperrpunkte(prisma) {
+  try {
+    if (await migrationErledigt(prisma, OFFBOARDING_SPERRPUNKTE_MARKER)) return;
+
+    const [vorlagen, vorlagenPunkte] = await Promise.all([
+      prisma.checklistTemplate.findMany({ select: { id: true, name: true } }),
+      prisma.checklistTemplateItem.findMany({
+        where: { title: { in: Object.keys(SPERRPUNKT_HINWEISE_JS) } },
+        select: { id: true, templateId: true, title: true, description: true },
+        orderBy: [{ templateId: "asc" }, { orderIndex: "asc" }],
+      }),
+    ]);
+
+    const plan = planeOffboardingSperrpunkte({ vorlagen, vorlagenPunkte });
+
+    const schreibvorgaenge = plan.punkte.map((p) =>
+      prisma.checklistTemplateItem.updateMany({
+        where: { id: p.id, title: p.title, description: p.von },
+        data: { description: p.nach },
+      }),
+    );
+    schreibvorgaenge.push(
+      markiereMigration(prisma, OFFBOARDING_SPERRPUNKTE_MARKER, {
+        geprueft: { vorlagen: vorlagen.length, kandidaten: vorlagenPunkte.length },
+        // Der Rueckweg: jeder Punkt mit seiner alten (leeren) Beschreibung.
+        punkte: plan.punkte.map((p) => ({ id: p.id, templateId: p.templateId, title: p.title, von: p.von })),
+        mitBeschreibung: plan.mitBeschreibung,
+        andereVorlage: plan.andereVorlage,
+      }),
+    );
+
+    const ergebnisse = await prisma.$transaction(schreibvorgaenge);
+    const gesetzt = ergebnisse
+      .slice(0, plan.punkte.length)
+      .reduce((summe, e) => summe + (e && typeof e.count === "number" ? e.count : 0), 0);
+
+    console.log(
+      "Offboarding-Sperrpunkte (" + OFFBOARDING_SPERRPUNKTE_MARKER + "): " +
+        gesetzt + " Vorlagenpunkte mit Hinweis versehen, " +
+        plan.mitBeschreibung + " mit eigener Beschreibung unveraendert.",
+    );
+  } catch (error) {
+    // Nicht kritisch fuer den Start: Ohne Hinweis stehen die Punkte wie bisher.
+    console.error("Migration " + OFFBOARDING_SPERRPUNKTE_MARKER + " fehlgeschlagen:", error.message);
+  }
+}
+
 async function main() {
   const prisma = new PrismaClient();
   try {
@@ -1909,6 +2229,10 @@ async function main() {
     // Ausstattung & Zugaenge (A2, Regel 2): Bestand ohne Merker der
     // Schrittliste auf false — nach dem Schema-Abgleich, vor dem Seed.
     await migriereMitAusstattung(prisma);
+    // Ausstattung & Zugaenge (A4, G25): Hinweis an den pauschalen Sperrpunkten
+    // der Offboarding-Vorlagen — vor dem Seed; auf einer frischen Datenbank nur
+    // der Merker (prisma/seed.ts legt die Vorlagen schon mit Hinweis an).
+    await migriereOffboardingSperrpunkte(prisma);
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {
@@ -1937,6 +2261,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  SYSTEM_VORLAGEN,
+  planeSystemVorlage,
+  ensureSystemDocumentTemplates,
   migrationsQuellen,
   RENTE_SCHRITT,
   LEGACY_DISPLAY_ORDER,
@@ -1979,4 +2306,10 @@ module.exports = {
   SUPERVISOR_MIT_AUSSTATTUNG_MARKER,
   planeMitAusstattung,
   migriereMitAusstattung,
+  OFFBOARDING_SPERRPUNKTE_MARKER,
+  SPERRPUNKT_HINWEIS_JS,
+  SPERRPUNKT_HINWEISE_JS,
+  sperrpunktHinweisJs,
+  planeOffboardingSperrpunkte,
+  migriereOffboardingSperrpunkte,
 };

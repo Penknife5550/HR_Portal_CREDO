@@ -75,6 +75,7 @@ import { GET as OFFBOARDING_DOWNLOAD } from "@/app/api/offboarding/[id]/document
 import { POST as CIVIL_SERVICE_UPLOAD } from "@/app/api/civil-service/[id]/documents/route";
 import { POST as OFFBOARDING_UPLOAD } from "@/app/api/offboarding/[id]/documents/route";
 import { POST as FRAGEBOGEN_UPLOAD } from "@/app/api/fragebogen/[token]/documents/route";
+import { POST as ONBOARDING_UPLOAD } from "@/app/api/onboarding/[id]/documents/route";
 import { NextRequest } from "next/server";
 
 const HR_SESSION = {
@@ -365,5 +366,63 @@ describe("Speichername beim Dokument-Upload", () => {
       /^uploads\/civil-service\/vb-1\/\d+-[0-9a-f]{8}-passwd$/,
     );
     expect(String(daten.filePath)).not.toContain("..");
+  });
+});
+
+// =============================================
+// Ausstattung & Zugaenge (A4, S34): unterschriebenes Uebergabeprotokoll
+// =============================================
+
+describe("Uebergabeprotokoll: Speichername und Download-Name", () => {
+  /**
+   * Der Upload von HR (POST /api/onboarding/[id]/documents) folgt nicht dem
+   * Muster oben (`sanitizeFilename` mit Originalnamen im Pfad), sondern dem der
+   * oeffentlichen Uploads: Speichername `<dokumentId>.<ext>` mit der Endung des
+   * AUS DEN BYTES erkannten Typs, Anzeigename `anzeigeNameBereinigen`. Der
+   * Download liefert ihn als ASCII-Namen mit derselben Endung aus.
+   */
+  const VORGANG = "3f1c2a4e-5b6d-4e7f-8a9b-0c1d2e3f4a5b";
+
+  it("legt <dokumentId>.pdf ab, speichert den bereinigten Namen und liefert ihn als .pdf aus", async () => {
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue({ id: VORGANG, organizationId: "org-1" });
+    const form = new FormData();
+    // PDF-Bytes unter einem Namen, der unter Windows ausfuehrbar waere.
+    form.append(
+      "datei",
+      new File([Buffer.from("%PDF-1.4\n%%EOF\n", "latin1")], "Übergabeprotokoll Müller.hta", { type: "text/html" }),
+    );
+    form.append("type", "UEBERGABEPROTOKOLL");
+
+    const res = await ONBOARDING_UPLOAD(
+      new NextRequest(`http://localhost:3000/api/onboarding/${VORGANG}/documents`, { method: "POST", body: form }),
+      { params: Promise.resolve({ id: VORGANG }) },
+    );
+    expect(res.status).toBe(201);
+
+    const [daten] = angelegteDaten(mockPrisma.document.create);
+    expect(daten.fileName).toBe("Übergabeprotokoll Müller.pdf");
+    expect(daten.mimeType).toBe("application/pdf");
+    expect(daten.filePath).toBe(`uploads/${VORGANG}/${daten.id}.pdf`);
+    expect(String(daten.filePath)).not.toMatch(/[^\x00-\x7F]/);
+    expect(mockWriteFile).toHaveBeenCalledTimes(1);
+    expect(String(mockWriteFile.mock.calls[0][0]).replace(/\\/g, "/")).toContain(`${VORGANG}/${daten.id}.pdf`);
+
+    // Der Download liefert genau diesen Datensatz aus.
+    mockPrisma.document.findFirst.mockResolvedValue({
+      id: daten.id,
+      onboardingId: VORGANG,
+      type: "UEBERGABEPROTOKOLL",
+      fileName: daten.fileName,
+      filePath: daten.filePath,
+      mimeType: daten.mimeType,
+    });
+    const download = await ONBOARDING_DOWNLOAD(
+      new NextRequest(`http://localhost:3000/api/onboarding/${VORGANG}/documents/${daten.id}`),
+      { params: Promise.resolve({ id: VORGANG, docId: String(daten.id) }) },
+    );
+    expect(download.status).toBe(200);
+    expect(download.headers.get("Content-Type")).toBe("application/pdf");
+    expect(download.headers.get("Content-Disposition")).toBe('attachment; filename="_bergabeprotokoll_M_ller.pdf"');
+    expect(download.headers.get("Content-Disposition")).toMatch(NUR_ASCII_DATEINAME);
   });
 });

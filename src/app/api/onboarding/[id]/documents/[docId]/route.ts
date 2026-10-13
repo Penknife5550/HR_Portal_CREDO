@@ -4,6 +4,8 @@
  * GET   – Dokument herunterladen (Portal-Rollen, nur im eigenen Mandanten)
  * PATCH – Ablaufdatum eines befristeten Nachweises setzen, aendern oder loeschen,
  *         oder ihn als unbefristet kennzeichnen (Paket 4, Z1)
+ * DELETE – ein hochgeladenes Uebergabeprotokoll entfernen (NUR der Typ
+ *         UEBERGABEPROTOKOLL; Ausstattung & Zugaenge A4, Review A4d)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,12 +15,15 @@ import { canAccessProcess, HR_EDIT_ROLES, PORTAL_ROLES } from "@/lib/permissions
 import {
   anzeigeNameBereinigen,
   asciiFilename,
+  dateiLoeschen,
   DOCX_MIME,
   ENDUNG_FUER_DATEITYP,
   fehlerCode,
   istErkannterDateityp,
   pfadInWurzeln,
 } from "@/lib/file-upload";
+import { PROTOKOLL_UPLOAD_MELDUNGEN, PROTOKOLL_UPLOAD_TYP } from "@/lib/ausgaben";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 import {
   ablaufKalendertag,
   istAbgelaufen,
@@ -455,6 +460,113 @@ export async function PATCH(
     return NextResponse.json(aktualisiert);
   } catch (error) {
     console.error("Fehler beim Aendern des Ablaufdatums:", error);
+    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+  }
+}
+
+// =============================================
+// DELETE /api/onboarding/:id/documents/:docId
+// =============================================
+/**
+ * Ein hochgeladenes Uebergabeprotokoll entfernen (Ausstattung & Zugaenge A4,
+ * G19, Review A4d) – NUR den Typ `UEBERGABEPROTOKOLL`.
+ *
+ * Warum es den Weg braucht: HR laedt das unterschriebene Protokoll ueber
+ * `POST /api/onboarding/[id]/documents` hoch. Ohne diesen Weg liess sich eine
+ * Fehlablage – etwa das Protokoll einer anderen Person mit Name, Unterschrift
+ * und Kennungen – weder berichtigen noch loeschen (Art. 5 Abs. 1 lit. d,
+ * Art. 17 DSGVO): Der einzige bisherige Loeschweg, der DELETE der
+ * Fragebogen-Route, nimmt den Typ bewusst aus, und der Lauf „Aufbewahrung“
+ * loescht erst mit der letzten Ausgabe des Vorgangs – bei einem Stueck, das
+ * VERBLEIBT oder ohne Anlass AUSGEGEBEN bleibt, nie.
+ *
+ *   - Nur HR_EDIT_ROLES (403); Mandant per `canAccessProcess`. Unbekannter
+ *     Vorgang und fremder Mandant ergeben dieselbe 404, ebenso unbekanntes
+ *     Dokument, Dokument eines anderen Vorgangs und JEDER andere Typ – die
+ *     Bedingung `type = UEBERGABEPROTOKOLL` steht in der Abfrage selbst.
+ *     Nachweise der Person loescht dieser Weg nie.
+ *   - Unabhaengig vom Status des Vorgangs: Eine Fehlablage muss sich auch
+ *     nach Abschluss oder Absage berichtigen lassen.
+ *   - Datei zuerst, dann die Zeile (wie der Loeschlauf, S35): `dateiLoeschen`
+ *     nur unter `uploads/<onboardingId>` – dort legt die Upload-Route ab.
+ *     „geloescht“ und „fehlte“ erlauben das Loeschen der Zeile; bei „fehler“
+ *     (Rechte, Pfad ausserhalb) bleibt sie stehen (500), und ein zweiter
+ *     Versuch geht. Scheitert die Transaktion nach dem Loeschen der Datei,
+ *     findet der naechste Versuch „fehlte“ und raeumt die Zeile ab.
+ *   - Zeile (bedingt per `deleteMany` mit Vorgang und Typ) und AuditLog
+ *     `DOCUMENT_DELETED` in EINER Transaktion – im Protokoll nur ID, Typ und
+ *     das Ergebnis an der Datei, nie der Dateiname. Hat ein gleichzeitiger
+ *     zweiter Aufruf die Zeile schon geloescht: 404, kein zweiter Eintrag.
+ */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string; docId: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+    }
+    if (!HR_EDIT_ROLES.includes(session.role)) {
+      return NextResponse.json(
+        { error: "Keine Berechtigung zum Bearbeiten dieses Vorgangs" },
+        { status: 403 }
+      );
+    }
+
+    const { id, docId } = await params;
+
+    const onboarding = await prisma.onboardingProcess.findUnique({
+      where: { id },
+      select: { id: true, organizationId: true },
+    });
+    if (!onboarding || !(await canAccessProcess(session, onboarding.organizationId))) {
+      return NextResponse.json({ error: VORGANG_NICHT_GEFUNDEN }, { status: 404 });
+    }
+
+    // Vorgang UND Typ stehen in der Abfrage: Ein anderes Dokument dieses
+    // Vorgangs ist fuer diesen Weg genauso unbekannt wie ein fremdes.
+    const dokument = await prisma.document.findFirst({
+      where: { id: docId, onboardingId: onboarding.id, type: PROTOKOLL_UPLOAD_TYP },
+      select: { id: true, filePath: true },
+    });
+    if (!dokument) {
+      return NextResponse.json({ error: DOKUMENT_NICHT_GEFUNDEN }, { status: 404 });
+    }
+
+    // Datei zuerst – nur unter dem Ordner DIESES Vorgangs (nie `uploads` als
+    // Ganzes, darunter liegen auch die BEM-Anlagen). `dateiLoeschen` wirft nie.
+    const datei = await dateiLoeschen(path.resolve(process.cwd(), dokument.filePath), [
+      path.join(process.cwd(), "uploads", onboarding.id),
+    ]);
+    if (datei === "fehler") {
+      console.error("[Onboarding/Dokumente] Uebergabeprotokoll: Datei nicht geloescht:", dokument.id);
+      return NextResponse.json({ error: PROTOKOLL_UPLOAD_MELDUNGEN.ENTFERNEN_DATEI_FEHLER }, { status: 500 });
+    }
+
+    const geloescht = await prisma.$transaction(async (tx) => {
+      const zeile = await tx.document.deleteMany({
+        where: { id: dokument.id, onboardingId: onboarding.id, type: PROTOKOLL_UPLOAD_TYP },
+      });
+      if (zeile.count === 0) return false;
+      await tx.auditLog.create({
+        data: {
+          userId: session.userId,
+          onboardingId: onboarding.id,
+          processType: "ONBOARDING",
+          action: "DOCUMENT_DELETED",
+          details: { documentId: dokument.id, dokumentTyp: PROTOKOLL_UPLOAD_TYP, datei },
+        },
+      });
+      return true;
+    });
+    if (!geloescht) {
+      return NextResponse.json({ error: DOKUMENT_NICHT_GEFUNDEN }, { status: 404 });
+    }
+
+    return NextResponse.json({ id: dokument.id, meldung: PROTOKOLL_UPLOAD_MELDUNGEN.ENTFERNT });
+  } catch (error) {
+    console.error("[Onboarding/Dokumente] Fehler beim Entfernen des Dokuments:", fehlerKennung(error));
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
 }

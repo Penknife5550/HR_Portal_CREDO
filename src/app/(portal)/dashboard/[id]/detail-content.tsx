@@ -105,6 +105,8 @@ import {
 } from "@/components/ausstattung/ausstattung-karte";
 import type { AusstattungAktionBody } from "@/components/ausstattung/ausstattung-dialoge";
 import type { AusgabenAktionBody } from "@/components/ausgaben/ausgaben-dialoge";
+import { ProtokollUpload } from "@/components/ausgaben/protokoll-upload";
+import { PROTOKOLL_UPLOAD_TYP } from "@/lib/ausgaben";
 import { AufgabeZusatz, EntfaelltHaken, istEntfallen } from "@/components/ausstattung/aufgabe-zusatz";
 import { AbschlussDialog, abschlussSenden } from "@/components/ausstattung/abschluss-dialog";
 import {
@@ -3352,6 +3354,21 @@ export function TabDocuments({
           // Vorgangsnummer unter dem Titel (Mockup P:1299).
           kopf={{ name: mitarbeiterName(data), vorgangsnummer: data.displayId }}
           fokusZiel={NACHFORDERUNG_FOKUSZIEL}
+        />
+      )}
+
+      {/* Unterschriebenes Uebergabeprotokoll (Ausstattung & Zugaenge A4, S34)
+          — direkt ueber der Liste, in der es nach dem Hochladen erscheint.
+          Nur mit Bearbeitungsrecht (wie die Routen) und nur, wenn der Vorgang
+          Ausgaben hat, die zurueckkommen, oder schon ein Protokoll traegt.
+          Die Karte listet die hochgeladenen Protokolle mit „Entfernen …“
+          (Review A4d: eine Fehlablage muss sich berichtigen lassen). */}
+      {canEdit && (
+        <ProtokollUpload
+          onboardingId={onboardingId}
+          protokoll={data.ausstattung?.protokoll}
+          dokumente={data.documents.filter((d) => d.type === PROTOKOLL_UPLOAD_TYP)}
+          onAktualisiert={onAktualisiert}
         />
       )}
 

@@ -91,6 +91,8 @@ export const GET = apiHandler(
         platzhalter: true,
         organizationId: true,
         isActive: true,
+        // Der Bearbeiten-Dialog sperrt das Modul einer System-Vorlage (G19).
+        isSystem: true,
         createdAt: true,
         updatedAt: true,
         organization: { select: { name: true, mandantNumber: true } },

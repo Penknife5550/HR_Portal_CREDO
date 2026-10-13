@@ -408,12 +408,13 @@ const POOL_WURZELN = [path.join(process.cwd(), "uploads", "starterpaket")];
  * BEM-Vorlagen nicht, die ganz normale DocumentTemplate-Zeilen aus derselben
  * Upload-Route sind.
  *
- * Die bestehende Erzeugen-Route liest die Datei ohne jede Pruefung. Das wird
- * hier nicht nachgemacht: dateipfad steht in der Datenbank, und eine
- * manipulierte Zeile duerfte sonst jede Datei des Servers als Anhang
- * verschicken.
+ * dateipfad steht in der Datenbank; ohne diese Schranke duerfte eine
+ * manipulierte Zeile jede Datei des Servers als Anhang verschicken. Seit A4
+ * (S33) liest auch die Erzeugen-Route (POST /api/brief-vorlagen/[id]/generate)
+ * ueber diese Funktion — vorher las sie die Datei ohne jede Pruefung
+ * (CLAUDE.md, Dokumentenpaket Regel 4).
  */
-async function leseVorlagenDatei(dateipfad: string): Promise<Buffer> {
+export async function leseVorlagenDatei(dateipfad: string): Promise<Buffer> {
   return readFile(await pfadInWurzeln(dateipfad, VORLAGEN_WURZELN));
 }
 
@@ -726,10 +727,13 @@ export function erlaubtePlatzhalter(position: AufgeloestePosition): string[] {
  *    Fehlschlag wird wieder ausgetragen, damit ein Verbindungsabriss bei der
  *    ersten Vorlage nicht alle folgenden mitreisst.
  *
- * Herausgegeben wird das Ergebnis als flache Kopie: Die Resolver liefern
- * ausschliesslich Zeichenketten, und kein heutiger Aufrufer schreibt hinein —
- * aber wer das spaeter tut, soll damit nicht der naechsten Vorlage in die Daten
- * oder in ihre Liste entschluesselter Felder schreiben.
+ * Herausgegeben wird das Ergebnis als flache Kopie, damit niemand der naechsten
+ * Vorlage in die Daten oder in ihre Liste entschluesselter Felder schreibt.
+ * Die Resolver liefern Zeichenketten UND Listen (Arrays wie
+ * `ausgaben_je_stelle`, A4 S33): Die Arrays werden zwischen den Vorlagen
+ * GETEILT (die Kopie ist flach) und deshalb nie beschrieben — weder hier noch
+ * in renderDocx, das die Daten nur liest. Wer einen Wert aendern will, ersetzt
+ * ihn in der Kopie, statt das Array selbst zu veraendern.
  */
 function neuerResolverSpeicher(modul: string) {
   const resolver = getResolver(modul);

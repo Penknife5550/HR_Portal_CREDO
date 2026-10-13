@@ -56,6 +56,9 @@ const ACTION_LABELS: Record<string, string> = {
   NOTE_UPDATED: "Notiz bearbeitet",
   NOTE_DELETED: "Notiz gelöscht",
   DOCUMENT_UPLOADED: "Dokument hochgeladen",
+  // Entfernen eines hochgeladenen Uebergabeprotokolls (Ausstattung A4) und
+  // die Dokumente-Routen von Verbeamtung, Elternzeit und Mutterschutz.
+  DOCUMENT_DELETED: "Dokument gelöscht",
   CHECKLIST_TOGGLED: "Checkliste aktualisiert",
   DEPARTMENT_LINKS_GENERATED: "Abteilungs-Links erstellt",
   REMINDER_SENT: "Reminder gesendet",

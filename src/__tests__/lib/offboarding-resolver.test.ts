@@ -13,6 +13,7 @@ jest.mock("@/lib/db", () => ({
     organization: { findUnique: jest.fn() },
     user: { findUnique: jest.fn() },
     userOrgAssignment: { findUnique: jest.fn() },
+    departmentConfig: { findMany: jest.fn() },
   },
 }));
 jest.mock("@/lib/encryption", () => ({
@@ -361,5 +362,120 @@ describe("Offboarding-Resolver — Befunde aus dem Codereview", () => {
 
   it("nimmt ein gueltiges Konzerneintrittsdatum weiterhin an", async () => {
     expect((await loese()).data.konzerneintritt).toBe("01.08.2010");
+  });
+});
+
+// =============================================
+// A4, S33 (G19, 1.9): {rueckgaben_je_stelle} fuer das Rueckgabeprotokoll
+// =============================================
+describe("Offboarding-Resolver — Rueckgaben je Stelle (S33)", () => {
+  const findKonfigs = prisma.departmentConfig.findMany as jest.Mock;
+  const am = new Date("2027-07-31T08:00:00.000Z");
+  const zeile = (itemName: string, teil: Record<string, unknown> = {}) => ({
+    category: "IT_HARDWARE",
+    itemName,
+    serialNumber: null,
+    isReturned: false,
+    returnedAt: null,
+    zustand: null,
+    ausgabe: null,
+    ...teil,
+  });
+
+  beforeEach(() => {
+    findKonfigs.mockResolvedValue([
+      { departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", email: "hm@gs.example", organizationId: "org-gs", isActive: true },
+      { departmentKey: "FACILITY", departmentName: "Hausmeister Gymnasium", email: "hm@gym.example", organizationId: "org-gym", isActive: true },
+    ]);
+  });
+
+  it("je Stelle der Ausgabe eine Gruppe, von HR erfasste Zeilen unter „Personalabteilung“, offene mit leerem Zustand", async () => {
+    findOff.mockResolvedValue(
+      vorgang({
+        arbeitsortId: "org-gs",
+        returnItems: [
+          zeile("Dienst-iPad (Lernmittel)", {
+            serialNumber: "FES-IPAD-0412", zustand: "BESCHAEDIGT", isReturned: true, returnedAt: am,
+            ausgabe: { departmentKey: "IT" },
+          }),
+          zeile("Schlüssel: Haupteingang", { serialNumber: "GS-114", ausgabe: { departmentKey: "FACILITY" } }),
+          zeile("Parkausweis", { zustand: "FEHLT" }),
+        ],
+      }),
+    );
+    const { data, sensitiveFields } = await loese();
+    expect(data.rueckgaben_je_stelle).toEqual([
+      {
+        rueckgabe_stelle: "IT-Abteilung",
+        gegenstaende: [
+          { rueckgabe_gegenstand: "Dienst-iPad (Lernmittel)", rueckgabe_kennung: "FES-IPAD-0412", rueckgabe_zustand: "beschädigt zurück", rueckgabe_am: "31.07.2027" },
+        ],
+      },
+      {
+        // Name an der Empfaenger-Einrichtung des Austritts (Arbeitsort, G12)
+        rueckgabe_stelle: "Hausmeister Grundschule",
+        gegenstaende: [
+          { rueckgabe_gegenstand: "Schlüssel: Haupteingang", rueckgabe_kennung: "GS-114", rueckgabe_zustand: "", rueckgabe_am: "" },
+        ],
+      },
+      {
+        rueckgabe_stelle: "Personalabteilung",
+        gegenstaende: [{ rueckgabe_gegenstand: "Parkausweis", rueckgabe_kennung: "", rueckgabe_zustand: "fehlt", rueckgabe_am: "" }],
+      },
+    ]);
+    expect(sensitiveFields).toEqual([]);
+    expect(findKonfigs).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { departmentKey: { in: ["IT", "FACILITY"] } } }),
+    );
+  });
+
+  it("ohne Arbeitsort gilt die Einrichtung des Austritts", async () => {
+    findOff.mockResolvedValue(
+      vorgang({ arbeitsortId: null, returnItems: [zeile("Schlüssel", { ausgabe: { departmentKey: "FACILITY" } })] }),
+    );
+    const { data } = await loese();
+    expect((data.rueckgaben_je_stelle as Array<{ rueckgabe_stelle: string }>)[0].rueckgabe_stelle).toBe("Hausmeister Gymnasium");
+  });
+
+  it("liest die Stelle ueber die Ausgabe, nie Zustandsnotiz oder Notiz der Rueckgabe", async () => {
+    await loese();
+    const auswahl = findOff.mock.calls[0][0].select;
+    expect(auswahl.arbeitsortId).toBe(true);
+    expect(auswahl.returnItems).toEqual({
+      select: {
+        category: true, itemName: true, serialNumber: true, isReturned: true,
+        returnedAt: true, zustand: true, ausgabe: { select: { departmentKey: true } },
+      },
+    });
+  });
+
+  it("Listen ohne Bemerkung: kaemen Notiz und Zustandsbeschreibung doch mit, stuenden sie nirgends", async () => {
+    findOff.mockResolvedValue(
+      vorgang({ returnItems: [zeile("Notebook", { notes: "Kratzer am Deckel", condition: "Akku schwach" })] }),
+    );
+    const { data } = await loese();
+    expect(JSON.stringify(data)).not.toMatch(/Kratzer|Akku/);
+  });
+
+  it("jedes innere Feld ist gesetzt; ohne Rueckgabe eine leere Liste (Leersatz der Vorlage) ohne Abfrage der Stellen", async () => {
+    findOff.mockResolvedValue(vorgang({ returnItems: [zeile("Notebook")] }));
+    const { data } = await loese();
+    const [stelle] = data.rueckgaben_je_stelle as Array<{ gegenstaende: Record<string, unknown>[] }>;
+    for (const wert of Object.values(stelle.gegenstaende[0])) expect(typeof wert).toBe("string");
+
+    jest.clearAllMocks();
+    findOff.mockResolvedValue(vorgang());
+    const leer = await loese();
+    expect(leer.data.rueckgaben_je_stelle).toEqual([]);
+    expect(findKonfigs).not.toHaveBeenCalled();
+  });
+
+  it("fremder Mandant: keine Liste (wie alle Vorgangsdaten)", async () => {
+    const leitung = { ...session, userId: "u2", role: "EINRICHTUNGSLEITUNG" };
+    (prisma.userOrgAssignment.findUnique as jest.Mock).mockResolvedValue(null);
+    findOff.mockResolvedValue(vorgang({ returnItems: [zeile("Notebook", { ausgabe: { departmentKey: "IT" } })] }));
+    const { data } = await getResolver("OFFBOARDING")(ctx({ session: leitung }));
+    expect(data.rueckgaben_je_stelle).toBeUndefined();
+    expect(findKonfigs).not.toHaveBeenCalled();
   });
 });

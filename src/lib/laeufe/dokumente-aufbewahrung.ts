@@ -24,6 +24,18 @@
  * `ausstattung`: `{ geleert, hinweiseGeleert, fehler }`, im Probelauf
  * `{ wuerdeLeeren }`.
  *
+ * Seit Paket A4 (S35, E-A37) loescht er die vermerkten Ausgaben aus
+ * „Ausstattung & Zugänge“ nach Ablauf ihrer Frist (`loeschenAb`: sechs Monate
+ * nach der Rueckgabe, drei Jahre ab Jahresende bei fehlender Rueckgabe) samt
+ * Kopien in den Rueckgaben, Kommentaren der Stellen und – mit der letzten
+ * Ausgabe eines Vorgangs – den Uebergabe- und Rueckgabeprotokollen
+ * (`ausgabenLoeschen` in ausgaben-lauf.ts, eigener Block, Sperrreihenfolge
+ * G24). Antwortfeld `ausgaben`: `{ aufbewahrungMonate, verjaehrungJahre,
+ * geloescht, rueckgabenGeleert, protokolleGeloescht,
+ * erzeugteProtokolleGeloescht, ohneFristAelterDreiJahre, fehler }`, im
+ * Probelauf `{ aufbewahrungMonate, verjaehrungJahre, wuerdeLoeschen,
+ * ohneFristAelterDreiJahre }`.
+ *
  * Gestartet vom Zeitplaner des Portals (src/lib/zeitplaner/, Einstellungen →
  * Automatische Läufe); Handaufruf ueber die duenne Route POST /api/cron/dokumente-aufbewahrung
  * (Bearer CRON_SECRET). Probelauf (`dryRun`, Route: ?dryRun=1): nur zaehlen.
@@ -37,6 +49,7 @@ import { laufAntwort, type LaufErgebnis, type LaufOptionen } from "@/lib/laeufe/
 import { individuelleMailsAufraeumen } from "@/lib/individuelle-mail-dienst";
 import { FREITEXT_AUFBEWAHRUNG_MONATE, freitextGrenze } from "@/lib/ausstattung";
 import { ausstattungFreitexteLeeren, leeresFreitexteErgebnis } from "@/lib/ausstattung-lauf";
+import { ausgabenLoeschen, leeresAusgabenErgebnis } from "@/lib/ausgaben-lauf";
 import { fehlerKennung } from "@/lib/fehler-kennung";
 
 export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promise<LaufErgebnis> {
@@ -59,6 +72,8 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
     if (dryRun) {
       const mails = await individuelleMailsAufraeumen({ grenze, dryRun: true });
       const ausstattung = await ausstattungFreitexteLeeren({ grenze: ausstattungGrenze, dryRun: true });
+      // Ausgaben (E-A37): nur zaehlen – faellige und aktive ohne Frist.
+      const ausgaben = await ausgabenLoeschen({ jetzt, dryRun: true });
       return laufAntwort({
         success: true,
         dryRun: true,
@@ -68,6 +83,7 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
         individuelleMails: { wuerdeLeeren: mails.mails },
         // Zeilen (Bemerkung/Angabe) und Hinweise zusammen.
         ausstattung: { ...ausstattungKopf, wuerdeLeeren: ausstattung.geleert + ausstattung.hinweiseGeleert },
+        ausgaben,
       });
     }
 
@@ -119,6 +135,18 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
       ausstattung.fehler++;
     }
 
+    // Eigener Block (E-A37): Ausgaben nach Ablauf der Frist samt Kopien,
+    // Kommentaren und Protokollen loeschen – ein Fehler dort laesst die Bloecke
+    // oben unberuehrt. Je Gruppe bzw. Vorgang faengt ausgabenLoeschen selbst
+    // ab; hier landet nur, was davor scheitert (etwa die Kandidatenabfrage).
+    let ausgaben = leeresAusgabenErgebnis();
+    try {
+      ausgaben = await ausgabenLoeschen({ jetzt, dryRun: false });
+    } catch (err) {
+      console.error("[cron/dokumente-aufbewahrung] Ausgaben (Loeschfristen):", fehlerKennung(err));
+      ausgaben.fehler++;
+    }
+
     return laufAntwort({
       success: true,
       aufbewahrungMonate: AUFBEWAHRUNG_MONATE,
@@ -134,6 +162,7 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
         hinweiseGeleert: ausstattung.hinweiseGeleert,
         fehler: ausstattung.fehler,
       },
+      ausgaben,
     });
   } catch (error) {
     console.error("[cron/dokumente-aufbewahrung] Schwerer Fehler:", error);

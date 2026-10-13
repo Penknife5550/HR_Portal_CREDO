@@ -61,6 +61,23 @@
  * mit `warErledigt`), ein offen uebernommenes VERBLEIBT beim Abschluss
  * (`abschlussFrist` mit `hierOffen`) und der Fortschritt des Steppers
  * (`rueckgabenFortschritt`).
+ * Seit S33 die Brief-Platzhalter der Resolver (`ausgabenPlatzhalter`,
+ * `rueckgabenJeStelle`, 1.9) fuer Uebergabe- und Rueckgabeprotokoll;
+ * Server: src/lib/doc-template-resolvers.ts, Vorlagen erzeugt
+ * scripts/system-vorlagen/ausstattungsprotokolle.js.
+ * Seit S34 Grenzen und Texte des Hochladens des unterschriebenen
+ * Uebergabeprotokolls (`PROTOKOLL_UPLOAD_TYP`, `PROTOKOLL_MAX_BYTES`,
+ * `protokollDateiGrund`, `PROTOKOLL_UPLOAD_MELDUNGEN`); Server:
+ * POST /api/onboarding/[id]/documents, Karte
+ * src/components/ausgaben/protokoll-upload.tsx.
+ * Seit S35 die Regeln des Loeschlaufs (G20, 1.11): Faelligkeit
+ * (`ausgabeFaellig`), die Loeschmenge nach den Sperren
+ * (`loeschMengeFestlegen`), die Grenze des Zaehlers ohne Frist
+ * (`ohneFristGrenze`), die System-Vorlagen der Protokolle
+ * (`PROTOKOLL_SYSTEM_VORLAGEN`) und die Protokoll-Details
+ * (`ausgabenGeloeschtDetails`); Server: `ausgabenLoeschenIn`
+ * (ausgaben-schreiben.ts) und src/lib/ausgaben-lauf.ts im Lauf
+ * „Aufbewahrung erzeugter Dokumente“.
  *
  * Importrichtung (G1): Diese Datei darf Werte aus ausstattung.ts,
  * abteilungsaufgaben.ts, constants.ts, format.ts, kalendertag.ts,
@@ -1513,6 +1530,97 @@ export function protokollAnzeige(art: ProtokollArt, stand: ProtokollStand): Prot
  */
 export function ausgabenMitRueckgabe(ausgaben: ReadonlyArray<{ zustand: string; beiAustritt: string }>): number {
   return ausgaben.filter((a) => a.beiAustritt === "RUECKGABE" && enthalten(AUSGABE_AKTIV, a.zustand)).length;
+}
+
+// =============================================
+// Unterschriebenes Uebergabeprotokoll hochladen (S34, G19)
+// =============================================
+
+/**
+ * Der einzige Dokumenttyp, den `POST /api/onboarding/[id]/documents` in A4
+ * annimmt. Er steht bewusst NICHT in `SELECTABLE_DOCUMENT_TYPES`: Die Person
+ * sieht ihn im Fragebogen nie (G19).
+ */
+export const PROTOKOLL_UPLOAD_TYP = "UEBERGABEPROTOKOLL" as const;
+
+/**
+ * Hoechstens 9 MB Rohbytes je Datei – wie die individuelle E-Mail. Die
+ * Middleware schneidet Portal-Bodys bei 10 MiB still ab; eine Datei von 10 MB
+ * kaeme samt Multipart-Rahmen abgeschnitten an.
+ */
+export const PROTOKOLL_MAX_BYTES = 9 * 1024 * 1024;
+
+/** Obergrenze der ganzen Anfrage: die Datei plus Formularfelder und Trenner. */
+export const PROTOKOLL_MAX_ANFRAGE_BYTES = PROTOKOLL_MAX_BYTES + 256 * 1024;
+
+/**
+ * Was die Dateiauswahl im Browser anbietet. Entschieden wird auf dem Server
+ * allein aus den Bytes (`erkenneDateityp`), nie aus Endung oder `file.type`.
+ */
+export const PROTOKOLL_ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp";
+
+/** Warum eine Datei schon an ihrer Groesse scheitert. */
+export type ProtokollDateiGrund = "LEER" | "ZU_GROSS";
+
+/**
+ * Die Groessenpruefung einer Protokolldatei – dieselbe im Browser (vor dem
+ * Senden) und auf dem Server (nach dem Lesen des Formulars). Genau
+ * `PROTOKOLL_MAX_BYTES` Bytes sind erlaubt.
+ */
+export function protokollDateiGrund(groesse: number): ProtokollDateiGrund | null {
+  if (!Number.isFinite(groesse) || groesse <= 0) return "LEER";
+  if (groesse > PROTOKOLL_MAX_BYTES) return "ZU_GROSS";
+  return null;
+}
+
+/** Texte des Hochladens (Route und Karte im Reiter Dokumente), ohne Anrede. */
+export const PROTOKOLL_UPLOAD_MELDUNGEN = {
+  TITEL: "Unterschriebenes Übergabeprotokoll",
+  KNOPF: "Unterschriebenes Übergabeprotokoll hochladen",
+  LAEDT: "Wird hochgeladen …",
+  HILFE: `PDF, JPG, PNG oder WebP, höchstens ${PROTOKOLL_MAX_BYTES / 1024 / 1024} MB. Die Person sieht das Protokoll im Fragebogen nicht.`,
+  /** 400: kein oder mehr als ein Feld `datei`. */
+  KEINE_DATEI: "Bitte genau eine Datei auswählen.",
+  /** 400: leere Datei. */
+  LEER: "Die Datei ist leer.",
+  /** 413: laut `Content-Length`, gezaehlt oder als Datei zu gross. */
+  ZU_GROSS: `Die Datei ist zu groß. Erlaubt sind höchstens ${PROTOKOLL_MAX_BYTES / 1024 / 1024} MB.`,
+  /** 400: `type` fehlt oder ist nicht `UEBERGABEPROTOKOLL`. */
+  FALSCHE_ART: "Hier lässt sich nur das unterschriebene Übergabeprotokoll hochladen.",
+  /** 415: Typ aus den Bytes nicht erlaubt. */
+  TYP_NICHT_ERLAUBT: "Dateityp nicht erlaubt. Erlaubt sind PDF, JPG, PNG und WebP.",
+  /** 400: `%PDF-` ohne `%%EOF` am Ende – meist abgebrochen gespeichert oder gescannt. */
+  PDF_UNVOLLSTAENDIG: "Das PDF ist unvollständig (abgebrochen gespeichert oder gescannt). Bitte neu speichern und erneut hochladen.",
+  /** 400: Formular nicht lesbar. */
+  FORMULAR: "Das Formular konnte nicht gelesen werden.",
+  /** 400: Datenstrom brach ab. */
+  ABGEBROCHEN: "Die Übertragung wurde abgebrochen. Bitte erneut hochladen.",
+  /** 201 */
+  ERFOLG: "Unterschriebenes Übergabeprotokoll hochgeladen.",
+  /** Netz weg oder unlesbare Antwort. */
+  NETZ: "Das Hochladen ist fehlgeschlagen. Bitte erneut versuchen.",
+
+  // Entfernen (DELETE /api/onboarding/[id]/documents/[docId], Review A4d):
+  // eine Fehlablage – etwa das Protokoll einer anderen Person – muss sich
+  // berichtigen lassen.
+  /** Ueberschrift der Liste der hochgeladenen Protokolle in der Karte. */
+  LISTE: "Hochgeladene Übergabeprotokolle",
+  /** Knopf an jeder Zeile der Liste – oeffnet die Rueckfrage. */
+  ENTFERNEN_KNOPF: "Entfernen …",
+  ENTFERNEN_TITEL: "Übergabeprotokoll entfernen?",
+  ENTFERNEN_SATZ: "Die Datei wird endgültig gelöscht. Danach lässt sich das richtige Protokoll hochladen.",
+  ENTFERNEN_BESTAETIGEN: "Entfernen",
+  /** 200 */
+  ENTFERNT: "Übergabeprotokoll entfernt.",
+  /** 500: `dateiLoeschen` meldet „fehler“ – die Zeile bleibt, ein zweiter Versuch geht. */
+  ENTFERNEN_DATEI_FEHLER: "Die Datei konnte nicht gelöscht werden. Bitte später erneut versuchen.",
+  /** Netz weg oder unlesbare Antwort. */
+  ENTFERNEN_NETZ: "Das Entfernen ist fehlgeschlagen. Bitte erneut versuchen.",
+} as const;
+
+/** Der Text zu einem Groessengrund (`protokollDateiGrund`). */
+export function protokollDateiGrundText(grund: ProtokollDateiGrund): string {
+  return grund === "LEER" ? PROTOKOLL_UPLOAD_MELDUNGEN.LEER : PROTOKOLL_UPLOAD_MELDUNGEN.ZU_GROSS;
 }
 
 // =============================================
@@ -3684,4 +3792,239 @@ export function protokollStellen(
       };
     }),
   }));
+}
+
+// =============================================
+// Brief-Platzhalter der Resolver (S33, 1.9)
+// =============================================
+
+/** Eine Ausgabe, wie der ONBOARDING-Resolver sie liest – nie Kommentare, nie `erfasstVonId`. */
+export interface PlatzhalterAusgabe {
+  departmentKey: string;
+  bezeichnung: string;
+  kennung: string | null;
+  uebergebenAm: Date | string | null;
+  zustand: string;
+  beiAustritt: string;
+}
+
+/** Die Ausgaben-Platzhalter des ONBOARDING-Resolvers. */
+export interface AusgabenPlatzhalter {
+  /** Liste je ausgebender Stelle (Uebergabeprotokoll, eine Seite je Stelle). */
+  ausgaben_je_stelle: UebergabeStelle[];
+  /** Eine Zeile je aktivem Stueck, wie `ausstattung_liste`; ohne Stueck "". */
+  ausgaben_liste: string;
+  /** Anzahl aktiver Stuecke als Zeichenkette ("0" ohne Stueck). */
+  ausgaben_anzahl: string;
+}
+
+/**
+ * `ausgaben_je_stelle`, `ausgaben_liste` und `ausgaben_anzahl` (1.9) aus den
+ * Ausgaben einer Einstellung – nur aktive Stuecke (AUSGEGEBEN, VERBLEIBT).
+ * Die Liste je Stelle kommt aus `protokollStellen` (jedes innere Feld gesetzt),
+ * die Zeilen aus `ausgabenListeMailFelder` („Dienst-iPad (Lernmittel) ·
+ * FES-IPAD-0412 · übergeben 28.01.2027“, ein Zugang „eingerichtet …“) –
+ * dieselbe Zeile wie in der Absage-Mail, Reihenfolge wie geliefert.
+ */
+export function ausgabenPlatzhalter(
+  stuecke: ReadonlyArray<PlatzhalterAusgabe>,
+  stellenNamen: Readonly<Record<string, string>>,
+): AusgabenPlatzhalter {
+  const aktive = stuecke.filter((s) => enthalten(AUSGABE_AKTIV, s.zustand));
+  return {
+    ausgaben_je_stelle: protokollStellen(
+      aktive.map((s) => ({
+        departmentKey: s.departmentKey,
+        bezeichnung: s.bezeichnung,
+        kennung: s.kennung,
+        am: s.uebergebenAm,
+        zustand: s.zustand,
+      })),
+      stellenNamen,
+      "UEBERGABE",
+    ),
+    ausgaben_liste: ausgabenListeMailFelder(aktive).ausgaben_liste,
+    ausgaben_anzahl: String(aktive.length),
+  };
+}
+
+/**
+ * Eine Rueckgabe-Zeile (`ReturnItem`), wie der OFFBOARDING-Resolver sie liest –
+ * nie `condition` oder `notes`. `departmentKey` ist die Stelle der Ausgabe,
+ * aus der die Zeile vorgeschlagen wurde; `null` = von HR erfasst.
+ */
+export interface PlatzhalterRueckgabe extends RueckgabeStand {
+  itemName: string;
+  serialNumber?: string | null;
+  returnedAt?: Date | string | null;
+  departmentKey: string | null;
+}
+
+/**
+ * `rueckgaben_je_stelle` (1.9): je zustaendiger Stelle die Rueckgabe-Zeilen,
+ * manuelle unter „Personalabteilung“, offene mit leerem Zustand und ohne
+ * Datum (zum Ausfuellen von Hand). Regeln wie `protokollStellen`.
+ */
+export function rueckgabenJeStelle(
+  zeilen: ReadonlyArray<PlatzhalterRueckgabe>,
+  stellenNamen: Readonly<Record<string, string>>,
+): RueckgabeStelle[] {
+  return protokollStellen(
+    zeilen.map((z) => ({
+      departmentKey: z.departmentKey,
+      bezeichnung: z.itemName,
+      kennung: z.serialNumber ?? null,
+      am: z.returnedAt ?? null,
+      zustand: z.zustand ?? null,
+      isReturned: z.isReturned,
+    })),
+    stellenNamen,
+    "RUECKGABE",
+  );
+}
+
+// =============================================
+// Loeschlauf nach Ablauf der Frist (G20, Feinplan 1.11, S35)
+// =============================================
+
+/**
+ * Hoechstens so viele faellige Ausgaben liest der Lauf „Aufbewahrung erzeugter
+ * Dokumente“ je Durchgang (1.11, Schritt 1; die aelteste Frist zuerst). Den
+ * Rest nimmt der naechste Lauf.
+ */
+export const AUSGABEN_LOESCH_SEITE = 500;
+
+/** Suchschluessel einer System-Vorlage (`{ isSystem: true, modul, originalName }`). */
+export interface SystemVorlagenSchluessel {
+  modul: "ONBOARDING" | "OFFBOARDING";
+  originalName: string;
+}
+
+/**
+ * Die System-Vorlagen der beiden Protokolle (G19, S33) – derselbe
+ * Suchschluessel wie im Seed-Check (`SYSTEM_VORLAGEN` in prisma/seed-check.js),
+ * NICHT der Name, den HR in Brief-Vorlagen pflegt. Mit der letzten Ausgabe
+ * eines Vorgangs loescht der Lauf auch die vom Portal erzeugten Protokolle
+ * (`GeneratedDocument` mit `refId` = Vorgang, 1.11, Schritt 4) – sonst
+ * ueberlebte ein beim Austritt erzeugtes Rueckgabeprotokoll die Ausgabe um bis
+ * zu ein halbes Jahr (zwoelf Monate nach der Erzeugung).
+ *
+ * seed-check.js laeuft im Container als reines JS und kann diese Datei nicht
+ * lesen; src/__tests__/lib/ausgaben-lauf.test.ts haelt beide Stellen gleich.
+ */
+export const PROTOKOLL_SYSTEM_VORLAGEN: Readonly<Record<ProtokollArt, Readonly<SystemVorlagenSchluessel>>> = {
+  UEBERGABE: { modul: "ONBOARDING", originalName: "Uebergabeprotokoll-Ausstattung.docx" },
+  RUECKGABE: { modul: "OFFBOARDING", originalName: "Rueckgabeprotokoll-Ausstattung.docx" },
+};
+
+/**
+ * Ist eine Ausgabe faellig (1.11)? `loeschenAb` ist gesetzt und erreicht – die
+ * Grenze zaehlt mit (`<=`, dieselbe Regel wie `loeschenAb: { lte: jetzt }` in
+ * der Abfrage des Laufs). Weil `loeschenAb` der Beginn eines Berliner Tages
+ * ist, faellt ein Stueck mit dem ersten Lauf dieses Tages. Ein unlesbarer Wert
+ * ist nie faellig (ohne `instanceof Date`, vgl. `gueltigerZeitpunkt`) –
+ * geloescht wird lieber spaeter als falsch.
+ */
+export function ausgabeFaellig(loeschenAb: Date | null | undefined, jetzt: Date): boolean {
+  const frist = gueltigerZeitpunkt(loeschenAb);
+  const jetztZeit = gueltigerZeitpunkt(jetzt);
+  return frist !== null && jetztZeit !== null && frist.getTime() <= jetztZeit.getTime();
+}
+
+/**
+ * Grenze des Zaehlers „aktive Ausgaben ohne Frist, aelter als drei Jahre“
+ * (`ohneFristAelterDreiJahre`, 1.11, Schritt 6): der Berliner Kalendertag von
+ * `jetzt` minus drei Jahre (`AUSGABE_VERJAEHRUNG_JAHRE`) als Wert fuer die
+ * `@db.Date`-Spalte `uebergebenAm` – gezaehlt wird `uebergebenAm < grenze`.
+ * Ein 29.02. wird auf den 28.02. gekappt (`monateSpaeter`). Der Zaehler macht
+ * nie zugeordnete Bestaende sichtbar (Feinplan Abschnitt 6, Frage 7); er ist
+ * nur eine Zahl, kein Befund.
+ */
+export function ohneFristGrenze(jetzt: Date): Date {
+  return kalendertagAlsDatum(monateSpaeter(berlinerKalendertag(jetzt), -12 * AUSGABE_VERJAEHRUNG_JAHRE));
+}
+
+/** Eine Ausgabe der Gruppe, wie der Lauf sie NACH seinen Sperren liest. */
+export interface LoeschKandidat {
+  id: string;
+  loeschenAb: Date | null;
+}
+
+/** Ein Bezug einer Ausgabe auf einen Austritt (Rueckgabe-Zeile oder Aufgabe mit `ausgabeId`, G28). */
+export interface LoeschBezug {
+  ausgabeId: string | null;
+  offboardingId: string;
+}
+
+/** Die Loeschmenge einer Gruppe (`loeschMengeFestlegen`). */
+export interface LoeschMenge {
+  /** Wird in diesem Lauf geloescht (nach `id` sortiert). */
+  ids: string[];
+  /** Nicht (mehr) faellig – etwa nach einem Zustandswechsel kurz vor der Sperre. Bleibt samt Kopien und Kommentaren. */
+  nichtMehrFaellig: string[];
+  /** Ein Austritt, den der Lauf nicht gesperrt hat, bezieht sie inzwischen – faellt fuer diesen Lauf heraus. */
+  ungesperrterAustritt: string[];
+}
+
+/**
+ * Die Loeschmenge einer Gruppe – festgelegt NACH den Sperren (1.11, Schritt 3;
+ * G24): Austritte und Einstellung sind gesperrt, der Lauf hat die Ausgaben und
+ * ihre Bezuege frisch gelesen.
+ *
+ *   - Was nicht mehr faellig ist (`ausgabeFaellig`), faellt heraus: Ein
+ *     Zustandswechsel kurz vor der Sperre hat die Frist neu gesetzt (oder
+ *     geleert) – die Ausgabe behaelt ihre Kopie in `ReturnItem` und die
+ *     Kommentare.
+ *   - Bezieht inzwischen ein weiterer Austritt eine Ausgabe, den der Lauf nicht
+ *     gesperrt hat, faellt sie fuer diesen Lauf heraus; der naechste liest
+ *     diesen Austritt vor den Sperren mit.
+ *
+ * Fehlt eine Ausgabe in `ausgaben` (inzwischen geloescht), gehoert sie zu
+ * keiner der drei Listen.
+ */
+export function loeschMengeFestlegen(opts: {
+  ausgaben: ReadonlyArray<LoeschKandidat>;
+  bezuege: ReadonlyArray<LoeschBezug>;
+  gesperrteAustritte: Iterable<string>;
+  jetzt: Date;
+}): LoeschMenge {
+  const gesperrt = new Set(opts.gesperrteAustritte);
+  const ungesperrt = new Set(
+    opts.bezuege
+      .filter((b): b is LoeschBezug & { ausgabeId: string } => !!b.ausgabeId && !gesperrt.has(b.offboardingId))
+      .map((b) => b.ausgabeId),
+  );
+  const menge: LoeschMenge = { ids: [], nichtMehrFaellig: [], ungesperrterAustritt: [] };
+  for (const a of [...opts.ausgaben].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0))) {
+    if (!ausgabeFaellig(a.loeschenAb, opts.jetzt)) menge.nichtMehrFaellig.push(a.id);
+    else if (ungesperrt.has(a.id)) menge.ungesperrterAustritt.push(a.id);
+    else menge.ids.push(a.id);
+  }
+  return menge;
+}
+
+/** `details` des Protokolls `AUSGABEN_GELOESCHT` (1.10) – nur Anzahlen. */
+export interface AusgabenGeloeschtDetails {
+  anzahl: number;
+  rueckgabenGeleert: number;
+  kommentareGeleert: number;
+  protokolle: number;
+  erzeugteProtokolle: number;
+}
+
+/**
+ * `details` von `AUSGABEN_GELOESCHT` in fester Form (G22: nur Anzahlen – nie
+ * Kennung, Bezeichnung, Name oder Pfad). Fehlende Zaehler sind 0, damit jede
+ * Zeile im Protokoll gleich aussieht – ob der Lauf Ausgaben geloescht oder nur
+ * die Protokolle eines Vorgangs abgeraeumt hat.
+ */
+export function ausgabenGeloeschtDetails(teil: Partial<AusgabenGeloeschtDetails>): AusgabenGeloeschtDetails {
+  const zahl = (n: number | undefined) => (typeof n === "number" && Number.isFinite(n) ? n : 0);
+  return {
+    anzahl: zahl(teil.anzahl),
+    rueckgabenGeleert: zahl(teil.rueckgabenGeleert),
+    kommentareGeleert: zahl(teil.kommentareGeleert),
+    protokolle: zahl(teil.protokolle),
+    erzeugteProtokolle: zahl(teil.erzeugteProtokolle),
+  };
 }

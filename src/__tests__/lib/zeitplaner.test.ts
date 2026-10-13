@@ -447,11 +447,20 @@ describe("Auswertung", () => {
     const a = laufAuswerten(
       "dokumente-aufbewahrung",
       200,
-      { dryRun: true, wuerdeLoeschen: 4, individuelleMails: { wuerdeLeeren: 1 }, ausstattung: { wuerdeLeeren: 3 } },
+      {
+        dryRun: true,
+        wuerdeLoeschen: 4,
+        individuelleMails: { wuerdeLeeren: 1 },
+        ausstattung: { wuerdeLeeren: 3 },
+        // Seit A4 (S35): Ausgaben – im Probelauf ebenfalls ohne `fehler`.
+        ausgaben: { aufbewahrungMonate: 6, verjaehrungJahre: 3, wuerdeLoeschen: 2, ohneFristAelterDreiJahre: 1 },
+      },
       true,
     );
     expect(a.ergebnis).toBe("OK");
     expect(a.zaehler).toContainEqual(["Würde leeren (Ausstattung: Bemerkungen, Angaben, Hinweise)", 3]);
+    expect(a.zaehler).toContainEqual(["Würde löschen (Ausgaben nach Ablauf der Frist)", 2]);
+    expect(a.zaehler).toContainEqual(["Ausgaben ohne Löschfrist, älter als drei Jahre", 1]);
   });
 
   it("Aufbewahrung: Freitexte der Ausstattung (E-A22) — gezaehlt, Fehler ein Befund, fehlendes Feld laut", () => {
@@ -462,6 +471,16 @@ describe("Auswertung", () => {
       fehler: 0,
       individuelleMails: { geleert: 0, dateienGeloescht: 0, fehler: 0 },
       ausstattung: { aufbewahrungMonate: 6, grenze: "2027-03-14T23:00:00.000Z", geleert: 4, hinweiseGeleert: 1, fehler: 0 },
+      ausgaben: {
+        aufbewahrungMonate: 6,
+        verjaehrungJahre: 3,
+        geloescht: 0,
+        rueckgabenGeleert: 0,
+        protokolleGeloescht: 0,
+        erzeugteProtokolleGeloescht: 0,
+        ohneFristAelterDreiJahre: 0,
+        fehler: 0,
+      },
     };
     const ok = laufAuswerten("dokumente-aufbewahrung", 200, antwort, false);
     expect(ok.ergebnis).toBe("OK");
@@ -491,6 +510,55 @@ describe("Auswertung", () => {
     expect(def?.beschreibung).toContain("Ausstattung & Zugänge");
     expect(def?.loescht).toBe(true);
     expect(def?.kannProbelauf).toBe(true);
+  });
+
+  it("Aufbewahrung: Ausgaben (E-A37, S35) — gezaehlt, Fehler ein Befund, „ohne Frist“ nur eine Zahl, fehlendes Feld laut", () => {
+    const ausgaben = {
+      aufbewahrungMonate: 6,
+      verjaehrungJahre: 3,
+      geloescht: 5,
+      rueckgabenGeleert: 2,
+      protokolleGeloescht: 1,
+      erzeugteProtokolleGeloescht: 1,
+      ohneFristAelterDreiJahre: 7,
+      fehler: 0,
+    };
+    const antwort = {
+      geloescht: 0,
+      dateienGeloescht: 0,
+      ordnerGeloescht: 0,
+      fehler: 0,
+      individuelleMails: { geleert: 0, dateienGeloescht: 0, fehler: 0 },
+      ausstattung: { geleert: 0, hinweiseGeleert: 0, fehler: 0 },
+      ausgaben,
+    };
+    const ok = laufAuswerten("dokumente-aufbewahrung", 200, antwort, false);
+    expect(ok.ergebnis).toBe("OK");
+    expect(ok.hinweis).toBeNull();
+    expect(ok.zaehler).toContainEqual(["Gelöscht: Ausgaben / Rückgaben geleert", "5 / 2"]);
+    expect(ok.zaehler).toContainEqual(["Gelöscht: Übergabe- und Rückgabeprotokolle – hochgeladen / erzeugt", "1 / 1"]);
+    // Nur eine Zahl – sieben alte Bestaende ohne Frist sind kein Befund.
+    expect(ok.zaehler).toContainEqual(["Ausgaben ohne Löschfrist, älter als drei Jahre", 7]);
+
+    const fehler = laufAuswerten("dokumente-aufbewahrung", 200, { ...antwort, ausgaben: { ...ausgaben, fehler: 3 } }, false);
+    expect(fehler.ergebnis).toBe("PROBLEME");
+    expect(fehler.zaehler).toContainEqual(["Fehler", 3, true]);
+    expect(fehler.hinweis).toMatch(/nächste Lauf erneut/);
+
+    // Fehlt `ausgaben` (Lauf vor S35 oder umbenannt): „Antwort unvollständig“, nie still 0.
+    const { ausgaben: _weg, ...ohne } = antwort;
+    void _weg;
+    const unvollstaendig = laufAuswerten("dokumente-aufbewahrung", 200, ohne, false);
+    expect(unvollstaendig.ergebnis).toBe("PROBLEME");
+    expect(JSON.stringify(unvollstaendig.zaehler)).toContain("ausgaben");
+  });
+
+  it("die Aufbewahrung nennt die Ausgaben und ihre Fristen in ihrer Beschreibung (E-A37)", () => {
+    const def = laufDefinition("dokumente-aufbewahrung");
+    expect(def?.beschreibung).toContain("vermerkte Ausgaben");
+    expect(def?.beschreibung).toContain("6 Monate nach der Rückgabe");
+    expect(def?.beschreibung).toContain("3 Jahre ab Jahresende");
+    expect(def?.beschreibung).toContain("Übergabe- und Rückgabeprotokollen");
   });
 
   it("berichtNoetig: Probleme, Fehler, Probelauf — Erfolg nur mit Schalter und Versand", () => {

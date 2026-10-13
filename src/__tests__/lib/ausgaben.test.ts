@@ -30,6 +30,14 @@
  * (`ausgabeNachZiel`, `gleichlaufPlan`), die Bindung aus Sicht des Austritts
  * (`gleichlaufGesperrt`) und das Feld `ausgabe` der Offboarding-Link-Seite
  * (`offboardingLinkAusgabeBauen`, `RUECKNAHME_AUSWAHL`).
+ * S33: die Brief-Platzhalter der Resolver (`ausgabenPlatzhalter`,
+ * `rueckgabenJeStelle`); Vorlagen und Rendern in system-vorlagen.test.ts.
+ * S34: Grenzen und Texte des Hochladens des unterschriebenen
+ * Uebergabeprotokolls (`protokollDateiGrund`, `PROTOKOLL_UPLOAD_MELDUNGEN`);
+ * die Route in onboarding-dokument-upload.test.ts.
+ * S35: die Regeln des Loeschlaufs (`ausgabeFaellig`, `ohneFristGrenze`,
+ * `loeschMengeFestlegen`, `ausgabenGeloeschtDetails`); der Lauf selbst in
+ * ausgaben-lauf.test.ts.
  */
 
 import fs from "fs";
@@ -81,6 +89,7 @@ import {
   ausgabenJeAufgabe,
   ausgabenListeMailFelder,
   ausgabenMitRueckgabe,
+  ausgabenPlatzhalter,
   ausgabenZeile,
   abgeloesteAustritte,
   bezugBindet,
@@ -106,6 +115,7 @@ import {
   offboardingLinkAusgabeBauen,
   offeneRueckgaben,
   rueckgabenFortschritt,
+  rueckgabenJeStelle,
   ohneVermerk,
   perLinkEntfernbar,
   protokollAnzeige,
@@ -147,7 +157,21 @@ import {
   type LageTextWerte,
   type VermerkZiel,
   type VorschlagAusgabe,
+  PROTOKOLL_ACCEPT,
+  PROTOKOLL_MAX_ANFRAGE_BYTES,
+  PROTOKOLL_MAX_BYTES,
+  PROTOKOLL_UPLOAD_MELDUNGEN,
+  PROTOKOLL_UPLOAD_TYP,
+  protokollDateiGrund,
+  protokollDateiGrundText,
+  AUSGABEN_LOESCH_SEITE,
+  PROTOKOLL_SYSTEM_VORLAGEN,
+  ausgabeFaellig,
+  ausgabenGeloeschtDetails,
+  loeschMengeFestlegen,
+  ohneFristGrenze,
 } from "@/lib/ausgaben";
+import { SELECTABLE_DOCUMENT_TYPES } from "@/lib/required-documents";
 import {
   AUSSTATTUNG_KATEGORIE,
   BEI_AUSTRITT,
@@ -2677,6 +2701,47 @@ describe("protokollAnzeige / ausgabenMitRueckgabe (G19)", () => {
   });
 });
 
+describe("Unterschriebenes Übergabeprotokoll hochladen (S34)", () => {
+  it("nimmt nur UEBERGABEPROTOKOLL an – einen Typ, den die Person im Fragebogen nie sieht", () => {
+    expect(PROTOKOLL_UPLOAD_TYP).toBe("UEBERGABEPROTOKOLL");
+    expect(SELECTABLE_DOCUMENT_TYPES).not.toContain(PROTOKOLL_UPLOAD_TYP);
+  });
+
+  it("9 MB je Datei; die ganze Anfrage bleibt unter der 10-MiB-Grenze der Middleware", () => {
+    expect(PROTOKOLL_MAX_BYTES).toBe(9 * 1024 * 1024);
+    expect(PROTOKOLL_MAX_ANFRAGE_BYTES).toBeGreaterThan(PROTOKOLL_MAX_BYTES);
+    expect(PROTOKOLL_MAX_ANFRAGE_BYTES).toBeLessThan(10 * 1024 * 1024);
+  });
+
+  it("protokollDateiGrund: leer, genau an der Grenze erlaubt, darueber zu gross", () => {
+    expect(protokollDateiGrund(0)).toBe("LEER");
+    expect(protokollDateiGrund(-1)).toBe("LEER");
+    expect(protokollDateiGrund(Number.NaN)).toBe("LEER");
+    expect(protokollDateiGrund(1)).toBeNull();
+    expect(protokollDateiGrund(PROTOKOLL_MAX_BYTES)).toBeNull();
+    expect(protokollDateiGrund(PROTOKOLL_MAX_BYTES + 1)).toBe("ZU_GROSS");
+  });
+
+  it("protokollDateiGrundText nennt den Grund", () => {
+    expect(protokollDateiGrundText("LEER")).toBe(PROTOKOLL_UPLOAD_MELDUNGEN.LEER);
+    expect(protokollDateiGrundText("ZU_GROSS")).toBe(PROTOKOLL_UPLOAD_MELDUNGEN.ZU_GROSS);
+    expect(PROTOKOLL_UPLOAD_MELDUNGEN.ZU_GROSS).toContain("9 MB");
+  });
+
+  it("die Auswahl bietet genau die Typen an, die erkenneDateityp annimmt", () => {
+    expect(PROTOKOLL_ACCEPT.split(",").filter((t) => t.includes("/")).sort()).toEqual(
+      ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+    );
+  });
+
+  it("Texte ohne Anrede (Portal), Knopf mit dem Namen aus dem Feinplan", () => {
+    expect(PROTOKOLL_UPLOAD_MELDUNGEN.KNOPF).toBe("Unterschriebenes Übergabeprotokoll hochladen");
+    for (const text of Object.values(PROTOKOLL_UPLOAD_MELDUNGEN)) {
+      expect(text).not.toMatch(/\b(du|Sie|Ihr|Ihre|dein|deine)\b/);
+    }
+  });
+});
+
 describe("ausgabeKalendertag", () => {
   it("@db.Date (Mitternacht UTC) und YYYY-MM-DD ergeben denselben Tag; leer bzw. unlesbar null", () => {
     expect(ausgabeKalendertag(utc("2027-01-28T00:00:00Z"))).toBe("2027-01-28");
@@ -3668,5 +3733,209 @@ describe("Meldungen der Zustände (S30)", () => {
     for (const text of [MELDUNGEN_AUSGABEN.ZUSTAND_NICHT_MOEGLICH, MELDUNGEN_AUSGABEN.STUECK_INZWISCHEN_GEAENDERT]) {
       expect(text).not.toMatch(/\b(du|dein)\b/i);
     }
+  });
+});
+
+// =============================================
+// S33: Brief-Platzhalter der Resolver (1.9)
+// =============================================
+
+describe("ausgabenPlatzhalter (S33, 1.9)", () => {
+  const stueck = (teil: Partial<Parameters<typeof ausgabenPlatzhalter>[0][number]>) => ({
+    departmentKey: "IT",
+    bezeichnung: "Dienst-iPad (Lernmittel)",
+    kennung: "FES-IPAD-0412",
+    uebergebenAm: utc("2027-01-28T00:00:00Z"),
+    zustand: "AUSGEGEBEN",
+    beiAustritt: "RUECKGABE",
+    ...teil,
+  });
+
+  it("Liste je Stelle, Zeilen wie die Absage-Mail und Anzahl – nur aktive Stuecke", () => {
+    const werte = ausgabenPlatzhalter(
+      [
+        stueck({}),
+        stueck({ bezeichnung: "Zugänge: Dienst-E-Mail", kennung: null, beiAustritt: "SPERREN", uebergebenAm: "2027-01-29" }),
+        stueck({ departmentKey: "FACILITY", bezeichnung: "Schlüssel: Haupteingang", kennung: "GS-114", zustand: "VERBLEIBT", uebergebenAm: "2027-01-30" }),
+        stueck({ bezeichnung: "Laptop", kennung: "NB-1", zustand: "ERSETZT" }),
+        stueck({ bezeichnung: "Alter Schlüssel", zustand: "ZURUECK" }),
+      ],
+      { FACILITY: "Hausmeister" },
+    );
+    expect(werte.ausgaben_anzahl).toBe("3");
+    expect(werte.ausgaben_liste.split("\n")).toEqual([
+      "Dienst-iPad (Lernmittel) · FES-IPAD-0412 · übergeben 28.01.2027",
+      "Zugänge: Dienst-E-Mail · eingerichtet 29.01.2027",
+      "Schlüssel: Haupteingang · GS-114 · übergeben 30.01.2027",
+    ]);
+    expect(werte.ausgaben_je_stelle).toEqual([
+      {
+        ausgabe_stelle: "IT-Abteilung",
+        gegenstaende: [
+          { ausgabe_gegenstand: "Dienst-iPad (Lernmittel)", ausgabe_kennung: "FES-IPAD-0412", ausgabe_uebergeben_am: "28.01.2027" },
+          { ausgabe_gegenstand: "Zugänge: Dienst-E-Mail", ausgabe_kennung: "", ausgabe_uebergeben_am: "29.01.2027" },
+        ],
+      },
+      {
+        ausgabe_stelle: "Hausmeister",
+        gegenstaende: [{ ausgabe_gegenstand: "Schlüssel: Haupteingang", ausgabe_kennung: "GS-114", ausgabe_uebergeben_am: "30.01.2027" }],
+      },
+    ]);
+  });
+
+  it("ohne aktives Stueck: leere Liste, leerer Text, Anzahl \"0\"", () => {
+    expect(ausgabenPlatzhalter([], {})).toEqual({ ausgaben_je_stelle: [], ausgaben_liste: "", ausgaben_anzahl: "0" });
+    expect(ausgabenPlatzhalter([stueck({ zustand: "FEHLT" })], {}).ausgaben_anzahl).toBe("0");
+  });
+});
+
+describe("rueckgabenJeStelle (S33, 1.9)", () => {
+  it("Stelle aus der Ausgabe, von HR erfasste unter der Personalabteilung, offene ohne Zustand und Datum", () => {
+    const gruppen = rueckgabenJeStelle(
+      [
+        { itemName: "Parkausweis", serialNumber: null, isReturned: false, returnedAt: null, zustand: null, departmentKey: null },
+        { itemName: "Dienst-iPad", serialNumber: "FES-IPAD-0412", isReturned: true, returnedAt: utc("2027-07-31T10:00:00Z"), zustand: "BESCHAEDIGT", departmentKey: "IT" },
+        { itemName: "Schlüssel: Haupteingang", serialNumber: "GS-114", isReturned: false, returnedAt: null, zustand: "FEHLT", departmentKey: "FACILITY" },
+        // Altbestand: zurueckgegeben ohne Zustand
+        { itemName: "Monitor", isReturned: true, returnedAt: utc("2027-07-30T10:00:00Z"), departmentKey: null },
+      ],
+      { FACILITY: "Hausmeister" },
+    );
+    expect(gruppen).toEqual([
+      {
+        rueckgabe_stelle: "IT-Abteilung",
+        gegenstaende: [
+          { rueckgabe_gegenstand: "Dienst-iPad", rueckgabe_kennung: "FES-IPAD-0412", rueckgabe_zustand: "beschädigt zurück", rueckgabe_am: "31.07.2027" },
+        ],
+      },
+      {
+        rueckgabe_stelle: "Hausmeister",
+        gegenstaende: [
+          { rueckgabe_gegenstand: "Schlüssel: Haupteingang", rueckgabe_kennung: "GS-114", rueckgabe_zustand: "fehlt", rueckgabe_am: "" },
+        ],
+      },
+      {
+        rueckgabe_stelle: "Personalabteilung",
+        gegenstaende: [
+          { rueckgabe_gegenstand: "Monitor", rueckgabe_kennung: "", rueckgabe_zustand: "zurück", rueckgabe_am: "30.07.2027" },
+          { rueckgabe_gegenstand: "Parkausweis", rueckgabe_kennung: "", rueckgabe_zustand: "", rueckgabe_am: "" },
+        ],
+      },
+    ]);
+  });
+
+  it("jedes innere Feld ist eine Zeichenkette; ohne Zeile keine Gruppe", () => {
+    const [g] = rueckgabenJeStelle([{ itemName: "X", isReturned: false, departmentKey: "IT" }], {});
+    for (const wert of Object.values(g.gegenstaende[0])) expect(typeof wert).toBe("string");
+    expect(rueckgabenJeStelle([], {})).toEqual([]);
+  });
+});
+
+// =============================================
+// Loeschlauf (S35, G20, Feinplan 1.11)
+// =============================================
+
+describe("ausgabeFaellig (1.11: Grenze genau am Tag)", () => {
+  // Frist eines ZURUECK vom 31.08.2026: Beginn des 28.02.2027 in Berlin.
+  const frist = ausgabeLoeschenAb({ zustand: "ZURUECK", zustandAm: utc("2026-08-31T10:00:00Z") })!;
+
+  it("faellig ab dem Beginn des Berliner Tages – die Grenze zaehlt mit", () => {
+    expect(frist.toISOString()).toBe("2027-02-27T23:00:00.000Z");
+    expect(ausgabeFaellig(frist, frist)).toBe(true);
+    // 28.02.2027, 03:15 Berlin – der Lauf dieses Tages
+    expect(ausgabeFaellig(frist, utc("2027-02-28T02:15:00Z"))).toBe(true);
+    // 27.02.2027, 23:59:59 Berlin – am Vortag noch nicht
+    expect(ausgabeFaellig(frist, utc("2027-02-27T22:59:59.999Z"))).toBe(false);
+  });
+
+  it("ohne Frist, mit unlesbarer Frist oder ungueltigem jetzt nie faellig", () => {
+    const jetzt = utc("2030-01-01T00:00:00Z");
+    expect(ausgabeFaellig(null, jetzt)).toBe(false);
+    expect(ausgabeFaellig(undefined, jetzt)).toBe(false);
+    expect(ausgabeFaellig(new Date("kaputt"), jetzt)).toBe(false);
+    expect(ausgabeFaellig("2027-01-01" as unknown as Date, jetzt)).toBe(false);
+    expect(ausgabeFaellig(frist, new Date("kaputt"))).toBe(false);
+  });
+
+  it("ein Date aus einem anderen Realm zaehlt (kein instanceof)", () => {
+    const fremd = structuredClone(frist);
+    expect(ausgabeFaellig(fremd, utc("2027-03-01T00:00:00Z"))).toBe(true);
+  });
+});
+
+describe("ohneFristGrenze (1.11, Schritt 6)", () => {
+  it("Berliner Kalendertag minus drei Jahre als @db.Date-Wert (Mitternacht UTC)", () => {
+    // 15.09.2027, 03:15 Berlin
+    expect(ohneFristGrenze(utc("2027-09-15T01:15:00Z")).toISOString()).toBe("2024-09-15T00:00:00.000Z");
+    expect(AUSGABE_VERJAEHRUNG_JAHRE).toBe(3);
+  });
+
+  it("der Berliner Tag zaehlt, nicht der UTC-Tag; der 29.02. wird gekappt", () => {
+    // 31.12.2027, 23:30 UTC = 01.01.2028, 00:30 Berlin
+    expect(ohneFristGrenze(utc("2027-12-31T23:30:00Z")).toISOString()).toBe("2025-01-01T00:00:00.000Z");
+    // 29.02.2028 → 28.02.2025
+    expect(ohneFristGrenze(utc("2028-02-29T10:00:00Z")).toISOString()).toBe("2025-02-28T00:00:00.000Z");
+  });
+});
+
+describe("loeschMengeFestlegen (1.11, Schritt 3)", () => {
+  const JETZT = utc("2027-09-15T01:15:00Z");
+  const faellig = utc("2027-03-14T23:00:00Z");
+  const spaeter = utc("2028-01-01T00:00:00Z");
+
+  it("faellige Ausgaben nach id sortiert; nicht mehr faellige bleiben", () => {
+    const menge = loeschMengeFestlegen({
+      ausgaben: [
+        { id: "ag-3", loeschenAb: faellig },
+        { id: "ag-1", loeschenAb: faellig },
+        { id: "ag-2", loeschenAb: null },
+        { id: "ag-4", loeschenAb: spaeter },
+      ],
+      bezuege: [],
+      gesperrteAustritte: [],
+      jetzt: JETZT,
+    });
+    expect(menge).toEqual({ ids: ["ag-1", "ag-3"], nichtMehrFaellig: ["ag-2", "ag-4"], ungesperrterAustritt: [] });
+  });
+
+  it("Bezug eines nicht gesperrten Austritts: faellt fuer diesen Lauf heraus; gesperrte Bezuege stoeren nicht", () => {
+    const menge = loeschMengeFestlegen({
+      ausgaben: [
+        { id: "ag-1", loeschenAb: faellig },
+        { id: "ag-2", loeschenAb: faellig },
+      ],
+      bezuege: [
+        { ausgabeId: "ag-1", offboardingId: "off-a" },
+        { ausgabeId: "ag-2", offboardingId: "off-a" },
+        { ausgabeId: "ag-2", offboardingId: "off-neu" },
+        { ausgabeId: null, offboardingId: "off-x" },
+      ],
+      gesperrteAustritte: new Set(["off-a"]),
+      jetzt: JETZT,
+    });
+    expect(menge).toEqual({ ids: ["ag-1"], nichtMehrFaellig: [], ungesperrterAustritt: ["ag-2"] });
+  });
+});
+
+describe("ausgabenGeloeschtDetails (1.10: nur Anzahlen)", () => {
+  it("feste Form, fehlende Zaehler sind 0, nichts anderes geht hinein", () => {
+    expect(ausgabenGeloeschtDetails({ anzahl: 2, kommentareGeleert: 1 })).toEqual({
+      anzahl: 2,
+      rueckgabenGeleert: 0,
+      kommentareGeleert: 1,
+      protokolle: 0,
+      erzeugteProtokolle: 0,
+    });
+    const fremd = { protokolle: 1, kennung: "FES-0412" } as unknown as Parameters<typeof ausgabenGeloeschtDetails>[0];
+    expect(Object.keys(ausgabenGeloeschtDetails(fremd))).not.toContain("kennung");
+    expect(ausgabenGeloeschtDetails({ anzahl: Number.NaN }).anzahl).toBe(0);
+  });
+});
+
+describe("Konstanten des Loeschlaufs", () => {
+  it("Seite von 500, beide Protokolle mit Suchschluessel der System-Vorlage", () => {
+    expect(AUSGABEN_LOESCH_SEITE).toBe(500);
+    expect(PROTOKOLL_SYSTEM_VORLAGEN.UEBERGABE.modul).toBe("ONBOARDING");
+    expect(PROTOKOLL_SYSTEM_VORLAGEN.RUECKGABE.modul).toBe("OFFBOARDING");
   });
 });

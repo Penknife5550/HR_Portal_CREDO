@@ -6,6 +6,9 @@
  *   aufgeloest + gemeldet, wenn die Vorlage sie nutzt (placeholders-Gating).
  * - {ausstattung_liste} (Ausstattung & Zugaenge, S20/E-A25): eine Zeile je
  *   gewaehlter Position, ohne Bemerkung, Angabe, Hinweis und Gestrichenes.
+ * - Listen-Platzhalter (A4, S33, Feinplan 1.9): Der Katalog kennt Listen,
+ *   {ausgaben_je_stelle}/{ausgaben_liste}/{ausgaben_anzahl} im Onboarding –
+ *   ohne Bemerkung, mit Mandantenpruefung, jedes innere Feld gesetzt.
  */
 
 // canAccessProcess wird ueberschrieben, alles andere aus permissions bleibt echt.
@@ -22,6 +25,7 @@ jest.mock("@/lib/db", () => ({
     contractEndProcess: { findUnique: jest.fn() },
     organization: { findUnique: jest.fn() },
     user: { findUnique: jest.fn() },
+    departmentConfig: { findMany: jest.fn() },
   },
 }));
 
@@ -33,6 +37,14 @@ import {
   getResolver,
   type ResolverContext,
 } from "@/lib/doc-template-resolvers";
+import {
+  eingabePlatzhalter,
+  handwerteOhneListen,
+  istListenPlatzhalter,
+  listenNamen,
+  sensiblePlatzhalter,
+  vorlagenListen,
+} from "@/lib/placeholder-catalog";
 
 const mockFindOnboarding = prisma.onboardingProcess.findUnique as jest.Mock;
 const mockFindOrg = prisma.organization.findUnique as jest.Mock;
@@ -753,5 +765,252 @@ describe("Datum in deutscher Zeit (der Container laeuft in UTC)", () => {
     const { data } = await getResolver("ONBOARDING")(ctx({ placeholders: ["eintrittsdatum"] }));
 
     expect(data.eintrittsdatum).toBe("01.09.2026");
+  });
+});
+
+// =============================================
+// Listen-Platzhalter (A4, S33, Feinplan 1.9)
+// =============================================
+describe("Listen im Platzhalter-Katalog (S33)", () => {
+  const alleDefs = Object.values(PLACEHOLDER_CATALOG).flat();
+  const listen = alleDefs.filter((d) => d.liste);
+
+  it("Onboarding kennt {ausgaben_je_stelle} als Liste samt {ausgaben_liste} und {ausgaben_anzahl} (Gruppe „Ausgaben“)", () => {
+    const onb = getPlaceholderCatalog("ONBOARDING");
+    const liste = onb.find((d) => d.key === "ausgaben_je_stelle");
+    expect(liste?.group).toBe("Ausgaben");
+    expect(listenNamen(liste!)).toEqual([
+      "ausgaben_je_stelle",
+      "ausgabe_stelle",
+      "gegenstaende",
+      "ausgabe_gegenstand",
+      "ausgabe_kennung",
+      "ausgabe_uebergeben_am",
+    ]);
+    for (const key of ["ausgaben_liste", "ausgaben_anzahl"]) {
+      const def = onb.find((d) => d.key === key);
+      expect({ key, group: def?.group, liste: def?.liste }).toEqual({ key, group: "Ausgaben", liste: undefined });
+    }
+  });
+
+  it("Offboarding kennt {rueckgaben_je_stelle} (Gruppe „Rückgaben“), aber keine ausgaben_*", () => {
+    const off = getPlaceholderCatalog("OFFBOARDING");
+    const liste = off.find((d) => d.key === "rueckgaben_je_stelle");
+    expect(liste?.group).toBe("Rückgaben");
+    expect(listenNamen(liste!)).toEqual([
+      "rueckgaben_je_stelle",
+      "rueckgabe_stelle",
+      "gegenstaende",
+      "rueckgabe_gegenstand",
+      "rueckgabe_kennung",
+      "rueckgabe_zustand",
+      "rueckgabe_am",
+    ]);
+    // Die bisherigen Rueckgabe-Platzhalter stehen in derselben Gruppe.
+    for (const key of ["rueckgaben_liste", "rueckgaben_offen_liste", "rueckgaben_offen_anzahl"]) {
+      expect(off.find((d) => d.key === key)?.group).toBe("Rückgaben");
+    }
+    expect(off.filter((d) => d.key.startsWith("ausgabe")).map((d) => d.key)).toEqual([]);
+    expect(getPlaceholderCatalog("ONBOARDING").some((d) => d.key === "rueckgaben_je_stelle")).toBe(false);
+  });
+
+  it("innere Felder tragen ein Praefix, und kein innerer Name ist zugleich ein gewoehnlicher Platzhalter", () => {
+    const einfach = new Set(alleDefs.filter((d) => !d.liste).map((d) => d.key));
+    expect(listen.map((d) => d.key).sort()).toEqual(["ausgaben_je_stelle", "rueckgaben_je_stelle"]);
+    for (const d of listen) {
+      const praefix = d.key === "ausgaben_je_stelle" ? "ausgabe_" : "rueckgabe_";
+      const felder = [...d.liste!.felder, ...(d.liste!.unterliste?.felder ?? [])].map((f) => f.name);
+      for (const name of felder) expect({ name, praefix: name.startsWith(praefix) }).toEqual({ name, praefix: true });
+      // Fehlte ein inneres Feld, griffe der Parser auf einen gleichnamigen Wert der
+      // Person zurueck – also darf es keinen gleichnamigen Platzhalter geben.
+      for (const name of listenNamen(d).slice(1)) {
+        expect({ name, kollision: einfach.has(name) }).toEqual({ name, kollision: false });
+      }
+    }
+  });
+
+  it("kein Listenname ist sensibel", () => {
+    const namen = listen.flatMap((d) => listenNamen(d));
+    expect(namen.length).toBeGreaterThan(10);
+    expect(sensiblePlatzhalter(namen)).toEqual([]);
+    for (const d of listen) expect(d.sensitive).toBeFalsy();
+  });
+
+  it("istListenPlatzhalter: Listen und innere Namen, unabhaengig von Schreibweise und Klammern", () => {
+    for (const name of ["ausgaben_je_stelle", "ausgabe_kennung", "gegenstaende", "{RUECKGABE_ZUSTAND}", "rueckgaben_je_stelle"]) {
+      expect({ name, liste: istListenPlatzhalter(name) }).toEqual({ name, liste: true });
+    }
+    for (const name of ["vorname", "ausgaben_liste", "ausgaben_anzahl", "rueckgaben_liste", "ausstattung_liste"]) {
+      expect({ name, liste: istListenPlatzhalter(name) }).toEqual({ name, liste: false });
+    }
+  });
+
+  it("eingabePlatzhalter: der Editor zeigt fuer innere Namen bekannter Listen kein Eingabefeld", () => {
+    expect(
+      eingabePlatzhalter([
+        "ausgabe_gegenstand",
+        "ausgabe_kennung",
+        "ausgabe_stelle",
+        "ausgaben_je_stelle",
+        "eintrittsdatum",
+        "gegenstaende",
+        "vorname",
+      ]),
+    ).toEqual(["eintrittsdatum", "vorname"]);
+  });
+
+  it("vorlagenListen nennt die genutzten Listen (nur Schluessel, je Liste einmal)", () => {
+    const genutzt = vorlagenListen(["ausgaben_je_stelle", "ausgabe_kennung", "vorname"], "ONBOARDING");
+    expect(genutzt.map((d) => d.key)).toEqual(["ausgaben_je_stelle"]);
+    // Eine ALLGEMEIN-Vorlage mit der Liste eines anderen Moduls zeigt sie trotzdem.
+    expect(vorlagenListen(["rueckgaben_je_stelle"], "ALLGEMEIN").map((d) => d.key)).toEqual(["rueckgaben_je_stelle"]);
+    expect(vorlagenListen(["vorname"], "ONBOARDING")).toEqual([]);
+  });
+
+  it("handwerteOhneListen: ein Handwert ersetzt nie eine Liste – weder ein Array des Resolvers noch einen Listennamen", () => {
+    const aufgeloest = { ausgaben_je_stelle: [{ ausgabe_stelle: "IT", gegenstaende: [] }], vorname: "Max", eigene_liste: ["a"] };
+    expect(
+      handwerteOhneListen(
+        { ausgaben_je_stelle: "Hand", ausgabe_kennung: "X-1", gegenstaende: "y", eigene_liste: "z", vorname: "Moritz", ort: "Minden" },
+        aufgeloest,
+      ),
+    ).toEqual({ vorname: "Moritz", ort: "Minden" });
+    expect(handwerteOhneListen(undefined, aufgeloest)).toEqual({});
+  });
+});
+
+describe("Onboarding-Resolver: {ausgaben_je_stelle}, {ausgaben_liste}, {ausgaben_anzahl} (S33)", () => {
+  const mockKonfigs = prisma.departmentConfig.findMany as jest.Mock;
+  const ausgabe = (teil: Record<string, unknown>) => ({
+    departmentKey: "IT",
+    bezeichnung: "Dienst-iPad (Lernmittel)",
+    kennung: "FES-IPAD-0412",
+    uebergebenAm: new Date("2027-01-28T00:00:00.000Z"),
+    zustand: "AUSGEGEBEN",
+    beiAustritt: "RUECKGABE",
+    ...teil,
+  });
+  const vorgang = (ausgaben: unknown) => ({
+    displayId: "2027-GS-007",
+    email: "erika.privat@example.org",
+    firstName: "Erika",
+    lastName: "Beispiel",
+    organizationId: "org-foerderverein",
+    arbeitsortId: "org-grundschule",
+    personalData: null,
+    supervisorData: null,
+    ausgaben,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCanAccessProcess.mockResolvedValue(true);
+    mockFindOrg.mockResolvedValue({
+      name: "Förderverein", shortName: "FV", mandantNumber: "780",
+      dsgvoVerantwortlicheName: null, dsgvoVerantwortlicheStrasse: null,
+      dsgvoVerantwortlichePlz: null, dsgvoVerantwortlicheOrt: null,
+    });
+    mockFindUser.mockResolvedValue(null);
+    mockKonfigs.mockResolvedValue([
+      { departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", email: "hm@gs.example", organizationId: "org-grundschule", isActive: true },
+      { departmentKey: "FACILITY", departmentName: "Hausmeister Förderverein", email: "hm@fv.example", organizationId: "org-foerderverein", isActive: true },
+    ]);
+  });
+
+  it("Liste je Stelle, Zeilen und Anzahl – Stellennamen an der Empfaenger-Einrichtung (Arbeitsort)", async () => {
+    mockFindOnboarding.mockResolvedValue(
+      vorgang([
+        ausgabe({}),
+        ausgabe({
+          departmentKey: "FACILITY",
+          bezeichnung: "Schlüssel: Haupteingang",
+          kennung: "GS-114",
+          zustand: "VERBLEIBT",
+          uebergebenAm: new Date("2027-01-30T00:00:00.000Z"),
+        }),
+      ]),
+    );
+    const { data, sensitiveFields } = await getResolver("ONBOARDING")(ctx());
+    expect(data.ausgaben_je_stelle).toEqual([
+      {
+        ausgabe_stelle: "IT-Abteilung",
+        gegenstaende: [{ ausgabe_gegenstand: "Dienst-iPad (Lernmittel)", ausgabe_kennung: "FES-IPAD-0412", ausgabe_uebergeben_am: "28.01.2027" }],
+      },
+      {
+        ausgabe_stelle: "Hausmeister Grundschule",
+        gegenstaende: [{ ausgabe_gegenstand: "Schlüssel: Haupteingang", ausgabe_kennung: "GS-114", ausgabe_uebergeben_am: "30.01.2027" }],
+      },
+    ]);
+    expect(data.ausgaben_liste).toBe(
+      "Dienst-iPad (Lernmittel) · FES-IPAD-0412 · übergeben 28.01.2027\nSchlüssel: Haupteingang · GS-114 · übergeben 30.01.2027",
+    );
+    expect(data.ausgaben_anzahl).toBe("2");
+    expect(sensitiveFields).toEqual([]);
+    expect(mockKonfigs).toHaveBeenCalledWith({
+      where: { departmentKey: { in: ["IT", "FACILITY"] } },
+      select: { departmentKey: true, departmentName: true, email: true, organizationId: true, isActive: true },
+    });
+    // Nur Namen der Stellen, nie Adressen.
+    expect(JSON.stringify(data.ausgaben_je_stelle)).not.toMatch(/@/);
+  });
+
+  it("liest nur aktive Ausgaben und nur die Felder der Protokollzeile – nie Kommentare oder das HR-Konto", async () => {
+    mockFindOnboarding.mockResolvedValue(vorgang([]));
+    await getResolver("ONBOARDING")(ctx());
+    const auswahl = mockFindOnboarding.mock.calls[0][0].select;
+    expect(auswahl.arbeitsortId).toBe(true);
+    expect(auswahl.ausgaben).toEqual({
+      where: { zustand: { in: ["AUSGEGEBEN", "VERBLEIBT"] } },
+      select: { departmentKey: true, bezeichnung: true, kennung: true, uebergebenAm: true, zustand: true, beiAustritt: true },
+      orderBy: [{ uebergebenAm: "asc" }, { createdAt: "asc" }],
+    });
+  });
+
+  it("Listen ohne Bemerkung: kaeme ein Kommentar doch mit, stuende er nirgends", async () => {
+    mockFindOnboarding.mockResolvedValue(
+      vorgang([ausgabe({ abteilungKommentar: "mit Huelle uebergeben", erfasstVonId: "hr-9", bemerkung: "geheim" })]),
+    );
+    const { data } = await getResolver("ONBOARDING")(ctx());
+    const text = JSON.stringify([data.ausgaben_je_stelle, data.ausgaben_liste]);
+    expect(text).not.toMatch(/Huelle|hr-9|geheim/);
+  });
+
+  it("jedes innere Feld ist gesetzt – auch ohne Kennung (\"\" statt fehlend)", async () => {
+    mockFindOnboarding.mockResolvedValue(vorgang([ausgabe({ kennung: null })]));
+    const { data } = await getResolver("ONBOARDING")(ctx());
+    const [stelle] = data.ausgaben_je_stelle as Array<{ ausgabe_stelle: string; gegenstaende: Record<string, unknown>[] }>;
+    expect(typeof stelle.ausgabe_stelle).toBe("string");
+    expect(stelle.gegenstaende[0]).toEqual({
+      ausgabe_gegenstand: "Dienst-iPad (Lernmittel)",
+      ausgabe_kennung: "",
+      ausgabe_uebergeben_am: "28.01.2027",
+    });
+  });
+
+  it("ohne Ausgabe: leere Liste (Leersatz der Vorlage), Anzahl \"0\", keine Zeilen, keine Abfrage der Stellen", async () => {
+    mockFindOnboarding.mockResolvedValue(vorgang([]));
+    const { data } = await getResolver("ONBOARDING")(ctx());
+    expect(data.ausgaben_je_stelle).toEqual([]);
+    expect(data.ausgaben_anzahl).toBe("0");
+    expect(data.ausgaben_liste).toBeUndefined();
+    expect(mockKonfigs).not.toHaveBeenCalled();
+    // Vorgang ohne das Feld (Mock eines Altbestands): dasselbe.
+    mockFindOnboarding.mockResolvedValue(vorgang(undefined));
+    expect((await getResolver("ONBOARDING")(ctx())).data.ausgaben_je_stelle).toEqual([]);
+  });
+
+  it("fremder Mandant: keine Liste, keine Zeilen, keine Anzahl (wie alle Vorgangsdaten)", async () => {
+    mockCanAccessProcess.mockResolvedValue(false);
+    mockFindOnboarding.mockResolvedValue(vorgang([ausgabe({})]));
+    const { data } = await getResolver("ONBOARDING")(ctx());
+    expect(data.ausgaben_je_stelle).toBeUndefined();
+    expect(data.ausgaben_liste).toBeUndefined();
+    expect(data.ausgaben_anzahl).toBeUndefined();
+    expect(mockKonfigs).not.toHaveBeenCalled();
+  });
+
+  it("ohne refId: keine Liste", async () => {
+    const { data } = await getResolver("ONBOARDING")(ctx({ refId: null }));
+    expect(data.ausgaben_je_stelle).toBeUndefined();
   });
 });

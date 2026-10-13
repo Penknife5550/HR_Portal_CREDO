@@ -450,6 +450,27 @@ describe("UEBERGABEPROTOKOLL (A4)", () => {
     expect(SCHRIFTFORM_DOKUMENTTYPEN).not.toContain("UEBERGABEPROTOKOLL");
     expect(NACHREICHBARE_PFLICHTEN).not.toContain("UEBERGABEPROTOKOLL");
   });
+
+  it("erledigt keinen offenen Nachweis und wird selbst nie als offen gemeldet (S34)", () => {
+    // Der Kasten „Offene Nachweise" und die Vorauswahl der Nachforderung lesen
+    // `offeneNachweise` mit den Typen ALLER Dokumente des Vorgangs — ein
+    // hochgeladenes Uebergabeprotokoll darf dort nichts verschieben.
+    const eingaben = pflichtEingabenAusVorgang({
+      required: ["GEBURTSURKUNDE_EIGEN"],
+      anzahlKinder: 0,
+      organisationstyp: "GYMNASIUM",
+      personalData: {
+        birthDate: "1990-05-03",
+        rvEntscheidung: null,
+        aufenthaltstitelErforderlich: true,
+        healthInsuranceType: "privat",
+      },
+    });
+    const ohne = offeneNachweise(eingaben, ["GEBURTSURKUNDE_EIGEN"]);
+    expect(offeneNachweise(eingaben, ["GEBURTSURKUNDE_EIGEN", "UEBERGABEPROTOKOLL"])).toEqual(ohne);
+    expect(ohne).not.toContain("UEBERGABEPROTOKOLL");
+    expect(ohne.length).toBeGreaterThan(0);
+  });
 });
 
 /**

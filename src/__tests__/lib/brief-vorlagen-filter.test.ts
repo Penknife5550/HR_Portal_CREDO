@@ -12,6 +12,8 @@ import {
   GELTUNG_GLOBAL,
   GELTUNG_MANDANT,
   MODUL_ALLE,
+  SYSTEM_VORLAGE_MODUL_FEST,
+  systemVorlageModulGesperrt,
   type FilterbareVorlage,
 } from "@/lib/brief-vorlagen-filter";
 
@@ -113,5 +115,27 @@ describe("filterVorlagen — Kombination", () => {
     const kopie = [...vorlagen];
     filterVorlagen(vorlagen, { modul: "ONBOARDING", geltung: KITA });
     expect(vorlagen).toEqual(kopie);
+  });
+});
+
+// System-Vorlagen: das Modul ist fest (Ausstattung A4, G19, Review A4d) —
+// dieselbe Regel fuer PATCH /api/brief-vorlagen/[id] und den Bearbeiten-Dialog.
+describe("systemVorlageModulGesperrt", () => {
+  it("sperrt nur ein ANDERES Modul an einer System-Vorlage", () => {
+    const system = { isSystem: true, modul: "OFFBOARDING" };
+    expect(systemVorlageModulGesperrt(system, "ALLGEMEIN")).toBe(true);
+    expect(systemVorlageModulGesperrt(system, "OFFBOARDING")).toBe(false);
+    expect(systemVorlageModulGesperrt(system, undefined)).toBe(false);
+  });
+
+  it("eine gewoehnliche Vorlage (auch ohne Angabe) wechselt frei", () => {
+    expect(systemVorlageModulGesperrt({ isSystem: false, modul: "ONBOARDING" }, "ALLGEMEIN")).toBe(false);
+    expect(systemVorlageModulGesperrt({ isSystem: null, modul: "ONBOARDING" }, "ALLGEMEIN")).toBe(false);
+    expect(systemVorlageModulGesperrt({ modul: "ONBOARDING" }, "ALLGEMEIN")).toBe(false);
+  });
+
+  it("der Text sagt den Grund, ohne Anrede", () => {
+    expect(SYSTEM_VORLAGE_MODUL_FEST).toContain("System-Vorlage");
+    expect(SYSTEM_VORLAGE_MODUL_FEST).not.toMatch(/\b(du|Sie|Ihr|Ihre|dein|deine)\b/);
   });
 });

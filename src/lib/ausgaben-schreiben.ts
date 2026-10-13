@@ -29,8 +29,10 @@
  * (`ausgabeImAustrittSperrenIn`, `ausgabeGleichlaufIn`, G15 bis G17) – auf
  * allen drei Wegen (Link der Stelle, Portal-PATCH, Reiter „Rückgaben“).
  * Seit S31 die Frist der beim Abschluss des Austritts offen gebliebenen
- * Stuecke (`offeneAusgabenAbschliessenIn`, G18). Spaeter haengt hier das
- * Loeschen im Lauf an (`ausgabenLoeschenIn`, S35).
+ * Stuecke (`offeneAusgabenAbschliessenIn`, G18). Seit S35 das Loeschen nach
+ * Ablauf der Frist (`ausgabenLoeschenIn`, G20) – aufgerufen vom Lauf
+ * „Aufbewahrung erzeugter Dokumente“ (src/lib/ausgaben-lauf.ts), der vorher in
+ * der Reihenfolge G24 sperrt und die Menge festlegt.
  */
 
 import type { Prisma } from "@prisma/client";
@@ -718,4 +720,163 @@ export async function ausgabeGleichlaufIn(
     folgeaufgabe,
     stellen: [...stellen],
   };
+}
+
+// =============================================
+// Loeschen nach Ablauf der Frist (G20, Feinplan 1.11, S35)
+// =============================================
+
+/**
+ * Was `ausgabenLoeschenIn` loescht und leert – vom Lauf NACH seinen Sperren
+ * gelesen und mit `loeschMengeFestlegen` festgelegt (1.11, Schritt 3).
+ */
+export interface AusgabenLoeschAuftrag {
+  /** Die festgelegte Menge samt Ausstattungsaufgabe, an der vermerkt wurde. */
+  ausgaben: ReadonlyArray<{ id: string; checklistItemId: string | null }>;
+  /**
+   * Die Rueckgabe-Zeilen dieser Ausgaben – VOR dem Loeschen gelesen: Danach
+   * steht ihre FK auf `null` (SetNull), und niemand faende die Kopie der
+   * Kennung (`serialNumber`) mehr.
+   */
+  rueckgabeIds: ReadonlyArray<string>;
+  /** Herkunft der Gruppe (gesperrt); `null` = ohne Herkunft. */
+  onboardingId: string | null;
+  /** Die gesperrten Austritte, die diese Ausgaben beziehen (G28). */
+  austrittIds: ReadonlyArray<string>;
+  jetzt: Date;
+}
+
+/** Was `ausgabenLoeschenIn` getan hat – nur Anzahlen und IDs (Protokoll und Bericht). */
+export interface AusgabenLoeschErgebnis {
+  geloescht: number;
+  /** Rueckgabe-Zeilen, deren Kopie (`serialNumber`, `condition`, `notes`) geleert wurde. */
+  rueckgabenGeleert: number;
+  /** Je Austritt: geleerte Kommentare der Stellen an Ruecknahme-, Sperr- und Folgeaufgaben. */
+  kommentareJeAustritt: Record<string, number>;
+  /** Geleerte Kommentare an Ausstattungsaufgaben der Einstellung, die danach keine Ausgabe mehr haben. */
+  kommentareEinstellung: number;
+  /** Die Einstellung hat danach keine Ausgabe mehr – ihr Merker `ausgabenGeloeschtAm` ist gesetzt. */
+  einstellungMerker: boolean;
+  /** Austritte ohne verbliebenen Ausgabebezug – ihr Merker `ausgabenGeloeschtAm` ist gesetzt. */
+  austritteMerker: string[];
+}
+
+/**
+ * Das Loeschen traf weniger Ausgaben als festgelegt – trotz der Sperren hat
+ * sich eine Frist bewegt. Wirft, damit die Transaktion des Laufs ZURUECKROLLT:
+ * Sonst haetten weiterlebende Ausgaben ihre Kommentare schon verloren. Der
+ * naechste Lauf legt die Menge neu fest.
+ */
+export class AusgabenLoeschKonflikt extends Error {
+  constructor() {
+    super("AUSGABEN_INZWISCHEN_GEAENDERT");
+    this.name = "AusgabenLoeschKonflikt";
+  }
+}
+
+/**
+ * Loescht eine festgelegte Menge von Ausgaben nach Ablauf ihrer Frist (G20,
+ * E-A37) – in der Transaktion des Laufs, der vorher in der Reihenfolge G24
+ * gesperrt hat (Austritte nach `id`, dann die Einstellung). Diese Funktion
+ * SPERRT SELBST NICHTS; sie schreibt nur fuer genau die uebergebene Menge, in
+ * der Reihenfolge G24 (Aufgaben → Ausgaben → Rueckgaben):
+ *
+ *   1. **Aufgaben:** Kommentare der Stellen an den Ruecknahme-, Sperr- und
+ *      Folgeaufgaben dieser Ausgaben leeren (je Austritt, nach `id`); an der
+ *      Onboarding-Ausstattungsaufgabe, an der vermerkt wurde („iPad 0412
+ *      übergeben“), nur, wenn sie danach keine Ausgabe mehr hat. Jede dieser
+ *      Ausstattungsaufgaben bekommt den Merker `ausgabenGeloeschtAm` – die
+ *      Karte zeigt dann „Ausgaben nach Ablauf der Aufbewahrungsfrist
+ *      gelöscht“ statt „Übergabe nicht vermerkt“, und der Reiter „Rückgaben“
+ *      bietet sie nie wieder „Als ausgegeben übernehmen“ an (`ohneVermerk`).
+ *      Der Merker steht hier und nicht erst am Ende, weil Aufgaben in G24 vor
+ *      den Ausgaben gesperrt werden; in derselben Transaktion ist das gleich.
+ *   2. **Ausgaben** loeschen, bedingt auf `loeschenAb <= jetzt` (das Netz unter
+ *      den Sperren). Trifft das weniger als festgelegt: `AusgabenLoeschKonflikt`.
+ *   3. **Rueckgaben:** die Kopie in `ReturnItem` leeren (`serialNumber`,
+ *      `condition`, `notes`) – ueber die vorher gelesenen IDs.
+ *   4. **Merker der Vorgaenge** (schon gesperrt): Einstellung ohne Ausgabe,
+ *      Austritt ohne verbliebenen Ausgabebezug (Rueckgabe-Zeile oder Aufgabe
+ *      mit `ausgabeId`) – danach fallen ihre Protokolle (Lauf, 1.11 Schritt 4).
+ *
+ * Ein neuer Vermerk setzt die Merker der Einstellung und der Aufgabe zurueck
+ * (`ausgabenAnlegenIn`). Ohne Menge geschieht nichts.
+ */
+export async function ausgabenLoeschenIn(tx: Db, auftrag: AusgabenLoeschAuftrag): Promise<AusgabenLoeschErgebnis> {
+  const { jetzt } = auftrag;
+  const ids = [...new Set(auftrag.ausgaben.map((a) => a.id))].sort();
+  const ergebnis: AusgabenLoeschErgebnis = {
+    geloescht: 0,
+    rueckgabenGeleert: 0,
+    kommentareJeAustritt: {},
+    kommentareEinstellung: 0,
+    einstellungMerker: false,
+    austritteMerker: [],
+  };
+  if (ids.length === 0) return ergebnis;
+  const austritte = [...new Set(auftrag.austrittIds)].sort();
+
+  // 1. Aufgaben – Offboarding je Austritt (nach id), dann die Ausstattungsaufgaben.
+  for (const offboardingId of austritte) {
+    const r = await tx.offboardingChecklistItem.updateMany({
+      where: { offboardingId, ausgabeId: { in: ids }, abteilungKommentar: { not: null } },
+      data: { abteilungKommentar: null, abteilungKommentarAm: null },
+    });
+    ergebnis.kommentareJeAustritt[offboardingId] = r.count;
+  }
+  const aufgabenIds = [
+    ...new Set(auftrag.ausgaben.map((a) => a.checklistItemId).filter((id): id is string => !!id)),
+  ].sort();
+  if (aufgabenIds.length > 0) {
+    const bleibend = await tx.ausgabe.findMany({
+      where: { checklistItemId: { in: aufgabenIds }, id: { notIn: ids } },
+      select: { checklistItemId: true },
+    });
+    const mitRest = new Set(bleibend.map((a) => a.checklistItemId));
+    const ohneRest = aufgabenIds.filter((id) => !mitRest.has(id));
+    if (ohneRest.length > 0) {
+      const r = await tx.checklistItem.updateMany({
+        where: { id: { in: ohneRest }, abteilungKommentar: { not: null } },
+        data: { abteilungKommentar: null, abteilungKommentarAm: null },
+      });
+      ergebnis.kommentareEinstellung = r.count;
+    }
+    await tx.checklistItem.updateMany({
+      where: { id: { in: aufgabenIds } },
+      data: { ausgabenGeloeschtAm: jetzt },
+    });
+  }
+
+  // 2. Ausgaben – bedingt auf die Frist (Netz unter den Sperren).
+  const geloescht = await tx.ausgabe.deleteMany({ where: { id: { in: ids }, loeschenAb: { lte: jetzt } } });
+  if (geloescht.count !== ids.length) throw new AusgabenLoeschKonflikt();
+  ergebnis.geloescht = geloescht.count;
+
+  // 3. Rueckgaben – die Kopie der Kennung und der Zustandsnotizen.
+  const rueckgabeIds = [...new Set(auftrag.rueckgabeIds)].sort();
+  if (rueckgabeIds.length > 0) {
+    const r = await tx.returnItem.updateMany({
+      where: { id: { in: rueckgabeIds } },
+      data: { serialNumber: null, condition: null, notes: null },
+    });
+    ergebnis.rueckgabenGeleert = r.count;
+  }
+
+  // 4. Merker der Vorgaenge (beide schon gesperrt).
+  if (auftrag.onboardingId && (await tx.ausgabe.count({ where: { onboardingId: auftrag.onboardingId } })) === 0) {
+    await tx.onboardingProcess.updateMany({
+      where: { id: auftrag.onboardingId },
+      data: { ausgabenGeloeschtAm: jetzt },
+    });
+    ergebnis.einstellungMerker = true;
+  }
+  for (const offboardingId of austritte) {
+    const mitBezug = { offboardingId, ausgabeId: { not: null } };
+    const rest =
+      (await tx.returnItem.count({ where: mitBezug })) + (await tx.offboardingChecklistItem.count({ where: mitBezug }));
+    if (rest > 0) continue;
+    await tx.offboardingProcess.updateMany({ where: { id: offboardingId }, data: { ausgabenGeloeschtAm: jetzt } });
+    ergebnis.austritteMerker.push(offboardingId);
+  }
+  return ergebnis;
 }

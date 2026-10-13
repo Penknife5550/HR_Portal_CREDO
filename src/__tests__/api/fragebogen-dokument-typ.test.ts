@@ -53,6 +53,7 @@ jest.mock("fs/promises", () => ({
 }));
 
 import { PATCH, POST } from "@/app/api/fragebogen/[token]/documents/route";
+import { SELECTABLE_DOCUMENT_TYPES } from "@/lib/required-documents";
 import { NextRequest } from "next/server";
 
 /** Minimale, gueltige PDF-Datei — die Route prueft die Magic Bytes (%PDF). */
@@ -418,11 +419,15 @@ describe("Ablaufdatum nachtragen", () => {
     expect(mockPrisma.document.updateMany).not.toHaveBeenCalled();
   });
 
-  it("sucht das Dokument nur im eigenen Vorgang", async () => {
+  it("sucht das Dokument nur im eigenen Vorgang und nur unter den waehlbaren Typen", async () => {
+    // Seit A4 (G19) gehoert der Typfilter dazu: Ein Dokument, das nur HR
+    // ablegt (UEBERGABEPROTOKOLL), ist ueber den Link unbekannt
+    // (fragebogen-dokumente.test.ts).
     await patchFrist({ documentId: "doc-1", gueltigBis: ZUKUNFT });
     expect(mockPrisma.document.findFirst.mock.calls[0][0].where).toEqual({
       id: "doc-1",
       onboardingId: "onb-1",
+      type: { in: SELECTABLE_DOCUMENT_TYPES },
     });
   });
 

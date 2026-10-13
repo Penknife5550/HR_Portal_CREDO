@@ -2,7 +2,8 @@
  * Vorlagenbibliothek (E0) — einzelne Vorlage.
  *
  * GET    /api/brief-vorlagen/[id]   Detail (HR-Rollen)
- * PATCH  /api/brief-vorlagen/[id]   Metadaten aendern (SUPER_ADMIN + HR_LEITUNG)
+ * PATCH  /api/brief-vorlagen/[id]   Metadaten aendern (SUPER_ADMIN + HR_LEITUNG);
+ *                                    das Modul einer System-Vorlage ist fest (409)
  * DELETE /api/brief-vorlagen/[id]   Deaktivieren / Soft-Delete (SUPER_ADMIN + HR_LEITUNG)
  */
 
@@ -11,6 +12,7 @@ import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { ADMIN_ROLES, HR_EDIT_ROLES, canAccessOrg } from "@/lib/permissions";
 import { getClientIpOrNull } from "@/lib/rate-limit";
+import { SYSTEM_VORLAGE_MODUL_FEST, systemVorlageModulGesperrt } from "@/lib/brief-vorlagen-filter";
 import { updateTemplateSchema } from "@/lib/validations/brief-vorlagen";
 import type { UpdateTemplateInput } from "@/lib/validations/brief-vorlagen";
 
@@ -34,6 +36,7 @@ export const GET = apiHandler(
         platzhalter: true,
         organizationId: true,
         isActive: true,
+        isSystem: true,
         createdAt: true,
         updatedAt: true,
         organization: { select: { name: true, mandantNumber: true } },
@@ -74,13 +77,23 @@ export const PATCH = apiHandler<UpdateTemplateInput>(
     const { id } = params;
     const existing = await prisma.documentTemplate.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, isSystem: true, modul: true },
     });
     if (!existing) {
       return NextResponse.json(
         { error: "Vorlage nicht gefunden" },
         { status: 404 },
       );
+    }
+
+    // Das Modul einer System-Vorlage ist fest (Review A4d, G19): Der Seed-Check
+    // findet sie ueber `{ isSystem, modul, originalName }`, der Loeschlauf der
+    // Ausstattungsprotokolle ihre erzeugten Dokumente ueber das Modul. Ein
+    // umgestelltes Modul liesse beim naechsten Start eine zweite Zeile
+    // entstehen. 409 VOR jedem Schreiben; Name, Beschreibung, Aktiv-Schalter
+    // und Mandant bleiben pflegbar.
+    if (systemVorlageModulGesperrt(existing, body.modul)) {
+      return NextResponse.json({ error: SYSTEM_VORLAGE_MODUL_FEST }, { status: 409 });
     }
 
     if (body.organizationId) {
@@ -105,7 +118,9 @@ export const PATCH = apiHandler<UpdateTemplateInput>(
     const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description;
-    if (body.modul !== undefined) updateData.modul = body.modul;
+    // Bei einer System-Vorlage ist hier nur noch dasselbe Modul moeglich – das
+    // ist keine Aenderung und gehoert nicht ins Protokoll.
+    if (body.modul !== undefined && !existing.isSystem) updateData.modul = body.modul;
     if (body.organizationId !== undefined)
       updateData.organizationId = body.organizationId;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;

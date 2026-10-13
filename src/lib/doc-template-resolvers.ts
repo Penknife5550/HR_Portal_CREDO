@@ -6,7 +6,11 @@
  * werden im jeweiligen Modul-Resolver entschluesselt und ueber `sensitiveFields`
  * gemeldet, damit der Aufrufer einen Audit-Log-Eintrag schreiben kann.
  *
- * Manuelle Eingaben aus der UI ueberschreiben spaeter immer die Resolver-Werte.
+ * Manuelle Eingaben aus der UI ueberschreiben spaeter die Resolver-Werte —
+ * ausser Listen (Arrays, z.B. `ausgaben_je_stelle`): die ueberschreibt nie ein
+ * Handwert (`handwerteOhneListen`, placeholder-catalog.ts). Jedes innere Feld
+ * einer Liste ist gesetzt ("" statt fehlend), sonst griffe der Ausdrucks-
+ * Parser von docxtemplater auf einen gleichnamigen Wert der Person zurueck.
  *
  * Stand E0: nur der ALLGEMEIN-Resolver (Datum, Mandant, verantwortliche Stelle).
  * Modul-Resolver (z.B. BEM, Onboarding) werden in spaeteren Epics via
@@ -31,7 +35,15 @@ import {
 } from "@/lib/constants";
 import { formatDatumDE } from "@/lib/format";
 import { ausstattungListe } from "@/lib/ausstattung";
-import { rueckgabeOffen, rueckgabeZeileText } from "@/lib/ausgaben";
+import {
+  AUSGABE_AKTIV,
+  ausgabenPlatzhalter,
+  rueckgabeOffen,
+  rueckgabeZeileText,
+  rueckgabenJeStelle,
+} from "@/lib/ausgaben";
+import { empfaengerEinrichtung } from "@/lib/abteilungsaufgaben";
+import { stellenNamenLaden } from "@/lib/ausgaben-daten";
 
 export interface ResolverContext {
   organizationId?: string | null;
@@ -214,6 +226,7 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
       firstName: true,
       lastName: true,
       organizationId: true,
+      arbeitsortId: true,
       personalData: {
         select: {
           salutation: true, title: true, firstName: true, lastName: true,
@@ -243,6 +256,16 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
           departmentKey: true, art: true, bezeichnung: true, auswahl: true,
           reihenfolge: true, gestrichenAm: true,
         },
+      },
+      // Ausgaben je Stueck (A4, G19, 1.9): nur aktive, nur die Felder der
+      // Protokollzeile — nie Kommentare der Stelle oder `erfasstVonId`.
+      ausgaben: {
+        where: { zustand: { in: [...AUSGABE_AKTIV] } },
+        select: {
+          departmentKey: true, bezeichnung: true, kennung: true,
+          uebergebenAm: true, zustand: true, beiAustritt: true,
+        },
+        orderBy: [{ uebergebenAm: "asc" }, { createdAt: "asc" }],
       },
     },
   });
@@ -331,6 +354,22 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
   // Ausstattung & Zugaenge (E-A25): eine Zeile je gewaehlter, nicht gestrichener
   // Position; die Regel steht rein in ausstattung.ts. Nichts gewaehlt → kein Wert.
   set("ausstattung_liste", ausstattungListe(ob.ausstattung ?? []));
+
+  // Ausgaben je Stueck (A4, G19, Feinplan 1.9): Liste je ausgebender Stelle
+  // fuer das Uebergabeprotokoll (eine Seite je Stelle), dazu Zeilen und
+  // Anzahl. Die Liste steht immer (leer = Leersatz der Vorlage), damit kein
+  // Handwert sie ersetzt; `ausgaben_liste` wie jedes leere Feld nur mit Inhalt.
+  // Stellennamen wie auf der Karte: Empfaenger-Einrichtung des Vorgangs.
+  const ausgaben = ob.ausgaben ?? [];
+  const stellenNamen = await stellenNamenLaden(
+    prisma,
+    ausgaben.map((a) => a.departmentKey),
+    empfaengerEinrichtung(ob),
+  );
+  const ausgabenWerte = ausgabenPlatzhalter(ausgaben, stellenNamen);
+  data.ausgaben_je_stelle = ausgabenWerte.ausgaben_je_stelle;
+  set("ausgaben_liste", ausgabenWerte.ausgaben_liste);
+  data.ausgaben_anzahl = ausgabenWerte.ausgaben_anzahl;
 
   // Sensible Felder nur aufloesen/melden, wenn die Vorlage sie nutzt.
   const wants = (key: string): boolean =>
@@ -538,6 +577,7 @@ const offboardingResolver: PlaceholderResolver = async (ctx) => {
     select: {
       displayId: true,
       organizationId: true,
+      arbeitsortId: true,
       employeeEmail: true,
       employeeFirstName: true,
       employeeLastName: true,
@@ -573,8 +613,14 @@ const offboardingResolver: PlaceholderResolver = async (ctx) => {
           status: true, finalizedAt: true, supervisorName: true,
         },
       },
+      // Nie `condition` oder `notes` (Freitext): weder in den Listen noch im
+      // Protokoll. Die Stelle einer vorgeschlagenen Zeile kommt aus ihrer
+      // Ausgabe (A4, 1.9); von HR erfasste Zeilen haben keine.
       returnItems: {
-        select: { category: true, itemName: true, serialNumber: true, isReturned: true, returnedAt: true, zustand: true },
+        select: {
+          category: true, itemName: true, serialNumber: true, isReturned: true,
+          returnedAt: true, zustand: true, ausgabe: { select: { departmentKey: true } },
+        },
       },
     },
   });
@@ -677,8 +723,8 @@ const offboardingResolver: PlaceholderResolver = async (ctx) => {
   }
 
   // Rueckgaben als mehrzeilige Zeichenkette: renderDocx laeuft mit
-  // linebreaks: true, Umbrueche kommen also im Word an. Ein Schleifen-Konstrukt
-  // kennen weder der Editor noch PlaceholderDef. ReturnItem hat kein
+  // linebreaks: true, Umbrueche kommen also im Word an. Die Liste je Stelle
+  // (Schleife, `rueckgaben_je_stelle`) steht weiter unten. ReturnItem hat kein
   // orderIndex, deshalb explizit sortieren.
   //
   // Seit A4 (G16, 1.9): „offen“ heisst ohne Zustand (`rueckgabeOffen`), und
@@ -702,6 +748,19 @@ const offboardingResolver: PlaceholderResolver = async (ctx) => {
     set("rueckgaben_offen_liste", offen.map((i) => rueckgabeZeileText(i)).join("\n"));
     set("rueckgaben_offen_anzahl", String(offen.length));
   }
+
+  // Je zustaendiger Stelle fuer das Rueckgabeprotokoll (A4, G19, 1.9): eine
+  // Seite je Stelle, von HR erfasste Zeilen unter „Personalabteilung“, offene
+  // mit leerem Zustand. Die Liste steht immer (leer = Leersatz der Vorlage),
+  // damit kein Handwert sie ersetzt. Stellennamen wie im Reiter Rueckgaben:
+  // Empfaenger-Einrichtung des Austritts.
+  const rueckgabeZeilen = sortiert.map((i) => ({ ...i, departmentKey: i.ausgabe?.departmentKey ?? null }));
+  const rueckgabeStellenNamen = await stellenNamenLaden(
+    prisma,
+    rueckgabeZeilen.map((z) => z.departmentKey),
+    empfaengerEinrichtung(off),
+  );
+  data.rueckgaben_je_stelle = rueckgabenJeStelle(rueckgabeZeilen, rueckgabeStellenNamen);
 
   // Sensibles Feld nur aufloesen und melden, wenn die Vorlage es nutzt.
   // Die Abfindung ist ein Freitext und wird UNVERAENDERT uebernommen.
